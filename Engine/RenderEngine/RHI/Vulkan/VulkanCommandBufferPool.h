@@ -2,22 +2,22 @@
 #include "VulkanLoader.h"
 #include "../RHIParallelCommandPool.h"
 
-#include <condition_variable>
 #include <atomic>
 #include <memory>
-#include <mutex>
-#include <thread>
 #include <vector>
 
 class VulkanDeviceResources;
 class VulkanEncoder;
 
-/// 워커마다 독립 VkCommandPool/VkCommandBuffer를 소유하는 G-3 Vulkan 구현.
+/// 기록 구간마다 독립 VkCommandPool/VkCommandBuffer를 소유한다. 물리 스레드는
+/// 공용 job_scheduler가 소유하며, 구간 번호와 물리 워커 번호는 독립적이다.
 /// Vulkan command pool의 host access는 externally synchronized이므로 한 worker가
 /// 자기 pool만 기록하고 owner thread가 worker 실행 전후에 reset/end한다.
 class VulkanCommandBufferPool final : public IRHIParallelCommandPool
 {
 public:
+    explicit VulkanCommandBufferPool(job_scheduler& scheduler = ce::get_job_scheduler())
+        : IRHIParallelCommandPool(scheduler) {}
     ~VulkanCommandBufferPool() override { Shutdown(); }
 
     bool Initialize(VulkanDeviceResources& resources, uint32_t workerCount,
@@ -33,8 +33,6 @@ public:
     bool CloseAll(std::string& outError) override;
     uint32_t DrainEncoderDrops(std::string& outLast) override;
     bool HasRecorded(uint32_t worker) const override;
-    void RunParallel(const std::function<void(uint32_t)>& job,
-        uint32_t workerCount) override;
     uint32_t GetEncoderUnimplementedCount() const
     {
         return m_encoderUnimplemented.load(std::memory_order_relaxed);
@@ -53,7 +51,6 @@ private:
         bool opened{ false };
     };
 
-    void WorkerLoop(uint32_t worker);
     void RetireEncoder(Slot& slot);
     uint32_t GetCurrentFrameSlot() const override { return m_frameIndex; }
     bool PrepareRecordedCommands(uint32_t frameSlot,
@@ -68,16 +65,6 @@ private:
     uint32_t m_workerCount{ 0 };
     uint32_t m_frameCount{ 0 };
     uint32_t m_frameIndex{ 0 };
-
-    std::vector<std::thread> m_threads;
-    std::mutex m_mutex;
-    std::condition_variable m_wakeSignal;
-    std::condition_variable m_doneSignal;
-    const std::function<void(uint32_t)>* m_job{ nullptr };
-    uint32_t m_jobWorkerCount{ 0 };
-    uint64_t m_generation{ 0 };
-    uint32_t m_pending{ 0 };
-    bool m_stopping{ false };
 
     std::atomic<uint32_t> m_encoderUnimplemented{ 0 };
     std::atomic<const char*> m_lastUnimplemented{ nullptr };

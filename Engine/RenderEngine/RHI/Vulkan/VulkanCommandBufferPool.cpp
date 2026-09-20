@@ -57,66 +57,7 @@ bool VulkanCommandBufferPool::Initialize(VulkanDeviceResources& resources,
         }
     }
 
-    m_stopping = false;
-    m_threads.reserve(workerCount - 1);
-    for (uint32_t worker = 1; worker < workerCount; ++worker)
-        m_threads.emplace_back(&VulkanCommandBufferPool::WorkerLoop, this, worker);
     return true;
-}
-
-void VulkanCommandBufferPool::WorkerLoop(uint32_t worker)
-{
-    uint64_t seen = 0;
-    for (;;)
-    {
-        const std::function<void(uint32_t)>* job = nullptr;
-        {
-            std::unique_lock lock(m_mutex);
-            m_wakeSignal.wait(lock, [&]
-            {
-                return m_stopping || (m_generation != seen && worker < m_jobWorkerCount);
-            });
-            if (m_stopping) return;
-            seen = m_generation;
-            job = m_job;
-        }
-
-        if (nullptr != job) (*job)(worker);
-
-        {
-            std::lock_guard guard(m_mutex);
-            if (0 != m_pending && 0 == --m_pending) m_doneSignal.notify_one();
-        }
-    }
-}
-
-void VulkanCommandBufferPool::RunParallel(
-    const std::function<void(uint32_t)>& job, uint32_t workerCount)
-{
-    if (0 == workerCount) return;
-    workerCount = (std::min)(workerCount, m_workerCount);
-    if (1 == workerCount || m_threads.empty())
-    {
-        job(0);
-        return;
-    }
-
-    {
-        std::lock_guard guard(m_mutex);
-        m_job = &job;
-        m_jobWorkerCount = workerCount;
-        m_pending = workerCount - 1;
-        ++m_generation;
-    }
-    m_wakeSignal.notify_all();
-    job(0);
-
-    {
-        std::unique_lock lock(m_mutex);
-        m_doneSignal.wait(lock, [&] { return 0 == m_pending; });
-        m_job = nullptr;
-        m_jobWorkerCount = 0;
-    }
 }
 
 void VulkanCommandBufferPool::RetireEncoder(Slot& slot)
@@ -134,19 +75,7 @@ void VulkanCommandBufferPool::RetireEncoder(Slot& slot)
 
 void VulkanCommandBufferPool::Shutdown()
 {
-    if (!m_threads.empty())
-    {
-        {
-            std::lock_guard guard(m_mutex);
-            m_stopping = true;
-            ++m_generation;
-        }
-        m_wakeSignal.notify_all();
-        for (std::thread& thread : m_threads)
-            if (thread.joinable()) thread.join();
-        m_threads.clear();
-    }
-
+    // CPU 기록은 owner의 RunParallel 반환으로 끝났다. GPU/제출 drain은 호출부가 맡는다.
     for (auto& frame : m_slots)
     {
         for (Slot& slot : frame)
@@ -244,6 +173,7 @@ uint32_t VulkanCommandBufferPool::DrainEncoderDrops(std::string& outLast)
 
 bool VulkanCommandBufferPool::CloseAll(std::string& outError)
 {
+    if (m_slots.empty()) return true;
     for (Slot& slot : m_slots[m_frameIndex])
     {
         if (!slot.opened) continue;

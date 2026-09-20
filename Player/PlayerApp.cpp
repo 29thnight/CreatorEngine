@@ -171,6 +171,10 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 			{
 				Player::g_smoke.frameLimit = wcstoull(argv[i + 1], nullptr, 10);
 			}
+			else if (0 == wcscmp(argv[i], L"--smoke-reload"))
+			{
+				Player::g_smoke.reloadScene = true;
+			}
 			else if (0 == wcscmp(argv[i], L"--command-service"))
 			{
 				// PHASE 14.5 LC8 — 기본 off. 켜는 것은 이 플래그뿐이다(§8 · §11.2).

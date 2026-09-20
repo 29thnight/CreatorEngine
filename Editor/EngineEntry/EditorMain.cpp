@@ -464,6 +464,7 @@ void Editor::EditorMain::Finalize()
 	//   없으면 어디까지 갔는지조차 알 수 없다.
 	std::printf("[SHUTDOWN] ClrHost 진입\n");
 	SceneManagers->SetDecommissioning();
+	SceneManagers->DrainSceneLoads();
 	SceneManagers->DrainAIUpdates();
 	ClrHost::Get().Shutdown();
 	std::printf("[SHUTDOWN] ClrHost 반환\n");

@@ -1708,29 +1708,29 @@ file::path DataSystem::GetFilePath(FileGuid fileguid) const
 	return m_assetMetaRegistry ? m_assetMetaRegistry->GetPath(fileguid) : file::path{};
 }
 
-AssetBundleLoadResult DataSystem::LoadAssetBundle(const AssetBundle& bundle)
+namespace
 {
-	// Independent of the scheduler's bookkeeping. Shared lifetime also makes a
-	// broken/omitted barrier diagnosable without a dangling stack counter.
-	auto completed = std::make_shared<std::atomic<std::size_t>>(0);
+job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
+    std::shared_ptr<std::atomic<std::size_t>> completed = {})
+{
 	job_group jobs;
 	for (const auto& entry : bundle.assets)
 	{
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
 		file::path name = entry.assetName;
 
-		jobs.add([this, type, name, completed]
+		jobs.add([&data, type, name, completed]
 		{
 			switch (type)
 			{
 			case ManagedAssetType::Model:
-				(void)LoadModelAssetGenerationByPath(name.string());
+				(void)data.LoadModelAssetGenerationByPath(name.string());
 				break;
 			case ManagedAssetType::Material:
-				LoadMaterial(name.string());
+				data.LoadMaterial(name.string());
 				break;
 			case ManagedAssetType::Texture:
-				LoadTexture(name.string());
+				data.LoadTexture(name.string());
 				break;
 			case ManagedAssetType::SpriteFont:
 				// 폰트 로딩은 D4에서 은퇴했다(DX11 SpriteFont). 번들에 옛
@@ -1740,12 +1740,24 @@ AssetBundleLoadResult DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 			default:
 				break;
 			}
-			completed->fetch_add(1, std::memory_order_release);
+			if (completed) completed->fetch_add(1, std::memory_order_release);
 		});
 	}
 
-	ce::get_job_scheduler().submit(std::move(jobs)).wait();
-	return {bundle.assets.size(), completed->load(std::memory_order_acquire)};
+    return jobs;
+}
+}
+
+AssetBundleLoadResult DataSystem::LoadAssetBundle(const AssetBundle& bundle)
+{
+    auto completed = std::make_shared<std::atomic<std::size_t>>(0);
+    ce::get_job_scheduler().submit(MakeAssetBundleJobs(*this, bundle, completed)).wait();
+    return {bundle.assets.size(), completed->load(std::memory_order_acquire)};
+}
+
+job_handle DataSystem::LoadAssetBundleAsync(const AssetBundle& bundle)
+{
+    return ce::get_job_scheduler().submit(MakeAssetBundleJobs(*this, bundle));
 }
 
 void DataSystem::RetainAssets(const AssetBundle& bundle)

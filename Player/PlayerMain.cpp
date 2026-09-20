@@ -460,6 +460,7 @@ void Player::PlayerMain::Finalize()
 	// 순서는 에디터 종료가 실측으로 다듬은 그대로다: 관리 측 → 표시/렌더
 	// 소비자 join → 씬 해체 → 렌더러. 새 frame 발행은 메인 루프 종료와 함께 끝났다.
 	SceneManagers->SetDecommissioning();
+	SceneManagers->DrainSceneLoads();
 	SceneManagers->DrainAIUpdates();
 	ClrHost::Get().Shutdown();
 
@@ -556,6 +557,46 @@ void Player::PlayerMain::Update()
 			gameDisplay.promotionCount >= 2 && 0 != slotMask &&
 			0 != (slotMask & (slotMask - 1u));
 		if (!displayRotated) return;
+
+        // Optional packaged-host regression: prepare through engine jobs, activate
+        // at the normal owner boundary, then require a displayed post-load frame.
+        if (g_smoke.reloadScene)
+        {
+            if (!m_smokeReloadStarted)
+            {
+                auto path = PathFinder::Relative("Scenes");
+                path.append(RuntimeSettings::Get().GetStartupSceneName());
+                m_smokeReload = SceneManagers->LoadSceneAsync(path.string());
+                m_smokeReloadStarted = true;
+                return;
+            }
+            if (m_smokeReload.valid())
+            {
+                if (m_smokeReload.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
+                    return;
+                m_smokeReloadScene = m_smokeReload.get();
+                if (!m_smokeReloadScene)
+                {
+                    std::printf("[player.smoke.reload] FAILED scene preparation\n");
+                    EngineBootstrap::SetExitCode(4);
+                    PostMessage(handle, WM_CLOSE, 0, 0);
+                    return;
+                }
+                SceneManagers->ActivateScene(m_smokeReloadScene);
+                return;
+            }
+            if (SceneManagers->GetActiveScene() != m_smokeReloadScene) return;
+            if (!m_smokeReloadActivated)
+            {
+                m_smokeReloadActivated = true;
+                m_smokeReloadPublishedFrame = renderState.publishedFrameId;
+                return;
+            }
+            if (gameDisplay.completedFrameId <= m_smokeReloadPublishedFrame) return;
+            std::printf("[player.smoke.reload] activated=true gameStart=%s pending=%s displayedAfterActivation=true\n",
+                SceneManagers->IsGameStart() ? "true" : "false",
+                SceneManagers->IsSceneLoading() ? "true" : "false");
+        }
 
 		// 파이프라인 구성을 남긴다 (E4 게이트).
 		//

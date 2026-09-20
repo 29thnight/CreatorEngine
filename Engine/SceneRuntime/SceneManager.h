@@ -10,6 +10,8 @@
 #include "GameObjectIndex.h"
 #include "DetachedEntityTransfer.h"
 #include "ScenePhase.h"
+#include <future>
+#include <thread>
 
 class Scene;
 class Entity;
@@ -80,6 +82,8 @@ public:
     void Decommissioning();
     // Main-thread teardown boundary, before managed script state is released.
     void DrainAIUpdates();
+    // Cancel and drain owned loads before CLR/DataSystem/common workers are torn down.
+    void DrainSceneLoads();
     void SetDecommissioning();
     bool IsDecommissioning() const { return m_exitCommand; }
 
@@ -92,11 +96,17 @@ public:
 	Scene* LoadScene(std::string_view name = "SampleScene");
 
 	void SaveSceneAsync(std::string_view name = "SampleScene");
+    // Owner thread only. Parsing/assets use engine jobs; entities are constructed at
+    // ApplyPendingSceneStructureChange or WaitForSceneLoad (scene structure boundary).
+    // future is only a result channel: do not block the owner with get() before pumping.
+    // SceneManager owns successful results, including an abandoned future. Failure or
+    // cancellation yields nullptr. Callback requests replace earlier pending callbacks.
 	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
     void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
     void ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete = true);
 	void BeforeAwakeSceneLoad();
 	bool IsSceneLoading() const;
+    // Blocks for preparation and constructs results; activation remains frame-boundary work.
     void WaitForSceneLoad();
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
@@ -202,9 +212,19 @@ public:
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
 
-    std::future<Scene*>                 m_loadingSceneFuture;
     InputActionManager*                 m_inputActionManager{ nullptr };
 private:
+    struct PendingSceneLoad;
+    std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate);
+    void CompleteSceneLoads(bool wait);
+    Scene* BuildPreparedScene(const PendingSceneLoad& load);
+    void RequireSceneLoadOwner() const;
+    std::thread::id m_sceneLoadOwner{std::this_thread::get_id()};
+    std::vector<std::shared_ptr<PendingSceneLoad>> m_pendingSceneLoads;
+    std::atomic_size_t m_pendingSceneLoadCount{0};
+    size_t m_sceneLoadEpoch = 0;
+    Scene* m_asyncSceneToActivate = nullptr;
+
     // Edit→Play→Stop transaction. 위의 primitive들을 조립한다. Editor 정책(Undo)은
     // E3-2 가 EditorPlayModeController 로 들어냈고, 선택 해제는 안전장치라 남는다.
     //

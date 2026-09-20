@@ -21,6 +21,7 @@
 #include "Render/Passes/UI/EnhancedUIPass.h"
 #include "RHI/DX12/DX12GpuProfiler.h"
 #include "RHI/DX12/DX12CommandListPool.h"
+#include "RHI/ParallelRecordingJobsSelfTest.h"
 #include "RHI/DX12/DX12MeshCache.h"
 #include "RHI/DX12/DX12PersistentHeap.h"
 #include "RHI/DX12/DX12TextureCache.h"
@@ -52,6 +53,8 @@
 #include "Mesh.h"
 
 #include <DirectXTex.h>
+#include "JobScheduler.h"
+#include <condition_variable>
 #include <atomic>
 #include <array>
 #include <vector>
@@ -1098,6 +1101,209 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
     return true;
 }
 
+namespace
+{
+    // Occupy a real scheduler worker so queued-input lifetime and drain are deterministic.
+    class PsoWorkerGate
+    {
+    public:
+        explicit PsoWorkerGate(job_scheduler& scheduler)
+        {
+            m_job = scheduler.submit([this]
+            {
+                std::unique_lock lock(m_mutex);
+                m_entered = true;
+                m_condition.notify_all();
+                m_condition.wait(lock, [this] { return m_released; });
+            });
+        }
+        ~PsoWorkerGate()
+        {
+            Release();
+            m_job.wait();
+        }
+        bool WaitUntilEntered()
+        {
+            std::unique_lock lock(m_mutex);
+            return m_condition.wait_for(lock, std::chrono::seconds(10), [this] { return m_entered; });
+        }
+        void Release()
+        {
+            std::lock_guard lock(m_mutex);
+            m_released = true;
+            m_condition.notify_all();
+        }
+
+    private:
+        std::mutex m_mutex;
+        std::condition_variable m_condition;
+        bool m_entered{}, m_released{};
+        job_handle m_job;
+    };
+
+    bool VerifyPsoJobs(DX12DeviceResources& resources, const RHIGraphicsPipelineDesc& base,
+        std::string& outLog)
+    {
+        thread_pool pool;
+        job_scheduler scheduler(pool);
+        DX12PSOManager manager(scheduler);
+        std::string error;
+        if (!manager.Initialize(&resources, L"", error))
+        {
+            outLog += "PSO jobs initialization failed: " + error + "\n";
+            return false;
+        }
+        using State = DX12PSOManager::RequestState;
+        ID3D12PipelineState* result = nullptr;
+        if (manager.Request(base, &result) != State::Failed || result
+            || manager.GetStats().m_asyncSubmissions != 0)
+        {
+            outLog += "Stopped scheduler accepted a PSO request\n";
+            return false;
+        }
+        scheduler.start(1);
+        {
+            PsoWorkerGate gate(scheduler);
+            if (!gate.WaitUntilEntered()) return false;
+            const auto* vs = static_cast<const std::uint8_t*>(base.vsBytecode);
+            const auto* ps = static_cast<const std::uint8_t*>(base.psBytecode);
+            std::vector<std::uint8_t> ownedVs(vs, vs + base.vsSize);
+            std::vector<std::uint8_t> ownedPs(ps, ps + base.psSize);
+            RHIGraphicsPipelineDesc temporary = base;
+            temporary.vsBytecode = ownedVs.data();
+            temporary.psBytecode = ownedPs.data();
+            for (int i = 0; i < 8; ++i)
+            {
+                if (manager.Request(temporary, &result) != State::Pending || result) return false;
+            }
+            if (manager.GetStats().m_asyncSubmissions != 1
+                || manager.GetStats().m_asyncWorkerExecutions != 0)
+            {
+                outLog += "PSO request duplicated work or bypassed the occupied scheduler\n";
+                return false;
+            }
+            std::fill(ownedVs.begin(), ownedVs.end(), 0);
+            std::fill(ownedPs.begin(), ownedPs.end(), 0);
+            // Both source arrays die before the queued compile starts.
+        }
+        auto waitReady = [&](const RHIGraphicsPipelineDesc& desc)
+        {
+            for (int i = 0; i < 1000; ++i)
+            {
+                const auto state = manager.Request(desc, &result);
+                if (state == State::Ready) return result != nullptr;
+                if (state == State::Failed) return false;
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+            return false;
+        };
+        if (!waitReady(base))
+        {
+            outLog += "Queued PSO did not retain shader bytes\n";
+            return false;
+        }
+        const auto ready = manager.GetStats();
+        if (ready.m_asyncSubmissions != 1 || ready.m_asyncWorkerExecutions != 1
+            || ready.compiles + ready.libraryHits != 1 || ready.failures != 1) return false;
+
+        // A driver compile failure must become Failed, preserve existing cache entries,
+        // and leave neither an exception nor a permanently pending result for the caller.
+        const std::array<std::uint8_t, 16> invalidBytecode{};
+        RHIGraphicsPipelineDesc invalid = base;
+        invalid.psBytecode = invalidBytecode.data();
+        invalid.psSize = invalidBytecode.size();
+        if (manager.Request(invalid, &result) != State::Pending) return false;
+        State failed = State::Pending;
+        for (int i = 0; i < 1000 && failed == State::Pending; ++i)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            failed = manager.Request(invalid, &result);
+        }
+        if (failed != State::Failed || result || manager.GetStats().failures != ready.failures + 1
+            || !waitReady(base))
+        {
+            outLog += "Failed PSO compile lost its result or damaged a cached pipeline\n";
+            return false;
+        }
+
+        RHIGraphicsPipelineDesc variant = base;
+        variant.blendEnable = !base.blendEnable;
+        auto drainQueued = [&](bool shutdown)
+        {
+            PsoWorkerGate gate(scheduler);
+            if (!gate.WaitUntilEntered()) return false;
+            const auto before = manager.GetStats();
+            if (manager.Request(variant, &result) != State::Pending) return false;
+            std::atomic<bool> rejectedDuringDrain{ false };
+            std::jthread release([&]
+            {
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+                while (std::chrono::steady_clock::now() < deadline)
+                {
+                    if (manager.Request(variant, nullptr) == State::Failed)
+                    {
+                        rejectedDuringDrain = true;
+                        break;
+                    }
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+                gate.Release();
+            });
+            if (shutdown) manager.Shutdown();
+            else manager.InvalidatePipelines();
+            release.join();
+            const auto after = manager.GetStats();
+            if (!rejectedDuringDrain || after.m_asyncSubmissions != before.m_asyncSubmissions + 1
+                || after.m_asyncWorkerExecutions != before.m_asyncWorkerExecutions + 1) return false;
+            const auto next = manager.Request(variant, &result);
+            return shutdown ? next == State::Failed && !result
+                            : next == State::Pending && !result && waitReady(variant);
+        };
+        if (!drainQueued(false))
+        {
+            outLog += "PSO invalidation did not drain/reject/discard/reopen correctly\n";
+            return false;
+        }
+        variant.cullMode = RHICullMode::Front;
+        if (!drainQueued(true))
+        {
+            outLog += "PSO shutdown did not drain or kept admitting work\n";
+            return false;
+        }
+        if (!scheduler.is_running()) return false;
+        scheduler.shutdown();
+
+        // A cache drains only its own jobs. An unrelated blocked job stays outstanding.
+        scheduler.start(2);
+        if (!manager.Initialize(&resources, L"", error)) return false;
+        {
+            PsoWorkerGate unrelated(scheduler);
+            if (!unrelated.WaitUntilEntered()) return false;
+            if (manager.Request(base, &result) != State::Pending || !waitReady(base)) return false;
+            std::atomic<bool> finished{ false }, timedOut{ false };
+            std::jthread watchdog([&]
+            {
+                const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+                while (!finished && std::chrono::steady_clock::now() < deadline)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                if (!finished) timedOut = true;
+                unrelated.Release();
+            });
+            manager.Shutdown();
+            finished = true;
+            watchdog.join();
+            if (timedOut || !scheduler.is_running())
+            {
+                outLog += "PSO cache waited for unrelated work or stopped the engine scheduler\n";
+                return false;
+            }
+        }
+        outLog += "PSO jobs: stopped rejection, owned bytes, duplicate coalescing, worker execution, "
+            "compile failure, invalidation/shutdown drain, admission closure, reopen and independent wait passed\n";
+        return true;
+    }
+}
+
 bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& outLog)
 {
     using Microsoft::WRL::ComPtr;
@@ -1197,6 +1403,8 @@ bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& ou
     base.psBytecode = psBlob.Data();
     base.psSize = psBlob.Size();
     base.layout = emptyRoot;
+
+    if (!VerifyPsoJobs(resources, base, outLog)) return false;
 
     RHIGraphicsPipelineDesc variants[3] = { base, base, base };
     variants[1].cullMode = RHICullMode::Back;
@@ -5203,7 +5411,9 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         }
     }
 
-    DX12CommandListPool pool;
+    thread_pool recordingWorkers;
+    job_scheduler recordingScheduler(recordingWorkers);
+    DX12CommandListPool pool(recordingScheduler);
     if (!pool.Initialize(resources, 4, DX12DeviceResources::kFrameCount, error))
     {
         outLog += "[3/4] 커맨드 리스트 풀 초기화 실패: " + error + "\n";
@@ -5211,12 +5421,22 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         return false;
     }
 
+    if (!VerifyParallelRecordingJobs(pool, resources, recordingScheduler, outLog))
+    {
+        pool.Shutdown();
+        resources.Shutdown();
+        return false;
+    }
+    uint32_t recordingFrame = 0;
+    std::atomic<uint32_t> callerRecordings{ 0 };
+
     // 순차/병렬을 같은 코드로 돌린다. 그래야 차이가 '병렬이라서'로 좁혀진다.
     const auto renderOnce = [&](uint32_t workers, std::vector<uint8_t>& outPixels,
         EnhancedRenderGraph::Stats& outStats, std::string& outStepError) -> bool
     {
         if (!resources.BeginFrame(outStepError)) return false;
-        pool.BeginFrame(0);
+        const uint32_t frameSlot = recordingFrame++ % DX12DeviceResources::kFrameCount;
+        pool.BeginFrame(frameSlot);
 
         EnhancedRenderGraph graph(resources);
 
@@ -5249,6 +5469,7 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
                 { { target, RHIResourceState::RenderTarget } },
                 [&, i](const EnhancedRenderGraph::ExecuteContext& executeContext)
                 {
+                    if (!thread_pool::is_worker_thread()) ++callerRecordings;
                     // 손으로 만든 RTV 힙이 사라졌다(V2-d). 띠 클리어가 원시
                     // 커맨드 리스트를 쓰던 유일한 이유였고, 이제 인코더가
                     // rect 클리어를 안다.
@@ -5287,8 +5508,8 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         }
         // batch가 mutable current slot을 다시 읽지 않는지 확인한다. 기록은 slot 0,
         // 제출 직전 pool current는 slot 1로 바꾼다. 잘못 구현하면 빈 slot 1이 제출된다.
-        pool.BeginFrame(1);
-        if (0 != batch.GetFrameSlot()) return false;
+        pool.BeginFrame((frameSlot + 1) % DX12DeviceResources::kFrameCount);
+        if (frameSlot != batch.GetFrameSlot()) return false;
         RHISubmissionTicket batchTicket;
         if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
             resources, std::move(batch), batchTicket, outStepError)) return false;
@@ -5326,7 +5547,26 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         return false;
     }
 
-    size_t differing = 0;
+    recordingScheduler.shutdown();
+    recordingScheduler.start(4);
+    bool repeatedPixels = true;
+    for (uint32_t iteration = 0; iteration < DX12DeviceResources::kFrameCount * 2; ++iteration)
+    {
+        std::vector<uint8_t> repeated;
+        EnhancedRenderGraph::Stats repeatedStats{};
+        if (!renderOnce(4, repeated, repeatedStats, error) || repeated != sequential ||
+            4 != repeatedStats.recordedLists)
+        {
+            repeatedPixels = false;
+            outLog += "[jobs] repeated frame failed: " + error + "\n";
+            break;
+        }
+    }
+    passed = passed && repeatedPixels && 0 == callerRecordings;
+    outLog += "[jobs] physical workers=1/4, logical lanes=4, frame slot reuse pixel parity: "
+        + std::string(repeatedPixels && 0 == callerRecordings ? "passed\n" : "failed\n");
+
+    size_t differing = sequential.size() == parallel.size() ? 0 : 1;
     for (size_t i = 0; i < sequential.size() && i < parallel.size(); ++i)
     {
         if (sequential[i] != parallel[i]) ++differing;
@@ -5404,6 +5644,9 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
     }
 
     pool.Shutdown();
+    bool schedulerAlive = false;
+    recordingScheduler.submit([&] { schedulerAlive = true; }).wait();
+    passed = passed && schedulerAlive;
     resources.Shutdown();
 
     outLog += passed ? "병렬 기록 검증 통과\n" : "병렬 기록 검증 실패\n";

@@ -1,4 +1,5 @@
 #include "../VulkanSelfTest.h"
+#include "RHI/ParallelRecordingJobsSelfTest.h"
 #include "RHI/Vulkan/VulkanCommandBufferPool.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/RHISubmissionThread.h"
@@ -33,13 +34,24 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
         return false;
     }
 
-    VulkanCommandBufferPool pool;
+    thread_pool recordingWorkers;
+    job_scheduler recordingScheduler(recordingWorkers);
+    VulkanCommandBufferPool pool(recordingScheduler);
     if (!pool.Initialize(resources, 4, VulkanDeviceResources::kFrameCount, error))
     {
         outLog += "[1/4] 병렬 command pool 초기화 실패: " + error + "\n";
         resources.Shutdown();
         return false;
     }
+
+    if (!VerifyParallelRecordingJobs(pool, resources, recordingScheduler, outLog))
+    {
+        pool.Shutdown();
+        resources.Shutdown();
+        return false;
+    }
+    uint32_t recordingFrame = 0;
+    std::atomic<uint32_t> callerRecordings{ 0 };
 
     RHIReadback readback{};
     if (!resources.CreateReadback(kParallelWidth, kParallelHeight,
@@ -56,7 +68,8 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
         EnhancedRenderGraph::Stats& outStats) -> bool
     {
         if (!resources.BeginFrame(error)) return false;
-        if (parallel) pool.BeginFrame(0);
+        const uint32_t frameSlot = recordingFrame++ % VulkanDeviceResources::kFrameCount;
+        if (parallel) pool.BeginFrame(frameSlot);
 
         EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
         graph.SetParallelRecordCostThreshold(0);
@@ -75,6 +88,7 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
                 { { target, RHIResourceState::RenderTarget } },
                 [&, passIndex](const EnhancedRenderGraph::ExecuteContext& context)
                 {
+                    if (parallel && !thread_pool::is_worker_thread()) ++callerRecordings;
                     const RHITextureHandle color = context.ResolveHandle(target);
                     const RHIRenderTargetBinding binding =
                         resources.CreateRenderTargets({ &color, 1 });
@@ -112,10 +126,10 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
             batchContract = recorded && batch.IsReadyForSubmit() &&
                 17 == batch.GetFrameId() &&
                 batchDesc.backendGeneration == batch.GetBackendGeneration() &&
-                29 == batch.GetDisplayToken() && 0 == batch.GetFrameSlot() &&
+                29 == batch.GetDisplayToken() && frameSlot == batch.GetFrameSlot() &&
                 batch.HasLifetimeToken() && !batch.GetCompletionPoint().IsValid();
             // 제출 직전 current slot을 바꿔도 batch는 기록 당시 slot 0을 써야 한다.
-            if (recorded) pool.BeginFrame(1);
+            if (recorded) pool.BeginFrame((frameSlot + 1) % VulkanDeviceResources::kFrameCount);
             if (recorded) recorded = GetRHISubmissionThread().EnqueueRecordedBatch(
                 &resources, resources, std::move(batch), batchTicket, error);
             batchContract = batchContract && recorded;
@@ -194,6 +208,24 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
         + std::to_string(parallelStats.recordedLists) + " · unit "
         + std::to_string(parallelStats.recordUnits) + ")\n";
 
+    recordingScheduler.shutdown();
+    recordingScheduler.start(4);
+    bool repeatedPixels = true;
+    for (uint32_t iteration = 0; iteration < VulkanDeviceResources::kFrameCount * 2; ++iteration)
+    {
+        RHIReadbackImage repeated{};
+        EnhancedRenderGraph::Stats repeatedStats{};
+        if (!renderOnce(true, repeated, repeatedStats) || repeated.data != sequential.data ||
+            4 != repeatedStats.recordedLists)
+        {
+            repeatedPixels = false;
+            outLog += "[jobs] repeated frame failed: " + error + "\n";
+            break;
+        }
+    }
+    outLog += "[jobs] physical workers=1/4, logical lanes=4, frame slot reuse pixel parity: "
+        + std::string(repeatedPixels && 0 == callerRecordings ? "passed\n" : "failed\n");
+
     const bool sameShape = sequential.width == parallel.width &&
         sequential.height == parallel.height && sequential.rowPitch == parallel.rowPitch &&
         sequential.data.size() == parallel.data.size();
@@ -211,7 +243,8 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
         resources.GetEncoderUnimplementedCount() + pool.GetEncoderUnimplementedCount();
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);
-    bool passed = samePixels && expectedColor && parallelShape &&
+    bool passed = samePixels && expectedColor && parallelShape && repeatedPixels &&
+        0 == callerRecordings &&
         0 == stubs && 0 == problems;
 
     outLog += "[4/4] 순차/병렬 픽셀 " + std::string(samePixels ? "일치" : "불일치")
@@ -223,6 +256,9 @@ bool RunVulkanParallelRecordingTest(std::string& outLog)
     resources.WaitForGpu();
     resources.ReleaseReadback(readback);
     pool.Shutdown();
+    bool schedulerAlive = false;
+    recordingScheduler.submit([&] { schedulerAlive = true; }).wait();
+    passed = passed && schedulerAlive;
     resources.Shutdown();
     const RHISubmissionOwnerStats shutdownOwner =
         GetRHISubmissionThread().GetOwnerStats(&resources);

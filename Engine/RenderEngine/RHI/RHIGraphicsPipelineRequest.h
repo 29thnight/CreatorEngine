@@ -40,6 +40,20 @@ public:
         return *this;
     }
 
+    // Capture inputs without compiling; deferred backends retain this request until completion.
+    bool Prepare(const RHIGraphicsPipelineDesc& source, std::string& outError)
+    {
+        if (m_handle.IsValid())
+        {
+            outError = "Cannot prepare an already published pipeline request";
+            return false;
+        }
+        RHIGraphicsPipelineRequest candidate;
+        if (!candidate.CopyFrom(source, outError)) return false;
+        *this = std::move(candidate);
+        return true;
+    }
+
     bool Create(IRenderPipelineCache& cache, const RHIGraphicsPipelineDesc& source,
         std::string& outError)
     {

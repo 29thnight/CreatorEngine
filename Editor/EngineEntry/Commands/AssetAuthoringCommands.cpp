@@ -119,6 +119,7 @@
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"
 #include "AssetIdentity/SceneModelGenerationSelfTest.h"
 #include "Tasks/WorkerPoolSelfTest.h"
+#include "Tasks/SceneLoadJobsSelfTest.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 #include "ShaderMeta.h"
@@ -1801,8 +1802,35 @@ namespace ConsoleCmd
             : CommandCore::Fail("worker.pool.failed", log, std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_scene_loadjobs(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 3) return InvalidArguments("scene.loadjobs <fixture-directory> <model-path>");
+        std::string log;
+        if (!RenderTest::RunSceneLoadJobsSelfTest(ctx.parts[1], ctx.parts[2], log))
+            return Fail("scene.loadjobs.failed", log);
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+        ctx.system.WaitForResult([directory = ctx.parts[1], deadline]() -> std::optional<CommandResult>
+        {
+            if (SceneManagers->IsSceneLoading())
+            {
+                if (std::chrono::steady_clock::now() > deadline)
+                    return Fail("scene.loadjobs.timeout", "Scene load did not progress through normal frames");
+                return std::nullopt;
+            }
+            std::string resultLog;
+            const bool passed = RenderTest::FinishSceneLoadJobsSelfTest(directory, resultLog);
+            auto data = CommandData::Object();
+            data.Set("passed", CommandData::Bool(passed));
+            data.Set("log", CommandData::String(resultLog));
+            return passed ? Ok(resultLog, std::move(data)) : Fail("scene.loadjobs.failed", resultLog, std::move(data));
+        });
+        return Ok(log);
+    }
+
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
+        reg.Result({ "scene.loadjobs" }, &Cmd_scene_loadjobs);
         reg.Result({ "worker.pool.probe" }, &Cmd_worker_pool_probe);
         reg.Result({ "assets.decodeab" }, &Cmd_assets_decodeab);
         reg.Result({ "assets.decodeabhdr" }, &Cmd_assets_decodeabhdr);

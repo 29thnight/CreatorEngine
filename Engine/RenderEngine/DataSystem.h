@@ -5,6 +5,7 @@
 #include "AssetMetaRegistry.h"
 #include "ClassProperty.h"
 #include "AssetBundle.h"
+#include "JobScheduler.h"
 #include "ShaderMetaHandle.h"
 #include "Assets/ModelAssetGeneration.h"
 #include <atomic>
@@ -106,6 +107,8 @@ public:
     void Finalize();
 	// Asset bundle operations
 	AssetBundleLoadResult LoadAssetBundle(const AssetBundle& bundle);
+	// Nonblocking submission; the handle owns all copied asset paths.
+	job_handle LoadAssetBundleAsync(const AssetBundle& bundle);
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
 	void UnloadUnusedAssets();

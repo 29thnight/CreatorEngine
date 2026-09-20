@@ -270,7 +270,10 @@ namespace LegacyTransformPromotion
     }
 }
 
-SceneManager::~SceneManager() = default;
+SceneManager::~SceneManager()
+{
+    DrainSceneLoads();
+}
 
 void SceneManager::SetGameStart(bool isStart)
 {
@@ -316,6 +319,7 @@ void SceneManager::ToggleGamePaused()
 
 void SceneManager::ManagerInitialize()
 {
+    m_sceneLoadOwner = std::this_thread::get_id();
     RegisterReflectManual(); // CT4: 명시 메타 파일럿 4타입 — def에서 빠진 몫
     ComponentFactorys->Initialize();
     m_inputActionManager = new InputActionManager();
@@ -333,6 +337,7 @@ bool SceneManager::HasPendingSceneStructureChange() const
 
 void SceneManager::ApplyPendingSceneStructureChange()
 {
+    CompleteSceneLoads(false);
     // 호출 지점이 렌더 정지 구간임을 전제로 한다(선언부 주석 참고).
 
     // 씬 교체도 같은 이유로 여기서 처리한다. 활성 씬을 갈아끼우고 이전 씬을
@@ -399,27 +404,6 @@ void SceneManager::Initialization()
     if(!m_isInitialized)
     {
 		m_isInitialized = true;
-    }
-
-    if (m_loadingSceneFuture.valid() &&
-        m_loadingSceneFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
-    {
-        try
-        {
-            // .get() retrieves the result. It will re-throw any exception caught in the async task.
-            Scene* loadedScene = m_loadingSceneFuture.get();
-            if (loadedScene)
-            {
-                // The scene is loaded, now activate it on the main thread.
-                ActivateScene(loadedScene);
-            }
-        }
-        catch (const std::exception& e)
-        {
-            Debug::PrintLog(spdlog::level::err, "Failed to activate loaded scene.");
-            // Handle loading failure
-        }
-        // The future is now invalid after .get(), so this block won't run again until a new scene is loaded.
     }
 
     if (!m_activeScene) return;
@@ -518,6 +502,7 @@ void SceneManager::DrainAIUpdates()
 void SceneManager::Decommissioning()
 {
     SetDecommissioning();
+    DrainSceneLoads();
     DrainAIUpdates();
     // 씬 수를 남긴다. 여기가 예상보다 많으면 목록에 중복이 들어간
     // 것이고, 그것이 종료 시 더블 delete로 번진다(실제로 겪었다).
@@ -582,6 +567,7 @@ void SceneManager::SetDecommissioning()
 
 Scene* SceneManager::CreateScene(std::string_view name)
 {
+    DrainSceneLoads();
     resourceTrimEvent.Broadcast();
     Scene* allocScene = Scene::CreateNewScene(name);
 	Scene* swapScene = nullptr;
@@ -680,6 +666,7 @@ Scene* SceneManager::SaveScene(std::string_view name)
 
 Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 {
+    DrainSceneLoads();
 	// D0(SerializationPlan): 이 함수 전체가 "씬 전환 1회"를 재는 자다. 하위 단계
 	// 합과 이 값의 차이가 곧 미귀속분이고, 그 차이를 숨기지 않는 것이 이 계측의 요점이다.
 	SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneLoadTotal);
@@ -852,6 +839,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
 Scene* SceneManager::LoadScene(std::string_view name)
 {
+    DrainSceneLoads();
     std::string loadSceneName = name.data();
     Scene* scene{ nullptr };
 
@@ -950,217 +938,216 @@ void SceneManager::SaveSceneAsync(std::string_view name)
 {
 }
 
+struct SceneManager::PendingSceneLoad
+{
+    std::string m_path;
+    Authoring::ParsedDocument m_document;
+    AssetBundle m_bundle;
+    job_handle m_preparation;
+    job_handle m_assets;
+    std::promise<Scene*> m_result;
+    size_t m_activationEpoch = 0;
+    bool m_autoActivate = false;
+    bool m_cancelled = false; // Only the owner reads/writes this flag.
+};
+
+void SceneManager::RequireSceneLoadOwner() const
+{
+    if (std::this_thread::get_id() != m_sceneLoadOwner)
+        throw std::logic_error("Scene loading must be driven by the SceneManager owner thread");
+}
+
+std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool autoActivate)
+{
+    RequireSceneLoadOwner();
+    auto load = std::make_shared<PendingSceneLoad>();
+    load->m_path = std::string(path);
+    load->m_autoActivate = autoActivate;
+    auto result = load->m_result.get_future();
+    if (m_exitCommand)
+    {
+        load->m_result.set_value(nullptr);
+        return result;
+    }
+    if (autoActivate)
+    {
+        load->m_activationEpoch = ++m_sceneLoadEpoch;
+        if (m_asyncSceneToActivate == m_sceneToActivate) m_sceneToActivate = nullptr;
+        m_asyncSceneToActivate = nullptr;
+        for (const auto& pending : m_pendingSceneLoads)
+            if (pending->m_autoActivate) pending->m_cancelled = true;
+    }
+
+    m_pendingSceneLoads.push_back(load);
+    ++m_pendingSceneLoadCount;
+    try
+    {
+        // No SceneManager/Scene/Entity capture. The owner waits for preparation before
+        // reading its document, bundle or asset handle. Even one worker can progress:
+        // enqueue the asset batch and return; never wait inside this callback.
+        load->m_preparation = ce::get_job_scheduler().submit([load]
+        {
+            load->m_document = ParseSceneDocument(load->m_path);
+            const auto bundleNode = load->m_document.Root()["m_requiredLoadAssetsBundle"];
+            if (bundleNode && !bundleNode.IsNull())
+                for (const auto asset : bundleNode["assets"])
+                    if (asset["assetTypeID"] && asset["assetName"])
+                    {
+                        AssetEntry entry{};
+                        entry.assetTypeID = asset["assetTypeID"].As<int>();
+                        entry.assetName = asset["assetName"].AsString();
+                        if (!load->m_bundle.ContainsAsset(entry)) load->m_bundle.AddAsset(entry);
+                    }
+            load->m_assets = DataSystems->LoadAssetBundleAsync(load->m_bundle);
+        });
+    }
+    catch (const std::exception& e)
+    {
+        m_pendingSceneLoads.pop_back();
+        --m_pendingSceneLoadCount;
+        load->m_result.set_value(nullptr);
+        Debug::PrintLog(spdlog::level::err, e.what());
+    }
+    return result;
+}
+
 std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
 {
-    return std::async(std::launch::async, [this, scenePath = std::string(name)]() -> Scene* {
-        try
-        {
-            // This code runs in a background thread.
-            Authoring::ParsedDocument sceneDocument = ParseSceneDocument(scenePath);
-            const Authoring::ReadNode sceneNode = sceneDocument.Root();
-            Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
-
-            if (const Authoring::ReadNode assetsBundleNode =
-                sceneNode["m_requiredLoadAssetsBundle"])
-            {
-                try
-                {
-                    if (!assetsBundleNode.IsNull())
-                    {
-                        auto* assetBundle = &newScene->m_requiredLoadAssetsBundle;
-                        if (const Authoring::ReadNode assets = assetsBundleNode["assets"])
-                        {
-                            for (const Authoring::ReadNode asset : assets)
-                            {
-                                if (asset["assetTypeID"] && asset["assetName"])
-                                {
-                                    AssetEntry entry{};
-                                    entry.assetTypeID = asset["assetTypeID"].As<int>();
-                                    entry.assetName = asset["assetName"].AsString();
-                                    if (!assetBundle->ContainsAsset(entry))
-                                    {
-                                        assetBundle->AddAsset(entry);
-                                    }
-                                }
-                            }
-                            DataSystems->LoadAssetBundle(*assetBundle);
-                        }
-                    }
-                }
-                catch (...)
-                {
-                }
-            }
-
-            // 두 루프 모두 newScene을 타깃으로 하므로 배치를 공유한다.
-			LoadIndexBatch loadBatch;
-			[[maybe_unused]] auto hierarchyTransaction =
-				newScene->BeginHierarchyBulkBuild();
-
-            for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
-            {
-                try
-                {
-                    const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-                    if (!type)
-                    {
-                        Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
-                        continue;
-                    }
-
-                    DesirealizeGameObject(newScene, type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
-                }
-                catch (const std::exception& e)
-                {
-                    Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize Entity: ") + e.what());
-                    continue;
-                }
-            }
-
-            for (const Authoring::ReadNode objNode :
-                sceneNode["DontDestroyOnLoadObjects"])
-            {
-                try
-                {
-                    const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-                    if (!type)
-                    {
-                        Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
-                        continue;
-                    }
-                    DesirealizeDontDestroyOnLoadObjects(newScene, type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
-                }
-                catch (const std::exception& e)
-                {
-                    Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize DontDestroyOnLoadObject: ") + e.what());
-                    continue;
-                }
-            }
-
-            RemapLoadBatchIndices(newScene, loadBatch);
-
-            // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2).
-			for (const auto& entry : loadBatch)
-			{
-				ReconnectPrefabInstance(newScene, entry.object);
-			}
-			hierarchyTransaction.Complete();
-
-			RebindEventDontDestroyOnLoadObjects(newScene);
-            //newScene->AllUpdateWorldMatrix();
-            return newScene;
-        }
-        catch (const std::exception& e)
-        {
-            Debug::PrintLog(spdlog::level::err, e.what());
-            // Returning nullptr indicates failure. The exception is also stored in the future.
-            return nullptr;
-        }
-    });
+    return BeginSceneLoad(name, false);
 }
 
 void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 {
-    // std::launch::async ensures the task runs on a new thread immediately.
-    m_loadingSceneFuture = std::async(std::launch::async, [this, scenePath = std::string(name)]() -> Scene* {
+    (void)BeginSceneLoad(name, true);
+}
+
+Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
+{
+    auto scene = std::unique_ptr<Scene>(Scene::LoadScene(file::path(load.m_path).stem().string()));
+    scene->m_requiredLoadAssetsBundle = load.m_bundle;
+    const auto root = load.m_document.Root();
+    LoadIndexBatch batch;
+    LoadIndexBatch ddolBatch;
+    // Preserve each API's DDOL target: callback loads stage DDOL in the active
+    // scene for its later transfer; result-only loads keep them in the result.
+    Scene* ddolScene = load.m_autoActivate && m_activeScene ? m_activeScene.load() : scene.get();
+    auto hierarchy = scene->BeginHierarchyBulkBuild();
+    auto ddolHierarchy = ddolScene->BeginHierarchyBulkBuild();
+    auto deserialize = [&](const Authoring::ReadNode& node, bool ddol)
+    {
         try
         {
-            // This code runs in a background thread.
-            Authoring::ParsedDocument sceneDocument = ParseSceneDocument(scenePath);
-            const Authoring::ReadNode sceneNode = sceneDocument.Root();
-            Scene* newScene = Scene::LoadScene(std::filesystem::path(scenePath).stem().string());
-
-            if (const Authoring::ReadNode assetsBundleNode =
-                sceneNode["m_requiredLoadAssetsBundle"])
-            {
-                if (!assetsBundleNode.IsNull())
-                {
-                    auto* assetBundle = &newScene->m_requiredLoadAssetsBundle;
-                    if (const Authoring::ReadNode assets = assetsBundleNode["assets"])
-                    {
-                        for (const Authoring::ReadNode asset : assets)
-                        {
-                            if (asset["assetTypeID"] && asset["assetName"])
-                            {
-                                AssetEntry entry{};
-                                entry.assetTypeID = asset["assetTypeID"].As<int>();
-                                entry.assetName = asset["assetName"].AsString();
-                                if (!assetBundle->ContainsAsset(entry))
-                                {
-                                    assetBundle->AddAsset(entry);
-                                }
-                            }
-                        }
-                        DataSystems->LoadAssetBundle(*assetBundle);
-                    }
-                }
-            }
-
-            // ★ LoadScene(비-즉시 버전)과 같은 이유로 두 루프가 서로 다른 씬을
-            // 타깃으로 한다 — m_Entities는 newScene, DontDestroyOnLoadObjects는
-            // (아직 활성화 전인) m_activeScene. 기존 동작 그대로 유지하고 배치만 나눈다.
-			LoadIndexBatch sceneBatch;
-			LoadIndexBatch ddolBatch;
-			[[maybe_unused]] auto sceneHierarchyTransaction =
-				newScene->BeginHierarchyBulkBuild();
-			[[maybe_unused]] auto ddolHierarchyTransaction =
-				m_activeScene.load()->BeginHierarchyBulkBuild();
-
-            for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
-            {
-                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-                if (!type) {
-                    Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
-                    continue;
-                }
-                DesirealizeGameObject(newScene, type, Authoring::NodeViewAccess::Make(objNode), &sceneBatch);
-            }
-
-            for (const Authoring::ReadNode objNode :
-                sceneNode["DontDestroyOnLoadObjects"])
-            {
-                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
-                if (!type)
-                {
-                    Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
-                    continue;
-                }
-                DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &ddolBatch);
-            }
-
-            RemapLoadBatchIndices(newScene, sceneBatch);
-            RemapLoadBatchIndices(m_activeScene.load(), ddolBatch);
-
-            // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — 두 배치가 서로 다른
-            // 씬을 타깃으로 하므로(위 주석 참고) 리매핑과 마찬가지로 따로 훑는다.
-            for (const auto& entry : sceneBatch)
-            {
-                ReconnectPrefabInstance(newScene, entry.object);
-            }
-			for (const auto& entry : ddolBatch)
-			{
-				ReconnectPrefabInstance(m_activeScene.load(), entry.object);
-			}
-			sceneHierarchyTransaction.Complete();
-			ddolHierarchyTransaction.Complete();
-
-			RebindEventDontDestroyOnLoadObjects(newScene);
-
-			newScene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
-            return newScene;
+            const auto* type = Meta::ExtractTypeFromYAML(node);
+            if (!type) throw std::runtime_error("Failed to extract scene entity type");
+            if (ddol)
+                DesirealizeDontDestroyOnLoadObjects(ddolScene, type, Authoring::NodeViewAccess::Make(node),
+                    ddolScene == scene.get() ? &batch : &ddolBatch);
+            else
+                DesirealizeGameObject(scene.get(), type, Authoring::NodeViewAccess::Make(node), &batch);
         }
         catch (const std::exception& e)
         {
-            Debug::PrintLog(spdlog::level::err, e.what());
-            // Returning nullptr indicates failure. The exception is also stored in the future.
-            return nullptr;
+            Debug::PrintLog(spdlog::level::err, std::string("Failed to deserialize scene entity: ") + e.what());
         }
-    });
+    };
+    try
+    {
+        // SaveScene records DDOL entities in both sections. Instantiate each identity
+        // only through the DDOL path; otherwise activation keeps a normal duplicate.
+        std::unordered_set<size_t> ddolIds;
+        for (const auto node : root["DontDestroyOnLoadObjects"])
+            if (node["m_instanceID"]) ddolIds.insert(node["m_instanceID"].As<size_t>());
+        for (const auto node : SerializedEntities(root))
+            if (!node["m_instanceID"] || !ddolIds.contains(node["m_instanceID"].As<size_t>()))
+                deserialize(node, false);
+        for (const auto node : root["DontDestroyOnLoadObjects"]) deserialize(node, true);
+        RemapLoadBatchIndices(scene.get(), batch);
+        RemapLoadBatchIndices(ddolScene, ddolBatch);
+        for (const auto& entry : batch) ReconnectPrefabInstance(scene.get(), entry.object);
+        for (const auto& entry : ddolBatch) ReconnectPrefabInstance(ddolScene, entry.object);
+        ddolHierarchy.Complete();
+        hierarchy.Complete();
+        scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
+        m_scenes.push_back(scene.get());
+    }
+    catch (...)
+    {
+        std::erase_if(m_dontDestroyOnLoadObjects, [&](Object* object)
+        {
+            auto* entity = dynamic_cast<Entity*>(object);
+            return entity && entity->GetScene() == scene.get();
+        });
+        for (const auto& entity : scene->m_Entities)
+            if (entity)
+            {
+                TagManagers->RemoveTagFromObject(entity->m_tag.ToString(), entity.get());
+                TagManagers->RemoveObjectFromLayer(entity->m_layer.ToString(), entity.get());
+                entity->Destroy();
+            }
+        scene->EndFramePass();
+        PrefabUtilitys->ForgetScene(scene.get());
+        throw;
+    }
+    return scene.release();
+}
+
+void SceneManager::CompleteSceneLoads(bool wait)
+{
+    RequireSceneLoadOwner();
+    if (m_pendingSceneLoads.empty()) return;
+    for (size_t i = 0; i < m_pendingSceneLoads.size();)
+    {
+        auto load = m_pendingSceneLoads[i];
+        if (!wait && !load->m_preparation.is_complete()) { ++i; continue; }
+        bool failed = false;
+        try { load->m_preparation.wait(); }
+        catch (const std::exception& e) { failed = true; Debug::PrintLog(spdlog::level::err, e.what()); }
+        catch (...) { failed = true; Debug::PrintLog(spdlog::level::err, "Scene preparation failed"); }
+        if (!wait && !load->m_assets.is_complete()) { ++i; continue; }
+        try { load->m_assets.wait(); }
+        catch (const std::exception& e) { failed = true; Debug::PrintLog(spdlog::level::err, e.what()); }
+        catch (...) { failed = true; Debug::PrintLog(spdlog::level::err, "Scene asset load failed"); }
+
+        // Remove before callbacks/component construction can enqueue another request.
+        m_pendingSceneLoads.erase(m_pendingSceneLoads.begin() + i);
+        --m_pendingSceneLoadCount;
+        Scene* scene = nullptr;
+        if (!failed && !load->m_cancelled && !m_exitCommand)
+        {
+            try { scene = BuildPreparedScene(*load); }
+            catch (const std::exception& e) { Debug::PrintLog(spdlog::level::err, e.what()); }
+            catch (...) { Debug::PrintLog(spdlog::level::err, "Scene construction failed"); }
+        }
+        load->m_result.set_value(scene);
+        if (scene && load->m_autoActivate && load->m_activationEpoch == m_sceneLoadEpoch && !m_exitCommand)
+        {
+            ActivateScene(scene);
+            m_asyncSceneToActivate = scene;
+        }
+    }
+}
+
+void SceneManager::WaitForSceneLoad()
+{
+    RequireSceneLoadOwner();
+    CompleteSceneLoads(true);
+}
+
+void SceneManager::DrainSceneLoads()
+{
+    RequireSceneLoadOwner();
+    ++m_sceneLoadEpoch;
+    if (m_asyncSceneToActivate == m_sceneToActivate) m_sceneToActivate = nullptr;
+    m_asyncSceneToActivate = nullptr;
+    if (m_pendingSceneLoads.empty()) return;
+    for (const auto& load : m_pendingSceneLoads) load->m_cancelled = true;
+    CompleteSceneLoads(true);
 }
 
 void SceneManager::ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete)
 {
     if (!sceneToActivate) return;
+    m_asyncSceneToActivate = nullptr;
 
 	m_sceneToActivate = sceneToActivate;
 	m_isOldSceneDelete = isOldSceneDelete;
@@ -1251,6 +1238,7 @@ void SceneManager::BeforeAwakeSceneLoad()
             delete oldScene;
         }
         m_sceneToActivate = nullptr;
+        m_asyncSceneToActivate = nullptr;
         Debug::PrintLog(spdlog::level::info, std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
 
         // 새 씬의 보존 목록(RetainAssets)이 갱신된 뒤이므로 이 시점에 캐시를 정리한다.
@@ -1283,7 +1271,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 
 bool SceneManager::IsSceneLoading() const
 {
-    return m_sceneToActivate != nullptr;
+    return m_pendingSceneLoadCount.load() != 0 || m_sceneToActivate != nullptr;
 }
 
 void SceneManager::AddDontDestroyOnLoad(Object* objPtr)

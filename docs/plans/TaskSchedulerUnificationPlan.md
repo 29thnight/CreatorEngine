@@ -16,14 +16,16 @@ PHASE 13 진행 상태는 [AnimationSchedulerPlan](AnimationSchedulerPlan.md)이
   공용 풀의 수명을 떼어 Editor/Player 공통 EngineBootstrap으로 옮긴다.
 - 별도 풀 비교·동시 경합 우선순위 벤치마크는 이번 완료 조건에서 제외한다.
   새 자체 work stealing 구현도 추가하지 않는다. enkiTS의 분배 정책을 사용한다.
-- 씬 로딩 `std::async` 2곳과 DX12 PSO 1곳, RHI command recording 풀은 후속이다.
-  값 반환·블로킹·워커별 자원 수명을 먼저 정리해야 한다. 장기 전용 루프는 유지한다.
+- DX12 PSO 비동기 컴파일(§10)과 씬 로딩 `std::async` 2곳(§11)은 공용 스케줄러로
+  이관했다. 씬 객체 구성은 게임 스레드의 씬 구조 변경 경계에서 완료한다.
+  DX12/Vulkan command recording도 구간별 자원 수명을 유지하며 이관했다(§12).
+  Render/Presentation/GPU 제출 등 장기 전용 루프는 유지한다.
 - 워커 프로파일러 마커는 [ProfilingCapturePlan](ProfilingCapturePlan.md) §0.5.5의
   안전한 전달 경계 이후에 추가한다.
 
 **§1~§8은 이 결정 이전의 조사·측정·중간 구현 기록이다.** 우선순위 실측 선행,
 Animation 전용 풀 유지, SceneManager 풀 소유, WorkerPool API 관련 서술은 현행
-지시가 아니다. 최신 구현·검증은 §9를 따른다. 과거 성능 수치를 이번 구현의
+지시가 아니다. 공용 기반 구현·검증은 §9, PSO 이관은 §10, 씬 로딩은 §11, 명령 기록은 §12를 따른다. 과거 성능 수치를 이번 구현의
 성능 향상 근거로 사용하지 않는다.
 ## 1. 당시 구조와 측정 (2026-09-15 · 현행 차이는 §0 우선)
 
@@ -425,6 +427,153 @@ S0.5·S6이 끝나면 `Core.ThreadPool`·`Core.CountingSemaphore`·`Core.Thread`
   Debug 결과는 같은 루트의 `Product-Debug`, `Animation-Debug`다.
   테스트 모델 SHA-256은 §8의 CreatorRobot과 동일하다.
 
-후속 범위는 SceneManager 값 반환/블로킹 로드, DX12 PSO 컴파일, RHI 워커별 명령
-기록 자원이다. S6은 공용 스케줄러 위의 애니메이션 청크화·계층 정리이며 전용 풀
+§9 이후 PSO 컴파일은 §10, SceneManager 값 반환/블로킹 로드는 §11에서 이관했다.
+RHI 명령 기록은 §12에서 공용 실행 기반으로 후속 이관했다. S6은 공용 스케줄러 위의 애니메이션 청크화·계층 정리이며 전용 풀
 선택 비교를 다시 하지 않는다. 장기 서비스 루프는 공용 Job 실행과 역할이 다르다.
+
+## 10. DX12 PSO 비동기 컴파일 이관 (2026-09-20)
+
+- `std::async`/`shared_future` 실행·대기를 공용 `job_scheduler` 제출과
+  `job_handle` 완료 확인으로 교체했다. 제품 소스의 실행용 `std::async`는
+  당시 SceneManager 씬 로드 2곳만 남았고, §11에서 이관했다.
+- 입력 복사는 기존 `RHIGraphicsPipelineRequest`의 소유 저장소를 재사용한다.
+  `Prepare`는 컴파일 없이 바이트코드·input element·semantic을 복사한다.
+  루트 시그니처는 COM 참조로 유지하므로 워커가 자원 표를 다시 조회하지 않는다.
+- 미완료 키 중복 병합, Pending 동안 fallback/skip, 완료 후 render owner 게시,
+  2회차 디스크 캐시 복원과 기존 동기 그래픽/컴퓨트 취득을 보존했다.
+- 종료/전체 무효화는 admission을 닫고 캐시별 작업을 lock 밖에서 회수한다.
+  무효화 결과는 폐기하며 종료 후 재제출은 거절한다. 소멸자도 같은 회수를 수행한다.
+  별도 스레드 풀 소유·종료는 없고, 검사에서만 독립 scheduler를 주입한다.
+- 현재 Request/Resolve 비동기 소비자는 `dx12.psocache`다. 라이브 렌더 패스의
+  동기 `GetOrCreate`를 비동기로 전환한 것은 아니다.
+- `dx12.psocache`에 실제 enkiTS 워커 점유 검사를 추가했다: 중지 중 제출 거절,
+  대기 중 원본 바이트코드 덮어쓰기/해제, 동일 키 8요청의 단일 제출, 실제 워커
+  실행, 드라이버 컴파일 실패, 무효화/종료 중 요청 거절·접수 작업 회수·결과 폐기,
+  무효화 후 재요청, 무관한 작업과 독립적인 대기를 검사한다.
+- 최종 VS18/v145 x64 Editor 및 참조 프로젝트 빌드: Debug/Release 모두 exit 0,
+  오류 0. 최종 증분 Debug 경고 0, Release 경고 19(기존 RS2008·IL2026·IL2075·
+  LNK4229). 이번에는 Player 실행·Vulkan 화면·성능 비교를 수행하지 않았다.
+- 최종 Debug/Release `dx12.psocache` 모두 `status=succeeded`, `passed=true`,
+  프로세스 exit 0, stderr 0. 위 PSO Job 검사를 비롯해 기존 캐시·무효화·폴백·
+  그래픽/컴퓨트 디스크 복원 검사가 통과했다. 2회차 그래픽 컴파일 0/라이브러리 히트 3,
+  컴퓨트 컴파일 0/라이브러리 히트 1, 폴백 이후 Skip 0을 유지했다.
+- 빌드/실행 후 변경 소스 4파일의 SHA-256 일치를 확인했다. 기존 검사 목록을 사용해
+  명령 등록 표를 바꾸지 않았으며, 테스트 모델은 기존 Triangle.slang을 유지한다.
+- 재현: `Tools/dx12-validation/Invoke-Dx12Suite.ps1 -Only dx12.psocache
+  -NoRenderWait -Exe <구성별 CreatorEditor.exe> -OutDir <결과 경로>`.
+  이 검사는 자체 디바이스/PSO를 사용하므로 라이브 씬 예열은 필요 없다.
+  결과 경로: `Build/Obj/Phase13Jobs/PsoMigration`.
+- 이 슬라이스 직후 남은 씬 로딩은 §11, DX12/Vulkan 명령 기록은 §12에서 이관했다.
+  성능 비교·CPU 예산·우선순위·애니메이션 S6 청크화는 후속이며 정확성 검사로 대체하지 않는다.
+
+## 11. 씬 로딩 2곳 이관 (2026-09-20)
+
+- `LoadSceneAsync` / `LoadSceneAsyncAndWaitCallback`의 `std::async`를 공용
+  `job_scheduler` + 소유 요청 레코드로 교체했다. Engine/Editor/Player C++ 제품
+  소스에서 실행용 `std::async(...)` 검색 결과는 0건이다.
+- 문서 파싱 후 비동기 자산 배치를 제출하고 워커를 반환한다. 게임 스레드가 두
+  토큰을 확인하여 엔티티/컴포넌트·리맵·프리팹·DDOL을 구성한다. 실제 게임 객체를
+  워커에서 생성하던 동작은 제거했다. callback DDOL의 기존 활성 씬 경유를 유지한다.
+- 첫 실제 저장/재로딩 검사에서 일반 엔티티/DDOL 두 절의 동일 ID가 중복 구성되는
+  것을 잡았다. 이관한 두 경로는 DDOL 절의 ID를 일반 절에서 제외하고 한 번만 구성한다.
+- 반환 future는 유지하되 결과 전달만 맡는다. 정상 프레임 경계 또는 명시적
+  `WaitForSceneLoad()`가 구성까지 완료한다. 소유 스레드의 pump 없는 future.get은
+  지원하지 않는다. 이관 전 두 API의 제품 호출자는 없었으며 동기 제품 로드는 유지한다.
+- 버린 future의 성공 씬도 SceneManager가 소유한다. 실패/취소는 nullptr, 겹친 callback은
+  최신 요청만 활성화, 동기 Create/Load는 이전 준비 취소·회수, 준비 중 loading 상태를 제공한다.
+- Editor/Player CLR 종료 전에 새 요청을 닫고 준비/자산 작업을 회수한다. 종료 시 취소한
+  결과로 씬을 구성하지 않는다. SceneManager 해체/소멸에도 회수를 배치했다.
+- `scene.loadjobs` 격리 commandlet과 `Tools/regression/verify-scene-load-jobs.ps1`을 추가했다.
+  실제 저장한 씬과 기존 CreatorRobot 번들을 사용한다. 테스트 모델 변경 없음.
+  명령은 fixture 씬을 만들고 마지막에 종료 상태로 전환하므로 격리 프로세스로만 실행한다.
+- VS18/v145 x64 Editor 및 참조 프로젝트 Debug/Release 빌드 오류 0. 최종 증분
+  Debug 경고 0, Release 경고 2(기존 Terrain C4244, LNK4229)다.
+- Player Debug/Release 빌드도 오류 0. Debug 경고 1(LNK4229), Release 경고 34
+  (LNK4229 및 기존 LNK4020 PDB 형식 레코드)다. Player 실행과 디버거 기호 가용성은
+  이번에 확인하지 않았다.
+- Debug/Release 각각 격리 `scene.loadjobs`: 성공, exit 0, stderr 0. 반환 경로/호출자 경로 소유,
+  future 폐기 시 비차단 및 씬 소유 3건, 최신 callback 선택, 누락 문서 nullptr,
+  콜드 모델 번들 게시, DDOL 2개 이송·동일 ID 단일 구성, 동기 로드에 의한 취소,
+  워커의 SceneManager 제출 거절, 정상 프레임 완료·활성화, 종료 전 회수/거절을 확인했다.
+- 별도 Debug/Release 프로세스의 기존 `worker.pool.probe`도 각각 번들 32/32, 외부 읽기 64,
+  호출 스레드 실행 0, Foliage 73개를 통과했다. 두 검사는 캐시를 공유하지 않는다.
+- 워커 점유 검사는 개별 외부 제출을 사용하면 pinned handoff가 이미 막힌 워커에
+  걸릴 수 있어, 하나의 stealable 그룹으로 워커 수만큼 제출한다. 검사 장치의 시간
+  초과를 이 방식으로 수정한 뒤 최종 두 구성에서 모두 통과했다.
+- 재현: `Tools/regression/verify-scene-load-jobs.ps1 -Configuration Debug|Release
+  -Work <새 결과 폴더>`. 결과는 `Build/Obj/Phase13Jobs/SceneMigration`의
+  `Debug-pass`, `Release`와 각 `worker` 하위 폴더에 있다. 변경 소스 13파일의
+  빌드/실행 후 SHA-256 일치, `git diff --check`를 확인했다.
+- CreatorRobot SHA-256: `58D779AFDE1A7FBD13332999C8B11890FB7E10FF2036CA6AE3645D14BEDBA402`.
+  성능 비교·단일 워커 제품 실행·Player 실행·Vulkan 화면 검증은 이번에 수행하지 않았다.
+- 이 슬라이스 이후 DX12/Vulkan 명령 기록 풀도 §12에서 이관했다.
+  성능 비교, CPU 예산/우선순위, 애니메이션 S6 최적화는 후속이다.
+
+## 12. DX12/Vulkan 명령 기록 이관 (2026-09-20)
+
+- DX12CommandListPool/VulkanCommandBufferPool의 전용 std::thread·조건 변수·작업
+  포인터를 제거했다. 공통 RunParallel이 구간별 Job 하나를 공용 job_scheduler에
+  묶어 제출하고 해당 그룹만 기다린다. 단일 구간도 공용 워커에서 실행한다.
+- 구간 번호는 물리 워커 ID와 독립적이다. `[frame slot][lane]` allocator/list 또는
+  command pool/buffer 소유는 유지한다. Reset → 기록 Job 완료 → Close → batch 제출,
+  GPU fence 완료 후 슬롯 재사용 순서를 유지한다. 풀 종료는 공용 스케줄러를 종료하지 않는다.
+- 공용 워커의 중첩 동기 호출은 제출 전에 거절한다. RenderGraph는 native Prepare/Reset
+  전에 거절하고, scheduler 중지·패스 예외는 실패 결과로 반환한다. 나머지 Job 완료 후
+  열린 command target을 닫아 다음 프레임의 재사용을 가능하게 한다. 실패 batch는 만들지 않는다.
+- dx12.parallel을 확장하고 활성 이관 검증을 위해 vk.parallel commandlet을 복원했다.
+  일반 제품 명령으로 등록하지 않는다. 모델 교체는 없으며 기존 색상/띠 clear 픽셀 fixture다.
+- 검사: 물리 워커 1/4 × 논리 구간 1/4/상한 초과의 정확히 한 번 실행, caller 실행 0,
+  예외 후 모든 구간 완료, 중첩/중지 제출 거절, 실제 native 자원 reset/실패 복구,
+  단일 물리 워커의 4개 command target, 반복 frame slot 재사용 픽셀 비교,
+  batch의 기록 당시 슬롯 유지, 자원 풀 종료 뒤 스케줄러 생존을 확인한다.
+- 재현: `Tools/regression/verify-command-recording-jobs.ps1 -Configuration Debug|Release
+  -Work <새 결과 폴더>`. 결과 경로: `Build/Obj/Phase13Jobs/CommandRecordingMigration`.
+- VS18/v145 x64 Editor 및 참조 프로젝트 Debug/Release 빌드 오류 0. 두 최종 빌드 모두
+  기존 `/DELAYLOAD:vulkan-1.dll` LNK4229 경고 1건이다.
+- Player Debug/Release 빌드도 오류 0. Debug 경고 1(LNK4229), Release 경고 34
+  (LNK4229 및 기존 LNK4020 PDB 형식 레코드)다. Player 실행과 디버거 기호 가용성은
+  이번 검증 범위에 포함하지 않았다.
+- Debug/Release × dx12.parallel/vk.parallel 네 실행 모두 `succeeded`, `passed=true`,
+  exit 0, stderr 0. DX12의 65,536픽셀 띠 덮임 오류 0, 1/4구간 결과의 다른 바이트 0.
+  Vulkan도 순차/병렬 픽셀 일치·최종 색 통과, 미구현 0·validation 문제 0이다.
+- 물리 워커 1개로 4개 native target을 기록하고, 워커 4개에서 세 프레임 슬롯을
+  두 차례 순환하는 추가 6프레임의 픽셀도 기준과 일치했다. 중지/패스 예외 뒤
+  target 재사용, 제출 직전 current slot 변경, pool 종료 후 scheduler 생존을 통과했다.
+  Vulkan shutdown의 pending task/batch/retirement는 0/0/0이다.
+- 호스트 경로 확인: Editor/Player의 StopLiveRenderThread가 먼저 완료되고, 이후
+  EngineBootstrap::FinalizeRuntime이 공용 스케줄러를 종료한다. 백엔드 자원 해체는
+  기존 RHI lifecycle drain 이후다. 공용 워커 ID에 묶인 recording TLS는 없다.
+- 정적 검사에서 두 RHI 풀의 전용 thread/condition_variable/WorkerLoop는 0건,
+  Engine/Editor/Player C++ 실행용 std::async 호출은 0건이다. 빌드/실행한 입력 13파일의
+  SHA-256 일치와 `git diff --check`를 확인했다. 테스트 모델 교체·성능 비교는 없다.
+- 성능 비교는 수행하지 않는다. CPU 예산/우선순위·애니메이션 S6 청크화는 후속이다.
+
+## 13. Player 실제 실행·씬 전환·종료 (2026-09-20)
+
+- 기존 smoke에 `--smoke-reload`를 추가했다. 첫 표시 슬롯 회전 뒤 시작 씬을
+  `LoadSceneAsync`로 준비하고, 정상 소유 프레임 경계에서 ActivateScene을 요청한다.
+  교체된 씬의 활성화와 이후 발행된 프레임의 표시 완료를 요구한 뒤 정상 종료한다.
+- `verify-player-job-lifecycle.ps1`은 지정한 cooked fixture를 격리 복사하고 최신 구성의
+  Player·Runtime/Common·Managed를 배치한다. native DLL/exe 해시를 대조하고, 자신이
+  시작한 프로세스만 종료한다. 기존 Player 전부를 종료하는 예전 검증 방식은 사용하지 않는다.
+- 최초 재사용한 과거 fixture에는 최신 Decal.slang이 없었다. 현재 BuildTool로 제한된
+  fixture를 다시 cook/PAK/Player 검증했고 Release/DX12 `verification=passed`를 얻었다.
+  그 과정에서 은퇴한 WorldSprite.hlsl을 요구한 BuildTool 검사도 수정했다(`f517fddc`).
+- 최종 Debug/Release 두 구성에서 reload와 normal-exit 총 4회 모두 exit 0·stderr 0.
+  reload는 관리 초기화/시뮬레이션 시작이 씬당 1회씩 총 2회, 전환 이후 표시 완료,
+  pending scene load 없음, text parser 0을 확인했다. 정상 서비스 실행은 `/health`의
+  frame 증가·idle·gameStart를 확인하고 quit 뒤 프로세스 runtime 폴더 제거까지 통과했다.
+- shutdown_trace의 `app.Finalize 완료` → `SceneManager::Destroy()` →
+  `ce::get_job_scheduler().shutdown()` → `FinalizeRuntime 완료` 순서도 확인했다.
+  정상 표시를 시작한 Player의 RHI 종료 stdout은 보장되지 않아 그 문자열을 완료 증거로
+  요구하지 않는다. GPU task/batch/retirement 0/0/0의 개별 증거는 §12의 RHI 검사다.
+- 최종 Editor/Player Debug·Release 빌드도 0오류. 기존 LNK4229/LNK4020와 관리 코드
+  분석 경고는 남아 있다. 소스와 실행 바이너리의 검증 기록은
+  `Build/Obj/Phase13S1/build-verification.json`, Player 기록은
+  `Build/Obj/Phase13Jobs/PlayerRuntime/{Debug-pass,Release-pass}/verification.json`이다.
+- 재현: `Tools/regression/verify-player-job-lifecycle.ps1 -Configuration Debug|Release
+  -CookedFixture <BuildToolSmoke.creator와 PackageSmokeProbe를 포함한 최신 패키지>`.
+  이번 fixture는 `PlayerRuntime/Packages/Game-6a91b88da394424c9f66447279e10cf4`다.
+- 시작 씬은 카메라·조명·관리 스크립트만 포함한다. 모델은 cook 입력에만 있으므로
+  실제 모델 렌더링·Vulkan Player·Shipping·clean VM까지 검증했다고 보지 않는다.
+  일반 작업 실행기 통일과 이 Player 수명 검증을 마쳤으며 CPU 예산·우선순위·S6 최적화는 후속이다.

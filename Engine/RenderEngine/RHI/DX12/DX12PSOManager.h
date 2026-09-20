@@ -2,10 +2,10 @@
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIPipelineState.h"
 #include "RenderFrameServices.h"
+#include "JobScheduler.h"
 #include <cstdint>
 #include <string>
 #include <vector>
-#include <future>
 #include <mutex>
 #include <unordered_map>
 #include <wrl/client.h>
@@ -40,6 +40,9 @@ class DX12DeviceResources;
 class DX12PSOManager : public IRenderPipelineCache
 {
 public:
+    explicit DX12PSOManager(job_scheduler& scheduler = ce::get_job_scheduler()) : m_scheduler(scheduler) {}
+    ~DX12PSOManager() override { Shutdown(); }
+
     struct Stats
     {
         uint32_t memoryHits{ 0 };   // 같은 실행 안에서 재사용
@@ -55,6 +58,8 @@ public:
         // 스키마 도장이 달라 통째로 버린 캐시 파일. 매 실행 1이면 도장이
         // 실행마다 달라지고 있다는 뜻이고, 그러면 디스크 캐시가 늘 논다.
         uint32_t cacheDiscarded{ 0 };
+        uint32_t m_asyncSubmissions{ 0 };
+        uint32_t m_asyncWorkerExecutions{ 0 };
     };
 
     // 비동기 요청의 상태. Pending 프레임은 폴백 PSO를 쓰거나 그 드로우를 건너뛴다 —
@@ -66,6 +71,7 @@ public:
     ///   이미 같은 모양이다.
     bool Initialize(DX12DeviceResources* resources, const std::wstring& cacheFilePath,
         std::string& outError);
+    // Lifecycle/invalidation run on the render owner, never on a common pool worker.
     void Shutdown();
 
     // 동기 취득 — 미스면 이 자리에서 컴파일한다(로딩 시점용).
@@ -83,6 +89,7 @@ public:
     // ★ 여기는 원시 포인터를 그대로 낸다. 인터페이스가 아니라 이 매니저 자신의
     //   표면이고, 호출자가 `dx12.psocache` 하나뿐이다(실측). 핸들로 바꾸면
     //   소비자 없는 자리를 하나 더 만드는 것이라 A-1 의 범위 밖이다.
+    // Copies borrowed inputs before submission; a stopped scheduler returns Failed.
     RequestState Request(const RHIGraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
 
     // ── 폴백 정책 ──
@@ -122,7 +129,7 @@ private:
 
     // 라이브러리 로드 → 실패 시 컴파일 → 라이브러리 저장. 락 밖에서 부른다.
     ComPtr<ID3D12PipelineState> CreateOne(const RHIGraphicsPipelineDesc& desc,
-        uint64_t hash, std::string& outError);
+        uint64_t hash, std::string& outError, ID3D12RootSignature* ownedSignature = nullptr);
     ComPtr<ID3D12PipelineState> CreateOneCompute(const RHIComputePipelineDesc& desc,
         uint64_t hash, std::string& outError);
 
@@ -139,7 +146,7 @@ private:
 
     /// 캐시에 넣고 핸들을 발급한다. **락을 쥔 채로** 부른다.
     RHIPipelineHandle Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
-        RHIPipelineLayoutHandle layout, std::string& outError);
+        ID3D12RootSignature* signature, std::string& outError);
     std::uint32_t RetireCachedPipelinesLocked(RHICompletionPoint retireAfter);
 
     class DX12DeviceResources*     m_resources{ nullptr };
@@ -159,9 +166,16 @@ private:
     };
     void RetireCacheEntryLocked(CacheEntry& entry, RHICompletionPoint retireAfter);
 
+    struct PendingCompile;
+    using PendingCompiles = std::unordered_map<uint64_t, std::shared_ptr<PendingCompile>>;
+    void WaitForPendingCompiles(const PendingCompiles& pending);
+
+    job_scheduler& m_scheduler; // Engine-owned executor outlives this cache.
+    std::mutex m_lifecycleMutex;
     mutable std::mutex m_mutex;
+    bool m_acceptingRequests{ false };
     std::unordered_map<uint64_t, CacheEntry> m_cache;
-    std::unordered_map<uint64_t, std::shared_future<ComPtr<ID3D12PipelineState>>> m_pending;
+    PendingCompiles m_pending;
     RHICompletionRetireQueue<ComPtr<ID3D12PipelineState>> m_retiredPipelines;
     ComPtr<ID3D12PipelineState> m_fallback;
     Stats m_stats;

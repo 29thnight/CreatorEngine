@@ -1116,7 +1116,7 @@
   <div class="phase-goal"><b>목표:</b> Pose 값 → 태스크 레시피 → 도달성 실행 위에 가시성 LOD와 CPU 버짓을 얹는다. 시간·진행률·이벤트는 평가 빈도와 분리하고, 에디터 프리뷰는 L0를 유지한다.
   <br><br><b>현재 기준:</b> 불변 ModelAssetGeneration·본 인덱스 채널 표·부모 선행 평탄 순회·C# 이벤트 큐 전달은 이미 있다. 과거 R1·R2·R3·R4·R6 경로와 AssetLoadJob은 선행 작업에서 제거됐다. S0는 초기 상태 선택·레이어 제외 포즈·래핑 전 이벤트 구간·블렌딩 소켓을 바로잡았다. 100체·C#·씬 본/소켓 제품 회귀와 실제 DX12 화면 회귀가 Debug/Release에서 통과했다. 화면 검사로 발견한 비활성 메시 그리기도 수정해 S0를 완료했다.
   <br><br><b>남은 비용:</b> 선형 키 탐색·매 평가 임시 할당·행렬 분해 블렌드·Animator 64KiB/Controller 32KiB 고정 배열·프록시당 512행렬 복사·LOD/버짓 부재.
-  <br><br><b>접점:</b> S0.5는 엔진 소유 thread_pool·job_scheduler로 DataSystem·썸네일·Animation·Foliage·AI 실행을 통일한다. 성능 비교는 이후이며 씬 로딩·PSO·RHI 풀은 후속이다. S3.6은 팔레트 dirty를 본 localWrites 조건에서 분리한 뒤 관측 본만 기록한다. S8 VM은 중단·완료 범위 제외다.</div>
+  <br><br><b>접점:</b> S0.5는 엔진 소유 thread_pool·job_scheduler로 DataSystem·썸네일·Animation·Foliage·AI 실행을 통일한다. PSO 비동기 컴파일도 공용 스케줄러로 이관했다(부속 계획 §10). 씬 로딩 2곳도 이관했고 프레임 경계에서 객체를 구성한다(부속 계획 §11). DX12/Vulkan 명령 기록도 공용 Job 그룹으로 이관했다(부속 계획 §12). 성능 최적화는 후속이다. S3.6은 팔레트 dirty를 본 localWrites 조건에서 분리한 뒤 관측 본만 기록한다. S8 VM은 중단·완료 범위 제외다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="13"><!-- JS 생성 --></table></div>
   <div class="verify"><div class="vt">페이즈 완료 기준 (AnimationSchedulerPlan.md §4)</div><ul>
     <li>불변 generation 유지 · 같은 모델 100체에서 포즈 오염 없음 · C# 이벤트 게임 스레드 전달과 반복 횟수 검증</li>
@@ -2185,8 +2185,8 @@ const TASKS = [
     note: "9-20 완료: 격리 회귀 각 45검사, 전체 Editor Debug/Release 빌드 exit 0. 제품 회귀 각 80314검사: 100 Animator×12회, 실제 C# 전달·레이어·씬 본·소켓 통과. DX12 화면 회귀도 각 13캡처·264검사 통과: 스킨 변형·블렌드·레이어·마스크·붉은 손 소켓·숨김/복귀. 비활성 메시를 계속 그리던 결함 수정. 일반 명령 133개 골든 동일. 근거: AnimationSchedulerPlan §7.1·§7.2." },
   { phase: 13, id: "13-11", title: "S0.5 — 공용 thread_pool · job_scheduler 통일",
     detail: "엔진이 지속적인 enkiTS 워커를 소유. job_group·job_handle·의존 작업·parallel_for 구현. DataSystem·썸네일·AnimationJob·Foliage·AI 이관, 구 WorkerPool·Animation 전용 풀 제거. 성능 비교는 완료 조건에서 제외.",
-    refs: "JobSchedulerDesign · TaskSchedulerUnificationPlan §9 · AnimationSchedulerPlan §9", priority: "P0", days: 2, status: "done",
-    note: "9-20 완료: 전체 Editor Debug/Release 빌드, 독립 각 10332검사·배리어 변이, ASan 348검사·조기 해제 변이 통과. 제품 각 번들 32/32·외부 읽기 64·Foliage 73·CreatorRobot 애니메이션 69514검사. Release DX12 13캡처·264검사, 썸네일 56검사·AI/BT·명령 133개 보존 통과. Player Release 링크 성공(PDB 기호 경고, 실행 미검증). 씬 로딩 std::async 2곳·PSO 1곳과 DX12/Vulkan 명령 기록 풀은 후속이며 전 경로 통일 완료로 세지 않는다." },
+    refs: "JobSchedulerDesign · TaskSchedulerUnificationPlan §9·§10·§11·§12·§13 · AnimationSchedulerPlan §9", priority: "P0", days: 2, status: "done",
+    note: "9-20 완료: 전체 Editor Debug/Release 빌드, 독립 각 10332검사·배리어 변이, ASan 348검사·조기 해제 변이 통과. 제품 각 번들 32/32·외부 읽기 64·Foliage 73·CreatorRobot 애니메이션 69514검사. Release DX12 13캡처·264검사, 썸네일 56검사·AI/BT·명령 133개 보존 통과. Player Release 링크 성공(PDB 기호 경고, 실행 미검증). PSO 비동기 컴파일도 후속 이관했고 Editor Debug/Release 빌드·dx12.psocache 회귀가 통과했다(부속 계획 §10). 씬 로딩 std::async 2곳도 이관했고 Editor Debug/Release 빌드·씬 로드/번들 회귀, Player Debug/Release 빌드가 통과했다(부속 계획 §11; Player 실행 미검증·기존 PDB 경고). DX12/Vulkan 명령 기록 전용 스레드를 공용 Job 그룹으로 이관했다(부속 계획 §12; Editor/Player Debug/Release 빌드·Editor 양 백엔드 실행 통과, 물리 워커 1/4·슬롯 재사용 픽셀 일치·실패 복구 확인, Player 실행 미검증·기존 PDB 경고). 후속 §13에서 Player Debug/Release 실제 비동기 재로딩·새 화면 표시·관리 스크립트 재시작·정상 종료도 통과했다. 최신 셰이더의 제한된 cooked fixture로 검증했고 모델 렌더링/Shipping/Vulkan Player는 범위 밖이다. CPU 예산·우선순위·S6 최적화는 후속이다." },
   { phase: 13, id: "13-1", title: "S1 — Release 계측 기선",
     detail: "Release 10/50/100체에서 계산·대기·본 투영·팔레트 전달 비용을 독립 QPC로 분리하고 버짓 기본값 근거를 기록한다. 워커 수집 마커는 PHASE 14 계약 이후.",
     refs: "AnimationSchedulerPlan §3 S1", priority: "P0", days: 1, status: "todo",

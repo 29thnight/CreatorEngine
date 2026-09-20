@@ -24,6 +24,7 @@
 //   무엇이 어느 도메인의 것인지 모르는 채로 자르게 된다.
 
 #include "CommandRegistrar.h"
+#include "RHI/Vulkan/VulkanSelfTest.h"
 #include "CommandSupport.h"
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
@@ -1208,6 +1209,18 @@ namespace ConsoleCmd
         return CommandCore::Ok("dx12.rendergraph 통과", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_vk_parallel(const ConsoleCommandContext&)
+    {
+        std::string log;
+        const bool passed = RunVulkanParallelRecordingTest(log);
+        std::printf("%s", log.c_str());
+        auto data = CommandCore::CommandData::Object();
+        data.Set("log", CommandCore::CommandData::String(std::move(log)));
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        return passed ? CommandCore::Ok("vk.parallel 통과", std::move(data))
+            : CommandCore::Fail("rendertest.failed", "vk.parallel 실패", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_dx12_parallel(const ConsoleCommandContext& ctx)
     {
         // 커맨드 기록 병렬화 검증(PHASE 3-6).
@@ -1355,6 +1368,7 @@ namespace ConsoleCmd
         reg.Result({ "dx12.iblshade" }, &Cmd_dx12_iblshade);
         reg.Result({ "dx12.rendergraph" }, &Cmd_dx12_rendergraph);
         reg.Result({ "dx12.parallel" }, &Cmd_dx12_parallel);
+        reg.Result({ "vk.parallel" }, &Cmd_vk_parallel);
         reg.Result({ "dx12.descriptorheap" }, &Cmd_dx12_descriptorheap);
         reg.Result({ "dx12.resize" }, &Cmd_dx12_resize);
         reg.Result({ "dx12.psocache" }, &Cmd_dx12_psocache);

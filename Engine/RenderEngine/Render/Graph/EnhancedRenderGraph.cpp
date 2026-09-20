@@ -603,6 +603,12 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         return false;
     }
 
+    if (thread_pool::is_worker_thread())
+    {
+        outError = "공용 워커에서 동기 명령 기록을 중첩할 수 없다";
+        return false;
+    }
+
     const size_t passCount = m_executeOrder.size();
     if (0 == passCount)
     {
@@ -701,13 +707,23 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         unitWorker[i] = static_cast<uint32_t>(i * workers / unitCount);
     }
 
+    const auto discardRecording = [&]
+    {
+        std::string closeError;
+        if (!pool.CloseAll(closeError)) outError += " / 기록 폐기 중 닫기 실패: " + closeError;
+    };
+
     // 리스트를 먼저 전부 연다.
     //
     // Open은 얼로케이터를 Reset하므로 스레드 안전하지 않다. 기록에 들어가기
     // 전에 한 스레드에서 끝내 두면 워커는 '이미 열린 리스트에 기록'만 한다.
     for (uint32_t worker = 0; worker < workers; ++worker)
     {
-        if (!pool.OpenWorker(worker, outError)) return false;
+        if (!pool.OpenWorker(worker, outError))
+        {
+            discardRecording();
+            return false;
+        }
     }
 
     // 워커에서 터진 예외를 삼키지 않는다. 조용히 사라지면 '가끔 화면이 빈다'가
@@ -772,16 +788,24 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
         }
     };
 
-    // 풀의 지속 워커를 쓴다.
-    //
-    // 처음에는 매 프레임 std::thread를 만들었는데 실측으로 그것이 손해였다:
-    // 순차 1.3761 ms · 병렬 2.3419 ms(워커 4) — 1.7배 느렸다. 기록 자체가
-    // 가벼운 씬에서는 스레드 생성 비용이 기록 비용을 넘는다.
-    //
-    // 워커가 하나면 풀이 깨우지 않고 그 자리에서 부른다 — 비교 기준에
-    // 동기화 비용이 섞이지 않아야 한다.
-    const std::function<void(uint32_t)> job = recordRange;
-    pool.RunParallel(job, workers);
+    // 기록 구간당 Job 하나를 엔진 공용 워커에 제출한다. 단일 구간도 같은 경로다.
+    // RunParallel은 모든 콜백이 끝난 뒤 반환/throw하므로 아래에서 안전하게 닫는다.
+    try
+    {
+        pool.RunParallel(recordRange, workers);
+    }
+    catch (const std::exception& e)
+    {
+        outError = "명령 기록 Job 실패: " + std::string(e.what());
+        discardRecording();
+        return false;
+    }
+    catch (...)
+    {
+        outError = "명령 기록 Job 실패: 알 수 없는 예외";
+        discardRecording();
+        return false;
+    }
 
     if (failed.load(std::memory_order_relaxed))
     {
@@ -791,10 +815,12 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
             {
                 outError = "워커 " + std::to_string(worker) + " 기록 실패: "
                     + workerErrors[worker];
+                discardRecording();
                 return false;
             }
         }
         outError = "워커 기록 실패(사유 미상)";
+        discardRecording();
         return false;
     }
 

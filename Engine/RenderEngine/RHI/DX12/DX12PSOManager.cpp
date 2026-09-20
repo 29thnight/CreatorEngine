@@ -2,11 +2,21 @@
 #include "DX12PSOManager.h"
 #include "DX12DeviceResources.h"
 #include "PathFinder.h"
+#include "../RHIGraphicsPipelineRequest.h"
 
 #include <algorithm>
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <stdexcept>
+
+struct DX12PSOManager::PendingCompile
+{
+    RHIGraphicsPipelineRequest m_input;
+    ComPtr<ID3D12RootSignature> m_signature;
+    ComPtr<ID3D12PipelineState> m_result;
+    job_handle m_completion;
+};
 
 namespace
 {
@@ -163,6 +173,13 @@ std::wstring DX12PSOManager::MakeLibraryName(uint64_t hash)
 bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
     const std::wstring& cacheFilePath, std::string& outError)
 {
+    Shutdown();
+    std::lock_guard lifecycle(m_lifecycleMutex);
+    {
+        std::lock_guard guard(m_mutex);
+        m_stats = {};
+        m_libraryLoadedFromDisk = false;
+    }
     if (nullptr == resources || nullptr == resources->GetDevice())
     {
         outError = "디바이스가 없다";
@@ -269,23 +286,41 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
         }
     }
 
+    std::lock_guard guard(m_mutex);
+    m_acceptingRequests = true;
     return true;
+}
+
+void DX12PSOManager::WaitForPendingCompiles(const PendingCompiles& pending)
+{
+    for (const auto& [hash, compile] : pending)
+    {
+        try
+        {
+            compile->m_completion.wait();
+        }
+        catch (...)
+        {
+            // A failed callback is complete too; continue draining the other jobs.
+            std::lock_guard guard(m_mutex);
+            ++m_stats.failures;
+        }
+    }
 }
 
 void DX12PSOManager::Shutdown()
 {
-    // 진행 중인 비동기 컴파일을 모두 회수한 뒤에 해제해야 한다 —
-    // future가 잡고 있는 디바이스 참조가 남으면 종료 순서가 꼬인다.
-    std::vector<std::shared_future<ComPtr<ID3D12PipelineState>>> inFlight;
+    if (thread_pool::is_worker_thread())
+        throw std::logic_error("PSO lifecycle must run on the render owner");
+    std::lock_guard lifecycle(m_lifecycleMutex);
+    PendingCompiles inFlight;
     {
-        std::lock_guard<std::mutex> guard(m_mutex);
-        for (auto& [hash, future] : m_pending) inFlight.push_back(future);
-        m_pending.clear();
+        std::lock_guard guard(m_mutex);
+        m_acceptingRequests = false;
+        inFlight.swap(m_pending);
     }
-    for (auto& future : inFlight)
-    {
-        if (future.valid()) future.wait();
-    }
+    WaitForPendingCompiles(inFlight);
+    inFlight.clear();
 
     std::lock_guard<std::mutex> guard(m_mutex);
     RetireCachedPipelinesLocked({});
@@ -300,16 +335,18 @@ void DX12PSOManager::Shutdown()
 }
 
 DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
-    const RHIGraphicsPipelineDesc& desc, uint64_t hash, std::string& outError)
+    const RHIGraphicsPipelineDesc& desc, uint64_t hash, std::string& outError,
+    ID3D12RootSignature* ownedSignature)
 {
     D3D12_GRAPHICS_PIPELINE_STATE_DESC d3dDesc{};
-    d3dDesc.pRootSignature = ResolveSignature(desc.layout);
+    d3dDesc.pRootSignature = ownedSignature ? ownedSignature : ResolveSignature(desc.layout);
     if (nullptr == d3dDesc.pRootSignature)
     {
         // ★ 조용히 넘기지 않는다. 예전에는 호출부가 포인터를 직접 넣었으므로
         //   널이면 D3D12 가 잡아 줬는데, 이제 표가 사이에 있어 "이미 놓인
         //   핸들"이라는 새 실패 모드가 생겼다.
         outError = "파이프라인 레이아웃 핸들이 유효하지 않다";
+        std::lock_guard guard(m_mutex);
         ++m_stats.failures;
         return nullptr;
     }
@@ -440,6 +477,7 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
     if (nullptr == d3dDesc.pRootSignature)
     {
         outError = "파이프라인 레이아웃 핸들이 유효하지 않다";
+        std::lock_guard guard(m_mutex);
         ++m_stats.failures;
         return nullptr;
     }
@@ -507,7 +545,7 @@ RHIPipelineHandle DX12PSOManager::GetOrCreateCompute(const RHIComputePipelineDes
     if (!pso) return {};
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    return Publish(hash, pso, desc.layout, outError);
+    return Publish(hash, pso, ResolveSignature(desc.layout), outError);
 }
 
 bool DX12PSOManager::SetFallback(const RHIGraphicsPipelineDesc& desc, std::string& outError)
@@ -573,24 +611,26 @@ bool DX12PSOManager::InvalidatePipeline(RHIPipelineHandle handle,
 
 std::uint32_t DX12PSOManager::InvalidatePipelines(RHICompletionPoint retireAfter)
 {
-    // 진행 중인 컴파일은 회수한다 — 옛 바이트코드를 참조하는 작업이 남으면
-    // 리로드로 해제된 블롭을 읽을 수 있다.
-    std::vector<std::shared_future<ComPtr<ID3D12PipelineState>>> inFlight;
+    if (thread_pool::is_worker_thread())
+        throw std::logic_error("PSO invalidation must run on the render owner");
+    std::lock_guard lifecycle(m_lifecycleMutex);
+    PendingCompiles inFlight;
+    bool reopen = false;
     {
-        std::lock_guard<std::mutex> guard(m_mutex);
-        for (auto& [hash, future] : m_pending) inFlight.push_back(future);
-        m_pending.clear();
+        std::lock_guard guard(m_mutex);
+        reopen = m_acceptingRequests;
+        m_acceptingRequests = false;
+        inFlight.swap(m_pending);
     }
-    for (auto& future : inFlight)
-    {
-        if (future.valid()) future.wait();
-    }
+    WaitForPendingCompiles(inFlight);
+    inFlight.clear();
 
     std::lock_guard<std::mutex> guard(m_mutex);
     const std::uint32_t invalidated = RetireCachedPipelinesLocked(retireAfter);
     if (0 != invalidated) ++m_stats.invalidations;
     m_stats.retiredPipelines = static_cast<uint32_t>(
         m_retiredPipelines.GetPendingCount());
+    m_acceptingRequests = reopen;
     return invalidated;
 }
 
@@ -627,7 +667,7 @@ RHIPipelineHandle DX12PSOManager::GetOrCreate(const RHIGraphicsPipelineDesc& des
     if (!pso) return {};
 
     std::lock_guard<std::mutex> guard(m_mutex);
-    return Publish(hash, pso, desc.layout, outError);
+    return Publish(hash, pso, ResolveSignature(desc.layout), outError);
 }
 
 /// 캐시에 넣고 핸들을 발급한다. **락을 쥔 채로** 부른다.
@@ -639,14 +679,14 @@ RHIPipelineHandle DX12PSOManager::GetOrCreate(const RHIGraphicsPipelineDesc& des
 ///   안에서, 즉 부르는 스레드에서만 한다 — 컴파일은 백그라운드로 가도
 ///   등록은 여기로 모인다.
 RHIPipelineHandle DX12PSOManager::Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
-    RHIPipelineLayoutHandle layout, std::string& outError)
+    ID3D12RootSignature* signature, std::string& outError)
 {
     const auto found = m_cache.find(hash);
     if (found != m_cache.end()) return found->second.handle;
 
     CacheEntry entry{};
     entry.pso = pso;
-    entry.handle = m_resources->RegisterPipeline(pso.Get(), ResolveSignature(layout));
+    entry.handle = m_resources->RegisterPipeline(pso.Get(), signature);
     if (!entry.handle.IsValid())
     {
         ++m_stats.failures;
@@ -682,48 +722,82 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
     ID3D12PipelineState** outPso)
 {
     if (outPso) *outPso = nullptr;
-    const uint64_t hash = ComputeHash(desc);
-
+    std::lock_guard guard(m_mutex);
+    if (!m_acceptingRequests) return RequestState::Failed;
+    if ((desc.vsSize && !desc.vsBytecode) || (desc.psSize && !desc.psBytecode)
+        || (desc.inputElementCount && !desc.inputElements))
     {
-        std::lock_guard<std::mutex> guard(m_mutex);
-        auto found = m_cache.find(hash);
-        if (found != m_cache.end())
-        {
-            ++m_stats.memoryHits;
-            if (outPso) *outPso = found->second.pso.Get();
-            return RequestState::Ready;
-        }
-
-        auto pendingIt = m_pending.find(hash);
-        if (pendingIt != m_pending.end())
-        {
-            // 아직 컴파일 중이면 이 프레임은 폴백으로 간다.
-            if (pendingIt->second.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
-            {
-                return RequestState::Pending;
-            }
-
-            ComPtr<ID3D12PipelineState> pso = pendingIt->second.get();
-            m_pending.erase(pendingIt);
-            if (!pso) return RequestState::Failed;
-
-            std::string ignored;
-            if (!Publish(hash, pso, desc.layout, ignored).IsValid()) return RequestState::Failed;
-            if (outPso) *outPso = m_cache.find(hash)->second.pso.Get();
-            return RequestState::Ready;
-        }
-
-        // 미스 — 백그라운드 컴파일을 걸고 이 프레임은 넘긴다.
-        // desc를 값으로 복사해 넘긴다. 셰이더 바이트코드 포인터는 호출부가
-        // 컴파일 완료까지 살려 둬야 한다(블롭 수명은 PSOManager가 모른다).
-        m_pending.emplace(hash, std::async(std::launch::async,
-            [this, desc, hash]() -> ComPtr<ID3D12PipelineState>
-            {
-                std::string ignored;
-                return CreateOne(desc, hash, ignored);
-            }).share());
+        ++m_stats.failures;
+        return RequestState::Failed;
+    }
+    const uint64_t hash = ComputeHash(desc);
+    const auto found = m_cache.find(hash);
+    if (found != m_cache.end())
+    {
+        ++m_stats.memoryHits;
+        if (outPso) *outPso = found->second.pso.Get();
+        return RequestState::Ready;
     }
 
+    const auto pendingIt = m_pending.find(hash);
+    if (pendingIt != m_pending.end())
+    {
+        if (!pendingIt->second->m_completion.is_complete()) return RequestState::Pending;
+
+        auto compile = std::move(pendingIt->second);
+        m_pending.erase(pendingIt);
+        try
+        {
+            compile->m_completion.wait(); // Already complete; never blocks while holding m_mutex.
+        }
+        catch (...)
+        {
+            ++m_stats.failures;
+            return RequestState::Failed;
+        }
+        if (!compile->m_result) return RequestState::Failed;
+
+        std::string ignored;
+        if (!Publish(hash, compile->m_result, compile->m_signature.Get(), ignored).IsValid())
+            return RequestState::Failed;
+        if (outPso) *outPso = m_cache.find(hash)->second.pso.Get();
+        return RequestState::Ready;
+    }
+
+    // Insert before submission: no allocation failure may orphan an accepted job.
+    try
+    {
+        auto compile = std::make_shared<PendingCompile>();
+        std::string ignored;
+        if (!compile->m_input.Prepare(desc, ignored))
+        {
+            ++m_stats.failures;
+            return RequestState::Failed;
+        }
+        compile->m_signature = ResolveSignature(desc.layout);
+        if (!compile->m_signature)
+        {
+            ++m_stats.failures;
+            return RequestState::Failed;
+        }
+        m_pending.emplace(hash, compile);
+        compile->m_completion = m_scheduler.submit([this, compile, hash]
+        {
+            {
+                std::lock_guard guard(m_mutex);
+                if (thread_pool::is_worker_thread()) ++m_stats.m_asyncWorkerExecutions;
+            }
+            std::string error;
+            compile->m_result = CreateOne(compile->m_input.GetDesc(), hash, error, compile->m_signature.Get());
+        });
+        ++m_stats.m_asyncSubmissions;
+    }
+    catch (...)
+    {
+        m_pending.erase(hash);
+        ++m_stats.failures;
+        return RequestState::Failed;
+    }
     return RequestState::Pending;
 }
 

@@ -1,13 +1,17 @@
-﻿#pragma once
+#pragma once
 #include "Delegate.h"
 
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
+#include <future>
+
 #include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
+
+class Scene;
 
 // 게임 플레이어의 메인 루프 (BuildPipelinePlan B0-2).
 //
@@ -35,6 +39,7 @@ namespace Player
 	struct SmokeOptions
 	{
 		uint64_t frameLimit{ 0 };
+		bool reloadScene{ false };
 
 		bool IsActive() const { return 0 != frameLimit; }
 	};
@@ -114,6 +119,11 @@ namespace Player
 		uint64_t m_presentationShutdownDiscarded{ 0 };
 		uint32_t m_presentationThreadTestDelayMs{ 0 };
 		double m_frameDeltaTime{ 0.0 };
+		std::future<Scene*> m_smokeReload;
+		Scene* m_smokeReloadScene{ nullptr };
+		bool m_smokeReloadStarted{ false };
+		bool m_smokeReloadActivated{ false };
+		uint64_t m_smokeReloadPublishedFrame{ 0 };
 		std::atomic_bool m_isInvokeResize = false;
 	};
 }

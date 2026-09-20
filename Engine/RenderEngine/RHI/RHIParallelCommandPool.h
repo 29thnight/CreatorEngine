@@ -1,5 +1,9 @@
 #pragma once
 #include "RHIRecordedBatch.h"
+#include "JobScheduler.h"
+
+#include <algorithm>
+#include <stdexcept>
 
 #include <array>
 #include <cstdint>
@@ -20,7 +24,11 @@ class IRHIParallelCommandPool
 public:
     static constexpr uint32_t kMaxWorkers = 8;
 
+    explicit IRHIParallelCommandPool(job_scheduler& scheduler = ce::get_job_scheduler())
+        : m_scheduler(scheduler) {}
     virtual ~IRHIParallelCommandPool() = default;
+    IRHIParallelCommandPool(const IRHIParallelCommandPool&) = delete;
+    IRHIParallelCommandPool& operator=(const IRHIParallelCommandPool&) = delete;
 
     virtual bool IsInitialized() const = 0;
     virtual uint32_t GetWorkerCount() const = 0;
@@ -50,9 +58,25 @@ public:
     virtual uint32_t DrainEncoderDrops(std::string& outLast) = 0;
     virtual bool HasRecorded(uint32_t worker) const = 0;
 
-    /// 지속 worker thread에서 job을 병렬 실행하고 join 지점까지 기다린다.
-    virtual void RunParallel(const std::function<void(uint32_t)>& job,
-        uint32_t workerCount) = 0;
+    /// worker는 물리 스레드가 아닌 독립 command target 번호다. 각 target을
+    /// 공용 Job 하나가 맡으며 한 target 안의 패스 순서는 호출자가 보존한다.
+    /// 단일 target도 공용 워커에서 실행한다. 모든 콜백/캡처가 끝난 뒤 반환하거나
+    /// 첫 예외를 전파한다. 중지 중 제출과 공용 워커의 중첩 동기 호출은 거절한다.
+    /// Initialize/BeginFrame/Open/RunParallel/Close/Shutdown은 owner가 직렬화한다.
+    /// 따라서 반환 뒤에는 기록 Job이 자원을 참조하지 않는다. GPU 완료 대기는 별도다.
+    void RunParallel(const std::function<void(uint32_t)>& job, uint32_t workerCount)
+    {
+        if (0 == workerCount) return;
+        if (thread_pool::is_worker_thread())
+            throw std::logic_error("command recording cannot wait from a job worker");
+        if (!IsInitialized())
+            throw std::logic_error("command recording pool is not initialized");
+        workerCount = (std::min)(workerCount, GetWorkerCount());
+        job_group group;
+        for (uint32_t worker = 0; worker < workerCount; ++worker)
+            group.add([&job, worker] { job(worker); });
+        m_scheduler.submit(std::move(group)).wait();
+    }
 
     /// 열린 command target을 닫고 workerOrder를 복사해 이동 전용 batch로 만든다.
     /// 이 메서드는 queue에 아무것도 제출하지 않는다.
@@ -165,6 +189,9 @@ public:
         batch.m_state = RHIRecordedBatchState::Submitted;
         return true;
     }
+
+private:
+    job_scheduler& m_scheduler; // Engine-owned; injected schedulers must outlive this pool.
 
 protected:
     virtual uint32_t GetCurrentFrameSlot() const = 0;
