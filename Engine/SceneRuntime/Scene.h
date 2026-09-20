@@ -5,6 +5,7 @@
 #include "EntityHandle.h"
 #include "AuthoringNodeView.h" // D3-a-5
 #include "SystemSchedule.h"
+#include "JobScheduler.h"
 #include "CameraSystem.h"
 #include "PhysicsManager.h"
 #include "AssetBundle.h"
@@ -305,6 +306,10 @@ public:
 
 	Scene();
 	~Scene();
+	Scene(const Scene&) = delete;
+	Scene& operator=(const Scene&) = delete;
+	Scene(Scene&&) = delete;
+	Scene& operator=(Scene&&) = delete;
 
     // Incremental construction cannot be captured as an authored scene halfway through.
     void BeginIncrementalConstruction() { ++m_incrementalConstructions; }
@@ -314,7 +319,7 @@ public:
 	// Entity의 단독 소유자. 외부에는 프레임 경계를 넘지 않는 raw pointer 또는
 	// EntityHandle만 노출한다. DDOL 이송은 unique_ptr 자체를 Scene 간 이동한다.
 	std::vector<std::unique_ptr<Entity>> m_Entities;
-	std::future<void> m_AIFuture;
+	job_handle m_AIJob;
 
 	Entity* AddEntity(std::unique_ptr<Entity> entity);
 	Entity* CreateEntity(std::string_view name, GameObjectType type = GameObjectType::Empty, Entity::Index parentIndex = -1);
@@ -425,7 +430,7 @@ private:
     //
     // EntityHandle::sceneId에 실려 "이 슬롯이 어느 씬 것인가"를 구분하는 값.
     // 생성자에서 딱 한 번 NextSceneId()로 받고 이후 절대 바뀌지 않는다 — Scene은
-    // std::future(m_AIFuture) 멤버 때문에 복사가 불가능하고 사용자 선언 소멸자가
+    // job_handle로 바뀌어도 씬의 기존 비복사·비이동 소유 계약을 유지한다. 사용자 선언 소멸자가
     // 암묵 이동도 막는 타입이라, 한 번 배정된 값이 다른 인스턴스와 섞일 길이 없다.
     // (한때 std::mutex 멤버도 이 논거였으나 잠금으로 쓰인 적이 없어 걷어냈다.)
     //
@@ -466,7 +471,7 @@ private:
 	// Entity::OnAfterSerialize만 호출하며 detached/비점유 Entity에는 쓰지 않는다.
 	void SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& node) const;
 	// 비소유 AI registry/component snapshot이 Entity를 읽는 동안 파괴·이송하지
-	// 않도록 Scene의 구조 변경 경계에서 future를 회수한다.
+	// 않도록 Scene의 구조 변경 경계에서 AI 작업을 회수한다.
 	void DrainAIUpdate();
     // index를 부모(또는 부모가 없으면 씬 루트)의 children 목록에서 뗀다.
     void UnlinkFromParentChildren(Entity::Index index);

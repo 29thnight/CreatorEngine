@@ -8,6 +8,7 @@
 // 죽은 표면(SetEvent·문자열 FindEvent — 호출자 0, return 누락 UB)은 이주하지
 // 않았다.
 #include "Animator.h"
+#include "AnimationPlayback.h"
 #include "Entity.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
@@ -142,11 +143,12 @@ void Animator::DeleteClipEvent(int clipIndex, int eventIndex)
 	}
 }
 
-std::size_t Animator::InvokeClipEvents(int clipIndex, float currentProgress,
-	float previousProgress)
+std::size_t Animator::InvokeClipEvents(int clipIndex, double currentProgress,
+	double previousProgress)
 {
 	const AnimatorClipOverride* clipOverride = FindClipOverride(clipIndex);
-	if (nullptr == clipOverride || clipOverride->events.empty()) return 0;
+	if (nullptr == clipOverride || clipOverride->events.empty()
+        || currentProgress == previousProgress) return 0;
 
 	// 이벤트를 받을 오브젝트: 애니메이터가 붙은 것이 자식이면 부모로 올라간다.
 	// (구 C++ 경로와 같은 규칙 — 스크립트는 보통 캐릭터 루트에 붙는다)
@@ -163,41 +165,20 @@ std::size_t Animator::InvokeClipEvents(int clipIndex, float currentProgress,
 		scripts = owner->GetComponents<ScriptComponent>();
 	}
 
-	// 매칭 판정과 큐잉을 분리한다 — 계수는 CLR·스크립트 유무와 무관하게
-	// 정확해야 게이트가 헤드리스에서 발화 규칙을 판정할 수 있다(큐잉 행동은
-	// 구 InvokeEvent와 동일: 스크립트·CLR이 없으면 아무것도 안 보낸다).
-	const bool looping = IsClipLooping(clipIndex);
-	std::size_t matchedCount = 0;
-	for (const KeyFrameEvent& event : clipOverride->events)
-	{
-		bool shouldTrigger = false;
-		if (currentProgress > previousProgress)
-		{
-			// 일반 진행
-			shouldTrigger = (previousProgress < event.key
-				&& event.key <= currentProgress);
-		}
-		else if (looping)
-		{
-			// 되감긴 경우 — 구간이 끝과 처음으로 갈라진다
-			shouldTrigger = (event.key > previousProgress && event.key <= 1.0f)
-				|| (event.key >= 0.0f && event.key <= currentProgress);
-		}
-		if (!shouldTrigger) continue;
-		++matchedCount;
-
-		if (scripts.empty()) continue;
-		auto& clr = ClrHost::Get();
-		if (!clr.IsReady()) continue;
-
-		// 발생 시점에 바로 부르지 않고 큐에 담는다 — 애니메이션 갱신은 잡
-		// 스레드에서도 돌고, 경계는 틱당 한 번만 넘는다는 규약이 있다(설계
-		// 문서 02절).
-		for (ScriptComponent* script : scripts)
-		{
-			if (nullptr == script || !script->HasInstance()) continue;
-			clr.QueueScriptMessage(script->GetInstanceId(), event.m_funName);
-		}
-	}
-	return matchedCount;
+    return animation::ForEachCrossedEvent(
+        std::span<const KeyFrameEvent>(clipOverride->events),
+        previousProgress, currentProgress, IsClipLooping(clipIndex),
+        [](const KeyFrameEvent& event) { return event.key; },
+        [&scripts](const KeyFrameEvent& event)
+        {
+            if (scripts.empty()) return;
+            auto& clr = ClrHost::Get();
+            if (!clr.IsReady()) return;
+            for (ScriptComponent* script : scripts)
+            {
+                if (!script || !script->HasInstance()) continue;
+                // Delivery remains in RuntimeFrame after the animation join.
+                clr.QueueScriptMessage(script->GetInstanceId(), event.m_funName);
+            }
+        });
 }

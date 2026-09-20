@@ -68,13 +68,16 @@ $script = Join-Path $Work "bt_smoke_resolved.txt"
 if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 
 $outPath = Join-Path $Work "bt_smoke.out"
-$proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $script `
-    -WorkingDirectory $exeDir `
+$resultPath = Join-Path $Work 'bt_smoke.results.jsonl'
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) `
+    -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError (Join-Path $Work "bt_smoke.err") -PassThru
+$processHandle = $proc.Handle
 $proc.WaitForExit(300000) | Out-Null
 
 if (-not $proc.HasExited) { $proc.Kill(); "타임아웃"; exit 1 }
+$proc.WaitForExit()
 
 if (-not (Test-Path $outPath)) { "출력이 없다: $outPath"; exit 1 }
 $text = Get-Content -LiteralPath $outPath -Raw
@@ -89,28 +92,21 @@ if ($text -match 'BT 지표 없음') {
     exit 1
 }
 
-# bt.status가 남긴 줄을 순서대로 뽑는다. 시나리오에 5회 있다.
-$statusLines = [regex]::Matches($text,
-    '\[bt\.status\] 트리 (\d+)개 · 노드 타입 (\d+)종 · 틱 (\d+)회 · 건너뜀 (\d+)회')
-$crossLines = [regex]::Matches($text,
-    '\[bt\.status\] 경계 통과 (\d+)회 / 프레임 (\d+) \(프레임당 ([\d.]+)\) · 전달 틱 (\d+)건 \(크로싱당 ([\d.]+) · 최대 배치 (\d+)\)')
-
-if ($statusLines.Count -lt 5) {
-    "bt.status 출력이 5회여야 하는데 $($statusLines.Count)회다 — 시나리오가 중간에 죽었을 수 있다."
-    "종료 코드: 0x{0:X8}" -f $proc.ExitCode
-    exit 1
+# bt.status is a structured command; human-readable stdout is not its contract.
+$rows = @(Get-Content -LiteralPath $resultPath | ConvertFrom-Json)
+$statusRows = @($rows | Where-Object command -eq 'bt.status')
+if (@($rows | Where-Object status -ne 'succeeded').Count -ne 0 -or $statusRows.Count -ne 5) {
+    throw "BT scenario failed or did not return exactly five snapshots: $resultPath"
 }
-
 function Get-Stat([int]$i) {
-    $m = $statusLines[$i]
+    $data = $statusRows[$i].data
     [pscustomobject]@{
-        Trees   = [int]$m.Groups[1].Value
-        Types   = [int]$m.Groups[2].Value
-        Ticks   = [long]$m.Groups[3].Value
-        Skipped = [long]$m.Groups[4].Value
+        Trees = [int]$data.treeCount
+        Types = [int]$data.nodeTypeCount
+        Ticks = [long]$data.tickCount
+        Skipped = [long]$data.skippedCount
     }
 }
-
 $before  = Get-Stat 0   # 소환 전
 $spawned = Get-Stat 1   # 소환 직후(재생 전)
 
@@ -153,13 +149,13 @@ if ($cleared.Trees -ne 0) { $failed += "씬 교체 후 트리가 $($cleared.Tree
 if ($spawned.Types -le 0) { $failed += "등록된 사용자 노드 타입이 0종이다(생성기 배선 확인)" }
 
 # 8·9 · 경계 불변식. 이 재설계의 핵심 주장이라 수치로 못을 박는다.
-if ($crossLines.Count -lt 3) {
-    $failed += "경계 계수 출력이 3회 미만이다($($crossLines.Count)회)"
+if ($statusRows.Count -lt 3) {
+    $failed += "경계 계수 출력이 3회 미만이다($($statusRows.Count)회)"
 } else {
-    $c = $crossLines[2]  # 재생 구간(bt.reset 직후부터)
-    $perFrame    = [double]$c.Groups[3].Value
-    $perCrossing = [double]$c.Groups[5].Value
-    $crossings   = [long]$c.Groups[1].Value
+    $c = $statusRows[2].data  # 재생 구간(bt.reset 직후부터)
+    $perFrame    = [double]$c.perFrame
+    $perCrossing = [double]$c.perCrossing
+    $crossings   = [long]$c.crossings
 
     if ($crossings -le 0) { $failed += "재생 구간에 경계 통과가 0회다 — BT가 넘어가지 않았다" }
     if ($perFrame -gt 1.0) { $failed += "프레임당 크로싱이 $perFrame 이다(1.00 이하여야 한다)" }
@@ -212,10 +208,10 @@ if ($proc.ExitCode -ne 0) { $failed += ("종료 코드 0x{0:X8}" -f $proc.ExitCo
 "재생 뒤   트리 {0}개 · 틱 {1} · 건너뜀 {2}" -f $playing.Trees, $playing.Ticks, $playing.Skipped
 "정지 뒤   트리 {0}개 · 틱 {1}" -f $stopped.Trees, $stopped.Ticks
 "씬 교체 뒤 트리 {0}개" -f $cleared.Trees
-if ($crossLines.Count -ge 3) {
-    $c = $crossLines[2]
+if ($statusRows.Count -ge 3) {
+    $c = $statusRows[2].data
     "경계      통과 {0}회 / 프레임 {1} (프레임당 {2}) · 크로싱당 {3}틱 · 최대 배치 {4}" -f `
-        $c.Groups[1].Value, $c.Groups[2].Value, $c.Groups[3].Value, $c.Groups[5].Value, $c.Groups[6].Value
+        $c.crossings, $c.flushCalls, $c.perFrame, $c.perCrossing, $c.maxBatch
 }
 ""
 

@@ -21,7 +21,7 @@ namespace RenderTest
     bool RunIncrementalModelCancellationSelfTest(const std::string& guardPath)
     {
         Scene* scene = SceneManagers->GetActiveScene();
-        const auto generation = DataSystems->FindModelAssetGenerationByStem("Gunner_F_Mythic");
+        const auto generation = DataSystems->FindModelAssetGenerationByStem("CreatorRobot");
         if (!scene || !generation) return false;
         auto pending = ModelSceneInstantiation::PendingInstance::Prepare(generation, {});
         if (!pending) return false;
@@ -66,8 +66,8 @@ namespace RenderTest
             std::size_t generationTextures{};
             std::size_t otherTextures{};
             std::size_t missingTextures{};
-            std::size_t gunnerRenderers{};
-            std::size_t gunnerEmbedded{};
+            std::size_t robotRenderers{};
+            std::size_t robotEmbedded{};
             std::string firstProblem{};
 
             void Note(const std::string& text)
@@ -127,9 +127,9 @@ namespace RenderTest
             {
                 tally.Note("meshAssetId " + entityName);
             }
-            const bool isGunner =
-                generation->SourcePath().filename().string() == "Gunner_F_Mythic.glb";
-            if (isGunner) ++tally.gunnerRenderers;
+            const bool isRobot =
+                generation->SourcePath().filename().string() == "CreatorRobot.glb";
+            if (isRobot) ++tally.robotRenderers;
             if (!renderer.m_Material) return;
 
             for (const MaterialPropertyValue& value : renderer.m_Material->m_propertyValues)
@@ -139,7 +139,7 @@ namespace RenderTest
                 if (nullptr == generation->FindTexture(value.m_textureGuid.m_guid))
                     continue; // 외부 텍스처 자산 — 이 축 밖(파일 경로 해석)
                 ++tally.embeddedProps;
-                if (isGunner) ++tally.gunnerEmbedded;
+                if (isRobot) ++tally.robotEmbedded;
 
                 const std::shared_ptr<Texture> owner =
                     renderer.m_Material->GetTextureMapShared(value.m_name);
@@ -190,7 +190,7 @@ namespace RenderTest
             DataSystems->SnapshotModelAssetGenerations();
 
         // "0개를 비교해 차이 0"을 통과로 읽지 않는다 — renderer·generation·embedded
-        // 계수가 실제로 움직였을 때만 pass다(Gunner 씬은 embedded 6이 정확히 나와야 한다).
+        // 계수가 실제로 움직였을 때만 pass다(Robot은 renderer당 embedded texture property 4개가 있어야 한다).
         bool passed = tally.renderers > 0 && tally.generationBound > 0
             && 0 == tally.unbound && 0 == tally.handleInvalid
             && tally.rhiView == tally.generationBound
@@ -198,12 +198,12 @@ namespace RenderTest
             && tally.embeddedProps == tally.generationTextures
             && 0 == tally.otherTextures
             && 0 == tally.missingTextures;
-        if (tally.gunnerRenderers > 0
-            && !(tally.gunnerRenderers >= 2u && 6u == tally.gunnerEmbedded))
+        if (tally.robotRenderers > 0
+            && !(tally.robotRenderers >= 4u && tally.robotRenderers * 4u == tally.robotEmbedded))
         {
             passed = false;
-            tally.Note("gunner closure renderers=" + std::to_string(tally.gunnerRenderers)
-                + " embedded=" + std::to_string(tally.gunnerEmbedded));
+            tally.Note("robot closure renderers=" + std::to_string(tally.robotRenderers)
+                + " embedded=" + std::to_string(tally.robotEmbedded));
         }
 
         char line[768]{};
@@ -211,13 +211,13 @@ namespace RenderTest
             "[CLI] assets.scenemodel %s renderers=%zu generation=%zu unbound=%zu"
             " handleInvalid=%zu rhiView=%zu meshIdPersisted=%zu"
             " textureProps=%zu embedded=%zu generationTextures=%zu"
-            " otherTextures=%zu missing=%zu gunner=%zu/%zu cacheLive=%zu cacheCreated=%llu"
+            " otherTextures=%zu missing=%zu robot=%zu/%zu cacheLive=%zu cacheCreated=%llu"
             " cacheHits=%llu generations=%zu%s%s\n",
             passed ? "pass" : "fail", tally.renderers, tally.generationBound,
             tally.unbound, tally.handleInvalid, tally.rhiView, tally.meshIdPersisted,
             tally.textureProps, tally.embeddedProps, tally.generationTextures,
             tally.otherTextures, tally.missingTextures,
-            tally.gunnerRenderers, tally.gunnerEmbedded, cache.live,
+            tally.robotRenderers, tally.robotEmbedded, cache.live,
             static_cast<unsigned long long>(cache.created),
             static_cast<unsigned long long>(cache.hits), generations.currentAssets,
             tally.firstProblem.empty() ? "" : " first=",
@@ -237,8 +237,8 @@ namespace RenderTest
             report->generationTextures = tally.generationTextures;
             report->otherTextures = tally.otherTextures;
             report->missingTextures = tally.missingTextures;
-            report->gunnerRenderers = tally.gunnerRenderers;
-            report->gunnerEmbedded = tally.gunnerEmbedded;
+            report->robotRenderers = tally.robotRenderers;
+            report->robotEmbedded = tally.robotEmbedded;
         }
         return passed;
     }

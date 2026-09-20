@@ -91,8 +91,8 @@ function New-SoakCommands([int]$Samples) {
     # 첫 대기가 렌더 예열을 겸한다(캡처 게이트와 같은 이유).
     $commands.Add('wait 2000')
     $commands.Add('editor.viewport game')
-    $commands.Add("model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"")
-    $commands.Add('model.place Gunner_F_Mythic')
+    $commands.Add("model.loadcached `"$root/Dynamic_CPP/Assets/Models/CreatorRobot.glb`"")
+    $commands.Add('model.place CreatorRobot')
     # probe 의 첫 generation 인스턴스(Anchor). 끝까지 지우지 않는다 — 옛 generation 을 그리는 쪽이다.
     #
     # ★ 이름을 바꾸지 않는다. `object.rename` 은 옛 이름을 이름 집합에서 놓지 않아(2026-09-16
@@ -111,7 +111,7 @@ function New-SoakCommands([int]$Samples) {
         $angle = ($i * 23) % 360
         $z = 2.0 + [math]::Sin($i * 0.4)
         $commands.Add(
-            ('object.transform Gunner_F_Mythic 0 0 {0:0.###} 0 {1} 0 0.025 0.025 0.025' -f $z, $angle))
+            ('object.transform CreatorRobot 0 0 {0:0.###} 0 {1} 0 1 1 1' -f $z, $angle))
         $commands.Add("wait $framesPerSample")
         $commands.Add('render.pbr.sealstatus')
 
@@ -254,7 +254,7 @@ try {
 
     # ── 재임포트 축: 자극했음을 수로 단정한다 ──
     $placedNames = @($results | Where-Object command -eq 'model.place' | ForEach-Object { $_.data.name })
-    $unexpectedNames = @($placedNames | Where-Object { $_ -notin @('Gunner_F_Mythic', $probeName, "$probeName (1)") })
+    $unexpectedNames = @($placedNames | Where-Object { $_ -notin @('CreatorRobot', $probeName, "$probeName (1)") })
     if ($unexpectedNames.Count -gt 0) {
         throw "배치 이름이 예측과 다르다($($unexpectedNames[0])) — Fresh 를 지우지 못해 쌓이고 있다; artifacts: $run"
     }

@@ -53,28 +53,19 @@ void AnimationController::SetCurState(std::string stateName)
 
 std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
-#pragma region OLD_CODE
 	if (!m_curState)
 	{
-		if (!StateVec.size() >= 2)   //0���� anystate�����
+		// Select the first playable state, regardless of AnyState name/order.
+		for (const auto& state : StateVec)
 		{
-			if (StateVec[1].get()->m_name != "Ani State")
-			{
-				m_curState = StateVec[1].get();
-			}
-			else
-			{
-				m_curState = StateVec[0].get();
-			}
-		}
-		else
-		{
-			return nullptr;
+			if (!state || state->m_isAny || state->AnimationIndex < 0) continue;
+			m_curState = state.get();
+			m_AnimationIndex = state->AnimationIndex;
+			if (m_owner) m_owner->m_AnimIndexChosen = m_AnimationIndex;
+			break;
 		}
 	}
-
-	if (m_curState == nullptr) return nullptr;
-
+	if (!m_curState) return nullptr;
 
 	AnimationState* aniState = GetAniState().get();
 	if (aniState)
@@ -105,7 +96,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	{
 		transState = m_nextState;
 	}
-	if (transState->Transitions.empty()) return nullptr;
+	if (!transState || transState->Transitions.empty()) return nullptr;
 
 	
 	for (auto& trans : transState->Transitions)
@@ -126,50 +117,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 		}
 	}
 	return nullptr;
-#pragma endregion
-	//if (!m_curState) 
-	//{
-	//	if (StateVec.size() >= 2) 
-	//	{
-	//		m_curState = (StateVec[1]->m_name != "Ani State") ? StateVec[1].get() : StateVec[0].get();
-	//	}
-	//	else 
-	//	{
-	//		return nullptr;
-	//	}
-	//}
 
-	//// 1) AnyState ĳ�� ���
-	//if (auto aniState = GetAniState()) 
-	//{
-	//	for (auto& trans : aniState->Transitions) 
-	//	{
-	//		if (trans->hasExitTime && trans->GetExitTime() >= curAnimationProgress)
-	//			continue;
-
-	//		if (trans->CheckTransiton()) 
-	//		{
-	//			// BUG FIX: �����ݷ� ����
-	//			if (trans->nextState != nullptr && m_curState != trans->nextState)
-	//				return trans;
-	//		}
-	//	}
-	//}
-
-	//// 2) ���� ������ ������ ���� ������ 1���� ����
-	//AnimationState* transState = m_isBlend ? m_nextState : m_curState;
-	//if (!transState || transState->Transitions.empty()) return nullptr;
-
-	//const bool checkBlend = m_isBlend;
-	//for (auto& trans : transState->Transitions) 
-	//{
-	//	if (trans->hasExitTime && trans->GetExitTime() >= (checkBlend ? nextAnimationProgress : curAnimationProgress))
-	//		continue;
-
-	//	if (trans->CheckTransiton(checkBlend))
-	//		return trans;
-	//}
-	//return nullptr;
 }
 
 
@@ -279,7 +227,7 @@ std::shared_ptr<AnimationState> AnimationController::GetAniState()
 {
 	for (auto& state : StateVec)
 	{
-		if (state->m_isAny == true)
+		if (state && state->m_isAny == true)
 			return state;
 	}
 	return nullptr;

@@ -217,8 +217,8 @@ public:
 
 	// ⚠ 담는 쪽은 스레드 안전해야 한다.
 	//
-	// AI 갱신은 게임 스레드가 아니라 std::async가 띄운 스레드에서 돈다
-	// (Scene::EndFramePass 말미의 m_AIFuture). 즉 QueueAITick은 그 스레드에서 불린다.
+	// AI 갱신은 게임 스레드가 아니라 공용 job_scheduler 워커에서 돈다
+	// (Scene::EndFramePass 말미의 m_AIJob). 즉 QueueAITick은 그 스레드에서 불린다.
 	// 반대로 Flush는 게임 스레드 전용이다 — 관리 측 호출은 GC 때문에 그래야 한다.
 	// 애니메이션 키프레임(ScriptMessage)이 같은 상황이고 같은 규약을 쓴다.
 	void QueueAITick(int instanceId, float deltaTime);

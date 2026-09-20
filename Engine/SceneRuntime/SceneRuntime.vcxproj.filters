@@ -424,6 +424,9 @@
     <ClInclude Include="AnimationController.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="AnimationPlayback.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
     <ClInclude Include="AnimationState.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>

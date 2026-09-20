@@ -77,7 +77,7 @@ private:
 	// 비소유 컴포넌트 포인터만 보관한다. DDOL 이송은 씬 편입/이탈 훅에서
 	// 옛 핸들을 제거하고 새 씬 핸들로 다시 등록한다.
 	plf::colony<std::pair<EntityHandle, IAIComponent*>> m_aiComponentMap;
-	// 업데이트는 Scene::m_AIFuture에서, 등록/해지는 게임 스레드에서 일어난다.
+	// 업데이트는 Scene::m_AIJob에서, 등록/해지는 게임 스레드에서 일어난다.
 	// 컨테이너는 잠금 아래 snapshot만 만들고 실제 AI 코드는 잠금 밖에서 실행한다.
 	mutable std::mutex m_aiComponentMutex;
 	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시

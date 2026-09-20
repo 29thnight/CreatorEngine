@@ -18,6 +18,7 @@
 #include "InputActionManager.h"
 #include "EngineMode.h"
 #include "EngineLaunchConfig.h"
+#include "JobScheduler.h"
 
 #include <cstdio>
 #include <cstring>
@@ -164,6 +165,9 @@ namespace EngineBootstrap
         SceneManager::GetInstance();
         ComponentFactory::GetInstance();
 
+        // One engine-owned pool for Editor and Player, independent of scene lifetimes.
+        ce::get_job_scheduler().start();
+
         return true;
     }
 
@@ -175,6 +179,7 @@ namespace EngineBootstrap
     {
         SHUTDOWN_STEP(ComponentFactory::Destroy());
         SHUTDOWN_STEP(SceneManager::Destroy());
+        SHUTDOWN_STEP(ce::get_job_scheduler().shutdown());
         SHUTDOWN_STEP(PhysicsManager::Destroy());
         SHUTDOWN_STEP(PhysicX::Destroy());
 		SHUTDOWN_STEP(TagManager::Destroy());

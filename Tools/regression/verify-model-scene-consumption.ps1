@@ -1,42 +1,8 @@
-# PHASE 3.75 MBC7 — Scene/MeshRenderer/material 직접 소비 + Gunner cold-load closure.
-#
-# ── 이 게이트가 메우는 구멍 ──
-#
-# MBC6은 RHI·패스가 typed `RHIModelMeshView`를 소비하게 했지만 그 뷰를 채우는
-# 제품 코드는 0곳이었다(합성 selftest만). MBC7은 MeshRenderer가 모델
-# `ModelAssetGeneration`을 붙들고 프록시→drawPool이 그 뷰를 채우며, 재질의 embedded
-# texture를 전역 임베디드 등록부·이름 폴백·로드 순서가 아니라 그 generation
-# closure에서 푼다(§6.2 Gunner). 이 게이트는 그 세 가지를 **실씬·실프로세스**로 잰다.
-#
-# ── 시나리오 ──
-#
-#   A(저작 프로세스) FT_Primitives(카메라·광원·UUIDv8 프리미티브 8) 위에 Gunner를
-#     cache 로드(model.loadcached — import를 타지 않아 tracked sidecar를 건드리지
-#     않는다) → 배치(model.place) → 카메라를 삼키지 않게 이동 → assets.scenemodel
-#     → 저장. dx12.scene은 활성 카메라를 요구하므로 빈 씬으로는 7을 잴 수 없다.
-#   B(콜드 프로세스) 저장 씬 로드 → assets.scenemodel → 같은 세대 ContentReload
-#     중복 알림(assets.scenemodel reload) → dx12.scene 렌더.
-#
-# ── 판정 항목 ──
-#
-#   1  배치가 typed 정본을 탔다             — [model.instantiate] generation: Gunner 1회
-#   2  씬 전수 typed 폐포(A)                — assets.scenemodel pass, generation ≥ 2,
-#      legacyOnly 0, embedded 6 = generationTextures 6, registryTextures 0, missing 0
-#   3  저장 씬에 영속 MeshId가 적혔다        — m_meshAssetId: <UUIDv8> ≥ 2
-#   4  콜드 로드 해석이 generation이다      — [mesh.resolve] generation: ≥ 10 · legacy 0 ·
-#      experiment 0 (FT 프리미티브 8 + Gunner 2, 전부 UUIDv8이라 전량 typed여야 한다)
-#   5  콜드 로드 폐포(B) — 2와 같은 조건    ★ 같은 프로세스의 이전 로드·등록부 없이
-#      6/6이 closure에서 온다(순서 해킹 없이 성립하는 것을 증명하는 축)
-#   6  같은 세대의 중복 알림은 owner 보존 — reused=6 retired=0 sameAggregate=true.
-#      실제 신세대 교체·실패 보존은 verify-model-generation-atomicity.ps1이 별도로 잰다.
-#   7  실GPU 렌더가 typed 업로드다          — dx12.scene 통과, 메시 업로드 N == generation N ≥ 1,
-#      handle(experiment 핸들 진입점) 0, 커버리지 > 0. `experiment` 계수는 packed 정점
-#      전체(attributeMask != 0 — generation 포함)라 판정 축이 아니다.
-#   8  정적 — 순서 해킹 토큰(modelGuidHint) 0, typed 배선 심볼 존재, stderr 공백, exit 0
-#
-# ★ 자가 틀렸을 때: 2/5가 embedded=0이면 Gunner 재질 GUID가 실리지 않은 것이고
-#   (0개 비교 통과 금지 — selftest가 gunner 6을 요구한다), 7의 experiment/handle이
-#   0이 아니면 프록시가 typed 뷰를 흘려 폴백이 받친 것이다.
+# Scene/MeshRenderer/material 직접 소비와 CreatorRobot cold-load closure.
+# A: FT_Primitives 위에 Scale 1 로봇 배치 -> 4 renderer / 16 texture property 검증 -> 저장.
+# B: 별도 프로세스로 로드 -> 같은 검증 -> 중복 reload -> 실 GPU 업로드/커버리지.
+# 고유 texture owner는 12개이며 ORM은 MetallicRoughness/Occlusion이 공유한다.
+# 중복 reload는 같은 generation과 owner 12개를 유지해야 한다.
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
@@ -89,10 +55,10 @@ function Invoke-Editor([string]$Label, [string[]]$Commands) {
 
 function Assert-SceneModelClosure([string]$Label, $Results) {
     $data = Get-SucceededCommand @($Results | Where-Object { $_.command -ne 'assets.scenemodel' -or -not $_.data.reload }) 'assets.scenemodel'
-    if ($data.generationBound -lt 2 -or $data.unbound -ne 0 -or $data.handleInvalid -ne 0 -or
+    if ($data.generationBound -lt 4 -or $data.unbound -ne 0 -or $data.handleInvalid -ne 0 -or
         $data.rhiView -ne $data.generationBound -or $data.meshIdPersisted -ne $data.generationBound -or
-        $data.embeddedProps -ne 6 -or $data.generationTextures -ne 6 -or $data.otherTextures -ne 0 -or
-        $data.missingTextures -ne 0 -or $data.gunnerEmbedded -ne 6) {
+        $data.embeddedProps -ne 16 -or $data.generationTextures -ne 16 -or $data.otherTextures -ne 0 -or
+        $data.missingTextures -ne 0 -or $data.robotEmbedded -ne 16) {
         Add-Failure "$Label typed scene model closure failed: $($data | ConvertTo-Json -Compress)"
     }
 }
@@ -109,13 +75,13 @@ try {
     if (-not (Test-Path -LiteralPath $Editor -PathType Leaf)) {
         throw "CreatorEditor 실행 파일이 없다: $Editor"
     }
-    $gunner = Join-Path $root 'Dynamic_CPP\Assets\Models\Gunner_F_Mythic.glb'
-    if (-not (Test-Path -LiteralPath $gunner -PathType Leaf)) { throw "스킨 모델이 없다: $gunner" }
+    $robot = Join-Path $root 'Dynamic_CPP\Assets\Models\CreatorRobot.glb'
+    if (-not (Test-Path -LiteralPath $robot -PathType Leaf)) { throw "스킨 모델이 없다: $robot" }
     $baseScene = Join-Path $root 'Dynamic_CPP\Assets\Scenes\FT_Primitives.creator'
     if (-not (Test-Path -LiteralPath $baseScene -PathType Leaf)) { throw "기준 씬이 없다: $baseScene" }
     New-Item -ItemType Directory -Path $run -Force | Out-Null
     if ($run -match '\s') { throw "console 인자로 넘길 작업 경로에 공백이 있다: $run" }
-    $savedScene = (Join-Path $run 'mbc7_gunner.creator').Replace('\', '/')
+    $savedScene = (Join-Path $run 'mbc7_robot.creator').Replace('\', '/')
 
     # ── A: 저작 프로세스 — 배치·폐포·저장 ──
     $author = Invoke-Editor 'author' @(
@@ -124,17 +90,17 @@ try {
         # `wait 2000` 은 Release 에서 첫 프레임(ShaderMeta 반영 ~24초)을 덮지 못했다 —
         # B 의 주석과 render.live.wait 핸들러 주석 참고.
         'render.live.wait',
-        "model.loadcached $($gunner.Replace('\', '/'))",
+        "model.loadcached $($robot.Replace('\', '/'))",
         'wait 60',
-        'model.place Gunner_F_Mythic',
+        'model.place CreatorRobot',
         'wait 60',
         # 원점의 캐릭터는 씬 카메라를 삼켜 커버리지가 전면이 된다 — 저작값으로 옮겨
         # 저장·재로드에 반영한다(vertex-live 게이트와 같은 처방).
-        'object.transform Gunner_F_Mythic 1.5 0 0 0 0 0 0.3 0.3 0.3',
+        'object.transform CreatorRobot 1.5 0 0 0 0 0 1 1 1',
         'wait 10',
         # 애니메이션 틱은 실시간이라 렌더가 비결정적이다 — 저장 전에 꺼서 B가
         # 결정적 바인드 포즈로 그리게 한다(vertex-live 게이트와 같은 처방).
-        'object.property Gunner_F_Mythic Animator m_isEnabled false',
+        'object.property CreatorRobot Animator m_isEnabled false',
         'wait 10',
         'assets.modeldiag',
         'assets.scenemodel',
@@ -146,7 +112,7 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($author.Stderr)) { Add-Failure 'A stderr가 비어 있지 않다.' }
     # MBC10 — 배치 관측은 읽기 전용 스냅샷이다(제품 stdout 토큰 없음).
     $authorDiag = Get-SucceededCommand $author.Results 'assets.modeldiag'
-    if ($authorDiag.instantiateGeneration -ne 1 -or $authorDiag.lastInstantiated -ne 'Gunner_F_Mythic' -or $authorDiag.instantiateRejected -ne 0) { Add-Failure 'A typed model placement coverage failed' }
+    if ($authorDiag.instantiateGeneration -ne 1 -or $authorDiag.lastInstantiated -ne 'CreatorRobot' -or $authorDiag.instantiateRejected -ne 0) { Add-Failure 'A typed model placement coverage failed' }
     if ($author.Stdout -match '\[(mesh\.resolve|model\.instantiate|anim\.tick|material\.finalize)\]') {
         Add-Failure '1c 제품 경로가 무조건 진단 토큰을 다시 찍는다(MBC10).'
     }
@@ -156,7 +122,7 @@ try {
     $sceneText = [IO.File]::ReadAllText($savedScene)
     $meshIds = [regex]::Matches($sceneText,
         'm_meshAssetId: [0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}')
-    if ($meshIds.Count -lt 2) { Add-Failure "3 저장 씬의 UUIDv8 m_meshAssetId가 2 미만이다: $($meshIds.Count)" }
+    if ($meshIds.Count -lt 4) { Add-Failure "3 저장 씬의 UUIDv8 m_meshAssetId가 4 미만이다: $($meshIds.Count)" }
     if ($sceneText -match 'm_meshAssetId: 00000000-0000-0000-0000-000000000000') {
         Add-Failure '3 nil m_meshAssetId가 저장됐다(해석 실패 renderer).'
     }
@@ -174,7 +140,7 @@ try {
         'render.live.wait',
         'assets.modeldiag',
         'assets.scenemodel',
-        'assets.scenemodel reload Gunner_F_Mythic',
+        'assets.scenemodel reload CreatorRobot',
         # 중복 알림 뒤에도 실제 scene 렌더가 이어져야 한다.
         'render.live.wait',
         'dx12.scene',
@@ -182,12 +148,12 @@ try {
     if ($cold.ExitCode -ne 0) { Add-Failure "B 종료 코드 $($cold.ExitCode)" }
     Assert-RenderWaits 'B' $cold.Results 2
     if (-not [string]::IsNullOrWhiteSpace($cold.Stderr)) { Add-Failure 'B stderr가 비어 있지 않다.' }
-    # FT 프리미티브 8 + Gunner 2 — UUIDv8 corpus라 전량 typed여야 한다(해석 실패 0).
+    # FT 프리미티브 8 + Robot 4 — UUIDv8 corpus라 전량 typed여야 한다(해석 실패 0).
     $coldDiag = Get-SucceededCommand $cold.Results 'assets.modeldiag'
-    if ($coldDiag.meshResolveGeneration -lt 10 -or $coldDiag.meshResolveFailed -ne 0) { Add-Failure 'Cold typed model resolution coverage failed' }
+    if ($coldDiag.meshResolveGeneration -lt 12 -or $coldDiag.meshResolveFailed -ne 0) { Add-Failure 'Cold typed model resolution coverage failed' }
     Assert-SceneModelClosure '5(B)' $cold.Results
     $reload = Get-SucceededCommand @($cold.Results | Where-Object { $_.command -eq 'assets.scenemodel' -and $_.data.reload }) 'assets.scenemodel'
-    if ($reload.textures -ne 6 -or $reload.reused -ne 6 -or $reload.created -ne 0 -or
+    if ($reload.textures -ne 12 -or $reload.reused -ne 12 -or $reload.created -ne 0 -or
         $reload.retired -ne 0 -or -not $reload.sameAggregate) { Add-Failure 'Duplicate reload failed to preserve generation and texture owners' }
     $sceneData = Get-SucceededCommand $cold.Results 'dx12.scene'
     if ($sceneData.meshUploads -lt 1 -or $sceneData.generationUploads -ne $sceneData.meshUploads -or $sceneData.coverage -le 0) { Add-Failure 'Typed GPU upload and coverage failed' }
@@ -226,7 +192,7 @@ if ($failures.Count -gt 0) {
     exit 1
 }
 $summary
-'통과 — Scene/MeshRenderer typed generation·Gunner cold closure 6/6, 중복 reload의 model/texture owner 보존, 실GPU 업로드 전량 typed'
+'통과 — Scene/MeshRenderer typed generation·CreatorRobot cold closure 16/16, unique textures 12, 중복 reload의 model/texture owner 보존, 실GPU 업로드 전량 typed'
 if (-not $PreserveArtifacts) {
     $workRoot = [IO.Path]::GetFullPath($Work).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
     $runPath = [IO.Path]::GetFullPath($run)

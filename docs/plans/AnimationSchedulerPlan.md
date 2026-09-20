@@ -1,115 +1,103 @@
 # 애니메이션 스케줄러 · LOD · CPU 버짓 재설계 (PHASE 13)
 
-2026-08-11 수립 · **2026-08-19 개정**(§1.5 대조 실측 추가, §2 설계 재구성, §3 단계 재배치).
+2026-08-11 수립 · 2026-08-19 설계 개정 · **2026-09-20 S0 완료·S0.5 공용 풀 이관**.
 
-애니메이션 런타임을 전수 추적한 결과, 본 행렬 계산이 **문자열
-키 트리 탐색 위에서, 공유 애셋에 쓰기 경합을 일으키며, 화면 밖 캐릭터까지
-전부 풀틱**으로 돌고 있다.
+목표는 애니메이션 평가를 Pose 값·태스크 레시피·도달성 실행으로 바꾸고,
+그 위에 가시성 LOD와 프레임 CPU 버짓을 얹는 것이다.
 
-초판은 언리얼 **Animation Budget Allocator** 구도의 이식만을 목표로 했다.
-8-19 개정에서 언리얼·유니티·Lumina 세 엔진과 대조한 결과(§1.5), 버짓만으로는
-부족하다는 것이 드러났다 — **평가 엔진 자체가 한 세대 뒤**이고, 버짓은 그
-위에 얹히는 상위 장치다. 그래서 이 페이즈는 두 겹이 된다:
+1. 시간·progress·키프레임 이벤트는 포즈 평가 빈도와 분리한다.
+2. 공유 모델 generation은 불변이다. 가변 재생 상태는 인스턴스가 소유한다.
+3. 빠른 경로를 기본값으로 유지하고, 에디터 프리뷰는 L0로 평가한다.
 
-```
-[아래층 — 평가 엔진 현대화]
-  Pose(SoA TRS 값) → 태스크 레시피 기록 → 도달성 실행(워커별 버퍼 풀)
-                                            ↓
-[위층 — 배분]                      레시피 강등 LOD(L0~L7)
-  Significance(거리·화면·가시성) → 태스크 EMA 기반 CPU 버짓 배분
-                                            ↓
-  관측 본만 Transform 투영 → 프레임 팔레트 아레나 → ProxyCommand
-```
+**현재 상태:** S0·S0.5 완료. S0.5의 공용 thread_pool·job_scheduler와 DataSystem·썸네일·Animation·Foliage·AI 이관은 Debug/Release 빌드·제품 회귀, Release DX12 화면·썸네일·AI/BT 회귀를 통과했다.
+통일을 우선하며 성능 비교는 완료 조건에서 제외한다. 현재 검증·잔여 범위는 §9를 따른다.
+S1~S7은 미완료, S8 VM은 중단이며 이 페이즈 완료 범위에서 제외한다.
+아래 현황이 8월 조사보다 우선한다. 과거 공수는 재산정 전 참고치이며 남은 공수가 아니다.
 
-원칙 둘을 먼저 박는다.
-
-1. **시간은 항상 전진하고, 건너뛰는 것은 포즈 계산뿐이다.**
-   `curAnimationProgress` 기반 게임플레이 판정(`endAnimation` 등)과 키프레임
-   이벤트는 틱 레이트와 무관하게 보존된다 — 언리얼과 같은 결정이다.
-2. **빠른 경로가 기본값이다.** 유니티는 같은 문제를 옵트인 탈출구(Optimize
-   Game Objects · `StringToHash` · culling mode)로 풀었고, 그래서 "알면 빠르고
-   모르면 느린" 시스템이 됐다(§1.5). 이 설계의 최적화는 전부 기본 동작이며
-   저작자가 알아야 켜지는 스위치를 두지 않는다.
-
----
-
-## 1. 지금 무엇이 있는가 — 실측 (2026-08-11)
+## 1. 현재 코드 기준선 (2026-09-20)
 
 ### 1.1 호출 사슬
 
+```text
+Runtime::TickSimulationFrame
+ └ SceneManager::GameLogic
+    ├ Scene::Update → AnimatorSystem::Update → Controller FSM
+    ├ InternalAnimationUpdateEvent → AnimationJob::Update
+    │  ├ Animator당 작업 하나 → job_group → 공용 job_scheduler/enkiTS
+    │  ├ 불변 ModelAssetGeneration → 인스턴스 포즈·이벤트 큐
+    │  └ join → Scene::PublishAnimatorPose + 소켓 Transform 반영
+    └ Scene::LateUpdate
+ 이후 RuntimeFrame::TickManagedPostPhysics → FlushScriptMessages → C#
+ 렌더 발행: ProxyCommand → PrimitiveRenderProxy → EnhancedDrawItem → 스키닝
 ```
-SceneManager::GameLogic (SceneManager.cpp:205-224)
- ├ Scene::Update → RegistryTick → Animator::Update        · FSM 전이만, 단일 스레드
- ├ InternalAnimationUpdateEvent.Broadcast
- │   └ AnimationJob::Update (ScriptBinder\AnimationJob.cpp:55-313)
- │       애니메이터 1개 = 태스크 1개 → 전용 ThreadPool(8) → NotifyAllAndWait (fork-join)
- └ Scene::LateUpdate → UpdateRenderData → ProxyCommand
-       Animator::m_FinalTransforms → m_palleteMap memcpy 32KB (ProxyCommand.cpp:106)
-```
 
-3-2G 이후 렌더 입력은 게임 스레드가 애니메이션·RenderScene delta 갱신을 끝낸 뒤
-immutable frame packet으로 발행하고, 전용 RenderThread가 bounded latest-wins queue에서
-소비한다. PresentationThread는 완료 display snapshot만 표시한다. 따라서 애니메이션
-fork-join은 packet 밀봉 전에 끝난다는 순서만 유지하며 렌더 스레드와 3자 배리어로
-락스텝하지 않는다. 이 골격(전용 단계 + fork-join)은 유지할 가치가 있고, 문제는 그
-안에서 도는 내용물이다.
+구현은 `Engine/SceneRuntime/AnimationJob.cpp`, 헤더·소유자는 아직 RenderEngine의
+`AnimationJob.h`·`RenderScene`이다. 렌더는 불변 프레임 packet을 별도 스레드에서 소비한다.
+S6에서 소유 경계를 정리하되, 애니메이션 join은 packet 발행 전에 끝나야 한다.
 
-### 1.2 정확성 결함 — 지혈 대상 (R1~R6)
+### 1.2 정확성 — 기존 결함과 S0 잔여를 구분한다
 
-| # | 결함 | 근거 |
+| 항목 | 9-20 정찰 결과 | S0 처리 |
 |---|---|---|
-| R1 | **공유 애셋 동시 쓰기 레이스.** `Skeleton`·`Animation`은 `DataSystem::Models` 캐시로 같은 모델의 모든 인스턴스가 공유하는데(`ComponentFactory.cpp:262`), 워커 8스레드가 `Animation::curKey`(`AnimationJob.cpp:368,419` → `Animation.h:48`)와 `Bone::m_global/localTransform`(`AnimationJob.cpp:377-378,422-423`)에 동시 기록. 같은 모델 2체면 레이스. `curKey`는 읽는 곳도 없다(죽은 캐시) | AnimationJob.cpp · Animation.h:48 |
-| R2 | **`operator[]`가 공유 애셋을 오염 + OOB.** `UpdateBlendBone`이 다음 클립에는 `find` 없이 `nextanimation->m_nodeAnimations[boneName]`(`:366`) — 채널이 없으면 빈 `NodeAnimation`이 **애셋 map에 삽입**되고(워커에서 map 구조 변경) `calculAni`가 빈 `m_positionKeys[0]`을 읽는다(`:651`) | AnimationJob.cpp:366,651 |
-| R3 | ~~**죽은 참조 하나가 나머지 전부를 건너뛴다.** 애니메이터 순회 중 `if (animator == nullptr) return;` — `continue`가 아니라 `return`~~ **→ 8-19 확인: 해소됨.** K2 리팩터(`shared_ptr` 관찰 → 프레임-로컬 raw 포인터)가 `continue`로 고쳤고 "적대 리뷰 발견 1"로 근거를 남겼다 | AnimationJob.cpp:100-116 |
-| R4 | **`CurrentKeyIndex`가 -1을 반환하면 `keys[-1]`.** 비루프 클립이 duration에 클램프될 때 time이 마지막 키 시간을 넘으면 -1이 그대로 인덱스로 쓰인다 | AnimationJob.cpp:20-32,654-660 |
-| R5 | **연산자 우선순위 버그.** `if (!StateVec.size() >= 2)` = `(!size) >= 2` = 항상 거짓 — 기본 상태 확정 분기가 죽어 있다 | AnimationController.cpp:60 |
-| R6 | **워커 스레드에서 C# 키프레임 이벤트 발화.** `InvokeEvent`(`:156,280`)가 스레드풀 람다 안에서 매니지드 콜백 진입 — `ClrHost.h:134` 주석이 자인하는 위험 | AnimationJob.cpp:156,280 |
+| R1 공유 Skeleton/Animation/Bone 쓰기 | typed generation 전환으로 과거 경로 소멸. 공유 데이터는 const, 출력은 Animator 소유 | 불변 generation 계약 유지·다수 인스턴스 제품 회귀 필요 |
+| R2 map 삽입·빈 키 OOB | 본 인덱스 채널 표와 누락 검사로 제거 | 새 큐/캐시를 만드는 작업 아님 |
+| R3 잘못된 전체 return | continue로 처리 중 | 유지 |
+| R4 keys[-1] | 실제 ModelAnimationSampler는 유효 구간 안에서 탐색 | 호출 없는 CurrentKeyIndex 잔재 삭제 |
+| R5 초기 상태 선택 | 연산자 우선순위 오류가 살아 있었음 | 첫 유효 비-AnyState 선택, 선택 클립 동기화·시간 초기화 |
+| R6 워커 C# 직호출 | 이미 QueueScriptMessage → RuntimeFrame flush 사용 | 기존 게임 스레드 전달 경계 유지. 새 이벤트 큐를 중복 도입하지 않음 |
+| S0-L 레이어 포즈 | 제외·비활성·채널 부재에서 영행렬/이전 레이어 버퍼가 섞일 수 있었음 | 평가된 활성 채널만 합성, 모두 제외하면 이전 로컬 유지. 최초 로컬·팔레트는 identity. 로컬·팔레트·소켓을 같은 선택값에서 산출 |
+| S0-S 블렌딩 소켓 | 단일 컨트롤러의 nextClip이 있으면 소켓 staging을 건너뛰었음 | 최종 블렌드 포즈에서 소켓 계산. 다중 레이어는 합성 뒤에만 계산. 실제 부착물 위치 회귀 통과 |
+| S0-E 이벤트 구간 | 래핑 후 progress 비교만으로 여러 루프·정지·역재생을 구별할 수 없음 | 래핑 전 구간 보존. 정방향 (이전,현재], 역방향 [현재,이전), 정지는 0회. 루프 경계·반복 횟수·클립 내 시간순 보존 |
 
-**8-19 재확인 — S0는 미착수다.** R3만 다른 작업의 부수 효과로 해소됐고
-**R1·R2·R4·R5·R6은 전부 살아 있다**(`AnimationJob.cpp:396,398,400,449` ·
-`AnimationController.cpp:60`). 특히 **R2는 워커 스레드에서 공유 애셋 `std::map`에
-노드를 삽입하면서 빈 벡터를 인덱싱**하는 미정의 동작이고, 캐릭터가 여러 마리
-나오는 씬에서 재현되는 종류다 — 이 페이즈의 다른 어떤 항목보다 우선한다.
+S0-E의 0 키와 1 키는 서로 다른 저작 이벤트다. 루프 경계에서 끝의 1과 다음
+시작의 0을 각각 전달한다. 같은 시각은 저작 순서가 우선한다. 인스턴스 사이의
+워커 완료 순서를 전역 이벤트 순서로 보장하지 않는다. 0길이/비유한 시간은
+안전한 0 포즈 시간과 빈 이벤트 구간으로 처리한다.
 
-### 1.3 구조적 비효율 (E1~E10)
+**검증 기록:** `Tools/regression/verify-animation-playback.ps1`의 Debug·Release
+격리 회귀 각각 45검사 통과. 제품이 사용하는 `AnimationPlayback.h`의 시간 진행·
+이벤트 열거·레이어 선택을 직접 검사한다. `verify-legacy-skeleton-retirement.ps1`
+통과(접촉 2/2, 창구 밖 0/0; 남은 접촉은 구 씬 키 읽기).
+추가한 `verify-animation-product.ps1`은 Debug/Release 전체 Editor 빌드 후 각각
+`ANIMATION_PRODUCT_OK actors=100 rounds=12 checks=80314 managedThreadErrors=0`을 냈다.
+실제 재생 전환·generation·AnimationJob·RuntimeFrame·C# 콜백과 씬 본/소켓 부착물을
+검사했다. 이어서 `verify-animation-visual.ps1`의 Debug/Release DX12 실제 화면 비교도
+각각 13캡처·264검사 통과했다. **S0 완료**이며 상세 근거는 §7.2에 기록한다.
 
-비용 구조: `O(애니메이터 × 본 × (std::map 문자열 탐색 + 키프레임 선형 스캔))`.
-본 수와 무관해야 할 상수 인자가 전부 최악의 선택으로 박혀 있다.
+### 1.3 남은 비용
 
-| # | 항목 | 근거 |
+| 축 | 현재 | 후속 |
 |---|---|---|
-| E1 | 본 채널 조회가 `std::map<std::string, NodeAnimation>` — 본마다 `find`+`operator[]` 2회, 매 프레임 | Animation.h:40 · AnimationJob.cpp:355,365-366,409,418 |
-| E2 | 키프레임 탐색이 매 프레임 처음부터 선형 스캔. `curKey` 캐시는 공유 객체에 저장(무용 + R1의 원인) | AnimationJob.cpp:20-32 |
-| E3 | 블렌딩이 본마다 `XMMatrixDecompose` ×2 — 채널 단계(SRT)에서 섞으면 공짜인 것을 행렬 분해로 되사고 있다 | AnimationJob.cpp:628-645 |
-| E4 | 레이어 경로(`UpdateBoneLayer`)가 본×컨트롤러로 같은 `find`를 중복 — "이 본을 누가 움직이나"는 클립 조합이 바뀔 때만 변하는 불변 정보 | AnimationJob.cpp:469-479 |
-| E5 | 매 프레임 힙 할당: 애니메이터 목록 재구축(`:61-67`) · 애니메이터당 `weak_ptr` 벡터 복사(`:73-77`, 캡처된 `shared_ptr`이 이미 생존 보장 — 순수 낭비) · `std::function` 할당(`:84`) | AnimationJob.cpp |
-| E6 | 512본 고정: `Animator` 인라인 배열 2벌 64KB(`Animator.h:80-81`) + 컨트롤러당 2벌 64KB(`AnimationController.h:36-37`) + 팔레트 memcpy 상시 32KB(`ProxyCommand.cpp:30,106`). 본 30개짜리도 동일 | — |
-| E7 | 본 트리를 포인터 추적 재귀로 순회 — `Skeleton::m_bones` 평탄 배열이 이미 있는데 쓰지 않는다 | AnimationJob.cpp:336-457 |
-| E8 | **LOD·가시성·거리 개념 0.** 화면 밖·원거리도 풀틱. `Mesh::SelectLOD`(Mesh.cpp:139-221)와 `Camera::CalculateLODDistance`(Camera.cpp:174-177)는 **구현만 있고 호출자 0** | grep 전수 확인 |
-| E9 | 전용 8스레드 상비 풀(`:36`) — 전역 `WorkerPools`와 별개로 코어를 점유, 태스크 입도는 애니메이터 1개(불균형) | AnimationJob.cpp:36,312 |
-| E10 | 배속 파라미터 조회가 매 프레임 뮤텍스 + 문자열 선형 탐색 — 기본값 `"None"`이라 매칭 불가인 경우조차 매번 | AnimationState.cpp:72-79 · Animator.h(FindParameter) |
+| E1 채널 접근 | 문자열 map 대신 본 인덱스 표, 평가마다 재생성 | S2′ generation·clip 키로 베이크 |
+| E2 키 탐색 | 유효 구간 선형 탐색 | S2′ 이진 탐색·인스턴스 커서 |
+| E3 포즈/블렌드 | matrix4x4, 블렌드마다 decompose | S2′ SoA TRS와 커널 |
+| E4 마스크 | BoneRegion 또는 이름 선형 조회 | S2′ dense weight |
+| E5 할당 | Animator 목록·controller 캡처·채널 표·globals·이벤트 정렬 | S2′ 재사용 저장소 |
+| E6 크기 | Animator 512행렬 두 벌(64KiB), Controller 한 벌(32KiB) | S3′ 실제 본 수 버퍼 |
+| 팔레트 | 프록시 발행마다 512행렬 할당/복사, draw.boneCount도 512 | S3.5 실제 본 수·프레임 저장소 |
+| E7 본 순회 | 부모 선행 평탄 순회는 이미 구현 | 다시 구현하지 않음 |
+| 본 투영 | topology/generation 바인딩 캐시·변경 로컬만 기록 | S3.6 관측 집합 + 팔레트 변경 독립 추적 |
+| E8·E9 스케줄링 | 공용 enkiTS, Animator당 작업 하나, LOD/버짓 없음 | S3.5·S4·S5·S6 |
+| E10 배속 파라미터 | mutex·이름 조회 | S2′ 핸들화 |
 
-그 외: `m_currAnimator`가 클래스 멤버가 아니라 **파일 전역 변수**(`AnimationJob.cpp:13`),
-`RenderEngine\AnimationJob.h`(헤더) ↔ `ScriptBinder\AnimationJob.cpp`(구현)의 계층
-기형, 소켓 갱신 코드 3중 복제(`:290-306,428-445,602-619`).
+`m_currAnimator`, legacy Bone 쓰기, `AnimationController.h`의 NodeEditor 직접
+의존은 이미 사라졌다. 이를 S3′·S8의 남은 작업으로 다시 세지 않는다.
 
-### 1.4 이미 있는데 안 쓰는 것 — 이 설계가 딛는 기존 자산
+### 1.4 기반과 의존
 
-| 자산 | 위치 | 쓰임 |
-|---|---|---|
-| 전역 워커 풀 `WorkerPools` | Utility_Framework\WorkerPool.h:16-68 | 전용 풀 은퇴 후보지 (S6에서 실측 비교). **S0.5에서 백엔드가 enkiTS로 바뀐다** |
-| enkiTS 태스크 스케줄러 | vcpkg `enkits` (S0.5에서 도입) | `threadnum_`이 0..`GetNumTaskThreads()-1` 보장 — S3.5 워커별 포즈 풀의 키 |
-| CPU 프로파일러 `gCPUProfiler` + `PROFILE_CPU_SCOPE` | ImGuiHelper\Profiler.h | 버짓 실측·HUD의 기반 |
-| `TimeSystem` (QPC) | Utility_Framework\TimeSystem.h | 인스턴스별 비용 측정 |
-| `Camera::CalculateLODDistance` · `GetFrustum` | Camera.cpp:174,121 | Significance 입력 (첫 배선) |
-| 게임 스레드 프러스텀 컬링 선례 | FoliageComponent.cpp:244-316 | 가시성 판정 패턴 재사용 |
-| `RenderScene::AnimatorMap` 등록 패턴 | RenderScene.h:153,184 | 인스턴스 등록의 골격 |
-| **`Skeleton::m_serial`** (인스턴스 유일 일련번호) | RenderEngine\Skeleton.h | **베이크 캐시의 무효화 키**(②) — Lumina의 `BindPoseGeneration`과 같은 역할을 이미 갖고 있다 |
-| **`BoneComponent`** (`m_boneIndex`·`m_resolvedSerial`) | ScriptBinder\BoneComponent.h | **관측 본 투영의 주소 지정**(④) — SceneGraph 트랙 E7-b의 결과를 그대로 승계 |
-| **`ProxyCommand` 불변 스냅샷 경계** | ScriptBinder\ProxyCommand.cpp | **팔레트 아레나의 종점**(⑤) — UE식 리테인드 프록시라 경계가 이미 있다 |
-| 논블로킹 폴링 선례 | DX12PSOManager.cpp:548-568 | (참고) 비동기 결과 소비 패턴 |
+- 공용 실행 기반은 `thread_pool` + `job_scheduler`다. DataSystem·썸네일·AnimationJob·Foliage·AI가 사용한다. 엔진 부팅/종료가 워커 수명을 소유하고 소비자는 자기 그룹만 기다린다. 의존 작업은 기다리는 동안 워커를 점유하지 않는다. 계약은 [JobSchedulerDesign](../design/JobSchedulerDesign.md), 검증은 §9를 따른다.
+- `AssetLoadJob` 삭제는 `317ab497`에서 완료됐다. S0.5 남은 구현에 중복 산입하지 않는다.
+- 현재 단계 마커는 `SceneManager::GameLogic`의 InternalAnimationUpdateEvent 전체를
+  감싼다. S1은 Release 10/50/100체에서 계산·대기·본 투영·팔레트 전달을 분리한다.
+  독립 QPC 측정은 먼저 가능하나, 워커 프로파일러 마커는
+  [ProfilingCapturePlan](ProfilingCapturePlan.md) §0.5.5의 안전한 수집 경계 이후다.
+- 본 캐시의 신원은 `{ModelId, SkeletonId, generation}`이며
+  `Animator::GetSkeletonSerial()`이 현재 그 신원을 해시한다. 삭제된 Skeleton::m_serial을 쓰지 않는다.
+- **S3.6 선행:** `Scene::PublishAnimatorPoseImpl`은 현재 localWrites > 0일 때
+  팔레트 프록시 dirty를 발행한다. 비관측 본 기록을 줄이기 전에 팔레트 변경을
+  별도로 추적해야 한다. 관측 본이 0이어도 스킨 포즈가 움직이는 회귀가 필요하다.
 
-### 1.5 다른 엔진 대조 — 세대 판정 (2026-08-19)
+### 1.5 다른 엔진 대조 — 2026-08-19 당시 기록 (현행 판정은 §1.1~1.4)
 
 언리얼·유니티·Lumina(`C:\Users\lance\Downloads\LuminaEngine-main`, 소스 직독)와
 평가 모델을 대조했다. **평가 엔진의 세대**로 줄을 세우면:
@@ -258,7 +246,7 @@ AnimInstance {
 ```
 
 `Animator`는 FSM·파라미터·소켓 목록만 남는 얇은 컴포넌트가 된다. 공유 애셋
-(`Skeleton`·`Animation`·`Bone`)에는 **런타임 쓰기 0** — 쓸 수 있는 곳이 인스턴스
+(`ModelAssetGeneration`의 skeleton·animations)에는 **런타임 쓰기 0** — 쓸 수 있는 곳이 인스턴스
 슬롯뿐이므로 R1이 "고쳤다"가 아니라 **발생 불가**가 된다.
 
 **키 검색도 여기서 바뀐다.** 프레임 간 시간이 단조 증가하므로 직전 키 인덱스를
@@ -271,10 +259,7 @@ position/rotation/scale 각각 — E2). 커서를 **공유 애셋이 아니라 �
 컨트롤러 비트마스크`도 함께 굽는다(E1·E4 소멸). 순회는 `m_bones` 평탄 배열을
 부모 선행 순서로 도는 단일 루프(E7 소멸 — 부모 선행이 아니면 베이크 시 정렬).
 
-베이크 캐시의 키는 **`Skeleton::m_serial`**을 그대로 쓴다 — 스켈레톤 인스턴스
-마다 유일한 일련번호로 이미 존재하고(`RenderEngine\Skeleton.h`), 해제된 주소가
-재할당돼도 캐시가 거짓 적중하지 않는다. Lumina가 같은 목적으로 둔
-`FSkeletonResource::BindPoseGeneration`과 같은 역할이며, 우리는 이미 갖고 있다.
+베이크 캐시는 `{ModelId, SkeletonId, generation, AnimationId}`로 식별한다. 현재 본 투영 캐시의 `GetSkeletonSerial()` 해시를 참고하되, 클립까지 구별하고 새 generation 게시 시 이전 캐시가 재사용되지 않게 한다.
 
 본 마스크는 **`BoneRegion` 7분할(Root·Spine·Neck·양팔·양다리)을 은퇴**하고
 **이름 기반 dense per-bone weight 배열**로 대체한다. 현 휴머노이드 경로는 팔
@@ -340,7 +325,7 @@ AnimationController(현 상태머신) ─┐
 누가 읽으면 `BoneComponent::GetWorldTransform()`이 그 자리에서 포즈로부터
 조상 사슬만 타고 계산한다(**O(깊이)이지 O(본수)가 아니다**). 그리고 그 호출이
 해당 뼈를 관측 집합으로 **자동 승격**시켜 다음 프레임부터 상시 투영된다.
-§6의 "`Bone` 트랜스폼의 숨은 소비자" 리스크가 설계로 해소되는 지점이다 —
+공유 Bone은 이미 은퇴했다. 남은 Entity Transform 소비 누락을 다루는 지점이다 —
 전환에 진단 장치를 함께 둔다는 원칙(`diagnostic-with-transition`)의 적용.
 
 **기대 효과.** 744 뼈 노드 × 프레임당 3회 순회 → 관측 본은 통상 캐릭터당 2~5개
@@ -367,8 +352,8 @@ Execute → Pose
 | 대상 | 크기 |
 |---|---|
 | `Animator::m_FinalTransforms[512]` · `m_localTransforms[512]` | 64KB / 인스턴스 |
-| `AnimationController::m_FinalTransforms[512]` · `m_LocalTransforms[512]` | 64KB / 컨트롤러 |
-| `ProxyCommand`의 `make_shared<xMatrix[]>(MAX_BONES)` + 32KB memcpy | 매 프레임 힙 할당 |
+| `AnimationController::m_LocalTransforms[512]` | 32KiB / 컨트롤러 |
+| `ProxyCommand`의 `make_shared<math::matrix4x4[]>(MAX_BONES)` + 32KiB copy | 프록시 발행마다 힙 할당 |
 
 렌더가 UE식 리테인드 프록시라 **불변 단방향 경계가 이미 있고**, 애니메이션
 출력이 그 위에 얹히기만 하면 된다. 유니티는 이 경계가 없어 Transform을 거쳐야
@@ -461,22 +446,21 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 강등 결정(⑧)이 **모든 레시피의 기대 비용을 모아 놓고** 내려야 하기 때문이다 —
 이것이 이 페이즈에서 유일하게 정당한 배리어다.
 
-**⑩ 이벤트 큐.** 워커는 `(animator, event, progress구간)`을 락프리 큐에 적재만
-하고, join 직후 **메인 스레드에서 일괄 발화**(R6 소멸). C# 경계는 메인 스레드
-고정. 틱을 건너뛴 프레임의 이벤트는 다음 평가 때 진행 구간 `[pre, cur]`로
-일괄 판정되므로 유실되지 않는다.
+**⑩ 이벤트 전달.** 현재 `QueueScriptMessage`의 보호된 큐와 join 이후
+게임 스레드 flush를 유지한다. Update는 매 프레임 래핑 전 시간 구간으로
+이벤트를 판정하며, 포즈 Execute를 건너뛰어도 이벤트를 다음 평가로 미루지 않는다.
+S0의 구간·순서 계약은 §1.2를 따른다. S6의 큐 구조 변경은 계측 필요성이
+있을 때 같은 전달 계약을 보존하며 진행한다.
 
 ### 2.3 이 엔진에 맞춘 결정
 
-- **새 코드의 자리는 `ScriptBinder\AnimationScheduler.{h,cpp}`.** 헤더는
-  RenderEngine에, 구현은 ScriptBinder에 두는 현 `AnimationJob`의 계층 기형을
+- **새 코드의 자리는 `Engine/SceneRuntime/AnimationScheduler.{h,cpp}`.** 헤더는
+  RenderEngine에, 구현은 SceneRuntime에 두는 현 `AnimationJob`의 계층 기형을
   반복하지 않는다. `RenderScene`은 팔레트(결과)만 소비하고 스케줄러를 소유하지
   않는다 — PHASE 5(커플링 절단)의 방향과 일치.
-- **전용 풀 vs `WorkerPools`는 실측으로 결정한다(S6).** 전용 8스레드는 코어
-  점유가 낭비지만, 전역 풀은 UI 렌더 데이터·지형 로드와 경합한다. S1 계측이
-  양쪽 비용을 보여준 뒤에 정한다 — 지금 단정하지 않는다.
+- **공용 enkiTS로 통일한다(9-20 확정).** 전용 풀 비교를 S6의 선택 조건에서 제거했다. AnimationJob도 S0.5에서 이관하며 S6은 청크 크기·작업 저장소·소유 계층 최적화에 집중한다.
 - **팔레트 전달 계약의 *형태*는 유지, *출처*는 아레나로.** `ProxyCommand` →
-  `m_palleteMap` → 스키닝이라는 사슬과 DX12 셰이더 계약은 **수정 없음**. 바뀌는
+  `PrimitiveRenderProxy::m_finalTransforms` → EnhancedDrawItem → 스키닝이라는 사슬과 DX12 셰이더 계약은 **수정 없음**. 바뀌는
   것은 (a) 복사 크기가 실제 본 수가 되고 (b) 출처가 컴포넌트 인라인 배열에서
   프레임 아레나 슬라이스가 되는 것뿐이다(⑤·E6).
 - **`Mesh::SelectLOD`(메시 LOD)는 이 페이즈 밖.** 같은 significance 입력을
@@ -507,12 +491,7 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 뚫지 않으면 이후 모든 측정이 무의미하다. 그리고 ③의 계약 덕분에 S8은
 프론트엔드 교체로 끝난다.
 
-> S8이 실제로 지우는 것 하나를 기록해 둔다 — 지금 `ScriptBinder\AnimationController.h`가
-> **`imgui-node-editor/imgui_node_editor.h`와 `nlohmann/json.hpp`를 include하고
-> `NodeEditor* m_nodeEditor`를 멤버로 들고 직렬화까지 한다.** 런타임 상태머신이
-> 에디터 노드 에디터를 물고 있어 이 헤더를 include하는 모든 TU가 따라 들어온다.
-> 바이트코드로 가면 런타임이 노드를 참조할 방법 자체가 없어져 이 간선이 소멸한다
-> (PHASE 5 래칫 게이트에 기여).
+> 2026-09-20 정정: AnimationController.h의 NodeEditor/json 직접 의존은 이미 제거됐다. VM으로만 지울 수 있는 간선으로 세지 않는다. S8은 중단하며 향후 별도 근거가 있을 때 재제안한다.
 
 **기각 목록:**
 
@@ -531,29 +510,26 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 
 | ID | 슬라이스 | 내용 | 완료 기준 | 공수 |
 |---|---|---|---|---|
-| S0 | 결함 지혈 | R1~R6. `curKey` 죽은 캐시 삭제 · R2 `find`+스킵 · R3 `continue` · R4 클램프 · R5 괄호 · R6 간이 이벤트 큐(수집→join 후 발화). `Bone` 트랜스폼 쓰기는 소비자 grep 후 제거 또는 S3′로 이관 명시(최종 소멸은 S3.6) | 같은 모델 다수 씬에서 공유 애셋 쓰기 grep 0 (curKey·map 삽입) · 이벤트가 메인 스레드에서만 발화 | 1.5일 |
-| S0.5 | **태스크 스케줄러 기반 정비** | `AssetLoadJob` 삭제(인스턴스화 0건) · vcpkg `enkits` 추가 + `WorkerPool` 백엔드 교체(시그니처 유지, 소비자 `DataSystem.cpp:1678`·`:1702` 무수정) · `ThreadPool` 생성자 우선순위 기본값 HIGHEST→NORMAL · `FoliageComponent`·`Scene` AI의 `std::async` 2건 이관 | `DataSystem` 경로 완료 수 == 제출 수(독립 카운터) · `std::async` 잔존 정확히 3건 | 2일 |
-| S1 | 계측 기선 | `PROFILE_CPU_SCOPE("Animation")` 단계 계측 + 인스턴스별 QPC. 캐릭터 N체(10/50/100) 비용 곡선 실측 → 버짓 기본값 근거 확보. 검증 씬 신설 | 비용 곡선 수치가 이 문서 §1에 추가 기록됨 | 1일 |
-| S2′ | 데이터 정지 작업 + **Pose 타입** | **`Pose`(SoA TRS) 신설 + 블렌드 커널 4종(§2.2①)** · 채널 테이블 베이크(E1·E4, 키는 `Skeleton::m_serial`) · **마스크를 `BoneRegion` 7분할 → 이름 기반 dense weight로 교체** · 부모 선행 정렬 + 평탄 순회(E7) · 키 커서: 이진 탐색 + **인스턴스** 캐시(E2) · 매 프레임 할당 제거(E5) · 배속 파라미터 핸들화(E10) | 핫 패스에서 문자열 조회 0 · 프레임당 힙 할당 0 · **행렬 분해 블렌드 0** · S1 대비 비용 곡선 재실측 개선 확인 | 4일 |
-| S3′ | AnimInstance 분리 (**시스템 소유**) | 핫 데이터 이관 · **`AnimationSystem`이 조밀 배열로 소유, `Animator`는 핸들만** · 포즈 prev/curr 실본수 버퍼 · `Bone` 런타임 쓰기 완전 소멸 · 파일 전역 `m_currAnimator` 은퇴 | 공유 애셋 런타임 쓰기 0 · `Animator`·`AnimationController` sizeof에서 64KB 배열 제거 | 3일 |
+| S0 | 결함 지혈 · 완료 | §1.2의 R5·S0-L·S0-E 구현, 기존 불변 자산·게임 스레드 이벤트 전달 유지. 블렌딩 소켓·비활성 메시 그리기 수정 | Debug/Release 격리·100체/CLR/소켓·DX12 화면 회귀, 전체 Editor 빌드 통과 (§7) | 완료 |
+| S0.5 | 공용 실행 기반 통일 | thread_pool·job_scheduler·job_handle·job_group, 엔진 수명 소유, DataSystem·썸네일·Animation·Foliage·AI 이관 | 그룹 독립 대기·의존·종료 drain·제품 회귀(§9). 성능 비교 제외 | 기존 2일·재산정 필요 |
+| S1 | 계측 기선 | Release 10/50/100체 계산·대기·투영·팔레트 비용 QPC 측정. 워커 수집은 PHASE 14 안전 경계 이후 | 비용 곡선·측정 조건·버짓 기본값 근거 기록 | 1일 |
+| S2′ | 데이터 정지 작업 + Pose 타입 | SoA TRS·블렌드 커널·generation/clip 채널 캐시·dense mask·키 커서·할당 제거·배속 핸들. 부모 선행 평탄 순회는 완료 | 문자열 조회·프레임 할당·행렬 분해 블렌드 0, S1 대비 재측정 | 기존 4일·재산정 필요 |
+| S3′ | AnimInstance 시스템 소유 | 가변 재생 데이터를 조밀 배열로 이관, Animator는 핸들. 실본수 prev/curr 버퍼. legacy Bone 쓰기·전역 m_currAnimator 제거는 이미 완료 | Animator 64KiB·Controller 32KiB 고정 포즈 배열 제거 | 기존 3일·재산정 필요 |
 | **S3.5** | **태스크 레시피 + Executor** | `AnimTaskList`(POD 플랫, 앞선 인덱스 의존) · Update/Execute 2패스 분리 · **도달성 실행** · 워커별 포즈 풀 + steal-in-place · **팔레트 프레임 아레나**(§2.2⑤) · `ProxyCommand`를 {offset,count}로 | 비활성 상태머신 가지의 포즈 계산 0회(스냅샷으로 판정) · 인스턴스당 살아 있는 포즈 버퍼 ≤ 4 · 팔레트 힙 할당 0 | 3일 |
-| **S3.6** | **관측 본 물질화** | 관측 집합 산출(4조건) · 구조 변경 시에만 재계산 · 비관측 본 Transform 갱신 정지 · `GetWorldTransform()` 온디맨드 FK + **자동 승격** · 소켓 경로를 관측 집합으로 통합(현 3중 복제 제거) | 744 뼈 노드 씬에서 프레임당 Transform 기록 수가 관측 본 수와 일치 · 부착물 위치 왕복 검사 통과 | 2일 |
+| **S3.6** | 관측 본 물질화 | 관측 집합·온디맨드 FK·자동 승격·소켓 통합. 팔레트 변경 알림을 localWrites 조건에서 분리 | 관측 본 0에서도 스킨 팔레트 전진·비관측 본 기록 0·부착물 왕복 검사 | 2일 |
 | S4 | Significance + **강등 사다리** | 거리·프러스텀·화면비 배선(§2.2⑥) · **L0~L7 레시피 변환 구현**(§2.2⑦) · **인러셜라이제이션**(L4 전제·승격 복귀) · 보간 · 재가시 복귀 · 에디터 L0 고정 | 화면 밖 캐릭터의 포즈 계산 비용 ≈ 0 · **등급별 비용이 단조 감소**(계측으로 판정) · 강등/승격 전환 팝 없음 | 4일 |
 | S5 | CPU 버짓 + 스케줄러 | **태스크 종류별 EMA 비용 모델** · 강등 등급 선택 알고리즘(계산형, §2.2⑧) · 이중 히스테리시스 · `EngineSetting` 설정값 | 100체 씬에서 버짓 상한 준수(초과 프레임 1% 미만) · **예측 비용 대 실측 비용 오차 15% 이내** · 버짓 2배 변화에 등급 분포가 단조 반응 | 3일 |
-| S6 | Job 배치 전환 | 청크 분할 · **전용 풀 vs `WorkerPools`(S0.5 이후 enkiTS) vs 전용 enkiTS 인스턴스** 3지선다 실측 비교 후 결정 · 이벤트 큐 정식화(락프리) · `AnimationScheduler`로 개명·이주(계층 정위치) | 태스크 수 = O(워커 수) · RenderEngine에 애니메이션 헤더 잔존 0 | 2일 |
+| S6 | Job 청크화·계층 정리 | 공용 job_scheduler 위 청크 분할·재사용 저장소 · 기존 이벤트 전달 유지 · AnimationScheduler 개명·SceneRuntime 소유 이주 | 태스크 수 = O(워커 수) · RenderEngine 애니메이션 헤더 잔존 0 | 2일 |
 | S7 | HUD + 회귀 | ProfilerWindow 버짓 패널(등록/평가/강등 등급 분포 · 버짓 대비 실측 ms · **태스크 실행 스냅샷**: 도달성·실행 순서·버퍼 소유) · 검증 씬을 회귀 세트에 편입(pwsh) | 패널에서 강등이 실시간 관측됨 · 회귀 세트 통과 | 2일 |
-| **S8** | **바이트코드 VM (선택·후행)** | 상태머신·그래프를 명령 스트림으로 컴파일 · 레지스터 파일(스칼라/포즈-태스크-인덱스) · 버전 스탬프 · 에디터 컴파일러 분리 · 핀↔레지스터 디버그 오버레이 | **Executor·Pose·버퍼 풀·강등 사다리 무변경** · 런타임에서 `imgui_node_editor` 간선 0 · 파라미터 조회에 문자열·뮤텍스 0 | 6~8일 |
+| **S8** | 바이트코드 VM · 중단 | 현재 완료 범위에서 제외. 재개하려면 별도 실측 근거 필요 | 현 페이즈 완료 기준에 포함하지 않음 | 합산 제외 |
 
-합계 ≈ **27.5일** (S8 제외) / **33.5~35.5일** (S8 포함).
+과거 합계 **27.5일**(S8 제외)은 계획 당시 공수다. 선행 완료분과 S0 검증 범위가 달라져 **현재 잔여 공수로 사용하지 않는다**. S1 기선 이후 다시 산정한다.
 초판 18.5일 대비 +9일 — S2′ +1 · **S3.5 +3** · **S3.6 +2** · S4 +1 · **S0.5 +2**(9-15 편입).
 
 **착수 제약:**
 
-- S0·**S0.5**·S1은 **즉시 착수 가능**하고 다른 페이즈와 충돌하지 않는다.
-- **S0.5는 S6의 선행이다.** 순서를 뒤집어 `AnimationJob`을 먼저 옮기면,
-  S2′~S3.5가 분해를 "애니메이터당 태스크"에서 "워커 수 청크 + 워커별 포즈
-  풀"로 바꾸므로 **곧 버려질 모양을 이식**하게 된다. 근거와 측정은
-  [TaskSchedulerUnificationPlan.md](TaskSchedulerUnificationPlan.md) §3.3.
+- S0·S0.5·S1의 독립 QPC 기선은 착수 가능하다. DataSystem·썸네일·대시보드의 동시 변경을 대조하고, 워커 프로파일러 수집은 PHASE 14의 안전한 전달 경계를 선행한다.
+- **S0.5의 공용 기반을 S6에서도 그대로 사용한다.** AnimationJob 실행기 교체는 선행하고, 평가 단위·버퍼 소유 변경은 S2′~S3.5와 S6에서 진행한다.
 - S2′ 이후는 `AnimationJob.cpp`를 크게 다시 쓰므로 **동시 세션 주의 대상**
   (공유 워크트리 — 착수 직전 HEAD 재대조, 한 슬라이스 한 커밋).
 - **S3.5는 S2′(Pose 값 타입)에 의존한다.** 포즈가 값이 아니면 태스크의
@@ -561,13 +537,13 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 - **S4의 강등 사다리는 S3.5(레시피)에 의존한다.** 레시피가 없으면 L1~L4가
   표현 불가이고 L5~L7만 남는다 — 그건 기존 3세대 엔진과 같은 수준이다.
 - **S3.6은 SceneGraph 페이즈와 경계가 걸친다** — §5 참조.
-- **S8은 S3.5 이후 언제든**. ③의 계약 덕분에 백엔드를 건드리지 않는다.
+- **S8은 중단·완료 범위 제외**다. 재개는 별도 제안으로 결정한다.
 
 ---
 
 ## 4. 페이즈 완료 기준
 
-1. **정확성** — 공유 애셋(`Skeleton`·`Animation`·`Bone`)에 런타임 쓰기 0.
+1. **정확성** — 공유 `ModelAssetGeneration`에 런타임 쓰기 0.
    같은 모델 100체 씬에서 크래시·포즈 오염 없음. 키프레임 이벤트는 메인
    스레드에서만, 유실·중복 없이(회귀 세트로 판정).
 2. **비례성** — 애니메이션 비용이 (평가한 인스턴스 × 실제 본 수 × 실행된
@@ -589,7 +565,7 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 | 계획 | 관계 |
 |---|---|
 | **SceneGraph 재설계 (트랙 E)** | **S3.6(관측 본 물질화)이 경계에 걸친다.** 뼈 GameObject의 계약을 "포즈 저장소"에서 "읽기 전용 투영면"으로 바꾸는 결정이므로, `SceneGraphRedesignPlan.md`에도 한 줄 남겨야 한다. `BoneComponent`(E7-b)와 `Scene::UpdateModelRecursive`의 Bone 분기가 직접 대상 — **폐기가 아니라 완성**이다(`m_boneIndex`·`m_resolvedSerial` 캐시는 투영 경로에서 계속 쓰인다) |
-| PHASE 5 (커플링 절단) | `AnimationJob`의 RenderEngine 헤더/ScriptBinder 구현 기형이 S6에서 해소. **추가로 S8이 `AnimationController.h` → `imgui_node_editor` 간선을 소멸시킨다** — 둘 다 래칫 게이트 통과 필수 |
+| PHASE 5 (커플링 절단) | `AnimationJob`의 RenderEngine 헤더/SceneRuntime 구현 기형이 S6에서 해소. Controller의 NodeEditor 직접 간선은 이미 제거됐다. S6은 헤더·소유 이주 후 래칫 게이트 통과 필요 |
 | PHASE 9 (생명주기) | 스케줄러는 `InternalAnimationUpdateEvent` 델리게이트 단계를 그대로 쓴다 — 델리게이트 은퇴가 이 단계에 오면 그때 이관(이 페이즈에서 선제 이동 안 함) |
 | MultiCameraRenderPlan | significance는 활성 카메라 최대값 — 뷰별 시간축 상태 원칙(잔상 교훈)과 충돌 없음(포즈는 뷰 무관 단일) |
 | PHASE 12.5 (빌드) | 무관 — 파일 충돌만 회피 |
@@ -597,7 +573,7 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
 
 ## 6. 리스크
 
-- **이벤트 발화 시점 이동(R6 수정).** 워커 즉시 → join 후 일괄. 같은 프레임
+- **이벤트 구간 수정(S0-E).** C# 전달은 기존 join 후 게임 스레드 큐를 유지한다. 같은 프레임
   안이므로 관찰 가능한 차이는 "이벤트 핸들러가 그 순간의 본 행렬을 읽는 경우"
   뿐 — 오히려 완성된 포즈를 읽게 되어 개선이다. 회귀 세트로 발화 순서·개수를
   고정해 두고 간다.
@@ -605,10 +581,7 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
   로직은 무손상. 위험은 시각뿐이고 LOD 경계·보간이 그 완충이다. 그래도
   히트박스가 본을 따라가는 게임플레이가 있다면 해당 캐릭터에 강등 면제
   플래그(significance 고정)를 준다 — 설계에 포함.
-- **`Bone` 트랜스폼의 숨은 소비자.** 에디터 본 시각화 등이 공유 `Bone`의
-  런타임 값을 읽고 있을 수 있다 — S0에서 grep 전수 후 S3′ 이관 목록에 명시.
-  **S3.6이 이 리스크를 설계로 흡수한다**: 비관측 본 조회 시 온디맨드 FK +
-  자동 승격이므로, grep이 놓친 소비자도 조용히 깨지지 않고 스스로 드러난다.
+- **본 Transform 소비자와 팔레트 dirty 결합.** 공유 Bone 타입은 은퇴했다. S3.6은 Entity/BoneComponent 조회·소켓 소비와 localWrites에 결합된 렌더 dirty를 분리해야 한다. 관측 집합의 누락은 온디맨드 FK·자동 승격·왕복 검사로 검증한다.
 
 - **관측 본 집합의 정확성 (S3.6 최대 리스크).** 빠뜨리면 무기가 손을 안
   따라간다. 완화 셋 — (a) 자동 승격 밸브, (b) 회귀 세트에 **"소켓 부착물
@@ -631,3 +604,130 @@ Update는 인스턴스별로 자기 컴포넌트만 만지므로 병렬 안전�
   곡선은 **반드시 Release 바이너리로** 재실측한다(`perf-measure-release-only`).
 - **공유 워크트리 동시 커밋.** `AnimationJob.cpp`·`Animator.h`는 게임 스크립트
   가 넓게 물고 있는 헤더 — 슬라이스 착수 직전 HEAD 재대조, 한 슬라이스 한 커밋.
+
+## 7. S0 실행 기록 (2026-09-20)
+
+- 구현: 초기 상태 선택·시간 초기화, 다중 레이어의 staging/최종 포즈 분리,
+  활성·채널·마스크 조건 합성, 래핑 전 이벤트 구간과 정방향/역방향·반복 전달.
+- 격리 회귀: Debug/Release 각각 `ANIMATION_PLAYBACK_OK checks=45`.
+- 제품 컴파일: AnimationJob.cpp·AnimationEventBridge.cpp·AnimationController.cpp·
+  Animator.cpp 각각 Debug/Release x64 exit 0. 다른 작업의 산출물과 겹치지 않는
+  `Build/Obj/Phase13S0/Selected-{Debug,Release}`에 생성했다.
+- 재현: `Tools/regression/verify-animation-playback.ps1 -CompileProduct`.
+  컴파일은 개별 TU 검사이며 전체 Editor 링크·실행을 뜻하지 않는다.
+- 초기 전체 non-unity 컴파일 시도는 수정하지 않은 ComponentFactory·EntityAuthoringRead·
+  PrefabUtility·ClrHost 등의 include 의존 오류로 exit 1이었다. 이 시도와 변경 TU의
+  성공을 구분한다. 원래 unity 제품 빌드의 성공/실패는 이 결과로 판정하지 않는다.
+- 기존 Skeleton 은퇴 검사 통과. 대시보드 JS 파싱·12항목/상태 검사 통과,
+  이번 변경 전 대시보드와 비교해 PHASE 13 밖의 내용은 동일함을 확인했다.
+
+### 7.1 제품 실행 검증
+
+- Debug/Release x64 **전체 CreatorEditor 빌드·링크 exit 0**. VS18/v145,
+  기본 unity 설정을 사용했다. 앞의 개별 non-unity 실패와 구분한다.
+- `Tools/regression/verify-animation-product.ps1 -Configuration Debug` 및
+  `-Configuration Release` 모두 exit 0. 각각
+  `ANIMATION_PRODUCT_OK actors=100 rounds=12 checks=80314 managedThreadErrors=0 model=Gunner_F_Mythic`.
+- 새 `animation.playback.probe`는 Commandlet 전용이다. 새 빈 씬에서 실제 `play` 전환이
+  확정된 뒤 시작한다. 테스트를 위해 재생 상태 비트를 직접 바꾸거나 관리 큐 전달
+  규약을 우회하지 않는다.
+- 같은 불변 generation을 공유하는 100 Animator를 생명주기로 등록하고, 서로 다른
+  재생 시각의 병렬 팔레트를 12회 순차 제품 표본과 대조했다. 씬 BoneComponent 투영도
+  확인했다. 종료 시 테스트 객체를 제거하고 등록 수 0을 단정한다.
+- 실제 C# 인스턴스가 수신 횟수·순서를 기록한다. worker join 직후에는 0건이고
+  `RuntimeFrame`의 post-physics flush 뒤에 전달된다. 정방향 다중 루프·역재생·속도 0·
+  비루프 끝 도달/반복 틱에서 기대 횟수와 순서가 일치했고, 생성 게임 스레드 밖 수신은 0건.
+- 활성/비활성 레이어, 전체 humanoid 마스크 제외, 유효 클립이 없는 레이어,
+  이름 마스크 제외, 이전 local과 현재 parent를 합친 팔레트·소켓을 검사했다.
+- 추가 수정: 단일 컨트롤러의 블렌딩도 최종 포즈로 소켓을 갱신한다.
+  회귀는 소켓 staging을 영행렬로 오염시킨 뒤 새 포즈·commit·부착물 위치를 확인하므로
+  예전 `nextClip == nullptr` 조건이 돌아오면 실패한다.
+- 일반 명령 표 회귀 통과: 골든/현재 **133개 동일**. 신규 Commandlet이 일반 명령으로
+  노출되지 않는다. 대시보드 PHASE 13 밖의 내용 보존 검사도 유지한다.
+- 실행 결과: `Build/Obj/Phase13S0/Product-{Debug,Release}/results.jsonl`.
+  이 결과의 실행 시간은 기동·CLR·검사 비용을 포함하므로 S1 성능 기선으로 쓰지 않는다.
+- 이 테스트는 팔레트/씬/CLR 제품 경로를 검사하며 GPU 픽셀을 대조하지 않는다.
+  당시 잔여였던 스킨 메시·소켓 부착물 화면 회귀는 아래 §7.2에서 완료했다.
+
+### 7.2 실제 렌더링 회귀
+
+- `verify-animation-visual.ps1`은 `FT_Primitives`의 조명·카메라를 사용하고,
+  Gunner 스킨 메시 두 개와 오른손 소켓의 붉은 큐브를 제품 경로로 그린다.
+  Commandlet 전용 `animation.visual.probe`가 확정된 일시정지 Play 상태에서
+  `DrainPendingLifecycle → SyncDerivedState → AnimationJob.Update(0) →
+  SyncDerivedState → UpdateRenderData`를 호출한다. 일시정지 프레임은 spatial
+  갱신을 생략하므로 고정 포즈 검사에서 이 정상 게시 경계를 명시적으로 사용한다.
+- `render.pbr.capture ... game controlled`의 **실제 DX12 GPU readback**을 비교한다.
+  캡처마다 새 렌더 프레임을 사용하며, 7개 attachment의 유한값·렌더 오류를 확인한다.
+  baseColor/depth/normal/display에서 같은 포즈의 반복, 블렌드 0/100%, 전체 레이어,
+  비활성 레이어, 전체 마스크 제외, 숨김 후 복귀의 동등성을 검사한다.
+- 클립 시각 변경·블렌드 중간·상체 마스크는 본 팔레트와 실제 스킨 깊이가 달라야 한다.
+  모델 월드 행렬은 고정하고, 붉은 큐브 주변을 제외한 픽셀로 판정하여 오브젝트 이동만으로
+  통과할 수 없게 했다. 소켓 위치와 draw의 월드 위치, 화면에 투영한 위치의 붉은 픽셀도 확인한다.
+- 이 검사로 메시 비활성 플래그가 `BuildDrawPool`에서 무시되는 제품 결함을 찾았다.
+  수정 전 `Visual-Release-2`에서는 숨긴 캐릭터가 기본 자세로 계속 그려졌다.
+  `poolMesh`가 비활성 프록시를 제외하도록 수정했으며, 비활성 배경 메시 제외와
+  숨김 시 draw 0개, 다시 표시했을 때 포즈·소켓 복귀를 함께 검사한다.
+- Debug/Release 전체 Editor 빌드·링크 exit 0. 두 구성 모두
+  `ANIMATION_VISUAL_OK captures=13 checks=264`이며, 실제 캡처 모음도 직접 확인했다.
+  근거: `Build/Obj/Phase13S0/Visual-Release-3` 및 `Visual-Debug-1`의
+  `visual-summary.json`과 `animation-contact-sheet.png`.
+  캡처 원본은 각 포즈 폴더의 `.f32`와 `manifest.json`이다. **S0 완료**로 반영한다.
+  이 검사는 DX12 정확성 회귀이며 Vulkan 패리티·S1 성능 기선·S4 LOD 승격 검증은 포함하지 않는다.
+
+## 8. S0.5 공용 WorkerPool 이관 — 중간 기록 (2026-09-20)
+
+> 아래는 job_scheduler 도입 이전 결과다. 전용 풀 유지·우선순위 비교 선행 결정은 §9로 대체했다.
+
+- ① AssetLoadJob 삭제와 ② enkiTS 공용 풀 이관까지 완료했다. 외부 스레드 제출,
+  대기 없는 비동기 완료, callback capture 수명, 예외 전달, 종료 drain을 보존한다.
+  구현·근거는 [TaskSchedulerUnificationPlan](TaskSchedulerUnificationPlan.md) §8을 따른다.
+- 독립 검사 Debug/Release 각각 `WORKER_POOL_OK checks=10257`. 실제 어댑터에서
+  대기를 제거한 변이도 두 구성 모두 독립 완료 계수 단정으로 검출했다.
+- 반복 실행 중 발견한 전달 작업의 조기 해제 경합을 수정했다. enkiTS가 제출 함수에서
+  아직 읽는 객체를 완료 측이 먼저 해제하지 않도록 양쪽 참조를 유지한다. 게시/후속 읽기
+  구간을 넓힌 ASan 집중 검사 273개 통과, 조기 해제 변이는 `AddPinnedTaskInt`에서
+  `heap-use-after-free`로 실패했다. 재현: `verify-worker-pool-lifetime.ps1`.
+- 수명 경합 수정 후 Debug/Release 전체 Editor 빌드·링크 exit 0. 두 구성에서 실제 번들 32건과 외부 제출 64건을
+  함께 실행해 완료 수 일치, 제출 스레드에서 실행된 작업 0건을 확인했다.
+  `enkiTS.dll`은 기존 배포 경로의 `Runtime/Common`에 포함됐다.
+- 실제 썸네일 Release 회귀 56검사 통과: 디코딩·게시·손상 파일 실패·수정 후 무효화·
+  재게시·예산 축출. 늦은 완료 폐기는 이번 실행에서 0건으로 별도 입증하지 않았다.
+- **테스트 모델 변경 반영:** 기존 Gunner 대신 이미 교체된 `CreatorRobot.glb`를 사용한다.
+  모델의 SHA-256은 `58D779AFDE1A7FBD13332999C8B11890FB7E10FF2036CA6AE3645D14BEDBA402`.
+  기존 §7의 Gunner 결과는 당시 기록으로 남긴다. 새 모델은 이름으로 Walk/Run을 선택하며,
+  소켓 화면 표식은 초록색이다. Release DX12 화면 회귀 `captures=13 checks=264` 통과,
+  실제 캡처 모음도 확인했다.
+- CreatorRobot의 제품 애니메이션 검사도 Debug/Release 각각
+  `ANIMATION_PRODUCT_OK actors=100 rounds=12 checks=69514 managedThreadErrors=0 model=CreatorRobot`.
+  모델의 본 구성 변경으로 검사 수가 달라졌으며, 기존 Gunner의 80314개 결과와 혼용하지 않는다.
+- 실행 근거: `Build/Obj/Phase13S05/Pool-{Debug,Release}`, `SubmissionLifetime`,
+  `Product-Debug`, `Product-Release-Final`, `Animation-Debug`, `Animation-Release-Final`,
+  `Thumbnails-Release-Final`, `Visual-Release-Final`. 화면 회귀는 정확성 검사이며 성능 측정이 아니다.
+  일반 명령 표 골든은 133개 동일하다(`Registry-Release`).
+- **남은 S0.5:** ③ 공용 풀과 AnimationJob 풀의 동시 경합 조건에서 우선순위 실측 후
+  자체 풀 기본값 변경, ④ Foliage/AI `std::async` 이관. 잔존 5곳을 계획된 3곳으로
+  줄이는 게이트는 아직 미실행이다. AnimationJob 풀 교체는 계속 S6 범위다.
+
+## 9. S0.5 공용 실행 기반 통일 (2026-09-20)
+
+§8 이후 사용자 결정에 따라 AnimationJob도 지금 공용 기반으로 옮겼다.
+전용 풀 비교와 동시 경합 우선순위 측정은 이번 완료 조건에서 제외한다.
+
+- 공용 타입: `thread_pool`, `job_scheduler`, `job_group`, `job_handle`.
+  엔진 부팅/종료에서 지속 워커를 소유한다. 각 소비자는 자기 그룹을 기다린다.
+- 이관: DataSystem·BrowserThumbnailCache·AnimationJob·Foliage·AI.
+  AnimationJob의 Animator당 작업 단위와 join 뒤 포즈·소켓 게시 경계를 유지한다.
+- 구 전용 풀과 WorkerPool API는 제거했다. AI는 Entity/Component 파괴·DDOL 이송,
+  CLR 종료 전에 회수한다. 공용 풀은 씬 해체 후 종료한다.
+- 독립 Debug/Release 각각 10332검사, 배리어 제거 변이 검출. ASan 348검사와
+  제출 중 조기 해제 변이 검출. 제품 검증은
+  [TaskSchedulerUnificationPlan §9](TaskSchedulerUnificationPlan.md#9-공용-스케줄러-구현-2026-09-20)에 기록한다.
+- 테스트 모델은 CreatorRobot이다. §7의 Gunner 결과와 혼용하지 않는다.
+- Debug/Release 전체 Editor 빌드·제품 검사 통과: 각 번들 32/32·외부 읽기 64·
+  Foliage 73, 애니메이션 100체×12회·69514검사·관리 스레드 오류 0.
+  Release DX12 13캡처·264검사, 썸네일 56검사, AI registry·BT 실행/씬 교체,
+  일반 명령 133개 골든도 통과했다. Player Release는 컴파일·링크 확인까지이며
+  PDB 기호 경고와 실행 미검증 범위는 부속 계획 §9에 남겼다. **S0.5 완료**다.
+- 씬 로드 2곳·PSO 1곳의 std::async, RHI 명령 기록 전용 풀은 후속 범위다.
+  S1 이후 평가 비용 최적화·LOD·버짓·AnimationScheduler 도메인 소유 이주는 남아 있다.

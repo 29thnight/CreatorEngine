@@ -20,6 +20,12 @@
 template <typename T>
 using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
 
+struct AssetBundleLoadResult
+{
+    std::size_t submitted{};
+    std::size_t completed{};
+};
+
 // Main system for storing runtime data
 class ModelLoader;
 class Model;
@@ -99,7 +105,7 @@ public:
 	void Initialize();
     void Finalize();
 	// Asset bundle operations
-	void LoadAssetBundle(const AssetBundle& bundle);
+	AssetBundleLoadResult LoadAssetBundle(const AssetBundle& bundle);
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
 	void UnloadUnusedAssets();

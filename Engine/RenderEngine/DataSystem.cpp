@@ -14,8 +14,8 @@
 #include "Benchmark.hpp"
 // SceneManager.h가 여기 있었다. LoadAssetBundle이 씬 매니저가 들고 있던
 // 스레드풀을 빌려 쓰느라 층 3이 층 4를 올려다봤다. 풀의 소유를 층 1로
-// 내리면서(WorkerPool.h) 그 이유가 사라졌다 — PHASE 4-3 슬라이스 3.
-#include "WorkerPool.h"
+// 내리면서(현재 JobScheduler.h) 그 이유가 사라졌다 — PHASE 4-3 슬라이스 3.
+#include "JobScheduler.h"
 // Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
 #include "ReflectionYml.h"
@@ -1708,14 +1708,18 @@ file::path DataSystem::GetFilePath(FileGuid fileguid) const
 	return m_assetMetaRegistry ? m_assetMetaRegistry->GetPath(fileguid) : file::path{};
 }
 
-void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
+AssetBundleLoadResult DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 {
+	// Independent of the scheduler's bookkeeping. Shared lifetime also makes a
+	// broken/omitted barrier diagnosable without a dangling stack counter.
+	auto completed = std::make_shared<std::atomic<std::size_t>>(0);
+	job_group jobs;
 	for (const auto& entry : bundle.assets)
 	{
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
 		file::path name = entry.assetName;
 
-		WorkerPools->Enqueue([this, type, name]
+		jobs.add([this, type, name, completed]
 		{
 			switch (type)
 			{
@@ -1736,10 +1740,12 @@ void DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 			default:
 				break;
 			}
+			completed->fetch_add(1, std::memory_order_release);
 		});
 	}
 
-	WorkerPools->NotifyAllAndWait();
+	ce::get_job_scheduler().submit(std::move(jobs)).wait();
+	return {bundle.assets.size(), completed->load(std::memory_order_acquire)};
 }
 
 void DataSystem::RetainAssets(const AssetBundle& bundle)

@@ -63,7 +63,7 @@ void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
 
 	// 여기서 트리를 돌지 않는다. 큐에 담기만 하고 실행은 틱 경계의 FlushAITicks가 한다.
 	//
-	// 이 함수는 게임 스레드가 아니라 AI 잡 스레드에서 불린다(Scene의 m_AIFuture).
+	// 이 함수는 게임 스레드가 아니라 AI 잡 스레드에서 불린다(Scene의 m_AIJob).
 	// 관리 코드는 게임 스레드에서만 부를 수 있으므로(GC 규약) 여기서 바로 넘길 수 없다.
 	// 물리·애니메이션 이벤트가 같은 이유로 같은 규약을 쓴다.
 	ClrHost::Get().QueueAITick(m_treeInstanceId, deltaSecond);

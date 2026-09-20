@@ -1095,6 +1095,20 @@ namespace experiment::importer
                 }
             }
 
+            // glTF의 키가 없는 TRS 성분은 node의 기본값을 유지한다.
+            // 런타임 track은 완전한 local TRS를 샘플링하므로 여기서 상수 키로
+            // 채운다. 회전만 키잉한 관절의 translation을 0으로 잃지 않게 한다.
+            for (ImportedChannel& channel : clip.channels)
+            {
+                const TrsTransform& local = scene.nodes[channel.target.Value()].local;
+                if (channel.translations.empty())
+                    channel.translations.push_back({ 0.0, local.translation });
+                if (channel.rotations.empty())
+                    channel.rotations.push_back({ 0.0, local.rotation });
+                if (channel.scales.empty())
+                    channel.scales.push_back({ 0.0, local.scale });
+            }
+
             clip.durationSeconds = duration;
             scene.clips.push_back(std::move(clip));
         }

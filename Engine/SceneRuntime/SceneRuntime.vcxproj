@@ -278,6 +278,7 @@
     <ClInclude Include="AnimationBehviourFatory.h" />
     <ClInclude Include="AniBehavior.h" />
     <ClInclude Include="AnimationController.h" />
+    <ClInclude Include="AnimationPlayback.h" />
     <ClInclude Include="Animator.h" />
     <ClInclude Include="AnimatorSystem.h" />
     <ClInclude Include="AnimationState.h" />

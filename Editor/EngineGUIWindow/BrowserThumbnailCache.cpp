@@ -3,7 +3,7 @@
 #include "EditorImGuiTexture.h"
 #include "Texture.h"
 #include "TextureImage.h"
-#include "WorkerPool.h"
+#include "JobScheduler.h"
 
 #include <algorithm>
 #include <atomic>
@@ -227,7 +227,7 @@ namespace
         item.state = thumbnail_state::working;
         const thumbnail_fs::path source = item.source;
         const std::uint64_t generation = item.generation;
-        WorkerPools->Enqueue([key, source, generation]()
+        ce::get_job_scheduler().submit([key, source, generation]()
         {
             thumbnail_completion done = thumbnail_run_generator(key, source, generation);
             thumbnail_cache_state& self = thumbnail_cache();
@@ -355,7 +355,7 @@ namespace
         }
 
         // ── ③ 대기 중인 요청을 조금씩 넘긴다 ────────────────────────────
-        if (WorkerPools->IsRunning() && !self.shuttingDown.load())
+        if (ce::get_job_scheduler().is_running() && !self.shuttingDown.load())
         {
             std::size_t dispatched = 0;
             // 보이는 것을 먼저 넘긴다(계약의 "가시 타일 우선 요청").
@@ -407,7 +407,7 @@ namespace
         snapshot.entries = self.entries.size();
         snapshot.bytes = self.bytes;
         snapshot.budgetBytes = budget;
-        snapshot.workerPoolRunning = WorkerPools->IsRunning();
+        snapshot.workerPoolRunning = ce::get_job_scheduler().is_running();
         for (const auto& [key, item] : self.entries)
         {
             switch (item.state)

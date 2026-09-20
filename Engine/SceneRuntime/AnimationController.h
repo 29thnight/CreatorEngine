@@ -37,8 +37,8 @@ public:
 	std::shared_ptr<AnimationState> m_anyState;
 	math::matrix4x4 m_LocalTransforms[512]{};
 
-	float m_timeElapsed;
-	float m_nextTimeElapsed;
+	float m_timeElapsed{};
+	float m_nextTimeElapsed{};
 	AvatarMask* m_avatarMask{};
 	float curAnimationProgress = 0.f;
 	float preCurAnimationProgress = 0.f;

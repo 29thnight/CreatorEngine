@@ -10,7 +10,7 @@ $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $run = Join-Path $Work ('creator-model-async-' + [guid]::NewGuid().ToString('N'))
 [IO.Directory]::CreateDirectory($run) | Out-Null
-$gunner = (Join-Path $root 'Dynamic_CPP\Assets\Models\Gunner_F_Mythic.glb').Replace('\', '/')
+$robot = (Join-Path $root 'Dynamic_CPP\Assets\Models\CreatorRobot.glb').Replace('\', '/')
 $su = (Join-Path $root 'Dynamic_CPP\Assets\Models\SU_Mythic.glb').Replace('\', '/')
 $large = (Join-Path $root 'Dynamic_CPP\Assets\Models\scene.glb').Replace('\', '/')
 $loaded = (Join-Path $run 'loaded.scene').Replace('\', '/')
@@ -22,7 +22,7 @@ $guarded = (Join-Path $run 'guarded.scene').Replace('\', '/')
 [IO.File]::WriteAllText($guarded, 'preserve-existing-scene')
 $commands = @(
     'scene.new AsyncPlacement', 'wait 10',
-    "model.async $gunner", 'model.async status', 'model.async wait', 'wait 10',
+    "model.async $robot", 'model.async status', 'model.async wait', 'wait 10',
     'model.async status', 'assets.scenemodel', 'scene.hierarchycheck', "scene.save $loaded",
     "model.async probe $guarded",
     'undo', 'wait 2', "scene.save $undone",
@@ -31,7 +31,7 @@ $commands = @(
     "model.async $su", 'undo', 'wait 10',
     "model.async $large", 'scene.new AsyncSwitched', 'wait 30',
     "scene.save $switched",
-    "model.async $gunner", 'play', 'wait 10', 'stop', 'wait 20',
+    "model.async $robot", 'play', 'wait 10', 'stop', 'wait 20',
     "scene.save $stopped", 'model.async status', 'quit'
 )
 $scenario = Join-Path $run 'commands.txt'
@@ -89,13 +89,13 @@ else {
 }
 foreach ($path in @($loaded, $redone)) {
     if (-not (Test-Path -LiteralPath $path)) { $failures.Add("Missing scene: $path"); continue }
-    if ([regex]::Matches([IO.File]::ReadAllText($path), 'm_meshAssetId:').Count -ne 2) {
-        $failures.Add("Expected two persisted mesh IDs: $path")
+    if ([regex]::Matches([IO.File]::ReadAllText($path), 'm_meshAssetId:').Count -ne 4) {
+        $failures.Add("Expected four persisted mesh IDs: $path")
     }
 }
 foreach ($path in @($undone, $switched, $stopped)) {
     if (-not (Test-Path -LiteralPath $path)) { $failures.Add("Missing scene: $path"); continue }
-    if ([IO.File]::ReadAllText($path) -match 'm_meshAssetId:|Gunner_F_Mythic|SU_Mythic') {
+    if ([IO.File]::ReadAllText($path) -match 'm_meshAssetId:|CreatorRobot|SU_Mythic') {
         $failures.Add("Cancelled model leaked into scene: $path")
     }
 }

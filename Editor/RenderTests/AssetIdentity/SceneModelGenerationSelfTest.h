@@ -18,8 +18,8 @@ namespace RenderTest
         std::uint64_t generationTextures{};
         std::uint64_t otherTextures{};
         std::uint64_t missingTextures{};
-        std::uint64_t gunnerRenderers{};
-        std::uint64_t gunnerEmbedded{};
+        std::uint64_t robotRenderers{};
+        std::uint64_t robotEmbedded{};
         std::uint64_t textures{};
         std::uint64_t reused{};
         std::uint64_t created{};
@@ -30,7 +30,7 @@ namespace RenderTest
     // PHASE 3.75 MBC7 — 활성 씬의 MeshRenderer가 typed generation handle로 서 있고,
     // 재질의 embedded texture owner가 전역 등록부·이름 폴백이 아니라 그 모델의
     // generation closure(DataSystem::ResolveModelGenerationTexture)에서 왔는지를
-    // 씬 전수로 잰다. Gunner가 있으면 §6.2 폐쇄 조건(renderer ≥ 2·embedded 6)을
+    // 씬 전수로 잰다. Robot가 있으면 §6.2 폐쇄 조건(renderer ≥ 4·renderer당 embedded property 4)을
     // 함께 단정한다. stdout 한 줄(`[CLI] assets.scenemodel pass|fail ...`)이 게이트
     // 관측 창구다.
     [[nodiscard]] bool RunSceneModelGenerationSelfTest(std::string& outLog, SceneModelReport* report = nullptr);

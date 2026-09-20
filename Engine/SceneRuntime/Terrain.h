@@ -1,5 +1,4 @@
 #pragma once
-#include "../Utility_Framework/Core.Thread.hpp"
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "TerrainCollider.h"
@@ -147,7 +146,6 @@ private:
     float m_maxHeight{ 500.0f }; // 최대 높이
     //todo: 인스펙터 및 높이 수정에 적용 안함 세이브로드 작업 이후 적용
 
-    //ThreadPool<std::function<void()>> m_threadPool; //이미지 세이브,로딩시 사용할 쓰레드 풀//component 생성시 4개 
 
     //== 에디터 전용
     //== window 공용으로 사용가능

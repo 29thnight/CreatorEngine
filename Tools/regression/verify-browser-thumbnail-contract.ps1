@@ -399,7 +399,7 @@ try {
         ("thumbnail_run_generator 호출이 " + $generatorCalls.Count + " 자리다 — 하나여야 한다. " +
          "둘째 자리가 생기면 그 자리는 Presentation 스레드일 수 있고, 그래도 그림과 장부는 옳게 나온다.")
     $dispatchBody = ($cacheCode -join "`n")
-    Assert ($dispatchBody -match 'WorkerPools[\s\S]{0,400}thumbnail_run_generator') `
+    Assert ($dispatchBody -match 'get_job_scheduler\(\)\.submit[\s\S]{0,400}thumbnail_run_generator') `
         'thumbnail_run_generator 가 워커 풀 안에서 불리지 않는다 — 디코딩이 프레임을 멈춘다'
 
     # S3 — 예산 비교가 상수를 직접 읽지 않는다. 읽으면 `budget` 명령은 장식이고

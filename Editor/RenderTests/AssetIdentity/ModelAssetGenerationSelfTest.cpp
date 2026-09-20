@@ -689,7 +689,7 @@ namespace RenderTest
         std::size_t skeletonCount = 0u;
         std::size_t animationCount = 0u;
         std::size_t descriptorCount = 0u;
-        bool sawGunner = false;
+        bool sawRobot = false;
         bool sawSu = false;
         std::string suRenderSummary;
         for (const std::filesystem::path& source : sources)
@@ -748,14 +748,15 @@ namespace RenderTest
             animationCount += generation->Animations().size();
             descriptorCount += generation->GpuDescriptors().size();
 
-            if (source.filename() == "Gunner_F_Mythic.glb")
+            if (source.filename() == "CreatorRobot.glb")
             {
-                sawGunner = true;
-                check.Check(generation->Materials().size() == 2u
-                    && generation->Textures().size() == 6u
+                sawRobot = true;
+                check.Check(generation->Meshes().size() == 4u
+                    && generation->Materials().size() == 4u
+                    && generation->Textures().size() == 12u
                     && generation->Skeleton() != nullptr
-                    && generation->Animations().size() == 10u,
-                    "Gunner material 2/embedded texture 6/skeleton/animation 10 closure");
+                    && generation->Animations().size() == 8u,
+                    "Robot mesh 4/material 4/embedded texture 12/skeleton/animation 8 closure");
             }
             if (source.filename() == "SU_Mythic.glb")
             {
@@ -802,7 +803,7 @@ namespace RenderTest
                 }
             }
         }
-        check.Check(sawGunner, "Gunner_F_Mythic corpus 포함");
+        check.Check(sawRobot, "CreatorRobot corpus 포함");
         check.Check(sawSu, "SU_Mythic corpus 포함");
         const assets::ModelAssetGenerationCacheSnapshot snapshot = cache.Snapshot();
         check.Check(snapshot.currentAssets == loadedCount

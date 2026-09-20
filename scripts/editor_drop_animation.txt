@@ -15,7 +15,12 @@ model.loadcached __MODEL__
 wait 120
 model.place __MODEL_NAME__
 wait 90
-experiment.animtick
+play
+wait 60
+animator.status
+wait 60
+animator.status
 assets.modeldiag
+stop
 wait 10
 quit

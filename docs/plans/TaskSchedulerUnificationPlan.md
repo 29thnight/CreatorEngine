@@ -1,36 +1,31 @@
-# 태스크 스케줄러 단일화 — enkiTS 이관 (PHASE 13 S0.5 · S6 부속)
+# 태스크 스케줄러 단일화 — enkiTS 공용 실행 기반 (PHASE 13 S0.5)
 
-2026-09-15 수립. **독립 페이즈가 아니다** — `AnimationSchedulerPlan.md`(PHASE 13)의
-S0.5(기반 정비)와 S6(Job 배치 전환)의 근거 문서다. 단계·공수·상태는 저쪽이
-정본이고, 이 문서는 그 판정에 이른 실태 조사와 측정을 담는다.
+2026-09-15 수립 · 2026-09-20 결정 개정. **통일을 먼저 완료하고 최적화는 이후에 한다.**
+현재 설계 정본은 [JobSchedulerDesign](../design/JobSchedulerDesign.md),
+PHASE 13 진행 상태는 [AnimationSchedulerPlan](AnimationSchedulerPlan.md)이다.
 
-> 초안은 별도 PHASE 26으로 세웠으나, 착수 전 대조에서 PHASE 13 S6이 이미 같은
-> 작업("전용 풀 vs WorkerPools 실측 비교")을 갖고 있음이 드러나 편입했다(§3.3).
+## 0. 2026-09-20 현행 결정
 
-엔진의 병렬 실행 표면을 전수 조사한 결과, **스레드 풀이 3벌 있고 그중 하나는
-인스턴스가 0개**였다. 같은 작업(fan-out 후 배리어)을 세 곳이 각자 구현하고
-있으며, 자체 풀의 동기화 프리미티브(`CountingSemaphore`)는 도입 이래 한 번도
-수정된 적이 없다.
+- 엔진이 지속적인 enkiTS 워커를 소유한다. 공용 `thread_pool` 위의 `job_scheduler`가
+  `job_group` 제출·`job_handle` 완료·의존 작업·범위 분할을 제공한다.
+- 공용 유틸리티는 STL 표기, 애니메이션 도메인 객체는 C# 표기를 따른다.
+  이전 `WorkerPool`/`WorkerPools` 별칭은 남기지 않는다.
+- AnimationJob 전용 풀을 S6까지 유지한다는 결정을 철회한다. 현재 평가 단위를
+  유지한 채 공용 기반으로 먼저 이관하고, S6에서는 청크화·소유 계층을 정리한다.
+- S0.5에 DataSystem·썸네일·AnimationJob·Foliage·AI를 이관한다. SceneManager에서
+  공용 풀의 수명을 떼어 Editor/Player 공통 EngineBootstrap으로 옮긴다.
+- 별도 풀 비교·동시 경합 우선순위 벤치마크는 이번 완료 조건에서 제외한다.
+  새 자체 work stealing 구현도 추가하지 않는다. enkiTS의 분배 정책을 사용한다.
+- 씬 로딩 `std::async` 2곳과 DX12 PSO 1곳, RHI command recording 풀은 후속이다.
+  값 반환·블로킹·워커별 자원 수명을 먼저 정리해야 한다. 장기 전용 루프는 유지한다.
+- 워커 프로파일러 마커는 [ProfilingCapturePlan](ProfilingCapturePlan.md) §0.5.5의
+  안전한 전달 경계 이후에 추가한다.
 
-이관 대상은 **fork-join 경로뿐**이고 장기 블로킹 스레드는 그대로 둔다. 후자를
-옮기면 워커가 영구 점유되어 풀이 굶기 때문이다 — 이 경계가 첫째 판정이다.
-
-둘째 판정은 순서다. **기반 정비(S0.5)와 `AnimationJob` 이관(S6)을 갈라 놓았다**
-— S2′~S3.5가 분해 자체를 바꾸므로, 먼저 옮기면 곧 버려질 모양을 이식하게 된다
-(§3.3). 따라서 자체 풀은 S6이 끝나야 은퇴한다.
-
-원칙 셋을 먼저 박는다.
-
-1. **옮기는 것은 "짧고 끝나는 일"뿐이다.** 블로킹 루프·I/O 대기·값 반환
-   비동기는 남긴다. Unity도 Job System과 비동기 로딩 스레드를 분리해 둔다.
-2. **교체의 명분은 처리량이다.** 꼬리 지연이 아니다(§2.3 — 이 기계에서 측정
-   불가). 정확성도 아니다(§2.2 — 자체 풀의 배리어는 정직했다).
-3. **인터페이스를 먼저 세우고 백엔드를 갈아 끼운다.** `WorkerPool`이 이미
-   그 모양이라 첫 소비자로 쓴다.
-
----
-
-## 1. 지금 무엇이 있는가 — 실측 (2026-09-15)
+**§1~§8은 이 결정 이전의 조사·측정·중간 구현 기록이다.** 우선순위 실측 선행,
+Animation 전용 풀 유지, SceneManager 풀 소유, WorkerPool API 관련 서술은 현행
+지시가 아니다. 최신 구현·검증은 §9를 따른다. 과거 성능 수치를 이번 구현의
+성능 향상 근거로 사용하지 않는다.
+## 1. 당시 구조와 측정 (2026-09-15 · 현행 차이는 §0 우선)
 
 ### 1.1 `Core.ThreadPool` 인스턴스 — 3개 중 1개는 죽어 있다
 
@@ -212,26 +207,15 @@ AnimationSchedulerPlan.md:541
 > 초안(PHASE 26)은 이 둘을 한 페이즈에 묶으려 했다. 대조 결과 순서 제약이
 > 드러나 PHASE 13의 S0.5·S6으로 갈라 편입했다(2026-09-15).
 
-### 3.4 ★ 앞선 판단 정정 — 잡끼리 겹치는 쓰기가 있다
+### 3.4 정확성과 스케줄러 교체의 경계
 
-이 조사 도중 "현행 fan-out은 잡끼리 공유 자료를 안 만지므로 접근 등록·충돌
-검출 같은 계약이 잡을 것이 없다"고 판단했으나, **틀렸다.** 근거로 삼은 것은
-`AnimationJob.cpp:170`의 X7 주석("worker는 Animator 소유 staging만 쓴다")
-하나였는데, PHASE 13 §1.2가 공유 애셋 경로의 레이스를 이미 기록해 두었다.
+9-15 문서의 R1·R2 판정은 8월 계획에 남아 있던 legacy AnimationJob 경로를
+현재 구현으로 오인했다. 9-20 소스 대조에서 해당 경로의 제거를 확인했다:
+`AnimationJob`은 const ModelAssetGeneration과 본 인덱스 track 표를 읽는다.
+`Skeleton::curKey`/공유 Bone 트랜스폼/map 삽입을 S2′의 남은 작업으로 세지 않는다.
 
-| | 내용 | 위치 |
-|---|---|---|
-| R1 | 공유 애셋 동시 쓰기. `Skeleton`·`Animation`이 `DataSystem::Models` 캐시로 인스턴스 간 공유되는데 워커 8스레드가 `Animation::curKey`와 `Bone::m_global/localTransform`에 동시 기록. **같은 모델 2체면 레이스** | `AnimationJob.cpp:368,419,377-378,422-423` |
-| R2 | `UpdateBlendBone`이 `nextanimation->m_nodeAnimations[boneName]`를 `find` 없이 호출 → 채널이 없으면 **워커 스레드에서 공유 애셋 `std::map`의 구조를 변경** | `AnimationJob.cpp:366,651` |
-| R6 | 워커 스레드에서 C# 키프레임 이벤트 발화 | `AnimationJob.cpp:156,280` |
-
-X7 주석은 **Scene packed storage와 부착 오브젝트 Transform에 대해서만** 참이고,
-`DataSystem::Models` 캐시를 경유하는 공유 애셋에는 해당하지 않는다. 주석의
-적용 범위를 그 문장이 다루지 않는 자료에까지 넓혀 읽은 것이 오류였다.
-
-함의: 스케줄러를 교체해도 R1·R2는 그대로 남는다. **enkiTS는 이 결함을 고치지
-않는다** — 고치는 것은 PHASE 13 S2′(공유 애셋에서 인스턴스 상태 분리)다.
-순서가 또 한 번 PHASE 13을 가리킨다.
+이 사실이 새 스케줄러의 정확성을 증명하지는 않는다. 배리어·task 수명·완료 계수는
+교체 후 별도 검증하고, 애니메이션 상태/레이어/이벤트는 정본 S0에서 검증한다.
 
 ### 3.5 보류 — DX12/Vulkan 커맨드 풀
 
@@ -248,14 +232,14 @@ X7 주석은 **Scene packed storage와 부착 오브젝트 Transform에 대해�
 
 ### PHASE 13 S0.5 — 태스크 스케줄러 기반 정비 (2일, P0, 즉시 착수 가능)
 
-**① `AssetLoadJob` 삭제**
-소비자 0. `AssetJob.h`/`.cpp` 제거, vcxproj·filters 항목 제거.
+**① `AssetLoadJob` 삭제 — 완료**
+`317ab497`에서 파일과 vcxproj·filters 항목이 제거됐다. 새 구현 범위에 중복 산입하지 않는다.
 게이트: 전체 솔루션 빌드 exit 0 (mtime이 아니라 **종료 코드로** 판정).
 
-**② enkiTS 도입 + `WorkerPool` 백엔드 교체**
+**② enkiTS 도입 + `WorkerPool` 백엔드 교체 — 완료(§8)**
 - `vcpkg.json`에 `enkits` 추가(포트 존재 확인 완료, zlib 라이선스)
 - `Enqueue`/`NotifyAllAndWait` 시그니처를 유지한 채 내부만 교체
-- 소비자(`DataSystem.cpp:1678`·`:1702`)는 수정하지 않는다
+- 소비자는 DataSystem 번들 로드와 BrowserThumbnailCache다. 공개 제출 표면은 유지하되 썸네일의 비동기 task 수명·완료·종료 경계도 검증한다.
 
 **게이트 S0.5-G1**: `DataSystem` 경로의 완료 수를 독립 카운터로 세어
 `NotifyAllAndWait` 반환 시 == 제출 수.
@@ -318,8 +302,9 @@ S0.5·S6이 끝나면 `Core.ThreadPool`·`Core.CountingSemaphore`·`Core.Thread`
   답을 거꾸로 냈다.
 - **대조군은 독립 유도를 갖는다.** 같은 프로세스에서 같은 출처를 두 번 읽는
   것은 대조가 아니다.
-- **게이트는 `run-all` 세트에 들어가야 존재한다.** 개별 스크립트로만 있으면
-  없는 것과 같다.
+- **변경에 닿는 게이트를 묶어 실행한다.** `run-all.ps1`은 9-16 폐지됐다.
+  현행 규칙은 `Tools/regression/README.md`이며, 공용 풀은 독립 검사·제품 번들·
+  실제 썸네일 경로를 한 묶음으로 기록한다.
 - **빌드 성공은 exit code로만 판정한다.** mtime은 LTCG 실패도 갱신한다.
 
 ---
@@ -329,7 +314,7 @@ S0.5·S6이 끝나면 `Core.ThreadPool`·`Core.CountingSemaphore`·`Core.Thread`
 | 항목 | 상태 |
 |---|---|
 | PHASE 13과의 최종 경계 | §3.3으로 갈랐고 PHASE 13 계획서·대시보드에 S0.5로 반영 완료(2026-09-15) |
-| R1·R2 공유 애셋 레이스 | 스케줄러 교체로 안 고쳐진다. PHASE 13 S2′ 소관 |
+| 과거 R1·R2 공유 애셋 레이스 | typed generation 전환으로 해당 경로 제거. 새 풀의 수명·배리어 검증과 S0 제품 회귀는 별개 |
 | 꼬리 지연 | 기계 노이즈가 신호보다 크다. 조용한 환경 재측정 필요 |
 | enkiTS가 빠른 이유 | 가설: `WaitforTask` 중 호출 스레드도 일한다(엔진 풀은 메인이 순수 대기). **미검증** |
 | 워커 16개 동시 경합에서의 우선순위 | 미측정. S6의 선행 조건 |
@@ -351,3 +336,95 @@ S0.5·S6이 끝나면 `Core.ThreadPool`·`Core.CountingSemaphore`·`Core.Thread`
   재현된다.
 - `docs/design/ContainerLibraryDesign.md` — "STL이 기본값, 자체 제작은 측정된
   축에서만". 본 문서는 같은 규율을 스케줄러에 적용한 것이다.
+
+## 8. S0.5 ② 공용 풀 이관 (2026-09-20)
+
+- enkiTS 1.12는 기존 vcpkg baseline으로 고정한다. `WorkerPool` 공개 제출·대기 표면과
+  SceneManager의 시작·종료 소유권을 유지하며 구현은 Utility_Framework의 cpp로 옮겼다.
+- `AddTaskSetToPipe`는 큐가 차면 호출 스레드에서 일을 실행할 수 있다.
+  썸네일 디코딩이 Presentation으로 돌아오지 않도록 임시 pinned 작업으로 워커에
+  전달한 뒤 일반 task set 큐에 넣는다. pinned API는 외부 스레드 등록 없이 제출할 수 있다.
+  근거: [enkiTS 1.12 API](https://github.com/dougbinks/enkiTS/blob/v1.12/src/TaskScheduler.h).
+- 일반 task는 enkiTS completion action에서 해제한다. 전달 작업은 제출 측과 완료 측의
+  참조 2개를 모두 놓은 뒤 해제한다. `AddPinnedTaskInt`가 큐에 게시한 뒤에도 작업의
+  `threadNum`을 읽기 때문에 완료 측 단독 해제는 안전하지 않다. 제출 수는 실행 완료와
+  callback capture 해제 뒤에 감소한다. 종료는 새 접수를 닫고 기존 작업을 모두 마친 뒤
+  워커를 join한다. 일반 대기 호출자는 기존처럼 일을 실행하지 않고 완료를 기다린다.
+  실행 예외는 다른 작업을 마친 뒤 대기 호출자에 전달한다.
+- DataSystem 번들 로드는 스케줄러 계수와 별개인 완료 수를 반환한다.
+  `worker.pool.probe`는 CreatorRobot 실제 번들 32건과 외부 생산자의 GLB 읽기 64건을
+  동시에 제출한다. 실제 이미지 디코딩·게시·무효화·축출은 기존 썸네일 제품 게이트가 맡는다.
+- `verify-worker-pool.ps1`: Debug/Release 각각 `WORKER_POOL_OK checks=10257`.
+  반복 배치, 네 외부 생산자, 대기 없는 비동기 완료, 중첩 제출, capture 해제, 예외,
+  종료 drain, 재시작을 검사했다. 실제 어댑터의 대기를 제거한 복사본은 두 구성 모두
+  독립 완료 계수 단정에서 실패했다(`WORKER_POOL_MUTATION_OK`).
+- 재실행 중 초기 전달 작업 해제 방식에서 접근 위반을 발견했다(enkiTS.dll `0xc0000005`).
+  `verify-worker-pool-lifetime.ps1`은 enkiTS 1.12 소스 복사본의 게시/후속 읽기 사이를
+  1ms 넓히고 실제 어댑터를 ASan으로 함께 빌드한다. 제출 측 참조를 제거한 변이가
+  `AddPinnedTaskInt`의 `heap-use-after-free`로 실패해 해당 경합을 검출함을 확인했다.
+  수정본은 같은 자극의 집중 검사 273개를 모두 통과했다(`WORKER_LIFETIME_OK`).
+  고의 지연을 넣는 검사만 반복 배치를 줄이며, 일반 풀 검사는 10257개를 유지한다.
+- 수명 경합 수정 후 Debug/Release 전체 CreatorEditor 빌드·링크 exit 0. 두 구성의 제품 번들 검사는
+  `WORKER_PRODUCT_OK bundleSubmitted=32 bundleCompleted=32 externalReads=64 inlineReads=0 model=CreatorRobot`.
+  `enkiTS.dll`은 기존 런타임 배포의 의존성 탐색으로 `Runtime/Common`에 포함됐다.
+- 실제 썸네일 제품 회귀는 Release에서 `BROWSER_THUMBNAIL_CONTRACT_OK (56 checks)`.
+  초기 3요청 중 이미지 2건 디코딩·게시, 손상 이미지 1건 실패, 수정 후 무효화 1건과 재게시,
+  40000바이트 예산에서 축출을 확인했다. 늦은 완료 폐기는 이번 실행에서 0건으로
+  해당 축의 성공 근거로 쓰지 않는다. 종료 drain은 별도의 독립 풀 검사로 확인했다.
+- S0.5 전체 완료는 아니다. ③ 전용 풀 기본 우선순위의 동시 경합 실측과 변경,
+  ④ Foliage/AI 이관, `std::async` 3곳 잔존 확인은 후속이다.
+  이번 정확성 검사는 §2의 과거 독립 측정이나 S1 제품 성능 기선을 대체하지 않는다.
+
+## 9. 공용 스케줄러 구현 (2026-09-20)
+
+- 사용자 결정대로 성능 비교를 건너뛰고 공용 실행 기반부터 통일했다.
+  [JobSchedulerDesign](../design/JobSchedulerDesign.md)에 소유·API·종료 계약을 정리했다.
+- `thread_pool`은 enkiTS 실행과 지속 워커를, `job_scheduler`는 그룹·완료 토큰·
+  의존 그래프·범위 분할을 맡는다. 엔진 시작/종료가 수명을 소유하고 소비자별
+  `job_handle.wait()`가 자기 작업만 기다린다. 완료 토큰은 캡처를 붙들지 않는다.
+- DataSystem·썸네일·AnimationJob·Foliage·Scene AI가 이 경로를 사용한다.
+  구 WorkerPool과 Animation 전용 풀, 사용처 0이 된 Core.ThreadPool/Core.Thread/
+  Core.CountingSemaphore를 소스·프로젝트에서 삭제했다. `std::async` 실행은
+  씬 로드 2곳·DX12 PSO 1곳으로 줄었다. 전역 `std::future` 제거가 목표인 것은 아니다.
+- Editor/Player 모두 엔진 부팅에서 시작한다. 새 프레임 생산 종료 후 AI 그룹을
+  CLR보다 먼저 회수하고, 씬 해체 중에는 풀이 살아 있으며 DataSystem보다 먼저 종료한다.
+  종료는 이미 수락한 의존 그래프까지 완료한다. 작업당 스레드 생성과 caller inline 실행은 없다.
+- 독립 검사: Debug/Release 각각 `JOB_SCHEDULER_OK checks=10332 workers=4 backend=enkiTS`.
+  그룹 독립 대기, 네 외부 제출자, persistent worker 신원, 반복 배치, fan-out/fan-in,
+  4096단계 빈 의존 체인, parallel_for 꼬리 범위, 실패 전파와 종속 본문 생략,
+  capture 해제, 워커 blocking wait 거부, 종료 drain·재시작을 검사했다.
+  실제 대기를 제거한 변이는 두 구성 모두 독립 완료 단정으로 실패했다.
+- enkiTS 게시/후속 읽기 구간을 넓힌 ASan 검사: 정상 구현 348검사 통과.
+  제출 측 참조를 제거한 변이는 `AddPinnedTaskInt`의 `heap-use-after-free`로 실패했다.
+  설치된 enkiTS 라이브러리를 바꾸지 않는 격리된 검사다.
+- 재현: `verify-worker-pool.ps1`, `verify-worker-pool-lifetime.ps1`.
+  산출물은 `Build/Obj/Phase13Jobs/Pool-{Debug,Release}`, `SubmissionLifetime`이다.
+
+제품 검증(성능 측정 수치로 사용하지 않는다):
+
+- VS18/v145 Debug/Release 전체 Editor 빌드·링크 exit 0.
+  같은 Release 엔진 라이브러리를 사용하는 Player 컴파일·링크도 exit 0
+  (`BuildProjectReferences=false`). Player 런타임 실행은 이번 검증에 포함하지 않았다.
+  Player 링크에는 여러 라이브러리의 PDB 형식 레코드 경고 LNK4020이 남았으며,
+  디버거의 일부 기호·타입 가용성은 별도 확인이 필요하다.
+- Debug/Release `worker.pool.probe`: 각각 실제 번들 제출/완료 32/32, 외부 파일 읽기 64,
+  제출 스레드 실행 0, 실제 Foliage 항목 73개 완료. 정적인 등록만 확인하지 않고
+  초기 culled 값을 제품 범위 처리로 바꾼 결과를 기다려 검사한다.
+- Debug/Release 애니메이션 제품 검사: 각각 CreatorRobot 100체 × 12회,
+  `checks=69514 managedThreadErrors=0`. 실제 generation·포즈·씬 본/소켓·CLR 경로다.
+- Release DX12 화면 비교: `captures=13 checks=264`. contact sheet도 확인했다.
+  Walk/Run·블렌드·레이어·마스크·초록 손 소켓·숨김/복귀가 정상이다.
+- Release 실제 썸네일 56검사 통과. `lateDropped=0`이므로 늦은 완료 폐기 경로를
+  자극했다고 주장하지 않는다. 독립 스케줄러 검사가 종료 drain을 검증한다.
+- Release BT: 트리 0→3, 재생 후 543틱·건너뜀 0, 프레임당 경계 통과 0.972376,
+  씬 교체 후 트리 0. 저작 블랙보드 조건과 Running을 거친 행동 완주도 확인했다.
+  기존 검사기는 폐기된 stdout 형식을 읽었으므로 현재 JSON 결과 계약으로 수정했다.
+- Release AI registry: 최초 등록→DDOL handle 재등록→파괴 해지, 20명령 모두 성공.
+  일반 명령 표 골든 133개 동일. BT/AI의 기존 로컬 fixture는 원본 바이트로 복원했다.
+- 결과: `Build/Obj/Phase13Jobs/{Product,Animation,Visual,Thumbnails,BT,AI,Registry}-Release`.
+  Debug 결과는 같은 루트의 `Product-Debug`, `Animation-Debug`다.
+  테스트 모델 SHA-256은 §8의 CreatorRobot과 동일하다.
+
+후속 범위는 SceneManager 값 반환/블로킹 로드, DX12 PSO 컴파일, RHI 워커별 명령
+기록 자원이다. S6은 공용 스케줄러 위의 애니메이션 청크화·계층 정리이며 전용 풀
+선택 비교를 다시 하지 않는다. 장기 서비스 루프는 공용 Job 실행과 역할이 다르다.

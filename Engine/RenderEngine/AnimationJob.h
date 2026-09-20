@@ -1,6 +1,5 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
-#include "../Utility_Framework/Core.Thread.hpp"
 #include <mathematics/matrix4x4.hpp>
 
 class RenderScene;
@@ -49,7 +48,6 @@ private:
 	Core::DelegateHandle m_sceneLoadedHandle;
 	Core::DelegateHandle m_sceneUnloadedHandle;
     Core::DelegateHandle m_AnimationUpdateHandle;
-    ThreadPool<std::function<void()>>* m_UpdateThreadPool;
     uint32 m_objectSize{};
 	mutable std::mutex m_animatorMutex;
 	// K2: weak_ptr<Animator>(공유 소유 관찰) → Animator*(프레임-로컬 관찰).

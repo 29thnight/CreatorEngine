@@ -459,6 +459,8 @@ void Player::PlayerMain::Finalize()
 
 	// 순서는 에디터 종료가 실측으로 다듬은 그대로다: 관리 측 → 표시/렌더
 	// 소비자 join → 씬 해체 → 렌더러. 새 frame 발행은 메인 루프 종료와 함께 끝났다.
+	SceneManagers->SetDecommissioning();
+	SceneManagers->DrainAIUpdates();
 	ClrHost::Get().Shutdown();
 
 	StopPresentationThread();

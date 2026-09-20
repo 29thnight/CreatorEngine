@@ -79,7 +79,7 @@ private:
 		uint32_t generation{ 0 };
 	};
 
-	// AI 잡 스레드(Scene::m_AIFuture) 문제로 뮤텍스를 남겼다 — 정확히는, 코드
+	// AI 잡 스레드(Scene::m_AIJob) 문제로 뮤텍스를 남겼다 — 정확히는, 코드
 	// 추적으로 QueueAITick/FlushAITicks 경로(BehaviorTreeComponent::InternalAIUpdate)
 	// 는 이 레지스트리를 건드리지 않는다는 것까지는 확인했다(int/float만 담아
 	// SpinLock으로 보호되는 별도 큐로 넘긴다). ClrHost.h의 "관리 코드 호출은

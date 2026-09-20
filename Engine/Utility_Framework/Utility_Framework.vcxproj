@@ -39,16 +39,13 @@
     <ClInclude Include="SerializationProfiler.h" />
     <ClInclude Include="plf_colony.h" />
     <ClInclude Include="Core.Coroutine.h" />
-    <ClInclude Include="Core.CountingSemaphore.h" />
     <ClInclude Include="Core.Definition.h" />
     <ClInclude Include="Core.Memory.hpp" />
     <ClInclude Include="Core.Minimal.h" />
     <ClInclude Include="Core.Property.h" />
     <ClInclude Include="Core.Runtime.h" />
-    <ClInclude Include="Core.Thread.h" />
-    <ClInclude Include="Core.Thread.hpp" />
-    <ClInclude Include="Core.ThreadPool.h" />
-    <ClInclude Include="WorkerPool.h" />
+    <ClInclude Include="ThreadPool.h" />
+    <ClInclude Include="JobScheduler.h" />
     <ClInclude Include="CoreWindow.h" />
     <ClInclude Include="WindowDesc.h" />
     <ClInclude Include="CoroutineHelper.h" />
@@ -92,6 +89,13 @@
     <ClInclude Include="WarmupLedger.h" />
 </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ThreadPool.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PreprocessorDefinitions>ENKITS_DLL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <ClCompile Include="JobScheduler.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="AuthoringRymlErrorPolicy.cpp" />
     <ClCompile Include="AuthoringScalarConvert.cpp" />
     <ClCompile Include="AuthoringParsedDocument.cpp" />

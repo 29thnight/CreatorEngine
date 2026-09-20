@@ -1,4 +1,5 @@
 #include "FoliageComponent.h"
+#include "JobScheduler.h"
 #include "FoliageSystem.h"
 #include "ExperimentMaterialMigration.h" // MBC9: generation 재질 시공
 #include "Assets/ModelAssetGeneration.h"
@@ -388,19 +389,15 @@ void FoliageComponent::UpdateFoliageCullingData(
 
     auto ranges = DivideRangeAuto(m_foliageInstances.size());
 
-    std::vector<std::future<void>> tasks;
-    tasks.reserve(ranges.size());
+    job_group tasks;
 
     for (auto& [begin, end] : ranges)
     {
-        tasks.emplace_back(std::async(std::launch::async, process_range, begin, end));
+        tasks.add([process_range, begin, end] { process_range(begin, end); });
     }
 
  // 완료 대기
-    for (auto& f : tasks)
-    {
-        if (f.valid()) f.get();
-    }
+    ce::get_job_scheduler().submit(std::move(tasks)).wait();
 }
 
 

@@ -27,6 +27,9 @@
     <ClInclude Include="AssetIdentity\AssetSidecarSchemaSelfTest.h" />
     <ClInclude Include="AssetIdentity\ModelAssetGenerationSelfTest.h" />
     <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h" />
+    <ClInclude Include="Tasks\WorkerPoolSelfTest.h" />
+    <ClInclude Include="Animation\AnimationPlaybackSelfTest.h" />
+    <ClInclude Include="Animation\AnimationVisualProbe.h" />
     <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialCookSelfTest.h" />
     <ClInclude Include="ExperimentParity\ExperimentMaterialResolveSelfTest.h" />
@@ -55,6 +58,15 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="AssetIdentity\ModelAssetGenerationSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Tasks\WorkerPoolSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimationVisualProbe.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimationPlaybackSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="AssetIdentity\SceneModelGenerationSelfTest.cpp">

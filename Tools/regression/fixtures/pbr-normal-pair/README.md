@@ -28,9 +28,10 @@ W1 의 판정은 "노멀맵이 있는 draw 와 없는 draw 가 서로 다르게 
 디스크에만 있다. 그것만 쓰는 게이트는 clean checkout 에서 조용히 비어 버린다
 (`Tools/regression/fixtures/imgui-ini` · `gltf-multifile` 이 같은 이유로 생겼다).
 
-★ 같은 이유로 `verify-pbr-wiring-baseline.ps1` 의 **Gunner 캡처 축도 지금 이 기계
-전용**이다. 이 fixture 가 그것을 대체하지는 않는다(Gunner 는 스킨드·다중 재질
-실물이다) — 다만 노멀맵 유무 축만큼은 저장소가 소유하게 된다.
+현재 `verify-pbr-wiring-baseline.ps1`의 스킨드·다중 재질 축은
+CreatorRobot으로 교체했다. 이 모델도 로컬 준비본이며 없으면 skipped로 기록한다.
+[CreatorRobot fixture 안내](../creator-robot/README.md)를 따른다. 이 대조쌍은
+계속 clean checkout에서 노멀맵 유무만 독립적으로 검증한다.
 
 ## 평평한 노멀맵을 쓰지 않는 이유
 

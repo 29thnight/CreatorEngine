@@ -32,10 +32,12 @@ if (Test-Path -LiteralPath $resultPath) { Remove-Item -LiteralPath $resultPath -
 # lifecycle.stress 는 commandlet 표에만 있으므로 --commandlet-script 가 필요하다.
 $proc = Start-Process -FilePath $Exe `
     -ArgumentList @('--commandlet-script', ('"'+$scenario+'"'), '--result-format', 'jsonl', '--result-file', ('"'+$resultPath+'"')) `
-    -WorkingDirectory $exeDir -RedirectStandardOutput $outPath `
+    -WorkingDirectory $exeDir -WindowStyle Hidden -RedirectStandardOutput $outPath `
     -RedirectStandardError $errPath -PassThru
+$processHandle = $proc.Handle
 $proc.WaitForExit($TimeoutSeconds * 1000) | Out-Null
 if (-not $proc.HasExited) { $proc.Kill(); "TIMEOUT"; exit 1 }
+$proc.WaitForExit()
 
 $failed = @()
 if ($proc.ExitCode -ne 0) { $failed += ("종료 코드 비정상: 0x{0:X8}" -f $proc.ExitCode) }

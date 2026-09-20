@@ -66,6 +66,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ThreadPool.cpp"><Filter>Core.Thread</Filter></ClCompile>
+    <ClCompile Include="JobScheduler.cpp"><Filter>Core.Thread</Filter></ClCompile>
     <ClCompile Include="AuthoringRymlErrorPolicy.cpp">
       <Filter>Core.Reflection</Filter>
     </ClCompile>
@@ -128,9 +130,6 @@
     <ClInclude Include="Core.Coroutine.h">
       <Filter>Core.Coroutine</Filter>
     </ClInclude>
-    <ClInclude Include="Core.CountingSemaphore.h">
-      <Filter>Core.Thread</Filter>
-    </ClInclude>
     <ClInclude Include="Core.Definition.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
@@ -146,13 +145,10 @@
     <ClInclude Include="Core.Runtime.h">
       <Filter>Core.definition</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Thread.h">
+    <ClInclude Include="ThreadPool.h">
       <Filter>Core.Thread</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Thread.hpp">
-      <Filter>Core.Thread</Filter>
-    </ClInclude>
-    <ClInclude Include="Core.ThreadPool.h">
+    <ClInclude Include="JobScheduler.h">
       <Filter>Core.Thread</Filter>
     </ClInclude>
     <ClInclude Include="CoreWindow.h">

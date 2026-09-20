@@ -70,8 +70,8 @@ foreach ($imported in $importedFixtures) {
 #   방법일 뿐이고, 값이 큰 외부 자산(라이선스 의무가 딸린 것 포함)까지 저장소에
 #   넣는 것은 이 게이트가 CI 에서 돌지도 않는 마당에 나쁜 거래다.
 #
-# ★ 실제로 여기 구멍이 있었다. Gunner 캡처는 `Dynamic_CPP/Assets/Models/
-#   Gunner_F_Mythic.glb` 를 열었는데 그 파일은 `.gitignore` 에 막혀 **추적 밖**이다
+# ★ 실제로 여기 구멍이 있었다. Robot 캡처는 `Dynamic_CPP/Assets/Models/
+#   CreatorRobot.glb` 를 열었는데 그 파일은 `.gitignore` 에 막혀 **추적 밖**이다
 #   — 이 기계 말고 다른 기여자 기계에서는 그 자리에서 죽거나, 더 나쁘게는 무엇도
 #   재지 못한 채 지나간다. 저장소에는 기여자가 다섯이다.
 #
@@ -83,7 +83,7 @@ function Set-AxisSkipped([string]$Name, [string]$Reason) {
     $script:axisReport[$Name] = "skipped: $Reason"
 }
 # ★ `skipped` 와 `deferred` 를 가른다. skipped 는 **이번 기계에 조건이 없어서**
-#   못 잰 것이고(예: 추적 밖 Gunner 자산), deferred 는 **계획이 다른 자리로 옮긴 것**
+#   못 잰 것이고(예: 추적 밖 Robot 자산), deferred 는 **계획이 다른 자리로 옮긴 것**
 #   이다. 둘을 한 통에 넣으면 "언젠가 고치면 다시 도는 축" 과 "다른 계획이 소유한 축"
 #   이 구분되지 않아, 뒷사람이 없는 결함을 찾아 헤매게 된다.
 function Set-AxisDeferred([string]$Name, [string]$Owner) {
@@ -395,8 +395,8 @@ try {
         [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, "`${1}$api"), $utf8)
         $primitive = Join-Path $run "$api-primitives"
         $primitiveRepeat = Join-Path $run "$api-primitives-repeat"
-        $gunner = Join-Path $run "$api-gunner"
-        $gunnerRepeat = Join-Path $run "$api-gunner-repeat"
+        $robot = Join-Path $run "$api-robot"
+        $robotRepeat = Join-Path $run "$api-robot-repeat"
         $captureMode = if ($api -eq 'dx12') { ' controlled' } else { '' }
         $normalPair = Join-Path $run "$api-normalpair"
         $alphaModes = Join-Path $run "$api-alphamodes"
@@ -414,9 +414,9 @@ try {
                 Remove-Item -Recurse -Force -LiteralPath $imported
             }
         }
-        # Gunner 는 추적 밖 자산이다. 있으면 재고, 없으면 **건너뛰었다고 적는다**.
-        $gunnerAsset = Join-Path $root 'Dynamic_CPP\Assets\Models\Gunner_F_Mythic.glb'
-        $hasGunner = Test-Path -LiteralPath $gunnerAsset
+        # Robot 는 추적 밖 자산이다. 있으면 재고, 없으면 **건너뛰었다고 적는다**.
+        $robotAsset = Join-Path $root 'Dynamic_CPP\Assets\Models\CreatorRobot.glb'
+        $hasRobot = Test-Path -LiteralPath $robotAsset
         $commands = @(
             "scene.switch `"$root/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator`"",
             # ★ 첫 대기가 렌더 예열을 겸한다 (2026-09-14). 라이브 렌더러의 첫
@@ -435,15 +435,15 @@ try {
         if ($api -eq 'dx12') {
             $commands += @('wait 90', "render.pbr.capture `"$primitiveRepeat`" game controlled")
         }
-        if ($hasGunner) {
+        if ($hasRobot) {
             $commands += @(
-                "model.loadcached `"$root/Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb`"",
-                'model.place Gunner_F_Mythic',
-                'object.transform Gunner_F_Mythic 0 0 2 0 180 0 0.025 0.025 0.025',
+                "model.loadcached `"$root/Dynamic_CPP/Assets/Models/CreatorRobot.glb`"",
+                'model.place CreatorRobot',
+                'object.transform CreatorRobot 0 0 2 0 180 0 1 1 1',
                 'wait 30',
-                "render.pbr.capture `"$gunner`" game$captureMode")
+                "render.pbr.capture `"$robot`" game$captureMode")
             if ($api -eq 'dx12') {
-                $commands += @('wait 90', "render.pbr.capture `"$gunnerRepeat`" game controlled")
+                $commands += @('wait 90', "render.pbr.capture `"$robotRepeat`" game controlled")
             }
         }
         $commands += @(
@@ -511,9 +511,9 @@ try {
             'model.place SamplerModes', 'object.transform SamplerModes 0 0 0 0 0 0 1 1 1',
             'wait 30', "render.pbr.capture `"$samplerPixels`" game", 'quit')
         $results = @(Invoke-Editor $api $commands)
-        $expectedCaptures = if ($hasGunner) { 6 } else { 5 }
+        $expectedCaptures = if ($hasRobot) { 6 } else { 5 }
         $expectedCaptures += $(if ($api -eq 'dx12') { 4 } else { 3 })
-        if ($api -eq 'dx12') { $expectedCaptures += $(if ($hasGunner) {2} else {1}) }
+        if ($api -eq 'dx12') { $expectedCaptures += $(if ($hasRobot) {2} else {1}) }
         $captures = @($results | Where-Object command -eq 'render.pbr.capture')
         if ($captures.Count -ne $expectedCaptures -or
             @($captures | Where-Object { $_.data.frameId -le 0 }).Count) {
@@ -526,18 +526,18 @@ try {
             Assert-PbrRepeatability $primitive $primitiveRepeat (Join-Path $run 'dx12-primitives-repeatability.json')
             Set-AxisRan 'dx12/primitives-hdr+display-repeatability'
         }
-        if ($hasGunner) {
-            Assert-Capture $gunner $api @('Gunner_F_Mythic')
-            Set-AxisRan "$api/gunner"
+        if ($hasRobot) {
+            Assert-Capture $robot $api @('CreatorRobot')
+            Set-AxisRan "$api/robot"
             if ($api -eq 'dx12') {
-                Assert-Capture $gunnerRepeat $api @('Gunner_F_Mythic')
-                Assert-PbrRepeatability $gunner $gunnerRepeat (Join-Path $run 'dx12-gunner-repeatability.json')
-                Set-AxisRan 'dx12/gunner-hdr+display-repeatability'
+                Assert-Capture $robotRepeat $api @('CreatorRobot')
+                Assert-PbrRepeatability $robot $robotRepeat (Join-Path $run 'dx12-robot-repeatability.json')
+                Set-AxisRan 'dx12/robot-hdr+display-repeatability'
             }
         } else {
-            # 조용히 넘어가지 않는다. 이 줄이 없으면 "Gunner 축을 쟀다" 와
-            # "Gunner 축이 없었다" 가 요약에서 구분되지 않는다.
-            Set-AxisSkipped "$api/gunner" 'Dynamic_CPP/Assets/Models/Gunner_F_Mythic.glb 없음 (추적 밖 자산)'
+            # 조용히 넘어가지 않는다. 이 줄이 없으면 "Robot 축을 쟀다" 와
+            # "Robot 축이 없었다" 가 요약에서 구분되지 않는다.
+            Set-AxisSkipped "$api/robot" 'Dynamic_CPP/Assets/Models/CreatorRobot.glb 없음 (추적 밖 자산)'
         }
         # 이 캡처의 모델 확인은 Models 목록이 아니라 render.pbr.normalpair 가 한다.
         # Assert-Capture 의 모델 검사는 `<이름>.glb.meta` 를 전제하는데 이 fixture 는
@@ -588,8 +588,8 @@ try {
             Set-AxisRan "$api/$($case[0])-product-pixels"
         }
         $captureDirs[$api] = @{ primitives = $primitive }
-        if ($hasGunner) { $captureDirs[$api]['gunner'] = $gunner }
-        $ranHere = @("primitives", $(if ($hasGunner) { 'gunner' }), 'normal-pair',
+        if ($hasRobot) { $captureDirs[$api]['robot'] = $robot }
+        $ranHere = @("primitives", $(if ($hasRobot) { 'robot' }), 'normal-pair',
             'alpha-modes+nonuniform-scale', 'sampler',
             'shared-material-seal', 'ao+emission-pixels', 'normal-pixels', 'sampler-pixels') | Where-Object { $_ }
         Write-Output "$api product capture PASS ($($ranHere -join ', ')): $run"

@@ -32,6 +32,8 @@ namespace CommandCore
         // 정렬된 표. 이름으로 이진 탐색한다.
         constexpr DescriptorSeed kSeeds[] = {
             { "ai.status", CommandCost::Immediate, "[오브젝트]", "AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)", CommandClass::EngineService, CommandLiveness::Live },
+            { "animation.playback.probe", CommandCost::Long, "<model-path>", "Validate parallel animation, managed events, layers and sockets", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "animation.visual.probe", CommandCost::Long, "<setup model-path|pose>", "Stage deterministic product animation frames for pixel regression", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animator.param", CommandCost::Frames, "<오브젝트> <파라미터> <bool|float|int|trigger>", "Animator 파라미터를 저작한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,name,type", true },
             { "animator.status", CommandCost::Frames, "", "Read live Animator palettes and product publication metrics", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "assets.decodeab", CommandCost::Long, "[root] [limit]", "Compare PNG decoder bytes", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
@@ -277,6 +279,7 @@ namespace CommandCore
             { "wait", CommandCost::Immediate, "<프레임>", "지정 프레임만큼 다음 명령을 미룬다", CommandClass::EngineService, CommandLiveness::Live },
             { "window.info", CommandCost::Immediate, "", "엔진이 인식하는 클라이언트 크기를 출력한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "window.resize", CommandCost::Frames, "<너비> <높이>", "창 클라이언트 크기를 바꾼다(해상도 검증용)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "width:integer,height:integer" },
+            { "worker.pool.probe", CommandCost::Long, "<model-path>", "Validate bundle completion and concurrent external producers", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
         };
     }
 
