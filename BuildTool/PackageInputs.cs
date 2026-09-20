@@ -114,7 +114,7 @@ internal static class PackageInputs
         var probe = scene.Equals("FT_Primitives.creator", StringComparison.OrdinalIgnoreCase);
         if (probe && (counts["Entity"] != 11 || counts["Transform"] != 11 || counts["Mesh"] != 8 || counts["Camera"] != 1 || counts["Light"] != 1 || counts["Script"] != 1 ||
             Regex.Matches(sceneText, @"(?m)^\s+m_scriptType:\s*PackageSmokeProbe\s*$").Count != 1)) throw new BuildException("FT_Primitives schema/probe count mismatch.");
-        if (!File.Exists(Paths.Child(merged, "Assets/Shaders/DefaultPassShader/WorldSprite.hlsl"))) throw new BuildException("Shader closure missing WorldSprite.hlsl.");
+        if (!File.Exists(Paths.Child(merged, "Assets/Shaders/DefaultPassShader/WorldSprite.slang"))) throw new BuildException("Shader closure missing WorldSprite.slang.");
         if (File.Exists(Paths.Child(merged, "ProjectSetting/EngineSettings.runtime.yml"))) throw new BuildException("Runtime template leaked into package input.");
         var lifecycleProbe = Regex.IsMatch(sceneText, @"(?m)^\s+m_scriptType:\s*PackageSmokeProbe\s*$");
         return new(scene, runtimeBackend.Groups[2].Value, counts, lifecycleProbe);

@@ -67,6 +67,18 @@ try
     Reject(() => GamePackager.ValidatePack("[PAK-ENTRY] wrong.txt\n", files), "Mismatched PAK listing accepted");
     Reject(() => GamePackager.ValidatePack("[PAK-ENTRY] payload.txt\n[PAK-ENTRY] payload.txt\n", files), "Duplicate PAK entry accepted");
 
+    var shaderClosure = Path.Combine(root, "shader-closure");
+    Directory.CreateDirectory(Path.Combine(shaderClosure, "Assets/Scenes"));
+    Directory.CreateDirectory(Path.Combine(shaderClosure, "Assets/Shaders/DefaultPassShader"));
+    File.WriteAllText(Path.Combine(shaderClosure, "Assets/Scenes/Demo.creator"), "m_Entities: []\n");
+    var closureSettings = Path.Combine(shaderClosure, "runtime.asset");
+    File.WriteAllText(closureSettings, "lastWindowSize:\n  x: 1280\n  y: 720\nrenderPassSettings:\nstartupSceneName: Demo.creator\nrender:\n  backend: dx12\nbuild:\n  render:\n    backend: dx12\n");
+    var spriteShader = Path.Combine(shaderClosure, "Assets/Shaders/DefaultPassShader/WorldSprite.slang");
+    File.WriteAllText(spriteShader, "// current renderer shader");
+    Check(PackageInputs.Validate(shaderClosure, closureSettings).StartupScene == "Demo.creator", "Slang shader closure rejected");
+    File.Move(spriteShader, Path.ChangeExtension(spriteShader, ".hlsl"));
+    Reject(() => PackageInputs.Validate(shaderClosure, closureSettings), "Legacy-only shader closure accepted");
+
     var stage = Path.Combine(root, "stage"); Directory.CreateDirectory(stage); var pointer = Path.Combine(stage, "game.current.json");
     Metadata.Write(pointer, new { releaseDirectory = "old", verification = "passed" }); var pointerHash = Metadata.Hash(pointer);
     var candidate = Path.Combine(stage, "candidate"); var release = Path.Combine(stage, "release"); Directory.CreateDirectory(candidate); Directory.CreateDirectory(release);

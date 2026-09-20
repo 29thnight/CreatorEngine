@@ -84,3 +84,20 @@
 
 따라서 **EXE 이관과 제한된 게임 패키지의 전체 흐름은 검증했고, 기존 모델 씬을 포함한 모든 게임의
 배포 준비 완료는 선언하지 않는다.**
+
+
+## 2026-09-20 Player Job 검증용 패키지 갱신
+
+- 현재 렌더러는 `WorldSprite.slang`을 읽지만 BuildTool 입력 검사는 은퇴한
+  `WorldSprite.hlsl`을 요구했다. 실제 소비 파일로 검사를 바꾸고 Slang 성공/legacy-only
+  거절 회귀를 추가했다. Release BuildTool 빌드 0경고·0오류, 테스트 44개 통과.
+- 과거 BTGame 콘텐츠는 Decal.slang 누락과 model artifact v8/v9 차이로 재사용할 수 없었다.
+  격리 MinimalFixture에 최신 셰이더·CreatorRobot generation 3과 기존 카메라/조명/관리
+  스크립트 씬을 넣어 현재 EXE로 재패키징했다. 원본 프로젝트·기본 배포 포인터는 보존했다.
+- Release/DX12 package-game 전체 단계와 Player 표시 슬롯 회전 검증 통과.
+  `Build/Obj/Phase13Jobs/PlayerRuntime/Packages/MinimalFixture.current.json`은
+  `Game-6a91b88da394424c9f66447279e10cf4`, `verification=passed`를 가리킨다.
+  로그는 같은 PlayerRuntime 폴더의 `package5.log`다.
+- 모델은 패키지 cook 입력에만 포함된다. 시작 씬은 모델을 그리지 않으므로 모델 렌더링,
+  Vulkan/Shipping/clean VM 검증으로 확대하지 않는다. 비동기 씬 전환·종료 검증은
+  TaskSchedulerUnificationPlan의 별도 Player gate에 기록한다.
