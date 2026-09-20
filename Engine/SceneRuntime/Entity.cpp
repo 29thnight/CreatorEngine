@@ -121,6 +121,14 @@ void Entity::SetLayer(std::string_view layer)
 
 void Entity::Destroy()
 {
+	// 씬 루트는 Scene과 수명을 함께한다. 슬롯 해제만 막으면 파괴 표시가
+	// 남아 Play 복원 뒤 spatial resolver가 루트의 자식 전체를 건너뛴다.
+	if (m_ownerScene && m_index == kSceneRootIndex
+		&& m_ownerScene->GetEntityRaw(kSceneRootIndex) == this)
+	{
+		return;
+	}
+
 	if (m_destroyMark)
 	{
 		return;
@@ -335,7 +343,7 @@ Entity::Index Entity::GetParentIndex() const
 		const size_t slot = static_cast<size_t>(m_index);
 		if (store.IsOccupied(slot)) return store.ParentOf(slot);
 	}
-	return INVALID_INDEX;
+	return kInvalidIndex;
 }
 
 Entity::Index Entity::GetRootIndex() const
@@ -437,7 +445,7 @@ void Entity::RemoveComponentTypeID(uint32 typeID)
 // 전역 Find*와 OwnerSceneFind*가 씬 소스만 다르고(활성 씬 vs m_ownerScene)
 // 몸통이 완전히 같았다. 아래 넷으로 수렴하고, 공개 API는 각자의 씬을
 // 넘겨 위임만 한다. 인덱스 조회는 Scene::TryGetEntity가 범위·
-// INVALID_INDEX 검사를 이미 해 주므로 그대로 맡긴다.
+// kInvalidIndex 검사를 이미 해 주므로 그대로 맡긴다.
 
 Entity* Entity::FindByNameInScene(Scene* scene, std::string_view name)
 {

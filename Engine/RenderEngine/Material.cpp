@@ -266,7 +266,7 @@ Material& Material::UseTextureMap(
 	}
 	else if (property == standard_material::property::NormalMap)
 	{
-		m_materialInfo.m_useNormalMap = hasTexture ? USE_NORMAL_MAP : 0;
+		m_materialInfo.m_useNormalMap = hasTexture ? kUseNormalMap : 0;
 	}
 	else if (property == standard_material::property::OrmMap)
 	{

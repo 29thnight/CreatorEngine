@@ -16,7 +16,7 @@
 #include "LightComponent.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
-#include "BoneRegion.h" // MAX_BONES
+#include "BoneRegion.h" // kMaxBones
 
 namespace
 {

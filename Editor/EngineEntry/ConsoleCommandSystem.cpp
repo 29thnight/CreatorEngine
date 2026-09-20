@@ -41,7 +41,7 @@
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Socket.h" // X7 transform bulk probe
-#include "BoneRegion.h" // MAX_BONES
+#include "BoneRegion.h" // kMaxBones
 #include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
@@ -960,6 +960,8 @@ namespace
 
         const std::string label = (parts.size() > 1) ? parts[1] : std::string("digest");
 
+        using D = CommandCore::CommandData;
+        D worldTransforms = D::Array();
         size_t emitted = 0;
         uint64_t hash = 1469598103934665603ull;   // FNV-1a 64 오프셋 기저
         const auto mix = [&hash](const char* text)
@@ -1004,6 +1006,27 @@ namespace
 			const auto& position = t.GetPositionValue();
 			const auto& rotation = t.GetRotationValue();
 			const auto& scale = t.GetScaleValue();
+            // 파생 캐시를 그대로 관측한다. 여기서 resolve하면 Play 복원의
+            // 갱신 누락을 진단 명령 자체가 고쳐 회귀 검사가 통과할 수 있다.
+            const auto vector = [](const auto& value)
+            {
+                D result = D::Array();
+                result.Append(D::Double(value.x));
+                result.Append(D::Double(value.y));
+                result.Append(D::Double(value.z));
+                return result;
+            };
+            D world = D::Object();
+            world.Set("name", D::String(displayName));
+            world.Set("destroyMarked", D::Bool(object->IsDestroyMark()));
+            world.Set("position", vector(position));
+            world.Set("worldPosition", vector(t.GetWorldPosition()));
+            D matrix = D::Array();
+            const auto worldMatrix = t.GetWorldMatrix();
+            for (const auto& matrixRow : worldMatrix.m)
+                for (const float value : matrixRow) matrix.Append(D::Double(value));
+            world.Set("worldMatrix", std::move(matrix));
+            worldTransforms.Append(std::move(world));
             char row[320]{};
             std::snprintf(row, sizeof(row),
                 "%u|%s|%d|%.4f,%.4f,%.4f|%.4f,%.4f,%.4f,%.4f|%.4f,%.4f,%.4f",
@@ -1038,6 +1061,7 @@ namespace
         data.Set("objects", CommandCore::CommandData::Int(
             static_cast<int64_t>(emitted)));
         data.Set("hash", CommandCore::CommandData::String(hashText));
+        data.Set("worldTransforms", std::move(worldTransforms));
         return CommandCore::Ok(summary, std::move(data));
     }
 
@@ -1236,7 +1260,7 @@ namespace
             {
                 const auto& node = scene->TryGetEntity(cur);
                 if (!node) return cur;
-                if (Entity::kSceneRootIndex == node->m_index) return Entity::INVALID_INDEX;
+                if (Entity::kSceneRootIndex == node->m_index) return Entity::kInvalidIndex;
 
                 const Entity::Index parentIndex = node->GetParentIndex();
                 const auto& parentObj = scene->TryGetEntity(parentIndex);

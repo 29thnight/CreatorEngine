@@ -42,7 +42,7 @@
 #include "Render/Core/EnhancedLightPacking.h"
 #include "Texture.h"
 #include "PrimitiveRenderProxy.h"
-#include "BoneRegion.h" // MAX_BONES
+#include "BoneRegion.h" // kMaxBones
 #include "DataSystem.h"
 #include "Assets/ModelAssetGeneration.h"
 #include <mathematics/transform.hpp>
@@ -3173,11 +3173,11 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             // 조건은 DX11 GBufferPass의 분류와 같다 — 팔레트가 있어도
             // m_isAnimationEnabled가 꺼져 있으면 DX11은 바인드 포즈로 그린다.
             if (proxy->m_isAnimationEnabled
-                && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
+                && (HashedGuid::kInvalidId != proxy->m_animatorGuid)
                 && proxy->m_finalTransforms)
             {
                 item.bonePalette = proxy->m_finalTransforms.get();
-                item.boneCount = MAX_BONES;
+                item.boneCount = kMaxBones;
                 item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
 
                 // I6-B4-pre 진단 — 하네스가 **실제로 받은** 팔레트의 digest.
@@ -3219,7 +3219,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
                             "digest63=%08X digest512=%08X\n",
                             (unsigned long long)item.animatorKey,
                             fold(item.bonePalette, 63),
-                            fold(item.bonePalette, MAX_BONES));
+                            fold(item.bonePalette, kMaxBones));
                     }
                 }
             }

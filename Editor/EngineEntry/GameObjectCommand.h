@@ -158,7 +158,7 @@ namespace Meta
                 Entity* parent = record.parent.Resolve();
                 scene->Reparent(scene->HandleOf(object->m_index), scene->HandleOf(parent ? parent->m_index : 0));
                 Entity* root = record.root.Resolve();
-                object->SetRootIndex(root ? root->m_index : Entity::INVALID_INDEX);
+                object->SetRootIndex(root ? root->m_index : Entity::kInvalidIndex);
             }
             return m_records.front().object.Resolve();
         }
@@ -217,7 +217,7 @@ namespace Meta
         SelectionSnapshot m_selection;
         std::string m_name;
         GameObjectType m_type;
-        Entity::Index m_index{Entity::INVALID_INDEX};
+        Entity::Index m_index{Entity::kInvalidIndex};
     };
 
     class DeleteGameObjectCommand : public IUndoableCommand
@@ -273,7 +273,7 @@ namespace Meta
         EntityReference m_source, m_created;
         std::string m_name;
         std::unique_ptr<DeleteGameObjectCommand> m_delete;
-        Entity::Index m_createdIndex{Entity::INVALID_INDEX};
+        Entity::Index m_createdIndex{Entity::kInvalidIndex};
     };
 
     class DuplicateGameObjectsCommand : public IUndoableCommand

@@ -83,11 +83,12 @@
 | `plf::colony` (서드파티) | B | ⑤ — `std` 컨테이너 자리 |
 | `HashingString` | **B** | ⑤ — `std::string`의 자리에 놓인다 (§5.3) |
 | `MemoryPool` | B | ④ — 할당자 요구사항에 물린다 |
-| `WorkerPool` · `ThreadPool` | **A** | ③ — 수명을 지니는 서비스 객체다 (§5.2) |
+| `thread_pool` · `job_scheduler` · `job_handle` · `job_group` | **B** | 엔진 공용 실행 유틸리티 (§5.2, 사용자 확정) |
 | `LogSystem` · `CoreWindow` · `EnginePaths` | A | ③ |
 | `BitFlag` | **B** | ⑤ — `std::bitset` 자리의 값 타입 (§5.3) |
 
-★ 굵게 표시한 셋은 현재 표기와 판정이 어긋난다. §8에서 다룬다.
+★ `HashingString` · `BitFlag`의 기존 표기와 판정 차이는 §5.3·§8에서 다룬다.
+공용 Job 유틸리티는 새 STL 표기로 이관한다(§5.2).
 
 ---
 
@@ -140,8 +141,8 @@ static constexpr Entity::Index INVALID_INDEX   = ...;
 static constexpr Entity::Index kSceneRootIndex = 0;
 ```
 
-실태를 세면 갈림이 대등하지 않다 — **`k` 접두 332종, `UPPER_SNAKE` 15종**
-(선언 기준, `Engine`+`Editor`). 22배다.
+실태를 세면 갈림이 대등하지 않다 — **`k` 접두 687종, `UPPER_SNAKE` 24종**
+(같은 기준으로 센 상수 선언. `Engine`·`Editor`·`Player`·`Dynamic_CPP`). 28배다.
 
 C# 컨벤션을 문자 그대로 적용하면 답은 `PascalCase`(`SceneRootIndex`)다.
 그러나 이 한 항목은 **예외로 두고 `k` 접두를 공식 표기로 삼기를 제안한다.**
@@ -150,15 +151,15 @@ C# 컨벤션을 문자 그대로 적용하면 답은 `PascalCase`(`SceneRootInde
 1. C#에서 상수가 `PascalCase`여도 문제가 없는 것은 그 언어에 타입·메서드·
    프로퍼티를 가르는 다른 장치가 있기 때문이다. C++에서 `SceneRootIndex`는
    타입인지 상수인지 호출부에서 구분되지 않는다. `k`는 그 구분을 돌려준다.
-2. 332종을 개명하는 diff는 이 문서의 나머지 전부를 합친 것보다 크다. 이득이
+2. 687종을 개명하는 diff는 이 문서의 나머지 전부를 합친 것보다 크다. 이득이
    "C# 지침과의 형식적 일치"뿐이라면 값을 못 한다.
 
-버리는 쪽은 `UPPER_SNAKE_CASE` 15종이다. C++에서 그 표기는 **매크로의 것**이고,
+버리는 쪽은 `UPPER_SNAKE_CASE` 24종이다. C++에서 그 표기는 **매크로의 것**이고,
 매크로는 스코프를 무시하므로 상수가 같은 모양이면 충돌을 읽어 내기 어렵다.
-15종이라 비용도 작다.
+24종이라 비용도 작다.
 
-→ **확정(9-1 (a))**. 이것이 규칙 1번의 유일한 의도적 예외다. `k` 접두 332종은
-그대로 두고, `UPPER_SNAKE` 15종만 `k` 접두로 옮긴다.
+→ **확정(9-1 (a))**. 이것이 규칙 1번의 유일한 의도적 예외다. `k` 접두 687종은
+그대로 두고, `UPPER_SNAKE` 쪽만 `k` 접두로 옮겼다 — 이행 결과는 §8.1.
 
 ### 3.5 약칭을 쓰지 않는다
 
@@ -240,13 +241,18 @@ namespace meta { ... }   // :190  — 다시 컴파일타임
 - `meta::displayName` (`MetaSchema.h:164`) — camelCase. `display_name`으로
   고친다. 같은 파일의 반환 타입 `display_name_attr`은 이미 snake_case다.
 
-### 5.2 `WorkerPool`은 층 A다
+### 5.2 공용 스레드 풀·Job 유틸리티는 층 B다
 
-이름에 "Pool"이 있지만 컨테이너가 아니다. `Startup`/`Shutdown`으로 수명을
-지고 싱글턴이며 `std`의 무엇을 대신하지 않는다(③). 현 표기 그대로 둔다.
+2026-09-20 사용자 확정: 유틸리티·컨테이너 수준의 엔진 공용 사용부는 STL
+컨벤션을 적용한다. 공용 실행 기반은 `thread_pool` · `job_scheduler` ·
+`job_handle` · `job_group`, 접근자는 `ce::get_thread_pool()` ·
+`ce::get_job_scheduler()`로 쓴다. 수명 보유 여부만으로 층 A로 분류하지 않는다.
+파일명은 공통 파일 규칙대로 `ThreadPool.h`, `JobScheduler.h`다.
+상세 경계는 [JobSchedulerDesign.md](JobSchedulerDesign.md)를 따른다.
 
-같은 이유로 `LogSystem` · `CoreWindow` · `DumpHandler` · `EnginePaths`도
-층 A다. **`Engine/Utility_Framework/`에 있다고 층 B가 아니다.**
+애니메이션 LOD·버짓 등 도메인 정책을 소유하는 `AnimationScheduler`는 층 A다.
+`LogSystem` · `CoreWindow` · `DumpHandler` · `EnginePaths`의 기존 층 A 판정은
+유지한다. 디렉터리 위치가 아니라 공용 도구와 엔진 도메인 객체의 역할로 구분한다.
 
 ### 5.3 `HashingString` · `BitFlag`는 층 B다
 
@@ -438,7 +444,7 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
 |---|---|---|
 | `meta::StampIdentity` → `stamp_identity` | 호출 2 | 없음 |
 | `meta::displayName` → `display_name` | 호출 소수 | 없음 |
-| `UPPER_SNAKE` 상수 → `k` 접두 | 15종 | 낮음 (컴파일러가 전부 잡는다) |
+| `UPPER_SNAKE` 상수 → `k` 접두 | 24종 | **완료** (§8.1) |
 | `k…` 상수 332종 | — | **개명하지 않는다** (§3.4) |
 | `BitFlag` → `bit_flag` | 3개 파일 | 중간 |
 | `HashingString` | 12개 파일 | **개명 없음** — 새로 작성할 때 `hashing_string`으로 태어난다 (§5.3) |
@@ -458,6 +464,62 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
 
 이 저장소의 규칙상 레거시 호환 계층은 두지 않는다 — 옛 이름의 별칭을 남기는
 식의 이행은 하지 않고, 바꿀 때 한 번에 바꾼다.
+
+### 8.1 이행 기록 — `UPPER_SNAKE` 정리 (2026-09-20)
+
+**결과: 21종 개명, 178곳, 49개 파일.** 3종은 근거를 적고 남겼다.
+
+(치환은 181곳에 닿았다. 그중 3곳은 다른 세션이 작업 중인 미커밋 신규 파일
+`Editor/RenderTests/Animation/` 둘에 있어 **작업 트리에만 남기고 커밋하지
+않았다** — 선언이 `kMaxBones`로 바뀐 이상 되돌리면 그 파일이 컴파일되지 않으므로
+치환은 유지해야 하고, 파일 자체는 그 세션이 커밋할 때 함께 간다.)
+
+대상을 세는 데 정규식이 두 번 틀렸고, 두 번 다 실측이 잡았다:
+
+1. 첫 패턴은 타입 이름에 숫자가 든 선언을 놓쳤다 — `constexpr bool32 USE_NORMAL_MAP`
+   의 `bool32`. 문자 집합에 `0-9`가 없었다.
+2. 두 번째 패턴은 `{2,}`라 **두 글자 이름을 통째로 놓쳤다** — `Camera::UP`.
+
+그래서 처음 "15종"이 최종 **24종**이 됐다. 이름을 세는 일은 한 번에 맞지 않는다.
+
+| 처리 | 종수 | 내용 |
+|---|---|---|
+| `k` 접두 (층 A) | 19 | `INVALID_INDEX`→`kInvalidIndex`(55곳), `MAX_BONES`→`kMaxBones`(31곳), `ALL_LAYER`, `MAX_CONTROLLER`(15곳), `KEYBOARD_COUNT`, `MOUSE_COUNT`, `GAMEPAD_KEY_COUNT`, `MAX_LAYER_SIZE`, `MAX_STACK_DEPTH`, `EVENT_BUFFER_SIZE`, `ALLOCATOR_SIZE`, `BITS`, `CHUNKS`, `Camera::FORWARD`·`RIGHT`·`UP`, `USE_NORMAL_MAP`, `USE_SHADOW_RECIVE`, `INVAILD_ID` |
+| snake_case (층 B) | 2 | `Paklib.hpp`의 `FNV_OFFSET`·`FNV_PRIME` — `fnv1a64` 자유 함수 안의 지역 상수라 §4.1을 따른다 |
+| **남김** | 3 | 아래 |
+
+**남긴 셋과 이유:**
+
+- `S0` · `S1` (`Sha256.h`) — SHA-256 사양서의 Σ0·Σ1 표기다. 알고리즘 문헌과
+  대조할 수 있다는 것이 이 이름의 값어치이므로 바꾸지 않는다. 같은 파일의
+  `kRound`는 이미 `k` 접두라 파일 안에서 규칙이 이미 갈려 있고, 그 갈림이 옳다.
+- `MP` (`ReflectionTypedDraw.h`) — 지역 상수와 **템플릿 매개변수가 같은 이름으로
+  쌍을 이뤄** 넘어다닌다(`CommitMemberChange<Owner, MemberT, MP>`). 상수 표기가
+  아니라 §3.5(약칭) 축이므로 그 작업에서 함께 다룬다.
+
+**오타 둘을 같이 고쳤다.** `INVAILD_ID`→`kInvalidId`, `USE_SHADOW_RECIVE`→
+`kUseShadowReceive`. 개명하면서 오타를 새 이름에 옮겨 적을 이유가 없다.
+
+**함정 셋을 만났다:**
+
+- `RIGHT`는 `Camera::RIGHT`(방향 벡터)와 `MouseKey::RIGHT`(열거형 값) 둘이다.
+  단어 경계 치환을 그대로 돌렸으면 열거형까지 바꿨다. `Camera::` 접두가 붙은
+  자리와 선언 파일 안으로 범위를 좁혔다.
+- `kBits`·`kInvalidIndex`는 **이미 다른 곳에 있었다**(`EditorStateContract.cpp`,
+  `DX12TargetViewHeap`, `HierarchyStore`). 전부 클래스·파일 스코프라 언어적
+  충돌은 없지만, `Entity::kInvalidIndex`와 `HierarchyStore::kInvalidIndex`가
+  같은 개념의 두 정의인지는 따로 볼 값어치가 있다.
+- ★ **소스 1,052개 중 56개가 UTF-8이 아니다**(CP949 48, 그 둘 다 아닌 것 8).
+  첫 스크립트는 디코딩 실패를 `continue`로 삼키고 **조용히 건너뛰었다.**
+  그 안에 `InputManager.h`의 `MAX_CONTROLLER` 8곳이 있었다 — 그대로 적용했으면
+  선언만 바뀌고 사용처가 남아 컴파일이 깨졌을 것이다. latin-1로 읽고 latin-1로
+  되쓰는 방식(모든 바이트가 1:1 왕복)에 `re.ASCII`를 더해 해결했다. 적용 후
+  인코딩 분포는 그대로다(CP949 48, 기타 8).
+
+검산은 둘을 걸었다 — ① 파일마다 바뀐 바이트 수가 치환 횟수로 정확히 설명되는지,
+② 적용 후 옛 이름이 남아 있지 않은지. 남은 것은 `BoneRegion.h`의
+`Skeleton::MAX_BONES` 하나이고, 이는 은퇴한 옛 심볼을 가리키는 주석이라
+의도적으로 보호했다.
 
 ---
 

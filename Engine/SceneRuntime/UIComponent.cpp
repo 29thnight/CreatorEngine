@@ -269,7 +269,7 @@ void UIComponent::DeserializeNavi()
 		++expected;
 
 		Entity* obj = ResolveNavigationRoute(nav);
-		if (!obj && m_legacyNavigationIds[nav.mode].m_ID_Data != HashedGuid::INVAILD_ID)
+		if (!obj && m_legacyNavigationIds[nav.mode].m_ID_Data != HashedGuid::kInvalidId)
 		{
 			obj = thisObj->OwnerSceneFindInstanceID(m_legacyNavigationIds[nav.mode]);
 			if (obj)

@@ -10,9 +10,9 @@ void EditorCameraRig::SetPose(const math::vector3& position, const math::quatern
 {
 	m_camera.m_eyePosition = position;
 	m_camera.rotate = math::normalize(rotation);
-	m_camera.m_forward = math::normalize(math::rotate(Camera::FORWARD, m_camera.rotate));
-	m_camera.m_up = math::normalize(math::rotate(Camera::UP, m_camera.rotate));
-	m_camera.m_right = math::normalize(math::rotate(Camera::RIGHT, m_camera.rotate));
+	m_camera.m_forward = math::normalize(math::rotate(Camera::kForward, m_camera.rotate));
+	m_camera.m_up = math::normalize(math::rotate(Camera::kUp, m_camera.rotate));
+	m_camera.m_right = math::normalize(math::rotate(Camera::kRight, m_camera.rotate));
 	SetOrientation(std::atan2(m_camera.m_forward.x, m_camera.m_forward.z),
 		-std::asin(std::clamp(m_camera.m_forward.y, -1.f, 1.f)));
 }
@@ -23,12 +23,12 @@ void EditorCameraRig::ResetToDefaultPose() noexcept
 	// 축의 pitch). 순서가 다르면 SetPose 가 되돌려 놓는 m_deltaYaw/m_deltaPitch
 	// 와 실제 자세가 어긋나, 우클릭 첫 프레임에 카메라가 튄다.
 	const math::quaternion yawRotation = math::quaternion_from_axis_angle(
-		Camera::UP, math::radians(kDefaultYawDegrees));
+		Camera::kUp, math::radians(kDefaultYawDegrees));
 	const math::quaternion pitchRotation = math::quaternion_from_axis_angle(
-		math::rotate(Camera::RIGHT, yawRotation), math::radians(kDefaultPitchDegrees));
+		math::rotate(Camera::kRight, yawRotation), math::radians(kDefaultPitchDegrees));
 	const math::quaternion rotation = math::normalize(yawRotation * pitchRotation);
 	const math::vector3 forward =
-		math::normalize(math::rotate(Camera::FORWARD, rotation));
+		math::normalize(math::rotate(Camera::kForward, rotation));
 	SetPose(kDefaultPivot - forward * kDefaultOrbitDistance, rotation);
 }
 
@@ -63,16 +63,16 @@ void EditorCameraRig::HandleMovement(float deltaTime)
 		m_deltaYaw += InputManagement->GetMouseDelta().x * 0.01f;
 
 		const math::quaternion qYaw =
-			math::quaternion_from_axis_angle(Camera::UP, m_deltaYaw);
-		const math::vector3 right = math::rotate(Camera::RIGHT, qYaw);
+			math::quaternion_from_axis_angle(Camera::kUp, m_deltaYaw);
+		const math::vector3 right = math::rotate(Camera::kRight, qYaw);
 		const math::quaternion qPitch =
 			math::quaternion_from_axis_angle(right, m_deltaPitch);
 		const math::quaternion cameraRotation = math::normalize(qYaw * qPitch);
 
 		m_camera.m_forward = math::normalize(
-			math::rotate(Camera::FORWARD, cameraRotation));
+			math::rotate(Camera::kForward, cameraRotation));
 		m_camera.m_up = math::normalize(
-			math::rotate(Camera::UP, cameraRotation));
+			math::rotate(Camera::kUp, cameraRotation));
 		m_camera.m_right = math::normalize(
 			math::cross(m_camera.m_up, m_camera.m_forward));
 		m_camera.rotate = cameraRotation;

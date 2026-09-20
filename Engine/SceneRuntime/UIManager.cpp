@@ -559,7 +559,7 @@ void UIManager::Update()
 				if (Canvas* canvas = node->GetComponent<Canvas>()) return canvas;
 
 				const Entity::Index parentIndex = node->GetParentIndex();
-				if (Entity::INVALID_INDEX == parentIndex) break;
+				if (Entity::kInvalidIndex == parentIndex) break;
 
 				node = node->OwnerSceneFindIndex(parentIndex);
 			}

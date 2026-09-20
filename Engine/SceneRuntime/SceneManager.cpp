@@ -130,7 +130,7 @@ namespace
 
         bool isInstanceRoot = true;
         const Entity::Index parentIndex = obj->GetParentIndex();
-        if (parentIndex != Entity::INVALID_INDEX)
+        if (parentIndex != Entity::kInvalidIndex)
         {
             if (auto parentObj = scene->TryGetEntity(parentIndex))
             {
@@ -318,8 +318,6 @@ void SceneManager::ManagerInitialize()
 {
     RegisterReflectManual(); // CT4: 명시 메타 파일럿 4타입 — def에서 빠진 몫
     ComponentFactorys->Initialize();
-	// 공용 작업자 풀. 소유는 층 1로 내렸고(WorkerPool.h) 수명만 여기서 잡는다.
-	WorkerPools->Startup();
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
     InputActionManagers->LoadManager();
@@ -511,8 +509,16 @@ void SceneManager::DisableOrEnable()
     m_activeScene.load()->EndFramePass();
 }
 
+void SceneManager::DrainAIUpdates()
+{
+    for (auto* scene : m_scenes)
+        if (scene) scene->DrainAIUpdate();
+}
+
 void SceneManager::Decommissioning()
 {
+    SetDecommissioning();
+    DrainAIUpdates();
     // 씬 수를 남긴다. 여기가 예상보다 많으면 목록에 중복이 들어간
     // 것이고, 그것이 종료 시 더블 delete로 번진다(실제로 겪었다).
     std::printf("[SHUTDOWN] Decommissioning 진입(씬 %zu)\n", m_scenes.size());
@@ -541,7 +547,6 @@ void SceneManager::Decommissioning()
 
     Memory::SafeDelete(m_inputActionManager);
 
-    WorkerPools->Shutdown();
 
 	PlayModeEvent.Clear();
 	InputEvent.Clear();
@@ -1660,7 +1665,7 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring
             itNode["m_instanceID"].As<size_t>(),
             itNode["m_name"].AsString(),
 			EntityAuthoring::InferCreationType(itNode),
-			Entity::INVALID_INDEX
+			Entity::kInvalidIndex
 		);
 
         if (obj)
@@ -1744,7 +1749,7 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
             itNode["m_instanceID"].As<size_t>(),
             itNode["m_name"].AsString(),
 			EntityAuthoring::InferCreationType(itNode),
-			Entity::INVALID_INDEX
+			Entity::kInvalidIndex
 		);
 
         if (obj)
@@ -1826,7 +1831,7 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             itNode["m_instanceID"].As<size_t>(),
             itNode["m_name"].AsString(),
 			EntityAuthoring::InferCreationType(itNode),
-			Entity::INVALID_INDEX
+			Entity::kInvalidIndex
 		);
         if (obj)
         {
@@ -1942,7 +1947,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         Debug::PrintLog(spdlog::level::err, "[Scene] '" + targetScene->GetSceneName().ToString() + "' Entity '"
             + (owner ? owner->m_name.ToString() : std::string("?")) + "'의 " + label
             + " 참조(파일 인덱스 " + std::to_string(fileIdx) + ")가 이 배치 안에 없습니다 — 데이터 오염 가능성.");
-        return Entity::INVALID_INDEX;
+        return Entity::kInvalidIndex;
     };
 
     for (auto& entry : batch)
@@ -1952,7 +1957,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
 
         // 파일 parent: 못 찾으면 씬 루트(kSceneRootIndex)로 편입한다.
         //
-        // 예전에는 INVALID_INDEX로 남겨 뒀는데, 그러면 "루트 children에는 실렸으면서
+        // 예전에는 kInvalidIndex로 남겨 뒀는데, 그러면 "루트 children에는 실렸으면서
         // 부모는 없다"는 어긋난 쌍이 로드 결과에 그대로 남는다. 표기를 하나로 모은
         // 뒤로는(Scene::AttachExistingEntity 주석) 여기서도 루트를 가리킨다.
         // 씬 합성 루트(0) 자신은 부모가 없으므로 그대로 무효로 남긴다.
@@ -1972,7 +1977,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
 			// Transform 컴포넌트 로드가 SetOwner를 다시 타며 bootstrap parent를
 			// 덮을 수 있다. 합성 루트까지 명시적으로 복원하지 않으면 parentID=0인
 			// self-parent가 남아 월드 행렬 평가가 무한 순회한다.
-			obj->SetParentIndex(Entity::INVALID_INDEX);
+			obj->SetParentIndex(Entity::kInvalidIndex);
 		}
 
         // m_childrenIndices: 합성 루트(0)는 아래에서 부모 포인터 기준으로 통째로
@@ -2000,7 +2005,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
             obj->ClearChildren();
         }
 
-        // m_rootIndex(스켈레톤 본 팔레트 등이 쓰는 루트 뼈 참조) — INVALID_INDEX는
+        // m_rootIndex(스켈레톤 본 팔레트 등이 쓰는 루트 뼈 참조) — kInvalidIndex는
         // "루트 뼈 없음/분리됨"이라는 유효한 상태다(Object::SetDontDestroyOnLoad가
         // 명시적으로 이 값을 쓰고, UpdateModelRecursive의 Bone 분기는 TryGetEntity가
         // nullptr을 돌려주면 조용히 건너뛴다) — 건드리지 않는다. 유효한 파일 인덱스인데
@@ -2014,7 +2019,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         }
 		else
 		{
-			obj->SetRootIndex(Entity::INVALID_INDEX);
+			obj->SetRootIndex(Entity::kInvalidIndex);
 		}
     }
 

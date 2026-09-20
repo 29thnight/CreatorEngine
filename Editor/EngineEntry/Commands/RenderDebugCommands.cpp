@@ -84,7 +84,7 @@
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Socket.h" // X7 transform bulk probe
-#include "BoneRegion.h" // MAX_BONES
+#include "BoneRegion.h" // kMaxBones
 #include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조

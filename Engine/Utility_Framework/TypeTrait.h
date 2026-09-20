@@ -86,7 +86,7 @@ constexpr bool IsCopyableForProperty()
 struct HashedGuid
 {
 	size_t m_ID_Data{ 0 };
-	static constexpr size_t INVAILD_ID{ 0 };
+	static constexpr size_t kInvalidId{ 0 };
 
 	constexpr HashedGuid() = default;
 	constexpr HashedGuid(size_t id) : m_ID_Data(id) {}

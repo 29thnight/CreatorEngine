@@ -86,7 +86,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     // 실제 parent/children 분리는 SceneManager의 DetachEntityHierarchy가 슬롯
     // 이송과 한 transaction으로 수행한다. 여기서 parent만 먼저 지우면 그때까지
     // 부모 children과 비대칭인 중간 상태가 노출된다.
-    go->SetRootIndex(Entity::INVALID_INDEX);
+    go->SetRootIndex(Entity::kInvalidIndex);
 
     // Register to global DDOL bucket
     for (auto& o : collected)
@@ -121,7 +121,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 		struct RootFixup
 		{
 			Entity* clone{ nullptr };
-			Entity::Index sourceRoot{ Entity::INVALID_INDEX };
+			Entity::Index sourceRoot{ Entity::kInvalidIndex };
 		};
 		std::unordered_map<Entity::Index, Entity::Index> sourceToClone;
 		std::vector<RootFixup> rootFixups;
@@ -198,7 +198,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			if (!fixup.clone) continue;
 			if (!Entity::IsValidIndex(fixup.sourceRoot))
 			{
-				fixup.clone->SetRootIndex(Entity::INVALID_INDEX);
+				fixup.clone->SetRootIndex(Entity::kInvalidIndex);
 				continue;
 			}
 

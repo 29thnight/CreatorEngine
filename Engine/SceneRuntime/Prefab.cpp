@@ -133,8 +133,8 @@ struct Prefab::InstantiateContext
 	struct RootFixup
 	{
 		Entity* entity{ nullptr };
-		Entity::Index targetIndex{ Entity::INVALID_INDEX };
-		Entity::Index sourceRootIndex{ Entity::INVALID_INDEX };
+		Entity::Index targetIndex{ Entity::kInvalidIndex };
+		Entity::Index sourceRootIndex{ Entity::kInvalidIndex };
 	};
 
 	std::unordered_map<Entity::Index, Entity::Index> indexRemap;
@@ -423,7 +423,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
     Entity::Index newIndex = obj->m_index;
 	const Entity::Index targetRootIndex = obj->GetRootIndex();
 	const Entity::Index sourceIndex = node["m_index"]
-		? node["m_index"].As<Entity::Index>() : Entity::INVALID_INDEX;
+		? node["m_index"].As<Entity::Index>() : Entity::kInvalidIndex;
 	const bool hasSourceRootIndex = static_cast<bool>(node["m_rootIndex"]);
 	const Entity::Index sourceRootIndex = hasSourceRootIndex
 		? node["m_rootIndex"].As<Entity::Index>() : targetRootIndex;

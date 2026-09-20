@@ -61,9 +61,9 @@ private:
 		resolved.m_eyePosition = m_pOwner->Transform_().GetWorldPosition();
 		const math::quaternion rotation = math::normalize(
 			m_pOwner->Transform_().GetWorldQuaternion());
-		resolved.m_forward = math::normalize(math::rotate(Camera::FORWARD, rotation));
-		resolved.m_up = math::normalize(math::rotate(Camera::UP, rotation));
-		resolved.m_right = math::normalize(math::rotate(Camera::RIGHT, rotation));
+		resolved.m_forward = math::normalize(math::rotate(Camera::kForward, rotation));
+		resolved.m_up = math::normalize(math::rotate(Camera::kUp, rotation));
+		resolved.m_right = math::normalize(math::rotate(Camera::kRight, rotation));
 		resolved.rotate = rotation;
 		return resolved;
 	}

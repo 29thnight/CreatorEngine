@@ -20,7 +20,7 @@ constexpr KeyState NextKeyState(KeyState current, bool isDown)
 
 void KeyboardState::Update()
 {
-	for (unsigned int i = 0; i < KEYBOARD_COUNT; ++i)
+	for (unsigned int i = 0; i < kKeyboardCount; ++i)
 	{
 		bool isDown = InputManagement->m_curKeyStates.Test(i);
 		KeyState current = GetKeyState(i);
@@ -30,7 +30,7 @@ void KeyboardState::Update()
 
 void MouseState::Update()
 {
-	for (size_t i = 0; i < MOUSE_COUNT; ++i)
+	for (size_t i = 0; i < kMouseCount; ++i)
 	{
 		bool isDown = InputManagement->m_curMouseState.Test(i);
 		KeyState current = GetKeyState(i);
@@ -40,9 +40,9 @@ void MouseState::Update()
 
 void PadState::Update()
 {
-	for (int padNum = 0; padNum < MAX_CONTROLLER; ++padNum)
+	for (int padNum = 0; padNum < kMaxController; ++padNum)
 	{
-		for (size_t btn = 0; btn < GAMEPAD_KEY_COUNT; ++btn)
+		for (size_t btn = 0; btn < kGamepadKeyCount; ++btn)
 		{
 			bool isDown = InputManagement->m_curPadState[padNum].Test(btn);
 			KeyState current = GetKeyState(padNum, btn);

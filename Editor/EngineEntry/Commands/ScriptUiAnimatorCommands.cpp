@@ -41,8 +41,10 @@
 #include "LifecycleTrace.h"
 #include "LifecycleRegistry.h"
 #include "Animator.h"
+#include "Animation/AnimationPlaybackSelfTest.h"
+#include "Animation/AnimationVisualProbe.h"
 #include "Socket.h" // X7 transform bulk probe
-#include "BoneRegion.h" // MAX_BONES
+#include "BoneRegion.h" // kMaxBones
 #include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
@@ -964,6 +966,41 @@ namespace ConsoleCmd
         return CommandCore::InternalError("script.invoke_internal", invoked.reason);
     }
 
+    static CommandCore::CommandResult Cmd_animation_playback_probe(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("animation.playback.probe <model-path>");
+        std::string log;
+        const bool passed = RenderTest::RunAnimationPlaybackSelfTest(ctx.parts[1], log);
+        auto data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(log));
+        std::printf("%s\n", log.c_str());
+        return passed ? CommandCore::Ok(log, std::move(data))
+            : CommandCore::Fail("animation.playback.failed", log, std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_animation_visual_probe(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 3)
+            return CommandCore::InvalidArguments("animation.visual.probe <setup model-path|pose>");
+        RenderTest::AnimationVisualReport report;
+        std::string error;
+        const bool passed = RenderTest::RunAnimationVisualProbe(ctx.parts[1],
+            ctx.parts.size() == 3 ? ctx.parts[2] : "", report, error);
+        auto data = CommandCore::CommandData::Object();
+        data.Set("pose", CommandCore::CommandData::String(ctx.parts[1]));
+        data.Set("modelId", CommandCore::CommandData::String(report.modelId));
+        data.Set("markerMeshId", CommandCore::CommandData::String(report.markerMeshId));
+        data.Set("bone", CommandCore::CommandData::String(report.bone));
+        data.Set("x", CommandCore::CommandData::Double(report.socketPosition[0]));
+        data.Set("y", CommandCore::CommandData::Double(report.socketPosition[1]));
+        data.Set("z", CommandCore::CommandData::Double(report.socketPosition[2]));
+        data.Set("paletteDigest", CommandCore::CommandData::Int(report.paletteDigest));
+        data.Set("skinnedMeshes", CommandCore::CommandData::Int(report.skinnedMeshes));
+        return passed ? CommandCore::Ok({}, std::move(data))
+            : CommandCore::Fail("animation.visual.failed", error, std::move(data));
+    }
+
     void RegisterScriptUiAnimatorCommands(Registrar& reg)
     {
         reg.Result({ "script.add" }, &Cmd_script_add);
@@ -977,6 +1014,8 @@ namespace ConsoleCmd
         reg.Result({ "ui.hitbox" }, &Cmd_ui_hitbox);
         reg.Result({ "ui.navprobe" }, &Cmd_ui_navprobe);
         reg.Result({ "ui.status" }, &Cmd_ui_status);
+        reg.Result({ "animation.playback.probe" }, &Cmd_animation_playback_probe);
+        reg.Result({ "animation.visual.probe" }, &Cmd_animation_visual_probe);
         reg.Result({ "animator.param" }, &Cmd_animator_param);
         reg.Result({ "script.invoke" }, &Cmd_script_invoke);
         reg.Result({ "script.reload" }, &Cmd_script_reload);

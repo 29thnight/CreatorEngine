@@ -1,10 +1,12 @@
 #include "AnimationJob.h"
+#include "JobScheduler.h"
 #include "RenderScene.h"
 #include "BoneRegion.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Benchmark.hpp"
 #include "AnimationController.h"
+#include "AnimationPlayback.h"
 #include "Animator.h"
 #include "Socket.h"
 #include "Assets/ModelAssetGeneration.h"   // PHASE 3.75 MBC8
@@ -15,28 +17,8 @@
 #include "ModelConsumptionDiagnostics.h" // MBC10: 틱 경로 관측(읽기 전용 계수)
 #include <mathematics/transform.hpp>
 
-inline float lerp(float a, float b, float f)
-{
-    return a + f * (b - a);
-}
-
-template <typename T>
-int CurrentKeyIndex(std::vector<T>& keys, double time)
-{
-    float duration = time;
-    for (UINT i = 0; i < keys.size() - 1; ++i)
-    {
-        if (duration <= keys[i + 1].m_time)
-        {
-            return i;
-        }
-    }
-    return -1;
-}
-
 AnimationJob::AnimationJob()
 {
-	m_UpdateThreadPool = new ThreadPool<std::function<void()>>(8); // 8 threads for animation updates
 	m_sceneLoadedHandle = SceneManagers->sceneLoadedEvent.AddRaw(this, &AnimationJob::PrepareAnimation);
     m_AnimationUpdateHandle = SceneManagers->InternalAnimationUpdateEvent.AddRaw(this, &AnimationJob::Update);
 	m_sceneUnloadedHandle = SceneManagers->sceneUnloadedEvent.AddRaw(this, &AnimationJob::CleanUp);
@@ -55,8 +37,6 @@ void AnimationJob::Finalize()
 		std::lock_guard<std::mutex> lock(m_animatorMutex);
 		m_animators.clear();
 	}
-	delete m_UpdateThreadPool;
-	m_UpdateThreadPool = nullptr;
 }
 
 void AnimationJob::RegisterAnimator(Animator* animator)
@@ -86,7 +66,7 @@ std::vector<Animator*> AnimationJob::SnapshotAnimators()
 	// 안전 근거 — 잡 실행 창과 컴포넌트 소멸 창은 겹치지 않는다:
 	// SceneManager::GameLogic이 InternalAnimationUpdateEvent를 Broadcast하면
 	// AnimationJob::Update가 이 스냅샷으로 스레드 풀에 작업을 흘리고
-	// NotifyAllAndWait로 그 프레임 안에서 완결된다. 실제 소멸(Scene::EndFramePass →
+	// 이 프레임의 job_handle.wait()로 완결된다. 실제 소멸(Scene::EndFramePass →
 	// FlushPendingDestroy → DestroyComponents의 component.reset())은 같은 게임
 	// 스레드의 그 뒤(EditorMain::Update의 DisableOrEnable)에서만 일어나므로,
 	// 여기서 담아 스레드 풀 람다에 넘기는 raw 포인터는 그 잡이 완료될 때까지
@@ -105,6 +85,7 @@ std::vector<Animator*> AnimationJob::SnapshotAnimators()
 void AnimationJob::Update(float deltaTime)
 {
 	const auto currentAnimators = SnapshotAnimators();
+	job_group jobs;
 
     for(const auto& animator : currentAnimators)
     {
@@ -115,15 +96,15 @@ void AnimationJob::Update(float deltaTime)
             controllers.push_back(sharedcontroller);
         }
         
-        // raw Animator* 캡처의 안전 근거는 "이 함수가 NotifyAllAndWait까지 반드시
+        // raw Animator* 캡처의 안전 근거는 "이 함수가 자기 작업 그룹의 wait까지 반드시
         // 도달해 잡을 프레임 안에서 완결한다"는 불변식이다 — 여기서 return으로
-        // 함수를 빠져나가면 이미 Enqueue된 잡이 대기 없이 프레임 경계를 넘어
+        // 함수를 빠져나가면 제출한 잡이 대기 없이 프레임 경계를 넘어
         // UAF가 된다(적대 리뷰 발견 1). 그래서 이 애니메이터만 건너뛴다.
         const bool hasExpiredController = std::any_of(controllers.begin(), controllers.end(),
             [](const std::weak_ptr<AnimationController>& controller) { return controller.lock() == nullptr; });
         if (hasExpiredController)
             continue;
-        m_UpdateThreadPool->Enqueue([this, animator, controllers, delta = deltaTime] ()
+        jobs.add([this, animator, controllers, delta = deltaTime] ()
         {
             // I6-B4b — 재생 경로가 하나다. legacy 재귀 폴백(UsesMultipleControllers
             // 분기 · UpdateBone/UpdateBlendBone/UpdateBoneLayer ~200줄)을 걷었다.
@@ -163,7 +144,7 @@ void AnimationJob::Update(float deltaTime)
         });
     }
 
-    m_UpdateThreadPool->NotifyAllAndWait();
+    ce::get_job_scheduler().submit(std::move(jobs)).wait();
 
 	// X7 — worker는 Animator 소유 pose/socket staging만 쓴다. Scene packed
 	// storage와 부착 오브젝트 Transform은 모든 job이 끝난 이 barrier 뒤에서
@@ -285,8 +266,9 @@ namespace
 
         const math::matrix4x4& rootTransform = source.RootTransform();
         const math::matrix4x4& globalInverse = source.GlobalInverse();
-        // legacy 재현: 소켓 행렬은 비블렌드 순회(UpdateBone)에서만 계산됐다.
-        const bool writeSockets = nullptr == nextClip && animator.HasSocket()
+        // Sockets consume the final pose, including single-controller blending.
+        const bool writeSockets = (!controller || !animator.UsesMultipleControllers())
+            && animator.HasSocket()
             && SceneManagers->m_isGameStart && nullptr != animator.GetOwner();
 
         // 게시 계약(parent < index) 덕에 단일 순회로 충분하다 — D4d와 같은 결.
@@ -321,11 +303,16 @@ namespace
             const math::matrix4x4 global = local * parentGlobal;
             globals[boneIndex] = global;
 
-            if (boneIndex < MAX_BONES)
+            if (boneIndex < kMaxBones)
             {
-                animator.m_localTransforms[boneIndex] = local;
-                animator.m_FinalTransforms[boneIndex] =
-                    source.InverseBind(boneIndex) * global * globalInverse;
+                // Layer evaluation writes only its own staging. Composite must
+                // retain the previous final local when every mask excludes it.
+                if (!controller || !animator.UsesMultipleControllers())
+                {
+                    animator.m_localTransforms[boneIndex] = local;
+                    animator.m_FinalTransforms[boneIndex] =
+                        source.InverseBind(boneIndex) * global * globalInverse;
+                }
                 if (controller)
                 {
                     controller->m_LocalTransforms[boneIndex] = local;
@@ -352,20 +339,18 @@ namespace
     void UpdateLayer(Animator& animator, const Source& source)
     {
         using Track = typename Source::Track;
-        // legacy UpdateBoneLayer 재현(단일 순회). 컨트롤러들의 m_LocalTransforms
-        // (앞선 포즈 패스가 채움)를 마스크로 골라 합성한다. legacy의 알려진 결함도
-        // 그대로 승계한다: 채널이 있는 본에서 모든 컨트롤러가 마스크에 걸리면
-        // globalTransform이 기본 초기화(영행렬 — math 규약)로 남아 팔레트에 나간다.
+        // Compose evaluated channels only. Local projection, skinning and sockets
+        // all consume the same selected pose, including humanoid masks.
         const std::size_t boneCount = source.BoneCount();
 
-        // 컨트롤러별 "이 본에 채널이 있는가" 표 — legacy hasAnyAnimation 재현
-        // (useController 필터가 없는 것까지 동일).
+        // Disabled controllers did not run UpdatePose and must not contribute.
         std::vector<std::vector<std::uint8_t>> controllerHasChannel(
             animator.m_animationControllers.size());
         for (std::size_t slot = 0; slot < controllerHasChannel.size(); ++slot)
         {
             controllerHasChannel[slot].assign(boneCount, 0);
             AnimationController* controller = animator.m_animationControllers[slot].get();
+            if (!controller || !controller->useController) continue;
             const auto* clip = source.ClipAt(controller ? controller->GetAnimationIndex() : -1);
             if (nullptr == clip) continue;
             std::vector<const Track*> trackOf;
@@ -386,16 +371,7 @@ namespace
             const math::matrix4x4 parentGlobal = parent != kPoseNoParent
                 ? globals[parent] : rootTransform;
 
-            bool hasAnyAnimation = false;
-            for (const auto& table : controllerHasChannel)
-            {
-                if (boneIndex < table.size() && table[boneIndex])
-                {
-                    hasAnyAnimation = true;
-                    break;
-                }
-            }
-            if (!hasAnyAnimation || boneIndex >= MAX_BONES)
+            if (boneIndex >= kMaxBones)
             {
                 globals[boneIndex] = parentGlobal;
                 continue;
@@ -406,38 +382,21 @@ namespace
                 : BoneRegion::Root;
             const std::string& boneName = source.BoneName(boneIndex);
 
-            math::matrix4x4 globalTransform{};
-            for (auto& sharedController : animator.m_animationControllers)
+            animation::LayerLocalPose selected(animator.m_localTransforms[boneIndex]);
+            for (std::size_t slot = 0; slot < animator.m_animationControllers.size(); ++slot)
             {
-                AnimationController* controller = sharedController.get();
+                AnimationController* controller = animator.m_animationControllers[slot].get();
                 if (nullptr == controller) continue;
-                const math::matrix4x4 candidate =
-                    controller->m_LocalTransforms[boneIndex] * parentGlobal;
-                if (controller->m_isBlend == false && controller->IsUseLayer() == false)
-                    continue;
                 AvatarMask* mask = controller->GetAvatarMask();
-                if (mask != nullptr)
-                {
-                    if (mask->isHumanoid)
-                    {
-                        if (mask->IsBoneEnabled(region))
-                        {
-                            globalTransform = candidate;
-                        }
-                    }
-                    else if (mask->IsBoneEnabled(boneName))
-                    {
-                        animator.m_localTransforms[boneIndex] =
-                            controller->m_LocalTransforms[boneIndex];
-                        globalTransform = candidate;
-                    }
-                }
-                else
-                {
-                    globalTransform = candidate;
-                }
+                const bool maskAllows = !mask || (mask->isHumanoid
+                    ? mask->IsBoneEnabled(region) : mask->IsBoneEnabled(boneName));
+                selected.Apply(controller->m_LocalTransforms[boneIndex],
+                    controller->useController && (controller->m_isBlend || controller->IsUseLayer()),
+                    controllerHasChannel[slot][boneIndex] != 0, maskAllows);
             }
 
+            animator.m_localTransforms[boneIndex] = selected.Local();
+            const math::matrix4x4 globalTransform = selected.Local() * parentGlobal;
             animator.m_FinalTransforms[boneIndex] =
                 source.InverseBind(boneIndex) * globalTransform * globalInverse;
 
@@ -461,200 +420,74 @@ namespace
     template <class Source>
     void TickPose(Animator& animator, const Source& source, float deltaT)
     {
-        if (animator.UsesMultipleControllers())
+        if (animator.m_animationControllers.empty())
         {
-            for (auto& sharedController : animator.m_animationControllers)
-            {
-                AnimationController* controller = sharedController.get();
-                if (nullptr == controller || !controller->useController) continue;
-
-                float animationSpeed = 1;
-                AnimationState* curState = controller->m_curState;
-                if (curState)
-                {
-                    animationSpeed = curState->animationSpeed;
-                    if (curState->useMultipler)
-                    {
-                        animationSpeed *= curState->multiplerAnimationSpeed;
-                    }
-                }
-
-                const auto* clip = source.ClipAt(controller->GetAnimationIndex());
-                if (nullptr == clip) continue;
-                const float duration = static_cast<float>(Source::Duration(*clip));
-                controller->m_timeElapsed += deltaT
-                    * static_cast<float>(Source::TicksPerSecond(*clip)) * animationSpeed;
-                if (animator.IsClipLooping(controller->GetAnimationIndex()))
-                {
-                    controller->m_timeElapsed =
-                        fmod(controller->m_timeElapsed, duration);
-                }
-                else if (controller->m_timeElapsed >= duration)
-                {
-                    controller->m_timeElapsed = duration;
-                    if (controller->curAnimationProgress >= 0.95)
-                        controller->endAnimation = true;
-                }
-                controller->preCurAnimationProgress = controller->curAnimationProgress;
-                controller->curAnimationProgress =
-                    controller->m_timeElapsed / duration;
-
-                if (controller->m_isBlend)
-                {
-                    const auto* nextClip = source.ClipAt(controller->GetNextAnimationIndex());
-                    if (nextClip)
-                    {
-                        const float nextDuration =
-                            static_cast<float>(Source::Duration(*nextClip));
-                        controller->m_nextTimeElapsed += deltaT
-                            * static_cast<float>(Source::TicksPerSecond(*nextClip));
-                        controller->m_nextTimeElapsed =
-                            fmod(controller->m_nextTimeElapsed, nextDuration);
-                        controller->preNextAnimationProgress =
-                            controller->nextAnimationProgress;
-                        controller->nextAnimationProgress =
-                            controller->m_nextTimeElapsed / nextDuration;
-                        UpdatePose(animator, source, controller,
-                            controller->GetAnimationIndex(),
-                            controller->GetNextAnimationIndex(),
-                            controller->m_timeElapsed,
-                            controller->m_nextTimeElapsed);
-                    }
-                }
-                else
-                {
-                    UpdatePose(animator, source, controller,
-                        controller->GetAnimationIndex(), -1,
-                        controller->m_timeElapsed, 0.f);
-                }
-
-                if (deltaT <= 0.f) continue;
-                animator.InvokeClipEvents(controller->GetAnimationIndex(),
-                    controller->curAnimationProgress,
-                    controller->preCurAnimationProgress);
-                if (controller->m_isBlend)
-                {
-                    animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
-                        controller->nextAnimationProgress,
-                        controller->preNextAnimationProgress);
-                }
-            }
-
-            UpdateLayer(animator, source);
-        }
-        else if (animator.m_animationControllers.empty())
-        {
-            const auto* clip = source.ClipAt(static_cast<int>(animator.m_AnimIndexChosen));
-            if (nullptr == clip) return;
-            const float duration = static_cast<float>(Source::Duration(*clip));
-            animator.m_TimeElapsed += deltaT
-                * static_cast<float>(Source::TicksPerSecond(*clip));
-            if (animator.IsClipLooping(static_cast<int>(animator.m_AnimIndexChosen)))
-            {
-                animator.m_TimeElapsed = fmod(animator.m_TimeElapsed, duration);
-            }
-            else if (animator.m_TimeElapsed >= duration)
-            {
-                animator.m_TimeElapsed = duration;
-            }
-
+            const int clipIndex = static_cast<int>(animator.m_AnimIndexChosen);
+            const auto* clip = source.ClipAt(clipIndex);
+            if (!clip) return;
+            const auto current = animation::AdvanceClip(animator.m_TimeElapsed,
+                deltaT * Source::TicksPerSecond(*clip), Source::Duration(*clip),
+                animator.IsClipLooping(clipIndex));
+            animator.m_TimeElapsed = current.time;
+            int nextIndex = -1;
             if (animator.m_isBlend)
             {
-                if (animator.nextAnimIndex == -1) return;
-                const auto* nextClip = source.ClipAt(animator.nextAnimIndex);
-                if (nullptr == nextClip) return;
-                const float nextDuration =
-                    static_cast<float>(Source::Duration(*nextClip));
-                animator.m_nextTimeElapsed += deltaT
-                    * static_cast<float>(Source::TicksPerSecond(*nextClip));
-                animator.m_nextTimeElapsed =
-                    fmod(animator.m_nextTimeElapsed, nextDuration);
-                UpdatePose(animator, source, nullptr,
-                    static_cast<int>(animator.m_AnimIndexChosen),
-                    animator.nextAnimIndex,
-                    animator.m_TimeElapsed, animator.m_nextTimeElapsed);
-            }
-            else
-            {
-                UpdatePose(animator, source, nullptr,
-                    static_cast<int>(animator.m_AnimIndexChosen), -1,
-                    animator.m_TimeElapsed, 0.f);
-            }
-        }
-        else // 컨트롤러 1개
-        {
-            AnimationController* controller = animator.m_animationControllers[0].get();
-            const auto* clip = source.ClipAt(controller->GetAnimationIndex());
-            if (nullptr == clip) return;
-            const float duration = static_cast<float>(Source::Duration(*clip));
-            AnimationState* curState = controller->m_curState;
-            float animationSpeed = 1;
-            if (curState)
-            {
-                animationSpeed = curState->animationSpeed;
-                if (curState->useMultipler)
+                if (const auto* next = source.ClipAt(animator.nextAnimIndex))
                 {
-                    animationSpeed *= curState->multiplerAnimationSpeed;
+                    nextIndex = animator.nextAnimIndex;
+                    animator.m_nextTimeElapsed = animation::AdvanceClip(
+                        animator.m_nextTimeElapsed, deltaT * Source::TicksPerSecond(*next),
+                        Source::Duration(*next), animator.IsClipLooping(nextIndex)).time;
                 }
             }
-            controller->m_timeElapsed += deltaT
-                * static_cast<float>(Source::TicksPerSecond(*clip)) * animationSpeed;
-            if (animator.IsClipLooping(controller->GetAnimationIndex()))
-            {
-                controller->m_timeElapsed = fmod(controller->m_timeElapsed, duration);
-            }
-            else if (controller->m_timeElapsed >= duration)
-            {
-                controller->m_timeElapsed = duration;
-                if (controller->curAnimationProgress >= 0.95)
-                    controller->endAnimation = true;
-            }
+            UpdatePose(animator, source, nullptr, clipIndex, nextIndex,
+                animator.m_TimeElapsed, animator.m_nextTimeElapsed);
+            return;
+        }
 
+        for (const auto& sharedController : animator.m_animationControllers)
+        {
+            AnimationController* controller = sharedController.get();
+            if (!controller || !controller->useController) continue;
+            const int clipIndex = controller->GetAnimationIndex();
+            const auto* clip = source.ClipAt(clipIndex);
+            if (!clip) continue;
+            const AnimationState* state = controller->m_curState;
+            const float speed = state ? state->animationSpeed
+                * (state->useMultipler ? state->multiplerAnimationSpeed : 1.f) : 1.f;
+            const bool looping = animator.IsClipLooping(clipIndex);
+            const auto current = animation::AdvanceClip(controller->m_timeElapsed,
+                deltaT * Source::TicksPerSecond(*clip) * speed,
+                Source::Duration(*clip), looping);
+            controller->m_timeElapsed = current.time;
             controller->preCurAnimationProgress = controller->curAnimationProgress;
-            controller->curAnimationProgress = controller->m_timeElapsed / duration;
+            controller->curAnimationProgress = current.progress;
+            if (!looping && current.progress >= 1.f) controller->endAnimation = true;
 
-            if (animator.m_isBlend)
+            int nextIndex = -1;
+            animation::ClipStep nextStep{};
+            if (controller->m_isBlend)
             {
-                if (animator.nextAnimIndex == -1) return;
-                const auto* nextClip = source.ClipAt(controller->GetNextAnimationIndex());
-                if (nullptr == nextClip) return;
-                const float nextDuration =
-                    static_cast<float>(Source::Duration(*nextClip));
-                controller->m_nextTimeElapsed += deltaT
-                    * static_cast<float>(Source::TicksPerSecond(*nextClip));
-                controller->m_nextTimeElapsed =
-                    fmod(controller->m_nextTimeElapsed, nextDuration);
-                controller->preNextAnimationProgress =
-                    controller->nextAnimationProgress;
-                controller->nextAnimationProgress =
-                    controller->m_nextTimeElapsed / nextDuration;
-                UpdatePose(animator, source, controller,
-                    controller->GetAnimationIndex(),
-                    controller->GetNextAnimationIndex(),
-                    controller->m_timeElapsed, controller->m_nextTimeElapsed);
-            }
-            else
-            {
-                UpdatePose(animator, source, controller,
-                    controller->GetAnimationIndex(), -1,
-                    controller->m_timeElapsed, 0.f);
-            }
-
-            if (deltaT > 0.f)
-            {
-                animator.InvokeClipEvents(controller->GetAnimationIndex(),
-                    controller->curAnimationProgress,
-                    controller->preCurAnimationProgress);
-                if (controller->m_isBlend)
+                if (const auto* next = source.ClipAt(controller->GetNextAnimationIndex()))
                 {
-                    animator.InvokeClipEvents(controller->GetNextAnimationIndex(),
-                        controller->nextAnimationProgress,
-                        controller->preNextAnimationProgress);
+                    nextIndex = controller->GetNextAnimationIndex();
+                    nextStep = animation::AdvanceClip(controller->m_nextTimeElapsed,
+                        deltaT * Source::TicksPerSecond(*next), Source::Duration(*next),
+                        animator.IsClipLooping(nextIndex));
+                    controller->m_nextTimeElapsed = nextStep.time;
+                    controller->preNextAnimationProgress = controller->nextAnimationProgress;
+                    controller->nextAnimationProgress = nextStep.progress;
                 }
             }
-        }
-    }
+            UpdatePose(animator, source, controller, clipIndex, nextIndex,
+                controller->m_timeElapsed, controller->m_nextTimeElapsed);
 
+            animator.InvokeClipEvents(clipIndex, current.eventEnd, current.eventBegin);
+            if (nextIndex >= 0)
+                animator.InvokeClipEvents(nextIndex, nextStep.eventEnd, nextStep.eventBegin);
+        }
+        if (animator.UsesMultipleControllers()) UpdateLayer(animator, source);
+    }
     // 결정적 표본 진입점(animtick 게이트 전용) — 살아 있는 컴포넌트를 빌려 쓰므로
     // 팔레트·선택 인덱스를 원복한다. 항등에서 시작한다 — "채널 없는 슬롯
     // 미기록" 규약 아래에서도 결과가 결정적이어야 골든이 성립한다.
@@ -666,17 +499,17 @@ namespace
         if (nullptr == source.ClipAt(clipIndex)) return false;
 
         std::vector<math::matrix4x4> savedLocal(
-            animator.m_localTransforms, animator.m_localTransforms + MAX_BONES);
+            animator.m_localTransforms, animator.m_localTransforms + kMaxBones);
         std::vector<math::matrix4x4> savedFinal(
-            animator.m_FinalTransforms, animator.m_FinalTransforms + MAX_BONES);
+            animator.m_FinalTransforms, animator.m_FinalTransforms + kMaxBones);
         const uint32_t savedChosen = animator.m_AnimIndexChosen;
         animator.m_AnimIndexChosen = static_cast<uint32_t>(clipIndex);
 
         std::fill(animator.m_FinalTransforms,
-            animator.m_FinalTransforms + MAX_BONES, math::matrix4x4::identity());
+            animator.m_FinalTransforms + kMaxBones, math::matrix4x4::identity());
         UpdatePose(animator, source, nullptr, clipIndex, -1, time, 0.f);
         std::copy(animator.m_FinalTransforms,
-            animator.m_FinalTransforms + MAX_BONES, outPose);
+            animator.m_FinalTransforms + kMaxBones, outPose);
 
         std::copy(savedLocal.begin(), savedLocal.end(), animator.m_localTransforms);
         std::copy(savedFinal.begin(), savedFinal.end(), animator.m_FinalTransforms);

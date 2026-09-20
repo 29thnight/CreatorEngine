@@ -104,7 +104,7 @@ void InputManager::KeyBoardUpdate()
         for (uint32_t i = 0; i < keyCount; ++i)
         {
             uint8_t virtualKey = m_GameInputKeyStates[i].virtualKey;
-            if (virtualKey < KEYBOARD_COUNT)
+            if (virtualKey < kKeyboardCount)
                 m_curKeyStates.Set(virtualKey);
         }
     }
@@ -127,7 +127,7 @@ void InputManager::MouseUpdate()
     static HRESULT lastReportedFailure = S_OK;
 
     ComPtr<IGameInputReading> reading;
-    //memset(curmouseState, 0, sizeof(bool) * MOUSE_COUNT);
+    //memset(curmouseState, 0, sizeof(bool) * kMouseCount);
     m_curMouseState.Reset();
     ResetMouseDelta();
     m_prevMouseWheelDelta = m_mouseWheelDelta;
@@ -294,7 +294,7 @@ void InputManager::PadUpdate()
         return;
     }
     bool found = false;
-    for (int i = 0; i < MAX_CONTROLLER; i++)
+    for (int i = 0; i < kMaxController; i++)
     {
         if (device[i] != nullptr && device[i] == tempDevice.Get())
         {
@@ -304,7 +304,7 @@ void InputManager::PadUpdate()
     }
     if (!found)
     {
-        for (int i = 0; i < MAX_CONTROLLER; i++)
+        for (int i = 0; i < kMaxController; i++)
         {
             if (device[i] == nullptr)
             {
@@ -321,7 +321,7 @@ void InputManager::GamePadUpdate()
     // 장치별로 갈라 두지 않는다 — 이 표지는 로그 중복만 막는다.
     static HRESULT lastReportedFailure = S_OK;
 
-    for (int i = 0; i < MAX_CONTROLLER; ++i)
+    for (int i = 0; i < kMaxController; ++i)
     {
         m_curPadState[i].Reset();
 
@@ -479,7 +479,7 @@ void InputManager::SetControllerVibration(DWORD Index, float leftMotorSpeed, flo
 
 void InputManager::UpdateControllerVibration(float tick)
 {
-    for (DWORD i = 0; i < MAX_CONTROLLER; ++i)
+    for (DWORD i = 0; i < kMaxController; ++i)
     {
     	if (device[i])
     	{

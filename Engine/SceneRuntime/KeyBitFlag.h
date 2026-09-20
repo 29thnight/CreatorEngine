@@ -3,10 +3,10 @@
 
 struct KeyBitFlag
 {
-    static constexpr size_t BITS = 256;
-    static constexpr size_t CHUNKS = BITS / 32;
+    static constexpr size_t kBits = 256;
+    static constexpr size_t kChunks = kBits / 32;
 
-    BitFlag chunks[CHUNKS]{};
+    BitFlag chunks[kChunks]{};
 
     void Set(uint8 key) noexcept
     {

@@ -52,7 +52,7 @@ Entity::SerializedHierarchy ReadSerializedHierarchy(const Authoring::ReadNode& n
 	rootNode = node["m_rootIndex"];
 	childrenNode = node["m_childrenIndices"];
 
-	if (parentNode) result.parentIndex = parentNode.As<Entity::Index>(Entity::INVALID_INDEX);
+	if (parentNode) result.parentIndex = parentNode.As<Entity::Index>(Entity::kInvalidIndex);
 	if (rootNode) result.rootIndex = rootNode.As<Entity::Index>(Entity::kSceneRootIndex);
 	if (childrenNode && childrenNode.IsSequence())
 	{

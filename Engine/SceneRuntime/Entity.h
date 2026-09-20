@@ -40,7 +40,7 @@ class Entity : public Object
     }
 public:
 	using Index = GameObjectIndex;
-	static constexpr Entity::Index INVALID_INDEX = std::numeric_limits<uint32_t>::max();
+	static constexpr Entity::Index kInvalidIndex = std::numeric_limits<uint32_t>::max();
 	// 씬 루트 오브젝트의 관례적 인덱스 (트랙 E3). 예전엔 AddChild의 루트
 	// 폴백(Entity.cpp)이 이 값을 리터럴 0으로 썼다 — 이름을 붙여 "루트를
 	// 가리키는 의도"임을 드러낸다. 통합 단계에서 Scene::GetRootEntity()를
@@ -49,7 +49,7 @@ public:
 	static constexpr Entity::Index kSceneRootIndex = 0;
 	struct SerializedHierarchy
 	{
-		Index parentIndex{ INVALID_INDEX };
+		Index parentIndex{ kInvalidIndex };
 		Index rootIndex{ kSceneRootIndex };
 		std::vector<Index> childrenIndices{};
 	};
@@ -244,12 +244,12 @@ public:
 
 	static inline bool IsValidIndex(Index index)
 	{
-		return index != INVALID_INDEX;
+		return index != kInvalidIndex;
 	}
 
 	static inline bool IsInvalidIndex(Index index)
 	{
-		return index == INVALID_INDEX;
+		return index == kInvalidIndex;
 	}
 
 	void SetEnabled(bool able) override final;
@@ -291,7 +291,7 @@ private:
 public:
 
 	HashedGuid m_attachedSoketID{};
-	Entity::Index m_index{ INVALID_INDEX };
+	Entity::Index m_index{ kInvalidIndex };
 	uint32 m_collisionType = 0;
 	FileGuid m_prefabFileGuid{ nullFileGuid };
 

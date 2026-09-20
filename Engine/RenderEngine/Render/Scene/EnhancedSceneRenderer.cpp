@@ -47,7 +47,7 @@
 #include "../../PrimitiveRenderProxy.h"
 #include "../../UIRenderProxy.h"
 #include "../../UIClipping.h"
-#include "../../BoneRegion.h" // MAX_BONES
+#include "../../BoneRegion.h" // kMaxBones
 #include "../../Mesh.h"
 #include "../../RenderState.h"
 #include "../../../Utility_Framework/PathFinder.h"
@@ -2800,6 +2800,10 @@ namespace
 
             const auto poolMesh = [this](const MeshRenderProxy* proxy)
             {
+                // Visibility is published by Scene even when the Animator is disabled.
+                // Exclude the mesh before building draws for any render pass.
+                if (!proxy->m_isEnabled) return;
+
                 // PHASE 3.75 MBC7 — typed generation 뷰가 정본이다. generation
                 // descriptor와 immutable 저장소를 대조해 뷰를 짓고(BuildRHIModelMeshView),
                 // 실패·부재면 experiment 핸들 → legacy Mesh 순으로 내려간다(MBC9 은퇴).
@@ -2825,11 +2829,11 @@ namespace
                 }
 
                 if (proxy->m_isAnimationEnabled
-                    && (HashedGuid::INVAILD_ID != proxy->m_animatorGuid)
+                    && (HashedGuid::kInvalidId != proxy->m_animatorGuid)
                     && proxy->m_finalTransforms)
                 {
                     pooled.item.bonePalette = proxy->m_finalTransforms.get();
-                    pooled.item.boneCount = MAX_BONES;
+                    pooled.item.boneCount = kMaxBones;
                     pooled.item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
                 }
 

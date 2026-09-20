@@ -289,7 +289,7 @@ Transform& Transform::SetScaleValue(
 // 부모가 없으면 월드 = 로컬이다.
 //
 // 인덱스 0은 씬 루트라 항상 항등이므로 예전부터 부모 없음과 같이 취급해 왔다.
-// 여기에 널 검사를 더한 이유는, 부모 인덱스가 INVALID_INDEX(-1)인 오브젝트가
+// 여기에 널 검사를 더한 이유는, 부모 인덱스가 kInvalidIndex(-1)인 오브젝트가
 // 실제로 존재하기 때문이다(Main Camera·Directional Light 등 최상위 오브젝트).
 // 전에는 그런 오브젝트에 월드 setter를 부르면 FindIndex가 널을 돌려주고
 // 곧바로 역참조해서 죽었다.
@@ -422,7 +422,7 @@ math::matrix4x4 Transform::UpdateWorldMatrix()
 	// 부모를 못 찾으면 최상위로 취급한다.
 	const Entity::Index parentIndex = m_pOwner
 		? m_pOwner->GetParentIndex()
-		: Entity::INVALID_INDEX;
+		: Entity::kInvalidIndex;
 	Entity* parent = (nullptr != m_pOwner && Entity::IsValidIndex(parentIndex))
 		? m_pOwner->OwnerSceneFindIndex(parentIndex)
 		: nullptr;
@@ -543,7 +543,7 @@ void Transform::SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLoc
 
 	const Entity::Index parentIndex = m_pOwner
 		? m_pOwner->GetParentIndex()
-		: Entity::INVALID_INDEX;
+		: Entity::kInvalidIndex;
 	Entity* parentObject = (nullptr != m_pOwner)
 		? m_pOwner->OwnerSceneFindIndex(parentIndex)
 		: nullptr;

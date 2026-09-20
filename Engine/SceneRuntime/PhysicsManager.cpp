@@ -1021,10 +1021,10 @@ void PhysicsManager::LoadCollisionMatrix()
 		return;
 	}
 	const Authoring::ReadNode matrixNode = document.Root();
-	constexpr int MAX_LAYER_SIZE = 32;
-	for (int i = 0; i < MAX_LAYER_SIZE; ++i)
+	constexpr int kMaxLayerSize = 32;
+	for (int i = 0; i < kMaxLayerSize; ++i)
 	{
-		for (int j = 0; j < MAX_LAYER_SIZE; ++j)
+		for (int j = 0; j < kMaxLayerSize; ++j)
 		{
 			const Authoring::ReadNode row = matrixNode.At(i);
 			const Authoring::ReadNode value = row.At(j);

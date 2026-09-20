@@ -66,7 +66,7 @@
 #include "LifecycleRegistry.h"
 #include "Animator.h"
 #include "Socket.h" // X7 transform bulk probe
-#include "BoneRegion.h" // MAX_BONES
+#include "BoneRegion.h" // kMaxBones
 #include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
@@ -118,6 +118,7 @@
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"
 #include "AssetIdentity/SceneModelGenerationSelfTest.h"
+#include "Tasks/WorkerPoolSelfTest.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 #include "ShaderMeta.h"
@@ -922,7 +923,7 @@ namespace ConsoleCmd
 
     // I5-D5a — Foliage 메시의 experiment 핸들 합류 게이트. 코퍼스에 Foliage
     // 저작분이 0이라(착수 정찰 실측) 합성으로 판정한다: seed가 씬에
-    // FoliageComponent+타입(Gunner)+인스턴스를 저작 경로(AddFoliageType —
+    // FoliageComponent+타입(Robot)+인스턴스를 저작 경로(AddFoliageType —
     // 바인딩 지점) 그대로 심고 foliage 자산을 게시하며, 저장·재로드 뒤 verify가
     // ①postLoad 재해석 경로의 바인딩 ②프록시 DrawSource의 핸들 반영
     // (CaptureDrawSources — 실물 함수) ③뷰 완비(stableKey)를 잰다. 렌더러
@@ -1492,8 +1493,8 @@ namespace ConsoleCmd
         data.Set("generationTextures", CommandData::Int(report.generationTextures));
         data.Set("otherTextures", CommandData::Int(report.otherTextures));
         data.Set("missingTextures", CommandData::Int(report.missingTextures));
-        data.Set("gunnerRenderers", CommandData::Int(report.gunnerRenderers));
-        data.Set("gunnerEmbedded", CommandData::Int(report.gunnerEmbedded));
+        data.Set("robotRenderers", CommandData::Int(report.robotRenderers));
+        data.Set("robotEmbedded", CommandData::Int(report.robotEmbedded));
         data.Set("textures", CommandData::Int(report.textures));
         data.Set("reused", CommandData::Int(report.reused));
         data.Set("created", CommandData::Int(report.created));
@@ -1788,8 +1789,21 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_worker_pool_probe(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("worker.pool.probe <model-path>");
+        std::string log;
+        const bool passed = RenderTest::RunWorkerPoolSelfTest(ctx.parts[1], log);
+        auto data = CommandCore::CommandData::Object();
+        data.Set("passed", CommandCore::CommandData::Bool(passed));
+        data.Set("log", CommandCore::CommandData::String(log));
+        return passed ? CommandCore::Ok(log, std::move(data))
+            : CommandCore::Fail("worker.pool.failed", log, std::move(data));
+    }
+
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
+        reg.Result({ "worker.pool.probe" }, &Cmd_worker_pool_probe);
         reg.Result({ "assets.decodeab" }, &Cmd_assets_decodeab);
         reg.Result({ "assets.decodeabhdr" }, &Cmd_assets_decodeabhdr);
         reg.Result({ "assets.texturebench" }, &Cmd_assets_texturebench);

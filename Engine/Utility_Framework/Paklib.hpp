@@ -66,10 +66,10 @@ namespace Pak {
 
     // FNV-1a 64 (경량 경로 해시)
     inline u64 fnv1a64(std::string_view s) {
-        const u64 FNV_OFFSET = 14695981039346656037ull;
-        const u64 FNV_PRIME = 1099511628211ull;
-        u64 h = FNV_OFFSET;
-        for (unsigned char c : s) { h ^= c; h *= FNV_PRIME; }
+        const u64 fnv_offset = 14695981039346656037ull;
+        const u64 fnv_prime = 1099511628211ull;
+        u64 h = fnv_offset;
+        for (unsigned char c : s) { h ^= c; h *= fnv_prime; }
         return h;
     }
 

@@ -25,7 +25,7 @@ namespace EditorDiagnostics
         // 최상위 오브젝트의 표기가 갈려 있는 것이 그 뿌리다(SceneGraphRedesignPlan
         // 트랙 E). 같은 뜻인데 두 값이 쓰인다:
         //   · Entity::AddChild            -> m_parentIndex = 부모 인덱스(루트면 0)
-        //   · Scene::AttachExistingEntity / DDOL 이탈 -> INVALID_INDEX(-1)
+        //   · Scene::AttachExistingEntity / DDOL 이탈 -> kInvalidIndex(-1)
         // 둘 다 씬 루트의 children에는 들어가므로, "-1인데 루트 children에 있음"이
         // 정상처럼 보인다. 그 상태를 세는 것이 topLevelInvalid다.
         if (!scene)
@@ -148,7 +148,7 @@ namespace EditorDiagnostics
             ++animatorCount;
             std::uint32_t digest = 2166136261u;
             const std::size_t bones =
-                (std::min)(animator->GetBoneCount(), (std::size_t)MAX_BONES);
+                (std::min)(animator->GetBoneCount(), (std::size_t)kMaxBones);
             for (std::size_t bone = 0; bone < bones; ++bone)
             {
                 const float* values = &animator->m_FinalTransforms[bone].m[0][0];

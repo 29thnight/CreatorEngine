@@ -25,7 +25,7 @@ Animator* FindEnabledAnimator(MeshRenderer* component)
 
 	Entity* meshOwner = component->GetOwner();
 	Entity::Index ownerIndex = meshOwner->GetParentIndex();
-	while (ownerIndex != Entity::INVALID_INDEX)
+	while (ownerIndex != Entity::kInvalidIndex)
 	{
 		Entity* owner = meshOwner->OwnerSceneFindIndex(ownerIndex);
 		if (nullptr == owner) break;
@@ -90,8 +90,8 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 		{
 			update.hasAnimator = true;
 			update.animatorGuid = animator->GetInstanceID();
-			update.bonePalette = std::make_shared<math::matrix4x4[]>(MAX_BONES);
-			std::copy_n(animator->m_FinalTransforms, MAX_BONES,
+			update.bonePalette = std::make_shared<math::matrix4x4[]>(kMaxBones);
+			std::copy_n(animator->m_FinalTransforms, kMaxBones,
 				update.bonePalette.get());
 		}
 	}

@@ -11,7 +11,7 @@
 #include <mathematics/matrix4x4.hpp>
 #include <optional>
 #include <type_traits>
-#include "BoneRegion.h" // MAX_BONES·BoneRegion
+#include "BoneRegion.h" // kMaxBones·BoneRegion
 
 // I5-D4e-2 — 클립별 이벤트·루프 오버라이드. 소유는 씬(Animator)이다(D0a 판정):
 // legacy조차 모델 자산에 직렬화한 적이 없고(.asset 캐시 포맷에 이벤트 없음) 씬
@@ -69,7 +69,8 @@ class Animator : public meta::identity<Animator, Component>
 public:
     Animator()
     {
-        socketvec.clear();
+        for (auto& local : m_localTransforms) local = math::matrix4x4::identity();
+        for (auto& final : m_FinalTransforms) final = math::matrix4x4::identity();
     }
     // I5-D4e-1: 본문은 cpp로 — shared_ptr<const experiment::Model> 멤버가
     // 전방선언 타입이라 헤더 inline 소멸이 불완전 타입을 인스턴스화한다.
@@ -134,8 +135,9 @@ public:
     void DeleteClipEvent(int clipIndex, int eventIndex);
     // 발화 — 트리거 매칭 계수를 돌려준다(CLR 미준비여도 계수는 정확하다 —
     // 게이트가 큐 없이 판정하는 창구).
-    std::size_t InvokeClipEvents(int clipIndex, float currentProgress,
-        float previousProgress);
+    // Unwrapped interval: multiple loops and reverse playback remain observable.
+    std::size_t InvokeClipEvents(int clipIndex, double currentProgress,
+        double previousProgress);
 
     // I5-D4e-3 — 본 해석·마스크 생성의 창구. Scene 본 전파와 AvatarMask
     // 생성이 legacy Skeleton(FindBone·m_serial·Bone* 트리)을 직접 만지던
@@ -191,8 +193,8 @@ public:
 public:
     float m_TimeElapsed{};
     uint32_t m_AnimIndexChosen{};
-    math::matrix4x4 m_localTransforms[MAX_BONES]{};
-    math::matrix4x4 m_FinalTransforms[MAX_BONES]{};
+    math::matrix4x4 m_localTransforms[kMaxBones]{};
+    math::matrix4x4 m_FinalTransforms[kMaxBones]{};
     static_assert(std::is_same_v<
         std::remove_extent_t<decltype(m_localTransforms)>, math::matrix4x4>);
     static_assert(std::is_same_v<

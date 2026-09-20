@@ -619,9 +619,9 @@ RayCastOutput PhysicX::Raycast(const RayCastInput& in)
 		| physx::PxQueryFlag::eDYNAMIC
 		| physx::PxQueryFlag::ePREFILTER
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerNumber == ALL_LAYER) {
+	if (in.layerNumber == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		filterData.data.word1 = 0xFFFFFFFF;
 		filterData.data.word2 = 0xFFFFFFFF;
@@ -683,9 +683,9 @@ RayCastOutput PhysicX::RaycastAll(const RayCastInput& in)
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerNumber == ALL_LAYER) {
+	if (in.layerNumber == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		filterData.data.word1 = 0xFFFFFFFF;
 		filterData.data.word2 = 0xFFFFFFFF;
@@ -2015,9 +2015,9 @@ SweepOutput PhysicX::BoxSweep(const SweepInput& in, const math::vector3& boxExte
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	// 어떤 레이어와 충돌할지 비트마스크로 지정합니다.
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerMask == ALL_LAYER) {
+	if (in.layerMask == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		//filterData.data.word1 = 0xFFFFFFFF;
 		//filterData.data.word2 = 0xFFFFFFFF;
@@ -2097,9 +2097,9 @@ SweepOutput PhysicX::SphereSweep(const SweepInput& in, float radius)
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerMask == ALL_LAYER) {
+	if (in.layerMask == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		//filterData.data.word1 = 0xFFFFFFFF;
 		//filterData.data.word2 = 0xFFFFFFFF;
@@ -2166,9 +2166,9 @@ SweepOutput PhysicX::CapsuleSweep(const SweepInput& in, float radius, float half
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerMask == ALL_LAYER) {
+	if (in.layerMask == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		//filterData.data.word1 = 0xFFFFFFFF;
 		//filterData.data.word2 = 0xFFFFFFFF;
@@ -2238,9 +2238,9 @@ OverlapOutput PhysicX::BoxOverlap(const OverlapInput& in, const math::vector3& b
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerMask == ALL_LAYER) {
+	if (in.layerMask == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		//filterData.data.word1 = 0xFFFFFFFF;
 		//filterData.data.word2 = 0xFFFFFFFF;
@@ -2310,9 +2310,9 @@ OverlapOutput PhysicX::SphereOverlap(const OverlapInput& in, float radius)
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	//filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어와 충돌하도록 설정합니다.
 	//filterData.data.word1 = in.layerMask; // 충돌할 레이어 마스크를 설정합니다. 
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerMask == ALL_LAYER) {
+	if (in.layerMask == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 	}
 	else {
@@ -2368,9 +2368,9 @@ OverlapOutput PhysicX::CapsuleOverlap(const OverlapInput& in, float radius, floa
 		| physx::PxQueryFlag::eNO_BLOCK
 		| physx::PxQueryFlag::eDISABLE_HARDCODED_FILTER;
 	
-	const unsigned int ALL_LAYER = ~0; // 모든 레이어를 의미하는 값
+	const unsigned int kAllLayer = ~0; // 모든 레이어를 의미하는 값
 
-	if (in.layerMask == ALL_LAYER) {
+	if (in.layerMask == kAllLayer) {
 		filterData.data.word0 = 0xFFFFFFFF; // 모든 레이어를 의미하는 값
 		//filterData.data.word1 = 0xFFFFFFFF;
 		//filterData.data.word2 = 0xFFFFFFFF;

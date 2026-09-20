@@ -48,7 +48,7 @@ namespace
         rough.name = "roughness";
         rough.value = 0.5f;
         material.properties.push_back(rough);
-        material.keywords.push_back("USE_NORMAL_MAP");
+        material.keywords.push_back("kUseNormalMap");
         return material;
     }
 

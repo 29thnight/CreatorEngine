@@ -122,7 +122,7 @@ void SceneViewWindow::RenderSceneViewWindow()
 // 최상위 오브젝트의 부모 월드 행렬은 항등이다.
 //
 // 부모를 지정하지 않고 만든 오브젝트(카메라·라이트·빈 오브젝트)는 m_parentIndex가
-// INVALID_INDEX(-1)로 남고 씬 루트의 children으로만 매달린다 — 씬 전체가 쓰는
+// kInvalidIndex(-1)로 남고 씬 루트의 children으로만 매달린다 — 씬 전체가 쓰는
 // 규약이다(Scene::AttachExistingEntity와 SceneManager 로더의 루트 children
 // 재구성이 같은 규약을 쓴다). 그런 오브젝트에 대해 FindIndex는 널을 돌려준다.
 //

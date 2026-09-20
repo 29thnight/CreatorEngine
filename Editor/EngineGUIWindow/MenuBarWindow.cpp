@@ -49,7 +49,7 @@
 #include "Core.Definition.h"
 #include <regex>
 
-constexpr int MAX_LAYER_SIZE = 32;
+constexpr int kMaxLayerSize = 32;
 
 void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
 {
@@ -180,7 +180,7 @@ MenuBarWindow::MenuBarWindow()
                         }
                         else
                         {
-                            ImGui::PushID(row * MAX_LAYER_SIZE + col);
+                            ImGui::PushID(row * kMaxLayerSize + col);
                             if (row <= col)
                             {
                                 bool value = collisionMatrix[row][col] != 0;

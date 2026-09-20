@@ -48,14 +48,14 @@ public:
 
 	math::quaternion rotate{};
 
-	static constexpr math::vector3 FORWARD = math::vector3::unit_z();
-	static constexpr math::vector3 RIGHT = math::vector3::unit_x();
-	static constexpr math::vector3 UP = math::vector3::unit_y();
+	static constexpr math::vector3 kForward = math::vector3::unit_z();
+	static constexpr math::vector3 kRight = math::vector3::unit_x();
+	static constexpr math::vector3 kUp = math::vector3::unit_y();
 
 	math::vector3 m_eyePosition{ 0.f, 1.f, -10.f };
-	math::vector3 m_forward{ FORWARD };
-	math::vector3 m_right{ RIGHT };
-	math::vector3 m_up{ UP };
+	math::vector3 m_forward{ kForward };
+	math::vector3 m_right{ kRight };
+	math::vector3 m_up{ kUp };
 
 	float m_nearPlane{ 0.1f };
 	float m_farPlane{ 500.f };

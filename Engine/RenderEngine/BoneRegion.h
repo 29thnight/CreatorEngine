@@ -5,7 +5,7 @@
 #include <string>
 
 // 애니메이터 팔레트의 고정 상한(legacy Skeleton::MAX_BONES 승계).
-inline constexpr std::uint32_t MAX_BONES{ 512 };
+inline constexpr std::uint32_t kMaxBones{ 512 };
 
 enum class BoneRegion
 {

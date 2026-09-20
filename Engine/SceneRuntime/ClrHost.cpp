@@ -532,7 +532,7 @@ namespace
 		if (nullptr == object) return {};
 
 		const Entity::Index parentIndex = object->GetParentIndex();
-		if (Entity::INVALID_INDEX == parentIndex) return {};
+		if (Entity::kInvalidIndex == parentIndex) return {};
 
 		Entity* parent = object->OwnerSceneFindIndex(parentIndex);
 		return (nullptr != parent) ? ScriptObjectRegistry::Get().Register(parent) : ScriptObjectHandle{};
@@ -1562,7 +1562,7 @@ namespace
 
 	int __stdcall Api_Input_GetKeyState(int key)
 	{
-		if (key < 0 || key >= KEYBOARD_COUNT) return static_cast<int>(KeyState::Idle);
+		if (key < 0 || key >= kKeyboardCount) return static_cast<int>(KeyState::Idle);
 		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
 		return static_cast<int>(InputManagement->m_keyboardState.GetKeyState(static_cast<size_t>(key)));
 	}

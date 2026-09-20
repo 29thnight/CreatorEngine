@@ -1,10 +1,10 @@
 #pragma once
 #include "Core.Definition.h"
 
-constexpr DWORD KEYBOARD_COUNT = 255;
-constexpr int MOUSE_COUNT = 3;
-constexpr int GAMEPAD_KEY_COUNT = 15;
-constexpr DWORD MAX_CONTROLLER = 4;
+constexpr DWORD kKeyboardCount = 255;
+constexpr int kMouseCount = 3;
+constexpr int kGamepadKeyCount = 15;
+constexpr DWORD kMaxController = 4;
 
 enum class InputType
 {
@@ -26,7 +26,7 @@ enum class KeyState
 //public:
 //	//다 idle상태로 만들기
 //	KeyboardState() {
-//		memset(keyboardkeyStates, 0, sizeof(KeyState) * KEYBOARD_COUNT);
+//		memset(keyboardkeyStates, 0, sizeof(KeyState) * kKeyboardCount);
 //	}
 //	~KeyboardState() {};
 //
@@ -34,7 +34,7 @@ enum class KeyState
 //	inline KeyState GetKeyState(size_t index) const { return keyboardkeyStates[index]; }
 //
 //private:
-//	KeyState keyboardkeyStates[KEYBOARD_COUNT];
+//	KeyState keyboardkeyStates[kKeyboardCount];
 //};
 
 class KeyboardState
@@ -63,7 +63,7 @@ public:
 	}
 
 private:
-	static constexpr size_t kBitCount = KEYBOARD_COUNT * 2;
+	static constexpr size_t kBitCount = kKeyboardCount * 2;
 	static constexpr size_t kByteCount = (kBitCount + 7) / 8;
 
 	uint8_t keyStateBits[kByteCount]{};
@@ -93,7 +93,7 @@ public:
 	}
 
 private:
-	static constexpr size_t BitCount = MOUSE_COUNT * 2;
+	static constexpr size_t BitCount = kMouseCount * 2;
 	static constexpr size_t ByteCount = (BitCount + 7) / 8;
 
 	uint8_t mouseBits[ByteCount]{};
@@ -108,7 +108,7 @@ public:
 
 	KeyState GetKeyState(int controllerIndex, size_t buttonIndex) const
 	{
-		size_t flatIndex = controllerIndex * GAMEPAD_KEY_COUNT + buttonIndex;
+		size_t flatIndex = controllerIndex * kGamepadKeyCount + buttonIndex;
 		size_t byteIndex = (flatIndex * 2) / 8;
 		size_t bitOffset = (flatIndex * 2) % 8;
 		uint8_t bits = padBits[byteIndex] >> bitOffset & 0b11;
@@ -117,7 +117,7 @@ public:
 
 	void SetKeyState(int controllerIndex, size_t buttonIndex, KeyState state)
 	{
-		size_t flatIndex = controllerIndex * GAMEPAD_KEY_COUNT + buttonIndex;
+		size_t flatIndex = controllerIndex * kGamepadKeyCount + buttonIndex;
 		size_t byteIndex = (flatIndex * 2) / 8;
 		size_t bitOffset = (flatIndex * 2) % 8;
 		padBits[byteIndex] &= ~(0b11 << bitOffset);
@@ -125,7 +125,7 @@ public:
 	}
 
 private:
-	static constexpr size_t TotalKeys = MAX_CONTROLLER * GAMEPAD_KEY_COUNT;
+	static constexpr size_t TotalKeys = kMaxController * kGamepadKeyCount;
 	static constexpr size_t BitCount = TotalKeys * 2;
 	static constexpr size_t ByteCount = (BitCount + 7) / 8;
 

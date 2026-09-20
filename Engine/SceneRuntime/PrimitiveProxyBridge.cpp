@@ -45,8 +45,8 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
 	Entity* meshOwner = component->GetOwner();
 	Entity::Index animatorOwnerIndex = meshOwner
 		? meshOwner->GetParentIndex()
-		: Entity::INVALID_INDEX;
-    while(animatorOwnerIndex != Entity::INVALID_INDEX)
+		: Entity::kInvalidIndex;
+    while(animatorOwnerIndex != Entity::kInvalidIndex)
     {
 		Entity* animatorOwner = meshOwner->OwnerSceneFindIndex(animatorOwnerIndex);
         if (animatorOwner)
@@ -61,7 +61,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
         }
 		animatorOwnerIndex = animatorOwner
 			? animatorOwner->GetParentIndex()
-			: Entity::INVALID_INDEX;
+			: Entity::kInvalidIndex;
 	}
 
     if (nullptr != m_Material)

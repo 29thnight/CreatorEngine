@@ -207,7 +207,7 @@ public:
 
 		uint32 LastFrameNameBytes = 0;	// 마지막 프레임의 이름 문자열 소비
 		uint32 PeakFrameNameBytes = 0;
-		uint32 NameCapacity = 0;		// EventData::ALLOCATOR_SIZE
+		uint32 NameCapacity = 0;		// EventData::kAllocatorSize
 
 		uint64 TotalDroppedEvents = 0;
 		uint64 TotalDroppedNames = 0;
@@ -218,7 +218,7 @@ public:
 	// 게임 스레드(Tick 호출자)가 쓰고 UI/CLI가 읽는다. 원자적 스냅샷이 아니라
 	// 표시용 근사치다 — 판정에 쓰는 값은 Tick 경계에서 읽을 것.
 	const Stats& GetStats() const { return m_Stats; }
-	void ResetStats() { m_Stats = Stats{}; m_Stats.EventCapacity = m_EventCapacity; m_Stats.NameCapacity = EventData::ALLOCATOR_SIZE; }
+	void ResetStats() { m_Stats = Stats{}; m_Stats.EventCapacity = m_EventCapacity; m_Stats.NameCapacity = EventData::kAllocatorSize; }
 
 	// QPC 주파수(틱/초). 틱을 시간으로 바꾸는 유일한 기준.
 	static uint64 GetTicksPerSecond();
@@ -226,10 +226,10 @@ public:
 	// Struct containing all sampling data of a single frame
 	struct EventData
 	{
-		static constexpr uint32 ALLOCATOR_SIZE = 1 << 14;
+		static constexpr uint32 kAllocatorSize = 1 << 14;
 
 		EventData()
-			: Allocator(ALLOCATOR_SIZE)
+			: Allocator(kAllocatorSize)
 		{
 		}
 
@@ -259,8 +259,8 @@ public:
 	// Thread-local storage to keep track of current depth and event stack
 	struct TLS
 	{
-		static constexpr int MAX_STACK_DEPTH = 32;
-		static constexpr int EVENT_BUFFER_SIZE = 1024;
+		static constexpr int kMaxStackDepth = 32;
+		static constexpr int kEventBufferSize = 1024;
 
 		template<typename T, uint32 N>
 		struct FixedStack
@@ -300,7 +300,7 @@ public:
 		};
 
 
-		FixedStack<uint32, MAX_STACK_DEPTH> EventStack;
+		FixedStack<uint32, kMaxStackDepth> EventStack;
 		uint32								ThreadIndex = 0;
 		bool								IsInitialized = false;
 

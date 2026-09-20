@@ -95,7 +95,7 @@ public:
 	void UpdateControllerVibration(float tick);
 	void SetControllerVibrationTime(DWORD Index, float time);
 	
-	math::vector4 vibrations[MAX_CONTROLLER]{};
+	math::vector4 vibrations[kMaxController]{};
 
 public:
 	ComPtr<IGameInput>				gameInput{};
@@ -128,8 +128,8 @@ private:
 	void ApplyCursorHidden(bool hidden);
 
 public:
-	GameInputGamepadState			m_GameInputPadState[MAX_CONTROLLER]{};
-	GamePadBitFlag					m_curPadState[MAX_CONTROLLER]{};
+	GameInputGamepadState			m_GameInputPadState[kMaxController]{};
+	GamePadBitFlag					m_curPadState[kMaxController]{};
 	//패드 최솟값
 	float							deadZone = 0.24f;
 	float							triggerdeadZone = 0.1f;
@@ -137,11 +137,11 @@ public:
 private:
 	IGameInputDevice*				device[4]{};
 	PadState						m_padState{};
-	math::vector2							m_controllerThumbL[MAX_CONTROLLER]{};
-	math::vector2							m_controllerThumbR[MAX_CONTROLLER]{};
-	float							m_controllerTriggerL[MAX_CONTROLLER]{}; // 왼쪽 트리거
-	float							m_controllerTriggerR[MAX_CONTROLLER]{}; // 오른쪽 트리거
-	float							m_controllerVibrationTime[MAX_CONTROLLER]{};
+	math::vector2							m_controllerThumbL[kMaxController]{};
+	math::vector2							m_controllerThumbR[kMaxController]{};
+	float							m_controllerTriggerL[kMaxController]{}; // 왼쪽 트리거
+	float							m_controllerTriggerR[kMaxController]{}; // 오른쪽 트리거
+	float							m_controllerVibrationTime[kMaxController]{};
 };
 
 inline static auto InputManagement = InputManager::GetInstance();

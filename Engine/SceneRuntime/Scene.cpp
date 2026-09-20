@@ -850,8 +850,8 @@ size_t Scene::CountHierarchyStoreMismatches() const
 
 void Scene::DrainAIUpdate()
 {
-	if (m_AIFuture.valid())
-		m_AIFuture.get();
+    auto job = std::exchange(m_AIJob, {});
+    job.wait();
 }
 
 void Scene::UnlinkFromParentChildren(Entity::Index index)
@@ -1457,7 +1457,7 @@ void Scene::AddRootEntity(std::string_view name)
     }
 
 	m_Entities[index] = std::move(ptr);
-	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), Entity::INVALID_INDEX,
+	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), Entity::kInvalidIndex,
 		Entity::kSceneRootIndex);
 	RecordTopologyCreated();
 	if (Transform* transform = m_Entities[index]->GetComponent<Transform>())
@@ -1602,7 +1602,7 @@ Entity* Scene::GetEntity(Entity::Index index)
 
 Entity* Scene::TryGetEntity(Entity::Index index)
 {
-    if (index == Entity::INVALID_INDEX || index < 0)
+    if (index == Entity::kInvalidIndex || index < 0)
     {
         return nullptr;
     }
@@ -1631,7 +1631,7 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
 
     // 루트부터 부모/씬 루트 children 에서 분리
 	UnlinkFromParentChildren(rootIndex);
-	root->SetParentIndex(Entity::INVALID_INDEX);
+	root->SetParentIndex(Entity::kInvalidIndex);
 
     for (size_t qi = 0; qi < queue.size(); ++qi)
     {
@@ -1710,7 +1710,7 @@ std::string Scene::MakeUniqueName(std::string_view base)
 // === C안 구현: 단일 객체 부착 ===
 Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::Index parentIndex)
 {
-    if (!go) return Entity::INVALID_INDEX;
+    if (!go) return Entity::kInvalidIndex;
 	Entity* object = go.get();
 
     // 이 씬 기준 유니크 네임 보장
@@ -1741,14 +1741,14 @@ Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::In
     // Transform 부모 세팅.
     //
     // ★ 루트 규약이 여기서 갈렸다 (SceneGraphRedesignPlan 트랙 E, 2026-08-20 통일).
-    // 예전 주석은 "INVALID_INDEX == 루트"였고 Entity::AddChild는 실제 인덱스(루트면 0)를
+    // 예전 주석은 "kInvalidIndex == 루트"였고 Entity::AddChild는 실제 인덱스(루트면 0)를
     // 넣었다. 둘 다 씬 루트의 children에는 들어가므로 "부모가 없다면서 루트 children에
     // 실려 있는" 상태가 정상처럼 보였고, 저작 자산에 두 표기가 236 대 31로 섞였다.
     // 그 어긋남이 순회가 서브트리를 통째로 빠뜨리는 결함의 뿌리다(뼈 61개).
     //
     // 이제 표기는 하나다: **부모의 children에 실린다 <=> 그 부모를 m_parentIndex로 가리킨다.**
     // 최상위 오브젝트도 예외가 아니고, 그 부모는 씬 루트(kSceneRootIndex)다.
-    // INVALID_INDEX는 "어느 씬에도 붙어 있지 않다"만 뜻한다(DDOL 이탈 중인 오브젝트).
+    // kInvalidIndex는 "어느 씬에도 붙어 있지 않다"만 뜻한다(DDOL 이탈 중인 오브젝트).
     // scene.hierarchycheck가 이 불변식을 잰다.
     if (Entity::IsValidIndex(parentIndex))
     {
@@ -1766,7 +1766,7 @@ Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::In
     else
     {
         // 씬 루트조차 없는 상태 — 붙일 곳이 없으므로 무부모로 둔다.
-		object->SetParentIndex(Entity::INVALID_INDEX);
+		object->SetParentIndex(Entity::kInvalidIndex);
     }
 
     // 씬 편입 통지(트랙 L1) — DDOL 재부착은 이미 초기화가 끝난 컴포넌트가
@@ -1800,8 +1800,8 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 	[[maybe_unused]] auto hierarchyTransaction = BeginHierarchyBulkBuild();
 	struct PendingRootRemap
 	{
-		Entity::Index newIndex{ Entity::INVALID_INDEX };
-		Entity::Index oldRootIndex{ Entity::INVALID_INDEX };
+		Entity::Index newIndex{ Entity::kInvalidIndex };
+		Entity::Index oldRootIndex{ Entity::kInvalidIndex };
 	};
 	std::vector<PendingRootRemap> pendingRoots;
 	pendingRoots.reserve(objects.size());
@@ -1814,7 +1814,7 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 		if (!transfer.entity) continue;
         Entity::Index newParent =
 			remap.contains(transfer.oldParentIndex) ? remap[transfer.oldParentIndex] :
-            Entity::INVALID_INDEX;
+            Entity::kInvalidIndex;
 
 		auto newIdx = AttachExistingEntity(std::move(transfer.entity), newParent);
 		remap[transfer.oldIndex] = newIdx;
@@ -1829,7 +1829,7 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 		Entity* entity = TryGetEntity(pending.newIndex);
 		if (!entity) continue;
 
-		Entity::Index newRoot = Entity::INVALID_INDEX;
+		Entity::Index newRoot = Entity::kInvalidIndex;
 		if (Entity::IsValidIndex(pending.oldRootIndex))
 		{
 			if (auto found = remap.find(pending.oldRootIndex); found != remap.end())
@@ -2556,9 +2556,9 @@ void Scene::DrainPendingLifecycle()
 
 void Scene::FixedUpdate(float deltaSecond)
 {
-    if (m_AIFuture.valid() && m_AIFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+    if (m_AIJob.valid() && m_AIJob.is_complete())
     {
-        m_AIFuture.get();
+        DrainAIUpdate();
     }
     PROFILE_CPU_BEGIN("AllUpdateWorldMatrix");
 	AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
@@ -2753,7 +2753,7 @@ void Scene::LateUpdate(float deltaSecond)
 void Scene::EndFramePass()
 {
 	// 비소유 AI snapshot이 Entity/Component 주소를 읽는 동안 파괴가 겹치지 않게
-	// 실제 구조 변경 전에 future를 회수한다.
+	// 실제 구조 변경 전에 AI 작업을 회수한다.
 	DrainAIUpdate();
     PROFILE_CPU_BEGIN("FlushPendingDestroy");
     // 이 자리가 프레임 끝의 파괴 지점이다 — 바로 아래에서 DestroyComponents와
@@ -2775,13 +2775,13 @@ void Scene::EndFramePass()
     DestroyEntities();
     PROFILE_CPU_END();
     //여기서 병렬처리
-    if(!m_AIFuture.valid())
+    if (!m_AIJob.valid() && !SceneManagers->IsDecommissioning())
     {
         float deltaSecond = Time->GetElapsedSeconds();
 		if (CameraComponent* camera = m_cameraSystem.GetPrimaryCamera())
 		{
 			const auto cameraFrustum = camera->TryGetFrustum();
-			m_AIFuture = std::async(std::launch::async,
+			m_AIJob = ce::get_job_scheduler().submit(
 				[deltaSecond, cameraFrustum]
 				{
 					AIManagers->InternalAIUpdate(deltaSecond, cameraFrustum);
@@ -3414,8 +3414,8 @@ void Scene::DestroyEntities()
     // 생존자의 인덱스는 이 루프가 끝난 뒤에도 절대 바뀌지 않는다.
     for (uint32_t index : deletedIndices)
     {
-        // 루트(0)는 절대 해제하지 않는다 — AllDestroyMark 등이 루트까지 마크해도
-        // 여기서 막힌다.
+        // Entity::Destroy가 씬 루트의 파괴 표시를 막는다. 슬롯 해제 경계에서도
+        // Scene과 수명을 함께하는 루트를 보호한다.
         if (0 == index) continue;
         if (index >= m_Entities.size()) continue;
 
@@ -3430,7 +3430,7 @@ void Scene::DestroyEntities()
                 static_cast<size_t>(childIdx) < m_Entities.size() &&
                 m_Entities[childIdx])
             {
-                m_Entities[childIdx]->SetParentIndex(Entity::INVALID_INDEX);
+                m_Entities[childIdx]->SetParentIndex(Entity::kInvalidIndex);
             }
         }
         obj->ClearChildren();
@@ -3583,7 +3583,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
 	std::unordered_set<Entity::Index>* visited, int depth,
 	TransformUpdateAccumulator* diagnostics)
 {
-    if (objIndex == Entity::INVALID_INDEX || objIndex < 0 ||
+    if (objIndex == Entity::kInvalidIndex || objIndex < 0 ||
         static_cast<size_t>(objIndex) >= m_Entities.size())
     {
         return;
@@ -3674,7 +3674,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
             boneComp->m_resolvedSerial = skeletonSerial;
         }
 
-        // ★ 범위 검사 — m_localTransforms는 크기 고정 배열(MAX_BONES=512,
+        // ★ 범위 검사 — m_localTransforms는 크기 고정 배열(kMaxBones=512,
         // Animator.h)이다. 위 m_resolvedFor 비교가 "다른 스켈레톤"은 이미
         // 걸러내지만, 캐시에 담긴 인덱스를 실제로 쓰기 전에 배열 경계를 한 번
         // 더 확인한다 — 인덱스가 파생값이라 저장하지 않기로 한 것과 같은 이유

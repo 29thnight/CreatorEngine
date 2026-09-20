@@ -10,7 +10,7 @@
 struct DetachedEntityTransfer
 {
 	std::unique_ptr<Entity> entity{};
-	Entity::Index oldIndex{ Entity::INVALID_INDEX };
-	Entity::Index oldParentIndex{ Entity::INVALID_INDEX };
-	Entity::Index oldRootIndex{ Entity::INVALID_INDEX };
+	Entity::Index oldIndex{ Entity::kInvalidIndex };
+	Entity::Index oldParentIndex{ Entity::kInvalidIndex };
+	Entity::Index oldRootIndex{ Entity::kInvalidIndex };
 };
