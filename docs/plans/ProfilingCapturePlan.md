@@ -211,9 +211,19 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 `PROFILE_CPU_BEGIN` 11곳 중 **2곳(`GameLogic` · `EndOfFrame`)은 9-15 이전부터 있던 제품 계측**이고,
 내가 새로 넣은 것은 12곳(`App.cpp` 3 · `EditorMain.cpp` 9)이다. 그 둘만 되살려 다시 빌드하니
 **27 · 388B** 로 한 바이트까지 9-15 와 일치했고, 임시 계측을 전부 복원하니 다시 **38 · 573B** 였다.
-→ **회귀는 없다.** 그리고 12곳을 넣었는데 38−27=11 만 늘었으므로, 새 계측 중 한 곳은 편집 모드에서
-돌지 않는다(재생 전용 경로). 이 왕복이 없었으면 25 를 보고 "계측 2곳이 사라졌다" 는 유령을 쫓았을 것이다
+→ **회귀는 없다.** 그리고 12곳을 넣었는데 38−27=11 만 늘었다 — 안 도는 한 곳은 `profile.frame` 으로
+지목했다: **`TickSimulationFrame`**(`EditorMain.cpp:665`)이다. 그 계측은 `IsPlayCommitted()` 가 거짓일 때의
+`return` **뒤**에 있어 편집 모드에서는 람다가 먼저 빠져나간다. 보존 프레임 [59,63) 네 개가 전부 이벤트 38 ·
+빠진 것 그 하나였다(§2.1 의 EngineFrameId 후보 표가 "편집 모드는 early return 이라 안 돈다" 고 적은 것이
+계측 축에서 그대로 재현됐다). 이 왕복이 없었으면 25 를 보고 "계측 2곳이 사라졌다" 는 유령을 쫓았을 것이다
 ([[gate-measures-stale-binary]]: 걷은 뒤에는 반드시 재빌드하고, 되돌린 뒤에도 재빌드한다).
+
+**`profile.frame` 을 밖에서 부르는 절차**(라이브 서버 없이): `wait 60` · `profile.frame` · `quit` 를
+CRLF 스크립트로 적고 `--commandlet-script` 로 넘기되, **출력은 `Start-Process -RedirectStandardOutput`**
+으로 받는다 — GUI 앱이라 셸 파이프로는 0 바이트다. `wait` 없이 부르면 보존 범위가 [1,2) 뿐이라
+부팅 첫 프레임(557ms)만 잡히고, 그 프레임에는 `CLIPump`(그 안에서 명령이 도는 중이라 아직 안 닫혔다)와
+`PublishRenderFrame`(아직 오지 않았다)이 빠져 있어 **관측 시점이 결과를 바꾼다**
+([[stimulus-changes-the-layout-it-probes]]).
 
 **`cli_registry.golden.tsv` 는 이미 최신이었다.** `verify-cli-registry-golden.ps1` 종료 코드 0 ·
 골든 133 = 현재 133 · "한 글자도 다르지 않다". `profile.frame`(golden 91행)은 9-17 갱신본에
