@@ -529,6 +529,21 @@ FodyWeavers.xsd
 # 출처: Tools/regression/fixtures/imgui-ini/README.md
 !Tools/regression/fixtures/imgui-ini/*.ini
 
+# 워커 계측 게이트의 fixture 씬은 예외다 (PHASE 14 P2).
+#
+# 위의 전면 `*.creator` 때문에 애니메이션이 도는 씬이 전부 추적 밖이었다.
+# 그래서 `Invoke-ProfilingValidation` 은 워커 스레드가 실제로 마커를 찍는지
+# 판정할 수단이 없었고, **워커 계측이 통째로 죽어도 초록이었다.**
+#
+# 게임 콘텐츠를 실으려는 것이 아니다. 이 씬은 모델도 텍스처도 참조하지 않는다 —
+# 빈 Animator 컴포넌트 여덟 개뿐이다(10 KB). AnimationJob 은 애니메이터마다 잡을
+# 하나씩 제출하고 계측은 그 잡의 첫 줄에 있으므로, 스켈레톤이 없어도 워커는
+# 자극된다. 제품 저작 경로(scene.new · scene.populate · component.add ·
+# scene.save)로 만들었고 손으로 쓰지 않았다.
+#
+# 출처: Tools/regression/fixtures/profiling-workers/README.md
+!Tools/regression/fixtures/profiling-workers/*.creator
+
 /Build/
 docs/dist/
 GEMINI.md

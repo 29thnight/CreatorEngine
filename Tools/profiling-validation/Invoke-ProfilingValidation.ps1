@@ -25,7 +25,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("Stats", "Build")]
+    [ValidateSet("Stats", "Workers", "Build")]
     [string]$Action = "Stats",
 
     [string]$Exe,
@@ -123,6 +123,103 @@ function Invoke-EngineScript {
 #   pwsh Tools/regression/verify-profile-core.ps1
 # 코어만 cl 로 링크해 Debug·Release 각각 초 단위로 돌고, 변이 셋으로 이빨까지
 # 증명한다. 이 파일에 남은 축은 **라이브 기준선**(-Action Stats) 하나다.
+
+# 워커 스레드의 구간 계측을 잰다.
+#
+# Stats 축과 나누는 이유는 **자극이 다르기** 때문이다. Stats 는 기본 씬의 교란
+# 없는 기준선을 재고, 이 축은 씬을 갈아 끼워 애니메이션 잡을 돌린다. 한 축에
+# 섞으면 기준선 숫자가 fixture 에 딸려 움직인다.
+#
+# ★ 이 축이 서기 전에는 워커 계측이 통째로 죽어도 아무 게이트도 붉지 않았다.
+#   자극이 없으면 등록된 워커의 칸이 빈 채로 초록이기 때문이다.
+function Invoke-Workers {
+    $fixture = Join-Path $repoRoot "Tools\regression\fixtures\profiling-workers\ProfilingWorkerFixture.creator"
+
+    # fixture 가 없으면 **통과시키지 않는다.** 추적 밖 fixture 를 가진 게이트는
+    # 이 기계에서만 돌고 clean checkout 에서는 조용히 빈다.
+    if (-not (Test-Path $fixture)) {
+        Write-Host ""
+        Write-Host "  실패           fixture 가 없다: $fixture" -ForegroundColor Red
+        Write-Host "                 (.gitignore 의 profiling-workers 예외를 확인할 것)"
+        return 1
+    }
+
+    $scenePath = ($fixture -replace '\\', '/')
+    $result = Invoke-EngineScript -Label "profile-workers" -Commands @(
+        "scene.switch $scenePath"
+        "wait $WarmupFrames"
+        "profile.frame"
+        "profile.stats"
+        "quit"
+    )
+
+    $body = $result.Combined -split "`n"
+    $statsLine = $body | Where-Object { $_ -match '"command"\s*:\s*"profile\.stats"' } | Select-Object -First 1
+    $frameLine = $body | Where-Object { $_ -match '"command"\s*:\s*"profile\.frame"' } | Select-Object -First 1
+    if (-not $statsLine -or -not $frameLine) {
+        Write-Host "profile.stats/profile.frame 응답을 찾지 못했다. 전체 출력: $($result.OutFile)" -ForegroundColor Red
+        return 1
+    }
+
+    try {
+        $stats = $statsLine.Trim() | ConvertFrom-Json
+        $frame = $frameLine.Trim() | ConvertFrom-Json
+    }
+    catch {
+        Write-Host "응답을 JSON 으로 읽지 못했다: $_" -ForegroundColor Red
+        return 1
+    }
+
+    $d = $stats.data
+    $workers = @($d.threads | Where-Object { $_.name -like '`[Worker *' })
+    $busy = @($workers | Where-Object { $_.capturedEvents -gt 0 })
+
+    # 최근 프레임에서 워커 스레드에 붙은 AnimationJob 을 센다. 건수만 보면
+    # "워커가 뭔가를 찍었다" 까지이고, 이름까지 봐야 **그 잡이** 잡혔다가 된다.
+    $jobEvents = 0
+    foreach ($f in $frame.data.frames) {
+        foreach ($t in $f.threads) {
+            if ($t.name -notlike '`[Worker *') { continue }
+            foreach ($e in $t.events) {
+                if ($e.name -eq 'AnimationJob') { $jobEvents++ }
+            }
+        }
+    }
+
+    Write-Host ""
+    Write-Host "[profile.workers] 애니메이션 잡 자극 (fixture 씬)"
+    Write-Host ("  fixture         {0}" -f (Split-Path $fixture -Leaf))
+    Write-Host ("  등록 워커       {0}개 / 이벤트를 찍은 워커 {1}개" -f $workers.Count, $busy.Count)
+    foreach ($t in ($workers | Sort-Object -Property name)) {
+        Write-Host ("    {0,-24} 이벤트 {1}" -f $t.name, $t.capturedEvents)
+    }
+    Write-Host ("  최근 {0}프레임의 AnimationJob  {1}건" -f $frame.data.frames.Count, $jobEvents)
+
+    # ── 단정 ────────────────────────────────────────────────────────────────
+    #
+    # ⚠ 워커 **전부**가 찍기를 요구하지 않는다. 잡을 어느 워커가 집는지는
+    #   스케줄러 사정이고, 부하에 따라 한둘은 비는 것이 정상이다. 계측의 생사와
+    #   그날의 분배를 가르려면 "여럿이 찍었다" 까지가 맞다.
+    $failures = New-Object System.Collections.Generic.List[string]
+    if ($stats.status -ne 'succeeded') { $failures.Add("status=$($stats.status)") }
+    if (-not $d.captureFrozen)         { $failures.Add("얼린 캡처가 없다") }
+    if ($d.malformedScopes -ne 0)      { $failures.Add("불균형 스코프 $($d.malformedScopes)") }
+    if ($workers.Count -le 0)          { $failures.Add("워커가 하나도 등록되지 않았다 - 수명 훅이 끊겼다") }
+    if ($busy.Count -lt 4)             { $failures.Add("이벤트를 찍은 워커가 $($busy.Count)개뿐이다 - 워커 계측이 끊겼다") }
+    if ($jobEvents -le 0)              { $failures.Add("워커 스레드에 AnimationJob 이 하나도 없다") }
+    if ($result.ExitCode -ne 0)        { $failures.Add("종료 코드 $($result.ExitCode)") }
+
+    Write-Host ""
+    Write-Host "── 판정 ─────────────────────────────"
+    if ($failures.Count -eq 0) {
+        Write-Host "  결과           통과" -ForegroundColor Green
+        return 0
+    }
+    foreach ($f in $failures) { Write-Host "  실패           $f" -ForegroundColor Red }
+    Write-Host ("  전체 출력      {0}" -f $result.OutFile)
+    Write-Host "  결과           실패" -ForegroundColor Red
+    return 1
+}
 
 function Invoke-Stats {
     # profile.frame 을 먼저 부르는 이유는 그 명령이 캡처를 **얼리기** 때문이다.
@@ -248,6 +345,7 @@ function Invoke-Stats {
 }
 
 switch ($Action) {
-    "Build" { Invoke-Build; exit 0 }
-    "Stats" { exit (Invoke-Stats) }
+    "Build"   { Invoke-Build; exit 0 }
+    "Stats"   { exit (Invoke-Stats) }
+    "Workers" { exit (Invoke-Workers) }
 }
