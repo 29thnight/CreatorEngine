@@ -78,6 +78,40 @@
 // 콘솔 명령마다 스택에 만들어지는 검증용이라 상시 상태를 들 수 없고, 그렇다고
 // 별도 공개 클래스를 두면 "DX12 렌더러 = EnhancedSceneRenderer"라는 로드맵의
 // 명칭 체계가 흐려진다(실제로 그렇게 만들었다가 물렸다).
+namespace EnhancedSceneRenderer
+{
+    // PHASE 14 P2 — 받아 둔 수명 훅. 익명 네임스페이스에 두지 않는다: 유니티
+    // 빌드의 격리 단위는 파일이 아니라 blob 이라, 같은 blob 에 든 다른 파일의
+    // 같은 이름과 조용히 한 덩어리가 된다. 여기 이름은 링커가 본다.
+    //
+    // 함수 지역 static 인 이유는 정적 초기화 순서다 — 훅을 거는 쪽(부트스트랩)이
+    // 이 번역 단위의 정적 초기화보다 먼저 돌 수 있다.
+    RenderThreadHooks& MutableRenderThreadHooks()
+    {
+        static RenderThreadHooks hooks{};
+        return hooks;
+    }
+
+    // 훅은 begin/end 두 개로 갈려 오지만, 부르는 자리에서는 다시 한 문장으로
+    // 묶는다 — 프레임 본문이 예외로 빠져나가도 닫혀야 한다. 실제로 TickLive 는
+    // try/catch 로 감싸인 자리다.
+    struct RenderThreadFrameScope
+    {
+        RenderThreadFrameScope()
+        {
+            const RenderThreadHooks& hooks = MutableRenderThreadHooks();
+            if (hooks.OnFrameBegin) hooks.OnFrameBegin();
+        }
+        ~RenderThreadFrameScope()
+        {
+            const RenderThreadHooks& hooks = MutableRenderThreadHooks();
+            if (hooks.OnFrameEnd) hooks.OnFrameEnd();
+        }
+        RenderThreadFrameScope(const RenderThreadFrameScope&) = delete;
+        RenderThreadFrameScope& operator=(const RenderThreadFrameScope&) = delete;
+    };
+}
+
 namespace
 {
     // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
@@ -4156,6 +4190,14 @@ namespace
                 renderQueueWake.notify_all();
                 if (FAILED(comResult)) return;
 
+                // PHASE 14 P2 — 이 스레드를 관측 도구에 알린다. COM 초기화가
+                // 실패하면 위에서 돌아가므로, 등록과 해제는 여기부터 짝이다.
+                {
+                    const EnhancedSceneRenderer::RenderThreadHooks& hooks =
+                        EnhancedSceneRenderer::MutableRenderThreadHooks();
+                    if (hooks.OnStart) hooks.OnStart();
+                }
+
                 for (;;)
                 {
                     FrameSubmission submission;
@@ -4184,26 +4226,31 @@ namespace
                     }
 
                     activeDeltaBatch = std::move(submission.deltas);
-                    try
                     {
-                        EnhancedSceneRenderer::TickLive(submission.frame);
+                        // 프레임 하나를 소비하는 구간. try/catch 바깥에 세워
+                        // 예외로 빠져나가도 닫히게 한다.
+                        EnhancedSceneRenderer::RenderThreadFrameScope frameScope;
+                        try
+                        {
+                            EnhancedSceneRenderer::TickLive(submission.frame);
+                        }
+                        catch (const std::exception& exception)
+                        {
+                            std::lock_guard<std::mutex> stateLock(renderStateMutex);
+                            lastError = std::string("RenderThread frame exception: ") +
+                                exception.what();
+                            ++frameFailures;
+                            Debug::PrintLog(spdlog::level::err, lastError);
+                        }
+                        catch (...)
+                        {
+                            std::lock_guard<std::mutex> stateLock(renderStateMutex);
+                            lastError = "RenderThread frame unknown exception";
+                            ++frameFailures;
+                            Debug::PrintLog(spdlog::level::err, lastError);
+                        }
+                        activeDeltaBatch.clear();
                     }
-                    catch (const std::exception& exception)
-                    {
-                        std::lock_guard<std::mutex> stateLock(renderStateMutex);
-                        lastError = std::string("RenderThread frame exception: ") +
-                            exception.what();
-                        ++frameFailures;
-                        Debug::PrintLog(spdlog::level::err, lastError);
-                    }
-                    catch (...)
-                    {
-                        std::lock_guard<std::mutex> stateLock(renderStateMutex);
-                        lastError = "RenderThread frame unknown exception";
-                        ++frameFailures;
-                        Debug::PrintLog(spdlog::level::err, lastError);
-                    }
-                    activeDeltaBatch.clear();
 
                     {
                         std::lock_guard<std::mutex> queueLock(renderQueueMutex);
@@ -4228,6 +4275,13 @@ namespace
                     renderThreadRunning = false;
                 }
                 renderQueueWake.notify_all();
+                // 스레드가 죽기 전에 끊는다. 이것이 없으면 수집기가 죽은
+                // 저장소를 가리킨 채 남는다.
+                {
+                    const EnhancedSceneRenderer::RenderThreadHooks& hooks =
+                        EnhancedSceneRenderer::MutableRenderThreadHooks();
+                    if (hooks.OnStop) hooks.OnStop();
+                }
                 CoUninitialize();
             });
         }
@@ -4778,6 +4832,11 @@ bool EnhancedSceneRenderer::PublishLiveFrame(EnhancedLiveFramePacket frame)
     submission.frame = std::move(frame);
     submission.deltas = ProxyCommandQueue->CapturePending();
     return state.PublishFrame(std::move(submission));
+}
+
+void EnhancedSceneRenderer::SetRenderThreadHooks(const RenderThreadHooks& hooks)
+{
+    MutableRenderThreadHooks() = hooks;
 }
 
 void EnhancedSceneRenderer::StopLiveRenderThread()

@@ -125,8 +125,13 @@ function Invoke-EngineScript {
 # 증명한다. 이 파일에 남은 축은 **라이브 기준선**(-Action Stats) 하나다.
 
 function Invoke-Stats {
+    # profile.frame 을 먼저 부르는 이유는 그 명령이 캡처를 **얼리기** 때문이다.
+    # 얼린 캡처가 있어야 profile.stats 가 스레드마다 몇 건을 찍었는지 셀 수 있고,
+    # 그 계수라야 "등록만 되고 아무것도 안 찍는 스레드" 를 잡는다. 재는 값 자체는
+    # 이미 다 쌓인 뒤라 달라지지 않는다.
     $result = Invoke-EngineScript -Label "profile-stats" -Commands @(
         "wait $WarmupFrames"
+        "profile.frame"
         "profile.stats"
         "quit"
     )
@@ -156,7 +161,7 @@ function Invoke-Stats {
     $d = $json.data
 
     Write-Host ""
-    Write-Host "[profile.stats] 라이브 기준선 (교란 없음)"
+    Write-Host "[profile.stats] 라이브 기준선 (측정 뒤 캡처를 얼려 읽는다)"
     Write-Host ("  상태            {0} / 보존 프레임 {1}개 (최신 {2})" -f $d.state, $d.retainedFrames, $d.frameEnd)
     Write-Host ("  이벤트/프레임   마지막 {0} / 최대 {1}" -f $d.lastFrameEvents, $d.peakFrameEvents)
     Write-Host ("  등록 마커       {0}" -f $d.registeredMarkers)
@@ -166,7 +171,8 @@ function Invoke-Stats {
     Write-Host ("  불균형 스코프   {0}" -f $d.malformedScopes)
     Write-Host ("  스레드          {0}개" -f $d.threadCount)
     foreach ($t in $d.threads) {
-        Write-Host ("    [{0}] {1,-24} tid={2}" -f $t.index, $t.name, $t.threadId)
+        Write-Host ("    [{0}] {1,-24} tid={2,-7} 이벤트 {3}" -f
+            $t.index, $t.name, $t.threadId, $t.capturedEvents)
     }
 
     # ── 단정 ────────────────────────────────────────────────────────────────
@@ -191,6 +197,41 @@ function Invoke-Stats {
     if ($d.freeChunks -le 0)          { $failures.Add("청크 풀이 고갈됐다 - 수집이 막히고 있다") }
     if (-not ($d.threads | Where-Object { $_.name -eq '[GameThread]' })) {
         $failures.Add("[GameThread] 가 캡처에 없다")
+    }
+
+    # ★ 등록 표는 프레임 표가 아니다. 스레드가 목록에 있다는 것과 그 스레드가
+    #   무언가를 찍었다는 것은 다른 말이고, 실제로 워커 8 개와
+    #   PresentationThread 가 "등록은 됐는데 이벤트 0" 인 채로 있던 적이 있다.
+    #   그래서 **찍은 건수**를 단정한다.
+    #
+    # ⚠ 이벤트 건수를 단정하는 스레드는 **이 워밍업 안에서 반드시 도는 것**으로
+    #   좁힌다. 그러지 않으면 단정이 재는 것은 계측의 생사가 아니라 그날의 부하다.
+    #
+    #   - 워커: 애니메이션 잡을 자극하려면 애니메이터가 있는 씬이 필요한데
+    #     Dynamic_CPP/Assets/Scenes 는 통째로 .gitignore 라 게이트가 쓸 fixture 가
+    #     없다. 씬을 전환해 재면 워커마다 20~40 건이 잡힌다(9-20 실측).
+    #   - RenderThread: Debug 는 라이브 발행 246 중 **4 개만 소비한다**(나머지는
+    #     latest-wins 로 접힌다). 245 프레임을 돌려도 캡처에 남는 것은 1 건이고
+    #     64 프레임 워밍업에서는 0 이다 — 여기서 건수를 단정하면 계측이 멀쩡해도
+    #     붉어진다. 등록 여부까지만 본다.
+    #
+    #   즉 **이 게이트는 워커·RenderThread 의 구간 계측에 눈멀어 있다.**
+    #   계획서 §0.5.8 에 그렇게 적어 두었다.
+    if (-not $d.captureFrozen) {
+        $failures.Add("얼린 캡처가 없다 - profile.frame 이 캡처를 공개하지 못했다")
+    }
+    foreach ($name in @('[GameThread]', '[PresentationThread]')) {
+        $thread = $d.threads | Where-Object { $_.name -eq $name }
+        if (-not $thread) {
+            $failures.Add("$name 가 스레드 목록에 없다")
+        } elseif ($thread.capturedEvents -le 0) {
+            $failures.Add("$name 가 등록만 되고 이벤트를 하나도 안 찍었다")
+        }
+    }
+    foreach ($name in @('[RenderThread]', '[Worker 1]')) {
+        if (-not ($d.threads | Where-Object { $_.name -eq $name })) {
+            $failures.Add("$name 가 스레드 목록에 없다 - 수명 훅이 끊겼다")
+        }
     }
     if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
 

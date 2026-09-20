@@ -230,15 +230,59 @@ P1 과 P2 를 한 덩어리로 지었다. 재활용하지 않기로 한 이상(�
 `Thread 5` 로 바뀐다" 로 나타난다. 훅의 값은 **귀속이 아니라 라벨과 등록 시점**
 이다 — 이것을 "워커가 안 잡힌다" 의 증거로 쓰면 안 된다.
 
-**아직 하지 않은 것 — RenderThread.** 전용 렌더 스레드는
-`EnhancedSceneRenderer.cpp:4143` 의 `std::thread` 이고, 거기에 등록을 넣으려면
-**RenderEngine → EngineDiagnostics 간선을 새로 만들어야 한다**(RenderEngine 은
-지금 `Utility_Framework` 하나만 참조한다). PHASE 4 가 간선을 154 → 101 로 줄인
-방향과 반대이므로 include 경로부터 얹지 않았다. 붙인다면 `thread_pool` 에서 쓴
-것과 같은 역전이 맞다 — 렌더러가 수명 훅을 내놓고 `EngineBootstrap` 이
-프로파일러를 꽂는다. 구간 마커까지 원하면 훅이 begin/end 두 쌍이 되므로, 어디를
-잴지 타임라인을 보고 정하는 P3 의 몫으로 남긴다. `AnimationJob` 외의 잡 구간에
-마커가 없는 것도 같은 이유다.
+**RenderThread 도 섰다 — 간선을 늘리지 않고.** 전용 렌더 스레드는
+`EnhancedSceneRenderer.cpp` 의 `std::thread` 인데, 거기에서 프로파일러를 직접
+부르면 **RenderEngine → EngineDiagnostics 간선이 새로 생긴다**(이 모듈이 참조하는
+엔진 라이브러리는 `Utility_Framework` 하나뿐이다). PHASE 4 가 간선을 154 → 101 로
+줄인 방향과 반대이므로 `thread_pool` 과 같은 역전을 썼다 — 렌더러는
+`RenderThreadHooks`(시작·종료·프레임 begin/end 네 개의 함수 포인터)를 받아 두고
+부르기만 하고, 꽂는 일은 `EngineBootstrap` 이 한다.
+
+**훅이 begin/end 로 갈리는 자리에는 얇은 표면을 냈다.** `ProfileScope.h` 에
+`profile_scope_begin/end` 를 더했다. 여기서 `profiler()` 를 직접 부르면
+CE_SHIPPING 약속이 그 파일 밖으로 새기 때문이다(§0.5.8 결함 3 이 그 약속을 한 번
+깨뜨렸다). 짝은 받는 쪽에서 다시 묶는다 — 렌더러는 `RenderThreadFrameScope` 라는
+RAII 로 감싸 `TickLive` 가 예외로 빠져나가도 닫히게 했다.
+
+**PresentationThread 는 등록만 되어 있었다.** 워커와 똑같은 모양으로 표에는 뜨는데
+이벤트가 0 이었다. `PresentFrame` 을 스코프로 감쌌다 — 잠금 대기까지 함께 재는
+자리라야 게임 스레드의 파괴 구간과 겹쳐 멈춘 시간이 보인다.
+
+**실측(애니메이터 있는 씬, 245 프레임).** 스레드 11, 마커 41, 불균형 0, 누락 0.
+
+| 스레드 | 찍은 이벤트 |
+|---|---|
+| `[GameThread]` | 6,322 |
+| `[PresentationThread]` | 241 |
+| `[Worker 1..8]` | 21~39 (합 241) |
+| `[RenderThread]` | 1 |
+
+★ **`[RenderThread]` 가 1 인 것은 계측이 아니라 Debug 의 렌더 소비가 그렇기
+때문이다.** 종료 장부가 `publish 245 / consume 4 / latest-wins 241 / overflow 241`
+이라고 적는다 — 발행 245 중 **4 개만 소비**되고 나머지는 접힌다. 그 4 개 중
+녹화 시작 뒤의 것이 1 개다.
+
+**`profile.stats` 가 스레드마다 몇 건을 찍었는지 낸다(`capturedEvents`).**
+`profile.frame` 은 최근 8 프레임만 내므로 드물게 도는 스레드는 그 창에 영영 안
+걸린다 — 실제로 RenderThread 를 붙이고도 프레임 표에서 못 찾아 헛짚었다. 이 계수는
+얼린 캡처 전체를 보므로 창과 무관하다. 캡처가 없을 때의 0 과 갈리도록
+`captureFrozen` 을 함께 낸다.
+
+**게이트가 이빨을 얻었다 — 다만 두 축에는 아직 눈멀어 있다.**
+`-Action Stats` 가 `[GameThread]` 와 `[PresentationThread]` 의 **건수**를 단정한다.
+변이 둘로 증명했다: 렌더 스레드 훅을 끊으면 "`[RenderThread]` 가 스레드 목록에
+없다", `PresentFrame` 스코프를 걷으면 "등록만 되고 이벤트를 하나도 안 찍었다".
+
+⚠ 건수를 단정하지 **못하는** 두 축이 있고, 이유가 다르다.
+
+- **워커** — 애니메이션 잡을 자극하려면 애니메이터가 있는 씬이 필요한데
+  `Dynamic_CPP/Assets/Scenes` 가 통째로 `.gitignore` 라 게이트가 쓸 fixture 가
+  없다. 추적되는 애니메이션 fixture 를 세우는 것이 선행이다.
+- **RenderThread** — 위의 `consume 4` 때문에 64 프레임 워밍업에서는 0 이다.
+  건수를 단정하면 계측이 멀쩡해도 붉어진다. 등록 여부까지만 본다.
+
+**아직 하지 않은 것.** `AnimationJob` 외의 잡 구간에는 마커가 없다. 어디를 잴지는
+타임라인을 보고 정하는 P3 의 몫이다. 위의 두 눈먼 축도 같이 닫아야 한다.
 
 ### 0.5.7 2026-09-20 정찰 최신화 — 전제 다섯이 또 바뀌었다
 
@@ -1423,9 +1467,9 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - [ ] Editor/Development에서 Record/Pause/Clear 가능
 - [ ] 최소 600프레임 또는 정한 메모리 예산만큼 rolling capture — **4프레임 링 폐기**(§2.2)
 - [ ] 멀티스레드 CPU Timeline과 선택 구간 Hierarchy
-- [ ] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
-      (§0.5.8 — 워커 8 과 PresentationThread 는 섰고 애니메이션 워커 시간이 실제로
-      잡힌다. **RenderThread 만 남았다**: 계층 간선을 새로 내야 해서 P3 로 미뤘다)
+- [x] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
+      (§0.5.8 — 셋 다 이벤트가 귀속된다. 회귀 감시는 아직 `[GameThread]`·
+      `[PresentationThread]` 두 축에만 걸려 있다)
 - [ ] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑
 - [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 engine_frame_id에 정렬
 - [ ] overflow·누락·malformed scope·profiler overhead 표시

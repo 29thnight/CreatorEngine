@@ -440,6 +440,10 @@ void Editor::EditorMain::PresentationThreadMain()
 		// UI는 살아 있는 씬 객체를 읽을 수 있다. GT의 파괴/교체 구간과만
 		// 상호 배제하고 프레임 진행 자체는 서로 기다리지 않는다.
 		{
+			// 등록만으로는 이 스레드가 캡처에 나오지 않는다 — 프레임은
+			// 이벤트가 있는 스레드만 싣는다. 잠금 대기까지 함께 재는 자리라야
+			// GT 의 파괴 구간과 겹쳐 멈춘 시간이 보인다.
+			ce::profile_scope _profile{ ce::marker<"PresentFrame">() };
 			std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
 			PresentFrame();
 		}

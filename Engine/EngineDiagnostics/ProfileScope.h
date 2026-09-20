@@ -37,6 +37,9 @@ namespace ce
 		profile_scope& operator=(const profile_scope&) = delete;
 	};
 
+	inline void profile_scope_begin(marker_id) {}
+	inline void profile_scope_end() {}
+
 #else
 
 	class profile_scope
@@ -68,6 +71,17 @@ namespace ce
 	private:
 		profiler_service* m_service;
 	};
+
+	// ★ 여는 일과 닫는 일이 **다른 함수로 갈리는 경계**에서만 쓴다 — 수명
+	//   훅처럼 콜백이 두 개로 오는 자리다. 그 자리에서는 RAII 를 쓸 수 없지만,
+	//   그렇다고 `profiler()` 를 직접 부르면 CE_SHIPPING 약속이 이 파일 밖으로
+	//   샌다 — 구성으로 계측을 끄는 계약은 한 곳에서만 지켜져야 한다. 그래서
+	//   껍데기 판을 함께 둔다.
+	//
+	//   짝은 부르는 쪽이 맞춰야 하므로, 훅을 받는 층에서 곧바로 RAII 로 다시
+	//   묶어라 — 실제로 렌더 스레드는 그렇게 쓴다.
+	inline void profile_scope_begin(marker_id id) { profiler().begin_scope(id); }
+	inline void profile_scope_end() { profiler().end_scope(); }
 
 #endif
 }

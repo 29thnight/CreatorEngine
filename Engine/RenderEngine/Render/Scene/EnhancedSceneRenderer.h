@@ -609,6 +609,28 @@ namespace EnhancedSceneRenderer
     void StopLiveRenderThread();
     EnhancedRenderThreadStats GetLiveRenderThreadStats();
 
+    /// RenderThread 수명·프레임 구간 훅(PHASE 14 P2).
+    ///
+    /// 관측 도구(프로파일러)가 이 스레드의 시작·종료와 프레임 소비 구간을
+    /// 알아야 하는데, RenderEngine 이 그 도구를 알면 계층 간선이 하나 늘어난다
+    /// (지금 이 모듈이 참조하는 엔진 라이브러리는 Utility_Framework 하나다).
+    /// 그래서 thread_pool::worker_hooks 와 같은 역전을 쓴다 — **함수를 받아 두고
+    /// 부르기만 한다.**
+    ///
+    /// ★ StartLiveRenderThread **전에** 걸어야 한다. 스레드는 첫 발행에서
+    ///   만들어지고, 그때 이미 걸려 있는 훅만 그 스레드의 시작을 본다.
+    ///
+    /// OnFrameBegin/OnFrameEnd 는 한 프레임 소비를 감싸며, 짝은 렌더러가
+    /// RAII 로 묶어 보장한다(예외로 빠져나가도 닫힌다).
+    struct RenderThreadHooks
+    {
+        void (*OnStart)() = nullptr;
+        void (*OnStop)() = nullptr;
+        void (*OnFrameBegin)() = nullptr;
+        void (*OnFrameEnd)() = nullptr;
+    };
+    void SetRenderThreadHooks(const RenderThreadHooks& hooks);
+
     /// 진단/오프라인 검증 전용. 호출 시점까지 발행된 frame packet과 proxy delta를
     /// RenderThread가 모두 소비할 때까지 기다린다. 일반 프레임 경로에서는 호출하지 않는다.
     bool WaitForLiveRenderThreadIdle(uint32_t timeoutMilliseconds);

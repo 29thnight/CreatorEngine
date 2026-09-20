@@ -696,6 +696,30 @@ namespace ConsoleCmd
         // ★ 얼린 캡처가 아니라 **지금 등록된** 스레드를 낸다. 캡처는 pause()
         //   뒤에만 있으므로, 녹화 중 기준선을 재는 이 명령이 캡처를 보면
         //   스레드가 언제나 빈 배열이 된다(게이트가 그렇게 잡았다).
+        //
+        // ★ 등록 표는 **프레임 표가 아니다.** 스레드가 여기 떠 있어도 그 스레드가
+        //   마커를 하나도 안 찍었으면 캡처의 어느 프레임에도 나오지 않는다
+        //   (프레임은 이벤트가 있는 스레드만 싣는다). 실제로 워커 10 개가 이 표에
+        //   뜨는데 프레임 이벤트는 그대로였던 적이 있다. 그래서 얼린 캡처가 있으면
+        //   **스레드마다 몇 건을 찍었는지**를 같이 낸다 — 그것이 "이 스레드가
+        //   관측되고 있다" 의 증거다.
+        //
+        //   `profile.frame` 은 최근 8 프레임만 내므로, 드물게 도는 스레드
+        //   (Debug 의 RenderThread 는 246 프레임 중 4 번 소비한다)는 그 창에
+        //   영영 안 걸린다. 이 계수는 창과 무관하게 캡처 전체를 본다.
+        ce::capture_session_ptr capturedForThreads = ce::profiler().capture();
+        std::unordered_map<std::uint32_t, std::uint64_t> capturedPerThread;
+        if (capturedForThreads)
+        {
+            for (const ce::frame_record& frame : capturedForThreads->frames())
+            {
+                for (const ce::profile_event& event : frame.events)
+                {
+                    ++capturedPerThread[event.thread_slot];
+                }
+            }
+        }
+
         auto threads = CommandData::Array();
         {
             for (const ce::thread_info& thread : ce::profiler().threads())
@@ -704,9 +728,15 @@ namespace ConsoleCmd
                 entry.Set("index", CommandData::Int(thread.slot));
                 entry.Set("name", CommandData::String(thread.name));
                 entry.Set("threadId", CommandData::Int(thread.os_thread_id));
+                const auto found = capturedPerThread.find(thread.slot);
+                entry.Set("capturedEvents", CommandData::Int(
+                    (found != capturedPerThread.end()) ? found->second : 0));
                 threads.Append(std::move(entry));
             }
         }
+        // 캡처가 없으면 위 계수는 전부 0 이다 — "0 건을 찍었다" 와 갈리도록
+        // 얼린 캡처가 있는지를 따로 낸다.
+        data.Set("captureFrozen", CommandData::Bool(bool(capturedForThreads)));
         data.Set("threadCount", CommandData::Int(summary.thread_count));
         data.Set("threads", std::move(threads));
         return Ok({}, std::move(data));

@@ -2,6 +2,7 @@
 #include "Camera.h"
 #include "ProfileScope.h"
 #include "ThreadPool.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "DumpHandler.h"
@@ -96,6 +97,18 @@ namespace EngineBootstrap
                 // 죽은 저장소를 가리킨 채 남는다(옛 코어의 UAF 자리).
                 ce::profiler().unregister_thread();
             } });
+
+        // 전용 RenderThread 도 같은 역전으로 붙인다 — RenderEngine 은 관측 도구를
+        // 모르고 함수를 받아 두기만 한다. 첫 라이브 발행에서 스레드가 만들어지므로
+        // 여기서 걸면 충분히 이르다.
+        //
+        // ★ 등록만으로는 캡처에 아무것도 안 나온다. 프레임은 **이벤트가 있는
+        //   스레드만** 싣기 때문에, 구간 훅까지 있어야 이 스레드가 보인다.
+        EnhancedSceneRenderer::SetRenderThreadHooks({
+            []() { ce::profiler().register_thread("[RenderThread]"); },
+            []() { ce::profiler().unregister_thread(); },
+            []() { ce::profile_scope_begin(ce::marker<"RenderThreadFrame">()); },
+            []() { ce::profile_scope_end(); } });
 
 		if ((config.prepareRuntimeContent ||
 			config.paths.HasRuntimeOwnershipCapability()) &&
