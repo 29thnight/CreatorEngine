@@ -155,8 +155,106 @@ $mutations = @(
         File   = 'ProfileService.cpp'
         Old    = "`t`tthread_stream* stream = t_streams[m_serviceSlot];`r`n`t`tif (!stream)"
         New    = "`t`tif (m_state.load(std::memory_order_relaxed) != recorder_state::recording)`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}`r`n`t`tthread_stream* stream = t_streams[m_serviceSlot];`r`n`t`tif (!stream)"
-        Expect = 'state-change/inner-depth'
+        # pause 가 열린 구간을 잘라 짝을 예약하게 되면서(§0.5.16) 안쪽 깊이는
+        # 그 예약이 되살린다. 바깥쪽이 여전히 밀리므로 이빨은 그대로다.
+        Expect = 'state-change/outer-depth'
         Why    = '닫는 쪽을 얼릴 수 있으면 스택에 칸이 남아 그 뒤의 깊이가 전부 밀린다'
+    },
+
+    # ── 얼린 캡처의 꼬리 ──────────────────────────────────────────
+    @{
+        # pause 가 열린 구간을 자르지 않던 때로 되돌린다.
+        Name   = 'pause-keeps-open-scope'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`tif (freeze != 0)"
+        New    = "`t`tif (false)"
+        # pause 를 부른 스레드는 pause 가 직접 자르므로 이 가지를 안 탄다.
+        # 계속 적는 워커만 여기를 지난다.
+        Expect = 'pause-worker/present'
+        Why    = 'pause 에는 다음 프레임이 없어 여기서 남기지 않으면 그 구간은 영영 사라진다'
+    },
+    @{
+        # 잘랐다고 표시하지 않는다. 진짜 종료가 같은 구간을 한 번 더 적는다.
+        Name   = 'pause-truncate-unmarked'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`t`tscope.emitted = true;"
+        New    = ""
+        Expect = 'pause-open/once'
+        Why    = '표시가 없으면 잘린 구간이 진짜 종료에서 한 번 더 기록된다'
+    },
+    @{
+        # 잘린 구간의 자리를 비운다(옛 개수 예약 모델).
+        Name   = 'truncate-pops-stack'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`t`tif (scope.emitted) continue;`r`n`t`t`tif (scope.generation != generation) continue;"
+        New    = "`t`t`tif (scope.emitted) continue;`r`n`t`t`tif (scope.generation != generation) continue;`r`n`t`t`t--m_depth;`r`n`t`t`t++m_skippedDepth;"
+        Expect = 'resume-pair/closed-on-time'
+        Why    = '자리를 비우면 다시 녹화한 뒤의 새 구간의 종료가 그 예약을 먼저 먹는다'
+    },
+    @{
+        # 스코프에 찍은 세대를 보지 않는다.
+        Name   = 'scope-ignores-generation'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`tif (scope.generation != m_generation.load(std::memory_order_acquire))"
+        New    = "`t`tif (false)"
+        Expect = 'clear-open/dropped'
+        Why    = '세대가 청크에만 있으면 Clear 전에 열린 구간이 새 캡처로 돌아온다'
+    },
+    @{
+        # Clear 가 봉인을 청하지 않는다. 쓰던 청크가 그대로 이어진다.
+        Name   = 'clear-without-seal'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`t`t`tentry.stream->request_seal();"
+        New    = ""
+        Expect = 'clear-new/kept'
+        Why    = '쓰던 청크를 끊지 않으면 Clear 뒤에 적은 것까지 옛 세대로 버려진다'
+    },
+    @{
+        # 자르는 도중의 재진입이 ack 를 먼저 올린다.
+        Name   = 'ack-before-seal'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`tif (m_inHonor)`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}"
+        New    = ""
+        Expect = 'ack-delivery/sealed'
+        Why    = '아직 청크에 없는 것을 두고 수집기가 다 봉인됐다고 읽는다'
+    },
+    @{
+        # 얼린 캡처가 언제나 온전하다고 말한다.
+        Name   = 'freeze-always-complete'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tcapture_session_ptr frozen = m_ring.freeze(threads, 0 == unacked, unacked);"
+        New    = "`t`tcapture_session_ptr frozen = m_ring.freeze(threads, true, 0);"
+        Expect = 'incomplete/flag'
+        Why    = '세는 것과 판정하는 것은 다르다 - 미응답을 덮으면 빠진 꼬리가 조용해 보인다'
+    },
+    @{
+        # 얼리기 전에 남은 프레임을 닫지 않는다.
+        Name   = 'pause-drops-pending'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tif (m_ring.has_pending_events())"
+        New    = "`t`tif (false)"
+        Expect = 'pause-open/present'
+        Why    = 'freeze() 는 닫힌 프레임만 보므로 마지막 프레임을 닫지 않으면 꼬리가 통째로 빠진다'
+    },
+
+    # ── 세대와 늦은 CPU 귀속 ──────────────────────────────────────
+    @{
+        # Clear 가 세대를 올리지 않는다.
+        Name   = 'clear-keeps-generation'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tconst std::uint64_t next = m_generation.fetch_add(1, std::memory_order_acq_rel) + 1;"
+        New    = "`t`tconst std::uint64_t next = m_generation.load(std::memory_order_acquire);"
+        Expect = 'clear-generation/dropped'
+        Why    = '세대가 그대로면 Clear 전에 열린 청크가 새 녹화로 재유입된다'
+    },
+    @{
+        # 늦게 온 CPU 구간을 수집한 프레임에 그냥 담는다.
+        Name   = 'late-cpu-to-collecting-frame'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`t`t`t`tif (place_by_tick(value)) continue;`r`n"
+        New    = ""
+        Expect = 'late-cpu/frame'
+        Why    = '수집한 프레임에 담으면 잠든 워커의 구간이 깨어난 프레임의 일처럼 보인다'
     },
 
     # ── 동시성 경계: 봉인은 주인만 한다 ───────────────────────────
@@ -184,7 +282,9 @@ $mutations = @(
         File   = 'ProfileCapture.cpp'
         Old    = "`t`t`tif (sealed_list->late_ingest)"
         New    = "`t`t`tif (false)"
-        Expect = 'gpu-lane/'
+        # 늦은 CPU 귀속이 생기면서(§0.5.16) 이 구간은 **끝난 시각** 규칙을 타고
+        # 엉뚱한 칸에 앉는다. GPU 는 제출 프레임이 제 자리라 여전히 붉다.
+        Expect = 'gpu-deferred/placed'
         Why    = '수집한 프레임에 담으면 GPU 일이 제 프레임보다 뒤에 그려진다'
     },
     @{

@@ -10,9 +10,13 @@ namespace ce
 	//-------------------------------------------------------------------------
 
 	capture_session::capture_session(std::vector<frame_record> frames,
-	                                 std::vector<thread_info>  threads)
+	                                 std::vector<thread_info>  threads,
+	                                 bool                      complete,
+	                                 std::uint32_t             unacked_streams)
 		: m_frames(std::move(frames))
 		, m_threads(std::move(threads))
+		, m_complete(complete)
+		, m_unackedStreams(unacked_streams)
 	{
 		for (const frame_record& frame : m_frames)
 		{
@@ -56,12 +60,25 @@ namespace ce
 		m_deferredSpans.clear();
 		m_lateSpansPlaced = 0;
 		m_lateSpansDropped = 0;
+		m_staleChunksDropped = 0;
+		m_lateEventsPlaced = 0;
+		m_lateEventsDropped = 0;
 	}
 
-	void capture_ring::ingest(const event_chunk* sealed_list)
+	void capture_ring::ingest(const event_chunk* sealed_list, std::uint64_t generation,
+	                          profile_tick frame_begin_tick)
 	{
 		while (sealed_list)
 		{
+			// ★ 지운 세대의 것은 받지 않는다. 잠든 워커가 Clear **전에** 적은
+			//   것을 들고 깨어나면, 그것은 이미 없어진 녹화의 자료다.
+			if (sealed_list->generation != generation)
+			{
+				m_staleChunksDropped += sealed_list->count;
+				sealed_list = sealed_list->next;
+				continue;
+			}
+
 			if (sealed_list->late_ingest)
 			{
 				// ★ 늦게 온 것은 **수집한 프레임**이 아니라 제 프레임 칸으로
@@ -76,13 +93,47 @@ namespace ce
 
 			// 청크 안의 순서는 writer 가 지켰다. 여기서는 그대로 잇는다 —
 			// 수집 시점에 정렬하지 않는 것이 이 설계의 요점이다.
-			m_pending.events.insert(
-				m_pending.events.end(),
-				sealed_list->events,
-				sealed_list->events + sealed_list->count);
+			//
+			// ★ 다만 **지금 프레임보다 앞서 끝난** 이벤트는 그대로 두면 안 된다.
+			//   writer 가 자기 일정으로 봉인하므로 CPU 구간도 늦게 올 수 있고,
+			//   늦은 것을 여기 담으면 프레임 귀속이 그만큼 틀어진다(§0.5.15).
+			for (std::uint32_t i = 0; i < sealed_list->count; ++i)
+			{
+				const profile_event& value = sealed_list->events[i];
+				if (0 != frame_begin_tick && value.tick_end < frame_begin_tick)
+				{
+					if (place_by_tick(value)) continue;
+				}
+				m_pending.events.push_back(value);
+			}
 
 			sealed_list = sealed_list->next;
 		}
+	}
+
+	bool capture_ring::place_by_tick(const profile_event& value)
+	{
+		// 뒤에서부터 찾는다. 늦게 오는 것은 대개 가장 최근 몇 프레임의 것이다.
+		for (std::size_t i = m_frames.size(); i > 0; --i)
+		{
+			frame_record& frame = m_frames[i - 1];
+
+			// 이 칸보다 **뒤에** 끝난 것이면 더 오래된 칸을 봐도 소용없다.
+			// 지금 프레임에 두는 것이 맞다.
+			if (value.tick_end >= frame.tick_end) return false;
+			if (value.tick_end < frame.tick_begin) continue;
+
+			const std::size_t before = frame.memory_bytes();
+			frame.events.push_back(value);
+			m_memoryBytes += frame.memory_bytes() - before;
+			++m_lateEventsPlaced;
+			return true;
+		}
+
+		// 링의 가장 오래된 칸보다도 앞선다. 지금 프레임에 담으면 귀속이
+		// 틀어지므로 담지 않고 **센다** — 조용히 섞으면 틀린 수치가 정상처럼 보인다.
+		++m_lateEventsDropped;
+		return true;
 	}
 
 	void capture_ring::place_late_span(const profile_event& value)
@@ -193,12 +244,14 @@ namespace ce
 		m_frames.erase(m_frames.begin(), m_frames.begin() + static_cast<std::ptrdiff_t>(drop));
 	}
 
-	capture_session_ptr capture_ring::freeze(std::span<const thread_info> threads) const
+	capture_session_ptr capture_ring::freeze(std::span<const thread_info> threads,
+	                                         bool complete, std::uint32_t unacked_streams) const
 	{
 		// 복사해서 넘긴다. 이 복사가 reader 를 recorder 에서 떼어 내는 값이고,
 		// 얼린 뒤 엔진이 계속 돌아도 손에 든 자료가 변하지 않는 이유다.
 		std::vector<frame_record> frames(m_frames.begin(), m_frames.end());
 		std::vector<thread_info>  thread_list(threads.begin(), threads.end());
-		return std::make_shared<const capture_session>(std::move(frames), std::move(thread_list));
+		return std::make_shared<const capture_session>(
+			std::move(frames), std::move(thread_list), complete, unacked_streams);
 	}
 }

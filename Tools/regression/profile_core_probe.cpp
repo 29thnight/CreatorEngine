@@ -947,8 +947,13 @@ namespace
 		{
 			for (std::uint32_t frame = first; frame <= last; ++frame)
 			{
-				ce::profile_scope scope{ service, ce::marker<"FollowTick">() };
-				busy_ticks(1);
+				// ★ 스코프를 **닫고** 프레임을 넘긴다. 닫기 전에 넘기면 그 구간은
+				//   다음 프레임의 것이 되고, 그러면 이 자극은 "프레임마다 한 틱"
+				//   이 아니라 "한 칸씩 밀린 틱" 을 만든다.
+				{
+					ce::profile_scope scope{ service, ce::marker<"FollowTick">() };
+					busy_ticks(1);
+				}
 				service.publish_frame(frame);
 			}
 		};
@@ -1588,6 +1593,503 @@ void test_concurrent_publish()
 	service.shutdown();
 }
 
+
+// ── 감사가 재현한 넷 ─────────────────────────────────────────────────
+//
+// 외부 감사가 사본에서 재현한 것들이다. 자극을 먼저 세우고 고친다 — 재현되지
+// 않는 지적은 고쳤는지 알 수 없다.
+
+// 이벤트가 담긴 프레임 칸의 번호. 없으면 0xFFFFFFFF.
+std::uint32_t frame_holding(const ce::capture_session& capture, ce::marker_id id)
+{
+	for (const ce::frame_record& frame : capture.frames())
+	{
+		for (const ce::profile_event& event : frame.events)
+		{
+			if (event.marker == id) return frame.engine_frame;
+		}
+	}
+	return 0xFFFFFFFFu;
+}
+
+const ce::profile_event* find_event(const ce::capture_session& capture, ce::marker_id id)
+{
+	for (const ce::frame_record& frame : capture.frames())
+	{
+		for (const ce::profile_event& event : frame.events)
+		{
+			if (event.marker == id) return &event;
+		}
+	}
+	return nullptr;
+}
+
+// ① Pause 시점에 열려 있던 구간은 잘린 채로 남아야 한다.
+//
+// ★ 프레임 경계에서 열린 구간을 닫지 않는 것은 **의도**다(프레임을 넘는 구간).
+//   하지만 pause 에는 다음 프레임이 없다 — 얼린 캡처가 그 구간의 마지막 기회다.
+void test_pause_truncates_open_scope()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	service.begin_scope(ce::marker<"OpenAtPause">());
+	service.publish_frame(1);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "pause-open/capture — 얼린 캡처가 있다");
+	if (!capture) { service.end_scope(); service.shutdown(); return; }
+
+	const ce::profile_event* event =
+		find_event(*capture, ce::marker<"OpenAtPause">());
+	check(event != nullptr, "pause-open/present — 열려 있던 구간이 남는다");
+	if (event)
+	{
+		check(ce::has_flag(event->flags, ce::event_flags::truncated_end),
+		      "pause-open/truncated — 끝을 못 봤다고 표시된다");
+	}
+
+	// 짝을 맞춘다. 여기서 또 기록되면 같은 구간이 두 번 남는다.
+	service.end_scope();
+	service.record(2);
+	service.publish_frame(2);
+	service.pause();
+
+	const ce::capture_session_ptr second = service.capture();
+	if (second)
+	{
+		std::size_t total = 0;
+		for (const ce::frame_record& frame : second->frames())
+		{
+			for (const ce::profile_event& e : frame.events)
+			{
+				if (e.marker == ce::marker<"OpenAtPause">()) ++total;
+			}
+		}
+		check_eq<std::size_t>(total, 1, "pause-open/once — 같은 구간이 두 번 남지 않는다");
+	}
+
+	service.shutdown();
+}
+
+// ② 늦게 온 CPU 구간은 **끝난 시각이 속한 프레임**에 담겨야 한다.
+//
+// ★ writer 가 자기 일정으로 봉인하게 되면서 생긴 노출이다(§0.5.15). 워커가
+//   한 번 적고 잠들면 그 청크는 워커가 깨어날 때까지 오지 않는다.
+void test_late_cpu_attribution()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	std::atomic<int> step{ 0 };
+	std::thread worker([&service, &step]()
+	{
+		service.register_thread("LateWorker");
+		{ ce::profile_scope scope{ service, ce::marker<"LateCpu">() }; }
+		step.store(1, std::memory_order_release);
+
+		// 주인이 프레임을 여러 번 닫는 동안 **아무것도 적지 않는다.**
+		while (step.load(std::memory_order_acquire) < 2) { std::this_thread::yield(); }
+
+		// 이제 한 번 더 적어 옛 청크가 봉인되게 한다.
+		{ ce::profile_scope scope{ service, ce::marker<"LateCpuTail">() }; }
+		step.store(3, std::memory_order_release);
+
+		while (step.load(std::memory_order_acquire) < 4) { std::this_thread::yield(); }
+		service.unregister_thread();
+	});
+
+	while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+	service.publish_frame(1);
+	service.publish_frame(2);
+	service.publish_frame(3);
+	step.store(2, std::memory_order_release);
+	while (step.load(std::memory_order_acquire) < 3) { std::this_thread::yield(); }
+	service.publish_frame(4);
+	step.store(4, std::memory_order_release);
+	worker.join();
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "late-cpu/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	check_eq(frame_holding(*capture, ce::marker<"LateCpu">()), std::uint32_t{ 1 },
+	         "late-cpu/frame — 끝난 시각이 속한 프레임 칸에 담긴다");
+
+	service.shutdown();
+}
+
+// ③ Clear 이전 세대의 청크가 새 링으로 재유입되면 안 된다.
+//
+// ★ **녹화를 멈추지 않고** 지운다. 이것이 세대 검사가 필요한 유일한 자리다 —
+//   멈췄다 다시 켜면 새 프레임이 전부 Clear 뒤에 열리므로 시각만 봐도 옛
+//   이벤트가 갈 칸이 없다. 하지만 녹화 중에 지우면 **지금 열려 있는 프레임의
+//   시작 시각은 Clear 보다 앞**이고, 그 칸이 옛 이벤트를 그대로 받아 준다.
+void test_clear_generation()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+	service.publish_frame(1);
+
+	std::atomic<int> step{ 0 };
+	std::thread worker([&service, &step]()
+	{
+		service.register_thread("ClearWorker");
+
+		while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+		{ ce::profile_scope scope{ service, ce::marker<"PreClear">() }; }
+		step.store(2, std::memory_order_release);
+
+		// 여기서 잔다. 이 청크는 아직 봉인되지 않았다.
+		while (step.load(std::memory_order_acquire) < 3) { std::this_thread::yield(); }
+
+		// 깨어나 한 번 더 적으면 옛 청크가 봉인돼 수집기로 간다.
+		{ ce::profile_scope scope{ service, ce::marker<"PostClear">() }; }
+		step.store(4, std::memory_order_release);
+
+		while (step.load(std::memory_order_acquire) < 5) { std::this_thread::yield(); }
+		service.unregister_thread();
+	});
+
+	step.store(1, std::memory_order_release);
+	while (step.load(std::memory_order_acquire) < 2) { std::this_thread::yield(); }
+
+	// 녹화를 멈추지 않고 지운다.
+	service.clear();
+
+	step.store(3, std::memory_order_release);
+	while (step.load(std::memory_order_acquire) < 4) { std::this_thread::yield(); }
+	step.store(5, std::memory_order_release);
+	worker.join();
+
+	service.publish_frame(10);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "clear-generation/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	check_eq(count_marker(*capture, ce::marker<"PreClear">()), std::size_t{ 0 },
+	         "clear-generation/dropped — 지운 세대의 이벤트가 돌아오지 않는다");
+	check(count_marker(*capture, ce::marker<"PostClear">()) > 0,
+	      "clear-generation/kept — 새 세대의 이벤트는 들어온다");
+
+	service.shutdown();
+}
+
+// ④ pause 의 얼림 요청은 **남의 스레드**에서도 열린 구간을 잘라야 한다.
+//
+// ★ ①은 pause 를 부른 스레드 자신의 스트림만 자극한다. 그쪽은 pause 가 직접
+//   자르므로, honor_seal_request 의 얼림 가지를 걷어도 ①은 초록이다 —
+//   두 층이 같은 절을 막으면 단정이 눈먼다. 그래서 계속 적고 있는 워커를
+//   따로 세운다.
+void test_pause_truncates_worker_scope()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	std::atomic<int> step{ 0 };
+	std::thread worker([&service, &step]()
+	{
+		service.register_thread("BusyWorker");
+
+		// 바깥 구간을 열어 둔 채 계속 적는다. write() 마다 얼림 요청을 본다.
+		service.begin_scope(ce::marker<"WorkerOuter">());
+		step.store(1, std::memory_order_release);
+
+		while (step.load(std::memory_order_acquire) < 2)
+		{
+			ce::profile_scope inner{ service, ce::marker<"WorkerTick">() };
+			busy_ticks(1);
+		}
+
+		service.end_scope();
+		step.store(3, std::memory_order_release);
+
+		while (step.load(std::memory_order_acquire) < 4) { std::this_thread::yield(); }
+		service.unregister_thread();
+	});
+
+	while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+	service.publish_frame(1);
+	service.pause();
+
+	const ce::live_summary summary = service.summary();
+	check_eq(summary.pause_unacked_streams, std::uint32_t{ 0 },
+	         "pause-worker/acked — 계속 적는 워커는 얼림에 응답한다");
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "pause-worker/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		const ce::profile_event* event =
+			find_event(*capture, ce::marker<"WorkerOuter">());
+		check(event != nullptr, "pause-worker/present — 워커의 열린 구간이 남는다");
+		if (event)
+		{
+			check(ce::has_flag(event->flags, ce::event_flags::truncated_end),
+			      "pause-worker/truncated — 끝을 못 봤다고 표시된다");
+		}
+	}
+
+	step.store(2, std::memory_order_release);
+	while (step.load(std::memory_order_acquire) < 3) { std::this_thread::yield(); }
+	step.store(4, std::memory_order_release);
+	worker.join();
+	service.shutdown();
+}
+
+
+
+// ── 경계 넷 (3차 감사) ───────────────────────────────────────────────
+//
+// 세대와 짝 맞춤이 **청크 단위**로만 서 있어서 생긴 것들이다. 세대는 청크에
+// 찍히는데 스코프는 청크보다 오래 살고, 짝 예약은 개수만 세는데 잘린 구간의
+// 짝은 가장 **바깥**이라 다음에 오는 종료와 순서가 뒤집힌다.
+
+// ⑤ Clear 뒤에 적은 것은 새 캡처에 남아야 한다.
+void test_clear_keeps_new_events()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	{ ce::profile_scope scope{ service, ce::marker<"BeforeClear">() }; }
+	service.clear();
+	{ ce::profile_scope scope{ service, ce::marker<"AfterClear">() }; }
+
+	service.publish_frame(2);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "clear-new/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		check_eq(count_marker(*capture, ce::marker<"AfterClear">()), std::size_t{ 1 },
+		         "clear-new/kept — Clear 뒤에 적은 것은 남는다");
+		check_eq(count_marker(*capture, ce::marker<"BeforeClear">()), std::size_t{ 0 },
+		         "clear-new/dropped — Clear 앞의 것은 남지 않는다");
+	}
+
+	service.shutdown();
+}
+
+// ⑥ Clear **전에 열린** 스코프는 나중에 닫혀도 새 캡처에 들어오면 안 된다.
+//
+// ★ 세대를 청크에만 찍으면 이 구간을 못 막는다. 스코프는 청크보다 오래 산다.
+void test_clear_drops_scope_opened_before()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	service.begin_scope(ce::marker<"OpenedBeforeClear">());
+	service.clear();
+	service.end_scope();
+
+	service.publish_frame(2);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "clear-open/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		check_eq(count_marker(*capture, ce::marker<"OpenedBeforeClear">()), std::size_t{ 0 },
+		         "clear-open/dropped — 지운 세대에서 연 구간은 돌아오지 않는다");
+	}
+
+	service.shutdown();
+}
+
+// ⑦ 다시 녹화한 뒤의 스코프는 **제 짝**으로 닫혀야 한다.
+//
+// ★ 잘린 구간의 짝을 개수로만 예약하면, 그 예약을 **새 스코프의 종료**가 먼저
+//   먹는다. 그러면 새 구간은 열린 채 남아 다음 pause 에서 잘린 것으로 기록된다.
+void test_scope_pairing_after_resume()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	service.begin_scope(ce::marker<"OuterAcrossPause">());
+	service.publish_frame(1);
+	service.pause();
+
+	service.record(2);
+	{
+		ce::profile_scope scope{ service, ce::marker<"AfterResume">() };
+		busy_ticks(1);
+	}
+
+	// 닫힌 시각을 여기서 못 박는다. 짝이 어긋나면 이 구간은 **아래의**
+	// end_scope 까지 열린 채 끌려가므로 끝 시각이 이 표식을 넘는다.
+	const ce::profile_tick closed = ce::profiler_service::now();
+	busy_ticks(400);
+
+	service.end_scope();   // 잘린 바깥 구간의 진짜 짝
+
+	service.publish_frame(2);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "resume-pair/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		const ce::profile_event* event =
+			find_event(*capture, ce::marker<"AfterResume">());
+		check(event != nullptr, "resume-pair/present — 다시 녹화한 뒤의 구간이 남는다");
+		if (event)
+		{
+			check(!ce::has_flag(event->flags, ce::event_flags::truncated_end),
+			      "resume-pair/complete — 제대로 닫힌 구간이 잘린 것으로 기록되지 않는다");
+			check(event->tick_end <= closed,
+			      "resume-pair/closed-on-time — 제 짝이 닫았지 남의 종료가 끌고 가지 않았다");
+		}
+	}
+
+	service.shutdown();
+}
+
+// ⑧ 얼림에 응답했다면 그 스트림의 것이 **이미 전달돼 있어야** 한다.
+//
+// ★ ack 는 "봉인까지 끝났다" 는 뜻이어야 한다. 자르는 도중 write() 가 다시
+//   들어와 ack 를 먼저 올리면, 아직 청크에 없는 것을 두고 수집기가 거둬 간다.
+//   한 번으로는 잡히지 않는 경합이라 여러 번 돌린다.
+void test_pause_ack_implies_delivery()
+{
+	for (int round = 0; round < 24; ++round)
+	{
+		ce::profiler_service service;
+		service.initialize({});
+		service.register_thread("Main");
+		service.record(1);
+
+		std::atomic<int> step{ 0 };
+		std::thread worker([&service, &step]()
+		{
+			service.register_thread("AckWorker");
+			service.begin_scope(ce::marker<"AckOuter">());
+			step.store(1, std::memory_order_release);
+
+			while (step.load(std::memory_order_acquire) < 2)
+			{
+				ce::profile_scope inner{ service, ce::marker<"AckTick">() };
+				busy_ticks(1);
+			}
+
+			service.end_scope();
+			step.store(3, std::memory_order_release);
+			while (step.load(std::memory_order_acquire) < 4) { std::this_thread::yield(); }
+			service.unregister_thread();
+		});
+
+		while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+		service.publish_frame(1);
+		service.pause();
+
+		const ce::live_summary summary = service.summary();
+		const ce::capture_session_ptr capture = service.capture();
+		const bool delivered =
+			(capture != nullptr) &&
+			(count_marker(*capture, ce::marker<"AckOuter">()) == 1);
+
+		if (0 == summary.pause_unacked_streams && !delivered)
+		{
+			check(false, "ack-delivery/sealed — 응답했으면 그 구간이 이미 전달돼 있다");
+		}
+
+		step.store(2, std::memory_order_release);
+		while (step.load(std::memory_order_acquire) < 3) { std::this_thread::yield(); }
+		step.store(4, std::memory_order_release);
+		worker.join();
+		service.shutdown();
+	}
+
+	check(true, "ack-delivery/rounds — 24 회 모두 응답과 전달이 함께 간다");
+}
+
+
+// ⑨ 얼린 캡처는 **온전한지 아닌지**를 스스로 말해야 한다.
+//
+// ★ 잠든 워커는 봉인 요청에 응답하지 못한다. 그 꼬리가 캡처에 없는데도
+//   frozen 으로 조용히 끝나면, 읽는 쪽은 "그 스레드가 조용했다" 와 "못 받았다"
+//   를 구분할 수 없다 — 빈 집합을 성공으로 읽는 바로 그 양식이다.
+void test_capture_reports_incompleteness()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	std::atomic<int> step{ 0 };
+	std::thread worker([&service, &step]()
+	{
+		service.register_thread("SleepingWorker");
+		{ ce::profile_scope scope{ service, ce::marker<"SleepTick">() }; }
+		step.store(1, std::memory_order_release);
+
+		// 여기서 잔다. 봉인 요청이 와도 들어줄 자리를 지나지 않는다.
+		while (step.load(std::memory_order_acquire) < 2) { std::this_thread::yield(); }
+		service.unregister_thread();
+	});
+
+	while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+	service.publish_frame(1);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "incomplete/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		check(!capture->complete(),
+		      "incomplete/flag — 못 받은 꼬리가 있으면 온전하지 않다고 말한다");
+		check(capture->unacked_streams() > 0,
+		      "incomplete/count — 몇 스트림을 못 받았는지 센다");
+	}
+
+	step.store(2, std::memory_order_release);
+	worker.join();
+	service.shutdown();
+}
+
+// ⑩ 다 응답했으면 온전하다고 말해야 한다. ⑨ 의 반대쪽이 없으면 "언제나
+//    온전하지 않다" 도 초록으로 지나간다.
+void test_capture_reports_completeness()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	{ ce::profile_scope scope{ service, ce::marker<"LoneTick">() }; }
+	service.publish_frame(1);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "complete/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		check(capture->complete(), "complete/flag — 다 응답했으면 온전하다");
+		check_eq(capture->unacked_streams(), std::uint32_t{ 0 },
+		         "complete/count — 못 받은 스트림이 없다");
+	}
+
+	service.shutdown();
+}
+
 int main()
 {
 	test_marker_identity();
@@ -1615,6 +2117,16 @@ int main()
 	test_gpu_lane_deferred();
 	test_gpu_lane_dropped();
 	test_concurrent_publish();
+	test_pause_truncates_open_scope();
+	test_late_cpu_attribution();
+	test_clear_generation();
+	test_pause_truncates_worker_scope();
+	test_clear_keeps_new_events();
+	test_clear_drops_scope_opened_before();
+	test_scope_pairing_after_resume();
+	test_pause_ack_implies_delivery();
+	test_capture_reports_incompleteness();
+	test_capture_reports_completeness();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

@@ -157,21 +157,40 @@ namespace ce
 		}
 
 		m_writer->reset(m_info.slot, m_sequence);
+		m_writer->generation = m_generation.load(std::memory_order_acquire);
 		return true;
 	}
 
 	void thread_stream::honor_seal_request()
 	{
+		// ★ 자르는 동안 write() 가 다시 여기로 들어온다. 그 안쪽 호출이 먼저
+		//   ack 를 올리면, 아직 청크에 들어가지도 않은 잘린 구간을 두고 수집기가
+		//   "다 봉인됐다" 로 읽고 거둬 가 버린다 — 실측에서 pause-worker/present
+		//   가 간헐로 붉었던 이유다. ack 는 **다 끝난 뒤** 한 번만 올린다.
+		if (m_inHonor)
+		{
+			return;
+		}
+
 		const std::uint64_t requested = m_sealRequest.load(std::memory_order_acquire);
 		if (requested == m_sealAck.load(std::memory_order_relaxed))
 		{
 			return;
 		}
 
-		// 열려 있는 스코프는 건드리지 않는다. 그것은 아직 청크에 없고,
-		// 프레임을 넘는 구간을 잃지 않는다는 규약 그대로다.
+		m_inHonor = true;
+
+		// ★ 얼림 요청이면 열린 구간을 그 시각에서 잘라 **남긴다.** 평범한
+		//   프레임 경계에서는 건드리지 않는다 — 그것이 프레임을 넘는 구간이다.
+		const profile_tick freeze = m_freezeTick.exchange(0, std::memory_order_acq_rel);
+		if (freeze != 0)
+		{
+			truncate_open_scopes(freeze);
+		}
+
 		seal_current();
 		m_sealAck.store(requested, std::memory_order_release);
+		m_inHonor = false;
 	}
 
 	void thread_stream::write(const profile_event& value)
@@ -216,6 +235,8 @@ namespace ce
 
 	void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame)
 	{
+		honor_seal_request();
+
 		if (m_depth >= kMaxScopeDepth)
 		{
 			// 버리고 센다. 옛 코어는 이 자리에서 스택 밖에 썼다.
@@ -235,11 +256,18 @@ namespace ce
 		scope.marker = id;
 		scope.frame = frame;
 		scope.flags = event_flags::none;
+		scope.generation = m_generation.load(std::memory_order_acquire);
+		scope.emitted = false;
 		++m_depth;
 	}
 
 	void thread_stream::end_scope(profile_tick now)
 	{
+		// ★ 짝을 보기 **전에** 요청을 들어준다. 얼림이면 지금 닫으려는 구간도
+		//   잘려 나가고 짝이 예약되므로, 바로 아래에서 그 예약을 소비한다 —
+		//   한 구간이 두 번 적히지 않는다.
+		honor_seal_request();
+
 		// 깊이 상한을 넘겨 못 연 스코프의 짝이 먼저다(begin_scope 의 주석).
 		// 이것을 스택보다 먼저 보지 않으면 남의 구간을 닫는다.
 		if (m_skippedDepth > 0)
@@ -258,6 +286,20 @@ namespace ce
 
 		--m_depth;
 		const open_scope& scope = m_stack[m_depth];
+
+		// 얼림에서 이미 잘려 나갔다. 여기서 또 적으면 한 구간이 두 번 남는다.
+		if (scope.emitted)
+		{
+			return;
+		}
+
+		// 지운 세대에서 연 구간이다. 지금 캡처의 것이 아니므로 적지 않고 센다 —
+		// 조용히 섞으면 지운 것이 돌아온 것처럼 보인다.
+		if (scope.generation != m_generation.load(std::memory_order_acquire))
+		{
+			m_staleScopes.fetch_add(1, std::memory_order_relaxed);
+			return;
+		}
 
 		profile_event value;
 		value.tick_begin = scope.tick_begin;
@@ -306,13 +348,50 @@ namespace ce
 		                std::memory_order_release);
 	}
 
+	void thread_stream::truncate_open_scopes(profile_tick freeze_tick)
+	{
+		// ★ 스택에서 **꺼내지 않는다.** 그 구간은 아직 열려 있고, 여기서 자리를
+		//   비우면 다시 녹화한 뒤의 새 구간이 그 자리를 차지해 짝이 뒤집힌다.
+		//   대신 '이미 적었다' 고 표시해 두고, 진짜 종료가 올 때 그 자리에서
+		//   확인한다 — 짝은 개수가 아니라 자리로 맞춘다.
+		const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+
+		for (std::uint32_t i = m_depth; i > 0; --i)
+		{
+			open_scope& scope = m_stack[i - 1];
+			if (scope.emitted) continue;
+			if (scope.generation != generation) continue;
+
+			profile_event value;
+			value.tick_begin = scope.tick_begin;
+			value.tick_end = freeze_tick;
+			value.marker = scope.marker;
+			value.frame = scope.frame;
+			value.depth = static_cast<std::uint16_t>(i - 1);
+			value.flags = scope.flags | event_flags::truncated_end;
+			write(value);
+
+			scope.emitted = true;
+		}
+	}
+
 	void thread_stream::finish(profile_tick now)
 	{
 		// 아직 열려 있는 것을 잃지 않고 닫는다 — 끝을 못 본 구간이라고 표시해서.
+		const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+
 		while (m_depth > 0)
 		{
 			--m_depth;
 			const open_scope& scope = m_stack[m_depth];
+
+			// 얼림에서 이미 적었거나 지운 세대의 것이면 다시 적지 않는다.
+			if (scope.emitted) continue;
+			if (scope.generation != generation)
+			{
+				m_staleScopes.fetch_add(1, std::memory_order_relaxed);
+				continue;
+			}
 
 			profile_event value;
 			value.tick_begin = scope.tick_begin;

@@ -687,6 +687,17 @@ namespace ConsoleCmd
         data.Set("malformedScopes", CommandData::Int(summary.unbalanced_scopes));
         data.Set("registeredMarkers", CommandData::Int(summary.registered_markers));
 
+        // 얼림이 온전했는지, 그리고 늦게 온 것들의 장부. 초록과 빈 집합을
+        // 가르는 값들이라 stats 에도 낸다.
+        data.Set("pauseUnackedStreams", CommandData::Int(summary.pause_unacked_streams));
+        data.Set("captureComplete", CommandData::Bool(summary.capture_complete));
+        data.Set("staleChunksDropped", CommandData::Int(
+            static_cast<std::int64_t>(summary.stale_chunks_dropped)));
+        data.Set("lateEventsPlaced", CommandData::Int(
+            static_cast<std::int64_t>(summary.late_events_placed)));
+        data.Set("lateEventsDropped", CommandData::Int(
+            static_cast<std::int64_t>(summary.late_events_dropped)));
+
         // 용량은 이제 이름 예산이 아니라 청크 풀이다.
         data.Set("chunkCount", CommandData::Int(summary.chunk_count));
         data.Set("freeChunks", CommandData::Int(summary.free_chunks));
@@ -875,7 +886,16 @@ namespace ConsoleCmd
             summary.state == ce::recorder_state::recording ? "recording" :
             summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
         data.Set("engineFrame", CommandCore::CommandData::Int(summary.engine_frame));
-        data.Set("hasCapture", CommandCore::CommandData::Bool(bool(ce::profiler().capture())));
+        const ce::capture_session_ptr capture = ce::profiler().capture();
+        data.Set("hasCapture", CommandCore::CommandData::Bool(bool(capture)));
+
+        // ★ "얼렸다" 와 "온전하게 얼렸다" 는 다르다. 잠든 워커는 봉인 요청에
+        //   응답하지 못하므로 그 꼬리가 캡처에 없는데, 이것을 내지 않으면
+        //   자동화는 빈 레인을 "그 스레드가 조용했다" 로 읽는다.
+        data.Set("captureComplete",
+                 CommandCore::CommandData::Bool(capture ? capture->complete() : true));
+        data.Set("unackedStreams", CommandCore::CommandData::Int(
+            capture ? static_cast<std::int64_t>(capture->unacked_streams()) : 0));
         return data;
     }
 

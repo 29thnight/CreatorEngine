@@ -138,6 +138,21 @@ namespace
 		{
 			ImGui::TextDisabled("녹화 중에는 요약만 공개된다 - Pause 를 눌러야 프레임을 열어 볼 수 있다");
 		}
+
+		// ★ 온전하지 않은 캡처를 **말없이** 그리지 않는다. 잠든 워커는 봉인
+		//   요청에 응답하지 못해 그 꼬리가 여기 없는데, 아무 말이 없으면
+		//   "그 스레드가 조용했다" 로 읽힌다.
+		else if (!summary.capture_complete)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
+			                   "얼림이 온전하지 않다 - 스트림 %u 의 꼬리가 이 캡처에 없다",
+			                   summary.pause_unacked_streams);
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("잠든 스레드는 봉인 요청을 들어줄 자리를 지나지 않는다.\n"
+				                  "그 스레드를 깨운 뒤 다시 Pause 하면 꼬리까지 들어온다.");
+			}
+		}
 	}
 
 	void draw_summary(const ce::live_summary& summary)
@@ -177,6 +192,18 @@ namespace
 
 		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.unbalanced_scopes);
 		draw_row("Unbalanced scopes", buffer);
+
+		// 늦게 온 것의 장부. placed 는 제 프레임 칸으로 돌아간 수, dropped 는
+		// 그 칸이 이미 링 밖이라 갈 곳이 없던 수다. stale 은 지운 세대의 것.
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64 " / %" PRIu64,
+		              summary.late_events_placed, summary.late_events_dropped);
+		draw_row("Late CPU placed / dropped", buffer);
+
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.stale_chunks_dropped);
+		draw_row("Stale (pre-Clear) dropped", buffer);
+
+		std::snprintf(buffer, sizeof(buffer), "%u", summary.pause_unacked_streams);
+		draw_row("Unacked at freeze", buffer);
 
 		ImGui::EndTable();
 	}
@@ -310,10 +337,17 @@ void DrawProfilerHUD()
 	if (ImGui::BeginTabItem("Collector"))
 	{
 		draw_summary(summary);
-		if (summary.dropped_events > 0 || summary.unbalanced_scopes > 0)
+		if (summary.dropped_events > 0 || summary.unbalanced_scopes > 0
+		    || summary.late_events_dropped > 0 || summary.stale_chunks_dropped > 0)
 		{
 			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
 			                   "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");
+		}
+		if (!summary.capture_complete)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
+			                   "얼림 미응답 스트림 %u - 그만큼의 꼬리가 빠져 있다",
+			                   summary.pause_unacked_streams);
 		}
 		ImGui::EndTabItem();
 	}

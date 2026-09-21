@@ -147,6 +147,81 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
 
+### 0.5.16 2026-09-21 P2 수집 경계 — 세대와 짝을 **자리**로 맞췄다
+
+§0.5.15 가 남긴 넷과, 외부 재감사가 추가로 재현한 넷을 함께 닫았다. 셋은
+자극을 세우자 그대로 재현됐고, 둘은 §0.5.15 에서 이미 닫혀 있었다.
+
+**뿌리는 하나다: 세대와 짝이 *청크 단위*로만 서 있었다.** 청크는 프레임마다
+봉인되는데 스코프는 그것을 넘어 살아 있고, 잘린 구간의 짝은 가장 **바깥**인데
+예약은 개수만 셌다.
+
+| 결함 | 재현 | 고친 자리 |
+|---|---|---|
+| 늦게 온 CPU 이벤트가 수집한 프레임에 앉는다 | `late-cpu/frame` 4 vs 1 | `capture_ring::place_by_tick` — 끝난 시각이 속한 칸으로 |
+| Clear 이전 청크가 새 링으로 재유입 | `clear-generation/dropped` 1 | 청크에 `generation`, `clear()` 가 올리고 봉인까지 청한다 |
+| Clear 뒤에 적은 것까지 유실 | `clear-new/kept` 0 | ★ 세대만 바꾸면 **쓰던 청크가 이어진다.** 끊어 줘야 한다 |
+| Clear 전에 **열린 스코프**가 재유입 | `clear-open/dropped` 1 | `open_scope::generation` — 스코프는 청크보다 오래 산다 |
+| pause 시점의 열린 스코프가 누락 | `pause-open/present` 부재 | `request_freeze` → `truncate_open_scopes` |
+| 다시 녹화한 뒤 짝이 뒤집힌다 | `resume-pair/closed-on-time` | `open_scope::emitted` — 짝은 **자리**로 맞춘다 |
+| ack 가 전달보다 먼저 온다 | `ack-delivery/sealed` 간헐 | `m_inHonor` 재진입 가드 |
+| 얼린 캡처가 온전한지 말하지 않는다 | `incomplete/flag` | `capture_session::complete()` |
+
+**★ 개수 예약은 방향이 반대였다.** 깊이 상한으로 못 연 구간은 언제나 가장
+안쪽이라 `m_skippedDepth` 로 맞는다. 그런데 얼림에 잘린 구간은 가장 바깥이다.
+같은 통에 넣자 **다시 녹화한 뒤 새로 연 구간의 종료가 그 예약을 먼저 먹고**,
+자기는 열린 채 남아 다음 pause 에서 "강제 종료" 로 기록됐다. 이제 잘린 구간은
+스택에서 꺼내지 않고 `emitted` 로 표시만 하고, 진짜 종료가 **그 자리에서**
+확인한다. `m_skippedDepth` 는 깊이 상한 전용으로 돌려놓았다.
+
+**★ ack 는 "봉인까지 끝났다" 여야 한다.** 자르는 동안 `write()` 가 다시
+`honor_seal_request()` 로 들어와 **안쪽 호출이 먼저 ack 를 올렸다.** 아직
+청크에 들어가지도 않은 잘린 구간을 두고 수집기가 "다 봉인됐다" 로 읽고 거둬
+간다. 한 번 돌려서는 초록이고 24 회 중 몇 번만 붉은 경합이라, 자극을 회차로
+돌린다(`ack-delivery/rounds`).
+
+**★ freeze() 는 닫힌 프레임만 본다.** 그래서 마지막 `publish_frame` 이후에
+모인 것 — 잘라 남긴 열린 구간이 바로 그것이다 — 이 캡처에 못 들어갔다.
+`pause()` 가 남은 프레임을 `lastEngineFrame + 1` 로 닫는다.
+
+**세는 것과 판정하는 것은 다르다.** 미응답 스트림 수를 요약에만 적어 두고
+그대로 frozen 으로 끝내면, 읽는 쪽은 "그 스레드가 조용했다" 와 "못 받았다" 를
+구분할 수 없다. 이제 `capture_session` 이 `complete()` 를 들고 다니고,
+`profile.stats`·`profile.pause`(`captureComplete`·`unackedStreams`)와 창의
+Collector 탭·툴바가 그것을 말한다.
+
+**게이트.** Debug·Release 모두 baseline 초록, 변이 **28 종 전원 검거**.
+새 자극 10 종에 변이 8 종을 새로 달았다.
+
+| 변이 | 잡은 절 |
+|---|---|
+| `pause-keeps-open-scope` | `pause-worker/present` |
+| `pause-truncate-unmarked` | `pause-open/once` |
+| `truncate-pops-stack` | `resume-pair/closed-on-time` |
+| `scope-ignores-generation` | `clear-open/dropped` |
+| `clear-without-seal` | `clear-new/kept` |
+| `clear-keeps-generation` | `clear-generation/dropped` |
+| `ack-before-seal` | `ack-delivery/sealed` |
+| `freeze-always-complete` | `incomplete/flag` |
+| `late-cpu-to-collecting-frame` | `late-cpu/frame` |
+| `pause-drops-pending` | `pause-open/present` |
+
+**★ 두 층이 같은 절을 막으면 단정이 눈먼다.** `pause-keeps-open-scope` 는 처음
+초록이었다. pause 를 부른 스레드는 pause 가 **직접** 자르므로 `honor` 의 얼림
+가지를 안 타기 때문이다. 계속 적는 워커를 따로 세우고서야 이빨이 생겼다.
+`clear-keeps-generation` 도 같은 이유로 처음 초록이었다 — 멈췄다 지우면 새
+프레임이 전부 Clear 뒤에 열려 시각만 봐도 옛 이벤트가 갈 칸이 없다. **녹화를
+멈추지 않고** 지우는 자극으로 바꾸자 세대 검사가 비로소 일을 했다.
+
+**자극 fixture 가 틀려 있었다.** `test_reader_live_follow` 는 `profile_scope`
+를 **닫기 전에** `publish_frame` 을 불러, 프레임마다 한 틱이 아니라 한 칸씩
+밀린 틱을 만들고 있었다. pause 가 마지막 프레임을 닫게 되자 그 꼬리가 드러나
+프레임 수가 하나씩 늘었다 — 제품이 아니라 자극이 틀린 것이었다.
+
+**남은 것.** 구조 셋은 아직이다: UI 가 `pause`·`record`·`clear` 를 직접
+부르는 것(단일 collector), `summary()` 가 고쳐지는 중인 링을 직접 읽는 것
+(불변 요약), 종료에서 남의 스트림을 회수하는 경로(종료 소유권).
+
 ### 0.5.15 2026-09-21 P2 동시성 경계 — 자극을 세우자마자 죽었다
 
 **외부 감사가 정적으로 짚은 것을 자극으로 확인했다.** `publish_frame()` 과

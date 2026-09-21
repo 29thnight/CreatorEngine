@@ -46,8 +46,10 @@ namespace ce
 	{
 	public:
 		capture_session() = default;
-		explicit capture_session(std::vector<frame_record> frames,
-		                         std::vector<thread_info>  threads);
+		capture_session(std::vector<frame_record> frames,
+		                std::vector<thread_info>  threads,
+		                bool                      complete,
+		                std::uint32_t             unacked_streams);
 
 		std::span<const frame_record> frames() const { return m_frames; }
 		std::span<const thread_info>  threads() const { return m_threads; }
@@ -56,6 +58,15 @@ namespace ce
 		std::size_t   memory_bytes() const { return m_memoryBytes; }
 		std::uint64_t total_events() const { return m_totalEvents; }
 
+		// 얼릴 때 **모든** 스트림이 봉인에 응답했는가. false 면 이 캡처에는
+		// 어느 스레드의 꼬리가 빠져 있다.
+		//
+		// ★ 세는 것과 판정하는 것은 다르다. 미응답을 요약에만 적어 두고 그대로
+		//   frozen 으로 끝내면, 읽는 쪽은 "그 스레드가 조용했다" 와 "못 받았다"
+		//   를 구분할 수 없다. 그래서 캡처 자신이 들고 다닌다.
+		bool          complete() const { return m_complete; }
+		std::uint32_t unacked_streams() const { return m_unackedStreams; }
+
 		const frame_record* find_frame(std::uint32_t engine_frame) const;
 
 	private:
@@ -63,6 +74,8 @@ namespace ce
 		std::vector<thread_info>  m_threads;
 		std::size_t               m_memoryBytes = 0;
 		std::uint64_t             m_totalEvents = 0;
+		bool                      m_complete = true;
+		std::uint32_t             m_unackedStreams = 0;
 	};
 
 	using capture_session_ptr = std::shared_ptr<const capture_session>;
@@ -76,7 +89,11 @@ namespace ce
 
 		// 봉인된 청크 목록을 프레임 버킷에 나눠 담는다. 청크는 호출자가
 		// pool 에 되돌린다.
-		void ingest(const event_chunk* sealed_list);
+		// generation 과 다른 세대의 청크는 버리고 센다(Clear 이전의 것).
+		// frame_begin_tick 은 지금 열려 있는 프레임의 시작 시각이고, 그보다
+		// 앞서 끝난 이벤트는 **자기 시각이 속한 프레임 칸**으로 돌려보낸다.
+		void ingest(const event_chunk* sealed_list, std::uint64_t generation,
+		            profile_tick frame_begin_tick);
 
 		// 이 프레임을 닫고 다음 프레임을 연다.
 		void close_frame(std::uint32_t engine_frame, profile_tick tick_begin, profile_tick tick_end);
@@ -91,7 +108,8 @@ namespace ce
 
 		// 지금까지 모인 것을 얼려 공개한다. 링은 비우지 않는다 — 다시
 		// 녹화를 눌러도 앞이 남아 있어야 하기 때문이다.
-		capture_session_ptr freeze(std::span<const thread_info> threads) const;
+		capture_session_ptr freeze(std::span<const thread_info> threads,
+		                           bool complete, std::uint32_t unacked_streams) const;
 
 		std::uint32_t retained_frames() const { return static_cast<std::uint32_t>(m_frames.size()); }
 		std::size_t   memory_bytes() const { return m_memoryBytes; }
@@ -100,6 +118,10 @@ namespace ce
 		// 가장 최근에 닫힌 프레임의 이벤트 수. 녹화 중에도 값싸게 읽히는
 		// 요약이라 게이트와 HUD 가 이것을 본다(§6.4 의 live summary).
 		std::uint32_t last_frame_events() const { return m_lastFrameEvents; }
+
+		// 아직 닫히지 않은 프레임에 모인 것이 있는가. pause 가 본다 — 마지막
+		// 프레임을 닫지 않고 얼리면 그 사이의 것이 통째로 사라진다.
+		bool has_pending_events() const { return !m_pending.events.empty(); }
 		std::uint32_t peak_frame_events() const { return m_peakFrameEvents; }
 
 		// 늦게 온 구간의 장부.
@@ -112,6 +134,9 @@ namespace ce
 		//   구분되지 않는다. 빈 집합을 성공으로 읽는 바로 그 양식이다.
 		std::uint64_t late_spans_placed() const { return m_lateSpansPlaced; }
 		std::uint64_t late_spans_dropped() const { return m_lateSpansDropped; }
+		std::uint64_t stale_chunks_dropped() const { return m_staleChunksDropped; }
+		std::uint64_t late_events_placed() const { return m_lateEventsPlaced; }
+		std::uint64_t late_events_dropped() const { return m_lateEventsDropped; }
 		std::size_t   late_spans_waiting() const { return m_deferredSpans.size(); }
 
 	private:
@@ -121,6 +146,11 @@ namespace ce
 		// 기다리게 두고, 이미 밀려났으면 버리고 센다.
 		void place_late_span(const profile_event& value);
 		void drain_deferred_spans();
+
+		// 늦게 온 CPU 구간. GPU 와 규칙이 다르다 — GPU 는 **제출한 프레임**에
+		// 귀속하지만(§5.4), CPU 구간은 **끝난 시각이 속한 프레임**이 제 자리다.
+		// 프레임을 넘는 구간이 닫히는 프레임에 기록되던 것과 같은 답이 나온다.
+		bool place_by_tick(const profile_event& value);
 
 		std::vector<frame_record> m_frames;
 		frame_record              m_pending;
@@ -132,6 +162,9 @@ namespace ce
 		std::vector<profile_event> m_deferredSpans;
 		std::uint64_t m_lateSpansPlaced = 0;
 		std::uint64_t m_lateSpansDropped = 0;
+		std::uint64_t m_staleChunksDropped = 0;
+		std::uint64_t m_lateEventsPlaced = 0;
+		std::uint64_t m_lateEventsDropped = 0;
 
 		std::uint32_t m_retainedFrames = kDefaultRetainedFrames;
 		std::size_t   m_memoryBudget = kDefaultMemoryBudget;

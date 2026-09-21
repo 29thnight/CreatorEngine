@@ -60,7 +60,16 @@ namespace ce
 
 		// pause 에서 봉인 요청에 **응답하지 않은** 스트림 수. 0 이 아니면 그
 		// 스트림의 꼬리가 이 캡처에 없다 — 잠든 워커가 대표적이다.
+		//
+		// ★ 이 값이 0 이 아니면 얼린 캡처는 **온전하지 않다.** 창과 게이트가
+		//   그것을 알아야 "비었다" 와 "못 받았다" 를 가릴 수 있다.
 		std::uint32_t  pause_unacked_streams = 0;
+		bool           capture_complete = true;
+
+		// 지운 세대의 것이라 버린 이벤트, 시각이 링 밖이라 버린 이벤트.
+		std::uint64_t  stale_chunks_dropped = 0;
+		std::uint64_t  late_events_placed = 0;
+		std::uint64_t  late_events_dropped = 0;
 	};
 
 	// 한 프로세스에 동시에 살 수 있는 서비스 수. 라이브 하나 + 검사용 하나면
@@ -166,6 +175,10 @@ namespace ce
 		// 마지막 pause 에서 응답하지 않은 스트림 수.
 		std::atomic<std::uint32_t> m_pauseUnacked{ 0 };
 
+		// 녹화 세대. clear() 가 올린다. 그 전에 열린 청크가 나중에 도착하면
+		// 세대가 어긋나고 수집기가 버린다 — 지운 것이 돌아오지 않게.
+		std::atomic<std::uint64_t> m_generation{ 1 };
+
 		std::uint32_t m_serviceSlot = 0;
 
 		std::atomic<bool>           m_initialized{ false };
@@ -181,6 +194,10 @@ namespace ce
 		// 수집기(프레임 경계를 도는 스레드)만 만진다.
 		capture_ring m_ring;
 		profile_tick m_frameBeginTick = 0;
+
+		// 마지막으로 닫은 엔진 프레임 번호. pause 가 남은 프레임을 닫을 때
+		// 그다음 번호를 쓴다 — 얼린 캡처의 꼬리도 어느 프레임인지 말해야 한다.
+		std::uint32_t m_lastEngineFrame = 0;
 
 		mutable std::mutex  m_captureLock;
 		capture_session_ptr m_capture;

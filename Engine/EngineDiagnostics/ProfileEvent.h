@@ -100,10 +100,18 @@ namespace ce
 		// 이벤트마다 표식을 보지 않아도 된다 — CPU 경로는 지금처럼 통째로 잇는다.
 		bool late_ingest = false;
 
+		// 이 청크를 쓴 녹화 세대. Clear 는 세대를 올리므로, 그 전에 열린
+		// 청크가 나중에 도착하면 세대가 어긋나고 수집기가 버린다.
+		//
+		// ★ 이것이 없으면 잠든 워커가 Clear **전에** 적은 것을 들고 깨어나
+		//   새 녹화에 섞는다. 지운 것이 돌아오는 셈이다.
+		std::uint64_t generation = 0;
+
 		void reset(std::uint32_t slot, std::uint64_t seq)
 		{
 			count = 0;
 			late_ingest = false;
+			generation = 0;
 			thread_slot = slot;
 			sequence = seq;
 			next = nullptr;

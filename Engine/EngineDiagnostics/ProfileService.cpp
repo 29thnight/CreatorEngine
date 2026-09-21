@@ -187,6 +187,7 @@ namespace ce
 		}
 
 		auto stream = std::make_unique<thread_stream>(m_pool, info);
+		stream->set_generation(m_generation.load(std::memory_order_acquire));
 		t_streams[m_serviceSlot] = stream.get();
 
 		stream_entry entry;
@@ -296,7 +297,8 @@ namespace ce
 			return;
 		}
 
-		m_ring.ingest(sealed);
+		m_ring.ingest(sealed, m_generation.load(std::memory_order_acquire),
+		              m_frameBeginTick);
 		m_pool.release(sealed);
 	}
 
@@ -321,6 +323,7 @@ namespace ce
 		info.name = kGpuLaneName;
 
 		auto stream = std::make_unique<thread_stream>(m_pool, info);
+		stream->set_generation(m_generation.load(std::memory_order_acquire));
 		thread_stream* created = stream.get();
 
 		stream_entry entry;
@@ -425,6 +428,7 @@ namespace ce
 		}
 
 		m_ring.close_frame(engine_frame, m_frameBeginTick, tick);
+		m_lastEngineFrame = engine_frame;
 		m_frameBeginTick = tick;
 
 		// 다음 프레임 번호를 예측해 올린다. 밖이 실제로 그 번호를 주면
@@ -458,14 +462,25 @@ namespace ce
 		//   뒤, 아직 응답하지 않은 스트림을 **센다**. 잠든 워커는 다음에 깨어날
 		//   때 봉인하므로 그때까지의 꼬리가 이 캡처에 없을 수 있고, 그것을
 		//   성공처럼 덮으면 "얼린 캡처가 온전하다" 가 거짓이 된다.
+		// 자를 시각을 **먼저** 확정한다. 스레드마다 제각각 지금을 읽으면 같은
+		// pause 인데 끝 시각이 갈리고, 그러면 얼린 캡처의 경계가 흐려진다.
+		const profile_tick freezeTick = now();
 		{
 			thread_stream* const self = t_streams[m_serviceSlot];
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			for (stream_entry& entry : m_streams)
 			{
 				if (!entry.stream) continue;
-				if (entry.stream.get() == self) entry.stream->publish_frame();
-				else                            entry.stream->request_seal();
+				if (entry.stream.get() == self)
+				{
+					// 내가 주인인 스트림은 지금 바로 자른다.
+					entry.stream->truncate_open_scopes(freezeTick);
+					entry.stream->publish_frame();
+				}
+				else
+				{
+					entry.stream->request_freeze(freezeTick);
+				}
 			}
 		}
 
@@ -493,13 +508,23 @@ namespace ce
 
 		collect_sealed();
 
+		// ★ 마지막 프레임을 닫는다. 닫지 않으면 마지막 publish_frame 이후에
+		//   모인 것 — pause 에서 잘라 남긴 열린 구간이 바로 그것이다 — 이
+		//   얼린 캡처에 들어가지 못한다. freeze() 는 닫힌 프레임만 본다.
+		if (m_ring.has_pending_events())
+		{
+			m_ring.close_frame(m_lastEngineFrame + 1, m_frameBeginTick, freezeTick);
+			m_lastEngineFrame = m_lastEngineFrame + 1;
+			m_frameBeginTick = freezeTick;
+		}
+
 		std::vector<thread_info> threads;
 		{
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			threads = m_threadInfo;
 		}
 
-		capture_session_ptr frozen = m_ring.freeze(threads);
+		capture_session_ptr frozen = m_ring.freeze(threads, 0 == unacked, unacked);
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
 			m_capture = std::move(frozen);
@@ -508,6 +533,31 @@ namespace ce
 
 	void profiler_service::clear()
 	{
+		// ★ 세대를 먼저 올린다. 이 뒤에 도착하는 옛 청크는 세대가 어긋나
+		//   수집기가 버린다 — 잠든 워커가 Clear **전에** 적은 것을 들고 깨어나
+		//   새 녹화에 섞는 것이 감사에서 재현된 결함이다.
+		const std::uint64_t next = m_generation.fetch_add(1, std::memory_order_acq_rel) + 1;
+
+		{
+			std::lock_guard<std::mutex> guard(m_streamLock);
+			for (stream_entry& entry : m_streams)
+			{
+				if (!entry.stream) continue;
+				entry.stream->set_generation(next);
+
+				// ★ 봉인도 함께 청한다. 세대는 **청크 단위**로 찍히므로, 지금
+				//   쓰고 있는 청크를 끊지 않으면 Clear 뒤에 적은 것까지 옛
+				//   세대의 청크에 실려 통째로 버려진다.
+				entry.stream->request_seal();
+			}
+		}
+
+		// 이미 봉인돼 대기 중인 것도 옛 세대다. 거두지 않고 곧바로 되돌린다.
+		if (event_chunk* stale = m_pool.take_sealed())
+		{
+			m_pool.release(stale);
+		}
+
 		m_ring.clear();
 		std::lock_guard<std::mutex> guard(m_captureLock);
 		m_capture.reset();
@@ -554,6 +604,10 @@ namespace ce
 		value.late_spans_dropped = m_ring.late_spans_dropped();
 		value.late_spans_waiting = m_ring.late_spans_waiting();
 		value.pause_unacked_streams = m_pauseUnacked.load(std::memory_order_relaxed);
+		value.capture_complete = (0 == value.pause_unacked_streams);
+		value.stale_chunks_dropped = m_ring.stale_chunks_dropped();
+		value.late_events_placed = m_ring.late_events_placed();
+		value.late_events_dropped = m_ring.late_events_dropped();
 
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);

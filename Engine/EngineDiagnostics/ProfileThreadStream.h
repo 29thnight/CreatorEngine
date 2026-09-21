@@ -78,6 +78,21 @@ namespace ce
 		marker_id     marker = invalid_marker;
 		std::uint32_t frame = 0;
 		event_flags   flags = event_flags::none;
+
+		// 이 구간을 연 녹화 세대. Clear 는 세대를 올리므로, 지우기 전에 열린
+		// 구간은 나중에 닫혀도 새 캡처의 것이 아니다.
+		//
+		// ★ 세대를 청크에만 찍으면 이것을 못 막는다. 스코프는 청크보다 오래
+		//   산다 — 청크는 프레임마다 봉인되지만 구간은 그것을 넘어 열려 있다.
+		std::uint64_t generation = 0;
+
+		// 얼림에서 이미 잘려 기록됐다. 진짜 종료가 와도 다시 적지 않는다.
+		//
+		// ★ 예전에는 이것을 개수(m_skippedDepth)로만 예약했다. 그런데 깊이
+		//   상한으로 못 연 구간은 언제나 가장 **안쪽**인 반면 잘린 구간은 가장
+		//   **바깥**이라, 개수로 세면 다시 녹화한 뒤의 새 구간의 종료가 그
+		//   예약을 먼저 먹고 자기는 열린 채 남았다. 짝은 자리로 맞춰야 한다.
+		bool          emitted = false;
 	};
 
 	// 스코프 스택 상한. 넘으면 **버리고 센다** — 옛 코어는 넘긴 Push 가
@@ -105,7 +120,14 @@ namespace ce
 		// ★ 버렸다고 세지는 않는다. 이것은 용량 부족으로 **잃은** 것이 아니라
 		//   녹화하지 않기로 해서 안 재는 것이다. 들어서 세면 pause 를 누를 때마다
 		//   손실 계수기가 오른다.
-		void skip_scope() { ++m_skippedDepth; }
+		void skip_scope()
+		{
+			// 얼어 있는 동안에도 이 자리는 지난다. 여기서 요청을 보지 않으면
+			// 워커는 다음 녹화까지 얼림을 모른다 — pause 가 여는 쪽을 막으므로
+			// write() 를 더는 타지 않기 때문이다.
+			honor_seal_request();
+			++m_skippedDepth;
+		}
 
 		// 이미 끝난 구간을 그대로 적는다. 스코프 스택을 쓰지 않는다 —
 		// GPU 구간은 나중에, 완성된 채로, 시작 시각까지 들고 온다.
@@ -128,9 +150,29 @@ namespace ce
 		// 스레드가 자기 안전한 자리에서 한다.
 		//
 		// ★ 이것이 경계의 전부다. 수집기는 청크 포인터를 만지지 않는다.
+		// 열려 있는 구간을 그 시각에서 잘라 기록한다. 짝은 예약해 두므로
+		// 나중에 실제 end_scope 가 와도 **두 번 기록하지 않고 남의 구간도
+		// 닫지 않는다** — 깊이 상한을 넘겼을 때와 같은 기제다.
+		void truncate_open_scopes(profile_tick freeze_tick);
+
 		void request_seal()
 		{
 			m_sealRequest.fetch_add(1, std::memory_order_release);
+		}
+
+		// 봉인에 더해 **열려 있는 구간을 그 시각에서 잘라 달라**고 요청한다.
+		// pause 가 쓴다 — 얼린 캡처에는 다음 프레임이 없으므로, 여기서 남기지
+		// 않으면 그 구간은 영영 사라진다(§6.1).
+		void request_freeze(profile_tick freeze_tick)
+		{
+			m_freezeTick.store(freeze_tick, std::memory_order_release);
+			m_sealRequest.fetch_add(1, std::memory_order_release);
+		}
+
+		// 이 스트림이 쓰는 녹화 세대. 수집기가 올리면 다음 청크부터 새 세대다.
+		void set_generation(std::uint64_t value)
+		{
+			m_generation.store(value, std::memory_order_release);
 		}
 
 		// 요청한 봉인이 처리됐는가. 수집기가 청크를 만지지 않고 물을 수 있는
@@ -167,6 +209,12 @@ namespace ce
 			return m_unbalancedScopes.load(std::memory_order_relaxed);
 		}
 
+		// 지운 세대에서 열려 닫힐 때 버려진 구간 수.
+		std::uint64_t stale_scopes() const
+		{
+			return m_staleScopes.load(std::memory_order_relaxed);
+		}
+
 	private:
 		bool ensure_chunk();
 		void write(const profile_event& value);
@@ -192,9 +240,15 @@ namespace ce
 		// 수집기가 올리고 주인이 따라 올린다. 둘이 같으면 요청이 다 처리된 것이다.
 		std::atomic<std::uint64_t> m_sealRequest{ 0 };
 		std::atomic<std::uint64_t> m_sealAck{ 0 };
+		std::atomic<profile_tick>  m_freezeTick{ 0 };
+
+		// 봉인 처리 중인가. 주인 스레드만 읽고 쓴다.
+		bool m_inHonor = false;
+		std::atomic<std::uint64_t> m_generation{ 0 };
 
 		std::atomic<std::uint64_t> m_droppedEvents{ 0 };    // free 청크가 없어 잃은 이벤트
 		std::atomic<std::uint64_t> m_droppedScopes{ 0 };    // 깊이 상한을 넘겨 못 연 스코프
-		std::atomic<std::uint64_t> m_unbalancedScopes{ 0 }; // 열지 않고 닫은 횟수
+		std::atomic<std::uint64_t> m_unbalancedScopes{ 0 };
+		std::atomic<std::uint64_t> m_staleScopes{ 0 }; // 열지 않고 닫은 횟수
 	};
 }
