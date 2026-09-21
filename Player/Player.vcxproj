@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
     게임 플레이어 (BuildPipelinePlan B0-2).
@@ -68,7 +68,7 @@
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
@@ -88,7 +88,7 @@
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Fmod\inc\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\ImGuiHelper\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Editor\EngineEntry\;$(SolutionDir)Engine\Physics\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>

@@ -79,8 +79,13 @@ public:
         std::string& outError);
     void ReleaseFogCloudNeutral(RHITextureHandle& texture);
 
-    void BeginProfilerFrame(uint32_t frameIndex);
+    /// 그 제출이 쓴 링 슬롯을 돌려준다. 부른 쪽이 적어 두어야 나중에
+    /// 수집할 때 "그 제출의 기록을 읽고 있는가" 를 물을 수 있다.
+    uint32_t BeginProfilerFrame(uint32_t frameIndex);
     void ResolveProfilerFrame();
+
+    /// Collect() 가 지금 읽게 되는 링 슬롯.
+    uint32_t ProfilerRingSlot() const;
     bool CollectProfiler(std::vector<EnhancedLivePassTiming>& outTimings,
         double& outTotalMilliseconds, std::string& outError);
 

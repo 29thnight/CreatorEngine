@@ -321,6 +321,31 @@ namespace ConsoleCmd
         data.Set("framesRendered", CommandData::Int(snapshot.framesRendered));
         data.Set("framesIdle", CommandData::Int(snapshot.framesIdle));
         data.Set("framesInFlight", CommandData::Int(snapshot.framesInFlight));
+
+        // ★ GPU 수집 장부를 내는 이유는 P4 기준선 때문이다. 패스별 GPU
+        //   시간은 지금까지 렌더 디버그 창에만 있었고, 그래서 그 숫자가 올바른
+        //   제출의 것인지를 물을 수단이 없었다 — 눈으로는 틀린 숫자도 그럴듯하다.
+        //
+        //   mismatches 는 "수집이 다른 제출의 기록을 읽은 횟수" 이고, P4 가
+        //   GpuFrameToken 을 세우면 0 이 되어야 한다.
+        {
+            auto gpu = CommandData::Object();
+            gpu.Set("ms", CommandData::Double(snapshot.gpuMs));
+            gpu.Set("collects", CommandData::Int(snapshot.gpuCollects));
+            gpu.Set("mismatches", CommandData::Int(snapshot.gpuCollectMismatches));
+            auto passes = CommandData::Array();
+            for (const EnhancedLivePassTiming& timing : snapshot.passTimings)
+            {
+                auto entry = CommandData::Object();
+                entry.Set("name", CommandData::String(timing.name));
+                entry.Set("ms", CommandData::Double(timing.milliseconds));
+                passes.Append(std::move(entry));
+            }
+            gpu.Set("passCount", CommandData::Int(
+                static_cast<std::int64_t>(snapshot.passTimings.size())));
+            gpu.Set("passes", std::move(passes));
+            data.Set("gpu", std::move(gpu));
+        }
         const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
         auto displayData = CommandData::Object();
         displayData.Set("iblGenerationCount", CommandData::Int(display.iblGenerationCount));

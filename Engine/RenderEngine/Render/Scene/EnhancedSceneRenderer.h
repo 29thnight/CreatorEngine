@@ -470,6 +470,12 @@ struct EnhancedLiveDebugSnapshot
     uint32_t uiBatchCount{ 0 };
     double   cpuMs{ 0.0 };
     double   gpuMs{ 0.0 };
+
+    /// GPU 수집 장부. mismatches 가 0 이 아니면 그만큼의 수치가 **끝난 제출이
+    /// 아닌 다른 제출의 것**이다 — Collect() 가 token 을 안 받기 때문이고,
+    /// P4 가 GpuFrameToken 을 세우면 0 이어야 한다.
+    uint64_t gpuCollects{ 0 };
+    uint64_t gpuCollectMismatches{ 0 };
     size_t   graveyardCount{ 0 };
     std::string lastError;
 

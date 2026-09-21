@@ -56,6 +56,14 @@ public:
     /// GPU가 그 프레임을 끝낸 뒤에 부른다(펜스 대기 후).
     bool Collect(std::vector<PassTiming>& outTimings, std::string& outError);
 
+    /// Collect() 가 지금 읽게 되는 링 슬롯. 제출할 때 적어 둔 슬롯과
+    /// 맞대는 용도다 — 둘이 다르면 그 수집은 **다른 제출의 기록을 읽고 있다.**
+    ///
+    /// ★ 임시 계측이 아니라 P4 의 기준선이다. 지금 구조에서는 이 값이 어긋날
+    ///   수 있고(BeginFrame 이 뷰마다 불리고 Collect 는 token 을 안 받는다),
+    ///   GpuFrameToken 이 서고 나면 영원히 0 이어야 한다.
+    uint32_t CurrentRingSlot() const { return m_frameIndex; }
+
     /// 마지막으로 수집한 것의 합계.
     double GetLastTotalMilliseconds() const { return m_lastTotalMs; }
 

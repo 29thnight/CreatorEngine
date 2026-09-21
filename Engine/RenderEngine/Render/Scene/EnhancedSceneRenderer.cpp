@@ -270,6 +270,14 @@ namespace
             uint64_t frameId{ 0 };
             EnhancedLiveViewKey key{};
 
+            // 이 제출이 GPU 프로파일러의 어느 링 슬롯에 기록했는가.
+            //
+            // ★ 지금은 적기만 하고 수집에 쓰지는 못 한다 — Collect() 가 token 을 받지
+            //   않아서 쓸 수가 없다. 대신 수집 직전에 프로파일러가 지금 읽게 되는
+            //   슬롯과 맞대어 **어긋난 횟수를 센다.** 그것이 P4 가 고칠 결함의 크기고,
+            //   GpuFrameToken 이 서면 이 자리가 실제 수집 키가 된다.
+            uint32_t profilerRingSlot{ IRHIGpuProfiler::kInvalidSlot };
+
             // 이 슬롯 프레임의 그래프. 규칙(dx12.compare 크래시의 교훈):
             // 그래프의 수명은 그 커맨드를 GPU가 끝낼 때까지다 — transient를
             // 그래프가 들고 있다. 승격(펜스 완료) 때 놓으면 풀로 반납된다.
@@ -1158,6 +1166,11 @@ namespace
         uint32_t viewRotation{ 0 };
         uint64_t framesRendered{ 0 };
         uint64_t framesIdle{ 0 };
+
+        // GPU 수집 장부. mismatches 가 0 이 아니면 그만큼의 수치가 **다른
+        // 제출의 것**이다(수집 직전 주석).
+        uint64_t gpuCollects{ 0 };
+        uint64_t gpuCollectMismatches{ 0 };
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
         uint64_t viewOverflowSkips{ 0 }; // 뷰 상한(kMaxLiveCameraViews) 초과로 건너뛴 수
         uint64_t frameFailures{ 0 };     // 프레임 기록 실패 누적(일시적인 것 포함)
@@ -1492,6 +1505,8 @@ namespace
             debugSnapshot.uiBatchCount = lastUIBatchCount;
             debugSnapshot.cpuMs = lastCpuMs;
             debugSnapshot.gpuMs = lastGpuMs;
+            debugSnapshot.gpuCollects = gpuCollects;
+            debugSnapshot.gpuCollectMismatches = gpuCollectMismatches;
             debugSnapshot.graveyardCount = static_cast<uint32_t>(
                 dx12.GetRetiredDisplayCount()) + dx12.GetAssetGraveyardCount();
             debugSnapshot.lastError = lastError;
@@ -3754,7 +3769,7 @@ namespace
                 }
             } frameGuard{ dx12, frameCommitted, capture, outError };
 
-            dx12.BeginProfilerFrame(frameCounter++);
+            const uint32_t profilerRingSlot = dx12.BeginProfilerFrame(frameCounter++);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -3845,6 +3860,7 @@ namespace
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
             slot.frameId = sourceFrameId;
             slot.key = view.key;
+            slot.profilerRingSlot = profilerRingSlot;
 
             // W8: 기록이 끝난 자리에서 인코더가 버린 명령을 비우며 모은다.
             // Vulkan 경로와 같은 뜻이고 같은 수를 센다.
@@ -5284,6 +5300,23 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                             std::printf("[dx12.live 검증] %s\n", validation.c_str());
                         }
                     }
+                }
+
+                // ★ 수집이 **그 제출의** 기록을 읽고 있는가를 먼저 센다.
+                //
+                //   Collect() 는 token 을 받지 않아 "지금 링 슬롯" 을 읽는다. 그런데
+                //   BeginProfilerFrame 은 **뷰마다** 불리고, 제출은 최대 둘이 인플라이트로
+                //   겈린다. 따라서 펜스가 끝난 제출의 기록은 이미 뒤에 온 제출이
+                //   덮어썼을 수 있고, 그러면 이 수치는 다른 뷰·다른 프레임의 것이다.
+                //
+                //   조용하다 — 숫자는 그럴듯하게 나오고 어느 프레임 것인지는 어디에도
+                //   적혀 있지 않다. 그래서 **세서** 드러낸다. P4 가 GpuFrameToken 을
+                //   세우면 이 수는 0 이어야 하고, 그것이 완료 조건의 판정 수단이다.
+                ++state.gpuCollects;
+                if (view.slots[slotIndex].profilerRingSlot !=
+                    state.dx12.ProfilerRingSlot())
+                {
+                    ++state.gpuCollectMismatches;
                 }
 
                 std::vector<EnhancedLivePassTiming> timings;

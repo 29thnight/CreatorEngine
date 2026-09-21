@@ -405,9 +405,16 @@ void EnhancedSceneRendererLiveDX12Adapter::ReleaseFogCloudNeutral(
     m_impl->fogCloudNeutral.Reset();
 }
 
-void EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(uint32_t frameIndex)
+uint32_t EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(uint32_t frameIndex)
 {
-    m_impl->profiler.BeginFrame(frameIndex % kFrameCount);
+    const uint32_t ringSlot = frameIndex % kFrameCount;
+    m_impl->profiler.BeginFrame(ringSlot);
+    return ringSlot;
+}
+
+uint32_t EnhancedSceneRendererLiveDX12Adapter::ProfilerRingSlot() const
+{
+    return m_impl->profiler.CurrentRingSlot();
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame()
