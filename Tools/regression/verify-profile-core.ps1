@@ -159,6 +159,38 @@ $mutations = @(
         Why    = '닫는 쪽을 얼릴 수 있으면 스택에 칸이 남아 그 뒤의 깊이가 전부 밀린다'
     },
 
+    # ── GPU 레인: 늦게 온 구간이 제 프레임 칸으로 가는가 ───────────
+    @{
+        # 늦게 온 것을 CPU 경로와 똑같이 **수집한 프레임**에 담는다. 실측에서
+        # 제출→수집이 최대 54.6 ms 였으므로 GPU 일이 세 칸 뒤에 그려진다.
+        Name   = 'gpu-span-to-pending'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`t`tif (sealed_list->late_ingest)"
+        New    = "`t`t`tif (false)"
+        Expect = 'gpu-lane/'
+        Why    = '수집한 프레임에 담으면 GPU 일이 제 프레임보다 뒤에 그려진다'
+    },
+    @{
+        # 아직 안 닫힌 프레임의 것을 기다리지 않고 곧바로 버린다. 그 프레임이
+        # 곧 닫히는데도 구간이 사라지므로 레인에 구멍이 생긴다.
+        Name   = 'gpu-span-no-defer'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`tif (m_deferredSpans.size() >= kMaxDeferredSpans)"
+        New    = "`t`tif (true)"
+        Expect = 'gpu-deferred/placed'
+        Why    = '닫히기 전에 온 구간을 기다리지 않으면 그 프레임의 레인이 빈다'
+    },
+    @{
+        # 갈 곳이 없어 버린 것을 세지 않는다. "레인이 비었다" 와 "늦어서
+        # 잃었다" 가 구분되지 않는다 — 빈 집합을 성공으로 읽는 그 양식이다.
+        Name   = 'gpu-span-silent-drop'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`t`t++m_lateSpansDropped;`r`n`t`t`treturn;`r`n`t`t}`r`n`r`n`t`t// 그 프레임이 아직 안 닫혔다."
+        New    = "`t`t`treturn;`r`n`t`t}`r`n`r`n`t`t// 그 프레임이 아직 안 닫혔다."
+        Expect = 'gpu-dropped/counted'
+        Why    = '버린 것을 세지 않으면 빈 레인과 잃은 레인이 같아 보인다'
+    },
+
     # ── 창이 매 프레임 부르는 따라가기 규칙 ────────────────────────
     @{
         # 한 번 집으면 끝이다. Live Follow 를 켜 두어도 새로 얼린 것으로 가지

@@ -251,6 +251,29 @@ namespace ce
 		write(value);
 	}
 
+	void thread_stream::write_span(marker_id id, profile_tick begin, profile_tick end,
+	                               std::uint32_t frame, std::uint16_t depth)
+	{
+		if (!ensure_chunk())
+		{
+			++m_droppedEvents;
+			return;
+		}
+
+		// 이 청크는 늦은 귀속을 거친다. 첫 이벤트를 쓸 때 세워 두면 청크가
+		// 재사용되어도 다음 acquire 에서 reset 이 다시 내린다.
+		m_writer->late_ingest = true;
+
+		profile_event value;
+		value.tick_begin = begin;
+		value.tick_end = end;
+		value.marker = id;
+		value.frame = frame;
+		value.depth = depth;
+		value.flags = event_flags::gpu_span;
+		write(value);
+	}
+
 	void thread_stream::publish_frame()
 	{
 		// ★ 열린 스코프를 닫지 않는다. 프레임을 넘는 구간은 닫히는 프레임에

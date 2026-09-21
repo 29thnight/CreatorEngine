@@ -52,6 +52,11 @@ namespace ce
 		std::size_t    memory_budget = 0;
 		std::uint32_t  free_chunks = 0;
 		std::uint32_t  chunk_count = 0;
+
+		// GPU 레인(§7.3). 늦게 온 구간이 제 프레임 칸을 찾았는가.
+		std::uint64_t  late_spans_placed = 0;
+		std::uint64_t  late_spans_dropped = 0;
+		std::size_t    late_spans_waiting = 0;
 	};
 
 	// 한 프로세스에 동시에 살 수 있는 서비스 수. 라이브 하나 + 검사용 하나면
@@ -93,6 +98,25 @@ namespace ce
 		// 모르게 된다(§2.1 engine_frame_id 정본 통합).
 		void publish_frame(std::uint32_t engine_frame);
 
+		// --- GPU 레인 ----------------------------------------------------
+		// 이미 끝난 GPU 구간을 전용 레인에 적는다(§7.3 의 GPU Graphics queue).
+		//
+		// ★ 틱은 **CPU(QPC) 축으로 옮긴 뒤**의 값이어야 한다. 이 층은 GPU 틱도
+		//   두 시계의 관계도 모른다 — 옮기는 일은 백엔드의 몫이고, 여기는
+		//   "이미 CPU 축에 있는 구간" 만 받는다.
+		//
+		// ★ 레인의 스트림은 **적는 쪽만** 봉인한다. publish_frame 은 이 레인을
+		//   건너뛴다 — 적는 스레드가 렌더 스레드이고 프레임 경계를 도는 쪽은
+		//   게임 스레드라, 남이 봉인하면 두 스레드가 같은 청크 포인터를 만진다.
+		void submit_gpu_span(marker_id id, profile_tick begin, profile_tick end,
+		                     std::uint32_t frame);
+
+		// 지금까지 적은 GPU 구간을 수집기에 넘긴다. 적는 스레드가 부른다.
+		void publish_gpu_spans();
+
+		// GPU 레인의 이름. 창과 게이트가 이 이름으로 레인을 찾는다.
+		static constexpr const char* kGpuLaneName = "[GPU Graphics]";
+
 		// --- recorder ----------------------------------------------------
 		// 시작 프레임 번호를 받는다. 이것이 없으면 첫 스코프들이 "아직 모르는"
 		// 프레임에 기록되고, 그 프레임을 닫을 때 붙는 라벨과 어긋난다 —
@@ -121,7 +145,17 @@ namespace ce
 			std::unique_ptr<thread_stream> stream;
 			std::uint32_t                  os_thread_id = 0;
 			bool                           live = false;
+
+			// 이 스트림은 적는 쪽만 봉인한다. publish_frame 이 건너뛴다.
+			bool                           self_sealed = false;
 		};
+
+		// GPU 레인의 스트림 자리. 아직 만들지 않았으면 비어 있다.
+		thread_stream* gpu_stream();
+
+		// 원자로 둔다. 만드는 것은 한 번이지만 읽는 쪽이 lock 없이 들어오므로,
+		// 평범한 포인터면 초기화가 보이지 않는 창이 생긴다.
+		std::atomic<thread_stream*> m_gpuStream{ nullptr };
 
 		std::uint32_t m_serviceSlot = 0;
 

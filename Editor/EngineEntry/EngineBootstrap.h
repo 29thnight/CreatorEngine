@@ -110,6 +110,24 @@ namespace EngineBootstrap
             []() { ce::profile_scope_begin(ce::marker<"RenderThreadFrame">()); },
             []() { ce::profile_scope_end(); } });
 
+        // GPU 구간도 같은 역전으로 받는다(§7.3 의 GPU Graphics queue).
+        //
+        // ★ 이름은 부르는 동안만 유효하므로 **여기서 곧바로** 표에 옮긴다.
+        //   GPU 패스 이름은 그래프가 정하므로 컴파일 시간에 없다 —
+        //   그래서 정적 marker<> 가 아니라 런타임 등록 경로를 쓴다.
+        //
+        // ★ 틱은 이미 CPU(QPC) 축이다. 옮기는 일은 두 시계를 가진 DX12
+        //   백엔드의 몫이고, 여기는 옮겨진 것만 받는다.
+        SetEnhancedLiveGpuSpanSink({
+            [](const char* name, std::uint64_t begin, std::uint64_t end,
+               std::uint32_t frame)
+            {
+                ce::profiler().submit_gpu_span(
+                    ce::intern_runtime_marker(name, ce::marker_kind::gpu_span),
+                    begin, end, frame);
+            },
+            []() { ce::profiler().publish_gpu_spans(); } });
+
 		if ((config.prepareRuntimeContent ||
 			config.paths.HasRuntimeOwnershipCapability()) &&
 			!config.paths.HasValidRuntimeOwnership())

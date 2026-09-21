@@ -364,7 +364,11 @@ function Invoke-Gpu {
         "render.live.wait 400"
         "render.live.wait 400"
         "render.live.wait 400"
+        "profile.record"
+        "render.live.wait 120"
+        "profile.pause"
         "dx12.live status"
+        "profile.frame"
         "quit"
     )
 
@@ -382,6 +386,33 @@ function Invoke-Gpu {
     }
 
     $gpu = $live.data.gpu
+
+    # GPU 레인은 dx12.live 가 아니라 **캡처**에서 확인한다. 장부가 초록이어도
+    # sink 를 아무도 걸지 않았으면 레인은 조용히 빈다.
+    $frameLine = ($result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"profile\.frame"' } | Select-Object -Last 1)
+    $gpuLaneEvents = 0
+    $gpuLaneFrames = 0
+    $gpuLaneSkewed = 0
+    $gpuLaneSeen = $false
+    if ($frameLine) {
+        try { $frameData = $frameLine.Trim() | ConvertFrom-Json } catch { $frameData = $null }
+        if ($frameData) {
+            foreach ($f in $frameData.data.frames) {
+                foreach ($th in $f.threads) {
+                    if ($th.name -ne '[GPU Graphics]') { continue }
+                    $gpuLaneSeen = $true
+                    $gpuLaneFrames++
+                    foreach ($e in $th.events) {
+                        $gpuLaneEvents++
+                        # ★ 이 한 줄이 이 조각의 계약이다. 이벤트가 담긴 프레임과
+                        #   이벤트가 들고 온 프레임 라벨이 같아야 한다.
+                        if ($e.startFrame -ne $f.frame) { $gpuLaneSkewed++ }
+                    }
+                }
+            }
+        }
+    }
 
     Write-Host ""
     Write-Host "[profile.gpu] GPU 수집 장부"
@@ -401,6 +432,9 @@ function Invoke-Gpu {
         $gpu.clockDriftMs, $gpu.clockMaxDriftMs)
     Write-Host ("  정렬 여유      제출→GPU 시작 최소 {0:N4} ms · GPU 끝→수집 최소 {1:N4} ms · 위반 {2}" -f
         $gpu.minSubmitToBeginMs, $gpu.minEndToCollectMs, $gpu.alignmentViolations)
+    Write-Host ("  귀속 지연      제출→수집 최대 {0:N4} ms" -f $gpu.maxSubmitToCollectMs)
+    Write-Host ("  레인 귀속      흘린 조각 {0} · 캡처의 GPU 레인 {1}칸 {2}건 · 어긋난 칸 {3}" -f
+        $gpu.spansEmitted, $gpuLaneFrames, $gpuLaneEvents, $gpuLaneSkewed)
     if ($gpu.clockError) { Write-Host ("  통합 축 사유   {0}" -f $gpu.clockError) }
     if ($gpu.lastError) { Write-Host ("  마지막 사유     {0}" -f $gpu.lastError) }
 
@@ -472,6 +506,26 @@ function Invoke-Gpu {
     if ($gpu.unalignedCollects -ne 0) {
         $failures.Add("CPU 축으로 못 옮긴 수집 $($gpu.unalignedCollects)/$($gpu.collects) - 표본이 있는데도 옮기지 않았다")
     }
+    # ── GPU 레인이 제 프레임 칸에 앉았는가(§7.3) ──────────────────
+    #
+    # ★ dx12.live 의 장부가 아니라 **캡처**를 묻는다. 수집이 돌고 정렬이 맞아도
+    #   sink 를 아무도 걸지 않았으면 레인은 조용히 빈다 — 생산만 있고 소비가
+    #   0 인 파이프라인이 이 저장소에서 여러 번 나왔다.
+    if ($gpu.spansEmitted -le 0) {
+        $failures.Add("EngineDiagnostics 로 흘린 조각이 0 - 귀속 sink 가 걸리지 않았다")
+    }
+    if (-not $gpuLaneSeen) {
+        $failures.Add("캡처에 [GPU Graphics] 레인이 없다 - 흘렸는데 담기지 않았다")
+    }
+    if ($gpuLaneEvents -le 0) {
+        $failures.Add("GPU 레인에 구간이 0 건 - 레인만 서고 내용이 없다")
+    }
+    # ★ 임계값이 아니라 동치다. 이벤트가 담긴 칸과 이벤트가 들고 온 라벨이
+    #   다르면 늦게 온 구간이 제 프레임으로 돌아가지 못한 것이다.
+    if ($gpuLaneSkewed -ne 0) {
+        $failures.Add("제 프레임 칸을 벗어난 GPU 구간 $gpuLaneSkewed/$gpuLaneEvents - 늦게 온 것이 수집한 프레임에 담겼다")
+    }
+
     if ($gpu.alignmentViolations -ne 0) {
         $failures.Add("정렬 위반 $($gpu.alignmentViolations)/$($gpu.collects) - 변환한 GPU 구간이 제출과 수집 사이를 벗어난다(제출→시작 최소 $($gpu.minSubmitToBeginMs) ms · 끝→수집 최소 $($gpu.minEndToCollectMs) ms)")
     }

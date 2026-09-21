@@ -53,12 +53,27 @@ namespace ce
 		m_droppedEvents = 0;
 		m_lastFrameEvents = 0;
 		m_peakFrameEvents = 0;
+		m_deferredSpans.clear();
+		m_lateSpansPlaced = 0;
+		m_lateSpansDropped = 0;
 	}
 
 	void capture_ring::ingest(const event_chunk* sealed_list)
 	{
 		while (sealed_list)
 		{
+			if (sealed_list->late_ingest)
+			{
+				// ★ 늦게 온 것은 **수집한 프레임**이 아니라 제 프레임 칸으로
+				//   돌려보낸다. 이 갈래가 없으면 GPU 일이 세 칸 뒤에 그려진다.
+				for (std::uint32_t i = 0; i < sealed_list->count; ++i)
+				{
+					place_late_span(sealed_list->events[i]);
+				}
+				sealed_list = sealed_list->next;
+				continue;
+			}
+
 			// 청크 안의 순서는 writer 가 지켰다. 여기서는 그대로 잇는다 —
 			// 수집 시점에 정렬하지 않는 것이 이 설계의 요점이다.
 			m_pending.events.insert(
@@ -67,6 +82,52 @@ namespace ce
 				sealed_list->events + sealed_list->count);
 
 			sealed_list = sealed_list->next;
+		}
+	}
+
+	void capture_ring::place_late_span(const profile_event& value)
+	{
+		// 뒤에서부터 찾는다. 늦게 오는 것은 대개 가장 최근 몇 프레임의 것이고,
+		// 실측에서 제출→수집이 최대 54.6 ms(세 프레임 남짓)였다.
+		for (std::size_t i = m_frames.size(); i > 0; --i)
+		{
+			frame_record& frame = m_frames[i - 1];
+			if (frame.engine_frame != value.frame) continue;
+
+			const std::size_t before = frame.memory_bytes();
+			frame.events.push_back(value);
+			m_memoryBytes += frame.memory_bytes() - before;
+			++m_lateSpansPlaced;
+			return;
+		}
+
+		// 링에 있는 가장 오래된 프레임보다 앞선 것은 이미 밀려난 것이다.
+		// 기다려도 오지 않으므로 버리고 센다.
+		if (!m_frames.empty() && value.frame < m_frames.front().engine_frame)
+		{
+			++m_lateSpansDropped;
+			return;
+		}
+
+		// 그 프레임이 아직 안 닫혔다. 다음 수집에서 다시 시도한다.
+		if (m_deferredSpans.size() >= kMaxDeferredSpans)
+		{
+			++m_lateSpansDropped;
+			return;
+		}
+		m_deferredSpans.push_back(value);
+	}
+
+	void capture_ring::drain_deferred_spans()
+	{
+		if (m_deferredSpans.empty()) return;
+
+		// 자기 자신을 다시 채우지 않도록 통째로 떼어 내고 돈다.
+		std::vector<profile_event> pendingSpans;
+		pendingSpans.swap(m_deferredSpans);
+		for (const profile_event& value : pendingSpans)
+		{
+			place_late_span(value);
 		}
 	}
 
@@ -88,6 +149,10 @@ namespace ce
 		m_memoryBytes += m_pending.memory_bytes();
 		m_frames.push_back(std::move(m_pending));
 		m_pending = frame_record{};
+
+		// 방금 프레임 하나가 닫혔다. 그 프레임을 기다리던 구간이 있으면
+		// 지금 들어간다 — 닫히기 **전에** 온 것들의 자리가 여기다.
+		drain_deferred_spans();
 
 		trim();
 	}

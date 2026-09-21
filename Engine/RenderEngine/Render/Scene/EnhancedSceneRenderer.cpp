@@ -112,6 +112,23 @@ namespace EnhancedSceneRenderer
     };
 }
 
+// GPU 구간을 받아 갈 자리. 프로세스 하나에 하나이고, 렌더러가 서기 전에
+// 걸어 둔다. 이 층은 받는 쪽이 무엇인지 모른다 — 함수만 들고 있다.
+namespace
+{
+    EnhancedLiveGpuSpanSink g_gpuSpanSink{};
+}
+
+void SetEnhancedLiveGpuSpanSink(const EnhancedLiveGpuSpanSink& sink)
+{
+    g_gpuSpanSink = sink;
+}
+
+namespace
+{
+    const EnhancedLiveGpuSpanSink& GpuSpanSink() { return g_gpuSpanSink; }
+}
+
 namespace
 {
     // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
@@ -1173,6 +1190,8 @@ namespace
         uint64_t gpuZeroLengthSlices{ 0 };
         uint64_t gpuSpanViolations{ 0 };
         uint64_t gpuSliceUnderflows{ 0 };
+        double   gpuMaxSubmitToCollectMs{ 0.0 };
+        uint64_t gpuSpansEmitted{ 0 };
         uint64_t gpuAlignmentViolations{ 0 };
         uint64_t gpuUnalignedCollects{ 0 };
         uint64_t gpuAlignedCollects{ 0 };
@@ -1527,6 +1546,8 @@ namespace
             debugSnapshot.gpuZeroLengthSlices = gpuZeroLengthSlices;
             debugSnapshot.gpuSpanViolations = gpuSpanViolations;
             debugSnapshot.gpuSliceUnderflows = gpuSliceUnderflows;
+            debugSnapshot.gpuMaxSubmitToCollectMs = gpuMaxSubmitToCollectMs;
+            debugSnapshot.gpuSpansEmitted = gpuSpansEmitted;
             debugSnapshot.gpuAlignmentViolations = gpuAlignmentViolations;
             debugSnapshot.gpuUnalignedCollects = gpuUnalignedCollects;
             debugSnapshot.gpuMinSubmitToBeginMs = gpuMinSubmitToBeginMs;
@@ -5346,12 +5367,13 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 //   그것은 숫자가 틀렸다는 것보다 훨씬 고치기 쉬운 신호다.
                 ++state.gpuCollects;
 
+                std::vector<EnhancedLiveGpuSlice> slices;
                 std::vector<EnhancedLivePassTiming> timings;
                 EnhancedLiveGpuSpan span{};
                 std::string collectError;
                 double totalMilliseconds = 0.0;
                 if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
-                    timings, span, totalMilliseconds, collectError))
+                    timings, slices, span, totalMilliseconds, collectError))
                 {
                     state.lastGpuMs = totalMilliseconds;
                     // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
@@ -5397,7 +5419,29 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                             state.gpuMinEndToCollectMs = (std::min)(
                                 state.gpuMinEndToCollectMs, span.gpuEndToCollectMs);
                         }
+                        state.gpuMaxSubmitToCollectMs = (std::max)(
+                            state.gpuMaxSubmitToCollectMs, span.submitToCollectMs);
                         ++state.gpuAlignedCollects;
+
+                        // ── EngineDiagnostics 로 귀속(§7.3) ──────────
+                        //
+                        // ★ 여기서만 흘린다. 통합 축이 살아 있고 정렬도
+                        //   맞은 수집만 내보낸다 — 맞지 않는 구간을 레인에
+                        //   얹으면 그럴듯한 자리에 거짓이 그려진다.
+                        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                        if (sink.on_span && span.submitToGpuBeginMs >= 0.0 &&
+                            span.gpuEndToCollectMs >= 0.0)
+                        {
+                            const uint32_t frameLabel = static_cast<uint32_t>(
+                                view.slots[slotIndex].profilerToken.engineFrameId);
+                            for (const EnhancedLiveGpuSlice& slice : slices)
+                            {
+                                sink.on_span(slice.name.c_str(), slice.beginCpuTick,
+                                             slice.endCpuTick, frameLabel);
+                                ++state.gpuSpansEmitted;
+                            }
+                            if (sink.on_flush && !slices.empty()) sink.on_flush();
+                        }
                     }
 
                     if (span.sliceCount < state.lastPassTimings.size())

@@ -33,6 +33,16 @@ namespace ce
 		// 조용히 잃었고, 그것이 selftest 의 cross-frame/preserve 가 기지
 		// 결함으로 남아 있던 이유다.
 		truncated_end = 1 << 1,
+
+		// GPU 큐에서 이미 끝난 구간. CPU 스코프와 달리 **늦게** 도착한다 —
+		// 펜스가 완료된 뒤에야 읽을 수 있기 때문이다(실측 제출→수집 최대
+		// 54.6 ms, 60 Hz 로 세 프레임이 넘는다).
+		//
+		// ★ 수집기는 이 표식을 보고 이벤트를 **수집한 프레임**이 아니라
+		//   **자기 프레임 칸**으로 돌려보낸다. 그러지 않으면 GPU 일이 세 칸
+		//   뒤에 그려지고, 그것은 "UI 보다 frame identity 가 먼저다"(§13.1)를
+		//   정면으로 어긴다.
+		gpu_span = 1 << 2,
 	};
 
 	inline constexpr event_flags operator|(event_flags a, event_flags b)
@@ -86,9 +96,14 @@ namespace ce
 
 		event_chunk* next = nullptr;   // pool 과 sealed 목록이 함께 쓰는 고리
 
+		// 늦게 오는 이벤트를 담은 청크인가. 수집기가 청크 단위로 가르므로
+		// 이벤트마다 표식을 보지 않아도 된다 — CPU 경로는 지금처럼 통째로 잇는다.
+		bool late_ingest = false;
+
 		void reset(std::uint32_t slot, std::uint64_t seq)
 		{
 			count = 0;
+			late_ingest = false;
 			thread_slot = slot;
 			sequence = seq;
 			next = nullptr;

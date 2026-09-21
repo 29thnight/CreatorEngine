@@ -351,6 +351,9 @@ namespace ConsoleCmd
             gpu.Set("clockDriftMs", CommandData::Double(snapshot.gpuClock.lastDriftMs));
             gpu.Set("clockMaxDriftMs",
                 CommandData::Double(snapshot.gpuClock.maxAbsoluteDriftMs));
+            gpu.Set("spansEmitted", CommandData::Int(snapshot.gpuSpansEmitted));
+            gpu.Set("maxSubmitToCollectMs",
+                CommandData::Double(snapshot.gpuMaxSubmitToCollectMs));
             gpu.Set("alignmentViolations",
                 CommandData::Int(snapshot.gpuAlignmentViolations));
             gpu.Set("unalignedCollects", CommandData::Int(snapshot.gpuUnalignedCollects));

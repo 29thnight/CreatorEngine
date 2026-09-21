@@ -89,8 +89,12 @@ public:
 
     /// 두 시계를 맞춘 표본의 상태. 통합 축이 꺼져 있으면 valid 가 거짓이다.
     EnhancedLiveGpuClock ProfilerClock() const;
+    /// outSlices 는 이름으로 묶기 **전**의 원본이고 틱은 CPU(QPC) 축이다.
+    /// 통합 축이 꺼져 있으면 비워서 돌려준다 — 옮기지 못한 틱을 내보내면
+    /// 받는 쪽이 그것을 CPU 시각으로 읽는다.
     bool CollectProfiler(const GpuFrameToken& token,
         std::vector<EnhancedLivePassTiming>& outTimings,
+        std::vector<EnhancedLiveGpuSlice>& outSlices,
         EnhancedLiveGpuSpan& outSpan,
         double& outTotalMilliseconds, std::string& outError);
 

@@ -350,6 +350,13 @@ struct EnhancedLiveGpuSpan
     double      submitToGpuBeginMs{ 0.0 };
     /// 변환한 GPU 끝부터 수집한 CPU 시각까지. 음수면 아직 안 끝난 것을 읽었다.
     double      gpuEndToCollectMs{ 0.0 };
+
+    /// 제출을 연 순간부터 수집까지의 경과.
+    ///
+    /// ★ 이것이 EngineDiagnostics 귀속의 전제다. capture_ring 은 이벤트를
+    ///   **수집한 프레임**의 기록에 담는데 GPU 구간은 늦게 온다. 이 수가 한
+    ///   프레임보다 크면 GPU 레인이 제 프레임 칸을 벗어난다는 뜻이다.
+    double      submitToCollectMs{ 0.0 };
 };
 
 /// 두 시계를 맞춘 표본의 상태(§5.1).
@@ -363,6 +370,32 @@ struct EnhancedLiveGpuClock
     bool     valid{ false };
     std::string lastError;
 };
+
+/// GPU 조각 하나를 CPU(QPC) 축에 얹은 것. 이름으로 묶기 **전**의 원본이다.
+struct EnhancedLiveGpuSlice
+{
+    std::string name;
+    uint64_t    beginCpuTick{ 0 };
+    uint64_t    endCpuTick{ 0 };
+};
+
+/// GPU 구간을 밖으로 흘리는 자리(§7.3 의 GPU Graphics queue).
+///
+/// ★ 이 층은 프로파일러를 모른다. 함수를 받아 두고 부르기만 한다 —
+///   thread_pool::worker_hooks 와 같은 뒤집기다(P2). 그 경계가 없으면
+///   RenderEngine 이 EngineDiagnostics 에 의존하게 되고, 그것은 이 트랙이
+///   내내 피해 온 방향이다.
+///
+/// ★ name 은 **부르는 동안만** 유효하다. 받는 쪽이 곧바로 자기 표에 옮긴다.
+struct EnhancedLiveGpuSpanSink
+{
+    void (*on_span)(const char* name, uint64_t beginCpuTick, uint64_t endCpuTick,
+                    uint32_t engineFrameId) = nullptr;
+    void (*on_flush)() = nullptr;
+};
+
+/// sink 를 건다. 렌더러가 서기 전에 걸어야 첫 수집부터 흐른다.
+void SetEnhancedLiveGpuSpanSink(const EnhancedLiveGpuSpanSink& sink);
 
 struct EnhancedLivePassTiming
 {
@@ -536,12 +569,21 @@ struct EnhancedLiveDebugSnapshot
     /// ★ 이것이 통합 축의 검산이다. CPU 가 제출을 열기 전에 GPU 가 돌았다거나,
     ///   수집한 뒤에 끝났다는 것은 있을 수 없다 — 나오면 두 시계가 맞지 않는
     ///   것이고, 그때 타임라인의 GPU 트랙은 그럴듯한 거짓말이 된다.
+/// EngineDiagnostics 레인으로 흘려보낸 GPU 조각 수.
+    ///
+    /// ★ 0 이면 귀속이 죽은 것이다 — 정렬이 맞아도, 수집이 돌아도, sink 를
+    ///   아무도 걸지 않았으면 레인은 조용히 빈다.
+    uint64_t gpuSpansEmitted{ 0 };
+
     uint64_t gpuAlignmentViolations{ 0 };
     uint64_t gpuUnalignedCollects{ 0 };  // 표본이 없어 옮기지 못한 수집
 
     /// 정렬 여유의 최솟값(ms). 둘 다 0 보다 커야 한다.
     double   gpuMinSubmitToBeginMs{ 0.0 };
     double   gpuMinEndToCollectMs{ 0.0 };
+
+    /// 제출→수집 경과의 최댓값. 귀속이 몇 프레임을 건너뛰는지를 말한다.
+    double   gpuMaxSubmitToCollectMs{ 0.0 };
 
     /// 두 시계 표본의 상태.
     EnhancedLiveGpuClock gpuClock{};

@@ -102,11 +102,36 @@ namespace ce
 		std::uint32_t last_frame_events() const { return m_lastFrameEvents; }
 		std::uint32_t peak_frame_events() const { return m_peakFrameEvents; }
 
+		// 늦게 온 구간의 장부.
+		//
+		//   placed   제 프레임 칸을 찾아 들어간 것
+		//   waiting  아직 그 프레임이 닫히지 않아 기다리는 것
+		//   dropped  그 프레임이 이미 링 밖으로 밀려나 갈 곳이 없던 것
+		//
+		// ★ dropped 를 세지 않으면 "GPU 레인이 비었다" 와 "늦어서 잃었다" 가
+		//   구분되지 않는다. 빈 집합을 성공으로 읽는 바로 그 양식이다.
+		std::uint64_t late_spans_placed() const { return m_lateSpansPlaced; }
+		std::uint64_t late_spans_dropped() const { return m_lateSpansDropped; }
+		std::size_t   late_spans_waiting() const { return m_deferredSpans.size(); }
+
 	private:
 		void trim();
 
+		// 이 구간을 제 프레임 칸에 넣는다. 그 프레임이 아직 안 닫혔으면
+		// 기다리게 두고, 이미 밀려났으면 버리고 센다.
+		void place_late_span(const profile_event& value);
+		void drain_deferred_spans();
+
 		std::vector<frame_record> m_frames;
 		frame_record              m_pending;
+
+		// 아직 제 프레임이 닫히지 않아 기다리는 구간. 상한을 두는 이유는
+		// 프레임이 영영 안 닫히는 경우(녹화를 멈춘 채 GPU 만 도는 경우)에
+		// 이 목록이 무한히 자라지 않게 하기 위해서다.
+		static constexpr std::size_t kMaxDeferredSpans = 4096;
+		std::vector<profile_event> m_deferredSpans;
+		std::uint64_t m_lateSpansPlaced = 0;
+		std::uint64_t m_lateSpansDropped = 0;
 
 		std::uint32_t m_retainedFrames = kDefaultRetainedFrames;
 		std::size_t   m_memoryBudget = kDefaultMemoryBudget;

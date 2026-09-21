@@ -116,6 +116,10 @@ namespace ce
 			}
 			m_streams.clear();
 			m_threadInfo.clear();
+
+			// 표가 비었으므로 레인 포인터도 놓는다. 안 놓으면 다음 초기화까지
+			// 죽은 스트림을 가리킨 채로 남는다.
+			m_gpuStream.store(nullptr, std::memory_order_release);
 		}
 
 		// 봉인된 것을 마저 거둔 뒤 풀을 접는다. 여기서 빼먹으면 종료 직전
@@ -295,6 +299,78 @@ namespace ce
 		m_pool.release(sealed);
 	}
 
+	thread_stream* profiler_service::gpu_stream()
+	{
+		thread_stream* existing = m_gpuStream.load(std::memory_order_acquire);
+		if (existing)
+		{
+			return existing;
+		}
+
+		std::lock_guard<std::mutex> guard(m_streamLock);
+		existing = m_gpuStream.load(std::memory_order_relaxed);
+		if (existing)
+		{
+			return existing;
+		}
+
+		thread_info info;
+		info.os_thread_id = 0;   // OS 스레드가 아니다 — 큐다.
+		info.slot = static_cast<std::uint32_t>(m_streams.size());
+		info.name = kGpuLaneName;
+
+		auto stream = std::make_unique<thread_stream>(m_pool, info);
+		thread_stream* created = stream.get();
+
+		stream_entry entry;
+		entry.stream = std::move(stream);
+		entry.os_thread_id = 0;
+		entry.live = true;
+		entry.self_sealed = true;
+
+		m_streams.push_back(std::move(entry));
+		m_threadInfo.push_back(std::move(info));
+
+		// 표에 올린 **뒤에** 공개한다. 먼저 공개하면 다른 스레드가 아직
+		// 등록되지 않은 스트림에 적을 수 있다.
+		m_gpuStream.store(created, std::memory_order_release);
+		return created;
+	}
+
+	void profiler_service::submit_gpu_span(marker_id id, profile_tick begin,
+	                                       profile_tick end, std::uint32_t frame)
+	{
+		if (!m_initialized.load(std::memory_order_acquire))
+		{
+			return;
+		}
+		if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
+		{
+			return;
+		}
+
+		// 끝이 시작보다 앞선 구간은 받지 않는다. 길이 0 은 받는다 — 그 패스는
+		// 실제로 돌았고 비용이 timestamp 분해능 아래일 뿐이다.
+		if (end < begin)
+		{
+			return;
+		}
+
+		thread_stream* stream = gpu_stream();
+		if (!stream) return;
+
+		// 깊이는 0 이다. 한 큐의 구간들은 중첩하지 않는다 — BeginPass/EndPass
+		// 가 커맨드 리스트에 순서대로 놓이기 때문이다.
+		stream->write_span(id, begin, end, frame, 0);
+	}
+
+	void profiler_service::publish_gpu_spans()
+	{
+		thread_stream* stream = m_gpuStream.load(std::memory_order_acquire);
+		if (!stream) return;
+		stream->publish_frame();
+	}
+
 	void profiler_service::publish_frame(std::uint32_t engine_frame)
 	{
 		if (!m_initialized.load(std::memory_order_acquire))
@@ -314,11 +390,16 @@ namespace ce
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			for (stream_entry& entry : m_streams)
 			{
-				if (entry.stream)
+				if (!entry.stream) continue;
+
+				// ★ 남의 스트림을 봉인하지 않는다. GPU 레인은 렌더 스레드가
+				//   적고 이 루프는 게임 스레드가 도므로, 여기서 봉인하면 두
+				//   스레드가 같은 청크 포인터를 동시에 만진다.
+				if (!entry.self_sealed)
 				{
 					entry.stream->publish_frame();
-					dropped += entry.stream->dropped_events();
 				}
+				dropped += entry.stream->dropped_events();
 			}
 		}
 
@@ -428,6 +509,12 @@ namespace ce
 			}
 		}
 		value.unbalanced_scopes = unbalanced;
+
+		// GPU 레인의 장부. 링은 수집기만 만지므로 여기서 읽는 것은
+		// 프레임 경계를 도는 쪽과 같은 스레드일 때만 정확하다 — 진단용이다.
+		value.late_spans_placed = m_ring.late_spans_placed();
+		value.late_spans_dropped = m_ring.late_spans_dropped();
+		value.late_spans_waiting = m_ring.late_spans_waiting();
 
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);

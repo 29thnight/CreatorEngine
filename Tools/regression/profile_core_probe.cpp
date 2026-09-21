@@ -1360,6 +1360,156 @@ namespace
 	}
 }
 
+
+// ── GPU 레인: 늦게 온 구간이 제 프레임 칸으로 돌아가는가 ──────────────
+//
+// ★ 이것이 이 조각의 계약 전부다. capture_ring 은 이벤트를 **수집한 프레임**의
+//   기록에 담는데, GPU 구간은 펜스가 끝난 뒤에야 읽히므로 늦게 온다(실측
+//   제출→수집 최대 54.6 ms — 60 Hz 로 세 프레임이 넘는다). 표식을 보고
+//   돌려보내지 않으면 GPU 일이 세 칸 뒤에 그려진다.
+void test_gpu_lane()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.record(1);
+
+	// 프레임 1~5 를 돌린다. GPU 구간은 **프레임 2 의 것**인데 프레임 5 를
+	// 닫기 직전에야 도착한다.
+	const ce::profile_tick base = ce::profiler_service::now();
+	for (std::uint32_t frame = 1; frame <= 5; ++frame)
+	{
+		if (frame == 5)
+		{
+			service.submit_gpu_span(ce::marker<"GpuPass">(), base + 10, base + 20, 2);
+			service.publish_gpu_spans();
+		}
+		service.publish_frame(frame);
+	}
+
+	service.pause();
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "gpu-lane/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	// 레인이 이름을 달고 표에 서 있다.
+	bool laneFound = false;
+	std::uint16_t laneSlot = 0;
+	for (const ce::thread_info& info : capture->threads())
+	{
+		if (info.name != ce::profiler_service::kGpuLaneName) continue;
+		laneFound = true;
+		laneSlot = static_cast<std::uint16_t>(info.slot);
+	}
+	check(laneFound, "gpu-lane/name — [GPU Graphics] 레인이 표에 있다");
+
+	// ★ 구간은 **프레임 2** 칸에 있어야 한다. 도착한 프레임 5 가 아니다.
+	std::size_t inFrameTwo = 0;
+	std::size_t inOtherFrames = 0;
+	for (const ce::frame_record& frame : capture->frames())
+	{
+		for (const ce::profile_event& event : frame.events)
+		{
+			if (!ce::has_flag(event.flags, ce::event_flags::gpu_span)) continue;
+			if (frame.engine_frame == 2) ++inFrameTwo;
+			else ++inOtherFrames;
+
+			check(event.thread_slot == laneSlot,
+			      "gpu-lane/slot — 구간이 GPU 레인 자리에 달렸다");
+			check(event.tick_begin == base + 10 && event.tick_end == base + 20,
+			      "gpu-lane/ticks — 넘긴 틱이 그대로 남는다");
+			check(event.frame == 2, "gpu-lane/frame-label — 라벨이 제 프레임이다");
+		}
+	}
+	check_eq<std::size_t>(inFrameTwo, 1, "gpu-lane/placed — 제 프레임 칸에 들어갔다");
+	check_eq<std::size_t>(inOtherFrames, 0,
+	                      "gpu-lane/no-skew — 수집한 프레임 칸에 남지 않았다");
+
+	service.shutdown();
+}
+
+// 아직 닫히지 않은 프레임의 구간은 기다렸다가 그 프레임이 닫힐 때 들어간다.
+void test_gpu_lane_deferred()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.record(1);
+
+	const ce::profile_tick base = ce::profiler_service::now();
+
+	// 프레임 1 을 닫은 뒤, **아직 오지 않은** 프레임 3 의 구간을 낸다.
+	service.publish_frame(1);
+	service.submit_gpu_span(ce::marker<"GpuAhead">(), base + 1, base + 2, 3);
+	service.publish_gpu_spans();
+	service.publish_frame(2);   // 아직 3 이 아니다 — 기다려야 한다
+	service.publish_frame(3);   // 여기서 들어간다
+	service.publish_frame(4);
+
+	service.pause();
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "gpu-deferred/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	std::size_t inFrameThree = 0;
+	std::size_t elsewhere = 0;
+	for (const ce::frame_record& frame : capture->frames())
+	{
+		for (const ce::profile_event& event : frame.events)
+		{
+			if (!ce::has_flag(event.flags, ce::event_flags::gpu_span)) continue;
+			if (frame.engine_frame == 3) ++inFrameThree;
+			else ++elsewhere;
+		}
+	}
+	check_eq<std::size_t>(inFrameThree, 1,
+	                      "gpu-deferred/placed — 그 프레임이 닫힐 때 들어간다");
+	check_eq<std::size_t>(elsewhere, 0,
+	                      "gpu-deferred/no-early — 닫히기 전 칸에 끼지 않는다");
+
+	service.shutdown();
+}
+
+// 그 프레임이 이미 링 밖으로 밀려났으면 **버리고 센다.** 조용히 사라지면
+// "GPU 레인이 비었다" 와 "늦어서 잃었다" 가 구분되지 않는다.
+void test_gpu_lane_dropped()
+{
+	ce::profiler_config config;
+	config.retained_frames = 3;
+
+	ce::profiler_service service;
+	service.initialize(config);
+	service.record(1);
+
+	const ce::profile_tick base = ce::profiler_service::now();
+	for (std::uint32_t frame = 1; frame <= 8; ++frame)
+	{
+		service.publish_frame(frame);
+	}
+
+	// 프레임 1 은 이미 밀려났다.
+	service.submit_gpu_span(ce::marker<"GpuGone">(), base + 1, base + 2, 1);
+	service.publish_gpu_spans();
+	service.publish_frame(9);
+
+	service.pause();
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "gpu-dropped/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	std::size_t spans = 0;
+	for (const ce::frame_record& frame : capture->frames())
+	{
+		for (const ce::profile_event& event : frame.events)
+		{
+			if (ce::has_flag(event.flags, ce::event_flags::gpu_span)) ++spans;
+		}
+	}
+	check_eq<std::size_t>(spans, 0, "gpu-dropped/absent — 갈 곳이 없으면 넣지 않는다");
+	check(service.summary().late_spans_dropped > 0,
+	      "gpu-dropped/counted — 버렸다는 사실을 센다");
+
+	service.shutdown();
+}
+
 int main()
 {
 	test_marker_identity();
@@ -1383,6 +1533,9 @@ int main()
 	test_timeline_view();
 	test_scope_across_state_change();
 	test_reader_sync();
+	test_gpu_lane();
+	test_gpu_lane_deferred();
+	test_gpu_lane_dropped();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

@@ -107,6 +107,14 @@ namespace ce
 		//   손실 계수기가 오른다.
 		void skip_scope() { ++m_skippedDepth; }
 
+		// 이미 끝난 구간을 그대로 적는다. 스코프 스택을 쓰지 않는다 —
+		// GPU 구간은 나중에, 완성된 채로, 시작 시각까지 들고 온다.
+		//
+		// ★ 틱은 **CPU(QPC) 축으로 옮긴 뒤**의 값이어야 한다. 이 층은 GPU 틱을
+		//   모르고, 옮기는 일은 두 시계를 가진 백엔드의 몫이다.
+		void write_span(marker_id id, profile_tick begin, profile_tick end,
+		                std::uint32_t frame, std::uint16_t depth);
+
 		// 프레임 경계. 열려 있는 스코프는 닫지 않는다 — 그것이 프레임을 넘는
 		// 구간이고, 옛 코어가 스택 맨 위를 무조건 닫아 잃던 것이다. 대신
 		// 지금까지 쓴 청크를 봉인해 수집기가 이번 프레임을 볼 수 있게 한다.

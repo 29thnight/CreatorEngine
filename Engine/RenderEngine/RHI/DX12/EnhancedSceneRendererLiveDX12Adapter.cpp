@@ -421,6 +421,7 @@ void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameTo
 
 bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& token,
     std::vector<EnhancedLivePassTiming>& outTimings,
+    std::vector<EnhancedLiveGpuSlice>& outSlices,
     EnhancedLiveGpuSpan& outSpan,
     double& outTotalMilliseconds, std::string& outError)
 {
@@ -476,6 +477,27 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
             static_cast<int64_t>(timings.queueEndCpuTicks);
         outSpan.submitToGpuBeginMs = static_cast<double>(submitToBegin) * cpuToMs;
         outSpan.gpuEndToCollectMs = static_cast<double>(endToCollect) * cpuToMs;
+        const int64_t submitToCollect = static_cast<int64_t>(collectTick.QuadPart) -
+            static_cast<int64_t>(token.cpuSubmitTick);
+        outSpan.submitToCollectMs = static_cast<double>(submitToCollect) * cpuToMs;
+
+        // raw 조각을 CPU 축으로 옮겨 내준다. 묶은 것이 아니라 이것이 타임라인의
+        // 자료다 — 묶으면 분할 패스가 한 덩어리로 보인다.
+        outSlices.resize(timings.slices.size());
+        for (size_t i = 0; i < timings.slices.size(); ++i)
+        {
+            outSlices[i].name.assign(timings.slices[i].name);
+            outSlices[i].beginCpuTick =
+                m_impl->profiler.GpuTickToCpuTick(timings.slices[i].beginTicks);
+            outSlices[i].endCpuTick =
+                m_impl->profiler.GpuTickToCpuTick(timings.slices[i].endTicks);
+        }
+    }
+    else
+    {
+        // 옮기지 못한 틱을 내보내지 않는다. 받는 쪽은 이것을 CPU 시각으로 읽고,
+        // 그러면 GPU 레인이 엉뚱한 곳에 그려진다.
+        outSlices.clear();
     }
     return true;
 }

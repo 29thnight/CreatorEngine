@@ -147,6 +147,60 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
 
+### 0.5.14 2026-09-21 P4 GPU 귀속 — 늦게 온 것을 제 프레임 칸으로 돌려보냈다
+
+**먼저 쟀다. 제출→수집이 최대 50~64 ms 다** — 60 Hz 로 세 프레임이 넘는다.
+`capture_ring` 은 이벤트를 **수집한 프레임**의 기록에 담으므로, 그대로 넣으면
+GPU 일이 세 칸 뒤에 그려진다. "UI 보다 frame identity 가 먼저다"(§13.1)를
+정면으로 어기는 자리라, 이 수 하나가 조각의 설계를 정했다.
+
+**선 것 다섯.**
+
+| 것 | 뜻 |
+|---|---|
+| `event_flags::gpu_span` · `event_chunk::late_ingest` | 늦게 오는 것임을 청크 단위로 가른다 |
+| `thread_stream::write_span` | 이미 끝난 구간을 스코프 스택 없이 적는다 |
+| `profiler_service::submit_gpu_span` | 전용 `[GPU Graphics]` 레인. **적는 쪽만** 봉인한다 |
+| `capture_ring::place_late_span` | 제 프레임 칸을 찾아 넣고, 아직이면 기다리고, 없으면 **센다** |
+| `intern_runtime_marker` | 런타임 이름을 **표가 소유한다**(정적 경로는 리터럴만 가리킨다) |
+
+**경계는 P2 가 정해 둔 그대로다.** RenderEngine 은 프로파일러를 모른다 —
+`EnhancedLiveGpuSpanSink` 로 함수를 받아 두고 부르기만 하고, 거는 쪽은
+`EngineBootstrap` 이다. `thread_pool::worker_hooks` 와 같은 뒤집기다.
+
+**★ 레인은 남이 봉인하면 안 된다.** `publish_frame` 은 등록된 모든 스트림의
+청크를 봉인하는데, 그 루프를 도는 것은 게임 스레드이고 GPU 레인에 적는 것은
+렌더 스레드다. 남이 봉인하면 두 스레드가 같은 청크 포인터를 만진다. 그래서
+`stream_entry::self_sealed` 를 두고 그 루프가 이 레인을 건너뛴다.
+
+**실측(Debug · 씬뷰·게임뷰 둘 활성 · 120 프레임 녹화).**
+
+| 항목 | 값 |
+|---|---|
+| EngineDiagnostics 로 흘린 조각 | 900 ~ 1,206 |
+| 캡처의 `[GPU Graphics]` 레인 | 5~6 칸 · 261~303 건 |
+| **제 프레임 칸을 벗어난 구간** | **0** |
+
+**변이 다섯이 각각 제 단정에서 붉어진다.** 코어 셋은 엔진을 띄우지 않고 돈다.
+
+| 변이 | 잡은 단정 |
+|---|---|
+| `gpu-span-to-pending`(늦은 것을 수집한 프레임에) | `gpu-lane/` (코어) |
+| `gpu-span-no-defer`(닫히기 전 것을 버림) | `gpu-deferred/placed` (코어) |
+| `gpu-span-silent-drop`(버린 것을 안 셈) | `gpu-dropped/counted` (코어) |
+| `sink-never-installed` | 흘린 조각 0 · 레인 없음 · 구간 0 (라이브) |
+| `late-span-to-pending` | 제 프레임 칸을 벗어난 구간 **456/456** (라이브) |
+
+마지막 둘이 라이브 축의 단정을 증명한다. 특히 skew 단정은 **임계값이 아니라
+동치**다 — 이벤트가 담긴 칸과 이벤트가 들고 온 라벨이 같아야 한다.
+
+**★ 남은 물음 하나(이 조각에서 고치지 않았다).** `publish_frame` 이 **다른
+스레드의** 스트림을 봉인하는 것은 GPU 레인 말고도 워커 스트림 전부에 해당한다.
+`thread_stream::seal_current` 가 `m_writer` 를 비우는 동안 그 워커가 `write()`
+안에 있을 수 있다. GPU 레인은 `self_sealed` 로 비껴 두었지만 워커 쪽은 그대로다.
+**아직 재지 않았다** — 코어 프로브에 "한 스레드가 계속 적는 동안 다른 스레드가
+publish_frame 을 도는" 자극을 세워 잃거나 망가지는지 보는 것이 다음 실험이다.
+
 ### 0.5.13 2026-09-21 P4 clock calibration — 판정을 임계값이 아니라 인과에 걸었다
 
 **§5.1 의 "CPU/GPU 상관: `GetClockCalibration`" 을 세웠다.** 그때까지 GPU

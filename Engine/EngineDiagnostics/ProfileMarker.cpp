@@ -1,5 +1,6 @@
 #include "ProfileMarker.h"
 
+#include <deque>
 #include <mutex>
 #include <string>
 #include <unordered_map>
@@ -17,6 +18,12 @@ namespace ce::detail::marker_registry_impl
 		std::mutex                                     lock;
 		std::vector<marker_desc>                       descs;
 		std::unordered_map<std::string, marker_id>     by_name;
+
+		// 런타임 이름의 보관소. deque 인 이유는 **주소가 고정**되어야 하기
+		// 때문이다 — vector<string> 은 재할당 때 원소를 옮기고, 짧은 문자열은
+		// 버퍼가 객체 안에 있어(SSO) 같이 움직인다. 그러면 표가 들고 있는
+		// c_str() 가 통째로 엉뚱한 곳을 가리킨다.
+		std::deque<std::string>                        owned_names;
 	};
 
 	// 함수 지역 static — 첫 호출에서 선다. 마커 슬롯의 동적 초기화가 어느
@@ -68,6 +75,34 @@ namespace ce
 			reg.by_name.emplace(std::move(key), id);
 			return id;
 		}
+	}
+
+	marker_id intern_runtime_marker(std::string_view name, marker_kind kind)
+	{
+		using namespace ce::detail::marker_registry_impl;
+
+		registry& reg = get();
+		std::lock_guard<std::mutex> guard(reg.lock);
+		ensure_sentinel(reg);
+
+		std::string key(name);
+		key.push_back('#');
+		key.push_back(static_cast<char>('0' + static_cast<int>(kind)));
+
+		const auto found = reg.by_name.find(key);
+		if (found != reg.by_name.end())
+		{
+			return found->second;
+		}
+
+		// 표가 이름을 소유한다. 이 주소는 프로세스가 끝날 때까지 산다.
+		reg.owned_names.emplace_back(name);
+		const char* stable = reg.owned_names.back().c_str();
+
+		const marker_id id = static_cast<marker_id>(reg.descs.size());
+		reg.descs.push_back(marker_desc{ stable, nullptr, 0, kind });
+		reg.by_name.emplace(std::move(key), id);
+		return id;
 	}
 
 	const marker_desc& marker_info(marker_id id)

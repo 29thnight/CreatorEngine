@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string_view>
 
 namespace ce
 {
@@ -28,6 +29,7 @@ namespace ce
 		cpu_scope = 0,
 		counter   = 1,
 		instant   = 2,
+		gpu_span  = 3,
 	};
 
 	struct marker_desc
@@ -83,6 +85,14 @@ namespace ce
 
 	// 등록된 마커를 되읽는다. reader(UI·CLI·저장)만 쓴다 — hot path 에는
 	// 이 경로가 없다.
+	// 런타임 이름의 마커. 이름이 컴파일 시간에 없을 때만 쓴다 — GPU 패스
+	// 이름이 그렇다(그래프가 정하고 셰이더 구성에 따라 달라진다).
+	//
+	// ★ 표가 **이름을 소유한다.** 정적 경로는 문자열 리터럴을 가리키므로
+	//   포인터만 들고 있어도 되지만, 런타임 이름은 부르는 쪽의 버퍼가 곧
+	//   덮인다 — 그대로 들면 나중에 읽을 때 남의 글자가 나온다.
+	marker_id intern_runtime_marker(std::string_view name, marker_kind kind);
+
 	const marker_desc& marker_info(marker_id id);
 	std::span<const marker_desc> registered_markers();
 	std::uint32_t registered_marker_count();
