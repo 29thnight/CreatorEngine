@@ -1,5 +1,6 @@
 #include "ProfileService.h"
 #include <chrono>
+#include <cstdio>
 #include <thread>
 
 #include <Windows.h>
@@ -145,10 +146,22 @@ namespace ce
 
 		m_state.store(recorder_state::stopped, std::memory_order_release);
 
+		std::string abandonedNames;
 		{
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			for (std::size_t i = 0; i < m_streams.size(); ++i)
 			{
+				// 놓아 두게 될 것의 이름을 먼저 적는다. 표를 비운 뒤에는 어느
+				// 스레드였는지 알 길이 없고, 그러면 수만 남아 고칠 자리를
+				// 못 짚는다.
+				const bool willAbandon = m_streams[i].stream &&
+					(m_streams[i].stream->owner_thread() != std::this_thread::get_id());
+				if (willAbandon && i < m_threadInfo.size())
+				{
+					if (!abandonedNames.empty()) abandonedNames += ", ";
+					abandonedNames += m_threadInfo[i].name;
+				}
+
 				destroy_stream_locked(i);
 			}
 			m_streams.clear();
@@ -191,6 +204,19 @@ namespace ce
 			std::lock_guard<std::mutex> guard(m_controlLock);
 			m_controlQueue.clear();
 		}
+
+		// ★ 종료가 어떻게 끝났는지 **밖에서 읽을 수 있어야** 한다. 놓아 둔
+		//   스트림 수는 요약에 있지만, 요약을 읽을 수 있는 시점에는 이미
+		//   서비스가 내려가 있다. 한 줄을 남긴다 — 0 이 아니면 종료 전에
+		//   unregister_thread 를 부르지 않은 스레드가 있다는 뜻이다.
+		std::fprintf(stderr,
+			"[profiler] shutdown abandoned=%llu retained=%zu foreign=%llu%s%s\n",
+			static_cast<unsigned long long>(m_abandonedStreams.load(std::memory_order_relaxed)),
+			retained_stream_count(),
+			static_cast<unsigned long long>(m_retiredForeign.load(std::memory_order_relaxed)),
+			abandonedNames.empty() ? "" : " - ",
+			abandonedNames.c_str());
+		std::fflush(stderr);
 	}
 
 	void profiler_service::destroy_stream_locked(std::size_t index)
@@ -460,6 +486,30 @@ namespace ce
 		stream->publish_frame();
 	}
 
+	void profiler_service::retire_gpu_lane()
+	{
+		thread_stream* stream = m_gpuStream.load(std::memory_order_acquire);
+		if (!stream) return;
+
+		// ★ 주인만 닫는다. 아니면 그냥 둔다 — 종료 경로가 세어서 알려 준다.
+		if (stream->owner_thread() != std::this_thread::get_id()) return;
+
+		// 남은 것을 먼저 넘긴다. 닫고 나면 이 레인의 꼬리를 아무도 못 준다.
+		stream->publish_frame();
+
+		std::lock_guard<std::mutex> guard(m_streamLock);
+		for (std::size_t i = 0; i < m_streams.size(); ++i)
+		{
+			if (m_streams[i].stream.get() != stream) continue;
+
+			// 표에서 먼저 내린다. 닫는 동안 다른 스레드가 이 포인터로
+			// 들어오면 이미 끝난 저장소를 만진다.
+			m_gpuStream.store(nullptr, std::memory_order_release);
+			destroy_stream_locked(i);
+			break;
+		}
+	}
+
 	void profiler_service::publish_frame(std::uint32_t engine_frame)
 	{
 		if (!m_initialized.load(std::memory_order_acquire))
@@ -725,6 +775,28 @@ namespace ce
 			std::this_thread::yield();
 		}
 		m_pauseUnacked.store(unacked, std::memory_order_relaxed);
+
+		// ★ 온전하지 않다는 것만으로는 고칠 자리를 못 짚는다. 누가 응답하지
+		//   않았는지 적는다 - 그 스레드가 안전한 자리를 안 지났다는 뜻이다.
+		if (0 != unacked)
+		{
+			std::string names;
+			{
+				std::lock_guard<std::mutex> guard(m_streamLock);
+				for (std::size_t i = 0; i < m_streams.size(); ++i)
+				{
+					const stream_entry& entry = m_streams[i];
+					if (!entry.stream) continue;
+					if (entry.stream->freeze_ack() == entry.stream->freeze_request()) continue;
+					if (!entry.stream->pending_work()) continue;
+					if (!names.empty()) names += ", ";
+					names += (i < m_threadInfo.size()) ? m_threadInfo[i].name : std::string("?");
+				}
+			}
+			std::fprintf(stderr, "[profiler] freeze incomplete - unacked=%u: %s\n",
+			             unacked, names.c_str());
+			std::fflush(stderr);
+		}
 
 		collect_sealed();
 

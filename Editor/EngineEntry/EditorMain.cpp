@@ -549,6 +549,14 @@ void Editor::EditorMain::Finalize()
 	// 먼저 비운다 — 명령이 리플렉션 Property를 참조하므로 옛 순서(등록
 	// 정리 뒤 파괴)보다 이쪽이 안전하다.
 	Meta::UndoSystemFinalize();
+
+	// ★ 워커를 **프로파일러보다 먼저** 멈춘다. 풀은 전역이라 소멸자가
+	//   main 이 끝난 뒤에 돌고, 그때는 프로파일러가 이미 닫혀 있다 —
+	//   그래서 워커의 종료 훅이 한 번도 안 불리고 스트림 여덟이 주인 없이
+	//   남았다(종료 줄의 abandoned=9 중 여덟). 여기는 씬·렌더가 모두
+	//   해체된 뒤라 새 작업이 들어올 곳이 없다.
+	ce::get_thread_pool().shutdown();
+
 	ce::profiler().shutdown();
 }
 

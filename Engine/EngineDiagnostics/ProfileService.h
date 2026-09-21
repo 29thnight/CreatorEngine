@@ -148,6 +148,15 @@ namespace ce
 		// 지금까지 적은 GPU 구간을 수집기에 넘긴다. 적는 스레드가 부른다.
 		void publish_gpu_spans();
 
+		// 레인을 은퇴시킨다. **적던 스레드가** 멎기 전에 부른다.
+		//
+		// ★ 이 레인은 OS 스레드가 아니라 큐지만, 저장소의 주인은 여전히
+		//   **처음 적은 스레드**다. 그 스레드가 unregister_thread 를 불러도
+		//   자기 TLS 스트림만 끊을 뿐 이 레인은 남는다 — 그래서 종료 때
+		//   게임 스레드가 남의 저장소를 마주하고 버려진 것으로 센다.
+		//   부른 쪽이 주인이 아니면 아무것도 하지 않는다.
+		void retire_gpu_lane();
+
 		// GPU 레인의 이름. 창과 게이트가 이 이름으로 레인을 찾는다.
 		static constexpr const char* kGpuLaneName = "[GPU Graphics]";
 

@@ -145,6 +145,13 @@ $lines = @(
     # 자리가 는다.
     'editor.window ###Editor.FrameProfiler open'
     'wait 120'
+    # ★ **녹화를 켠다.** 아래 ④ 축이 재는 것은 종료 때 주인 없이 남는 스트림
+    #   수인데, 워커와 GPU 레인의 스트림은 녹화 중에만 생긴다. 켜지 않으면
+    #   그 축은 아무것도 없는 상태에서 0 을 읽고, 미자극이 초록이 된다.
+    'profile.record'
+    'wait 120'
+    'profile.stats'
+    'wait 10'
     # 관리 로그를 **래퍼를 통해** 낸다. 기동 로그(`Bootstrap.cs`)는 `Native.Log` 를
     # 직접 부르므로 `Component.Log` 계열의 [Caller*] 전달을 한 번도 안 지난다 —
     # 그 축을 자극하지 않고 아래 단정을 걸면 미자극을 초록으로 읽는다.
@@ -290,6 +297,60 @@ foreach ($line in ($distinct | Select-Object -First 5)) {
 }
 Assert ($imguiErrors.Count -eq 0) `
     ("ImGui 가 규약 위반을 " + $imguiErrors.Count + " 줄 신고했다(고유 " + $distinct.Count + " 종, 위 목록). 그림이 맞아도 위반은 위반이다")
+
+# ── ④ 종료 때 주인 없이 남은 프로파일러 스트림 ─────────────────────────────
+#
+# 스트림은 **적는 스레드가** 주인이다. 그 스레드가 멎기 전에 자기 것을 닫지
+# 않으면, 종료를 도는 게임 스레드는 남의 저장소를 닫지 못하고 풀과 함께
+# 놓아 둔다(누수는 아니지만 그 스레드의 꼬리는 어느 캡처에도 없다).
+#
+# 2026-09-21 에 실측 `abandoned=9` 였다. 전역 thread_pool 의 소멸자가 main 이
+# 끝난 **뒤에** 돌아 워커 여덟의 종료 훅이 한 번도 안 불렸고, GPU 레인은
+# 렌더 스레드가 적는데 그 스레드의 unregister 가 자기 TLS 스트림만 끊었다.
+#
+# ★ 개수만 재지 않는다. "0" 은 스트림이 하나도 안 생겨도 0 이다. 위에서
+#   녹화를 켰고, 그 회차의 `profile.stats` 가 워커와 GPU 레인을 실제로
+#   세웠다는 것을 먼저 단정한다.
+$statsRows = @($rows | Where-Object { $_.command -eq 'profile.stats' -and $_.status -eq 'succeeded' })
+Assert ($statsRows.Count -ge 1) `
+    'profile.stats 가 한 줄도 없다 — 녹화를 못 켰다면 아래 스트림 축은 빈 집합을 통과한다'
+if ($statsRows.Count -ge 1) {
+    $laneNames = @($statsRows[-1].data.threads | ForEach-Object { $_.name })
+    Write-Host ("  등록된 레인 " + $laneNames.Count + ": " + ($laneNames -join ', '))
+    Assert (@($laneNames | Where-Object { $_ -like '`[Worker *' }).Count -ge 1) `
+        ("워커 레인이 표에 없다 (" + ($laneNames -join ', ') +
+         ") — 버려진 스트림 축이 재려던 것이 이 회차에 아예 안 생겼다")
+    # ★ GPU 레인은 **여기서 단정하지 않는다.** 이 회차는 라이브 뷰가 제출한
+    #   프레임의 타임스탬프를 되읽는 데까지 가지 않아 레인이 아예 안 생긴다
+    #   (실측: 등록된 레인 11 개에 [GPU Graphics] 없음). 자극할 수 없는 것을
+    #   단정으로 적으면 미자극이 붉게 읽히거나, 통과시키면 빈 집합이 초록이
+    #   된다. 그 레인의 은퇴 축은 자극이 실제로 닿는 자에 있다:
+    #     pwsh Tools/profiling-validation/Invoke-ProfilingValidation.ps1 -Action Gpu
+}
+
+$stderrPath = Join-Path $work 'stderr.txt'
+$shutdownLine = ''
+if (Test-Path -LiteralPath $stderrPath) {
+    $shutdownLine = (@(Select-String -LiteralPath $stderrPath -Pattern '\[profiler\] shutdown ' |
+        ForEach-Object { $_.Line.Trim() }) | Select-Object -Last 1)
+}
+Assert (-not [string]::IsNullOrWhiteSpace($shutdownLine)) `
+    "stderr 에 '[profiler] shutdown' 줄이 없다 — 프로파일러가 종료를 돌지 않았거나 줄이 사라졌다. 없는 줄에서 '버려진 0' 을 읽을 수는 없다"
+if (-not [string]::IsNullOrWhiteSpace($shutdownLine)) {
+    Write-Host ("  " + $shutdownLine)
+    $shutdownMatch = [regex]::Match($shutdownLine,
+        'abandoned=(?<abandoned>\d+)\s+retained=(?<retained>\d+)\s+foreign=(?<foreign>\d+)')
+    Assert $shutdownMatch.Success `
+        ("종료 줄의 모양이 바뀌었다: " + $shutdownLine + " — 이 정규식을 함께 고쳐라")
+    if ($shutdownMatch.Success) {
+        Assert ('0' -eq $shutdownMatch.Groups['abandoned'].Value) `
+            ("종료 때 주인 없이 남은 스트림이 " + $shutdownMatch.Groups['abandoned'].Value +
+             " 개다: " + $shutdownLine + " — 그 스레드들이 멎기 전에 자기 스트림을 닫지 않았다")
+        Assert ('0' -eq $shutdownMatch.Groups['foreign'].Value) `
+            ("남의 스트림을 만진 횟수가 " + $shutdownMatch.Groups['foreign'].Value +
+             " 이다: " + $shutdownLine + " — 주인 아닌 스레드가 저장소를 만졌다")
+    }
+}
 
 Write-Host ""
 Write-Host ("  HTML 로그 행 " + $totalRows + " · 심각 " + $severeRows.Count +

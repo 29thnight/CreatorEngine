@@ -106,7 +106,14 @@ namespace EngineBootstrap
         //   스레드만** 싣기 때문에, 구간 훅까지 있어야 이 스레드가 보인다.
         EnhancedSceneRenderer::SetRenderThreadHooks({
             []() { ce::profiler().register_thread("[RenderThread]"); },
-            []() { ce::profiler().unregister_thread(); },
+            []()
+            {
+                // ★ GPU 레인의 저장소 주인도 이 스레드다 — 여기서 적기
+                //   때문이다. 자기 스트림만 끊고 가면 레인은 주인 없이 남아
+                //   종료 때 버려진 것으로 잡힌다.
+                ce::profiler().retire_gpu_lane();
+                ce::profiler().unregister_thread();
+            },
             []() { ce::profile_scope_begin(ce::marker<"RenderThreadFrame">()); },
             []() { ce::profile_scope_end(); } });
 

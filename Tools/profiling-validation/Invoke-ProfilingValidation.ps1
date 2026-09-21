@@ -530,6 +530,42 @@ function Invoke-Gpu {
         $failures.Add("정렬 위반 $($gpu.alignmentViolations)/$($gpu.collects) - 변환한 GPU 구간이 제출과 수집 사이를 벗어난다(제출→시작 최소 $($gpu.minSubmitToBeginMs) ms · 끝→수집 최소 $($gpu.minEndToCollectMs) ms)")
     }
 
+    # ── 레인이 주인 손에서 닫히는가 ────────────────────────────────
+    #
+    # 스트림의 주인은 **적는 스레드**다. GPU 레인은 OS 스레드가 아니라 큐지만
+    # 저장소를 만드는 것은 처음 적은 스레드(렌더 스레드)이고, 그 스레드가
+    # unregister_thread 를 불러도 자기 TLS 스트림만 끊어 레인은 남는다.
+    # 그러면 종료를 도는 게임 스레드가 남의 저장소를 마주하고 닫지 못한 채
+    # 놓아 둔다 — 그 스레드의 꼬리는 어느 캡처에도 남지 않는다.
+    #
+    # 2026-09-21 실측은 `abandoned=9` 였다(워커 여덟 + [GPU Graphics]).
+    #
+    # ★ 이 축을 여기 두는 이유는 **자극이 여기에만 있기 때문**이다. GPU 레인은
+    #   녹화 중에 라이브 제출의 타임스탬프를 되읽어야 생기고, 위의
+    #   `$gpuLaneSeen` 단정이 이 회차에 실제로 생겼음을 이미 보증한다.
+    $shutdownLine = (($result.Combined -split "`n" |
+        Where-Object { $_ -match '\[profiler\] shutdown ' }) | Select-Object -Last 1)
+    if (-not $shutdownLine) {
+        $failures.Add("stderr 에 '[profiler] shutdown' 줄이 없다 - 없는 줄에서 '버려진 0' 을 읽을 수는 없다")
+    }
+    else {
+        $shutdownLine = $shutdownLine.Trim()
+        Write-Host ("  종료 소유      {0}" -f $shutdownLine)
+        $m = [regex]::Match($shutdownLine,
+            'abandoned=(?<abandoned>\d+)\s+retained=(?<retained>\d+)\s+foreign=(?<foreign>\d+)')
+        if (-not $m.Success) {
+            $failures.Add("종료 줄의 모양이 바뀌었다: $shutdownLine - 이 정규식을 함께 고쳐라")
+        }
+        else {
+            if ($m.Groups['abandoned'].Value -ne '0') {
+                $failures.Add("종료 때 주인 없이 남은 스트림 $($m.Groups['abandoned'].Value) 개: $shutdownLine - 그 스레드들이 멎기 전에 자기 스트림을 닫지 않았다")
+            }
+            if ($m.Groups['foreign'].Value -ne '0') {
+                $failures.Add("남의 스트림을 만진 횟수 $($m.Groups['foreign'].Value): $shutdownLine")
+            }
+        }
+    }
+
     if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
 
     Write-Host ""
