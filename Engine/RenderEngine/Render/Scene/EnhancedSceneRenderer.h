@@ -339,6 +339,29 @@ struct EnhancedLiveGpuSpan
 
     /// 길이 0 으로 찍힌 조각. 결함이 아니라 분해능 아래의 패스다.
     uint32_t    zeroLengthSlices{ 0 };
+
+    /// queue span 을 CPU(QPC) 축으로 옮긴 것과, 그 축이 살아 있는지.
+    uint64_t    queueBeginCpuTicks{ 0 };
+    uint64_t    queueEndCpuTicks{ 0 };
+    bool        cpuAligned{ false };
+
+    /// 제출을 연 CPU 시각부터 변환한 GPU 시작까지. 음수면 GPU 가 제출보다 먼저
+    /// 돌았다는 뜻이고, 그것은 두 시계가 맞지 않는다는 말이다.
+    double      submitToGpuBeginMs{ 0.0 };
+    /// 변환한 GPU 끝부터 수집한 CPU 시각까지. 음수면 아직 안 끝난 것을 읽었다.
+    double      gpuEndToCollectMs{ 0.0 };
+};
+
+/// 두 시계를 맞춘 표본의 상태(§5.1).
+struct EnhancedLiveGpuClock
+{
+    uint64_t gpuTicksPerSecond{ 0 };
+    uint64_t cpuTicksPerSecond{ 0 };
+    uint64_t sampleCount{ 0 };
+    double   lastDriftMs{ 0.0 };
+    double   maxAbsoluteDriftMs{ 0.0 };
+    bool     valid{ false };
+    std::string lastError;
 };
 
 struct EnhancedLivePassTiming
@@ -507,6 +530,21 @@ struct EnhancedLiveDebugSnapshot
     uint64_t gpuZeroLengthSlices{ 0 };   // 길이 0 인 조각 — 정보이지 판정이 아니다
     uint64_t gpuSpanViolations{ 0 };     // busy > queueSpan — 겹침을 중복으로 셌다
     uint64_t gpuSliceUnderflows{ 0 };    // 조각 < 이름 — 묶은 것이 원본보다 많다
+
+    /// 변환한 GPU 구간이 **제출과 수집 사이**를 벗어난 수집.
+    ///
+    /// ★ 이것이 통합 축의 검산이다. CPU 가 제출을 열기 전에 GPU 가 돌았다거나,
+    ///   수집한 뒤에 끝났다는 것은 있을 수 없다 — 나오면 두 시계가 맞지 않는
+    ///   것이고, 그때 타임라인의 GPU 트랙은 그럴듯한 거짓말이 된다.
+    uint64_t gpuAlignmentViolations{ 0 };
+    uint64_t gpuUnalignedCollects{ 0 };  // 표본이 없어 옮기지 못한 수집
+
+    /// 정렬 여유의 최솟값(ms). 둘 다 0 보다 커야 한다.
+    double   gpuMinSubmitToBeginMs{ 0.0 };
+    double   gpuMinEndToCollectMs{ 0.0 };
+
+    /// 두 시계 표본의 상태.
+    EnhancedLiveGpuClock gpuClock{};
 
     /// 마지막 성공 수집의 귀속. 패스별 숫자가 어느 프레임·어느 제출·어느
     /// 뷰의 것인지를 적는다. 이것이 없으면 숫자가 맞는지 물을 수가 없다.

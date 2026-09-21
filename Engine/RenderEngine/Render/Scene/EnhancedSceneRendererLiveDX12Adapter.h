@@ -86,6 +86,9 @@ public:
     GpuFrameToken BeginProfilerFrame(uint64_t engineFrameId, uint64_t submissionId,
         uint64_t renderViewId);
     void ResolveProfilerFrame(const GpuFrameToken& token);
+
+    /// 두 시계를 맞춘 표본의 상태. 통합 축이 꺼져 있으면 valid 가 거짓이다.
+    EnhancedLiveGpuClock ProfilerClock() const;
     bool CollectProfiler(const GpuFrameToken& token,
         std::vector<EnhancedLivePassTiming>& outTimings,
         EnhancedLiveGpuSpan& outSpan,

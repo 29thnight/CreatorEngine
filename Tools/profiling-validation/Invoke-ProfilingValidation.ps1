@@ -395,6 +395,13 @@ function Invoke-Gpu {
     Write-Host ("  귀속           frame {0} · submission {1} · view {2}" -f $gpu.frame, $gpu.submission, $gpu.viewId)
     Write-Host ("  누적 장부      버림 {0} · 길이 0 이 {1} · span 위반 {2} · 조각 부족 {3}" -f
         $gpu.droppedTotal, $gpu.zeroLengthTotal, $gpu.spanViolations, $gpu.sliceUnderflows)
+    Write-Host ("  통합 축        표본 {0}회 · GPU {1:N0} Hz · CPU {2:N0} Hz · 못 옮긴 수집 {3}" -f
+        $gpu.clockSamples, $gpu.clockGpuHz, $gpu.clockCpuHz, $gpu.unalignedCollects)
+    Write-Host ("  표본 어긋남    직전 {0:N4} ms · 최대 {1:N4} ms" -f
+        $gpu.clockDriftMs, $gpu.clockMaxDriftMs)
+    Write-Host ("  정렬 여유      제출→GPU 시작 최소 {0:N4} ms · GPU 끝→수집 최소 {1:N4} ms · 위반 {2}" -f
+        $gpu.minSubmitToBeginMs, $gpu.minEndToCollectMs, $gpu.alignmentViolations)
+    if ($gpu.clockError) { Write-Host ("  통합 축 사유   {0}" -f $gpu.clockError) }
     if ($gpu.lastError) { Write-Host ("  마지막 사유     {0}" -f $gpu.lastError) }
 
     $failures = New-Object System.Collections.Generic.List[string]
@@ -447,6 +454,26 @@ function Invoke-Gpu {
     # 이름합은 묶은 구간의 합이라 서로 겹칠 수 있고, 그 합집합은 busy 를 덮는다.
     if ($gpu.ms -lt ($gpu.busyMs - 1e-6)) {
         $failures.Add("이름합 $($gpu.ms) < busy $($gpu.busyMs) - 묶은 구간이 원본을 다 덮지 못한다")
+    }
+
+    # ── 두 시계가 맞았는가(§5.1) ────────────────────────────────────
+    #
+    # ★ 판정을 임계값이 아니라 **인과**에 건다. 변환한 GPU 구간은 CPU 가 제출을
+    #   연 뒤에 시작해서 수집하기 전에 끝나야 한다 — 하드웨어가 달라도 그대로
+    #   서는 관계다. "몇 ms 안쪽" 같은 수를 고르면 그 수가 곧 거짓말의 여유가 된다.
+    if ($gpu.clockValid -ne $true) {
+        $failures.Add("clock calibration 표본이 없다 - CPU/GPU 통합 축이 꺼져 있다: $($gpu.clockError)")
+    }
+    # ★ 표본이 한 번뿐이면 주기적 재표본이 죽어 있어도 초록이다. 예열이 몇 초를
+    #   지나므로 둘 이상 나와야 한다 — 임계값이 아니라 "다시 뜨는가" 를 묻는다.
+    if ($gpu.clockSamples -lt 2) {
+        $failures.Add("clock calibration 표본 $($gpu.clockSamples) 회 - 주기적 재표본이 돌지 않았다")
+    }
+    if ($gpu.unalignedCollects -ne 0) {
+        $failures.Add("CPU 축으로 못 옮긴 수집 $($gpu.unalignedCollects)/$($gpu.collects) - 표본이 있는데도 옮기지 않았다")
+    }
+    if ($gpu.alignmentViolations -ne 0) {
+        $failures.Add("정렬 위반 $($gpu.alignmentViolations)/$($gpu.collects) - 변환한 GPU 구간이 제출과 수집 사이를 벗어난다(제출→시작 최소 $($gpu.minSubmitToBeginMs) ms · 끝→수집 최소 $($gpu.minEndToCollectMs) ms)")
     }
 
     if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }

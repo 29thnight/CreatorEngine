@@ -1173,6 +1173,11 @@ namespace
         uint64_t gpuZeroLengthSlices{ 0 };
         uint64_t gpuSpanViolations{ 0 };
         uint64_t gpuSliceUnderflows{ 0 };
+        uint64_t gpuAlignmentViolations{ 0 };
+        uint64_t gpuUnalignedCollects{ 0 };
+        uint64_t gpuAlignedCollects{ 0 };
+        double   gpuMinSubmitToBeginMs{ 0.0 };
+        double   gpuMinEndToCollectMs{ 0.0 };
         uint64_t gpuCollectMismatches{ 0 };
 
         // 마지막으로 수집에 성공한 것의 귀속. 숫자만 내고 **어느 프레임·어느 뷰
@@ -1522,6 +1527,11 @@ namespace
             debugSnapshot.gpuZeroLengthSlices = gpuZeroLengthSlices;
             debugSnapshot.gpuSpanViolations = gpuSpanViolations;
             debugSnapshot.gpuSliceUnderflows = gpuSliceUnderflows;
+            debugSnapshot.gpuAlignmentViolations = gpuAlignmentViolations;
+            debugSnapshot.gpuUnalignedCollects = gpuUnalignedCollects;
+            debugSnapshot.gpuMinSubmitToBeginMs = gpuMinSubmitToBeginMs;
+            debugSnapshot.gpuMinEndToCollectMs = gpuMinEndToCollectMs;
+            debugSnapshot.gpuClock = dx12.ProfilerClock();
             debugSnapshot.gpuCollectMismatches = gpuCollectMismatches;
             debugSnapshot.lastGpuFrameId = lastGpuFrameId;
             debugSnapshot.lastGpuSubmissionId = lastGpuSubmissionId;
@@ -5358,6 +5368,38 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     state.gpuDroppedSlices += span.droppedSlices;
                     state.gpuZeroLengthSlices += span.zeroLengthSlices;
                     if (span.busyMs > span.queueSpanMs + 1e-9) ++state.gpuSpanViolations;
+                    // ── 통합 축의 검산(§5.1) ─────────────────────────────────
+                    //
+                    // 변환한 GPU 구간은 **제출을 연 뒤에 시작해서 수집하기 전에**
+                    // 끝나야 한다. 그 바깥으로 나가면 두 시계가 맞지 않는 것이고,
+                    // 그때 GPU 트랙은 그럴듯한 거짓말이 된다. 임계값이 아니라
+                    // 인과라서 하드웨어가 달라도 그대로 선다.
+                    if (!span.cpuAligned)
+                    {
+                        ++state.gpuUnalignedCollects;
+                    }
+                    else
+                    {
+                        if (span.submitToGpuBeginMs < 0.0 || span.gpuEndToCollectMs < 0.0)
+                        {
+                            ++state.gpuAlignmentViolations;
+                        }
+                        // 여유의 **최솟값**을 든다. 평균은 한 번의 큰 어긋남을 가린다.
+                        if (0 == state.gpuAlignedCollects)
+                        {
+                            state.gpuMinSubmitToBeginMs = span.submitToGpuBeginMs;
+                            state.gpuMinEndToCollectMs = span.gpuEndToCollectMs;
+                        }
+                        else
+                        {
+                            state.gpuMinSubmitToBeginMs = (std::min)(
+                                state.gpuMinSubmitToBeginMs, span.submitToGpuBeginMs);
+                            state.gpuMinEndToCollectMs = (std::min)(
+                                state.gpuMinEndToCollectMs, span.gpuEndToCollectMs);
+                        }
+                        ++state.gpuAlignedCollects;
+                    }
+
                     if (span.sliceCount < state.lastPassTimings.size())
                     {
                         ++state.gpuSliceUnderflows;

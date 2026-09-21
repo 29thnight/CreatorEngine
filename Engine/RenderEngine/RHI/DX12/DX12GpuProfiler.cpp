@@ -34,8 +34,16 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
         return false;
     }
 
+    m_queue = queue;
     m_maxPassesPerFrame = maxPassesPerFrame;
     m_frameCount = frameCount;
+
+    // 세션 시작에서 한 번 뜬다(§5.1). 실패해도 초기화를 세우지는 않는다 —
+    // 통합 축이 없을 뿐 패스별 시간과 queue 상대시간은 그대로 쓸 수 있다.
+    // ★ 사유는 삼키지 않되 outError 에 넣지 않는다. 초기화는 성공이고
+    //   outError 를 채우면 성공한 호출이 실패처럼 읽힌다. 진단으로 따로 든다.
+    m_calibrationError.clear();
+    SampleClockCalibration(m_calibrationError);
 
     // 레코드 크기를 여기서 한 번만 잡는다. 프레임마다 늘리면 병렬 기록 중에
     // 재할당이 일어나고, 그때 다른 워커가 들고 있던 참조가 무효가 된다.
@@ -91,6 +99,8 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
 
 void DX12GpuProfiler::Shutdown()
 {
+    m_queue.Reset();
+    m_calibration = ClockCalibration{};
     m_records.clear();
     m_readback.Reset();
     m_queryHeap.Reset();
@@ -99,6 +109,94 @@ void DX12GpuProfiler::Shutdown()
     m_recordingSlot = 0;
     m_slotUsedPasses.reset();
     m_slotTokens.clear();
+}
+
+bool DX12GpuProfiler::SampleClockCalibration(std::string& outError)
+{
+    if (!m_queue)
+    {
+        outError = "clock calibration - 큐가 없다";
+        return false;
+    }
+
+    uint64_t gpuTicks = 0;
+    uint64_t cpuTicks = 0;
+    const HRESULT hr = m_queue->GetClockCalibration(&gpuTicks, &cpuTicks);
+    if (FAILED(hr))
+    {
+        // ★ 가진 표본을 버리지 않는다. 물러섬은 "통합 축을 끈다" 이지
+        //   "맞춰 둔 것을 잃는다" 가 아니다.
+        outError = "clock calibration 실패 " + ProfilerHrToString(hr);
+        return false;
+    }
+
+    LARGE_INTEGER cpuFrequency{};
+    if (!QueryPerformanceFrequency(&cpuFrequency) || 0 == cpuFrequency.QuadPart)
+    {
+        outError = "QPC 주파수 조회 실패";
+        return false;
+    }
+
+    LARGE_INTEGER nowTick{};
+    QueryPerformanceCounter(&nowTick);
+
+    // ★ 덮어쓰기 **전에** 직전 표본으로 지금 GPU 틱을 예측해 본다. 덮어쓴 뒤에
+    //   재면 자기 자신과 비교하게 되어 언제나 0 이 나온다.
+    int64_t driftTicks = 0;
+    if (m_calibration.valid)
+    {
+        const uint64_t predicted = GpuTickToCpuTick(gpuTicks);
+        driftTicks = static_cast<int64_t>(cpuTicks) - static_cast<int64_t>(predicted);
+    }
+
+    const uint64_t previousCount = m_calibration.sampleCount;
+    m_calibration.gpuTicks = gpuTicks;
+    m_calibration.cpuTicks = cpuTicks;
+    m_calibration.gpuTicksPerSecond = m_ticksPerSecond;
+    m_calibration.cpuTicksPerSecond = static_cast<uint64_t>(cpuFrequency.QuadPart);
+    m_calibration.lastSampleCpuTick = static_cast<uint64_t>(nowTick.QuadPart);
+    m_calibration.sampleCount = previousCount + 1;
+    m_calibration.lastDriftTicks = driftTicks;
+    const int64_t absoluteDrift = (driftTicks < 0) ? -driftTicks : driftTicks;
+    if (absoluteDrift > m_calibration.maxAbsoluteDriftTicks)
+    {
+        m_calibration.maxAbsoluteDriftTicks = absoluteDrift;
+    }
+    m_calibration.valid = (0 != m_ticksPerSecond);
+    return m_calibration.valid;
+}
+
+void DX12GpuProfiler::RefreshClockCalibrationIfStale()
+{
+    if (!m_queue || 0 == m_calibration.cpuTicksPerSecond) return;
+
+    LARGE_INTEGER nowTick{};
+    QueryPerformanceCounter(&nowTick);
+    const int64_t elapsed =
+        nowTick.QuadPart - static_cast<int64_t>(m_calibration.lastSampleCpuTick);
+    const int64_t interval = static_cast<int64_t>(
+        static_cast<double>(m_calibration.cpuTicksPerSecond) * kCalibrationIntervalSeconds);
+    if (elapsed < interval) return;
+
+    m_calibrationError.clear();
+    SampleClockCalibration(m_calibrationError);
+}
+
+uint64_t DX12GpuProfiler::GpuTickToCpuTick(uint64_t gpuTick) const
+{
+    if (!m_calibration.valid || 0 == m_calibration.gpuTicksPerSecond) return 0;
+
+    const int64_t gpuDelta =
+        static_cast<int64_t>(gpuTick) - static_cast<int64_t>(m_calibration.gpuTicks);
+    const int64_t gpuFrequency = static_cast<int64_t>(m_calibration.gpuTicksPerSecond);
+    const int64_t cpuFrequency = static_cast<int64_t>(m_calibration.cpuTicksPerSecond);
+
+    // 몫과 나머지를 따로 옮긴다. 먼저 곱하면 몇 분만 지나도 64 비트를 넘고,
+    // 먼저 나누면 초 미만이 통째로 잘린다.
+    const int64_t wholeSeconds = gpuDelta / gpuFrequency;
+    const int64_t remainder = gpuDelta % gpuFrequency;
+    const int64_t cpuDelta = wholeSeconds * cpuFrequency + remainder * cpuFrequency / gpuFrequency;
+    return static_cast<uint64_t>(static_cast<int64_t>(m_calibration.cpuTicks) + cpuDelta);
 }
 
 GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
@@ -111,6 +209,16 @@ GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
     token.submissionId = submissionId;
     token.renderViewId = renderViewId;
     token.ringSlot = static_cast<uint32_t>(submissionId % m_frameCount);
+
+    // 제출을 연 순간을 적는다. 이것이 없으면 변환한 GPU 시작이 "그 제출보다
+    // 뒤인가" 를 물을 수 없고, 그러면 통합 축은 검산할 수 없는 숫자가 된다.
+    // 제출을 열 때마다 묻되 간격이 막는다. 자기 자리에서 스스로 낡는 것을
+    // 아는 편이, 부르는 쪽 어딘가에 타이머를 하나 더 두는 것보다 낫다.
+    RefreshClockCalibrationIfStale();
+
+    LARGE_INTEGER submitTick{};
+    QueryPerformanceCounter(&submitTick);
+    token.cpuSubmitTick = static_cast<uint64_t>(submitTick.QuadPart);
 
     m_recordingSlot = token.ringSlot;
     m_slotUsedPasses[token.ringSlot].store(0, std::memory_order_relaxed);
@@ -215,6 +323,9 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
         outTimings.droppedSliceName.clear();
         outTimings.droppedSliceDeltaTicks = 0;
         outTimings.zeroLengthSlices = 0;
+        outTimings.queueBeginCpuTicks = 0;
+        outTimings.queueEndCpuTicks = 0;
+        outTimings.cpuAligned = false;
         return false;
     };
 
@@ -246,6 +357,9 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     outTimings.droppedSliceName.clear();
     outTimings.droppedSliceDeltaTicks = 0;
     outTimings.zeroLengthSlices = 0;
+    outTimings.queueBeginCpuTicks = 0;
+    outTimings.queueEndCpuTicks = 0;
+    outTimings.cpuAligned = false;
 
     if (!m_readback || m_records.empty()) { outTimings.slices.clear(); return true; }
 
@@ -366,6 +480,15 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     }
     busy += runEnd - runBegin;
     outTimings.busyTicks = busy;
+
+    // queue span 을 CPU 축으로 옮긴다. 표본이 없으면 옮기지 않고 그렇다고 적는다 —
+    // 0 을 그럴듯한 시각처럼 내보내면 정렬된 것과 구별되지 않는다.
+    if (m_calibration.valid)
+    {
+        outTimings.queueBeginCpuTicks = GpuTickToCpuTick(queueBegin);
+        outTimings.queueEndCpuTicks = GpuTickToCpuTick(queueEnd);
+        outTimings.cpuAligned = true;
+    }
     return true;
 }
 

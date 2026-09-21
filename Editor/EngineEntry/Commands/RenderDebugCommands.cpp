@@ -340,6 +340,24 @@ namespace ConsoleCmd
             gpu.Set("zeroLengthTotal", CommandData::Int(snapshot.gpuZeroLengthSlices));
             gpu.Set("spanViolations", CommandData::Int(snapshot.gpuSpanViolations));
             gpu.Set("sliceUnderflows", CommandData::Int(snapshot.gpuSliceUnderflows));
+
+            // 통합 축(§5.1). clockValid 가 거짓이면 GPU 구간을 CPU 축으로 옮기지
+            // 못한 것이고, 그때 alignmentViolations 는 0 이어도 뜻이 없다.
+            gpu.Set("clockValid", CommandData::Bool(snapshot.gpuClock.valid));
+            gpu.Set("clockSamples", CommandData::Int(snapshot.gpuClock.sampleCount));
+            gpu.Set("clockGpuHz", CommandData::Int(snapshot.gpuClock.gpuTicksPerSecond));
+            gpu.Set("clockCpuHz", CommandData::Int(snapshot.gpuClock.cpuTicksPerSecond));
+            gpu.Set("clockError", CommandData::String(snapshot.gpuClock.lastError));
+            gpu.Set("clockDriftMs", CommandData::Double(snapshot.gpuClock.lastDriftMs));
+            gpu.Set("clockMaxDriftMs",
+                CommandData::Double(snapshot.gpuClock.maxAbsoluteDriftMs));
+            gpu.Set("alignmentViolations",
+                CommandData::Int(snapshot.gpuAlignmentViolations));
+            gpu.Set("unalignedCollects", CommandData::Int(snapshot.gpuUnalignedCollects));
+            gpu.Set("minSubmitToBeginMs",
+                CommandData::Double(snapshot.gpuMinSubmitToBeginMs));
+            gpu.Set("minEndToCollectMs",
+                CommandData::Double(snapshot.gpuMinEndToCollectMs));
             gpu.Set("frame", CommandData::Int(snapshot.lastGpuFrameId));
             gpu.Set("submission", CommandData::Int(snapshot.lastGpuSubmissionId));
             gpu.Set("viewId", CommandData::Int(snapshot.lastGpuViewId));

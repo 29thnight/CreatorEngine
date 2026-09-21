@@ -454,7 +454,47 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
     outSpan.droppedSliceName = timings.droppedSliceName;
     outSpan.droppedSliceDeltaTicks = timings.droppedSliceDeltaTicks;
     outSpan.zeroLengthSlices = timings.zeroLengthSlices;
+
+    // 통합 축. 표본이 없으면 옮기지 않았다는 것을 그대로 전한다 — 0 을 시각처럼
+    // 내보내면 정렬된 것과 구별되지 않는다.
+    outSpan.cpuAligned = timings.cpuAligned;
+    outSpan.queueBeginCpuTicks = timings.queueBeginCpuTicks;
+    outSpan.queueEndCpuTicks = timings.queueEndCpuTicks;
+    if (timings.cpuAligned)
+    {
+        LARGE_INTEGER collectTick{};
+        QueryPerformanceCounter(&collectTick);
+        const double cpuToMs = (m_impl->profiler.Calibration().cpuTicksPerSecond > 0)
+            ? (1000.0 / static_cast<double>(m_impl->profiler.Calibration().cpuTicksPerSecond))
+            : 0.0;
+
+        // ★ 부호를 살려서 뺀다. uint64 끼리 빼면 음수가 천문학적 양수가 되어
+        //   "여유가 아주 많다" 로 읽히고, 어긋남이 통째로 숨는다.
+        const int64_t submitToBegin = static_cast<int64_t>(timings.queueBeginCpuTicks) -
+            static_cast<int64_t>(token.cpuSubmitTick);
+        const int64_t endToCollect = static_cast<int64_t>(collectTick.QuadPart) -
+            static_cast<int64_t>(timings.queueEndCpuTicks);
+        outSpan.submitToGpuBeginMs = static_cast<double>(submitToBegin) * cpuToMs;
+        outSpan.gpuEndToCollectMs = static_cast<double>(endToCollect) * cpuToMs;
+    }
     return true;
+}
+
+EnhancedLiveGpuClock EnhancedSceneRendererLiveDX12Adapter::ProfilerClock() const
+{
+    const DX12GpuProfiler::ClockCalibration& calibration = m_impl->profiler.Calibration();
+    EnhancedLiveGpuClock clock{};
+    clock.gpuTicksPerSecond = calibration.gpuTicksPerSecond;
+    clock.cpuTicksPerSecond = calibration.cpuTicksPerSecond;
+    clock.sampleCount = calibration.sampleCount;
+    const double cpuToMs = (calibration.cpuTicksPerSecond > 0)
+        ? (1000.0 / static_cast<double>(calibration.cpuTicksPerSecond)) : 0.0;
+    clock.lastDriftMs = static_cast<double>(calibration.lastDriftTicks) * cpuToMs;
+    clock.maxAbsoluteDriftMs =
+        static_cast<double>(calibration.maxAbsoluteDriftTicks) * cpuToMs;
+    clock.valid = calibration.valid;
+    clock.lastError = m_impl->profiler.CalibrationError();
+    return clock;
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::MaintainAssetCaches(uint64_t frameIndex)

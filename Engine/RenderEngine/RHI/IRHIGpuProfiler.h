@@ -18,6 +18,14 @@ struct GpuFrameToken
     static constexpr uint32_t kInvalidRingSlot = 0xFFFFFFFFu;
 
     uint64_t engineFrameId{ 0 };
+
+    /// 이 제출을 **연 순간**의 CPU 시각(QPC). EngineDiagnostics 의 profile_tick 과
+    /// 같은 축이다 — 둘 다 QueryPerformanceCounter 의 원시 값이다.
+    ///
+    /// ★ 이것이 GPU 구간을 검산하는 자다. 변환한 GPU 시작은 이 시각보다 뒤여야
+    ///   하고, 변환한 GPU 끝은 수집한 시각보다 앞이어야 한다. 그 사이를 벗어나면
+    ///   두 시계가 정렬되지 않은 것이고, 그때 통합 축은 그럴듯한 거짓말이 된다.
+    uint64_t cpuSubmitTick{ 0 };
     uint64_t submissionId{ 0 };
     uint64_t fenceValue{ 0 };
     uint64_t renderViewId{ 0 };

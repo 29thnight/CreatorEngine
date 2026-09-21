@@ -45,6 +45,31 @@ public:
         uint64_t    endTicks{ 0 };
     };
 
+    /// CPU(QPC)와 GPU 큐 timestamp 를 **한 순간에 함께 읽은** 표본(§5.1).
+    ///
+    /// 두 시계는 단위도 원점도 다르다. 이 표본 하나가 있어야 GPU 틱을 CPU 축으로
+    /// 옮길 수 있고, 그래야 "이 패스가 저 프레임의 어느 지점에서 돌았나" 를 물을
+    /// 수 있다. 표본이 없으면 통합 축을 끄고 큐 상대시간만 남긴다(§12).
+    struct ClockCalibration
+    {
+        uint64_t gpuTicks{ 0 };
+        uint64_t cpuTicks{ 0 };            // QPC 원시 값
+        uint64_t gpuTicksPerSecond{ 0 };
+        uint64_t cpuTicksPerSecond{ 0 };
+        uint64_t sampleCount{ 0 };         // 몇 번 다시 떴는가
+        uint64_t lastSampleCpuTick{ 0 };
+
+        // 새 표본이 **직전 표본으로 예측한 값**에서 얼마나 벗어났는가(CPU 틱).
+        // 두 시계가 같은 속도로 가면 0 에 붙고, 벌어지면 이 수가 자란다.
+        //
+        // ★ 여기에는 임계값을 걸지 않는다. 고른 수가 곧 거짓말의 여유가 되기
+        //   때문이다 — 정렬 판정은 "제출과 수집 사이" 라는 인과가 맡는다.
+        int64_t  lastDriftTicks{ 0 };
+        int64_t  maxAbsoluteDriftTicks{ 0 };
+
+        bool     valid{ false };
+    };
+
     /// 제출 하나의 수집 결과.
     ///
     /// ★ 합계를 하나로 정의하지 않는다(§3.4). queue span 은 첫 timestamp 부터
@@ -73,6 +98,12 @@ public:
         // 길이가 정확히 0 인 조각. **버리지 않는다** — 그 패스는 실제로 돌았고
         // 비용이 timestamp 분해능 아래일 뿐이다. 세는 것은 정보지 판정이 아니다.
         uint32_t zeroLengthSlices{ 0 };
+
+        // queue span 을 CPU(QPC) 축으로 옮긴 것. cpuAligned 가 거짓이면 표본이
+        // 없다는 뜻이고, 그때 이 둘은 0 이며 큐 상대시간만 유효하다.
+        uint64_t queueBeginCpuTicks{ 0 };
+        uint64_t queueEndCpuTicks{ 0 };
+        bool     cpuAligned{ false };
 
         // 버린 조각 중 **첫 번째의 이름.** 수만 세면 "한 개 버렸다" 까지만 알고
         // 어느 패스가 짝을 잃었는지는 모른다 — 고칠 수 없는 수는 계수기가 아니라
@@ -123,6 +154,31 @@ public:
     /// 분할 패스를 그대로 나열하면 "GBuffer 가 여섯 번 있다" 가 되어 읽을 수 없다.
     void MergeSlices(const FrameTimings& timings, std::vector<PassTiming>& outTimings);
 
+    /// 지금 시점의 표본을 새로 뜬다.
+    ///
+    /// ★ 실패해도 **이전 표본을 버리지 않는다.** 한 번 실패했다고 이미 맞춰 둔
+    ///   축까지 잃을 이유가 없고, 계획서가 말한 물러섬은 "통합 축을 끈다" 이지
+    ///   "가진 것을 버린다" 가 아니다(§12).
+    bool SampleClockCalibration(std::string& outError);
+
+    /// 표본이 낡았으면 다시 뜬다. 제출을 열 때마다 불러도 되도록 간격으로 막는다.
+    /// 실패는 삼킨다 — 물러섬은 이미 valid 와 CalibrationError 가 말한다.
+    void RefreshClockCalibrationIfStale();
+
+    /// 표본을 다시 뜨는 간격. 두 시계의 어긋남은 천천히 자라므로 초 단위면 된다.
+    static constexpr double kCalibrationIntervalSeconds = 1.0;
+
+    const ClockCalibration& Calibration() const { return m_calibration; }
+
+    /// 마지막 표본 시도가 실패한 사유. 비어 있으면 실패한 적이 없다.
+    const std::string& CalibrationError() const { return m_calibrationError; }
+
+    /// GPU 틱을 CPU(QPC) 축으로 옮긴다. 표본이 없으면 0 을 돌려준다.
+    ///
+    /// 나눗셈을 곱셈 사이에 두어 128 비트 없이 넘침을 피한다 — 나머지를 따로
+    /// 옮기므로 오차는 CPU 틱 1 미만이고, 실수 변환이 아니라 정수 그대로다.
+    uint64_t GpuTickToCpuTick(uint64_t gpuTick) const;
+
     /// 그 슬롯이 지금 들고 있는 표. 프로브와 진단용이다.
     GpuFrameToken SlotToken(uint32_t ringSlot) const;
 
@@ -157,6 +213,12 @@ private:
     // busy 계산용 스크래치. 조각을 정렬해 훑어야 하는데 원본 순서를 깨면
     // 안 되므로 사본을 둔다.
     std::vector<std::pair<uint64_t, uint64_t>> m_busyScratch;
+
+    // 큐를 붙잡아 둔다. 표본을 다시 뜨려면 필요하고, 주파수만 받아 두고
+    // 놓아 버리면 그 뒤로는 두 시계를 맞출 수단이 없다.
+    ComPtr<ID3D12CommandQueue> m_queue;
+    ClockCalibration           m_calibration;
+    std::string                m_calibrationError;
 
     ComPtr<ID3D12QueryHeap> m_queryHeap;
     ComPtr<ID3D12Resource>  m_readback;
