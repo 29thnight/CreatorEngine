@@ -87,6 +87,28 @@ $mutations = @(
         New    = "`t`tif (events.size() > 1000000) std::sort(events.begin(), events.end(), precedes);"
         Expect = 'aggregate/'
         Why    = '이벤트는 끝난 순서로 들어오므로 정렬 없이는 자식이 부모보다 먼저 나온다'
+    },
+
+    # ── PHASE 14 P3 reader ──────────────────────────────────────────────────
+    @{
+        # Live Follow 를 무시하고 언제나 최신으로 간다. 스파이크를 붙잡아 둘 수
+        # 없게 되는데, 캡처를 다시 받기 전까지는 화면상 아무 차이도 없다.
+        Name   = 'reader-follow-always'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tif (m_liveFollow)"
+        New    = "`t`tif (true)"
+        Expect = 'reader-follow/'
+        Why    = '따라가기를 꺼도 최신으로 점프하면 붙잡아 두겠다는 약속이 깨진다'
+    },
+    @{
+        # 선택이 바뀌어도 집계 캐시를 그대로 둔다. 과거 프레임을 골라도 화면은
+        # 이전 프레임을 계속 보여 주는데, 숫자가 그럴듯해서 눈으로는 모른다.
+        Name   = 'reader-stale-cache'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t`tm_aggregateValid = false;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
+        New    = "`t`t`tm_aggregateValid = true;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
+        Expect = 'reader/'
+        Why    = '선택이 바뀌어도 캐시를 안 버리면 다른 프레임의 숫자를 계속 보여 준다'
     }
 )
 
@@ -95,6 +117,7 @@ $sources = @(
     (Join-Path $core 'ProfileThreadStream.cpp'),
     (Join-Path $core 'ProfileCapture.cpp'),
     (Join-Path $core 'ProfileAggregate.cpp'),
+    (Join-Path $core 'ProfileReader.cpp'),
     (Join-Path $core 'ProfileService.cpp'),
     (Join-Path $PSScriptRoot 'profile_core_probe.cpp')
 )

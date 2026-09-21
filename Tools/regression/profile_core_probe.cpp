@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "ProfileAggregate.h"
+#include "ProfileReader.h"
 #include "ProfileScope.h"
 #include "ProfileService.h"
 
@@ -781,6 +782,253 @@ namespace
 		}
 		check(row->total_ticks > 0, "aggregate-truncated/length — 길이가 0 이 아니다");
 	}
+	//-------------------------------------------------------------------------
+	// ⑭ PHASE 14 P3 — reader 상태. 완료조건 둘이 여기 있다:
+	//    "10초 녹화 후 과거 프레임 선택 가능" 과 "pause 후 엔진이 계속 돌아도
+	//    선택 자료가 변하지 않음".
+	//-------------------------------------------------------------------------
+	void test_reader_selection()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		// 프레임마다 호출 수를 다르게 한다 — 과거 프레임을 골랐을 때 그
+		// 프레임의 자료가 나오는지 값으로 가릴 수 있어야 한다.
+		for (std::uint32_t frame = 1; frame <= 10; ++frame)
+		{
+			for (std::uint32_t n = 0; n < frame; ++n)
+			{
+				ce::profile_scope scope{ service, ce::marker<"ReaderTick">() };
+				busy_ticks(1);
+			}
+			service.publish_frame(frame);
+		}
+		service.pause();
+
+		ce::capture_reader reader;
+		reader.adopt(service.capture());
+
+		check(reader.has_capture(), "reader/capture — 얼린 캡처를 받았다");
+		if (!reader.has_capture())
+		{
+			return;
+		}
+
+		check_eq(reader.available_first(), std::uint32_t{ 1 }, "reader/first — 가장 오래된 프레임");
+		check_eq(reader.available_last(), std::uint32_t{ 10 }, "reader/last — 가장 최신 프레임");
+
+		// live follow 가 기본이므로 선택은 최신이다.
+		check(reader.live_follow(), "reader/follow-default — 기본은 따라가기");
+		check_eq(reader.selected_first(), std::uint32_t{ 10 }, "reader/follow — 최신을 고른다");
+
+		{
+			const ce::aggregate_row* row =
+				find_flat(reader.aggregate(), ce::marker<"ReaderTick">());
+			check(row != nullptr, "reader/row — 선택한 프레임에 행이 있다");
+			if (row)
+			{
+				check_eq(row->call_count, std::uint64_t{ 10 },
+				         "reader/latest-calls — 최신 프레임은 열 번");
+			}
+		}
+
+		// ★ 과거 프레임 선택. 3 번 프레임은 세 번 불렸다.
+		reader.select_frame(3);
+		check_eq(reader.selected_first(), std::uint32_t{ 3 }, "reader/select — 과거 프레임을 고른다");
+		{
+			const ce::aggregate_row* row =
+				find_flat(reader.aggregate(), ce::marker<"ReaderTick">());
+			check(row != nullptr, "reader/past-row — 과거 프레임에 행이 있다");
+			if (row)
+			{
+				check_eq(row->call_count, std::uint64_t{ 3 },
+				         "reader/past-calls — 고른 프레임의 자료가 나온다");
+			}
+		}
+
+		// 범위 선택. 1..4 는 1+2+3+4 = 10 번.
+		reader.select_range(1, 4);
+		check_eq(reader.selected_count(), std::uint32_t{ 4 }, "reader/range — 네 프레임을 고른다");
+		{
+			const ce::aggregate_row* row =
+				find_flat(reader.aggregate(), ce::marker<"ReaderTick">());
+			if (row)
+			{
+				check_eq(row->call_count, std::uint64_t{ 10 },
+				         "reader/range-calls — 범위의 합이 나온다");
+			}
+		}
+
+		// 뒤집어 줘도 같은 범위다.
+		reader.select_range(4, 1);
+		check_eq(reader.selected_first(), std::uint32_t{ 1 }, "reader/swap-first — 뒤집힌 범위를 바로잡는다");
+		check_eq(reader.selected_last(), std::uint32_t{ 4 }, "reader/swap-last — 뒤집힌 범위를 바로잡는다");
+
+		// 범위 밖을 고르면 안으로 자른다.
+		reader.select_range(900, 901);
+		check_eq(reader.selected_first(), std::uint32_t{ 10 }, "reader/clamp — 범위 밖은 안으로 자른다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑮ ★ 완료조건: pause 뒤 엔진이 계속 돌아도 손에 든 자료가 변하지 않는다.
+	//-------------------------------------------------------------------------
+	void test_reader_frozen_while_running()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		for (std::uint32_t frame = 1; frame <= 3; ++frame)
+		{
+			ce::profile_scope scope{ service, ce::marker<"Before">() };
+			busy_ticks(1);
+			service.publish_frame(frame);
+		}
+		service.pause();
+
+		ce::capture_reader reader;
+		reader.adopt(service.capture());
+		reader.set_live_follow(false);
+		reader.select_frame(2);
+
+		const ce::frame_aggregate& before = reader.aggregate();
+		const std::uint64_t beforeEvents = before.event_count();
+		const ce::profile_tick beforeTotal = before.timeline_total_ticks();
+		const std::size_t beforeRows = before.hierarchy().size();
+		check(beforeEvents > 0, "reader-frozen/before — 얼리기 전에 자료가 있다");
+
+		// 엔진이 계속 돈다. 녹화를 다시 켜고 다른 marker 로 여러 프레임.
+		service.record(4);
+		for (std::uint32_t frame = 4; frame <= 40; ++frame)
+		{
+			for (int n = 0; n < 5; ++n)
+			{
+				ce::profile_scope scope{ service, ce::marker<"After">() };
+				busy_ticks(1);
+			}
+			service.publish_frame(frame);
+		}
+
+		// reader 는 아무것도 하지 않았다. 손에 든 것이 그대로여야 한다.
+		const ce::frame_aggregate& after = reader.aggregate();
+		check_eq(after.event_count(), beforeEvents,
+		         "reader-frozen/events — 엔진이 돌아도 이벤트 수가 그대로다");
+		check_eq(after.timeline_total_ticks(), beforeTotal,
+		         "reader-frozen/total — 엔진이 돌아도 합계가 그대로다");
+		check_eq(after.hierarchy().size(), beforeRows,
+		         "reader-frozen/rows — 엔진이 돌아도 행 수가 그대로다");
+		check_eq(reader.selected_first(), std::uint32_t{ 2 },
+		         "reader-frozen/selection — 선택이 저절로 움직이지 않는다");
+
+		// 새로 얼린 캡처에는 After 가 있다 — 엔진이 실제로 돌았다는 확인이다.
+		// (이 줄이 없으면 위의 '변하지 않았다' 가 '아무 일도 없었다' 와
+		//  구분되지 않는다.)
+		service.pause();
+		ce::capture_session_ptr fresh = service.capture();
+		check(fresh != nullptr && count_marker(*fresh, ce::marker<"After">()) > 0,
+		      "reader-frozen/engine-ran — 그동안 엔진이 실제로 기록했다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑯ Live Follow. 켜면 새 캡처를 받을 때 최신으로 가고, 끄면 보던 자리를
+	//    지킨다 — 스파이크를 붙잡아 두는 것이 그 토글의 쓸모다.
+	//-------------------------------------------------------------------------
+	void test_reader_live_follow()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		auto run_frames = [&service](std::uint32_t first, std::uint32_t last)
+		{
+			for (std::uint32_t frame = first; frame <= last; ++frame)
+			{
+				ce::profile_scope scope{ service, ce::marker<"FollowTick">() };
+				busy_ticks(1);
+				service.publish_frame(frame);
+			}
+		};
+
+		run_frames(1, 5);
+		service.pause();
+
+		ce::capture_reader reader;
+		reader.adopt(service.capture());
+		check_eq(reader.selected_first(), std::uint32_t{ 5 }, "reader-follow/initial — 최신을 고른다");
+
+		// 따라가기를 끄고 과거를 붙잡는다.
+		reader.set_live_follow(false);
+		reader.select_frame(2);
+
+		service.record(6);
+		run_frames(6, 12);
+		service.pause();
+		reader.adopt(service.capture());
+
+		check_eq(reader.selected_first(), std::uint32_t{ 2 },
+		         "reader-follow/held — 끄면 보던 자리를 지킨다");
+		check_eq(reader.available_last(), std::uint32_t{ 12 },
+		         "reader-follow/available — 새 캡처의 범위는 갱신된다");
+
+		// 다시 켜면 그 자리에서 최신으로 간다.
+		reader.set_live_follow(true);
+		check_eq(reader.selected_first(), std::uint32_t{ 12 },
+		         "reader-follow/resume — 켜면 최신으로 간다");
+
+		service.record(13);
+		run_frames(13, 20);
+		service.pause();
+		reader.adopt(service.capture());
+		check_eq(reader.selected_first(), std::uint32_t{ 20 },
+		         "reader-follow/latest — 켜 두면 계속 따라간다");
+
+		reader.reset();
+		check(!reader.has_capture(), "reader-follow/reset — 놓으면 비어 있다");
+		check(reader.aggregate().hierarchy().empty(),
+		      "reader-follow/reset-empty — 놓은 뒤 집계가 비어 있다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑰ 캐시. 같은 선택을 두 번 물어도 다시 접지 않는다. "느려지지 않았다" 를
+	//    말로 적으면 아무도 재지 않으므로 접은 횟수를 밖에서 보이게 둔다.
+	//-------------------------------------------------------------------------
+	void test_reader_fold_cache()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		for (std::uint32_t frame = 1; frame <= 5; ++frame)
+		{
+			ce::profile_scope scope{ service, ce::marker<"CacheTick">() };
+			busy_ticks(1);
+			service.publish_frame(frame);
+		}
+		service.pause();
+
+		ce::capture_reader reader;
+		reader.adopt(service.capture());
+		check_eq(reader.fold_count(), std::uint64_t{ 0 }, "reader-cache/lazy — 묻기 전에는 접지 않는다");
+
+		(void)reader.aggregate();
+		(void)reader.aggregate();
+		(void)reader.aggregate();
+		check_eq(reader.fold_count(), std::uint64_t{ 1 }, "reader-cache/reuse — 같은 선택은 한 번만 접는다");
+
+		reader.select_frame(2);
+		(void)reader.aggregate();
+		check_eq(reader.fold_count(), std::uint64_t{ 2 }, "reader-cache/invalidate — 선택이 바뀌면 다시 접는다");
+
+		// 같은 자리를 다시 고르는 것은 바뀐 것이 아니다.
+		reader.select_frame(2);
+		(void)reader.aggregate();
+		check_eq(reader.fold_count(), std::uint64_t{ 2 }, "reader-cache/same — 같은 자리를 다시 골라도 그대로");
+	}
 }
 
 int main()
@@ -798,6 +1046,10 @@ int main()
 	test_aggregate_threads();
 	test_aggregate_flat();
 	test_aggregate_truncated();
+	test_reader_selection();
+	test_reader_frozen_while_running();
+	test_reader_live_follow();
+	test_reader_fold_cache();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

@@ -23,6 +23,7 @@
     <ClInclude Include="ProfileCapture.h" />
     <ClInclude Include="ProfileEvent.h" />
     <ClInclude Include="ProfileMarker.h" />
+    <ClInclude Include="ProfileReader.h" />
     <ClInclude Include="ProfileScope.h" />
     <ClInclude Include="ProfileService.h" />
     <ClInclude Include="ProfileThreadStream.h" />
@@ -31,6 +32,7 @@
     <ClCompile Include="ProfileAggregate.cpp" />
     <ClCompile Include="ProfileCapture.cpp" />
     <ClCompile Include="ProfileMarker.cpp" />
+    <ClCompile Include="ProfileReader.cpp" />
     <ClCompile Include="ProfileService.cpp" />
     <ClCompile Include="ProfileThreadStream.cpp" />
   </ItemGroup>
