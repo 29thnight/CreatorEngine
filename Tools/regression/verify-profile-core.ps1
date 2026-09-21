@@ -26,16 +26,16 @@ $mutations = @(
     @{
         Name   = 'close-open-scopes'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`tseal_current();`r`n`t}`r`n`r`n`tvoid thread_stream::finish"
-        New    = "`t`twhile (m_depth > 0) { end_scope(0); }`r`n`t`tseal_current();`r`n`t}`r`n`r`n`tvoid thread_stream::finish"
+        Old    = "`t`tseal_current();`r`n`r`n`t`t// 주인이 직접 봉인했으니"
+        New    = "`t`twhile (m_depth > 0) { end_scope(0); }`r`n`t`tseal_current();`r`n`r`n`t`t// 주인이 직접 봉인했으니"
         Expect = 'cross-frame/'
         Why    = '프레임 경계에서 열린 스코프를 닫으면(옛 코어가 그랬다) 프레임을 넘는 구간을 잃는다'
     },
     @{
         Name   = 'silent-drop'
         File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`t`t++m_droppedEvents;`r`n`t`t`treturn;"
-        New    = "`t`t`treturn;"
+        Old    = "`t`thonor_seal_request();`r`n`r`n`t`tif (!ensure_chunk())`r`n`t`t{`r`n`t`t`tm_droppedEvents.fetch_add(1, std::memory_order_relaxed);`r`n"
+        New    = "`t`thonor_seal_request();`r`n`r`n`t`tif (!ensure_chunk())`r`n`t`t{`r`n"
         Expect = 'overflow/'
         Why    = '잃은 이벤트를 세지 않으면 프레임이 정상인 척한다'
     },
@@ -157,6 +157,23 @@ $mutations = @(
         New    = "`t`tif (m_state.load(std::memory_order_relaxed) != recorder_state::recording)`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}`r`n`t`tthread_stream* stream = t_streams[m_serviceSlot];`r`n`t`tif (!stream)"
         Expect = 'state-change/inner-depth'
         Why    = '닫는 쪽을 얼릴 수 있으면 스택에 칸이 남아 그 뒤의 깊이가 전부 밀린다'
+    },
+
+    # ── 동시성 경계: 봉인은 주인만 한다 ───────────────────────────
+    @{
+        # 수집기가 남의 현재 청크를 직접 봉인하던 예전 동작으로 되돌린다.
+        #
+        # ★ 이 변이는 **죽는다.** writer 가 m_writer 로 쓰는 동안 수집기가 그
+        #   포인터를 비우고 청크를 풀에 되돌리므로, 두 스레드가 같은 저장소를
+        #   만진다. 실측에서 Debug·Release 모두 ACCESS_VIOLATION 이었다.
+        #   그래서 stderr 의 표식이 아니라 충돌로 판정한다.
+        Name   = 'collector-seals-others'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`t`t`tif (entry.stream.get() == self)`r`n`t`t`t`t{`r`n`t`t`t`t`tentry.stream->publish_frame();`r`n`t`t`t`t}`r`n`t`t`t`telse`r`n`t`t`t`t{`r`n`t`t`t`t`tentry.stream->request_seal();`r`n`t`t`t`t}"
+        New    = "`t`t`t`t(void)self;`r`n`t`t`t`tentry.stream->publish_frame();"
+        Expect = 'concurrent-publish/'
+        AllowCrash = $true
+        Why    = '남의 청크를 봉인하면 쓰기와 겹쳐 이벤트를 잃거나 프로세스가 죽는다'
     },
 
     # ── GPU 레인: 늦게 온 구간이 제 프레임 칸으로 가는가 ───────────
@@ -311,6 +328,18 @@ foreach ($config in $configs) {
         }
         if ($result.ExitCode -eq 0) {
             $failures.Add("$config 변이 '$($mutation.Name)' 가 통과했다 — 검사에 이빨이 없다. $($mutation.Why)")
+            continue
+        }
+        # ★ 어떤 결함은 **단정이 돌기 전에 프로세스를 죽인다.** 동시성 경계가
+        #   그렇다 — 봉인과 쓰기가 겹치면 stderr 에 한 줄도 남기지 못하고
+        #   ACCESS_VIOLATION 으로 끝난다. 그때는 충돌 자체가 붉음이다.
+        #
+        #   AllowCrash 를 적은 변이에만 허용한다. 모든 변이에 열어 두면
+        #   "컴파일은 됐는데 엉뚱한 데서 죽었다" 가 통과로 읽힌다.
+        $crashed = ($result.ExitCode -lt 0)
+        if ($crashed -and $mutation.ContainsKey('AllowCrash') -and $mutation.AllowCrash) {
+            Write-Host ("[OK]   $config 변이 '" + $mutation.Name +
+                        "' — 충돌로 잡았다 (exit " + $result.ExitCode + ')')
             continue
         }
         if ($result.StdErr -notmatch [regex]::Escape($mutation.Expect)) {

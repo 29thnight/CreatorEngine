@@ -160,11 +160,29 @@ namespace ce
 		return true;
 	}
 
+	void thread_stream::honor_seal_request()
+	{
+		const std::uint64_t requested = m_sealRequest.load(std::memory_order_acquire);
+		if (requested == m_sealAck.load(std::memory_order_relaxed))
+		{
+			return;
+		}
+
+		// 열려 있는 스코프는 건드리지 않는다. 그것은 아직 청크에 없고,
+		// 프레임을 넘는 구간을 잃지 않는다는 규약 그대로다.
+		seal_current();
+		m_sealAck.store(requested, std::memory_order_release);
+	}
+
 	void thread_stream::write(const profile_event& value)
 	{
+		// 수집기가 봉인을 청했으면 **여기서** 들어준다. 청크를 만지기 전이
+		// 유일하게 안전한 자리다 — 그리고 이 스레드만 여기를 지난다.
+		honor_seal_request();
+
 		if (!ensure_chunk())
 		{
-			++m_droppedEvents;
+			m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
 			return;
 		}
 
@@ -208,7 +226,7 @@ namespace ce
 			//   언제나 가장 안쪽이고, 따라서 end_scope 가 이 수를 먼저 소비하면
 			//   정확히 제 짝을 만난다.
 			++m_skippedDepth;
-			++m_droppedScopes;
+			m_droppedScopes.fetch_add(1, std::memory_order_relaxed);
 			return;
 		}
 
@@ -234,7 +252,7 @@ namespace ce
 		{
 			// 열지 않고 닫았다. RAII 표기에서는 나올 수 없는 경로다 —
 			// 남는다면 손으로 짝을 맞춘 코드가 어딘가 있다는 뜻이므로 센다.
-			++m_unbalancedScopes;
+			m_unbalancedScopes.fetch_add(1, std::memory_order_relaxed);
 			return;
 		}
 
@@ -256,7 +274,7 @@ namespace ce
 	{
 		if (!ensure_chunk())
 		{
-			++m_droppedEvents;
+			m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
 			return;
 		}
 
@@ -282,6 +300,10 @@ namespace ce
 		//   닫았고(그래서 "CPU Frame" 대신 남의 구간을 닫았다) 그것이
 		//   cross-frame/preserve 가 기지 결함으로 남아 있던 이유다.
 		seal_current();
+
+		// 주인이 직접 봉인했으니 대기 중인 요청도 함께 풀린 것이다.
+		m_sealAck.store(m_sealRequest.load(std::memory_order_acquire),
+		                std::memory_order_release);
 	}
 
 	void thread_stream::finish(profile_tick now)
@@ -301,7 +323,7 @@ namespace ce
 			value.flags = scope.flags | event_flags::truncated_end;
 			write(value);
 
-			++m_unbalancedScopes;
+			m_unbalancedScopes.fetch_add(1, std::memory_order_relaxed);
 		}
 
 		seal_current();

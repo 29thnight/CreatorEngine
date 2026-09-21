@@ -1510,6 +1510,84 @@ void test_gpu_lane_dropped()
 	service.shutdown();
 }
 
+
+// ── 적는 동안 거두기 ──────────────────────────────────────────────────
+//
+// ★ 기존 multithread 검사는 워커를 전부 join() 한 **뒤에** 수집한다. 그래서
+//   "writer 가 계속 적는 동안 collector 가 거둔다" 는 경계를 한 번도 자극하지
+//   않았다. 설계는 "writer 는 자기 스트림만, 수집기는 봉인된 것만" 이라고
+//   적혀 있지만, publish_frame 은 등록된 **모든** 스트림의 현재 청크를
+//   봉인하고 writer 는 그 잠금을 잡지 않는다.
+//
+//   판정은 계수다. 봉인과 쓰기가 겹쳐 이벤트를 잃으면 드롭으로 세지 않고
+//   사라지므로 "수집분 + 드롭 = 발생분" 이 깨진다.
+void test_concurrent_publish()
+{
+	constexpr int kWorkers = 4;
+	constexpr int kScopesPerWorker = 20000;
+
+	ce::profiler_service service;
+	ce::profiler_config config;
+	config.chunk_count = 512;
+	config.retained_frames = 4096;
+	service.initialize(config);
+	service.register_thread("Main");
+	service.record(1);
+
+	std::atomic<int> finished{ 0 };
+	std::vector<std::thread> workers;
+	workers.reserve(kWorkers);
+
+	for (int i = 0; i < kWorkers; ++i)
+	{
+		workers.emplace_back([&service, &finished, i]()
+		{
+			const std::string name = "Worker" + std::to_string(i);
+			service.register_thread(name.c_str());
+
+			for (int n = 0; n < kScopesPerWorker; ++n)
+			{
+				ce::profile_scope scope{ service, ce::marker<"ConcurrentScope">() };
+			}
+
+			service.unregister_thread();
+			finished.fetch_add(1, std::memory_order_release);
+		});
+	}
+
+	// ★ 워커가 적는 **동안** 프레임을 계속 닫는다. 이것이 자극이다.
+	std::uint32_t frame = 1;
+	while (finished.load(std::memory_order_acquire) < kWorkers)
+	{
+		service.publish_frame(frame++);
+	}
+
+	for (std::thread& worker : workers)
+	{
+		worker.join();
+	}
+
+	service.publish_frame(frame);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "concurrent-publish/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	const ce::live_summary summary = service.summary();
+	const std::size_t seen = count_marker(*capture, ce::marker<"ConcurrentScope">());
+	const std::uint64_t expected =
+		static_cast<std::uint64_t>(kWorkers) * kScopesPerWorker;
+
+	// 잃었으면 드롭으로 세어야 한다. 세지 않고 사라지는 것이 이 경계의 결함이다.
+	check_eq(seen + summary.dropped_events, expected,
+	         "concurrent-publish/accounted — 수집분 + 드롭 = 발생분");
+	check_eq(summary.unbalanced_scopes, std::uint64_t{ 0 },
+	         "concurrent-publish/balanced — 불균형 스코프 0");
+
+	service.shutdown();
+}
+
 int main()
 {
 	test_marker_identity();
@@ -1536,6 +1614,7 @@ int main()
 	test_gpu_lane();
 	test_gpu_lane_deferred();
 	test_gpu_lane_dropped();
+	test_concurrent_publish();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

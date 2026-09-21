@@ -1,4 +1,5 @@
 #include "ProfileService.h"
+#include <thread>
 
 #include <Windows.h>
 
@@ -326,7 +327,6 @@ namespace ce
 		entry.stream = std::move(stream);
 		entry.os_thread_id = 0;
 		entry.live = true;
-		entry.self_sealed = true;
 
 		m_streams.push_back(std::move(entry));
 		m_threadInfo.push_back(std::move(info));
@@ -386,18 +386,29 @@ namespace ce
 		// 등록된 모든 스트림이 자기 청크를 봉인한다. 열린 스코프는 닫지
 		// 않는다 — 프레임을 넘는 구간을 잃지 않기 위해서다.
 		std::uint64_t dropped = 0;
+		thread_stream* const self = t_streams[m_serviceSlot];
 		{
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			for (stream_entry& entry : m_streams)
 			{
 				if (!entry.stream) continue;
 
-				// ★ 남의 스트림을 봉인하지 않는다. GPU 레인은 렌더 스레드가
-				//   적고 이 루프는 게임 스레드가 도므로, 여기서 봉인하면 두
-				//   스레드가 같은 청크 포인터를 동시에 만진다.
-				if (!entry.self_sealed)
+				// ★ 남의 스트림을 **건드리지 않는다.** 예전에는 여기서 모든
+				//   스트림의 현재 청크를 직접 봉인했고, writer 는 그 잠금을
+				//   잡지 않으므로 쓰기와 봉인이 그대로 겹쳤다. 실측: 워커 넷이
+				//   적는 동안 이 루프를 돌리자 Debug·Release 모두
+				//   ACCESS_VIOLATION 으로 죽었다(§0.5.15).
+				//
+				//   이제는 요청만 올린다. 봉인은 주인 스레드가 자기 write()
+				//   첫머리에서 한다. 내가 곧 이 스레드의 주인이면 — 게임
+				//   스레드가 자기 스트림을 가진 경우 — 아래에서 직접 봉인한다.
+				if (entry.stream.get() == self)
 				{
 					entry.stream->publish_frame();
+				}
+				else
+				{
+					entry.stream->request_seal();
 				}
 				dropped += entry.stream->dropped_events();
 			}
@@ -443,16 +454,43 @@ namespace ce
 		// 멈춘 시점까지를 온전히 담는다.
 		m_state.store(recorder_state::frozen, std::memory_order_release);
 
+		// ★ 여기서도 남의 청크를 만지지 않는다. 요청을 올리고 **짧게** 기다린
+		//   뒤, 아직 응답하지 않은 스트림을 **센다**. 잠든 워커는 다음에 깨어날
+		//   때 봉인하므로 그때까지의 꼬리가 이 캡처에 없을 수 있고, 그것을
+		//   성공처럼 덮으면 "얼린 캡처가 온전하다" 가 거짓이 된다.
 		{
+			thread_stream* const self = t_streams[m_serviceSlot];
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			for (stream_entry& entry : m_streams)
 			{
-				if (entry.stream)
-				{
-					entry.stream->publish_frame();
-				}
+				if (!entry.stream) continue;
+				if (entry.stream.get() == self) entry.stream->publish_frame();
+				else                            entry.stream->request_seal();
 			}
 		}
+
+		// 응답을 기다린다. 상한을 두는 이유는 잠든 producer 가 영영 안 깨어날
+		// 수 있기 때문이다 — 관측 도구가 관측 대상을 기다리며 멈추면 안 된다.
+		std::uint32_t unacked = 0;
+		for (int attempt = 0; attempt < kPauseAckAttempts; ++attempt)
+		{
+			unacked = 0;
+			{
+				std::lock_guard<std::mutex> guard(m_streamLock);
+				for (stream_entry& entry : m_streams)
+				{
+					if (!entry.stream) continue;
+					if (entry.stream->seal_ack() != entry.stream->seal_request())
+					{
+						++unacked;
+					}
+				}
+			}
+			if (0 == unacked) break;
+			std::this_thread::yield();
+		}
+		m_pauseUnacked.store(unacked, std::memory_order_relaxed);
+
 		collect_sealed();
 
 		std::vector<thread_info> threads;
@@ -515,6 +553,7 @@ namespace ce
 		value.late_spans_placed = m_ring.late_spans_placed();
 		value.late_spans_dropped = m_ring.late_spans_dropped();
 		value.late_spans_waiting = m_ring.late_spans_waiting();
+		value.pause_unacked_streams = m_pauseUnacked.load(std::memory_order_relaxed);
 
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);

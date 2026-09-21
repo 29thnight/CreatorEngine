@@ -57,6 +57,10 @@ namespace ce
 		std::uint64_t  late_spans_placed = 0;
 		std::uint64_t  late_spans_dropped = 0;
 		std::size_t    late_spans_waiting = 0;
+
+		// pause 에서 봉인 요청에 **응답하지 않은** 스트림 수. 0 이 아니면 그
+		// 스트림의 꼬리가 이 캡처에 없다 — 잠든 워커가 대표적이다.
+		std::uint32_t  pause_unacked_streams = 0;
 	};
 
 	// 한 프로세스에 동시에 살 수 있는 서비스 수. 라이브 하나 + 검사용 하나면
@@ -117,6 +121,10 @@ namespace ce
 		// GPU 레인의 이름. 창과 게이트가 이 이름으로 레인을 찾는다.
 		static constexpr const char* kGpuLaneName = "[GPU Graphics]";
 
+		// pause 가 봉인 응답을 기다리는 횟수. 상한을 두는 이유는 잠든
+		// producer 가 영영 안 깨어날 수 있기 때문이다.
+		static constexpr int kPauseAckAttempts = 256;
+
 		// --- recorder ----------------------------------------------------
 		// 시작 프레임 번호를 받는다. 이것이 없으면 첫 스코프들이 "아직 모르는"
 		// 프레임에 기록되고, 그 프레임을 닫을 때 붙는 라벨과 어긋난다 —
@@ -146,8 +154,6 @@ namespace ce
 			std::uint32_t                  os_thread_id = 0;
 			bool                           live = false;
 
-			// 이 스트림은 적는 쪽만 봉인한다. publish_frame 이 건너뛴다.
-			bool                           self_sealed = false;
 		};
 
 		// GPU 레인의 스트림 자리. 아직 만들지 않았으면 비어 있다.
@@ -156,6 +162,9 @@ namespace ce
 		// 원자로 둔다. 만드는 것은 한 번이지만 읽는 쪽이 lock 없이 들어오므로,
 		// 평범한 포인터면 초기화가 보이지 않는 창이 생긴다.
 		std::atomic<thread_stream*> m_gpuStream{ nullptr };
+
+		// 마지막 pause 에서 응답하지 않은 스트림 수.
+		std::atomic<std::uint32_t> m_pauseUnacked{ 0 };
 
 		std::uint32_t m_serviceSlot = 0;
 

@@ -118,7 +118,31 @@ namespace ce
 		// 프레임 경계. 열려 있는 스코프는 닫지 않는다 — 그것이 프레임을 넘는
 		// 구간이고, 옛 코어가 스택 맨 위를 무조건 닫아 잃던 것이다. 대신
 		// 지금까지 쓴 청크를 봉인해 수집기가 이번 프레임을 볼 수 있게 한다.
+		//
+		// ★ **주인 스레드만 부른다.** 남이 부르면 m_writer 를 비우는 동안 주인이
+		//   그 포인터로 쓰고 있을 수 있다. 실측: 워커 넷이 적는 동안 수집기가
+		//   이 함수를 돌리자 Debug·Release 모두 ACCESS_VIOLATION 으로 죽었다.
 		void publish_frame();
+
+		// 수집기가 "지금 봉인해 달라" 고 **요청**만 한다. 실제 봉인은 주인
+		// 스레드가 자기 안전한 자리에서 한다.
+		//
+		// ★ 이것이 경계의 전부다. 수집기는 청크 포인터를 만지지 않는다.
+		void request_seal()
+		{
+			m_sealRequest.fetch_add(1, std::memory_order_release);
+		}
+
+		// 요청한 봉인이 처리됐는가. 수집기가 청크를 만지지 않고 물을 수 있는
+		// 유일한 수단이다.
+		std::uint64_t seal_request() const
+		{
+			return m_sealRequest.load(std::memory_order_acquire);
+		}
+		std::uint64_t seal_ack() const
+		{
+			return m_sealAck.load(std::memory_order_acquire);
+		}
 
 		// 이 스레드의 기록을 끝낸다. 남은 청크를 봉인하고, 아직 열려 있는
 		// 스코프가 있으면 truncated_end 로 닫아 **잃지 않는다**.
@@ -128,14 +152,29 @@ namespace ce
 		std::uint32_t      slot() const { return m_info.slot; }
 		std::uint32_t      open_depth() const { return m_depth; }
 
-		std::uint64_t dropped_events() const { return m_droppedEvents; }
-		std::uint64_t dropped_scopes() const { return m_droppedScopes; }
-		std::uint64_t unbalanced_scopes() const { return m_unbalancedScopes; }
+		// ★ 원자로 둔다. 적는 것은 주인 스레드이고 읽는 것은 수집기·요약이라,
+		//   평범한 정수면 그 자체로 경합이다(계획서 §0.5.15).
+		std::uint64_t dropped_events() const
+		{
+			return m_droppedEvents.load(std::memory_order_relaxed);
+		}
+		std::uint64_t dropped_scopes() const
+		{
+			return m_droppedScopes.load(std::memory_order_relaxed);
+		}
+		std::uint64_t unbalanced_scopes() const
+		{
+			return m_unbalancedScopes.load(std::memory_order_relaxed);
+		}
 
 	private:
 		bool ensure_chunk();
 		void write(const profile_event& value);
 		void seal_current();
+
+		// 요청이 와 있으면 지금 봉인한다. 주인 스레드의 안전한 자리에서만
+		// 불린다 — write() 가 청크를 만지기 **전**과 스코프가 다 닫힌 뒤다.
+		void honor_seal_request();
 
 		chunk_pool&   m_pool;
 		thread_info   m_info;
@@ -150,8 +189,12 @@ namespace ce
 		// end_scope 가 스택을 건드리기 전에 이 수를 먼저 소비해야 짝이 맞는다.
 		std::uint32_t m_skippedDepth = 0;
 
-		std::uint64_t m_droppedEvents = 0;    // free 청크가 없어 잃은 이벤트
-		std::uint64_t m_droppedScopes = 0;    // 깊이 상한을 넘겨 못 연 스코프
-		std::uint64_t m_unbalancedScopes = 0; // 열지 않고 닫은 횟수
+		// 수집기가 올리고 주인이 따라 올린다. 둘이 같으면 요청이 다 처리된 것이다.
+		std::atomic<std::uint64_t> m_sealRequest{ 0 };
+		std::atomic<std::uint64_t> m_sealAck{ 0 };
+
+		std::atomic<std::uint64_t> m_droppedEvents{ 0 };    // free 청크가 없어 잃은 이벤트
+		std::atomic<std::uint64_t> m_droppedScopes{ 0 };    // 깊이 상한을 넘겨 못 연 스코프
+		std::atomic<std::uint64_t> m_unbalancedScopes{ 0 }; // 열지 않고 닫은 횟수
 	};
 }
