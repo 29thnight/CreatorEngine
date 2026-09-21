@@ -27,6 +27,15 @@ namespace ce
 		stopped = 0,     // marker 는 즉시 return
 		recording = 1,   // rolling ring 에 계속 기록
 		frozen = 2,      // producer 를 멈추고 immutable capture 를 공개
+
+		// 멈추라고는 했는데 아직 모두의 꼬리를 받지 못했다. 수집기가 다음
+		// 프레임 경계에서 마무리한다.
+		//
+		// ★ 이 상태가 없으면 Pause 를 부른 쪽이 완료까지 **기다려야** 한다.
+		//   UI 는 씬 잠금을 쥔 채 부르고 게임 스레드는 같은 잠금을 통과해야
+		//   요청을 처리하므로, 기다리는 순간 서로를 기다린다(실측 2,000 ms
+		//   상한까지 멈췄고 돌아왔을 때도 여전히 recording 이었다).
+		pausing = 3,
 	};
 
 	struct profiler_config
@@ -75,11 +84,8 @@ namespace ce
 		// 어느 캡처에도 없다 — 종료 전에 unregister_thread 를 부르지 않은 것이다.
 		std::uint64_t  abandoned_streams = 0;
 
-		// 다른 스레드에서 들어와 수집기로 넘긴 제어 요청 수, 그리고 프레임이
-		// 돌지 않아 끝내 적용되지 못한 수. 후자가 0 이 아니면 **부른 대로
-		// 되지 않았다.**
+		// 다른 스레드에서 들어와 수집기로 넘긴 제어 요청 수.
 		std::uint64_t  control_requests_deferred = 0;
-		std::uint64_t  control_requests_timed_out = 0;
 
 		// 지운 세대의 것이라 버린 이벤트, 시각이 링 밖이라 버린 이벤트.
 		std::uint64_t  stale_chunks_dropped = 0;
@@ -159,9 +165,11 @@ namespace ce
 		//
 		//   그래서 수집기 스레드에서 불리면 그 자리에서 하고, 다른 스레드에서
 		//   불리면 **요청으로 줄을 세운 뒤 다음 프레임 경계에서** 적용된다.
-		//   부른 쪽은 적용될 때까지 짧게 기다리므로 호출 뒤의 상태는 같다.
-		//   수집기가 한 번도 돈 적이 없으면(프레임이 안 도는 검사용 서비스)
-		//   그 자리에서 한다 — 기다릴 대상이 없기 때문이다.
+		//   **부른 쪽은 기다리지 않는다.** 수집기가 한 번도 돈 적이 없으면
+		//   (프레임이 안 도는 검사용 서비스) 그 자리에서 한다.
+		//
+		//   그래서 pause() 뒤의 상태는 frozen 이 아니라 pausing 일 수 있다.
+		//   캡처가 필요하면 state 가 frozen 이 될 때까지 기다려야 한다.
 		void record(std::uint32_t first_frame = 0);
 		void pause();
 		void clear();
@@ -176,6 +184,14 @@ namespace ce
 		static profile_tick ticks_per_second();
 		static profile_tick now();
 
+		// 종료에서 해제하지 못하고 **놓아 둔** 스트림의 수(프로세스 전체 누적).
+		//
+		// ★ 주인이 아직 돌고 있는 스트림은 파괴할 수 없다. 남의 finish() 를
+		//   피해도 곧바로 저장소를 해제하면 같은 일이고, 소멸자 자신이 소유
+		//   검사 없이 seal_current() 를 부른다. 확인되지 않은 것은 놓아 두고
+		//   **센다** — 종료 전에 unregister_thread 를 부르지 않았다는 뜻이다.
+		static std::size_t retained_stream_count();
+
 	private:
 		thread_stream* current_stream();
 
@@ -184,7 +200,7 @@ namespace ce
 		thread_stream* tls_stream() const;
 
 		// --- 제어 요청 줄 -------------------------------------------------
-		enum class control_op : std::uint8_t { record, pause, clear };
+		enum class control_op : std::uint8_t { record, pause, clear, finish_pause };
 
 		struct control_request
 		{
@@ -206,13 +222,13 @@ namespace ce
 		void pause_now();
 		void clear_now();
 
-		// 제어 요청이 적용되길 기다리는 시간 상한. 프레임이 안 돌면 영영 오지
-		// 않으므로 상한을 둔다 — 관측 도구가 관측 대상을 기다리며 멈추면 안 된다.
-		//
-		// ★ 횟수로 세면 안 된다. yield 한 번의 길이는 부하에 따라 수십 배로
-		//   갈리므로, 같은 상한이 어떤 실행에서는 2 ms 고 어떤 실행에서는
-		//   200 ms 다. 기다리는 대상은 **프레임 경계**라 시간으로 재야 한다.
-		static constexpr int kControlWaitMilliseconds = 2000;
+		// 얼림을 마무리한다. 봉인 응답을 확인하고 링을 얼려 공개한다.
+		// **수집기만** 부른다 — 링을 만지기 때문이다.
+		void finish_pause();
+
+		// 얼림을 청한 시각. pause 를 부른 순간 한 번 정해지고, 모든 스트림이
+		// 같은 시각에서 잘린다.
+		std::atomic<profile_tick> m_freezeTick{ 0 };
 		void           collect_sealed();
 		void           destroy_stream_locked(std::size_t index);
 
@@ -276,13 +292,16 @@ namespace ce
 		std::atomic<std::uint64_t>   m_controlEnqueued{ 0 };
 		std::atomic<std::uint64_t>   m_controlApplied{ 0 };
 		std::atomic<std::uint64_t>   m_controlDeferred{ 0 };
-		std::atomic<std::uint64_t>   m_controlTimedOut{ 0 };
 
 		std::atomic<bool>           m_initialized{ false };
 		std::atomic<recorder_state> m_state{ recorder_state::stopped };
 		std::atomic<std::uint32_t>  m_engineFrame{ 0 };
 
-		chunk_pool m_pool;
+		// ★ shared_ptr 인 이유는 **놓아 둔 스트림이 풀보다 오래 살기** 때문이다.
+		//   주인이 아직 도는 스트림을 종료에서 파괴할 수 없으므로 놓아 두는데,
+		//   그 스트림은 계속 이 풀에 청크를 청한다. 풀을 먼저 접으면 놓아 둔
+		//   의미가 없다.
+		std::shared_ptr<chunk_pool> m_pool = std::make_shared<chunk_pool>();
 
 		mutable std::mutex        m_streamLock;
 		std::vector<stream_entry> m_streams;

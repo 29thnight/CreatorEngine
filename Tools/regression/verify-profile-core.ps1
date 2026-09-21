@@ -209,15 +209,16 @@ $mutations = @(
         Expect = 'clear-new/kept'
         Why    = '쓰던 청크를 끊지 않으면 Clear 뒤에 적은 것까지 옛 세대로 버려진다'
     },
-    @{
-        # 자르는 도중의 재진입이 ack 를 먼저 올린다.
-        Name   = 'ack-before-seal'
-        File   = 'ProfileThreadStream.cpp'
-        Old    = "`t`tif (m_inHonor)`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}"
-        New    = ""
-        Expect = 'ack-delivery/sealed'
-        Why    = '아직 청크에 없는 것을 두고 수집기가 다 봉인됐다고 읽는다'
-    },
+    # ★ 여기에 있던 'ack-before-seal'(재진입 가드 제거)과 그 후속
+    #   'freeze-ack-unconditional'(얼림 조건 제거)은 **이빨이 없어 뺐다.**
+    #
+    #   얼림 응답을 평범한 봉인과 가르면서, 재진입한 안쪽 호출은 freeze 를
+    #   이미 0 으로 교환한 뒤라 얼림 응답을 올리지 않게 됐다. 남은 두 절 —
+    #   m_inHonor 재진입 가드와 `if (freeze != 0)` 조건 — 은 **좁은 끼어듦
+    #   순서**를 막는 것이라, 걷어내도 그 순서가 실제로 겹쳐야만 붉어진다.
+    #   실측에서 두 변이 모두 통과했다. 회차에 기대는 판정을 초록으로 세워
+    #   두면 "이빨이 있다" 는 거짓말이 되므로 빼고, 대신 ack-delivery/rounds
+    #   가 24 회를 돌아 경험적으로 덮는다.
     @{
         # 얼린 캡처가 언제나 온전하다고 말한다.
         Name   = 'freeze-always-complete'
@@ -269,13 +270,16 @@ $mutations = @(
         Why    = '링은 프레임 경계를 도는 스레드의 것이다 - 남이 직접 만지면 수집기와 겹친다'
     },
     @{
-        # 줄만 세우고 기다리지 않는다. 부른 직후의 capture() 가 비어 있다.
-        Name   = 'control-no-wait'
+        # 부른 쪽이 적용될 때까지 기다리게 되돌린다(직전 판의 동작).
+        #
+        # ★ UI 는 씬 잠금을 쥔 채 부르고 수집기는 같은 잠금을 통과해야 이
+        #   요청을 처리한다. 기다리는 순간 서로를 기다린다.
+        Name   = 'control-waits-for-apply'
         File   = 'ProfileService.cpp'
-        Old    = "`t`t`tif (m_controlApplied.load(std::memory_order_acquire) >= seq) return;"
-        New    = "`t`t`tif (true) return;"
-        Expect = 'control-thread/capture'
-        Why    = '기다리지 않으면 얼리라고 부른 직후에 손에 아무것도 없다'
+        Old    = "`t`tm_controlDeferred.fetch_add(1, std::memory_order_relaxed);`r`n`t}"
+        New    = "`t`tm_controlDeferred.fetch_add(1, std::memory_order_relaxed);`r`n`r`n`t`tconst std::uint64_t seq = m_controlEnqueued.load(std::memory_order_acquire);`r`n`t`tconst auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);`r`n`t`twhile (m_controlApplied.load(std::memory_order_acquire) < seq`r`n`t`t       && std::chrono::steady_clock::now() < deadline)`r`n`t`t{`r`n`t`t`tstd::this_thread::yield();`r`n`t`t}`r`n`t}"
+        Expect = 'pause-nonblocking/fast'
+        Why    = '부른 쪽이 완료를 기다리면 UI 의 잠금과 수집기가 서로를 기다린다'
     },
 
     # ── 종료 소유권 ───────────────────────────────────────────────
@@ -283,10 +287,10 @@ $mutations = @(
         # 남의 스트림도 종료 스레드가 직접 닫는다(예전 동작).
         Name   = 'shutdown-finishes-foreign'
         File   = 'ProfileService.cpp'
-        Old    = "`t`tif (entry.stream->owner_thread() == std::this_thread::get_id())"
-        New    = "`t`tif (true)"
-        Expect = 'shutdown-own/abandoned'
-        Why    = '주인이 살아 있는데 남이 finish() 를 부르면 쓰고 있는 저장소를 만진다'
+        Old    = "`t`tconst bool owned = (entry.stream->owner_thread() == std::this_thread::get_id());"
+        New    = "`t`tconst bool owned = true;"
+        Expect = 'shutdown-retain/counted'
+        Why    = '주인이 살아 있는데 남이 finish() 를 부르고 저장소까지 해제하면 쓰는 자리가 사라진다'
     },
     @{
         # thread_local 자리의 세대를 보지 않는다. 지난 서비스의 죽은 스트림을

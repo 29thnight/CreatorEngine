@@ -74,6 +74,7 @@ namespace
 		{
 		case ce::recorder_state::recording: return "Recording";
 		case ce::recorder_state::frozen:    return "Frozen";
+		case ce::recorder_state::pausing:   return "Pausing";
 		default:                            return "Stopped";
 		}
 	}
@@ -210,9 +211,7 @@ namespace
 		              summary.foreign_stream_touches, summary.abandoned_streams);
 		draw_row("Foreign touches / abandoned", buffer);
 
-		std::snprintf(buffer, sizeof(buffer), "%" PRIu64 " (미적용 %" PRIu64 ")",
-		              summary.control_requests_deferred,
-		              summary.control_requests_timed_out);
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.control_requests_deferred);
 		draw_row("Control deferred", buffer);
 
 		ImGui::EndTable();
@@ -350,7 +349,7 @@ void DrawProfilerHUD()
 		if (summary.dropped_events > 0 || summary.unbalanced_scopes > 0
 		    || summary.late_events_dropped > 0 || summary.stale_chunks_dropped > 0
 		    || summary.foreign_stream_touches > 0 || summary.abandoned_streams > 0
-		    || summary.control_requests_timed_out > 0)
+		    )
 		{
 			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
 			                   "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");

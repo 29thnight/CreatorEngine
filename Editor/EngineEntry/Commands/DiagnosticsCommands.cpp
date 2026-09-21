@@ -668,6 +668,7 @@ namespace ConsoleCmd
         //   내면 "예산이 있는데 안 쓴다" 로 읽히므로 거짓말이 된다.
         data.Set("state", CommandData::String(
             summary.state == ce::recorder_state::recording ? "recording" :
+            summary.state == ce::recorder_state::pausing ? "pausing" :
             summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
         data.Set("paused", CommandData::Bool(summary.state != ce::recorder_state::recording));
         data.Set("engineFrame", CommandData::Int(summary.engine_frame));
@@ -706,8 +707,6 @@ namespace ConsoleCmd
             static_cast<std::int64_t>(summary.abandoned_streams)));
         data.Set("controlRequestsDeferred", CommandData::Int(
             static_cast<std::int64_t>(summary.control_requests_deferred)));
-        data.Set("controlRequestsTimedOut", CommandData::Int(
-            static_cast<std::int64_t>(summary.control_requests_timed_out)));
 
         // 용량은 이제 이름 예산이 아니라 청크 풀이다.
         data.Set("chunkCount", CommandData::Int(summary.chunk_count));
@@ -895,6 +894,7 @@ namespace ConsoleCmd
         auto data = CommandCore::CommandData::Object();
         data.Set("state", CommandCore::CommandData::String(
             summary.state == ce::recorder_state::recording ? "recording" :
+            summary.state == ce::recorder_state::pausing ? "pausing" :
             summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
         data.Set("engineFrame", CommandCore::CommandData::Int(summary.engine_frame));
         const ce::capture_session_ptr capture = ce::profiler().capture();

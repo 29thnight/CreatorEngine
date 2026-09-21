@@ -65,6 +65,28 @@ namespace ce::detail::profile_service_impl
 
 	// 서비스 인스턴스마다, 그리고 shutdown 마다 새로 나가는 번호.
 	std::atomic<std::uint64_t> g_slotEpoch{ 1 };
+
+	// ★ 주인이 아직 도는 스트림은 파괴할 수 없다. 여기에 스트림과 **그 풀**을
+	//   함께 놓아 둔다 — 풀을 먼저 접으면 놓아 둔 의미가 없다. 일부러 해제하지
+	//   않는다: 종료 전에 unregister_thread 를 부르지 않은 스레드가 있다는
+	//   뜻이고, 그 스레드는 여전히 돌고 있다.
+	struct retained_stream
+	{
+		std::unique_ptr<thread_stream> stream;
+		std::shared_ptr<chunk_pool>    pool;
+	};
+
+	std::mutex& retained_lock()
+	{
+		static std::mutex* lock = new std::mutex();
+		return *lock;
+	}
+
+	std::vector<retained_stream>& retained_streams()
+	{
+		static std::vector<retained_stream>* list = new std::vector<retained_stream>();
+		return *list;
+	}
 }
 
 namespace ce
@@ -108,7 +130,7 @@ namespace ce
 			return;
 		}
 
-		m_pool.initialize(config.chunk_count);
+		m_pool->initialize(config.chunk_count);
 		m_ring.configure(config.retained_frames, config.memory_budget);
 		m_frameBeginTick = now();
 		m_initialized.store(true, std::memory_order_release);
@@ -140,7 +162,18 @@ namespace ce
 		// 봉인된 것을 마저 거둔 뒤 풀을 접는다. 여기서 빼먹으면 종료 직전
 		// 프레임이 통째로 사라진다.
 		collect_sealed();
-		m_pool.shutdown();
+
+		// ★ 놓아 둔 스트림이 있으면 풀을 접지 않는다. 접으면 청크 저장소가
+		//   사라져 아직 도는 writer 가 없어진 자리에 쓴다. 다음 initialize 가
+		//   새 풀을 세우므로, 이 풀은 놓아 둔 스트림과 함께 남는다.
+		if (0 == m_abandonedStreams.load(std::memory_order_relaxed))
+		{
+			m_pool->shutdown();
+		}
+		else
+		{
+			m_pool = std::make_shared<chunk_pool>();
+		}
 
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
@@ -171,14 +204,7 @@ namespace ce
 		// ★ 주인만 자기 스트림을 닫는다. 남이 finish() 를 부르면 주인이 쓰고
 		//   있는 저장소를 만진다 — 그것이 여기서 죽던 길이다. 못 닫은 것은
 		//   **세어 둔다.** 조용히 넘기면 "그 스레드가 조용했다" 로 읽힌다.
-		if (entry.stream->owner_thread() == std::this_thread::get_id())
-		{
-			entry.stream->finish(now());
-		}
-		else
-		{
-			m_abandonedStreams.fetch_add(1, std::memory_order_relaxed);
-		}
+		const bool owned = (entry.stream->owner_thread() == std::this_thread::get_id());
 
 		m_retiredDropped.fetch_add(entry.stream->dropped_events(), std::memory_order_relaxed);
 		m_retiredUnbalanced.fetch_add(entry.stream->unbalanced_scopes(), std::memory_order_relaxed);
@@ -191,7 +217,21 @@ namespace ce
 			t_streams[m_serviceSlot] = tls_slot{};
 		}
 
-		entry.stream.reset();
+		if (owned)
+		{
+			entry.stream->finish(now());
+			entry.stream.reset();
+		}
+		else
+		{
+			// 주인이 아직 돈다. 닫지도, **해제하지도** 않는다 — 소멸자가
+			// 소유 검사 없이 청크를 만지는 것을 피해도 저장소가 사라지면
+			// 주인이 쓰는 자리가 없어진다. 풀과 함께 놓아 두고 센다.
+			std::lock_guard<std::mutex> guard(retained_lock());
+			retained_streams().push_back(retained_stream{ std::move(entry.stream), m_pool });
+			m_abandonedStreams.fetch_add(1, std::memory_order_relaxed);
+		}
+
 		entry.live = false;
 	}
 
@@ -223,7 +263,7 @@ namespace ce
 			info.name = "Thread " + std::to_string(info.slot);
 		}
 
-		auto stream = std::make_unique<thread_stream>(m_pool, info);
+		auto stream = std::make_unique<thread_stream>(*m_pool, info);
 		stream->set_generation(m_generation.load(std::memory_order_acquire));
 		t_streams[m_serviceSlot] = tls_slot{ stream.get(), m_slotEpoch };
 
@@ -337,7 +377,7 @@ namespace ce
 
 	void profiler_service::collect_sealed()
 	{
-		event_chunk* sealed = m_pool.take_sealed();
+		event_chunk* sealed = m_pool->take_sealed();
 		if (!sealed)
 		{
 			return;
@@ -345,7 +385,7 @@ namespace ce
 
 		m_ring.ingest(sealed, m_generation.load(std::memory_order_acquire),
 		              m_frameBeginTick);
-		m_pool.release(sealed);
+		m_pool->release(sealed);
 	}
 
 	thread_stream* profiler_service::gpu_stream()
@@ -368,7 +408,7 @@ namespace ce
 		info.slot = static_cast<std::uint32_t>(m_streams.size());
 		info.name = kGpuLaneName;
 
-		auto stream = std::make_unique<thread_stream>(m_pool, info);
+		auto stream = std::make_unique<thread_stream>(*m_pool, info);
 		stream->set_generation(m_generation.load(std::memory_order_acquire));
 		thread_stream* created = stream.get();
 
@@ -433,6 +473,14 @@ namespace ce
 
 		// 줄에 선 제어 요청을 먼저 적용한다. 링을 만지는 것은 이 스레드뿐이다.
 		apply_control_requests();
+
+		// 얼리는 중이면 여기서 마무리한다. 줄에 요청이 남아 있지 않아도
+		// (부른 쪽이 앞절반만 하고 갔어도) 이 갈래가 끝을 맺는다.
+		if (m_state.load(std::memory_order_acquire) == recorder_state::pausing)
+		{
+			finish_pause();
+			return;
+		}
 
 		if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
 		{
@@ -509,33 +557,28 @@ namespace ce
 		{
 			switch (op)
 			{
-			case control_op::record: record_now(frame); break;
-			case control_op::pause:  pause_now();       break;
-			case control_op::clear:  clear_now();       break;
+			case control_op::record:       record_now(frame); break;
+			case control_op::pause:        pause_now();       break;
+			case control_op::clear:        clear_now();       break;
+			case control_op::finish_pause: finish_pause();    break;
 			}
 			return;
 		}
 
-		std::uint64_t seq = 0;
+		// ★ **기다리지 않는다.** 부른 쪽이 완료를 기다리면 잠금 순서가 뒤집힌다:
+		//   UI 는 씬 잠금을 쥔 채 여기로 들어오고, 수집기는 같은 잠금을 통과해야
+		//   이 요청을 처리한다. 실측에서 상한 2,000 ms 를 다 쓰고도 적용되지
+		//   못한 채 돌아왔다(여전히 recording, 캡처 없음).
+		//
+		//   대신 pause 는 부르는 그 자리에서 **막을 수 있는 것을 다 막는다** —
+		//   상태를 pausing 으로 올리고, 자기 스트림은 자기가 잠근다. 수집기는
+		//   남은 응답만 확인해 공개한다.
 		{
 			std::lock_guard<std::mutex> guard(m_controlLock);
 			m_controlQueue.push_back(control_request{ op, frame });
-			seq = m_controlEnqueued.fetch_add(1, std::memory_order_acq_rel) + 1;
+			m_controlEnqueued.fetch_add(1, std::memory_order_acq_rel);
 		}
 		m_controlDeferred.fetch_add(1, std::memory_order_relaxed);
-
-		// 적용될 때까지 기다린다. 부른 쪽이 곧바로 capture() 를 읽으므로,
-		// 여기서 안 기다리면 "얼렸는데 캡처가 없다" 가 된다.
-		const auto deadline = std::chrono::steady_clock::now()
-			+ std::chrono::milliseconds(kControlWaitMilliseconds);
-		while (std::chrono::steady_clock::now() < deadline)
-		{
-			if (m_controlApplied.load(std::memory_order_acquire) >= seq) return;
-			std::this_thread::yield();
-		}
-
-		// 프레임이 돌지 않는다. 조용히 돌아가면 부른 대로 된 것처럼 보이므로 센다.
-		m_controlTimedOut.fetch_add(1, std::memory_order_relaxed);
 	}
 
 	void profiler_service::apply_control_requests()
@@ -553,9 +596,10 @@ namespace ce
 		{
 			switch (request.op)
 			{
-			case control_op::record: record_now(request.frame); break;
-			case control_op::pause:  pause_now();               break;
-			case control_op::clear:  clear_now();               break;
+			case control_op::record:       record_now(request.frame); break;
+			case control_op::pause:        pause_now();               break;
+			case control_op::clear:        clear_now();               break;
+			case control_op::finish_pause: finish_pause();            break;
 			}
 		}
 
@@ -569,7 +613,41 @@ namespace ce
 
 	void profiler_service::pause()
 	{
-		dispatch_control(control_op::pause, 0);
+		// ★ 이 절반은 **어느 스레드에서든 그 자리에서** 한다. 상태를 올리고,
+		//   자를 시각을 정하고, 자기 스트림을 자기가 잠근다. 링을 만지지
+		//   않으므로 수집기와 겹치지 않는다.
+		//
+		//   자기 스트림을 자기가 잠그는 것이 핵심이다 — 부른 쪽이 완료를
+		//   기다리면 기다리는 동안 자기 봉인 요청에 응답할 수 없어, 자기가
+		//   자기 꼬리를 못 넘긴다(실측: 미응답 1, 그 스레드의 이벤트 0).
+		if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
+		{
+			return;
+		}
+
+		const profile_tick freezeTick = now();
+		m_freezeTick.store(freezeTick, std::memory_order_release);
+		m_state.store(recorder_state::pausing, std::memory_order_release);
+
+		{
+			thread_stream* const self = tls_stream();
+			std::lock_guard<std::mutex> guard(m_streamLock);
+			for (stream_entry& entry : m_streams)
+			{
+				if (!entry.stream) continue;
+				if (entry.stream.get() == self)
+				{
+					entry.stream->freeze_self(freezeTick);
+				}
+				else
+				{
+					entry.stream->request_freeze(freezeTick);
+				}
+			}
+		}
+
+		// 마무리는 링을 만지므로 수집기의 일이다.
+		dispatch_control(control_op::finish_pause, 0);
 	}
 
 	void profiler_service::clear()
@@ -591,41 +669,36 @@ namespace ce
 
 	void profiler_service::pause_now()
 	{
-		if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
+		// 줄을 통해 들어온 pause. 앞절반은 pause() 가 이미 했다.
+		if (m_state.load(std::memory_order_acquire) == recorder_state::recording)
+		{
+			pause();
+		}
+		finish_pause();
+	}
+
+	void profiler_service::finish_pause()
+	{
+		if (m_state.load(std::memory_order_acquire) != recorder_state::pausing)
 		{
 			return;
 		}
 
-		// producer 를 먼저 멈춘다. 그 뒤에 봉인된 것을 거둬야 얼린 캡처가
-		// 멈춘 시점까지를 온전히 담는다.
-		m_state.store(recorder_state::frozen, std::memory_order_release);
+		const profile_tick freezeTick = m_freezeTick.load(std::memory_order_acquire);
 
-		// ★ 여기서도 남의 청크를 만지지 않는다. 요청을 올리고 **짧게** 기다린
-		//   뒤, 아직 응답하지 않은 스트림을 **센다**. 잠든 워커는 다음에 깨어날
-		//   때 봉인하므로 그때까지의 꼬리가 이 캡처에 없을 수 있고, 그것을
-		//   성공처럼 덮으면 "얼린 캡처가 온전하다" 가 거짓이 된다.
-		// 자를 시각을 **먼저** 확정한다. 스레드마다 제각각 지금을 읽으면 같은
-		// pause 인데 끝 시각이 갈리고, 그러면 얼린 캡처의 경계가 흐려진다.
-		const profile_tick freezeTick = now();
+		// ★ **내 스트림부터 잠근다.** 아래에서 응답을 기다리는 동안 이 스레드는
+		//   자기 봉인 요청에 응답할 자리를 지나지 못한다 — 부른 쪽에서 겪은
+		//   것과 같은 일이 수집기에서 되풀이된다(미응답 1). 기다리기 전에
+		//   내 것을 끝낸다.
 		{
 			thread_stream* const self = tls_stream();
-			std::lock_guard<std::mutex> guard(m_streamLock);
-			for (stream_entry& entry : m_streams)
-			{
-				if (!entry.stream) continue;
-				if (entry.stream.get() == self)
-				{
-					// 내가 주인인 스트림은 지금 바로 자른다.
-					entry.stream->truncate_open_scopes(freezeTick);
-					entry.stream->publish_frame();
-				}
-				else
-				{
-					entry.stream->request_freeze(freezeTick);
-				}
-			}
+			if (self) self->freeze_self(freezeTick);
 		}
 
+		// ★ 남의 청크를 만지지 않는다. 응답을 **짧게** 기다린 뒤, 아직
+		//   응답하지 않은 스트림을 **센다**. 잠든 워커는 다음에 깨어날 때
+		//   봉인하므로 그때까지의 꼬리가 이 캡처에 없을 수 있고, 그것을
+		//   성공처럼 덮으면 "얼린 캡처가 온전하다" 가 거짓이 된다.
 		// 응답을 기다린다. 상한을 두는 이유는 잠든 producer 가 영영 안 깨어날
 		// 수 있기 때문이다 — 관측 도구가 관측 대상을 기다리며 멈추면 안 된다.
 		std::uint32_t unacked = 0;
@@ -637,7 +710,12 @@ namespace ce
 				for (stream_entry& entry : m_streams)
 				{
 					if (!entry.stream) continue;
-					if (entry.stream->seal_ack() != entry.stream->seal_request())
+					// ★ **얼림** 응답만 센다. 평범한 프레임 봉인 요청까지 함께
+					//   세면 등록만 해 두고 조용한 스레드가 언제나 미응답으로
+					//   잡혀, 얼린 캡처가 늘 "온전하지 않다" 가 된다.
+					//   넘길 것이 없는 스트림도 응답할 일이 없으므로 뺀다.
+					if (entry.stream->freeze_ack() != entry.stream->freeze_request()
+					    && entry.stream->pending_work())
 					{
 						++unacked;
 					}
@@ -672,6 +750,10 @@ namespace ce
 			std::lock_guard<std::mutex> guard(m_captureLock);
 			m_capture = std::move(frozen);
 		}
+
+		// 공개까지 끝난 뒤에야 frozen 이다. 그 전에는 pausing 이고, 읽는 쪽은
+		// "아직 손에 없다" 를 그 상태로 안다.
+		m_state.store(recorder_state::frozen, std::memory_order_release);
 	}
 
 	void profiler_service::clear_now()
@@ -696,9 +778,9 @@ namespace ce
 		}
 
 		// 이미 봉인돼 대기 중인 것도 옛 세대다. 거두지 않고 곧바로 되돌린다.
-		if (event_chunk* stale = m_pool.take_sealed())
+		if (event_chunk* stale = m_pool->take_sealed())
 		{
-			m_pool.release(stale);
+			m_pool->release(stale);
 		}
 
 		m_ring.clear();
@@ -733,6 +815,12 @@ namespace ce
 		m_ringStats = value;
 	}
 
+	std::size_t profiler_service::retained_stream_count()
+	{
+		std::lock_guard<std::mutex> guard(retained_lock());
+		return retained_streams().size();
+	}
+
 	live_summary profiler_service::summary() const
 	{
 		live_summary value;
@@ -755,8 +843,8 @@ namespace ce
 		}
 		value.memory_budget = kDefaultMemoryBudget;
 		value.registered_markers = registered_marker_count();
-		value.free_chunks = m_pool.free_count();
-		value.chunk_count = m_pool.chunk_count();
+		value.free_chunks = m_pool->free_count();
+		value.chunk_count = m_pool->chunk_count();
 
 		std::uint64_t unbalanced = m_retiredUnbalanced.load(std::memory_order_relaxed);
 		std::uint64_t foreign = m_retiredForeign.load(std::memory_order_relaxed);
@@ -776,7 +864,6 @@ namespace ce
 		value.foreign_stream_touches = foreign;
 		value.abandoned_streams = m_abandonedStreams.load(std::memory_order_relaxed);
 		value.control_requests_deferred = m_controlDeferred.load(std::memory_order_relaxed);
-		value.control_requests_timed_out = m_controlTimedOut.load(std::memory_order_relaxed);
 
 		value.pause_unacked_streams = m_pauseUnacked.load(std::memory_order_relaxed);
 		value.capture_complete = (0 == value.pause_unacked_streams);

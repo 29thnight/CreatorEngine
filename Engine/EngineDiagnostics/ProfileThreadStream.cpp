@@ -133,6 +133,16 @@ namespace ce
 
 	thread_stream::~thread_stream()
 	{
+		// ★ 주인이 아니면 **아무것도 만지지 않는다.** 남의 finish() 를 피해도
+		//   소멸자가 소유 검사 없이 seal_current() 를 부르면 같은 일이다 —
+		//   주인이 m_writer 로 쓰는 동안 그 포인터를 비우고 청크를 되돌린다.
+		//   여기까지 온 것은 호출자가 파괴해도 된다고 판단한 것이지만, 그
+		//   판단이 틀렸을 때 죽는 대신 청크 하나를 잃는 쪽을 고른다.
+		if (!owned_by_caller())
+		{
+			return;
+		}
+
 		// 남은 청크를 잃지 않는다. 열린 스코프는 finish() 가 닫았어야 하지만,
 		// 안 불렸더라도 여기서 청크는 넘어간다.
 		seal_current();
@@ -158,6 +168,7 @@ namespace ce
 
 		m_writer->reset(m_info.slot, m_sequence);
 		m_writer->generation = m_generation.load(std::memory_order_acquire);
+		m_pendingWork.store(true, std::memory_order_release);
 		return true;
 	}
 
@@ -190,6 +201,11 @@ namespace ce
 
 		seal_current();
 		m_sealAck.store(requested, std::memory_order_release);
+		if (freeze != 0)
+		{
+			m_freezeAck.store(m_freezeRequest.load(std::memory_order_acquire),
+			                  std::memory_order_release);
+		}
 		m_inHonor = false;
 	}
 
@@ -229,6 +245,10 @@ namespace ce
 
 	void thread_stream::seal_current()
 	{
+		// 넘길 것이 남았는가를 여기서 다시 센다. 열린 구간이 없고 쓰던 청크도
+		// 없으면 이 스트림은 얼림에 응답할 것이 없다.
+		m_pendingWork.store(m_depth > 0, std::memory_order_release);
+
 		if (!m_writer)
 		{
 			return;
@@ -266,6 +286,8 @@ namespace ce
 			m_droppedScopes.fetch_add(1, std::memory_order_relaxed);
 			return;
 		}
+
+		m_pendingWork.store(true, std::memory_order_release);
 
 		open_scope& scope = m_stack[m_depth];
 		scope.tick_begin = now;
@@ -370,6 +392,18 @@ namespace ce
 		// 주인이 직접 봉인했으니 대기 중인 요청도 함께 풀린 것이다.
 		m_sealAck.store(m_sealRequest.load(std::memory_order_acquire),
 		                std::memory_order_release);
+	}
+
+	void thread_stream::freeze_self(profile_tick freeze_tick)
+	{
+		if (!owned_by_caller()) return;
+
+		truncate_open_scopes(freeze_tick);
+		seal_current();
+		m_sealAck.store(m_sealRequest.load(std::memory_order_acquire),
+		                std::memory_order_release);
+		m_freezeAck.store(m_freezeRequest.load(std::memory_order_acquire),
+		                  std::memory_order_release);
 	}
 
 	void thread_stream::truncate_open_scopes(profile_tick freeze_tick)

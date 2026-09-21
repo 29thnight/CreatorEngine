@@ -7,10 +7,16 @@
 // 직접 넘겨야 했다(그 교란이 stats 기준선을 못 믿게 만들었다).
 //
 // 판정은 종료 코드다. 실패 사유는 stderr 로 낸다.
+#if defined(_WIN32)
+#include <windows.h>
+#include <crtdbg.h>
+#endif
+
 #include <atomic>
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <thread>
 #include <vector>
@@ -2251,38 +2257,240 @@ void test_control_from_other_thread()
 	gate.store(1, std::memory_order_release);
 	while (0 == parked.load(std::memory_order_acquire)) { std::this_thread::yield(); }
 
-	// 멈춰 있는 동안 재개를 예약한다. pause() 가 기다리지 않으면 이 지연보다
-	// 먼저 돌아오고, 그때 capture() 는 비어 있다.
-	std::thread releaser([&gate]()
-	{
-		std::this_thread::sleep_for(std::chrono::milliseconds(60));
-		gate.store(2, std::memory_order_release);
-	});
-
+	// ★ 수집기가 멈춰 있는 **동안** 부른다. 부른 쪽이 기다리면 여기서 수집기를
+	//   기다리게 되고, 수집기가 이 스레드를 기다리는 배치(UI 의 씬 잠금)에서는
+	//   그대로 교착이다. 그래서 곧바로 돌아와야 한다.
 	service.pause();
+
+	{
+		const ce::live_summary mid = service.summary();
+		check(mid.state == ce::recorder_state::pausing,
+		      "control-thread/pausing — 수집기가 멈춰 있어도 곧바로 돌아온다");
+		check(service.capture() == nullptr,
+		      "control-thread/not-yet — 아직 공개하지 않았다고 말한다");
+		check(mid.control_requests_deferred > 0,
+		      "control-thread/deferred — 수집기가 아닌 호출은 줄을 선다");
+	}
+
+	// 수집기를 재개시키면 마무리된다.
+	gate.store(2, std::memory_order_release);
+
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+	while (service.summary().state != ce::recorder_state::frozen
+	       && std::chrono::steady_clock::now() < deadline)
+	{
+		std::this_thread::yield();
+	}
 
 	const ce::live_summary summary = service.summary();
 	check(summary.state == ce::recorder_state::frozen,
-	      "control-thread/frozen — 부른 직후에 실제로 얼어 있다");
+	      "control-thread/frozen — 수집기가 돌면 얼림이 끝난다");
 	check(service.capture() != nullptr,
-	      "control-thread/capture — 부른 직후에 캡처가 손에 있다");
-	check(summary.control_requests_deferred > 0,
-	      "control-thread/deferred — 수집기가 아닌 호출은 줄을 선다");
-	check_eq(summary.control_requests_timed_out, std::uint64_t{ 0 },
-	         "control-thread/applied — 끝내 적용되지 못한 요청이 없다");
+	      "control-thread/capture — 그때 캡처가 선다");
 	check_eq(summary.foreign_stream_touches, std::uint64_t{ 0 },
 	         "control-thread/owned — 남의 스트림을 만지지 않았다");
 
-	releaser.join();
 	running.store(false, std::memory_order_release);
-	gate.store(2, std::memory_order_release);
 	service.record(summary.engine_frame);
 	collector.join();
 	service.shutdown();
 }
 
+
+// ── 제어 큐 경계 (4차 감사) ──────────────────────────────────────────
+//
+// 기다림을 넣으면서 잠금 순서를 뒤집었다. UI 는 씬 잠금을 쥔 채 Pause 완료를
+// 기다리고, 게임 스레드는 같은 잠금을 통과해야 그 요청을 처리한다.
+
+// ⑭ Pause 요청은 **부른 쪽을 막지 않는다.**
+//
+// ★ UI 가 쥔 잠금을 수집기가 기다리는 배치를 그대로 세운다. 부른 쪽이 완료를
+//   기다리면 둘이 서로를 기다려 상한(2 초)까지 화면이 멈춘다.
+void test_pause_does_not_block_caller()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.record(1);
+
+	std::mutex sceneLock;
+	std::atomic<int> started{ 0 };
+	std::atomic<bool> running{ true };
+
+	std::thread collector([&service, &sceneLock, &started, &running]()
+	{
+		service.register_thread("Collector");
+		std::uint32_t frame = 1;
+		while (running.load(std::memory_order_acquire))
+		{
+			// 게임 스레드도 같은 잠금을 통과해야 프레임을 닫는다.
+			std::lock_guard<std::mutex> guard(sceneLock);
+			{ ce::profile_scope scope{ service, ce::marker<"LockedTick">() }; }
+			service.publish_frame(frame++);
+			started.store(1, std::memory_order_release);
+		}
+		service.unregister_thread();
+	});
+
+	while (0 == started.load(std::memory_order_acquire)) { std::this_thread::yield(); }
+
+	std::int64_t elapsedMs = 0;
+	{
+		// UI 가 쥐는 잠금. 이것을 쥔 채로 Pause 를 부른다.
+		std::lock_guard<std::mutex> guard(sceneLock);
+
+		const auto begin = std::chrono::steady_clock::now();
+		service.pause();
+		elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+			std::chrono::steady_clock::now() - begin).count();
+	}
+
+	check(elapsedMs < 200,
+	      "pause-nonblocking/fast — 잠금을 쥔 채 불러도 곧바로 돌아온다");
+
+	// 잠금을 놓으면 수집기가 마저 돌아 얼림이 끝난다.
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+	while (service.summary().state != ce::recorder_state::frozen
+	       && std::chrono::steady_clock::now() < deadline)
+	{
+		std::this_thread::yield();
+	}
+
+	check(service.summary().state == ce::recorder_state::frozen,
+	      "pause-nonblocking/frozen — 수집기가 돌면 얼림이 끝난다");
+	check(service.capture() != nullptr,
+	      "pause-nonblocking/capture — 그때 캡처가 선다");
+
+	running.store(false, std::memory_order_release);
+	service.record(service.summary().engine_frame);
+	collector.join();
+	service.shutdown();
+}
+
+// ⑮ Pause 를 부른 스레드 **자신의 기록**이 빠지면 안 된다.
+//
+// ★ 부른 쪽이 완료를 기다리면, 기다리는 동안 자기 봉인 요청에 응답할 수 없다 —
+//   자기가 자기 꼬리를 못 넘긴다. 미응답 1, 그 스레드의 이벤트 0 이 된다.
+void test_pause_requester_records_land()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.record(1);
+
+	std::atomic<int> started{ 0 };
+	std::atomic<bool> running{ true };
+
+	std::thread collector([&service, &started, &running]()
+	{
+		service.register_thread("Collector");
+		std::uint32_t frame = 1;
+		while (running.load(std::memory_order_acquire))
+		{
+			{ ce::profile_scope scope{ service, ce::marker<"CollectorBeat">() }; }
+			service.publish_frame(frame++);
+			started.store(1, std::memory_order_release);
+		}
+		service.unregister_thread();
+	});
+
+	while (0 == started.load(std::memory_order_acquire)) { std::this_thread::yield(); }
+
+	service.register_thread("Requester");
+	{ ce::profile_scope scope{ service, ce::marker<"RequesterWork">() }; }
+	service.pause();
+
+	const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+	while (service.summary().state != ce::recorder_state::frozen
+	       && std::chrono::steady_clock::now() < deadline)
+	{
+		std::this_thread::yield();
+	}
+
+	const ce::live_summary summary = service.summary();
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "pause-requester/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		check(count_marker(*capture, ce::marker<"RequesterWork">()) > 0,
+		      "pause-requester/present — 부른 스레드의 기록이 캡처에 있다");
+		check(capture->complete(),
+		      "pause-requester/complete — 부른 스레드가 자기 응답을 막지 않는다");
+	}
+	check_eq(summary.pause_unacked_streams, std::uint32_t{ 0 },
+	         "pause-requester/acked — 미응답이 없다");
+
+	running.store(false, std::memory_order_release);
+	service.record(summary.engine_frame);
+	collector.join();
+	service.unregister_thread();
+	service.shutdown();
+}
+
+// ⑯ 종료는 살아 있는 writer 의 저장소를 해제하지 않는다.
+//
+// ★ 남의 finish() 를 피해도 곧바로 stream.reset() 으로 파괴하면 같은 일이다.
+//   소멸자는 소유 검사 없이 seal_current() 를 부르고, 그 뒤 저장소가 사라진다.
+//   확인되지 않은 writer 의 것은 **놓아 둔다** — 확인 뒤에야 해제다.
+void test_shutdown_retains_live_storage()
+{
+	const std::size_t before = ce::profiler_service::retained_stream_count();
+
+	{
+		ce::profiler_service service;
+		service.initialize({});
+		service.register_thread("Main");
+		service.record(1);
+
+		std::atomic<int> step{ 0 };
+		std::thread worker([&service, &step]()
+		{
+			service.register_thread("StillRunning");
+			{ ce::profile_scope scope{ service, ce::marker<"LiveTick">() }; }
+			step.store(1, std::memory_order_release);
+
+			while (step.load(std::memory_order_acquire) < 2) { std::this_thread::yield(); }
+		});
+
+		while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+		service.publish_frame(1);
+		service.shutdown();
+
+		check_eq(service.summary().abandoned_streams, std::uint64_t{ 1 },
+		         "shutdown-retain/counted — 확인되지 않은 writer 를 센다");
+		check_eq(ce::profiler_service::retained_stream_count(), before + 1,
+		         "shutdown-retain/kept — 그 저장소를 해제하지 않고 남긴다");
+
+		step.store(2, std::memory_order_release);
+		worker.join();
+	}
+}
+
+// ★ 어서션·오류 창을 띄우지 않는다.
+//
+//   변이 하나가 링의 vector 를 두 스레드가 함께 만지게 만들자 Debug 이터레이터
+//   검사가 **모달 창**을 띄웠고, 게이트가 붉어지는 대신 그 자리에서 멈췄다.
+//   판정이 종료 코드인 하네스에서 창은 곧 무응답이다. stderr 로 내보내고 곧바로
+//   비정상 종료하게 해야 변이가 "잡혔다" 로 읽힌다.
+void silence_crt_dialogs()
+{
+#if defined(_WIN32)
+	_set_error_mode(_OUT_TO_STDERR);
+	::SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+	_set_abort_behavior(0, _WRITE_ABORT_MSG | _CALL_REPORTFAULT);
+
+#if defined(_DEBUG)
+	for (int report : { _CRT_WARN, _CRT_ERROR, _CRT_ASSERT })
+	{
+		_CrtSetReportMode(report, _CRTDBG_MODE_FILE);
+		_CrtSetReportFile(report, _CRTDBG_FILE_STDERR);
+	}
+#endif
+#endif
+}
+
 int main()
 {
+	silence_crt_dialogs();
+
 	test_marker_identity();
 	test_basic_capture();
 	test_cross_frame_scope();
@@ -2321,6 +2529,9 @@ int main()
 	test_shutdown_owns_only_its_stream();
 	test_tls_slot_epoch();
 	test_control_from_other_thread();
+	test_pause_does_not_block_caller();
+	test_pause_requester_records_land();
+	test_shutdown_retains_live_storage();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

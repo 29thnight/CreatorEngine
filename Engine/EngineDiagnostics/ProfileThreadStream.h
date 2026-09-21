@@ -175,7 +175,32 @@ namespace ce
 		void request_freeze(profile_tick freeze_tick)
 		{
 			m_freezeTick.store(freeze_tick, std::memory_order_release);
+			m_freezeRequest.fetch_add(1, std::memory_order_release);
 			m_sealRequest.fetch_add(1, std::memory_order_release);
+		}
+
+		// 주인이 자기 스트림을 그 자리에서 잠근다. 기다리는 쪽은 자기 봉인
+		// 요청에 응답할 자리를 지나지 못하므로, 기다리기 **전에** 자기 것을
+		// 끝내야 한다 — 부른 쪽에서도 수집기에서도 같다.
+		void freeze_self(profile_tick freeze_tick);
+
+		// 얼림에 응답했는가. ★ 평범한 프레임 봉인(request_seal)과 갈라 센다.
+		//   둘을 한 통에 넣었더니, 등록만 해 두고 조용한 스레드가 **언제나**
+		//   미응답으로 잡혀 얼린 캡처가 늘 "온전하지 않다" 가 됐다.
+		std::uint64_t freeze_request() const
+		{
+			return m_freezeRequest.load(std::memory_order_acquire);
+		}
+		std::uint64_t freeze_ack() const
+		{
+			return m_freezeAck.load(std::memory_order_acquire);
+		}
+
+		// 아직 넘기지 않은 것이 있는가(쓰던 청크 또는 열린 구간). false 면
+		// 이 스트림은 얼림에 응답할 것이 없다 — 꼬리가 이미 다 넘어갔다.
+		bool pending_work() const
+		{
+			return m_pendingWork.load(std::memory_order_acquire);
 		}
 
 		// 이 스트림이 쓰는 녹화 세대. 수집기가 올리면 다음 청크부터 새 세대다.
@@ -262,6 +287,9 @@ namespace ce
 		std::atomic<std::uint64_t> m_sealRequest{ 0 };
 		std::atomic<std::uint64_t> m_sealAck{ 0 };
 		std::atomic<profile_tick>  m_freezeTick{ 0 };
+		std::atomic<std::uint64_t> m_freezeRequest{ 0 };
+		std::atomic<std::uint64_t> m_freezeAck{ 0 };
+		std::atomic<bool>          m_pendingWork{ false };
 
 		// 봉인 처리 중인가. 주인 스레드만 읽고 쓴다.
 		bool m_inHonor = false;
