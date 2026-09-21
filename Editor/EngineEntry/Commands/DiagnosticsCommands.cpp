@@ -855,6 +855,53 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    // 녹화 제어. 창 툴바의 Record/Pause 단추와 같은 두 동작이다.
+    //
+    // ★ `profile.frame` 으로는 이 자리를 대신할 수 없다. 그것은 **읽는** 명령이라
+    //   읽기 위해 얼렸다면 끝나기 전에 다시 열어 둔다 — 관측이 관측 대상을 멈춰
+    //   두면 안 되기 때문이다. 그래서 창은 얼린 상태를 한 번도 보지 못하고,
+    //   프레임마다 도는 adopt 관문(state == frozen)을 지나치지 않는다.
+    //
+    // ★ 타임라인을 그리게 하려면 **얼린 캡처가 있고 + 녹화 중** 이어야 한다.
+    //   얼린 캡처가 없으면 그릴 것이 없고, 녹화 중이 아니면 그렸다는 증거(ProfilerTimeline
+    //   마커)가 어디에도 남지 않는다. 두 명령을 갈라 둔 것이 그 상태를
+    //   CLI 로 만들 수 있게 하는 유일한 수단이다.
+
+    static CommandCore::CommandData ProfileStatePayload()
+    {
+        const ce::live_summary summary = ce::profiler().summary();
+        auto data = CommandCore::CommandData::Object();
+        data.Set("state", CommandCore::CommandData::String(
+            summary.state == ce::recorder_state::recording ? "recording" :
+            summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
+        data.Set("engineFrame", CommandCore::CommandData::Int(summary.engine_frame));
+        data.Set("hasCapture", CommandCore::CommandData::Bool(bool(ce::profiler().capture())));
+        return data;
+    }
+
+    static CommandCore::CommandResult Cmd_profile_record(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("profile.record takes no arguments");
+
+        // 얼린 캡처는 건드리지 않는다. 잡고 보던 것을 남겨 둔 채 기록만 다시
+        // 열려야 창이 그리던 것을 계속 그린다 — 창의 Record 단추도 같다.
+        //
+        // 프레임 번호를 지금 것으로 이어 붙인다. 기본값 0 으로 부르면 번호가
+        // 되감아 보존 구간이 앞뒤로 섞인다.
+        ce::profiler().record(ce::profiler().summary().engine_frame);
+        return Ok({}, ProfileStatePayload());
+    }
+
+    static CommandCore::CommandResult Cmd_profile_pause(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("profile.pause takes no arguments");
+
+        ce::profiler().pause();
+        return Ok({}, ProfileStatePayload());
+    }
+
     // ★ `dump.crash` 를 지웠다(2026-09-05). `crash.test` 와 같은 네 분기를 가진
     //   중복이었고, 호출자가 없었으며, **죽지 않았다.**
     //
@@ -1356,6 +1403,8 @@ namespace ConsoleCmd
         reg.Result({ "pix.capture" }, &Cmd_pix_capture);
         reg.Result({ "profile.stats" }, &Cmd_profile_stats);
         reg.Result({ "profile.frame" }, &Cmd_profile_frame);
+        reg.Result({ "profile.record" }, &Cmd_profile_record);
+        reg.Result({ "profile.pause" }, &Cmd_profile_pause);
         // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).
         //   `dump.list` 는 목록만, `dump.show` 는 가장 최근 요약의 내용까지 찍는다
         //   (`Cmd_dump_list` 안에서 `cmd == "dump.show"` 로 갈린다). 한 descriptor 를

@@ -1029,6 +1029,335 @@ namespace
 		(void)reader.aggregate();
 		check_eq(reader.fold_count(), std::uint64_t{ 2 }, "reader-cache/same — 같은 자리를 다시 골라도 그대로");
 	}
+	//-------------------------------------------------------------------------
+	// ⑱ PHASE 14 P3 — Timeline 이 그리는 원시 스팬.
+	//
+	//    집계가 세운 순서를 그대로 남긴 것이다. 그리는 층이 다시 정렬하면 두
+	//    정렬이 갈리는 순간 표와 타임라인이 서로 다른 트리를 말하게 된다.
+	//-------------------------------------------------------------------------
+	void test_timeline_spans()
+	{
+		ce::profiler_service service;
+		ce::profiler_config config;
+		config.chunk_count = 256;
+		service.initialize(config);
+		service.register_thread("Main");
+		service.record(1);
+
+		std::thread worker([&service]()
+		{
+			service.register_thread("Worker");
+			for (int i = 0; i < 3; ++i)
+			{
+				ce::profile_scope scope{ service, ce::marker<"SpanWorker">() };
+				busy_ticks(2);
+			}
+			service.unregister_thread();
+		});
+
+		{
+			ce::profile_scope outer{ service, ce::marker<"SpanOuter">() };
+			busy_ticks(2);
+			{
+				ce::profile_scope inner{ service, ce::marker<"SpanInner">() };
+				busy_ticks(1);
+			}
+		}
+		worker.join();
+
+		service.publish_frame(1);
+		service.pause();
+
+		ce::capture_session_ptr capture = service.capture();
+		if (!capture)
+		{
+			check(false, "timeline/capture — 얼린 캡처가 있다");
+			return;
+		}
+
+		const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 1);
+		const std::span<const ce::profile_event> spans = aggregate.spans();
+
+		check_eq(static_cast<std::uint64_t>(spans.size()), aggregate.event_count(),
+		         "timeline/count — 스팬 수가 이벤트 수와 같다");
+		check(!spans.empty(), "timeline/nonempty — 스팬이 있다");
+		if (spans.empty())
+		{
+			return;
+		}
+
+		// ★ 전위 순서. 스레드 → 시작 tick → depth.
+		for (std::size_t i = 1; i < spans.size(); ++i)
+		{
+			const ce::profile_event& previous = spans[i - 1];
+			const ce::profile_event& current = spans[i];
+			const bool ordered =
+				(previous.thread_slot < current.thread_slot) ||
+				(previous.thread_slot == current.thread_slot &&
+				 (previous.tick_begin < current.tick_begin ||
+				  (previous.tick_begin == current.tick_begin &&
+				   previous.depth <= current.depth)));
+			check(ordered, "timeline/order — 스팬이 전위 순서로 서 있다");
+		}
+
+		// 스레드마다 자기 몫이 연속이다. 레인을 그리는 쪽이 그 범위만 훑는다.
+		std::uint32_t covered = 0;
+		for (const ce::thread_summary& thread : aggregate.threads())
+		{
+			check(thread.span_begin <= thread.span_end,
+			      "timeline/range-order — 스팬 범위가 뒤집히지 않았다");
+			check_eq(thread.span_end - thread.span_begin, thread.event_count,
+			         "timeline/range-count — 범위 길이가 이벤트 수와 같다");
+			for (std::uint32_t i = thread.span_begin; i < thread.span_end; ++i)
+			{
+				check_eq(spans[i].thread_slot, thread.thread_slot,
+				         "timeline/range-owner — 범위 안은 전부 그 스레드의 것");
+			}
+			covered += thread.span_end - thread.span_begin;
+		}
+		check_eq(static_cast<std::size_t>(covered), spans.size(),
+		         "timeline/range-cover — 범위들이 스팬을 빠짐없이 덮는다");
+
+		// 스팬은 선택 구간의 벽시계 안에 있다.
+		for (const ce::profile_event& span : spans)
+		{
+			check(span.tick_end >= span.tick_begin,
+			      "timeline/span-order — 끝이 시작보다 앞서지 않는다");
+		}
+	}
+
+	//-------------------------------------------------------------------------
+	// ⑲ Timeline 의 가로 시야. 확대·이동이 구간 밖으로 나가지 않는다 —
+	//    나갈 수 있으면 빈 화면을 보게 되고, 그때 사용자는 계측이 없다고 읽는다.
+	//-------------------------------------------------------------------------
+	void test_timeline_view()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		for (std::uint32_t frame = 1; frame <= 6; ++frame)
+		{
+			ce::profile_scope scope{ service, ce::marker<"ViewTick">() };
+			busy_ticks(3);
+			service.publish_frame(frame);
+		}
+		service.pause();
+
+		ce::capture_reader reader;
+		reader.adopt(service.capture());
+		reader.set_live_follow(false);
+		reader.select_range(1, 6);
+
+		const ce::frame_aggregate& folded = reader.aggregate();
+		const ce::profile_tick low = folded.tick_begin();
+		const ce::profile_tick high = folded.tick_end();
+		check(high > low, "timeline-view/span — 선택 구간에 길이가 있다");
+		if (high <= low)
+		{
+			return;
+		}
+
+		// 처음에는 구간 전체를 본다.
+		check_eq(reader.view_begin(), low, "timeline-view/initial-begin — 처음엔 구간 전체");
+		check_eq(reader.view_end(), high, "timeline-view/initial-end — 처음엔 구간 전체");
+
+		// 확대하면 좁아지고, 가운데를 잡았으면 가운데가 제자리다.
+		const ce::profile_tick pivot = low + (high - low) / 2;
+		const ce::profile_tick fullSpan = reader.view_span();
+		reader.zoom_view(0.5, pivot);
+		check(reader.view_span() < fullSpan, "timeline-view/zoom-in — 확대하면 좁아진다");
+		check(reader.view_begin() >= low && reader.view_end() <= high,
+		      "timeline-view/zoom-bounds — 확대해도 구간 안에 있다");
+		check(reader.view_begin() <= pivot && pivot <= reader.view_end(),
+		      "timeline-view/zoom-pivot — 잡은 자리가 시야에 남는다");
+
+		// 아무리 확대해도 0 폭이 되지 않는다. tick 이 정수라 반올림이 시야를
+		// 뒤집으면 begin > end 가 되고 그리는 쪽이 음수 폭을 만난다.
+		for (int i = 0; i < 40; ++i)
+		{
+			reader.zoom_view(0.5, pivot);
+		}
+		check(reader.view_span() > 0, "timeline-view/zoom-floor — 아무리 확대해도 폭이 0 이 아니다");
+		check(reader.view_end() > reader.view_begin(), "timeline-view/zoom-sane — 시야가 뒤집히지 않는다");
+
+		// 멀리 밀어도 구간 밖으로 나가지 않는다.
+		reader.pan_view(static_cast<std::int64_t>(high - low) * 10);
+		check(reader.view_end() <= high, "timeline-view/pan-right — 오른쪽으로 새지 않는다");
+		check(reader.view_begin() >= low, "timeline-view/pan-right-begin — 시작도 구간 안");
+
+		reader.pan_view(-static_cast<std::int64_t>(high - low) * 10);
+		check(reader.view_begin() >= low, "timeline-view/pan-left — 왼쪽으로 새지 않는다");
+
+		// 축소는 구간 전체보다 넓어지지 않는다.
+		for (int i = 0; i < 40; ++i)
+		{
+			reader.zoom_view(2.0, pivot);
+		}
+		check_eq(reader.view_span(), high - low, "timeline-view/zoom-out-cap — 구간 전체보다 넓어지지 않는다");
+
+		// ★ 선택이 바뀌면 시야가 그 구간으로 돌아간다. 전에 보던 자리가 남아
+		//   있으면 다른 프레임을 골랐을 때 빈 화면이 나온다.
+		reader.zoom_view(0.25, pivot);
+		reader.select_frame(2);
+		const ce::frame_aggregate& one = reader.aggregate();
+		check_eq(reader.view_begin(), one.tick_begin(),
+		         "timeline-view/reset-on-select — 선택이 바뀌면 시야가 돌아간다");
+		check_eq(reader.view_end(), one.tick_end(),
+		         "timeline-view/reset-on-select-end — 선택이 바뀌면 시야가 돌아간다");
+
+		reader.zoom_view(0.25, one.tick_begin());
+		reader.reset_view();
+		check_eq(reader.view_begin(), one.tick_begin(), "timeline-view/reset — 손으로도 되돌린다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ㉑ 녹화 경계를 넘는 스코프.
+	//
+	//    pause·record 가 구간 한가운데서 일어나도 짝이 어긋나지 않는다.
+	//    여는 쪽과 닫는 쪽에 같은 상태 관문을 걸었더니, 닫는 쪽이 얼어 버려
+	//    스택에 한 칸이 남고 그 뒤의 모든 구간이 한 칸씩 깊어졌다.
+	//
+	//    ★ 조용한 결함이다. 아무것도 실패하지 않고 깊이만 밀린다 — 그래서
+	//      불균형 계수기만 보는 단정으로는 부족하고, 경계 뒤의 중첩까지 재야 한다.
+	//-------------------------------------------------------------------------
+	void test_scope_across_state_change()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		// ㈚ 열고 나서 얼린다 — 닫는 쪽이 얼린 뒤에 온다.
+		{
+			ce::profile_scope outer{ service, ce::marker<"AcrossPause">() };
+			busy_ticks(1);
+			service.pause();
+		}
+		check_eq(service.summary().unbalanced_scopes, static_cast<std::uint64_t>(0),
+		         "state-change/close-while-frozen — 얼린 뒤에 닫아도 짝이 맞는다");
+
+		// ㈛ 얼린 채로 열고, 녹화를 다시 열어 놓고 닫는다 — 여는 쪽이 없었다.
+		{
+			ce::profile_scope outer{ service, ce::marker<"AcrossRecord">() };
+			busy_ticks(1);
+			service.record(2);
+		}
+		check_eq(service.summary().unbalanced_scopes, static_cast<std::uint64_t>(0),
+		         "state-change/open-while-frozen — 얼린 채 연 것을 닫아도 짝이 맞는다");
+
+		// ★ 경계를 두 번 넘고 난 뒤의 중첩이 제 깊이로 선다. 짝이 하나
+		//   어긋나 있으면 여기서 깊이가 밀린다 — 불균형 계수기는 0 인 채로.
+		{
+			ce::profile_scope outer{ service, ce::marker<"AfterBoundaryOuter">() };
+			busy_ticks(1);
+			{
+				ce::profile_scope inner{ service, ce::marker<"AfterBoundaryInner">() };
+				busy_ticks(1);
+			}
+		}
+
+		service.publish_frame(2);
+		service.pause();
+
+		ce::capture_session_ptr capture = service.capture();
+		if (!capture)
+		{
+			check(false, "state-change/capture — 얼린 캡처가 있다");
+			return;
+		}
+
+		const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 2, 2);
+
+		// ★ 깊이를 찾는 조건에 건다. 짝이 하나 어긋나 있으면 이름은 그대로인 채
+		//   깊이만 밀리므로, 이름만 찾으면 밀린 것을 찾아내지 못한다.
+		const ce::aggregate_row* outer =
+			find_row(aggregate, ce::marker<"AfterBoundaryOuter">(), 0);
+		const ce::aggregate_row* inner =
+			find_row(aggregate, ce::marker<"AfterBoundaryInner">(), 1);
+
+		check(outer != nullptr,
+		      "state-change/outer-depth — 경계 뒤의 바깥 구간이 깊이 0 으로 선다");
+		check(inner != nullptr,
+		      "state-change/inner-depth — 경계 뒤의 안쪽 구간이 깊이 1 로 선다");
+
+		// 얼린 채 연 구간은 재지 않았으므로 표에 없어야 한다. 남아 있으면
+		// 녹화를 멈춰 둔 동안의 시간이 구간 길이로 들어가 숨는다.
+		check(find_flat(aggregate, ce::marker<"AcrossRecord">()) == nullptr,
+		      "state-change/skipped-not-recorded — 얼린 채 연 구간은 표에 없다");
+	}
+
+	//-------------------------------------------------------------------------
+	// ㉒ 창이 매 프레임 부르는 따라가기 규칙(capture_reader::sync).
+	//
+	//    이것이 창이 아니라 코어에 있는 이유는 재기 위해서다. 예전에는
+	//    창이 `state == frozen` 을 보고 집었는데, 얼린 순간은 보는 쪽이 한 번도
+	//    못 볼 수 있는 찰나라 어느 날은 빈 화면이 나왔다. 그 규칙이 화면에
+	//    있었으므로 게이트가 물 자리가 없었다.
+	//-------------------------------------------------------------------------
+	void test_reader_sync()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+
+		auto take = [&service](std::uint32_t frame) -> ce::capture_session_ptr
+		{
+			service.record(frame);
+			{
+				ce::profile_scope scope{ service, ce::marker<"SyncTick">() };
+				busy_ticks(2);
+			}
+			service.publish_frame(frame);
+			service.pause();
+			return service.capture();
+		};
+
+		ce::capture_reader reader;
+
+		// 손에도 없고 서비스에도 없으면 아무 일도 없다.
+		check(!reader.sync(nullptr), "reader-sync/empty — 내놓은 것이 없으면 갈아타지 않는다");
+		check(!reader.has_capture(), "reader-sync/empty-stays — 그래도 빈 손 그대로다");
+
+		const ce::capture_session_ptr first = take(1);
+		check(static_cast<bool>(first), "reader-sync/first-exists — 첫 캡처가 섬");
+		check(reader.sync(first), "reader-sync/first — 빈 손이면 첫 하나를 집는다");
+		check(reader.capture() == first.get(), "reader-sync/first-same — 집은 것이 그것이다");
+
+		// ★ 같은 것을 다시 주면 손대지 않는다. 창이 매 프레임 부르므로, 여기서
+		//   매번 adopt 하면 선택과 시야가 매 프레임 초기화되고 접은 결과가 버려진다.
+		//
+		// ★ 이 절은 **따라가기를 켜 둔 채로** 재야 한다. 꺼 두면 붙잡아 둔 것을 지키는
+		//   절이 먼저 막아서, 같은 것인지 가리는 절을 걷어도 단정이 통과한다 —
+		//   두 층이 같은 절을 막으면 변이가 조용히 살아남는다.
+		check(reader.live_follow(), "reader-sync/follow-default — 기본값은 따라가기다");
+		reader.select_frame(1);
+		const std::uint64_t foldsBefore = reader.fold_count();
+		(void)reader.aggregate();
+		check(!reader.sync(first), "reader-sync/same — 같은 것을 다시 주면 갈아타지 않는다");
+		(void)reader.aggregate();
+		check_eq(reader.fold_count(), foldsBefore + 1,
+		         "reader-sync/same-no-refold — 같은 것을 받았다고 다시 접지 않는다");
+
+		reader.set_live_follow(false);
+
+		// 따라가지 않기로 했으면 새로 얼린 것이 와도 보던 것을 지킨다.
+		const ce::capture_session_ptr second = take(2);
+		check(second.get() != first.get(), "reader-sync/second-differs — 두 번째는 다른 것이다");
+		check(!reader.sync(second), "reader-sync/pinned — 꺼 두었으면 갈아타지 않는다");
+		check(reader.capture() == first.get(), "reader-sync/pinned-keeps — 보던 것을 그대로 든다");
+
+		// 켜면 새로 얼린 것으로 갈아탄다. 그것이 그 체크박스가 적은 약속이다.
+		reader.set_live_follow(true);
+		check(reader.sync(second), "reader-sync/follow — 켜 두었으면 새로 얼린 것으로 간다");
+		check(reader.capture() == second.get(), "reader-sync/follow-latest — 손에 든 것이 최신이다");
+
+		// ★ 서비스가 빈손이라고 보던 것을 버리지는 않는다. 놓는 것은 Clear 가
+		//   reset() 으로 명시하는 일이고, 그것을 여기서 흔들면 붙잡아 둔 것이 사라진다.
+		check(!reader.sync(nullptr), "reader-sync/null — 빈 것을 주면 갈아타지 않는다");
+		check(reader.capture() == second.get(), "reader-sync/null-keeps — 보던 것을 잃지 않는다");
+	}
 }
 
 int main()
@@ -1050,6 +1379,10 @@ int main()
 	test_reader_frozen_while_running();
 	test_reader_live_follow();
 	test_reader_fold_cache();
+	test_timeline_spans();
+	test_timeline_view();
+	test_scope_across_state_change();
+	test_reader_sync();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

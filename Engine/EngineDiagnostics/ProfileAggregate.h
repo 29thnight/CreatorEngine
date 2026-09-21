@@ -58,6 +58,12 @@ namespace ce
 
 		// depth 0 구간의 길이 합. 겹치지 않으므로 그냥 더한다.
 		profile_tick  root_ticks = 0;
+
+		// 이 스레드의 스팬이 spans() 안에서 차지하는 구간 [begin, end).
+		// 레인을 그리는 쪽이 자기 몫만 훑을 수 있게 해 둔다 — 스팬이 스레드
+		// 순으로 정렬돼 있으므로 연속이다.
+		std::uint32_t span_begin = 0;
+		std::uint32_t span_end = 0;
 	};
 
 	// 프레임 범위 하나를 접은 결과. 만든 뒤에는 바뀌지 않는다.
@@ -65,6 +71,14 @@ namespace ce
 	{
 	public:
 		std::span<const aggregate_row>  hierarchy() const { return m_hierarchy; }
+
+		// ★ Timeline 이 그리는 원시 구간. 접기 전의 이벤트를 전위 순서
+		//   (스레드 → 시작 tick → depth)로 세워 둔 것이다.
+		//
+		//   집계가 이미 이 순서로 세운 것을 **버리지 않고 남긴다**. 그리는
+		//   층이 다시 정렬하면 같은 일을 두 번 하는 데다, 두 정렬이 갈리는
+		//   순간 표와 타임라인이 서로 다른 트리를 말하게 된다.
+		std::span<const profile_event>  spans() const { return m_spans; }
 		std::span<const aggregate_row>  flat() const { return m_flat; }
 		std::span<const thread_summary> threads() const { return m_threads; }
 
@@ -89,6 +103,7 @@ namespace ce
 		                                        std::uint32_t, std::uint32_t);
 
 	private:
+		std::vector<profile_event>  m_spans;
 		std::vector<aggregate_row>  m_hierarchy;
 		std::vector<aggregate_row>  m_flat;
 		std::vector<thread_summary> m_threads;

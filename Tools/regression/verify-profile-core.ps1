@@ -105,10 +105,80 @@ $mutations = @(
         # 이전 프레임을 계속 보여 주는데, 숫자가 그럴듯해서 눈으로는 모른다.
         Name   = 'reader-stale-cache'
         File   = 'ProfileReader.cpp'
-        Old    = "`t`t`tm_aggregateValid = false;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
-        New    = "`t`t`tm_aggregateValid = true;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
+        Old    = "`t`t`tm_aggregateValid = false;`r`n`t`t`tm_viewValid = false;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
+        New    = "`t`t`tm_aggregateValid = true;`r`n`t`t`tm_viewValid = false;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
         Expect = 'reader/'
         Why    = '선택이 바뀌어도 캐시를 안 버리면 다른 프레임의 숫자를 계속 보여 준다'
+    },
+
+    # ── PHASE 14 P3 Timeline ────────────────────────────────────────────────
+    @{
+        # 시야를 구간 안으로 자르지 않는다. 멀리 밀면 빈 화면이 나오고,
+        # 그때 사용자는 계측이 없다고 읽는다 — 화면만 봐서는 못 가린다.
+        Name   = 'timeline-view-unclamped'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tif (m_viewBegin < low)"
+        New    = "`t`tif (false)"
+        Expect = 'timeline-view/'
+        Why    = '시야가 구간 밖으로 나가면 빈 화면이 나오고 계측이 없는 것처럼 보인다'
+    },
+    @{
+        # 선택이 바뀌어도 시야를 그대로 둔다. 다른 프레임을 골랐는데 전에
+        # 보던 tick 을 계속 보므로 타임라인이 빈다.
+        Name   = 'timeline-view-kept'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t`tm_aggregateValid = false;`r`n`t`t`tm_viewValid = false;"
+        New    = "`t`t`tm_aggregateValid = false;"
+        Expect = 'timeline-view/reset-on-select'
+        Why    = '선택이 바뀌어도 시야를 안 되돌리면 다른 프레임에서 빈 타임라인을 본다'
+    },
+
+    # ── 녹화 경계를 넘는 스코프 ────────────────────────────────────
+    @{
+        # 여는 쪽을 건너뛰면서 짝을 예약하지 않는다. 얼린 채 열린 구간의 짝이
+        # 나중에 스택에서 남의 구간을 닫는다.
+        Name   = 'scope-skip-unpaired'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`t`tstream->skip_scope();`r`n`t`t`treturn;"
+        New    = "`t`t`treturn;"
+        Expect = 'state-change/'
+        Why    = '여는 쪽만 건너뛰면 그 짝이 스택에서 남의 구간을 닫는다'
+    },
+    @{
+        # 닫는 쪽에도 상태 관문을 다시 건다. 얼린 뒤에 닫힌 구간이 스택에 남아
+        # 그 뒤의 깊이가 한 칸씩 밀린다.
+        #
+        # ★ 이 변이는 **아무것도 실패시키지 않는다.** 불균형 계수기는 0 인
+        #   채로 깊이만 밀리므로, 계수기만 보는 단정은 이것을 못 잡는다. Expect 를
+        #   깊이 단정에 묶어 둔 것이 그 이유다.
+        Name   = 'scope-end-gated'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tthread_stream* stream = t_streams[m_serviceSlot];`r`n`t`tif (!stream)"
+        New    = "`t`tif (m_state.load(std::memory_order_relaxed) != recorder_state::recording)`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}`r`n`t`tthread_stream* stream = t_streams[m_serviceSlot];`r`n`t`tif (!stream)"
+        Expect = 'state-change/inner-depth'
+        Why    = '닫는 쪽을 얼릴 수 있으면 스택에 칸이 남아 그 뒤의 깊이가 전부 밀린다'
+    },
+
+    # ── 창이 매 프레임 부르는 따라가기 규칙 ────────────────────────
+    @{
+        # 한 번 집으면 끝이다. Live Follow 를 켜 두어도 새로 얼린 것으로 가지
+        # 않으므로, 두 번째 pause 부터는 화면이 옆에 멈춰 선다.
+        Name   = 'reader-sync-once'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tif (m_capture && !m_liveFollow)"
+        New    = "`t`tif (m_capture)"
+        Expect = 'reader-sync/follow'
+        Why    = '한 번만 집으면 Live Follow 가 약속한 것을 지키지 못한다'
+    },
+    @{
+        # 같은 것을 받아도 매번 갈아태다. 창이 매 프레임 부르므로 선택과 시야가
+        # 매 프레임 초기화되고 접은 결과가 매 프레임 버려진다.
+        Name   = 'reader-sync-always'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tif (latest.get() == m_capture.get())"
+        New    = "`t`tif (false)"
+        Expect = 'reader-sync/same'
+        Why    = '같은 것을 매 프레임 다시 집으면 선택과 시야가 매 프레임 초기화된다'
     }
 )
 

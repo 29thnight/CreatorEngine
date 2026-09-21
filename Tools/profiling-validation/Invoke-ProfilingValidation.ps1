@@ -243,6 +243,18 @@ function Invoke-Window {
         "profile.stats"
         "editor.window ###Editor.FrameProfiler open"
         "wait 30"
+        # ★ 타임라인을 자극하는 두 줄이다.
+        #
+        #   타임라인은 얼린 캡처가 있어야 그려지는데, 얼린 채로는 마커가 찍히지
+        #   않아 그렸다는 증거가 남지 않는다. 얼렸다가 바로 다시 열어야 둘이 동시에 선다.
+        #
+        # ★ 사이에 wait 를 두지 **않는다.** 얼린 순간을 창이 볼 수 있게 두면,
+        #   상태를 보고 집는 낡은 관문도 우연히 통과한다 — 그러면 이 축은 "찰나를
+        #   놓쳐도 집는다" 를 재지 못하고 날마다 다른 답을 낸다. 붙여 두면
+        #   얼린 구간이 한 프레임보다 짧아지므로 자극이 결정적이 된다.
+        "profile.pause"
+        "profile.record"
+        "wait 30"
         "profile.frame"
         "profile.stats"
         "quit"
@@ -274,9 +286,13 @@ function Invoke-Window {
     # 스레드가 그리므로 귀속까지 봐야 "그 스레드가 실제로 그렸다" 가 된다.
     $windowEvents = 0
     $onPresentation = 0
+    $timelineEvents = 0
     foreach ($f in $frame.data.frames) {
         foreach ($t in $f.threads) {
             foreach ($e in $t.events) {
+                if ($e.name -eq 'ProfilerTimeline' -and $t.name -eq '[PresentationThread]') {
+                    $timelineEvents++
+                }
                 if ($e.name -ne 'ProfilerWindow') { continue }
                 $windowEvents++
                 if ($t.name -eq '[PresentationThread]') { $onPresentation++ }
@@ -289,6 +305,7 @@ function Invoke-Window {
     Write-Host ("  창 열기 요청    {0}" -f $open.status)
     Write-Host ("  최근 {0}프레임의 ProfilerWindow  {1}건 (그중 프레젠테이션 스레드 {2})" -f
         $frame.data.frames.Count, $windowEvents, $onPresentation)
+    Write-Host ("  같은 구간의 ProfilerTimeline  {0}건 (프레젠테이션 스레드)" -f $timelineEvents)
     Write-Host ("  등록 마커       {0}" -f $stats.data.registeredMarkers)
     Write-Host ("  창을 닫은 뒤 상태  {0}" -f $closed.data.state)
 
@@ -307,6 +324,12 @@ function Invoke-Window {
     }
     if ($onPresentation -le 0) {
         $failures.Add("ProfilerWindow 가 프레젠테이션 스레드에 붙지 않았다")
+    }
+    # ★ 창이 돌았다는 것과 **타임라인이 그려졌다** 는 것은 다르다. 타임라인은
+    #   얼린 캡처가 없으면 한 줄짜리 안내문만 내고 빠져나간다 — 그래도 창은
+    #   열려 있고 ProfilerWindow 는 찍힌다. 두 마커를 갈라 세는 이유가 그것이다.
+    if ($timelineEvents -le 0) {
+        $failures.Add("ProfilerTimeline 이 캡처에 없다 - 창은 돌았으나 타임라인 본문은 돌지 않았다")
     }
     if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
 

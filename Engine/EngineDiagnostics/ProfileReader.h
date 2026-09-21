@@ -28,6 +28,18 @@ namespace ce
 		// rolling ring 이 오래된 프레임을 버리면 선택이 밖으로 나간다).
 		void adopt(capture_session_ptr capture);
 
+		// 서비스가 내놓은 최신 얼린 캡처를 따라간다. 창이 매 프레임 부른다.
+		// 갈아타면 true.
+		//
+		// ★ 관문을 녹화 **상태**가 아니라 손에 든 것으로 건다. 얼린 순간은
+		//   보는 쪽이 한 번도 못 볼 수 있는 찰나다 — pause 와 record 가 한 프레임
+		//   사이에 다 지나가면 "frozen 일 때 집는다" 는 관문은 영영 열리지 않고,
+		//   그러면 캡처가 있는데도 빈 화면을 본다.
+		//
+		// ★ 이 정책이 창이 아니라 여기 있는 이유는 **재기 위해서**다. 화면에
+		//   두면 갈아타는지를 물을 수단이 눈뿐이 된다.
+		bool sync(capture_session_ptr latest);
+
 		// 캡처를 놓는다. Clear 가 부른다.
 		void reset();
 
@@ -53,12 +65,37 @@ namespace ce
 		// 선택 구간의 집계. 선택이 바뀌지 않았으면 다시 접지 않는다.
 		const frame_aggregate& aggregate() const;
 
+		// ── Timeline 의 가로 시야 ───────────────────────────────────────────
+		//
+		// 선택한 프레임들의 벽시계 구간 안에서 어디를 보고 있는가. 확대·이동이
+		// 여기 있는 이유는 선택과 같다 — 순수 상태라 화면 없이 잴 수 있고,
+		// "확대해도 구간 밖으로 나가지 않는다" 같은 계약을 프로브가 문다.
+		//
+		// 선택이 바뀌면 시야는 그 구간 전체로 돌아간다. 다른 프레임을 골랐는데
+		// 전에 보던 자리가 남아 있으면 빈 화면이 나온다.
+		profile_tick view_begin() const;
+		profile_tick view_end() const;
+		profile_tick view_span() const;
+
+		void reset_view();
+
+		// pivot 을 제자리에 두고 배율을 바꾼다. factor < 1 이면 확대(구간이
+		// 좁아진다), > 1 이면 축소. 선택 구간보다 넓어지지 않고, 최소 폭
+		// 아래로 좁아지지도 않는다.
+		void zoom_view(double factor, profile_tick pivot);
+
+		// 시야를 옮긴다. 선택 구간 밖으로는 나가지 않는다 — 나갈 수 있으면
+		// 빈 화면을 보게 되고, 그때 사용자는 계측이 없다고 읽는다.
+		void pan_view(std::int64_t delta_ticks);
+
 		// 실제로 접은 횟수. 캐시가 도는지 밖에서 볼 수 있어야 검사가 된다 —
 		// "느려지지 않았다" 는 말로만 적으면 아무도 재지 않는다.
 		std::uint64_t fold_count() const { return m_foldCount; }
 
 	private:
 		void clamp_selection();
+		void clamp_view() const;
+		void ensure_view() const;
 
 		capture_session_ptr m_capture;
 		bool          m_liveFollow = true;
@@ -73,5 +110,11 @@ namespace ce
 		mutable frame_aggregate m_aggregate;
 		mutable bool            m_aggregateValid = false;
 		mutable std::uint64_t   m_foldCount = 0;
+
+		// 시야는 집계가 서야 뜻이 생긴다(구간의 tick 을 알아야 한다). 그래서
+		// 처음 물을 때 세우고, 선택이 바뀌면 무효가 된다.
+		mutable profile_tick m_viewBegin = 0;
+		mutable profile_tick m_viewEnd = 0;
+		mutable bool         m_viewValid = false;
 	};
 }

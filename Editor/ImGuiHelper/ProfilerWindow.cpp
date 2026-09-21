@@ -231,12 +231,11 @@ void DrawProfilerHUD()
 	ce::profiler_service& service = ce::profiler();
 	const ce::live_summary summary = service.summary();
 
-	// 얼어 있는데 아직 손에 쥔 것이 없으면(다른 경로로 pause 되었을 때)
-	// 그때 받아 온다. CLI 의 profile.frame 도 pause 를 부른다.
-	if (summary.state == ce::recorder_state::frozen && !reader().has_capture())
-	{
-		reader().adopt(service.capture());
-	}
+	// 다른 경로로 얼린 것을 따라간다. CLI 의 profile.pause·profile.frame 둘 다 얼린다.
+	//
+	// ★ 언제 갈아타는가 는 이 줄이 아니라 reader 가 정한다. 그래야 그 규칙을
+	//   화면 없이 재고 변이로 물 수 있다 — 여기 조건문을 두면 재는 수단이 눈뿐이다.
+	reader().sync(service.capture());
 
 	draw_toolbar(summary);
 	ImGui::Separator();
@@ -246,6 +245,12 @@ void DrawProfilerHUD()
 		return;
 	}
 
+	// ★ Frame Overview 와 Timeline 이 **첫 탭**에 함께 있다. §7.2 가 프레임
+	//   그래프를 "모든 분석의 entry point" 라고 부른 대로, 프레임을 고르고
+	//   그 자리에서 구간을 들여다보는 것이 한 화면에서 이어져야 한다.
+	//
+	//   기본 탭이라는 것도 값이다 — 도크 탭은 선택돼야 본문이 돌므로,
+	//   뒤 탭에 두면 창을 열어도 타임라인이 한 번도 그려지지 않는다.
 	if (ImGui::BeginTabItem("Capture"))
 	{
 		draw_frame_overview();
@@ -254,7 +259,22 @@ void DrawProfilerHUD()
 		{
 			draw_selection_summary();
 			ImGui::Separator();
+			draw_timeline();
+		}
+		ImGui::EndTabItem();
+	}
+
+	if (ImGui::BeginTabItem("Hierarchy"))
+	{
+		if (reader().has_capture())
+		{
+			draw_selection_summary();
+			ImGui::Separator();
 			draw_hierarchy_table();
+		}
+		else
+		{
+			ImGui::TextDisabled("얼린 캡처가 없다 - Pause 를 누를 것");
 		}
 		ImGui::EndTabItem();
 	}

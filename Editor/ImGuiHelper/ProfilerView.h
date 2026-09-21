@@ -28,6 +28,9 @@ namespace editor::profiler_view
 	// 프레임 그래프. 클릭으로 한 프레임, 끌어서 범위를 고른다.
 	void draw_frame_overview();
 
+	// 스레드 레인에 구간을 그린다. 확대·이동·tooltip 이 여기 있다.
+	void draw_timeline();
+
 	// 집계 표. Hierarchy 는 트리, Flat 은 평평한 목록.
 	void draw_hierarchy_table();
 	void draw_flat_table();

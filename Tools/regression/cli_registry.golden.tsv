@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	133
-# names	142
+# commands	135
+# names	144
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -89,6 +89,8 @@ prefab.overrides	-	immediate	editor	engine_service	live	no	yes	<오브젝트>	�
 prefab.status	-	immediate	editor	engine_service	live	no	yes	-	프리팹 등록·캐시 상태를 낸다
 prefab.update	-	frames	editor	engine_service	live	no	yes	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
 profile.frame	-	immediate	editor	engine_service	live	no	yes	-	보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)
+profile.pause	-	immediate	editor	engine_service	live	no	yes	-	녹화를 멈춰 그때까지를 얼린다(창이 그것을 집는다)
+profile.record	-	immediate	editor	engine_service	live	no	yes	-	얼린 캡처를 남긴 채 기록만 다시 연다
 profile.stats	-	immediate	editor	engine_service	live	no	yes	-	프로파일러 자체 비용과 용량 소진(교란 없음)
 quit	exit	immediate	both	engine_service	terminates_process	no	yes	-	호스트를 종료한다
 render.backend	-	immediate	editor	engine_service	live	no	yes	status	부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)

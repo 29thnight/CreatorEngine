@@ -77,7 +77,11 @@ namespace ce
 		result.m_frameEnd = last_frame + 1;
 
 		// ── 1. 범위 안의 이벤트를 모은다 ────────────────────────────────────
-		std::vector<profile_event> events;
+		//
+		// 모아서 세운 것을 그대로 결과에 남긴다(m_spans). Timeline 이 그리는
+		// 원시 구간이 이것이고, 그리는 층이 다시 정렬하면 두 정렬이 갈리는
+		// 순간 표와 타임라인이 서로 다른 트리를 말하게 된다.
+		std::vector<profile_event>& events = result.m_spans;
 		bool sawFrame = false;
 		for (const frame_record& frame : capture.frames())
 		{
@@ -149,6 +153,22 @@ namespace ce
 		std::sort(result.m_threads.begin(), result.m_threads.end(),
 		          [](const thread_summary& a, const thread_summary& b)
 		          { return a.thread_slot < b.thread_slot; });
+
+		// 스팬은 스레드 순으로 서 있으므로 각 스레드의 몫이 연속이다.
+		// 레인을 그리는 쪽이 자기 구간만 훑도록 경계를 적어 둔다.
+		{
+			std::uint32_t cursor = 0;
+			for (thread_summary& summary : result.m_threads)
+			{
+				summary.span_begin = cursor;
+				while (cursor < events.size() &&
+				       events[cursor].thread_slot == summary.thread_slot)
+				{
+					++cursor;
+				}
+				summary.span_end = cursor;
+			}
+		}
 
 		for (const thread_summary& summary : result.m_threads)
 		{

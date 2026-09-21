@@ -340,6 +340,7 @@
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerFrameOverview.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerTables.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerTimeline.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />
     <ClCompile Include="ImGuiHelper\widgets.cpp" />
   </ItemGroup>

@@ -243,16 +243,27 @@ namespace ce
 		return t_streams[m_serviceSlot];
 	}
 
+	// ★ 상태 관문은 **여는 쪽에만** 있고, 그때도 짝을 예약하고 나간다.
+	//
+	//   두 쪽에 같은 관문을 걸면 pause·record 가 스코프 한가운데서 일어날 때
+	//   짝이 어긋난다. 여는 쪽만 재고 닫는 쪽이 얼어 버리면 스택에 한 칸이 남아
+	//   **그 뒤의 모든 구간이 한 칸씩 깊어진다.** 거꾸로, 얼린 채 열고 녹화가
+	//   다시 열린 뒤에 닫으면 스택에서 남의 구간을 닫는다.
+	//
+	//   둘 다 조용하다 — 깊이만 밀릴 뿐 아무것도 실패하지 않는다. 툴바의
+	//   Pause 단추도 다른 스레드가 구간 안에 있을 때 눌리므로, CLI 를 붙이기
+	//   전에도 있던 결함이다.
 	void profiler_service::begin_scope(marker_id id)
 	{
-		if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
+		thread_stream* stream = current_stream();
+		if (!stream)
 		{
 			return;
 		}
 
-		thread_stream* stream = current_stream();
-		if (!stream)
+		if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
 		{
+			stream->skip_scope();
 			return;
 		}
 
@@ -261,11 +272,8 @@ namespace ce
 
 	void profiler_service::end_scope()
 	{
-		if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
-		{
-			return;
-		}
-
+		// 상태를 보지 않는다. 여는 쪽이 이미 재놓았거나 짝을 예약해 둥으므로,
+		// 닫는 쪽은 언제나 스트림까지 가 닿아야 스택이 제자리로 돌아온다.
 		thread_stream* stream = t_streams[m_serviceSlot];
 		if (!stream)
 		{
