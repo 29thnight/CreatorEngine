@@ -205,6 +205,16 @@ namespace
 		std::snprintf(buffer, sizeof(buffer), "%u", summary.pause_unacked_streams);
 		draw_row("Unacked at freeze", buffer);
 
+		// 소유 경계. 셋 다 0 이어야 한다.
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64 " / %" PRIu64,
+		              summary.foreign_stream_touches, summary.abandoned_streams);
+		draw_row("Foreign touches / abandoned", buffer);
+
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64 " (미적용 %" PRIu64 ")",
+		              summary.control_requests_deferred,
+		              summary.control_requests_timed_out);
+		draw_row("Control deferred", buffer);
+
 		ImGui::EndTable();
 	}
 
@@ -338,7 +348,9 @@ void DrawProfilerHUD()
 	{
 		draw_summary(summary);
 		if (summary.dropped_events > 0 || summary.unbalanced_scopes > 0
-		    || summary.late_events_dropped > 0 || summary.stale_chunks_dropped > 0)
+		    || summary.late_events_dropped > 0 || summary.stale_chunks_dropped > 0
+		    || summary.foreign_stream_touches > 0 || summary.abandoned_streams > 0
+		    || summary.control_requests_timed_out > 0)
 		{
 			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
 			                   "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");

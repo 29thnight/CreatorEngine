@@ -8,6 +8,7 @@
 //
 // 판정은 종료 코드다. 실패 사유는 stderr 로 낸다.
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <cstdio>
 #include <string>
@@ -1587,6 +1588,12 @@ void test_concurrent_publish()
 	// 잃었으면 드롭으로 세어야 한다. 세지 않고 사라지는 것이 이 경계의 결함이다.
 	check_eq(seen + summary.dropped_events, expected,
 	         "concurrent-publish/accounted — 수집분 + 드롭 = 발생분");
+
+	// ★ 그리고 그 경계는 **결정적으로** 서 있어야 한다. 위의 단정은 경합이
+	//   실제로 겹쳤을 때만 붉어지므로, 같은 코드가 어떤 실행에서는 초록이다.
+	//   소유 위반은 겹치든 말든 세어지므로 회차에 기대지 않는다.
+	check_eq(summary.foreign_stream_touches, std::uint64_t{ 0 },
+	         "concurrent-publish/owned — 남의 스트림을 만진 호출이 없다");
 	check_eq(summary.unbalanced_scopes, std::uint64_t{ 0 },
 	         "concurrent-publish/balanced — 불균형 스코프 0");
 
@@ -2090,6 +2097,190 @@ void test_capture_reports_completeness()
 	service.shutdown();
 }
 
+
+// ⑪ 종료는 **주인만** 자기 스트림을 닫는다.
+//
+// ★ 주인이 살아 있는 스트림을 종료 스레드가 finish() 하면, 주인이 쓰고 있는
+//   저장소를 만진다 — `collector-seals-others` 가 죽던 것과 같은 길이다.
+//   닫지 못한 것은 세어 둬야 "그 스레드가 조용했다" 와 구분된다.
+void test_shutdown_owns_only_its_stream()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(1);
+
+	std::atomic<int> step{ 0 };
+	std::thread worker([&service, &step]()
+	{
+		service.register_thread("NeverUnregisters");
+		{ ce::profile_scope scope{ service, ce::marker<"ShutdownTick">() }; }
+		step.store(1, std::memory_order_release);
+
+		// 여기서 잔다. unregister_thread 를 부르지 않고 종료를 맞는다.
+		while (step.load(std::memory_order_acquire) < 2) { std::this_thread::yield(); }
+	});
+
+	while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+	service.publish_frame(1);
+	service.shutdown();
+
+	const ce::live_summary summary = service.summary();
+	check_eq(summary.abandoned_streams, std::uint64_t{ 1 },
+	         "shutdown-own/abandoned — 주인이 살아 있어 닫지 못한 것을 센다");
+	check_eq(summary.foreign_stream_touches, std::uint64_t{ 0 },
+	         "shutdown-own/untouched — 남의 스트림을 만지지 않았다");
+
+	step.store(2, std::memory_order_release);
+	worker.join();
+}
+
+// ⑫ 종료 뒤 남은 thread_local 자리는 **없는 것으로** 읽혀야 한다.
+//
+// ★ shutdown 은 부른 스레드의 자리만 끊을 수 있다. 다른 스레드의 자리는 죽은
+//   스트림을 계속 가리키므로, 같은 스레드가 다시 등록하러 오면 "이미 등록됨"
+//   으로 돌아가 해제된 포인터를 그대로 쓴다.
+void test_tls_slot_epoch()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main");
+
+	std::atomic<int> step{ 0 };
+	std::thread worker([&service, &step]()
+	{
+		service.register_thread("Recycled");
+		{ ce::profile_scope scope{ service, ce::marker<"FirstLife">() }; }
+		step.store(1, std::memory_order_release);
+
+		// 종료와 재초기화를 기다린다. 자리는 그대로 남아 있다.
+		while (step.load(std::memory_order_acquire) < 2) { std::this_thread::yield(); }
+
+		// 같은 스레드가 다시 등록한다. 세대를 보지 않으면 죽은 스트림으로 간다.
+		service.register_thread("SecondLife");
+		{ ce::profile_scope scope{ service, ce::marker<"SecondLife">() }; }
+		step.store(3, std::memory_order_release);
+
+		while (step.load(std::memory_order_acquire) < 4) { std::this_thread::yield(); }
+		service.unregister_thread();
+	});
+
+	service.record(1);
+	while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
+	service.publish_frame(1);
+	service.shutdown();
+
+	service.initialize({});
+	service.register_thread("Main");
+	service.record(10);
+	step.store(2, std::memory_order_release);
+	while (step.load(std::memory_order_acquire) < 3) { std::this_thread::yield(); }
+
+	service.publish_frame(10);
+	step.store(4, std::memory_order_release);
+	worker.join();
+	service.publish_frame(11);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "tls-epoch/capture — 얼린 캡처가 있다");
+	if (capture)
+	{
+		check(count_marker(*capture, ce::marker<"SecondLife">()) > 0,
+		      "tls-epoch/registered — 같은 스레드가 새 서비스에 다시 잡힌다");
+		check_eq(count_marker(*capture, ce::marker<"FirstLife">()), std::size_t{ 0 },
+		         "tls-epoch/no-carryover — 지난 서비스의 것은 넘어오지 않는다");
+	}
+
+	check_eq(service.summary().foreign_stream_touches, std::uint64_t{ 0 },
+	         "tls-epoch/owned — 죽은 자리를 따라가 남의 것을 만지지 않았다");
+
+	service.shutdown();
+}
+
+
+// ⑬ 수집기가 아닌 스레드의 제어 호출은 **수집기로 넘어가** 적용된다.
+//
+// ★ 링은 프레임 경계를 도는 스레드의 것이다. 창이나 콘솔 스레드가 pause 에서
+//   직접 링을 만지면 수집기와 겹친다 — 스트림에서 죽던 것과 같은 경계다.
+//   그래서 줄을 세우고, 부른 쪽은 **적용될 때까지 기다린다.** 기다리지 않으면
+//   부른 직후의 capture() 가 비어 "얼렸는데 아무것도 없다" 가 된다.
+void test_control_from_other_thread()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.record(1);
+
+	std::atomic<int> gate{ 0 };      // 1 = 수집기 멈춤 요청, 2 = 재개
+	std::atomic<int> parked{ 0 };
+	std::atomic<int> started{ 0 };
+	std::atomic<bool> running{ true };
+
+	std::thread collector([&service, &gate, &parked, &started, &running]()
+	{
+		service.register_thread("Collector");
+		std::uint32_t frame = 1;
+		while (running.load(std::memory_order_acquire))
+		{
+			if (1 == gate.load(std::memory_order_acquire))
+			{
+				// 프레임을 닫지 않고 선다. 이 동안 들어온 제어 요청은
+				// 재개하기 전까지 적용될 수 없다.
+				parked.store(1, std::memory_order_release);
+				while (2 != gate.load(std::memory_order_acquire))
+				{
+					std::this_thread::yield();
+				}
+				parked.store(0, std::memory_order_release);
+			}
+
+			{ ce::profile_scope scope{ service, ce::marker<"CollectorTick">() }; }
+			service.publish_frame(frame++);
+
+			// ★ 이 표식이 선 뒤에야 수집기 스레드가 정해진다. engine_frame 은
+			//   record() 가 이미 올려 두므로 그것으로는 "수집기가 돌았다" 를
+			//   판정할 수 없다.
+			started.store(1, std::memory_order_release);
+		}
+		service.unregister_thread();
+	});
+
+	// 수집기가 자리를 잡을 때까지 기다린다.
+	while (0 == started.load(std::memory_order_acquire)) { std::this_thread::yield(); }
+
+	gate.store(1, std::memory_order_release);
+	while (0 == parked.load(std::memory_order_acquire)) { std::this_thread::yield(); }
+
+	// 멈춰 있는 동안 재개를 예약한다. pause() 가 기다리지 않으면 이 지연보다
+	// 먼저 돌아오고, 그때 capture() 는 비어 있다.
+	std::thread releaser([&gate]()
+	{
+		std::this_thread::sleep_for(std::chrono::milliseconds(60));
+		gate.store(2, std::memory_order_release);
+	});
+
+	service.pause();
+
+	const ce::live_summary summary = service.summary();
+	check(summary.state == ce::recorder_state::frozen,
+	      "control-thread/frozen — 부른 직후에 실제로 얼어 있다");
+	check(service.capture() != nullptr,
+	      "control-thread/capture — 부른 직후에 캡처가 손에 있다");
+	check(summary.control_requests_deferred > 0,
+	      "control-thread/deferred — 수집기가 아닌 호출은 줄을 선다");
+	check_eq(summary.control_requests_timed_out, std::uint64_t{ 0 },
+	         "control-thread/applied — 끝내 적용되지 못한 요청이 없다");
+	check_eq(summary.foreign_stream_touches, std::uint64_t{ 0 },
+	         "control-thread/owned — 남의 스트림을 만지지 않았다");
+
+	releaser.join();
+	running.store(false, std::memory_order_release);
+	gate.store(2, std::memory_order_release);
+	service.record(summary.engine_frame);
+	collector.join();
+	service.shutdown();
+}
+
 int main()
 {
 	test_marker_identity();
@@ -2127,6 +2318,9 @@ int main()
 	test_pause_ack_implies_delivery();
 	test_capture_reports_incompleteness();
 	test_capture_reports_completeness();
+	test_shutdown_owns_only_its_stream();
+	test_tls_slot_epoch();
+	test_control_from_other_thread();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

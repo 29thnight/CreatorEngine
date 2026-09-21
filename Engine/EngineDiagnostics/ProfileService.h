@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <thread>
 #include <string>
 #include <vector>
 
@@ -65,6 +66,20 @@ namespace ce
 		//   그것을 알아야 "비었다" 와 "못 받았다" 를 가릴 수 있다.
 		std::uint32_t  pause_unacked_streams = 0;
 		bool           capture_complete = true;
+
+		// 주인이 아닌 스레드가 남의 스트림을 만지려 한 횟수. **0 이어야 한다.**
+		// 0 이 아니면 그 호출은 아무 일도 하지 않았고, 그만큼의 기록이 없다.
+		std::uint64_t  foreign_stream_touches = 0;
+
+		// 주인이 살아 있어 닫지 못한 채 회수한 스트림 수. 그만큼의 꼬리가
+		// 어느 캡처에도 없다 — 종료 전에 unregister_thread 를 부르지 않은 것이다.
+		std::uint64_t  abandoned_streams = 0;
+
+		// 다른 스레드에서 들어와 수집기로 넘긴 제어 요청 수, 그리고 프레임이
+		// 돌지 않아 끝내 적용되지 못한 수. 후자가 0 이 아니면 **부른 대로
+		// 되지 않았다.**
+		std::uint64_t  control_requests_deferred = 0;
+		std::uint64_t  control_requests_timed_out = 0;
 
 		// 지운 세대의 것이라 버린 이벤트, 시각이 링 밖이라 버린 이벤트.
 		std::uint64_t  stale_chunks_dropped = 0;
@@ -138,6 +153,15 @@ namespace ce
 		// 시작 프레임 번호를 받는다. 이것이 없으면 첫 스코프들이 "아직 모르는"
 		// 프레임에 기록되고, 그 프레임을 닫을 때 붙는 라벨과 어긋난다 —
 		// 프레임을 넘는 구간의 시작 프레임이 틀어지는 것이 그 증상이다.
+		// ★ 이 셋은 **수집기의 일**이다. 링은 프레임 경계를 도는 스레드의
+		//   것이고, 창이나 콘솔 스레드가 여기서 직접 링을 만지면 수집기와
+		//   겹친다 — 스트림에서 그랬던 것과 같은 경계다.
+		//
+		//   그래서 수집기 스레드에서 불리면 그 자리에서 하고, 다른 스레드에서
+		//   불리면 **요청으로 줄을 세운 뒤 다음 프레임 경계에서** 적용된다.
+		//   부른 쪽은 적용될 때까지 짧게 기다리므로 호출 뒤의 상태는 같다.
+		//   수집기가 한 번도 돈 적이 없으면(프레임이 안 도는 검사용 서비스)
+		//   그 자리에서 한다 — 기다릴 대상이 없기 때문이다.
 		void record(std::uint32_t first_frame = 0);
 		void pause();
 		void clear();
@@ -154,8 +178,68 @@ namespace ce
 
 	private:
 		thread_stream* current_stream();
+
+		// 이 스레드의 자리. 세대가 어긋나면 지난 서비스의 것이므로 없는 것으로
+		// 읽는다 — 남의 스레드의 자리는 shutdown 이 끊을 수 없기 때문이다.
+		thread_stream* tls_stream() const;
+
+		// --- 제어 요청 줄 -------------------------------------------------
+		enum class control_op : std::uint8_t { record, pause, clear };
+
+		struct control_request
+		{
+			control_op    op = control_op::pause;
+			std::uint32_t frame = 0;
+		};
+
+		// 지금 이 스레드가 수집기인가. 수집기가 아직 없으면 true 를 낸다 —
+		// 기다릴 대상이 없으므로 그 자리에서 하는 것이 맞다.
+		bool on_collector() const;
+
+		// 요청을 세우고 적용될 때까지 짧게 기다린다.
+		void dispatch_control(control_op op, std::uint32_t frame);
+
+		// 줄에 선 것을 전부 적용한다. 수집기만 부른다.
+		void apply_control_requests();
+
+		void record_now(std::uint32_t first_frame);
+		void pause_now();
+		void clear_now();
+
+		// 제어 요청이 적용되길 기다리는 시간 상한. 프레임이 안 돌면 영영 오지
+		// 않으므로 상한을 둔다 — 관측 도구가 관측 대상을 기다리며 멈추면 안 된다.
+		//
+		// ★ 횟수로 세면 안 된다. yield 한 번의 길이는 부하에 따라 수십 배로
+		//   갈리므로, 같은 상한이 어떤 실행에서는 2 ms 고 어떤 실행에서는
+		//   200 ms 다. 기다리는 대상은 **프레임 경계**라 시간으로 재야 한다.
+		static constexpr int kControlWaitMilliseconds = 2000;
 		void           collect_sealed();
 		void           destroy_stream_locked(std::size_t index);
+
+		// 링에서 뽑은 수치. **수집기만** 만드는 값이고, 읽는 쪽은 여기 찍힌
+		// 사본만 본다.
+		//
+		// ★ 예전에는 summary() 가 m_ring 을 직접 읽었다. 링은 수집기가
+		//   고치는 중인 자료라, 창이나 콘솔 스레드가 그것을 읽으면 고쳐지는
+		//   도중의 vector 를 보는 것이다 — 값이 흔들리는 정도가 아니라
+		//   size 와 저장소가 어긋난 순간을 밟을 수 있다.
+		struct ring_stats
+		{
+			std::uint32_t retained_frames = 0;
+			std::uint32_t last_frame_events = 0;
+			std::uint32_t peak_frame_events = 0;
+			std::uint64_t dropped_events = 0;
+			std::size_t   memory_bytes = 0;
+			std::uint64_t late_spans_placed = 0;
+			std::uint64_t late_spans_dropped = 0;
+			std::size_t   late_spans_waiting = 0;
+			std::uint64_t stale_chunks_dropped = 0;
+			std::uint64_t late_events_placed = 0;
+			std::uint64_t late_events_dropped = 0;
+		};
+
+		// 지금 링의 상태를 찍어 공개한다. 수집기가 부른다.
+		void publish_ring_stats();
 
 		struct stream_entry
 		{
@@ -181,6 +265,19 @@ namespace ce
 
 		std::uint32_t m_serviceSlot = 0;
 
+		// 이 서비스가 thread_local 자리에 찍는 번호. shutdown 에서 올라간다.
+		std::uint64_t m_slotEpoch = 0;
+
+		// 프레임 경계를 도는 스레드. 첫 publish_frame 이 정한다.
+		std::atomic<std::thread::id> m_collectorThread{ std::thread::id{} };
+
+		std::mutex                   m_controlLock;
+		std::vector<control_request> m_controlQueue;
+		std::atomic<std::uint64_t>   m_controlEnqueued{ 0 };
+		std::atomic<std::uint64_t>   m_controlApplied{ 0 };
+		std::atomic<std::uint64_t>   m_controlDeferred{ 0 };
+		std::atomic<std::uint64_t>   m_controlTimedOut{ 0 };
+
 		std::atomic<bool>           m_initialized{ false };
 		std::atomic<recorder_state> m_state{ recorder_state::stopped };
 		std::atomic<std::uint32_t>  m_engineFrame{ 0 };
@@ -193,6 +290,10 @@ namespace ce
 
 		// 수집기(프레임 경계를 도는 스레드)만 만진다.
 		capture_ring m_ring;
+
+		// 그 링에서 찍어 낸 사본. 읽는 쪽은 이것만 본다.
+		mutable std::mutex m_ringStatsLock;
+		ring_stats         m_ringStats;
 		profile_tick m_frameBeginTick = 0;
 
 		// 마지막으로 닫은 엔진 프레임 번호. pause 가 남은 프레임을 닫을 때
@@ -206,5 +307,7 @@ namespace ce
 		// 죽었다고 해서 잃은 수가 없던 일이 되면 안 된다.
 		std::atomic<std::uint64_t> m_retiredDropped{ 0 };
 		std::atomic<std::uint64_t> m_retiredUnbalanced{ 0 };
+		std::atomic<std::uint64_t> m_retiredForeign{ 0 };
+		std::atomic<std::uint64_t> m_abandonedStreams{ 0 };
 	};
 }

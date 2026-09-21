@@ -1,4 +1,5 @@
 #include "ProfileService.h"
+#include <chrono>
 #include <thread>
 
 #include <Windows.h>
@@ -51,7 +52,19 @@ namespace ce::detail::profile_service_impl
 
 	// ★ 서비스마다 한 칸. 옛 코어처럼 하나를 공유하지 않으므로 검사용
 	//   서비스가 라이브 캡처를 교란하지 않는다.
-	thread_local thread_stream* t_streams[kMaxLiveServices] = {};
+	// ★ 포인터만 두면 **남의 스레드의 자리가 매달린다.** shutdown 은 부른
+	//   스레드의 자리만 끊을 수 있고, 다른 스레드의 thread_local 은 죽은
+	//   스트림을 계속 가리킨다. 그래서 자리마다 세대를 같이 적어 두고, 서비스가
+	//   들고 있는 세대와 다르면 **없는 것으로 읽는다.**
+	struct tls_slot
+	{
+		thread_stream* stream = nullptr;
+		std::uint64_t  epoch = 0;
+	};
+	thread_local tls_slot t_streams[kMaxLiveServices] = {};
+
+	// 서비스 인스턴스마다, 그리고 shutdown 마다 새로 나가는 번호.
+	std::atomic<std::uint64_t> g_slotEpoch{ 1 };
 }
 
 namespace ce
@@ -60,6 +73,7 @@ namespace ce
 
 	profiler_service::profiler_service()
 		: m_serviceSlot(acquire_slot())
+		, m_slotEpoch(g_slotEpoch.fetch_add(1, std::memory_order_relaxed) + 1)
 	{
 	}
 
@@ -133,6 +147,17 @@ namespace ce
 			m_capture.reset();
 		}
 		m_ring.clear();
+		publish_ring_stats();
+
+		// ★ 세대를 올린다. 다른 스레드의 thread_local 자리는 여기서 끊을 수
+		//   없으므로, 끊는 대신 **읽히지 않게** 한다.
+		m_slotEpoch = g_slotEpoch.fetch_add(1, std::memory_order_relaxed) + 1;
+		m_collectorThread.store(std::thread::id{}, std::memory_order_release);
+
+		{
+			std::lock_guard<std::mutex> guard(m_controlLock);
+			m_controlQueue.clear();
+		}
 	}
 
 	void profiler_service::destroy_stream_locked(std::size_t index)
@@ -143,15 +168,27 @@ namespace ce
 			return;
 		}
 
-		entry.stream->finish(now());
+		// ★ 주인만 자기 스트림을 닫는다. 남이 finish() 를 부르면 주인이 쓰고
+		//   있는 저장소를 만진다 — 그것이 여기서 죽던 길이다. 못 닫은 것은
+		//   **세어 둔다.** 조용히 넘기면 "그 스레드가 조용했다" 로 읽힌다.
+		if (entry.stream->owner_thread() == std::this_thread::get_id())
+		{
+			entry.stream->finish(now());
+		}
+		else
+		{
+			m_abandonedStreams.fetch_add(1, std::memory_order_relaxed);
+		}
+
 		m_retiredDropped.fetch_add(entry.stream->dropped_events(), std::memory_order_relaxed);
 		m_retiredUnbalanced.fetch_add(entry.stream->unbalanced_scopes(), std::memory_order_relaxed);
+		m_retiredForeign.fetch_add(entry.stream->foreign_touches(), std::memory_order_relaxed);
 
 		// ★ 이 스레드가 이 서비스에서 쓰던 자리를 끊는다. 옛 코어가 죽은
 		//   thread_local 을 계속 가리켜 이후 모든 수집이 UAF 였던 자리다.
-		if (t_streams[m_serviceSlot] == entry.stream.get())
+		if (tls_stream() == entry.stream.get())
 		{
-			t_streams[m_serviceSlot] = nullptr;
+			t_streams[m_serviceSlot] = tls_slot{};
 		}
 
 		entry.stream.reset();
@@ -165,7 +202,7 @@ namespace ce
 			return;
 		}
 
-		if (t_streams[m_serviceSlot])
+		if (tls_stream())
 		{
 			return;   // 이미 등록됨
 		}
@@ -188,7 +225,7 @@ namespace ce
 
 		auto stream = std::make_unique<thread_stream>(m_pool, info);
 		stream->set_generation(m_generation.load(std::memory_order_acquire));
-		t_streams[m_serviceSlot] = stream.get();
+		t_streams[m_serviceSlot] = tls_slot{ stream.get(), m_slotEpoch };
 
 		stream_entry entry;
 		entry.stream = std::move(stream);
@@ -201,7 +238,7 @@ namespace ce
 
 	void profiler_service::unregister_thread()
 	{
-		thread_stream* stream = t_streams[m_serviceSlot];
+		thread_stream* stream = tls_stream();
 		if (!stream)
 		{
 			return;
@@ -220,7 +257,7 @@ namespace ce
 		// ★ 슬롯은 남기고 스트림만 끊는다. 이미 수집된 이벤트가 thread_slot
 		//   으로 귀속을 표현하므로, 자리를 지우면 지난 프레임의 스레드가
 		//   어긋난다. 이름표는 캡처가 사는 동안 그대로 둔다.
-		t_streams[m_serviceSlot] = nullptr;
+		t_streams[m_serviceSlot] = tls_slot{};
 	}
 
 	std::uint32_t profiler_service::thread_count() const
@@ -235,9 +272,18 @@ namespace ce
 		return m_threadInfo;
 	}
 
+	thread_stream* profiler_service::tls_stream() const
+	{
+		const tls_slot& slot = t_streams[m_serviceSlot];
+
+		// 세대가 다르면 이 자리는 **지난 서비스의 것**이다. 그 스트림은 이미
+		// 없어졌으므로 따라가면 use-after-free 다.
+		return (slot.epoch == m_slotEpoch) ? slot.stream : nullptr;
+	}
+
 	thread_stream* profiler_service::current_stream()
 	{
-		thread_stream* stream = t_streams[m_serviceSlot];
+		thread_stream* stream = tls_stream();
 		if (stream)
 		{
 			return stream;
@@ -246,7 +292,7 @@ namespace ce
 		// 등록하지 않은 스레드가 마커를 찍으면 그 자리에서 등록한다.
 		// 이름이 없으면 슬롯 번호로 붙는다 — 잃는 것보다 낫다.
 		register_thread(nullptr);
-		return t_streams[m_serviceSlot];
+		return tls_stream();
 	}
 
 	// ★ 상태 관문은 **여는 쪽에만** 있고, 그때도 짝을 예약하고 나간다.
@@ -280,7 +326,7 @@ namespace ce
 	{
 		// 상태를 보지 않는다. 여는 쪽이 이미 재놓았거나 짝을 예약해 둥으므로,
 		// 닫는 쪽은 언제나 스트림까지 가 닿아야 스택이 제자리로 돌아온다.
-		thread_stream* stream = t_streams[m_serviceSlot];
+		thread_stream* stream = tls_stream();
 		if (!stream)
 		{
 			return;
@@ -381,6 +427,13 @@ namespace ce
 			return;
 		}
 
+		// ★ 여기가 수집기다. 이 자리를 표시해 두면 다른 스레드에서 들어온
+		//   제어 요청이 어디로 가야 하는지 정해진다.
+		m_collectorThread.store(std::this_thread::get_id(), std::memory_order_release);
+
+		// 줄에 선 제어 요청을 먼저 적용한다. 링을 만지는 것은 이 스레드뿐이다.
+		apply_control_requests();
+
 		if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
 		{
 			return;
@@ -389,7 +442,7 @@ namespace ce
 		// 등록된 모든 스트림이 자기 청크를 봉인한다. 열린 스코프는 닫지
 		// 않는다 — 프레임을 넘는 구간을 잃지 않기 위해서다.
 		std::uint64_t dropped = 0;
-		thread_stream* const self = t_streams[m_serviceSlot];
+		thread_stream* const self = tls_stream();
 		{
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			for (stream_entry& entry : m_streams)
@@ -429,6 +482,9 @@ namespace ce
 
 		m_ring.close_frame(engine_frame, m_frameBeginTick, tick);
 		m_lastEngineFrame = engine_frame;
+
+		// 찍어 둔다. 읽는 쪽은 이 사본만 본다 — 링 자체는 수집기의 것이다.
+		publish_ring_stats();
 		m_frameBeginTick = tick;
 
 		// 다음 프레임 번호를 예측해 올린다. 밖이 실제로 그 번호를 주면
@@ -436,7 +492,92 @@ namespace ce
 		m_engineFrame.store(engine_frame + 1, std::memory_order_relaxed);
 	}
 
+	bool profiler_service::on_collector() const
+	{
+		const std::thread::id collector = m_collectorThread.load(std::memory_order_acquire);
+
+		// 아직 아무도 프레임을 닫은 적이 없으면 수집기가 없다. 기다릴 대상이
+		// 없으므로 부른 자리에서 하는 것이 맞다 — 프레임이 안 도는 검사용
+		// 서비스가 그 경우다.
+		if (collector == std::thread::id{}) return true;
+		return collector == std::this_thread::get_id();
+	}
+
+	void profiler_service::dispatch_control(control_op op, std::uint32_t frame)
+	{
+		if (on_collector())
+		{
+			switch (op)
+			{
+			case control_op::record: record_now(frame); break;
+			case control_op::pause:  pause_now();       break;
+			case control_op::clear:  clear_now();       break;
+			}
+			return;
+		}
+
+		std::uint64_t seq = 0;
+		{
+			std::lock_guard<std::mutex> guard(m_controlLock);
+			m_controlQueue.push_back(control_request{ op, frame });
+			seq = m_controlEnqueued.fetch_add(1, std::memory_order_acq_rel) + 1;
+		}
+		m_controlDeferred.fetch_add(1, std::memory_order_relaxed);
+
+		// 적용될 때까지 기다린다. 부른 쪽이 곧바로 capture() 를 읽으므로,
+		// 여기서 안 기다리면 "얼렸는데 캡처가 없다" 가 된다.
+		const auto deadline = std::chrono::steady_clock::now()
+			+ std::chrono::milliseconds(kControlWaitMilliseconds);
+		while (std::chrono::steady_clock::now() < deadline)
+		{
+			if (m_controlApplied.load(std::memory_order_acquire) >= seq) return;
+			std::this_thread::yield();
+		}
+
+		// 프레임이 돌지 않는다. 조용히 돌아가면 부른 대로 된 것처럼 보이므로 센다.
+		m_controlTimedOut.fetch_add(1, std::memory_order_relaxed);
+	}
+
+	void profiler_service::apply_control_requests()
+	{
+		std::vector<control_request> pending;
+		std::uint64_t applied = 0;
+		{
+			std::lock_guard<std::mutex> guard(m_controlLock);
+			if (m_controlQueue.empty()) return;
+			pending.swap(m_controlQueue);
+			applied = m_controlEnqueued.load(std::memory_order_acquire);
+		}
+
+		for (const control_request& request : pending)
+		{
+			switch (request.op)
+			{
+			case control_op::record: record_now(request.frame); break;
+			case control_op::pause:  pause_now();               break;
+			case control_op::clear:  clear_now();               break;
+			}
+		}
+
+		m_controlApplied.store(applied, std::memory_order_release);
+	}
+
 	void profiler_service::record(std::uint32_t first_frame)
+	{
+		dispatch_control(control_op::record, first_frame);
+	}
+
+	void profiler_service::pause()
+	{
+		dispatch_control(control_op::pause, 0);
+	}
+
+	void profiler_service::clear()
+	{
+		dispatch_control(control_op::clear, 0);
+	}
+
+	void profiler_service::record_now(std::uint32_t first_frame)
 	{
 		if (!m_initialized.load(std::memory_order_acquire))
 		{
@@ -445,9 +586,10 @@ namespace ce
 		m_engineFrame.store(first_frame, std::memory_order_relaxed);
 		m_frameBeginTick = now();
 		m_state.store(recorder_state::recording, std::memory_order_release);
+		publish_ring_stats();
 	}
 
-	void profiler_service::pause()
+	void profiler_service::pause_now()
 	{
 		if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
 		{
@@ -466,7 +608,7 @@ namespace ce
 		// pause 인데 끝 시각이 갈리고, 그러면 얼린 캡처의 경계가 흐려진다.
 		const profile_tick freezeTick = now();
 		{
-			thread_stream* const self = t_streams[m_serviceSlot];
+			thread_stream* const self = tls_stream();
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			for (stream_entry& entry : m_streams)
 			{
@@ -524,6 +666,7 @@ namespace ce
 			threads = m_threadInfo;
 		}
 
+		publish_ring_stats();
 		capture_session_ptr frozen = m_ring.freeze(threads, 0 == unacked, unacked);
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
@@ -531,7 +674,7 @@ namespace ce
 		}
 	}
 
-	void profiler_service::clear()
+	void profiler_service::clear_now()
 	{
 		// ★ 세대를 먼저 올린다. 이 뒤에 도착하는 옛 청크는 세대가 어긋나
 		//   수집기가 버린다 — 잠든 워커가 Clear **전에** 적은 것을 들고 깨어나
@@ -559,6 +702,8 @@ namespace ce
 		}
 
 		m_ring.clear();
+		publish_ring_stats();
+
 		std::lock_guard<std::mutex> guard(m_captureLock);
 		m_capture.reset();
 	}
@@ -569,22 +714,52 @@ namespace ce
 		return m_capture;
 	}
 
-	live_summary profiler_service::summary() const
+	void profiler_service::publish_ring_stats()
 	{
-		live_summary value;
-		value.state = m_state.load(std::memory_order_acquire);
-		value.engine_frame = m_engineFrame.load(std::memory_order_relaxed);
+		ring_stats value;
 		value.retained_frames = m_ring.retained_frames();
 		value.last_frame_events = m_ring.last_frame_events();
 		value.peak_frame_events = m_ring.peak_frame_events();
 		value.dropped_events = m_ring.dropped_events();
 		value.memory_bytes = m_ring.memory_bytes();
+		value.late_spans_placed = m_ring.late_spans_placed();
+		value.late_spans_dropped = m_ring.late_spans_dropped();
+		value.late_spans_waiting = m_ring.late_spans_waiting();
+		value.stale_chunks_dropped = m_ring.stale_chunks_dropped();
+		value.late_events_placed = m_ring.late_events_placed();
+		value.late_events_dropped = m_ring.late_events_dropped();
+
+		std::lock_guard<std::mutex> guard(m_ringStatsLock);
+		m_ringStats = value;
+	}
+
+	live_summary profiler_service::summary() const
+	{
+		live_summary value;
+		value.state = m_state.load(std::memory_order_acquire);
+		value.engine_frame = m_engineFrame.load(std::memory_order_relaxed);
+		// ★ 링을 직접 읽지 않는다. 수집기가 찍어 둔 사본을 베낀다.
+		{
+			std::lock_guard<std::mutex> guard(m_ringStatsLock);
+			value.retained_frames = m_ringStats.retained_frames;
+			value.last_frame_events = m_ringStats.last_frame_events;
+			value.peak_frame_events = m_ringStats.peak_frame_events;
+			value.dropped_events = m_ringStats.dropped_events;
+			value.memory_bytes = m_ringStats.memory_bytes;
+			value.late_spans_placed = m_ringStats.late_spans_placed;
+			value.late_spans_dropped = m_ringStats.late_spans_dropped;
+			value.late_spans_waiting = m_ringStats.late_spans_waiting;
+			value.stale_chunks_dropped = m_ringStats.stale_chunks_dropped;
+			value.late_events_placed = m_ringStats.late_events_placed;
+			value.late_events_dropped = m_ringStats.late_events_dropped;
+		}
 		value.memory_budget = kDefaultMemoryBudget;
 		value.registered_markers = registered_marker_count();
 		value.free_chunks = m_pool.free_count();
 		value.chunk_count = m_pool.chunk_count();
 
 		std::uint64_t unbalanced = m_retiredUnbalanced.load(std::memory_order_relaxed);
+		std::uint64_t foreign = m_retiredForeign.load(std::memory_order_relaxed);
 		{
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			value.thread_count = static_cast<std::uint32_t>(m_threadInfo.size());
@@ -593,21 +768,18 @@ namespace ce
 				if (entry.stream)
 				{
 					unbalanced += entry.stream->unbalanced_scopes();
+					foreign += entry.stream->foreign_touches();
 				}
 			}
 		}
 		value.unbalanced_scopes = unbalanced;
+		value.foreign_stream_touches = foreign;
+		value.abandoned_streams = m_abandonedStreams.load(std::memory_order_relaxed);
+		value.control_requests_deferred = m_controlDeferred.load(std::memory_order_relaxed);
+		value.control_requests_timed_out = m_controlTimedOut.load(std::memory_order_relaxed);
 
-		// GPU 레인의 장부. 링은 수집기만 만지므로 여기서 읽는 것은
-		// 프레임 경계를 도는 쪽과 같은 스레드일 때만 정확하다 — 진단용이다.
-		value.late_spans_placed = m_ring.late_spans_placed();
-		value.late_spans_dropped = m_ring.late_spans_dropped();
-		value.late_spans_waiting = m_ring.late_spans_waiting();
 		value.pause_unacked_streams = m_pauseUnacked.load(std::memory_order_relaxed);
 		value.capture_complete = (0 == value.pause_unacked_streams);
-		value.stale_chunks_dropped = m_ring.stale_chunks_dropped();
-		value.late_events_placed = m_ring.late_events_placed();
-		value.late_events_dropped = m_ring.late_events_dropped();
 
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);

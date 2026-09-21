@@ -147,6 +147,57 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
 
+### 0.5.17 2026-09-21 P2 소유 경계 — 규약을 강제로 바꿨다
+
+감사가 정적으로만 짚었던 구조 셋(단일 collector · 불변 요약 · 종료 소유권)을
+닫았다. 셋 다 **"이 자료는 이 스레드의 것"** 이라는 같은 규약의 다른 면이고,
+규약으로만 적혀 있는 동안에는 아무도 지키지 않았다.
+
+**★ 충돌 판정은 회차에 기대는 자였다.** `collector-seals-others` 는 §0.5.15
+에서 "Debug·Release 모두 죽는다" 로 못 박았는데, 이번에 같은 변이가 **어떤
+실행에서는 초록으로 지나갔다.** 겹쳐야만 붉어지는 판정이기 때문이다. 그래서
+소유를 **세는 것**으로 바꿨다 — `thread_stream` 이 주인의 스레드를 들고, 주인이
+아닌 호출은 아무것도 하지 않고 `foreign_touches` 로 세어진다. 겹치든 말든 선다.
+
+| 것 | 전 | 후 |
+|---|---|---|
+| 남의 스트림 조작 | 규약(주석) · 겹치면 ACCESS_VIOLATION | 거절 + 계수 · `concurrent-publish/owned` 가 **결정적으로** 잡는다 |
+| `summary()` | 고쳐지는 중인 `m_ring` 을 직접 읽음 | 수집기가 찍어 둔 `ring_stats` 사본 |
+| `record`·`pause`·`clear` | 부른 스레드가 링을 직접 만짐 | 수집기 아니면 줄을 세우고 **적용될 때까지 기다린다** |
+| 종료 | 종료 스레드가 남의 `finish()` 호출 | 주인만 닫는다 · 못 닫은 것은 `abandoned_streams` |
+| 종료 뒤 남의 `thread_local` | 죽은 스트림을 계속 가리킴 | 자리마다 세대 · 어긋나면 **없는 것으로 읽는다** |
+
+**★ shutdown 은 부른 스레드의 자리만 끊을 수 있다.** 다른 스레드의
+`thread_local` 은 해제된 스트림을 계속 가리키고, 같은 스레드가 새 서비스에
+다시 등록하러 오면 "이미 등록됨" 으로 돌아가 그 포인터를 그대로 쓴다. 끊을 수
+없으므로 **읽히지 않게** 했다 — 자리마다 세대를 적고, 서비스가 든 세대와 다르면
+비어 있는 것으로 읽는다(`tls-epoch/`).
+
+**★ 기다림은 시간으로 재야 한다.** 제어 요청의 대기를 처음에 yield **횟수**로
+두었더니, 수집기를 60 ms 세운 자극에서 그대로 시간 초과로 붉었다. yield 한 번의
+길이는 부하에 따라 수십 배로 갈린다. 기다리는 대상이 프레임 경계이므로 상한도
+시간(2 초)이다. 끝내 적용되지 못한 요청은 `control_requests_timed_out` 으로
+센다 — 조용히 돌아가면 부른 대로 된 것처럼 보인다.
+
+**게이트.** Debug·Release baseline 초록, 변이 **32 종 전원 검거**.
+
+| 변이 | 잡은 절 |
+|---|---|
+| `collector-seals-others` | `concurrent-publish/owned` (충돌 판정에서 계수로) |
+| `shutdown-finishes-foreign` | `shutdown-own/abandoned` |
+| `tls-ignores-epoch` | `tls-epoch/` |
+| `control-applies-inline` | `control-thread/deferred` |
+| `control-no-wait` | `control-thread/capture` |
+
+**자극이 자기가 재는 것을 못 잡을 뻔했다.** `control-thread/deferred` 가 처음
+붉었다. "수집기가 돌기 시작했다" 를 `summary().engine_frame` 으로 판정했는데,
+그 값은 `record()` 가 이미 올려 두므로 수집기가 한 번도 돌지 않았어도 0 이
+아니다. 표식을 수집기 스레드가 직접 세우게 바꾸고서야 자극이 성립했다.
+
+**창과 명령에도 낸다.** `profile.stats` 가 `foreignStreamTouches`·
+`abandonedStreams`·`controlRequestsDeferred`·`controlRequestsTimedOut` 을 내고,
+Collector 탭이 같은 값을 줄로 보여 주며 0 이 아니면 경고를 세운다.
+
 ### 0.5.16 2026-09-21 P2 수집 경계 — 세대와 짝을 **자리**로 맞췄다
 
 §0.5.15 가 남긴 넷과, 외부 재감사가 추가로 재현한 넷을 함께 닫았다. 셋은

@@ -698,6 +698,17 @@ namespace ConsoleCmd
         data.Set("lateEventsDropped", CommandData::Int(
             static_cast<std::int64_t>(summary.late_events_dropped)));
 
+        // 소유 경계. 셋 다 0 이어야 한다 — 0 이 아니면 그 호출은 아무 일도
+        // 하지 못했고, 그만큼의 기록이 어디에도 없다.
+        data.Set("foreignStreamTouches", CommandData::Int(
+            static_cast<std::int64_t>(summary.foreign_stream_touches)));
+        data.Set("abandonedStreams", CommandData::Int(
+            static_cast<std::int64_t>(summary.abandoned_streams)));
+        data.Set("controlRequestsDeferred", CommandData::Int(
+            static_cast<std::int64_t>(summary.control_requests_deferred)));
+        data.Set("controlRequestsTimedOut", CommandData::Int(
+            static_cast<std::int64_t>(summary.control_requests_timed_out)));
+
         // 용량은 이제 이름 예산이 아니라 청크 풀이다.
         data.Set("chunkCount", CommandData::Int(summary.chunk_count));
         data.Set("freeChunks", CommandData::Int(summary.free_chunks));

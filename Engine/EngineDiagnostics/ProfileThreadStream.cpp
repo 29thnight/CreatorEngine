@@ -195,6 +195,8 @@ namespace ce
 
 	void thread_stream::write(const profile_event& value)
 	{
+		if (!owned_by_caller()) return;
+
 		// 수집기가 봉인을 청했으면 **여기서** 들어준다. 청크를 만지기 전이
 		// 유일하게 안전한 자리다 — 그리고 이 스레드만 여기를 지난다.
 		honor_seal_request();
@@ -210,6 +212,19 @@ namespace ce
 			static_cast<std::uint16_t>(m_info.slot);
 		++m_writer->count;
 		++m_sequence;
+	}
+
+	bool thread_stream::owned_by_caller() const
+	{
+		// thread_local 에 한 번 담아 두고 비교한다. 소유 검사가 hot path 에
+		// 걸리므로 매번 물어보지 않는다.
+		static thread_local const std::thread::id self = std::this_thread::get_id();
+		if (m_ownerThread == self)
+		{
+			return true;
+		}
+		m_foreignTouches.fetch_add(1, std::memory_order_relaxed);
+		return false;
 	}
 
 	void thread_stream::seal_current()
@@ -235,6 +250,7 @@ namespace ce
 
 	void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame)
 	{
+		if (!owned_by_caller()) return;
 		honor_seal_request();
 
 		if (m_depth >= kMaxScopeDepth)
@@ -263,6 +279,8 @@ namespace ce
 
 	void thread_stream::end_scope(profile_tick now)
 	{
+		if (!owned_by_caller()) return;
+
 		// ★ 짝을 보기 **전에** 요청을 들어준다. 얼림이면 지금 닫으려는 구간도
 		//   잘려 나가고 짝이 예약되므로, 바로 아래에서 그 예약을 소비한다 —
 		//   한 구간이 두 번 적히지 않는다.
@@ -314,6 +332,8 @@ namespace ce
 	void thread_stream::write_span(marker_id id, profile_tick begin, profile_tick end,
 	                               std::uint32_t frame, std::uint16_t depth)
 	{
+		if (!owned_by_caller()) return;
+
 		if (!ensure_chunk())
 		{
 			m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
@@ -336,6 +356,10 @@ namespace ce
 
 	void thread_stream::publish_frame()
 	{
+		// ★ 남이 부르면 아무것도 하지 않는다. 예전에는 수집기가 여기로 들어와
+		//   남의 m_writer 를 비웠고, 그 포인터로 쓰고 있던 주인과 겹쳐 죽었다.
+		if (!owned_by_caller()) return;
+
 		// ★ 열린 스코프를 닫지 않는다. 프레임을 넘는 구간은 닫히는 프레임에
 		//   기록되고, 시작 프레임 번호를 들고 있으므로 분석기가 어느 프레임에
 		//   걸쳐 있었는지 복원할 수 있다. 옛 코어는 여기서 스택 맨 위를 무조건
@@ -350,6 +374,8 @@ namespace ce
 
 	void thread_stream::truncate_open_scopes(profile_tick freeze_tick)
 	{
+		if (!owned_by_caller()) return;
+
 		// ★ 스택에서 **꺼내지 않는다.** 그 구간은 아직 열려 있고, 여기서 자리를
 		//   비우면 다시 녹화한 뒤의 새 구간이 그 자리를 차지해 짝이 뒤집힌다.
 		//   대신 '이미 적었다' 고 표시해 두고, 진짜 종료가 올 때 그 자리에서
@@ -377,6 +403,8 @@ namespace ce
 
 	void thread_stream::finish(profile_tick now)
 	{
+		if (!owned_by_caller()) return;
+
 		// 아직 열려 있는 것을 잃지 않고 닫는다 — 끝을 못 본 구간이라고 표시해서.
 		const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
 

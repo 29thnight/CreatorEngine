@@ -153,8 +153,8 @@ $mutations = @(
         #   깊이 단정에 묶어 둔 것이 그 이유다.
         Name   = 'scope-end-gated'
         File   = 'ProfileService.cpp'
-        Old    = "`t`tthread_stream* stream = t_streams[m_serviceSlot];`r`n`t`tif (!stream)"
-        New    = "`t`tif (m_state.load(std::memory_order_relaxed) != recorder_state::recording)`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}`r`n`t`tthread_stream* stream = t_streams[m_serviceSlot];`r`n`t`tif (!stream)"
+        Old    = "`t`tthread_stream* stream = tls_stream();`r`n`t`tif (!stream)"
+        New    = "`t`tif (m_state.load(std::memory_order_relaxed) != recorder_state::recording)`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}`r`n`t`tthread_stream* stream = tls_stream();`r`n`t`tif (!stream)"
         # pause 가 열린 구간을 잘라 짝을 예약하게 되면서(§0.5.16) 안쪽 깊이는
         # 그 예약이 되살린다. 바깥쪽이 여전히 밀리므로 이빨은 그대로다.
         Expect = 'state-change/outer-depth'
@@ -257,6 +257,51 @@ $mutations = @(
         Why    = '수집한 프레임에 담으면 잠든 워커의 구간이 깨어난 프레임의 일처럼 보인다'
     },
 
+    # ── 단일 collector ────────────────────────────────────────────
+    @{
+        # 어느 스레드에서 불리든 그 자리에서 한다(예전 동작). 링을 수집기와
+        # 다른 스레드가 함께 만진다.
+        Name   = 'control-applies-inline'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tif (on_collector())"
+        New    = "`t`tif (true)"
+        Expect = 'control-thread/deferred'
+        Why    = '링은 프레임 경계를 도는 스레드의 것이다 - 남이 직접 만지면 수집기와 겹친다'
+    },
+    @{
+        # 줄만 세우고 기다리지 않는다. 부른 직후의 capture() 가 비어 있다.
+        Name   = 'control-no-wait'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`t`tif (m_controlApplied.load(std::memory_order_acquire) >= seq) return;"
+        New    = "`t`t`tif (true) return;"
+        Expect = 'control-thread/capture'
+        Why    = '기다리지 않으면 얼리라고 부른 직후에 손에 아무것도 없다'
+    },
+
+    # ── 종료 소유권 ───────────────────────────────────────────────
+    @{
+        # 남의 스트림도 종료 스레드가 직접 닫는다(예전 동작).
+        Name   = 'shutdown-finishes-foreign'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tif (entry.stream->owner_thread() == std::this_thread::get_id())"
+        New    = "`t`tif (true)"
+        Expect = 'shutdown-own/abandoned'
+        Why    = '주인이 살아 있는데 남이 finish() 를 부르면 쓰고 있는 저장소를 만진다'
+    },
+    @{
+        # thread_local 자리의 세대를 보지 않는다. 지난 서비스의 죽은 스트림을
+        # 그대로 따라간다.
+        #
+        # ★ 이 변이는 **죽을 수 있다.** 해제된 스트림으로 쓰기 때문이다.
+        Name   = 'tls-ignores-epoch'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`treturn (slot.epoch == m_slotEpoch) ? slot.stream : nullptr;"
+        New    = "`t`t(void)m_slotEpoch;`r`n`t`treturn slot.stream;"
+        Expect = 'tls-epoch/'
+        AllowCrash = $true
+        Why    = '남의 스레드의 자리는 shutdown 이 끊을 수 없으므로 세대로 무효화해야 한다'
+    },
+
     # ── 동시성 경계: 봉인은 주인만 한다 ───────────────────────────
     @{
         # 수집기가 남의 현재 청크를 직접 봉인하던 예전 동작으로 되돌린다.
@@ -269,8 +314,10 @@ $mutations = @(
         File   = 'ProfileService.cpp'
         Old    = "`t`t`t`tif (entry.stream.get() == self)`r`n`t`t`t`t{`r`n`t`t`t`t`tentry.stream->publish_frame();`r`n`t`t`t`t}`r`n`t`t`t`telse`r`n`t`t`t`t{`r`n`t`t`t`t`tentry.stream->request_seal();`r`n`t`t`t`t}"
         New    = "`t`t`t`t(void)self;`r`n`t`t`t`tentry.stream->publish_frame();"
-        Expect = 'concurrent-publish/'
-        AllowCrash = $true
+        # ★ 이제는 죽지 않는다. 소유를 강제하므로 남의 호출은 거절되고 세어진다.
+        #   충돌 판정은 회차에 기대는 자였다 — 같은 변이가 어떤 실행에서는
+        #   겹치지 않아 초록으로 지나갔다. 계수는 겹치든 말든 선다.
+        Expect = 'concurrent-publish/owned'
         Why    = '남의 청크를 봉인하면 쓰기와 겹쳐 이벤트를 잃거나 프로세스가 죽는다'
     },
 

@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include "ProfileEvent.h"
@@ -101,6 +102,12 @@ namespace ce
 	inline constexpr std::uint32_t kMaxScopeDepth = 64;
 
 	// writer 하나가 소유한다. 이 타입의 어떤 멤버도 다른 스레드가 쓰지 않는다.
+	//
+	// ★ 그것이 **규약**일 때는 아무도 지키지 않았다. 수집기가 남의 현재 청크를
+	//   직접 봉인했고, 실측에서 Debug·Release 모두 ACCESS_VIOLATION 이었다.
+	//   그래서 이제 소유를 **강제**한다: 주인이 아닌 스레드의 호출은 아무것도
+	//   하지 않고 세어진다(`foreign_touches`). 세지 않고 거절만 하면 "조용한
+	//   스트림" 과 "거절당한 호출" 이 구분되지 않는다.
 	class thread_stream
 	{
 	public:
@@ -122,6 +129,8 @@ namespace ce
 		//   손실 계수기가 오른다.
 		void skip_scope()
 		{
+			if (!owned_by_caller()) return;
+
 			// 얼어 있는 동안에도 이 자리는 지난다. 여기서 요청을 보지 않으면
 			// 워커는 다음 녹화까지 얼림을 모른다 — pause 가 여는 쪽을 막으므로
 			// write() 를 더는 타지 않기 때문이다.
@@ -215,6 +224,15 @@ namespace ce
 			return m_staleScopes.load(std::memory_order_relaxed);
 		}
 
+		// 주인이 아닌 스레드가 이 스트림을 만지려 한 횟수. 0 이 아니면
+		// 소유 경계가 깨진 것이고, 그 호출이 한 일은 아무것도 없다.
+		std::uint64_t foreign_touches() const
+		{
+			return m_foreignTouches.load(std::memory_order_relaxed);
+		}
+
+		std::thread::id owner_thread() const { return m_ownerThread; }
+
 	private:
 		bool ensure_chunk();
 		void write(const profile_event& value);
@@ -223,6 +241,9 @@ namespace ce
 		// 요청이 와 있으면 지금 봉인한다. 주인 스레드의 안전한 자리에서만
 		// 불린다 — write() 가 청크를 만지기 **전**과 스코프가 다 닫힌 뒤다.
 		void honor_seal_request();
+
+		// 부르는 쪽이 주인인가. 아니면 세고 false 를 낸다.
+		bool owned_by_caller() const;
 
 		chunk_pool&   m_pool;
 		thread_info   m_info;
@@ -249,6 +270,10 @@ namespace ce
 		std::atomic<std::uint64_t> m_droppedEvents{ 0 };    // free 청크가 없어 잃은 이벤트
 		std::atomic<std::uint64_t> m_droppedScopes{ 0 };    // 깊이 상한을 넘겨 못 연 스코프
 		std::atomic<std::uint64_t> m_unbalancedScopes{ 0 };
-		std::atomic<std::uint64_t> m_staleScopes{ 0 }; // 열지 않고 닫은 횟수
+		std::atomic<std::uint64_t> m_staleScopes{ 0 };
+		mutable std::atomic<std::uint64_t> m_foreignTouches{ 0 };
+
+		// 이 스트림을 만든 스레드. 만드는 자리가 곧 주인이다.
+		const std::thread::id m_ownerThread = std::this_thread::get_id(); // 열지 않고 닫은 횟수
 	};
 }
