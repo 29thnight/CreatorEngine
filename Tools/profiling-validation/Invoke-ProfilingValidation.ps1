@@ -25,7 +25,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("Stats", "Workers", "Build")]
+    [ValidateSet("Stats", "Workers", "Window", "Build")]
     [string]$Action = "Stats",
 
     [string]$Exe,
@@ -221,6 +221,107 @@ function Invoke-Workers {
     return 1
 }
 
+# 프로파일러 창이 실제로 **그려지는지** 잰다.
+#
+# ★ 창이 열린 것과 본문이 도는 것은 다르다. 도크 탭으로 겹친 창은 선택돼야
+#   본문이 돌고, 그러지 않으면 `editor.window ... open` 이 성공해도 DrawProfilerHUD
+#   까지 오지 않는다. 그래서 창 본문에 마커를 하나 걸고 **그 마커가 캡처에
+#   나타나는지**로 판정한다 — 프로파일러가 자기 창을 증언한다.
+#
+# ⚠ 이 축이 재는 것은 "본문이 돌았다" 까지다. 표의 숫자가 맞는지는 코어가
+#   판정한다(verify-profile-core.ps1 의 aggregate/ · reader/ 검사). 화면이
+#   숫자를 만들지 않으므로 그 둘을 나눌 수 있다.
+function Invoke-Window {
+    # 창을 열고 → 닫고 → 다시 연다. 중간의 profile.stats 가 완료조건
+    # "창을 닫아도 recording 상태가 유지된다" 를 재는 자리다 — 녹화는 서비스가
+    # 들고 창은 reader 일 뿐이라는 것이 설계이고, 그 설계가 실제로 그런지 본다.
+    $result = Invoke-EngineScript -Label "profile-window" -Commands @(
+        "editor.window ###Editor.FrameProfiler open"
+        "wait $WarmupFrames"
+        "editor.window ###Editor.FrameProfiler close"
+        "wait 30"
+        "profile.stats"
+        "editor.window ###Editor.FrameProfiler open"
+        "wait 30"
+        "profile.frame"
+        "profile.stats"
+        "quit"
+    )
+
+    $body = $result.Combined -split "`n"
+    $openLine  = $body | Where-Object { $_ -match '"command"\s*:\s*"editor\.window"' } | Select-Object -First 1
+    $frameLine = $body | Where-Object { $_ -match '"command"\s*:\s*"profile\.frame"' } | Select-Object -First 1
+    $statsLines = @($body | Where-Object { $_ -match '"command"\s*:\s*"profile\.stats"' })
+    $closedLine = $statsLines | Select-Object -First 1   # 창을 닫은 뒤
+    $statsLine  = $statsLines | Select-Object -Last 1    # 다시 연 뒤
+    if (-not $openLine -or -not $frameLine -or -not $statsLine -or -not $closedLine) {
+        Write-Host "응답을 찾지 못했다. 전체 출력: $($result.OutFile)" -ForegroundColor Red
+        return 1
+    }
+
+    try {
+        $open  = $openLine.Trim()  | ConvertFrom-Json
+        $frame = $frameLine.Trim() | ConvertFrom-Json
+        $stats = $statsLine.Trim() | ConvertFrom-Json
+        $closed = $closedLine.Trim() | ConvertFrom-Json
+    }
+    catch {
+        Write-Host "응답을 JSON 으로 읽지 못했다: $_" -ForegroundColor Red
+        return 1
+    }
+
+    # 창 마커가 어느 스레드에 몇 건이나 붙었는지 센다. 창은 프레젠테이션
+    # 스레드가 그리므로 귀속까지 봐야 "그 스레드가 실제로 그렸다" 가 된다.
+    $windowEvents = 0
+    $onPresentation = 0
+    foreach ($f in $frame.data.frames) {
+        foreach ($t in $f.threads) {
+            foreach ($e in $t.events) {
+                if ($e.name -ne 'ProfilerWindow') { continue }
+                $windowEvents++
+                if ($t.name -eq '[PresentationThread]') { $onPresentation++ }
+            }
+        }
+    }
+
+    Write-Host ""
+    Write-Host "[profile.window] 프로파일러 창 (###Editor.FrameProfiler)"
+    Write-Host ("  창 열기 요청    {0}" -f $open.status)
+    Write-Host ("  최근 {0}프레임의 ProfilerWindow  {1}건 (그중 프레젠테이션 스레드 {2})" -f
+        $frame.data.frames.Count, $windowEvents, $onPresentation)
+    Write-Host ("  등록 마커       {0}" -f $stats.data.registeredMarkers)
+    Write-Host ("  창을 닫은 뒤 상태  {0}" -f $closed.data.state)
+
+    $failures = New-Object System.Collections.Generic.List[string]
+    if ($open.status -ne 'succeeded')  { $failures.Add("창 열기 실패: $($open.status)") }
+    if ($stats.status -ne 'succeeded') { $failures.Add("profile.stats status=$($stats.status)") }
+    if ($stats.data.malformedScopes -ne 0) {
+        $failures.Add("불균형 스코프 $($stats.data.malformedScopes) - 창이 스코프 짝을 깨뜨렸다")
+    }
+    # ★ 완료조건: 창을 닫아도 녹화가 멈추지 않는다.
+    if ($closed.data.state -ne 'recording') {
+        $failures.Add("창을 닫았더니 녹화가 '$($closed.data.state)' 가 됐다 - 창이 녹화를 소유하면 안 된다")
+    }
+    if ($windowEvents -le 0) {
+        $failures.Add("ProfilerWindow 가 캡처에 없다 - 창이 열렸다고 했는데 본문이 돌지 않았다")
+    }
+    if ($onPresentation -le 0) {
+        $failures.Add("ProfilerWindow 가 프레젠테이션 스레드에 붙지 않았다")
+    }
+    if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
+
+    Write-Host ""
+    Write-Host "── 판정 ─────────────────────────────"
+    if ($failures.Count -eq 0) {
+        Write-Host "  결과           통과" -ForegroundColor Green
+        return 0
+    }
+    foreach ($f in $failures) { Write-Host "  실패           $f" -ForegroundColor Red }
+    Write-Host ("  전체 출력      {0}" -f $result.OutFile)
+    Write-Host "  결과           실패" -ForegroundColor Red
+    return 1
+}
+
 function Invoke-Stats {
     # profile.frame 을 먼저 부르는 이유는 그 명령이 캡처를 **얼리기** 때문이다.
     # 얼린 캡처가 있어야 profile.stats 가 스레드마다 몇 건을 찍었는지 셀 수 있고,
@@ -359,4 +460,5 @@ switch ($Action) {
     "Build"   { Invoke-Build; exit 0 }
     "Stats"   { exit (Invoke-Stats) }
     "Workers" { exit (Invoke-Workers) }
+    "Window"  { exit (Invoke-Window) }
 }

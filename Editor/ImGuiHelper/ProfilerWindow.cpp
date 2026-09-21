@@ -1,16 +1,21 @@
-// PHASE 14 P1+P2 — 최소 reader.
+// PHASE 14 P3 — 녹화 UI.
 //
 // 옛 ProfilerWindow(557줄)는 걷었다. 그것은 전역 프로파일러의 vector 를 매
 // 프레임 직접 읽어 타임라인을 그렸고, 읽는 동안에도 기록이 계속돼 화면과
-// 자료가 어긋났다. 새 코어에서 UI 는 얼린 캡처의 reader 일 뿐이므로
-// (계획서 §6.4) 그림을 그대로 옮길 수 없다 — 자료 모델이 다르다.
+// 자료가 어긋났다. 새 코어에서 UI 는 얼린 캡처의 reader 일 뿐이다(§6.4).
 //
-// 본격적인 녹화 UI(Frame Overview · Hierarchy/Flat · 프레임 선택)는 P3 의
-// 몫이다. 그때까지 이 자리는 **요약과 녹화 제어만** 낸다. 빈 창을 두지 않는
-// 이유는 회귀 때문이다: 계측이 살아 있는지, 스레드가 몇 개 잡히는지, 드롭이
-// 있는지를 에디터에서 눈으로 확인할 수단이 사라지면 P3 까지 그 축이 관측
-// 밖에 놓인다.
+// ★ 이 층에는 자료를 접는 코드가 없다. Hierarchy/Flat/레인 합계는 전부
+//   ProfileAggregate 가 만들고, 선택과 Live Follow 는 ProfileReader 가 든다.
+//   그래야 완료조건("Timeline 합계와 Hierarchy inclusive 가 일치", "pause 후
+//   엔진이 돌아도 선택 자료가 변하지 않음")을 화면 없이 잰다 — 그리는 것만
+//   으로는 살았는지 알 수 없다는 것을 P1·P2 에서 두 번 겪었다.
+//
+// ★ Space 단축키를 만들지 않는다. §7.1 이 "Space 전역 단축키는 제거하거나
+//   Profiler 창 focus 일 때만 받는다" 고 적은 것은 옛 코어 얘기이고, 지금
+//   에디터에는 그런 단축키가 없다. 여기서 새로 만들지 않는 것이 그 조건을
+//   지키는 가장 싼 방법이다.
 #include "ProfilerHUD.h"
+#include "ProfilerView.h"
 
 #include <cinttypes>
 #include <cstdio>
@@ -18,9 +23,52 @@
 #include "ImGui.h"
 #include "ProfileScope.h"
 
-namespace editor::profiler_hud
+namespace editor::profiler_view
 {
-	inline const char* state_label(ce::recorder_state state)
+	// 창이 소유하는 reader. 함수 지역 static 이라 창을 닫아도 살아 있다 —
+	// 녹화 상태는 서비스가, 선택은 이 reader 가 들고 있으므로 창을 여닫아도
+	// 둘 다 유지된다(완료조건).
+	ce::capture_reader& reader()
+	{
+		static ce::capture_reader instance;
+		return instance;
+	}
+
+	double ticks_to_milliseconds(ce::profile_tick ticks)
+	{
+		const double frequency =
+			static_cast<double>(ce::profiler_service::ticks_per_second());
+		if (frequency <= 0.0)
+		{
+			return 0.0;
+		}
+		return static_cast<double>(ticks) * 1000.0 / frequency;
+	}
+
+	const char* thread_name(const ce::capture_session* capture, std::uint16_t slot)
+	{
+		if (capture)
+		{
+			for (const ce::thread_info& info : capture->threads())
+			{
+				if (info.slot == slot)
+				{
+					return info.name.c_str();
+				}
+			}
+		}
+
+		// 이름표를 못 찾아도 빈 칸을 내지 않는다. 슬롯 번호만으로도 두 줄이
+		// 같은 스레드인지 가릴 수 있다.
+		static thread_local char fallback[32];
+		std::snprintf(fallback, sizeof(fallback), "slot %u", static_cast<unsigned>(slot));
+		return fallback;
+	}
+}
+
+namespace
+{
+	const char* state_label(ce::recorder_state state)
 	{
 		switch (state)
 		{
@@ -30,7 +78,7 @@ namespace editor::profiler_hud
 		}
 	}
 
-	inline void draw_row(const char* label, const char* value)
+	void draw_row(const char* label, const char* value)
 	{
 		ImGui::TableNextRow();
 		ImGui::TableSetColumnIndex(0);
@@ -38,39 +86,67 @@ namespace editor::profiler_hud
 		ImGui::TableSetColumnIndex(1);
 		ImGui::TextUnformatted(value);
 	}
-}
 
-void DrawProfilerHUD()
-{
-	using namespace editor::profiler_hud;
-
-	ce::profiler_service& service = ce::profiler();
-	const ce::live_summary summary = service.summary();
-
-	const bool recording = (summary.state == ce::recorder_state::recording);
-	if (ImGui::Button(recording ? "Pause" : "Record"))
+	// 툴바. 녹화 제어와 Live Follow.
+	void draw_toolbar(const ce::live_summary& summary)
 	{
+		using namespace editor::profiler_view;
+
+		ce::profiler_service& service = ce::profiler();
+		const bool recording = (summary.state == ce::recorder_state::recording);
+
+		if (ImGui::Button(recording ? "Pause" : "Record"))
+		{
+			if (recording)
+			{
+				service.pause();
+				// 얼린 그 순간의 것을 곧바로 손에 쥔다. 누른 뒤 한 번 더
+				// 무언가를 해야 자료가 나오면 "멈췄는데 빈 화면" 이 된다.
+				reader().adopt(service.capture());
+			}
+			else
+			{
+				service.record(summary.engine_frame);
+			}
+		}
+
+		ImGui::SameLine();
+		if (ImGui::Button("Clear"))
+		{
+			service.clear();
+			reader().reset();
+		}
+
+		ImGui::SameLine();
+		bool follow = reader().live_follow();
+		if (ImGui::Checkbox("Live Follow", &follow))
+		{
+			reader().set_live_follow(follow);
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("켜면 새로 얼린 캡처에서 최신 프레임을 고른다.\n"
+			                  "끄면 보던 프레임을 지킨다 - 스파이크를 붙잡아 둘 때 쓴다.");
+		}
+
+		ImGui::SameLine();
+		ImGui::Text("%s  ·  frame %u", state_label(summary.state), summary.engine_frame);
+
+		// 녹화 중에는 볼 것이 없다는 것이 설계다(§6.4). 그 사실을 적어 두지
+		// 않으면 "타임라인이 안 나온다" 로 읽힌다.
 		if (recording)
 		{
-			service.pause();
+			ImGui::TextDisabled("녹화 중에는 요약만 공개된다 - Pause 를 눌러야 프레임을 열어 볼 수 있다");
 		}
-		else
+	}
+
+	void draw_summary(const ce::live_summary& summary)
+	{
+		if (!ImGui::BeginTable("ProfilerSummary", 2, ImGuiTableFlags_SizingStretchProp))
 		{
-			service.record(summary.engine_frame);
+			return;
 		}
-	}
-	ImGui::SameLine();
-	if (ImGui::Button("Clear"))
-	{
-		service.clear();
-	}
-	ImGui::SameLine();
-	ImGui::Text("%s - frame %u", state_label(summary.state), summary.engine_frame);
 
-	ImGui::Separator();
-
-	if (ImGui::BeginTable("ProfilerSummary", 2, ImGuiTableFlags_SizingStretchProp))
-	{
 		char buffer[128];
 
 		std::snprintf(buffer, sizeof(buffer), "%u", summary.retained_frames);
@@ -105,12 +181,122 @@ void DrawProfilerHUD()
 		ImGui::EndTable();
 	}
 
-	if (summary.dropped_events > 0 || summary.unbalanced_scopes > 0)
+	// 선택 구간의 집계 요약. ★ 두 합이 어긋나면 그 자리에서 드러나야 한다 —
+	// 코어 프로브가 잡는 것과 같은 불변식이고, 화면에서도 보이는 편이 낫다.
+	void draw_selection_summary()
 	{
-		ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
-		                   "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");
+		using namespace editor::profiler_view;
+
+		const ce::frame_aggregate& aggregate = reader().aggregate();
+		ImGui::Text("이벤트 %llu  ·  구간 %.3f ms  ·  레인 %zu",
+		            static_cast<unsigned long long>(aggregate.event_count()),
+		            ticks_to_milliseconds(aggregate.tick_end() - aggregate.tick_begin()),
+		            aggregate.threads().size());
+
+		if (aggregate.timeline_total_ticks() != aggregate.hierarchy_total_ticks())
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f),
+			                   "레인 합계와 트리 합계가 어긋난다 (%.3f ms vs %.3f ms) - 집계를 믿지 말 것",
+			                   ticks_to_milliseconds(aggregate.timeline_total_ticks()),
+			                   ticks_to_milliseconds(aggregate.hierarchy_total_ticks()));
+		}
+		if (aggregate.truncated_events() > 0)
+		{
+			ImGui::TextDisabled("잘린 구간 %llu 개 - 그 줄의 길이는 실제보다 짧다",
+			                    static_cast<unsigned long long>(aggregate.truncated_events()));
+		}
+		if (aggregate.dropped_events() > 0)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
+			                   "이 구간에서 %llu 개를 잃었다 - 합계를 그대로 믿지 말 것",
+			                   static_cast<unsigned long long>(aggregate.dropped_events()));
+		}
+	}
+}
+
+void DrawProfilerHUD()
+{
+	using namespace editor::profiler_view;
+
+	// ★ 창이 **그려졌다** 는 증거를 프로파일러 자신이 낸다. 창이 열린 것과
+	//   본문이 도는 것은 다르다 — 도크 탭으로 겹친 창은 선택돼야 본문이
+	//   돌고, 그러지 않으면 `editor.window ... open` 이 성공해도 여기까지
+	//   오지 않는다. 이 마커가 캡처에 나타나는지로 게이트가 판정한다.
+	//
+	//   자기 UI 비용을 자기가 재는 것은 §7 이 말하는 profiler overhead 이기도
+	//   하다 — 녹화 중에는 표를 그리지 않으므로(캡처가 없다) 이 구간은 툴바와
+	//   요약만 담는다.
+	ce::profile_scope _profile{ ce::marker<"ProfilerWindow">() };
+
+	ce::profiler_service& service = ce::profiler();
+	const ce::live_summary summary = service.summary();
+
+	// 얼어 있는데 아직 손에 쥔 것이 없으면(다른 경로로 pause 되었을 때)
+	// 그때 받아 온다. CLI 의 profile.frame 도 pause 를 부른다.
+	if (summary.state == ce::recorder_state::frozen && !reader().has_capture())
+	{
+		reader().adopt(service.capture());
 	}
 
+	draw_toolbar(summary);
 	ImGui::Separator();
-	ImGui::TextDisabled("Timeline/Hierarchy: PHASE 14 P3");
+
+	if (!ImGui::BeginTabBar("ProfilerTabs"))
+	{
+		return;
+	}
+
+	if (ImGui::BeginTabItem("Capture"))
+	{
+		draw_frame_overview();
+		ImGui::Separator();
+		if (reader().has_capture())
+		{
+			draw_selection_summary();
+			ImGui::Separator();
+			draw_hierarchy_table();
+		}
+		ImGui::EndTabItem();
+	}
+
+	if (ImGui::BeginTabItem("Flat"))
+	{
+		if (reader().has_capture())
+		{
+			draw_selection_summary();
+			ImGui::Separator();
+			draw_flat_table();
+		}
+		else
+		{
+			ImGui::TextDisabled("얼린 캡처가 없다 - Pause 를 누를 것");
+		}
+		ImGui::EndTabItem();
+	}
+
+	if (ImGui::BeginTabItem("Threads"))
+	{
+		if (reader().has_capture())
+		{
+			draw_thread_table();
+		}
+		else
+		{
+			ImGui::TextDisabled("얼린 캡처가 없다 - Pause 를 누를 것");
+		}
+		ImGui::EndTabItem();
+	}
+
+	if (ImGui::BeginTabItem("Collector"))
+	{
+		draw_summary(summary);
+		if (summary.dropped_events > 0 || summary.unbalanced_scopes > 0)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
+			                   "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");
+		}
+		ImGui::EndTabItem();
+	}
+
+	ImGui::EndTabBar();
 }

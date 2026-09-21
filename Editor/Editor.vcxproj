@@ -163,6 +163,7 @@
     <ClInclude Include="ImGuiHelper\NodeEditor.h" />
     <ClInclude Include="ImGuiHelper\PinHelper.h" />
     <ClInclude Include="ImGuiHelper\ProfilerHUD.h" />
+    <ClInclude Include="ImGuiHelper\ProfilerView.h" />
     <ClInclude Include="ImGuiHelper\EditorInspectorPanel.h" />
     <ClInclude Include="ImGuiHelper\EditorPropertyRow.h" />
     <ClInclude Include="ImGuiHelper\EditorAxisField3.h" />
@@ -337,6 +338,8 @@
     <ClCompile Include="ImGuiHelper\EditorNavContract.cpp" />
     <ClCompile Include="ImGuiHelper\EditorStateContract.cpp" />
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerFrameOverview.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerTables.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />
     <ClCompile Include="ImGuiHelper\widgets.cpp" />
   </ItemGroup>
