@@ -405,29 +405,23 @@ void EnhancedSceneRendererLiveDX12Adapter::ReleaseFogCloudNeutral(
     m_impl->fogCloudNeutral.Reset();
 }
 
-uint32_t EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(uint32_t frameIndex)
+GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
+    uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId)
 {
-    const uint32_t ringSlot = frameIndex % kFrameCount;
-    m_impl->profiler.BeginFrame(ringSlot);
-    return ringSlot;
+    return m_impl->profiler.BeginFrame(engineFrameId, submissionId, renderViewId);
 }
 
-uint32_t EnhancedSceneRendererLiveDX12Adapter::ProfilerRingSlot() const
+void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameToken& token)
 {
-    return m_impl->profiler.CurrentRingSlot();
+    m_impl->profiler.ResolveFrame(m_impl->resources.GetCommandList(), token);
 }
 
-void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame()
-{
-    m_impl->profiler.ResolveFrame(m_impl->resources.GetCommandList());
-}
-
-bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(
+bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& token,
     std::vector<EnhancedLivePassTiming>& outTimings,
     double& outTotalMilliseconds, std::string& outError)
 {
     std::vector<DX12GpuProfiler::PassTiming> nativeTimings;
-    if (!m_impl->profiler.Collect(nativeTimings, outError)) return false;
+    if (!m_impl->profiler.Collect(token, nativeTimings, outError)) return false;
 
     outTimings.clear();
     outTimings.reserve(nativeTimings.size());

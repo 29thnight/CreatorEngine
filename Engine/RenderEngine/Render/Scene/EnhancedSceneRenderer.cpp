@@ -270,13 +270,12 @@ namespace
             uint64_t frameId{ 0 };
             EnhancedLiveViewKey key{};
 
-            // 이 제출이 GPU 프로파일러의 어느 링 슬롯에 기록했는가.
+            // 이 제출의 GPU 프로파일 표. 부른 자리에서 받아 보관했다가 펜스가
+            // 끝났을 때 그대로 Collect 에 넘긴다.
             //
-            // ★ 지금은 적기만 하고 수집에 쓰지는 못 한다 — Collect() 가 token 을 받지
-            //   않아서 쓸 수가 없다. 대신 수집 직전에 프로파일러가 지금 읽게 되는
-            //   슬롯과 맞대어 **어긋난 횟수를 센다.** 그것이 P4 가 고칠 결함의 크기고,
-            //   GpuFrameToken 이 서면 이 자리가 실제 수집 키가 된다.
-            uint32_t profilerRingSlot{ IRHIGpuProfiler::kInvalidSlot };
+            // ★ 이것이 없었을 때 수집은 "지금 기록 중인 슬롯" 을 읽었고, 실측에서
+            //   수집의 83% 가 남의 제출을 읽고 있었다(§0.5.10).
+            GpuFrameToken profilerToken{};
 
             // 이 슬롯 프레임의 그래프. 규칙(dx12.compare 크래시의 교훈):
             // 그래프의 수명은 그 커맨드를 GPU가 끝낼 때까지다 — transient를
@@ -1171,6 +1170,14 @@ namespace
         // 제출의 것**이다(수집 직전 주석).
         uint64_t gpuCollects{ 0 };
         uint64_t gpuCollectMismatches{ 0 };
+
+        // 마지막으로 수집에 성공한 것의 귀속. 숫자만 내고 **어느 프레임·어느 뷰
+        // 것인지를 적지 않으면** 그 숫자가 맞는지 물을 수 없다 — 그것이 §0.5.10 이
+        // 드러난 이유였다.
+        uint64_t    lastGpuFrameId{ 0 };
+        uint64_t    lastGpuSubmissionId{ 0 };
+        uint64_t    lastGpuViewId{ 0 };
+        std::string lastGpuCollectError;
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
         uint64_t viewOverflowSkips{ 0 }; // 뷰 상한(kMaxLiveCameraViews) 초과로 건너뛴 수
         uint64_t frameFailures{ 0 };     // 프레임 기록 실패 누적(일시적인 것 포함)
@@ -1507,6 +1514,10 @@ namespace
             debugSnapshot.gpuMs = lastGpuMs;
             debugSnapshot.gpuCollects = gpuCollects;
             debugSnapshot.gpuCollectMismatches = gpuCollectMismatches;
+            debugSnapshot.lastGpuFrameId = lastGpuFrameId;
+            debugSnapshot.lastGpuSubmissionId = lastGpuSubmissionId;
+            debugSnapshot.lastGpuViewId = lastGpuViewId;
+            debugSnapshot.lastGpuCollectError = lastGpuCollectError;
             debugSnapshot.graveyardCount = static_cast<uint32_t>(
                 dx12.GetRetiredDisplayCount()) + dx12.GetAssetGraveyardCount();
             debugSnapshot.lastError = lastError;
@@ -3769,7 +3780,8 @@ namespace
                 }
             } frameGuard{ dx12, frameCommitted, capture, outError };
 
-            const uint32_t profilerRingSlot = dx12.BeginProfilerFrame(frameCounter++);
+            const GpuFrameToken profilerToken =
+                dx12.BeginProfilerFrame(sourceFrameId, frameCounter++, view.key.viewId);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -3846,7 +3858,7 @@ namespace
             if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
                 outError)) return false;
 
-            dx12.ResolveProfilerFrame();
+            dx12.ResolveProfilerFrame(profilerToken);
 
             if (!dx12.EndFrame(outError)) return false;
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
@@ -3860,7 +3872,7 @@ namespace
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
             slot.frameId = sourceFrameId;
             slot.key = view.key;
-            slot.profilerRingSlot = profilerRingSlot;
+            slot.profilerToken = profilerToken;
 
             // W8: 기록이 끝난 자리에서 인코더가 버린 명령을 비우며 모은다.
             // Vulkan 경로와 같은 뜻이고 같은 수를 센다.
@@ -5302,27 +5314,22 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     }
                 }
 
-                // ★ 수집이 **그 제출의** 기록을 읽고 있는가를 먼저 센다.
+                // ★ 수집은 **그 제출의 표로** 한다.
                 //
-                //   Collect() 는 token 을 받지 않아 "지금 링 슬롯" 을 읽는다. 그런데
-                //   BeginProfilerFrame 은 **뷰마다** 불리고, 제출은 최대 둘이 인플라이트로
-                //   겈린다. 따라서 펜스가 끝난 제출의 기록은 이미 뒤에 온 제출이
-                //   덮어썼을 수 있고, 그러면 이 수치는 다른 뷰·다른 프레임의 것이다.
+                //   예전에는 Collect() 가 token 을 받지 않아 "지금 기록 중인 슬롯" 을
+                //   읽었다. BeginProfilerFrame 은 **뷰마다** 불리고 제출은 인플라이트로
+                //   겈리므로, 펜스가 끝난 제출의 기록을 뒤에 온 제출이 이미 덮어썼을 수
+                //   있었고, 실측에서 수집의 83% 가 그러고 있었다(§0.5.10).
                 //
-                //   조용하다 — 숫자는 그럴듯하게 나오고 어느 프레임 것인지는 어디에도
-                //   적혀 있지 않다. 그래서 **세서** 드러낸다. P4 가 GpuFrameToken 을
-                //   세우면 이 수는 0 이어야 하고, 그것이 완료 조건의 판정 수단이다.
+                //   이제는 표가 낡았으면 Collect 가 **실패한다.** 그럴듯한 숫자를 내는
+                //   대신 세서 드러낸다 — mismatches 가 0 이 아니면 링이 모자란다는 뜻이고,
+                //   그것은 숫자가 틀렸다는 것보다 훨씬 고치기 쉬운 신호다.
                 ++state.gpuCollects;
-                if (view.slots[slotIndex].profilerRingSlot !=
-                    state.dx12.ProfilerRingSlot())
-                {
-                    ++state.gpuCollectMismatches;
-                }
 
                 std::vector<EnhancedLivePassTiming> timings;
                 std::string collectError;
                 double totalMilliseconds = 0.0;
-                if (state.dx12.CollectProfiler(
+                if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
                     timings, totalMilliseconds, collectError))
                 {
                     state.lastGpuMs = totalMilliseconds;
@@ -5330,6 +5337,14 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
                     // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
                     state.lastPassTimings = std::move(timings);
+                    state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
+                    state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
+                    state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
+                }
+                else
+                {
+                    ++state.gpuCollectMismatches;
+                    state.lastGpuCollectError = collectError;
                 }
                 ++state.framesRendered;
             }

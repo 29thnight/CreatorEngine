@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <string>
 
 namespace
 {
@@ -38,7 +39,16 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
 
     // 레코드 크기를 여기서 한 번만 잡는다. 프레임마다 늘리면 병렬 기록 중에
     // 재할당이 일어나고, 그때 다른 워커가 들고 있던 참조가 무효가 된다.
-    m_records.assign(maxPassesPerFrame, PassRecord{});
+    m_records.assign(static_cast<size_t>(maxPassesPerFrame) * frameCount, PassRecord{});
+
+    // 슬롯마다 사용 수와 표를 따로 둔다. 이것이 없어서 수집이 "지금 기록
+    // 중인 슬롯" 을 읽었다(§0.5.10).
+    m_slotUsedPasses = std::make_unique<std::atomic<uint32_t>[]>(frameCount);
+    for (uint32_t i = 0; i < frameCount; ++i)
+    {
+        m_slotUsedPasses[i].store(0, std::memory_order_relaxed);
+    }
+    m_slotTokens.assign(frameCount, GpuFrameToken{});
 
     const uint32_t queriesPerFrame = maxPassesPerFrame * 2;   // 패스마다 시작·끝
     const uint32_t totalQueries = queriesPerFrame * frameCount;
@@ -86,18 +96,43 @@ void DX12GpuProfiler::Shutdown()
     m_queryHeap.Reset();
     m_maxPassesPerFrame = 0;
     m_frameCount = 0;
-    m_usedPasses.store(0, std::memory_order_relaxed);
+    m_recordingSlot = 0;
+    m_slotUsedPasses.reset();
+    m_slotTokens.clear();
 }
 
-void DX12GpuProfiler::BeginFrame(uint32_t frameIndex)
+GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
+    uint64_t submissionId, uint64_t renderViewId)
 {
-    if (0 == m_frameCount) return;
-    m_frameIndex = frameIndex % m_frameCount;
-    m_usedPasses.store(0, std::memory_order_relaxed);
+    if (0 == m_frameCount) return GpuFrameToken{};
+
+    GpuFrameToken token;
+    token.engineFrameId = engineFrameId;
+    token.submissionId = submissionId;
+    token.renderViewId = renderViewId;
+    token.ringSlot = static_cast<uint32_t>(submissionId % m_frameCount);
+
+    m_recordingSlot = token.ringSlot;
+    m_slotUsedPasses[token.ringSlot].store(0, std::memory_order_relaxed);
+    m_slotTokens[token.ringSlot] = token;
 
     // 지우지 않고 표시만 되돌린다. clear/push_back은 재할당을 일으켜
     // 병렬 기록에서 성립하지 않는다 — 크기는 초기화 때 한 번만 잡는다.
-    for (auto& record : m_records) record.used = false;
+    //
+    // ★ **그 슬롯의 구간만** 되돌린다. 전부 되돌리면 인플라이트 제출의
+    //   기록을 지우게 되고, 그것이 바로 이 페이즈가 고치는 결함이다.
+    const size_t base = static_cast<size_t>(token.ringSlot) * m_maxPassesPerFrame;
+    for (uint32_t i = 0; i < m_maxPassesPerFrame; ++i)
+    {
+        m_records[base + i].used = false;
+    }
+    return token;
+}
+
+GpuFrameToken DX12GpuProfiler::SlotToken(uint32_t ringSlot) const
+{
+    if (ringSlot >= m_slotTokens.size()) return GpuFrameToken{};
+    return m_slotTokens[ringSlot];
 }
 
 uint32_t DX12GpuProfiler::BeginPass(RHIEncoder& encoder, const std::string& name)
@@ -118,7 +153,8 @@ uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, cons
     if (!m_queryHeap || nullptr == commandList) return kInvalidSlot;
 
     // 슬롯을 원자적으로 예약한다. 병렬 기록에서는 여러 워커가 동시에 들어온다.
-    const uint32_t slot = m_usedPasses.fetch_add(1, std::memory_order_relaxed);
+    const uint32_t slot =
+        m_slotUsedPasses[m_recordingSlot].fetch_add(1, std::memory_order_relaxed);
     if (slot >= m_maxPassesPerFrame)
     {
         // 넘친 만큼 되돌리지 않는다. 되돌리면 다른 워커가 그 사이에 받은
@@ -126,9 +162,9 @@ uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, cons
         return kInvalidSlot;
     }
 
-    const uint32_t base = (m_frameIndex * m_maxPassesPerFrame + slot) * 2;
+    const uint32_t base = (m_recordingSlot * m_maxPassesPerFrame + slot) * 2;
 
-    PassRecord& record = m_records[slot];
+    PassRecord& record = m_records[RecordIndex(m_recordingSlot, slot)];
     record.name = name;
     record.beginQuery = base;
     record.endQuery = base + 1;
@@ -144,25 +180,53 @@ void DX12GpuProfiler::EndPass(ID3D12GraphicsCommandList* commandList, uint32_t s
     if (slot >= m_maxPassesPerFrame) return;
 
     commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
-        m_records[slot].endQuery);
+        m_records[RecordIndex(m_recordingSlot, slot)].endQuery);
 }
 
-void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList)
+void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList,
+    const GpuFrameToken& token)
 {
-    const uint32_t used = (std::min)(m_usedPasses.load(std::memory_order_relaxed),
+    if (!token.IsValid() || token.ringSlot >= m_frameCount) return;
+
+    const uint32_t used = (std::min)(
+        m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed),
         m_maxPassesPerFrame);
     if (!m_queryHeap || nullptr == commandList || 0 == used) return;
 
-    // 이 프레임 구간만 옮긴다. 전부 옮기면 다른 프레임이 쓰는 중인 영역까지 건드린다.
-    const uint32_t base = m_frameIndex * m_maxPassesPerFrame * 2;
+    // 이 제출 구간만 옮긴다. 전부 옮기면 다른 제출이 쓰는 중인 영역까지 건드린다.
+    const uint32_t base = token.ringSlot * m_maxPassesPerFrame * 2;
     const uint32_t count = used * 2;
 
     commandList->ResolveQueryData(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
         base, count, m_readback.Get(), static_cast<uint64_t>(base) * sizeof(uint64_t));
 }
 
-bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& outError)
+bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
+    std::vector<PassTiming>& outTimings, std::string& outError)
 {
+    // ★ 그 슬롯이 아직 **그 제출의** 것인지 먼저 묻는다.
+    //
+    //   링이 짧고 제출은 인플라이트로 겈리므로, 펜스가 끝난 제출의 슬롯을
+    //   뒤에 온 제출이 이미 다시 열었을 수 있다. 그때 숫자를 내면 그럴듯한데
+    //   틀린 값이 된다 — 예전에 수집의 83% 가 그러고 있었다.
+    if (!token.IsValid() || token.ringSlot >= m_frameCount)
+    {
+        outError = "GPU 수집 표가 비었다";
+        outTimings.clear();
+        return false;
+    }
+
+    const GpuFrameToken& held = m_slotTokens[token.ringSlot];
+    if (held.submissionId != token.submissionId)
+    {
+        outError = "GPU 수집 표가 낡았다 — 슬롯 " +
+            std::to_string(token.ringSlot) + " 은 제출 " +
+            std::to_string(held.submissionId) + " 의 것이고 물은 것은 " +
+            std::to_string(token.submissionId) + " 이다";
+        outTimings.clear();
+        return false;
+    }
+
     // ★ clear()를 여기서 부르지 않는다. clear는 원소를 파괴해 각 PassTiming::name이
     // 들고 있던 버퍼까지 버리고, 그러면 아래 resize+assign이 매 프레임 다시
     // 할당한다 — 이 함수를 고친 목적 자체가 그 할당을 없애는 것이다.
@@ -172,9 +236,10 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
 
     if (!m_readback || m_records.empty()) { outTimings.clear(); return true; }
 
-    const uint32_t base = m_frameIndex * m_maxPassesPerFrame * 2;
+    const uint32_t base = token.ringSlot * m_maxPassesPerFrame * 2;
     const size_t offset = static_cast<size_t>(base) * sizeof(uint64_t);
-    const uint32_t used = (std::min)(m_usedPasses.load(std::memory_order_relaxed),
+    const uint32_t used = (std::min)(
+        m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed),
         m_maxPassesPerFrame);
     const size_t bytes = static_cast<size_t>(used) * 2 * sizeof(uint64_t);
 
@@ -199,10 +264,31 @@ bool DX12GpuProfiler::Collect(std::vector<PassTiming>& outTimings, std::string& 
     // 스크래치는 멤버다(선언부 주석 참고) — clear는 용량을 지운다.
     m_mergeScratch.clear();
 
+    // ★ 읽은 기록이 **그 슬롯의 것**인지 질의 인덱스로 검산한다.
+    //
+    //   질의 인덱스는 절대값이라 슬롯마다 구간이 갈라져 있다. 따라서 기록을
+    //   엉뚱한 슬롯에서 집어 왔다면 그 인덱스가 이 구간 밖으로 나간다.
+    //
+    //   이 검산이 없으면 "표는 신선한데 기록을 다른 슬롯에서 읽는" 변이가
+    //   조용히 살아남는다 — 신선도 검사와 기록 읽기가 서로 다른 것을 보기
+    //   때문이다. 두 절이 같은 것을 물어야 한 절을 걷었을 때 드러난다.
+    const uint32_t slotQueryBegin = token.ringSlot * m_maxPassesPerFrame * 2;
+    const uint32_t slotQueryEnd = slotQueryBegin + m_maxPassesPerFrame * 2;
+
     for (uint32_t i = 0; i < used; ++i)
     {
-        const PassRecord& record = m_records[i];
+        const PassRecord& record = m_records[RecordIndex(token.ringSlot, i)];
         if (!record.used) continue;
+
+        if (record.beginQuery < slotQueryBegin || record.endQuery >= slotQueryEnd)
+        {
+            outError = "GPU 수집 기록이 슬롯 " + std::to_string(token.ringSlot) +
+                " 의 질의 구간 밖을 가리킨다";
+            outTimings.clear();
+            const D3D12_RANGE abortRange{ 0, 0 };
+            m_readback->Unmap(0, &abortRange);
+            return false;
+        }
 
         const uint64_t begin = timestamps[record.beginQuery];
         const uint64_t end = timestamps[record.endQuery];

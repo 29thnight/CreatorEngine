@@ -25,7 +25,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("Stats", "Workers", "Window", "Build")]
+    [ValidateSet("Stats", "Workers", "Window", "Gpu", "Build")]
     [string]$Action = "Stats",
 
     [string]$Exe,
@@ -345,6 +345,83 @@ function Invoke-Window {
     return 1
 }
 
+# ── Gpu ── GPU 수집이 **그 제출의** 기록을 읽는가(P4).
+#
+# ★ 이 축이 생긴 이유. 패스별 GPU 시간은 렌더 디버그 창에만 있었고, 그
+#   숫자가 올바른 제출의 것인지를 물을 수단이 없었다. 착수 전 실측에서
+#   수집의 83% 가 남의 제출을 읽고 있었다(§0.5.10) — 눈으로는 틀린 숫자도
+#   그럴듯하다.
+#
+# ⚠ 이 축이 재는 것은 "표가 낡지 않았다" 까지다. 표가 낡았을 때 수집을
+#   거절하는 가드 자체를 걷어내는 변이는 이 축이 잡지 못한다 — 그때는
+#   다시 조용해진다. 링을 좀히는 변이(제출마다 같은 슬롯)로 가드가 **울린다**는
+#   것은 잴다.
+function Invoke-Gpu {
+    # 라이브 렌더러는 프레임 수로 예열하지 않는다 — 첫 프레임이 slang reflect 로
+    # 수십 초를 쓴다. render.live.wait 은 라이브 프레임 완료를 기다린다.
+    $result = Invoke-EngineScript -Label "profile-gpu" -Commands @(
+        "render.live.wait 300"
+        "render.live.wait 400"
+        "render.live.wait 400"
+        "render.live.wait 400"
+        "dx12.live status"
+        "quit"
+    )
+
+    $line = ($result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"dx12\.live"' } | Select-Object -Last 1)
+    if (-not $line) {
+        Write-Host "dx12.live 응답을 찾지 못했다. 전체 출력: $($result.OutFile)" -ForegroundColor Red
+        return 1
+    }
+
+    try { $live = $line.Trim() | ConvertFrom-Json }
+    catch {
+        Write-Host "응답을 JSON 으로 읽지 못했다: $_" -ForegroundColor Red
+        return 1
+    }
+
+    $gpu = $live.data.gpu
+
+    Write-Host ""
+    Write-Host "[profile.gpu] GPU 수집 장부"
+    Write-Host ("  렌더한 프레임   {0}" -f $live.data.framesRendered)
+    Write-Host ("  수집           {0}" -f $gpu.collects)
+    Write-Host ("  표가 낡아 거절  {0}" -f $gpu.mismatches)
+    Write-Host ("  패스           {0}개 · 합계 {1:N4} ms" -f $gpu.passCount, $gpu.ms)
+    Write-Host ("  귀속           frame {0} · submission {1} · view {2}" -f $gpu.frame, $gpu.submission, $gpu.viewId)
+    if ($gpu.lastError) { Write-Host ("  마지막 사유     {0}" -f $gpu.lastError) }
+
+    $failures = New-Object System.Collections.Generic.List[string]
+    if ($live.data.ready -ne $true) { $failures.Add("파이프라인이 준비되지 않았다") }
+    if ($gpu.collects -le 0) {
+        # 자극이 한 번도 닿지 않았다는 뜻이다. 나머지 단정은 전부 공백에서
+        # 초록이 되므로 여기서 막는다.
+        $failures.Add("GPU 수집이 0 회 - 자극이 수집 경로에 닿지 않았다")
+    }
+    if ($gpu.mismatches -ne 0) {
+        $failures.Add("표가 낡아 거절한 수집 $($gpu.mismatches)/$($gpu.collects) - 제출마다 기록이 갈라져 있지 않다")
+    }
+    if ($gpu.passCount -le 0) {
+        $failures.Add("수집한 패스가 0 개 - 수치가 비어 있다")
+    }
+    if ($gpu.frame -le 0) {
+        $failures.Add("귀속할 engineFrameId 가 없다 - 숫자가 어느 프레임 것인지 모른다")
+    }
+    if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
+
+    Write-Host ""
+    Write-Host "── 판정 ─────────────────────"
+    if ($failures.Count -eq 0) {
+        Write-Host "  결과           통과" -ForegroundColor Green
+        return 0
+    }
+    foreach ($f in $failures) { Write-Host "  실패           $f" -ForegroundColor Red }
+    Write-Host ("  전체 출력      {0}" -f $result.OutFile)
+    Write-Host "  결과           실패" -ForegroundColor Red
+    return 1
+}
+
 function Invoke-Stats {
     # profile.frame 을 먼저 부르는 이유는 그 명령이 캡처를 **얼리기** 때문이다.
     # 얼린 캡처가 있어야 profile.stats 가 스레드마다 몇 건을 찍었는지 셀 수 있고,
@@ -484,4 +561,5 @@ switch ($Action) {
     "Stats"   { exit (Invoke-Stats) }
     "Workers" { exit (Invoke-Workers) }
     "Window"  { exit (Invoke-Window) }
+    "Gpu"     { exit (Invoke-Gpu) }
 }

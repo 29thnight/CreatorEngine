@@ -3755,7 +3755,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
 
         if (!resources.BeginFrame(outStepError)) return false;
         commandPool.BeginFrame(0);
-        profiler.BeginFrame(0);
+        // 자가 검증은 제출 하나를 끝까지 기다렸다 읽는다 — 표는 그래도 받아 둔다.
+        const GpuFrameToken profilerToken = profiler.BeginFrame(0, 0, 0);
 
         // 업로드는 그래프 밖에서 — Declare는 선언만, Record는 리소스를 만들지 않는다.
         shadow.SetBias(shadowBias);
@@ -3967,7 +3968,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         lastRecordMilliseconds = std::chrono::duration<double, std::milli>(
             std::chrono::steady_clock::now() - recordBegin).count();
 
-        profiler.ResolveFrame(resources.GetCommandList());
+        profiler.ResolveFrame(resources.GetCommandList(), profilerToken);
         if (!resources.EndFrame(outStepError)) return false;
         resources.WaitForGpu();
         const RHILifecycleResult& lifecycle = resources.GetLastLifecycleResult();
@@ -3981,7 +3982,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         if (useParallelRecording &&
             !GetRHISubmissionThread().Wait(recordedTicket, outStepError)) return false;
 
-        if (!profiler.Collect(outTimings, outStepError)) return false;
+        if (!profiler.Collect(profilerToken, outTimings, outStepError)) return false;
 
         RHIReadbackImage depthCaptured{};
         if (!resources.MapReadback(depthReadback, depthCaptured, outStepError))

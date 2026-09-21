@@ -2,6 +2,8 @@
 
 #include "EnhancedSceneRenderer.h"
 #include "../../RHI/RHIHandle.h"
+// GpuFrameToken 은 값으로 오가므로 전방 선언으로는 부족하다.
+#include "../../RHI/IRHIGpuProfiler.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -79,14 +81,13 @@ public:
         std::string& outError);
     void ReleaseFogCloudNeutral(RHITextureHandle& texture);
 
-    /// 그 제출이 쓴 링 슬롯을 돌려준다. 부른 쪽이 적어 두어야 나중에
-    /// 수집할 때 "그 제출의 기록을 읽고 있는가" 를 물을 수 있다.
-    uint32_t BeginProfilerFrame(uint32_t frameIndex);
-    void ResolveProfilerFrame();
-
-    /// Collect() 가 지금 읽게 되는 링 슬롯.
-    uint32_t ProfilerRingSlot() const;
-    bool CollectProfiler(std::vector<EnhancedLivePassTiming>& outTimings,
+    /// 제출 하나를 열고 그 제출의 표를 돌려준다. 부른 쪽이 보관했다가
+    /// Resolve · Collect 에 그대로 넘긴다.
+    GpuFrameToken BeginProfilerFrame(uint64_t engineFrameId, uint64_t submissionId,
+        uint64_t renderViewId);
+    void ResolveProfilerFrame(const GpuFrameToken& token);
+    bool CollectProfiler(const GpuFrameToken& token,
+        std::vector<EnhancedLivePassTiming>& outTimings,
         double& outTotalMilliseconds, std::string& outError);
 
     void MaintainAssetCaches(uint64_t frameIndex);

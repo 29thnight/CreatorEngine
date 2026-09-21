@@ -2,6 +2,7 @@
 #include <atomic>
 #include <cstdint>
 #include <string>
+#include <memory>
 #include <vector>
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -36,10 +37,16 @@ public:
 
     bool IsInitialized() const { return nullptr != m_queryHeap.Get(); }
 
-    /// 프레임 시작에 부른다. 그 프레임 구간의 슬롯을 되감는다 —
-    /// 업로드 링·디스크립터 링과 같은 패턴이고, 이유도 같다(GPU가 아직
-    /// 이전 프레임 결과를 쓰고 있을 수 있다).
-    void BeginFrame(uint32_t frameIndex);
+    /// 제출 하나를 열고 그 제출의 표를 돌려준다. 링 슬롯은 여기서 고른다 —
+    /// 링 산술이 한 자리에만 있어야 부르는 쪽과 읽는 쪽이 갈라지지 않는다.
+    ///
+    /// 돌려받은 표를 그 제출의 슬롯에 보관했다가 ResolveFrame · Collect 에 그대로
+    /// 넘긴다. 보관하지 않으면 나중에 "어느 제출의 것을 읽을까" 를 물을 수 없다.
+    ///
+    /// ★ 슬롯의 기록(이름·질의 인덱스·사용 표시)만 되감는다. 다른 슬롯은
+    ///   건드리지 않는다 — 그것이 인플라이트 제출의 기록을 지키는 유일한 방법이다.
+    GpuFrameToken BeginFrame(uint64_t engineFrameId, uint64_t submissionId,
+        uint64_t renderViewId);
 
     /// 패스 시작. 돌려준 슬롯을 EndPass에 그대로 넘긴다.
     /// 슬롯이 모자라면 kInvalidSlot을 돌려주고, 그 패스는 측정에서 빠진다.
@@ -50,19 +57,20 @@ public:
     uint32_t BeginPass(ID3D12GraphicsCommandList* commandList, const std::string& name);
     void     EndPass(ID3D12GraphicsCommandList* commandList, uint32_t slot);
 
-    /// 프레임 끝에, 커맨드 리스트를 닫기 전에 부른다. 질의 결과를 리드백으로 옮긴다.
-    void ResolveFrame(ID3D12GraphicsCommandList* commandList);
+    /// 제출을 닫기 전에 부른다. 그 표가 가리키는 슬롯의 질의만 리드백으로 옮긴다.
+    void ResolveFrame(ID3D12GraphicsCommandList* commandList, const GpuFrameToken& token);
 
-    /// GPU가 그 프레임을 끝낸 뒤에 부른다(펜스 대기 후).
-    bool Collect(std::vector<PassTiming>& outTimings, std::string& outError);
-
-    /// Collect() 가 지금 읽게 되는 링 슬롯. 제출할 때 적어 둔 슬롯과
-    /// 맞대는 용도다 — 둘이 다르면 그 수집은 **다른 제출의 기록을 읽고 있다.**
+    /// GPU 가 **그 제출을** 끝낸 뒤에 부른다(펜스 완료 후).
     ///
-    /// ★ 임시 계측이 아니라 P4 의 기준선이다. 지금 구조에서는 이 값이 어긋날
-    ///   수 있고(BeginFrame 이 뷰마다 불리고 Collect 는 token 을 안 받는다),
-    ///   GpuFrameToken 이 서고 나면 영원히 0 이어야 한다.
-    uint32_t CurrentRingSlot() const { return m_frameIndex; }
+    /// ★ 표가 가리키는 슬롯에 **그 표가 그대로 있는지** 먼저 확인한다. 사이에
+    ///   다른 제출이 그 슬롯을 다시 열었으면 기록은 이미 남의 것이므로, 그때는
+    ///   수치를 내지 않고 **실패한다.** 예전에는 그 자리에서 그럴듯한 숫자가 나왔고
+    ///   어느 프레임 것인지는 어디에도 적혀 있지 않았다.
+    bool Collect(const GpuFrameToken& token, std::vector<PassTiming>& outTimings,
+        std::string& outError);
+
+    /// 그 슬롯이 지금 들고 있는 표. 프로브와 진단용이다.
+    GpuFrameToken SlotToken(uint32_t ringSlot) const;
 
     /// 마지막으로 수집한 것의 합계.
     double GetLastTotalMilliseconds() const { return m_lastTotalMs; }
@@ -97,7 +105,10 @@ private:
 
     uint32_t m_maxPassesPerFrame{ 0 };
     uint32_t m_frameCount{ 0 };
-    uint32_t m_frameIndex{ 0 };
+
+    // 지금 **기록 중인** 슬롯. 기록은 한 번에 한 제출뿐이므로 하나면 충분하다 —
+    // 읽는 쪽은 이것을 보지 않고 표의 ringSlot 을 본다.
+    uint32_t m_recordingSlot{ 0 };
     // 슬롯 카운터는 원자적이다.
     //
     // 병렬 기록에서는 여러 워커가 동시에 BeginPass를 부른다. 단순 증가면
@@ -106,14 +117,30 @@ private:
     //
     // 질의 힙 자체는 하나로 충분하다 — 인덱스가 겹치지 않으면 여러 커맨드
     // 리스트가 같은 힙에 써도 된다. 워커마다 힙을 나눌 필요는 없었다.
-    std::atomic<uint32_t> m_usedPasses{ 0 };
 
     // 틱을 밀리초로 바꾸는 값. 큐마다 다를 수 있어 초기화 때 받아 둔다.
     uint64_t m_ticksPerSecond{ 0 };
 
     // 레코드는 미리 크기를 잡고 인덱스로 접근한다. push_back은 재할당을
     // 일으켜 병렬에서 성립하지 않는다.
+    //
+    // ★ 크기가 frameCount * maxPassesPerFrame 이다. 예전에는 maxPassesPerFrame
+    //   한 벌이었고, 그래서 질의 힙·리드백은 슬롯별로 갈라져 있는데 **CPU 쪽
+    //   기록만 한 벌**이었다. 인플라이트 제출이 둘이면 뒤에 온 것이 앞의 이름·
+    //   질의 인덱스를 덮어 썼다.
     std::vector<PassRecord> m_records;
+
+    // 슬롯·패스 쌍을 평탄 인덱스로 바꾼다. 두 자리에서 같은 산술을 적으면
+    // 한쪽만 고칠 때 조용히 어긋난다.
+    size_t RecordIndex(uint32_t ringSlot, uint32_t pass) const
+    {
+        return static_cast<size_t>(ringSlot) * m_maxPassesPerFrame + pass;
+    }
+
+    // 슬롯마다의 사용 패스 수와 표. atomic 은 복사도 이동도 안 되므로
+    // vector 가 아니라 고정 배열로 둔다.
+    std::unique_ptr<std::atomic<uint32_t>[]> m_slotUsedPasses;
+    std::vector<GpuFrameToken>               m_slotTokens;
     double m_lastTotalMs{ 0.0 };
 };
 

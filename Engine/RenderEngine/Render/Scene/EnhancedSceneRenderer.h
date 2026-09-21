@@ -476,6 +476,13 @@ struct EnhancedLiveDebugSnapshot
     /// P4 가 GpuFrameToken 을 세우면 0 이어야 한다.
     uint64_t gpuCollects{ 0 };
     uint64_t gpuCollectMismatches{ 0 };
+
+    /// 마지막 성공 수집의 귀속. 패스별 숫자가 어느 프레임·어느 제출·어느
+    /// 뷰의 것인지를 적는다. 이것이 없으면 숫자가 맞는지 물을 수가 없다.
+    uint64_t    lastGpuFrameId{ 0 };
+    uint64_t    lastGpuSubmissionId{ 0 };
+    uint64_t    lastGpuViewId{ 0 };
+    std::string lastGpuCollectError;
     size_t   graveyardCount{ 0 };
     std::string lastError;
 

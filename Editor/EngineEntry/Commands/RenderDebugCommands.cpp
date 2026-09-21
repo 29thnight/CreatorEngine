@@ -333,6 +333,10 @@ namespace ConsoleCmd
             gpu.Set("ms", CommandData::Double(snapshot.gpuMs));
             gpu.Set("collects", CommandData::Int(snapshot.gpuCollects));
             gpu.Set("mismatches", CommandData::Int(snapshot.gpuCollectMismatches));
+            gpu.Set("frame", CommandData::Int(snapshot.lastGpuFrameId));
+            gpu.Set("submission", CommandData::Int(snapshot.lastGpuSubmissionId));
+            gpu.Set("viewId", CommandData::Int(snapshot.lastGpuViewId));
+            gpu.Set("lastError", CommandData::String(snapshot.lastGpuCollectError));
             auto passes = CommandData::Array();
             for (const EnhancedLivePassTiming& timing : snapshot.passTimings)
             {
