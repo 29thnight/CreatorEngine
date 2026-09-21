@@ -321,6 +321,26 @@ struct EnhancedLiveDisplayTexture
 
 /// 패스 하나의 GPU 시간. DX12GpuProfiler::PassTiming을 에디터로 옮기는 값
 /// 타입이다 — 그 헤더는 d3d12.h를 끌고 오므로 UI 계층에 노출하지 않는다.
+/// 한 제출의 GPU 구간 요약. 합계를 하나로 정의하지 않는다(§3.4).
+///
+/// ★ queueSpan 은 첫 timestamp 부터 마지막까지이고, busy 는 겹치지 않는 실행
+///   구간의 합이다. 둘의 차이가 공백이고, 그것을 보지 못하면 "GPU 가 바쁘다" 와
+///   "큐가 잡혀 있다" 를 가를 수 없다.
+struct EnhancedLiveGpuSpan
+{
+    double   queueSpanMs{ 0.0 };
+    double   busyMs{ 0.0 };
+    uint32_t sliceCount{ 0 };
+    uint32_t droppedSlices{ 0 };
+
+    /// 버린 조각 중 첫 번째의 패스 이름. 비어 있으면 버린 것이 없다는 뜻이다.
+    std::string droppedSliceName;
+    int64_t     droppedSliceDeltaTicks{ 0 };
+
+    /// 길이 0 으로 찍힌 조각. 결함이 아니라 분해능 아래의 패스다.
+    uint32_t    zeroLengthSlices{ 0 };
+};
+
 struct EnhancedLivePassTiming
 {
     std::string name;
@@ -477,11 +497,23 @@ struct EnhancedLiveDebugSnapshot
     uint64_t gpuCollects{ 0 };
     uint64_t gpuCollectMismatches{ 0 };
 
+    /// 길이 셋의 관계를 **수집마다** 검산한 장부(§3.4).
+    ///
+    /// ★ 마지막 한 번의 lastGpuSpan 만 보면 씬뷰와 게임뷰 중 어느 쪽을 읽는지가
+    ///   실행마다 갈린다 — 한쪽에만 있는 패스(선이 없는 GizmoLine 은 씬뷰에만
+    ///   있다)는 그러면 절반의 확률로만 검사를 받는다. 그래서 검산을 수집하는
+    ///   자리에 두고 수로 누적한다. 게이트는 마지막 값이 아니라 이 수를 묻는다.
+    uint64_t gpuDroppedSlices{ 0 };      // 뒤집힌 조각 — 0 이 아니면 결함
+    uint64_t gpuZeroLengthSlices{ 0 };   // 길이 0 인 조각 — 정보이지 판정이 아니다
+    uint64_t gpuSpanViolations{ 0 };     // busy > queueSpan — 겹침을 중복으로 셌다
+    uint64_t gpuSliceUnderflows{ 0 };    // 조각 < 이름 — 묶은 것이 원본보다 많다
+
     /// 마지막 성공 수집의 귀속. 패스별 숫자가 어느 프레임·어느 제출·어느
     /// 뷰의 것인지를 적는다. 이것이 없으면 숫자가 맞는지 물을 수가 없다.
     uint64_t    lastGpuFrameId{ 0 };
     uint64_t    lastGpuSubmissionId{ 0 };
     uint64_t    lastGpuViewId{ 0 };
+    EnhancedLiveGpuSpan lastGpuSpan{};
     std::string lastGpuCollectError;
     size_t   graveyardCount{ 0 };
     std::string lastError;

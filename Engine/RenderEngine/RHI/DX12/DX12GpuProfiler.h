@@ -25,10 +25,59 @@
 class DX12GpuProfiler : public IRHIGpuProfiler
 {
 public:
+    /// 표시용으로 이름끼리 묶은 것. 원본은 PassSlice 에 남아 있다.
     struct PassTiming
     {
         std::string name;
         double      milliseconds{ 0.0 };
+    };
+
+    /// 조각 하나의 raw 구간. 분할 패스는 조각마다 구간을 찍으므로 한 패스가
+    /// 여러 조각이 된다.
+    ///
+    /// ★ 이름으로 묶기 **전의** 것을 남긴다(§3.3: "같은 이름의 slice 는 표시
+    ///   단계에서 묶되 원본 interval 은 버리지 않는다"). 묶은 것만 남기면 GPU
+    ///   타임라인을 그릴 수가 없고, 조각이 서로 겹치는지도 알 수 없다.
+    struct PassSlice
+    {
+        std::string name;
+        uint64_t    beginTicks{ 0 };
+        uint64_t    endTicks{ 0 };
+    };
+
+    /// 제출 하나의 수집 결과.
+    ///
+    /// ★ 합계를 하나로 정의하지 않는다(§3.4). queue span 은 첫 timestamp 부터
+    ///   마지막까지이고, busy 는 겹치지 않는 실행 구간의 합이며, 패스별 시간은
+    ///   조각마다의 것이다. 세을 더하면 서로 다른 수가 나오고, 그것이 정상이다.
+    struct FrameTimings
+    {
+        GpuFrameToken          token{};
+        std::vector<PassSlice> slices;             // 기록 순서 그대로
+        uint64_t queueBeginTicks{ 0 };
+        uint64_t queueEndTicks{ 0 };
+        uint64_t busyTicks{ 0 };
+        uint64_t ticksPerSecond{ 0 };
+
+        // 끝이 시작보다 **앞선** 조각. 큰 음수가 되므로 뺀다 — 다만 **숨기지
+        // 않고 센다.** 예전에는 조용히 0 으로 바꿔 합계에 섞여 들어갔다.
+        //
+        // ★ 길이가 0 인 것은 여기 들어오지 않는다. 둘을 `end <= begin` 으로 한데
+        //   묶었더니, 그릴 것이 없어 일찍 빠져나간 패스(선이 없는 GizmoLine)가
+        //   결함으로 세졌다. 두 timestamp 가 같은 틱에 찍히는 것은 정상이다.
+        uint32_t droppedSlices{ 0 };
+
+        // 버린 조각의 end - begin. 부호가 있어야 "얼마나 뒤집혔는가" 를 물을 수 있다.
+        int64_t droppedSliceDeltaTicks{ 0 };
+
+        // 길이가 정확히 0 인 조각. **버리지 않는다** — 그 패스는 실제로 돌았고
+        // 비용이 timestamp 분해능 아래일 뿐이다. 세는 것은 정보지 판정이 아니다.
+        uint32_t zeroLengthSlices{ 0 };
+
+        // 버린 조각 중 **첫 번째의 이름.** 수만 세면 "한 개 버렸다" 까지만 알고
+        // 어느 패스가 짝을 잃었는지는 모른다 — 고칠 수 없는 수는 계수기가 아니라
+        // 경보음일 뿐이다.
+        std::string droppedSliceName;
     };
 
     bool Initialize(ID3D12Device* device, ID3D12CommandQueue* queue,
@@ -66,8 +115,13 @@ public:
     ///   다른 제출이 그 슬롯을 다시 열었으면 기록은 이미 남의 것이므로, 그때는
     ///   수치를 내지 않고 **실패한다.** 예전에는 그 자리에서 그럴듯한 숫자가 나왔고
     ///   어느 프레임 것인지는 어디에도 적혀 있지 않았다.
-    bool Collect(const GpuFrameToken& token, std::vector<PassTiming>& outTimings,
+    bool Collect(const GpuFrameToken& token, FrameTimings& outTimings,
         std::string& outError);
+
+    /// raw 조각을 이름으로 묶어 표시용으로 만든다. 원본은 그대로 둔다.
+    ///
+    /// 분할 패스를 그대로 나열하면 "GBuffer 가 여섯 번 있다" 가 되어 읽을 수 없다.
+    void MergeSlices(const FrameTimings& timings, std::vector<PassTiming>& outTimings);
 
     /// 그 슬롯이 지금 들고 있는 표. 프로브와 진단용이다.
     GpuFrameToken SlotToken(uint32_t ringSlot) const;
@@ -99,6 +153,10 @@ private:
         uint32_t slices{ 0 };
     };
     std::vector<std::pair<std::string_view, MergedSpan>> m_mergeScratch;
+
+    // busy 계산용 스크래치. 조각을 정렬해 훑어야 하는데 원본 순서를 깨면
+    // 안 되므로 사본을 둔다.
+    std::vector<std::pair<uint64_t, uint64_t>> m_busyScratch;
 
     ComPtr<ID3D12QueryHeap> m_queryHeap;
     ComPtr<ID3D12Resource>  m_readback;

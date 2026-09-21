@@ -3982,7 +3982,9 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         if (useParallelRecording &&
             !GetRHISubmissionThread().Wait(recordedTicket, outStepError)) return false;
 
-        if (!profiler.Collect(profilerToken, outTimings, outStepError)) return false;
+        DX12GpuProfiler::FrameTimings frameTimings;
+        if (!profiler.Collect(profilerToken, frameTimings, outStepError)) return false;
+        profiler.MergeSlices(frameTimings, outTimings);
 
         RHIReadbackImage depthCaptured{};
         if (!resources.MapReadback(depthReadback, depthCaptured, outStepError))

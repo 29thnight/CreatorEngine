@@ -202,39 +202,52 @@ void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList,
 }
 
 bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
-    std::vector<PassTiming>& outTimings, std::string& outError)
+    FrameTimings& outTimings, std::string& outError)
 {
+    auto fail = [&outTimings](std::string& error, std::string text) -> bool
+    {
+        error = std::move(text);
+        outTimings.slices.clear();
+        outTimings.queueBeginTicks = 0;
+        outTimings.queueEndTicks = 0;
+        outTimings.busyTicks = 0;
+        outTimings.droppedSlices = 0;
+        outTimings.droppedSliceName.clear();
+        outTimings.droppedSliceDeltaTicks = 0;
+        outTimings.zeroLengthSlices = 0;
+        return false;
+    };
+
     // ★ 그 슬롯이 아직 **그 제출의** 것인지 먼저 묻는다.
     //
-    //   링이 짧고 제출은 인플라이트로 겈리므로, 펜스가 끝난 제출의 슬롯을
+    //   링이 짧고 제출은 인플라이트로 갈리므로, 펜스가 끝난 제출의 슬롯을
     //   뒤에 온 제출이 이미 다시 열었을 수 있다. 그때 숫자를 내면 그럴듯한데
     //   틀린 값이 된다 — 예전에 수집의 83% 가 그러고 있었다.
     if (!token.IsValid() || token.ringSlot >= m_frameCount)
     {
-        outError = "GPU 수집 표가 비었다";
-        outTimings.clear();
-        return false;
+        return fail(outError, "GPU 수집 표가 비었다");
     }
 
     const GpuFrameToken& held = m_slotTokens[token.ringSlot];
     if (held.submissionId != token.submissionId)
     {
-        outError = "GPU 수집 표가 낡았다 — 슬롯 " +
+        return fail(outError, "GPU 수집 표가 낡았다 — 슬롯 " +
             std::to_string(token.ringSlot) + " 은 제출 " +
             std::to_string(held.submissionId) + " 의 것이고 물은 것은 " +
-            std::to_string(token.submissionId) + " 이다";
-        outTimings.clear();
-        return false;
+            std::to_string(token.submissionId) + " 이다");
     }
 
-    // ★ clear()를 여기서 부르지 않는다. clear는 원소를 파괴해 각 PassTiming::name이
-    // 들고 있던 버퍼까지 버리고, 그러면 아래 resize+assign이 매 프레임 다시
-    // 할당한다 — 이 함수를 고친 목적 자체가 그 할당을 없애는 것이다.
-    // 정상 경로는 아래에서 resize로 정확한 크기를 맞추고, 조기 반환 경로만
-    // 여기서 비운다(그쪽은 프레임마다 도는 길이 아니다).
-    m_lastTotalMs = 0.0;
+    outTimings.token = token;
+    outTimings.ticksPerSecond = m_ticksPerSecond;
+    outTimings.queueBeginTicks = 0;
+    outTimings.queueEndTicks = 0;
+    outTimings.busyTicks = 0;
+    outTimings.droppedSlices = 0;
+    outTimings.droppedSliceName.clear();
+    outTimings.droppedSliceDeltaTicks = 0;
+    outTimings.zeroLengthSlices = 0;
 
-    if (!m_readback || m_records.empty()) { outTimings.clear(); return true; }
+    if (!m_readback || m_records.empty()) { outTimings.slices.clear(); return true; }
 
     const uint32_t base = token.ringSlot * m_maxPassesPerFrame * 2;
     const size_t offset = static_cast<size_t>(base) * sizeof(uint64_t);
@@ -248,21 +261,11 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     const HRESULT hr = m_readback->Map(0, &range, &mapped);
     if (FAILED(hr))
     {
-        outError = "질의 리드백 Map 실패 " + ProfilerHrToString(hr);
-        outTimings.clear();
-        return false;
+        return fail(outError, "질의 리드백 Map 실패 " + ProfilerHrToString(hr));
     }
 
     const auto* timestamps = static_cast<const uint64_t*>(mapped);
-
-    // 같은 이름이 여러 번 나올 수 있다.
-    //
-    // 분할 패스는 조각마다 구간을 찍으므로 한 패스가 여러 레코드가 된다.
-    // 그것을 그대로 나열하면 "GBuffer가 여섯 번 있다"가 되어 읽을 수 없다.
-    // 이름으로 묶어 처음 시작~마지막 끝으로 합친다 — GPU 타임라인은 하나이고
-    // 조각들은 순서대로 실행되므로 그 구간이 곧 패스 전체 시간이다.
-    // 스크래치는 멤버다(선언부 주석 참고) — clear는 용량을 지운다.
-    m_mergeScratch.clear();
+    const D3D12_RANGE emptyRange{ 0, 0 };
 
     // ★ 읽은 기록이 **그 슬롯의 것**인지 질의 인덱스로 검산한다.
     //
@@ -272,8 +275,13 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     //   이 검산이 없으면 "표는 신선한데 기록을 다른 슬롯에서 읽는" 변이가
     //   조용히 살아남는다 — 신선도 검사와 기록 읽기가 서로 다른 것을 보기
     //   때문이다. 두 절이 같은 것을 물어야 한 절을 걷었을 때 드러난다.
-    const uint32_t slotQueryBegin = token.ringSlot * m_maxPassesPerFrame * 2;
+    const uint32_t slotQueryBegin = base;
     const uint32_t slotQueryEnd = slotQueryBegin + m_maxPassesPerFrame * 2;
+
+    // 크기를 먼저 맞춘다. 정상 상태에서는 패스 구성이 안 바뀜므로 같은 수가
+    // 나오고, 그러면 resize 가 아무것도 하지 않아 문자열 버퍼가 그대로 살아있다.
+    size_t sliceCount = 0;
+    if (outTimings.slices.size() < used) outTimings.slices.resize(used);
 
     for (uint32_t i = 0; i < used; ++i)
     {
@@ -282,39 +290,119 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
 
         if (record.beginQuery < slotQueryBegin || record.endQuery >= slotQueryEnd)
         {
-            outError = "GPU 수집 기록이 슬롯 " + std::to_string(token.ringSlot) +
-                " 의 질의 구간 밖을 가리킨다";
-            outTimings.clear();
-            const D3D12_RANGE abortRange{ 0, 0 };
-            m_readback->Unmap(0, &abortRange);
-            return false;
+            m_readback->Unmap(0, &emptyRange);
+            return fail(outError, "GPU 수집 기록이 슬롯 " +
+                std::to_string(token.ringSlot) + " 의 질의 구간 밖을 가리킨다");
         }
 
         const uint64_t begin = timestamps[record.beginQuery];
         const uint64_t end = timestamps[record.endQuery];
 
+        // 순서가 **뒤집힌** 값만 버린다. 큰 음수가 되어 합계를 망가뜨리기
+        // 때문이고, 버렸다는 사실은 **센다** — 조용히 0 으로 바꾸면 수치가
+        // 줄어든 것처럼 보인다.
+        if (end < begin)
+        {
+            if (0 == outTimings.droppedSlices)
+            {
+                outTimings.droppedSliceName.assign(record.name);
+                outTimings.droppedSliceDeltaTicks =
+                    static_cast<int64_t>(end) - static_cast<int64_t>(begin);
+            }
+            ++outTimings.droppedSlices;
+            continue;
+        }
+
+        // 길이 0 은 버리지 않는다. 그 패스는 그릴 것이 없어 일찍 빠져나갔을
+        // 뿐이고, 없었던 것처럼 지우면 타임라인에서 그 패스가 통째로 사라진다.
+        if (end == begin) ++outTimings.zeroLengthSlices;
+
+        PassSlice& slice = outTimings.slices[sliceCount++];
+        slice.name.assign(record.name);
+        slice.beginTicks = begin;
+        slice.endTicks = end;
+    }
+
+    outTimings.slices.resize(sliceCount);
+    m_readback->Unmap(0, &emptyRange);
+
+    if (0 == sliceCount) return true;
+
+    // queue span 과 busy 를 가른다(§3.4).
+    //
+    //   queue span : 첫 timestamp 부터 마지막까지 — 그 제출이 큐를 잡고 있던 길이
+    //   busy       : 겹치지 않는 실행 구간의 합 — 실제로 일한 길이
+    //
+    //   둘은 같지 않다. 간격이 있으면 busy 가 작고, 그 차이가 공백이다.
+    //   조각을 단순히 더한 값은 세 번째 수이고, 겹침을 중복으로 센다.
+    m_busyScratch.clear();
+    m_busyScratch.reserve(sliceCount);
+    uint64_t queueBegin = outTimings.slices[0].beginTicks;
+    uint64_t queueEnd = outTimings.slices[0].endTicks;
+    for (const PassSlice& slice : outTimings.slices)
+    {
+        queueBegin = (std::min)(queueBegin, slice.beginTicks);
+        queueEnd = (std::max)(queueEnd, slice.endTicks);
+        m_busyScratch.emplace_back(slice.beginTicks, slice.endTicks);
+    }
+    outTimings.queueBeginTicks = queueBegin;
+    outTimings.queueEndTicks = queueEnd;
+
+    std::sort(m_busyScratch.begin(), m_busyScratch.end());
+    uint64_t busy = 0;
+    uint64_t runBegin = m_busyScratch[0].first;
+    uint64_t runEnd = m_busyScratch[0].second;
+    for (size_t i = 1; i < m_busyScratch.size(); ++i)
+    {
+        const auto& span = m_busyScratch[i];
+        if (span.first > runEnd)
+        {
+            busy += runEnd - runBegin;
+            runBegin = span.first;
+            runEnd = span.second;
+            continue;
+        }
+        runEnd = (std::max)(runEnd, span.second);
+    }
+    busy += runEnd - runBegin;
+    outTimings.busyTicks = busy;
+    return true;
+}
+
+void DX12GpuProfiler::MergeSlices(const FrameTimings& timings,
+    std::vector<PassTiming>& outTimings)
+{
+    m_lastTotalMs = 0.0;
+
+    // 스크래치는 멤버다(선언부 주석) — clear 는 용량을 지우지 않는다.
+    m_mergeScratch.clear();
+    for (const PassSlice& slice : timings.slices)
+    {
         auto found = m_mergeScratch.end();
         for (auto it = m_mergeScratch.begin(); it != m_mergeScratch.end(); ++it)
         {
-            if (it->first == record.name) { found = it; break; }
+            if (it->first == slice.name) { found = it; break; }
         }
 
         if (found == m_mergeScratch.end())
         {
-            // 키는 record.name을 가리키는 view다 — 사본을 만들지 않는다.
-            m_mergeScratch.emplace_back(std::string_view{ record.name }, MergedSpan{ begin, end, 1 });
+            // 키는 slice.name 을 가리키는 view 다 — 사본을 만들지 않는다.
+            m_mergeScratch.emplace_back(std::string_view{ slice.name },
+                MergedSpan{ slice.beginTicks, slice.endTicks, 1 });
             continue;
         }
 
-        found->second.begin = (std::min)(found->second.begin, begin);
-        found->second.end = (std::max)(found->second.end, end);
+        found->second.begin = (std::min)(found->second.begin, slice.beginTicks);
+        found->second.end = (std::max)(found->second.end, slice.endTicks);
         ++found->second.slices;
     }
 
-    // clear + push_back이 아니라 resize + 제자리 대입이다. 문자열이 이미 들고
-    // 있는 버퍼를 재사용해야 프레임마다 새로 할당하지 않는다 — 패스 구성이
-    // 안정되면(정상 상태) 여기서 힙 할당이 0이 된다.
+    // clear + push_back 이 아니라 resize + 제자리 대입이다. 문자열이 이미 들고
+    // 있는 버퍼를 재사용해야 프레임마다 새로 할당하지 않는다.
     outTimings.resize(m_mergeScratch.size());
+    const double toMs = (timings.ticksPerSecond > 0)
+        ? (1000.0 / static_cast<double>(timings.ticksPerSecond)) : 0.0;
+
     for (size_t i = 0; i < m_mergeScratch.size(); ++i)
     {
         const auto& entry = m_mergeScratch[i];
@@ -323,25 +411,15 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
         timing.name.assign(entry.first);
         if (1 != entry.second.slices)
         {
-            // std::to_string은 할당한다 — 스택 버퍼에 찍어 붙인다.
+            // std::to_string 은 할당한다 — 스택 버퍼에 찍어 붙인다.
             char suffix[24]{};
             const int len = std::snprintf(suffix, sizeof(suffix), "(x%u)", entry.second.slices);
             if (len > 0) { timing.name.append(suffix, static_cast<size_t>(len)); }
         }
 
-        // 순서가 뒤집힌 값은 버린다. 큐가 비어 있거나 질의가 기록되지 않은
-        // 경우인데, 그대로 빼면 거대한 음수가 나와 합계를 망친다.
         timing.milliseconds = (entry.second.end > entry.second.begin)
-            ? (static_cast<double>(entry.second.end - entry.second.begin)
-                / static_cast<double>(m_ticksPerSecond)) * 1000.0
-            : 0.0;
-
+            ? static_cast<double>(entry.second.end - entry.second.begin) * toMs : 0.0;
         m_lastTotalMs += timing.milliseconds;
     }
-
-    // 쓰지 않았으므로 빈 범위로 Unmap한다.
-    const D3D12_RANGE emptyRange{ 0, 0 };
-    m_readback->Unmap(0, &emptyRange);
-    return true;
 }
 

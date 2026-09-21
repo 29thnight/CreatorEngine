@@ -38,6 +38,9 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     DX12MeshCache meshCache;
     DX12TextureCache textureCache;
     DX12GpuProfiler profiler;
+    // 프레임마다 재사용하는 수집물. 문자열 버퍼를 지켜 할당을 없앤다.
+    DX12GpuProfiler::FrameTimings profilerTimings;
+    std::vector<DX12GpuProfiler::PassTiming> profilerMerged;
 
     ComPtr<ID3D12Resource> fogCloudNeutral;
     std::vector<DisplayResource> activeDisplays;
@@ -418,18 +421,39 @@ void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameTo
 
 bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& token,
     std::vector<EnhancedLivePassTiming>& outTimings,
+    EnhancedLiveGpuSpan& outSpan,
     double& outTotalMilliseconds, std::string& outError)
 {
+    // 수집물은 멤버로 둔다. 지역 변수면 조각마다 std::string 을 프레임마다
+    // 새로 할당하게 된다 — Collect 가 제자리 대입을 쓰는 이유가 그것이다.
+    DX12GpuProfiler::FrameTimings& timings = m_impl->profilerTimings;
+    if (!m_impl->profiler.Collect(token, timings, outError)) return false;
+
+    // ★ raw 조각은 timings 에 그대로 남아 있다. 이름으로 묶는 것은 **표시용**이고,
+    //   GPU 타임라인은 묶지 않은 쪽을 그릴 것이다.
     std::vector<DX12GpuProfiler::PassTiming> nativeTimings;
-    if (!m_impl->profiler.Collect(token, nativeTimings, outError)) return false;
+    nativeTimings.swap(m_impl->profilerMerged);
+    m_impl->profiler.MergeSlices(timings, nativeTimings);
 
     outTimings.clear();
     outTimings.reserve(nativeTimings.size());
     for (DX12GpuProfiler::PassTiming& timing : nativeTimings)
     {
-        outTimings.push_back({ std::move(timing.name), timing.milliseconds });
+        outTimings.push_back({ timing.name, timing.milliseconds });
     }
     outTotalMilliseconds = m_impl->profiler.GetLastTotalMilliseconds();
+    m_impl->profilerMerged.swap(nativeTimings);
+
+    const double toMs = (timings.ticksPerSecond > 0)
+        ? (1000.0 / static_cast<double>(timings.ticksPerSecond)) : 0.0;
+    outSpan.queueSpanMs = (timings.queueEndTicks > timings.queueBeginTicks)
+        ? static_cast<double>(timings.queueEndTicks - timings.queueBeginTicks) * toMs : 0.0;
+    outSpan.busyMs = static_cast<double>(timings.busyTicks) * toMs;
+    outSpan.sliceCount = static_cast<uint32_t>(timings.slices.size());
+    outSpan.droppedSlices = timings.droppedSlices;
+    outSpan.droppedSliceName = timings.droppedSliceName;
+    outSpan.droppedSliceDeltaTicks = timings.droppedSliceDeltaTicks;
+    outSpan.zeroLengthSlices = timings.zeroLengthSlices;
     return true;
 }
 

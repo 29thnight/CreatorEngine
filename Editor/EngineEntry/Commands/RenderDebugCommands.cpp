@@ -333,9 +333,28 @@ namespace ConsoleCmd
             gpu.Set("ms", CommandData::Double(snapshot.gpuMs));
             gpu.Set("collects", CommandData::Int(snapshot.gpuCollects));
             gpu.Set("mismatches", CommandData::Int(snapshot.gpuCollectMismatches));
+
+            // 수집마다의 검산 장부. 마지막 한 번(아래 lastGpuSpan)은 어느 뷰의
+            // 것인지가 실행마다 갈리므로, 판정은 이 누적 수로 한다.
+            gpu.Set("droppedTotal", CommandData::Int(snapshot.gpuDroppedSlices));
+            gpu.Set("zeroLengthTotal", CommandData::Int(snapshot.gpuZeroLengthSlices));
+            gpu.Set("spanViolations", CommandData::Int(snapshot.gpuSpanViolations));
+            gpu.Set("sliceUnderflows", CommandData::Int(snapshot.gpuSliceUnderflows));
             gpu.Set("frame", CommandData::Int(snapshot.lastGpuFrameId));
             gpu.Set("submission", CommandData::Int(snapshot.lastGpuSubmissionId));
             gpu.Set("viewId", CommandData::Int(snapshot.lastGpuViewId));
+            // ★ 합계는 하나가 아니다(§3.4). ms 는 이름으로 묶은 것의 합이고,
+            //   queueSpanMs 는 큐를 잡고 있던 길이, busyMs 는 실제로 일한 길이다.
+            gpu.Set("queueSpanMs", CommandData::Double(snapshot.lastGpuSpan.queueSpanMs));
+            gpu.Set("busyMs", CommandData::Double(snapshot.lastGpuSpan.busyMs));
+            gpu.Set("sliceCount", CommandData::Int(snapshot.lastGpuSpan.sliceCount));
+            gpu.Set("droppedSlices", CommandData::Int(snapshot.lastGpuSpan.droppedSlices));
+            gpu.Set("droppedSliceName",
+                CommandData::String(snapshot.lastGpuSpan.droppedSliceName));
+            gpu.Set("droppedSliceDeltaTicks",
+                CommandData::Int(snapshot.lastGpuSpan.droppedSliceDeltaTicks));
+            gpu.Set("zeroLengthSlices",
+                CommandData::Int(snapshot.lastGpuSpan.zeroLengthSlices));
             gpu.Set("lastError", CommandData::String(snapshot.lastGpuCollectError));
             auto passes = CommandData::Array();
             for (const EnhancedLivePassTiming& timing : snapshot.passTimings)

@@ -388,8 +388,13 @@ function Invoke-Gpu {
     Write-Host ("  렌더한 프레임   {0}" -f $live.data.framesRendered)
     Write-Host ("  수집           {0}" -f $gpu.collects)
     Write-Host ("  표가 낡아 거절  {0}" -f $gpu.mismatches)
-    Write-Host ("  패스           {0}개 · 합계 {1:N4} ms" -f $gpu.passCount, $gpu.ms)
+    Write-Host ("  패스           {0}개(이름) · {1}조각(raw) · 버린 조각 {2} · 길이 0 인 조각 {3}" -f
+        $gpu.passCount, $gpu.sliceCount, $gpu.droppedSlices, $gpu.zeroLengthSlices)
+    Write-Host ("  길이           이름합 {0:N4} · queueSpan {1:N4} · busy {2:N4} ms" -f
+        $gpu.ms, $gpu.queueSpanMs, $gpu.busyMs)
     Write-Host ("  귀속           frame {0} · submission {1} · view {2}" -f $gpu.frame, $gpu.submission, $gpu.viewId)
+    Write-Host ("  누적 장부      버림 {0} · 길이 0 이 {1} · span 위반 {2} · 조각 부족 {3}" -f
+        $gpu.droppedTotal, $gpu.zeroLengthTotal, $gpu.spanViolations, $gpu.sliceUnderflows)
     if ($gpu.lastError) { Write-Host ("  마지막 사유     {0}" -f $gpu.lastError) }
 
     $failures = New-Object System.Collections.Generic.List[string]
@@ -408,6 +413,42 @@ function Invoke-Gpu {
     if ($gpu.frame -le 0) {
         $failures.Add("귀속할 engineFrameId 가 없다 - 숫자가 어느 프레임 것인지 모른다")
     }
+
+    # ── raw 구간이 살아 있는가(§3.3) · 길이 셋의 관계가 성립하는가(§3.4) ──
+    #
+    # ★ 묻는 대상이 **누적 장부**다. 마지막 한 번의 값은 씬뷰와 게임뷰 중 어느
+    #   쪽인지가 실행마다 갈려서, 한쪽에만 있는 패스는 절반의 확률로만 검사를
+    #   받는다. 실제로 그랬다 — 길이 0 인 GizmoLine 은 씬뷰에만 있고, 그래서
+    #   같은 코드로 초록과 붉음이 번갈아 나왔다.
+    if ($gpu.droppedTotal -ne 0) {
+        $detail = if ($gpu.droppedSliceName) {
+            " (마지막 표본: '$($gpu.droppedSliceName)', $($gpu.droppedSliceDeltaTicks) 틱)"
+        } else { "" }
+        $failures.Add("뒤집힌 조각 누적 $($gpu.droppedTotal) 개$detail - 끝이 시작보다 앞선다")
+    }
+    # busy 는 겹침을 한 번만 센 합이므로 queue span 을 넘을 수 없다.
+    # 넘으면 합치는 산술이 겹침을 중복으로 센 것이다.
+    if ($gpu.spanViolations -ne 0) {
+        $failures.Add("busy > queueSpan 인 수집 $($gpu.spanViolations)/$($gpu.collects) - 겹침을 중복으로 센다")
+    }
+    # 이름으로 묶는 것은 표시용이다. 묶은 것만 남기면 GPU 타임라인을 그릴 수가
+    # 없고 조각이 서로 겹치는지도 알 수 없다. 조각 수가 이름 수보다 적을 수는 없다.
+    if ($gpu.sliceUnderflows -ne 0) {
+        $failures.Add("raw 조각 < 이름 인 수집 $($gpu.sliceUnderflows)/$($gpu.collects) - 묶은 것보다 원본이 적을 수 없다")
+    }
+    # ★ 분할 패스가 실제로 여러 조각으로 남아 있어야 한다. 같으면 묶기가 원본을
+    #   덮어쓴 것과 구별되지 않는다 — 이 씬은 분할 패스를 늘 가지고 있다.
+    if ($gpu.sliceCount -le $gpu.passCount) {
+        $failures.Add("raw 조각 $($gpu.sliceCount) <= 이름 $($gpu.passCount) - 분할 패스의 조각이 남아 있지 않다")
+    }
+    if ($gpu.busyMs -le 0) {
+        $failures.Add("busy 가 0 ms - 겹치지 않는 실행 구간이 없다")
+    }
+    # 이름합은 묶은 구간의 합이라 서로 겹칠 수 있고, 그 합집합은 busy 를 덮는다.
+    if ($gpu.ms -lt ($gpu.busyMs - 1e-6)) {
+        $failures.Add("이름합 $($gpu.ms) < busy $($gpu.busyMs) - 묶은 구간이 원본을 다 덮지 못한다")
+    }
+
     if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
 
     Write-Host ""

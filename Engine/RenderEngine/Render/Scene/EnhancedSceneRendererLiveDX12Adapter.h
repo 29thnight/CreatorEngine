@@ -88,6 +88,7 @@ public:
     void ResolveProfilerFrame(const GpuFrameToken& token);
     bool CollectProfiler(const GpuFrameToken& token,
         std::vector<EnhancedLivePassTiming>& outTimings,
+        EnhancedLiveGpuSpan& outSpan,
         double& outTotalMilliseconds, std::string& outError);
 
     void MaintainAssetCaches(uint64_t frameIndex);

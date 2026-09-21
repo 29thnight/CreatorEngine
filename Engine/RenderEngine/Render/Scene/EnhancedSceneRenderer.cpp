@@ -1169,6 +1169,10 @@ namespace
         // GPU 수집 장부. mismatches 가 0 이 아니면 그만큼의 수치가 **다른
         // 제출의 것**이다(수집 직전 주석).
         uint64_t gpuCollects{ 0 };
+        uint64_t gpuDroppedSlices{ 0 };
+        uint64_t gpuZeroLengthSlices{ 0 };
+        uint64_t gpuSpanViolations{ 0 };
+        uint64_t gpuSliceUnderflows{ 0 };
         uint64_t gpuCollectMismatches{ 0 };
 
         // 마지막으로 수집에 성공한 것의 귀속. 숫자만 내고 **어느 프레임·어느 뷰
@@ -1177,6 +1181,7 @@ namespace
         uint64_t    lastGpuFrameId{ 0 };
         uint64_t    lastGpuSubmissionId{ 0 };
         uint64_t    lastGpuViewId{ 0 };
+        EnhancedLiveGpuSpan lastGpuSpan{};
         std::string lastGpuCollectError;
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
         uint64_t viewOverflowSkips{ 0 }; // 뷰 상한(kMaxLiveCameraViews) 초과로 건너뛴 수
@@ -1513,10 +1518,15 @@ namespace
             debugSnapshot.cpuMs = lastCpuMs;
             debugSnapshot.gpuMs = lastGpuMs;
             debugSnapshot.gpuCollects = gpuCollects;
+            debugSnapshot.gpuDroppedSlices = gpuDroppedSlices;
+            debugSnapshot.gpuZeroLengthSlices = gpuZeroLengthSlices;
+            debugSnapshot.gpuSpanViolations = gpuSpanViolations;
+            debugSnapshot.gpuSliceUnderflows = gpuSliceUnderflows;
             debugSnapshot.gpuCollectMismatches = gpuCollectMismatches;
             debugSnapshot.lastGpuFrameId = lastGpuFrameId;
             debugSnapshot.lastGpuSubmissionId = lastGpuSubmissionId;
             debugSnapshot.lastGpuViewId = lastGpuViewId;
+            debugSnapshot.lastGpuSpan = lastGpuSpan;
             debugSnapshot.lastGpuCollectError = lastGpuCollectError;
             debugSnapshot.graveyardCount = static_cast<uint32_t>(
                 dx12.GetRetiredDisplayCount()) + dx12.GetAssetGraveyardCount();
@@ -5327,10 +5337,11 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 ++state.gpuCollects;
 
                 std::vector<EnhancedLivePassTiming> timings;
+                EnhancedLiveGpuSpan span{};
                 std::string collectError;
                 double totalMilliseconds = 0.0;
                 if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
-                    timings, totalMilliseconds, collectError))
+                    timings, span, totalMilliseconds, collectError))
                 {
                     state.lastGpuMs = totalMilliseconds;
                     // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
@@ -5340,6 +5351,17 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
                     state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
                     state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
+                    state.lastGpuSpan = span;
+
+                    // 길이 셋의 관계를 여기서 묻는다. 둘 다 손에 있는 자리가
+                    // 여기뿐이고, 여기서 세야 모든 뷰의 모든 수집이 검사를 받는다.
+                    state.gpuDroppedSlices += span.droppedSlices;
+                    state.gpuZeroLengthSlices += span.zeroLengthSlices;
+                    if (span.busyMs > span.queueSpanMs + 1e-9) ++state.gpuSpanViolations;
+                    if (span.sliceCount < state.lastPassTimings.size())
+                    {
+                        ++state.gpuSliceUnderflows;
+                    }
                 }
                 else
                 {
