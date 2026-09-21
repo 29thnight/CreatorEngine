@@ -5434,10 +5434,20 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                         {
                             const uint32_t frameLabel = static_cast<uint32_t>(
                                 view.slots[slotIndex].profilerToken.engineFrameId);
+
+                            // 귀속은 **그 제출의 표**에서 뽑는다. "지금 기록 중인
+                            // 슬롯" 을 읽으면 §0.5.10 의 83% 가 그대로 돌아온다.
+                            EnhancedLiveGpuSpanOrigin origin{};
+                            origin.submissionId = static_cast<uint32_t>(
+                                view.slots[slotIndex].profilerToken.submissionId);
+                            origin.renderViewId = static_cast<uint16_t>(
+                                view.slots[slotIndex].profilerToken.renderViewId);
+                            origin.queueId = view.slots[slotIndex].profilerToken.queueId;
+
                             for (const EnhancedLiveGpuSlice& slice : slices)
                             {
                                 sink.on_span(slice.name.c_str(), slice.beginCpuTick,
-                                             slice.endCpuTick, frameLabel);
+                                             slice.endCpuTick, frameLabel, origin);
                                 ++state.gpuSpansEmitted;
                             }
                             if (sink.on_flush && !slices.empty()) sink.on_flush();

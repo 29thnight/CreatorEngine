@@ -387,10 +387,22 @@ struct EnhancedLiveGpuSlice
 ///   내내 피해 온 방향이다.
 ///
 /// ★ name 은 **부르는 동안만** 유효하다. 받는 쪽이 곧바로 자기 표에 옮긴다.
+/// 이 구간이 어느 제출·어느 뷰·어느 큐의 것인가. §7.3 이 GPU bar 의 tooltip 에
+/// 싣기로 한 것들이고, 전부 수집이 쓴 **그 제출의 표**(GpuFrameToken)에서 온다.
+///
+/// ★ fence 는 넘기지 않는다. 이 백엔드에서 fenceValue 는 submissionId 와 1:1 이라
+///   이벤트마다 8 바이트를 더 지고 같은 것에 두 번째 이름을 주는 일이 된다.
+struct EnhancedLiveGpuSpanOrigin
+{
+    uint32_t submissionId = 0;
+    uint16_t renderViewId = 0;
+    uint8_t  queueId = 0;
+};
+
 struct EnhancedLiveGpuSpanSink
 {
     void (*on_span)(const char* name, uint64_t beginCpuTick, uint64_t endCpuTick,
-                    uint32_t engineFrameId) = nullptr;
+                    uint32_t engineFrameId, const EnhancedLiveGpuSpanOrigin& origin) = nullptr;
     void (*on_flush)() = nullptr;
 };
 

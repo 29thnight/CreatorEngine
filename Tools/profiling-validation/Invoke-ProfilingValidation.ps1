@@ -395,6 +395,12 @@ function Invoke-Gpu {
     $gpuLaneFrames = 0
     $gpuLaneSkewed = 0
     $gpuLaneSeen = $false
+
+    # §7.3 의 귀속과 트랙 순서.
+    $gpuNoOrigin = 0        # 제출 번호가 0 인 GPU 구간
+    $laneOrderBreaks = 0    # 레인이 트랙 순서를 어긴 자리
+    $laneOrderSample = ''
+    $lanesScanned = 0
     if ($frameLine) {
         try { $frameData = $frameLine.Trim() | ConvertFrom-Json } catch { $frameData = $null }
         if ($frameData) {
@@ -408,8 +414,36 @@ function Invoke-Gpu {
                         # ★ 이 한 줄이 이 조각의 계약이다. 이벤트가 담긴 프레임과
                         #   이벤트가 들고 온 프레임 라벨이 같아야 한다.
                         if ($e.startFrame -ne $f.frame) { $gpuLaneSkewed++ }
+
+                        # 귀속(§7.3 의 tooltip). 제출 번호가 0 이면 그 구간은
+                        # 어느 제출의 것인지 말하지 못한다 — 같은 프레임의
+                        # 씬뷰와 게임뷰가 이름만 같은 두 줄로 보인다.
+                        $submission = 0
+                        if ($null -ne $e.PSObject.Properties['submission']) {
+                            $submission = [int]$e.submission
+                        }
+                        if (0 -eq $submission) { $gpuNoOrigin++ }
                     }
                 }
+
+                # 레인이 §7.3 의 트랙 순서로 나오는가. CLI 는 코어의
+                # track_precedes 로 세워 내므로, 여기서 순서를 다시 적지 않고
+                # **오름차순인지만** 묻는다.
+                $previous = -1
+                $names = @()
+                foreach ($th in $f.threads) {
+                    $kind = if ($null -ne $th.PSObject.Properties['trackKind']) {
+                        [int]$th.trackKind } else { -1 }
+                    $names += ($th.name + '(' + $kind + ')')
+                    if ($kind -lt $previous) {
+                        $laneOrderBreaks++
+                        if ('' -eq $laneOrderSample) {
+                            $laneOrderSample = 'frame ' + $f.frame + ': ' + ($names -join ' -> ')
+                        }
+                    }
+                    $previous = $kind
+                }
+                if ($f.threads.Count -ge 2) { $lanesScanned++ }
             }
         }
     }
@@ -435,6 +469,8 @@ function Invoke-Gpu {
     Write-Host ("  귀속 지연      제출→수집 최대 {0:N4} ms" -f $gpu.maxSubmitToCollectMs)
     Write-Host ("  레인 귀속      흘린 조각 {0} · 캡처의 GPU 레인 {1}칸 {2}건 · 어긋난 칸 {3}" -f
         $gpu.spansEmitted, $gpuLaneFrames, $gpuLaneEvents, $gpuLaneSkewed)
+    Write-Host ("  출처·트랙      제출 번호 0 인 구간 {0} · 트랙 순서 위반 {1} (레인 둘 이상인 프레임 {2})" -f
+        $gpuNoOrigin, $laneOrderBreaks, $lanesScanned)
     if ($gpu.clockError) { Write-Host ("  통합 축 사유   {0}" -f $gpu.clockError) }
     if ($gpu.lastError) { Write-Host ("  마지막 사유     {0}" -f $gpu.lastError) }
 
@@ -524,6 +560,22 @@ function Invoke-Gpu {
     #   다르면 늦게 온 구간이 제 프레임으로 돌아가지 못한 것이다.
     if ($gpuLaneSkewed -ne 0) {
         $failures.Add("제 프레임 칸을 벗어난 GPU 구간 $gpuLaneSkewed/$gpuLaneEvents - 늦게 온 것이 수집한 프레임에 담겼다")
+    }
+
+    # ── GPU bar 가 자기 출처를 말하는가(§7.3 tooltip) ─────────────
+    if ($gpuNoOrigin -ne 0) {
+        $failures.Add("제출 번호가 0 인 GPU 구간 $gpuNoOrigin/$gpuLaneEvents - 어느 제출의 것인지 말하지 못한다")
+    }
+
+    # ── 레인이 §7.3 의 트랙 순서로 서는가 ─────────────────────────
+    #
+    # ★ "어긴 자리 0" 은 잴 레인이 없어도 0 이다. 레인이 둘 이상인 프레임을
+    #   실제로 훑었는지 먼저 묻는다.
+    if ($lanesScanned -le 0) {
+        $failures.Add("레인이 둘 이상인 프레임이 없다 - 트랙 순서 단정이 빈 집합을 통과한다")
+    }
+    if ($laneOrderBreaks -ne 0) {
+        $failures.Add("트랙 순서를 어긴 레인 $laneOrderBreaks 자리 ($laneOrderSample) - 창과 CLI 가 다른 순서를 말한다")
     }
 
     if ($gpu.alignmentViolations -ne 0) {

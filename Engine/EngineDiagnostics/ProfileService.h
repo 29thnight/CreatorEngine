@@ -114,7 +114,12 @@ namespace ce
 		// 스트림을 서비스가 만들어 소유한다. 등록한 스레드가 끝나면
 		// unregister_thread 를 부르고, 안 불러도 서비스 종료 시 정리된다 —
 		// 어느 쪽이든 수집기가 죽은 저장소를 읽는 경로가 없다.
-		void register_thread(const char* name = nullptr);
+		// ★ 트랙은 **부르는 쪽이** 말한다. 타임라인의 레인 순서(§7.3)가 이
+		//   값으로 서고, 말하지 않으면 `other` 로 맨 아래에 간다. 코어가 이름을
+		//   뜯어 짐작하지 않는 이유는 track_kind 의 주석에 있다.
+		void register_thread(const char* name = nullptr,
+		                     track_kind   kind = track_kind::other,
+		                     std::uint32_t track_order = 0);
 		void unregister_thread();
 		std::uint32_t thread_count() const;
 
@@ -143,7 +148,7 @@ namespace ce
 		//   건너뛴다 — 적는 스레드가 렌더 스레드이고 프레임 경계를 도는 쪽은
 		//   게임 스레드라, 남이 봉인하면 두 스레드가 같은 청크 포인터를 만진다.
 		void submit_gpu_span(marker_id id, profile_tick begin, profile_tick end,
-		                     std::uint32_t frame);
+		                     std::uint32_t frame, const gpu_span_context& gpu);
 
 		// 지금까지 적은 GPU 구간을 수집기에 넘긴다. 적는 스레드가 부른다.
 		void publish_gpu_spans();

@@ -89,7 +89,11 @@ namespace EngineBootstrap
                 // enkiTS threadnum_ 은 0..GetNumTaskThreads()-1 로 안정 보장된다.
                 char name[32];
                 std::snprintf(name, sizeof(name), "[Worker %u]", index);
-                ce::profiler().register_thread(name);
+                // ★ index 를 트랙 순서로 함께 넘긴다. 슬롯(등록 순서)은 회차마다
+                //   갈리지만 enkiTS 의 threadnum_ 은 0..N-1 로 안정 보장되므로,
+                //   레인이 회차와 무관하게 1,2,3… 으로 선다.
+                ce::profiler().register_thread(name, ce::track_kind::command_thread,
+                                               index + 1);
             },
             [](unsigned int)
             {
@@ -105,7 +109,10 @@ namespace EngineBootstrap
         // ★ 등록만으로는 캡처에 아무것도 안 나온다. 프레임은 **이벤트가 있는
         //   스레드만** 싣기 때문에, 구간 훅까지 있어야 이 스레드가 보인다.
         EnhancedSceneRenderer::SetRenderThreadHooks({
-            []() { ce::profiler().register_thread("[RenderThread]"); },
+            // 렌더 스레드는 command-build/execute 트랙(§7.3 의 셋째)이고,
+            // 워커보다 위에 둔다 — 워커의 순서는 1 부터다.
+            []() { ce::profiler().register_thread("[RenderThread]",
+                                                  ce::track_kind::command_thread, 0); },
             []()
             {
                 // ★ GPU 레인의 저장소 주인도 이 스레드다 — 여기서 적기
@@ -127,11 +134,19 @@ namespace EngineBootstrap
         //   백엔드의 몫이고, 여기는 옮겨진 것만 받는다.
         SetEnhancedLiveGpuSpanSink({
             [](const char* name, std::uint64_t begin, std::uint64_t end,
-               std::uint32_t frame)
+               std::uint32_t frame, const EnhancedLiveGpuSpanOrigin& origin)
             {
+                // 귀속은 옮겨 담기만 한다. 두 타입이 같은 모양인 것은 우연이
+                // 아니라 이 자리가 경계이기 때문이다 — RenderEngine 은
+                // ce::gpu_span_context 를 모르고, 코어는 GpuFrameToken 을 모른다.
+                ce::gpu_span_context gpu{};
+                gpu.submission = origin.submissionId;
+                gpu.view = origin.renderViewId;
+                gpu.queue = origin.queueId;
+
                 ce::profiler().submit_gpu_span(
                     ce::intern_runtime_marker(name, ce::marker_kind::gpu_span),
-                    begin, end, frame);
+                    begin, end, frame, gpu);
             },
             []() { ce::profiler().publish_gpu_spans(); } });
 

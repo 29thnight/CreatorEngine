@@ -379,6 +379,39 @@ $mutations = @(
         New    = "`t`tif (false)"
         Expect = 'reader-sync/same'
         Why    = '같은 것을 매 프레임 다시 집으면 선택과 시야가 매 프레임 초기화된다'
+    },
+
+    # ── §7.3 의 트랙 순서와 GPU 귀속 ───────────────────────────────
+    @{
+        # 트랙을 안 보고 트랙 안의 순서부터 본다. 그러면 레인이 등록 순서로
+        # 돌아가고, 워커의 등록 순서는 회차마다 갈린다.
+        Name   = 'track-order-ignores-kind'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`tif (a.kind != b.kind) return a.kind < b.kind;`r`n"
+        New    = ""
+        Expect = 'track-order/lane'
+        Why    = '트랙을 안 보면 레인 순서가 등록 순서로 돌아간다'
+    },
+    @{
+        # 레인의 스팬 경계는 요약이 **이벤트와 같은 순서**일 때 걸어 둔 것이다.
+        # 그 전제를 깨면 아무것도 실패하지 않고 모든 레인이 빈다 — 순서를
+        # 바꾸는 자리(2b)를 경계보다 앞으로 옮기면 정확히 이 모양이 된다.
+        Name   = 'spans-walk-out-of-order'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t{`r`n`t`t`tstd::uint32_t cursor = 0;"
+        New    = "`t`tstd::reverse(result.m_threads.begin(), result.m_threads.end());`r`n`t`t{`r`n`t`t`tstd::uint32_t cursor = 0;"
+        Expect = 'track-order/range'
+        Why    = '요약 순서가 이벤트 순서와 어긋나면 레인 경계가 통째로 빈다'
+    },
+    @{
+        # 제출 번호를 안 싣는다. GPU bar 의 tooltip 이 같은 프레임의 씬뷰와
+        # 게임뷰 제출을 가릴 수 없게 된다.
+        Name   = 'gpu-origin-dropped'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`tvalue.submission = gpu.submission;"
+        New    = "`t`tvalue.submission = 0;"
+        Expect = 'gpu-origin/submission'
+        Why    = '귀속을 안 실으면 같은 이름의 두 제출이 구분되지 않는다'
     }
 )
 

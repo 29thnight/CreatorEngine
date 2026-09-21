@@ -72,7 +72,46 @@ namespace ce
 		std::uint16_t thread_slot = 0;
 		std::uint16_t depth = 0;
 		event_flags   flags = event_flags::none;
-		std::uint8_t  reserved = 0;
+
+		// 어느 큐의 구간인가. CPU 스코프는 0 이고, GPU 구간만 백엔드가 준
+		// queue id 를 싣는다. §7.3 의 여섯째 트랙(Compute/Copy)이 설 때
+		// 레인을 가르는 자가 이것이다.
+		std::uint8_t  queue = 0;
+
+		// ── GPU 구간만 쓰는 칸 ────────────────────────────────────────────
+		//
+		// ★ CPU 스코프에서는 0 이다. 그런데도 모든 이벤트가 이 여섯 바이트를
+		//   지고 간다 — 자리를 나누는(union) 대신 그냥 넓혔다. 레코드가
+		//   32 → 40 바이트(+25%)가 되고, 600 프레임 실측 캡처의 총량은
+		//   863 KB 다(예산 128 MB). 자리를 겹쳐 두면 "지금 이 칸이 무슨
+		//   뜻인가" 를 flags 로 매번 되물어야 하고, 그 물음을 한 번 빠뜨리면
+		//   CPU 구간의 depth 가 제출 번호로 읽힌다.
+		//
+		// ★ fence 는 싣지 않는다. 이 백엔드에서 fence 값은 제출과 1:1 이라
+		//   이벤트마다 8 바이트를 더 지고 **같은 것에 두 번째 이름**을 주는
+		//   일이 된다. 큐가 여럿이 되어 둘이 갈라지면 그때 싣는다.
+		std::uint32_t submission = 0;   // 이 구간이 실린 GPU 제출 번호
+		std::uint16_t view = 0;         // 어느 뷰(카메라)의 제출인가
+		std::uint16_t reserved = 0;
+	};
+
+	// ★ 이 수를 **못 박아 둔다.** 링의 메모리는 이 레코드 × 보존 프레임의
+	//   이벤트 수이고, 여기에 필드를 하나 더하는 일은 캡처 전체의 크기를
+	//   바꾸는 결정이다. 조용히 커지면 아무도 그 결정을 내린 적이 없게 된다 —
+	//   늘려야 한다면 이 줄을 함께 고치고, 왜 늘렸는지를 위에 적어라.
+	static_assert(sizeof(profile_event) == 40,
+	              "profile_event 의 크기가 바뀌었다 — 링 메모리가 그만큼 움직인다");
+
+	// GPU 구간이 들고 오는 귀속. 어느 제출의, 어느 뷰의, 어느 큐의 것인가.
+	//
+	// ★ 인자를 셋 더 늘리는 대신 묶었다. `write_span(id, begin, end, frame,
+	//   depth, submission, view, queue)` 는 같은 폭의 정수가 줄줄이 서서,
+	//   자리를 하나 바꿔 넣어도 컴파일러가 아무 말도 하지 않는다.
+	struct gpu_span_context
+	{
+		std::uint32_t submission = 0;
+		std::uint16_t view = 0;
+		std::uint8_t  queue = 0;
 	};
 
 	// 청크 하나의 이벤트 수. 프레임당 27~38 개가 현재 실측이므로 256 이면

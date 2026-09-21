@@ -261,7 +261,8 @@ namespace ce
 		entry.live = false;
 	}
 
-	void profiler_service::register_thread(const char* name)
+	void profiler_service::register_thread(const char* name, track_kind kind,
+	                                       std::uint32_t track_order)
 	{
 		if (!m_initialized.load(std::memory_order_acquire))
 		{
@@ -280,6 +281,8 @@ namespace ce
 		thread_info info;
 		info.os_thread_id = os_id;
 		info.slot = static_cast<std::uint32_t>(m_streams.size());
+		info.kind = kind;
+		info.track_order = track_order;
 		if (name && *name)
 		{
 			info.name = name;
@@ -433,6 +436,7 @@ namespace ce
 		info.os_thread_id = 0;   // OS 스레드가 아니다 — 큐다.
 		info.slot = static_cast<std::uint32_t>(m_streams.size());
 		info.name = kGpuLaneName;
+		info.kind = track_kind::gpu_graphics;
 
 		auto stream = std::make_unique<thread_stream>(*m_pool, info);
 		stream->set_generation(m_generation.load(std::memory_order_acquire));
@@ -453,7 +457,8 @@ namespace ce
 	}
 
 	void profiler_service::submit_gpu_span(marker_id id, profile_tick begin,
-	                                       profile_tick end, std::uint32_t frame)
+	                                       profile_tick end, std::uint32_t frame,
+	                                       const gpu_span_context& gpu)
 	{
 		if (!m_initialized.load(std::memory_order_acquire))
 		{
@@ -476,7 +481,7 @@ namespace ce
 
 		// 깊이는 0 이다. 한 큐의 구간들은 중첩하지 않는다 — BeginPass/EndPass
 		// 가 커맨드 리스트에 순서대로 놓이기 때문이다.
-		stream->write_span(id, begin, end, frame, 0);
+		stream->write_span(id, begin, end, frame, 0, gpu);
 	}
 
 	void profiler_service::publish_gpu_spans()

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <unordered_map>
+#include <utility>
 
 // 유니티 빌드 때문에 익명 네임스페이스를 쓰지 않는다(계획서 §14).
 namespace ce::detail::profile_aggregate_impl
@@ -156,6 +157,12 @@ namespace ce
 
 		// 스팬은 스레드 순으로 서 있으므로 각 스레드의 몫이 연속이다.
 		// 레인을 그리는 쪽이 자기 구간만 훑도록 경계를 적어 둔다.
+		//
+		// ★ 이 순회는 요약이 **이벤트와 같은 순서**(슬롯 오름차순)일 때만
+		//   성립한다. 아래에서 트랙 순서로 다시 세우므로, 경계는 반드시
+		//   그 전에 적어야 한다. 순서를 바꾼 뒤에 돌리면 첫 요약의 슬롯이
+		//   events[0] 과 안 맞아 **모든 레인이 [0,0) 으로 비고**, 아무것도
+		//   실패하지 않은 채 타임라인만 빈 화면이 된다.
 		{
 			std::uint32_t cursor = 0;
 			for (thread_summary& summary : result.m_threads)
@@ -168,6 +175,35 @@ namespace ce
 				}
 				summary.span_end = cursor;
 			}
+		}
+
+		// ── 2b. §7.3 의 트랙 순서로 레인을 세운다 ──────────────────────────
+		//
+		// 슬롯은 **등록 순서**라 회차마다 갈린다(워커 여덟의 등록이 겹친다).
+		// 트랙은 등록하는 쪽이 선언한 것이므로 회차와 무관하다.
+		//
+		// ★ 경계(span_begin/end)는 인덱스라 자리를 바꿔도 그대로 뜻을 지킨다 —
+		//   그래서 위에서 먼저 적어 두고 여기서 옮긴다.
+		{
+			const std::span<const thread_info> registry = capture.threads();
+			auto track_of = [&](std::uint16_t slot) -> thread_info
+			{
+				for (const thread_info& info : registry)
+				{
+					if (info.slot == slot) return info;
+				}
+				// 표에 없는 슬롯. 트랙을 모르므로 기본값(other)으로 맨 아래다.
+				thread_info unknown;
+				unknown.slot = slot;
+				return unknown;
+			};
+
+			std::stable_sort(result.m_threads.begin(), result.m_threads.end(),
+			                 [&](const thread_summary& a, const thread_summary& b)
+			                 {
+				                 return track_precedes(track_of(a.thread_slot),
+				                                       track_of(b.thread_slot));
+			                 });
 		}
 
 		for (const thread_summary& summary : result.m_threads)

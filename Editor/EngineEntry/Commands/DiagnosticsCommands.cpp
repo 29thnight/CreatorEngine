@@ -817,8 +817,16 @@ namespace ConsoleCmd
 
                 // 스레드별로 나눈다. 이벤트에 thread_slot 이 박혀 있으므로
                 // 수집 시점에 정렬하지 않고 여기서 가른다.
+                // ★ 레인 순서를 §7.3 으로 세워 낸다. 창이 보는 것과 같은
+                //   순서여야 게이트가 화면 없이 그 순서를 물을 수 있다.
+                //   비교는 코어의 track_precedes 하나를 쓴다 — 여기서 다시
+                //   적으면 두 벌이 되고, 한쪽만 고쳐지는 날이 온다.
+                std::vector<ce::thread_info> lanes(capture->threads().begin(),
+                                                   capture->threads().end());
+                std::sort(lanes.begin(), lanes.end(), ce::track_precedes);
+
                 auto threadList = CommandData::Array();
-                for (const ce::thread_info& thread : capture->threads())
+                for (const ce::thread_info& thread : lanes)
                 {
                     auto eventList = CommandData::Array();
                     double rootMs = 0.0;
@@ -843,6 +851,16 @@ namespace ConsoleCmd
                         {
                             eventEntry.Set("truncatedEnd", CommandData::Bool(true));
                         }
+                        if (ce::has_flag(event.flags, ce::event_flags::gpu_span))
+                        {
+                            // §7.3 의 GPU bar tooltip 이 싣는 것과 같은 셋.
+                            // 화면에만 두면 그것이 살아 있는지 물을 수단이
+                            // 눈뿐이 된다.
+                            eventEntry.Set("gpu", CommandData::Bool(true));
+                            eventEntry.Set("submission", CommandData::Int(event.submission));
+                            eventEntry.Set("view", CommandData::Int(event.view));
+                            eventEntry.Set("queue", CommandData::Int(event.queue));
+                        }
                         eventList.Append(std::move(eventEntry));
                         ++count;
                     }
@@ -852,6 +870,9 @@ namespace ConsoleCmd
                     auto threadEntry = CommandData::Object();
                     threadEntry.Set("index", CommandData::Int(thread.slot));
                     threadEntry.Set("name", CommandData::String(thread.name));
+                    threadEntry.Set("trackKind",
+                        CommandData::Int(static_cast<std::int64_t>(thread.kind)));
+                    threadEntry.Set("trackOrder", CommandData::Int(thread.track_order));
                     threadEntry.Set("count", CommandData::Int(static_cast<std::int64_t>(count)));
                     threadEntry.Set("rootMs", CommandData::Double(rootMs));
                     threadEntry.Set("events", std::move(eventList));

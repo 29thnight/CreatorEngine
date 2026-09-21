@@ -1392,7 +1392,7 @@ void test_gpu_lane()
 	{
 		if (frame == 5)
 		{
-			service.submit_gpu_span(ce::marker<"GpuPass">(), base + 10, base + 20, 2);
+			service.submit_gpu_span(ce::marker<"GpuPass">(), base + 10, base + 20, 2, {});
 			service.publish_gpu_spans();
 		}
 		service.publish_frame(frame);
@@ -1439,6 +1439,177 @@ void test_gpu_lane()
 	service.shutdown();
 }
 
+//-----------------------------------------------------------------------------
+// §7.3 의 트랙 순서. 레인은 **등록 순서가 아니라 선언한 트랙**으로 선다.
+//
+// ★ 자극을 일부러 거꾸로 세운다. 슬롯 오름차순이면 정답과 정확히 반대가
+//   되도록 등록해야, 두 순서가 우연히 같아 변이가 통과하는 일이 없다.
+//   실제 에디터에서 워커 여덟의 등록 순서가 회차마다 갈리는 것이 이 축을
+//   세운 이유다 — 슬롯은 회차를 타고, 트랙은 타지 않는다.
+//
+// ★ 레인의 스팬 경계도 함께 묻는다. 그 경계는 요약이 **이벤트와 같은
+//   순서**일 때 걸어 둔 것이라, 순서를 바꾸는 자리와 짝이 맞지 않으면
+//   아무것도 실패하지 않고 모든 레인이 비어 버린다.
+//-----------------------------------------------------------------------------
+void test_track_order()
+{
+	ce::profiler_service service;
+	service.initialize({});
+
+	// 슬롯 0 — 맨 아래로 가야 할 것을 맨 먼저 등록한다.
+	service.register_thread("Script", ce::track_kind::script_thread);
+	service.record(1);
+
+	auto lane = [&service](const char* name, ce::track_kind kind, std::uint32_t order)
+	{
+		std::thread worker([&service, name, kind, order]()
+		{
+			service.register_thread(name, kind, order);
+			{
+				ce::profile_scope scope{ service, ce::marker<"LaneWork">() };
+				busy_ticks(4);
+			}
+			service.unregister_thread();
+		});
+		worker.join();
+	};
+
+	lane("WorkerTwo", ce::track_kind::command_thread, 2);   // 슬롯 1
+	lane("WorkerOne", ce::track_kind::command_thread, 1);   // 슬롯 2
+	lane("Game",      ce::track_kind::game_thread,    0);   // 슬롯 3
+
+	{
+		ce::profile_scope scope{ service, ce::marker<"ScriptWork">() };
+		busy_ticks(4);
+	}
+
+	// 슬롯 4 — GPU 레인은 submit 이 만든다.
+	const ce::profile_tick base = ce::profiler_service::now();
+	service.submit_gpu_span(ce::marker<"GpuPass">(), base + 10, base + 20, 1, {});
+	service.publish_gpu_spans();
+
+	service.publish_frame(1);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "track-order/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 1);
+	const std::span<const ce::thread_summary> lanes = aggregate.threads();
+	check_eq(lanes.size(), std::size_t{ 5 }, "track-order/lanes — 레인 다섯이 섰다");
+	if (lanes.size() != 5) { service.shutdown(); return; }
+
+	auto name_of = [&capture](std::uint16_t slot) -> std::string
+	{
+		for (const ce::thread_info& info : capture->threads())
+		{
+			if (info.slot == slot) return info.name;
+		}
+		return "?";
+	};
+
+	const char* expected[5] = { "Game", "WorkerOne", "WorkerTwo", "Script",
+	                            ce::profiler_service::kGpuLaneName };
+	for (std::size_t i = 0; i < 5; ++i)
+	{
+		const std::string actual = name_of(lanes[i].thread_slot);
+		const std::string label = std::string("track-order/lane") + std::to_string(i) +
+		                          " — " + expected[i] + " 자리 (관측 " + actual + ")";
+		check(actual == expected[i], label.c_str());
+	}
+
+	// ★ 경계가 제 레인을 가리키는가. 순서를 바꾸는 자리와 경계를 적는 자리가
+	//   어긋나면 여기서 모든 레인이 [0,0) 으로 빈다.
+	const std::span<const ce::profile_event> spans = aggregate.spans();
+	std::size_t covered = 0;
+	std::size_t strayed = 0;
+	for (const ce::thread_summary& summary : lanes)
+	{
+		const std::string label = std::string("track-order/range-") +
+		                          name_of(summary.thread_slot) +
+		                          " — 레인의 스팬 구간이 비지 않았다";
+		check(summary.span_begin < summary.span_end, label.c_str());
+		for (std::uint32_t i = summary.span_begin; i < summary.span_end && i < spans.size(); ++i)
+		{
+			++covered;
+			if (spans[i].thread_slot != summary.thread_slot) ++strayed;
+		}
+	}
+	check_eq(strayed, std::size_t{ 0 },
+	         "track-order/range-owner — 레인 구간에 남의 스팬이 없다");
+	check_eq(covered, spans.size(),
+	         "track-order/range-cover — 레인 구간들이 스팬 전부를 덮는다");
+
+	service.shutdown();
+}
+
+//-----------------------------------------------------------------------------
+// GPU bar 의 tooltip 이 싣는 귀속(§7.3): 제출 번호 · 뷰 · 큐.
+//
+// ★ 이것이 없으면 같은 프레임의 씬뷰와 게임뷰 제출이 **이름만 같은 두 줄**로
+//   보인다. §0.5.10 에서 수집의 83% 가 남의 제출을 읽고 있었는데도 오래
+//   안 보였던 이유가 그 구분의 부재였다.
+//-----------------------------------------------------------------------------
+void test_gpu_span_origin()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.record(1);
+
+	ce::gpu_span_context origin;
+	origin.submission = 4242;
+	origin.view = 7;
+	origin.queue = 2;
+
+	const ce::profile_tick base = ce::profiler_service::now();
+	for (std::uint32_t frame = 1; frame <= 3; ++frame)
+	{
+		if (frame == 3)
+		{
+			service.submit_gpu_span(ce::marker<"GpuPass">(), base + 10, base + 20, 2, origin);
+			service.publish_gpu_spans();
+		}
+		service.publish_frame(frame);
+	}
+
+	service.pause();
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "gpu-origin/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	std::size_t seen = 0;
+	for (const ce::frame_record& frame : capture->frames())
+	{
+		for (const ce::profile_event& event : frame.events)
+		{
+			if (!ce::has_flag(event.flags, ce::event_flags::gpu_span)) continue;
+			++seen;
+			check_eq<std::uint32_t>(event.submission, 4242u,
+			                        "gpu-origin/submission — 제출 번호가 그대로 남는다");
+			check_eq<unsigned>(event.view, 7u, "gpu-origin/view — 뷰가 그대로 남는다");
+			check_eq<unsigned>(event.queue, 2u, "gpu-origin/queue — 큐가 그대로 남는다");
+		}
+	}
+	check_eq(seen, std::size_t{ 1 }, "gpu-origin/present — GPU 구간이 하나 담겼다");
+
+	// CPU 스코프는 이 칸을 쓰지 않는다. 0 이 아니면 남의 값이 새어 든 것이다.
+	std::size_t cpuDirty = 0;
+	for (const ce::frame_record& frame : capture->frames())
+	{
+		for (const ce::profile_event& event : frame.events)
+		{
+			if (ce::has_flag(event.flags, ce::event_flags::gpu_span)) continue;
+			if (0 != event.submission || 0 != event.view || 0 != event.queue) ++cpuDirty;
+		}
+	}
+	check_eq(cpuDirty, std::size_t{ 0 },
+	         "gpu-origin/cpu-clean — CPU 스코프의 GPU 칸은 0 이다");
+
+	service.shutdown();
+}
+
+
 // 아직 닫히지 않은 프레임의 구간은 기다렸다가 그 프레임이 닫힐 때 들어간다.
 void test_gpu_lane_deferred()
 {
@@ -1450,7 +1621,7 @@ void test_gpu_lane_deferred()
 
 	// 프레임 1 을 닫은 뒤, **아직 오지 않은** 프레임 3 의 구간을 낸다.
 	service.publish_frame(1);
-	service.submit_gpu_span(ce::marker<"GpuAhead">(), base + 1, base + 2, 3);
+	service.submit_gpu_span(ce::marker<"GpuAhead">(), base + 1, base + 2, 3, {});
 	service.publish_gpu_spans();
 	service.publish_frame(2);   // 아직 3 이 아니다 — 기다려야 한다
 	service.publish_frame(3);   // 여기서 들어간다
@@ -1498,7 +1669,7 @@ void test_gpu_lane_dropped()
 	}
 
 	// 프레임 1 은 이미 밀려났다.
-	service.submit_gpu_span(ce::marker<"GpuGone">(), base + 1, base + 2, 1);
+	service.submit_gpu_span(ce::marker<"GpuGone">(), base + 1, base + 2, 1, {});
 	service.publish_gpu_spans();
 	service.publish_frame(9);
 
@@ -2513,6 +2684,8 @@ int main()
 	test_scope_across_state_change();
 	test_reader_sync();
 	test_gpu_lane();
+	test_track_order();
+	test_gpu_span_origin();
 	test_gpu_lane_deferred();
 	test_gpu_lane_dropped();
 	test_concurrent_publish();

@@ -81,7 +81,7 @@ Editor::EditorMain::~EditorMain()
 void Editor::EditorMain::Initialize()
 {
 	// 초기화는 부트스트랩이 이미 했다(워커보다 먼저 서야 한다).
-	ce::profiler().register_thread("[GameThread]");
+	ce::profiler().register_thread("[GameThread]", ce::track_kind::game_thread);
 	// 지금은 부팅과 함께 기록을 연다. 녹화 제어(Record/Pause)는 P3 의
 	// ProfilerWindow 가 가져간다 — 그때까지는 옛 코어와 같은 "항상 기록"
 	// 동작을 유지해야 기준선을 맞대 볼 수 있다.
@@ -396,7 +396,9 @@ void Editor::EditorMain::PresentationThreadMain()
 	// PHASE 14 P2 — 이 스레드가 ImGui 전체를 그린다. 옛 코어에서는 계측을
 	// 걷어야 했다(3-2G: producer TLS 수집이 멀티 writer 안전하지 않았다).
 	// sealed chunk handoff 가 선 지금은 안전하다.
-	ce::profiler().register_thread("[PresentationThread]");
+	// 표시는 제출한 것을 화면에 내보내는 일이라 같은 트랙의 꼬리에 둔다.
+	ce::profiler().register_thread("[PresentationThread]",
+	                               ce::track_kind::command_thread, 0xFFFFFFFFu);
 	for (;;)
 	{
 		bool hasFrameRequest = false;

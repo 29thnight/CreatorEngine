@@ -4,6 +4,13 @@
 
 namespace ce
 {
+	bool track_precedes(const thread_info& a, const thread_info& b)
+	{
+		if (a.kind != b.kind) return a.kind < b.kind;
+		if (a.track_order != b.track_order) return a.track_order < b.track_order;
+		return a.slot < b.slot;
+	}
+
 	//-------------------------------------------------------------------------
 	// chunk_pool
 	//-------------------------------------------------------------------------
@@ -352,7 +359,8 @@ namespace ce
 	}
 
 	void thread_stream::write_span(marker_id id, profile_tick begin, profile_tick end,
-	                               std::uint32_t frame, std::uint16_t depth)
+	                               std::uint32_t frame, std::uint16_t depth,
+	                               const gpu_span_context& gpu)
 	{
 		if (!owned_by_caller()) return;
 
@@ -373,6 +381,9 @@ namespace ce
 		value.frame = frame;
 		value.depth = depth;
 		value.flags = event_flags::gpu_span;
+		value.submission = gpu.submission;
+		value.view = gpu.view;
+		value.queue = gpu.queue;
 		write(value);
 	}
 

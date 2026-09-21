@@ -21,13 +21,53 @@
 
 namespace ce
 {
+	// §7.3 이 정한 트랙 순서. 타임라인의 레인은 이 값으로 선다.
+	//
+	// ★ 이름을 뜯어 짐작하지 않는다. 코어가 `"[Worker "` 같은 접두사를 알면
+	//   이름을 바꾸는 순간 순서가 **조용히** 무너지고, 그때 무너진 것을
+	//   가리키는 것이 아무것도 없다. 등록하는 쪽이 자기가 어느 트랙인지
+	//   말한다 — worker_hooks 와 같은 뒤집기다.
+	//
+	// ★ 슬롯 오름차순으로는 안 된다. 슬롯은 **등록 순서**이고 워커의 등록
+	//   순서는 회차마다 갈린다(실측: `[Worker 1], [Worker 5], [Worker 7] …`
+	//   다음 회차 `[Worker 2], [Worker 5], [Worker 1] …`). 그러면 같은 코드로
+	//   레인 순서가 번갈아 나와 무엇도 고정할 수 없다.
+	enum class track_kind : std::uint8_t
+	{
+		frame_boundary = 0,   // 프레임 경계·instant
+		game_thread    = 1,   // CPU main/game
+		command_thread = 2,   // command-build/command-execute/worker
+		script_thread  = 3,   // managed/script
+		gpu_graphics   = 4,   // GPU Graphics queue
+		gpu_compute    = 5,   // GPU Compute/Copy queue
+		other          = 6,   // 말하지 않은 것은 맨 아래
+	};
+
 	// 한 스레드가 프로파일러에 보이는 이름과 자리.
 	struct thread_info
 	{
 		std::string   name;
 		std::uint32_t os_thread_id = 0;
 		std::uint32_t slot = 0;
+
+		// 어느 트랙에 속하는가, 그리고 그 트랙 **안에서** 몇 번째인가.
+		//
+		// ★ track_order 가 따로 있는 이유는 슬롯이 못 쓰는 자이기 때문이다.
+		//   enkiTS 의 `threadnum_` 은 0..N-1 로 안정 보장되므로 워커는 그것을
+		//   넘긴다 — 등록이 어떤 순서로 겹치든 레인은 1,2,3… 으로 선다.
+		track_kind    kind = track_kind::other;
+		std::uint32_t track_order = 0;
 	};
+
+	// 레인 순서(§7.3). 트랙 → 트랙 안의 순서 → 슬롯.
+	//
+	// ★ 이 비교가 **한 벌이어야 한다.** 타임라인이 보는 순서와 CLI 가 내는
+	//   순서를 따로 적으면, 한쪽만 고쳐지는 날 화면과 게이트가 서로 다른
+	//   순서를 말하면서 둘 다 자기가 옳다고 한다.
+	//
+	// ★ inline 이 아니라 .cpp 에 둔다. 변이 하네스가 바꿔 치는 단위가 .cpp 라,
+	//   헤더에 두면 이 비교에 이빨이 있는지 물을 수단이 없다.
+	bool track_precedes(const thread_info& a, const thread_info& b);
 
 	// 청크를 나눠 주고 봉인된 것을 모은다. free 가 없으면 **막지 않고**
 	// drop 을 센다(§6.2) — 관측 도구가 관측 대상을 멈춰 세우면 그 수치는
@@ -144,7 +184,8 @@ namespace ce
 		// ★ 틱은 **CPU(QPC) 축으로 옮긴 뒤**의 값이어야 한다. 이 층은 GPU 틱을
 		//   모르고, 옮기는 일은 두 시계를 가진 백엔드의 몫이다.
 		void write_span(marker_id id, profile_tick begin, profile_tick end,
-		                std::uint32_t frame, std::uint16_t depth);
+		                std::uint32_t frame, std::uint16_t depth,
+		                const gpu_span_context& gpu);
 
 		// 프레임 경계. 열려 있는 스코프는 닫지 않는다 — 그것이 프레임을 넘는
 		// 구간이고, 옛 코어가 스택 맨 위를 무조건 닫아 잃던 것이다. 대신
