@@ -18,29 +18,67 @@ namespace editor::profiler_view
 			ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 			ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
 
+		// 표를 그리는 **동안만** 칸 여백을 좁힌다.
+		//
+		// ★ 에디터 테마는 `CellPadding.x = 6` 을 두고 마지막에
+		//   `ScaleAllSizes(FontScaleMain × FontScaleDpi)` 를 먹인다. 이 기기에서
+		//   1.5 × 1.5 = 2.25 이므로 실제 값이 **13.5** 이고, ImGui 는 열마다
+		//   그것을 양쪽에 더한다 — 열 하나가 글자 너비보다 27 px 넓어진다.
+		//   열이 열이면 270 px 이 숫자 밖으로 나가고, 그만큼 Marker 열이 좁다.
+		//
+		// ★ 전역으로 고치지 않는다. 같은 스타일을 Inspector·Content Browser 도
+		//   쓰고, 그쪽은 글자 위주라 넉넉한 여백이 맞다. 여기만 좁히고 되돌린다.
+		//
+		// ★ `BeginTable` **앞에서** 밀어야 한다. 표는 여백을 시작할 때 한 번
+		//   읽어 두고 그 뒤로는 스타일을 다시 보지 않는다.
+		struct table_padding_scope
+		{
+			table_padding_scope()
+			{
+				const ImVec2 padding = ImGui::GetStyle().CellPadding;
+				ImGui::PushStyleVar(ImGuiStyleVar_CellPadding,
+				                    ImVec2(padding.x * 0.5f, padding.y));
+			}
+			~table_padding_scope() { ImGui::PopStyleVar(); }
+
+			table_padding_scope(const table_padding_scope&) = delete;
+			table_padding_scope& operator=(const table_padding_scope&) = delete;
+		};
+
 		void time_cell(ce::profile_tick ticks)
 		{
 			ImGui::Text("%.3f", ticks_to_milliseconds(ticks));
 		}
 
-		// ⚠ 열 폭이 **선언대로 서지 않는다.** 여기 넘기는 수를 글자에서 재도
-		//   (`CalcTextSize` + CellPadding) 그려진 폭이 80 px 판과 픽셀 단위로
-		//   같았다 — 화면을 떠서 열 경계를 세어 확인했다. 그래서 헤더가
-		//   "Tota..." 로 잘리는데, 이 잘림은 열을 더하기 전부터 있던 것이다.
-		//   까닭을 아직 못 짚었으므로 상수를 그대로 둔다. 효과가 없는 코드를
-		//   고친 척 남기는 것이 더 나쁘다.
+		// 폭을 **주지 않는다.** 폭이 0 인 WidthFixed 열은 ImGui 가 내용과
+		// 머리글 중 넓은 쪽에 맞춘다.
+		//
+		// ★ 여기 80 px 같은 날 숫자가 박혀 있었고, 그래서 머리글이 "Tota..."
+		//   로 잘렸다. 테마가 글자에 2.25 배를 먹이는데 이 수만 안 커지기
+		//   때문이다.
+		//
+		// ★ 손으로 `CalcTextSize` 를 재서 넘기는 것도 **틀렸다.** 재 보니 그
+		//   값이 실제로 그려지는 너비의 1/1.5 였다 — 테마의 두 배율 중 하나만
+		//   반영된다. 화면을 떠서 열 경계를 세기 전까지는 고친 줄 알았다.
+		//   ImGui 는 머리글의 이상 너비를 자기가 들고 있으므로, 재지 말고
+		//   맡기는 것이 폰트가 바뀌어도 따라간다.
+		void auto_column(const char* label)
+		{
+			ImGui::TableSetupColumn(label, ImGuiTableColumnFlags_WidthFixed);
+		}
+
 		void setup_columns()
 		{
 			ImGui::TableSetupColumn("Marker", ImGuiTableColumnFlags_WidthStretch);
-			ImGui::TableSetupColumn("Thread", ImGuiTableColumnFlags_WidthFixed, 130.0f);
-			ImGui::TableSetupColumn("Total ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableSetupColumn("Self ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableSetupColumn("Calls", ImGuiTableColumnFlags_WidthFixed, 60.0f);
-			ImGui::TableSetupColumn("Avg ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableSetupColumn("Min ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableSetupColumn("Max ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableSetupColumn("P95 ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-			ImGui::TableSetupColumn("Frames", ImGuiTableColumnFlags_WidthFixed, 70.0f);
+			auto_column("Thread");
+			auto_column("Total ms");
+			auto_column("Self ms");
+			auto_column("Calls");
+			auto_column("Avg ms");
+			auto_column("Min ms");
+			auto_column("Max ms");
+			auto_column("P95 ms");
+			auto_column("Frames");
 			ImGui::TableSetupScrollFreeze(1, 1);
 			ImGui::TableHeadersRow();
 		}
@@ -139,6 +177,7 @@ namespace editor::profiler_view
 			return;
 		}
 
+		const table_padding_scope padding;
 		if (!ImGui::BeginTable("ProfilerHierarchy", 10, kTableFlags))
 		{
 			return;
@@ -167,6 +206,7 @@ namespace editor::profiler_view
 			return;
 		}
 
+		const table_padding_scope padding;
 		if (!ImGui::BeginTable("ProfilerFlat", 10, kTableFlags))
 		{
 			return;
@@ -196,14 +236,15 @@ namespace editor::profiler_view
 			return;
 		}
 
+		const table_padding_scope padding;
 		if (!ImGui::BeginTable("ProfilerThreads", 4, kTableFlags))
 		{
 			return;
 		}
 		ImGui::TableSetupColumn("Thread", ImGuiTableColumnFlags_WidthStretch);
-		ImGui::TableSetupColumn("Root ms", ImGuiTableColumnFlags_WidthFixed, 90.0f);
-		ImGui::TableSetupColumn("Events", ImGuiTableColumnFlags_WidthFixed, 80.0f);
-		ImGui::TableSetupColumn("Depth", ImGuiTableColumnFlags_WidthFixed, 60.0f);
+		auto_column("Root ms");
+		auto_column("Events");
+		auto_column("Depth");
 		ImGui::TableHeadersRow();
 
 		const ce::capture_session* capture = reader().capture();
