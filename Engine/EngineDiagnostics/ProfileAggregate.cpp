@@ -38,6 +38,82 @@ namespace ce::detail::profile_aggregate_impl
 			|| has_flag(event.flags, event_flags::truncated_end);
 	}
 
+	// 호출 하나의 표본(§7.4 의 Min·P95·Frames).
+	//
+	// ★ 이 셋은 누적만으로는 안 나온다. p95 는 분포를 알아야 하므로 호출마다의
+	//   길이를 남겨야 하고, "나타난 프레임 수" 는 중복을 지워야 하므로 프레임
+	//   번호도 함께 남겨야 한다.
+	//
+	// ★ 프레임을 "마지막으로 본 값" 과 비교해 세면 안 된다. 이벤트는 시작 tick
+	//   오름차순으로 훑는데, 프레임 경계를 넘긴 바깥 구간은 자기보다 늦게
+	//   시작한 자식보다 **큰** 프레임 번호를 달고 먼저 나온다 — 그 자리에서
+	//   프레임 번호가 거꾸로 가고, 그러면 같은 프레임을 두 번 센다.
+	struct call_sample
+	{
+		std::uint32_t row = 0;
+		std::uint32_t frame = 0;
+		profile_tick  ticks = 0;
+	};
+
+	// 행마다 min · p95 · 나타난 프레임 수를 표본에서 낸다.
+	//
+	// ★ 부르는 자리가 중요하다. `rows` 의 색인이 표본의 `row` 와 같아야 하므로,
+	//   행을 다시 세우는(전위 순서로 옮기는) **앞**에서 부르거나, 옮긴 뒤라면
+	//   표본의 색인도 같이 옮겨야 한다. §0.5.20 의 스팬 경계와 같은 함정이다.
+	inline void fold_call_samples(std::vector<call_sample>& samples,
+	                              std::vector<aggregate_row>& rows)
+	{
+		if (samples.empty() || rows.empty())
+		{
+			return;
+		}
+
+		std::sort(samples.begin(), samples.end(),
+		          [](const call_sample& a, const call_sample& b)
+		          {
+			          if (a.row != b.row) return a.row < b.row;
+			          return a.ticks < b.ticks;
+		          });
+
+		for (std::size_t begin = 0; begin < samples.size(); )
+		{
+			std::size_t end = begin;
+			while (end < samples.size() && samples[end].row == samples[begin].row)
+			{
+				++end;
+			}
+
+			aggregate_row& row = rows[samples[begin].row];
+			const std::size_t count = end - begin;
+			row.min_ticks = samples[begin].ticks;
+
+			// nearest-rank: ceil(0.95 × count) 번째. count 가 1 이면 1 이므로
+			// 색인은 언제나 [begin, end) 안이다.
+			const std::size_t rank = (count * 95 + 99) / 100;
+			row.p95_ticks = samples[begin + rank - 1].ticks;
+
+			begin = end;
+		}
+
+		// 나타난 프레임 수는 (행, 프레임) 중복을 지워야 나온다.
+		std::sort(samples.begin(), samples.end(),
+		          [](const call_sample& a, const call_sample& b)
+		          {
+			          if (a.row != b.row) return a.row < b.row;
+			          return a.frame < b.frame;
+		          });
+
+		for (std::size_t i = 0; i < samples.size(); ++i)
+		{
+			if (i > 0 && samples[i].row == samples[i - 1].row &&
+			    samples[i].frame == samples[i - 1].frame)
+			{
+				continue;
+			}
+			++rows[samples[i].row].frame_appearances;
+		}
+	}
+
 	// hierarchy 에서 (부모, 스레드, marker) 가 같은 줄을 찾는 키.
 	struct node_key
 	{
@@ -255,6 +331,8 @@ namespace ce
 		std::vector<std::uint32_t> stack;        // 행 인덱스 + 1
 		std::vector<profile_tick>  stackEnd;
 		std::vector<profile_tick>  childTicks;   // 행마다 직속 자식 total 합
+		std::vector<call_sample>   samples;      // 호출마다 길이와 프레임
+		samples.reserve(events.size());
 
 		for (const profile_event& event : events)
 		{
@@ -303,6 +381,8 @@ namespace ce
 			}
 
 			const profile_tick ticks = span_ticks(event);
+			samples.push_back(call_sample{ row, event.frame, ticks });
+
 			aggregate_row& node = result.m_hierarchy[row];
 			++node.call_count;
 			node.total_ticks += ticks;
@@ -333,6 +413,10 @@ namespace ce
 			node.self_ticks = (node.total_ticks > childTicks[i])
 				? (node.total_ticks - childTicks[i]) : 0;
 		}
+
+		// Min·P95·Frames 는 **다시 세우기 전에** 접는다. 표본의 `row` 는 아직
+		// 쌓은 순서의 색인이다.
+		fold_call_samples(samples, result.m_hierarchy);
 
 		// 행을 전위 순서로 다시 세운다. 위 순회는 **처음 본 순서**로 쌓으므로
 		// 한 부모의 자식들이 흩어져 있다 — 표가 트리로 보이려면 서브트리가
@@ -403,6 +487,13 @@ namespace ce
 				node.child_end = last + 1;
 			}
 
+			// 표본도 함께 옮긴다. Flat 이 같은 표본을 다시 쓰는데, 옮기지 않으면
+			// 남의 행에 자기 분포를 적는다.
+			for (call_sample& sample : samples)
+			{
+				sample.row = remap[sample.row];
+			}
+
 			result.m_hierarchy = std::move(ordered);
 		}
 
@@ -412,6 +503,8 @@ namespace ce
 		// self 를 더한 것이라 총합이 보존된다.
 		{
 			std::unordered_map<std::uint64_t, std::uint32_t> flatIndex;
+			std::vector<std::uint32_t> flatOfRow(result.m_hierarchy.size(), 0);
+			std::uint32_t source = 0;
 			for (const aggregate_row& node : result.m_hierarchy)
 			{
 				const std::uint64_t key =
@@ -420,21 +513,42 @@ namespace ce
 				auto found = flatIndex.find(key);
 				if (found == flatIndex.end())
 				{
+					flatOfRow[source] = static_cast<std::uint32_t>(result.m_flat.size());
 					flatIndex.emplace(key, static_cast<std::uint32_t>(result.m_flat.size()));
 					aggregate_row fresh = node;
 					fresh.depth = 0;
 					fresh.child_begin = fresh.child_end = 0;
+
+					// ★ 분포는 **베끼지 않는다.** 아래에서 표본으로 다시 접으므로
+					//   여기 남은 값은 남의 것이 되고, 프레임 수는 `+=` 라 그 위에
+					//   더해져 호출 수보다 커진다.
+					fresh.min_ticks = 0;
+					fresh.p95_ticks = 0;
+					fresh.frame_appearances = 0;
 					result.m_flat.push_back(fresh);
+					++source;
 					continue;
 				}
 
+				flatOfRow[source] = found->second;
 				aggregate_row& target = result.m_flat[found->second];
 				target.call_count += node.call_count;
 				target.total_ticks += node.total_ticks;
 				target.self_ticks += node.self_ticks;
 				target.max_ticks = (std::max)(target.max_ticks, node.max_ticks);
 				target.truncated = target.truncated || node.truncated;
+				++source;
 			}
+
+			// ★ 프레임 수를 행마다 더하면 안 된다. 같은 marker 가 한 프레임 안
+			//   두 부모 밑에서 불리면 행이 둘인데 프레임은 하나다 — 더하면 2 가
+			//   된다. p95 도 같다: 부분들의 p95 로는 전체의 p95 가 안 나온다.
+			//   그래서 Flat 은 합치지 않고 **같은 표본을 다시 접는다.**
+			for (call_sample& sample : samples)
+			{
+				sample.row = flatOfRow[sample.row];
+			}
+			fold_call_samples(samples, result.m_flat);
 
 			std::sort(result.m_flat.begin(), result.m_flat.end(),
 			          [](const aggregate_row& a, const aggregate_row& b)

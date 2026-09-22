@@ -37,6 +37,22 @@ namespace ce
 		profile_tick  total_ticks = 0;   // inclusive — 자식을 포함한다
 		profile_tick  self_ticks = 0;    // exclusive — 직속 자식의 total 을 뺀 것
 		profile_tick  max_ticks = 0;     // 한 호출의 최대 inclusive
+		profile_tick  min_ticks = 0;     // 한 호출의 최소 inclusive
+
+		// 호출 길이의 95 백분위(§7.4 의 "긴 꼬리 확인").
+		//
+		// ★ nearest-rank 다 — 오름차순으로 세운 표본의 ceil(0.95 × n) 번째를
+		//   **그대로** 낸다. 보간하지 않는 이유는, 보간한 수는 어느 호출도
+		//   그만큼 걸린 적이 없는데 표에 서기 때문이다. 이 열을 보는 사람은
+		//   "이만큼 걸린 호출이 있었다" 로 읽는다.
+		profile_tick  p95_ticks = 0;
+
+		// 이 marker 가 **나타난 프레임 수**(§7.4 의 Frames).
+		//
+		// ★ call_count 와 다르다. 한 프레임에 열 번 불린 것과 열 프레임에 한
+		//   번씩 불린 것은 call_count 가 같고 이 수가 다르다 — 앞엣것은 그
+		//   프레임 하나가 비싼 것이고 뒤엣것은 늘 켜져 있는 비용이다.
+		std::uint32_t frame_appearances = 0;
 
 		// 이 행에 **잘린 구간이 섞였다.** 녹화 시작을 못 본 채 끝났거나(begin)
 		// 끝을 못 본 채 프레임이 넘어간(end) 구간이다. 표시하는 쪽은 이 줄의

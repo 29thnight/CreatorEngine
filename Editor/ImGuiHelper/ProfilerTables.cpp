@@ -23,6 +23,12 @@ namespace editor::profiler_view
 			ImGui::Text("%.3f", ticks_to_milliseconds(ticks));
 		}
 
+		// ⚠ 열 폭이 **선언대로 서지 않는다.** 여기 넘기는 수를 글자에서 재도
+		//   (`CalcTextSize` + CellPadding) 그려진 폭이 80 px 판과 픽셀 단위로
+		//   같았다 — 화면을 떠서 열 경계를 세어 확인했다. 그래서 헤더가
+		//   "Tota..." 로 잘리는데, 이 잘림은 열을 더하기 전부터 있던 것이다.
+		//   까닭을 아직 못 짚었으므로 상수를 그대로 둔다. 효과가 없는 코드를
+		//   고친 척 남기는 것이 더 나쁘다.
 		void setup_columns()
 		{
 			ImGui::TableSetupColumn("Marker", ImGuiTableColumnFlags_WidthStretch);
@@ -31,7 +37,10 @@ namespace editor::profiler_view
 			ImGui::TableSetupColumn("Self ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 			ImGui::TableSetupColumn("Calls", ImGuiTableColumnFlags_WidthFixed, 60.0f);
 			ImGui::TableSetupColumn("Avg ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+			ImGui::TableSetupColumn("Min ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
 			ImGui::TableSetupColumn("Max ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+			ImGui::TableSetupColumn("P95 ms", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+			ImGui::TableSetupColumn("Frames", ImGuiTableColumnFlags_WidthFixed, 70.0f);
 			ImGui::TableSetupScrollFreeze(1, 1);
 			ImGui::TableHeadersRow();
 		}
@@ -66,7 +75,17 @@ namespace editor::profiler_view
 			ImGui::TableNextColumn();
 			time_cell(row.call_count ? (row.total_ticks / row.call_count) : 0);
 			ImGui::TableNextColumn();
+			time_cell(row.min_ticks);
+			ImGui::TableNextColumn();
 			time_cell(row.max_ticks);
+			ImGui::TableNextColumn();
+			time_cell(row.p95_ticks);
+
+			// ★ Frames 는 Calls 와 다른 것을 말한다. 한 프레임에 열 번 불린
+			//   것과 열 프레임에 한 번씩 불린 것은 Calls 가 같다 — 앞엣것은
+			//   그 프레임 하나가 비싼 것이고, 뒤엣것은 늘 켜져 있는 비용이다.
+			ImGui::TableNextColumn();
+			ImGui::Text("%u", row.frame_appearances);
 		}
 
 		// 전위 순서 배열에서 서브트리 하나를 그린다.
@@ -120,7 +139,7 @@ namespace editor::profiler_view
 			return;
 		}
 
-		if (!ImGui::BeginTable("ProfilerHierarchy", 7, kTableFlags))
+		if (!ImGui::BeginTable("ProfilerHierarchy", 10, kTableFlags))
 		{
 			return;
 		}
@@ -148,7 +167,7 @@ namespace editor::profiler_view
 			return;
 		}
 
-		if (!ImGui::BeginTable("ProfilerFlat", 7, kTableFlags))
+		if (!ImGui::BeginTable("ProfilerFlat", 10, kTableFlags))
 		{
 			return;
 		}

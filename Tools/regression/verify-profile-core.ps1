@@ -450,6 +450,54 @@ $mutations = @(
         New    = "`t`tvalue.flags = event_flags::none;"
         Expect = 'instant/present'
         Why    = '표식이 없으면 길이 0 인 스코프와 구분되지 않는다'
+    },
+
+    # ── §7.4 Min·P95·Frames ─────────────────────────────────────────
+    @{
+        # p95 의 등수를 표본 수로 바꾼다. 긴 꼬리를 보려고 만든 열이 "가장
+        # 나쁜 한 번" 이 되어, 늘 그만큼 걸린다고 읽힌다.
+        #
+        # ★ 처음에는 `row.p95_ticks` 를 직접 `samples[end - 1]` 로 바꿨는데
+        #   **컴파일이 안 됐다.** 이 게이트는 /W4 /WX 라, 그 변이가 `rank` 를
+        #   미사용으로 만들면 C4189 가 오류가 된다. 변이는 값만 틀리게 해야
+        #   하고, 쓰이던 것을 안 쓰이게 만들면 안 된다.
+        Name   = 'p95-reports-max'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`tconst std::size_t rank = (count * 95 + 99) / 100;"
+        New    = "`t`t`tconst std::size_t rank = count;"
+        Expect = 'distribution/p95'
+        Why    = 'p95 가 max 와 같아지면 꼬리를 볼 수 없다'
+    },
+    @{
+        # 표본을 내림차순으로 세운다. min 자리에 max 가 온다 — 두 열이
+        # 서로를 베끼는데 둘 다 "값이 있다" 는 사실은 그대로다.
+        Name   = 'distribution-sorted-descending'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`t          return a.ticks < b.ticks;"
+        New    = "`t`t`t          return a.ticks > b.ticks;"
+        Expect = 'distribution/min'
+        Why    = '오름차순이 아니면 min·p95 가 모두 다른 자리를 가리킨다'
+    },
+    @{
+        # 프레임 중복을 안 지운다. Frames 가 Calls 와 같아지고, 두 열이
+        # 같은 것을 말하게 된다 — 그러면 Frames 열이 있을 까닭이 없다.
+        Name   = 'frames-count-duplicates'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`tif (i > 0 && samples[i].row == samples[i - 1].row &&`r`n`t`t`t    samples[i].frame == samples[i - 1].frame)`r`n`t`t`t{`r`n`t`t`t`tcontinue;`r`n`t`t`t}`r`n"
+        New    = ""
+        Expect = 'distribution/frames'
+        Why    = '중복을 안 지우면 나타난 프레임 수가 호출 수가 된다'
+    },
+    @{
+        # Flat 이 갈래의 분포를 베낀 채 시작한다. 프레임 수는 `+=` 라 그 위에
+        # 더해져, 한 프레임에 두 부모 밑으로 불린 marker 가 두 프레임으로
+        # 잡힌다 — 캡처에 있는 프레임 수보다 커질 수도 있다.
+        Name   = 'flat-copies-branch-distribution'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`t`t`tfresh.frame_appearances = 0;"
+        New    = "`t`t`t`t`tfresh.frame_appearances = node.frame_appearances;"
+        Expect = 'flat-union/frames'
+        Why    = '부분의 프레임 수를 더하면 전체의 프레임 수가 안 된다'
     }
 )
 

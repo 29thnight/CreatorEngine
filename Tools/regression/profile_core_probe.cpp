@@ -1545,6 +1545,149 @@ void test_track_order()
 }
 
 //-----------------------------------------------------------------------------
+// §7.4 의 Min·P95·Frames.
+//
+// ★ 길이를 정확히 아는 자극이 필요하다. busy_ticks 는 회차마다 길이가 달라
+//   p95 의 **값**을 물을 수가 없고, 물을 수 없으면 "커 보이니 맞겠지" 로
+//   끝난다. GPU 구간은 tick 을 직접 주므로 분포를 지어낼 수 있다.
+//-----------------------------------------------------------------------------
+void test_call_distribution()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.record(1);
+
+	const ce::profile_tick base = ce::profiler_service::now();
+	const ce::gpu_span_context origin;
+
+	// 프레임 1..4 에 다섯씩 스무 개, 길이 1..20.
+	std::uint32_t length = 0;
+	for (std::uint32_t frame = 1; frame <= 5; ++frame)
+	{
+		if (frame >= 2)
+		{
+			for (int i = 0; i < 5; ++i)
+			{
+				++length;
+				const ce::profile_tick begin = base + length * 100;
+				service.submit_gpu_span(ce::marker<"Pass">(), begin, begin + length,
+				                        frame - 1, origin);
+			}
+			service.publish_gpu_spans();
+		}
+		service.publish_frame(frame);
+	}
+
+	service.pause();
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "distribution/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 4);
+
+	const ce::aggregate_row* row = nullptr;
+	for (const ce::aggregate_row& candidate : aggregate.hierarchy())
+	{
+		if (candidate.marker == ce::marker<"Pass">()) row = &candidate;
+	}
+	check(nullptr != row, "distribution/row — Pass 가 표에 있다");
+	if (nullptr != row)
+	{
+		check_eq<unsigned long long>(row->call_count, 20ull,
+		                             "distribution/calls — 스무 번 불렸다");
+		check_eq<ce::profile_tick>(row->min_ticks, 1u,
+		                           "distribution/min — 가장 짧은 호출이 1");
+		check_eq<ce::profile_tick>(row->max_ticks, 20u,
+		                           "distribution/max — 가장 긴 호출이 20");
+
+		// nearest-rank: ceil(0.95 × 20) = 19 → 오름차순 19 번째 = 19.
+		// 보간하면 19.05 가 나오는데, 그만큼 걸린 호출은 하나도 없다.
+		check_eq<ce::profile_tick>(row->p95_ticks, 19u,
+		                           "distribution/p95 — 95 백분위가 19");
+		check_eq<std::uint32_t>(row->frame_appearances, 4u,
+		                        "distribution/frames — 네 프레임에 나타났다");
+	}
+
+	// ★ 프레임 수는 호출 수와 **다른 수**여야 한다. 둘이 같아지는 구현
+	//   (중복을 안 지움)이 가장 흔한 실수라, 다르다는 것 자체를 문다.
+	if (nullptr != row)
+	{
+		check(row->frame_appearances != static_cast<std::uint32_t>(row->call_count),
+		      "distribution/frames-not-calls — 프레임 수가 호출 수와 다르다");
+	}
+
+	service.shutdown();
+}
+
+//-----------------------------------------------------------------------------
+// Flat 의 분포는 부분을 합쳐서 만들 수 없다.
+//
+// ★ 같은 marker 가 한 프레임 안에서 두 부모 밑으로 불리면 hierarchy 행은
+//   둘인데 **프레임은 하나**다. 행마다의 프레임 수를 더하면 2 가 되고, 그
+//   수는 프레임 수보다 커진다 — 아무것도 실패하지 않은 채로.
+//-----------------------------------------------------------------------------
+void test_flat_distribution_union()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main", ce::track_kind::game_thread);
+	service.record(1);
+
+	for (std::uint32_t frame = 1; frame <= 3; ++frame)
+	{
+		{
+			ce::profile_scope left{ service, ce::marker<"Left">() };
+			ce::profile_scope shared{ service, ce::marker<"Shared">() };
+			busy_ticks(2);
+		}
+		{
+			ce::profile_scope right{ service, ce::marker<"Right">() };
+			ce::profile_scope shared{ service, ce::marker<"Shared">() };
+			busy_ticks(2);
+		}
+		service.publish_frame(frame);
+	}
+
+	service.pause();
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "flat-union/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 3);
+
+	std::size_t hierarchyRows = 0;
+	for (const ce::aggregate_row& node : aggregate.hierarchy())
+	{
+		if (node.marker != ce::marker<"Shared">()) continue;
+		++hierarchyRows;
+		check_eq<std::uint32_t>(node.frame_appearances, 3u,
+		                        "flat-union/branch-frames — 갈래마다 세 프레임");
+	}
+	check_eq(hierarchyRows, std::size_t{ 2 },
+	         "flat-union/branches — 부모가 둘이라 행도 둘이다");
+
+	const ce::aggregate_row* flat = nullptr;
+	for (const ce::aggregate_row& node : aggregate.flat())
+	{
+		if (node.marker == ce::marker<"Shared">()) flat = &node;
+	}
+	check(nullptr != flat, "flat-union/row — Flat 에 Shared 가 한 줄이다");
+	if (nullptr != flat)
+	{
+		check_eq<unsigned long long>(flat->call_count, 6ull,
+		                             "flat-union/calls — 호출은 여섯이다");
+		check_eq<std::uint32_t>(flat->frame_appearances, 3u,
+		                        "flat-union/frames — 프레임은 셋이다(더하면 6)");
+		check(flat->min_ticks <= flat->p95_ticks,
+		      "flat-union/order — min 이 p95 를 넘지 않는다");
+		check(flat->p95_ticks <= flat->max_ticks,
+		      "flat-union/order-max — p95 가 max 를 넘지 않는다");
+	}
+
+	service.shutdown();
+}
+
+//-----------------------------------------------------------------------------
 // §7.3 트랙 1 — 프레임 경계.
 //
 // ★ 집계가 들고 있던 tick_begin/tick_end 는 **범위 전체**의 양 끝이라 프레임이
@@ -2845,6 +2988,8 @@ int main()
 	test_gpu_lane();
 	test_track_order();
 	test_gpu_span_origin();
+	test_call_distribution();
+	test_flat_distribution_union();
 	test_frame_boundaries();
 	test_instant_events();
 	test_gpu_lane_deferred();
