@@ -187,6 +187,14 @@ namespace ce
 		                std::uint32_t frame, std::uint16_t depth,
 		                const gpu_span_context& gpu);
 
+		// 길이가 없는 사건 하나를 적는다(§7.3 의 첫째 트랙).
+		//
+		// ★ 깊이는 **지금 열려 있는 깊이**다. 그 자리에서 일어난 일이라는
+		//   사실이 공짜로 남고, 0 으로 박았을 때의 사고도 함께 막는다 —
+		//   깊이 0 짜리 점은 트리에 들어가면 스택에서 부모를 밀어낸다
+		//   (event_flags::instant 의 주석).
+		void write_instant(marker_id id, profile_tick tick, std::uint32_t frame);
+
 		// 프레임 경계. 열려 있는 스코프는 닫지 않는다 — 그것이 프레임을 넘는
 		// 구간이고, 옛 코어가 스택 맨 위를 무조건 닫아 잃던 것이다. 대신
 		// 지금까지 쓴 청크를 봉인해 수집기가 이번 프레임을 볼 수 있게 한다.

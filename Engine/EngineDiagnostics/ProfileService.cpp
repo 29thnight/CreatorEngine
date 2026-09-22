@@ -404,6 +404,23 @@ namespace ce
 		stream->end_scope(now());
 	}
 
+	void profiler_service::mark_instant(marker_id id)
+	{
+		if (!m_initialized.load(std::memory_order_acquire))
+		{
+			return;
+		}
+		if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
+		{
+			return;
+		}
+
+		thread_stream* stream = current_stream();
+		if (!stream) return;
+
+		stream->write_instant(id, now(), m_lastEngineFrame + 1);
+	}
+
 	void profiler_service::collect_sealed()
 	{
 		event_chunk* sealed = m_pool->take_sealed();

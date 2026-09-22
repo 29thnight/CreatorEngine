@@ -840,7 +840,13 @@ namespace ConsoleCmd
                             ? static_cast<double>(event.tick_end - event.tick_begin) * toMs
                             : 0.0;
                         // 깊이 0 만 더한다. 중첩 구간을 전부 더하면 합이 프레임을 넘는다.
-                        if (0 == event.depth) rootMs += ms;
+                        // 길이 없는 사건은 0 이라 더해도 같지만, 집계가 빼는
+                        // 것과 같은 기준을 여기서도 쓴다.
+                        if (0 == event.depth &&
+                            !ce::has_flag(event.flags, ce::event_flags::instant))
+                        {
+                            rootMs += ms;
+                        }
 
                         auto eventEntry = CommandData::Object();
                         eventEntry.Set("name", CommandData::String(ce::marker_info(event.marker).name));
@@ -850,6 +856,13 @@ namespace ConsoleCmd
                         if (ce::has_flag(event.flags, ce::event_flags::truncated_end))
                         {
                             eventEntry.Set("truncatedEnd", CommandData::Bool(true));
+                        }
+                        if (ce::has_flag(event.flags, ce::event_flags::instant))
+                        {
+                            // 길이가 없는 사건(§7.3 의 첫째 트랙). ms 는 0 이라
+                            // 그것만으로는 스코프와 구분되지 않는다 — 표식을
+                            // 따로 낸다.
+                            eventEntry.Set("instant", CommandData::Bool(true));
                         }
                         if (ce::has_flag(event.flags, ce::event_flags::gpu_span))
                         {
@@ -883,6 +896,40 @@ namespace ConsoleCmd
                 frames.Append(std::move(frameEntry));
             }
         }
+
+        // ── §7.3 트랙 1: 길이가 없는 사건 ──────────────────────────────
+        //
+        // ★ 위의 frames 는 **최근 여덟 칸**만 낸다. 사건은 드물게 일어나므로
+        //   (씬 전환, Play 진입) 그 창 안에 있을 이유가 없다 — 60 프레임 전에
+        //   일어난 것이 캡처에는 있는데 응답에는 없으면, 읽는 쪽은 "안 찍혔다"
+        //   와 "창 밖이다" 를 가릴 수 없다. 캡처 전체를 훑어 따로 낸다.
+        auto instants = CommandData::Array();
+        std::size_t instantCount = 0;
+        std::size_t instantReported = 0;
+        if (capture)
+        {
+            // 드문 사건이지만 상한을 둔다. 없으면 잘못 건 계측 하나가 응답을
+            // 통째로 못 쓰게 만든다.
+            constexpr std::size_t kMaxReportedInstants = 64;
+            for (const ce::frame_record& record : capture->frames())
+            {
+                for (const ce::profile_event& event : record.events)
+                {
+                    if (!ce::has_flag(event.flags, ce::event_flags::instant)) continue;
+                    ++instantCount;
+                    if (instantReported >= kMaxReportedInstants) continue;
+                    ++instantReported;
+
+                    auto entry = CommandData::Object();
+                    entry.Set("name", CommandData::String(ce::marker_info(event.marker).name));
+                    entry.Set("frame", CommandData::Int(event.frame));
+                    entry.Set("threadSlot", CommandData::Int(event.thread_slot));
+                    instants.Append(std::move(entry));
+                }
+            }
+        }
+        data.Set("instantCount", CommandData::Int(static_cast<std::int64_t>(instantCount)));
+        data.Set("instants", std::move(instants));
 
         data.Set("rangeBegin", CommandData::Int(rangeBegin));
         data.Set("rangeEnd", CommandData::Int(rangeEnd));

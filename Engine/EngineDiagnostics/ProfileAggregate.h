@@ -66,6 +66,19 @@ namespace ce
 		std::uint32_t span_end = 0;
 	};
 
+	// 프레임 하나의 벽시계 구간(§7.3 의 첫째 트랙).
+	//
+	// ★ 집계가 들고 있는 tick_begin/tick_end 는 범위 **전체**의 양 끝이라
+	//   프레임이 어디서 갈리는지는 말하지 못한다. 그리는 층이 캡처를 다시
+	//   훑어 경계를 세면 접기가 두 곳에 생기고, 선택 범위가 바뀔 때 한쪽만
+	//   따라간다.
+	struct frame_boundary
+	{
+		std::uint32_t engine_frame = 0;
+		profile_tick  tick_begin = 0;
+		profile_tick  tick_end = 0;
+	};
+
 	// 프레임 범위 하나를 접은 결과. 만든 뒤에는 바뀌지 않는다.
 	class frame_aggregate
 	{
@@ -81,6 +94,13 @@ namespace ce
 		std::span<const profile_event>  spans() const { return m_spans; }
 		std::span<const aggregate_row>  flat() const { return m_flat; }
 		std::span<const thread_summary> threads() const { return m_threads; }
+
+		// 이 범위에 든 프레임들의 경계. 엔진 프레임 오름차순이다.
+		std::span<const frame_boundary> boundaries() const { return m_boundaries; }
+
+		// 길이가 없는 사건(§7.3). spans() 안에도 있지만 시각으로 세워 두고
+		// 따로 든다 — 경계 띠가 레인을 훑지 않고 이것만 그린다.
+		std::span<const profile_event>  instants() const { return m_instants; }
 
 		std::uint32_t frame_begin() const { return m_frameBegin; }
 		std::uint32_t frame_end() const { return m_frameEnd; }   // [begin, end)
@@ -104,6 +124,8 @@ namespace ce
 
 	private:
 		std::vector<profile_event>  m_spans;
+		std::vector<frame_boundary> m_boundaries;
+		std::vector<profile_event>  m_instants;
 		std::vector<aggregate_row>  m_hierarchy;
 		std::vector<aggregate_row>  m_flat;
 		std::vector<thread_summary> m_threads;

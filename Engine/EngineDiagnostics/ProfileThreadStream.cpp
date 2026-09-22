@@ -387,6 +387,31 @@ namespace ce
 		write(value);
 	}
 
+	void thread_stream::write_instant(marker_id id, profile_tick tick,
+	                                  std::uint32_t frame)
+	{
+		if (!owned_by_caller()) return;
+
+		// 얼림·봉인 요청을 여기서도 본다. 드물게 오는 사건이라 이 자리가
+		// 한 스레드의 유일한 안전한 자리일 수 있다.
+		honor_seal_request();
+
+		if (!ensure_chunk())
+		{
+			m_droppedEvents.fetch_add(1, std::memory_order_relaxed);
+			return;
+		}
+
+		profile_event value;
+		value.tick_begin = tick;
+		value.tick_end = tick;
+		value.marker = id;
+		value.frame = frame;
+		value.depth = static_cast<std::uint16_t>(m_depth);
+		value.flags = event_flags::instant;
+		write(value);
+	}
+
 	void thread_stream::publish_frame()
 	{
 		// ★ 남이 부르면 아무것도 하지 않는다. 예전에는 수집기가 여기로 들어와

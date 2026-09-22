@@ -195,6 +195,21 @@ function Invoke-Workers {
     }
     Write-Host ("  최근 {0}프레임의 AnimationJob  {1}건" -f $frame.data.frames.Count, $jobEvents)
 
+    # ── §7.3 트랙 1: 길이가 없는 사건 ───────────────────────────────────────
+    #
+    # 이 축의 자극은 위의 `scene.switch` 다. 씬이 바뀌면 SceneManager 가
+    # SceneActivated 를 찍는다.
+    #
+    # ★ frames 배열을 보지 않는다. 그것은 **최근 여덟 칸**만 담고, 전환은
+    #   60 프레임 전에 일어났다 — 거기서 세면 "안 찍혔다" 와 "창 밖이다" 가
+    #   같아 보인다. profile.frame 이 캡처 전체를 훑어 따로 내는 목록을 쓴다.
+    $instantNames = @()
+    if ($null -ne $frame.data.PSObject.Properties['instants']) {
+        $instantNames = @($frame.data.instants | ForEach-Object { $_.name })
+    }
+    $sceneActivated = @($instantNames | Where-Object { $_ -eq 'SceneActivated' }).Count
+    Write-Host ("  길이 없는 사건  {0}건 (SceneActivated {1})" -f $instantNames.Count, $sceneActivated)
+
     # ── 단정 ────────────────────────────────────────────────────────────────
     #
     # ⚠ 워커 **전부**가 찍기를 요구하지 않는다. 잡을 어느 워커가 집는지는
@@ -207,6 +222,7 @@ function Invoke-Workers {
     if ($workers.Count -le 0)          { $failures.Add("워커가 하나도 등록되지 않았다 - 수명 훅이 끊겼다") }
     if ($busy.Count -lt 4)             { $failures.Add("이벤트를 찍은 워커가 $($busy.Count)개뿐이다 - 워커 계측이 끊겼다") }
     if ($jobEvents -le 0)              { $failures.Add("워커 스레드에 AnimationJob 이 하나도 없다") }
+    if ($sceneActivated -le 0)         { $failures.Add("SceneActivated 사건이 없다 - 씬을 갈아 끼웠는데 §7.3 트랙 1 이 비었다") }
     if ($result.ExitCode -ne 0)        { $failures.Add("종료 코드 $($result.ExitCode)") }
 
     Write-Host ""

@@ -386,6 +386,15 @@ void SceneManager::ApplyPendingSceneStructureChange()
     }
 }
 
+void SceneManager::NotifyActiveSceneChanged()
+{
+    // 길이가 없는 사건(§7.3 의 첫째 트랙). 씬이 바뀌면 그 뒤 프레임들의
+    // 성격이 통째로 달라지는데, 그 까닭이 타임라인에 남지 않으면 "여기서부터
+    // 갑자기 느려졌다" 까지만 읽힌다.
+    ce::profile_instant(ce::marker<"SceneActivated">());
+    activeSceneChangedEvent.Broadcast();
+}
+
 void SceneManager::Editor()
 {
     {
@@ -622,7 +631,7 @@ Scene* SceneManager::CreateScene(std::string_view name)
     m_scenes.push_back(allocScene);
     m_activeSceneIndex = m_scenes.size() - 1;
     allocScene->m_buildIndex = m_activeSceneIndex.load();
-    activeSceneChangedEvent.Broadcast();
+    NotifyActiveSceneChanged();
     newSceneCreatedEvent.Broadcast();
 
     return allocScene;
@@ -837,7 +846,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;
-		activeSceneChangedEvent.Broadcast();
+		NotifyActiveSceneChanged();
 		sceneLoadedEvent.Broadcast();
 		// 여기 있던 "플레이어면 재생을 켠다" 분기는 PlayerMain으로 옮겼다(E3-6).
 		// 씬 로드가 곧 재생 시작이라는 것은 Player의 정책이지 씬 로더가 알아야 할
@@ -1241,7 +1250,7 @@ void SceneManager::BeforeAwakeSceneLoad()
         RebindEventDontDestroyOnLoadObjects(m_sceneToActivate.load());
 		m_activeScene.load()->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
 
-        activeSceneChangedEvent.Broadcast();
+        NotifyActiveSceneChanged();
         sceneLoadedEvent.Broadcast();
 
         m_activeScene.load()->Reset();
@@ -1597,6 +1606,7 @@ bool SceneManager::BeginPlayTransaction()
     // 구독해 그 일을 한다. Player는 구독자가 없어 아무 일도 일어나지 않는다.
     {
         ce::profile_scope _profile{ ce::marker<"PlayModeEvent(enter)">() };
+        ce::profile_instant(ce::marker<"PlayModeEntered">());
         PlayModeEvent.Broadcast(true);
     }
     return true;
@@ -1648,9 +1658,10 @@ void SceneManager::EndPlayTransaction()
     // 이탈 통지. 씬이 복원된 뒤에 던진다 — 구독자가 씬을 들여다볼 수 있어야 한다.
     // (현재 Editor 구독자는 진입만 쓰지만, 대칭을 지켜 두어야 이탈 정책이 생길 때
     //  자리를 다시 정하지 않는다.)
+    ce::profile_instant(ce::marker<"PlayModeExited">());
     PlayModeEvent.Broadcast(false);
 
-    activeSceneChangedEvent.Broadcast();
+    NotifyActiveSceneChanged();
     sceneLoadedEvent.Broadcast();
 
 	m_isEditorSceneLoaded = false;

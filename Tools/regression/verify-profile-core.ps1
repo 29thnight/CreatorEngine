@@ -412,6 +412,44 @@ $mutations = @(
         New    = "`t`tvalue.submission = 0;"
         Expect = 'gpu-origin/submission'
         Why    = '귀속을 안 실으면 같은 이름의 두 제출이 구분되지 않는다'
+    },
+
+    # ── §7.3 트랙 1: 프레임 경계와 길이 없는 사건 ──────────────────
+    @{
+        # 프레임 경계를 모으지 않는다. 그리는 층은 프레임이 어디서 갈리는지
+        # 알 수 없고, 확대하면 "무언가 오래 걸린다" 까지만 읽힌다.
+        Name   = 'boundaries-dropped'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`tresult.m_boundaries.push_back(boundary);"
+        New    = ""
+        Expect = 'boundary/count'
+        Why    = '경계를 안 모으면 막대가 어느 프레임의 것인지 알 수 없다'
+    },
+    @{
+        # 길이 없는 사건을 트리에 넣는다. total 0 · calls N 인 줄이 시간
+        # 순위표에 섞인다.
+        #
+        # ★ 처음에는 Expect 를 'instant/keeps-parent'(사건 뒤에 열린 구간이
+        #   부모를 지키는가)에 걸었는데, **그 절은 안 울렸다.** write_instant
+        #   가 깊이를 0 이 아니라 **지금 열려 있는 깊이**로 적기 때문에, 트리에
+        #   들어가도 부모를 밀어내지 못한다. 실제로 걸리는 자리로 옮겼다 —
+        #   짐작한 인과를 그대로 두면 그 절에 이빨이 있다는 거짓말이 된다.
+        Name   = 'instant-into-tree'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`tif (is_instant(event))`r`n`t`t`t{`r`n`t`t`t`tcontinue;`r`n`t`t`t}`r`n`r`n`t`t`t// 스레드가 바뀌면"
+        New    = "`t`t`t// 스레드가 바뀌면"
+        Expect = 'instant/not-in-tree'
+        Why    = '점이 트리에 끼면 시간 순위표에 길이 없는 줄이 섞인다'
+    },
+    @{
+        # 사건에 표식을 안 단다. 집계가 길이 0 짜리 스코프로 읽어 경계 띠가
+        # 비고, 그러면서 트리에는 들어간다.
+        Name   = 'instant-unflagged'
+        File   = 'ProfileThreadStream.cpp'
+        Old    = "`t`tvalue.flags = event_flags::instant;"
+        New    = "`t`tvalue.flags = event_flags::none;"
+        Expect = 'instant/present'
+        Why    = '표식이 없으면 길이 0 인 스코프와 구분되지 않는다'
     }
 )
 

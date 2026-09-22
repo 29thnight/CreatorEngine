@@ -1545,6 +1545,165 @@ void test_track_order()
 }
 
 //-----------------------------------------------------------------------------
+// §7.3 트랙 1 — 프레임 경계.
+//
+// ★ 집계가 들고 있던 tick_begin/tick_end 는 **범위 전체**의 양 끝이라 프레임이
+//   어디서 갈리는지는 말하지 못한다. 경계를 따로 들지 않으면 그리는 층이 캡처를
+//   다시 훑게 되고, 접기가 두 곳에 생긴다.
+//-----------------------------------------------------------------------------
+void test_frame_boundaries()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main", ce::track_kind::game_thread);
+	service.record(1);
+
+	for (std::uint32_t frame = 1; frame <= 4; ++frame)
+	{
+		{
+			ce::profile_scope scope{ service, ce::marker<"FrameWork">() };
+			busy_ticks(4);
+		}
+		service.publish_frame(frame);
+	}
+
+	service.pause();
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "boundary/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 4);
+	const std::span<const ce::frame_boundary> bounds = aggregate.boundaries();
+	check_eq(bounds.size(), std::size_t{ 4 }, "boundary/count — 프레임 넷의 경계가 넷이다");
+	if (bounds.size() != 4) { service.shutdown(); return; }
+
+	// 엔진 프레임 오름차순이고, 경계가 겹치지 않고, 범위의 양 끝과 맞는다.
+	bool ascending = true;
+	bool ordered = true;
+	for (std::size_t i = 0; i < bounds.size(); ++i)
+	{
+		if (bounds[i].tick_end < bounds[i].tick_begin) ordered = false;
+		if (i > 0 && bounds[i].engine_frame <= bounds[i - 1].engine_frame) ascending = false;
+		if (i > 0 && bounds[i].tick_begin < bounds[i - 1].tick_begin) ordered = false;
+	}
+	check(ascending, "boundary/ascending — 엔진 프레임 오름차순이다");
+	check(ordered, "boundary/monotonic — 경계가 시간 순으로 선다");
+	check_eq<std::uint32_t>(bounds.front().engine_frame, 1u, "boundary/first — 첫 칸이 프레임 1");
+	check_eq<std::uint32_t>(bounds.back().engine_frame, 4u, "boundary/last — 마지막 칸이 프레임 4");
+
+	// ★ 범위의 양 끝은 경계들의 양 끝과 **같아야** 한다. 다르면 둘 중 하나가
+	//   다른 자료를 보고 있다는 뜻이다.
+	check_eq(aggregate.tick_begin(), bounds.front().tick_begin,
+	         "boundary/range-begin — 범위 시작이 첫 경계와 같다");
+	check_eq(aggregate.tick_end(), bounds.back().tick_end,
+	         "boundary/range-end — 범위 끝이 마지막 경계와 같다");
+
+	// 고른 범위 밖의 프레임은 경계에도 없다.
+	const ce::frame_aggregate two = ce::aggregate_frames(*capture, 2, 3);
+	check_eq(two.boundaries().size(), std::size_t{ 2 },
+	         "boundary/selected — 고른 범위만큼만 경계가 선다");
+
+	service.shutdown();
+}
+
+//-----------------------------------------------------------------------------
+// §7.3 트랙 1 — 길이가 없는 사건.
+//
+// ★ 이것이 트리에 들어가면 깊이 0 짜리 점이 스택에서 부모를 밀어내고, 그
+//   뒤의 자식들이 **부모를 잃은 채 루트로 올라온다.** 길이가 0 이라 합계는
+//   하나도 안 어긋나므로 수치로는 잡히지 않는다 — 부모가 누구인지를 물어야
+//   잡힌다.
+//-----------------------------------------------------------------------------
+void test_instant_events()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("Main", ce::track_kind::game_thread);
+	service.record(1);
+
+	{
+		ce::profile_scope outer{ service, ce::marker<"Outer">() };
+		busy_ticks(4);
+
+		// 바깥 구간 **한가운데**에서 찍는다. 스코프 밖에서 찍으면 스택이
+		// 비어 있어 부모를 밀어낼 일 자체가 없고, 그러면 아래 단정이
+		// 일어나지도 않은 사고를 통과시킨다.
+		service.mark_instant(ce::marker<"SceneActivated">());
+
+		{
+			ce::profile_scope inner{ service, ce::marker<"Inner">() };
+			busy_ticks(4);
+		}
+	}
+
+	service.publish_frame(1);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(static_cast<bool>(capture), "instant/capture — 얼린 캡처가 있다");
+	if (!capture) { service.shutdown(); return; }
+
+	const ce::frame_aggregate aggregate = ce::aggregate_frames(*capture, 1, 1);
+
+	// ① 사건이 자기 목록에 있고, 길이가 0 이고, 표식을 달고 있다.
+	const std::span<const ce::profile_event> instants = aggregate.instants();
+	check_eq(instants.size(), std::size_t{ 1 }, "instant/present — 사건 하나가 담겼다");
+	if (instants.size() == 1)
+	{
+		check(instants[0].marker == ce::marker<"SceneActivated">(),
+		      "instant/marker — 찍은 이름 그대로다");
+		check_eq(instants[0].tick_end, instants[0].tick_begin,
+		         "instant/zero-length — 길이가 0 이다");
+		check(ce::has_flag(instants[0].flags, ce::event_flags::instant),
+		      "instant/flag — 표식이 달려 있다");
+	}
+
+	// ② 트리에는 없다.
+	std::size_t inTree = 0;
+	for (const ce::aggregate_row& row : aggregate.hierarchy())
+	{
+		if (row.marker == ce::marker<"SceneActivated">()) ++inTree;
+	}
+	check_eq(inTree, std::size_t{ 0 }, "instant/not-in-tree — 트리에 들어가지 않는다");
+
+	std::size_t inFlat = 0;
+	for (const ce::aggregate_row& row : aggregate.flat())
+	{
+		if (row.marker == ce::marker<"SceneActivated">()) ++inFlat;
+	}
+	check_eq(inFlat, std::size_t{ 0 }, "instant/not-in-flat — Flat 에도 들어가지 않는다");
+
+	// ③ ★ 사건 **뒤에 열린 구간이 부모를 지킨다.** 이것이 이 검사의 핵심이다.
+	std::uint32_t outerRow = 0;
+	bool outerFound = false;
+	for (std::uint32_t i = 0; i < aggregate.hierarchy().size(); ++i)
+	{
+		if (aggregate.hierarchy()[i].marker != ce::marker<"Outer">()) continue;
+		outerRow = i;
+		outerFound = true;
+	}
+	check(outerFound, "instant/outer — 바깥 구간이 표에 있다");
+	if (outerFound)
+	{
+		const ce::aggregate_row& outer = aggregate.hierarchy()[outerRow];
+		bool innerIsChild = false;
+		for (std::uint32_t i = outer.child_begin;
+		     i < outer.child_end && i < aggregate.hierarchy().size(); ++i)
+		{
+			if (aggregate.hierarchy()[i].marker == ce::marker<"Inner">()) innerIsChild = true;
+		}
+		check(innerIsChild,
+		      "instant/keeps-parent — 사건 뒤에 열린 구간이 부모를 지킨다");
+	}
+
+	// ④ 두 합의 동치가 그대로다. 사건을 한쪽에서만 빼면 여기가 깨진다.
+	check_eq(aggregate.timeline_total_ticks(), aggregate.hierarchy_total_ticks(),
+	         "instant/totals — 사건이 섞여도 두 합이 같다");
+
+	service.shutdown();
+}
+
+//-----------------------------------------------------------------------------
 // GPU bar 의 tooltip 이 싣는 귀속(§7.3): 제출 번호 · 뷰 · 큐.
 //
 // ★ 이것이 없으면 같은 프레임의 씬뷰와 게임뷰 제출이 **이름만 같은 두 줄**로
@@ -2686,6 +2845,8 @@ int main()
 	test_gpu_lane();
 	test_track_order();
 	test_gpu_span_origin();
+	test_frame_boundaries();
+	test_instant_events();
 	test_gpu_lane_deferred();
 	test_gpu_lane_dropped();
 	test_concurrent_publish();

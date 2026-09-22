@@ -193,6 +193,14 @@ public:
     Core::Delegate<void, float>         InternalAnimationUpdateEvent{};
     //Manager Events
     Core::Delegate<void>                activeSceneChangedEvent{};
+
+    // 활성 씬이 바뀌었음을 알린다. 프로파일러의 '길이 없는 사건'(§7.3)을
+    // 함께 찍으므로 **이 함수를 거쳐야** 타임라인의 경계 띠에 남는다.
+    //
+    // ★ Broadcast 를 직접 부르는 자리가 넷이었다. 넷에 같은 줄을 베끼면
+    //   나중에 생기는 다섯째가 조용히 빠진다.
+    void NotifyActiveSceneChanged();
+
     Core::Delegate<void>                sceneLoadedEvent{};
     Core::Delegate<void>                sceneUnloadedEvent{};
     Core::Delegate<void>                newSceneCreatedEvent{};

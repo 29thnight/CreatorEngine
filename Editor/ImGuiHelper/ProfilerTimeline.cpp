@@ -13,6 +13,7 @@
 #include "ProfilerView.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 
 #include "ImGui.h"
@@ -24,10 +25,33 @@ namespace editor::profiler_view
 	namespace
 	{
 		constexpr float kLaneHeaderWidth = 150.0f;
-		constexpr float kRowHeight = 18.0f;
 		constexpr float kLanePadding = 6.0f;
 		constexpr float kMinimumSpanWidth = 1.0f;
-		constexpr float kTimelineHeight = 260.0f;
+
+		// ── 줄 높이는 폰트가 정한다 ────────────────────────────────────────
+		//
+		// ★ 여기에 18 px 이 박혀 있었다. 에디터가 한글 폰트를 얹으면서 한 줄이
+		//   그보다 커졌고, 그때부터 레인 이름과 그 아래 ms 가 **서로 겹쳐**
+		//   그려졌다. 막대 안의 마커 이름도 위아래가 잘렸다.
+		//
+		//   수치로는 한 군데도 안 어긋난다 — 접는 일은 전부 코어가 하고 이
+		//   층은 그리기만 하므로, 프로브가 무는 숫자는 전부 그대로다. 눈으로만
+		//   잡히는 종류의 결함이라 화면을 한 번 떠 보기 전까지 몰랐다.
+		constexpr float kRowTextPadding = 4.0f;
+
+		// §7.3 의 첫째 트랙 — 프레임 경계와 길이 없는 사건이 사는 띠. 제 글자
+		// 한 줄이 들어갈 만큼만 높다.
+		constexpr float kStripTextPadding = 6.0f;
+
+		// 한 번에 보여 주는 줄 수. 전체 높이를 픽셀로 박으면 폰트가 커졌을 때
+		// 맨 아래 레인(트랙 순서상 GPU)이 화면 밖으로 밀린다.
+		constexpr int kVisibleRows = 14;
+
+		// 레인 머리글은 이름과 ms 두 줄이다. 깊이가 0 인 레인이라도 두 줄은
+		// 확보해야 아래 레인의 이름 위에 ms 가 얹히지 않는다.
+		constexpr int kLaneHeaderRows = 2;
+
+		constexpr float kInstantMarkRadius = 4.0f;
 
 		// 깊이마다 색을 달리해 중첩이 눈에 들어오게 한다. 마커 id 를 섞어
 		// 같은 깊이의 이웃이 붙어 보이지 않게 한다.
@@ -100,9 +124,12 @@ namespace editor::profiler_view
 		ImGui::SameLine();
 		ImGui::TextDisabled("(휠: 확대 · 끌기: 이동)");
 
+		const float rowHeight = ImGui::GetTextLineHeight() + kRowTextPadding;
+		const float stripHeight = ImGui::GetTextLineHeight() + kStripTextPadding;
+
 		const ImVec2 origin = ImGui::GetCursorScreenPos();
 		const float width = (std::max)(ImGui::GetContentRegionAvail().x, 200.0f);
-		const ImVec2 size(width, kTimelineHeight);
+		const ImVec2 size(width, stripHeight + static_cast<float>(kVisibleRows) * rowHeight);
 
 		ImGui::InvisibleButton("##ProfilerTimeline", size,
 		                       ImGuiButtonFlags_MouseButtonLeft);
@@ -124,16 +151,103 @@ namespace editor::profiler_view
 			return plotLeft + static_cast<float>(offset / ticksPerPixel);
 		};
 
+		// ── §7.3 트랙 1: 프레임 경계와 사건 ────────────────────────────────
+		//
+		// ★ 맨 위에 둔다. 아래 레인의 막대가 어느 프레임의 것인지는 이 띠가
+		//   없으면 읽을 수 없다 — 확대하면 프레임 번호가 화면에서 사라지고,
+		//   그때 타임라인은 "무언가 오래 걸린다" 까지만 말한다.
+		const float stripTop = origin.y;
+		const float stripBottom = stripTop + stripHeight;
+		const ce::frame_boundary* hoveredFrame = nullptr;
+		const ce::profile_event* hoveredInstant = nullptr;
+
+		draw->AddRectFilled(ImVec2(origin.x, stripTop), ImVec2(origin.x + size.x, stripBottom),
+		                    IM_COL32(28, 31, 37, 255));
+		draw->AddText(ImVec2(origin.x + 4.0f, stripTop + 3.0f),
+		              IM_COL32(150, 158, 172, 255), "Frames");
+
+		for (const ce::frame_boundary& boundary : aggregate.boundaries())
+		{
+			if (boundary.tick_end < viewBegin || boundary.tick_begin > viewBegin + viewSpan)
+			{
+				continue;
+			}
+
+			const float x0 = (std::max)(tick_to_x(boundary.tick_begin), plotLeft);
+			const float x1 = tick_to_x(boundary.tick_end);
+
+			// 경계선은 띠만이 아니라 **레인 전체를 가른다.** 띠 안에만 그으면
+			// 아래 막대와 눈으로 맞춰야 하고, 그 맞춤은 확대할수록 틀어진다.
+			draw->AddLine(ImVec2(x0, stripTop), ImVec2(x0, origin.y + size.y),
+			              IM_COL32(70, 78, 92, 255));
+
+			// 번호는 칸이 넉넉할 때만. 좁으면 선만 남는다.
+			if (x1 - x0 > 34.0f)
+			{
+				char label[32];
+				std::snprintf(label, sizeof(label), "%u", boundary.engine_frame);
+				draw->PushClipRect(ImVec2(x0 + 2.0f, stripTop), ImVec2(x1 - 1.0f, stripBottom), true);
+				draw->AddText(ImVec2(x0 + 3.0f, stripTop + 3.0f),
+				              IM_COL32(190, 198, 212, 255), label);
+				draw->PopClipRect();
+			}
+
+			if (hovered)
+			{
+				const ImVec2 mouse = ImGui::GetIO().MousePos;
+				if (mouse.x >= x0 && mouse.x <= x1 &&
+				    mouse.y >= stripTop && mouse.y <= stripBottom)
+				{
+					hoveredFrame = &boundary;
+				}
+			}
+		}
+
+		// 길이가 없는 사건. 레인이 아니라 여기 모인다 — 어느 스레드가 냈든
+		// "언제 일어났는가" 가 이 트랙이 답하는 물음이기 때문이다.
+		for (const ce::profile_event& instant : aggregate.instants())
+		{
+			if (instant.tick_begin < viewBegin || instant.tick_begin > viewBegin + viewSpan)
+			{
+				continue;
+			}
+
+			const float x = tick_to_x(instant.tick_begin);
+			if (x < plotLeft) continue;
+
+			const float y = stripBottom - kInstantMarkRadius - 1.0f;
+			const ImVec2 points[3] = {
+				ImVec2(x, y - kInstantMarkRadius),
+				ImVec2(x - kInstantMarkRadius, y + kInstantMarkRadius),
+				ImVec2(x + kInstantMarkRadius, y + kInstantMarkRadius),
+			};
+			draw->AddTriangleFilled(points[0], points[1], points[2],
+			                        IM_COL32(240, 190, 90, 255));
+			draw->AddLine(ImVec2(x, stripBottom), ImVec2(x, origin.y + size.y),
+			              IM_COL32(150, 120, 60, 160));
+
+			if (hovered)
+			{
+				const ImVec2 mouse = ImGui::GetIO().MousePos;
+				if (std::abs(mouse.x - x) <= kInstantMarkRadius + 2.0f &&
+				    mouse.y >= stripTop && mouse.y <= stripBottom)
+				{
+					hoveredInstant = &instant;
+				}
+			}
+		}
+
 		// 레인. 순서는 코어가 정한 §7.3 의 트랙 순서(game → command/worker →
 		// script → GPU)를 그대로 쓴다. 여기서 다시 세우면 그 순서가 옳은지
 		// 물을 수단이 눈뿐이 된다 — 지금은 코어 프로브가 묻는다.
-		float laneTop = origin.y + kLanePadding;
+		float laneTop = stripBottom + kLanePadding;
 		const ce::profile_event* hoveredSpan = nullptr;
 
 		for (const ce::thread_summary& thread : aggregate.threads())
 		{
-			const float laneHeight =
-				static_cast<float>(thread.max_depth + 1) * kRowHeight + kLanePadding;
+			const int laneRows =
+				(std::max)(static_cast<int>(thread.max_depth) + 1, kLaneHeaderRows);
+			const float laneHeight = static_cast<float>(laneRows) * rowHeight + kLanePadding;
 			if (laneTop > origin.y + size.y)
 			{
 				break;
@@ -146,13 +260,22 @@ namespace editor::profiler_view
 			char lane[64];
 			std::snprintf(lane, sizeof(lane), "%.3f ms",
 			              ticks_to_milliseconds(thread.root_ticks));
-			draw->AddText(ImVec2(origin.x + 4.0f, laneTop + kRowHeight * 0.85f),
+			draw->AddText(ImVec2(origin.x + 4.0f, laneTop + rowHeight),
 			              IM_COL32(130, 140, 155, 255), lane);
 
 			for (std::uint32_t i = thread.span_begin;
 			     i < thread.span_end && i < spans.size(); ++i)
 			{
 				const ce::profile_event& span = spans[i];
+
+				// 길이가 없는 사건은 위의 경계 띠가 그린다. 여기서도 그리면
+				// 폭 0 짜리 막대가 레인마다 겹쳐 서고, 같은 것이 두 자리에서
+				// 서로 다른 뜻으로 읽힌다.
+				if (ce::has_flag(span.flags, ce::event_flags::instant))
+				{
+					continue;
+				}
+
 				if (span.tick_end < viewBegin || span.tick_begin > viewBegin + viewSpan)
 				{
 					continue;   // 시야 밖
@@ -160,8 +283,8 @@ namespace editor::profiler_view
 
 				const float x0 = tick_to_x(span.tick_begin);
 				const float x1 = (std::max)(tick_to_x(span.tick_end), x0 + kMinimumSpanWidth);
-				const float y0 = laneTop + static_cast<float>(span.depth) * kRowHeight;
-				const float y1 = y0 + kRowHeight - 2.0f;
+				const float y0 = laneTop + static_cast<float>(span.depth) * rowHeight;
+				const float y1 = y0 + rowHeight - 2.0f;
 
 				const bool truncated =
 					ce::has_flag(span.flags, ce::event_flags::truncated_begin) ||
@@ -201,7 +324,23 @@ namespace editor::profiler_view
 		              IM_COL32(80, 86, 96, 255));
 		draw->PopClipRect();
 
-		if (hoveredSpan)
+		if (hoveredInstant)
+		{
+			ImGui::BeginTooltip();
+			ImGui::TextUnformatted(ce::marker_info(hoveredInstant->marker).name);
+			ImGui::Text("frame %u  ·  %s", hoveredInstant->frame,
+			            thread_name(view.capture(), hoveredInstant->thread_slot));
+			ImGui::TextDisabled("길이가 없는 사건 - 일어난 순간만 있다");
+			ImGui::EndTooltip();
+		}
+		else if (hoveredFrame)
+		{
+			const ce::profile_tick length = (hoveredFrame->tick_end > hoveredFrame->tick_begin)
+				? (hoveredFrame->tick_end - hoveredFrame->tick_begin) : 0;
+			ImGui::SetTooltip("frame %u\n%.4f ms", hoveredFrame->engine_frame,
+			                  ticks_to_milliseconds(length));
+		}
+		else if (hoveredSpan)
 		{
 			const ce::profile_tick length = (hoveredSpan->tick_end > hoveredSpan->tick_begin)
 				? (hoveredSpan->tick_end - hoveredSpan->tick_begin) : 0;

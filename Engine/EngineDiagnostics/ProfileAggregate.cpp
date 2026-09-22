@@ -27,6 +27,11 @@ namespace ce::detail::profile_aggregate_impl
 			? (event.tick_end - event.tick_begin) : 0;
 	}
 
+	inline bool is_instant(const profile_event& event)
+	{
+		return has_flag(event.flags, event_flags::instant);
+	}
+
 	inline bool is_truncated(const profile_event& event)
 	{
 		return has_flag(event.flags, event_flags::truncated_begin)
@@ -105,6 +110,14 @@ namespace ce
 
 			result.m_droppedEvents += frame.dropped_events;
 			events.insert(events.end(), frame.events.begin(), frame.events.end());
+
+			// 프레임이 어디서 갈리는지. 프레임 기록은 엔진 프레임 오름차순으로
+			// 서 있으므로 그대로 옮기면 정렬이 끝난다.
+			frame_boundary boundary;
+			boundary.engine_frame = frame.engine_frame;
+			boundary.tick_begin = frame.tick_begin;
+			boundary.tick_end = frame.tick_end;
+			result.m_boundaries.push_back(boundary);
 		}
 
 		result.m_eventCount = events.size();
@@ -145,11 +158,33 @@ namespace ce
 
 			++summary->event_count;
 			summary->max_depth = (std::max)(summary->max_depth, event.depth);
+
+			// ★ 길이가 없는 사건은 합에도 트리에도 넣지 않는다. Hierarchy·Flat
+			//   이 세는 것은 **걸린 시간**이고 점에는 그것이 없다.
+			//
+			//   길이가 0 이라 더해도 0 이지만, 넣고 안 넣고를 **두 곳에서
+			//   다르게** 정하면 timeline_total 과 hierarchy_total 의 동치가
+			//   깨진다. 한 자리에서 가르고 아래 트리도 같은 기준을 쓴다.
+			if (is_instant(event))
+			{
+				result.m_instants.push_back(event);
+				continue;
+			}
+
 			if (event.depth == 0)
 			{
 				summary->root_ticks += span_ticks(event);
 			}
 		}
+
+		// 사건은 **시각 순**으로 세운다. 위에서는 스팬 순서(슬롯 먼저)로 모았고,
+		// 경계 띠는 스레드를 가리지 않고 시간축 하나에 늘어놓기 때문이다.
+		std::sort(result.m_instants.begin(), result.m_instants.end(),
+		          [](const profile_event& a, const profile_event& b)
+		          {
+			          if (a.tick_begin != b.tick_begin) return a.tick_begin < b.tick_begin;
+			          return a.thread_slot < b.thread_slot;
+		          });
 
 		std::sort(result.m_threads.begin(), result.m_threads.end(),
 		          [](const thread_summary& a, const thread_summary& b)
@@ -223,6 +258,12 @@ namespace ce
 
 		for (const profile_event& event : events)
 		{
+			// 길이가 없는 사건은 트리에 들어가지 않는다(위의 같은 기준).
+			if (is_instant(event))
+			{
+				continue;
+			}
+
 			// 스레드가 바뀌면 스택은 뜻을 잃는다. 깊이 비교만으로는 다른
 			// 스레드의 조상이 부모로 잡힌다.
 			if (!stack.empty() &&

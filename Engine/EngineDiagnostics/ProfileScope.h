@@ -39,6 +39,7 @@ namespace ce
 
 	inline void profile_scope_begin(marker_id) {}
 	inline void profile_scope_end() {}
+	inline void profile_instant(marker_id) {}
 
 #else
 
@@ -82,6 +83,10 @@ namespace ce
 	//   묶어라 — 실제로 렌더 스레드는 그렇게 쓴다.
 	inline void profile_scope_begin(marker_id id) { profiler().begin_scope(id); }
 	inline void profile_scope_end() { profiler().end_scope(); }
+
+	// 길이가 없는 사건. RAII 로 묶을 짝이 없으므로 함수 하나다 —
+	// 짝이 없다는 것이 이 표기의 뜻 전부다.
+	inline void profile_instant(marker_id id) { profiler().mark_instant(id); }
 
 #endif
 }
