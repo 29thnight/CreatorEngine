@@ -96,6 +96,18 @@ namespace ce
 	};
 
 	// 프레임 범위 하나를 접은 결과. 만든 뒤에는 바뀌지 않는다.
+	// 어디까지 접을 것인가.
+	//
+	// ★ Timeline 은 구간·레인·경계만 쓰고 Hierarchy/Flat 은 쳐다보지 않는다.
+	//   그런데 이제 Timeline 이 **보이는 창 전체**(수백 프레임)를 그리고, 창은
+	//   녹화 중에 계속 미끄러진다. 쓰지도 않는 두 표를 그때마다 같이 세우면
+	//   프로파일러가 제가 재려는 프레임을 스스로 잡아먹는다.
+	enum class aggregate_scope
+	{
+		full,        // 구간 + 레인 + Hierarchy + Flat
+		spans_only,  // 구간 + 레인 + 경계 + 사건까지만
+	};
+
 	class frame_aggregate
 	{
 	public:
@@ -136,7 +148,8 @@ namespace ce
 		profile_tick  hierarchy_total_ticks() const { return m_hierarchyTotal; }
 
 		friend frame_aggregate aggregate_frames(const capture_session&,
-		                                        std::uint32_t, std::uint32_t);
+		                                        std::uint32_t, std::uint32_t,
+		                                        aggregate_scope);
 
 	private:
 		std::vector<profile_event>  m_spans;
@@ -161,5 +174,6 @@ namespace ce
 	// 없으면 빈 집계를 낸다 — 부르는 쪽이 판정할 수 있도록 던지지 않는다.
 	frame_aggregate aggregate_frames(const capture_session& capture,
 	                                 std::uint32_t first_frame,
-	                                 std::uint32_t last_frame);
+	                                 std::uint32_t last_frame,
+	                                 aggregate_scope scope = aggregate_scope::full);
 }

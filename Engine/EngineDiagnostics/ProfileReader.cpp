@@ -35,6 +35,7 @@ namespace ce
 	{
 		m_capture = std::move(capture);
 		m_aggregateValid = false;
+		m_windowAggregateValid = false;
 		m_viewValid = false;
 
 		if (!m_capture || m_capture->frame_count() == 0)
@@ -166,6 +167,20 @@ namespace ce
 
 	void capture_reader::clamp_graph()
 	{
+		clamp_graph_range();
+
+		// ★ 창이 움직였으면 시야를 다시 앉힌다. 안 하면 타임라인이 지난 창의
+		//   tick 을 그대로 들고 있어서, 굴린 뒤 빈 화면이 나온다.
+		if (m_windowAggregateValid
+		    && (m_windowAggregateFirst != graph_first()
+		        || m_windowAggregateLast != graph_last()))
+		{
+			rebase_view_to_window();
+		}
+	}
+
+	void capture_reader::clamp_graph_range()
+	{
 		if (!m_capture || 0 == m_graphCount)
 		{
 			return;
@@ -201,6 +216,7 @@ namespace ce
 		m_availableFirst = m_availableLast = 0;
 		m_selectedFirst = m_selectedLast = 0;
 		m_aggregateValid = false;
+		m_windowAggregateValid = false;
 		m_viewValid = false;
 		reset_graph();
 	}
@@ -237,8 +253,10 @@ namespace ce
 
 		if (m_selectedFirst != previousFirst || m_selectedLast != previousLast)
 		{
+			// ★ 시야는 건드리지 않는다. 기준이 선택에서 창으로 옮겨졌으므로
+			//   다른 프레임을 골라도 타임라인이 그리는 범위는 그대로고,
+			//   여기서 되돌리면 확대해 둔 것이 클릭 한 번에 풀린다.
 			m_aggregateValid = false;
-			m_viewValid = false;
 		}
 	}
 
@@ -276,6 +294,9 @@ namespace ce
 		constexpr profile_tick kMinimumViewTicks = 16;
 	}
 
+	// ★ 기준이 선택에서 **창**으로 옮겨졌다. 고른 한 프레임을 기준으로 삼으면
+	//   위 그래프가 244 프레임을 보여 주는 동안 아래 타임라인은 1.6 ms 짜리
+	//   한 칸만 그린다.
 	void capture_reader::ensure_view() const
 	{
 		if (m_viewValid)
@@ -283,7 +304,7 @@ namespace ce
 			return;
 		}
 
-		const frame_aggregate& folded = aggregate();
+		const frame_aggregate& folded = window_aggregate();
 		m_viewBegin = folded.tick_begin();
 		m_viewEnd = folded.tick_end();
 		if (m_viewEnd <= m_viewBegin)
@@ -291,11 +312,31 @@ namespace ce
 			m_viewEnd = m_viewBegin + kMinimumViewTicks;
 		}
 		m_viewValid = true;
+		m_viewSpansWholeWindow = true;
+	}
+
+	// 창이 미끄러졌을 때 시야를 어떻게 할 것인가.
+	//
+	// ★ 확대해 두지 않았으면 **따라간다.** 확대해 뒀으면 보던 자리를 지키고
+	//   범위 안으로만 자른다 — 굴릴 때마다 확대가 풀리면 확대가 뜻이 없다.
+	void capture_reader::rebase_view_to_window() const
+	{
+		if (!m_viewValid)
+		{
+			return;
+		}
+
+		if (m_viewSpansWholeWindow)
+		{
+			m_viewValid = false;
+			return;
+		}
+		clamp_view();
 	}
 
 	void capture_reader::clamp_view() const
 	{
-		const frame_aggregate& folded = aggregate();
+		const frame_aggregate& folded = window_aggregate();
 		const profile_tick low = folded.tick_begin();
 		const profile_tick high = (folded.tick_end() > low)
 			? folded.tick_end() : (low + kMinimumViewTicks);
@@ -323,6 +364,10 @@ namespace ce
 			m_viewBegin = high - span;
 		}
 		m_viewEnd = m_viewBegin + span;
+
+		// 확대해 뒀는가. 창이 미끄러질 때 따라갈지 자리를 지킬지가 여기서
+		// 갈린다 — 그래서 자르는 자리에서 한 번만 적는다.
+		m_viewSpansWholeWindow = (span >= full);
 	}
 
 	profile_tick capture_reader::view_begin() const
@@ -396,6 +441,33 @@ namespace ce
 		}
 		m_viewEnd = m_viewBegin + span;
 		clamp_view();
+	}
+
+	const frame_aggregate& capture_reader::window_aggregate() const
+	{
+		const std::uint32_t first = graph_first();
+		const std::uint32_t last = graph_last();
+
+		if (m_windowAggregateValid
+		    && m_windowAggregateFirst == first && m_windowAggregateLast == last)
+		{
+			return m_windowAggregate;
+		}
+
+		if (m_capture)
+		{
+			m_windowAggregate =
+				aggregate_frames(*m_capture, first, last, aggregate_scope::spans_only);
+			++m_foldCount;
+		}
+		else
+		{
+			m_windowAggregate = frame_aggregate{};
+		}
+		m_windowAggregateFirst = first;
+		m_windowAggregateLast = last;
+		m_windowAggregateValid = true;
+		return m_windowAggregate;
 	}
 
 	const frame_aggregate& capture_reader::aggregate() const

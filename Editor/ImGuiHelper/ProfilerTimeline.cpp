@@ -122,11 +122,15 @@ namespace editor::profiler_view
 			return;
 		}
 
-		const ce::frame_aggregate& aggregate = view.aggregate();
+		// ★ **보이는 창**을 그린다. 고른 한 프레임이 아니다 — 위 그래프가
+		//   244 프레임을 보여 주는 동안 아래가 1.6 ms 짜리 한 칸만 그리면
+		//   같은 화면의 두 그림이 서로 다른 범위를 말한다. 선택은 아래에서
+		//   띠로 표시한다.
+		const ce::frame_aggregate& aggregate = view.window_aggregate();
 		const std::span<const ce::profile_event> spans = aggregate.spans();
 		if (spans.empty())
 		{
-			ImGui::TextDisabled("선택한 구간에 이벤트가 없다");
+			ImGui::TextDisabled("보이는 구간에 이벤트가 없다");
 			return;
 		}
 
@@ -145,9 +149,10 @@ namespace editor::profiler_view
 		const double rulerStepMs = nice_step(
 			ticks_to_milliseconds(viewSpan) * kRulerLabelSpacing
 			/ (std::max)(ImGui::GetContentRegionAvail().x - kLaneHeaderWidth, 32.0f));
-		ImGui::Text("시야 %.3f ms  ·  전체 %.3f ms  ·  자 한 칸 %.4g ms",
+		ImGui::Text("시야 %.3f ms  ·  창 %.3f ms (frame %u..%u)  ·  자 한 칸 %.4g ms",
 		            ticks_to_milliseconds(viewSpan),
 		            ticks_to_milliseconds(aggregate.tick_end() - aggregate.tick_begin()),
+		            view.graph_first(), view.graph_last(),
 		            rulerStepMs);
 		ImGui::SameLine();
 		if (ImGui::SmallButton("전체 보기"))
@@ -257,6 +262,16 @@ namespace editor::profiler_view
 
 			const float x0 = (std::max)(tick_to_x(boundary.tick_begin), plotLeft);
 			const float x1 = tick_to_x(boundary.tick_end);
+
+			// ★ 고른 프레임을 띠로 칠한다. 창 전체를 그리게 된 뒤로는 "지금
+			//   어느 프레임을 표에서 보고 있는가" 가 그림에서 사라졌다.
+			if (boundary.engine_frame >= view.selected_first()
+			    && boundary.engine_frame <= view.selected_last())
+			{
+				draw->AddRectFilled(ImVec2(x0, stripTop),
+				                    ImVec2((std::max)(x1, x0 + 1.0f), origin.y + size.y),
+				                    IM_COL32(90, 150, 210, 30));
+			}
 
 			// 경계선은 띠만이 아니라 **레인 전체를 가른다.** 띠 안에만 그으면
 			// 아래 막대와 눈으로 맞춰야 하고, 그 맞춤은 확대할수록 틀어진다.

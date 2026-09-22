@@ -39,7 +39,12 @@ namespace editor::profiler_view
 		//   맨 윗선의 글자가 프레임 번호 자 위로 나가고, 아래에 두면 막대에
 		//   묻힌다 — 어느 쪽도 자리가 없다. 그래서 막대가 들어오지 않는
 		//   칸을 왼쪽에 따로 낸다. 타임라인의 레인 머리글과 같은 방식이다.
-		constexpr float kScaleGutterRows = 2.6f;
+		//
+		// ★ 폭을 타임라인의 레인 머리글과 **같게** 잡는다. 두 그림이 같은 창을
+		//   그리므로 같은 x 가 같은 자리여야 한다 — 왼쪽 여백이 다르면 위
+		//   막대와 아래 구간이 어긋나 보이고, 그러면 눈으로 잇는 일이 다시
+		//   사람 몫이 된다.
+		constexpr float kScaleGutterWidth = 150.0f;
 
 		// 세로 눈금은 이 계단에서 고른다. 최댓값에 딱 맞추면 프레임 하나가
 		// 튈 때마다 눈금이 통째로 바뀌어 높이를 눈으로 비교할 수 없다.
@@ -91,7 +96,7 @@ namespace editor::profiler_view
 		const float rowHeight = ImGui::GetTextLineHeight();
 		const float barWidth = (std::max)(rowHeight * kBarWidthRatio, kMinimumBarWidth);
 		const float width = (std::max)(ImGui::GetContentRegionAvail().x, 64.0f);
-		const float gutter = rowHeight * kScaleGutterRows;
+		const float gutter = kScaleGutterWidth;
 		const float plotWidth = (std::max)(width - gutter, 32.0f);
 
 		// 담을 수 있는 만큼만 보여 준다. 나머지는 왼쪽에 남아 있고, 굴려서 본다.

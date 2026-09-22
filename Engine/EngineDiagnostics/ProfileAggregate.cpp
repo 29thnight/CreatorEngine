@@ -147,7 +147,8 @@ namespace ce
 
 	frame_aggregate aggregate_frames(const capture_session& capture,
 	                                 std::uint32_t first_frame,
-	                                 std::uint32_t last_frame)
+	                                 std::uint32_t last_frame,
+	                                 aggregate_scope scope)
 	{
 		frame_aggregate result;
 		if (last_frame < first_frame)
@@ -320,6 +321,13 @@ namespace ce
 		for (const thread_summary& summary : result.m_threads)
 		{
 			result.m_timelineTotal += summary.root_ticks;
+		}
+
+		// ★ Timeline 이 청한 것이면 여기서 끝이다. 아래 두 표는 선택 구간을
+		//   묻는 쪽(Hierarchy·Flat 탭)만 쓴다.
+		if (aggregate_scope::spans_only == scope)
+		{
+			return result;
 		}
 
 		// ── 3. Hierarchy ────────────────────────────────────────────────────

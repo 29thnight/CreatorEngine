@@ -92,7 +92,19 @@ namespace ce
 		void select_latest();
 
 		// 선택 구간의 집계. 선택이 바뀌지 않았으면 다시 접지 않는다.
+		// Hierarchy·Flat 표가 이것을 읽는다.
 		const frame_aggregate& aggregate() const;
+
+		// ── 보이는 창의 집계 ────────────────────────────────────────────
+		//
+		// ★ Timeline 이 읽는 것은 **이쪽**이다. 고른 한 프레임만 그리면
+		//   위 그래프가 244 프레임을 보여 주는 동안 아래는 1.6 ms 짜리 한 칸만
+		//   그린다 — 같은 화면의 두 그림이 서로 다른 범위를 말한다.
+		//
+		//   구간·레인·경계까지만 접는다(`spans_only`). 창은 녹화 중에 계속
+		//   미끄러지고, 그때마다 쓰지도 않는 표를 세우면 프로파일러가 제가
+		//   재려는 프레임을 잡아먹는다.
+		const frame_aggregate& window_aggregate() const;
 
 		// ── Timeline 의 가로 시야 ───────────────────────────────────────────
 		//
@@ -100,8 +112,10 @@ namespace ce
 		// 여기 있는 이유는 선택과 같다 — 순수 상태라 화면 없이 잴 수 있고,
 		// "확대해도 구간 밖으로 나가지 않는다" 같은 계약을 프로브가 문다.
 		//
-		// 선택이 바뀌면 시야는 그 구간 전체로 돌아간다. 다른 프레임을 골랐는데
-		// 전에 보던 자리가 남아 있으면 빈 화면이 나온다.
+		// ★ 기준은 **보이는 창**이다(선택이 아니다). 그래서 다른 프레임을
+		//   골라도 시야는 그대로다 — 창 안에 있는 한 빈 화면이 될 수가 없고,
+		//   고를 때마다 확대가 풀리면 확대가 뜻이 없다. 창이 미끄러지면,
+		//   확대해 두지 않았을 때만 따라간다.
 		profile_tick view_begin() const;
 		profile_tick view_end() const;
 		profile_tick view_span() const;
@@ -126,6 +140,7 @@ namespace ce
 		void shift_selection(std::int64_t delta);
 		void clamp_view() const;
 		void ensure_view() const;
+		void rebase_view_to_window() const;
 
 		capture_session_ptr m_capture;
 		bool          m_liveFollow = true;
@@ -142,14 +157,25 @@ namespace ce
 		mutable std::uint64_t   m_foldCount = 0;
 
 		// 시야는 집계가 서야 뜻이 생긴다(구간의 tick 을 알아야 한다). 그래서
-		// 처음 물을 때 세우고, 선택이 바뀌면 무효가 된다.
+		// 처음 물을 때 세우고, 창이 바뀌면 무효가 된다.
 		mutable profile_tick m_viewBegin = 0;
 		mutable profile_tick m_viewEnd = 0;
 		mutable bool         m_viewValid = false;
 
+		// 창 집계의 캐시. 접은 범위를 같이 들고 있어야 창이 미끄러진 것을 안다.
+		mutable frame_aggregate m_windowAggregate;
+		mutable std::uint32_t   m_windowAggregateFirst = 0;
+		mutable std::uint32_t   m_windowAggregateLast = 0;
+		mutable bool            m_windowAggregateValid = false;
+
+		// 시야가 창 전체를 덮고 있는가. 덮고 있으면 창이 미끄러질 때 따라가고,
+		// 확대해 둔 상태면 보던 자리를 지킨다.
+		mutable bool m_viewSpansWholeWindow = true;
+
 		// 그래프의 창. 0 이면 "아직 세우지 않았다" 이고, 그때는 보존 구간
 		// 전체를 뜻한다.
 		void clamp_graph();
+		void clamp_graph_range();
 		std::uint32_t m_graphFirst = 0;
 		std::uint32_t m_graphCount = 0;
 

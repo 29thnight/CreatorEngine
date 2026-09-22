@@ -105,8 +105,8 @@ $mutations = @(
         # 이전 프레임을 계속 보여 주는데, 숫자가 그럴듯해서 눈으로는 모른다.
         Name   = 'reader-stale-cache'
         File   = 'ProfileReader.cpp'
-        Old    = "`t`t`tm_aggregateValid = false;`r`n`t`t`tm_viewValid = false;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
-        New    = "`t`t`tm_aggregateValid = true;`r`n`t`t`tm_viewValid = false;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
+        Old    = "`t`t`tm_aggregateValid = false;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
+        New    = "`t`t`tm_aggregateValid = true;`r`n`t`t}`r`n`t}`r`n`r`n`tvoid capture_reader::select_latest()"
         Expect = 'reader/'
         Why    = '선택이 바뀌어도 캐시를 안 버리면 다른 프레임의 숫자를 계속 보여 준다'
     },
@@ -123,14 +123,36 @@ $mutations = @(
         Why    = '시야가 구간 밖으로 나가면 빈 화면이 나오고 계측이 없는 것처럼 보인다'
     },
     @{
-        # 선택이 바뀌어도 시야를 그대로 둔다. 다른 프레임을 골랐는데 전에
-        # 보던 tick 을 계속 보므로 타임라인이 빈다.
-        Name   = 'timeline-view-kept'
+        # 고를 때마다 시야를 되돌린다. 기준이 창으로 옮겨진 뒤로는 이것이
+        # 퇴행이다 — 확대해 둔 것이 클릭 한 번에 풀린다.
+        Name   = 'timeline-view-reset-on-select'
         File   = 'ProfileReader.cpp'
-        Old    = "`t`t`tm_aggregateValid = false;`r`n`t`t`tm_viewValid = false;"
-        New    = "`t`t`tm_aggregateValid = false;"
-        Expect = 'timeline-view/reset-on-select'
-        Why    = '선택이 바뀌어도 시야를 안 되돌리면 다른 프레임에서 빈 타임라인을 본다'
+        Old    = "`t`t`t// ★ 시야는 건드리지 않는다."
+        New    = "`t`t`tm_viewValid = false;`r`n`t`t`t// ★ 시야는 건드리지 않는다."
+        Expect = 'timeline-view/kept-on-select'
+        Why    = '고를 때마다 시야가 돌아가면 확대가 클릭 한 번에 풀린다'
+    },
+    @{
+        # 시야를 창이 아니라 선택 구간으로 세운다. 지금 도구가 그러했다 —
+        # 위 그래프가 244 프레임을 그리는 동안 아래는 한 칸만 그렸다.
+        Name   = 'timeline-view-follows-selection'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tconst frame_aggregate& folded = window_aggregate();`r`n`t`tm_viewBegin = folded.tick_begin();"
+        New    = "`t`tconst frame_aggregate& folded = aggregate();`r`n`t`tm_viewBegin = folded.tick_begin();"
+        # ★ 예측은 kept-on-select 였는데 실제로는 이 절이 먼저 붉어진다 —
+        #   시야가 선택을 따르는 순간 **처음 서는 자리부터** 창과 어긋난다.
+        Expect = 'timeline-view/initial-end'
+        Why    = '시야가 선택을 따르면 타임라인이 그래프와 다른 범위를 말한다'
+    },
+    @{
+        # 창 집계를 캐시에서 다시 안 접는다. 창이 미끄러져도 지난 창의
+        # 구간을 계속 그린다.
+        Name   = 'window-aggregate-stale'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t    && m_windowAggregateFirst == first && m_windowAggregateLast == last)"
+        New    = "`t`t    && m_windowAggregateFirst <= first && m_windowAggregateLast >= last)"
+        Expect = 'window/follows-span'
+        Why    = '창이 미끄러져도 안 다시 접으면 지난 구간을 계속 그린다'
     },
 
     # ── 녹화 경계를 넘는 스코프 ────────────────────────────────────

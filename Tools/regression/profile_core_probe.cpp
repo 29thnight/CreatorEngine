@@ -1246,7 +1246,11 @@ namespace
 		service.register_thread("Main");
 		service.record(1);
 
-		for (std::uint32_t frame = 1; frame <= 6; ++frame)
+		// ★ 20 프레임이다. 여섯으로는 **창을 좁힐 수가 없다** —
+		//   kMinimumGraphFrames 가 8 이라 set_graph_span(3) 이 보존 전체로
+		//   되돌아가고, 그러면 "창이 좁아지면 집계도 좁아진다" 를 무는 변이가
+		//   조용히 통과한다.
+		for (std::uint32_t frame = 1; frame <= 20; ++frame)
 		{
 			ce::profile_scope scope{ service, ce::marker<"ViewTick">() };
 			busy_ticks(3);
@@ -1257,12 +1261,17 @@ namespace
 		ce::capture_reader reader;
 		reader.adopt(service.capture());
 		reader.set_live_follow(false);
+		// ★ 선택을 창보다 좁게 둔다. 둘이 같으면 "시야가 선택이 아니라 창을
+		//   따른다" 를 자극할 수가 없다.
 		reader.select_range(1, 6);
 
-		const ce::frame_aggregate& folded = reader.aggregate();
+		// ★ 기준은 **보이는 창**이다. 선택(1..6)으로 재면 안 된다 — 위 자극은
+		//   스코프를 publish_frame 뒤에 닫으므로 19 틱짜리 프레임 7 이 하나 더
+		//   생기고, 창은 그것까지 품는다.
+		const ce::frame_aggregate& folded = reader.window_aggregate();
 		const ce::profile_tick low = folded.tick_begin();
 		const ce::profile_tick high = folded.tick_end();
-		check(high > low, "timeline-view/span — 선택 구간에 길이가 있다");
+		check(high > low, "timeline-view/span — 보이는 창에 길이가 있다");
 		if (high <= low)
 		{
 			return;
@@ -1306,19 +1315,58 @@ namespace
 		}
 		check_eq(reader.view_span(), high - low, "timeline-view/zoom-out-cap — 구간 전체보다 넓어지지 않는다");
 
-		// ★ 선택이 바뀌면 시야가 그 구간으로 돌아간다. 전에 보던 자리가 남아
-		//   있으면 다른 프레임을 골랐을 때 빈 화면이 나온다.
-		reader.zoom_view(0.25, pivot);
-		reader.select_frame(2);
-		const ce::frame_aggregate& one = reader.aggregate();
-		check_eq(reader.view_begin(), one.tick_begin(),
-		         "timeline-view/reset-on-select — 선택이 바뀌면 시야가 돌아간다");
-		check_eq(reader.view_end(), one.tick_end(),
-		         "timeline-view/reset-on-select-end — 선택이 바뀌면 시야가 돌아간다");
-
-		reader.zoom_view(0.25, one.tick_begin());
+		// ★ 시야의 기준은 선택이 아니라 **보이는 창**이다.
+		//
+		//   고른 한 프레임을 기준으로 삼으면, 위 그래프가 244 프레임을 보여
+		//   주는 동안 아래 타임라인은 1.6 ms 짜리 한 칸만 그린다 — 같은 화면의
+		//   두 그림이 서로 다른 범위를 말한다.
 		reader.reset_view();
-		check_eq(reader.view_begin(), one.tick_begin(), "timeline-view/reset — 손으로도 되돌린다");
+		{
+			const ce::frame_aggregate& windowed = reader.window_aggregate();
+			check_eq(windowed.frame_begin(), reader.graph_first(),
+			         "window/first — 창 집계의 시작은 그래프 창의 시작이다");
+			check_eq(windowed.frame_end(), reader.graph_last() + 1,
+			         "window/last — 창 집계의 끝은 그래프 창의 끝이다");
+			check_eq(reader.view_begin(), windowed.tick_begin(),
+			         "timeline-view/spans-window — 시야는 창 전체로 선다");
+			check_eq(reader.view_end(), windowed.tick_end(),
+			         "timeline-view/spans-window-end — 시야는 창 전체로 선다");
+		}
+
+		// 선택을 한 프레임으로 좁혀도 시야는 그대로다. 여기서 되돌리면
+		// 확대해 둔 것이 클릭 한 번에 풀린다.
+		reader.zoom_view(0.25, pivot);
+		const ce::profile_tick keptBegin = reader.view_begin();
+		const ce::profile_tick keptSpan = reader.view_span();
+		reader.select_frame(2);
+		check_eq(reader.view_begin(), keptBegin,
+		         "timeline-view/kept-on-select — 골라도 시야가 안 움직인다");
+		check_eq(reader.view_span(), keptSpan,
+		         "timeline-view/kept-on-select-span — 골라도 배율이 안 풀린다");
+
+		// 창을 좁히면, 확대해 두지 않았을 때는 **따라간다.**
+		reader.reset_view();
+		reader.set_graph_span(3);
+		{
+			const ce::frame_aggregate& narrowed = reader.window_aggregate();
+			check_eq(narrowed.frame_begin(), reader.graph_first(),
+			         "window/follows-span — 창을 좁히면 집계도 좁아진다");
+			check_eq(reader.view_begin(), narrowed.tick_begin(),
+			         "timeline-view/follows-window — 확대 안 했으면 창을 따라간다");
+			check_eq(reader.view_end(), narrowed.tick_end(),
+			         "timeline-view/follows-window-end — 확대 안 했으면 창을 따라간다");
+		}
+
+		// 확대해 뒀으면 창이 미끄러져도 배율을 지킨다.
+		reader.zoom_view(0.5, reader.view_begin() + reader.view_span() / 2);
+		const ce::profile_tick heldSpan = reader.view_span();
+		reader.pan_graph(-1);
+		check_eq(reader.view_span(), heldSpan,
+		         "timeline-view/zoom-held-on-pan — 굴려도 배율이 안 풀린다");
+
+		reader.reset_view();
+		check_eq(reader.view_begin(), reader.window_aggregate().tick_begin(),
+		         "timeline-view/reset — 손으로도 되돌린다");
 	}
 
 	//-------------------------------------------------------------------------
