@@ -147,6 +147,54 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
 
+### 0.5.25 2026-09-22 문서 부채 — 계획서가 남은 일을 잘못 세고 있었다
+
+코드가 아니라 **이 계획서와 게이트 README 가 틀린** 것을 고쳤다. 여기가 틀리면
+다음에 열었을 때 무엇이 남았는지를 다시 잘못 센다.
+
+**§11.0 을 새로 뒀다.** 회귀 세트는 9-16 에 폐지됐고 그 뒤로 검사는 "변경마다
+모아 묶어" 돌린다 — **이름이 어디에도 없으면 다음 세션이 무엇을 돌려야 할지
+찾지 못한다.** 여섯 게이트를 이름 · 엔진을 띄우는가 · 무는 것으로 적었다. §14 의
+완료 조건 하나가 정확히 이것을 요구하고 있었다.
+
+**§14 체크박스 다섯을 닫았다** — Record/Pause/Clear · 600 프레임 rolling ·
+멀티스레드 Timeline + 선택 Hierarchy · `cross-frame/preserve` PASS · 검사 이름
+등재. 닫지 않은 것에는 **왜 아직인가**를 붙였다(예: overflow 표시는 앞의 셋이
+서고 profiler 자체 비용 칸만 없다).
+
+**남은 것을 한 문단으로 적었다.** 통째로 안 한 단계 셋(P5 counter · P6 `.ceprof`
+· P7 자동 trigger)과, 선 단계에 난 구멍 넷(§7.3 여섯째 트랙 · 멀티카메라 GPU
+매핑 · profiler 자체 비용 · UI 없는 Player 캡처).
+
+**★ 게이트 README 두 곳이 은퇴한 시스템을 설명하고 있었다.**
+`Tools/profiling-validation/README.md` 는 전체가 `profile.selftest` 와
+`CPUProfiler` 의 문서였다 — `PASS`/`KNOWN-DEFECT`/`SKIP` 삼분 판정,
+`PROFILE_SELFTEST_OK` 마커, `GetTLSUnsafe` 의 공유 TLS. **그 코드는 P1+P2 에서
+통째로 사라졌고**(`CPUProfiler` 소스 0 건), 그래서 §11.0 이 가리키는 문서가
+거짓말이 될 참이었다. 지금 네 축이 무엇을 자극하고 무엇을 무는지로 다시 썼고,
+P0 의 결함 표는 **"은퇴한 코어의 이력"** 이라고 못 박아 남겼다 — 같은 종류의
+결함이 새 코어에서도 가능하고, 그 계약들이 지금 `verify-profile-core.ps1` 의
+검사로 옮겨 가 있기 때문이다. 스크립트 자신의 `.DESCRIPTION`·`.PARAMETER` 도
+축 둘만 적고 있어 넷으로 고쳤다.
+
+**`Tools/regression/README.md` 표에 두 줄이 아예 없었다** —
+`verify-editor-startup-diagnostics.ps1` 과 `verify-player-shipping-isolation.ps1`.
+둘 다 존재하고 §14 의 조건을 지는데 표에 없었다. 표에 없는 게이트는 없는 게이트다.
+
+**★ 문서에 절대 수를 적지 않기로 했다.** 이번에 지운 거짓 중 셋이 낡은 숫자였다 —
+`PROFILE_CPU_BEGIN 호출부가 현재 41곳`(지금 0), `현재 등록 스레드 [GameThread] 1개`
+(지금 넷 + 워커), `각 112 검사`(지금 그보다 훨씬 많다). 기준선 숫자는 남이 계측을
+얹기만 해도 흔들린다. 코어 게이트의 검사·변이 수만은 **게이트를 실제로 돌려 나온
+수**로 적는다.
+
+**같이 정정한 것.** §11.4 의 "워커 8스레드가 계측 밖이라 모드 3·4 가 반쪽" 은
+풀린 조건이다(`-Action Workers` 가 문다). `.ceprof` 0 건의 범위도
+"저장소 전체" 가 아니라 `Engine`·`Editor`·`Tools`·`Dynamic_CPP` 전수로 좁혔다 —
+계획서 자신이 그 낱말을 쓰므로 "전체 0" 은 그 자리에서 거짓이다.
+
+**대시보드는 안 고쳤다.** `RefactoringPlanDashboard.html` 의 PHASE 14 여덟 줄을
+검산했더니 P4 `progress` · P5·P6·P7 `todo` 로 **이번 감사와 정확히 일치**한다.
+
 ### 0.5.24 2026-09-22 P4 타임라인이 **보이는 창**을 그린다 — 한 칸만 그리면 두 그림이 서로 다른 말을 한다
 
 §0.5.23 이 위 그래프를 고쳤는데 아래 타임라인은 그대로였다. 위가 244 프레임을
@@ -2496,6 +2544,30 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 ## 11. 검증 매트릭스
 
+### 11.0 게이트 — 어느 검사가 무엇을 무는가
+
+★ **이 절이 비어 있으면 위의 표는 아무도 안 돌린다.** 회귀 세트는 9-16 에
+폐지됐고, 그 뒤로 검사는 "변경마다 모아 묶어" 돌린다 — 이름이 여기 없으면 다음
+세션이 무엇을 돌려야 할지 찾지 못한다.
+
+| 게이트 | 엔진 | 무는 것 |
+|---|---|---|
+| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약 전부. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 332 검사. **변이 51** 가 각각 제 검사에서 붉는지까지 본다 |
+| `Tools/profiling-validation/Invoke-ProfilingValidation.ps1 -Action Stats` | 에디터 | 기본 씬의 교란 없는 라이브 기준선. 스레드마다 **무엇을 찍었는가**(절대 수가 아니다) |
+| 〃 `-Action Workers` | 에디터 | fixture 씬으로 애니메이션 잡을 돌려 **워커 스레드의 구간 계측**과 SceneActivated 사건 |
+| 〃 `-Action Window` | 에디터 | 프로파일러 창이 실제로 **그려지는지**(창 본문 마커가 캡처에 나타나는지), 창을 닫아도 `state == recording` 인지 |
+| 〃 `-Action Gpu` | 에디터 | GPU 수집 장부 — 패스 조각 · 통합 축 · 정렬 여유 · 귀속 지연 · 레인 귀속 · 종료 소유 |
+| `Tools/regression/verify-editor-startup-diagnostics.ps1` | 에디터 | 시동 진단. 등록 레인 목록(워커 레인이 하나 이상), 심한 로그 0, `[profiler] shutdown abandoned/retained/foreign` 가 0 인지. **검사 수는 분기에 따라 달라지므로 여기 적지 않는다** — 게이트가 제 수를 낸다 |
+
+**네 라이브 축은 자극에 `profile.record` 를 명시한다**(2026-09-22). 부팅과 함께
+기록을 열던 줄을 걷었으므로, 켜지 않으면 **빈 캡처를 성공으로 읽는다.** `Workers`
+는 그것을 **씬 교체 앞**에 둬야 한다 — 뒤면 SceneActivated 사건이 기록 밖에서
+일어나 §7.3 트랙 1 이 빈다.
+
+**아직 게이트가 없는 축**(§14 에서 빈칸으로 남은 것들과 같다): `.ceprof`
+round-trip, counter 정렬, Player 캡처, 멀티카메라 GPU 매핑, 장시간 stress,
+네 모드 오버헤드 비교(§11.4).
+
 ### 11.1 CPU 정확성
 
 | 사례 | 기대 |
@@ -2555,8 +2627,13 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 > 어떤 변이로도 자극되지 않는 **빈 단정**이다 — 달더라도 값만 기록하고 이빨이 없음을
 > 명시한다. 이 절이 재야 할 것은 예산이 아니라 **네 모드의 프레임 시간 차이**다.
 >
-> 그리고 이 절은 **P2 이후에야 의미가 생긴다.** 지금은 워커 8스레드가 계측 밖이라
-> 모드 3·4가 재는 것이 반쪽이다(§2.1).
+> 그리고 이 절은 **P2 이후에야 의미가 생긴다.**
+>
+> ~~지금은 워커 8스레드가 계측 밖이라 모드 3·4가 재는 것이 반쪽이다(§2.1).~~
+> **2026-09-22 정정: 그 조건은 풀렸다.** 워커 레인이 등록되고 `AnimationJob` 이
+> 거기 붙는다 — `-Action Workers` 가 "이벤트를 찍은 워커 넷 이상" 을 문다.
+> 그러니 모드 3·4 는 이제 **온전히 잴 수 있다.** 다만 아직 counter 가 없어
+> 모드 4 의 `all counters` 는 P5 가 설 때까지 모드 3 과 같은 것을 잰다.
 
 ---
 
@@ -2605,30 +2682,53 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 다음 전부가 성립해야 계획 완료다.
 
-- [ ] Editor/Development에서 Record/Pause/Clear 가능
-- [ ] 최소 600프레임 또는 정한 메모리 예산만큼 rolling capture — **4프레임 링 폐기**(§2.2)
-- [ ] 멀티스레드 CPU Timeline과 선택 구간 Hierarchy
+- [x] Editor/Development에서 Record/Pause/Clear 가능 — Record 는 **수집 스위치**이고
+      끄는 것이 Pause 다(§0.5.23). 화면으로 확인(2026-09-22)
+- [x] 최소 600프레임 또는 정한 메모리 예산만큼 rolling capture — **4프레임 링 폐기**(§2.2)
+      (화면 실측 `보존 23035..23634` = 600)
+- [x] 멀티스레드 CPU Timeline과 선택 구간 Hierarchy — 타임라인은 **보이는 창**을
+      그리고(레인 넷: GameThread · RenderThread · PresentationThread · GPU Graphics),
+      Hierarchy·Flat 은 선택 구간을 접는다(§0.5.24)
 - [x] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
       (§0.5.8 — 셋 다 이벤트가 귀속된다. 회귀 감시는 아직 `[GameThread]`·
       `[PresentationThread]` 두 축에만 걸려 있다)
 - [ ] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑
 - [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 engine_frame_id에 정렬
-- [ ] overflow·누락·malformed scope·profiler overhead 표시
+- [ ] overflow·누락·malformed scope·profiler overhead 표시 — **앞의 셋은 선다**
+      (Collector 탭이 dropped/unbalanced/late/stale/foreign/abandoned 와 미응답
+      스트림을 내고, 구멍이 있으면 "합계를 그대로 믿지 말 것" 을 띄운다).
+      **profiler 자체 비용 칸은 아직 없다** — `ProfilerWindow`·`ProfilerTimeline`
+      마커로 간접 관측만 된다
 - [ ] `.ceprof` 저장/불러오기 round-trip 검증
 - [ ] profiler UI가 닫혀도 Development Player capture 가능
 - [ ] `CE_SHIPPING=1`에서 프로파일러 심볼 0 — `verify-player-shipping-isolation.ps1` 단정
 - [ ] CreatorEngine.sln의 Academy_4Q + Player 빌드 통과
 - [ ] CPU/GPU selftest와 장시간 stress 통과
-- [ ] ★ **selftest `cross-frame/preserve`가 KNOWN-DEFECT에서 PASS로** — 이 한 줄이
-      수집 코어 교체의 진척 정의다
-- [ ] ★ **프로파일링 검사가 README 표와 §11 에 이름으로 올라 있다** — 회귀 세트는
-      폐지됐고(9-16), 찾을 수 없는 검사는 다음 세션에 모이지 않는다
+- [x] ★ **selftest `cross-frame/preserve`가 KNOWN-DEFECT에서 PASS로** — 이 한 줄이
+      수집 코어 교체의 진척 정의다. 코어 프로브의 `cross-frame/` 네 절
+      (`capture`·`duration`·`origin`·`preserve`)이 전부 초록이고, 변이
+      `close-open-scopes` 가 그 자리에서 붉어진다
+- [x] ★ **프로파일링 검사가 README 표와 §11 에 이름으로 올라 있다** — 회귀 세트는
+      폐지됐고(9-16), 찾을 수 없는 검사는 다음 세션에 모이지 않는다.
+      §11.0 에 여섯 게이트를 이름·엔진·무는 것으로 적었다(2026-09-22)
 - [ ] DX12 debug layer/DRED 회귀 없음
 - [ ] 선택 조건에서 지원되는 PIX 다음 프레임 캡처 가능
 
 **매크로 잔존 0**(§5.2) — `PROFILE_CPU_BEGIN`·`PROFILE_CPU_END`·`PROFILER_INITIALIZE`
 등 옛 매크로가 정의·사용 모두에서 사라져야 한다. 소스 전수 검사로 판정하고, 주석·이력은
-제외한다.
+제외한다. **2026-09-22 실측: `Engine/`·`Editor/` 전수 0 건.**
+
+> ★ **남은 것은 단계 셋과 구멍 넷이다**(2026-09-22 감사).
+>
+> 통째로 안 한 단계 — **P5**(counter provider · 관리 marker. `EngineDiagnostics`
+> 에 counter 파일이 0 이고 §7.4 의 `GC/Counter` 열이 비어 있다) · **P6**(`.ceprof`.
+> `Engine`·`Editor`·`Tools`·`Dynamic_CPP` 전수에 그 문자열이 **0 건**이다 —
+> 이 계획서 안에만 있고, 그래서 얼린 캡처는 프로세스와 함께 사라진다) ·
+> **P7**(자동 trigger · PIX 연결).
+>
+> 선 단계의 구멍 — §7.3 여섯째 트랙(Compute/Copy, 백엔드가 그 큐를 써야 선다) ·
+> 멀티카메라 GPU 매핑(`-Action Gpu` 실측이 `view 1` 뿐이라 둘 이상에서 재 본 적이
+> 없다) · profiler 자체 비용 표시 · UI 없이 Development Player 캡처.
 
 이 조건을 닫은 뒤에 Flame Graph, 두 캡처 비교, 원격 플레이어 연결, 자동 성능 회귀 게이트를
 후속 계획으로 분리한다.

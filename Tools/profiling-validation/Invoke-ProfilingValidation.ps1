@@ -1,27 +1,41 @@
 #Requires -Version 7.0
 <#
 .SYNOPSIS
-    프레임 프로파일러 수집 코어 검증 진입점 (PHASE 14).
+    프레임 프로파일러 라이브 검증 진입점 (PHASE 14).
 
 .DESCRIPTION
-    에디터를 무인으로 기동해 CPU 프로파일러 특성화 검사를 돌리고 판정한다.
-    판정 근거는 화면이 아니라 두 가지다 — 종료 코드와 로그의 고정 마커.
+    에디터를 무인으로 기동해, 수집 코어가 **살아 있는 엔진에서 실제로 서는지**
+    판정한다. 판정 근거는 화면이 아니라 둘이다 — 종료 코드와 응답 JSON.
 
-    P0에서 이 스크립트가 재는 것은 "프로파일러가 좋은가"가 아니라
-    **지금 무엇이 참인가**다. P2에서 수집 코어를 갈아끼울 때 이 검사가
-    계속 통과해야 하고, KNOWN-DEFECT로 남은 항목이 PASS로 바뀌어야 한다.
+    경계가 분명하다. 표의 숫자가 맞는지는 코어가 프로세스 밖에서 증명하고
+    (Tools/regression/verify-profile-core.ps1), 이 스크립트는 그 숫자가 나올
+    자리에 무엇이 실제로 흘렀는지만 본다. 화면이 숫자를 만들지 않으므로 둘을
+    나눌 수 있다.
+
+    ★ 네 라이브 축 모두 자극에 `profile.record` 를 명시한다(2026-09-22).
+      부팅과 함께 기록을 열던 줄을 걷었으므로, 켜지 않으면 캡처가 비고 그러면
+      이 게이트들이 **빈 캡처를 성공으로 읽는다.** Workers 는 그것을
+      `scene.switch` **앞**에 둬야 한다.
+
+    ⚠ 단정은 "무엇을 찍었는가" 지 "몇 개를 찍었는가" 가 아니다. 기준선 숫자는
+      남이 계측을 얹기만 해도 흔들린다.
 
     PowerShell 5.1로 돌리지 말 것. 이 저장소의 스크립트와 엔진 로그는 UTF-8이고
     5.1은 이를 시스템 코드페이지로 읽어 한글이 깨진 채 정규식 판정이 어긋난다.
 
 .PARAMETER Action
-    Stats     라이브 기준선(기본, 교란 없음)
-              코어 계약 검사는 Tools/regression/verify-profile-core.ps1 이 맡는다
+    Stats     기본 씬의 교란 없는 라이브 기준선(기본값). 보존·이벤트·마커·청크와
+              [GameThread]/[RenderThread]/[PresentationThread]/[Worker 1] 귀속
+    Workers   fixture 씬으로 애니메이션 잡을 돌려 워커 레인의 구간 계측과
+              SceneActivated(길이 없는 사건)
+    Window    프로파일러 창이 실제로 그려지는지(본문 마커가 캡처에 나타나는지),
+              창을 닫아도 녹화가 계속되는지
+    Gpu       GPU 수집 장부 — 제출별 기록·정렬·귀속·레인·트랙 순서·종료 소유
     Build     Debug|x64 빌드만 수행
 
 .EXAMPLE
-    pwsh -NoProfile -File .\Tools\profiling-validation\Invoke-ProfilingValidation.ps1
     pwsh -NoProfile -File .\Tools\profiling-validation\Invoke-ProfilingValidation.ps1 -Action Stats
+    pwsh -NoProfile -File .\Tools\profiling-validation\Invoke-ProfilingValidation.ps1 -Action Workers
 #>
 [CmdletBinding()]
 param(
