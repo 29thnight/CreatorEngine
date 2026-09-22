@@ -452,6 +452,88 @@ $mutations = @(
         Why    = '표식이 없으면 길이 0 인 스코프와 구분되지 않는다'
     },
 
+    # ── §6.4 개정: 녹화 중 공개 ─────────────────────────────────────
+    @{
+        # 녹화 중에는 스냅샷을 내지 않는다. 그러면 "보려면 멈춰라" 로 되돌아간다.
+        Name   = 'live-capture-never-published'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tpublish_live_capture(tick);"
+        New    = ""
+        Expect = 'live/published'
+        Why    = '녹화 중에 공개하지 않으면 멈춰야만 프레임을 볼 수 있다'
+    },
+    @{
+        # 청하지 않아도 낸다. 창이 닫혀 있어도 프레임마다 링을 통째로 복사하고,
+        # 그 비용은 프로파일러가 스스로 만든 것이라 어느 마커에도 안 잡힌다.
+        Name   = 'live-capture-ignores-request'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`tif (!m_liveCaptureRequested.load(std::memory_order_relaxed))`r`n`t`t{`r`n`t`t`treturn;`r`n`t`t}"
+        New    = ""
+        Expect = 'live/unrequested'
+        Why    = '청하지 않아도 내면 창이 닫혀 있는 동안에도 링을 복사한다'
+    },
+    @{
+        # 공개하면서 녹화를 멈춘다. 지금 도구가 그러했다.
+        Name   = 'live-capture-stops-recording'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`t`tm_capture = std::move(live);`r`n`t`t}`r`n`t}"
+        New    = "`t`t`tm_capture = std::move(live);`r`n`t`t}`r`n`t`tm_state.store(recorder_state::frozen, std::memory_order_release);`r`n`t}"
+        Expect = 'live/still-recording'
+        Why    = '공개가 녹화를 멈추면 Unity 의 Current Frame 모드가 서지 않는다'
+    },
+
+    # ── §7.2 프레임 그래프의 창 ──────────────────────────────────────
+    @{
+        # 폭을 정할 때 왼쪽 끝에 붙인다. 녹화 중에 최신 프레임이 화면 밖으로
+        # 나가 버리고, 사람은 "녹화가 멈췄다" 로 읽는다.
+        Name   = 'graph-span-anchors-left'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tconst std::uint32_t anchor = graph_last();"
+        New    = "`t`tconst std::uint32_t anchor = graph_first();"
+        Expect = 'graph/span-anchors-right'
+        Why    = '왼쪽에 붙이면 녹화 중 최신 프레임이 화면 밖에 있다'
+    },
+    @{
+        # 새 캡처가 와도 창이 안 흐른다. 그래프가 옛 구간에 얼어붙는다.
+        Name   = 'graph-does-not-flow'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t`t`tm_graphFirst = (m_availableLast + 1 > span)`r`n`t`t`t`t`t? (m_availableLast + 1 - span) : m_availableFirst;"
+        New    = "`t`t`t`tm_graphFirst = (m_availableLast + 1 > span)`r`n`t`t`t`t`t? m_graphFirst : m_availableFirst;"
+        Expect = 'graph/flows'
+        Why    = '창이 안 흐르면 녹화 중 새 프레임이 그래프에 안 들어온다'
+    },
+    @{
+        # 뒤로 굴려도 따라가기가 안 꺼진다. 다음 스냅샷이 창을 최신으로
+        # 되돌려서, 손으로 굴린 것이 한 프레임 만에 사라진다.
+        Name   = 'graph-pan-keeps-following'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tset_live_follow(m_graphFirst >= lastFirst);"
+        New    = "`t`tset_live_follow(m_graphFirst <= lastFirst);"
+        Expect = 'graph/pan-stops-following'
+        Why    = '굴려도 따라가기가 켜져 있으면 옛 구간을 읽을 수 없다'
+    },
+    @{
+        # 오른쪽 경계를 프레임 수만큼 물리지 않는다. 창이 보존 끝을 넘어가
+        # 빈 칸을 그리고, 사람은 그 프레임들이 사라졌다고 읽는다.
+        Name   = 'graph-clamp-right-off-by-window'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`tconst std::uint32_t lastFirst = m_availableLast - m_graphCount + 1;"
+        New    = "`t`tconst std::uint32_t lastFirst = m_availableLast;"
+        Expect = 'graph/clamp-right'
+        Why    = '오른쪽 경계를 창 폭만큼 안 물리면 창이 보존 밖으로 나간다'
+    },
+
+    @{
+        # 선택이 창과 반대로 움직인다. 스크롤 하나가 전부를 민다는 계약이
+        # 깨지면 위 그래프와 아래 타임라인이 서로 다른 자리를 말한다.
+        Name   = 'graph-pan-moves-selection-backwards'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t`tstatic_cast<std::int64_t>(m_graphFirst) - static_cast<std::int64_t>(before);"
+        New    = "`t`t`tstatic_cast<std::int64_t>(before) - static_cast<std::int64_t>(m_graphFirst);"
+        Expect = 'graph/selection-follows-pan'
+        Why    = '선택이 창을 안 따라가면 스크롤이 위쪽 그림만 흔든다'
+    },
+
     # ── §7.4 Min·P95·Frames ─────────────────────────────────────────
     @{
         # p95 의 등수를 표본 수로 바꾼다. 긴 꼬리를 보려고 만든 열이 "가장

@@ -43,6 +43,13 @@ namespace ce
 		std::uint32_t chunk_count = 256;                       // 청크 풀 크기
 		std::uint32_t retained_frames = kDefaultRetainedFrames;
 		std::size_t   memory_budget = kDefaultMemoryBudget;
+
+		// 녹화 중 스냅샷을 몇 ms 마다 낼 것인가(§6.4 개정).
+		//
+		// ★ 한 번 낼 때 링을 통째로 복사한다. 그 일을 수집기(게임 스레드)가
+		//   하므로, 화면이 부르는 대로 다 내주면 재려는 대상을 흔든다.
+		//   0 이면 요청마다 낸다 — 검사에서 쓰는 값이다.
+		double live_capture_interval_ms = 100.0;
 	};
 
 	// 녹화 중에도 값싸게 읽히는 요약(§6.4). 전체 캡처를 복사하지 않는다.
@@ -205,6 +212,18 @@ namespace ce
 
 		// QPC 주파수(틱/초). 틱을 시간으로 바꾸는 유일한 기준.
 		static profile_tick ticks_per_second();
+
+		// ── 녹화 중 공개(§6.4 개정) ─────────────────────────────────────
+		//
+		// ★ §6.4 는 "pause 시 capture 를 교체" 라고만 적었고, 그것을 글자대로
+		//   구현하자 **수집을 멈춰야만 프레임을 볼 수 있는** 도구가 됐다.
+		//   목표는 Unity 프로파일러다 — Record 가 도는 동안에도 프레임을
+		//   보여 준다(매뉴얼의 Current Frame 모드).
+		//
+		//   보는 쪽이 이것을 부르면 **다음 프레임 경계에서** 스냅샷이 선다.
+		//   아무도 부르지 않으면 한 번도 만들지 않는다 — 창이 닫혀 있을 때
+		//   공짜인 이유가 그것이다. 요청은 한 번 쓰이고 지워진다.
+		void request_live_capture();
 		static profile_tick now();
 
 		// 종료에서 해제하지 못하고 **놓아 둔** 스트림의 수(프로세스 전체 누적).
@@ -248,6 +267,9 @@ namespace ce
 		// 얼림을 마무리한다. 봉인 응답을 확인하고 링을 얼려 공개한다.
 		// **수집기만** 부른다 — 링을 만지기 때문이다.
 		void finish_pause();
+
+		// 녹화 중 스냅샷. **수집기만** 부른다(같은 까닭).
+		void publish_live_capture(profile_tick tick);
 
 		// 얼림을 청한 시각. pause 를 부른 순간 한 번 정해지고, 모든 스트림이
 		// 같은 시각에서 잘린다.
@@ -344,6 +366,12 @@ namespace ce
 
 		mutable std::mutex  m_captureLock;
 		capture_session_ptr m_capture;
+
+		// 녹화 중 공개. 청한 표식은 아무 스레드나 올리고, 나머지 둘은
+		// 수집기만 만진다.
+		std::atomic<bool> m_liveCaptureRequested{ false };
+		profile_tick      m_lastLiveCapture = 0;
+		double            m_liveCaptureIntervalMs = 100.0;
 
 		// 스트림이 사라질 때 그 스레드의 계수를 서비스로 옮긴다 — 스레드가
 		// 죽었다고 해서 잃은 수가 없던 일이 되면 안 된다.

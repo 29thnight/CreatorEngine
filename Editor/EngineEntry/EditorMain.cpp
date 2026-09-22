@@ -82,10 +82,18 @@ void Editor::EditorMain::Initialize()
 {
 	// 초기화는 부트스트랩이 이미 했다(워커보다 먼저 서야 한다).
 	ce::profiler().register_thread("[GameThread]", ce::track_kind::game_thread);
-	// 지금은 부팅과 함께 기록을 연다. 녹화 제어(Record/Pause)는 P3 의
-	// ProfilerWindow 가 가져간다 — 그때까지는 옛 코어와 같은 "항상 기록"
-	// 동작을 유지해야 기준선을 맞대 볼 수 있다.
-	ce::profiler().record(Time->GetFrameCount());
+	// ★ 부팅과 함께 기록을 열지 **않는다.**
+	//
+	//   P2 때는 열었다. 옛 코어가 "항상 기록" 이라 새 코어의 기준선을 맞대
+	//   보려면 같은 조건이어야 했고, 그 자리 주석이 "P3 의 ProfilerWindow 가
+	//   가져간다" 고 적어 두었다. P3 는 창과 버튼을 만들었지만 이 줄을 걷지
+	//   않았고, 그래서 **사용자가 볼 수 있는 첫 동작이 Pause 뿐**이었다.
+	//
+	//   Unity 매뉴얼이 Record 에 적은 뜻이 그대로 계약이다 — 꺼져 있으면
+	//   아무것도 모으지 않는다. 모으기 시작하는 것은 사람이 정한다.
+	//
+	//   ⚠ 라이브 축을 재는 게이트는 이제 자극에 `profile.record` 를 넣어야
+	//     한다. 부팅 상태에 기대던 자극은 빈 캡처를 성공으로 읽는다.
 
 	// 워커 계측 훅과 프로파일러 초기화는 EngineBootstrap::InitializeRuntime 이
 	// 가져갔다 — enkiTS 워커는 거기서 만들어지고 threadStart 는 그때 한 번만

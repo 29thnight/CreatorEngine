@@ -58,6 +58,35 @@ namespace ce
 		std::uint32_t selected_last() const { return m_selectedLast; }
 		std::uint32_t selected_count() const { return m_selectedLast - m_selectedFirst + 1; }
 
+		// ── 프레임 그래프의 창(§7.2) ────────────────────────────────────
+		//
+		// ★ 보존된 프레임을 **전부 한 화면에 뭉개지 않는다.** 막대 폭은
+		//   고정이고, 화면에 담기는 만큼만 보여 준다. 새 프레임은 오른쪽에서
+		//   들어오고 옛 프레임은 왼쪽으로 밀려 나간다 — 폭을 프레임 수로
+		//   나누면 같은 프레임이 매 스냅샷 다른 자리에 그려져서, 그래프가
+		//   흐르는 것이 아니라 매번 새로 그려지는 그림이 된다.
+		//
+		// ★ 이 상태가 reader 에 있는 이유는 선택·시야와 같다. 화면에 두면
+		//   "끝까지 가면 멈춘다" 같은 계약을 잴 수단이 눈뿐이 된다.
+		std::uint32_t graph_first() const;
+		std::uint32_t graph_count() const;
+		std::uint32_t graph_last() const;
+
+		// 화면이 몇 프레임을 담을 수 있는지 그리는 쪽이 알려 준다. 따라가는
+		// 중이면 오른쪽 끝을 최신에 붙인 채 왼쪽으로 늘어난다.
+		void set_graph_span(std::uint32_t frames);
+
+		// 창을 옮긴다. 보존 구간 밖으로는 나가지 않는다. 뒤로 굴리면 따라가기가
+		// 풀리고, 오른쪽 끝에 닿으면 다시 켜진다.
+		//
+		// ★ 고른 프레임도 **같이 움직인다.** 굴리는 것은 "지금 보고 있는
+		//   자리" 하나여야 한다 — 그래프만 밀리고 아래 타임라인이 제자리면
+		//   축이 둘이 되고, 그때 사람은 두 곳을 따로 맞춰야 한다.
+		void pan_graph(std::int32_t delta_frames);
+
+		// 보존 구간 전체로 되돌린다.
+		void reset_graph();
+
 		void select_frame(std::uint32_t frame) { select_range(frame, frame); }
 		void select_range(std::uint32_t first, std::uint32_t last);
 		void select_latest();
@@ -94,6 +123,7 @@ namespace ce
 
 	private:
 		void clamp_selection();
+		void shift_selection(std::int64_t delta);
 		void clamp_view() const;
 		void ensure_view() const;
 
@@ -116,5 +146,15 @@ namespace ce
 		mutable profile_tick m_viewBegin = 0;
 		mutable profile_tick m_viewEnd = 0;
 		mutable bool         m_viewValid = false;
+
+		// 그래프의 창. 0 이면 "아직 세우지 않았다" 이고, 그때는 보존 구간
+		// 전체를 뜻한다.
+		void clamp_graph();
+		std::uint32_t m_graphFirst = 0;
+		std::uint32_t m_graphCount = 0;
+
+		// 한 화면에 이보다 적게 보여 주지 않는다. 더 좁히면 막대 몇 개만
+		// 남아 그래프가 아니라 점이 된다.
+		static constexpr std::uint32_t kMinimumGraphFrames = 8;
 	};
 }

@@ -131,6 +131,7 @@ namespace ce
 			return;
 		}
 
+		m_liveCaptureIntervalMs = config.live_capture_interval_ms;
 		m_pool->initialize(config.chunk_count);
 		m_ring.configure(config.retained_frames, config.memory_budget);
 		m_frameBeginTick = now();
@@ -607,6 +608,9 @@ namespace ce
 		publish_ring_stats();
 		m_frameBeginTick = tick;
 
+		// 녹화 중 공개. 보는 쪽이 청했을 때만, 정한 간격으로.
+		publish_live_capture(tick);
+
 		// 다음 프레임 번호를 예측해 올린다. 밖이 실제로 그 번호를 주면
 		// 일치하고, 건너뛰더라도 다음 publish 가 라벨을 정확히 붙인다.
 		m_engineFrame.store(engine_frame + 1, std::memory_order_relaxed);
@@ -735,6 +739,11 @@ namespace ce
 		}
 		m_engineFrame.store(first_frame, std::memory_order_relaxed);
 		m_frameBeginTick = now();
+
+		// 간격 계수기를 되돌린다. 녹화를 새로 열었는데 지난 회차의 시각이
+		// 남아 있으면 첫 스냅샷이 한 박자 늦게 선다.
+		m_lastLiveCapture = 0;
+
 		m_state.store(recorder_state::recording, std::memory_order_release);
 		publish_ring_stats();
 	}
@@ -848,6 +857,58 @@ namespace ce
 		// 공개까지 끝난 뒤에야 frozen 이다. 그 전에는 pausing 이고, 읽는 쪽은
 		// "아직 손에 없다" 를 그 상태로 안다.
 		m_state.store(recorder_state::frozen, std::memory_order_release);
+	}
+
+	void profiler_service::request_live_capture()
+	{
+		m_liveCaptureRequested.store(true, std::memory_order_relaxed);
+	}
+
+	// 수집기에서만 부른다. 링을 만지는 것은 이 스레드뿐이다.
+	void profiler_service::publish_live_capture(profile_tick tick)
+	{
+		// ★ 청하지 않으면 만들지 않는다. "늘 만들어 두고 안 보면 버린다" 로
+		//   두면 창이 닫혀 있는 동안에도 프레임마다 링을 복사하게 되고,
+		//   그 비용은 프로파일러가 스스로 만들어 낸 것이라 어느 마커에도
+		//   안 잡힌다.
+		if (!m_liveCaptureRequested.load(std::memory_order_relaxed))
+		{
+			return;
+		}
+
+		const double intervalMs = m_liveCaptureIntervalMs;
+		if (intervalMs > 0.0 && 0 != m_lastLiveCapture)
+		{
+			const profile_tick interval = static_cast<profile_tick>(
+				static_cast<double>(ticks_per_second()) * intervalMs / 1000.0);
+			if (tick - m_lastLiveCapture < interval)
+			{
+				return;   // 아직 이르다. 요청은 그대로 두고 다음 프레임에 다시 본다.
+			}
+		}
+
+		m_lastLiveCapture = tick;
+		m_liveCaptureRequested.store(false, std::memory_order_relaxed);
+
+		std::vector<thread_info> threads;
+		{
+			std::lock_guard<std::mutex> guard(m_streamLock);
+			threads = m_threadInfo;
+		}
+
+		// ★ complete = true 다. 이 스냅샷은 **닫힌 프레임만** 담는다 — 열린
+		//   구간의 꼬리는 아직 어느 프레임에도 없으므로 빠진 것이 아니다.
+		//   pause 의 unacked 는 "봉인을 청했는데 응답이 없다" 는 뜻이고,
+		//   여기서는 아무도 봉인을 기다리지 않는다.
+		//
+		// ★ 가장 최근 몇 프레임은 **아직 확정이 아니다.** 늦게 오는 GPU
+		//   구간이 닫힌 프레임에 나중에 들어가기 때문이다(실측 제출→수집
+		//   최대 94 ms). 다음 스냅샷에 그것이 담긴다.
+		capture_session_ptr live = m_ring.freeze(threads, true, 0);
+		{
+			std::lock_guard<std::mutex> guard(m_captureLock);
+			m_capture = std::move(live);
+		}
 	}
 
 	void profiler_service::clear_now()

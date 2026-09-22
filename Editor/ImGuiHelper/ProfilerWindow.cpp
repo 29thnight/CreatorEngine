@@ -96,7 +96,11 @@ namespace
 		ce::profiler_service& service = ce::profiler();
 		const bool recording = (summary.state == ce::recorder_state::recording);
 
-		if (ImGui::Button(recording ? "Pause" : "Record"))
+		// ★ 토글이다. Unity 의 ⏺ 와 같은 뜻 — 켜면 모으고 끄면 모으지 않는다.
+		//   "Pause" 라고 적던 시절에는 **보려면 멈춰야 했으므로** 그 이름이
+		//   맞았다. 보는 것과 모으는 것이 갈렸으니 이름도 갈린다.
+		bool record = recording;
+		if (ImGui::Checkbox("Record", &record))
 		{
 			if (recording)
 			{
@@ -136,11 +140,13 @@ namespace
 		ImGui::SameLine();
 		ImGui::Text("%s  ·  frame %u", state_label(summary.state), summary.engine_frame);
 
-		// 녹화 중에는 볼 것이 없다는 것이 설계다(§6.4). 그 사실을 적어 두지
-		// 않으면 "타임라인이 안 나온다" 로 읽힌다.
+		// ★ 녹화 중 화면은 **한 박자 뒤처진다.** 코어가 정한 간격으로만
+		//   스냅샷을 내고, 늦게 오는 GPU 구간은 닫힌 프레임에 나중에 들어간다
+		//   (실측 제출→수집 최대 94 ms). 그 사실을 적어 두지 않으면 "최신
+		//   프레임에 GPU 막대가 없다" 를 결함으로 읽는다.
 		if (recording)
 		{
-			ImGui::TextDisabled("녹화 중에는 요약만 공개된다 - Pause 를 눌러야 프레임을 열어 볼 수 있다");
+			ImGui::TextDisabled("녹화 중 - 화면은 마지막 스냅샷이다 (GPU 구간은 몇 프레임 뒤에 채워진다)");
 		}
 
 		// ★ 온전하지 않은 캡처를 **말없이** 그리지 않는다. 잠든 워커는 봉인
@@ -268,6 +274,13 @@ void DrawProfilerHUD()
 	ce::profile_scope _profile{ ce::marker<"ProfilerWindow">() };
 
 	ce::profiler_service& service = ce::profiler();
+
+	// ★ 녹화 중에도 프레임을 보여 준다(§6.4 개정). 창이 떠 있는 동안만
+	//   청하므로, 창을 닫으면 코어는 스냅샷을 한 번도 만들지 않는다.
+	//   간격은 코어가 정한다 — 화면이 부르는 대로 다 내주면 링을 통째로
+	//   복사하는 비용이 재려는 대상을 흔든다.
+	service.request_live_capture();
+
 	const ce::live_summary summary = service.summary();
 
 	// 다른 경로로 얼린 것을 따라간다. CLI 의 profile.pause·profile.frame 둘 다 얼린다.
@@ -313,7 +326,7 @@ void DrawProfilerHUD()
 		}
 		else
 		{
-			ImGui::TextDisabled("얼린 캡처가 없다 - Pause 를 누를 것");
+			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
 		}
 		ImGui::EndTabItem();
 	}
@@ -328,7 +341,7 @@ void DrawProfilerHUD()
 		}
 		else
 		{
-			ImGui::TextDisabled("얼린 캡처가 없다 - Pause 를 누를 것");
+			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
 		}
 		ImGui::EndTabItem();
 	}
@@ -341,7 +354,7 @@ void DrawProfilerHUD()
 		}
 		else
 		{
-			ImGui::TextDisabled("얼린 캡처가 없다 - Pause 를 누를 것");
+			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
 		}
 		ImGui::EndTabItem();
 	}

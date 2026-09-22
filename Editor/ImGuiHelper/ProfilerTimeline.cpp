@@ -17,6 +17,8 @@
 #include <cstdio>
 
 #include "ImGui.h"
+#include <imgui_internal.h>
+
 #include "ProfileMarker.h"
 #include "ProfileScope.h"
 
@@ -52,6 +54,29 @@ namespace editor::profiler_view
 		constexpr int kLaneHeaderRows = 2;
 
 		constexpr float kInstantMarkRadius = 4.0f;
+
+		// ── 위쪽 자 ────────────────────────────────────────────────────────
+		//
+		// ★ 막대만 그리면 "이게 몇 ms 짜리냐" 를 그림에서 읽을 수가 없다.
+		//   글로 적은 "시야 n ms" 는 전체 폭이 몇 ms 인지만 말하고, 눈앞의
+		//   막대 하나가 얼마인지는 여전히 가늠이다. 눈금을 위에 새긴다.
+		constexpr float kRulerTextPadding = 4.0f;
+
+		// 눈금 하나가 최소 이만큼은 떨어져야 숫자가 겹치지 않는다.
+		constexpr float kRulerLabelSpacing = 90.0f;
+
+		// 1-2-5 계단. 눈금 간격을 이 중에서 고르면 숫자가 0.5·1·2·5 처럼
+		// 읽히는 값으로만 선다 — 0.347 ms 간격은 자가 아니다.
+		double nice_step(double raw)
+		{
+			if (raw <= 0.0) { return 1.0; }
+			const double magnitude = std::pow(10.0, std::floor(std::log10(raw)));
+			const double normalized = raw / magnitude;
+			if (normalized <= 1.0) { return magnitude; }
+			if (normalized <= 2.0) { return 2.0 * magnitude; }
+			if (normalized <= 5.0) { return 5.0 * magnitude; }
+			return 10.0 * magnitude;
+		}
 
 		// 깊이마다 색을 달리해 중첩이 눈에 들어오게 한다. 마커 id 를 섞어
 		// 같은 깊이의 이웃이 붙어 보이지 않게 한다.
@@ -93,7 +118,7 @@ namespace editor::profiler_view
 		ce::capture_reader& view = reader();
 		if (!view.has_capture())
 		{
-			ImGui::TextDisabled("얼린 캡처가 없다 - Pause 를 누를 것");
+			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
 			return;
 		}
 
@@ -113,26 +138,41 @@ namespace editor::profiler_view
 		}
 
 		// 배율을 글로도 낸다. 그림만 보면 지금 몇 ms 를 보고 있는지 모른다.
-		ImGui::Text("시야 %.3f ms  ·  전체 %.3f ms",
+		//
+		// ★ 자의 한 칸이 몇 ms 인지도 **여기** 적는다. 자 안에 적어 봤더니
+		//   첫 눈금 위에 얹혔다 — 그 자리는 ImGui 가 재는 글자 너비가 실제보다
+		//   좁아서(에디터 배율 탓) 어떤 여백을 줘도 믿을 수가 없다.
+		const double rulerStepMs = nice_step(
+			ticks_to_milliseconds(viewSpan) * kRulerLabelSpacing
+			/ (std::max)(ImGui::GetContentRegionAvail().x - kLaneHeaderWidth, 32.0f));
+		ImGui::Text("시야 %.3f ms  ·  전체 %.3f ms  ·  자 한 칸 %.4g ms",
 		            ticks_to_milliseconds(viewSpan),
-		            ticks_to_milliseconds(aggregate.tick_end() - aggregate.tick_begin()));
+		            ticks_to_milliseconds(aggregate.tick_end() - aggregate.tick_begin()),
+		            rulerStepMs);
 		ImGui::SameLine();
 		if (ImGui::SmallButton("전체 보기"))
 		{
 			view.reset_view();
 		}
 		ImGui::SameLine();
-		ImGui::TextDisabled("(휠: 확대 · 끌기: 이동)");
+		ImGui::TextDisabled("(휠: 한 프레임 안에서 확대 · 끌기: 이동)");
 
 		const float rowHeight = ImGui::GetTextLineHeight() + kRowTextPadding;
 		const float stripHeight = ImGui::GetTextLineHeight() + kStripTextPadding;
+		const float rulerHeight = ImGui::GetTextLineHeight() + kRulerTextPadding;
 
 		const ImVec2 origin = ImGui::GetCursorScreenPos();
 		const float width = (std::max)(ImGui::GetContentRegionAvail().x, 200.0f);
-		const ImVec2 size(width, stripHeight + static_cast<float>(kVisibleRows) * rowHeight);
+		const ImVec2 size(width, rulerHeight + stripHeight
+		                  + static_cast<float>(kVisibleRows) * rowHeight);
 
 		ImGui::InvisibleButton("##ProfilerTimeline", size,
 		                       ImGuiButtonFlags_MouseButtonLeft);
+
+		// ★ 휠을 이 항목이 가져간다. 안 가져가면 확대하면서 창도 같이 굴러서
+		//   보려던 레인이 화면 밖으로 밀린다.
+		ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+
 		const bool hovered = ImGui::IsItemHovered();
 		const bool active = ImGui::IsItemActive();
 
@@ -151,12 +191,54 @@ namespace editor::profiler_view
 			return plotLeft + static_cast<float>(offset / ticksPerPixel);
 		};
 
+		// ── 위쪽 자 — ms ───────────────────────────────────────────────────
+		//
+		// 0 은 **선택한 구간의 시작**이다. 절대 tick 을 적으면 자릿수가 열
+		// 자리를 넘어 아무것도 읽히지 않고, 프레임마다 값이 통째로 바뀐다.
+		const float rulerTop = origin.y;
+		const float rulerBottom = rulerTop + rulerHeight;
+		draw->AddRectFilled(ImVec2(origin.x, rulerTop),
+		                    ImVec2(origin.x + size.x, rulerBottom),
+		                    IM_COL32(32, 35, 42, 255));
+		draw->AddText(ImVec2(origin.x + 4.0f, rulerTop + 2.0f),
+		              IM_COL32(150, 158, 172, 255), "ms");
+
+		{
+			const double originMs = ticks_to_milliseconds(aggregate.tick_begin());
+			const double beginMs = ticks_to_milliseconds(viewBegin) - originMs;
+			const double spanMs = ticks_to_milliseconds(viewSpan);
+			const double stepMs = nice_step(spanMs * kRulerLabelSpacing / plotWidth);
+
+			// 첫 눈금은 시야 안의 첫 배수다.
+			double markMs = std::ceil(beginMs / stepMs) * stepMs;
+			for (; markMs <= beginMs + spanMs; markMs += stepMs)
+			{
+				const float x = plotLeft +
+					static_cast<float>((markMs - beginMs) / spanMs) * plotWidth;
+
+				draw->AddLine(ImVec2(x, rulerBottom - 6.0f), ImVec2(x, rulerBottom),
+				              IM_COL32(170, 178, 192, 220));
+
+				// 눈금선은 레인까지 내린다. 자와 막대를 눈으로 맞추는 일이
+				// 없어야 자가 자 노릇을 한다.
+				draw->AddLine(ImVec2(x, rulerBottom), ImVec2(x, origin.y + size.y),
+				              IM_COL32(255, 255, 255, 14));
+
+				char label[32];
+				if (stepMs >= 1.0)      { std::snprintf(label, sizeof(label), "%.0f", markMs); }
+				else if (stepMs >= 0.1) { std::snprintf(label, sizeof(label), "%.1f", markMs); }
+				else                    { std::snprintf(label, sizeof(label), "%.2f", markMs); }
+				draw->AddText(ImVec2(x + 3.0f, rulerTop + 2.0f),
+				              IM_COL32(190, 198, 212, 255), label);
+			}
+		}
+
 		// ── §7.3 트랙 1: 프레임 경계와 사건 ────────────────────────────────
 		//
 		// ★ 맨 위에 둔다. 아래 레인의 막대가 어느 프레임의 것인지는 이 띠가
 		//   없으면 읽을 수 없다 — 확대하면 프레임 번호가 화면에서 사라지고,
 		//   그때 타임라인은 "무언가 오래 걸린다" 까지만 말한다.
-		const float stripTop = origin.y;
+		const float stripTop = rulerBottom;
 		const float stripBottom = stripTop + stripHeight;
 		const ce::frame_boundary* hoveredFrame = nullptr;
 		const ce::profile_event* hoveredInstant = nullptr;

@@ -145,7 +145,11 @@ function Invoke-Workers {
     }
 
     $scenePath = ($fixture -replace '\\', '/')
+    # ★ `profile.record` 를 **씬 교체 앞**에 둔다. 부팅 수집을 걷은 뒤로는
+    #   켜지 않으면 캡처가 없고, 켜는 시점이 교체 뒤면 SceneActivated 사건이
+    #   기록 밖에서 일어나 §7.3 트랙 1 이 빈다.
     $result = Invoke-EngineScript -Label "profile-workers" -Commands @(
+        "profile.record"
         "scene.switch $scenePath"
         "wait $WarmupFrames"
         "profile.frame"
@@ -251,7 +255,11 @@ function Invoke-Window {
     # 창을 열고 → 닫고 → 다시 연다. 중간의 profile.stats 가 완료조건
     # "창을 닫아도 recording 상태가 유지된다" 를 재는 자리다 — 녹화는 서비스가
     # 들고 창은 reader 일 뿐이라는 것이 설계이고, 그 설계가 실제로 그런지 본다.
+    # ★ 여기도 `profile.record` 를 명시한다. 이 축의 단정 하나가 "창을 닫아도
+    #   state == recording" 인데, 켠 적이 없으면 그 단정은 켜지지 않은 것을
+    #   "멈췄다" 로 읽는다.
     $result = Invoke-EngineScript -Label "profile-window" -Commands @(
+        "profile.record"
         "editor.window ###Editor.FrameProfiler open"
         "wait $WarmupFrames"
         "editor.window ###Editor.FrameProfiler close"
@@ -667,8 +675,12 @@ function Invoke-Stats {
     #   앞의 하나는 그 예열을 통과시키고, 뒤의 하나는 **측정 구간 안에서** 라이브
     #   프레임이 최소 한 번 끝나는 것을 보장한다. 게임 스레드를 세우지 않으므로
     #   (`WaitForResult` 로 판정만 미룬다) 다른 축의 값이 왜곡되지 않는다.
+    # ★ `profile.record` 를 **명시한다.** 부팅과 함께 기록을 열던 시절에는
+    #   없어도 돌았는데, 그 줄을 걷은 뒤로는 없으면 이 축이 빈 캡처를 읽는다
+    #   — 그리고 빈 캡처는 "이벤트 0" 이라 조용히 지나간다.
     $result = Invoke-EngineScript -Label "profile-stats" -Commands @(
         "render.live.wait 300"
+        "profile.record"
         "wait $WarmupFrames"
         "render.live.wait 120"
         "profile.frame"

@@ -52,6 +52,17 @@ namespace ce
 		if (m_liveFollow)
 		{
 			m_selectedFirst = m_selectedLast = m_availableLast;
+
+			// ★ 따라가는 동안에는 그래프도 **끝을 붙잡는다.** 창 너비는
+			//   그대로 두고 오른쪽 끝만 최신에 맞춘다 — 확대해 둔 것이
+			//   새 스냅샷마다 풀리면 확대가 뜻이 없다.
+			if (0 != m_graphCount)
+			{
+				const std::uint32_t span = m_graphCount;
+				m_graphFirst = (m_availableLast + 1 > span)
+					? (m_availableLast + 1 - span) : m_availableFirst;
+			}
+			clamp_graph();
 			return;
 		}
 
@@ -59,6 +70,129 @@ namespace ce
 		//   그 프레임을 버렸으면 지킬 수가 없으므로 범위 안으로 자른다 —
 		//   조용히 최신으로 점프하면 "붙잡아 뒀다" 는 약속이 깨진다.
 		clamp_selection();
+
+		// ★ 그래프도 같다. 보던 구간이 링에서 밀려나면 자르되, 최신으로
+		//   점프시키지는 않는다 — 뒤로 굴려 놓고 보던 사람의 손에서 자료가
+		//   빠져나가는 것이 이 창이 있는 까닭과 정반대다.
+		clamp_graph();
+	}
+
+	// ── 프레임 그래프의 창(§7.2) ────────────────────────────────────────
+	//
+	// 0 은 "아직 세우지 않았다" 이고 보존 구간 전체를 뜻한다. 캡처가 없으면
+	// 둘 다 0 이라 그리는 쪽이 아무것도 안 그린다.
+	std::uint32_t capture_reader::graph_first() const
+	{
+		if (!m_capture) return 0;
+		return (0 == m_graphCount) ? m_availableFirst : m_graphFirst;
+	}
+
+	std::uint32_t capture_reader::graph_count() const
+	{
+		if (!m_capture) return 0;
+		const std::uint32_t available = m_availableLast - m_availableFirst + 1;
+		return (0 == m_graphCount) ? available : m_graphCount;
+	}
+
+	std::uint32_t capture_reader::graph_last() const
+	{
+		const std::uint32_t count = graph_count();
+		return (0 == count) ? 0 : (graph_first() + count - 1);
+	}
+
+	void capture_reader::set_graph_span(std::uint32_t frames)
+	{
+		if (!m_capture || 0 == frames) return;
+
+		const std::uint32_t anchor = graph_last();
+		m_graphCount = frames;
+
+		// ★ 폭이 바뀔 때 움직이는 것은 **왼쪽 끝**이다. 오른쪽 끝을 붙잡아야
+		//   창을 넓혀도 보고 있던 최신 프레임이 제자리에 남는다.
+		m_graphFirst = (anchor + 1 > frames) ? (anchor + 1 - frames) : m_availableFirst;
+		clamp_graph();
+	}
+
+	void capture_reader::pan_graph(std::int32_t delta_frames)
+	{
+		if (!m_capture || 0 == delta_frames) return;
+
+		const std::uint32_t before = graph_first();
+		const std::uint32_t count = graph_count();
+		const std::int64_t first = static_cast<std::int64_t>(before) + delta_frames;
+
+		m_graphCount = count;
+		m_graphFirst = (first < static_cast<std::int64_t>(m_availableFirst))
+			? m_availableFirst : static_cast<std::uint32_t>(first);
+		clamp_graph();
+
+		// ★ 고른 프레임을 **같은 만큼** 민다. 굴리는 것은 "지금 보고 있는
+		//   자리" 하나여야 한다 — 그래프 창만 움직이고 선택이 제자리면 아래
+		//   타임라인은 그대로라서, 스크롤이 위쪽 그림만 흔드는 것처럼 보인다.
+		//
+		//   경계에서 창이 덜 움직였으면 선택도 덜 움직여야 한다. 그래서 청한
+		//   양이 아니라 **실제로 움직인 양**을 쓴다.
+		const std::int64_t applied =
+			static_cast<std::int64_t>(m_graphFirst) - static_cast<std::int64_t>(before);
+		shift_selection(applied);
+
+		// ★ 뒤로 굴렸으면 따라가기를 끈다. 안 끄면 다음 스냅샷이 창을 최신으로
+		//   되돌려서, 손으로 굴린 것이 한 프레임 만에 사라진다.
+		const std::uint32_t lastFirst = (m_availableLast + 1 > m_graphCount)
+			? (m_availableLast + 1 - m_graphCount) : m_availableFirst;
+		set_live_follow(m_graphFirst >= lastFirst);
+	}
+
+	// 고른 구간을 통째로 옮긴다. 폭은 지킨다 — 굴리다가 선택이 넓어지거나
+	// 좁아지면 아래 표의 수가 조용히 달라진다.
+	void capture_reader::shift_selection(std::int64_t delta)
+	{
+		if (0 == delta) return;
+
+		const std::int64_t first = static_cast<std::int64_t>(m_selectedFirst) + delta;
+		const std::int64_t last = static_cast<std::int64_t>(m_selectedLast) + delta;
+		const std::int64_t floor = static_cast<std::int64_t>(m_availableFirst);
+
+		m_selectedFirst = static_cast<std::uint32_t>((std::max)(first, floor));
+		m_selectedLast = static_cast<std::uint32_t>((std::max)(last, floor));
+		clamp_selection();
+	}
+
+	void capture_reader::reset_graph()
+	{
+		m_graphFirst = 0;
+		m_graphCount = 0;
+	}
+
+	void capture_reader::clamp_graph()
+	{
+		if (!m_capture || 0 == m_graphCount)
+		{
+			return;
+		}
+
+		const std::uint32_t available = m_availableLast - m_availableFirst + 1;
+		if (m_graphCount > available)
+		{
+			m_graphCount = available;
+		}
+		if (m_graphCount < kMinimumGraphFrames)
+		{
+			m_graphCount = (available < kMinimumGraphFrames) ? available : kMinimumGraphFrames;
+		}
+
+		if (m_graphFirst < m_availableFirst)
+		{
+			m_graphFirst = m_availableFirst;
+		}
+
+		// ★ 오른쪽 끝을 넘지 않는다. 넘으면 빈 칸을 그리게 되고, 그때
+		//   사용자는 "그 프레임들이 사라졌다" 로 읽는다.
+		const std::uint32_t lastFirst = m_availableLast - m_graphCount + 1;
+		if (m_graphFirst > lastFirst)
+		{
+			m_graphFirst = lastFirst;
+		}
 	}
 
 	void capture_reader::reset()
@@ -68,6 +202,7 @@ namespace ce
 		m_selectedFirst = m_selectedLast = 0;
 		m_aggregateValid = false;
 		m_viewValid = false;
+		reset_graph();
 	}
 
 	void capture_reader::set_live_follow(bool value)

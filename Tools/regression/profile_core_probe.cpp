@@ -1005,6 +1005,103 @@ namespace
 	}
 
 	//-------------------------------------------------------------------------
+	// ⑯-2 프레임 그래프의 창. 막대 폭이 고정이므로 화면이 담는 프레임 수는
+	//     그리는 쪽이 정하고, 창은 최신을 따라 **흐른다** — 새 프레임이
+	//     오른쪽에서 들어오고 옛 프레임은 왼쪽으로 밀려 나간다. 뒤로 굴리면
+	//     그 자리에 멈춰 있어야 옛 기록을 읽을 수 있다.
+	//-------------------------------------------------------------------------
+	void test_reader_graph_window()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Main");
+		service.record(1);
+
+		auto run_frames = [&service](std::uint32_t first, std::uint32_t last)
+		{
+			for (std::uint32_t frame = first; frame <= last; ++frame)
+			{
+				{
+					ce::profile_scope scope{ service, ce::marker<"GraphTick">() };
+					busy_ticks(1);
+				}
+				service.publish_frame(frame);
+			}
+		};
+
+		run_frames(1, 40);
+		service.pause();
+
+		ce::capture_reader reader;
+		reader.adopt(service.capture());
+
+		// 창을 세우기 전에는 보존 전체다.
+		check_eq(reader.graph_first(), std::uint32_t{ 1 }, "graph/default-first");
+		check_eq(reader.graph_count(), std::uint32_t{ 40 }, "graph/default-all");
+		check_eq(reader.graph_last(), std::uint32_t{ 40 }, "graph/default-last");
+
+		// 화면이 10 프레임만 담는다면 **오른쪽 끝이 최신**이어야 한다. 왼쪽
+		// 끝에 붙이면 녹화 중에 최신 프레임이 화면 밖에 있게 된다.
+		reader.set_graph_span(10);
+		check_eq(reader.graph_count(), std::uint32_t{ 10 }, "graph/span-count");
+		check_eq(reader.graph_last(), std::uint32_t{ 40 }, "graph/span-anchors-right");
+		check_eq(reader.graph_first(), std::uint32_t{ 31 }, "graph/span-first");
+
+		// 새 캡처가 오면 창이 흐른다 — 폭은 그대로, 오른쪽 끝만 최신으로.
+		service.record(41);
+		run_frames(41, 50);
+		service.pause();
+		reader.adopt(service.capture());
+		check_eq(reader.graph_count(), std::uint32_t{ 10 }, "graph/flow-keeps-span");
+		check_eq(reader.graph_last(), std::uint32_t{ 50 }, "graph/flows");
+		check_eq(reader.graph_first(), std::uint32_t{ 41 }, "graph/flow-first");
+
+		// 뒤로 굴리면 따라가기가 풀리고 그 자리에 선다.
+		check_eq(reader.selected_first(), std::uint32_t{ 50 }, "graph/pan-selection-before");
+		reader.pan_graph(-20);
+		check(!reader.live_follow(), "graph/pan-stops-following");
+		check_eq(reader.graph_first(), std::uint32_t{ 21 }, "graph/pan-back");
+		check_eq(reader.graph_last(), std::uint32_t{ 30 }, "graph/pan-window");
+
+		// ★ 고른 프레임도 같은 만큼 움직인다. 축은 하나다 — 그래프 창만
+		//   밀리고 선택이 제자리면 아래 타임라인이 안 따라오고, 그때 스크롤은
+		//   위쪽 그림만 흔드는 것이 된다.
+		check_eq(reader.selected_first(), std::uint32_t{ 30 }, "graph/selection-follows-pan");
+		check_eq(reader.selected_last(), std::uint32_t{ 30 }, "graph/selection-keeps-width");
+
+		// ★ 굴려 놓은 자리는 새 캡처가 와도 지켜진다. 이것이 "옛 기록이 왼쪽에
+		//   남는다" 의 실체다 — 여기서 최신으로 튀면 읽던 구간을 잃는다.
+		service.record(51);
+		run_frames(51, 60);
+		service.pause();
+		reader.adopt(service.capture());
+		check_eq(reader.graph_first(), std::uint32_t{ 21 }, "graph/pan-held");
+		check_eq(reader.available_last(), std::uint32_t{ 60 }, "graph/pan-available");
+
+		// 왼쪽 끝을 넘지 않는다. 선택도 창이 실제로 움직인 만큼만 따라간다.
+		reader.pan_graph(-100000);
+		check_eq(reader.graph_first(), reader.available_first(), "graph/clamp-left");
+		check_eq(reader.selected_first(), std::uint32_t{ 10 }, "graph/selection-clamped-with-window");
+
+		// 오른쪽 끝에 닿으면 따라가기가 다시 켜진다.
+		reader.pan_graph(100000);
+		check_eq(reader.graph_last(), std::uint32_t{ 60 }, "graph/clamp-right");
+		check(reader.live_follow(), "graph/pan-to-newest-resumes");
+
+		// 보존보다 넓게 달라고 해도 보존 전체까지다.
+		reader.set_graph_span(100000);
+		check_eq(reader.graph_count(), reader.available_last() - reader.available_first() + 1,
+		         "graph/span-clamped-to-available");
+		check_eq(reader.graph_first(), reader.available_first(), "graph/span-clamped-first");
+
+		// 놓으면 창도 초기화된다.
+		reader.set_graph_span(10);
+		reader.reset();
+		reader.adopt(service.capture());
+		check_eq(reader.graph_count(), std::uint32_t{ 60 }, "graph/reset-clears-window");
+	}
+
+	//-------------------------------------------------------------------------
 	// ⑰ 캐시. 같은 선택을 두 번 물어도 다시 접지 않는다. "느려지지 않았다" 를
 	//    말로 적으면 아무도 재지 않으므로 접은 횟수를 밖에서 보이게 둔다.
 	//-------------------------------------------------------------------------
@@ -1540,6 +1637,93 @@ void test_track_order()
 	         "track-order/range-owner — 레인 구간에 남의 스팬이 없다");
 	check_eq(covered, spans.size(),
 	         "track-order/range-cover — 레인 구간들이 스팬 전부를 덮는다");
+
+	service.shutdown();
+}
+
+//-----------------------------------------------------------------------------
+// §6.4 개정 — 녹화 중에도 캡처가 공개된다.
+//
+// ★ 이 검사가 생긴 까닭. §6.4 는 "pause 시 capture 를 교체" 라고만 적었고,
+//   그것을 글자대로 구현하자 **수집을 멈춰야만 프레임을 볼 수 있는** 도구가
+//   됐다. 목표는 Unity 프로파일러다 — Record 가 도는 동안에도 프레임을
+//   보여 준다(매뉴얼의 Current Frame 모드).
+//
+// ★ 그러면서도 **청하지 않으면 만들지 않는다.** 창이 닫혀 있는 동안에도
+//   프레임마다 링을 통째로 복사하면, 그 비용은 프로파일러가 스스로 만들어
+//   낸 것이라 어느 마커에도 안 잡힌다.
+//-----------------------------------------------------------------------------
+void test_live_capture_while_recording()
+{
+	ce::profiler_service service;
+	ce::profiler_config config;
+	config.live_capture_interval_ms = 0.0;   // 검사에서는 청하는 대로 낸다
+	service.initialize(config);
+	service.register_thread("Main", ce::track_kind::game_thread);
+	service.record(1);
+
+	// ① 아무도 안 보면 스냅샷이 없다.
+	for (std::uint32_t frame = 1; frame <= 3; ++frame)
+	{
+		{
+			ce::profile_scope scope{ service, ce::marker<"Work">() };
+			busy_ticks(4);
+		}
+		service.publish_frame(frame);
+	}
+	check(!service.capture(), "live/unrequested — 청하지 않으면 스냅샷이 없다");
+
+	// ② 청하면 다음 프레임 경계에서 선다.
+	service.request_live_capture();
+	{
+		ce::profile_scope scope{ service, ce::marker<"Work">() };
+		busy_ticks(4);
+	}
+	service.publish_frame(4);
+
+	const ce::capture_session_ptr live = service.capture();
+	check(static_cast<bool>(live), "live/published — 녹화 중에 캡처가 선다");
+
+	// ③ 공개했다고 녹화가 멈추지 않는다. 이것이 Pause 와 갈리는 자리다.
+	check(service.state() == ce::recorder_state::recording,
+	      "live/still-recording — 공개해도 녹화가 멈추지 않는다");
+
+	if (live)
+	{
+		check_eq(live->frame_count(), std::uint32_t{ 4 },
+		         "live/frames — 닫힌 프레임이 모두 담긴다");
+		check(live->complete(), "live/complete — 닫힌 프레임만 담으므로 온전하다");
+
+		// 이 스냅샷으로도 접힌다. 얼린 것만 접을 수 있으면 "보려면 멈춰라" 가
+		// 코어에 남아 있는 것이다.
+		const ce::frame_aggregate aggregate = ce::aggregate_frames(*live, 1, 4);
+		check(aggregate.hierarchy().size() > 0,
+		      "live/foldable — 녹화 중 스냅샷도 접힌다");
+	}
+
+	// ④ 다시 청하면 그 뒤의 프레임까지 담긴 **새** 스냅샷이 온다.
+	service.request_live_capture();
+	{
+		ce::profile_scope scope{ service, ce::marker<"Work">() };
+		busy_ticks(4);
+	}
+	service.publish_frame(5);
+
+	const ce::capture_session_ptr next = service.capture();
+	check(next.get() != live.get(), "live/refreshed — 다시 청하면 새 스냅샷이다");
+	if (next)
+	{
+		check_eq(next->frame_count(), std::uint32_t{ 5 },
+		         "live/grows — 새 스냅샷에 그 뒤 프레임이 들어 있다");
+	}
+
+	// ⑤ 앞서 받은 것은 **변하지 않는다.** 읽는 쪽이 손에 쥔 자료가 뒤에서
+	//    바뀌면 접은 결과와 화면이 어긋난다.
+	if (live)
+	{
+		check_eq(live->frame_count(), std::uint32_t{ 4 },
+		         "live/immutable — 먼저 받은 스냅샷은 그대로다");
+	}
 
 	service.shutdown();
 }
@@ -2980,6 +3164,7 @@ int main()
 	test_reader_selection();
 	test_reader_frozen_while_running();
 	test_reader_live_follow();
+	test_reader_graph_window();
 	test_reader_fold_cache();
 	test_timeline_spans();
 	test_timeline_view();
@@ -2988,6 +3173,7 @@ int main()
 	test_gpu_lane();
 	test_track_order();
 	test_gpu_span_origin();
+	test_live_capture_while_recording();
 	test_call_distribution();
 	test_flat_distribution_union();
 	test_frame_boundaries();
