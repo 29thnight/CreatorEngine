@@ -25,6 +25,11 @@ namespace editor::profiler_view
 	// 슬롯 번호를 낸다 — 빈 칸보다 낫다.
 	const char* thread_name(const ce::capture_session* capture, std::uint16_t slot);
 
+	// 마커 이름. ★ **캡처에 묻는다** — `ce::marker_info(id)` 는 프로세스 전역
+	// registry 를 읽으므로, 파일에서 읽은 캡처에서는 같은 id 가 전혀 다른
+	// 이름을 가리킨다(P6). 화면이 남의 이름을 조용히 그리는 길이라 막았다.
+	const char* marker_name(const ce::capture_session* capture, ce::marker_id id);
+
 	// 프레임 그래프. 클릭으로 한 프레임, 끌어서 범위를 고른다.
 	void draw_frame_overview();
 

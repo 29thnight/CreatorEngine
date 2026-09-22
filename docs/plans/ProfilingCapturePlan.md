@@ -147,6 +147,55 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
 
+### 0.5.26 2026-09-23 P6-1 캡처가 제 어휘와 시계를 들고 다닌다 — 파일보다 먼저
+
+P6 의 첫 조각은 파일이 아니다. 파일을 먼저 지었으면 아래 두 결함을 **파일 형식
+안으로 굳혔을** 것이다.
+
+**★ 이름이 프로세스 전역 표로만 풀렸다.** 화면·commandlet 이 전부
+`ce::marker_info(id)` 를 불렀다. 라이브에서는 같은 프로세스라 맞았지만, 파일에서
+읽은 캡처는 남의 빌드가 등록한 id 를 들고 오고 **같은 id 가 전혀 다른 이름을
+가리킨다.** 화면에는 멀쩡한 글자가 나오므로 눈으로도 게이트로도 못 잡는다.
+
+`capture_marker`(이름·파일·행·갈래를 **글자째** 소유)를 두고 `freeze()` 가
+그 순간의 표를 복사해 싣는다. 이름을 푸는 자리는 `capture_session::marker(id)`
+하나이고, 표 밖의 id 는 **빈 이름**이다 — 전역으로 물러나지 않는다.
+`Engine`·`Editor` 의 `marker_info()` 호출은 **0** 이 됐다(타임라인 막대·사건
+tooltip·구간 tooltip·Hierarchy/Flat 라벨·commandlet 둘).
+
+`snapshot_markers()` 는 잠금 **안에서** 글자까지 복사한다. 옛
+`registered_markers()` 는 잠금 밖으로 포인터를 내보내 "등록이 멈춘 뒤에만 쓴다"
+는 약속에 기대고 있었다.
+
+**★ 같은 결함이 시계에도 있었다.** `ticks_to_milliseconds` 가 **읽는 기계의**
+QPC 주파수로 나눴다. 다른 기계에서 뜬 캡처는 모든 구간 길이가 두 주파수의 비만큼
+틀리고, 숫자는 여전히 그럴듯하다. §8.2 가 헤더에 "QPC frequency" 를 적어 둔
+이유인데, **메모리 안의 캡처에도 똑같이 필요했다.** `capture_environment` 를 두고
+`freeze()` 가 싣는다. 환산은 `capture_session::milliseconds()` 가 하고, 주파수를
+모르면 **0 을 낸다** — 이 기계 것으로 물러나지 않는다. 물러나는 경로를 남기면
+그 경로가 파일 캡처에서도 돈다.
+
+| 계약 | 무는 절 | 변이 |
+|---|---|---|
+| 캡처가 제 이름을 말한다 | `vocabulary/name-outer` · `name-inner` · `kind` | `capture-vocabulary-empty` |
+| 얼린 뒤 등록은 안 섞인다 | `vocabulary/frozen` | `capture-vocabulary-follows-registry` |
+| 모르는 id 는 빈 이름 | `vocabulary/unknown` · `out-of-range` | `capture-vocabulary-unknown-named` |
+| 캡처가 제 주파수를 든다 | `clock/carried` | `capture-clock-dropped` |
+| 1초치 tick = 1000 ms | `clock/milliseconds` | `capture-clock-seconds` |
+| 주파수를 모르면 0 ms | `clock/unknown-zero` | — |
+
+**★ 하네스 한계 하나.** `marker_count()` 를 헤더에 inline 으로 뒀더니 변이가
+**아무 효과 없이** 적용됐다. 이 하네스는 **컴파일 목록의 `.cpp`** 만 갈아
+끼우므로, 헤더에 적힌 계약은 이빨을 증명할 수단이 아예 없다 — 그 자리는 조용히
+"검사됐다" 로 세어진다. `marker_count()` 를 `.cpp` 로 내리고 헤더에 이유를 적었다.
+
+**★ 옛 변이의 앵커가 낡았다.** `freeze()` 가 시계를 받으며 호출이 두 줄로 갈리자
+`freeze-always-complete` 가 "대상이 소스에 없다" 로 붉어졌다. 하네스가 설계대로
+멈춘 것이다. 앵커를 둘째 줄의 온전함 인자로 옮겼다 — 같은 줄을 시계 변이도
+잡지만, 변이는 각자 원본에 따로 걸리므로 서로를 가리지 않는다.
+
+게이트. 코어 Debug·Release 각 345 검사 · 변이 56. 에디터 빌드 오류 0.
+
 ### 0.5.25 2026-09-22 문서 부채 — 계획서가 남은 일을 잘못 세고 있었다
 
 코드가 아니라 **이 계획서와 게이트 README 가 틀린** 것을 고쳤다. 여기가 틀리면
@@ -2552,7 +2601,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 | 게이트 | 엔진 | 무는 것 |
 |---|---|---|
-| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약 전부. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 332 검사. **변이 51** 가 각각 제 검사에서 붉는지까지 본다 |
+| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약 전부. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 345 검사. **변이 56** 가 각각 제 검사에서 붉는지까지 본다 |
 | `Tools/profiling-validation/Invoke-ProfilingValidation.ps1 -Action Stats` | 에디터 | 기본 씬의 교란 없는 라이브 기준선. 스레드마다 **무엇을 찍었는가**(절대 수가 아니다) |
 | 〃 `-Action Workers` | 에디터 | fixture 씬으로 애니메이션 잡을 돌려 **워커 스레드의 구간 계측**과 SceneActivated 사건 |
 | 〃 `-Action Window` | 에디터 | 프로파일러 창이 실제로 **그려지는지**(창 본문 마커가 캡처에 나타나는지), 창을 닫아도 `state == recording` 인지 |

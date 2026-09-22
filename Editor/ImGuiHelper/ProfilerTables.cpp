@@ -87,7 +87,10 @@ namespace editor::profiler_view
 		// 다른 줄과 나란히 두면 안 된다는 것을 이름 옆에 적는다.
 		void marker_label(const ce::aggregate_row& row, char* buffer, std::size_t size)
 		{
-			const char* name = ce::marker_info(row.marker).name;
+			// ★ 이름은 **캡처에** 묻는다(P6). 전역 registry 로 풀면 파일에서
+			//   읽은 캡처가 이 프로세스의 남의 이름을 그린다 — 같은 id 가 남의
+			//   빌드에서는 전혀 다른 마커다. 행이 온 캡처와 같은 것에 묻는다.
+			const char* name = marker_name(reader().capture(), row.marker);
 			if (row.truncated)
 			{
 				std::snprintf(buffer, size, "%s  (잘림)", name);

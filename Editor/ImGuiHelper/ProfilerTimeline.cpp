@@ -397,7 +397,7 @@ namespace editor::profiler_view
 				{
 					draw->PushClipRect(ImVec2(x0 + 2.0f, y0), ImVec2(x1 - 1.0f, y1), true);
 					draw->AddText(ImVec2(x0 + 3.0f, y0 + 1.0f), IM_COL32(20, 22, 26, 255),
-					              ce::marker_info(span.marker).name);
+					              marker_name(view.capture(), span.marker));
 					draw->PopClipRect();
 				}
 
@@ -424,7 +424,7 @@ namespace editor::profiler_view
 		if (hoveredInstant)
 		{
 			ImGui::BeginTooltip();
-			ImGui::TextUnformatted(ce::marker_info(hoveredInstant->marker).name);
+			ImGui::TextUnformatted(marker_name(view.capture(), hoveredInstant->marker));
 			ImGui::Text("frame %u  ·  %s", hoveredInstant->frame,
 			            thread_name(view.capture(), hoveredInstant->thread_slot));
 			ImGui::TextDisabled("길이가 없는 사건 - 일어난 순간만 있다");
@@ -446,7 +446,7 @@ namespace editor::profiler_view
 				ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_end);
 
 			ImGui::BeginTooltip();
-			ImGui::TextUnformatted(ce::marker_info(hoveredSpan->marker).name);
+			ImGui::TextUnformatted(marker_name(view.capture(), hoveredSpan->marker));
 			ImGui::Text("%.4f ms  ·  frame %u", ticks_to_milliseconds(length),
 			            hoveredSpan->frame);
 

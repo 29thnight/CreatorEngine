@@ -133,6 +133,29 @@ namespace ce
 		return std::span<const marker_desc>(reg.descs.data(), reg.descs.size());
 	}
 
+	std::vector<capture_marker> snapshot_markers()
+	{
+		using namespace ce::detail::marker_registry_impl;
+
+		registry& reg = get();
+		std::lock_guard<std::mutex> guard(reg.lock);
+		ensure_sentinel(reg);
+
+		// 잠금 **안에서** 글자까지 복사한다. 밖으로 나가는 것은 포인터가
+		// 아니라 값이므로, 이 뒤에 표가 재할당돼도 뜬 것은 안 변한다.
+		std::vector<capture_marker> table;
+		table.reserve(reg.descs.size());
+		for (const marker_desc& desc : reg.descs)
+		{
+			table.push_back(capture_marker{
+				desc.name ? std::string(desc.name) : std::string(),
+				desc.file ? std::string(desc.file) : std::string(),
+				desc.line,
+				desc.kind });
+		}
+		return table;
+	}
+
 	std::uint32_t registered_marker_count()
 	{
 		using namespace ce::detail::marker_registry_impl;

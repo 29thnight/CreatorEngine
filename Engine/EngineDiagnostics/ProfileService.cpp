@@ -848,7 +848,8 @@ namespace ce
 		}
 
 		publish_ring_stats();
-		capture_session_ptr frozen = m_ring.freeze(threads, 0 == unacked, unacked);
+		capture_session_ptr frozen = m_ring.freeze(
+			threads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
 			m_capture = std::move(frozen);
@@ -904,7 +905,8 @@ namespace ce
 		// ★ 가장 최근 몇 프레임은 **아직 확정이 아니다.** 늦게 오는 GPU
 		//   구간이 닫힌 프레임에 나중에 들어가기 때문이다(실측 제출→수집
 		//   최대 94 ms). 다음 스냅샷에 그것이 담긴다.
-		capture_session_ptr live = m_ring.freeze(threads, true, 0);
+		capture_session_ptr live = m_ring.freeze(
+			threads, capture_environment{ ticks_per_second() }, true, 0);
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
 			m_capture = std::move(live);

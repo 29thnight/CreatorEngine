@@ -9,12 +9,16 @@ namespace ce
 	// capture_session
 	//-------------------------------------------------------------------------
 
-	capture_session::capture_session(std::vector<frame_record> frames,
-	                                 std::vector<thread_info>  threads,
-	                                 bool                      complete,
-	                                 std::uint32_t             unacked_streams)
+	capture_session::capture_session(std::vector<frame_record>   frames,
+	                                 std::vector<thread_info>    threads,
+	                                 std::vector<capture_marker> markers,
+	                                 capture_environment         environment,
+	                                 bool                        complete,
+	                                 std::uint32_t               unacked_streams)
 		: m_frames(std::move(frames))
 		, m_threads(std::move(threads))
+		, m_markers(std::move(markers))
+		, m_environment(environment)
 		, m_complete(complete)
 		, m_unackedStreams(unacked_streams)
 	{
@@ -23,6 +27,37 @@ namespace ce
 			m_memoryBytes += frame.memory_bytes();
 			m_totalEvents += frame.events.size();
 		}
+	}
+
+	double capture_session::milliseconds(profile_tick ticks) const
+	{
+		// 주파수를 모르는 캡처는 0 을 낸다. 이 기계의 QPC 로 대신 나누지
+		// **않는다** — 그러면 남의 기계에서 뜬 캡처가 그럴듯한 거짓 숫자를 낸다.
+		if (0 == m_environment.ticks_per_second)
+		{
+			return 0.0;
+		}
+		return static_cast<double>(ticks) * 1000.0 /
+		       static_cast<double>(m_environment.ticks_per_second);
+	}
+
+	std::uint32_t capture_session::marker_count() const
+	{
+		// **이 캡처가 들고 있는** 표의 크기다. 전역 registry 의 수가 아니다 —
+		// 그것을 내면 얼린 뒤 등록된 마커가 이 캡처에 섞여 보인다.
+		return static_cast<std::uint32_t>(m_markers.size());
+	}
+
+	const capture_marker& capture_session::marker(marker_id id) const
+	{
+		// 표 밖의 id 는 **빈 이름**이다. 전역 registry 로 물러나지 않는다 —
+		// 그러면 파일에서 온 캡처가 이 프로세스의 남의 이름을 그린다.
+		static const capture_marker unknown{};
+		if (id >= m_markers.size())
+		{
+			return unknown;
+		}
+		return m_markers[id];
 	}
 
 	const frame_record* capture_session::find_frame(std::uint32_t engine_frame) const
@@ -245,13 +280,19 @@ namespace ce
 	}
 
 	capture_session_ptr capture_ring::freeze(std::span<const thread_info> threads,
+	                                         capture_environment environment,
 	                                         bool complete, std::uint32_t unacked_streams) const
 	{
 		// 복사해서 넘긴다. 이 복사가 reader 를 recorder 에서 떼어 내는 값이고,
 		// 얼린 뒤 엔진이 계속 돌아도 손에 든 자료가 변하지 않는 이유다.
 		std::vector<frame_record> frames(m_frames.begin(), m_frames.end());
 		std::vector<thread_info>  thread_list(threads.begin(), threads.end());
+
+		// ★ 어휘도 **이 순간**의 것을 함께 뜬다(P6). 얼린 뒤에 등록되는
+		//   마커는 이 캡처의 뜻이 아니고, 파일로 나갔다 돌아온 캡처는 이
+		//   표 없이는 제 이름을 말할 수 없다.
 		return std::make_shared<const capture_session>(
-			std::move(frames), std::move(thread_list), complete, unacked_streams);
+			std::move(frames), std::move(thread_list), snapshot_markers(),
+			environment, complete, unacked_streams);
 	}
 }

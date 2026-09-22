@@ -155,6 +155,64 @@ $mutations = @(
         Why    = '창이 미끄러져도 안 다시 접으면 지난 구간을 계속 그린다'
     },
 
+    # ── P6 캡처의 어휘 ─────────────────────────────────────────────
+    #
+    # ★ 이름을 전역 registry 로 풀면 파일에서 읽은 캡처가 **남의 빌드의
+    #   이름**을 그린다. 화면에는 멀쩡한 글자가 나오므로 눈으로는 못 잡는다.
+    @{
+        # 얼릴 때 어휘를 안 싣는다. 캡처가 제 이름을 말할 수 없게 된다.
+        Name   = 'capture-vocabulary-empty'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`t`tstd::move(frames), std::move(thread_list), snapshot_markers(),"
+        New    = "`t`t`tstd::move(frames), std::move(thread_list), std::vector<capture_marker>{},"
+        Expect = 'vocabulary/name-outer'
+        Why    = '어휘를 안 실으면 캡처가 제 이름을 말하지 못한다'
+    },
+
+    @{
+        # 어휘의 크기를 **전역 표**에서 읽는다. 얼린 뒤 등록된 마커가 이
+        # 캡처에 섞여 보이고, 그것이 곧 "복사하지 않았다" 의 증상이다.
+        Name   = 'capture-vocabulary-follows-registry'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`treturn static_cast<std::uint32_t>(m_markers.size());"
+        New    = "`t`treturn registered_marker_count();"
+        Expect = 'vocabulary/frozen'
+        Why    = '전역 수를 내면 얼린 뒤 등록한 마커가 이 캡처에 섞인다'
+    },
+
+    @{
+        # 모르는 id 에 자리표 이름을 준다. "모른다" 가 화면에서 사라지고
+        # 남의 캡처의 id 가 그럴듯한 글자로 그려진다.
+        Name   = 'capture-vocabulary-unknown-named'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`tstatic const capture_marker unknown{};"
+        New    = "`t`tstatic const capture_marker unknown{ `"<invalid>`", {}, 0, marker_kind::cpu_scope };"
+        Expect = 'vocabulary/unknown'
+        Why    = '모르는 id 가 이름을 가지면 "모른다" 를 화면에서 잃는다'
+    },
+
+    @{
+        # 얼릴 때 시계를 안 싣는다. 파일에서 읽은 캡처가 제 주파수를 모르게
+        # 되고, 그러면 읽는 기계의 QPC 로 나누는 옛 길로 되돌아간다.
+        Name   = 'capture-clock-dropped'
+        File   = 'ProfileService.cpp'
+        Old    = "`t`t`tthreads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);"
+        New    = "`t`t`tthreads, capture_environment{}, 0 == unacked, unacked);"
+        Expect = 'clock/carried'
+        Why    = '시계를 안 실으면 캡처가 제 구간 길이를 말하지 못한다'
+    },
+
+    @{
+        # 초를 밀리초로 안 바꾼다. 모든 구간이 1000 배 짧게 나오는데, 표의
+        # 모양은 그대로라 "빨라졌다" 로 읽힌다.
+        Name   = 'capture-clock-seconds'
+        File   = 'ProfileCapture.cpp'
+        Old    = "`t`treturn static_cast<double>(ticks) * 1000.0 /"
+        New    = "`t`treturn static_cast<double>(ticks) * 1.0 /"
+        Expect = 'clock/milliseconds'
+        Why    = '초를 ms 로 안 바꾸면 모든 구간이 1000 배 짧게 나온다'
+    },
+
     # ── 녹화 경계를 넘는 스코프 ────────────────────────────────────
     @{
         # 여는 쪽을 건너뛰면서 짝을 예약하지 않는다. 얼린 채 열린 구간의 짝이
@@ -245,8 +303,12 @@ $mutations = @(
         # 얼린 캡처가 언제나 온전하다고 말한다.
         Name   = 'freeze-always-complete'
         File   = 'ProfileService.cpp'
-        Old    = "`t`tcapture_session_ptr frozen = m_ring.freeze(threads, 0 == unacked, unacked);"
-        New    = "`t`tcapture_session_ptr frozen = m_ring.freeze(threads, true, 0);"
+        # ★ P6 에서 freeze 가 시계를 함께 받게 되며 호출이 두 줄로 갈렸다.
+        #   앵커는 둘째 줄의 **온전함 인자**만 잡는다 — 같은 줄을 시계 변이
+        #   (capture-clock-dropped)도 잡지만, 변이는 각자 원본에 따로 걸리므로
+        #   서로를 가리지 않는다.
+        Old    = "`t`t`tthreads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);"
+        New    = "`t`t`tthreads, capture_environment{ ticks_per_second() }, true, 0);"
         Expect = 'incomplete/flag'
         Why    = '세는 것과 판정하는 것은 다르다 - 미응답을 덮으면 빠진 꼬리가 조용해 보인다'
     },

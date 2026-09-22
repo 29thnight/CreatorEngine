@@ -41,18 +41,59 @@ namespace ce
 	inline constexpr std::uint32_t kDefaultRetainedFrames = 600;
 	inline constexpr std::size_t   kDefaultMemoryBudget = 128ull * 1024ull * 1024ull;
 
+	// 캡처가 **자기 뜻을 풀기 위해** 들고 다녀야 하는 것. 전부 뜬 기계의
+	// 값이고, 읽는 기계의 것으로 풀면 숫자가 조용히 틀린다(§8.2).
+	//
+	// ★ 인자를 늘리는 대신 묶었다. `freeze(threads, complete, unacked,
+	//   ticks_per_second)` 는 같은 폭의 정수가 줄줄이 서서, 자리를 바꿔 넣어도
+	//   컴파일러가 아무 말도 하지 않는다.
+	struct capture_environment
+	{
+		// tick → 초. 이 값으로 나눠야 ms 가 나온다.
+		//
+		// ★ 지금까지 환산은 **읽는 기계의** QPC 주파수로 했다. 라이브에서는
+		//   같은 기계라 맞았지만, 파일에서 읽은 캡처에서는 모든 구간 길이가
+		//   두 주파수의 비만큼 틀린다 — 그리고 화면에는 그럴듯한 숫자가
+		//   그대로 나오므로 눈으로도 게이트로도 못 잡는다.
+		profile_tick ticks_per_second = 0;
+	};
+
 	// 얼어붙은 캡처. 생성 뒤에는 아무도 고치지 않는다.
 	class capture_session
 	{
 	public:
 		capture_session() = default;
-		capture_session(std::vector<frame_record> frames,
-		                std::vector<thread_info>  threads,
-		                bool                      complete,
-		                std::uint32_t             unacked_streams);
+		capture_session(std::vector<frame_record>   frames,
+		                std::vector<thread_info>    threads,
+		                std::vector<capture_marker> markers,
+		                capture_environment         environment,
+		                bool                        complete,
+		                std::uint32_t               unacked_streams);
 
 		std::span<const frame_record> frames() const { return m_frames; }
 		std::span<const thread_info>  threads() const { return m_threads; }
+
+		// ── 이 캡처의 어휘(P6) ───────────────────────────────────────────
+		//
+		// ★ 이름을 푸는 자리는 **여기 하나**다. `ce::marker_info(id)` 로 풀면
+		//   전역 registry 를 읽게 되고, 파일에서 온 캡처에서는 그것이 남의
+		//   이름이다. 읽는 쪽은 언제나 자기가 들고 있는 캡처에 물어라.
+		std::span<const capture_marker> markers() const { return m_markers; }
+
+		// ★ inline 으로 두지 않는다. 변이 하네스는 **컴파일 목록의 파일**만
+		//   갈아 끼울 수 있어서, 헤더에 적힌 계약은 이빨을 증명할 수단이 없다.
+		std::uint32_t marker_count() const;
+
+		// 모르는 id 는 빈 이름을 돌려준다 — 던지지도, 전역으로 새지도 않는다.
+		const capture_marker& marker(marker_id id) const;
+
+		// ── 이 캡처의 시계(P6) ───────────────────────────────────────────
+		const capture_environment& environment() const { return m_environment; }
+
+		// tick 을 ms 로. ★ **이 캡처의** 주파수로 나눈다. 주파수를 모르면
+		// 0 을 낸다 — 이 기계의 것으로 대신 나누지 않는다. 틀린 숫자보다
+		// 빈 숫자가 낫다.
+		double milliseconds(profile_tick ticks) const;
 
 		std::uint32_t frame_count() const { return static_cast<std::uint32_t>(m_frames.size()); }
 		std::size_t   memory_bytes() const { return m_memoryBytes; }
@@ -70,8 +111,10 @@ namespace ce
 		const frame_record* find_frame(std::uint32_t engine_frame) const;
 
 	private:
-		std::vector<frame_record> m_frames;
-		std::vector<thread_info>  m_threads;
+		std::vector<frame_record>   m_frames;
+		std::vector<thread_info>    m_threads;
+		std::vector<capture_marker> m_markers;
+		capture_environment         m_environment{};
 		std::size_t               m_memoryBytes = 0;
 		std::uint64_t             m_totalEvents = 0;
 		bool                      m_complete = true;
@@ -109,6 +152,7 @@ namespace ce
 		// 지금까지 모인 것을 얼려 공개한다. 링은 비우지 않는다 — 다시
 		// 녹화를 눌러도 앞이 남아 있어야 하기 때문이다.
 		capture_session_ptr freeze(std::span<const thread_info> threads,
+		                           capture_environment environment,
 		                           bool complete, std::uint32_t unacked_streams) const;
 
 		std::uint32_t retained_frames() const { return static_cast<std::uint32_t>(m_frames.size()); }

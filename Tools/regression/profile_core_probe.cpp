@@ -3169,6 +3169,100 @@ void test_shutdown_retains_live_storage()
 	}
 }
 
+// P6-1 — 캡처가 제 어휘를 소유한다.
+//
+// ★ 지금까지 이름은 **프로세스 전역** registry 로만 풀렸다(marker_info(id)).
+//   파일에서 읽은 캡처에는 그것이 통하지 않는다 — 그 프로세스는 남의 빌드가
+//   등록한 이름을 등록한 적이 없고, 같은 id 가 전혀 다른 이름을 가리킨다.
+//   그러면 표가 **조용히 남의 이름**을 그리고, 어느 게이트도 그것을 못 본다.
+//
+//   그래서 얼리는 순간 캡처가 제 표를 **글자째** 복사해 들고 간다.
+void test_capture_vocabulary()
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("VocabThread");
+	service.record(1);
+
+	{
+		ce::profile_scope outer{ service, ce::marker<"VocabOuter">() };
+		busy_ticks(4);
+		{
+			ce::profile_scope inner{ service, ce::marker<"VocabInner">() };
+			busy_ticks(2);
+		}
+	}
+
+	service.publish_frame(1);
+	service.pause();
+
+	const ce::capture_session_ptr capture = service.capture();
+	check(capture != nullptr, "vocabulary/capture — 얼린 캡처가 있다");
+	if (!capture)
+	{
+		return;
+	}
+
+	const ce::marker_id outer = ce::marker<"VocabOuter">();
+	const ce::marker_id inner = ce::marker<"VocabInner">();
+
+	check(capture->marker(outer).name == "VocabOuter",
+	      "vocabulary/name-outer — 캡처가 제 이름을 말한다");
+	check(capture->marker(inner).name == "VocabInner",
+	      "vocabulary/name-inner — 중첩 구간의 이름도 캡처가 말한다");
+	check(capture->marker(outer).kind == ce::marker_kind::cpu_scope,
+	      "vocabulary/kind — 갈래도 함께 온다");
+
+	// ★ 얼린 뒤에 등록한 것은 이 캡처의 뜻이 아니다. 이 절이 "복사했는가" 와
+	//   "전역을 그대로 보고 있는가" 를 가른다 — 전역을 보면 표가 자란다.
+	const std::uint32_t before = capture->marker_count();
+	const ce::marker_id late =
+		ce::intern_runtime_marker("VocabRegisteredAfterFreeze", ce::marker_kind::cpu_scope);
+	check_eq(capture->marker_count(), before,
+	         "vocabulary/frozen — 얼린 뒤 등록한 마커는 이 캡처에 없다");
+	check(capture->marker(late).name.empty(),
+	      "vocabulary/unknown — 모르는 id 는 빈 이름이다");
+	check(capture->marker(1000000u).name.empty(),
+	      "vocabulary/out-of-range — 범위 밖 id 도 안전하다");
+	check(capture->marker_count() > 1,
+	      "vocabulary/table — 표에 자리표 말고도 무언가 있다");
+
+	// 표가 **인덱스 = id** 로 서야 이벤트가 제 이름을 찾는다.
+	bool indexed = true;
+	for (const ce::frame_record& frame : capture->frames())
+	{
+		for (const ce::profile_event& value : frame.events)
+		{
+			if (value.marker >= capture->marker_count())
+			{
+				indexed = false;
+			}
+		}
+	}
+	check(indexed, "vocabulary/indexed — 모든 이벤트의 marker 가 표 안에 있다");
+
+	// ── 캡처가 제 시계를 들고 다닌다 ────────────────────────────────────
+	//
+	// ★ 어휘와 같은 결함이 시계에도 있었다. 환산이 **읽는 기계의** QPC
+	//   주파수를 쓰면, 다른 기계에서 뜬 캡처의 모든 구간 길이가 두 주파수의
+	//   비만큼 틀린다 — 그런데 숫자는 여전히 그럴듯해서 눈으로 못 잡는다.
+	const ce::profile_tick frequency = ce::profiler_service::ticks_per_second();
+	check(capture->environment().ticks_per_second == frequency,
+	      "clock/carried — 캡처가 뜬 기계의 주파수를 들고 있다");
+	check(frequency > 0, "clock/frequency — 주파수가 0 이 아니다");
+
+	// 1초치 tick 은 1000 ms 다. 배수가 틀리면 여기서 어긋난다.
+	const double oneSecond = capture->milliseconds(frequency);
+	check(oneSecond > 999.9 && oneSecond < 1000.1,
+	      "clock/milliseconds — 1초치 tick 이 1000 ms 로 환산된다");
+
+	// 주파수를 모르는 캡처는 **0 을 낸다.** 이 기계의 것으로 대신 나누지
+	// 않는다 — 그것이 곧 파일 캡처가 거짓 숫자를 내는 길이다.
+	const ce::capture_session blank;
+	check(blank.milliseconds(frequency) == 0.0,
+	      "clock/unknown-zero — 주파수를 모르면 0 ms 다");
+}
+
 // ★ 어서션·오류 창을 띄우지 않는다.
 //
 //   변이 하나가 링의 vector 를 두 스레드가 함께 만지게 만들자 Debug 이터레이터
@@ -3245,6 +3339,7 @@ int main()
 	test_pause_does_not_block_caller();
 	test_pause_requester_records_land();
 	test_shutdown_retains_live_storage();
+	test_capture_vocabulary();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

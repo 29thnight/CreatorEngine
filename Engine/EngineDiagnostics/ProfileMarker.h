@@ -11,7 +11,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <span>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace ce
 {
@@ -96,4 +98,30 @@ namespace ce
 	const marker_desc& marker_info(marker_id id);
 	std::span<const marker_desc> registered_markers();
 	std::uint32_t registered_marker_count();
+
+	// ── 캡처가 들고 다니는 어휘(P6) ──────────────────────────────────────
+	//
+	// ★ `marker_desc` 는 **포인터**를 들고 있고 그 글자는 이 프로세스의
+	//   registry 가 소유한다. 파일에서 읽은 캡처에는 그 주인이 없다 — 그
+	//   프로세스는 남의 빌드가 등록한 이름을 등록한 적이 없고, 같은 id 가
+	//   전혀 다른 이름을 가리킨다. 전역 표로 이름을 풀면 그때 화면이
+	//   **조용히 남의 이름**을 그린다.
+	//
+	//   그래서 캡처는 자기 어휘를 **글자째** 들고 다닌다. 얼리는 순간 한 벌
+	//   복사하고, 그 뒤로는 registry 가 얼마나 자라든 이 캡처의 뜻은 안 변한다.
+	struct capture_marker
+	{
+		std::string   name;
+		std::string   file;   // 비어 있을 수 있다
+		std::uint32_t line = 0;
+		marker_kind   kind = marker_kind::cpu_scope;
+	};
+
+	// 지금 등록된 표를 **글자를 복사해** 한 벌 뜬다. 첫 칸은 `invalid_marker`
+	// 자리표이므로 인덱스가 곧 id 다.
+	//
+	// ★ `registered_markers()` 와 달리 잠금 밖으로 포인터를 내보내지 않는다.
+	//   그쪽은 등록이 겹치면 재할당된 옛 저장소를 볼 수 있어 "등록이 멈춘
+	//   뒤에만 쓴다" 는 약속에 기대고 있었다. 복사는 그 약속이 필요 없다.
+	std::vector<capture_marker> snapshot_markers();
 }

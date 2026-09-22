@@ -36,8 +36,16 @@ namespace editor::profiler_view
 
 	double ticks_to_milliseconds(ce::profile_tick ticks)
 	{
-		const double frequency =
-			static_cast<double>(ce::profiler_service::ticks_per_second());
+		// ★ 환산은 **캡처가 뜬 기계의** 주파수로 한다(P6). 이 기계의 QPC 로
+		//   나누면 남의 기계에서 뜬 .ceprof 의 모든 구간 길이가 두 주파수의
+		//   비만큼 틀리고, 화면에는 그럴듯한 숫자가 그대로 나온다.
+		//
+		//   캡처가 없으면 환산할 것도 없다. 이 기계의 주파수로 물러나지
+		//   **않는다** — 물러나는 순간 그 경로가 파일 캡처에서도 돌 수 있다.
+		const ce::capture_session* capture = reader().capture();
+		const double frequency = capture
+			? static_cast<double>(capture->environment().ticks_per_second)
+			: 0.0;
 		if (frequency <= 0.0)
 		{
 			return 0.0;
@@ -62,6 +70,25 @@ namespace editor::profiler_view
 		// 같은 스레드인지 가릴 수 있다.
 		static thread_local char fallback[32];
 		std::snprintf(fallback, sizeof(fallback), "slot %u", static_cast<unsigned>(slot));
+		return fallback;
+	}
+
+	const char* marker_name(const ce::capture_session* capture, ce::marker_id id)
+	{
+		if (capture)
+		{
+			const ce::capture_marker& info = capture->marker(id);
+			if (!info.name.empty())
+			{
+				return info.name.c_str();
+			}
+		}
+
+		// 표에 없는 id. 전역 registry 로 물러나지 **않는다** — 그러면 남의
+		// 빌드에서 온 캡처가 이 프로세스의 엉뚱한 이름을 그린다. 대신 id 를
+		// 그대로 보여 준다: 모른다는 것이 화면에 보여야 한다.
+		static thread_local char fallback[32];
+		std::snprintf(fallback, sizeof(fallback), "marker %u", static_cast<unsigned>(id));
 		return fallback;
 	}
 }

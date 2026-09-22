@@ -849,7 +849,9 @@ namespace ConsoleCmd
                         }
 
                         auto eventEntry = CommandData::Object();
-                        eventEntry.Set("name", CommandData::String(ce::marker_info(event.marker).name));
+                        // ★ 이름은 **이 캡처에** 묻는다(P6). 전역 registry 로 풀면
+                        //   파일에서 읽은 캡처가 남의 빌드의 이름을 낸다.
+                        eventEntry.Set("name", CommandData::String(capture->marker(event.marker).name));
                         eventEntry.Set("depth", CommandData::Int(event.depth));
                         eventEntry.Set("ms", CommandData::Double(ms));
                         eventEntry.Set("startFrame", CommandData::Int(event.frame));
@@ -921,7 +923,7 @@ namespace ConsoleCmd
                     ++instantReported;
 
                     auto entry = CommandData::Object();
-                    entry.Set("name", CommandData::String(ce::marker_info(event.marker).name));
+                    entry.Set("name", CommandData::String(capture->marker(event.marker).name));
                     entry.Set("frame", CommandData::Int(event.frame));
                     entry.Set("threadSlot", CommandData::Int(event.thread_slot));
                     instants.Append(std::move(entry));
