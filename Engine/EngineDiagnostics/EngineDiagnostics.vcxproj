@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="ProfileAggregate.h" />
     <ClInclude Include="ProfileCapture.h" />
+    <ClInclude Include="ProfileCaptureFile.h" />
     <ClInclude Include="ProfileEvent.h" />
     <ClInclude Include="ProfileMarker.h" />
     <ClInclude Include="ProfileReader.h" />
@@ -31,6 +32,7 @@
   <ItemGroup>
     <ClCompile Include="ProfileAggregate.cpp" />
     <ClCompile Include="ProfileCapture.cpp" />
+    <ClCompile Include="ProfileCaptureFile.cpp" />
     <ClCompile Include="ProfileMarker.cpp" />
     <ClCompile Include="ProfileReader.cpp" />
     <ClCompile Include="ProfileService.cpp" />

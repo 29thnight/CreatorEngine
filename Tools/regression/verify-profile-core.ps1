@@ -213,6 +213,72 @@ $mutations = @(
         Why    = '초를 ms 로 안 바꾸면 모든 구간이 1000 배 짧게 나온다'
     },
 
+    # ── P6-2 .ceprof ───────────────────────────────────────────────
+    #
+    # ★ 새 검사 45 개가 첫 컴파일에서 전부 초록이었다. 그것은 아무것도
+    #   증명하지 않는다 — 아래가 각 절에 이빨이 있다는 증명이다.
+    @{
+        # CRC 를 안 본다. 망가진 몸통이 그대로 읽혀 틀린 값을 그린다.
+        Name   = 'capture-file-skips-crc'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = "`t`t`tif (crc32(body) != entry.crc)"
+        New    = "`t`t`tif (crc32(body) != crc32(body))"
+        Expect = 'file-reject/checksum'
+        Why    = 'CRC 를 안 보면 망가진 파일이 멀쩡한 척 열린다'
+    },
+
+    @{
+        # 잘린 파일을 "손상됐다" 로 부른다. 다시 받으면 될 파일을 버리게 만든다.
+        Name   = 'capture-file-cut-as-damage'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = "`t`tif (!all_chunks_within(*table, bytes.size()))`r`n`t`t{`r`n`t`t`treturn std::unexpected(capture_file_error::truncated);"
+        New    = "`t`tif (!all_chunks_within(*table, bytes.size()))`r`n`t`t{`r`n`t`t`treturn std::unexpected(capture_file_error::checksum_mismatch);"
+        Expect = 'file-reject/cut-is-truncated'
+        Why    = '잘림과 손상을 가르지 않으면 사용자가 할 일을 잘못 고른다'
+    },
+
+    @{
+        # 같은 폭의 두 필드를 바꿔 쓴다. 크기가 같으니 읽기는 성공하고,
+        # 스레드와 깊이가 **조용히** 뒤바뀐다 — 수만 세는 검사는 못 잡는다.
+        Name   = 'capture-file-swaps-fields'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = "`t`tout.put(value.thread_slot);`r`n`t`tout.put(value.depth);"
+        New    = "`t`tout.put(value.depth);`r`n`t`tout.put(value.thread_slot);"
+        Expect = 'file/round-trip/event-fields'
+        Why    = '필드가 뒤바뀌어도 수는 같다 — 필드 전부를 봐야 잡힌다'
+    },
+
+    @{
+        # 프레임 순서를 안 본다. find_frame 의 이분 탐색이 엉뚱한 프레임을 낸다.
+        Name   = 'capture-file-accepts-unordered'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = "`t`t`tif (i > 0 && frames[i - 1].engine_frame >= frames[i].engine_frame)"
+        New    = "`t`t`tif (i > 0 && frames[i - 1].engine_frame == frames[i].engine_frame)"
+        Expect = 'file-reject/order'
+        Why    = '순서가 어긋난 캡처는 멈추지 않고 엉뚱한 프레임을 낸다'
+    },
+
+    @{
+        # 개수를 믿는다. CRC 가 맞는 거대한 개수 하나로 프레임 43 억 칸을
+        # 잡으려 든다.
+        Name   = 'capture-file-trusts-count'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = "`t`tif (!in.get(count) || !in.can_hold(count, kFrameHeadBytes))"
+        New    = "`t`tif (!in.get(count) || !in.can_hold(0, kFrameHeadBytes))"
+        Expect = 'file-reject/bounded-allocation'
+        Why    = '개수를 믿으면 손상된 파일 하나가 할당으로 프로세스를 죽인다'
+    },
+
+    @{
+        # 교체하지 않고 복사한다. 결과 파일은 맞지만 임시 파일이 남는다.
+        Name   = 'capture-file-leaves-temp'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = "`t`tstd::filesystem::rename(temporary, path, error);"
+        New    = "`t`tstd::filesystem::copy_file(temporary, path, std::filesystem::copy_options::overwrite_existing, error);"
+        Expect = 'file-disk/no-temp'
+        Why    = '교체 대신 복사하면 저장할 때마다 임시 파일이 쌓인다'
+    },
+
     # ── 녹화 경계를 넘는 스코프 ────────────────────────────────────
     @{
         # 여는 쪽을 건너뛰면서 짝을 예약하지 않는다. 얼린 채 열린 구간의 짝이
@@ -671,6 +737,7 @@ $sources = @(
     (Join-Path $core 'ProfileMarker.cpp'),
     (Join-Path $core 'ProfileThreadStream.cpp'),
     (Join-Path $core 'ProfileCapture.cpp'),
+    (Join-Path $core 'ProfileCaptureFile.cpp'),
     (Join-Path $core 'ProfileAggregate.cpp'),
     (Join-Path $core 'ProfileReader.cpp'),
     (Join-Path $core 'ProfileService.cpp'),

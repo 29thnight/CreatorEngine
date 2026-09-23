@@ -17,14 +17,69 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <new>
 #include <string>
 #include <thread>
 #include <vector>
 
 #include "ProfileAggregate.h"
+#include "ProfileCaptureFile.h"
 #include "ProfileReader.h"
 #include "ProfileScope.h"
 #include "ProfileService.h"
+
+// ── 할당 감시(P6-2 의 개수 방어) ─────────────────────────────────────────
+//
+// ★ 개수 방어는 **결과로는 안 보인다**. 방어가 없어도 첫 프레임을 읽다 바이트가
+//   모자라 어차피 거절된다. 다른 것은 그 전에 개수만큼 **잡으려 든다**는 것뿐이다.
+//   그래서 판정을 결과가 아니라 해독 중 가장 큰 할당 요청에 건다.
+//
+// ★ 무장한 동안 상한을 넘는 요청은 **즉시** bad_alloc 이다. 그러지 않으면
+//   43 억 칸 요청이 구성마다 다르게 끝난다 — Debug 는 곧바로 실패했고 Release
+//   는 실제로 잡아 채우다 60 초 제한에 걸렸다(기계 메모리까지 먹으면서).
+namespace allocation_watch
+{
+	std::atomic<bool>        armed{ false };
+	std::atomic<std::size_t> largest{ 0 };
+	constexpr std::size_t    kCeiling = std::size_t{ 1 } << 30;   // 1 GiB
+
+	void note(std::size_t size)
+	{
+		std::size_t seen = largest.load(std::memory_order_relaxed);
+		while (size > seen && !largest.compare_exchange_weak(seen, size, std::memory_order_relaxed))
+		{
+		}
+	}
+}
+
+void* operator new(std::size_t size)
+{
+	if (allocation_watch::armed.load(std::memory_order_relaxed))
+	{
+		allocation_watch::note(size);
+		if (size > allocation_watch::kCeiling)
+		{
+			throw std::bad_alloc();
+		}
+	}
+	if (void* memory = std::malloc(size == 0 ? 1 : size))
+	{
+		return memory;
+	}
+	throw std::bad_alloc();
+}
+
+void operator delete(void* memory) noexcept
+{
+	std::free(memory);
+}
+
+void operator delete(void* memory, std::size_t) noexcept
+{
+	std::free(memory);
+}
 
 namespace
 {
@@ -3263,6 +3318,417 @@ void test_capture_vocabulary()
 	      "clock/unknown-zero — 주파수를 모르면 0 ms 다");
 }
 
+// ── P6-2 `.ceprof` ───────────────────────────────────────────────────────
+//
+// 이벤트의 **모든 필드**를 자극하는 캡처 하나. 수만 같으면 통과하는 왕복 검사는
+// 필드 하나를 빠뜨린 직렬화를 못 잡는다 — 제출 번호·뷰·큐가 0 인 CPU 구간만
+// 넣으면 그 셋을 안 쓰는 writer 도 초록이다.
+ce::capture_session_ptr make_rich_capture(ce::profiler_service& service)
+{
+	service.initialize({});
+	service.register_thread("FileMain");
+	service.record(1);
+
+	ce::gpu_span_context origin;
+	origin.submission = 9001;
+	origin.view = 3;
+	origin.queue = 1;
+
+	std::thread worker([&service]()
+	{
+		service.register_thread("FileWorker");
+		{
+			ce::profile_scope scope{ service, ce::marker<"FileWorkerJob">() };
+			busy_ticks(3);
+		}
+		service.unregister_thread();
+	});
+	worker.join();
+
+	const ce::profile_tick base = ce::profiler_service::now();
+	for (std::uint32_t frame = 1; frame <= 4; ++frame)
+	{
+		{
+			ce::profile_scope outer{ service, ce::marker<"FileOuter">() };
+			busy_ticks(3);
+			{
+				ce::profile_scope inner{ service, ce::marker<"FileInner">() };
+				busy_ticks(2);
+			}
+			if (frame == 2)
+			{
+				service.mark_instant(ce::marker<"FileInstant">());
+			}
+		}
+		if (frame == 3)
+		{
+			service.submit_gpu_span(ce::marker<"FileGpuPass">(), base + 10, base + 40, 2, origin);
+			service.publish_gpu_spans();
+		}
+		service.publish_frame(frame);
+	}
+	service.pause();
+	return service.capture();
+}
+
+bool same_event(const ce::profile_event& a, const ce::profile_event& b)
+{
+	return a.tick_begin == b.tick_begin && a.tick_end == b.tick_end &&
+	       a.marker == b.marker && a.frame == b.frame &&
+	       a.thread_slot == b.thread_slot && a.depth == b.depth &&
+	       a.flags == b.flags && a.queue == b.queue &&
+	       a.submission == b.submission && a.view == b.view &&
+	       a.reserved == b.reserved;
+}
+
+// 두 캡처가 **뜻까지** 같은가. 수가 아니라 필드 전부를 본다.
+void check_same_capture(const ce::capture_session& a, const ce::capture_session& b,
+                        const char* prefix)
+{
+	char what[160];
+	auto label = [&](const char* tail) -> const char*
+	{
+		std::snprintf(what, sizeof(what), "%s/%s", prefix, tail);
+		return what;
+	};
+
+	check_eq(b.frame_count(), a.frame_count(), label("frames — 프레임 수가 같다"));
+	check_eq(b.total_events(), a.total_events(), label("events — 이벤트 수가 같다"));
+	check_eq(b.marker_count(), a.marker_count(), label("markers — 어휘 크기가 같다"));
+	check_eq(static_cast<std::uint64_t>(b.threads().size()),
+	         static_cast<std::uint64_t>(a.threads().size()), label("threads — 스레드 수가 같다"));
+	check(b.environment().ticks_per_second == a.environment().ticks_per_second,
+	      label("clock — 주파수가 같다"));
+	check(b.complete() == a.complete() && b.unacked_streams() == a.unacked_streams(),
+	      label("completeness — 온전함 표식이 같다"));
+
+	bool framesSame = a.frame_count() == b.frame_count();
+	bool eventsSame = framesSame;
+	for (std::size_t i = 0; framesSame && i < a.frames().size(); ++i)
+	{
+		const ce::frame_record& x = a.frames()[i];
+		const ce::frame_record& y = b.frames()[i];
+		framesSame = x.engine_frame == y.engine_frame && x.tick_begin == y.tick_begin &&
+		             x.tick_end == y.tick_end && x.dropped_events == y.dropped_events &&
+		             x.events.size() == y.events.size();
+		for (std::size_t k = 0; framesSame && eventsSame && k < x.events.size(); ++k)
+		{
+			eventsSame = same_event(x.events[k], y.events[k]);
+		}
+	}
+	check(framesSame, label("frame-fields — 프레임 머리가 같다"));
+	check(eventsSame, label("event-fields — 모든 이벤트의 모든 필드가 같다"));
+
+	bool markersSame = a.marker_count() == b.marker_count();
+	for (std::uint32_t id = 0; markersSame && id < a.marker_count(); ++id)
+	{
+		const ce::capture_marker& x = a.marker(id);
+		const ce::capture_marker& y = b.marker(id);
+		markersSame = x.name == y.name && x.file == y.file && x.line == y.line && x.kind == y.kind;
+	}
+	check(markersSame, label("marker-fields — 어휘의 글자가 같다"));
+
+	bool threadsSame = a.threads().size() == b.threads().size();
+	for (std::size_t i = 0; threadsSame && i < a.threads().size(); ++i)
+	{
+		const ce::thread_info& x = a.threads()[i];
+		const ce::thread_info& y = b.threads()[i];
+		threadsSame = x.name == y.name && x.os_thread_id == y.os_thread_id && x.slot == y.slot &&
+		              x.kind == y.kind && x.track_order == y.track_order;
+	}
+	check(threadsSame, label("thread-fields — 스레드 이름표가 같다"));
+}
+
+// 파일로 나갔다 돌아와도 **같은 뜻**이다.
+void test_capture_file_round_trip()
+{
+	ce::profiler_service service;
+	const ce::capture_session_ptr capture = make_rich_capture(service);
+	check(capture != nullptr, "file/capture — 얼린 캡처가 있다");
+	if (!capture)
+	{
+		return;
+	}
+
+	// 자극이 필드를 다 건드렸는지부터 본다. GPU 구간이 없으면 제출·뷰·큐를
+	// 안 쓰는 writer 도 통과한다 — 자극이 재는 값에 닿았다는 증명이다.
+	bool sawGpu = false;
+	bool sawInstant = false;
+	bool sawDepth = false;
+	for (const ce::frame_record& frame : capture->frames())
+	{
+		for (const ce::profile_event& value : frame.events)
+		{
+			sawGpu = sawGpu || (value.submission == 9001 && value.view == 3 && value.queue == 1);
+			sawInstant = sawInstant || ce::has_flag(value.flags, ce::event_flags::instant);
+			sawDepth = sawDepth || value.depth > 0;
+		}
+	}
+	check(sawGpu, "file/stimulus-gpu — 자극에 제출·뷰·큐를 가진 GPU 구간이 있다");
+	check(sawInstant, "file/stimulus-instant — 자극에 길이 없는 사건이 있다");
+	check(sawDepth, "file/stimulus-depth — 자극에 중첩 구간이 있다");
+	check(capture->threads().size() >= 2, "file/stimulus-threads — 자극에 스레드가 둘 이상이다");
+
+	const std::vector<std::byte> bytes = ce::encode_capture(*capture);
+	check(bytes.size() > 64, "file/encoded — 인코딩이 비어 있지 않다");
+
+	const auto decoded = ce::decode_capture(bytes);
+	check(decoded.has_value(), "file/decoded — 제 손으로 쓴 것을 읽는다");
+	if (!decoded.has_value())
+	{
+		return;
+	}
+	check_same_capture(*capture, **decoded, "file/round-trip");
+
+	// 완료 조건 둘째 — 대표 마커의 Total/Self/Calls 가 같다. 필드가 같으면
+	// 따라오지만, 그것을 **표의 말로** 한 번 더 단정한다.
+	const std::uint32_t first = capture->frames().front().engine_frame;
+	const std::uint32_t last = capture->frames().back().engine_frame;
+	const ce::frame_aggregate before = ce::aggregate_frames(*capture, first, last);
+	const ce::frame_aggregate after = ce::aggregate_frames(**decoded, first, last);
+	const ce::marker_id outer = ce::marker<"FileOuter">();
+	const ce::aggregate_row* x = nullptr;
+	const ce::aggregate_row* y = nullptr;
+	for (const ce::aggregate_row& row : before.flat()) { if (row.marker == outer) x = &row; }
+	for (const ce::aggregate_row& row : after.flat()) { if (row.marker == outer) y = &row; }
+	check(x != nullptr && y != nullptr, "file/aggregate-row — 대표 마커가 두 표에 다 있다");
+	if (x && y)
+	{
+		check_eq(y->total_ticks, x->total_ticks, "file/aggregate-total — Total 이 같다");
+		check_eq(y->self_ticks, x->self_ticks, "file/aggregate-self — Self 가 같다");
+		check_eq(y->call_count, x->call_count, "file/aggregate-calls — Calls 가 같다");
+	}
+
+	// 그리고 **이름이 캡처를 따라왔다.** 파일에서 온 캡처가 제 이름을 말한다.
+	check((*decoded)->marker(outer).name == "FileOuter",
+	      "file/name — 읽은 캡처가 제 이름을 말한다");
+}
+
+// CRC-32 를 **따로** 유도한다. 코어의 표 방식과 같은 출처를 두 번 부르면
+// 대조가 아니다 — 비트 단위로 한 번 더 계산해, 형식이 표준 IEEE CRC-32 를
+// 쓴다는 것(바깥 도구가 검증할 수 있다는 것)까지 함께 증명한다.
+std::uint32_t independent_crc32(const std::byte* data, std::size_t size)
+{
+	std::uint32_t value = 0xFFFFFFFFu;
+	for (std::size_t i = 0; i < size; ++i)
+	{
+		value ^= static_cast<std::uint8_t>(data[i]);
+		for (int bit = 0; bit < 8; ++bit)
+		{
+			const std::uint32_t mask = 0u - (value & 1u);
+			value = (value >> 1) ^ (0xEDB88320u & mask);
+		}
+	}
+	return ~value;
+}
+
+// 청크 표에서 type 을 찾는다. 머리 16 바이트 뒤에 32 바이트짜리 항목이 선다.
+bool find_chunk(const std::vector<std::byte>& bytes, std::uint32_t type,
+                std::size_t& entry_at, std::uint64_t& offset, std::uint64_t& size)
+{
+	std::uint32_t count = 0;
+	std::memcpy(&count, bytes.data() + 12, sizeof(count));
+	for (std::uint32_t i = 0; i < count; ++i)
+	{
+		const std::size_t at = 16 + static_cast<std::size_t>(i) * 32;
+		std::uint32_t found = 0;
+		std::memcpy(&found, bytes.data() + at, sizeof(found));
+		if (found == type)
+		{
+			entry_at = at;
+			std::memcpy(&offset, bytes.data() + at + 8, sizeof(offset));
+			std::memcpy(&size, bytes.data() + at + 16, sizeof(size));
+			return true;
+		}
+	}
+	return false;
+}
+
+// 완료 조건 셋째 — 어디서 끊겨도, 어디가 망가져도 멈추지 않고 거절한다.
+void test_capture_file_rejects()
+{
+	ce::profiler_service service;
+	const ce::capture_session_ptr capture = make_rich_capture(service);
+	if (!capture)
+	{
+		check(false, "file-reject/capture — 얼린 캡처가 있다");
+		return;
+	}
+	const std::vector<std::byte> bytes = ce::encode_capture(*capture);
+
+	// ★ **모든 바이트 위치**에서 잘라 본다. 몇 군데만 고르면 그 사이의 경계
+	//   (개수 필드 한가운데, 문자열 길이 뒤)가 비는데, 거기가 실제로 넘치는 곳이다.
+	bool everyCutRejected = true;
+	bool bodyCutIsTruncated = true;
+	for (std::size_t length = 0; length < bytes.size(); ++length)
+	{
+		const auto result = ce::decode_capture(std::span<const std::byte>(bytes.data(), length));
+		if (result.has_value())
+		{
+			everyCutRejected = false;
+		}
+		else if (length >= 16 && result.error() != ce::capture_file_error::truncated)
+		{
+			// 머리(16 바이트) 뒤에서 잘렸는데 "잘렸다" 가 아니면, 사용자는
+			// 멀쩡한 파일이 손상됐다고 읽는다.
+			bodyCutIsTruncated = false;
+		}
+	}
+	check(everyCutRejected, "file-reject/every-cut — 어느 길이로 잘려도 받아들이지 않는다");
+	check(bodyCutIsTruncated, "file-reject/cut-is-truncated — 머리 뒤에서 잘리면 '잘렸다' 다");
+
+	// 끝의 한 바이트를 뒤집는다 — 마지막 청크(프레임)의 몸통이다.
+	std::vector<std::byte> damaged = bytes;
+	damaged.back() = static_cast<std::byte>(static_cast<unsigned char>(damaged.back()) ^ 0x5Au);
+	const auto crc = ce::decode_capture(damaged);
+	check(!crc.has_value() && crc.error() == ce::capture_file_error::checksum_mismatch,
+	      "file-reject/checksum — 몸통이 망가지면 CRC 가 거절한다");
+
+	std::vector<std::byte> alien = bytes;
+	alien[0] = std::byte{ 'X' };
+	const auto magic = ce::decode_capture(alien);
+	check(!magic.has_value() && magic.error() == ce::capture_file_error::not_a_capture,
+	      "file-reject/magic — 매직이 다르면 캡처가 아니다");
+
+	// 형식 버전은 매직 뒤 첫 u32 다. 이 빌드보다 새 것은 거절한다.
+	std::vector<std::byte> future = bytes;
+	const std::uint32_t newer = ce::kCaptureFileVersion + 1;
+	std::memcpy(future.data() + 8, &newer, sizeof(newer));
+	const auto version = ce::decode_capture(future);
+	check(!version.has_value() && version.error() == ce::capture_file_error::unsupported_version,
+	      "file-reject/version — 더 새 형식은 거절한다");
+
+	// 프레임이 오름차순이 아니면 find_frame 의 이분 탐색이 **조용히** 엉뚱한
+	// 프레임을 낸다. 읽는 자리에서 막는다.
+	std::vector<ce::frame_record> shuffled(capture->frames().begin(), capture->frames().end());
+	std::swap(shuffled.front(), shuffled.back());
+	const ce::capture_session unordered(
+		std::move(shuffled),
+		std::vector<ce::thread_info>(capture->threads().begin(), capture->threads().end()),
+		std::vector<ce::capture_marker>(capture->markers().begin(), capture->markers().end()),
+		capture->environment(), capture->complete(), capture->unacked_streams());
+	const auto order = ce::decode_capture(ce::encode_capture(unordered));
+	check(!order.has_value() && order.error() == ce::capture_file_error::malformed,
+	      "file-reject/order — 프레임이 오름차순이 아니면 거절한다");
+
+	// ── CRC 가 표준인가, 그리고 CRC 가 맞는 채 개수만 거대한 파일 ────────
+	//
+	// ★ 잘린 파일은 전부 **범위 검사에서 먼저** 걸려, 개수 방어까지 가지
+	//   않는다. 그러면 그 방어는 걷어도 초록이다 — 자극이 없기 때문이다.
+	//   CRC 가 맞는 채로 개수만 거대하게 만든 파일이 그 절의 유일한 자극이다.
+	std::size_t entryAt = 0;
+	std::uint64_t framesOffset = 0;
+	std::uint64_t framesSize = 0;
+	const bool located = find_chunk(bytes, 4, entryAt, framesOffset, framesSize);
+	check(located, "file-reject/frames-chunk — 프레임 청크가 표에 있다");
+	if (located)
+	{
+		std::uint32_t stored = 0;
+		std::memcpy(&stored, bytes.data() + entryAt + 24, sizeof(stored));
+		check(stored == independent_crc32(bytes.data() + framesOffset, framesSize),
+		      "file-reject/crc-standard — 청크 CRC 가 표준 IEEE CRC-32 다");
+
+		std::vector<std::byte> huge = bytes;
+		const std::uint32_t countAll = 0xFFFFFFFFu;
+		std::memcpy(huge.data() + framesOffset, &countAll, sizeof(countAll));
+		const std::uint32_t patched = independent_crc32(huge.data() + framesOffset, framesSize);
+		std::memcpy(huge.data() + entryAt + 24, &patched, sizeof(patched));
+
+		// 방어가 없으면 여기서 프레임 43 억 칸을 잡으려 든다. 감시가 그 요청을
+		// 기록하고 곧바로 던지게 한다 — 구성마다 끝이 갈리지 않게.
+		bool rejected = false;
+		allocation_watch::largest.store(0, std::memory_order_relaxed);
+		allocation_watch::armed.store(true, std::memory_order_relaxed);
+		try
+		{
+			const auto result = ce::decode_capture(huge);
+			rejected = !result.has_value() && result.error() == ce::capture_file_error::malformed;
+		}
+		catch (const std::exception&)
+		{
+			rejected = false;
+		}
+		allocation_watch::armed.store(false, std::memory_order_relaxed);
+		const std::size_t largest = allocation_watch::largest.load(std::memory_order_relaxed);
+
+		check(rejected, "file-reject/huge-count — CRC 가 맞아도 거대한 개수는 거절한다");
+		// 입력보다 큰 한 덩어리를 잡을 까닭이 없다. 레코드는 파일에서 늘 줄어들지
+		// 않고(패딩만 붙는다) 몇 배로 부풀 뿐이므로 여유를 넉넉히 둔다.
+		check(largest <= huge.size() * 16,
+		      "file-reject/bounded-allocation — 해독 중 가장 큰 할당이 입력 크기에 묶인다");
+	}
+
+	bool described = true;
+	for (int value = 0; value <= static_cast<int>(ce::capture_file_error::malformed); ++value)
+	{
+		const char* text = ce::describe(static_cast<ce::capture_file_error>(value));
+		described = described && text != nullptr && text[0] != '\0';
+	}
+	check(described, "file-reject/describe — 모든 오류에 사람이 읽을 말이 있다");
+}
+
+// 디스크. 교체가 원자적이고, 저장 대상이 새 녹화에 흔들리지 않는다.
+void test_capture_file_on_disk()
+{
+	ce::profiler_service service;
+	const ce::capture_session_ptr capture = make_rich_capture(service);
+	if (!capture)
+	{
+		check(false, "file-disk/capture — 얼린 캡처가 있다");
+		return;
+	}
+
+	const std::filesystem::path folder =
+		std::filesystem::temp_directory_path() / "creator-profile-core-probe";
+	std::error_code ignored;
+	std::filesystem::remove_all(folder, ignored);
+	std::filesystem::create_directories(folder, ignored);
+	const std::filesystem::path path = folder / "round-trip.ceprof";
+
+	const auto saved = ce::save_capture(*capture, path);
+	check(saved.has_value(), "file-disk/saved — 저장이 성공한다");
+
+	const auto loaded = ce::load_capture(path);
+	check(loaded.has_value(), "file-disk/loaded — 저장한 것을 연다");
+	if (loaded.has_value())
+	{
+		check_same_capture(*capture, **loaded, "file-disk/round-trip");
+	}
+
+	// 같은 이름에 다시 쓴다. 임시 파일이 남으면 교체가 끝나지 않은 것이다.
+	const auto again = ce::save_capture(*capture, path);
+	check(again.has_value(), "file-disk/overwrite — 같은 이름에 다시 쓸 수 있다");
+	std::size_t entries = 0;
+	for (const auto& entry : std::filesystem::directory_iterator(folder, ignored))
+	{
+		(void)entry;
+		++entries;
+	}
+	check_eq(entries, std::size_t{ 1 }, "file-disk/no-temp — 교체 뒤에 파일은 하나뿐이다");
+
+	const auto missing = ce::load_capture(folder / "does-not-exist.ceprof");
+	check(!missing.has_value() && missing.error() == ce::capture_file_error::open_failed,
+	      "file-disk/missing — 없는 파일은 '열 수 없다' 다");
+
+	// 완료 조건 넷째 — 저장 중 새 녹화를 시작해도 저장 대상이 변하지 않는다.
+	// 얼린 캡처를 쥔 채 녹화를 다시 돌려 프레임을 더 쌓은 뒤 저장한다.
+	const std::uint32_t frozenFrames = capture->frame_count();
+	service.record(100);
+	for (std::uint32_t frame = 100; frame < 106; ++frame)
+	{
+		{ ce::profile_scope scope{ service, ce::marker<"FileAfterFreeze">() }; }
+		service.publish_frame(frame);
+	}
+	const auto snapshot = ce::save_capture(*capture, path);
+	const auto reread = ce::load_capture(path);
+	check(snapshot.has_value() && reread.has_value() &&
+	      (*reread)->frame_count() == frozenFrames,
+	      "file-disk/snapshot — 녹화가 이어져도 저장한 것은 얼린 그대로다");
+	service.pause();
+
+	std::filesystem::remove_all(folder, ignored);
+}
+
 // ★ 어서션·오류 창을 띄우지 않는다.
 //
 //   변이 하나가 링의 vector 를 두 스레드가 함께 만지게 만들자 Debug 이터레이터
@@ -3340,6 +3806,9 @@ int main()
 	test_pause_requester_records_land();
 	test_shutdown_retains_live_storage();
 	test_capture_vocabulary();
+	test_capture_file_round_trip();
+	test_capture_file_rejects();
+	test_capture_file_on_disk();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)
