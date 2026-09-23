@@ -9,6 +9,7 @@
 //   (ProfileAggregate/ProfileReader) — 그래야 완료조건을 화면 없이 잰다.
 //   이 층은 이미 접힌 것을 그리기만 한다.
 #include <cstdint>
+#include <filesystem>
 
 #include "ProfileReader.h"
 
@@ -29,6 +30,14 @@ namespace editor::profiler_view
 	// registry 를 읽으므로, 파일에서 읽은 캡처에서는 같은 id 가 전혀 다른
 	// 이름을 가리킨다(P6). 화면이 남의 이름을 조용히 그리는 길이라 막았다.
 	const char* marker_name(const ce::capture_session* capture, ce::marker_id id);
+
+	// `.ceprof` 파일 대화상자(P6-3). 취소하면 빈 경로다.
+	//
+	// ★ 구현이 ProfilerCaptureDialog.cpp 에 따로 있다. Windows 헤더를 그 한
+	//   파일에 가둬 유니티 blob 에서 뺐다 — min/max 매크로가 옆 파일의
+	//   std::min/std::max 를 깨뜨리지 않게.
+	std::filesystem::path pick_capture_to_open();
+	std::filesystem::path pick_capture_to_save();
 
 	// 프레임 그래프. 클릭으로 한 프레임, 끌어서 범위를 고른다.
 	void draw_frame_overview();

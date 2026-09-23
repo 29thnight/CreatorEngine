@@ -3729,6 +3729,71 @@ void test_capture_file_on_disk()
 	std::filesystem::remove_all(folder, ignored);
 }
 
+// P6-3 — 파일을 연다. 라이브에 덮이지 않고, 파일의 최신에 선다.
+//
+// ★ 자극의 두 캡처는 프레임 번호가 **겹치지 않게** 둔다(라이브 1..20, 파일
+//   100..130). 겹치면 "보던 선택을 이어 갔다" 와 "파일의 최신을 골랐다" 가 같은
+//   번호로 나와 가를 수 없다.
+ce::capture_session_ptr make_frames(std::uint32_t first, std::uint32_t last)
+{
+	ce::profiler_service service;
+	service.initialize({});
+	service.register_thread("OpenProbe");
+	service.record(first);
+	for (std::uint32_t frame = first; frame <= last; ++frame)
+	{
+		{ ce::profile_scope scope{ service, ce::marker<"OpenTick">() }; }
+		service.publish_frame(frame);
+	}
+	service.pause();
+	return service.capture();
+}
+
+void test_reader_open_file()
+{
+	const ce::capture_session_ptr live = make_frames(1, 20);
+	const ce::capture_session_ptr source = make_frames(100, 130);
+	check(live != nullptr && source != nullptr, "open/captures — 두 캡처가 선다");
+	if (!live || !source)
+	{
+		return;
+	}
+
+	// 파일에서 **실제로 읽은** 캡처로 연다 — 메모리의 것을 그대로 넘기면
+	// 이 검사가 파일 경로를 한 번도 안 지난다.
+	const auto decoded = ce::decode_capture(ce::encode_capture(*source));
+	check(decoded.has_value(), "open/decoded — 파일로 나갔다 돌아온 캡처다");
+	if (!decoded.has_value())
+	{
+		return;
+	}
+	const ce::capture_session_ptr file = *decoded;
+
+	ce::capture_reader reader;
+	reader.sync(live);                  // 기본은 따라가기다
+	reader.select_range(1, 1);          // 라이브에서 앞쪽을 보고 있었다
+	reader.set_graph_span(8);           // 그래프 창 13..20
+
+	reader.open(file);
+	check(reader.capture() == file.get(), "open/replaces — 연 캡처를 본다");
+	check(!reader.live_follow(), "open/stops-following — 열면 따라가기가 꺼진다");
+	check_eq(reader.selected_last(), 130u, "open/selects-latest — 파일의 최신 프레임을 고른다");
+
+	// 창이 매 프레임 그래프 폭을 다시 준다. 그 폭이 파일의 **최신 끝**에 서야 한다.
+	reader.set_graph_span(8);
+	check_eq(reader.graph_last(), 130u, "open/graph-at-latest — 그래프가 파일의 최신 끝에 선다");
+
+	// 다음 프레임. 창은 서비스의 라이브 캡처로 sync 를 부른다.
+	const bool replaced = reader.sync(live);
+	check(!replaced && reader.capture() == file.get(),
+	      "open/survives-sync — 다음 프레임의 sync 가 연 파일을 덮지 않는다");
+
+	// 따라가기를 다시 켜면 라이브로 돌아간다. 돌아가는 길이 따로 없는 이유다.
+	reader.set_live_follow(true);
+	reader.sync(live);
+	check(reader.capture() == live.get(), "open/return-to-live — 따라가기를 켜면 라이브로 돌아간다");
+}
+
 // ★ 어서션·오류 창을 띄우지 않는다.
 //
 //   변이 하나가 링의 vector 를 두 스레드가 함께 만지게 만들자 Debug 이터레이터
@@ -3809,6 +3874,7 @@ int main()
 	test_capture_file_round_trip();
 	test_capture_file_rejects();
 	test_capture_file_on_disk();
+	test_reader_open_file();
 
 	std::printf("profile core probe: %d checks, %d failures\n", g_checks, g_failures);
 	if (g_failures == 0)

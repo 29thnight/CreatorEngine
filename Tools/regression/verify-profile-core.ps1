@@ -1,5 +1,15 @@
 [CmdletBinding()]
-param([ValidateSet('Debug','Release','All')][string]$Configuration = 'All')
+param(
+    [ValidateSet('Debug','Release','All')][string]$Configuration = 'All',
+    # 돌릴 변이 이름(와일드카드). 비우면 전부다. 변이마다 코어를 통째로 다시
+    # 컴파일하므로 전부는 구성당 수십 분이다 — 바꾼 계약의 변이만 골라 돌린다.
+    # 예: -Only 'reader-open-*','capture-file-*'
+    #
+    # ★ 이름이 `$Mutation` 이면 안 된다. PowerShell 변수는 대소문자를 안 가려
+    #   아래 foreach 의 `$mutation` 과 같은 변수가 되고, [string[]] 형 제약이
+    #   변이 표를 문자열로 바꿔 버린다.
+    [string[]]$Only = @()
+)
 
 # PHASE 14 P1+P2 — 새 프로파일러 코어의 계약 검사.
 #
@@ -277,6 +287,40 @@ $mutations = @(
         New    = "`t`tstd::filesystem::copy_file(temporary, path, std::filesystem::copy_options::overwrite_existing, error);"
         Expect = 'file-disk/no-temp'
         Why    = '교체 대신 복사하면 저장할 때마다 임시 파일이 쌓인다'
+    },
+
+    # ── P6-3 파일 열기 ─────────────────────────────────────────────
+    @{
+        # 열어도 따라가기를 안 끈다. 다음 프레임의 sync() 가 라이브로 덮어써
+        # 연 파일이 한 프레임만 보이고 사라진다 — 화면에서는 "안 열렸다" 로 보인다.
+        Name   = 'reader-open-keeps-following'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t// 파일을 보는 동안은 라이브를 따라가지 않는다 — 다음 sync() 가 덮는다.`r`n`t`tm_liveFollow = false;"
+        New    = "`t`t// 파일을 보는 동안은 라이브를 따라가지 않는다 — 다음 sync() 가 덮는다.`r`n`t`tm_liveFollow = true;"
+        Expect = 'open/stops-following'
+        Why    = '따라가기를 안 끄면 연 파일이 다음 프레임에 라이브로 덮인다'
+    },
+
+    @{
+        # 라이브의 그래프 창을 이어 간다. 파일 범위의 앞머리에 잘려 붙어
+        # 최신을 안 보인다.
+        Name   = 'reader-open-keeps-graph'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t// set_graph_span 이 파일의 최신 끝에 창을 세운다.`r`n`t`treset_graph();"
+        New    = "`t`t// set_graph_span 이 파일의 최신 끝에 창을 세운다."
+        Expect = 'open/graph-at-latest'
+        Why    = '라이브의 그래프 창을 이어 가면 파일의 앞머리에 서서 최신을 안 보인다'
+    },
+
+    @{
+        # 보던 선택을 이어 간다. 라이브의 1 번이 파일 범위의 가장자리(100)에
+        # 잘려 붙는다.
+        Name   = 'reader-open-keeps-selection'
+        File   = 'ProfileReader.cpp'
+        Old    = "`t`t// 파일 범위 가장자리에 잘려 붙는다.`r`n`t`tselect_latest();"
+        New    = "`t`t// 파일 범위 가장자리에 잘려 붙는다."
+        Expect = 'open/selects-latest'
+        Why    = '보던 선택을 이어 가면 남의 번호가 파일 가장자리에 잘려 붙는다'
     },
 
     # ── 녹화 경계를 넘는 스코프 ────────────────────────────────────
@@ -733,6 +777,20 @@ $mutations = @(
     }
 )
 
+# ★ 고른 것이 하나도 없으면 붉다. 오타 난 이름이 "변이 0 개 통과" 로 읽히면
+#   검사를 안 한 것이 통과로 남는다.
+$mutationTotal = $mutations.Count
+if ($Only.Count -gt 0) {
+    $mutations = @($mutations | Where-Object {
+        $name = $_.Name
+        @($Only | Where-Object { $name -like $_ }).Count -gt 0
+    })
+    if ($mutations.Count -eq 0) {
+        Write-Host ("[FAIL] -Only '" + ($Only -join "','") + "' 에 맞는 변이가 없다") -ForegroundColor Red
+        exit 1
+    }
+}
+
 $sources = @(
     (Join-Path $core 'ProfileMarker.cpp'),
     (Join-Path $core 'ProfileThreadStream.cpp'),
@@ -862,7 +920,13 @@ if ($failures.Count -gt 0) {
 }
 
 Write-Host '-- 판정 -----------------------------'
-Write-Host ("프로파일러 코어 통과 — 계약이 서고, 변이 {0} 이 각각 제 검사에서 붉어진다" -f $mutations.Count)
+if ($mutations.Count -lt $mutationTotal) {
+    # 골라 돌린 판정은 전부 돈 판정과 다르게 적는다 — 나중에 읽는 사람이 헷갈리지 않게.
+    Write-Host ("프로파일러 코어 통과 — 계약이 서고, 고른 변이 {0} / 전체 {1} 이 각각 제 검사에서 붉어진다" -f $mutations.Count, $mutationTotal)
+}
+else {
+    Write-Host ("프로파일러 코어 통과 — 계약이 서고, 변이 {0} 이 각각 제 검사에서 붉어진다" -f $mutations.Count)
+}
 
 # 종료 코드를 명시한다. 판정이 종료 코드뿐인 집중 검사 방식에서는 성공
 # 경로가 남의 $LASTEXITCODE 를 흘리면 게이트가 판정 능력을 잃는다

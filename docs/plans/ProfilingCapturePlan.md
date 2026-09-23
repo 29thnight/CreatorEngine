@@ -27,7 +27,7 @@ ImGui 타임라인을 먼저 확장하지 않는다. 엔진·렌더러·관리 �
 3. 한 프레임 또는 여러 프레임을 선택한다.
 4. CPU Timeline·GPU Queue·Hierarchy·Counters가 같은 선택 구간을 설명한다.
 5. 캡처를 `.ceprof`로 저장하고 다시 열어 같은 결과를 얻는다.
-6. 내부 캡처로 원인을 좁힌 뒤 다음 동일 조건을 PIX/ETW로 정밀 캡처할 수 있다.
+6. 선택 프레임·뷰를 내장 Render Frame Debugger로 열어 pass/draw·상태·리소스와 중간 출력을 조사한다.
 
 ---
 
@@ -146,6 +146,75 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
   이미 전 프로젝트에 정의돼 있다(§5.2).
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
+
+### 0.5.28 2026-09-23 P7 목표 정정 — 외부 캡처 연결이 아니라 내장 렌더 디버거
+
+사용자가 요청한 것은 PIX/RenderDoc과 같은 방식으로 프레임을 조사하는 **엔진 내장형**
+도구다. 이전 P7의 자동 trigger·PIX/ETW 연결은 비교 도구의 이름을 제품 요구로
+잘못 옮긴 계획 오류다. 이 문서 §9·§10 P7·§14와 대시보드는 내장 Render Frame
+Debugger를 목표로 고쳤다. 구현 단위 RF0~RF7과 완료 조건은
+`RenderFrameDebuggerPlan.md`가 정본이다. 이 절보다 아래에 남은 과거 일지의
+"P7 자동 trigger/PIX" 표기는 당시 계획의 기록이며 현재 범위가 아니다.
+
+### 0.5.28 2026-09-23 P6-3 에디터가 파일을 열고 쓴다 — 다음 프레임이 연 파일을 덮는다
+
+Profiler 창 도구줄에 **Save**·**Open** 이 붙었다. Save 는 **보고 있는** 캡처를
+쓴다(캡처가 없으면 꺼져 있다). Open 은 파일을 읽어 그 캡처를 보여 주고, 도구줄
+아래 한 줄에 "파일: 이름 · frame a..b (n) · 이벤트 · 스레드" 를 띄운다. 저장·열기가
+실패하면 `describe()` 의 까닭(잘림 · 손상 · 형식 아님 · 판 불일치 · 어긋남)이 같은
+자리에 남는다 — 손상된 파일을 열었는데 아무 일도 안 일어나면 사용자는 버튼이 안
+먹는다고 읽는다.
+
+**★ 창에서 `adopt()` 만 부르면 연 파일이 한 프레임 뒤 사라진다.** 창은 매 프레임
+`reader().sync(service.capture())` 를 부르고, 따라가기가 켜져 있으면 그것이 라이브
+캡처로 **조용히** 덮는다. 그리고 `adopt()` 는 같은 녹화의 다음 스냅샷을 받는
+자리라 선택과 그래프 창을 **이어 간다** — 파일은 프레임 번호부터 남의 것이라, 이어
+가면 라이브에서 보던 선택이 파일 범위의 가장자리에 잘려 붙고 그래프는 파일의
+앞머리에 서서 최신을 안 보인다. 셋을 코어의 `capture_reader::open()` 한 곳에 모았다:
+따라가기를 끄고, 그래프 창을 비우고, 파일의 최신 프레임을 고른다. 따라가기를 다시
+켜면 라이브로 돌아간다 — 돌아가는 길이 따로 없는 이유다.
+
+이 정책을 창이 아니라 코어에 둔 것은 **재기 위해서**다. 창에서 네 호출을 조합하면
+그 순서가 맞는지를 물을 수단이 눈뿐이다. 코어 검사 `open/*` 여덟이 그것을 문다 —
+자극의 두 캡처는 프레임 번호가 **겹치지 않게**(라이브 1..20, 파일 100..130) 두었다.
+겹치면 "보던 선택을 이어 갔다" 와 "파일의 최신을 골랐다" 가 같은 번호로 나와 가를
+수 없다. 연 캡처는 메모리의 것을 그대로 넘기지 않고 `encode → decode` 를 지난
+것이다 — 그래야 이 검사가 파일 경로를 한 번이라도 지난다.
+
+| 계약 | 무는 절 | 변이 |
+|---|---|---|
+| 열면 따라가기가 꺼진다 | `open/stops-following` | `reader-open-keeps-following` |
+| 그래프가 파일의 최신 끝에 선다 | `open/graph-at-latest` | `reader-open-keeps-graph` |
+| 파일의 최신 프레임을 고른다 | `open/selects-latest` | `reader-open-keeps-selection` |
+
+**★ 온전함 경고가 남의 캡처 이야기를 하고 있었다.** "얼림이 온전하지 않다" 는
+라이브 서비스 요약(`summary.capture_complete`)을 읽었다 — 파일을 보는 동안에도
+지금 녹화의 상태를 말한다. 보고 있는 캡처의 `complete()`·`unacked_streams()` 를
+읽게 했다. P6-1 에서 어휘와 시계를 캡처로 옮긴 것과 같은 결함이다. Collector 탭은
+그대로 라이브 기록기의 장부다 — 떨어뜨린 수·늦은 수는 파일에 없다.
+
+**유니티 blob 두 가지.** 파일 대화상자는 `<windows.h>` 를 요구하는데 그 min/max
+매크로가 옆 파일의 `std::min`·`std::max` 를 깨뜨린다 — 대화상자를
+`ProfilerCaptureDialog.cpp` 한 파일에 가두고 blob 에서 뺐다(`IncludeInUnityFile`).
+창의 파일 도우미는 익명이 아니라 이름 있는 네임스페이스(`capture_file_view`)에
+두었다 — 익명 네임스페이스는 blob 에서 옆 파일과 공유된다.
+
+**하지 않은 것 셋.**
+
+- **비동기 저장**(§P6 할 일). 저장은 파일 대화상자 뒤에서 도는데 대화상자가 이미
+  화면을 막고, 600 프레임 실측 캡처가 863 KB 다. 저장 대상이 안 변한다는 완료 조건은
+  얼린 캡처가 불변이라 이미 선다(§0.5.27). 캡처가 수십 MB 로 커지는 것을 실측한 뒤에
+  짓는다.
+- **캡처 metadata**(§8.2 의 엔진 버전 · 빌드 · 세션 시각 · 플랫폼). 형식에 그 청크가
+  없다. 지금 파일 줄에 뜨는 것은 프레임 범위 · 이벤트 · 스레드 수뿐이다. 모르는 청크는
+  건너뛰므로 판을 올리지 않고 더할 수 있다.
+- **화면에서 눌러 본 적이 없다.** 대화상자는 OS 모달이라 이 세션의 손으로 몰 수
+  없다. 무는 것은 코어의 `open()` 계약과 에디터 빌드(오류 0)까지다.
+
+게이트. 코어 Debug·Release 각 402 검사. 변이는 Debug 에서 65 전부, Release 에서는
+**새 셋만**(`-Only 'reader-open-*'`) — Release 전부는 30 분을 넘겨 도중에 멈췄다.
+그때까지 Release 변이 15 개가 다 잡혔고, 멈춘 뒤의 50 개는 이번에 안 바뀐 계약이다.
+에디터 Debug 빌드 오류 0.
 
 ### 0.5.27 2026-09-23 P6-2 `.ceprof` — 첫 판에 다 초록이었다는 것은 아무것도 증명하지 않는다
 
@@ -1701,18 +1770,19 @@ CRLF 스크립트로 적고 `--commandlet-script` 로 넘기되, **출력은 `St
 - 고정 메모리 예산의 rolling capture
 - Record/Pause/Clear, 프레임 선택, Timeline, Hierarchy, Save/Load
 - 캡처 overflow·누락·프로파일러 자체 비용의 가시화
-- 선택 조건을 이용한 다음 프레임 PIX/ETW 캡처 연결
+- 프로파일러의 선택 프레임·뷰에서 내장 Render Frame Debugger 캡처로 이어지는 진입점
 
 ### 1.2 1차 범위에서 제외
 
 - 모든 C++/C# 함수를 자동 계측하는 Deep Profiling
-- 과거 내부 캡처를 PIX GPU Capture로 소급 변환
+- 프로파일러의 여러 프레임 기록에 단일 프레임의 draw/리소스 데이터를 상시 중복 저장
 - 원격 장치 스트리밍 프로파일러
 - 네트워크 프로토콜과 다중 사용자 공유
 - 매 할당의 네이티브 call stack 수집
 - GPU 파이프라인 통계 query와 shader instruction 수준 분석
 - 단일 프레임의 pass/draw/dispatch event tree, 중간 render target 미리보기와 draw 단위
-  격리 replay — 이 기능은 `RenderFrameDebuggerPlan.md`가 소유한다.
+  격리 replay의 **구현 책임** — 이 계획의 P7에서 연결하되 상세 슬라이스는
+  `RenderFrameDebuggerPlan.md`가 소유한다.
 - Flame Graph, 비교 분석, 회귀 대시보드의 완성형 UX
 
 Deep Profiling은 기본 녹화와 분리한다. 모든 호출을 자동 계측하면 관측 대상의 실행 특성을
@@ -2205,8 +2275,8 @@ Pause는 다음 engine frame 경계에서 확정한다. 중간 scope는 `truncat
 - 캡처 프레임·메모리 사용량
 - Category/Module 선택
 - Save / Load
-- Trigger 설정
-- `Capture next matching frame in PIX`
+- 선택 프레임·뷰의 `Open Render Frame Debugger`
+- 조건부 내부 캡처 설정(RF7에서 추가)
 
 Space 전역 단축키는 제거하거나 Profiler 창 focus일 때만 받는다. 편집기 viewport 입력과
 충돌하지 않아야 한다.
@@ -2315,38 +2385,31 @@ Chunk table
 
 ---
 
-## 9. PIX·RenderDoc·ETW의 역할
+## 9. 내장 Render Frame Debugger와의 연결
 
-내부 프로파일러는 긴 구간의 탐색 도구이고 외부 도구는 한 재현 지점의 정밀 분석 도구다.
+제품 목표는 엔진 안에서 프레임을 직접 조사하는 것이다. PIX/RenderDoc 같은 도구명은
+사용자가 기대하는 프레임 탐색 경험의 예시이지 외부 도구 실행·ETW export를 완료 조건으로
+채택하라는 뜻이 아니다.
 
-| 도구 | 담당 |
+| 내장 도구 | 담당 |
 |---|---|
-| Creator Profiler | 여러 프레임 추세, CPU/GPU/GC 상관, 스파이크 조건 발견 |
-| Creator Frame Debugger | 선택한 한 submission의 pass/draw 의미, batch 구성과 중간 출력 재현 |
-| PIX | 선택 조건의 다음 GPU 프레임, queue/pass/resource/shader 정밀 분석 |
-| RenderDoc | 렌더 상태·리소스·draw 재생 검증 |
-| ETW/WPA | OS scheduling, context switch, I/O, thread wait 분석 |
+| Creator Profiler (`.ceprof`) | 여러 프레임의 CPU/GPU/GC 추세와 문제 프레임·뷰 탐색 |
+| Render Frame Debugger (`.ceframe`) | 완료된 한 submission의 pass/draw/dispatch 순서, 객체·자산·상태·리소스와 중간 출력 조사 |
 
-과거 `.ceprof`에는 GPU command stream과 전체 resource state가 없으므로 PIX 캡처로 변환할 수
-없다. 대신 다음 trigger를 제공한다.
-
-내부 Frame Debugger도 GPU command stream 전체를 보존하는 외부 replay 도구가 아니다. profiler가
-문제 frame/view를 찾으면 `RenderFrameDebuggerPlan.md`의 `.ceframe` metadata/preview로 엔진 의미를
-확인하고, 같은 조건의 다음 frame을 PIX/RenderDoc으로 연결한다.
-
-- marker duration이 임계값 초과
-- CPU/GPU frame budget 초과
-- 특정 marker 첫 등장
-- 다음 N번째 프레임
-
-조건이 맞으면 **다음 재현 프레임**의 PIX capture를 요청한다. PIX marker는 지원되는
-WinPixEventRuntime 경로로만 넣고 raw Begin/End 주입은 하지 않는다.
+프로파일러에서 프레임·뷰를 선택하면 같은 `EngineFrameId`·`SubmissionId`·`RenderViewId`를
+Render Frame Debugger에 넘긴다. 이미 지나간 프레임의 렌더 입력과 GPU 리소스가 보존되지
+않았다면 그 과거 프레임을 재현했다고 가장하지 않는다. 이 경우 선택한 뷰의 **다음 완료
+submission**을 엔진 내부에서 캡처하고, 원래 선택과 새 캡처의 ID를 각각 표시한다.
+캡처된 `.ceframe`은 이벤트 트리·상태·리소스와 선택 이벤트의 출력 preview를 보여 준다.
+상세 데이터 모델, 격리 replay, 파일화와 검증은 `RenderFrameDebuggerPlan.md` RF0~RF7이
+소유한다. 조건부 자동 캡처는 이 내장 경로의 후속 편의 기능이다.
 
 ---
 
 ## 10. 실행 계획
 
-각 단계는 독립 커밋이고, 다음 단계는 앞 단계의 selftest와 smoke가 통과한 뒤 착수한다.
+P0~P6은 빌드 가능한 조각으로 검증하며 진행한다. P7은 단일 커밋이 아니라
+`RenderFrameDebuggerPlan.md`의 RF0~RF7 슬라이스와 각 검증 게이트를 따른다.
 
 ### P0 — 현재 동작 기준선과 profiler selftest 표면
 
@@ -2651,22 +2714,22 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - 중간 절단 파일과 CRC 오류를 crash 없이 거절
 - 저장 중 새 recording을 시작해도 저장 대상이 변하지 않음
 
-### P7 — 자동 trigger와 외부 캡처 연결
+### P7 — 내장 Render Frame Debugger (상세: `RenderFrameDebuggerPlan.md` RF0~RF7)
 
 할 일:
 
-- CPU/GPU/GC/marker 조건 trigger
-- 조건 전후 프레임 보존(pre-trigger/post-trigger)
-- 기존 DX12 validation/PIX launch 흐름과 연결
-- 선택적 ETW TraceLogging provider/export
-- 외부 캡처 경로와 `.ceprof` metadata를 상호 참조
+- 프로파일러의 선택 프레임·뷰에서 내장 프레임 캡처 요청으로 연결
+- 완료된 submission의 pass/draw/dispatch/copy 이벤트·객체·자산·렌더 상태·리소스 기록
+- 선택 pass 출력과 draw 단계의 중간 화면을 격리 replay로 확인
+- `.ceframe` 저장·재열람과 `.ceprof` session/frame/submission ID 상호 참조
+- 조건부 내부 캡처, Development Player, Shipping 격리와 비용 검증
 
 완료 조건:
 
-- `GPU frame > threshold` 재현에서 내부 캡처가 자동 freeze
-- 요청한 다음 GPU 프레임을 지원되는 PIX 경로로 capture
-- PIX 사용 불가 환경에서는 내부 캡처만 보존하고 원인을 명확히 표시
-- profiler marker 추가가 기존 PIX command stream을 손상하지 않음
+- Scene/Game 동시·2-in-flight에서 요청한 뷰의 완료 submission만 freeze
+- pass/draw 이벤트 순서·batch 구성·상태·리소스가 실제 제출과 일치
+- 선택 pass/draw 출력 preview가 원래 입력을 사용하고 live display/history를 바꾸지 않음
+- `.ceframe` 왕복, 누락·미지원 상태 표시, Editor/Development Player 및 DX12/Vulkan 게이트 통과
 
 ---
 
@@ -2680,7 +2743,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 | 게이트 | 엔진 | 무는 것 |
 |---|---|---|
-| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약 전부. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 394 검사. **변이 62** 가 각각 제 검사에서 붉는지까지 본다 |
+| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약 전부. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 402 검사. **변이 65** 가 각각 제 검사에서 붉는지까지 본다 |
 | `Tools/profiling-validation/Invoke-ProfilingValidation.ps1 -Action Stats` | 에디터 | 기본 씬의 교란 없는 라이브 기준선. 스레드마다 **무엇을 찍었는가**(절대 수가 아니다) |
 | 〃 `-Action Workers` | 에디터 | fixture 씬으로 애니메이션 잡을 돌려 **워커 스레드의 구간 계측**과 SceneActivated 사건 |
 | 〃 `-Action Window` | 에디터 | 프로파일러 창이 실제로 **그려지는지**(창 본문 마커가 캡처에 나타나는지), 창을 닫아도 `state == recording` 인지 |
@@ -2799,7 +2862,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 5. **멀티카메라를 기본 조건으로 본다.** EngineFrame과 GPU submission을 1:1로 가정하지 않는다.
 6. **Resource Counter를 없애지 않는다.** provider가 준비되는 동안 기존 창은 비교 기준으로 유지한다.
 7. **Deep Profile은 별도 모드다.** 기본 marker capture의 성능 계약을 깨지 않는다.
-8. **PIX/RenderDoc은 대체재가 아니라 후속 정밀 도구다.** 내부 profiler가 여러 프레임에서 조건을 찾는다.
+8. **내장 Render Frame Debugger가 제품 목표다.** profiler가 문제 프레임을 찾고 디버거가 그 submission의 렌더 실행을 설명한다.
 9. **Player를 함께 검증한다.** 수집 코어는 에디터에 종속되지 않는다.
 10. **각 단계에 재현 명령과 성공 marker를 남긴다.** 화면만 보고 완료 판정하지 않는다.
 
@@ -2827,8 +2890,9 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
       **profiler 자체 비용 칸은 아직 없다** — `ProfilerWindow`·`ProfilerTimeline`
       마커로 간접 관측만 된다
 - [x] `.ceprof` 저장/불러오기 round-trip 검증 — 코어 게이트의 `file/*` 가 모든 이벤트의
-      모든 필드와 대표 마커의 Total/Self/Calls 를 대조한다(§0.5.27). **에디터의 저장·열기
-      배선과 오류 표시는 P6-3 몫**이다
+      모든 필드와 대표 마커의 Total/Self/Calls 를 대조한다(§0.5.27). 에디터의 Save·Open 과
+      오류 표시는 §0.5.28 — 연 파일이 라이브에 안 덮이는 것을 `open/*` 가 문다.
+      **비동기 저장 · 캡처 metadata 는 짓지 않았다**(사유는 §0.5.28)
 - [ ] profiler UI가 닫혀도 Development Player capture 가능
 - [ ] `CE_SHIPPING=1`에서 프로파일러 심볼 0 — `verify-player-shipping-isolation.ps1` 단정
 - [ ] CreatorEngine.sln의 Academy_4Q + Player 빌드 통과
@@ -2841,7 +2905,8 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
       폐지됐고(9-16), 찾을 수 없는 검사는 다음 세션에 모이지 않는다.
       §11.0 에 여섯 게이트를 이름·엔진·무는 것으로 적었다(2026-09-22)
 - [ ] DX12 debug layer/DRED 회귀 없음
-- [ ] 선택 조건에서 지원되는 PIX 다음 프레임 캡처 가능
+- [ ] 내장 Render Frame Debugger에서 선택 뷰의 완료 submission을 정확히 캡처하고
+      pass/draw·상태·리소스·중간 출력을 조사 가능 — 상세 판정은 `RenderFrameDebuggerPlan.md` §13
 
 **매크로 잔존 0**(§5.2) — `PROFILE_CPU_BEGIN`·`PROFILE_CPU_END`·`PROFILER_INITIALIZE`
 등 옛 매크로가 정의·사용 모두에서 사라져야 한다. 소스 전수 검사로 판정하고, 주석·이력은
@@ -2852,9 +2917,9 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 > 통째로 안 한 단계 — **P5**(counter provider · 관리 marker. `EngineDiagnostics`
 > 에 counter 파일이 0 이고 §7.4 의 `GC/Counter` 열이 비어 있다) · **P6**(`.ceprof`.
 > ~~소스 전수 0 건~~ — **2026-09-23 P6-1·P6-2 착지**: 캡처가 어휘와 시계를 소유하고
-> 코어가 쓰고 읽는다(§0.5.26 · §0.5.27). **남은 것은 에디터의 저장·열기 배선과 오류
-> 표시(P6-3)**다) ·
-> **P7**(자동 trigger · PIX 연결).
+> 코어가 쓰고 읽는다(§0.5.26 · §0.5.27). **P6-3 에서 에디터가 열고 쓴다**(§0.5.28).
+> 남은 것은 비동기 저장과 캡처 metadata 둘이고, 사유를 적어 미뤘다) ·
+> **P7**(내장 Render Frame Debugger — `RenderFrameDebuggerPlan.md` RF0~RF7).
 >
 > 선 단계의 구멍 — §7.3 여섯째 트랙(Compute/Copy, 백엔드가 그 큐를 써야 선다) ·
 > 멀티카메라 GPU 매핑(`-Action Gpu` 실측이 `view 1` 뿐이라 둘 이상에서 재 본 적이
@@ -2874,8 +2939,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
   <https://docs.unity3d.com/cn/6000.0/ScriptReference/Unity.Profiling.ProfilerMarker.html>
 - D3D12 CPU/GPU clock calibration
   <https://learn.microsoft.com/windows/win32/api/d3d12/nf-d3d12-id3d12commandqueue-getclockcalibration>
-- Windows TraceLogging/ETW
-  <https://learn.microsoft.com/windows/win32/tracelogging/trace-logging-reference>
+- 내장 Render Frame Debugger 상세 계획: `docs/plans/RenderFrameDebuggerPlan.md`
 - CreatorEngine 기존 DX12 검증 진입점
   `Tools/dx12-validation/Invoke-DX12Validation.ps1`
 - 스케줄러 이관과 순서 제약: `docs/plans/TaskSchedulerUnificationPlan.md`(PHASE 13 S0.5·S6)

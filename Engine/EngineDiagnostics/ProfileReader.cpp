@@ -221,6 +221,22 @@ namespace ce
 		reset_graph();
 	}
 
+	void capture_reader::open(capture_session_ptr capture)
+	{
+		// 파일을 보는 동안은 라이브를 따라가지 않는다 — 다음 sync() 가 덮는다.
+		m_liveFollow = false;
+
+		// 라이브의 그래프 창은 이 파일에서 뜻이 없다. 비워 두면 다음
+		// set_graph_span 이 파일의 최신 끝에 창을 세운다.
+		reset_graph();
+
+		adopt(std::move(capture));
+
+		// 파일의 최신 프레임을 고른다. 보던 선택을 이어 가면 남의 번호가
+		// 파일 범위 가장자리에 잘려 붙는다.
+		select_latest();
+	}
+
 	void capture_reader::set_live_follow(bool value)
 	{
 		if (m_liveFollow == value)

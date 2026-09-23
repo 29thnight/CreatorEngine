@@ -19,8 +19,11 @@
 
 #include <cinttypes>
 #include <cstdio>
+#include <memory>
+#include <string>
 
 #include "ImGui.h"
+#include "ProfileCaptureFile.h"
 #include "ProfileScope.h"
 
 namespace editor::profiler_view
@@ -93,6 +96,112 @@ namespace editor::profiler_view
 	}
 }
 
+// ★ 이름 있는 네임스페이스에 둔다. 아래의 익명 네임스페이스는 유니티 blob 에서
+//   옆 파일과 **공유**되므로, `opened()` 같은 흔한 이름이 남의 것과 겹친다.
+namespace editor::profiler_view::capture_file_view
+{
+	// ── 파일(P6-3) ────────────────────────────────────────────────────────
+	//
+	// 파일에서 연 캡처가 **무엇인가** — 표시용이다. 라이브에 덮이지 않게 하는
+	// 정책은 코어의 capture_reader::open() 이 진다(재기 위해서).
+	//
+	// ★ weak_ptr 로 든다. reader 가 그 캡처를 놓으면(따라가기를 켜 라이브로
+	//   돌아가면) lock() 이 비어 "파일: …" 표시가 **저절로** 사라진다. 원시
+	//   포인터로 비교하면 풀린 주소에 새 라이브 캡처가 앉을 때 파일로 오인한다.
+	struct opened_capture
+	{
+		std::weak_ptr<const ce::capture_session> capture;
+		std::string                              name;
+	};
+
+	opened_capture& opened()
+	{
+		static opened_capture value;
+		return value;
+	}
+
+	// 마지막 저장·열기의 결과. 실패를 **말없이** 삼키지 않는다 — 손상된 파일을
+	// 열었는데 아무 일도 안 일어나면 사용자는 버튼이 안 먹는다고 읽는다.
+	std::string& file_message()
+	{
+		static std::string value;
+		return value;
+	}
+
+	std::string utf8_file_name(const std::filesystem::path& path)
+	{
+		const std::u8string name = path.filename().u8string();
+		return std::string(name.begin(), name.end());
+	}
+
+	void save_viewed_capture()
+	{
+		const ce::capture_session* capture = reader().capture();
+		if (!capture)
+		{
+			return;
+		}
+		const std::filesystem::path path = pick_capture_to_save();
+		if (path.empty())
+		{
+			return;   // 취소는 결과가 아니다
+		}
+
+		// ★ 보고 있는 캡처를 쓴다. 얼린 캡처는 아무도 고치지 않으므로 저장하는
+		//   동안 녹화가 이어져도 쓰는 것이 변하지 않는다(§P6 완료 조건 넷째).
+		const auto saved = ce::save_capture(*capture, path);
+		file_message() = saved
+			? "저장했다 - " + utf8_file_name(path)
+			: std::string("저장하지 못했다 - ") + ce::describe(saved.error());
+	}
+
+	void open_capture_file()
+	{
+		const std::filesystem::path path = pick_capture_to_open();
+		if (path.empty())
+		{
+			return;
+		}
+		const auto loaded = ce::load_capture(path);
+		if (!loaded)
+		{
+			file_message() = std::string("열지 못했다 - ") + ce::describe(loaded.error());
+			return;
+		}
+
+		reader().open(*loaded);
+		opened() = opened_capture{ *loaded, utf8_file_name(path) };
+		file_message().clear();
+	}
+
+	void draw_file_line()
+	{
+		const ce::capture_session* shown = reader().capture();
+		const std::shared_ptr<const ce::capture_session> file = opened().capture.lock();
+		if (shown && file.get() == shown && shown->frame_count() > 0)
+		{
+			ImGui::TextColored(ImVec4(0.55f, 0.80f, 1.0f, 1.0f),
+			                   "파일: %s  ·  frame %u..%u (%u)  ·  이벤트 %" PRIu64 "  ·  스레드 %zu",
+			                   opened().name.c_str(),
+			                   shown->frames().front().engine_frame,
+			                   shown->frames().back().engine_frame,
+			                   shown->frame_count(),
+			                   shown->total_events(),
+			                   shown->threads().size());
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("파일에서 연 캡처를 보고 있다 - 녹화가 돌아도 이 화면은 안 바뀐다.\n"
+				                  "라이브로 돌아가려면 Live Follow 를 켠다.");
+			}
+		}
+		if (!file_message().empty())
+		{
+			ImGui::TextDisabled("%s", file_message().c_str());
+		}
+	}
+
+}
+
 namespace
 {
 	const char* state_label(ce::recorder_state state)
@@ -153,6 +262,20 @@ namespace
 		}
 
 		ImGui::SameLine();
+		ImGui::BeginDisabled(!reader().has_capture());
+		if (ImGui::Button("Save"))
+		{
+			editor::profiler_view::capture_file_view::save_viewed_capture();
+		}
+		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+		if (ImGui::Button("Open"))
+		{
+			editor::profiler_view::capture_file_view::open_capture_file();
+		}
+
+		ImGui::SameLine();
 		bool follow = reader().live_follow();
 		if (ImGui::Checkbox("Live Follow", &follow))
 		{
@@ -179,11 +302,16 @@ namespace
 		// ★ 온전하지 않은 캡처를 **말없이** 그리지 않는다. 잠든 워커는 봉인
 		//   요청에 응답하지 못해 그 꼬리가 여기 없는데, 아무 말이 없으면
 		//   "그 스레드가 조용했다" 로 읽힌다.
-		else if (!summary.capture_complete)
+		//
+		// ★ **보고 있는 캡처**의 표식을 읽는다. 라이브 서비스의 요약을 읽으면
+		//   파일을 보는 동안 남의 캡처 이야기를 한다 — 캡처가 제 온전함을 들고
+		//   다니는 이유가 그것이다(ProfileCapture.h).
+		else if (const ce::capture_session* shown = reader().capture();
+		         shown && !shown->complete())
 		{
 			ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
 			                   "얼림이 온전하지 않다 - 스트림 %u 의 꼬리가 이 캡처에 없다",
-			                   summary.pause_unacked_streams);
+			                   shown->unacked_streams());
 			if (ImGui::IsItemHovered())
 			{
 				ImGui::SetTooltip("잠든 스레드는 봉인 요청을 들어줄 자리를 지나지 않는다.\n"
@@ -317,6 +445,7 @@ void DrawProfilerHUD()
 	reader().sync(service.capture());
 
 	draw_toolbar(summary);
+	editor::profiler_view::capture_file_view::draw_file_line();
 	ImGui::Separator();
 
 	if (!ImGui::BeginTabBar("ProfilerTabs"))

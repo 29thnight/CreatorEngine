@@ -338,6 +338,9 @@
     <ClCompile Include="ImGuiHelper\EditorNavContract.cpp" />
     <ClCompile Include="ImGuiHelper\EditorStateContract.cpp" />
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerCaptureDialog.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ImGuiHelper\ProfilerFrameOverview.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerTables.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerTimeline.cpp" />
