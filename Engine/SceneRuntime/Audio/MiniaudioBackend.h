@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include <memory>
 #include <string>
 
@@ -6,6 +7,26 @@
 
 namespace wave
 {
+    struct AudioCallbackMetrics final
+    {
+        std::uint64_t count{ 0 };
+        std::uint64_t overHalfPeriod{ 0 };
+        std::uint64_t overFullPeriod{ 0 };
+        std::uint64_t meanNanoseconds{ 0 };
+        std::uint64_t p99UpperNanoseconds{ 0 };
+        std::uint64_t maxNanoseconds{ 0 };
+        std::uint32_t minimumFrames{ 0 };
+        std::uint32_t maximumFrames{ 0 };
+    };
+
+    struct AudioDeviceDiagnostics final
+    {
+        std::string backend;
+        std::string deviceName;
+        std::uint32_t periodFrames{ 0 };
+        std::uint32_t bufferFrames{ 0 };
+    };
+
     // miniaudio 백엔드. **이 헤더에 `ma_*` 토큰이 하나도 없다** — 구현은 전부
     // `MiniaudioBackend.cpp` 안에서 끝난다(ThirdParty/miniaudio/PROVENANCE.md 의 통합 규약).
     //
@@ -27,7 +48,7 @@ namespace wave
     class MiniaudioBackend final : public AudioBackend
     {
     public:
-        MiniaudioBackend();
+        explicit MiniaudioBackend(bool profileCallbacks = false);
         ~MiniaudioBackend() override;
 
         [[nodiscard]] bool Start(const DeviceSettings& settings) override;
@@ -36,6 +57,8 @@ namespace wave
 
         [[nodiscard]] bool LoadClip(const ClipKey& key,
             const std::filesystem::path& source) override;
+        [[nodiscard]] bool LoadCookedClip(const ClipKey& key,
+            const experiment::cooked::CookedAudioClipSource& source) override;
         void UnloadClip(const ClipKey& key) override;
         [[nodiscard]] bool HasClip(const ClipKey& key) const override;
 
@@ -62,6 +85,11 @@ namespace wave
 
         // 실제로 열린 장치 설정. 요청값과 다를 수 있다.
         [[nodiscard]] DeviceSettings ActualSettings() const noexcept;
+
+        // Opt-in local profiling. Callback counters use fixed atomic storage;
+        // the audio thread does not allocate, log, or take a lock here.
+        [[nodiscard]] AudioCallbackMetrics CallbackMetrics() const noexcept;
+        [[nodiscard]] AudioDeviceDiagnostics DeviceDiagnostics() const;
 
     private:
         struct Implementation;

@@ -4,6 +4,8 @@
 #include "ListenerState.h"
 #include "PlayRequest.h"
 
+namespace experiment::cooked { class CookedAudioClipSource; }
+
 namespace wave
 {
     // 백엔드가 열 장치의 요청값. 실제로 열린 값은 백엔드가 되돌려 준다.
@@ -46,6 +48,13 @@ namespace wave
         // ── 클립 자원 ─────────────────────────────────────────────────────
         [[nodiscard]] virtual bool LoadClip(const ClipKey& key,
             const std::filesystem::path& source) = 0;
+        [[nodiscard]] virtual bool LoadCookedClip(const ClipKey& key,
+            const experiment::cooked::CookedAudioClipSource& source)
+        {
+            (void)key;
+            (void)source;
+            return false;
+        }
         virtual void UnloadClip(const ClipKey& key) = 0;
         [[nodiscard]] virtual bool HasClip(const ClipKey& key) const = 0;
 

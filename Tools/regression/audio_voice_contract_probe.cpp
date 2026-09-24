@@ -5,7 +5,7 @@
 //   지금 성립하는가" 를 재는 자가 없으면, 재배선 뒤에도 소리가 안 나는 상태가
 //   그대로 초록으로 통과한다.
 //
-// ★★ 음원은 저장소에 커밋하지 않는다. 이 probe 가 매 실행마다 sine PCM WAV 를
+// ★★ 음원은 저장소에 커밋하지 않는다. 이 probe 가 매 실행마다 WAV/MP3/FLAC 을
 //   **생성**해 `Build/`(git 무시) 아래 임시 자산 루트에 쓴다. 바이트는 결정적이다.
 //
 // ★★★ 이 probe 는 지금 `SoundManager` 의 표면을 직접 쓴다. 배선이 `wave::`
@@ -19,6 +19,7 @@
 // 종료 코드: 0 통과 · 1 실패 · 3 오디오 장치 없음(검사 불가, 초록이 아니다)
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -26,17 +27,26 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <memory>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
 
+#include <Windows.h>
+#include <Psapi.h>
+
+#include "Audio/AudioHost.h"
 #include "Audio/AudioRuntime.h"
 #include "Audio/ClipDirectory.h"
 #include "Audio/MiniaudioBackend.h"
 #include "Audio/NullAudioBackend.h"
 #include "Audio/VoiceTable.h"
+#include "Assets/AudioClipSourceMetadata.h"
 #include "PathFinder.h"
 #include "SoundManager.h"
+#include "audio_fixture_decoder.h"
 
 namespace
 {
@@ -73,6 +83,115 @@ namespace
         }
     }
 
+    void WriteBigEndian(std::vector<std::uint8_t>& out, std::uint64_t value, int byteCount)
+    {
+        for (int index = byteCount - 1; index >= 0; --index)
+        {
+            out.push_back(static_cast<std::uint8_t>((value >> (8 * index)) & 0xFFu));
+        }
+    }
+
+    bool WriteBytes(const file::path& target, const std::vector<std::uint8_t>& bytes)
+    {
+        std::ofstream stream(target, std::ios::binary | std::ios::trunc);
+        if (!stream.is_open()) return false;
+        stream.write(reinterpret_cast<const char*>(bytes.data()),
+            static_cast<std::streamsize>(bytes.size()));
+        return stream.good();
+    }
+
+    bool ReadBytes(const file::path& source, std::vector<std::uint8_t>& bytes)
+    {
+        std::ifstream stream(source, std::ios::binary);
+        if (!stream.is_open()) return false;
+        bytes.assign(std::istreambuf_iterator<char>(stream), std::istreambuf_iterator<char>());
+        return stream.good() || stream.eof();
+    }
+
+    // MPEG-1 Layer III, 32 kb/s, 44.1 kHz, mono. Each silent frame contains
+    // 104 bytes and represents 1152 PCM samples. No audio asset is checked in.
+    bool WriteSilentMp3(const file::path& target, const file::path& truncatedTarget)
+    {
+        constexpr std::size_t kFrameBytes = 104u;
+        constexpr std::size_t kFrameCount = 48u;
+        std::vector<std::uint8_t> bytes(kFrameBytes * kFrameCount, 0u);
+        for (std::size_t frame = 0; frame < kFrameCount; ++frame)
+        {
+            const std::size_t offset = frame * kFrameBytes;
+            bytes[offset] = 0xFFu;
+            bytes[offset + 1u] = 0xFBu;
+            bytes[offset + 2u] = 0x10u;
+            bytes[offset + 3u] = 0xC0u;
+        }
+        if (!WriteBytes(target, bytes)) return false;
+        bytes.resize(kFrameBytes / 2u); // incomplete first frame
+        return WriteBytes(truncatedTarget, bytes);
+    }
+
+    std::uint8_t FlacCrc8(const std::vector<std::uint8_t>& bytes)
+    {
+        std::uint8_t crc = 0u;
+        for (const std::uint8_t byte : bytes)
+        {
+            crc ^= byte;
+            for (int bit = 0; bit < 8; ++bit)
+            {
+                crc = static_cast<std::uint8_t>((crc << 1u) ^
+                    ((crc & 0x80u) ? 0x07u : 0u));
+            }
+        }
+        return crc;
+    }
+
+    std::uint16_t FlacCrc16(const std::vector<std::uint8_t>& bytes)
+    {
+        std::uint16_t crc = 0u;
+        for (const std::uint8_t byte : bytes)
+        {
+            crc ^= static_cast<std::uint16_t>(byte) << 8u;
+            for (int bit = 0; bit < 8; ++bit)
+            {
+                crc = static_cast<std::uint16_t>((crc << 1u) ^
+                    ((crc & 0x8000u) ? 0x8005u : 0u));
+            }
+        }
+        return crc;
+    }
+
+    // RFC 9639: STREAMINFO and fixed 4096-sample mono frames containing
+    // constant-zero subframes. Both frame checksums are calculated here.
+    bool WriteSilentFlac(const file::path& target, const file::path& truncatedTarget)
+    {
+        constexpr std::uint64_t kBlockSize = 4096u;
+        constexpr std::uint64_t kFrameCount = 12u;
+        std::vector<std::uint8_t> bytes;
+        AppendTag(bytes, "fLaC");
+        WriteBigEndian(bytes, 0x80000022u, 4); // last block, STREAMINFO, 34 bytes
+        WriteBigEndian(bytes, kBlockSize, 2);
+        WriteBigEndian(bytes, kBlockSize, 2);
+        WriteBigEndian(bytes, 0u, 3); // unknown minimum frame size
+        WriteBigEndian(bytes, 0u, 3); // unknown maximum frame size
+        const std::uint64_t streamInfo = (48000ull << 44u) | (15ull << 36u) |
+            (kBlockSize * kFrameCount); // mono, 16-bit, known sample count
+        WriteBigEndian(bytes, streamInfo, 8);
+        for (int index = 0; index < 16; ++index) bytes.push_back(0u); // unknown MD5
+
+        for (std::uint64_t frameNumber = 0; frameNumber < kFrameCount; ++frameNumber)
+        {
+            std::vector<std::uint8_t> frame{
+                0xFFu, 0xF8u, 0xCAu, 0x08u,
+                static_cast<std::uint8_t>(frameNumber) };
+            frame.push_back(FlacCrc8(frame));
+            frame.push_back(0u); // constant subframe, no wasted bits
+            WriteBigEndian(frame, 0u, 2); // one signed 16-bit zero sample
+            WriteBigEndian(frame, FlacCrc16(frame), 2);
+            bytes.insert(bytes.end(), frame.begin(), frame.end());
+        }
+        if (!WriteBytes(target, bytes)) return false;
+        bytes.resize(42u + 5u); // STREAMINFO and incomplete first frame header
+        return WriteBytes(truncatedTarget, bytes);
+    }
+
     // 16-bit PCM 모노 sine. 바이트가 결정적이라 같은 인자면 같은 파일이 나온다.
     //
     // ★ amplitude 기본값은 0 이다 — 즉 **무음**을 쓴다. 이 게이트가 재는 것은 보이스
@@ -81,11 +200,9 @@ namespace
     //   생기면 그때 진폭을 준다. 진폭이 0이어도 프레임 수와 헤더는 그대로라 디코드·
     //   길이·루프 판정에는 영향이 없다(채널 volume 이 아니라 내용이 0이므로
     //   `vol0virtualvol` 가상화 경로도 타지 않는다).
-    bool WriteSineWav(const file::path& target, float seconds, float frequency,
-        float amplitude = 0.0f)
+    template <typename Sample>
+    bool WritePcmWav(const file::path& target, std::uint32_t frameCount, Sample sampleAt)
     {
-        const std::uint32_t frameCount =
-            static_cast<std::uint32_t>(static_cast<float>(kSampleRate) * seconds);
         const std::uint32_t dataBytes = frameCount * 2u;
 
         std::vector<std::uint8_t> bytes;
@@ -105,22 +222,111 @@ namespace
         AppendTag(bytes, "data");
         WriteLittleEndian(bytes, dataBytes, 4);
 
-        const double step = 6.283185307179586 * static_cast<double>(frequency) /
-            static_cast<double>(kSampleRate);
         for (std::uint32_t frame = 0; frame < frameCount; ++frame)
         {
-            const double sample = std::sin(step * static_cast<double>(frame)) *
-                static_cast<double>(amplitude);
-            const std::int16_t quantized = static_cast<std::int16_t>(sample * 32767.0);
+            const std::int16_t quantized = sampleAt(frame);
             WriteLittleEndian(bytes, static_cast<std::uint32_t>(
                 static_cast<std::uint16_t>(quantized)), 2);
         }
+        return WriteBytes(target, bytes);
+    }
 
-        std::ofstream stream(target, std::ios::binary | std::ios::trunc);
-        if (!stream.is_open()) return false;
-        stream.write(reinterpret_cast<const char*>(bytes.data()),
-            static_cast<std::streamsize>(bytes.size()));
-        return stream.good();
+    bool WriteSineWav(const file::path& target, float seconds, float frequency,
+        float amplitude = 0.0f)
+    {
+        const std::uint32_t frameCount =
+            static_cast<std::uint32_t>(static_cast<float>(kSampleRate) * seconds);
+        const double step = 6.283185307179586 * static_cast<double>(frequency) /
+            static_cast<double>(kSampleRate);
+        return WritePcmWav(target, frameCount, [step, amplitude](std::uint32_t frame)
+        {
+            return static_cast<std::int16_t>(std::sin(step * static_cast<double>(frame)) *
+                static_cast<double>(amplitude) * 32767.0);
+        });
+    }
+
+    bool WriteImpulseWav(const file::path& target)
+    {
+        return WritePcmWav(target, 4800u, [](std::uint32_t frame) -> std::int16_t
+        {
+            return frame == 0u ? 24576 : 0;
+        });
+    }
+
+    bool WriteShortLoopWav(const file::path& target)
+    {
+        // 24 complete 480 Hz cycles in 2400 frames (50 ms): a repeatable seam.
+        return WritePcmWav(target, 2400u, [](std::uint32_t frame) -> std::int16_t
+        {
+            const double phase = 6.283185307179586 * 480.0 * frame / kSampleRate;
+            return static_cast<std::int16_t>(std::sin(phase) * 8191.0);
+        });
+    }
+
+    bool WriteMalformedFixtures(const file::path& formats)
+    {
+        if (!WriteBytes(formats / "corrupt.wav", std::vector<std::uint8_t>(44u, 0u)))
+            return false;
+        if (!WriteBytes(formats / "corrupt.mp3", std::vector<std::uint8_t>(416u, 0u)))
+            return false;
+        if (!WriteBytes(formats / "corrupt.flac",
+            std::vector<std::uint8_t>{ 'f', 'L', 'a', 'C', 0x80u, 0u, 0u, 0u }))
+            return false;
+        std::vector<std::uint8_t> wav;
+        if (!ReadBytes(formats / "silence.wav", wav) || wav.size() < 44u) return false;
+        std::vector<std::uint8_t> truncatedWav = wav;
+        truncatedWav.resize(20u); // incomplete fmt chunk
+        if (!WriteBytes(formats / "truncated.wav", truncatedWav)) return false;
+        std::vector<std::uint8_t> oversizedWav = wav;
+        oversizedWav.resize(44u); // no PCM despite an enormous declared data chunk
+        for (std::size_t index : { 4u, 5u, 6u, 7u, 40u, 41u, 42u, 43u })
+            oversizedWav[index] = 0xFFu;
+        if (!WriteBytes(formats / "oversized.wav", oversizedWav)) return false;
+        const std::vector<std::uint8_t> oversizedMp3{
+            'I', 'D', '3', 4u, 0u, 0u, 0x7Fu, 0x7Fu, 0x7Fu, 0x7Fu };
+        if (!WriteBytes(formats / "oversized.mp3", oversizedMp3)) return false;
+        const std::vector<std::uint8_t> oversizedFlac{
+            'f', 'L', 'a', 'C', 0x80u, 0xFFu, 0xFFu, 0xFFu };
+        return WriteBytes(formats / "oversized.flac", oversizedFlac);
+    }
+
+    bool WriteShortCompressedLoops(const file::path& formats)
+    {
+        std::vector<std::uint8_t> mp3;
+        if (!ReadBytes(formats / "silent.mp3", mp3) || mp3.size() < 4u * 104u)
+            return false;
+        mp3.resize(4u * 104u); // 4 MPEG frames, about 104 ms at 44.1 kHz
+        if (!WriteBytes(formats / "loop.mp3", mp3)) return false;
+
+        std::vector<std::uint8_t> flac;
+        if (!ReadBytes(formats / "silent.flac", flac) || flac.size() < 53u)
+            return false;
+        flac.resize(53u); // STREAMINFO (42 bytes) and one 4096-sample frame
+        std::vector<std::uint8_t> streamInfo;
+        WriteBigEndian(streamInfo, (48000ull << 44u) | (15ull << 36u) | 4096ull, 8);
+        std::copy(streamInfo.begin(), streamInfo.end(), flac.begin() + 18);
+        return WriteBytes(formats / "loop.flac", flac);
+    }
+
+    bool WriteTailTruncatedFixtures(const file::path& formats)
+    {
+        std::vector<std::uint8_t> wav;
+        if (!ReadBytes(formats / "sine.wav", wav) || wav.size() != 44u + 4800u * 2u)
+            return false;
+        wav.resize(44u + 2400u * 2u); // header still declares 4800 frames
+        if (!WriteBytes(formats / "tail.wav", wav)) return false;
+
+        std::vector<std::uint8_t> mp3;
+        if (!ReadBytes(formats / "silent.mp3", mp3) || mp3.size() < 52u)
+            return false;
+        mp3.resize(mp3.size() - 52u); // final MPEG frame cut in half
+        if (!WriteBytes(formats / "tail.mp3", mp3)) return false;
+
+        std::vector<std::uint8_t> flac;
+        if (!ReadBytes(formats / "silent.flac", flac) || flac.size() < 5u)
+            return false;
+        flac.resize(flac.size() - 5u); // final frame lacks its tail and CRC
+        return WriteBytes(formats / "tail.flac", flac);
     }
 
     struct Fixture
@@ -148,6 +354,20 @@ namespace
         file::create_directories(out.root / "Runtime" / "Data", error);
         if (error) return false;
         if (!withClips) return true;
+
+        file::create_directories(out.root / "Formats", error);
+        if (error) return false;
+        if (!WriteSilentMp3(out.root / "Formats" / "silent.mp3",
+            out.root / "Formats" / "truncated.mp3")) return false;
+        if (!WriteSilentFlac(out.root / "Formats" / "silent.flac",
+            out.root / "Formats" / "truncated.flac")) return false;
+        if (!WriteShortCompressedLoops(out.root / "Formats")) return false;
+        if (!WriteSineWav(out.root / "Formats" / "silence.wav", 0.10f, 1000.0f)) return false;
+        if (!WriteSineWav(out.root / "Formats" / "sine.wav", 0.10f, 1000.0f, 0.5f)) return false;
+        if (!WriteImpulseWav(out.root / "Formats" / "impulse.wav")) return false;
+        if (!WriteShortLoopWav(out.root / "Formats" / "loop.wav")) return false;
+        if (!WriteTailTruncatedFixtures(out.root / "Formats")) return false;
+        if (!WriteMalformedFixtures(out.root / "Formats")) return false;
 
         file::create_directories(out.assets / "Sounds", error);
         if (error) return false;
@@ -224,6 +444,248 @@ namespace
         playing = false;
         if (nullptr != pair.ch3D && FMOD_OK == pair.ch3D->isPlaying(&playing) && playing) return true;
         return false;
+    }
+
+    int RunOfflineFixtures(const Fixture& fixture)
+    {
+        std::printf("[AU0] 생성 fixture PCM 검증\n");
+        const file::path formats = fixture.root / "Formats";
+
+        assets::AudioClipSourceMetadata wav{}, mp3{}, flac{}, tail{};
+        std::string inspectError;
+        const bool wavInspected = assets::InspectAudioClipSource(
+            formats / "sine.wav", wav, inspectError);
+        const bool mp3Inspected = assets::InspectAudioClipSource(
+            formats / "silent.mp3", mp3, inspectError);
+        const bool flacInspected = assets::InspectAudioClipSource(
+            formats / "silent.flac", flac, inspectError);
+        Report(wavInspected && mp3Inspected && flacInspected
+            && wav.codec == assets::AudioCodec::Wav
+            && mp3.codec == assets::AudioCodec::Mp3
+            && flac.codec == assets::AudioCodec::Flac
+            && wav.payloadSize > 0u && mp3.payloadSize > 0u && flac.payloadSize > 0u,
+            "AU2: 세 지원 포맷의 원본 크기·SHA-256을 생성한다");
+        Report(assets::InspectAudioClipSource(formats / "tail.wav", tail, inspectError)
+            && tail.payloadSize < wav.payloadSize
+            && tail.sourceContentHash != wav.sourceContentHash,
+            "AU2: 뒤쪽 절단은 원본 크기·해시를 바꾼다");
+        Report(!assets::InspectAudioClipSource(formats / "corrupt.mp3", tail, inspectError)
+            && !assets::InspectAudioClipSource(formats / "corrupt.flac", tail, inspectError)
+            && !assets::InspectAudioClipSource(formats / "probe.ogg", tail, inspectError),
+            "AU2: 잘못된 시그니처와 OGG는 원본 검사에서 거부된다");
+
+        std::vector<std::int16_t> pcm;
+        std::uint64_t length = 0u;
+        bool decoded = wave::probe::DecodePcmS16Mono48k(formats / "sine.wav", 48u, pcm, length);
+        Report(decoded && length == 4800u && pcm[0] == 0 &&
+            std::abs(pcm[12] - 16383) <= 1 && std::abs(pcm[36] + 16383) <= 1,
+            "sine WAV: 48 kHz·1000 Hz·0.5 amplitude PCM 값과 길이");
+        decoded = wave::probe::DecodePcmS16Mono48k(formats / "impulse.wav", 128u, pcm, length);
+        Report(decoded && length == 4800u && pcm[0] == 24576 &&
+            std::all_of(pcm.begin() + 1, pcm.end(), [](std::int16_t value) { return value == 0; }),
+            "impulse WAV: 첫 sample 뒤 무음");
+        decoded = wave::probe::DecodePcmS16Mono48k(formats / "loop.wav", 2400u, pcm, length);
+        Report(decoded && length == 2400u && pcm[0] == 0 && pcm[25] == 8191 &&
+            pcm[75] == -8191 && std::abs((pcm[0] - pcm[2399]) - (pcm[1] - pcm[0])) <= 1,
+            "short-loop WAV: 24주기와 양 끝 접합 기울기");
+        for (const char* name : { "silence.wav", "silent.mp3", "silent.flac",
+            "loop.mp3", "loop.flac" })
+        {
+            decoded = wave::probe::DecodePcmS16Mono48k(formats / name, 128u, pcm, length);
+            const bool silent = decoded && std::all_of(pcm.begin(), pcm.end(),
+                [](std::int16_t value) { return value == 0; });
+            std::printf("  %s: ", name);
+            Report(silent, "첫 128 PCM sample 무음");
+        }
+        std::printf("실패 %d건\n", g_failures);
+        return g_failures == 0 ? kExitPass : kExitFail;
+    }
+
+    int RunWaveMalformed(const Fixture& fixture)
+    {
+        std::printf("[AU0] 손상·절단·과장 헤더 matrix\n");
+        wave::MiniaudioBackend backend;
+        wave::AudioRuntime runtime(backend, 4);
+        if (!runtime.Start(wave::DeviceSettings{}))
+        {
+            std::printf("장치 없음: %s\n", backend.LastError().c_str());
+            return kExitNoDevice;
+        }
+        for (const char* name : { "corrupt.wav", "truncated.wav", "oversized.wav",
+            "corrupt.mp3", "truncated.mp3", "oversized.mp3",
+            "corrupt.flac", "truncated.flac", "oversized.flac" })
+        {
+            std::printf("  MALFORMED_CASE %s\n", name);
+            std::fflush(stdout);
+            const wave::ClipKey key(name);
+            const bool accepted = runtime.LoadClip(key, fixture.root / "Formats" / name);
+            Report(!accepted && !HasClipKey(runtime.ListClipKeys(), name),
+                "손상 입력은 clip 표에 오르지 않는다");
+            Report(backend.LastError().find(name) != std::string::npos,
+                "거부 사유에 해당 파일명이 남는다");
+        }
+        runtime.Shutdown();
+        std::printf("실패 %d건\n", g_failures);
+        return g_failures == 0 ? kExitPass : kExitFail;
+    }
+
+    int RunWaveTailAudit(const Fixture& fixture)
+    {
+        std::printf("[AU0/AU3] 정상 prefix 뒤쪽 절단 감사\n");
+        wave::MiniaudioBackend backend;
+        wave::AudioRuntime runtime(backend, 4);
+        if (!runtime.Start(wave::DeviceSettings{}))
+        {
+            std::printf("장치 없음: %s\n", backend.LastError().c_str());
+            return kExitNoDevice;
+        }
+        for (const auto& [name, original] : {
+            std::pair{ "tail.wav", "sine.wav" },
+            std::pair{ "tail.mp3", "silent.mp3" },
+            std::pair{ "tail.flac", "silent.flac" } })
+        {
+            const file::path source = fixture.root / "Formats" / name;
+            std::vector<std::int16_t> originalPcm;
+            std::uint64_t originalReported = 0u;
+            (void)wave::probe::DecodePcmS16Mono48k(
+                fixture.root / "Formats" / original, 70000u, originalPcm, originalReported);
+            std::vector<std::int16_t> pcm;
+            std::uint64_t reported = 0u;
+            (void)wave::probe::DecodePcmS16Mono48k(source, 70000u, pcm, reported);
+            const wave::ClipKey key(name);
+            const bool accepted = runtime.LoadClip(key, source);
+            wave::VoiceHandle voice{};
+            if (accepted)
+            {
+                wave::PlayRequest request{};
+                request.clip = key;
+                request.volume = 0.0f;
+                voice = runtime.Play(request);
+            }
+            std::printf("TAIL_RESULT file=%s original_frames=%llu reported_frames=%llu decoded_frames=%llu load=%u play=%u error=%s\n",
+                name, static_cast<unsigned long long>(originalPcm.size()),
+                static_cast<unsigned long long>(reported),
+                static_cast<unsigned long long>(pcm.size()),
+                accepted ? 1u : 0u, voice.IsValid() ? 1u : 0u,
+                backend.LastError().c_str());
+            Report(!pcm.empty() && pcm.size() < originalPcm.size(),
+                "정상 prefix 뒤쪽 PCM이 실제로 사라졌다");
+            runtime.Stop(voice);
+            runtime.UnloadClip(key);
+        }
+        runtime.Shutdown();
+        std::printf("실패 %d건\n", g_failures);
+        return g_failures == 0 ? kExitPass : kExitFail;
+    }
+
+    [[nodiscard]] std::uint64_t ProcessCpu100ns()
+    {
+        FILETIME created{}, exited{}, kernel{}, user{};
+        if (!GetProcessTimes(GetCurrentProcess(), &created, &exited, &kernel, &user)) return 0u;
+        const auto ticks = [](FILETIME value) -> std::uint64_t
+        {
+            return (static_cast<std::uint64_t>(value.dwHighDateTime) << 32u) |
+                value.dwLowDateTime;
+        };
+        return ticks(kernel) + ticks(user);
+    }
+
+    // Local AU0 sample: same generated clip, same device, fixed workload per run.
+    // CPU and peak working set are process-wide; callback timing covers mixing only.
+    int RunWavePerformance(const Fixture& fixture)
+    {
+        wave::MiniaudioBackend backend(true);
+        wave::AudioRuntime runtime(backend, 64);
+        const auto startupBegin = std::chrono::steady_clock::now();
+        if (!runtime.Start(wave::DeviceSettings{}))
+        {
+            std::printf("PERF_SKIP device=%s\n", backend.LastError().c_str());
+            return kExitNoDevice;
+        }
+        const auto startupEnd = std::chrono::steady_clock::now();
+        const wave::AudioDeviceDiagnostics device = backend.DeviceDiagnostics();
+        const wave::DeviceSettings actual = backend.ActualSettings();
+        const wave::ClipKey key("perf_loop");
+        const auto loadBegin = std::chrono::steady_clock::now();
+        if (!runtime.LoadClip(key, fixture.assets / "Sounds" / "probe_tone.wav"))
+        {
+            std::printf("PERF_FAIL load=%s\n", backend.LastError().c_str());
+            runtime.Shutdown();
+            return kExitFail;
+        }
+        const auto loadEnd = std::chrono::steady_clock::now();
+        wave::PlayRequest request{};
+        request.clip = key;
+        request.loop = true;
+        const auto batchBegin = std::chrono::steady_clock::now();
+        double firstPlayMs = 0.0;
+        for (int index = 0; index < 32; ++index)
+        {
+            const auto playBegin = std::chrono::steady_clock::now();
+            if (!runtime.Play(request).IsValid())
+            {
+                std::printf("PERF_FAIL voice=%d\n", index);
+                runtime.Shutdown();
+                return kExitFail;
+            }
+            if (index == 0)
+                firstPlayMs = std::chrono::duration<double, std::milli>(
+                    std::chrono::steady_clock::now() - playBegin).count();
+        }
+        const auto batchEnd = std::chrono::steady_clock::now();
+        const auto workloadBegin = std::chrono::steady_clock::now();
+        const std::uint64_t cpuBegin = ProcessCpu100ns();
+        std::vector<std::uint64_t> updateNs;
+        updateNs.reserve(256u);
+        while (std::chrono::steady_clock::now() - workloadBegin < std::chrono::seconds(3))
+        {
+            const auto begin = std::chrono::steady_clock::now();
+            runtime.Update(0.016f);
+            updateNs.push_back(static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - begin).count()));
+            std::this_thread::sleep_for(std::chrono::milliseconds(16));
+        }
+        const auto workloadEnd = std::chrono::steady_clock::now();
+        const std::uint64_t cpuEnd = ProcessCpu100ns();
+        runtime.Shutdown();
+        PROCESS_MEMORY_COUNTERS_EX memory{};
+        memory.cb = sizeof(memory);
+        const bool memoryRead = 0 != GetProcessMemoryInfo(GetCurrentProcess(),
+            reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&memory), sizeof(memory));
+        const wave::AudioCallbackMetrics callback = backend.CallbackMetrics();
+        std::sort(updateNs.begin(), updateNs.end());
+        const std::uint64_t updateP99 = updateNs.empty() ? 0u :
+            updateNs[(updateNs.size() * 99u + 99u) / 100u - 1u];
+        const auto milliseconds = [](auto duration) -> double
+        {
+            return std::chrono::duration<double, std::milli>(duration).count();
+        };
+        const double elapsedMs = milliseconds(workloadEnd - workloadBegin);
+        const double cpuCorePercent = elapsedMs > 0.0
+            ? static_cast<double>(cpuEnd - cpuBegin) / (elapsedMs * 100.0) : 0.0;
+        const double updateHz = elapsedMs > 0.0
+            ? static_cast<double>(updateNs.size()) * 1000.0 / elapsedMs : 0.0;
+        std::printf("PERF_DEVICE backend=%s name=%s rate=%u channels=%u period_frames=%u buffer_frames=%u callback_frames_min=%u callback_frames_max=%u\n",
+            device.backend.c_str(), device.deviceName.c_str(), actual.sampleRate,
+            actual.channels, device.periodFrames, device.bufferFrames,
+            callback.minimumFrames, callback.maximumFrames);
+        std::printf("PERF_RESULT voices=32 duration_ms=%.3f start_ms=%.3f load_ms=%.3f first_play_ms=%.3f play_batch_ms=%.3f cpu_one_core_pct=%.2f peak_working_set_bytes=%llu private_bytes=%llu callback_count=%llu callback_mean_us=%.2f callback_p99_upper_us=%.2f callback_max_us=%.2f callback_over_half=%llu callback_over_full=%llu update_count=%llu update_hz=%.2f update_p99_us=%.2f\n",
+            elapsedMs, milliseconds(startupEnd - startupBegin), milliseconds(loadEnd - loadBegin),
+            firstPlayMs, milliseconds(batchEnd - batchBegin),
+            cpuCorePercent,
+            static_cast<unsigned long long>(memoryRead ? memory.PeakWorkingSetSize : 0u),
+            static_cast<unsigned long long>(memoryRead ? memory.PrivateUsage : 0u),
+            static_cast<unsigned long long>(callback.count),
+            static_cast<double>(callback.meanNanoseconds) / 1000.0,
+            static_cast<double>(callback.p99UpperNanoseconds) / 1000.0,
+            static_cast<double>(callback.maxNanoseconds) / 1000.0,
+            static_cast<unsigned long long>(callback.overHalfPeriod),
+            static_cast<unsigned long long>(callback.overFullPeriod),
+            static_cast<unsigned long long>(updateNs.size()),
+            updateHz,
+            static_cast<double>(updateP99) / 1000.0);
+        return callback.count > 0u && !updateNs.empty() && memoryRead ? kExitPass : kExitFail;
     }
 
     // ── 검사 1: 폴더에 넣은 클립이 적재된다 ───────────────────────────────
@@ -431,10 +893,138 @@ namespace
         Report(!backend.IsRunning(), "종료가 백엔드를 멈춘다");
     }
 
+    class RejectingAudioBackend final : public wave::AudioBackend
+    {
+    public:
+        bool Start(const wave::DeviceSettings& settings) override
+        {
+            ++starts;
+            (void)m_partial.Start(settings);
+            return !rejectStart;
+        }
+        void Stop() override { ++stops; m_partial.Stop(); }
+        bool IsRunning() const override { return m_partial.IsRunning(); }
+        bool LoadClip(const wave::ClipKey& key, const file::path& source) override
+        {
+            return m_partial.LoadClip(key, source);
+        }
+        void UnloadClip(const wave::ClipKey& key) override { m_partial.UnloadClip(key); }
+        bool HasClip(const wave::ClipKey& key) const override { return m_partial.HasClip(key); }
+        wave::BackendVoiceId StartVoice(const wave::PlayRequest& request) override
+        {
+            return m_partial.StartVoice(request);
+        }
+        void StopVoice(wave::BackendVoiceId voice) override { m_partial.StopVoice(voice); }
+        void SetVoicePaused(wave::BackendVoiceId voice, bool paused) override
+        {
+            m_partial.SetVoicePaused(voice, paused);
+        }
+        bool IsVoicePlaying(wave::BackendVoiceId voice) const override
+        {
+            return m_partial.IsVoicePlaying(voice);
+        }
+        void SetVoiceVolume(wave::BackendVoiceId voice, float gain) override
+        {
+            m_partial.SetVoiceVolume(voice, gain);
+        }
+        void SetVoicePitch(wave::BackendVoiceId voice, float pitch) override
+        {
+            m_partial.SetVoicePitch(voice, pitch);
+        }
+        void SetVoiceTransform(wave::BackendVoiceId voice,
+            const math::vector3& position, const math::vector3& velocity) override
+        {
+            m_partial.SetVoiceTransform(voice, position, velocity);
+        }
+        void SetBusVolume(wave::BusId bus, float gain) override
+        {
+            m_partial.SetBusVolume(bus, gain);
+        }
+        void SetListener(const wave::ListenerState& listener) override
+        {
+            m_partial.SetListener(listener);
+        }
+        void Update() override { m_partial.Update(); }
+
+        int starts{ 0 };
+        int stops{ 0 };
+        bool rejectStart{ true };
+
+    private:
+        wave::NullAudioBackend m_partial;
+    };
+
+    void RunWaveHost()
+    {
+        std::printf("[11] Host 소유 수명과 Null degrade\n");
+        auto device = std::make_unique<RejectingAudioBackend>();
+        RejectingAudioBackend* const observedDevice = device.get();
+        wave::AudioHost host(std::move(device), 2);
+        Report(nullptr == host.Service() && wave::AudioHostMode::Stopped == host.Mode(),
+            "시작 전에는 서비스가 없다");
+
+        wave::PlayRequest request{};
+        request.clip = wave::ClipKey("host_probe");
+        request.ownerId = 77u;
+        wave::VoiceHandle previous{};
+        wave::VoiceHandle firstFallback{};
+        bool cyclesPassed = true;
+        bool staleRejected = true;
+        for (int cycle = 0; cycle < 100; ++cycle)
+        {
+            cyclesPassed &= host.Start(wave::DeviceSettings{});
+            cyclesPassed &= wave::AudioHostMode::Null == host.Mode();
+            wave::AudioService* const service = host.Service();
+            if (nullptr == service) { cyclesPassed = false; break; }
+            staleRejected &= !service->IsAlive(previous);
+            cyclesPassed &= service->LoadClip(request.clip, "host_probe.wav");
+            const wave::VoiceHandle voice = service->Play(request);
+            if (0 == cycle) firstFallback = voice;
+            cyclesPassed &= voice.IsValid() && service->IsAlive(voice);
+            staleRejected &= !service->IsAlive(previous);
+            host.Update(0.016f);
+            host.Shutdown();
+            cyclesPassed &= nullptr == host.Service() &&
+                wave::AudioHostMode::Stopped == host.Mode();
+            previous = voice;
+        }
+        Report(cyclesPassed, "장치 실패 뒤 Null 재생·틱·종료 100회가 끝난다");
+        Report(staleRejected, "Host 재시작 뒤 이전 보이스 핸들이 거부된다");
+        Report(100 == observedDevice->starts && 100 == observedDevice->stops &&
+            !observedDevice->IsRunning(), "부분 초기화한 장치를 매번 정리한다");
+
+        observedDevice->rejectStart = false;
+        const bool recovered = host.Start(wave::DeviceSettings{});
+        wave::AudioService* const recoveredService = host.Service();
+        bool recoveryPassed = recovered && wave::AudioHostMode::Device == host.Mode() &&
+            nullptr != recoveredService;
+        if (recoveredService)
+        {
+            recoveryPassed &= recoveredService->LoadClip(request.clip, "host_probe.wav");
+            const wave::VoiceHandle deviceVoice = recoveredService->Play(request);
+            recoveryPassed &= deviceVoice.IsValid() && recoveredService->IsAlive(deviceVoice);
+            recoveryPassed &= !recoveredService->IsAlive(firstFallback);
+        }
+        host.Shutdown();
+        recoveryPassed &= 101 == observedDevice->starts && 101 == observedDevice->stops;
+        Report(recoveryPassed, "Null 뒤 장치 복구에서도 옛 핸들이 새 보이스를 가리키지 않는다");
+
+        wave::NullAudioBackend reusedNull;
+        bool slotsReclaimed = true;
+        for (int cycle = 0; cycle < 100; ++cycle)
+        {
+            slotsReclaimed &= reusedNull.Start(wave::DeviceSettings{});
+            slotsReclaimed &= reusedNull.LoadClip(request.clip, "host_probe.wav");
+            slotsReclaimed &= 1u == reusedNull.StartVoice(request).value;
+            reusedNull.Stop();
+        }
+        Report(slotsReclaimed, "Null 백엔드의 보이스 저장소가 재시작마다 회수된다");
+    }
+
     // ── 검사 8: wave + miniaudio ──────────────────────────────────────────
     //
-    // 실제 장치로 도는 경로다. 장치가 없으면 이 검사만 건너뛴다(그 자체가 degrade
-    // 계약이다 — Null 로 내려가면 상위는 분기하지 않는다).
+    // 실제 장치로 도는 경로다. 이 프로세스는 이미 FMOD 장치 개방을 확인했다.
+    // 여기서 miniaudio만 실패하면 건너뛰기가 아니라 이행을 막는 게이트 실패다.
     void RunWaveMiniaudio(const Fixture& fixture)
     {
         std::printf("[8] wave + miniaudio\n");
@@ -444,8 +1034,9 @@ namespace
 
         if (!runtime.Start(wave::DeviceSettings{}))
         {
-            std::printf("  (장치를 열지 못했다: %s — 이 검사만 건너뛴다)\n",
+            std::printf("  miniaudio 장치를 열지 못했다: %s\n",
                 backend.LastError().c_str());
+            Report(false, "FMOD가 연 장치에서 miniaudio도 시작한다");
             return;
         }
         Report(backend.IsRunning(), "miniaudio 장치가 열린다");
@@ -460,6 +1051,17 @@ namespace
             "손상 파일은 적재가 거부된다");
         Report(!backend.LastError().empty(), "거부 사유가 문장으로 남는다");
 
+        const wave::ClipKey mp3("probe_mp3");
+        const wave::ClipKey flac("probe_flac");
+        Report(runtime.LoadClip(mp3, fixture.root / "Formats" / "silent.mp3"),
+            "생성한 MP3가 디코드되어 적재된다");
+        Report(runtime.LoadClip(flac, fixture.root / "Formats" / "silent.flac"),
+            "생성한 FLAC이 디코드되어 적재된다");
+        Report(!runtime.LoadClip(wave::ClipKey("truncated_mp3"),
+            fixture.root / "Formats" / "truncated.mp3"), "절단된 MP3는 거부된다");
+        Report(!runtime.LoadClip(wave::ClipKey("truncated_flac"),
+            fixture.root / "Formats" / "truncated.flac"), "절단된 FLAC은 거부된다");
+
         wave::PlayRequest request{};
         request.clip = tone;
         request.bus = wave::BusId{ 1u };
@@ -472,6 +1074,16 @@ namespace
         runtime.Stop(voice);
         Report(!runtime.IsAlive(voice), "정지 뒤 손잡이가 죽는다");
 
+        request.clip = mp3;
+        const wave::VoiceHandle mp3Voice = runtime.Play(request);
+        Report(mp3Voice.IsValid(), "MP3가 재생된다");
+        runtime.Stop(mp3Voice);
+        request.clip = flac;
+        const wave::VoiceHandle flacVoice = runtime.Play(request);
+        Report(flacVoice.IsValid(), "FLAC이 재생된다");
+        runtime.Stop(flacVoice);
+        request.clip = tone;
+
         // ★ 자연 종료 회수. 옛 배선에는 이 경로가 아예 없어 끝난 소리의 자리가
         //   백엔드 열거로만 드러났다. 짧은 클립을 끝까지 두고 틱이 슬롯을 돌려주는지 본다.
         wave::PlayRequest shortRequest = request;
@@ -483,6 +1095,23 @@ namespace
         runtime.Update(0.016f);
         Report(!runtime.IsAlive(shortVoice), "끝난 보이스를 틱이 회수한다");
         Report(0u == runtime.AliveVoiceCount(), "회수 뒤 생존 보이스가 0이다");
+
+        for (const char* name : { "loop.wav", "loop.mp3", "loop.flac" })
+        {
+            const wave::ClipKey loopKey(name);
+            Report(runtime.LoadClip(loopKey, fixture.root / "Formats" / name),
+                "짧은 loop fixture가 적재된다");
+            request.clip = loopKey;
+            request.loop = true;
+            request.volume = 0.0f; // keep the device test quiet
+            const wave::VoiceHandle loopVoice = runtime.Play(request);
+            std::this_thread::sleep_for(std::chrono::milliseconds(250));
+            runtime.Update(0.016f);
+            std::printf("  %s: ", name);
+            Report(loopVoice.IsValid() && runtime.IsAlive(loopVoice),
+                "원본 길이를 넘겨도 looping voice가 살아 있다");
+            runtime.Stop(loopVoice);
+        }
 
         runtime.Shutdown();
         Report(!backend.IsRunning(), "종료가 장치를 닫는다");
@@ -505,8 +1134,9 @@ namespace
         wave::AudioRuntime runtime(backend, 8);
         if (!runtime.Start(wave::DeviceSettings{}))
         {
-            std::printf("  (장치를 열지 못했다: %s — 이 검사만 건너뛴다)\n",
+            std::printf("  miniaudio 장치를 열지 못했다: %s\n",
                 backend.LastError().c_str());
+            Report(false, "클립 폴더 검사에 필요한 miniaudio 장치가 열린다");
             return;
         }
 
@@ -602,11 +1232,17 @@ int main(int argc, char** argv)
         std::printf("fixture 를 만들지 못했다: %s\n", fixture.assets.string().c_str());
         return kExitFail;
     }
+    if (mode == "fixture-only") return kExitPass;
+    if (mode == "fixture-verify") return RunOfflineFixtures(fixture);
     if (!InitializePaths(fixture))
     {
         std::printf("PathFinder 초기화 실패\n");
         return kExitFail;
     }
+
+    if (mode == "wave-performance") return RunWavePerformance(fixture);
+    if (mode == "wave-malformed") return RunWaveMalformed(fixture);
+    if (mode == "wave-tail-audit") return RunWaveTailAudit(fixture);
 
     // ★★ wave 모드는 여기서 갈라진다 — `SoundManager` 를 **만들기 전에** 끝낸다.
     //   싱글톤을 한 번이라도 건드리면 FMOD 적재 스레드가 서고, 그러면 이 실행이
@@ -615,6 +1251,8 @@ int main(int argc, char** argv)
     {
         return RunWaveShutdown(fixture, withClips);
     }
+
+    if (mode == "run") RunWaveHost();
 
     Sound->initialize(kMaxChannels);
 

@@ -1,4 +1,5 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
+#include "Experiment/Cooked/CookedAudioClipFormat.h"
 #include "Experiment/Cooked/CookedModelCodec.h"
 #include "Experiment/Cooked/MaterialCookProducer.h"
 #include "Experiment/Cooked/ModelGenerationExportProducer.h" // MBC11: generation 내보내기
@@ -7,13 +8,16 @@
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 #include "Assets/AssetIdentityEpoch.h"
+#include "Assets/AudioClipSourceMetadata.h"
 #include "Assets/ModelAssetAuthoringTransaction.h"
+#include "AudioDecodeValidation.h"
 #include "AuthoringCookedDocument.h"
 #include "AuthoringNodeEquality.h"
 #include "AuthoringParsedDocument.h"
 
 #include <algorithm>
 #include <chrono>
+#include <array>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -25,6 +29,7 @@
 #include <span>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -322,13 +327,6 @@ namespace
                 return false;
             }
         }
-        else if (out.models.empty() && out.textures.empty()
-            && out.shaderMetas.empty() && out.materials.empty()
-            && out.scenes.empty())
-        {
-            failure = "Cook에는 하나 이상의 --model/--texture/--shadermeta/--material이 필요하다.";
-            return false;
-        }
         if ((out.mode == Arguments::Mode::Cook
             || out.mode == Arguments::Mode::AuthorModelAsset)
             && out.outputRoot.empty())
@@ -449,6 +447,35 @@ namespace
             failure = "검증할 파일을 완전히 읽지 못했다: " + path.string();
             return false;
         }
+        return true;
+    }
+
+    [[nodiscard]] bool HashFile(const std::filesystem::path& path,
+        ck::Sha256Digest& digest, std::uint64_t& size, std::string& failure)
+    {
+        std::ifstream input(LongPath(path), std::ios::binary);
+        if (!input)
+        {
+            failure = "해시할 파일을 열 수 없다: " + path.string();
+            return false;
+        }
+        Hash::Sha256 hash;
+        std::array<char, 64u * 1024u> buffer{};
+        size = 0u;
+        while (input)
+        {
+            input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+            const auto count = static_cast<std::size_t>(input.gcount());
+            if (count == 0u) break;
+            hash.Update(buffer.data(), count);
+            size += count;
+        }
+        if (!input.eof() || input.bad())
+        {
+            failure = "파일 해시 읽기가 완료되지 않았다: " + path.string();
+            return false;
+        }
+        digest = hash.Finish();
         return true;
     }
 
@@ -576,9 +603,30 @@ namespace
         return 0;
     }
 
+    struct AudioSourceInput final
+    {
+        experiment::AssetId assetId{};
+        std::filesystem::path source{};
+        assets::AudioClipSourceMetadata stamp{};
+        audio_cook::DecodedSource decoded{};
+        ck::AudioLoadMode loadMode{};
+        ck::AudioSpatialKind spatialKind{};
+    };
+
+    struct AudioCookProduct final
+    {
+        std::filesystem::path source{};
+        std::string artifactPath{};
+        std::array<std::byte, ck::kAudioClipHeaderBytes> header{};
+        ck::CookedAssetManifestEntry manifestEntry{};
+        Hash::Sha256Digest payloadSha256{};
+        std::uint64_t payloadBytes{};
+    };
+
     [[nodiscard]] bool BuildSourceIdentityTable(
         const std::filesystem::path& assetRoot,
         std::vector<ck::AssetSourceManifestEntry>& outEntries,
+        std::vector<AudioSourceInput>& outAudios,
         std::string& failure)
     {
         std::vector<std::filesystem::path> sidecars;
@@ -599,16 +647,39 @@ namespace
                 failure = "source identity sidecar 열거가 끊겼다: " + error.message();
                 return false;
             }
-            if (iterator->is_regular_file(error) && !error
-                && iterator->path().extension() == ".meta")
+            if (iterator->is_regular_file(error) && !error)
             {
-                sidecars.push_back(iterator->path());
+                const std::filesystem::path& source = iterator->path();
+                std::string extension = source.extension().string();
+                std::ranges::transform(extension, extension.begin(),
+                    [](unsigned char value)
+                    {
+                        return static_cast<char>(value >= 'A' && value <= 'Z'
+                            ? value - 'A' + 'a' : value);
+                    });
+                if (extension == ".ogg")
+                {
+                    failure = "OGG audio source는 지원하지 않는다: " + source.string();
+                    return false;
+                }
+                if (assets::IsAudioClipSource(source))
+                {
+                    std::filesystem::path metaPath = source;
+                    metaPath += ".meta";
+                    if (!std::filesystem::is_regular_file(metaPath, error) || error)
+                    {
+                        failure = "audio source sidecar가 없다: " + source.string();
+                        return false;
+                    }
+                }
+                if (extension == ".meta") sidecars.push_back(source);
             }
             error.clear();
         }
         std::ranges::sort(sidecars);
 
         std::vector<ck::AssetSourceManifestEntry> entries;
+        std::vector<AudioSourceInput> audios;
         entries.reserve(sidecars.size());
         for (const std::filesystem::path& sidecar : sidecars)
         {
@@ -661,6 +732,62 @@ namespace
                 return false;
             }
 
+            if (assets::IsAudioClipSource(source))
+            {
+                const Authoring::ReadNode audio = document.Root()["audioClip"];
+                const Authoring::ReadNode mode = audio["loadMode"];
+                const Authoring::ReadNode spatial = audio["spatialKind"];
+                const Authoring::ReadNode codec = audio["codec"];
+                const Authoring::ReadNode size = audio["payloadSize"];
+                const Authoring::ReadNode hash = audio["sourceContentHash"];
+                assets::AudioClipSourceMetadata inspected{};
+                std::string inspectionError;
+                if (!audio.IsMap() || audio["schemaVersion"].Scalar() != "1"
+                    || !mode.IsScalar() || !assets::IsAudioLoadMode(mode.Scalar())
+                    || !spatial.IsScalar() || !assets::IsAudioSpatialKind(spatial.Scalar())
+                    || !codec.IsScalar() || !size.IsScalar() || !hash.IsScalar()
+                    || !assets::InspectAudioClipSource(source, inspected, inspectionError)
+                    || codec.Scalar() != assets::AudioCodecName(inspected.codec)
+                    || size.Scalar() != std::to_string(inspected.payloadSize)
+                    || hash.Scalar() != Hash::ToHex(inspected.sourceContentHash))
+                {
+                    failure = "audio source/meta stamp가 유효하지 않거나 다르다: "
+                        + source.string() + " (" + inspectionError + ")";
+                    return false;
+                }
+
+                audio_cook::DecodedSource decoded{};
+                if (!audio_cook::ValidateEncodedSource(source, decoded,
+                    inspectionError))
+                {
+                    failure = "audio encoded stream이 유효하지 않다: "
+                        + source.string() + " (" + inspectionError + ")";
+                    return false;
+                }
+                if (spatial.Scalar() == "PointMono" && decoded.channels != 1u)
+                {
+                    failure = "PointMono audio source는 mono여야 한다: "
+                        + source.string();
+                    return false;
+                }
+                assets::AudioClipSourceMetadata finalStamp{};
+                if (!assets::InspectAudioClipSource(source, finalStamp, inspectionError)
+                    || finalStamp.payloadSize != inspected.payloadSize
+                    || finalStamp.sourceContentHash != inspected.sourceContentHash)
+                {
+                    failure = "audio source가 decode 검증 중 바뀌었다: "
+                        + source.string();
+                    return false;
+                }
+                audios.push_back(AudioSourceInput{
+                    assetId, source, inspected, decoded,
+                    mode.Scalar() == "Auto" ? ck::AudioLoadMode::Auto
+                        : mode.Scalar() == "Resident" ? ck::AudioLoadMode::Resident
+                        : ck::AudioLoadMode::Stream,
+                    spatial.Scalar() == "PointMono" ? ck::AudioSpatialKind::PointMono
+                        : ck::AudioSpatialKind::NonSpatial });
+            }
+
             entries.push_back(ck::AssetSourceManifestEntry{
                 assetId, sourcePath });
         }
@@ -671,7 +798,157 @@ namespace
         }
 
         outEntries = std::move(entries);
+        outAudios = std::move(audios);
         failure.clear();
+        return true;
+    }
+
+    [[nodiscard]] bool BuildAudioCookProducts(
+        std::span<const AudioSourceInput> inputs,
+        std::set<std::string>& artifactPaths,
+        ck::CookedAssetManifest& manifest,
+        std::vector<AudioCookProduct>& products,
+        std::string& failure)
+    {
+        for (const AudioSourceInput& input : inputs)
+        {
+            const std::string path = ck::MakeDerivedAudioClipArtifactPath(input.assetId);
+            if (path.empty() || !artifactPaths.insert(path).second)
+            {
+                failure = "audio artifact identity/path가 중복되거나 유효하지 않다: "
+                    + input.source.string();
+                return false;
+            }
+            if (input.stamp.payloadSize > UINT64_MAX - ck::kAudioClipHeaderBytes)
+            {
+                failure = "audio artifact 크기가 범위를 벗어난다: " + input.source.string();
+                return false;
+            }
+
+            ck::CookedAudioClipHeader metadata{};
+            metadata.codec = input.stamp.codec;
+            metadata.loadMode = input.loadMode;
+            metadata.spatialKind = input.spatialKind;
+            metadata.channels = static_cast<std::uint8_t>(input.decoded.channels);
+            metadata.sampleRate = input.decoded.sampleRate;
+            metadata.frameCount = input.decoded.frameCount;
+            metadata.payloadBytes = input.stamp.payloadSize;
+            metadata.payloadSha256 = input.stamp.sourceContentHash;
+            const auto header = ck::WriteAudioClipHeader(metadata);
+            ck::CookedAudioClipHeader roundTrip{};
+            if (!ck::ReadAudioClipHeader(header,
+                ck::kAudioClipHeaderBytes + metadata.payloadBytes, roundTrip))
+            {
+                failure = "audio artifact header가 유효하지 않다: " + input.source.string();
+                return false;
+            }
+
+            std::ifstream source(LongPath(input.source), std::ios::binary);
+            if (!source)
+            {
+                failure = "audio artifact source를 열 수 없다: " + input.source.string();
+                return false;
+            }
+            Hash::Sha256 payloadHash;
+            Hash::Sha256 artifactHash;
+            artifactHash.Update(header.data(), header.size());
+            std::array<char, 64u * 1024u> buffer{};
+            std::uint64_t size = 0u;
+            while (source)
+            {
+                source.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+                const auto count = static_cast<std::size_t>(source.gcount());
+                if (count == 0u) break;
+                payloadHash.Update(buffer.data(), count);
+                artifactHash.Update(buffer.data(), count);
+                size += count;
+            }
+            if (!source.eof() || source.bad() || size != metadata.payloadBytes
+                || payloadHash.Finish() != metadata.payloadSha256)
+            {
+                failure = "audio source가 artifact 준비 중 바뀌었다: "
+                    + input.source.string();
+                return false;
+            }
+
+            AudioCookProduct product{};
+            product.source = input.source;
+            product.artifactPath = path;
+            product.header = header;
+            product.payloadSha256 = metadata.payloadSha256;
+            product.payloadBytes = metadata.payloadBytes;
+            product.manifestEntry.assetId = input.assetId;
+            product.manifestEntry.kind = ck::CookedAssetKind::AudioClip;
+            product.manifestEntry.formatVersion = ck::kAudioClipArtifactVersion;
+            product.manifestEntry.byteSize = header.size() + size;
+            product.manifestEntry.contentSha256 = artifactHash.Finish();
+            product.manifestEntry.artifactPath = path;
+            manifest.entries.push_back(product.manifestEntry);
+            products.push_back(std::move(product));
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool WriteAudioCookProduct(const AudioCookProduct& product,
+        const std::filesystem::path& stagingRoot, std::string& failure)
+    {
+        const std::filesystem::path target =
+            stagingRoot / std::filesystem::path(product.artifactPath);
+        std::error_code error;
+        std::filesystem::create_directories(LongPath(target.parent_path()), error);
+        if (error)
+        {
+            failure = "audio artifact 디렉터리를 만들 수 없다: " + error.message();
+            return false;
+        }
+        std::ifstream input(LongPath(product.source), std::ios::binary);
+        std::ofstream output(LongPath(target), std::ios::binary | std::ios::trunc);
+        if (!input || !output)
+        {
+            failure = "audio artifact 입출력 파일을 열 수 없다: " + target.string();
+            return false;
+        }
+        output.write(reinterpret_cast<const char*>(product.header.data()),
+            static_cast<std::streamsize>(product.header.size()));
+        Hash::Sha256 payloadHash;
+        std::array<char, 64u * 1024u> buffer{};
+        std::uint64_t copied = 0u;
+        while (input)
+        {
+            input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
+            const auto count = static_cast<std::size_t>(input.gcount());
+            if (count == 0u) break;
+            output.write(buffer.data(), static_cast<std::streamsize>(count));
+            payloadHash.Update(buffer.data(), count);
+            copied += count;
+        }
+        output.flush();
+        if (!input.eof() || input.bad() || !output || copied != product.payloadBytes
+            || payloadHash.Finish() != product.payloadSha256)
+        {
+            failure = "audio source가 artifact 기록 중 바뀌었거나 쓰기가 실패했다: "
+                + product.source.string();
+            return false;
+        }
+        output.close();
+        if (!output)
+        {
+            failure = "audio artifact를 닫지 못했다: " + target.string();
+            return false;
+        }
+        std::ifstream persisted(LongPath(target), std::ios::binary);
+        std::array<std::byte, ck::kAudioClipHeaderBytes> header{};
+        persisted.read(reinterpret_cast<char*>(header.data()),
+            static_cast<std::streamsize>(header.size()));
+        ck::CookedAudioClipHeader parsed{};
+        if (!persisted || !ck::ReadAudioClipHeader(header,
+            product.manifestEntry.byteSize, parsed)
+            || header != product.header)
+        {
+            failure = "게시 전 audio artifact header 재검증이 실패했다: "
+                + product.artifactPath;
+            return false;
+        }
         return true;
     }
 
@@ -930,10 +1207,26 @@ namespace
         }
 
         std::string sourceIdentityFailure;
+        std::vector<AudioSourceInput> audioInputs;
         if (!BuildSourceIdentityTable(assetRoot, manifest.sourceAssets,
+            audioInputs,
             sourceIdentityFailure))
         {
             std::cerr << "asset-cooker error: " << sourceIdentityFailure << '\n';
+            return 3;
+        }
+        std::vector<AudioCookProduct> audioProducts;
+        if (!BuildAudioCookProducts(audioInputs, artifactPaths, manifest,
+            audioProducts, sourceIdentityFailure))
+        {
+            std::cerr << "asset-cooker error: " << sourceIdentityFailure << '\n';
+            return 3;
+        }
+        for (const AudioCookProduct& product : audioProducts)
+            totalArtifactBytes += product.manifestEntry.byteSize;
+        if (manifest.entries.empty())
+        {
+            std::cerr << "asset-cooker error: cook할 cooked asset이 없다.\n";
             return 3;
         }
 
@@ -1090,6 +1383,15 @@ namespace
             }
         }
 
+        for (const AudioCookProduct& product : audioProducts)
+        {
+            if (!WriteAudioCookProduct(product, stagingRoot, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+        }
+
         const std::filesystem::path manifestFile =
             stagingRoot / "Derived/asset-manifest.cemf";
         if (!WriteBinaryFile(manifestFile, manifestWrite.bytes, failure))
@@ -1150,6 +1452,22 @@ namespace
                     product.artifactBytes.size(), digest, manifestIssues))
             {
                 std::cerr << "asset-cooker error: texture manifest 검증이 실패했다: "
+                    << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
+        for (const AudioCookProduct& product : audioProducts)
+        {
+            const ck::CookedAssetManifestEntry* entry =
+                restoredManifest.Find(product.manifestEntry.assetId);
+            if (!entry || entry->kind != ck::CookedAssetKind::AudioClip
+                || entry->formatVersion != ck::kAudioClipArtifactVersion
+                || entry->artifactPath != product.artifactPath
+                || entry->byteSize != product.manifestEntry.byteSize
+                || entry->contentSha256 != product.manifestEntry.contentSha256)
+            {
+                std::cerr << "asset-cooker error: audio manifest 재검증이 실패했다: "
                     << product.artifactPath << '\n';
                 return 5;
             }
@@ -1262,18 +1580,16 @@ namespace
             {
                 const std::filesystem::path artifactFile =
                     stagingRoot / std::filesystem::path(entry.artifactPath);
-                std::vector<std::byte> bytes;
-                if (!ReadBinaryFile(artifactFile, bytes, failure))
+                ck::Sha256Digest digest{};
+                std::uint64_t byteSize = 0u;
+                if (!HashFile(artifactFile, digest, byteSize, failure))
                 {
                     std::cerr << "asset-cooker error: manifest 가 이름 붙인 "
                         "artifact 가 없다: " << entry.artifactPath << '\n';
                     return 5;
                 }
-                ck::Sha256Digest digest{};
-                std::string hashError;
                 manifestIssues.clear();
-                if (!ck::ComputeSha256(bytes, digest, hashError)
-                    || !ck::VerifyArtifact(entry, bytes.size(), digest,
+                if (!ck::VerifyArtifact(entry, byteSize, digest,
                         manifestIssues))
                 {
                     std::cerr << "asset-cooker error: stale artifact — "
@@ -1333,8 +1649,18 @@ namespace
             closureSweptFiles = sweptFiles;
         }
 
-        error.clear();
-        std::filesystem::rename(LongPath(stagingRoot), LongPath(outputRoot), error);
+        // A freshly closed staging tree can be held briefly by another Windows
+        // file-system consumer. Retry only access-denied publication while the
+        // destination is still absent; other errors remain immediate failures.
+        for (unsigned attempt = 0u; attempt < 10u; ++attempt)
+        {
+            error.clear();
+            std::filesystem::rename(LongPath(stagingRoot), LongPath(outputRoot), error);
+            if (!error || error != std::errc::permission_denied) break;
+            std::error_code existsError;
+            if (std::filesystem::exists(outputRoot, existsError) || existsError) break;
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
         if (error)
         {
             std::cerr << "asset-cooker error: 최종 디렉터리를 게시할 수 없다: "
@@ -1368,6 +1694,7 @@ namespace
             << " textureBytes=" << totalTextureBytes
             << " shaderMetaBytes=" << totalShaderMetaBytes
             << " manifest=Derived/asset-manifest.cemf\n";
+        std::cout << "asset-cooker audioClips=" << audioProducts.size() << '\n';
         for (const ck::ShaderMetaCookProduct& product : shaderMetaProducts)
         {
             // ★ source 셰이더 GUID 를 여기서 소비한다. 해소는 증명해 놓고

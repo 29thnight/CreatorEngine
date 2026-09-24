@@ -776,6 +776,15 @@
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>
+    <ClInclude Include="Experiment\Cooked\CookedAudioClipFormat.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\CookedAudioClipSource.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Cooked\PakAudioClipByteSource.h">
+      <Filter>Resources\Model\Experiment\Cooked</Filter>
+    </ClInclude>
     <ClInclude Include="Experiment\Cooked\ModelCookIdentity.h">
       <Filter>Resources\Model\Experiment\Cooked</Filter>
     </ClInclude>

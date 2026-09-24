@@ -36,6 +36,7 @@ namespace experiment::cooked
         ShaderMeta = 4,
         Scene = 5,
         Prefab = 6,
+        AudioClip = 7,
     };
 
     using Sha256Digest = std::array<std::uint8_t, 32>;
@@ -120,6 +121,9 @@ namespace experiment::cooked
 
     [[nodiscard]] std::string MakeDerivedPrefabArtifactPath(
         const AssetId& prefabAssetId);
+
+    [[nodiscard]] std::string MakeDerivedAudioClipArtifactPath(
+        const AssetId& audioClipAssetId);
 
     [[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept;

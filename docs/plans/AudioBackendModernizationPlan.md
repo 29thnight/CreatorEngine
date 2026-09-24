@@ -8,7 +8,7 @@
   AU0 의 "유효 FMOD 항목 A/B" 가 성립하지 않고, ② AU8 이 지목한 `Tools/build.ps1` stage 는
   `Tools/runtime/deploy-runtime.ps1` 의 PE import 폐포로 이사했으며, ③ 배포본이 FMOD 로깅 빌드를
   라이선스 등재 없이 싣고 있다.
-- 상태: **계획 수립 · 구현 미착수**
+- 상태: **부분 구현 — AU0·AU1·AU2·AU3 진행, AU4~AU9 미착수** (2026-09-24)
 - 배치: PHASE 17 직렬화·Asset/Cook 경계와 PHASE 12.5 package gate 뒤, PHASE 23 MSI·Launcher 제품화 앞
 - 초기 추정: **45 인일**. AU0 기준선과 device/backend 스파이크 뒤 갱신
 - 확정 포맷: **WAV · MP3 · FLAC만 지원**. OGG/Vorbis와 그 밖의 포맷은 importer에서 명시적으로 거부
@@ -345,10 +345,12 @@ counter를 남긴다. package smoke에는 최소 한 개의 MP3 stream과 FLAC l
 
 ### AU0 — 기준선 유효성 분류·합성 fixture·실패 canary (P0, 3일)
 
-> **2026-09-16 부분 착지 — §11.** fixture 생성기·실패 canary·게이트가 섰다
+> **2026-09-24 부분 착지 — §11.** WAV와 결정적 무음 MP3/FLAC fixture 생성기·실패 canary·게이트가 섰다
 > (`Tools/regression/verify-audio-voice-contract.ps1`). **이 슬라이스의 판정문에서
 > "유효 FMOD 항목 A/B" 를 참고로 강등한다** — 비교 대상이 없다(§11.1). 남은 것은
-> 절대 성능 예산(callback/CPU/memory/startup)과 MP3/FLAC fixture 다.
+> 압축 포맷의 비무음 파형·impulse, 뒤쪽 프레임 손상·실제 대용량 입력, stream/장시간
+> workload의 절대 성능 예산이다. 단일 장치·32보이스 Release 기준선은 §11.10,
+> 생성 fixture와 9개 손상 입력 matrix는 §11.11, 뒤쪽 절단·resident 경계는 §11.12에 기록했다.
 
 - sine, impulse, silence, short loop를 WAV/MP3/FLAC으로 생성하는 재현 가능한 test fixture를 둔다.
 - 기존 동작을 `유효(play/stop/loop/stream/bus)`, `고장(shutdown/lifetime)`, `미검증(listener/spatial/reverb)`으로
@@ -365,10 +367,10 @@ counter를 남긴다. package smoke에는 최소 한 개의 MP3 stream과 FLAC l
 
 ### AU1 — backend-neutral 계약·모듈·listener·Host 수명 (P0, 5일)
 
-> **2026-09-16 부분 착지 — §11.** `wave` 네임스페이스로 값 타입·계약·보이스 표가
-> 섰다(`Engine/SceneRuntime/Audio/`). 표면은 백엔드 API 이식이 아니라 **소비자 요구
-> 역산**으로 만들었다(§11.2). 남은 것은 Null backend, Host 소유 initialize/update/
-> shutdown, Scene-owned source/listener 등록부, 그리고 옛 표면을 걷는 이행이다.
+> **2026-09-24 부분 착지 — §11.** `wave` 값 타입·계약·보이스 표·Null backend와
+> Host 소유 `AudioHost`가 섰다. 장치 실패 후 Null 전환과 100회 시작/종료·장치 복구 뒤 낡은 핸들 거부를
+> 로컬 게이트에서 확인했다. 남은 것은 Scene-owned source/listener 등록부, 실제 Editor/Player
+> Host 소유·틱 배선, component/scene transfer/DDOL 수명과 옛 표면 이행이다.
 
 - `AudioClipId`, `AudioVoiceHandle`, `AudioBusId`, listener/play/state command를 정의한다.
 - generation stale-handle rejection과 logical voice table을 구현한다.
@@ -393,10 +395,12 @@ missing/failed reference package fail-closed가 통과한다. Editor 미기동 c
 
 ### AU3 — `MiniaudioBackend` 미배선 구현 (P0, 4일)
 
-> **2026-09-16 부분 착지 — §11.6.** 벤더링(0.11.25 · MIT-0 · PROVENANCE)과 단일 구현 TU 규약,
-> 실 device open/close, error translation, 적재 시 디코드 검증이 섰고 게이트 13 단정이 초록이다.
-> **남은 것:** MP3/FLAC 축(지금 fixture 는 WAV 뿐), stream/resident 정책, pak/VFS byte source 와
-> job-thread 수명. 제품 배선은 여전히 없다. `FmodBackend` 는 출하 뒤로 미뤘다(§11.6).
+> **2026-09-24 부분 착지 — §11.6.** 벤더링(0.11.25 · MIT-0 · PROVENANCE)과 단일 구현 TU 규약,
+> 실 device open/close, error translation, 적재 시 디코드 검증이 섰다. 결정적 무음 MP3/FLAC의
+> 적재·재생과 절단 파일 거부도 로컬 게이트에 추가됐다. **남은 것:** 다양한 실제 인코딩과 손상 입력,
+> authored stream/resident 정책, pak/VFS byte source, job-thread 수명. §11.12에서 현재 경로를
+> 임시 resident decode로 명시했으며 실제 stream은 아직 없다. 제품 배선은 여전히 없다.
+> `FmodBackend` 는 출하 뒤로 미뤘다(§11.6).
 
 - exact pinned `miniaudio.c/.h`와 LICENSE/provenance를 벤더링한다.
 - 한 implementation TU만 컴파일하고 public/header 전이를 막는다.
@@ -624,6 +628,7 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 | `Engine/SceneRuntime/Audio/NullAudioBackend.h/.cpp` | 장치 없이 도는 결정적 구현. degrade 경로 겸 판정 경로 |
 | `Engine/SceneRuntime/Audio/MiniaudioBackend.h/.cpp` | miniaudio 를 무는 유일한 TU. pimpl |
 | `Engine/SceneRuntime/Audio/AudioRuntime.h/.cpp` | `AudioService` 구현. 백엔드를 참조로만 받는다 |
+| `Engine/SceneRuntime/Audio/AudioHost.h/.cpp` | 장치 실패 시 Null 전환과 시작·틱·종료를 소유. 제품 미배선 |
 | `Engine/SceneRuntime/Audio/ClipDirectory.h/.cpp` | 폴더 훑기 **동기 호출 한 번**. 빠진 것을 세어 돌려준다 |
 | `ThirdParty/miniaudio/` | 0.11.25 · MIT-0 · PROVENANCE.md |
 | `Tools/regression/verify-audio-voice-contract.ps1` | 로컬 게이트. **run-all 미배선** |
@@ -649,7 +654,7 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
   전제와 맞지 않는다. 로컬에서 손으로 돌린다.
 - **음원을 저장소에 커밋하지 않는다.** 예외 없다. `Dynamic_CPP/Assets/Sound/` 와 `Sounds/` 를 `.meta`
   까지 무시로 막았다(두 철자를 다 막은 이유는 저작 폴더가 `Sound/` 인데 로더가 도는 경로가 `Sounds/`
-  라서다). 게이트 fixture 는 probe 가 `Build/` 아래에 무음 PCM 으로 생성한다.
+  라서다). 게이트 fixture 는 probe 가 `Build/` 아래에 무음 WAV/MP3/FLAC 으로 생성한다.
 - AU2 가 착지해 `.meta` 가 오디오 identity 의 정본이 되면 이 무시 규칙을 다시 판단해야 한다 —
   "음원은 빼고 identity 만 추적" 이 필요해질 수 있다.
 
@@ -696,8 +701,304 @@ FMOD 적재 스레드가 서서, 멈췄을 때 원인이 wave 종료인지 옛 �
 변이로 이빨을 확인했다. `Shutdown()` 에 **옛 결함과 같은 모양**(클립이 비면 돌지 않는 루프)을
 심자 canary 가 붉어진다 — 회귀가 오면 잡힌다는 뜻이다.
 
-### 11.8 다음
+### 11.8 소비자 전환 경계 (AU7)
 
-접점 12곳과 Inspector 채널 직결 5블록을 `wave` 로 옮기고 `SoundManager`/`SoundSystem` 을 걷는다.
-`wave` 의 `SceneRuntime.vcxproj` 등록과 FMOD canary 철거는 그 슬라이스에서 함께 한다.
-폴더 훑기를 **누가 언제 부르는가**(Host 소유 수명)가 그 슬라이스의 첫 물음이다.
+§6의 의존 순서대로 AU2·AU3, AU4~AU6 기능 판정을 닫은 뒤 접점 12곳과 Inspector 채널
+직결 5블록을 `wave` 로 옮기고 `SoundManager`/`SoundSystem` 을 걷는다. `wave` 의
+`SceneRuntime.vcxproj` 등록과 FMOD canary 철거도 그 전환 슬라이스에서 함께 한다.
+Host 소유 수명과 클립 적재 시점은 AU1에서 먼저 확정하되, AU7 전에는 제품 기본 backend를
+바꾸지 않는다. FMOD와 miniaudio를 동시에 shipping하지 않는다는 §0의 제약을 지킨다.
+
+### 11.9 2026-09-24 AU0·AU1 보강
+
+- 게이트가 외부 encoder 없이 무음 MP3(48 MPEG-1 Layer III frame)와 FLAC(12개의
+  4096-sample constant frame)을 `Build/Validation/AudioVoiceContract/Formats` 아래 생성한다.
+  FLAC 프레임은 RFC 9639의 STREAMINFO·frame CRC 규칙으로 만든다. miniaudio의 적재·재생
+  단정 4개가 Debug/Release에서 통과했다. 절단 MP3/FLAC의 거부도 Debug에서 확인했다.
+  WAV/MP3/FLAC 및 절단 fixture는 재생성 전후 SHA-256
+  일치를 게이트에서 검사한다. 음원 파일은 저장소에 추가하지 않았다.
+- `AudioHost`는 backend와 `AudioRuntime` 인스턴스를 소유하며 장치 시작 실패의 부분 자원을
+  정리한 뒤 Null로 내려간다. 런타임 인스턴스를 Host 수명 동안 유지해 재시작 시 보이스
+  generation이 초기값으로 되돌아가지 않게 했다. Null과 실제 장치의 generation 영역도 갈라
+  장치 복구 뒤 옛 Null 핸들이 새 보이스를 가리키지 않게 했다. Null backend는 Stop에서
+  보이스·클립·버스 저장소를 회수한다. 실패 장치 주입으로 100회 시작·재생·틱·종료,
+  복구 뒤 이전 핸들 거부와 부분 초기화 정리를 확인했다.
+- 절단 FLAC은 STREAMINFO만 유효해도 종전 `LoadClip`의 sound 초기화에 성공했다. 실제 첫
+  PCM 프레임을 읽는 검사를 추가해 거부하도록 고쳤다. 뒤쪽 stream 손상은 AU3/AU9의
+  decode-error·underrun 진단으로 별도 판정한다.
+- 이 변경은 로컬 게이트에만 컴파일된다. `SceneRuntime.vcxproj`·Editor·Player의 기본 FMOD
+  경로는 바꾸지 않았다. AU1의 Scene 소유 등록부·제품 Host 배선과 AU0의 성능 예산은 여전히
+  판정 전이다.
+
+### 11.10 2026-09-24 AU0 실장치 성능 기준선
+
+> 이 표는 §11.12의 명시적 resident decode 변경 전 기준선이다. 변경 뒤의 현재 Release
+> 반복 측정은 §11.12에 따로 기록한다.
+
+`MiniaudioBackend(true)`가 로컬 측정 실행에서만 장치 callback을 감싼다. callback 안에서는
+믹서 처리 전후 시간과 프레임 수를 고정 크기 원자 histogram에 기록한다. 할당·로그·잠금은 없다.
+일반 `MiniaudioBackend()`의 callback 경로는 그대로다. `wave-performance` 모드는 FMOD
+싱글톤을 만들지 않지만, 계약 probe 실행 파일에 FMOD DLL이 링크돼 있으므로 프로세스 메모리를
+miniaudio 단독 점유량으로 해석하지 않는다.
+
+`verify-audio-voice-contract.ps1 -Configuration Release -PerformanceRuns 5`의 동일 PC 반복값
+(`Build/Validation/audio-voice-performance-release-final-20260924.log`, 로컬 git 무시 산출물):
+
+| 조건/지표 | 관측 5회 |
+|---|---:|
+| WASAPI Realtek 스피커, 출력 | 48 kHz · 2채널 · callback 480 frames(10 ms) · device buffer 1056 frames |
+| workload | 생성한 0.6초 무음 WAV 32개 동시 loop · 회당 약 3초 · Update 실측 32.7~33.0 Hz |
+| callback p99 | 0.45~0.52 ms (10 µs histogram bin의 상한) |
+| callback 최대 | 0.478~1.022 ms |
+| callback 반 주기/전체 주기 초과 | 각각 0/0 (회당 305~307 callbacks, 10 ms callback 기준) |
+| 장치 Start / 클립 Load | 68.4~72.9 ms / 0.367~0.452 ms |
+| 프로세스 CPU, 1코어 대비 / peak working set | 0.52~2.59% / 13.31~13.35 MB |
+| Update p99 | 27.0~66.4 µs (회당 99 calls) |
+
+이 수치는 **resident 무음 WAV 한 조건의 로컬 기준선**이다. callback 시간은 miniaudio mixer
+호출을 감싸며 장치 변환/driver 시간을 포함하지 않는다. CPU와 working set은 FMOD가 링크된
+probe 프로세스 전체 값이다. `callback_over_full=0`은 실행 중 hardware underrun 0의 증거가
+아니다. stream/decode/reverb·128 voice·실제 게임 틱·다른 장치·장시간 실행은 아직 측정하지
+않았다. 따라서 AU0 절대 CPU/메모리/시작 예산과 AU4/AU9 underrun 판정은 아직 정하지 않는다.
+
+### 11.11 2026-09-24 AU0 파형·루프·손상 입력 matrix
+
+로컬 게이트가 git 무시 `Build/Validation/AudioVoiceContract/Formats` 아래 다음 바이트를
+매번 생성하고 재생성 SHA-256 일치를 확인한다.
+
+- WAV: 48 kHz mono 16-bit PCM의 1 kHz sine(0.5 amplitude), 첫 sample만 24576인
+  impulse, 무음, 480 Hz 24주기/2400-frame(50 ms) 짧은 loop. offline miniaudio decode로
+  길이·대표 sample·loop 접합부 기울기를 값으로 검사했다.
+- MP3/FLAC: 기존 결정적 무음 파일과 별도로 4 MPEG frame(약 104 ms) 및 1 FLAC frame
+  (4096 sample, 약 85 ms)의 짧은 loop를 생성했다. offline 첫 128 PCM sample이 0인지
+  확인하고, 실장치에서 세 포맷 모두 250 ms 뒤에도 looping voice가 살아 있는지 검사했다.
+- WAV/MP3/FLAC 각각 corrupt·truncated·oversized-header 세 종류, 총 9개를 만든다.
+  oversized fixture는 실제 큰 파일이 아니라 **작은 파일이 큰 길이를 선언**한다. 각 파일의
+  `LoadClip` 거부, clip 표 부재, 파일명이 들어간 오류 문장을 검사한다. 별도 프로세스에
+  10초 제한을 걸어 디코더 정지도 실패로 만든다. OGG의 확장자 거부는 기존 폴더 스캔
+  단정이 계속 맡는다.
+
+Debug/Release 로컬 게이트가 통과했다(`audio-voice-matrix-debug-verified-20260924.log`,
+`audio-voice-matrix-release-final-20260924.log`; git 무시 산출물). FMOD 장치가 열렸는데
+miniaudio 시작만 실패한 실행도 이제 검사 생략이 아닌 실패다. 이 matrix는 첫 프레임 또는
+헤더가 망가진 입력을 다룬다. **정상 prefix 뒤쪽 손상·실제 대용량 파일·stream 중단은 아직
+거부/복구 계약이 없다.** MP3/FLAC의 비무음 sine·impulse를 재현 가능하게 만드는 encoder
+경로도 남았다. 따라서 AU0는 여전히 부분 진행이다.
+
+### 11.12 2026-09-24 뒤쪽 절단·임시 resident 경계
+
+`tail.wav/mp3/flac`은 정상 파일의 첫 프레임을 보존하고 끝만 자른다. 생성 SHA-256은
+로컬 게이트에 포함했다. 정상 원본과 48 kHz mono offline 디코드 결과를 비교한 현재 결과:
+
+| 파일 | 원본 PCM frames | 절단본 PCM frames | 절단본 decoder 보고 길이 | 현재 `LoadClip`/`Play` |
+|---|---:|---:|---:|---|
+| WAV | 4,800 | 2,400 | 2,400 | 성공/성공 |
+| MP3 | 60,187 | 58,933 | 58,932 | 성공/성공 |
+| FLAC | 49,152 | 45,056 | 49,152 | 성공/성공 |
+
+MP3의 1-frame 차이는 44.1→48 kHz 디코더 길이 계산과 실제 반환 프레임의 차이로 관측됐고,
+이 fixture의 원본 대비 손실 판정에는 영향을 주지 않는다. **세 포맷 모두 실제 PCM이 사라졌는데
+backend가 적재와 보이스 시작을 허용한다.** 이것은 §11.11의 첫 프레임/헤더 손상 9건 통과와
+별개인 알려진 실패다. `LoadClip`이 첫 PCM만 확인하는 데다 miniaudio의 동기 predecode도
+불완전한 끝을 오류로 거부하지 않았다. 따라서 stream 오류·underrun 0을 주장하지 않는다.
+
+소스 점검에서 `StartVoice`에 `MA_SOUND_FLAG_STREAM`이 없음을 확인했다. 종전 기본 flag 0은
+인코딩된 파일을 메모리에 두고 mixer callback에서 디코드하는 경로였다. AU2의 저작 metadata가
+아직 없으므로 지금은 `MA_SOUND_FLAG_DECODE`로 **모든 보이스를 임시 resident**로 명시해
+재생 시작 전에 디코드한다. 첫 재생은 동기 디코드 비용을 낸다. `LoadClip`의 probe는 해제되므로
+이 변경을 클립 사전 적재나 실제 stream 지원으로 세지 않는다.
+
+fixture의 offline 디코드는 `WAVE_AUDIO_PROBE`에서만 `MiniaudioBackend.cpp`가 구현하는
+벤더 중립 검증 훅으로 옮겼다. 게이트는 `miniaudio.h` include 소유자가 이 구현 TU 하나인지
+검사한다. 공개 헤더와 probe TU에는 벤더 헤더가 없다.
+
+변경 뒤 동일 WASAPI 장치(48 kHz/2채널, 480-frame callback)의 Release 5회·32 looping WAV·
+회당 3초 실측: callback p99 상한 **0.30~0.36 ms**, 반 주기 초과 **0회**, 장치 Start
+**67.1~77.7 ms**, `LoadClip` **0.381~0.407 ms**, 첫 `Play` **0.144~0.162 ms**,
+32개 `Play` 합계 **0.314~0.486 ms**. 이 짧은 resident WAV 표본만으로 종전 기준선 대비
+개선률이나 제품 예산을 확정하지 않는다. 로그는
+`Build/Validation/audio-tail-resident-release-final-20260924.log`와
+`audio-tail-resident-debug-final-20260924.log`(git 무시 산출물)다.
+
+뒤쪽 손상 fail-closed는 AU2의 포맷별 원본 검증·cooked metadata와 AU3의 stream decode
+오류·job-thread 수명 계약에서 닫아야 한다. 실제 stream read/underrun 측정은 그 경로가 생긴
+뒤에만 가능하다.
+
+### 11.13 2026-09-24 AU2 자산 등록 포맷 경계
+
+Editor Asset DB의 등록 확장자와 asset GUID 계약 게이트를 WAV/MP3/FLAC으로 맞췄다.
+OGG는 신규 `.meta` 생성에서 거부하며, 기존 OGG `.meta`가 watcher 알림으로 들어와도
+Editor DB가 catalog에 등록하지 않는다. 기존 FMOD `SoundManager`의 제품 적재 경로는
+AU7 전환 전까지 그대로이며, 일반 `DataSystem` 부팅 catalog와 packer의 전체 Assets
+복사는 아직 AU2의 오디오 정책을 적용하지 않는다. 따라서 이 단계는 **Editor DB의 진입
+경계**만 닫았고, 패키지 OGG 거부나 AudioClip cook 완료로 세지 않는다.
+
+Debug x64 `CreatorEditor.vcxproj` 전체 빌드는 통과했다. `verify-asset-guid-contract.ps1`은
+170개 `.meta`를 파싱했으나 Strict 판정은 이 변경과 무관한 기존
+`Dynamic_CPP/Assets/Prefabs/ImmProbe.prefab.meta`의 tracked/ignore 충돌 1건으로 실패했다.
+비 Strict 실행은 종료 코드 0이지만 `identityReady=false`라 AU2 완료 근거로 쓰지 않는다.
+
+### 11.14 2026-09-24 AU2 오디오 source stamp와 import 설정
+
+Editor의 `.meta` 생성은 지원 오디오에 한해 `audioClip` schema 1 블록을 기록한다.
+`loadMode=Auto`, `spatialKind=NonSpatial`이 신규 기본값이며, 재저작 때는 기존의
+`Auto|Resident|Stream`, `PointMono|NonSpatial` 값을 보존하고 잘못된 값은 거부한다.
+identity는 현재 일반 자산 계약의 canonical UUIDv4 `guid`를 사용한다. source에서
+생성하는 `codec`, `payloadSize`, `sourceContentHash`(SHA-256)는 저작 설정과 분리해
+매번 다시 계산한다. 파일 전체를 64 KiB 단위로 읽으며 크기·수정 시각이 읽는 동안
+바뀌면 등록하지 않는다. 확장자별 최소 시그니처와 빈 파일도 거부한다.
+
+이 source stamp는 **처음부터 완전한 encoded stream임을 증명하지 않는다**. 특히 정상
+prefix 뒤쪽 절단은 원본과 다른 크기·해시로 관측되지만, 최초 import만으로 원래
+바이트를 알 수 없으므로 여전히 `audioClip` meta가 만들어질 수 있다. 다음 cook 단계는
+저장된 stamp와 source를 대조하고 전체 프레임·channels·sampleRate·frameCount를
+검증해야 한다. 현재 `wave` 런타임은 아직 이 meta를 읽지 않는다.
+
+생성 WAV/MP3/FLAC 세 포맷, 뒤쪽 절단의 stamp 변화, 손상 시그니처·OGG 거부를
+기존 offline fixture probe에 추가했다. 첫 실행에서 8바이트 FLAC이 시그니처만으로
+통과하는 것을 검출해 STREAMINFO 최소 길이·형태 검사를 보강했고, 재실행한 Debug
+로컬 오디오 게이트 전체가 통과했다(`Build/Validation/audio-meta-debug-final-20260924.log`,
+git 무시 산출물).
+
+### 11.15 2026-09-24 AU2 cook 입력 봉쇄
+
+`AssetCooker`의 source identity table 작성 단계에서 Assets 루트 전체의 오디오
+입력을 확인한다. WAV/MP3/FLAC은 `.meta`가 반드시 있어야 하며, 저장된 schema 1의
+`loadMode`·`spatialKind`·`codec`·`payloadSize`·`sourceContentHash`를 현재 원본과
+대조한다. 같은 크기의 바이트 변경도 SHA-256 불일치로 실패한다. OGG 파일은 `.meta`
+유무와 관계없이 거부한다. 이 검사는 staging 디렉터리를 만들기 전이므로 실패한
+입력이 부분 cook 출력으로 게시되지 않는다.
+
+`verify-audio-cook-stamp.ps1`은 git 무시 위치에 만든 작은 WAV와 기존 texture로
+AssetCooker를 실제 실행했다. 정상 2회 manifest digest 일치, 같은 크기의 원본 변경,
+잘못된 import 설정, OGG, 누락된 audio sidecar의 거부와 출력 부재가 통과했다.
+Debug x64 AssetCooker·Editor 빌드도 통과했다. 기존 범용
+`verify-experiment-asset-cooker.ps1`은 저장소의
+`Library/ModelAssetGenerations/8a69bd42-f950-8265-9c0e-0ff597095141/8`
+부재로 조기에 중단돼 이번 변경의 회귀 판정에는 사용하지 못했다.
+
+이 시점에는 audio cooked artifact/manifest entry가 없었다. packer가 원본 Assets를
+복사하므로 cook 이후 pack 전 바이트 변경까지 이 stamp가 보호하지 않는다.
+처음부터 절단된 원본은 동일한 절단본으로 stamp를 만들 수 있으므로, 전체 encoded
+frame 검증도 별도 작업으로 남았다. 당시 miniaudio 디코더는 SceneRuntime의
+`MiniaudioBackend.cpp` 한 TU에 있고 AssetCooker는 RenderEngine·Utility만 링크했다.
+이어 오프라인 decode 경계와 WAV/MP3/FLAC의 컨테이너 끝 조건을 검사한 뒤
+오디오 artifact와 bounded payload range를 게시해야 한다.
+
+### 11.16 2026-09-24 AU2 오프라인 encoded stream 검증
+
+`AssetCooker`에 독립적인 miniaudio 구현 TU를 추가해 cook 입력 오디오를 끝까지
+디코드한다. 장치·엔진·resource manager·threading 기능은 이 도구에서 끈다.
+WAV는 RIFF 선언 크기와 실제 파일 길이를, FLAC은 STREAMINFO의 총 sample 수와
+실제 디코드 PCM frame 수를 대조한다. MP3는 ID3v2/ID3v1 경계를 제외한 MPEG
+Layer III frame chain이 파일 끝까지 정확히 이어지는지 확인한다. 디코더가 보고한
+채널은 mono/stereo, sample rate는 양수여야 하며 `PointMono` 설정에는 mono만
+허용한다. 디코드 도중 원본이 바뀌지 않았는지도 마지막 크기·SHA-256 재검사로
+확인한다. 어느 검사든 실패하면 staging 생성 전에 cook을 중단한다.
+
+전용 `verify-audio-cook-stamp.ps1`의 Debug·Release 실행에서 정상 WAV/MP3/FLAC,
+각 포맷의 뒤쪽 절단본 3건(절단본에 맞춰 `.meta`를 재작성), 손상·절단·과장 길이
+fixture 9건, stereo의 `NonSpatial` 허용과 `PointMono` 거부가 통과했다.
+Debug·Release x64 `AssetCooker.vcxproj` 빌드도 통과했다. 이 검증은 MP3의
+free-format 및 임의 확장 tag나 FLAC의 알 수 없는 총 sample 수 같은 입력을
+보수적으로 거부할 수 있고, CRC가 없는 MP3 frame 내부의 모든 음질 손상을
+증명하지 않는다.
+
+이 시점에는 오디오 cooked artifact/manifest entry, bounded payload range,
+AudioClipId·VFS 연결이 없었다. packer의 원본 Assets 복사 경로와 runtime stream
+read 오류·underrun 대응도 별도 잔여 작업이다.
+
+### 11.17 2026-09-24 AU2 오디오 artifact와 CEMF 게시
+
+AssetCooker는 검증한 모든 WAV/MP3/FLAC을 GUID 경로
+`Derived/Audio/<첫 두 자리>/<guid>.ceac`로 자동 게시한다. CEAC v1의 72바이트
+헤더는 codec, Auto/Resident/Stream, PointMono/NonSpatial, 채널, sample rate,
+PCM frame 수, encoded payload의 64비트 offset·길이와 payload SHA-256을 담는다.
+payload는 원본 encoded 바이트 그대로이며, CEMF v2에는 `AudioClip` kind 7,
+format version 1, 전체 artifact의 크기·SHA-256·경로를 기록한다. CEMF 버전은
+바꾸지 않고 기존 entry 레이아웃을 사용한다. 명시적인 model/texture 인자가 없어도
+오디오만 있는 Assets root를 cook할 수 있으며, 게시할 cooked asset이 전혀 없으면
+실패한다.
+
+검증 후 artifact 준비와 staging 기록 모두 64 KiB 단위로 source를 읽으면서 저장된
+크기·해시를 다시 대조한다. staging 헤더를 재판독하고 최종 폐포 스윕에서 모든
+artifact의 크기·해시를 stream 방식으로 확인한 뒤에만 출력 디렉터리를 원자적으로
+게시한다. 전용 게이트는 정상 WAV/MP3/FLAC의 header range, payload byte equality,
+CEMF kind/version/path/size/hash와 두 번 cook한 manifest digest 일치를 확인한다.
+손상·절단·OGG·누락/불일치 sidecar는 출력이 없음을 확인했다.
+
+이 시점에는 CEAC의 bounded range를 pak/VFS byte source로 열거나 backend에
+전달하는 제품 소비자가 없었다. packer가 원본 Assets를 복사하는 기존 경로도 남아 있으므로
+pack 이후 파일 변경 방지, AudioClipId 저작 참조와 package의 missing-reference
+fail-closed는 이어서 연결해야 한다.
+
+### 11.18 2026-09-24 AU2 cooked audio byte source
+
+`Pak::Archive`에 virtual entry의 `sizeOf`와 `readRange`를 추가했다. 호출 범위를
+entry의 uncompressed 길이에 대조하고 겹치는 chunk만 읽어 압축 해제한다. 읽기
+chunk는 최대 4 MiB로 제한하며, 암호화된 pak에서도 앞선 chunk의 CTR 소비량을
+반영한다. 기존 AES key handle이 초기화 직후 해제되는 작업 버퍼를 참조하던
+수명 오류도 고쳤다. `contains`·`readAll`·range 조회는 path hash 뒤 실제
+virtual path까지 대조한다.
+
+`CookedAssetCatalog::OpenAudioClip`은 GUID로 CEMF AudioClip entry를 찾고,
+loose cooked tree 또는 pak byte source에서 CEAC의 크기·헤더·전체 artifact
+SHA-256·payload SHA-256을 64 KiB 단위로 확인한다. 성공한 source의
+`ReadPayload`는 CEAC 헤더의 offset·길이를 벗어난 읽기를 거부한다. 소스가
+reader를 공유 소유하므로 반환한 범위 핸들의 reader 수명이 보존된다.
+
+`verify-audio-cooked-byte-source.ps1`은 실제 AssetPacker가 게시한 pak과
+loose tree에서 4개 클립(WAV 2·MP3·FLAC)을 열어 source bytes와 대조했다.
+97바이트 encrypted pak chunk 경계, 범위 밖 요청, 없는 GUID와 변조된 CEAC
+거부를 확인했다. pak의 legacy `readAll`도 같은 암호화 fixture로 대조했다.
+
+현재 pak reader는 range 호출마다 pak 파일을 다시 열고, clip open 시 전체
+artifact를 해시한다. 이는 bounded 메모리와 무결성 경계이며 realtime stream
+job/캐시의 성능 계약은 아니다. open 이후 파일이 바뀌지 않도록 mount를 고정하는
+수명 계약도 아직 필요하다. 제품 `AudioBackend::LoadClip`은 아직 원본 파일
+경로를 받으므로 이 source를 재생에 연결하는 일, AudioClipId 이관, stream
+decode·cancel/drain과 packer의 원본 audio 제외는 남아 있다.
+
+### 11.19 2026-09-24 AU2 cooked resident 재생 경로
+
+`CookedAudioClipSource`가 검증한 manifest GUID를 보존한다. `AudioService`와
+`AudioRuntime`은 이 source를 `ClipKey::FromGuid`로 등록하며, GUID 키와 동일한
+철자의 legacy filename 키는 다른 값으로 취급한다. 저작 씬 필드의 GUID 이관은
+아직 진행하지 않았다. `MiniaudioBackend`는 bounded CEAC payload를 메모리로
+읽고 SHA-256을 다시 확인한 뒤, metadata와 동일한 채널·sample rate·frame 수의
+PCM을 완전히 디코드해 적재한다. 보이스마다 독립된 `ma_audio_buffer`를 만들고
+공유 PCM을 소유하여 재생 중 언로드해도 callback이 해제된 메모리를 읽지 않는다.
+재생은 원본 파일 경로나 임시 추출 파일을 거치지 않는다.
+
+이 단계에서 `Auto`와 `Resident`는 decoded PCM과 encoded payload 각각 64 MiB
+이내일 때만 resident로 받는다. `Stream`은 작업자, 취소, seek/loop와 종료 시
+drain 계약이 아직 없어서 명시적으로 거부한다. 따라서 큰 `Auto` clip의 stream
+선택, source mount의 파일 identity 고정, 장시간 stream underflow 진단은 남아
+있다. resident는 적재할 때 해시를 다시 확인하므로 open 뒤 파일이 바뀌면
+거부하고, 적재 뒤에는 PCM snapshot을 재생한다. 기존 Editor/Player FMOD
+제품 경로는 AU7 전까지 그대로다.
+
+`verify-audio-cooked-byte-source.ps1`의 Debug·Release x64 실행에서 WAV 2개,
+MP3, FLAC 네 클립 모두 pak byte source에서 device 재생·언로드를 통과했다.
+loose/pak/encrypted range와 변조 거부 외에 open 뒤 payload 변경 거부,
+`Stream`의 resident 오인 적재 거부도 확인했다. `RenderEngine`과 `AssetCooker`
+Debug·Release 빌드를 다시 수행했다. Windows에서 staging 최종 rename이
+간헐적으로 access denied를 반환해, 출력 경로가 여전히 없고 오류가
+permission denied인 경우에만 제한된 재시도를 추가했다.
+
+### 11.20 2026-09-24 AU2 pak mount 읽기 수명
+
+stream worker가 CEAC를 읽기 전에 pak의 검증·읽기 대상이 같은 파일이어야 한다.
+종전 `Pak::Archive`는 인덱스를 읽은 뒤 파일을 닫고 `readRange`와 `readAll`
+호출마다 경로로 다시 열었다. 이제 Archive가 읽기 핸들을 수명 동안 보유하고
+writer 공유를 거부한다. 인덱스와 모든 payload 읽기가 그 핸들을 사용하며,
+동시 range 요청은 파일 커서 접근을 직렬화한다. `AssetPacker`는 후보 pak의
+index 검증 핸들을 닫은 뒤 파일을 최종 이름으로 게시한다.
+
+Debug·Release x64 AssetPacker 빌드와 `verify-audio-cooked-byte-source.ps1`
+네 클립 게이트가 통과했다. 암호화 pak에서 겹치는 range를 세 스레드가
+반복해도 동일한 바이트를 읽었고, mount 동안 파일 writer 열기는 거부됐다.
+`verify-pak-source-exclusion.ps1`도 통과했다. 이 변경은 pak mount의 파일
+수명을 고정한다. loose cooked tree reader는 여전히 경로 기반이며, 실제
+stream decode 작업자·취소·drain과 `Auto`의 cooked resident/stream 결정은
+후속 단계다.

@@ -1,4 +1,5 @@
 #include "CookedAssetManifest.h"
+#include "CookedAudioClipFormat.h"
 #include "../../Assets/AssetIdentityProfile.h" // MBC11: IsUuidV8
 
 #include <Windows.h>
@@ -70,6 +71,7 @@ namespace experiment::cooked
             case CookedAssetKind::ShaderMeta:
             case CookedAssetKind::Scene:
             case CookedAssetKind::Prefab:
+            case CookedAssetKind::AudioClip:
                 return true;
             }
             return false;
@@ -295,6 +297,13 @@ namespace experiment::cooked
                         "format version 0은 게시할 수 없다.");
                     valid = false;
                 }
+                if (entry.kind == CookedAssetKind::AudioClip
+                    && entry.formatVersion != kAudioClipArtifactVersion)
+                {
+                    AddIssue(issues, context + ".formatVersion",
+                        "지원하지 않는 audio artifact version이다.");
+                    valid = false;
+                }
                 if (!HasDigest(entry.contentSha256))
                 {
                     AddIssue(issues, context + ".contentSha256",
@@ -492,6 +501,13 @@ namespace experiment::cooked
         const std::string guid = Uuid::ToString(prefabAssetId.value);
         return "Derived/Prefabs/" + guid.substr(0u, 2u) + "/" + guid
             + ".prefab";
+    }
+
+    std::string MakeDerivedAudioClipArtifactPath(const AssetId& audioClipAssetId)
+    {
+        if (!IsAssetIdV4(audioClipAssetId)) return {};
+        const std::string guid = Uuid::ToString(audioClipAssetId.value);
+        return "Derived/Audio/" + guid.substr(0u, 2u) + "/" + guid + ".ceac";
     }
 
     bool ComputeSha256(std::span<const std::byte> bytes,

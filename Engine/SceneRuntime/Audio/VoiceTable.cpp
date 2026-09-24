@@ -5,14 +5,17 @@ namespace wave
     namespace
     {
         // 세대는 0 을 건너뛴다 — 값 초기화한 핸들(generation 0)이 유효해 보이면 안 된다.
-        [[nodiscard]] std::uint32_t NextGeneration(std::uint32_t current) noexcept
+        [[nodiscard]] std::uint32_t NextGeneration(
+            std::uint32_t current, std::uint32_t generationNamespace) noexcept
         {
-            const std::uint32_t next = current + 1u;
-            return (0u == next) ? 1u : next;
+            std::uint32_t sequence = ((current & 0x7FFFFFFFu) + 1u) & 0x7FFFFFFFu;
+            if (0u == sequence) sequence = 1u;
+            return generationNamespace | sequence;
         }
     }
 
-    VoiceTable::VoiceTable(std::size_t capacity)
+    VoiceTable::VoiceTable(std::size_t capacity, std::uint32_t generationNamespace)
+        : m_generationNamespace(generationNamespace & 0x80000000u)
     {
         m_slots.resize(capacity);
         for (std::size_t index = 0; index < capacity; ++index)
@@ -29,7 +32,7 @@ namespace wave
         m_freeSlots.pop_front();
 
         Slot& slot = m_slots[index];
-        slot.generation = NextGeneration(slot.generation);
+        slot.generation = NextGeneration(slot.generation, m_generationNamespace);
 
         slot.record = VoiceRecord{};
         slot.record.clip = request.clip;

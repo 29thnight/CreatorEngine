@@ -87,6 +87,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="AssetCooker.cpp" />
+    <ClCompile Include="AudioDecodeValidation.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Engine\RenderEngine\RenderEngine.vcxproj">

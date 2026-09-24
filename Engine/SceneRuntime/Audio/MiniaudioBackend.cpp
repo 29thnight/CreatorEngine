@@ -1,8 +1,18 @@
 #include "MiniaudioBackend.h"
+#include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <chrono>
 #include <deque>
+#include <limits>
 #include <unordered_map>
 #include <vector>
+
+#if defined(WAVE_AUDIO_PROBE)
+#include "../../../Tools/regression/audio_fixture_decoder.h"
+#endif
 
 // ★ miniaudio 를 여는 **유일한 자리**다. 구현까지 여기서 만든다
 //   (`MINIAUDIO_IMPLEMENTATION`). 벤더의 `miniaudio.c` 는 쓰지 않는다 — 같은 일을
@@ -18,6 +28,30 @@
 
 namespace wave
 {
+#if defined(WAVE_AUDIO_PROBE)
+    namespace probe
+    {
+        bool DecodePcmS16Mono48k(const std::filesystem::path& source,
+            std::size_t wantedFrames, std::vector<std::int16_t>& samples,
+            std::uint64_t& length)
+        {
+            ma_decoder decoder{};
+            const ma_decoder_config config = ma_decoder_config_init(ma_format_s16, 1u, 48000u);
+            if (MA_SUCCESS != ma_decoder_init_file(source.string().c_str(), &config, &decoder))
+                return false;
+            length = 0u;
+            (void)ma_decoder_get_length_in_pcm_frames(&decoder, &length);
+            samples.assign(wantedFrames, 0);
+            ma_uint64 framesRead = 0u;
+            const ma_result read = ma_decoder_read_pcm_frames(&decoder, samples.data(),
+                static_cast<ma_uint64>(wantedFrames), &framesRead);
+            ma_decoder_uninit(&decoder);
+            samples.resize(static_cast<std::size_t>(framesRead));
+            return (MA_SUCCESS == read || MA_AT_END == read) && framesRead == wantedFrames;
+        }
+    }
+#endif
+
     namespace
     {
         [[nodiscard]] ma_vec3f ToVector(const math::vector3& value) noexcept
@@ -32,6 +66,18 @@ namespace wave
 
     struct MiniaudioBackend::Implementation final
     {
+        static constexpr std::uint64_t kHistogramStepNs = 10'000u;
+        static constexpr std::size_t kHistogramBins = 2049u;
+        static constexpr std::uint64_t kResidentPcmBudgetBytes = 64u * 1024u * 1024u;
+
+        struct ResidentClip final
+        {
+            std::vector<float> pcm;
+            ma_uint32 channels{};
+            ma_uint32 sampleRate{};
+            ma_uint64 frames{};
+        };
+
         // 슬롯 하나가 백엔드 보이스 하나다.
         //
         // ★ `std::deque` 를 쓴다. `ma_sound` 는 **주소가 고정돼야 한다**(엔진의 노드
@@ -39,14 +85,74 @@ namespace wave
         struct VoiceSlot final
         {
             ma_sound sound{};
+            ma_audio_buffer buffer{};
+            std::shared_ptr<ResidentClip> resident;
             bool initialized{ false };
+            bool bufferInitialized{ false };
             bool paused{ false };
         };
 
         ma_engine engine{};
         bool engineReady{ false };
+        bool profileCallbacks{ false };
+        std::array<std::atomic<std::uint64_t>, kHistogramBins> callbackHistogram{};
+        std::atomic<std::uint64_t> callbackNanoseconds{ 0 };
+        std::atomic<std::uint64_t> callbackMaximumNs{ 0 };
+        std::atomic<std::uint64_t> callbacksOverHalfPeriod{ 0 };
+        std::atomic<std::uint64_t> callbacksOverFullPeriod{ 0 };
+        std::atomic<std::uint32_t> callbackMinimumFrames{ std::numeric_limits<std::uint32_t>::max() };
+        std::atomic<std::uint32_t> callbackMaximumFrames{ 0 };
+        AudioDeviceDiagnostics deviceDiagnostics{};
+
+        void ResetCallbackMetrics() noexcept
+        {
+            for (auto& bin : callbackHistogram) bin.store(0, std::memory_order_relaxed);
+            callbackNanoseconds.store(0, std::memory_order_relaxed);
+            callbackMaximumNs.store(0, std::memory_order_relaxed);
+            callbacksOverHalfPeriod.store(0, std::memory_order_relaxed);
+            callbacksOverFullPeriod.store(0, std::memory_order_relaxed);
+            callbackMinimumFrames.store(std::numeric_limits<std::uint32_t>::max(),
+                std::memory_order_relaxed);
+            callbackMaximumFrames.store(0, std::memory_order_relaxed);
+        }
+
+        static void ProfiledDataCallback(ma_device* device, void* output,
+            const void* input, ma_uint32 frames)
+        {
+            (void)input;
+            auto* const engine = static_cast<ma_engine*>(device->pUserData);
+            auto* const state = static_cast<Implementation*>(engine->pProcessUserData);
+            const auto begin = std::chrono::steady_clock::now();
+            (void)ma_engine_read_pcm_frames(engine, output, frames, nullptr);
+            const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now() - begin).count();
+            const std::uint64_t duration = static_cast<std::uint64_t>(std::max(elapsed, 0ll));
+            const std::size_t bin = static_cast<std::size_t>(std::min<std::uint64_t>(
+                duration / kHistogramStepNs, kHistogramBins - 1u));
+            state->callbackHistogram[bin].fetch_add(1, std::memory_order_relaxed);
+            state->callbackNanoseconds.fetch_add(duration, std::memory_order_relaxed);
+            std::uint64_t maximum = state->callbackMaximumNs.load(std::memory_order_relaxed);
+            while (maximum < duration && !state->callbackMaximumNs.compare_exchange_weak(
+                maximum, duration, std::memory_order_relaxed)) {}
+            std::uint32_t minimumFrames = state->callbackMinimumFrames.load(std::memory_order_relaxed);
+            while (minimumFrames > frames && !state->callbackMinimumFrames.compare_exchange_weak(
+                minimumFrames, frames, std::memory_order_relaxed)) {}
+            std::uint32_t maximumFrames = state->callbackMaximumFrames.load(std::memory_order_relaxed);
+            while (maximumFrames < frames && !state->callbackMaximumFrames.compare_exchange_weak(
+                maximumFrames, frames, std::memory_order_relaxed)) {}
+            if (device->sampleRate > 0u)
+            {
+                const std::uint64_t periodNs =
+                    1'000'000'000ull * frames / device->sampleRate;
+                if (duration * 2u >= periodNs)
+                    state->callbacksOverHalfPeriod.fetch_add(1, std::memory_order_relaxed);
+                if (duration >= periodNs)
+                    state->callbacksOverFullPeriod.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
 
         std::unordered_map<ClipKey, std::filesystem::path> clips;
+        std::unordered_map<ClipKey, std::shared_ptr<ResidentClip>> cookedClips;
         std::unordered_map<std::uint16_t, std::unique_ptr<ma_sound_group>> busGroups;
 
         std::deque<VoiceSlot> voices;
@@ -71,6 +177,12 @@ namespace wave
 
             ma_sound_stop(&slot.sound);
             ma_sound_uninit(&slot.sound);
+            if (slot.bufferInitialized)
+            {
+                ma_audio_buffer_uninit(&slot.buffer);
+                slot.bufferInitialized = false;
+            }
+            slot.resident.reset();
             slot.initialized = false;
             slot.paused = false;
             freeVoices.push_back(index);
@@ -95,9 +207,10 @@ namespace wave
         }
     };
 
-    MiniaudioBackend::MiniaudioBackend()
+    MiniaudioBackend::MiniaudioBackend(bool profileCallbacks)
         : m_implementation(std::make_unique<Implementation>())
     {
+        m_implementation->profileCallbacks = profileCallbacks;
     }
 
     MiniaudioBackend::~MiniaudioBackend()
@@ -113,6 +226,13 @@ namespace wave
         ma_engine_config config = ma_engine_config_init();
         config.sampleRate = settings.sampleRate;
         config.channels = settings.channels;
+        state.ResetCallbackMetrics();
+        state.deviceDiagnostics = {};
+        if (state.profileCallbacks)
+        {
+            config.dataCallback = &Implementation::ProfiledDataCallback;
+            config.pProcessUserData = &state;
+        }
 
         const ma_result result = ma_engine_init(&config, &state.engine);
         if (MA_SUCCESS != result)
@@ -126,6 +246,17 @@ namespace wave
 
         state.actual.sampleRate = ma_engine_get_sample_rate(&state.engine);
         state.actual.channels = ma_engine_get_channels(&state.engine);
+        if (const ma_device* const device = ma_engine_get_device(&state.engine))
+        {
+            state.deviceDiagnostics.backend = ma_get_backend_name(device->pContext->backend);
+            state.deviceDiagnostics.deviceName = device->playback.name;
+            state.deviceDiagnostics.periodFrames = device->playback.internalPeriodSizeInFrames;
+            state.deviceDiagnostics.bufferFrames = device->playback.internalPeriodSizeInFrames *
+                device->playback.internalPeriods;
+            if (device->pContext->backend == ma_backend_wasapi)
+                state.deviceDiagnostics.bufferFrames =
+                    device->wasapi.actualBufferSizeInFramesPlayback;
+        }
         state.engineReady = true;
         state.lastError.clear();
         return true;
@@ -154,6 +285,7 @@ namespace wave
         ma_engine_uninit(&state.engine);
         state.engineReady = false;
         state.clips.clear();
+        state.cookedClips.clear();
     }
 
     bool MiniaudioBackend::IsRunning() const
@@ -167,11 +299,33 @@ namespace wave
         if (!state.engineReady) return false;
         if (key.IsEmpty()) return false;
 
-        // ★ 경로를 적어 두는 것으로 끝내지 않는다. 한 번 열어 **디코드 가능한지**
-        //   확인하고 닫는다. 그래야 손상 파일이 "적재 성공, 재생 실패" 로 뒤늦게
-        //   드러나지 않는다. 이 왕복이 resource manager 캐시도 데워 둔다.
-        ma_sound probe{};
         const std::string path = source.string();
+        // Opening a sound can succeed from a valid FLAC STREAMINFO even when
+        // the first audio frame is truncated. Require one decoded PCM frame.
+        // Later stream corruption is an AU3/AU9 decode-error responsibility.
+        ma_decoder decoder{};
+        const ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, 1u, 0u);
+        const ma_result decoderResult = ma_decoder_init_file(path.c_str(), &decoderConfig, &decoder);
+        if (MA_SUCCESS != decoderResult)
+        {
+            state.lastError = std::string("클립을 디코드하지 못했다: ") + path + " — " +
+                ma_result_description(decoderResult);
+            return false;
+        }
+        float firstSample = 0.0f;
+        ma_uint64 framesRead = 0u;
+        const ma_result readResult = ma_decoder_read_pcm_frames(&decoder, &firstSample, 1u, &framesRead);
+        ma_decoder_uninit(&decoder);
+        if (MA_SUCCESS != readResult || 1u != framesRead)
+        {
+            state.lastError = "클립의 첫 오디오 프레임을 읽지 못했다: " + path;
+            return false;
+        }
+
+        // The probe validates resident decoding before publishing the key.
+        // It is released here; StartVoice uses DECODE so mixing does not
+        // decode the encoded file on the device callback.
+        ma_sound probe{};
         const ma_result result = ma_sound_init_from_file(&state.engine, path.c_str(),
             MA_SOUND_FLAG_DECODE | MA_SOUND_FLAG_NO_SPATIALIZATION, nullptr, nullptr, &probe);
         if (MA_SUCCESS != result)
@@ -183,18 +337,111 @@ namespace wave
         ma_sound_uninit(&probe);
 
         state.clips[key] = source;
+        state.cookedClips.erase(key);
+        state.lastError.clear();
+        return true;
+    }
+
+    bool MiniaudioBackend::LoadCookedClip(const ClipKey& key,
+        const experiment::cooked::CookedAudioClipSource& source)
+    {
+        namespace ck = experiment::cooked;
+        Implementation& state = *m_implementation;
+        if (!state.engineReady || !key.IsGuid()
+            || key != ClipKey::FromGuid(source.Id().value)) return false;
+        const auto& metadata = source.Metadata();
+        if (metadata.loadMode == ck::AudioLoadMode::Stream)
+        {
+            state.lastError = "stream 클립은 아직 작업자와 종료 계약이 없다";
+            return false;
+        }
+        if (metadata.frameCount == 0u || metadata.channels == 0u
+            || metadata.frameCount > Implementation::kResidentPcmBudgetBytes /
+                (metadata.channels * sizeof(float))
+            || source.PayloadSize() > Implementation::kResidentPcmBudgetBytes)
+        {
+            state.lastError = "resident 클립이 64 MiB 예산을 넘었다";
+            return false;
+        }
+
+        std::vector<std::byte> encoded(static_cast<std::size_t>(source.PayloadSize()));
+        std::string failure;
+        if (!source.ReadPayload(0u, encoded, failure)
+            || Hash::Sha256::Compute(encoded.data(), encoded.size()) != metadata.payloadSha256)
+        {
+            state.lastError = "cooked 클립 payload가 바뀌었거나 읽기에 실패했다: " + failure;
+            return false;
+        }
+
+        ma_decoder decoder{};
+        const ma_decoder_config config = ma_decoder_config_init(ma_format_f32, 0u, 0u);
+        const ma_result initialized = ma_decoder_init_memory(
+            encoded.data(), encoded.size(), &config, &decoder);
+        if (initialized != MA_SUCCESS)
+        {
+            state.lastError = std::string("cooked 클립 디코더 초기화 실패: ") +
+                ma_result_description(initialized);
+            return false;
+        }
+        ma_format format = ma_format_unknown;
+        ma_uint32 channels = 0u;
+        ma_uint32 sampleRate = 0u;
+        if (ma_decoder_get_data_format(&decoder, &format, &channels,
+            &sampleRate, nullptr, 0u) != MA_SUCCESS
+            || format != ma_format_f32 || channels != metadata.channels
+            || sampleRate != metadata.sampleRate)
+        {
+            ma_decoder_uninit(&decoder);
+            state.lastError = "cooked 클립 디코더 형식이 CEAC metadata와 다르다";
+            return false;
+        }
+        auto resident = std::make_shared<Implementation::ResidentClip>();
+        resident->channels = metadata.channels;
+        resident->sampleRate = metadata.sampleRate;
+        resident->frames = metadata.frameCount;
+        resident->pcm.resize(static_cast<std::size_t>(
+            metadata.frameCount * metadata.channels));
+        ma_uint64 decoded = 0u;
+        ma_result readResult = MA_SUCCESS;
+        while (decoded < metadata.frameCount)
+        {
+            ma_uint64 framesRead = 0u;
+            readResult = ma_decoder_read_pcm_frames(&decoder,
+                resident->pcm.data() + decoded * metadata.channels,
+                std::min<ma_uint64>(4096u, metadata.frameCount - decoded),
+                &framesRead);
+            decoded += framesRead;
+            if ((readResult != MA_SUCCESS && readResult != MA_AT_END)
+                || framesRead == 0u) break;
+        }
+        float extra[2]{};
+        ma_uint64 extraFrames = 0u;
+        if (decoded == metadata.frameCount)
+            readResult = ma_decoder_read_pcm_frames(&decoder, extra, 1u, &extraFrames);
+        ma_decoder_uninit(&decoder);
+        if (decoded != metadata.frameCount || extraFrames != 0u
+            || (readResult != MA_SUCCESS && readResult != MA_AT_END))
+        {
+            state.lastError = "cooked 클립 PCM 길이가 CEAC metadata와 다르다";
+            return false;
+        }
+        state.cookedClips[key] = std::move(resident);
+        state.clips.erase(key);
+        state.lastError.clear();
         return true;
     }
 
     void MiniaudioBackend::UnloadClip(const ClipKey& key)
     {
         m_implementation->clips.erase(key);
+        m_implementation->cookedClips.erase(key);
     }
 
     bool MiniaudioBackend::HasClip(const ClipKey& key) const
     {
         const Implementation& state = *m_implementation;
-        return state.clips.find(key) != state.clips.end();
+        return state.clips.find(key) != state.clips.end()
+            || state.cookedClips.find(key) != state.cookedClips.end();
     }
 
     BackendVoiceId MiniaudioBackend::StartVoice(const PlayRequest& request)
@@ -203,7 +450,9 @@ namespace wave
         if (!state.engineReady) return BackendVoiceId{};
 
         const auto clip = state.clips.find(request.clip);
-        if (clip == state.clips.end()) return BackendVoiceId{};
+        const auto cooked = state.cookedClips.find(request.clip);
+        if (clip == state.clips.end() && cooked == state.cookedClips.end())
+            return BackendVoiceId{};
 
         std::size_t index = 0;
         if (!state.freeVoices.empty())
@@ -219,16 +468,41 @@ namespace wave
 
         Implementation::VoiceSlot& slot = state.voices[index];
         const bool spatial = request.spatialBlend > 0.0f;
-        const ma_uint32 flags = spatial
-            ? static_cast<ma_uint32>(0)
-            : static_cast<ma_uint32>(MA_SOUND_FLAG_NO_SPATIALIZATION);
-
-        const std::string path = clip->second.string();
-        const ma_result result = ma_sound_init_from_file(&state.engine, path.c_str(),
-            flags, state.GroupFor(request.bus), nullptr, &slot.sound);
+        const ma_uint32 spatialFlag = spatial ? 0u : MA_SOUND_FLAG_NO_SPATIALIZATION;
+        const std::string name = request.clip.Text();
+        ma_result result = MA_SUCCESS;
+        if (cooked != state.cookedClips.end())
+        {
+            slot.resident = cooked->second;
+            ma_audio_buffer_config config = ma_audio_buffer_config_init(ma_format_f32,
+                slot.resident->channels, slot.resident->frames,
+                slot.resident->pcm.data(), nullptr);
+            config.sampleRate = slot.resident->sampleRate;
+            result = ma_audio_buffer_init(&config, &slot.buffer);
+            if (result == MA_SUCCESS)
+            {
+                slot.bufferInitialized = true;
+                result = ma_sound_init_from_data_source(&state.engine,
+                    reinterpret_cast<ma_data_source*>(&slot.buffer), spatialFlag,
+                    state.GroupFor(request.bus), &slot.sound);
+            }
+        }
+        else
+        {
+            // Legacy authoring files still decode before playback.
+            result = ma_sound_init_from_file(&state.engine, clip->second.string().c_str(),
+                MA_SOUND_FLAG_DECODE | spatialFlag,
+                state.GroupFor(request.bus), nullptr, &slot.sound);
+        }
         if (MA_SUCCESS != result)
         {
-            state.lastError = std::string("보이스를 만들지 못했다: ") + path + " — " +
+            if (slot.bufferInitialized)
+            {
+                ma_audio_buffer_uninit(&slot.buffer);
+                slot.bufferInitialized = false;
+            }
+            slot.resident.reset();
+            state.lastError = std::string("보이스를 만들지 못했다: ") + name + " — " +
                 ma_result_description(result);
             state.freeVoices.push_back(index);
             return BackendVoiceId{};
@@ -256,7 +530,7 @@ namespace wave
         if (MA_SUCCESS != ma_sound_start(&slot.sound))
         {
             state.ReleaseSlot(index);
-            state.lastError = "보이스를 시작하지 못했다: " + path;
+            state.lastError = "보이스를 시작하지 못했다: " + name;
             return BackendVoiceId{};
         }
         return BackendVoiceId{ static_cast<std::uint64_t>(index + 1u) };
@@ -362,5 +636,40 @@ namespace wave
     DeviceSettings MiniaudioBackend::ActualSettings() const noexcept
     {
         return m_implementation->actual;
+    }
+
+    AudioCallbackMetrics MiniaudioBackend::CallbackMetrics() const noexcept
+    {
+        const Implementation& state = *m_implementation;
+        AudioCallbackMetrics result{};
+        std::uint64_t cumulative = 0;
+        for (const auto& bin : state.callbackHistogram)
+            result.count += bin.load(std::memory_order_relaxed);
+        const std::uint64_t p99Rank = (result.count * 99u + 99u) / 100u;
+        for (std::size_t index = 0; index < state.callbackHistogram.size(); ++index)
+        {
+            cumulative += state.callbackHistogram[index].load(std::memory_order_relaxed);
+            if (p99Rank > 0u && cumulative >= p99Rank)
+            {
+                result.p99UpperNanoseconds = (index + 1u) * Implementation::kHistogramStepNs;
+                break;
+            }
+        }
+        if (result.count > 0u)
+        {
+            result.meanNanoseconds = state.callbackNanoseconds.load(std::memory_order_relaxed) /
+                result.count;
+            result.minimumFrames = state.callbackMinimumFrames.load(std::memory_order_relaxed);
+            result.maximumFrames = state.callbackMaximumFrames.load(std::memory_order_relaxed);
+        }
+        result.maxNanoseconds = state.callbackMaximumNs.load(std::memory_order_relaxed);
+        result.overHalfPeriod = state.callbacksOverHalfPeriod.load(std::memory_order_relaxed);
+        result.overFullPeriod = state.callbacksOverFullPeriod.load(std::memory_order_relaxed);
+        return result;
+    }
+
+    AudioDeviceDiagnostics MiniaudioBackend::DeviceDiagnostics() const
+    {
+        return m_implementation->deviceDiagnostics;
     }
 }

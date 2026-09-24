@@ -3,7 +3,9 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
     [string]$VisualStudioInstallation = '',
-    [int]$ShutdownTimeoutSeconds = 10
+    [int]$ShutdownTimeoutSeconds = 10,
+    [ValidateRange(0, 20)]
+    [int]$PerformanceRuns = 0
 )
 
 # 오디오 보이스 계약 게이트 — 로컬 검증 전용.
@@ -11,7 +13,7 @@ param(
 # ★ **run-all.ps1 에 배선하지 않는다.** 실제 오디오 장치를 요구하므로 무인 회귀
 #   세트의 전제와 맞지 않는다. 배선을 다시 긋는 동안 손으로 돌리는 자다.
 #
-# ★★ 음원은 저장소에 커밋하지 않는다. probe 가 실행마다 sine WAV 를 생성해
+# ★★ 음원은 저장소에 커밋하지 않는다. probe 가 실행마다 WAV/MP3/FLAC 을 생성해
 #   `Build/Validation/AudioVoiceContract`(git 무시) 아래에 쓴다.
 #
 # ★★★ 하네스 모양은 `verify-experiment-contract.ps1` 을 따랐다 — cl.exe 로 probe 를
@@ -80,6 +82,7 @@ $waveSources = @(
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\VoiceTable.cpp')
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\NullAudioBackend.cpp')
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\AudioRuntime.cpp')
+    (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\AudioHost.cpp')
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\MiniaudioBackend.cpp')
     (Join-Path $repoRoot 'Engine\SceneRuntime\Audio\ClipDirectory.cpp')
 )
@@ -89,6 +92,19 @@ foreach ($source in $waveSources) {
 foreach ($source in $engineSources) {
     if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "원본이 없다: $source" }
 }
+$audioProbeSources = @(
+    Get-ChildItem -LiteralPath (Join-Path $repoRoot 'Engine\SceneRuntime\Audio') -Recurse -File |
+        Where-Object { $_.Extension -in '.cpp', '.h' }
+    Get-ChildItem -LiteralPath $PSScriptRoot -File |
+        Where-Object { $_.Extension -in '.cpp', '.h' }
+)
+$vendorHeaderOwners = @(Select-String -Path $audioProbeSources.FullName `
+    -Pattern '^\s*#\s*include\s*[<"][^>"]*miniaudio\.h[>"]')
+$oneImplementation = Join-Path $repoRoot 'Engine\SceneRuntime\Audio\MiniaudioBackend.cpp'
+if ($vendorHeaderOwners.Count -ne 1 -or $vendorHeaderOwners[0].Path -ne $oneImplementation) {
+    throw 'miniaudio.h include는 MiniaudioBackend.cpp 구현 TU 한 곳에만 있어야 한다.'
+}
+Write-Host '[AUDIO VOICE] miniaudio.h 단일 구현 TU 확인'
 $engineLibNames = @('Utility_Framework')
 $vendorLibNamesByConfig = @{
     Debug   = @('fmtd', 'spdlogd')
@@ -149,7 +165,7 @@ Write-Host ("[AUDIO VOICE] {0} wave 컴파일 (/W4 /WX)" -f $Configuration)
 $waveObjectDir = Join-Path $outputDirectory 'wave'
 New-Item -ItemType Directory -Path $waveObjectDir -Force | Out-Null
 $waveCompileCommand = 'call "' + $vcvars + '" >nul && cl.exe ' + $common +
-    ' /W4 /WX ' + $externalFlags + ' /Fo:"' + $waveObjectDir + '\\" ' +
+    ' /W4 /WX /DWAVE_AUDIO_PROBE ' + $externalFlags + ' /Fo:"' + $waveObjectDir + '\\" ' +
     (($waveSources | ForEach-Object { '"' + $_ + '"' }) -join ' ')
 & $env:ComSpec /d /s /c $waveCompileCommand
 if ($LASTEXITCODE -ne 0) { throw "wave 컴파일 실패: exit $LASTEXITCODE" }
@@ -185,7 +201,7 @@ if (-not (Test-Path -LiteralPath $fmodLib -PathType Leaf)) {
 $libArguments += '"' + $fmodLib + '"'
 # miniaudio 의 Windows 백엔드가 쓰는 시스템 라이브러리. 벤더 소스는
 # `#pragma comment(lib, ...)` 를 심지 않으므로 여기서 준다.
-$libArguments += @('ole32.lib', 'user32.lib', 'advapi32.lib')
+$libArguments += @('ole32.lib', 'user32.lib', 'advapi32.lib', 'psapi.lib')
 
 Write-Host ("[AUDIO VOICE] {0} 링크" -f $Configuration)
 $linkCommand = 'call "' + $vcvars + '" >nul && link.exe /nologo /OUT:"' + $executable +
@@ -207,6 +223,101 @@ try {
     if ($runExit -eq 3) {
         Write-Host '[AUDIO VOICE] 오디오 장치가 없다 — 검사 불가(통과 아님)'
         exit 3
+    }
+
+    # The three generated format fixtures must be byte-identical on a second
+    # run. This mode does not initialize FMOD or open an audio device.
+    $fixtureRoot = Join-Path $repoRoot 'Build\Validation\AudioVoiceContract'
+    $fixtureFiles = @(
+        'Assets\Sounds\probe_tone.wav',
+        'Formats\silence.wav',
+        'Formats\sine.wav',
+        'Formats\impulse.wav',
+        'Formats\loop.wav',
+        'Formats\loop.mp3',
+        'Formats\loop.flac',
+        'Formats\silent.mp3',
+        'Formats\silent.flac',
+        'Formats\corrupt.wav',
+        'Formats\corrupt.mp3',
+        'Formats\corrupt.flac',
+        'Formats\truncated.wav',
+        'Formats\truncated.mp3',
+        'Formats\truncated.flac',
+        'Formats\tail.wav',
+        'Formats\tail.mp3',
+        'Formats\tail.flac',
+        'Formats\oversized.wav',
+        'Formats\oversized.mp3',
+        'Formats\oversized.flac'
+    )
+    $firstHashes = @{}
+    foreach ($relative in $fixtureFiles) {
+        $path = Join-Path $fixtureRoot $relative
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+            throw "fixture 가 없다: $path"
+        }
+        $firstHashes[$relative] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    }
+    & $executable 'fixture-only' $repoRoot
+    if ($LASTEXITCODE -ne 0) { throw "fixture 재생성 실패: exit $LASTEXITCODE" }
+    foreach ($relative in $fixtureFiles) {
+        $path = Join-Path $fixtureRoot $relative
+        $secondHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+        if ($secondHash -ne $firstHashes[$relative]) {
+            throw "fixture 바이트가 재생성 뒤 달라졌다: $relative"
+        }
+        Write-Host ("[AUDIO VOICE] fixture SHA-256 {0}: {1}" -f $relative, $secondHash)
+    }
+
+    Write-Host '[AUDIO VOICE] 생성 PCM fixture offline 검증'
+    & $executable 'fixture-verify' $repoRoot
+    if ($LASTEXITCODE -ne 0) { throw "PCM fixture 검증 실패: exit $LASTEXITCODE" }
+
+    # Hostile decoder inputs run in their own process so a vendor hang has a
+    # bounded, visible failure rather than freezing the full contract gate.
+    Write-Host '[AUDIO VOICE] 손상·절단·과장 헤더 matrix (10초 제한)'
+    $malformedStdout = Join-Path $outputDirectory 'malformed-stdout.log'
+    $malformedStderr = Join-Path $outputDirectory 'malformed-stderr.log'
+    $malformed = Start-Process -FilePath $executable -ArgumentList @('wave-malformed', $repoRoot) `
+        -PassThru -NoNewWindow -RedirectStandardOutput $malformedStdout `
+        -RedirectStandardError $malformedStderr
+    $malformedFinished = $malformed.WaitForExit(10000)
+    if (-not $malformedFinished) {
+        try { $malformed.Kill($true) } catch { }
+    }
+    if (Test-Path -LiteralPath $malformedStdout) {
+        Get-Content -LiteralPath $malformedStdout | ForEach-Object { Write-Host $_ }
+    }
+    if (Test-Path -LiteralPath $malformedStderr) {
+        Get-Content -LiteralPath $malformedStderr | ForEach-Object { Write-Host $_ }
+    }
+    if (-not $malformedFinished) { throw '손상 입력 디코더가 10초 안에 끝나지 않았다.' }
+    if ($malformed.ExitCode -ne 0) {
+        if ($malformed.ExitCode -eq 3) { exit 3 }
+        throw "손상 입력 matrix 실패: exit $($malformed.ExitCode)"
+    }
+
+    # Observe late truncation separately: LoadClip currently validates the
+    # first PCM frame only, so acceptance here is evidence, not a pass claim.
+    Write-Host '[AUDIO VOICE] 정상 prefix 뒤쪽 절단 감사 (15초 제한)'
+    $tailStdout = Join-Path $outputDirectory 'tail-stdout.log'
+    $tailStderr = Join-Path $outputDirectory 'tail-stderr.log'
+    $tailAudit = Start-Process -FilePath $executable -ArgumentList @('wave-tail-audit', $repoRoot) `
+        -PassThru -NoNewWindow -RedirectStandardOutput $tailStdout `
+        -RedirectStandardError $tailStderr
+    $tailFinished = $tailAudit.WaitForExit(15000)
+    if (-not $tailFinished) { try { $tailAudit.Kill($true) } catch { } }
+    if (Test-Path -LiteralPath $tailStdout) {
+        Get-Content -LiteralPath $tailStdout | ForEach-Object { Write-Host $_ }
+    }
+    if (Test-Path -LiteralPath $tailStderr) {
+        Get-Content -LiteralPath $tailStderr | ForEach-Object { Write-Host $_ }
+    }
+    if (-not $tailFinished) { throw '뒤쪽 절단 감사가 15초 안에 끝나지 않았다.' }
+    if ($tailAudit.ExitCode -ne 0) {
+        if ($tailAudit.ExitCode -eq 3) { exit 3 }
+        throw "뒤쪽 절단 감사 실패: exit $($tailAudit.ExitCode)"
     }
 
     # ── 종료 canary ────────────────────────────────────────────────────────
@@ -259,6 +370,17 @@ try {
     if ($noDevice) {
         Write-Host '[AUDIO VOICE] 오디오 장치가 없다 — 검사 불가(통과 아님)'
         exit 3
+    }
+
+    if ($runExit -eq 0 -and $shutdownExit -eq 0) {
+        for ($index = 1; $index -le $PerformanceRuns; ++$index) {
+            Write-Host ("[AUDIO VOICE] {0} 측정 {1}/{2} — 32 looping WAV voices, 3초" -f `
+                $Configuration, $index, $PerformanceRuns)
+            & $executable 'wave-performance' $repoRoot
+            if ($LASTEXITCODE -ne 0) {
+                throw "성능 샘플 실패: run $index exit $LASTEXITCODE"
+            }
+        }
     }
 }
 finally { $env:PATH = $previousPath }

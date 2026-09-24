@@ -1,5 +1,6 @@
 #pragma once
 #include <unordered_map>
+#include <unordered_set>
 
 #include "AudioBackend.h"
 #include "AudioService.h"
@@ -20,7 +21,8 @@ namespace wave
     class AudioRuntime final : public AudioService
     {
     public:
-        AudioRuntime(AudioBackend& backend, std::size_t voiceCapacity);
+        AudioRuntime(AudioBackend& backend, std::size_t voiceCapacity,
+            std::uint32_t generationNamespace = 0u);
         ~AudioRuntime() override;
 
         // Host 가 부른다. 장치를 열지 못하면 false — 그때 Host 가 Null 로 내려간다.
@@ -48,6 +50,8 @@ namespace wave
 
         [[nodiscard]] bool LoadClip(const ClipKey& key,
             const std::filesystem::path& source) override;
+        [[nodiscard]] bool LoadCookedClip(
+            const experiment::cooked::CookedAudioClipSource& source) override;
         void UnloadClip(const ClipKey& key) override;
         [[nodiscard]] std::vector<ClipKey> ListClipKeys() const override;
 
@@ -67,7 +71,7 @@ namespace wave
 
         // 클립 목록의 정본은 런타임이 든다 — 백엔드마다 "무엇을 적재했는가" 를
         // 되물을 수 있어야 할 이유가 없고, 에디터 피커는 백엔드와 무관해야 한다.
-        std::unordered_map<ClipKey, std::filesystem::path> m_clips;
+        std::unordered_set<ClipKey> m_clips;
 
         std::uint64_t m_frame{ 0 };
         bool m_started{ false };

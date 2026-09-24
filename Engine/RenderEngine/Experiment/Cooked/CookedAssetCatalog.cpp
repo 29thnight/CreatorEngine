@@ -1,4 +1,5 @@
 #include "CookedAssetCatalog.h"
+#include "CookedAudioClipSource.h"
 
 #include <algorithm>
 #include <set>
@@ -65,6 +66,19 @@ namespace experiment::cooked
         const std::u8string utf8Path(first, first + entry->sourcePath.size());
         return (derivedRoot_ / std::filesystem::path(utf8Path))
             .lexically_normal();
+    }
+
+    bool CookedAssetCatalog::OpenAudioClip(const AssetId& assetId,
+        std::shared_ptr<const ArtifactByteSource> bytes,
+        CookedAudioClipSource& out, std::string& failure) const
+    {
+        const CookedAssetManifestEntry* entry = Find(assetId);
+        if (!entry)
+        {
+            failure = "audio clip GUID is absent from cooked manifest";
+            return false;
+        }
+        return OpenCookedAudioClipEntry(*entry, std::move(bytes), out, failure);
     }
 
     std::size_t CookedAssetCatalog::CountOfKind(

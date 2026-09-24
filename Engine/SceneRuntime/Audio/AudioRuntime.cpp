@@ -1,12 +1,14 @@
 #include "AudioRuntime.h"
+#include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
 #include <algorithm>
 
 namespace wave
 {
-    AudioRuntime::AudioRuntime(AudioBackend& backend, std::size_t voiceCapacity)
+    AudioRuntime::AudioRuntime(AudioBackend& backend, std::size_t voiceCapacity,
+        std::uint32_t generationNamespace)
         : m_backend(backend)
-        , m_voices(voiceCapacity)
+        , m_voices(voiceCapacity, generationNamespace)
     {
     }
 
@@ -33,9 +35,8 @@ namespace wave
         m_voices.ForEachAlive([&alive](VoiceHandle handle, VoiceRecord&) { alive.push_back(handle); });
         for (const VoiceHandle handle : alive) Stop(handle);
 
-        for (const auto& [key, source] : m_clips)
+        for (const ClipKey& key : m_clips)
         {
-            (void)source;
             m_backend.UnloadClip(key);
         }
         m_clips.clear();
@@ -149,7 +150,17 @@ namespace wave
         if (key.IsEmpty()) return false;
         if (!m_backend.LoadClip(key, source)) return false;
 
-        m_clips[key] = source;
+        m_clips.insert(key);
+        return true;
+    }
+
+    bool AudioRuntime::LoadCookedClip(
+        const experiment::cooked::CookedAudioClipSource& source)
+    {
+        const ClipKey key = ClipKey::FromGuid(source.Id().value);
+        if (key.IsEmpty() || !m_started) return false;
+        if (!m_backend.LoadCookedClip(key, source)) return false;
+        m_clips.insert(key);
         return true;
     }
 
@@ -173,14 +184,14 @@ namespace wave
     {
         std::vector<ClipKey> keys;
         keys.reserve(m_clips.size());
-        for (const auto& [key, source] : m_clips)
+        for (const ClipKey& key : m_clips)
         {
-            (void)source;
             keys.push_back(key);
         }
         std::sort(keys.begin(), keys.end(), [](const ClipKey& left, const ClipKey& right)
         {
-            return left.Text() < right.Text();
+            if (left.Text() != right.Text()) return left.Text() < right.Text();
+            return left.IsGuid() < right.IsGuid();
         });
         return keys;
     }

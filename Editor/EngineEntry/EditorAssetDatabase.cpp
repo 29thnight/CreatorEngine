@@ -1,6 +1,7 @@
 #include "EditorAssetDatabase.h"
 
 #include "Interfaces/AssetAuthoringPort.h"
+#include "Assets/AudioClipSourceMetadata.h"
 #include "Assets/ModelAssetAuthoringTransaction.h"
 #include "Assets/ModelSidecarV2.h"
 #include "Experiment/Import/GltfSourceDependencies.h"
@@ -1480,7 +1481,7 @@ private:
 	{
 		std::lock_guard lock(m_authoringMutex);
 		const file::path targetFile = RemoveMetaExtension(metaPath);
-		if (!file::exists(targetFile)) return;
+		if (!file::exists(targetFile) || !IsTargetFile(targetFile)) return;
 		const FileGuid guid = LoadGuidFromMeta(metaPath);
 		if (guid != FileGuid{})
 		{
@@ -1606,6 +1607,9 @@ private:
 		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {})
 	{
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
+		// Audio import policy is explicit: an old .ogg sidecar must not make an
+		// unsupported source look cataloged through a direct CreateMeta call.
+		if (ToLower(targetFile.extension().string()) == ".ogg") return {};
 		if (assets::IsModelAuthoringSource(targetFile))
 		{
 			if (preferredGuid != FileGuid{})
@@ -1638,6 +1642,20 @@ private:
 			return guid;
 		}
 
+		const std::string extension = ToLower(targetFile.extension().string());
+		const bool audioSource = assets::IsAudioClipSource(targetFile);
+		assets::AudioClipSourceMetadata audioMetadata{};
+		if (audioSource)
+		{
+			std::string failure;
+			if (!assets::InspectAudioClipSource(targetFile, audioMetadata, failure))
+			{
+				Debug::PrintLog(spdlog::level::err, "Audio source import rejected: "
+					+ targetFile.string() + " (" + failure + ")");
+				return {};
+			}
+		}
+
 		const file::path metaPath = targetFile.string() + ".meta";
 		Authoring::WriteDocument document;
 		if (file::exists(metaPath))
@@ -1655,9 +1673,36 @@ private:
 		}
 		const Authoring::WriteNode root = document.Root();
 		root.SetMap();
+		std::string audioLoadMode = "Auto";
+		std::string audioSpatialKind = "NonSpatial";
+		if (audioSource)
+		{
+			const Authoring::ReadNode prior = root.Read()["audioClip"];
+			if (prior)
+			{
+				if (!prior.IsMap() || prior["schemaVersion"].As(0u)
+					!= assets::kAudioClipMetaSchemaVersion
+					|| !prior["loadMode"].IsScalar()
+					|| !prior["spatialKind"].IsScalar())
+				{
+					Debug::PrintLog(spdlog::level::err, "Audio clip meta schema is invalid: "
+						+ metaPath.string());
+					return {};
+				}
+				audioLoadMode = prior["loadMode"].AsString();
+				audioSpatialKind = prior["spatialKind"].AsString();
+				if (!assets::IsAudioLoadMode(audioLoadMode)
+					|| !assets::IsAudioSpatialKind(audioSpatialKind))
+				{
+					Debug::PrintLog(spdlog::level::err, "Audio clip import setting is invalid: "
+						+ metaPath.string());
+					return {};
+				}
+			}
+		}
 
 		const FileGuid guid = ResolveOrCreateGuid(targetFile, root, preferredGuid);
-		if (guid == FileGuid{}) return {};
+		if (guid == FileGuid{} || (audioSource && !guid.IsRandomV4())) return {};
 		if (preferredGuid != FileGuid{} && guid != preferredGuid)
 		{
 			Debug::PrintLog(spdlog::level::err, "Editor asset identity disagrees with canonical sidecar: "
@@ -1673,7 +1718,17 @@ private:
 		importSettings.Child("timestamp").SetScalar(timestampError
 			? 0 : timestamp.time_since_epoch().count());
 
-		const std::string extension = ToLower(targetFile.extension().string());
+		if (audioSource)
+		{
+			const Authoring::WriteNode audioClip = root.Child("audioClip");
+			audioClip.Child("schemaVersion").SetScalar(assets::kAudioClipMetaSchemaVersion);
+			audioClip.Child("loadMode").SetScalar(audioLoadMode);
+			audioClip.Child("spatialKind").SetScalar(audioSpatialKind);
+			audioClip.Child("codec").SetScalar(assets::AudioCodecName(audioMetadata.codec));
+			audioClip.Child("payloadSize").SetScalar(audioMetadata.payloadSize);
+			audioClip.Child("sourceContentHash").SetScalar(
+				Hash::ToHex(audioMetadata.sourceContentHash));
+		}
 		if (extension == ".cpp")
 		{
 			root.RemoveChild("reflectionFlag");
@@ -1862,7 +1917,7 @@ private:
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
 		".hlsl", ".slang", ".shadermeta", ".shader", ".cpp", ".cs",
-		".wav", ".mp3", ".ogg", ".spritefont",
+		".wav", ".mp3", ".flac", ".spritefont",
 		".terrain", ".bt", ".blackboard", ".prefab", ".volume",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
 		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity

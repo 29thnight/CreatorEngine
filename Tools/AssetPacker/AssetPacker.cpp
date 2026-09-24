@@ -460,21 +460,26 @@ int wmain(int argc, wchar_t* argv[])
 
         // Re-open before promotion. This validates the header/index hash and makes a
         // partial candidate impossible to publish as the canonical package.
-        const Pak::Archive archive(candidate);
-        const auto archivedFiles = archive.list();
-        if (archivedFiles.size() != files.size())
+        std::vector<Pak::Archive::FileInfo> archivedFiles;
         {
-            Fail("pak entry count mismatch after reopen");
-        }
-        for (std::size_t i = 0; i < files.size(); ++i)
-        {
-            if (archivedFiles[i].path != files[i].virtualPath ||
-                archivedFiles[i].size != fs::file_size(files[i].sourcePath))
+            const Pak::Archive archive(candidate);
+            archivedFiles = archive.list();
+            if (archivedFiles.size() != files.size())
             {
-                Fail("pak index differs from sorted input at: " + files[i].virtualPath);
+                Fail("pak entry count mismatch after reopen");
+            }
+            for (std::size_t i = 0; i < files.size(); ++i)
+            {
+                if (archivedFiles[i].path != files[i].virtualPath ||
+                    archivedFiles[i].size != fs::file_size(files[i].sourcePath))
+                {
+                    Fail("pak index differs from sorted input at: " + files[i].virtualPath);
+                }
             }
         }
 
+        // The verifier pins the candidate for its lifetime. Close that mount
+        // before atomically publishing the candidate under the output name.
         PromoteCandidate(candidate, output);
         if (args.listEntries)
         {

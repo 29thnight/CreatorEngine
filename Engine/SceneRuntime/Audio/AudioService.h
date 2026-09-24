@@ -5,6 +5,8 @@
 #include "ListenerState.h"
 #include "PlayRequest.h"
 
+namespace experiment::cooked { class CookedAudioClipSource; }
+
 namespace wave
 {
     // 오디오 서비스 계약. **이 헤더에 vendor 타입이 없다.**
@@ -70,6 +72,10 @@ namespace wave
         //   적재를 끝내야 통과하는 플래그를 기다려 **폴더가 없으면 영원히 멈췄다**.
         //   적재를 부르는 자가 명시적이면 그 셋이 한꺼번에 사라진다.
         virtual bool LoadClip(const ClipKey& key, const std::filesystem::path& source) = 0;
+        // Cooked clips use their manifest GUID. The source owns its mounted
+        // byte reader; backends must not turn it into an authoring file path.
+        virtual bool LoadCookedClip(
+            const experiment::cooked::CookedAudioClipSource& source) = 0;
         virtual void UnloadClip(const ClipKey& key) = 0;
 
         // ⑥ 에디터 클립 피커 전용. 런타임 경로는 이걸 부르지 않는다.

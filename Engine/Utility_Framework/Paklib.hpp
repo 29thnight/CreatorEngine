@@ -32,6 +32,8 @@
 
 #pragma once
 #include <cstdint>
+#include <algorithm>
+#include <limits>
 #include <vector>
 #include <string>
 #include <string_view>
@@ -47,10 +49,14 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <ranges>
+#include <share.h>
 
 #pragma warning(disable : 4996)
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
 #include <windows.h>
 #include <bcrypt.h>
 #pragma comment(lib, "bcrypt.lib")
@@ -92,6 +98,10 @@ namespace Pak {
     namespace Crypto {
         struct Aes256Ctr {
             BCRYPT_ALG_HANDLE hAlg{}; BCRYPT_KEY_HANDLE hKey{}; std::array<u8, 16> iv{}; // 128-bit counter/nonce
+            std::vector<u8> keyObject{}; // BCrypt key handle borrows this storage.
+            Aes256Ctr() = default;
+            Aes256Ctr(const Aes256Ctr&) = delete;
+            Aes256Ctr& operator=(const Aes256Ctr&) = delete;
             ~Aes256Ctr() { if (hKey) BCryptDestroyKey(hKey); if (hAlg) BCryptCloseAlgorithmProvider(hAlg, 0); }
 
             static std::array<u8, 16> makeCtrIV(const u8 salt[16], u64 fileId) {
@@ -103,12 +113,14 @@ namespace Pak {
             }
 
             void init(const std::array<u8, 32>& key, std::array<u8, 16> iv_) {
+                if (hKey) { BCryptDestroyKey(hKey); hKey = nullptr; }
+                if (hAlg) { BCryptCloseAlgorithmProvider(hAlg, 0); hAlg = nullptr; }
                 NTSTATUS st = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, nullptr, 0); if (st < 0) fail("BCryptOpenAlgorithmProvider");
                 st = BCryptSetProperty(hAlg, BCRYPT_CHAINING_MODE, (PUCHAR)BCRYPT_CHAIN_MODE_ECB, (ULONG)std::wcslen(BCRYPT_CHAIN_MODE_ECB) * sizeof(wchar_t), 0);
                 if (st < 0) fail("BCryptSetProperty ECB");
                 DWORD objLen = 0, r = 0; st = BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, (PUCHAR)&objLen, sizeof(objLen), &r, 0); if (st < 0) fail("GetProperty OBJECT_LENGTH");
-                std::unique_ptr<u8[]> obj(new u8[objLen]{});
-                st = BCryptGenerateSymmetricKey(hAlg, &hKey, obj.get(), objLen, (PUCHAR)key.data(), (ULONG)key.size(), 0);
+                keyObject.assign(objLen, 0u);
+                st = BCryptGenerateSymmetricKey(hAlg, &hKey, keyObject.data(), objLen, (PUCHAR)key.data(), (ULONG)key.size(), 0);
                 if (st < 0) fail("BCryptGenerateSymmetricKey");
                 iv = iv_;
             }
@@ -391,9 +403,17 @@ namespace Pak {
 
     class Archive {
         std::filesystem::path m_path; Header m_hdr{}; IndexHeader m_ih{}; std::vector<Entry> m_entries; std::unordered_map<u64, size_t> m_hashToIndex; std::optional<std::array<u8, 32>> m_key;
+        // Index and payload reads must refer to the same mounted file. Deny
+        // writers while this archive is alive; the lock protects FILE's cursor
+        // when multiple audio workers read different entries concurrently.
+        std::unique_ptr<std::FILE, decltype(&std::fclose)> m_file{ nullptr, &std::fclose };
+        mutable std::mutex m_readMutex;
     public:
         explicit Archive(std::filesystem::path pak, OpenOptions opt = {}) : m_path(std::move(pak)), m_key(std::move(opt.key)) {
-            std::FILE* fp = nullptr; _wfopen_s(&fp, m_path.wstring().c_str(), L"rb"); ensure(fp, "open pak");
+            std::FILE* raw = _wfsopen(m_path.wstring().c_str(), L"rb", _SH_DENYWR);
+            ensure(raw != nullptr, "open pak");
+            m_file.reset(raw);
+            std::FILE* fp = m_file.get();
             auto read = [&](void* p, size_t n) { if (std::fread(p, 1, n, fp) != n) fail("read pak"); };
             auto seek = [&](u64 ofs) { _fseeki64(fp, ofs, SEEK_SET); };
             read(&m_hdr, sizeof(m_hdr)); ensure(std::string_view(m_hdr.magic, 4) == "PAK1", "bad magic");
@@ -418,7 +438,6 @@ namespace Pak {
                 e.chunks.resize(e.chunkCount); for (u32 c = 0; c < e.chunkCount; c++) read(&e.chunks[c], sizeof(ChunkInfo));
                 m_hashToIndex[e.pathHash] = m_entries.size(); m_entries.emplace_back(std::move(e));
             }
-            std::fclose(fp);
         }
 
         struct FileInfo { std::string path; u64 size; bool encrypted; bool compressed; };
@@ -428,11 +447,97 @@ namespace Pak {
             return out;
         }
 
-        bool contains(std::string_view virtualPath) const { return m_hashToIndex.contains(fnv1a64(virtualPath)); }
+        bool contains(std::string_view virtualPath) const { return findExact(virtualPath).has_value(); }
+
+        std::optional<u64> sizeOf(std::string_view virtualPath) const {
+            const auto index = findExact(virtualPath);
+            if (!index) return std::nullopt;
+            return m_entries[*index].uncompressedSize;
+        }
+
+        // Reads only the chunks intersecting [offset, offset + out.size()).
+        // The range is relative to the uncompressed virtual file, not the pak.
+        void readRange(std::string_view virtualPath, u64 offset,
+            std::span<u8> out) const {
+            const auto index = findExact(virtualPath);
+            ensure(index.has_value(), "pak entry not found");
+            const Entry& e = m_entries[*index];
+            ensure(offset <= e.uncompressedSize
+                && out.size() <= e.uncompressedSize - offset,
+                "pak read range exceeds entry");
+            if (out.empty()) return;
+
+            std::lock_guard lock(m_readMutex);
+            std::FILE* const fp = m_file.get();
+            ensure(fp != nullptr, "pak mount is closed");
+
+            std::array<u8, 16> ctr{};
+            if (e.flags & 1) {
+                ensure(m_key.has_value(), "pak key required");
+                ctr = Crypto::Aes256Ctr::makeCtrIV(m_hdr.salt, e.fileId);
+            }
+            u64 logical = 0;
+            const u64 end = offset + out.size();
+            size_t copied = 0;
+            for (const ChunkInfo& chunkInfo : e.chunks) {
+                ensure(chunkInfo.uncompSize <= e.uncompressedSize - logical,
+                    "pak chunk extent exceeds entry");
+                ensure(e.chunkSize != 0u && e.chunkSize <= 4u * 1024u * 1024u
+                    && chunkInfo.uncompSize <= e.chunkSize
+                    && static_cast<u64>(chunkInfo.compSize)
+                        <= static_cast<u64>(e.chunkSize)
+                            + static_cast<u64>(e.chunkSize) / 255u + 16u,
+                    "pak chunk size is invalid");
+                const u64 chunkEnd = logical + chunkInfo.uncompSize;
+                if (chunkEnd > offset && logical < end) {
+                    ensure(chunkInfo.compSize != 0 && chunkInfo.uncompSize != 0,
+                        "pak chunk has empty payload");
+                    ensure(chunkInfo.ofs <= static_cast<u64>(
+                        (std::numeric_limits<std::int64_t>::max)()),
+                        "pak chunk offset exceeds seek range");
+                    ensure(_fseeki64(fp, chunkInfo.ofs, SEEK_SET) == 0,
+                        "seek pak range chunk");
+                    std::vector<u8> encoded(chunkInfo.compSize);
+                    ensure(std::fread(encoded.data(), 1, encoded.size(), fp)
+                        == encoded.size(), "read pak range chunk");
+                    if (e.flags & 1) {
+                        Crypto::Aes256Ctr aes;
+                        aes.init(*m_key, ctr);
+                        aes.crypt_inplace(encoded.data(), encoded.size());
+                    }
+                    std::vector<u8> plain;
+                    if (e.flags & 2) {
+                        Compression::LZ4Codec lz4;
+                        plain = lz4.decompress(encoded, chunkInfo.uncompSize);
+                    } else {
+                        plain = std::move(encoded);
+                    }
+                    ensure(plain.size() == chunkInfo.uncompSize,
+                        "pak range chunk decoded size mismatch");
+                    const u64 takeBegin = std::max(offset, logical);
+                    const u64 takeEnd = std::min(end, chunkEnd);
+                    const size_t sourceBegin = static_cast<size_t>(takeBegin - logical);
+                    const size_t take = static_cast<size_t>(takeEnd - takeBegin);
+                    std::memcpy(out.data() + copied, plain.data() + sourceBegin, take);
+                    copied += take;
+                }
+                if (e.flags & 1) {
+                    u64 blocks = (static_cast<u64>(chunkInfo.compSize) + 15u) / 16u;
+                    while (blocks-- != 0u) {
+                        for (int byte = 15; byte >= 8; --byte)
+                            if (++ctr[byte]) break;
+                    }
+                }
+                logical = chunkEnd;
+                if (logical >= end) break;
+            }
+            ensure(copied == out.size(), "pak range is incomplete");
+        }
 
         std::vector<u8> readAll(std::string_view virtualPath) const {
-            auto it = m_hashToIndex.find(fnv1a64(virtualPath)); ensure(it != m_hashToIndex.end(), "not found");
-            return readByIndex(it->second);
+            const auto index = findExact(virtualPath);
+            ensure(index.has_value(), "not found");
+            return readByIndex(*index);
         }
 
         void extractToFile(std::string_view virtualPath, const std::wstring& outPath) const {
@@ -442,9 +547,17 @@ namespace Pak {
         }
 
     private:
+        std::optional<size_t> findExact(std::string_view virtualPath) const {
+            const auto it = m_hashToIndex.find(fnv1a64(virtualPath));
+            if (it == m_hashToIndex.end()
+                || m_entries[it->second].path != virtualPath) return std::nullopt;
+            return it->second;
+        }
+
         std::vector<u8> readByIndex(size_t idx) const {
             const Entry& e = m_entries[idx];
-            std::FILE* fp = nullptr; _wfopen_s(&fp, m_path.wstring().c_str(), L"rb"); ensure(fp, "open pak");
+            std::lock_guard lock(m_readMutex);
+            std::FILE* const fp = m_file.get(); ensure(fp != nullptr, "pak mount is closed");
             auto read = [&](void* p, size_t n) { if (std::fread(p, 1, n, fp) != n) fail("read pak chunk"); };
             auto seek = [&](u64 ofs) { _fseeki64(fp, ofs, SEEK_SET); };
 
@@ -474,7 +587,7 @@ namespace Pak {
                 }
                 std::memcpy(out.data() + outOff, plain.data(), plain.size()); outOff += plain.size();
             }
-            std::fclose(fp); return out;
+            return out;
         }
     };
 

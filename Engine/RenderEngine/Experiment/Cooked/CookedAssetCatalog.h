@@ -4,12 +4,15 @@
 
 #include <cstddef>
 #include <filesystem>
+#include <memory>
 #include <span>
 #include <string>
 #include <vector>
 
 namespace experiment::cooked
 {
+    class ArtifactByteSource;
+    class CookedAudioClipSource;
     // CEMF 하나를 읽어 **GUID 로 묻는** 런타임 경계.
     //
     // ★ 이것이 대체하려는 것은 `DataSystem::LoadAssetCatalog` 다. 지금은 부팅
@@ -17,9 +20,9 @@ namespace experiment::cooked
     //   표를 만든다. pak 에 CEMF 가 실려 있으므로 그 스캔은 필요 없다 —
     //   바이너리 하나를 읽으면 같은 표가 나오고, **덤으로 의존까지 나온다.**
     //
-    // ★ **경계는 여기까지다.** catalog 는 조회만 한다. 실제 자산 로드는 I5 에서
-    //   렌더 경로가 `experiment::Model` 을 직접 소비할 때 붙는다. 그전까지 이
-    //   표의 소비자는 게이트 하나이고, 그 사실을 숨기지 않는다.
+    // ★ 모델·재질 소비는 별도 로더에 둔다. AU2 AudioClip은 여기서 GUID를
+    //   찾아 byte source의 CEAC/CEMF 무결성까지 확인한 뒤 bounded payload
+    //   reader를 돌려준다. 실제 오디오 backend 재생은 상위 계층의 책임이다.
     //
     // ★ CEMF v2는 두 표를 명시적으로 분리해 함께 싣는다. cooked entries는
     //   GUID→artifact, sourceAssets는 GUID→package source path다. Player는 후자로
@@ -64,6 +67,12 @@ namespace experiment::cooked
         // 읽는 consumer와 AssetMetaRegistry를 `.meta` 스캔 없이 연결한다.
         [[nodiscard]] std::filesystem::path ResolveSourcePath(
             const AssetId& assetId) const;
+
+        // GUID lookup plus CEAC/CEMF integrity verification. The byte source
+        // may address the loose cooked tree or a mounted pak.
+        [[nodiscard]] bool OpenAudioClip(const AssetId& assetId,
+            std::shared_ptr<const ArtifactByteSource> bytes,
+            CookedAudioClipSource& out, std::string& failure) const;
         [[nodiscard]] std::span<const AssetSourceManifestEntry> SourceAssets()
             const noexcept
         {

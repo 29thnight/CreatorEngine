@@ -47,7 +47,7 @@ namespace wave
     class VoiceTable final
     {
     public:
-        explicit VoiceTable(std::size_t capacity);
+        explicit VoiceTable(std::size_t capacity, std::uint32_t generationNamespace = 0u);
 
         // 빈 슬롯을 하나 잡아 기록을 채우고 핸들을 준다. 자리가 없으면 무효 핸들.
         //
@@ -102,5 +102,6 @@ namespace wave
         //   한눈에 읽힌다.
         std::deque<std::uint32_t> m_freeSlots;
         std::size_t m_aliveCount{ 0 };
+        std::uint32_t m_generationNamespace{ 0 };
     };
 }

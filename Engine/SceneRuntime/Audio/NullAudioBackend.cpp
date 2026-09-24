@@ -1,4 +1,5 @@
 #include "NullAudioBackend.h"
+#include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
 namespace wave
 {
@@ -19,13 +20,28 @@ namespace wave
             voice.playing = false;
             voice.paused = false;
         }
+        m_voices.clear();
+        m_clips.clear();
+        m_busVolumes.clear();
         m_running = false;
     }
 
     bool NullAudioBackend::LoadClip(const ClipKey& key, const std::filesystem::path& source)
     {
+        (void)source;
         if (key.IsEmpty()) return false;
-        m_clips[key] = source;
+        m_clips.insert(key);
+        return true;
+    }
+
+    bool NullAudioBackend::LoadCookedClip(const ClipKey& key,
+        const experiment::cooked::CookedAudioClipSource& source)
+    {
+        if (!m_running || !key.IsGuid()
+            || key != ClipKey::FromGuid(source.Id().value)
+            || source.Metadata().loadMode == experiment::cooked::AudioLoadMode::Stream)
+            return false;
+        m_clips.insert(key);
         return true;
     }
 

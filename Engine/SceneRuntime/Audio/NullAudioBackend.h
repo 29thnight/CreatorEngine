@@ -1,6 +1,7 @@
 #pragma once
 #include <deque>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "AudioBackend.h"
@@ -30,6 +31,8 @@ namespace wave
 
         [[nodiscard]] bool LoadClip(const ClipKey& key,
             const std::filesystem::path& source) override;
+        [[nodiscard]] bool LoadCookedClip(const ClipKey& key,
+            const experiment::cooked::CookedAudioClipSource& source) override;
         void UnloadClip(const ClipKey& key) override;
         [[nodiscard]] bool HasClip(const ClipKey& key) const override;
 
@@ -87,7 +90,7 @@ namespace wave
         DeviceSettings m_settings{};
         ListenerState m_listener{};
 
-        std::unordered_map<ClipKey, std::filesystem::path> m_clips;
+        std::unordered_set<ClipKey> m_clips;
         std::unordered_map<std::uint16_t, float> m_busVolumes;
 
         // id 는 1부터 매긴다 — 0 은 언제나 무효다.
