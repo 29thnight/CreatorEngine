@@ -204,11 +204,11 @@ Release 게임 패키지는 현재 **.NET 10 x64와 필요한 네이티브 런�
 
 ## 빌드와 검증
 
-### 공개 CI의 범위
+### 로컬 빌드 범위
 
-[현재 워크플로](.github/workflows/build.yml)는 Editor/Core 경계 검사와 핵심 엔진 라이브러리의 Debug·Release 빌드를 대상으로 합니다. FMOD 개발 바이너리가 저장소에 없으므로 **Editor/Player 링크·실행이나 실제 게임 패키징까지 확인하는 CI는 아닙니다.**
+엔진 빌드는 MSVC v145가 설치된 Windows 개발 환경에서 검증합니다. 공개 GitHub Actions에는 [브랜드·문서 페이지 배포](.github/workflows/website.yml)만 남아 있으며, 엔진 빌드 결과를 확인하는 CI는 없습니다. FMOD 개발 바이너리도 저장소에 없으므로 Editor/Player 링크·실행과 실제 게임 패키징은 별도로 검증해야 합니다.
 
-Debug 레그는 non-unity로 각 번역 단위의 include 자급성을 확인하고, Release 레그는 기본 unity 구성을 사용하도록 설정되어 있습니다. 로컬에서 같은 Debug 빌드 범위를 실행하려면 다음 명령을 사용합니다.
+Debug non-unity 빌드로 각 번역 단위의 include 자급성을 확인하려면 다음 명령을 사용합니다. Release 빌드는 기본 unity 구성을 사용합니다.
 
 ```powershell
 $targets = @(
