@@ -1,9 +1,11 @@
 ﻿#pragma once
 #include <windows.h>
 #include <functional>
+#include <string_view>
 #include <unordered_map>
 #include <shellapi.h> // 추가
 #include "DumpHandler.h"
+#include "CrashReporterClient.h"
 #include "WindowDesc.h"
 // <strsafe.h> include가 여기 있었다 (2026-08-10). 유일한 소비자가
 // 표시 모드 전환의 StringCchCopyW(대상 모니터 장치명 복사)였다.
@@ -106,31 +108,34 @@ public:
     /// 이제 후크 설치는 LogSystem 한 곳이 맡고, 여기는 기록만 한다.
     static void WriteCrashDump(void* exceptionPointers, const char* reason)
     {
-        // 무인 모드(--script/--exec로 돌린 CLI·CI)에서는 물어보지 않고 바로 남긴다.
-        // 대화상자를 띄우면 아무도 답하지 않아 그대로 멈춰 있다가 덤프 없이 죽는다.
-        if (!g_unattended)
-        {
-            const int answer = MessageBox(NULL, L"Should Create Dump ?", L"Exception",
-                MB_YESNO | MB_ICONQUESTION | MB_TOPMOST | MB_SETFOREGROUND);
-            if (IDYES != answer) return;
-        }
-
         auto* pointers = static_cast<EXCEPTION_POINTERS*>(exceptionPointers);
         HWND window = s_instance ? s_instance->m_hWnd : nullptr;
 
-        // 덤프 기록 중 다시 죽더라도 로그는 남도록 먼저 밀어낸다.
+        // The launcher runs again as a small, independent crash reporter. Keep
+        // this thread alive only until it has copied the exception and written
+        // the dump; the reporter can keep its dialog open after this process dies.
         Log::FlushNow();
+        const file::path externalDumpPath = MakeDumpFilePath();
+        crash_report::Session reporter;
+        if (!externalDumpPath.empty() && reporter.WriteDump(pointers, externalDumpPath,
+            reason, g_dumpType == DUMP_TYPE_FULL ? 2 : 1, g_unattended))
+        {
+            // Preserve the existing symbol-rich report. If this unstable process
+            // fails while building it, the independent reporter still has the dump
+            // and will write a small fallback report of its own.
+            std::string report = (nullptr != pointers)
+                ? BuildCrashReport(pointers)
+                : BuildAbnormalExitReport(reason, nullptr);
+            report += "[크래시] DumpWriterProcessId: " +
+                std::to_string(reporter.ReporterProcessId()) + "\n";
+            WriteCrashReportArtifacts(externalDumpPath, report, window);
+            reporter.ReportReady();
+            return;
+        }
 
-        // 순서가 핵심이다: .dmp를 먼저 쓰고 요약은 그 뒤에 만든다.
-        //
-        // 요약을 만드는 BuildCrashReport는 dbghelp로 스택을 걷고 std::string을
-        // 늘려 가는데, 힙이 손상됐거나 스택이 고갈된 프로세스에서는 바로 거기서
-        // 또 죽는다. 예전에는 요약이 먼저였던 탓에 로그에 CRASH 줄만 남고
-        // .dmp도 스택도 통째로 없어진 크래시가 실제로 있었다.
+        // An old or missing launcher must not turn a crash into "no dump".
+        CrashNotify("[크래시] 외부 기록자를 시작하지 못해 프로세스 내부에서 덤프를 기록합니다.");
         const file::path dumpPath = WriteMinidumpFile(pointers, g_dumpType);
-
-        // SEH 경로는 예외 컨텍스트가 있어 정확한 크래시 지점을 뜰 수 있다.
-        // 나머지(abort·terminate 등)는 지금 이 자리의 스택으로 대신한다.
         const std::string report = (nullptr != pointers)
             ? BuildCrashReport(pointers)
             : BuildAbnormalExitReport(reason, nullptr);
@@ -146,6 +151,27 @@ public:
     static void SetDumpType(DUMP_TYPE dumpType)
     {
         g_dumpType = dumpType;
+
+        // The CLI sets this flag after editor initialization. Crash handling is
+        // installed before that, so detect automation arguments here as well.
+        int argumentCount{};
+        wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &argumentCount);
+        if (arguments)
+        {
+            for (int i = 1; i < argumentCount; ++i)
+            {
+                const std::wstring_view argument(arguments[i]);
+                if (argument == L"--script" || argument == L"--exec" ||
+                    argument == L"--exec-args" || argument == L"--console" ||
+                    argument == L"--commandlet" ||
+                    argument == L"--commandlet-script")
+                {
+                    g_unattended = true;
+                    break;
+                }
+            }
+            LocalFree(arguments);
+        }
 
         // 덤프 종류가 정해지는 유일한 지점이라 여기서 기록자를 등록한다.
         // 후크 자체는 LogSystem이 걸어 두었고, 크래시 경로 전부(SEH·terminate·abort·

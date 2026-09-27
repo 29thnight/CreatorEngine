@@ -36,7 +36,7 @@
     </ClCompile>
     <Link>
       <SubSystem>$(LauncherSubsystem)</SubSystem>
-      <AdditionalDependencies>Shell32.lib;User32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>Shell32.lib;User32.lib;Dbghelp.lib;Comctl32.lib;Comdlg32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <Manifest>
@@ -48,7 +48,7 @@
       <AdditionalManifestFiles>$(MSBuildThisFileDirectory)..\..\Editor\EngineEntry\CreatorEditor.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
     </Manifest>
   </ItemDefinitionGroup>
-  <ItemGroup><ClCompile Include="RuntimeLauncher.cpp" /></ItemGroup>
+  <ItemGroup><ClCompile Include="RuntimeLauncher.cpp" /><ClCompile Include="CrashReporter.cpp" /></ItemGroup>
   <ItemGroup><ResourceCompile Include="EngineVersion.rc" /></ItemGroup>
   <ItemGroup Condition="'$(LauncherName)' == 'CreatorEditor'">
     <ResourceCompile Include="..\..\Editor\EngineEntry\Academy_4Q.rc" />

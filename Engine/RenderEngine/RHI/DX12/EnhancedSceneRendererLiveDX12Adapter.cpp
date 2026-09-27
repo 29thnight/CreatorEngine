@@ -15,6 +15,7 @@
 #include "PathFinder.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <utility>
 #include <vector>
@@ -65,6 +66,25 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
 {
     Impl& impl = *m_impl;
     if (!impl.resources.Initialize(width, height, outError)) return false;
+    uint32_t profilerPassCapacity = 64;
+#if defined(_DEBUG)
+    // 회귀 검사용으로만 질의 슬롯을 좁힌다. 실제 pass 실행은 그대로 두고
+    // 빠진 timestamp가 렌더러와 Collector 양쪽에 계상되는지 자극한다.
+    char queryLimit[16]{};
+    size_t queryLimitBytes = 0;
+    if (0 == getenv_s(&queryLimitBytes, queryLimit, sizeof(queryLimit),
+            "CREATOR_DX12_GPU_QUERY_LIMIT") && queryLimitBytes > 1 &&
+        queryLimitBytes <= sizeof(queryLimit))
+    {
+        char* end = nullptr;
+        const unsigned long parsed = std::strtoul(queryLimit, &end, 10);
+        if (end != queryLimit && *end == '\0' && parsed >= 1 && parsed <= 64)
+            profilerPassCapacity = static_cast<uint32_t>(parsed);
+    }
+    if (profilerPassCapacity != 64)
+        std::printf("[GPU profiler] query capacity %u (Debug validation)\n",
+            profilerPassCapacity);
+#endif
     if (!impl.commandPool.Initialize(impl.resources, 4, kFrameCount, outError) ||
         !impl.pipelines.Initialize(&impl.resources,
             PathFinder::CachePath("RHI/DX12/dx12_live.cache").wstring(), outError) ||
@@ -72,7 +92,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
         !impl.meshCache.Initialize(&impl.resources, outError) ||
         !impl.textureCache.Initialize(&impl.resources, outError) ||
         !impl.profiler.Initialize(impl.resources.GetDevice(),
-            impl.resources.GetCommandQueue(), 64, kFrameCount, outError))
+            impl.resources.GetCommandQueue(), profilerPassCapacity, kFrameCount, outError))
     {
         return false;
     }
@@ -147,6 +167,31 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownInterop()
 bool EnhancedSceneRendererLiveDX12Adapter::IsInitialized() const
 {
     return m_impl->resources.IsInitialized();
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::QueryVideoMemory(uint64_t& usedMB,
+    uint64_t& budgetMB) const
+{
+    if (!IsInitialized()) return false;
+    const RHIVideoMemoryInfo memory = m_impl->resources.QueryVideoMemory();
+    if (memory.budgetMB == 0) return false;
+    usedMB = memory.usedMB;
+    budgetMB = memory.budgetMB;
+    return true;
+}
+
+EnhancedSceneRendererLiveDX12Adapter::CounterSnapshot
+EnhancedSceneRendererLiveDX12Adapter::GetCounterSnapshot() const
+{
+    CounterSnapshot out{};
+    if (!IsInitialized()) return out;
+    const RHIUploadStats upload = m_impl->resources.GetUploadStats();
+    const auto descriptor = m_impl->resources.GetDescriptorRecycler().GetStats();
+    out.uploadBytes = upload.bytesAllocated;
+    out.uploadOverflows = upload.batchRollbacks;
+    out.descriptorAllocations = descriptor.allocations;
+    out.descriptorOverflows = descriptor.overflows;
+    return out;
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::BeginFrame(std::string& outError)
@@ -451,6 +496,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
         ? static_cast<double>(timings.queueEndTicks - timings.queueBeginTicks) * toMs : 0.0;
     outSpan.busyMs = static_cast<double>(timings.busyTicks) * toMs;
     outSpan.sliceCount = static_cast<uint32_t>(timings.slices.size());
+    outSpan.queryOverflowPasses = timings.overflowedPasses;
     outSpan.droppedSlices = timings.droppedSlices;
     outSpan.droppedSliceName = timings.droppedSliceName;
     outSpan.droppedSliceDeltaTicks = timings.droppedSliceDeltaTicks;

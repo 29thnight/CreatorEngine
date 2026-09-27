@@ -292,7 +292,10 @@ void DataSystem::Finalize()
     Materials.clear();
 	UITextures.clear();
 	SpriteSheets.clear();
-	m_retainedAssets.clear();
+	{
+		std::lock_guard retainedGuard(m_retainedAssetsMutex);
+		m_retainedAssets.clear();
+	}
 	{
 		std::lock_guard lock(m_retiredTextureMutex);
 		m_retiredTextureGenerations.clear();
@@ -1762,6 +1765,7 @@ job_handle DataSystem::LoadAssetBundleAsync(const AssetBundle& bundle)
 
 void DataSystem::RetainAssets(const AssetBundle& bundle)
 {
+	std::lock_guard retainedGuard(m_retainedAssetsMutex);
 	for (const auto& entry : bundle.assets)
 	{
 		file::path name = entry.assetName;
@@ -1789,11 +1793,21 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 
 void DataSystem::ClearRetainedAssets()
 {
+	std::lock_guard retainedGuard(m_retainedAssetsMutex);
 	m_retainedAssets.clear();
+}
+
+size_t DataSystem::SnapshotRetainedAssetCount() const
+{
+	std::lock_guard retainedGuard(m_retainedAssetsMutex);
+	size_t count = 0;
+	for (const auto& [type, names] : m_retainedAssets) count += names.size();
+	return count;
 }
 
 void DataSystem::UnloadUnusedAssets()
 {
+	std::lock_guard retainedGuard(m_retainedAssetsMutex);
 	// 캐시에서 지운다고 곧바로 파괴되는 것이 아니다.
 	// 컴포넌트·프록시·Model이 shared_ptr로 공동 소유하므로(2-2~2-5),
 	// 아직 사용 중인 에셋은 참조가 남아 살아 있고 실제 해제는 마지막 참조가

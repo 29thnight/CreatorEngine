@@ -2,6 +2,7 @@
 #include "AssetIdentityHex.h"
 
 #include "AuthoringParsedDocument.h"
+#include "AuthoringCookedDocument.h"
 #include "AuthoringWriteNode.h"
 
 #include <Windows.h>
@@ -127,14 +128,17 @@ namespace assets
         return out;
     }
 
-    bool ReadIdentityEpochHeader(std::string_view yaml, IdentityEpochHeader& out,
+    bool ReadIdentityEpochHeader(std::string_view documentBytes, IdentityEpochHeader& out,
         std::vector<EpochHeaderIssue>& outIssues)
     {
         const std::size_t before = outIssues.size();
         IdentityEpochHeader parsed;
         std::string parseError;
-        const Authoring::ParsedDocument document =
-            Authoring::ParsedDocument::ParseText(std::string(yaml), parseError);
+        const std::span<const std::byte> bytes{
+            reinterpret_cast<const std::byte*>(documentBytes.data()), documentBytes.size() };
+        const Authoring::ParsedDocument document = Authoring::IsCookedDocument(bytes)
+            ? Authoring::ParsedDocument::ParseCooked(bytes, parseError)
+            : Authoring::ParsedDocument::ParseText(std::string(documentBytes), parseError);
         if (!document)
         {
             AddIssue(outIssues, EpochHeaderIssueCode::InvalidDocument, "root", parseError);

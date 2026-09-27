@@ -110,6 +110,22 @@ namespace EnhancedSceneRenderer
         RenderThreadFrameScope(const RenderThreadFrameScope&) = delete;
         RenderThreadFrameScope& operator=(const RenderThreadFrameScope&) = delete;
     };
+
+    struct RenderThreadPhaseScope
+    {
+        explicit RenderThreadPhaseScope(RenderPhase phase)
+        {
+            const RenderThreadHooks& hooks = MutableRenderThreadHooks();
+            if (hooks.OnPhaseBegin) hooks.OnPhaseBegin(phase);
+        }
+        ~RenderThreadPhaseScope()
+        {
+            const RenderThreadHooks& hooks = MutableRenderThreadHooks();
+            if (hooks.OnPhaseEnd) hooks.OnPhaseEnd();
+        }
+        RenderThreadPhaseScope(const RenderThreadPhaseScope&) = delete;
+        RenderThreadPhaseScope& operator=(const RenderThreadPhaseScope&) = delete;
+    };
 }
 
 // GPU 구간을 받아 갈 자리. 프로세스 하나에 하나이고, 렌더러가 서기 전에
@@ -131,6 +147,8 @@ namespace
 
 namespace
 {
+    using EnhancedSceneRenderer::RenderPhase;
+    using EnhancedSceneRenderer::RenderThreadPhaseScope;
     // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
     // legacy Mesh 신원(m_hashingMesh)이다. 두 키는 D4b가 적은 대로 같은
     // 64비트 공간을 쓰므로 섞여도 충돌 가정이 같다.
@@ -726,10 +744,13 @@ namespace
             }
             if (nullptr == slot) { outError = "Vulkan 라이브 리드백 슬롯이 모두 사용 중"; return false; }
 
-            if (!resources.BeginFrame(outError))
             {
-                if (capture) capture->Fail(outError);
-                return false;
+                RenderThreadPhaseScope begin(RenderPhase::begin_frame);
+                if (!resources.BeginFrame(outError))
+                {
+                    if (capture) capture->Fail(outError);
+                    return false;
+                }
             }
             bool committed = false;
             struct FrameGuard
@@ -752,39 +773,46 @@ namespace
             } frameGuard{ resources, committed, capture, outError };
 
             const uint32_t frameIndex = static_cast<uint32_t>(frameCounter++);
-            commandPool.BeginFrame(commandPoolFrame);
-            textureCache.BeginFrame(frameIndex);
-            meshCache.BeginFrame(frameIndex);
-            const RHIDeviceMemoryPressureInfo pressureInfo = resources
-                .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
-            RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
-                pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
-            textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),
-                &evictionPass);
-            meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
-                &evictionPass);
-            if (!prepareFrame(outError)) return false;
+            {
+                RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
+                commandPool.BeginFrame(commandPoolFrame);
+                textureCache.BeginFrame(frameIndex);
+                meshCache.BeginFrame(frameIndex);
+                const RHIDeviceMemoryPressureInfo pressureInfo = resources
+                    .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
+                RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
+                    pressureInfo.memoryPressure, pressureInfo.targetReleaseBytes);
+                textureCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                    &evictionPass);
+                meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
+                    &evictionPass);
+                if (!prepareFrame(outError)) return false;
+            }
 
             slot->graph = std::make_shared<EnhancedRenderGraph>(
                 static_cast<IRenderDeviceServices&>(resources));
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
-            blackboard.Reset();
-
-            LiveFrameBinding binding{};
-            binding.viewIndex = viewIndex;
-            binding.readbackTarget = slot->readback;
-            binding.viewFlags = HasViewFlag(viewPacket.viewFlags,
-                EnhancedLiveViewFlags::SceneOverlay)
-                ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
-            desc.DeclareAll(blackboard, graph, frameContext, binding);
-            if (capture && !capture->Declare(resources, graph, blackboard,
-                    width, height, outError)) return false;
-
-            if (!blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
             {
-                outError = "Vulkan 라이브 공통 scene graph의 표시 출력이 없다";
-                return false;
+                RenderThreadPhaseScope build(RenderPhase::graph_build);
+                blackboard.Reset();
+
+                LiveFrameBinding binding{};
+                binding.viewIndex = viewIndex;
+                binding.readbackTarget = slot->readback;
+                binding.viewFlags = HasViewFlag(viewPacket.viewFlags,
+                    EnhancedLiveViewFlags::SceneOverlay)
+                    ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
+                desc.DeclareAll(blackboard, graph, frameContext, binding);
+                if (capture && !capture->Declare(resources, graph, blackboard,
+                        width, height, outError)) return false;
+
+                if (!blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
+                {
+                    outError = "Vulkan 라이브 공통 scene graph의 표시 출력이 없다";
+                    return false;
+                }
+                if (!graph.Compile(outError)) return false;
             }
 
             RHIRecordedBatchDesc batchDesc{};
@@ -794,16 +822,21 @@ namespace
             batchDesc.lifetimeToken = slot->graph;
             RHIRecordedBatch batch;
             RHISubmissionTicket batchTicket;
-            if (!graph.Compile(outError)) return false;
             LiveStopwatch recordWatch;
             recordWatch.Start();
-            if (!graph.RecordParallel(commandPool, 4, batchDesc, batch, outError))
-                return false;
+            {
+                RenderThreadPhaseScope record(RenderPhase::command_record);
+                if (!graph.RecordParallel(commandPool, 4, batchDesc, batch, outError))
+                    return false;
+            }
             lastNativeRecordMs = recordWatch.ElapsedMs();
-            if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
-                    resources, std::move(batch), batchTicket, outError)) return false;
-            lastGraphStats = graph.GetStats();
-            if (!resources.EndFrame(outError)) return false;
+            {
+                RenderThreadPhaseScope submit(RenderPhase::submit);
+                if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
+                        resources, std::move(batch), batchTicket, outError)) return false;
+                lastGraphStats = graph.GetStats();
+                if (!resources.EndFrame(outError)) return false;
+            }
             committed = true;
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
@@ -1201,6 +1234,7 @@ namespace
         double   gpuMinSubmitToBeginMs{ 0.0 };
         double   gpuMinEndToCollectMs{ 0.0 };
         uint64_t gpuCollectMismatches{ 0 };
+        uint64_t gpuQueryOverflowPasses{ 0 };
 
         // 마지막으로 수집에 성공한 것의 귀속. 숫자만 내고 **어느 프레임·어느 뷰
         // 것인지를 적지 않으면** 그 숫자가 맞는지 물을 수 없다 — 그것이 §0.5.10 이
@@ -1211,6 +1245,7 @@ namespace
         EnhancedLiveGpuSpan lastGpuSpan{};
         std::string lastGpuCollectError;
         uint64_t framesInFlight{ 0 };   // 펜스 미완으로 새 제출을 쉰 틱 수
+        uint32_t gpuMaxPendingSubmissions{ 0 };
         uint64_t viewOverflowSkips{ 0 }; // 뷰 상한(kMaxLiveCameraViews) 초과로 건너뛴 수
         uint64_t frameFailures{ 0 };     // 프레임 기록 실패 누적(일시적인 것 포함)
         bool     vulkanFirstFrameReported{ false };
@@ -1231,6 +1266,8 @@ namespace
 
         uint32_t lastDrawCount{ 0 };    // 이번 프레임 GBuffer 드로우(0이면 빈 화면이다)
         uint32_t lastBatchCount{ 0 };
+		uint32_t profileFrameDrawCount{ 0 }; // sum across views in one submission
+		uint32_t profileFrameBatchCount{ 0 };
         uint32_t lastDecalCount{ 0 };
         uint32_t lastDecalBatchCount{ 0 };
         uint32_t lastSpriteCount{ 0 };
@@ -1530,6 +1567,7 @@ namespace
             debugSnapshot.framesRendered = framesRendered;
             debugSnapshot.framesIdle = framesIdle;
             debugSnapshot.framesInFlight = framesInFlight;
+            debugSnapshot.gpuMaxPendingSubmissions = gpuMaxPendingSubmissions;
             debugSnapshot.publishedFrameId = publishedFrameId;
             debugSnapshot.consumedFrameId = consumedFrameId;
             debugSnapshot.sceneEpoch = sceneEpoch;
@@ -1557,6 +1595,7 @@ namespace
             debugSnapshot.gpuMinEndToCollectMs = gpuMinEndToCollectMs;
             debugSnapshot.gpuClock = dx12.ProfilerClock();
             debugSnapshot.gpuCollectMismatches = gpuCollectMismatches;
+            debugSnapshot.gpuQueryOverflowPasses = gpuQueryOverflowPasses;
             debugSnapshot.lastGpuFrameId = lastGpuFrameId;
             debugSnapshot.lastGpuSubmissionId = lastGpuSubmissionId;
             debugSnapshot.lastGpuViewId = lastGpuViewId;
@@ -3804,10 +3843,13 @@ namespace
             LivePipeline& p = *pipeline;
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
 
-            if (!dx12.BeginFrame(outError))
             {
-                if (capture) capture->Fail(outError);
-                return false;
+                RenderThreadPhaseScope begin(RenderPhase::begin_frame);
+                if (!dx12.BeginFrame(outError))
+                {
+                    if (capture) capture->Fail(outError);
+                    return false;
+                }
             }
 
             // 여기서부터는 커맨드 리스트가 열려 있다. 아래 어느 지점에서
@@ -3847,10 +3889,15 @@ namespace
                 ~CaptureHistoryGuard() { if (active) Reset(); }
             } historyGuard{ view, capture && capture->controlled };
             if (historyGuard.active) historyGuard.Reset();
-            if (!PreparePipelineFrame(p, viewIndex, outError)) return false;
+            {
+                RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
+                if (!PreparePipelineFrame(p, viewIndex, outError)) return false;
+            }
 
             lastDrawCount = p.gbuffer.GetLastDrawCount();
             lastBatchCount = p.gbuffer.GetLastBatchCount();
+			profileFrameDrawCount += lastDrawCount;
+			profileFrameBatchCount += lastBatchCount;
             lastDecalCount = p.decal.GetLastDecalCount();
             lastDecalBatchCount = p.decal.GetLastBatchCount();
             lastSpriteCount = p.sprite.GetLastItemCount();
@@ -3875,26 +3922,29 @@ namespace
             // litColor 폴백 체인(`X.GetOutput().IsValid() ? X : 이전값`)이 통째로
             // 사라진 것에 주목할 것. 그 일은 이제 블랙보드 슬롯이 한다 —
             // 수정 노드가 꺼지면 슬롯 값이 그대로 남는다.
-            p.blackboard.Reset();
-
-            LiveFrameBinding binding{};
-            binding.viewIndex = viewIndex;
-            binding.sharedTarget = slot.rhiTexture;
-            binding.viewFlags = HasViewFlag(view.viewFlags,
-                EnhancedLiveViewFlags::SceneOverlay)
-                ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
-
-            p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
-            if (capture && !capture->Declare(dx12.Resources(), graph, p.blackboard,
-                    p.width, p.height, outError)) return false;
-
-            if (!p.blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
             {
-                outError = "포스트 체인 출력이 없다";
-                return false;
-            }
+                RenderThreadPhaseScope build(RenderPhase::graph_build);
+                p.blackboard.Reset();
 
-            if (!graph.Compile(outError)) return false;
+                LiveFrameBinding binding{};
+                binding.viewIndex = viewIndex;
+                binding.sharedTarget = slot.rhiTexture;
+                binding.viewFlags = HasViewFlag(view.viewFlags,
+                    EnhancedLiveViewFlags::SceneOverlay)
+                    ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
+
+                p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
+                if (capture && !capture->Declare(dx12.Resources(), graph, p.blackboard,
+                        p.width, p.height, outError)) return false;
+
+                if (!p.blackboard.Get(LiveSlots::kDisplayLdr).IsValid())
+                {
+                    outError = "포스트 체인 출력이 없다";
+                    return false;
+                }
+
+                if (!graph.Compile(outError)) return false;
+            }
 
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
@@ -3905,16 +3955,22 @@ namespace
             RHISubmissionTicket batchTicket;
             LiveStopwatch recordWatch;
             recordWatch.Start();
-            if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc,
-                batch, outError)) return false;
+            {
+                RenderThreadPhaseScope record(RenderPhase::command_record);
+                if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc,
+                    batch, outError)) return false;
+            }
             p.lastNativeRecordMs = recordWatch.ElapsedMs();
             p.lastGraphStats = graph.GetStats();
-            if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
-                outError)) return false;
+            {
+                RenderThreadPhaseScope submit(RenderPhase::submit);
+                if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
+                    outError)) return false;
 
-            dx12.ResolveProfilerFrame(profilerToken);
+                dx12.ResolveProfilerFrame(profilerToken);
 
-            if (!dx12.EndFrame(outError)) return false;
+                if (!dx12.EndFrame(outError)) return false;
+            }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
@@ -4281,15 +4337,24 @@ namespace
                     if (hooks.OnStart) hooks.OnStart();
                 }
 
+                auto nextVideoMemorySample = std::chrono::steady_clock::now();
                 for (;;)
                 {
                     FrameSubmission submission;
                     {
                         std::unique_lock<std::mutex> queueLock(renderQueueMutex);
-                        renderQueueWake.wait(queueLock, [this]
                         {
-                            return renderThreadStopRequested || !renderQueue.empty();
-                        });
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            // A render thread can stay asleep for the entire capture
+                            // when no live frame is consumed. Close bounded idle
+                            // scopes so the profiler records that idle time and the
+                            // lane does not disappear from a live recording.
+                            renderQueueWake.wait_for(queueLock, std::chrono::milliseconds(100), [this]
+                            {
+                                return renderThreadStopRequested || !renderQueue.empty();
+                            });
+                        }
                         if (renderQueue.empty())
                         {
                             if (renderThreadStopRequested) break;
@@ -4304,6 +4369,8 @@ namespace
 
                     if (0 != renderThreadTestDelayMs)
                     {
+                        EnhancedSceneRenderer::RenderThreadPhaseScope delay(
+                            EnhancedSceneRenderer::RenderPhase::test_delay);
                         std::this_thread::sleep_for(
                             std::chrono::milliseconds(renderThreadTestDelayMs));
                     }
@@ -4315,7 +4382,85 @@ namespace
                         EnhancedSceneRenderer::RenderThreadFrameScope frameScope;
                         try
                         {
+							const auto& hooks = EnhancedSceneRenderer::MutableRenderThreadHooks();
+							const bool sampleCounters = hooks.OnCounters && hooks.ShouldSampleCounters &&
+								hooks.ShouldSampleCounters();
+							std::chrono::steady_clock::duration counterQueryTime{};
+							const auto beforeQueryStarted = std::chrono::steady_clock::now();
+							std::uint64_t beforeUploadBytes = 0, beforeUploadOverflows = 0;
+							std::uint64_t beforeDescriptors = 0, beforeDescriptorOverflows = 0;
+							if (sampleCounters && backend == EnhancedLiveBackend::DX12 && pipeline)
+							{
+								const auto before = dx12.GetCounterSnapshot();
+								beforeUploadBytes = before.uploadBytes;
+								beforeUploadOverflows = before.uploadOverflows;
+								beforeDescriptors = before.descriptorAllocations;
+								beforeDescriptorOverflows = before.descriptorOverflows;
+							}
+							else if (sampleCounters && backend == EnhancedLiveBackend::Vulkan && vulkanPipeline)
+							{
+								const auto upload = vulkanPipeline->resources.GetUploadStats();
+								beforeUploadBytes = upload.bytesAllocated;
+								beforeUploadOverflows = upload.batchRollbacks;
+								const auto descriptor = vulkanPipeline->resources.GetDescriptorRecyclerStats();
+								beforeDescriptors = descriptor.allocations;
+								beforeDescriptorOverflows = descriptor.allocationFailures;
+							}
+							if (sampleCounters) counterQueryTime += std::chrono::steady_clock::now() - beforeQueryStarted;
                             EnhancedSceneRenderer::TickLive(submission.frame);
+							if (sampleCounters)
+							{
+								const auto afterQueryStarted = std::chrono::steady_clock::now();
+								std::uint64_t afterUploadBytes = 0, afterUploadOverflows = 0;
+							std::uint64_t afterDescriptors = 0, afterDescriptorOverflows = 0;
+							if (backend == EnhancedLiveBackend::DX12 && pipeline)
+							{
+									const auto after = dx12.GetCounterSnapshot();
+									afterUploadBytes = after.uploadBytes;
+									afterUploadOverflows = after.uploadOverflows;
+									afterDescriptors = after.descriptorAllocations;
+									afterDescriptorOverflows = after.descriptorOverflows;
+								}
+								else if (backend == EnhancedLiveBackend::Vulkan && vulkanPipeline)
+								{
+									const auto upload = vulkanPipeline->resources.GetUploadStats();
+									afterUploadBytes = upload.bytesAllocated;
+									afterUploadOverflows = upload.batchRollbacks;
+									const auto descriptor = vulkanPipeline->resources.GetDescriptorRecyclerStats();
+									afterDescriptors = descriptor.allocations;
+									afterDescriptorOverflows = descriptor.allocationFailures;
+								}
+								counterQueryTime += std::chrono::steady_clock::now() - afterQueryStarted;
+								const EnhancedSceneRenderer::RenderThreadHooks::Counters sample{
+									afterUploadBytes >= beforeUploadBytes ? afterUploadBytes - beforeUploadBytes : 0,
+									afterUploadOverflows >= beforeUploadOverflows ? afterUploadOverflows - beforeUploadOverflows : 0,
+									afterDescriptors >= beforeDescriptors ? afterDescriptors - beforeDescriptors : 0,
+									afterDescriptorOverflows >= beforeDescriptorOverflows ? afterDescriptorOverflows - beforeDescriptorOverflows : 0,
+									profileFrameDrawCount, profileFrameBatchCount,
+									std::chrono::duration<double, std::micro>(counterQueryTime).count() };
+								hooks.OnCounters(static_cast<std::uint32_t>(submission.frame.frameId), sample);
+							}
+							// Query on the resource-owning thread at 4 Hz. No Editor/UI
+							// path touches the renderer's state or its lock for this graph.
+							const auto sampleTime = std::chrono::steady_clock::now();
+							if (hooks.OnVideoMemory && sampleTime >= nextVideoMemorySample)
+							{
+								nextVideoMemorySample = sampleTime + std::chrono::milliseconds(250);
+								std::uint64_t usedMB = 0;
+								std::uint64_t budgetMB = 0;
+								bool available = false;
+								if (backend == EnhancedLiveBackend::Vulkan && vulkanPipeline)
+								{
+									const RHIVideoMemoryInfo memory = vulkanPipeline->resources.QueryVideoMemory();
+									available = memory.budgetMB > 0;
+									usedMB = memory.usedMB;
+									budgetMB = memory.budgetMB;
+								}
+								else if (backend == EnhancedLiveBackend::DX12 && pipeline)
+									available = dx12.QueryVideoMemory(usedMB, budgetMB);
+								if (available)
+									hooks.OnVideoMemory(static_cast<std::uint32_t>(submission.frame.frameId), usedMB, budgetMB);
+							}
                         }
                         catch (const std::exception& exception)
                         {
@@ -4336,6 +4481,8 @@ namespace
                     }
 
                     {
+                        EnhancedSceneRenderer::RenderThreadPhaseScope complete(
+                            EnhancedSceneRenderer::RenderPhase::completion);
                         std::lock_guard<std::mutex> queueLock(renderQueueMutex);
                         renderInProgress = 0;
                         ++renderConsumed;
@@ -4979,7 +5126,13 @@ bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMillisec
 void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 {
     LiveState& state = GetLiveState();
-    std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
+    std::unique_lock<std::mutex> stateLock(state.renderStateMutex, std::defer_lock);
+    {
+        RenderThreadPhaseScope lockWait(RenderPhase::state_lock_wait);
+        stateLock.lock();
+    }
+	state.profileFrameDrawCount = 0;
+	state.profileFrameBatchCount = 0;
     state.controlledCaptureFrame = state.pbrCapture && state.pbrCapture->controlled
         && state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
         && inputFrame.frameId > state.pbrCapture->afterFrameId;
@@ -5034,20 +5187,19 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // 단계. App이 두 렌더 배리어를 모두 지난 뒤 호출하므로 씬 구조 변경과
     // 에디터 카메라 조작이 끝난 안정된 프레임 경계다. 카메라 수와 무관하게
     // 프록시는 한 번만 민다 — 카메라 값은 이미 frame packet에 밀봉돼 있다.
-    if (state.runtimeInitialized && state.renderScene && !sceneLoading)
     {
-		if (state.renderScene->BeginProxyFrame(frame.sceneEpoch))
-			ProxyCommandQueue->ExecuteBatch(*state.renderScene, frame.sceneEpoch,
-				std::move(state.activeDeltaBatch));
-		else
-			ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
-        // 프록시가 확정된 뒤에 드로우 풀을 모은다. 카메라를 보지 않는
-        // 일이라 뷰 루프 밖이고, 뷰는 이 풀을 절두체로 거르기만 한다
-        // (RenderSceneViewPlan ③).
-        state.BuildDrawPool();
-    }
-    else
-    {
+        RenderThreadPhaseScope proxy(RenderPhase::proxy_sync);
+        if (state.runtimeInitialized && state.renderScene && !sceneLoading)
+        {
+			if (state.renderScene->BeginProxyFrame(frame.sceneEpoch))
+				ProxyCommandQueue->ExecuteBatch(*state.renderScene, frame.sceneEpoch,
+					std::move(state.activeDeltaBatch));
+			else
+				ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
+            state.BuildDrawPool();
+        }
+        else
+        {
         // 로딩 중에는 frame은 건너뛰어도 delta를 잃으면 안 된다. consumer 보류
         // 큐에 두었다가 다음 renderable packet에서 epoch 규칙과 함께 적용한다.
         ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
@@ -5057,7 +5209,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
         //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
         state.drawPool.clear();
-        state.decals.clear();
+            state.decals.clear();
+        }
     }
 
     // ── Vulkan editor TickLive 공통 scene graph 경로 ──
@@ -5070,6 +5223,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     {
         if (state.vulkanPipeline)
         {
+            RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
             uint64_t promoted = 0;
             std::string validation;
             state.vulkanPipeline->PromoteCompleted(
@@ -5204,7 +5358,12 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 ++state.viewOverflowSkips;
                 continue;
             }
-            if (!state.CaptureFromView(frame, viewPacket))
+            bool captured = false;
+            {
+                RenderThreadPhaseScope capture(RenderPhase::view_capture);
+                captured = state.CaptureFromView(frame, viewPacket);
+            }
+            if (!captured)
             {
                 ++state.framesIdle;
                 continue;
@@ -5216,10 +5375,15 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 return state.PreparePipelineFrame(
                     p, static_cast<uint32_t>(viewIndex), prepareError);
             };
-            if (!p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
-                frame.frameId,
-                GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
-                prepareFrame, error, state.BeginPbrCapture(frame, viewPacket)))
+            bool rendered = false;
+            {
+                RenderThreadPhaseScope renderView(RenderPhase::view_render);
+                rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
+                    frame.frameId,
+                    GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
+                    prepareFrame, error, state.BeginPbrCapture(frame, viewPacket));
+            }
+            if (!rendered)
             {
                 if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
                     state.pbrCapture->Fail(error);
@@ -5268,6 +5432,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
             state.lastDrawCount = p.gbuffer.GetLastDrawCount();
             state.lastBatchCount = p.gbuffer.GetLastBatchCount();
+			state.profileFrameDrawCount += state.lastDrawCount;
+			state.profileFrameBatchCount += state.lastBatchCount;
             state.lastDecalCount = p.decal.GetLastDecalCount();
             state.lastDecalBatchCount = p.decal.GetLastBatchCount();
             state.lastSpriteCount = p.sprite.GetLastItemCount();
@@ -5306,6 +5472,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
     if (nullptr != state.pipeline)
     {
+        RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
         LivePipeline& p = *state.pipeline;
 
         // ── 자산 상주 관리 (②-b · ③) ──
@@ -5396,6 +5563,15 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
                     state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
                     state.lastGpuSpan = span;
+                    state.gpuQueryOverflowPasses += span.queryOverflowPasses;
+                    if (span.queryOverflowPasses > 0)
+                    {
+                        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                        if (sink.on_issue)
+                            sink.on_issue(static_cast<uint32_t>(
+                                view.slots[slotIndex].profilerToken.engineFrameId),
+                                span.queryOverflowPasses, false, "GPU query slots exhausted");
+                    }
 
                     // 길이 셋의 관계를 여기서 묻는다. 둘 다 손에 있는 자리가
                     // 여기뿐이고, 여기서 세야 모든 뷰의 모든 수집이 검사를 받는다.
@@ -5475,6 +5651,11 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 {
                     ++state.gpuCollectMismatches;
                     state.lastGpuCollectError = collectError;
+                    const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                    if (sink.on_issue)
+                        sink.on_issue(static_cast<uint32_t>(
+                            view.slots[slotIndex].profilerToken.engineFrameId),
+                            0, true, collectError.c_str());
                 }
                 ++state.framesRendered;
             }
@@ -5686,15 +5867,25 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             continue;
         }
 
-        if (!state.CaptureFromView(frame, viewPacket))
+        bool captured = false;
+        {
+            RenderThreadPhaseScope capture(RenderPhase::view_capture);
+            captured = state.CaptureFromView(frame, viewPacket);
+        }
+        if (!captured)
         {
             ++state.framesIdle;
             continue;
         }
 
         std::string error;
-        if (!state.RenderOnce(*view, renderSlot, frame.frameId, error,
-                state.BeginPbrCapture(frame, viewPacket)))
+        bool rendered = false;
+        {
+            RenderThreadPhaseScope renderView(RenderPhase::view_render);
+            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, error,
+                state.BeginPbrCapture(frame, viewPacket));
+        }
+        if (!rendered)
         {
             if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
                 state.pbrCapture->Fail(error);
@@ -5734,6 +5925,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
         state.consecutiveFrameFailures = 0;
         ++totalPending;
+        state.gpuMaxPendingSubmissions = (std::max)(
+            state.gpuMaxPendingSubmissions, static_cast<uint32_t>(totalPending));
         state.AddNativeRecordSample(p.lastNativeRecordMs);
         renderedAny = true;
     }

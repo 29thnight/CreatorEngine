@@ -143,6 +143,38 @@ int main()
             .wait();
         for (const auto& slot : ranges)
             require(slot == 1, "parallel_for tail coverage");
+        std::array<std::atomic<unsigned>, 73> indexed{};
+        const auto indexed_submitter = std::this_thread::get_id();
+        std::atomic<unsigned> indexed_on_submitter{0};
+        auto indexed_capture = std::make_shared<int>(42);
+        std::weak_ptr<int> indexed_weak = indexed_capture;
+        auto indexed_handle = scheduler.submit_indexed(indexed.size(),
+            [&, indexed_capture](std::size_t index) {
+                ++indexed[index];
+                if (std::this_thread::get_id() == indexed_submitter)
+                    ++indexed_on_submitter;
+            });
+        indexed_capture.reset();
+        indexed_handle.wait();
+        for (const auto& slot : indexed)
+            require(slot == 1, "indexed batch exactly once");
+        require(indexed_on_submitter == 0, "indexed batch stays on workers");
+        require(indexed_weak.expired(), "indexed completion releases captures");
+        scheduler.submit_indexed(0, [](std::size_t) {
+            throw std::runtime_error("empty indexed batch executed");
+        }).wait();
+        bool indexed_failed = false;
+        try
+        {
+            scheduler.submit_indexed(5, [](std::size_t index) {
+                if (index == 3) throw std::runtime_error("indexed failure");
+            }).wait();
+        }
+        catch (const std::runtime_error& error)
+        {
+            indexed_failed = std::string_view(error.what()) == "indexed failure";
+        }
+        require(indexed_failed, "indexed failure propagates");
         scheduler.parallel_for(0, 1, [](auto, auto) { throw std::runtime_error("empty range executed"); }).wait();
         rejected = false;
         try

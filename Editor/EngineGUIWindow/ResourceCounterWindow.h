@@ -2,6 +2,9 @@
 #include "ImGui.h"
 #include "EngineResourceCensus.h"
 #include <cstdint>
+#include <atomic>
+#include <chrono>
+#include <memory>
 
 // 리소스 카운터 HUD.
 //
@@ -13,6 +16,7 @@ class ResourceCounterWindow
 {
 public:
 	void Draw();
+	static void PublishFromGameThread(std::uint32_t frame);
 	~ResourceCounterWindow() = default;
 
 private:
@@ -57,9 +61,12 @@ private:
 		int64_t  gcPausePercentX100{ 0 };
 	};
 
-	Snapshot Capture(bool includeGpuObjects) const;
+	Snapshot Capture() const;
+	void Publish(std::uint32_t frame);
 	void DrawCountRow(const char* label, size_t current, size_t baseline) const;
 
 	Snapshot m_baseline{};
-	Snapshot m_lastGpuCensus{};   // 무거운 GPU 집계는 요청 시에만 갱신해 보관
+	std::atomic<std::shared_ptr<const Snapshot>> m_displayed{};
+	std::atomic<bool> m_requested{ false };
+	std::chrono::steady_clock::time_point m_lastSample{}; // game thread only
 };

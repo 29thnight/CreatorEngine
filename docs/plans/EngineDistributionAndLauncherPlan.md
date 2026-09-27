@@ -11,6 +11,7 @@
 관련 정본:
 
 - [RefactoringPlanDashboard.html](../RefactoringPlanDashboard.html) — PHASE 23 진행 상태
+- [Phase23LauncherReadiness.md](../analysis/Phase23LauncherReadiness.md) — 2026-09-23 DL0 소스·개발 배포 기준선과 미해결 설치 게이트
 - [EngineVersionPolicy.md](../design/EngineVersionPolicy.md) — 제품 세대·기능 릴리스·엔진 빌드·API 계약·채널의 확정 규칙
 - [BuildPipelinePlan.md](BuildPipelinePlan.md) — 빌드·Cook·Stage·Pak·Verify 파이프라인
 - [EngineLayerSeparationPlan.md](EngineLayerSeparationPlan.md) — Engine / Editor / Player 경계

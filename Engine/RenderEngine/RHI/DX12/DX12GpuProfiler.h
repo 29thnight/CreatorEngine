@@ -83,6 +83,8 @@ public:
         uint64_t queueEndTicks{ 0 };
         uint64_t busyTicks{ 0 };
         uint64_t ticksPerSecond{ 0 };
+        // 예약했지만 질의 힙 용량을 넘어 측정하지 못한 패스 수.
+        uint32_t overflowedPasses{ 0 };
 
         // 끝이 시작보다 **앞선** 조각. 큰 음수가 되므로 뺀다 — 다만 **숨기지
         // 않고 센다.** 예전에는 조용히 0 으로 바꿔 합계에 섞여 들어갔다.

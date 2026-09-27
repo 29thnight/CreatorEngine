@@ -1,14 +1,17 @@
 ﻿#pragma once
 #include "Core.Minimal.h"
+#include "EngineVersion.h"
 #include <wingdi.h>
 #include <commctrl.h>
+#include <algorithm>
+#include <iterator>
 
 #pragma comment(lib, "comctl32.lib")
 
 enum class ProgressWindowStyle
 {
     Basic,         // 텍스트 + 프로그레스바
-    InitStyle     // 배경이미지 + 프로그레스바
+    InitStyle     // 배경이미지 + 버전/로딩 단계 + 하단 프로그레스바
 };
 
 class ProgressWindow : public Singleton<ProgressWindow>
@@ -23,6 +26,11 @@ public:
     {
         m_style = style;
         m_imagePath = imagePath;
+        m_progress = 0;
+        m_step = 0;
+        m_totalSteps = 0;
+        m_stageText = L"Starting editor";
+        m_detailText = L"Preparing engine services...";
         InitCommonControls();
 
         // 창 생성 완료를 이벤트로 기다린다. 예전의 sleep(300)은 느린 디스크에서
@@ -56,14 +64,37 @@ public:
 
     void SetProgress(int value)
     {
+        if (m_style == ProgressWindowStyle::InitStyle && m_hWnd)
+        {
+            SendMessageW(m_hWnd, kProgressMessage, static_cast<WPARAM>(std::clamp(value, 0, 100)), 0);
+            return;
+        }
         if (m_hProgress)
             SendMessage(m_hProgress, PBM_SETPOS, value, 0);
     }
 
     void SetStatusText(const std::wstring& text)
     {
+        if (m_style == ProgressWindowStyle::InitStyle && m_hWnd)
+        {
+            SendMessageW(m_hWnd, kStatusMessage, 0, reinterpret_cast<LPARAM>(&text));
+            return;
+        }
         if (m_hText)
             SetWindowTextW(m_hText, text.c_str());
+    }
+
+    void SetBootStatus(const std::wstring& stage, const std::wstring& detail, int step, int total)
+    {
+        if (m_style != ProgressWindowStyle::InitStyle || !m_hWnd) return;
+        const BootStatus status{ stage, detail, step, total };
+        SendMessageW(m_hWnd, kBootStatusMessage, 0, reinterpret_cast<LPARAM>(&status));
+    }
+
+    void SetBootDetail(const std::wstring& detail)
+    {
+        if (m_style == ProgressWindowStyle::InitStyle && m_hWnd)
+            SendMessageW(m_hWnd, kDetailMessage, 0, reinterpret_cast<LPARAM>(&detail));
     }
 
     void Close()
@@ -120,6 +151,8 @@ public:
             DeleteObject(m_hFont);
             m_hFont = nullptr;
         }
+        if (m_hStageFont) { DeleteObject(m_hStageFont); m_hStageFont = nullptr; }
+        if (m_hInfoFont) { DeleteObject(m_hInfoFont); m_hInfoFont = nullptr; }
     }
 
 private:
@@ -189,9 +222,9 @@ private:
 
     void CreateInitUI()
     {
-        const int width = 512;
-        const int height = 300;
-        constexpr int progressBarHeight = 12;
+        // The bitmap remains the same 512x300 resource; only its displayed size grows.
+        const int width = 666;
+        const int height = 390;
         int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
         int y = (GetSystemMetrics(SM_CYSCREEN) - height) / 2;
 
@@ -205,25 +238,77 @@ private:
                                            0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
         }
 
-        m_hFont = CreateFont(18, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
-                             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-                             DEFAULT_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"맑은 고딕");
-
-        m_hText = CreateWindowEx(0, L"STATIC", L"Loading...",
-            WS_CHILD | WS_VISIBLE,
-            20, height - 60, width - 40, 20,
-            m_hWnd, nullptr, GetModuleHandle(nullptr), nullptr);
-
-        SendMessage(m_hText, WM_SETFONT, (WPARAM)m_hFont, TRUE);
-
-        m_hProgress = CreateWindowEx(0, PROGRESS_CLASS, nullptr,
-            WS_CHILD | WS_VISIBLE | PBS_SMOOTH,
-            0, height - progressBarHeight, width, progressBarHeight,
-            m_hWnd, nullptr, GetModuleHandle(nullptr), nullptr);
-
-        SendMessage(m_hProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
+        m_hStageFont = CreateFontW(19, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"맑은 고딕");
+        m_hInfoFont = CreateFontW(16, 0, 0, 0, FW_NORMAL, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"맑은 고딕");
         ShowWindow(m_hWnd, SW_SHOWNORMAL);
         UpdateWindow(m_hWnd);
+    }
+
+    void PaintInitUI(HDC hdc, const RECT& client)
+    {
+        const int width = client.right;
+        const int height = client.bottom;
+        if (m_hBitmap)
+        {
+            HDC imageDC = CreateCompatibleDC(hdc);
+            HBITMAP oldBitmap = static_cast<HBITMAP>(SelectObject(imageDC, m_hBitmap));
+            BITMAP bitmap{};
+            GetObjectW(m_hBitmap, sizeof(bitmap), &bitmap);
+            SetStretchBltMode(hdc, HALFTONE);
+            SetBrushOrgEx(hdc, 0, 0, nullptr);
+            StretchBlt(hdc, 0, 0, width, height, imageDC,
+                0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY);
+            SelectObject(imageDC, oldBitmap);
+            DeleteDC(imageDC);
+        }
+        else
+        {
+            FillRect(hdc, &client, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
+        }
+
+        const int left = MulDiv(width, 32, 512);
+        const int top = MulDiv(height, 222, 300);
+        SetBkMode(hdc, TRANSPARENT);
+        SetTextColor(hdc, RGB(185, 199, 211));
+        const auto oldFont = SelectObject(hdc, m_hInfoFont);
+        const std::wstring version = std::wstring(L"Version ") +
+            std::wstring(std::begin(CreatorEngineVersion::Build),
+                std::end(CreatorEngineVersion::Build) - 1) +
+            (CreatorEngineVersion::LocalDevelopment ? L"  |  Local development" : L"");
+        RECT versionRect{ left, top, width - left, top + 23 };
+        DrawTextW(hdc, version.c_str(), -1, &versionRect,
+            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+        SelectObject(hdc, m_hStageFont);
+        SetTextColor(hdc, RGB(255, 255, 255));
+        std::wstring stage = m_stageText;
+        if (m_totalSteps > 0)
+            stage += L" (" + std::to_wstring(m_step) + L"/" + std::to_wstring(m_totalSteps) + L")";
+        RECT stageRect{ left, top + 27, width - left, top + 52 };
+        DrawTextW(hdc, stage.c_str(), -1, &stageRect,
+            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+        SelectObject(hdc, m_hInfoFont);
+        SetTextColor(hdc, RGB(205, 216, 225));
+        RECT detailRect{ left, top + 52, width - left, height - kProgressBarHeight - 3 };
+        DrawTextW(hdc, m_detailText.c_str(), -1, &detailRect,
+            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+        SelectObject(hdc, oldFont);
+
+        // Leave the unfilled portion as the bitmap's black background.
+        // The fill matches the blue background of the loading image's icon.
+        if (m_progress > 0)
+        {
+            RECT fill{ 0, height - kProgressBarHeight,
+                MulDiv(width, m_progress, 100), height };
+            HBRUSH fillBrush = CreateSolidBrush(RGB(15, 166, 253));
+            FillRect(hdc, &fill, fillBrush);
+            DeleteObject(fillBrush);
+        }
     }
 
 
@@ -240,17 +325,40 @@ private:
             SetWindowLongPtr(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
             return 0;
         }
-        case WM_CTLCOLORSTATIC:
-        {
-            if ((HWND)lParam == self->m_hText && self->m_style == ProgressWindowStyle::InitStyle)
+        case kProgressMessage:
+            if (self)
             {
-                SetTextColor((HDC)wParam, RGB(255, 255, 255));
-                SetBkColor((HDC)wParam, RGB(0, 0, 0));
-                static HBRUSH hBrush = CreateSolidBrush(RGB(0, 0, 0));
-                return (INT_PTR)hBrush;
+                self->m_progress = static_cast<int>(wParam);
+                InvalidateRect(hwnd, nullptr, FALSE);
             }
-            break;
-        }
+            return 0;
+        case kStatusMessage:
+            if (self && lParam)
+            {
+                self->m_stageText = *reinterpret_cast<const std::wstring*>(lParam);
+                self->m_detailText.clear();
+                self->m_totalSteps = 0;
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
+        case kBootStatusMessage:
+            if (self && lParam)
+            {
+                const auto& status = *reinterpret_cast<const BootStatus*>(lParam);
+                self->m_stageText = status.stage;
+                self->m_detailText = status.detail;
+                self->m_step = status.step;
+                self->m_totalSteps = status.total;
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
+        case kDetailMessage:
+            if (self && lParam)
+            {
+                self->m_detailText = *reinterpret_cast<const std::wstring*>(lParam);
+                InvalidateRect(hwnd, nullptr, FALSE);
+            }
+            return 0;
         case WM_NCHITTEST:
         {
             // InitStyle은 WS_POPUP이라 캡션이 없다. 클라이언트 영역 히트를
@@ -262,28 +370,37 @@ private:
         }
         case WM_PAINT:
         {
-            if (self && self->m_style == ProgressWindowStyle::InitStyle && self->m_hBitmap)
+            if (self && self->m_style == ProgressWindowStyle::InitStyle)
             {
                 PAINTSTRUCT ps;
                 HDC hdc = BeginPaint(hwnd, &ps);
-                HDC memDC = CreateCompatibleDC(hdc);
-                HBITMAP oldBmp = (HBITMAP)SelectObject(memDC, self->m_hBitmap);
-
-                BITMAP bmp;
-                GetObjectW(self->m_hBitmap, sizeof(BITMAP), &bmp);
-
-                RECT clientRect;
-                GetClientRect(hwnd, &clientRect);
-                StretchBlt(hdc, 0, 0, clientRect.right, clientRect.bottom,
-                           memDC, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY);
-
-                SelectObject(memDC, oldBmp);
-                DeleteDC(memDC);
+                RECT client{};
+                GetClientRect(hwnd, &client);
+                HDC bufferDC = CreateCompatibleDC(hdc);
+                HBITMAP buffer = bufferDC
+                    ? CreateCompatibleBitmap(hdc, client.right, client.bottom) : nullptr;
+                if (buffer)
+                {
+                    HBITMAP oldBuffer = static_cast<HBITMAP>(SelectObject(bufferDC, buffer));
+                    self->PaintInitUI(bufferDC, client);
+                    BitBlt(hdc, 0, 0, client.right, client.bottom,
+                        bufferDC, 0, 0, SRCCOPY);
+                    SelectObject(bufferDC, oldBuffer);
+                    DeleteObject(buffer);
+                }
+                else
+                {
+                    self->PaintInitUI(hdc, client);
+                }
+                if (bufferDC) DeleteDC(bufferDC);
                 EndPaint(hwnd, &ps);
                 return 0;
             }
             break;
         }
+        case WM_ERASEBKGND:
+            if (self && self->m_style == ProgressWindowStyle::InitStyle) return 1;
+            break;
         case WM_DESTROY:
             PostQuitMessage(0);
             return 0;
@@ -293,6 +410,19 @@ private:
     }
 
 private:
+    struct BootStatus
+    {
+        const std::wstring& stage;
+        const std::wstring& detail;
+        int step;
+        int total;
+    };
+
+    static constexpr UINT kProgressMessage = WM_APP + 0x210;
+    static constexpr UINT kStatusMessage = WM_APP + 0x211;
+    static constexpr UINT kBootStatusMessage = WM_APP + 0x212;
+    static constexpr UINT kDetailMessage = WM_APP + 0x213;
+    static constexpr int kProgressBarHeight = 12;
     ProgressWindowStyle m_style = ProgressWindowStyle::Basic;
     file::path m_imagePath = L"";
     HWND m_hWnd = nullptr;
@@ -300,9 +430,16 @@ private:
     HWND m_hText = nullptr;
     HBITMAP m_hBitmap = nullptr;
     HFONT m_hFont = nullptr;
+    HFONT m_hStageFont = nullptr;
+    HFONT m_hInfoFont = nullptr;
     HANDLE m_hThread = nullptr;
     HANDLE m_hReadyEvent = nullptr;
 	std::wstring m_title = L"Initializing...";
+    std::wstring m_stageText = L"Starting editor";
+    std::wstring m_detailText = L"Preparing engine services...";
+    int m_step = 0;
+    int m_totalSteps = 0;
+    int m_progress = 0;
 };
 
 inline static auto g_progressWindow = ProgressWindow::GetInstance();

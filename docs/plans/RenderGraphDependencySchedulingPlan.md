@@ -12,13 +12,13 @@
 
 1. **실행 그래프는 `EnhancedRenderGraph` 하나만 유지한다.** 별도 FrameGraph나 제품용
    이중 실행 경로를 만들지 않고 현재 Compile/Execute 경계를 확장한다.
-2. **Pipeline Asset의 Pass Stack은 저작·직렬화 순서다.** 실제 실행 순서는
-   `read`/`write`/`modify`로 만든 리소스 버전 의존성에서 계산하고, 서로 독립인 Pass만
-   저작 순서를 안정 tie-break로 사용한다.
-3. **접근 의미와 상태를 분리한다.** `Read`, `Write`, `ReadWrite`가 의존성을 만들고
-   `RHIResourceState`는 배리어 계획만 담당한다. `write`와 `modify`는 새 버전 핸들을
-   반환하며 소비자는 원하는 버전을 명시한다.
-4. **단일 그래픽 큐를 먼저 완결한다.** 버전 모델 → stable DAG → 기존 파이프라인 이관 →
+2. **C# Pipeline IR의 Pass 목록은 저작 순서다.** 실제 실행 순서는 선언한 리소스
+   의존성에서 계산하고, 서로 독립인 Pass만 저작 index를 안정 tie-break로 사용한다.
+3. **DAG 정렬을 먼저 연다.** `Read`, `Write`, `ReadWrite`와 `RHIResourceState`를 분리한
+   뒤 첫 DAG는 단일 writer 리소스와 명시적 ordering token만 받는다. 다중 writer와
+   `ReadWrite` 연쇄는 추측하지 않고 오류로 거부한다. 다음 슬라이스에서 버전 핸들을
+   도입해 `Write`/`Modify`의 연쇄를 연다.
+4. **단일 그래픽 큐를 먼저 완결한다.** 단일 writer DAG → 버전/Modify DAG → 기존 파이프라인 이관 →
    DX12/Vulkan live 픽셀 게이트를 닫기 전에는 aliasing과 async compute를 열지 않는다.
 5. **그 뒤에 메모리와 큐 최적화를 연다.** transient buffer/aliasing을 먼저, 실제 GPU
    겹침 이득을 계측한 뒤 multi-queue/async compute를 도입한다.
@@ -26,8 +26,9 @@
    슬라이스는 직전 acceptance gate가 통과한 뒤 시작한다.
 
 이 순서는 현재 코드가 위상 정렬을 포기한 이유를 무시하지 않는다. 현재의 unversioned
-handle과 state 기반 쓰기 추론만으로는 두 writer의 선후를 알 수 없다. 먼저 접근 모드와
-버전 계보를 도입해 그 모호성을 제거한 뒤에만 의존성 스케줄러를 켠다.
+handle과 state 기반 쓰기 추론만으로는 두 writer의 선후를 알 수 없다. RG1에서 명시적
+접근과 **단일 writer DAG**를 먼저 닫고, 모호한 두 writer는 fail-closed한다. RG2에서
+버전 계보를 도입한 뒤에만 다중 writer를 스케줄한다.
 
 ---
 
@@ -62,6 +63,9 @@ handle과 state 기반 쓰기 추론만으로는 두 writer의 선후를 알 수
 ## 2. 목표 계약
 
 ### 2.1 리소스와 버전
+
+이 절은 **RG2 이후의 최종 계약**이다. RG1의 첫 DAG는 명시적 접근을 요구하되
+단일 writer만 허용하며 같은 리소스의 추가 `Write`/`ReadWrite`를 실패시킨다.
 
 ```text
 RGResourceId = 프레임 안에서 동일한 논리 texture/buffer의 정체성
@@ -110,12 +114,12 @@ forked write, read/write 중복 선언, 범위를 벗어난 handle도 GPU 실행
 
 ### 2.4 저작 순서와 실행 순서
 
-Pipeline Asset Inspector는 사용자가 이해하고 diff할 수 있는 Pass Stack을 계속 저장한다.
+C# Pipeline IR은 사용자가 이해하고 diff할 수 있는 authored Pass 목록을 보존한다.
 Compiler가 각 슬롯의 버전 핸들을 연결한 뒤에는 다음처럼 해석한다.
 
 - 의존성이 있는 Pass: 리소스 edge가 실행 선후를 결정한다.
 - 독립 Pass: Stack 순서가 deterministic tie-break다.
-- 화면 표시와 serialization: Stack 순서를 유지한다.
+- 화면 표시와 IR serialization: authored 순서를 유지한다.
 - 실행 미리보기: compiled order와 원래 authored index를 함께 표시한다.
 
 ---
@@ -128,18 +132,23 @@ Compiler가 각 슬롯의 버전 핸들을 연결한 뒤에는 다음처럼 해�
 | ID | 슬라이스 | 선행 | 공수 | 종료 게이트 |
 |---|---|---:|---:|---|
 | ~~**RG0**~~ | **`BASE-0`에 흡수** — 4-0·SRP-G0와 같은 하네스·같은 artifact였다. graph dump와 변이 fixture는 `BASE-0`의 소비 항목으로 남는다 | 없음 | (BASE-0 6일에 포함) | [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.1 |
-| **RG1** | 명시적 access mode + versioned texture/buffer handle | RG0 | 8일 | `Read/Write/Modify` 단위 검사, import/transient version dump, forked write와 stale handle fail-closed |
-| **RG2** | stable single-queue DAG compiler | RG1 | 10일 | RAW/WAR/WAW, 독립 Pass tie-break, cycle chain, 선언 배열 shuffle fixture가 결정적 compiled order를 생성 |
+| **RG1** | 명시적 access mode + 단일 writer stable DAG compiler | BASE-0 | 8일* | RAW, 독립 Pass tie-break, cycle chain, 선언 배열 shuffle fixture; 다중 writer와 모호한 ReadWrite 연쇄는 명시적 오류 |
+| **RG2** | versioned texture/buffer handle + 다중 writer/Modify DAG | RG1 | 10일* | `Write`/`Modify` 새 version, WAR/WAW, import/transient version dump, forked write·stale handle fail-closed |
 | **RG3** | DAG 기준 culling·lifetime·barrier 재계산 | RG2 | 8일 | 죽은 producer 제거, 마지막 소비 수명, Transition/UAV 계획이 sorted order 기준으로 일치 |
 | **RG4** | dependency wave 기반 병렬 recording·진단 | RG3 | 7일 | sequential/parallel compiled order와 픽셀 동일, wave·critical path·edge 원인 dump 제공 |
-| **RG5** | 제품 Pass와 Pipeline Asset compiler 이관 | RG4 | 12일 | 기본 19개 node, 제품 호출 28곳과 test/fixture 80곳의 접근 선언 이관; 임시 adapter 잔여 0 |
+| **RG5** | 제품 Pass 접근 선언 이관 | RG4 | 12일 | 기본 19개 node, 제품 호출과 test/fixture 접근 선언 이관; 임시 adapter 잔여 0. C# IR 조립은 PHASE 4.6 소유 |
 | **RG6** | DX12/Vulkan 제품 cutover — **이 페이즈의 완료선** | RG5, **BASE-0** | 8일 | 같은 밀봉 입력의 별도 프로세스 live frame, PNG/차영상/선형 오차, CPU record·pass GPU·graph stats, validation 0 |
 | **RG7** | transient buffer + in-frame aliasing | RG6 | 20일 | alias off/on 픽셀 동일, peak committed/resident byte 감소 실측, poison/overlap/lifetime 변이 통과 |
 | **RG8** | queue-neutral multi-queue + async compute | RG7 | 25일 | single-queue fallback, cross-queue fence/ownership, DX12/Vulkan validation, 겹침 GPU 이득 실측 |
 | **RG9** | subresource·split barrier·Resource Inspector 성숙 | RG8 | 15일 | mip/array/range 추적, split barrier parity, producer/consumer/version/order/lifetime/alias/queue 시각화 |
 
 > **2026-09-01 정정** — `RG0` 4일은 `BASE-0`으로, `RG8`의 큐/펜스 RHI 계약 몫은 `Q0`으로 빠져나갔다.
-> 아래 합계는 정정 전 수다. 통합 합계는 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §9가 정본이다.
+> 아래 합계는 정정 전 수다. 현재 통합 합계는 [`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이다.
+
+\* **2026-09-23 재배열:** RG1/RG2의 8/10일은 이전 총 18일의 임시 배분이다.
+단일 writer DAG와 버전 도입의 실제 표면을 구현 착수 전에 재계수한다. 현재 산정 합계는
+변경하지 않았고, 미확인 차이를 완료로 처리하지 않는다. 현재 통합 회계는
+[`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이다.
 
 - **RG0~RG6: 57일, 약 11.4 엔지니어 주.** Unreal RDG형 단일 큐 리소스 의존성
   스케줄링과 제품 전환의 첫 완료선이다.
@@ -164,20 +173,23 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 - 테스트가 잘못된 구현을 잡는지 producer edge 삭제, version 재사용, 순서 뒤집기 변이로
   확인한다.
 
-### RG1 — 모호성을 API에서 제거한다
+### RG1 — 최소 접근 선언으로 단일 writer DAG부터 정렬한다
 
-- 기존 `{handle, state}` aggregate 초기화는 임시 adapter에서만 받고 제품 코드는 명시적
-  builder API로 옮긴다.
-- `Write`/`Modify`가 반환한 새 handle을 다음 consumer가 받게 해 버전 계보를 호출부에
-  보이게 한다.
-- texture import/create와 buffer import/create의 대칭을 닫는다.
-- 컴파일 결과에 resource ID, version, producer, consumer, access, required state를 기록한다.
+- 기존 `{handle, state}` aggregate 초기화는 임시 adapter에서만 받고 테스트와 이관 대상은
+  `Read`/`Write`/`ReadWrite`를 상태와 별도로 선언한다.
+- 한 리소스에 writer가 하나일 때 RAW edge와 명시적 ordering token으로 stable topological
+  sort를 수행한다. ready 집합은 authored index로 tie-break한다.
+- writer가 둘 이상이거나 `ReadWrite` 연쇄의 producer를 결정할 수 없으면 컴파일을 실패시킨다.
+  선언 순서에서 암묵적인 writer 순서를 추측하지 않는다.
+- 독립 Pass 재배열, cycle, 누락 producer, 다중 writer 거부 fixture를 기준선과 대조한다.
 
-### RG2 — 정답이 생긴 뒤 정렬한다
+### RG2 — 버전으로 다중 writer·Modify DAG를 연다
 
-- edge table과 indegree를 compact arena/vector로 만들고 hot frame heap churn을 계측한다.
-- ready queue는 authored index 오름차순으로 고정한다.
-- side-effect-only Pass는 명시적 ordering token이나 root edge를 사용한다.
+- `Write`/`Modify`가 새 version handle을 반환하고 후속 consumer가 특정 버전을 읽게 한다.
+- texture와 buffer의 import/create, read/write/modify 계약을 대칭으로 닫는다.
+- RAW/WAR/WAW와 `Modify` 연쇄를 version 계보로 유도하며 다중 writer를 명시적으로 판정한다.
+- 컴파일 결과에 resource ID·version·producer·consumer·access·required state를 기록한다.
+  edge/indegree 저장을 compact하게 유지하고 hot-frame heap churn을 계측한다.
 - debug에서는 전체 cycle 사슬, release에서는 짧은 오류와 stable ID를 남긴다.
 
 ### RG3~RG4 — 기존 기능을 새 순서에 다시 연결한다
@@ -190,15 +202,17 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 
 ### RG5~RG6 — 제품을 한 번만 전환한다
 
-> **`SRP-1`과의 병합 — 기각 확정 (2026-09-01).** `Phase4UnifiedPlan` 백로그 산정 중
+> **과거 `SRP-1`과의 병합 판정 (2026-09-01, 현재 계획에는 미적용).** `Phase4UnifiedPlan` 백로그 산정 중
 > "RG5와 SRP-1이 같은 500줄을 만지니 병합하자"는 제안이 나왔다가 **전수 실측으로
 > 기각**됐다. 두 계획서가 같은 명사("19개 노드")를 쓰지만 대상 심볼이 다르다 —
 > RG5는 `AddPass`/`AddSplitPass`(총 120 · **제품 38** · 게이트 82)로 **Pass 구현 파일
 > 전역에 흩어져** 있고, SRP-1은 `AddNode`(총 33 · 제품 33)로 **조립부에 모여** 있다.
 > 교집합 파일은 `EnhancedSceneRenderer.cpp` 하나뿐이고 그 안에서도 다른 줄이다.
 > 축도 다르다(접근 **선언** vs 노드 **조립**) — 합치면 픽셀이 붉을 때 어느 축인지
-> 못 가린다. `RG5 → SRP-1` **순서 의존만 유지**하고 공수는 12일·8일 각각 둔다.
+> 못 가린다. 당시에는 `RG5 → SRP-1` 순서와 12일·8일을 따로 산정했다.
 > 판정 전문: [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) §12-E.
+> 현재 C# 저작 전환은 [`CSharpRenderPipelinePlan.md`](CSharpRenderPipelinePlan.md)의
+> `CSRP-5`가 별도로 소유하며, 옛 `SRP-1` 8일을 이월하지 않는다.
 >
 > **덤 — 호출 수가 늘었다.** §3 표와 아래 목록의 근거인 "제품 28곳 · test/fixture
 > 80곳(총 108)"이 2026-09-01 실측으로 **제품 38 · 게이트 82(총 120)**다. 제품만 **+36%**.
@@ -273,34 +287,35 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 ## 7. 다른 페이즈·트랙과의 의존성
 
 이 트랙은 **PHASE 4.3**이 소유한다. 2026-09-15 이전에는 PHASE 4.75의 한 트랙이었고, 그때
-`BASE-0`은 PHASE 4.5에 있었다. 지금은 `BASE-0`도 이 페이즈가 소유하며 PHASE 4.5·4.75가
-읽기 전용 입력으로 받는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §1.3·§6.
+`BASE-0`은 PHASE 4.5에 있었다. 지금은 `BASE-0`도 이 페이즈가 소유하며 PHASE 4.5·4.6·
+4.7·4.75·4.8의 필요한 게이트가 읽기 전용 입력으로 받는다. 현재 관계는
+[`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이다.
 
 | 계획/트랙 | 소속 | 관계 |
 |---|---|---|
 | `BASE-0` | **같은 페이즈** | `RG0`의 graph dump·변이 fixture를 흡수한 공통 밀봉 하네스다. `RG1`이 선행으로 받고 `RG6`가 live 판정에 쓴다. 하네스는 한 벌만 만든다 |
-| `ScriptableRenderPipelinePlan.md` | PHASE 4.75 | Pipeline Asset의 `read/write/modify`를 RG1 버전 API로 낮춘다. authored Pass Stack은 정본·tie-break이고 compiled DAG가 실행 순서다. `SRP-1`은 `RG5`를 하드 선행으로 받는다 |
+| `CSharpRenderPipelinePlan.md` | PHASE 4.6 | C# `Build()`의 immutable IR이 RG1 단일 writer DAG, RG2 version/Modify 계약을 소비한다. 제품 조립 전환 `CSRP-5`는 RG6 이후 별도 판정한다 |
 | SRP-G0 | (`BASE-0`에 흡수) | RG0 기준선과 RG6 전체 live backend artifact를 공유한다. 별도 캡처 체계를 만들지 않는다 |
 | `LivePipelineDescPlan.md` | archive | 현재 nodes/reads/writes/modifies를 RG5의 첫 native compiler 입력으로 사용한다 |
 | `RhiBoundaryPlan.md` | archive | RG7 heap/alias 계약과 RG8 queue/fence 계약을 backend-neutral RHI에만 추가한다 |
-| `ModelAssetBigBangCutoverPlan.md` | PHASE 3.75 | MBC6의 vertex attribute mask→input layout/PSO/VSIn 계약과 model generation handle이 RG5의 Asset-first 제품 이관 전에 필요하다 |
-| 트랙 L4 | PHASE 4.75 | `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. `Q0`은 RHI 계층 공용 기반이며 어느 트랙도 별도 queue 계층을 만들지 않는다 — [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.2·§8.2 |
-| GPU-driven/DXR/Stochastic Lighting | PHASE 4.75 | RG6 단일 큐 제품 cutover 뒤 새 resource/pass를 추가하고, RG7~RG9 기능을 필요에 따라 소비한다 |
+| `ModelAssetBigBangCutoverPlan.md` | PHASE 3.75 | MBC6의 vertex attribute mask→input layout/PSO/VSIn 계약과 model generation handle이 RG5 제품 이관 전에 필요하다 |
+| 트랙 L4 | PHASE 4.7 | `RG8`이 아니라 **`Q0`**(queue/fence RHI 계약)의 소비자다. `Q0`은 RHI 계층 공용 기반이며 어느 트랙도 별도 queue 계층을 만들지 않는다 — [`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md) |
+| GPU-driven/DXR/Stochastic Lighting | PHASE 4.8 | RG6 단일 큐 제품 cutover 뒤 새 resource/pass를 추가하고, RG7~RG9 기능을 필요에 따라 소비한다 |
 | TU/FG | PHASE 4.5 | **이 트랙을 선행으로 받지 않는다.** 모션 벡터·업스케일은 RG 재작성과 독립이고, 프레임 생성은 SDK가 자기 큐를 소유하므로 `Q0`도 받지 않는다. `BASE-0` 하나만 공유한다 — [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md) §3.3 |
 
 권장 임계 경로는 다음으로 고정한다.
 
 ```text
-RG0 → RG1 → RG2 → RG3 → RG4 → RG5 → RG6
-                                      ↓
-                                    RG7 → RG8 → RG9
+BASE-0 → RG1(단일 writer DAG) → RG2(version/Modify DAG) → RG3 → RG4 → RG5 → RG6
+                                                                              ↓
+                                                                            RG7 → RG8 → RG9
 ```
 
 **2026-09-02 정정.** 모델/정점 입력 계약은 PHASE 3.75 완료를 하드 선행으로 받고, `SRP-G0`는
 `BASE-0`으로 흡수돼 이 트랙보다 앞에 선다. **L4의 async compute는 `RG8`이 아니라 `Q0`을
 기다린다** — `Q0`은 `RG8`·`L4` 중 먼저 필요해지는 쪽의 착수 시점에 세운다. 그 전의
-UV/BVH/직접광 준비는 독립적으로 진행할 수 있다. 통합 순서는
-[`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §3이 정본이다.
+UV/BVH/직접광 준비는 독립적으로 진행할 수 있다. 현재 통합 순서는
+[`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이다.
 
 **2026-09-15 페이즈 분리.** 이 트랙과 `BASE-0`이 **PHASE 4.3**으로 나왔다. 공수·선행·종료
 게이트는 하나도 바뀌지 않았고 **소속만 바뀌었다** — 이 재배치를 진척으로 읽지 않는다.

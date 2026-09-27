@@ -60,6 +60,7 @@ namespace ce
 
 		bool has_capture() const { return static_cast<bool>(m_capture); }
 		const capture_session* capture() const { return m_capture.get(); }
+		capture_session_ptr capture_handle() const { return m_capture; }
 
 		bool live_follow() const { return m_liveFollow; }
 		void set_live_follow(bool value);
@@ -103,6 +104,8 @@ namespace ce
 		void reset_graph();
 
 		void select_frame(std::uint32_t frame) { select_range(frame, frame); }
+		// Move the detailed timeline to a frame picked in the overview.
+		void focus_frame(std::uint32_t frame);
 		void select_range(std::uint32_t first, std::uint32_t last);
 		void select_latest();
 
@@ -146,6 +149,10 @@ namespace ce
 		// 빈 화면을 보게 되고, 그때 사용자는 계측이 없다고 읽는다.
 		void pan_view(std::int64_t delta_ticks);
 
+		// Seek across the entire retained capture. The overview window follows
+		// the target so the timeline can keep its readable time scale.
+		void seek_view(profile_tick begin);
+
 		// 실제로 접은 횟수. 캐시가 도는지 밖에서 볼 수 있어야 검사가 된다 —
 		// "느려지지 않았다" 는 말로만 적으면 아무도 재지 않는다.
 		std::uint64_t fold_count() const { return m_foldCount; }
@@ -186,6 +193,7 @@ namespace ce
 		// 시야가 창 전체를 덮고 있는가. 덮고 있으면 창이 미끄러질 때 따라가고,
 		// 확대해 둔 상태면 보던 자리를 지킨다.
 		mutable bool m_viewSpansWholeWindow = true;
+		bool m_viewAutoDefault = true;
 
 		// 그래프의 창. 0 이면 "아직 세우지 않았다" 이고, 그때는 보존 구간
 		// 전체를 뜻한다.

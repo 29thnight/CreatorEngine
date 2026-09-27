@@ -19,17 +19,20 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 
 ## plans/
 
-실행 계획 25종과 미래 계획 1종. 진행 상태는 [대시보드](RefactoringPlanDashboard.html#doc-index)를 함께 본다.
+현재 계획과 이력 문서. 진행 상태는 [대시보드](RefactoringPlanDashboard.html#doc-index)를 함께 본다.
 
 | 문서 | 대상 |
 |---|---|
 | [PBRWiringStabilizationPlan.md](plans/PBRWiringStabilizationPlan.md) | PHASE 4 · DX12 완료 — W0~W9 제품 배선·실장면 게이트. Vulkan 교차 판정은 PHASE 4.9. |
 | [BlenderMaterialGraphPlan.md](plans/BlenderMaterialGraphPlan.md) | PHASE 4.25 · MAT-0 완료 — Blender 5.1.1 재질 기준 장면과 선형 HDR golden 고정. Principled ABI와 Material Graph 제품 작업은 후속. |
-| [LatticeAdoptionPlan.md](plans/LatticeAdoptionPlan.md) | LX-0~6 · 공수 미산정 — LX-2 독립 ImGui 예제 게이트 통과. Editor 연결, 새 BT/Animator 저작 창, `imgui-node-editor` 제거는 후속. |
-| [Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md) | PHASE 4 계열 · 정본 — PHASE 4·4.25·4.3·4.5·4.75의 책임·순서·공수 통합 기준. |
+| [RenderPhaseRoadmap.md](plans/RenderPhaseRoadmap.md) | PHASE 4 계열 · 정본 — DAG 우선 순서, 분리 완료선, 현재 공수 원장. |
 | [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.3 · RG — 공통 밀봉 하네스와 리소스 의존성 스케줄링, 단계별 제품 전환. |
-| [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.75 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
-| [ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md) | PHASE 4.75 · SRP — Pipeline Asset·Custom Pass·Shader Graph 저작과 제품 배선. |
+| [CSharpRenderPipelinePlan.md](plans/CSharpRenderPipelinePlan.md) | PHASE 4.6 · CSRP — C# 저작·불변 IR·native Pass 연결. 공수 미산정. |
+| [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.7 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
+| [RendererQualityPlan.md](plans/RendererQualityPlan.md) | PHASE 4.75 · RND — probe/AO·shadow·display/post의 독립 품질 게이트. |
+| [GpuFeaturePlanningPlan.md](plans/GpuFeaturePlanningPlan.md) | PHASE 4.8 · GPU — GPU-driven·확률 조명·DXR 설계 및 구현 공수 확정. |
+| [LatticeAdoptionPlan.md](plans/LatticeAdoptionPlan.md) | LX-0~6 · 공수 미산정 — LX-2 독립 ImGui 예제 게이트 통과. Editor 연결, 새 BT/Animator 저작 창, `imgui-node-editor` 제거는 후속. |
+| [BackendParityPlan.md](plans/BackendParityPlan.md) | PHASE 4.9 — DX12/Vulkan 교차 판정 복귀. 공수 미산정. |
 | [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의 뒤 소유 게이트 13칸 HEAD 재실행으로 조건 ① 닫음(초록 11·붉음 2는 게이트 결함). 남은 조건은 GUI 수동 하나, MCP 보류. |
 | [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
 | [EnginePackagingPlan.md](plans/EnginePackagingPlan.md) | PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지. |
@@ -39,8 +42,9 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [EngineLayerSeparationPlan.md](plans/EngineLayerSeparationPlan.md) | E0~E7 · 잔여 있음 — Runtime Core·Editor·Host 경계. E2 writer와 E7 잔여 유지. |
 | [AnimationSchedulerPlan.md](plans/AnimationSchedulerPlan.md) | PHASE 13 — 애니메이션 스케줄러·LOD·CPU 버짓 재설계. |
 | [TaskSchedulerUnificationPlan.md](plans/TaskSchedulerUnificationPlan.md) | PHASE 13 S0.5·S6 부속 — 태스크 스케줄러 enkiTS 이관의 실태 조사·측정. fork-join만 옮기고 장기 블로킹 스레드 18곳은 존치. |
-| [ProfilingCapturePlan.md](plans/ProfilingCapturePlan.md) | PHASE 14 · 진행 — 수집 코어·녹화·구간 분석과 프로파일러 소비 경로. |
-| [RenderFrameDebuggerPlan.md](plans/RenderFrameDebuggerPlan.md) | PHASE 14 확장 — 불변 프레임 캡처·그리기 출처·선택적 픽셀 재현. |
+| [ProfilingCapturePlan.md](plans/ProfilingCapturePlan.md) | PHASE 14 P0~P6 · 진행 — CPU/GPU/GC 시간축 수집·녹화·구간 분석. |
+| [MemoryProfilerPlan.md](plans/MemoryProfilerPlan.md) | PHASE 14 MP0~MP6 · 진행 — Memory 탭 수동 스냅샷·A/B 분석과 객체별 네이티브/관리/GPU 계측 확장. |
+| [RenderFrameDebuggerPlan.md](plans/RenderFrameDebuggerPlan.md) | 14-7 독립 트랙 · 미착수 — 원하는 뷰의 다음 완료 제출 하나를 수동 캡처하고 이벤트/상태/리소스·출력을 조사(RF0~RF7). |
 | [UtilityFrameworkModernizationPlan.md](plans/UtilityFrameworkModernizationPlan.md) | PHASE 15 · 진행 — 유틸리티의 실제 소비·계약을 기준으로 정리. |
 | [MathematicsMigrationPlan.md](plans/MathematicsMigrationPlan.md) | 구조 완료 · 검증 잔여 — 수학 라이브러리 이주. pixel·Physics runtime gate가 남아 있다. |
 | [UISystemRedesignPlan.md](plans/UISystemRedesignPlan.md) | PHASE 16 · 진행 — Scene 소유 UI Runtime과 값 타입 렌더 제출. 9-15 개정에서 텍스트 렌더(트랙 T)가 U1 앞으로 서고, UI 저작의 소유 레이어를 C++로 확정했다(D-5). |
@@ -51,6 +55,10 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [AudioBackendModernizationPlan.md](plans/AudioBackendModernizationPlan.md) | PHASE 22 — FMOD 은퇴와 miniaudio 통합·오디오 회귀. |
 | [EngineDistributionAndLauncherPlan.md](plans/EngineDistributionAndLauncherPlan.md) | PHASE 23 — 엔진 배포·Launcher·프로젝트 관리와 설치 회귀. |
 | [SimulationEffectContractPlan.md](plans/SimulationEffectContractPlan.md) | PHASE 24 · 현재 리팩토링 이후의 미래 계획 · 구현 미착수 |
+
+이전 PHASE 4 계열 원장과 Asset-first SRP 판단은
+[Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md),
+[ScriptableRenderPipelinePlan.md](plans/ScriptableRenderPipelinePlan.md)에 이력으로 보존한다.
 
 ## plans/archive/
 
@@ -64,6 +72,8 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 
 | 문서 | 대상 |
 |---|---|
+| [RenderPipelineTargetArchitecture.md](design/RenderPipelineTargetArchitecture.md) | C# `Build()` 저작·불변 IR·기존 C++ Pass 실행의 현재 설계 정본 |
+| [LatticeNodeSystem.md](design/LatticeNodeSystem.md) | Lattice(LX) 공통 그래프 계약·편집 UI 초안과 [화면 와이어프레임](design/LatticeEditorWireframe.svg) |
 | [EngineVersionPolicy.md](design/EngineVersionPolicy.md) | 확정 — 제품 세대·기능 릴리스·네 자리 엔진 빌드·API 계약·채널. 적용은 PHASE 23 DL5·DL6·DL10 |
 | [ContainerLibraryDesign.md](design/ContainerLibraryDesign.md) | `ce::dynamic_array` — 자체 컨테이너 설계와 기각 근거 |
 | [RhiGpuMemoryLifetimeDesign.md](design/RhiGpuMemoryLifetimeDesign.md) | RHI GPU 메모리 수명 |
@@ -74,6 +84,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 
 | 문서 | 대상 |
 |---|---|
+| [Phase475AxisClassification.md](analysis/Phase475AxisClassification.md) | 분리 전 PHASE 4.75의 22개 활성 행을 분류한 당시 정적 점검(2026-09-23) |
 | [CreatorBuildToolValidation.md](analysis/CreatorBuildToolValidation.md) | 독립 BuildTool EXE·private runtime·패키징 검증과 기존 모델 씬 제한(2026-09-13) |
 | [EngineStructureAnalysis.html](analysis/EngineStructureAnalysis.html) | 엔진 구조 전반 |
 | [ReflectionSystemAnalysis.md](analysis/ReflectionSystemAnalysis.md) | 리플렉션 시스템 실측 |

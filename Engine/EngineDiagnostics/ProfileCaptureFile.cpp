@@ -2,6 +2,7 @@
 
 #include <array>
 #include <bit>
+#include <cmath>
 #include <cstring>
 #include <fstream>
 #include <string>
@@ -33,6 +34,8 @@ namespace ce::detail::capture_file_impl
 		markers     = 2,
 		threads     = 3,
 		frames      = 4,
+		counters    = 5,
+		counter_descriptors = 6,
 	};
 	constexpr std::uint32_t kChunkVersion = 1;
 
@@ -230,6 +233,41 @@ namespace ce::detail::capture_file_impl
 		return out.take();
 	}
 
+	std::vector<std::byte> encode_counters(const capture_session& capture)
+	{
+		byte_writer out;
+		out.put(capture.dropped_counters());
+		out.put(capture.frame_count());
+		for (const frame_record& frame : capture.frames())
+		{
+			out.put(frame.engine_frame);
+			out.put(static_cast<std::uint32_t>(frame.counters.size()));
+			for (const profile_counter_sample& sample : frame.counters)
+			{
+				std::uint64_t bits = 0;
+				static_assert(sizeof(bits) == sizeof(sample.value));
+				std::memcpy(&bits, &sample.value, sizeof(bits));
+				out.put(static_cast<std::uint16_t>(sample.id));
+				out.put(bits);
+			}
+		}
+		return out.take();
+	}
+
+	std::vector<std::byte> encode_counter_descriptors(const capture_session& capture)
+	{
+		byte_writer out;
+		out.put(static_cast<std::uint32_t>(capture.counter_descriptors().size()));
+		for (const capture_counter& value : capture.counter_descriptors())
+		{
+			out.put(static_cast<std::uint16_t>(value.id));
+			out.put(counter_bit(value.category));
+			out.put_string(value.name);
+			out.put_string(value.unit);
+		}
+		return out.take();
+	}
+
 	// ── 청크 몸통 읽기 ───────────────────────────────────────────────────────
 	using parse_result = std::expected<void, capture_file_error>;
 
@@ -334,8 +372,9 @@ namespace ce::detail::capture_file_impl
 		frame.tick_begin = begin;
 		frame.tick_end = end;
 		frame.events.resize(events);
-		for (profile_event& value : frame.events)
+		for (std::uint32_t eventIndex = 0; eventIndex < events; ++eventIndex)
 		{
+			profile_event& value = frame.events.mutable_at(eventIndex);
 			if (!parse_event(in, value))
 			{
 				return std::unexpected(capture_file_error::malformed);
@@ -364,6 +403,62 @@ namespace ce::detail::capture_file_impl
 			{
 				return std::unexpected(capture_file_error::malformed);
 			}
+		}
+		return finish(in);
+	}
+
+	parse_result parse_counters(byte_reader in, std::vector<frame_record>& frames,
+	                            std::uint64_t& dropped)
+	{
+		std::uint32_t count = 0;
+		if (!in.get(dropped) || !in.get(count) || count != frames.size() || !in.can_hold(count, 8))
+			return std::unexpected(capture_file_error::malformed);
+		for (frame_record& frame : frames)
+		{
+			std::uint32_t number = 0, samples = 0;
+			if (!in.get(number) || !in.get(samples) || number != frame.engine_frame ||
+			    !in.can_hold(samples, 10))
+				return std::unexpected(capture_file_error::malformed);
+			frame.counters.reserve(samples);
+			for (std::uint32_t i = 0; i < samples; ++i)
+			{
+				std::uint16_t id = 0;
+				std::uint64_t bits = 0;
+				if (!in.get(id) || !in.get(bits) || id == 0)
+					return std::unexpected(capture_file_error::malformed);
+				profile_counter_sample sample{};
+				sample.id = static_cast<profile_counter_id>(id);
+				std::memcpy(&sample.value, &bits, sizeof(bits));
+				if (!std::isfinite(sample.value))
+					return std::unexpected(capture_file_error::malformed);
+				for (const auto& existing : frame.counters)
+					if (existing.id == sample.id)
+						return std::unexpected(capture_file_error::malformed);
+				frame.counters.push_back(sample);
+			}
+		}
+		return finish(in);
+	}
+
+	parse_result parse_counter_descriptors(byte_reader in, std::vector<capture_counter>& values)
+	{
+		std::uint32_t count = 0;
+		if (!in.get(count) || count > 65535 || !in.can_hold(count, 14))
+			return std::unexpected(capture_file_error::malformed);
+		values.reserve(count);
+		for (std::uint32_t i = 0; i < count; ++i)
+		{
+			std::uint16_t id = 0;
+			counter_mask category = 0;
+			capture_counter value{};
+			if (!in.get(id) || !in.get(category) || !in.get_string(value.name) ||
+			    !in.get_string(value.unit) || id != i + 1 || value.name.empty() ||
+			    value.name.size() > 255 || value.unit.size() > 32 ||
+			    category == 0 || (category & (category - 1)) != 0 || category > counter_bit(counter_category::resources))
+				return std::unexpected(capture_file_error::malformed);
+			value.id = static_cast<profile_counter_id>(id);
+			value.category = static_cast<counter_category>(category);
+			values.push_back(std::move(value));
 		}
 		return finish(in);
 	}
@@ -459,11 +554,13 @@ namespace ce
 	std::vector<std::byte> encode_capture(const capture_session& capture)
 	{
 		using namespace ce::detail::capture_file_impl;
-		const std::array<std::pair<chunk_type, std::vector<std::byte>>, 4> chunks{ {
+		const std::array<std::pair<chunk_type, std::vector<std::byte>>, 6> chunks{ {
 			{ chunk_type::environment, encode_environment(capture) },
 			{ chunk_type::markers,     encode_markers(capture) },
 			{ chunk_type::threads,     encode_threads(capture) },
 			{ chunk_type::frames,      encode_frames(capture) },
+			{ chunk_type::counters,    encode_counters(capture) },
+			{ chunk_type::counter_descriptors, encode_counter_descriptors(capture) },
 		} };
 
 		byte_writer out;
@@ -506,10 +603,13 @@ namespace ce
 		std::vector<frame_record>   frames;
 		std::vector<thread_info>    threads;
 		std::vector<capture_marker> markers;
+		std::vector<capture_counter> counterDescriptors;
 		capture_environment         environment{};
 		bool                        complete = true;
 		std::uint32_t               unacked = 0;
+		std::uint64_t               droppedCounters = 0;
 		std::uint32_t               seen = 0;   // 필수 청크 넷의 비트
+		std::span<const std::byte> countersBody{};
 
 		for (const chunk_entry& entry : *table)
 		{
@@ -525,7 +625,7 @@ namespace ce
 			}
 
 			parse_result parsed{};
-			const std::uint32_t bit = (entry.type >= 1 && entry.type <= 4) ? (1u << entry.type) : 0u;
+			const std::uint32_t bit = (entry.type >= 1 && entry.type <= 6) ? (1u << entry.type) : 0u;
 			if (0 != (seen & bit))
 			{
 				return std::unexpected(capture_file_error::malformed);   // 같은 청크가 둘
@@ -540,6 +640,9 @@ namespace ce
 			case chunk_type::markers: parsed = parse_markers(byte_reader(body), markers); break;
 			case chunk_type::threads: parsed = parse_threads(byte_reader(body), threads); break;
 			case chunk_type::frames:  parsed = parse_frames(byte_reader(body), frames); break;
+			case chunk_type::counters: countersBody = body; break;
+			case chunk_type::counter_descriptors:
+				parsed = parse_counter_descriptors(byte_reader(body), counterDescriptors); break;
 			default:
 				// 모르는 청크는 건너뛴다 — 같은 형식 버전 안에서 덧붙인 것이다.
 				// CRC 는 이미 봤으므로 손상은 아니다.
@@ -556,10 +659,22 @@ namespace ce
 		{
 			return std::unexpected(capture_file_error::malformed);
 		}
+		if (!countersBody.empty())
+		{
+			if (const parse_result parsed = parse_counters(byte_reader(countersBody), frames,
+			                                                droppedCounters); !parsed)
+				return std::unexpected(parsed.error());
+		}
+		const std::size_t knownCounters = counterDescriptors.empty() ? 5 : counterDescriptors.size();
+		for (const frame_record& frame : frames)
+			for (const profile_counter_sample& sample : frame.counters)
+				if (static_cast<std::uint16_t>(sample.id) > knownCounters)
+					return std::unexpected(capture_file_error::malformed);
 
 		return std::make_shared<const capture_session>(
 			std::move(frames), std::move(threads), std::move(markers),
-			environment, complete, unacked);
+			environment, complete, unacked, droppedCounters,
+			std::move(counterDescriptors));
 	}
 
 	std::expected<void, capture_file_error>

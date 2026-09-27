@@ -2,7 +2,7 @@
 //
 // 옛 ProfilerWindow(557줄)는 걷었다. 그것은 전역 프로파일러의 vector 를 매
 // 프레임 직접 읽어 타임라인을 그렸고, 읽는 동안에도 기록이 계속돼 화면과
-// 자료가 어긋났다. 새 코어에서 UI 는 얼린 캡처의 reader 일 뿐이다(§6.4).
+// 자료가 어긋났다. 새 UI는 수집기가 공개한 immutable 캡처만 읽는다(§6.4).
 //
 // ★ 이 층에는 자료를 접는 코드가 없다. Hierarchy/Flat/레인 합계는 전부
 //   ProfileAggregate 가 만들고, 선택과 Live Follow 는 ProfileReader 가 든다.
@@ -23,6 +23,7 @@
 #include <string>
 
 #include "ImGui.h"
+#include "EditorIcons.h"
 #include "ProfileCaptureFile.h"
 #include "ProfileScope.h"
 
@@ -255,7 +256,7 @@ namespace
 		}
 
 		ImGui::SameLine();
-		if (ImGui::Button("Clear"))
+		if (ImGui::Button(EditorIcon::Label<EditorIcon::Delete, " Clear">))
 		{
 			service.clear();
 			reader().reset();
@@ -270,14 +271,14 @@ namespace
 		ImGui::EndDisabled();
 
 		ImGui::SameLine();
-		if (ImGui::Button("Open"))
+		if (ImGui::Button(EditorIcon::Label<EditorIcon::ContentBrowser, " Open">))
 		{
 			editor::profiler_view::capture_file_view::open_capture_file();
 		}
 
 		ImGui::SameLine();
 		bool follow = reader().live_follow();
-		if (ImGui::Checkbox("Live Follow", &follow))
+		if (ImGui::Checkbox(EditorIcon::Label<EditorIcon::Forward, " Live Follow">, &follow))
 		{
 			reader().set_live_follow(follow);
 		}
@@ -289,6 +290,26 @@ namespace
 
 		ImGui::SameLine();
 		ImGui::Text("%s  ·  frame %u", state_label(summary.state), summary.engine_frame);
+		if (ImGui::TreeNode("Counter modules"))
+		{
+			const auto toggle = [&](const char* label, ce::counter_category category)
+			{
+				const ce::counter_mask bit = ce::counter_bit(category);
+				bool enabled = (service.get_counter_mask() & bit) != 0;
+				if (ImGui::Checkbox(label, &enabled))
+				{
+					const ce::counter_mask before = service.get_counter_mask();
+					service.set_counter_mask(enabled ? before | bit : before & ~bit);
+				}
+			};
+			toggle("Process CPU/RAM", ce::counter_category::process);
+			ImGui::SameLine(); toggle("GPU VRAM", ce::counter_category::gpu);
+			ImGui::SameLine(); toggle("Render", ce::counter_category::render);
+			ImGui::SameLine(); toggle("Managed GC", ce::counter_category::managed);
+			ImGui::SameLine(); toggle("Resources", ce::counter_category::resources);
+			ImGui::TextDisabled("Resources는 기본 꺼짐 · 켜면 0.5초마다 소유 프레임에서 집계합니다");
+			ImGui::TreePop();
+		}
 
 		// ★ 녹화 중 화면은 **한 박자 뒤처진다.** 코어가 정한 간격으로만
 		//   스냅샷을 내고, 늦게 오는 GPU 구간은 닫힌 프레임에 나중에 들어간다
@@ -306,17 +327,24 @@ namespace
 		// ★ **보고 있는 캡처**의 표식을 읽는다. 라이브 서비스의 요약을 읽으면
 		//   파일을 보는 동안 남의 캡처 이야기를 한다 — 캡처가 제 온전함을 들고
 		//   다니는 이유가 그것이다(ProfileCapture.h).
-		else if (const ce::capture_session* shown = reader().capture();
-		         shown && !shown->complete())
+		if (const ce::capture_session* shown = reader().capture();
+		    shown && !shown->complete())
 		{
 			ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
-			                   "얼림이 온전하지 않다 - 스트림 %u 의 꼬리가 이 캡처에 없다",
+			                   "캡처 미확정 - 스트림 %u 의 봉인 응답이 아직 없다",
 			                   shown->unacked_streams());
 			if (ImGui::IsItemHovered())
 			{
 				ImGui::SetTooltip("잠든 스레드는 봉인 요청을 들어줄 자리를 지나지 않는다.\n"
-				                  "그 스레드를 깨운 뒤 다시 Pause 하면 꼬리까지 들어온다.");
+				                  "라이브라면 다음 스냅샷에서, 얼린 캡처라면 다시 Pause 한 뒤 확인한다.");
 			}
+		}
+		if (const ce::capture_session* shown = reader().capture();
+		    shown && shown->dropped_counters() > 0)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
+			                   "텔레메트리 표본 손실: %llu",
+			                   static_cast<unsigned long long>(shown->dropped_counters()));
 		}
 	}
 
@@ -349,11 +377,16 @@ namespace
 
 		std::snprintf(buffer, sizeof(buffer), "%u / %u", summary.free_chunks, summary.chunk_count);
 		draw_row("Free chunks", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%.2f MiB",
+		              static_cast<double>(summary.page_pool_bytes) / (1024.0 * 1024.0));
+		draw_row("Page pool memory", buffer);
 
 		// 잃은 것과 어긋난 것은 0 이 아니면 눈에 띄어야 한다. 프로파일러가
 		// 스스로 잃은 수를 감추면 그 수치를 근거로 내리는 판단이 전부 틀어진다.
 		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.dropped_events);
 		draw_row("Dropped events", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.dropped_counters);
+		draw_row("Dropped telemetry samples", buffer);
 
 		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.unbalanced_scopes);
 		draw_row("Unbalanced scopes", buffer);
@@ -366,6 +399,10 @@ namespace
 
 		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.stale_chunks_dropped);
 		draw_row("Stale (pre-Clear) dropped", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.malformed_pages);
+		draw_row("Malformed pages", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.ingested_pages);
+		draw_row("Ingested pages", buffer);
 
 		std::snprintf(buffer, sizeof(buffer), "%u", summary.pause_unacked_streams);
 		draw_row("Unacked at freeze", buffer);
@@ -377,6 +414,45 @@ namespace
 
 		std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.control_requests_deferred);
 		draw_row("Control deferred", buffer);
+
+		std::snprintf(buffer, sizeof(buffer), "%u / %" PRIu64,
+		              summary.collector_queued_frames, summary.collector_dropped_frames);
+		draw_row("Collector queued / dropped frames", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%" PRIu64 " / %" PRIu64,
+		              summary.gpu_query_overflow_passes, summary.gpu_collect_failures);
+		draw_row("GPU query lost / collect failures", buffer);
+		if (summary.gpu_issue_last_frame != 0)
+		{
+			std::snprintf(buffer, sizeof(buffer), "%u", summary.gpu_issue_last_frame);
+			draw_row("Last GPU issue frame", buffer);
+		}
+		const double collectorFrequency = static_cast<double>(ce::profiler_service::ticks_per_second());
+		auto collector_ms = [collectorFrequency](ce::profile_tick ticks)
+		{
+			return collectorFrequency > 0.0
+				? static_cast<double>(ticks) * 1000.0 / collectorFrequency : 0.0;
+		};
+		std::snprintf(buffer, sizeof(buffer), "%.3f ms / %" PRIu64 " batches",
+		              collector_ms(summary.collector.page_ingest_ticks),
+		              summary.collector.ingest_batches);
+		draw_row("Page ingest + attribution", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%.3f ms / %" PRIu64 " frames",
+		              collector_ms(summary.collector.frame_close_ticks),
+		              summary.collector.frames_closed);
+		draw_row("Frame close + retention", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%.3f ms / %" PRIu64 " captures",
+		              collector_ms(summary.collector.snapshot_ticks),
+		              summary.collector.snapshots_built);
+		draw_row("Capture publish", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%.3f / %.3f ms",
+		              collector_ms(summary.collector.wait_ticks),
+		              collector_ms(summary.collector.queue_delay_ticks));
+		draw_row("Signal wait / queue delay", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%.3f ms",
+		              collector_ms(summary.collector.replenish_ticks));
+		draw_row("Page replenish", buffer);
+		std::snprintf(buffer, sizeof(buffer), "%u", summary.collector_os_thread_id);
+		draw_row("Collector OS thread", buffer);
 
 		ImGui::EndTable();
 	}
@@ -424,8 +500,7 @@ void DrawProfilerHUD()
 	//   오지 않는다. 이 마커가 캡처에 나타나는지로 게이트가 판정한다.
 	//
 	//   자기 UI 비용을 자기가 재는 것은 §7 이 말하는 profiler overhead 이기도
-	//   하다 — 녹화 중에는 표를 그리지 않으므로(캡처가 없다) 이 구간은 툴바와
-	//   요약만 담는다.
+	//   하다. 창이 열려 있으면 녹화 중에도 최신 immutable 스냅샷을 그린다.
 	ce::profile_scope _profile{ ce::marker<"ProfilerWindow">() };
 
 	ce::profiler_service& service = ce::profiler();
@@ -447,99 +522,123 @@ void DrawProfilerHUD()
 	draw_toolbar(summary);
 	editor::profiler_view::capture_file_view::draw_file_line();
 	ImGui::Separator();
-
-	if (!ImGui::BeginTabBar("ProfilerTabs"))
+	// The left rail keeps every profiler view in one predictable location.
+	// The selected frame range belongs to the reader, not to an individual page.
+	enum class page { frames, timeline, cpu, memory, gpu, network, animation,
+		hierarchy, flat, threads, collector };
+	static page selected = page::timeline;
+	static bool timelineFlame = false;
+	const float railWidth = ImGui::GetTextLineHeightWithSpacing() + 20.0f;
+	ImGui::BeginChild("##ProfilerNavigation", ImVec2(railWidth, 0.0f), false,
+	                  ImGuiWindowFlags_NoScrollbar);
+	const auto nav = [&](page target, const char* icon, const char* title, const char* description)
 	{
-		return;
-	}
-
-	// ★ Frame Overview 와 Timeline 이 **첫 탭**에 함께 있다. §7.2 가 프레임
-	//   그래프를 "모든 분석의 entry point" 라고 부른 대로, 프레임을 고르고
-	//   그 자리에서 구간을 들여다보는 것이 한 화면에서 이어져야 한다.
-	//
-	//   기본 탭이라는 것도 값이다 — 도크 탭은 선택돼야 본문이 돌므로,
-	//   뒤 탭에 두면 창을 열어도 타임라인이 한 번도 그려지지 않는다.
-	if (ImGui::BeginTabItem("Capture"))
+		ImGui::PushID(static_cast<int>(target));
+		const bool active = selected == target;
+		const ImVec4 activeColor = ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive);
+		if (active) ImGui::PushStyleColor(ImGuiCol_Button, activeColor);
+		if (ImGui::Button(icon, ImVec2(railWidth - 12.0f, railWidth - 12.0f))) selected = target;
+		if (active) ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::BeginTooltip();
+			ImGui::TextUnformatted(title);
+			ImGui::TextDisabled("%s", description);
+			ImGui::EndTooltip();
+		}
+		ImGui::PopID();
+	};
+	nav(page::frames, EditorIcon::Profiler, "프레임 그래프", "전체 프레임과 CPU·메모리·GPU 추이");
+	nav(page::timeline, EditorIcon::Layers, "타임라인", "스레드·GPU 구간을 시간축에서 탐색");
+	ImGui::Separator();
+	nav(page::cpu, EditorIcon::Timing, "CPU", "프로세스 사용률과 CPU Self 상위 마커");
+	nav(page::memory, EditorIcon::Runtime, "메모리", "프로세스 RAM 작업 집합");
+	nav(page::gpu, EditorIcon::Game, "GPU", "Graphics 구간 시간과 VRAM");
+	nav(page::network, EditorIcon::World, "네트워크", "엔진 송수신량");
+	nav(page::animation, EditorIcon::AvatarMask, "Animation", "실시간 CPU 예산과 태스크 실행 기록");
+	ImGui::Separator();
+	nav(page::hierarchy, EditorIcon::Hierarchy, "Hierarchy", "부모·자식 호출 관계와 구간 통계");
+	nav(page::flat, EditorIcon::Menu, "Flat", "호출 위치를 합친 마커별 통계");
+	nav(page::threads, EditorIcon::Grid, "Threads", "스레드별 구간 요약");
+	nav(page::collector, EditorIcon::Settings, "Collector", "수집 상태와 손실 계상");
+	ImGui::EndChild();
+	ImGui::SameLine(0.0f, 0.0f);
+	ImGui::BeginChild("##ProfilerPage", ImVec2(0.0f, 0.0f), false);
+	const char* pageTitle = selected == page::frames ? "프레임 그래프" :
+		selected == page::timeline ? "타임라인" :
+		selected == page::cpu ? "CPU" :
+		selected == page::memory ? "메모리" :
+		selected == page::gpu ? "GPU" :
+		selected == page::network ? "네트워크" :
+		selected == page::animation ? "Animation Budget" :
+		selected == page::hierarchy ? "Hierarchy" :
+		selected == page::flat ? "Flat" :
+		selected == page::threads ? "Threads" : "Collector";
+	ImGui::TextUnformatted(pageTitle);
+	ImGui::Separator();
+	switch (selected)
 	{
+	case page::frames:
 		draw_frame_overview();
 		ImGui::Separator();
+		draw_telemetry_dashboard();
+		break;
+	case page::timeline:
+		draw_frame_overview();
 		if (reader().has_capture())
 		{
 			draw_selection_summary();
 			ImGui::Separator();
-			draw_timeline();
+			if (ImGui::RadioButton("시간순 레인", !timelineFlame)) timelineFlame = false;
+			ImGui::SameLine();
+			if (ImGui::RadioButton("CPU 호출 계층", timelineFlame)) timelineFlame = true;
+			ImGui::Separator();
+			if (timelineFlame) draw_flame_graph();
+			else draw_timeline();
 		}
-		ImGui::EndTabItem();
-	}
-
-	if (ImGui::BeginTabItem("Hierarchy"))
-	{
+		break;
+	case page::cpu:
+		draw_telemetry(telemetry_page::cpu);
+		if (reader().has_capture())
+		{
+			ImGui::Separator();
+			draw_flame_graph();
+		}
+		break;
+	case page::memory: draw_memory_profiler(); break;
+	case page::gpu: draw_telemetry(telemetry_page::gpu); break;
+	case page::network: draw_telemetry(telemetry_page::network); break;
+	case page::animation: draw_animation_budget(); break;
+	case page::hierarchy:
+	case page::flat:
 		if (reader().has_capture())
 		{
 			draw_selection_summary();
 			ImGui::Separator();
-			draw_hierarchy_table();
+			if (selected == page::hierarchy) draw_hierarchy_table();
+			else draw_flat_table();
 		}
-		else
-		{
-			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
-		}
-		ImGui::EndTabItem();
-	}
-
-	if (ImGui::BeginTabItem("Flat"))
-	{
-		if (reader().has_capture())
-		{
-			draw_selection_summary();
-			ImGui::Separator();
-			draw_flat_table();
-		}
-		else
-		{
-			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
-		}
-		ImGui::EndTabItem();
-	}
-
-	if (ImGui::BeginTabItem("Threads"))
-	{
-		if (reader().has_capture())
-		{
-			draw_thread_table();
-		}
-		else
-		{
-			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
-		}
-		ImGui::EndTabItem();
-	}
-
-	if (ImGui::BeginTabItem("Collector"))
-	{
+		else ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
+		break;
+	case page::threads:
+		if (reader().has_capture()) draw_thread_table();
+		else ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
+		break;
+	case page::collector:
 		draw_summary(summary);
-		if (summary.dropped_events > 0 || summary.unbalanced_scopes > 0
+		if (!summary.gpu_issue_last_error.empty())
+			ImGui::TextWrapped("Last GPU issue: %s", summary.gpu_issue_last_error.c_str());
+		if (summary.dropped_events > 0 || summary.dropped_counters > 0 || summary.unbalanced_scopes > 0
 		    || summary.late_events_dropped > 0 || summary.stale_chunks_dropped > 0
 		    || summary.foreign_stream_touches > 0 || summary.abandoned_streams > 0
-		    )
-		{
+		    || summary.collector_dropped_frames > 0 || summary.malformed_pages > 0
+		    || summary.gpu_query_overflow_passes > 0 || summary.gpu_collect_failures > 0)
 			ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
 			                   "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");
-		}
 		if (!summary.capture_complete)
-		{
 			ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
-			                   "얼림 미응답 스트림 %u - 그만큼의 꼬리가 빠져 있다",
-			                   summary.pause_unacked_streams);
-		}
-		ImGui::EndTabItem();
+			                   "캡처 미확정 - 미응답 스트림 %u", summary.capture_unacked_streams);
+		break;
 	}
-
-	if (ImGui::BeginTabItem("Animation Budget"))
-	{
-		draw_animation_budget();
-		ImGui::EndTabItem();
-	}
-
-	ImGui::EndTabBar();
+	ImGui::EndChild();
 }

@@ -27,7 +27,9 @@ ImGui 타임라인을 먼저 확장하지 않는다. 엔진·렌더러·관리 �
 3. 한 프레임 또는 여러 프레임을 선택한다.
 4. CPU Timeline·GPU Queue·Hierarchy·Counters가 같은 선택 구간을 설명한다.
 5. 캡처를 `.ceprof`로 저장하고 다시 열어 같은 결과를 얻는다.
-6. 선택 프레임·뷰를 내장 Render Frame Debugger로 열어 pass/draw·상태·리소스와 중간 출력을 조사한다.
+
+별도 `Render Frame Debugger`는 독립 수동 단일 프레임 캡처 도구다. 이 프로파일러의
+완료 조건이나 `.ceprof` 파일 형식에 포함하지 않는다.
 
 ---
 
@@ -147,7 +149,238 @@ HUD에서 인스턴스별 강등 등급·비용·사유 관측" — 은 프로�
 - **P2가 앞당겨진다.** 워커 계측이 PHASE 13의 전제이므로 sealed chunk handoff는
   "나중에 정확도를 올리는 일"이 아니라 **다른 페이즈를 막고 있는 일**이다.
 
-### 0.5.28 2026-09-23 P7 목표 정정 — 외부 캡처 연결이 아니라 내장 렌더 디버거
+### 0.5.36 2026-09-23 14-7을 프로파일러와 독립한 단일 프레임 캡처로 정정
+
+사용자 목표는 RenderDoc/PIX의 GPU 프레임 캡처처럼 원하는 뷰의 **다음 완료
+제출 하나**를 잡아 렌더 이벤트·상태·리소스·출력을 조사하는 엔진 내장 도구다.
+시간축 프로파일러의 연속 녹화나 NVIDIA식 하드웨어 성능 분석은 선행 조건이
+아니다. `14-7`은 대시보드 일정 번호로만 유지하고, 별도 `RenderCapture`
+프로젝트/서비스·`.ceframe` 파일을 `RenderFrameDebuggerPlan.md`가 소유한다.
+프로파일러의 서비스·수집 큐·세마포어·`.ceprof`·counter/marker와는 런타임 및
+빌드 의존을 두지 않는다. frame/view/submission/fence는 렌더러가 발행한 값만
+공유한다. 프로파일러 프레임에서 열기와 조건부 자동 트리거는 후속 선택 기능이다.
+이는 **계획 정정**이며 RF0~RF7 구현 완료를 뜻하지 않는다.
+
+### 0.5.35 2026-09-23 P4 완료 — 두 뷰·인플라이트·손실 진단을 제품 경로로 검증
+
+`-Action Gpu`는 중앙 뷰포트를 Scene → Game → Scene으로 바꾸고 Game Preview를
+연 뒤, 두 뷰를 함께 녹화하고 창을 리사이즈한다. Game 표시 모드에서도
+`editorTarget=true`인 것은 의도된 구조다(`ViewportHostWindow::publish_viewport_demand`):
+Scene 렌더 타깃을 유지하고 Game 수요만 더한다. 따라서 “Game 단독”을
+`display.scene.active=false`로 판정하지 않고, 실제 뷰포트 모드·수요와
+Game 완료 타깃을 확인한다. Scene과 Game의 GPU 조각 수가 다른 **같은 엔진 프레임**을
+잡아 서로 다른 `submissionId`가 붙는지도 검사한다. 기록 순서가 바뀌어도
+`engineFrameId`·`submissionId`·`viewId`의 조합이 유지돼야 한다.
+
+Debug 전체 솔루션 빌드 후 최종 제품 게이트(원본:
+`Build/Validation/ProfileP4/20260923-final-gpu-frames/profile-gpu.out`)는 수집 135회,
+표가 어긋나 거절된 수집 0, 같은 프레임의 서로 다른 두 뷰 4개,
+제출 충돌 0, 최대 미완료 제출 2, 인플라이트 상한으로 보류한 틱 41이었다.
+리사이즈 세대는 2→3이었고 Scene/Game 완료 세대가 모두 3에 도달했다.
+GPU 구간 4,839개가 sink로 흘렀고 선택 캡처의 귀속 어긋남은 0이었다.
+clock 표본 4회, 정렬 실패 0, Debug Layer 활성·DRED 활성 상태에서
+검증/DRED 메시지는 0건이었다. 앞선 같은 게이트도 두 번 통과했다
+(수집 140회·126회, 양쪽 모두 실패·손실 0).
+GPU 프레임 조회로 바꾼 뒤 반복 실행도 통과했다(원본:
+`Build/Validation/ProfileP4/20260923-final-repeat/profile-gpu.out`, 수집 132회,
+같은 프레임 두 뷰 3개, 최대 2-inflight, 손실·정렬 위반·DX12 오류 0).
+
+반복 실행에서 기본 `profile.frame`의 **마지막 엔진 프레임 8개**에는 GPU 레인이
+없는데 캡처 전체에는 GPU 이벤트 1,761건이 있는 경우가 나왔다. GPU 수집이 늦게
+도착해 앞선 프레임에 귀속되므로 조회 창의 결함이었다. `profile.frame gpu`는
+캡처 전체에서 GPU 구간이 있는 최근 8프레임을 골라, 게이트가 실제 GPU 레인의
+귀속·뷰·제출을 검사한다. 기본 `profile.frame`의 조회 범위는 유지한다.
+
+`DX12GpuProfiler`는 질의 예약 수가 슬롯 상한을 넘은 양을
+`FrameTimings::overflowedPasses`로 전달한다. 렌더러는 누적 초과와 수집 실패를
+따로 세고, GPU sink의 `on_issue`로 녹화 서비스에 프레임·누락 수·마지막 이유를
+보낸다. Collector 화면과 `profile.stats`가 이를 표시한다.
+`-Action GpuLoss`는 **Debug에만** `CREATOR_DX12_GPU_QUERY_LIMIT=16`을 적용해
+실제 초과를 만든다(원본:
+`Build/Validation/ProfileP4/20260923-loss-final/profile-gpu-loss.out`).
+렌더러 누적 누락 596, 녹화 중 Collector 누락 275, 마지막 발생 프레임 3234와
+이유 `GPU query slots exhausted`가 나왔고 수집 실패는 0이었다.
+기본 상한 64로 다시 실행한 정상 게이트에서는 양쪽 누락이 모두 0이었다.
+코어 Debug/Release는 각각 439검사 통과, GPU 누락과 수집 실패를 숨기는
+변이 둘이 두 구성에서 각각 해당 단정으로 실패했다.
+
+미완료 fence의 슬롯은 `EnhancedSceneRenderer::TickLive`의 완료 fence 비교를
+통과한 뒤에만 `Collect(token)`으로 넘어간다. 최대 2-inflight와 보류 틱이
+이 경계를 실제로 자극했고, 수집 실패·정렬 위반·DX12 오류가 0이었다.
+정상 제품 경로에는 라이브 pipeline 전체 재구축 명령이 없다. 리사이즈는
+표시 슬롯과 transient 자원을 완료 fence 뒤에 재생성하는 현재의 재구축 경로다.
+향후 pipeline hot reload를 도입하면 별도의 세대 전환 게이트를 추가한다.
+GPU 손실 진단은 현재 **라이브 녹화 요약**에 남는다. `.ceprof` 파일에 이
+요약을 직렬화하는 metadata 작업은 P6의 파일 형식 범위다.
+
+### 0.5.34 2026-09-23 라이브 Page Ingest 명칭·수집 단계 비용 계측
+
+라이브 `capture_ring::ingest`는 직렬화 바이트를 해석하지 않는다. 봉인된 네이티브
+`event_chunk`의 헤더·세대를 확인하고, 늦은 이벤트를 원래 프레임에 귀속한 뒤
+불변 페이지 구간을 프레임 인덱스에 연결한다. 실제 `.ceprof` 역직렬화는
+`load_capture`의 파일 읽기 경로다. 따라서 라이브 통계의 `deserializedPages`와
+화면의 `Deserialized pages`를 `ingestedPages`와 `Ingested pages`로 바꿨다.
+§0.5.31의 `Deserialize`는 당시 수집 단계에 붙였던 이름이며, 현행 작업의
+이름으로 사용하지 않는다. 외부에서 옛 JSON 필드를 읽는 도구는 새 키로 바꿔야 한다.
+
+수집 스레드에서 QPC 누적 tick을 단계별로 센다. `wait`는 세마포어 신호 대기,
+`queue delay`는 제출 시각부터 해당 프레임 작업을 시작할 때까지의 지연이다.
+작업 비용은 `page ingest + attribution`, `frame close + retention`,
+`capture publish`, `page replenish`로 나눈다. 호출·프레임·스냅샷 수와 함께
+`profile.stats` JSON과 Collector 화면에 노출하며, 화면과 검증 스크립트는
+QPC 주파수로 ms로 환산한다. 값은 녹화 시작 뒤 누적된 벽시계 시간이다.
+`wait`와 `queue delay`는 수집 CPU 작업 비용에 합산하지 않는다. 파일 로드
+비용이나 파일 내부 tick 주파수와도 섞지 않는다.
+
+Debug Editor 기본 씬의 `Stats` 원본은 `Build/Validation/ProfileCollectorStages/
+20260923-133348/manifest.json`과 같은 폴더의 `profile-stats.out`에 보존했다.
+봉인 페이지 225개·수집 호출 208회에서 page ingest 3.657ms, 프레임 마감
+64회에서 1.197ms, 캡처 게시 7회에서 5.014ms, 페이지 보충 0.594ms였다.
+신호 대기 27,901.089ms와 제출 큐 지연 19.040ms는 별도 표시한다.
+늦은 이벤트 233개가 제 프레임에 놓였고 늦어서 버린 이벤트는 0이었다.
+이 기준선에서 page ingest는 지배적 비용으로 드러나지 않았으므로 이벤트별
+귀속 규칙이나 페이지 표현을 바꾸는 최적화는 적용하지 않았다. 고부하 제품
+장면에서 이 비용이 커지면 늦은 이벤트 검색과 페이지 인덱스 연결을 따로
+계측해 병목을 확인한다.
+
+검증 중 Release stress가 간헐적으로 `record`/`clear` 완료 대기에서 멈췄다.
+수집기가 완료 값을 대기용 mutex 밖에서 갱신하여 조건 변수 통지를 놓칠 수
+있었으므로, 완료 값 갱신을 같은 mutex 아래로 옮겼다. 수정 후 Debug·Release
+코어 각 434항목과 `silent-drop` 변이, Debug Editor의 `Stats`·`Window`,
+5초 stress(각 1,589,248·10,682,368 프레임, 드롭 0)가 통과했다.
+Debug Editor·Player 빌드도 통과했다. Release 실행 파일을 추가로 5회
+반복해 모두 통과했다. stress 원본과 반복 결과는
+`Build/Validation/ProfileCollectorStress/20260923-134221/`에 있다.
+이 검증은 장시간 제품 장면이나 전체 변이 65개를 대신하지 않는다.
+
+### 0.5.33 2026-09-23 기본 수집 큐·페이지 풀 확장
+
+기본 `profiler_config`의 `max_queued_frames`와 `max_chunk_count`는 0(상한 없음)이다.
+프레임 제출 큐는 필요할 때 커지고, 기록자 페이지 풀이 비면 해당 기록자가 새 페이지를
+할당한다. 수집 스레드는 평상시 free 페이지를 미리 보충한다. Tracy의 메모리 확장
+방향을 참고했으나 현재 큐는 mutex 기반 `std::deque`이며 Tracy의 구현을 복제한 것은 아니다.
+
+`memory_budget`는 rolling capture가 보존할 프레임의 예산이다. 제출 큐나 페이지 풀의
+전체 메모리를 제한하지 않는다. 그래서 수집기가 계속 뒤처지면 프로세스 메모리와
+기록자 측 할당 지연이 늘 수 있다. Collector에는 큐 길이·페이지 풀 바이트를 표시한다.
+명시적 상한을 설정한 검사·도구에서는 기존 드롭 계수를 유지한다. 할당 실패, 손상
+페이지, 너무 늦게 도착해 보존 프레임을 찾지 못한 이벤트도 계속 진단한다. 기본
+확장은 모든 상황에서 손실이 없다는 보증이 아니다.
+
+Debug·Release 코어 각 430항목과 `silent-drop` 변이가 통과했다. 보존 예산을
+페이지 하나 크기로 줄여도 1,024개 이벤트가 모두 남는 검사를 포함한다. 5초 수집 stress에서
+Debug 118주기·1,933,312경계, Release 892주기·14,614,528경계가 제출됐고,
+두 구성 모두 보존 프레임 수가 제출량과 일치하며 드롭 0이었다. 원본 결과:
+`Build/Validation/ProfileCollectorStress/20260923-130907/manifest.json`.
+Debug Editor·Player 빌드와 실제 Editor의 `Stats`·`Window` 실행 게이트도 통과했다.
+`Stats`에서 누락 이벤트 0, 버린 경계 0, 수집 대기 프레임 0을 확인했다.
+장시간 제품 장면의 메모리 증가·기록자 할당 지연은 아직 측정하지 않았다.
+페이지 헤더 확인과 프레임 연결 작업은 여전히 수집 스레드에서 수행하므로,
+이 변경만으로 `Deserialize` 소요 시간의 원인을 판정하지 않는다.
+
+### 0.5.32 2026-09-23 수집기 포화·종료 경합과 4모드 코어 비용 측정
+
+`Tools/regression/verify-profile-collector-stress.ps1`는 Debug·Release에서
+각 20초간 기록자 4개와 16,384개씩의 프레임 경계 제출을 반복한다. 매 주기
+`수집 프레임 + 버린 경계 == 제출 경계`와 큐 배출, 손상 페이지 0, 외부 스트림
+접근 0을 검사한다. 별도 단계에서는 열린 스코프를 가진 다섯 번째 기록자를
+포함해 기록자와 제출자가 계속 도는 중에 서비스를 종료하고, 종료 후에도
+기록 시도를 계속하게 해 TLS 세대 무효화와 스트림 보유 경계를 자극한다.
+이 검사에서 `m_slotEpoch`의 동시 읽기·쓰기를 원자 변수로 바꾸었다.
+
+실행 결과: Debug 2,923주기·47,890,432경계 제출, Release 7,981주기·
+130,760,704경계 제출. 두 구성 모두 모든 주기에서 큐가 포화됐고, 보존+드롭
+합계가 제출량과 일치했다. 손상 페이지·외부 스트림 접근은 0, 열린 상태로
+종료된 스트림 5개를 안전하게 계상했다. 원본 JSON과 빌드 로그:
+`Build/Validation/ProfileCollectorStress/20260923-121209/manifest.json`.
+Debug·Release 코어 각 424항목과 `tls-ignores-epoch` 변이도 통과했고,
+Debug Editor·Player 빌드 및 Editor `Stats/Workers/Window/Gpu` 실행 게이트를
+다시 통과했다.
+
+`Tools/regression/measure-profile-overhead.ps1`는 동일한 고정 작업을
+2,000프레임×5회씩 네 모드에서 재며 실행 순서를 회전한다. 각 프레임은
+CPU scope 호출 64개, CPU+GPU 모드에는 GPU span 제출 8개를 더한다.
+활성 구간 밖에 500µs 양보 시간을 둔다. 중앙 실행의 CPU 활성 시간(ms)은
+다음과 같다.
+
+| 모드 | P50 | P95 | P99 | 기록 이벤트/초 | 이벤트 payload/초 | 최대 캡처 메모리 |
+|---|---:|---:|---:|---:|---:|---:|
+| Shipping compile-out | 0.0013 | 0.0016 | 0.0018 | 0 | 0 | 0 |
+| 개발 빌드·중지 | 0.0030 | 0.0046 | 0.0057 | 0 | 0 | 0 |
+| CPU 기록 | 0.0085 | 0.0129 | 0.0160 | 약 251,000 | 약 10.0 MB | 6.17 MB |
+| CPU+GPU 이벤트 기록 | 0.0087 | 0.0147 | 0.0227 | 약 266,000 | 약 10.6 MB | 6.36 MB |
+
+모든 실행의 이벤트·프레임 드롭은 0이다. Shipping에서는 마커 등록도 0이 되도록
+`marker()`의 인자 평가 경로를 끊었다. 수집 스레드의 OS CPU 시간은 기록 모드
+중앙 실행에서 각각 31.25ms였지만, `GetThreadTimes`의 짧은 구간 계측이
+15.625ms 단위로 흔들려 정밀한 self-cost 수치로 보지 않는다. 원본 실행별
+JSON·조건·중앙값: `Build/Validation/ProfileOverhead/20260923-122605/manifest.json`.
+이것은 **코어 합성 부하**다. §11.4의 동일 제품 장면·해상도 4모드 프레임 시간,
+실제 GPU 프레임 시간, P5의 전체 counter 기록은 아직 측정하지 않았다.
+
+### 0.5.31 2026-09-23 봉인 페이지의 수집기 측 Deserialize 및 얕은 라이브 스냅샷
+
+전용 수집 스레드 이후에도 봉인된 `event_chunk`의 모든 이벤트를
+`frame_record.events`에 다시 복사하고, 라이브 캡처를 만들 때 링 전체의
+이벤트를 한 번 더 복사했다. CPU 기록자는 이미 고정 길이 이벤트와 숫자 마커 ID를
+청크에 쓰므로, 별도의 바이트 직렬화 단계를 넣지 않고 이 청크를 프로세스 내부의
+native binary page로 사용한다. 이것은 Unity의 실제 내부 포맷을 추정해 복제한
+것이 아니며, 휴대 가능한 `.ceprof` 파일 포맷과도 구별한다.
+
+기록 스레드는 페이지가 차거나 프레임 경계에서 자기 페이지만 봉인한다. 봉인
+목록이 비어 있다가 첫 페이지가 들어올 때 C++20 `std::counting_semaphore`로
+수집기를 깨운다. 수집기는 프레임 제출 작업과의 순서를 지키며 페이지를 떼어
+헤더(매직·버전·이벤트 크기·개수)와 세대를 확인한다. 정상 페이지는 이벤트를
+복사하지 않고 프레임의 페이지 구간 인덱스로 잇는다. 늦은 CPU/GPU 구간만
+이벤트별로 제 프레임을 찾되, 가능한 경우에도 원본 페이지의 구간을 참조한다.
+손상 페이지는 계수와 누락 장부에 남긴다.
+
+프레임을 얼리거나 라이브 캡처를 공개할 때는 프레임 인덱스와 불변 페이지 참조만
+복사한다. 마지막 캡처가 페이지를 놓으면 풀로 되돌아간다. 이전 캡처가 서비스
+종료 뒤까지 살아 있어도 풀을 함께 보유하므로 포인터가 무효화되지 않는다.
+페이지 보유로 free 목록이 줄면 수집 스레드가 예산 상한 안에서 보충하며,
+기록자 경로는 할당이나 대기 없이 페이지를 얻거나 누락을 계상한다. 라이브
+스냅샷에서 봉인 요청에 응답하지 않은 스트림은 미확정 수와 함께 표시한다.
+
+검증: Debug·Release 코어 각 424항목 통과, 수집기 프레임 누락 변이는 두
+구성의 `basic/count`에서 검출. 페이지를 프레임 경계 없이 봉인해도 수집기가
+깨어나는 경우, 이전 스냅샷 불변성·종료 뒤 페이지 생존·미응답 스트림·손상
+페이지 거절, 지운 녹화의 누락 기준선 초기화를 포함한다. Debug Editor·Player 빌드와 실제 Editor의
+`Stats/Workers/Window/Gpu` 게이트가 통과했다. Stats에서는 별도 수집 OS 스레드,
+누락 이벤트 0, 손상 페이지 0, 버린 프레임 경계 0을 확인했다. 장시간 고부하의
+큐 포화·종료 경합과 여러 플랫폼/빌드 구성은 아직 이 증거에 포함되지 않는다.
+
+### 0.5.30 2026-09-23 CPU 수집기를 전용 신호 대기 스레드로 이전
+
+사용자 결정: 이번 변경은 **전용 수집 스레드까지**이며 Profiler 표시 창의 별도
+프로세스화는 포함하지 않는다. Unity 화면의 `WaitForSignal`·`Deserialize`는
+동작의 단서일 뿐 내부 직렬화 형식의 사양이 아니다. 현재 라이브 자료는 이미
+`event_chunk`이므로 역직렬화를 흉내 내기 위해 프레임마다 바이트로 바꾸지 않는다.
+
+기록 스레드의 소유 규칙은 유지한다. `publish_frame()` 호출자는 자기 청크를
+봉인하고 남의 스트림에는 요청만 보낸 다음, 그 시점까지 봉인된 청크·엔진 프레임
+번호·경계 tick을 한 작업으로 제출한다. 전용 수집기는 세마포어에서 자다가 작업이
+들어오면 FIFO 순서로 청크를 링에 반영하고 프레임을 닫으며, 요청된 라이브
+스냅샷을 만든다. 프레임 호출자는 링·캡처를 직접 만지지 않는다. `record`·`clear`와
+프레임 제출은 한 줄에서 순서를 지키고, `pause`는 호출자 자신의 꼬리를 먼저
+봉인한 뒤 수집기가 얼림을 마친다. 즉시 캡처를 돌려주는 `profile.frame`만
+명시적인 완료 경계를 기다린다.
+
+제출 큐는 프레임 작업 256개에서 자른다. 포화 시 잃은 프레임·이벤트를 세고
+Collector 탭과 `profile.stats`에 드러낸다. 건너뛴 시간은 다음 정상 프레임의
+길이에 합치지 않는다. 종료는 대기 중인 작업을 처리하고 수집 스레드를 join한
+뒤에 스트림·풀을 정리한다. `.ceprof` 파일의 Save/Open 경로와 Editor 안의
+ProfilerWindow는 이번 변경에서 그대로 둔다.
+
+코어 기준 검사는 Debug·Release 각 409항목 통과, 전용 소비자가 프레임 수집을
+건너뛰는 변이는 `basic/count`에서 붉어진다. Debug Editor·Player 빌드와
+Editor 제품 경로의 `-Action Stats/Workers/Window/Gpu`도 통과했다. Stats에서
+수집기 OS 스레드 ID가 GameThread와 다르고 버린 프레임 경계가 0인 것을 확인했다.
+대량 제출 2,048프레임은 처리하거나 손실로 계상되는 것도 코어에서 확인했다.
+이들은 정상 부하의 제품 증거와 단기 대량 제출의 코어 증거다. 큐 포화·종료 경합을
+의도적으로 재현하는 장시간 부하와 다른 구성의 제품 실행은 아직 검증하지 않았다.
+
+### 0.5.29 2026-09-23 P7 목표 정정 — 외부 캡처 연결이 아니라 내장 렌더 디버거
 
 사용자가 요청한 것은 PIX/RenderDoc과 같은 방식으로 프레임을 조사하는 **엔진 내장형**
 도구다. 이전 P7의 자동 trigger·PIX/ETW 연결은 비교 도구의 이름을 제품 요구로
@@ -390,7 +623,8 @@ P0 의 결함 표는 **"은퇴한 코어의 이력"** 이라고 못 박아 남�
 계획서 자신이 그 낱말을 쓰므로 "전체 0" 은 그 자리에서 거짓이다.
 
 **대시보드는 안 고쳤다.** `RefactoringPlanDashboard.html` 의 PHASE 14 여덟 줄을
-검산했더니 P4 `progress` · P5·P6·P7 `todo` 로 **이번 감사와 정확히 일치**한다.
+검산했더니 P4 `progress` · P5·P6·P7 `todo` 로 **당시 감사와 정확히 일치**했다.
+P4의 현재 상태는 2026-09-23 완료 기록(§0.5.35)을 따른다.
 
 ### 0.5.24 2026-09-22 P4 타임라인이 **보이는 창**을 그린다 — 한 칸만 그리면 두 그림이 서로 다른 말을 한다
 
@@ -1770,7 +2004,6 @@ CRLF 스크립트로 적고 `--commandlet-script` 로 넘기되, **출력은 `St
 - 고정 메모리 예산의 rolling capture
 - Record/Pause/Clear, 프레임 선택, Timeline, Hierarchy, Save/Load
 - 캡처 overflow·누락·프로파일러 자체 비용의 가시화
-- 프로파일러의 선택 프레임·뷰에서 내장 Render Frame Debugger 캡처로 이어지는 진입점
 
 ### 1.2 1차 범위에서 제외
 
@@ -2234,19 +2467,19 @@ Pause는 다음 engine frame 경계에서 확정한다. 중간 scope는 `truncat
 - thread마다 writer 전용 고정 크기 chunk
 - chunk가 차거나 frame publish 지점에 도달하면 sealed queue로 넘김
 - collector만 sealed chunk를 소비
-- hot path에서 heap allocation 금지
-- free chunk가 없으면 drop count 증가, blocking 금지
+- 평소에는 미리 준비된 페이지를 사용하고, free 페이지가 없으면 기록자가 새 페이지를 할당
+- 명시적 페이지 상한 또는 할당 실패 시에만 drop count 증가
 - thread별 sequence로 동일 timestamp 순서 보존
 
-기본 chunk 크기와 pool 수는 selftest 측정으로 결정한다. 상수부터 크게 잡아 문제를 숨기지
-않고, overflow가 UI와 로그에 보이게 한다.
+기본 페이지 수는 selftest 측정으로 결정한다. 생산자가 소비자보다 오래 빠르면
+풀·제출 큐의 메모리가 커지므로 Collector에서 큐 길이와 풀 메모리를 본다(§0.5.33).
 
 ### 6.3 Rolling capture
 
 초기 기본값:
 
 - 600 engine frames
-- 전체 메모리 예산 128 MiB
+- rolling capture 보존 예산 128 MiB (제출 큐와 페이지 풀은 별도)
 - 둘 중 먼저 닿으면 가장 오래된 완결 프레임부터 제거
 - 현재 쓰는 프레임과 미완 scope가 참조하는 string/marker는 제거하지 않음
 - UI에 `used / budget`, retained frames, dropped events 표시
@@ -2275,8 +2508,9 @@ Pause는 다음 engine frame 경계에서 확정한다. 중간 scope는 `truncat
 - 캡처 프레임·메모리 사용량
 - Category/Module 선택
 - Save / Load
-- 선택 프레임·뷰의 `Open Render Frame Debugger`
-- 조건부 내부 캡처 설정(RF7에서 추가)
+
+`Open Render Frame Debugger`는 별도 RF 트랙의 후속 선택적 adapter다. 이 Toolbar의
+기본 기능이나 프로파일러 완료 조건이 아니다.
 
 Space 전역 단축키는 제거하거나 Profiler 창 focus일 때만 받는다. 편집기 viewport 입력과
 충돌하지 않아야 한다.
@@ -2385,7 +2619,7 @@ Chunk table
 
 ---
 
-## 9. 내장 Render Frame Debugger와의 연결
+## 9. 독립 Render Frame Debugger와의 선택적 연결
 
 제품 목표는 엔진 안에서 프레임을 직접 조사하는 것이다. PIX/RenderDoc 같은 도구명은
 사용자가 기대하는 프레임 탐색 경험의 예시이지 외부 도구 실행·ETW export를 완료 조건으로
@@ -2396,20 +2630,23 @@ Chunk table
 | Creator Profiler (`.ceprof`) | 여러 프레임의 CPU/GPU/GC 추세와 문제 프레임·뷰 탐색 |
 | Render Frame Debugger (`.ceframe`) | 완료된 한 submission의 pass/draw/dispatch 순서, 객체·자산·상태·리소스와 중간 출력 조사 |
 
-프로파일러에서 프레임·뷰를 선택하면 같은 `EngineFrameId`·`SubmissionId`·`RenderViewId`를
-Render Frame Debugger에 넘긴다. 이미 지나간 프레임의 렌더 입력과 GPU 리소스가 보존되지
-않았다면 그 과거 프레임을 재현했다고 가장하지 않는다. 이 경우 선택한 뷰의 **다음 완료
-submission**을 엔진 내부에서 캡처하고, 원래 선택과 새 캡처의 ID를 각각 표시한다.
-캡처된 `.ceframe`은 이벤트 트리·상태·리소스와 선택 이벤트의 출력 preview를 보여 준다.
-상세 데이터 모델, 격리 replay, 파일화와 검증은 `RenderFrameDebuggerPlan.md` RF0~RF7이
-소유한다. 조건부 자동 캡처는 이 내장 경로의 후속 편의 기능이다.
+Render Frame Debugger는 프로파일러를 시작하지 않고도 UI/CLI에서 뷰를 지정해
+**다음 완료 submission 하나**를 캡처하고 `.ceframe`을 저장·연다. 두 도구는
+렌더러가 발행한 frame/view/submission ID만 공유하며 서비스·수집 큐·파일 schema는
+공유하지 않는다. 나중에 프로파일러 선택 프레임·뷰에서 연결하더라도, 과거
+프레임의 렌더 입력과 GPU 리소스가 보존되지 않았다면 과거 프레임을 재현했다고
+가장하지 않는다. 이 경우 선택한 뷰의 **다음 완료 submission**을 새로 캡처하고
+원래 선택과 실제 캡처 ID를 구분해 표시한다. 이 adapter와 조건부 자동 트리거는
+두 도구의 완료 조건에서 제외한다. 상세 데이터 모델·격리 replay·파일화는
+`RenderFrameDebuggerPlan.md` RF0~RF7이 소유한다.
 
 ---
 
 ## 10. 실행 계획
 
-P0~P6은 빌드 가능한 조각으로 검증하며 진행한다. P7은 단일 커밋이 아니라
-`RenderFrameDebuggerPlan.md`의 RF0~RF7 슬라이스와 각 검증 게이트를 따른다.
+이 프로파일러 계획은 P0~P6을 빌드 가능한 조각으로 검증한다. 대시보드 `14-7`은
+일정상 같은 묶음에 남지만, 독립 `RenderCapture` 제품 트랙이며 구현·검증 정본은
+`RenderFrameDebuggerPlan.md` RF0~RF7이다.
 
 ### P0 — 현재 동작 기준선과 profiler selftest 표면
 
@@ -2627,7 +2864,8 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - 8개 이상 writer thread stress에서 충돌·손상 없음
 - 프레임 경계를 넘는 scope의 duration이 정확함(`cross-frame/preserve` PASS)
 - thread 생성/종료 후 dangling TLS 접근 없음
-- pool 고갈 시 정지하지 않고 dropped count가 정확히 증가
+- 기본 풀은 초기 페이지를 넘어도 확장해 이벤트를 보존
+- 명시적 pool 상한 또는 할당 실패 시 dropped count 증가
 - ASan 가능 구성 또는 동등한 메모리 검증에서 오류 없음
 - ★ **애니메이션 워커의 시간이 캡처에 나타난다** — PHASE 13 §4의 완료 기준("예측 비용
   대 실측 오차 15% 이내")을 판정할 수단이 이것이다
@@ -2666,22 +2904,138 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 검증 장면:
 
-- 가벼운/무거운 GPU 패스를 프레임마다 번갈아 실행
-- 인플라이트 0/1/2 각각 측정
-- 씬뷰 단독, 게임뷰 단독, 두 뷰 동시
-- 리사이즈와 pipeline rebuild 직전·직후
+- 서로 다른 GPU 조각 수의 Scene/Game 제출이 같은 엔진 프레임에 존재하고
+  서로 다른 제출 번호로 귀속
+- 최대 2-inflight와 미완료 fence 때문에 다음 제출을 보류하는 경계
+- Scene 표시 모드, Game 표시 모드, Scene+Game Preview 동시 수요
+- 리사이즈 전후 두 뷰의 완료 세대 비교(라이브 pipeline 전체 재구축은 현재 정상 운영 명령이 없음)
+- Debug에서 질의 슬롯을 16개로 제한해 실제 overflow를 발생시키는 손실 게이트
 
 완료 조건:
 
-- heavy/light 패턴이 올바른 `engine_frame_id`와 `submission_id`에 교대로 매핑
+- 같은 엔진 프레임의 서로 다른 Scene/Game 패스 조각 수가 각각 올바른
+  `engine_frame_id`·`submission_id`·`view_id`에 매핑
 - 2-in-flight와 멀티카메라에서 이전/최신 query record 혼동 없음
 - fence 미완료 slot을 읽지 않음
-- GPU query overflow와 collect 실패가 캡처 diagnostics에 남음
+- GPU query overflow와 collect 실패가 라이브 녹화 Collector diagnostics에 따로 남음
 - D3D12 debug layer/DRED 메시지 0건
 
 ### P5 — Counter provider와 관리 marker
 
-할 일:
+메모리 탭의 수동 스냅샷·객체별 분석은 P5의 프레임별 counter와 별도인 [MemoryProfilerPlan.md](MemoryProfilerPlan.md) MP0~MP6에서 추적한다. P5 완료가 Unity 수준의 메모리 객체·참조 계측 완료를 뜻하지는 않는다.
+
+**2026-09-23 P5 완료.** 초기 텔레메트리 경로는 프레임에 희소 counter 값을 붙여
+immutable capture와 `.ceprof`의 선택 청크에 보존한다. Collector가 엔진 프로세스
+CPU 사용률(전체 논리 CPU 기준)과 RAM 작업 집합을 100ms 간격으로 샘플하고,
+RenderThread가 DX12/Vulkan의 VRAM 사용량을 250ms 간격으로 발행한다. GPU
+Graphics 시간은 이미 캡처된 GPU 구간의 합집합에서 읽는다. 에디터의 선형 그래프는
+같은 프레임 선택을 공유하고 값이 없는 구간을 0으로 잇지 않는다. LAN은 엔진
+송수신 계측원이 현재 없으므로 **측정 불가**로 표시한다. OS 어댑터 전체 송수신량을
+엔진 트래픽으로 대체하지 않는다. RenderThread/PresentationThread에는 대기·잠금·
+준비·기록·제출/표시 단계 마커를 더했다. 아래의 owner 제공자와 관리 마커가
+이 초기 경로를 확장한다.
+
+2026-09-23 검증: Debug Editor 빌드, Debug/Release 코어 각 447검사·선택 CRC 변이,
+`Invoke-ProfilingValidation.ps1 -Action Stats`·`Window`·`Gpu` 통과.
+`Stats`의 `profile.frame`에서 CPU/RAM과 VRAM 희소 표본을 확인했고,
+`droppedCounters=0`이었다. `ProfilerTelemetry` 자체 계측은 Debug 창 게이트의
+7표본에서 0.27~0.61ms였다. 원본은 `Build/Validation/ProfileP5/20260923/`
+아래 `final-stats`·`final-window`·`final-gpu`에 있다. 이 초기 게이트 이후의
+화면 배치·상호작용 확인은 아래 UI 후속에 기록했다. 장시간 부하는 아직 검증하지 않았다.
+
+2026-09-23 UI 후속: 실제 에디터 화면에서 네 그래프가 타임라인을 밀어내고
+긴 기록의 여러 초가 한 타임라인에 압축되는 문제가 확인됐다. 모든 분석 페이지를
+왼쪽 Material Symbols 아이콘 레일에 모으고 각 아이콘에 설명 툴팁을 붙였다.
+`프레임 그래프`는 프레임 개요와 CPU·RAM·GPU Graphics·VRAM의 2×2 시계열,
+`타임라인`은 같은 프레임 개요와 시간순 레인/CPU 호출 계층 전환을 제공한다.
+CPU 페이지는 선택 구간 A와 별도 프레임 범위 B의 평균·표본 수 비교, 시계열,
+Self 상위 마커, 호출 계층을 배치했다. Flat과 Hierarchy는 공통 마커 검색과
+스레드 필터를 쓴다. 이는 Datadog Continuous Profiler의 시각화 전환·오른쪽
+순위 목록·비교 배치를 참고하되 엔진 캡처에 실제로 있는 값만 표시한 것이다
+(`https://www.datadoghq.com/blog/dotnet-datadog-continuous-profiler/`). 타임라인은
+짧은 라이브 캡처에서 자라더라도 기본 100ms 시야로 수렴하고, 하단 탐색 막대로
+**보존된 기록 전체**를 이동한다. 새 스냅샷에도 사용자 배율을 유지하며 상단
+프레임/시계열을 클릭하면 상세 시야가 해당 프레임으로 이동한다. 좁은 구간의
+잘린 이름과 숫자는 숨기고 툴팁에 보존한다. Debug Editor 빌드, Debug·Release
+코어 각 459검사와 타임라인 시야 변이, Window 제품 게이트를 통과했고 실제
+화면에서 레일·툴팁·페이지 배치·호출 계층 전환을 확인했다. 장시간 부하는 남았다.
+
+2026-09-23 타임라인 화면 후속: 150px 고정 스레드 이름 칸에서 긴 이름이 시간축에
+겹치던 문제를 해결했다. 이름 칸은 현재 스레드 이름에 맞춰 넓어지고, 각 이름은
+그 칸 안에서만 그리며 전체 이름은 툴팁으로 볼 수 있다. 레인 높이의 14줄 상한을
+없애 호출 깊이만큼 확장하고 내부 세로 스크롤·스레드별 접기/펼치기·전체
+접기/펼치기를 제공한다. CPU 호출 계층 그래프도 18단계 표시 상한을 제거했다.
+GPU 페이지에 VRAM 시계열이 있으므로 옛 Profiler 창 아래의 단독 VRAM Usage
+막대는 제거했다. Debug 전체 및 최종 Editor/CreatorEditor 증분 빌드는 경고·오류
+0이었다. 실제 화면에서 이름 칸·접기/펼치기·VRAM 단독 바 제거를 확인했다.
+`Window` 게이트 첫 실행은 최근 8프레임에 프로파일러 마커가 없어 실패했고,
+재실행은 `ProfilerWindow`·`ProfilerTimeline` 각 7건으로 통과했다. 이 게이트는
+최근 8프레임 표본에 민감하므로 첫 실패를 기능 결함이나 안정 통과로 덮지 않는다.
+
+같은 날 RenderThread 누락 피드백: 기본 장면의 짧은 녹화에서 스레드는 등록됐지만
+완료된 이벤트가 0건이어서 타임라인이 레인을 통째로 생략했다. 캡처의 등록 스레드
+표에서 RenderThread를 합쳐 이벤트가 없을 때에도 레인을 표시하고, 0ms로 해석할
+수 없도록 `완료 이벤트 없음`이라 적는다. 렌더 큐의 무기한 대기 스코프는 100ms
+단위로 닫아 실제 유휴 시간도 기록한다. 처음 실행 중인 렌더 작업이 아직 끝나지
+않은 경우에는 완료 구간을 주장하지 않는다. 렌더 완료를 기다린 제품 게이트와
+실제 화면 확인을 따로 기록한다.
+`Stats` 제품 게이트에서 `render.live.wait`로 완료를 보장한 캡처는
+RenderThread 이벤트 934건, 누적 누락 0·불균형 스코프 0으로 통과했다
+(`Build/Validation/ProfileP5/20260923/render-thread-stats`). 짧은 `Window`
+게이트에서는 해당 스레드의 완료 이벤트 0건이 재현됐다. 두 조건을 섞어
+“항상 렌더 작업이 완료됐다”고 해석하지 않는다.
+최종 Debug 화면에서는 GameThread와 PresentationThread 사이에 RenderThread 레인이
+표시되고, 해당 100ms 시야에 완료된 구간이 없을 때 `완료 이벤트 없음`으로 읽혔다.
+
+2026-09-23 P5 종결: `CounterRegistry`는 런타임 추가 ID와 이름·단위·범주를
+불변 캡처에 함께 보관하고 `.ceprof` 선택 청크로 왕복한다. process/GPU/render/
+managed/resources 모듈 마스크를 UI와 `profile.counter-mask`에서 제어하며,
+Resources는 기본 꺼짐이다. Resource Counter 창은 GameThread가 0.5초 간격으로
+발행한 snapshot만 읽어 UI 스레드가 엔진 컨테이너 락이나 관리 GC API를 잡지
+않는다. RenderThread는 DX12/Vulkan upload bytes·rejected batches·descriptor
+allocations/overflow와 GBuffer draw/batch를 소비한 submission의 엔진 프레임에
+발행한다. 고정 용량을 가진 upload ring의 단순 overflow가 아니라 실제
+`batchRollbacks`를 `Upload rejected batches`로 표시한다. 제공자별 비용도
+process/render/GC/resources로 분리했다. `CreatorEngine.Diagnostics.ProfilerMarker`의
+native bridge가 ScriptCore 전후 물리 틱을 기록하고 같은 GameThread 프레임에
+GC Gen0/1/2·힙·단편화·일시정지 비율을 발행한다. 한 제공자의 값은 Pause와
+교차할 때 일부만 남지 않도록 묶어서 큐에 넣는다. Record는 마지막 완료 프레임의
+다음 번호를 요청하고, Collector가 실제 받은 첫 프레임 경계로 시작점을 확정한다.
+요청 처리 중 GameThread가 앞서가더라도 그 이전 RenderThread 제출을 캡처
+누락으로 세지 않는다.
+
+검증: Debug Editor/CreatorEditor와 ScriptCore 빌드, Debug·Release 코어 각
+473검사·`counter-registry-*` 선택 변이 2종 통과. 제품 `Providers` 게이트는
+Resource off 표본 0/on 표본 1 및 비용 80.3µs를 확인했고, 강제 GC의 Gen2 증가와
+`ScriptCore.PrePhysicsTick`·`PostPhysicsTick`이 동일한 frame 5473에 있다.
+동일 제품의 process/render/GC 제공자 비용 마지막 표본은 각각 19.0/6.8/8.9µs였다.
+원본은 `Build/Validation/ProfileP5/20260923/completion-providers-batch`에 있다.
+첫 경계가 늦어지는 현상의 재현 로그는 같은 폴더의 `counter-drop-trace`에 있다
+(요청된 시작 시각 뒤에 RenderThread frame 6505가 완료됐으나 첫 보존 frame은
+6508). 수정 뒤 제품 게이트 재측정은 아래 P5 최종 기록을 따른다.
+Upload·descriptor 거절 카운터가 활성화된 owner 프레임에만 붙는지는 코어
+회귀로 확인했다. 실제 RHI 용량 초과를 강제로 만드는 제품 검증은 수행하지
+않았으므로 실부하에서 양수 사례의 빈도나 복구 동작까지 증명한 것은 아니다.
+LAN은 합의한 엔진 트래픽 기준의 제공자가 생길 때 연결한다. 장시간 비용·보존
+검증은 P7 성능 검증에 남긴다.
+
+P5 최종 기록: 별도 세션의 동시 빌드가 `SceneRuntime.pdb`를 사용해 첫 증분
+빌드가 충돌했으며, 해당 빌드가 끝난 뒤 Debug `CreatorEditor.vcxproj` 전체
+빌드가 성공했다. Debug·Release 코어는 각 473검사와 선택 변이 2종을
+통과했다. 최신 실행 파일의 `Providers` 게이트는 Resource off/on과 GC·스크립트
+동일 프레임을 재확인했고, 양쪽 캡처의 `droppedCounters=0`을 새 게이트 단정으로
+검증했다. 마지막 제공자 비용 표본은 process/render/GC/resources 순서로
+21.3/4.7/8.0/60.2µs였다. `Stats`는 GameThread 1742건,
+RenderThread 726건, PresentationThread 608건, GPU Graphics 2223건을
+수집했으며 이벤트·카운터 누락과 불균형 스코프가 모두 0이었다. `Window`는
+ProfilerWindow·ProfilerTimeline을 각 5건 확인하고 창을 닫은 뒤에도
+기록이 계속됨을 확인했다. 원본은
+`Build/Validation/ProfileP5/20260923/completion-providers-asserted`,
+`completion-stats-final`, `completion-window-final`에 있다. 짧은 `Window`
+구간에서 창을 닫은 뒤 RenderThread 완료 이벤트는 0건이므로, 해당 구간의
+렌더 작업 완료를 이 게이트가 입증한다고 해석하지 않는다.
+
+구현 범위:
 
 - `CounterRegistry`와 category/module mask
 - Resource Counter의 데이터를 owner-published counter로 이동
@@ -2714,22 +3068,13 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - 중간 절단 파일과 CRC 오류를 crash 없이 거절
 - 저장 중 새 recording을 시작해도 저장 대상이 변하지 않음
 
-### P7 — 내장 Render Frame Debugger (상세: `RenderFrameDebuggerPlan.md` RF0~RF7)
+### 14-7 — 독립 Render Frame Debugger (상세: `RenderFrameDebuggerPlan.md` RF0~RF7)
 
-할 일:
-
-- 프로파일러의 선택 프레임·뷰에서 내장 프레임 캡처 요청으로 연결
-- 완료된 submission의 pass/draw/dispatch/copy 이벤트·객체·자산·렌더 상태·리소스 기록
-- 선택 pass 출력과 draw 단계의 중간 화면을 격리 replay로 확인
-- `.ceframe` 저장·재열람과 `.ceprof` session/frame/submission ID 상호 참조
-- 조건부 내부 캡처, Development Player, Shipping 격리와 비용 검증
-
-완료 조건:
-
-- Scene/Game 동시·2-in-flight에서 요청한 뷰의 완료 submission만 freeze
-- pass/draw 이벤트 순서·batch 구성·상태·리소스가 실제 제출과 일치
-- 선택 pass/draw 출력 preview가 원래 입력을 사용하고 live display/history를 바꾸지 않음
-- `.ceframe` 왕복, 누락·미지원 상태 표시, Editor/Development Player 및 DX12/Vulkan 게이트 통과
+이 절은 프로파일러 P6 다음 구현 단계가 아니라 별도 계획으로 향하는 참조다.
+기본 동작은 원하는 Scene/Game 뷰의 **다음 완료 submission 하나**를 수동 캡처하는
+것이다. `profile.record`, `.ceprof`, profiler counter/marker 및 조건부 자동 트리거는
+RF0~RF7의 선행 조건이나 완료 조건이 아니다. 판정은 `RenderFrameDebuggerPlan.md`
+§13과 전용 render-capture 게이트를 따른다.
 
 ---
 
@@ -2743,20 +3088,24 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 | 게이트 | 엔진 | 무는 것 |
 |---|---|---|
-| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약 전부. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 402 검사. **변이 65** 가 각각 제 검사에서 붉는지까지 본다 |
+| `Tools/regression/verify-profile-core.ps1` | 안 띄운다 | 코어 계약. `EngineDiagnostics` 를 `cl /W4 /WX` 로 직접 컴파일해 Debug·Release 각 459 검사. 전체 **변이 67** 중 GPU 손실 진단 변이와 타임라인 시야 변이를 선택 검증했다(§0.5.35, P5 UI 후속) |
+| `Tools/regression/verify-profile-collector-stress.ps1` | 안 띄운다 | Debug·Release에서 기본 확장 큐의 제출·보존 일치와 드롭 0, 명시적 상한을 둔 활성 기록 중 종료 경합 (§0.5.33) |
+| `Tools/regression/measure-profile-overhead.ps1` | 안 띄운다 | Shipping·중지·CPU·CPU+GPU 이벤트의 코어 합성 부하 사전 측정 (§0.5.32). 제품 장면 §11.4 완료 판정은 아님 |
 | `Tools/profiling-validation/Invoke-ProfilingValidation.ps1 -Action Stats` | 에디터 | 기본 씬의 교란 없는 라이브 기준선. 스레드마다 **무엇을 찍었는가**(절대 수가 아니다) |
 | 〃 `-Action Workers` | 에디터 | fixture 씬으로 애니메이션 잡을 돌려 **워커 스레드의 구간 계측**과 SceneActivated 사건 |
 | 〃 `-Action Window` | 에디터 | 프로파일러 창이 실제로 **그려지는지**(창 본문 마커가 캡처에 나타나는지), 창을 닫아도 `state == recording` 인지 |
-| 〃 `-Action Gpu` | 에디터 | GPU 수집 장부 — 패스 조각 · 통합 축 · 정렬 여유 · 귀속 지연 · 레인 귀속 · 종료 소유 |
+| 〃 `-Action Gpu` | 에디터 | Scene/Game/동시 뷰의 다른 제출·2-inflight·리사이즈 세대와 GPU 패스 조각·clock·레인 귀속·DX12 Debug Layer/DRED 메시지 0 |
+| 〃 `-Action GpuLoss` | 에디터 | Debug 질의 슬롯 16개 자극에서 렌더러와 녹화 Collector가 누락 패스 수·프레임·이유를 계상하고 collect 실패와 구분 |
 | `Tools/regression/verify-editor-startup-diagnostics.ps1` | 에디터 | 시동 진단. 등록 레인 목록(워커 레인이 하나 이상), 심한 로그 0, `[profiler] shutdown abandoned/retained/foreign` 가 0 인지. **검사 수는 분기에 따라 달라지므로 여기 적지 않는다** — 게이트가 제 수를 낸다 |
 
-**네 라이브 축은 자극에 `profile.record` 를 명시한다**(2026-09-22). 부팅과 함께
+**다섯 라이브 축은 자극에 `profile.record` 를 명시한다**(2026-09-23). 부팅과 함께
 기록을 열던 줄을 걷었으므로, 켜지 않으면 **빈 캡처를 성공으로 읽는다.** `Workers`
 는 그것을 **씬 교체 앞**에 둬야 한다 — 뒤면 SceneActivated 사건이 기록 밖에서
 일어나 §7.3 트랙 1 이 빈다.
 
-**아직 게이트가 없는 축**(§14 에서 빈칸으로 남은 것들과 같다): counter 정렬, Player 캡처, 멀티카메라 GPU 매핑, 장시간 stress,
-네 모드 오버헤드 비교(§11.4).
+**아직 게이트가 없는 축**(§14 에서 빈칸으로 남은 것들과 같다): counter 정렬, Player 캡처,
+동일 제품 장면의 네 모드 오버헤드·GPU 프레임 비교(§11.4).
+장시간 수집기 stress와 네 모드 **코어 사전 측정**은 §0.5.32에서 별도로 검증했다.
 
 ### 11.1 CPU 정확성
 
@@ -2768,7 +3117,8 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 | recording 중간 시작 | 열린 scope를 truncated로 표시 |
 | pause 중간 요청 | 다음 frame 경계에서 freeze |
 | thread 생성/종료 | ThreadBegin/End와 stream 안전 회수 |
-| chunk pool 고갈 | deadlock 없이 dropped count 증가 |
+| 기본 chunk pool 고갈 | 페이지 확장 후 이벤트 전부 보존 |
+| 명시적 pool 상한 | deadlock 없이 dropped count 증가 |
 | 같은 timestamp | thread sequence로 안정 순서 |
 
 ### 11.2 GPU 정확성
@@ -2862,7 +3212,7 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 5. **멀티카메라를 기본 조건으로 본다.** EngineFrame과 GPU submission을 1:1로 가정하지 않는다.
 6. **Resource Counter를 없애지 않는다.** provider가 준비되는 동안 기존 창은 비교 기준으로 유지한다.
 7. **Deep Profile은 별도 모드다.** 기본 marker capture의 성능 계약을 깨지 않는다.
-8. **내장 Render Frame Debugger가 제품 목표다.** profiler가 문제 프레임을 찾고 디버거가 그 submission의 렌더 실행을 설명한다.
+8. **내장 Render Frame Debugger는 독립 제품 목표다.** 수동 단일 프레임 캡처는 profiler 녹화나 선택 프레임 없이 동작한다.
 9. **Player를 함께 검증한다.** 수집 코어는 에디터에 종속되지 않는다.
 10. **각 단계에 재현 명령과 성공 marker를 남긴다.** 화면만 보고 완료 판정하지 않는다.
 
@@ -2882,11 +3232,12 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - [x] ★ **애니메이션 워커 8스레드·RenderThread·PresentationThread가 캡처에 나타남**
       (§0.5.8 — 셋 다 이벤트가 귀속된다. 회귀 감시는 아직 `[GameThread]`·
       `[PresentationThread]` 두 축에만 걸려 있다)
-- [ ] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑
+- [x] 멀티카메라·2-in-flight에서도 정확한 GPU frame/submission 매핑 — Scene/Game 같은
+      프레임의 다른 조각 수·제출 번호, 최대 2-inflight, 리사이즈 전후 세대 검증(§0.5.35)
 - [ ] CPU/GPU/Rendering/Memory/GC counter가 같은 engine_frame_id에 정렬
 - [ ] overflow·누락·malformed scope·profiler overhead 표시 — **앞의 셋은 선다**
       (Collector 탭이 dropped/unbalanced/late/stale/foreign/abandoned 와 미응답
-      스트림을 내고, 구멍이 있으면 "합계를 그대로 믿지 말 것" 을 띄운다).
+      스트림 및 GPU query/collect 손실을 내고, 구멍이 있으면 "합계를 그대로 믿지 말 것" 을 띄운다).
       **profiler 자체 비용 칸은 아직 없다** — `ProfilerWindow`·`ProfilerTimeline`
       마커로 간접 관측만 된다
 - [x] `.ceprof` 저장/불러오기 round-trip 검증 — 코어 게이트의 `file/*` 가 모든 이벤트의
@@ -2904,9 +3255,10 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 - [x] ★ **프로파일링 검사가 README 표와 §11 에 이름으로 올라 있다** — 회귀 세트는
       폐지됐고(9-16), 찾을 수 없는 검사는 다음 세션에 모이지 않는다.
       §11.0 에 여섯 게이트를 이름·엔진·무는 것으로 적었다(2026-09-22)
-- [ ] DX12 debug layer/DRED 회귀 없음
-- [ ] 내장 Render Frame Debugger에서 선택 뷰의 완료 submission을 정확히 캡처하고
-      pass/draw·상태·리소스·중간 출력을 조사 가능 — 상세 판정은 `RenderFrameDebuggerPlan.md` §13
+- [x] DX12 debug layer/DRED 회귀 없음 — P4 기본 게이트의 두 기능 활성·메시지 0건(§0.5.35)
+
+내장 Render Frame Debugger의 완료 조건은 이 프로파일러 체크리스트에 합치지 않는다.
+독립 RF0~RF7 판정은 `RenderFrameDebuggerPlan.md` §13에 있다.
 
 **매크로 잔존 0**(§5.2) — `PROFILE_CPU_BEGIN`·`PROFILE_CPU_END`·`PROFILER_INITIALIZE`
 등 옛 매크로가 정의·사용 모두에서 사라져야 한다. 소스 전수 검사로 판정하고, 주석·이력은
@@ -2914,16 +3266,16 @@ P1 착수 **전에** 기준선을 세운다. 갈아엎은 뒤에는 "원래 34�
 
 > ★ **남은 것은 단계 셋과 구멍 넷이다**(2026-09-22 감사).
 >
-> 통째로 안 한 단계 — **P5**(counter provider · 관리 marker. `EngineDiagnostics`
-> 에 counter 파일이 0 이고 §7.4 의 `GC/Counter` 열이 비어 있다) · **P6**(`.ceprof`.
+> 진행 중인 단계 — **P5**(프로세스 CPU/RAM·RenderThread VRAM 희소 counter와
+> 선형 그래프·RT/PT 단계 마커 착지. 동적 registry/mask·자원/GC/스크립트 provider는 남음) · **P6**(`.ceprof`.
 > ~~소스 전수 0 건~~ — **2026-09-23 P6-1·P6-2 착지**: 캡처가 어휘와 시계를 소유하고
 > 코어가 쓰고 읽는다(§0.5.26 · §0.5.27). **P6-3 에서 에디터가 열고 쓴다**(§0.5.28).
 > 남은 것은 비동기 저장과 캡처 metadata 둘이고, 사유를 적어 미뤘다) ·
 > **P7**(내장 Render Frame Debugger — `RenderFrameDebuggerPlan.md` RF0~RF7).
 >
 > 선 단계의 구멍 — §7.3 여섯째 트랙(Compute/Copy, 백엔드가 그 큐를 써야 선다) ·
-> 멀티카메라 GPU 매핑(`-Action Gpu` 실측이 `view 1` 뿐이라 둘 이상에서 재 본 적이
-> 없다) · profiler 자체 비용 표시 · UI 없이 Development Player 캡처.
+> profiler 전체 자체 비용 표시 · UI 없이 Development Player 캡처.
+> 멀티카메라 GPU 매핑은 §0.5.35에서 닫았다.
 
 이 조건을 닫은 뒤에 Flame Graph, 두 캡처 비교, 원격 플레이어 연결, 자동 성능 회귀 게이트를
 후속 계획으로 분리한다.

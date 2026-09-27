@@ -6,7 +6,8 @@
 ## 결정
 
 목표는 실행 기반의 통일이다. 백엔드는 enkiTS 1.12로 고정하고 성능 비교는 이번
-완료 조건에서 제외한다. 청크 크기, 워커 수, 작업 저장소 최적화는 이후에 진행한다.
+완료 조건에서 제외한다. 애니메이션의 워커 수 기준 청크와 제출 저장소 정리는
+PHASE 13 S6에서 완료했다. 워커 수 정책 자체와 다른 소비자의 최적화는 후속이다.
 
 엔진이 시작 때 워커를 만들고 종료 때 회수한다. Editor와 Player 모두
 `EngineBootstrap::InitializeRuntime`에서 공용 스케줄러를 시작한다. 씬이나 소비자는
@@ -35,13 +36,16 @@
   전파하여 긴 체인이 워커 스택을 소진하지 않게 한다.
 - `parallel_for(count, grain, callback)`: `[begin,end)` 범위로 분할한다.
   `grain == 0`은 오류, `count == 0`은 정상적인 빈 작업이다.
+- `submit_indexed(count, callback)`: 한 콜백을 인덱스 범위의 enkiTS 배치로
+  제출한다. 인덱스마다 `std::function`을 만들지 않는다. 호출자는 완료까지
+  콜백이 캡처한 저장소를 유지한다. 0개는 본문 없는 완료 토큰이다.
 
 각 그룹은 첫 예외를 보존하고 나머지 그룹 구성원은 끝까지 실행한다. `wait()`가
 그룹 오류를 다시 던진다. 버린 토큰의 오류는 별도 전역 오류 큐로 전달하지 않으므로,
 결과를 무시하는 제품 작업은 본문에서 실패를 자신의 완료 경로로 보고해야 한다.
 
 워커에서 아직 끝나지 않은 토큰을 `wait()`하면 `logic_error`를 낸다. 풀 고갈을
-피하려면 의존 작업을 사용한다. 제품의 동기식 LoadAssetBundle·AnimationJob·Foliage
+피하려면 의존 작업을 사용한다. 제품의 동기식 LoadAssetBundle·AnimationScheduler·Foliage
 진입점은 호스트/게임 스레드에서 호출한다. 임의의 공용 워커 안에서 이 동기 경로를
 중첩 호출하는 것은 지원하지 않는다.
 
@@ -65,10 +69,10 @@ Editor/Player는 새 프레임 생산이 끝난 뒤 씬 로드와 Scene의 AI �
 
 ## 이관 범위
 
-DataSystem 번들 로드, BrowserThumbnailCache, AnimationJob, Foliage 범위 처리,
+DataSystem 번들 로드, BrowserThumbnailCache, AnimationScheduler, Foliage 범위 처리,
 Scene AI 갱신, DX12 PSO 비동기 컴파일, SceneManager 비동기 씬 준비와 DX12/Vulkan 명령 기록이 공용 스케줄러를 사용한다. 구 WorkerPool과 Animation 전용 풀 및
 사용처가 없어진 Core.ThreadPool/Core.Thread/Core.CountingSemaphore는 제거한다.
-AnimationJob의 평가 알고리즘·게임 스레드 이벤트 전달·포즈 게시 순서는 보존한다.
+AnimationScheduler의 평가 알고리즘·게임 스레드 이벤트 전달·포즈 게시 순서는 보존한다.
 
 Presentation/Render/GPU 제출·소켓·파일 감시 등 장기 루프는 전용 스레드 역할이다.
 명령 기록 자원 풀은 백엔드에 남지만 자체 실행 스레드는 소유하지 않는다.
@@ -166,3 +170,13 @@ ProxyCommand의 팔레트 할당·복사 시간도 render commit의 부분집합
 실제 10/50/100체 기선과 표본 조건은 [AnimationSchedulerPlan §10](../plans/AnimationSchedulerPlan.md#10-s1-제품-경로-비용-기선-2026-09-20)을 따른다.
 측정은 공용 풀의 워커 수나 스케줄링 정책을 변경하지 않는다. 지속적인 worker 이벤트
 수집은 여전히 PHASE 14 P1b/P2의 안전한 전달 경계 이후에 진행한다.
+
+## 애니메이션 S6 청크 제출 (2026-09-27)
+
+`AnimationScheduler`는 `SceneManager`가 소유한다. Update와 Execute 각각에서
+`min(대상 수, 워커 수×2)`개의 인덱스 청크를 `submit_indexed`로 보낸다.
+한 청크는 여러 Animator를 처리하고 각 인스턴스의 측정 슬롯·워커 로컬 포즈
+저장소는 분리한다. 두 배리어와 사이의 CPU 예산 결정, 이벤트 큐의 게임 스레드
+전달은 유지한다. 청크 캡처가 가리키는 작업·타이밍·인덱스 저장소는 스케줄러가
+소유하며 각 제출의 `wait()` 이후에만 재사용한다. 결과와 증거는
+[AnimationSchedulerPlan §45](../plans/AnimationSchedulerPlan.md#45-s6-완료--워커-수-기준-청크와-sceneruntime-소유-2026-09-27)에 기록한다.

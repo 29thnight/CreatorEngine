@@ -40,6 +40,7 @@
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
+#include "MemoryProfilerSnapshot.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
@@ -691,9 +692,14 @@ namespace ConsoleCmd
         // 얼림이 온전했는지, 그리고 늦게 온 것들의 장부. 초록과 빈 집합을
         // 가르는 값들이라 stats 에도 낸다.
         data.Set("pauseUnackedStreams", CommandData::Int(summary.pause_unacked_streams));
+        data.Set("captureUnackedStreams", CommandData::Int(summary.capture_unacked_streams));
         data.Set("captureComplete", CommandData::Bool(summary.capture_complete));
         data.Set("staleChunksDropped", CommandData::Int(
             static_cast<std::int64_t>(summary.stale_chunks_dropped)));
+        data.Set("malformedPages", CommandData::Int(
+            static_cast<std::int64_t>(summary.malformed_pages)));
+        data.Set("ingestedPages", CommandData::Int(
+            static_cast<std::int64_t>(summary.ingested_pages)));
         data.Set("lateEventsPlaced", CommandData::Int(
             static_cast<std::int64_t>(summary.late_events_placed)));
         data.Set("lateEventsDropped", CommandData::Int(
@@ -707,10 +713,33 @@ namespace ConsoleCmd
             static_cast<std::int64_t>(summary.abandoned_streams)));
         data.Set("controlRequestsDeferred", CommandData::Int(
             static_cast<std::int64_t>(summary.control_requests_deferred)));
+        data.Set("collectorThreadId", CommandData::Int(summary.collector_os_thread_id));
+        data.Set("collectorQueuedFrames", CommandData::Int(summary.collector_queued_frames));
+        data.Set("collectorDroppedFrames", CommandData::Int(
+            static_cast<std::int64_t>(summary.collector_dropped_frames)));
+        data.Set("droppedCounters", CommandData::Int(
+            static_cast<std::int64_t>(summary.dropped_counters)));
+        data.Set("gpuQueryOverflowPasses", CommandData::Int(
+            static_cast<std::int64_t>(summary.gpu_query_overflow_passes)));
+        data.Set("gpuCollectFailures", CommandData::Int(
+            static_cast<std::int64_t>(summary.gpu_collect_failures)));
+        data.Set("gpuIssueLastFrame", CommandData::Int(summary.gpu_issue_last_frame));
+        data.Set("gpuIssueLastError", CommandData::String(summary.gpu_issue_last_error));
+		data.Set("counterMask", CommandData::Int(ce::profiler().get_counter_mask()));
+        data.Set("collectorWaitTicks", CommandData::Int(summary.collector.wait_ticks));
+        data.Set("collectorQueueDelayTicks", CommandData::Int(summary.collector.queue_delay_ticks));
+        data.Set("collectorPageIngestTicks", CommandData::Int(summary.collector.page_ingest_ticks));
+        data.Set("collectorIngestBatches", CommandData::Int(summary.collector.ingest_batches));
+        data.Set("collectorFrameCloseTicks", CommandData::Int(summary.collector.frame_close_ticks));
+        data.Set("collectorFramesClosed", CommandData::Int(summary.collector.frames_closed));
+        data.Set("collectorSnapshotTicks", CommandData::Int(summary.collector.snapshot_ticks));
+        data.Set("collectorSnapshotsBuilt", CommandData::Int(summary.collector.snapshots_built));
+        data.Set("collectorReplenishTicks", CommandData::Int(summary.collector.replenish_ticks));
 
         // 용량은 이제 이름 예산이 아니라 청크 풀이다.
         data.Set("chunkCount", CommandData::Int(summary.chunk_count));
         data.Set("freeChunks", CommandData::Int(summary.free_chunks));
+        data.Set("pagePoolBytes", CommandData::Int(static_cast<std::int64_t>(summary.page_pool_bytes)));
         data.Set("memoryBytes", CommandData::Int(static_cast<std::int64_t>(summary.memory_bytes)));
         data.Set("memoryBudget", CommandData::Int(static_cast<std::int64_t>(summary.memory_budget)));
 
@@ -776,7 +805,9 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_profile_frame(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() != 1) return InvalidArguments("profile.frame takes no arguments");
+        const bool gpuOnly = (ctx.parts.size() == 2 && ctx.parts[1] == "gpu");
+        if (ctx.parts.size() != 1 && !gpuOnly)
+            return InvalidArguments("profile.frame [gpu]");
 
         // 읽으려면 얼려야 한다. 이미 얼어 있으면 그대로 쓴다.
         const bool wasRecording = (ce::profiler().state() == ce::recorder_state::recording);
@@ -784,6 +815,9 @@ namespace ConsoleCmd
         {
             ce::profiler().pause();
         }
+        // 전용 수집 스레드가 앞선 프레임과 얼림을 모두 처리한 뒤 읽는다.
+        // 이 명령은 캡처를 즉시 돌려주는 조회이므로 비동기 공개를 기다려야 한다.
+        ce::profiler().wait_until_idle();
 
         ce::capture_session_ptr capture = ce::profiler().capture();
         auto data = CommandData::Object();
@@ -800,20 +834,39 @@ namespace ConsoleCmd
             rangeBegin = capture->frames().front().engine_frame;
             rangeEnd = capture->frames().back().engine_frame + 1;
 
-            // 프레임이 많을 수 있으므로 최근 것만 낸다 — 드랍을 찾는 일은
-            // 프레임 사이의 차이를 보는 일이라 여러 개가 필요하지만,
-            // 600 프레임을 전부 JSON 으로 내면 읽는 쪽이 못 쓴다.
+            // 기본 조회는 최근 프레임, gpu 조회는 GPU 구간이 있는 최근 프레임을
+            // 낸다. GPU 수집은 늦게 도착하므로 마지막 여덟 엔진 프레임만 보면
+            // 캡처에 GPU 구간이 있어도 조회 결과에서는 빠질 수 있다.
             constexpr std::size_t kMaxReportedFrames = 8;
             const std::span<const ce::frame_record> all = capture->frames();
-            const std::size_t first = (all.size() > kMaxReportedFrames)
-                ? (all.size() - kMaxReportedFrames) : 0;
+            std::vector<std::size_t> selected;
+            selected.reserve(kMaxReportedFrames);
+            for (std::size_t i = all.size(); i > 0 && selected.size() < kMaxReportedFrames; --i)
+            {
+                if (gpuOnly && !std::any_of(all[i - 1].events.begin(), all[i - 1].events.end(),
+                    [](const ce::profile_event& event)
+                    {
+                        return ce::has_flag(event.flags, ce::event_flags::gpu_span);
+                    })) continue;
+                selected.push_back(i - 1);
+            }
+            std::reverse(selected.begin(), selected.end());
 
-            for (std::size_t i = first; i < all.size(); ++i)
+            for (const std::size_t i : selected)
             {
                 const ce::frame_record& record = all[i];
                 auto frameEntry = CommandData::Object();
                 frameEntry.Set("frame", CommandData::Int(record.engine_frame));
                 frameEntry.Set("droppedEvents", CommandData::Int(record.dropped_events));
+				auto counters = CommandData::Array();
+				for (const ce::profile_counter_sample& sample : record.counters)
+				{
+					auto entry = CommandData::Object();
+					entry.Set("id", CommandData::Int(static_cast<std::uint16_t>(sample.id)));
+					entry.Set("value", CommandData::Double(sample.value));
+					counters.Append(std::move(entry));
+				}
+				frameEntry.Set("counters", std::move(counters));
 
                 // 스레드별로 나눈다. 이벤트에 thread_slot 이 박혀 있으므로
                 // 수집 시점에 정렬하지 않고 여기서 가른다.
@@ -935,6 +988,51 @@ namespace ConsoleCmd
 
         data.Set("rangeBegin", CommandData::Int(rangeBegin));
         data.Set("rangeEnd", CommandData::Int(rangeEnd));
+        data.Set("droppedCounters", CommandData::Int(
+            capture ? static_cast<std::int64_t>(capture->dropped_counters()) : 0));
+		auto counterDescriptors = CommandData::Array();
+		if (capture)
+		{
+			for (const ce::capture_counter& descriptor : capture->counter_descriptors())
+			{
+				auto entry = CommandData::Object();
+				entry.Set("id", CommandData::Int(static_cast<std::uint16_t>(descriptor.id)));
+				entry.Set("name", CommandData::String(descriptor.name));
+				entry.Set("unit", CommandData::String(descriptor.unit));
+				entry.Set("category", CommandData::Int(ce::counter_bit(descriptor.category)));
+				counterDescriptors.Append(std::move(entry));
+			}
+		}
+        data.Set("counterDescriptors", std::move(counterDescriptors));
+        auto counterCoverage = CommandData::Array();
+        if (capture)
+        {
+            for (const ce::capture_counter& descriptor : capture->counter_descriptors())
+            {
+                std::uint64_t samples = 0;
+                std::uint32_t lastFrame = 0;
+                double lastValue = 0.0;
+                for (const ce::frame_record& record : capture->frames())
+                {
+                    for (const ce::profile_counter_sample& sample : record.counters)
+                    {
+                        if (sample.id != descriptor.id) continue;
+                        ++samples;
+                        lastFrame = record.engine_frame;
+                        lastValue = sample.value;
+                    }
+                }
+                if (samples == 0) continue;
+                auto entry = CommandData::Object();
+                entry.Set("id", CommandData::Int(static_cast<std::uint16_t>(descriptor.id)));
+                entry.Set("name", CommandData::String(descriptor.name));
+                entry.Set("samples", CommandData::Int(static_cast<std::int64_t>(samples)));
+                entry.Set("lastFrame", CommandData::Int(lastFrame));
+                entry.Set("lastValue", CommandData::Double(lastValue));
+                counterCoverage.Append(std::move(entry));
+            }
+        }
+        data.Set("counterCoverage", std::move(counterCoverage));
         data.Set("paused", CommandData::Bool(true));
         data.Set("frames", std::move(frames));
 
@@ -988,8 +1086,8 @@ namespace ConsoleCmd
         // 얼린 캡처는 건드리지 않는다. 잡고 보던 것을 남겨 둔 채 기록만 다시
         // 열려야 창이 그리던 것을 계속 그린다 — 창의 Record 단추도 같다.
         //
-        // 프레임 번호를 지금 것으로 이어 붙인다. 기본값 0 으로 부르면 번호가
-        // 되감아 보존 구간이 앞뒤로 섞인다.
+        // summary.engine_frame은 마지막으로 닫힌 프레임의 다음 번호다.
+        // 0으로 다시 열면 보존 구간이 되감겨 섞인다.
         ce::profiler().record(ce::profiler().summary().engine_frame);
         return Ok({}, ProfileStatePayload());
     }
@@ -1001,6 +1099,80 @@ namespace ConsoleCmd
 
         ce::profiler().pause();
         return Ok({}, ProfileStatePayload());
+    }
+
+    static CommandCore::CommandResult Cmd_profile_counter_mask(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1 && ctx.parts.size() != 3)
+            return InvalidArguments("profile.counter-mask [process|gpu|network|render|managed|resources on|off]");
+        auto& service = ce::profiler();
+        if (ctx.parts.size() == 3)
+        {
+            const std::string& name = ctx.parts[1];
+            ce::counter_category category{};
+            if (name == "process") category = ce::counter_category::process;
+            else if (name == "gpu") category = ce::counter_category::gpu;
+            else if (name == "network") category = ce::counter_category::network;
+            else if (name == "render") category = ce::counter_category::render;
+            else if (name == "managed") category = ce::counter_category::managed;
+            else if (name == "resources") category = ce::counter_category::resources;
+            else return InvalidArguments("unknown counter category");
+            if (ctx.parts[2] != "on" && ctx.parts[2] != "off")
+                return InvalidArguments("counter category state must be on or off");
+            const ce::counter_mask bit = ce::counter_bit(category);
+            const ce::counter_mask before = service.get_counter_mask();
+            service.set_counter_mask(ctx.parts[2] == "on" ? before | bit : before & ~bit);
+        }
+        auto data = CommandData::Object();
+        data.Set("mask", CommandData::Int(service.get_counter_mask()));
+        return Ok({}, std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_memory_capture(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("memory.capture takes no arguments");
+        auto& service = editor::memory_profiler::snapshot_service::instance();
+        service.request();
+        auto data = CommandData::Object();
+        data.Set("pending", CommandData::Bool(service.pending()));
+        return Ok({}, std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_memory_snapshot(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1) return InvalidArguments("memory.snapshot takes no arguments");
+        auto& service = editor::memory_profiler::snapshot_service::instance();
+        const auto captured = service.latest();
+        auto data = CommandData::Object();
+        data.Set("pending", CommandData::Bool(service.pending()));
+        data.Set("available", CommandData::Bool(bool(captured)));
+        if (captured)
+        {
+            data.Set("serial", CommandData::Int(captured->serial));
+            data.Set("frame", CommandData::Int(captured->frame));
+            data.Set("captureMs", CommandData::Double(captured->capture_ms));
+            data.Set("processValid", CommandData::Bool(captured->process_valid));
+            data.Set("workingSetBytes", CommandData::Int(captured->working_set_bytes));
+              data.Set("privateCommitBytes", CommandData::Int(captured->private_commit_bytes));
+              data.Set("crtHeapValid", CommandData::Bool(captured->crt_heap_valid));
+              data.Set("crtLiveBytes", CommandData::Int(captured->crt_live_bytes));
+              data.Set("crtLiveBlocks", CommandData::Int(captured->crt_live_blocks));
+            data.Set("managedValid", CommandData::Bool(captured->managed_valid));
+            data.Set("managedHeapBytes", CommandData::Int(captured->managed_heap_bytes));
+            data.Set("vramValid", CommandData::Bool(captured->vram_valid));
+            data.Set("vramUsedBytes", CommandData::Int(captured->vram_used_bytes));
+            data.Set("textureCpuPixelBytes", CommandData::Int(captured->texture_cpu_pixel_bytes));
+            data.Set("objects", CommandData::Int(captured->objects.size()));
+            data.Set("regions", CommandData::Int(captured->regions.size()));
+            data.Set("committedPrivateBytes", CommandData::Int(captured->committed_private_bytes));
+            data.Set("committedImageBytes", CommandData::Int(captured->committed_image_bytes));
+            data.Set("committedMappedBytes", CommandData::Int(captured->committed_mapped_bytes));
+            data.Set("reservedVirtualBytes", CommandData::Int(captured->reserved_virtual_bytes));
+        }
+        return Ok({}, std::move(data));
     }
 
     // ★ `dump.crash` 를 지웠다(2026-09-05). `crash.test` 와 같은 네 분기를 가진
@@ -1506,6 +1678,9 @@ namespace ConsoleCmd
         reg.Result({ "profile.frame" }, &Cmd_profile_frame);
         reg.Result({ "profile.record" }, &Cmd_profile_record);
         reg.Result({ "profile.pause" }, &Cmd_profile_pause);
+        reg.Result({ "profile.counter-mask" }, &Cmd_profile_counter_mask);
+        reg.Result({ "memory.capture" }, &Cmd_memory_capture);
+        reg.Result({ "memory.snapshot" }, &Cmd_memory_snapshot);
         // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).
         //   `dump.list` 는 목록만, `dump.show` 는 가장 최근 요약의 내용까지 찍는다
         //   (`Cmd_dump_list` 안에서 `cmd == "dump.show"` 로 갈린다). 한 descriptor 를

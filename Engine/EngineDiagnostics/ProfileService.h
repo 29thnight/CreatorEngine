@@ -9,10 +9,17 @@
 //   자기 자리를 가지므로, 검사용 서비스와 라이브 서비스가 같은 스레드에서
 //   동시에 살아 서로를 건드리지 않는다.
 #include <atomic>
+#include <climits>
+#include <condition_variable>
 #include <cstdint>
+#include <deque>
+#include <future>
 #include <memory>
 #include <mutex>
+#include <semaphore>
+#include <span>
 #include <thread>
+#include <utility>
 #include <string>
 #include <vector>
 
@@ -28,8 +35,8 @@ namespace ce
 		recording = 1,   // rolling ring 에 계속 기록
 		frozen = 2,      // producer 를 멈추고 immutable capture 를 공개
 
-		// 멈추라고는 했는데 아직 모두의 꼬리를 받지 못했다. 수집기가 다음
-		// 프레임 경계에서 마무리한다.
+		// 멈추라고는 했는데 아직 모두의 꼬리를 받지 못했다. 전용 수집
+		// 스레드가 이미 제출된 프레임 뒤에서 마무리한다.
 		//
 		// ★ 이 상태가 없으면 Pause 를 부른 쪽이 완료까지 **기다려야** 한다.
 		//   UI 는 씬 잠금을 쥔 채 부르고 게임 스레드는 같은 잠금을 통과해야
@@ -40,16 +47,35 @@ namespace ce
 
 	struct profiler_config
 	{
-		std::uint32_t chunk_count = 256;                       // 청크 풀 크기
+		std::uint32_t chunk_count = 256;                       // 미리 할당할 페이지 수
+		std::uint32_t max_chunk_count = 0;                   // 0: 필요할 때 확장
+		std::uint32_t max_queued_frames = 0;                // 0: 프레임 제출 큐 확장
 		std::uint32_t retained_frames = kDefaultRetainedFrames;
 		std::size_t   memory_budget = kDefaultMemoryBudget;
 
 		// 녹화 중 스냅샷을 몇 ms 마다 낼 것인가(§6.4 개정).
 		//
-		// ★ 한 번 낼 때 링을 통째로 복사한다. 그 일을 수집기(게임 스레드)가
-		//   하므로, 화면이 부르는 대로 다 내주면 재려는 대상을 흔든다.
+		// ★ 한 번 낼 때 프레임 인덱스와 페이지 참조를 복사한다. 그 일을
+		//   전용 수집 스레드가 하므로, 화면이 부르는 대로 다 내주면
+		//   여전히 재려는 대상을 흔든다.
 		//   0 이면 요청마다 낸다 — 검사에서 쓰는 값이다.
 		double live_capture_interval_ms = 100.0;
+	};
+
+	// 전용 수집 스레드의 누적 QPC 경과 시간. wait 는 유휴 대기,
+	// queue_delay 는 제출 이후 처리 시작까지의 지연이며 작업 비용이 아니다.
+	struct collector_timing
+	{
+		profile_tick wait_ticks = 0;
+		profile_tick queue_delay_ticks = 0;
+		profile_tick page_ingest_ticks = 0;
+		profile_tick frame_close_ticks = 0;
+		profile_tick snapshot_ticks = 0;
+		profile_tick replenish_ticks = 0;
+		std::uint64_t queued_frames_started = 0;
+		std::uint64_t ingest_batches = 0;
+		std::uint64_t frames_closed = 0;
+		std::uint64_t snapshots_built = 0;
 	};
 
 	// 녹화 중에도 값싸게 읽히는 요약(§6.4). 전체 캡처를 복사하지 않는다.
@@ -69,10 +95,12 @@ namespace ce
 		std::size_t    memory_budget = 0;
 		std::uint32_t  free_chunks = 0;
 		std::uint32_t  chunk_count = 0;
+		std::size_t    page_pool_bytes = 0;
 
 		// GPU 레인(§7.3). 늦게 온 구간이 제 프레임 칸을 찾았는가.
 		std::uint64_t  late_spans_placed = 0;
 		std::uint64_t  late_spans_dropped = 0;
+		std::uint64_t  dropped_counters = 0;
 		std::size_t    late_spans_waiting = 0;
 
 		// pause 에서 봉인 요청에 **응답하지 않은** 스트림 수. 0 이 아니면 그
@@ -81,6 +109,7 @@ namespace ce
 		// ★ 이 값이 0 이 아니면 얼린 캡처는 **온전하지 않다.** 창과 게이트가
 		//   그것을 알아야 "비었다" 와 "못 받았다" 를 가릴 수 있다.
 		std::uint32_t  pause_unacked_streams = 0;
+		std::uint32_t  capture_unacked_streams = 0;
 		bool           capture_complete = true;
 
 		// 주인이 아닌 스레드가 남의 스트림을 만지려 한 횟수. **0 이어야 한다.**
@@ -93,9 +122,19 @@ namespace ce
 
 		// 다른 스레드에서 들어와 수집기로 넘긴 제어 요청 수.
 		std::uint64_t  control_requests_deferred = 0;
+		std::uint32_t  collector_queued_frames = 0;
+		std::uint64_t  collector_dropped_frames = 0;
+		std::uint32_t  collector_os_thread_id = 0;
+		collector_timing collector{};
+		std::uint64_t  gpu_query_overflow_passes = 0;
+		std::uint64_t  gpu_collect_failures = 0;
+		std::uint32_t  gpu_issue_last_frame = 0;
+		std::string    gpu_issue_last_error;
 
 		// 지운 세대의 것이라 버린 이벤트, 시각이 링 밖이라 버린 이벤트.
 		std::uint64_t  stale_chunks_dropped = 0;
+		std::uint64_t  malformed_pages = 0;
+		std::uint64_t  ingested_pages = 0;
 		std::uint64_t  late_events_placed = 0;
 		std::uint64_t  late_events_dropped = 0;
 	};
@@ -150,8 +189,36 @@ namespace ce
 
 		// 프레임 경계. 엔진 프레임 번호는 밖에서 받는다 — 프로파일러가
 		// 자기 카운터를 따로 세면 그 수가 엔진의 어느 프레임인지 아무도
-		// 모르게 된다(§2.1 engine_frame_id 정본 통합).
+		// 모르게 된다(§2.1 engine_frame_id 정본 통합). 호출자는 자기 청크를
+		// 봉인하고 다른 기록자에게 봉인을 요청한 뒤 경계만 수집 스레드에 넘긴다.
 		void publish_frame(std::uint32_t engine_frame);
+		// Owner-published sparse telemetry. The collector attributes by engine frame.
+		void publish_counter(std::uint32_t engine_frame, profile_counter_id id, double value);
+		// Publish one provider's frame sample as a unit with respect to pause/control.
+		void publish_counters(std::uint32_t engine_frame, counter_category category,
+		                      std::span<const profile_counter_sample> samples);
+		void publish_video_memory(std::uint32_t engine_frame, std::uint64_t used_mb,
+		                          std::uint64_t budget_mb)
+		{
+			m_latestVramUsed.store(used_mb, std::memory_order_relaxed);
+			m_latestVramBudget.store(budget_mb, std::memory_order_release);
+			publish_counter(engine_frame, profile_counter_id::gpu_vram_mb, static_cast<double>(used_mb));
+		}
+		std::pair<std::uint64_t, std::uint64_t> latest_video_memory() const
+		{
+			const auto budget = m_latestVramBudget.load(std::memory_order_acquire);
+			return { m_latestVramUsed.load(std::memory_order_relaxed), budget };
+		}
+		void set_counter_mask(counter_mask value) { m_counterMask.store(value, std::memory_order_release); }
+		counter_mask get_counter_mask() const { return m_counterMask.load(std::memory_order_acquire); }
+		bool counter_enabled(counter_category category) const
+		{
+			return state() == recorder_state::recording &&
+				(get_counter_mask() & counter_bit(category)) != 0;
+		}
+		// 진단·검사에서 앞서 제출한 작업의 완료가 필요할 때만 쓰는 경계.
+		// 매 프레임 호출하면 비동기 수집의 이점이 사라진다.
+		void wait_until_idle();
 
 		// --- GPU 레인 ----------------------------------------------------
 		// 이미 끝난 GPU 구간을 전용 레인에 적는다(§7.3 의 GPU Graphics queue).
@@ -165,6 +232,8 @@ namespace ce
 		//   게임 스레드라, 남이 봉인하면 두 스레드가 같은 청크 포인터를 만진다.
 		void submit_gpu_span(marker_id id, profile_tick begin, profile_tick end,
 		                     std::uint32_t frame, const gpu_span_context& gpu);
+		void report_gpu_issue(std::uint32_t frame, std::uint32_t lost_passes,
+		                      bool collect_failed, const char* reason);
 
 		// 지금까지 적은 GPU 구간을 수집기에 넘긴다. 적는 스레드가 부른다.
 		void publish_gpu_spans();
@@ -189,14 +258,12 @@ namespace ce
 		// 시작 프레임 번호를 받는다. 이것이 없으면 첫 스코프들이 "아직 모르는"
 		// 프레임에 기록되고, 그 프레임을 닫을 때 붙는 라벨과 어긋난다 —
 		// 프레임을 넘는 구간의 시작 프레임이 틀어지는 것이 그 증상이다.
-		// ★ 이 셋은 **수집기의 일**이다. 링은 프레임 경계를 도는 스레드의
+		// ★ 이 셋은 **수집기의 일**이다. 링은 전용 수집 스레드의
 		//   것이고, 창이나 콘솔 스레드가 여기서 직접 링을 만지면 수집기와
 		//   겹친다 — 스트림에서 그랬던 것과 같은 경계다.
 		//
-		//   그래서 수집기 스레드에서 불리면 그 자리에서 하고, 다른 스레드에서
-		//   불리면 **요청으로 줄을 세운 뒤 다음 프레임 경계에서** 적용된다.
-		//   **부른 쪽은 기다리지 않는다.** 수집기가 한 번도 돈 적이 없으면
-		//   (프레임이 안 도는 검사용 서비스) 그 자리에서 한다.
+		//   전용 수집 스레드가 제어 요청과 프레임 경계를 같은 줄에서 처리한다.
+		//   record/clear 는 적용까지 기다리고, pause 의 얼림 마무리는 비동기다.
 		//
 		//   그래서 pause() 뒤의 상태는 frozen 이 아니라 pausing 일 수 있다.
 		//   캡처가 필요하면 state 가 frozen 이 될 때까지 기다려야 한다.
@@ -220,7 +287,7 @@ namespace ce
 		//   목표는 Unity 프로파일러다 — Record 가 도는 동안에도 프레임을
 		//   보여 준다(매뉴얼의 Current Frame 모드).
 		//
-		//   보는 쪽이 이것을 부르면 **다음 프레임 경계에서** 스냅샷이 선다.
+		//   보는 쪽이 이것을 부르면 다음에 소비하는 프레임 경계에서 스냅샷이 선다.
 		//   아무도 부르지 않으면 한 번도 만들지 않는다 — 창이 닫혀 있을 때
 		//   공짜인 이유가 그것이다. 요청은 한 번 쓰이고 지워진다.
 		void request_live_capture();
@@ -250,15 +317,14 @@ namespace ce
 			std::uint32_t frame = 0;
 		};
 
-		// 지금 이 스레드가 수집기인가. 수집기가 아직 없으면 true 를 낸다 —
-		// 기다릴 대상이 없으므로 그 자리에서 하는 것이 맞다.
+		// 전용 수집 스레드인가.
 		bool on_collector() const;
 
-		// 요청을 세우고 적용될 때까지 짧게 기다린다.
+		// 제어 요청을 수집 스레드에 넘긴다.
 		void dispatch_control(control_op op, std::uint32_t frame);
-
-		// 줄에 선 것을 전부 적용한다. 수집기만 부른다.
-		void apply_control_requests();
+		void collector_loop();
+		void collect_frame(std::uint32_t engine_frame, profile_tick tick,
+		                   profile_tick gap_before_tick, event_chunk* sealed);
 
 		void record_now(std::uint32_t first_frame);
 		void pause_now();
@@ -275,6 +341,10 @@ namespace ce
 		// 같은 시각에서 잘린다.
 		std::atomic<profile_tick> m_freezeTick{ 0 };
 		void           collect_sealed();
+		void           ingest_pages(event_chunk* sealed, profile_tick frame_begin_tick);
+		void           close_frame(std::uint32_t engine_frame, profile_tick begin, profile_tick end);
+		void           account_counter_queue_loss();
+		void           replenish_pages();
 		void           destroy_stream_locked(std::size_t index);
 
 		// 링에서 뽑은 수치. **수집기만** 만드는 값이고, 읽는 쪽은 여기 찍힌
@@ -293,10 +363,14 @@ namespace ce
 			std::size_t   memory_bytes = 0;
 			std::uint64_t late_spans_placed = 0;
 			std::uint64_t late_spans_dropped = 0;
+			std::uint64_t dropped_counters = 0;
 			std::size_t   late_spans_waiting = 0;
 			std::uint64_t stale_chunks_dropped = 0;
+			std::uint64_t malformed_pages = 0;
+			std::uint64_t ingested_pages = 0;
 			std::uint64_t late_events_placed = 0;
 			std::uint64_t late_events_dropped = 0;
+			collector_timing collector{};
 		};
 
 		// 지금 링의 상태를 찍어 공개한다. 수집기가 부른다.
@@ -327,33 +401,80 @@ namespace ce
 		std::uint32_t m_serviceSlot = 0;
 
 		// 이 서비스가 thread_local 자리에 찍는 번호. shutdown 에서 올라간다.
-		std::uint64_t m_slotEpoch = 0;
+		std::atomic<std::uint64_t> m_slotEpoch{ 0 };
 
-		// 프레임 경계를 도는 스레드. 첫 publish_frame 이 정한다.
+		// 링과 캡처를 소유하는 전용 수집 스레드.
 		std::atomic<std::thread::id> m_collectorThread{ std::thread::id{} };
-
-		std::mutex                   m_controlLock;
-		std::vector<control_request> m_controlQueue;
+		std::atomic<std::uint32_t> m_collectorOsThreadId{ 0 };
+		std::thread                 m_collectorWorker;
+		enum class work_kind : std::uint8_t { frame, counter, control, barrier };
+		struct collector_work
+		{
+			work_kind kind = work_kind::frame;
+			control_request control{};
+			std::uint32_t frame = 0;
+			profile_tick tick = 0;
+			profile_counter_sample counter{};
+			std::uint64_t generation = 0;
+			profile_tick gap_before_tick = 0;
+			std::uint64_t control_ticket = 0;
+			std::shared_ptr<std::promise<void>> completion;
+			event_chunk* sealed = nullptr;
+		};
+		mutable std::mutex            m_workLock;
+		std::deque<collector_work>    m_workQueue;
+		std::counting_semaphore<INT_MAX> m_workSignal{ 0 };
+		std::size_t                   m_maxQueuedFrames = 0;
+		std::size_t                   m_queuedFrames = 0;
+		std::atomic<std::uint64_t>    m_droppedFrameBoundaries{ 0 };
+		std::atomic<std::uint64_t>    m_droppedFrameBaseline{ 0 };
+		std::atomic<std::uint64_t>    m_queueDroppedEvents{ 0 };
+		std::atomic<std::uint64_t>    m_queueDroppedCounters{ 0 };
+		std::uint64_t                 m_accountedCounterQueueDropped = 0;
+		// producer·제출 큐 누락의 마지막 절대값. 링 자체의 손상 페이지 누락과
+		// 비교하면 두 출처가 서로의 증가분을 가리므로 별도로 유지한다.
+		std::uint64_t                 m_accountedSourceDropped = 0;
+		std::atomic<profile_tick>     m_pendingGapTick{ 0 };
+		bool                          m_stopWorker = false;
+		std::mutex                    m_controlWaitLock;
+		std::condition_variable       m_controlAppliedCv;
 		std::atomic<std::uint64_t>   m_controlEnqueued{ 0 };
 		std::atomic<std::uint64_t>   m_controlApplied{ 0 };
 		std::atomic<std::uint64_t>   m_controlDeferred{ 0 };
 
 		std::atomic<bool>           m_initialized{ false };
 		std::atomic<recorder_state> m_state{ recorder_state::stopped };
+		std::atomic<counter_mask> m_counterMask{
+			counter_bit(counter_category::process) | counter_bit(counter_category::gpu) |
+			counter_bit(counter_category::render) | counter_bit(counter_category::managed) };
+		std::atomic<std::uint64_t> m_latestVramUsed{ 0 };
+		std::atomic<std::uint64_t> m_latestVramBudget{ 0 };
 		std::atomic<std::uint32_t>  m_engineFrame{ 0 };
+		// An in-flight render submission may finish after Record starts even though
+		// its source frame predates this recording. It is outside this capture.
+		std::atomic<std::uint32_t>  m_recordStartFrame{ 0 };
+		bool m_firstRecordBoundaryPending = false; // collector-owned
 
 		// ★ shared_ptr 인 이유는 **놓아 둔 스트림이 풀보다 오래 살기** 때문이다.
 		//   주인이 아직 도는 스트림을 종료에서 파괴할 수 없으므로 놓아 두는데,
 		//   그 스트림은 계속 이 풀에 청크를 청한다. 풀을 먼저 접으면 놓아 둔
 		//   의미가 없다.
 		std::shared_ptr<chunk_pool> m_pool = std::make_shared<chunk_pool>();
+		std::uint32_t m_maxChunkCount = 0;
+		std::size_t   m_memoryBudget = kDefaultMemoryBudget;
 
 		mutable std::mutex        m_streamLock;
 		std::vector<stream_entry> m_streams;
 		std::vector<thread_info>  m_threadInfo;
 
-		// 수집기(프레임 경계를 도는 스레드)만 만진다.
+		// 전용 수집 스레드만 만진다(종료 시 join 뒤 정리 제외).
 		capture_ring m_ring;
+		collector_timing m_collectorTiming{}; // 수집 스레드만 수정
+		std::atomic<std::uint64_t> m_gpuQueryOverflowPasses{ 0 };
+		std::atomic<std::uint64_t> m_gpuCollectFailures{ 0 };
+		std::atomic<std::uint32_t> m_gpuIssueLastFrame{ 0 };
+		mutable std::mutex m_gpuIssueLock;
+		std::string m_gpuIssueLastError;
 
 		// 그 링에서 찍어 낸 사본. 읽는 쪽은 이것만 본다.
 		mutable std::mutex m_ringStatsLock;
@@ -363,6 +484,13 @@ namespace ce
 		// 마지막으로 닫은 엔진 프레임 번호. pause 가 남은 프레임을 닫을 때
 		// 그다음 번호를 쓴다 — 얼린 캡처의 꼬리도 어느 프레임인지 말해야 한다.
 		std::uint32_t m_lastEngineFrame = 0;
+		profile_tick m_lastProcessSampleTick = 0;
+		std::uint64_t m_lastProcessCpu100ns = 0;
+		std::uint64_t m_lastProcessWall100ns = 0;
+		double m_processCpuPercent = 0.0;
+		double m_processRamMb = 0.0;
+		bool m_hasProcessCpu = false;
+		bool m_hasProcessRam = false;
 
 		mutable std::mutex  m_captureLock;
 		capture_session_ptr m_capture;

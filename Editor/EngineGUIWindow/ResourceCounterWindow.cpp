@@ -8,6 +8,8 @@
 #include "RHI/IRHIDeviceResources.h"
 #include "ClrHost.h"
 #include "EditorIcons.h"
+#include "ProfileScope.h"
+#include <array>
 
 namespace
 {
@@ -63,15 +65,15 @@ void ResourceCounterWindow::DrawCountRow(const char* label, size_t current, size
 	}
 }
 
-ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuObjects) const
+ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture() const
 {
 	Snapshot snapshot{};
 	snapshot.valid = true;
 
 	// --- 에셋 캐시 ---
 	// 전용 뮤텍스가 있는 컨테이너는 규약을 지켜 읽는다.
-	// UITextures/SpriteSheets/SFonts는 아직 전용 락이 없어(리팩토링 1-8 대상)
-	// 근사치로 읽는다. HUD 용도에서는 추세만 보이면 충분하다.
+	// UI texture and sprite caches share the texture lock. The retained bundle
+	// set has its own snapshot because the bundle window can update it on PT.
 	if (auto* dataSystem = DataSystem::GetInstance())
 	{
 		snapshot.models = dataSystem->SnapshotModelAssetGenerations().currentAssets;
@@ -82,16 +84,11 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 		{
 			std::lock_guard<std::mutex> lock(dataSystem->m_textureMutex);
 			snapshot.textures = dataSystem->Textures.size();
+			snapshot.uiTextures = dataSystem->UITextures.size();
+			snapshot.spriteSheets = dataSystem->SpriteSheets.size();
 		}
-
-		snapshot.uiTextures = dataSystem->UITextures.size();
-		snapshot.spriteSheets = dataSystem->SpriteSheets.size();
 		snapshot.spriteFonts = 0; // 폰트 컨테이너는 D4에서 은퇴, SDF 계통에서 복원
-
-		for (const auto& [type, names] : dataSystem->m_retainedAssets)
-		{
-			snapshot.retainedAssets += names.size();
-		}
+		snapshot.retainedAssets = dataSystem->SnapshotRetainedAssetCount();
 	}
 
 	// --- 렌더 프록시 ---
@@ -102,40 +99,19 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 		snapshot.proxies = counts.proxies;
 		snapshot.uiProxies = counts.uiProxies;
 	}
-
+	// Animation ownership lives in SceneRuntime; renderer consumes the published palette.
 	snapshot.animators = SceneManagers->GetAnimationScheduler().GetAnimatorCount();
 	snapshot.animationPalettes = snapshot.animators;
 
-	// --- GPU ---
-	if (auto* resources = GetDiagnosticsDeviceResources())
-	{
-		snapshot.engineResources = Diagnostics::CaptureResourceSnapshot();
-
-		if (includeGpuObjects)
-		{
-			// 실행 중에는 타입별 집계를 얻을 수 없다(디버그 레이어 순회가 이후 렌더를
-			// 망가뜨린다). VRAM만 채워지고 liveGpuValid는 false로 남는다 —
-			// allowDeviceEnumeration=false가 그 약속이다.
-			const RHIGpuObjectCensus census = resources->CaptureLiveObjectCensus(false);
-			snapshot.vramUsedMB = census.vramUsedMB;
-			snapshot.vramBudgetMB = census.vramBudgetMB;
-			snapshot.liveGpuObjects = census.totalObjects;
-			snapshot.liveGpuValid = census.available;
-		}
-		else
-		{
-			// VRAM 조회는 가벼우므로 주기 갱신에 포함한다.
-			const RHIVideoMemoryInfo memory = resources->QueryVideoMemory();
-			snapshot.vramUsedMB = memory.usedMB;
-			snapshot.vramBudgetMB = memory.budgetMB;
-		}
-	}
+	// Resource atomics and render-owner video memory; no device query here.
+	snapshot.engineResources = Diagnostics::CaptureResourceSnapshot();
+	const auto [usedMB, budgetMB] = ce::profiler().latest_video_memory();
+	snapshot.vramUsedMB = usedMB;
+	snapshot.vramBudgetMB = budgetMB;
 
 	// --- 관리 힙 (PHASE 9-7) ---
 	//
-	// HUD는 게임 스레드의 ImGui 패스에서 그려지므로 여기서 경계를 넘어도 규약을 지킨다
-	// (관리 코드 호출은 게임 스레드 전용). 하는 일은 카운터 읽기뿐이고 HUD 자체가
-	// 0.5초 주기라 틱마다 넘지도 않는다.
+	// This producer runs on the game thread; Draw only reads its published snapshot.
 	{
 		ClrHost::ScriptGcStats gc{};
 		if (ClrHost::Get().GetManagedGcStats(gc))
@@ -153,22 +129,74 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 	return snapshot;
 }
 
+void ResourceCounterWindow::PublishFromGameThread(std::uint32_t frame)
+{
+	resource_counter_state().Publish(frame);
+}
+
+void ResourceCounterWindow::Publish(std::uint32_t frame)
+{
+	const bool recordingResources = ce::profiler().counter_enabled(ce::counter_category::resources);
+	if (!recordingResources && !m_requested.exchange(false, std::memory_order_acq_rel)) return;
+	const auto now = std::chrono::steady_clock::now();
+	if (m_lastSample.time_since_epoch().count() != 0 &&
+	    now - m_lastSample < std::chrono::duration<double>(kRefreshIntervalSeconds)) return;
+	m_lastSample = now;
+	const ce::profile_tick resourceStarted = ce::profiler_service::now();
+	Snapshot snapshot = Capture();
+	const double resourceUs = static_cast<double>(ce::profiler_service::now() - resourceStarted) *
+		1000000.0 / static_cast<double>(ce::profiler_service::ticks_per_second());
+	m_displayed.store(std::make_shared<const Snapshot>(snapshot), std::memory_order_release);
+	if (recordingResources)
+	{
+		auto& service = ce::profiler();
+		std::array<ce::profile_counter_sample, 11 + Diagnostics::kEngineResourceNames.size()> samples{};
+		std::size_t count = 0;
+		const auto add = [&samples, &count](ce::profile_counter_id id, double value)
+		{
+			samples[count++] = { id, value };
+		};
+		add(ce::profile_counter_id::provider_resources_us, resourceUs);
+		add(ce::profile_counter_id::resource_models, static_cast<double>(snapshot.models));
+		add(ce::profile_counter_id::resource_materials, static_cast<double>(snapshot.materials));
+		add(ce::profile_counter_id::resource_textures, static_cast<double>(snapshot.textures));
+		add(ce::profile_counter_id::resource_proxies, static_cast<double>(snapshot.proxies));
+		static const std::array extraIds{
+			ce::register_counter("UI textures", "count", ce::counter_category::resources),
+			ce::register_counter("Sprite sheets", "count", ce::counter_category::resources),
+			ce::register_counter("Retained assets", "count", ce::counter_category::resources),
+			ce::register_counter("UI proxies", "count", ce::counter_category::resources),
+			ce::register_counter("Animators", "count", ce::counter_category::resources),
+			ce::register_counter("Animation palettes", "count", ce::counter_category::resources),
+		};
+		const std::array extraValues{
+			snapshot.uiTextures, snapshot.spriteSheets, snapshot.retainedAssets,
+			snapshot.uiProxies, snapshot.animators, snapshot.animationPalettes,
+		};
+		for (std::size_t i = 0; i < extraIds.size(); ++i)
+			add(extraIds[i], static_cast<double>(extraValues[i]));
+		static const auto engineIds = []
+		{
+			std::array<ce::profile_counter_id, Diagnostics::kEngineResourceNames.size()> ids{};
+			for (std::size_t i = 0; i < ids.size(); ++i)
+				ids[i] = ce::register_counter(
+					std::string("Engine resource ") + std::string(Diagnostics::kEngineResourceNames[i]),
+					"count", ce::counter_category::resources);
+			return ids;
+		}();
+		for (std::size_t i = 0; i < engineIds.size(); ++i)
+			add(engineIds[i], static_cast<double>(snapshot.engineResources.counts[i]));
+		service.publish_counters(frame, ce::counter_category::resources,
+			std::span<const ce::profile_counter_sample>(samples.data(), count));
+	}
+}
+
 // PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
 void ResourceCounterWindow::Draw()
 {
-	static Snapshot displayed{};
-	static double lastRefreshTime = -1.0;
-
-	const double now = ImGui::GetTime();
-	if (!displayed.valid || (now - lastRefreshTime) >= kRefreshIntervalSeconds)
-	{
-		displayed = Capture(false);
-		lastRefreshTime = now;
-	}
-
-	// 무거운 GPU 객체 집계는 별도 보관값을 재사용한다.
-	displayed.liveGpuObjects = m_lastGpuCensus.liveGpuObjects;
-	displayed.liveGpuValid = m_lastGpuCensus.liveGpuValid;
+	m_requested.store(true, std::memory_order_release);
+	const auto published = m_displayed.load(std::memory_order_acquire);
+	const Snapshot displayed = published ? *published : Snapshot{};
 
 	// --- 기준선 조작 ---
 	if (ImGui::Button(EditorIcon::Label<EditorIcon::Baseline, " 현재를 기준선으로">))

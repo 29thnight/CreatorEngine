@@ -326,13 +326,14 @@ namespace ConsoleCmd
         //   시간은 지금까지 렌더 디버그 창에만 있었고, 그래서 그 숫자가 올바른
         //   제출의 것인지를 물을 수단이 없었다 — 눈으로는 틀린 숫자도 그럴듯하다.
         //
-        //   mismatches 는 "수집이 다른 제출의 기록을 읽은 횟수" 이고, P4 가
-        //   GpuFrameToken 을 세우면 0 이 되어야 한다.
+        //   mismatches 는 Collect(token)이 그 제출의 기록을 거절한 횟수이고,
+        //   queryOverflowPasses 는 질의 슬롯 부족으로 측정하지 못한 패스 수다.
         {
             auto gpu = CommandData::Object();
             gpu.Set("ms", CommandData::Double(snapshot.gpuMs));
             gpu.Set("collects", CommandData::Int(snapshot.gpuCollects));
             gpu.Set("mismatches", CommandData::Int(snapshot.gpuCollectMismatches));
+            gpu.Set("queryOverflowPasses", CommandData::Int(snapshot.gpuQueryOverflowPasses));
 
             // 수집마다의 검산 장부. 마지막 한 번(아래 lastGpuSpan)은 어느 뷰의
             // 것인지가 실행마다 갈리므로, 판정은 이 누적 수로 한다.
@@ -364,6 +365,8 @@ namespace ConsoleCmd
             gpu.Set("frame", CommandData::Int(snapshot.lastGpuFrameId));
             gpu.Set("submission", CommandData::Int(snapshot.lastGpuSubmissionId));
             gpu.Set("viewId", CommandData::Int(snapshot.lastGpuViewId));
+            gpu.Set("maxPendingSubmissions", CommandData::Int(
+                snapshot.gpuMaxPendingSubmissions));
             // ★ 합계는 하나가 아니다(§3.4). ms 는 이름으로 묶은 것의 합이고,
             //   queueSpanMs 는 큐를 잡고 있던 길이, busyMs 는 실제로 일한 길이다.
             gpu.Set("queueSpanMs", CommandData::Double(snapshot.lastGpuSpan.queueSpanMs));

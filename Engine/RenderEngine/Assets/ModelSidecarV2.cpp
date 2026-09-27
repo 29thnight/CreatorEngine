@@ -3,6 +3,7 @@
 #include "AssetIdentityRegistry.h"
 
 #include "AuthoringParsedDocument.h"
+#include "AuthoringCookedDocument.h"
 #include "AuthoringWriteNode.h"
 #include "Sha256.h"
 
@@ -207,8 +208,11 @@ namespace assets
         const std::size_t before = outIssues.size();
         ModelSidecarV2 doc;
         std::string parseError;
-        const Authoring::ParsedDocument document =
-            Authoring::ParsedDocument::ParseText(std::string(yaml), parseError);
+        const std::span<const std::byte> bytes{
+            reinterpret_cast<const std::byte*>(yaml.data()), yaml.size() };
+        const Authoring::ParsedDocument document = Authoring::IsCookedDocument(bytes)
+            ? Authoring::ParsedDocument::ParseCooked(bytes, parseError)
+            : Authoring::ParsedDocument::ParseText(std::string(yaml), parseError);
         if (!document)
         {
             AddIssue(outIssues, SidecarIssueCode::InvalidDocument, "root", parseError);

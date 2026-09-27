@@ -25,7 +25,7 @@ internal static class PlayerVerification
         if (owners.Length != 1 || Path.GetFileName(owners[0]) != result.ProcessId.ToString()) throw new BuildException("Player runtime owner is not exactly the launched PID.");
         var unpacked = Path.Combine(owners[0], "RuntimeContent");
         var unpackedFiles = Paths.Files(unpacked).ToArray();
-        if (unpackedFiles.Length != entries.Length || unpackedFiles.Any(p => Path.GetExtension(p).ToLowerInvariant() is ".meta" or ".json") ||
+        if (unpackedFiles.Length != entries.Length || unpackedFiles.Any(p => PackageInputs.Excluded(p)) ||
             !File.Exists(Path.Combine(unpacked, "Assets/Derived/asset-manifest.cemf"))) throw new BuildException("Unpacked runtime content closure mismatch.");
         Metadata.Verify(unpacked, entries, context.Cancellation);
         Paths.DeleteTree(temp, tempOwner); return metrics;

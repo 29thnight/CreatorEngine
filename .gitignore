@@ -462,6 +462,9 @@ FodyWeavers.xsd
 /imgui.ini
 *.creator
 *.meta
+# Player animation product regression owns this authored scene fixture.
+!Tools/regression/fixtures/AnimationPlayer.creator
+!Tools/regression/fixtures/AnimationPlayer.creator.meta
 # 프로젝트 분리 전에는 로컬 게임 콘텐츠의 sidecar를 추적하지 않는다.
 # `git add -f`로 이 규약을 우회하지 않는다. 아래의 명시적 예외는 저장소가
 # 소유하는 clean-checkout 검증/패키지 폐포뿐이며 target과 .meta를 같이 추적한다.

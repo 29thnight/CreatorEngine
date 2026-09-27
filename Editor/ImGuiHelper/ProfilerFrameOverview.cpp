@@ -285,7 +285,9 @@ namespace editor::profiler_view
 		else if (ImGui::IsItemDeactivated() && !ImGui::IsMouseDragPastThreshold(ImGuiMouseButton_Left))
 		{
 			view.set_live_follow(false);
-			view.select_frame(frame_at(ImGui::GetIO().MousePos.x));
+			const std::uint32_t frame = frame_at(ImGui::GetIO().MousePos.x);
+			view.select_frame(frame);
+			view.focus_frame(frame);
 		}
 
 		// ── 가로 스크롤 막대 ─────────────────────────────────────────────

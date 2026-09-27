@@ -42,8 +42,8 @@ PHASE 4.75의 GPU 설계 게이트에 `4-5 DLSS 구상` 1일이 한 줄로 있�
 | 범위 | 정본 |
 |---|---|
 | PHASE 4.5 순서·공수·완료선 | 이 문서 |
-| 페이즈 간 순서와 총공수 | [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) |
-| Pass를 Asset으로 기술하는 계약·조건부 Pass fallback 규칙 | [`ScriptableRenderPipelinePlan.md`](ScriptableRenderPipelinePlan.md) |
+| 페이즈 간 순서와 총공수 | [`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md) |
+| C# Pass 저작·조건부 구성·fallback 계약 | [`CSharpRenderPipelinePlan.md`](CSharpRenderPipelinePlan.md)·[`RenderPipelineTargetArchitecture.md`](../design/RenderPipelineTargetArchitecture.md) |
 | versioned resource·DAG·barrier·queue/fence | [`RenderGraphDependencySchedulingPlan.md`](RenderGraphDependencySchedulingPlan.md) |
 | 재질 의미·pre-tone linear HDR 응답 | [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md) |
 | vertex attribute schema·model generation | [`ModelAssetBigBangCutoverPlan.md`](archive/ModelAssetBigBangCutoverPlan.md) |
@@ -192,11 +192,11 @@ DirectSR은 DX12 백엔드의 구현 수단 후보로만 둔다** — `TU0`가 �
 | `BASE-0` | 공통 밀봉 frame/PNG/HDR/timing/graph stats | · | PHASE 4.25 | 6 | **PHASE 4.3** |
 
 **이 행은 이 페이즈의 공수에 포함되지 않는다.** 2026-09-14에 PHASE 4.75에서 이곳으로 이관했고
-2026-09-15에 PHASE 4.3으로 다시 옮겼다 — 소비자 셋(4.3 `RG1`/`RG6`, 4.5 `TR0`/`TR1`, 4.75 전
-트랙) 가운데 가장 앞에 서는 것이 RG이기 때문이다. **하네스 산출물 계약 서술은 이 문서가 계속
+2026-09-15에 PHASE 4.3으로 다시 옮겼다 — 소비자 중 4.3 `RG1`/`RG6`가 가장 앞에 서기
+때문이다. 이후 분리된 4.6~4.8도 필요한 게이트에서 같은 하네스를 소비한다. **하네스 산출물 계약 서술은 이 문서가 계속
 소유한다** — 밀봉 frame packet·PNG/HDR·timing·graph stats의 형식과 계측 무해화 요구가 `TR0`의
 직접 입력이라 여기서 갈라 놓으면 두 벌이 된다. 소유 페이즈·공수·선후는
-[`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.1이 정본이다.
+[`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이다.
 
 ### 5.2 트랙 TR — 시간축 기반, 25일
 
@@ -260,7 +260,8 @@ PHASE 4.3 BASE-0  (이 페이즈가 소유하지 않는다 · RG 본체는 기�
                           │                 │      └→ FG4
                           └─────────────────────────→ TFG9
     ↓
-PHASE 4.75 (BASE-0·RG5·RG6·Q0를 PHASE 4.3에서 입력으로 받는다)
+PHASE 4.6 C# 저작 · 4.7 라이트맵 · 4.75 렌더러 품질 · 4.8 GPU 설계
+(각 항목이 필요한 BASE-0·RG·Q0 계약을 PHASE 4.3에서 입력으로 받는다)
 ```
 
 `TR0`는 `TR1`과 병렬이지만 **`TU2` 착지 전에는 반드시 끝나 있어야 한다.** 업스케일러가 붙는

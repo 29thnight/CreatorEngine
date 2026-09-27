@@ -15,7 +15,7 @@
 | Behavior Tree | [`BTBuildGraph.h`](../../Engine/SceneRuntime/BTBuildGraph.h)의 `.bt` 노드/자식, [`BTEditorBridge.h`](../../Editor/EngineGUIWindow/BTEditorBridge.h)와 [`MenuBarWindow.cpp`](../../Editor/EngineGUIWindow/MenuBarWindow.cpp)의 직접 `ax::NodeEditor` 호출 | 이후 BT 자산·창을 재작성할 때 LX를 사용. 기존 `.bt` 변환 없음 |
 | Animator state graph | [`AnimatorEditorWindows.cpp`](../../Editor/EngineGUIWindow/AnimatorEditorWindows.cpp)의 `NodeEditor`와 `Assets/NodeEditor/*.json` 위치 sidecar | 독립 예제에서 상태 이름만 보이는 제목 전용 노드와 방향 화살표 전이 스타일을 검증. 이후 controller·창을 재작성할 때 LX를 사용. 기존 위치 JSON 변환 없음 |
 | `NodeEditor` / `BlueprintBuilder` | [`NodeEditor.h`](../../Editor/ImGuiHelper/NodeEditor.h)는 프레임마다 노드를 만들고 이름으로 연결한다. [`BlueprintBuilder.h`](../../Editor/ImGuiHelper/BlueprintBuilder.h)는 node-editor 그리기 보조 | 공통 저작 모델로 승격하지 않고 소비자를 옮긴 뒤 은퇴 |
-| 렌더 파이프라인 | C# Pipeline IR 계획은 C# 저작 → native IR → RenderGraph 실행 | 향후 시각화/저작 요구가 생기면 같은 IR을 투영하거나 생성. 별도 실행 그래프는 만들지 않음 |
+| 렌더 파이프라인 | [현재 C# Pipeline IR 정본](RenderPipelineTargetArchitecture.md)은 C# 저작 → native IR → RenderGraph 실행 | 향후 시각화/저작 요구가 생기면 같은 IR을 투영하거나 생성. 별도 실행 그래프는 만들지 않음 |
 
 현재 `imgui-node-editor`는 [`vcpkg.json`](../../vcpkg.json)의 직접 의존이다. BT와
 Animator가 실제 UI 소비자이므로 Material Graph 창만 LX로 그려서는 의존성을

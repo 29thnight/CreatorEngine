@@ -61,6 +61,8 @@ try
     var cookInput = Path.Combine(root, "cook-input"); PackageInputs.CopyProject(project, cookInput, CancellationToken.None);
     Check(!Directory.Exists(Path.Combine(cookInput, "Assets/Script")), "C# source identities leaked into native cook input");
     Check(File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl.meta")) && File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl")), "Runtime source identity was removed from cook input");
+    Check(!PackageInputs.Excluded(Path.Combine(cookInput, "Assets/Derived/Models/ab/id/1/sidecar.meta")), "Cooked model sidecar was excluded from the package");
+    Check(PackageInputs.Excluded(Path.Combine(cookInput, "Assets/Models/Robot.glb.meta")), "Authoring model sidecar entered the package");
     Reject(() => engine.AssertProject(project), "Missing project pin accepted"); engine.SelectProject(project); engine.AssertProject(project); ++checks;
     var wrong = manifest.DeepClone(); wrong["buildId"] = Guid.NewGuid().ToString("D"); Reject(() => new EngineDistribution(engineRoot, wrong.AsObject()).AssertProject(project), "Wrong project pin accepted");
     GamePackager.ValidatePack("[PAK-ENTRY] payload.txt\n", files); ++checks;

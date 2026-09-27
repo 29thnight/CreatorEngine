@@ -6,6 +6,9 @@
 #include "ProfilerView.h"
 
 #include <cstdio>
+#include <algorithm>
+#include <cctype>
+#include <cstring>
 
 #include "ImGui.h"
 #include "ProfileMarker.h"
@@ -17,6 +20,48 @@ namespace editor::profiler_view
 		constexpr ImGuiTableFlags kTableFlags =
 			ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
 			ImGuiTableFlags_Resizable | ImGuiTableFlags_ScrollY;
+		char markerFilter[128]{};
+		int threadFilter = -1;
+
+		bool marker_matches(const ce::aggregate_row& row)
+		{
+			if (threadFilter >= 0 && row.thread_slot != threadFilter) return false;
+			if (markerFilter[0] == '\0') return true;
+			const char* name = marker_name(reader().capture(), row.marker);
+			return std::search(name, name + std::strlen(name), markerFilter,
+				markerFilter + std::strlen(markerFilter),
+				[](unsigned char left, unsigned char right)
+				{ return std::tolower(left) == std::tolower(right); }) != name + std::strlen(name);
+		}
+
+		bool subtree_matches(std::span<const ce::aggregate_row> rows, std::uint32_t index)
+		{
+			const std::uint32_t end = (std::min)(static_cast<std::uint32_t>(rows.size()),
+				(std::max)(rows[index].child_end, index + 1));
+			for (std::uint32_t i = index; i < end; ++i)
+				if (marker_matches(rows[i])) return true;
+			return false;
+		}
+
+		void draw_filters()
+		{
+			ImGui::SetNextItemWidth((std::min)(ImGui::GetContentRegionAvail().x * 0.45f, 420.0f));
+			ImGui::InputTextWithHint("##ProfilerMarkerFilter", "마커 이름 검색", markerFilter, sizeof(markerFilter));
+			ImGui::SameLine();
+			ImGui::SetNextItemWidth(220.0f);
+			const ce::capture_session* capture = reader().capture();
+			const char* current = threadFilter < 0 ? "모든 스레드" :
+				thread_name(capture, static_cast<std::uint16_t>(threadFilter));
+			if (ImGui::BeginCombo("##ProfilerThreadFilter", current))
+			{
+				if (ImGui::Selectable("모든 스레드", threadFilter < 0)) threadFilter = -1;
+				if (capture)
+					for (const ce::thread_info& thread : capture->threads())
+						if (ImGui::Selectable(thread.name.c_str(), threadFilter == static_cast<int>(thread.slot)))
+							threadFilter = static_cast<int>(thread.slot);
+				ImGui::EndCombo();
+			}
+		}
 
 		// 표를 그리는 **동안만** 칸 여백을 좁힌다.
 		//
@@ -134,9 +179,12 @@ namespace editor::profiler_view
 		// ★ 루트를 depth 로 판별하지 않는다. 녹화가 도중에 시작되면 부모를
 		//   못 본 구간이 depth > 0 인 채로 루트가 된다 — 깊이로 거르면 그런
 		//   줄이 표에서 통째로 사라진다.
-		void draw_subtree(std::span<const ce::aggregate_row> rows, std::uint32_t index)
+		void draw_subtree(std::span<const ce::aggregate_row> rows, std::uint32_t index,
+		                  int expandRequest, bool ancestorMatched = false)
 		{
 			const ce::aggregate_row& row = rows[index];
+			if (!ancestorMatched && !subtree_matches(rows, index)) return;
+			const bool childrenMatch = ancestorMatched || marker_matches(row);
 			const bool hasChildren = row.child_begin < row.child_end;
 
 			ImGui::TableNextRow();
@@ -153,6 +201,8 @@ namespace editor::profiler_view
 			}
 
 			ImGui::PushID(static_cast<int>(index));
+			if (hasChildren && expandRequest != 0)
+				ImGui::SetNextItemOpen(expandRequest > 0, ImGuiCond_Always);
 			const bool open = ImGui::TreeNodeEx(label, flags);
 			value_cells(row);
 
@@ -161,7 +211,7 @@ namespace editor::profiler_view
 				std::uint32_t child = row.child_begin;
 				while (child < row.child_end && child < rows.size())
 				{
-					draw_subtree(rows, child);
+					draw_subtree(rows, child, expandRequest, childrenMatch);
 					child = (rows[child].child_end > child) ? rows[child].child_end : (child + 1);
 				}
 				ImGui::TreePop();
@@ -172,6 +222,11 @@ namespace editor::profiler_view
 
 	void draw_hierarchy_table()
 	{
+		draw_filters();
+		const bool expandAll = ImGui::SmallButton("계층 모두 펼치기");
+		ImGui::SameLine();
+		const bool collapseAll = ImGui::SmallButton("최상위 접기");
+		const int expandRequest = expandAll ? 1 : (collapseAll ? -1 : 0);
 		const ce::frame_aggregate& aggregate = reader().aggregate();
 		const std::span<const ce::aggregate_row> rows = aggregate.hierarchy();
 		if (rows.empty())
@@ -192,7 +247,7 @@ namespace editor::profiler_view
 		std::uint32_t index = 0;
 		while (index < rows.size())
 		{
-			draw_subtree(rows, index);
+			draw_subtree(rows, index, expandRequest);
 			index = (rows[index].child_end > index) ? rows[index].child_end : (index + 1);
 		}
 
@@ -201,6 +256,7 @@ namespace editor::profiler_view
 
 	void draw_flat_table()
 	{
+		draw_filters();
 		const ce::frame_aggregate& aggregate = reader().aggregate();
 		const std::span<const ce::aggregate_row> rows = aggregate.flat();
 		if (rows.empty())
@@ -218,6 +274,7 @@ namespace editor::profiler_view
 
 		for (const ce::aggregate_row& row : rows)
 		{
+			if (!marker_matches(row)) continue;
 			ImGui::TableNextRow();
 			ImGui::TableNextColumn();
 			char label[192];

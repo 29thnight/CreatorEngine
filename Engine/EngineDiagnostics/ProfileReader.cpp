@@ -33,14 +33,17 @@ namespace ce
 
 	void capture_reader::adopt(capture_session_ptr capture)
 	{
+		const profile_tick previousSpan = m_viewValid && m_viewEnd > m_viewBegin
+			? m_viewEnd - m_viewBegin : 0;
+		const bool previousWholeWindow = m_viewValid && m_viewSpansWholeWindow;
 		m_capture = std::move(capture);
 		m_aggregateValid = false;
 		m_windowAggregateValid = false;
-		m_viewValid = false;
 
 		if (!m_capture || m_capture->frame_count() == 0)
 		{
 			m_capture.reset();
+			m_viewValid = false;
 			m_availableFirst = m_availableLast = 0;
 			m_selectedFirst = m_selectedLast = 0;
 			return;
@@ -64,6 +67,20 @@ namespace ce
 					? (m_availableLast + 1 - span) : m_availableFirst;
 			}
 			clamp_graph();
+			if (m_viewAutoDefault)
+			{
+				m_viewValid = false;
+				return;
+			}
+			if (previousSpan > 0)
+			{
+				const frame_aggregate& window = window_aggregate();
+				m_viewEnd = window.tick_end();
+				m_viewBegin = previousWholeWindow ? window.tick_begin()
+					: (m_viewEnd > previousSpan ? m_viewEnd - previousSpan : 0);
+				m_viewValid = true;
+				clamp_view();
+			}
 			return;
 		}
 
@@ -76,6 +93,7 @@ namespace ce
 		//   점프시키지는 않는다 — 뒤로 굴려 놓고 보던 사람의 손에서 자료가
 		//   빠져나가는 것이 이 창이 있는 까닭과 정반대다.
 		clamp_graph();
+		if (m_viewValid) clamp_view();
 	}
 
 	// ── 프레임 그래프의 창(§7.2) ────────────────────────────────────────
@@ -135,6 +153,7 @@ namespace ce
 		//   양이 아니라 **실제로 움직인 양**을 쓴다.
 		const std::int64_t applied =
 			static_cast<std::int64_t>(m_graphFirst) - static_cast<std::int64_t>(before);
+		if (applied != 0) m_viewAutoDefault = false;
 		shift_selection(applied);
 
 		// ★ 뒤로 굴렸으면 따라가기를 끈다. 안 끄면 다음 스냅샷이 창을 최신으로
@@ -218,6 +237,7 @@ namespace ce
 		m_aggregateValid = false;
 		m_windowAggregateValid = false;
 		m_viewValid = false;
+		m_viewAutoDefault = true;
 		reset_graph();
 	}
 
@@ -229,6 +249,8 @@ namespace ce
 		// 라이브의 그래프 창은 이 파일에서 뜻이 없다. 비워 두면 다음
 		// set_graph_span 이 파일의 최신 끝에 창을 세운다.
 		reset_graph();
+		m_viewValid = false;
+		m_viewAutoDefault = true;
 
 		adopt(std::move(capture));
 
@@ -285,6 +307,21 @@ namespace ce
 		select_range(m_availableLast, m_availableLast);
 	}
 
+	void capture_reader::focus_frame(std::uint32_t frame)
+	{
+		if (!m_capture) return;
+		const frame_record* target = m_capture->find_frame(frame);
+		if (!target) return;
+		ensure_view();
+		if (target->tick_begin >= m_viewBegin && target->tick_end <= m_viewEnd) return;
+		const profile_tick span = m_viewEnd - m_viewBegin;
+		const profile_tick center = target->tick_begin + (target->tick_end - target->tick_begin) / 2;
+		m_viewBegin = center > span / 2 ? center - span / 2 : 0;
+		m_viewEnd = m_viewBegin + span;
+		m_viewAutoDefault = false;
+		clamp_view();
+	}
+
 	void capture_reader::clamp_selection()
 	{
 		if (!m_capture)
@@ -321,14 +358,15 @@ namespace ce
 		}
 
 		const frame_aggregate& folded = window_aggregate();
-		m_viewBegin = folded.tick_begin();
 		m_viewEnd = folded.tick_end();
-		if (m_viewEnd <= m_viewBegin)
-		{
-			m_viewEnd = m_viewBegin + kMinimumViewTicks;
-		}
+		const profile_tick low = folded.tick_begin();
+		if (m_viewEnd <= low) m_viewEnd = low + kMinimumViewTicks;
+		const profile_tick frequency = m_capture ? m_capture->environment().ticks_per_second : 0;
+		const profile_tick preferred = (std::max)(frequency / 10, kMinimumViewTicks);
+		const profile_tick span = (std::min)(m_viewEnd - low, preferred);
+		m_viewBegin = m_viewEnd - span;
 		m_viewValid = true;
-		m_viewSpansWholeWindow = true;
+		m_viewSpansWholeWindow = span >= m_viewEnd - low;
 	}
 
 	// 창이 미끄러졌을 때 시야를 어떻게 할 것인가.
@@ -406,7 +444,44 @@ namespace ce
 
 	void capture_reader::reset_view()
 	{
-		m_viewValid = false;
+		m_viewAutoDefault = false;
+		const frame_aggregate& folded = window_aggregate();
+		m_viewBegin = folded.tick_begin();
+		m_viewEnd = (std::max)(folded.tick_end(), m_viewBegin + kMinimumViewTicks);
+		m_viewValid = true;
+		m_viewSpansWholeWindow = true;
+	}
+
+	void capture_reader::seek_view(profile_tick begin)
+	{
+		if (!m_capture || m_capture->frames().empty()) return;
+		m_viewAutoDefault = false;
+		ensure_view();
+		const profile_tick span = m_viewEnd - m_viewBegin;
+		const auto frames = m_capture->frames();
+		const profile_tick captureBegin = frames.front().tick_begin;
+		const profile_tick captureEnd = frames.back().tick_end;
+		const profile_tick lastBegin = captureEnd > captureBegin + span
+			? captureEnd - span : captureBegin;
+		begin = (std::clamp)(begin, captureBegin, lastBegin);
+		const profile_tick center = begin + span / 2;
+		auto found = std::find_if(frames.begin(), frames.end(),
+			[center](const frame_record& frame) { return frame.tick_end >= center; });
+		if (found == frames.end()) found = frames.end() - 1;
+		const std::uint32_t count = graph_count();
+		if (count > 0)
+		{
+			m_graphCount = count;
+			const std::uint32_t target = found->engine_frame;
+			m_graphFirst = target > count / 2 ? target - count / 2 : m_availableFirst;
+			clamp_graph();
+		}
+		m_viewBegin = begin;
+		m_viewEnd = begin + span;
+		m_viewValid = true;
+		clamp_view();
+		set_live_follow(false);
+		select_frame(found->engine_frame);
 	}
 
 	void capture_reader::zoom_view(double factor, profile_tick pivot)
@@ -416,6 +491,7 @@ namespace ce
 		{
 			return;
 		}
+		m_viewAutoDefault = false;
 
 		const profile_tick span = (m_viewEnd > m_viewBegin)
 			? (m_viewEnd - m_viewBegin) : kMinimumViewTicks;
@@ -442,7 +518,9 @@ namespace ce
 
 	void capture_reader::pan_view(std::int64_t delta_ticks)
 	{
+		if (delta_ticks == 0) return;
 		ensure_view();
+		m_viewAutoDefault = false;
 		const profile_tick span = (m_viewEnd > m_viewBegin)
 			? (m_viewEnd - m_viewBegin) : kMinimumViewTicks;
 

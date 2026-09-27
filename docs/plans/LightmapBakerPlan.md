@@ -1,4 +1,7 @@
-# 라이트맵 베이커 재작성 (PHASE 4.75 · 트랙 L)
+# 라이트맵 베이커 재작성 (PHASE 4.7 · 트랙 L)
+
+> 2026-09-23 PHASE 4.75에서 4.7로 소속을 분리했다. `L0~L7`의 구현 범위·상태·
+> 35일 산정은 유지한다. 현재 페이즈 순서는 [`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md).
 
 2026-08-25 신설. 삭제된 DX11 베이커를 실측한 결과 **복원이 아니라 재작성**이 맞다는
 결론에서 출발한다. 고칠 지점이 성능만이 아니라 **정확성에도** 있어서 그대로 되살리면
@@ -409,9 +412,9 @@ BVH)이 실제로 이득인지 판정한다. **재기 전에 열지 않는다.**
 |---|---|
 | **`ModelAssetBigBangCutoverPlan` (PHASE 3.75)** | **하드 선행.** MBC3 authoring transaction과 MBC6 vertex schema를 소비한다. UV1은 라이트맵 대상 메시에만 붙고 L1이 새 model generation으로 원자 게시한다 |
 | **`RenderGraphDependencySchedulingPlan` (PHASE 4.3 · 트랙 RG)** | `Q0`(queue-neutral 큐·cross-queue 펜스·상태 전이)은 L4-a와 RG8의 공용 기반이다. `L4`는 `RG8`을 기다리지 않는다 |
-| **`ScriptableRenderPipelinePlan` (같은 PHASE 4.75)** | `LightMapPass` 를 Pipeline Asset 이 선택하는 Pass 로 둘지, 소스 Native Pass 로 둘지 결정 필요 |
-| PHASE 4.75 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |
-| PHASE 4.75 DXR | BLAS 가 서면 **베이크의 BVH 를 DXR 가속 구조로 대체**할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다 |
+| **`CSharpRenderPipelinePlan` (PHASE 4.6)** | 기존 C++ `LightMapPass` 실행을 native registry에 연결하고 C# IR에서 선택한다. 라이트맵 산출물·베이커 수명은 PHASE 4.7이 소유한다 |
+| PHASE 4.8 Stochastic Lighting | 정적 간접광이 라이트맵에 있으면 그쪽이 담당할 범위가 줄어든다 — 설계 게이트에서 경계를 정한다 |
+| PHASE 4.8 DXR | BLAS 가 서면 **베이크의 BVH 를 DXR 가속 구조로 대체**할 수 있다. L2 의 자체 BVH 는 그때까지의 다리다 |
 | `RhiBoundaryPlan` (PHASE 3) | L3 이 DX12 RHI 로 재작성. async compute 판정 기준을 그대로 적용 |
 | `MaterialPipelinePlan` (PHASE 3.5) | 베이크 커널의 셰이더 퍼뮤테이션이 `.shadermeta` 정본을 따른다 |
 | `SerializationPlan` (PHASE 17) | 구운 라이트맵 텍스처의 자산 형식·쿠킹 결정을 공유 |

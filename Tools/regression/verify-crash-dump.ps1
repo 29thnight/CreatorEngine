@@ -9,6 +9,7 @@
 #   2. 옆에 .txt 요약이 생기고, 그 안에 심볼이 붙은 스택이 들어 있다
 #   3. 스택 맨 위쪽에 실제 크래시 지점(ConsoleCommandSystem::Execute)이 있다
 #   4. 세션 로그에 기록자 등록 줄이 남는다
+#   5. 덤프를 쓴 PID가 크래시 난 프로세스와 다르다
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP
@@ -24,11 +25,11 @@ $logDir = Join-Path $exeDir "Saved\Log"
 # 종류별 기대 요약. 각 크래시 경로가 서로 다른 후크를 타므로 전부 확인한다.
 #   av        SEH 필터(미처리 예외)
 #   abort     SIGABRT 시그널 핸들러
-#   throw     미처리 C++ 예외 - SEH 필터가 0xE06D7363으로 먼저 받는다
+#   throw     미처리 C++ 예외. 스택 해제 중 joinable thread가 남으면 terminate가 먼저 온다.
 $cases = @(
     @{ Kind = "av";        Expect = "ACCESS_VIOLATION" },
     @{ Kind = "abort";     Expect = "abort" },
-    @{ Kind = "throw";     Expect = "C\+\+_EXCEPTION" }
+    @{ Kind = "throw";     Expect = "C\+\+_EXCEPTION|std::terminate" }
 )
 
 $failures = @()
@@ -85,6 +86,11 @@ foreach ($case in $cases) {
 
     if ($report -notmatch $case.Expect) {
         $failures += "${kind}: 요약에 '$($case.Expect)'가 없다"
+    }
+
+    $writer = [regex]::Match($report, 'DumpWriterProcessId:\s*(\d+)')
+    if (-not $writer.Success -or [int]$writer.Groups[1].Value -eq $proc.Id) {
+        $failures += "${kind}: 별도 프로세스가 덤프를 기록하지 않았다"
     }
 
     # 3. 심볼이 붙은 스택인가. '(심볼 없음)'만 늘어선 스택은 덤프가 있어도 쓸모없다.

@@ -1,5 +1,7 @@
 #include "ProfileThreadStream.h"
 
+#include <algorithm>
+#include <new>
 #include <utility>
 
 namespace ce
@@ -20,21 +22,23 @@ namespace ce
 		shutdown();
 	}
 
-	void chunk_pool::initialize(std::uint32_t chunk_count)
+	void chunk_pool::initialize(std::uint32_t chunk_count, std::uint32_t maximum_chunks)
 	{
 		std::lock_guard<std::mutex> guard(m_lock);
 
 		m_storage.clear();
-		m_storage.reserve(chunk_count);
+		// 명시적 상한이 있으면 포인터 자리를 미리 잡는다. 기본 모드는
+		// 필요할 때 확장하므로 초기 페이지 수만큼만 예약한다.
+		m_maximumChunks = maximum_chunks == 0 ? 0 : (std::max)(chunk_count, maximum_chunks);
+		m_storage.reserve(m_maximumChunks == 0 ? chunk_count : m_maximumChunks);
 		m_free = nullptr;
 		m_sealed = nullptr;
 		m_sealedTail = nullptr;
 		m_chunkCount = chunk_count;
 		m_freeCount = chunk_count;
 
-		// 한 번에 다 잡아 둔다. hot path 에서 heap 을 건드리지 않는 것이
-		// 계약이므로(§6.2) 이후의 할당은 존재하지 않는다 — 옛 코어의
-		// BeginEvent 가 버퍼를 resize 하던 자리가 여기서 사라진다.
+		// 초기 페이지만 한 번에 잡는다. 부족해지면 수집 스레드가
+		// 보충하므로 기록자의 hot path 에서는 heap 을 건드리지 않는다.
 		for (std::uint32_t i = 0; i < chunk_count; ++i)
 		{
 			auto chunk = std::make_unique<event_chunk>();
@@ -47,27 +51,50 @@ namespace ce
 	void chunk_pool::shutdown()
 	{
 		std::lock_guard<std::mutex> guard(m_lock);
+		m_signal = nullptr;
 		m_free = nullptr;
 		m_sealed = nullptr;
 		m_sealedTail = nullptr;
 		m_freeCount = 0;
 		m_chunkCount = 0;
+		m_maximumChunks = 0;
 		m_storage.clear();
+	}
+
+	void chunk_pool::set_signal(std::counting_semaphore<INT_MAX>* signal)
+	{
+		std::lock_guard<std::mutex> guard(m_lock);
+		m_signal = signal;
 	}
 
 	event_chunk* chunk_pool::acquire()
 	{
 		std::lock_guard<std::mutex> guard(m_lock);
-		if (!m_free)
+		if (m_free)
+		{
+			event_chunk* chunk = m_free;
+			m_free = chunk->next;
+			chunk->next = nullptr;
+			--m_freeCount;
+			return chunk;
+		}
+		if (m_chunkCount == UINT32_MAX
+		    || (m_maximumChunks != 0 && m_chunkCount >= m_maximumChunks))
 		{
 			return nullptr;
 		}
-
-		event_chunk* chunk = m_free;
-		m_free = chunk->next;
-		chunk->next = nullptr;
-		--m_freeCount;
-		return chunk;
+		try
+		{
+			auto chunk = std::make_unique<event_chunk>();
+			event_chunk* result = chunk.get();
+			m_storage.push_back(std::move(chunk));
+			++m_chunkCount;
+			return result;
+		}
+		catch (const std::bad_alloc&)
+		{
+			return nullptr;
+		}
 	}
 
 	void chunk_pool::seal(event_chunk* chunk)
@@ -78,6 +105,7 @@ namespace ce
 		}
 
 		std::lock_guard<std::mutex> guard(m_lock);
+		const bool wasEmpty = (m_sealed == nullptr);
 
 		// 꼬리에 붙인다. 청크 안의 순서는 writer 가, 청크 사이의 순서는
 		// 이 목록이 지킨다.
@@ -92,6 +120,7 @@ namespace ce
 			m_sealed = chunk;
 			m_sealedTail = chunk;
 		}
+		if (wasEmpty && m_signal) m_signal->release();
 	}
 
 	event_chunk* chunk_pool::take_sealed()
@@ -120,6 +149,59 @@ namespace ce
 			++m_freeCount;
 			chunk_list = next;
 		}
+	}
+
+	void chunk_pool::replenish(std::uint32_t target_free, std::uint32_t maximum_chunks)
+	{
+		std::uint32_t count = 0;
+		{
+			std::lock_guard<std::mutex> guard(m_lock);
+			const std::uint32_t limit = maximum_chunks == 0
+				? UINT32_MAX : (std::max)(maximum_chunks, m_maximumChunks);
+			if (m_freeCount >= target_free || m_chunkCount >= limit) return;
+			count = (std::min)(target_free - m_freeCount, limit - m_chunkCount);
+		}
+		// 미리 보충하는 페이지는 잠금 밖의 수집 스레드에서 할당한다.
+		std::vector<std::unique_ptr<event_chunk>> fresh;
+		try
+		{
+			fresh.reserve(count);
+			for (std::uint32_t i = 0; i < count; ++i)
+			{
+				fresh.push_back(std::make_unique<event_chunk>());
+			}
+		}
+		catch (const std::bad_alloc&)
+		{
+			// 준비된 페이지는 추가한다. 다음 기록자가 부족하면 직접 할당한다.
+		}
+		if (fresh.empty()) return;
+		std::lock_guard<std::mutex> guard(m_lock);
+		const std::uint32_t limit = maximum_chunks == 0
+			? UINT32_MAX : (std::max)(maximum_chunks, m_maximumChunks);
+		for (auto& page : fresh)
+		{
+			if (m_chunkCount >= limit) break;
+			try
+			{
+				m_storage.push_back(std::move(page));
+			}
+			catch (const std::bad_alloc&)
+			{
+				break;
+			}
+			event_chunk* added = m_storage.back().get();
+			added->next = m_free;
+			m_free = added;
+			++m_freeCount;
+			++m_chunkCount;
+		}
+	}
+
+	std::uint32_t chunk_pool::chunk_count() const
+	{
+		std::lock_guard<std::mutex> guard(m_lock);
+		return m_chunkCount;
 	}
 
 	std::uint32_t chunk_pool::free_count() const

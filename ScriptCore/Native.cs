@@ -301,13 +301,17 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, Color4> Rect_GetWorldRect;
     public delegate* unmanaged<ObjectHandle, Float2> Rect_GetScreenPosition;
     public delegate* unmanaged<ObjectHandle, Float2, void> Rect_SetScreenPosition;
+
+    public delegate* unmanaged<byte*, uint> Profiler_Register;
+    public delegate* unmanaged<uint, void> Profiler_Begin;
+    public delegate* unmanaged<void> Profiler_End;
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 27;
+    public const int ExpectedVersion = 28;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -414,6 +418,29 @@ internal static unsafe class Native
         _api = *table;
         _bound = true;
         return true;
+    }
+
+    internal static uint RegisterProfilerMarker(string name)
+    {
+        if (!Entered() || _api.Profiler_Register == null || string.IsNullOrWhiteSpace(name)) return 0;
+        int byteCount = System.Text.Encoding.UTF8.GetByteCount(name);
+        if (byteCount > 255) return 0;
+        byte* buffer = stackalloc byte[byteCount + 1];
+        System.Text.Encoding.UTF8.GetBytes(name, new Span<byte>(buffer, byteCount));
+        buffer[byteCount] = 0;
+        return _api.Profiler_Register(buffer);
+    }
+
+    internal static bool BeginProfilerMarker(uint marker)
+    {
+        if (marker == 0 || !Entered() || _api.Profiler_Begin == null) return false;
+        _api.Profiler_Begin(marker);
+        return true;
+    }
+
+    internal static void EndProfilerMarker()
+    {
+        if (Entered() && _api.Profiler_End != null) _api.Profiler_End();
     }
 
     // ── 로그 ──

@@ -119,5 +119,13 @@ internal static class PackageInputs
         var lifecycleProbe = Regex.IsMatch(sceneText, @"(?m)^\s+m_scriptType:\s*PackageSmokeProbe\s*$");
         return new(scene, runtimeBackend.Groups[2].Value, counts, lifecycleProbe);
     }
-    public static bool Excluded(string path) => Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".meta" or ".json";
+    public static bool Excluded(string path)
+    {
+        // The generation reader validates this cooked companion at runtime.
+        // Source .meta files remain authoring-only and are replaced by CEMF.
+        if (Path.GetFileName(path).Equals("sidecar.meta", StringComparison.OrdinalIgnoreCase) &&
+            path.Replace('\\', '/').Contains("/Assets/Derived/Models/", StringComparison.OrdinalIgnoreCase))
+            return false;
+        return Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".meta" or ".json";
+    }
 }

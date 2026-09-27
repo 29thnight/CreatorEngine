@@ -1,9 +1,12 @@
 #include "ProfileService.h"
 #include <chrono>
+#include <cmath>
 #include <cstdio>
+#include <new>
 #include <thread>
 
 #include <Windows.h>
+#include <psapi.h>
 
 #include <algorithm>
 #include <utility>
@@ -132,10 +135,31 @@ namespace ce
 		}
 
 		m_liveCaptureIntervalMs = config.live_capture_interval_ms;
-		m_pool->initialize(config.chunk_count);
+		m_collectorTiming = {};
+		m_maxQueuedFrames = config.max_queued_frames;
+		m_memoryBudget = config.memory_budget > 0 ? config.memory_budget : kDefaultMemoryBudget;
+		m_accountedSourceDropped = m_retiredDropped.load(std::memory_order_relaxed)
+			+ m_queueDroppedEvents.load(std::memory_order_relaxed);
+		m_queueDroppedCounters.store(0, std::memory_order_relaxed);
+		m_accountedCounterQueueDropped = 0;
+		m_pendingGapTick.store(0, std::memory_order_relaxed);
+		m_droppedFrameBaseline.store(
+			m_droppedFrameBoundaries.load(std::memory_order_relaxed), std::memory_order_relaxed);
+		// 보존 링의 예산은 생산자 큐의 상한이 아니다. 수집이 늦으면
+		// 제출 작업과 페이지가 자라며, 캡처 보존 시에만 오래된 프레임을 정리한다.
+		m_maxChunkCount = config.max_chunk_count;
+		m_pool->initialize(config.chunk_count, m_maxChunkCount);
+		while (m_workSignal.try_acquire()) {}
+		m_pool->set_signal(&m_workSignal);
 		m_ring.configure(config.retained_frames, config.memory_budget);
 		m_frameBeginTick = now();
+		{
+			std::lock_guard<std::mutex> guard(m_workLock);
+			m_stopWorker = false;
+		}
 		m_initialized.store(true, std::memory_order_release);
+		m_collectorWorker = std::thread([this] { collector_loop(); });
+		m_collectorThread.store(m_collectorWorker.get_id(), std::memory_order_release);
 	}
 
 	void profiler_service::shutdown()
@@ -146,6 +170,14 @@ namespace ce
 		}
 
 		m_state.store(recorder_state::stopped, std::memory_order_release);
+		m_pool->set_signal(nullptr);
+		{
+			std::lock_guard<std::mutex> guard(m_workLock);
+			m_stopWorker = true;
+		}
+		m_workSignal.release();
+		if (m_collectorWorker.joinable()) m_collectorWorker.join();
+		m_controlAppliedCv.notify_all();
 
 		std::string abandonedNames;
 		{
@@ -177,17 +209,10 @@ namespace ce
 		// 프레임이 통째로 사라진다.
 		collect_sealed();
 
-		// ★ 놓아 둔 스트림이 있으면 풀을 접지 않는다. 접으면 청크 저장소가
-		//   사라져 아직 도는 writer 가 없어진 자리에 쓴다. 다음 initialize 가
-		//   새 풀을 세우므로, 이 풀은 놓아 둔 스트림과 함께 남는다.
-		if (0 == m_abandonedStreams.load(std::memory_order_relaxed))
-		{
-			m_pool->shutdown();
-		}
-		else
-		{
-			m_pool = std::make_shared<chunk_pool>();
-		}
+		// 얼린 캡처와 주인이 아직 살아 있는 스트림은 옛 풀의 페이지를
+		// 붙잡을 수 있다. 풀을 강제로 비우지 않고 새 서비스용 풀로 바꾼다.
+		// 마지막 페이지·스트림 참조가 사라질 때 옛 풀이 저절로 정리된다.
+		m_pool = std::make_shared<chunk_pool>();
 
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
@@ -198,12 +223,15 @@ namespace ce
 
 		// ★ 세대를 올린다. 다른 스레드의 thread_local 자리는 여기서 끊을 수
 		//   없으므로, 끊는 대신 **읽히지 않게** 한다.
-		m_slotEpoch = g_slotEpoch.fetch_add(1, std::memory_order_relaxed) + 1;
+		m_slotEpoch.store(g_slotEpoch.fetch_add(1, std::memory_order_relaxed) + 1,
+		                  std::memory_order_release);
 		m_collectorThread.store(std::thread::id{}, std::memory_order_release);
+		m_collectorOsThreadId.store(0, std::memory_order_release);
 
 		{
-			std::lock_guard<std::mutex> guard(m_controlLock);
-			m_controlQueue.clear();
+			std::lock_guard<std::mutex> guard(m_workLock);
+			m_workQueue.clear();
+			m_queuedFrames = 0;
 		}
 
 		// ★ 종료가 어떻게 끝났는지 **밖에서 읽을 수 있어야** 한다. 놓아 둔
@@ -295,7 +323,8 @@ namespace ce
 
 		auto stream = std::make_unique<thread_stream>(*m_pool, info);
 		stream->set_generation(m_generation.load(std::memory_order_acquire));
-		t_streams[m_serviceSlot] = tls_slot{ stream.get(), m_slotEpoch };
+		t_streams[m_serviceSlot] = tls_slot{
+			stream.get(), m_slotEpoch.load(std::memory_order_acquire) };
 
 		stream_entry entry;
 		entry.stream = std::move(stream);
@@ -348,7 +377,8 @@ namespace ce
 
 		// 세대가 다르면 이 자리는 **지난 서비스의 것**이다. 그 스트림은 이미
 		// 없어졌으므로 따라가면 use-after-free 다.
-		return (slot.epoch == m_slotEpoch) ? slot.stream : nullptr;
+		return (slot.epoch == m_slotEpoch.load(std::memory_order_acquire))
+			? slot.stream : nullptr;
 	}
 
 	thread_stream* profiler_service::current_stream()
@@ -419,7 +449,7 @@ namespace ce
 		thread_stream* stream = current_stream();
 		if (!stream) return;
 
-		stream->write_instant(id, now(), m_lastEngineFrame + 1);
+		stream->write_instant(id, now(), m_engineFrame.load(std::memory_order_relaxed));
 	}
 
 	void profiler_service::collect_sealed()
@@ -430,9 +460,41 @@ namespace ce
 			return;
 		}
 
-		m_ring.ingest(sealed, m_generation.load(std::memory_order_acquire),
-		              m_frameBeginTick);
-		m_pool->release(sealed);
+		ingest_pages(sealed, m_frameBeginTick);
+	}
+
+	void profiler_service::ingest_pages(event_chunk* sealed, profile_tick frame_begin_tick)
+	{
+		if (!sealed) return;
+		const profile_tick start = now();
+		m_ring.ingest(sealed, m_pool, m_generation.load(std::memory_order_acquire),
+		              frame_begin_tick);
+		m_collectorTiming.page_ingest_ticks += now() - start;
+		++m_collectorTiming.ingest_batches;
+	}
+
+	void profiler_service::close_frame(std::uint32_t engine_frame,
+	                                   profile_tick begin, profile_tick end)
+	{
+		const profile_tick start = now();
+		m_ring.close_frame(engine_frame, begin, end);
+		m_collectorTiming.frame_close_ticks += now() - start;
+		++m_collectorTiming.frames_closed;
+	}
+
+	void profiler_service::account_counter_queue_loss()
+	{
+		const std::uint64_t total = m_queueDroppedCounters.load(std::memory_order_relaxed);
+		for (std::uint64_t i = m_accountedCounterQueueDropped; i < total; ++i)
+			m_ring.note_dropped_counter();
+		m_accountedCounterQueueDropped = total;
+	}
+
+	void profiler_service::replenish_pages()
+	{
+		const profile_tick start = now();
+		m_pool->replenish(64, m_maxChunkCount);
+		m_collectorTiming.replenish_ticks += now() - start;
 	}
 
 	thread_stream* profiler_service::gpu_stream()
@@ -533,6 +595,69 @@ namespace ce
 		}
 	}
 
+	void profiler_service::publish_counter(std::uint32_t engine_frame,
+	                                       profile_counter_id id, double value)
+	{
+		if (!m_initialized.load(std::memory_order_acquire) ||
+		    m_state.load(std::memory_order_relaxed) != recorder_state::recording) return;
+		if (engine_frame < m_recordStartFrame.load(std::memory_order_acquire)) return;
+		if (!std::isfinite(value) ||
+		    (get_counter_mask() & counter_category_bit(id)) == 0) return;
+		collector_work work;
+		work.kind = work_kind::counter;
+		work.frame = engine_frame;
+		work.counter = { id, value };
+		work.generation = m_generation.load(std::memory_order_acquire);
+		{
+			std::lock_guard<std::mutex> guard(m_workLock);
+			if (m_stopWorker ||
+			    m_state.load(std::memory_order_acquire) != recorder_state::recording ||
+			    engine_frame < m_recordStartFrame.load(std::memory_order_acquire)) return;
+			try { m_workQueue.push_back(std::move(work)); }
+			catch (const std::bad_alloc&)
+			{
+				m_queueDroppedCounters.fetch_add(1, std::memory_order_relaxed);
+				return;
+			}
+		}
+		m_workSignal.release();
+	}
+
+	void profiler_service::publish_counters(std::uint32_t engine_frame,
+	                                        counter_category category,
+	                                        std::span<const profile_counter_sample> samples)
+	{
+		if (samples.empty() || !m_initialized.load(std::memory_order_acquire) ||
+		    m_state.load(std::memory_order_acquire) != recorder_state::recording ||
+		    engine_frame < m_recordStartFrame.load(std::memory_order_acquire) ||
+		    (get_counter_mask() & counter_bit(category)) == 0) return;
+		std::size_t queued = 0;
+		{
+			std::lock_guard<std::mutex> guard(m_workLock);
+			if (m_stopWorker ||
+			    m_state.load(std::memory_order_acquire) != recorder_state::recording ||
+			    engine_frame < m_recordStartFrame.load(std::memory_order_acquire)) return;
+			for (const profile_counter_sample sample : samples)
+			{
+				if (!std::isfinite(sample.value) ||
+				    counter_category_bit(sample.id) != counter_bit(category)) continue;
+				collector_work work;
+				work.kind = work_kind::counter;
+				work.frame = engine_frame;
+				work.counter = sample;
+				work.generation = m_generation.load(std::memory_order_acquire);
+				try { m_workQueue.push_back(std::move(work)); }
+				catch (const std::bad_alloc&)
+				{
+				m_queueDroppedCounters.fetch_add(1, std::memory_order_relaxed);
+				continue;
+				}
+				++queued;
+			}
+		}
+		if (queued != 0) m_workSignal.release(static_cast<std::ptrdiff_t>(queued));
+	}
+
 	void profiler_service::publish_frame(std::uint32_t engine_frame)
 	{
 		if (!m_initialized.load(std::memory_order_acquire))
@@ -540,29 +665,27 @@ namespace ce
 			return;
 		}
 
-		// ★ 여기가 수집기다. 이 자리를 표시해 두면 다른 스레드에서 들어온
-		//   제어 요청이 어디로 가야 하는지 정해진다.
-		m_collectorThread.store(std::this_thread::get_id(), std::memory_order_release);
-
-		// 줄에 선 제어 요청을 먼저 적용한다. 링을 만지는 것은 이 스레드뿐이다.
-		apply_control_requests();
-
-		// 얼리는 중이면 여기서 마무리한다. 줄에 요청이 남아 있지 않아도
-		// (부른 쪽이 앞절반만 하고 갔어도) 이 갈래가 끝을 맺는다.
-		if (m_state.load(std::memory_order_acquire) == recorder_state::pausing)
+		// 제어 요청과 프레임 경계의 순서를 고정한다. pause/clear 뒤에
+		// 오래 걸린 publish_frame 이 옛 프레임을 넣지 못하게 한다.
+		std::unique_lock<std::mutex> workGuard(m_workLock);
+		if (m_stopWorker) return;
+		const recorder_state current = m_state.load(std::memory_order_acquire);
+		if (current == recorder_state::pausing)
 		{
-			finish_pause();
+			// 프레임 제출자도 기록자다. 얼림 요청 뒤 다음 안전 지점이
+			// publish_frame 이면 자기 꼬리를 여기서 직접 넘긴다.
+			if (thread_stream* self = tls_stream())
+			{
+				self->freeze_self(m_freezeTick.load(std::memory_order_acquire));
+			}
 			return;
 		}
-
-		if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
+		if (current != recorder_state::recording)
 		{
 			return;
 		}
-
 		// 등록된 모든 스트림이 자기 청크를 봉인한다. 열린 스코프는 닫지
 		// 않는다 — 프레임을 넘는 구간을 잃지 않기 위해서다.
-		std::uint64_t dropped = 0;
 		thread_stream* const self = tls_stream();
 		{
 			std::lock_guard<std::mutex> guard(m_streamLock);
@@ -587,44 +710,189 @@ namespace ce
 				{
 					entry.stream->request_seal();
 				}
-				dropped += entry.stream->dropped_events();
 			}
 		}
-
-		collect_sealed();
-
+		// 이 경계까지 봉인된 청크만 함께 넘긴다. 소비자가 늦게 깨어나도
+		// 다음 프레임에 쓰인 청크를 앞 프레임으로 당겨 읽지 않는다.
+		event_chunk* sealed = m_pool->take_sealed();
+		// 호출자의 프레임 경계 시각을 사용한다. 소비자 스케줄링 지연을
+		// 프레임 길이로 잘못 기록하지 않는다.
 		const profile_tick tick = now();
-		// 누적 드롭에서 지난번까지의 몫을 빼 이번 프레임의 증분만 넘긴다.
-		const std::uint64_t total = dropped + m_retiredDropped.load(std::memory_order_relaxed);
-		if (total > m_ring.dropped_events())
+		m_engineFrame.store(engine_frame + 1, std::memory_order_relaxed);
+		auto drop_frame = [&]
 		{
-			m_ring.note_dropped(total - m_ring.dropped_events());
+			std::uint64_t lost = 0;
+			for (event_chunk* chunk = sealed; chunk; chunk = chunk->next)
+			{
+				lost += chunk->count;
+			}
+			m_queueDroppedEvents.fetch_add(lost, std::memory_order_relaxed);
+			m_droppedFrameBoundaries.fetch_add(1, std::memory_order_relaxed);
+			m_pendingGapTick.store(tick, std::memory_order_release);
+			m_pool->release(sealed);
+		};
+		if (m_maxQueuedFrames != 0 && m_queuedFrames >= m_maxQueuedFrames)
+		{
+			drop_frame();
+			return;
+		}
+		collector_work work;
+		work.kind = work_kind::frame;
+		work.frame = engine_frame;
+		work.tick = tick;
+		work.gap_before_tick = m_pendingGapTick.exchange(0, std::memory_order_acq_rel);
+		work.sealed = sealed;
+		try
+		{
+			m_workQueue.push_back(std::move(work));
+		}
+		catch (const std::bad_alloc&)
+		{
+			// 큐 자체를 더 늘릴 메모리가 없으면 해당 경계를 명시적으로 잃는다.
+			drop_frame();
+			return;
+		}
+		++m_queuedFrames;
+		m_workSignal.release();
+	}
+
+	void profiler_service::report_gpu_issue(std::uint32_t frame,
+		std::uint32_t lost_passes, bool collect_failed, const char* reason)
+	{
+		if (m_state.load(std::memory_order_relaxed) != recorder_state::recording) return;
+		if (lost_passes == 0 && !collect_failed) return;
+		if (lost_passes > 0)
+			m_gpuQueryOverflowPasses.fetch_add(lost_passes, std::memory_order_relaxed);
+		if (collect_failed)
+			m_gpuCollectFailures.fetch_add(1, std::memory_order_relaxed);
+		{
+			std::lock_guard<std::mutex> guard(m_gpuIssueLock);
+			m_gpuIssueLastFrame.store(frame, std::memory_order_relaxed);
+			m_gpuIssueLastError = reason ? reason : "";
+		}
+	}
+
+	void profiler_service::wait_until_idle()
+	{
+		if (!m_initialized.load(std::memory_order_acquire) || on_collector()) return;
+		auto completion = std::make_shared<std::promise<void>>();
+		std::future<void> finished = completion->get_future();
+		{
+			std::lock_guard<std::mutex> guard(m_workLock);
+			if (m_stopWorker) return;
+			collector_work work;
+			work.kind = work_kind::barrier;
+			work.completion = std::move(completion);
+			m_workQueue.push_back(std::move(work));
+			m_workSignal.release();
+		}
+		finished.wait();
+	}
+
+	void profiler_service::collect_frame(std::uint32_t engine_frame, profile_tick tick,
+	                                     profile_tick gap_before_tick, event_chunk* sealed)
+	{
+		if (m_firstRecordBoundaryPending)
+		{
+			// The requested start frame can already be behind the game thread.
+			// Only the first boundary actually collected defines the capture start.
+			m_recordStartFrame.store(engine_frame, std::memory_order_release);
+			m_ring.discard_deferred_counters_before(engine_frame);
+			m_firstRecordBoundaryPending = false;
+		}
+		const profile_tick started = now();
+		if (started >= tick) m_collectorTiming.queue_delay_ticks += started - tick;
+		++m_collectorTiming.queued_frames_started;
+		// 버린 프레임의 시간은 다음 살아남은 프레임에 더하지 않는다.
+		// 번호도 건너뛰므로 화면에서 구멍을 볼 수 있다.
+		if (gap_before_tick > m_frameBeginTick && gap_before_tick < tick)
+		{
+			m_frameBeginTick = gap_before_tick;
+		}
+		if (sealed)
+		{
+			ingest_pages(sealed, m_frameBeginTick);
+		}
+		std::uint64_t sourceDropped = m_queueDroppedEvents.load(std::memory_order_relaxed);
+		{
+			std::lock_guard<std::mutex> guard(m_streamLock);
+			for (const stream_entry& entry : m_streams)
+			{
+				if (entry.stream) sourceDropped += entry.stream->dropped_events();
+			}
+			sourceDropped += m_retiredDropped.load(std::memory_order_relaxed);
+		}
+		// producer·제출 큐 누락만 이전 절대값과 비교한다. 링의 손상 페이지
+		// 누락까지 기준에 섞으면 두 출처가 같은 수만큼 빠질 수 있다.
+		if (sourceDropped > m_accountedSourceDropped)
+		{
+			m_ring.note_dropped(sourceDropped - m_accountedSourceDropped);
+			m_accountedSourceDropped = sourceDropped;
 		}
 
-		m_ring.close_frame(engine_frame, m_frameBeginTick, tick);
+		account_counter_queue_loss();
+		close_frame(engine_frame, m_frameBeginTick, tick);
+		// Process-owned counters are sampled by the collector, never by the UI.
+		// Reuse the last sample between 100 ms polls so the graph remains continuous.
+		if ((get_counter_mask() & counter_bit(counter_category::process)) != 0 &&
+		    (m_lastProcessSampleTick == 0 ||
+		     tick - m_lastProcessSampleTick >= ticks_per_second() / 10))
+		{
+			const profile_tick providerStarted = now();
+			FILETIME created{}, exited{}, kernel{}, user{}, wall{};
+			auto as_u64 = [](const FILETIME& value) -> std::uint64_t
+			{
+				return (static_cast<std::uint64_t>(value.dwHighDateTime) << 32) |
+				       value.dwLowDateTime;
+			};
+			::GetSystemTimeAsFileTime(&wall);
+			if (::GetProcessTimes(::GetCurrentProcess(), &created, &exited, &kernel, &user))
+			{
+				const std::uint64_t cpu = as_u64(kernel) + as_u64(user);
+				const std::uint64_t elapsed = as_u64(wall);
+				if (m_lastProcessWall100ns != 0 && elapsed > m_lastProcessWall100ns &&
+				    cpu >= m_lastProcessCpu100ns)
+				{
+					const std::uint32_t cores = (std::max)(std::uint32_t{ 1 },
+						static_cast<std::uint32_t>(::GetActiveProcessorCount(ALL_PROCESSOR_GROUPS)));
+					m_processCpuPercent = (std::min)(100.0,
+						100.0 * static_cast<double>(cpu - m_lastProcessCpu100ns) /
+						(static_cast<double>(elapsed - m_lastProcessWall100ns) * cores));
+					m_hasProcessCpu = true;
+				}
+				m_lastProcessCpu100ns = cpu;
+				m_lastProcessWall100ns = elapsed;
+			}
+			PROCESS_MEMORY_COUNTERS memory{};
+			if (::K32GetProcessMemoryInfo(::GetCurrentProcess(), &memory, sizeof(memory)))
+			{
+				m_processRamMb = static_cast<double>(memory.WorkingSetSize) / (1024.0 * 1024.0);
+				m_hasProcessRam = true;
+			}
+			m_lastProcessSampleTick = tick;
+			const double providerUs = static_cast<double>(now() - providerStarted) * 1000000.0 /
+				static_cast<double>(ticks_per_second());
+			m_ring.record_counter(engine_frame, { profile_counter_id::provider_process_us, providerUs });
+		}
+		if ((get_counter_mask() & counter_bit(counter_category::process)) != 0 && m_hasProcessCpu)
+			m_ring.record_counter(engine_frame, { profile_counter_id::process_cpu_percent, m_processCpuPercent });
+		if ((get_counter_mask() & counter_bit(counter_category::process)) != 0 && m_hasProcessRam)
+			m_ring.record_counter(engine_frame, { profile_counter_id::process_ram_mb, m_processRamMb });
 		m_lastEngineFrame = engine_frame;
 
-		// 찍어 둔다. 읽는 쪽은 이 사본만 본다 — 링 자체는 수집기의 것이다.
-		publish_ring_stats();
 		m_frameBeginTick = tick;
 
 		// 녹화 중 공개. 보는 쪽이 청했을 때만, 정한 간격으로.
 		publish_live_capture(tick);
+		replenish_pages();
+		// 찍어 둔다. 읽는 쪽은 이 사본만 본다 — 링 자체는 수집기의 것이다.
+		publish_ring_stats();
 
-		// 다음 프레임 번호를 예측해 올린다. 밖이 실제로 그 번호를 주면
-		// 일치하고, 건너뛰더라도 다음 publish 가 라벨을 정확히 붙인다.
-		m_engineFrame.store(engine_frame + 1, std::memory_order_relaxed);
 	}
 
 	bool profiler_service::on_collector() const
 	{
-		const std::thread::id collector = m_collectorThread.load(std::memory_order_acquire);
-
-		// 아직 아무도 프레임을 닫은 적이 없으면 수집기가 없다. 기다릴 대상이
-		// 없으므로 부른 자리에서 하는 것이 맞다 — 프레임이 안 도는 검사용
-		// 서비스가 그 경우다.
-		if (collector == std::thread::id{}) return true;
-		return collector == std::this_thread::get_id();
+		return m_collectorThread.load(std::memory_order_acquire) == std::this_thread::get_id();
 	}
 
 	void profiler_service::dispatch_control(control_op op, std::uint32_t frame)
@@ -641,45 +909,110 @@ namespace ce
 			return;
 		}
 
-		// ★ **기다리지 않는다.** 부른 쪽이 완료를 기다리면 잠금 순서가 뒤집힌다:
-		//   UI 는 씬 잠금을 쥔 채 여기로 들어오고, 수집기는 같은 잠금을 통과해야
-		//   이 요청을 처리한다. 실측에서 상한 2,000 ms 를 다 쓰고도 적용되지
-		//   못한 채 돌아왔다(여전히 recording, 캡처 없음).
-		//
-		//   대신 pause 는 부르는 그 자리에서 **막을 수 있는 것을 다 막는다** —
-		//   상태를 pausing 으로 올리고, 자기 스트림은 자기가 잠근다. 수집기는
-		//   남은 응답만 확인해 공개한다.
+		if (!m_initialized.load(std::memory_order_acquire)) return;
+		std::uint64_t ticket = 0;
 		{
-			std::lock_guard<std::mutex> guard(m_controlLock);
-			m_controlQueue.push_back(control_request{ op, frame });
-			m_controlEnqueued.fetch_add(1, std::memory_order_acq_rel);
+			std::lock_guard<std::mutex> guard(m_workLock);
+			if (m_stopWorker || !m_initialized.load(std::memory_order_acquire)) return;
+			ticket = m_controlEnqueued.fetch_add(1, std::memory_order_acq_rel) + 1;
+			collector_work work;
+			work.kind = work_kind::control;
+			work.control = control_request{ op, frame };
+			work.control_ticket = ticket;
+			m_workQueue.push_back(std::move(work));
+			m_workSignal.release();
 		}
 		m_controlDeferred.fetch_add(1, std::memory_order_relaxed);
+
+		// 시작과 지우기는 반환 직후 상태를 읽는 호출자가 있다. pause 의
+		// 마무리만 다른 기록자의 응답을 기다릴 수 있으므로 비동기로 둔다.
+		if (op == control_op::record || op == control_op::clear)
+		{
+			std::unique_lock<std::mutex> guard(m_controlWaitLock);
+			m_controlAppliedCv.wait(guard, [this, ticket]
+			{
+				return m_controlApplied.load(std::memory_order_acquire) >= ticket
+					|| !m_initialized.load(std::memory_order_acquire);
+			});
+		}
 	}
 
-	void profiler_service::apply_control_requests()
+	void profiler_service::collector_loop()
 	{
-		std::vector<control_request> pending;
-		std::uint64_t applied = 0;
+		m_collectorOsThreadId.store(static_cast<std::uint32_t>(::GetCurrentThreadId()),
+		                            std::memory_order_release);
+		for (;;)
 		{
-			std::lock_guard<std::mutex> guard(m_controlLock);
-			if (m_controlQueue.empty()) return;
-			pending.swap(m_controlQueue);
-			applied = m_controlEnqueued.load(std::memory_order_acquire);
-		}
-
-		for (const control_request& request : pending)
-		{
-			switch (request.op)
+			const profile_tick waitStart = now();
+			m_workSignal.acquire();
+			m_collectorTiming.wait_ticks += now() - waitStart;
+			collector_work work;
+			event_chunk* pages = nullptr;
+			bool hasWork = false;
 			{
-			case control_op::record:       record_now(request.frame); break;
-			case control_op::pause:        pause_now();               break;
-			case control_op::clear:        clear_now();               break;
-			case control_op::finish_pause: finish_pause();            break;
+				std::lock_guard<std::mutex> guard(m_workLock);
+				if (m_workQueue.empty())
+				{
+					if (m_stopWorker) return;
+					// 프레임 작업과의 순서만 잠근 채 목록을 떼어 온다.
+					pages = m_pool->take_sealed();
+				}
+				else
+				{
+					work = std::move(m_workQueue.front());
+					m_workQueue.pop_front();
+					if (work.kind == work_kind::frame) --m_queuedFrames;
+					hasWork = true;
+				}
 			}
+			if (!hasWork)
+			{
+				if (pages)
+				{
+					ingest_pages(pages, m_frameBeginTick);
+					replenish_pages();
+					publish_ring_stats();
+				}
+				continue;
+			}
+			if (work.kind == work_kind::frame)
+			{
+				collect_frame(work.frame, work.tick, work.gap_before_tick, work.sealed);
+				continue;
+			}
+			if (work.kind == work_kind::counter)
+			{
+				if (work.generation == m_generation.load(std::memory_order_acquire))
+				{
+					if (work.frame >= m_recordStartFrame.load(std::memory_order_acquire))
+						m_ring.record_counter(work.frame, work.counter);
+				}
+				else m_ring.note_dropped_counter();
+				publish_ring_stats();
+				continue;
+			}
+			if (work.kind == work_kind::barrier)
+			{
+				collect_sealed();
+				replenish_pages();
+				publish_ring_stats();
+				work.completion->set_value();
+				continue;
+			}
+			switch (work.control.op)
+			{
+			case control_op::record:       record_now(work.control.frame); break;
+			case control_op::pause:        pause_now();                 break;
+			case control_op::clear:        clear_now();                 break;
+			case control_op::finish_pause: finish_pause();              break;
+			}
+			// 완료 조건과 wait()의 잠금이 같아야 검사 직후 통지를 놓치지 않는다.
+			{
+				std::lock_guard<std::mutex> guard(m_controlWaitLock);
+				m_controlApplied.store(work.control_ticket, std::memory_order_release);
+			}
+			m_controlAppliedCv.notify_all();
 		}
-
-		m_controlApplied.store(applied, std::memory_order_release);
 	}
 
 	void profiler_service::record(std::uint32_t first_frame)
@@ -738,7 +1071,14 @@ namespace ce
 			return;
 		}
 		m_engineFrame.store(first_frame, std::memory_order_relaxed);
+		m_recordStartFrame.store(first_frame, std::memory_order_release);
+		m_firstRecordBoundaryPending = true;
 		m_frameBeginTick = now();
+		m_lastProcessSampleTick = 0;
+		m_lastProcessCpu100ns = 0;
+		m_lastProcessWall100ns = 0;
+		m_hasProcessCpu = false;
+		m_hasProcessRam = false;
 
 		// 간격 계수기를 되돌린다. 녹화를 새로 열었는데 지난 회차의 시각이
 		// 남아 있으면 첫 스냅샷이 한 박자 늦게 선다.
@@ -830,14 +1170,37 @@ namespace ce
 		}
 
 		collect_sealed();
+		const profile_tick gap = m_pendingGapTick.exchange(0, std::memory_order_acq_rel);
+		if (gap > m_frameBeginTick && gap < freezeTick)
+		{
+			m_frameBeginTick = gap;
+		}
+		// 마지막 프레임 제출이 과부하로 버려졌어도 손실을 얼린 캡처에 남긴다.
+		std::uint64_t sourceDropped = m_queueDroppedEvents.load(std::memory_order_relaxed);
+		{
+			std::lock_guard<std::mutex> guard(m_streamLock);
+			for (const stream_entry& entry : m_streams)
+			{
+				if (entry.stream) sourceDropped += entry.stream->dropped_events();
+			}
+			sourceDropped += m_retiredDropped.load(std::memory_order_relaxed);
+		}
+		if (sourceDropped > m_accountedSourceDropped)
+		{
+			m_ring.note_dropped(sourceDropped - m_accountedSourceDropped);
+			m_accountedSourceDropped = sourceDropped;
+		}
 
 		// ★ 마지막 프레임을 닫는다. 닫지 않으면 마지막 publish_frame 이후에
 		//   모인 것 — pause 에서 잘라 남긴 열린 구간이 바로 그것이다 — 이
 		//   얼린 캡처에 들어가지 못한다. freeze() 는 닫힌 프레임만 본다.
+		account_counter_queue_loss();
 		if (m_ring.has_pending_events())
 		{
-			m_ring.close_frame(m_lastEngineFrame + 1, m_frameBeginTick, freezeTick);
-			m_lastEngineFrame = m_lastEngineFrame + 1;
+			const std::uint32_t tailFrame = (std::max)(
+				m_lastEngineFrame + 1, m_engineFrame.load(std::memory_order_relaxed));
+			close_frame(tailFrame, m_frameBeginTick, freezeTick);
+			m_lastEngineFrame = tailFrame;
 			m_frameBeginTick = freezeTick;
 		}
 
@@ -847,13 +1210,16 @@ namespace ce
 			threads = m_threadInfo;
 		}
 
-		publish_ring_stats();
+		const profile_tick snapshotStart = now();
 		capture_session_ptr frozen = m_ring.freeze(
 			threads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
 			m_capture = std::move(frozen);
 		}
+		m_collectorTiming.snapshot_ticks += now() - snapshotStart;
+		++m_collectorTiming.snapshots_built;
+		publish_ring_stats();
 
 		// 공개까지 끝난 뒤에야 frozen 이다. 그 전에는 pausing 이고, 읽는 쪽은
 		// "아직 손에 없다" 를 그 상태로 안다.
@@ -892,29 +1258,39 @@ namespace ce
 		m_liveCaptureRequested.store(false, std::memory_order_relaxed);
 
 		std::vector<thread_info> threads;
+		std::uint32_t unacked = 0;
 		{
 			std::lock_guard<std::mutex> guard(m_streamLock);
 			threads = m_threadInfo;
+			for (const stream_entry& entry : m_streams)
+			{
+				if (!entry.stream || !entry.stream->pending_work()) continue;
+				if (entry.stream->seal_ack() != entry.stream->seal_request()) ++unacked;
+			}
 		}
+		// ack 를 먼저 본 뒤 페이지를 거둔다. ack 가 선 페이지는 이미 seal
+		// 목록에 있으므로 이 순서라야 complete=true 가 실제 수집을 뜻한다.
+		// 아직 응답하지 않은 스레드가 있으면 스냅샷을 미확정으로 공개한다.
+		collect_sealed();
 
-		// ★ complete = true 다. 이 스냅샷은 **닫힌 프레임만** 담는다 — 열린
-		//   구간의 꼬리는 아직 어느 프레임에도 없으므로 빠진 것이 아니다.
-		//   pause 의 unacked 는 "봉인을 청했는데 응답이 없다" 는 뜻이고,
-		//   여기서는 아무도 봉인을 기다리지 않는다.
-		//
 		// ★ 가장 최근 몇 프레임은 **아직 확정이 아니다.** 늦게 오는 GPU
 		//   구간이 닫힌 프레임에 나중에 들어가기 때문이다(실측 제출→수집
 		//   최대 94 ms). 다음 스냅샷에 그것이 담긴다.
+		const profile_tick snapshotStart = now();
 		capture_session_ptr live = m_ring.freeze(
-			threads, capture_environment{ ticks_per_second() }, true, 0);
+			threads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);
 		{
 			std::lock_guard<std::mutex> guard(m_captureLock);
 			m_capture = std::move(live);
 		}
+		m_collectorTiming.snapshot_ticks += now() - snapshotStart;
+		++m_collectorTiming.snapshots_built;
 	}
 
 	void profiler_service::clear_now()
 	{
+		m_recordStartFrame.store(m_engineFrame.load(std::memory_order_acquire), std::memory_order_release);
+		m_firstRecordBoundaryPending = true;
 		// ★ 세대를 먼저 올린다. 이 뒤에 도착하는 옛 청크는 세대가 어긋나
 		//   수집기가 버린다 — 잠든 워커가 Clear **전에** 적은 것을 들고 깨어나
 		//   새 녹화에 섞는 것이 감사에서 재현된 결함이다.
@@ -941,6 +1317,32 @@ namespace ce
 		}
 
 		m_ring.clear();
+		m_accountedCounterQueueDropped = m_queueDroppedCounters.load(std::memory_order_relaxed);
+		m_lastProcessSampleTick = 0;
+		m_lastProcessCpu100ns = 0;
+		m_lastProcessWall100ns = 0;
+		m_hasProcessCpu = false;
+		m_hasProcessRam = false;
+		m_collectorTiming = {};
+		m_gpuQueryOverflowPasses.store(0, std::memory_order_relaxed);
+		m_gpuCollectFailures.store(0, std::memory_order_relaxed);
+		{
+			std::lock_guard<std::mutex> issueGuard(m_gpuIssueLock);
+			m_gpuIssueLastFrame.store(0, std::memory_order_relaxed);
+			m_gpuIssueLastError.clear();
+		}
+		m_pendingGapTick.store(0, std::memory_order_relaxed);
+		m_accountedSourceDropped = m_queueDroppedEvents.load(std::memory_order_relaxed);
+		{
+			std::lock_guard<std::mutex> guard(m_streamLock);
+			for (const stream_entry& entry : m_streams)
+			{
+				if (entry.stream) m_accountedSourceDropped += entry.stream->dropped_events();
+			}
+			m_accountedSourceDropped += m_retiredDropped.load(std::memory_order_relaxed);
+		}
+		m_droppedFrameBaseline.store(
+			m_droppedFrameBoundaries.load(std::memory_order_relaxed), std::memory_order_relaxed);
 		publish_ring_stats();
 
 		std::lock_guard<std::mutex> guard(m_captureLock);
@@ -963,10 +1365,14 @@ namespace ce
 		value.memory_bytes = m_ring.memory_bytes();
 		value.late_spans_placed = m_ring.late_spans_placed();
 		value.late_spans_dropped = m_ring.late_spans_dropped();
+		value.dropped_counters = m_ring.dropped_counters();
 		value.late_spans_waiting = m_ring.late_spans_waiting();
 		value.stale_chunks_dropped = m_ring.stale_chunks_dropped();
+		value.malformed_pages = m_ring.malformed_pages();
+		value.ingested_pages = m_ring.ingested_pages();
 		value.late_events_placed = m_ring.late_events_placed();
 		value.late_events_dropped = m_ring.late_events_dropped();
+		value.collector = m_collectorTiming;
 
 		std::lock_guard<std::mutex> guard(m_ringStatsLock);
 		m_ringStats = value;
@@ -993,15 +1399,20 @@ namespace ce
 			value.memory_bytes = m_ringStats.memory_bytes;
 			value.late_spans_placed = m_ringStats.late_spans_placed;
 			value.late_spans_dropped = m_ringStats.late_spans_dropped;
+			value.dropped_counters = m_ringStats.dropped_counters;
 			value.late_spans_waiting = m_ringStats.late_spans_waiting;
 			value.stale_chunks_dropped = m_ringStats.stale_chunks_dropped;
+			value.malformed_pages = m_ringStats.malformed_pages;
+			value.ingested_pages = m_ringStats.ingested_pages;
 			value.late_events_placed = m_ringStats.late_events_placed;
 			value.late_events_dropped = m_ringStats.late_events_dropped;
+			value.collector = m_ringStats.collector;
 		}
-		value.memory_budget = kDefaultMemoryBudget;
+		value.memory_budget = m_memoryBudget;
 		value.registered_markers = registered_marker_count();
 		value.free_chunks = m_pool->free_count();
 		value.chunk_count = m_pool->chunk_count();
+		value.page_pool_bytes = static_cast<std::size_t>(value.chunk_count) * sizeof(event_chunk);
 
 		std::uint64_t unbalanced = m_retiredUnbalanced.load(std::memory_order_relaxed);
 		std::uint64_t foreign = m_retiredForeign.load(std::memory_order_relaxed);
@@ -1021,6 +1432,21 @@ namespace ce
 		value.foreign_stream_touches = foreign;
 		value.abandoned_streams = m_abandonedStreams.load(std::memory_order_relaxed);
 		value.control_requests_deferred = m_controlDeferred.load(std::memory_order_relaxed);
+		{
+			std::lock_guard<std::mutex> guard(m_workLock);
+			value.collector_queued_frames = static_cast<std::uint32_t>(m_queuedFrames);
+		}
+		value.collector_dropped_frames =
+			m_droppedFrameBoundaries.load(std::memory_order_relaxed)
+			- m_droppedFrameBaseline.load(std::memory_order_relaxed);
+		value.collector_os_thread_id = m_collectorOsThreadId.load(std::memory_order_acquire);
+		value.gpu_query_overflow_passes = m_gpuQueryOverflowPasses.load(std::memory_order_relaxed);
+		value.gpu_collect_failures = m_gpuCollectFailures.load(std::memory_order_relaxed);
+		{
+			std::lock_guard<std::mutex> issueGuard(m_gpuIssueLock);
+			value.gpu_issue_last_frame = m_gpuIssueLastFrame.load(std::memory_order_relaxed);
+			value.gpu_issue_last_error = m_gpuIssueLastError;
+		}
 
 		value.pause_unacked_streams = m_pauseUnacked.load(std::memory_order_relaxed);
 		value.capture_complete = (0 == value.pause_unacked_streams);
@@ -1030,6 +1456,8 @@ namespace ce
 			if (m_capture)
 			{
 				value.total_events = m_capture->total_events();
+				value.capture_complete = m_capture->complete();
+				value.capture_unacked_streams = m_capture->unacked_streams();
 			}
 		}
 		return value;

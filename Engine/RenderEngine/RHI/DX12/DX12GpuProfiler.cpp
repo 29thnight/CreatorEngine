@@ -319,6 +319,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
         outTimings.queueBeginTicks = 0;
         outTimings.queueEndTicks = 0;
         outTimings.busyTicks = 0;
+        outTimings.overflowedPasses = 0;
         outTimings.droppedSlices = 0;
         outTimings.droppedSliceName.clear();
         outTimings.droppedSliceDeltaTicks = 0;
@@ -353,6 +354,10 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     outTimings.queueBeginTicks = 0;
     outTimings.queueEndTicks = 0;
     outTimings.busyTicks = 0;
+    const uint32_t reservedPasses =
+        m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed);
+    outTimings.overflowedPasses = reservedPasses > m_maxPassesPerFrame
+        ? reservedPasses - m_maxPassesPerFrame : 0;
     outTimings.droppedSlices = 0;
     outTimings.droppedSliceName.clear();
     outTimings.droppedSliceDeltaTicks = 0;
@@ -365,9 +370,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
 
     const uint32_t base = token.ringSlot * m_maxPassesPerFrame * 2;
     const size_t offset = static_cast<size_t>(base) * sizeof(uint64_t);
-    const uint32_t used = (std::min)(
-        m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed),
-        m_maxPassesPerFrame);
+    const uint32_t used = (std::min)(reservedPasses, m_maxPassesPerFrame);
     const size_t bytes = static_cast<size_t>(used) * 2 * sizeof(uint64_t);
 
     void* mapped = nullptr;

@@ -6,13 +6,15 @@
 //   chunk_pool   free 청크를 나눠 주고 되받는다. 봉인된 청크의 유일한 주인.
 //   thread_stream  writer 하나가 쓰는 현재 청크와 열린 스코프 스택.
 //
-// writer 는 자기 thread_stream 만 만지고, 수집기는 chunk_pool 의 sealed 목록만
-// 만진다. 옛 코어가 스레드 표를 순회하며 남의 TLS 를 읽던 자리가 여기서
-// 사라진다 — 수집기는 스레드를 순회하지 않는다.
+// writer 는 자기 thread_stream 만 만진다. 수집기는 pool 의 sealed 목록을
+// 소비하고 스트림의 원자적 응답 상태만 읽는다. 남의 TLS 나 현재 쓰는 청크를
+// 직접 읽던 옛 경로는 없다.
 #include <atomic>
+#include <climits>
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <semaphore>
 #include <string>
 #include <thread>
 #include <vector>
@@ -69,9 +71,8 @@ namespace ce
 	//   헤더에 두면 이 비교에 이빨이 있는지 물을 수단이 없다.
 	bool track_precedes(const thread_info& a, const thread_info& b);
 
-	// 청크를 나눠 주고 봉인된 것을 모은다. free 가 없으면 **막지 않고**
-	// drop 을 센다(§6.2) — 관측 도구가 관측 대상을 멈춰 세우면 그 수치는
-	// 이미 관측이 아니다.
+	// 청크를 나눠 주고 봉인된 것을 모은다. free 가 없으면 필요할 때
+	// 페이지를 확장한다. 명시적 상한 또는 할당 실패만 누락으로 남긴다.
 	class chunk_pool
 	{
 	public:
@@ -81,11 +82,14 @@ namespace ce
 		chunk_pool(const chunk_pool&) = delete;
 		chunk_pool& operator=(const chunk_pool&) = delete;
 
-		void initialize(std::uint32_t chunk_count);
+		void initialize(std::uint32_t chunk_count, std::uint32_t maximum_chunks);
 		void shutdown();
+		// 봉인 목록이 빈 상태에서 첫 페이지가 들어왔을 때만 깨운다.
+		// 종료 시 nullptr 로 끊어, 서비스보다 오래 사는 풀도 안전하게 남긴다.
+		void set_signal(std::counting_semaphore<INT_MAX>* signal);
 
-		// free 목록에서 하나 꺼낸다. 비어 있으면 nullptr — 호출자가 drop 을
-		// 센다. 절대 기다리지 않는다.
+		// free 목록에서 하나 꺼낸다. 비어 있으면 기록자가 페이지를 할당한다.
+		// 명시적 상한 또는 할당 실패 시에만 nullptr 를 반환한다.
 		event_chunk* acquire();
 
 		// writer 가 다 쓴 청크를 넘긴다. 이 호출 뒤 writer 는 그 포인터를
@@ -98,7 +102,11 @@ namespace ce
 		// 수집이 끝난 청크를 free 로 되돌린다.
 		void release(event_chunk* chunk_list);
 
-		std::uint32_t chunk_count() const { return m_chunkCount; }
+		// 보존 캡처가 페이지를 붙잡아도 writer 는 기다리지 않는다. 부족분은
+		// 수집 스레드가 미리 할당해 free 목록에 보충한다.
+		void replenish(std::uint32_t target_free, std::uint32_t maximum_chunks);
+
+		std::uint32_t chunk_count() const;
 		std::uint32_t free_count() const;
 
 	private:
@@ -110,6 +118,8 @@ namespace ce
 		event_chunk*  m_sealedTail = nullptr;
 		std::uint32_t m_chunkCount = 0;
 		std::uint32_t m_freeCount = 0;
+		std::uint32_t m_maximumChunks = 0;
+		std::counting_semaphore<INT_MAX>* m_signal = nullptr;
 	};
 
 	// 열린 스코프 하나. 깊이와 시작 시각을 들고 있다가 닫힐 때 이벤트가 된다.
@@ -207,7 +217,7 @@ namespace ce
 		// 수집기가 "지금 봉인해 달라" 고 **요청**만 한다. 실제 봉인은 주인
 		// 스레드가 자기 안전한 자리에서 한다.
 		//
-		// ★ 이것이 경계의 전부다. 수집기는 청크 포인터를 만지지 않는다.
+		// ★ 이것이 경계의 전부다. 수집기는 writer 의 현재 청크를 만지지 않는다.
 		// 열려 있는 구간을 그 시각에서 잘라 기록한다. 짝은 예약해 두므로
 		// 나중에 실제 end_scope 가 와도 **두 번 기록하지 않고 남의 구간도
 		// 닫지 않는다** — 깊이 상한을 넘겼을 때와 같은 기제다.

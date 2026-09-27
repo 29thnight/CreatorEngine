@@ -50,6 +50,15 @@ public:
     void ShutdownInterop();
 
     bool IsInitialized() const;
+    bool QueryVideoMemory(uint64_t& usedMB, uint64_t& budgetMB) const;
+    struct CounterSnapshot
+    {
+        uint64_t uploadBytes = 0;
+        uint64_t uploadOverflows = 0;
+        uint64_t descriptorAllocations = 0;
+        uint64_t descriptorOverflows = 0;
+    };
+    CounterSnapshot GetCounterSnapshot() const;
     bool BeginFrame(std::string& outError);
     void AbortFrame();
     bool EndFrame(std::string& outError);

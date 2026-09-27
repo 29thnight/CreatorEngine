@@ -2,6 +2,9 @@
 
 #include "../../Assets/ModelAssetGeneration.h"
 #include "../../Assets/ModelSidecarV2.h"
+#include "AuthoringCookedDocument.h"
+#include "AuthoringParsedDocument.h"
+#include "Sha256.h"
 
 #include <algorithm>
 #include <fstream>
@@ -127,7 +130,6 @@ namespace experiment::cooked
         }
         std::ranges::sort(files);
 
-        std::vector<std::byte> recordBytes;
         for (const std::filesystem::path& file : files)
         {
             const std::filesystem::path relative = file.lexically_relative(generationPath);
@@ -139,12 +141,10 @@ namespace experiment::cooked
                     + file.string());
                 return result;
             }
-            product.artifactBytes += exported.bytes.size();
             if (relative.generic_string().rfind("textures/", 0) == 0)
                 product.embeddedTextureBytes += exported.bytes.size();
             if (relative == std::filesystem::path("generation.asset"))
             {
-                recordBytes = exported.bytes;
                 product.recordArtifactPath = exported.artifactPath;
             }
             product.files.push_back(std::move(exported));
@@ -155,8 +155,64 @@ namespace experiment::cooked
             return result;
         }
 
-        Sha256Digest digest{};
+        // The library keeps human-readable authoring records. The packaged
+        // Player needs the same validated fields without a runtime text parse.
+        auto findFile = [&product](std::string_view suffix)
+        {
+            return std::ranges::find_if(product.files, [suffix](const auto& file)
+            { return file.artifactPath.ends_with(suffix); });
+        };
+        auto record = findFile("/generation.asset");
+        auto generationSidecar = findFile("/sidecar.meta");
+        if (record == product.files.end() || generationSidecar == product.files.end())
+        {
+            AddIssue(result, "generation", "generation record 또는 sidecar가 없다.");
+            return result;
+        }
+        auto encode = [&result](std::string_view text, std::vector<std::byte>& out,
+            const char* context)
+        {
+            std::string error;
+            const auto document = Authoring::ParsedDocument::ParseText(std::string(text), error);
+            if (!document || !Authoring::EncodeCookedDocument(document.Root(), out, error))
+            {
+                AddIssue(result, context, "CEDO 변환 실패: " + error);
+                return false;
+            }
+            return true;
+        };
+        const std::string sidecarSource{
+            reinterpret_cast<const char*>(generationSidecar->bytes.data()),
+            generationSidecar->bytes.size() };
+        if (!encode(sidecarSource, generationSidecar->bytes, "sidecar.meta")) return result;
+        Sha256Digest sidecarDigest{};
         std::string hashError;
+        if (!ComputeSha256(generationSidecar->bytes, sidecarDigest, hashError))
+        {
+            AddIssue(result, "sidecar.meta", "SHA-256 계산 실패: " + hashError);
+            return result;
+        }
+        std::string recordSource{
+            reinterpret_cast<const char*>(record->bytes.data()), record->bytes.size() };
+        constexpr std::string_view key = "sidecarFingerprint: ";
+        const std::size_t field = recordSource.find(key);
+        const std::size_t value = field == std::string::npos ? field : field + key.size();
+        const std::size_t end = field == std::string::npos ? field
+            : recordSource.find_first_of("\r\n", value);
+        if (field == std::string::npos || end == std::string::npos
+            || recordSource.find(key, end) != std::string::npos)
+        {
+            AddIssue(result, "generation.asset", "sidecarFingerprint 필드가 유일하지 않다.");
+            return result;
+        }
+        recordSource.replace(value, end - value, "sha256:" + Hash::ToHex(sidecarDigest));
+        if (!encode(recordSource, record->bytes, "generation.asset")) return result;
+
+        product.artifactBytes = 0;
+        for (const auto& file : product.files) product.artifactBytes += file.bytes.size();
+        const std::vector<std::byte>& recordBytes = record->bytes;
+
+        Sha256Digest digest{};
         if (!ComputeSha256(recordBytes, digest, hashError))
         {
             AddIssue(result, "generation.asset", "SHA-256 계산 실패: " + hashError);

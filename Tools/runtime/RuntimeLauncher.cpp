@@ -7,6 +7,7 @@
 #include <fstream>
 #include <string>
 #include "HostAbi.h"
+#include "CrashReporter.h"
 #include "../../Engine/Utility_Framework/EngineVersion.h"
 
 namespace
@@ -20,6 +21,9 @@ namespace
 
     int Run(int argc, wchar_t** argv, int show)
     {
+        // Crash reporting must run without loading the possibly broken engine DLL.
+        if (argc >= 2 && wcscmp(argv[1], L"--crash-reporter") == 0)
+            return RunCrashReporter(argc, argv);
         wchar_t executable[32768]{};
         const DWORD length = GetModuleFileNameW(nullptr, executable, 32768);
         if (!length || length >= 32768) return Fail(L"Cannot locate executable");

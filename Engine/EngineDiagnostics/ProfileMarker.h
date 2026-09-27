@@ -82,7 +82,13 @@ namespace ce
 	template <detail::fixed_string Name, marker_kind Kind = marker_kind::cpu_scope>
 	inline marker_id marker()
 	{
+		// 호출부의 profile_scope 가 Shipping 에서 빈 껍데기여도 생성자
+		// 인자는 평가된다. 슬롯을 여기서 끊어야 마커 등록까지 사라진다.
+#if CE_SHIPPING
+		return invalid_marker;
+#else
 		return detail::marker_slot<Name, Kind>::id;
+#endif
 	}
 
 	// 등록된 마커를 되읽는다. reader(UI·CLI·저장)만 쓴다 — hot path 에는

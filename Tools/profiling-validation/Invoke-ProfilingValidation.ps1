@@ -12,7 +12,7 @@
     자리에 무엇이 실제로 흘렀는지만 본다. 화면이 숫자를 만들지 않으므로 둘을
     나눌 수 있다.
 
-    ★ 네 라이브 축 모두 자극에 `profile.record` 를 명시한다(2026-09-22).
+    ★ 모든 라이브 축의 자극에 `profile.record` 를 명시한다(2026-09-23).
       부팅과 함께 기록을 열던 줄을 걷었으므로, 켜지 않으면 캡처가 비고 그러면
       이 게이트들이 **빈 캡처를 성공으로 읽는다.** Workers 는 그것을
       `scene.switch` **앞**에 둬야 한다.
@@ -30,7 +30,9 @@
               SceneActivated(길이 없는 사건)
     Window    프로파일러 창이 실제로 그려지는지(본문 마커가 캡처에 나타나는지),
               창을 닫아도 녹화가 계속되는지
-    Gpu       GPU 수집 장부 — 제출별 기록·정렬·귀속·레인·트랙 순서·종료 소유
+    Gpu       Scene/Game/동시 뷰·리사이즈·2-inflight·DX12 검증과 GPU 수집 장부
+    GpuLoss   Debug 질의 슬롯을 16개로 좁혀 누락이 Collector에 기록되는지 검증
+    Providers Resource 모듈 mask와 관리 GC/스크립트 마커의 동일 프레임 귀속
     Build     Debug|x64 빌드만 수행
 
 .EXAMPLE
@@ -39,7 +41,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("Stats", "Workers", "Window", "Gpu", "Build")]
+    [ValidateSet("Stats", "Workers", "Window", "Gpu", "GpuLoss", "Providers", "Memory", "Build")]
     [string]$Action = "Stats",
 
     [string]$Exe,
@@ -66,6 +68,7 @@ if (-not $Exe) {
 if (-not $OutputRoot) {
     $OutputRoot = Join-Path ([IO.Path]::GetTempPath()) "creator-profiling-validation"
 }
+$OutputRoot = [IO.Path]::GetFullPath($OutputRoot)
 $null = New-Item -ItemType Directory -Path $OutputRoot -Force
 
 function Find-MSBuild {
@@ -111,6 +114,7 @@ function Invoke-EngineScript {
         -WorkingDirectory $exeDir `
         -RedirectStandardOutput $outFile `
         -RedirectStandardError $errFile `
+        -WindowStyle Hidden `
         -PassThru
 
     if (-not $proc.WaitForExit($TimeoutSec * 1000)) {
@@ -344,6 +348,8 @@ function Invoke-Window {
     Write-Host ("  최근 {0}프레임의 ProfilerWindow  {1}건 (그중 프레젠테이션 스레드 {2})" -f
         $frame.data.frames.Count, $windowEvents, $onPresentation)
     Write-Host ("  같은 구간의 ProfilerTimeline  {0}건 (프레젠테이션 스레드)" -f $timelineEvents)
+    $renderThread = $closed.data.threads | Where-Object { $_.name -eq '[RenderThread]' } | Select-Object -First 1
+    Write-Host ("  창을 닫은 뒤 RenderThread 이벤트  {0}건" -f $(if ($renderThread) { $renderThread.capturedEvents } else { 0 }))
     Write-Host ("  등록 마커       {0}" -f $stats.data.registeredMarkers)
     Write-Host ("  창을 닫은 뒤 상태  {0}" -f $closed.data.state)
 
@@ -398,20 +404,50 @@ function Invoke-Gpu {
     # 라이브 렌더러는 프레임 수로 예열하지 않는다 — 첫 프레임이 slang reflect 로
     # 수십 초를 쓴다. render.live.wait 은 라이브 프레임 완료를 기다린다.
     $result = Invoke-EngineScript -Label "profile-gpu" -Commands @(
+        "editor.window ###Editor.GamePreview close"
+        "editor.viewport scene"
         "render.live.wait 300"
         "render.live.wait 400"
         "render.live.wait 400"
         "render.live.wait 400"
+        "editor.viewport"
+        "dx12.live status"
+        "editor.viewport game"
+        "wait 10"
+        "render.live.wait 400"
+        "render.live.wait 400"
+        "editor.viewport"
+        "dx12.live status"
+        "editor.viewport scene"
+        "editor.window ###Editor.GamePreview open"
+        "wait 10"
+        "render.live.wait 400"
+        "render.live.wait 400"
+        "editor.viewport"
+        "dx12.live status"
         "profile.record"
+        "render.live.wait 120"
+        "window.resize 1417 873"
+        "render.live.wait 120"
+        "render.live.wait 120"
+        "render.live.wait 120"
+        "render.live.wait 120"
+        "render.live.wait 120"
+        "render.live.wait 120"
+        "render.live.wait 120"
+        "render.live.wait 120"
+        "render.live.wait 120"
         "render.live.wait 120"
         "profile.pause"
         "dx12.live status"
-        "profile.frame"
+        "profile.stats"
+        "profile.frame gpu"
         "quit"
     )
 
-    $line = ($result.Combined -split "`n" |
-        Where-Object { $_ -match '"command"\s*:\s*"dx12\.live"' } | Select-Object -Last 1)
+    $liveLines = @($result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"dx12\.live"' })
+    $line = $liveLines | Select-Object -Last 1
     if (-not $line) {
         Write-Host "dx12.live 응답을 찾지 못했다. 전체 출력: $($result.OutFile)" -ForegroundColor Red
         return 1
@@ -424,6 +460,35 @@ function Invoke-Gpu {
     }
 
     $gpu = $live.data.gpu
+    $statsLine = ($result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"profile\.stats"' } | Select-Object -Last 1)
+    $profileStats = if ($statsLine) { $statsLine.Trim() | ConvertFrom-Json } else { $null }
+    $singleScene = if ($liveLines.Count -ge 4) {
+        $liveLines[0].Trim() | ConvertFrom-Json } else { $null }
+    $singleGame = if ($liveLines.Count -ge 4) {
+        $liveLines[1].Trim() | ConvertFrom-Json } else { $null }
+    $beforeResize = if ($liveLines.Count -ge 4) {
+        $liveLines[2].Trim() | ConvertFrom-Json } else { $null }
+    $viewportLines = @($result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"editor\.viewport"' })
+    $sceneDemand = if ($viewportLines.Count -ge 6) {
+        $viewportLines[1].Trim() | ConvertFrom-Json } else { $null }
+    $gameDemand = if ($viewportLines.Count -ge 6) {
+        $viewportLines[3].Trim() | ConvertFrom-Json } else { $null }
+    $multiDemand = if ($viewportLines.Count -ge 6) {
+        $viewportLines[5].Trim() | ConvertFrom-Json } else { $null }
+    $beforeResizeGeneration = if ($beforeResize) {
+        [int]$beforeResize.data.display.resizeGeneration } else { -1 }
+    $singleSceneActive = $null -ne $sceneDemand -and $sceneDemand.data.editorTarget
+    $singleSceneHasGame = $null -ne $sceneDemand -and $sceneDemand.data.gameTarget
+    $singleGameHasScene = $null -ne $gameDemand -and $gameDemand.data.editorTarget
+    $singleGameActive = $null -ne $gameDemand -and $gameDemand.data.gameTarget
+    $multiSceneDemand = $null -ne $multiDemand -and $multiDemand.data.editorTarget
+    $multiGameDemand = $null -ne $multiDemand -and $multiDemand.data.gameTarget
+    $validationModeLine = ($result.Combined -split "`n" |
+        Where-Object { $_ -match '\[DX12 검증\]' } | Select-Object -Last 1)
+    $validationMessages = @($result.Combined -split "`n" |
+        Where-Object { $_ -match '\[dx12\.live 검증\]|\[CORRUPTION\]|\[DRED\]' })
 
     # GPU 레인은 dx12.live 가 아니라 **캡처**에서 확인한다. 장부가 초록이어도
     # sink 를 아무도 걸지 않았으면 레인은 조용히 빈다.
@@ -433,6 +498,10 @@ function Invoke-Gpu {
     $gpuLaneFrames = 0
     $gpuLaneSkewed = 0
     $gpuLaneSeen = $false
+    $gpuViews = @{}
+    $gpuViewFrames = @{}
+    $gpuSubmissionViews = @{}
+    $gpuSubmissionConflicts = 0
 
     # §7.3 의 귀속과 트랙 순서.
     $gpuNoOrigin = 0        # 제출 번호가 0 인 GPU 구간
@@ -461,6 +530,30 @@ function Invoke-Gpu {
                             $submission = [int]$e.submission
                         }
                         if (0 -eq $submission) { $gpuNoOrigin++ }
+                        $view = if ($null -ne $e.PSObject.Properties['view']) {
+                            [int]$e.view } else { 0 }
+                        if ($view -gt 0) {
+                            $gpuViews[$view] = $true
+                            $frameKey = [string]$f.frame
+                            if (-not $gpuViewFrames.ContainsKey($frameKey)) {
+                                $gpuViewFrames[$frameKey] = @{}
+                            }
+                            if (-not $gpuViewFrames[$frameKey].ContainsKey($view)) {
+                                $gpuViewFrames[$frameKey][$view] = 0
+                            }
+                            $gpuViewFrames[$frameKey][$view] =
+                                [int]$gpuViewFrames[$frameKey][$view] + 1
+                        }
+                        if ($submission -gt 0) {
+                            $submissionKey = "$($f.frame):$submission"
+                            if ($gpuSubmissionViews.ContainsKey($submissionKey) -and
+                                $gpuSubmissionViews[$submissionKey] -ne $view) {
+                                $gpuSubmissionConflicts++
+                            }
+                            else {
+                                $gpuSubmissionViews[$submissionKey] = $view
+                            }
+                        }
                     }
                 }
 
@@ -486,18 +579,47 @@ function Invoke-Gpu {
         }
     }
 
+    $multiViewFrames = @($gpuViewFrames.Values | Where-Object {
+        $_.ContainsKey(1) -and $_.ContainsKey(2)
+    }).Count
+    $differentPassFrames = @($gpuViewFrames.Values | Where-Object {
+        $_.ContainsKey(1) -and $_.ContainsKey(2) -and $_[1] -ne $_[2]
+    }).Count
+
     Write-Host ""
     Write-Host "[profile.gpu] GPU 수집 장부"
     Write-Host ("  렌더한 프레임   {0}" -f $live.data.framesRendered)
     Write-Host ("  수집           {0}" -f $gpu.collects)
-    Write-Host ("  표가 낡아 거절  {0}" -f $gpu.mismatches)
+    Write-Host ("  수집 실패      {0}" -f $gpu.mismatches)
     Write-Host ("  패스           {0}개(이름) · {1}조각(raw) · 버린 조각 {2} · 길이 0 인 조각 {3}" -f
         $gpu.passCount, $gpu.sliceCount, $gpu.droppedSlices, $gpu.zeroLengthSlices)
     Write-Host ("  길이           이름합 {0:N4} · queueSpan {1:N4} · busy {2:N4} ms" -f
         $gpu.ms, $gpu.queueSpanMs, $gpu.busyMs)
     Write-Host ("  귀속           frame {0} · submission {1} · view {2}" -f $gpu.frame, $gpu.submission, $gpu.viewId)
-    Write-Host ("  누적 장부      버림 {0} · 길이 0 이 {1} · span 위반 {2} · 조각 부족 {3}" -f
-        $gpu.droppedTotal, $gpu.zeroLengthTotal, $gpu.spanViolations, $gpu.sliceUnderflows)
+    Write-Host ("  다중 뷰        Scene/Game {0}/{1} · 같은 프레임 {2} (서로 다른 조각 수 {3}) · 제출 충돌 {4} · 최대 인플라이트 {5}" -f
+        $live.data.display.scene.ready, $live.data.display.game.ready,
+        $multiViewFrames, $differentPassFrames,
+        $gpuSubmissionConflicts, $gpu.maxPendingSubmissions)
+    Write-Host ("  펜스 대기      인플라이트 상한으로 건너뛴 틱 {0}" -f $live.data.framesInFlight)
+    Write-Host ("  뷰 수요        Scene 모드 {0}/{1} · Game 모드 {2}/{3}" -f
+        $singleSceneActive, $singleSceneHasGame,
+        $singleGameHasScene, $singleGameActive)
+    Write-Host ("  리사이즈       generation {0} → {1} · Scene/Game 완료 {2}/{3}" -f
+        $beforeResizeGeneration,
+        $live.data.display.resizeGeneration,
+        $live.data.display.scene.completedResizeGeneration,
+        $live.data.display.game.completedResizeGeneration)
+    Write-Host ("  DX12 검증      {0} · 오류 메시지 {1}" -f
+        [string]$validationModeLine, $validationMessages.Count)
+    Write-Host ("  누적 장부      질의 초과 {0} · 버림 {1} · 길이 0 이 {2} · span 위반 {3} · 조각 부족 {4}" -f
+        $gpu.queryOverflowPasses, $gpu.droppedTotal, $gpu.zeroLengthTotal,
+        $gpu.spanViolations, $gpu.sliceUnderflows)
+    if ($profileStats) {
+        Write-Host ("  Collector 진단 질의 초과 {0} · 수집 실패 {1} · 마지막 프레임 {2}" -f
+            $profileStats.data.gpuQueryOverflowPasses,
+            $profileStats.data.gpuCollectFailures,
+            $profileStats.data.gpuIssueLastFrame)
+    }
     Write-Host ("  통합 축        표본 {0}회 · GPU {1:N0} Hz · CPU {2:N0} Hz · 못 옮긴 수집 {3}" -f
         $gpu.clockSamples, $gpu.clockGpuHz, $gpu.clockCpuHz, $gpu.unalignedCollects)
     Write-Host ("  표본 어긋남    직전 {0:N4} ms · 최대 {1:N4} ms" -f
@@ -514,13 +636,69 @@ function Invoke-Gpu {
 
     $failures = New-Object System.Collections.Generic.List[string]
     if ($live.data.ready -ne $true) { $failures.Add("파이프라인이 준비되지 않았다") }
+    if ($null -eq $singleScene -or $null -eq $sceneDemand -or
+        $singleScene.data.display.scene.ready -ne $true -or
+        $sceneDemand.data.mode -ne 'scene' -or
+        -not $singleSceneActive -or $singleSceneHasGame) {
+        $failures.Add("Scene 모드의 뷰 수요/GPU 렌더 타깃 검증 실패")
+    }
+    if ($null -eq $singleGame -or $null -eq $gameDemand -or
+        $singleGame.data.display.game.ready -ne $true -or
+        $gameDemand.data.mode -ne 'game' -or
+        -not $singleGameHasScene -or -not $singleGameActive) {
+        $failures.Add("Game 모드의 뷰 수요/GPU 렌더 타깃 검증 실패")
+    }
+    if (-not $multiSceneDemand -or -not $multiGameDemand) {
+        $failures.Add("동시 Scene/Game 뷰 수요가 없다")
+    }
+    if ($null -eq $beforeResize -or
+        $live.data.display.resizeGeneration -le $beforeResizeGeneration -or
+        $live.data.display.scene.completedResizeGeneration -ne $live.data.display.resizeGeneration -or
+        $live.data.display.game.completedResizeGeneration -ne $live.data.display.resizeGeneration) {
+        $failures.Add("리사이즈 전후 두 뷰의 완료 세대가 일치하지 않는다")
+    }
+    if ($validationModeLine -notmatch 'DebugLayer=on.*DRED=on') {
+        $failures.Add("DX12 Debug Layer와 DRED가 활성화되지 않았다: $validationModeLine")
+    }
+    if ($validationMessages.Count -ne 0) {
+        $failures.Add("DX12 검증/DRED 오류 메시지 $($validationMessages.Count)건: $($validationMessages[0])")
+    }
+    if ($live.data.display.scene.ready -ne $true -or $live.data.display.game.ready -ne $true) {
+        $failures.Add("Scene/Game 두 렌더 타깃이 함께 준비되지 않았다")
+    }
+    if (-not $gpuViews.ContainsKey(1) -or -not $gpuViews.ContainsKey(2) -or $multiViewFrames -le 0) {
+        $failures.Add("같은 프레임의 Scene/Game GPU 구간이 캡처에 모두 없다")
+    }
+    if ($differentPassFrames -le 0) {
+        $failures.Add("두 뷰의 조각 수가 다른 프레임이 없어 제출별 기록 혼동을 구분할 자극이 없다")
+    }
+    if ($gpuSubmissionConflicts -ne 0) {
+        $failures.Add("하나의 GPU 제출 번호가 서로 다른 뷰에 귀속됐다")
+    }
+    if ($gpu.maxPendingSubmissions -ne 2) {
+        $failures.Add("GPU 2-inflight 를 확인하지 못했다: 최대 $($gpu.maxPendingSubmissions)")
+    }
+    if ($live.data.framesInFlight -le 0) {
+        $failures.Add("미완료 펜스 때문에 다음 제출을 보류한 틱이 없다")
+    }
     if ($gpu.collects -le 0) {
         # 자극이 한 번도 닿지 않았다는 뜻이다. 나머지 단정은 전부 공백에서
         # 초록이 되므로 여기서 막는다.
         $failures.Add("GPU 수집이 0 회 - 자극이 수집 경로에 닿지 않았다")
     }
     if ($gpu.mismatches -ne 0) {
-        $failures.Add("표가 낡아 거절한 수집 $($gpu.mismatches)/$($gpu.collects) - 제출마다 기록이 갈라져 있지 않다")
+        $failures.Add("GPU 수집 실패 $($gpu.mismatches)/$($gpu.collects): $($gpu.lastError)")
+    }
+    if ($gpu.queryOverflowPasses -ne 0) {
+        $failures.Add("GPU 질의 슬롯 초과로 잃은 패스 $($gpu.queryOverflowPasses)개")
+    }
+    if ($null -eq $profileStats -or $null -eq $profileStats.data.PSObject.Properties['gpuQueryOverflowPasses'] -or
+        $null -eq $profileStats.data.PSObject.Properties['gpuCollectFailures']) {
+        $failures.Add("profile.stats에 GPU 손실 진단 필드가 없다")
+    }
+    elseif ($profileStats.data.gpuQueryOverflowPasses -ne 0 -or
+        $profileStats.data.gpuCollectFailures -ne 0) {
+        $failures.Add("녹화 Collector에 GPU 손실이 기록됐다")
     }
     if ($gpu.passCount -le 0) {
         $failures.Add("수집한 패스가 0 개 - 수치가 비어 있다")
@@ -670,6 +848,232 @@ function Invoke-Gpu {
     return 1
 }
 
+function Invoke-GpuLoss {
+    $previousLimit = $env:CREATOR_DX12_GPU_QUERY_LIMIT
+    try {
+        $env:CREATOR_DX12_GPU_QUERY_LIMIT = '16'
+        $result = Invoke-EngineScript -Label 'profile-gpu-loss' -Commands @(
+            'editor.window ###Editor.GamePreview open'
+            'render.live.wait 300'
+            'render.live.wait 400'
+            'render.live.wait 400'
+            'render.live.wait 400'
+            'profile.record'
+            'render.live.wait 120'
+            'render.live.wait 120'
+            'render.live.wait 120'
+            'profile.pause'
+            'dx12.live status'
+            'profile.stats'
+            'quit'
+        )
+    }
+    finally {
+        $env:CREATOR_DX12_GPU_QUERY_LIMIT = $previousLimit
+    }
+
+    $liveLine = $result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"dx12\.live"' } |
+        Select-Object -Last 1
+    $statsLine = $result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"profile\.stats"' } |
+        Select-Object -Last 1
+    if (-not $liveLine -or -not $statsLine) {
+        Write-Host "  실패           GPU 손실 장부 응답이 없다: $($result.OutFile)" -ForegroundColor Red
+        return 1
+    }
+    $live = $liveLine.Trim() | ConvertFrom-Json
+    $stats = $statsLine.Trim() | ConvertFrom-Json
+    $gpu = $live.data.gpu
+    $d = $stats.data
+
+    Write-Host ""
+    Write-Host "[profile.gpu-loss] 질의 슬롯 부족 자극"
+    Write-Host ("  수집           {0} · 실패 {1} · 렌더러 누락 {2}" -f
+        $gpu.collects, $gpu.mismatches, $gpu.queryOverflowPasses)
+    Write-Host ("  Collector      누락 {0} · 수집 실패 {1} · 마지막 프레임 {2} · 이유 {3}" -f
+        $d.gpuQueryOverflowPasses, $d.gpuCollectFailures,
+        $d.gpuIssueLastFrame, $d.gpuIssueLastError)
+
+    $failures = New-Object System.Collections.Generic.List[string]
+    if ($result.Combined -notmatch '\[GPU profiler\] query capacity 16') {
+        $failures.Add('Debug 질의 슬롯 16개 자극이 적용되지 않았다')
+    }
+    if ($gpu.collects -le 0 -or $gpu.queryOverflowPasses -le 0) {
+        $failures.Add('렌더러가 질의 초과를 관측하지 못했다')
+    }
+    if ($d.gpuQueryOverflowPasses -le 0 -or $d.gpuIssueLastFrame -le 0 -or
+        $d.gpuIssueLastError -notmatch 'GPU query slots exhausted') {
+        $failures.Add('녹화 Collector에 누락 건수·프레임·이유가 전달되지 않았다')
+    }
+    if ($gpu.mismatches -ne 0 -or $d.gpuCollectFailures -ne 0) {
+        $failures.Add('질의 초과를 수집 실패로 잘못 계상했다')
+    }
+    if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
+    if ($failures.Count -eq 0) {
+        Write-Host '  결과           통과' -ForegroundColor Green
+        return 0
+    }
+    foreach ($failure in $failures) {
+        Write-Host "  실패           $failure" -ForegroundColor Red
+    }
+    Write-Host "  전체 출력      $($result.OutFile)"
+    return 1
+}
+
+function Invoke-Providers {
+    $result = Invoke-EngineScript -Label "profile-providers" -Commands @(
+        "render.live.wait 300"
+        "profile.counter-mask resources off"
+        "profile.record"
+        "play"
+        "wait 12"
+        "profile.frame"
+        "profile.counter-mask resources on"
+        "wait 12"
+        "gc.collect"
+        "wait 3"
+        "profile.frame"
+        "profile.stats"
+        "quit"
+    )
+    $lines = @($result.Combined -split "`n" | Where-Object { $_ -match '"command"\s*:\s*"profile\.frame"' })
+    $collectLine = $result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"gc\.collect"' } | Select-Object -First 1
+    $playLine = $result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"play"' } | Select-Object -First 1
+    $failures = New-Object System.Collections.Generic.List[string]
+    if ($lines.Count -ne 2 -or -not $collectLine -or -not $playLine) {
+        Write-Host "  실패           제공자 검증 응답이 부족하다: $($result.OutFile)" -ForegroundColor Red
+        return 1
+    }
+    try {
+        $off = $lines[0].Trim() | ConvertFrom-Json
+        $on = $lines[1].Trim() | ConvertFrom-Json
+        $collect = $collectLine.Trim() | ConvertFrom-Json
+        $play = $playLine.Trim() | ConvertFrom-Json
+    }
+    catch {
+        Write-Host "  실패           제공자 응답 JSON 오류: $_" -ForegroundColor Red
+        return 1
+    }
+    $offCoverage = @($off.data.counterCoverage)
+    $onCoverage = @($on.data.counterCoverage)
+    $offGen2 = @($offCoverage | Where-Object { $_.id -eq 14 } | Select-Object -First 1)
+    $baselineGen2 = if ($offGen2.Count) { [double]$offGen2[0].lastValue } else { -1.0 }
+    $gcFrame = @($on.data.frames | Where-Object {
+        $frame = $_
+        $gc = @($frame.counters | Where-Object { $_.id -eq 14 -and $_.value -gt $baselineGen2 })
+        $markers = @($frame.threads | ForEach-Object { $_.events } |
+            Where-Object { $_.name -eq 'ScriptCore.PrePhysicsTick' -or $_.name -eq 'ScriptCore.PostPhysicsTick' })
+        $gc.Count -gt 0 -and $markers.Count -gt 0
+    } | Select-Object -First 1)
+    if ($play.status -ne 'succeeded' -or $collect.status -ne 'succeeded') {
+        $failures.Add("Play/GC 자극 실패: $($play.status)/$($collect.status)")
+    }
+    if (@($offCoverage | Where-Object { $_.id -in 18,19,20,21,25 }).Count -ne 0) {
+        $failures.Add('Resource 모듈 off 동안 값이 수집됐다')
+    }
+    foreach ($id in @(18,19,20,21,25)) {
+        if (@($onCoverage | Where-Object { $_.id -eq $id -and $_.samples -gt 0 }).Count -eq 0) {
+            $failures.Add("Resource 모듈 on 뒤 counter $id 가 없다")
+        }
+    }
+    if ($gcFrame.Count -eq 0) {
+        $failures.Add('강제 GC 뒤 증가한 Gen2 값과 ScriptCore 마커가 같은 프레임에 없다')
+    }
+    if (@($on.data.counterDescriptors | Where-Object { $_.id -eq 25 -and $_.name -eq 'Resource provider cost' }).Count -eq 0) {
+        $failures.Add('캡처가 Resource 제공자 어휘를 보존하지 않았다')
+    }
+    if ($off.data.droppedCounters -ne 0 -or $on.data.droppedCounters -ne 0) {
+        $failures.Add("제공자 캡처에서 counter 누락: off=$($off.data.droppedCounters), on=$($on.data.droppedCounters)")
+    }
+    if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
+    Write-Host "[profile.providers] Resource off/on · GC/스크립트 프레임"
+    Write-Host ("  Resource 표본  off={0} on={1} · GC 동시 프레임={2}" -f
+        @($offCoverage | Where-Object { $_.id -eq 25 }).Count,
+        @($onCoverage | Where-Object { $_.id -eq 25 }).Count,
+        $(if ($gcFrame.Count) { $gcFrame[0].frame } else { '없음' }))
+    if ($failures.Count -eq 0) {
+        Write-Host '  결과           통과' -ForegroundColor Green
+        return 0
+    }
+    foreach ($failure in $failures) { Write-Host "  실패           $failure" -ForegroundColor Red }
+    Write-Host "  전체 출력      $($result.OutFile)"
+    return 1
+}
+
+function Invoke-Memory {
+    $model = Join-Path $repoRoot "Dynamic_CPP\Assets\Models\Prim_Cube.glb"
+    if (-not (Test-Path $model)) {
+        Write-Host "[memory] 모델 fixture 가 없다: $model" -ForegroundColor Red
+        return 1
+    }
+    $modelPath = ($model -replace '\\', '/')
+    $result = Invoke-EngineScript -Label "memory-snapshots" -Commands @(
+        "model.loadcached $modelPath"
+        "wait $WarmupFrames"
+        "memory.capture"
+        "wait 4"
+        "memory.snapshot"
+        "memory.capture"
+        "wait 4"
+        "memory.snapshot"
+        "quit"
+    )
+    $lines = @($result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"memory\.snapshot"' })
+    $modelLine = $result.Combined -split "`n" |
+        Where-Object { $_ -match '"command"\s*:\s*"model\.loadcached"' } | Select-Object -First 1
+    if ($lines.Count -ne 2) {
+        Write-Host "[memory] 스냅샷 응답 2개가 없다: $($result.OutFile)" -ForegroundColor Red
+        return 1
+    }
+    try { $first = $lines[0].Trim() | ConvertFrom-Json; $second = $lines[1].Trim() | ConvertFrom-Json }
+    catch {
+        Write-Host "[memory] JSON 오류: $_" -ForegroundColor Red
+        return 1
+    }
+    $failures = New-Object System.Collections.Generic.List[string]
+    try { $modelResult = $modelLine.Trim() | ConvertFrom-Json }
+    catch { $modelResult = $null }
+    if (-not $modelResult -or $modelResult.status -ne 'succeeded') {
+        $failures.Add('모델 fixture 로드 실패')
+    }
+    foreach ($snapshot in @($first, $second)) {
+        if ($snapshot.status -ne 'succeeded' -or -not $snapshot.data.available -or $snapshot.data.pending) {
+            $failures.Add('스냅샷이 다음 GameThread 경계에서 완성되지 않았다')
+        }
+        if (-not $snapshot.data.processValid -or $snapshot.data.workingSetBytes -le 0 -or
+            $snapshot.data.privateCommitBytes -le 0) {
+            $failures.Add('OS 프로세스 메모리 표본이 없다')
+        }
+        if (-not $snapshot.data.crtHeapValid -or $snapshot.data.crtLiveBytes -le 0 -or
+            $snapshot.data.crtLiveBlocks -le 0) {
+            $failures.Add('Debug CRT live heap 표본이 없다')
+        }
+        if ($snapshot.data.regions -le 0 -or $snapshot.data.committedPrivateBytes -le 0) {
+            $failures.Add('가상 메모리 영역 표본이 없다')
+        }
+        if ($snapshot.data.objects -le 0) { $failures.Add('씬을 연 뒤 자산 객체가 없다') }
+        if ($snapshot.data.captureMs -le 0) { $failures.Add('수집 비용 표본이 없다') }
+    }
+    if ($second.data.serial -le $first.data.serial -or $second.data.frame -lt $first.data.frame) {
+        $failures.Add('두 스냅샷의 순서가 어긋났다')
+    }
+    if ($result.ExitCode -ne 0) { $failures.Add("종료 코드 $($result.ExitCode)") }
+    Write-Host ("[memory] frame {0} → {1} · 객체 {2} → {3} · 영역 {4} → {5} · 수집 {6:N2}/{7:N2} ms" -f
+        $first.data.frame, $second.data.frame, $first.data.objects, $second.data.objects,
+        $first.data.regions, $second.data.regions, $first.data.captureMs, $second.data.captureMs)
+    if ($failures.Count -eq 0) {
+        Write-Host '  결과           통과' -ForegroundColor Green
+        return 0
+    }
+    foreach ($failure in $failures) { Write-Host "  실패           $failure" -ForegroundColor Red }
+    Write-Host "  전체 출력      $($result.OutFile)"
+    return 1
+}
+
 function Invoke-Stats {
     # profile.frame 을 먼저 부르는 이유는 그 명령이 캡처를 **얼리기** 때문이다.
     # 얼린 캡처가 있어야 profile.stats 가 스레드마다 몇 건을 찍었는지 셀 수 있고,
@@ -734,7 +1138,19 @@ function Invoke-Stats {
     Write-Host ("  청크 풀         여유 {0} / {1}" -f $d.freeChunks, $d.chunkCount)
     Write-Host ("  캡처 메모리     {0:N2} MiB / {1:N0} MiB" -f ($d.memoryBytes / 1MB), ($d.memoryBudget / 1MB))
     Write-Host ("  누적 누락       이벤트 {0}" -f $d.totalDroppedEvents)
+    Write-Host ("  카운터 누락     {0}" -f $d.droppedCounters)
     Write-Host ("  불균형 스코프   {0}" -f $d.malformedScopes)
+    Write-Host ("  잘못된 페이지   {0}" -f $d.malformedPages)
+    Write-Host ("  수집 스레드     tid={0} / 대기 프레임 {1} / 버린 경계 {2}" -f
+        $d.collectorThreadId, $d.collectorQueuedFrames, $d.collectorDroppedFrames)
+    $collectorMs = 1000.0 / [double]$d.ticksPerSecond
+    Write-Host ("  수집 비용       페이지 {0:N3} / 프레임 {1:N3} / 캡처 {2:N3} ms" -f
+        ($d.collectorPageIngestTicks * $collectorMs),
+        ($d.collectorFrameCloseTicks * $collectorMs),
+        ($d.collectorSnapshotTicks * $collectorMs))
+    Write-Host ("  대기/지연       신호 {0:N3} / 제출 큐 {1:N3} ms" -f
+        ($d.collectorWaitTicks * $collectorMs),
+        ($d.collectorQueueDelayTicks * $collectorMs))
     Write-Host ("  스레드          {0}개" -f $d.threadCount)
     foreach ($t in $d.threads) {
         Write-Host ("    [{0}] {1,-24} tid={2,-7} 이벤트 {3}" -f
@@ -760,7 +1176,15 @@ function Invoke-Stats {
     if ($d.lastFrameEvents -le 0)     { $failures.Add("이벤트가 0이다 - 계측이 통째로 죽었다") }
     if ($d.registeredMarkers -le 0)   { $failures.Add("등록된 마커가 0이다 - 마커 등록이 끊겼다") }
     if ($d.malformedScopes -ne 0)     { $failures.Add("불균형 스코프 $($d.malformedScopes) - 스코프 짝이 깨졌다") }
+    if ($d.malformedPages -ne 0)      { $failures.Add("잘못된 수집 페이지 $($d.malformedPages)") }
     if ($d.freeChunks -le 0)          { $failures.Add("청크 풀이 고갈됐다 - 수집이 막히고 있다") }
+    if ($d.collectorThreadId -le 0)   { $failures.Add("전용 수집 스레드 ID 가 없다") }
+    $gameThread = $d.threads | Where-Object { $_.name -eq '[GameThread]' } | Select-Object -First 1
+    if ($gameThread -and $d.collectorThreadId -eq $gameThread.threadId) {
+        $failures.Add("수집기가 GameThread 에서 돌고 있다")
+    }
+
+    if ($d.collectorQueuedFrames -gt 256) { $failures.Add("수집 대기 프레임 상한을 넘었다") }
     if (-not ($d.threads | Where-Object { $_.name -eq '[GameThread]' })) {
         $failures.Add("[GameThread] 가 캡처에 없다")
     }
@@ -814,4 +1238,7 @@ switch ($Action) {
     "Workers" { exit (Invoke-Workers) }
     "Window"  { exit (Invoke-Window) }
     "Gpu"     { exit (Invoke-Gpu) }
+    "GpuLoss" { exit (Invoke-GpuLoss) }
+    "Providers" { exit (Invoke-Providers) }
+    "Memory" { exit (Invoke-Memory) }
 }

@@ -205,8 +205,9 @@ void Core::App::Initialize(CoreWindow& coreWindow)
         [](float p) { g_progressWindow->SetProgress(p); },
         []() { g_progressWindow->Close(); },
     };
-    BootProgress::Begin(BootProgress::kEditorBootSteps);
-    BootProgress::Step(L"Initializing Core...");
+    // 자동화 실행은 첫 프레임 예열을 건너뛰므로 표시할 단계도 하나 적다.
+    BootProgress::Begin(BootProgress::kEditorBootSteps - (EditorHasAutomationArgument() ? 1 : 0));
+    BootProgress::Step(L"Starting editor", L"Preparing core services");
 
 	// 덤프 종류 지정과 기록자 등록은 EngineBootstrap::InitializeRuntime이 이미 했다.
 	// 여기서 또 부르면 등록 로그가 두 번 찍히고, 무엇보다 '여기가 등록 지점'이라는
@@ -218,8 +219,9 @@ void Core::App::Initialize(CoreWindow& coreWindow)
 	// DX11 디바이스는 더 이상 만들어지지 않는다 — 씬은 EnhancedSceneRenderer가,
 	// 화면 출력은 ImGui DX12 셸이 각자 자기 디바이스를 세운다.
 
-    BootProgress::Step(L"Initializing Windows API...");
+    BootProgress::Step(L"Creating editor window", L"Registering window and input handlers");
     RegisterHandler(coreWindow);
+	BootProgress::Step(L"Creating editor host", L"Preparing the main editor session");
 	Load();
 	Run();
 }
@@ -374,7 +376,7 @@ void Core::App::WarmUpFirstRenderedFrame()
 {
 	if (EditorHasAutomationArgument()) return;
 
-	BootProgress::Step(L"Preparing renderer...");
+	BootProgress::Step(L"Preparing renderer", L"Waiting for the first scene view frame");
 
 	// 상한은 '예열이 실패해도 에디터는 뜬다'를 지키는 자다. 넘기면 예열
 	// 없이 예전과 같은 상태로 창을 띄운다 — 검정 씬뷰가 잠시 보일 뿐
@@ -382,19 +384,27 @@ void Core::App::WarmUpFirstRenderedFrame()
 	constexpr auto kWarmUpLimit = std::chrono::seconds(60);
 	const auto deadline = std::chrono::steady_clock::now() + kWarmUpLimit;
 
+	bool firstPass = true;
 	while (std::chrono::steady_clock::now() < deadline)
 	{
+		if (firstPass) BootProgress::Detail(L"Updating the scene for its first frame");
 		DataSystems->DrainQueuedAssetChanges();
 		m_main->Update();
 
 		// 넘길 뷰가 없으면 만들 그림도 없다. 여기서 기다리면 상한까지
 		// 헛돈다 — 카메라 없는 씬을 여는 실행이 그렇다.
+		if (firstPass) BootProgress::Detail(L"Submitting the first scene view frame");
 		if (0 == PublishRenderFrame()) return;
 
 		if (0 != EnhancedSceneRenderer::GetLiveDisplayTexture(
 				EnhancedLiveDisplayTarget::Editor).textureId)
 		{
 			return;
+		}
+		if (firstPass)
+		{
+			BootProgress::Detail(L"Waiting for the render thread to finish the first frame");
+			firstPass = false;
 		}
 
 		// RT가 완료한 슬롯을 표시로 승격하는 것은 다음 TickLive다. 잠깐
@@ -410,7 +420,7 @@ void Core::App::Run()
 	CoreWindow::GetForCurrentInstance()->InitializeTask([&]
 	{
 		m_main->Initialize();
-		BootProgress::Step(L"Initializing Input...");
+		BootProgress::Step(L"Initializing input", L"Connecting keyboard and mouse devices");
         InputManagement->Initialize(m_hWnd);
 		//InputActionManagers->LoadManager();
 		// ★ 첫 라이브 프레임은 로딩 화면 **뒤**에서 돌린다 (2026-09-14).

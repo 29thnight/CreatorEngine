@@ -331,6 +331,7 @@ struct EnhancedLiveGpuSpan
     double   queueSpanMs{ 0.0 };
     double   busyMs{ 0.0 };
     uint32_t sliceCount{ 0 };
+    uint32_t queryOverflowPasses{ 0 };
     uint32_t droppedSlices{ 0 };
 
     /// 버린 조각 중 첫 번째의 패스 이름. 비어 있으면 버린 것이 없다는 뜻이다.
@@ -404,6 +405,8 @@ struct EnhancedLiveGpuSpanSink
     void (*on_span)(const char* name, uint64_t beginCpuTick, uint64_t endCpuTick,
                     uint32_t engineFrameId, const EnhancedLiveGpuSpanOrigin& origin) = nullptr;
     void (*on_flush)() = nullptr;
+    void (*on_issue)(uint32_t engineFrameId, uint32_t lostPasses,
+                     bool collectFailed, const char* reason) = nullptr;
 };
 
 /// sink 를 건다. 렌더러가 서기 전에 걸어야 첫 수집부터 흐른다.
@@ -538,6 +541,7 @@ struct EnhancedLiveDebugSnapshot
     uint64_t framesRendered{ 0 };
     uint64_t framesIdle{ 0 };
     uint64_t framesInFlight{ 0 };
+    uint32_t gpuMaxPendingSubmissions{ 0 }; // 뷰 합산, 실제 펜스 미완 제출의 최대 수
     uint64_t publishedFrameId{ 0 };
     uint64_t consumedFrameId{ 0 };
     uint64_t sceneEpoch{ 0 };
@@ -559,11 +563,11 @@ struct EnhancedLiveDebugSnapshot
     double   cpuMs{ 0.0 };
     double   gpuMs{ 0.0 };
 
-    /// GPU 수집 장부. mismatches 가 0 이 아니면 그만큼의 수치가 **끝난 제출이
-    /// 아닌 다른 제출의 것**이다 — Collect() 가 token 을 안 받기 때문이고,
-    /// P4 가 GpuFrameToken 을 세우면 0 이어야 한다.
+    /// GPU 수집 장부. mismatches 가 0 이 아니면 Collect(token)이 그 제출의
+    /// 표를 확인하지 못해 수치를 거절한 횟수다.
     uint64_t gpuCollects{ 0 };
     uint64_t gpuCollectMismatches{ 0 };
+    uint64_t gpuQueryOverflowPasses{ 0 };
 
     /// 길이 셋의 관계를 **수집마다** 검산한 장부(§3.4).
     ///
@@ -759,12 +763,35 @@ namespace EnhancedSceneRenderer
     ///
     /// OnFrameBegin/OnFrameEnd 는 한 프레임 소비를 감싸며, 짝은 렌더러가
     /// RAII 로 묶어 보장한다(예외로 빠져나가도 닫힌다).
+    enum class RenderPhase : std::uint8_t
+    {
+        queue_idle, test_delay, state_lock_wait, proxy_sync, gpu_collect,
+        view_capture, view_render, begin_frame, resource_prepare, graph_build,
+        command_record, submit, completion
+    };
     struct RenderThreadHooks
     {
         void (*OnStart)() = nullptr;
         void (*OnStop)() = nullptr;
         void (*OnFrameBegin)() = nullptr;
         void (*OnFrameEnd)() = nullptr;
+		void (*OnPhaseBegin)(RenderPhase phase) = nullptr;
+		void (*OnPhaseEnd)() = nullptr;
+		// RenderThread owner sample; 0 budget means no supported measurement.
+		void (*OnVideoMemory)(std::uint32_t frame, std::uint64_t usedMB,
+		                      std::uint64_t budgetMB) = nullptr;
+		bool (*ShouldSampleCounters)() = nullptr;
+		struct Counters
+		{
+			std::uint64_t uploadBytes = 0;
+			std::uint64_t uploadOverflows = 0;
+			std::uint64_t descriptorAllocations = 0;
+			std::uint64_t descriptorOverflows = 0;
+			std::uint32_t draws = 0;
+			std::uint32_t batches = 0;
+			double providerCostUs = 0.0;
+		};
+		void (*OnCounters)(std::uint32_t frame, const Counters&) = nullptr;
     };
     void SetRenderThreadHooks(const RenderThreadHooks& hooks);
 

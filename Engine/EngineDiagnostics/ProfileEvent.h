@@ -79,7 +79,7 @@ namespace ce
 		std::uint32_t frame = 0;      // 이 구간이 **시작한** 엔진 프레임
 
 		// ★ 귀속은 이벤트가 들고 다닌다. 청크에만 두면 수집기가 이벤트를
-		//   프레임 벡터로 옮기는 순간 어느 스레드의 것인지 잃는다 —
+		//   프레임의 페이지 구간에 연결한 뒤 어느 스레드의 것인지 잃는다 —
 		//   그것이 옛 코어가 수집 시점에 스팬을 정렬해야 했던 이유이고,
 		//   그 정렬의 부등호 하나가 스레드를 통째로 사라지게 했다.
 		std::uint16_t thread_slot = 0;
@@ -131,11 +131,18 @@ namespace ce
 	// 게임 스레드는 여러 프레임에 한 번 봉인한다. 상수는 크게 잡아 문제를
 	// 숨기지 않는다(§6.2) — 부족하면 drop 이 아니라 봉인 빈도로 먼저 나타난다.
 	inline constexpr std::uint32_t kEventsPerChunk = 256;
+	inline constexpr std::uint32_t kProfilePageMagic = 0x43505246; // CPRF
+	inline constexpr std::uint16_t kProfilePageVersion = 1;
 
 	// writer 전용 저장소. 봉인 전에는 오직 자기 스레드만, 봉인 뒤에는 오직
 	// 수집기만 만진다. 두 시기가 겹치지 않는다는 것이 이 타입의 계약 전부다.
 	struct event_chunk
 	{
+		// 수집기가 페이지 경계에서 한 번 검사한다. 이는 같은 프로세스의
+		// native 페이지 계약이며 .ceprof 의 휴대용 파일 형식은 아니다.
+		std::uint32_t magic = kProfilePageMagic;
+		std::uint16_t version = kProfilePageVersion;
+		std::uint16_t event_bytes = sizeof(profile_event);
 		profile_event events[kEventsPerChunk]{};
 		std::uint32_t count = 0;
 
@@ -161,6 +168,9 @@ namespace ce
 
 		void reset(std::uint32_t slot, std::uint64_t seq)
 		{
+			magic = kProfilePageMagic;
+			version = kProfilePageVersion;
+			event_bytes = sizeof(profile_event);
 			count = 0;
 			late_ingest = false;
 			generation = 0;

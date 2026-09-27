@@ -379,6 +379,12 @@ void EnhancedRenderDebugWindow::Draw()
 		LabeledValue("CPU (record+submit)", buffer);
 		std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.gpuMs);
 		LabeledValue("GPU (queue total)", buffer);
+		ImGui::Text("GPU samples: %llu, rejected: %llu, query overflow: %llu",
+			static_cast<unsigned long long>(displayed.gpuCollects),
+			static_cast<unsigned long long>(displayed.gpuCollectMismatches),
+			static_cast<unsigned long long>(displayed.gpuQueryOverflowPasses));
+		if (!displayed.lastGpuCollectError.empty())
+			ImGui::TextWrapped("Last GPU collect error: %s", displayed.lastGpuCollectError.c_str());
 	}
 
 	// ── 패스별 GPU 시간 ──

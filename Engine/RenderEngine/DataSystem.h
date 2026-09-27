@@ -111,6 +111,7 @@ public:
 	job_handle LoadAssetBundleAsync(const AssetBundle& bundle);
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
+	[[nodiscard]] size_t SnapshotRetainedAssetCount() const;
 	void UnloadUnusedAssets();
 	//Resource Model — PHASE 3.75 MBC9: 모델의 유일한 런타임 표현은 immutable
 	// assets::ModelAssetGeneration이다(legacy Model·Assimp·역브리지·병행 핸들 은퇴).
@@ -284,6 +285,7 @@ public:
 	std::mutex m_textureMutex;
 	std::mutex m_materialMutex;
 	std::mutex m_fontMutex;
+	mutable std::mutex m_retainedAssetsMutex;
 
 	// I5-D5c1 — base 재질 자산의 저작 원본 캐시(GUID 키). legacy Materials
 	// 캐시와 별개다: 그쪽은 변환 산물이고 이쪽이 원본이다. 자체 뮤텍스를

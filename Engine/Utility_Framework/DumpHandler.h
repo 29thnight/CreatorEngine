@@ -238,8 +238,9 @@ inline file::path MakeDumpFilePath()
     GetLocalTime(&now);
 
     wchar_t stamp[64]{};
-    std::swprintf(stamp, std::size(stamp), L"_%04d%02d%02d_%02d%02d%02d",
-        now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond);
+    std::swprintf(stamp, std::size(stamp), L"_%04d%02d%02d_%02d%02d%02d_%lu",
+        now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond,
+        static_cast<unsigned long>(GetCurrentProcessId()));
 
     file::path result(PathFinder::DumpPath());
     result /= file::path(moduleFileName).filename().replace_extension(L"").wstring() + stamp + L".dmp";

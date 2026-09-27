@@ -147,8 +147,8 @@ $mutations = @(
         # 위 그래프가 244 프레임을 그리는 동안 아래는 한 칸만 그렸다.
         Name   = 'timeline-view-follows-selection'
         File   = 'ProfileReader.cpp'
-        Old    = "`t`tconst frame_aggregate& folded = window_aggregate();`r`n`t`tm_viewBegin = folded.tick_begin();"
-        New    = "`t`tconst frame_aggregate& folded = aggregate();`r`n`t`tm_viewBegin = folded.tick_begin();"
+        Old    = "`t`tconst frame_aggregate& folded = window_aggregate();`r`n`t`tm_viewEnd = folded.tick_end();"
+        New    = "`t`tconst frame_aggregate& folded = aggregate();`r`n`t`tm_viewEnd = folded.tick_end();"
         # ★ 예측은 kept-on-select 였는데 실제로는 이 절이 먼저 붉어진다 —
         #   시야가 선택을 따르는 순간 **처음 서는 자리부터** 창과 어긋난다.
         Expect = 'timeline-view/initial-end'
@@ -446,13 +446,13 @@ $mutations = @(
         # 늦게 온 CPU 구간을 수집한 프레임에 그냥 담는다.
         Name   = 'late-cpu-to-collecting-frame'
         File   = 'ProfileCapture.cpp'
-        Old    = "`t`t`t`t`tif (place_by_tick(value)) continue;`r`n"
-        New    = ""
+        Old    = "`t`t`t`t`t    && place_by_tick(value, page, i)) continue;"
+        New    = "`t`t`t`t`t    && false) continue;"
         Expect = 'late-cpu/frame'
         Why    = '수집한 프레임에 담으면 잠든 워커의 구간이 깨어난 프레임의 일처럼 보인다'
     },
 
-    # ── 단일 collector ────────────────────────────────────────────
+    # ── 전용 collector ────────────────────────────────────────────
     @{
         # 어느 스레드에서 불리든 그 자리에서 한다(예전 동작). 링을 수집기와
         # 다른 스레드가 함께 만진다.
@@ -461,19 +461,16 @@ $mutations = @(
         Old    = "`t`tif (on_collector())"
         New    = "`t`tif (true)"
         Expect = 'control-thread/deferred'
-        Why    = '링은 프레임 경계를 도는 스레드의 것이다 - 남이 직접 만지면 수집기와 겹친다'
+        Why    = '링은 전용 수집 스레드의 것이다 - 남이 직접 만지면 수집기와 겹친다'
     },
     @{
-        # 부른 쪽이 적용될 때까지 기다리게 되돌린다(직전 판의 동작).
-        #
-        # ★ UI 는 씬 잠금을 쥔 채 부르고 수집기는 같은 잠금을 통과해야 이
-        #   요청을 처리한다. 기다리는 순간 서로를 기다린다.
-        Name   = 'control-waits-for-apply'
+        # 전용 소비자가 프레임 청크를 링에 반영하지 않으면 기본 캡처가 붉어져야 한다.
+        Name   = 'collector-skips-frame'
         File   = 'ProfileService.cpp'
-        Old    = "`t`tm_controlDeferred.fetch_add(1, std::memory_order_relaxed);`r`n`t}"
-        New    = "`t`tm_controlDeferred.fetch_add(1, std::memory_order_relaxed);`r`n`r`n`t`tconst std::uint64_t seq = m_controlEnqueued.load(std::memory_order_acquire);`r`n`t`tconst auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2000);`r`n`t`twhile (m_controlApplied.load(std::memory_order_acquire) < seq`r`n`t`t       && std::chrono::steady_clock::now() < deadline)`r`n`t`t{`r`n`t`t`tstd::this_thread::yield();`r`n`t`t}`r`n`t}"
-        Expect = 'pause-nonblocking/fast'
-        Why    = '부른 쪽이 완료를 기다리면 UI 의 잠금과 수집기가 서로를 기다린다'
+        Old    = "`t`t`t`tcollect_frame(work.frame, work.tick, work.gap_before_tick, work.sealed);"
+        New    = "`t`t`t`tm_pool->release(work.sealed);"
+        Expect = 'basic/count'
+        Why    = '전용 스레드가 청크를 링에 넣지 않으면 프레임 수집이 사라진다'
     },
 
     # ── 종료 소유권 ───────────────────────────────────────────────
@@ -493,8 +490,8 @@ $mutations = @(
         # ★ 이 변이는 **죽을 수 있다.** 해제된 스트림으로 쓰기 때문이다.
         Name   = 'tls-ignores-epoch'
         File   = 'ProfileService.cpp'
-        Old    = "`t`treturn (slot.epoch == m_slotEpoch) ? slot.stream : nullptr;"
-        New    = "`t`t(void)m_slotEpoch;`r`n`t`treturn slot.stream;"
+        Old    = "slot.epoch == m_slotEpoch.load(std::memory_order_acquire)"
+        New    = "true"
         Expect = 'tls-epoch/'
         AllowCrash = $true
         Why    = '남의 스레드의 자리는 shutdown 이 끊을 수 없으므로 세대로 무효화해야 한다'
@@ -525,7 +522,7 @@ $mutations = @(
         # 제출→수집이 최대 54.6 ms 였으므로 GPU 일이 세 칸 뒤에 그려진다.
         Name   = 'gpu-span-to-pending'
         File   = 'ProfileCapture.cpp'
-        Old    = "`t`t`tif (sealed_list->late_ingest)"
+        Old    = "`t`t`tif (page->late_ingest)"
         New    = "`t`t`tif (false)"
         # 늦은 CPU 귀속이 생기면서(§0.5.16) 이 구간은 **끝난 시각** 규칙을 타고
         # 엉뚱한 칸에 앉는다. GPU 는 제출 프레임이 제 자리라 여전히 붉다.
@@ -774,6 +771,38 @@ $mutations = @(
         New    = "`t`t`t`t`tfresh.frame_appearances = node.frame_appearances;"
         Expect = 'flat-union/frames'
         Why    = '부분의 프레임 수를 더하면 전체의 프레임 수가 안 된다'
+    },
+    @{
+        Name   = 'gpu-issue-silent-overflow'
+        File   = 'ProfileService.cpp'
+        Old    = 'm_gpuQueryOverflowPasses.fetch_add(lost_passes, std::memory_order_relaxed);'
+        New    = 'm_gpuQueryOverflowPasses.fetch_add(0, std::memory_order_relaxed);'
+        Expect = 'gpu-issue/overflow'
+        Why    = '질의 슬롯 초과로 빠진 GPU 패스를 Collector에서 세지 않으면 불완전한 캡처가 정상으로 보인다'
+    },
+    @{
+        Name   = 'gpu-issue-silent-collect'
+        File   = 'ProfileService.cpp'
+        Old    = 'm_gpuCollectFailures.fetch_add(1, std::memory_order_relaxed);'
+        New    = 'm_gpuCollectFailures.fetch_add(0, std::memory_order_relaxed);'
+        Expect = 'gpu-issue/collect'
+        Why    = '리드백 실패가 Collector에서 사라지면 GPU 구간 누락을 구분할 수 없다'
+    },
+    @{
+        Name   = 'counter-registry-disabled-render'
+        File   = 'ProfileCapture.cpp'
+        Old    = 'if (number >= 6 && number <= 11) return counter_bit(counter_category::render);'
+        New    = 'if (number >= 6 && number <= 11) return counter_bit(counter_category::process);'
+        Expect = 'counter-registry/mask'
+        Why    = '꺼진 렌더 모듈의 counter가 녹화되면 mask가 비용과 값에 영향을 주지 못한다'
+    },
+    @{
+        Name   = 'counter-registry-file-vocabulary'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = '{ chunk_type::counter_descriptors, encode_counter_descriptors(capture) },'
+        New    = '{ chunk_type::counter_descriptors, std::vector<std::byte>{} },'
+        Expect = 'counter-registry/file'
+        Why    = '지표 이름을 파일에 담지 않으면 새 실행에서 숫자 ID의 의미가 사라진다'
     }
 )
 

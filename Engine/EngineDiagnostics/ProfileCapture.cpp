@@ -1,10 +1,204 @@
 #include "ProfileCapture.h"
 
 #include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <limits>
+#include <mutex>
 #include <utility>
 
 namespace ce
 {
+	namespace detail::counter_registry_impl
+	{
+		struct registry
+		{
+			std::mutex lock;
+			std::vector<capture_counter> entries{
+				{ profile_counter_id::process_cpu_percent, "CPU", "%", counter_category::process },
+				{ profile_counter_id::process_ram_mb, "RAM", "MB", counter_category::process },
+				{ profile_counter_id::gpu_vram_mb, "VRAM", "MB", counter_category::gpu },
+				{ profile_counter_id::lan_send_bytes_per_second, "LAN send", "B/s", counter_category::network },
+				{ profile_counter_id::lan_receive_bytes_per_second, "LAN receive", "B/s", counter_category::network },
+				{ profile_counter_id::upload_bytes, "Upload", "B", counter_category::render },
+				{ profile_counter_id::upload_overflows, "Upload rejected batches", "count", counter_category::render },
+				{ profile_counter_id::descriptor_allocations, "Descriptors", "count", counter_category::render },
+				{ profile_counter_id::descriptor_overflows, "Descriptor overflow", "count", counter_category::render },
+				{ profile_counter_id::draw_calls, "GBuffer draws", "count", counter_category::render },
+				{ profile_counter_id::batches, "GBuffer batches", "count", counter_category::render },
+				{ profile_counter_id::gc_gen0_collections, "GC Gen0", "count", counter_category::managed },
+				{ profile_counter_id::gc_gen1_collections, "GC Gen1", "count", counter_category::managed },
+				{ profile_counter_id::gc_gen2_collections, "GC Gen2", "count", counter_category::managed },
+				{ profile_counter_id::gc_heap_mb, "GC heap", "MB", counter_category::managed },
+				{ profile_counter_id::gc_fragmented_mb, "GC fragmented", "MB", counter_category::managed },
+				{ profile_counter_id::gc_pause_percent, "GC pause", "%", counter_category::managed },
+				{ profile_counter_id::resource_models, "Models", "count", counter_category::resources },
+				{ profile_counter_id::resource_materials, "Materials", "count", counter_category::resources },
+				{ profile_counter_id::resource_textures, "Textures", "count", counter_category::resources },
+				{ profile_counter_id::resource_proxies, "Render proxies", "count", counter_category::resources },
+				{ profile_counter_id::provider_process_us, "Process provider cost", "us", counter_category::process },
+				{ profile_counter_id::provider_render_us, "Render provider cost", "us", counter_category::render },
+				{ profile_counter_id::provider_gc_us, "GC provider cost", "us", counter_category::managed },
+				{ profile_counter_id::provider_resources_us, "Resource provider cost", "us", counter_category::resources },
+			};
+		};
+		registry& instance()
+		{
+			static registry value;
+			return value;
+		}
+	}
+
+	profile_counter_id register_counter(std::string_view name, std::string_view unit,
+	                                    counter_category category)
+	{
+		if (name.empty() || name.size() > 255 || unit.size() > 32)
+			return static_cast<profile_counter_id>(0);
+		auto& registry = detail::counter_registry_impl::instance();
+		std::lock_guard guard(registry.lock);
+		for (const auto& entry : registry.entries)
+			if (entry.name == name)
+				return entry.unit == unit && entry.category == category
+					? entry.id : static_cast<profile_counter_id>(0);
+		if (registry.entries.size() >= (std::numeric_limits<std::uint16_t>::max)())
+			return static_cast<profile_counter_id>(0);
+		const auto id = static_cast<profile_counter_id>(registry.entries.size() + 1);
+		registry.entries.push_back({ id, std::string(name), std::string(unit), category });
+		return id;
+	}
+
+	std::vector<capture_counter> snapshot_counters()
+	{
+		auto& registry = detail::counter_registry_impl::instance();
+		std::lock_guard guard(registry.lock);
+		return registry.entries;
+	}
+
+	counter_mask counter_category_bit(profile_counter_id id)
+	{
+		const auto number = static_cast<std::uint16_t>(id);
+		if (number >= 1 && number <= 2) return counter_bit(counter_category::process);
+		if (number == 3) return counter_bit(counter_category::gpu);
+		if (number >= 4 && number <= 5) return counter_bit(counter_category::network);
+		if (number >= 6 && number <= 11) return counter_bit(counter_category::render);
+		if (number >= 12 && number <= 17) return counter_bit(counter_category::managed);
+		if (number >= 18 && number <= 21) return counter_bit(counter_category::resources);
+		if (number == 22) return counter_bit(counter_category::process);
+		if (number == 23) return counter_bit(counter_category::render);
+		if (number == 24) return counter_bit(counter_category::managed);
+		if (number == 25) return counter_bit(counter_category::resources);
+		auto& registry = detail::counter_registry_impl::instance();
+		std::lock_guard guard(registry.lock);
+		if (number > 0 && number <= registry.entries.size())
+			return counter_bit(registry.entries[number - 1].category);
+		return 0;
+	}
+
+	const capture_counter* find_counter(std::span<const capture_counter> counters,
+	                                    profile_counter_id id)
+	{
+		const auto number = static_cast<std::uint16_t>(id);
+		if (number > 0 && number <= counters.size() && counters[number - 1].id == id)
+			return &counters[number - 1];
+		for (const auto& descriptor : counters)
+			if (descriptor.id == id) return &descriptor;
+		return nullptr;
+	}
+
+	const profile_event& frame_events::operator[](std::size_t index) const
+	{
+		assert(index < m_count);
+		std::size_t low = 0;
+		std::size_t high = m_segments.size();
+		while (low + 1 < high)
+		{
+			const std::size_t middle = low + (high - low) / 2;
+			if (m_segments[middle].begin <= index) low = middle;
+			else high = middle;
+		}
+		const segment& part = m_segments[low];
+		const std::size_t offset = part.offset + index - part.begin;
+		return part.page ? part.page->events[offset] : (*part.owned)[offset];
+	}
+
+	void frame_events::materialize()
+	{
+		if (m_segments.size() == 1 && m_segments[0].owned
+		    && m_segments[0].owned.use_count() == 1) return;
+		auto values = std::make_shared<std::vector<profile_event>>();
+		values->reserve(m_count);
+		for (const profile_event& value : *this) values->push_back(value);
+		m_segments.clear();
+		m_segments.push_back(segment{ {}, std::move(values), 0, 0,
+			static_cast<std::uint32_t>(m_count) });
+		m_memoryBytes = m_segments[0].owned->capacity() * sizeof(profile_event);
+	}
+
+	profile_event& frame_events::mutable_at(std::size_t index)
+	{
+		assert(index < m_count);
+		materialize();
+		return (*m_segments[0].owned)[index];
+	}
+
+	void frame_events::push_back(const profile_event& value)
+	{
+		if (m_segments.empty() || !m_segments.back().owned
+		    || m_segments.back().owned.use_count() != 1)
+		{
+			auto values = std::make_shared<std::vector<profile_event>>();
+			values->reserve(8);
+			m_memoryBytes += values->capacity() * sizeof(profile_event);
+			m_segments.push_back(segment{ {}, std::move(values), m_count, 0, 0 });
+		}
+		segment& last = m_segments.back();
+		const std::size_t before = last.owned->capacity();
+		last.owned->push_back(value);
+		m_memoryBytes += (last.owned->capacity() - before) * sizeof(profile_event);
+		++last.count;
+		++m_count;
+	}
+
+	void frame_events::resize(std::size_t count)
+	{
+		if (count == 0)
+		{
+			m_segments.clear();
+			m_count = m_memoryBytes = 0;
+			return;
+		}
+		materialize();
+		m_segments[0].owned->resize(count);
+		m_segments[0].count = static_cast<std::uint32_t>(count);
+		m_count = count;
+		m_memoryBytes = m_segments[0].owned->capacity() * sizeof(profile_event);
+	}
+
+	void frame_events::append_page(std::shared_ptr<const event_chunk> page,
+	                               std::uint32_t offset, std::uint32_t count)
+	{
+		if (!page || count == 0) return;
+		assert(offset + count <= page->count);
+		if (!m_segments.empty())
+		{
+			segment& last = m_segments.back();
+			if (last.page.get() == page.get() && last.offset + last.count == offset)
+			{
+				last.count += count;
+				m_count += count;
+				return;
+			}
+		}
+		bool firstReference = true;
+		for (const segment& existing : m_segments)
+		{
+			if (existing.page.get() == page.get()) { firstReference = false; break; }
+		}
+		m_segments.push_back(segment{ std::move(page), {}, m_count, offset, count });
+		m_count += count;
+		if (firstReference) m_memoryBytes += sizeof(event_chunk);
+	}
+
 	//-------------------------------------------------------------------------
 	// capture_session
 	//-------------------------------------------------------------------------
@@ -14,14 +208,23 @@ namespace ce
 	                                 std::vector<capture_marker> markers,
 	                                 capture_environment         environment,
 	                                 bool                        complete,
-	                                 std::uint32_t               unacked_streams)
+	                                 std::uint32_t               unacked_streams,
+	                                 std::uint64_t               dropped_counters,
+	                                 std::vector<capture_counter> counters)
 		: m_frames(std::move(frames))
 		, m_threads(std::move(threads))
 		, m_markers(std::move(markers))
+		, m_counters(std::move(counters))
 		, m_environment(environment)
+		, m_droppedCounters(dropped_counters)
 		, m_complete(complete)
 		, m_unackedStreams(unacked_streams)
 	{
+		if (m_counters.empty())
+		{
+			auto builtins = snapshot_counters();
+			m_counters.assign(builtins.begin(), builtins.begin() + (std::min)(builtins.size(), std::size_t{ 25 }));
+		}
 		for (const frame_record& frame : m_frames)
 		{
 			m_memoryBytes += frame.memory_bytes();
@@ -88,6 +291,8 @@ namespace ce
 	{
 		m_frames.clear();
 		m_pending = frame_record{};
+		m_deferredCounters.clear();
+		m_droppedCounters = 0;
 		m_memoryBytes = 0;
 		m_droppedEvents = 0;
 		m_lastFrameEvents = 0;
@@ -96,57 +301,93 @@ namespace ce
 		m_lateSpansPlaced = 0;
 		m_lateSpansDropped = 0;
 		m_staleChunksDropped = 0;
+		m_malformedPages = 0;
+		m_ingestedPages = 0;
 		m_lateEventsPlaced = 0;
 		m_lateEventsDropped = 0;
 	}
 
-	void capture_ring::ingest(const event_chunk* sealed_list, std::uint64_t generation,
-	                          profile_tick frame_begin_tick)
+	void capture_ring::ingest(event_chunk* sealed_list, std::shared_ptr<chunk_pool> pool,
+	                          std::uint64_t generation, profile_tick frame_begin_tick)
 	{
 		while (sealed_list)
 		{
-			// ★ 지운 세대의 것은 받지 않는다. 잠든 워커가 Clear **전에** 적은
-			//   것을 들고 깨어나면, 그것은 이미 없어진 녹화의 자료다.
-			if (sealed_list->generation != generation)
+			event_chunk* const next = sealed_list->next;
+			sealed_list->next = nullptr;
+			// 캡처가 이 페이지의 마지막 참조를 놓아야 free 목록에 돌아간다.
+			// 풀도 함께 붙잡으므로 서비스 종료 뒤의 얼린 캡처가 안전하다.
+			std::shared_ptr<const event_chunk> page(sealed_list,
+				[pool](const event_chunk* value)
+				{
+					pool->release(const_cast<event_chunk*>(value));
+				});
+			if (page->magic != kProfilePageMagic || page->version != kProfilePageVersion
+			    || page->event_bytes != sizeof(profile_event)
+			    || page->count > kEventsPerChunk)
 			{
-				m_staleChunksDropped += sealed_list->count;
-				sealed_list = sealed_list->next;
+				++m_malformedPages;
+				note_dropped((std::min)(page->count, kEventsPerChunk));
+				sealed_list = next;
 				continue;
 			}
+			// ★ 지운 세대의 것은 받지 않는다. 잠든 워커가 Clear **전에** 적은
+			//   것을 들고 깨어나면, 그것은 이미 없어진 녹화의 자료다.
+			if (page->generation != generation)
+			{
+				m_staleChunksDropped += page->count;
+				sealed_list = next;
+				continue;
+			}
+			++m_ingestedPages;
 
-			if (sealed_list->late_ingest)
+			if (page->late_ingest)
 			{
 				// ★ 늦게 온 것은 **수집한 프레임**이 아니라 제 프레임 칸으로
 				//   돌려보낸다. 이 갈래가 없으면 GPU 일이 세 칸 뒤에 그려진다.
-				for (std::uint32_t i = 0; i < sealed_list->count; ++i)
+				for (std::uint32_t i = 0; i < page->count; ++i)
 				{
-					place_late_span(sealed_list->events[i]);
+					place_late_span(page->events[i], page, i);
 				}
-				sealed_list = sealed_list->next;
+				sealed_list = next;
 				continue;
 			}
 
-			// 청크 안의 순서는 writer 가 지켰다. 여기서는 그대로 잇는다 —
-			// 수집 시점에 정렬하지 않는 것이 이 설계의 요점이다.
+			// 청크 안의 순서는 writer 가 지켰다. 대부분의 페이지는 전부
+			// 현재 프레임이므로 인덱스 하나로 붙이고 이벤트를 복사하지 않는다.
 			//
 			// ★ 다만 **지금 프레임보다 앞서 끝난** 이벤트는 그대로 두면 안 된다.
 			//   writer 가 자기 일정으로 봉인하므로 CPU 구간도 늦게 올 수 있고,
 			//   늦은 것을 여기 담으면 프레임 귀속이 그만큼 틀어진다(§0.5.15).
-			for (std::uint32_t i = 0; i < sealed_list->count; ++i)
+			bool allCurrent = true;
+			for (std::uint32_t i = 0; i < page->count; ++i)
 			{
-				const profile_event& value = sealed_list->events[i];
-				if (0 != frame_begin_tick && value.tick_end < frame_begin_tick)
+				if (0 != frame_begin_tick && page->events[i].tick_end < frame_begin_tick)
 				{
-					if (place_by_tick(value)) continue;
+					allCurrent = false;
+					break;
 				}
-				m_pending.events.push_back(value);
 			}
-
-			sealed_list = sealed_list->next;
+			if (allCurrent)
+			{
+				m_pending.events.append_page(page, 0, page->count);
+			}
+			else
+			{
+				for (std::uint32_t i = 0; i < page->count; ++i)
+				{
+					const profile_event& value = page->events[i];
+					if (0 != frame_begin_tick && value.tick_end < frame_begin_tick
+					    && place_by_tick(value, page, i)) continue;
+					m_pending.events.append_page(page, i, 1);
+				}
+			}
+			sealed_list = next;
 		}
 	}
 
-	bool capture_ring::place_by_tick(const profile_event& value)
+	bool capture_ring::place_by_tick(const profile_event& value,
+	                                 const std::shared_ptr<const event_chunk>& page,
+	                                 std::uint32_t offset)
 	{
 		// 뒤에서부터 찾는다. 늦게 오는 것은 대개 가장 최근 몇 프레임의 것이다.
 		for (std::size_t i = m_frames.size(); i > 0; --i)
@@ -159,7 +400,7 @@ namespace ce
 			if (value.tick_end < frame.tick_begin) continue;
 
 			const std::size_t before = frame.memory_bytes();
-			frame.events.push_back(value);
+			frame.events.append_page(page, offset, 1);
 			m_memoryBytes += frame.memory_bytes() - before;
 			++m_lateEventsPlaced;
 			return true;
@@ -171,7 +412,9 @@ namespace ce
 		return true;
 	}
 
-	void capture_ring::place_late_span(const profile_event& value)
+	void capture_ring::place_late_span(const profile_event& value,
+	                                   const std::shared_ptr<const event_chunk>& page,
+	                                   std::uint32_t offset)
 	{
 		// 뒤에서부터 찾는다. 늦게 오는 것은 대개 가장 최근 몇 프레임의 것이고,
 		// 실측에서 제출→수집이 최대 54.6 ms(세 프레임 남짓)였다.
@@ -181,7 +424,8 @@ namespace ce
 			if (frame.engine_frame != value.frame) continue;
 
 			const std::size_t before = frame.memory_bytes();
-			frame.events.push_back(value);
+			if (page) frame.events.append_page(page, offset, 1);
+			else frame.events.push_back(value);
 			m_memoryBytes += frame.memory_bytes() - before;
 			++m_lateSpansPlaced;
 			return;
@@ -235,12 +479,69 @@ namespace ce
 		m_memoryBytes += m_pending.memory_bytes();
 		m_frames.push_back(std::move(m_pending));
 		m_pending = frame_record{};
+		for (auto it = m_deferredCounters.begin(); it != m_deferredCounters.end();)
+		{
+			if (it->frame == engine_frame)
+			{
+				record_counter(it->frame, it->sample);
+				it = m_deferredCounters.erase(it);
+			}
+			else if (it->frame < engine_frame)
+			{
+				++m_droppedCounters;
+				it = m_deferredCounters.erase(it);
+			}
+			else ++it;
+		}
 
 		// 방금 프레임 하나가 닫혔다. 그 프레임을 기다리던 구간이 있으면
 		// 지금 들어간다 — 닫히기 **전에** 온 것들의 자리가 여기다.
 		drain_deferred_spans();
 
 		trim();
+	}
+
+	void capture_ring::record_counter(std::uint32_t engine_frame, profile_counter_sample sample)
+	{
+		if (static_cast<std::uint16_t>(sample.id) == 0 || !std::isfinite(sample.value))
+		{
+			++m_droppedCounters;
+			return;
+		}
+		for (auto it = m_frames.rbegin(); it != m_frames.rend(); ++it)
+		{
+			if (it->engine_frame != engine_frame) continue;
+			for (auto& existing : it->counters)
+			{
+				if (existing.id == sample.id) { existing.value = sample.value; return; }
+			}
+			const std::size_t before = it->memory_bytes();
+			it->counters.push_back(sample);
+			m_memoryBytes += it->memory_bytes() - before;
+			return;
+		}
+		if (!m_frames.empty() && engine_frame < m_frames.front().engine_frame)
+		{
+			++m_droppedCounters;
+			return;
+		}
+		if (!m_frames.empty() && engine_frame <= m_frames.back().engine_frame)
+		{
+			++m_droppedCounters; // frame boundary was skipped
+			return;
+		}
+		if (m_deferredCounters.size() >= 4096) { ++m_droppedCounters; return; }
+		m_deferredCounters.push_back({ engine_frame, sample });
+	}
+
+	void capture_ring::discard_deferred_counters_before(std::uint32_t engine_frame)
+	{
+		// Record may be requested while the game thread advances. Samples from
+		// submissions older than the first boundary never belonged to this capture.
+		std::erase_if(m_deferredCounters, [engine_frame](const deferred_counter& sample)
+		{
+			return sample.frame < engine_frame;
+		});
 	}
 
 	void capture_ring::trim()
@@ -283,8 +584,8 @@ namespace ce
 	                                         capture_environment environment,
 	                                         bool complete, std::uint32_t unacked_streams) const
 	{
-		// 복사해서 넘긴다. 이 복사가 reader 를 recorder 에서 떼어 내는 값이고,
-		// 얼린 뒤 엔진이 계속 돌아도 손에 든 자료가 변하지 않는 이유다.
+		// 프레임 인덱스와 페이지 참조만 복사한다. 이벤트 본문은 봉인된
+		// 페이지에 남으므로 라이브 스냅샷을 반복해도 본문을 다시 복사하지 않는다.
 		std::vector<frame_record> frames(m_frames.begin(), m_frames.end());
 		std::vector<thread_info>  thread_list(threads.begin(), threads.end());
 
@@ -293,6 +594,6 @@ namespace ce
 		//   표 없이는 제 이름을 말할 수 없다.
 		return std::make_shared<const capture_session>(
 			std::move(frames), std::move(thread_list), snapshot_markers(),
-			environment, complete, unacked_streams);
+			environment, complete, unacked_streams, m_droppedCounters, snapshot_counters());
 	}
 }

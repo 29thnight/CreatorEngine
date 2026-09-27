@@ -1,5 +1,12 @@
 # Scriptable Render Pipeline · Custom Pass 설계 (PHASE 4.75)
 
+> **2026-09-23 이력 문서.** 아래 Asset-first Pipeline Inspector 정본, `SRP-0~6`의
+> 33일 산정과 PHASE 4.75 소속은 현재 실행 계획이 아니다. 새 정본은
+> [`RenderPipelineTargetArchitecture.md`](../design/RenderPipelineTargetArchitecture.md),
+> [`CSharpRenderPipelinePlan.md`](CSharpRenderPipelinePlan.md),
+> [`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)다. 과거 판단·측정 근거와 기존 링크를
+> 보존하기 위해 본문은 당시 상태로 남긴다.
+
 2026-08-16 최초 작성, 2026-08-24 Asset-first 작성 모델로 개정, 2026-08-28 리소스
 의존성 스케줄링 트랙 RG를 확정. 2026-09-03 PHASE 4.75로 이동하면서 현재 PBR 배선과
 Blender Material Graph를 별도 완료선으로 분리했다.
@@ -762,8 +769,10 @@ Graph 동등성 밖의 renderer task `RND-1~RND-3`으로 남긴다.
 
 `4-1`과 `GPU-1`~`GPU-9`는 설계 게이트다. 다만 현재 `EnhancedRenderGraph`의 선언 순서 계약을
 Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 구현 트랙으로 확정**했고,
-2026-09-15에 `BASE-0`과 함께 **PHASE 4.3**으로 분리됐다. 나머지 SRP 번호는 최종 `GPU-9`에서
-네 GPU 기능의 공통 기반과 함께 묶거나 분리한다.
+2026-09-15에 `BASE-0`과 함께 **PHASE 4.3**으로 분리됐다. 2026-09-23
+[`PHASE 4.75 축 분류`](../analysis/Phase475AxisClassification.md)에서 `SRP-0~SRP-6`은
+GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·Stochastic Lighting·DXR의
+공통 자원과 기능별 구현 슬라이스·공수를 정하는 설계 게이트이며, SRP 전체의 완료 선행이 아니다.
 
 > 구 항목 ID `4-2`/`4-3`/`4-4`/`4-6`은 2026-09-15에 `GPU-1`/`GPU-2`/`GPU-3`/`GPU-9`로 개명됐다.
 > 하이픈 `4-3`이 새 페이즈 번호 `4.3`과 충돌했기 때문이며 내용은 바뀌지 않았다.
@@ -853,7 +862,8 @@ Asset-first Pass의 `read/write/modify` 의미와 맞추는 **트랙 RG0~RG9는 
 
 - 정적 `NativePassRegistry`
 - settings schema/version
-- DXR 또는 업스케일러 최소 native fixture 하나를 Pipeline Asset에서 선택
+- 소스 Native Pass fixture 하나를 Pipeline Asset에서 선택해 registry·schema 경계를 검증.
+  앞서 완료된 업스케일러를 써도 되지만, 신규 DXR 구현을 이 슬라이스의 필수 선행으로 두지 않음
 - DLL loader 없이 소스 빌드만으로 확장됨을 문서화
 
 ### 분리된 PBR·Material 후속

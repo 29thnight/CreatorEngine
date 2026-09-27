@@ -15,7 +15,7 @@
 //   header      magic "CEPROF\0\0" · u32 format_version · u32 chunk_count
 //   chunk table chunk_count × { u32 type · u32 version · u64 offset · u64 size ·
 //                               u32 crc32 · u32 reserved }
-//   chunks      environment · markers · threads · frames
+//   chunks      environment · markers · threads · frames · counters(optional)
 //
 // ★ 이벤트는 **필드 하나씩** 쓴다. `profile_event` 를 통째로 복사하면 구조체의
 //   패딩과 배치가 곧 파일 형식이 되는데, 그 구조체는 "크기가 바뀌면 이 줄을

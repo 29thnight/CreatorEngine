@@ -8,7 +8,6 @@
 #include "EditorWorkspaceStore.h"
 #include "EditorChromeSnapshot.h"
 #include "LogSystem.h"
-#include "RHI/IRHIDeviceResources.h"
 #include "SceneManager.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
 // 완전한 형이 필요하고, PhysicsManagers도 직접 받는다.
@@ -50,26 +49,6 @@
 #include <regex>
 
 constexpr int kMaxLayerSize = 32;
-
-void ShowVRAMBarGraph(uint64_t usedVRAM, uint64_t budgetVRAM)
-{
-    float usagePercent = (float)usedVRAM / (float)budgetVRAM;
-    ImGui::Text("VRAM Usage: %.2f MB / %.2f MB", usedVRAM / (1024.0f * 1024.0f), budgetVRAM / (1024.0f * 1024.0f));
-
-    // 바 높이와 너비 정의
-    ImVec2 barSize = ImVec2(300, 20);
-    ImVec2 cursorPos = ImGui::GetCursorScreenPos();
-    ImDrawList* drawList = ImGui::GetWindowDrawList();
-
-    // 배경 바
-    drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + barSize.x, cursorPos.y + barSize.y), IM_COL32(100, 100, 100, 255));
-
-    // 사용량 바
-    float fillWidth = barSize.x * usagePercent;
-    drawList->AddRectFilled(cursorPos, ImVec2(cursorPos.x + fillWidth, cursorPos.y + barSize.y), IM_COL32(50, 200, 50, 255));
-
-    ImGui::Dummy(barSize); // 레이아웃 공간 확보
-}
 
 namespace
 {
@@ -2665,27 +2644,5 @@ void MenuBarWindow::ShowRenderDebugWindow()
 // BringWindowToFocusFront/DisplayFront 둘은 선언의 stacking 으로 갔다.
 void MenuBarWindow::ShowProfilerWindow()
 {
-    const float vramPanelHeight = 50.0f; // VRAM 그래프 높이
-    const float contentWidth = ImGui::GetContentRegionAvail().x;
-    const float contentHeight = ImGui::GetContentRegionAvail().y;
-
-    // 위쪽: HUD
-    ImGui::BeginChild("Profiler HUD", ImVec2(contentWidth, contentHeight - vramPanelHeight), false);
-    {
-        DrawProfilerHUD();
-    }
-    ImGui::EndChild();
-
-    // 아래쪽: VRAM 그래프
-    ImGui::BeginChild("VRAM Panel", ImVec2(contentWidth, vramPanelHeight), false);
-    {
-        if (auto* resources = GetDiagnosticsDeviceResources())
-        {
-            // 그래프는 바이트를 받는다 — 계약이 MB로 주므로 되돌린다.
-            constexpr uint64_t megabyte = 1024ull * 1024ull;
-            const RHIVideoMemoryInfo info = resources->QueryVideoMemory();
-            ShowVRAMBarGraph(info.usedMB * megabyte, info.budgetMB * megabyte);
-        }
-    }
-    ImGui::EndChild();
+    DrawProfilerHUD();
 }

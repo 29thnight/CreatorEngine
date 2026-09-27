@@ -1,6 +1,7 @@
 #include "EngineRuntimePaths.h"
 #include "ScriptApiVersion.h"
 #include "ClrHost.h"
+#include "ProfileScope.h"
 #include "MaterialScriptBinding.h"
 #include "PathFinder.h"
 #include "Entity.h"
@@ -372,9 +373,33 @@ namespace
 		// Camera.WorldToScreenPoint와 같은 좌상단 원점 화면 픽셀 좌표.
 		Float2 (__stdcall* Rect_GetScreenPosition)(ScriptObjectHandle handle);
 		void   (__stdcall* Rect_SetScreenPosition)(ScriptObjectHandle handle, Float2 position);
+
+		std::uint32_t (__stdcall* Profiler_Register)(const char* name);
+		void (__stdcall* Profiler_Begin)(std::uint32_t marker);
+		void (__stdcall* Profiler_End)();
 	};
 
 	ScriptApiTable g_apiTable{};
+
+	std::uint32_t __stdcall Api_Profiler_Register(const char* name)
+	{
+#if CE_SHIPPING
+		return 0;
+#else
+		if (!name || !*name || !ce::profiler().is_initialized()) return 0;
+		return ce::intern_runtime_marker(name, ce::marker_kind::cpu_scope);
+#endif
+	}
+
+	void __stdcall Api_Profiler_Begin(std::uint32_t marker)
+	{
+		if (marker != 0) ce::profile_scope_begin(marker);
+	}
+
+	void __stdcall Api_Profiler_End()
+	{
+		ce::profile_scope_end();
+	}
 
 	// ── API 구현 ──
 	// 전부 게임 스레드에서만 불린다(관리 코드 호출을 게임 스레드로 한정했으므로).
@@ -2520,6 +2545,9 @@ namespace
 		g_apiTable.Rect_GetWorldRect           = &Api_Rect_GetWorldRect;
 		g_apiTable.Rect_GetScreenPosition      = &Api_Rect_GetScreenPosition;
 		g_apiTable.Rect_SetScreenPosition      = &Api_Rect_SetScreenPosition;
+		g_apiTable.Profiler_Register           = &Api_Profiler_Register;
+		g_apiTable.Profiler_Begin              = &Api_Profiler_Begin;
+		g_apiTable.Profiler_End                = &Api_Profiler_End;
 	}
 
 	// ── hostfxr ──

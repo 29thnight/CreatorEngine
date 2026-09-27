@@ -13,6 +13,8 @@ namespace CreatorEngine;
 /// </summary>
 public static class Bootstrap
 {
+    private static readonly Diagnostics.ProfilerMarker PrePhysicsProfile = new("ScriptCore.PrePhysicsTick");
+    private static readonly Diagnostics.ProfilerMarker PostPhysicsProfile = new("ScriptCore.PostPhysicsTick");
     /// <summary>엔진 API 표를 받아 초기화한다. 0이면 성공.</summary>
     [UnmanagedCallersOnly]
     public static unsafe int Initialize(nint apiTable)
@@ -70,7 +72,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int PrePhysicsTick(float dt)
     {
-        try { ScriptRegistry.PrePhysicsTick(dt); return ScriptRegistry.ActiveCount; }
+        try { using var scope = PrePhysicsProfile.Auto(); ScriptRegistry.PrePhysicsTick(dt); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(PrePhysicsTick)); return -1; }
     }
 
@@ -78,7 +80,7 @@ public static class Bootstrap
     [UnmanagedCallersOnly]
     public static int PostPhysicsTick(float dt)
     {
-        try { ScriptRegistry.PostPhysicsTick(dt); return ScriptRegistry.ActiveCount; }
+        try { using var scope = PostPhysicsProfile.Auto(); ScriptRegistry.PostPhysicsTick(dt); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(PostPhysicsTick)); return -1; }
     }
 

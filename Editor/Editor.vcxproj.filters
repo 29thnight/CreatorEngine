@@ -402,6 +402,9 @@
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
+    <ClInclude Include="EngineGUIWindow\MemoryProfilerSnapshot.h">
+      <Filter>EditorUI\Window</Filter>
+    </ClInclude>
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
       <Filter>EditorUI\Window</Filter>
     </ClInclude>
@@ -650,6 +653,9 @@
     <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
+    <ClCompile Include="EngineGUIWindow\MemoryProfilerSnapshot.cpp">
+      <Filter>EditorUI\Window</Filter>
+    </ClCompile>
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
@@ -681,6 +687,12 @@
       <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp">
+      <Filter>ImGuiHelper\소스 파일\Profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\ProfilerTelemetry.cpp">
+      <Filter>ImGuiHelper\소스 파일\Profiler</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\ProfilerMemory.cpp">
       <Filter>ImGuiHelper\소스 파일\Profiler</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\ProfilerAnimation.cpp">

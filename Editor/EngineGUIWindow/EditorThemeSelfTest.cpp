@@ -191,7 +191,7 @@ namespace editor
         for (const auto& number : numbers)
         {
             char buffer[64];
-            std::strcpy(buffer, number.input);
+            strcpy_s(buffer, sizeof(buffer), number.input);
             widgets::compact_property_number(buffer);
             checks.expect(std::strcmp(buffer, number.expected) == 0,
                 "compact number", number.input);

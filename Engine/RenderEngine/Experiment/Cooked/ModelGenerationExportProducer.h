@@ -5,7 +5,8 @@
 // Derived에 구웠다. MBC3부터 모델의 정본 산출물은 authoring transaction이 게시한
 // **generation**(`Library/ModelAssetGenerations/<ModelId>/<generation>/`)이고, 런타임은
 // 그것만 읽는다(`DataSystem::LoadModelAssetGeneration`). 그래서 cook은 다시 굽지 않는다 —
-// 이미 게시된 generation을 검증한 뒤 그대로 Derived로 내보낸다(파일 바이트 동일).
+// 이미 게시된 generation을 검증한 뒤 Derived로 내보낸다. 검증용 record와
+// sidecar는 런타임 텍스트 파서를 쓰지 않도록 CEDO로 변환한다.
 //
 //   Derived/Models/<xx>/<ModelId>/<generation>/generation.asset   ← manifest entry(kind Model)
 //   Derived/Models/<xx>/<ModelId>/<generation>/model.cemc

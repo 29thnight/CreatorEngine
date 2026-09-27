@@ -32,6 +32,8 @@
 #include "EditorWindowChrome.h"
 #include "UIManager.h"
 #include "ProfileScope.h"
+#include "ResourceCounterWindow.h"
+#include "MemoryProfilerSnapshot.h"
 #include "ThreadPool.h"
 #include <cstdio>
 #include "WinProcProxy.h"
@@ -46,6 +48,7 @@
 #include "imgui.h"
 #include "imgui_impl_win32.h"
 
+#include <array>
 #include <sstream>
 #include <algorithm>
 #include <chrono>
@@ -80,6 +83,7 @@ Editor::EditorMain::~EditorMain()
 
 void Editor::EditorMain::Initialize()
 {
+	BootProgress::Step(L"Initializing editor session", L"Registering the game thread and undo system");
 	// 초기화는 부트스트랩이 이미 했다(워커보다 먼저 서야 한다).
 	ce::profiler().register_thread("[GameThread]", ce::track_kind::game_thread);
 	// ★ 부팅과 함께 기록을 열지 **않는다.**
@@ -104,12 +108,10 @@ void Editor::EditorMain::Initialize()
 	// 에서도 인스턴스를 만들던 것을 걷은 자리다.
 	Meta::UndoSystemInitialize();
 
-	BootProgress::Step(L"Initializing RenderEngine...");
-
 	// 옥트리 컬링 초기화가 여기 있었다 — 계통 전체를 걷었다
 	// (RenderSceneViewPlan ③, MeshRenderer::OnInitialized의 주석 참고).
 
-	BootProgress::Step(L"Creating Renderers...");
+	BootProgress::Step(L"Configuring scene viewport", L"Setting the viewport size and scene overlay");
 
 	// 화면 크기 버스의 첫 값. 이후 리사이즈는 HandleWindowResize가 같은 창에서
 	// 직접 읽어 알린다 — 첫 값만 DX11 출력 크기를 거치고 있었고 그것이 D4의
@@ -139,6 +141,7 @@ void Editor::EditorMain::Initialize()
 	const EnhancedLiveBackend startupBackend =
 		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
 		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
+	BootProgress::Step(L"Starting render backend", L"Creating the scene renderer");
 	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
 		throw std::runtime_error(enhancedError);
@@ -150,6 +153,7 @@ void Editor::EditorMain::Initialize()
 	// InitializeRuntime은 카메라를 만들지 않고, 씬 오버레이 뷰 판정도 Host가
 	// 뷰 요청(EnhancedLiveViewRequest)에 선언한다. avoid 플래그는 Core가
 	// 만들던 시절의 값 그대로다.
+	BootProgress::Step(L"Creating editor camera", L"Preparing the scene view camera rig");
 	{
 		auto cameraRig = std::make_unique<EditorCameraRig>();
 		EditorSessionState::Get().SetCameraRig(std::move(cameraRig));
@@ -209,12 +213,14 @@ void Editor::EditorMain::Initialize()
 	//   패널 상태를 그 표에 되돌린다. 등록이 뒤에 있던 동안은 그 순회가 빈
 	//   표를 돌아 **닫아 둔 패널이 재시작마다 다시 열렸다** — 파일에는 0 이
 	//   적혀 있는데 아무도 읽지 않았다.
+	BootProgress::Step(L"Registering editor windows", L"Building the editor panel registry");
 	::editor::register_editor_windows();
 
 	// 호스트(IImGuiHost → DX12/Vulkan backend)가 여기서 선다. 구 ImGuiRenderer는 HWND
 	// 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
 	// 그릴 표를 넘긴다(PHASE 21 W3). 표는 위 `register_editor_windows` 가
 	// 이미 채워 두었다.
+	BootProgress::Step(L"Starting editor interface", L"Initializing the ImGui presentation host");
 	m_editorRenderer = std::make_unique<EditorRenderer>(
 		EditorWindowHandle(), ::editor::process_windows());
 	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
@@ -226,6 +232,7 @@ void Editor::EditorMain::Initialize()
 		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
 		GetImGuiHost().GetBackendName());
 
+	BootProgress::Step(L"Preparing editor tools", L"Connecting gizmos, menus and inspectors");
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(
 		EnhancedSceneRenderer::GetRenderScene(),
 		EditorSessionState::Get().EditorCamera());
@@ -247,10 +254,10 @@ void Editor::EditorMain::Initialize()
 	// 그 표를 읽는 것이 인스펙터만이 아니라서 부팅의 일로 올렸다.
 	::editor::windows::register_inspector_typed_draws();
 
-	BootProgress::Step(L"Initializing SoundManager...");
+	BootProgress::Step(L"Initializing audio", L"Starting the sound manager");
 	Sound->initialize(128);
 
-	BootProgress::Step(L"Loading Assets...");
+	BootProgress::Step(L"Loading assets", L"Initializing engine data services");
 
 	// 확장자별 open 정책과 source asset watcher는 Editor Host 소유다.
 	EditorPlatform::Get().SetOpenFileOverride([](const file::path& filepath) -> bool
@@ -264,8 +271,10 @@ void Editor::EditorMain::Initialize()
 	});
 
 	DataSystems->Initialize();
+	BootProgress::Step(L"Opening asset database", L"Indexing editor project assets");
 	if (!EditorAssetDatabase::Get().Initialize())
 		throw std::runtime_error("Editor asset database initialization failed");
+	BootProgress::Step(L"Preparing asset previews", L"Loading editor icons and preview services");
 	EditorAssetPresentation::Get().Initialize();
 
 	// 콘텐츠 브라우저는 여기서 만들지 않는다(PHASE 21 W3). "presentation 이
@@ -278,12 +287,13 @@ void Editor::EditorMain::Initialize()
 	//   그 자리에서 Save를 부르면 handler가 아직 없어 첫 실행 기본값이 조용히
 	//   사라진다. 아래 CreateScene이 태그를 읽는 첫 지점이므로 그 사이가
 	//   유일하게 안전한 자리다.
+	BootProgress::Step(L"Loading tags and layers", L"Preparing project authoring settings");
 	TagManagers->Initialize();
 
-	BootProgress::Step(L"Loading Project...");
+	BootProgress::Step(L"Opening project", L"Creating the active scene");
 	SceneManagers->CreateScene();
 
-	BootProgress::Step(L"Registering Frame Events...");
+	BootProgress::Step(L"Preparing editor events", L"Connecting play mode, input and frame updates");
 
 	// 재생 전환에서 Editor만 하는 일을 여기서 건다. 델리게이트 구독뿐이라 씬보다
 	// 앞이든 뒤든 무방하지만, 첫 재생 전환보다는 반드시 앞이어야 한다.
@@ -308,16 +318,19 @@ void Editor::EditorMain::Initialize()
 		UIManagers->Update();
 		Sound->update();
 	});
-	BootProgress::Step(L"Initializing Managers...");
+	BootProgress::Step(L"Initializing scene systems", L"Starting scene managers");
 	SceneManagers->ManagerInitialize();
+	BootProgress::Step(L"Initializing physics", L"Starting the physics manager");
 	PhysicsManagers->Initialize();
 
 	// CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
+	BootProgress::Step(L"Loading scripting", L"Starting the managed script runtime");
 	ClrHost::Get().Initialize();
 	Editor::ModelPlacement::Get().Initialize();
 
 	ce::profiler().publish_frame(Time->GetFrameCount());
+	BootProgress::Step(L"Starting editor presentation", L"Launching the presentation thread");
 	StartPresentationThread();
 }
 
@@ -411,6 +424,7 @@ void Editor::EditorMain::PresentationThreadMain()
 	{
 		bool hasFrameRequest = false;
 		{
+			ce::profile_scope idle{ ce::marker<"PresentationQueueIdle">() };
 			std::unique_lock<std::mutex> lock(m_presentationMutex);
 			m_presentationWake.wait(lock, [this]
 			{
@@ -426,23 +440,33 @@ void Editor::EditorMain::PresentationThreadMain()
 				m_consumedPresentationFrameId = m_requestedPresentationFrameId;
 		}
 
-		while (!WinProcProxy::GetInstance()->IsEmpty())
 		{
-			auto [hwnd, message, wParam, lParam] =
-				WinProcProxy::GetInstance()->PopMessage();
-			ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam);
+			ce::profile_scope messages{ ce::marker<"PresentationMessages">() };
+			while (!WinProcProxy::GetInstance()->IsEmpty())
+			{
+				auto [hwnd, message, wParam, lParam] =
+					WinProcProxy::GetInstance()->PopMessage();
+				ImGui_ImplWin32_WndProcHandler(hwnd, message, wParam, lParam);
+			}
 		}
 
 		if (m_isInvokeResize.exchange(false, std::memory_order_acq_rel))
+		{
+			ce::profile_scope resize{ ce::marker<"PresentationResize">() };
 			HandleWindowResize();
+		}
 
 		// 프레임 **사이**에서 적용한다. 라이브 타깃을 놓았다 다시 만드는 일이라
 		// ImGui 프레임 한복판에서 하면 이번 프레임이 이미 잡아 둔 텍스처 ID 가
 		// 그 자리에서 무효가 된다.
-		ApplyViewportRenderExtent();
+		{
+			ce::profile_scope extent{ ce::marker<"PresentationViewportExtent">() };
+			ApplyViewportRenderExtent();
+		}
 
 		if (0 != m_presentationThreadTestDelayMs)
 		{
+			ce::profile_scope delay{ ce::marker<"PresentationTestDelay">() };
 			std::this_thread::sleep_for(
 				std::chrono::milliseconds(m_presentationThreadTestDelayMs));
 		}
@@ -454,12 +478,20 @@ void Editor::EditorMain::PresentationThreadMain()
 			// 이벤트가 있는 스레드만 싣는다. 잠금 대기까지 함께 재는 자리라야
 			// GT 의 파괴 구간과 겹쳐 멈춘 시간이 보인다.
 			ce::profile_scope _profile{ ce::marker<"PresentFrame">() };
-			std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
-			PresentFrame();
+			std::unique_lock<std::mutex> sceneLock(m_sceneStructureMutex, std::defer_lock);
+			{
+				ce::profile_scope lockWait{ ce::marker<"PresentationSceneLockWait">() };
+				sceneLock.lock();
+			}
+			{
+				ce::profile_scope ui{ ce::marker<"PresentationUI">() };
+				PresentFrame();
+			}
 		}
 
 		if (hasFrameRequest)
 		{
+			ce::profile_scope bookkeeping{ ce::marker<"PresentationComplete">() };
 			std::lock_guard<std::mutex> lock(m_presentationMutex);
 			++m_presentationFrames;
 		}
@@ -730,7 +762,32 @@ void Editor::EditorMain::Update()
 		}
 	}
 
-	ce::profiler().publish_frame(Time->GetFrameCount());
+	const std::uint32_t profileFrame = Time->GetFrameCount();
+	ResourceCounterWindow::PublishFromGameThread(profileFrame);
+	editor::memory_profiler::snapshot_service::instance().poll_game_thread(profileFrame);
+	if (ce::profiler().counter_enabled(ce::counter_category::managed))
+	{
+		ClrHost::ScriptGcStats gc{};
+		const ce::profile_tick gcStarted = ce::profiler_service::now();
+		const bool gcAvailable = ClrHost::Get().GetManagedGcStats(gc);
+		if (gcAvailable)
+		{
+			const double gcUs = static_cast<double>(ce::profiler_service::now() - gcStarted) *
+				1000000.0 / static_cast<double>(ce::profiler_service::ticks_per_second());
+			constexpr double kBytesPerMB = 1024.0 * 1024.0;
+			const std::array<ce::profile_counter_sample, 7> samples{{
+				{ ce::profile_counter_id::provider_gc_us, gcUs },
+				{ ce::profile_counter_id::gc_gen0_collections, static_cast<double>(gc.gen0Collections) },
+				{ ce::profile_counter_id::gc_gen1_collections, static_cast<double>(gc.gen1Collections) },
+				{ ce::profile_counter_id::gc_gen2_collections, static_cast<double>(gc.gen2Collections) },
+				{ ce::profile_counter_id::gc_heap_mb, gc.heapSizeBytes / kBytesPerMB },
+				{ ce::profile_counter_id::gc_fragmented_mb, gc.fragmentedBytes / kBytesPerMB },
+				{ ce::profile_counter_id::gc_pause_percent, gc.pauseTimePercentageX100 / 100.0 },
+			}};
+			ce::profiler().publish_counters(profileFrame, ce::counter_category::managed, samples);
+		}
+	}
+	ce::profiler().publish_frame(profileFrame);
 
 	if (SceneManagers->IsDecommissioning())
 	{
@@ -765,13 +822,22 @@ void Editor::EditorMain::OnGui()
 		return;
 	}
 
-	m_editorRenderer->BeginRender();
-
-	m_menuBarWindow->RenderMenuBar();
-
-
-	m_editorRenderer->Render();
-	m_editorRenderer->EndRender();
+	{
+		ce::profile_scope begin{ ce::marker<"ImGuiBeginFrame">() };
+		m_editorRenderer->BeginRender();
+	}
+	{
+		ce::profile_scope menu{ ce::marker<"ImGuiMenuBar">() };
+		m_menuBarWindow->RenderMenuBar();
+	}
+	{
+		ce::profile_scope panels{ ce::marker<"ImGuiPanels">() };
+		m_editorRenderer->Render();
+	}
+	{
+		ce::profile_scope submit{ ce::marker<"ImGuiRenderPresent">() };
+		m_editorRenderer->EndRender();
+	}
 }
 
 void Editor::EditorMain::InvokeResizeFlag()

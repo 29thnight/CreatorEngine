@@ -60,7 +60,7 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 | generic `.shadergraph` 구상 | Material output과 Fullscreen/Compute output 책임이 섞임 | 같은 graph 기반, 명시적 `domain=material|pass`와 서로 다른 output 계약 |
 
 현재 활성 구현은 `domain=material`뿐이다. `pass`는 LX 공통 기반에서 나중에
-열 수 있는 별도 domain이며, 현재 C# Pipeline 저작 계획의
+열 수 있는 별도 domain이며, 현재 [C# Pipeline 저작 계획](CSharpRenderPipelinePlan.md)의
 완료 조건이나 이 문서의 34일에 포함하지 않는다.
 
 ---

@@ -23,6 +23,7 @@
 #include "EngineLaunchConfig.h"
 #include "JobScheduler.h"
 
+#include <array>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
@@ -122,7 +123,47 @@ namespace EngineBootstrap
                 ce::profiler().unregister_thread();
             },
             []() { ce::profile_scope_begin(ce::marker<"RenderThreadFrame">()); },
-            []() { ce::profile_scope_end(); } });
+            []() { ce::profile_scope_end(); },
+            [](EnhancedSceneRenderer::RenderPhase phase)
+            {
+                using Phase = EnhancedSceneRenderer::RenderPhase;
+                switch (phase)
+                {
+                case Phase::queue_idle: ce::profile_scope_begin(ce::marker<"RenderQueueIdle">()); break;
+                case Phase::test_delay: ce::profile_scope_begin(ce::marker<"RenderTestDelay">()); break;
+                case Phase::state_lock_wait: ce::profile_scope_begin(ce::marker<"RenderStateLockWait">()); break;
+                case Phase::proxy_sync: ce::profile_scope_begin(ce::marker<"RenderProxySync">()); break;
+                case Phase::gpu_collect: ce::profile_scope_begin(ce::marker<"RenderGpuCollect">()); break;
+                case Phase::view_capture: ce::profile_scope_begin(ce::marker<"RenderViewCapture">()); break;
+                case Phase::view_render: ce::profile_scope_begin(ce::marker<"RenderView">()); break;
+                case Phase::begin_frame: ce::profile_scope_begin(ce::marker<"RenderBeginFrame">()); break;
+                case Phase::resource_prepare: ce::profile_scope_begin(ce::marker<"RenderResourcePrepare">()); break;
+                case Phase::graph_build: ce::profile_scope_begin(ce::marker<"RenderGraphBuild">()); break;
+                case Phase::command_record: ce::profile_scope_begin(ce::marker<"RenderCommandRecord">()); break;
+                case Phase::submit: ce::profile_scope_begin(ce::marker<"RenderSubmit">()); break;
+                case Phase::completion: ce::profile_scope_begin(ce::marker<"RenderComplete">()); break;
+                }
+            },
+            []() { ce::profile_scope_end(); },
+            [](std::uint32_t frame, std::uint64_t usedMB, std::uint64_t budgetMB)
+            {
+                ce::profiler().publish_video_memory(frame, usedMB, budgetMB);
+            },
+			[]() { return ce::profiler().counter_enabled(ce::counter_category::render); },
+			[](std::uint32_t frame, const EnhancedSceneRenderer::RenderThreadHooks::Counters& value)
+			{
+				auto& service = ce::profiler();
+				const std::array<ce::profile_counter_sample, 7> samples{{
+					{ ce::profile_counter_id::upload_bytes, static_cast<double>(value.uploadBytes) },
+					{ ce::profile_counter_id::upload_overflows, static_cast<double>(value.uploadOverflows) },
+					{ ce::profile_counter_id::descriptor_allocations, static_cast<double>(value.descriptorAllocations) },
+					{ ce::profile_counter_id::descriptor_overflows, static_cast<double>(value.descriptorOverflows) },
+					{ ce::profile_counter_id::draw_calls, static_cast<double>(value.draws) },
+					{ ce::profile_counter_id::batches, static_cast<double>(value.batches) },
+					{ ce::profile_counter_id::provider_render_us, value.providerCostUs },
+				}};
+				service.publish_counters(frame, ce::counter_category::render, samples);
+			} });
 
         // GPU 구간도 같은 역전으로 받는다(§7.3 의 GPU Graphics queue).
         //
@@ -148,7 +189,12 @@ namespace EngineBootstrap
                     ce::intern_runtime_marker(name, ce::marker_kind::gpu_span),
                     begin, end, frame, gpu);
             },
-            []() { ce::profiler().publish_gpu_spans(); } });
+            []() { ce::profiler().publish_gpu_spans(); },
+            [](std::uint32_t frame, std::uint32_t lostPasses,
+               bool collectFailed, const char* reason)
+            {
+                ce::profiler().report_gpu_issue(frame, lostPasses, collectFailed, reason);
+            } });
 
 		if ((config.prepareRuntimeContent ||
 			config.paths.HasRuntimeOwnershipCapability()) &&

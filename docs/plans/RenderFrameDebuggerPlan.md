@@ -1,8 +1,18 @@
-# 렌더 프레임 디버거 — 프레임이 무엇을 그렸는지 재현 가능한 캡처 (PHASE 14 확장)
+# 내장 렌더 프레임 디버거 — 독립 단일 프레임 캡처 (14-7)
 
 작성: 2026-08-24
 
 상태: 설계 기준선 · 구현 미착수
+
+목표 정정(2026-09-23): **엔진 내장형 렌더 프레임 디버거**를 만든다. PIX/RenderDoc은
+사용자 경험을 설명하는 비유였으며 외부 도구 연결은 이 계획의 선행 조건이나 완료 조건이
+아니다. 대시보드 `14-7`은 이 문서의 독립 RF0~RF7 작업을 가리킨다.
+
+구조 정정(2026-09-23): 대시보드 번호 `14-7`은 일정상 묶음일 뿐 **프로파일러의
+P0~P6 다음 단계나 하위 모듈이 아니다.** 별도 `RenderCapture` 코어가 요청한
+Scene/Game 뷰의 **다음 완료 submission 하나**를 명시적으로 캡처한다.
+`ProfilerService`의 녹화 상태·수집 큐·세마포어·`.ceprof` 파일·counter/marker는
+캡처의 입력도 선행 조건도 아니다. 사후 프레임/뷰 링크는 선택적 UI 편의 기능이다.
 
 소스 기준: `2e691254` + 2026-08-24 작업트리 정적 판독
 
@@ -19,8 +29,9 @@
 
 ## 0. 결정 요약
 
-1. **`EngineDiagnostics`가 프레임 캡처의 정본을 소유한다.** 캡처 요청 상태,
-   불변 이벤트 목록, 문자열·상태 표, 예산·누락 진단, reader와 파일화를 이 프로젝트에 둔다.
+1. **독립 `RenderCapture` 코어가 프레임 캡처의 정본을 소유한다.** 캡처 요청 상태,
+   불변 이벤트 목록, 문자열·상태 표, 예산·누락 진단, reader와 `.ceframe` 파일화를
+   프로파일러와 별도 프로젝트/서비스에 둔다.
 2. **`RenderEngine`이 렌더 의미와 GPU 실행을 소유한다.** pass/draw/dispatch/copy를
    기록하고, 렌더 오브젝트·메시·머테리얼·셰이더 의미를 붙이며, 선택 이벤트의 출력
    재현과 GPU 리소스 수명을 책임진다.
@@ -28,36 +39,38 @@
    완성된 불변 캡처만 그린다. 렌더러 내부 container나 backend 리소스를 직접 순회하지 않는다.
 4. **메타데이터 캡처와 픽셀 재현을 분리한다.** 첫 수직 슬라이스는 정확한 이벤트 트리만
    만든다. 선택 이벤트의 중간 화면은 별도의 격리 replay 슬라이스에서 추가한다.
-5. **PHASE 14 P1의 `EngineFrameId`와 P4의 `GpuFrameToken/SubmissionId`가 선행한다.**
-   멀티뷰·2-in-flight에서 프레임 귀속이 증명되기 전에는 Frame Debugger UI를 완료로 보지 않는다.
-6. **`EngineDiagnostics`에는 `Scene*`, `Mesh*`, `Texture*`, `RHIHandle`, D3D12/Vulkan,
+5. **렌더러가 발행한 중립적인 frame/view/submission ID와 완료 fence를 사용한다.**
+   현재 `GpuFrameToken`은 `IRHIGpuProfiler.h`에 있고 query `ringSlot`까지 담으므로
+   그대로 공통 계약으로 쓰지 않는다. RF0에서 renderer-owned 제출 식별 값으로
+   분리하고 profiler와 frame capture가 각각 이를 소비한다. 멀티뷰·2-in-flight
+   귀속은 디버거 자체 게이트로 증명한다.
+6. **`RenderCapture` 코어에는 `Scene*`, `Mesh*`, `Texture*`, `RHIHandle`, D3D12/Vulkan,
    ImGui 타입을 넣지 않는다.** 고정 폭 값 ID와 string table만 경계를 넘는다.
 7. **새 process-global registry와 새 계측 매크로를 만들지 않는다.** composition root가
    diagnostics service와 renderer provider를 명시적으로 배선한다.
 8. **`EnhancedLiveDebugSnapshot`은 현행 status 창의 정본으로 유지한다.** 대용량 draw/event
    vector를 여기에 추가하지 않는다.
-9. **PIX/RenderDoc을 대체하지 않는다.** 내부 도구는 엔진 의미가 붙은 한 프레임을 설명하고,
-   API command stream·shader instruction·descriptor 원시 상태의 정밀 분석은 외부 도구가 맡는다.
+9. **내장 디버거가 제품 경로다.** 완료된 프레임의 이벤트 순서·렌더 상태·리소스·중간 출력을
+   엔진 안에서 조사한다. 외부 도구 설치·실행 여부는 이 기능의 가용성이나 완료 판정을 바꾸지 않는다.
+10. **기본 동작은 일회성 수동 캡처다.** 평소에는 수집하지 않고 Arm 이후 해당 뷰의
+    다음 제출 하나만 기록한다. 과거 프로파일러 프레임을 원본 그대로 다시 캡처했다고 표시하지 않는다.
 
 ---
 
 ## 1. 현재 소스 기준선
 
-### 1.1 `EngineDiagnostics`는 물리적으로 생겼지만 아직 CPU profiler 코어다
+### 1.1 프로파일러와 렌더 캡처는 서로 다른 서비스다
 
-- `Engine/EngineDiagnostics/EngineDiagnostics.vcxproj:21~27,37~64`는 `StaticLibrary`이며 현재
-  `Profiler.{h,cpp}`와 `ProfilerSelfTest.{h,cpp}` 네 파일만 가진다.
-- ProjectReference가 없는 독립 라이브러리다. 이 성질은 유지한다.
-- `Engine/EngineDiagnostics/Profiler.h:145~168`은 표시를 ImGui 쪽으로 분리해 수집·보관만
-  안다는 경계를 이미 선언한다.
-- `ProfilingCapturePlan.md`의 P1a 물리 이관은 끝났지만 `ProfilerService`, `MarkerRegistry`,
-  단일 `EngineFrameId`, shipping compile-out은 아직 남아 있다.
-- 현행 `Engine/EngineDiagnostics/Profiler.cpp:96~170`의 `CPUProfiler::Tick()`은 producer
-  TLS의 vector를 직접 읽고 초기화한다. 따라서 Frame
-  Debugger가 이 전역 profiler container에 렌더 이벤트를 밀어 넣는 방식은 선택하지 않는다.
+2026-09-23 현행 소스에서 `EngineDiagnostics`는 CPU/GPU 시간 이벤트의 녹화·집계를
+담고 있고 `RenderCaptureService`나 `.ceframe` 구현은 없다. `GpuFrameToken`은
+`Engine/RenderEngine/RHI/IRHIGpuProfiler.h`에 frame/view/submission/fence 값을
+담지만 query `ringSlot`도 함께 가진다. 이 헤더를 디버거 공통 계약으로 삼으면
+GPU 프로파일러의 내부 슬롯 정책이 새 캡처 서비스로 새어 들어간다.
 
-판정: **프로젝트 위치는 맞지만 `CPUProfiler`가 Frame Debugger의 모델은 아니다.**
-`EngineDiagnostics/RenderCapture`라는 독립 하위 도메인을 둔다.
+판정: 렌더 명령·상태·리소스를 `ProfilerService`의 이벤트 링에 넣지 않는다.
+독립 `Engine/RenderCapture` 프로젝트와 별도 상태 기계·저장소·파일 형식을 둔다.
+이 절 아래의 2026-08-24 소스 경로·줄 번호는 작성 당시 기준선이며 구현 시 현재
+호출 경로를 다시 확인한다.
 
 ### 1.2 현재 renderer diagnostics는 최신 상태 표시이지 캡처가 아니다
 
@@ -168,7 +181,7 @@ submission/display slot을 쓴다. 반면 현행
 - 필요한 temporal history 입력
 - 원래 submission/view의 extent와 format
 
-이 packet은 GPU 리소스와 renderer 타입을 가지므로 `EngineDiagnostics`에 넣지 않는다.
+이 packet은 GPU 리소스와 renderer 타입을 가지므로 `RenderCapture` 코어에 넣지 않는다.
 renderer-owned bounded store가 보유하고 diagnostics에는 generation이 있는 opaque `ReplayTicket`
 값만 전달한다. ticket은 직렬화하지 않으며 renderer teardown/rebuild 시 명시적으로 만료한다.
 
@@ -188,7 +201,7 @@ renderer-owned bounded store가 보유하고 diagnostics에는 generation이 있
 7. 살아 있는 source object는 에디터 selection으로 이동하고, 사라진 object는 stale로 표시한다.
 8. 캡처를 저장하고 다시 열어 같은 metadata와 이미 만들어 둔 preview를 본다.
 
-### 2.2 "Unity 수준"의 이 계획상 정의
+### 2.2 단일 프레임 디버깅의 완료 기준
 
 다음이 모두 있어야 제품 목표를 충족한다.
 
@@ -205,9 +218,9 @@ renderer-owned bounded store가 보유하고 diagnostics에는 generation이 있
 - 멀티뷰·2-in-flight에서도 정확한 `EngineFrameId/SubmissionId` 매핑
 - UI가 닫혀 있어도 Development Player에서 metadata 캡처 가능
 
-### 2.3 1차 범위에서 제외
+### 2.3 첫 슬라이스에서 뒤로 미루는 고급 기능
 
-- RenderDoc처럼 임의 API command stream 전체를 저장하고 다른 GPU/프로세스에서 replay
+- 임의 API command stream 전체를 저장하고 다른 GPU/프로세스에서 replay
 - shader source 단위 step debugging, instruction trace, wave/register 검사
 - descriptor heap 원시 주소나 backend object dump를 portable schema로 만들기
 - 매 frame 모든 draw 뒤의 render target 상시 복사
@@ -216,6 +229,12 @@ renderer-owned bounded store가 보유하고 diagnostics에는 generation이 있
 - scene/game object를 살려 두기 위한 process-global registry
 - live `Scene*`, `Entity*`, `Camera*`, `Mesh*`, `Texture*`를 capture file에 보존
 - profiler timeline과 Frame Debugger UI를 한 창으로 합치기
+- `.ceprof`의 선택 프레임에서 캡처 요청을 여는 선택적 연결
+- CPU/GPU/GC/marker 임계값에 따른 조건부 자동 트리거
+
+이 목록은 내장 디버거의 영구적인 기능 상한이 아니다. RF0~RF7의 프레임 탐색·상태/리소스
+조사·격리 replay를 먼저 검증하고, 추가 저수준 기능은 실제 디버깅 사례와 비용을 보고
+후속 슬라이스로 결정한다.
 
 ---
 
@@ -225,7 +244,7 @@ renderer-owned bounded store가 보유하고 diagnostics에는 generation이 있
 [Composition root: Editor/Player Host]
         │ explicit AttachRenderCaptureProvider(provider)
         ▼
-[EngineDiagnostics — ProjectReference 0 유지]
+[RenderCapture — 프로파일러와 별도 프로젝트, ProjectReference 0]
   RenderCaptureService
   RenderCaptureStore / Reader / File
   IRenderCaptureProvider / IRenderTraceSink
@@ -242,12 +261,13 @@ renderer-owned bounded store가 보유하고 diagnostics에는 generation이 있
   EditorRenderObjectResolver
 ```
 
-### 3.1 `EngineDiagnostics` 소유
+### 3.1 독립 `RenderCapture` 코어 소유
 
 권장 파일:
 
 ```text
-Engine/EngineDiagnostics/RenderCapture/
+Engine/RenderCapture/
+  RenderCapture.vcxproj
   RenderCaptureTypes.h
   RenderCaptureService.h/.cpp
   RenderCaptureStore.h/.cpp
@@ -276,7 +296,7 @@ Engine/EngineDiagnostics/RenderCapture/
 - `RHIFormat`, `RHIHandle`, D3D12/Vulkan 타입
 - renderer callback을 찾는 전역 registry
 
-`EngineDiagnostics`가 Utility에도 의존하지 않는 현재 성질을 유지하기 위해 자산 GUID는
+`RenderCapture` 코어가 Utility·EngineDiagnostics·RenderEngine에 의존하지 않도록 자산 GUID는
 `DiagnosticGuid128` 같은 고정 16-byte 값으로 복사한다. `FileGuid`나 `ShaderMetaHandle` 타입을
 헤더에서 직접 include하지 않는다.
 
@@ -297,6 +317,7 @@ Engine/RenderEngine/Diagnostics/
 책임:
 
 - request를 안전한 render frame 경계에서 수락
+- profiler query 슬롯과 무관한 renderer-owned 제출 식별 값 발행
 - graph/pass/resource/command event 생성
 - render object와 asset 의미를 capture-local 값 ID로 변환
 - 병렬 record의 deterministic merge
@@ -357,15 +378,17 @@ struct RenderSubmissionKey
     uint64_t submissionId;
     uint64_t renderViewId;
     uint64_t fenceValue;
-    uint32_t ringSlot;
     uint8_t  queueId;
 };
 ```
 
-`engineFrameId/submissionId`는 이 계획이 새로 정의하지 않는다. PHASE 14 P1/P4의 정본 타입을
-사용한다. P4의 view 필드는 현재 `EnhancedLiveViewKey::viewId`와 같은 안정된 논리
-`RenderViewId`여야 하며 camera/container slot을 작은 정수로 복사한 값이면 안 된다. capture
-service는 그 값을 복사해 보존할 뿐 발행하지 않는다.
+`engineFrameId/submissionId`를 캡처 서비스가 새로 발행하지 않는다. 렌더러가 실제
+제출에 사용한 ID와 fence를 중립적인 렌더 제출 계약으로 보유하고 provider가
+위 값으로 복사한다. GPU profiler는 같은 식별 값을 자기 `GpuFrameToken`에 붙이되
+query `ringSlot`을 별도로 소유한다. 디버거는 `IRHIGpuProfiler::Collect`의 성공이나
+프로파일러 녹화 상태를 보지 않는다. view 값은 현재 `EnhancedLiveViewKey::viewId`와 같은 안정된
+논리 `RenderViewId`여야 하며 camera/container slot을 작은 정수로 복사한 값이면 안
+된다.
 
 ### 4.2 pass identity
 
@@ -531,7 +554,7 @@ RenderEngine이 `RHIFormat`을 위 stable enum으로 변환한다. 미지원 for
 - replay ticket available/expired
 - provider/backend/build 정보
 - abort/failure reason
-- profiler/capture 자체 CPU 시간과 byte 수
+- capture 자체 CPU 시간과 byte 수
 
 한도 초과를 조용히 잘라 정상 capture처럼 보이지 않게 한다.
 
@@ -560,6 +583,9 @@ Frozen
 
 UI가 `Armed`를 곧 capture 완료로 표시하지 않는다. metadata 기록이 끝났어도 fence가 완료되지
 않으면 event 결과와 target preview는 아직 공개하지 않는다.
+한 번 Arm하면 선택 뷰에서 실제로 제출된 다음 frame 하나만 수락한다. 완료·실패·취소
+뒤 자동으로 재무장하지 않으며, 다음 캡처에는 새 명시적 요청이 필요하다. 프로파일러
+Record/Pause 상태는 이 전이에 관여하지 않는다.
 
 ### 5.2 request 수락 경계
 
@@ -714,8 +740,10 @@ continuous profiler capture에 draw event와 여러 이미지 blob을 섞지 않
 - `.ceprof`: 여러 frame의 CPU/GPU/GC/counter 추세
 - `.ceframe`: 명시적으로 잡은 한 개 또는 소수 submission의 render event와 artifact
 
-두 파일은 `sessionId`, `EngineFrameId`, `SubmissionId`, build ID로 상호 참조할 수 있다.
-PHASE 14 P6의 chunk envelope/CRC/임시 파일 원자 교체 코드는 공유하되 schema는 분리한다.
+`.ceframe`은 단독으로 저장·열람된다. `.ceprof`의 존재나 P6 완료는 필요하지 않다.
+공통 chunk/CRC/원자 교체 유틸리티가 안정적으로 분리돼 있으면 재사용할 수 있지만,
+프로파일러 파일 schema·reader에는 의존하지 않는다. 같은 실행의 `EngineFrameId`,
+`SubmissionId`, build ID로 연결하는 기능은 추후 선택적 adapter에서만 제공한다.
 
 ### 7.2 `.ceframe` 1차 chunk
 
@@ -751,17 +779,18 @@ Chunk table
 
 ## 8. 실행 슬라이스
 
-초기 추정은 총 18~22일이다. RF0의 event 수·byte 수·record overhead 실측 뒤 RF4~RF6의
+RF0~RF7에 적힌 초기 공수의 합은 22~23일이다. RF0의 event 수·byte 수·record overhead 실측 뒤 RF4~RF6의
 artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커밋이며 앞 단계 gate를 통과해야
 다음 단계로 간다.
 
 ### RF0 — 데이터 계약·상태 기계·자가 검증 (P0, 2일)
 
-선행: PHASE 14 P1의 `EngineFrameId` 타입/발행 위치 확정
+선행: 렌더러가 실제 제출에 쓰는 frame/view 식별 경계 확인. 프로파일러 P1 완료는 조건이 아님
 
 할 일:
 
-- `EngineDiagnostics/RenderCapture` 파일 뼈대
+- 독립 `Engine/RenderCapture` 프로젝트와 파일 뼈대
+- 렌더러 소유의 중립적인 제출 식별 계약을 `GpuFrameToken`의 query 슬롯 정책에서 분리
 - capture/pass/event/object/asset/resource/state/artifact 값 타입
 - request state machine과 bounded store
 - immutable reader revision
@@ -772,7 +801,7 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 
 완료 조건:
 
-- EngineDiagnostics ProjectReference 0 유지
+- RenderCapture ProjectReference 0 유지, EngineDiagnostics/Profile* include·link 0
 - ImGui/SceneRuntime/RenderEngine/D3D12/Vulkan include 0
 - state transition, overflow, stale reader, attach/detach selftest 통과
 - stopped mode service에서 frame당 allocation 0
@@ -780,7 +809,7 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 
 ### RF1 — Frame/View/Pass/Command metadata capture (P0, 3일)
 
-선행: PHASE 14 P4 `GpuFrameToken/SubmissionId/Collect(token)` 완료
+선행: 렌더러의 submission/view/fence 소유와 완료 확인 경계. GPU profiler `Collect(token)`은 조건이 아님
 
 할 일:
 
@@ -880,7 +909,7 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 
 ### RF6 — `.ceframe` 저장·불러오기 (P2, 2일)
 
-선행: PHASE 14 P6 chunk envelope 또는 동등한 공통 container 완성
+선행: `.ceframe` 전용 versioned container 계약. PHASE 14 P6은 조건이 아님
 
 할 일:
 
@@ -888,7 +917,7 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 - metadata와 이미 생성한 artifact 저장
 - lazy artifact load
 - CRC/schema/build/backend metadata UI
-- `.ceprof` session 상호 참조
+- `.ceprof` 없이 단독으로 열리는 reader
 
 완료 조건:
 
@@ -897,12 +926,11 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 - 손상/절단/구버전 파일 crash 없이 거절
 - 저장 중 live capture가 바뀌어도 저장 대상 불변
 
-### RF7 — Trigger·Player·Shipping·성능 hardening (P2, 2.5일)
+### RF7 — 수동 단일 캡처의 Player·Shipping·성능 검증 (P2, 2.5일)
 
 할 일:
 
-- profiler frame 선택에서 다음 동일 view capture 연결
-- `Capture next matching frame in PIX/RenderDoc` metadata 연결
+- Editor와 CLI에서 지정 뷰의 다음 완료 submission 하나만 캡처
 - Development Player CLI save
 - Shipping compile-out/disabled 정책 검증
 - capture off/metadata/replay 세 모드 overhead 측정
@@ -910,8 +938,8 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 
 완료 조건:
 
-- `.ceprof` spike frame과 `.ceframe`/외부 capture가 ID로 연결
-- PIX/RenderDoc 불가 환경에서도 내부 metadata 보존
+- `profile.record`를 한 번도 부르지 않은 실행에서도 캡처·저장·재열람 성공
+- 외부 도구 없이 수동 단일 frame의 metadata·preview 캡처 가능
 - Shipping에서 UI/provider/file entry point 노출 정책 일치
 - capture off 상태의 P95/P99 회귀가 합의 예산 안
 - capture failure가 engine frame이나 renderer lifecycle을 중단하지 않음
@@ -921,35 +949,36 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 ## 9. 의존 관계와 병행 가능성
 
 ```text
-Profiling P1: EngineFrameId ───────┐
-                                   ├─ RF0
-Profiling P4: GpuFrameToken ───────┴─ RF1 ─ RF2 ─ RF3 ─ RF4 ─ RF5
-Profiling P6: chunk container ────────────────────────────────└─ RF6
-Profiling P7: external trigger ───────────────────────────────── RF7
+Renderer frame/view/submission/fence identity ─ RF0 ─ RF1 ─ RF2 ─ RF3
+                                                     └─ RF4 ─ RF5
+RenderCapture 전용 .ceframe container ───────────────────── RF6
+독립 수동 캡처 제품 검증 ─────────────────────────────────── RF7
 
 SRP stable Pass GUID ───── optional enrichment, RF1의 hard blocker 아님
 Editor Workspace W1/W2 ─── window shell 이관점, capture core blocker 아님
 SceneGraph Entity 전환 ─── resolver 개선점, RenderObjectRef adapter로 선행 가능
+Profiler 선택 frame/view 링크·조건부 trigger ─ optional adapter, RF0~RF7 blocker 아님
 ```
 
 ### 9.1 hard dependency
 
-- RF0: canonical `EngineFrameId`
-- RF1 이후: `GpuFrameToken`, `SubmissionId`, view/fence/ring slot 정확성
-- RF6: 공통 chunk envelope를 재사용할 수 있는 PHASE 14 P6
+- RF0: 렌더러의 실제 frame/view 식별 값
+- RF1 이후: submission ID, view, fence 및 in-flight 소유의 정확성
+- RF6: 독립 `.ceframe` container의 version/CRC/원자 교체 계약
 
 ### 9.2 soft dependency
 
 - SRP의 stable Pass GUID가 없으면 현재 pipeline revision + ordinal + name으로 동작
 - SceneGraph 최종 EntityHandle이 없어도 sceneEpoch + proxy GUID로 live resolve
 - PHASE 21 workspace 이전에는 기존 window registry를 사용
+- `.ceprof` 프레임 선택 연결은 ID를 전달하는 별도 adapter로 추가할 수 있다
 
 ### 9.3 병행 금지 또는 조율 필요
 
 - RF1/RF4/RF5와 RenderGraph/RHIEncoder 대수술을 같은 파일에서 병행
 - RF2와 draw batching 구조 변경을 조율 없이 병행
 - RF3와 PHASE 21 window registry 교체를 같은 커밋에서 병행
-- RF6와 `.ceprof` chunk schema 구현을 별도 중복 container로 병행
+- RF6의 공통 파일 유틸리티 추출과 `.ceprof` schema 수정이 같은 파일을 만지면 조율
 
 ---
 
@@ -1014,7 +1043,6 @@ SceneGraph Entity 전환 ─── resolver 개선점, RenderObjectRef adapter�
 - DX12와 Vulkan metadata capture
 - DX12/Vulkan 대표 preview pixel
 - `Tools/dx12-validation/Invoke-Dx12Suite.ps1`
-- `Tools/profiling-validation/Invoke-ProfilingValidation.ps1`
 - 신규 `Tools/render-capture-validation/Invoke-RenderFrameCaptureValidation.ps1`
 - `render.livecheck` 양 backend
 - include/project boundary ratchet
@@ -1083,16 +1111,17 @@ Diagnostics panel 또는 Frame Debugger banner에 최소 다음을 표시한다.
 8. **replay가 live history/display를 바꾸지 않는다.** 별도 target/resource namespace를 쓴다.
 9. **incomplete를 complete처럼 보이지 않는다.** 누락은 데이터 모델과 UI에 남긴다.
 10. **현재 live debug snapshot을 capture store로 쓰지 않는다.** status와 forensic capture를 분리한다.
-11. **외부 도구와 경쟁하지 않는다.** 내부 의미 정보에서 PIX/RenderDoc 정밀 분석으로 연결한다.
+11. **내장 도구만으로 핵심 디버깅 흐름을 완결한다.** 외부 도구 실행을 기능의 전제로 두지 않는다.
 12. **Player와 Vulkan을 마지막에 몰아 넣지 않는다.** RF1부터 공용 metadata path를 검증한다.
 13. **새 process-global registry를 만들지 않는다.** provider와 resolver는 composition root가 소유한다.
 14. **런타임 세대 handle을 영속 자산 ID로 쓰지 않는다.** catalog GUID와 capture-local revision을 구분한다.
+15. **프로파일러는 캡처의 진입점이 아니다.** profiler 없이 UI/CLI에서 Arm→한 완료 제출→Frozen→`.ceframe`을 완결한다.
 
 ---
 
 ## 13. 최종 완료 조건
 
-- [ ] `EngineDiagnostics/RenderCapture`가 ProjectReference 0과 backend/editor include 0을 유지
+- [ ] 독립 `Engine/RenderCapture`가 ProjectReference 0과 Profile*/backend/editor include·link 0을 유지
 - [ ] selected next completed Scene/Game submission을 정확히 freeze
 - [ ] pass/draw/dispatch/clear/copy/resolve/barrier/present event 순서 보존
 - [ ] 모든 instanced draw가 GPU command 1개와 member object N개로 표시
@@ -1108,7 +1137,7 @@ Diagnostics panel 또는 Frame Debugger banner에 최소 다음을 표시한다.
 - [ ] DX12/Vulkan metadata와 대표 preview 검증
 - [ ] Debug unity + Release non-unity + Editor + Player build 통과
 - [ ] capture idle/metadata/replay overhead와 budget 실측 기록
-- [ ] PIX/RenderDoc capture와 build/frame/submission ID 상호 참조
+- [ ] 프로파일러를 시작하지 않은 Editor/Development Player에서 수동 단일 캡처·저장·재열람 성공
 
 ---
 
@@ -1116,9 +1145,10 @@ Diagnostics panel 또는 Frame Debugger banner에 최소 다음을 표시한다.
 
 ### `ProfilingCapturePlan.md`
 
-- `EngineFrameId`, `SubmissionId`, `GpuFrameToken`, capture file envelope를 공급한다.
-- profiler는 여러 frame에서 문제 frame을 찾고 이 계획은 한 frame의 렌더 의미를 설명한다.
-- `.ceprof`와 `.ceframe`은 session/frame/submission ID로 연결한다.
+- 대시보드의 `14-7`은 일정 번호이고, RF0~RF7은 프로파일러 P0~P6과 독립된 제품 작업이다.
+- 필요한 frame/view/submission/fence 값은 렌더러가 공급한다. 프로파일러 서비스·파일·counter는 공급자가 아니다.
+- profiler는 여러 frame의 시간 추세를 읽고, 이 계획은 수동으로 잡은 한 frame의 렌더 실행을 조사한다.
+- `.ceprof`→`.ceframe` 진입점은 후속 선택적 adapter이며 양쪽 완료 조건에 넣지 않는다.
 
 ### `ScriptableRenderPipelinePlan.md`
 
@@ -1151,4 +1181,4 @@ Diagnostics panel 또는 Frame Debugger banner에 최소 다음을 표시한다.
 - 계획과 소스가 다르면 소스를 다시 판독하고 이 문서를 갱신한다.
 - RF0 실측 뒤 event/artifact budget, 허용 overhead, RF4~RF6 공수를 갱신한다.
 - 새 backend나 pass template이 들어오면 semantic coverage와 preview format matrix를 추가한다.
-- 외부 도구가 지원하지 않는 환경에서도 내부 metadata capture의 완료 조건을 낮추지 않는다.
+- 외부 도구 지원 여부와 무관하게 내부 metadata·preview·replay 완료 조건을 판정한다.

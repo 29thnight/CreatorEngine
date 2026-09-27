@@ -5,6 +5,7 @@
 
 #include "ModelSidecarV2.h"
 #include "AuthoringParsedDocument.h"
+#include "AuthoringCookedDocument.h"
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/ModelLoader.h"
 #include "../Texture.h"
@@ -117,8 +118,11 @@ namespace assets
             GenerationRecord& out, std::string& failure)
         {
             std::string parseError;
-            const Authoring::ParsedDocument document =
-                Authoring::ParsedDocument::ParseText(std::string(text), parseError);
+            const std::span<const std::byte> bytes{
+                reinterpret_cast<const std::byte*>(text.data()), text.size() };
+            const Authoring::ParsedDocument document = Authoring::IsCookedDocument(bytes)
+                ? Authoring::ParsedDocument::ParseCooked(bytes, parseError)
+                : Authoring::ParsedDocument::ParseText(std::string(text), parseError);
             if (!document || !document.Root().IsMap())
             {
                 failure = "generation record를 파싱하지 못했다: " + parseError;

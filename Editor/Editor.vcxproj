@@ -149,6 +149,7 @@
     <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h" />
     <ClInclude Include="EngineGUIWindow\ReflectionTypedDraw.h" />
     <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h" />
+    <ClInclude Include="EngineGUIWindow\MemoryProfilerSnapshot.h" />
     <ClInclude Include="EngineGUIWindow\SceneViewWindow.h" />
     <ClInclude Include="EngineGUIWindow\SceneViewportOverlay.h" />
     <ClInclude Include="EngineGUIWindow\EditorViewportCanvas.h" />
@@ -325,6 +326,7 @@
     <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\MemoryProfilerSnapshot.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\SceneViewportOverlay.cpp" />
     <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp" />
@@ -342,6 +344,8 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\ProfilerFrameOverview.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerTelemetry.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerMemory.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerAnimation.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerTables.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerTimeline.cpp" />
