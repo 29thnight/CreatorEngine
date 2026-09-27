@@ -1,11 +1,20 @@
 # Blender형 PBR·Material Graph 계획 (PHASE 4.25)
 
-**신설 2026-09-03 · 10슬라이스 34일 · 미착수 · 선행 PHASE 4**
+**신설 2026-09-03 · 10슬라이스 34일 · MAT-0 완료, 페이즈 진행 중 · 선행 PHASE 4**
+
+공통 노드 저작 계층·UI의 설계 초안은
+[`LatticeNodeSystem.md`](../design/LatticeNodeSystem.md), Material 우선 순서와
+이후 창의 재작성 시점은 [`LatticeAdoptionPlan.md`](LatticeAdoptionPlan.md)가
+소유한다. LX 캔버스의 독립 ImGui 예제 빌드·조작 게이트 `LX-2`는 통과했고,
+Editor 제품 연결 `LX-3`은 후속이다. 이 문서의 34일은 Material 의미와
+`MAT-2/MAT-6`의 기본 graph 산출물 산정이다. Blender Shader Editor에 가까운
+노드·소켓·그룹·편집 동작의 전 범위와 노드별 지원 확대는 `LX-0` 대응표를 만든 뒤 별도 산정한다.
+기존 BT·Animator 자산 변환 비용은 계획하지 않는다.
 
 아트 팀이 Blender에서 만든 재질 의도를 CreatorEngine에서 같은 방식으로 이해하고 예측할 수
-있게 만드는 계획이다. 목표는 Blender 자체의 모든 렌더 기능 복제가 아니라, **Blender 5.1.1
-Principled BSDF/OpenPBR 계열의 재질 구성과 pre-tone linear HDR 결과**를 게임 엔진 비용 모델
-안에서 일치시키는 것이다.
+있게 만드는 계획이다. **노드 저작 구조와 조작은 Blender Shader Editor에 거의 1:1로 대응**하도록
+LX를 설계한다. 렌더 결과는 **Blender 5.1.1 Principled BSDF/OpenPBR 계열의 재질 구성과
+pre-tone linear HDR 결과**를 게임 엔진 비용 모델 안에서 검증한다.
 
 PHASE 4가 현재 glTF PBR 배선을 안정화한 뒤 시작한다. RenderGraph·그림자·reflection probe·
 후처리와 generic Custom Pass authoring은 PHASE 4.75가 소유한다.
@@ -22,6 +31,7 @@ PHASE 4가 현재 glTF PBR 배선을 안정화한 뒤 시작한다. RenderGraph�
 - Coat, Sheen, Anisotropy, Iridescence, Transmission, Subsurface와 Volume 입력.
 - 같은 mesh·UV·texture·HDRI·light·camera에서 tone mapping 전 linear HDR 비교.
 - Material Graph 저장/재개방, typed node/pin, deterministic Slang codegen.
+- Blender 5.1.1 Shader Editor 대비 node tree·socket·link·group/interface·reroute·frame·값 위젯·편집 동작 대응표와 노드별 지원 판정.
 - 게임 엔진용 Standard/Layered/Special 품질 tier와 자동 Deferred/Forward routing.
 
 ### 제외
@@ -48,6 +58,10 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 | Opaque/Transparent 중심 route | alpha와 물리 transmission을 구분하지 못함 | Opaque/Mask/Blend + Transmission/Volume route |
 | 단일 Standard 재질 비용 모델 | 저가 재질도 고급 lobe 비용을 부담하거나 artist가 내부 pass를 알아야 함 | `MaterialFeatureMask`와 자동 tier/routing |
 | generic `.shadergraph` 구상 | Material output과 Fullscreen/Compute output 책임이 섞임 | 같은 graph 기반, 명시적 `domain=material|pass`와 서로 다른 output 계약 |
+
+현재 활성 구현은 `domain=material`뿐이다. `pass`는 LX 공통 기반에서 나중에
+열 수 있는 별도 domain이며, 현재 C# Pipeline 저작 계획의
+완료 조건이나 이 문서의 34일에 포함하지 않는다.
 
 ---
 
@@ -100,9 +114,9 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `MAT-0` | Blender 5.1.1 reference scene·pre-tone HDR golden 고정 | · | PHASE 4 W9 | 2 |
+| `MAT-0` | Blender 5.1.1 reference scene·pre-tone HDR golden 고정 | ✓ | PHASE 4 W9 | 2 |
 | `MAT-1` | `PrincipledSurface`·`MaterialFeatureMask` 공용 Slang ABI | · | MAT-0 | 4 |
-| `MAT-2` | typed Graph IR·domain·schema migration·round-trip | · | MAT-1 | 4 |
+| `MAT-2` | typed Graph IR·domain·schema migration·round-trip | · | MAT-1, LX-2 독립 예제 게이트 | 4 |
 | `MAT-3` | core Principled 의미·기본값·IOR/specular/emission/alpha | · | MAT-1 | 4 |
 | `MAT-4` | coat·sheen·anisotropy·iridescence layered lobe | · | MAT-3 | 4 |
 | `MAT-5` | transmission·subsurface·volume와 Special route | · | MAT-3 | 4 |
@@ -114,6 +128,19 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 
 구 PHASE 4의 `SRP-3` 공용 graph 기반과 단일 PBR 레인의 material 의미·lobe·codegen 몫을
 이 열 개 슬라이스가 대체한다. 옛 PBR ID는 새 작업과 병행하지 않는다.
+`MAT-2`는 Lattice의 공통 node/pin/connection·layout/serialization 계약을
+Material domain에 적용하고, `MAT-6`은 그 검증 결과를 material typed IR와 Slang으로
+내린다. `LX-3`과 동일 산출물을 중복 완료 처리하지 않는다. Lattice 기반의 다른
+창 재작성과 `imgui-node-editor` 최종 제거는 LX 계획에서 별도로 판정한다.
+`MAT-2`의 4일을 Blender 노드 전체 목록 구현 완료로 간주하지 않는다. LX-0 대응표에서
+정한 지원 노드/소켓과 편집 기능을 별도 범위·공수·제품 게이트로 관리한다.
+
+### MAT-0 고정 결과 (2026-09-28)
+
+- [`Tools/blender/fixtures/material-reference-5.1.1/README.md`](../../Tools/blender/fixtures/material-reference-5.1.1/README.md)의 Blender 5.1.1 장면, 15개 core/layered/special 구체 사례, 입력·환경·해시 manifest를 비교 기준으로 고정했다.
+- `material-grid-linear.exr`은 Raw view transform에서 저장한 scene-linear RGBA32F다. AgX PNG는 표시 전용이다. 최대 선형 red 값 13.71875로 1.0 초과 HDR 값 보존을 확인했다.
+- 별도 출력 디렉터리에서 동일 입력으로 다시 렌더하고 EXR 전체 RGBA 픽셀의 최대 절대 차이 `0.0`을 확인했다. 제품 결과와 Blender 결과의 허용 오차 판정은 `MAT-9`에서 한다.
+- EEVEE 볼륨 경계가 보이는 `special_volume`은 특수 재질의 독립 진단 사례다. shadow/AO/probe/post의 비교를 이 golden으로 대체하지 않는다.
 
 ---
 
@@ -121,6 +148,7 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 
 - `.shadergraph(domain=material)` 저장→닫기→재개방 뒤 node/pin/connection/layout/Blackboard,
   default, color-space intent와 subgraph가 보존된다.
+- LX-0 대응표에서 지원으로 표시한 Blender 노드의 소켓 이름·순서·기본값·표시 조건과 내부 컨트롤, 접힘·연결·그룹 조작이 독립 예제와 Editor 제품 경로에서 확인된다.
 - unknown node와 schema migration 실패는 graph와 마지막 정상 compiled generation을 보존한다.
 - Blender reference의 core·layered·special material grid가 pre-tone linear HDR 허용 오차를 통과한다.
 - 같은 지원 feature의 Deferred/Forward route 교차 비교가 허용 오차를 통과한다.

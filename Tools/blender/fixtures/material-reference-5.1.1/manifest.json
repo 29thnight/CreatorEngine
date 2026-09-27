@@ -1,0 +1,495 @@
+{
+  "schema": "creator.material.blender-reference.v1",
+  "blender_version": "5.1.1",
+  "blender_hash": "b70da489d7f4",
+  "renderer": "BLENDER_EEVEE",
+  "reference": "scene-linear pre-view-transform RGBA32F OpenEXR",
+  "preview": "AgX display only; never compare as material golden",
+  "resolution": [
+    800,
+    480
+  ],
+  "render_samples": 32,
+  "ray_tracing": false,
+  "film_transparent": true,
+  "mesh": {
+    "path": "Dynamic_CPP/Assets/Models/Prim_Sphere.glb",
+    "sha256": "91cc87c32fbd1d559582a38edbce177d8418f4f405b4993a1f66159ac0d44408"
+  },
+  "hdri": {
+    "path": "Dynamic_CPP/Assets/HDR/autumn_field_puresky_1k.hdr",
+    "sha256": "e60470d3a0f219585df1d74c393b472361c5400a7ff8d071ebe6eca29b7fe2b0",
+    "strength": 0.35
+  },
+  "light": {
+    "type": "AREA",
+    "energy": 850.0,
+    "shape": "DISK",
+    "size": 4.0,
+    "position": [
+      -3.0,
+      4.0,
+      5.0
+    ],
+    "shadows": false
+  },
+  "camera": {
+    "type": "ORTHO",
+    "scale": 10.0,
+    "position": [
+      0.0,
+      0.0,
+      10.0
+    ]
+  },
+  "cases": [
+    {
+      "id": "core_base",
+      "position": [
+        -3.4,
+        1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.85,
+          0.42,
+          0.24,
+          1.0
+        ],
+        "Roughness": 0.45
+      },
+      "center_uv": [
+        0.16,
+        0.775
+      ],
+      "center_rgba_mean": [
+        1.4202408,
+        0.4141671,
+        0.3597213,
+        1.0
+      ]
+    },
+    {
+      "id": "core_metal",
+      "position": [
+        -1.7,
+        1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.8,
+          0.7,
+          0.45,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.18
+      },
+      "center_uv": [
+        0.33,
+        0.775
+      ],
+      "center_rgba_mean": [
+        1.5050115,
+        0.271036,
+        0.0941271,
+        1.0
+      ]
+    },
+    {
+      "id": "core_rough",
+      "position": [
+        0.0,
+        1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.72,
+          0.7,
+          0.68,
+          1.0
+        ],
+        "Roughness": 0.88
+      },
+      "center_uv": [
+        0.5,
+        0.775
+      ],
+      "center_rgba_mean": [
+        0.7322462,
+        0.2734176,
+        0.3338598,
+        1.0
+      ]
+    },
+    {
+      "id": "core_normal",
+      "position": [
+        1.7,
+        1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.75,
+          0.75,
+          0.75,
+          1.0
+        ],
+        "Roughness": 0.42,
+        "normal_map": true
+      },
+      "center_uv": [
+        0.67,
+        0.775
+      ],
+      "center_rgba_mean": [
+        0.4594191,
+        0.1744385,
+        0.2265289,
+        1.0
+      ]
+    },
+    {
+      "id": "core_emission",
+      "position": [
+        3.4,
+        1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.1,
+          0.1,
+          0.1,
+          1.0
+        ],
+        "Emission Color": [
+          0.3,
+          0.55,
+          1.0,
+          1.0
+        ],
+        "Emission Strength": 5.0
+      },
+      "center_uv": [
+        0.84,
+        0.775
+      ],
+      "center_rgba_mean": [
+        1.5545281,
+        2.778978,
+        5.0361129,
+        1.0
+      ]
+    },
+    {
+      "id": "layer_coat",
+      "position": [
+        -3.4,
+        0.0,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.55,
+          0.25,
+          0.18,
+          1.0
+        ],
+        "Roughness": 0.35,
+        "Coat Weight": 0.85,
+        "Coat Roughness": 0.08
+      },
+      "center_uv": [
+        0.16,
+        0.5
+      ],
+      "center_rgba_mean": [
+        0.508662,
+        0.1105534,
+        0.1087827,
+        1.0
+      ]
+    },
+    {
+      "id": "layer_sheen",
+      "position": [
+        -1.7,
+        0.0,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.3,
+          0.52,
+          0.66,
+          1.0
+        ],
+        "Roughness": 0.55,
+        "Sheen Weight": 0.9,
+        "Sheen Tint": [
+          0.3,
+          0.9,
+          0.8,
+          1.0
+        ]
+      },
+      "center_uv": [
+        0.33,
+        0.5
+      ],
+      "center_rgba_mean": [
+        0.3069097,
+        0.2086954,
+        0.3109131,
+        1.0
+      ]
+    },
+    {
+      "id": "layer_anisotropic",
+      "position": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.76,
+          0.62,
+          0.38,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.3,
+        "Anisotropic": 0.8
+      },
+      "center_uv": [
+        0.5,
+        0.5
+      ],
+      "center_rgba_mean": [
+        0.080866,
+        0.0216572,
+        0.0182872,
+        1.0
+      ]
+    },
+    {
+      "id": "layer_thin_film",
+      "position": [
+        1.7,
+        0.0,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Coat Weight": 0.7,
+        "Thin Film Thickness": 550.0,
+        "Thin Film IOR": 1.4
+      },
+      "center_uv": [
+        0.67,
+        0.5
+      ],
+      "center_rgba_mean": [
+        0.1072866,
+        0.0545505,
+        0.1141513,
+        1.0
+      ]
+    },
+    {
+      "id": "layer_mixed",
+      "position": [
+        3.4,
+        0.0,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.55,
+          0.48,
+          0.35,
+          1.0
+        ],
+        "Roughness": 0.32,
+        "Coat Weight": 0.5,
+        "Sheen Weight": 0.45,
+        "Anisotropic": 0.35
+      },
+      "center_uv": [
+        0.84,
+        0.5
+      ],
+      "center_rgba_mean": [
+        0.2035999,
+        0.0695041,
+        0.071455,
+        1.0
+      ]
+    },
+    {
+      "id": "special_transmission",
+      "position": [
+        -3.4,
+        -1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.72,
+          0.85,
+          0.95,
+          1.0
+        ],
+        "Roughness": 0.12,
+        "IOR": 1.45,
+        "Transmission Weight": 0.9
+      },
+      "center_uv": [
+        0.16,
+        0.225
+      ],
+      "center_rgba_mean": [
+        0.0467289,
+        0.02256,
+        0.0370326,
+        1.0
+      ]
+    },
+    {
+      "id": "special_subsurface",
+      "position": [
+        -1.7,
+        -1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.86,
+          0.28,
+          0.22,
+          1.0
+        ],
+        "Roughness": 0.5,
+        "Subsurface Weight": 0.8,
+        "Subsurface Scale": 0.18
+      },
+      "center_uv": [
+        0.33,
+        0.225
+      ],
+      "center_rgba_mean": [
+        0.4816446,
+        0.0745551,
+        0.0776841,
+        1.0
+      ]
+    },
+    {
+      "id": "special_alpha",
+      "position": [
+        0.0,
+        -1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.2,
+          0.7,
+          0.45,
+          1.0
+        ],
+        "Roughness": 0.35,
+        "Alpha": 0.4
+      },
+      "center_uv": [
+        0.5,
+        0.225
+      ],
+      "center_rgba_mean": [
+        0.0611831,
+        0.0782365,
+        0.0692104,
+        0.6366191
+      ]
+    },
+    {
+      "id": "special_volume",
+      "position": [
+        1.7,
+        -1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.3,
+          0.5,
+          0.85,
+          1.0
+        ],
+        "Roughness": 0.5,
+        "volume_density": 0.18
+      },
+      "center_uv": [
+        0.67,
+        0.225
+      ],
+      "center_rgba_mean": [
+        0.12677,
+        0.0830614,
+        0.1770337,
+        1.0
+      ]
+    },
+    {
+      "id": "special_transmission_alpha",
+      "position": [
+        3.4,
+        -1.65,
+        0.0
+      ],
+      "inputs": {
+        "Base Color": [
+          0.8,
+          0.5,
+          0.3,
+          1.0
+        ],
+        "Roughness": 0.2,
+        "Transmission Weight": 0.5,
+        "Alpha": 0.6
+      },
+      "center_uv": [
+        0.84,
+        0.225
+      ],
+      "center_rgba_mean": [
+        0.1081668,
+        0.0262837,
+        0.0232735,
+        0.844607
+      ]
+    }
+  ],
+  "source_sha256": "4daceabbfda69394c57f657b3fff9d55e01b669484b552ea7db16596ef462c2e",
+  "files": {
+    "base-checker.png": "1c58f8aa87fe6498bc7985a27d204fea21d517ba3f1d9339fbe28394244a7859",
+    "normal-wave.png": "e16630906f0141361604b1772fddd47e93250e67cbbcc2ef83f226ea4022263a",
+    "material-grid.blend": "2a15669faf60b45e2b8f671c6bc8eff192c2d31c5496ec72b762a12d6211dee9",
+    "material-grid-linear.exr": "533ac8efb50ce7ad036dbc848e391ce7879ed704c2c9ed83638e47ac44e6787f",
+    "material-grid-preview.png": "add5f77f60eab832bb159b09458cd361a3346ffdf589454b17c000ebddb3f2b3"
+  },
+  "max_red_linear": 13.71875,
+  "rerender_comparison": null
+}

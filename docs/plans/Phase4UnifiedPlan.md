@@ -1,6 +1,6 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
-**신설 2026-09-01 · 재분할 2026-09-03 · PHASE 4.5 분리 2026-09-14 · PHASE 4.3 분리 2026-09-15 · PHASE 4.9 신설 2026-09-15(공수 미산정) · 갱신 2026-09-20 · 활성 69행 352.5일 · 완료 22일 · 잔여 330.5일**
+**신설 2026-09-01 · 재분할 2026-09-03 · PHASE 4.5 분리 2026-09-14 · PHASE 4.3 분리 2026-09-15 · PHASE 4.9 신설 2026-09-15(공수 미산정) · 갱신 2026-09-28 · 활성 69행 352.5일 · 완료 24일 · 잔여 328.5일**
 
 기존 단일 PHASE 4에는 현재 PBR 배선 수정, Blender형 Material Graph, RenderGraph·라이트맵·
 일반 SRP·후처리·차세대 GPU 기능이 한데 섞여 있었다. 이 문서는 그것을 다섯 완료선으로
@@ -17,11 +17,11 @@ PHASE 4.5가 소유하던 `BASE-0` 6일이 새 페이즈로 옮겨갔을 뿐이�
 | 페이즈 | 단일 책임 | 활성 행 | 일 | 상태 |
 |---|---|---:|---:|---|
 | **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W0~W9 완료(현재 DX12 제품 계약) |
-| **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | 미착수 |
+| **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | MAT-0 완료, 진행 중 |
 | **4.3** | 공통 밀봉 하네스와 RenderGraph 리소스 의존성·queue/fence RHI 계약 | 11 | 119 | 미착수 |
 | **4.5** | 모션 벡터·jitter·히스토리와 Temporal Upscaling·Frame Generation | 16 | 86 | 미착수 |
 | **4.75** | 라이트맵·일반 SRP·shadow/probe/post·GPU 기능 | 22 | 95.5 | 4일 완료 |
-| **합계** |  | **69** | **352.5** | **잔여 330.5** |
+| **합계** |  | **69** | **352.5** | **잔여 328.5** |
 
 `Q0`(queue/fence RHI 계약)은 미산정이며 위 119일에 포함되지 않는다.
 
@@ -299,7 +299,7 @@ CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단
 
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
-| `MAT-0` | Blender 5.1.1 reference·pre-tone HDR golden | · | PBR-W9 | 2 |
+| `MAT-0` | Blender 5.1.1 reference·pre-tone HDR golden | ✓ | PBR-W9 | 2 |
 | `MAT-1` | `PrincipledSurface`·`MaterialFeatureMask` ABI | · | MAT-0 | 4 |
 | `MAT-2` | typed Material Graph IR·round-trip | · | MAT-1 | 4 |
 | `MAT-3` | core Principled 의미·기본값 | · | MAT-1 | 4 |
@@ -312,6 +312,9 @@ CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단
 
 구 `SRP-3`의 공용 graph 기반과 구 PBR 레인의 material 몫은 이 페이즈가 대체한다.
 완료선은 [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md) §6을 따른다.
+`MAT-0`은 Blender 5.1.1 scene-linear RGBA32F golden과 고정 장면·입력 manifest를
+저장했고, 독립 재렌더 EXR 전체 픽셀 차이 `0.0`을 확인했다. 이는 Blender 기준선
+검증이며 엔진 Material Graph·렌더 결과 일치의 완료 판정은 아니다.
 
 ---
 
@@ -470,7 +473,7 @@ renderer golden과 성능 gate를 사용한다.
 | 묶음 | 활성 행 | 총일 | 완료 | 진행 기성 | 잔여 |
 |---|---:|---:|---:|---:|---:|
 | PHASE 4 PBR 배선 | 10 | 18 | 18 | 0 | 0 |
-| PHASE 4.25 Material Graph | 10 | 34 | 0 | 0 | 34 |
+| PHASE 4.25 Material Graph | 10 | 34 | 2 | 0 | 32 |
 | PHASE 4.3 공통 기준선 | 1 | 6 | 0 | 0 | 6 |
 | PHASE 4.3 트랙 RG/Q0 | 10 | 113 | 0 | 0 | 113 |
 | PHASE 4.5 트랙 TR | 4 | 25 | 0 | 0 | 25 |
@@ -481,7 +484,7 @@ renderer golden과 성능 gate를 사용한다.
 | PHASE 4.75 라이트맵 | 8 | 35 | 2 | 0 | 33 |
 | PHASE 4.75 일반 SRP | 6 | 33 | 0 | 0 | 33 |
 | PHASE 4.75 renderer/post | 3 | 20 | 0 | 0 | 20 |
-| **합계** | **69** | **352.5** | **22** | **0** | **330.5** |
+| **합계** | **69** | **352.5** | **24** | **0** | **328.5** |
 
 페이즈 소계는 PHASE 4 18일 · 4.25 34일 · **4.3 119일** · **4.5 86일** · **4.75 95.5일**이다.
 

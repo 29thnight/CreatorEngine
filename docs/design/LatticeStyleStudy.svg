@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="840" viewBox="0 0 1440 840" role="img" aria-labelledby="title desc">
+  <title id="title">Lattice style study with row anchored pins</title>
+  <desc id="desc">Dark three panel editor with colored node headers, left input pins, right output pins, and typed curved wires.</desc>
+  <defs>
+    <linearGradient id="amber" x2="0" y2="1"><stop stop-color="#f2a21a"/><stop offset="1" stop-color="#564028"/></linearGradient>
+    <linearGradient id="teal" x2="0" y2="1"><stop stop-color="#25a9ab"/><stop offset="1" stop-color="#2a444b"/></linearGradient>
+    <linearGradient id="red" x2="0" y2="1"><stop stop-color="#e9504b"/><stop offset="1" stop-color="#4b3035"/></linearGradient>
+    <linearGradient id="green" x2="0" y2="1"><stop stop-color="#49aa5d"/><stop offset="1" stop-color="#2b4838"/></linearGradient>
+    <linearGradient id="purple" x2="0" y2="1"><stop stop-color="#ab55ba"/><stop offset="1" stop-color="#48304d"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="1" dy="5" stdDeviation="5" flood-opacity=".4"/></filter>
+    <style>
+      text { font-family: 'Segoe UI', Arial, sans-serif; fill: #e8edf0; font-size: 13px; }
+      .muted { fill: #a4adb1; font-size: 11px; }
+      .heading { font-size: 15px; font-weight: 600; }
+      .node { fill: #222e33; stroke: #5c6d72; stroke-width: 1.2; }
+      .header { font-size: 14px; font-weight: 600; }
+      .field { fill: #344249; stroke: #53666d; stroke-width: 1; }
+      .wire { fill: none; stroke-width: 2.5; stroke-linecap: round; }
+      .panel { fill: #242a2d; stroke: #3d464a; stroke-width: 1; }
+    </style>
+  </defs>
+
+  <rect width="1440" height="840" fill="#1c2022"/>
+  <rect x="0" y="0" width="1440" height="38" fill="#242a2d"/>
+  <text x="18" y="25" class="heading">Lattice  /  Material Graph</text>
+  <text x="1144" y="25" class="muted">Oak_Bark.shadergraph  ·  Saved</text>
+
+  <rect class="panel" x="0" y="38" width="248" height="802"/>
+  <text x="18" y="67" class="heading">Library</text>
+  <rect class="field" x="18" y="83" width="212" height="30" rx="5"/>
+  <text x="31" y="103" class="muted">⌕  Search nodes...</text>
+  <text x="18" y="143">Texture</text><text x="18" y="169">Texture Sample</text>
+  <text x="18" y="195">Color</text><text x="18" y="221">Multiply</text>
+  <text x="18" y="247">Normal Map</text><text x="18" y="273">Principled Surface</text>
+  <line x1="18" y1="299" x2="230" y2="299" stroke="#445056"/>
+  <text x="18" y="329" class="heading">Property Editor</text>
+  <text x="18" y="358" class="muted">Selected node · Multiply</text>
+  <text x="18" y="392">Node style</text>
+  <rect x="18" y="404" width="212" height="31" rx="5" fill="url(#red)"/>
+  <text x="29" y="424">Header color</text>
+  <text x="18" y="465">Pin style</text>
+  <circle cx="35" cy="486" r="7" fill="#ff7953" stroke="#1e272b" stroke-width="2"/>
+  <text x="53" y="491" class="muted">Circle · Color · 5 px</text>
+  <text x="18" y="530">Connection style</text>
+  <path d="M23 557 C85 527 139 585 218 553" class="wire" stroke="#ff7953"/>
+  <text x="18" y="594" class="muted">Color · 2.5 px · curve</text>
+  <text x="18" y="815" class="muted">Styles saved beside the graph</text>
+
+  <rect x="248" y="38" width="936" height="802" fill="#1b2022"/>
+  <g opacity=".45" stroke="#303a3e" stroke-width="1">
+    <path d="M308 38V840 M368 38V840 M428 38V840 M488 38V840 M548 38V840 M608 38V840 M668 38V840 M728 38V840 M788 38V840 M848 38V840 M908 38V840 M968 38V840 M1028 38V840 M1088 38V840 M1148 38V840"/>
+    <path d="M248 100H1184 M248 160H1184 M248 220H1184 M248 280H1184 M248 340H1184 M248 400H1184 M248 460H1184 M248 520H1184 M248 580H1184 M248 640H1184 M248 700H1184 M248 760H1184 M248 820H1184"/>
+  </g>
+  <g class="wire">
+    <path d="M477 190 C513 190 515 190 551 190" stroke="#35c3b9"/>
+    <path d="M716 216 C763 216 711 341 756 341" stroke="#ff7953"/>
+    <path d="M716 371 C737 371 735 371 756 371" stroke="#ff7953"/>
+    <path d="M477 565 C513 565 515 565 551 565" stroke="#35c3b9"/>
+    <path d="M716 591 C820 591 823 485 1001 485" stroke="#b78be2"/>
+    <path d="M921 355 C972 355 950 455 1001 455" stroke="#ff7953"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect class="node" x="307" y="151" width="170" height="91" rx="8"/>
+    <path d="M315 151H469Q477 151 477 159V181H307V159Q307 151 315 151Z" fill="url(#amber)"/>
+    <text x="320" y="172" class="header">Base Color Texture</text>
+    <text x="321" y="220" class="muted">Asset  T_BaseColor</text>
+    <text x="415" y="194">Texture</text>
+    <circle cx="477" cy="190" r="6" fill="#35c3b9" stroke="#1b2022" stroke-width="2"/>
+
+    <rect class="node" x="551" y="151" width="165" height="115" rx="8"/>
+    <path d="M559 151H708Q716 151 716 159V181H551V159Q551 151 559 151Z" fill="url(#teal)"/>
+    <text x="564" y="172" class="header">Texture Sample</text>
+    <text x="564" y="194">Texture</text><text x="661" y="220">Color</text>
+    <circle cx="551" cy="190" r="6" fill="#35c3b9" stroke="#1b2022" stroke-width="2"/>
+    <circle cx="716" cy="216" r="6" fill="#ff7953" stroke="#1b2022" stroke-width="2"/>
+
+    <rect class="node" x="551" y="331" width="165" height="83" rx="8"/>
+    <path d="M559 331H708Q716 331 716 339V361H551V339Q551 331 559 331Z" fill="url(#amber)"/>
+    <text x="564" y="352" class="header">Tint Color</text>
+    <text x="659" y="375">Color</text>
+    <circle cx="716" cy="371" r="6" fill="#ff7953" stroke="#1b2022" stroke-width="2"/>
+
+    <rect class="node" x="756" y="301" width="165" height="123" rx="8"/>
+    <path d="M764 301H913Q921 301 921 309V331H756V309Q756 301 764 301Z" fill="url(#red)"/>
+    <text x="769" y="322" class="header">Multiply</text>
+    <text x="770" y="345">A</text><text x="770" y="375">B</text>
+    <text x="864" y="359">Result</text>
+    <circle cx="756" cy="341" r="6" fill="#ff7953" stroke="#1b2022" stroke-width="2"/>
+    <circle cx="756" cy="371" r="6" fill="#ff7953" stroke="#1b2022" stroke-width="2"/>
+    <circle cx="921" cy="355" r="6" fill="#ff7953" stroke="#1b2022" stroke-width="2"/>
+
+    <rect class="node" x="307" y="526" width="170" height="91" rx="8"/>
+    <path d="M315 526H469Q477 526 477 534V556H307V534Q307 526 315 526Z" fill="url(#amber)"/>
+    <text x="320" y="547" class="header">Normal Texture</text>
+    <text x="321" y="595" class="muted">Asset  T_Normal</text>
+    <text x="415" y="569">Texture</text>
+    <circle cx="477" cy="565" r="6" fill="#35c3b9" stroke="#1b2022" stroke-width="2"/>
+
+    <rect class="node" x="551" y="526" width="165" height="115" rx="8"/>
+    <path d="M559 526H708Q716 526 716 534V556H551V534Q551 526 559 526Z" fill="url(#green)"/>
+    <text x="564" y="547" class="header">Normal Map</text>
+    <text x="564" y="569">Texture</text><text x="651" y="595">Normal</text>
+    <circle cx="551" cy="565" r="6" fill="#35c3b9" stroke="#1b2022" stroke-width="2"/>
+    <path d="M716 585L722 591L716 597L710 591Z" fill="#b78be2" stroke="#1b2022" stroke-width="2"/>
+
+    <rect class="node" x="1001" y="416" width="168" height="125" rx="8"/>
+    <path d="M1009 416H1161Q1169 416 1169 424V446H1001V424Q1001 416 1009 416Z" fill="url(#purple)"/>
+    <text x="1014" y="437" class="header">Principled Surface</text>
+    <text x="1015" y="459">Base Color</text><text x="1015" y="489">Normal</text>
+    <circle cx="1001" cy="455" r="6" fill="#ff7953" stroke="#1b2022" stroke-width="2"/>
+    <path d="M1001 479L1007 485L1001 491L995 485Z" fill="#b78be2" stroke="#1b2022" stroke-width="2"/>
+  </g>
+
+  <rect class="panel" x="1184" y="38" width="256" height="802"/>
+  <text x="1201" y="69" class="heading">Evaluation Trace</text>
+  <text x="1201" y="101" class="muted">INPUTS</text>
+  <text x="1201" y="130">Base Color Texture</text><text x="1201" y="159">Normal Texture</text>
+  <line x1="1201" y1="179" x2="1421" y2="179" stroke="#475257"/>
+  <text x="1201" y="211" class="muted">OPERATIONS</text>
+  <text x="1201" y="240">Texture Sample</text><text x="1201" y="269">Tint Color</text>
+  <rect x="1195" y="283" width="230" height="34" rx="5" fill="#37464a" stroke="#e26961"/>
+  <text x="1205" y="306">Multiply</text>
+  <text x="1201" y="340">Normal Map</text>
+  <line x1="1201" y1="364" x2="1421" y2="364" stroke="#475257"/>
+  <text x="1201" y="396" class="muted">OUTPUT</text><text x="1201" y="425">Principled Surface</text>
+  <text x="1201" y="815" class="muted">7 nodes · 6 links</text>
+</svg>

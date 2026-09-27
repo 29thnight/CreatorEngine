@@ -341,10 +341,12 @@
   <p class="lead">진행·대기·차단 상태의 실행 계획 25종을 먼저 표시한다. 종료·대체된 계획 19종은 <a href="plans/archive/README.md">보관함</a>에서 근거와 검증 한계를 확인한다.</p>
   <h3>실행 계획 — 진행·대기·차단</h3>
   <div class="doc-grid">
-    <div class="doc"><a href="plans/PBRWiringStabilizationPlan.md">PBRWiringStabilizationPlan.md</a><span class="tie">PHASE 4 · 진행</span>
-      <div class="why">현행 PBR 배선·재질 의미·backend 동등성과 실장면 회귀. 09-19 IBL 적분·거울 반사·GGX·SSAO·SSGI 후속 수정 및 DX12 검증(§25); W9 시각 고정은 잔여.</div></div>
-    <div class="doc"><a href="plans/BlenderMaterialGraphPlan.md">BlenderMaterialGraphPlan.md</a><span class="tie">PHASE 4.25 · 미착수</span>
-      <div class="why">Principled 기반 Material Graph와 artist workflow.</div></div>
+    <div class="doc"><a href="plans/PBRWiringStabilizationPlan.md">PBRWiringStabilizationPlan.md</a><span class="tie">PHASE 4 · DX12 완료</span>
+      <div class="why">W0~W9의 DX12 제품 PBR 배선과 실장면 게이트 완료. Vulkan 제품 교차 판정은 PHASE 4.9에서 관리한다.</div></div>
+    <div class="doc"><a href="plans/BlenderMaterialGraphPlan.md">BlenderMaterialGraphPlan.md</a><span class="tie">PHASE 4.25 · MAT-0 완료</span>
+      <div class="why">Blender 5.1.1 재질 기준 장면·선형 HDR golden을 고정했다. 엔진 Principled ABI, Material Graph, 제품 비교는 후속 MAT 단계다.</div></div>
+<div class="doc is-ref"><a href="plans/LatticeAdoptionPlan.md">LatticeAdoptionPlan.md</a><span class="tie">LX 횡단 계획 · 독립 예제 게이트 통과</span>
+      <div class="why">공통 그래프·UI의 Debug/Release 자체 검사와 실제 창 조작·저장 재개방을 확인했다. LX-3 Editor 연결, BT/Animator 새 저작 창, imgui-node-editor 제거는 각각 별도 게이트다. PHASE 4.25의 34일에 다른 창 이관 공수를 포함하지 않는다.</div></div>
     <div class="doc"><a href="plans/Phase4UnifiedPlan.md">Phase4UnifiedPlan.md</a><span class="tie">PHASE 4 계열 · 정본</span>
       <div class="why">PHASE 4·4.25·4.3·4.5·4.75의 책임·순서·공수 통합 기준.</div></div>
     <div class="doc"><a href="plans/TemporalReconstructionPlan.md">TemporalReconstructionPlan.md</a><span class="tie">PHASE 4.5 · 미착수</span>
@@ -606,7 +608,7 @@
 <!-- ===== PHASE 4.25 ===== -->
 <section class="phase" id="phase-4.25">
   <h2 class="sec"><span class="no">PHASE 4.25</span>Blender형 PBR · Material Graph <span class="phase-pct" data-phase-pct="4.25"></span></h2>
-  <div class="phase-meta"><b>정본: <a href="plans/BlenderMaterialGraphPlan.md" style="color:var(--accent)">BlenderMaterialGraphPlan.md</a></b> · 2026-09-03 신설 · <b>활성 10행 34일 · 미착수</b> · 선행 PHASE 4.</div>
+  <div class="phase-meta"><b>정본: <a href="plans/BlenderMaterialGraphPlan.md" style="color:var(--accent)">BlenderMaterialGraphPlan.md</a></b> · 2026-09-28 MAT-0 완료 · <b>MAT 10행 34일 중 2일 완료 · 진행 중</b> · LX 횡단 작업은 공수 미산정 별도 행 · 선행 PHASE 4.</div>
   <div class="phase-goal"><b>목표:</b> Blender 5.1.1 Principled 재질의 pre-tone linear HDR 응답을 목표로 <code>PrincipledSurface</code>·<code>MaterialFeatureMask</code>·typed Material Graph를 세운다. Standard/Layered/Special 자동 route와 cook specialization, artist용 비용 badge로 품질과 게임 성능을 함께 관리한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="4.25"><!-- JS 생성 --></table></div>
   <div class="verify">
@@ -2915,13 +2917,37 @@ const TASKS = [
   // ---------- PHASE 4.25: Blender형 Principled PBR·Material Graph ----------
   { phase: 4.25, id: "MAT-0", title: "Blender 5.1.1 reference·pre-tone HDR golden",
     detail: "같은 mesh·texture·HDRI·light·camera의 core/layered/special material grid를 고정하고 tone mapping 전 linear HDR을 비교 정본으로 삼는다.",
-    refs: "BlenderMaterialGraphPlan MAT-0", priority: "P0", days: 2, status: "todo", note: "좌표계·shadow·AO·probe·post는 비교에서 제외한다." },
+    refs: "BlenderMaterialGraphPlan MAT-0 · Tools/blender/fixtures/material-reference-5.1.1", priority: "P0", days: 2, status: "done", note: "2026-09-28 Blender 5.1.1의 15개 core/layered/special 사례와 scene-linear RGBA32F EXR·장면·manifest 고정. 독립 재렌더 전체 RGBA 픽셀 최대 차이 0.0. AgX PNG는 표시 전용. 제품 일치 판정은 MAT-9; shadow·AO·probe·post는 제외." },
   { phase: 4.25, id: "MAT-1", title: "PrincipledSurface·MaterialFeatureMask 공용 Slang ABI",
     detail: "Deferred/Forward가 함께 소비할 유일한 material evaluation 결과와 정적 feature 집합을 정의한다.",
     refs: "BlenderMaterialGraphPlan MAT-1", priority: "P0", days: 4, status: "todo", note: "route가 달라도 같은 지원 feature의 외형이 바뀌지 않아야 한다." },
   { phase: 4.25, id: "MAT-2", title: "typed Material Graph IR·domain·round-trip",
     detail: "Color/Vector/Normal/Texture/Sampler/Surface/Closure pin, stable node ID, subgraph, schema migration과 unknown-node recovery를 구현한다.",
-    refs: "BlenderMaterialGraphPlan MAT-2", priority: "P0", days: 4, status: "todo", note: ".shadergraph에 domain=material|pass를 명시하고 output 계약을 분리한다." },
+    refs: "BlenderMaterialGraphPlan MAT-2 · LatticeNodeSystem", priority: "P0", days: 4, status: "todo", note: "LX-2 독립 ImGui 예제 게이트 뒤 domain=material을 구현한다. Blender형 노드·소켓·그룹·편집 동작의 전체 대응 범위는 LX-0 대응표 후 별도 산정한다." },
+  { phase: 4.25, id: "LX-0", title: "Material 노드·소켓 Blender 대응표",
+    detail: "Blender 5.1.1 Shader Editor의 node tree·socket·link·group/interface·편집 동작과 새 .shadergraph 목표 schema를 대조한다. 기존 BT·Animator 자산 fixture와 변환은 범위에서 제외한다.",
+    refs: "LatticeAdoptionPlan LX-0 · LatticeMaterialBlenderParity · BlenderMaterialGraphPlan", priority: "P0", days: null, status: "done", note: "Blender 5.1.1 로컬 설치본에서 생성 가능한 103개 타입의 기본 소켓·값·17개 단일 enum 변경을 추출하고 2회 SHA-256 일치 확인. Material 목표 schema·대표 graph·독립 예제/Editor 소비 경계 고정. 제품 node/compiler 지원은 미구현." },
+  { phase: 4.25, id: "LX-1", title: "Lattice 공통 그래프 모델·동적 핀",
+    detail: "안정 ID, 타입 링크, 저장 왕복·복구, Undo와 노드별 동적 핀 규칙을 독립 코어에 둔다.",
+     refs: "LatticeAdoptionPlan LX-1 · LatticeExample README", priority: "P0", days: null, status: "progress", note: "LX-0 Material 기준선 완료. 정의 registry·domain/schema, 소켓 identifier·typed value·위치/접힘/Frame/view LXLayout을 LXG 8로 왕복. 독립 LXDocument 명령·revision·dirty·Undo/Redo와 Material 예제 UI 명령 연결을 검사. Factor·Color·Texture 항목을 typed 핀 값에 결속하고 Property Editor의 bool/int/float/vector/normal/color/texture 다중 항목 수정→저장 왕복 통과. Frame 묶음 이동·삭제, DPI별 view 복원과 외부 LXS 5 스타일·기존 4형식 읽기 검증. Node Group 내부 graph·interface ID·instance와 저장 왕복, 손상 파일 거부 및 LXG 7→8 재저장 통과. 그룹 내부 graph 초안 편집과 interface 입력·출력 노출/이름/순서 수정, 인스턴스 핀 ID·외부 링크 유지, 연결된 소켓 제거 거부 및 단일 Undo 통과. Group Input/Output 경계·내부 링크, 타입별 interface 기본값·순서·인스턴스 동기화와 저장 왕복 통과. 선택 Material 노드의 그룹화 명령·경계 소켓·외부 링크/Frame 보존·단일 Undo·저장 왕복 통과. 루트 정의와 중첩 복사본의 ID 공유, 수정·새 소켓의 중첩 인스턴스 전파, Undo/Redo·저장 왕복 통과. 참조·소유 순환, 복사본 불일치, 중첩 연결 소켓 제거와 16단계 초과를 거부. Material 컴파일, reroute·annotation·안정 오류 코드는 미완료. BT/Animator 기존 자산 변환 제외." },
+  { phase: 4.25, id: "LX-2", title: "Lattice 독립 ImGui 예제 조작 검증",
+    detail: "검색·연결 드래그·다중 선택·묶음 이동/삭제·키보드·동적 핀·대량 노드·DPI/resize를 독립 예제에서 검사한다.",
+    refs: "LatticeAdoptionPlan LX-2 · LatticeExample README", priority: "P0", days: null, status: "done", note: "2026-09-28 독립 예제 게이트 통과. Debug/Release 빌드·자체 검사, 250노드, 2모니터 DPI/창 크기와 DX11 캡처를 확인했다. 보이는 창에서 접힘·핀 정렬·연결/타입 거부·검색/생성·복사/붙여넣기·Undo/Redo·진단 클릭 이동·외부 창 스타일·저장 후 재실행을 검증했다. Library 노드 겹침을 수정하고 좁은 창에서 연속 생성·화면 이동·저장 왕복을 확인했다. Ctrl+클릭 다중 선택과 동시 이동은 사용자가 실제 창에서 확인했다. Editor/Material 제품 경로는 LX-3과 MAT 작업이다." },
+  { phase: 4.25, id: "LX-3", title: "Lattice Material 창 Editor 연결",
+    detail: "Lattice 공통 코어·ImGui 캔버스를 Editor host에 연결하고 Material 문서·창별 스타일·제품 저장 경로를 세운다. .shadergraph와 Material 컴파일 산출물은 MAT-2/MAT-6과 함께 검증한다.",
+    refs: "LatticeAdoptionPlan LX-3 · BlenderMaterialGraphPlan MAT-2/MAT-6", priority: "P0", days: null, status: "todo", note: "LX-2 독립 예제 게이트 통과. Editor DX12/Vulkan 조작, .shadergraph 저장·재개방, typed IR/Slang/진단은 미검증. 완성 선행은 MAT-1이며 이관 공수는 미산정." },
+  { phase: 4.25, id: "LX-3H", title: "열린 LX 그래프의 HTTP CLI 실시간 조작",
+    detail: "Editor의 인증된 CommandService를 통해 열린 LX 문서·핀을 조회하고 연결·해제·Undo·저장한다. UI와 HTTP는 같은 문서 명령을 사용한다.",
+    refs: "LatticeAdoptionPlan LX-3H · LatticeNodeSystem", priority: "P0", days: null, status: "todo", note: "LX-3 Editor host 후 필수 게이트. /health frame 진행·idle, POST /command, revision 충돌·무변경 실패·저장 왕복을 검증한다. 공수 미산정." },
+  { phase: 4.25, id: "LX-4", title: "Animator 새 저작 창 LX 적용",
+    detail: "기존 자산 변환 없이 새 controller/state/transition 저작을 LX에 구현하고 저장·실행을 검증한다.",
+    refs: "LatticeAdoptionPlan LX-4", priority: "P1", days: null, status: "todo", note: "Material 선행 작업의 완료 조건이 아니다. 독립 예제에서는 제목 전용 FSM 스타일만 검증했다." },
+  { phase: 4.25, id: "LX-5", title: "Behavior Tree 새 저작 창 LX 적용",
+    detail: "기존 .bt 변환 없이 새 BT 저작과 child order·decorator·weight·실행을 LX로 검증한다.",
+    refs: "LatticeAdoptionPlan LX-5", priority: "P1", days: null, status: "todo", note: "Material 선행 작업의 완료 조건이 아니다. 기존 BT 편집 창은 활성 상태로 유지한다." },
+  { phase: 4.25, id: "LX-6", title: "imgui-node-editor 의존성 제거",
+    detail: "LX-3~5의 활성 UI 소비자가 모두 이전한 뒤 NodeEditor/BlueprintBuilder/PinHelper와 imgui-node-editor 직접 의존을 제거한다.",
+    refs: "LatticeAdoptionPlan LX-6", priority: "P1", days: null, status: "todo", note: "현재 Animator/BT 소비자가 남아 있다. Editor Debug/Release와 새 그래프 제품 경로를 확인한 뒤 제거한다." },
   { phase: 4.25, id: "MAT-3", title: "core Principled 의미·기본값",
     detail: "Base Color·Metallic·Roughness·IOR/Specular IOR Level·Normal·Alpha·Emission Color/Strength의 Blender 의미와 기본값을 맞춘다.",
     refs: "BlenderMaterialGraphPlan MAT-3", priority: "P0", days: 4, status: "todo", note: "factor×texture와 constant-only 입력을 독립 판정한다." },
@@ -3013,7 +3039,7 @@ document.querySelectorAll("table.tasks").forEach(table => {
       <td><code>${t.id}</code></td>
       <td><strong>${esc(t.title)}</strong><br><span style="color:var(--text-dim);font-size:12.5px">${rich(t.detail)}</span>${t.note ? `<br><span style="color:var(--accent);font-size:12px">📝 ${rich(t.note)}</span>` : ""}</td>
       <td><span class="pr ${PR_CLASS[t.priority]}">${t.priority}</span></td>
-      <td>${t.days}일</td>
+      <td>${Number.isFinite(t.days) ? t.days + "일" : "미산정"}</td>
       <td><span class="st ${ST_CLASS[t.status]}">${ST_LABEL[t.status]}</span></td>
       <td style="font-size:12px;color:var(--text-dim)">${esc(t.refs)}</td>
     </tr>`;

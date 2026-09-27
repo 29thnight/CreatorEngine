@@ -23,8 +23,9 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 
 | 문서 | 대상 |
 |---|---|
-| [PBRWiringStabilizationPlan.md](plans/PBRWiringStabilizationPlan.md) | PHASE 4 · 진행 — 현행 PBR 배선·재질 의미·backend 동등성과 실장면 회귀. |
-| [BlenderMaterialGraphPlan.md](plans/BlenderMaterialGraphPlan.md) | PHASE 4.25 · 미착수 — Principled 기반 Material Graph와 artist workflow. |
+| [PBRWiringStabilizationPlan.md](plans/PBRWiringStabilizationPlan.md) | PHASE 4 · DX12 완료 — W0~W9 제품 배선·실장면 게이트. Vulkan 교차 판정은 PHASE 4.9. |
+| [BlenderMaterialGraphPlan.md](plans/BlenderMaterialGraphPlan.md) | PHASE 4.25 · MAT-0 완료 — Blender 5.1.1 재질 기준 장면과 선형 HDR golden 고정. Principled ABI와 Material Graph 제품 작업은 후속. |
+| [LatticeAdoptionPlan.md](plans/LatticeAdoptionPlan.md) | LX-0~6 · 공수 미산정 — LX-2 독립 ImGui 예제 게이트 통과. Editor 연결, 새 BT/Animator 저작 창, `imgui-node-editor` 제거는 후속. |
 | [Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md) | PHASE 4 계열 · 정본 — PHASE 4·4.25·4.3·4.5·4.75의 책임·순서·공수 통합 기준. |
 | [RenderGraphDependencySchedulingPlan.md](plans/RenderGraphDependencySchedulingPlan.md) | PHASE 4.3 · RG — 공통 밀봉 하네스와 리소스 의존성 스케줄링, 단계별 제품 전환. |
 | [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.75 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
