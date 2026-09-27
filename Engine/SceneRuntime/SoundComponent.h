@@ -35,7 +35,7 @@ class SoundComponent : public meta::identity<SoundComponent, Component>
            meta::method<&Self::Play>,
            meta::method<&Self::Stop>,
            meta::method<&Self::Pause>.params("pause"),
-           meta::method<&Self::IsPlaying>,
+           meta::method<&Self::IsPlaying>.readOnlyInInspector(),
            meta::method<&Self::PlayOneShot>);
    }
 public:

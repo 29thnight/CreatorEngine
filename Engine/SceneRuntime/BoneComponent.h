@@ -44,7 +44,7 @@ class BoneComponent : public meta::identity<BoneComponent, Component>
    static consteval auto reflect()
    {
        return meta::schema<Self>(
-           meta::method<&Self::GetResolvedBoneIndex>);
+           meta::method<&Self::GetResolvedBoneIndex>.readOnlyInInspector());
    }
 public:
     BoneComponent() = default;

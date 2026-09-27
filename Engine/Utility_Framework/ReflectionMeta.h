@@ -94,6 +94,16 @@ namespace meta
         return prop;
     }
 
+    template<auto Fn, size_t NParams>
+    inline Meta::Method BuildMethodFrom(const method_info<Fn, NParams>& mi)
+    {
+        Meta::Method method = Meta::MakeMethod(mi.identifier.data(), mi.pointer,
+            std::vector<std::string>(mi.paramNames.begin(), mi.paramNames.end()));
+        method.inspectorReadOnly = mi.inspectorReadOnly;
+        method.inspectorHidden = mi.inspectorHidden;
+        return method;
+    }
+
     // 어댑터: 로컬 스키마 → 기존 Meta::Type 테이블 — 이름 기반 소비자의 정본
     // 공급원(CT7 재정의). Property/Method는 **로컬** 필드·메서드만 싣고 부모는
     // Type::parent 체인이 잇는다(레거시 파리티). 컴파일타임 서술자는 canonical
@@ -129,8 +139,7 @@ namespace meta
             {
                 static const auto arr = std::apply([](const auto&... fs)
                 {
-                    return std::to_array({ Meta::MakeMethod(fs.identifier.data(), fs.pointer,
-                        std::vector<std::string>(fs.paramNames.begin(), fs.paramNames.end()))... });
+                    return std::to_array({ BuildMethodFrom(fs)... });
                 }, schema_of<T>.methods);
                 return { arr };
             }
@@ -212,8 +221,16 @@ namespace meta
                         .with(meta::range(0.0f, 1.0f),
                               meta::displayName("Ranged")),
                     meta::method<&Self::Fire>.params("shots"),
-                    meta::method<&Self::IsEmpty>);
+                    meta::method<&Self::IsEmpty>.readOnlyInInspector());
             }
+        };
+
+        // MSVC는 다중 상속 멤버 포인터를 `{&Type::Method,0}`으로 출력한다.
+        struct MethodBaseA { virtual ~MethodBaseA() = default; };
+        struct MethodBaseB { virtual ~MethodBaseB() = default; };
+        struct CanaryMultipleBases : MethodBaseA, MethodBaseB
+        {
+            void Fire(int) {}
         };
 
         class CanaryChild : public Canary
@@ -275,6 +292,7 @@ namespace meta
         static_assert(method_name_raw<&Canary::Fire>() == "Fire",
             "MSVC 멤버 함수 NTTP __FUNCSIG__ 표기가 변했다 — method_name_raw 갱신 필요");
         static_assert(method_name_raw<&Canary::IsEmpty>() == "IsEmpty");
+        static_assert(method_name_raw<&CanaryMultipleBases::Fire>() == "Fire");
 
         // 타입 이름은 **한정 이름**(네임스페이스 포함)이고, 라이브러리 복제본과
         // 엔진 TypeTrait::type_name의 출력 동일성은 여기서 교차 검증한다 —
@@ -309,6 +327,7 @@ namespace meta
             .has_attribute<display_name_attr>());
         static_assert(std::get<0>(schema_of<Canary>.methods).paramNames[0]
             == std::string_view{ "shots" });
+        static_assert(std::get<1>(schema_of<Canary>.methods).inspectorReadOnly);
         static_assert(declaringType(std::get<2>(fields<CanaryChild>()))
             == "meta::detail::selftest::CanaryChild");
         static_assert(declaringType(std::get<0>(fields<CanaryChild>()))

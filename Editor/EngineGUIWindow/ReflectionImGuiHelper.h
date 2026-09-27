@@ -25,6 +25,11 @@ namespace EditorImGuiTexture { unsigned long long From(Texture* texture); }
 #include "Entity.h"
 #include "TypeTrait.h"
 #include "InputManager.h"
+#include <algorithm>
+#include <any>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 using namespace TypeTrait;
 namespace Meta
@@ -65,121 +70,161 @@ namespace Meta
         }
     }
 
-    // CT7: 레거시 프로퍼티 위젯 체인(DrawProperties)은 은퇴했다 — typed Draw
-    // (ReflectionTypedDraw.h)가 단일 경로다. 파리티는 CT6-c A/B 캡처로 증명됐다.
+    enum class MethodInputKind { Int, Float, Bool, String, Unsupported };
+
+    inline MethodInputKind MethodInputOf(const MethodParameter& param)
+    {
+        if (param.typeID == GUIDCreator::GetTypeID<int>()) return MethodInputKind::Int;
+        if (param.typeID == GUIDCreator::GetTypeID<float>()) return MethodInputKind::Float;
+        if (param.typeID == GUIDCreator::GetTypeID<bool>()) return MethodInputKind::Bool;
+        if (param.typeID == GUIDCreator::GetTypeID<std::string>()) return MethodInputKind::String;
+        return MethodInputKind::Unsupported;
+    }
+
+    struct MethodUiState
+    {
+        std::vector<std::any> arguments;
+        std::string feedback;
+        bool failed = false;
+        int lastSeenFrame = 0;
+    };
+
+    inline std::string MethodResultText(const std::any& result)
+    {
+        if (!result.has_value()) return "Invoked";
+        if (const auto* value = std::any_cast<int>(&result)) return "Result: " + std::to_string(*value);
+        if (const auto* value = std::any_cast<float>(&result)) return "Result: " + std::to_string(*value);
+        if (const auto* value = std::any_cast<bool>(&result)) return *value ? "Result: true" : "Result: false";
+        if (const auto* value = std::any_cast<std::string>(&result)) return "Result: " + *value;
+        return "Invoked (result cannot be displayed)";
+    }
+
+    inline void InvokeInspectorMethod(void* instance, const Method& method, MethodUiState& state)
+    {
+        try
+        {
+            state.feedback = MethodResultText(method.invoker(instance, state.arguments));
+            state.failed = false;
+        }
+        catch (const std::exception& e)
+        {
+            if (!state.failed || state.feedback != e.what())
+                Debug::PrintLog(spdlog::level::err, e.what());
+            state.feedback = e.what();
+            state.failed = true;
+        }
+    }
+
+    inline void DrawMethodFeedback(const MethodUiState& state)
+    {
+        if (state.feedback.empty()) return;
+        const ImVec4 color = state.failed ? ImVec4(1.f, .4f, .4f, 1.f)
+            : ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled);
+        ImGui::PushStyleColor(ImGuiCol_Text, color);
+        ImGui::TextWrapped("%s", state.feedback.c_str());
+        ImGui::PopStyleColor();
+    }
+
+    // CT7: 속성은 typed Draw 경로지만 메서드는 이 공통 UI가 담당한다.
     inline void DrawMethods(void* instance, const Type& type)
     {
-        // 하나의 정적 컨테이너로 모든 매개변수를 관리합니다.
-        static std::unordered_map<std::string, std::any> paramValues;
+        const bool hasVisibleMethod = std::any_of(type.methods.begin(), type.methods.end(),
+            [](const Method& method) { return !method.inspectorHidden; });
+        if (!hasVisibleMethod) return;
 
-        for (const auto& method : type.methods)
+        // ImGui ID는 상위 컴포넌트 ID, 인스턴스 포인터, 메서드 순서를 포함한다.
+        // 접은 컴포넌트의 임시 입력도 잠시 보존하고 오래 안 쓴 상태는 회수한다.
+        static std::unordered_map<ImGuiID, MethodUiState> states;
+        static int lastCleanupFrame = 0;
+        const int frame = ImGui::GetFrameCount();
+        if (frame - lastCleanupFrame >= 600)
         {
-            if (method.parameters.empty())
+            for (auto it = states.begin(); it != states.end();)
             {
-                ImGui::Text("Function: ");
-                ImGui::SameLine();
-                if (ImGui::Button(method.name))
-                {
-                    try
-                    {
-                        method.invoker(instance, {});
-                    }
-                    catch (const std::exception& e)
-                    {
-                        Debug::PrintLog(spdlog::level::err, e.what());
-                    }
-                }
+                if (frame - it->second.lastSeenFrame > 3600) it = states.erase(it);
+                else ++it;
             }
-            else
-            {
-                if (ImGui::TreeNode(method.name))
-                {
-                    // CT1: 키에 타입명을 포함한다 — paramValues는 전 컴포넌트가
-                    // 공유하는 static 맵이라, 동명 메서드(같은 인덱스)의 입력값이
-                    // 타입 경계를 넘어 서로 새어 들어갔다. 조립도 메서드당 1회로.
-                    const std::string keyBase = type.name + "_" + std::string(method.name) + "_param_";
-
-                    // 각 매개변수에 대해 고유한 키 생성
-                    for (size_t i = 0; i < method.parameters.size(); i++)
-                    {
-                        const auto& param = method.parameters[i];
-                        std::string key = keyBase + std::to_string(i);
-
-                        // 해당 키가 컨테이너에 없다면, 기본값을 설정
-                        if (paramValues.find(key) == paramValues.end())
-                        {
-                            if (std::string(param.typeName) == "int")
-                                paramValues[key] = 0;
-                            else if (std::string(param.typeName) == "float")
-                                paramValues[key] = 0.0f;
-                            else if (std::string(param.typeName) == "bool")
-                                paramValues[key] = false;
-                            else if (param.typeID == GUIDCreator::GetTypeID<std::string>())
-                                paramValues[key] = std::string();
-                            // 여기서 다른 지원 타입에 대한 기본값을 추가할 수 있음
-                        }
-
-                        // 각 타입별로 UI 위젯을 출력합니다.
-                        if (std::string(param.typeName) == "int")
-                        {
-                            int value = std::any_cast<int>(paramValues[key]);
-                            ImGui::InputInt(param.name.c_str(), &value);
-                            paramValues[key] = value;
-                        }
-                        else if (std::string(param.typeName) == "float")
-                        {
-                            float value = std::any_cast<float>(paramValues[key]);
-                            ImGui::InputFloat(param.name.c_str(), &value);
-                            paramValues[key] = value;
-                        }
-                        else if (std::string(param.typeName) == "bool")
-                        {
-                            bool value = std::any_cast<bool>(paramValues[key]);
-                            ImGui::Checkbox(param.name.c_str(), &value);
-                            paramValues[key] = value;
-                        }
-                        else if (param.typeID == GUIDCreator::GetTypeID<std::string>())
-                        {
-                            std::string value = std::any_cast<std::string>(paramValues[key]);
-                            // C 스타일 버퍼가 필요하므로 임시 버퍼 사용
-                            char buf[128];
-                            // strncpy_s를 사용하여 안전하게 문자열 복사 (_TRUNCATE: 출력 버퍼 크기를 넘어가면 잘라냄)
-                            strncpy_s(buf, sizeof(buf), value.c_str(), _TRUNCATE);
-                            buf[sizeof(buf) - 1] = '\0';
-                            if (ImGui::InputText(param.name.c_str(), buf, sizeof(buf)))
-                            {
-                                paramValues[key] = std::string(buf);
-                            }
-                        }
-                        else
-                        {
-                            // std::string을 varargs(%s)에 그대로 넘기던 UB도 함께 수정
-                            ImGui::Text("Parameter %s of type %s is not supported.",
-                                param.name.c_str(), param.typeName.c_str());
-                        }
-                    }
-
-                    if (ImGui::Button("Invoke"))
-                    {
-                        std::vector<std::any> args;
-                        for (size_t i = 0; i < method.parameters.size(); i++)
-                        {
-                            std::string key = keyBase + std::to_string(i);
-                            args.push_back(paramValues[key]);
-                        }
-                        try
-                        {
-                            method.invoker(instance, args);
-                        }
-                        catch (const std::exception& e)
-                        {
-                            Debug::PrintLog(spdlog::level::err, e.what());
-                        }
-                    }
-                    ImGui::TreePop();
-                }
-            }
+            lastCleanupFrame = frame;
         }
+
+        ImGui::SeparatorText("Methods");
+        ImGui::PushID(instance);
+        for (size_t methodIndex = 0; methodIndex < type.methods.size(); ++methodIndex)
+        {
+            const Method& method = type.methods[methodIndex];
+            if (method.inspectorHidden) continue;
+            ImGui::PushID(static_cast<int>(methodIndex));
+            MethodUiState& state = states[ImGui::GetID("##methodState")];
+            state.lastSeenFrame = frame;
+            if (state.arguments.size() != method.parameters.size())
+                state.arguments.resize(method.parameters.size());
+
+            if (method.inspectorReadOnly && method.parameters.empty())
+            {
+                InvokeInspectorMethod(instance, method, state);
+                ImGui::TextUnformatted(method.name);
+                DrawMethodFeedback(state);
+            }
+            else if (method.parameters.empty())
+            {
+                if (ImGui::Button(method.name)) InvokeInspectorMethod(instance, method, state);
+                DrawMethodFeedback(state);
+            }
+            else if (ImGui::TreeNode(method.name))
+            {
+                bool supported = true;
+                for (size_t i = 0; i < method.parameters.size(); ++i)
+                {
+                    const MethodParameter& param = method.parameters[i];
+                    std::any& argument = state.arguments[i];
+                    ImGui::PushID(static_cast<int>(i));
+                    switch (MethodInputOf(param))
+                    {
+                    case MethodInputKind::Int:
+                        if (!std::any_cast<int>(&argument)) argument = 0;
+                        ImGui::TextUnformatted(param.name.c_str());
+                        ImGui::SetNextItemWidth(-1.f);
+                        if (ImGui::InputInt("##value", std::any_cast<int>(&argument))) state.feedback.clear();
+                        break;
+                    case MethodInputKind::Float:
+                        if (!std::any_cast<float>(&argument)) argument = 0.f;
+                        ImGui::TextUnformatted(param.name.c_str());
+                        ImGui::SetNextItemWidth(-1.f);
+                        if (ImGui::InputFloat("##value", std::any_cast<float>(&argument))) state.feedback.clear();
+                        break;
+                    case MethodInputKind::Bool:
+                        if (!std::any_cast<bool>(&argument)) argument = false;
+                        if (ImGui::Checkbox(param.name.c_str(), std::any_cast<bool>(&argument))) state.feedback.clear();
+                        break;
+                    case MethodInputKind::String:
+                    {
+                        if (!std::any_cast<std::string>(&argument)) argument = std::string{};
+                        auto* value = std::any_cast<std::string>(&argument);
+                        ImGui::TextUnformatted(param.name.c_str());
+                        ImGui::SetNextItemWidth(-1.f);
+                        if (ImGui::InputText("##value", value->data(), value->capacity() + 1,
+                            ImGuiInputTextFlags_CallbackResize, InputTextCallback, value))
+                            state.feedback.clear();
+                        break;
+                    }
+                    case MethodInputKind::Unsupported:
+                        supported = false;
+                        ImGui::TextDisabled("%s: %s is not supported", param.name.c_str(), param.typeName.c_str());
+                        break;
+                    }
+                    ImGui::PopID();
+                }
+
+                ImGui::BeginDisabled(!supported);
+                const bool invoke = ImGui::Button("Invoke");
+                ImGui::EndDisabled();
+                if (invoke && supported) InvokeInspectorMethod(instance, method, state);
+                DrawMethodFeedback(state);
+                ImGui::TreePop();
+            }
+            ImGui::PopID();
+        }
+        ImGui::PopID();
     }
 
     // 열거형 점검(8-17): 이름 키 재조회(EnumRegistry->Find — 같은 것을 두 번

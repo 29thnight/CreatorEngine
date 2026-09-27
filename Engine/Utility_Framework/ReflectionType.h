@@ -71,6 +71,8 @@ namespace Meta
         const char*              name;
         Invoker                  invoker;
         MethodParameterContainer parameters;
+        bool                     inspectorReadOnly = false;
+        bool                     inspectorHidden = false;
     };
 
     // CT11: 팩토리 접합 — FactoryRegistry(typeID 해시 조회 싱글턴)가 Type

@@ -64,7 +64,7 @@ class Animator : public meta::identity<Animator, Component>
             meta::field<&Self::m_Motion>,
             meta::field<&Self::m_animationControllers>,
             meta::field<&Self::Parameters>,
-            meta::method<&Self::UpdateAnimation>);
+            meta::method<&Self::UpdateAnimation>.hideInInspector());
     }
 public:
     Animator()

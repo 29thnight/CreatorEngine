@@ -25,7 +25,7 @@ class ImageComponent : public meta::identity<ImageComponent, UIComponent>
            meta::field<&Self::clipPercent>,
            meta::field<&Self::clipDirection>,
            meta::field<&Self::useNativeTextureSize>,
-           meta::method<&Self::UpdateTexture>);
+           meta::method<&Self::UpdateTexture>.hideInInspector());
    }
 public:
 	ImageComponent();

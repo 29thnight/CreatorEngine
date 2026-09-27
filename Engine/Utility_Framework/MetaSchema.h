@@ -64,9 +64,10 @@ namespace meta
             return sig.substr(colons + 2, close - (colons + 2));
         }
 
-        // 멤버 **함수** 포인터 NTTP는 표기가 다르다(VS 18 프로브 실측):
-        //   "... method_name_raw<void __cdecl P2::Foo(int)>(void)"
-        // — 이름은 인자 여는 괄호 직전의 마지막 "::" 뒤 구간이다.
+        // 멤버 함수 포인터 NTTP는 상속 형태에 따라 두 표기가 나온다(MSVC):
+        //   method_name_raw<void __cdecl P2::Foo(int)>(void)
+        //   method_name_raw<{&Multi::Foo,0}>(void)
+        // 두 번째의 `,0}`이 표시 이름에 섞이지 않도록 별도로 끝을 찾는다.
         template<auto Fn>
         consteval std::string_view method_name_raw()
         {
@@ -74,6 +75,12 @@ namespace meta
             constexpr std::string_view marker = "method_name_raw<";
             const size_t begin = sig.find(marker) + marker.size();
             std::string_view inner = sig.substr(begin, sig.rfind(">(") - begin);
+            if (inner.starts_with('{'))
+            {
+                const size_t end = inner.find_first_of(",}");
+                const size_t colons = inner.rfind("::", end);
+                return inner.substr(colons + 2, end - (colons + 2));
+            }
             const size_t argOpen = inner.find('(');
             const size_t colons = inner.rfind("::", argOpen);
             return inner.substr(colons + 2, argOpen - (colons + 2));
@@ -316,12 +323,29 @@ namespace meta
         static constexpr std::string_view identifier = detail::method_name_holder<Fn>::view;
 
         std::array<const char*, NParams> paramNames{};
+        bool inspectorReadOnly = false;
+        bool inspectorHidden = false;
 
         template<class... Names>
         consteval auto params(Names... names) const
         {
             static_assert(NParams == 0, "params()는 한 번만 부른다");
-            return method_info<Fn, sizeof...(Names)>{ { names... } };
+            return method_info<Fn, sizeof...(Names)>{ { names... }, inspectorReadOnly, inspectorHidden };
+        }
+
+        consteval auto readOnlyInInspector() const
+        {
+            static_assert(NParams == 0, "읽기 전용 Inspector 메서드는 인자를 받지 않아야 한다");
+            auto copy = *this;
+            copy.inspectorReadOnly = true;
+            return copy;
+        }
+
+        consteval auto hideInInspector() const
+        {
+            auto copy = *this;
+            copy.inspectorHidden = true;
+            return copy;
         }
     };
 
