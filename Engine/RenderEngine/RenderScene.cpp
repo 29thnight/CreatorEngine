@@ -29,7 +29,6 @@ void RenderScene::Finalize()
 		SpinLock lock(m_proxyMapFlag);
 		m_proxyMap.clear();
 	}
-	m_animationJob.Finalize();
 }
 
 bool RenderScene::BeginProxyFrame(uint64_t sceneEpoch)
@@ -79,10 +78,6 @@ RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 		SpinLock lock(m_proxyMapFlag);
 		counts.proxies = m_proxyMap.size();
 	}
-	counts.animators = m_animationJob.GetAnimatorCount();
-	// 팔레트는 더 이상 RenderScene registry가 아니다. Animator의 pose를 update
-	// delta가 명령 소유 버퍼로 복사하므로 진단 행은 활성 animator와 1:1이다.
-	counts.animationPalettes = counts.animators;
 
 	{
 		SpinLock lock(m_lightProxyMapFlag);

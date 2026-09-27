@@ -398,24 +398,26 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         m_drawGeometry.emplace(enhanced_draw::GeometryKey(draw), geometry);
     }
 
-    // 본 팔레트를 애니메이터별로 한 번씩 모은다(GBuffer와 같은 규칙).
-    //
-    // 두 패스가 각자 모으는 것이 낭비로 보이지만, 공유하려면 패스 사이에
-    // 소유자를 두어야 하고 그건 실행 순서에 대한 가정을 하나 더 만든다.
-    // 팔레트 복사는 애니메이터당 한 번이라 실측으로도 문제가 안 된다.
+    // Product views share one upload; isolated fixtures retain a local one.
     for (const auto& draw : *context.draws)
     {
         if (0 == enhanced_draw::GeometryKey(draw)) continue;
         if (nullptr == draw.bonePalette || 0 == draw.boneCount) continue;
         if (m_boneOffsets.find(draw.animatorKey) != m_boneOffsets.end()) continue;
-
-        const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
-        m_bonePalettes.resize(offset + draw.boneCount);
-        for (uint32_t i = 0; i < draw.boneCount; ++i)
+        if (context.animationPalettes)
         {
-            m_bonePalettes[offset + i] = math::transpose(draw.bonePalette[i]);
+            const auto& shared = context.animationPalettes->Offsets();
+            if (const auto found = shared.find(draw.animatorKey); found != shared.end())
+                m_boneOffsets.emplace(draw.animatorKey, found->second);
         }
-        m_boneOffsets.emplace(draw.animatorKey, offset);
+        else
+        {
+            const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
+            m_bonePalettes.resize(offset + draw.boneCount);
+            for (uint32_t i = 0; i < draw.boneCount; ++i)
+                m_bonePalettes[offset + i] = PackedBoneMatrix::From(draw.bonePalette[i]);
+            m_boneOffsets.emplace(draw.animatorKey, offset);
+        }
     }
 
     // 메시 기준으로 정렬해 둔다. 같은 메시가 붙어 있어야 Record에서 한 번의
@@ -507,27 +509,30 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                 // 본 팔레트는 조각당 한 번. 스킨드가 없어도 꽂는다 — 루트에
                 // 선언된 슬롯을 비워 두면 검증 레이어가 경고한다.
-                const uint64_t paletteBytes = m_bonePalettes.empty()
-                    ? sizeof(math::matrix4x4)
-                    : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
-
-                const auto paletteBuffer = context.resources->AllocateUpload(
-                    RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-                        sizeof(math::matrix4x4) });
-                if (paletteBuffer.IsValid())
+                RHIBufferSlice paletteBuffer{};
+                if (context.animationPalettes)
+                    paletteBuffer = context.animationPalettes->Upload();
+                else
                 {
-                    if (m_bonePalettes.empty())
+                    const uint64_t paletteBytes = m_bonePalettes.empty()
+                        ? sizeof(PackedBoneMatrix)
+                        : sizeof(PackedBoneMatrix) * static_cast<uint64_t>(m_bonePalettes.size());
+                    paletteBuffer = context.resources->AllocateUpload(
+                        RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+                            sizeof(PackedBoneMatrix) });
+                    if (paletteBuffer.IsValid())
                     {
-                        const math::matrix4x4 identity = math::matrix4x4::identity();
-                        memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
-                    }
-                    else
-                    {
-                        memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
+                        if (m_bonePalettes.empty())
+                        {
+                            const PackedBoneMatrix identity = PackedBoneMatrix::Identity();
+                            memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
+                        }
+                        else memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
                             static_cast<size_t>(paletteBytes));
                     }
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteBuffer);
                 }
+                if (paletteBuffer.IsValid())
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, paletteBuffer);
             }
 
             // 조각 하나가 (캐스케이드, 드로우 범위) 하나를 맡는다.
@@ -756,8 +761,10 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                     instance.boneOffset = kNoSkinning;
                     if (skinned)
                     {
-                        const auto offset = m_boneOffsets.find(draw.animatorKey);
-                        if (offset != m_boneOffsets.end()) instance.boneOffset = offset->second;
+                        const auto& offsets = context.animationPalettes
+                            ? context.animationPalettes->Offsets() : m_boneOffsets;
+                        const auto offset = offsets.find(draw.animatorKey);
+                        if (offset != offsets.end()) instance.boneOffset = offset->second;
                     }
 
                     instances.push_back(instance);

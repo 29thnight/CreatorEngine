@@ -15,6 +15,7 @@
 // 태그가 맞을 때만 그 타입 포인터를 돌려주므로 태그와 필드가 한 자리에서
 // 함께 검사된다.
 #include "RenderProxy.h"
+#include "AnimationPaletteArena.h"
 #include "LightMapping.h"
 #include "BillboardType.h"
 #include "TerrainBuffers.h"
@@ -134,12 +135,14 @@ public:
 	std::uint64_t								m_authoredRevision{ 0 };
 	HashedGuid						m_animatorGuid{};
 	HashedGuid						m_materialGuid{};
-	// 본 팔레트 버퍼(소유권 공유).
-	// RenderScene::AnimationPalette와 같은 버퍼를 가리키며, 애니메이터가 해제되어도
-	// 이 프록시가 참조하는 동안에는 버퍼가 살아 있다.
-	std::shared_ptr<math::matrix4x4[]>	m_finalTransforms{};
-	static_assert(std::is_same_v<decltype(m_finalTransforms),
-		std::shared_ptr<math::matrix4x4[]>>);
+	// The retained proxy keeps its captured batch arena alive. Offsets resolve
+	// only after the game-thread batch is sealed, so render draws never observe
+	// a vector reallocation or a mutable Animator.
+	std::shared_ptr<const ce::animation_palette_arena> m_paletteArena{};
+	std::uint32_t m_paletteOffset{ 0 };
+	std::uint32_t m_boneCount{ 0 };
+	static_assert(std::is_same_v<decltype(m_paletteArena),
+		std::shared_ptr<const ce::animation_palette_arena>>);
 	LightMapping					m_LightMapping;
 	uint32							m_bitflag{ 0 };
 

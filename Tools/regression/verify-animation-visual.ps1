@@ -21,9 +21,10 @@ $commands = @(
     ('scene.switch "' + $scene + '"'), 'window.resize 1280 900',
     'play', 'wait 2', 'play.pause',
     ('animation.visual.probe setup "' + $model + '"'),
-    'wait 2', 'editor.viewport game', 'render.live.wait 60'
+    # A cold live frame took 63.4s in the Phase 13 DDOL gate; 60s truncated it.
+    'wait 2', 'editor.viewport game', 'render.live.wait 120'
 )
-$poses = @('a','a-repeat','b','next','blend0','blendhalf','blend1','layer','layerdisabled','masked','upper','hidden','show')
+$poses = @('a','a-repeat','b','next','blend0','blendhalf','blend1','layer','layerdisabled','masked','upper','additive','hidden','show','unobservedA','unobservedB')
 foreach ($pose in $poses) {
     $action = if ($pose -eq 'a-repeat') {'a'} else {$pose}
     $commands += @("animation.visual.probe $action", 'wait 2',

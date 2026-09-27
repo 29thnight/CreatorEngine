@@ -505,6 +505,10 @@ void Editor::EditorMain::Finalize()
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
+	// Asset and scene teardown may release proxies still referenced by a queued
+	// render frame. Drain the consumer before either owner starts shutting down.
+	EnhancedSceneRenderer::StopLiveRenderThread();
+	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 	Editor::ModelPlacement::Get().Shutdown();
 	EditorScriptAuthoring::Shutdown();
 	EditorAssetPresentation::Get().Shutdown();
@@ -521,12 +525,6 @@ void Editor::EditorMain::Finalize()
 
 	EditorAssetDatabase::Get().Shutdown();
 	std::printf("[SHUTDOWN] EditorAssetDatabase 반환\n");
-
-	// 전용 RenderThread의 bounded queue를 여기서 완전히 drain한다. 아래
-	// Decommissioning은 RenderScene::Finalize를 호출하므로 순서가 뒤집히면 RT가
-	// 파괴 중인 proxy map을 읽게 된다.
-	EnhancedSceneRenderer::StopLiveRenderThread();
-	std::printf("[SHUTDOWN] RenderThread drain 반환\n");
 
 	// 기여자 해제는 렌더 스레드가 멎은 뒤가 안전하다 — 더 이상 조립이 없다.
 	// 살아 있는 파이프라인의 기여 노드는 자기 패스 묶음을 붙들므로 무관하다.
@@ -680,11 +678,9 @@ void Editor::EditorMain::Update()
 				SceneManagers->Editor();
 				SceneManagers->InputEvents(m_frameDeltaTime);
 
-				// delta 0을 **명시적으로** 넘긴다. 편집 모드는 일시정지가 아니지만
-				// 시간도 진행하지 않는 제3의 상태다. 예전에는 GameLogic()의 기본
-				// 인자로 0이 조용히 들어갔는데, 그러면 "delta 0은 일시정지에서만"이라는
-				// 규약이 깨지고 있는지 호출부만 봐서는 알 수 없다.
-				SceneManagers->GameLogic(0.0f);
+				// 편집 중 게임 로직의 시간은 멈춘다. 애니메이션에는 프레임 시간을
+				// 전달하되, 실제 진행 여부는 Animator의 미리보기 상태가 결정한다.
+				SceneManagers->GameLogic(0.0f, m_frameDeltaTime);
 
 				// 편집 모드에서는 스크립트를 돌리지 않는다(Unity와 같은 규약).
 				// 붙여 둔 스크립트는 보류 큐에 쌓였다가 재생 시작 시 한꺼번에 OnInitialized를 받는다.

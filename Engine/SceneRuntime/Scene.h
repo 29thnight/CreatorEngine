@@ -207,11 +207,14 @@ struct AnimatorPoseUploadMetrics
 	uint64_t bindLookups = 0;
 	uint64_t validBones = 0;
 	uint64_t invalidBones = 0;
+	uint64_t observedBones = 0;
+	uint64_t projectedBones = 0;
 	uint64_t localWrites = 0;
 	uint64_t queuedRoots = 0;
-	// 팔레트가 바뀐 프레임에 스킨 프록시를 몇 개 dirty로 올렸는가.
-	// 0인데 localWrites > 0이면 최신 팔레트가 렌더로 못 간다.
+	// Palette changes are independent of observed Scene bone local writes.
+	// The count records skinned proxies dirtied by a changed palette.
 	uint64_t paletteDirty = 0;
+	bool paletteChanged = false;
 };
 
 struct TransformWorldWrite
@@ -845,6 +848,9 @@ public:
 		TransformSyncPoint syncPoint = TransformSyncPoint::Unspecified);
 	bool ResolveSpatialTransforms();
 	bool EnsureResolved(EntityHandle target);
+	// A direct bone Transform read promotes an otherwise hidden bone and pulls
+	// its current ancestor chain without waiting for the next animation tick.
+	bool PrepareAnimatedBoneRead(Entity& bone);
 	AnimatorPoseUploadMetrics PublishAnimatorPose(Animator& animator);
 	// PHASE 3.75 MBC10 — 제품 barrier(AnimationJob)가 남긴 마지막 publish 메트릭의
 	// 읽기 전용 스냅샷. 진단(`experiment.animlive`)이 publish를 **다시 부르지 않고**

@@ -73,6 +73,11 @@ math::matrix4x4 Camera::CalculateInverseProjection() const
 	return math::inverse(CalculateProjection());
 }
 
+float Camera::CalculateLODDistance(math::vector3 worldPosition) const noexcept
+{
+	return math::length(worldPosition - m_eyePosition);
+}
+
 Core::Sizef Camera::GetScreenSize() const
 {
 	const auto size = ScreenResizeBus::Get().GetSizeSnapshot();

@@ -18,11 +18,11 @@ AniTransition::~AniTransition()
 
 bool AniTransition::CheckTransiton(bool isBlend)
 {
-	auto Progress = m_ownerController->curAnimationProgress;
+	auto Progress = m_ownerController->GetPlayback().currentProgress;
 	//연속전이중 progress가 제대로 초기화안되서 전이가 이상하게됨
 	if (isBlend)
 	{
-		Progress = m_ownerController->nextAnimationProgress;
+		Progress = m_ownerController->GetPlayback().nextProgress;
 	}
 	if (hasExitTime) //최소 탈출시간 있을때
 	{
@@ -47,7 +47,7 @@ bool AniTransition::CheckTransiton(bool isBlend)
 	{
 		if (conditions.empty()) //탈출시간은 없고 조건없으면 애니메이션 끝나면탈출 loop면 탈출불가
 		{
-			if (m_ownerController->endAnimation)
+			if (m_ownerController->HasEndedAnimation())
 				return true;
 		}
 		else  //탈출 시간없고 조건있으면 조건만족시 탈출

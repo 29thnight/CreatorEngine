@@ -46,7 +46,8 @@ namespace animation
     // Authored order breaks ties, including during reverse playback.
     template <typename Event, typename KeyOf, typename Emit>
     std::size_t ForEachCrossedEvent(std::span<const Event> events,
-        double begin, double end, bool looping, KeyOf keyOf, Emit emit)
+        double begin, double end, bool looping, std::vector<std::size_t>& order,
+        KeyOf keyOf, Emit emit)
     {
         if (events.empty() || !std::isfinite(begin) || !std::isfinite(end)
             || begin == end)
@@ -58,7 +59,7 @@ namespace animation
             if (begin == end) return 0;
         }
         const bool forward = end > begin;
-        std::vector<std::size_t> order;
+        order.clear();
         order.reserve(events.size());
         for (std::size_t i = 0; i < events.size(); ++i)
         {
@@ -67,10 +68,12 @@ namespace animation
                 order.push_back(i);
         }
         if (order.empty()) return 0;
-        std::stable_sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b)
+        std::sort(order.begin(), order.end(), [&](std::size_t a, std::size_t b)
         {
-            return forward ? keyOf(events[a]) < keyOf(events[b])
-                : keyOf(events[a]) > keyOf(events[b]);
+            const double left = keyOf(events[a]);
+            const double right = keyOf(events[b]);
+            return left == right ? a < b
+                : (forward ? left < right : left > right);
         });
 
         const double firstCycle = looping ? std::floor(begin) : 0.0;
@@ -96,6 +99,15 @@ namespace animation
             cycle = next;
         }
         return count;
+    }
+
+    template <typename Event, typename KeyOf, typename Emit>
+    std::size_t ForEachCrossedEvent(std::span<const Event> events,
+        double begin, double end, bool looping, KeyOf keyOf, Emit emit)
+    {
+        std::vector<std::size_t> order;
+        return ForEachCrossedEvent(events, begin, end, looping, order,
+            keyOf, emit);
     }
 
     // Only evaluated, enabled channels may overwrite a bone. If every layer

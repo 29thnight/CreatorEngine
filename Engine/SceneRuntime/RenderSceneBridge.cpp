@@ -4,7 +4,6 @@
 // 컴포넌트를 읽어 프록시를 만들거나 갱신하는 경계 코드다. 렌더 측 로직
 // (프레임 갱신, 스냅샷, 패스 데이터)은 RenderEngine/RenderScene.cpp에 남는다.
 #include "RenderScene.h"
-#include "Animator.h"
 #include "MeshRenderer.h"
 #include "FoliageComponent.h"
 #include "Terrain.h"
@@ -27,16 +26,6 @@ void EnqueueProxyDelta(ProxyCommand command)
 		ProxyCommandQueue->PushProxyCommand(std::move(command));
 	}
 }
-}
-
-void RenderScene::RegisterAnimator(Animator* animatorPtr)
-{
-	m_animationJob.RegisterAnimator(animatorPtr);
-}
-
-void RenderScene::UnregisterAnimator(Animator* animatorPtr)
-{
-	m_animationJob.UnregisterAnimator(animatorPtr);
 }
 
 void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)

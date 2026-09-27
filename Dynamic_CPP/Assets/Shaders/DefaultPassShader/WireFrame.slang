@@ -1,3 +1,5 @@
+#include "Includes/PackedBones.slang"
+
 cbuffer WireFrameFrame : register(b0)
 {
     float4x4 gViewProjection;
@@ -11,7 +13,7 @@ struct WireInstance
 };
 
 StructuredBuffer<WireInstance> gInstances : register(t0);
-StructuredBuffer<float4x4>     gBones     : register(t1);
+StructuredBuffer<PackedBone>     gBones     : register(t1);
 
 #define NO_SKINNING 0xFFFFFFFFu
 
@@ -35,13 +37,13 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
     {
         float4x4 boneTransform = input.boneWeights[0]
-            * gBones[instance.boneOffset + (uint)input.boneIndices[0]];
+            * UnpackBone(gBones[instance.boneOffset + (uint)input.boneIndices[0]]);
 
         [unroll]
         for (int i = 1; i < 4; ++i)
         {
             boneTransform += input.boneWeights[i]
-                * gBones[instance.boneOffset + (uint)input.boneIndices[i]];
+                * UnpackBone(gBones[instance.boneOffset + (uint)input.boneIndices[i]]);
         }
 
         position = mul(float4(position, 1.0f), boneTransform).xyz;

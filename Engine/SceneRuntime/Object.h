@@ -28,7 +28,7 @@ class Object : public IObject, public meta::polymorphic
            // 맞춘다. 리플렉션 경로에서 직접 쓰면 그 단계를 건너뛴다.
            meta::field<&Self::m_name>.with(meta::readonly(), meta::debugOnly()),
            // 인스턴스 식별자. `GUIDCreator` 의 전역 집합과 시스템 레지스트리
-           // (`AnimationJob::m_animators` 등)의 키다. 손으로 고치면 등록은 옛
+// (`AnimationScheduler::m_animators` 등)의 키다. 손으로 고치면 등록은 옛
            // 키로 남고 해제는 새 키로 가서 레지스트리에 죽은 항목이 남는다.
            meta::field<&Self::m_instanceID>.with(meta::readonly(), meta::debugOnly()),
            // 전용 체크박스가 담당한다 — 인스펙터는 `SetEnabled` 를 거쳐야

@@ -1,0 +1,41 @@
+{
+  "date": "2026-09-24",
+  "slice": "PHASE 13 S2d: short-channel sampler dispatch and dense layer mask",
+  "model": "CreatorRobot.glb",
+  "clip": "Walk",
+  "conditions": "Fresh Release Editor processes; each variant has 3 runs, 30 warmup and 120 sampled frames per actor population; paused Play CPU-only product probe, 8 workers, profiling recording not requested; worker-sum overlaps wait and is not OS CPU time; GPU and presentation excluded",
+  "percentileMethod": "nearest rank over 360 frames per actor population",
+  "unit": "milliseconds",
+  "workerSumP50": {
+    "cursorBefore": { "10": 0.1105, "50": 0.5243, "100": 1.0641 },
+    "temporaryLinearCall": { "10": 0.0974, "50": 0.4623, "100": 0.9775 },
+    "cursorWithoutEmptyChannelWritesBeforeMask": { "10": 0.1008, "50": 0.4699, "100": 0.9794 },
+    "cursorWithoutEmptyChannelWritesAfterMask": { "10": 0.1108, "50": 0.5193, "100": 1.0598 },
+    "finalShortChannelDispatch": { "10": 0.0986, "50": 0.4712, "100": 0.9954 }
+  },
+  "cpuFrameP50": {
+    "cursorBefore": { "10": 0.3790, "50": 2.1790, "100": 9.5318 },
+    "temporaryLinearCall": { "10": 0.3241, "50": 1.8920, "100": 8.5173 },
+    "cursorWithoutEmptyChannelWritesBeforeMask": { "10": 0.3874, "50": 2.1241, "100": 9.0806 },
+    "cursorWithoutEmptyChannelWritesAfterMask": { "10": 0.4179, "50": 2.1513, "100": 9.3887 },
+    "finalShortChannelDispatch": { "10": 0.3037, "50": 1.9004, "100": 8.5591 }
+  },
+  "raw": {
+    "cursorBefore": "Build/Obj/Phase13S2d/PreMask-Release",
+    "temporaryLinearCall": "Build/Obj/Phase13S2d/Linear-Release",
+    "cursorWithoutEmptyChannelWritesBeforeMask": "Build/Obj/Phase13S2d/NoEmptyWrite-Release",
+    "cursorWithoutEmptyChannelWritesAfterMask": "Build/Obj/Phase13S2d/Final-Release",
+    "finalShortChannelDispatch": "Build/Obj/Phase13S2d/Hybrid-Release"
+  },
+  "interpretation": "The temporary product-path linear call isolates the cached sampler as the source of most of the earlier Walk worker regression. Removing redundant writes alone did not retain its benefit after the dense-mask build; code generation and instance layout changed. The final short-channel dispatch recovers most of the regression on this fixture. It does not establish the optimal threshold for other clips or multi-layer mask performance.",
+  "validation": {
+    "editorBuilds": ["Release", "Debug"],
+    "independentPlaybackChecksEach": 7219,
+    "productChecksEach": 231987,
+    "managedThreadErrors": 0,
+    "visualCaptures": 13,
+    "visualChecks": 264,
+    "displayF32ByteIdenticalToS2c": 13,
+    "playerAndVulkanRun": false
+  }
+}

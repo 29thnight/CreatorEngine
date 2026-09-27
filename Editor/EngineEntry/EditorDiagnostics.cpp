@@ -148,10 +148,10 @@ namespace EditorDiagnostics
             ++animatorCount;
             std::uint32_t digest = 2166136261u;
             const std::size_t bones =
-                (std::min)(animator->GetBoneCount(), (std::size_t)kMaxBones);
+                (std::min)(animator->GetBoneCount(), animator->GetInstance().finalTransforms.size());
             for (std::size_t bone = 0; bone < bones; ++bone)
             {
-                const float* values = &animator->m_FinalTransforms[bone].m[0][0];
+                const float* values = &animator->GetInstance().finalTransforms[bone].m[0][0];
                 for (int element = 0; element < 16; ++element)
                 {
                     const std::int32_t quantized = static_cast<std::int32_t>(
@@ -167,7 +167,7 @@ namespace EditorDiagnostics
             // 루프 판정과 클립 길이를 함께 찍는다 — elapsed만 보면 "끝에서
             // 멈춘 것"과 "긴 클립을 지나는 중"을 구별할 수 없다(실측으로
             // 그 둘을 혼동할 뻔했다).
-            const int clipIndex = static_cast<int>(animator->m_AnimIndexChosen);
+            const int clipIndex = static_cast<int>(animator->GetSelectedClipIndex());
             const double duration = animator->GetClipDuration(clipIndex);
             // 팔레트가 갱신되는데 화면이 안 움직이면 그 다음 구간이다 —
             // Scene::PublishAnimatorPose가 팔레트를 씬 packed storage와
@@ -184,7 +184,7 @@ namespace EditorDiagnostics
             entry.Set("path", CommandData::String(animator->TypedSkeleton() ? "generation" : "none"));
             entry.Set("enabled", CommandData::Bool(animator->IsEnabled()));
             entry.Set("clip", CommandData::Int(clipIndex));
-            entry.Set("elapsed", CommandData::Double(animator->m_TimeElapsed));
+            entry.Set("elapsed", CommandData::Double(animator->GetInstance().timeElapsed));
             entry.Set("duration", CommandData::Double(duration));
             entry.Set("loop", CommandData::Bool(animator->IsClipLooping(clipIndex)));
             entry.Set("clips", CommandData::Int(animator->GetClipCount()));
@@ -231,7 +231,7 @@ namespace EditorDiagnostics
                 object->GetHashedName().ToString().c_str(),
                 animator->TypedSkeleton() ? "generation" : "none",
                 animator->IsEnabled() ? 1 : 0,
-                animator->m_AnimIndexChosen, animator->m_TimeElapsed,
+                animator->GetSelectedClipIndex(), animator->GetInstance().timeElapsed,
                 duration, animator->IsClipLooping(clipIndex) ? 1 : 0,
                 animator->GetClipCount(), bones, digest);
         }

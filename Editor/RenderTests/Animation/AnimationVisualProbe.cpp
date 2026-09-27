@@ -1,5 +1,5 @@
 #include "Animation/AnimationVisualProbe.h"
-#include "AnimationJob.h"
+#include "AnimationScheduler.h"
 #include "Animator.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "DataSystem.h"
@@ -68,7 +68,9 @@ namespace RenderTest
         }
         if (!actor) { error = "Run setup first"; return false; }
         auto* animator = actor->GetComponent<Animator>();
-        if (!animator || !animator->m_modelGeneration || animator->socketvec.empty())
+        const bool unobserved = action == "unobservedA" || action == "unobservedB";
+        if (!animator || !animator->m_modelGeneration
+            || (animator->socketvec.empty() && !unobserved))
         { error = "Visual fixture is incomplete"; return false; }
         const auto generation = animator->m_modelGeneration;
         // Exporters may reorder animation arrays. Choose the intended moving
@@ -81,17 +83,49 @@ namespace RenderTest
         }
         if (walkIndex < 0 || runIndex < 0)
         { error = "Visual fixture requires named Walk and Run clips"; return false; }
-        if (action == "hidden" || action == "show")
+        const bool ikPose = action == "ik-base" || action == "ik-full"
+            || action == "ik-down1" || action == "ik-down2" || action == "ik-down3"
+            || action == "ik-up1" || action == "ik-up2" || action == "ik-up3";
+        if (ikPose)
+        {
+            // Every capture samples the same Walk time. Only the camera-selected
+            // quality stage and retained IK fade state change between frames.
+            animator->ClearControllersAndParams();
+            auto controller = std::make_shared<AnimationController>();
+            controller->m_owner = animator;
+            controller->name = "IKBase";
+            controller->CreateState("Current", walkIndex);
+            controller->CheckTransition();
+            controller->GetPlayback().timeElapsed = static_cast<float>(
+                generation->Animations()[walkIndex].durationTicks * .15);
+            animator->m_animationControllers.push_back(controller);
+            animator->m_QualityRadius = action.starts_with("ik-down") ? .17f : 1.f;
+            animator->GetInstance().qualityOverride = -1;
+            if (action == "ik-base") animator->m_TwoBoneIKConstraints.clear();
+            else if (animator->m_TwoBoneIKConstraints.size() != 1)
+            { error = "Run ik-base before the IK transition"; return false; }
+        }
+        else if (action == "hidden" || action == "show")
         {
             actor->SetEnabled(action == "show");
             marker->SetEnabled(action == "show");
         }
         else
         {
+            if (action == "unobservedA")
+            {
+                for (Socket* socket : animator->socketvec)
+                {
+                    if (socket) { socket->DetachAllObject(); delete socket; }
+                }
+                animator->socketvec.clear();
+                marker->SetEnabled(false);
+            }
             const bool blend = action == "blend0" || action == "blendhalf" || action == "blend1";
             const bool layer = action == "layer" || action == "layerdisabled"
-                || action == "masked" || action == "upper";
-            if (action != "setup" && action != "a" && action != "b" && action != "next" && !blend && !layer)
+                || action == "masked" || action == "upper" || action == "additive";
+            if (action != "setup" && action != "a" && action != "b" && action != "next"
+                && !unobserved && !blend && !layer)
             { error = "Unknown visual pose"; return false; }
             animator->ClearControllersAndParams();
             auto first = std::make_shared<AnimationController>();
@@ -100,11 +134,11 @@ namespace RenderTest
             const int clipIndex = action == "next" ? runIndex : walkIndex;
             first->CreateState("Current", clipIndex);
             first->CheckTransition();
-            first->m_timeElapsed = static_cast<float>(generation->Animations()[clipIndex].durationTicks
-                * (action == "next" ? 0.65 : action == "b" ? 0.7 : 0.15));
+            first->GetPlayback().timeElapsed = static_cast<float>(generation->Animations()[clipIndex].durationTicks
+                * (action == "next" ? 0.65 : action == "b" || action == "unobservedB" ? 0.7 : 0.15));
             animator->m_animationControllers.push_back(first);
-            animator->blendT = 0.f;
-            animator->m_isBlend = false;
+            animator->GetPlaybackControl().blendT = 0.f;
+            animator->GetPlaybackControl().isBlending = false;
             if (blend)
             {
                 first->CreateState("Next", runIndex);
@@ -112,10 +146,10 @@ namespace RenderTest
                 transition->hasExitTime = true;
                 transition->exitTime = 0.f;
                 first->UpdateState();
-                if (!first->m_isBlend || first->GetNextAnimationIndex() != runIndex)
+	if (!first->IsBlending() || first->GetNextAnimationIndex() != runIndex)
                 { error = "Visual blend transition did not start"; return false; }
-                first->m_nextTimeElapsed = static_cast<float>(generation->Animations()[runIndex].durationTicks * 0.65);
-                animator->blendT = action == "blend0" ? 0.f : action == "blend1" ? 1.f : 0.5f;
+                first->GetPlayback().nextTimeElapsed = static_cast<float>(generation->Animations()[runIndex].durationTicks * 0.65);
+            animator->GetPlaybackControl().blendT = action == "blend0" ? 0.f : action == "blend1" ? 1.f : 0.5f;
             }
             if (layer)
             {
@@ -124,12 +158,13 @@ namespace RenderTest
                 second->name = "Overlay";
                 second->CreateState("Overlay", runIndex);
                 second->CheckTransition();
-                second->m_timeElapsed = static_cast<float>(generation->Animations()[runIndex].durationTicks * 0.65);
+                second->GetPlayback().timeElapsed = static_cast<float>(generation->Animations()[runIndex].durationTicks * 0.65);
                 second->m_avatarMask = new AvatarMask();
                 second->m_avatarMask->useAll = action != "upper" && action != "masked";
                 second->m_avatarMask->useUpper = action == "upper";
                 second->m_avatarMask->useLower = false;
                 second->useController = action != "layerdisabled";
+                second->m_additive = action == "additive";
                 if (action == "masked") first->m_useLayer = false;
                 animator->m_animationControllers.push_back(second);
             }
@@ -139,19 +174,73 @@ namespace RenderTest
         scene->DrainPendingLifecycle();
         scene->SyncDerivedState();
         if (action != "hidden")
-            SceneManagers->GetRenderScene()->GetAnimationJob().Update(0.f);
+            SceneManagers->GetAnimationScheduler().Update(ikPose ? .05f : 0.f);
+        if (action == "ik-base")
+        {
+            const auto& skeleton = *generation->Skeleton();
+            const int end = animator->ResolveBoneIndex(animator->socketvec[0]->m_ObjectName);
+            if (end < 0 || static_cast<std::size_t>(end) >= skeleton.bones.size())
+            { error = "IK marker bone is missing"; return false; }
+            const auto middle = skeleton.bones[end].parent;
+            if (middle >= skeleton.bones.size())
+            { error = "IK marker has no middle bone"; return false; }
+            const auto start = skeleton.bones[middle].parent;
+            const auto tracks = generation->AnimationTracks(walkIndex);
+            if (start >= skeleton.bones.size() || end >= kMaxBones
+                || tracks.size() <= static_cast<std::size_t>(end)
+                || !tracks[start] || !tracks[middle] || !tracks[end])
+            { error = "IK marker chain needs three tracked bones"; return false; }
+            const auto& globals = animator->GetInstance().poseGlobals;
+            const math::vector3 root = globals[start].translation();
+            const math::vector3 elbow = globals[middle].translation();
+            const math::vector3 hand = globals[end].translation();
+            if (math::length(elbow - root) <= .01f
+                || math::length(hand - elbow) <= .01f)
+            { error = "IK marker chain has zero reach"; return false; }
+            const math::matrix4x4 world = actor->Transform_().GetWorldMatrix();
+            TwoBoneIKConstraint constraint{};
+            constraint.StartBone = skeleton.bones[start].name;
+            constraint.MiddleBone = skeleton.bones[middle].name;
+            constraint.EndBone = skeleton.bones[end].name;
+            constraint.TargetWorld = math::transform_point(
+                root + (hand - root) * .6f + math::vector3{ 0.f, .12f, .08f }, world);
+            constraint.PoleWorld = math::transform_point(
+                elbow + math::vector3{ .1f, .2f, .3f }, world);
+            constraint.Enabled = true;
+            animator->m_TwoBoneIKConstraints.push_back(std::move(constraint));
+        }
         scene->SyncDerivedState();
         scene->UpdateRenderData();
-        const auto position = animator->socketvec[0]->m_boneMatrix.translation();
-        report.socketPosition = {position.x, position.y, position.z};
-        report.bone = animator->socketvec[0]->m_ObjectName;
+        if (!unobserved)
+        {
+            const auto position = animator->socketvec[0]->m_boneMatrix.translation();
+            report.socketPosition = {position.x, position.y, position.z};
+            report.bone = animator->socketvec[0]->m_ObjectName;
+        }
+        AnimatorPoseUploadMetrics publication{};
+        if (scene->TryGetLastAnimatorPoseMetrics(*animator, publication))
+        {
+            report.observedBones = publication.observedBones;
+            report.projectedBones = publication.projectedBones;
+            report.localWrites = publication.localWrites;
+            report.paletteDirty = publication.paletteDirty;
+            report.paletteChanged = publication.paletteChanged;
+        }
         report.modelId = FileGuid(generation->Identity().modelId).ToString();
+        auto& instance = animator->GetInstance();
+        report.qualityStage = static_cast<int>(instance.qualityStage);
+        report.optionalIKWeight = instance.optionalIKWeight;
+        report.projectedHeight = instance.projectedHeight;
+        instance.taskList.for_each_reachable([&](const animation::task& item)
+        {
+            if (item.kind == animation::task_kind::two_bone_ik) ++report.ikTasks;
+        });
         report.markerMeshId = marker->GetComponent<MeshRenderer>()->m_meshAssetId.ToString();
         report.paletteDigest = 2166136261u;
         for (std::size_t b = 0; b < generation->Skeleton()->bones.size() && b < kMaxBones; ++b)
         {
             std::array<float, 16> values;
-            std::memcpy(values.data(), &animator->m_FinalTransforms[b], sizeof(values));
+            std::memcpy(values.data(), &animator->GetInstance().finalTransforms[b], sizeof(values));
             for (const float v : values)
                 report.paletteDigest = (report.paletteDigest ^ std::bit_cast<std::uint32_t>(v)) * 16777619u;
         }

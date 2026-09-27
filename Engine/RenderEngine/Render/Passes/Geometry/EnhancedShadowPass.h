@@ -8,6 +8,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Graph/PackedBoneMatrix.h"
 // ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
 //   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
 //   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
@@ -179,7 +180,7 @@ private:
     std::vector<size_t> m_sortedDraws;
 
     // 프레임의 본 팔레트(GBuffer와 같은 수집 규칙). 스킨드 캐스터가 없으면 빈다.
-    std::vector<math::matrix4x4>           m_bonePalettes;
+    std::vector<PackedBoneMatrix>           m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
 
     RHISamplerTable m_sampler;

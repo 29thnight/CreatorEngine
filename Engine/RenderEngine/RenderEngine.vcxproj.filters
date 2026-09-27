@@ -575,9 +575,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AnimationJob.h">
-      <Filter>Asset\JobSystem\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="AssetBundle.h">
       <Filter>Resources\AssetBundle</Filter>
     </ClInclude>
@@ -874,6 +871,9 @@
     </ClInclude>
     <ClInclude Include="ProjectionType.h">
       <Filter>Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationPaletteArena.h">
+      <Filter>ProxyCommandQueue</Filter>
     </ClInclude>
     <ClInclude Include="ProxyCommand.h">
       <Filter>ProxyCommandQueue\ProxyCommand</Filter>

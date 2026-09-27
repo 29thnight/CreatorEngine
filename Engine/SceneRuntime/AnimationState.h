@@ -5,6 +5,7 @@
 #include "AniBehavior.h"
 
 class AnimationController;
+class ConditionParameter;
 class AnimationState
 {	
    public:
@@ -61,5 +62,10 @@ public:
 	float m_animationTimeElapsed = 0;
 	bool m_isAny = false;
 	bool useMultipler = false;
+	// Runtime-only handle. Parameter layout changes invalidate the cached index;
+	// direct name edits are checked against the resolved entry on every read.
+	std::size_t m_speedParameterIndex{ static_cast<std::size_t>(-1) };
+	std::uint64_t m_speedParameterVersion{};
+	std::string m_speedParameterName{};
 };
 

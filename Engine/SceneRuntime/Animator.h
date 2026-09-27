@@ -7,9 +7,14 @@
 //#include "IAwakable.h"
 //#include "IOnDestroy.h"
 #include "AnimationController.h"
+#include "AnimatorSystem.h"
 #include "KeyFrameEvent.h" // I5-D4e-2: 클립 오버라이드 소유
+#include "../RenderEngine/LocalPose.h"
+#include "../RenderEngine/ClipSamplingCursor.h"
+#include <array>
 #include <mathematics/matrix4x4.hpp>
 #include <optional>
+#include <span>
 #include <type_traits>
 #include "BoneRegion.h" // kMaxBones·BoneRegion
 
@@ -26,13 +31,68 @@ struct AnimatorClipOverride final
 	std::vector<KeyFrameEvent> events{};
 };
 
+// Scene-authored target. Gameplay may update the world-space target and pole
+// before the animation frame; workers receive a resolved value snapshot.
+struct TwoBoneIKConstraint final
+{
+    static consteval auto reflect()
+    {
+        using Self = TwoBoneIKConstraint;
+        return meta::schema<Self>(
+            meta::field<&Self::StartBone>,
+            meta::field<&Self::MiddleBone>,
+            meta::field<&Self::EndBone>,
+            meta::field<&Self::TargetWorld>,
+            meta::field<&Self::PoleWorld>,
+            meta::field<&Self::Weight>,
+            meta::field<&Self::Enabled>,
+            meta::field<&Self::Required>);
+    }
+
+    std::string StartBone{};
+    std::string MiddleBone{};
+    std::string EndBone{};
+    math::vector3 TargetWorld{};
+    math::vector3 PoleWorld{ 0.f, 1.f, 0.f };
+    float Weight{ 1.f };
+    bool Enabled{ false };
+    bool Required{ false };
+};
+
+// A local-space procedural correction applied after clip and layer evaluation.
+struct BoneTransformConstraint final
+{
+    static consteval auto reflect()
+    {
+        using Self = BoneTransformConstraint;
+        return meta::schema<Self>(
+            meta::field<&Self::Bone>,
+            meta::field<&Self::TranslationOffset>,
+            meta::field<&Self::RotationOffset>,
+            meta::field<&Self::ScaleMultiplier>,
+            meta::field<&Self::Weight>,
+            meta::field<&Self::Enabled>,
+            meta::field<&Self::Required>);
+    }
+
+    std::string Bone{};
+    math::vector3 TranslationOffset{};
+    math::quaternion RotationOffset{ 0.f, 0.f, 0.f, 1.f };
+    math::vector3 ScaleMultiplier{ 1.f, 1.f, 1.f };
+    float Weight{ 1.f };
+    bool Enabled{};
+    bool Required{};
+};
+
 class AnimationController;
 class Socket;
+class ScriptComponent;
 namespace assets // PHASE 3.75 MBC8: typed 재생 정본(shared_ptr 보관용)
 {
     class ModelAssetGeneration;
     struct ModelSkeletonAsset;
     struct ModelAnimationAsset;
+    struct ModelAnimationTrack;
 }
 
 // PHASE 3.75 MBC8/MBC9 — Animator 창구의 데이터 출처(진단·게이트 관측 축).
@@ -59,32 +119,31 @@ class Animator : public meta::identity<Animator, Component>
         // 옮겼으므로, 표기만 소유를 따라가면 된다 — 쓰기는 새 정본으로,
         // 읽기는 구 씬 서브트리 폴백을 존치한다(OnDeserialized 참조).
         return meta::schema<Self>(
-            meta::field<&Self::m_AnimIndexChosen>,
-            meta::field<&Self::m_AnimIndex>,
+            meta::field<&Self::m_AnimIndexChosen>.with(meta::hidden()),
+            meta::field<&Self::m_AnimIndex>.with(meta::hidden()),
             meta::field<&Self::m_Motion>,
+            meta::field<&Self::m_QualityRadius>.with(meta::hidden()),
+            meta::field<&Self::m_LowDetailBoneCount>.with(meta::hidden()),
+            meta::field<&Self::m_ForceFullQuality>.with(meta::hidden()),
+            meta::field<&Self::m_TwoBoneIKConstraints>.with(meta::hidden()),
+            meta::field<&Self::m_BoneTransformConstraints>.with(meta::hidden()),
             meta::field<&Self::m_animationControllers>,
             meta::field<&Self::Parameters>,
             meta::method<&Self::UpdateAnimation>.hideInInspector());
     }
 public:
-    Animator()
-    {
-        for (auto& local : m_localTransforms) local = math::matrix4x4::identity();
-        for (auto& final : m_FinalTransforms) final = math::matrix4x4::identity();
-    }
+    Animator();
     // I5-D4e-1: 본문은 cpp로 — shared_ptr<const experiment::Model> 멤버가
     // 전방선언 타입이라 헤더 inline 소멸이 불완전 타입을 인스턴스화한다.
     virtual ~Animator();
 
-    void OnInitialized() override;
-    void OnUninitializing() override;
-
     // 트랙 C3: 가상 Update 오버라이드를 걷어내고 AnimatorSystem(조밀 벡터,
-    // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
-    // 근거는 AnimatorSystem.h 주석). OnInitialized/OnUninitializing은 RenderScene 등록용으로
-    // 그대로 둔다(트랙 범위 밖 — AnimationJob 스키닝 등록부와 혼동 금지).
+    // 전용 틱)으로 옮겼다. AnimationJob 등록도 씬 편입/이탈 훅을 쓴다:
+    // DDOL 재부착에는 OnInitialized가 다시 호출되지 않기 때문이다.
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;
+    void OnPropertyChanged(std::string_view propertyName,
+        Meta::PropertyChangeSource source) override;
     void SetAnimation(int index);
     void UpdateAnimation();
     void CreateController(std::string name);
@@ -93,7 +152,8 @@ public:
     void DeleteController(int index);
     void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
-    bool UsesMultipleControllers() { return m_animationControllers.size() >= 2; }
+    [[nodiscard]] bool IsDirectEditorPreview() const;
+    [[nodiscard]] bool UsesMultipleControllers() const;
     void SetUseLayer(int layerindex,bool _useLayer);
     Entity* FindBoneRecursive(Entity* parent, const std::string& boneName);
     Socket* MakeSocket(std::string_view socketName,std::string_view boneName, Entity* object);
@@ -101,6 +161,10 @@ public:
 
     // CT6-d: 스켈레톤·파라미터·컨트롤러 그래프 복원(구 팩토리 분기 이동)
     void OnDeserialized(const Authoring::NodeView& node); // D3-a-4
+
+    // Preserve the existing m_AnimIndexChosen YAML key while runtime selection
+    // lives in the system-owned instance.
+    void OnBeforeSerialize();
 
     // I5-D4e-2 — 씬 표기는 기존 형상(m_Skeleton.m_animations[i].m_isLoop/
     // m_keyFrameEvent)을 유지하되, 리플렉션이 적은 공유 자산 값을 Animator
@@ -171,6 +235,9 @@ public:
     // 파생이라 멱등)을 유지한다. outViaExperiment는 게이트 관측 창구.
     BoneMask* BuildAvatarBoneMasks(AvatarMask& mask,
         bool* outViaExperiment = nullptr, AnimatorDataPath* outPath = nullptr);
+    // Converts a saved seven-region mask to named bone weights once the model
+    // generation is bound. New masks are authored directly as bone weights.
+    bool ConvertLegacyAvatarMask(AvatarMask& mask);
 
     // PHASE 3.75 MBC8 — typed 정본 창구. m_Motion(ModelId)으로 붙든 immutable
     // generation의 skeleton·clip. 스위치와 무관하며, 있으면 모든 창구·틱이 이것을
@@ -188,40 +255,46 @@ public:
     ConditionParameter* AddDefaultParameter(ValueType vType);
     template<typename T>
     void SetParameter(const std::string valuename, T Value);
-    ConditionParameter* FindParameter(std::string valueName);
+    ConditionParameter* FindParameter(std::string_view valueName);
+    std::size_t FindParameterIndex(std::string_view valueName) const;
+    ConditionParameter* ParameterAt(std::size_t index) const noexcept;
+    [[nodiscard]] std::uint64_t ParameterVersion() const noexcept { return m_parameterVersion; }
+    void NotifyParameterLayoutChanged() noexcept { ++m_parameterVersion; }
 
 public:
-    float m_TimeElapsed{};
+    // Reflection-only compatibility mirror. Runtime readers use GetSelectedClipIndex().
     uint32_t m_AnimIndexChosen{};
-    math::matrix4x4 m_localTransforms[kMaxBones]{};
-    math::matrix4x4 m_FinalTransforms[kMaxBones]{};
-    static_assert(std::is_same_v<
-        std::remove_extent_t<decltype(m_localTransforms)>, math::matrix4x4>);
-    static_assert(std::is_same_v<
-        std::remove_extent_t<decltype(m_FinalTransforms)>, math::matrix4x4>);
-    float blendT = 0;
+    [[nodiscard]] AnimInstance& GetInstance() noexcept;
+    [[nodiscard]] const AnimInstance& GetInstance() const noexcept;
+    [[nodiscard]] uint32_t GetSelectedClipIndex() const noexcept { return GetInstance().selectedClipIndex; }
+    void SetSelectedClipIndex(uint32_t index) noexcept { GetInstance().selectedClipIndex = index; }
+    [[nodiscard]] AnimatorPlaybackControl& GetPlaybackControl() noexcept { return GetInstance().control; }
+    [[nodiscard]] const AnimatorPlaybackControl& GetPlaybackControl() const noexcept { return GetInstance().control; }
     int m_AnimIndex{};
-    int nextAnimIndex = -1;
-    float m_nextTimeElapsed{};
     FileGuid m_Motion{};
+    // World-space approximation used when estimating on-screen character size.
+    float m_QualityRadius{ 1.f };
+    // Authored parent-first prefix. Zero disables skeletal detail reduction.
+    std::uint32_t m_LowDetailBoneCount{};
+    // Gameplay attachments such as hitboxes may require every-frame L0.
+    bool m_ForceFullQuality{ false };
+    std::vector<TwoBoneIKConstraint> m_TwoBoneIKConstraints{};
+    std::vector<BoneTransformConstraint> m_BoneTransformConstraints{};
     std::vector<Socket*> socketvec;
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     std::vector<ConditionParameter*> Parameters;
-    std::mutex m_paramMutex;
+    mutable std::mutex m_paramMutex;
+    std::uint64_t m_parameterVersion{ 1 };
 
-    bool m_isBlend = false;
 private:
     bool m_IsEnabled = false;
+    AnimInstanceHandle m_instance{};
 
 public:
     // PHASE 3.75 MBC8/MBC9 — typed 재생 정본. m_Motion(ModelId)으로
     // EnsureAnimationBinding이 채운다. 비직렬화 — 영속 신원은 m_Motion이 진다.
     std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
-    // 본별 BoneRegion 파생 캐시(uint8 저장 — 헤더가 BoneRegion.h를 열지 않기 위한
-    // 불투명 표현). AvatarMask humanoid 레이어 판정이 소비한다.
-    std::vector<std::uint8_t> m_boneRegions{};
-    // [anim.tick] 경로 관측을 애니메이터당 1회로 줄이는 플래그.
-    bool m_tickPathLogged{ false };
+    // Evaluation buffers, playback time and cursors live in the instance.
     void EnsureAnimationBinding();
     void BindModelGeneration(std::shared_ptr<const assets::ModelAssetGeneration> generation);
 
@@ -229,12 +302,11 @@ public:
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.
     std::vector<AnimatorClipOverride> m_clipOverrides{};
 
-    float m_stopTimer = 0.f;
-	float m_stopDuration = 0.f;
     void StopAnimation(float duration)
     {
-        m_stopTimer = duration;
-        m_stopDuration = 0.f;
+		auto& control = GetPlaybackControl();
+		control.stopTimer = duration;
+		control.stoppedDuration = 0.f;
 	}
 };
 
@@ -249,6 +321,7 @@ inline void Animator::AddParameter(const std::string valuename, T value, ValueTy
     }
     ConditionParameter* newParameter = new ConditionParameter(value, vType, valuename);
     Parameters.push_back(newParameter);
+    NotifyParameterLayoutChanged();
 }
 
 template<typename T>

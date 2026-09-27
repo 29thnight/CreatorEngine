@@ -153,7 +153,8 @@ std::size_t Animator::InvokeClipEvents(int clipIndex, double currentProgress,
 	// 이벤트를 받을 오브젝트: 애니메이터가 붙은 것이 자식이면 부모로 올라간다.
 	// (구 C++ 경로와 같은 규칙 — 스크립트는 보통 캐릭터 루트에 붙는다)
 	Entity* owner = GetOwner();
-	std::vector<ScriptComponent*> scripts;
+	auto& scripts = GetInstance().eventScriptsScratch;
+	scripts.clear();
 	if (nullptr != owner)
 	{
 		const Entity::Index parentIndex = owner->GetParentIndex();
@@ -162,12 +163,13 @@ std::size_t Animator::InvokeClipEvents(int clipIndex, double currentProgress,
 			Entity* parent = owner->OwnerSceneFindIndex(parentIndex);
 			if (nullptr != parent) owner = parent;
 		}
-		scripts = owner->GetComponents<ScriptComponent>();
+		owner->CollectComponents(scripts);
 	}
 
     return animation::ForEachCrossedEvent(
         std::span<const KeyFrameEvent>(clipOverride->events),
         previousProgress, currentProgress, IsClipLooping(clipIndex),
+        GetInstance().eventOrderScratch,
         [](const KeyFrameEvent& event) { return event.key; },
         [&scripts](const KeyFrameEvent& event)
         {

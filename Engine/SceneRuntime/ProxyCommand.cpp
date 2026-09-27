@@ -9,6 +9,7 @@
 #include "SpriteSheetComponent.h"
 #include "TextComponent.h"
 #include "RenderScene.h"
+#include "ProxyCommandQueue.h"
 #include "Material.h"
 #include "SpriteRenderer.h"
 #include "DecalComponent.h"
@@ -17,6 +18,7 @@
 #include "Canvas.h"
 #include "RectTransformComponent.h"
 #include <algorithm>
+#include <array>
 
 namespace
 {
@@ -82,9 +84,9 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 	update.isShadowReceive = component->m_shadowRecive;
 	update.enableLOD = component->m_isEnableLOD;
 
-	// Animator는 게임 소유 가변 객체다. 렌더 소비 단계가 Animator*를 읽지
-	// 않도록 여기서 최종 팔레트를 immutable buffer로 복사한다. 한 명령이
-	// 버퍼를 소유하므로 게임/렌더 실행이 겹쳐도 원본 수명에 기대지 않는다.
+	// Capture once per distinct Animator pose in the current delta batch. The
+	// queue seals its arena before RenderThread consumes any command; retained
+	// proxies keep the immutable arena alive after that batch is released.
 	if (component->IsSkinnedMesh())
 	{
 		if (Animator* animator = FindEnabledAnimator(component))
@@ -94,14 +96,31 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
             auto* sample = AnimationMeasurementScope::Current();
             const auto begin = sample ? AnimationMeasurementScope::Clock::now()
                 : AnimationMeasurementScope::Clock::time_point{};
-			update.bonePalette = std::make_shared<math::matrix4x4[]>(kMaxBones);
-			std::copy_n(animator->m_FinalTransforms, kMaxBones,
-				update.bonePalette.get());
+			const auto& finals = animator->GetInstance().finalTransforms;
+			// Preserve the old bind-pose fallback when no generation is bound yet.
+			static const auto identity = []
+			{
+			std::array<math::matrix4x4, kMaxBones> matrices{};
+			matrices.fill(math::matrix4x4::identity());
+			return matrices;
+			}();
+			const std::span<const math::matrix4x4> palette = finals.empty()
+				? std::span<const math::matrix4x4>{ identity }
+				: std::span<const math::matrix4x4>{ finals };
+			const auto captured = ProxyCommandQueue->CaptureAnimationPalette(
+				static_cast<std::uint64_t>(update.animatorGuid), palette);
+			m_captureArena = captured.arena;
+			update.paletteOffset = captured.offset;
+			update.boneCount = captured.count;
             if (sample)
             {
                 sample->m_paletteUs += AnimationMeasurementScope::Microseconds(begin, AnimationMeasurementScope::Clock::now());
-                ++sample->m_paletteCopies;
-                sample->m_paletteBytes += sizeof(math::matrix4x4) * kMaxBones;
+				if (captured.copied)
+				{
+					++sample->m_paletteCopies;
+					sample->m_paletteBytes += sizeof(math::matrix4x4) * captured.count;
+				}
+				if (captured.allocated) ++sample->m_paletteArenaAllocations;
             }
 		}
 	}
@@ -368,7 +387,9 @@ ProxyCommand ProxyCommand::DestroyUI(HashedGuid guid, uint64_t sceneEpoch)
 }
 
 ProxyCommand::ApplyResult ProxyCommand::Apply(
-	RenderScene& renderScene, uint64_t sceneEpoch)
+	RenderScene& renderScene, uint64_t sceneEpoch,
+	std::shared_ptr<const ce::animation_palette_arena> paletteArena,
+	std::uint32_t localPaletteOffset)
 {
 	bool applied = false;
 
@@ -458,7 +479,9 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 
 				proxy->m_isAnimationEnabled = update->hasAnimator;
 				proxy->m_animatorGuid = update->animatorGuid;
-				proxy->m_finalTransforms = update->bonePalette;
+				proxy->m_paletteArena = std::move(paletteArena);
+				proxy->m_paletteOffset = localPaletteOffset;
+				proxy->m_boneCount = update->boneCount;
 				applied = true;
 			}
 		}

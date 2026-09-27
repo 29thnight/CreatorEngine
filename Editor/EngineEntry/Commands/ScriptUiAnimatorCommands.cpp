@@ -969,11 +969,28 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_animation_baseline_probe(const ConsoleCommandContext& ctx)
     {
         using CommandCore::CommandData;
-        if (ctx.parts.size() != 3 || (ctx.parts[2] != "10" && ctx.parts[2] != "50" && ctx.parts[2] != "100"))
-            return CommandCore::InvalidArguments("animation.baseline.probe <model-path> <10|50|100>");
+        if ((ctx.parts.size() != 3 && ctx.parts.size() != 4 && ctx.parts.size() != 5)
+            || (ctx.parts[2] != "10" && ctx.parts[2] != "50" && ctx.parts[2] != "100")
+            || (ctx.parts.size() == 4 && (ctx.parts[3].size() != 1
+                || ctx.parts[3][0] < '0' || ctx.parts[3][0] > '7'))
+            || (ctx.parts.size() == 5 && ctx.parts[3] != "budget"))
+            return CommandCore::InvalidArguments("animation.baseline.probe <model-path> <10|50|100> [0..7|budget <ms>]");
         RenderTest::AnimationBaselineReport report;
         std::string error;
-        const bool passed = RenderTest::RunAnimationBaselineProbe(ctx.parts[1], std::stoul(ctx.parts[2]), report, error);
+        const int qualityStage = ctx.parts.size() == 4 ? ctx.parts[3][0] - '0' : -1;
+        double budgetMs{};
+        if (ctx.parts.size() == 5)
+        {
+            try { budgetMs = std::stod(ctx.parts[4]); }
+            catch (...) { return CommandCore::InvalidArguments("budget must be a positive number of milliseconds"); }
+            if (!std::isfinite(budgetMs) || budgetMs <= 0.)
+                return CommandCore::InvalidArguments("budget must be a positive number of milliseconds");
+        }
+        const bool passed = budgetMs > 0.
+            ? RenderTest::RunAnimationBudgetProbe(ctx.parts[1], std::stoul(ctx.parts[2]),
+                budgetMs, report, error)
+            : RenderTest::RunAnimationBaselineProbe(ctx.parts[1],
+                std::stoul(ctx.parts[2]), qualityStage, report, error);
         auto data = CommandData::Object();
         data.Set("passed", CommandData::Bool(passed));
         data.Set("actors", CommandData::Int(report.m_actors));
@@ -981,6 +998,9 @@ namespace ConsoleCmd
         data.Set("sceneBones", CommandData::Int(report.m_sceneBones));
         data.Set("skinnedMeshes", CommandData::Int(report.m_skinnedMeshes));
         data.Set("workers", CommandData::Int(report.m_workers));
+        data.Set("qualityStage", CommandData::Int(report.m_qualityStage));
+        data.Set("budgetMs", CommandData::Double(report.m_budgetMs));
+        data.Set("lowDetailBoneCount", CommandData::Int(report.m_lowDetailBoneCount));
         data.Set("warmupFrames", CommandData::Int(30));
         data.Set("clip", CommandData::String("Walk"));
         auto frames = CommandData::Array();
@@ -992,6 +1012,10 @@ namespace ConsoleCmd
             frame.Set("waitUs", CommandData::Double(sample.m_waitUs));
             frame.Set("workerSumUs", CommandData::Double(sample.m_workerSumUs));
             frame.Set("workerSpanUs", CommandData::Double(sample.m_workerSpanUs));
+            frame.Set("updatePassWaitUs", CommandData::Double(sample.m_updatePassWaitUs));
+            frame.Set("executePassWaitUs", CommandData::Double(sample.m_executePassWaitUs));
+            frame.Set("updatePassWorkerSumUs", CommandData::Double(sample.m_updatePassWorkerSumUs));
+            frame.Set("executePassWorkerSumUs", CommandData::Double(sample.m_executePassWorkerSumUs));
             frame.Set("publishUs", CommandData::Double(sample.m_publishUs));
             frame.Set("socketUs", CommandData::Double(sample.m_socketUs));
             frame.Set("updateUs", CommandData::Double(sample.m_updateUs));
@@ -999,11 +1023,25 @@ namespace ConsoleCmd
             frame.Set("renderCommitUs", CommandData::Double(sample.m_renderCommitUs));
             frame.Set("paletteUs", CommandData::Double(sample.m_paletteUs));
             frame.Set("jobs", CommandData::Int(sample.m_jobs));
+            frame.Set("updatePassJobs", CommandData::Int(sample.m_updatePassJobs));
+            frame.Set("executePassJobs", CommandData::Int(sample.m_executePassJobs));
             frame.Set("evaluatedAnimators", CommandData::Int(sample.m_evaluatedAnimators));
             frame.Set("validBones", CommandData::Int(sample.m_validBones));
             frame.Set("localWrites", CommandData::Int(sample.m_localWrites));
             frame.Set("paletteCopies", CommandData::Int(sample.m_paletteCopies));
             frame.Set("paletteBytes", CommandData::Int(sample.m_paletteBytes));
+		frame.Set("paletteArenaAllocations", CommandData::Int(sample.m_paletteArenaAllocations));
+		frame.Set("poseStorageGrowths", CommandData::Int(sample.m_poseStorageGrowths));
+            frame.Set("budgetUs", CommandData::Double(sample.m_budgetUs));
+            frame.Set("predictedPoseUs", CommandData::Double(sample.m_predictedPoseUs));
+            frame.Set("measuredPoseUs", CommandData::Double(sample.m_measuredPoseUs));
+            frame.Set("budgetEligible", CommandData::Int(sample.m_budgetEligible));
+            frame.Set("budgetDegraded", CommandData::Int(sample.m_budgetDegraded));
+            frame.Set("budgetOverrun", CommandData::Int(sample.m_budgetOverrun));
+            auto stages = CommandData::Array();
+            for (const auto count : sample.m_qualityStageCounts)
+                stages.Append(CommandData::Int(count));
+            frame.Set("qualityStageCounts", std::move(stages));
             frames.Append(std::move(frame));
         }
         data.Set("frames", std::move(frames));
@@ -1042,6 +1080,15 @@ namespace ConsoleCmd
         data.Set("z", CommandCore::CommandData::Double(report.socketPosition[2]));
         data.Set("paletteDigest", CommandCore::CommandData::Int(report.paletteDigest));
         data.Set("skinnedMeshes", CommandCore::CommandData::Int(report.skinnedMeshes));
+        data.Set("observedBones", CommandCore::CommandData::Int(report.observedBones));
+        data.Set("projectedBones", CommandCore::CommandData::Int(report.projectedBones));
+        data.Set("localWrites", CommandCore::CommandData::Int(report.localWrites));
+        data.Set("paletteDirty", CommandCore::CommandData::Int(report.paletteDirty));
+        data.Set("paletteChanged", CommandCore::CommandData::Bool(report.paletteChanged));
+        data.Set("qualityStage", CommandCore::CommandData::Int(report.qualityStage));
+        data.Set("ikTasks", CommandCore::CommandData::Int(report.ikTasks));
+        data.Set("optionalIKWeight", CommandCore::CommandData::Double(report.optionalIKWeight));
+        data.Set("projectedHeight", CommandCore::CommandData::Double(report.projectedHeight));
         return passed ? CommandCore::Ok({}, std::move(data))
             : CommandCore::Fail("animation.visual.failed", error, std::move(data));
     }

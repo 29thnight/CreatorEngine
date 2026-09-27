@@ -342,6 +342,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\ProfilerFrameOverview.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerAnimation.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerTables.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerTimeline.cpp" />
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />

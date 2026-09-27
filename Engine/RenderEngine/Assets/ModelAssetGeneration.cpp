@@ -1,4 +1,5 @@
 #include "ModelAssetGeneration.h"
+#include "ModelAnimationSampler.h"
 
 #include <chrono>
 
@@ -376,7 +377,7 @@ namespace assets
         std::optional<ModelSkeletonAsset> skeleton,
         std::vector<ModelAnimationAsset> animations,
         std::optional<ModelAnimatorAsset> animator,
-        std::vector<ModelGpuUploadDescriptor> gpuDescriptors) noexcept
+        std::vector<ModelGpuUploadDescriptor> gpuDescriptors)
         : identity_(std::move(identity)), name_(std::move(name)),
         sourcePath_(std::move(sourcePath)), nodes_(std::move(nodes)),
         meshes_(std::move(meshes)), materials_(std::move(materials)),
@@ -384,6 +385,10 @@ namespace assets
         animations_(std::move(animations)), animator_(std::move(animator)),
         gpuDescriptors_(std::move(gpuDescriptors))
     {
+        if (!skeleton_) return;
+        m_animationTracks.resize(animations_.size());
+        for (std::size_t clip = 0; clip < animations_.size(); ++clip)
+            animation::BuildTrackTable(animations_[clip], skeleton_->bones.size(), m_animationTracks[clip]);
     }
 
     const ModelAssetGenerationIdentity& ModelAssetGeneration::Identity() const noexcept
@@ -428,6 +433,12 @@ namespace assets
     const ModelAnimatorAsset* ModelAssetGeneration::Animator() const noexcept
     {
         return animator_ ? &*animator_ : nullptr;
+    }
+
+    std::span<const ModelAnimationTrack* const> ModelAssetGeneration::AnimationTracks(int clipIndex) const noexcept
+    {
+        if (clipIndex < 0 || static_cast<std::size_t>(clipIndex) >= m_animationTracks.size()) return {};
+        return m_animationTracks[static_cast<std::size_t>(clipIndex)];
     }
     std::span<const ModelGpuUploadDescriptor>
         ModelAssetGeneration::GpuDescriptors() const noexcept

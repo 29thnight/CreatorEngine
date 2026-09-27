@@ -28,6 +28,7 @@
 #include "CharacterControllerSystem.h"
 #include "BoneRegion.h"
 #include "BoneComponent.h"
+#include "Socket.h"
 #include "PhysicsManager.h"
 #include "BoxColliderComponent.h"
 #include "SphereColliderComponent.h"
@@ -150,6 +151,9 @@ struct TransformExecutionGraphState
 		std::vector<uint64_t> worldEpoch;
 		std::vector<uint64_t> parentWorldEpoch;
 		std::vector<uint8_t> scaleQuatDirty;
+		// Animated bones without a Transform observer remain in the hierarchy,
+		// but a parent resolve must not write their cached world transforms.
+		std::vector<uint8_t> unobservedAnimatedBone;
 		// X7의 bulk pose upload 전까지 Bone만 기존 binding을 읽는다. culling
 		// publication도 compile 시 포인터를 잡아 일반 노드 inner loop의 component
 		// lookup을 없앤다.
@@ -163,6 +167,10 @@ struct TransformExecutionGraphState
 		uint64_t skeletonSerial = 0;
 		uint64_t topologyVersion = kInvalidVersion;
 		std::vector<ExecIndex> boneExecByIndex;
+		std::vector<std::string> boneNameByIndex;
+		std::vector<uint8_t> nonBoneChildByIndex;
+		std::vector<uint8_t> observedBones;
+		std::vector<math::matrix4x4> publishedPalette;
 		uint64_t validBones = 0;
 		uint64_t invalidBones = 0;
 	};
@@ -1247,6 +1255,7 @@ bool Scene::CompileExecutionGraphs(uint64_t topologyVersion)
 					spatial.worldEpoch.push_back(0);
 					spatial.parentWorldEpoch.push_back(0);
 					spatial.scaleQuatDirty.push_back(1);
+					spatial.unobservedAnimatedBone.push_back(0);
 					spatial.boneComponents.push_back(entity.GetComponent<BoneComponent>());
 					spatial.meshRenderers.push_back(entity.GetComponent<MeshRenderer>());
 				}
@@ -3696,13 +3705,13 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
             boneComp->m_resolvedSerial = skeletonSerial;
         }
 
-        // ★ 범위 검사 — m_localTransforms는 크기 고정 배열(kMaxBones=512,
-        // Animator.h)이다. 위 m_resolvedFor 비교가 "다른 스켈레톤"은 이미
+        // ★ 범위 검사 — 로컬 포즈 버퍼는 실제 본 수(최대 kMaxBones)만 보유한다.
+        // 위 m_resolvedFor 비교가 "다른 스켈레톤"은 이미
         // 걸러내지만, 캐시에 담긴 인덱스를 실제로 쓰기 전에 배열 경계를 한 번
         // 더 확인한다 — 인덱스가 파생값이라 저장하지 않기로 한 것과 같은 이유
         // (BoneComponent.h 주석)로, 쓰는 자리에서 스스로를 방어한다.
         const bool hasValidIndex = boneComp->m_boneIndex >= 0
-            && static_cast<size_t>(boneComp->m_boneIndex) < std::size(animator->m_localTransforms);
+            && static_cast<size_t>(boneComp->m_boneIndex) < std::size(animator->GetInstance().localTransforms);
 		const size_t storeSlot = static_cast<size_t>(objIndex);
 		const bool localNeedsCompose = storeSlot >= m_transformStore.Size()
 			|| 0 != m_transformStore.dirty[storeSlot];
@@ -3710,7 +3719,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
 		math::matrix4x4 local{};
 		if (hasValidIndex)
 		{
-			local = animator->m_localTransforms[boneComp->m_boneIndex];
+			local = animator->GetInstance().localTransforms[boneComp->m_boneIndex];
 		}
 		else if (diagnostics && localNeedsCompose)
 		{
@@ -4296,6 +4305,18 @@ bool Scene::ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
 				exec = (std::min)(range.end, graph.subtreeEnd[exec]);
 				continue;
 			}
+			if (graph.unobservedAnimatedBone[exec])
+			{
+				BoneComponent* bone = graph.boneComponents[exec];
+				Entity* owner = bone ? Resolve(bone->m_animatorOwner) : nullptr;
+				Animator* animator = owner ? owner->GetComponent<Animator>() : nullptr;
+				if (animator && animator->IsEnabled()
+					&& animator->GetSkeletonSerial() == bone->m_resolvedSerial)
+				{
+					exec = (std::min)(range.end, graph.subtreeEnd[exec]);
+					continue;
+				}
+			}
 
 			const size_t slot = handle.index;
 			math::matrix4x4 local{};
@@ -4407,6 +4428,96 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPose(Animator& animator)
 	return metrics;
 }
 
+math::matrix4x4 BoneComponent::GetWorldTransform() const
+{
+	return GetOwner() ? GetOwner()->Transform_().GetWorldMatrix()
+		: math::matrix4x4::identity();
+}
+
+bool Scene::PrepareAnimatedBoneRead(Entity& boneEntity)
+{
+	if (boneEntity.GetScene() != this || boneEntity.IsDestroyMark()) return false;
+	BoneComponent* bone = boneEntity.GetComponent<BoneComponent>();
+	if (!bone) return false;
+	Entity* owner = nullptr;
+	// The component may have moved between scenes since its last binding.
+	// Resolve the actual ancestor rather than trusting a coincidentally reused
+	// slot/generation from the old scene.
+	size_t depth = 0;
+	for (Entity::Index parent = boneEntity.GetParentIndex();
+		Entity::IsValidIndex(parent) && depth++ < m_Entities.size();)
+	{
+		Entity* ancestor = TryGetEntity(parent);
+		if (!ancestor) break;
+		if (ancestor->GetComponent<Animator>()) { owner = ancestor; break; }
+		parent = ancestor->GetParentIndex();
+	}
+	Animator* animator = owner ? owner->GetComponent<Animator>() : nullptr;
+	if (!animator || !animator->IsEnabled()) return false;
+	const bool promoted = !bone->m_runtimeObserved;
+	if (promoted)
+		Debug::PrintLog(spdlog::level::info,
+			"[animation.observed-bone] promoted " + boneEntity.m_name.ToString());
+	bone->m_runtimeObserved = true;
+	using State = TransformExecutionGraphState;
+	const EntityHandle ownerHandle = HandleOf(owner->m_index);
+	const EntityHandle boneHandle = HandleOf(boneEntity.m_index);
+	if (m_executionGraphs && m_executionGraphs->spatialDataSynchronized
+		&& m_executionGraphs->compiledVersion == GetTopologyVersion()
+		&& ownerHandle.IsValid() && boneHandle.IsValid())
+	{
+		auto& graph = m_executionGraphs->spatial;
+		const auto binding = m_executionGraphs->animatorPoseBindings.find(animator->GetInstanceID());
+		if (binding != m_executionGraphs->animatorPoseBindings.end()
+			&& binding->second.owner == ownerHandle
+			&& binding->second.skeletonSerial == animator->GetSkeletonSerial()
+			&& binding->second.topologyVersion == m_executionGraphs->compiledVersion
+			&& ownerHandle.index < graph.entityToExec.size()
+			&& boneHandle.index < graph.entityToExec.size())
+		{
+			const State::ExecIndex ownerExec = graph.entityToExec[ownerHandle.index];
+			const State::ExecIndex boneExec = graph.entityToExec[boneHandle.index];
+			if (ownerExec != State::kInvalidExec && boneExec != State::kInvalidExec
+				&& boneExec > ownerExec && boneExec < graph.subtreeEnd[ownerExec]
+				&& graph.execToEntity[boneExec] == boneHandle)
+			{
+				bool wroteLocal = false;
+				const auto& bindingData = binding->second;
+				const auto& locals = animator->GetInstance().localTransforms;
+				for (State::ExecIndex exec = boneExec; exec != ownerExec;
+					exec = graph.parentExec[exec])
+				{
+					BoneComponent* pathBone = graph.boneComponents[exec];
+					if (!pathBone || pathBone->m_boneIndex < 0) continue;
+					const size_t index = static_cast<size_t>(pathBone->m_boneIndex);
+					if (index >= bindingData.boneExecByIndex.size()
+						|| bindingData.boneExecByIndex[index] != exec
+						|| index >= locals.size()) continue;
+					const EntityHandle pathHandle = graph.execToEntity[exec];
+					if (pathHandle.index >= m_transformStore.Size()) continue;
+					graph.unobservedAnimatedBone[exec] = 0;
+					const math::matrix4x4& local = locals[index];
+					if (graph.localMatrix[exec] == local
+						&& m_transformStore.localMatrix[pathHandle.index] == local) continue;
+					graph.localMatrix[exec] = local;
+					m_transformStore.localMatrix[pathHandle.index] = local;
+					m_transformStore.dirty[pathHandle.index] = 0;
+					uint64_t& epoch = graph.localEpoch[exec];
+					if (0 == ++epoch) ++epoch;
+					wroteLocal = true;
+				}
+				if (wroteLocal)
+					PublishLocalWrite(ownerHandle, TransformWriteReason::Animator);
+				return EnsureResolved(boneHandle);
+			}
+		}
+	}
+	// Before the first binding, use the normal publication path once. The
+	// established binding above keeps subsequent reads proportional to depth.
+	PublishAnimatorPose(*animator);
+	return EnsureResolved(HandleOf(boneEntity.m_index));
+}
+
 bool Scene::TryGetLastAnimatorPoseMetrics(const Animator& animator,
 	AnimatorPoseUploadMetrics& outMetrics) const
 {
@@ -4495,10 +4606,15 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 		binding.skeletonSerial = metrics.skeletonSerial;
 		binding.topologyVersion = m_executionGraphs->compiledVersion;
 		const size_t poseCapacity = (std::min)(
-			animator.GetBoneCount(), std::size(animator.m_localTransforms));
+			animator.GetBoneCount(), std::size(animator.GetInstance().localTransforms));
 		binding.boneExecByIndex.assign(poseCapacity, State::kInvalidExec);
+		binding.boneNameByIndex.resize(poseCapacity);
+		binding.nonBoneChildByIndex.assign(poseCapacity, 0);
+		binding.observedBones.assign(poseCapacity, 0);
 
 		const ExecIndex subtreeEnd = graph.subtreeEnd[ownerExec];
+		for (ExecIndex exec = ownerExec; exec < subtreeEnd; ++exec)
+			graph.unobservedAnimatedBone[exec] = 0;
 		for (ExecIndex exec = ownerExec; exec < subtreeEnd; ++exec)
 		{
 			BoneComponent* bone = graph.boneComponents[exec];
@@ -4510,9 +4626,10 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 				continue;
 			}
 
-			bone->m_boneIndex = animator.ResolveBoneIndex(
-				boneEntity->RemoveSuffixNumberTag());
+			const std::string boneName = boneEntity->RemoveSuffixNumberTag();
+			bone->m_boneIndex = animator.ResolveBoneIndex(boneName);
 			bone->m_resolvedSerial = metrics.skeletonSerial;
+			bone->m_animatorOwner = ownerHandle;
 			++metrics.bindLookups;
 			const bool validIndex = bone->m_boneIndex >= 0
 				&& static_cast<size_t>(bone->m_boneIndex)
@@ -4525,24 +4642,76 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 				continue;
 			}
 			binding.boneExecByIndex[static_cast<size_t>(bone->m_boneIndex)] = exec;
+			binding.boneNameByIndex[static_cast<size_t>(bone->m_boneIndex)] = boneName;
 			++binding.validBones;
+		}
+		// A non-bone child is structural observation; topology changes rebuild
+		// this binding rather than scanning the subtree on every animation tick.
+		for (ExecIndex child = ownerExec + 1; child < subtreeEnd; ++child)
+		{
+			const ExecIndex parent = graph.parentExec[child];
+			if (parent >= graph.boneComponents.size() || !graph.boneComponents[parent]
+				|| graph.boneComponents[child]) continue;
+			const int index = graph.boneComponents[parent]->m_boneIndex;
+			if (index >= 0 && static_cast<size_t>(index) < poseCapacity
+				&& binding.boneExecByIndex[static_cast<size_t>(index)] == parent)
+				binding.nonBoneChildByIndex[static_cast<size_t>(index)] = 1;
 		}
 		bindingIt = m_executionGraphs->animatorPoseBindings.insert_or_assign(
 			bindingKey, std::move(binding)).first;
 		metrics.rebound = true;
 	}
 
-	const State::AnimatorPoseBinding& binding = bindingIt->second;
+	State::AnimatorPoseBinding& binding = bindingIt->second;
 	metrics.validBones = binding.validBones;
 	metrics.invalidBones = binding.invalidBones;
+	// Observation is a property of the current hierarchy and readers, not of
+	// the skinning palette. Rebuild the small mask so direct pin/selection and
+	// socket edits take effect without requiring a topology transaction.
+	binding.observedBones.assign(binding.boneExecByIndex.size(), 0);
 	for (size_t boneIndex = 0; boneIndex < binding.boneExecByIndex.size(); ++boneIndex)
 	{
 		const ExecIndex exec = binding.boneExecByIndex[boneIndex];
 		if (State::kInvalidExec == exec || exec >= graph.execToEntity.size()) continue;
+		BoneComponent* bone = graph.boneComponents[exec];
+		Entity* boneEntity = Resolve(graph.execToEntity[exec]);
+		if (!bone || !boneEntity) continue;
+		bool direct = bone->m_bPinned || bone->m_runtimeObserved
+			|| boneEntity == m_selectedEntity || binding.nonBoneChildByIndex[boneIndex]
+			|| std::ranges::find(m_selectedEntities, boneEntity) != m_selectedEntities.end();
+		if (!direct)
+		{
+			const std::string& name = binding.boneNameByIndex[boneIndex];
+			for (const Socket* socket : animator.socketvec)
+				if (socket && socket->m_ObjectName == name) { direct = true; break; }
+		}
+		if (!direct) continue;
+		++metrics.observedBones;
+		// Spatial propagation needs current locals along the target's ancestor
+		// chain. Include only that closure, never unrelated sibling bones.
+		for (ExecIndex ancestor = exec; ancestor != ownerExec
+			&& ancestor != State::kInvalidExec; ancestor = graph.parentExec[ancestor])
+		{
+			BoneComponent* ancestorBone = graph.boneComponents[ancestor];
+			if (!ancestorBone || ancestorBone->m_boneIndex < 0) continue;
+			const size_t index = static_cast<size_t>(ancestorBone->m_boneIndex);
+			if (index < binding.observedBones.size()
+				&& binding.boneExecByIndex[index] == ancestor)
+				binding.observedBones[index] = 1;
+		}
+	}
+	for (size_t boneIndex = 0; boneIndex < binding.boneExecByIndex.size(); ++boneIndex)
+	{
+		const ExecIndex exec = binding.boneExecByIndex[boneIndex];
+		if (exec != State::kInvalidExec && exec < graph.unobservedAnimatedBone.size())
+			graph.unobservedAnimatedBone[exec] = !binding.observedBones[boneIndex];
+		if (!binding.observedBones[boneIndex]) continue;
+		++metrics.projectedBones;
+		if (State::kInvalidExec == exec || exec >= graph.execToEntity.size()) continue;
 		const EntityHandle boneHandle = graph.execToEntity[exec];
 		if (!Resolve(boneHandle) || boneHandle.index >= m_transformStore.Size()) continue;
 
-		const math::matrix4x4& local = animator.m_localTransforms[boneIndex];
+		const math::matrix4x4& local = animator.GetInstance().localTransforms[boneIndex];
 		const size_t slot = boneHandle.index;
 		if (graph.localMatrix[exec] == local
 			&& m_transformStore.localMatrix[slot] == local)
@@ -4565,22 +4734,15 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 		metrics.queuedRoots = 1;
 	}
 
-	// ★ 본 팔레트는 프록시가 **다시 만들어질 때만** 렌더로 간다
-	//   (ProxyCommand가 m_FinalTransforms를 immutable buffer로 복사한다).
-	//   X8이 프록시 발행을 dirty 게이팅으로 바꾸면서 그 마스크에 "팔레트가
-	//   바뀌었다"에 해당하는 축이 없었다 — 그래서 스킨 메시가 **정상적으로
-	//   그려지되 첫 포즈에서 굳었다**. 오브젝트를 움직이면 Transform dirty가
-	//   올라가 그때만 툭 갱신되는 것으로 확인됐다.
-	//
-	//   렌더러는 애니메이터 소유 엔티티가 아니라 그 **자식**에 붙으므로
-	//   (SK_*), 엔티티 하나가 아니라 서브트리를 훑는다. 프록시가 없는
-	//   엔티티는 빈 목록이라 비용이 사실상 인덱싱뿐이다.
-	//
-	//   ★ localWrites > 0으로 가둔다 — 로컬이 하나도 안 바뀌었으면 포즈가
-	//     그대로이므로(둘은 같은 틱에서 함께 쓰인다) 프레임마다 프록시를
-	//     새로 짓지 않는다. X8의 dedup을 스킨 메시에서만 통째로 버리지 않는다.
-	if (metrics.localWrites > 0)
+	// The palette is independent of observed Transform writes. A character
+	// with no exposed bones must still advance its skinned render proxies.
+	const auto& palette = animator.GetInstance().finalTransforms;
+	metrics.paletteChanged = palette.size() != binding.publishedPalette.size()
+		|| !std::equal(palette.begin(), palette.end(),
+			binding.publishedPalette.begin(), binding.publishedPalette.end());
+	if (metrics.paletteChanged)
 	{
+		binding.publishedPalette.assign(palette.begin(), palette.end());
 		const ExecIndex paletteSubtreeEnd = graph.subtreeEnd[ownerExec];
 		for (ExecIndex exec = ownerExec; exec < paletteSubtreeEnd; ++exec)
 		{
@@ -4906,15 +5068,18 @@ bool Scene::EnsureResolved(EntityHandle target)
 		const bool parentChanged = graph.parentWorldEpoch[exec] != parentEpoch;
 		const bool mirrorChanged = m_transformStore.worldMatrix[slot]
 			!= graph.worldMatrix[exec];
-		if (!localChanged && !parentChanged && !mirrorChanged)
+		// Animator publication has already written graph.localMatrix, so
+		// comparing local against that mirror alone can miss an unpublished
+		// world change on the first direct bone read.
+		const math::matrix4x4 world = local * parentWorld;
+		const bool worldChanged = world != graph.worldMatrix[exec];
+		if (!localChanged && !parentChanged && !mirrorChanged && !worldChanged)
 		{
 			graph.parentWorldEpoch[exec] = parentEpoch;
 			continue;
 		}
 
 		++pull.recomputedNodes;
-		const math::matrix4x4 world = local * parentWorld;
-		const bool worldChanged = world != graph.worldMatrix[exec];
 		graph.parentWorldEpoch[exec] = parentEpoch;
 		if (!worldChanged && !mirrorChanged) continue;
 

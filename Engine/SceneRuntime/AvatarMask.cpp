@@ -41,9 +41,10 @@ void AvatarMask::ReCreateMask(AvatarMask* _otherMask)
         m_BoneMasks.push_back(copy);
     }*/
     //m_BoneMasks = _otherMask->m_BoneMasks;
-    for(int i = 0; i < _otherMask->m_BoneMasks.size(); ++i)
+    for (std::size_t i = 0; i < m_BoneMasks.size() && i < _otherMask->m_BoneMasks.size(); ++i)
     {
         m_BoneMasks[i]->isEnabled = _otherMask->m_BoneMasks[i]->isEnabled;
+        m_BoneMasks[i]->weight = _otherMask->m_BoneMasks[i]->weight;
     }
     isHumanoid = _otherMask->isHumanoid;
     useAll = _otherMask->useAll;

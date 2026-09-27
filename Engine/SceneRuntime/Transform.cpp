@@ -1,6 +1,7 @@
 #include "Transform.h"
 #include "Entity.h"
 #include "Scene.h"
+#include "BoneComponent.h"
 #include "ReflectionYml.h"
 
 const char* TransformWriteReasonName(TransformWriteReason reason)
@@ -367,12 +368,34 @@ math::matrix4x4 Transform::GetLocalMatrix()
 
 math::matrix4x4 Transform::GetWorldMatrix() const
 {
+	PrepareAnimatedBoneRead();
 	return GetStoredWorldMatrix();
+}
+
+void Transform::PrepareAnimatedBoneRead() const
+{
+	if (!m_pOwner || !m_pOwner->GetComponent<BoneComponent>()) return;
+	Scene* scene = m_pOwner->GetScene();
+	if (!scene) return;
+	static thread_local bool reentrant = false;
+	if (reentrant) return;
+	reentrant = true;
+	struct Reset final { bool& value; ~Reset() { value = false; } } reset{ reentrant };
+	scene->PrepareAnimatedBoneRead(*m_pOwner);
 }
 
 //add joker1092
 math::matrix4x4 Transform::GetWorldMatrix_NoScale() const
 {
+	PrepareAnimatedBoneRead();
+	if (m_pOwner && m_pOwner->GetComponent<BoneComponent>())
+	{
+		const math::vector4 q = GetStoredWorldQuaternion();
+		const math::vector4 p = GetStoredWorldPosition();
+		return math::compose(math::vector3::one(),
+			math::quaternion{ q.x, q.y, q.z, q.w },
+			math::vector3{ p.x, p.y, p.z });
+	}
 	// 로컬 회전·이동만으로 행렬을 구성합니다.
 	const math::matrix4x4 localMatrix_NoScale = math::compose(
 		math::vector3::one(),
@@ -574,18 +597,21 @@ void Transform::SetAndDecomposeMatrix(const math::matrix4x4& matrix, bool setLoc
 
 math::vector3 Transform::GetWorldPosition() const
 {
+	PrepareAnimatedBoneRead();
 	const math::vector4 stored = GetStoredWorldPosition();
 	return math::vector3{ stored.x, stored.y, stored.z };
 }
 
 math::vector3 Transform::GetWorldScale() const
 {
+	PrepareAnimatedBoneRead();
 	const math::vector4 stored = GetStoredWorldScale();
 	return math::vector3{ stored.x, stored.y, stored.z };
 }
 
 math::quaternion Transform::GetWorldQuaternion() const
 {
+	PrepareAnimatedBoneRead();
 	const math::vector4 stored = GetStoredWorldQuaternion();
 	return math::quaternion{ stored.x, stored.y, stored.z, stored.w };
 }

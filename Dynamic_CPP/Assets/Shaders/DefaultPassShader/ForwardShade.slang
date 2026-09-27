@@ -2,6 +2,7 @@
 #include "Includes/MaterialEvaluation.slang"
 #include "Includes/PbrSurface.slang"
 #include "Includes/PbrCoverage.slang"
+#include "Includes/PackedBones.slang"
 
 // MBC6: ModelAssetGeneration의 전체 mask가 입력 레이아웃과 shader 축을 함께
 // 만든다. Forward도 GBuffer/Shadow와 같은 palette 규약으로 skin pose를 계산한다.
@@ -116,7 +117,7 @@ StructuredBuffer<float4>        gLights    : register(t1);
 StructuredBuffer<uint>          gTileCount : register(t2);
 StructuredBuffer<uint>          gTileList  : register(t3);
 #ifdef MODEL_VERTEX_SKINNING
-StructuredBuffer<float4x4>      gBones     : register(t12);
+StructuredBuffer<PackedBone>      gBones     : register(t12);
 #define NO_SKINNING 0xFFFFFFFFu
 #endif
 
@@ -249,12 +250,12 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     if (instance.boneOffset != NO_SKINNING && input.boneWeights[0] > 0.0f)
     {
         float4x4 boneTransform = input.boneWeights[0]
-            * gBones[instance.boneOffset + input.boneIndices[0]];
+            * UnpackBone(gBones[instance.boneOffset + input.boneIndices[0]]);
         [unroll]
         for (int i = 1; i < 4; ++i)
         {
             boneTransform += input.boneWeights[i]
-                * gBones[instance.boneOffset + input.boneIndices[i]];
+                * UnpackBone(gBones[instance.boneOffset + input.boneIndices[i]]);
         }
         input.position = mul(float4(input.position, 1.0f), boneTransform).xyz;
         frameTransform = mul((float3x3)boneTransform, frameTransform);

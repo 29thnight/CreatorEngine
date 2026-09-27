@@ -1,6 +1,4 @@
 #pragma once
-#include "AnimationJob.h"
-
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
@@ -53,14 +51,6 @@ public:
 	void Finalize();
 
 
-
-	// K2: Animator 추적을 공유 소유에서 프레임-로컬 raw 포인터로(AnimationJob 참조).
-	void RegisterAnimator(Animator* animatorPtr);
-	void UnregisterAnimator(Animator* animatorPtr);
-
-	// I5-D4e-1: experiment.animtick 패리티 게이트 전용 — 제품 틱 함수
-	// (EvaluateParityPose)를 게이트가 직접 태우기 위한 접근.
-	AnimationJob& GetAnimationJob() { return m_animationJob; }
 
     void RegisterCommand(MeshRenderer* meshRendererPtr);
     void UpdateCommand(MeshRenderer* meshRendererPtr);
@@ -115,8 +105,6 @@ public:
 		size_t proxies{ 0 };
 		size_t lightProxies{ 0 };
 		size_t uiProxies{ 0 };
-		size_t animators{ 0 };
-		size_t animationPalettes{ 0 };
 	};
 	ResourceCounts GetResourceCounts();
 
@@ -125,12 +113,10 @@ private:
 	friend class InspectorWindow;
 	friend class SceneViewWindow;
 	friend class ProxyCommand;
-	friend class AnimationJob;
 
 	std::atomic<Scene*>	m_currentScene{};
 	std::atomic_ullong	m_sceneEpoch{ 1 };
 	uint64_t			m_consumedSceneEpoch{ 0 }; // 렌더 소비 스레드 전용
-	AnimationJob		m_animationJob{};
 	ProxyMap			m_proxyMap;
 	LightProxyMap		m_lightProxyMap;
 	UIProxyMap          m_uiProxyMap;

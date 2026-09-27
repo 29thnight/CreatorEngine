@@ -67,9 +67,17 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 
 void AnimationState::UpdateAnimationSpeed()
 {
-	ConditionParameter* parameter = m_ownerController->GetOwner()->FindParameter(animationSpeedParameterName);
-	if (parameter)
+	Animator* animator = m_ownerController ? m_ownerController->GetOwner() : nullptr;
+	if (!animator) return;
+	ConditionParameter* parameter = animator->ParameterAt(m_speedParameterIndex);
+	if (m_speedParameterVersion != animator->ParameterVersion()
+		|| m_speedParameterName != animationSpeedParameterName
+		|| !parameter || parameter->name != animationSpeedParameterName)
 	{
-		multiplerAnimationSpeed = parameter->fValue;
+		m_speedParameterIndex = animator->FindParameterIndex(animationSpeedParameterName);
+		m_speedParameterVersion = animator->ParameterVersion();
+		m_speedParameterName = animationSpeedParameterName;
+		parameter = animator->ParameterAt(m_speedParameterIndex);
 	}
+	if (parameter) multiplerAnimationSpeed = parameter->fValue;
 }

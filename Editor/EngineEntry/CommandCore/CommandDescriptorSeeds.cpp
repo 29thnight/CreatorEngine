@@ -32,7 +32,7 @@ namespace CommandCore
         // 정렬된 표. 이름으로 이진 탐색한다.
         constexpr DescriptorSeed kSeeds[] = {
             { "ai.status", CommandCost::Immediate, "[오브젝트]", "AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)", CommandClass::EngineService, CommandLiveness::Live },
-            { "animation.baseline.probe", CommandCost::Long, "<model-path> <10|50|100>", "Measure product animation CPU stages with QPC", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "animation.baseline.probe", CommandCost::Long, "<model-path> <10|50|100> [0..7]", "Measure product animation CPU stages with QPC", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animation.playback.probe", CommandCost::Long, "<model-path>", "Validate parallel animation, managed events, layers and sockets", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animation.visual.probe", CommandCost::Long, "<setup model-path|pose>", "Stage deterministic product animation frames for pixel regression", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "animator.param", CommandCost::Frames, "<오브젝트> <파라미터> <bool|float|int|trigger>", "Animator 파라미터를 저작한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,name,type", true },
@@ -185,6 +185,7 @@ namespace CommandCore
             // ★★★ `player.move` 가 §11.3 의 "값이 게임을 재시작하지 않고 반영된다" 를
             //   **관측 가능하게** 만드는 자리다. 쓰기만 있고 읽기가 없으면 반영을
             //   주장만 할 수 있다 — `player.object` 로 되읽어야 판정이 된다.
+            { "player.animation", CommandCost::Immediate, "<이름>", "Animator의 현재 클립·시간·스킨 팔레트를 조회한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
             { "player.move", CommandCost::Frames, "<이름> <x> <y> <z>", "오브젝트의 로컬 위치를 옮긴다(재시작 없이 반영된다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
             { "player.object", CommandCost::Immediate, "<이름>", "오브젝트 하나의 위치·회전·크기를 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
             { "player.objects", CommandCost::Immediate, "[이름 조각]", "활성 씬의 오브젝트 이름을 나열한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },

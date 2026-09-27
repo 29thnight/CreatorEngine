@@ -11,6 +11,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Graph/PackedBoneMatrix.h"
 #include "../../Graph/EnhancedDrawSealLedger.h"
 #include "../../Scene/MaterialTextureTable.h"
 // ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
@@ -301,7 +302,7 @@ private:
 
     // 프레임의 모든 본 팔레트를 이어 붙인 것. 애니메이터별로 한 번씩만 담기고,
     // 인스턴스의 boneOffset이 자기 구간의 시작을 가리킨다.
-    std::vector<math::matrix4x4>          m_bonePalettes;
+    std::vector<PackedBoneMatrix>          m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;   // 애니메이터 키 → 오프셋
     RHISamplerTable                                 m_sampler{};
     // W7 — 재질이 선언한 샘플러마다 테이블 하나. 배치 키가 샘플러로 갈리므로

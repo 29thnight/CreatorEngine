@@ -262,6 +262,7 @@ namespace
         // 소유한다(E4-2). UI는 런타임 게임 UI라 남는다(E4-1 재분류).
         EnhancedUIPass        ui;
 
+        AnimationPaletteFrame animationPalettes{};
         EnhancedFrameContext frameContext{};
 
         // 이 파이프라인의 조립 기술. 파이프라인이 설 때 한 번 짜이고, 노드의
@@ -408,6 +409,7 @@ namespace
         RHITextureHandle fogCloudNeutralHandle;
         RHITextureHandle fogBlueNoiseHandle;
         bool fogInputsReady{ false };
+        AnimationPaletteFrame animationPalettes{};
         EnhancedFrameContext frameContext{};
         LivePipelineDesc desc;
         LiveBlackboard blackboard;
@@ -523,6 +525,7 @@ namespace
             frameContext.camera = &camera;
             frameContext.draws = &draws;
             frameContext.forwardDraws = &forwardDraws;
+            frameContext.animationPalettes = &animationPalettes;
             frameContext.lights = &lights;
 
             // 기여 노드(기즈모 체인)의 같은 규약은 Contribute가
@@ -1654,6 +1657,7 @@ namespace
             p.frameContext.camera = &cameraSnapshot;
             p.frameContext.draws = &draws;
             p.frameContext.forwardDraws = &forwardDraws;
+            p.frameContext.animationPalettes = &p.animationPalettes;
             p.frameContext.lights = &lights;
 
             // 패스 구성과 순서는 dx12.scene(RunSceneBindingTest)과 같다 — 그
@@ -2929,12 +2933,15 @@ namespace
                         ? 0.f : math::length(bounds.extents);
                 }
 
+                const math::matrix4x4* palette = proxy->m_paletteArena
+                    ? proxy->m_paletteArena->resolve(proxy->m_paletteOffset,
+                        proxy->m_boneCount) : nullptr;
                 if (proxy->m_isAnimationEnabled
                     && (HashedGuid::kInvalidId != proxy->m_animatorGuid)
-                    && proxy->m_finalTransforms)
+                    && palette)
                 {
-                    pooled.item.bonePalette = proxy->m_finalTransforms.get();
-                    pooled.item.boneCount = kMaxBones;
+                    pooled.item.bonePalette = palette;
+                    pooled.item.boneCount = proxy->m_boneCount;
                     pooled.item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
                 }
 
@@ -3775,6 +3782,12 @@ namespace
             p.sprite.SetItems(&worldSprites);
             p.ui.SetRects(&uiRects);
 
+            if (!p.animationPalettes.Prepare(*p.frameContext.resources,
+                    p.frameContext.draws, p.frameContext.forwardDraws))
+            {
+                outError = "공용 애니메이션 팔레트 업로드 실패";
+                return false;
+            }
             return p.desc.PrepareAll(p.frameContext, viewIndex, outError);
         }
 
@@ -4187,6 +4200,7 @@ namespace
     {
         ProxyCommandQueueController::Batch compacted;
         compacted.reserve(batch.size());
+        compacted.take_palettes_from(batch);
         std::unordered_map<ProxyUpdateKey, size_t, ProxyUpdateKeyHash> latestUpdates;
         uint64_t superseded = 0;
 
@@ -4421,10 +4435,8 @@ namespace
             {
                 ProxyCommandQueueController::Batch merged;
                 merged.reserve(mergedDeltaCount);
-                for (ProxyCommand& command : newest.deltas)
-                    merged.push_back(std::move(command));
-                for (ProxyCommand& command : submission.deltas)
-                    merged.push_back(std::move(command));
+                merged.append(std::move(newest.deltas));
+                merged.append(std::move(submission.deltas));
 
                 const uint64_t mergedSuperseded = CompactProxyUpdates(merged);
                 renderCoalescedDeltas += mergedSuperseded;

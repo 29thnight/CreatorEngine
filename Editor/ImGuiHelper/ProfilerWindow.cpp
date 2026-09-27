@@ -535,5 +535,11 @@ void DrawProfilerHUD()
 		ImGui::EndTabItem();
 	}
 
+	if (ImGui::BeginTabItem("Animation Budget"))
+	{
+		draw_animation_budget();
+		ImGui::EndTabItem();
+	}
+
 	ImGui::EndTabBar();
 }

@@ -6,6 +6,7 @@
 #include "AuthoringParsedDocument.h"
 
 #include <cstdio>
+#include <cmath>
 #include <exception>
 #include <filesystem>
 #include <memory>
@@ -124,9 +125,35 @@ bool RuntimeSettings::Load() noexcept
         const std::filesystem::path startupScene = startupSceneNode
             ? startupSceneNode.AsString() : "SampleScene";
 
+        AnimationBudgetSettings animationBudget{};
+        const Authoring::ReadNode animationNode = root["animation"];
+        if (animationNode)
+        {
+            if (!animationNode.IsMap())
+            {
+                Debug::PrintLog(spdlog::level::err, "EngineSettings animation must be a map.");
+                return false;
+            }
+            if (const auto value = animationNode["cpuBudgetMs"])
+                animationBudget.cpuBudgetMs = value.As<double>();
+            if (const auto value = animationNode["promotionGraceFrames"])
+                animationBudget.promotionGraceFrames = value.As<std::uint16_t>();
+            if (const auto value = animationNode["hysteresis"])
+                animationBudget.hysteresis = value.As<double>();
+            if (!std::isfinite(animationBudget.cpuBudgetMs)
+                || animationBudget.cpuBudgetMs <= 0.
+                || !std::isfinite(animationBudget.hysteresis)
+                || animationBudget.hysteresis < 0. || animationBudget.hysteresis >= .5)
+            {
+                Debug::PrintLog(spdlog::level::err, "Invalid EngineSettings animation budget.");
+                return false;
+            }
+        }
+
         m_renderPassSettings = std::move(renderPassSettings);
         m_renderBackend = renderBackend;
         m_startupSceneName = startupScene.wstring();
+        m_animationBudgetSettings = animationBudget;
 
         Debug::PrintLog(spdlog::level::debug, std::string("[RenderBackend] runtime=") +
             RenderBackendName(m_renderBackend));

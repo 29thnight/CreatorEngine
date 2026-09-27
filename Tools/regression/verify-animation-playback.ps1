@@ -31,7 +31,7 @@ foreach ($current in $configurations) {
         $msbuild = Join-Path $VisualStudioInstallation 'MSBuild/Current/Bin/MSBuild.exe'
         $compileOutput = Join-Path $repoRoot "Build/Obj/Phase13S0/Selected-$current/"
         New-Item -Path $compileOutput -ItemType Directory -Force | Out-Null
-        foreach ($file in @('AnimationJob.cpp', 'AnimationEventBridge.cpp',
+        foreach ($file in @('AnimationScheduler.cpp', 'AnimationEventBridge.cpp',
             'AnimationController.cpp', 'Animator.cpp')) {
             # MSVC's SelectClCompile compares one item identity. Passing a list
             # here would select nothing and compile the entire non-unity project.

@@ -46,6 +46,28 @@ namespace assets::animation
             if (!(span > 0.0)) return 0.0f;
             return static_cast<float>((time - k0.time) / span);
         }
+
+        template <class Key, class Value, class ValueOf, class Interpolate>
+        [[nodiscard]] Value SampleCachedKeys(const std::vector<Key>& keys, double time,
+            ModelInterpolationMode mode, std::size_t& cursor, Value fallback,
+            ValueOf valueOf, Interpolate interpolate)
+        {
+            if (keys.size() <= 1)
+            {
+                return keys.empty() ? fallback : valueOf(keys.front());
+            }
+            std::size_t index = Animation::FindKeyInterval(std::span{ keys }, time, cursor);
+            if (mode == ModelInterpolationMode::Step)
+            {
+                // Keep the interval cursor, not the selected Step key, so an
+                // exact key and terminal holds obey the original boundary rule.
+                if (keys[index + 1].time <= time) ++index;
+                return valueOf(keys[index]);
+            }
+            const auto& k0 = keys[index];
+            const auto& k1 = keys[index + 1];
+            return interpolate(valueOf(k0), valueOf(k1), Alpha(k0, k1, time));
+        }
     }
 
     math::vector3 SampleTranslation(const ModelAnimationTrack& track, double time)
@@ -78,27 +100,50 @@ namespace assets::animation
         return math::slerp(k0.value, k1.value, Alpha(k0, k1, time));
     }
 
-    float SampleUniformScale(const ModelAnimationTrack& track, double time)
+    math::vector3 SampleScale(const ModelAnimationTrack& track, double time)
     {
         const auto& keys = track.scales;
-        if (keys.empty()) return 1.0f;
-        if (keys.size() == 1) return keys.front().value.x;
+        if (keys.empty()) return { 1.f, 1.f, 1.f };
+        if (keys.size() == 1) return keys.front().value;
         if (track.scaleInterpolation == ModelInterpolationMode::Step)
         {
-            return keys[StepKeyIndex(keys, time)].value.x;
+            return keys[StepKeyIndex(keys, time)].value;
         }
         const std::size_t index = LinearIntervalIndex(keys, time);
         const auto& k0 = keys[index];
         const auto& k1 = keys[index + 1];
-        return k0.value.x + (k1.value.x - k0.value.x) * Alpha(k0, k1, time);
+        return math::lerp(k0.value, k1.value, Alpha(k0, k1, time));
     }
 
     math::matrix4x4 SampleLocal(const ModelAnimationTrack& track, double time)
     {
         const math::vector3 position = SampleTranslation(track, time);
         const math::quaternion rotation = SampleRotation(track, time);
-        const float scale = SampleUniformScale(track, time);
-        return math::compose(math::vector3{ scale, scale, scale }, rotation, position);
+        const math::vector3 scale = SampleScale(track, time);
+        return math::compose(scale, rotation, position);
+    }
+
+    Animation::LocalTransform SampleLocalTransform(const ModelAnimationTrack& track, double time)
+    {
+        const math::vector3 translation = SampleTranslation(track, time);
+        const math::quaternion rotation = SampleRotation(track, time);
+        const math::vector3 scale = SampleScale(track, time);
+        return { translation, rotation, scale };
+    }
+
+    Animation::LocalTransform SampleLocalTransform(const ModelAnimationTrack& track, double time,
+        Animation::TrackKeyCursor& cursor)
+    {
+        const auto translation = SampleCachedKeys(track.translations, time, track.translationInterpolation,
+            cursor.m_translation, math::vector3{}, [](const auto& key) { return key.value; },
+            [](const auto& a, const auto& b, float alpha) { return math::lerp(a, b, alpha); });
+        const auto rotation = SampleCachedKeys(track.rotations, time, track.rotationInterpolation,
+            cursor.m_rotation, math::quaternion{ 0.f, 0.f, 0.f, 1.f }, [](const auto& key) { return key.value; },
+            [](const auto& a, const auto& b, float alpha) { return math::slerp(a, b, alpha); });
+        const auto scale = SampleCachedKeys(track.scales, time, track.scaleInterpolation,
+            cursor.m_scale, math::vector3{ 1.f, 1.f, 1.f }, [](const auto& key) { return key.value; },
+            [](const auto& a, const auto& b, float alpha) { return math::lerp(a, b, alpha); });
+        return { translation, rotation, scale };
     }
 
     std::size_t CountUniqueKeyTimes(const ModelAnimationAsset& clip, double eps)

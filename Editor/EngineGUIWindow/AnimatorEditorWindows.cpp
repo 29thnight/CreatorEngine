@@ -54,7 +54,8 @@ namespace editor::animator_editing
 {
     namespace
     {
-        int g_selected_clip = 0;
+        int g_selected_clip = -1;
+        size_t g_selected_clip_owner = 0;
         int g_selected_avatar_controller = -1;
     }
 
@@ -70,7 +71,17 @@ namespace editor::animator_editing
     }
 
     int selected_clip() { return g_selected_clip; }
-    void select_clip(int index) { g_selected_clip = index; }
+    void select_clip(int index)
+    {
+        g_selected_clip = index;
+        Animator* animator = current();
+        g_selected_clip_owner = animator ? animator->GetInstanceID() : 0;
+    }
+
+    bool selected_clip_matches(Animator& animator)
+    {
+        return g_selected_clip_owner == animator.GetInstanceID();
+    }
 
     int selected_avatar_controller() { return g_selected_avatar_controller; }
     void select_avatar_controller(int index) { g_selected_avatar_controller = index; }
@@ -127,10 +138,17 @@ void DrawAnimatorEventWindow()
     Animator* animator = current();
     if (nullptr == animator) return;
 
+    if (!animator_editing::selected_clip_matches(*animator))
+    {
+        ImGui::TextDisabled("Choose Edit beside a clip on this Animator.");
+        return;
+    }
+
     const int clipIndex = animator_editing::selected_clip();
     if (clipIndex < 0 || clipIndex >= static_cast<int>(animator->GetClipCount())) return;
 
 ImGui::Text("%s", animator->GetClipName(clipIndex).c_str());
+ImGui::TextDisabled("Function is sent to scripts on this object's event receiver.");
 if (ImGui::Button("Add Event"))
 {
 	animator->AddClipEvent(clipIndex);
@@ -148,10 +166,10 @@ if (clipOverride && !clipOverride->events.empty())
 		ImGui::PushID(eventIndex);
 		ImGui::Dummy(ImVec2(10.0f, 0));
 		ImGui::SameLine();
-		ImGui::Text("eventName");
+		ImGui::Text("Event Name");
 		ImGui::SameLine();
 		char eventBuffer[128];
-		strcpy_s(eventBuffer, event.m_eventName.c_str());
+		strncpy_s(eventBuffer, sizeof(eventBuffer), event.m_eventName.c_str(), _TRUNCATE);
 		eventBuffer[sizeof(eventBuffer) - 1] = '\0';
 		ImGui::SetNextItemWidth(150);
 		if (ImGui::InputText("##event", eventBuffer, sizeof(eventBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
@@ -161,28 +179,12 @@ if (clipOverride && !clipOverride->events.empty())
 		ImGui::SameLine();
 		ImGui::Dummy(ImVec2(10.0f, 0));
 		ImGui::SameLine();
-		ImGui::Text("scriptName");
-		ImGui::SameLine();
-
-		char scriptBuffer[128];
-		strcpy_s(scriptBuffer, event.m_scriptName.c_str());
-		scriptBuffer[sizeof(scriptBuffer) - 1] = '\0';
-		ImGui::SetNextItemWidth(150);
-		if (ImGui::InputText("##script", scriptBuffer, sizeof(scriptBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
-		{
-			event.m_scriptName = scriptBuffer;
-		}
-			
-
-		ImGui::SameLine();
-		ImGui::Dummy(ImVec2(10.0f, 0));
-		ImGui::SameLine();
-		ImGui::Text("funName");
+		ImGui::Text("Function");
 		ImGui::SameLine();
 
 
 		char funBuffer[128];
-		strcpy_s(funBuffer, event.m_funName.c_str());
+		strncpy_s(funBuffer, sizeof(funBuffer), event.m_funName.c_str(), _TRUNCATE);
 		funBuffer[sizeof(funBuffer) - 1] = '\0';
 		ImGui::SetNextItemWidth(150);
 		if (ImGui::InputText("##fun", funBuffer, sizeof(funBuffer), ImGuiInputTextFlags_EnterReturnsTrue))
@@ -254,6 +256,24 @@ void DrawAnimationControllersWindow()
     static int selectedTransitionIndex = -1;
     static int preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호
     static bool isOpenAniBehaviorPopup = false;
+    static AnimationState* selectedState = nullptr;
+    static size_t previousAnimatorId = 0;
+
+    if (previousAnimatorId != animator->GetInstanceID())
+    {
+        previousAnimatorId = animator->GetInstanceID();
+        selectedControllerIndex = -1;
+        preSelectIndex = -1;
+        linkIndex = -1;
+        ClickNodeIndex = -1;
+        targetNodeIndex = -1;
+        selectedTransitionIndex = -1;
+        preInspectorIndex = -1;
+        isOpenAniBehaviorPopup = false;
+        selectedState = nullptr;
+        animator_editing::select_avatar_controller(-1);
+        close_window(EditorWindowName::kAvatarMask);
+    }
 
 //int i = 0;
 
@@ -306,7 +326,6 @@ if (showControllerTabs)
 			}
 			if (ImGui::BeginPopup("RightClickMenu"))
 			{
-				if (ImGui::MenuItem("Copy Contorller")) { /* 카피 컨트롤러 함수 */ }
 				if (ImGui::MenuItem("Delete Controller"))
 				{
 					animator->DeleteController(selectedControllerIndex);
@@ -344,6 +363,7 @@ if (showControllerTabs)
 					std::string filename = controller->name + ".json";
 					GetControllerNodeEditor(controller.get())->ReNameJson(filename);
 				}
+				ImGui::Checkbox("Additive (clip start reference)", &controller->m_additive);
 
 				ImGui::Text("Avatar Mask");
 				ImGui::SameLine();
@@ -433,6 +453,8 @@ if (showControllerTabs)
 				{
 					for (auto& state : controller->StateVec)
 					{
+						if (state->animationSpeedParameterName == parameter->name)
+							state->animationSpeedParameterName = buffer;
 						for (auto& transtion : state->Transitions)
 						{
 							for (auto& condition : transtion->conditions)
@@ -446,6 +468,7 @@ if (showControllerTabs)
 					}
 				}
 				parameter->name = buffer;
+				animator->NotifyParameterLayoutChanged();
 			}
 			ImGui::SameLine();
 			if (ImGui::SmallButton(EditorIcon::Remove))
@@ -466,7 +489,8 @@ NodeEditor* nodeEdtior = nullptr;
 ImGui::EndChild();
 ImGui::SameLine();
 ImGui::BeginChild("Controller Info", ImVec2(900, 500), false);
-if (!animator->m_animationControllers.empty() && selectedControllerIndex != -1)
+if (selectedControllerIndex >= 0
+    && selectedControllerIndex < static_cast<int>(animator->m_animationControllers.size()))
 	controller = animator->m_animationControllers[selectedControllerIndex].get();
 std::string controllerName;
 if (controller)
@@ -477,7 +501,7 @@ else
 {
 	controllerName = " Controller Info";
 }
-ImGui::Text(controllerName.c_str());
+ImGui::TextUnformatted(controllerName.c_str());
 ImGui::Separator();
 if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 {
@@ -611,7 +635,6 @@ ImGui::SameLine();
 ImGui::BeginChild("Inspector Info", ImVec2(400, 500), false);
 ImGui::Text("Inspector");
 ImGui::Separator();
-static AnimationState* selectedState = nullptr;
 if (preSelectIndex != selectedControllerIndex)
 {
 	linkIndex = -1;
@@ -649,7 +672,7 @@ if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType
 			}
 
 
-			if (selectedTransitionIndex != -1)
+			if (selectedTransitionIndex == i)
 			{
 				auto& conditions = transition->conditions;
 				ImGui::Separator();
@@ -833,7 +856,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 	}
 	else
 	{
-		ImGui::Text(state->m_name.c_str());
+		ImGui::TextUnformatted(state->m_name.c_str());
 	}
 	if (state->m_isAny == false)
 	{
@@ -1154,17 +1177,19 @@ void DrawAvatarMaskWindow()
     auto& controller = controllers[index];
 
 // 내용물 UI 작성
-ImGui::Text(controller->name.c_str());
+ImGui::TextUnformatted(controller->name.c_str());
 ImGui::Separator();
 auto avatarMask = controller->GetAvatarMask();
-ImGui::Checkbox("isHumaniod", &avatarMask->isHumanoid);
 ImGui::Separator();
 ImGui::Separator();
 if (avatarMask->isHumanoid)
 {
+	ImGui::TextUnformatted("Legacy region mask");
 	ImGui::Checkbox("UseAll", &avatarMask->useAll);
 	ImGui::Checkbox("UseUpper", &avatarMask->useUpper);
 	ImGui::Checkbox("UseLower", &avatarMask->useLower);
+	if (ImGui::Button("Convert to per-bone weights"))
+		animator->ConvertLegacyAvatarMask(*avatarMask);
 }
 else
 {
@@ -1182,6 +1207,7 @@ else
 				{
 					// Checkbox를 트리 노드 안에 표시
 					ImGui::Checkbox(("Enable##" + mask->boneName).c_str(), &mask->isEnabled);
+					ImGui::SliderFloat(("Weight##" + mask->boneName).c_str(), &mask->weight, 0.f, 1.f);
 
 					for (auto& child : mask->m_children)
 					{

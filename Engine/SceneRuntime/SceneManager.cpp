@@ -1,5 +1,6 @@
 #include "SceneManager.h"
 #include "RenderScene.h"
+#include "AnimationScheduler.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
 #include "FoliageComponent.h"
@@ -270,6 +271,11 @@ namespace LegacyTransformPromotion
     }
 }
 
+SceneManager::SceneManager()
+    : m_animationScheduler(std::make_unique<AnimationScheduler>(*this))
+{
+}
+
 SceneManager::~SceneManager()
 {
     DrainSceneLoads();
@@ -454,7 +460,7 @@ void SceneManager::InputEvents(float deltaSecond)
     }
 }
 
-void SceneManager::GameLogic(float deltaSecond)
+void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
 {
     if (!m_activeScene) return;
 
@@ -470,7 +476,7 @@ void SceneManager::GameLogic(float deltaSecond)
 
     {
         ce::profile_scope _profile{ ce::marker<"InternalAnimationUpdateEvent">() };
-        InternalAnimationUpdateEvent.Broadcast(deltaSecond);
+        InternalAnimationUpdateEvent.Broadcast(animationDeltaSecond);
     }
 
     {
@@ -537,6 +543,7 @@ void SceneManager::Decommissioning()
     {
         renderScene->Finalize();
     }
+    m_animationScheduler->Finalize();
 
 	// DDOL 대상을 먼저 파괴 표시한다. Scene이 소유한 unique_ptr를 해제하기 전에
 	// 표시를 세워야 하며, 평상시 DDOL 목록은 비소유 포인터일 뿐이다.

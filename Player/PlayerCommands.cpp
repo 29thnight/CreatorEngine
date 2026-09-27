@@ -4,14 +4,21 @@
 #include "CommandCore/CommandRegistry.h"
 
 #include "Entity.h"
+#include "Animator.h"
+#include "MeshRenderer.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "TimeSystem.h"
 #include "Transform.h"
 
 #include <algorithm>
+#include <array>
+#include <bit>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
+#include <iomanip>
+#include <sstream>
 #include <unordered_map>
 
 namespace PlayerCmd
@@ -164,6 +171,51 @@ namespace PlayerCmd
 			return CommandCore::Ok("object", std::move(data));
 		}
 
+		CommandCore::CommandResult Cmd_animation(const std::vector<std::string>& parts)
+		{
+			if (parts.size() != 2)
+				return CommandCore::InvalidArguments("player.animation: <이름> 이 필요하다");
+			Scene* scene = ActiveScene();
+			if (!scene)
+				return CommandCore::PreconditionFailed("scene.none", "활성 씬이 없다");
+			Entity* object = scene->GetEntity(parts[1]);
+			Animator* animator = object ? object->GetComponent<Animator>() : nullptr;
+			if (!animator)
+				return CommandCore::Fail("animation.not_found", "Animator를 찾을 수 없다: " + parts[1]);
+
+			// Commands run on the game thread before simulation. The previous
+// AnimationScheduler::Update has already joined its workers at this point.
+			const AnimInstance& instance = animator->GetInstance();
+			std::uint64_t digest = 14695981039346656037ull;
+			for (const auto& matrix : instance.finalTransforms)
+			{
+				std::array<float, 16> values{};
+				std::memcpy(values.data(), &matrix, sizeof(values));
+				for (float value : values)
+				{
+					digest ^= std::bit_cast<std::uint32_t>(value);
+					digest *= 1099511628211ull;
+				}
+			}
+			std::ostringstream digestText;
+			digestText << std::hex << std::setw(16) << std::setfill('0') << digest;
+			std::size_t skinnedMeshes = 0;
+			for (const MeshRenderer* mesh : object->GetComponentsInChildren<MeshRenderer>())
+				if (mesh->IsSkinnedMesh()) ++skinnedMeshes;
+
+			CommandCore::CommandData data = CommandCore::CommandData::Object();
+			data.Set("name", CommandCore::CommandData::String(parts[1]));
+			data.Set("clip", CommandCore::CommandData::String(
+				animator->GetClipName(static_cast<int>(instance.selectedClipIndex))));
+			data.Set("time", CommandCore::CommandData::Double(instance.timeElapsed));
+			data.Set("bones", CommandCore::CommandData::Int(
+				static_cast<int64_t>(instance.finalTransforms.size())));
+			data.Set("skinnedMeshes", CommandCore::CommandData::Int(
+				static_cast<int64_t>(skinnedMeshes)));
+			data.Set("paletteDigest", CommandCore::CommandData::String(digestText.str()));
+			return CommandCore::Ok("animation", std::move(data));
+		}
+
 		CommandCore::CommandResult Cmd_move(const std::vector<std::string>& parts)
 		{
 			if (parts.size() < 5)
@@ -220,6 +272,7 @@ namespace PlayerCmd
 			{ "player.scene",   &Cmd_scene },
 			{ "player.objects", &Cmd_objects },
 			{ "player.object",  &Cmd_object },
+			{ "player.animation", &Cmd_animation },
 			{ "player.move",    &Cmd_move },
 		};
 

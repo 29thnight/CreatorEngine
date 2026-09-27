@@ -168,6 +168,7 @@ public:
 	void UpdateDirty();
 
 private:
+	void PrepareAnimatedBoneRead() const;
 	friend class RenderScene;
 	friend class InspectorWindow;
 	friend class Scene;

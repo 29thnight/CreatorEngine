@@ -44,6 +44,11 @@ public:
 		return ResolveCamera().TryGetFrustum(aspectRatio);
 	}
 
+	float CalculateLODDistance(math::vector3 worldPosition) const
+	{
+		return ResolveCamera().CalculateLODDistance(worldPosition);
+	}
+
 	math::aabb GetEditorBoundingBox() const
 	{
 		const auto& position = m_pOwner->Transform_().GetPositionValue();

@@ -3373,27 +3373,27 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
                 item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
             }
 
-            // 본 팔레트. 포인터만 나르고 복사는 패스가 PrepareFrame에서 한다 —
-            // 512행렬(32KB)을 여기서 복사하면 프록시마다 그만큼 든다.
-            // 팔레트 버퍼는 프록시가 shared_ptr로 붙들고 있어 이 프레임 동안
-            // 살아 있다(MeshRenderProxy의 수명 계약).
+            // 본 팔레트는 캡처 배치의 불변 아레나가 소유한다. 프록시가 아레나를
+            // 붙들고 있어 이 프레임 동안 포인터가 살아 있다.
             //
             // 조건은 DX11 GBufferPass의 분류와 같다 — 팔레트가 있어도
             // m_isAnimationEnabled가 꺼져 있으면 DX11은 바인드 포즈로 그린다.
+            const math::matrix4x4* palette = proxy->m_paletteArena
+                ? proxy->m_paletteArena->resolve(proxy->m_paletteOffset,
+                    proxy->m_boneCount) : nullptr;
             if (proxy->m_isAnimationEnabled
                 && (HashedGuid::kInvalidId != proxy->m_animatorGuid)
-                && proxy->m_finalTransforms)
+                && palette)
             {
-                item.bonePalette = proxy->m_finalTransforms.get();
-                item.boneCount = kMaxBones;
+                item.bonePalette = palette;
+                item.boneCount = proxy->m_boneCount;
                 item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
 
                 // I6-B4-pre 진단 — 하네스가 **실제로 받은** 팔레트의 digest.
                 // animator.status가 Animator::m_FinalTransforms에서 뜬
                 // 값과 같은 방식(1/4096 양자화 FNV)으로 접는다. 두 값이
                 // 같으면 운반은 옳고 결함은 그 뒤(셰이더/CB), 다르면 운반
-                // 구간이다. 앞 64개만 접는 축도 함께 낸다 — animlive는
-                // 본 수(63)만큼만 접으므로 그쪽과 직접 대조하려면 필요하다.
+                // 구간이다. 실제 본 수만 읽어 범위 밖 접근을 피한다.
                 {
                     auto fold = [](const math::matrix4x4* palette,
                         std::size_t count) -> std::uint32_t
@@ -3424,10 +3424,10 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
                     {
                         ++reported;
                         std::printf("[dx12.scene] bonePalette 수신 — animator=%llu "
-                            "digest63=%08X digest512=%08X\n",
+                            "count=%u digest=%08X\n",
                             (unsigned long long)item.animatorKey,
-                            fold(item.bonePalette, 63),
-                            fold(item.bonePalette, kMaxBones));
+                            item.boneCount,
+                            fold(item.bonePalette, item.boneCount));
                     }
                 }
             }

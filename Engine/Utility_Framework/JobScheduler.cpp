@@ -39,6 +39,8 @@ struct scheduler_state
     thread_pool& pool_;
     // Dispatch is installed by job_scheduler, the only thread_pool submission owner.
     std::function<void(std::vector<std::function<void()>>, std::function<void(std::exception_ptr)>)> dispatch_;
+    std::function<void(std::size_t, std::function<void(std::size_t)>,
+                       std::function<void(std::exception_ptr)>)> dispatch_indexed_;
     mutable std::mutex mutex_;
     std::condition_variable done_;
     std::size_t pending_{};
@@ -55,19 +57,24 @@ struct completion_state : std::enable_shared_from_this<completion_state>
     std::size_t remaining_{};
     std::exception_ptr failure_;
     std::vector<std::function<void()>> tasks_;
+    std::function<void(std::size_t)> indexed_task_;
+    std::size_t indexed_count_{};
     std::vector<std::function<void(std::exception_ptr)>> continuations_;
 
     void finish(std::exception_ptr error) noexcept
     {
         std::vector<std::function<void()>> discarded;
+        std::function<void(std::size_t)> discarded_indexed;
         {
             std::lock_guard lock(mutex_);
             if (complete_ || completing_)
                 return;
             completing_ = true;
             discarded = std::move(tasks_);
+            discarded_indexed = std::move(indexed_task_);
         }
         discarded.clear();
+        discarded_indexed = {};
         std::vector<std::function<void(std::exception_ptr)>> ready;
         {
             std::lock_guard lock(mutex_);
@@ -84,6 +91,8 @@ struct completion_state : std::enable_shared_from_this<completion_state>
     void prerequisite_complete(std::exception_ptr error) noexcept
     {
         std::vector<std::function<void()>> work;
+        std::function<void(std::size_t)> indexed_task;
+        std::size_t indexed_count{};
         {
             std::lock_guard lock(mutex_);
             if (complete_ || completing_ || dispatched_)
@@ -95,21 +104,28 @@ struct completion_state : std::enable_shared_from_this<completion_state>
             dispatched_ = true;
             error = failure_;
             work = std::move(tasks_);
+            indexed_task = std::move(indexed_task_);
+            indexed_count = indexed_count_;
         }
-        if (error || work.empty())
+        if (error || (work.empty() && !indexed_count))
         {
             work.clear();
+            indexed_task = {};
             finish(error);
             return;
         }
         try
         {
-            owner_->dispatch_(std::move(work),
-                              [self = shared_from_this()](std::exception_ptr result) { self->finish(result); });
+            auto complete = [self = shared_from_this()](std::exception_ptr result) { self->finish(result); };
+            if (indexed_count)
+                owner_->dispatch_indexed_(indexed_count, std::move(indexed_task), std::move(complete));
+            else
+                owner_->dispatch_(std::move(work), std::move(complete));
         }
         catch (...)
         {
             work.clear();
+            indexed_task = {};
             finish(std::current_exception());
         }
     }
@@ -141,6 +157,11 @@ job_scheduler::job_scheduler(thread_pool& pool) : state_(std::make_shared<job_de
                                 std::function<void(std::exception_ptr)> complete) {
         const auto count = tasks.size();
         pool.dispatch(count, [tasks = std::move(tasks)](std::size_t index) { tasks[index](); }, std::move(complete));
+    };
+    state_->dispatch_indexed_ = [&pool](std::size_t count,
+                                       std::function<void(std::size_t)> task,
+                                       std::function<void(std::exception_ptr)> complete) {
+        pool.dispatch(count, std::move(task), std::move(complete));
     };
 }
 job_scheduler::~job_scheduler()
@@ -212,6 +233,26 @@ job_handle job_scheduler::submit_after(std::span<const job_handle> dependencies,
         job->finish(std::current_exception());
         throw;
     }
+    return job_handle(std::move(job));
+}
+job_handle job_scheduler::submit_indexed(std::size_t count, std::function<void(std::size_t)> task)
+{
+    if (!count)
+        return submit(job_group{});
+    if (!task)
+        throw std::invalid_argument("indexed job requires a task");
+    auto job = std::make_shared<job_detail::completion_state>();
+    job->owner_ = state_;
+    job->indexed_task_ = std::move(task);
+    job->indexed_count_ = count;
+    job->remaining_ = 1;
+    {
+        std::lock_guard lock(state_->mutex_);
+        if (!state_->accepting_)
+            throw std::runtime_error("job_scheduler is stopped");
+        ++state_->pending_;
+    }
+    job->prerequisite_complete({});
     return job_handle(std::move(job));
 }
 job_handle job_scheduler::parallel_for(std::size_t count, std::size_t grain,

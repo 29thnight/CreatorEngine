@@ -2,15 +2,16 @@
 // PHASE 3.75 MBC8 — typed 재생 데이터(ModelSkeletonAsset·ModelAnimationAsset)의
 // 포즈 샘플러와 클립 계량.
 //
-// 산술 규칙은 experiment::sampler(PoseSampler.h)와 같다 — legacy calculAni 재현:
-//   - Linear 트랙: 위치 lerp, 회전 slerp, scale은 **x 성분만** 읽어 3축 동일 적용.
+// 키 경계·회전 규칙은 experiment::sampler(PoseSampler.h)를 따른다.
+//   - Linear 트랙: 위치 lerp, 회전 slerp, scale은 3축을 각각 보간.
 //   - Step 트랙: 시각 이하의 마지막 키 값을 유지(계단).
 //   - 보간 구간 경계는 등호 제외(keys[index+1] < time인 동안 전진).
-// 같은 자산의 재생 골든(experiment.animtick poseDigest)이 experiment 경로와 비트
-// 단위로 같아야 한다 — 그것이 이 파일의 정확성 게이트다. experiment 샘플러는 MBC9에서
-// 은퇴하고 이 파일만 남는다.
+// 비균등 scale은 legacy X축 복제 대신 저작된 3축을 보존한다. 균등 scale 자산의
+// 기존 재생 골든은 유지하며, 비균등 자산은 별도 제품 게이트에서 확인한다.
 
 #include "ModelAssetGeneration.h"
+#include "../LocalPose.h"
+#include "../ClipSamplingCursor.h"
 
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/quaternion.hpp>
@@ -27,10 +28,16 @@ namespace assets::animation
         const ModelAnimationTrack& track, double time);
     [[nodiscard]] math::quaternion SampleRotation(
         const ModelAnimationTrack& track, double time);
-    [[nodiscard]] float SampleUniformScale(
+    [[nodiscard]] math::vector3 SampleScale(
         const ModelAnimationTrack& track, double time);
     [[nodiscard]] math::matrix4x4 SampleLocal(
         const ModelAnimationTrack& track, double time);
+    // Product sampling retains TRS until FK. SampleLocal remains the independent
+    // matrix reference used by the existing single-clip golden checks.
+    [[nodiscard]] Animation::LocalTransform SampleLocalTransform(
+        const ModelAnimationTrack& track, double time);
+    [[nodiscard]] Animation::LocalTransform SampleLocalTransform(
+        const ModelAnimationTrack& track, double time, Animation::TrackKeyCursor& cursor);
 
     // 클립의 키프레임 수 = 유니크 키 시각 개수(eps 1e-6) — legacy 임포터 정의가
     // 정본이고 experiment::clip::CountUniqueKeyTimes와 같은 값이다. 이벤트 저작의

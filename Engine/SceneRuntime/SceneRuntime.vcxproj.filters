@@ -185,7 +185,7 @@
     <ClCompile Include="AnimationEventBridge.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
-    <ClCompile Include="AnimationJob.cpp">
+    <ClCompile Include="AnimationScheduler.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
     <ClCompile Include="AnimationState.cpp">
@@ -425,6 +425,18 @@
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AnimationPlayback.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimTaskList.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationBudget.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationScheduler.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="TwoBoneIK.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AnimationState.h">

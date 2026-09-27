@@ -39,6 +39,7 @@ public:
 	math::matrix4x4 CalculateView() const;
 	math::matrix4x4 CalculateInverseView() const;
 	math::matrix4x4 CalculateInverseProjection() const;
+	float CalculateLODDistance(math::vector3 worldPosition) const noexcept;
 	Core::Sizef GetScreenSize() const;
 	std::optional<math::bounding_frustum> TryGetFrustum(
 		float aspectRatio = 0.f) const;

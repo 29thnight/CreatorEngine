@@ -4,10 +4,38 @@
 #include "Animator.h"
 #include "BoneRegion.h"
 #include "AvatarMask.h"
+#include <atomic>
+#include <cassert>
+
+namespace
+{
+    std::atomic<std::uint64_t> g_nextControllerPlaybackId{ 1 };
+}
+
+AnimationController::AnimationController()
+    : m_playbackId(g_nextControllerPlaybackId.fetch_add(1, std::memory_order_relaxed)) {}
+
+ControllerPlayback& AnimationController::GetPlayback()
+{
+    assert(m_owner && !weak_from_this().expired());
+    return m_owner->GetInstance().GetControllerPlayback(m_playbackId, weak_from_this());
+}
+
+const ControllerPlayback& AnimationController::GetPlayback() const
+{
+    return const_cast<AnimationController*>(this)->GetPlayback();
+}
+
+void AnimationController::OnBeforeSerialize()
+{
+    if (m_owner && !weak_from_this().expired())
+        m_curState = GetPlayback().currentState;
+}
+
 void AnimationController::SetNextState(std::string stateName)
 {
 
-	m_nextState = FindState(stateName);
+	GetPlayback().nextState = FindState(stateName);
 }
 
 AnimationController::~AnimationController()
@@ -17,26 +45,31 @@ AnimationController::~AnimationController()
 
 bool AnimationController::BlendingAnimation(float tick)
 {
-	blendingTime += tick;
-	float t = blendingTime / m_curTrans->GetBlendTime();
-	m_owner->blendT = std::clamp(t, 0.0f, 1.0f);
-	if (blendingTime >= m_curTrans->GetBlendTime()) //������ Ÿ���� ������ ���������� -> �����ִϸ��̼Ǹ� ���
+	auto& playback = GetPlayback();
+	auto& ownerControl = m_owner->GetPlaybackControl();
+	playback.blendingTime += tick;
+	float t = playback.blendingTime / playback.currentTransition->GetBlendTime();
+	ownerControl.blendT = std::clamp(t, 0.0f, 1.0f);
+	if (playback.blendingTime >= playback.currentTransition->GetBlendTime()) //������ Ÿ���� ������ ���������� -> �����ִϸ��̼Ǹ� ���
 	{
-		m_curState = m_nextState;
-		m_nextState = nullptr;
-		m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
-		m_AnimationIndex = m_nextAnimationIndex;
-		curAnimationProgress = nextAnimationProgress;
-		preCurAnimationProgress = preNextAnimationProgress;
-		nextAnimationProgress = 0.f;
-		preNextAnimationProgress = 0.f;
-		m_timeElapsed = m_nextTimeElapsed;
-		m_nextTimeElapsed = 0.f;
-		m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; 
+		playback.currentState = playback.nextState;
+		m_curState = playback.currentState;
+		playback.nextState = nullptr;
+		m_owner->SetSelectedClipIndex(ownerControl.nextClipIndex);
+		playback.animationIndex = playback.nextAnimationIndex;
+		playback.nextAnimationIndex = -1;
+		playback.currentTransition = nullptr;
+		playback.currentProgress = playback.nextProgress;
+		playback.previousCurrentProgress = playback.previousNextProgress;
+		playback.nextProgress = 0.f;
+		playback.previousNextProgress = 0.f;
+		playback.timeElapsed = playback.nextTimeElapsed;
+		playback.nextTimeElapsed = 0.f;
+		m_owner->GetInstance().timeElapsed = m_owner->GetInstance().nextTimeElapsed;
 
-		m_owner->nextAnimIndex = -1;
-		m_owner->m_isBlend = false;
-		m_isBlend = false;
+		ownerControl.nextClipIndex = -1;
+		ownerControl.isBlending = false;
+		playback.isBlending = false;
 		return false;
 	}
 
@@ -45,27 +78,34 @@ bool AnimationController::BlendingAnimation(float tick)
 
 void AnimationController::SetCurState(std::string stateName)
 {
-	m_curState = FindState(stateName);
+	auto& playback = GetPlayback();
+	playback.currentState = FindState(stateName);
+	m_curState = playback.currentState;
 
-	m_owner->m_AnimIndexChosen = m_curState->AnimationIndex;
-	m_AnimationIndex = m_curState->AnimationIndex;
+	if (playback.currentState)
+	{
+		m_owner->SetSelectedClipIndex(playback.currentState->AnimationIndex);
+		playback.animationIndex = playback.currentState->AnimationIndex;
+	}
 }
 
 std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 {
-	if (!m_curState)
+	auto& playback = GetPlayback();
+	if (!playback.currentState)
 	{
 		// Select the first playable state, regardless of AnyState name/order.
 		for (const auto& state : StateVec)
 		{
 			if (!state || state->m_isAny || state->AnimationIndex < 0) continue;
-			m_curState = state.get();
-			m_AnimationIndex = state->AnimationIndex;
-			if (m_owner) m_owner->m_AnimIndexChosen = m_AnimationIndex;
+			playback.currentState = state.get();
+			m_curState = playback.currentState;
+			playback.animationIndex = state->AnimationIndex;
+			if (m_owner) m_owner->SetSelectedClipIndex(playback.animationIndex);
 			break;
 		}
 	}
-	if (!m_curState) return nullptr;
+	if (!playback.currentState) return nullptr;
 
 	AnimationState* aniState = GetAniState().get();
 	if (aniState)
@@ -76,12 +116,12 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 			{
 				if (trans->hasExitTime)
 				{
-					if (trans->GetExitTime() >= curAnimationProgress)
+					if (trans->GetExitTime() >= GetPlayback().currentProgress)
 						continue;
 				}
 				if (true == trans->CheckTransiton())
 				{
-					if (trans->nextState != nullptr && m_curState != trans->nextState)
+					if (trans->nextState != nullptr && playback.currentState != trans->nextState)
 					{
 						return trans;
 					}
@@ -91,17 +131,17 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	}
 
 
-	AnimationState* transState = m_curState;
-	if (m_isBlend)
+	AnimationState* transState = playback.currentState;
+	if (playback.isBlending)
 	{
-		transState = m_nextState;
+		transState = playback.nextState;
 	}
 	if (!transState || transState->Transitions.empty()) return nullptr;
 
 	
 	for (auto& trans : transState->Transitions)
 	{
-		if (m_isBlend)
+		if (playback.isBlending)
 		{
 			if (true == trans->CheckTransiton(true))
 			{
@@ -131,50 +171,55 @@ void AnimationController::UpdateState()
 	//���̰������� �ִϸ��̼� ���������� //���������� ������ȭ������� �߰��ʿ�*****
 	if (nullptr != trans)
 	{
+		auto& playback = GetPlayback();
+		auto& ownerControl = m_owner->GetPlaybackControl();
 		
-		endAnimation = false;
-		if (needBlend == true)
+		playback.endAnimation = false;
+		if (playback.needBlend == true)
 		{
 			/*if (m_curState->behaviour != nullptr)
 				m_curState->behaviour->Exit();
 			if (m_nextState->behaviour != nullptr)
 				m_nextState->behaviour->Enter();*/
-			m_curState = m_nextState;
-			m_nextState = nullptr;
-			m_owner->m_AnimIndexChosen = m_owner->nextAnimIndex;
-			m_AnimationIndex = m_nextAnimationIndex;
-			curAnimationProgress = nextAnimationProgress;
-			preCurAnimationProgress = preNextAnimationProgress;
-			nextAnimationProgress = 0.f;
-			preNextAnimationProgress = 0.f;
-			m_timeElapsed = m_nextTimeElapsed;
-			m_nextTimeElapsed = 0.f;
-			m_owner->m_TimeElapsed = m_owner->m_nextTimeElapsed; 
+			playback.currentState = playback.nextState;
+			m_curState = playback.currentState;
+			playback.nextState = nullptr;
+			m_owner->SetSelectedClipIndex(ownerControl.nextClipIndex);
+			playback.animationIndex = playback.nextAnimationIndex;
+			playback.nextAnimationIndex = -1;
+			playback.currentTransition = nullptr;
+			playback.currentProgress = playback.nextProgress;
+			playback.previousCurrentProgress = playback.previousNextProgress;
+			playback.nextProgress = 0.f;
+			playback.previousNextProgress = 0.f;
+			playback.timeElapsed = playback.nextTimeElapsed;
+			playback.nextTimeElapsed = 0.f;
+			m_owner->GetInstance().timeElapsed = m_owner->GetInstance().nextTimeElapsed;
 
 			/*if (m_curState && m_curState->behaviour)
 				m_curState->behaviour->Enter();*/
-			m_owner->nextAnimIndex = -1;
-			m_owner->m_isBlend = false;
-			m_isBlend = false;
+			ownerControl.nextClipIndex = -1;
+			ownerControl.isBlending = false;
+			playback.isBlending = false;
 
 
 
 		}
-		m_nextState = FindState(trans->GetNextState());
+		playback.nextState = FindState(trans->GetNextState());
 
-		if (m_curState->behaviour != nullptr)
-			m_curState->behaviour->Exit();
-		if (m_nextState->behaviour != nullptr)
-			m_nextState->behaviour->Enter();
+		if (playback.currentState->behaviour != nullptr)
+			playback.currentState->behaviour->Exit();
+		if (playback.nextState->behaviour != nullptr)
+			playback.nextState->behaviour->Enter();
 
 
-		m_owner->nextAnimIndex = m_nextState->AnimationIndex;
-		m_nextAnimationIndex = m_nextState->AnimationIndex;
+		ownerControl.nextClipIndex = playback.nextState->AnimationIndex;
+		playback.nextAnimationIndex = playback.nextState->AnimationIndex;
 
-		m_curTrans = trans.get();
-		needBlend = true;
-		m_owner->m_isBlend = true;
-		m_isBlend = true;
+		playback.currentTransition = trans.get();
+		playback.needBlend = true;
+		ownerControl.isBlending = true;
+		playback.isBlending = true;
 
 		if (m_owner->m_animationControllers.size() >= 2)
 		{
@@ -182,36 +227,37 @@ void AnimationController::UpdateState()
 			{
 				if (!othercontorller->useController) continue;
 				if (othercontorller->name == name) continue;
-				if (othercontorller->GetAnimationIndex() == m_nextAnimationIndex)
-					m_nextTimeElapsed = othercontorller->m_timeElapsed;
+				if (othercontorller->GetAnimationIndex() == playback.nextAnimationIndex)
+					playback.nextTimeElapsed = othercontorller->GetPlayback().timeElapsed;
 				else
-					m_nextTimeElapsed = 0.0f;
+					playback.nextTimeElapsed = 0.0f;
 			}
 		}
 		else
 		{
-			m_nextTimeElapsed = 0.0f;
+			playback.nextTimeElapsed = 0.0f;
 		}
 
-		m_owner->blendT = 0.0f;
-		blendingTime = 0.0f;
+		ownerControl.blendT = 0.0f;
+		playback.blendingTime = 0.0f;
 	}
 
 }
 void AnimationController::Update(float tick)
 {
+	auto& playback = GetPlayback();
 	UpdateState();
-	if (needBlend)
+	if (playback.needBlend)
 	{
 		if (BlendingAnimation(tick) == false) //true == blending   false  == blend end
-			needBlend = false;
+			playback.needBlend = false;
 	}
 
-	if (m_curState == nullptr) return;
+	if (playback.currentState == nullptr) return;
 
-	m_curState->UpdateAnimationSpeed();
-	if(m_curState->behaviour != nullptr)
-		m_curState->behaviour->Update(tick);
+	playback.currentState->UpdateAnimationSpeed();
+	if(playback.currentState->behaviour != nullptr)
+		playback.currentState->behaviour->Update(tick);
 }
 
 int AnimationController::GetAnimatonIndexformState(std::string stateName)
@@ -283,9 +329,34 @@ void AnimationController::DeleteState(std::string stateName)
 			return state->m_name == stateName;
 		});
 
-	if (it->get() == m_curState)
+	if (it == StateVec.end()) return;
+	auto& playback = GetPlayback();
+	if (it->get() == playback.currentState)
 	{
+		playback.currentState = nullptr;
 		m_curState = nullptr;
+	}
+	if (it->get() == playback.nextState)
+	{
+		playback.nextState = nullptr;
+		playback.currentTransition = nullptr;
+		playback.nextAnimationIndex = -1;
+		playback.needBlend = false;
+		playback.isBlending = false;
+		m_owner->GetPlaybackControl().nextClipIndex = -1;
+		m_owner->GetPlaybackControl().isBlending = false;
+	}
+	else if (playback.currentTransition
+		&& (playback.currentTransition->curState == it->get()
+			|| playback.currentTransition->nextState == it->get()))
+	{
+		playback.currentTransition = nullptr;
+		playback.nextState = nullptr;
+		playback.nextAnimationIndex = -1;
+		playback.needBlend = false;
+		playback.isBlending = false;
+		m_owner->GetPlaybackControl().nextClipIndex = -1;
+		m_owner->GetPlaybackControl().isBlending = false;
 	}
 
 	for (auto& state : StateVec)
@@ -298,10 +369,7 @@ void AnimationController::DeleteState(std::string stateName)
 				|| t->GetNextState() == stateName;
 		});
 	}
-	if (it != StateVec.end())
-	{
-		StateVec.erase(it); 
-	}
+	StateVec.erase(it);
 }
 
 
@@ -312,11 +380,23 @@ void AnimationController::DeleteTransiton(const std::string& fromStateName, cons
 	if (!state) return;
 
 	auto& transitions = state->Transitions;
+	auto& playback = GetPlayback();
 	
 	std::erase_if(transitions, [&](const std::shared_ptr<AniTransition>& t)
 	{
-		return t->GetCurState() == fromStateName 
+		const bool remove = t->GetCurState() == fromStateName
 			&& t->GetNextState() == toStateName;
+		if (remove && playback.currentTransition == t.get())
+		{
+			playback.currentTransition = nullptr;
+			playback.nextState = nullptr;
+			playback.nextAnimationIndex = -1;
+			playback.needBlend = false;
+			playback.isBlending = false;
+			m_owner->GetPlaybackControl().nextClipIndex = -1;
+			m_owner->GetPlaybackControl().isBlending = false;
+		}
+		return remove;
 	});
 }
 
@@ -364,6 +444,7 @@ void AnimationController::CreateMask()
 		// 폴백). region 태깅(MarkRegionSkeleton)은 legacy 폴백 안으로 들어갔다
 		// — experiment 경로는 Animator 소유 region 캐시를 쓴다.
 		m_avatarMask = new AvatarMask;
+		m_avatarMask->isHumanoid = false; // new masks author weights by bone name
 		m_avatarMask->RootMask = m_owner->BuildAvatarBoneMasks(*m_avatarMask);
 	}
 }

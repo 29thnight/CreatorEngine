@@ -9,11 +9,14 @@ class BoneMask
    {
        using Self = BoneMask;
        return meta::schema<Self>(
-           meta::field<&Self::isEnabled>);
+           meta::field<&Self::boneName>,
+           meta::field<&Self::isEnabled>,
+           meta::field<&Self::weight>);
    }
 public:
 	BoneMask() = default;
 	std::string boneName;
 	std::vector<BoneMask*> m_children;
 	bool isEnabled = true;
+	float weight = 1.f;
 };

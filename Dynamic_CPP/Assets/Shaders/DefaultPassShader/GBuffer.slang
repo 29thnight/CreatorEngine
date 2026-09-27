@@ -1,6 +1,7 @@
 #include "Includes/MaterialCoordinates.slang"
 #include "Includes/MaterialEvaluation.slang"
 #include "Includes/PbrCoverage.slang"
+#include "Includes/PackedBones.slang"
 
 // GBuffer 기록 패스. GBuffer.hlsl 의 이식본이다.
 //
@@ -65,7 +66,7 @@ StructuredBuffer<InstanceData> gInstances : register(t4);
 
 // 프레임의 모든 본 팔레트를 이어 붙인 것. 인스턴스의 boneOffset이 자기
 // 구간의 시작을 가리킨다.
-StructuredBuffer<float4x4> gBones : register(t5);
+StructuredBuffer<PackedBone> gBones : register(t5);
 
 static const uint kNoSkinning = 0xFFFFFFFFu;
 
@@ -155,11 +156,11 @@ VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
     if (instance.boneOffset != kNoSkinning && input.boneWeights[0] > 0.0)
     {
         float4x4 boneTransform = input.boneWeights[0]
-            * gBones[instance.boneOffset + uint(input.boneIndices[0])];
+            * UnpackBone(gBones[instance.boneOffset + uint(input.boneIndices[0])]);
         [unroll]
         for (int i = 1; i < 4; ++i)
             boneTransform += input.boneWeights[i]
-                * gBones[instance.boneOffset + uint(input.boneIndices[i])];
+                * UnpackBone(gBones[instance.boneOffset + uint(input.boneIndices[i])]);
         input.position = mul(float4(input.position, 1.0), boneTransform).xyz;
         frameTransform = mul((float3x3)boneTransform, frameTransform);
     }

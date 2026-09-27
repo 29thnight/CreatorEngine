@@ -1246,13 +1246,20 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
             if (nullptr != draw.bonePalette && 0 != draw.boneCount
                 && m_boneOffsets.find(draw.animatorKey) == m_boneOffsets.end())
             {
-                const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
-                m_bonePalettes.resize(offset + draw.boneCount);
-                for (uint32_t i = 0; i < draw.boneCount; ++i)
+                if (context.animationPalettes)
                 {
-                    m_bonePalettes[offset + i] = math::transpose(draw.bonePalette[i]);
+                    const auto& shared = context.animationPalettes->Offsets();
+                    if (const auto found = shared.find(draw.animatorKey); found != shared.end())
+                        m_boneOffsets.emplace(draw.animatorKey, found->second);
                 }
-                m_boneOffsets.emplace(draw.animatorKey, offset);
+                else
+                {
+                    const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
+                    m_bonePalettes.resize(offset + draw.boneCount);
+                    for (uint32_t i = 0; i < draw.boneCount; ++i)
+                        m_bonePalettes[offset + i] = PackedBoneMatrix::From(draw.bonePalette[i]);
+                    m_boneOffsets.emplace(draw.animatorKey, offset);
+                }
             }
             if (0 != enhanced_draw::GeometryKey(draw)) ++m_lastDrawCount;
         }
@@ -1668,8 +1675,10 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         instances[i].boneOffset = 0xFFFFFFFFu;
         if (nullptr != draw.bonePalette && 0 != draw.boneCount)
         {
-            const auto found = m_boneOffsets.find(draw.animatorKey);
-            if (found != m_boneOffsets.end()) instances[i].boneOffset = found->second;
+            const auto& offsets = context.animationPalettes
+                ? context.animationPalettes->Offsets() : m_boneOffsets;
+            const auto found = offsets.find(draw.animatorKey);
+            if (found != offsets.end()) instances[i].boneOffset = found->second;
         }
 
         const MaterialKey key = MakeMaterialKey(draw);
@@ -1730,23 +1739,27 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     if (!cb.IsValid()) return false;
     memcpy(cb.cpuAddress, &params, sizeof(params));
 
-    const uint64_t paletteBytes = m_bonePalettes.empty()
-        ? sizeof(math::matrix4x4)
-        : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
-    const auto paletteBuffer = context.resources->AllocateUpload(
-        RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-            sizeof(math::matrix4x4) });
-    if (!paletteBuffer.IsValid()) return false;
-    if (m_bonePalettes.empty())
-    {
-        constexpr math::matrix4x4 identity = math::matrix4x4::identity();
-        memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
-    }
+    RHIBufferSlice paletteBuffer{};
+    if (context.animationPalettes)
+        paletteBuffer = context.animationPalettes->Upload();
     else
     {
-        memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
+        const uint64_t paletteBytes = m_bonePalettes.empty()
+            ? sizeof(PackedBoneMatrix)
+            : sizeof(PackedBoneMatrix) * static_cast<uint64_t>(m_bonePalettes.size());
+        paletteBuffer = context.resources->AllocateUpload(
+            RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+                sizeof(PackedBoneMatrix) });
+        if (!paletteBuffer.IsValid()) return false;
+        if (m_bonePalettes.empty())
+        {
+            const PackedBoneMatrix identity = PackedBoneMatrix::Identity();
+            memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
+        }
+        else memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
             static_cast<size_t>(paletteBytes));
     }
+    if (!paletteBuffer.IsValid()) return false;
 
     // Install the first layout before preparing frame bindings. Each batch
     // rebinds them because its reflected material table may change the layout.

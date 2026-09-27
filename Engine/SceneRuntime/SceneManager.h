@@ -11,6 +11,7 @@
 #include "DetachedEntityTransfer.h"
 #include "ScenePhase.h"
 #include <future>
+#include <memory>
 #include <thread>
 
 class Scene;
@@ -18,12 +19,13 @@ class Entity;
 class MeshRenderer;
 class Material;
 class RenderScene;
+class AnimationScheduler;
 class InputActionManager;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
     friend class Singleton<SceneManager>;
-    SceneManager() = default;
+    SceneManager();
     ~SceneManager();
 
 public:
@@ -72,7 +74,8 @@ public:
     //   인자를 생략해 delta 0이 조용히 들어갔고, "delta 0은 일시정지에서만"이라는
     //   규약이 지켜지는지 호출부만 봐서는 알 수 없었다. 0을 넘길 이유가 있으면
     //   호출부가 0.0f라고 적는다.
-    void GameLogic(float deltaSecond);
+    void GameLogic(float deltaSecond, float animationDeltaSecond);
+    void GameLogic(float deltaSecond) { GameLogic(deltaSecond, deltaSecond); }
     void SceneRendering(float deltaSecond);
 	void OnDrawGizmos();
     void GUIRendering();
@@ -111,6 +114,7 @@ public:
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
+    AnimationScheduler& GetAnimationScheduler() noexcept { return *m_animationScheduler; }
     void AddDontDestroyOnLoad(Object* objPtr);
 	void RemoveDontDestroyOnLoad(Object* objPtr);
 	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
@@ -291,6 +295,7 @@ private:
     AssetBundle                         m_dontDestroyOnLoadAssetsBundle{};
     std::atomic<Scene*>                 m_activeScene{};
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };
+    std::unique_ptr<AnimationScheduler>  m_animationScheduler;
 	std::string                         m_LoadSceneName{};
     std::atomic_size_t                  m_activeSceneIndex{};
 	std::atomic_bool                    m_volumeProfileApply{ false };

@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-24",
+  "slice": "PHASE 13 S2′ closure: weighted TRS layers, additive kernel, nonuniform scale, speed handle, evaluation scratch reuse",
+  "status": "complete",
+  "model": "CreatorRobot.glb",
+  "modelSha256": "58D779AFDE1A7FBD13332999C8B11890FB7E10FF2036CA6AE3645D14BEDBA402",
+  "clip": "Walk",
+  "conditions": "Fresh Release Editor processes; 3 runs per actor population, 30 warmup and 120 sampled frames per run, paused Play CPU-only product probe, 8 workers; no profiling recording; worker-sum overlaps wait and is not OS CPU time; GPU and presentation excluded",
+  "percentileMethod": "nearest rank over 360 frames per actor population",
+  "unit": "milliseconds",
+  "workerSumP50": {
+    "S2d": { "10": 0.0986, "50": 0.4712, "100": 0.9954 },
+    "S2e": { "10": 0.1072, "50": 0.5295, "100": 1.0723 }
+  },
+  "cpuFrameP50": {
+    "S2d": { "10": 0.3037, "50": 1.9004, "100": 8.5591 },
+    "S2e": { "10": 0.4793, "50": 2.5263, "100": 11.1474 }
+  },
+  "interpretation": "The S2′ closure passes correctness gates but does not show a Walk performance improvement over S2d. The 100-actor worker-sum p50 is 1.0723 ms versus 0.9954 ms for S2d. The three 100-actor CPU run medians rose from 9.451 to 11.739 to 12.370 ms during this session, so this run does not isolate the feature cost from system or thermal drift. This single-clip probe does not measure multi-layer weighted-mask performance.",
+  "validation": {
+    "editorBuilds": ["Debug", "Release"],
+    "independentPlaybackChecksEach": 7231,
+    "productActors": 100,
+    "productRounds": 12,
+    "productChecksEach": 233196,
+    "managedThreadErrors": 0,
+    "visualBackend": "DX12",
+    "visualCaptures": 13,
+    "visualChecks": 264,
+    "displayF32ByteIdenticalToS2d": 1,
+    "displayF32MaxChangedValuesPerCapture": 68,
+    "displayF32MaxAbsoluteDifference": 0.0156862736,
+    "playerAndVulkanRun": false
+  },
+  "remainingBoundaries": [
+    "Legacy seven-region masks remain readable until explicit editor conversion to named weights; new masks use named weights by default.",
+    "Additive is a tested per-bone kernel; graph/task authoring and execution belongs to S3.5.",
+    "CreatorRobot.glb has no authored scale keys; nonuniform scale is verified with synthetic three-axis tracks in the product and independent samplers.",
+    "Scheduler job_group submission allocations belong to S6; fixed 512-bone proxy palette allocation and copy belong to S3.5.",
+    "No product performance claim for weighted multi-layer clips, Player, or Vulkan."
+  ],
+  "raw": {
+    "buildDebug": "Build/Obj/Phase13S2e/Debug-closure-build.log",
+    "buildRelease": "Build/Obj/Phase13S2e/Release-final-closure-build.log",
+    "independentPlayback": "Build/Obj/Phase13S2e/playback-final.log",
+    "productDebug": "Build/Obj/Phase13S2e/Product-Debug-Closure",
+    "productRelease": "Build/Obj/Phase13S2e/Product-Release-FinalClosure",
+    "visualRelease": "Build/Obj/Phase13S2e/Visual-Release-FinalClosure",
+    "baselineRelease": "Build/Obj/Phase13S2e/Baseline-Release-FinalClosure/baseline.json"
+  }
+}

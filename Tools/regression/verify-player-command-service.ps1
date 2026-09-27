@@ -146,7 +146,7 @@ try {
     if ($wrongRole.Count -gt 0) {
         $failures.Add("player-registry : roles 에 Player 가 없는 명령이 등록돼 있다: $(($wrongRole | ForEach-Object { $_.name }) -join ', ')")
     }
-    $expectedNames = @('help','quit','player.status','player.scene','player.objects','player.object','player.move') | Sort-Object
+    $expectedNames = @('help','quit','player.status','player.scene','player.objects','player.object','player.move','player.animation') | Sort-Object
     if (@(Compare-Object $expectedNames $names).Count -ne 0 -or $commands.count -ne $expectedNames.Count) {
         $failures.Add("Player discovery differs from the supported command contract: $($names -join ',')")
     }

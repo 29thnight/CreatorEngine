@@ -1,4 +1,5 @@
 #pragma once
+#include "AnimationPaletteArena.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
@@ -6,6 +7,7 @@
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <type_traits>
+#include <utility>
 #include <variant>
 
 class FoliageComponent;
@@ -65,7 +67,8 @@ public:
 		// 커맨드가 세대 변화를 보고 새 스냅샷을 나른다.
 		std::shared_ptr<const experiment::Material> authoredMaterial{};
 		std::uint64_t authoredRevision{ 0 };
-		std::shared_ptr<math::matrix4x4[]> bonePalette{};
+		std::uint32_t paletteOffset{ 0 };
+		std::uint32_t boneCount{ 0 };
 		HashedGuid animatorGuid{};
 		HashedGuid materialGuid{};
 		LightMapping lightMapping{};
@@ -185,7 +188,22 @@ public:
 
 	// 단 한 번 소비한다. 대상이 이미 해제되었거나 타입이 다르면 false로
 	// drop하고 payload를 비운다.
-	ApplyResult Apply(RenderScene& renderScene, uint64_t sceneEpoch);
+	ApplyResult Apply(RenderScene& renderScene, uint64_t sceneEpoch,
+		std::shared_ptr<const ce::animation_palette_arena> paletteArena = {},
+		std::uint32_t localPaletteOffset = 0);
+	[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> GetPaletteSlice() const noexcept
+	{
+		if (const auto* update = std::get_if<MeshUpdate>(&m_payload))
+			return { update->paletteOffset, update->boneCount };
+		return {};
+	}
+	void RebasePaletteOffset(std::uint32_t base)
+	{
+		if (auto* update = std::get_if<MeshUpdate>(&m_payload); update && update->boneCount)
+			update->paletteOffset += base;
+	}
+	[[nodiscard]] std::shared_ptr<const ce::animation_palette_arena> TakeCaptureArena() noexcept
+	{ return std::move(m_captureArena); }
 	uint64_t GetSceneEpoch() const noexcept { return m_sceneEpoch; }
 
 	// bounded RenderThread queue가 같은 프록시의 연속 update를 latest-wins로
@@ -202,6 +220,9 @@ private:
 	HashedGuid	m_proxyGUID{};
 	uint64_t	m_sceneEpoch{ 0 };
 	Payload		m_payload{};
+	// Producer-side handoff only. CapturePending moves this owner to its batch;
+	// the render-thread command payload contains just offset and count.
+	std::shared_ptr<const ce::animation_palette_arena> m_captureArena{};
 };
 
 static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldMatrix),
@@ -210,8 +231,6 @@ static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldPosition),
 	math::vector3>);
 static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldBounds),
 	math::aabb>);
-static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::bonePalette),
-	std::shared_ptr<math::matrix4x4[]>>);
 static_assert(std::is_same_v<decltype(ProxyCommand::TerrainUpdate::worldMatrix),
 	math::matrix4x4>);
 static_assert(std::is_same_v<decltype(ProxyCommand::FoliageUpdate::worldMatrix),

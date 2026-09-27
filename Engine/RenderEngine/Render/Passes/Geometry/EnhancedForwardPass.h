@@ -13,6 +13,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Graph/PackedBoneMatrix.h"
 #include "../../Graph/EnhancedDrawSealLedger.h"
 #include "../../Scene/MaterialTextureTable.h"
 #include "../../../RHI/RHIGraphicsPipelineRequest.h"
@@ -461,7 +462,7 @@ private:
 
     // GBuffer와 같은 animator-keyed 팔레트 저장소. Forward의 투명 스킨 메시도
     // 같은 pose를 읽고, 인접 instancing은 instance별 bone offset으로 유지한다.
-    std::vector<math::matrix4x4> m_bonePalettes;
+    std::vector<PackedBoneMatrix> m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;
 
     RGHandle           m_shadowMap;

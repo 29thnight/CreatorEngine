@@ -461,7 +461,6 @@
     <ClInclude Include="Interfaces\AAPassSetting.h" />
 	<ClInclude Include="Interfaces\AssetAuthoringPort.h" />
 	<ClInclude Include="Render\Core\RenderFeatureContributor.h" />
-    <ClInclude Include="AnimationJob.h" />
     <ClInclude Include="AssetBundle.h" />
     <ClInclude Include="AssetEntry.h" />
     <ClInclude Include="AssetMetaRegistry.h" />
@@ -474,6 +473,7 @@
     <ClInclude Include="KeyFrameEvent.h" />
     <ClInclude Include="MaterialFlowInformation.h" />
     <ClInclude Include="MeshOptimizer.h" />
+    <ClInclude Include="AnimationPaletteArena.h" />
     <ClInclude Include="ProxyCommand.h" />
     <ClInclude Include="ProxyCommandQueue.h" />
     <ClInclude Include="Interfaces\ShadowMapPassSetting.h" />
@@ -554,6 +554,8 @@
     <ClInclude Include="Assets\ModelSidecarV2.h" />
     <ClInclude Include="Assets\ModelAssetAuthoringTransaction.h" />
     <ClInclude Include="Assets\ModelAnimationSampler.h" />
+    <ClInclude Include="LocalPose.h" />
+    <ClInclude Include="ClipSamplingCursor.h" />
     <ClInclude Include="Assets\ModelAssetGeneration.h" />
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h" />
     <ClInclude Include="Experiment\Cooked\CookedAudioClipFormat.h" />

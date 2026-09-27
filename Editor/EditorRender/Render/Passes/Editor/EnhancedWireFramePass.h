@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Render/Graph/EnhancedRenderPass.h"
+#include "Render/Graph/PackedBoneMatrix.h"
 // ★ A-4. `DX12MeshCache.h` 를 물던 자리다. 메시 바인딩이 `RHIMeshBinding`
 //   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
 //   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
@@ -96,7 +97,8 @@ public:
 
 private:
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
-    void CollectDraws(const std::vector<EnhancedDrawItem>* draws);
+    void CollectDraws(const EnhancedFrameContext& context,
+        const std::vector<EnhancedDrawItem>* draws);
 
     struct Batch
     {
@@ -138,7 +140,7 @@ private:
     std::vector<InstanceData> m_instances;   // 배치 순서로 연속
 
     // 본 팔레트. 애니메이터별로 한 번만 담고 인스턴스가 오프셋으로 가리킨다.
-    std::vector<math::matrix4x4>            m_bonePalettes;
+    std::vector<PackedBoneMatrix>            m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t>  m_boneOffsets;
 
     std::unordered_map<std::size_t, RHIMeshBinding> m_geometry;

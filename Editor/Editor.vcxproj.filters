@@ -683,6 +683,9 @@
     <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp">
       <Filter>ImGuiHelper\소스 파일\Profiler</Filter>
     </ClCompile>
+    <ClCompile Include="ImGuiHelper\ProfilerAnimation.cpp">
+      <Filter>ImGuiHelper\소스 파일\Profiler</Filter>
+    </ClCompile>
     <ClCompile Include="ImGuiHelper\widgets.cpp">
       <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
     </ClCompile>

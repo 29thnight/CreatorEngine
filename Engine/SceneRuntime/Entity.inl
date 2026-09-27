@@ -183,6 +183,14 @@ inline std::vector<T*> Entity::GetComponents()
 }
 
 template<typename T>
+inline void Entity::CollectComponents(std::vector<T*>& out)
+{
+    out.clear();
+    for (auto& component : m_components)
+        if (T* casted = dynamic_cast<T*>(component.get())) out.push_back(casted);
+}
+
+template<typename T>
 inline void Entity::RemoveComponent(T* component)
 {
 	// K2: 여기서 물리적으로 슬롯을 비우지 않는다(swap-and-pop을 하지 않는다) —

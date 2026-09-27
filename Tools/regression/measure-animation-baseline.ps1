@@ -43,10 +43,11 @@ for ($repeat = 1; $repeat -le $Repeats; ++$repeat) {
             $data = $probe.data
             if (-not $data.passed -or $data.frames.Count -ne 120 -or $data.bones -le 0 -or $data.workers -le 0) { throw 'Incomplete baseline' }
             foreach ($frame in $data.frames) {
-                if ($frame.jobs -ne $data.actors -or $frame.evaluatedAnimators -ne $data.actors -or $frame.paletteCopies -ne $data.skinnedMeshes -or $frame.paletteBytes -ne $data.skinnedMeshes * 512 * 64 -or $frame.localWrites -le 0 -or $frame.validBones -ne $data.sceneBones) { throw 'Empty measured path' }
+                $chunks = [Math]::Min($data.actors, [Math]::Max(1, $data.workers) * 2)
+                if ($frame.jobs -ne $chunks -or $frame.updatePassJobs -ne $chunks -or $frame.executePassJobs -ne $chunks -or $frame.evaluatedAnimators -ne $data.actors -or $frame.paletteCopies -ne $data.actors -or $frame.paletteBytes -ne $data.actors * $data.bones * 64 -or $frame.paletteArenaAllocations -ne 0 -or $frame.poseStorageGrowths -ne 0 -or $frame.localWrites -le 0 -or $frame.validBones -ne $data.sceneBones) { throw 'Empty measured path' }
             }
             $row = [ordered]@{ repeat=$repeat; actors=$data.actors; bones=$data.bones; meshes=$data.skinnedMeshes; workers=$data.workers; frames=120; paletteBytes=$data.frames[0].paletteBytes }
-            foreach ($metric in @('prepareUs','submitUs','waitUs','workerSumUs','workerSpanUs','publishUs','socketUs','updateUs','syncUs','renderCommitUs','paletteUs','cpuFrameUs')) {
+            foreach ($metric in @('prepareUs','submitUs','waitUs','workerSumUs','workerSpanUs','updatePassWaitUs','executePassWaitUs','updatePassWorkerSumUs','executePassWorkerSumUs','publishUs','socketUs','updateUs','syncUs','renderCommitUs','paletteUs','cpuFrameUs')) {
                 $values = @(foreach ($frame in $data.frames) {
                     if ($metric -eq 'cpuFrameUs') { $frame.updateUs + $frame.syncUs + $frame.renderCommitUs }
                     else { $frame.$metric }
@@ -59,5 +60,25 @@ for ($repeat = 1; $repeat -le $Repeats; ++$repeat) {
         }
     } finally { if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit() } }
 }
-@{ configuration=$Configuration; model=$Model; modelSha256=(Get-FileHash -LiteralPath $Model).Hash; head=(git -C $repo rev-parse HEAD); cpu=(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name); rows=$rows; clock='MSVC steady_clock / QPC'; unit='microseconds'; measured='CPU pose update + Scene sync + proxy commit; palette allocation/copy is a subset of commit; worker time overlaps wait; excludes GPU and presentation' } |
+$sourceHashes = [ordered]@{}
+foreach ($relative in @('Engine/SceneRuntime/AnimationScheduler.cpp', 'Engine/SceneRuntime/AnimationScheduler.h', 'Engine/SceneRuntime/AnimTaskList.h',
+    'Engine/SceneRuntime/Scene.cpp', 'Engine/SceneRuntime/Scene.h',
+    'Engine/SceneRuntime/BoneComponent.h', 'Engine/SceneRuntime/Transform.cpp',
+    'Engine/SceneRuntime/AnimatorSystem.h', 'Engine/SceneRuntime/Animator.h',
+    'Engine/SceneRuntime/Animator.cpp', 'Engine/SceneRuntime/ProxyCommand.cpp',
+    'Engine/RenderEngine/Assets/ModelAssetGeneration.h', 'Engine/RenderEngine/Assets/ModelAssetGeneration.cpp',
+    'Engine/RenderEngine/Assets/ModelAnimationSampler.cpp', 'Engine/RenderEngine/Assets/ModelAnimationSampler.h',
+    'Engine/RenderEngine/LocalPose.h', 'Engine/RenderEngine/ClipSamplingCursor.h',
+    'Engine/RenderEngine/AnimationPaletteArena.h', 'Engine/RenderEngine/ProxyCommandQueue.h',
+    'Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h',
+    'Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h',
+    'Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang',
+    'Engine/RenderEngine/ProxyCommand.h', 'Engine/RenderEngine/PrimitiveRenderProxy.h',
+    'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp',
+    'Editor/RenderTests/Animation/AnimationBaselineProbe.cpp')) {
+    $sourceHashes[$relative] = (Get-FileHash -LiteralPath (Join-Path $repo $relative)).Hash
+}
+$runtime = Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
+$runtimeHash = if (Test-Path -LiteralPath $runtime) { (Get-FileHash -LiteralPath $runtime).Hash } else { $null }
+@{ configuration=$Configuration; model=$Model; modelSha256=(Get-FileHash -LiteralPath $Model).Hash; executableSha256=(Get-FileHash -LiteralPath $exe).Hash; runtimeSha256=$runtimeHash; sourceHashes=$sourceHashes; head=(git -C $repo rev-parse HEAD); cpu=(Get-CimInstance Win32_Processor | Select-Object -First 1 -ExpandProperty Name); rows=$rows; clock='MSVC steady_clock / QPC'; unit='microseconds'; measured='CPU pose update + Scene sync + proxy commit; palette allocation/copy is a subset of commit; worker time overlaps wait; excludes GPU and presentation' } |
     ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $Work 'baseline.json') -Encoding utf8

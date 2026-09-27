@@ -3,6 +3,7 @@
 #include "Windows/EditorStandardWindows.h"
 #include "RenderScene.h"
 #include "SceneManager.h"
+#include "AnimationScheduler.h"
 #include "DataSystem.h"
 #include "RHI/IRHIDeviceResources.h"
 #include "ClrHost.h"
@@ -100,9 +101,10 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture(bool includeGpuOb
 		const RenderScene::ResourceCounts counts = renderScene->GetResourceCounts();
 		snapshot.proxies = counts.proxies;
 		snapshot.uiProxies = counts.uiProxies;
-		snapshot.animators = counts.animators;
-		snapshot.animationPalettes = counts.animationPalettes;
 	}
+
+	snapshot.animators = SceneManagers->GetAnimationScheduler().GetAnimatorCount();
+	snapshot.animationPalettes = snapshot.animators;
 
 	// --- GPU ---
 	if (auto* resources = GetDiagnosticsDeviceResources())

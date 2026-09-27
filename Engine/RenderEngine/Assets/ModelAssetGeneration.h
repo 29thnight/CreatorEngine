@@ -338,6 +338,9 @@ namespace assets
         [[nodiscard]] std::span<const ModelTextureAsset> Textures() const noexcept;
         [[nodiscard]] const ModelSkeletonAsset* Skeleton() const noexcept;
         [[nodiscard]] std::span<const ModelAnimationAsset> Animations() const noexcept;
+        // Bone-indexed channels baked once before publication. The generation owns
+        // both the table and tracks; callers retain its Shared for the whole job.
+        [[nodiscard]] std::span<const ModelAnimationTrack* const> AnimationTracks(int clipIndex) const noexcept;
         [[nodiscard]] const ModelAnimatorAsset* Animator() const noexcept;
         [[nodiscard]] std::span<const ModelGpuUploadDescriptor> GpuDescriptors() const noexcept;
         [[nodiscard]] const ModelMeshAsset* FindMesh(const Uuid::Uuid16& meshId) const noexcept;
@@ -357,7 +360,7 @@ namespace assets
             std::optional<ModelSkeletonAsset> skeleton,
             std::vector<ModelAnimationAsset> animations,
             std::optional<ModelAnimatorAsset> animator,
-            std::vector<ModelGpuUploadDescriptor> gpuDescriptors) noexcept;
+            std::vector<ModelGpuUploadDescriptor> gpuDescriptors);
 
         ModelAssetGenerationIdentity identity_{};
         std::string name_{};
@@ -368,6 +371,7 @@ namespace assets
         std::vector<ModelTextureAsset> textures_{};
         std::optional<ModelSkeletonAsset> skeleton_{};
         std::vector<ModelAnimationAsset> animations_{};
+        std::vector<std::vector<const ModelAnimationTrack*>> m_animationTracks{};
         std::optional<ModelAnimatorAsset> animator_{};
         std::vector<ModelGpuUploadDescriptor> gpuDescriptors_{};
     };

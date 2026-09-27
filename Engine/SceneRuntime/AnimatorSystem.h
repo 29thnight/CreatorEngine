@@ -1,8 +1,280 @@
 #pragma once
 #include "ClassProperty.h"
+#include "../RenderEngine/LocalPose.h"
+#include "../RenderEngine/BoneRegion.h"
+#include "../RenderEngine/ClipSamplingCursor.h"
+#include "AnimTaskList.h"
+#include <mathematics/matrix4x4.hpp>
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <span>
+#include <string>
+#include <thread>
+#include <unordered_map>
 #include <vector>
 
 class Animator;
+class AnimationController;
+class AnimationState;
+class AniTransition;
+class ScriptComponent;
+namespace assets { struct ModelAnimationTrack; }
+
+// Authored masks can change through public Editor fields; cache their exact
+// shape so the bone-indexed weights are rebuilt when those fields change.
+struct AnimatorLayerMaskCache final
+{
+    struct NamedBone final
+    {
+        bool m_present{};
+        std::string m_name{};
+        bool m_enabled{};
+        float m_weight{ 1.f };
+    };
+
+    bool m_valid{};
+    bool m_hasMask{};
+    bool m_isHumanoid{};
+    bool m_useAll{};
+    bool m_useUpper{};
+    bool m_useLower{};
+    std::vector<NamedBone> m_namedBones{};
+    std::vector<float> m_weights{};
+};
+
+struct AnimatorIKBinding final
+{
+    std::uint64_t skeletonSerial{};
+    std::string startName{};
+    std::string middleName{};
+    std::string endName{};
+    std::uint32_t start{ animation::invalid_task };
+    std::uint32_t middle{ animation::invalid_task };
+    std::uint32_t end{ animation::invalid_task };
+};
+
+struct AnimatorIKSnapshot final
+{
+    std::uint32_t start{};
+    std::uint32_t middle{};
+    std::uint32_t end{};
+    math::vector3 target{};
+    math::vector3 pole{};
+    float weight{};
+    bool required{};
+};
+
+struct AnimatorBoneTransformBinding final
+{
+    std::uint64_t skeletonSerial{};
+    std::string boneName{};
+    std::uint32_t bone{ animation::invalid_task };
+};
+
+struct AnimatorBoneTransformSnapshot final
+{
+    std::uint32_t bone{};
+    math::vector3 translationOffset{};
+    math::quaternion rotationOffset{ 0.f, 0.f, 0.f, 1.f };
+    math::vector3 scaleMultiplier{ 1.f, 1.f, 1.f };
+    float weight{};
+    bool required{};
+};
+
+struct AnimInstanceHandle final
+{
+    std::uint32_t slot{ UINT32_MAX };
+    std::uint32_t generation{};
+};
+
+struct ControllerPlayback final
+{
+    AnimationState* currentState{};
+    AnimationState* nextState{};
+    AniTransition* currentTransition{};
+    int animationIndex{};
+    int nextAnimationIndex{ -1 };
+    bool needBlend{};
+    bool isBlending{};
+    bool endAnimation{};
+    float timeElapsed{};
+    float nextTimeElapsed{};
+    float currentProgress{};
+    float previousCurrentProgress{};
+    float nextProgress{};
+    float previousNextProgress{};
+    float blendingTime{};
+};
+
+struct AnimatorPlaybackControl final
+{
+    float blendT{};
+    int nextClipIndex{ -1 };
+    bool isBlending{};
+    float stopTimer{};
+    float stoppedDuration{};
+};
+
+struct AnimInstance final
+{
+    static constexpr std::size_t kControllerSlotPageSize = 4;
+
+    struct ControllerSlot final
+    {
+        std::uint64_t id{};
+        std::weak_ptr<AnimationController> owner{};
+        ControllerPlayback playback{};
+    };
+
+    std::uint32_t slot{};
+    std::vector<math::matrix4x4> localTransforms{};
+    std::vector<math::matrix4x4> finalTransforms{};
+    Animation::LocalPose pose{};
+    std::uint32_t selectedClipIndex{};
+    // Editor-only clip preview bypasses the controller graph without changing it.
+    bool editorPreviewActive{};
+    bool editorPreviewPlaying{};
+    bool editorPreviewPaused{};
+    bool captureTaskExecution{};
+    std::vector<std::uint32_t> executedTaskIndices{};
+    float timeElapsed{};
+    float nextTimeElapsed{};
+    AnimatorPlaybackControl control{};
+    std::vector<math::matrix4x4> poseGlobals{};
+    // Reused parent-first reachability scratch for IK subtree recomputation.
+    std::vector<std::uint8_t> ikAffectedBones{};
+    float optionalIKWeight{ 1.f };
+    // Local-space inertial offsets bridge a snapped L4 pose back to full blending.
+    std::vector<Animation::AdditiveDelta> blendRecoveryOffsets{};
+    Animation::LocalPose blendRecoverySourcePose{};
+    float blendRecoveryElapsed{};
+    bool blendRecoveryPending{};
+    bool blendRecoveryActive{};
+    bool l4SnappedBlend{};
+    std::vector<Animation::LocalTransform> bindLocals{};
+    std::uint64_t bindSkeletonSerial{};
+    std::uint32_t activeBoneCount{};
+    std::uint32_t evaluatedBoneSamples{};
+    Animation::LocalPose l6PreviousPose{};
+    Animation::LocalPose l6LatestPose{};
+    std::vector<math::matrix4x4> l6PreviousLocals{};
+    std::vector<math::matrix4x4> l6LatestLocals{};
+    std::vector<math::matrix4x4> l6PreviousFinals{};
+    std::vector<math::matrix4x4> l6LatestFinals{};
+    std::vector<math::matrix4x4> l6PreviousGlobals{};
+    std::vector<math::matrix4x4> l6LatestGlobals{};
+    float l6PublishedAlpha{ 1.f };
+    std::uint8_t l6Phase{};
+    std::uint8_t l6NextPhase{};
+    std::uint8_t l6Interval{ 2 };
+    bool l6Seeded{};
+    bool l6Evaluate{ true };
+    int l6ClipIndex{ -1 };
+    int l6ControllerSlot{ -1 };
+    // Number of clip samples actually executed by the most recent pose pass.
+    std::uint32_t executedPoseSamples{};
+    std::uint64_t poseStorageGrowths{};
+    std::size_t workerPoseBufferCount{};
+    std::uintptr_t workerPosePoolIdentity{};
+    std::array<const void*, 3> workerCurrentStorage{};
+    std::vector<std::array<Animation::ClipSamplingCursor, 2>> samplingCursors{};
+    animation::task_list taskList{};
+    std::vector<AnimatorIKBinding> ikBindings{};
+    std::vector<AnimatorIKSnapshot> ikSnapshots{};
+    std::vector<AnimatorBoneTransformBinding> boneTransformBindings{};
+    std::vector<AnimatorBoneTransformSnapshot> boneTransformSnapshots{};
+    float significance{ 1.f };
+    float projectedHeight{ 1.f };
+    animation::quality_stage qualityStage{ animation::quality_stage::l0 };
+    std::uint16_t budgetPromotionFrames{};
+    // -1 selects the camera policy. Product probes may force L0-L6 or L7.
+    int qualityOverride{ -1 };
+    std::vector<std::span<const assets::ModelAnimationTrack* const>> layerTrackTables{};
+    std::vector<AnimatorLayerMaskCache> layerMaskCaches{};
+    std::vector<std::uint8_t> layerSelected{};
+    std::vector<std::size_t> eventOrderScratch{};
+    std::vector<ScriptComponent*> eventScriptsScratch{};
+    std::vector<std::uint8_t> boneRegions{};
+    bool tickPathLogged{};
+    // Dense lookup order is independent of authored controller layer order.
+    // Page records keep in-progress transitions stable while layers grow.
+    std::vector<std::unique_ptr<ControllerSlot[]>> controllerPages{};
+    std::vector<ControllerSlot*> freeControllerSlots{};
+    std::vector<ControllerSlot*> controllerSlots{};
+    std::unordered_map<std::uint64_t, std::size_t> controllerSlotById{};
+
+    [[nodiscard]] ControllerPlayback& GetControllerPlayback(
+        std::uint64_t id, std::weak_ptr<AnimationController> owner)
+    {
+        if (const auto found = controllerSlotById.find(id); found != controllerSlotById.end())
+            return controllerSlots[found->second]->playback;
+
+        if (freeControllerSlots.empty())
+        {
+            auto page = std::make_unique<ControllerSlot[]>(kControllerSlotPageSize);
+            auto* records = page.get();
+            freeControllerSlots.reserve((controllerPages.size() + 1) * kControllerSlotPageSize);
+            controllerPages.push_back(std::move(page));
+            for (std::size_t slot = kControllerSlotPageSize; slot > 0; --slot)
+                freeControllerSlots.push_back(records + slot - 1);
+        }
+
+        ControllerSlot* record = freeControllerSlots.back();
+        const auto index = controllerSlots.size();
+        controllerSlots.push_back(record);
+        try
+        {
+            controllerSlotById.emplace(id, index);
+        }
+        catch (...)
+        {
+            controllerSlots.pop_back();
+            throw;
+        }
+        freeControllerSlots.pop_back();
+        record->id = id;
+        record->owner = std::move(owner);
+        return record->playback;
+    }
+
+    void PruneExpiredControllerPlayback()
+    {
+        for (std::size_t index = 0; index < controllerSlots.size();)
+        {
+            if (!controllerSlots[index]->owner.expired()) { ++index; continue; }
+            ControllerSlot* retired = controllerSlots[index];
+            controllerSlotById.erase(retired->id);
+            if (index + 1 != controllerSlots.size())
+            {
+                controllerSlots[index] = controllerSlots.back();
+                controllerSlotById.find(controllerSlots[index]->id)->second = index;
+            }
+            controllerSlots.pop_back();
+            *retired = ControllerSlot{};
+            freeControllerSlots.push_back(retired);
+        }
+    }
+
+    void ResizePose(std::size_t boneCount)
+    {
+        const std::size_t paletteCount = (std::min)(boneCount, static_cast<std::size_t>(kMaxBones));
+        localTransforms.resize(paletteCount, math::matrix4x4::identity());
+        finalTransforms.resize(paletteCount, math::matrix4x4::identity());
+        pose.Resize(boneCount);
+    }
+
+    [[nodiscard]] std::size_t GetAllocatedPoseBufferCount() const noexcept
+    {
+        return std::size_t(pose.has_storage())
+            + std::size_t(l6PreviousPose.has_storage())
+            + std::size_t(l6LatestPose.has_storage())
+            + std::size_t(blendRecoverySourcePose.has_storage());
+    }
+};
 
 // PHASE(SceneGraphRedesignPlan) 트랙 C3 — Animator 가상 Update 오버라이드의 시스템 이관.
 //
@@ -63,6 +335,10 @@ public:
     // 등록되어 있지 않으면 조용히 무시한다.
     void Unregister(Animator* animator);
 
+    AnimInstanceHandle CreateInstance();
+    void DestroyInstance(AnimInstanceHandle handle);
+    [[nodiscard]] AnimInstance* ResolveInstance(AnimInstanceHandle handle) noexcept;
+
     // 등록된 Animator 전부를 한 번에 틱한다. 옛 Animator::Update와 동일한 가드
     // (owner 없음/파괴 표시/비활성 스킵)를 이 시스템이 대신 적용한다 — 예전에는
     // Scene::RegistryTick이 공통으로 해주던 가드였다.
@@ -71,7 +347,24 @@ public:
     size_t GetCount() const noexcept { return m_animators.size(); }
 
 private:
+    void RequireOwnerThread() const;
+    static constexpr std::size_t kInstancePageSize = 64;
+    struct InstanceSlot final
+    {
+        std::uint32_t denseIndex{};
+        std::uint32_t generation{ 1 };
+        bool occupied{};
+    };
+    std::mutex m_instanceMutex{};
+    std::vector<InstanceSlot> m_instanceSlots{};
+    std::vector<std::uint32_t> m_freeInstanceSlots{};
+    // Records are contiguous within each page and never relocate. The dense
+    // pointer order can swap/pop without invalidating a worker's record address.
+    std::vector<std::unique_ptr<AnimInstance[]>> m_instancePages{};
+    std::vector<AnimInstance*> m_freeInstanceRecords{};
+    std::vector<AnimInstance*> m_instances{};
     std::vector<Animator*> m_animators;
+    const std::thread::id m_ownerThreadId{ std::this_thread::get_id() };
 };
 
 static auto AnimatorSystems = AnimatorSystem::GetInstance();

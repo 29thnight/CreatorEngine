@@ -148,6 +148,8 @@ public:
 
 	template<typename T>
 	std::vector<T*> GetComponents();
+	template<typename T>
+	void CollectComponents(std::vector<T*>& out);
 
 	template<typename T>
 	void RemoveComponent(T* component);

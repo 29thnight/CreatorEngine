@@ -5,8 +5,12 @@
 #include <array>
 #include <cmath>
 #include <memory>
+#include <cstring>
+#include <limits>
+#include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 #include <mathematics/color.hpp>
@@ -16,6 +20,7 @@
 #include <mathematics/vector4.hpp>
 
 #include "EnhancedMaterialSealIdentity.h"
+#include "PackedBoneMatrix.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/IRenderPipelineCache.h"
@@ -336,6 +341,60 @@ struct EnhancedShadowData
 
 static_assert(std::is_trivially_copyable_v<EnhancedShadowData>);
 
+// One upload per rendered view is shared by shadow, GBuffer, forward and
+// editor wireframe. The view's RHI frame owns the upload slice until its fence.
+class AnimationPaletteFrame final
+{
+public:
+    bool Prepare(IRenderDeviceServices& resources,
+        const std::vector<EnhancedDrawItem>* opaque,
+        const std::vector<EnhancedDrawItem>* forward)
+    {
+        m_matrices.clear();
+        m_offsets.clear();
+        m_upload = {};
+        auto collect = [this](const std::vector<EnhancedDrawItem>* draws)
+        {
+            if (!draws) return;
+            for (const auto& draw : *draws)
+            {
+                if (!draw.bonePalette || !draw.boneCount
+                    || m_offsets.contains(draw.animatorKey)) continue;
+                if (draw.boneCount > (std::numeric_limits<std::uint32_t>::max)()
+                    - m_matrices.size())
+                    throw std::length_error("animation palette upload overflow");
+                const auto offset = static_cast<std::uint32_t>(m_matrices.size());
+                m_matrices.resize(m_matrices.size() + draw.boneCount);
+                for (std::uint32_t bone = 0; bone < draw.boneCount; ++bone)
+                    m_matrices[offset + bone] = PackedBoneMatrix::From(draw.bonePalette[bone]);
+                m_offsets.emplace(draw.animatorKey, offset);
+            }
+        };
+        collect(opaque);
+        collect(forward);
+        const auto bytes = sizeof(PackedBoneMatrix)
+            * (m_matrices.empty() ? std::size_t{ 1 } : m_matrices.size());
+        m_upload = resources.AllocateUpload(RHIUploadRequest{
+            bytes, RHIUploadUsage::BufferCopy, sizeof(PackedBoneMatrix) });
+        if (!m_upload.IsValid()) return false;
+        if (m_matrices.empty())
+        {
+            const auto identity = PackedBoneMatrix::Identity();
+            std::memcpy(m_upload.cpuAddress, &identity, sizeof(identity));
+        }
+        else std::memcpy(m_upload.cpuAddress, m_matrices.data(), bytes);
+        return true;
+    }
+
+    [[nodiscard]] const auto& Offsets() const noexcept { return m_offsets; }
+    [[nodiscard]] RHIBufferSlice Upload() const noexcept { return m_upload; }
+
+private:
+    std::vector<PackedBoneMatrix> m_matrices{};
+    std::unordered_map<std::uint64_t, std::uint32_t> m_offsets{};
+    RHIBufferSlice m_upload{};
+};
+
 // 한 프레임의 렌더 입력과 도구. 패스는 여기 있는 것만 쓴다 —
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext
@@ -371,6 +430,10 @@ struct EnhancedFrameContext
     // Forward+가 이미 deferred로 그려진 것을 한 번 더 그리게 되는데,
     // 둘 다 '그림이 조금 이상하다'로만 드러나 원인을 찾기 어렵다.
     const std::vector<EnhancedDrawItem>* forwardDraws{ nullptr };
+
+    // Product paths provide the one-per-view packed upload. Isolated pass
+    // fixtures may leave this null and use their local fallback.
+    const AnimationPaletteFrame* animationPalettes{ nullptr };
 
     // 이 프레임의 광원. 씬의 Light를 그대로 들지 않고 셰이더가 쓰는 형태로
     // 복사해 온다 — 메시·재질과 같은 이유다.

@@ -1,0 +1,2896 @@
+m_Entities:
+  - Entity: 8465162159729457626
+    m_name: AnimationPlayer
+    m_instanceID: 3250423762
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 0
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1231881084
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 1}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 1}
+        m_parentID: 4294967295
+    m_isStatic: false
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  - Entity: 8465162159729457626
+    m_name: MainCamera
+    m_instanceID: 3017426043
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 1
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3157244545
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0.95, z: -3.2, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - CameraComponent: 13209209574413295037
+        m_typeUUID: de554d88-0db0-40a0-a77d-0bc32b5d9dc7
+        m_name: CameraComponent
+        m_instanceID: 2271894954
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Camera:
+          rotate: {x: 0, y: 0, z: 0, w: 1}
+          m_nearPlane: 0.1
+          m_farPlane: 500
+          m_fov: 60
+        m_isPrimary: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: SunLight
+    m_instanceID: 2128783013
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 2
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1876859479
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 20, z: 0, w: 0}
+        rotation: {x: 0.4030582, y: -0.272532, z: 0.12708376, w: 0.86436105}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - LightComponent: 4057566390273757802
+        m_typeUUID: 3803b17f-21c6-4a57-b216-985d0c7a3886
+        m_name: LightComponent
+        m_instanceID: 1360361394
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_color: {r: 1, g: 0.96, b: 0.9, a: 1}
+        m_lightIndex: 0
+        m_constantAttenuation: 1
+        m_linearAttenuation: 0.09
+        m_quadraticAttenuation: 0.032
+        m_spotLightAngle: 30
+        m_intencity: 1.6
+        m_range: 10
+        m_lightType: 0
+        m_lightStatus: 2
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: Ground
+    m_instanceID: 4129597143
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 3
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1176200239
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 32221179
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Plane_Mat
+          m_baseColorTexName: Plane_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.9
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 524e9895-230d-4a3d-a187-06ec6df9d59e
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: 8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45
+        m_meshAssetId: 178dd85b-7088-8e3e-af23-a2c983ca1e7e
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Cube
+    m_instanceID: 2437420229
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 4
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1837605995
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -5.25, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1528968153
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Cube_Mat
+          m_baseColorTexName: Cube_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.55
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: eeadbf9a-d493-4ace-8a78-b5fb9711f1cf
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: 8a69bd42-f950-8265-9c0e-0ff597095141
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 8a69bd42-f950-8265-9c0e-0ff597095141
+        m_meshAssetId: a4aa6c26-0466-8374-b0d8-e63626e3fbc7
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Sphere
+    m_instanceID: 2877142216
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 5
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1905471519
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -3.75, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 4131360435
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Sphere_Mat
+          m_baseColorTexName: Sphere_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.3
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 21b841d1-9443-4eb5-8f39-e6263f43b2f0
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: df464176-385d-8563-98b9-5b1d266415bd
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: df464176-385d-8563-98b9-5b1d266415bd
+        m_meshAssetId: 10939add-54b9-87f3-bccf-775d715274ae
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_IcoSphere
+    m_instanceID: 3243932360
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 6
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2762123847
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -2.25, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1059023374
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: IcoSphere_Mat
+          m_baseColorTexName: IcoSphere_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.65
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: d4a134d8-46ea-4640-bc43-d4241a803aa2
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: 63c7b8bc-3057-833b-86ae-870fa7a6aed7
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 63c7b8bc-3057-833b-86ae-870fa7a6aed7
+        m_meshAssetId: d84fc43c-dfb6-8803-bcc5-7cb2d510a9cd
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Cylinder
+    m_instanceID: 98246106
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 7
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3988441254
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.75, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 2987023090
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Cylinder_Mat
+          m_baseColorTexName: Cylinder_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 1
+            m_roughness: 0.35
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 24b956be-ba20-41b9-9b06-fc0221a28d0b
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: cdf2f89b-32f4-85d5-adc6-c652c61a071c
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: cdf2f89b-32f4-85d5-adc6-c652c61a071c
+        m_meshAssetId: fd816a99-62d5-8926-b72f-c582fd705ab1
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Cone
+    m_instanceID: 2558746156
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 8
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1355396268
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.75, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1819365999
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Cone_Mat
+          m_baseColorTexName: Cone_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.8
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 9444798b-d1e8-4fa3-960e-bb07327d67db
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: 9888e325-a6fb-8378-b297-aa1f10eca2dc
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 9888e325-a6fb-8378-b297-aa1f10eca2dc
+        m_meshAssetId: 0ad356ee-71ab-8104-a008-b5c4e31b91f3
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Torus
+    m_instanceID: 164840058
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 9
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1565773593
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 2.25, y: 0.5, z: 0, w: 0}
+        rotation: {x: 0.70710677, y: 0, z: 0, w: 0.7071067}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1892867896
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Torus_Mat
+          m_baseColorTexName: Torus_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 1
+            m_roughness: 0.15
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 465fca74-0eea-4e7d-b4ca-526e56bce230
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: 17d1efaf-9c93-8adb-ab23-6f4a04810c46
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 17d1efaf-9c93-8adb-ab23-6f4a04810c46
+        m_meshAssetId: 66033d4e-bc68-84d2-b140-553da730cc1e
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: P_Suzanne
+    m_instanceID: 673769957
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 10
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2065858695
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 3.75, y: 0.6, z: 0, w: 0}
+        rotation: {x: 0, y: 1, z: -0, w: -4.371139e-08}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 3861733645
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          m_name: Suzanne_Mat
+          m_baseColorTexName: Suzanne_Mat_BaseColor.png
+          m_normalTexName: ""
+          m_ORM_TexName: ""
+          m_AO_TexName: ""
+          m_EmissiveTexName: ""
+          m_materialInfo:
+            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
+            m_metallic: 0
+            m_roughness: 0.45
+            m_IOR: 1.5
+          m_flowInfo:
+            m_windVector: {x: 0, y: 0, z: 0, w: 0}
+            m_uvScroll: {x: 0, y: 0}
+          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
+          m_propertyValues:
+            - m_name: baseColorMap
+              m_numericValue: ~
+              m_integerValue: 0
+              m_boolValue: false
+              m_textureGuid: 5a78bcdd-7eaf-4bf7-aee2-7cefc96272a2
+              m_textureUvSet: 0
+              m_textureUvOffset: {x: 0, y: 0}
+              m_textureUvScale: {x: 1, y: 1}
+              m_textureUvRotation: 0
+          m_keywordSelections: ~
+          m_fileGuid: 987a8d42-3964-8d46-9024-7f280c92f986
+          m_renderingMode: 0
+          m_doubleSided: false
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 987a8d42-3964-8d46-9024-7f280c92f986
+        m_meshAssetId: fd45a171-ae8b-8c74-b129-0ee00371b7ad
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: CreatorRobot
+    m_instanceID: 2882025534
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 11
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3118539522
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 0}
+        rotation: {x: 0, y: 0.9999999, z: -0, w: -1.1920929e-07}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - Animator: 10963690946328088244
+        m_typeUUID: b1144467-8a80-45e8-9a24-eab65e16e2be
+        m_name: Animator
+        m_instanceID: 2335385510
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_AnimIndexChosen: 1
+        m_AnimIndex: 0
+        m_Motion: 6c6d4501-1a95-8c70-b3ea-2818679968dd
+        m_animationControllers: ~
+        Parameters: ~
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [12, 16]
+  - Entity: 8465162159729457626
+    m_name: CreatorRobot_Body
+    m_instanceID: 1707283580
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 12
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 29193991
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: -0, w: 0}
+        rotation: {x: -0, y: -0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 11
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1572542361
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          schema: 1
+          assetId: 3da9d174-3334-897b-8d93-a2361153701b
+          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          name: CreatorRobot_Arms_Mat
+          blendMode: opaque
+          properties:
+            - name: baseColor
+              float4: [1, 1, 1, 1]
+            - name: metallic
+              float: 1
+            - name: roughness
+              float: 1
+            - name: normalScale
+              float: 1
+            - name: occlusionStrength
+              float: 1
+            - name: emissive
+              float3: [0, 0, 0]
+            - name: emissiveStrength
+              float: 1
+            - name: baseColorMap
+              texture: {guid: 17fe402f-a438-87be-a39f-0c836e147b85, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: normalMap
+              texture: {guid: d6804e50-d028-8d11-9f49-e7a6d62b1a17, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: ormMap
+              texture: {guid: 84106e16-8a55-8b29-afea-bc496f9d1e6e, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: aoMap
+              texture: {guid: 84106e16-8a55-8b29-afea-bc496f9d1e6e, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: doubleSided
+              bool: true
+          keywords: []
+          keywordSelections: []
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: true
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
+        m_meshAssetId: 9ad77a24-5de7-8fa3-933a-1a0a0289a47d
+    m_isStatic: false
+    m_parentIndex: 11
+    m_rootIndex: 0
+    m_childrenIndices: [13]
+  - Entity: 8465162159729457626
+    m_name: CreatorRobot_Body (1)
+    m_instanceID: 2236061157
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 13
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1389934349
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: -0, w: 0}
+        rotation: {x: -0, y: -0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 12
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 3358230805
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          schema: 1
+          assetId: bc5b3455-62ee-88ea-931a-80a5d0837cd4
+          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          name: CreatorRobot_LegsMat
+          blendMode: opaque
+          properties:
+            - name: baseColor
+              float4: [1, 1, 1, 1]
+            - name: metallic
+              float: 1
+            - name: roughness
+              float: 1
+            - name: normalScale
+              float: 1
+            - name: occlusionStrength
+              float: 1
+            - name: emissive
+              float3: [0, 0, 0]
+            - name: emissiveStrength
+              float: 1
+            - name: baseColorMap
+              texture: {guid: a58128de-61bd-8d89-869b-9f7c6c6a936b, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: normalMap
+              texture: {guid: 5bfaa19c-7e71-85a5-87ec-189a8adcf9aa, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: ormMap
+              texture: {guid: d7ed0de9-dc20-86fb-b656-95dba104dc36, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: aoMap
+              texture: {guid: d7ed0de9-dc20-86fb-b656-95dba104dc36, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: doubleSided
+              bool: true
+          keywords: []
+          keywordSelections: []
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: true
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
+        m_meshAssetId: c20d30f6-9239-86cb-9439-2da5c91208fc
+    m_isStatic: false
+    m_parentIndex: 12
+    m_rootIndex: 0
+    m_childrenIndices: [14]
+  - Entity: 8465162159729457626
+    m_name: CreatorRobot_Body (2)
+    m_instanceID: 3298574095
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 14
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2160945924
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: -0, w: 0}
+        rotation: {x: -0, y: -0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 13
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 1629848992
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          schema: 1
+          assetId: 67f04bd1-60cc-892c-bfb8-b701d928c882
+          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          name: CreatorRobot_TorsoMat
+          blendMode: opaque
+          properties:
+            - name: baseColor
+              float4: [1, 1, 1, 1]
+            - name: metallic
+              float: 1
+            - name: roughness
+              float: 1
+            - name: normalScale
+              float: 1
+            - name: occlusionStrength
+              float: 1
+            - name: emissive
+              float3: [0, 0, 0]
+            - name: emissiveStrength
+              float: 1
+            - name: baseColorMap
+              texture: {guid: b7b9936f-75aa-8ffb-a75b-f06935f709af, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: normalMap
+              texture: {guid: 4696481c-fb68-8445-99a7-db4038c1b22c, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: ormMap
+              texture: {guid: 21dfcee7-0ca7-81bf-8690-d50c3a609c29, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: aoMap
+              texture: {guid: 21dfcee7-0ca7-81bf-8690-d50c3a609c29, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: doubleSided
+              bool: true
+          keywords: []
+          keywordSelections: []
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: true
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
+        m_meshAssetId: 113354b6-1d54-8d61-9bff-3ebbab69787f
+    m_isStatic: false
+    m_parentIndex: 13
+    m_rootIndex: 0
+    m_childrenIndices: [15]
+  - Entity: 8465162159729457626
+    m_name: CreatorRobot_Body (3)
+    m_instanceID: 3357770175
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 15
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1744557908
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: -0, w: 0}
+        rotation: {x: -0, y: -0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 14
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 385074350
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          schema: 1
+          assetId: 6a96e44c-40e9-8453-8436-36295a392bc2
+          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          name: CreatorRobot_Head_Mat
+          blendMode: opaque
+          properties:
+            - name: baseColor
+              float4: [1, 1, 1, 1]
+            - name: metallic
+              float: 1
+            - name: roughness
+              float: 1
+            - name: normalScale
+              float: 1
+            - name: occlusionStrength
+              float: 1
+            - name: emissive
+              float3: [0, 0, 0]
+            - name: emissiveStrength
+              float: 1
+            - name: baseColorMap
+              texture: {guid: 908afc9b-e23f-876e-a5c6-82bfd42ebbe2, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: normalMap
+              texture: {guid: 2769c332-be12-80bb-8adc-80eff09fd7dd, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: ormMap
+              texture: {guid: a291f48f-b922-80f2-b36f-715e0cd1c6f1, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: aoMap
+              texture: {guid: a291f48f-b922-80f2-b36f-715e0cd1c6f1, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
+            - name: doubleSided
+              bool: true
+          keywords: []
+          keywordSelections: []
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: true
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
+        m_meshAssetId: a4c8cc56-491e-8fbf-b6d6-e83209dee1ce
+    m_isStatic: false
+    m_parentIndex: 14
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: root
+    m_instanceID: 1956634043
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 16
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 34870001
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: -0, w: 0}
+        rotation: {x: 0, y: 1, z: 0, w: 7.54979e-08}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 11
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3154730307
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 11
+    m_rootIndex: 11
+    m_childrenIndices: [17]
+  - Entity: 8465162159729457626
+    m_name: hips
+    m_instanceID: 344794111
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 17
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1993673889
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 3.774895e-09, y: 1.015, z: 0.025, w: 0}
+        rotation: {x: -0.05530037, y: 3.1737876e-08, z: 6.592318e-09, w: 0.99846977}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 16
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 297585106
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 16
+    m_rootIndex: 11
+    m_childrenIndices: [18, 19, 20]
+  - Entity: 8465162159729457626
+    m_name: spine
+    m_instanceID: 976953074
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 18
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3873571392
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 5.551115e-16, y: 0.09055394, z: -6.519258e-09, w: 0}
+        rotation: {x: 0.013757553, y: 1.19198035e-07, z: 4.3730417e-10, w: 0.99990547}
+        scale: {x: 1, y: 0.99999976, z: 0.99999976, w: 0}
+        m_parentID: 17
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2025267827
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 17
+    m_rootIndex: 11
+    m_childrenIndices: [21]
+  - Entity: 8465162159729457626
+    m_name: upper_leg_l
+    m_instanceID: 3813246193
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 19
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 142883258
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.15, y: -1.9324943e-08, z: -1.870135e-08, w: 0}
+        rotation: {x: 7.533467e-08, y: -0.0657236, z: 0.9978379, w: -4.961989e-09}
+        scale: {x: 1, y: 0.99999994, z: 1.000002, w: 0}
+        m_parentID: 17
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2997210039
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 17
+    m_rootIndex: 11
+    m_childrenIndices: [22]
+  - Entity: 8465162159729457626
+    m_name: upper_leg_r
+    m_instanceID: 1950504508
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 20
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1510157281
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.15, y: -1.9324943e-08, z: 7.52548e-09, w: 0}
+        rotation: {x: 7.533467e-08, y: -0.0657236, z: 0.9978379, w: -4.961989e-09}
+        scale: {x: 1, y: 0.99999994, z: 1.000002, w: 0}
+        m_parentID: 17
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 142140142
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 17
+    m_rootIndex: 11
+    m_childrenIndices: [23]
+  - Entity: 8465162159729457626
+    m_name: chest
+    m_instanceID: 4147181896
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 21
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 186107002
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -7.236807e-16, y: 0.12041602, z: -2.3283064e-09, w: 0}
+        rotation: {x: 0.096747674, y: -1.1865011e-07, z: 3.0752703e-09, w: 0.99530894}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 18
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2935905684
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 18
+    m_rootIndex: 11
+    m_childrenIndices: [24]
+  - Entity: 8465162159729457626
+    m_name: lower_leg_l
+    m_instanceID: 2232705219
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 22
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 395159370
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -7.0050628e-09, y: 0.38308352, z: -3.3892915e-09, w: 0}
+        rotation: {x: -0.0007917354, y: 2.1344493e-09, z: -5.6840626e-09, w: 0.9999997}
+        scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+        m_parentID: 19
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 461332618
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 19
+    m_rootIndex: 11
+    m_childrenIndices: [25]
+  - Entity: 8465162159729457626
+    m_name: lower_leg_r
+    m_instanceID: 1948580955
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 23
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3236675218
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 2.279726e-08, y: 0.3830835, z: -3.5956278e-09, w: 0}
+        rotation: {x: -0.0007917354, y: 2.1344493e-09, z: -5.6840626e-09, w: 0.9999997}
+        scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+        m_parentID: 20
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1473366904
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 20
+    m_rootIndex: 11
+    m_childrenIndices: [26]
+  - Entity: 8465162159729457626
+    m_name: upper_chest
+    m_instanceID: 2642514315
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 24
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1132523292
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.8780849e-16, y: 0.13583069, z: 1.4901161e-08, w: 0}
+        rotation: {x: -0.036099486, y: 1.19131656e-07, z: -1.1474757e-09, w: 0.9993483}
+        scale: {x: 1, y: 0.9999999, z: 0.9999999, w: 0}
+        m_parentID: 21
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 414300748
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 21
+    m_rootIndex: 11
+    m_childrenIndices: [27, 28, 29]
+  - Entity: 8465162159729457626
+    m_name: foot_l
+    m_instanceID: 1330448690
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 25
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2029997860
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 1.6801521e-10, y: 0.53413475, z: -1.6999575e-09, w: 0}
+        rotation: {x: -0.47997385, y: -1.0626131e-08, z: 3.4645087e-08, w: 0.8772828}
+        scale: {x: 1, y: 0.9999999, z: 0.99999994, w: 0}
+        m_parentID: 22
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2342542309
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 22
+    m_rootIndex: 11
+    m_childrenIndices: [30]
+  - Entity: 8465162159729457626
+    m_name: foot_r
+    m_instanceID: 968029972
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 26
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2789683039
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 1.6801521e-10, y: 0.53413475, z: -1.5596715e-09, w: 0}
+        rotation: {x: -0.47997385, y: -1.0626131e-08, z: 3.4645087e-08, w: 0.8772828}
+        scale: {x: 1, y: 0.9999999, z: 0.99999994, w: 0}
+        m_parentID: 23
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1333163847
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 23
+    m_rootIndex: 11
+    m_childrenIndices: [31]
+  - Entity: 8465162159729457626
+    m_name: neck
+    m_instanceID: 3008365306
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 27
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1778730982
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.8780849e-16, y: 0.13009608, z: 1.8626451e-09, w: 0}
+        rotation: {x: 0.016431717, y: -1.1919319e-07, z: 5.2230703e-10, w: 0.999865}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 24
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2726438115
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 24
+    m_rootIndex: 11
+    m_childrenIndices: [32]
+  - Entity: 8465162159729457626
+    m_name: clavicle_l
+    m_instanceID: 1367325913
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 28
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1477441012
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.074999996, y: 0.116452344, z: 0.03555065, w: 0}
+        rotation: {x: 0.09035029, y: -0.11229891, z: -0.68050987, w: 0.71842337}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 24
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1000434999
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 24
+    m_rootIndex: 11
+    m_childrenIndices: [33]
+  - Entity: 8465162159729457626
+    m_name: clavicle_r
+    m_instanceID: 1544948348
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 29
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 668149703
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.07500001, y: 0.116452344, z: 0.035550628, w: 0}
+        rotation: {x: 0.09035023, y: 0.11229885, z: 0.6805098, w: 0.7184234}
+        scale: {x: 1.0000001, y: 0.99999994, z: 1, w: 0}
+        m_parentID: 24
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3814275338
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 24
+    m_rootIndex: 11
+    m_childrenIndices: [34]
+  - Entity: 8465162159729457626
+    m_name: toes_l
+    m_instanceID: 4028369652
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 30
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3344006846
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -6.8358705e-09, y: 0.12879811, z: 1.4506683e-08, w: 0}
+        rotation: {x: -0.258087, y: 4.071902e-08, z: 1.0877561e-08, w: 0.9661217}
+        scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+        m_parentID: 25
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 625070271
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 25
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: toes_r
+    m_instanceID: 4034946603
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 31
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 680853699
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -6.8358705e-09, y: 0.12879811, z: 4.1197685e-09, w: 0}
+        rotation: {x: -0.258087, y: 4.071902e-08, z: 1.0877561e-08, w: 0.9661217}
+        scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+        m_parentID: 26
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 833180982
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 26
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: head
+    m_instanceID: 1686581051
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 32
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3539407824
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -2.8094706e-17, y: 0.07017826, z: 1.8626451e-09, w: 0}
+        rotation: {x: -0.035646208, y: 3.589689e-15, z: 3.11629e-09, w: 0.9993645}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 27
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2342950178
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 27
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: upper_arm_l
+    m_instanceID: 4193218097
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 33
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3552409548
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -5.014706e-08, y: 0.19321232, z: 3.7252903e-09, w: 0}
+        rotation: {x: -0.14378336, y: -0.0034952613, z: -0.024049938, w: 0.9893108}
+        scale: {x: 0.99999994, y: 1.0000001, z: 0.99999994, w: 0}
+        m_parentID: 28
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 4030088003
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 28
+    m_rootIndex: 11
+    m_childrenIndices: [35]
+  - Entity: 8465162159729457626
+    m_name: upper_arm_r
+    m_instanceID: 2421401304
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 34
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 980429387
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -7.1953984e-08, y: 0.1932123, z: -7.450581e-09, w: 0}
+        rotation: {x: -0.14378339, y: 0.0034952515, z: 0.024049943, w: 0.98931074}
+        scale: {x: 0.99999994, y: 1.0000001, z: 1, w: 0}
+        m_parentID: 29
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3504124989
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 29
+    m_rootIndex: 11
+    m_childrenIndices: [36]
+  - Entity: 8465162159729457626
+    m_name: lower_arm_l
+    m_instanceID: 4143629945
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 35
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 4085171297
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -7.617287e-09, y: 0.3080001, z: -2.8833753e-09, w: 0}
+        rotation: {x: -1.743477e-08, y: 9.662447e-09, z: 0.0194442, w: 0.99981093}
+        scale: {x: 1, y: 0.99999994, z: 1, w: 0}
+        m_parentID: 33
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2152907969
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 33
+    m_rootIndex: 11
+    m_childrenIndices: [37]
+  - Entity: 8465162159729457626
+    m_name: lower_arm_r
+    m_instanceID: 1854913318
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 36
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3682300985
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 9.097159e-09, y: 0.3080001, z: 2.2724436e-09, w: 0}
+        rotation: {x: -1.8439263e-09, y: -1.101053e-08, z: -0.0194442, w: 0.99981093}
+        scale: {x: 1, y: 0.99999994, z: 1, w: 0}
+        m_parentID: 34
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 297770967
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 34
+    m_rootIndex: 11
+    m_childrenIndices: [38]
+  - Entity: 8465162159729457626
+    m_name: hand_l
+    m_instanceID: 1765017837
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 37
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3413627012
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.0010908e-07, y: 0.2571945, z: 4.3668127e-09, w: 0}
+        rotation: {x: 0.024725078, y: -0.0004808595, z: -0.019438257, w: 0.9995053}
+        scale: {x: 0.99999994, y: 1, z: 0.9999999, w: 0}
+        m_parentID: 35
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1279988817
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 35
+    m_rootIndex: 11
+    m_childrenIndices: [39, 40, 41, 42, 43]
+  - Entity: 8465162159729457626
+    m_name: hand_r
+    m_instanceID: 3599890460
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 38
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 940216970
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.5374923e-08, y: 0.25719446, z: 1.8456288e-09, w: 0}
+        rotation: {x: 0.024725078, y: 0.0004808607, z: 0.019438257, w: 0.9995053}
+        scale: {x: 0.99999994, y: 1, z: 0.9999999, w: 0}
+        m_parentID: 36
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3221397586
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 36
+    m_rootIndex: 11
+    m_childrenIndices: [44, 45, 46, 47, 48]
+  - Entity: 8465162159729457626
+    m_name: thumb_01_l
+    m_instanceID: 3130985820
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 39
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3138894749
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.0009999311, y: 0.025236432, z: -0.036292206, w: 0}
+        rotation: {x: -0.3139456, y: -0.021207396, z: 0.076353006, w: 0.94612825}
+        scale: {x: 1, y: 1, z: 1.0000001, w: 0}
+        m_parentID: 37
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 805860702
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 37
+    m_rootIndex: 11
+    m_childrenIndices: [49]
+  - Entity: 8465162159729457626
+    m_name: index_01_l
+    m_instanceID: 4110533270
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 40
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3140523973
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.003999953, y: 0.099838115, z: -0.02596821, w: 0}
+        rotation: {x: 0.00929652, y: -0.0006672723, z: -0.011342347, w: 0.99989223}
+        scale: {x: 0.99999994, y: 0.9999999, z: 1, w: 0}
+        m_parentID: 37
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3528940538
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 37
+    m_rootIndex: 11
+    m_childrenIndices: [50]
+  - Entity: 8465162159729457626
+    m_name: middle_01_l
+    m_instanceID: 3026933513
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 41
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1171913016
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 1.1328382e-07, y: 0.10277509, z: -0.007090336, w: 0}
+        rotation: {x: -0.013865688, y: -0.0003867608, z: -0.010859968, w: 0.99984485}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 37
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 4292302732
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 37
+    m_rootIndex: 11
+    m_childrenIndices: [51]
+  - Entity: 8465162159729457626
+    m_name: ring_01_l
+    m_instanceID: 845434785
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 42
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 667956978
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.0040000603, y: 0.10281469, z: 0.013933422, w: 0}
+        rotation: {x: -0.024728214, y: -0.00027482683, z: -0.011106168, w: 0.9996325}
+        scale: {x: 0.99999994, y: 0.99999994, z: 0.9999999, w: 0}
+        m_parentID: 37
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1550987216
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 37
+    m_rootIndex: 11
+    m_childrenIndices: [52]
+  - Entity: 8465162159729457626
+    m_name: pinky_01_l
+    m_instanceID: 2810829753
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 43
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3336467169
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.009000054, y: 0.09885916, z: 0.03515497, w: 0}
+        rotation: {x: -0.036910232, y: -0.00015300102, z: -0.012192006, w: 0.9992442}
+        scale: {x: 0.99999994, y: 0.99999994, z: 0.99999994, w: 0}
+        m_parentID: 37
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 328600461
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 37
+    m_rootIndex: 11
+    m_childrenIndices: [53]
+  - Entity: 8465162159729457626
+    m_name: thumb_01_r
+    m_instanceID: 1498600229
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 44
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 611679798
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.0009999312, y: 0.025236448, z: -0.036292195, w: 0}
+        rotation: {x: -0.31394556, y: 0.021207385, z: -0.076353006, w: 0.94612825}
+        scale: {x: 1, y: 1, z: 1.0000001, w: 0}
+        m_parentID: 38
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3463764687
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 38
+    m_rootIndex: 11
+    m_childrenIndices: [54]
+  - Entity: 8465162159729457626
+    m_name: index_01_r
+    m_instanceID: 537794350
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 45
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1228233207
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0.003999953, y: 0.09983813, z: -0.0259682, w: 0}
+        rotation: {x: 0.009296522, y: 0.0006672729, z: 0.011342343, w: 0.99989223}
+        scale: {x: 1.0000001, y: 0.99999994, z: 1.0000001, w: 0}
+        m_parentID: 38
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3949699399
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 38
+    m_rootIndex: 11
+    m_childrenIndices: [55]
+  - Entity: 8465162159729457626
+    m_name: middle_01_r
+    m_instanceID: 2684988484
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 46
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 4230291254
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.1317968e-07, y: 0.10277511, z: -0.007090324, w: 0}
+        rotation: {x: -0.013865688, y: 0.00038676136, z: 0.010859966, w: 0.99984485}
+        scale: {x: 1, y: 1.0000001, z: 1.0000001, w: 0}
+        m_parentID: 38
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 791258885
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 38
+    m_rootIndex: 11
+    m_childrenIndices: [56]
+  - Entity: 8465162159729457626
+    m_name: ring_01_r
+    m_instanceID: 1350118917
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 47
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3102395428
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.0040000603, y: 0.102814704, z: 0.013933449, w: 0}
+        rotation: {x: -0.024728207, y: 0.00027482765, z: 0.01110617, w: 0.9996325}
+        scale: {x: 1, y: 1.0000001, z: 0.99999994, w: 0}
+        m_parentID: 38
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1051541252
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 38
+    m_rootIndex: 11
+    m_childrenIndices: [57]
+  - Entity: 8465162159729457626
+    m_name: pinky_01_r
+    m_instanceID: 4199336621
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 48
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 62674948
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -0.009000054, y: 0.098859124, z: 0.035154965, w: 0}
+        rotation: {x: -0.036910232, y: 0.00015300173, z: 0.012192006, w: 0.9992442}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 38
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 4091246443
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 38
+    m_rootIndex: 11
+    m_childrenIndices: [58]
+  - Entity: 8465162159729457626
+    m_name: thumb_02_l
+    m_instanceID: 1059197160
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 49
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 199608477
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 4.5642256e-08, y: 0.03049587, z: -8.195639e-08, w: 0}
+        rotation: {x: 0.13002595, y: 0.012355375, z: -0.024883457, w: 0.9911213}
+        scale: {x: 0.99999994, y: 0.9999999, z: 0.9999999, w: 0}
+        m_parentID: 39
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2976273201
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 39
+    m_rootIndex: 11
+    m_childrenIndices: [59]
+  - Entity: 8465162159729457626
+    m_name: index_02_l
+    m_instanceID: 3486289821
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 50
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1006272235
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -5.4300763e-08, y: 0.04411351, z: -4.8894435e-09, w: 0}
+        rotation: {x: -0.017913383, y: -0.00023862603, z: -0.0047540595, w: 0.9998282}
+        scale: {x: 1, y: 1.0000001, z: 0.99999994, w: 0}
+        m_parentID: 40
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 163852942
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 40
+    m_rootIndex: 11
+    m_childrenIndices: [60]
+  - Entity: 8465162159729457626
+    m_name: middle_02_l
+    m_instanceID: 2872046752
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 51
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2807726097
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 1.3492536e-07, y: 0.046021726, z: -4.0745363e-09, w: 0}
+        rotation: {x: 0.0038299619, y: -9.800593e-05, z: -0.003833985, w: 0.99998534}
+        scale: {x: 1, y: 1, z: 1.0000001, w: 0}
+        m_parentID: 41
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1864563339
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 41
+    m_rootIndex: 11
+    m_childrenIndices: [61]
+  - Entity: 8465162159729457626
+    m_name: ring_02_l
+    m_instanceID: 1540787157
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 52
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 263819849
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 6.611647e-08, y: 0.045011174, z: 1.8480216e-08, w: 0}
+        rotation: {x: 0.015139271, y: -6.107836e-05, z: -0.0040355213, w: 0.99987733}
+        scale: {x: 0.9999999, y: 1, z: 1, w: 0}
+        m_parentID: 42
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2039131894
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 42
+    m_rootIndex: 11
+    m_childrenIndices: [62]
+  - Entity: 8465162159729457626
+    m_name: pinky_02_l
+    m_instanceID: 2544701039
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 53
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1683826920
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.7186498e-07, y: 0.041024398, z: 1.6298145e-09, w: 0}
+        rotation: {x: 0.012188679, y: 5.4454656e-05, z: -0.004465693, w: 0.99991584}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 43
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1831682517
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 43
+    m_rootIndex: 11
+    m_childrenIndices: [63]
+  - Entity: 8465162159729457626
+    m_name: thumb_02_r
+    m_instanceID: 1535612455
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 54
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3575897623
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -6.054342e-08, y: 0.030495834, z: 7.450581e-09, w: 0}
+        rotation: {x: 0.13002595, y: -0.012355379, z: 0.02488346, w: 0.9911213}
+        scale: {x: 0.99999994, y: 1.0000001, z: 1.0000001, w: 0}
+        m_parentID: 44
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1936702380
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 44
+    m_rootIndex: 11
+    m_childrenIndices: [64]
+  - Entity: 8465162159729457626
+    m_name: index_02_r
+    m_instanceID: 3134057229
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 55
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2224750104
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 1.6603688e-07, y: 0.04411354, z: -5.5879354e-09, w: 0}
+        rotation: {x: -0.017913383, y: 0.00023862634, z: 0.0047540604, w: 0.9998282}
+        scale: {x: 1, y: 1.0000001, z: 0.99999994, w: 0}
+        m_parentID: 45
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2206013956
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 45
+    m_rootIndex: 11
+    m_childrenIndices: [65]
+  - Entity: 8465162159729457626
+    m_name: middle_02_r
+    m_instanceID: 2777658606
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 56
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2431140414
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.758535e-08, y: 0.046021752, z: -1.3969839e-08, w: 0}
+        rotation: {x: 0.0038299607, y: 9.800613e-05, z: 0.003833985, w: 0.99998534}
+        scale: {x: 1, y: 0.99999994, z: 1.0000001, w: 0}
+        m_parentID: 46
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2640673763
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 46
+    m_rootIndex: 11
+    m_childrenIndices: [66]
+  - Entity: 8465162159729457626
+    m_name: ring_02_r
+    m_instanceID: 2641936923
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 57
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1384050071
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -6.053459e-08, y: 0.04501119, z: 1.8518191e-09, w: 0}
+        rotation: {x: 0.015139266, y: 6.1078565e-05, z: 0.0040355152, w: 0.99987733}
+        scale: {x: 0.99999994, y: 1, z: 1, w: 0}
+        m_parentID: 47
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3961963326
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 47
+    m_rootIndex: 11
+    m_childrenIndices: [67]
+  - Entity: 8465162159729457626
+    m_name: pinky_02_r
+    m_instanceID: 1306331422
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 58
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 76042354
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 5.449145e-08, y: 0.041024353, z: -2.3690518e-08, w: 0}
+        rotation: {x: 0.012188682, y: -5.4454467e-05, z: 0.0044656903, w: 0.99991584}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 48
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 24249633
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 48
+    m_rootIndex: 11
+    m_childrenIndices: [68]
+  - Entity: 8465162159729457626
+    m_name: thumb_03_l
+    m_instanceID: 4184000716
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 59
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3114408813
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 1.2177601e-07, y: 0.030822108, z: 5.2154064e-08, w: 0}
+        rotation: {x: -0.045345392, y: 0.012588594, z: -0.03190528, w: 0.9983824}
+        scale: {x: 0.99999994, y: 0.9999998, z: 0.9999999, w: 0}
+        m_parentID: 49
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3246390750
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 49
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: index_03_l
+    m_instanceID: 4109268475
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 60
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 908526754
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.5534414e-07, y: 0.031032419, z: 3.4924597e-10, w: 0}
+        rotation: {x: -0.001413079, y: 0.0004967783, z: 0.016113909, w: 0.99986905}
+        scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+        m_parentID: 50
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2445682395
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 50
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: middle_03_l
+    m_instanceID: 1931749618
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 61
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3467330467
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.702283e-07, y: 0.034029633, z: -2.0954758e-09, w: 0}
+        rotation: {x: 0.00045144782, y: 0.00043866163, z: 0.014695237, w: 0.9998918}
+        scale: {x: 0.99999994, y: 0.99999994, z: 1, w: 0}
+        m_parentID: 51
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1386610984
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 51
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: ring_03_l
+    m_instanceID: 1032098574
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 62
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 4018086392
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 4.8529767e-08, y: 0.033030435, z: -6.6356733e-09, w: 0}
+        rotation: {x: -0.015137653, y: 0.00022935541, z: 0.015143473, w: 0.9997707}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 52
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 665497282
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 52
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: pinky_03_l
+    m_instanceID: 1884238876
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 63
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3979452550
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 2.8585299e-09, y: 0.030016601, z: 5.013693e-09, w: 0}
+        rotation: {x: -1.226998e-09, y: 4.745578e-08, z: 0.016658535, w: 0.99986124}
+        scale: {x: 0.9999999, y: 0.99999994, z: 1, w: 0}
+        m_parentID: 53
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3430689684
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 53
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: thumb_03_r
+    m_instanceID: 600819556
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 64
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1636721303
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 1.2448803e-07, y: 0.03082207, z: 7.450581e-09, w: 0}
+        rotation: {x: -0.045345433, y: -0.012588583, z: 0.031905286, w: 0.9983824}
+        scale: {x: 0.99999994, y: 0.9999997, z: 0.99999994, w: 0}
+        m_parentID: 54
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2830938427
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 54
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: index_03_r
+    m_instanceID: 4027045915
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 65
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1262796100
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 2.4958979e-08, y: 0.031032331, z: -4.4237822e-09, w: 0}
+        rotation: {x: -0.001413079, y: -0.0004967794, z: -0.016113909, w: 0.99986905}
+        scale: {x: 1, y: 0.99999994, z: 0.99999994, w: 0}
+        m_parentID: 55
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 3718473296
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 55
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: middle_03_r
+    m_instanceID: 3722467203
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 66
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1548602016
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 4.7293724e-08, y: 0.03402954, z: -0, w: 0}
+        rotation: {x: 0.0004514492, y: -0.00043866248, z: -0.014695235, w: 0.9998918}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 56
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2968272321
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 56
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: ring_03_r
+    m_instanceID: 2488019214
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 67
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 4161624981
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 6.135058e-08, y: 0.033030406, z: 8.614734e-09, w: 0}
+        rotation: {x: -0.015137652, y: -0.00022935634, z: -0.015143468, w: 0.9997707}
+        scale: {x: 1.0000001, y: 1.0000001, z: 1, w: 0}
+        m_parentID: 57
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 1516393565
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 57
+    m_rootIndex: 11
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: pinky_03_r
+    m_instanceID: 4043962670
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 68
+    m_collisionType: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layer: Default
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 915097937
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: -1.258009e-07, y: 0.030016689, z: 1.6436765e-09, w: 0}
+        rotation: {x: -1.5372728e-09, y: -4.8469385e-08, z: -0.016658537, w: 0.99986124}
+        scale: {x: 0.9999998, y: 0.99999994, z: 1, w: 0}
+        m_parentID: 58
+      - BoneComponent: 1488742951885702090
+        m_typeUUID: 1dcdf030-472b-4f67-a410-a602b52900a1
+        m_name: BoneComponent
+        m_instanceID: 2903195861
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+    m_isStatic: false
+    m_parentIndex: 58
+    m_rootIndex: 11
+    m_childrenIndices: []
+m_buildIndex: 0
+m_sceneName: FT_Primitives
+m_requiredLoadAssetsBundle:
+  name: ""
+  path: ""
+  assets: ~

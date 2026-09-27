@@ -1,6 +1,7 @@
 #include "Animator.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AnimatorSystem.h"
+#include "AnimationScheduler.h"
 #include "TransCondition.h"
 #include "AniTransition.h"
 #include "AnimationState.h"
@@ -9,14 +10,32 @@
 #include "ReflectionYml.h"
 #include "DataSystem.h"
 #include "AnimationController.h"
-#include "RenderScene.h"
 #include "../RenderEngine/BoneRegion.h"
 #include "SceneManager.h"
 #include "Socket.h"
 #include "../RenderEngine/Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8
+#include <algorithm>
+#include <cassert>
+
+Animator::Animator() : m_instance(AnimatorSystems->CreateInstance()) {}
+
+AnimInstance& Animator::GetInstance() noexcept
+{
+    AnimInstance* instance = AnimatorSystems->ResolveInstance(m_instance);
+    assert(instance);
+    return *instance;
+}
+
+const AnimInstance& Animator::GetInstance() const noexcept
+{
+    const AnimInstance* instance = AnimatorSystems->ResolveInstance(m_instance);
+    assert(instance);
+    return *instance;
+}
 
 Animator::~Animator()
 {
+	AnimatorSystems->DestroyInstance(m_instance);
 	m_animationControllers.clear();
 
 	{
@@ -165,10 +184,45 @@ void Animator::EnsureAnimationBinding()
 }
 
 void Animator::BindModelGeneration(
-	std::shared_ptr<const assets::ModelAssetGeneration> generation)
+    std::shared_ptr<const assets::ModelAssetGeneration> generation)
 {
+	auto& instance = GetInstance();
+	instance.layerTrackTables.clear();
+	instance.layerMaskCaches.clear();
+	instance.layerSelected.clear();
+	instance.poseGlobals.clear();
+	instance.ikBindings.clear();
+	instance.ikSnapshots.clear();
+	instance.boneTransformBindings.clear();
+	instance.boneTransformSnapshots.clear();
+	instance.workerPoseBufferCount = 0;
+	instance.workerPosePoolIdentity = 0;
+	instance.workerCurrentStorage = {};
+	instance.pose.Clear();
+	instance.l6PreviousPose.Clear();
+	instance.l6LatestPose.Clear();
+	instance.l6PreviousLocals.clear();
+	instance.l6LatestLocals.clear();
+	instance.l6PreviousFinals.clear();
+	instance.l6LatestFinals.clear();
+	instance.l6PreviousGlobals.clear();
+	instance.l6LatestGlobals.clear();
+	instance.l6PublishedAlpha = 1.f;
+	instance.blendRecoverySourcePose.Clear();
+	instance.l6Seeded = false;
+	instance.l6NextPhase = 0;
+	instance.l6ClipIndex = -1;
+	instance.l6ControllerSlot = -1;
+	instance.bindLocals.clear();
+	instance.bindSkeletonSerial = 0;
+	instance.blendRecoveryPending = false;
+	instance.blendRecoveryActive = false;
+	instance.localTransforms.clear();
+	instance.finalTransforms.clear();
+	for (auto& slot : instance.samplingCursors)
+		for (auto& cursor : slot) cursor.Clear();
 	m_modelGeneration.reset();
-	m_boneRegions.clear();
+	instance.boneRegions.clear();
 	if (!generation) return;
 	if (generation->Identity().modelId != m_Motion.m_guid) return;
 	const assets::ModelSkeletonAsset* skeleton = generation->Skeleton();
@@ -177,7 +231,7 @@ void Animator::BindModelGeneration(
 	{
 		return;
 	}
-	m_boneRegions = DeriveTypedBoneRegions(*skeleton);
+	instance.boneRegions = DeriveTypedBoneRegions(*skeleton);
 	m_modelGeneration = std::move(generation);
 }
 
@@ -315,39 +369,36 @@ BoneMask* Animator::BuildAvatarBoneMasks(AvatarMask& mask,
 		});
 }
 
-void Animator::OnInitialized()
-{
-	auto renderScene = SceneManagers->GetRenderScene();
-	if (renderScene)
-	{
-		renderScene->RegisterAnimator(this);
-	}
-}
-
-void Animator::OnUninitializing()
-{
-	auto scene = GetOwner()->m_ownerScene;
-	auto renderScene = SceneManagers->GetRenderScene();
-	if (renderScene)
-	{
-		renderScene->UnregisterAnimator(this);
-	}
-}
-
-// 트랙 C3 — AnimatorSystem 등록/해지. OnInitialized/OnUninitializing(컴포넌트당 1회 게이트)이
-// 아니라 씬 편입/이탈 훅을 쓰는 이유는 AnimatorSystem.h 상단 주석 참조 — DDOL
-// 오브젝트가 씬을 건널 때도 매번 다시 불려야 하기 때문이다. 실제 파괴 경로
-// (Scene::FlushPendingDestroy)??OnUninitializing 직전??
-// OnRemovingFromScene을 먼저 부르므로, 이 시스템에서 빠지는 시점이 항상 실
-// 파괴보다 먼저다.
+// Scene 편입/이탈은 첫 생성과 DDOL 재부착에 모두 호출된다. AnimationScheduler의
+// raw Animator* 등록도 이 수명 경계를 따라야 씬 언로드 후 다시 채워진다.
 void Animator::OnAddedToScene()
 {
 	AnimatorSystems->Register(this);
+	SceneManagers->GetAnimationScheduler().RegisterAnimator(this);
 }
 
 void Animator::OnRemovingFromScene()
 {
+	SceneManagers->GetAnimationScheduler().UnregisterAnimator(this);
 	AnimatorSystems->Unregister(this);
+}
+
+void Animator::OnPropertyChanged(std::string_view propertyName,
+    Meta::PropertyChangeSource source)
+{
+    Component::OnPropertyChanged(propertyName, source);
+    if (propertyName == "m_AnimIndexChosen")
+        SetSelectedClipIndex(m_AnimIndexChosen);
+}
+
+bool Animator::IsDirectEditorPreview() const
+{
+    return !SceneManagers->IsGameStart() && GetInstance().editorPreviewActive;
+}
+
+bool Animator::UsesMultipleControllers() const
+{
+    return m_animationControllers.size() >= 2 && !IsDirectEditorPreview();
 }
 
 void Animator::SetAnimation(int index)
@@ -375,8 +426,8 @@ void Animator::UpdateAnimation()
 		m_AnimIndex = static_cast<int>(clipCount) - 1;
 	}
 
-	m_AnimIndexChosen = m_AnimIndex;
-	m_TimeElapsed = 0;
+	SetSelectedClipIndex(static_cast<uint32_t>(m_AnimIndex));
+	GetInstance().timeElapsed = 0;
 	
 }
 
@@ -512,6 +563,7 @@ void Animator::ClearControllersAndParams()
 		delete p;  
 	}
 	Parameters.clear();
+	NotifyParameterLayoutChanged();
 }
 
 void Animator::DeleteParameter(int index)
@@ -538,6 +590,7 @@ void Animator::DeleteParameter(int index)
 		}
 		delete Parameters[index];
 		Parameters.erase(Parameters.begin() + index);
+		NotifyParameterLayoutChanged();
 	}
 }
 
@@ -582,11 +635,12 @@ ConditionParameter* Animator::AddDefaultParameter(ValueType vType)
 	{
 		std::unique_lock lock(m_paramMutex);
 		Parameters.push_back(newParameter);
+		NotifyParameterLayoutChanged();
 	}
 	return newParameter;
 }
 
-ConditionParameter* Animator::FindParameter(std::string valueName)
+ConditionParameter* Animator::FindParameter(std::string_view valueName)
 {
 	std::unique_lock lock(m_paramMutex);
 	for (const auto parameter : Parameters)
@@ -599,6 +653,57 @@ ConditionParameter* Animator::FindParameter(std::string valueName)
 	return nullptr; 
 }
 
+bool Animator::ConvertLegacyAvatarMask(AvatarMask& mask)
+{
+	if (!mask.isHumanoid) return true;
+	const assets::ModelSkeletonAsset* skeleton = TypedSkeleton();
+	const auto& boneRegions = GetInstance().boneRegions;
+	if (!skeleton || boneRegions.size() != skeleton->bones.size()) return false;
+	if (mask.m_BoneMasks.empty())
+		mask.RootMask = BuildAvatarBoneMasks(mask);
+	if (mask.m_BoneMasks.size() != skeleton->bones.size()) return false;
+
+	// Resolve every entry before changing the mask. A partial or stale tree
+	// remains readable through its legacy flags instead of silently losing bones.
+	std::vector<float> weights;
+	weights.reserve(mask.m_BoneMasks.size());
+	std::vector<bool> matched(skeleton->bones.size(), false);
+	for (const BoneMask* boneMask : mask.m_BoneMasks)
+	{
+		if (!boneMask) return false;
+		auto found = std::find_if(skeleton->bones.begin(), skeleton->bones.end(),
+			[&](const auto& bone) { return bone.name == boneMask->boneName; });
+		if (found == skeleton->bones.end()) return false;
+		const std::size_t boneIndex = static_cast<std::size_t>(found - skeleton->bones.begin());
+		if (matched[boneIndex]) return false;
+		matched[boneIndex] = true;
+		weights.push_back(mask.IsBoneEnabled(
+			static_cast<BoneRegion>(boneRegions[boneIndex])) ? 1.f : 0.f);
+	}
+	for (std::size_t i = 0; i < mask.m_BoneMasks.size(); ++i)
+	{
+		mask.m_BoneMasks[i]->isEnabled = true;
+		mask.m_BoneMasks[i]->weight = weights[i];
+	}
+	mask.isHumanoid = false;
+	return true;
+}
+
+std::size_t Animator::FindParameterIndex(std::string_view valueName) const
+{
+	std::lock_guard lock(m_paramMutex);
+	for (std::size_t i = 0; i < Parameters.size(); ++i)
+		if (Parameters[i] && Parameters[i]->name == valueName) return i;
+	return static_cast<std::size_t>(-1);
+}
+
+ConditionParameter* Animator::ParameterAt(std::size_t index) const noexcept
+{
+	// AnimatorSystem updates states on the game thread. Parameter structural
+	// edits also occur there; the cached index is never a raw owning pointer.
+	return index < Parameters.size() ? Parameters[index] : nullptr;
+}
+
 
 
 
@@ -606,6 +711,7 @@ ConditionParameter* Animator::FindParameter(std::string valueName)
 void Animator::OnDeserialized(const Authoring::NodeView& view)
 {
 	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
+	SetSelectedClipIndex(m_AnimIndexChosen);
 	// CT6-d: 구 ComponentFactory Animator 분기 이동(동작·순서 보존).
 	// Parameters·m_animationControllers는 포인터 원소 벡터라 typed 역직렬화가
 	// 건드리지 않는다 — 여기의 수동 복원이 실채움이다.
@@ -739,9 +845,22 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 						for (const auto boneMask : boneMaskNode)
 						{
-							BoneMask* newboneMask = new BoneMask();
-							Meta::Deserialize(newboneMask, boneMask);
-							avatarMask.m_BoneMasks[i]->isEnabled = newboneMask->isEnabled;
+							BoneMask authored;
+							Meta::Deserialize(&authored, boneMask);
+							BoneMask* target = nullptr;
+							if (!authored.boneName.empty())
+							{
+								for (BoneMask* candidate : avatarMask.m_BoneMasks)
+									if (candidate && candidate->boneName == authored.boneName)
+									{ target = candidate; break; }
+							}
+							else if (i < static_cast<int>(avatarMask.m_BoneMasks.size()))
+								target = avatarMask.m_BoneMasks[i]; // legacy index-only scene
+							if (target)
+							{
+								target->isEnabled = authored.isEnabled;
+								target->weight = authored.weight;
+							}
 							i++;
 						}
 					}
@@ -806,6 +925,11 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 			m_animationControllers.push_back(animationController);
 		}
 	}
+}
+
+void Animator::OnBeforeSerialize()
+{
+	m_AnimIndexChosen = GetSelectedClipIndex();
 }
 
 void Animator::OnAfterSerialize(const Authoring::MutableNodeView& view)

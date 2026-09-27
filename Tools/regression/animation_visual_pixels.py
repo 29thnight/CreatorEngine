@@ -39,13 +39,14 @@ def main(work):
               and manifest["sealLedger"]["textureUploadFailures"] == 0)
         skin_draws = [d for d in manifest["draws"] if d["modelId"] == report["modelId"]]
         marker_draws = [d for d in manifest["draws"] if d["meshId"] == report["markerMeshId"]]
+        unobserved = name.startswith("unobserved")
         if name == "hidden":
             check("hidden/no-fixture-draws", len(manifest["draws"]) == 0)
         else:
             check(f"{name}/skinned-draws", len(skin_draws) == 4 and report["skinnedMeshes"] == 4)
-            check(f"{name}/disabled-background-meshes", len(manifest["draws"]) == len(skin_draws) + 1)
-            check(f"{name}/marker-draw", len(marker_draws) == 1)
-            if marker_draws:
+            check(f"{name}/disabled-background-meshes", len(manifest["draws"]) == len(skin_draws) + (0 if unobserved else 1))
+            check(f"{name}/marker-draw", len(marker_draws) == (0 if unobserved else 1))
+            if marker_draws and not unobserved:
                 actual = np.array(marker_draws[0]["world"])[12:15]
                 expected = np.array([report["x"], report["y"], report["z"]])
                 check(f"{name}/socket-proxy-position", np.max(np.abs(actual - expected)) < 0.002)
@@ -54,14 +55,15 @@ def main(work):
         captures[name] = dict(manifest=manifest, pixels=pixels, report=report, image=image)
 
     expected_names = {"a", "a-repeat", "b", "next", "blend0", "blendhalf", "blend1",
-                      "layer", "layerdisabled", "masked", "upper", "hidden", "show"}
+                      "layer", "layerdisabled", "masked", "upper", "additive", "hidden", "show",
+                      "unobservedA", "unobservedB"}
     check("all-captures", set(captures) == expected_names)
     metrics = {"equivalent": {}, "different": {}, "markers": {}}
     marker_bounds = {}
     reference_worlds = {d["meshId"]: d["world"] for d in captures["a"]["manifest"]["draws"]
                         if d["modelId"] == captures["a"]["report"]["modelId"]}
     for name, capture in captures.items():
-        if name == "hidden":
+        if name == "hidden" or name.startswith("unobserved"):
             continue
         m, p, report = capture["manifest"], capture["pixels"], capture["report"]
         check(f"{name}/stationary-model-root", all(np.allclose(d["world"], reference_worlds[d["meshId"]],
@@ -99,14 +101,15 @@ def main(work):
         check(f"{left}={right}/later-frame", captures[left]["manifest"]["frameId"] < captures[right]["manifest"]["frameId"])
 
     for pair in (("a", "a-repeat"), ("a", "blend0"), ("next", "blend1"),
-                 ("next", "layer"), ("a", "layerdisabled"), ("a", "masked"), ("upper", "show")):
+                 ("next", "layer"), ("a", "layerdisabled"), ("a", "masked"), ("additive", "show")):
         equivalent(*pair)
 
     background = captures["hidden"]["pixels"]["depth"]
-    for name in ("a", "b", "next", "blendhalf", "upper"):
+    for name in ("a", "b", "next", "blendhalf", "upper", "additive"):
         coverage = int(np.any(np.abs(captures[name]["pixels"]["depth"] - background) > 1e-5, axis=2).sum())
         check(f"{name}/visible-geometry", coverage > 400)
-    for left, right in (("a", "b"), ("a", "blendhalf"), ("next", "blendhalf"), ("a", "upper")):
+    for left, right in (("a", "b"), ("a", "blendhalf"), ("next", "blendhalf"),
+                        ("a", "upper"), ("a", "additive")):
         a, b = captures[left]["pixels"]["depth"], captures[right]["pixels"]["depth"]
         changed = np.any(np.abs(a - b) > 1e-5, axis=2)
         # A moving cube alone cannot pass a skinned-mesh animation check.
@@ -118,15 +121,32 @@ def main(work):
         check(f"{left}!={right}/skin-depth", count > 100)
         check(f"{left}!={right}/palette", captures[left]["report"]["paletteDigest"] != captures[right]["report"]["paletteDigest"])
 
+    for name in ("unobservedA", "unobservedB"):
+        report = captures[name]["report"]
+        check(f"{name}/zero-observed-bones", report["observedBones"] == 0
+              and report["projectedBones"] == 0 and report["localWrites"] == 0)
+        check(f"{name}/palette-published", report["paletteChanged"] and report["paletteDirty"] >= 4)
+        coverage = int(np.any(np.abs(captures[name]["pixels"]["depth"] - background) > 1e-5, axis=2).sum())
+        check(f"{name}/visible-skin", coverage > 400)
+    no_a = captures["unobservedA"]["pixels"]["depth"]
+    no_b = captures["unobservedB"]["pixels"]["depth"]
+    no_change = int(np.any(np.abs(no_a - no_b) > 1e-5, axis=2).sum())
+    check("unobserved/skin-depth-advances", no_change > 100)
+    check("unobserved/palette-advances",
+          captures["unobservedA"]["report"]["paletteDigest"]
+          != captures["unobservedB"]["report"]["paletteDigest"])
+
     # Contact sheet contains the actual GPU display readbacks, with labels only.
     labels = [("a", "Walk / 15%"), ("b", "Walk / 70%"), ("next", "Run / 65%"),
               ("blend0", "Blend / 0%"), ("blendhalf", "Blend / 50%"), ("blend1", "Blend / 100%"),
               ("layer", "Overlay enabled"), ("layerdisabled", "Overlay disabled"), ("masked", "All layers masked"),
-              ("upper", "Upper body overlay"), ("hidden", "Hidden"), ("show", "Visible again")]
+              ("upper", "Upper body overlay"), ("additive", "Additive overlay"),
+              ("hidden", "Hidden"), ("show", "Visible again"),
+              ("unobservedA", "No exposed bone / 15%"), ("unobservedB", "No exposed bone / 70%")]
     cell_w = 400
     source_w, source_h = captures["a"]["image"].size
     cell_h = round(source_h * cell_w / source_w)
-    sheet = Image.new("RGB", (cell_w * 3, (cell_h + 30) * 4), "#151920")
+    sheet = Image.new("RGB", (cell_w * 3, (cell_h + 30) * 6), "#151920")
     draw = ImageDraw.Draw(sheet)
     for index, (name, label) in enumerate(labels):
         x, y = index % 3 * cell_w, index // 3 * (cell_h + 30)

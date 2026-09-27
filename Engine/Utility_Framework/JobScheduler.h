@@ -74,6 +74,9 @@ class job_scheduler
     // Dependencies must belong to this scheduler. Failed prerequisites skip the
     // dependent body and propagate the error. Waiting graphs occupy no workers.
     job_handle submit_after(std::span<const job_handle> dependencies, job_group group);
+    // One callback is shared by an indexed batch. No per-index task vector is
+    // built; callers keep captured storage alive until the handle completes.
+    job_handle submit_indexed(std::size_t count, std::function<void(std::size_t)> task);
     job_handle parallel_for(std::size_t count, std::size_t grain, std::function<void(std::size_t, std::size_t)> task);
 
   private:

@@ -1,20 +1,22 @@
 #pragma once
 #include "Component.h"
+#include "EntityHandle.h"
+#include <mathematics/matrix4x4.hpp>
 
 // 저장된 GameObjectType::Bone 판정을 컴포넌트 질의로 옮기는 마커(트랙 E,
 // E7-b). Scene::UpdateModelRecursive의 Bone 분기가 "이 오브젝트가 뼈인가"를
 // 저장된 enum이 아니라 이 컴포넌트의 보유 여부(HasComponent<BoneComponent>())로
 // 판정한다. E7-c 이후 m_gameObjectType은 구파일 YAML 승격 입력으로만 남는다.
 //
-// ── reflect()가 로컬 필드를 하나도 안 두는 이유 ──
+// ── 뼈 인덱스는 직렬화하지 않는다 ──
 //
 // 뼈 인덱스는 Skeleton::m_bones 안에서의 위치이고, 이 값은 모델(스켈레톤
 // 애셋)이 정하는 파생값이다. 저장해 두면 모델을 바꿔 끼운 뒤 죽은 인덱스로
 // 애니메이션이 엉뚱한 뼈를 움직이거나 범위를 벗어나 읽는다 — 그래서 이
-// 컴포넌트는 직렬화할 로컬 필드가 없다(schema<Self>()가 빈 로컬 스키마를
-// 돌려주고, 기반 Component::m_FileID만 상속 질의로 계속 나온다).
+// 컴포넌트는 관측 고정 설정 m_bPinned만 직렬화한다. 인덱스와 런타임 관측
+// 상태는 다시 구할 수 있으므로 저장하지 않는다.
 //
-// ── m_boneIndex·m_resolvedFor는 반대로 직렬화하면 안 되는 런타임 캐시다 ──
+// ── m_boneIndex·m_resolvedSerial은 직렬화하면 안 되는 런타임 캐시다 ──
 //
 // Skeleton::FindBone(문자열 선형 탐색, RenderEngine/Skeleton.cpp)을 매 프레임
 // 다시 돌지 않으려고 여기 담아 둔다. 저작 자산에 Bone 노드가 744개
@@ -30,29 +32,27 @@
 class BoneComponent : public meta::identity<BoneComponent, Component>
 {
    public:
-   // ★ 필드 0 · 메서드 1인 이유 — 둘 다 강제된 결과다.
-   //
-   //   필드가 0인 것은 위에 적은 대로 뼈 인덱스가 파생값이라 저장하면 안 되기
-   //   때문이고, 그렇다고 스키마를 통째로 비울 수는 없다: meta::adapt<T>()가
-   //   `field_count > 0 || method_count > 0`을 static_assert로 막는다
-   //   (Utility_Framework/ReflectionMeta.h:105 — "빈 서술은 지원하지 않는다").
-   //   Meta::Register<BoneComponent>()가 그 adapt를 타므로, 등록하는 순간
-   //   빈 스키마는 컴파일 자체가 안 된다.
-   //
-   //   그래서 UIButton·SoundComponent와 같은 MethodOnly 형태를 쓴다 — 메서드만
-   //   싣고 필드는 0. 직렬화 노드에는 타입 태그만 남고 값은 실리지 않는다.
+   // m_bPinned는 저작 설정이며, bone index/serial/owner와 자동 승격은
+   // 현재 scene 및 skeleton에 종속된 런타임 캐시다.
    static consteval auto reflect()
    {
        return meta::schema<Self>(
+           meta::field<&Self::m_bPinned>,
            meta::method<&Self::GetResolvedBoneIndex>.readOnlyInInspector());
    }
 public:
     BoneComponent() = default;
     virtual ~BoneComponent() = default;
 
-    // 지금 캐시에 담긴 뼈 인덱스(-1이면 아직 못 풀었음). 진단용이자 위 reflect()가
-    // 요구하는 최소 한 개의 서술 항목이다.
+    // 지금 캐시에 담긴 뼈 인덱스(-1이면 아직 못 풀었음). 진단용이다.
     int GetResolvedBoneIndex() { return m_boneIndex; }
+    [[nodiscard]] math::matrix4x4 GetWorldTransform() const;
+
+    // Explicit gameplay observation survives scene save/load. Automatic
+    // promotion is runtime-only and is reset when the component is recreated.
+    bool m_bPinned{ false };
+    bool m_runtimeObserved{ false };
+    EntityHandle m_animatorOwner{};
 
     // 마지막 binding의 FindBone 결과. -1은 아직 안 풀렸거나 그 skeleton에 없는
     // 본이라는 뜻이다. m_resolvedSerial이 같으면 negative 결과도 다시 찾지 않는다.

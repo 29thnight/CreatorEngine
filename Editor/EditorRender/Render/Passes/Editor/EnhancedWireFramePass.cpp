@@ -107,7 +107,8 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     return true;
 }
 
-void EnhancedWireFramePass::CollectDraws(const std::vector<EnhancedDrawItem>* draws)
+void EnhancedWireFramePass::CollectDraws(const EnhancedFrameContext& context,
+    const std::vector<EnhancedDrawItem>* draws)
 {
     if (nullptr == draws) return;
 
@@ -144,17 +145,20 @@ void EnhancedWireFramePass::CollectDraws(const std::vector<EnhancedDrawItem>* dr
         {
             if (m_boneOffsets.find(draw.animatorKey) == m_boneOffsets.end())
             {
-                const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
-                m_bonePalettes.resize(offset + draw.boneCount);
-
-                // HLSL이 열 우선으로 읽으므로 전치해 둔다. world 행렬과 같은
-                // 규약이다 — 본만 다른 규약으로 올리면 팔다리가 날아간다.
-                for (uint32_t i = 0; i < draw.boneCount; ++i)
+                if (context.animationPalettes)
                 {
-                    m_bonePalettes[offset + i] = math::transpose(draw.bonePalette[i]);
+                    const auto& shared = context.animationPalettes->Offsets();
+                    if (const auto found = shared.find(draw.animatorKey); found != shared.end())
+                        m_boneOffsets.emplace(draw.animatorKey, found->second);
                 }
-
-                m_boneOffsets.emplace(draw.animatorKey, offset);
+                else
+                {
+                    const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
+                    m_bonePalettes.resize(offset + draw.boneCount);
+                    for (uint32_t i = 0; i < draw.boneCount; ++i)
+                        m_bonePalettes[offset + i] = PackedBoneMatrix::From(draw.bonePalette[i]);
+                    m_boneOffsets.emplace(draw.animatorKey, offset);
+                }
             }
             ++m_lastSkinnedCount;
         }
@@ -186,8 +190,8 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
     }
 
     // 두 큐를 다 그린다 — 와이어프레임은 deferred/forward 구분이 없다.
-    CollectDraws(context.draws);
-    CollectDraws(context.forwardDraws);
+    CollectDraws(context, context.draws);
+    CollectDraws(context, context.forwardDraws);
 
     if (m_batches.empty()) return true;
 
@@ -218,8 +222,10 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
                 instance.boneOffset = kNoSkinning;
                 if (nullptr != draw.bonePalette && 0 != draw.boneCount)
                 {
-                    const auto found = m_boneOffsets.find(draw.animatorKey);
-                    if (found != m_boneOffsets.end()) instance.boneOffset = found->second;
+                    const auto& offsets = context.animationPalettes
+                        ? context.animationPalettes->Offsets() : m_boneOffsets;
+                    const auto found = offsets.find(draw.animatorKey);
+                    if (found != offsets.end()) instance.boneOffset = found->second;
                 }
 
                 ++batch.count;
@@ -349,25 +355,27 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
 
             // 팔레트가 없어도 t1은 꽂는다. 스킨드가 없는 프레임에서도 루트
             // SRV가 비면 검증 레이어가 잡는다(GBuffer에서 겪은 것과 같다).
-            const uint64_t paletteBytes = m_bonePalettes.empty()
-                ? sizeof(math::matrix4x4)
-                : sizeof(math::matrix4x4) * static_cast<uint64_t>(m_bonePalettes.size());
-
-            const auto paletteUpload = context.resources->AllocateUpload(
-                RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-                    sizeof(math::matrix4x4) });
-            if (!paletteUpload.IsValid()) return;
-
-            if (m_bonePalettes.empty())
-            {
-                const math::matrix4x4 identity = math::matrix4x4::identity();
-                memcpy(paletteUpload.cpuAddress, &identity, sizeof(identity));
-            }
+            RHIBufferSlice paletteUpload{};
+            if (context.animationPalettes)
+                paletteUpload = context.animationPalettes->Upload();
             else
             {
-                memcpy(paletteUpload.cpuAddress, m_bonePalettes.data(),
+                const uint64_t paletteBytes = m_bonePalettes.empty()
+                    ? sizeof(PackedBoneMatrix)
+                    : sizeof(PackedBoneMatrix) * static_cast<uint64_t>(m_bonePalettes.size());
+                paletteUpload = context.resources->AllocateUpload(
+                    RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
+                        sizeof(PackedBoneMatrix) });
+                if (!paletteUpload.IsValid()) return;
+                if (m_bonePalettes.empty())
+                {
+                    const PackedBoneMatrix identity = PackedBoneMatrix::Identity();
+                    memcpy(paletteUpload.cpuAddress, &identity, sizeof(identity));
+                }
+                else memcpy(paletteUpload.cpuAddress, m_bonePalettes.data(),
                     static_cast<size_t>(paletteBytes));
             }
+            if (!paletteUpload.IsValid()) return;
 
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);

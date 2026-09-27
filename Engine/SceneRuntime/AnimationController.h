@@ -4,11 +4,15 @@
 #include "ConditionParameter.h"
 #include "AnimationState.h"
 #include "AvatarMask.h"
+#include "AnimatorSystem.h"
+#include "../RenderEngine/LocalPose.h"
 #include <mathematics/matrix4x4.hpp>
+#include <cstdint>
+#include <memory>
 class AniTransition;
 class AvatarMask;
 class Animator;
-class AnimationController 
+class AnimationController : public std::enable_shared_from_this<AnimationController>
 {
    public:
    static consteval auto reflect()
@@ -21,47 +25,46 @@ class AnimationController
            meta::field<&Self::m_anyState>,
            meta::field<&Self::m_avatarMask>,
            meta::field<&Self::useController>,
-           meta::field<&Self::useMask>);
+           meta::field<&Self::useMask>,
+           meta::field<&Self::m_additive>);
    }
 public:
-    AnimationController() = default;
+    AnimationController();
 	~AnimationController();
-    std::string name = "None";
+    AnimationController(const AnimationController&) = delete;
+    AnimationController& operator=(const AnimationController&) = delete;
+    AnimationController(AnimationController&&) = delete;
+    AnimationController& operator=(AnimationController&&) = delete;
+	std::string name = "None";
+	// Legacy scene key. Runtime selection belongs to ControllerPlayback.
 	AnimationState* m_curState = nullptr;
-	AnimationState* m_nextState = nullptr;
 	Animator* m_owner{};
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
 	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
 	std::set<std::string> StateNameSet;
 
 	std::shared_ptr<AnimationState> m_anyState;
-	math::matrix4x4 m_LocalTransforms[512]{};
-
-	float m_timeElapsed{};
-	float m_nextTimeElapsed{};
 	AvatarMask* m_avatarMask{};
-	float curAnimationProgress = 0.f;
-	float preCurAnimationProgress = 0.f;
-	float nextAnimationProgress = 0.f;
-	float preNextAnimationProgress = 0.f;
 private:
-	AniTransition* m_curTrans{};
-	float blendingTime = 0;
-	int m_AnimationIndex = 0;
-	int m_nextAnimationIndex = -1;
-	//지금일어나는중인 전이 - 블렌드시간 탈출시간등
+	std::uint64_t m_playbackId{};
 
 public:
-	bool needBlend = false;
-	bool m_isBlend = false;
 	//컨트롤러 바꿔치기용
 	bool useController = true;
 	bool m_useLayer = true;
 
 	bool useMask = false;
-	bool endAnimation = false;
+	// Opt-in overlay: evaluate a delta from this layer's clip at time zero.
+	bool m_additive = false;
 
 public:
+	[[nodiscard]] ControllerPlayback& GetPlayback();
+	[[nodiscard]] const ControllerPlayback& GetPlayback() const;
+	[[nodiscard]] AnimationState* GetCurrentState() const { return GetPlayback().currentState; }
+	[[nodiscard]] bool IsBlending() const { return GetPlayback().isBlending; }
+	[[nodiscard]] bool HasEndedAnimation() const { return GetPlayback().endAnimation; }
+	void MarkAnimationEnded() { GetPlayback().endAnimation = true; }
+	void OnBeforeSerialize();
 	bool BlendingAnimation(float tick);
 	Animator* GetOwner() { return m_owner; };
 	void SetCurState(std::string stateName);
@@ -70,8 +73,8 @@ public:
 	void UpdateState();
 	void Update(float tick);
 	int GetAnimatonIndexformState(std::string stateName);
-	int GetAnimationIndex() { return m_AnimationIndex; }
-	int GetNextAnimationIndex() { return m_nextAnimationIndex; }
+	int GetAnimationIndex() const { return GetPlayback().animationIndex; }
+	int GetNextAnimationIndex() const { return GetPlayback().nextAnimationIndex; }
 	std::shared_ptr<AnimationState> GetAniState();
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
 	std::shared_ptr<AnimationState> CreateState_UI();
