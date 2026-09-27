@@ -214,6 +214,9 @@
     <ClInclude Include="MetaSchema.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="ReflgenBridge.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
     <ClInclude Include="MetaStateCommand.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
