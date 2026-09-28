@@ -584,10 +584,26 @@ namespace Meta::Typed
                 HasPostLoad<T>() ? &PostLoadThunk<T> : nullptr, };
     }
 
+    // ── 경로 선택 (reflgen 도입 P5) ──────────────────────────────────────
+    //
+    // reflgen 이 서술한 타입(ReflgenRecord)은 reflgen 직렬화로 쓰고 읽는다 — Authoring 백엔드(ReflgenAuthoring.h)와
+    // 엔진 serializer(ReflgenAuthoringSerializers.h)가 이 파일의 형식 계약을 그대로 낸다. 아래의 레거시 본문
+    // (…Legacy)은 reflgen 서술이 없는 타입(meta 코어 카나리아·프로브)에만 남는다 — meta 스키마를 걷을 때 함께 걷는다.
+    // ★ 고르는 것은 컴파일 때다. 두 본문을 모두 실체화하면 타입마다 코드가 두 벌 생성된다(SceneManager.cpp 의
+    //   코드 생성이 5.7 s → 18.2 s 였다).
+}
+
+#include "ReflgenAuthoringSerializers.h"
+
+namespace Meta::Typed
+{
     // ── Serialize (typed) ──────────────────────────────────────────────────
 
     template<meta::reflectable T>
     void SerializeObjectInto(T& obj, Authoring::WriteNode node);
+
+    template<meta::reflectable T>
+    void SerializeObjectIntoLegacy(T& obj, Authoring::WriteNode node);
 
     // 멤버 하나의 방출 — 레거시 분기 순서(벡터→포인터→스칼라→enum→구조체→마커) 보존
     template<class V>
@@ -788,6 +804,20 @@ namespace Meta::Typed
     template<meta::reflectable T>
     void SerializeObjectInto(T& obj, Authoring::WriteNode node)
     {
+        if constexpr (ReflgenRecord<T>)
+        {
+            Authoring::ReflgenWriter writer(node);
+            reflgen::serialize(writer, obj);
+        }
+        else
+        {
+            SerializeObjectIntoLegacy(obj, node);
+        }
+    }
+
+    template<meta::reflectable T>
+    void SerializeObjectIntoLegacy(T& obj, Authoring::WriteNode node)
+    {
 		node.SetMap();
 
 		// U7: 직렬화 직전 파생 참조를 최신 구조로 다시 계산할 수 있는 선택 훅.
@@ -839,6 +869,9 @@ namespace Meta::Typed
 
     template<meta::reflectable T>
     void DeserializeObjectFrom(T& obj, const Authoring::ReadNode& node);
+
+    template<meta::reflectable T>
+    void DeserializeObjectFromLegacy(T& obj, const Authoring::ReadNode& node);
 
     /// 노드 하나를 원소 하나로 읽는다 — 시퀀스·맵 값이 공유하는 정본.
     template<class E>
@@ -1050,6 +1083,20 @@ namespace Meta::Typed
 
     template<meta::reflectable T>
     void DeserializeObjectFrom(T& obj, const Authoring::ReadNode& node)
+    {
+        if constexpr (ReflgenRecord<T>)
+        {
+            Authoring::ReflgenReader reader(node);
+            reflgen::deserialize(reader, obj);
+        }
+        else
+        {
+            DeserializeObjectFromLegacy(obj, node);
+        }
+    }
+
+    template<meta::reflectable T>
+    void DeserializeObjectFromLegacy(T& obj, const Authoring::ReadNode& node)
     {
         meta::for_each_field(obj, [&](std::string_view memberName, auto& value)
         {

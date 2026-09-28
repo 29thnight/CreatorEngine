@@ -14,12 +14,12 @@
 # port 를 만든다(REFLGEN_SOURCE 표지 사이).
 set(VCPKG_BUILD_TYPE release) # 생성기는 도구이고 라이브러리는 헤더뿐이다 — debug 빌드가 필요 없다.
 
-# REFLGEN_SOURCE_BEGIN (make-overlay-port.ps1 -Ref e9ce742587743018ade81bd0b4e861b5ae000be9)
+# REFLGEN_SOURCE_BEGIN (make-overlay-port.ps1 -Ref f08f0751687e53470a868e64638ce01a701594fd)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO 29thnight/reflgen_cpp
-    REF e9ce742587743018ade81bd0b4e861b5ae000be9
-    SHA512 c713abcec1eb8f80c4b1b97986ba062dd31d8d47f0219031adf5dc789deacf0910cd3d73096e090a2dd57d01291c4187680a0c504dd8ec013ce9d7611f728b08
+    REF f08f0751687e53470a868e64638ce01a701594fd
+    SHA512 10f6c86cb0f3ea34c41fa834388e67763aaf09a3c5c9c7b0898a13008c423345c25d6c71631d9ef8c8a416fea842d4609509d30d4308cd05bae5aea8b5a8487b
     HEAD_REF main
 )
 # REFLGEN_SOURCE_END

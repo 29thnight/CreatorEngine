@@ -217,6 +217,12 @@
     <ClInclude Include="ReflgenBridge.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="ReflgenAuthoring.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflgenAuthoringSerializers.h">
+      <Filter>Core.Reflection</Filter>
+    </ClInclude>
     <ClInclude Include="MetaStateCommand.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
