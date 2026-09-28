@@ -4,15 +4,10 @@
 #include "Camera.h"
 #include <mathematics/bounds.hpp>
 
-class CameraComponent : public meta::identity<CameraComponent, Component>
+class [[reflgen::reflect]] CameraComponent : public meta::identity<CameraComponent, Component>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_Camera>,
-           meta::field<&Self::m_isPrimary>);
-   }
 public:
     // CT6-d: 팩토리 분기의 강제 활성(저장된 비활성도 켬 — 기존 특이 동작 보존)
     void OnDeserialized() { SetEnabled(true); }
@@ -75,7 +70,7 @@ private:
 
 	Camera m_Camera{};
 	// Editor picking용 2x2x2 unit box. 중심은 매 호출마다 owner position이다.
-	math::aabb m_editorBoundingBox{
+	[[reflgen::ignore]] math::aabb m_editorBoundingBox{
 		math::vector3{}, math::vector3{ 1.0f, 1.0f, 1.0f } };
 	bool m_isPrimary{ false };
 };

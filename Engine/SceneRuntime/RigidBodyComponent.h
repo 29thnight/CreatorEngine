@@ -5,24 +5,10 @@
 #include "EForceMode.h"
 #include "../physics/PhysicsCommon.h"  
 
-class RigidBodyComponent : public meta::identity<RigidBodyComponent, Component>
+class [[reflgen::reflect]] RigidBodyComponent : public meta::identity<RigidBodyComponent, Component>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_bodyType>,
-           meta::field<&Self::LinearDamping>,
-           meta::field<&Self::m_mass>,
-           meta::field<&Self::maxLinearVelocity>,
-           meta::field<&Self::maxAngularVelocity>,
-           meta::field<&Self::maxContactImpulse>,
-           meta::field<&Self::maxDepenetrationVelocity>,
-           meta::field<&Self::m_useGravity>,
-           meta::field<&Self::m_setTrigger>,
-           meta::field<&Self::m_setKinematic>,
-           meta::field<&Self::m_collisionEnabled>);
-   }
 public:
 	RigidBodyComponent() = default;
 	
@@ -102,8 +88,8 @@ public:
 private:
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
-	EForceMode forceMode{ EForceMode::NONE };
-	float AngularDamping =0.05f;
+	[[reflgen::ignore]] EForceMode forceMode{ EForceMode::NONE };
+	[[reflgen::ignore]] float AngularDamping =0.05f;
 	float LinearDamping = 0.01f;
 	float m_mass = 70.f;
 	float maxLinearVelocity = 1e+16;
@@ -114,11 +100,11 @@ private:
 	bool m_setTrigger = false; // 트리거 설정 여부
 	bool m_setKinematic = false; // 키네마틱 설정 여부
 	bool m_collisionEnabled = true; // 콜라이더 활성화 여부
-	math::vector3 velocity{};
-	math::vector3 m_scale{};
+	[[reflgen::ignore]] math::vector3 velocity{};
+	[[reflgen::ignore]] math::vector3 m_scale{};
 private:
-	math::vector3 m_linearVelocity;
-	math::vector3 m_angularVelocity;
+	[[reflgen::ignore]] math::vector3 m_linearVelocity;
+	[[reflgen::ignore]] math::vector3 m_angularVelocity;
 
 private:
 	// ---- 비트 플래그 정의 ----
@@ -133,7 +119,7 @@ private:
 	};
 
 	// 단일 바이트로 상태 보관 (초기값: dirty=false, 모든 lock=false)
-	uint8_t m_rbFlags{ 0 };
+	[[reflgen::ignore]] uint8_t m_rbFlags{ 0 };
 
 	// ---- 헬퍼 ----
 	inline bool TestFlag(uint8_t m) const noexcept {

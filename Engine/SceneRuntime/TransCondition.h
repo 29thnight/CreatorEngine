@@ -4,17 +4,9 @@
 #include "ConditionParameter.h"
 
 class AnimationController;
-class TransCondition
+class [[reflgen::reflect]] TransCondition
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = TransCondition;
-       return meta::schema<Self>(
-           meta::field<&Self::valueName>,
-           meta::field<&Self::CompareParameter>,
-           meta::field<&Self::cType>);
-   }
 public:
 	TransCondition() = default;
 
@@ -70,9 +62,9 @@ public:
 	void SetConditionType(ConditionType _conditionType) { cType = _conditionType;}
 	//타입 ,값 ,함수
 	std::string valueName = "None";
-	ConditionParameter* valueParameter;
+	[[reflgen::ignore]] ConditionParameter* valueParameter;
 	ConditionParameter CompareParameter;
-	AnimationController* m_ownerController{};
+	[[reflgen::ignore]] AnimationController* m_ownerController{};
 	ConditionType cType = ConditionType::Equal;
 };
 

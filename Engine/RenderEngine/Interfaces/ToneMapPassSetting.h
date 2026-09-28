@@ -2,29 +2,9 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 
-struct ToneMapPassSetting
+struct [[reflgen::reflect]] ToneMapPassSetting
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = ToneMapPassSetting;
-       return meta::schema<Self>(
-           meta::field<&Self::isAbleAutoExposure>,
-           meta::field<&Self::isAbleToneMap>,
-           meta::field<&Self::fNumber>,
-           meta::field<&Self::shutterTime>,
-           meta::field<&Self::ISO>,
-           meta::field<&Self::exposureCompensation>,
-           meta::field<&Self::speedBrightness>,
-           meta::field<&Self::speedDarkness>,
-           meta::field<&Self::toneMapType>,
-           meta::field<&Self::filmSlope>,
-           meta::field<&Self::filmToe>,
-           meta::field<&Self::filmShoulder>,
-           meta::field<&Self::filmBlackClip>,
-           meta::field<&Self::filmWhiteClip>,
-           meta::field<&Self::toneMapExposure>);
-   }
     ToneMapPassSetting() = default;
 
     bool isAbleAutoExposure{ true };

@@ -140,15 +140,35 @@
     <_EngineVcpkgInstalledDir Condition="'$(_EngineVcpkgInstalledDir)' == ''">$(MSBuildThisFileDirectory)vcpkg_installed\$(_EngineVcpkgTriplet)\</_EngineVcpkgInstalledDir>
     <EngineReflgenTargets Condition="'$(EngineReflgenTargets)' == ''">$([MSBuild]::EnsureTrailingSlash('$(_EngineVcpkgInstalledDir)'))$(_EngineVcpkgTriplet)\share\reflgen\msbuild\reflgen.targets</EngineReflgenTargets>
     <ReflgenAttributeScopes>creator</ReflgenAttributeScopes>
+    <!-- 엔진은 서술만 쓴다 — 등록은 REFLECT_TYPE_LIST(Meta::Register)가, 직렬화는 타입드 YAML 이 한다. 쓰지 않을
+         reflgen 런타임 서술자(등록 함수)는 컴파일하지 않는다. -->
+    <ReflgenRegistration>false</ReflgenRegistration>
     <ReflgenAttributeHeaders>$(MSBuildThisFileDirectory)Engine\Utility_Framework\ReflgenBridge.h</ReflgenAttributeHeaders>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <!-- [[reflgen::reflect]] 타입을 가진 모듈 — header 를 ClInclude 로 가진 프로젝트가 생성한다. -->
     <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\RenderEngine\RenderEngine.vcxproj" />
+    <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\SceneRuntime\SceneRuntime.vcxproj" />
+    <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Editor\Editor.vcxproj" />
     <ReflgenReference Include="@(_EngineReflgenModule)" Exclude="$(MSBuildProjectFullPath)" />
   </ItemGroup>
 
   <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and Exists('$(EngineReflgenTargets)')" />
+
+  <!--
+    vcpkg 의 MSBuild 통합은 vcpkg.json·vcpkg-configuration.json 이 바뀔 때만 다시 설치한다 — overlay port 만 바꾸면
+    (ports\reflgen 을 새 커밋에 고정하는 것) 옛 설치로 빌드한다. overlay port 파일을 설치의 입력에 더한다.
+    _ZVcpkgInstallManifestDependenciesInputs 는 vcpkg.targets 의 내부 item 이다 — 이름이 바뀌면 이 줄은 아무 일도
+    하지 않는다(그때도 아래 가드는 설치가 이번 빌드에 바뀐 것을 잡는다).
+  -->
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <_ZVcpkgInstallManifestDependenciesInputs Include="$(MSBuildThisFileDirectory)ports\**" />
+  </ItemGroup>
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and Exists('$(EngineReflgenTargets)')">
+    <!-- 평가 때 가져온 reflgen targets 의 시각 — 빌드 중에 vcpkg 가 reflgen 을 바꿔 설치했는지 가린다. -->
+    <_EngineReflgenTargetsStamp>$([System.IO.File]::GetLastWriteTime('$(EngineReflgenTargets)').Ticks)</_EngineReflgenTargetsStamp>
+  </PropertyGroup>
 
   <!--
     vcpkg 가 reflgen 을 이번 빌드에서 처음 설치했으면 위 Import 는 평가 때 파일이 없어 건너뛰었다. 그대로
@@ -167,6 +187,22 @@
            Text="reflgen was installed by vcpkg during this build, after its MSBuild targets could be imported. Build again (once per environment)." />
     <Error Condition="!Exists('$(EngineReflgenTargets)')"
            Text="reflgen MSBuild targets not found: $(EngineReflgenTargets). Run the vcpkg manifest install (vcpkg.json lists reflgen) or set EngineReflgenTargets." />
+  </Target>
+
+  <!--
+    vcpkg 가 이번 빌드에 reflgen 을 바꿔 설치했으면(ports\reflgen 을 다시 고정한 뒤 첫 빌드) 위 Import 는 옛 targets 를
+    가져왔다 — 옛 targets 에 새 생성기·header 가 섞인다. 생성하기 전에 설치를 먼저 돌리고, 가져온 targets 가 바뀌었으면
+    이유를 말하고 멈춘다. 다른 프로젝트가 ReflgenReference 로 이 프로젝트의 생성을 부를 때도 같은 길이다.
+  -->
+  <Target Name="_EngineReflgenUpdatedDuringBuild"
+          BeforeTargets="ReflgenGenerate"
+          DependsOnTargets="$(_EngineRequireReflgenAfter)"
+          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(ReflgenTargetsImported)' == 'true' and '$(_EngineReflgenTargetsStamp)' != '' and '$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_EngineReflgenTargetsStampNow Condition="Exists('$(EngineReflgenTargets)')">$([System.IO.File]::GetLastWriteTime('$(EngineReflgenTargets)').Ticks)</_EngineReflgenTargetsStampNow>
+    </PropertyGroup>
+    <Error Condition="'$(_EngineReflgenTargetsStampNow)' != '$(_EngineReflgenTargetsStamp)'"
+           Text="reflgen was updated by vcpkg during this build (ports\reflgen changed), after its MSBuild targets were imported. Build again (once per environment)." />
   </Target>
 
   <!--

@@ -3,20 +3,9 @@
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 
-class SphereColliderComponent : public meta::identity<SphereColliderComponent, Component>, public ICollider
+class [[reflgen::reflect]] SphereColliderComponent : public meta::identity<SphereColliderComponent, Component>, public ICollider
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::radius>,
-           meta::field<&Self::staticFriction>,
-           meta::field<&Self::dynamicFriction>,
-           meta::field<&Self::restitution>,
-           meta::field<&Self::density>,
-           meta::field<&Self::m_posOffset>,
-           meta::field<&Self::m_rotOffset>);
-   }
 public:
 	SphereColliderComponent() = default;
 
@@ -160,9 +149,9 @@ public:
 	math::quaternion GetRotationOffset() override { return m_rotOffset; }
 
 private:
-	SphereColliderInfo m_Info;
-	EColliderType m_type;
-	unsigned int m_collsionCount = 0;
+	[[reflgen::ignore]] SphereColliderInfo m_Info;
+	[[reflgen::ignore]] EColliderType m_type;
+	[[reflgen::ignore]] unsigned int m_collsionCount = 0;
 	// ICollider을(를) 통해 상속됨
 	void OnTriggerEnter(ICollider* other) override { ++m_collsionCount; }
 	void OnTriggerStay(ICollider* other) override {}

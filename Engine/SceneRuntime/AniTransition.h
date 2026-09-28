@@ -5,21 +5,9 @@
 #include "ConditionParameter.h"
 class AnimationState;
 class AnimationController;
-class AniTransition
+class [[reflgen::reflect]] AniTransition
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = AniTransition;
-       return meta::schema<Self>(
-           meta::field<&Self::conditions>,
-           meta::field<&Self::m_name>,
-           meta::field<&Self::curStateName>,
-           meta::field<&Self::nextStateName>,
-           meta::field<&Self::exitTime>,
-           meta::field<&Self::blendTime>,
-           meta::field<&Self::hasExitTime>);
-   }
 public:
 	AniTransition() = default;
 	//AniTransition(std::string curStatename, std::string nextStatename, AnimationController* owner);
@@ -62,10 +50,10 @@ public:
 
 public:
 	std::vector<TransCondition> conditions{};
-	AnimationController* m_ownerController{};
+	[[reflgen::ignore]] AnimationController* m_ownerController{};
 	std::string m_name = "NoName";
-	AnimationState* curState = nullptr;
-	AnimationState* nextState = nullptr;
+	[[reflgen::ignore]] AnimationState* curState = nullptr;
+	[[reflgen::ignore]] AnimationState* nextState = nullptr;
 	std::string curStateName{};
 	std::string nextStateName{};
 	float exitTime = 0.1f;

@@ -8,29 +8,20 @@
 // normalMap 텍스처 존재에서 유도되는 순수 0/1 상태다(저작·직렬화 없음).
 constexpr bool32 kUseNormalMap = 1;
 
-cbuffer MaterialInfomation
+cbuffer [[reflgen::reflect]] MaterialInfomation
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = MaterialInfomation;
-       return meta::schema<Self>(
-           meta::field<&Self::m_baseColor>,
-           meta::field<&Self::m_metallic>,
-           meta::field<&Self::m_roughness>,
-           meta::field<&Self::m_IOR>);
-   }
     const static UINT  kUseShadowReceive = 256u;
 
     math::color   m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
     float		  m_metallic{ 0.0f };
     float		  m_roughness{ 1.0f };
-    bool32		  m_useBaseColor{};
-    bool32		  m_useOccRoughMetal{};
-    bool32		  m_useAOMap{};
-    bool32		  m_useEmissive{};
-    bool32		  m_useNormalMap{};
-    bool32		  m_convertToLinearSpace{ false };
+    [[reflgen::ignore]] bool32		  m_useBaseColor{};
+    [[reflgen::ignore]] bool32		  m_useOccRoughMetal{};
+    [[reflgen::ignore]] bool32		  m_useAOMap{};
+    [[reflgen::ignore]] bool32		  m_useEmissive{};
+    [[reflgen::ignore]] bool32		  m_useNormalMap{};
+    [[reflgen::ignore]] bool32		  m_convertToLinearSpace{ false };
     float         m_IOR{ 1.5f };
 
     MaterialInfomation() = default;

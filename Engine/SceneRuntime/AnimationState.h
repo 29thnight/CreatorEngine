@@ -6,24 +6,9 @@
 
 class AnimationController;
 class ConditionParameter;
-class AnimationState
+class [[reflgen::reflect]] AnimationState
 {	
    public:
-   static consteval auto reflect()
-   {
-       using Self = AnimationState;
-       return meta::schema<Self>(
-           meta::field<&Self::m_name>,
-           meta::field<&Self::behaviourName>,
-           meta::field<&Self::Transitions>,
-           meta::field<&Self::index>,
-           meta::field<&Self::AnimationIndex>,
-           meta::field<&Self::animationSpeed>,
-           meta::field<&Self::multiplerAnimationSpeed>,
-           meta::field<&Self::animationSpeedParameterName>,
-           meta::field<&Self::m_isAny>,
-           meta::field<&Self::useMultipler>);
-   }
 public:
 	AnimationState();
    ~AnimationState();
@@ -47,8 +32,8 @@ public:
 public:
 	std::string m_name{};
 	std::string behaviourName{};
-	std::shared_ptr<AniBehavior> behaviour{};
-	AnimationController* m_ownerController{};
+	[[reflgen::ignore]] std::shared_ptr<AniBehavior> behaviour{};
+	[[reflgen::ignore]] AnimationController* m_ownerController{};
 	std::vector<std::shared_ptr<AniTransition>> Transitions;
 	int index =0; 
 	int AnimationIndex = 0;
@@ -59,13 +44,13 @@ public:
 	float multiplerAnimationSpeed = 1;
 	std::string animationSpeedParameterName = "None";
 	//상태의 애니메이션 시간 상하체 분리후 합칠떄쓸용
-	float m_animationTimeElapsed = 0;
+	[[reflgen::ignore]] float m_animationTimeElapsed = 0;
 	bool m_isAny = false;
 	bool useMultipler = false;
 	// Runtime-only handle. Parameter layout changes invalidate the cached index;
 	// direct name edits are checked against the resolved entry on every read.
-	std::size_t m_speedParameterIndex{ static_cast<std::size_t>(-1) };
-	std::uint64_t m_speedParameterVersion{};
-	std::string m_speedParameterName{};
+	[[reflgen::ignore]] std::size_t m_speedParameterIndex{ static_cast<std::size_t>(-1) };
+	[[reflgen::ignore]] std::uint64_t m_speedParameterVersion{};
+	[[reflgen::ignore]] std::string m_speedParameterName{};
 };
 

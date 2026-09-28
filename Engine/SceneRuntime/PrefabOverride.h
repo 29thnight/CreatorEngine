@@ -16,18 +16,9 @@
 //
 // m_componentType이 비어 있으면 Entity 자신의 프로퍼티(예: m_tag)를 가리키고,
 // 채워져 있으면 그 이름의 컴포넌트 타입에 속한 프로퍼티를 가리킨다.
-struct PrefabOverride
+struct [[reflgen::reflect]] PrefabOverride
 {
     public:
-    static consteval auto reflect()
-    {
-        using Self = PrefabOverride;
-        return meta::schema<Self>(
-            meta::field<&Self::m_componentType>,
-            meta::field<&Self::m_componentSlot>,
-            meta::field<&Self::m_propertyName>,
-            meta::field<&Self::m_valueYaml>);
-    }
     PrefabOverride() = default;
 
     std::string m_componentType{};

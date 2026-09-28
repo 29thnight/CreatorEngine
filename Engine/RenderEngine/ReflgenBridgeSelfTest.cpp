@@ -63,8 +63,8 @@ namespace
                 meta::field<&Self::m_distance>.with(meta::units("m"), meta::wide()),
                 meta::field<&Self::m_hidden>.with(meta::hidden()),
                 meta::field<&Self::m_instanceID>.with(meta::readonly(), meta::debugOnly()),
-                meta::method<&Self::Fire>.params("shots"),
-                meta::method<&Self::IsEmpty>);
+                meta::method<&Self::Fire>.params("shots").hideInInspector(),
+                meta::method<&Self::IsEmpty>.readOnlyInInspector());
         }
     }
 
@@ -121,7 +121,8 @@ namespace
                         return false;
                     }
                 }
-                return true;
+                return left.inspectorReadOnly == right.inspectorReadOnly
+                    && left.inspectorHidden == right.inspectorHidden;
             });
             return fields && methods;
         }

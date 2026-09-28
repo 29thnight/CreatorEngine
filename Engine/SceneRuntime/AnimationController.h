@@ -12,22 +12,9 @@
 class AniTransition;
 class AvatarMask;
 class Animator;
-class AnimationController : public std::enable_shared_from_this<AnimationController>
+class [[reflgen::reflect]] AnimationController : public std::enable_shared_from_this<AnimationController>
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = AnimationController;
-       return meta::schema<Self>(
-           meta::field<&Self::name>,
-           meta::field<&Self::m_curState>,
-           meta::field<&Self::StateVec>,
-           meta::field<&Self::m_anyState>,
-           meta::field<&Self::m_avatarMask>,
-           meta::field<&Self::useController>,
-           meta::field<&Self::useMask>,
-           meta::field<&Self::m_additive>);
-   }
 public:
     AnimationController();
 	~AnimationController();
@@ -38,20 +25,20 @@ public:
 	std::string name = "None";
 	// Legacy scene key. Runtime selection belongs to ControllerPlayback.
 	AnimationState* m_curState = nullptr;
-	Animator* m_owner{};
+	[[reflgen::ignore]] Animator* m_owner{};
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
-	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
-	std::set<std::string> StateNameSet;
+	[[reflgen::ignore]] std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
+	[[reflgen::ignore]] std::set<std::string> StateNameSet;
 
 	std::shared_ptr<AnimationState> m_anyState;
 	AvatarMask* m_avatarMask{};
 private:
-	std::uint64_t m_playbackId{};
+	[[reflgen::ignore]] std::uint64_t m_playbackId{};
 
 public:
 	//컨트롤러 바꿔치기용
 	bool useController = true;
-	bool m_useLayer = true;
+	[[reflgen::ignore]] bool m_useLayer = true;
 
 	bool useMask = false;
 	// Opt-in overlay: evaluate a delta from this layer's clip at time zero.

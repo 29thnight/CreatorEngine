@@ -278,18 +278,9 @@ struct TransformWriteMetrics
 	std::array<uint64_t, kTransformWriteReasonCount> byReason{};
 };
 
-class Scene
+class [[reflgen::reflect]] Scene
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = Scene;
-       return meta::schema<Self>(
-           meta::field<&Self::m_Entities>,
-           meta::field<&Self::m_buildIndex>,
-           meta::field<&Self::m_sceneName>,
-           meta::field<&Self::m_requiredLoadAssetsBundle>);
-   }
 public:
 	class HierarchyBulkBuildScope
 	{
@@ -322,7 +313,7 @@ public:
 	// Entity의 단독 소유자. 외부에는 프레임 경계를 넘지 않는 raw pointer 또는
 	// EntityHandle만 노출한다. DDOL 이송은 unique_ptr 자체를 Scene 간 이동한다.
 	std::vector<std::unique_ptr<Entity>> m_Entities;
-	job_handle m_AIJob;
+	[[reflgen::ignore]] job_handle m_AIJob;
 
 	Entity* AddEntity(std::unique_ptr<Entity> entity);
 	Entity* CreateEntity(std::string_view name, GameObjectType type = GameObjectType::Empty, Entity::Index parentIndex = -1);
@@ -425,9 +416,9 @@ private:
     // m_Entities와 항상 같은 길이를 유지하는 세대 테이블. 슬롯을 해제할 때
     // 증가하고, 그 값 그대로 다음 입주자에게 물려준다 — 0은 절대 나오지
     // 않는다(EntityHandle의 "무효"와 겹치면 안 되므로 0을 건너뛴다).
-    std::vector<uint32_t> m_generations;
+    [[reflgen::ignore]] std::vector<uint32_t> m_generations;
     // tombstone(= nullptr)된 슬롯의 인덱스. 다음 할당이 여기서 먼저 꺼내 쓴다.
-    std::vector<uint32_t> m_freeSlots;
+    [[reflgen::ignore]] std::vector<uint32_t> m_freeSlots;
 
     // ── 씬 식별자 (트랙 W — EntityHandle에 씬 스코프 도입) ──
     //
@@ -437,11 +428,11 @@ private:
     // 암묵 이동도 막는 타입이라, 한 번 배정된 값이 다른 인스턴스와 섞일 길이 없다.
     // (한때 std::mutex 멤버도 이 논거였으나 잠금으로 쓰인 적이 없어 걷어냈다.)
     //
-    // reflect()에 올리지 않는다 — 프로세스 실행마다 새로 매기는 런타임 전용
+    // 서술에서 뺀다(reflgen::ignore) — 프로세스 실행마다 새로 매기는 런타임 전용
     // 값이라 저장했다 복원해 봐야 의미가 없다(RenderEngine/Skeleton.h의
     // m_serial과 같은 이유로 직렬화 대상이 아니다).
-    const uint32_t m_sceneId;
-    std::uint32_t m_incrementalConstructions{ 0 };
+    [[reflgen::ignore]] const uint32_t m_sceneId;
+    [[reflgen::ignore]] std::uint32_t m_incrementalConstructions{ 0 };
     // 씬 생성마다 단조 증가하는 일련번호 발급. SceneManager::m_scenes에서의
     // 위치(vector index)는 쓰지 않는다 — 씬이 삭제되면 그 위치가 다음 씬에게
     // 재사용돼 ABA가 난다(Skeleton::NextSerial 선례와 같은 사유, 그쪽 주석 참고).
@@ -450,17 +441,17 @@ private:
 
     // 트랜스폼 파생 데이터 SoA 스토어(SceneGraphRedesignPlan §4 트랙 S, S1).
     // m_Entities·m_generations와 평행 — AllocateSlot/ReleaseSlot이 동기한다.
-    TransformStore m_transformStore;
+    [[reflgen::ignore]] TransformStore m_transformStore;
     // SceneGraph 계층의 유일 정본. Entity는 슬롯/정체성과 컴포넌트만 보유하고,
     // 런타임 읽기·쓰기와 YAML 어댑터가 모두 이 Store를 사용한다(H3).
-    HierarchyStore m_hierarchyStore;
+    [[reflgen::ignore]] HierarchyStore m_hierarchyStore;
 	// X4 derived projection. PIMPL로 ExecIndex와 packed 배열을 이 헤더 밖에 가둔다.
-	// reflect()에 없으므로 Entity slot/generation 및 디스크 identity와 독립이다.
-	std::unique_ptr<TransformExecutionGraphState> m_executionGraphs;
+	// 서술에서 빠지므로(reflgen::ignore) Entity slot/generation 및 디스크 identity와 독립이다.
+	[[reflgen::ignore]] std::unique_ptr<TransformExecutionGraphState> m_executionGraphs;
 	// 렌더 컴포넌트 membership, light index 부기, 재사용 snapshot을 한 도메인으로
 	// 묶는다. Scene은 Entity와 phase orchestration만 드러내고 구체 컨테이너는
-	// Scene.cpp에 가둔다. 직렬화 대상이 아니다(reflect()에 넣지 않는다).
-	std::unique_ptr<SceneRenderRegistryState> m_renderRegistry;
+	// Scene.cpp에 가둔다. 직렬화 대상이 아니다(reflgen::ignore).
+	[[reflgen::ignore]] std::unique_ptr<SceneRenderRegistryState> m_renderRegistry;
 
     // 슬롯 할당 단일점. free 리스트가 있으면 재사용하고(세대는 해제 시 이미
     // 올라가 있다), 없으면 새로 늘린다. CreateEntity/AddEntity/
@@ -624,11 +615,11 @@ private:
     // 구독자가 0이 됐다 — 옛 RegistryTick도 그 시점에 소멸했다(3d8ff9a4). 그
     // 셋을 SystemSchedule에서 철거했으니(SystemSchedule.h) 지금 여기 남는 것은
     // PendingInitialize·PendingSimulation·DestroyWatch 셋뿐이다.
-    SystemSchedule m_schedule;
-	CameraSystem m_cameraSystem;
+    [[reflgen::ignore]] SystemSchedule m_schedule;
+	[[reflgen::ignore]] CameraSystem m_cameraSystem;
 	// math::tween<T> 값과 engine binding의 Scene-scoped 소유자. 전방 선언 +
 	// unique_ptr로 Scene.h의 광범위한 소비자가 tween.hpp까지 전이 include하지 않게 한다.
-	std::unique_ptr<TweenManager> m_tweenManager;
+	[[reflgen::ignore]] std::unique_ptr<TweenManager> m_tweenManager;
 
     // 진입 방향 3단계(OnInitialized·OnAddedToScene·OnBeginSimulation)를 큐에서
     // 소진한다. 공개 창구는 DrainPendingLifecycle 하나이고 이 함수가 그 본체다 —
@@ -857,8 +848,8 @@ public:
 	// 이것을 읽는다 — 관측이 상태를 바꾸면 그 관측은 재현되지 않는다.
 	[[nodiscard]] bool TryGetLastAnimatorPoseMetrics(const Animator& animator,
 		AnimatorPoseUploadMetrics& outMetrics) const;
-	mutable std::mutex m_lastAnimatorPoseMetricsMutex;
-	std::unordered_map<const Animator*, AnimatorPoseUploadMetrics> m_lastAnimatorPoseMetrics;
+	[[reflgen::ignore]] mutable std::mutex m_lastAnimatorPoseMetricsMutex;
+	[[reflgen::ignore]] std::unordered_map<const Animator*, AnimatorPoseUploadMetrics> m_lastAnimatorPoseMetrics;
 private:
 	AnimatorPoseUploadMetrics PublishAnimatorPoseImpl(Animator& animator);
 public:
@@ -988,50 +979,50 @@ private:
 	static inline std::atomic_bool s_transformWriteDiagnosticsEnabled = false;
 	static inline std::atomic_bool s_sparseSpatialResolverEnabled = true;
 
-	std::array<TransformUpdateMetrics, kTransformSyncPointCount>
+	[[reflgen::ignore]] std::array<TransformUpdateMetrics, kTransformSyncPointCount>
 		m_transformUpdateMetrics{};
-	std::atomic<uint64_t> m_topologyCreated{ 0 };
-	std::atomic<uint64_t> m_topologyDestroyed{ 0 };
-	std::atomic<uint64_t> m_topologyReparented{ 0 };
-	std::atomic<uint64_t> m_topologyVersion{ 0 };
-	uint32_t m_hierarchyBulkBuildDepth = 0;
-	bool m_hierarchyBulkBuildMutated = false;
-	TransformTopologyMutationCounters m_topologyFrameBaseline{};
-	TransformTopologyMutationCounters m_topologyObservationBaseline{};
-	TransformTopologyMutationCounters m_lastFrameTopologyMutations{};
-	uint64_t m_transformDiagnosticFrameCount = 0;
-	std::atomic<uint64_t> m_transformPublishEpoch{ 0 };
-	std::atomic<uint64_t> m_transformInvalidPublishCount{ 0 };
-	std::array<std::atomic<uint64_t>, kTransformWriteReasonCount>
+	[[reflgen::ignore]] std::atomic<uint64_t> m_topologyCreated{ 0 };
+	[[reflgen::ignore]] std::atomic<uint64_t> m_topologyDestroyed{ 0 };
+	[[reflgen::ignore]] std::atomic<uint64_t> m_topologyReparented{ 0 };
+	[[reflgen::ignore]] std::atomic<uint64_t> m_topologyVersion{ 0 };
+	[[reflgen::ignore]] uint32_t m_hierarchyBulkBuildDepth = 0;
+	[[reflgen::ignore]] bool m_hierarchyBulkBuildMutated = false;
+	[[reflgen::ignore]] TransformTopologyMutationCounters m_topologyFrameBaseline{};
+	[[reflgen::ignore]] TransformTopologyMutationCounters m_topologyObservationBaseline{};
+	[[reflgen::ignore]] TransformTopologyMutationCounters m_lastFrameTopologyMutations{};
+	[[reflgen::ignore]] uint64_t m_transformDiagnosticFrameCount = 0;
+	[[reflgen::ignore]] std::atomic<uint64_t> m_transformPublishEpoch{ 0 };
+	[[reflgen::ignore]] std::atomic<uint64_t> m_transformInvalidPublishCount{ 0 };
+	[[reflgen::ignore]] std::array<std::atomic<uint64_t>, kTransformWriteReasonCount>
 		m_transformWriteReasonCounts{};
-	uint64_t m_transformWriteEpochBaseline = 0;
-	uint64_t m_transformInvalidPublishBaseline = 0;
-	std::array<uint64_t, kTransformWriteReasonCount>
+	[[reflgen::ignore]] uint64_t m_transformWriteEpochBaseline = 0;
+	[[reflgen::ignore]] uint64_t m_transformInvalidPublishBaseline = 0;
+	[[reflgen::ignore]] std::array<uint64_t, kTransformWriteReasonCount>
 		m_transformWriteReasonBaselines{};
-	std::atomic<uint64_t> m_uiDirtyEpoch{ 1 };
-	std::atomic<uint64_t> m_uiResolvedEpoch{ 0 };
-	std::atomic<uint64_t> m_spatialDirtyEpoch{ 1 };
-	std::atomic<uint64_t> m_spatialResolvedEpoch{ 0 };
-	math::rect m_lastUILayoutScreenRect{};
-	bool m_hasLastUILayoutScreenRect = false;
+	[[reflgen::ignore]] std::atomic<uint64_t> m_uiDirtyEpoch{ 1 };
+	[[reflgen::ignore]] std::atomic<uint64_t> m_uiResolvedEpoch{ 0 };
+	[[reflgen::ignore]] std::atomic<uint64_t> m_spatialDirtyEpoch{ 1 };
+	[[reflgen::ignore]] std::atomic<uint64_t> m_spatialResolvedEpoch{ 0 };
+	[[reflgen::ignore]] math::rect m_lastUILayoutScreenRect{};
+	[[reflgen::ignore]] bool m_hasLastUILayoutScreenRect = false;
 
-    std::unordered_set<std::string> m_entityNameSet{};
+    [[reflgen::ignore]] std::unordered_set<std::string> m_entityNameSet{};
 
 private:
 	friend class PhysicsManager;
 	using RigidBodyTypeLinkCallback = std::unordered_map<Entity*, std::function<void(const EBodyType&)>>;
 	using ColliderContainerType = std::unordered_map<PhysicsManager::ColliderID, PhysicsManager::ColliderInfo>;
 
-	std::vector<RigidBodyComponent*>            m_rigidBodyComponents;
-	std::vector<BoxColliderComponent*>          m_boxColliderComponents;
-	std::vector<SphereColliderComponent*>       m_sphereColliderComponents;
-	std::vector<CapsuleColliderComponent*>      m_capsuleColliderComponents;
-	std::vector<MeshColliderComponent*>         m_meshColliderComponents;
-	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
+	[[reflgen::ignore]] std::vector<RigidBodyComponent*>            m_rigidBodyComponents;
+	[[reflgen::ignore]] std::vector<BoxColliderComponent*>          m_boxColliderComponents;
+	[[reflgen::ignore]] std::vector<SphereColliderComponent*>       m_sphereColliderComponents;
+	[[reflgen::ignore]] std::vector<CapsuleColliderComponent*>      m_capsuleColliderComponents;
+	[[reflgen::ignore]] std::vector<MeshColliderComponent*>         m_meshColliderComponents;
+	[[reflgen::ignore]] std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
 	// m_terrainColliderComponents는 쓰기 전용(getter도 읽기도 없음)이라 걷어냈다 —
 	// 실제 물리 등록은 PhysicsManagers->AddCollider와 m_colliderContainer가 한다.
-    RigidBodyTypeLinkCallback					m_ColliderTypeLinkCallback;
-	ColliderContainerType						m_colliderContainer;
+    [[reflgen::ignore]] RigidBodyTypeLinkCallback					m_ColliderTypeLinkCallback;
+	[[reflgen::ignore]] ColliderContainerType						m_colliderContainer;
 
 private:
 	// 이 씬에 속한 캔버스의 캐시. 소유가 아니다 — 수명은 m_Entities가 쥔다.
@@ -1050,8 +1041,8 @@ private:
 	// (Scene.cpp의 슬롯 해제 단일점) Resolve가 sceneId·세대 둘 다 확인하므로,
 	// 이송된 캔버스는 다음 해석에서 조용히 걸러진다. 등록 이벤트를 놓쳐도
 	// 안전한 방향으로만 틀린다는 것이 이 캐시의 계약이다.
-	std::vector<EntityHandle>	Canvases;
-	std::unordered_map<std::string, EntityHandle> CanvasMap;
+	[[reflgen::ignore]] std::vector<EntityHandle>	Canvases;
+	[[reflgen::ignore]] std::unordered_map<std::string, EntityHandle> CanvasMap;
 
 public:
 	// 이 씬의 EntityHandle::sceneId (트랙 W). Resolve/HandleOf가 내부적으로
@@ -1059,7 +1050,7 @@ public:
 	// 없다) 여기서 얻는다.
 	uint32_t GetSceneId() const { return m_sceneId; }
 	const HashingString& GetSceneName() const noexcept { return m_sceneName; }
-    Entity*					m_selectedEntity = nullptr;
-	std::vector<Entity*>	m_selectedEntities;
-    Core::DelegateHandle		resetObjHandle{};
+    [[reflgen::ignore]] Entity*					m_selectedEntity = nullptr;
+	[[reflgen::ignore]] std::vector<Entity*>	m_selectedEntities;
+    [[reflgen::ignore]] Core::DelegateHandle		resetObjHandle{};
 };

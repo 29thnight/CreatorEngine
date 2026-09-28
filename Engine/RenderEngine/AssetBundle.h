@@ -2,17 +2,9 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "AssetEntry.h"
 
-struct AssetBundle
+struct [[reflgen::reflect]] AssetBundle
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = AssetBundle;
-       return meta::schema<Self>(
-           meta::field<&Self::name>,
-           meta::field<&Self::path>,
-           meta::field<&Self::assets>);
-   }
 	AssetBundle() = default;
 	AssetBundle(const std::string& name, const file::path& path)
 		: name(name), path(path.string()) {}

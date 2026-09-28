@@ -314,6 +314,9 @@
     <ClCompile Include="Prefab.cpp">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClCompile>
+    <ClCompile Include="ReflgenParity.cpp">
+      <Filter>Classes\GameObject\Prefab</Filter>
+    </ClCompile>
     <ClCompile Include="PrefabUtility.cpp">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClCompile>
@@ -647,6 +650,9 @@
       <Filter>Classes\Components\InputComponent</Filter>
     </ClInclude>
     <ClInclude Include="Prefab.h">
+      <Filter>Classes\GameObject\Prefab</Filter>
+    </ClInclude>
+    <ClInclude Include="PrefabOverride.h">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClInclude>
     <ClInclude Include="PrefabUtility.h">

@@ -2,16 +2,9 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 
-struct CurvePoint
+struct [[reflgen::reflect]] CurvePoint
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = CurvePoint;
-       return meta::schema<Self>(
-           meta::field<&Self::distance>,
-           meta::field<&Self::gain>);
-   }
     float distance = 0.f;
     float gain = 1.f;
 

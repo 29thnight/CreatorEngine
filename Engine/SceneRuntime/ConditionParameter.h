@@ -22,20 +22,9 @@ enum class ValueType : std::uint16_t
 	Trigger,
 };
 
-class ConditionParameter
+class [[reflgen::reflect]] ConditionParameter
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = ConditionParameter;
-       return meta::schema<Self>(
-           meta::field<&Self::name>,
-           meta::field<&Self::fValue>,
-           meta::field<&Self::iValue>,
-           meta::field<&Self::vType>,
-           meta::field<&Self::bValue>,
-           meta::field<&Self::tValue>);
-   }
 public:
 	ConditionParameter() = default;
 	template<typename T>

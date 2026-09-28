@@ -9,35 +9,9 @@ namespace FMOD
 	class Channel;
 }
 
-class SoundComponent : public meta::identity<SoundComponent, Component>
+class [[reflgen::reflect]] SoundComponent : public meta::identity<SoundComponent, Component>
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::clipKey>,
-           meta::field<&Self::bus>,
-           meta::field<&Self::volume>,
-           meta::field<&Self::pitch>,
-           meta::field<&Self::priority>,
-           meta::field<&Self::spatialBlend>,
-           meta::field<&Self::minDistance>,
-           meta::field<&Self::maxDistance>,
-           meta::field<&Self::reverbLevel>,
-           meta::field<&Self::reverbIndex>,
-           meta::field<&Self::rolloff>,
-           meta::field<&Self::velocity>,
-           meta::field<&Self::localRolloffCurve>,
-           meta::field<&Self::loop>,
-           meta::field<&Self::playOnStart>,
-           meta::field<&Self::spatial>,
-           meta::field<&Self::useReverbSend>,
-           meta::method<&Self::Play>,
-           meta::method<&Self::Stop>,
-           meta::method<&Self::Pause>.params("pause"),
-           meta::method<&Self::IsPlaying>.readOnlyInInspector(),
-           meta::method<&Self::PlayOneShot>);
-   }
 public:
 	SoundComponent() = default;
 
@@ -55,11 +29,11 @@ public:
 	void TickUpdate(float tick);
 	void TickLateUpdate(float tick);
 
-	void Play();
-	void Stop();
-	void Pause(bool pause);
-	bool IsPlaying();
-	void PlayOneShot();
+	[[reflgen::reflect]] void Play();
+	[[reflgen::reflect]] void Stop();
+	[[reflgen::reflect]] void Pause(bool pause);
+	[[reflgen::reflect, creator::read_only_in_inspector]] bool IsPlaying();
+	[[reflgen::reflect]] void PlayOneShot();
 
 	void EditorSet();
 
@@ -85,18 +59,18 @@ public:
 	Rolloff rolloff = Rolloff::Inverse;
 
 	// 3D 속성(엔진 좌표에서 받아 세팅)
-	math::vector3 position{ 0,0,0 };
+	[[reflgen::ignore]] math::vector3 position{ 0,0,0 };
 	math::vector3 velocity{ 0,0,0 };
 	std::vector<CurvePoint> localRolloffCurve;
 
 private:
 	float SampleLocalRolloff(float d) const;
 
-	FMOD_VECTOR _pos{};
-	FMOD_VECTOR _velocity{};
+	[[reflgen::ignore]] FMOD_VECTOR _pos{};
+	[[reflgen::ignore]] FMOD_VECTOR _velocity{};
 
-	FMOD::Channel* channel2D = nullptr;
-	FMOD::Channel* channel3D = nullptr;
+	[[reflgen::ignore]] FMOD::Channel* channel2D = nullptr;
+	[[reflgen::ignore]] FMOD::Channel* channel3D = nullptr;
 
 public:
 	bool loop = false;

@@ -33,6 +33,7 @@
   <ItemGroup>
     <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h" />
     <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\ReflgenParity.cpp" />
     <ClInclude Include="EngineGUIWindow\EditorPanelCost.h" />
     <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp" />
     <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h" />

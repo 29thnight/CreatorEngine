@@ -14,6 +14,8 @@
 // 같은 값**이다(ReflgenBridgeSelfTest.cpp 가 증명한다). 엔진 소비자는 스키마 타입에 대한 template 이므로 타입과
 // 값이 같으면 동작도 같다.
 //   - 필드·메서드: 선언 순서 그대로. 이름은 엔진이 멤버 포인터에서 읽는다(meta::field_info::identifier).
+//   - 메서드 속성: creator::read_only_in_inspector·hide_in_inspector 를 엔진 메서드의 인스펙터 플래그
+//     (readOnlyInInspector·hideInInspector)로 옮긴다. 다른 속성은 컴파일 오류다.
 //   - 속성: reflgen::range·display_name·hidden·readonly 는 엔진 속성으로 바꾸고, 엔진 속성(creator::…)은 그대로
 //     싣는다. 엔진이 읽지 않는 reflgen 속성(description·serialized_name·category·transient·required)은 컴파일
 //     오류다 — 조용히 버리면 붙인 사람이 기대한 일이 일어나지 않는다.
@@ -33,6 +35,15 @@ namespace creator
     using units = meta::units_attr;
     using debug_only = meta::debug_only_attr;
     using wide = meta::wide_attr;
+
+    // 메서드 속성 — 인스펙터의 호출 UI. 엔진은 method_info 의 플래그로 든다(속성 타입이 아니다).
+    struct read_only_in_inspector
+    {
+    };
+
+    struct hide_in_inspector
+    {
+    };
 }
 
 namespace meta
@@ -102,24 +113,57 @@ namespace meta
             return reflgen_bridge::field(source, std::index_sequence_for<Attrs...>{});
         }
 
-        // 파라미터 이름은 생성된 서술의 문자열 리터럴이다 — NUL 종단이다.
-        template<auto Function, std::size_t N, std::size_t... I>
-        consteval auto parameters(const reflgen::method_descriptor<Function, N>& source, std::index_sequence<I...>)
+        template<class A>
+        inline constexpr bool is_method_attribute =
+            std::is_same_v<A, creator::read_only_in_inspector> || std::is_same_v<A, creator::hide_in_inspector>;
+
+        // 엔진 레시피의 meta::method<&T::f>.readOnlyInInspector().hideInInspector() 와 같은 값.
+        template<auto Function, bool ReadOnly, bool Hidden>
+        consteval auto flagged_method()
         {
-            return meta::method<Function>.params(source.parameter_names[I].data()...);
+            if constexpr (ReadOnly && Hidden)
+            {
+                return meta::method<Function>.readOnlyInInspector().hideInInspector();
+            }
+            else if constexpr (ReadOnly)
+            {
+                return meta::method<Function>.readOnlyInInspector();
+            }
+            else if constexpr (Hidden)
+            {
+                return meta::method<Function>.hideInInspector();
+            }
+            else
+            {
+                return meta::method<Function>;
+            }
+        }
+
+        // 파라미터 이름은 생성된 서술의 문자열 리터럴이다 — NUL 종단이다. 플래그는 params() 가 옮긴다.
+        template<auto Function, std::size_t N, class... Attrs, std::size_t... I>
+        consteval auto parameters(const meta::method_info<Function, 0>& flagged,
+            const reflgen::method_descriptor<Function, N, Attrs...>& source, std::index_sequence<I...>)
+        {
+            return flagged.params(source.parameter_names[I].data()...);
         }
 
         template<auto Function, std::size_t N, class... Attrs>
         consteval auto method(const reflgen::method_descriptor<Function, N, Attrs...>& source)
         {
-            static_assert(sizeof...(Attrs) == 0, "엔진 메서드 서술에는 속성이 없다 — 메서드에 속성을 달지 않는다");
+            static_assert((is_method_attribute<Attrs> && ...),
+                "엔진 메서드 서술의 속성은 creator::read_only_in_inspector·hide_in_inspector 뿐이다");
+            constexpr bool read_only = (std::is_same_v<Attrs, creator::read_only_in_inspector> || ...);
+            constexpr bool hidden = (std::is_same_v<Attrs, creator::hide_in_inspector> || ...);
+            // 엔진 규칙 — 읽기 전용 인스펙터 메서드는 인자를 받지 않는다(meta::method_info::readOnlyInInspector).
+            static_assert(!read_only || N == 0, "읽기 전용 Inspector 메서드는 인자를 받지 않아야 한다");
+            constexpr auto flagged = reflgen_bridge::flagged_method<Function, read_only, hidden>();
             if constexpr (N == 0)
             {
-                return meta::method<Function>;
+                return flagged;
             }
             else
             {
-                return reflgen_bridge::parameters(source, std::make_index_sequence<N>{});
+                return reflgen_bridge::parameters(flagged, source, std::make_index_sequence<N>{});
             }
         }
 

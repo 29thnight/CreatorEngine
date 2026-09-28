@@ -7,18 +7,10 @@
 #include "BillboardType.h"
 #include "Texture.h"
 
-class SpriteRenderer : public meta::identity<SpriteRenderer, Component>
+class [[reflgen::reflect]] SpriteRenderer : public meta::identity<SpriteRenderer, Component>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_SpritePath>,
-           meta::field<&Self::m_orderInLayer>,
-           meta::field<&Self::m_billboardAxis>,
-           meta::field<&Self::m_billboardType>,
-           meta::field<&Self::m_enableDepth>);
-   }
 public:
     SpriteRenderer() = default;
 
@@ -46,7 +38,7 @@ private:
     std::string m_SpritePath{};
     int m_orderInLayer{ 0 };
     math::vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
-    std::shared_ptr<Texture> m_Sprite = nullptr;
+    [[reflgen::ignore]] std::shared_ptr<Texture> m_Sprite = nullptr;
     BillboardType m_billboardType{ BillboardType::None };
 	bool m_enableDepth{ false };
 };

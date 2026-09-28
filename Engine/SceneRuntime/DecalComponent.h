@@ -3,25 +3,10 @@
 #include "Component.h"
 
 class Texture;
-class DecalComponent : public meta::identity<DecalComponent, Component>
+class [[reflgen::reflect]] DecalComponent : public meta::identity<DecalComponent, Component>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_diffusefileName>,
-           meta::field<&Self::m_normalFileName>,
-           meta::field<&Self::m_ormFileName>,
-           meta::field<&Self::m_decalTexture>,
-           meta::field<&Self::m_normalTexture>,
-           meta::field<&Self::m_occluroughmetalTexture>,
-           meta::field<&Self::sliceX>,
-           meta::field<&Self::sliceY>,
-           meta::field<&Self::sliceNumber>,
-           meta::field<&Self::slicePerSeconds>,
-           meta::field<&Self::useAnimation>,
-           meta::field<&Self::isLoop>);
-   }
 public:
     DecalComponent() = default;
 
@@ -62,16 +47,16 @@ private:
     Texture* m_occluroughmetalTexture{};
 
 	// 직렬화/인스펙터 호환 raw 별칭은 위에 남기되 실제 수명은 이 셋이 가진다.
-	std::shared_ptr<Texture> m_decalTextureOwner{};
-	std::shared_ptr<Texture> m_normalTextureOwner{};
-	std::shared_ptr<Texture> m_ormTextureOwner{};
+	[[reflgen::ignore]] std::shared_ptr<Texture> m_decalTextureOwner{};
+	[[reflgen::ignore]] std::shared_ptr<Texture> m_normalTextureOwner{};
+	[[reflgen::ignore]] std::shared_ptr<Texture> m_ormTextureOwner{};
 
 public:
     uint32 sliceX = 1;
 	uint32 sliceY = 1;
     int sliceNumber = 0;
     float slicePerSeconds = 1.f;
-    float timer = 0.f;
+    [[reflgen::ignore]] float timer = 0.f;
     bool useAnimation = false;
     bool isLoop = true;
 

@@ -5,6 +5,10 @@
 // 경계가 이 파일이다. 엔진 결합(정체성 스탬핑 identity·Meta::Type 어댑터·
 // selftest 교차 검증)은 ReflectionMeta.h가 이 위에 얹는다.
 //
+// ★ reflgen 전환 뒤 엔진 타입은 [[reflgen::reflect]] 로 서술한다 — 다리(ReflgenBridge.h)가 그 서술을
+//   meta::of<T> 로 옮겨 이 파일의 질의 표면(schema_of·fields·for_each_field)이 그대로 소비한다. 아래의
+//   reflect() 레시피 표기는 meta 코어와 그 selftest 카나리아(ReflectionMeta.h)가 쓴다.
+//
 // 모델 (사용자 확정 2026-08-17):
 //   - 클래스 선언이 상속 관계의 **유일한 원본**이다: meta::identity<T, Base>가
 //     identity_descriptor를 공개하고, schema<T>는 그것으로 부모를 자동 추론한다.

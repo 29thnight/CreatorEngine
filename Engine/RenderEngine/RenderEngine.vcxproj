@@ -158,6 +158,7 @@
   <ItemGroup>
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="ReflgenBridgeSelfTest.cpp" />
+    <ClCompile Include="ReflgenParity.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />

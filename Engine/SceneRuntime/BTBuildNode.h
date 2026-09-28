@@ -4,25 +4,9 @@
 #include "BTEnum.h"
 
 
-struct BTBuildNode
+struct [[reflgen::reflect]] BTBuildNode
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = BTBuildNode;
-       return meta::schema<Self>(
-           meta::field<&Self::ID>,
-           meta::field<&Self::Type>,
-           meta::field<&Self::Name>,
-           meta::field<&Self::ParentID>,
-           meta::field<&Self::IsRoot>,
-           meta::field<&Self::HasScript>,
-           meta::field<&Self::ScriptName>,
-           meta::field<&Self::Policy>,
-           meta::field<&Self::Children>,
-           meta::field<&Self::ChildWeights>,
-           meta::field<&Self::Position>);
-   }
 	BTBuildNode() = default;
 	~BTBuildNode() = default;
 
@@ -41,5 +25,5 @@ struct BTBuildNode
 
 	math::vector2	Position; // 노드 위치 (에디터용)
 
-	std::string State;
+	[[reflgen::ignore]] std::string State;
 };

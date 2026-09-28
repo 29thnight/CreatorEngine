@@ -14,16 +14,9 @@
 //-----------------------------------------------------------------------------
 class ComponentFactory;
 class ProxyCommand;
-class TerrainComponent : public meta::identity<TerrainComponent, Component>
+class [[reflgen::reflect]] TerrainComponent : public meta::identity<TerrainComponent, Component>
 {
     public:
-    static consteval auto reflect()
-    {
-        return meta::schema<Self>(
-            meta::field<&Self::m_width>,
-            meta::field<&Self::m_height>,
-            meta::field<&Self::m_trrainAssetGuid>);
-    }
 public:
     void OnDeserialized(); // CT6-d: 지형 애셋 로드(구 팩토리 분기)
 
@@ -125,37 +118,37 @@ private:
     bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
 public:
     FileGuid m_trrainAssetGuid{};// 에셋 가이드
-    std::wstring m_terrainTargetPath{};
+    [[reflgen::ignore]] std::wstring m_terrainTargetPath{};
 
 private:
     friend class ProxyCommand;
 
-    std::vector<float> m_heightMap;
-    std::vector<math::vector3> m_vNormalMap;
-    std::vector<TerrainLayer>            m_layers; // 레이어 정보들
-    std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
+    [[reflgen::ignore]] std::vector<float> m_heightMap;
+    [[reflgen::ignore]] std::vector<math::vector3> m_vNormalMap;
+    [[reflgen::ignore]] std::vector<TerrainLayer>            m_layers; // 레이어 정보들
+    [[reflgen::ignore]] std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
 
-    std::shared_ptr<TerrainMesh> m_pTerrainMesh; // 지형 메시 (한 덩어리로 관리)
+    [[reflgen::ignore]] std::shared_ptr<TerrainMesh> m_pTerrainMesh; // 지형 메시 (한 덩어리로 관리)
     //TerrainMesh* m_pMesh{ nullptr };
-    std::shared_ptr<TerrainMaterial> m_pMaterial{}; // 프록시와 프레임 기록까지 공동 소유
-    TerrainBrush* m_currentBrush{ nullptr };
+    [[reflgen::ignore]] std::shared_ptr<TerrainMaterial> m_pMaterial{}; // 프록시와 프레임 기록까지 공동 소유
+    [[reflgen::ignore]] TerrainBrush* m_currentBrush{ nullptr };
 
-    float m_minHeight{ -100.0f }; // 최소 높이 
-    float m_maxHeight{ 500.0f }; // 최대 높이
+    [[reflgen::ignore]] float m_minHeight{ -100.0f }; // 최소 높이 
+    [[reflgen::ignore]] float m_maxHeight{ 500.0f }; // 최대 높이
     //todo: 인스펙터 및 높이 수정에 적용 안함 세이브로드 작업 이후 적용
 
 
     //== 에디터 전용
     //== window 공용으로 사용가능
-    uint32                               m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
+    [[reflgen::ignore]] uint32                               m_selectedLayerID{ 0xFFFFFFFF }; // 선택된 레이어 ID (0xFFFFFFFF는 선택 안됨을 의미)
     //== 에디터 전용
-    uint32                               m_nextLayerID{ 0 }; // 다음 레이어 ID
+    [[reflgen::ignore]] uint32                               m_nextLayerID{ 0 }; // 다음 레이어 ID
     //== window 공용으로 사용 불가능
-    std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
-    uint32 m_terrainID{ 0 }; // 지형 ID
+    [[reflgen::ignore]] std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
+    [[reflgen::ignore]] uint32 m_terrainID{ 0 }; // 지형 ID
 
 public:
-    bool m_initComplete{ false };
+    [[reflgen::ignore]] bool m_initComplete{ false };
 };

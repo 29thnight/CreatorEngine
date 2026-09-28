@@ -2,14 +2,9 @@
 #include "Core.Minimal.h"
 #include "Component.h"
 
-class InvalidScriptComponent : public meta::identity<InvalidScriptComponent, Component>
+class [[reflgen::reflect]] InvalidScriptComponent : public meta::identity<InvalidScriptComponent, Component>
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_errorMessage>);
-   }
 public:
 	InvalidScriptComponent() = default;
 

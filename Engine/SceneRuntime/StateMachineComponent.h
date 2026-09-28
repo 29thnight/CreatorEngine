@@ -11,14 +11,9 @@ namespace FSM
 	class Transition;
 }
 
-class StateMachineComponent :public meta::identity<StateMachineComponent, Component>, public IAIComponent
+class [[reflgen::reflect]] StateMachineComponent :public meta::identity<StateMachineComponent, Component>, public IAIComponent
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::name>);
-   }
 public:
 	using ConditionFunc = std::function<bool(const BlackBoard&)>;
 public:
@@ -40,8 +35,8 @@ public:
 	void RemoveTransition(FSM::Transition* transition);
 	FSM::FSMState* FindStateByName(const std::string& name) const;
 private:
-	std::vector<std::shared_ptr<FSM::FSMState>> m_states;
-	std::vector<std::shared_ptr<FSM::Transition>> m_transitions;
-	FSM::FSMState* m_currentState = nullptr;
-	BlackBoard m_localBB;
+	[[reflgen::ignore]] std::vector<std::shared_ptr<FSM::FSMState>> m_states;
+	[[reflgen::ignore]] std::vector<std::shared_ptr<FSM::Transition>> m_transitions;
+	[[reflgen::ignore]] FSM::FSMState* m_currentState = nullptr;
+	[[reflgen::ignore]] BlackBoard m_localBB;
 };

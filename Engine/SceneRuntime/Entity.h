@@ -15,29 +15,10 @@ class Bone;
 class RenderScene;
 class ModelLoader;
 class Prefab;
-class Entity : public Object
+class [[reflgen::reflect]] Entity : public Object
 {
     public:
     using meta_identity = meta::identity_descriptor<Entity, Object>;
-    static consteval auto reflect()
-    {
-        using Self = Entity;
-        return meta::schema<Self>(
-            meta::field<&Self::m_attachedSoketID>,
-            // m_transform 필드 소멸(S1-b) — Transform이 Component로 승격되며
-            // m_components 안의 컴포넌트 블록으로 직렬화된다. Entity 스키마에서
-            // 빠지는 것이 의도된 형상 변경이다(리플렉션 골든 재기준선 필요).
-            meta::field<&Self::m_index>,
-            meta::field<&Self::m_collisionType>,
-            meta::field<&Self::m_prefabFileGuid>,
-            meta::field<&Self::m_prefabOverrides>,
-            meta::field<&Self::m_tag>,
-            meta::field<&Self::m_layer>,
-            meta::field<&Self::m_editorIcon>.with(meta::hidden()),
-            meta::field<&Self::m_editorLocked>.with(meta::hidden()),
-            meta::field<&Self::m_components>,
-            meta::field<&Self::m_isStatic>);
-    }
 public:
 	using Index = GameObjectIndex;
 	static constexpr Entity::Index kInvalidIndex = std::numeric_limits<uint32_t>::max();
@@ -202,7 +183,7 @@ private:
 	// GetComponent<Transform>() 특수화(Entity.inl)와 공개 접근자 Transform_()가
 	// 여기를 읽어 FindComponentSlot 선형 탐색을 건너뛴다. UI는 의도적으로
 	// Transform이 없으므로 nullptr가 정상 상태이고, Canvas는 Transform을 갖는다.
-	Transform* m_pTransformComponent{ nullptr };
+	[[reflgen::ignore]] Transform* m_pTransformComponent{ nullptr };
 
 	// 타입→슬롯 탐색의 단일 구현 (SceneGraphRedesignPlan §4 트랙 K, K2).
 	//
@@ -293,6 +274,9 @@ private:
 public:
 
 	HashedGuid m_attachedSoketID{};
+	// m_transform 필드 소멸(S1-b) — Transform이 Component로 승격되며
+	// m_components 안의 컴포넌트 블록으로 직렬화된다. Entity 스키마에서
+	// 빠지는 것이 의도된 형상 변경이다(리플렉션 골든 재기준선 필요).
 	Entity::Index m_index{ kInvalidIndex };
 	uint32 m_collisionType = 0;
 	FileGuid m_prefabFileGuid{ nullFileGuid };
@@ -308,8 +292,8 @@ public:
     HashingString m_layer{ "Default" };
     // Authoring presentation only. Stable preset ID; empty keeps the default.
     // Stored with the entity so scene/prefab round trips and duplication retain it.
-    std::string m_editorIcon{};
-    bool m_editorLocked{ false }; // Authoring lock; runtime simulation ignores it.
+    [[reflgen::hidden]] std::string m_editorIcon{};
+    [[reflgen::hidden]] bool m_editorLocked{ false }; // Authoring lock; runtime simulation ignores it.
 
 	// K2: m_componentIds(unordered_map<HashedGuid,size_t>) 소멸 — 이중 구조의
 	// 절반이었다. 정본은 m_components 하나, 타입 조회는 FindComponentSlot(마스크
@@ -349,14 +333,14 @@ public:
 	// 인덱스(TypeTrait::ComponentTypeIndex) 기준이라 절대 직렬화하지 않는다 —
 	// [[Property]]를 붙이지 않는다. "이 타입이 하나 이상 있는가"만 뜻한다
 	// (AddComponentAllowMultiple로 여러 개 붙는 스크립트 쪽도 비트 하나로 접힌다).
-	uint64_t m_componentTypeMask{ 0 };
+	[[reflgen::ignore]] uint64_t m_componentTypeMask{ 0 };
 
 	// 씬 그래프 상의 단계 (SceneGraphRedesignPlan §4 트랙 L1). 세션 로컬 런타임
 	// 상태라 직렬화하지 않는다 — [[Property]]를 붙이지 않는다. 생성과 동시에
 	// m_Entities에 등록되는 현행 경로들(CreateEntity 등) 때문에 기본값을
 	// InScene으로 둔다 — Detached/Attached는 DDOL 이송 창(Scene::
 	// DetachEntityHierarchy/AttachExistingEntity)에서만 관측된다.
-	ScenePhase m_scenePhase{ ScenePhase::InScene };
+	[[reflgen::ignore]] ScenePhase m_scenePhase{ ScenePhase::InScene };
 
 	// 컨테이너를 통째로 비우고 다시 채우는 경로(프리팹 갱신 등)를 위한 재구축.
 	// m_components를 처음부터 훑어 마스크를 다시 세운다 — 그런 경로는 AddComponent를
@@ -377,8 +361,8 @@ public:
 	// 헤더가 추가되자 그 운이 깨져 C2680이 났다).
 	void RebuildComponentTypeMask();
 
-	Scene* m_ownerScene{ nullptr };
-	Prefab* m_prefab{ nullptr };
+	[[reflgen::ignore]] Scene* m_ownerScene{ nullptr };
+	[[reflgen::ignore]] Prefab* m_prefab{ nullptr };
 
 	// 프리팹 원본 스냅샷 — 더 이상 오버라이드 판정의 정본이 아니다(그 자리는
 	// m_prefabOverrides로 옮겼다, P1). 오버라이드 기록의 정본은 에디터가 프로퍼티를
@@ -387,9 +371,9 @@ public:
 	// 비교해 목록을 시딩하는 마이그레이션 편의로만 쓴다. 비직렬화라 씬을 재로드하면
 	// 비고, 그러면 시딩할 근거가 없어 "오버라이드 없음"으로 취급한다(예외 1과 같은 결과).
 	// D3-a-3: 문서 소유 타입이 감싼다(§3.3). 이 멤버는 여전히 비직렬화이고
-	// reflect()에 없다 — 바뀐 것은 소유 표현뿐이며 시딩 의미는 그대로다.
-	Authoring::Document m_prefabOriginal{};
-	std::string m_removedSuffixNumberTag{};
+	// 서술에서 빠진다(reflgen::ignore) — 바뀐 것은 소유 표현뿐이며 시딩 의미는 그대로다.
+	[[reflgen::ignore]] Authoring::Document m_prefabOriginal{};
+	[[reflgen::ignore]] std::string m_removedSuffixNumberTag{};
 
 	bool m_isStatic{ false };
 };

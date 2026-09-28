@@ -9,14 +9,10 @@
 class Entity;
 class Transform;
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
-class Component : public meta::identity<Component, Object>
+class [[reflgen::reflect]] Component : public meta::identity<Component, Object>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_FileID>);
-   }
 public:
 	Component() = default;
 
@@ -142,9 +138,9 @@ public:
 	Component& GetComponent(HashedGuid typeof);
 
 protected:
-	uint8_t			m_lifecycleState{ 0 };
-	Entity*		m_pOwner{};
-	Transform*		m_pTransform{ nullptr };
+	[[reflgen::ignore]] uint8_t			m_lifecycleState{ 0 };
+	[[reflgen::ignore]] Entity*		m_pOwner{};
+	[[reflgen::ignore]] Transform*		m_pTransform{ nullptr };
 	FileGuid m_FileID{};
 };
 

@@ -4,19 +4,9 @@
 #include "BoneMask.h"
 
 enum class BoneRegion;
-class AvatarMask
+class [[reflgen::reflect]] AvatarMask
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = AvatarMask;
-       return meta::schema<Self>(
-           meta::field<&Self::m_BoneMasks>,
-           meta::field<&Self::isHumanoid>,
-           meta::field<&Self::useAll>,
-           meta::field<&Self::useUpper>,
-           meta::field<&Self::useLower>);
-   }
 
 public:
 	AvatarMask() = default;
@@ -28,7 +18,7 @@ public:
 
 
 	void ReCreateMask(AvatarMask* _otherMask);
-	BoneMask* RootMask{ nullptr };
+	[[reflgen::ignore]] BoneMask* RootMask{ nullptr };
 	bool IsBoneEnabled(const std::string& name);
 	std::vector<BoneMask*> m_BoneMasks;
 	bool isHumanoid = true; 

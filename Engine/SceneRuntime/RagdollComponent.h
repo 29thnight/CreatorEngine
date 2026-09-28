@@ -9,14 +9,9 @@
 class AriculationData;
 class ArticulationLoader;
 
-class RagdollComponent : public meta::identity<RagdollComponent, Component>, public ICollider
+class [[reflgen::reflect]] RagdollComponent : public meta::identity<RagdollComponent, Component>, public ICollider
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_bIsRagdoll>);
-   }
 public:
 	RagdollComponent() = default;
 
@@ -24,19 +19,19 @@ public:
 
 
 private:
-	unsigned int m_ragdollID;
-	unsigned int m_collsionCount = 0;
+	[[reflgen::ignore]] unsigned int m_ragdollID;
+	[[reflgen::ignore]] unsigned int m_collsionCount = 0;
 
 	//bool m_bIsRagdoll{ false };
 
-	float m_fBlendTime{ 0.0f };
-	float m_fComplateTime{ 1.0f };
+	[[reflgen::ignore]] float m_fBlendTime{ 0.0f };
+	[[reflgen::ignore]] float m_fComplateTime{ 1.0f };
 
-	math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
-	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+	[[reflgen::ignore]] math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+	[[reflgen::ignore]] math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
-	std::string m_ArticulationPath;
-	ArticulationData* m_articulationData;
+	[[reflgen::ignore]] std::string m_ArticulationPath;
+	[[reflgen::ignore]] ArticulationData* m_articulationData;
 
 
 	// ICollider을(를) 통해 상속됨

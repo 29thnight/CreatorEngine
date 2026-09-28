@@ -778,7 +778,7 @@ namespace ConsoleCmd
         // ── 이 명령이 왜 먼저 서는가 (P-write S0) ──
         //
         // 지금 이 목록은 **항상 비어 있다.** 채우는 지점이 SeedOverridesFromSnapshot
-        // 하나뿐이고, 그 기준인 m_prefabOriginal이 reflect()에 없어 비직렬화라
+        // 하나뿐이고, 그 기준인 m_prefabOriginal이 서술에서 빠져(reflgen::ignore) 비직렬화라
         // 씬을 다시 열면 근거가 사라진다(PrefabUtility.cpp:62-67의 자백 참고).
         // 그래서 프리팹을 갱신하면 인스턴스의 로컬 수정이 에러도 로그도 없이 덮인다.
         //

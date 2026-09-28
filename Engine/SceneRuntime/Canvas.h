@@ -11,21 +11,9 @@
 
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 
-class Canvas : public meta::identity<Canvas, Component>
+class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::ScaleMode>,
-           meta::field<&Self::ReferenceResolution>,
-           meta::field<&Self::MatchWidthOrHeight>,
-           meta::field<&Self::ScaleFactor>,
-           meta::field<&Self::RenderMode>,
-           meta::field<&Self::PlaneDistance>,
-           meta::field<&Self::CanvasOrder>,
-           meta::field<&Self::CanvasName>);
-   }
 public:
 	Canvas();
 	~Canvas() = default;
@@ -92,14 +80,14 @@ public:
 	// ScreenSpaceCamera에서 게임 카메라 앞에 놓을 거리.
 	float PlaneDistance = 100.f;
 
-	int PreCanvasOrder = 0;
+	[[reflgen::ignore]] int PreCanvasOrder = 0;
 	int CanvasOrder = 0;
 	// 씬 소유 객체를 장기 소유하지 않는 세대 검증 캐시. DDOL 이송 때
 	// OnRemovingFromScene에서 비우고, 새 씬의 OnAddedToScene 이후 UIManager가
 	// 현재 sceneId/index/generation으로 다시 연결한다.
-	std::vector<EntityHandle> UIObjs;
+	[[reflgen::ignore]] std::vector<EntityHandle> UIObjs;
 	std::string CanvasName = "Canvas";
-	std::string prevCanvasName{};
+	[[reflgen::ignore]] std::string prevCanvasName{};
 };
 
 
