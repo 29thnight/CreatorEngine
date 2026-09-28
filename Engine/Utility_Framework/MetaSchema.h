@@ -48,6 +48,7 @@
 #include <type_traits>
 #include <cstddef>
 #include <limits>
+#include <utility>
 
 namespace meta
 {
@@ -360,18 +361,60 @@ namespace meta
         template<class E> struct is_method_info : std::false_type {};
         template<auto F, size_t N> struct is_method_info<method_info<F, N>> : std::true_type {};
 
+        // ★ 스키마는 그것을 쓰는 번역 단위마다 타입마다 평가된다 — 컴파일 시간이 곧 이 코드의 비용이다.
+        //   MSVC 의 std::tuple 은 재귀 상속이라 원소 N 개짜리 하나가 N 단의 클래스를 실체화한다. 그래서 인자
+        //   전부를 std::tuple 에 담았다가 std::apply + std::tuple_cat 으로 고르지 않는다(tuple_cat 은 그 위에
+        //   tuple<tuple<...>&&...> 을 또 만든다). 인자는 평평한 묶음(leaf 다중 상속, 1 단)에 참조로 두고, 고를
+        //   위치를 상수 배열로 센 뒤 결과 튜플을 한 번에 만든다. reflgen 의 schema 와 같은 수다.
+        template<size_t I, class E>
+        struct entry_leaf
+        {
+            const E& value;
+        };
+
+        template<class Seq, class... Es>
+        struct entry_pack;
+
+        template<size_t... I, class... Es>
+        struct entry_pack<std::index_sequence<I...>, Es...> : entry_leaf<I, Es>...
+        {
+        };
+
+        template<size_t I, class E>
+        consteval const E& entry_at(const entry_leaf<I, E>& leaf) noexcept
+        {
+            return leaf.value;
+        }
+
+        template<template<class> class Pred, class... Es>
+        inline constexpr size_t picked_count = (size_t{ Pred<Es>::value } + ... + 0);
+
+        template<template<class> class Pred, class... Es>
+        consteval auto picked_positions()
+        {
+            constexpr bool matches[] = { Pred<Es>::value..., false };
+            std::array<size_t, picked_count<Pred, Es...>> positions{};
+            size_t next = 0;
+            for (size_t i = 0; i < sizeof...(Es); ++i)
+            {
+                if (matches[i]) { positions[next++] = i; }
+            }
+            return positions;
+        }
+
+        template<template<class> class Pred, class... Es, size_t... I>
+        consteval auto pick(const entry_pack<std::index_sequence_for<Es...>, Es...>& entries, std::index_sequence<I...>)
+        {
+            constexpr auto positions = picked_positions<Pred, Es...>();
+            return std::tuple<std::remove_cvref_t<decltype(entry_at<positions[I]>(entries))>...>{
+                entry_at<positions[I]>(entries)... };
+        }
+
         // schema 인자에서 종류별 부분 튜플을 뽑는다 (순서 보존).
         template<template<class> class Pred, class... Es>
-        consteval auto pick(std::tuple<Es...> t)
+        consteval auto pick(const entry_pack<std::index_sequence_for<Es...>, Es...>& entries)
         {
-            return std::apply([](auto... e)
-            {
-                return std::tuple_cat([&]
-                {
-                    if constexpr (Pred<decltype(e)>::value) { return std::tuple{ e }; }
-                    else { return std::tuple<>{}; }
-                }()...);
-            }, t);
+            return pick<Pred, Es...>(entries, std::make_index_sequence<picked_count<Pred, Es...>>{});
         }
     }
 
@@ -418,9 +461,9 @@ namespace meta
     template<class T, class... Entries>
     consteval auto schema(Entries... entries)
     {
-        auto all = std::tuple<Entries...>{ entries... };
-        auto fs = detail::pick<detail::is_field_info>(all);
-        auto ms = detail::pick<detail::is_method_info>(all);
+        const detail::entry_pack<std::index_sequence_for<Entries...>, Entries...> all{ { entries }... };
+        auto fs = detail::pick<detail::is_field_info, Entries...>(all);
+        auto ms = detail::pick<detail::is_method_info, Entries...>(all);
 
         if constexpr (detail::declares_identity<T>)
         {
