@@ -1,5 +1,7 @@
 #pragma once
-// reflgen 전환 동등성 증명의 도구 (reflgen 도입 P4) — 모듈마다 있는 ReflgenParity.cpp 가 쓴다.
+// reflgen 전환 동등성 증명의 도구 (reflgen 도입 P4) — reflgen_codemod.py 가 쓰는 표(모듈마다 ReflgenParity.cpp)가
+// include 한다. 표는 전환을 증명한 뒤 지운다(필드가 바뀌면 깨진다) — 이 도구는 다음 전환을 위해 codemod 옆에
+// 남는다. 엔진 빌드에는 들어가지 않는다.
 //
 // 옛 레시피가 적었던 것(필드 이름·순서·속성, 메서드 이름·파라미터 이름)을 값으로 적어 두고, 다리
 // (ReflgenBridge.h)가 만든 엔진 스키마(meta::schema_of<T>)가 그것과 같은지 컴파일 때 견준다.

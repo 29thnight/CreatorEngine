@@ -314,9 +314,6 @@
     <ClCompile Include="Prefab.cpp">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClCompile>
-    <ClCompile Include="ReflgenParity.cpp">
-      <Filter>Classes\GameObject\Prefab</Filter>
-    </ClCompile>
     <ClCompile Include="PrefabUtility.cpp">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClCompile>

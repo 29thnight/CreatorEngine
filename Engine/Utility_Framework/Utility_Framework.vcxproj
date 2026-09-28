@@ -71,7 +71,6 @@
     <ClInclude Include="ReflectionFunction.h" />
     <ClInclude Include="MetaSchema.h" />
     <ClInclude Include="ReflgenBridge.h" />
-    <ClInclude Include="ReflgenParity.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
     <ClInclude Include="ReflectionYml.h" />

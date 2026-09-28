@@ -217,9 +217,6 @@
     <ClInclude Include="ReflgenBridge.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="ReflgenParity.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
     <ClInclude Include="MetaStateCommand.h">
       <Filter>Core.Reflection</Filter>
     </ClInclude>

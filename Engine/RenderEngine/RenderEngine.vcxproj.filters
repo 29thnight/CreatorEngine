@@ -285,9 +285,6 @@
     <ClCompile Include="ReflgenBridgeSelfTest.cpp">
       <Filter>Interfaces</Filter>
     </ClCompile>
-    <ClCompile Include="ReflgenParity.cpp">
-      <Filter>Interfaces</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\ThirdParty\fastgltf\src\base64.cpp">
       <Filter>ThirdParty\fastgltf</Filter>
     </ClCompile>

@@ -9,7 +9,8 @@
 #
 # 옮기기 전의 레시피는 모듈마다 동등성 증명 표(ReflgenParity.cpp)로 남긴다. 다리가 만든 엔진 스키마가 그 표와
 # 필드 이름·순서·속성 타입·속성 값·메서드·파라미터 이름까지 같은지 컴파일 때 단정한다 — 소비자는 스키마 타입에
-# 대한 template 이라 같으면 동작도 같다.
+# 대한 template 이라 같으면 동작도 같다. 표는 이 폴더의 ReflgenParity.h 를 include 한다. 새 표는 그 모듈의
+# vcxproj 에 ClCompile 로 넣고, 증명한 뒤에는 지운다(필드가 바뀌면 깨진다 — 넣는 커밋과 지우는 커밋을 가른다).
 #
 # 위치는 libclang(C API, ctypes — Visual Studio 의 LLVM)으로 얻는다. 파싱 인자는 빌드가 남긴 reflgen 인자 파일
 # (Build/Obj/*/x64-Debug/reflgen/reflgen_*.args)을 합쳐 쓴다 — Debug x64 를 한 번 빌드한 뒤에 돌린다. master 를
@@ -17,6 +18,7 @@
 # 바꾼다(이미 옮긴 타입의 줄은 둔다).
 import argparse
 import ctypes as C
+import os
 import pathlib
 import re
 import sys
@@ -421,10 +423,10 @@ def parity_file(module, plans, existing=''):
         '// 옮긴 타입마다 다리(ReflgenBridge.h)가 만든 엔진 스키마가 옛 레시피와 필드 이름·순서·속성 타입·속성 값·',
         '// 메서드·파라미터 이름까지 같은지 컴파일 때 단정한다. 엔진 소비자는 스키마 타입에 대한 template 이라 같으면',
         '// 동작도 같다. 이 표는 옛 레시피의 기록이다 — 필드를 더하거나 빼면 여기 줄도 고친다.',
-        '#include "ReflgenParity.h"',
     ]
     here = (ROOT / PARITY_FILES[module]).parent
-    includes = set(re.findall(r'#include "([^"]+)"', existing)) - {'ReflgenParity.h'}
+    lines.append('#include "' + pathlib.Path(os.path.relpath(pathlib.Path(__file__).with_name('ReflgenParity.h'), here)).as_posix() + '"')
+    includes = {i for i in re.findall(r'#include "([^"]+)"', existing) if not i.endswith('ReflgenParity.h')}
     for header in {p['file'] for p in plans}:
         relative = pathlib.Path(header).resolve().relative_to(here.resolve()) if pathlib.Path(header).resolve().is_relative_to(here.resolve()) else None
         includes.add((relative or pathlib.Path(header).name).as_posix())

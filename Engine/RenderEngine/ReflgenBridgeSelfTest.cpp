@@ -1,15 +1,13 @@
-// reflgen 다리 동등성 증명 (reflgen 도입 파일럿)
+// reflgen 다리 규칙 시험 (reflgen 도입)
 //
-// reflgen 으로 옮긴 타입마다 옮기기 전의 레시피를 legacy 에 그대로 두고, 다리(ReflgenBridge.h)가 만든 엔진
-// 스키마(meta::schema_of<T>)가 그것과 **같은 타입이고 같은 값**인지 컴파일 때 단정한다. 엔진 소비자(직렬화·
-// 인스펙터·Meta::Type 어댑터)는 스키마 타입에 대한 template 이라 타입과 값이 같으면 동작도 같다 — 자산을 읽고
-// 쓰는 바이트도 같다. 필드 순서·이름·속성 타입은 타입에, 속성 값과 파라미터 이름은 값에 있다.
+// 다리(ReflgenBridge.h)가 reflgen 서술을 엔진 스키마(meta::schema_of<T>)로 옮기는 규칙을 카나리아 타입 하나로
+// 컴파일 때 단정한다 — 같은 서술을 손으로 쓴 엔진 레시피(legacy)와 **같은 타입이고 같은 값**이어야 한다. 엔진
+// 소비자(직렬화·인스펙터·Meta::Type 어댑터)는 스키마 타입에 대한 template 이라 타입과 값이 같으면 동작도 같다.
+// 필드 순서·이름·속성 타입은 타입에, 속성 값과 파라미터 이름은 값에 있다.
 //
-// 타입을 reflgen 으로 옮길 때 그 타입의 옛 레시피를 여기 legacy 로 옮기고 단정 한 줄을 더한다.
-#include "AAPassSetting.h"
-#include "LightMapping.h"
+// 엔진 타입 전부를 옮길 때는 옮기기 전 레시피 전부를 같은 식으로 대조했다(전환 커밋의 ReflgenParity.*). 그 표는
+// 필드가 바뀔 때마다 깨지므로 전환 뒤에 치웠다 — 여기에는 다리의 규칙(속성·메서드를 옮기는 법)만 남긴다.
 #include "ReflgenBridgeCanary.h"
-#include "ShadowMapPassSetting.h"
 #include <cstddef>
 #include <string_view>
 #include <tuple>
@@ -20,40 +18,6 @@ namespace
 {
     namespace legacy
     {
-        consteval auto aa_pass_setting()
-        {
-            using Self = AAPassSetting;
-            return meta::schema<Self>(
-                meta::field<&Self::isApply>,
-                meta::field<&Self::bias>,
-                meta::field<&Self::biasMin>,
-                meta::field<&Self::spanMax>);
-        }
-
-        consteval auto shadow_map_pass_setting()
-        {
-            using Self = ShadowMapPassSetting;
-            return meta::schema<Self>(
-                meta::field<&Self::useCascade>,
-                meta::field<&Self::isCloudOn>,
-                meta::field<&Self::cloudSize>,
-                meta::field<&Self::cloudDirection>,
-                meta::field<&Self::cloudMoveSpeed>,
-                meta::field<&Self::cloudAlpha>,
-                meta::field<&Self::epsilon>);
-        }
-
-        consteval auto light_mapping()
-        {
-            using Self = LightMapping;
-            return meta::schema<Self>(
-                meta::field<&Self::lightmapIndex>,
-                meta::field<&Self::ligthmapResolution>,
-                meta::field<&Self::lightmapScale>,
-                meta::field<&Self::lightmapOffset>,
-                meta::field<&Self::lightmapTiling>);
-        }
-
         consteval auto canary()
         {
             using Self = reflgen_bridge_canary::Canary;
@@ -131,18 +95,12 @@ namespace
     template<class T>
     using bridged_t = std::remove_cvref_t<decltype(meta::schema_of<T>)>;
 
-    // 레시피가 사라졌다 — 서술은 다리(meta::of<T>)에서만 온다.
-    static_assert(!meta::detail::has_local_recipe<AAPassSetting> && meta::detail::has_external_recipe<AAPassSetting>);
-    static_assert(Meta::HasReflection<AAPassSetting>);
+    // 레시피가 없다 — 서술은 다리(meta::of<T>)에서만 온다.
+    static_assert(!meta::detail::has_local_recipe<reflgen_bridge_canary::Canary>
+        && meta::detail::has_external_recipe<reflgen_bridge_canary::Canary>);
+    static_assert(Meta::HasReflection<reflgen_bridge_canary::Canary>);
 
-    static_assert(std::is_same_v<bridged_t<AAPassSetting>, decltype(legacy::aa_pass_setting())>);
-    static_assert(same_values<AAPassSetting>(legacy::aa_pass_setting()));
-    static_assert(std::is_same_v<bridged_t<ShadowMapPassSetting>, decltype(legacy::shadow_map_pass_setting())>);
-    static_assert(same_values<ShadowMapPassSetting>(legacy::shadow_map_pass_setting()));
-    static_assert(std::is_same_v<bridged_t<LightMapping>, decltype(legacy::light_mapping())>);
-    static_assert(same_values<LightMapping>(legacy::light_mapping()));
-
-    // 카나리아 — 속성·메서드를 옮기는 규칙 전부.
+    // 속성·메서드를 옮기는 규칙 전부.
     static_assert(std::is_same_v<bridged_t<reflgen_bridge_canary::Canary>, decltype(legacy::canary())>);
     static_assert(same_values<reflgen_bridge_canary::Canary>(legacy::canary()));
     // 표시 이름은 C 문자열로 쓰인다(Property::displayName) — NUL 종단이어야 한다.
