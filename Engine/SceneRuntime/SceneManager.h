@@ -271,9 +271,9 @@ private:
     };
     using LoadIndexBatch = std::vector<LoadIndexEntry>;
 
-    void DesirealizeGameObject(const Meta::Type* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
-    void DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
-	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
+    void DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
+    void DesirealizeGameObject(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
+	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
 
     // 배치가 끝난 직후 한 번 호출. targetScene이 null이거나 batch가 비어 있으면
     // 아무것도 하지 않는다(로더별 타깃 씬이 갈리는 경우 배치도 나눠 호출한다 —

@@ -282,9 +282,6 @@
     <ClCompile Include="MeshOptimizer.cpp">
       <Filter>Asset\MeshOptimizer</Filter>
     </ClCompile>
-    <ClCompile Include="ReflgenBridgeSelfTest.cpp">
-      <Filter>Interfaces</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\ThirdParty\fastgltf\src\base64.cpp">
       <Filter>ThirdParty\fastgltf</Filter>
     </ClCompile>
@@ -614,9 +611,6 @@
     <ClInclude Include="Interfaces\AAPassSetting.h">
       <Filter>RenderPass\AAPass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\ReflgenBridgeCanary.h">
-      <Filter>Interfaces</Filter>
-    </ClInclude>
     <ClInclude Include="Interfaces\AssetAuthoringPort.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
@@ -691,6 +685,9 @@
     </ClInclude>
     <ClInclude Include="Material.h">
       <Filter>Resources\Material</Filter>
+    </ClInclude>
+    <ClInclude Include="ReflgenRegistration.h">
+      <Filter>Interfaces</Filter>
     </ClInclude>
     <ClInclude Include="ShaderMetaHandle.h">
       <Filter>Resources\Material</Filter>

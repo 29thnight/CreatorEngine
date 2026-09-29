@@ -100,12 +100,12 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     if (!original)
         return nullptr;
 
-    const Meta::Type* meta = Meta::MetaDataRegistry->Find(original->GetTypeID());
+    const reflgen::type_descriptor* meta = Meta::Find(original->GetTypeID());
     if (!meta)
         return nullptr;
 
 	// E7-c: Entity는 저장 타입 필드 없이도 공간 컴포넌트 조합을 정확히 복제해야
-	// 한다. meta->create()는 기본 Entity(Transform)를 만들기 때문에 UI 원본에
+	// 한다. Meta::Create(*meta)는 기본 Entity(Transform)를 만들기 때문에 UI 원본에
 	// 사용하면 RectTransform을 추가한 뒤 둘을 함께 갖게 된다. Entity만 Scene의
 	// 정식 생성 경로를 먼저 타고, 나머지 Object는 아래 기존 팩토리를 유지한다.
 	if (auto* originalEntity = dynamic_cast<const Entity*>(original))
@@ -130,7 +130,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			std::string_view requestedName) -> Entity*
 		{
 			if (!source) return nullptr;
-			const Meta::Type* sourceMeta = Meta::MetaDataRegistry->Find(source->GetTypeID());
+			const reflgen::type_descriptor* sourceMeta = Meta::Find(source->GetTypeID());
 			if (!sourceMeta) return nullptr;
 
 			Authoring::WriteDocument sourceDocument = Meta::SerializeDocument(
@@ -217,8 +217,8 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 	}
 
 	// 새 인스턴스 생성
-    // CT11: 팩토리 접합 — meta(Type*)가 생성 함수를 직접 든다(조회 0회).
-    Object* cloneObj = meta->create ? static_cast<Object*>(meta->create()) : nullptr;
+    // CT11: 팩토리 접합 — meta(서술자)가 생성 함수를 직접 든다(조회 0회). T* → Object* 는 서술자의 base 체인이 보정한다.
+    Object* cloneObj = Meta::Create<Object>(*meta).release();
     if (!cloneObj)
         return nullptr;
 

@@ -211,23 +211,20 @@ void Entity::AttachComponentLifecycle(Component* component)
 	}
 }
 
-Component* Entity::AddComponent(const Meta::Type& type)
+Component* Entity::AddComponent(const reflgen::type_descriptor& type)
 {
-    if (auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& component) { return component->GetTypeID() == type.typeID; }); it != m_components.end())
+    const HashedGuid typeID = Meta::TypeIDOf(type);
+    if (auto it = std::ranges::find_if(m_components, [&](const std::unique_ptr<Component>& component) { return component->GetTypeID() == typeID; }); it != m_components.end())
     {
-		Debug::PrintLog(spdlog::level::warn, "Component of type " + type.name + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
+		Debug::PrintLog(spdlog::level::warn, "Component of type " + std::string(type.name()) + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
 		return it->get();
     }
 
-    // CT11: 팩토리 접합 — 이미 손에 쥔 Type이 생성 함수를 직접 든다(조회 0회).
-    // K2 스테이지 A: make_shared 경로(createShared) 대신 createUnique로 만든다 —
-    // GameObject가 유일한 소유자이므로 shared_ptr의 참조 계수는 애초에 필요 없었다.
-    // void* → Component*는 createShared의 shared_ptr<void> → static_pointer_cast<Component>와
-    // 같은 원리(단일 상속 체인이라 오프셋 0, meta::polymorphic의 가상 소멸자가 올바른 파생
-    // 타입으로 delete되게 한다).
-    std::unique_ptr<Component> component = type.createUnique
-        ? std::unique_ptr<Component>(static_cast<Component*>(type.createUnique().release()))
-        : nullptr;
+    // CT11: 팩토리 접합 — 이미 손에 쥔 서술자가 생성 함수를 직접 든다(조회 0회).
+    // K2 스테이지 A: GameObject가 유일한 소유자이므로 고유 소유로 만든다.
+    // reflgen 도입 P5: T* → Component* 는 서술자의 base 체인이 보정한다(옛 경로는 오프셋 0을 가정했다) —
+    // Component 의 반영된 자손이 아니면 nullptr 이다. 삭제는 가상 소멸자(meta::polymorphic)가 파생 타입으로 한다.
+    std::unique_ptr<Component> component = Meta::Create<Component>(type);
 
     Component* rawComponent = component.get();
     if (rawComponent)
@@ -245,7 +242,7 @@ Component* Entity::AddComponent(const Meta::Type& type)
 		// K2: m_componentIds(맵) 소멸 — push_back 자체가 등록이다. 조회는
 		// FindComponentSlot(마스크 선판정 + 선형 탐색)으로 수렴했다.
 
-		// K1-a 후속 배선: Meta::Type 경유 부착(디스크 로드 경로, ComponentFactory::
+		// K1-a 후속 배선: 서술자 경유 부착(디스크 로드 경로, ComponentFactory::
 		// LoadComponent가 실제로 부른다)도 템플릿 AddComponent<T>()와 동일하게
 		// 마스크 비트를 세워야 HasComponent<T>()가 로드된 오브젝트에서도 맞는다.
 		const uint32_t maskIndex = TypeTrait::ComponentTypeIndex::Find(rawComponent->GetTypeID());
@@ -258,11 +255,9 @@ Component* Entity::AddComponent(const Meta::Type& type)
 	return rawComponent;
 }
 
-Component* Entity::AddComponentAllowMultiple(const Meta::Type& type)
+Component* Entity::AddComponentAllowMultiple(const reflgen::type_descriptor& type)
 {
-	std::unique_ptr<Component> component = type.createUnique
-		? std::unique_ptr<Component>(static_cast<Component*>(type.createUnique().release()))
-		: nullptr;
+	std::unique_ptr<Component> component = Meta::Create<Component>(type);
 
 	Component* rawComponent = component.get();
 	if (!rawComponent)
@@ -291,10 +286,10 @@ Component* Entity::AddComponentAllowMultiple(const Meta::Type& type)
 	return rawComponent;
 }
 
-Component* Entity::GetComponent(const Meta::Type& type)
+Component* Entity::GetComponent(const reflgen::type_descriptor& type)
 {
     // K2: m_componentIds(맵) 소멸 — FindComponentSlot(마스크 선판정 + 선형 탐색)로 수렴.
-    const size_t slot = FindComponentSlot(type.typeID);
+    const size_t slot = FindComponentSlot(Meta::TypeIDOf(type));
     return slot == kInvalidComponentSlot ? nullptr : m_components[slot].get();
 }
 

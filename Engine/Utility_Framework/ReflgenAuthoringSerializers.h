@@ -63,10 +63,12 @@ namespace Meta::Typed
 			}
 		}
 
+		// 헤더의 타입 이름 — reflgen 서술의 이름(생성기가 적는 한정 이름)이다. 엔진 typeID 를 만드는 이름과 같은 표기
+		// 인지는 RegisterReflectManual.h 가 반영 타입마다 컴파일 때 대조한다.
 		template<class T>
 		constexpr std::string_view RecordName()
 		{
-			return std::remove_cvref_t<decltype(::meta::reflect<T>())>::identifier;
+			return reflgen::schema_of<T>.name;
 		}
 
 		// 레거시 SerializeObjectInto 와 같은 순서 — 훅 → 헤더 → 필드 → 훅.
@@ -333,10 +335,10 @@ struct reflgen::serializer<C>
 			}
 			else if constexpr (Meta::Typed::IsComponentExact<U>())
 			{
-				// 원소 정적 타입이 Component 그 자체 → 실타입(typeID → TypeOps)으로 쓴다(레거시).
-				const Meta::Typed::TypeOps* ops = Meta::Typed::FindTypeOps(pointee->GetTypeID().m_ID_Data);
+				// 원소 정적 타입이 Component 그 자체 → 실타입(typeID → 등록소의 서술자)으로 쓴다(레거시).
+				const reflgen::type_descriptor* type = Meta::Find(pointee->GetTypeID());
 				auto* authoring = dynamic_cast<Authoring::ReflgenWriter*>(&out);
-				if (nullptr == ops)
+				if (nullptr == type)
 				{
 					out.write_null(); // unknown component
 				}
@@ -346,7 +348,7 @@ struct reflgen::serializer<C>
 				}
 				else
 				{
-					ops->serializeInto(pointee, authoring->TakeValueNode());
+					Meta::SerializeInto(Meta::MostDerived(pointee), *type, authoring->TakeValueNode());
 				}
 			}
 			else if constexpr (Meta::Typed::ReflgenRecord<U>)

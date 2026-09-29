@@ -46,9 +46,9 @@ namespace
         static consteval auto reflect()
         {
             using Self = ProbeNested;
-            return meta::schema<Self>(
-                meta::field<&Self::m_id>,
-                meta::field<&Self::m_tag>);
+            return reflgen::schema<Self>(
+                reflgen::field<&Self::m_id>,
+                reflgen::field<&Self::m_tag>);
         }
 
         int m_id{ 0 };
@@ -62,28 +62,28 @@ namespace
         static consteval auto reflect()
         {
             using Self = ProbeFixture;
-            return meta::schema<Self>(
-                meta::field<&Self::m_name>,
-                meta::field<&Self::m_path>,
-                meta::field<&Self::m_vectorInt>,
-                meta::field<&Self::m_vectorString>,
-                meta::field<&Self::m_vectorBool>,
-                meta::field<&Self::m_vectorEnum>,
-                meta::field<&Self::m_vectorRect>,
-                meta::field<&Self::m_vectorColor>,
-                meta::field<&Self::m_vectorNested>,
-                meta::field<&Self::m_deque>,
-                meta::field<&Self::m_list>,
-                meta::field<&Self::m_set>,
-                meta::field<&Self::m_unorderedSet>,
-                meta::field<&Self::m_array>,
-                meta::field<&Self::m_mapStringInt>,
-                meta::field<&Self::m_mapIntVector3>,
-                meta::field<&Self::m_mapEnumValue>,
-                meta::field<&Self::m_mapNested>,
-                meta::field<&Self::m_unorderedMap>,
-                meta::field<&Self::m_emptyVector>,
-                meta::field<&Self::m_emptyMap>);
+            return reflgen::schema<Self>(
+                reflgen::field<&Self::m_name>,
+                reflgen::field<&Self::m_path>,
+                reflgen::field<&Self::m_vectorInt>,
+                reflgen::field<&Self::m_vectorString>,
+                reflgen::field<&Self::m_vectorBool>,
+                reflgen::field<&Self::m_vectorEnum>,
+                reflgen::field<&Self::m_vectorRect>,
+                reflgen::field<&Self::m_vectorColor>,
+                reflgen::field<&Self::m_vectorNested>,
+                reflgen::field<&Self::m_deque>,
+                reflgen::field<&Self::m_list>,
+                reflgen::field<&Self::m_set>,
+                reflgen::field<&Self::m_unorderedSet>,
+                reflgen::field<&Self::m_array>,
+                reflgen::field<&Self::m_mapStringInt>,
+                reflgen::field<&Self::m_mapIntVector3>,
+                reflgen::field<&Self::m_mapEnumValue>,
+                reflgen::field<&Self::m_mapNested>,
+                reflgen::field<&Self::m_unorderedMap>,
+                reflgen::field<&Self::m_emptyVector>,
+                reflgen::field<&Self::m_emptyMap>);
         }
 
         // ★ 음성 축. 이 둘이 시퀀스로 새면 range 일반화가 무너진 것이다.

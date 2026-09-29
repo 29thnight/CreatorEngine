@@ -1,16 +1,17 @@
 # reflgen 전환 codemod (reflgen 도입 P4) — static consteval auto reflect() 레시피를 [[reflgen::…]] attribute 로 옮긴다.
 #
 #   python Tools/migration/reflgen_codemod.py            # 무엇을 바꿀지 보고만 한다
-#   python Tools/migration/reflgen_codemod.py --apply    # header 를 고치고 동등성 증명 표를 쓴다
+#   python Tools/migration/reflgen_codemod.py --apply    # header 를 고친다
 #
 # 레시피는 이 타입이 직렬화·인스펙터에 내놓는 필드를 적은 목록(opt-in)이고, reflgen 은 모든 비정적 데이터 멤버를
 # 반영한다(opt-out). 그래서 레시피에 없던 멤버에는 [[reflgen::ignore]] 를 단다 — 저장되지 않는 런타임 상태라는
 # 표지가 멤버마다 남는다. 레시피 순서는 모든 타입에서 선언 순서와 같다(실측) — YAML 키 순서는 바뀌지 않는다.
 #
-# 옮기기 전의 레시피는 모듈마다 동등성 증명 표(ReflgenParity.cpp)로 남긴다. 다리가 만든 엔진 스키마가 그 표와
-# 필드 이름·순서·속성 타입·속성 값·메서드·파라미터 이름까지 같은지 컴파일 때 단정한다 — 소비자는 스키마 타입에
-# 대한 template 이라 같으면 동작도 같다. 표는 이 폴더의 ReflgenParity.h 를 include 한다. 새 표는 그 모듈의
-# vcxproj 에 ClCompile 로 넣고, 증명한 뒤에는 지운다(필드가 바뀌면 깨진다 — 넣는 커밋과 지우는 커밋을 가른다).
+# P4 에서는 옮기기 전의 레시피를 동등성 증명 표(ReflgenParity.cpp — reflgen 다리가 만든 엔진 스키마와 대조)로 남겼다.
+# reflgen 도입 P5 에서 엔진 스키마(meta::schema)와 다리를 걷어 그 대조는 더 이상 설 자리가 없다 — 표를 쓰지 않는다.
+# master 에서 받은 레시피를 옮긴 뒤에는 빌드(레시피가 적던 필드만 반영되는지는 [[reflgen::ignore]] 가 보인다)와
+# 런타임 비교(기준선 에디터와 장면 저장 바이트 비교)로 확인한다. 옛 레시피는 meta::schema 로 적혀 있어 옮기기 전에는
+# 컴파일되지 않는다 — master 를 받은 직후 이 도구를 먼저 돌린다.
 #
 # 위치는 libclang(C API, ctypes — Visual Studio 의 LLVM)으로 얻는다. 파싱 인자는 빌드가 남긴 reflgen 인자 파일
 # (Build/Obj/*/x64-Debug/reflgen/reflgen_*.args)을 합쳐 쓴다 — Debug x64 를 한 번 빌드한 뒤에 돌린다. master 를
@@ -27,12 +28,8 @@ LLVM = pathlib.Path(r'C:\Program Files\Microsoft Visual Studio\18\Community\VC\T
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 # meta 코어의 selftest 카나리아는 meta 로 둔다 — meta 코어를 지키는 것이 그것들의 일이다.
 SKIP_NAMESPACES = ('meta::detail::selftest',)
-# 모듈(vcxproj 이름) → 동등성 증명 표를 둘 자리.
-PARITY_FILES = {
-    'RenderEngine': 'Engine/RenderEngine/ReflgenParity.cpp',
-    'SceneRuntime': 'Engine/SceneRuntime/ReflgenParity.cpp',
-    'Editor': 'Editor/EngineGUIWindow/ReflgenParity.cpp',
-}
+# [[reflgen::reflect]] 타입을 가질 수 있는 모듈(vcxproj 이름) — Directory.Build.targets 의 _EngineReflgenModule.
+REFLGEN_MODULES = ('RenderEngine', 'SceneRuntime', 'Editor')
 # 레시피 속성 → reflgen attribute. 엔진에만 있는 속성은 creator 이름공간(ReflgenBridge.h)이다.
 ATTRIBUTES = {
     'range': ('reflgen::range', True),
@@ -412,48 +409,6 @@ def project_owners():
     return owners
 
 
-PARITY_BLOCK = re.compile(r'    static_assert\(parity::matches<([^>]+)>\(\n.*?\)\);\n', re.S)
-
-
-def parity_file(module, plans, existing=''):
-    """이번에 옮긴 타입의 줄을 쓰고, 이미 있던 표(existing)에서 다른 타입의 줄은 그 자리에 둔다."""
-    lines = [
-        '// reflgen 전환 동등성 증명 — Tools/migration/reflgen_codemod.py 가 옮기기 전의 레시피에서 썼다.',
-        '//',
-        '// 옮긴 타입마다 다리(ReflgenBridge.h)가 만든 엔진 스키마가 옛 레시피와 필드 이름·순서·속성 타입·속성 값·',
-        '// 메서드·파라미터 이름까지 같은지 컴파일 때 단정한다. 엔진 소비자는 스키마 타입에 대한 template 이라 같으면',
-        '// 동작도 같다. 이 표는 옛 레시피의 기록이다 — 필드를 더하거나 빼면 여기 줄도 고친다.',
-    ]
-    here = (ROOT / PARITY_FILES[module]).parent
-    lines.append('#include "' + pathlib.Path(os.path.relpath(pathlib.Path(__file__).with_name('ReflgenParity.h'), here)).as_posix() + '"')
-    includes = {i for i in re.findall(r'#include "([^"]+)"', existing) if not i.endswith('ReflgenParity.h')}
-    for header in {p['file'] for p in plans}:
-        relative = pathlib.Path(header).resolve().relative_to(here.resolve()) if pathlib.Path(header).resolve().is_relative_to(here.resolve()) else None
-        includes.add((relative or pathlib.Path(header).name).as_posix())
-    lines += [f'#include "{include}"' for include in sorted(includes)]
-    lines += ['', 'namespace', '{']
-    blocks = {}
-    for plan in plans:
-        items = []
-        for kind, name, extra in plan['entries']:
-            if kind == 'field':
-                attributes = ''.join(f', meta::{a}({arg})' for a, arg in extra)
-                items.append(f'parity::field("{name}"{attributes})')
-            else:
-                # 메서드는 멤버 포인터로 적는다 — method_info 타입(함수·파라미터 수)이 같은지 본다(ReflgenParity.h).
-                parameters, flags = extra
-                items.append(f'parity::method<&{plan["type"]}::{name}>(' + ', '.join(parameters) + ')'
-                             + ''.join(f'.{flag}()' for flag in flags))
-        body = ',\n        '.join(items)
-        blocks[plan['type']] = f'    static_assert(parity::matches<{plan["type"]}>(\n        {body}));\n'
-    kept = []
-    for match in PARITY_BLOCK.finditer(existing):
-        kept.append(blocks.pop(match.group(1), match.group(0)))
-    lines.append(''.join(kept + list(blocks.values())).rstrip('\n'))
-    lines += ['}', '']
-    return '\n'.join(lines)
-
-
 def main():
     options = argparse.ArgumentParser()
     options.add_argument('--apply', action='store_true')
@@ -469,7 +424,7 @@ def main():
     by_module = {}
     for plan in plans:
         module = owner_of(plan['file'], owners)
-        if module not in PARITY_FILES:
+        if module not in REFLGEN_MODULES:
             raise SystemExit(f'{plan["type"]}: header 를 가진 모듈이 없다({plan["file"]}) — ClInclude 에 넣는다')
         by_module.setdefault(module, []).append(plan)
 
@@ -485,11 +440,6 @@ def main():
 
     for file in sorted({p['file'] for p in plans}):
         apply_edits(file, [e for p in plans if p['file'] == file for e in p['edits']])
-    for module, module_plans in by_module.items():
-        target = ROOT / PARITY_FILES[module]
-        existing = target.read_bytes().decode('utf-8').replace('\r\n', '\n') if target.exists() else ''
-        target.write_bytes(parity_file(module, module_plans, existing).replace('\n', '\r\n').encode('utf-8'))
-        print('wrote', target.relative_to(ROOT))
 
 
 main()

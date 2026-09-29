@@ -75,8 +75,7 @@ bool RuntimeSettings::Load() noexcept
         RenderPassSettings renderPassSettings = m_renderPassSettings;
         if (root["renderPassSettings"])
         {
-            Meta::Typed::DeserializeThunk<RenderPassSettings>(
-                &renderPassSettings, root["renderPassSettings"]);
+            Meta::Typed::DeserializeObjectFrom(renderPassSettings, root["renderPassSettings"]);
         }
 
         RenderBackend renderBackend = RenderBackend::DX12;

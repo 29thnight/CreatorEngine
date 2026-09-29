@@ -628,7 +628,7 @@ namespace editor::widgets
 
     namespace
     {
-        // 기본은 꺼짐이다. 켜 두면 `meta::debugOnly()` 로 표시한 내부 식별자가
+        // 기본은 꺼짐이다. 켜 두면 `[[creator::debug_only]]` 로 표시한 내부 식별자가
         // 기본 인스펙터에 샌다 — 표시 속성을 붙인 뜻이 사라진다.
         constexpr bool kDebugModeDefault = false;
 

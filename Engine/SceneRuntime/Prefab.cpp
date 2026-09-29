@@ -324,7 +324,7 @@ void Prefab::SerializeNestedReference(const Entity* obj,
 	if (!obj)
 		return;
 
-	const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
+	const reflgen::type_descriptor* type = Meta::Find(obj->GetTypeID());
 	if (type)
 	{
 		Entity* nonConst = const_cast<Entity*>(obj);
@@ -352,7 +352,7 @@ void Prefab::SerializeRecursive(const Entity* obj, FileGuid ownerPrefabGuid,
 	if (!obj)
 		return;
 
-	const Meta::Type* type = Meta::MetaDataRegistry->Find(obj->GetTypeID());
+	const reflgen::type_descriptor* type = Meta::Find(obj->GetTypeID());
 	if (type)
 	{
 		Entity* nonConst = const_cast<Entity*>(obj);
@@ -417,7 +417,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
     if (!obj)
         return nullptr;
 
-    const Meta::Type* meta = Meta::MetaDataRegistry->Find(TypeTrait::GUIDCreator::GetTypeID<Entity>());
+    const reflgen::type_descriptor* meta = Meta::Find(TypeTrait::GUIDCreator::GetTypeID<Entity>());
     HashedGuid newInstanceID = obj->GetInstanceID();
 	HashingString newHashedName = obj->GetHashedName();
     Entity::Index newIndex = obj->m_index;

@@ -21,13 +21,13 @@ GameObjectType InferCreationType(const Authoring::ReadNode& node)
 	{
 		for (const auto componentNode : components)
 		{
-			const Meta::Type* componentType = nullptr;
+			const reflgen::type_descriptor* componentType = nullptr;
 			try { componentType = Meta::ExtractTypeFromYAML(componentNode); }
 			catch (const std::exception&) { continue; }
 			if (!componentType) continue;
 
-			hasTransform |= componentType->typeID == type_guid(Transform);
-			hasRectTransform |= componentType->typeID == type_guid(RectTransformComponent);
+			hasTransform |= Meta::TypeIDOf(*componentType) == type_guid(Transform);
+			hasRectTransform |= Meta::TypeIDOf(*componentType) == type_guid(RectTransformComponent);
 		}
 	}
 

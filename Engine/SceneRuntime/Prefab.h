@@ -10,8 +10,6 @@
 class [[reflgen::reflect]] Prefab : public Object
 {
    friend struct reflgen::access;
-   public:
-   using meta_identity = meta::identity_descriptor<Prefab, Object>;
 public:
     Prefab() = default;
     Prefab(std::string_view name, const Entity* source);

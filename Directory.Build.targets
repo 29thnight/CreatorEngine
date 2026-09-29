@@ -123,12 +123,12 @@
 
     ★ 모든 native 프로젝트가 서술을 만드는 엔진 모듈 전부의 주입을 받는다(ReflgenReference). 이 저장소의
       라이브러리는 ProjectReference 없이 include 경로로 서로의 header 를 연다(Physics ↔ SceneRuntime 는
-      순환이다). 한 번역 단위라도 주입 없이 반영 타입을 보면 meta::reflectable<T> 가 번역 단위마다 달라진다 —
+      순환이다). 한 번역 단위라도 주입 없이 반영 타입을 보면 reflgen::reflectable<T> 가 번역 단위마다 달라진다 —
       조용한 ODR 위반이다. 주입은 전방 선언뿐이라 전부 받아도 싸다. ReflgenReference 는 빌드 순서를 걸지
       않는다 — 상대의 생성만 기다린다.
 
-    ★★ ReflgenBridge.h 는 주입 header 가 맨 먼저 include 한다(ReflgenAttributeHeaders). 엔진 속성 이름공간
-       creator 와 meta::of<T> 다리가 거기 있다 — 어떤 소비자가 meta::of<T> 를 묻기 전에 선언돼야 한다.
+    ★★ ReflgenAttributes.h 는 주입 header 가 맨 먼저 include 한다(ReflgenAttributeHeaders). 엔진 속성 이름공간
+       creator 가 거기 있다 — 생성된 서술이 그 타입을 싣는다.
   -->
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
     <!-- vcpkg 의 MSBuild 통합은 VcpkgTriplet 을 이 파일보다 뒤(vcpkg.targets)에서 정한다 — 여기서는 아직 비어
@@ -140,10 +140,13 @@
     <_EngineVcpkgInstalledDir Condition="'$(_EngineVcpkgInstalledDir)' == ''">$(MSBuildThisFileDirectory)vcpkg_installed\$(_EngineVcpkgTriplet)\</_EngineVcpkgInstalledDir>
     <EngineReflgenTargets Condition="'$(EngineReflgenTargets)' == ''">$([MSBuild]::EnsureTrailingSlash('$(_EngineVcpkgInstalledDir)'))$(_EngineVcpkgTriplet)\share\reflgen\msbuild\reflgen.targets</EngineReflgenTargets>
     <ReflgenAttributeScopes>creator</ReflgenAttributeScopes>
-    <!-- 엔진은 서술만 쓴다 — 등록은 REFLECT_TYPE_LIST(Meta::Register)가, 직렬화는 타입드 YAML 이 한다. 쓰지 않을
-         reflgen 런타임 서술자(등록 함수)는 컴파일하지 않는다. -->
-    <ReflgenRegistration>false</ReflgenRegistration>
-    <ReflgenAttributeHeaders>$(MSBuildThisFileDirectory)Engine\Utility_Framework\ReflgenBridge.h</ReflgenAttributeHeaders>
+    <!-- 런타임 타입 표는 reflgen 서술자다 — 생성된 등록 함수가 엔진 등록소(Meta::Types, ReflgenRuntime.h)를 채운다.
+         서술자는 등록 함수의 번역 단위에서 만들어지므로 그곳이 엔진 serializer 특수화와 필드 타입의 정의를 보아야
+         한다 — 무엇을 왜 보게 하는지는 ReflgenRegistration.h 에 있다. 못 보면 같은 타입의 서술자가 번역 단위마다
+         달라진다. -->
+    <ReflgenRegistration>true</ReflgenRegistration>
+    <ReflgenRegistrationHeaders>$(MSBuildThisFileDirectory)Engine\RenderEngine\ReflgenRegistration.h</ReflgenRegistrationHeaders>
+    <ReflgenAttributeHeaders>$(MSBuildThisFileDirectory)Engine\Utility_Framework\ReflgenAttributes.h</ReflgenAttributeHeaders>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">

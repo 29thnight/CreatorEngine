@@ -12,13 +12,12 @@
 
 class Scene;
 class Bone;
+namespace reflgen { class type_descriptor; }
 class RenderScene;
 class ModelLoader;
 class Prefab;
 class [[reflgen::reflect]] Entity : public Object
 {
-    public:
-    using meta_identity = meta::identity_descriptor<Entity, Object>;
 public:
 	using Index = GameObjectIndex;
 	static constexpr Entity::Index kInvalidIndex = std::numeric_limits<uint32_t>::max();
@@ -87,15 +86,15 @@ public:
 	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
 	// 호출자는 이미 전부 raw 포인터로만 썼다(그린 상태 확인, GameObjectCommand.h
 	// 등은 반환값을 쓰지 않는다).
-	Component* AddComponent(const Meta::Type& type);
+	Component* AddComponent(const reflgen::type_descriptor& type);
 
 	// 같은 타입을 여러 개 붙일 수 있는 형태.
 	//
 	// 일반 AddComponent는 타입당 하나로 제한하고 기존 것을 돌려준다. 스크립트는 그 규칙을
 	// 따를 수 없다 — 한 오브젝트에 스크립트를 여럿 붙이는 것이 보통이기 때문이다.
 	// (관리 스크립트를 담는 ScriptComponent가 이쪽을 쓴다)
-	Component* AddComponentAllowMultiple(const Meta::Type& type);
-    Component* GetComponent(const Meta::Type& type);
+	Component* AddComponentAllowMultiple(const reflgen::type_descriptor& type);
+    Component* GetComponent(const reflgen::type_descriptor& type);
 	void RefreshComponentIdIndices();
 	void AddChild(Entity* _objcet);
 

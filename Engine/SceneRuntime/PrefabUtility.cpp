@@ -38,28 +38,26 @@ namespace
 		return names;
 	}
 
-	// type(및 type.parent 체인)의 프로퍼티를 스냅샷과 비교해 달라진 것만 오버라이드로
+	// type의 프로퍼티(부모 것 먼저 — fields() 순서)를 스냅샷과 비교해 달라진 것만 오버라이드로
 	// 시딩한다. componentType이 비어 있으면 GameObject 자신의 프로퍼티를 뜻한다.
-	void SeedTypeOverrides(const Meta::Type& type, const std::string& componentType,
+	void SeedTypeOverrides(const reflgen::type_descriptor& type, const std::string& componentType,
 		const Authoring::ReadNode& currentNode,
 		const Authoring::ReadNode& snapshotNode,
 		std::vector<PrefabOverride>& out, int componentSlot = -1)
 	{
-		if (type.parent)
-			SeedTypeOverrides(*type.parent, componentType, currentNode, snapshotNode, out, componentSlot);
-
-		for (const auto& prop : type.properties)
+		for (const reflgen::field_info& field : type.fields())
 		{
+			const std::string name(field.key());
 			// m_components·m_prefabOverrides 자신은 구조적으로 따로 다룬다 — 통짜
 			// Dump 비교로 여기서 오버라이드로 잡으면 안 된다.
 			if (componentType.empty() &&
-				(std::strcmp(prop.name, "m_components") == 0
-					|| std::strcmp(prop.name, "m_prefabOverrides") == 0
-					|| std::strcmp(prop.name, "m_index") == 0))
+				(name == "m_components"
+					|| name == "m_prefabOverrides"
+					|| name == "m_index"))
 				continue;
 
-			const Authoring::ReadNode currProp = currentNode[prop.name];
-			const Authoring::ReadNode snapProp = snapshotNode[prop.name];
+			const Authoring::ReadNode currProp = currentNode[name.c_str()];
+			const Authoring::ReadNode snapProp = snapshotNode[name.c_str()];
 			if (!currProp || !snapProp)
 				continue;
 			// D3-a-1: 문자열 덤프 비교 → 구조 비교(§3.3, Y-6). 비교하려고 문자열을
@@ -72,7 +70,7 @@ namespace
 			PrefabOverride ov;
 			ov.m_componentType = componentType;
 			ov.m_componentSlot = componentSlot;
-			ov.m_propertyName = prop.name;
+			ov.m_propertyName = name;
 			ov.m_valueYaml = currProp.Dump();
 			out.push_back(std::move(ov));
 		}
@@ -113,12 +111,13 @@ namespace
 			const size_t count = std::min(currComponents.Size(), snapComponents.Size());
 			for (size_t i = 0; i < count; ++i)
 			{
-				const Meta::Type* compType = Meta::ExtractTypeFromYAML(
+				const reflgen::type_descriptor* compType = Meta::ExtractTypeFromYAML(
 					currComponents.At(i));
 				if (!compType)
 					continue;
-				const int slot = slotByType[compType->name]++;
-				SeedTypeOverrides(*compType, compType->name,
+				const std::string compName(compType->name());
+				const int slot = slotByType[compName]++;
+				SeedTypeOverrides(*compType, compName,
 					currComponents.At(i), snapComponents.At(i),
 					obj.m_prefabOverrides, slot);
 			}
@@ -179,8 +178,8 @@ namespace
 			if (!comp)
 				continue;
 
-			if (const Meta::Type* type = Meta::FindTypeByInstance(comp.get()))
-				existingByType[type->name].push_back(i);
+			if (const reflgen::type_descriptor* type = Meta::FindTypeByInstance(comp.get()))
+				existingByType[std::string(type->name())].push_back(i);
 		}
 
 		std::vector<bool> kept(originalCount, false);
@@ -190,12 +189,13 @@ namespace
 		{
 			// K1-b UUID 우선, 이름 폴백 — Entity 레벨 갱신·ComponentFactory::
 			// LoadComponent와 같은 판정 창구를 재사용한다.
-			const Meta::Type* type = Meta::ExtractTypeFromYAML(node);
+			const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(node);
 			if (!type)
 				continue; // 타입을 못 정하면 LoadComponent도 이 노드를 버린다(로그는 그쪽 몫)
 
-			auto& indices = existingByType[type->name];
-			size_t& ordinal = nextOrdinal[type->name];
+			const std::string typeName(type->name());
+			auto& indices = existingByType[typeName];
+			size_t& ordinal = nextOrdinal[typeName];
 
 			if (ordinal < indices.size())
 			{
@@ -211,7 +211,7 @@ namespace
 				// 걸려도 에러가 나지 않는다. 값은 ordinal-1과 같아야 하고, 다르면
 				// 그것이 곧 결함이다.
 				const auto overriddenNames = CollectComponentOverrideNames(
-					obj, type->name, PrefabUtility::ComputeComponentSlot(obj, comp));
+					obj, typeName, PrefabUtility::ComputeComponentSlot(obj, comp));
 				Meta::DeserializePrefab(comp, *type, node, overriddenNames);
 			}
 			else
@@ -302,7 +302,7 @@ int PrefabUtility::ComputeComponentSlot(const Entity& obj, const Component* targ
     if (!target)
         return -1;
 
-    const Meta::Type* targetType = Meta::FindTypeByInstance(const_cast<Component*>(target));
+    const reflgen::type_descriptor* targetType = Meta::FindTypeByInstance(const_cast<Component*>(target));
     if (!targetType)
         return -1;
 
@@ -314,8 +314,8 @@ int PrefabUtility::ComputeComponentSlot(const Entity& obj, const Component* targ
         if (comp.get() == target)
             return slot;
 
-        const Meta::Type* type = Meta::FindTypeByInstance(comp.get());
-        if (type && type->name == targetType->name)
+        const reflgen::type_descriptor* type = Meta::FindTypeByInstance(comp.get());
+        if (type && type->name() == targetType->name())
             ++slot;
     }
     return -1;
@@ -340,7 +340,7 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
             continue;
 
         Component* target = comp.get();
-        const Meta::Type* type = Meta::FindTypeByInstance(target);
+        const reflgen::type_descriptor* type = Meta::FindTypeByInstance(target);
         if (!type)
             continue;
 
@@ -353,7 +353,7 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
 
         for (const auto& ov : obj.m_prefabOverrides)
         {
-            if (ov.m_componentType != type->name)
+            if (ov.m_componentType != type->name())
                 continue;
             // -1은 "순번 미지정 = 그 타입 전체"(PrefabOverride.h) — 옛 데이터 호환.
             if (ov.m_componentSlot != -1 && ov.m_componentSlot != slot)
@@ -392,7 +392,7 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
                 // 조용히 넘기지 않는다 — 값 하나가 유실되면 그 필드는 이후
                 // 프리팹 갱신을 계속 받아 사용자 수정이 사라진 것처럼 보인다.
 				Debug::PrintLog(spdlog::level::err, "ApplyRecordedOverrides: 값 파싱 실패 "
-					+ type->name + "." + ov.m_propertyName + " — " + parseError);
+					+ std::string(type->name()) + "." + ov.m_propertyName + " — " + parseError);
 			}
         }
 
@@ -426,7 +426,7 @@ void PrefabUtility::RecordPropertyOverride(Entity& obj, const Component& compone
     if (nullptr != SceneManagers && SceneManagers->IsGameStart())
         return;
 
-    const Meta::Type* type = Meta::FindTypeByInstance(const_cast<Component*>(&component));
+    const reflgen::type_descriptor* type = Meta::FindTypeByInstance(const_cast<Component*>(&component));
     if (!type)
         return;
 
@@ -446,7 +446,7 @@ void PrefabUtility::RecordPropertyOverride(Entity& obj, const Component& compone
 
     for (auto& ov : obj.m_prefabOverrides)
     {
-        if (ov.m_componentType == type->name
+        if (ov.m_componentType == type->name()
             && ov.m_componentSlot == slot
             && ov.m_propertyName == propertyName)
         {
@@ -456,7 +456,7 @@ void PrefabUtility::RecordPropertyOverride(Entity& obj, const Component& compone
     }
 
     PrefabOverride ov;
-    ov.m_componentType = type->name;
+    ov.m_componentType = std::string(type->name());
     ov.m_componentSlot = slot;
     ov.m_propertyName = propertyName;
     ov.m_valueYaml = valueYaml;
