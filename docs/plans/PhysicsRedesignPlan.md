@@ -76,6 +76,9 @@ else core -= 4;
 
 `RigidBodyComponent::reflect()`에 `LinearDamping`은 있는데 `AngularDamping`이 **빠져 있다**. 인스펙터에서 각 감쇠를 조정해도 저장되지 않고 로드 시 기본값(0.05)으로 되돌아온다. 한 줄 누락이고 저작 데이터가 지금 조용히 유실되고 있다.
 
+**갱신(2026-09-30, reflgen 전환)**: 레시피는 사라졌고 누락은 그대로 옮겨졌다 — 전환 codemod가 레시피에 없던
+필드에 `[[reflgen::ignore]]` 를 붙였으므로 `RigidBodyComponent.h` 의 `AngularDamping` 에 `ignore` 가 달려 있다.
+
 ### 1.3 구조적 결함 — 재작성이 뒤집어야 할 것
 
 | # | 결함 | 근거 |
@@ -252,7 +255,7 @@ CUDA 초기화 실패 시 `eENABLE_GPU_DYNAMICS`·`broadPhaseType`을 CPU로 되
 
 #### Z5. `AngularDamping` 직렬화 누락 정정 — P1 · 0.25일
 
-`RigidBodyComponent::reflect()`에 `meta::field<&Self::AngularDamping>` 한 줄 추가. B4가 스키마를 다시 쓰지만, 그때까지 저작 데이터가 계속 유실된다.
+~~`RigidBodyComponent::reflect()`에 `meta::field<&Self::AngularDamping>` 한 줄 추가.~~ **갱신(2026-09-30)**: `AngularDamping` 의 `[[reflgen::ignore]]` 를 떼고, 선언을 `LinearDamping` 뒤로 옮긴다 — reflgen은 선언 순서대로 저장하므로 그래야 기존 키 순서(`m_bodyType`·`LinearDamping`·`AngularDamping`·`m_mass`)가 설계 §7과 같다. B4가 스키마를 다시 쓰지만, 그때까지 저작 데이터가 계속 유실된다.
 
 > **Exit**: 6종 수정 후 `PhysicsDrop` 씬 30분 연속 구동에서 크래시 0, 씬 전환 20회 후 `CollisionData` 잔존 0, 인스펙터에서 조정한 각 감쇠가 재로드 후 보존.
 

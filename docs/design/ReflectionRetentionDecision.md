@@ -7,6 +7,11 @@
 **존치.** 폐지·대체 논의는 종결한다. 다만 아래 §4의 재배치 3건은 부채로 남기고, 실행은
 DX12 라이브 파이프라인 작업 이후로 미룬다.
 
+**후속(2026-09-30)**: 존치한 것은 리플렉션의 **역할**이고, 표현은 그 뒤 두 번 바뀌었다 — PHASE 18이 매크로를
+`reflect()` 레시피로, 2026-09 reflgen 전환이 레시피를 헤더 속성(`[[reflgen::reflect]]`)과 생성된 서술로
+옮겼다. 아래 존치 근거 셋(자산 포맷·핫리로드 상태 보존·인스펙터 자동 생성)은 reflgen 전환에서도 그대로
+지켰다 — 저장 포맷은 바이트 동일이다. 현재 설계는 [ReflectionDesign.md](ReflectionDesign.md)에 있다.
+
 ## 1. 대상 정의
 
 "엔진 전용 리플렉션"은 `Reflect()` 갈래(`ReflectionField` / MetaGenerator / `*.generated.h`)를
@@ -48,6 +53,9 @@ DX12 라이브 파이프라인 작업 이후로 미룬다.
 
 **대체재 부재**: C++26 정적 리플렉션은 현 MSVC 툴체인에 없고, RTTR 등 서드파티는 등록 코드를
 다시 손으로 작성해야 하므로 교체 이득이 없다.
+**정정(2026-09-30)**: "대체재 부재"는 등록 코드를 손으로 쓰는 라이브러리만 본 판단이었다. 헤더를 읽어
+서술을 생성하는 reflgen(libclang 생성기, C++26 native reflection과 같은 반영 범위)으로 옮겼다 — 손으로 쓰는
+등록 코드가 없고 자산 포맷을 바꾸지 않았다.
 
 ## 4. 잔여 부채 (기록만 — 실행 보류)
 
@@ -82,3 +90,6 @@ ScriptReflectionAndFactoryClear)을 제거했다. 남은 헤더툴은 MetaGenera
 
 - R1은 [Phase5CouplingPlan.md](../plans/archive/Phase5CouplingPlan.md) §3-C4 / 5-3(에디터 UI 분리)에 귀속.
 - 헤더 이동 시 MetaGenerator 스캔 경로 확인 필수 — 같은 문서 §3-B의 `Navigation.h` 항목과 동일 함정.
+  **갱신(2026-09-30)**: MetaGenerator는 은퇴했고 지금은 reflgen이 프로젝트의 `ClInclude` 를 읽는다. 반영
+  모듈(`RenderEngine`·`SceneRuntime`·`Editor`) 밖으로 헤더를 옮기면 서술이 다른 프로젝트에 주입되지 않고
+  등록되지도 않는 같은 계열의 함정이 남는다([ReflectionDesign.md](ReflectionDesign.md) §1.2).

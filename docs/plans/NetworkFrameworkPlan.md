@@ -7,7 +7,8 @@ Simulation Tick, 네트워크 정체성, Replication, Transport adapter.
 경계), [SceneGraphRedesignPlan](archive/SceneGraphRedesignPlan.md)(EntityHandle·Scene 수명주기),
 [EngineLayerSeparationPlan](EngineLayerSeparationPlan.md)(Runtime/Core 물리 경계),
 [PhysicsRedesignPlan](PhysicsRedesignPlan.md)(고정 스텝 소비자·스레딩),
-[ReflectionRedesignPlan](archive/ReflectionRedesignPlan.md)(macro-free canonical schema).
+[ReflectionRedesignPlan](archive/ReflectionRedesignPlan.md)(macro-free canonical schema),
+[ReflectionDesign](../design/ReflectionDesign.md)(2026-09-30 현재 — reflgen 서술).
 
 이 문서는 **네트워크 라이브러리를 당장 링크하는 계획이 아니다.** 먼저 엔진 상태와
 시뮬레이션을 Transport로부터 분리하고, 소켓 없이 Loopback에서 계약을 증명한 다음
@@ -20,7 +21,7 @@ Simulation Tick, 네트워크 정체성, Replication, Transport adapter.
 
 1. **ryml/YAML은 Editor authoring 전용이다.** 네트워크 hot path와 Player/Server
    replication에는 YAML/JSON DOM을 넣지 않는다.
-2. **스키마 순회만 공유한다.** `meta::schema` 위에 `AuthoringArchive`,
+2. **스키마 순회만 공유한다.** `meta::schema`(2026-09-30부터 reflgen 서술) 위에 `AuthoringArchive`,
    `CookedArchive`, `NetworkArchive`를 서로 다른 정책으로 둔다.
 3. **`EntityHandle`은 wire에 쓰지 않는다.** 서버가 발급하는 `NetworkObjectId`와
    프로세스 로컬 `EntityHandle` 사이에 명시적 레지스트리를 둔다.
@@ -99,7 +100,7 @@ include 0이 그 결과다). 다만 **런타임 모듈이 authoring document를 
 |---|---|---|
 | `EntityHandle {sceneId,index,generation}` | 한 프로세스의 Scene 슬롯 | **금지** |
 | `FileGuid` | 저장 자산의 영속 정체성 | spawn descriptor에서 사용 가능 |
-| `Meta::Type::typeID`/`HashedGuid` | 타입명 기반 FNV 조회 키 | **wire ID로 금지** |
+| `Meta::Type::typeID`/`HashedGuid` (현 `Meta::TypeIDOf` — reflgen `type_id` 와 같은 값) | 타입명 기반 FNV 조회 키 | **wire ID로 금지** |
 | `ComponentTypeUUID::kTable` (2026-09-04 추가) | 컴포넌트 타입의 **리네임 불변 영속 UUID** 32종 | 정본 후보 · 폭은 재단 필요 |
 
 `sceneId`는 프로세스 안에서 생성되는 일련번호이고, 서로 다른 피어의 슬롯 배치는
@@ -140,6 +141,8 @@ handshake에서 확정한 고정폭 short id를 쓰는 안을 먼저 검토한�
   포인터·RHI 객체 없이 불변 값만 다른 스레드에 공개한다.
 - `MetaSchema.h`(`Engine/Utility_Framework/`, 633줄)는 std-only canonical schema이며
   `field.with(attr...)`가 consteval 가변 인자라 속성 추가가 **순수 추가**다.
+  **갱신(2026-09-30)**: `MetaSchema.h` 는 reflgen 전환으로 사라졌다. canonical schema는 reflgen 서술이고
+  속성 추가는 `ReflgenAttributes.h` 의 속성 타입 추가로 여전히 순수 추가다.
 - (2026-09-04 추가) `RHIAssetEvictionPolicy.h`는 값 구조체와 순수 판정 함수만으로
   정책을 소유하고 device를 모른다. §6이 위임 가능한 슬라이스의 형태로 지목하는 선례다.
 
@@ -206,7 +209,7 @@ ServerRuntime ─────────► SceneRuntime / NetReplication / Tra
 
 | 모듈 | 책임 | 금지 의존 |
 |---|---|---|
-| `MetaSchema` | 타입·필드의 canonical descriptor | YAML, packet, socket, Editor |
+| `MetaSchema` (2026-09-30부터 reflgen 서술 — `schema_of`·`type_descriptor`) | 타입·필드의 canonical descriptor | YAML, packet, socket, Editor |
 | `SerializationAuthoring` | ryml 문서 소유·YAML load/save·Editor node edit | Transport |
 | `SerializationCooked` | 재생성 가능한 runtime asset binary | socket, peer 상태 |
 | `NetCore` | 고정 폭 ID, bounded reader/writer, protocol header, queue 값 타입 | Scene pointer, YAML/JSON |
@@ -262,15 +265,43 @@ public:
 
 ### 4.3 안정적인 network schema
 
-`MetaSchema`의 기존 `.with(...)`에 macro 없이 속성을 추가한다.
+~~`MetaSchema`의 기존 `.with(...)`에 macro 없이 속성을 추가한다.~~
+
+~~`meta::field<&Self::m_health>.with(meta::replicated(1, meta::quantize_u16(0.0f, 100.0f), meta::replication_condition::everyone))`~~
+
+**갱신(2026-09-30, reflgen 전환)**: `.with(...)` 레시피는 사라졌다. 속성은 멤버에 직접 달고, 속성 타입은
+`creator` 이름공간에 둔다(`Engine/Utility_Framework/ReflgenAttributes.h` — [ReflectionDesign.md](../design/ReflectionDesign.md) §1.1).
+여전히 macro 없는 순수 추가다.
+
+**결정(2026-09-30, 방향): 복제 속성은 측면마다 하나씩 나누고, 인자는 리터럴만 쓴다.** 조건·보간은 인자 없는
+표지 타입이다. 아래 이름과 quantizer 종류는 예시이며, 구체 형태는 N0 계측 뒤에 동결한다(§6.4 — 추정을 계약으로
+굳히지 않는다).
 
 ```cpp
-meta::field<&Self::m_health>.with(
-    meta::replicated(
-        1, // stable NetFieldId; 삭제 후 재사용 금지
-        meta::quantize_u16(0.0f, 100.0f),
-        meta::replication_condition::everyone))
+[[creator::net_id(1), creator::quantize_u16(0.0f, 100.0f)]]    // 조건 기본값 everyone, 보간 기본값 none
+float m_health = 100.0f;
+
+[[creator::net_id(2), creator::replicate_to_owner, creator::interpolate_linear]]
+math::vector3 m_aimTarget;
 ```
+
+- **인자에 이름공간 이름이 없다.** reflgen은 속성 인자에서 `reflgen`·`std`·자기 클래스 멤버 밖의 이름을 보면
+  그 헤더의 생성물이 원본 헤더를 include 하게 만든다(가벼운 주입을 잃는다). 리터럴과 표지 타입만 쓰면 지금
+  reflgen 그대로 가볍다.
+- **측면 하나에 속성 하나다.** 엔진의 기존 속성(`reflgen::range(lo, hi)`·`creator::debug_only`)과 같은 모양이고,
+  소비자는 아는 속성만 질의한다(`has_attribute<creator::net_id>()`). persistence serializer는 이 속성들을 모르므로
+  무시하는 규칙이 따로 필요 없다.
+- **C++26 주석으로 그대로 옮겨진다** — `[[=creator::net_id{1}, =creator::quantize_u16{0.0f, 100.0f}]]`. 모두
+  구조적 타입이다.
+
+기각: ① 한 속성에 ID·quantizer·조건을 담기(`creator::replicated(1, creator::quantize_u16(…), creator::replication_condition::everyone)`)
+— 인자의 이름공간 이름 때문에 복제 필드를 가진 헤더마다 가벼운 주입을 잃는다. ② reflgen이 `ATTRIBUTE_SCOPES`
+이름공간의 이름을 원본 없이 보게 고치기 — 생성기 몇 줄로 되지만 나눈 속성으로 필요가 없어지고, reflgen 1.0 전에
+생성기의 이름 규칙(계약)을 늘리게 된다. 이름 붙은 상수를 인자로 꼭 써야 하는 속성이 실제로 생기면 그때 1.x에서
+다룬다.
+
+대가: 한 속성으로 묶으면 ID·quantizer·조건이 저절로 함께 있었다. 나누면 그 보장을 아래 schema build 검사가
+대신한다 — `net_id` 없이 단 네트워크 속성(짝 없는 속성)을 실패시킨다.
 
 필수 속성:
 
@@ -283,6 +314,7 @@ meta::field<&Self::m_health>.with(
 컴포넌트와 메시지도 이름 hash가 아니라 고정 폭의 명시 ID를 가진다. schema build가
 중복 ID, 재사용된 tombstone, 지원하지 않는 타입, 상한 없는 container를 compile/test
 단계에서 실패시킨다. persistence serializer는 network 속성을 무시한다.
+(2026-09-30 추가) 속성을 나눈 뒤로는 `net_id` 없이 단 네트워크 속성도 schema build가 실패시킨다.
 
 ### 4.4 실제 고정 Simulation Tick
 
@@ -573,6 +605,8 @@ gate를 실제로 붉게 만든다.
 타입은 사라졌으며(include 0), `Authoring::Document`가 ryml `Tree`를 `Impl`로 숨긴다.
 
 - `MetaSchema`를 format-neutral canonical schema로 유지한다.
+  **갱신(2026-09-30)**: 그 자리를 reflgen 서술이 이었다 — 서술은 포맷을 모르고, 엔진 YAML은 reflgen
+  writer·reader 인터페이스 위의 `ReflgenAuthoring.h` 가 붙인다.
 - `Entity.h`, `ComponentFactory`, Runtime interface에서 YAML/JSON 타입을 제거한다.
 - `AuthoringDocument`는 ryml `Tree`를 소유하고 Node view의 수명을 문서 아래로
   제한한다.
@@ -845,6 +879,9 @@ N0 계측 전에는 추정이기 때문이다. **추정을 계약으로 굳히�
 `.with(...)`에 **순수 추가**로 붙는다 — `.with`가 consteval 가변 인자라 기존 소비자의
 의미가 바뀌지 않는다. 반대로 속성을 매크로로 도입하면 PHASE 18이 없앤 매크로 0종을
 되돌리므로 금지한다.
+**갱신(2026-09-30)**: reflgen 전환 뒤에는 `ReflgenAttributes.h` 에 측면별 속성 타입(`creator::net_id`·
+`quantize_*`·조건과 보간 표지)을 더하는 순수 추가다 — 소비자는 아는 속성만 질의하므로 기존 의미가 바뀌지
+않는다. 인자는 리터럴만 쓴다. 매크로 금지는 그대로다(§4.3).
 
 ### 6.5 이양 경계표
 

@@ -12,10 +12,15 @@
     → CookedArchive(리플렉션 순회 → 바이너리 + GUID 매니페스트)
     → pak → Player/Server(바이너리 로드만, 텍스트 parser 호출 0)
 
-meta::schema
+reflgen 서술(schema_of)
     → NetworkArchive(복제 opt-in 필드만 → bitstream)
     → NetReplication → Transport
 ```
+
+**갱신(2026-09-30, reflgen 전환)**: 공유 스키마는 처음 `meta::schema` 였고 지금은 reflgen 서술이다
+(컴파일 때 `reflgen::schema_of<T>`, 런타임 `reflgen::type_descriptor` — [ReflectionDesign.md](../design/ReflectionDesign.md)).
+저작 YAML은 reflgen 직렬화 위의 엔진 writer·reader(`ReflgenAuthoring.h`)가 쓰고 읽으며 출력은 전환 전과
+바이트 동일이다. 아래에서 `MetaSchema`·`Meta::Type` 이라 적은 자리는 그 서술로 읽는다.
 
 전제: 사용자가 **기존 파일 호환 무시를 허용**했다. 이 전제는 §7의
 SceneGraphRedesignPlan §5("파일 포맷 불변·일괄 변환 금지")와 충돌하므로
@@ -535,7 +540,7 @@ YAML만 읽는다. 외부 교환 계약이 생긴 JSON만 명시 예외로 남�
 
 | 후보 | 판정 | 근거 |
 |---|---|---|
-| **커스텀 바이너리** (리플렉션 테이블 순회 직렬) | **채택** | 이 엔진은 `Meta::Type`이 직렬화의 단일 진실이다 — 쿠킹은 "리플렉션 순회 결과를 키 없이 순서대로 쓰기 + 문자열 테이블"로 충분하다. `ModelLoader`의 모델 바이너리 캐시(`ModelLoader.cpp:526,753`)가 사내 선례 |
+| **커스텀 바이너리** (리플렉션 테이블 순회 직렬) | **채택** | 이 엔진은 `Meta::Type`(현 reflgen 서술)이 직렬화의 단일 진실이다 — 쿠킹은 "리플렉션 순회 결과를 키 없이 순서대로 쓰기 + 문자열 테이블"로 충분하다. `ModelLoader`의 모델 바이너리 캐시(`ModelLoader.cpp:526,753`)가 사내 선례 |
 | FlatBuffers | 기각 | 스키마 이중 관리 — 리플렉션 시스템이 있는데 스키마 언어를 또 세운다 |
 | CBOR/MessagePack (nlohmann 내장) | 기각(과도기 대안으로만 기록) | 추가 의존성 0은 장점이나 자기서술 포맷이라 키 문자열이 반복되고 이득이 제한적 |
 
@@ -661,10 +666,13 @@ PHASE 17은 socket, packet, RPC, replication을 구현하지 않는다. 대신 P
 포맷 결합 없이 시작할 수 있도록 다음 경계를 완료 조건에 포함한다.
 
 - `MetaSchema`는 std-only canonical descriptor를 유지한다.
+  **갱신(2026-09-30)**: 스키마는 reflgen 서술이다 — 포맷을 모르고, 포맷은 writer·reader가 붙인다.
 - 저장 필드는 기존 선택 규칙, network 필드는 `replicated_attr` opt-in으로 갈라진다.
+  **갱신(2026-09-30)**: 저장 필드는 반영 멤버 전부에서 `[[reflgen::ignore]]`·`[[reflgen::transient]]` 를 뺀 것이다. network 속성은
+  `creator` 이름공간의 속성 타입으로 단다(`ReflgenAttributes.h`).
 - `EntityHandle`, `size_t typeID`, Node view는 wire type으로 직렬화할 수 없다.
 - `ComponentFactory`는 `Meta::Type`/정규화된 descriptor를 받고 authoring adapter가
-  textual type을 해석한다.
+  textual type을 해석한다. **갱신(2026-09-30)**: descriptor는 `reflgen::type_descriptor` 다(`Meta::Find`).
 - scalar codec은 공유할 수 있지만 CookedArchive와 NetworkArchive의 header/version/
   delta/quantization 정책은 공유하지 않는다.
 
@@ -2576,7 +2584,7 @@ D3의 정본 Release A/B와 D5 정본 성능
 8. yaml-cpp·nlohmann consumer/include 0, Editor authoring backend는 ryml 하나.
 9. Entity/ComponentFactory/Runtime interface에 YAML/JSON/ryml Node 타입 0.
 10. `AuthoringArchive`, `CookedArchive`, PHASE 20용 `NetworkArchive` 소비 경계가
-    같은 `MetaSchema` 위에서 서로의 포맷 타입 없이 컴파일된다.
+    같은 `MetaSchema`(2026-09-30부터 reflgen 서술) 위에서 서로의 포맷 타입 없이 컴파일된다.
 
 ## 6. 하지 않을 것
 

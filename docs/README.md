@@ -78,6 +78,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [ContainerLibraryDesign.md](design/ContainerLibraryDesign.md) | `ce::dynamic_array` — 자체 컨테이너 설계와 기각 근거 |
 | [RhiGpuMemoryLifetimeDesign.md](design/RhiGpuMemoryLifetimeDesign.md) | RHI GPU 메모리 수명 |
 | [ResourceOwnershipDesign.html](design/ResourceOwnershipDesign.html) | 자원 소유권 |
+| [ReflectionDesign.md](design/ReflectionDesign.md) | 리플렉션 현재 설계 정본 — reflgen 서술·빌드 연동·런타임 등록소·소비자와 기각 근거 |
 | [ReflectionRetentionDecision.md](design/ReflectionRetentionDecision.md) | 리플렉션 존치 결정 |
 
 ## analysis/
