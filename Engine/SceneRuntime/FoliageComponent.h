@@ -8,14 +8,9 @@
 #include <optional>
 
 class TerrainComponent;
-class FoliageComponent : public meta::identity<FoliageComponent, Component>
+class [[reflgen::reflect]] FoliageComponent : public meta::identity<FoliageComponent, Component>
 {
     public:
-    static consteval auto reflect()
-    {
-        return meta::schema<Self>(
-            meta::field<&Self::m_foliageAssetGuid>);
-    }
 public:
     FoliageComponent() = default;
 
@@ -60,6 +55,9 @@ public:
 
     FileGuid m_foliageAssetGuid{};
 private:
+    [[reflgen::ignore]]
     std::vector<FoliageType> m_foliageTypes{};
+
+    [[reflgen::ignore]]
     std::vector<FoliageInstance> m_foliageInstances{};
 };

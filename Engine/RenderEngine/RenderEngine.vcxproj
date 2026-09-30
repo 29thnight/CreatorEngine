@@ -622,6 +622,7 @@
     <ClInclude Include="MaterialGraphSceneSubsurface.h" />
     <ClInclude Include="MaterialGraphSceneVolume.h" />
     <ClInclude Include="MaterialGraphSceneRefraction.h" />
+    <ClInclude Include="ReflgenRegistration.h" />
     <ClInclude Include="ShaderMetaHandle.h" />
     <ClInclude Include="ShaderMeta.h" />
     <ClInclude Include="MaterialPropertyPacker.h" />

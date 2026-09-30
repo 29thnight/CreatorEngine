@@ -16,18 +16,9 @@
 // 카메라 한 대의 값 상태. 소유권·활성 뷰 선택·렌더 슬롯 배정은 이 타입의
 // 책임이 아니다. SceneRuntime의 CameraComponent와 Editor의 camera rig가 각각
 // 값을 소유하고 RenderCore에는 FrameCameraSnapshot만 전달한다.
-class Camera
+class [[reflgen::reflect]] Camera
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = Camera;
-       return meta::schema<Self>(
-           meta::field<&Self::rotate>,
-           meta::field<&Self::m_nearPlane>,
-           meta::field<&Self::m_farPlane>,
-           meta::field<&Self::m_fov>);
-   }
 public:
 	Camera() = default;
 	~Camera() = default;
@@ -53,18 +44,29 @@ public:
 	static constexpr math::vector3 kRight = math::vector3::unit_x();
 	static constexpr math::vector3 kUp = math::vector3::unit_y();
 
+	[[reflgen::ignore]]
 	math::vector3 m_eyePosition{ 0.f, 1.f, -10.f };
+
+	[[reflgen::ignore]]
 	math::vector3 m_forward{ kForward };
+
+	[[reflgen::ignore]]
 	math::vector3 m_right{ kRight };
+
+	[[reflgen::ignore]]
 	math::vector3 m_up{ kUp };
 
 	float m_nearPlane{ 0.1f };
 	float m_farPlane{ 500.f };
 	float m_fov{ 60.f };
 
+	[[reflgen::ignore]]
 	float m_viewWidth{ 1.f };
+
+	[[reflgen::ignore]]
 	float m_viewHeight{ 1.f };
 
+	[[reflgen::ignore]]
 	bool m_isOrthographic{ false };
 
 };

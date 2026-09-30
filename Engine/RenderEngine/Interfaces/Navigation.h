@@ -35,17 +35,9 @@ constexpr bool HasUIEffect(UIEffects value, UIEffects flag) noexcept
 	return 0 != (static_cast<std::uint32_t>(value) & static_cast<std::uint32_t>(flag));
 }
 
-struct Navigation
+struct [[reflgen::reflect]] Navigation
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = Navigation;
-       return meta::schema<Self>(
-           meta::field<&Self::mode>,
-           meta::field<&Self::parentHops>,
-           meta::field<&Self::childOrdinals>);
-   }
 	int mode{};
 
 	// U7 — 전역 instanceID 대신 소스 UI를 기준으로 한 계층 로컬 경로를 저장한다.

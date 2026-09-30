@@ -17,6 +17,7 @@
 #include "StandardMaterialProperty.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
+#include "ReflgenRuntime.h"
 #include <unordered_set>
 #include "RectTransformComponent.h"
 #include "AuthoringNodeEquality.h"
@@ -61,35 +62,35 @@ namespace EditorObjectOperations
             {
                 if (!component || component->IsDestroyMark()) continue;
                 const bool matches = name == "#" + std::to_string(component->GetInstanceID())
-                    || component->ToString() == name || (type && component->GetTypeID() == type->typeID);
+                    || component->ToString() == name || (type && component->GetTypeID() == Meta::TypeIDOf(*type));
                 if (!matches) continue;
                 if (found) return nullptr; // require #instanceId for repeated component types
                 found = component.get();
             }
             return found;
         }
-        const Meta::Property* FindProperty(const Meta::Type* type, const std::string& field)
+        // 같은 이름이면 파생 타입의 필드가 부모 것을 가린다(C++ 이름 탐색, 옛 부모 체인 탐색과 같다).
+        const reflgen::field_info* FindProperty(const reflgen::type_descriptor* type, const std::string& field)
         {
-            for (; type; type = type->parent)
-                for (const auto& property : type->properties)
-                    if (property.name && field == property.name) return &property;
-            return nullptr;
+            return type ? type->find_field(field) : nullptr;
         }
-        bool ParsePropertyValue(const Meta::Property& property, const std::string& raw, std::any& value)
+        template<class V>
+        bool IsFieldOf(const reflgen::field_info& field) { return field.type() == reflgen::type_id_of<V>(); }
+        // 값은 필드 타입 그대로 담는다(enum 은 int) — AssignPropertyValue 가 같은 판정으로 꺼내 쓴다.
+        bool ParsePropertyValue(const reflgen::field_info& property, const std::string& raw, std::any& value)
         {
-            const auto hash = property.typeID;
-            if (hash == GUIDCreator::GetTypeID<std::string>()) { value = raw; return true; }
-            if (hash == GUIDCreator::GetTypeID<HashingString>()) { value = HashingString(raw); return true; }
-            if (property.typeName == "FileGuid")
+            const reflgen::enum_descriptor* enumeration = property.enumeration();
+            if (IsFieldOf<std::string>(property)) { value = raw; return true; }
+            if (IsFieldOf<HashingString>(property)) { value = HashingString(raw); return true; }
+            if (IsFieldOf<FileGuid>(property))
             { try { value = FileGuid(raw); return true; } catch (...) { return false; } }
-            if (hash == GUIDCreator::GetTypeID<bool>() || property.typeName == "bool32")
+            if (IsFieldOf<bool>(property))
             {
                 if (raw != "true" && raw != "false" && raw != "0" && raw != "1") return false;
                 value = raw == "true" || raw == "1"; return true;
             }
-            if (property.enumType)
-                for (const auto& entry : property.enumType->values)
-                    if (entry.name && raw == entry.name) { value = entry.value; return true; }
+            if (enumeration)
+                if (const auto* entry = enumeration->find(std::string_view(raw))) { value = static_cast<int>(entry->value); return true; }
             std::string buffer = raw;
             for (char& c : buffer) if (c == ',') c = ' ';
             std::istringstream stream(buffer);
@@ -97,31 +98,50 @@ namespace EditorObjectOperations
             double number;
             while (stream >> number) { if (!std::isfinite(number)) return false; numbers.push_back(number); }
             if (!stream.eof() || numbers.empty()) return false;
-            if (hash == GUIDCreator::GetTypeID<double>() && numbers.size() == 1) { value = numbers[0]; return true; }
+            if (IsFieldOf<double>(property) && numbers.size() == 1) { value = numbers[0]; return true; }
             const auto f = [&](size_t i) { return static_cast<float>(numbers[i]); };
             for (double n : numbers) if (std::abs(n) > (std::numeric_limits<float>::max)()) return false;
-            if (hash == GUIDCreator::GetTypeID<float>() && numbers.size() == 1) { value = f(0); return true; }
+            if (IsFieldOf<float>(property) && numbers.size() == 1) { value = f(0); return true; }
             if (numbers.size() == 1 && numbers[0] == std::trunc(numbers[0]))
             {
-                if ((hash == GUIDCreator::GetTypeID<int>() || property.enumType) && numbers[0] >= INT_MIN && numbers[0] <= INT_MAX)
+                if ((IsFieldOf<int>(property) || enumeration) && numbers[0] >= INT_MIN && numbers[0] <= INT_MAX)
                 {
                     const int n = static_cast<int>(numbers[0]);
-                    if (property.enumType)
-                    {
-                        bool valid = false;
-                        for (const auto& entry : property.enumType->values) if (entry.value == n) valid = true;
-                        if (!valid) return false;
-                    }
+                    if (enumeration && !enumeration->find(static_cast<long long>(n))) return false;
                     value = n; return true;
                 }
-                if ((hash == GUIDCreator::GetTypeID<unsigned int>() || property.typeName == "UINT") && numbers[0] >= 0 && numbers[0] <= UINT_MAX)
+                // bool32·UINT 는 unsigned int 의 별칭이다 — 필드 타입은 별칭을 벗긴 이름이라 여기서 함께 잡힌다.
+                if (IsFieldOf<unsigned int>(property) && numbers[0] >= 0 && numbers[0] <= UINT_MAX)
                 { value = static_cast<unsigned int>(numbers[0]); return true; }
             }
-            if (hash == GUIDCreator::GetTypeID<math::vector2>() && numbers.size() == 2) { value = math::vector2{f(0), f(1)}; return true; }
-            if (hash == GUIDCreator::GetTypeID<math::vector3>() && numbers.size() == 3) { value = math::vector3{f(0), f(1), f(2)}; return true; }
-            if (hash == GUIDCreator::GetTypeID<math::vector4>() && numbers.size() == 4) { value = math::vector4{f(0), f(1), f(2), f(3)}; return true; }
-            if (hash == GUIDCreator::GetTypeID<math::color>() && numbers.size() == 4) { value = math::color{f(0), f(1), f(2), f(3)}; return true; }
+            if (IsFieldOf<math::vector2>(property) && numbers.size() == 2) { value = math::vector2{f(0), f(1)}; return true; }
+            if (IsFieldOf<math::vector3>(property) && numbers.size() == 3) { value = math::vector3{f(0), f(1), f(2)}; return true; }
+            if (IsFieldOf<math::vector4>(property) && numbers.size() == 4) { value = math::vector4{f(0), f(1), f(2), f(3)}; return true; }
+            if (IsFieldOf<math::color>(property) && numbers.size() == 4) { value = math::color{f(0), f(1), f(2), f(3)}; return true; }
             return false;
+        }
+        template<class V>
+        bool AssignAs(const reflgen::field_info& property, void* address, const std::any& value)
+        {
+            if (!IsFieldOf<V>(property)) return false;
+            *static_cast<V*>(address) = std::any_cast<const V&>(value);
+            return true;
+        }
+        // ParsePropertyValue 가 담은 값을 필드에 쓴다. object 는 서술자 타입의 객체다(Meta::MostDerived).
+        bool AssignPropertyValue(const reflgen::field_info& property, void* object, const std::any& value)
+        {
+            void* address = property.address(object);
+            if (const reflgen::enum_descriptor* enumeration = property.enumeration())
+            {
+                enumeration->write(address, std::any_cast<int>(value));
+                return true;
+            }
+            return AssignAs<std::string>(property, address, value) || AssignAs<HashingString>(property, address, value)
+                || AssignAs<FileGuid>(property, address, value) || AssignAs<bool>(property, address, value)
+                || AssignAs<double>(property, address, value) || AssignAs<float>(property, address, value)
+                || AssignAs<int>(property, address, value) || AssignAs<unsigned int>(property, address, value)
+                || AssignAs<math::vector2>(property, address, value) || AssignAs<math::vector3>(property, address, value)
+                || AssignAs<math::vector4>(property, address, value) || AssignAs<math::color>(property, address, value);
         }
 
         CommandCore::CommandData Snapshot(EntityHandle handle, Entity& object)
@@ -156,8 +176,8 @@ namespace EditorObjectOperations
                 {
                     D entry = D::Object();
                     entry.Set("id", D::String("#" + std::to_string(component->GetInstanceID())));
-                    const auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
-                    entry.Set("type", D::String(type ? type->name : component->ToString()));
+                    const auto* type = Meta::Find(component->GetTypeID());
+                    entry.Set("type", D::String(type ? std::string(type->name()) : component->ToString()));
                     entry.Set("enabled", D::Bool(component->IsEnabled()));
                     components.Append(std::move(entry));
                 }
@@ -279,7 +299,7 @@ namespace EditorObjectOperations
         if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
         auto* component = FindComponent(object, name);
         if (!component) return InvalidArguments("Missing or ambiguous component");
-        const auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
+        const auto* type = Meta::Find(component->GetTypeID());
         if (!type) return InvalidArguments("Unregistered component type");
         const auto convert = [](auto&& self, const Authoring::ReadNode& node) -> CommandData {
             if (node.IsMap())
@@ -301,11 +321,13 @@ namespace EditorObjectOperations
         data.Set("component", CommandData::String("#" + std::to_string(component->GetInstanceID())));
         data.Set("values", convert(convert, document.Root().Read()));
         auto fields = CommandData::Array();
-        for (auto* current = type; current; current = current->parent)
-            for (const auto& property : current->properties)
+        // 파생 타입의 필드부터(옛 부모 체인 순서) — 타입 이름은 reflgen 표기다.
+        for (auto* current = type; current; current = Meta::Parent(*current))
+            for (const reflgen::field_info& property : Meta::LocalFields(*current))
             {
                 auto field = CommandData::Object();
-                field.Set("name", CommandData::String(property.name)); field.Set("type", CommandData::String(property.typeName));
+                field.Set("name", CommandData::String(std::string(property.name())));
+                field.Set("type", CommandData::String(std::string(property.type_name())));
                 fields.Append(std::move(field));
             }
         data.Set("fields", std::move(fields));
@@ -452,7 +474,7 @@ namespace EditorObjectOperations
 
     PropertyEdit CapturePropertyEdit(Component& component, std::vector<std::string> fields)
     {
-        const auto* type = Meta::Find(component.GetTypeID().m_ID_Data);
+        const auto* type = Meta::Find(component.GetTypeID());
         auto* object = component.GetOwner();
         return {object->GetScene()->HandleOf(object->m_index), "#" + std::to_string(component.GetInstanceID()),
             std::move(fields), Meta::SerializeDocument(&component, *type)};
@@ -467,7 +489,7 @@ namespace EditorObjectOperations
             auto* object = Resolve(edit.target);
             auto* component = object ? FindComponent(object, edit.component) : nullptr;
             if (!component) continue; // the gesture's object was removed or its scene changed
-            const auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
+            const auto* type = Meta::Find(component->GetTypeID());
             if (!type) continue;
             auto before = std::make_shared<Authoring::WriteDocument>(std::move(edit.before));
             auto after = std::make_shared<Authoring::WriteDocument>(Meta::SerializeDocument(component, *type));
@@ -520,9 +542,9 @@ namespace EditorObjectOperations
         if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         auto* component = FindComponent(object, componentName);
         if (!component) return InvalidArguments("Missing or ambiguous component; use its #id", "component.not_found");
-        const auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
+        const auto* type = Meta::Find(component->GetTypeID());
         const auto* property = FindProperty(type, field);
-        if (!property || !property->setter) return InvalidArguments("Field is not editable", "property.not_found");
+        if (!property) return InvalidArguments("Field is not editable", "property.not_found");
         // Engine identity and ownership fields are not authoring properties.
         if (field == "m_instanceID" || field == "m_index" || field == "m_typeID") return InvalidArguments("Identity fields are read-only");
         if (field == "m_isEnabled" && !PolicyOf(*component).individuallyToggleable)
@@ -530,7 +552,8 @@ namespace EditorObjectOperations
         std::any value;
         if (!ParsePropertyValue(*property, raw, value)) return InvalidArguments("Value does not match property type", "property.value_invalid");
         auto before = Meta::SerializeDocument(component, *type);
-        property->setter(component, value);
+        if (!AssignPropertyValue(*property, Meta::MostDerived(component), value))
+            return InvalidArguments("Value does not match property type", "property.value_invalid");
         const bool changed = CommitProperty(*component, field, std::move(before));
         auto data = Snapshot(target, *object); data.Set("changed", CommandData::Bool(changed));
         data.Set("field", CommandData::String(field)); data.Set("value", CommandData::String(raw));
@@ -592,7 +615,7 @@ namespace EditorObjectOperations
         if (found == ComponentFactorys->m_componentTypes.end() || !found->second) return InvalidArguments("Unknown component type");
         const auto* type = found->second;
         for (const auto& component : object->m_components)
-            if (component && component->GetTypeID() == type->typeID && !component->IsDestroyMark())
+            if (component && component->GetTypeID() == Meta::TypeIDOf(*type) && !component->IsDestroyMark())
                 {
                     auto result = Describe(target); result.data.Set("changed", CommandData::Bool(false)); return result;
                 }
@@ -682,7 +705,7 @@ namespace EditorObjectOperations
         auto* component = FindComponent(object, name);
         if (!component) return InvalidArguments("Missing or ambiguous component");
         if (!PolicyOf(*component).removable) return InvalidArguments("Spatial component is required by the object type");
-        auto* type = Meta::Find(component->GetTypeID().m_ID_Data);
+        auto* type = Meta::Find(component->GetTypeID());
         auto snapshot = std::make_shared<Authoring::WriteDocument>(Meta::SerializeDocument(component, *type));
         const std::string id = "#" + std::to_string(component->GetInstanceID());
         Meta::EntityReference reference(object);

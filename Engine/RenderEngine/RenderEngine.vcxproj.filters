@@ -686,6 +686,9 @@
     <ClInclude Include="Material.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>
+    <ClInclude Include="ReflgenRegistration.h">
+      <Filter>Interfaces</Filter>
+    </ClInclude>
     <ClInclude Include="ShaderMetaHandle.h">
       <Filter>Resources\Material</Filter>
     </ClInclude>

@@ -649,6 +649,9 @@
     <ClInclude Include="Prefab.h">
       <Filter>Classes\GameObject\Prefab</Filter>
     </ClInclude>
+    <ClInclude Include="PrefabOverride.h">
+      <Filter>Classes\GameObject\Prefab</Filter>
+    </ClInclude>
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClInclude>

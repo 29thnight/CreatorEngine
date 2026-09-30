@@ -14,7 +14,7 @@ Windows x64용 C++23 게임 엔진과 Dear ImGui 에디터, 독립 Player, 콘�
 
 Editor와 Player는 같은 런타임 계층을 사용합니다. 렌더링은 DirectX 12·Vulkan RHI와 `EnhancedRenderGraph`로 구성하고, 게임 로직은 .NET 10 C# 스크립트로 확장합니다. enkiTS 기반 공용 작업 스케줄러가 애니메이션·자산 로딩·렌더 명령 기록을 실행하고, 독립 실행 파일인 **CreatorBuildTool**이 엔진 배포·C# 컴파일·콘텐츠 cook·게임 패키징을 담당합니다.
 
-> **개발 상태:** 현재는 구조 개선이 진행 중인 개발 버전입니다. [`EngineVersion.json`](EngineVersion.json)의 `CreatorEngine 2 / 0.0.0.0 / preview / localDevelopment=true`는 미발행 로컬 개발 상태이며 정식 릴리스 번호가 아닙니다. 아래 설명은 **2026-09-28의 소스와 빌드 설정**을 기준으로 합니다. 계획서의 목표와 현재 구현·검증 범위는 구분합니다.
+> **개발 상태:** 현재는 구조 개선이 진행 중인 개발 버전입니다. [`EngineVersion.json`](EngineVersion.json)의 `CreatorEngine 2 / 0.0.0.0 / preview / localDevelopment=true`는 미발행 로컬 개발 상태이며 정식 릴리스 번호가 아닙니다. 아래 설명은 **2026-09-30의 소스와 빌드 설정**을 기준으로 합니다. 계획서의 목표와 현재 구현·검증 범위는 구분합니다.
 
 ## 현재 구성
 
@@ -28,7 +28,8 @@ Editor와 Player는 같은 런타임 계층을 사용합니다. 렌더링은 Dir
 | Content | fastgltf·ufbx 모델 임포트, MikkTSpace 탄젠트 생성, ryml 기반 저작 YAML, 자산 메타데이터, AssetCooker와 AssetPacker |
 | Build & Distribution | C# `CreatorBuildTool`, 엔진 배포본과 프로젝트 pin, 포함된 Roslyn 컴파일러·사설 .NET 런타임, cook → PAK → Player 검증 → 게시 |
 | Diagnostics | CPU/GPU 타임라인·계층 분석·모듈별 카운터, `.ceprof` 저장·열기, Memory 스냅샷·A/B 비교, Editor/Player 명령 서비스와 회귀 검사 |
-| Graph Authoring | Lattice의 독립 그래프 모델·문서·ImGui 캔버스와 독립 예제. Editor 통합과 Material Graph 제품 연결은 진행 계획에서 별도 관리 |
+| Graph Authoring | Lattice 그래프·문서·ImGui 캔버스, MeshRenderer에서 여는 Material Node Editor, Inspector 재질 편집·미리보기, 그래프의 Slang 생성·제품 렌더·쿠킹 경로 |
+| Reflection | reflgen의 생성된 타입 서술자·모듈 등록, 엔진의 저작 YAML·Inspector 어댑터. 저장 제외 필드는 `[[reflgen::ignore]]`로 명시 |
 
 ### 런타임 흐름
 
@@ -64,10 +65,13 @@ flowchart TB
 | [프레임 프로파일러](docs/plans/ProfilingCapturePlan.md) | Record/Pause, CPU/GPU 구간·카운터 분석, 캡처 소유 이름·시계, `.ceprof` 저장·열기 | 장시간 녹화·오버헤드 등 잔여 게이트. 별도 단일 제출 캡처인 [Render Frame Debugger](docs/plans/RenderFrameDebuggerPlan.md)의 `.ceframe`은 계획 단계 |
 | [메모리 프로파일러](docs/plans/MemoryProfilerPlan.md) | GameThread 경계의 수동 스냅샷, 프로세스·힙·자산 객체·주소 지도와 A/B 비교 | 네이티브 할당 소유자, 관리 객체·참조, GPU 자원별 계측과 보존 확장 |
 | [오디오 전환](docs/plans/AudioBackendModernizationPlan.md) | `wave::AudioRuntime`, miniaudio·Null 백엔드, 보이스 정책과 cooked 클립 바이트 입력의 독립 구현 | SoundComponent·Editor/Player 제품 배선, FMOD 링크·배포 제거와 장치·재생 회귀. 현재 호스트에는 FMOD가 필요 |
-| [Lattice](docs/plans/LatticeAdoptionPlan.md)·[Material Graph](docs/plans/BlenderMaterialGraphPlan.md) | 독립 그래프·문서·캔버스 예제와 Material Graph 구현 작업 | Editor 저작 창·제품 경로 연결과 기존 `imgui-node-editor` 소비자 이관 |
+| [Lattice](docs/plans/LatticeAdoptionPlan.md)·[Material Graph](docs/plans/BlenderMaterialGraphPlan.md) | MAT-0~8 완료: 그래프를 재질 정본으로 사용, Slang·바인딩·PSO·쿠킹, Scene Surface/Volume·SSS·투과, 노드 창·Inspector 편집과 미리보기 | MAT-9 렌더 대조·성능 수용 진행. 박막의 Blender 이미지 차이, Special·텍스처 및 경로별 대조와 성능 게이트. BT·Animator 자산은 재작성 때 LX 사용 |
+| [리플렉션](docs/design/ReflectionDesign.md) | reflgen 1.0.0 생성기·런타임, Visual Studio 18용 확장, 생성된 모듈 등록과 기존 저작 포맷 어댑터 | 새 반영 필드는 기본 저장 대상이므로 런타임 캐시의 제외 속성과 기동 등록 검사를 함께 유지 |
 | [배포·Launcher](docs/plans/EngineDistributionAndLauncherPlan.md) | CreatorBuildTool, 엔진 배포본·프로젝트 pin과 패키징 | 정식 `.creatorproject` parser, Launcher·MSI 제품화 |
 
 [네트워크 fixed tick·replication](docs/plans/NetworkFrameworkPlan.md)도 후속 구현 범위입니다. 전체 작업 상태와 검증 기록은 [문서 색인](docs/README.md)과 [대시보드](docs/RefactoringPlanDashboard.html)에서 확인할 수 있습니다.
+
+PHASE 4.25의 현재 완료 공수는 **32/34일**입니다. [동일 입력 Blender 이미지 대조](docs/analysis/MAT9BlenderImageComparison.md), [모델 배치 성능 조사](docs/analysis/MAT9MaterialScenePerformance.md), [다른 세션의 노드 편집기 성능 개선](docs/analysis/MAT9NodeEditorPerformance.md)은 각각 측정 조건과 남은 검증을 기록합니다. reflgen 병합 전의 성능 수치를 병합 후 측정으로 해석하지 않습니다.
 
 ## 기술 기준
 
@@ -80,6 +84,7 @@ flowchart TB
 | 작업 실행 | enkiTS, 엔진 공용 `thread_pool`·`job_scheduler` |
 | 물리·오디오 | NVIDIA PhysX, 현재 제품 경로의 FMOD Core API, 전환 중인 miniaudio 0.11.25 |
 | 직렬화·패키징 | ryml 기반 저작 YAML, 도구·명령용 JSON, `.creator`·`.prefab`·`.meta`, 쿠킹된 런타임 문서, PAK |
+| 리플렉션 | reflgen 1.0.0, `[[reflgen::reflect]]` 타입의 생성된 서술자와 엔진 등록소, `creator::` Inspector 속성 |
 | 의존성 관리 | [`vcpkg.json`](vcpkg.json)의 manifest·baseline + [`ThirdParty/`](ThirdParty/README.md)의 고정 의존성 |
 
 수학 라이브러리 교체에는 `ThirdParty/Mathematics`를 사용합니다. 구조 이주와 픽셀·물리 런타임 검증의 잔여 범위는 [Mathematics 이주 계획](docs/plans/MathematicsMigrationPlan.md)에서 구분합니다.
@@ -111,6 +116,8 @@ Set-Location CreatorEngine
 ```
 
 MSBuild의 manifest mode가 `vcpkg_installed/`에 필요한 패키지를 복원합니다. 바이너리 캐시가 없는 환경에서는 PhysX 등 네이티브 의존성을 소스에서 빌드하므로 첫 복원 비용이 큽니다. 현재 모델 임포트 경로는 저장소에 고정된 fastgltf·ufbx이며, Assimp 설치 목록을 따로 구성하지 않습니다.
+
+reflgen은 [`ports/reflgen`](ports/reflgen/portfile.cmake)의 고정 버전을 복원합니다. 처음 설치되거나 생성기 설정이 바뀐 빌드는 MSBuild 설정을 다시 읽도록 재빌드를 안내할 수 있습니다. Visual Studio의 코드 탐색 지원은 [공식 VSIX 릴리스](https://github.com/29thnight/reflgen_cpp/releases/tag/v1.0.1)의 확장 1.0.1을 VS 18에 설치합니다. 확장은 편집 지원용이며 실제 생성은 MSBuild가 수행합니다.
 
 FMOD 개발 바이너리는 저장소에 포함되지 않으므로 로컬 SDK에서 다음 파일을 배치해야 합니다.
 

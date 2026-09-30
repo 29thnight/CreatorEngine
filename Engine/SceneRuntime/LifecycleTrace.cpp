@@ -168,7 +168,8 @@ namespace Lifecycle
     const char* Trace::TypeNameOf(Component* component)
     {
         if (nullptr == component) return "?";
-        const Meta::Type* type = Meta::Find(component->GetTypeID().m_ID_Data);
-        return (nullptr != type) ? type->name.c_str() : "?";
+        const reflgen::type_descriptor* type = Meta::Find(component->GetTypeID());
+        // 서술자의 이름은 생성 코드의 문자열 리터럴(.named("…"))이라 NUL 로 끝난다.
+        return (nullptr != type) ? type->name().data() : "?";
     }
 }

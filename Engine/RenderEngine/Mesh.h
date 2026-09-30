@@ -82,18 +82,11 @@ class Material;
 class ModelLoader;
 class MeshOptimizer;
 class Camera;
-class Mesh : public meta::polymorphic, public std::enable_shared_from_this<Mesh>,
+class [[reflgen::reflect]] Mesh : public meta::polymorphic, public std::enable_shared_from_this<Mesh>,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Mesh>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       using Self = Mesh;
-       return meta::schema<Self>(
-           meta::field<&Self::m_name>,
-           meta::field<&Self::m_materialIndex>,
-           meta::field<&Self::m_LODThresholds>);
-   }
 public:
 	// 각 LOD 레벨의 GPU 리소스를 관리하는 구조체
 	struct LODResource
@@ -142,6 +135,7 @@ public:
 	std::vector<uint32> GetIndices() const { return m_indices; }
 	uint32 GetStride()  { return m_stride; }
 
+	[[reflgen::ignore]]
 	HashedGuid m_hashingMesh{ make_guid() };
 
 private:
@@ -151,13 +145,21 @@ private:
 
 	uint32 m_materialIndex{};
 
+	[[reflgen::ignore]]
 	std::string m_modelName;
 
+	[[reflgen::ignore]]
 	std::vector<Vertex> m_vertices;
+
+	[[reflgen::ignore]]
 	std::vector<uint32> m_indices;
 
+	[[reflgen::ignore]]
 	math::aabb m_boundingBox{};
+
+	[[reflgen::ignore]]
 	math::sphere m_boundingSphere{};
+
 	static_assert(std::is_same_v<decltype(m_boundingBox), math::aabb>);
 	static_assert(std::is_same_v<decltype(m_boundingSphere), math::sphere>);
 	static_assert(sizeof(math::aabb) == 24u);
@@ -165,7 +167,9 @@ private:
 
 	// --- LOD 관련 멤버 변수 ---
 	// 인덱스 0: 원본(LOD0), 1: LOD1, ...
+	[[reflgen::ignore]]
 	std::vector<LODResource> m_LODs;
+
 	// 화면 공간 크기 기반의 LOD 전환 임계값
 	std::vector<float> m_LODThresholds;
 	// ---

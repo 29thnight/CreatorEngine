@@ -49,6 +49,10 @@
     { "name": "spdlog", "$why": "로그 — LogSystem·LogSink" },
     { "name": "stb", "$why": "이미지 로드/기록 — Terrain" },
     {
+      "name": "reflgen",
+      "$why": "reflgen 도입 — [[reflgen::reflect]] 에서 리플렉션 서술을 생성한다(생성기·MSBuild 연동·헤더). overlay port(ports/reflgen)가 reflgen 릴리스 태그(v1.0.0)를 가리킨다. Directory.Build.targets 가 share/reflgen/msbuild/reflgen.targets 를 가져온다"
+    },
+    {
       "name": "ryml",
       "$why": "SerializationPlan D3-b — 저작 YAML parser/writer 단일 backend. 전이 의존 c4core는 직접 적지 않는다. 근거: D0 실측에서 scene load의 60%가 text parsing이었다"
     }

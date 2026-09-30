@@ -5,21 +5,9 @@
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 
-class CapsuleColliderComponent : public meta::identity<CapsuleColliderComponent, Component>, public ICollider
+class [[reflgen::reflect]] CapsuleColliderComponent : public meta::identity<CapsuleColliderComponent, Component>, public ICollider
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_radius>,
-           meta::field<&Self::m_posOffset>,
-           meta::field<&Self::m_rotOffset>,
-           meta::field<&Self::m_height>,
-           meta::field<&Self::staticFriction>,
-           meta::field<&Self::dynamicFriction>,
-           meta::field<&Self::restitution>,
-           meta::field<&Self::density>);
-   }
 public:
 	CapsuleColliderComponent() 
    {
@@ -61,8 +49,13 @@ public:
 
 
 private:
+	[[reflgen::ignore]]
 	EColliderType m_type;
+
+	[[reflgen::ignore]]
 	CapsuleColliderInfo m_Info;
+
+	[[reflgen::ignore]]
 	int m_collsionCount{ 0 };
 
 public:

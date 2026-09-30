@@ -200,8 +200,8 @@ namespace LegacyTransformPromotion
             {
                 try
                 {
-                    const Meta::Type* componentType = Meta::ExtractTypeFromYAML(componentNode);
-                    if (componentType && componentType->typeID == type_guid(BoneComponent))
+                    const reflgen::type_descriptor* componentType = Meta::ExtractTypeFromYAML(componentNode);
+                    if (componentType && Meta::TypeIDOf(*componentType) == type_guid(BoneComponent))
                         return; // 신파일 — 아래 m_components 로드 루프가 채운다.
                 }
                 catch (const std::exception&)
@@ -802,7 +802,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         {
             try
             {
-                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type)
                 {
                     Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
@@ -823,7 +823,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         {
             try
             {
-                const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+                const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
                 if (!type)
                 {
                     Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
@@ -913,7 +913,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
 
         for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
         {
-            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+            const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
             {
                 Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
@@ -926,7 +926,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
         for (const Authoring::ReadNode objNode :
             sceneNode["DontDestroyOnLoadObjects"])
         {
-            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+            const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
             if (!type)
             {
                 Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
@@ -1503,7 +1503,7 @@ bool SceneManager::RestoreSceneSnapshot()
 	        for (const Authoring::ReadNode objNode : SerializedEntities(
 	            Authoring::DocumentAccess::Read(m_editorSceneBackup)))
 	        {
-	            const Meta::Type* type = Meta::ExtractTypeFromYAML(objNode);
+	            const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
 	            if (!type)
 	            {
 	                Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
@@ -1674,10 +1674,10 @@ void SceneManager::EndPlayTransaction()
 	m_isEditorSceneLoaded = false;
 }
 
-void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
+void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
-    if (type->typeID == type_guid(Entity))
+    if (Meta::TypeIDOf(*type) == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이 배치가
         // 로드된 뒤 RemapLoadBatchIndices까지 끝나야 m_parentIndex가 슬롯 인덱스로
@@ -1760,10 +1760,10 @@ void SceneManager::DesirealizeGameObject(const Meta::Type* type, const Authoring
     }
 }
 
-void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
+void SceneManager::DesirealizeGameObject(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
-    if (type->typeID == type_guid(Entity))
+    if (Meta::TypeIDOf(*type) == type_guid(Entity))
     {
         // 프리팹 재연결(P-a)은 더 이상 여기서 오브젝트 하나씩 하지 않는다 — 이유는
         // 위 오버로드 주석 참고(ReconnectPrefabInstance, SceneGraphRedesignPlan P2).
@@ -1837,10 +1837,10 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const Meta::Type* t
     }
 }
 
-void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const Meta::Type* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
+void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
-    if (type->typeID == type_guid(Entity))
+    if (Meta::TypeIDOf(*type) == type_guid(Entity))
     {
         auto it = std::find_if(m_dontDestroyOnLoadObjects.begin(), m_dontDestroyOnLoadObjects.end(),
 			[&](const auto& obj) { return obj->GetInstanceID() == itNode["m_instanceID"].As<size_t>(); });

@@ -2,6 +2,7 @@
 #include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
 #include "ReflectionUndo.h"
+#include "ReflgenRuntime.h"
 #include "CoreWindow.h"
 #include "BootProgress.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
@@ -319,6 +320,9 @@ void Editor::EditorMain::Initialize()
 		Sound->update();
 	});
 	BootProgress::Step(L"Initializing scene systems", L"Starting scene managers");
+	// Editor 모듈의 반영 타입(인스펙터 자극물 등)은 에디터만 링크한다 — 런타임 모듈의 등록(RegisterReflectManual,
+	// ManagerInitialize 안)과 따로 여기서 같은 등록소에 넣는다.
+	reflgen::generated::register_Editor(Meta::Types());
 	SceneManagers->ManagerInitialize();
 	BootProgress::Step(L"Initializing physics", L"Starting the physics manager");
 	PhysicsManagers->Initialize();

@@ -3,14 +3,8 @@
 #include "Component.h"
 #include "SceneRenderProfile.h"
 
-class SceneRenderProfileComponent : public meta::identity<SceneRenderProfileComponent, Component>
+class [[reflgen::reflect]] SceneRenderProfileComponent : public meta::identity<SceneRenderProfileComponent, Component>
 {
-  public:
-    static consteval auto reflect()
-    {
-        return meta::schema<Self>(meta::field<&Self::m_renderProfileName>, meta::field<&Self::m_renderProfileGuid>);
-    }
-
   public:
     SceneRenderProfileComponent() = default;
 
@@ -27,7 +21,12 @@ class SceneRenderProfileComponent : public meta::identity<SceneRenderProfileComp
     FileGuid m_renderProfileGuid{nullFileGuid};
 
   private:
+    [[reflgen::ignore]]
     RenderPassSettings m_prevSettings{};
+
+    [[reflgen::ignore]]
     SceneRenderProfile m_profile{};
+
+    [[reflgen::ignore]]
     bool m_isProfileLoaded{false};
 };

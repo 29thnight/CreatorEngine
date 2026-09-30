@@ -370,13 +370,13 @@ namespace
                 // 0인 죽은 함수였고 PBRMaterial CB는 어떤 셰이더에도 없다. 소비 0인
                 // 저작 표면은 데이터만 쌓는다. m_IOR 필드 자체는 S2c/I6에서 제거한다.
 
-                for (auto& enumProp : mat_type->properties)
+                for (const reflgen::field_info& enumProp : mat_type ? mat_type->fields() : std::span<const reflgen::field_info>{})
                 {
-                    if (enumProp.typeID == TypeTrait::GUIDCreator::GetTypeID<MaterialRenderingMode>())
+                    if (enumProp.type() == reflgen::type_id_of<MaterialRenderingMode>())
                     {
                         auto mode = meshRenderer->m_Material->m_renderingMode;
                         ImGui::SetNextItemWidth(sheet.line("Rendering Mode"));
-                        Meta::DrawEnumProperty((int*)&mode, enumProp, "##RenderingMode");
+                        Meta::DrawEnumProperty(&mode, enumProp, "##RenderingMode");
                         if (mode != meshRenderer->m_Material->m_renderingMode)
                             EditorObjectOperations::MaterialMode({meshRenderer->m_Material}, mode);
                         break;

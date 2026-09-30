@@ -208,11 +208,9 @@ namespace EngineBootstrap
         // 고정한다. PathFinder와 RuntimeSettings는 아래의 명시적 Host config만 쓴다.
         EngineMode::Set(config.compatibilityRunMode);
 
-        Meta::RegisterClassInitalize();
         if (!PathFinder::Initialize(config.paths))
         {
             std::fputs("[EnginePaths] Host가 유효한 경로를 제공하지 않았다\n", stderr);
-            Meta::RegisterClassFinalize();
             return false;
         }
 		try
@@ -224,7 +222,6 @@ namespace EngineBootstrap
 			std::fprintf(stderr, "[Log] initialization failed: %s\n", exception.what());
 			DebugClass::GetInstance()->AbortInitialization();
 			DebugClass::Destroy();
-			Meta::RegisterClassFinalize();
 			return false;
 		}
 		catch (...)
@@ -232,7 +229,6 @@ namespace EngineBootstrap
 			std::fputs("[Log] initialization failed with an unknown error\n", stderr);
 			DebugClass::GetInstance()->AbortInitialization();
 			DebugClass::Destroy();
-			Meta::RegisterClassFinalize();
 			return false;
 		}
 
@@ -251,7 +247,6 @@ namespace EngineBootstrap
 		{
 			std::fputs("[EnginePaths] Host runtime content preparation failed\n", stderr);
 			Debug::PrintLog(spdlog::level::err, "Host runtime content preparation failed");
-			Meta::RegisterClassFinalize();
 			Log::Finalize();
 			return false;
 		}
@@ -262,7 +257,6 @@ namespace EngineBootstrap
 				stderr);
 			Debug::PrintLog(spdlog::level::err, "RuntimeSettings 초기화 실패 — 기본값으로 계속하지 않는다");
 			RuntimeSettings::Shutdown();
-			Meta::RegisterClassFinalize();
 			Log::Finalize();
 			return false;
 		}
@@ -274,7 +268,6 @@ namespace EngineBootstrap
 			std::fputs("[HostSettings] Host settings initialization failed\n", stderr);
 			Debug::PrintLog(spdlog::level::err, "Host settings initialization failed");
 			RuntimeSettings::Shutdown();
-			Meta::RegisterClassFinalize();
 			Log::Finalize();
 			return false;
 		}
@@ -314,7 +307,6 @@ namespace EngineBootstrap
 		SHUTDOWN_STEP(InputManager::Destroy());
 		SHUTDOWN_STEP(DataSystem::Destroy());
 		SHUTDOWN_STEP(PrefabUtility::Destroy());
-        SHUTDOWN_STEP(Meta::RegisterClassFinalize());
 		// Runtime settings outlive every Core consumer and teardown service. Destroying
 		// them earlier leaves shutdown hooks with a dangling settings view.
 		SHUTDOWN_STEP(RuntimeSettings::Shutdown());

@@ -31,7 +31,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [LightmapBakerPlan.md](plans/LightmapBakerPlan.md) | PHASE 4.7 · L — 라이트맵 베이커 재작성과 비동기 베이킹 계약. |
 | [RendererQualityPlan.md](plans/RendererQualityPlan.md) | PHASE 4.75 · RND — probe/AO·shadow·display/post의 독립 품질 게이트. |
 | [GpuFeaturePlanningPlan.md](plans/GpuFeaturePlanningPlan.md) | PHASE 4.8 · GPU — GPU-driven·확률 조명·DXR 설계 및 구현 공수 확정. |
-| [LatticeAdoptionPlan.md](plans/LatticeAdoptionPlan.md) | LX-0~6 · 공수 미산정 — LX-2 독립 ImGui 예제 게이트 통과. Editor 연결, 새 BT/Animator 저작 창, `imgui-node-editor` 제거는 후속. |
+| [LatticeAdoptionPlan.md](plans/LatticeAdoptionPlan.md) | LX-0~6 · 공수 미산정 — LX-2 독립 게이트 통과, Material Editor·열린 문서 HTTP 제품 연결 진행. MAT-0~8 완료, LX-3/3H의 전체 조작 게이트·새 BT/Animator 창·`imgui-node-editor` 제거는 후속. |
 | [BackendParityPlan.md](plans/BackendParityPlan.md) | PHASE 4.9 — DX12/Vulkan 교차 판정 복귀. 공수 미산정. |
 | [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의 뒤 소유 게이트 13칸 HEAD 재실행으로 조건 ① 닫음(초록 11·붉음 2는 게이트 결함). 남은 조건은 GUI 수동 하나, MCP 보류. |
 | [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
@@ -78,6 +78,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [ContainerLibraryDesign.md](design/ContainerLibraryDesign.md) | `ce::dynamic_array` — 자체 컨테이너 설계와 기각 근거 |
 | [RhiGpuMemoryLifetimeDesign.md](design/RhiGpuMemoryLifetimeDesign.md) | RHI GPU 메모리 수명 |
 | [ResourceOwnershipDesign.html](design/ResourceOwnershipDesign.html) | 자원 소유권 |
+| [ReflectionDesign.md](design/ReflectionDesign.md) | 리플렉션 현재 설계 정본 — reflgen 서술·빌드 연동·런타임 등록소·소비자와 기각 근거 |
 | [ReflectionRetentionDecision.md](design/ReflectionRetentionDecision.md) | 리플렉션 존치 결정 |
 
 ## analysis/
@@ -91,6 +92,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [MAT9BlenderImageComparison.md](analysis/MAT9BlenderImageComparison.md) | Core/Layered 동일 입력 24장·Debug/Release 일치·박막 잔여 차이와 기준 노이즈(2026-09-30) |
 | [MAT9MaterialScenePerformance.md](analysis/MAT9MaterialScenePerformance.md) | 모델 배치 후 Debug/Release 렌더 CPU 회귀와 청크·LOD·binding 개선(2026-09-30) |
 | [MAT9NodeEditorPerformance.md](analysis/MAT9NodeEditorPerformance.md) | 다른 세션의 캔버스·Scene 잠금 대기·Inspector preview 실측 통합(2026-09-30) |
+| [ReflgenPhase425Integration.md](analysis/ReflgenPhase425Integration.md) | reflgen PR #114·VS 확장 설치, 4.25 충돌 해결과 통합 검증(2026-09-30) |
 | [PPLContainerMigrationAnalysis.md](analysis/PPLContainerMigrationAnalysis.md) | PPL 컨테이너 이관 |
 | [RectTransformAnalysis.html](analysis/RectTransformAnalysis.html) | RectTransform |
 | [RendererPortingLog.html](analysis/RendererPortingLog.html) | 렌더러 포팅 이력 |

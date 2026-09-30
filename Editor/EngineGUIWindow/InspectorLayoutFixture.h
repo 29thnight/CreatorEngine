@@ -33,33 +33,16 @@ namespace editor::inspector
         Third,
     };
 
-    struct InspectorFixtureLeaf
+    struct [[reflgen::reflect]] InspectorFixtureLeaf
     {
-        static consteval auto reflect()
-        {
-            using Self = InspectorFixtureLeaf;
-            return meta::schema<Self>(
-                meta::field<&Self::weight>,
-                meta::field<&Self::note>,
-                meta::field<&Self::offset>);
-        }
 
         float weight{ 0.5f };
         std::string note{ "leaf note that is long enough to be clipped at narrow widths" };
         math::vector3 offset{ 1.f, 2.f, 3.f };
     };
 
-    struct InspectorFixtureBranch
+    struct [[reflgen::reflect]] InspectorFixtureBranch
     {
-        static consteval auto reflect()
-        {
-            using Self = InspectorFixtureBranch;
-            return meta::schema<Self>(
-                meta::field<&Self::depth>,
-                meta::field<&Self::title>,
-                meta::field<&Self::leaf>,
-                meta::field<&Self::samples>);
-        }
 
         int depth{ 2 };
         std::string title{ "branch title" };
@@ -67,31 +50,8 @@ namespace editor::inspector
         std::vector<float> samples{ 0.25f, 0.5f, 0.75f };
     };
 
-    struct InspectorLayoutFixture
+    struct [[reflgen::reflect]] InspectorLayoutFixture
     {
-        static consteval auto reflect()
-        {
-            using Self = InspectorLayoutFixture;
-            return meta::schema<Self>(
-                meta::field<&Self::count>,
-                meta::field<&Self::ratio>,
-                meta::field<&Self::toggle>,
-                meta::field<&Self::caption>,
-                meta::field<&Self::mode>,
-                meta::field<&Self::extent>,
-                meta::field<&Self::position>,
-                meta::field<&Self::plane>,
-                meta::field<&Self::branch>,
-                meta::field<&Self::weights>,
-                meta::field<&Self::names>,
-                meta::field<&Self::points>,
-                meta::field<&Self::smallIds>,
-                meta::field<&Self::fixed>,
-                meta::field<&Self::tags>,
-                meta::field<&Self::scores>,
-                meta::field<&Self::leaves>,
-                meta::field<&Self::branches>);
-        }
 
         int count{ 7 };
         float ratio{ 0.33f };

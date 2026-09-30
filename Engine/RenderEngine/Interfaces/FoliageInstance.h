@@ -5,23 +5,18 @@
 #include <mathematics/transform.hpp>
 #include <type_traits>
 
-struct FoliageInstance
+struct [[reflgen::reflect]] FoliageInstance
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = FoliageInstance;
-       return meta::schema<Self>(
-           meta::field<&Self::m_position>,
-           meta::field<&Self::m_rotation>,
-           meta::field<&Self::m_scale>,
-           meta::field<&Self::m_foliageTypeID>);
-   }
     math::vector3 m_position{};
     math::vector3 m_rotation{}; // Euler angles
     math::vector3 m_scale{ 1.f,1.f,1.f };
     std::uint32_t m_foliageTypeID{ 0 }; // index of FoliageType
+
+    [[reflgen::ignore]]
     bool m_isCulled{ false }; // whether this instance is culled or not
+
+	[[reflgen::ignore]]
 	math::matrix4x4 m_worldMatrix{ math::matrix4x4::identity() };
 
 	// position/rotation/scale은 foliage asset의 정본이고 world는 런타임 파생값이다.

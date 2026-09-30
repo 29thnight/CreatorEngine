@@ -10,26 +10,10 @@
 #include <mathematics/vector2.hpp>
 #include "Scene.h"
 
-class CharacterControllerComponent : public meta::identity<CharacterControllerComponent, Component>, public ICollider
+class [[reflgen::reflect]] CharacterControllerComponent : public meta::identity<CharacterControllerComponent, Component>, public ICollider
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_posOffset>,
-           meta::field<&Self::m_radius>,
-           meta::field<&Self::m_rotOffset>,
-           meta::field<&Self::m_height>,
-           meta::field<&Self::maxSpeed>,
-           meta::field<&Self::acceleration>,
-           meta::field<&Self::staticFriction>,
-           meta::field<&Self::dynamicFriction>,
-           meta::field<&Self::jumpSpeed>,
-           meta::field<&Self::gravityWeight>,
-           meta::field<&Self::m_fBaseSpeed>,
-           meta::field<&Self::m_fFinalMultiplierSpeed>,
-           meta::field<&Self::m_rotationSpeed>);
-   }
 public:
 	CharacterControllerComponent() = default;
 
@@ -225,7 +209,10 @@ public:
 	math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
 	float m_radius = 0.55f;
 	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+	[[reflgen::ignore]]
 	math::vector2 m_moveInput{ 0.0f, 0.0f };
+
 	float m_height = 2.f;
 
 	float maxSpeed = 1.025f;	//최대 속도 //&&&&&speed
@@ -236,35 +223,71 @@ public:
 	float gravityWeight = 0.2f;	//중력 가속도
 
 private:
+	[[reflgen::ignore]]
 	bool m_bIsFall{ false }; //낙하중인지 체크
+
+	[[reflgen::ignore]]
 	bool m_bOnMove{ false }; //이동중인지 체크
+
+	[[reflgen::ignore]]
 	bool m_bHasInput{ false }; //입력값이 있는지 체크
+
+	[[reflgen::ignore]]
 	bool m_useAutomaticRotation{ true }; // 자동 회전 기능 사용 여부
 
+	[[reflgen::ignore]]
 	math::vector3 m_lookDirection;
+
+	[[reflgen::ignore]]
 	bool m_hasCustomLookDirection = false;
 
+	[[reflgen::ignore]]
 	Transform* m_transform;
+
 	//컨트롤러 정보
+	[[reflgen::ignore]]
 	CharacterControllerInfo m_controllerInfo;
+
 	//무브먼트 정보
+	[[reflgen::ignore]]
 	CharacterMovementInfo m_movementInfo;
+
 	//컨트롤러 아이디
+	[[reflgen::ignore]]
 	unsigned int m_controllerID{ 0 };
+
 	//collision
+	[[reflgen::ignore]]
 	unsigned int m_collsionCount{ 0 };
+
 	float m_fBaseSpeed{ 0.025f }; //기본 속도
+
+	[[reflgen::ignore]]
 	float PreSpeed = m_fBaseSpeed;
+
+	[[reflgen::ignore]]
 	float m_speed = 0.f; //변해서 쓸스피드
+
+	[[reflgen::ignore]]
 	float m_fBaseAcceleration{ 1.0f }; //기본 가속도
+
 	float m_fFinalMultiplierSpeed{ 1.0f }; //최종 속도
+
+	[[reflgen::ignore]]
 	float JumpPower = 0.f; //점프나 넉백시 위로뜰힘
+
+	[[reflgen::ignore]]
 	math::vector3 preRotation;
+
 	float m_rotationSpeed{ 0.1f }; //회전 속도
+
 	//이동 제한
+	[[reflgen::ignore]]
 	std::array<bool, 4> m_bMoveRestrict;
 
+	[[reflgen::ignore]]
 	EColliderType m_type{ EColliderType::COLLISION };
+
 	// ICollider을(를) 통해 상속됨
 	void SetColliderType(EColliderType type) override
 	{

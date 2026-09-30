@@ -2439,14 +2439,16 @@ void MenuBarWindow::SHowInputActionMap()
 
                     if (ImGui::BeginPopup("selectMethod"))
                     {
-                        auto type = Meta::Find(action->m_scriptName);
+                        auto type = Meta::Find(std::string_view(action->m_scriptName));
                         if (type != nullptr)
                         {
-                            for (auto& method : type->methods)
+                            // 그 타입이 선언한 메서드만(옛 Meta::Type::methods 와 같다).
+                            for (const reflgen::method_info& method : Meta::LocalMethods(*type))
                             {
-                                if (ImGui::MenuItem(method.name))
+                                const std::string methodName(method.name());
+                                if (ImGui::MenuItem(methodName.c_str()))
                                 {
-                                    action->funName = method.name;
+                                    action->funName = methodName;
                                 }
                             }
                         }

@@ -1,10 +1,18 @@
 # Lattice (LX) 머테리얼 우선 도입 계획
 
-**2026-09-24 범위 수정 · 독립 예제 구현 진행 · LX 공수 미산정.** 명칭과
+**2026-09-30 현재 상태 · 머테리얼 제품 연결 진행 · LX 공수 미산정.** 명칭과
 공통 계약·UI는 [LatticeNodeSystem.md](../design/LatticeNodeSystem.md)가 소유한다.
 PHASE 4.25의 재질 의미와 Slang 생성은
 [BlenderMaterialGraphPlan.md](BlenderMaterialGraphPlan.md)의 `MAT-0`~`MAT-9`가
 소유한다. LX와 MAT의 같은 산출물을 중복 완료 처리하지 않는다.
+
+현재 Material Node Editor와 MeshRenderer Inspector는 LX 문서·캔버스 및
+실시간 HTTP 명령에 연결되어 있다. MAT-0~8은 완료, MAT-9의 렌더 대조·성능
+수용은 진행 중이다. LX-3/3H는 제품의 전체 조작·Vulkan Editor UI·그룹/Blackboard
+전용 저작 패널까지 닫은 상태가 아니므로 진행 중으로 유지한다.
+[편집기 설계](../design/MaterialNodeEditor.md)와
+[2026-09-30 다른 세션의 성능 개선](../analysis/MAT9NodeEditorPerformance.md)을 따른다.
+아래 날짜별 기록의 미구현·잔여 표기는 해당 측정 시점의 상태다.
 
 현재는 **Material Graph만 선행**한다. 기존 `.bt`·AnimatorController 자산은
 재작성 예정이므로 LX용 변환기, 의미 보존 migration, 기존 자산 fixture를 만들지

@@ -8,9 +8,12 @@
 // 인스펙터 typed Draw (PHASE 18 CT6-c).
 //
 // 레거시 DrawProperties(프로퍼티당 정수 비교 선형 체인 + function/any 접근)를
-// meta 서술 기반 컴파일타임 디스패치로 대체한다. 멤버를 실제 타입 T&로 만지므로
+// 서술 기반 컴파일타임 디스패치로 대체한다. 멤버를 실제 타입 T&로 만지므로
 // getter/setter 왕복·any 박싱이 없고, 벡터 편집은 원본을 직접 조작한다(임시
-// 벡터 복사 소멸). meta::range/displayName 속성도 여기서 소비한다.
+// 벡터 복사 소멸). reflgen::range·display_name 속성도 여기서 소비한다.
+//
+// reflgen 도입 P5: 서술은 reflgen 의 것(reflgen::schema_of<T> — 로컬 필드, direct_bases_t — 반영된 부모)을 직접
+// 읽는다. 속성은 reflgen::hidden·readonly·display_name·range 와 엔진 속성 creator::debug_only·wide 다.
 //
 // CT7 정산: 레거시 체인·A/B 토글(inspector.typeddraw)은 픽셀 동등 캡처 검수
 // (CT6-c) 후 은퇴했다 — 이 typed 경로가 유일본이다. 파리티 기준은 레거시의
@@ -71,15 +74,14 @@ namespace Meta::TypedDraw
     {
         return std::apply([](const auto&... ms)
         {
-            return ((std::remove_cvref_t<decltype(ms)>::identifier ==
-                        std::string_view{ "m_isEnabled" } &&
+            return ((ms.name == std::string_view{ "m_isEnabled" } &&
                      std::remove_cvref_t<decltype(ms)>::template
-                        has_attribute<meta::hidden_attr>()) || ...);
-        }, meta::schema_of<Object>.fields);
+                        has_attribute<reflgen::hidden>()) || ...);
+        }, reflgen::schema_of<Object>.fields);
     }
 }
 static_assert(Meta::TypedDraw::ObjectHidesEnabledFlag(),
-    "Object::m_isEnabled 에서 meta::hidden() 이 떨어졌다 — 인스펙터가 활성 플래그를 두 번 그린다");
+    "Object::m_isEnabled 에서 reflgen::hidden 이 떨어졌다 — 인스펙터가 활성 플래그를 두 번 그린다");
 
 // `Object` 의 정체성 필드 둘이 손에 닿지 않는지 단정한다 (W2-I).
 //
@@ -98,20 +100,20 @@ namespace Meta::TypedDraw
     {
         return std::apply([field](const auto&... ms)
         {
-            return ((std::remove_cvref_t<decltype(ms)>::identifier == field &&
+            return ((ms.name == field &&
                      std::remove_cvref_t<decltype(ms)>::template
                         has_attribute<Attr>()) || ...);
-        }, meta::schema_of<Object>.fields);
+        }, reflgen::schema_of<Object>.fields);
     }
 }
-static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::readonly_attr>("m_name"),
-    "Object::m_name 에서 meta::readonly() 가 떨어졌다 — 컴포넌트의 타입 이름 사본이 다시 편집 가능해진다");
-static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::debug_only_attr>("m_name"),
-    "Object::m_name 에서 meta::debugOnly() 가 떨어졌다 — 컴포넌트 머리글과 같은 이름이 줄마다 겹쳐 나온다");
-static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::readonly_attr>("m_instanceID"),
-    "Object::m_instanceID 에서 meta::readonly() 가 떨어졌다 — 레지스트리 키를 손으로 고칠 수 있게 된다");
-static_assert(Meta::TypedDraw::ObjectFieldMarked<meta::debug_only_attr>("m_instanceID"),
-    "Object::m_instanceID 에서 meta::debugOnly() 가 떨어졌다 — 내부 식별자가 기본 인스펙터에 샌다");
+static_assert(Meta::TypedDraw::ObjectFieldMarked<reflgen::readonly>("m_name"),
+    "Object::m_name 에서 reflgen::readonly 가 떨어졌다 — 컴포넌트의 타입 이름 사본이 다시 편집 가능해진다");
+static_assert(Meta::TypedDraw::ObjectFieldMarked<creator::debug_only>("m_name"),
+    "Object::m_name 에서 creator::debug_only 가 떨어졌다 — 컴포넌트 머리글과 같은 이름이 줄마다 겹쳐 나온다");
+static_assert(Meta::TypedDraw::ObjectFieldMarked<reflgen::readonly>("m_instanceID"),
+    "Object::m_instanceID 에서 reflgen::readonly 가 떨어졌다 — 레지스트리 키를 손으로 고칠 수 있게 된다");
+static_assert(Meta::TypedDraw::ObjectFieldMarked<creator::debug_only>("m_instanceID"),
+    "Object::m_instanceID 에서 creator::debug_only 가 떨어졌다 — 내부 식별자가 기본 인스펙터에 샌다");
 
 namespace Meta::TypedDraw
 {
@@ -123,7 +125,7 @@ namespace Meta::TypedDraw
     {
         if constexpr (std::is_base_of_v<Component, Owner>)
         {
-            const auto* type = Meta::Find(obj->GetTypeID().m_ID_Data);
+            const auto* type = Meta::Find(obj->GetTypeID());
             if (obj->GetOwner() && type)
             {
                 obj->*MP = prevValue;
@@ -180,9 +182,9 @@ namespace Meta::TypedDraw
     template<class E>
     inline void DrawEnumCombo(const char* label, const char* idName, E& value)
     {
-        // CT9-b: magic_enum → 자급 표(meta::enum_entries). 같은 스캔 원리·
-        // 동일 범위라 이름·순서가 레거시 콤보와 그대로 일치한다.
-        constexpr auto& entries = meta::enum_entries<E>;
+        // CT9-b: magic_enum → 자급 표. reflgen 도입 P5: reflgen::enum_entries — 같은 스캔 원리·
+        // 동일 범위([-128, 128])라 이름·순서가 레거시 콤보와 그대로 일치한다.
+        constexpr auto& entries = reflgen::enum_entries<E>;
 
         int currentIndex = 0;
         std::vector<const char*> items;
@@ -373,7 +375,7 @@ namespace Meta::TypedDraw
         || std::is_same_v<E, math::vector4> || std::is_same_v<E, math::quaternion>
         || std::is_same_v<E, math::color>;
 
-    template<meta::reflectable T>
+    template<reflgen::reflectable T>
     void DrawTypedObject(T& obj);
 
     // 값 위젯이 쓰는 숨은 ID. 라벨은 공통 배치 계층이 이미 그렸으므로 위젯
@@ -381,8 +383,8 @@ namespace Meta::TypedDraw
     // 쓰여도 ID 가 겹치지 않는다.
     inline constexpr const char* kValueId = "##v";
 
-    // 이 멤버의 표시 이름. `meta::displayName` 이 붙어 있으면 그것이고,
-    // 없으면 식별자에서 유도한다(W2-I3).
+    // 이 멤버의 표시 이름. `reflgen::display_name` 이 붙어 있으면 그것이고,
+    // 없으면 식별자에서 유도한다(W2-I3). 둘 다 생성된 서술의 문자열 리터럴이라 NUL 로 끝난다.
     //
     // 유도를 기본으로 둔 이유는 실측이다 — 저장소의 필드 416개 중
     // `displayName` 선언은 0건이었다. 손으로 붙이는 길은 안 붙인 필드가 조용히
@@ -390,14 +392,13 @@ namespace Meta::TypedDraw
     template<class MI>
     inline const char* MemberLabel(const MI& mi)
     {
-        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::display_name_attr>())
+        if constexpr (std::remove_cvref_t<MI>::template has_attribute<reflgen::display_name>())
         {
-            return mi.template attribute<meta::display_name_attr>().value.data();
+            return mi.template attribute<reflgen::display_name>().value.data();
         }
         else
         {
-            return editor::widgets::display_label(
-                std::remove_cvref_t<MI>::identifier.data());
+            return editor::widgets::display_label(mi.name.data());
         }
     }
 
@@ -407,7 +408,7 @@ namespace Meta::TypedDraw
     // 흔들리는" 상태가 되지 않는다.
     // 상속 체인을 `DrawFrame` 과 같은 모양으로 거슬러 오른다.
     //
-    // 처음에는 `meta::fields<T>()` 로 체인 전체를 한 번에 받으려 했는데
+    // 처음에는 `meta::fields<T>()`(옛 엔진 스키마) 로 체인 전체를 한 번에 받으려 했는데
     // MSVC 가 "이니셜라이저가 너무 많이 중첩되었습니다" 로 막았다 — 그 질의가
     // 체인을 `tuple_cat` 으로 물질화하기 때문이다. 그리는 쪽이 이미 재귀로
     // 내려가므로 힌트도 같은 모양으로 맞춘다.
@@ -437,21 +438,19 @@ namespace Meta::TypedDraw
         DisabledScope& operator=(const DisabledScope&) = delete;
     };
 
-    template<meta::reflectable T>
+    template<reflgen::reflectable T>
     inline float LabelHintOf()
     {
-        using Desc = std::remove_cvref_t<decltype(meta::schema_of<T>)>;
-
         float widest = 0.f;
-        if constexpr (Desc::has_base)
+        [&]<class... Bases>(reflgen::type_list<Bases...>)
         {
-            widest = LabelHintOf<typename Desc::base_type>();
-        }
+            ((widest = ImMax(widest, LabelHintOf<Bases>())), ...);
+        }(reflgen::direct_bases_t<T>{});
         std::apply([&](const auto&... ms)
         {
             ((widest = ImMax(widest,
                 ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);
-        }, meta::schema_of<T>.fields);
+        }, reflgen::schema_of<T>.fields);
         return widest;
     }
 
@@ -490,15 +489,15 @@ namespace Meta::TypedDraw
         constexpr auto MP = std::remove_cvref_t<MI>::pointer;
         using MemberT = std::remove_cvref_t<decltype(obj.*MP)>;
 
-        const char* name = std::remove_cvref_t<MI>::identifier.data();
+        const char* name = mi.name.data(); // 생성된 서술의 문자열 리터럴 — NUL 로 끝난다
 
         // 숨김은 속성이 정한다 (W2-I3).
         //
         // 예전에는 여기서 필드 이름을 문자열로 비교해 `m_isEnabled` 를 걸렀다.
         // 필드를 옮기거나 이름을 바꾸면 그 규칙이 조용히 풀리는 자리였고,
         // 다른 내부 필드를 숨길 길도 없었다. 규칙을 선언 쪽으로 옮긴다 —
-        // `Object.h` 의 `meta::hidden()` 이 그 자리다.
-        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::hidden_attr>())
+        // `Object.h` 의 `[[reflgen::hidden]]` 이 그 자리다.
+        if constexpr (std::remove_cvref_t<MI>::template has_attribute<reflgen::hidden>())
         {
             return;
         }
@@ -508,7 +507,7 @@ namespace Meta::TypedDraw
         // `hidden` 과 달리 판정이 런타임이다. 속성이 붙었는지는 컴파일 시에
         // 정해지므로 `if constexpr` 로 감싼다 — 붙지 않은 필드에는 이 검사
         // 코드가 아예 생성되지 않는다.
-        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::debug_only_attr>())
+        if constexpr (std::remove_cvref_t<MI>::template has_attribute<creator::debug_only>())
         {
             if (!editor::widgets::property_debug_mode())
             {
@@ -519,16 +518,16 @@ namespace Meta::TypedDraw
         // 읽기 전용이면 그리되 손이 닿지 않는다. 비활성 위젯은 언제나 거짓을
         // 돌려주므로 아래 `changed` 경로와 언두는 저절로 닫힌다.
         const DisabledScope disabled{
-            std::remove_cvref_t<MI>::template has_attribute<meta::readonly_attr>() };
+            std::remove_cvref_t<MI>::template has_attribute<reflgen::readonly>() };
 
         // CT6-b 속성 소비
         const char* label = MemberLabel(mi);
         bool hasRange = false;
         float rangeMin = 0.0f;
         float rangeMax = 0.0f;
-        if constexpr (std::remove_cvref_t<MI>::template has_attribute<meta::range_attr<float>>())
+        if constexpr (std::remove_cvref_t<MI>::template has_attribute<reflgen::range<float>>())
         {
-            const auto r = mi.template attribute<meta::range_attr<float>>();
+            const auto r = mi.template attribute<reflgen::range<float>>();
             hasRange = true;
             rangeMin = r.min;
             rangeMax = r.max;
@@ -536,12 +535,12 @@ namespace Meta::TypedDraw
 
         MemberT& value = obj.*MP;
 
-        // 넓은 줄은 두 갈래로 정해진다 — 필드에 붙은 `meta::wide()` 와 값
+        // 넓은 줄은 두 갈래로 정해진다 — 필드에 붙은 `creator::wide` 와 값
         // 타입의 드로어가 선언한 `kWideMode`. s&box 의 `[WideMode]` 와
         // `ControlWidget.IsWideMode` 가 같은 짝이다. 둘 다 컴파일 시에
         // 정해지므로 넓히지 않는 줄은 사본조차 만들지 않는다.
         constexpr bool kWideRow =
-            std::remove_cvref_t<MI>::template has_attribute<meta::wide_attr>() ||
+            std::remove_cvref_t<MI>::template has_attribute<creator::wide>() ||
             editor::inspector::DrawerWantsWideRow<MemberT>;
 
         const editor::widgets::property_layout_metrics layout = []
@@ -810,7 +809,7 @@ namespace Meta::TypedDraw
                             ImGui::SetNextItemWidth(BeginElementLine(index));
                             DrawContainerElement(kValueId, element);
                         }
-                        else if constexpr (meta::reflectable<E>)
+                        else if constexpr (reflgen::reflectable<E>)
                         {
                             if (editor::widgets::property_group_header(
                                 std::to_string(index).c_str()))
@@ -852,7 +851,7 @@ namespace Meta::TypedDraw
                             editor::widgets::begin_property_line(keyLabel.c_str(), layout));
                         DrawContainerElement(kValueId, entry.second);
                     }
-                    else if constexpr (meta::reflectable<M>)
+                    else if constexpr (reflgen::reflectable<M>)
                     {
                         if (editor::widgets::property_group_header(keyLabel.c_str()))
                         {
@@ -875,7 +874,7 @@ namespace Meta::TypedDraw
 
             if (nullptr != p)
             {
-                if constexpr (meta::reflectable<U>)
+                if constexpr (reflgen::reflectable<U>)
                 {
                     ImGui::PushID(name);
                     if (editor::widgets::property_group_header(label))
@@ -894,7 +893,7 @@ namespace Meta::TypedDraw
                 ImGui::Text("%s: nullptr [For GUI Debug]", name);
             }
         }
-        else if constexpr (meta::reflectable<MemberT>)
+        else if constexpr (reflgen::reflectable<MemberT>)
         {
             ImGui::PushID(name);
             if (editor::widgets::property_group_header(label))
@@ -912,36 +911,39 @@ namespace Meta::TypedDraw
 
     // 서술 프레임 하나 — 레거시 DrawObject의 PushID(type.name)·부모 우선·
     // 멤버·메서드 순서를 그대로 따른다.
-    template<meta::reflectable T, class Owner>
+    template<reflgen::reflectable T, class Owner>
     inline void DrawFrame(Owner& obj)
     {
-        // CT8→CT9: 정적 desc 사본 대신 canonical 물질화(meta::schema_of<T>)
-        // 직접 참조 — DrawFrame<T, Owner>가 Owner 조합마다 서술자를 중복
-        // 물질화하던 지점이었다. 부모는 로컬 스키마의 base_type 체인.
-        using Desc = std::remove_cvref_t<decltype(meta::schema_of<T>)>;
+        // canonical 물질화(reflgen::schema_of<T>) 직접 참조 — 로컬 필드만 든다. 부모는 반영된 직계 부모
+        // (direct_bases_t, 선언 순서)의 프레임이 먼저 그린다. ID 는 타입 이름의 글자들이다(옛 PushID(이름)과 같은 값).
+        using Desc = reflgen::schema_type_t<T>;
+        constexpr std::string_view typeName = reflgen::schema_of<T>.name;
 
-        ImGui::PushID(Desc::identifier.data());
+        ImGui::PushID(typeName.data(), typeName.data() + typeName.size());
 
-        if constexpr (Desc::has_base)
+        [&]<class... Bases>(reflgen::type_list<Bases...>)
         {
-            DrawFrame<typename Desc::base_type>(obj);
-        }
+            (DrawFrame<Bases>(obj), ...);
+        }(reflgen::direct_bases_t<T>{});
 
         std::apply([&](const auto&... ms)
         {
             (DrawOneMember(obj, ms), ...);
-        }, meta::schema_of<T>.fields);
+        }, reflgen::schema_of<T>.fields);
 
-        // 메서드는 레거시 DrawMethods 재사용 (파라미터 UI 파리티) — 프레임의
-        // 런타임 Type을 넘긴다.
-        Meta::DrawMethods(static_cast<void*>(&obj), Meta::TypeOf<T>());
+        // 메서드는 레거시 DrawMethods 재사용 (파라미터 UI 파리티) — 이 프레임이 선언한 메서드만(부모 것은 부모
+        // 프레임이 그린다). 객체는 T 포인터로 넘긴다 — 서술자의 invoke 가 T 객체를 받는다(기반 오프셋 보정).
+        if constexpr (Desc::method_count > 0)
+        {
+            Meta::DrawMethods(static_cast<void*>(static_cast<T*>(&obj)), Meta::LocalMethods(Meta::TypeOf<T>()));
+        }
 
         ImGui::PopID();
     }
 
     // 자기 프레임 필드만 보는 힌트. `DrawOwnMembers` 가 부모를 그리지 않으므로
     // 그쪽은 이 값을 쓴다.
-    template<meta::reflectable T>
+    template<reflgen::reflectable T>
     inline float OwnLabelHintOf()
     {
         float widest = 0.f;
@@ -949,7 +951,7 @@ namespace Meta::TypedDraw
         {
             ((widest = ImMax(widest,
                 ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);
-        }, meta::schema_of<T>.fields);
+        }, reflgen::schema_of<T>.fields);
         return widest;
     }
 
@@ -960,10 +962,10 @@ namespace Meta::TypedDraw
     // 고치면 그대로 디스크에 남는다. 사본을 읽기 전용으로 돌린 것과 별개로,
     // 디버그 모드에서 보는 이름은 사본이 아니라 **정본**이어야 한다.
     //
-    // 여기 있는 값은 `meta::schema_of<T>` 의 식별자다. 컴파일 시 상수이고
+    // 여기 있는 값은 `reflgen::schema_of<T>` 의 이름이다. 컴파일 시 상수이고
     // 직렬화되지 않으므로 고칠 자리 자체가 없다 — 읽기 전용으로 "막은" 것이
     // 아니라 쓸 수 있는 저장소가 없는 것이다.
-    template<meta::reflectable T>
+    template<reflgen::reflectable T>
     inline void DrawTypeIdentityRow()
     {
         if (!editor::widgets::property_debug_mode())
@@ -971,18 +973,17 @@ namespace Meta::TypedDraw
             return;
         }
 
-        using Desc = std::remove_cvref_t<decltype(meta::schema_of<T>)>;
+        constexpr std::string_view typeName = reflgen::schema_of<T>.name;
 
         const DisabledScope disabled{ true };
         const auto& layout = editor::widgets::current_property_layout();
         (void)editor::widgets::begin_property_line("Type", layout);
 
-        // 길이를 함께 넘긴다. 식별자는 `string_view` 라 널로 끝난다는 보장이 없다.
-        ImGui::TextUnformatted(Desc::identifier.data(),
-            Desc::identifier.data() + Desc::identifier.size());
+        // 길이를 함께 넘긴다. 이름은 `string_view` 라 널로 끝난다는 보장이 없다.
+        ImGui::TextUnformatted(typeName.data(), typeName.data() + typeName.size());
     }
 
-    template<meta::reflectable T>
+    template<reflgen::reflectable T>
     void DrawTypedObject(T& obj)
     {
         // 배치는 프레임 하나에 한 번 잰다. 상속 체인 전체가 같은 라벨 열에
@@ -995,14 +996,14 @@ namespace Meta::TypedDraw
     // 레거시 DrawProperties 등가 — 자기 프레임 멤버만(부모·메서드 제외).
     // PassSetting 패널·서브 구조체 패널처럼 "이 타입의 프로퍼티만" 그리던
     // 직접 호출자들의 대체다 (CT7).
-    template<meta::reflectable T>
+    template<reflgen::reflectable T>
     void DrawOwnMembers(T& obj)
     {
         const LayoutScope scope{ OwnLabelHintOf<T>() };
         std::apply([&](const auto&... ms)
         {
             (DrawOneMember(obj, ms), ...);
-        }, meta::schema_of<T>.fields);
+        }, reflgen::schema_of<T>.fields);
     }
 
     template<class T>

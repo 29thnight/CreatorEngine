@@ -6,18 +6,10 @@
 
 using namespace BT;
 
-class BehaviorTreeComponent : 
+class [[reflgen::reflect]] BehaviorTreeComponent :
 	public meta::identity<BehaviorTreeComponent, Component>, public IAIComponent
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::name>,
-           meta::field<&Self::blackBoardName>,
-           meta::field<&Self::m_BehaviorTreeGuid>,
-           meta::field<&Self::m_BlackBoardGuid>);
-   }
 public:
 	BehaviorTreeComponent() = default;
 
@@ -55,8 +47,11 @@ public:
 	FileGuid m_BehaviorTreeGuid; // Behavior Tree의 GUID
 	FileGuid m_BlackBoardGuid; // 블랙보드의 GUID
 private:
+	[[reflgen::ignore]]
 	BlackBoard* m_pBlackboard; // 블랙보드 데이터
+
 	// 愿由?痢??몃━ ?몄뒪?댁뒪 id. ?뚯닔硫??몃━媛 ?녿떎.
 	// m_root쨌m_built媛 ?덈뜕 ?먮━?????몃━ ?ㅼ껜???댁젣 愿由?痢≪뿉 ?덈떎.
+	[[reflgen::ignore]]
 	int m_treeInstanceId{ -1 };
 };

@@ -2,25 +2,9 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include <mathematics/color.hpp>
-struct BitMaskPassSetting
+struct [[reflgen::reflect]] BitMaskPassSetting
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = BitMaskPassSetting;
-       return meta::schema<Self>(
-           meta::field<&Self::isOn>,
-           meta::field<&Self::blurOutline>,
-           meta::field<&Self::outlineVelocity>,
-           meta::field<&Self::m_color1>,
-           meta::field<&Self::m_color2>,
-           meta::field<&Self::m_color3>,
-           meta::field<&Self::m_color4>,
-           meta::field<&Self::m_color5>,
-           meta::field<&Self::m_color6>,
-           meta::field<&Self::m_color7>,
-           meta::field<&Self::m_color8>);
-   }
 	BitMaskPassSetting() = default;
 
 	bool isOn = true;

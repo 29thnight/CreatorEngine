@@ -230,8 +230,7 @@ bool EditorSettingsStore::Save() noexcept
         RenderPassSettings renderPassSettings =
             RuntimeSettings::Get().GetRenderPassSettings();
 		Authoring::WriteDocument renderPassDocument;
-		Meta::Typed::SerializeThunk<RenderPassSettings>(
-			&renderPassSettings, renderPassDocument.Root());
+		Meta::Typed::SerializeObjectInto(renderPassSettings, renderPassDocument.Root());
 		const Authoring::ReadNode serializedRenderPassSettings =
 			renderPassDocument.Root().Read();
         const Authoring::WriteNode storedRenderPassSettings =

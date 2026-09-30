@@ -3,16 +3,9 @@
 #include "Component.h"
 #include "KeyState.h"
 class ActionMap;
-class PlayerInputComponent : public meta::identity<PlayerInputComponent, Component>
+class [[reflgen::reflect]] PlayerInputComponent : public meta::identity<PlayerInputComponent, Component>
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_actionMapName>,
-           meta::field<&Self::m_scriptName>,
-           meta::field<&Self::controllerIndex>);
-   }
 public:
 	PlayerInputComponent() = default;
 	
@@ -26,8 +19,11 @@ public:
 	void SetActionMap(ActionMap* _actionMap);
 	void SetControllerVibration(float tick, float leftMotorSpeed, float rightMotorSpeed, float lowFre, float highFre);
 	void SetControllerVibration(float tick, float power);
+
 	//쓸 액션맵네임
-	ActionMap* m_actionMap = nullptr; 
+	[[reflgen::ignore]]
+	ActionMap* m_actionMap = nullptr;
+
 	std::string m_actionMapName = "None";
 	//함수가 포함된 스크립트네임 아마 자기가 소유중인것만? 없어도 될듯
 	std::string m_scriptName{};

@@ -16,23 +16,9 @@
 // 필요해졌는데, 그 헤더는 Camera·RenderPassData·프록시 계층을 통째로 끌고 온다.
 // ScriptBinder의 어느 헤더도 그것을 include하지 않는 것이 이 저장소의 규약이라
 // 정의를 .cpp로 옮겼다.
-class LightComponent : public meta::identity<LightComponent, Component>
+class [[reflgen::reflect]] LightComponent : public meta::identity<LightComponent, Component>
 {
     public:
-    static consteval auto reflect()
-    {
-        return meta::schema<Self>(
-            meta::field<&Self::m_color>,
-            meta::field<&Self::m_lightIndex>,
-            meta::field<&Self::m_constantAttenuation>,
-            meta::field<&Self::m_linearAttenuation>,
-            meta::field<&Self::m_quadraticAttenuation>,
-            meta::field<&Self::m_spotLightAngle>,
-            meta::field<&Self::m_intencity>,
-            meta::field<&Self::m_range>,
-            meta::field<&Self::m_lightType>,
-            meta::field<&Self::m_lightStatus>);
-    }
 public:
     // CT6-d: 팩토리 분기의 강제 활성 보존
     void OnDeserialized() { SetEnabled(true); }
@@ -106,6 +92,7 @@ public:
 	}
 private:
 	// Editor picking용 2x2x2 unit box. 중심은 매 호출마다 owner position이다.
+	[[reflgen::ignore]]
 	math::aabb m_editorBoundingBox{
 		math::vector3{}, math::vector3{ 1.0f, 1.0f, 1.0f } };
 

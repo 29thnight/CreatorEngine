@@ -1,0 +1,256 @@
+{
+  "date": "2026-09-30",
+  "pullRequest": {
+    "number": 114,
+    "url": "https://github.com/29thnight/CreatorEngine/pull/114",
+    "head": "1ff657a6ea5b9aa4cbae63128221ebd4be2f2ced",
+    "remoteMerge": "090aba0afe16e1495fec06738d928fb581617595"
+  },
+  "phase425Snapshot": "0268e4b5cc6bfeed5258b426a3ce5f3bbed7f886",
+  "extension": {
+    "identity": "Reflgen.VisualStudio.29thnight",
+    "version": "1.0.1",
+    "vsInstance": "55b1962e",
+    "exitCode": 0,
+    "sha256": "44E7F76741BA890CFEC3CBC051823FEEEAFCF0646A8DA479E5176E7EFFF8994D"
+  },
+  "engineReflgenVersion": "1.0.0",
+  "toolchain": {
+    "visualStudioMajor": 18,
+    "platform": "x64",
+    "platformToolset": "v145",
+    "useDynamicDebugging": false,
+    "linkIncremental": false
+  },
+  "builds": [
+    {
+      "configuration": "Debug",
+      "target": "CreatorEngine.sln",
+      "exitCode": 0,
+      "msbuildErrors": 0,
+      "seconds": 767.97,
+      "localLog": "Build/Obj/ReflgenIntegration/build-debug-2-console.log"
+    },
+    {
+      "configuration": "Release",
+      "target": "CreatorEngine.sln",
+      "exitCode": 0,
+      "msbuildErrors": 0,
+      "seconds": 991.48,
+      "localLog": "Build/Obj/ReflgenIntegration/build-release-console.log"
+    }
+  ],
+  "productRegressions": [
+    {
+      "configuration": "Debug",
+      "checks": 1344,
+      "captures": 5,
+      "sources": 1139,
+      "sourceDrift": 0,
+      "exitCode": 0,
+      "gpuProblems": 0,
+      "droppedMessages": 0,
+      "localCaseRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\MaterialProductProbe\\NodeEditor-Debug-984dd7c70686"
+    },
+    {
+      "configuration": "Release",
+      "checks": 1344,
+      "captures": 5,
+      "sources": 1139,
+      "sourceDrift": 0,
+      "exitCode": 0,
+      "gpuProblems": 0,
+      "droppedMessages": 0,
+      "localCaseRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\MaterialProductProbe\\NodeEditor-Release-0cbfadeef88d"
+    }
+  ],
+  "generatedSchemas": [
+    {
+      "configuration": "Debug",
+      "type": "Material",
+      "fields": [
+        "m_name",
+        "m_baseColorTexName",
+        "m_normalTexName",
+        "m_ORM_TexName",
+        "m_AO_TexName",
+        "m_EmissiveTexName",
+        "m_materialInfo",
+        "m_flowInfo",
+        "m_shaderMetaGuid",
+        "m_propertyValues",
+        "m_keywordSelections",
+        "m_fileGuid",
+        "m_renderingMode",
+        "m_doubleSided"
+      ],
+      "matchesPreMergeContract": true
+    },
+    {
+      "configuration": "Debug",
+      "type": "FoliageType",
+      "fields": [
+        "m_castShadow",
+        "m_isShadowRecive",
+        "m_modelName"
+      ],
+      "matchesPreMergeContract": true
+    },
+    {
+      "configuration": "Debug",
+      "type": "SceneRenderProfile",
+      "fields": [
+        "settings"
+      ],
+      "matchesPreMergeContract": true
+    },
+    {
+      "configuration": "Debug",
+      "type": "SceneRenderProfileComponent",
+      "fields": [
+        "m_renderProfileName",
+        "m_renderProfileGuid"
+      ],
+      "matchesPreMergeContract": true
+    },
+    {
+      "configuration": "Release",
+      "type": "Material",
+      "fields": [
+        "m_name",
+        "m_baseColorTexName",
+        "m_normalTexName",
+        "m_ORM_TexName",
+        "m_AO_TexName",
+        "m_EmissiveTexName",
+        "m_materialInfo",
+        "m_flowInfo",
+        "m_shaderMetaGuid",
+        "m_propertyValues",
+        "m_keywordSelections",
+        "m_fileGuid",
+        "m_renderingMode",
+        "m_doubleSided"
+      ],
+      "matchesPreMergeContract": true
+    },
+    {
+      "configuration": "Release",
+      "type": "FoliageType",
+      "fields": [
+        "m_castShadow",
+        "m_isShadowRecive",
+        "m_modelName"
+      ],
+      "matchesPreMergeContract": true
+    },
+    {
+      "configuration": "Release",
+      "type": "SceneRenderProfile",
+      "fields": [
+        "settings"
+      ],
+      "matchesPreMergeContract": true
+    },
+    {
+      "configuration": "Release",
+      "type": "SceneRenderProfileComponent",
+      "fields": [
+        "m_renderProfileName",
+        "m_renderProfileGuid"
+      ],
+      "matchesPreMergeContract": true
+    }
+  ],
+  "otherSessionMeasurements": "MAT9NodeEditorPerformance.json",
+  "performanceRemeasured": false,
+  "dashboard": {
+    "entries": 435,
+    "fullParse": true,
+    "finitePercentages": true,
+    "mismatches": 0
+  },
+  "attributeLayout": {
+    "selfTest": true,
+    "headers": 52,
+    "blocks": 295
+  },
+  "containerClassification": [
+    "Debug",
+    "Release"
+  ],
+  "containerRoundtrip": {
+    "configuration": "Debug",
+    "axes": 28,
+    "failures": 0
+  },
+  "phase425": {
+    "completedDays": 32,
+    "totalDays": 34,
+    "MAT9": "progress",
+    "LX3": "progress",
+    "LX3H": "progress"
+  },
+  "sourceHashes": [
+    {
+      "path": "Directory.Build.targets",
+      "sha256": "cfb22740719ba4297ddaaa19c4b1c5768c0f71899939da4598cd1af4a8a0e74b"
+    },
+    {
+      "path": "ports/reflgen/portfile.cmake",
+      "sha256": "ebe04b397f237c7870f1663a95c53c3121aaa0bab200ce37d6015233312f72e3"
+    },
+    {
+      "path": "vcpkg.json",
+      "sha256": "7d5486e83c371382e6d608c97f616223017428fde4b310c99c8967f0903efc1d"
+    },
+    {
+      "path": "Engine/RenderEngine/Material.h",
+      "sha256": "a4849b07482cd578b38d1dadc79957317edab2677c77a2b9df6a328e7ca6d0ad"
+    },
+    {
+      "path": "Engine/RenderEngine/Interfaces/FoliageType.h",
+      "sha256": "66dcb634070ecd888f1c0f555ca8d3308b23de7cf184cb281dfb2bf007c77c4a"
+    },
+    {
+      "path": "Engine/RenderEngine/SceneRenderProfile.h",
+      "sha256": "038be81be7a35fe57996b0905a804ccf40af23c1f397143f92f91b1feacb9fbc"
+    },
+    {
+      "path": "Engine/SceneRuntime/SceneRenderProfileComponent.h",
+      "sha256": "3f06ac564c068f8df53948744a2b2df289fbd1e0e6d7c93c0deb2dedbff83479"
+    },
+    {
+      "path": "Engine/SceneRuntime/RegisterReflectManual.h",
+      "sha256": "fbb1e0d3b66a7f1a77eacd45a579c7774ae1f278b541d920f9711a5c74c14757"
+    },
+    {
+      "path": "Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp",
+      "sha256": "ad6776540a7e02ebc73e4a0529cd0811f192ed1b32f207777d1a82011b579642"
+    },
+    {
+      "path": "Editor/EngineGUIWindow/MaterialGraphWindow.cpp",
+      "sha256": "395d9cfd5ddb475b98e86d7e8812b13f240449a2c81dafd0e6f4726cf4258309"
+    },
+    {
+      "path": "Editor/EngineGUIWindow/MaterialGraphWindow.h",
+      "sha256": "dec2ebbe7443b2bd7a3eee079b0d9ffed279960b18c1207018428979f8837bf9"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+      "sha256": "3d1c790ae3a8b056907e5eab54d6205315874c6f516862c357fdbf1a404e9bd2"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h",
+      "sha256": "d7c1cc06095c01c428083e7c2f55a6cb0ad92d6a540e5b93f43c54e912daefc7"
+    },
+    {
+      "path": "Lattice/ImGui/LXCanvas.cpp",
+      "sha256": "cf2fdaff912eb40fae01a60e157b0b7bcbe6ff05e7f7e63ac7d8c4bae2ed3055"
+    },
+    {
+      "path": "Lattice/ImGui/LXNodeItems.h",
+      "sha256": "5216593fe6c96eaea5e048c56bdf9b06fa45a02f1d9029b5d817c9bf74ec1c56"
+    }
+  ]
+}
