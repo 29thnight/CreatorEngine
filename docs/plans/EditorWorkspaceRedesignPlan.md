@@ -4133,6 +4133,13 @@ flag로 분리한다. 단, 완료 뒤 영구 이중 경로를 유지하지 않�
 
 따라서 `editor::`는 **별도 계통**이다. `meta::`를 읽지도, 확장하지도 않는다.
 
+**갱신(2026-09-30, reflgen 전환)**: 위 표와 이 부록이 비유로 드는 리플렉션 부품(`meta::method`·`meta::field`·
+`Meta::Method`·`Meta::MakeMethod`·`MetaSchema.h` 와 그 카나리아·`reflect()` 레시피)은 사라졌고,
+`verify-reflection-golden.ps1` 도 지금은 없다. 런타임 메서드 서술은 reflgen `method_info` 이고 여전히 멤버
+함수만 서술하며 `Engine/Utility_Framework` 에서 런타임 전역에 퍼진다 — 기각 근거 가운데 계층 오염과 인스턴스
+제약은 그대로이고, 골든 사정권 근거는 게이트와 함께 사라졌다. `editor::` 를 별도 계통으로 둔다는 결정은
+바뀌지 않는다([ReflectionDesign.md](../design/ReflectionDesign.md)).
+
 단 두 관례는 그대로 물려받는다. **파일명은 PascalCase, 네임스페이스 안 식별자는 snake_case**다
 (`MetaSchema.h`가 `meta::field`·`schema_of`·`field_info`를 담는 것과 같은 분리). 선언 함수 이름은
 리플렉션의 `static consteval auto reflect()`(`SoundComponent.h:15`)에 대응해 **`for_editor()`**로 둔다.

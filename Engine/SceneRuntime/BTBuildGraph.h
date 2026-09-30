@@ -3,16 +3,13 @@
 #include "BTBuildNode.h"
 #include "ReflectionYml.h"
 
-struct BTBuildGraph
+struct [[reflgen::reflect]] BTBuildGraph
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = BTBuildGraph;
-       return meta::schema<Self>(
-           meta::field<&Self::NodeList>);
-   }
+	[[reflgen::ignore]]
 	std::unordered_map<HashedGuid, BTBuildNode*> Nodes;
+
+	[[reflgen::ignore]]
 	BTBuildNode* SelectedNode{ nullptr };
 
 	std::vector<BTBuildNode> NodeList;

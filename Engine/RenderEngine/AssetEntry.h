@@ -15,16 +15,9 @@ enum class ManagedAssetType
 	SpriteSheet
 };
 
-struct AssetEntry
+struct [[reflgen::reflect]] AssetEntry
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = AssetEntry;
-       return meta::schema<Self>(
-           meta::field<&Self::assetTypeID>,
-           meta::field<&Self::assetName>);
-   }
 	AssetEntry() = default;
 	AssetEntry(ManagedAssetType assetTypeID, const file::path& assetName)
 		: assetTypeID((int)assetTypeID), assetName(assetName.string()) {

@@ -109,9 +109,16 @@ if (-not (@($typedYmlCode | Where-Object { $_ -match 'concept\s+SerializedAsKeye
 # ③ 빈 컨테이너 표기 규칙이 **양쪽** 갈래에 같게 걸려 있는가.
 #    시퀀스만 `~` 고 맵은 `[]`/`{}` 가 되면, 같은 자리에서 컨테이너를 바꾸는
 #    것만으로 파일 형상이 갈린다. 실행 축은 이걸 못 본다(형상은 런타임 산출이다).
-$emptyRuleCount = @($typedYmlCode | Where-Object { $_ -match 'std::ranges::empty\(value\)' }).Count
-if ($emptyRuleCount -ne 2) {
-    $ratchetFailures += ("ReflectionTypedYml.h: 빈 컨테이너 규칙이 {0}자리다 — 시퀀스와 맵 두 갈래 모두에 있어야 한다" -f $emptyRuleCount)
+#
+#    reflgen 도입 P5: 반영 타입의 YAML 은 reflgen 직렬화가 Authoring writer(ReflgenAuthoring.h)로 쓴다. 규칙은 그
+#    writer 의 한 자리(Open — begin_array·begin_object 가 같이 지난다)에 있다: 크기 0 이면 `~`. 두 갈래가 한 함수를
+#    지나고, 규칙이 그 함수에 한 번 있는지를 본다.
+$authoringCode = Get-CodeLines (Join-Path $repoRoot 'Engine\Utility_Framework\ReflgenAuthoring.h')
+$emptyRuleCount = @($authoringCode | Where-Object { $_ -match 'if \(0 == size && !record\)' }).Count
+$sharedOpen = @($authoringCode | Where-Object { $_ -match 'void begin_array\(std::size_t size\) override \{ Open\(size, false\); \}' }).Count -eq 1 -and
+              @($authoringCode | Where-Object { $_ -match 'void begin_object\(std::size_t size\) override \{ Open\(size, true\); \}' }).Count -eq 1
+if ($emptyRuleCount -ne 1 -or -not $sharedOpen) {
+    $ratchetFailures += ("ReflgenAuthoring.h: 빈 컨테이너 규칙이 {0}자리, 시퀀스·맵 공용 열기={1} — 두 갈래가 한 규칙(Open)을 지나야 한다" -f $emptyRuleCount, $sharedOpen)
 }
 
 # ④ 판정의 출처가 하나인가.

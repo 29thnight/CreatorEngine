@@ -2,18 +2,9 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 
-struct AAPassSetting
+struct [[reflgen::reflect]] AAPassSetting
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = AAPassSetting;
-       return meta::schema<Self>(
-           meta::field<&Self::isApply>,
-           meta::field<&Self::bias>,
-           meta::field<&Self::biasMin>,
-           meta::field<&Self::spanMax>);
-   }
     AAPassSetting() = default;
    ~AAPassSetting() = default;
 

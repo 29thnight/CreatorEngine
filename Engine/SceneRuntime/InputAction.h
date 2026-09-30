@@ -36,27 +36,23 @@ extern ControllerButton ParseControllerButton(const std::string& str);
 extern std::string KeyBoardString(KeyBoard _key);
 extern KeyBoard ParseKeyBoard(const std::string& str);
 
-class InputAction
+class [[reflgen::reflect]] InputAction
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = InputAction;
-       return meta::schema<Self>(
-           meta::field<&Self::actionName>,
-           meta::field<&Self::m_scriptName>,
-           meta::field<&Self::funName>);
-   }
 public:
 	InputAction() = default;
 
 
 	std::string actionName;
 
+	[[reflgen::ignore]]
 	InputType inputType= InputType::KeyBoard; //keyboard ,mouse ,gamepad
+
 	void SetInputType(InputType _inputType) {inputType = _inputType;}
 	
+	[[reflgen::ignore]]
 	ActionType actionType = ActionType::Button; //value , button
+
 	void SetActionType(ActionType _actionType)
 	{ 
 		actionType = _actionType;
@@ -102,21 +98,32 @@ public:
 			}
 		}
 	};
-	KeyState  keystate  = KeyState::Down;  //down hold 
+
+	[[reflgen::ignore]]
+	KeyState  keystate  = KeyState::Down;  //down hold
+
 	void SetKeyState(KeyState _keyState) { keystate = _keyState; };
 
+	[[reflgen::ignore]]
 	InputValueType valueType = InputValueType::Vector2;   // float ,vector2
+
 	void SetValueType(InputValueType _inputValueType) { valueType = _inputValueType; };
 
+	[[reflgen::ignore]]
 	std::vector<size_t> key = { 0 };
+
 	void SetKey(std::vector<size_t> _key) { key = _key; };
 	void SetControllerButton(ControllerButton _btn);
 
 
-	size_t playerIndex = 0; //from player input component 
+	[[reflgen::ignore]]
+	size_t playerIndex = 0; //from player input component
 
 
+	[[reflgen::ignore]]
 	InputValue value; //0
+
+	[[reflgen::ignore]]
 	std::string objName; //필요없음
 
 	//자기 식별이름
@@ -125,8 +132,13 @@ public:
 	//실행함 함수이름 Attak
 	std::string funName = "None";
 
+	[[reflgen::ignore]]
 	ControllerButton m_controllerButton = ControllerButton::None;
+
+	[[reflgen::ignore]]
 	std::function<void()> buttonAction;
+
+	[[reflgen::ignore]]
 	std::function<void(std::any)> valueAction;
 
 };

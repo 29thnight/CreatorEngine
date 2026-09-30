@@ -49,5 +49,11 @@ SpaceAfterTemplateKeyword: false
 
 # BinPackArguments/BinPackParameters 는 끄지 않는다 — 실측에서 오히려
 # 변경이 늘었다(2,943 → 3,153). 인자를 한 줄에 하나씩 세워 둔 자리
-# (예: meta::schema 의 필드 나열)는 그 블록만 `// clang-format off` /
+# (예: 옛 meta::schema 의 필드 나열 — reflgen 전환으로 사라졌다)는 그 블록만 `// clang-format off` /
 # `// clang-format on` 으로 감싸 보호한다.
+
+# 리플렉션 속성([[reflgen::...]]·[[creator::...]])은 자기 줄에 두고 선언을 그 아래 줄에 둔다
+# (CodingConventions.md §7.4, Tools/regression/verify-reflgen-attribute-layout.ps1 가 지킨다).
+# Leave 는 속성 뒤의 줄바꿈을 있는 그대로 둔다 — Never 는 이 배치를 한 줄로 되돌리고, Always 는
+# [[nodiscard]] 같은 다른 속성까지 펼친다. 지금 기본값이 Leave 지만 기본은 버전마다 바뀔 수 있어 적어 둔다.
+BreakAfterAttributes: Leave

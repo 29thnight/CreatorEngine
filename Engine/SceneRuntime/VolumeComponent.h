@@ -3,15 +3,9 @@
 #include "Component.h"
 #include "VolumeProfile.h"
 
-class VolumeComponent : public meta::identity<VolumeComponent, Component>
+class [[reflgen::reflect]] VolumeComponent : public meta::identity<VolumeComponent, Component>
 {
     public:
-    static consteval auto reflect()
-    {
-        return meta::schema<Self>(
-            meta::field<&Self::m_volumeProfileName>,
-            meta::field<&Self::m_volumeProfileGuid>);
-    }
 public:
     VolumeComponent() = default;
 
@@ -28,7 +22,12 @@ public:
     FileGuid m_volumeProfileGuid{ nullFileGuid };
 
 private:
+    [[reflgen::ignore]]
     RenderPassSettings m_prevSettings{};
+
+    [[reflgen::ignore]]
     VolumeProfile m_profile{};
+
+    [[reflgen::ignore]]
     bool m_isProfileLoaded{ false };
 };

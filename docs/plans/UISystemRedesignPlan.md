@@ -23,6 +23,13 @@
 | 수학 이주 S6-C (`3903b695`, `7b1e60f3`) | UI 경계의 정본 타입이 `math::vector2/rect/color`다. §8.1의 `RectF/Float4/Color` 스케치는 **그대로 쓰면 안 되는 유령 타입**이 됐다 |
 | 리플렉션 재설계 PHASE 18 | 매크로 0종, `static consteval auto reflect()` + `meta::schema`가 정본. U6의 "reflection golden 갱신"은 다른 기계를 가리키게 됐다 |
 
+**갱신(2026-09-30, reflgen 전환)**: 리플렉션 표현이 한 번 더 바뀌었다. 레시피(`reflect()`·`meta::schema`)는
+사라졌고 정본은 헤더의 반영 클래스 선언 자체다 — `[[reflgen::reflect]]` 클래스의 멤버가 전부 저장되고
+`[[reflgen::ignore]]` 로 뺀다([ReflectionDesign.md](../design/ReflectionDesign.md)). 이 문서에서 "`reflect()`
+스키마"라 적은 자리는 그 서술로 읽는다. 정본이 하나이고 소비자가 셋(직렬화·인스펙터·`object.property`)이라는
+판단은 그대로다. 달라진 점 하나: 레시피는 opt-in이었지만 지금은 opt-out이라, UI 컴포넌트에 멤버를 더하면
+`ignore` 를 달지 않는 한 **저장 포맷이 바로 바뀐다.**
+
 그리고 이번 실측에서 **계획서에 아예 없던 결함 세 건**이 나왔다(§1.4). 그중 하나는
 "UI 텍스트를 그리는 코드가 엔진 어디에도 없다"이고, 이건 단계 하나를 고치는 문제가
 아니라 **트랙 하나가 통째로 빠져 있었다**는 뜻이다.

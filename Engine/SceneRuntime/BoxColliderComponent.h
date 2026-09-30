@@ -5,29 +5,10 @@
 #include "../physics/PhysicsCommon.h"
 #include "../Physics/ICollider.h"
 
-class BoxColliderComponent : public meta::identity<BoxColliderComponent, Component>, public ICollider
+class [[reflgen::reflect]] BoxColliderComponent : public meta::identity<BoxColliderComponent, Component>, public ICollider
 {
-   public:
-   // CT4 파일럿: generated.h + Serializable/Property 어노테이션을 P2996 유사
-   // 매크로 프리 표기로 대체. 멤버 순서 = 구 generated.h(골든 diff 0의 전제).
-   // 주의: 주석에도 이중 대괄호 어노테이션 원문을 쓰지 말 것 — 생성기가
-   // regex_search로 줄을 훑는다.
-       // 마찰·반발 계수의 range는 속성 표기의 살아있는 예시다 — 어댑터는
-       // 무시하고(골든 무영향), CT6 인스펙터가 슬라이더 한계로 소비한다.
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_boxExtent>,
-           meta::field<&Self::m_posOffset>,
-           meta::field<&Self::m_rotOffset>,
-           meta::field<&Self::staticFriction>.with(
-               meta::range(0.0f, 1.0f)),
-           meta::field<&Self::dynamicFriction>.with(
-               meta::range(0.0f, 1.0f)),
-           meta::field<&Self::restitution>.with(
-               meta::range(0.0f, 1.0f)),
-           meta::field<&Self::density>);
-   }
+   // 멤버 선언 순서가 곧 직렬화 키 순서다(reflgen 은 선언 순서로 서술한다) — 구 generated.h 의 순서
+   // (골든 diff 0의 전제)를 지킨다.
 public:
 
     BoxColliderComponent()
@@ -67,9 +48,17 @@ public:
    math::vector3 m_posOffset{};
    math::quaternion m_rotOffset{};
 
+   // 마찰·반발 계수의 range는 속성 표기의 살아있는 예시다 — 어댑터는
+   // 무시하고(골든 무영향), CT6 인스펙터가 슬라이더 한계로 소비한다.
+   [[reflgen::range(0.0f, 1.0f)]]
    float staticFriction = 0.5f;	//정적 물체 마찰 계수
+
+   [[reflgen::range(0.0f, 1.0f)]]
    float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
+
+   [[reflgen::range(0.0f, 1.0f)]]
    float restitution = 0.3f;	//탄성 계수
+
    float density = 10.0f;	//밀도
 
 
@@ -177,6 +166,7 @@ public:
 
     math::quaternion GetRotationOffset() override;
     
+    [[reflgen::ignore]]
     BoxColliderInfo m_Info;
 private:  
 
@@ -192,6 +182,9 @@ private:
 
     void OnCollisionExit(ICollider* other) override;
 
+    [[reflgen::ignore]]
     EColliderType m_type;
+
+	[[reflgen::ignore]]
 	unsigned int m_collsionCount = 0;
 };

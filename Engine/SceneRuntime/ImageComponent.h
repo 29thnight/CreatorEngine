@@ -10,23 +10,10 @@
 class Texture;
 class UIMesh;
 class Canvas;
-class ImageComponent : public meta::identity<ImageComponent, UIComponent>
+class [[reflgen::reflect]] ImageComponent : public meta::identity<ImageComponent, UIComponent>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::texturePaths>,
-           meta::field<&Self::color>,
-           meta::field<&Self::curindex>,
-           meta::field<&Self::rotate>,
-           meta::field<&Self::origin>,
-           meta::field<&Self::unionScale>,
-           meta::field<&Self::clipPercent>,
-           meta::field<&Self::clipDirection>,
-           meta::field<&Self::useNativeTextureSize>,
-           meta::method<&Self::UpdateTexture>.hideInInspector());
-   }
 public:
 	ImageComponent();
 	~ImageComponent() = default;
@@ -55,7 +42,10 @@ public:
 	// 오히려 같은 이름을 쓰는 쪽이 "이 셋이 같은 부류의 틱"이라는 사실을
 	// 코드에서 바로 드러낸다.
 	void TickLayout(float tick);
+
+	[[reflgen::reflect, creator::hide_in_inspector]]
 	void UpdateTexture();
+
 	void SetTexture(int index);
 
 	// RectTransform의 sizeDelta를 현재 텍스처의 픽셀 크기로 맞춘다(uGUI의 SetNativeSize).
@@ -81,11 +71,17 @@ private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;
 	std::vector<std::string> 				texturePaths;
+
+	[[reflgen::ignore]]
 	std::vector<std::shared_ptr<Texture>>	textures;
 
 public:
+	[[reflgen::ignore]]
 	ImageInfo								uiinfo{};
+
+	[[reflgen::ignore]]
 	std::shared_ptr<Texture>				m_curtexture{};
+
 	math::color								color{ 1,1,1,1 };
 	int										curindex{ 0 };
 	float									rotate{ 0 };

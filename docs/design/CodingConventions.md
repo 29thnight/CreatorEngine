@@ -76,10 +76,11 @@
 | 타입 | 층 | 판정 근거 |
 |---|---|---|
 | `Entity` · `Component` · `Transform` · `Scene` | A | ①②③ 전부 |
-| `Meta::Type` · `Meta::Property` · `Meta::Deserialize` | A | ② — 런타임 리플렉션이 다루는 대상이 객체다 |
+| `Meta::Find` · `Meta::TypeOf` · `Meta::Deserialize` | A | ② — 런타임 리플렉션 창구가 다루는 대상이 객체다 |
 | `AnimationController` · `Canvas` · `AudioService` | A | ②③ |
 | `ce::remove_at_swap` · `ce::atomic_write` · `ce::read_file` | B | ⑥ — 자유 함수 |
-| `meta::field` · `meta::schema` · `meta::for_each_field` | B | ④⑥ — 컴파일타임 도구 |
+| `meta::identity` | B | ⑥ — 컴파일타임 도구(정체성 스탬핑) |
+| `reflgen::schema_of` · `reflgen::type_descriptor` (서드파티) | B | ⑤⑥ — 외부 라이브러리의 표기 그대로 |
 | `plf::colony` (서드파티) | B | ⑤ — `std` 컨테이너 자리 |
 | `HashingString` | **B** | ⑤ — `std::string`의 자리에 놓인다 (§5.3) |
 | `MemoryPool` | B | ④ — 할당자 요구사항에 물린다 |
@@ -89,6 +90,9 @@
 | `ce::profile_scope` · `ce::marker<>` | **B** | 엔진 공용 진단 유틸리티 — `thread_pool` 선례 (§5.4 예외) |
 
 ★ `HashingString` · `BitFlag`의 기존 표기와 판정 차이는 §5.3·§8에서 다룬다.
+★ 리플렉션 행은 2026-09-30 reflgen 전환에 맞춰 갱신했다. 옛 행은 `Meta::Type`·`Meta::Property`(A)와
+`meta::field`·`meta::schema`·`meta::for_each_field`(B)였다 — 판정은 그대로이고 타입이 바뀌었다
+([ReflectionDesign.md](ReflectionDesign.md)).
 공용 Job 유틸리티는 새 STL 표기로 이관한다(§5.2).
 
 ---
@@ -184,11 +188,12 @@ C# 컨벤션을 문자 그대로 적용하면 답은 `PascalCase`(`SceneRootInde
 | 변수 템플릿 · 특성 술어 | `snake_case` + `_v` / `_t` | `is_container_v`, `element_t` |
 | 네임스페이스 | `lowercase` | `ce`, `meta`, `rhi`, `assets`, `editor` |
 | 템플릿 매개변수 | `PascalCase` 한 단어 | `template<class T, class Alloc>` |
-| 파일 | 주 타입과 같은 이름, 그러나 **파일명만은 `PascalCase`** | `MetaSchema.h`가 `meta::schema`를 담는다 |
+| 파일 | 주 타입과 같은 이름, 그러나 **파일명만은 `PascalCase`** | `ThreadPool.h`가 `thread_pool`을 담는다 |
 
 마지막 줄은 의도된 비대칭이다. 파일 이름은 Visual Studio 필터·`vcxproj`·
 `#include` 경로에 박혀 있고 층과 무관하게 한 벌이어야 탐색이 된다. 층 B의
-파일도 `PascalCase`로 적는다 — 이미 그렇다(`MetaSchema.h`, `ReflectionType.h`).
+파일도 `PascalCase`로 적는다 — 이미 그렇다(`ThreadPool.h`, `JobScheduler.h`).
+예시는 2026-09-30에 바꿨다 — 처음 든 `MetaSchema.h`(`meta::schema`)는 reflgen 전환으로 사라졌다.
 
 ### 4.2 멤버 접두는 `m_`이 아니라 후치 `_`
 
@@ -235,12 +240,25 @@ namespace meta { ... }   // :190  — 다시 컴파일타임
 즉 이 컨벤션은 저장소에 새 질서를 들이는 것이 아니라, **이미 암묵적으로
 지켜지던 갈림을 문장으로 적는 것**이다. 이 둘은 통합하지 않는다.
 
+**갱신(2026-09-30, reflgen 전환)**: 위 코드 블록은 전환 전 모습이다. 컴파일타임 스키마와 런타임 타입 표는
+reflgen으로 옮겨 갔고(`reflgen::schema_of` · `reflgen::type_descriptor`), 두 이름공간에 남은 것은 이렇다.
+
+```cpp
+// Engine/Utility_Framework/ReflectionMeta.h
+namespace meta { ... }   // 층 B — identity<T, Base> (m_name·m_typeID 스탬핑)
+// Engine/Utility_Framework/ReflgenRuntime.h · ReflectionYml.h
+namespace Meta { ... }   // 층 A — 런타임 창구 (Types, Find, TypeOf, SerializeInto, Deserialize)
+```
+
+두 층은 이제 파일로도 갈린다. 갈림의 기준(도구 대 객체)은 그대로다.
+
 남은 어긋남 둘:
 
-- `meta::identity::StampIdentity()` (`ReflectionMeta.h:45`) — 층 B 안의
+- `meta::identity::StampIdentity()` (`ReflectionMeta.h:37`) — 층 B 안의
   PascalCase 메서드. `stamp_identity()`로 고친다. private이라 호출자가 둘뿐이다.
-- `meta::displayName` (`MetaSchema.h:164`) — camelCase. `display_name`으로
-  고친다. 같은 파일의 반환 타입 `display_name_attr`은 이미 snake_case다.
+- ~~`meta::displayName` (`MetaSchema.h:164`) — camelCase. `display_name`으로
+  고친다. 같은 파일의 반환 타입 `display_name_attr`은 이미 snake_case다.~~
+  **해소(2026-09-30)**: `MetaSchema.h` 와 함께 사라졌다. 표시 이름은 reflgen 속성 `reflgen::display_name` 이다.
 
 ### 5.2 공용 스레드 풀·Job 유틸리티는 층 B다
 
@@ -394,8 +412,8 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
 
 **`BinPackArguments`/`BinPackParameters`는 끄지 않는다.** 껐더니 실측에서
 오히려 변경이 늘었다(2,943 → 3,153). 인자를 한 줄에 하나씩 세워 둔 자리
-(예: `Entity::reflect()`의 `meta::field` 나열)는 전역 설정이 아니라 그 블록만
-`// clang-format off` / `// clang-format on`으로 감싸 보호한다.
+(예: 옛 `Entity::reflect()`의 `meta::field` 나열 — reflgen 전환으로 레시피가 사라져 지금은 그런 블록이
+없다)는 전역 설정이 아니라 그 블록만 `// clang-format off` / `// clang-format on`으로 감싸 보호한다.
 
 ### 7.2 미리보기 결과 — 재포맷은 코드를 바꾸지 않는다
 
@@ -442,6 +460,56 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
 ★ 3단계는 **작업 트리가 깨끗할 때** 해야 한다. 994개 파일을 건드리므로 다른
 세션의 미커밋 변경이 있으면 통째로 휩쓸린다. 착수 전에 `git status`가 비어
 있는지 확인한다.
+
+### 7.4 리플렉션 속성 배치 (2026-09-30 확정)
+
+변수·메서드에 다는 리플렉션 속성(`[[reflgen::…]]`·`[[creator::…]]`)은 **자기 줄**에
+두고, 선언은 그 아래 줄에 둔다. 속성을 단 선언이 앞뒤 내용과 이어져 있으면
+**빈 줄**로 가른다.
+
+```cpp
+class [[reflgen::reflect]] DoorComponent : public meta::identity<DoorComponent, Component>
+{
+    friend struct reflgen::access;
+public:
+    [[reflgen::reflect, creator::read_only_in_inspector]]
+    bool IsOpen() const;
+
+    void Close();
+
+private:
+    EDoorKind m_kind = EDoorKind::Hinged;
+
+    // 열림 정도는 매 프레임 다시 계산한다
+    [[reflgen::ignore]]
+    float m_openAmount = 0.0f;
+
+    [[reflgen::ignore]]
+    float m_speed = 1.0f;
+};
+```
+
+- 선언 바로 위의 설명 주석은 그 선언과 한 덩어리다 — 빈 줄은 주석 위에 들어간다.
+- 범위의 경계와는 가르지 않는다: `{`로 끝나는 줄 다음, `}`로 시작하는 줄 앞,
+  접근 지정자(`public:` 등)의 앞뒤.
+- 여러 줄에 걸친 선언은 선언이 끝나는 줄(`;` 또는 `}`)까지가 한 덩어리다.
+- 클래스 머리의 속성(`class [[reflgen::reflect]] X`)과 `[[nodiscard]]` 같은 다른
+  속성은 대상이 아니다.
+
+**왜:** reflgen 전환 뒤 반영 범위는 opt-out이다 — 필드는 `[[reflgen::ignore]]`를
+달지 않는 한 저장된다([ReflectionDesign.md](ReflectionDesign.md) §1). 속성이 선언과
+한 줄에 붙어 있으면 무엇이 저장에서 빠졌는지가 긴 타입 이름 사이에 묻힌다. 자기 줄에
+두면 줄 머리만 훑어도 보이고, 빈 줄로 가르면 속성이 어느 선언에 붙는지 헷갈리지 않는다.
+
+강제와 도구:
+
+- `Tools/regression/verify-reflgen-attribute-layout.ps1` — 어긋난 배치가 하나라도 있으면
+  붉다. 변환 규칙은 합성 표본으로 먼저 자기 시험한다.
+- `python Tools/migration/reflgen_attribute_layout.py --apply` — 고친다(두 번 돌려도 같다).
+  `reflgen_codemod.py`도 속성을 단 뒤 이 배치를 거친다.
+- `.clang-format`의 `BreakAfterAttributes: Leave` — 재포맷이 속성 뒤 줄바꿈을 되돌리지
+  않는다(`Never`는 한 줄로 합치고, `Always`는 다른 속성까지 펼친다). VS 18 동봉
+  clang-format 22.1.3으로 확인했다.
 
 ---
 
@@ -542,6 +610,7 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
 | 9-2 | `HashingString`·`BitFlag` 개명 | **(b)** `BitFlag`만 개명. `HashingString`은 새로 작성하며 층 B로 태어난다 | §5.3 |
 | 9-3 | `.clang-format` | **(a)** 전면 도입 + 재포맷 단독 커밋 + blame-ignore 등재 | §7.1~7.3 |
 | 9-4 | 게이트 강제 | 제안대로 — 9-1·9-2가 정해진 **뒤에** 만든다 (지금이 그 뒤다) | 아래 |
+| 9-5 | 리플렉션 속성 배치 (2026-09-30 추가) | 속성은 자기 줄, 선언은 그 아래 줄. 이어진 내용과는 빈 줄로 가른다. 게이트와 고치는 도구를 함께 둔다 | §7.4 |
 
 ### 9-4 후속 — 게이트
 

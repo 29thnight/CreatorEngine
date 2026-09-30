@@ -6,22 +6,9 @@
 #include "Core.Minimal.h"
 #include "BlackBoardEnum.h"
 
-struct BlackBoardValue
+struct [[reflgen::reflect]] BlackBoardValue
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = BlackBoardValue;
-       return meta::schema<Self>(
-           meta::field<&Self::Type>,
-           meta::field<&Self::BoolValue>,
-           meta::field<&Self::IntValue>,
-           meta::field<&Self::FloatValue>,
-           meta::field<&Self::StringValue>,
-           meta::field<&Self::Vec2Value>,
-           meta::field<&Self::Vec3Value>,
-           meta::field<&Self::Vec4Value>);
-   }
 	BlackBoardValue() = default;
 	~BlackBoardValue() = default;
 

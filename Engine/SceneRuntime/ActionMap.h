@@ -3,16 +3,9 @@
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include "InputAction.h"
-class ActionMap
+class [[reflgen::reflect]] ActionMap
 {
    public:
-   static consteval auto reflect()
-   {
-       using Self = ActionMap;
-       return meta::schema<Self>(
-           meta::field<&Self::m_name>,
-           meta::field<&Self::m_actions>);
-   }
 public:
 	ActionMap() = default;
 	~ActionMap();

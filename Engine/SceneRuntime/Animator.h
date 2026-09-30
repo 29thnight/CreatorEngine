@@ -33,21 +33,8 @@ struct AnimatorClipOverride final
 
 // Scene-authored target. Gameplay may update the world-space target and pole
 // before the animation frame; workers receive a resolved value snapshot.
-struct TwoBoneIKConstraint final
+struct [[reflgen::reflect]] TwoBoneIKConstraint final
 {
-    static consteval auto reflect()
-    {
-        using Self = TwoBoneIKConstraint;
-        return meta::schema<Self>(
-            meta::field<&Self::StartBone>,
-            meta::field<&Self::MiddleBone>,
-            meta::field<&Self::EndBone>,
-            meta::field<&Self::TargetWorld>,
-            meta::field<&Self::PoleWorld>,
-            meta::field<&Self::Weight>,
-            meta::field<&Self::Enabled>,
-            meta::field<&Self::Required>);
-    }
 
     std::string StartBone{};
     std::string MiddleBone{};
@@ -60,20 +47,8 @@ struct TwoBoneIKConstraint final
 };
 
 // A local-space procedural correction applied after clip and layer evaluation.
-struct BoneTransformConstraint final
+struct [[reflgen::reflect]] BoneTransformConstraint final
 {
-    static consteval auto reflect()
-    {
-        using Self = BoneTransformConstraint;
-        return meta::schema<Self>(
-            meta::field<&Self::Bone>,
-            meta::field<&Self::TranslationOffset>,
-            meta::field<&Self::RotationOffset>,
-            meta::field<&Self::ScaleMultiplier>,
-            meta::field<&Self::Weight>,
-            meta::field<&Self::Enabled>,
-            meta::field<&Self::Required>);
-    }
 
     std::string Bone{};
     math::vector3 TranslationOffset{};
@@ -106,31 +81,9 @@ enum class AnimatorDataPath : std::uint8_t
 
 // K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
 // 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(OnInitialized/OnUninitializing 참조).
-class Animator : public meta::identity<Animator, Component>
+class [[reflgen::reflect]] Animator : public meta::identity<Animator, Component>
 {
     public:
-    static consteval auto reflect()
-    {
-        // I6-B1 — legacy Skeleton 서브트리는 더 이상 씬에 쓰지 않는다.
-        // 리플렉션이 포인터를 따라 적던 것은 클립 이름·m_isLoop·
-        // m_keyFrameEvent·m_rootTransform인데, **재로드가 실제로 읽는 것은
-        // 클립별 (isLoop, events) 뿐**이고 나머지는 자산에서 다시 유도되는
-        // 값이다. 그 둘은 D4e-2가 이미 Animator 소유(m_clipOverrides)로
-        // 옮겼으므로, 표기만 소유를 따라가면 된다 — 쓰기는 새 정본으로,
-        // 읽기는 구 씬 서브트리 폴백을 존치한다(OnDeserialized 참조).
-        return meta::schema<Self>(
-            meta::field<&Self::m_AnimIndexChosen>.with(meta::hidden()),
-            meta::field<&Self::m_AnimIndex>.with(meta::hidden()),
-            meta::field<&Self::m_Motion>,
-            meta::field<&Self::m_QualityRadius>.with(meta::hidden()),
-            meta::field<&Self::m_LowDetailBoneCount>.with(meta::hidden()),
-            meta::field<&Self::m_ForceFullQuality>.with(meta::hidden()),
-            meta::field<&Self::m_TwoBoneIKConstraints>.with(meta::hidden()),
-            meta::field<&Self::m_BoneTransformConstraints>.with(meta::hidden()),
-            meta::field<&Self::m_animationControllers>,
-            meta::field<&Self::Parameters>,
-            meta::method<&Self::UpdateAnimation>.hideInInspector());
-    }
 public:
     Animator();
     // I5-D4e-1: 본문은 cpp로 — shared_ptr<const experiment::Model> 멤버가
@@ -145,7 +98,10 @@ public:
     void OnPropertyChanged(std::string_view propertyName,
         Meta::PropertyChangeSource source) override;
     void SetAnimation(int index);
+
+    [[reflgen::reflect, creator::hide_in_inspector]]
     void UpdateAnimation();
+
     void CreateController(std::string name);
     std::shared_ptr<AnimationController> CreateController_UI();
     std::shared_ptr<AnimationController> CreateController_UINoAni();
@@ -262,44 +218,80 @@ public:
     void NotifyParameterLayoutChanged() noexcept { ++m_parameterVersion; }
 
 public:
+    // I6-B1 — legacy Skeleton 서브트리는 더 이상 씬에 쓰지 않는다.
+    // 리플렉션이 포인터를 따라 적던 것은 클립 이름·m_isLoop·
+    // m_keyFrameEvent·m_rootTransform인데, **재로드가 실제로 읽는 것은
+    // 클립별 (isLoop, events) 뿐**이고 나머지는 자산에서 다시 유도되는
+    // 값이다. 그 둘은 D4e-2가 이미 Animator 소유(m_clipOverrides)로
+    // 옮겼으므로, 표기만 소유를 따라가면 된다 — 쓰기는 새 정본으로,
+    // 읽기는 구 씬 서브트리 폴백을 존치한다(OnDeserialized 참조).
+    //
     // Reflection-only compatibility mirror. Runtime readers use GetSelectedClipIndex().
+    [[reflgen::hidden]]
     uint32_t m_AnimIndexChosen{};
+
     [[nodiscard]] AnimInstance& GetInstance() noexcept;
     [[nodiscard]] const AnimInstance& GetInstance() const noexcept;
     [[nodiscard]] uint32_t GetSelectedClipIndex() const noexcept { return GetInstance().selectedClipIndex; }
     void SetSelectedClipIndex(uint32_t index) noexcept { GetInstance().selectedClipIndex = index; }
     [[nodiscard]] AnimatorPlaybackControl& GetPlaybackControl() noexcept { return GetInstance().control; }
     [[nodiscard]] const AnimatorPlaybackControl& GetPlaybackControl() const noexcept { return GetInstance().control; }
+
+    [[reflgen::hidden]]
     int m_AnimIndex{};
+
     FileGuid m_Motion{};
+
     // World-space approximation used when estimating on-screen character size.
+    [[reflgen::hidden]]
     float m_QualityRadius{ 1.f };
+
     // Authored parent-first prefix. Zero disables skeletal detail reduction.
+    [[reflgen::hidden]]
     std::uint32_t m_LowDetailBoneCount{};
+
     // Gameplay attachments such as hitboxes may require every-frame L0.
+    [[reflgen::hidden]]
     bool m_ForceFullQuality{ false };
+
+    [[reflgen::hidden]]
     std::vector<TwoBoneIKConstraint> m_TwoBoneIKConstraints{};
+
+    [[reflgen::hidden]]
     std::vector<BoneTransformConstraint> m_BoneTransformConstraints{};
+
+    [[reflgen::ignore]]
     std::vector<Socket*> socketvec;
+
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     std::vector<ConditionParameter*> Parameters;
+
+    [[reflgen::ignore]]
     mutable std::mutex m_paramMutex;
+
+    [[reflgen::ignore]]
     std::uint64_t m_parameterVersion{ 1 };
 
 private:
+    [[reflgen::ignore]]
     bool m_IsEnabled = false;
+
+    [[reflgen::ignore]]
     AnimInstanceHandle m_instance{};
 
 public:
     // PHASE 3.75 MBC8/MBC9 — typed 재생 정본. m_Motion(ModelId)으로
     // EnsureAnimationBinding이 채운다. 비직렬화 — 영속 신원은 m_Motion이 진다.
+    [[reflgen::ignore]]
     std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+
     // Evaluation buffers, playback time and cursors live in the instance.
     void EnsureAnimationBinding();
     void BindModelGeneration(std::shared_ptr<const assets::ModelAssetGeneration> generation);
 
     // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.
+    [[reflgen::ignore]]
     std::vector<AnimatorClipOverride> m_clipOverrides{};
 
     void StopAnimation(float duration)

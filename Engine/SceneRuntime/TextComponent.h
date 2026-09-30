@@ -8,22 +8,10 @@
 #include "Canvas.h"
 #include "UIComponent.h"
 
-class TextComponent : public meta::identity<TextComponent, UIComponent>
+class [[reflgen::reflect]] TextComponent : public meta::identity<TextComponent, UIComponent>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::fontPath>,
-           meta::field<&Self::message>,
-           meta::field<&Self::relpos>,
-           meta::field<&Self::color>,
-           meta::field<&Self::manualRect>,
-           meta::field<&Self::fontSize>,
-           meta::field<&Self::horizontalAlignment>,
-           meta::field<&Self::useManualRect>,
-           meta::field<&Self::m_textMeasureSize>);
-   }
 public:
 	TextComponent();
 	~TextComponent() = default;
@@ -85,15 +73,25 @@ private:
     math::color color{};
     // When true, message bounds are taken from manualRect instead of the parent's RectTransform
     math::rect manualRect{};
+
     // Calculated in Update: maximum render area from parent RectTransform
+    [[reflgen::ignore]]
     math::vector2 stretchSize{ 0.f, 0.f };
+
     float fontSize{ 1.f };
+
     // 캔버스에서 물려받은 배율. Update에서 RectTransform으로부터 채워지고,
     // 렌더 프록시가 fontSize에 곱한다. 파생값이라 직렬화하지 않는다(PHASE 7-3).
+    [[reflgen::ignore]]
     float layoutScale{ 1.f };
+
 	TextAlignment horizontalAlignment{ TextAlignment::Center };
     bool useManualRect{ false };
+
+    [[reflgen::ignore]]
     bool isStretchX{ false };
+
+    [[reflgen::ignore]]
     bool isStretchY{ false };
 public:
 	math::vector2 m_textMeasureSize{ 0.f };

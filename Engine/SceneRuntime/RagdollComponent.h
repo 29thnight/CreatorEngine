@@ -9,14 +9,9 @@
 class AriculationData;
 class ArticulationLoader;
 
-class RagdollComponent : public meta::identity<RagdollComponent, Component>, public ICollider
+class [[reflgen::reflect]] RagdollComponent : public meta::identity<RagdollComponent, Component>, public ICollider
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_bIsRagdoll>);
-   }
 public:
 	RagdollComponent() = default;
 
@@ -24,18 +19,30 @@ public:
 
 
 private:
+	[[reflgen::ignore]]
 	unsigned int m_ragdollID;
+
+	[[reflgen::ignore]]
 	unsigned int m_collsionCount = 0;
 
 	//bool m_bIsRagdoll{ false };
 
+	[[reflgen::ignore]]
 	float m_fBlendTime{ 0.0f };
+
+	[[reflgen::ignore]]
 	float m_fComplateTime{ 1.0f };
 
+	[[reflgen::ignore]]
 	math::vector3 m_posOffset{ 0.0f, 0.0f, 0.0f };
+
+	[[reflgen::ignore]]
 	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
 
+	[[reflgen::ignore]]
 	std::string m_ArticulationPath;
+
+	[[reflgen::ignore]]
 	ArticulationData* m_articulationData;
 
 

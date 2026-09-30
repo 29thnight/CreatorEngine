@@ -336,7 +336,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
         m_newScriptPage = false;
         m_componentCatalog.clear();
         for (const auto& [name, type] : ComponentFactorys->m_componentTypes)
-            if (type && !name.empty() && type->typeID != type_guid(ScriptComponent))
+            if (type && !name.empty() && Meta::TypeIDOf(*type) != type_guid(ScriptComponent))
                 m_componentCatalog.push_back(Native(name));
         for (auto& name : ClrHost::Get().GetComponentTypeNames()) m_componentCatalog.push_back(Script(name));
         Sort(m_componentCatalog);
@@ -476,7 +476,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
                 const auto found = ComponentFactorys->m_componentTypes.find(row.entry->type);
                 if (found != ComponentFactorys->m_componentTypes.end())
                     for (const auto& component : entity->m_components)
-                        if (component && !component->IsDestroyMark() && component->GetTypeID() == found->second->typeID) attached = true;
+                        if (component && !component->IsDestroyMark() && component->GetTypeID() == Meta::TypeIDOf(*found->second)) attached = true;
             }
             ImGui::PushID(i);
             ImGui::BeginDisabled(attached);
@@ -2162,7 +2162,7 @@ void InspectorWindow::Draw()
 			// 문자열 생성 + 문자열 해시 조회였다 — m_name이 타입명과 일치한다는
 			// GENERATED_BODY 관행에 기댄 우회이기도 했다. typeID 조회는 항등이다
 			// (Registry가 등록 시 이름 맵·해시 맵에 같은 Type을 넣는다).
-			const auto& type = Meta::Find(component->GetTypeID().m_ID_Data);
+			const auto& type = Meta::Find(component->GetTypeID());
 
 			std::string componentBaseName = component->ToString();
 			if (!type) continue;
@@ -2466,7 +2466,7 @@ void InspectorWindow::Draw()
     ImGui::EndDisabled();
 	// 디버그 모드 토글 (PHASE 21 W2-I).
 	//
-	// `meta::debugOnly()` 로 표시한 항목은 이 모드에서만 그려진다. 내부
+	// `[[creator::debug_only]]` 로 표시한 항목은 이 모드에서만 그려진다. 내부
 	// 식별자처럼 평소엔 잡음이지만 문제를 쫓을 때는 봐야 하는 것들이다.
 	//
 	// 빈 자리 오른쪽 클릭으로 연다 — 줄을 하나도 쓰지 않는다. 항목 위에서는

@@ -69,7 +69,10 @@
     <ClInclude Include="PathFinder.h" />
     <ClInclude Include="Reflection.hpp" />
     <ClInclude Include="ReflectionFunction.h" />
-    <ClInclude Include="MetaSchema.h" />
+    <ClInclude Include="ReflgenAttributes.h" />
+    <ClInclude Include="ReflgenAuthoring.h" />
+    <ClInclude Include="ReflgenAuthoringSerializers.h" />
+    <ClInclude Include="ReflgenRuntime.h" />
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
     <ClInclude Include="ReflectionYml.h" />
@@ -110,6 +113,7 @@
     <ClCompile Include="TimeSystem.cpp" />
     <ClCompile Include="ProgressSink.cpp" />
     <ClCompile Include="ReflectionYml.cpp" />
+    <ClCompile Include="ReflgenRuntime.cpp" />
     <ClCompile Include="TypeTrait.cpp" />
     <ClCompile Include="WarmupLedger.cpp" />
   </ItemGroup>

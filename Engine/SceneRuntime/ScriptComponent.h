@@ -14,15 +14,9 @@
 // 경계를 넘으면 스크립트 수만큼 건너게 되어 그 설계가 무너진다.
 // 6단계 훅과 OnEnable/OnDisable은 전부 override해 NotifyManagedLifecycle로 넘긴다
 // (ScriptLifecyclePhase.h) — 관리 측 생명주기의 드라이버를 네이티브 하나로 두기 위해서다.
-class ScriptComponent : public meta::identity<ScriptComponent, Component>
+class [[reflgen::reflect]] ScriptComponent : public meta::identity<ScriptComponent, Component>
 {
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_scriptType>,
-           meta::field<&Self::m_fieldData>);
-   }
 public:
 	ScriptComponent() = default;
 
@@ -140,10 +134,14 @@ public:
 	std::uint64_t InitializationAttempts() const { return m_initializationAttempts; }
 
 private:
+	[[reflgen::ignore]]
 	int m_instanceId{ -1 };
+
+	[[reflgen::ignore]]
 	std::uint64_t m_initializationAttempts{};
 
 	// EnsureInstance가 한 번 실패했는가. 편집 모드에서는 드레인이 매 프레임
 	// 부르므로 이것이 없으면 실패 로그가 프레임마다 쌓인다.
+	[[reflgen::ignore]]
 	bool m_instanceCreateFailed{ false };
 };

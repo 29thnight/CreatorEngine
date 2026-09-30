@@ -39,18 +39,10 @@ const AnchorPresetEntry* GetAnchorPresetTable();
 size_t GetAnchorPresetCount();
 const AnchorPresetEntry& GetAnchorPresetEntry(AnchorPreset preset);
 
-class RectTransformComponent : public meta::identity<RectTransformComponent, Component>
+class [[reflgen::reflect]] RectTransformComponent : public meta::identity<RectTransformComponent, Component>
 {
+   friend struct reflgen::access;
    public:
-   static consteval auto reflect()
-   {
-       return meta::schema<Self>(
-           meta::field<&Self::m_anchorMin>,
-           meta::field<&Self::m_anchorMax>,
-           meta::field<&Self::m_anchoredPosition>,
-           meta::field<&Self::m_sizeDelta>,
-           meta::field<&Self::m_pivot>);
-   }
 public:
     RectTransformComponent();
     virtual ~RectTransformComponent() = default;
@@ -185,12 +177,15 @@ private:
     //
     // 기존 파일에 남은 m_worldRect 키는 무해하다. 역직렬화가 등록된 프로퍼티만
     // 조회하므로 모르는 키는 읽히지 않는다 — 에셋을 고칠 필요가 없다.
+    [[reflgen::ignore]]
     math::rect m_worldRect;
 
     // 레이아웃이 변경되었는지 여부
+    [[reflgen::ignore]]
     bool m_isDirty = true;
 
     // 캔버스에서 물려받은 배율. 파생값이라 직렬화하지 않는다(m_worldRect와 같은 이유).
+    [[reflgen::ignore]]
     float m_layoutScale = 1.f;
 
     // 부동소수 오차를 감안한 rect 비교. "바뀌었는가" 판정을 한 곳에서 한다.

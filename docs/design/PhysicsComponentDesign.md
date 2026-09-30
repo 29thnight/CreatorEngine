@@ -82,7 +82,7 @@ struct BodyHandle {
 
 컴포넌트는 **저작값**(직렬화 대상)과 `BodyHandle` 하나를 든다. 런타임 상태는 스토어에 한 벌만 있다.
 
-지금 `RigidBodyComponent`에는 `m_linearVelocity`, `m_angularVelocity`, `m_scale`이 멤버로 있고 물리 쪽에도 같은 값이 있어 **매 프레임 양방향으로 복사된다.** 셋 다 사라진다 — 셋 다 `reflect()` 스키마에 없으므로 직렬화 호환에 영향이 없다.
+지금 `RigidBodyComponent`에는 `m_linearVelocity`, `m_angularVelocity`, `m_scale`이 멤버로 있고 물리 쪽에도 같은 값이 있어 **매 프레임 양방향으로 복사된다.** 셋 다 사라진다 — 셋 다 직렬화하지 않는 멤버이므로(옛 `reflect()` 스키마에 없었고, 지금은 `[[reflgen::ignore]]`) 직렬화 호환에 영향이 없다.
 
 ### P3. 변경은 커맨드로 모인다
 
@@ -266,28 +266,15 @@ Scene::FixedUpdate
 
 ## 7. 컴포넌트 표면
 
-```cpp
-class RigidBodyComponent : public meta::identity<RigidBodyComponent, Component>
-{
-public:
-    static consteval auto reflect()   // 기존 필드명 보존 + AngularDamping 누락 정정
-    {
-        return meta::schema<Self>(
-            meta::field<&Self::m_bodyType>,
-            meta::field<&Self::LinearDamping>,
-            meta::field<&Self::AngularDamping>,   // ★ 현 스키마에 빠져 있다 — 각 감쇠가 저장되지 않는다
-            meta::field<&Self::m_mass>,
-            meta::field<&Self::maxLinearVelocity>,
-            meta::field<&Self::maxAngularVelocity>,
-            meta::field<&Self::maxContactImpulse>,
-            meta::field<&Self::maxDepenetrationVelocity>,
-            meta::field<&Self::m_useGravity>,
-            meta::field<&Self::m_setTrigger>,
-            meta::field<&Self::m_setKinematic>,
-            meta::field<&Self::m_collisionEnabled>,
-            meta::field<&Self::m_lockFlags>);
-    }
+2026-09-30 reflgen 표기로 갱신했다 — 처음 적은 표기는 `static consteval auto reflect()` 레시피였다. reflgen은
+반영 클래스의 멤버를 전부 저장하므로(선언 순서가 저장 순서다) 저장하지 않는 멤버에 `[[reflgen::ignore]]` 를
+단다([ReflectionDesign.md](ReflectionDesign.md) §1).
 
+```cpp
+class [[reflgen::reflect]] RigidBodyComponent : public meta::identity<RigidBodyComponent, Component>
+{
+    friend struct reflgen::access;   // private 저작값을 서술이 읽는다
+public:
     // 읽기 — 스토어를 본다. 사본을 들지 않는다
     Mathf::Vector3 GetLinearVelocity() const;
     Mathf::Vector3 GetAngularVelocity() const;
@@ -300,9 +287,11 @@ public:
     void SetKinematic(bool on);
 
 private:
-    // 저작값 (직렬화)
+    // 저작값 (직렬화) — 기존 필드명·키 순서 보존 + AngularDamping 누락 정정
     EBodyType m_bodyType = EBodyType::DYNAMIC;
-    float m_mass = 70.f, LinearDamping = 0.01f, AngularDamping = 0.05f;
+    float LinearDamping = 0.01f;
+    float AngularDamping = 0.05f;   // ★ 지금은 [[reflgen::ignore]] 다 — 각 감쇠가 저장되지 않는다
+    float m_mass = 70.f;
     float maxLinearVelocity = 1e16f, maxAngularVelocity = 100.f;
     float maxContactImpulse = 1e32f, maxDepenetrationVelocity = 1e32f;
     bool  m_useGravity = true, m_setTrigger = false;
@@ -310,6 +299,7 @@ private:
     uint8_t m_lockFlags = 0;
 
     // 런타임 (직렬화 안 함)
+    [[reflgen::ignore]]
     BodyHandle m_handle{};
 };
 ```

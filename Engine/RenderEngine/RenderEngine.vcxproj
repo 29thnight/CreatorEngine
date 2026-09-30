@@ -527,6 +527,7 @@
     <ClInclude Include="RHI\RHIValidationLedger.h" />
     <ClInclude Include="GpuDiagnostics.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="ReflgenRegistration.h" />
     <ClInclude Include="ShaderMetaHandle.h" />
     <ClInclude Include="ShaderMeta.h" />
     <ClInclude Include="MaterialPropertyPacker.h" />

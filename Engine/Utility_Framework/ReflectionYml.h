@@ -6,13 +6,16 @@
 // (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
 #include "AuthoringReadNode.h" // D3-b-2b-1b
 #include "AuthoringWriteNode.h" // D3-b-3
+#include "ReflgenAuthoring.h" // Authoring 백엔드 — 서술자가 이 writer·reader 로 쓰고 읽는다
 #include "AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "IObject.h"
 // ComponentUUIDRegistry(K1-b) 조회 창구. IObject.h가 이미 물고 있어 사실상
 // 중복 include지만, 이 파일이 직접 쓰는 것을 명시한다.
 #include "TypeTrait.h"
-// TypeOf<T>() 정의처 — 템플릿 래퍼 3곳이 T::Reflect() 대신 단일 창구를 쓴다(CT4-d).
+#include "LogSystem.h" // Debug::PrintLog
 #include "ReflectionMeta.h"
+// 런타임 타입 창구(Meta::Find·TypeOf·TypeIDOf) — 템플릿 래퍼 3곳이 T 의 서술자를 등록소에서 찾는다.
+#include "ReflgenRuntime.h"
 #include <cstdint>
 #include <unordered_set>
 
@@ -54,15 +57,13 @@ namespace Meta
 	}
 
 	//FindTypeByInstance base IObject
-	inline const Type* FindTypeByInstance(void* instance)
+	inline const reflgen::type_descriptor* FindTypeByInstance(void* instance)
 	{
 		if (instance == nullptr)
 			return nullptr;
 
 		const IObject* comp = static_cast<const IObject*>(instance);
-		std::size_t typeID = comp->GetTypeID();
-
-		return MetaDataRegistry->Find(typeID);
+		return Find(comp->GetTypeID());
 	}
 }
 
@@ -74,16 +75,17 @@ class Entity;
 inline constexpr const char GAMEOBJECT_YAML_KEY[] = "Entity";
 
 // CT6-a 런타임 브리지: 타입이 런타임에 정해지는 소비자(씬 로드·컴포넌트
-// 벡터)의 typed 디스패치 표. 타입당 함수 포인터 2개 — 레거시의 프로퍼티당
-// std::function 2개와 대비된다. 썽크 정의는 ReflectionTypedYml.h, 등록은
+// 벡터)의 typed 디스패치 표. 썽크 정의는 ReflectionTypedYml.h, 등록은
 // RegisterReflectManual.h(등록 정본).
+//
+// reflgen 도입 P5: 쓰기·읽기 썽크(serializeInto·deserialize)는 걷었다 — 런타임 쓰기·읽기는 reflgen 서술자
+// (type_descriptor::serialize·deserialize, 아래 SerializeInto·Deserialize)가 한다. 서술자의 썽크는 등록 함수의 번역
+// 단위에서 한 번 만들어진다 — 여기 썽크를 두면 같은 직렬화 코드가 등록 정본의 번역 단위(SceneManager.cpp)에서
+// 76 타입 몫 한 벌 더 실체화된다. 남은 것은 역직렬화 후처리 훅이다.
 namespace Meta::Typed
 {
 	struct TypeOps
 	{
-		void (*serializeInto)(void* instance, Authoring::WriteNode node);
-		void (*deserialize)(void* instance, const Authoring::ReadNode& node);
-
 		// CT6-d: 역직렬화 후처리 훅 — ComponentFactory의 타입별 하드코딩
 		// 분기(애셋 GUID 해석·리소스 로드)를 컴포넌트 소유의 OnDeserialized로
 		// 옮기고, 팩토리는 이 포인터 하나로 디스패치한다. 훅이 없는 타입은
@@ -114,37 +116,81 @@ namespace Meta
 	// PropertyToYamlNode/YamlNodeToProperty 헬퍼는 CT1 조회 순서 역전으로
 	// Serialize/Deserialize 본문에 흡수됐다 (호출처가 각 1곳뿐이었다).
 
-	inline bool SerializeInto(void* instance, const Type& type,
+	// instance 는 type 의 객체다(서술자의 타입 포인터 — 다형 객체면 Meta::MostDerived).
+	inline bool SerializeInto(void* instance, const reflgen::type_descriptor& type,
 		Authoring::WriteNode node)
 	{
-		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
+		if (!type.is_serializable())
 		{
-			ops->serializeInto(instance, node);
-			return true;
+			Debug::PrintLog(spdlog::level::err, std::string("SerializeInto: 직렬화할 수 없는 타입 - ") + std::string(type.name()));
+			return false;
 		}
 
-		Debug::PrintLog(spdlog::level::err, std::string("SerializeInto: typed ops 미등록 타입 - ") + type.name
-			+ " (RegisterReflectManual.h 목록을 확인하라)");
-		return false;
+		Authoring::ReflgenWriter writer(node);
+		type.serialize(writer, instance);
+		return true;
+	}
+
+	// 엔진 객체(IObject)를 type 의 객체 주소로 — 서술자의 쓰기·읽기·필드 주소는 그 타입의 포인터를 받는다. 실타입
+	// 주소(MostDerived)에서 실타입 서술자의 base 체인으로 type 까지 올라간다(다중 상속의 오프셋 보정 — type 이 실타입이면
+	// 그 주소 그대로). Component*·Entity* 같은 인자는 void* 보다 아래 IObject* 오버로드로 간다(파생→기반 변환이 void*
+	// 변환보다 낫다) — 호출처가 주소를 맞추는 것을 잊을 수 없다.
+	inline void* ObjectAddress(IObject* instance, const reflgen::type_descriptor& type)
+	{
+		void* object = MostDerived(instance);
+		const reflgen::type_descriptor* dynamic = Find(instance->GetTypeID());
+		void* address = nullptr != dynamic ? dynamic->upcast(object, type.id()) : nullptr;
+		if (nullptr == address)
+		{
+			throw std::logic_error("ObjectAddress: 객체의 실타입(" + std::to_string(instance->GetTypeID().m_ID_Data)
+				+ ")이 " + std::string(type.name()) + " 이거나 그 반영된 자손이 아니다");
+		}
+		return address;
+	}
+
+	inline bool SerializeInto(IObject* instance, const reflgen::type_descriptor& type, Authoring::WriteNode node)
+	{
+		return SerializeInto(ObjectAddress(instance, type), type, node);
+	}
+
+	// 컴파일 때 아는 타입의 서술자 — 등록 전이면(부트스트랩 순서가 어긋났으면) 옛 경로처럼 오류를 남기고 nullptr.
+	template<typename T>
+	inline const reflgen::type_descriptor* FindRegistered(const char* caller)
+	{
+		const reflgen::type_descriptor* type = Find(TypeTrait::GUIDCreator::GetTypeID<T>());
+		if (nullptr == type)
+		{
+			Debug::PrintLog(spdlog::level::err, std::string(caller) + ": 등록되지 않은 타입 - "
+				+ std::string(TypeTrait::type_name<T>()) + " (RegisterReflectManual 이 먼저 돌아야 한다)");
+		}
+		return type;
 	}
 
 	template<typename T>
 	inline bool SerializeInto(T* instance, Authoring::WriteNode node)
 	{
-		return SerializeInto(reinterpret_cast<void*>(instance), TypeOf<T>(), node);
+		const reflgen::type_descriptor* type = FindRegistered<T>("SerializeInto");
+		return nullptr != type && SerializeInto(reinterpret_cast<void*>(instance), *type, node);
 	}
 
-	inline Authoring::WriteDocument SerializeDocument(void* instance, const Type& type)
+	inline Authoring::WriteDocument SerializeDocument(void* instance, const reflgen::type_descriptor& type)
 	{
 		Authoring::WriteDocument document;
 		SerializeInto(instance, type, document.Root());
 		return document;
 	}
 
+	inline Authoring::WriteDocument SerializeDocument(IObject* instance, const reflgen::type_descriptor& type)
+	{
+		return SerializeDocument(ObjectAddress(instance, type), type);
+	}
+
 	template<typename T>
 	inline Authoring::WriteDocument SerializeDocument(T* instance)
 	{
-		return SerializeDocument(reinterpret_cast<void*>(instance), TypeOf<T>());
+		Authoring::WriteDocument document;
+		SerializeInto(instance, document.Root());
+		return document;
 	}
 
 	// 리네임된 타입의 **구 이름 → 현 이름** (§5 읽기 별칭).
@@ -177,7 +223,7 @@ namespace Meta
 		return name;
 	}
 
-	inline const Type* ExtractTypeFromYAML(const Authoring::ReadNode& node)
+	inline const reflgen::type_descriptor* ExtractTypeFromYAML(const Authoring::ReadNode& node)
 	{
 		if (!node || !node.IsMap())
 			return nullptr;
@@ -194,7 +240,7 @@ namespace Meta
 			{
 				if (const std::string* typeName = TypeTrait::ComponentUUIDRegistry::FindNameByUUID(uuid))
 				{
-					if (const Meta::Type* type = MetaDataRegistry->Find(*typeName))
+					if (const reflgen::type_descriptor* type = Find(std::string_view(*typeName)))
 					{
 						return type;
 					}
@@ -224,7 +270,7 @@ namespace Meta
 			// 끝낸다. E6 리네임 직후 `- GameObject:` 헤더에서 실제로 밟았고, 증상은
 			// 헤더가 아니라 그 다음 줄(`m_name: Test1`)을 가리켜 원인을 가렸다.
 			bool renamed = false;
-			const Meta::Type* type = MetaDataRegistry->Find(ResolveRenamedTypeName(typeName, renamed));
+			const reflgen::type_descriptor* type = Find(ResolveRenamedTypeName(typeName, renamed));
 			if (!type)
 				continue;
 
@@ -252,7 +298,7 @@ namespace Meta
 			// 단, 리네임 표를 지나온 이름은 ID가 어긋나는 것이 **정상**이다
 			// (ID가 이름의 FNV-1a라 개명하면 반드시 달라진다). 그 자리까지 경고하면
 			// 오브젝트마다 한 줄씩 나와 진짜 불일치가 묻힌다.
-			if (type->typeID != typeID && !renamed)
+			if (TypeIDOf(*type) != typeID && !renamed)
 			{
 				Debug::PrintLog(spdlog::level::warn, std::string("ExtractTypeFromYAML: typeID 불일치 — 이름으로 수용(구 파일, 재저장 시 치유): ")
 					+ typeName);
@@ -267,7 +313,7 @@ namespace Meta
 			{
 				const std::string typeName{ kv.key.Scalar() };
 				bool renamed = false;
-				return MetaDataRegistry->Find(ResolveRenamedTypeName(typeName, renamed));
+				return Find(ResolveRenamedTypeName(typeName, renamed));
 			}
 		}
 
@@ -277,7 +323,7 @@ namespace Meta
 			std::uint64_t id = 0;
 			if (Authoring::Scalar::TryParseUInt64(node["typeID"].Scalar(), id))
 			{
-				return MetaDataRegistry->Find(static_cast<std::size_t>(id));
+				return Find(HashedGuid{ static_cast<std::size_t>(id) });
 			}
 		}
 
@@ -285,22 +331,31 @@ namespace Meta
 	}
 
 	// D3-b-2b-1b-2c: backend-neutral 어댑터를 받는 단일 진입점.
-	inline void Deserialize(void* instance, const Type& type, const Authoring::ReadNode& node)
+	// instance 는 type 의 객체다(SerializeInto 와 같다).
+	inline void Deserialize(void* instance, const reflgen::type_descriptor& type, const Authoring::ReadNode& node)
 	{
-		if (const Typed::TypeOps* ops = Typed::FindTypeOps(type.typeID.m_ID_Data))
+		if (!type.is_deserializable())
 		{
-			ops->deserialize(instance, node);
+			Debug::PrintLog(spdlog::level::err, std::string("Deserialize: 역직렬화할 수 없는 타입 - ") + std::string(type.name()));
 			return;
 		}
 
-		Debug::PrintLog(spdlog::level::err, std::string("Deserialize: typed ops 미등록 타입 - ") + type.name
-			+ " (RegisterReflectManual.h 목록을 확인하라)");
+		Authoring::ReflgenReader reader(node);
+		type.deserialize(reader, instance);
+	}
+
+	inline void Deserialize(IObject* instance, const reflgen::type_descriptor& type, const Authoring::ReadNode& node)
+	{
+		Deserialize(ObjectAddress(instance, type), type, node);
 	}
 
 	template<class T>
 	inline void Deserialize(T* instance, const Authoring::ReadNode& node)
 	{
-		Deserialize(reinterpret_cast<void*>(instance), TypeOf<T>(), node);
+		if (const reflgen::type_descriptor* type = FindRegistered<T>("Deserialize"))
+		{
+			Deserialize(reinterpret_cast<void*>(instance), *type, node);
+		}
 	}
 }
 
@@ -313,7 +368,12 @@ namespace Meta
 	// Entity::m_prefabOverrides에서 뽑아 넘기는 명시 목록이다 — overriddenProperties에
 	// 있는 프로퍼티 이름은 새 값 적용에서 제외하고(현재 값 그대로), 나머지만 newNode의
 	// 값으로 갱신한다.
-	inline void DeserializePrefab(void* instance, const Type& type,
+	//
+	// 프리팹 값을 받는 것은 이 타입이 선언한 필드뿐이다(LocalFields) — 부모 타입의 필드(Object 의 m_name·m_instanceID,
+	// Component 의 활성 상태 등 인스턴스 정체성)는 인스턴스 값 그대로 남는다. 옛 경로가 그렇게 동작했다: 부모 단계를
+	// 먼저 읽었지만 마지막 읽기가 그 전에 뜬 스냅샷(부모 필드는 인스턴스 값)으로 전부 되돌렸다. 부모 필드까지 받으면
+	// 인스턴스가 원본 오브젝트의 이름과 instanceID 를 받는다(verify-prefab-override-write 가 잡는다).
+	inline void DeserializePrefab(void* instance, const reflgen::type_descriptor& type,
 		const Authoring::ReadNode& newNode,
 		const std::unordered_set<std::string>& overriddenProperties)
 	{
@@ -321,30 +381,36 @@ namespace Meta
 		Authoring::WriteDocument patchedDocument = SerializeDocument(instance, type);
 		const Authoring::WriteNode patchedNode = patchedDocument.Root();
 
-		if (type.parent)
+		for (const reflgen::field_info& field : LocalFields(type))
 		{
-			DeserializePrefab(instance, *type.parent, newNode, overriddenProperties);
-		}
-
-		for (const auto& prop : type.properties)
-		{
-			const Authoring::ReadNode incoming = newNode[prop.name];
+			const std::string key(field.key());
+			const Authoring::ReadNode incoming = newNode[key.c_str()];
 			if (!incoming)
 				continue;
 
-			if (overriddenProperties.contains(prop.name))
+			if (overriddenProperties.contains(key))
 				continue; // 오버라이드된 속성 — 현재 값을 그대로 둔다
 
-			patchedNode.Child(prop.name).Assign(incoming);
+			patchedNode.Child(key).Assign(incoming);
 		}
 
 		Deserialize(instance, type, patchedNode.Read());
+	}
+
+	inline void DeserializePrefab(IObject* instance, const reflgen::type_descriptor& type,
+		const Authoring::ReadNode& newNode,
+		const std::unordered_set<std::string>& overriddenProperties)
+	{
+		DeserializePrefab(ObjectAddress(instance, type), type, newNode, overriddenProperties);
 	}
 
 	template<typename T>
 	inline void DeserializePrefab(T* instance, const Authoring::ReadNode& newNode,
 		const std::unordered_set<std::string>& overriddenProperties)
 	{
-		DeserializePrefab(reinterpret_cast<void*>(instance), TypeOf<T>(), newNode, overriddenProperties);
+		if (const reflgen::type_descriptor* type = FindRegistered<T>("DeserializePrefab"))
+		{
+			DeserializePrefab(reinterpret_cast<void*>(instance), *type, newNode, overriddenProperties);
+		}
 	}
 }
