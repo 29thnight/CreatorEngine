@@ -50,7 +50,7 @@
     { "name": "stb", "$why": "이미지 로드/기록 — Terrain" },
     {
       "name": "reflgen",
-      "$why": "reflgen 도입 — [[reflgen::reflect]] 에서 리플렉션 서술을 생성한다(생성기·MSBuild 연동·헤더). overlay port(ports/reflgen)가 reflgen 저장소의 커밋을 가리킨다. Directory.Build.targets 가 share/reflgen/msbuild/reflgen.targets 를 가져온다"
+      "$why": "reflgen 도입 — [[reflgen::reflect]] 에서 리플렉션 서술을 생성한다(생성기·MSBuild 연동·헤더). overlay port(ports/reflgen)가 reflgen 릴리스 태그(v1.0.0)를 가리킨다. Directory.Build.targets 가 share/reflgen/msbuild/reflgen.targets 를 가져온다"
     },
     {
       "name": "ryml",

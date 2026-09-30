@@ -1,6 +1,6 @@
 # 엔진 리플렉션 — reflgen
 
-작성: 2026-09-30 · 근거: `reflgen-adoption` 브랜치(f58d9fc0) · reflgen 85e2101(`ports/reflgen`)
+작성: 2026-09-30 · 근거: `reflgen-adoption` 브랜치(f58d9fc0) · reflgen 1.0.0(`ports/reflgen` 이 `v1.0.0` 태그를 가리킨다)
 이 문서는 엔진 리플렉션의 **현재 설계 정본**이다. 옛 체계(`reflect()` 레시피·`meta::schema`·`Meta::Type`)를
 말하는 문서를 읽을 때는 §9의 대응표를 본다.
 
@@ -111,7 +111,9 @@ reflgen은 vcpkg 매니페스트(`vcpkg.json`)의 overlay port(`ports/reflgen`)�
 
 ### 2.1 reflgen을 다른 커밋에 고정할 때
 
-1. reflgen 저장소에서 `scripts/make-overlay-port.ps1 -Ref <sha>` 로 port를 만들어 `ports/reflgen` 을 바꾼다.
+1. reflgen 저장소에서 `scripts/make-overlay-port.ps1 -Destination <엔진>\ports` 로 port를 만들어 `ports/reflgen` 을
+   바꾼다. `-Ref` 없이 부르면 그 저장소 판의 릴리스 태그(`v<판>`)를, `-Ref <커밋>` 이면 GitHub 에 push 한 커밋을
+   받는다. 릴리스에 고정하는 것이 기본이다.
 2. 첫 빌드는 vcpkg가 reflgen을 다시 설치한 뒤 **"Build again"** 오류로 멈춘다. 평가 때 가져온 targets가 낡았기
    때문이다(`_EngineReflgenUpdatedDuringBuild`). 두 번째 빌드가 새 reflgen으로 끝까지 간다.
 3. vcpkg MSBuild 연동은 원래 `vcpkg.json` 이 바뀔 때만 다시 설치한다. 엔진은 `ports\**` 를 설치 입력에 더해

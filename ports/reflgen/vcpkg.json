@@ -1,6 +1,6 @@
 {
   "name": "reflgen",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Macro-free, attribute-driven C++20 reflection with a code generator and MSBuild/CMake integration",
   "homepage": "https://github.com/29thnight/reflgen_cpp",
   "license": "MIT AND Apache-2.0 WITH LLVM-exception",
