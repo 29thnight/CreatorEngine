@@ -11,6 +11,9 @@
 #include "Reflection.hpp"
 #include "ReflectionTypedYml.h" // CT6-a: typed 직렬화 썽크 등록
 #include "ReflgenRuntime.h"     // 런타임 타입 등록소(Meta::Types)
+#include "LogSystem.h"          // VerifyReflectRegistration — critical 로그 후 abort
+#include <cstdlib>
+#include <string>
 #include "MeshRenderer.h"
 #include "BoxColliderComponent.h"
 #include "LightMapping.h"
@@ -177,6 +180,45 @@
 REFLECT_TYPE_LIST(REFLECT_IDENTITY_ONE)
 #undef REFLECT_IDENTITY_ONE
 
+// 등록소의 서술자가 목록의 타입을 쓰고 읽을 수 있는가 — 기동 때 1회. 서술자는 등록 함수의 번역 단위에서 만들어지고,
+// 그곳이 엔진 serializer 특수화를 못 보면(ReflgenRegistration.h 에서 빠지면) 그 필드는 직렬화기 없이 남는다. 컴파일
+// 오류가 없고 씬을 저장·로드할 때 serialization_error 로 처음 드러나며, 번역 단위마다 서술도 갈린다. reflgen 은
+// 다른 곳에 특수화가 있다는 것을 알 수 없으므로 엔진이 확인한다: 목록의 타입은 전부 서술자로 쓰고 읽는다(TypeOps 는
+// postLoad 만 든다). transient 필드는 reflgen 이 판정에서 뺀다.
+inline void VerifyReflectRegistration()
+{
+    std::string failures;
+    const auto check = [&failures](const reflgen::type_descriptor& type) {
+        if (type.is_serializable() && type.is_deserializable())
+        {
+            return;
+        }
+        failures += "\n  " + std::string(type.name()) + (type.is_serializable() ? "" : " [쓰기 불가]")
+            + (type.is_deserializable() ? "" : " [읽기 불가]") + " -";
+        for (const reflgen::field_info& field : type.fields())
+        {
+            if (!field.is_serializable() || !field.is_deserializable())
+            {
+                failures += " " + std::string(field.name()) + "(" + std::string(field.type_name()) + ")";
+            }
+        }
+    };
+
+#define REFLECT_VERIFY_ONE(T) \
+    check(Meta::TypeOf<T>());
+
+    REFLECT_TYPE_LIST(REFLECT_VERIFY_ONE)
+#undef REFLECT_VERIFY_ONE
+
+    if (!failures.empty())
+    {
+        Debug::PrintLog(spdlog::level::critical, "reflgen 서술자가 쓰거나 읽지 못하는 타입(필드의 serializer 가 등록 함수에"
+            " 보이지 않는다 - Engine/RenderEngine/ReflgenRegistration.h 를 확인하라):" + failures);
+        Log::FlushNow();
+        std::abort();
+    }
+}
+
 inline void RegisterReflectManual()
 {
     reflgen::generated::register_RenderEngine(Meta::Types());
@@ -187,4 +229,6 @@ inline void RegisterReflectManual()
 
     REFLECT_TYPE_LIST(REFLECT_REGISTER_ONE)
 #undef REFLECT_REGISTER_ONE
+
+    VerifyReflectRegistration();
 }

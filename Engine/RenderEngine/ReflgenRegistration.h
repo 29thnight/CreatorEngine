@@ -8,6 +8,8 @@
 // 보는 것은 모듈의 반영 header 들뿐이라, 거기서 모자라는 것을 여기서 채운다:
 //
 //   ① 엔진 serializer 특수화(ReflectionTypedYml.h → ReflgenAuthoringSerializers.h) — 봉투·enum·math·포인터 규칙.
+//      여기서 빠진 특수화는 컴파일 오류 없이 그 필드를 서술자에서 직렬화기 없이 남길 수 있다 — 기동 검사
+//      (VerifyReflectRegistration, RegisterReflectManual.h)가 타입과 필드를 적고 멈춘다.
 //   ② 반영 header 가 전방 선언만 하는 필드 타입의 정의 — 서술된 타입이 여기서 불완전하면 그 서술(생성된 describe())이
 //      실체화되며 컴파일이 멈춘다. 새로 생기면 그 타입의 header 를 여기에 더한다.
 #include "ReflectionTypedYml.h"
