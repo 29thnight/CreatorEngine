@@ -1182,3 +1182,14 @@ Diagnostics panel 또는 Frame Debugger banner에 최소 다음을 표시한다.
 - RF0 실측 뒤 event/artifact budget, 허용 overhead, RF4~RF6 공수를 갱신한다.
 - 새 backend나 pass template이 들어오면 semantic coverage와 preview format matrix를 추가한다.
 - 외부 도구 지원 여부와 무관하게 내부 metadata·preview·replay 완료 조건을 판정한다.
+
+## 2026-10-01 Render Debug 메뉴의 제품 진입 조건
+
+현재 Render Debug의 비동작 DX11/PIX 안내는 Render Frame Debugger 미지원 안내와
+Profiler Rendering - Live 연결로 바꿨다. 이것은 RF 구현 완료가 아니다.
+RF4/UI 단계는 `###Editor.RenderPassDebug` stable window를 실제 내부 capture controller/reader로
+교체하고 Render Debug에서 그 창을 연다. UI 소유의 두 번째 capture service를 만들지 않는다.
+RF7 제품 gate에 메뉴 → Scene/Game 다음 완료 submission 요청 → 결과/event/resource/middle-output
+탐색 → .ceframe 재열람을 포함한다. Record off·.ceprof 파일을 연 상태에서도 성공해야 하며
+PIX/RenderDoc 설치를 선행으로 요구하지 않는다. 이 진입/독립 검증이 없으면 14-7을 닫지 않는다.
+관련 배치는 [EditorRenderingSurfacesPlan.md](EditorRenderingSurfacesPlan.md)다.

@@ -28,8 +28,11 @@ The manifest records selected fields and hashes. A gate compares a fresh CPU
 reference against the pinned baseline, separately from the GPU/CPU comparison.
 
 EEVEE 5.1.1 does not evaluate Principled anisotropy or thin film. Those feature
-comparisons require a Cycles reference at MAT-9. The current thin film uses three
-effective RGB wavelengths, not Cycles spectral/CIE integration; its visual
-approximation is explicitly still awaiting that acceptance gate.
+comparisons require a Cycles reference at MAT-9. The active film model now uses
+visible-spectrum Fourier sensitivity and three Airy terms. The historical
+`numeric-golden.csv`/`manifest.json` retain the former RGB-3 baseline. Active
+`numeric-golden-spectral.csv`/`spectral-manifest.json` pin the new double CPU
+baseline; the verifier also requires every non-film fixture to match history.
+Rendered material acceptance remains pending.
 
 Contract and validation scope: [PrincipledLayeredSemantics.md](../../../../docs/design/PrincipledLayeredSemantics.md).

@@ -29,8 +29,8 @@ struct [[reflgen::reflect]] RenderPassSettings
     ToneMapPassSetting      toneMap{};
 	VolumetricFogPassSetting volumetricFog{};
     BitMaskPassSetting      bitMask{};
-    std::string             skyboxTextureName{ "kloofendal_43d_clear_puresky_4k.hdr" };
-	bool                    m_isSkyboxEnabled{ true };
+    std::string             skyboxTextureName{ "forest.ceibl" };
+	bool                    m_isSkyboxEnabled{ false };
     math::vector3		    m_windDirection{ 1.f,0.f,0.f };
 	float                   m_windStrength{ 0.1f };
     float				    m_windSpeed{ 1.f };

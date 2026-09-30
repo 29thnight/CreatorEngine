@@ -25,7 +25,8 @@ Shadow VS/PS다. SSS·refraction·Volume feature에 필요한 PS/CS를 추가한
 순수 Volume은 shadow caster stage를 요구하지 않는다. 지원하지 않는 공간 의존 Volume은
 쿠킹에서 거부한다. DXIL과 SPIR-V 중 하나만 포함한 결과도 완전한 Scene product로 받지 않는다.
 
-`semanticKey`의 `|lx-scene-host:1`과 정확한 stage/profile 집합으로 Scene 산출물을 구분한다.
+`semanticKey`의 `|lx-scene-host:2`와 정확한 stage/profile 집합으로 Scene 산출물을 구분한다.
+2는 가시광 Fourier 박막 모델을 포함한다. 이전 3파장 모델의 Scene product는 재쿠킹한다.
 LXMC2의 checksum, bound source, typed resource table과 byte budget 검증도 유지한다.
 일반 단일 VS/PS용 `PipelineSlot`은 여러 pass가 있는 product를 거부하며 이전 PSO를 보존한다.
 

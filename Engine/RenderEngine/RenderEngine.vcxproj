@@ -273,6 +273,7 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedSpritePass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSkyBoxPass.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedIBLGenerator.cpp" />
+    <ClCompile Include="Assets\CookedEnvironment.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedDecalPass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedVolumetricFogPass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSRPass.cpp" />
@@ -708,6 +709,7 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedForwardPass.h" />
     <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h" />
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h" />
+    <ClInclude Include="Assets\CookedEnvironment.h" />
     <ClInclude Include="Render\Core\EnhancedLivePipelineDesc.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h" />

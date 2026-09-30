@@ -85,3 +85,13 @@ stale handle, 잘못된 keyword/queue, reload 실패 변이가 게이트를 붉�
 기존 SRP 33일과 완료된 구 `4-1` 2일은 새 C# 계획의 진척·예산으로 옮기지 않는다.
 각 슬라이스는 실제 native/managed 소비 경계와 배포 표면을 재계수한 뒤 공수를 기록한다.
 현재 문서 작성과 정적 대조는 구현·빌드·런타임 통과가 아니다.
+
+## 2026-10-01 Editor viewer / 설정 착지 완료 조건
+
+CSRP-5 제품 cutover는 [RG-V](RenderGraphDependencySchedulingPlan.md#rg-v--compiled-graph-읽기-전용-viewer-2026-10-01-추가)의
+같은 read-only viewer에 C# IR 세대·native compiled node/slot/order/hash를 표시한다.
+CSRP-6의 reload 실패/마지막 정상 세대·per-view/history 검증은 viewer의 표시 세대와
+실제 실행 세대가 일치하는지도 포함한다. 이 연결이 없으면 CSRP-5/6을 완료로 닫지 않는다.
+Project Settings Graphics의 pipeline 선택/설정은 W9의 shared schema를 소비한다.
+SceneRenderProfile은 파라미터이며 C# RenderPipeline.Build 조립의 대체 저작 정본이 아니다.
+공수는 현행 CSRP-0~6 미산정 규칙을 유지한다.

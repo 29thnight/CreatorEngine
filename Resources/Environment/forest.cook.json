@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "artifact": "forest.ceibl",
+  "artifactSha256": "8c004884368a36ece50bf9e046aaf96f0d47b3e3232a024582eae7dc68b05579",
+  "source": "Blender 5.1.1 release/datafiles/studiolights/world/forest.exr",
+  "sourceSha256": "bdf2298244affa0f85509380fd130ac6d4dfaa3c856df065998f7f4c1a93dc0d",
+  "recipeSha256": "0a326fd77ba342609eb2a30938614476ac578929c77ea2dc7d2226ac9a662e62",
+  "cubeSize": 512,
+  "irradianceSize": 64,
+  "environmentMipLevels": 7,
+  "prefilterMipLevels": 6,
+  "brdfSize": 512,
+  "format": "RGBA16Float",
+  "colorSpace": "linear Rec.709",
+  "irradianceConvention": "E/pi",
+  "bytes": 35843184,
+  "producer": "Tools/AssetCooker/cook-environment.ps1",
+  "license": "CC0; Greg Zaal / Poly Haven, ninomaru_teien"
+}

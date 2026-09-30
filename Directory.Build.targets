@@ -219,6 +219,18 @@
     가리켰는데, PrecompiledShaderPath 를 읽는 코드는 한 줄도 없었다.
     소비자 0인 복사였으므로 PathFinder 항목과 함께 걷었다.
   -->
+  <Target Name="DeployEnvironmentResources"
+          AfterTargets="Build"
+          Condition="'$(MSBuildProjectName)' == 'CreatorEditor' Or '$(MSBuildProjectName)' == 'Player'">
+    <ItemGroup>
+      <_EnvironmentResource Include="$(SolutionDir)Resources\Environment\*" />
+    </ItemGroup>
+    <Error Condition="!Exists('$(SolutionDir)Resources\Environment\forest.ceibl')"
+           Text="Default environment is missing. Run Tools/AssetCooker/cook-environment.ps1." />
+    <Copy SourceFiles="@(_EnvironmentResource)" DestinationFolder="$(EngineResourceOutDir)Environment\"
+          SkipUnchangedFiles="true" />
+  </Target>
+
   <Target Name="DeployEditorResources"
           AfterTargets="Build"
           Condition="'$(MSBuildProjectName)' == 'CreatorEditor'">

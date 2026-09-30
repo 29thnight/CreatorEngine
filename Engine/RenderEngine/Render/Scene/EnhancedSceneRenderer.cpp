@@ -1,6 +1,7 @@
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
 #include "EnhancedPbrCapture.h"
+#include "RuntimeSettings.h"
 #include "../../../Utility_Framework/WarmupLedger.h"
 
 #include "../Graph/EnhancedRenderGraph.h"
@@ -865,6 +866,10 @@ namespace
             }
             if (nullptr == slot) { outError = "Vulkan 라이브 리드백 슬롯이 모두 사용 중"; return false; }
 
+            std::string environmentCacheError;
+            if (!ibl.FinishCookedCapture(resources.GetCompletedFenceValue(),environmentCacheError))
+                Debug::PrintLog(spdlog::level::warn,"[EnvironmentCache] " + environmentCacheError);
+
             {
                 RenderThreadPhaseScope begin(RenderPhase::begin_frame);
                 if (!resources.BeginFrame(outError))
@@ -934,6 +939,8 @@ namespace
                 binding.viewFlags = HasViewFlag(viewPacket.viewFlags,
                     EnhancedLiveViewFlags::SceneOverlay)
                     ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
+                if (HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::HideSkyBox))
+                    binding.viewFlags |= LiveViewFlags::kHideSkyBox;
                 desc.DeclareAll(blackboard, graph, frameContext, binding);
                 if (capture && !capture->Declare(resources, graph, blackboard,
                         width, height, outError)) return false;
@@ -975,6 +982,7 @@ namespace
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
+            ibl.MarkCookedCaptureSubmitted(slot->fenceValue);
             slot->viewIndex = viewIndex;
             slot->key = viewPacket.key;
             slot->frameId = sourceFrameId;
@@ -1107,12 +1115,15 @@ namespace
         EnhancedRenderThreadStats GetRenderThreadStats() const;
         bool WaitForRenderThreadIdle(uint32_t timeoutMilliseconds);
 
-        // 원본 HDR는 기존 자산 로더가 만든 DX11 Texture지만 소유자는 이쪽이다.
-        // DX12TextureCache가 프레임 시작에 같은 어댑터의 리소스로 올린 뒤 IBL
-        // 생성기가 큐브맵·조도·프리필터·BRDF LUT를 만든다.
+        // Cooked data is loaded before decode/generation. A raw HDR cache miss
+        // generates the four maps once and publishes their pixels asynchronously.
         std::string                 skyBoxPath;
         std::unique_ptr<Texture> skyEquirect;
+        std::optional<assets::CookedEnvironment> skyCooked;
+        std::optional<assets::EnvironmentIdentity> skyCookIdentity;
+        std::filesystem::path skyCookCachePath;
         bool                        skyBoxDirty{ true };
+        bool                        skyBoxEnabled{ true };
 
         // ── 볼류메트릭 포그 입력 ──
         //
@@ -2460,9 +2471,11 @@ namespace
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.skyBox; };
                 node.reads = { LiveSlots::kGBufferDepth };
                 node.modifies = { LiveSlots::kLitColor };
-                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
-                    const EnhancedFrameContext& ctx, const LiveFrameBinding&)
+                node.declare = [this, &p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
                 {
+                    p.skyBox.SetShowEnvironment(skyBoxEnabled &&
+                        !(binding.viewFlags & LiveViewFlags::kHideSkyBox));
                     EnhancedSkyBoxPass::Inputs inputs{};
                     inputs.color = bb.Get(LiveSlots::kLitColor);
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
@@ -4113,6 +4126,7 @@ namespace
         bool PreparePipelineFrame(PipelineT& p, uint32_t viewIndex, RHIShaderBinary output,
             std::string& outError)
         {
+            RHIShaderCompiler::ScopedOutput environmentOutput(output);
             p.graphInput = graphViewInput;
             {
                 RHIShaderCompiler::ScopedOutput outputScope(output);
@@ -4135,6 +4149,48 @@ namespace
                 }
             if (!p.iblGenerated || skyBoxDirty)
             {
+                // Default CPU data was checked during InitializeLive. Other
+                // selections check a content+recipe cache once, before decode.
+                if (!skyCooked)
+                {
+                    assets::CookedEnvironment cached;
+                    if (file::path(skyBoxPath).extension() == ".ceibl")
+                    {
+                        if (!assets::ReadCookedEnvironment(skyBoxPath,cached,outError)) return false;
+                        Hash::Sha256Digest recipe;
+                        if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
+                                cached.cubeSize,cached.brdfSize,recipe,outError)) return false;
+                        if (cached.identity.recipe != recipe)
+                        { outError="Cooked environment recipe changed; recook the selected environment"; return false; }
+                        skyCooked = std::move(cached);
+                    }
+                    else
+                    {
+                        if (!skyCookIdentity)
+                        {
+                            assets::EnvironmentIdentity identity;
+                            if (!assets::EnvironmentSourceIdentity(skyBoxPath,identity.source,outError) ||
+                                !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
+                                    512,512,identity.recipe,outError)) return false;
+                            skyCookIdentity=identity;
+                            skyCookCachePath=PathFinder::CachePath()/"Environment"/assets::EnvironmentCacheName(identity);
+                        }
+                        std::string cacheError;
+                        if (assets::ReadCookedEnvironment(skyCookCachePath,cached,cacheError,&*skyCookIdentity))
+                        {
+                            skyCooked=std::move(cached);
+                            Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] hit " + skyCookCachePath.string());
+                        }
+                    }
+                }
+                if (skyCooked)
+                {
+                    if (!p.ibl.InstallCooked(p.frameContext,std::move(*skyCooked),outError)) return false;
+                    skyCooked.reset();
+                    Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] uploaded cooked maps " + skyBoxPath);
+                }
+                else
+                {
                 if (!skyEquirect)
                 {
                     try
@@ -4171,6 +4227,9 @@ namespace
                     outError = "HDR→Cube/IBL 생성 실패: " + outError;
                     return false;
                 }
+                if (!p.ibl.QueueCookedCapture(skyCookCachePath,*skyCookIdentity,outError)) return false;
+                Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] generated; queued " + skyCookCachePath.string());
+                }
 
                 p.iblGenerated = true;
                 skyBoxDirty = false;
@@ -4178,6 +4237,7 @@ namespace
                 ++displaySnapshot.iblGenerationCount;
             }
 
+            if (!p.ibl.TouchCooked(p.frameContext,outError)) return false;
             // Bind the retained environment maps for this frame's consumers.
             p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), EnhancedIBLGenerator::kFormat, 1);
             p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
@@ -4211,6 +4271,10 @@ namespace
         {
             LivePipeline& p = *pipeline;
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
+
+            std::string environmentCacheError;
+            if (!p.ibl.FinishCookedCapture(dx12.GetCompletedFenceValue(),environmentCacheError))
+                Debug::PrintLog(spdlog::level::warn,"[EnvironmentCache] " + environmentCacheError);
 
             {
                 RenderThreadPhaseScope begin(RenderPhase::begin_frame);
@@ -4312,6 +4376,8 @@ namespace
                     EnhancedLiveViewFlags::SceneOverlay)
                     ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
 
+                if (HasViewFlag(view.viewFlags, EnhancedLiveViewFlags::HideSkyBox))
+                    binding.viewFlags |= LiveViewFlags::kHideSkyBox;
                 p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
                 if (capture && !capture->Declare(dx12.Resources(), graph, p.blackboard,
                         p.width, p.height, outError)) return false;
@@ -4362,6 +4428,7 @@ namespace
             // 먹어 총 대기를 58ms로 만들었다(실제 GPU는 3.7ms) — 그 벽을
             // 여기서 없앤다.
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
+            p.ibl.MarkCookedCaptureSubmitted(slot.fenceValue);
             slot.frameId = sourceFrameId;
             slot.previewComplete = p.graphInput && !p.graphInput->Draws().empty() &&
                 (!materialPreviewView || (graphViewInput && !graphViewInput->Draws().empty() &&
@@ -5111,9 +5178,24 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         // Host가 뷰 요청에 실어 넘긴다. Core는 씬 오버레이 뷰 판정도 하지 않는다.
 
         state.skyBoxPath =
-            PathFinder::Relative("HDR\\kloofendal_43d_clear_puresky_4k.hdr").string();
+            PathFinder::EngineResourcePath("Environment/forest.ceibl").string();
+        assets::CookedEnvironment defaultEnvironment;
+        if (!assets::ReadCookedEnvironment(state.skyBoxPath,defaultEnvironment,outError)) return false;
+        Hash::Sha256Digest recipe;
+        if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
+                defaultEnvironment.cubeSize,defaultEnvironment.brdfSize,recipe,outError)) return false;
+        if (recipe != defaultEnvironment.identity.recipe)
+        {
+            outError="Default forest environment cook recipe is stale; recook engine resources";
+            return false;
+        }
+        state.skyCooked=std::move(defaultEnvironment);
         state.skyEquirect.reset();
         state.skyBoxDirty = true;
+        // Bootstrap actually installs the bundled forest, not the legacy saved path.
+        // Keep the reported selection consistent and hide only its background.
+        if (auto* settings = RuntimeSettings::TryGet())
+            settings->SetEnvironmentSelection("forest.ceibl", false);
 
         // 포그 초기 켬/끔. 무인 검증이 UI 없이 켤 수 있어야 해서 둔다
         // (BuildPipeline의 후처리 환경변수와 같은 취지). 한 번만 읽는 이유는
@@ -5197,12 +5279,34 @@ bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& 
         outError = "HDR 경로가 비어 있다";
         return false;
     }
-
+    std::error_code fileError;
+    const file::path source(path);
+    if (!std::filesystem::is_regular_file(source,fileError) ||
+        (source.extension()!=".hdr" && source.extension()!=".ceibl"))
+    { outError="Select an existing HDR or cooked .ceibl environment"; return false; }
+    std::optional<assets::CookedEnvironment> cooked;
+    if (source.extension()==".ceibl")
+    {
+        assets::CookedEnvironment candidate;
+        Hash::Sha256Digest recipe;
+        if (!assets::ReadCookedEnvironment(source,candidate,outError) ||
+            !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
+                candidate.cubeSize,candidate.brdfSize,recipe,outError)) return false;
+        if (candidate.identity.recipe!=recipe)
+        { outError="Cooked environment recipe changed; recook the selected environment"; return false; }
+        cooked=std::move(candidate);
+    }
     state.skyBoxPath = path;
     state.skyEquirect.reset();
+    state.skyCooked=std::move(cooked);
+    state.skyCookIdentity.reset();
+    state.skyCookCachePath.clear();
     state.skyBoxDirty = true;
     if (state.pipeline) state.pipeline->iblGenerated = false;
+    if (auto* settings = RuntimeSettings::TryGet())
+        settings->SetEnvironmentSelection(path, true);
     state.lastError.clear();
+    outError.clear();
     return true;
 }
 
@@ -5292,6 +5396,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     state.publishedTotalSeconds += deltaSeconds;
     frame.totalSeconds = state.publishedTotalSeconds;
     frame.sceneLoading = sceneLoading;
+    frame.skyBoxEnabled = RuntimeSettings::Get().GetRenderPassSettings().m_isSkyboxEnabled;
     const auto screenSize = ScreenResizeBus::Get().GetSizeSnapshot();
     frame.width = screenSize.width;
     frame.height = screenSize.height;
@@ -5572,6 +5677,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 
     // 모든 뷰가 producer가 밀봉한 동일한 시간축을 본다.
     state.totalSeconds = frame.totalSeconds;
+    state.skyBoxEnabled = frame.skyBoxEnabled;
 
     // ── [프레임당 1회] 씬·프록시 갱신 ──
     //
@@ -6247,6 +6353,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             view->promotionCount = 0;
             view->promotedSlotMask = 0;
         }
+
+        // View policies may change while the logical camera/history identity stays the same.
+        view->viewFlags = viewPacket.viewFlags;
 
         // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
         if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
@@ -7133,6 +7242,9 @@ void EnhancedSceneRenderer::ShutdownLive()
     if (state.runtimeInitialized)
     {
         state.skyEquirect.reset();
+        state.skyCooked.reset();
+        state.skyCookIdentity.reset();
+        state.skyCookCachePath.clear();
         if (state.renderScene)
         {
             // SceneManager::Decommissioning이 활성 RenderScene을 먼저 Finalize한다.

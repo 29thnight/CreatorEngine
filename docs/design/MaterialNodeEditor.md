@@ -407,3 +407,16 @@ Debug CreatorEditor 전체 빌드와 기존 Material Node Editor 제품 회귀�
 후자는 열린 문서의 편집·저장·재개방 및 실제 Scene/독립 구체 capture 5회에 대한
 1,337개 검사(`LX_MATERIAL_NODE_EDITOR_OK`, source drift 0, 정상 종료)다.
 구체의 실제 draw/픽셀 변경·완료 이미지 재사용·숨김 후 재게시·실패한 Apply의 정상 generation 보존을 검사했다. 실제 Windows UI로 File Load Scene→Ground Inspector→노드 창 진입과 preview 열기/Refresh를 확인했다. 메뉴는 씬 소유 스레드에 scene.switch를 큐잉하며, 작은 창의 상태/preview 설명은 줄바꿈한다. 증거: Build/Obj/mat8-preview-regression4.log, mat8-preview-menu-build.log, mat8-preview-wrap-build.log 및 MaterialProductProbe/NodeEditor-Debug-5736845a10e7의 5개 최종 capture. Release·성능·Blender rendered parity는 MAT-9에서 판정한다.
+
+## Scene context 변경 (2026-10-01)
+
+성공한 `activeSceneChangedEvent`와 Open/Draw/Preview/HTTP 접근의 context guard가
+active Scene ID를 비교한다. 다른 Scene이면 active document·selection·pinned/Inspector preview를
+해제한다. Open Materials는 현재 Scene에서 resolve되는 EntityHandle/component 문서만 보여준다.
+실패한 Scene load가 Scene을 교체하지 않으면 기존 문서는 유지한다. 삭제된 대상도 새 Scene에 바인딩하지 않는다.
+
+미저장 문서는 메모리에 유지하고 `Saved/Editor/MaterialDrafts/Scene_<id>_Document_<id>.shadergraph`에
+복구 사본을 쓴다. 원 자산을 자동으로 덮어쓰거나 새 Scene에 Apply하지 않는다.
+사본 쓰기 실패는 문서를 유지하고 빈 창의 안내에 표시한다. 명시적 복구 열기/새 자산 저장 UX는 W9에 남는다.
+`material.editor sessions`는 활성 여부/current scene·visible 문서/retained draft 신원을 보고한다.
+Scene 외 직접 자산 편집은 별도 context 모드로 계획하며 이번 scene-bound 창에 암묵적으로 섞지 않는다.

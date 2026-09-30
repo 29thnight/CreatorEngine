@@ -65,6 +65,16 @@ internal static class GamePackager
             var runtimeRecord = Metadata.Read(Path.Combine(engine.BinaryRoot, "Runtime/Manifests/Player.json"));
             var runtimeSources = Metadata.ParseEntries(runtimeRecord.Array("entries")); Metadata.Verify(engine.BinaryRoot, runtimeSources, context.Cancellation);
             var rootFiles = new List<string>();
+            // The scene renderer boots from cooked environment pixels. They are
+            // common engine resources; no authoring EXR is packaged with a game.
+            var environments = Paths.Child(engine.BinaryRoot, "Resources/Environment");
+            if (!File.Exists(Path.Combine(environments, "forest.ceibl")))
+                throw new BuildException("Engine default environment is missing. Rebuild and publish the engine resources.");
+            foreach (var source in Paths.Files(environments))
+            {
+                var relative = "Resources/Environment/" + Paths.Relative(environments, source);
+                Paths.Copy(source, Paths.Child(candidate, relative)); rootFiles.Add(relative);
+            }
             foreach (var source in runtimeSources)
             {
                 var relative = source.Path.StartsWith("Player/", StringComparison.Ordinal) ? source.Path[7..] : source.Path;

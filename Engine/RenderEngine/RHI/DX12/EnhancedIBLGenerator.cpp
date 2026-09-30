@@ -4,6 +4,8 @@
 #include <cstring>
 #include <string>
 #include "../RHIShaderCompiler.h"
+#include "../../Texture.h"
+#include "../IRenderTextureCache.h"
 
 namespace
 {
@@ -84,7 +86,8 @@ bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
 
     m_resources = context.resources;
 
-    return CreatePipelines(context, outError);
+    // Cooked startup never needs the ten generation shaders/PSOs.
+    return true;
 }
 
 bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
@@ -240,6 +243,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         return false;
     }
 
+    if (!m_rectToCubePso.IsValid() && !CreatePipelines(context, outError)) return false;
     m_cubeSize = cubeSize;
     m_brdfSize = brdfSize;
     m_importanceSize = cubeSize;
@@ -473,13 +477,164 @@ void EnhancedIBLGenerator::ReleaseTargets()
         &m_importanceRows, &m_importanceMarginal, &m_importanceSamples };
     for (auto* handle : handles)
     {
-        if (m_resources) m_resources->ReleaseTexture(*handle);
+        // Uploaded cooked images belong to the texture cache; generated targets
+        // belong to this generator. Never release a cache-owned handle here.
+        const bool cookedHandle = m_cookedTextures[0] &&
+            (handle == &m_cubeMapHandle || handle == &m_irradianceHandle ||
+             handle == &m_prefilteredHandle || handle == &m_brdfLutHandle);
+        if (m_resources && !cookedHandle) m_resources->ReleaseTexture(*handle);
         *handle = {};
     }
+    m_cookedTextures = {};
+}
+
+bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
+    assets::CookedEnvironment value, std::string& error)
+{
+    if (!m_resources || m_resources != context.resources || !context.textureCache || m_generation == UINT64_MAX)
+    { error = "Cooked environment context is invalid"; return false; }
+    ReleaseTargets();
+    m_cubeSize = value.cubeSize; m_brdfSize = value.brdfSize;
+    for (size_t index=0; index<4; ++index)
+    {
+        m_cookedTextures[index] = Texture::CreateSharedFromImage("CookedEnvironment",std::move(value.images[index]));
+        if (!m_cookedTextures[index]) { error = "Cooked environment image is invalid"; return false; }
+    }
+    return TouchCooked(context,error);
+}
+
+bool EnhancedIBLGenerator::TouchCooked(const EnhancedFrameContext& context, std::string& error)
+{
+    error.clear();
+    if (!m_cookedTextures[0]) return true;
+    RHITextureHandle* handles[]{&m_cubeMapHandle,&m_irradianceHandle,&m_prefilteredHandle,&m_brdfLutHandle};
+    bool changed = false;
+    for (size_t index=0; index<4; ++index)
+    {
+        const auto entry = context.textureCache->GetOrUpload(m_cookedTextures[index].get(),error);
+        const auto image = m_cookedTextures[index]->GetImageView();
+        if (!error.empty() || !entry.IsValid() || entry.width!=image.Width() || entry.height!=image.Height() ||
+            entry.mipLevels!=image.MipLevels() || entry.format!=image.Format() || entry.isCube!=image.IsCube())
+        { error = "Cooked environment upload failed: " + error; return false; }
+        changed |= *handles[index] != entry.handle;
+        *handles[index] = entry.handle;
+    }
+    if (changed) ++m_generation;
+    error.clear(); return true;
+}
+
+bool EnhancedIBLGenerator::QueueCookedCapture(const std::filesystem::path& file,
+    const assets::EnvironmentIdentity& identity, std::string& error)
+{
+    CookedCapture capture;
+    const RHITextureHandle handles[]{m_cubeMapHandle,m_irradianceHandle,m_prefilteredHandle,m_brdfLutHandle};
+    for (uint32_t image=0; image<4; ++image)
+    {
+        const auto description=m_resources->DescribeTexture(handles[image]);
+        for (uint32_t mip=0; mip<description.mipLevels; ++mip)
+        {
+            CookedCaptureSlice slice; slice.image=image; slice.mip=mip;
+            if (!m_resources->CreateReadback(std::max(1u,description.width>>mip),std::max(1u,description.height>>mip),
+                kFormat,image<3?6u:1u,slice.readback,error))
+            {
+                for (auto& previous:capture.slices) m_resources->ReleaseReadback(previous.readback);
+                capture.slices.clear(); return false;
+            }
+            capture.slices.push_back(slice);
+        }
+    }
+    auto& encoder=m_resources->GetImmediateEncoder();
+    for (uint32_t image=0; image<4; ++image)
+    {
+        const RHITransition toCopy{handles[image],RHIResourceState::PixelShaderResource,RHIResourceState::CopySource};
+        m_resources->TransitionResources({&toCopy,1});
+        const auto description=m_resources->DescribeTexture(handles[image]);
+        for (const auto& slice:capture.slices) if (slice.image==image)
+            for (uint32_t face=0; face<slice.readback.sliceCount; ++face)
+                encoder.CopyToReadback(slice.readback,handles[image],face,face*description.mipLevels+slice.mip);
+        const RHITransition toSample{handles[image],RHIResourceState::CopySource,RHIResourceState::PixelShaderResource};
+        m_resources->TransitionResources({&toSample,1});
+    }
+    capture.path=file; capture.identity=identity; capture.fence=0;
+    capture.cube=m_cubeSize; capture.brdf=m_brdfSize;
+    m_cookedCaptures.push_back(std::move(capture));
+    error.clear(); return true;
+}
+
+void EnhancedIBLGenerator::MarkCookedCaptureSubmitted(uint64_t fence)
+{
+    for (auto& capture : m_cookedCaptures) if (!capture.fence) capture.fence=fence;
+}
+
+bool EnhancedIBLGenerator::FinishCookedCapture(uint64_t completedFence,std::string& error)
+{
+    if (m_cookedWrite.valid())
+    {
+        if (m_cookedWrite.wait_for(std::chrono::seconds(0)) != std::future_status::ready) return true;
+        error=m_cookedWrite.get();
+        if (!error.empty()) return false;
+    }
+    error.clear();
+    if (m_cookedCaptures.empty()) return true;
+    auto& capture=m_cookedCaptures.front();
+    if (!capture.fence || completedFence<capture.fence) return true;
+    assets::CookedEnvironment cooked;
+    cooked.cubeSize=capture.cube; cooked.brdfSize=capture.brdf; cooked.identity=capture.identity;
+    for (uint32_t image=0; image<4; ++image)
+    {
+        const uint32_t size=image==1?std::min(cooked.cubeSize,64u):image==3?cooked.brdfSize:cooked.cubeSize;
+        const uint32_t mips=image==0?CubeMipCount(size):image==2?kPrefilterMips:1;
+        cooked.images[image]=TextureImage::Allocate(kFormat,size,size,image<3?6u:1u,mips,image<3);
+    }
+    bool valid=true;
+    for (auto& slice:capture.slices)
+    {
+        RHIReadbackImage mapped;
+        if (!m_resources->MapReadback(slice.readback,mapped,error)) valid=false;
+        const auto& image=cooked.images[slice.image];
+        const auto* target=image.Find(slice.mip,0);
+        if (valid && (!mapped.IsValid() || mapped.format!=kFormat || mapped.width!=target->width ||
+            mapped.height!=target->height || mapped.sliceCount!=image.ArraySize() || mapped.rowPitch<target->rowPitch ||
+            mapped.sliceBytes<size_t(mapped.rowPitch)*mapped.height ||
+            mapped.data.size()<mapped.sliceBytes*mapped.sliceCount))
+        { error="Environment readback layout differs"; valid=false; }
+        if (valid)
+            for (uint32_t face=0; face<mapped.sliceCount; ++face)
+            {
+                auto& image=cooked.images[slice.image]; const auto& target=*image.Find(slice.mip,face);
+                CopyImageRows(image.MutablePixelsAt(target),target.rowPitch,
+                    reinterpret_cast<const std::byte*>(mapped.data.data()+face*mapped.sliceBytes),mapped.rowPitch,
+                    target.height,target.rowPitch);
+            }
+        m_resources->ReleaseReadback(slice.readback);
+    }
+    capture.slices.clear(); capture.fence=0;
+    const auto file=capture.path;
+    m_cookedCaptures.erase(m_cookedCaptures.begin());
+    if (!valid) return false;
+    m_cookedWrite=std::async(std::launch::async,
+        [file,value=std::move(cooked)]() mutable {
+            std::string failure;
+            assets::WriteCookedEnvironment(file,value,failure);
+            return failure;
+        });
+    return true;
 }
 
 void EnhancedIBLGenerator::Shutdown()
 {
+    // The owner drains the GPU before teardown. Finish submitted captures even
+    // when the application closes before the next render-frame poll.
+    while (m_resources && !m_cookedCaptures.empty() && m_cookedCaptures.front().fence)
+    {
+        if (m_cookedWrite.valid()) { m_cookedWrite.wait(); m_cookedWrite.get(); }
+        std::string ignored;
+        FinishCookedCapture(UINT64_MAX,ignored);
+    }
+    if (m_cookedWrite.valid()) { m_cookedWrite.wait(); m_cookedWrite.get(); }
+    for (auto& capture:m_cookedCaptures)
+        for (auto& slice:capture.slices) if (m_resources) m_resources->ReleaseReadback(slice.readback);
+    m_cookedCaptures.clear();
     ReleaseTargets();
     m_resources = nullptr;
     m_rectToCubePso = {};

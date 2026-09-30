@@ -11,7 +11,7 @@ if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {
     $VisualStudioInstallation = @(& $vswhere -latest -products '*' `
         -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)[0]
 }
-$msbuild = Join-Path $VisualStudioInstallation 'MSBuild\Current\Bin\MSBuild.exe'
+$msbuild = Join-Path $VisualStudioInstallation 'MSBuild\Current\Bin\amd64\MSBuild.exe'
 $output = Join-Path $repo 'Build\Obj\MaterialProductProbe'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $dependencyOptions = @()

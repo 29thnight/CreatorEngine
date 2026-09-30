@@ -1,65 +1,26 @@
 #pragma once
+#include "PrincipledThinFilmSensitivity.slang"
 
-// Three-channel wave-optics approximation: phase wavelengths are 650/550/450 nm.
-// These are effective RGB wavelengths, not a spectral/CIE reconstruction.
-// MAT-9 measures this approximation against the pinned Cycles reference.
-float2 FilmMultiply(float2 a, float2 b)
+// Belcour/Barla Fourier Airy series integrated in linear Rec.709.
+// Interface phases/F82 conventions adapted from Cycles 5.1.1 bsdf_util.h
+// (BSD-3-Clause). See Tools/blender/fixtures/thin-film-sensitivity-5.1.1/NOTICE.md.
+float2 FilmUnitPhase(float2 amplitude)
 {
-    return float2(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x);
+    const float magnitude = length(amplitude);
+    return magnitude > 0.0 ? amplitude / magnitude : float2(1.0, 0.0);
 }
 
-float2 FilmDivide(float2 a, float2 b)
+void FilmSensitivity(float opd, out float3 real, out float3 imaginary)
 {
-    return float2(dot(a, b), a.y * b.x - a.x * b.y) / max(dot(b, b), 1e-20);
+    const float coordinate = saturate(6.283185307179586 * opd / 60000.0) * 511.0;
+    const uint index = min(uint(coordinate), 511u);
+    const uint next = min(index + 1u, 511u);
+    const float weight = coordinate - index;
+    real = lerp(FilmSensitivityReal[index], FilmSensitivityReal[next], weight);
+    imaginary = lerp(FilmSensitivityImag[index], FilmSensitivityImag[next], weight);
 }
 
-float2 FilmSquareRoot(float2 value)
-{
-    const float magnitude = length(value);
-    return float2(sqrt(max(0.5 * (magnitude + value.x), 0.0)),
-        sqrt(max(0.5 * (magnitude - value.x), 0.0)));
-}
-
-float FilmAiryReflectance(float r12, float2 r23, float phase)
-{
-    const float2 propagated = FilmMultiply(r23, float2(cos(phase), sin(phase)));
-    const float2 numerator = propagated + float2(r12, 0.0);
-    const float2 denominator = r12 * propagated + float2(1.0, 0.0);
-    return saturate(dot(numerator, numerator) / max(dot(denominator, denominator), 1e-20));
-}
-
-float FilmReflectance(float cosine, float filmIor, float thickness,
-    float2 substrateIor, float wavelength)
-{
-    const float cosIncident = saturate(cosine);
-    if (cosIncident == 0.0)
-    {
-        return 1.0;
-    }
-    const float sineSquared = 1.0 - cosIncident * cosIncident;
-    const float cosFilmSquared = 1.0 - sineSquared / (filmIor * filmIor);
-    if (cosFilmSquared <= 0.0)
-    {
-        return 1.0;
-    }
-    const float cosFilm = sqrt(cosFilmSquared);
-    const float filmQ = filmIor * cosFilm;
-    const float r12s = (cosIncident - filmQ) / max(cosIncident + filmQ, 1e-20);
-    const float r12p = (filmIor * cosIncident - cosFilm)
-        / max(filmIor * cosIncident + cosFilm, 1e-20);
-    const float2 substrateSquared = FilmMultiply(substrateIor, substrateIor);
-    const float2 substrateQ = FilmSquareRoot(substrateSquared - float2(sineSquared, 0.0));
-    const float2 r23s = FilmDivide(float2(filmQ, 0.0) - substrateQ,
-        float2(filmQ, 0.0) + substrateQ);
-    const float2 pTerm = substrateSquared * cosFilm;
-    const float2 r23p = FilmDivide(pTerm - filmIor * substrateQ, pTerm + filmIor * substrateQ);
-    const float phase = 12.566370614359172 * filmQ * thickness / wavelength;
-    return 0.5 * (FilmAiryReflectance(r12s, r23s, phase)
-        + FilmAiryReflectance(r12p, r23p, phase));
-}
-
-// Recover a conductor n+ik from F0 and the F82 response. This is an RGB optical
-// estimate; the authored metallic F0/F82 remain exact when film is disabled.
+// F82 controls the magnitude at the film/substrate boundary; n+ik supplies phase.
 void FilmConductorIor(float3 f0, float3 f82, out float3 n, out float3 k)
 {
     const float3 reflection = min(f0, 0.999);
@@ -69,9 +30,109 @@ void FilmConductorIor(float3 f0, float3 f82, out float3 n, out float3 k)
         / (1.0 - reflection), 0.0));
 }
 
-float3 EvaluateFilmRgb(float cosine, float filmIor, float thickness, float3 n, float3 k)
+void FilmSubstrate(float cosFilm, float filmIor, float n, float k, float f82,
+    out float2 reflectance, out float2 phaseS, out float2 phaseP)
 {
-    return float3(FilmReflectance(cosine, filmIor, thickness, float2(n.r, k.r), 650.0),
-        FilmReflectance(cosine, filmIor, thickness, float2(n.g, k.g), 550.0),
-        FilmReflectance(cosine, filmIor, thickness, float2(n.b, k.b), 450.0));
+    if (f82 < 0.0)
+    {
+        const float eta = n / filmIor;
+        const float transmittedSquared = eta * eta - (1.0 - cosFilm * cosFilm);
+        if (transmittedSquared <= 0.0)
+        {
+            reflectance = float2(1.0);
+            phaseS = phaseP = float2(1.0, 0.0);
+            return;
+        }
+        const float cosSubstrate = sqrt(transmittedSquared) / eta;
+        const float s = (cosFilm - eta * cosSubstrate) / (cosFilm + eta * cosSubstrate);
+        const float p = (eta * cosFilm - cosSubstrate) / (eta * cosFilm + cosSubstrate);
+        reflectance = float2(s * s, p * p);
+        phaseS = float2(s >= 0.0 ? 1.0 : -1.0, 0.0);
+        phaseP = float2(p >= 0.0 ? 1.0 : -1.0, 0.0);
+        return;
+    }
+    const float nSquared = n * n;
+    const float kSquared = k * k;
+    const float twoNk = 2.0 * n * k;
+    const float t1 = nSquared - kSquared - filmIor * filmIor * (1.0 - cosFilm * cosFilm);
+    const float t2 = sqrt(t1 * t1 + twoNk * twoNk);
+    const float uSquared = max(0.5 * (t2 + t1), 0.0);
+    const float vSquared = max(0.5 * (t2 - t1), 0.0);
+    const float u = sqrt(uSquared);
+    const float v = sqrt(vSquared);
+    const float incidentQ = filmIor * cosFilm;
+    phaseS = FilmUnitPhase(float2(incidentQ * incidentQ - uSquared - vSquared, -2.0 * incidentQ * v));
+    const float opticalNorm = (nSquared + kSquared) * cosFilm;
+    phaseP = FilmUnitPhase(float2(opticalNorm * opticalNorm - filmIor * filmIor * (uSquared + vSquared),
+        2.0 * incidentQ * (twoNk * u - (nSquared - kSquared) * v)));
+    const float relativeN = n / filmIor;
+    const float relativeKSquared = kSquared / (filmIor * filmIor);
+    const float f0 = ((relativeN - 1.0) * (relativeN - 1.0) + relativeKSquared)
+        / ((relativeN + 1.0) * (relativeN + 1.0) + relativeKSquared);
+    const float x82 = 6.0 / 7.0;
+    const float fifth82 = x82 * x82 * x82 * x82 * x82;
+    const float correction = (lerp(f0, 1.0, fifth82) - f82) * 7.0 / (fifth82 * x82);
+    const float x = 1.0 - cosFilm;
+    const float fifth = x * x * x * x * x;
+    const float magnitude = saturate(lerp(f0, 1.0, fifth) - correction * cosFilm * fifth * x);
+    reflectance = float2(magnitude);
+}
+
+float3 EvaluateFilmRgb(float cosine, float filmIor, float thickness, float3 n, float3 k, float3 f82)
+{
+    const float incident = saturate(cosine);
+    const float transmittedSquared = filmIor * filmIor - (1.0 - incident * incident);
+    if (transmittedSquared <= 0.0 || incident == 0.0)
+    {
+        return float3(1.0);
+    }
+    const float cosFilm = sqrt(transmittedSquared) / filmIor;
+    const float s = (incident - filmIor * cosFilm) / (incident + filmIor * cosFilm);
+    const float p = (filmIor * incident - cosFilm) / (filmIor * incident + cosFilm);
+    const float2 r12 = float2(s * s, p * p);
+    const float2 phase21 = -float2(s >= 0.0 ? 1.0 : -1.0, p >= 0.0 ? 1.0 : -1.0);
+    float3 r23s, r23p, phaseSReal, phaseSImag, phasePReal, phasePImag;
+    [unroll]
+    for (uint channel = 0; channel < 3; ++channel)
+    {
+        float2 r23, phaseS, phaseP;
+        FilmSubstrate(cosFilm, filmIor, n[channel], k[channel], f82[channel], r23, phaseS, phaseP);
+        r23s[channel] = r23.x;
+        r23p[channel] = r23.y;
+        phaseSReal[channel] = phaseS.x * phase21.x;
+        phaseSImag[channel] = phaseS.y * phase21.x;
+        phasePReal[channel] = phaseP.x * phase21.y;
+        phasePImag[channel] = phaseP.y * phase21.y;
+    }
+    const float3 productS = r12.x * r23s;
+    const float3 productP = r12.y * r23p;
+    const float3 rootS = sqrt(productS);
+    const float3 rootP = sqrt(productP);
+    const float transmissionS = 1.0 - r12.x;
+    const float transmissionP = 1.0 - r12.y;
+    const float3 multipleS = transmissionS * transmissionS * r23s / max(1.0 - productS, 1e-20);
+    const float3 multipleP = transmissionP * transmissionP * r23p / max(1.0 - productP, 1e-20);
+    float3 result = 0.5 * (multipleS + r12.x + multipleP + r12.y);
+    float3 coefficientS = multipleS - transmissionS;
+    float3 coefficientP = multipleP - transmissionP;
+    float3 powerSReal = phaseSReal, powerSImag = phaseSImag;
+    float3 powerPReal = phasePReal, powerPImag = phasePImag;
+    const float opd = 2.0 * filmIor * thickness * cosFilm;
+    [unroll]
+    for (uint order = 1; order <= 3; ++order)
+    {
+        float3 sensitivityReal, sensitivityImag;
+        FilmSensitivity(order * opd, sensitivityReal, sensitivityImag);
+        coefficientS *= rootS;
+        coefficientP *= rootP;
+        result += coefficientS * (powerSReal * sensitivityReal + powerSImag * sensitivityImag)
+            + coefficientP * (powerPReal * sensitivityReal + powerPImag * sensitivityImag);
+        const float3 nextSImag = powerSReal * phaseSImag + powerSImag * phaseSReal;
+        powerSReal = powerSReal * phaseSReal - powerSImag * phaseSImag;
+        powerSImag = nextSImag;
+        const float3 nextPImag = powerPReal * phasePImag + powerPImag * phasePReal;
+        powerPReal = powerPReal * phasePReal - powerPImag * phasePImag;
+        powerPImag = nextPImag;
+    }
+    return saturate(result);
 }

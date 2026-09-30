@@ -1,0 +1,17 @@
+{
+  "schema_version": 2,
+  "algorithm": "visible-spectrum Rec709 Fourier Airy order 3 + film-relative F82 + substrate Fss compensation",
+  "reference_kind": "CreatorEngine CPU double closure numeric baseline; not Blender rendered parity",
+  "blender_version": "5.1.1",
+  "mask": 16383,
+  "numeric_golden_rows": 4410,
+  "numeric_golden_sha256": "94370D5E127F63DF031CE0150414BDB40CE8F1F223AA720FF1F20196DCA8AB78",
+  "changed_cases": [
+    "all_layers_alpha_zero",
+    "all_layers_ao_zero",
+    "all_layers_special",
+    "glass_thin_film"
+  ],
+  "historical_baseline": "numeric-golden.csv",
+  "created": "2026-09-30"
+}

@@ -45,6 +45,9 @@ namespace editor
             EditorWindowName::kAssetBundle,
             EditorWindowName::kResourceCounter,
             EditorWindowName::kRenderPass,
+            EditorWindowName::kPreferences,
+            EditorWindowName::kProjectSettings,
+            EditorWindowName::kMaterialGraph,
         };
 
         bool draws_without_store(std::string_view stable_id)

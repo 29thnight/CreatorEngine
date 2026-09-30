@@ -203,7 +203,8 @@ inline Vector Ambient(const IblBakePoint& point, const IblBakeSample& sample, co
     const Vector view = Unit(Rgb4(point.viewTier));
     const Integral base{Rgb4(sample.baseSingleAlbedo), Rgb4(sample.baseAverage), sample.baseSingleAlbedo[3]};
     const Integral coat{Rgb4(sample.coatSingleAlbedo), Rgb4(sample.coatAverage), sample.coatSingleAlbedo[3]};
-    const Vector multiple = Multiple(base), coatMultiple = Multiple(coat);
+    const auto baseWeights=LayeredBaseWeights(material,view,base);
+    const Vector multiple = layered ? baseWeights.multiple : Multiple(base), coatMultiple = Multiple(coat);
     const auto ao = [&](Vector normal, double roughness) {
         return Clamp(std::pow(Clamp(Dot(normal, view)) + material.ao, std::exp2(-16 * roughness - 1)) - 1 +
                      material.ao);
@@ -218,7 +219,7 @@ inline Vector Ambient(const IblBakePoint& point, const IblBakeSample& sample, co
         return (diffuse + multiple) * Rgb4(sample.irradiance) * material.ao +
                base.single * Rgb4(sample.basePrefiltered) * ao(material.normal, material.roughness);
     }
-    diffuse = material.base * ((1 - material.metal) * std::max(1 - Maximum(base.single + multiple), 0.0));
+    diffuse = baseWeights.diffuse;
     const Vector sheenNormal =
         Unit(material.normal * (1 - Clamp(material.coat)) + material.coatNormal * Clamp(material.coat));
     const Vector ltc = Sheen(table, Clamp(Dot(sheenNormal, view)), material.sheenRoughness, 0x7ff);

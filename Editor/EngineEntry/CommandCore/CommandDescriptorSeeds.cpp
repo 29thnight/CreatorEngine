@@ -102,7 +102,7 @@ namespace CommandCore
             { "editor.nav", CommandCost::Immediate, "[reset|key <키>...|pointer <x> <y>|press|release]", "키보드 탐색 계약(커서·disabled 위반 수)을 읽고 키를 주입한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.panelcost", CommandCost::Immediate, "[reset]", "패널별 draw 비용과 그 프레임에 한 일의 수(행·디렉터리 스캔)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.renderscale", CommandCost::Immediate, "[auto|off|<0.25-1.0>]", "뷰포트 렌더 배율 — 표시 크기보다 낮게 그린다(기본 auto = 1/DPI)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
-            { "editor.sceneview", CommandCost::Immediate, "", "씬 뷰 오버레이 배치와 카메라 상태를 읽는다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "editor.sceneview", CommandCost::Immediate, "[skybox|statistics|fps on|off]", "Read Scene overlay state or request local view visibility", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "", true },
             { "editor.selftest", CommandCost::Immediate, "", "editor:: 선언 배선 자가 검사(창 표·메뉴 표)를 돌린다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "editor.state", CommandCost::Immediate, "[reset]", "위젯 상태 행렬(선언 대 관측)을 읽는다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "editor.theme", CommandCost::Immediate, "", "적용된 ImGui 스타일 값을 TSV로 내고 배율 출처를 판정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
@@ -132,7 +132,7 @@ namespace CommandCore
             // PBR-W8 — named input 은 스칼라 형태만 선언한다. CLI 는 4 성분
             // baseColor 도 받지만 위치 바인딩으로는 1 개와 4 개를 한 줄에 못 적고,
             // 억지로 적으면 HTTP 가 조용히 어긋난 인자를 만든다.
-            { "material.editor", CommandCost::Frames, "open|new <object> | state | <operation> <document-id> <revision> <arguments...>", "Open and edit the active LX Material document; revisions protect real-time edits", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "", true },
+            { "material.editor", CommandCost::Frames, "open|new <object> | state | sessions | <operation> <document-id> <revision> <arguments...>", "Open and edit the active LX Material document; revisions protect real-time edits", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "", true },
             { "material.graph", CommandCost::Frames, "<object> [bind <graph-guid>|set <parameter-id> <value...>|reload]", "LX inline material instance query, replacement and typed overrides", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "", true },
             { "material.override", CommandCost::Frames, "<오브젝트> <렌더러색인> <속성> <값|r g b a>", "렌더러별 MaterialInstance override 를 얹는다(공유 재질을 값으로 가른다)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,renderer:integer,property,value:number" },
             { "mem.delta", CommandCost::Immediate, "[라벨]", "기준선 대비 CRT 블록·바이트 증감(기준선이 없으면 지금을 기준선으로 삼는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "label=" },
@@ -212,6 +212,7 @@ namespace CommandCore
             // 나눠 쓰므로 "에디터 종료" 는 Player 의 help 에서 거짓이 된다.
             { "quit", CommandCost::Immediate, "", "호스트를 종료한다", CommandClass::EngineService, CommandLiveness::TerminatesProcess, false, CommandRoles::Both },
             { "render.backend", CommandCost::Immediate, "status", "부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
+            { "render.environment", CommandCost::Immediate, "<HDR-or-ceibl-path> | status | background on|off", "Select environment; reuse cooked maps or generate and cache once", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "path", true },
             { "render.live.capture", CommandCost::Long, "<new-absolute-directory> [game|editor] [controlled]", "Capture actual product attachments through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.fence", CommandCost::Long, "[timeout-seconds]", "Wait for a product frame through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.wait", CommandCost::Long, "[timeout-seconds]", "라이브 렌더러가 이 명령 뒤 발행된 프레임을 끝낼 때까지 다음 명령을 미룬다(프레임 수 대기 대신 예열 판정)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

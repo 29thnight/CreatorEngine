@@ -41,6 +41,8 @@ namespace editor::windows
     void draw_resource_counter();   // "본문이 걸렸는가" 를 묻던 has_* 도
 
     void draw_render_pass();        // 뜻이 없다. 정의는 EngineGUIWindow 짝.
+    void draw_preferences();
+    void draw_project_settings();
 
     /// typed Draw 등록. 창이 아니라 부팅이 부른다 — 이유는
     /// `InspectorWindow.cpp` 의 정의 자리에 적혀 있다.
@@ -122,6 +124,13 @@ struct editor_tool_windows
                 .traits(window_trait::always_vertical_scrollbar |
                         window_trait::no_collapse)
                 .open_by_default(false),
+
+            panel<&windows::draw_preferences>(
+                EditorWindowName::kPreferences, EditorWindowName::kPreferencesLabel)
+                .initial_size(480.f, 320.f).open_by_default(false),
+            panel<&windows::draw_project_settings>(
+                EditorWindowName::kProjectSettings, EditorWindowName::kProjectSettingsLabel)
+                .initial_size(560.f, 480.f).open_by_default(false),
 
             // 아래 넷도 생성자가 곧바로 닫던 것들이다. 열 곳 중 여섯이
             // 그랬고, 그 판단이 전부 선언으로 왔다.

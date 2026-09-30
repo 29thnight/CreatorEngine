@@ -1,6 +1,6 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
-**정본 2026-09-30 · MAT-0~MAT-8 완료 · MAT-9 rendered parity·성능 수용 잔여 · 그 외 미착수 유지.**
+**정본 2026-10-01 · MAT-0~MAT-8 완료 · MAT-9 rendered parity·성능 수용 잔여 · RND-ENV 배경 슬라이스 진행 · 그 외 미착수 유지.**
 이 문서는 PHASE 4 계열의 현재 소유권·표시 순서·공수 원장이다. 이전 Asset-first SRP
 분할의 근거·이력은 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)에 보존했다.
 새 C# 저작/네이티브 실행 목표는
@@ -12,14 +12,14 @@
 |---|---|---:|---:|---:|---|
 | **4** | 현행 DX12 PBR 제품 배선 | 10 | 18 | 18 | — |
 | **4.25** | Material Graph·Principled/artist 계약 | 10 | 34 | 32 (`MAT-0~MAT-8`) | — |
-| **4.3** | `BASE-0` → 단일 writer DAG → version/Modify DAG·RHI queue 기반 | 11 | 119 | 0 | `Q0` |
+| **4.3** | `BASE-0` → 단일 writer DAG → version/Modify DAG·RHI queue 기반 | 12 | 119 | 0 | `Q0`, `RG-V` |
 | **4.5** | 모션/히스토리·업스케일·프레임 생성 | 16 | 86 | 0 | — |
 | **4.6** | C# Pipeline IR·PassSchema/Roslyn·native 조립 | 7 | 미산정 | 0 | `CSRP-0~6` 전부 |
 | **4.7** | UV1·BVH·백그라운드 라이트맵 | 8 | 35 | 2 | — |
-| **4.75** | renderer 품질: probe/AO·shadow·display/post | 3 | 20 | 0 | — |
+| **4.75** | renderer 품질: probe/AO·shadow·display/post·Environment | 4 | 20 | 0 | `RND-ENV` |
 | **4.8** | GPU-driven·확률 조명·DXR 설계 판정 | 4 | 5.5 | 0 | 세 기능의 실제 구현 |
 | **4.9** | DX12/Vulkan PBR 교차 판정 복귀 | 0 | 미산정 | 0 | 시간 고정 이후 슬라이스 |
-| **현재 합계** | | **69 (산정 62·미산정 7)** | **산정 317.5** | **산정 52** | **잔여 산정 265.5일 + 미산정** |
+| **현재 합계** | | **71 (산정 62·미산정 9)** | **산정 317.5** | **산정 52** | **잔여 산정 265.5일 + 미산정** |
 
 구 원장의 **69행 352.5일·완료 22일**에서 Asset-first `4-1` 2일과
 `SRP-0/1/2/4/5/6` 33일, 총 7행 35일을 **새 C# 계획으로 이월하지 않고**
@@ -100,7 +100,7 @@ Pass/graph에 얹을 때의 `RG6`, `Q0`, `MAT-9`, 시간축 입력은 **항목�
 | 공통 node 저작·UI와 기존 graph 창 이관 | [`LatticeNodeSystem.md`](../design/LatticeNodeSystem.md), [`LatticeAdoptionPlan.md`](LatticeAdoptionPlan.md) — 독립 ImGui 예제 빌드·조작 게이트 통과. Editor 제품 통합은 별도 단계. 횡단 범위·공수 미산정이며 4.25의 34일에 BT/Animator 이관을 포함하지 않음 |
 | 시간축 | [`TemporalReconstructionPlan.md`](TemporalReconstructionPlan.md) |
 | 라이트맵 | [`LightmapBakerPlan.md`](LightmapBakerPlan.md) |
-| renderer probe/AO·shadow·display/post | [`RendererQualityPlan.md`](RendererQualityPlan.md) |
+| renderer probe/AO·shadow·display/post·Environment | [`RendererQualityPlan.md`](RendererQualityPlan.md) |
 | GPU-driven·확률 조명·DXR 설계 | [`GpuFeaturePlanningPlan.md`](GpuFeaturePlanningPlan.md) |
 | 백엔드 패리티 | [`BackendParityPlan.md`](BackendParityPlan.md) |
 | 분리 전 4.75 항목 감사 | [`Phase475AxisClassification.md`](../analysis/Phase475AxisClassification.md) |
@@ -122,3 +122,12 @@ Pass/graph에 얹을 때의 `RG6`, `Q0`, `MAT-9`, 시간축 입력은 **항목�
 문서 재배치는 빌드·GPU 런타임·픽셀 동등성의 새 증거가 아니다. 새 C# 범위와
 PHASE 4.9는 실제 소비 표면을 실측한 뒤 공수를 산정한다.
 Lattice 설계 초안과 UI 와이어프레임도 구현·검증 기성에 넣지 않는다.
+
+## 2026-10-01 UI/환경 후속 추적
+
+4.3 RG-V와 4.75 RND-ENV를 각각 미산정 활성 행으로 추가했다. 기존 산정 317.5일·완료
+52일은 유지한다. RG-V는 RG3부터 시작하고 RG6 제품 결과에서 닫으며 CSRP-5/6에서 같은
+viewer로 C# IR을 표시한다. RND-ENV는 MAT-7 기반에서 배경/IBL/캐시 계약을 닫는다.
+W9(Phase21)와 14-LIVE/14-7(Phase14)은 이 4 계열 공수에 섞지 않는다.
+정본은 [EditorRenderingSurfacesPlan.md](EditorRenderingSurfacesPlan.md),
+[EnvironmentRenderingPlan.md](EnvironmentRenderingPlan.md)다.

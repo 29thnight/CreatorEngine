@@ -42,6 +42,7 @@ enum class EnhancedLiveViewFlags : uint32_t
     SceneOverlay = 1u << 0,
     ScreenSpaceUI = 1u << 1,
     CanvasPreview = 1u << 2,
+    HideSkyBox = 1u << 3,
 };
 
 inline EnhancedLiveViewFlags operator|(EnhancedLiveViewFlags left,
@@ -201,6 +202,7 @@ struct EnhancedLiveFramePacket
     uint32_t width{ 0 };
     uint32_t height{ 0 };
     bool     sceneLoading{ false };
+    bool     skyBoxEnabled{ true };
     // M6-P2d-d: Host가 실제 Scene material에서 수집해 넘긴 추가 의존성.
     // 아래 ShaderMeta owner 배열은 이 선언과 primary/cache 입력을 resolve한 결과다.
     EnhancedRequiredAssetPacket requiredAssets;
@@ -713,7 +715,8 @@ namespace EnhancedSceneRenderer
     void SetDisplayPresentationSink(
         std::shared_ptr<IDisplayPresentationSink> sink);
 
-    /// equirect HDR를 교체한다. 다음 프레임 시작에서 큐브맵과 IBL을 재생성한다.
+    /// Select a validated HDR/cooked environment and enable its background.
+    /// The next frame installs cached maps or regenerates IBL for the new source.
     bool SetSkyBoxPath(const std::string& path, std::string& outError);
 
     /// 켠다. Enhanced-only 런타임에서는 초기화가 이 상태를 유지한다.

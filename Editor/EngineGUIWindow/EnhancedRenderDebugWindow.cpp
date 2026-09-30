@@ -6,6 +6,11 @@
 #include "EditorTheme.h"
 #include "TimeSystem.h"
 #include "RHI/ScreenSizedResource.h"
+#include "ProfilerView.h"
+#include "EditorWindowRegistry.h"
+#include "EditorSettingsStore.h"
+#include "RuntimeSettings.h"
+#include "Windows/EditorToolboxWindows.h"
 
 #include <algorithm>
 #include <cfloat>
@@ -286,46 +291,68 @@ void editor::DrawRenderRuntime(const EnhancedLiveDebugSnapshot& displayed)
 			0u == displayed.graveyardCount ? kDimColor : kWarnColor);
 }
 
-void editor::DrawSceneRenderStatistics()
+void editor::OpenRenderLiveDiagnostics()
 {
-    static EnhancedLiveDebugSnapshot displayed;
-    static double refreshed = -1.0;
-    if (refreshed < 0 || ImGui::GetTime() - refreshed >= 0.25)
-    {
-        displayed = EnhancedSceneRenderer::GetLiveDebugSnapshot();
-        refreshed = ImGui::GetTime();
-    }
-    ImGui::TextUnformatted("Render Statistics");
+    profiler_view::select_rendering_live();
+    queue_window_request(EditorWindowName::kFrameProfiler, window_request::focus);
+}
+
+void EnhancedRenderDebugWindow::Draw()
+{
+    ImGui::TextUnformatted("RenderPass - pipeline structure");
+    ImGui::TextWrapped("Compiled graph visualization is not available yet. Active pipeline declarations are shown below.");
+    if (ImGui::Button("Graphics settings")) editor::open_window(EditorWindowName::kProjectSettings);
+    ImGui::SameLine();
+    if (ImGui::Button("Rendering - Live")) editor::OpenRenderLiveDiagnostics();
+    const auto snapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
     ImGui::Separator();
-    ImGui::Text("FPS: %d", Time->GetFramesPerSecond());
-    ImGui::Text("Screen Size: %u x %u", ScreenResizeBus::Get().GetWidth(), ScreenResizeBus::Get().GetHeight());
-    ImGui::SeparatorText("Runtime");
-    DrawRenderRuntime(displayed);
-    ImGui::SeparatorText("Frame cost");
-    ImGui::Text("CPU (record + submit): %.3f ms", displayed.cpuMs);
-    ImGui::Text("GPU (queue total): %.3f ms", displayed.gpuMs);
-    ImGui::SeparatorText("GPU pass timings");
-    if (displayed.passTimings.empty()) ImGui::TextDisabled("No completed GPU sample");
-    else if (ImGui::BeginTable("ScenePassTimings", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+    ImGui::TextUnformatted(snapshot.pipelineDescription.empty() ? "No pipeline description available." : snapshot.pipelineDescription.c_str());
+}
+
+void editor::windows::draw_preferences()
+{
+    auto& preferences = EditorSettingsStore::Get().Preferences();
+    bool changed = false;
+    float scale = preferences.GetImGuiScale();
+    if (ImGui::SliderFloat("UI scale", &scale, .8f, 1.5f))
+    { preferences.SetImGuiScale(scale); changed = true; }
+    float width = preferences.GetContentTreeWidth();
+    if (ImGui::SliderFloat("Content Browser tree width", &width, 120.f, 600.f))
+    { preferences.SetContentTreeWidth(width); changed = true; }
+    if (changed) EditorSettingsStore::Get().Save();
+    ImGui::TextWrapped("Manage workspace layouts from Window > Workspace.");
+}
+
+void editor::windows::draw_project_settings()
+{
+    if (ImGui::BeginTabBar("ProjectSettingsPages"))
     {
-        ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 3.f);
-        ImGui::TableSetupColumn("Sum ms", ImGuiTableColumnFlags_WidthStretch, 1.f);
-        ImGui::TableSetupColumn("Span ms", ImGuiTableColumnFlags_WidthStretch, 1.f);
-        ImGui::TableHeadersRow();
-        for (const auto& pass : displayed.passTimings)
+        if (ImGui::BeginTabItem("General / Build"))
+        { draw_build_scene_setting(); ImGui::EndTabItem(); }
+        if (ImGui::BeginTabItem("Graphics"))
         {
-            ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::TextUnformatted(pass.name.c_str());
-            ImGui::TableNextColumn(); ImGui::Text("%.3f", pass.milliseconds);
-            ImGui::TableNextColumn(); ImGui::Text("%.3f", pass.spanMilliseconds);
+            ImGui::TextUnformatted("Enhanced Scene Renderer");
+            ImGui::TextWrapped("SceneRenderProfile owns Scene parameters. The controls below are temporary live tuning; they do not save a project profile.");
+            auto settings = RuntimeSettings::Get().GetRenderPassSettings();
+            if (ImGui::Checkbox("Show environment background", &settings.m_isSkyboxEnabled))
+            { RuntimeSettings::Get().SetRenderPassSettings(settings); EditorSettingsStore::Get().Save(); }
+            render_pass_state().DrawPassSettings();
+            ImGui::EndTabItem();
         }
-        ImGui::EndTable();
+        if (ImGui::BeginTabItem("Quality"))
+        {
+            ImGui::TextWrapped("Quality presets are not available yet. Edit a SceneRenderProfile in the Inspector to save Scene settings.");
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
     }
-    if (!displayed.lastError.empty()) ImGui::TextWrapped("%s", displayed.lastError.c_str());
 }
 
 // PHASE 21 W3: 생성자 안 람다였던 본문. 옮긴 것은 들여쓰기뿐이다.
-void EnhancedRenderDebugWindow::Draw()
+void editor::DrawRenderLiveDiagnostics()
 {
+	static bool m_sortByDuration = false;
+	static int selectedTarget = 0;
 	static EnhancedLiveDebugSnapshot displayed{};
 	static double lastRefreshTime = -1.0;
 
@@ -336,11 +363,22 @@ void EnhancedRenderDebugWindow::Draw()
 		lastRefreshTime = now;
 	}
 
-	// ── 패스 세부 설정 ──
-	//
-	// 이 창의 본래 이름이 Pipeline Setting이다. 계측만 있고 설정이 없으면
-	// 이름이 거짓말이 된다.
-	DrawPassSettings();
+    ImGui::TextDisabled("Live renderer state - independent of Record and .ceprof selection");
+    constexpr const char* targets[]{"Scene", "Game", "Material Preview"};
+    ImGui::Combo("View", &selectedTarget, targets, 3);
+    const auto displays = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+    const auto& view = displays.Get(static_cast<EnhancedLiveDisplayTarget>(selectedTarget));
+    const bool gpuMatches = view.ready && view.key.viewId == displayed.lastGpuViewId &&
+        displayed.lastGpuSubmissionId && !displayed.passTimings.empty();
+    ImGui::Text("Completed frame %llu / view %llu / %u x %u / %s",
+        static_cast<unsigned long long>(view.completedFrameId), static_cast<unsigned long long>(view.key.viewId),
+        view.completedWidth, view.completedHeight, view.ready ? "ready" : "unavailable");
+    ImGui::Text("Latest GPU sample: frame %llu / submission %llu / view %llu",
+        static_cast<unsigned long long>(displayed.lastGpuFrameId),
+        static_cast<unsigned long long>(displayed.lastGpuSubmissionId),
+        static_cast<unsigned long long>(displayed.lastGpuViewId));
+    if (displayed.lastGpuFrameId && displayed.consumedFrameId >= displayed.lastGpuFrameId)
+        ImGui::Text("Sample age: %llu engine frames", static_cast<unsigned long long>(displayed.consumedFrameId - displayed.lastGpuFrameId));
 
 	// ── 러너 상태 ──
 	//
@@ -351,36 +389,16 @@ void EnhancedRenderDebugWindow::Draw()
 		editor::DrawRenderRuntime(displayed);
 	}
 
-	// LivePipelineDesc의 단일 목록을 그대로 보여 준다. 별도 CLI 덤프를
-	// 늘리지 않고도 실제 활성 backend가 쓰는 순서·활성 상태·슬롯 흐름을
-	// 확인할 수 있으며, 문자열은 파이프라인 변경 때만 다시 만들어진다.
-	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Layers, " Pipeline topology">))
-	{
-		LabeledValue("Descriptor",
-			displayed.pipelineDescriptionValid ? "valid" : "invalid",
-			displayed.pipelineDescriptionValid ? kOkColor : kErrorColor);
-
-		if (displayed.pipelineDescription.empty())
-		{
-			ImGui::TextColored(kDimColor, "No pipeline description available.");
-		}
-		else
-		{
-			ImGui::BeginChild("PipelineTopology", ImVec2(0, 260.0f), true,
-				ImGuiWindowFlags_HorizontalScrollbar);
-			ImGui::TextUnformatted(displayed.pipelineDescription.c_str());
-			ImGui::EndChild();
-		}
-	}
+    if (ImGui::Button("Open RenderPass structure")) open_window(EditorWindowName::kRenderPass);
 
 	// ── 프레임 비용 ──
 	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Timing, " Frame cost">, ImGuiTreeNodeFlags_DefaultOpen))
 	{
 		char buffer[64]{};
 		std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.cpuMs);
-		LabeledValue("CPU (record+submit)", buffer);
+		LabeledValue("CPU (all views)", buffer);
 		std::snprintf(buffer, sizeof(buffer), "%.3f ms", displayed.gpuMs);
-		LabeledValue("GPU (queue total)", buffer);
+		LabeledValue("GPU (selected view)", gpuMatches ? buffer : "unavailable");
 		ImGui::Text("GPU samples: %llu, rejected: %llu, query overflow: %llu",
 			static_cast<unsigned long long>(displayed.gpuCollects),
 			static_cast<unsigned long long>(displayed.gpuCollectMismatches),
@@ -394,14 +412,14 @@ void EnhancedRenderDebugWindow::Draw()
 	{
 		ImGui::Checkbox("Sort by duration", &m_sortByDuration);
 		ImGui::SameLine();
-		ImGui::TextColored(kDimColor, "(%zu passes)", displayed.passTimings.size());
+		ImGui::TextColored(kDimColor, "(%zu passes)", gpuMatches ? displayed.passTimings.size() : 0u);
 
-		if (displayed.passTimings.empty())
+		if (!gpuMatches)
 		{
 			ImGui::TextColored(kDimColor,
-				"No timings collected. The runner has not completed a frame yet,");
+				"No completed GPU sample for the selected view.");
 			ImGui::TextColored(kDimColor,
-				"or profiler initialization failed.");
+				"Samples from another view are never shown as this view.");
 		}
 		else
 		{

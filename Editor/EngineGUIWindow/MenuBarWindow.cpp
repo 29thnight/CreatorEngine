@@ -18,6 +18,7 @@
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "ProfilerHUD.h"
+#include "EnhancedRenderDebugWindow.h"
 #include "CoreWindow.h"
 #include "EditorIcons.h"
 #include "EditorFontResources.h"
@@ -404,13 +405,8 @@ void MenuBarWindow::RenderMenuBar()
             }
             if (ImGui::BeginMenu("Settings"))
             {
-                if (ImGui::MenuItem("Pipeline Setting"))
-                {
-                    if (!editor::is_window_open(EditorWindowName::kRenderPass))
-                    {
-                        editor::open_window(EditorWindowName::kRenderPass);
-                    }
-                }
+                if (ImGui::MenuItem("Preferences")) editor::open_window(EditorWindowName::kPreferences);
+                if (ImGui::MenuItem("Project Settings")) editor::open_window(EditorWindowName::kProjectSettings);
 
                 if (ImGui::MenuItem("Collision Matrix"))
                 {
@@ -439,13 +435,6 @@ void MenuBarWindow::RenderMenuBar()
                 // 검은 글씨와 밝은 입력란 색을 눌러 담던 자리였다. 팝업이
                 // 다크 스킨을 따라가므로 그 우회로가 전부 필요 없어졌다.
 
-                EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
-                float imguiScale = preferences.GetImGuiScale();
-                if (ImGui::DragFloat("ImGuiScale", &imguiScale, 0.1f, 0.8f, 1.5f))
-                {
-                    preferences.SetImGuiScale(imguiScale);
-                    EditorSettingsStore::Get().Save();
-                }
                 ::editor::append_top_menu_items(::editor::top_menu_root::settings, selectionPtr);
                 ImGui::EndMenu();
             }
@@ -2617,32 +2606,10 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
 }
 void MenuBarWindow::ShowRenderDebugWindow()
 {
-    {
-        // 옛 표시 가드가 있던 자리다. 범위만 남긴다 — 본문을 통째로
-        // 들여쓰기 바꾸면 진짜 변경이 공백에 묻힌다.
-        // RenderDebugManager는 ID3D11DeviceContext로 패스 결과를 복사해 두는
-        // DX11 전용 장치이고, 그것을 채우던 GBuffer/Deferred/Forward 패스는
-        // SceneRenderer와 함께 메인 배선에서 빠졌다. 그래서 이 창은 열려도
-        // 언제나 비어 있었다 — 빈 창은 "캡처가 없다"와 "경로가 죽었다"를
-        // 구분해 주지 않으므로, 살아 있는 DX12 표면으로 안내한다.
-        // 기본 폰트는 라틴 전용이라 여기 문자열은 영문으로 쓴다(한글은 ??로 나온다).
-        ImGui::TextUnformatted("The DX11 pass capture viewer does not work in Enhanced-only mode.");
-        ImGui::Spacing();
-        ImGui::TextUnformatted("Per-pass GPU timings and validation messages for");
-        ImGui::TextUnformatted("EnhancedRenderer (DX12) live in Settings > Pipeline Setting.");
-        ImGui::Spacing();
-        if (ImGui::Button("Open Pipeline Setting"))
-        {
-            if (!editor::is_window_open(EditorWindowName::kRenderPass))
-            {
-                editor::open_window(EditorWindowName::kRenderPass);
-            }
-            editor::close_window(EditorWindowName::kRenderPassDebug);
-        }
-        ImGui::Spacing();
-        ImGui::TextUnformatted("For per-pass resource contents, take a PIX capture:");
-        ImGui::TextUnformatted("  Tools\\dx12-validation\\Invoke-DX12Validation.ps1 -Action PixCapture");
-	}
+    ImGui::TextUnformatted("Render Frame Debugger");
+    ImGui::TextWrapped("Frame capture and event/resource inspection are not available yet.");
+    ImGui::TextWrapped("Current live pass timings and validation are available without recording.");
+    if (ImGui::Button("Open Rendering - Live")) editor::OpenRenderLiveDiagnostics();
 }
 
 // PHASE 21 M4 3단계: 프레임 루프 안에 인라인으로 있던 본문이다. 셸이 프레임을

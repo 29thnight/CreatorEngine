@@ -1,6 +1,7 @@
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
+#include "MaterialGraphWindow.h"
 #include "ReflectionUndo.h"
 #include "ReflgenRuntime.h"
 #include "CoreWindow.h"
@@ -203,6 +204,7 @@ void Editor::EditorMain::Initialize()
 	m_activeSceneChangedHandle = activeSceneChangedEvent.AddLambda([]()
 	{
 		EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
+		::editor::material_editing::OnActiveSceneChanged();
 	});
 
 	// PHASE 21 M4 2단계: 창 객체보다 먼저 표를 세운다. 생성자가 자기 본문을

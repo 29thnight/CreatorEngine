@@ -44,6 +44,7 @@ struct Session
     std::size_t component = 0;
     FileGuid guid;
     std::filesystem::path path;
+    std::filesystem::path recoveryPath;
     LXMaterialAsset asset;
     LXDocument document;
     LXStyleSheet styles;
@@ -377,6 +378,47 @@ std::uint64_t previewSerial = 0;
 std::shared_ptr<const material_graph::SceneMaterialSource> inspectorPreview;
 std::uint64_t inspectorPreviewRevision{};
 std::chrono::steady_clock::time_point inspectorPreviewVisible{};
+std::uint32_t observedSceneId{};
+
+void ReconcileSceneLocked()
+{
+    const auto* scene = SceneManagers->GetActiveScene();
+    const auto sceneId = scene ? scene->GetSceneId() : 0u;
+    if (sceneId != observedSceneId)
+    {
+        observedSceneId = sceneId;
+        active = nullptr;
+        inspectorPreview.reset();
+        inspectorPreviewVisible = {};
+        for (auto& session : sessions)
+        {
+            if (session->document.Dirty() && session->target.sceneId != sceneId)
+            {
+                // Scene/document IDs restart with the process. Do not overwrite
+                // a recovery copy from an earlier Editor session.
+                if (session->recoveryPath.empty())
+                    session->recoveryPath = PathFinder::RelativeToBaseProject("Saved/Editor/MaterialDrafts") /
+                        ("Scene_" + std::to_string(session->target.sceneId) + "_Document_" +
+                         std::to_string(session->document.DocumentId()) + "_" +
+                         FileGuid::CreateRandomV4().ToString() + ".shadergraph");
+                const auto& recovery = session->recoveryPath;
+                std::error_code error;
+                std::filesystem::create_directories(recovery.parent_path(), error);
+                if (error) session->message = "Draft recovery directory: " + error.message();
+                else session->Snapshot().Save(recovery, &session->message);
+            }
+            session->previewPinned = false;
+            session->previewSource.reset();
+            session->canvas.selectedNodes.clear();
+            session->canvas.selectedNode = 0;
+        }
+    }
+    if (active && !active->Renderer()) active = nullptr;
+    // Retain unsaved documents for explicit recovery; never bind them to a new Scene.
+    std::erase_if(sessions, [](const auto& session) {
+        return session.get() != active && !session->Renderer() && !session->document.Dirty();
+    });
+}
 
 std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> previewFloor;
 std::string previewFloorError;
@@ -428,6 +470,7 @@ void RefreshPreview(Session& session)
 
 bool OpenLocked(MeshRenderer& renderer, std::string& error, bool create = false)
 {
+    ReconcileSceneLocked();
     auto* owner = renderer.GetOwner();
     if (!owner || !owner->GetScene() || !PathFinder::IsAssetAuthoringEnabled())
     {
@@ -626,6 +669,7 @@ void DrawSession(Session& session)
                 ImGui::TextDisabled("Open Materials");
                 for (const auto& document : sessions)
                 {
+                    if (!document->Renderer()) continue;
                     ImGui::PushID(document.get());
                     if (ImGui::Selectable(document->name.c_str(), document.get() == active))
                     {
@@ -838,12 +882,30 @@ bool Open(MeshRenderer& renderer, std::string& error)
     return OpenLocked(renderer, error);
 }
 
+void OnActiveSceneChanged()
+{
+    std::lock_guard lock(sessionMutex);
+    ReconcileSceneLocked();
+}
+
 void Draw()
 {
     std::lock_guard lock(sessionMutex);
+    ReconcileSceneLocked();
     if (!active)
     {
         ImGui::TextUnformatted("Open a material from MeshRenderer in the Inspector.");
+        const auto drafts = std::count_if(sessions.begin(), sessions.end(), [](const auto& s) {
+            return !s->Renderer() && s->document.Dirty();
+        });
+        if (drafts)
+        {
+            ImGui::TextDisabled("%zu unsaved documents retained from previous Scenes.", size_t(drafts));
+            ImGui::TextWrapped("Recovery copies: Saved/Editor/MaterialDrafts. Previous Scene documents cannot be applied here.");
+            for (const auto& session : sessions)
+                if (!session->Renderer() && session->document.Dirty() && !session->message.empty())
+                    ImGui::TextWrapped("%s", session->message.c_str());
+        }
         return;
     }
     DrawSession(*active);
@@ -852,6 +914,7 @@ void Draw()
 void DrawInspectorPreview(MeshRenderer& renderer)
 {
     std::lock_guard lock(sessionMutex);
+    ReconcileSceneLocked();
     if (!ImGui::CollapsingHeader("Preview"))
     {
         inspectorPreviewVisible = {};
@@ -899,6 +962,7 @@ bool CapturePreviewRequest(EnhancedLiveViewRequest& request)
         ce::profile_scope wait{ce::marker<"MaterialPreviewRequestLockWait">()};
         lock.lock();
     }
+    ReconcileSceneLocked();
     if (inspectorPreview && std::chrono::steady_clock::now() - inspectorPreviewVisible <= std::chrono::milliseconds(250))
     {
         if (inspectorPreview->coverage.flags & EnhancedMaterialCoverage::Blended) return false;
@@ -930,6 +994,30 @@ CommandResult Command(const std::vector<std::string>& parts)
 {
     using namespace ConsoleCmd;
     std::lock_guard lock(sessionMutex);
+    ReconcileSceneLocked();
+    if (parts.size() == 2 && parts[1] == "sessions")
+    {
+        auto data = CommandData::Object();
+        data.Set("scene", CommandData::Int(observedSceneId));
+        data.Set("open", CommandData::Bool(active != nullptr));
+        auto visible = CommandData::Array();
+        auto retained = CommandData::Array();
+        for (const auto& session : sessions)
+        {
+            if (session->Renderer()) visible.Append(Describe(*session));
+            else if (session->document.Dirty())
+            {
+                auto draft = CommandData::Object();
+                draft.Set("graph", CommandData::String(session->guid.ToString()));
+                draft.Set("document", CommandData::Int(session->document.DocumentId()));
+                draft.Set("scene", CommandData::Int(session->target.sceneId));
+                retained.Append(std::move(draft));
+            }
+        }
+        data.Set("visible", std::move(visible));
+        data.Set("retained", std::move(retained));
+        return Ok({}, std::move(data));
+    }
     if (parts.size() == 3 && (parts[1] == "open" || parts[1] == "new"))
     {
         EntityHandle target;

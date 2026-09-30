@@ -7,6 +7,11 @@
   4,410행 기준선이다. **Blender rendered golden이 아니다.**
 - `manifest.json`: LF로 정규화한 UTF-8 SHA-256, case/view/field 범위와 evaluator 경로.
   GPU와 CPU가 함께 바뀌어 이전 baseline을 놓치지 않도록 회귀 wrapper에서 pinned hash와 17,640성분을 대조한다.
+- 2026-09-30의 가시광 Fourier LUT·3차 Airy·F82 및 substrate Fss 수정은
+  `numeric-golden-spectral.csv`와 `spectral-manifest.json`에 별도로 고정했다.
+  기존 `numeric-golden.csv`는 RGB 3파장 구현의 역사적 기준으로 보존한다.
+  검증은 새 4,410행 전체를 대조하고, 명시된 박막 사례 4개 외의 결과는
+  역사적 기준과도 일치해야 한다. Blender rendered 수용 판정은 MAT-9에 남는다.
 
 ## 재현
 

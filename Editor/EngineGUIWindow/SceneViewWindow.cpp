@@ -536,11 +536,14 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 			if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
 			{
 				const file::path filepath = editor::asset_drag::path_of(*HDRPayload);
-				RuntimeSettings::Get().SetSkyboxTextureName(filepath.string());
 				std::string skyError;
 				if (!EnhancedSceneRenderer::SetSkyBoxPath(filepath.string(), skyError))
 				{
 					Debug::PrintLog(spdlog::level::err, "SkyBox 변경 실패: " + skyError);
+				}
+				else
+				{
+					editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
 				}
 			}
 

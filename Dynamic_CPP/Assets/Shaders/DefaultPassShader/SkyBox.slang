@@ -2,6 +2,7 @@ cbuffer SkyBoxConstants : register(b0)
 {
     float4x4 gViewProjection;
     float4   gEyePosition;   // w = 스케일
+    float4   gBackgroundColor; // linear gray; alpha selects solid background
 };
 
 TextureCube  gCubeMap : register(t0);
@@ -42,5 +43,7 @@ VSOut VSMain(uint vertexId : SV_VertexID)
 
 float4 PSMain(VSOut input) : SV_TARGET
 {
+    if (gBackgroundColor.a > 0.5f)
+        return float4(gBackgroundColor.rgb, 1.0f);
     return float4(gCubeMap.SampleLevel(gSampler, input.texCoord, 0.0f).rgb, 1.0f);
 }

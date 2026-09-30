@@ -567,7 +567,7 @@ Core/Layered 상수 재질 10종·제어 재질 2종을 평행광/white furnace�
 BOX reconstruction 폭과 기본 anisotropic tangent 차이를 분리했으며,
 emission-only 제어 차이는 0, 박막 외 재질 relative RMS는 최대 1.941%였다.
 각 native 400,495개 검사·GPU validation 0건·정상 종료와 구성 간 393,216 RGBA 성분 바이트 일치를 확인했다.
-박막은 평행광 18.348% / furnace 15.646%로 차이가 남는다.
+당시 RGB 3파장 박막은 평행광 18.348% / furnace 15.646%로 차이가 남았다.
 독립 시드 0/11 재렌더의 박막 변동은 0.00636% / 0.22359%로 훨씬 작았다.
 Core rough 평행광의 1.941% 차이도 시드 변동 0.00132%만으로 설명되지 않는다.
 기존 650/550/450nm 근사를 rendered parity 통과로 처리하지 않는다.
@@ -577,6 +577,32 @@ Core rough 평행광의 1.941% 차이도 시드 변동 0.00132%만으로 설명�
 재질별 근사 수용·route/성능 gate는 동일 MAT-9 잔여에 유지한다.
 MAT-9 progress·완료 공수 32/34일은 유지한다.
 상세 조건·한계·수치는 [MAT9BlenderImageComparison](../analysis/MAT9BlenderImageComparison.md)이 소유한다.
+
+### MAT-9 가시광 박막·환경 쿠킹 후속 — 2026-09-30
+
+사용자 요청에 따라 RGB 3파장을 linear Rec.709 Fourier LUT 512×6·3차 Airy·금속 F82로
+교체했다. dielectric diffuse attenuation과 substrate Fss 보상을 함께 수정했다.
+동일 고정 이미지의 박막 RMS는 평행광 18.348→2.835%, furnace 15.646→1.352%다.
+Debug/Release 각 24장·400,495개 검사·GPU validation 0건과 이미지 바이트 일치를 확인했다.
+Layered 216,776개·Special 202,049개 검사 및 역사적 non-film 수치 보존,
+최신 IBL bake/소비 Debug/Release 각 19,351개 검사를 통과했다.
+직접 파장 적분 2,646성분에서는 LUT/3차 최대 절대 차이 0.002072,
+grazing 조건의 3차/infinite Airy 차이 0.124655를 측정하여 한계로 남긴다.
+Release 64×64 GPU probe에서 박막 warm median은 평행광 +0.054864ms,
+furnace +0.102288ms였고 최초 lookup 준비 비용도 늘었다. 이 값으로 실제 Scene FPS를 수용하지 않는다.
+
+사용자가 선택한 기본 forest 환경은 CC0 원본의 쿠킹 네 맵·모든 mip를 Resources에 보관하고
+bootstrap에서 CPU preload 후 첫 device frame에 올린다. EXR는 runtime에 배포하지 않는다.
+기존 HDRI 생성도 원본/recipe SHA cache key와 fence 완료 readback·비동기 원자적 저장을
+사용하도록 연결했다. Editor cache 경로는 Saved/Editor/Cache/Environment다.
+DX12 Debug/Release·Vulkan Release 실제 isolated Editor에서 기본 load·HDR cold 저장·warm hit·
+손상 거부와 이전 환경 유지·정상 종료를 확인했다. 네 맵 GPU roundtrip은 exact였다.
+Editor Debug/Release 및 C# BuildTool 빌드를 통과했고 Editor/Player resource 배치와 game
+packaging 복사를 연결했다. 새 Player 패키지 실행은 이번 묶음에서 검증하지 않았다.
+
+MAT-9 progress·32/34일을 유지한다. 잔여는 재질별 rendered 오차 수용, Special·texture/normal-map·
+원래 grid 대조, Deferred/Forward parity와 이동 카메라·tier별 성능 상한 판정이다.
+상세 수치·재현·라이선스는 [MAT9ThinFilmAndEnvironment](../analysis/MAT9ThinFilmAndEnvironment.md)가 소유한다.
 
 ## 6. 완료 기준
 

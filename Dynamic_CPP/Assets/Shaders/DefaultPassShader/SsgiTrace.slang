@@ -219,6 +219,11 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         float2 hitUV;
         if (TraceHiZ(position + normal * 0.01f, direction, uv, hitUV))
         {
+            // Hi-Z uses reduced min-depth cells. A hit cell can contain geometry
+            // while this full-resolution texel is sky; never gather its background
+            // color as surface radiance. GBuffer normals clear to zero off geometry.
+            const int2 hitNormalCoord = min(int2(hitUV * gNormalSize), int2(gNormalSize) - 1);
+            if (!any(gNormal.Load(int3(hitNormalCoord, 0)).xyz != 0.0f)) continue;
             // 맞은 표면의 직접광이 이 픽셀의 간접광이 된다.
             // Load로 읽는다. 히트 지점의 색을 그대로 쓰므로 보간이 필요
             // 없고, 샘플러를 안 만들면 힙도 바인딩도 하나 준다.

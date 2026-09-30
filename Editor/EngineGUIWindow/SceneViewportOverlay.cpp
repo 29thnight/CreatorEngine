@@ -10,6 +10,7 @@
 #include <cstdio>
 #include <mutex>
 #include <string>
+#include <optional>
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"
 
@@ -17,6 +18,7 @@ namespace editor::scene_overlay_detail
 {
     std::mutex snapshotMutex;
     SceneOverlaySnapshot snapshot;
+    std::array<std::optional<bool>, 3> requestedVisibility;
     constexpr const char* tools[]{EditorIcon::Select, EditorIcon::Move, EditorIcon::Rotate, EditorIcon::Scale};
     constexpr const char* toolNames[]{"Select (Q)", "Move (W)", "Rotate (E)", "Scale (R)"};
     constexpr const char* snapNames[]{"Translation snap", "Rotation snap", "Scale snap"};
@@ -97,10 +99,25 @@ editor::SceneOverlaySnapshot editor::ReadSceneOverlaySnapshot()
     return scene_overlay_detail::snapshot;
 }
 
+void editor::RequestSceneOverlayVisibility(SceneOverlayVisibility setting, bool visible)
+{
+    std::lock_guard lock(scene_overlay_detail::snapshotMutex);
+    scene_overlay_detail::requestedVisibility[static_cast<size_t>(setting)] = visible;
+}
+
 void editor::SceneViewportOverlay::Draw(
     EditorCameraRig& rig, GizmoRenderer* gizmos, const ViewportCanvas& canvas, float sceneFps)
 {
     using namespace scene_overlay_detail;
+    {
+        std::lock_guard lock(snapshotMutex);
+        bool* values[]{&showSkyBox, &showStatistics, &showFps};
+        for (size_t i = 0; i < requestedVisibility.size(); ++i)
+        {
+            if (requestedVisibility[i]) *values[i] = *requestedVisibility[i];
+            requestedVisibility[i].reset();
+        }
+    }
     // 오버레이가 놓이는 자리는 **content** 다. image 가 아니다 — crop 에서
     // image 는 content 를 넘으므로 그 사각형에 툴바를 놓으면 화면 밖으로 나간다.
     const ImVec2 imageMin = canvas.contentMin;
@@ -131,7 +148,7 @@ void editor::SceneViewportOverlay::Draw(
         {layout.left.x + layout.leftWidth, layout.left.y + h}) ||
         (layout.rightWidth > 0 && ImGui::IsMouseHoveringRect(layout.right,
             {layout.right.x + layout.rightWidth, layout.right.y + h}));
-    bool openStatistics = false, openCamera = false;
+    bool openCamera = false;
     const auto projectionMenu = [&] {
         if (ImGui::MenuItem("Perspective", nullptr, !cam.m_isOrthographic)) cam.m_isOrthographic = false;
         if (ImGui::MenuItem("Orthographic", nullptr, cam.m_isOrthographic)) cam.m_isOrthographic = true;
@@ -142,13 +159,15 @@ void editor::SceneViewportOverlay::Draw(
         if (ImGui::MenuItem("Wireframe overlay", nullptr, gizmos && gizmos->IsWireFrameEnabled(), gizmos != nullptr))
             gizmos->SetWireFrame();
         ImGui::Separator();
-        if (ImGui::MenuItem("Render Pass settings")) open_window(EditorWindowName::kRenderPass);
+        if (ImGui::MenuItem("Graphics settings")) open_window(EditorWindowName::kProjectSettings);
     };
     const auto showMenu = [&] {
         ImGui::MenuItem("Orientation gizmo", nullptr, &showViewGizmo);
         ImGui::MenuItem("FPS", nullptr, &showFps);
+        ImGui::MenuItem("SkyBox", nullptr, &showSkyBox);
         if (ImGui::MenuItem("Grid settings")) open_window(EditorWindowName::kGridSettings);
-        if (ImGui::MenuItem("Render Statistics")) openStatistics = true;
+        ImGui::MenuItem("Render Statistics", nullptr, &showStatistics);
+        if (ImGui::MenuItem("Rendering - Live")) OpenRenderLiveDiagnostics();
     };
     const auto snapMenu = [&](int i) {
         ImGui::Checkbox(snapNames[i], &snapEnabled[i]);
@@ -179,7 +198,7 @@ void editor::SceneViewportOverlay::Draw(
         for (int i = 0; i < 3; ++i)
         { ImGui::PushID(i); if (ImGui::BeginMenu(snapNames[i])) { snapMenu(i); ImGui::EndMenu(); } ImGui::PopID(); }
         if (ImGui::MenuItem("Camera settings")) openCamera = true;
-        if (ImGui::MenuItem("Render Statistics")) openStatistics = true;
+        ImGui::MenuItem("Render Statistics", nullptr, &showStatistics);
     };
     {
         const ToolbarStyle style(scale);
@@ -241,7 +260,6 @@ void editor::SceneViewportOverlay::Draw(
     if (ImGui::BeginPopup("SceneShading")) { shadingMenu(); ImGui::EndPopup(); }
     if (ImGui::BeginPopup("SceneShow")) { showMenu(); ImGui::EndPopup(); }
     if (openCamera) ImGui::OpenPopup("CameraSettings");
-    if (openStatistics) ImGui::OpenPopup("RenderStatistics");
     ImGui::SetNextWindowSizeConstraints({ThemePixels(240.f), 0}, {ThemePixels(440.f), (std::max)(h, imageMax.y - imageMin.y)});
     if (ImGui::BeginPopup("CameraSettings"))
     {
@@ -254,8 +272,6 @@ void editor::SceneViewportOverlay::Draw(
         ImGui::DragFloat("Camera Speed", rig.SpeedPtr(), 0.1f, 0.f, 200.f, "%.1f", ImGuiSliderFlags_AlwaysClamp);
         ImGui::EndPopup();
     }
-    ImGui::SetNextWindowSizeConstraints({ThemePixels(280.f), 0}, {ThemePixels(520.f), (std::max)(h, imageMax.y - imageMin.y)});
-    if (ImGui::BeginPopup("RenderStatistics")) { DrawSceneRenderStatistics(); ImGui::EndPopup(); }
     const bool anyPopup = popupWasOpen || ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel);
     const bool windowHovered = ImGui::IsWindowHovered();
     const bool drawViewGizmo = showViewGizmo && layout.showGizmo;
@@ -308,7 +324,35 @@ void editor::SceneViewportOverlay::Draw(
     }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) leftOwned = false;
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) rightOwned = false;
-    if (showFps && canvas.valid)
+    if (showStatistics && canvas.valid)
+    {
+        static EnhancedLiveDebugSnapshot costs;
+        static double refresh = -1.0;
+        if (refresh < 0 || ImGui::GetTime() - refresh >= .25)
+        {
+            costs = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+            refresh = ImGui::GetTime();
+        }
+        const auto displays = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+        const auto& scene = displays.Get(EnhancedLiveDisplayTarget::Editor);
+        char label[224]{};
+        char gpu[40] = "GPU unavailable";
+        if (costs.lastGpuViewId == kEnhancedEditorViewId && costs.lastGpuSubmissionId && !costs.passTimings.empty())
+            std::snprintf(gpu, sizeof(gpu), "GPU %.2f ms", costs.gpuMs);
+        std::snprintf(label, sizeof(label), "%u x %u   %.1f FPS\nEnhanced / %s   %s\n%s",
+            scene.completedWidth, scene.completedHeight, sceneFps, displays.backend == EnhancedLiveBackend::Vulkan ? "Vulkan" : "DX12",
+            scene.ready ? "ready" : "preparing", gpu);
+        const ImVec2 textSize = ImGui::CalcTextSize(label);
+        const float pad = ThemePixels(7.f);
+        const ImVec2 min{layout.left.x, layout.gizmoCenter.y - layout.radius};
+        const ImVec2 max{min.x + textSize.x + 2 * pad, min.y + textSize.y + 2 * pad};
+        auto* draw = ImGui::GetWindowDrawList();
+        draw->PushClipRect(canvas.clipMin, canvas.clipMax, true);
+        draw->AddRectFilled(min, max, IM_COL32(18, 21, 25, 175), ThemePixels(4.f));
+        draw->AddText({min.x + pad, min.y + pad}, IM_COL32(235, 239, 244, 255), label);
+        draw->PopClipRect();
+    }
+    if (showFps && !showStatistics && canvas.valid)
     {
         char label[32]{};
         std::snprintf(label, sizeof(label), "Scene %.1f FPS", sceneFps);
@@ -325,5 +369,6 @@ void editor::SceneViewportOverlay::Draw(
     std::lock_guard lock(snapshotMutex);
     snapshot = {true, blocksPointer, drawViewGizmo, viewUsing, cam.m_isOrthographic, local, layout.mode,
         imageMin, imageMax, layout.left, layout.right, layout.gizmoCenter,
-        layout.leftWidth, layout.rightWidth, h, layout.radius, operation, cam.m_eyePosition, cam.m_forward, canvas};
+        layout.leftWidth, layout.rightWidth, h, layout.radius, operation, cam.m_eyePosition, cam.m_forward, canvas,
+        showStatistics, showSkyBox, showFps};
 }

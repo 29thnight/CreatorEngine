@@ -19,7 +19,7 @@ if($LASTEXITCODE -ne 0) { throw 'Matched reference identity failed' }
 New-Item -ItemType Directory $case | Out-Null
 $vswhere=Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
 $vs=@(& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath)[0]
-$msbuild=Join-Path $vs 'MSBuild/Current/Bin/MSBuild.exe'
+$msbuild=Join-Path $vs 'MSBuild/Current/Bin/amd64/MSBuild.exe'
 & $msbuild "$PSScriptRoot/MaterialMatchedImageProbe.vcxproj" /m:2 /nologo "/p:Configuration=$Configuration" /p:Platform=x64 /p:UseDynamicDebugging=false /p:LinkIncremental=false /p:VcpkgManifestInstall=false /v:minimal *> "$case/build.log"
 if($LASTEXITCODE -ne 0) { throw "Native image probe build failed; see $case/build.log" }
 $previousPath=$env:PATH

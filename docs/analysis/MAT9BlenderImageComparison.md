@@ -1,6 +1,7 @@
 # MAT-9 Blender / native image comparison
 
-2026-09-30. First matched **Core / Layered constant-input** image measurement.
+2026-09-30. Matched **Core / Layered constant-input** image measurement, updated
+after the visible-spectrum thin-film implementation.
 MAT-9 remains in progress; these results do not close Special transport, the
 textured area-light/HDRI grid, route parity or performance acceptance.
 
@@ -64,7 +65,7 @@ All 393,216 RGBA components of the 24 images are byte-identical across configura
 | Coat | 0.182% | 0.147% |
 | Sheen | 0.090% | 0.176% |
 | Anisotropy, explicit UV tangent | 0.937% | 1.019% |
-| Thin film | **18.348%** | **15.646%** |
+| Thin film, current Fourier LUT / F82 | **2.835%** | **1.352%** |
 | Mixed layers | 0.071% | 0.120% |
 | Emission-only control | **0.000%** | **0.000%** |
 | Diffuse white control | 0.045% | 0.066% |
@@ -72,6 +73,12 @@ All 393,216 RGBA components of the 24 images are byte-identical across configura
 Small differences include the native BRDF/integration approximations, Monte Carlo
 noise and half-float lighting quantization. They must not all be attributed to one
 of those terms without an additional isolation test.
+
+The historical RGB 650/550/450nm film baseline was **18.348% / 15.646%**.
+The current LUT, dielectric diffuse weighting and substrate Fss corrections reduce
+that difference to the table above. Non-film cases retain their previous values.
+See [thin-film implementation, dense spectral reference and GPU cost](MAT9ThinFilmAndEnvironment.md)
+for the separately measured contributions and approximation limits.
 
 ### Reference noise isolation
 
@@ -81,7 +88,8 @@ same mesh, inputs, 1,024 samples and render settings. Over the same comparison m
 - Directional maximum seed-to-seed relative RMS: **0.05802%** (Core metal).
 - Furnace maximum seed-to-seed relative RMS: **0.22359%** (thin film).
 - Thin film seed-to-seed: **0.00636%** directional / **0.22359%** furnace, compared
-  with native/reference differences of 18.348% / 15.646%.
+  with current native/reference differences of 2.835% / 1.352% (historically
+  18.348% / 15.646% for RGB 3 wavelengths).
 - Core rough directional seed-to-seed: **0.00132%**, compared with 1.941% native
   difference. That remaining direct-light difference cannot be explained by the
   measured reference noise alone. Its BRDF/energy approximation needs separate judgment.
@@ -90,10 +98,11 @@ This is one independent seed pair, not a statistical confidence interval or a
 universal convergence bound. It identifies the measured film difference as much
 larger than this reference's sampling variation.
 
-The remaining film difference is visible and survives the camera/filter/tangent
-corrections. The current engine evaluates interference at 650/550/450 nm; Cycles
-uses wavelength-integrated Fourier sensitivity and an F82 model at the film/metal
-interface. This is a measured approximation limit, **not accepted rendered parity**.
+The current engine uses visible-spectrum Fourier sensitivity, three Airy orders
+and an F82 model at the film/metal interface. The residual difference remains above
+the measured seed variation. This is **not accepted rendered parity**; spectral
+order truncation, RGB optical reconstruction and the remaining BRDF approximations
+need material-specific acceptance bounds.
 See the pinned [Cycles Fresnel implementation](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_util.h)
 and [microfacet Fresnel](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_microfacet.h).
 
@@ -121,7 +130,9 @@ Local evidence:
 
 - `Tools/blender/fixtures/material-matched-5.1.1`: frozen Blender source images and setup.
 - `Build/Obj/Mat9Images-Release-frozen-final` and `Mat9Images-Debug-frozen-final`:
-  native captures, actual consumed inputs/geometry, build and validation logs.
+  historical RGB-3 native captures, inputs/geometry, build and validation logs.
+- `Build/Obj/Mat9Images-Release-film-spectral-v4` and
+  `Mat9Images-Debug-film-spectral-final`: current LUT captures and regression evidence.
 - `Build/Obj/Mat9MatchedReference-repeat-11`: independent seed-11 reference.
 - `Build/Obj/mat9-blender-comparison-frozen-final.json` and `.png`: metrics, reference
   noise measurements and contact sheet.
@@ -131,8 +142,9 @@ Local evidence:
 
 ## Next required work
 
-1. Film fidelity: evaluate a wavelength-integrated replacement and its cost against
-   this rendered reference before changing the accepted material algorithm.
+1. Film acceptance: judge the current wavelength-integrated replacement's residual
+   image differences, grazing-angle limits and measured cold/warm cost. The
+   implementation and first cost measurement are complete; rendered acceptance remains.
 2. Special transport and texture/factor/normal-map reference scenes, with shared
    supported geometry/background/transport conditions and explicit approximation limits.
 3. Define material-specific acceptance bounds using repeated reference noise checks;

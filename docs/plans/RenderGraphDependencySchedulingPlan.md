@@ -326,3 +326,21 @@ UV/BVH/직접광 준비는 독립적으로 진행할 수 있다. 현재 통합 �
 
 **이 페이즈의 완료선은 `RG6`이다.** `RG7`~`RG9`는 같은 페이즈 안의 최적화 트랙이며, 늦어져도
 `RG6`가 세운 제품 RenderGraph를 declaration-order로 되돌리지 않는다.
+
+## RG-V — compiled graph 읽기 전용 viewer (2026-10-01 추가)
+
+PHASE 4.3의 별도 todo 미산정 행이다. RG9의 subresource/split barrier 구현 완료까지
+기본 graph viewer를 미루지 않는다. RG3 compiled DAG/culling/lifetime/barrier 결과를 입력으로
+초기 viewer를 만들고 RG6 제품 cutover에서 Scene/Game view별 실제 compiled generation으로 검증한다.
+RG4 wave/critical-path와 RG7~9 alias/queue/range 정보는 지원되는 세대에서 같은 reader에 추가한다.
+
+- Window > RenderPass는 설정/시간 계측이 아닌 이 viewer를 연다. 노드·리소스·edge 원인,
+  authored/compiled order, version, culling, lifetime/state/barrier를 조사할 수 있다.
+- 실행/저작의 정본을 새로 만들지 않는다. compiled immutable snapshot을 읽고, runtime GPU
+  리소스를 UI가 소유하지 않는다. 미지원 range/queue는 빈 정답을 만들어 표시하지 않는다.
+- 두 view·Scene/resize/세대 교체에서 원 graph와 node/edge/hash/수명/배리어가 일치하고,
+  Pass 조건 변경/culled branch·cycle 진단이 실제 compile 결과와 일치해야 한다.
+- 선언 배열 shuffle, missing edge, stale snapshot 변이가 검증을 실패시키고, viewer off/on
+  비용·메모리 상한과 Debug/Release UI를 확인한다. 단순 현재 pipeline 문자열 dump는 RG-V 완료가 아니다.
+- 4.6 CSRP-5/6의 C# Build → immutable IR → native compile 결과를 동일 viewer에 연결한다.
+  Source가 C++/C#인 경우를 표시하되 두 개의 편집 가능한 graph SoT를 만들지 않는다.

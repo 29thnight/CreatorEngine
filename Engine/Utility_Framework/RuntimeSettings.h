@@ -58,10 +58,12 @@ public:
         const std::scoped_lock lock(m_renderPassSettingsMutex);
         return m_renderPassSettings;
     }
-    void SetSkyboxTextureName(std::string value)
+    // Publish the validated source and its presentation policy together.
+    void SetEnvironmentSelection(std::string value, bool showBackground)
     {
         const std::scoped_lock lock(m_renderPassSettingsMutex);
         m_renderPassSettings.skyboxTextureName = std::move(value);
+        m_renderPassSettings.m_isSkyboxEnabled = showBackground;
     }
 
 private:

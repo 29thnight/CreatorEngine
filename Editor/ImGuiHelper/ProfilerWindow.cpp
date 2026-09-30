@@ -16,8 +16,10 @@
 //   지키는 가장 싼 방법이다.
 #include "ProfilerHUD.h"
 #include "ProfilerView.h"
+#include "EnhancedRenderDebugWindow.h"
 
 #include <cinttypes>
+#include <atomic>
 #include <cstdio>
 #include <memory>
 #include <string>
@@ -490,9 +492,18 @@ namespace
 	}
 }
 
+namespace editor::profiler_view
+{
+	enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive };
+	page selectedPage = page::timeline;
+	std::atomic_bool renderingLiveRequested{false};
+	void select_rendering_live() { renderingLiveRequested = true; }
+}
+
 void DrawProfilerHUD()
 {
 	using namespace editor::profiler_view;
+	if (renderingLiveRequested.exchange(false)) selectedPage = page::renderingLive;
 
 	// ★ 창이 **그려졌다** 는 증거를 프로파일러 자신이 낸다. 창이 열린 것과
 	//   본문이 도는 것은 다르다 — 도크 탭으로 겹친 창은 선택돼야 본문이
@@ -509,7 +520,7 @@ void DrawProfilerHUD()
 	//   청하므로, 창을 닫으면 코어는 스냅샷을 한 번도 만들지 않는다.
 	//   간격은 코어가 정한다 — 화면이 부르는 대로 다 내주면 링을 통째로
 	//   복사하는 비용이 재려는 대상을 흔든다.
-	service.request_live_capture();
+	if (selectedPage != page::renderingLive) service.request_live_capture();
 
 	const ce::live_summary summary = service.summary();
 
@@ -517,16 +528,14 @@ void DrawProfilerHUD()
 	//
 	// ★ 언제 갈아타는가 는 이 줄이 아니라 reader 가 정한다. 그래야 그 규칙을
 	//   화면 없이 재고 변이로 물 수 있다 — 여기 조건문을 두면 재는 수단이 눈뿐이다.
-	reader().sync(service.capture());
+	if (selectedPage != page::renderingLive) reader().sync(service.capture());
 
 	draw_toolbar(summary);
 	editor::profiler_view::capture_file_view::draw_file_line();
 	ImGui::Separator();
 	// The left rail keeps every profiler view in one predictable location.
-	// The selected frame range belongs to the reader, not to an individual page.
-	enum class page { frames, timeline, cpu, memory, gpu, network, animation,
-		hierarchy, flat, threads, collector };
-	static page selected = page::timeline;
+	// The selectedPage frame range belongs to the reader, not to an individual page.
+
 	static bool timelineFlame = false;
 	const float railWidth = ImGui::GetTextLineHeightWithSpacing() + 20.0f;
 	ImGui::BeginChild("##ProfilerNavigation", ImVec2(railWidth, 0.0f), false,
@@ -534,10 +543,10 @@ void DrawProfilerHUD()
 	const auto nav = [&](page target, const char* icon, const char* title, const char* description)
 	{
 		ImGui::PushID(static_cast<int>(target));
-		const bool active = selected == target;
+		const bool active = selectedPage == target;
 		const ImVec4 activeColor = ImGui::GetStyleColorVec4(ImGuiCol_HeaderActive);
 		if (active) ImGui::PushStyleColor(ImGuiCol_Button, activeColor);
-		if (ImGui::Button(icon, ImVec2(railWidth - 12.0f, railWidth - 12.0f))) selected = target;
+		if (ImGui::Button(icon, ImVec2(railWidth - 12.0f, railWidth - 12.0f))) selectedPage = target;
 		if (active) ImGui::PopStyleColor();
 		if (ImGui::IsItemHovered())
 		{
@@ -554,6 +563,7 @@ void DrawProfilerHUD()
 	nav(page::cpu, EditorIcon::Timing, "CPU", "프로세스 사용률과 CPU Self 상위 마커");
 	nav(page::memory, EditorIcon::Runtime, "메모리", "프로세스 RAM 작업 집합");
 	nav(page::gpu, EditorIcon::Game, "GPU", "Graphics 구간 시간과 VRAM");
+	nav(page::renderingLive, EditorIcon::Scene, "Rendering - Live", "Live renderer diagnostics without Record");
 	nav(page::network, EditorIcon::World, "네트워크", "엔진 송수신량");
 	nav(page::animation, EditorIcon::AvatarMask, "Animation", "실시간 CPU 예산과 태스크 실행 기록");
 	ImGui::Separator();
@@ -564,19 +574,20 @@ void DrawProfilerHUD()
 	ImGui::EndChild();
 	ImGui::SameLine(0.0f, 0.0f);
 	ImGui::BeginChild("##ProfilerPage", ImVec2(0.0f, 0.0f), false);
-	const char* pageTitle = selected == page::frames ? "프레임 그래프" :
-		selected == page::timeline ? "타임라인" :
-		selected == page::cpu ? "CPU" :
-		selected == page::memory ? "메모리" :
-		selected == page::gpu ? "GPU" :
-		selected == page::network ? "네트워크" :
-		selected == page::animation ? "Animation Budget" :
-		selected == page::hierarchy ? "Hierarchy" :
-		selected == page::flat ? "Flat" :
-		selected == page::threads ? "Threads" : "Collector";
+	const char* pageTitle = selectedPage == page::frames ? "프레임 그래프" :
+		selectedPage == page::timeline ? "타임라인" :
+		selectedPage == page::cpu ? "CPU" :
+		selectedPage == page::memory ? "메모리" :
+		selectedPage == page::gpu ? "GPU" :
+		selectedPage == page::network ? "네트워크" :
+		selectedPage == page::animation ? "Animation Budget" :
+		selectedPage == page::renderingLive ? "Rendering - Live" :
+		selectedPage == page::hierarchy ? "Hierarchy" :
+		selectedPage == page::flat ? "Flat" :
+		selectedPage == page::threads ? "Threads" : "Collector";
 	ImGui::TextUnformatted(pageTitle);
 	ImGui::Separator();
-	switch (selected)
+	switch (selectedPage)
 	{
 	case page::frames:
 		draw_frame_overview();
@@ -609,13 +620,14 @@ void DrawProfilerHUD()
 	case page::gpu: draw_telemetry(telemetry_page::gpu); break;
 	case page::network: draw_telemetry(telemetry_page::network); break;
 	case page::animation: draw_animation_budget(); break;
+	case page::renderingLive: editor::DrawRenderLiveDiagnostics(); break;
 	case page::hierarchy:
 	case page::flat:
 		if (reader().has_capture())
 		{
 			draw_selection_summary();
 			ImGui::Separator();
-			if (selected == page::hierarchy) draw_hierarchy_table();
+			if (selectedPage == page::hierarchy) draw_hierarchy_table();
 			else draw_flat_table();
 		}
 		else ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");

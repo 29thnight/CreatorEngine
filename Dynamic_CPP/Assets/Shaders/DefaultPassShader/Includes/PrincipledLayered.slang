@@ -233,6 +233,37 @@ PrincipledLayeredState BuildLayeredState(PrincipledSurface material, float3 view
     const float3 baseReflectance = integral.base.singleScatter + state.baseMultipleScatter;
     state.baseDiffuse = material.baseColor * (1.0 - material.metallic)
         * max(1.0 - PrincipledMaxChannel(baseReflectance), 0.0);
+#if (LX_MATERIAL_FEATURE_MASK & 0x0400u) != 0
+    if (material.thinFilmThickness > 0.0 && material.thinFilmIor != 1.0
+        && (material.metallic > 0.0 || material.thinFilmIor != material.ior))
+    {
+        // Cycles GGX compensation uses the underlying closure's Fss even when
+        // thin-film Fresnel is enabled. Its directional single scatter still
+        // contains the film; only the average used for compensation is fixed.
+        const float root = (state.reflection.ior - 1.0) / (state.reflection.ior + 1.0);
+        const float physicalF0 = root * root;
+        const float physicalFss = state.reflection.ior >= 1.0
+            ? (state.reflection.ior - 1.0) / (4.08567 + 1.00071 * state.reflection.ior)
+            : 1.0 - state.reflection.ior * state.reflection.ior
+                * (1.0 - (rcp(state.reflection.ior) - 1.0) / (4.08567 + 1.00071 / state.reflection.ior));
+        const float3 dielectricFss = lerp(state.reflection.dielectricF0,float3(1.0),
+            saturate((physicalFss-physicalF0) / max(1.0-physicalF0,1e-20)));
+        const float3 metalFss = lerp(state.reflection.metalF0,float3(1.0),1.0/21.0)
+            - state.reflection.metalF82Correction / 126.0;
+        PrincipledIblIntegral compensation = integral.base;
+        compensation.averageFresnel = saturate(lerp(dielectricFss,metalFss,material.metallic));
+        state.baseMultipleScatter = PrincipledMultipleScatter(compensation);
+        // Cycles estimates a film dielectric closure's layering albedo at the
+        // view angle. Metal is a separate closure, so its RGB reflectivity must
+        // not attenuate the remaining dielectric diffuse a second time.
+        PrincipledReflection dielectric = state.reflection;
+        dielectric.metallic = 0.0;
+        const float3 albedo = EvaluatePrincipledFresnel(dielectric,
+            saturate(dot(material.normal, state.view)));
+        state.baseDiffuse = material.baseColor * (1.0 - material.metallic)
+            * max(1.0 - PrincipledMaxChannel(albedo), 0.0);
+    }
+#endif
     state.sheenNormal = PrincipledUnitNormal(lerp(material.normal, material.coatNormal,
         saturate(material.coatWeight)), material.normal);
     state.sheenTangent = PrincipledProjectedTangent(state.view, state.sheenNormal);

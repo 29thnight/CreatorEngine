@@ -71,6 +71,10 @@ public:
     /// 클립 범위 밖으로 나가지 않을 크기면 된다.
     void SetScale(float scale) { m_scale = scale; }
 
+    /// Hide the environment image while retaining its IBL resources.
+    /// Neutral linear gray is processed by the normal scene post chain.
+    void SetShowEnvironment(bool show) { m_showEnvironment = show; }
+
     RGHandle GetOutput() const { return m_output; }
     RGHandle GetDepth() const { return m_depth; }
 
@@ -88,6 +92,7 @@ private:
     RHIFormat       m_cubeMapFormat{ RHIFormat::RGBA16Float };
     uint32_t        m_cubeMapMips{ 1 };
     float           m_scale{ 500.f };
+    bool            m_showEnvironment{ true };
 
     // 프레임 밀봉 값(3-2).
         math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };

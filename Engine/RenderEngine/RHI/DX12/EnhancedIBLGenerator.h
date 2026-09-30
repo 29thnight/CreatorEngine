@@ -1,6 +1,12 @@
 #pragma once
 #include "../RHIFormat.h"
 #include <cstdint>
+#include <array>
+#include <memory>
+#include <filesystem>
+#include <vector>
+#include <future>
+#include "../../Assets/CookedEnvironment.h"
 
 #include "../../Render/Graph/EnhancedRenderPass.h"
 
@@ -68,6 +74,15 @@ public:
         RHITextureHandle equirect, RHIFormat equirectFormat,
         uint32_t cubeSize, uint32_t brdfSize, std::string& outError);
 
+    bool InstallCooked(const EnhancedFrameContext& context, assets::CookedEnvironment value, std::string& error);
+    bool TouchCooked(const EnhancedFrameContext& context, std::string& error);
+    // Record copies in the current upload frame; publish only after its fence.
+    bool QueueCookedCapture(const std::filesystem::path& file, const assets::EnvironmentIdentity& identity,
+        std::string& error);
+    void MarkCookedCaptureSubmitted(uint64_t fence);
+    bool FinishCookedCapture(uint64_t completedFence, std::string& error);
+    bool HasPendingCookedCapture() const { return !m_cookedCaptures.empty() || m_cookedWrite.valid(); }
+
     // 핸들로 낸다. 소비처는 RHIBindingDesc::SrvCube/Srv2D로 그대로 받으며,
     // 실물 소유권은 CreateTexture를 수행한 backend resource table에 있다.
     RHITextureHandle GetCubeMap() const { return m_cubeMapHandle; }
@@ -80,6 +95,19 @@ public:
     uint32_t GetIrradianceSize() const { return (m_cubeSize < 64u) ? m_cubeSize : 64u; }
 
 private:
+    struct CookedCaptureSlice { RHIReadback readback; uint32_t image{}, mip{}; };
+    std::array<std::shared_ptr<class Texture>, 4> m_cookedTextures;
+    struct CookedCapture
+    {
+        std::vector<CookedCaptureSlice> slices;
+        std::filesystem::path path;
+        assets::EnvironmentIdentity identity;
+        uint64_t fence{};
+        uint32_t cube{}, brdf{};
+    };
+    // Selections may change while the preceding GPU copy/disk write is pending.
+    std::vector<CookedCapture> m_cookedCaptures;
+    std::future<std::string> m_cookedWrite;
     void ReleaseTargets();
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool CreateTargets(uint32_t cubeSize, uint32_t brdfSize,

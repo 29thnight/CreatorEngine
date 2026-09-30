@@ -12,6 +12,7 @@
 #include "DataSystem.h"
 #include "Material.h"
 #include "MaterialGraphWindow.h"
+#include "SceneViewportOverlay.h"
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
 #include "EditorAssetDatabase.h"
@@ -367,6 +368,8 @@ uint32_t Core::App::PublishRenderFrame()
 			EnhancedLiveDisplayTarget::Editor,
 			EnhancedLiveViewFlags::SceneOverlay |
 				EnhancedLiveViewFlags::CanvasPreview };
+		if (!::editor::ReadSceneOverlaySnapshot().skyBoxVisible)
+			views[viewCount - 1].viewFlags = views[viewCount - 1].viewFlags | EnhancedLiveViewFlags::HideSkyBox;
 	}
 	Scene* activeScene = SceneManagers->GetActiveScene();
 	CameraComponent* const gameCamera = (nullptr != activeScene)

@@ -10,6 +10,7 @@ struct EnhancedLiveViewRequest;
 namespace editor::material_editing
 {
 bool Open(MeshRenderer& renderer, std::string& error);
+void OnActiveSceneChanged();
 void Draw();
 void DrawInspectorPreview(MeshRenderer& renderer);
 bool CapturePreviewRequest(EnhancedLiveViewRequest& request);

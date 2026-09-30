@@ -18,6 +18,7 @@ struct PrincipledReflection
     float thinFilmIor;
     float3 metalIor;
     float3 metalExtinction;
+    float3 metalF82;
 #endif
 };
 
@@ -37,6 +38,7 @@ PrincipledReflection BuildPrincipledReflection(PrincipledSurface material)
     const float3 f82 = saturate(lerp(material.metalF0, float3(1.0), x82Fifth)
         - material.metalF82Correction * (1.0 / 7.0) * x82Fifth * x82);
     FilmConductorIor(material.metalF0, f82, reflection.metalIor, reflection.metalExtinction);
+    reflection.metalF82 = f82;
 #endif
     return reflection;
 }
@@ -90,7 +92,7 @@ float3 EvaluatePrincipledFresnel(PrincipledReflection reflection, float cosine)
         const float transition = smoothstep(0.0, 1.0, reflection.thinFilmThickness);
         const float filmIor = lerp(1.0, reflection.thinFilmIor, transition);
         float3 filmDielectric = EvaluateFilmRgb(cosineClamped, filmIor,
-            reflection.thinFilmThickness, float3(reflection.ior), float3(0.0));
+            reflection.thinFilmThickness, float3(reflection.ior), float3(0.0), float3(-1.0));
         const float f0Root = (reflection.ior - 1.0) / (reflection.ior + 1.0);
         const float physicalF0 = f0Root * f0Root;
         if (physicalF0 > 1e-5)
@@ -100,7 +102,7 @@ float3 EvaluatePrincipledFresnel(PrincipledReflection reflection, float cosine)
         }
         dielectric = lerp(dielectric, saturate(filmDielectric), transition);
         const float3 filmMetal = EvaluateFilmRgb(cosineClamped, filmIor, reflection.thinFilmThickness,
-            reflection.metalIor, reflection.metalExtinction);
+            reflection.metalIor, reflection.metalExtinction, reflection.metalF82);
         metal = lerp(metal, filmMetal, transition);
     }
 #endif

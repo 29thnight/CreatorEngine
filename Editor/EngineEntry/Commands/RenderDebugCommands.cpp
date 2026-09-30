@@ -47,6 +47,7 @@
 //   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
+#include "SceneViewportOverlay.h"
 #include "RHI/RHIValidationLedger.h"
 #include "CommandSupport.h"
 #include "EditorObjectOperations.h"
@@ -286,6 +287,33 @@ namespace ConsoleCmd
         auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
         if (!result.IsSuccess()) return result;
         return EditorObjectOperations::MaterialMode(target, ctx.parts[2] == "opaque" ? MaterialRenderingMode::Opaque : MaterialRenderingMode::Transparent);
+    }
+
+    static CommandCore::CommandResult Cmd_render_environment(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if ((ctx.parts.size() == 2 && ctx.parts[1] == "status") ||
+            (ctx.parts.size() == 3 && ctx.parts[1] == "background" &&
+             (ctx.parts[2] == "on" || ctx.parts[2] == "off")))
+        {
+            auto settings = RuntimeSettings::Get().GetRenderPassSettings();
+            if (ctx.parts.size() == 3)
+            {
+                settings.m_isSkyboxEnabled = ctx.parts[2] == "on";
+                RuntimeSettings::Get().SetRenderPassSettings(settings);
+            }
+            auto data = CommandData::Object();
+            data.Set("background", CommandData::Bool(settings.m_isSkyboxEnabled));
+            data.Set("path", CommandData::String(settings.skyboxTextureName));
+            data.Set("iblGenerations", CommandData::Int(EnhancedSceneRenderer::GetLiveDisplaySnapshot().iblGenerationCount));
+            return Ok({}, std::move(data));
+        }
+        if (ctx.parts.size()!=2) return InvalidArguments("render.environment <HDR-or-ceibl-path> | status | background on|off");
+        std::string error;
+        if (!EnhancedSceneRenderer::SetSkyBoxPath(ctx.parts[1],error)) return Fail("render.environment_failed",error);
+        editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
+        auto data=CommandData::Object(); data.Set("path",CommandData::String(ctx.parts[1]));
+        return Ok("Environment selection queued; render.live.fence waits for publication",std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_render_backend(const ConsoleCommandContext& ctx)
@@ -766,6 +794,7 @@ namespace ConsoleCmd
     {
         reg.Result({ "light.proxy" }, &Cmd_light_proxy);
         reg.Result({ "render.matmode" }, &Cmd_render_matmode);
+        reg.Result({ "render.environment" }, &Cmd_render_environment);
         reg.Result({ "render.backend" }, &Cmd_render_backend);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
         reg.Result({ "render.live.wait" }, &Cmd_render_live_wait);

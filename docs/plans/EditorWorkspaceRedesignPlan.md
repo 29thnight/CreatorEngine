@@ -1,6 +1,10 @@
 # 에디터 워크스페이스 · 도킹 · ViewportHost 재설계 (PHASE 21)
 
 - 수립일: 2026-08-24
+- 설정 표면 추가: 2026-10-01 — **W9**(공수 미산정, progress)의 Preferences/Project Settings,
+  저장소·default profile·Quality·draft 복구 계약을 추가했다. 현재 적용과 남은 완료 조건은
+  [EditorRenderingSurfacesPlan.md](EditorRenderingSurfacesPlan.md), 검증은
+  [EditorRenderingSurfacesValidation.md](../analysis/EditorRenderingSurfacesValidation.md)에 기록한다.
 - 사전 정찰 갱신: 2026-08-30 (§1 기준선 전수 재실측 · §3.2/§7.1/§8.3/§9/§11/§12 정정)
 - 재정찰: 2026-09-10 — §1 17항 재대조(15 그대로 · 2 정정) · 신규 발견 9건 · 메뉴 표면 감사.
   전문은 [EditorMenuSurfaceAndPhase21Preflight.md](../analysis/EditorMenuSurfaceAndPhase21Preflight.md).
@@ -4933,3 +4937,17 @@ Content Browser가 도크되지 않은 적이 있다. 표를 훑으면 도크 �
 
 **M4는 여기서 닫힌다.** 다음은 W3 — 안정 식별자를 `Editor.*`로 바꾸면서 기존
 `imgui.ini`의 도크 항목을 이주시키는 일이다.
+
+## W9 — Preferences / Project Settings 수명·설정 정본 (2026-10-01 추가)
+
+상태 progress, 공수 미산정(`days:null`). 실제 UI/설정 inventory와 항목별 완료 gate는
+[EditorRenderingSurfacesPlan.md §2](EditorRenderingSurfacesPlan.md#2-w9--preferences--project-settings-소유권저장-계약-phase-21-미산정)다.
+기존 Preferences 두 필드·Build 편집기·Graphics 임시 live tuning을 전용 창으로 분리했다.
+개인/프로젝트 저장소 분리, default SceneRenderProfile/환경 GUID resolver, Quality preset,
+Show 항목과 카메라/진단 선호도 저장, material draft 복구 UX, 실제 쿠킹/Player 소비를 남긴다.
+W3/W4 stable 창/context 기반을 소비한다. profile parameter와 C# pipeline composition의
+저작 정본을 섞지 않으며, 기존 완료 W3/W4를 이 추가 범위의 완료 증거로 대체하지 않는다.
+
+W2-V 후속 통계는 popup 대신 Scene 좌측 비상호작용 HUD와 Show toggle이다. Scene 완료 해상도·
+Scene rendered FPS를 사용한다. per-view CPU/GPU producer와 stale 표시 완료는 Phase 14의
+14-LIVE를 소비하며, 다른 view의 시간이나 global FPS를 Scene 값으로 쓰지 않는다.

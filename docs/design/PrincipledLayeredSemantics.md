@@ -17,9 +17,10 @@ MAT-0의 EEVEE material grid는 두 입력의 효과를 입증하는 golden이 �
 이 두 기능의 재질 의미 비교에는 Cycles 기준이 필요하다. 이 항목을 EEVEE 전체 parity로 표시하지 않는다.
 
 Thin film은 [Cycles optical 구성](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bsdf_util.h)을 참고한
-독립 Airy 간섭식이다. **650/550/450nm 세 유효 파장으로 RGB를 근사**한다.
-Cycles의 CIE/Fourier spectral 적분과 동일한 색 결과를 주장하지 않는다.
-IOR·두께·각도 변화와 금속 n+ik를 계산하며, 근사의 시각 오차와 게임 비용 수용은 MAT-9에서 판정한다.
+가시광 Fourier Airy 간섭식이다. **512개 complex XYZ sensitivity를 linear Rec.709로 변환한
+LUT와 3차까지의 간섭 항**을 사용한다. 금속 경계의 위상은 n+ik, 크기는 film-relative F0/F82다.
+이전 650/550/450nm 모델은 historical numeric baseline에만 보존한다.
+IOR·두께·각도·금속 광학 특성 복원의 근사 한계와 rendered parity 수용은 MAT-9에서 판정한다.
 
 ## 입력
 
@@ -91,7 +92,7 @@ Lookup bake의 차원·cache·환경 convolution, graph→입력 생성은 MAT-6
 | `0x00FF` | core+Coat | 별도 GGX·coat integral·tint 경로 |
 | `0x017F` | core+Sheen | 32×32×float3 고정 LTC, 네 계수점 보간·분포 |
 | `0x027F` | core+Anisotropy | tangent frame·두 alpha 축, view azimuth integral |
-| `0x047F` | core+Thin Film | RGB complex 광학 계산·F0/F82→n+ik |
+| `0x047F` | core+Thin Film | 12KiB spectral Fourier LUT·3차 Airy·F0/F82→n+ik |
 | `0x01FF` / `0x07FF` | Coat+Sheen / 모든 Layered | 해당 기능의 정적 합성 |
 
 Layered 범위는 `0x07FF`다. Layered bit에는 Specular/IOR bit가 필요하다.
@@ -113,7 +114,7 @@ Cook variant 상한·resource 비용 badge와 GPU 시간 gate는 MAT-7~MAT-9의 
 - Blender 소켓 기본값 13개, 고정 Sheen 계수 1,024개의 SHA-256을 검사한다.
 - DXIL/SPIR-V 14개 컴파일, 잘못된 Layered 의존 mask 8개 거부. SPIR-V는 컴파일 검증이며 Vulkan GPU 실행은 아니다.
 - RTX 4070 Ti D3D12의 35개 사례×8개 시선×7개 permutation을 CPU double 기준과 비교한다.
-  Thin film CPU 기준은 shader의 Airy 재귀 대신 독립 characteristic matrix 해법이다.
+  Thin film CPU 기준은 complex 경계 진폭/위상과 double Fourier 합으로 shader의 실수 전개를 검산한다.
 - 수치·독립성 검사 **216,776건**, 흰색 환경 energy bound **5,712건**을 통과했다.
   허용 정규화 오차는 0.00005, 최대 오차는 **0.0000011920929**다.
   스침각/정면 Fresnel, coat IOR=4에서 F0 아래로 내려가는 물리 반사도 포함한다.
@@ -127,6 +128,20 @@ Cook variant 상한·resource 비용 badge와 GPU 시간 gate는 MAT-7~MAT-9의 
   세 명령 모두 통과했으며 Forward/reference 16,384픽셀의 불일치는 0이었다.
 
 Blender/Cycles rendered golden 교차 판정, 제품 route parity·성능과 thin film 근사 수용은 MAT-9에 남는다.
+
+### MAT-9 박막 모델 교체 — 2026-09-30
+
+금속 비율은 diffuse weight에서 한 번 적용한다. 박막 diffuse layering은 dielectric view-angle
+Fresnel로 감쇠하고, GGX multiple-scatter 보정의 Fss는 박막 아래 기판 응답을 사용한다.
+Thickness=0, film IOR=1, dielectric과 film IOR가 같은 경우의 기존 불변성 검사는 유지한다.
+정적 film mask가 없는 shader에는 LUT와 박막 계산이 포함되지 않는다.
+
+고정 Blender 24장 대조의 박막 relative RMS는 평행광 18.348%→2.835%, 균일 흰색 환경
+15.646%→1.352%다. Debug/Release 이미지 데이터가 일치한다. 전 재질 parity 통과로 표시하지 않는다.
+고정 spectral numeric baseline은 `numeric-golden-spectral.csv`와 `spectral-manifest.json`이며,
+박막 fixture 외에는 이전 `numeric-golden.csv`와의 일치를 추가로 요구한다.
+별도 1nm 직접 적분은 LUT 보간 오차와 3차 절단 오차를 분리한다.
+상세 측정과 한계는 [MAT9ThinFilmAndEnvironment](../analysis/MAT9ThinFilmAndEnvironment.md)에 기록한다.
 
 대시보드 JavaScript 파싱과 MAT 10행/34일/완료 18일 집계는 통과했다.
 전체 `verify-plan-dashboard.ps1`은 HEAD 기준과 동일하게 기존 미산정 `days: null` 처리 24건과

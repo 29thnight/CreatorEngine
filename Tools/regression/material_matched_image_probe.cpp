@@ -164,6 +164,9 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         if (file.path().extension() == ".inputs") cases.push_back(file.path());
     std::ranges::sort(cases);
     unsigned frame{};
+    const bool measureTiming=std::getenv("CREATOR_MAT9_TIMING")!=nullptr;
+    std::ofstream timing(output/"timing.csv");
+    timing << "case,repeat,program_prepare_ms,frame_prepare_ms,gpu_frame_ms\n";
     for (const auto& inputFile : cases)
     {
         const auto name = inputFile.stem().string();
@@ -173,7 +176,11 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         std::filesystem::copy_file(inputFile, capturedInput);
         geometry.draw.materialGraphInstance = MatchedInstance(root, capturedInput, output, store);
         geometry.draw.materialGraphSlot = 1;
+        const auto programStart=std::chrono::steady_clock::now();
         WaitSceneProgram(host, context, geometry.draw.materialGraphInstance->generation);
+        const auto programMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-programStart).count();
+        for (unsigned repeat=0;repeat<(measureTiming?9u:1u);++repeat)
+        {
         context.frameId = ++frame;
         context.sceneEpoch = 1;
         lights.clear();
@@ -198,9 +205,22 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             Check(uploaded.IsValid(), "Matched furnace cube " + error);
             environmentHandle = uploaded.handle;
         }
+        Microsoft::WRL::ComPtr<ID3D12QueryHeap> timer;
+        RHIReadback timerReadback;
+        uint64_t timerFrequency{};
+        if (measureTiming)
+        {
+            const D3D12_QUERY_HEAP_DESC timerDesc{D3D12_QUERY_HEAP_TYPE_TIMESTAMP,2,0};
+            Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&timerDesc,IID_PPV_ARGS(&timer))) &&
+                SUCCEEDED(device.GetCommandQueue()->GetTimestampFrequency(&timerFrequency)) &&
+                device.CreateBufferReadback(16,timerReadback,error),"Matched GPU timer");
+            static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList()->EndQuery(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0);
+        }
+        const auto prepareStart=std::chrono::steady_clock::now();
         Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
                   host.PrepareResidency(context, input, error) &&
                   host.Prepare(context, input, environmentHandle, {}, {}, {}, {}, error, 1), "Matched prepare " + error);
+        const auto prepareMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-prepareStart).count();
         auto graph = std::make_shared<EnhancedRenderGraph>(device);
         gbuffer.Declare(*graph, context);
         const auto outputs = gbuffer.GetOutputs();
@@ -251,6 +271,12 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         }
         if (!graph->Compile(error)) throw std::runtime_error("Matched graph compile: " + error);
         if (!graph->Execute(error)) throw std::runtime_error("Matched graph execute: " + error);
+        if (measureTiming)
+        {
+            auto* list=static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList();
+            list->EndQuery(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,1);
+            list->ResolveQueryData(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0,2,device.Resolve(timerReadback.buffer),0);
+        }
         if (!device.EndFrame(error)) throw std::runtime_error("Matched frame submit: " + error);
         if (!GetRHISubmissionThread().DrainSubmissions(&device, error))
             throw std::runtime_error("Matched submission drain: " + error);
@@ -258,6 +284,17 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
               "Matched publication " + error);
         device.WaitForGpu();
         Check(GetRHISubmissionThread().Drain(&device, error), "Matched retirement " + error);
+        if (measureTiming)
+        {
+            RHIReadbackImage times;
+            Check(device.MapReadback(timerReadback,times,error),"Matched GPU timer map");
+            std::array<uint64_t,2> ticks;
+            std::memcpy(ticks.data(),times.data.data(),16);
+            Check(ticks[1]>=ticks[0] && timerFrequency>0,"Matched GPU timer order");
+            timing << name << ',' << repeat << ',' << programMs << ',' << prepareMs << ','
+                   << double(ticks[1]-ticks[0])*1000/timerFrequency << '\n';
+            device.ReleaseReadback(timerReadback);
+        }
         RHIReadbackImage mapped;
         Check(device.MapReadback(readback, mapped, error), "Matched map " + error);
         std::ofstream image(output / (name + ".f32"), std::ios::binary);
@@ -290,6 +327,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         graph.reset();
         std::string validation;
         Check(device.DrainDebugMessages(validation) == 0, "Matched GPU validation " + validation);
+        }
     }
     host.ShutdownAfterIdle();
     gbuffer.Shutdown(); deferred.Shutdown(); meshes.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown();

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "material_probe_gpu.h"
+#include "principled_thin_film_sensitivity.h"
 
 #include <algorithm>
 #include <array>
@@ -286,31 +287,51 @@ inline double Dielectric(double cosine, double ior)
     return (s * s + p * p) / 2;
 }
 
-inline double Film(double cosine, double filmIor, double thickness, std::complex<double> substrate, double wavelength)
+inline double Film(double cosine, double filmIor, double thickness,
+                   std::complex<double> substrate, size_t channel, double f82 = -1)
 {
-    if (cosine == 0 || (1 - cosine * cosine) / (filmIor * filmIor) >= 1)
-    {
-        return 1;
-    }
-    // Independent thin-layer characteristic-matrix solution, rather than the
-    // shader's complex Airy reflection recursion. IOR/thickness are unitless/nm.
-    const double filmQ = std::sqrt(filmIor * filmIor - (1 - cosine * cosine));
-    const auto substrateQ = std::sqrt(substrate * substrate - (1 - cosine * cosine));
-    const double delta = 2 * kPi * filmQ * thickness / wavelength;
-    const std::complex<double> imaginary{0, -std::sin(delta)};
+    const double sinSquared = 1 - cosine * cosine;
+    if (cosine == 0 || sinSquared >= filmIor * filmIor) return 1;
+    const double cosFilm = std::sqrt(1 - sinSquared / (filmIor * filmIor));
+    const double r12[2]{(cosine - filmIor * cosFilm) / (cosine + filmIor * cosFilm),
+                        (filmIor * cosine - cosFilm) / (filmIor * cosine + cosFilm)};
+    const auto q = std::sqrt(substrate * substrate - sinSquared);
+    const std::complex<double> r23[2]{(filmIor * cosFilm - q) / (filmIor * cosFilm + q),
+        (substrate * substrate * cosFilm - filmIor * q) / (substrate * substrate * cosFilm + filmIor * q)};
     double sum = 0;
-    for (bool parallel : {false, true})
+    for (size_t polarization = 0; polarization < 2; ++polarization)
     {
-        const double y0 = parallel ? 1 / cosine : cosine;
-        const double yFilm = parallel ? filmIor * filmIor / filmQ : filmQ;
-        const auto ySubstrate = parallel ? substrate * substrate / substrateQ : substrateQ;
-        const auto b = std::cos(delta) + imaginary * ySubstrate / yFilm;
-        const auto c = imaginary * yFilm + std::cos(delta) * ySubstrate;
-        sum += std::norm((y0 * b - c) / (y0 * b + c));
+        const double top = r12[polarization] * r12[polarization];
+        double bottom = std::norm(r23[polarization]);
+        if (f82 >= 0)
+        {
+            const double f0 = std::norm((substrate - filmIor) / (substrate + filmIor));
+            const double correction = (f0 + (1 - f0) * std::pow(6.0 / 7.0, 5) - f82)
+                                      * 7 / std::pow(6.0 / 7.0, 6);
+            bottom = Clamp(f0 + (1 - f0) * std::pow(1 - cosFilm, 5)
+                           - correction * cosFilm * std::pow(1 - cosFilm, 6));
+        }
+        const double magnitude = std::abs(r23[polarization]);
+        const auto phase = (magnitude > 0 ? r23[polarization] / magnitude : std::complex<double>{1, 0})
+                           * (r12[polarization] >= 0 ? -1.0 : 1.0);
+        const double transmission = 1 - top;
+        const double multiple = transmission * transmission * bottom / std::max(1 - top * bottom, 1e-20);
+        double value = top + multiple;
+        for (unsigned order = 1; order <= 3; ++order)
+        {
+            const double position = Clamp(2 * kPi * (2 * filmIor * thickness * cosFilm * order) / 60000) * 511;
+            const size_t index = size_t(position), next = std::min(index + 1, size_t(511));
+            const double t = position - index;
+            const auto sensitivity = std::complex<double>{
+                kFilmSensitivity[index][channel] * (1 - t) + kFilmSensitivity[next][channel] * t,
+                kFilmSensitivity[index][channel + 3] * (1 - t) + kFilmSensitivity[next][channel + 3] * t};
+            value += 2 * (multiple - transmission) * std::pow(std::sqrt(top * bottom), order)
+                     * std::real(std::pow(phase, order) * std::conj(sensitivity));
+        }
+        sum += value;
     }
     return Clamp(sum / 2);
 }
-
 inline Vector Fresnel(const Material& material, double cosine, bool coat = false)
 {
     cosine = Clamp(cosine);
@@ -329,7 +350,6 @@ inline Vector Fresnel(const Material& material, double cosine, bool coat = false
     const double transition =
         Clamp(material.thickness) * Clamp(material.thickness) * (3 - 2 * Clamp(material.thickness));
     const double filmIor = 1 + (material.filmIor - 1) * transition;
-    constexpr double wavelengths[3]{650, 550, 450};
     Vector result{};
     for (size_t channel = 0; channel < 3; ++channel)
     {
@@ -342,7 +362,7 @@ inline Vector Fresnel(const Material& material, double cosine, bool coat = false
             Clamp(metalF0 + (1 - metalF0) * std::pow(1 - cosine, 5) - correction * cosine * std::pow(1 - cosine, 6));
         if (material.thickness > 0 && material.filmIor != 1)
         {
-            double film = Film(cosine, filmIor, material.thickness, {ior, 0}, wavelengths[channel]);
+            double film = Film(cosine, filmIor, material.thickness, {ior, 0}, channel);
             if (normal > 1e-5)
             {
                 film *= 1 + (f0 / normal - 1) * Clamp((1 - film) / (1 - normal));
@@ -356,7 +376,7 @@ inline Vector Fresnel(const Material& material, double cosine, bool coat = false
             const double n = nMax + (nMin - nMax) * f82Tinted;
             const double kSquared = (boundedF0 * (n + 1) * (n + 1) - (n - 1) * (n - 1)) / (1 - boundedF0);
             film = Film(cosine, filmIor, material.thickness, {n, std::sqrt(std::max(kSquared, 0.0))},
-                        wavelengths[channel]);
+                        channel, f82Tinted);
             metal += transition * (film - metal);
         }
         result[channel] = (1 - material.metal) * dielectric + material.metal * metal;
@@ -531,15 +551,49 @@ inline Float4 Pack(Vector vector, double w = 0)
     return {float(vector[0]), float(vector[1]), float(vector[2]), float(w)};
 }
 
+struct BaseWeights { Vector multiple, diffuse; };
+inline BaseWeights LayeredBaseWeights(const Material& material, Vector view, const Integral& base)
+{
+    Vector baseMultiple = Multiple(base);
+    Vector diffuse =
+        material.base * ((1 - material.metal) * std::max(1 - Maximum(base.single + baseMultiple), 0.0));
+    if (material.thickness > 0 && material.filmIor != 1 && (material.metal > 0 || material.filmIor != material.ior))
+    {
+        const double authoredF0=std::pow((material.ior-1)/(material.ior+1),2)*2*material.level;
+        const double f0Root=std::sqrt(std::clamp(authoredF0,0.0,0.99));
+        const double adjusted=(1+f0Root)/(1-f0Root);
+        const double ior=material.level==0.5?material.ior:material.ior<1?1/adjusted:adjusted;
+        const double f0=std::pow((ior-1)/(ior+1),2);
+        const double fss=ior>=1?(ior-1)/(4.08567+1.00071*ior)
+            :1-ior*ior*(1-(1/ior-1)/(4.08567+1.00071/ior));
+        Integral compensation=base;
+        for (size_t channel=0;channel<3;++channel)
+        {
+            const double tintedF0=Clamp(authoredF0*material.tint[channel]);
+            const double dielectricFss=tintedF0+(1-tintedF0)*Clamp((fss-f0)/(1-f0));
+            const double metalF0=Clamp(material.base[channel]);
+            const double schlick82=metalF0+(1-metalF0)*std::pow(6.0/7.0,5);
+            const double correction=schlick82*(1-Clamp(material.tint[channel]))*7/std::pow(6.0/7.0,6);
+            const double metalFss=metalF0+(1-metalF0)/21-correction/126;
+            compensation.average[channel]=Clamp(dielectricFss*(1-material.metal)+metalFss*material.metal);
+        }
+        baseMultiple=Multiple(compensation);
+        Material dielectric = material;
+        dielectric.metal = 0;
+        diffuse = material.base * ((1 - material.metal) * std::max(1 - Maximum(Fresnel(dielectric, Dot(material.normal, view))), 0.0));
+    }
+    return {baseMultiple,diffuse};
+}
+
 inline Expected Reference(const Material& material, Vector view, unsigned mask, const SheenTable& table)
 {
     const Vector light = Unit({0.35, -0.2, 0.8});
     const Vector half = Unit(view + light);
     const Frame frame = MakeFrame(material, false), coatFrame = MakeFrame(material, true);
     const Integral base = Integrate(material, view, false), coat = Integrate(material, view, true);
-    const Vector baseMultiple = Multiple(base), coatMultiple = Multiple(coat);
-    const Vector diffuse =
-        material.base * ((1 - material.metal) * std::max(1 - Maximum(base.single + baseMultiple), 0.0));
+    const auto terms = LayeredBaseWeights(material,view,base);
+    const Vector baseMultiple=terms.multiple, diffuse=terms.diffuse;
+    const Vector coatMultiple=Multiple(coat);
     const Vector sheenNormal =
         Unit(material.normal * (1 - Clamp(material.coat)) + material.coatNormal * Clamp(material.coat));
     const Vector sheenCoefficients = Sheen(table, Clamp(Dot(sheenNormal, view)), material.sheenRoughness, mask);

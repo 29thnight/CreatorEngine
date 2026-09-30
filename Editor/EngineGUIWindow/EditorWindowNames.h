@@ -33,6 +33,10 @@ namespace EditorWindowName
     inline constexpr const char* kResourceCounter = "###Editor.ResourceCounter";
     inline constexpr const char* kRenderPassLabel = "RenderPass";
     inline constexpr const char* kRenderPass = "###Editor.RenderPass";
+    inline constexpr const char* kPreferences = "###Editor.Preferences";
+    inline constexpr const char* kPreferencesLabel = "Preferences";
+    inline constexpr const char* kProjectSettings = "###Editor.ProjectSettings";
+    inline constexpr const char* kProjectSettingsLabel = "Project Settings";
     inline constexpr const char* kBehaviorTreeLabel = "Behavior Tree Editor";
     inline constexpr const char* kBehaviorTree = "###Editor.BehaviorTree";
     inline constexpr const char* kBlackBoardLabel = "BlackBoard Editor";
@@ -63,7 +67,7 @@ namespace EditorWindowName
     inline constexpr const char* kInputActionMaps = "###Editor.InputActionMaps";
     inline constexpr const char* kBuildSceneSettingLabel = "Build Scene Setting";
     inline constexpr const char* kBuildSceneSetting = "###Editor.BuildSceneSetting";
-    inline constexpr const char* kRenderPassDebugLabel = "RenderPass Debug";
+    inline constexpr const char* kRenderPassDebugLabel = "Render Frame Debugger";
     inline constexpr const char* kRenderPassDebug = "###Editor.RenderPassDebug";
     inline constexpr const char* kGridSettingsLabel = "Grid Settings";
     inline constexpr const char* kGridSettings = "###Editor.GridSettings";

@@ -52,6 +52,8 @@
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
 #include "SceneViewportOverlay.h"
+#include "EnhancedRenderDebugWindow.h"
+#include "EditorWindowNames.h"
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
@@ -822,7 +824,12 @@ namespace ConsoleCmd
         const auto& args = ctx.parts;
         if (3 != args.size()) return InvalidArguments("editor.window <stable-id> <open|close|focus>");
 
-        ::editor::window_request request{};
+          ::editor::window_request request{};
+          if (args[1] == EditorWindowName::kFrameProfiler && args[2] == "rendering-live")
+          {
+              ::editor::OpenRenderLiveDiagnostics();
+              return Ok("Rendering - Live queued for the next UI frame");
+          }
         if ("open" == args[2])       request = ::editor::window_request::open;
         else if ("close" == args[2]) request = ::editor::window_request::close;
         else if ("focus" == args[2]) request = ::editor::window_request::focus;
@@ -1083,10 +1090,23 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_editor_sceneview(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() != 1) return InvalidArguments("This command takes no arguments");
+        if (ctx.parts.size() == 3 && (ctx.parts[2] == "on" || ctx.parts[2] == "off"))
+        {
+            editor::SceneOverlayVisibility setting;
+            if (ctx.parts[1] == "skybox") setting = editor::SceneOverlayVisibility::SkyBox;
+            else if (ctx.parts[1] == "statistics") setting = editor::SceneOverlayVisibility::Statistics;
+            else if (ctx.parts[1] == "fps") setting = editor::SceneOverlayVisibility::Fps;
+            else return InvalidArguments("editor.sceneview [skybox|statistics|fps on|off]");
+            editor::RequestSceneOverlayVisibility(setting, ctx.parts[2] == "on");
+            return Ok("Scene overlay change queued for the next UI frame");
+        }
+        if (ctx.parts.size() != 1) return InvalidArguments("editor.sceneview [skybox|statistics|fps on|off]");
         const auto s = editor::ReadSceneOverlaySnapshot();
         if (!s.valid) return Fail("editor.sceneview.no_frame", "Scene view has not published a frame");
         auto data = CommandData::Object();
+        data.Set("skybox", CommandData::Bool(s.skyBoxVisible));
+        data.Set("statistics", CommandData::Bool(s.statisticsVisible));
+        data.Set("fps", CommandData::Bool(s.fpsVisible));
         const auto vec2 = [](ImVec2 v) { auto a = CommandData::Array(); a.Append(CommandData::Double(v.x)); a.Append(CommandData::Double(v.y)); return a; };
         const auto vec3 = [](math::vector3 v) { auto a = CommandData::Array(); a.Append(CommandData::Double(v.x)); a.Append(CommandData::Double(v.y)); a.Append(CommandData::Double(v.z)); return a; };
         data.Set("mode", CommandData::Int(static_cast<int>(s.mode)));

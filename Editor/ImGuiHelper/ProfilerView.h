@@ -47,6 +47,7 @@ namespace editor::profiler_view
 	void draw_telemetry_dashboard();
 	void draw_memory_profiler();
 	void draw_animation_budget();
+	void select_rendering_live();
 
 	// 스레드 레인에 구간을 그린다. 확대·이동·tooltip 이 여기 있다.
 	void draw_timeline();

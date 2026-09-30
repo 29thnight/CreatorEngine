@@ -73,6 +73,7 @@ namespace LiveViewFlags
 
     /// Host가 기여한 씬 오버레이 노드가 이 뷰에 그린다(저작 보조 뷰).
     constexpr uint32_t kSceneOverlay  = 1u << 1;
+    constexpr uint32_t kHideSkyBox = 1u << 2;
 }
 
 /// 프레임마다 비우고 다시 채우는 이름 → 핸들 표.

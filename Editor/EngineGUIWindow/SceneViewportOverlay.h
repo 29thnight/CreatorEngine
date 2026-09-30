@@ -51,6 +51,8 @@ namespace editor
         float snapValues[3]{1.f, 15.f, 0.25f};
         bool showViewGizmo{true};
         bool showFps{true};
+        bool showStatistics{false};
+        bool showSkyBox{true};
         bool leftOwned{}, rightOwned{};
         bool blocksPointer{}, blocksShortcuts{};
         math::vector3 orbitPivot{};
@@ -75,6 +77,9 @@ namespace editor
         int operation{};
         math::vector3 cameraPosition{}, cameraForward{};
         ViewportCanvas canvas;
+        bool statisticsVisible{}, skyBoxVisible{true}, fpsVisible{true};
     };
     SceneOverlaySnapshot ReadSceneOverlaySnapshot();
+    enum class SceneOverlayVisibility { SkyBox, Statistics, Fps };
+    void RequestSceneOverlayVisibility(SceneOverlayVisibility setting, bool visible);
 }

@@ -4,7 +4,7 @@
 
 namespace material_graph
 {
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:1";
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:2";
 
 struct SceneShaderSet
 {

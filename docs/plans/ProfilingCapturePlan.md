@@ -3296,3 +3296,19 @@ RF0~RF7의 선행 조건이나 완료 조건이 아니다. 판정은 `RenderFram
   `Tools/dx12-validation/Invoke-DX12Validation.ps1`
 - 스케줄러 이관과 순서 제약: `docs/plans/TaskSchedulerUnificationPlan.md`(PHASE 13 S0.5·S6)
 - 이 계획의 소비자: `docs/plans/AnimationSchedulerPlan.md` §4 완료 기준(버짓·강등 관측)
+
+## 14-LIVE — 녹화 독립 Rendering 페이지 (2026-10-01 추가)
+
+별도 미산정 progress 행이다. P0~P6 수집/파일 계약의 완료를 되돌리지 않는다.
+RenderPass/통계 popup의 세부 진단을 Profiler Rendering - Live로 옮기고 Record 없이
+renderer snapshot을 표시한다. 이 page는 capture reader의 선택 자료를 정본으로 삼지 않는다.
+현재 Scene/Game/Preview 선택과 완료 frame/view, 마지막 GPU submission·frame age를 보이며
+선택 view가 아닌 표본은 unavailable이다. CPU는 모든 view의 합계로 명시한다.
+
+남은 완료 gate: [EditorRenderingSurfacesPlan.md §3](EditorRenderingSurfacesPlan.md#3-14-live--rendering-live-완료-계약-phase-14-미산정).
+view별 CPU/GPU immutable 완료 snapshot·벽시계 age·epoch/resize·지원 상태, Record off/on/
+파일 reader와 독립 동작, HUD·page off/on 비용 상한을 실제 검증한다.
+독립 RenderCapture/RF0~RF7과 .ceframe은 이 page의 구현이 아니고 여전히 14-7의 책임이다.
+2026-10-01 Release Vulkan의 offscreen 설정 창 UI 진행 후 live HTTP operation 미완료 재현도
+14-LIVE의 backend/수요/비차단 상태 조회 gate로 남긴다. 원인과 재실행 결과는
+[EditorRenderingSurfacesValidation.md](../analysis/EditorRenderingSurfacesValidation.md)에 추적한다.

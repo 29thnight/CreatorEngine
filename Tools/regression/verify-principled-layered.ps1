@@ -121,18 +121,5 @@ $golden = @(Import-Csv -LiteralPath $goldenPath)
 if ($golden.Count -ne 1960) {
     throw 'Expected 1960 numeric golden rows'
 }
-foreach ($row in $golden) {
-    $key = $row.case + '/' + $row.angle + '/' + $row.field
-    if (-not $fresh.ContainsKey($key)) {
-        throw "Missing numeric golden row: $key"
-    }
-    foreach ($channel in @('x', 'y', 'z', 'w')) {
-        $actual = [double]::Parse($fresh[$key].$channel, [Globalization.CultureInfo]::InvariantCulture)
-        $expected = [double]::Parse($row.$channel, [Globalization.CultureInfo]::InvariantCulture)
-        if ([double]::IsNaN($actual) -or [double]::IsInfinity($actual) -or
-            [Math]::Abs($actual - $expected) / [Math]::Max(1.0, [Math]::Abs($expected)) -gt 0.000001) {
-            throw "Pinned numeric golden differs: $key/$channel"
-        }
-    }
-}
-Write-Output 'PRINCIPLED_LAYERED_NUMERIC_GOLDEN_OK rows=1960 checks=7840'
+. (Join-Path $PSScriptRoot 'verify-thin-film-numeric-baseline.ps1')
+Assert-ThinFilmNumericBaseline -Domain layered -Directory $fixtureDirectory -Fresh $fresh -Historical $golden -View angle

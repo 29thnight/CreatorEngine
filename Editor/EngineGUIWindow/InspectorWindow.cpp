@@ -1341,15 +1341,6 @@ void InspectorWindow::ImGuiDrawHelperRenderProfile(SceneRenderProfileComponent* 
 		sheet.line("Use SkyBox");
 		ImGui::Checkbox("##UseSkyBox", &profile.settings.m_isSkyboxEnabled);
 
-		std::string_view profileTextureName = profile.settings.skyboxTextureName;
-		const RenderPassSettings runtimeRenderSettings =
-			RuntimeSettings::Get().GetRenderPassSettings();
-		std::string_view settingsTextureName = runtimeRenderSettings.skyboxTextureName;
-		if (!settingsTextureName.empty() && settingsTextureName != profileTextureName)
-		{
-			profile.settings.skyboxTextureName = settingsTextureName;
-		}
-
 		const float width = sheet.line("HDR");
 		const std::string hdrName = profile.settings.skyboxTextureName.empty()
 			? std::string("None (drag HDR texture)") : profile.settings.skyboxTextureName;

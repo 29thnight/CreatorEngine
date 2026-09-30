@@ -36,7 +36,9 @@ namespace
     {
         math::matrix4x4 viewProjection{ math::matrix4x4::identity() };   // 전치해서 넣는다
         math::vector4 eyePositionScale{};
+        math::vector4 backgroundColor{}; // alpha: 1 = solid background, 0 = cube
     };
+    static_assert(sizeof(SkyBoxConstants) == 96u);
 
     bool CompileSkyBoxShader(const char* entry, const char* target,
         RHIShaderBlob& outBlob, std::string& outError)
@@ -97,6 +99,8 @@ bool EnhancedSkyBoxPass::CreatePipelines(const EnhancedFrameContext& context,
     // 깊이 테스트를 켠다 — z = w x 0.99999와 짝을 이뤄 씬이 안 그린 곳에만
     // 하늘이 남는다. 블렌딩은 없다(하늘은 불투명 배경이다).
     desc.depthEnable = true;
+    // Background visibility must not change the geometry consumed by SSGI/SSR.
+    desc.depthWriteMask = RHIDepthWrite::Zero;
     desc.blendEnable = false;
     desc.cullMode = RHICullMode::None;
     desc.numRenderTargets = 1;
@@ -179,7 +183,8 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
 
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ m_output, RHIResourceState::RenderTarget });
-    usages.push_back({ m_depth, RHIResourceState::DepthWrite });
+    usages.push_back({ m_depth, ownsDepth
+        ? RHIResourceState::DepthWrite : RHIResourceState::DepthRead });
 
     graph.AddPass(GetName(), usages,
         [this, &context, ownsColor, ownsDepth](
@@ -188,8 +193,9 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             RHIEncoder& encoder = *executeContext.encoder;
 
             const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
-            const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.ResolveHandle(m_depth), kDepthFormat);
+            const auto depthDesc = ownsDepth
+                ? RHIDepthTargetDesc::Depth(executeContext.ResolveHandle(m_depth), kDepthFormat)
+                : RHIDepthTargetDesc::DepthReadOnly(executeContext.ResolveHandle(m_depth), kDepthFormat);
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 
@@ -214,6 +220,8 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             constants.viewProjection = math::transpose(m_viewProjection);
             constants.eyePositionScale = math::vector4(
                 m_eyePosition.x, m_eyePosition.y, m_eyePosition.z, m_scale);
+            constants.backgroundColor = math::vector4(
+                0.18f, 0.18f, 0.18f, m_showEnvironment ? 0.f : 1.f);
 
             const auto cb = context.resources->UploadConstants(
                 &constants, sizeof(SkyBoxConstants));
@@ -242,4 +250,3 @@ void EnhancedSkyBoxPass::Shutdown()
 
     m_pso = {};
 }
-
