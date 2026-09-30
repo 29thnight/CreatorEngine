@@ -6,10 +6,16 @@
 #include "Assets/AssetIdentityProfile.h"                       // MBC11: UUIDv8 source identity
 #include "Experiment/Cooked/SceneCookProducer.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
+#include "Experiment/Cooked/CookedMaterialProgram.h"
+#include "MaterialGraphSceneCompiler.h"
+#include "MaterialInstanceValidation.h"
+#include "Experiment/Cooked/CookedAudioClipSource.h"
+#include "Experiment/Cooked/CookSupport.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 #include "Assets/AssetIdentityEpoch.h"
 #include "Assets/AudioClipSourceMetadata.h"
 #include "Assets/ModelAssetAuthoringTransaction.h"
+#include "Assets/ModelMaterialGraph.h"
 #include "AudioDecodeValidation.h"
 #include "AuthoringCookedDocument.h"
 #include "AuthoringNodeEquality.h"
@@ -61,6 +67,9 @@ namespace
         std::vector<std::filesystem::path> models{};
         std::vector<std::filesystem::path> textures{};
         std::vector<std::filesystem::path> shaderMetas{};
+        std::vector<std::filesystem::path> shaderGraphs{};
+        std::filesystem::path materialProgramRoot{};
+        std::filesystem::path materialShaderRoot{};
         std::vector<std::filesystem::path> materials{};
         std::vector<std::filesystem::path> scenes{};
         std::string identityEpoch{};
@@ -73,6 +82,8 @@ namespace
             << "Usage: AssetCooker --asset-root <Assets> --output <new-dir> "
                "[--generation-root <Library/ModelAssetGenerations>] "
                "[--model <source> ...] [--texture <source> ...] [--shadermeta <source> ...] [--material <source> ...] [--scene <source> ...]\n"
+            << "       [--shadergraph <source> ...] [--material-shader-root <DefaultPassShader>]\n"
+            << "       [--material-program-root <preverified-program-tree>]\n"
             << "       (--model은 게시된 generation을 내보낸다 — 먼저 --author-model-asset)\n"
             << "       AssetCooker --author-model-asset "
                "--asset-root <Assets> --output <generation-root> --model <source>\n"
@@ -223,6 +234,23 @@ namespace
             {
                 out.shaderMetas.push_back(value);
             }
+            else if (option == L"--shadergraph")
+            {
+                out.shaderGraphs.push_back(value);
+            }
+            else if (option == L"--material-shader-root")
+            {
+                out.materialShaderRoot = value;
+            }
+            else if (option == L"--material-program-root")
+            {
+                if (!out.materialProgramRoot.empty())
+                {
+                    failure = "--material-program-root는 한 번만 지정할 수 있다.";
+                    return false;
+                }
+                out.materialProgramRoot = value;
+            }
             else if (option == L"--material")
             {
                 out.materials.push_back(value);
@@ -254,6 +282,8 @@ namespace
                     out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterStageValidation;
                 else if (value == L"after-generation-publish")
                     out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterGenerationPublish;
+                else if (value == L"after-material-graph-publish")
+                    out.modelAuthoringFailurePoint = assets::ModelAuthoringFailurePoint::AfterMaterialGraphPublish;
                 else
                 {
                     failure = "알 수 없는 model authoring failure point다.";
@@ -267,6 +297,13 @@ namespace
             }
         }
 
+        if ((!out.shaderGraphs.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty()) &&
+            (out.mode != Arguments::Mode::Cook || (out.shaderGraphs.empty() && out.models.empty()) ||
+             (!out.materialProgramRoot.empty() && !out.materialShaderRoot.empty())))
+        {
+            failure = "Material options require cook mode and shader graphs; select automatic compilation or preverified input.";
+            return false;
+        }
         if (out.mode == Arguments::Mode::CompileRuntimeDocuments)
         {
             if (out.runtimeRoot.empty())
@@ -492,7 +529,7 @@ namespace
             return true;
         if (!virtualPath.starts_with("Assets/")) return false;
         return extension == ".inputmap" || extension == ".bt"
-            || extension == ".blackboard" || extension == ".volume"
+            || extension == ".blackboard" || extension == ".renderprofile"
             || extension == ".terrain" || extension == ".foliage";
     }
 
@@ -712,7 +749,7 @@ namespace
                 return false;
             }
             // MBC11 — 모델 sidecar(schema v2)는 최상위 `guid`가 없고 `assetId`(UUIDv8)를
-            // 든다. 다른 자산은 여전히 최상위 `guid`(UUIDv4)다.
+            // 든다. 모델에서 파생한 shadergraph의 guid도 UUIDv8을 사용한다.
             const Authoring::ReadNode guidNode = document.Root()["guid"];
             const Authoring::ReadNode assetIdNode = document.Root()["assetId"];
             experiment::AssetId assetId;
@@ -720,6 +757,10 @@ namespace
             if (guidNode && guidNode.IsScalar())
             {
                 identified = experiment::TryParseCanonicalAssetId(guidNode.AsString(), assetId);
+                if (!identified && source.extension() == ".shadergraph")
+                {
+                    identified = assets::TryParseCanonicalUuidV8(guidNode.AsString(), assetId.value);
+                }
             }
             else if (assetIdNode && assetIdNode.IsScalar())
             {
@@ -727,8 +768,7 @@ namespace
             }
             if (!identified)
             {
-                failure = "source sidecar 신원이 canonical UUIDv4(guid)/UUIDv8(assetId)가 아니다: "
-                    + sidecar.string();
+                failure = "source sidecar 신원이 canonical UUIDv4 또는 허용된 UUIDv8이 아니다: " + sidecar.string();
                 return false;
             }
 
@@ -1138,6 +1178,118 @@ namespace
             shaderMetaProducts.push_back(std::move(product));
         }
 
+        std::vector<ck::MaterialProgramCookProduct> materialProgramProducts;
+        const material_graph::Budget materialBudget;
+        material_cook::Programs materialPrograms;
+        auto graphInputs = arguments.shaderGraphs;
+        for (const auto& model : products)
+        {
+            for (const auto& entry : model.subAssetEntries)
+            {
+                if (entry.kind == ck::CookedAssetKind::Material)
+                {
+                    graphInputs.push_back(
+                        assets::ModelMaterialGraphPath(assetRoot, model.modelAssetId.value, entry.assetId.value));
+                }
+            }
+        }
+        std::set<std::filesystem::path> compiledGraphs;
+        for (const auto& graphInput : graphInputs)
+        {
+            error.clear();
+            const auto sourcePath = std::filesystem::weakly_canonical(
+                graphInput.is_relative() ? assetRoot / graphInput : graphInput, error);
+            const auto sourceSize = std::filesystem::file_size(sourcePath, error);
+            if (error || sourcePath.extension() != ".shadergraph" ||
+                !ck::IsContainedPath(assetRoot, sourcePath) || sourceSize > 16u * 1024u * 1024u)
+            {
+                std::cerr << "asset-cooker error: shadergraph source is missing, oversized or outside Assets.\n";
+                return 3;
+            }
+            if (!compiledGraphs.insert(sourcePath).second)
+            {
+                continue;
+            }
+            experiment::AssetId graphId;
+            std::string graphError;
+            auto metaPath = sourcePath;
+            metaPath += ".meta";
+            if (!ck::ReadMetaAssetId(metaPath, graphId, graphError))
+            {
+                std::cerr << "asset-cooker error: " << graphError << '\n';
+                return 3;
+            }
+            std::string graphText;
+            if (!ck::ReadTextFile(sourcePath, graphText))
+            {
+                std::cerr << "asset-cooker error: cannot read shadergraph source.\n";
+                return 3;
+            }
+            const auto graph = LX::LXMaterialArchive::Read(graphText, LX::CreateMaterialDefinitions(), &graphError);
+            if (!graph)
+            {
+                std::cerr << "asset-cooker error: " << graphError << '\n';
+                return 3;
+            }
+            const auto virtualPath = ck::MakeDerivedMaterialProgramArtifactPath(graphId);
+            material_graph::VerifiedProduct verifiedProduct;
+            if (arguments.materialProgramRoot.empty())
+            {
+                const auto generated = LX::GenerateMaterialSlang(*graph);
+                const auto shaders = arguments.materialShaderRoot.empty()
+                    ? assetRoot / "Shaders/DefaultPassShader"
+                    : std::filesystem::absolute(arguments.materialShaderRoot);
+                const auto source = assetRoot.parent_path() / "Library/LXSceneCook" /
+                    (Uuid::ToString(graphId.value) + ".slang");
+                if (!generated || !material_graph::CompileSceneProduct(*generated, shaders, source,
+                        materialBudget, verifiedProduct, graphError))
+                {
+                    std::cerr << "asset-cooker error: automatic Scene material compilation failed: "
+                        << (generated ? graphError : "graph generation failed") << '\n';
+                    return 3;
+                }
+            }
+            else
+            {
+                error.clear();
+                const auto programRoot = std::filesystem::weakly_canonical(arguments.materialProgramRoot, error);
+                const auto programPath = std::filesystem::weakly_canonical(programRoot / virtualPath, error);
+                const auto programSize = std::filesystem::file_size(programPath, error);
+                if (virtualPath.empty() || error || !ck::IsContainedPath(programRoot, programPath) ||
+                    programSize > materialBudget.compiledBytes + 128ull * 1024ull * 1024ull)
+                {
+                    std::cerr << "asset-cooker error: verified material program is missing, oversized or outside its root.\n";
+                    return 3;
+                }
+                std::vector<std::byte> programBytes;
+                material_graph::CookedProgram verified;
+                if (!ck::ReadBinaryFile(programPath, programBytes) ||
+                    !material_graph::ReadCookedProgram(
+                        {reinterpret_cast<const std::uint8_t*>(programBytes.data()), programBytes.size()},
+                        materialBudget, verified, graphError))
+                {
+                    std::cerr << "asset-cooker error: " << graphError << '\n';
+                    return 3;
+                }
+                verifiedProduct = std::move(verified.product);
+            }
+            ck::MaterialProgramCookProduct product;
+            if (!ck::BuildMaterialProgramCookProduct(graphId, *graph, verifiedProduct, materialBudget, product, graphError))
+            {
+                std::cerr << "asset-cooker error: " << graphError << '\n';
+                return 3;
+            }
+            if (!artifactPaths.insert(product.manifestEntry.artifactPath).second)
+            {
+                std::cerr << "asset-cooker error: duplicate material program artifact.\n";
+                return 3;
+            }
+            totalArtifactBytes += product.artifactBytes.size();
+            manifest.entries.push_back(product.manifestEntry);
+            materialProgramProducts.push_back(std::move(product));
+            materialPrograms.emplace(graphId, std::move(verifiedProduct));
+        }
+
         std::vector<ck::MaterialCookProduct> materialProducts;
         materialProducts.reserve(arguments.materials.size());
         std::uint64_t totalStandaloneMaterialBytes = 0u;
@@ -1204,6 +1356,20 @@ namespace
             totalUnproducedGuids += product.unproducedGuidReferences;
             manifest.entries.push_back(product.manifestEntry);
             sceneProducts.push_back(std::move(product));
+        }
+
+        auto instanceSources = arguments.materials;
+        instanceSources.insert(instanceSources.end(), arguments.scenes.begin(), arguments.scenes.end());
+        for (const auto& source : instanceSources)
+        {
+            std::string failure;
+            const auto path = source.is_relative() ? assetRoot / source : source;
+            const auto document = Authoring::ParsedDocument::ParseFile(path.string(), failure);
+            if (!document || !material_cook::ValidateInstances(document.Root(), materialPrograms, manifest, failure))
+            {
+                std::cerr << "asset-cooker error: material instance closure failed: " << failure << '\n';
+                return 3;
+            }
         }
 
         std::string sourceIdentityFailure;
@@ -1331,6 +1497,23 @@ namespace
             {
                 std::cerr << "asset-cooker error: 게시 전 shadermeta 재검증이 실패했다: "
                     << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
+        for (const auto& product : materialProgramProducts)
+        {
+            const auto artifactFile = stagingRoot / product.manifestEntry.artifactPath;
+            if (!WriteBinaryFile(artifactFile, product.artifactBytes, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+            const ck::LooseArtifactByteSource bytes(stagingRoot);
+            material_graph::CookedProgram persisted;
+            if (!ck::OpenCookedMaterialProgram(product.manifestEntry, bytes, materialBudget, persisted, failure))
+            {
+                std::cerr << "asset-cooker error: material program verification failed: " << failure << '\n';
                 return 5;
             }
         }
@@ -1489,6 +1672,18 @@ namespace
             {
                 std::cerr << "asset-cooker error: shadermeta manifest 검증이 실패했다: "
                     << product.artifactPath << '\n';
+                return 5;
+            }
+        }
+
+        for (const auto& product : materialProgramProducts)
+        {
+            const auto* entry = restoredManifest.Find(product.manifestEntry.assetId);
+            const ck::LooseArtifactByteSource bytes(stagingRoot);
+            material_graph::CookedProgram persisted;
+            if (!entry || !ck::OpenCookedMaterialProgram(*entry, bytes, materialBudget, persisted, failure))
+            {
+                std::cerr << "asset-cooker error: material program manifest verification failed: " << failure << '\n';
                 return 5;
             }
         }
@@ -1677,6 +1872,7 @@ namespace
             << " embeddedTextureBytes=" << totalEmbeddedTextureBytes
             << " textures=" << textureProducts.size()
             << " shaderMetas=" << shaderMetaProducts.size()
+            << " materialPrograms=" << materialProgramProducts.size()
             << " standaloneMaterials=" << materialProducts.size()
             << " standaloneMaterialBytes=" << totalStandaloneMaterialBytes
             << " scenes=" << totalScenes

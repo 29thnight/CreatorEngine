@@ -18,7 +18,8 @@ bool SamePinSchema(const Pin& first, const Pin& second)
 LXNodeDefinitionRegistry::LXNodeDefinitionRegistry()
 {
     RegisterDomain("material", {PinType::Bool, PinType::Int, PinType::Float, PinType::Vector, PinType::Color,
-                                PinType::Normal, PinType::Texture, PinType::Surface});
+                                PinType::Normal, PinType::Texture, PinType::Surface, PinType::Sampler,
+                                PinType::Closure});
     RegisterDomain("behavior", {PinType::Flow, PinType::Bool, PinType::Int, PinType::Float, PinType::Vector,
                                 PinType::Color, PinType::Normal, PinType::Texture});
     RegisterDomain("animation", {PinType::Flow, PinType::Bool, PinType::Int, PinType::Float, PinType::Vector,

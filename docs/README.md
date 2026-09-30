@@ -88,6 +88,9 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [CreatorBuildToolValidation.md](analysis/CreatorBuildToolValidation.md) | 독립 BuildTool EXE·private runtime·패키징 검증과 기존 모델 씬 제한(2026-09-13) |
 | [EngineStructureAnalysis.html](analysis/EngineStructureAnalysis.html) | 엔진 구조 전반 |
 | [ReflectionSystemAnalysis.md](analysis/ReflectionSystemAnalysis.md) | 리플렉션 시스템 실측 |
+| [MAT9BlenderImageComparison.md](analysis/MAT9BlenderImageComparison.md) | Core/Layered 동일 입력 24장·Debug/Release 일치·박막 잔여 차이와 기준 노이즈(2026-09-30) |
+| [MAT9MaterialScenePerformance.md](analysis/MAT9MaterialScenePerformance.md) | 모델 배치 후 Debug/Release 렌더 CPU 회귀와 청크·LOD·binding 개선(2026-09-30) |
+| [MAT9NodeEditorPerformance.md](analysis/MAT9NodeEditorPerformance.md) | 다른 세션의 캔버스·Scene 잠금 대기·Inspector preview 실측 통합(2026-09-30) |
 | [PPLContainerMigrationAnalysis.md](analysis/PPLContainerMigrationAnalysis.md) | PPL 컨테이너 이관 |
 | [RectTransformAnalysis.html](analysis/RectTransformAnalysis.html) | RectTransform |
 | [RendererPortingLog.html](analysis/RendererPortingLog.html) | 렌더러 포팅 이력 |

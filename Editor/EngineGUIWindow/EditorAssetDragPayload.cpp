@@ -19,7 +19,7 @@ namespace
     constexpr std::string_view kPathPayloadTypes[] = {
         "Unknown", "Model", "Texture", "MaterialTexture", "TerrainTexture",
         "Shader", "CppScript", "CSharpScript", "Prefab", "Sound", "HDR",
-        "VolumeProfile", "Font", "SPRITESHEET", "UI_TEXTURE",
+        "SceneRenderProfile", "Font", "SPRITESHEET", "UI_TEXTURE",
     };
 
     bool is_path_payload_type(std::string_view type)

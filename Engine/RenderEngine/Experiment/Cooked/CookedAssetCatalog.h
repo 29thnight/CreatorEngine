@@ -9,6 +9,12 @@
 #include <string>
 #include <vector>
 
+namespace material_graph
+{
+    struct Budget;
+    struct CookedProgram;
+}
+
 namespace experiment::cooked
 {
     class ArtifactByteSource;
@@ -73,6 +79,10 @@ namespace experiment::cooked
         [[nodiscard]] bool OpenAudioClip(const AssetId& assetId,
             std::shared_ptr<const ArtifactByteSource> bytes,
             CookedAudioClipSource& out, std::string& failure) const;
+
+        [[nodiscard]] bool OpenMaterialProgram(const AssetId& assetId,
+            const ArtifactByteSource& bytes, const material_graph::Budget& budget,
+            material_graph::CookedProgram& out, std::string& failure) const;
         [[nodiscard]] std::span<const AssetSourceManifestEntry> SourceAssets()
             const noexcept
         {

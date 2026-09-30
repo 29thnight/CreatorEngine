@@ -653,6 +653,9 @@
     <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\MaterialGraphCommands.cpp">
+      <Filter>EditorRuntime\Runtime</Filter>
+    </ClCompile>
     <ClCompile Include="EngineGUIWindow\MemoryProfilerSnapshot.cpp">
       <Filter>EditorUI\Window</Filter>
     </ClCompile>
@@ -701,5 +704,18 @@
     <ClCompile Include="ImGuiHelper\widgets.cpp">
       <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EngineGUIWindow\MaterialGraphWindow.h" />
+    <ClInclude Include="EngineGUIWindow\MaterialGraphPresentation.h" />
+    <ClInclude Include="..\Lattice\Core\LXDocument.h" />
+    <ClInclude Include="..\Lattice\ImGui\LXCanvas.h" />
+    <ClInclude Include="..\Lattice\ImGui\LXNodeItems.h" />
+    <ClInclude Include="..\Lattice\ImGui\LXStyle.h" />
+    <ClCompile Include="EngineGUIWindow\MaterialGraphWindow.cpp" />
+    <ClCompile Include="EngineGUIWindow\MaterialGraphPresentation.cpp" />
+    <ClCompile Include="..\Lattice\Core\LXDocument.cpp" />
+    <ClCompile Include="..\Lattice\ImGui\LXCanvas.cpp" />
+    <ClCompile Include="..\Lattice\ImGui\LXStyle.cpp" />
   </ItemGroup>
 </Project>

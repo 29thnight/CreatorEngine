@@ -53,7 +53,7 @@ New-Item -ItemType Directory -Force -Path $Work | Out-Null
 
 # 이관을 끝낸 드로어. 옮길 때마다 여기에 더한다.
 $Migrated = @('GameObjectBaseInfo', 'Transform',
-    'SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'VolumeComponent',
+    'SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'SceneRenderProfileComponent',
     'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent',
     'RectTransformComponent')
 # 이관한 드로어의 그리는 함수 — 소스 축이 본문을 잘라 읽는다. 첫 칸이 파일(저장소 기준), 나머지가
@@ -70,12 +70,12 @@ $DrawerSources = @{
     ImportSettings        = @('Editor/EngineGUIWindow/DrawYamlNodeEditor.cpp', 'DrawYamlNodeEditor', 'DrawEntry', 'DrawScalar', 'BeginContainer')
     Canvas                = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperCanvas')
     RectTransformComponent = @('Editor/EngineGUIWindow/ImGuiDrawHelperRectTransformComponent.cpp', 'ImGuiDrawHelperRectTransformComponent', 'DrawVec2Row', 'DrawAnchorPresetPopup', 'DrawAnchorIconButton')
-    VolumeComponent       = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperVolume')
+    SceneRenderProfileComponent       = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperRenderProfile')
     BehaviorTreeComponent = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperBT')
     StateMachineComponent = @('Editor/EngineGUIWindow/InspectorWindow.cpp', 'InspectorWindow::ImGuiDrawHelperFSM')
 }
 # 전용 드로어를 가진 컴포넌트 열둘 — 계획서 §W2-I 재기준선 표.
-$Drawers = @('SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'VolumeComponent',
+$Drawers = @('SoundComponent', 'DecalComponent', 'ImageComponent', 'SpriteRenderer', 'Canvas', 'SceneRenderProfileComponent',
     'BehaviorTreeComponent', 'StateMachineComponent', 'Animator', 'MeshRenderer', 'PlayerInputComponent', 'TerrainComponent')
 # 유형이 붙이는 공간 컴포넌트. 값은 `object.create` 의 유형이다.
 $SpatialDrawers = [ordered]@{ RectTransformComponent = 'UI' }

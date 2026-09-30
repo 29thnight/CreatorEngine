@@ -53,7 +53,7 @@ $registeredExtensions = @(
     '.png', '.dds', '.jpg', '.jpeg', '.hdr',
     '.hlsl', '.shadermeta', '.shader', '.cpp', '.cs',
     '.wav', '.mp3', '.ogg', '.spritefont',
-    '.terrain', '.bt', '.blackboard', '.prefab', '.volume',
+    '.terrain', '.bt', '.blackboard', '.prefab', '.renderprofile',
     '.foliage', '.asset', '.creator'
 )
 $registered = [System.Collections.Generic.HashSet[string]]::new(

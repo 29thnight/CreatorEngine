@@ -459,6 +459,19 @@ void DX12Encoder::CopyPartialToReadback(const RHIReadback& readback, RHITextureH
     m_commandList->CopyTextureRegion(&dst, 0, 0, 0, &src, &box);
 }
 
+bool DX12Encoder::CopyBuffer(const RHIBufferSlice& destination, const RHIBufferSlice& source)
+{
+    if (!m_commandList || !m_resources || !source.size || destination.size != source.size) return false;
+    auto* src = m_resources->Resolve(source.buffer);
+    auto* dst = m_resources->Resolve(destination.buffer);
+    if (!src || !dst || src == dst) return false;
+    const auto srcBytes = src->GetDesc().Width, dstBytes = dst->GetDesc().Width;
+    if (source.offset > srcBytes || source.size > srcBytes - source.offset ||
+        destination.offset > dstBytes || destination.size > dstBytes - destination.offset) return false;
+    m_commandList->CopyBufferRegion(dst, destination.offset, src, source.offset, source.size);
+    return true;
+}
+
 void DX12Encoder::CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
     uint64_t sourceOffset, uint64_t bytes)
 {

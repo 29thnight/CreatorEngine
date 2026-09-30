@@ -36,6 +36,10 @@ enum class PrimitiveProxyType
 };
 
 class Material;
+namespace material_graph
+{
+struct SceneMaterialSource;
+}
 class Mesh;
 class MeshRenderer;
 namespace experiment { struct Material; } // I5-D5c2-2 저작 정본 스냅샷
@@ -118,6 +122,7 @@ public:
 	// 컴포넌트에서 스냅샷할 때 shared_ptr을 그대로 복사하므로,
 	// 원본이 파괴되거나 언로드되어도 이 프록시가 그리는 중에는 안전하다.
 	std::shared_ptr<Material>		m_Material{};
+    std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource;
 	// PHASE 3.75 MBC7/MBC9 — typed 정본이 유일한 지오메트리 출처다. 컴포넌트가
 	// 붙든 immutable generation과 메시 인덱스의 사본. drawPool이 이것으로
 	// RHIModelMeshView를 만들어 패스에 싣고, shared_ptr이 뷰가 가리키는 정점·인덱스
@@ -194,6 +199,7 @@ public:
 	struct DrawSource
 	{
 		std::shared_ptr<Material> material{};
+        std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
 		// I5-D5c4 — 재질 저작 정본(FoliageType 병행 필드의 사본). drawPool이
 		// pooled.authoredMaterialSource로 옮겨 sealing 직행에 합류시킨다.
 		std::shared_ptr<const experiment::Material> authoredMaterial{};

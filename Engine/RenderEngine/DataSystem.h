@@ -8,6 +8,7 @@
 #include "JobScheduler.h"
 #include "ShaderMetaHandle.h"
 #include "Assets/ModelAssetGeneration.h"
+#include "MaterialGraphRuntime.h"
 #include <atomic>
 #include <cstddef>
 #include <iosfwd>
@@ -47,6 +48,7 @@ enum class RuntimeAssetType
 	UITexture,
 	SpriteSheet,
 	ShaderMeta,
+    MaterialGraph,
 };
 
 enum class RuntimeAssetChangeKind
@@ -250,7 +252,18 @@ public:
 	// shared snapshot은 호출자가 보유하는 동안 안전하지만 reload 뒤 옛 handle은
 	// resolve되지 않는다. 값 복사 API는 기존 호출 호환 경계다.
 	ShaderMetaHandle LoadShaderMetaHandle(FileGuid guid, std::string& outError);
-	std::shared_ptr<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
+
+    std::shared_ptr<const material_graph::Generation> LoadMaterialGraphGeneration(FileGuid guid, std::string& error,
+                                                                                  bool reload = false);
+    std::shared_ptr<const material_graph::Generation> ResolveMaterialGraphGeneration(FileGuid guid) const;
+    file::path GetMaterialGraphSourcePath(FileGuid guid) const;
+    bool ConfigureModelMaterialGraph(Material& material, const assets::ModelAssetGeneration& model,
+                                      const assets::ModelMaterialAsset& source, std::string& error);
+    bool ConfigureMaterialGraph(Material& material, const material_graph::InstanceDescription& description,
+                                 std::string& error, bool reload = false);
+    bool ConfigureMaterialGraphAuthoring(Material& material, const LX::LXMaterialAsset& asset,
+                                         const material_graph::InstanceDescription& description, std::string& error);
+    std::shared_ptr<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
 	bool LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
 		std::string& outError);
 
@@ -356,7 +369,8 @@ private:
 	std::unordered_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
 	std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;
 	std::vector<std::uint32_t> m_shaderMetaFreeSlots;
-	std::mutex m_pendingAssetChangeMutex;
+    material_graph::GenerationStore m_materialGraphGenerations;
+    std::mutex m_pendingAssetChangeMutex;
 	std::vector<RuntimeAssetChange> m_pendingAssetChanges;
 
 };

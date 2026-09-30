@@ -1,5 +1,6 @@
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 
 #include <algorithm>
 #include <atomic>
@@ -7,6 +8,13 @@
 
 namespace
 {
+    // An address may be reused while a packet still retains an old graph output.
+    // Epochs must distinguish both Reset and reconstruction at the same address.
+    uint64_t NextResourceEpoch()
+    {
+        static std::atomic<uint64_t> next{1};
+        return next.fetch_add(1, std::memory_order_relaxed);
+    }
 
     // 쓰기로 보는 상태. 의존성 유도와 컬링이 이 구분을 쓴다.
     bool IsWriteState(RHIResourceState state)
@@ -41,6 +49,64 @@ void EnhancedRenderGraph::Reset()
     m_executeOrder.clear();
     m_compiled = false;
     m_stats = Stats{};
+    m_resourceEpoch = NextResourceEpoch();
+    m_preparedPool = nullptr;
+    m_preparedRecording = m_preparedDescriptors = 0;
+    m_preparedRecordingConsumed = false;
+}
+
+RHIBufferHandle EnhancedRenderGraph::ResolveBufferHandle(RGHandle handle) const
+{
+    return handle.IsValid() && handle.index < m_resources.size() ? m_resources[handle.index].buffer : RHIBufferHandle{};
+}
+
+RGHandle EnhancedRenderGraph::FindImportedBuffer(RHIBufferHandle buffer) const
+{
+    if (buffer.IsValid())
+    {
+        for (size_t i = 0; i < m_resources.size(); ++i)
+        {
+            if (m_resources[i].imported && m_resources[i].buffer == buffer)
+            {
+                return {static_cast<uint16_t>(i)};
+            }
+        }
+    }
+    return {};
+}
+
+RGHandle EnhancedRenderGraph::FindImportedTexture(RHITextureHandle texture) const
+{
+    if (texture.IsValid())
+    {
+        for (size_t i = 0; i < m_resources.size(); ++i)
+        {
+            if (m_resources[i].imported && m_resources[i].handle == texture)
+            {
+                return {static_cast<uint16_t>(i)};
+            }
+        }
+    }
+    return {};
+}
+
+bool EnhancedRenderGraph::PrepareParallel(IRHIParallelCommandPool& pool, std::string& outError)
+{
+    if (m_preparedPool || !m_resources.empty() || !m_passes.empty() || m_compiled || !pool.IsInitialized() ||
+        m_deviceServices->GetCurrentUploadRecordingId() == 0 || thread_pool::is_worker_thread())
+    {
+        outError = "Parallel preparation needs an empty graph, initialized pool and an active owner recording.";
+        return false;
+    }
+    if (!pool.Prepare(outError))
+    {
+        return false;
+    }
+    m_preparedPool = &pool;
+    m_preparedRecording = m_deviceServices->GetCurrentUploadRecordingId();
+    m_preparedDescriptors = m_deviceServices->GetDescriptorVersionToken();
+    outError.clear();
+    return true;
 }
 
 RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
@@ -130,6 +196,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
 
 bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphOrder">()};
     // ── 실행 순서는 선언 순서다. 그래프가 다시 정렬하지 않는다. ──
     //
     // 처음에는 위상 정렬로 순서를 '유도'하게 짰다가 자가 검증에서 뒤집었다.
@@ -191,8 +258,17 @@ bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 
 void EnhancedRenderGraph::CullPasses()
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphCull">()};
     const size_t passCount = m_passes.size();
     for (auto& pass : m_passes) pass.culled = true;
+
+    // Index writers once rather than scanning every pass and usage for each read.
+    // Keep all writers, including later declarations, to preserve reachability semantics.
+    std::vector<std::vector<size_t>> writers(m_resources.size());
+    for (size_t i = 0; i < passCount; ++i)
+        for (const auto& usage : m_passes[i].usages)
+            if (usage.handle.IsValid() && usage.handle.index < writers.size() && IsWriteState(usage.state))
+                writers[usage.handle.index].push_back(i);
 
     // 뿌리: 부작용이 있는 패스(결과가 그래프 밖으로 나간다)와 외부 리소스에 쓰는 패스.
     // 후자를 넣는 이유는, 임포트한 리소스는 그래프가 수명을 모르므로 그 쓰기가
@@ -232,21 +308,11 @@ void EnhancedRenderGraph::CullPasses()
             if (IsWriteState(usage.state)) continue;
             if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
 
-            // 이 리소스를 앞서 쓴 패스들을 살린다.
-            for (size_t producer = 0; producer < passCount; ++producer)
+            for (const size_t producer : writers[usage.handle.index])
             {
                 if (!m_passes[producer].culled) continue;
-
-                for (const auto& producerUsage : m_passes[producer].usages)
-                {
-                    if (producerUsage.handle.index == usage.handle.index &&
-                        IsWriteState(producerUsage.state))
-                    {
-                        m_passes[producer].culled = false;
-                        stack.push_back(producer);
-                        break;
-                    }
-                }
+                m_passes[producer].culled = false;
+                stack.push_back(producer);
             }
         }
     }
@@ -265,6 +331,7 @@ void EnhancedRenderGraph::CullPasses()
 
 bool EnhancedRenderGraph::CreateTransients(std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphTransients">()};
     // 살아남은 패스가 실제로 쓰는 리소스만 만든다. 컬링된 패스만 쓰던 것을
     // 만드는 것은 낭비이고, 그 낭비는 프레임마다 반복된다.
     for (auto& resource : m_resources)
@@ -367,6 +434,13 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
 EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services)
     : m_deviceServices(&services)
 {
+    // A live scene declares dozens of passes/resources per recording. Pass owns
+    // several vectors; growing the outer array repeatedly also rebuilds their
+    // checked-iterator proxies in Debug. These are initial capacities, not limits.
+    m_resources.reserve(256);
+    m_passes.reserve(128);
+    m_executeOrder.reserve(128);
+    m_resourceEpoch = NextResourceEpoch();
 }
 
 EnhancedRenderGraph::~EnhancedRenderGraph()
@@ -496,6 +570,7 @@ void EnhancedRenderGraph::PlanBarriers()
 
 bool EnhancedRenderGraph::Compile(std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"RenderGraphCompile">()};
     // ★ 디바이스를 인자로 받지 않는다 (G-1). 생성자에서 받은 중립 service를
     //   그대로 쓰므로 호출부가 같은 값을 도로 넘기지 않는다.
     if (nullptr == m_deviceServices)
@@ -566,8 +641,27 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
 
         // 분할 패스는 조각 하나로 부른다 — 통째로 기록하는 것과 같아야 한다는
         // 것이 계약이고, 순차 경로가 그 계약의 기준이 된다.
-        if (pass.splitExecute) pass.splitExecute(context, 0, 1);
-        else if (pass.execute)  pass.execute(context);
+        try
+        {
+            if (pass.splitExecute)
+                pass.splitExecute(context, 0, 1);
+            else if (pass.execute)
+                pass.execute(context);
+        }
+        catch (const std::exception& exception)
+        {
+            if (nullptr != m_profiler)
+                m_profiler->EndPass(encoder, timerSlot);
+            outError = pass.name + ": " + exception.what();
+            return false;
+        }
+        catch (...)
+        {
+            if (nullptr != m_profiler)
+                m_profiler->EndPass(encoder, timerSlot);
+            outError = pass.name + ": unknown recording failure";
+            return false;
+        }
 
         if (nullptr != m_profiler) m_profiler->EndPass(encoder, timerSlot);
     }
@@ -592,6 +686,14 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     uint32_t workerCount, const RHIRecordedBatchDesc& batchDesc,
     RHIRecordedBatch& outBatch, std::string& outError)
 {
+    if (outBatch.IsValid() ||
+        (m_preparedPool && (m_preparedPool != &pool || m_preparedRecordingConsumed || m_preparedRecording == 0 ||
+                            m_preparedRecording != m_deviceServices->GetCurrentUploadRecordingId() ||
+                            m_preparedDescriptors != m_deviceServices->GetDescriptorVersionToken())))
+    {
+        outError = "Parallel recording has a nonempty result or stale/already consumed preparation.";
+        return false;
+    }
     if (!m_compiled)
     {
         outError = "Compile을 먼저 불러야 한다";
@@ -687,7 +789,12 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
     // backend가 immediate upload/copy를 먼저 제출하고 worker recording용
     // allocation version을 연다. 호출부가 Flush를 빼먹을 수 없게 경계 안에 둔다.
-    if (!pool.Prepare(outError)) return false;
+    if (m_preparedPool)
+    {
+        m_preparedRecordingConsumed = true;
+    }
+    else if (!pool.Prepare(outError))
+        return false;
 
     // ── 배분: 연속 블록 ──
     //

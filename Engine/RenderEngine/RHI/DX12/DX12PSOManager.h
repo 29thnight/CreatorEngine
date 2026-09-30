@@ -91,6 +91,8 @@ public:
     //   소비자 없는 자리를 하나 더 만드는 것이라 A-1 의 범위 밖이다.
     // Copies borrowed inputs before submission; a stopped scheduler returns Failed.
     RequestState Request(const RHIGraphicsPipelineDesc& desc, ID3D12PipelineState** outPso);
+    RHIPipelineRequestState RequestGraphics(const RHIGraphicsPipelineDesc& desc,
+        RHIPipelineHandle& result, std::string& outError) override;
 
     // ── 폴백 정책 ──
     //

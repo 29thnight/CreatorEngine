@@ -41,6 +41,8 @@
 
 #include "../../Camera.h"
 #include "../../Material.h"
+#include "../../MaterialGraphSceneInput.h"
+#include "../../MaterialGraphSceneHost.h"
 #include "../../RenderScene.h"
 #include "../Core/EnhancedLightPacking.h"
 #include "../../Texture.h"
@@ -70,6 +72,9 @@
 #include <chrono>
 #include <string_view>
 #include <unordered_map>
+#include <set>
+#include <mathematics/transform.hpp>
+#include <mathematics/scalar.hpp>
 
 // EnhancedSceneRenderer의 단독 메인 런타임 구현.
 //
@@ -147,6 +152,112 @@ namespace
 
 namespace
 {
+    // Built-in preview geometry has a reserved, stable identity and immutable
+    // storage. SceneViewInput copies/seals it before any GPU submission.
+    struct MaterialPreviewSphere
+    {
+        std::vector<std::byte> vertices;
+        std::vector<uint32_t> indices;
+        RHIModelMeshView mesh;
+        MaterialPreviewSphere()
+        {
+            Uuid::TryParse("e590a6f7-075f-8f70-83cb-3f427aa960bc", mesh.handle.modelId);
+            Uuid::TryParse("991d13a0-1288-8ac2-8777-f6f77fb8ed63", mesh.handle.meshId);
+            mesh.handle.generation = 1;
+            mesh.vertexAttributeMask = assets::kCoreVertexAttributes;
+            mesh.vertexStride = assets::StrideOf(mesh.vertexAttributeMask);
+            mesh.vertexLayoutHash = assets::VertexLayoutHash(mesh.vertexAttributeMask);
+            constexpr uint32_t rings = 32, segments = 64;
+            vertices.resize((rings + 1) * (segments + 1) * mesh.vertexStride);
+            for (uint32_t y = 0; y <= rings; ++y)
+                for (uint32_t x = 0; x <= segments; ++x)
+                {
+                    const float theta = float(y) * 3.14159265359f / rings;
+                    const float phi = float(x) * 6.28318530718f / segments;
+                    const math::vector3 normal{std::sin(theta) * std::cos(phi), std::cos(theta),
+                                               std::sin(theta) * std::sin(phi)};
+                    const math::vector2 uv{float(x) / segments, float(y) / rings};
+                    const math::vector4 tangent{-std::sin(phi), 0.f, std::cos(phi), 1.f};
+                    auto* vertex = vertices.data() + (y * (segments + 1) + x) * mesh.vertexStride;
+                    const auto write = [&](assets::VertexAttribute attribute, const auto& value) {
+                        std::memcpy(vertex + assets::OffsetOf(mesh.vertexAttributeMask, attribute), &value, sizeof(value));
+                    };
+                    write(assets::VertexAttribute::Position, normal);
+                    write(assets::VertexAttribute::Normal, normal);
+                    write(assets::VertexAttribute::Uv0, uv);
+                    write(assets::VertexAttribute::Tangent, tangent);
+                }
+            for (uint32_t y = 0; y < rings; ++y)
+                for (uint32_t x = 0; x < segments; ++x)
+                {
+                    const auto a = y * (segments + 1) + x, b = a + segments + 1;
+                    if (y != 0) indices.insert(indices.end(), {a, a + 1, b});
+                    if (y + 1 != rings) indices.insert(indices.end(), {a + 1, b + 1, b});
+                }
+            mesh.vertexData = vertices.data();
+            mesh.vertexBytes = vertices.size();
+            mesh.indexData = indices.data();
+            mesh.indexCount = static_cast<uint32_t>(indices.size());
+        }
+    };
+
+    struct MaterialPreviewFloor
+    {
+        std::vector<std::byte> vertices;
+        std::vector<uint32_t> indices;
+        RHIModelMeshView mesh;
+        explicit MaterialPreviewFloor(unsigned color)
+        {
+            Uuid::TryParse("e590a6f7-075f-8f70-83cb-3f427aa960bc", mesh.handle.modelId);
+            Uuid::TryParse(color ? "4a0c084a-ea1a-83a7-9cb4-c13acfe9c702" : "4a0c084a-ea1a-83a7-9cb4-c13acfe9c701", mesh.handle.meshId);
+            mesh.handle.generation = 1;
+            mesh.vertexAttributeMask = assets::kCoreVertexAttributes;
+            mesh.vertexStride = assets::StrideOf(mesh.vertexAttributeMask);
+            mesh.vertexLayoutHash = assets::VertexLayoutHash(mesh.vertexAttributeMask);
+            for (int z = -8; z < 8; ++z)
+                for (int x = -8; x < 8; ++x)
+                {
+                    if (unsigned((x + z + 16) % 2) != color) continue;
+                    const auto first = static_cast<uint32_t>(vertices.size() / mesh.vertexStride);
+                    for (const auto corner : {math::vector2{0, 0}, math::vector2{0, 1}, math::vector2{1, 1}, math::vector2{1, 0}})
+                    {
+                        const auto offset = vertices.size();
+                        vertices.resize(offset + mesh.vertexStride);
+                        auto* vertex = vertices.data() + offset;
+                        const auto write = [&](assets::VertexAttribute attribute, const auto& value) {
+                            std::memcpy(vertex + assets::OffsetOf(mesh.vertexAttributeMask, attribute), &value, sizeof(value));
+                        };
+                        write(assets::VertexAttribute::Position, math::vector3{(x + corner.x) * .65f, -1.01f, (z + corner.y) * .65f});
+                        write(assets::VertexAttribute::Normal, math::vector3{0, 1, 0});
+                        write(assets::VertexAttribute::Uv0, corner);
+                        write(assets::VertexAttribute::Tangent, math::vector4{1, 0, 0, 1});
+                    }
+                    indices.insert(indices.end(), {first, first + 1, first + 2, first, first + 2, first + 3});
+                }
+            mesh.vertexData = vertices.data();
+            mesh.vertexBytes = vertices.size();
+            mesh.indexData = indices.data();
+            mesh.indexCount = static_cast<uint32_t>(indices.size());
+        }
+    };
+
+    FrameCameraSnapshot MaterialPreviewCamera(uint32_t width, uint32_t height)
+    {
+        FrameCameraSnapshot camera;
+        camera.eyePosition = {0.f, 1.65f, -3.8f};
+        camera.forward = math::normalize(-camera.eyePosition);
+        camera.right = {1.f, 0.f, 0.f};
+        camera.up = math::cross(camera.forward, camera.right);
+        camera.fov = 45.f;
+        camera.nearPlane = 0.1f;
+        camera.farPlane = 20.f;
+        camera.view = math::look_at_lh(camera.eyePosition, {}, camera.up);
+        camera.projection = math::perspective_fov_lh(math::radians(camera.fov),
+            float(width) / std::max(height, 1u), camera.nearPlane, camera.farPlane);
+        camera.inverseView = math::inverse(camera.view);
+        camera.inverseProjection = math::inverse(camera.projection);
+        return camera;
+    }
     using EnhancedSceneRenderer::RenderPhase;
     using EnhancedSceneRenderer::RenderThreadPhaseScope;
     // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
@@ -260,6 +371,8 @@ namespace
         //   주석 참조). 나머지 패스는 프레임 안에서 입력→출력이 끝나므로
         //   카메라가 둘이어도 한 인스턴스로 충분하다.
         EnhancedGBufferPass   gbuffer;
+        material_graph::SceneHost graphMaterials;
+        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
         EnhancedShadowPass    shadow;
         EnhancedDecalPass     decal;
         EnhancedDeferredPass  deferred;
@@ -299,6 +412,7 @@ namespace
         // 일이 구조적으로 없다 — WaitForGpu가 필요 없어지는 이유다.
         struct DisplaySlot
         {
+            bool previewComplete{false};
             RHITextureHandle rhiTexture;
             EnhancedSceneRendererLiveDX12Adapter::DisplayToken interopToken{
                 EnhancedSceneRendererLiveDX12Adapter::kInvalidDisplayToken };
@@ -411,6 +525,8 @@ namespace
 
         EnhancedShadowPass shadow;
         EnhancedGBufferPass gbuffer;
+        material_graph::SceneHost graphMaterials;
+        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
         EnhancedDecalPass decal;
         EnhancedSSAOPass ssao;
         EnhancedDeferredPass deferred;
@@ -438,6 +554,7 @@ namespace
 
         struct View
         {
+            bool previewComplete{false};
             EnhancedLiveViewKey key{};
             EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
             EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
@@ -457,6 +574,7 @@ namespace
 
         struct Slot
         {
+            bool previewComplete{false};
             RHIReadback readback{};
             std::shared_ptr<EnhancedRenderGraph> graph;
             uint64_t fenceValue{ 0 };
@@ -612,6 +730,7 @@ namespace
             desc.ShutdownAll(
                 static_cast<uint32_t>(EnhancedSceneRenderer::kMaxLiveCameraViews));
             desc.Clear();
+            graphMaterials.ShutdownAfterIdle();
             ibl.Shutdown();
             commandPool.Shutdown();
             textureCache.Shutdown();
@@ -659,6 +778,7 @@ namespace
             views[selected].displayTarget = requested.displayTarget;
             views[selected].viewFlags = requested.viewFlags;
             views[selected].ready = false;
+            views[selected].previewComplete = false;
             views[selected].promotionCount = 0;
             views[selected].promotedSlotMask = 0;
             views[selected].completedFrameId = 0;
@@ -700,6 +820,7 @@ namespace
                             ++view.promotionCount;
                             view.promotedSlotMask |= (1u << slotIndex);
                             view.completedFrameId = slot.frameId;
+                            view.previewComplete = slot.previewComplete;
                         }
                     }
                     if (belongsToView)
@@ -794,6 +915,16 @@ namespace
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
             {
+                RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::SpirV);
+                if (!graphMaterials.PrepareResidency(frameContext, graphInput, outError)) return false;
+                if (graphInput && !graphInput->Draws().empty() &&
+                    !graph.PrepareParallel(commandPool, outError)) return false;
+                if (!graphMaterials.Prepare(frameContext, graphInput, ibl.GetCubeMap(),
+                        ibl.GetIrradianceMap(), ibl.GetPrefilteredMap(),
+                        shadow.GetShadowData(), {}, outError, ibl.GetGeneration())) return false;
+                if (capture) capture->RecordLatticeInput(graphInput);
+            }
+            {
                 RenderThreadPhaseScope build(RenderPhase::graph_build);
                 blackboard.Reset();
 
@@ -838,12 +969,17 @@ namespace
                 if (!resources.EndFrame(outError)) return false;
             }
             committed = true;
+            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+            if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
+                    graphCompletion, outError, batchTicket)) return false;
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
             slot->viewIndex = viewIndex;
             slot->key = viewPacket.key;
             slot->frameId = sourceFrameId;
+            slot->previewComplete = graphInput && !graphInput->Draws().empty() &&
+                (!viewPacket.materialPreview || graphInput->Draws()[0].material == viewPacket.materialPreview->instance);
             slot->pending = true;
             if (capture)
             {
@@ -1106,13 +1242,14 @@ namespace
             const EnhancedLiveViewKey& key, uint64_t presentationKey,
             uint64_t completedFrameId, uint64_t promotionCount,
             uint32_t promotedSlotMask, uint32_t width, uint32_t height,
-            uint64_t resultResizeGeneration = 0)
+            uint64_t resultResizeGeneration = 0, bool previewComplete = false)
         {
             const uint32_t targetIndex = DisplayTargetIndex(displayTarget);
             EnhancedLiveDisplayEntrySnapshot& entry =
                 displaySnapshot.targets[targetIndex];
             if (!entry.active || entry.key != key) return;
             entry.ready = 0 != presentationKey;
+            entry.previewComplete = previewComplete;
             entry.completedFrameId = completedFrameId;
             entry.completedWidth = width;
             entry.completedHeight = height;
@@ -1136,7 +1273,7 @@ namespace
                 PublishDisplayResultLocked(view.displayTarget, view.key,
                     VulkanLivePipeline::kDisplayKeyBase + i + 1u,
                     view.completedFrameId, view.promotionCount,
-                    view.promotedSlotMask, vulkanPipeline->width, vulkanPipeline->height);
+                    view.promotedSlotMask, vulkanPipeline->width, vulkanPipeline->height, 0, view.previewComplete);
             }
         }
 
@@ -1160,6 +1297,7 @@ namespace
             // SealForwardMaterials/SealGBufferMaterials가 값 snapshot을 만든 뒤
             // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
             std::shared_ptr<const Material> materialSource{};
+            std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
             // I5-D5c2-2 — 재질 저작 정본의 값 스냅샷. 있으면 sealing이
             // properties·keywords·blendMode를 이것으로 덮는다(부속은 legacy).
             std::shared_ptr<const experiment::Material> authoredMaterialSource{};
@@ -1194,6 +1332,11 @@ namespace
 
         std::vector<EnhancedDrawItem> draws;
         std::vector<EnhancedDrawItem> forwardDraws;
+        std::vector<EnhancedDrawItem> graphDraws;
+        // Same ordering as graphDraws/SceneDrawInput::sourceIndex. These sealed
+        // legacy draws keep the entire model visible during a cold graph compile.
+        std::vector<EnhancedDrawItem> graphFallbackDraws;
+        std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
         // 몇 개를 봤고 패스 한도에 몇 개가 걸리는지"를 답하는 데 쓴다 —
@@ -1203,6 +1346,8 @@ namespace
         // 그리는 패스가 하나뿐이라 컨텍스트에 실을 이유가 없다. 여기 두는
         // 것은 매 프레임 재할당을 피하기 위해서다.
         std::vector<EnhancedDecalPass::Item> decals;
+        const std::vector<EnhancedDecalPass::Item> previewDecals;
+        bool materialPreviewView{false};
         EnhancedGizmoSceneData        gizmoData;   // 아이콘 벡터를 프레임 동안 소유
 
         uint32_t ssaoFrameIndex{ 0 };
@@ -1567,6 +1712,16 @@ namespace
             debugSnapshot.framesRendered = framesRendered;
             debugSnapshot.framesIdle = framesIdle;
             debugSnapshot.framesInFlight = framesInFlight;
+            const auto geometryStats = pipeline ? pipeline->graphMaterials.GeometryStats() :
+                (vulkanPipeline ? vulkanPipeline->graphMaterials.GeometryStats() : material_graph::MeshSurfaceCacheStats{});
+            debugSnapshot.materialGeometryUploads = geometryStats.uploads;
+            debugSnapshot.materialGeometryUploadBytes = geometryStats.uploadedBytes;
+            debugSnapshot.materialGeometryCacheHits = geometryStats.hits;
+            debugSnapshot.materialGeometryResidentBytes = geometryStats.residentBytes;
+            debugSnapshot.materialGeometryEntries = geometryStats.entries;
+            debugSnapshot.materialGeometryTransforms = geometryStats.transforms;
+            debugSnapshot.materialGeometryTransformHits = geometryStats.transformHits;
+            debugSnapshot.materialGeometryOutputBytes = geometryStats.cachedOutputBytes;
             debugSnapshot.gpuMaxPendingSubmissions = gpuMaxPendingSubmissions;
             debugSnapshot.publishedFrameId = publishedFrameId;
             debugSnapshot.consumedFrameId = consumedFrameId;
@@ -1625,6 +1780,7 @@ namespace
                     target.name = lastPassTimings[i].name;
                 }
                 target.milliseconds = lastPassTimings[i].milliseconds;
+                target.spanMilliseconds = lastPassTimings[i].spanMilliseconds;
             }
 
             // 검증 메시지는 처음 관측한 것만 쌓이므로 개수가 늘 때만 다시 만든다.
@@ -1939,6 +2095,7 @@ namespace
             p.desc.ShutdownAll(static_cast<uint32_t>(LivePipeline::kMaxCameraViews));
             p.desc.Clear();
 
+            p.graphMaterials.ShutdownAfterIdle();
             p.ibl.Shutdown();
 
             // 포그 입력은 파이프라인 수명에 묶인다(텍스처 캐시가 함께 죽는다).
@@ -2135,6 +2292,7 @@ namespace
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     p.shadow.Declare(graph, ctx);
+                    p.graphMaterials.DeclareShadow(graph, p.shadow.GetShadowMap());
                     bb.Set(LiveSlots::kShadowMap, p.shadow.GetShadowMap());
                 };
                 p.desc.AddNode(std::move(node));
@@ -2165,6 +2323,22 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
+            {
+                LivePassNode node;
+                node.name = "LX.Scene.GBuffer";
+                node.modifies = {
+                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
+                    LiveSlots::kGBufferNormal, LiveSlots::kGBufferEmissive,
+                    LiveSlots::kGBufferBitmask, LiveSlots::kGBufferDepth,
+                };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb));
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
             // ── 데칼 ──
             //
             // GBuffer 바로 뒤, SSAO·Deferred 앞이다(DX11과 같은 자리).
@@ -2180,7 +2354,7 @@ namespace
                 node.prepare = [this, &p](const EnhancedFrameContext& ctx,
                     std::string& err, uint32_t) -> bool
                 {
-                    p.decal.SetDecals(decals);
+                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals);
                     return p.decal.PrepareFrame(ctx, err);
                 };
                 node.reads = { LiveSlots::kGBufferDepth };
@@ -2191,8 +2365,13 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
-                    p.decal.SetInputs(GatherGBufferOutputs(bb));
+                    const auto inputs = GatherGBufferOutputs(bb);
+                    p.decal.SetInputs(inputs);
                     p.decal.Declare(graph, ctx);
+                    if (p.decal.HasPreparedDecals())
+                    {
+                        p.graphMaterials.DeclareDecalInputs(graph, inputs, p.decal.GetBaseline());
+                    }
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -2243,6 +2422,29 @@ namespace
                     p.forward.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
                     p.deferred.Declare(graph, ctx);
                     bb.Set(LiveSlots::kLitColor, p.deferred.GetOutput());
+                };
+                p.desc.AddNode(std::move(node));
+            }
+
+            {
+                LivePassNode node;
+                node.name = "LX.Scene.Color";
+                node.reads = {
+                    LiveSlots::kAmbientOcclusion, LiveSlots::kShadowMap,
+                };
+                // Refraction completes the opaque HDR first, then installs the
+                // closest transmitting surface in the shared GBuffer and depth.
+                node.modifies = {
+                    LiveSlots::kLitColor, LiveSlots::kGBufferDepth, LiveSlots::kGBufferBitmask,
+                    LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
+                    LiveSlots::kGBufferNormal, LiveSlots::kGBufferEmissive,
+                };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    p.graphMaterials.DeclareColor(graph, GatherGBufferOutputs(bb),
+                        bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kAmbientOcclusion),
+                        bb.Get(LiveSlots::kShadowMap));
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -2426,6 +2628,21 @@ namespace
                 p.desc.AddNode(std::move(node));
             }
 
+            // Material media compose the completed Scene before tone mapping.
+            // Volume-only boundaries never become opaque GBuffer depth owners.
+            {
+                LivePassNode node;
+                node.name = "LX.Scene.Volume";
+                node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
+                node.modifies = { LiveSlots::kLitColor };
+                node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
+                    const EnhancedFrameContext&, const LiveFrameBinding&)
+                {
+                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareVolume(graph,
+                        bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kGBufferDepth), bb.Get(LiveSlots::kShadowMap)));
+                };
+                p.desc.AddNode(std::move(node));
+            }
             // ── 볼류메트릭 포그 (뷰마다 인스턴스 · 꺼질 수 있다) ──
             //
             // 라이팅 결과 위에, 톤맵 앞에 얹는다(DX11과 같은 자리).
@@ -2913,6 +3130,9 @@ namespace
         void BuildDrawPool()
         {
             drawPool.clear();
+            graphDraws.clear();
+            graphFallbackDraws.clear();
+            graphViewInput.reset();
             decals.clear();
             spritePool.clear();
             uiProxySnapshot.clear();
@@ -2984,7 +3204,19 @@ namespace
                     pooled.item.animatorKey = static_cast<uint64_t>(proxy->m_animatorGuid);
                 }
 
-                if (const auto* material = proxy->m_Material.get())
+                if (proxy->m_graphMaterialSource)
+                {
+                    pooled.graphMaterialSource = proxy->m_graphMaterialSource;
+                    pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
+                    pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
+                    pooled.item.coverage = pooled.graphMaterialSource->coverage;
+                    pooled.materialSource = proxy->m_Material;
+                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
+                    pooled.authoredRevision = proxy->m_authoredRevision;
+                    pooled.isTransparent =
+                        (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
+                }
+                else if (const auto* material = proxy->m_Material.get())
                 {
                     pooled.materialSource = proxy->m_Material;
                     pooled.authoredMaterialSource = proxy->m_authoredMaterial;
@@ -3022,7 +3254,18 @@ namespace
                     pooled.item.modelMeshView = modelView;
                     pooled.generationSource = source.modelGeneration;
 
-                    if (source.material)
+                    if (source.graphMaterialSource)
+                    {
+                        pooled.graphMaterialSource = std::move(source.graphMaterialSource);
+                        pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
+                        pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
+                        pooled.item.coverage = pooled.graphMaterialSource->coverage;
+                        pooled.materialSource = std::move(source.material);
+                        pooled.authoredMaterialSource = std::move(source.authoredMaterial);
+                        pooled.isTransparent =
+                            (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
+                    }
+                    else if (source.material)
                     {
                         pooled.materialSource = std::move(source.material);
                         // I5-D5c4 — Foliage도 저작 정본을 나른다(poolMesh와 같은
@@ -3143,6 +3386,7 @@ namespace
 
             for (PooledDraw& pooled : drawPool)
             {
+                if (pooled.graphMaterialSource) continue;
                 if (!pooled.isTransparent) continue;
                 if (!pooled.materialSource)
                 {
@@ -3369,6 +3613,7 @@ namespace
         bool SealGBufferMaterials(
             const std::vector<EnhancedShaderMetaFrameSnapshot>& shaders,
             EnhancedGBufferPass& pass, const EnhancedFrameContext& context,
+            material_graph::SceneHost& graphMaterials,
             RHICompletionPoint retireAfter, RHIShaderBinary output,
             std::string& outError)
         {
@@ -3389,11 +3634,27 @@ namespace
                 std::shared_ptr<const EnhancedMaterialDrawSnapshot>> sealed;
             sealed.reserve(drawPool.size());
             RHIShaderCompiler::ScopedOutput outputScope(output);
+            std::set<assets::ModelAssetGenerationHandle> pendingGraphModels;
+            for (const PooledDraw& pooled : drawPool)
+            {
+                if (!pooled.graphMaterialSource || pooled.isTransparent) continue;
+                const auto& instance = pooled.graphMaterialSource->instance;
+                if (!instance || !graphMaterials.IsProgramReady(instance->generation, output))
+                {
+                    const auto& handle = pooled.item.modelMeshView.handle;
+                    pendingGraphModels.insert({handle.modelId, handle.generation});
+                }
+            }
             std::vector<std::pair<Uuid::Uuid16, std::uint64_t>> drawnGenerations;
             drawnGenerations.reserve(drawPool.size());
 
             for (PooledDraw& pooled : drawPool)
             {
+                if (pooled.graphMaterialSource)
+                {
+                    const auto& handle = pooled.item.modelMeshView.handle;
+                    if (!pendingGraphModels.contains({handle.modelId, handle.generation})) continue;
+                }
                 // P2a Forward snapshot은 앞의 SealForwardMaterials가 별도로
                 // 밀봉했다. GBuffer ShaderMeta 계약을 투명 draw에 섞지 않는다.
                 if (pooled.isTransparent)
@@ -3570,6 +3831,7 @@ namespace
                 0 == frame.width || 0 == frame.height) return false;
 
             cameraSnapshot = viewPacket.camera;
+            materialPreviewView = viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
             totalSeconds = frame.totalSeconds;
 
             gizmoData = viewPacket.gizmos
@@ -3577,9 +3839,64 @@ namespace
 
             draws.clear();
             forwardDraws.clear();
+            graphDraws.clear();
+            graphFallbackDraws.clear();
+            graphViewInput.reset();
             lights.clear();
             worldSprites.clear();
             uiRects.clear();
+            if (materialPreviewView)
+            {
+                const auto& source = viewPacket.materialPreview;
+                if (!source || !source->instance) return false;
+                static const MaterialPreviewSphere sphere;
+                EnhancedDrawItem draw;
+                draw.geometryKey = HashModelMeshHandle(sphere.mesh.handle);
+                draw.modelMeshView = sphere.mesh;
+                draw.worldMatrix = math::matrix4x4::identity();
+                draw.boundRadius = 1.f;
+                draw.coverage = source->coverage;
+                draw.materialGraphInstance = source->instance;
+                draw.materialGraphSlot = source->materialSlot ? source->materialSlot : 1;
+                material_graph::SceneInputView inputView;
+                inputView.frameId = frame.frameId;
+                inputView.sceneEpoch = frame.sceneEpoch;
+                inputView.viewId = viewPacket.key.viewId;
+                inputView.historyRevision = viewPacket.key.historyRevision;
+                inputView.width = frame.width;
+                inputView.height = frame.height;
+                inputView.camera = cameraSnapshot;
+                std::string error;
+                static const std::array<MaterialPreviewFloor, 2> floor{MaterialPreviewFloor{0}, MaterialPreviewFloor{1}};
+                std::vector<EnhancedDrawItem> previewDraws{draw};
+                for (unsigned i = 0; i < floor.size(); ++i)
+                {
+                    const auto& ground = viewPacket.materialPreviewFloor[i];
+                    if (!ground || !ground->instance) continue;
+                    EnhancedDrawItem tile;
+                    tile.geometryKey = HashModelMeshHandle(floor[i].mesh.handle);
+                    tile.modelMeshView = floor[i].mesh;
+                    tile.worldMatrix = math::matrix4x4::identity();
+                    tile.boundRadius = 8.f;
+                    tile.coverage = ground->coverage;
+                    tile.materialGraphInstance = ground->instance;
+                    tile.materialGraphSlot = ground->materialSlot;
+                    previewDraws.push_back(std::move(tile));
+                }
+                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error))
+                {
+                    lastError = "Material preview: " + error;
+                    return false;
+                }
+                EnhancedLight key;
+                key.direction = {0.4f, -0.6f, 0.7f, 0.f};
+                key.color = {1.f, 0.95f, 0.9f, 3.f};
+                lights.push_back(key);
+                lastPoolDraws = static_cast<uint32_t>(previewDraws.size());
+                lastCulledDraws = 0;
+                lastLightSelection = {};
+                return true;
+            }
             // decals는 비우지 않는다 — BuildDrawPool이 프레임당 한 번 채우고
             // 뷰 둘이 같은 목록을 본다. 여기서 비우면 두 번째 뷰가 빈 것을 쓴다.
 
@@ -3695,12 +4012,44 @@ namespace
                     continue;
                 }
 
-                if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
+                if (pooled.graphMaterialSource)
+                {
+                    auto graphDraw = pooled.item;
+                    graphDraw.materialSnapshot.reset();
+                    graphDraw.forwardMaterialSnapshot.reset();
+                    graphDraws.push_back(std::move(graphDraw));
+                    auto fallback = pooled.item;
+                    fallback.materialGraphInstance.reset();
+                    fallback.materialGraphSlot = 0;
+                    graphFallbackDraws.push_back(std::move(fallback));
+                }
+                else if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
                 else                      draws.push_back(pooled.item);
             }
 
             lastPoolDraws = static_cast<uint32_t>(drawPool.size());
             lastCulledDraws = culled;
+
+            {
+                material_graph::SceneInputView inputView;
+                inputView.frameId = frame.frameId;
+                inputView.sceneEpoch = frame.sceneEpoch;
+                inputView.viewId = viewPacket.key.viewId;
+                inputView.historyRevision = viewPacket.key.historyRevision;
+                inputView.width = frame.width;
+                inputView.height = frame.height;
+                inputView.camera = cameraSnapshot;
+                std::string inputError;
+                if (!material_graph::SceneViewInput::Seal(inputView, graphDraws, {}, graphViewInput, inputError))
+                {
+                    lastError = "LX Scene input sealing failed: " + inputError;
+                    ++frameFailures;
+                    return false;
+                }
+                // The sealed view owns geometry and pose bytes. No proxy palette
+                // pointers need to survive into GPU packet preparation.
+                graphDraws.clear();
+            }
 
             // ── 투명은 먼 것부터 ──
             //
@@ -3761,9 +4110,29 @@ namespace
         /// 백엔드의 프레임이 열려 있어야 한다 — IBL과 자산 캐시 업로드가
         /// immediate encoder를 사용하고, 그 뒤 병렬 그래프 제출이 이어진다.
         template <typename PipelineT>
-        bool PreparePipelineFrame(PipelineT& p, uint32_t viewIndex,
+        bool PreparePipelineFrame(PipelineT& p, uint32_t viewIndex, RHIShaderBinary output,
             std::string& outError)
         {
+            p.graphInput = graphViewInput;
+            {
+                RHIShaderCompiler::ScopedOutput outputScope(output);
+                if (!p.graphMaterials.SelectReadyInput(p.frameContext, p.graphInput, p.graphInput, outError))
+                    return false;
+            }
+            // The graph selection is a subsequence of the sealed source view.
+            // Draw the missing opaque slots through the existing PBR pass until
+            // every graph program for their model generation is ready.
+            std::vector<bool> graphSelected(graphFallbackDraws.size());
+            if (p.graphInput)
+                for (const auto& draw : p.graphInput->Draws())
+                    if (draw.sourceIndex < graphSelected.size()) graphSelected[draw.sourceIndex] = true;
+            for (std::size_t i = 0; i < graphFallbackDraws.size(); ++i)
+                if (!graphSelected[i] && graphFallbackDraws[i].materialSnapshot)
+                {
+                    draws.push_back(graphFallbackDraws[i]);
+                    if (pbrCapture && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
+                        pbrCapture->RecordPendingLatticeFallback(graphFallbackDraws[i]);
+                }
             if (!p.iblGenerated || skyBoxDirty)
             {
                 if (!skyEquirect)
@@ -3891,7 +4260,7 @@ namespace
             if (historyGuard.active) historyGuard.Reset();
             {
                 RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
-                if (!PreparePipelineFrame(p, viewIndex, outError)) return false;
+                if (!PreparePipelineFrame(p, viewIndex, RHIShaderBinary::Dxil, outError)) return false;
             }
 
             lastDrawCount = p.gbuffer.GetLastDrawCount();
@@ -3912,6 +4281,16 @@ namespace
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(dx12.Profiler());
             graph.SetTransientPool(&p.transientPool);
+            {
+                RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::Dxil);
+                if (!p.graphMaterials.PrepareResidency(p.frameContext, p.graphInput, outError)) return false;
+                if (p.graphInput && !p.graphInput->Draws().empty() &&
+                    !graph.PrepareParallel(dx12.CommandPool(), outError)) return false;
+                if (!p.graphMaterials.Prepare(p.frameContext, p.graphInput, p.ibl.GetCubeMap(),
+                        p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
+                        p.shadow.GetShadowData(), {}, outError, p.ibl.GetGeneration())) return false;
+                if (capture) capture->RecordLatticeInput(p.graphInput);
+            }
 
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
@@ -3972,6 +4351,9 @@ namespace
                 if (!dx12.EndFrame(outError)) return false;
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
+            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+            if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
+                    graphCompletion, outError, batchTicket)) return false;
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
             // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
@@ -3981,6 +4363,9 @@ namespace
             // 여기서 없앤다.
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
             slot.frameId = sourceFrameId;
+            slot.previewComplete = p.graphInput && !p.graphInput->Draws().empty() &&
+                (!materialPreviewView || (graphViewInput && !graphViewInput->Draws().empty() &&
+                    p.graphInput->Draws()[0].material == graphViewInput->Draws()[0].material));
             slot.key = view.key;
             slot.profilerToken = profilerToken;
 
@@ -5043,6 +5428,13 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         view.camera = views[i].camera;
         view.displayTarget = views[i].displayTarget;
         view.viewFlags = views[i].viewFlags;
+        view.materialPreview = views[i].materialPreview;
+        view.materialPreviewFloor = views[i].materialPreviewFloor;
+        if (view.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview)
+        {
+            view.camera = MaterialPreviewCamera(frame.width, frame.height);
+            continue;
+        }
 
         auto gizmos = std::make_shared<EnhancedGizmoSceneData>();
         CaptureEnhancedGizmoSceneData(view.camera, collectColliders,
@@ -5209,6 +5601,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
         //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
         state.drawPool.clear();
+        state.graphDraws.clear();
+        state.graphFallbackDraws.clear();
+        state.graphViewInput.reset();
             state.decals.clear();
         }
     }
@@ -5325,7 +5720,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 return;
             }
             if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
-                    p.gbuffer, p.frameContext,
+                    p.gbuffer, p.frameContext, p.graphMaterials,
                     RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
                     RHIShaderBinary::SpirV,
                     shaderError))
@@ -5358,6 +5753,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 ++state.viewOverflowSkips;
                 continue;
             }
+            if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
+                p.views[viewIndex].ready && p.views[viewIndex].previewComplete && !state.controlledCaptureFrame)
+                continue;
             bool captured = false;
             {
                 RenderThreadPhaseScope capture(RenderPhase::view_capture);
@@ -5373,7 +5771,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             const auto prepareFrame = [&state, &p, viewIndex](std::string& prepareError)
             {
                 return state.PreparePipelineFrame(
-                    p, static_cast<uint32_t>(viewIndex), prepareError);
+                    p, static_cast<uint32_t>(viewIndex), RHIShaderBinary::SpirV, prepareError);
             };
             bool rendered = false;
             {
@@ -5509,7 +5907,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     state.PublishDisplayResultLocked(view.displayTarget, view.key,
                         view.slots[slotIndex].interopToken,
                         view.slots[slotIndex].frameId, view.promotionCount,
-                        view.promotedSlotMask, p.width, p.height, p.resizeGeneration);
+                        view.promotedSlotMask, p.width, p.height, p.resizeGeneration,
+                        view.slots[slotIndex].previewComplete);
                 }
                 view.pendingQueue.erase(view.pendingQueue.begin());
                 view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
@@ -5750,7 +6149,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             return;
         }
         if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
-                p.gbuffer, p.frameContext,
+                p.gbuffer, p.frameContext, p.graphMaterials,
                 RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
                 RHIShaderBinary::Dxil,
                 shaderError))
@@ -5850,6 +6249,18 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
 
         // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
+        if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
+            view->displaySlot >= 0 && view->slots[view->displaySlot].previewComplete && !state.controlledCaptureFrame)
+        {
+            // Reopening a hidden preview reuses its completed image. The public
+            // demand snapshot was cleared while hidden, so publish it again.
+            std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
+            const auto& cached = view->slots[view->displaySlot];
+            state.PublishDisplayResultLocked(view->displayTarget, view->key, cached.interopToken,
+                cached.frameId, view->promotionCount, view->promotedSlotMask, p.width, p.height,
+                p.resizeGeneration, true);
+            continue;
+        }
         int renderSlot = -1;
         for (int i = 0; i < LivePipeline::kSlotsPerView; ++i)
         {

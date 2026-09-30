@@ -389,7 +389,7 @@ public:
 
     /// 중립 상태 → D3D12 상태. DX12 서비스와 인코더가 native barrier를 만들 때 쓴다.
     static D3D12_RESOURCE_STATES ToD3D12(RHIResourceState state);
-    void ReleaseBuffer(RHIBufferHandle handle) { m_resourceTable.Release(handle); }
+    void ReleaseBuffer(RHIBufferHandle handle) override { m_resourceTable.Release(handle); }
 
     /// 살아 있는 칸 수 — 진단용. 프레임마다 늘면 누가 안 놓고 있다는 뜻이다.
     size_t GetLiveTextureCount() const { return m_resourceTable.LiveTextureCount(); }
@@ -507,6 +507,7 @@ private:
 
     // 스왑체인(셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다).
     ComPtr<IDXGISwapChain3>            m_swapChain;
+    UINT                             m_swapChainFlags{ 0 };
     std::array<ComPtr<ID3D12Resource>, kFrameCount> m_backBuffers;
     ComPtr<ID3D12DescriptorHeap>       m_backBufferRtvHeap;
     uint32_t                           m_backBufferRtvSize{ 0 };

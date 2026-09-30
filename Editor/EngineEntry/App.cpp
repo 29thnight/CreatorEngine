@@ -11,6 +11,7 @@
 #include "CoreWindow.h"
 #include "DataSystem.h"
 #include "Material.h"
+#include "MaterialGraphWindow.h"
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
 #include "EditorAssetDatabase.h"
@@ -45,16 +46,37 @@ processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'\"")
 
 namespace
 {
-	std::filesystem::path EditorPathArgument(const wchar_t* option)
-	{
-		int count{};
-		wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
-		std::filesystem::path result;
-		if (!arguments) return result;
-		for (int i = 1; i + 1 < count; ++i)
-			if (wcscmp(arguments[i], option) == 0) { result = std::filesystem::absolute(arguments[i + 1]).lexically_normal(); break; }
-		LocalFree(arguments);
-		return result;
+bool EditorSmokeOffscreen()
+{
+    int count{};
+    wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    bool enabled = false;
+    if (arguments)
+    {
+        for (int index = 1; index < count; ++index)
+        {
+            enabled |= std::wstring_view(arguments[index]) == L"--smoke-offscreen";
+        }
+        LocalFree(arguments);
+    }
+    return enabled;
+}
+
+std::filesystem::path EditorPathArgument(const wchar_t* option)
+{
+    int count{};
+    wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+    std::filesystem::path result;
+    if (!arguments)
+        return result;
+    for (int i = 1; i + 1 < count; ++i)
+        if (wcscmp(arguments[i], option) == 0)
+        {
+            result = std::filesystem::absolute(arguments[i + 1]).lexically_normal();
+            break;
+        }
+    LocalFree(arguments);
+    return result;
 	}
 
 	/// 이 실행이 사람을 위한 것인가, 하네스를 위한 것인가.
@@ -63,24 +85,25 @@ namespace
 	/// `ConsoleCommandSystem::InitializeFromCommandLine`이 창을 띄운 **뒤**에
 	/// 돌기 때문이다. 부팅 예열은 그보다 앞에서 판정해야 하므로 명령줄을
 	/// 직접 본다. 목록은 ConsoleCommandSystem의 인자 해석과 같은 다섯이다.
-	bool EditorHasAutomationArgument()
-	{
-		int count{};
-		wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
-		if (!arguments) return false;
-		bool automation = false;
-		for (int i = 1; i < count && !automation; ++i)
-		{
-			const std::wstring_view argument{ arguments[i] };
-			automation = argument == L"--script" || argument == L"--exec"
-				|| argument == L"--console" || argument == L"--commandlet"
-				|| argument == L"--commandlet-script";
-		}
-		LocalFree(arguments);
-		return automation;
-	}
+    bool EditorHasAutomationArgument()
+    {
+        int count{};
+        wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+        if (!arguments)
+            return false;
+        bool automation = false;
+        for (int i = 1; i < count && !automation; ++i)
+        {
+            const std::wstring_view argument{arguments[i]};
+            automation = argument == L"--script" || argument == L"--exec" || argument == L"--console" ||
+                         argument == L"--commandlet" || argument == L"--commandlet-script" ||
+                         argument == L"--command-service" || argument == L"--smoke-offscreen";
+        }
+        LocalFree(arguments);
+        return automation;
+    }
 
-	std::filesystem::path ResolveEditorWorkspaceRoot(
+    std::filesystem::path ResolveEditorWorkspaceRoot(
 		const std::filesystem::path& executableRoot) noexcept
 	{
 		try
@@ -156,7 +179,14 @@ namespace
 		config.window.fitNearestMonitor = false;
 		config.window.showOnCreate = false;
 		config.window.acceptFileDrops = true;
-		config.window.messageInterceptor =
+        if (EditorSmokeOffscreen())
+        {
+            config.window.clientWidth = 640;
+            config.window.clientHeight = 480;
+            config.window.scaleClientToDpi = false;
+            config.window.acceptFileDrops = false;
+        }
+        config.window.messageInterceptor =
 			[](HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				-> std::optional<LRESULT>
 		{
@@ -194,17 +224,20 @@ void Core::App::Initialize(CoreWindow& coreWindow)
 {
 
     std::wstring loadingImgPath = PathFinder::IconPath() / L"Loading.bmp";
-    g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
+    if (!EditorSmokeOffscreen())
+    {
+        g_progressWindow->Launch(ProgressWindowStyle::InitStyle, loadingImgPath);
 
-    // 아래층(셰이더 리로드 등)이 게시하는 진행률을 이 창이 받도록 싱크를 건다.
-    // 아래층은 ProgressWindow의 존재를 모른다 — Utility_Framework/ProgressSink.h 참고.
-    Progress::GetSink() = Progress::Sink{
-        []() { g_progressWindow->Launch(); },
-        [](const std::wstring& t) { g_progressWindow->SetTitle(t); },
-        [](const std::wstring& t) { g_progressWindow->SetStatusText(t); },
-        [](float p) { g_progressWindow->SetProgress(p); },
-        []() { g_progressWindow->Close(); },
-    };
+        // 아래층(셰이더 리로드 등)이 게시하는 진행률을 이 창이 받도록 싱크를 건다.
+        // 아래층은 ProgressWindow의 존재를 모른다 — Utility_Framework/ProgressSink.h 참고.
+        Progress::GetSink() = Progress::Sink{
+            []() { g_progressWindow->Launch(); },
+            [](const std::wstring& t) { g_progressWindow->SetTitle(t); },
+            [](const std::wstring& t) { g_progressWindow->SetStatusText(t); },
+            [](float p) { g_progressWindow->SetProgress(p); },
+            []() { g_progressWindow->Close(); },
+        };
+    }
     // 자동화 실행은 첫 프레임 예열을 건너뛰므로 표시할 단계도 하나 적다.
     BootProgress::Begin(BootProgress::kEditorBootSteps - (EditorHasAutomationArgument() ? 1 : 0));
     BootProgress::Step(L"Starting editor", L"Preparing core services");
@@ -348,6 +381,8 @@ uint32_t Core::App::PublishRenderFrame()
 			EnhancedLiveViewFlags::ScreenSpaceUI };
 	}
 	// M6-P2d-d: 실제 Scene component가 소유한 Material에서 pass별
+	if (viewCount < EnhancedSceneRenderer::kMaxLiveCameraViews &&
+		::editor::material_editing::CapturePreviewRequest(views[viewCount])) ++viewCount;
 	// ShaderMeta GUID를 선언한다. DataSystem cache에 없는 복제/런타임
 	// Material도 이 owner snapshot에 포함되며 RenderEngine은 Water/Wind
 	// 같은 대표 파일 이름을 알 필요가 없다.
@@ -445,8 +480,11 @@ void Core::App::Run()
 		// 반대 순서로 하면 서로 다른 스레드의 두 창 사이에서 활성화 전환이
 		// 일어나며 동기 SendMessage 교착이 비결정적으로 발생했다.
 		g_progressWindow->Close();
-		CoreWindow::GetForCurrentInstance()->Show();
-		// 예열 장부: 여기까지가 "창이 뜬다" 이고, 계획서가 재 온 긴 구간은
+        if (!EditorSmokeOffscreen())
+        {
+            CoreWindow::GetForCurrentInstance()->Show();
+        }
+        // 예열 장부: 여기까지가 "창이 뜬다" 이고, 계획서가 재 온 긴 구간은
 		// 이 **뒤**에 있다(2026-09-14 실측: 창 1.7s, 씬뷰 첫 그림 18.5s).
 		engine::warmup::mark(engine::warmup::stage::window_shown);
 
@@ -473,7 +511,7 @@ void Core::App::Run()
 			Debug::PrintLog(spdlog::level::debug, "[SHUTDOWN] CLI quit 요청 — 종료 시작");
 			m_windowClosed = true;
 			PostQuitMessage(0);
-		}
+        }
 	});
 }
 

@@ -49,7 +49,7 @@ namespace editor::inspector
             { "Terrain",       EditorIcon::Terrain },
             { "Audio",         EditorIcon::Audio },
             { "Script",        EditorIcon::Script },
-            { "Volume",        EditorIcon::Volume },
+            { "Volume",        EditorIcon::RenderProfile },
             { "Font",          EditorIcon::Font },
             { "Layers",        EditorIcon::Layers },
             { "Appearance",    EditorIcon::Appearance },
@@ -140,8 +140,8 @@ CREATOR_INSPECTOR_ICON(TextComponent, "Font")
 CREATOR_INSPECTOR_ICON(UIButton, "Select")
 
 // ── 후처리·자산 ─────────────────────────────────────────────────────────
-CREATOR_INSPECTOR_ICON(VolumeComponent, "Volume")
-CREATOR_INSPECTOR_ICON(VolumeProfile, "Volume")
+CREATOR_INSPECTOR_ICON(SceneRenderProfileComponent, "RenderProfile")
+CREATOR_INSPECTOR_ICON(SceneRenderProfile, "RenderProfile")
 CREATOR_INSPECTOR_ICON(AssetBundle, "AssetBundle")
 CREATOR_INSPECTOR_ICON(Prefab, "Prefab")
 CREATOR_INSPECTOR_ICON(Scene, "Scene")

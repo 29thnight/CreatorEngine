@@ -42,6 +42,8 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp23</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
@@ -51,12 +53,14 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <AdditionalLibraryDirectories>$(MSBuildProjectDirectory)\..\..\vcpkg_installed\x64-windows\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>imgui.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>imgui.lib;ryml.lib;c4core.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <LanguageStandard>stdcpp23</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <WarningLevel>Level4</WarningLevel>
       <TreatWarningAsError>false</TreatWarningAsError>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -66,11 +70,18 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <AdditionalLibraryDirectories>$(MSBuildProjectDirectory)\..\..\vcpkg_installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>imguid.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>imguid.lib;ryml.lib;c4core.lib;d3d11.lib;dxgi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="MaterialGraphTests.cpp" />
+    <ClCompile Include="..\..\Editor\EngineGUIWindow\MaterialGraphPresentation.cpp" />
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialGraph.cpp" />
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialIR.cpp" />
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialNodes.cpp" />
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialCompiler.cpp" />
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialOperators.cpp" />
     <ClCompile Include="..\..\Lattice\Core\LXGraph.cpp" />
     <ClCompile Include="..\..\Lattice\Core\LXDocument.cpp" />
     <ClCompile Include="..\..\Lattice\Core\LXNodeDefinition.cpp" />
@@ -78,6 +89,12 @@
     <ClCompile Include="..\..\Lattice\ImGui\LXStyle.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="MaterialGraphTests.h" />
+    <ClInclude Include="..\..\Lattice\Material\LXMaterialGraph.h" />
+    <ClInclude Include="..\..\Lattice\Material\LXMaterialIR.h" />
+    <ClInclude Include="..\..\Lattice\Material\LXMaterialExecution.h" />
+    <ClInclude Include="..\..\Lattice\Material\LXMaterialCompiler.h" />
+    <ClInclude Include="..\..\Lattice\Material\LXMaterialOperators.h" />
     <ClInclude Include="..\..\Lattice\Core\LXGraph.h" />
     <ClInclude Include="..\..\Lattice\Core\LXDocument.h" />
     <ClInclude Include="..\..\Lattice\Core\LXNodeDefinition.h" />
@@ -86,4 +103,13 @@
     <ClInclude Include="..\..\Lattice\ImGui\LXStyle.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup>
+    <MaterialPreviewFont Include="..\..\Resources\Editor\Fonts\Inter-Regular.ttf" />
+    <MaterialPreviewFont Include="..\..\Resources\Editor\Fonts\MaterialSymbolsOutlined-Editor.ttf" />
+    <MaterialPreviewFont Include="..\..\Resources\Editor\Fonts\LICENSE-Inter.txt" />
+    <MaterialPreviewFont Include="..\..\Resources\Editor\Fonts\LICENSE-MaterialSymbols.txt" />
+  </ItemGroup>
+  <Target Name="DeployMaterialPreviewFonts" AfterTargets="Build">
+    <Copy SourceFiles="@(MaterialPreviewFont)" DestinationFolder="$(OutDir)Fonts" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

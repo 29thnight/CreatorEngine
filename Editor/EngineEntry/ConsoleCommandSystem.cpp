@@ -897,8 +897,11 @@ bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex)
 
 void ConsoleCommandSystem::WaitForResult(std::function<std::optional<CommandCore::CommandResult>()> poll)
 {
-    if (!m_commandletMode || m_executingFromService || m_waitResult || !poll)
-        throw std::logic_error("Deferred results require one active commandlet");
+    if ((!m_commandletMode && !m_executingFromService) || !m_executing.load(std::memory_order_acquire) ||
+        m_waitResult || !poll)
+    {
+        throw std::logic_error("Deferred results require one active commandlet or service request");
+    }
     m_waitResult = std::move(poll);
 }
 
@@ -2476,6 +2479,7 @@ namespace ConsoleCmd
             RegisterDiagnosticsCommands(registrar);
             RegisterScriptUiAnimatorCommands(registrar);
             RegisterSceneObjectCommands(registrar);
+            RegisterMaterialGraphCommands(registrar);
             RegisterAssetAuthoringCommands(registrar);
             RegisterCoreCommands(registrar);
 

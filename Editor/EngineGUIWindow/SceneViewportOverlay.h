@@ -50,6 +50,7 @@ namespace editor
         bool snapEnabled[3]{false, false, false};
         float snapValues[3]{1.f, 15.f, 0.25f};
         bool showViewGizmo{true};
+        bool showFps{true};
         bool leftOwned{}, rightOwned{};
         bool blocksPointer{}, blocksShortcuts{};
         math::vector3 orbitPivot{};
@@ -60,7 +61,7 @@ namespace editor
         // 드러나지 않지만 정책이 갈리는 순간(crop 은 image 가 content 를 넘는다)
         // 툴바가 화면 밖으로 나간다.
         void Draw(EditorCameraRig& camera, GizmoRenderer* gizmos,
-            const ViewportCanvas& canvas);
+            const ViewportCanvas& canvas, float sceneFps);
         float* ActiveSnap() { return operation > 0 && snapEnabled[operation - 1] ? &snapValues[operation - 1] : nullptr; }
     };
 

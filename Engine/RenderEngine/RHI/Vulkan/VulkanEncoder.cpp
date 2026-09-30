@@ -851,6 +851,19 @@ void VulkanEncoder::CopyPartialToReadback(const RHIReadback&, RHITextureHandle, 
     NoteUnimplemented("CopyPartialToReadback");  // 〃
 }
 
+bool VulkanEncoder::CopyBuffer(const RHIBufferSlice& destination, const RHIBufferSlice& source)
+{
+    if (!m_commandBuffer || !m_resources || !source.size || destination.size != source.size) return false;
+    const auto src = m_resources->Resolve(source.buffer), dst = m_resources->Resolve(destination.buffer);
+    if (!src.IsValid() || !dst.IsValid() || src.buffer == dst.buffer ||
+        source.offset > src.bytes || source.size > src.bytes - source.offset ||
+        destination.offset > dst.bytes || destination.size > dst.bytes - destination.offset) return false;
+    EndRenderTargets();
+    const VkBufferCopy copy{source.offset, destination.offset, source.size};
+    vkCmdCopyBuffer(m_commandBuffer, src.buffer, dst.buffer, 1, &copy);
+    return true;
+}
+
 void VulkanEncoder::CopyBufferToReadback(const RHIReadback& readback,
     RHIBufferHandle source, uint64_t sourceOffset, uint64_t bytes)
 {

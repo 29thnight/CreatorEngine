@@ -34,6 +34,10 @@
 
 class Mesh;
 class Texture;
+namespace material_graph
+{
+struct Instance;
+}
 
 // M6-P1b2a: Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
 // ShaderMeta reflection이 해석한 논리 property/GUID/register와 CPU generation owner를
@@ -255,6 +259,12 @@ struct EnhancedDrawItem
     // ShaderMeta generation/permutation/property block을 같은 경계에 합친다.
     std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>
         forwardMaterialSnapshot{};
+
+    // Scene input sealing retains the exact typed LX generation/instance.
+    // A graph draw is selected separately from the ShaderMeta queues.
+    std::shared_ptr<const material_graph::Instance> materialGraphInstance{};
+    // Runtime Material identity, stable across instance/generation replacement.
+    std::uint64_t materialGraphSlot{};
 
     // ── 스키닝 ──
     //

@@ -72,6 +72,7 @@ namespace experiment::cooked
             case CookedAssetKind::Scene:
             case CookedAssetKind::Prefab:
             case CookedAssetKind::AudioClip:
+            case CookedAssetKind::MaterialProgram:
                 return true;
             }
             return false;
@@ -297,11 +298,13 @@ namespace experiment::cooked
                         "format version 0은 게시할 수 없다.");
                     valid = false;
                 }
-                if (entry.kind == CookedAssetKind::AudioClip
-                    && entry.formatVersion != kAudioClipArtifactVersion)
+                if ((entry.kind == CookedAssetKind::AudioClip
+                     && entry.formatVersion != kAudioClipArtifactVersion) ||
+                    (entry.kind == CookedAssetKind::MaterialProgram
+                     && entry.formatVersion != kMaterialProgramArtifactVersion))
                 {
                     AddIssue(issues, context + ".formatVersion",
-                        "지원하지 않는 audio artifact version이다.");
+                        "지원하지 않는 audio/material program artifact version이다.");
                     valid = false;
                 }
                 if (!HasDigest(entry.contentSha256))
@@ -485,6 +488,13 @@ namespace experiment::cooked
         const std::string guid = Uuid::ToString(materialAssetId.value);
         return "Derived/Materials/" + guid.substr(0u, 2u) + "/" + guid
             + ".asset";
+    }
+
+    std::string MakeDerivedMaterialProgramArtifactPath(const AssetId& graphAssetId)
+    {
+        if (!IsAssetIdV4(graphAssetId) && !assets::IsUuidV8(graphAssetId.value)) return {};
+        const std::string guid = Uuid::ToString(graphAssetId.value);
+        return "Derived/MaterialPrograms/" + guid.substr(0u, 2u) + "/" + guid + ".lxmaterial";
     }
 
     std::string MakeDerivedSceneArtifactPath(const AssetId& sceneAssetId)
@@ -775,14 +785,14 @@ namespace experiment::cooked
         for (std::uint32_t index = 0u; index < entryCount; ++index)
         {
             RawEntry raw;
-            reader.Raw(raw.assetId.value.data.data(), raw.assetId.value.data.size());
+            static_cast<void>(reader.Raw(raw.assetId.value.data.data(), raw.assetId.value.data.size()));
             raw.kind = static_cast<CookedAssetKind>(reader.U8());
             const std::uint8_t reserved0 = reader.U8();
             const std::uint8_t reserved1 = reader.U8();
             const std::uint8_t reserved2 = reader.U8();
             raw.formatVersion = reader.U32();
             raw.byteSize = reader.U64();
-            reader.Raw(raw.contentSha256.data(), raw.contentSha256.size());
+            static_cast<void>(reader.Raw(raw.contentSha256.data(), raw.contentSha256.size()));
             raw.pathOffset = reader.U32();
             raw.pathBytes = reader.U32();
             raw.dependencyBegin = reader.U32();
@@ -801,7 +811,7 @@ namespace experiment::cooked
         for (std::uint32_t index = 0u; index < sourceEntryCount; ++index)
         {
             RawSourceEntry raw;
-            reader.Raw(raw.assetId.value.data.data(), raw.assetId.value.data.size());
+            static_cast<void>(reader.Raw(raw.assetId.value.data.data(), raw.assetId.value.data.size()));
             raw.pathOffset = reader.U32();
             raw.pathBytes = reader.U32();
             if (!reader.Ok())

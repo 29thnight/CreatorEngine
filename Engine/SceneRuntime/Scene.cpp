@@ -3,7 +3,7 @@
 #include <chrono>
 #include <cstdio> // FireReentrancyStress가 stdout에도 낸다(회귀가 발화를 본다)
 #include "LifecycleRegistry.h"
-#include "VolumeComponent.h"
+#include "SceneRenderProfileComponent.h"
 #include "LifecycleTrace.h"
 #include "Entity.h"
 #include "ClrHost.h"
@@ -2429,7 +2429,7 @@ void Scene::FireReentrancyStress(bool midTraversal, const std::string& origin)
         {
             auto created = CreateEntity("StressReentrant_" + std::to_string(n));
             if (!created) continue;
-            created->AddComponent<VolumeComponent>();
+            created->AddComponent<SceneRenderProfileComponent>();
             ++added;
         }
     }

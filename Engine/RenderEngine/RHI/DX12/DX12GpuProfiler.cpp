@@ -514,13 +514,14 @@ void DX12GpuProfiler::MergeSlices(const FrameTimings& timings,
         {
             // 키는 slice.name 을 가리키는 view 다 — 사본을 만들지 않는다.
             m_mergeScratch.emplace_back(std::string_view{ slice.name },
-                MergedSpan{ slice.beginTicks, slice.endTicks, 1 });
+                MergedSpan{ slice.beginTicks, slice.endTicks, 1, slice.endTicks - slice.beginTicks });
             continue;
         }
 
         found->second.begin = (std::min)(found->second.begin, slice.beginTicks);
         found->second.end = (std::max)(found->second.end, slice.endTicks);
         ++found->second.slices;
+        found->second.duration += slice.endTicks - slice.beginTicks;
     }
 
     // clear + push_back 이 아니라 resize + 제자리 대입이다. 문자열이 이미 들고
@@ -543,8 +544,9 @@ void DX12GpuProfiler::MergeSlices(const FrameTimings& timings,
             if (len > 0) { timing.name.append(suffix, static_cast<size_t>(len)); }
         }
 
-        timing.milliseconds = (entry.second.end > entry.second.begin)
+        timing.spanMilliseconds = (entry.second.end > entry.second.begin)
             ? static_cast<double>(entry.second.end - entry.second.begin) * toMs : 0.0;
+        timing.milliseconds = static_cast<double>(entry.second.duration) * toMs;
         m_lastTotalMs += timing.milliseconds;
     }
 }

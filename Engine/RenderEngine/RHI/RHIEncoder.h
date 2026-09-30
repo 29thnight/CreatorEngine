@@ -293,6 +293,11 @@ public:
     virtual void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
         uint64_t sourceOffset = 0, uint64_t bytes = 0) = 0;
 
+    // Record an exact buffer copy. Caller owns CopySource/CopyDest transitions
+    // and retains both allocations until the submission completes.
+    virtual bool CopyBuffer(const RHIBufferSlice&, const RHIBufferSlice&)
+    { return false; }
+
     /// 텍스처 한 장을 통째로 옮긴다(서브리소스 인덱스 기준).
     ///
     /// CopyResource와 다른 점: 이쪽은 서브리소스를 골라 뜬다. 라이브 표시가

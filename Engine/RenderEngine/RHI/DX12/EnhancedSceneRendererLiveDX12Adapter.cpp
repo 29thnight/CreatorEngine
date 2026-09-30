@@ -66,7 +66,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
 {
     Impl& impl = *m_impl;
     if (!impl.resources.Initialize(width, height, outError)) return false;
-    uint32_t profilerPassCapacity = 64;
+    constexpr uint32_t defaultProfilerPassCapacity = 256;
+    uint32_t profilerPassCapacity = defaultProfilerPassCapacity;
 #if defined(_DEBUG)
     // 회귀 검사용으로만 질의 슬롯을 좁힌다. 실제 pass 실행은 그대로 두고
     // 빠진 timestamp가 렌더러와 Collector 양쪽에 계상되는지 자극한다.
@@ -78,10 +79,10 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     {
         char* end = nullptr;
         const unsigned long parsed = std::strtoul(queryLimit, &end, 10);
-        if (end != queryLimit && *end == '\0' && parsed >= 1 && parsed <= 64)
+        if (end != queryLimit && *end == '\0' && parsed >= 1 && parsed <= defaultProfilerPassCapacity)
             profilerPassCapacity = static_cast<uint32_t>(parsed);
     }
-    if (profilerPassCapacity != 64)
+    if (profilerPassCapacity != defaultProfilerPassCapacity)
         std::printf("[GPU profiler] query capacity %u (Debug validation)\n",
             profilerPassCapacity);
 #endif
@@ -485,7 +486,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
     outTimings.reserve(nativeTimings.size());
     for (DX12GpuProfiler::PassTiming& timing : nativeTimings)
     {
-        outTimings.push_back({ timing.name, timing.milliseconds });
+        outTimings.push_back({ timing.name, timing.milliseconds, timing.spanMilliseconds });
     }
     outTotalMilliseconds = m_impl->profiler.GetLastTotalMilliseconds();
     m_impl->profilerMerged.swap(nativeTimings);

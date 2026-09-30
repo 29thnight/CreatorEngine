@@ -306,15 +306,17 @@ void editor::DrawSceneRenderStatistics()
     ImGui::Text("GPU (queue total): %.3f ms", displayed.gpuMs);
     ImGui::SeparatorText("GPU pass timings");
     if (displayed.passTimings.empty()) ImGui::TextDisabled("No completed GPU sample");
-    else if (ImGui::BeginTable("ScenePassTimings", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+    else if (ImGui::BeginTable("ScenePassTimings", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
     {
         ImGui::TableSetupColumn("Pass", ImGuiTableColumnFlags_WidthStretch, 3.f);
-        ImGui::TableSetupColumn("ms", ImGuiTableColumnFlags_WidthStretch, 1.f);
+        ImGui::TableSetupColumn("Sum ms", ImGuiTableColumnFlags_WidthStretch, 1.f);
+        ImGui::TableSetupColumn("Span ms", ImGuiTableColumnFlags_WidthStretch, 1.f);
         ImGui::TableHeadersRow();
         for (const auto& pass : displayed.passTimings)
         {
             ImGui::TableNextRow(); ImGui::TableNextColumn(); ImGui::TextUnformatted(pass.name.c_str());
             ImGui::TableNextColumn(); ImGui::Text("%.3f", pass.milliseconds);
+            ImGui::TableNextColumn(); ImGui::Text("%.3f", pass.spanMilliseconds);
         }
         ImGui::EndTable();
     }

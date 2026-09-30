@@ -115,7 +115,7 @@ try {
     $runtimeDocuments = [Collections.Generic.List[IO.FileInfo]]::new()
     foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $runtimeRoot 'ProjectSetting') `
         -File -Recurse -Filter '*.asset')) { $runtimeDocuments.Add($file) }
-    $extensions = @('.inputmap', '.bt', '.blackboard', '.volume', '.terrain', '.foliage')
+    $extensions = @('.inputmap', '.bt', '.blackboard', '.renderprofile', '.terrain', '.foliage')
     foreach ($file in @(Get-ChildItem -LiteralPath (Join-Path $runtimeRoot 'Assets') `
         -File -Recurse | Where-Object { $extensions -contains $_.Extension.ToLowerInvariant() })) {
         $runtimeDocuments.Add($file)

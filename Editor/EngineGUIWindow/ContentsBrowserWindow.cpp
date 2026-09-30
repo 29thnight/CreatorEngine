@@ -46,7 +46,7 @@ namespace
 		{ FileType::Prefab,         "Prefab"			},
 		{ FileType::Sound,          "Sound"				},
 		{ FileType::HDR,            "HDR"				},
-		{ FileType::VolumeProfile , "VolumeProfile"		},
+		{ FileType::SceneRenderProfile , "SceneRenderProfile"		},
 		{ FileType::Font,           "Font"				}
 	} };
 
@@ -654,11 +654,11 @@ void ContentsBrowserWindow::ApplyRequests()
             m_pendingScrollY = std::max(0.f, request.value);
             break;
         case Kind::create_folder:
-        case Kind::create_volume_profile:
+        case Kind::create_render_profile:
             if (m_scope != Scope::folder)
                 rejection = "open a folder to create assets in it";
             else if (!CreateNamedAsset(Kind::create_folder == request.kind ? CreateKind::folder
-                    : CreateKind::volume_profile, m_currentDirectory, request.text))
+                    : CreateKind::render_profile, m_currentDirectory, request.text))
                 rejection = m_error;
             break;
         }
@@ -689,7 +689,7 @@ void ContentsBrowserWindow::PublishSnapshot()
     snapshot.canForward = m_historyIndex + 1 < m_history.size();
     snapshot.canUp = m_scope == Scope::folder && m_currentDirectory != m_rootDirectory;
     snapshot.canCreate = m_scope == Scope::folder;
-    snapshot.canCreateVolumeProfile = m_scope == Scope::folder && CanCreateVolumeProfileIn(m_currentDirectory);
+    snapshot.canCreateSceneRenderProfile = m_scope == Scope::folder && CanCreateSceneRenderProfileIn(m_currentDirectory);
     snapshot.resultCount = m_publishedResultCount;
     snapshot.results = m_publishedResults;
     snapshot.scrollY = m_fileListScrollY;
@@ -727,10 +727,10 @@ void ContentsBrowserWindow::DrawFolderMenu(const file::path& directory)
     //   프레임**에 캐시가 통째로 버려졌다 — 폴더 우클릭 메뉴를 열어 둔 동안 브라우저가
     //   매 프레임 전부 다시 훑었다는 뜻이다. 아래 타일 쪽(`:521`)은 같은 일을 중괄호와
     //   함께 적어 두어 멀쩡했다 — 복제된 코드의 한쪽만 틀린 모양이다.
-    if (CanCreateVolumeProfileIn(directory)
-        && ImGui::MenuItem("Create Volume Profile..."))
+    if (CanCreateSceneRenderProfileIn(directory)
+        && ImGui::MenuItem("Create Scene Render Profile..."))
     {
-        OpenCreateDialog(CreateKind::volume_profile, directory);
+        OpenCreateDialog(CreateKind::render_profile, directory);
     }
     if (ImGui::MenuItem("Open in File Explorer"))
         EditorPlatform::Get().RevealInFileExplorer(directory);
@@ -751,14 +751,14 @@ void ContentsBrowserWindow::OpenCreateDialog(CreateKind kind, const file::path& 
     m_error.clear();
 }
 
-bool ContentsBrowserWindow::CanCreateVolumeProfileIn(const file::path& directory) const
+bool ContentsBrowserWindow::CanCreateSceneRenderProfileIn(const file::path& directory) const
 {
-    return !m_volumeProfileDirectory.empty() && browser_same_path(directory, m_volumeProfileDirectory);
+    return !m_sceneRenderProfileDirectory.empty() && browser_same_path(directory, m_sceneRenderProfileDirectory);
 }
 
 bool ContentsBrowserWindow::CreateNamedAsset(CreateKind kind, const file::path& directory, std::string_view name)
 {
-    // W2-B: 예전 Volume Profile 은 OS 저장 대화상자를 열고 반환값을 버렸다 — 취소도
+    // W2-B: 예전 Scene Render Profile 은 OS 저장 대화상자를 열고 반환값을 버렸다 — 취소도
     // 실패도 같은 침묵이었고 같은 이름이면 말없이 숫자가 붙었다. 이제 폴더 만들기와
     // 같은 길이다: 이름을 받고, 실패하면 이유를 대화상자에 남기고, 성공하면 보인다.
     file::path created;
@@ -769,12 +769,12 @@ bool ContentsBrowserWindow::CreateNamedAsset(CreateKind kind, const file::path& 
         Navigate(created);
         return true;
     }
-    if (!CanCreateVolumeProfileIn(directory))
+    if (!CanCreateSceneRenderProfileIn(directory))
     {
-        m_error = "Volume profiles are created in the VolumeProfile folder.";
+        m_error = "Scene render profiles are created in the SceneRenderProfile folder.";
         return false;
     }
-    if (!EditorAssetDatabase::Get().CreateVolumeProfile(directory, name, created, m_error)) return false;
+    if (!EditorAssetDatabase::Get().CreateSceneRenderProfile(directory, name, created, m_error)) return false;
     // 만든 것을 고른 채로 보여 준다. 이미 그 폴더에 있으면 Navigate 는 이력을 늘리지 않는다.
     if (!browser_same_path(m_currentDirectory, directory)) Navigate(directory);
     SelectAsset(created);
@@ -790,7 +790,7 @@ void ContentsBrowserWindow::DrawFolderDialog()
         m_openFolderDialog = false;
     }
     const char* const title = CreateKind::folder == m_createKind
-        ? "New Folder###BrowserCreateAsset" : "New Volume Profile###BrowserCreateAsset";
+        ? "New Folder###BrowserCreateAsset" : "New Scene Render Profile###BrowserCreateAsset";
     if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ImGui::TextUnformatted(browser_utf8(m_folderTarget).c_str());
@@ -1157,9 +1157,9 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 			const file::path asset = directory;
 			if (Navigate(asset.parent_path())) SelectAsset(asset);
 		}
-		if (m_scope == Scope::folder && CanCreateVolumeProfileIn(m_currentDirectory)
-			&& ImGui::MenuItem("Create Volume Profile..."))
-			OpenCreateDialog(CreateKind::volume_profile, m_currentDirectory);
+		if (m_scope == Scope::folder && CanCreateSceneRenderProfileIn(m_currentDirectory)
+			&& ImGui::MenuItem("Create Scene Render Profile..."))
+			OpenCreateDialog(CreateKind::render_profile, m_currentDirectory);
 
 		// 선언된 자산 팝업 항목(PHASE 21 M1). 문맥은 이 타일이 가리키는 파일이다.
 		if (::editor::popup_host_has_items(::editor::popup_host::content_browser_asset))
@@ -1476,8 +1476,8 @@ void ContentsBrowserWindow::Draw()
             // 붙은 날것이라 정확히 그 함정이다.
             std::error_code prefabError;
             m_prefabDirectory = editor::browser_canonical(PathFinder::PrefabSourcePath(), prefabError);
-            std::error_code volumeError;
-            m_volumeProfileDirectory = editor::browser_canonical(PathFinder::VolumeProfilePath(), volumeError);
+            std::error_code profileError;
+            m_sceneRenderProfileDirectory = editor::browser_canonical(PathFinder::SceneRenderProfilePath(), profileError);
             // 프로젝트가 바뀌면 이전 프로젝트의 이력·선택·범위를 쓰지 않는다(계약 6).
             m_currentDirectory.clear();
             m_scope = Scope::folder;

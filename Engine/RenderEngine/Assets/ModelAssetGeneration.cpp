@@ -11,6 +11,8 @@
 #include "../Texture.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
 #include <fstream>
 #include <limits>
 #include <ranges>
@@ -320,6 +322,114 @@ namespace assets
                 }
             }
             return !out.pixels.empty();
+        }
+
+        // A validated PNG still has to be decoded and have its mip chain built.
+        // Keep that derived RGBA8 chain outside the immutable model generation.
+        // The caller verifies the source artifact SHA-256 before consulting this cache.
+        [[nodiscard]] bool ReadDecodedTextureCache(const std::filesystem::path& path,
+            ModelTextureColorSpace colorSpace, ModelTextureAsset& out)
+        {
+            std::ifstream stream(path, std::ios::binary);
+            if (!stream) return false;
+            const auto read = [&stream](auto& value) {
+                stream.read(reinterpret_cast<char*>(&value), sizeof(value));
+                return static_cast<bool>(stream);
+            };
+            std::array<char, 8> magic{};
+            std::uint32_t width{}, height{}, levels{}, arrays{}, format{}, space{}, count{};
+            std::uint64_t bytes{};
+            stream.read(magic.data(), magic.size());
+            if (!stream || magic != std::array<char, 8>{'C','E','I','M','0','0','0','1'} ||
+                !read(width) || !read(height) || !read(levels) || !read(arrays) ||
+                !read(format) || !read(space) || !read(count) || !read(bytes) ||
+                !width || !height || width > 16384 || height > 16384 ||
+                !levels || levels > 16 || arrays != 1 || count != levels ||
+                bytes == 0 || bytes > (512ull << 20) ||
+                space != static_cast<std::uint32_t>(colorSpace) ||
+                format != static_cast<std::uint32_t>(colorSpace == ModelTextureColorSpace::Srgb
+                    ? RHIFormat::RGBA8UnormSrgb : RHIFormat::RGBA8Unorm))
+                return false;
+            ModelTextureAsset candidate;
+            candidate.colorSpace = colorSpace;
+            candidate.format = static_cast<RHIFormat>(format);
+            candidate.width = width;
+            candidate.height = height;
+            candidate.mipLevels = levels;
+            candidate.arraySize = arrays;
+            candidate.subresources.resize(count);
+            std::uint64_t expectedOffset = 0;
+            for (std::uint32_t mip = 0; mip < count; ++mip)
+            {
+                auto& sub = candidate.subresources[mip];
+                if (!read(sub.width) || !read(sub.height) || !read(sub.offset) ||
+                    !read(sub.rowPitch) || !read(sub.slicePitch) ||
+                    sub.width != (std::max)(1u, width >> mip) ||
+                    sub.height != (std::max)(1u, height >> mip) ||
+                    sub.offset != expectedOffset || sub.rowPitch < std::uint64_t(sub.width) * 4 ||
+                    sub.slicePitch < sub.rowPitch * sub.height ||
+                    sub.slicePitch > bytes - expectedOffset)
+                    return false;
+                expectedOffset += sub.slicePitch;
+            }
+            if (expectedOffset != bytes) return false;
+            candidate.pixels.resize(static_cast<std::size_t>(bytes));
+            stream.read(reinterpret_cast<char*>(candidate.pixels.data()),
+                static_cast<std::streamsize>(bytes));
+            if (!stream || stream.peek() != std::char_traits<char>::eof()) return false;
+            out.colorSpace = candidate.colorSpace;
+            out.format = candidate.format;
+            out.width = candidate.width;
+            out.height = candidate.height;
+            out.mipLevels = candidate.mipLevels;
+            out.arraySize = candidate.arraySize;
+            out.isCube = false;
+            out.subresources = std::move(candidate.subresources);
+            out.pixels = std::move(candidate.pixels);
+            return true;
+        }
+
+        void WriteDecodedTextureCache(const std::filesystem::path& path,
+            const ModelTextureAsset& texture)
+        {
+            std::error_code error;
+            std::filesystem::create_directories(path.parent_path(), error);
+            if (error) return;
+            static std::atomic<std::uint64_t> serial{};
+            const auto stage = std::filesystem::path(path.string() + ".stage-" +
+                std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
+                "-" + std::to_string(++serial));
+            std::ofstream stream(stage, std::ios::binary | std::ios::trunc);
+            if (!stream) return;
+            const auto write = [&stream](const auto& value) {
+                stream.write(reinterpret_cast<const char*>(&value), sizeof(value));
+            };
+            constexpr std::array<char, 8> magic{'C','E','I','M','0','0','0','1'};
+            stream.write(magic.data(), magic.size());
+            write(texture.width); write(texture.height);
+            write(texture.mipLevels); write(texture.arraySize);
+            const auto format = static_cast<std::uint32_t>(texture.format);
+            const auto space = static_cast<std::uint32_t>(texture.colorSpace);
+            const auto count = static_cast<std::uint32_t>(texture.subresources.size());
+            const auto bytes = static_cast<std::uint64_t>(texture.pixels.size());
+            write(format); write(space); write(count); write(bytes);
+            for (const auto& sub : texture.subresources)
+            {
+                write(sub.width); write(sub.height); write(sub.offset);
+                write(sub.rowPitch); write(sub.slicePitch);
+            }
+            stream.write(reinterpret_cast<const char*>(texture.pixels.data()),
+                static_cast<std::streamsize>(texture.pixels.size()));
+            stream.close();
+            if (!stream)
+            {
+                std::filesystem::remove(stage, error);
+                return;
+            }
+            std::filesystem::remove(path, error);
+            error.clear();
+            std::filesystem::rename(stage, path, error);
+            if (error) std::filesystem::remove(stage, error);
         }
 
         [[nodiscard]] ModelInterpolationMode ConvertInterpolation(
@@ -866,12 +976,23 @@ namespace assets
             const auto color = textureColorSpaces.find(texture.textureId);
             const ModelTextureColorSpace colorSpace = color != textureColorSpaces.end()
                 ? color->second : ModelTextureColorSpace::Linear;
-            if (!CopyTexturePixels(encoded, colorSpace, texture, failure))
+            std::filesystem::path decodedCache;
+            if (!request.decodedTextureCacheRoot.empty())
+            {
+                const auto digest = generationRecord->artifactFingerprint.substr(
+                    generationRecord->artifactFingerprint.find(':') + 1);
+                decodedCache = request.decodedTextureCacheRoot /
+                    (Uuid::ToString(texture.textureId) + "-" + digest +
+                     (colorSpace == ModelTextureColorSpace::Srgb ? "-srgb.ceim" : "-linear.ceim"));
+            }
+            const bool cached = !decodedCache.empty() && ReadDecodedTextureCache(decodedCache, colorSpace, texture);
+            if (!cached && !CopyTexturePixels(encoded, colorSpace, texture, failure))
             {
                 AddIssue(result, ModelAssetGenerationIssueCode::TextureDecodeFailed,
                     "textures." + textureRecord->stableKey, failure);
                 return result;
             }
+            if (!cached && !decodedCache.empty()) WriteDecodedTextureCache(decodedCache, texture);
             textures.push_back(std::move(texture));
         }
 

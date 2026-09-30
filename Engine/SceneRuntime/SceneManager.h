@@ -169,9 +169,9 @@ public:
     // cache 소속 여부와 무관하게 owner snapshot으로 돌려준다.
     std::vector<std::shared_ptr<Material>> CaptureRequiredRenderMaterials() const;
 
-	void VolumeProfileApply();
-	bool IsVolumeProfileApply() const { return m_volumeProfileApply; }
-	void ResetVolumeProfileApply() { m_volumeProfileApply = false; }
+	void RequestRenderProfileApply();
+	bool IsRenderProfileApplyPending() const { return m_renderProfileApplyPending; }
+	void ResetRenderProfileApply() { m_renderProfileApplyPending = false; }
 
 public:
 	// 재생 진입/이탈 통지 (E3-2). 인자는 isEntering — true면 진입, false면 이탈.
@@ -298,7 +298,7 @@ private:
     std::unique_ptr<AnimationScheduler>  m_animationScheduler;
 	std::string                         m_LoadSceneName{};
     std::atomic_size_t                  m_activeSceneIndex{};
-	std::atomic_bool                    m_volumeProfileApply{ false };
+	std::atomic_bool                    m_renderProfileApplyPending{ false };
     std::atomic_bool                    m_exitCommand{ false };
     std::atomic_bool                    m_isOldSceneDelete = true;
 };

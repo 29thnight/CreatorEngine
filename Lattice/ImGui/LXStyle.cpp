@@ -47,10 +47,11 @@ void WriteStyle(std::ostream& out, const LXCanvasStyle& style)
     WriteColor(out, style.grid);
     WriteColor(out, style.shadow);
     out << style.gridSpacing << ' ' << style.shadowOffset << ' ' << style.minZoom << ' ' << style.maxZoom << ' '
-        << style.zoomStep << ' ' << style.showGrid;
+        << style.zoomStep << ' ' << style.showGrid << ' ' << static_cast<int>(style.gridPattern) << ' '
+        << style.gridDotRadius;
 }
 
-bool ReadStyle(std::istream& in, LXCanvasStyle& style)
+bool ReadStyle(std::istream& in, LXCanvasStyle& style, int version)
 {
     int showGrid = 0;
     if (!ReadColor(in, style.background) || !ReadColor(in, style.grid) || !ReadColor(in, style.shadow) ||
@@ -60,6 +61,16 @@ bool ReadStyle(std::istream& in, LXCanvasStyle& style)
         return false;
     }
     style.showGrid = showGrid != 0;
+    if (version >= 6)
+    {
+        int pattern = 0;
+        if (!(in >> pattern >> style.gridDotRadius) || pattern < 0 || pattern > 1 ||
+            !std::isfinite(style.gridDotRadius) || style.gridDotRadius <= 0.0f)
+        {
+            return false;
+        }
+        style.gridPattern = static_cast<LXGridPattern>(pattern);
+    }
     return std::isfinite(style.gridSpacing) && style.gridSpacing > 0.0f && std::isfinite(style.shadowOffset) &&
            std::isfinite(style.minZoom) && style.minZoom > 0.0f && std::isfinite(style.maxZoom) &&
            style.maxZoom >= style.minZoom && std::isfinite(style.zoomStep) && style.zoomStep > 1.0f &&
@@ -400,7 +411,7 @@ bool LXStyleSheet::Save(const std::string& path, std::string* error) const
 void LXStyleSheet::Write(std::ostream& out) const
 {
     out << std::setprecision(std::numeric_limits<float>::max_digits10);
-    out << "LXS 5\nC ";
+    out << "LXS 6\nC ";
     WriteStyle(out, canvas);
     out << "\nFR ";
     WriteStyle(out, frame);
@@ -505,8 +516,8 @@ std::optional<LXStyleSheet> LXStyleSheet::LoadExact(const std::string& path, std
     std::string tag;
     int version = 0;
     LXStyleSheet styles;
-    if (!(in >> magic >> version) || magic != "LXS" || (version < 1 || version > 5) || !(in >> tag) || tag != "C" ||
-        !ReadStyle(in, styles.canvas) || !(in >> tag) ||
+    if (!(in >> magic >> version) || magic != "LXS" || (version < 1 || version > 6) || !(in >> tag) || tag != "C" ||
+        !ReadStyle(in, styles.canvas, version) || !(in >> tag) ||
         (version >= 4 && (tag != "FR" || !ReadStyle(in, styles.frame) || !(in >> tag))) || tag != "DN" ||
         !ReadStyle(in, styles.defaultNode, version) || !(in >> tag) || tag != "DP" ||
         !ReadStyle(in, styles.defaultPin, version) || !(in >> tag) || tag != "DW" ||
@@ -514,6 +525,7 @@ std::optional<LXStyleSheet> LXStyleSheet::LoadExact(const std::string& path, std
     {
         return invalid("Invalid style header or defaults");
     }
+    styles.sourceVersion_ = version;
 
     std::size_t count = 0;
     if (!ReadCount(in, "NT", count))
@@ -551,7 +563,7 @@ std::optional<LXStyleSheet> LXStyleSheet::LoadExact(const std::string& path, std
     {
         int type = -1;
         LXPinStyle style;
-        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Surface) || !ReadStyle(in, style, version) ||
+        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Closure) || !ReadStyle(in, style, version) ||
             !styles.pinTypeStyles_.emplace(static_cast<PinType>(type), style).second)
         {
             return invalid("Invalid pin type style");
@@ -578,7 +590,7 @@ std::optional<LXStyleSheet> LXStyleSheet::LoadExact(const std::string& path, std
     {
         int type = -1;
         LXWireStyle style;
-        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Surface) || !ReadStyle(in, style, version) ||
+        if (!(in >> type) || type < 0 || type > static_cast<int>(PinType::Closure) || !ReadStyle(in, style, version) ||
             !styles.wireTypeStyles_.emplace(static_cast<PinType>(type), style).second)
         {
             return invalid("Invalid wire type style");

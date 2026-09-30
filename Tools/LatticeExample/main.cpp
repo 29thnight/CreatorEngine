@@ -2,8 +2,12 @@
 #include "../../Lattice/Core/LXDocument.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include "../../Lattice/ImGui/LXCanvas.h"
+#include "MaterialGraphTests.h"
+#include "../../Editor/EngineGUIWindow/MaterialGraphPresentation.h"
+#include "../../Editor/ImGuiHelper/EditorIconAlignment.h"
 
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 
@@ -988,6 +992,40 @@ void LoadExampleFont()
             ImGui::GetIO().FontDefault = font;
         }
     }
+}
+
+bool LoadMaterialPreviewFont()
+{
+    auto& atlas = *ImGui::GetIO().Fonts;
+    atlas.Clear();
+    static constexpr ImWchar exclusions[]{0xe000, 0xf8ff, 0};
+    ImFontConfig textConfig;
+    textConfig.SizePixels = 16.0f;
+    textConfig.Flags |= ImFontFlags_NoLoadError;
+    textConfig.GlyphExcludeRanges = exclusions;
+    const auto textPath = DefaultExamplePath("Fonts/Inter-Regular.ttf");
+    auto* text = atlas.AddFontFromFileTTF(textPath.c_str(), 16.0f, &textConfig);
+    if (!text)
+    {
+        text = atlas.AddFontDefault(&textConfig);
+    }
+    ImGui::GetIO().FontDefault = text;
+    const auto iconPath = DefaultExamplePath(EditorIcon::FontPath);
+    if (!text || !editor::fonts::merge_aligned_icons(atlas, iconPath.c_str(), 16.0f))
+    {
+        std::cerr << "Cannot load the material preview icon font: " << iconPath << std::endl;
+        return false;
+    }
+    for (const auto& role : EditorIcon::Roles)
+    {
+        if (!text->IsGlyphInFont(static_cast<ImWchar>(role.codepoint)))
+        {
+            std::cerr << "Missing material preview icon: " << role.name << std::endl;
+            return false;
+        }
+    }
+    std::cout << "LX_MATERIAL_ICON_FONT_OK roles=" << std::size(EditorIcon::Roles) << std::endl;
+    return true;
 }
 
 bool MatchesSearch(const char* label, const char* query)
@@ -2579,10 +2617,47 @@ bool CanvasGestureTest(float dpi, ImVec2 displaySize, bool documentBacked = fals
     io.AddKeyEvent(ImGuiMod_Ctrl, false);
     frame();
 
+    click(titlePoint(target));
+    io.AddKeyEvent(ImGuiMod_Ctrl, true);
+    frame();
+    click(titlePoint(source));
+    io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    frame();
+    const LX::NodePosition snapSource{source, graph.FindLayout(source)->x, graph.FindLayout(source)->y};
+    const LX::NodePosition snapTarget{target, graph.FindLayout(target)->x, graph.FindLayout(target)->y};
+    canvas.snapToGrid = true;
+    const ImVec2 snapStart = titlePoint(target);
+    io.AddMousePosEvent(snapStart.x, snapStart.y);
+    frame();
+    io.AddMouseButtonEvent(0, true);
+    frame();
+    io.AddMousePosEvent(snapStart.x + 23.0f * dpi, snapStart.y + 17.0f * dpi);
+    frame();
+    io.AddMouseButtonEvent(0, false);
+    frame();
+    const auto* snappedSource = graph.FindLayout(source);
+    const auto* snappedTarget = graph.FindLayout(target);
+    const float spacing = styles.canvas.gridSpacing;
+    const bool snapped = std::abs(std::remainder(snappedTarget->x, spacing)) < 0.01f &&
+                         std::abs(std::remainder(snappedTarget->y, spacing)) < 0.01f &&
+                         std::abs((snappedTarget->x - snappedSource->x) - (snapTarget.x - snapSource.x)) < 0.01f &&
+                         std::abs((snappedTarget->y - snappedSource->y) - (snapTarget.y - snapSource.y)) < 0.01f;
+    io.AddKeyEvent(ImGuiMod_Ctrl, true);
+    io.AddKeyEvent(ImGuiKey_Z, true);
+    frame();
+    const bool snapUndone = std::abs(graph.FindLayout(target)->x - snapTarget.x) < 0.01f &&
+                            std::abs(graph.FindLayout(target)->y - snapTarget.y) < 0.01f &&
+                            std::abs(graph.FindLayout(source)->x - snapSource.x) < 0.01f &&
+                            std::abs(graph.FindLayout(source)->y - snapSource.y) < 0.01f;
+    io.AddKeyEvent(ImGuiKey_Z, false);
+    io.AddKeyEvent(ImGuiMod_Ctrl, false);
+    canvas.snapToGrid = false;
+    frame();
+
     const bool passed = connected && connectRevision && rejected && rejectedRevision && dragConnected &&
                         dragConnectRevision && dragged && previewRevision && dragRevision && undone && redone &&
-                        zoomed && panned && multiSelected && groupMoved && deleted && deleteUndone && groupUndo &&
-                        pasted && pasteUndone;
+                        zoomed && panned && multiSelected && groupMoved && snapped && snapUndone && deleted &&
+                        deleteUndone && groupUndo && pasted && pasteUndone;
     if (!passed)
     {
         std::cerr << "Gesture failure dpi=" << dpi << " document=" << documentBacked << " size=" << displaySize.x << 'x'
@@ -2590,8 +2665,9 @@ bool CanvasGestureTest(float dpi, ImVec2 displaySize, bool documentBacked = fals
                   << " dragConnect=" << dragConnected << " drag=" << dragged << " revisions=" << connectRevision
                   << rejectedRevision << dragConnectRevision << previewRevision << dragRevision << " undo=" << undone
                   << " redo=" << redone << " zoom=" << zoomed << " pan=" << panned << " multi=" << multiSelected
-                  << " groupMove=" << groupMoved << " delete=" << deleted << " deleteUndo=" << deleteUndone
-                  << " groupUndo=" << groupUndo << " paste=" << pasted << " pasteUndo=" << pasteUndone << std::endl;
+                  << " groupMove=" << groupMoved << " snap=" << snapped << " snapUndo=" << snapUndone
+                  << " delete=" << deleted << " deleteUndo=" << deleteUndone << " groupUndo=" << groupUndo
+                  << " paste=" << pasted << " pasteUndo=" << pasteUndone << std::endl;
     }
     ImGui::DestroyContext();
     return passed;
@@ -2756,10 +2832,15 @@ bool PersistenceTest()
         std::size_t remainingStyles = 0;
         while (std::getline(source, line))
         {
-            if (line == "LXS 5")
+            if (line == "LXS 6")
             {
                 legacy << "LXS 4\n";
                 continue;
+            }
+            if (line.starts_with("C "))
+            {
+                line.erase(line.rfind(' '));
+                line.erase(line.rfind(' '));
             }
             if (line.starts_with("NT ") || line.starts_with("NI ") || line.starts_with("PT ") ||
                 line.starts_with("PI ") || line.starts_with("WT ") || line.starts_with("WI "))
@@ -3441,7 +3522,7 @@ bool GroupContractTest()
     migratedFile.close();
     auto migrated = LX::LXGraph::Load(legacyPath.string(), &error, registry);
     const bool legacyMigrated =
-        legacySaved && migratedHeader == "LXG 8 \"material\" 1" && migrated && legacy->Equals(*migrated);
+        legacySaved && migratedHeader == "LXG 9 \"material\" 1" && migrated && legacy->Equals(*migrated);
     std::filesystem::remove(path);
     std::filesystem::remove(path.string() + ".bak");
     std::filesystem::remove(invalidPath);
@@ -4482,6 +4563,15 @@ bool CanvasFrameViewTest(float dpi, ImVec2 displaySize)
     const bool dpiChanged =
         std::abs(canvas.pan.x - (canvas.canvasSize.x * 0.5f - 375.5f * 1.25f * changedDpi)) < 0.01f &&
         std::abs(canvas.pan.y - (canvas.canvasSize.y * 0.5f + 42.25f * 1.25f * changedDpi)) < 0.01f;
+    const float userScale = 1.35f;
+    ImGui::GetStyle().FontScaleMain = userScale;
+    ImGui::GetStyle().ScaleAllSizes(userScale);
+    draw();
+    const float combinedScale = changedDpi * userScale;
+    const bool userScaleChanged =
+        std::abs(canvas.viewDpi - combinedScale) < 0.01f &&
+        std::abs(canvas.pan.x - (canvas.canvasSize.x * 0.5f - 375.5f * 1.25f * combinedScale)) < 0.01f &&
+        std::abs(canvas.pan.y - (canvas.canvasSize.y * 0.5f + 42.25f * 1.25f * combinedScale)) < 0.01f;
     const ImVec2 center{origin.x + canvas.canvasSize.x * 0.5f, origin.y + canvas.canvasSize.y * 0.5f};
     io.AddMousePosEvent(center.x, center.y);
     draw();
@@ -4501,13 +4591,13 @@ bool CanvasFrameViewTest(float dpi, ImVec2 displaySize)
     const bool panSaved = document.Revision() == beforePan + 1 && document.Graph().Layout().view.saved;
     ImGui::DestroyContext();
     const bool passed = frameId && preview && moved && undone && deleted && deleteUndone && viewSet && restored &&
-                        resized && dpiChanged && zoomed && panPreview && panSaved;
+                        resized && dpiChanged && userScaleChanged && zoomed && panPreview && panSaved;
     if (!passed)
     {
         std::cerr << "Frame or view gesture failed at dpi=" << dpi << " preview=" << preview << " moved=" << moved
                   << " undo=" << undone << " delete=" << deleted << " deleteUndo=" << deleteUndone
                   << " restored=" << restored << " resize=" << resized << " dpiChange=" << dpiChanged
-                  << " zoom=" << zoomed << " pan=" << panSaved << std::endl;
+                  << " userScale=" << userScaleChanged << " zoom=" << zoomed << " pan=" << panSaved << std::endl;
     }
     return passed;
 }
@@ -4683,8 +4773,258 @@ bool AnimationStyleTest()
     return headerSelected && previewStartsAtPort && connectedPortsConnect && freeSidePort && rendered;
 }
 
+bool MaterialNodeMenuInteractionTest()
+{
+    ImGui::CreateContext();
+    ApplyExampleTheme();
+    auto& io = ImGui::GetIO();
+    io.IniFilename = nullptr;
+    io.DisplaySize = {1440.0f, 840.0f};
+    io.DeltaTime = 1.0f / 60.0f;
+    unsigned char* pixels = nullptr;
+    int width = 0;
+    int height = 0;
+    io.Fonts->GetTexDataAsRGBA32(&pixels, &width, &height);
+    io.Fonts->SetTexID(static_cast<ImTextureID>(1));
+    const auto definitions = LX::CreateMaterialDefinitions();
+    const auto entries = editor::material_editing::MaterialNodeMenuEntries(definitions, "Reroute");
+    std::string search = "Reroute";
+    std::optional<std::string> selected;
+    const auto frame = [&](bool open) {
+        ImGui::NewFrame();
+        ImGui::SetNextWindowPos({20.0f, 20.0f});
+        ImGui::SetNextWindowSize({700.0f, 650.0f});
+        ImGui::Begin("Material Add menu interaction", nullptr, ImGuiWindowFlags_NoSavedSettings);
+        if (open)
+        {
+            ImGui::OpenPopup("Add");
+        }
+        if (ImGui::BeginPopup("Add"))
+        {
+            if (open)
+            {
+                ImGui::OpenPopup("Reroute");
+            }
+            if (const auto type = editor::material_editing::DrawMaterialNodeAddMenu(definitions, search))
+            {
+                selected = type;
+            }
+            ImGui::EndPopup();
+        }
+        ImGui::End();
+        ImGui::Render();
+    };
+    bool passed = true;
+    for (std::size_t index = 0; index < entries.size(); ++index)
+    {
+        selected.reset();
+        frame(true);
+        frame(false);
+        const auto& context = *ImGui::GetCurrentContext();
+        if (context.OpenPopupStack.Size != 2 || !context.OpenPopupStack[1].Window)
+        {
+            passed = false;
+            break;
+        }
+        const auto* menu = context.OpenPopupStack[1].Window;
+        const float stride = ImGui::GetTextLineHeightWithSpacing();
+        const ImVec2 point{menu->DC.CursorStartPos.x + 20.0f, menu->DC.CursorStartPos.y +
+                                                                  static_cast<float>(index) * stride +
+                          ImGui::GetFontSize() * 0.5f};
+        io.AddMousePosEvent(point.x, point.y);
+        frame(false);
+        frame(false);
+        if (context.HoveredIdPreviousFrameItemCount != 1)
+        {
+            passed = false;
+            break;
+        }
+        io.AddMouseButtonEvent(0, true);
+        frame(false);
+        io.AddMouseButtonEvent(0, false);
+        frame(false);
+        if (!selected || *selected != entries[index].type)
+        {
+            std::cerr << "Material Reroute menu selected the wrong registered type: " << entries[index].type
+                      << std::endl;
+            passed = false;
+            break;
+        }
+    }
+    ImGui::DestroyContext();
+    if (passed)
+    {
+        std::cout << "LX_MATERIAL_ADD_MENU_INTERACTION_OK 9 distinct clicks, hovered ID count 1" << std::endl;
+    }
+    else
+    {
+        std::cerr << "Material Add submenu interaction failed" << std::endl;
+    }
+    return passed;
+}
+
 bool SelfTest()
 {
+    if (!RunMaterialGraphTests())
+    {
+        return false;
+    }
+    {
+        const auto definitions = LX::CreateMaterialDefinitions();
+        const auto entries = editor::material_editing::MaterialNodeMenuEntries(definitions);
+        std::set<std::pair<std::string, std::string>> labels;
+        std::set<std::string> types;
+        std::size_t reroutes = 0;
+        std::size_t multiplies = 0;
+        for (const auto& entry : entries)
+        {
+            if (!types.insert(entry.type).second || !labels.emplace(entry.group, entry.label).second)
+            {
+                std::cerr << "Material Add menu contains duplicate identities or ambiguous labels" << std::endl;
+                return false;
+            }
+            if (entry.group == "Reroute")
+            {
+                ++reroutes;
+                const auto* definition = definitions.nodes->Find(entry.type);
+                if (entry.label != LX::PinTypeName(definition->defaults.pins.front().type))
+                {
+                    return false;
+                }
+            }
+            if (entry.type.starts_with("LXMultiply"))
+            {
+                ++multiplies;
+                if (entry.label == "Multiply")
+                {
+                    return false;
+                }
+            }
+        }
+        const auto filtered = editor::material_editing::MaterialNodeMenuEntries(definitions, "LXRerouteFloat");
+        if (reroutes != 9 || multiplies != 2 || filtered.size() != 1 || filtered.front().group != "Reroute" ||
+            filtered.front().type != "LXRerouteFloat" || filtered.front().label != "Float")
+        {
+            return false;
+        }
+        std::cout << "LX_MATERIAL_ADD_MENU_OK unique labels, 9 typed reroutes, 2 typed multiplies, filtered identity"
+                  << std::endl;
+    }
+    if (!MaterialNodeMenuInteractionTest())
+    {
+        return false;
+    }
+    {
+        LX::LXMaterialAsset material;
+        const auto nodeId = material.CreateNode("ShaderNodeBsdfPrincipled", 10.0f, 20.0f);
+        const auto outputId = material.CreateNode("ShaderNodeOutputMaterial", 500.0f, 20.0f);
+        const auto* node = material.graph.FindNode(nodeId);
+        auto items = editor::material_editing::MaterialItems(material.Definitions());
+        const auto styles = editor::material_editing::BlenderStyles(material.Definitions());
+        const auto& style = styles.ForNode(*node);
+        const auto& layout = *material.graph.FindLayout(nodeId);
+        const auto base =
+            std::ranges::find_if(node->pins, [](const LX::Pin& pin) { return pin.Identifier() == "Base Color"; });
+        const auto sss = std::ranges::find_if(
+            node->pins, [](const LX::Pin& pin) { return pin.Identifier() == "Subsurface Weight"; });
+        const auto height = LX::MeasureNode(*node, layout, style, items).height;
+        const auto control = LX::ItemRect(*node, layout, "Base Color", style, items);
+        const auto pin = LX::PinPosition(*node, layout, *base, style, &items);
+        const auto* output = material.graph.FindNode(outputId);
+        if (items.Find(*output, "target") ||
+            std::ranges::any_of(items.Rows(*output), [](const LX::LXNodeRow& row) { return row.key == "target"; }))
+        {
+            std::cerr << "Material output exposed a Blender renderer selector" << std::endl;
+            return false;
+        }
+        struct CopyObservedPredicate
+        {
+            int* copies;
+
+            explicit CopyObservedPredicate(int& count) : copies(&count) {}
+            CopyObservedPredicate(const CopyObservedPredicate& other) : copies(other.copies) { ++*copies; }
+            bool operator()(const LX::Pin&) const { return true; }
+        };
+        int predicateCopies = 0;
+        items.SetPinPredicates(CopyObservedPredicate(predicateCopies), {});
+        predicateCopies = 0;
+        for (int sample = 0; sample < 32; ++sample)
+        {
+            const auto measured = LX::PinPosition(*node, layout, *base, style, &items);
+            if (measured.x != pin.x || measured.y != pin.y || predicateCopies != 0)
+            {
+                std::cerr << "Pin positioning copied the item registry or changed its geometry" << std::endl;
+                return false;
+            }
+        }
+        int predicateCalls = 0;
+        items.SetPinPredicates(
+            [&](const LX::Pin&) {
+                ++predicateCalls;
+                return true;
+            },
+            {});
+        {
+            const LX::LXNodeItemRegistry::RowCacheScope rowCache(items);
+            LX::PinPosition(*node, layout, *base, style, &items);
+            const int firstRowPass = predicateCalls;
+            for (int sample = 0; sample < 32; ++sample)
+            {
+                LX::PinPosition(*node, layout, *base, style, &items);
+            }
+            if (firstRowPass == 0 || predicateCalls != firstRowPass)
+            {
+                std::cerr << "Visible rows were recomputed within the canvas frame" << std::endl;
+                return false;
+            }
+            items.ToggleSection(*node, "Subsurface");
+            if (!items.PinRow(*node, *sss))
+            {
+                std::cerr << "Section toggle did not invalidate visible rows" << std::endl;
+                return false;
+            }
+            items.ToggleSection(*node, "Subsurface");
+        }
+        const int beforeNextFrame = predicateCalls;
+        LX::PinPosition(*node, layout, *base, style, &items);
+        if (predicateCalls == beforeNextFrame)
+        {
+            std::cerr << "Visible rows survived beyond their canvas frame" << std::endl;
+            return false;
+        }
+        if (height >= 500.0f || pin.y != (control.minimum.y + control.maximum.y) * 0.5f || items.PinRow(*node, *sss))
+        {
+            return false;
+        }
+        items.ToggleSection(*node, "Subsurface");
+        if (!items.PinRow(*node, *sss) || LX::MeasureNode(*node, layout, style, items).height <= height)
+        {
+            return false;
+        }
+        items.ToggleSection(*node, "Subsurface");
+        auto compact = layout;
+        compact.collapsed = true;
+        if (LX::MeasureNode(*node, compact, style, items).height > 60.0f)
+        {
+            return false;
+        }
+        LX::LXDocument document(material.graph);
+        const auto pinId = base->id;
+        if (!document
+                 .Execute(LX::LXSetSocketValue{pinId, std::array<double, 4>{0.2, 0.3, 0.4, 1.0}}, document.Revision())
+                 .applied ||
+            !document.AcceptSavedSnapshot() || document.Dirty() ||
+            !document.Execute(LX::LXUndo{}, document.Revision()).applied || !document.Dirty() ||
+            !document.Execute(LX::LXRedo{}, document.Revision()).applied || document.Dirty())
+        {
+            return false;
+        }
+        std::cout << "LX_MATERIAL_PRESENTATION_OK rows, sections, compact pins, saved Undo baseline" << std::endl;
+    }
+    if (!RunMaterialCompilerTests())
+    {
+        return false;
+    }
     LX::LXGraph graph = Fixture();
     if (!graph.Validate().empty() || graph.Nodes().size() != 7 || graph.Links().size() != 6)
     {
@@ -4810,20 +5150,56 @@ bool SelfTest()
     }
 
     styles.canvas.showGrid = true;
+    styles.canvas.gridPattern = LX::LXGridPattern::Dots;
+    styles.canvas.gridDotRadius = 1.15f;
     const std::filesystem::path styleFile = std::filesystem::temp_directory_path() / "lattice-example-selftest.lxstyle";
     if (!styles.Save(styleFile.string(), &reason))
     {
         return false;
     }
     const auto restoredStyles = LX::LXStyleSheet::Load(styleFile.string(), &reason);
+    std::ostringstream legacyStyle;
+    {
+        std::ifstream source(styleFile);
+        std::string line;
+        while (std::getline(source, line))
+        {
+            if (line == "LXS 6")
+            {
+                line = "LXS 5";
+            }
+            else if (line.starts_with("C "))
+            {
+                line.erase(line.rfind(' '));
+                line.erase(line.rfind(' '));
+            }
+            legacyStyle << line << '\n';
+        }
+    }
+    std::filesystem::remove(styleFile.string() + ".bak");
+    {
+        std::ofstream legacy(styleFile, std::ios::trunc);
+        legacy << legacyStyle.str();
+    }
+    const auto restoredLegacyStyle = LX::LXStyleSheet::Load(styleFile.string(), &reason);
     std::filesystem::remove(styleFile);
     std::filesystem::remove(styleFile.string() + ".bak");
-    if (!restoredStyles || !restoredStyles->canvas.showGrid || restoredStyles->ForNode(nodes[0]).width != 240.0f ||
+    if (!restoredStyles || !restoredStyles->canvas.showGrid ||
+        restoredStyles->canvas.gridPattern != LX::LXGridPattern::Dots ||
+        restoredStyles->canvas.gridDotRadius != 1.15f || restoredStyles->SourceVersion() != 6 ||
+        restoredStyles->ForNode(nodes[0]).width != 240.0f ||
         restoredStyles->ForPin(nodes[0].pins[0]).shape != LX::LXPinShape::Triangle ||
         restoredStyles->ForWire(colorLink, LX::PinType::Color).thickness != 4.0f)
     {
         return false;
     }
+    if (!restoredLegacyStyle || restoredLegacyStyle->SourceVersion() != 5 ||
+        restoredLegacyStyle->canvas.gridPattern != LX::LXGridPattern::Lines ||
+        restoredLegacyStyle->ForNode(nodes[0]).width != 240.0f)
+    {
+        return false;
+    }
+    std::cout << "LX_GRID_STYLE_OK dots round-trip, legacy line styles" << std::endl;
 
     const auto extra = graph.AddNode(Spec(3), 100, 100);
     graph.Connect(nodes[2].pins[0].id, graph.FindNode(extra)->pins[0].id);
@@ -5857,6 +6233,77 @@ void DrawAnimationUI(LX::LXGraph& graph, LX::CanvasState& canvas, LX::LXStyleShe
 }
 } // namespace
 
+void DrawProductMaterialPreview()
+{
+    static LX::LXMaterialAsset asset;
+    static std::unique_ptr<LX::LXDocument> document;
+    static auto styles = editor::material_editing::BlenderStyles(asset.Definitions());
+    static auto items = editor::material_editing::MaterialItems(asset.Definitions());
+    static LX::CanvasState canvas;
+    static std::string materialName = "Material";
+    static std::string nodeSearch;
+    if (!document)
+    {
+        const auto surface = asset.CreateNode("ShaderNodeBsdfPrincipled", 260.0f, 160.0f);
+        asset.activeOutput = asset.CreateNode("ShaderNodeOutputMaterial", 790.0f, 160.0f);
+        const auto* source = asset.graph.FindNode(surface);
+        const auto* target = asset.graph.FindNode(asset.activeOutput);
+        asset.graph.Connect(source->pins.back().id, target->pins.front().id);
+        document = std::make_unique<LX::LXDocument>(asset.graph);
+    }
+    ImGui::SetNextWindowPos({0.0f, 0.0f});
+    ImGui::SetNextWindowSize(ImGui::GetIO().DisplaySize);
+    {
+        const editor::material_editing::MaterialHeaderScope header(styles.canvas.background);
+        ImGui::Begin("Material Node Editor", nullptr,
+                     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoMove |
+                         ImGuiWindowFlags_MenuBar);
+        if (ImGui::BeginMenuBar())
+        {
+            editor::material_editing::DrawMaterialContextSelector();
+            for (const auto* menu : {"View", "Select", "Add", "Node"})
+            {
+                if (ImGui::BeginMenu(menu))
+                {
+                    if (std::string_view(menu) == "Add")
+                    {
+                        if (const auto type =
+                                editor::material_editing::DrawMaterialNodeAddMenu(asset.Definitions(), nodeSearch))
+                        {
+                            const float scale = canvas.zoom * std::max(0.1f, canvas.viewDpi);
+                            document->Execute(LX::LXCreateNode{*type,
+                                                               (canvas.canvasSize.x * 0.5f - canvas.pan.x) / scale,
+                                                               (canvas.canvasSize.y * 0.5f - canvas.pan.y) / scale},
+                                              document->Revision());
+                        }
+                    }
+                    else
+                    {
+                        ImGui::MenuItem("Material preview", nullptr, false, false);
+                    }
+                    ImGui::EndMenu();
+                }
+            }
+            const auto action = editor::material_editing::DrawMaterialDataBar(
+                materialName, false, true, styles.canvas.showGrid, canvas.snapToGrid,
+                [] { ImGui::MenuItem("Material", nullptr, true); }, {});
+            if (action == editor::material_editing::MaterialBarAction::ToggleSnap)
+            {
+                canvas.snapToGrid = !canvas.snapToGrid;
+            }
+            else if (action == editor::material_editing::MaterialBarAction::ToggleGrid)
+            {
+                styles.canvas.showGrid = !styles.canvas.showGrid;
+            }
+            ImGui::EndMenuBar();
+        }
+    }
+    const auto origin = ImGui::GetCursorScreenPos();
+    LX::DrawCanvas(document->GraphForCanvas(), canvas, styles, items, document.get());
+    editor::material_editing::DrawMaterialBreadcrumb(origin, canvas.canvasSize, "Cube", "Cube", materialName);
+    ImGui::End();
+}
+
 int wmain(int argc, wchar_t** argv)
 {
 #ifdef _DEBUG
@@ -5888,13 +6335,14 @@ int wmain(int argc, wchar_t** argv)
         return passed ? 0 : 1;
     }
     const bool behaviorCapture = argc > 1 && arguments[1] == "--capture-bt";
+    const bool materialCapture = argc > 1 && arguments[1] == "--capture-material";
     const bool animationCapture = argc > 1 && arguments[1] == "--capture-fsm";
     const bool collapsedCapture = argc > 1 && arguments[1] == "--capture-collapsed";
     const bool frameCapture = argc > 1 && arguments[1] == "--capture-frame";
     const bool groupCapture = argc > 1 && arguments[1] == "--capture-group";
     const bool groupEditorCapture = argc > 1 && arguments[1] == "--capture-group-editor";
-    const bool capture = behaviorCapture || animationCapture || collapsedCapture || frameCapture || groupCapture ||
-                         groupEditorCapture || (argc > 1 && arguments[1] == "--capture");
+    const bool capture = materialCapture || behaviorCapture || animationCapture || collapsedCapture || frameCapture ||
+                         groupCapture || groupEditorCapture || (argc > 1 && arguments[1] == "--capture");
     if (capture && argc < 3)
     {
         std::cerr
@@ -5904,7 +6352,7 @@ int wmain(int argc, wchar_t** argv)
     }
     const std::string capturePath = capture ? arguments[2] : "";
     std::string file;
-    if (behaviorCapture || animationCapture)
+    if (materialCapture || behaviorCapture || animationCapture)
     {
         file = "LatticeExample.lxg";
     }
@@ -6066,6 +6514,17 @@ int wmain(int argc, wchar_t** argv)
     io.IniFilename = nullptr;
     ApplyExampleTheme();
     LoadExampleFont();
+    if (materialCapture)
+    {
+        if (!LoadMaterialPreviewFont())
+        {
+            ImGui::DestroyContext();
+            ReleaseDevice();
+            DestroyWindow(window);
+            UnregisterClassW(windowClass.lpszClassName, windowClass.hInstance);
+            return 6;
+        }
+    }
     // Win32 coordinates and ImGui style must use the same monitor scale.
     const float dpi = capture ? 1.0f : ImGui_ImplWin32_GetDpiScaleForHwnd(window);
     ImGui::GetStyle().FontScaleDpi = dpi;
@@ -6101,7 +6560,11 @@ int wmain(int argc, wchar_t** argv)
         ImGui_ImplDX11_NewFrame();
         ImGui_ImplWin32_NewFrame();
         ImGui::NewFrame();
-        if (groupEditor.draft)
+        if (materialCapture)
+        {
+            DrawProductMaterialPreview();
+        }
+        else if (groupEditor.draft)
         {
             DrawGroupEditor(groupEditor, materialDocument, styles, items);
         }

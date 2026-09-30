@@ -270,6 +270,16 @@ public:
     ///   따라서 이 생성자로 만든 그래프도 backend 중립 pool을 받아
     ///   `RecordParallel`을 실행할 수 있다.
     explicit EnhancedRenderGraph(IRenderDeviceServices& services);
+    const IRenderDeviceServices& DeviceServices() const { return *m_deviceServices; }
+    uint64_t ResourceEpoch() const { return m_resourceEpoch; }
+    RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
+    RGHandle FindImportedBuffer(RHIBufferHandle buffer) const;
+    RGHandle FindImportedTexture(RHITextureHandle texture) const;
+
+    // Flush the immediate upload prefix before preparing recording-scoped pass
+    // packets. RecordParallel reuses this exact recording instead of flushing it
+    // again. Call before declaration; abort/prefix/version changes invalidate it.
+    bool PrepareParallel(IRHIParallelCommandPool& pool, std::string& outError);
 
     ~EnhancedRenderGraph();
 
@@ -439,5 +449,9 @@ private:
     Stats m_stats;
 
     uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };
+    uint64_t m_resourceEpoch{1};
+    IRHIParallelCommandPool* m_preparedPool{nullptr};
+    uint64_t m_preparedRecording{0}, m_preparedDescriptors{0};
+    bool m_preparedRecordingConsumed{false};
 };
 

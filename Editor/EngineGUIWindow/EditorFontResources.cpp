@@ -43,6 +43,8 @@ namespace editor::fonts
             "segoeui.ttf",
         };
 
+        constexpr const char* kEmojiCandidates[]{ "seguiemj.ttf" };
+
         // UI private-use slots belong to icons, including Inter's PUA alternates.
         // ImGui 1.92 caps GlyphExcludeRanges at 64 values; use one persistent range.
         constexpr ImWchar kIconExclusions[]{ 0xe000, 0xf8ff, 0 };
@@ -84,6 +86,8 @@ namespace editor::fonts
             result.role.assign(role);
             result.size_pixels = size_pixels;
             ImGuiIO& io = ImGui::GetIO();
+            const std::string emojiPath = resolve_font_path(kEmojiCandidates);
+            const ImWchar* textExclusions = emojiPath.empty() ? kIconExclusions : text_with_emoji_exclusions;
             for (const char* candidate : candidates)
             {
                 ++result.candidates_tried;
@@ -98,7 +102,7 @@ namespace editor::fonts
                 const std::string filename(utf8.begin(), utf8.end());
                 ImFontConfig config;
                 config.Flags |= ImFontFlags_NoLoadError;
-                config.GlyphExcludeRanges = kIconExclusions;
+                config.GlyphExcludeRanges = textExclusions;
                 result.font = io.Fonts->AddFontFromFileTTF(
                     filename.c_str(), size_pixels, &config);
                 if (nullptr != result.font)
@@ -117,12 +121,33 @@ namespace editor::fonts
                 {
                     ImFontConfig config;
                     config.SizePixels = size_pixels;
-                    config.GlyphExcludeRanges = kIconExclusions;
+                    config.GlyphExcludeRanges = textExclusions;
                     result.font = io.Fonts->AddFontDefault(&config);
                     result.used_fallback = true;
                 }
             }
 
+            if (result.font)
+            {
+                loaded_font emoji;
+                emoji.role = std::string(role) + "-emoji";
+                emoji.size_pixels = size_pixels;
+                emoji.candidates_tried = std::size(kEmojiCandidates);
+                if (!emojiPath.empty() && merge_color_emoji_fallback(*io.Fonts, emojiPath.c_str(), size_pixels))
+                {
+                    emoji.resolved_path = emojiPath;
+                    emoji.font = result.font;
+                }
+                else
+                {
+                    // No glyphs have been baked yet. Keep monochrome text usable
+                    // if the optional system font is absent or rejected.
+                    result.font->Sources.front()->GlyphExcludeRanges = kIconExclusions;
+                }
+                store().push_back(std::move(emoji));
+            }
+
+            // Merge emoji before Korean so the latter cannot capture BMP emoji.
             // A separate Korean font used by menus does not cover the body's
             // SerializeField labels. Each text face needs its own fallback source.
             if (result.font && !result.font->IsGlyphInFont(0xAC00))

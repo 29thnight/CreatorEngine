@@ -151,6 +151,7 @@ namespace editor
             view.is_central = node->IsCentralNode();
             view.is_leaf    = node->IsLeafNode();
             view.is_visible = node->IsVisible;
+            view.merged_flags = static_cast<std::uint32_t>(node->MergedFlags);
             snapshot.nodes.push_back(view);
 
             for (int slot = 0; slot < node->Windows.Size; ++slot)
@@ -175,6 +176,11 @@ namespace editor
         //   §1.4 가 기록한 "그려지는데 자리를 잃은 패널" 은 이 감사가
         //   구조적으로 볼 수 없었다 — 바로 그 사고를 잡으려고 만든 수인데도.
         const std::vector<window_entry>& entries = process_windows().entries;
+        snapshot.moving_window = context->MovingWindow ? context->MovingWindow->Name : "";
+        const auto* hovered = context->HoveredWindowUnderMovingWindow;
+        snapshot.hovered_window_under_moving = hovered ? hovered->RootWindowDockTree->Name : "";
+        snapshot.docking_payload =
+            context->DragDropActive && context->DragDropPayload.IsDataType(IMGUI_PAYLOAD_TYPE_WINDOW);
         snapshot.placements.reserve(entries.size());
         for (const window_entry& entry : entries)
         {

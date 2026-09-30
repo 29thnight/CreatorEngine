@@ -45,7 +45,7 @@ namespace
         case Type::Prefab: return EditorIcon::Prefab;
         case Type::Sound: return EditorIcon::Audio;
         case Type::HDR: return EditorIcon::HDR;
-        case Type::VolumeProfile: return EditorIcon::Volume;
+        case Type::SceneRenderProfile: return EditorIcon::RenderProfile;
         case Type::Font: return EditorIcon::Font;
         default: return EditorIcon::Unknown;
         }
@@ -271,7 +271,7 @@ void EditorAssetPresentation::LoadPresentationResources()
 		{ ".cpp", FileType::CppScript }, { ".h", FileType::CppScript },
 		{ ".cs", FileType::CSharpScript }, { ".wav", FileType::Sound },
 		{ ".mp3", FileType::Sound }, { ".terrain", FileType::TerrainTexture },
-		{ ".prefab", FileType::Prefab }, { ".volume", FileType::VolumeProfile },
+		{ ".prefab", FileType::Prefab }, { ".renderprofile", FileType::SceneRenderProfile },
 		{ ".spritefont", FileType::Font },
 	};
 
@@ -295,7 +295,7 @@ void EditorAssetPresentation::LoadPresentationResources()
     constexpr std::array fileIconNames{
         L"Unknown.png", L"Model.png", L"Texture.png", L"Material.png", L"Terrain.png",
         L"Shader.png", L"Code.png", L"Code.png", L"EntityPrefab.png", L"Audio.png",
-        L"HDR.png", L"VolumeProfile.png", L"Font.png"
+        L"HDR.png", L"SceneRenderProfile.png", L"Font.png"
     };
     static_assert(fileIconNames.size() == static_cast<size_t>(FileType::End));
     for (size_t i = 0; i < fileIconNames.size(); ++i)

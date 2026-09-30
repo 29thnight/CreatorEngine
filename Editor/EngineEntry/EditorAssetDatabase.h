@@ -9,7 +9,7 @@
 #include <string_view>
 
 class Material;
-class VolumeProfile;
+class SceneRenderProfile;
 struct TerrainAuthoringRequest;
 struct TerrainAuthoringResult;
 struct TextAssetAuthoringRequest;
@@ -69,11 +69,11 @@ public:
 	ModelRecoveryStats GetModelRecoveryStats() const;
 	bool IsSupportExtension(std::string_view extension) const;
 	bool SaveMaterial(Material* material);
-	bool CreateVolumeProfile(const file::path& directory, std::string_view name,
+	bool CreateSceneRenderProfile(const file::path& directory, std::string_view name,
 		file::path& createdPath, std::string& error);
     bool CreateFolder(const file::path& parent, std::string_view name,
         file::path& createdPath, std::string& error);
-	bool SaveExistingVolumeProfile(FileGuid guid, VolumeProfile* volume);
+	bool SaveExistingSceneRenderProfile(FileGuid guid, SceneRenderProfile* volume);
 
 private:
 	EditorAssetDatabase() = default;

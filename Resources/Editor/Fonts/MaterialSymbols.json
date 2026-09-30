@@ -65,7 +65,7 @@
     "Shader": "code_blocks",
     "Script": "code",
     "HDR": "panorama",
-    "Volume": "tune",
+    "RenderProfile": "tune",
     "Font": "text_fields",
     "Unknown": "draft",
     "Menu": "menu",
@@ -73,6 +73,13 @@
     "Lit": "contrast",
     "Show": "visibility",
     "Lock": "lock",
-    "Unlock": "lock_open"
+    "Unlock": "lock_open",
+    "Save": "save",
+    "Shield": "shield",
+    "Duplicate": "content_copy",
+    "Pin": "push_pin",
+    "Overlays": "join_inner",
+    "NodeEditor": "blur_circular",
+    "FrameAll": "filter_center_focus"
   }
 }

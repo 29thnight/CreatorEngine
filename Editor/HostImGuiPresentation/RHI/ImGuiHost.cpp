@@ -1,3 +1,4 @@
+#include "../../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "IImGuiHost.h"
 #include "ImGuiWin32Cursor.h"
 #include "DX12/ImGuiDx12Shell.h"
@@ -182,7 +183,10 @@ namespace
         void EndFrame() override
         {
             if (!m_renderer) return;
-            ImGui::Render();
+            {
+                ce::profile_scope draw{ce::marker<"ImGuiBuildDrawData">()};
+                ImGui::Render();
+            }
             // 예열 장부: UI 가 한 프레임을 온전히 끝낸 때. 창이 보이는 것과 다른
             // 사건이다 — 그 사이에 첫 프레임의 셰이더·파이프라인 비용이 있다.
             engine::warmup::mark(engine::warmup::stage::first_ui_frame);
@@ -198,6 +202,7 @@ namespace
             ImGuiIO& io = ImGui::GetIO();
             if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
             {
+                ce::profile_scope platforms{ce::marker<"ImGuiPlatformWindows">()};
                 ImGui::UpdatePlatformWindows();
                 ImGui::RenderPlatformWindowsDefault();
             }

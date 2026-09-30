@@ -1,8 +1,11 @@
 #include "DataSystem.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1 (MBC9: ExperimentModelMigration.cpp에서 이주)
+#include "Experiment/Cooked/CookedAudioClipSource.h"
 #include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelMaterialGraph.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Material.h" // MBC9: Model.h 전이 include가 사라져 직접 든다
+#include "MaterialGraphSceneCompiler.h"
 #include "Mesh.h"
 #include "Texture.h"
 #include <fstream> // I7-C1: manifest 읽기
@@ -40,6 +43,7 @@
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
+#include <Windows.h>
 
 // 검색 함수
 bool HasImageFile(const file::path& directory)
@@ -141,8 +145,10 @@ namespace
 			return RuntimeAssetType::Texture;
 		}
 		if (extension == ".shadermeta") return RuntimeAssetType::ShaderMeta;
+        if (extension == ".shadergraph")
+            return RuntimeAssetType::MaterialGraph;
 
-		return RuntimeAssetType::CatalogOnly;
+        return RuntimeAssetType::CatalogOnly;
 	}
 
 	file::path ResolveRuntimeAssetPath(std::string_view requestedPath,
@@ -281,7 +287,8 @@ void DataSystem::Initialize()
 
 void DataSystem::Finalize()
 {
-	m_modelAssetGenerations.Clear();
+    m_materialGraphGenerations.Clear();
+    m_modelAssetGenerations.Clear();
 	{
 		std::lock_guard lock(m_modelGenerationTextureMutex);
 		m_modelGenerationTextures.clear();
@@ -381,26 +388,30 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 	// calls는 호출 횟수가 아니라 실제로 파싱한 `.meta` 개수다 — 이 단계는 부팅 1회이므로
 	// 그 값을 세는 편이 판정에 쓸모 있다(회귀 게이트가 "0개를 성공으로 읽는" 것을 막는다).
 	const auto catalogElapsed = std::chrono::steady_clock::now() - catalogStart;
-	SerializationProfile::RecordBootStage(
-		SerializationProfile::Stage::AssetCatalog,
-		static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
-			catalogElapsed).count()),
-		parsedMetaCount);
+    SerializationProfile::RecordBootStage(
+        SerializationProfile::Stage::AssetCatalog,
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(catalogElapsed).count()),
+        parsedMetaCount);
 }
 
-assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(
-	FileGuid guid)
+assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(FileGuid guid)
 {
-	if (FileGuid{} == guid || !assets::IsUuidV8(guid.m_guid)) return {};
-	if (auto current = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
-		return current;
-	return LoadAndPublishModelAssetGeneration(guid, true);
+    if (FileGuid{} == guid || !assets::IsUuidV8(guid.m_guid))
+        return {};
+    if (auto current = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
+    {
+        if (!PathFinder::IsAssetAuthoringEnabled() || GetFilePath(guid).empty() ||
+            assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *current))
+        {
+            return current;
+        }
+    }
+    return LoadAndPublishModelAssetGeneration(guid, true);
 }
 
 assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGeneration(
 	FileGuid guid, bool allowEditorRecovery)
 {
-
 	// MBC11 — cooked catalog가 마운트돼 있고 이 모델의 generation 레코드가 신선하면
 	// 그 레코드(Derived/Models/xx/<id>/<gen>/generation.asset)를 읽는다. Player는 이
 	// 경로뿐이고 Editor는 마운트 없이 Library(저작 정본)를 읽는다. 어느 쪽도 실패하면
@@ -408,6 +419,8 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 	assets::ModelAssetGenerationLoadRequest request;
 	request.identityHeaderPath = PathFinder::ProjectSettingPath("AssetIdentity.asset");
 	request.expectedModelId = guid.m_guid;
+    if (PathFinder::IsAssetAuthoringEnabled())
+        request.decodedTextureCacheRoot = PathFinder::CachePath("ModelTextures");
 	const file::path cookedRecord = ResolveCookedArtifact(experiment::AssetId{ guid.m_guid });
 	const bool fromCatalog = !cookedRecord.empty()
 		&& cookedRecord.filename() == file::path("generation.asset");
@@ -444,16 +457,26 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 			? "알 수 없는 generation load 실패"
 			: loaded.issues.front().context + ": "
 				+ loaded.issues.front().message;
-		Debug::PrintLog(spdlog::level::err, std::string("[model.generation] 게시 전 검증 실패(")
-			+ (fromCatalog ? "catalog" : "library") + "): " + sourceLabel
-			+ " (" + detail + ")");
-		return {};
-	}
-	(fromCatalog ? m_generationFromCatalog : m_generationFromLibrary)
-		.fetch_add(1, std::memory_order_relaxed);
-	const std::string sourcePathString = sourceLabel;
+        Debug::PrintLog(spdlog::level::err, std::string("[model.generation] 게시 전 검증 실패(") +
+                                                (fromCatalog ? "catalog" : "library") + "): " + sourceLabel + " (" +
+                                                detail + ")");
+        return {};
+    }
+    // Authoring graphs are required even when an Editor project mounts a
+    // previously cooked geometry generation. Player needs only the cooked closure.
+    if (PathFinder::IsAssetAuthoringEnabled() && !GetFilePath(guid).empty() &&
+        !assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *loaded.generation))
+    {
+        if (allowEditorRecovery && AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
+            return LoadAndPublishModelAssetGeneration(guid, false);
+        Debug::PrintLog(spdlog::level::err,
+                        "Model material graphs are missing; import the model before publishing it.");
+        return {};
+    }
+    (fromCatalog ? m_generationFromCatalog : m_generationFromLibrary).fetch_add(1, std::memory_order_relaxed);
+    const std::string sourcePathString = sourceLabel;
 
-	assets::ModelAssetPublishResult published =
+    assets::ModelAssetPublishResult published =
 		m_modelAssetGenerations.Publish(std::move(loaded.generation));
 	if (!published.Succeeded())
 	{
@@ -796,7 +819,22 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 bool DataSystem::SerializeMaterialPayload(Material& material,
 	Authoring::WriteNode outNode) const
 {
-	SynchronizeLegacyMaterialProperties(material);
+    if (const auto& instance = material.GetMaterialGraphInstance())
+    {
+        material_graph::InstanceDocument document;
+        document.name = material.m_name;
+        document.materialId.value = material.m_fileGuid.m_guid;
+        document.doubleSided = material.m_doubleSided;
+        document.blendMode = material.m_renderingMode == MaterialRenderingMode::Transparent ? "transparent" :
+            material.m_renderingMode == MaterialRenderingMode::Masked ? "masked" : "opaque";
+        document.description = instance->description;
+        std::string error;
+        if (material_graph::WriteInstanceDocument(document, outNode, error))
+            return true;
+        Debug::PrintLog(spdlog::level::err, "LX material save failed: " + error);
+        return false;
+    }
+    SynchronizeLegacyMaterialProperties(material);
 	Authoring::WriteDocument staging;
 	const Authoring::WriteNode node = staging.Root();
 
@@ -866,13 +904,378 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 	return DeserializeMaterialPayload(material, view, nullptr);
 }
 
+namespace
+{
+std::string MaterialGraphCacheInput(const LX::LXMaterialProgram& program,
+                                    const file::path& shaderDirectory, std::string& error)
+{
+    std::string input = "lx-scene-authoring-cache-v1";
+    const auto append = [&](std::string_view value) {
+        const std::uint64_t size = value.size();
+        input.append(reinterpret_cast<const char*>(&size), sizeof(size));
+        input.append(value);
+    };
+    append(program.slang);
+    append(LX::WriteMaterialProgramMetadata(program));
+    std::vector<file::path> shaders;
+    std::error_code filesystemError;
+    for (file::recursive_directory_iterator it(shaderDirectory, filesystemError), end;
+         !filesystemError && it != end; it.increment(filesystemError))
+    {
+        if (it->is_regular_file() && it->path().extension() == ".slang")
+            shaders.push_back(it->path());
+    }
+    if (filesystemError || shaders.empty())
+    {
+        error = "Cannot enumerate Scene shader dependencies for the authoring cache.";
+        return {};
+    }
+    std::ranges::sort(shaders);
+    for (const auto& path : shaders)
+    {
+        std::ifstream stream(path, std::ios::binary);
+        const std::string contents{std::istreambuf_iterator<char>(stream), {}};
+        if (!stream && !stream.eof())
+        {
+            error = "Cannot read Scene shader dependency: " + path.string();
+            return {};
+        }
+        append(path.lexically_relative(shaderDirectory).generic_string());
+        append(contents);
+    }
+    return input;
+}
+
+bool ReadMaterialGraphCache(const file::path& path, std::string_view input,
+                            material_graph::CookedProgram& result)
+{
+    std::ifstream file(path, std::ios::binary);
+    if (!file) return false;
+    std::array<char, 8> magic{};
+    std::uint64_t inputSize{}, productSize{};
+    file.read(magic.data(), magic.size());
+    file.read(reinterpret_cast<char*>(&inputSize), sizeof(inputSize));
+    file.read(reinterpret_cast<char*>(&productSize), sizeof(productSize));
+    if (!file || magic != std::array<char, 8>{'L','X','S','C','A','C','H','1'} ||
+        inputSize != input.size() || productSize == 0 || productSize > (128ull << 20))
+        return false;
+    std::string recorded(input.size(), '\0');
+    file.read(recorded.data(), static_cast<std::streamsize>(recorded.size()));
+    if (!file || recorded != input) return false;
+    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(productSize));
+    file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+    if (!file || file.peek() != std::char_traits<char>::eof()) return false;
+    std::string validation;
+    return material_graph::ReadCookedProgram(bytes, {}, result, validation);
+}
+
+void WriteMaterialGraphCache(const file::path& path, std::string_view input,
+                             const material_graph::VerifiedProduct& product)
+{
+    std::vector<std::uint8_t> bytes;
+    std::string error;
+    if (!material_graph::WriteCookedProgram(product, {}, bytes, error)) return;
+    static std::atomic<std::uint64_t> serial{};
+    const file::path staging = path.string() + ".stage-" + std::to_string(GetCurrentProcessId()) +
+                               "-" + std::to_string(++serial);
+    {
+        std::ofstream file(staging, std::ios::binary | std::ios::trunc);
+        constexpr std::array<char, 8> magic{'L','X','S','C','A','C','H','1'};
+        const std::uint64_t inputSize = input.size(), productSize = bytes.size();
+        file.write(magic.data(), magic.size());
+        file.write(reinterpret_cast<const char*>(&inputSize), sizeof(inputSize));
+        file.write(reinterpret_cast<const char*>(&productSize), sizeof(productSize));
+        file.write(input.data(), static_cast<std::streamsize>(input.size()));
+        file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        file.close();
+        if (!file)
+        {
+            std::error_code ignored;
+            std::filesystem::remove(staging, ignored);
+            return;
+        }
+    }
+    if (!MoveFileExW(staging.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+    {
+        std::error_code ignored;
+        std::filesystem::remove(staging, ignored);
+    }
+}
+
+bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, material_graph::CookedProgram& result,
+                              std::string& error)
+{
+    error.clear();
+    std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    const auto program = LX::GenerateMaterialSlang(asset, &diagnostics);
+    if (!program)
+    {
+        for (const auto& diagnostic : diagnostics)
+        {
+            error += diagnostic.code + ": " + diagnostic.message + "\n";
+        }
+        return false;
+    }
+    const auto source = PathFinder::CachePath("Lattice") / (guid.ToString() + ".slang");
+    const auto shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
+    std::error_code filesystemError;
+    std::filesystem::create_directories(source.parent_path(), filesystemError);
+    if (filesystemError)
+    {
+        error = filesystemError.message();
+        return false;
+    }
+    std::string cacheError;
+    const std::string cacheInput = MaterialGraphCacheInput(*program, shaderDirectory, cacheError);
+    const auto cachePath = file::path(source.string() + ".scene-cache");
+    if (!cacheInput.empty() && ReadMaterialGraphCache(cachePath, cacheInput, result) &&
+        result.product.program.slang == program->slang &&
+        result.metadata == LX::WriteMaterialProgramMetadata(*program) &&
+        result.product.program.semanticKey.ends_with(material_graph::SceneHostIdentity))
+    {
+        return true;
+    }
+    if (!material_graph::CompileSceneProduct(*program, shaderDirectory, source, {},
+                                             result.product, error))
+    {
+        return false;
+    }
+    result.metadata = LX::WriteMaterialProgramMetadata(result.product.program);
+    result.boundSource = material_graph::BuildBoundSource(result.product.program);
+    if (!cacheInput.empty()) WriteMaterialGraphCache(cachePath, cacheInput, result.product);
+    return true;
+}
+}
+
+std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphGeneration(FileGuid guid,
+                                                                                          std::string& error,
+                                                                                          bool reload)
+{
+    const experiment::AssetId id{guid.m_guid};
+    return m_materialGraphGenerations.Load(
+        id,
+        [this, guid, id](material_graph::CookedProgram& result, std::string& failure) {
+            const auto catalog = GetCookedCatalog();
+            if (!catalog && !PathFinder::IsAssetAuthoringEnabled())
+            {
+                failure = "LX graph requires a mounted, verified cooked material catalog.";
+                return false;
+            }
+            std::optional<LX::LXMaterialAsset> source;
+            if (PathFinder::IsAssetAuthoringEnabled())
+            {
+                const file::path sourcePath = GetMaterialGraphSourcePath(guid);
+                if (Lowercase(sourcePath.extension().string()) != ".shadergraph")
+                {
+                    failure = "LX graph GUID does not resolve to its authoring source.";
+                    return false;
+                }
+                source = LX::LXMaterialAsset::Load(sourcePath, LX::CreateMaterialDefinitions(), &failure);
+                if (!source)
+                    return false;
+            }
+            if (catalog)
+            {
+                const experiment::cooked::LooseArtifactByteSource bytes(catalog->DerivedRoot());
+                if (material_graph::LoadCookedGeneration(*catalog, bytes, id, source ? &*source : nullptr, result, failure))
+                {
+                    return true;
+                }
+            }
+            // An Editor may reopen an edited or newly authored graph before the
+            // next package cook. Player keeps the strict bytecode-only boundary.
+            return source && CompileAuthoringMaterial(*source, guid, result, failure);
+        },
+        reload, error);
+}
+
+std::shared_ptr<const material_graph::Generation> DataSystem::ResolveMaterialGraphGeneration(FileGuid guid) const
+{
+    return m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid});
+}
+
+file::path DataSystem::GetMaterialGraphSourcePath(FileGuid guid) const
+{
+    const auto registered = GetFilePath(guid);
+    if (!registered.empty())
+        return registered;
+    for (const auto& model : m_modelAssetGenerations.SnapshotCurrent())
+    {
+        for (const auto& material : model->Materials())
+        {
+            if (assets::ModelMaterialGraphId(material.materialId) == guid.m_guid)
+            {
+                const auto path = assets::ModelMaterialGraphPath(PathFinder::Relative(""), model->Identity().modelId,
+                                                                 material.materialId);
+                return assets::ModelMaterialGraphIdentityMatches(path, guid.m_guid) ? path : file::path{};
+            }
+        }
+    }
+    return {};
+}
+
+bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::ModelAssetGeneration& model,
+                                             const assets::ModelMaterialAsset& source, std::string& error)
+{
+    if (material.HasMaterialGraph())
+        return true;
+    material_graph::InstanceDescription description;
+    description.graphId.value = assets::ModelMaterialGraphId(source.materialId);
+    const auto generation = LoadMaterialGraphGeneration(FileGuid(description.graphId.value), error);
+    if (!generation)
+        return false;
+    experiment::Material imported;
+    ExperimentMaterialMigration::ConvertModelMaterialAsset(source, model, imported);
+    SynchronizeLegacyMaterialProperties(material);
+    // Existing Scene edits become instance overrides only when they differ
+    // from the imported PBR seed. An edited source graph remains authoritative.
+    for (const auto& parameter : generation->cooked.product.program.parameters)
+    {
+        const std::string property = parameter.identifier == "alpha" ? "baseColor" : parameter.identifier;
+        const auto original = std::ranges::find(imported.properties, property, &experiment::MaterialProperty::name);
+        const auto current = std::ranges::find(material.m_propertyValues, property, &MaterialPropertyValue::m_name);
+        if (original == imported.properties.end() || current == material.m_propertyValues.end())
+            continue;
+        if (parameter.type == LX::PinType::Texture)
+        {
+            const auto* texture = std::get_if<experiment::TextureReference>(&original->value);
+            if (texture && current->m_textureGuid != FileGuid{} &&
+                current->m_textureGuid.m_guid != texture->assetId.value)
+                description.textures.push_back({parameter.id, experiment::AssetId{current->m_textureGuid.m_guid}});
+            continue;
+        }
+        std::vector<float> before;
+        std::visit(
+            [&](const auto& value) {
+                using T = std::decay_t<decltype(value)>;
+                if constexpr (std::is_same_v<T, float>)
+                    before = {value};
+                else if constexpr (std::is_same_v<T, math::vector3>)
+                    before = {value.x, value.y, value.z};
+                else if constexpr (std::is_same_v<T, math::vector4>)
+                    before = {value.x, value.y, value.z, value.w};
+            },
+            original->value);
+        const auto& after = current->m_numericValue;
+        if (parameter.identifier == "alpha")
+        {
+            if (before.size() == 4 && after.size() == 4 && before[3] != after[3])
+                description.parameters.push_back({parameter.id, double(after[3])});
+        }
+        else if (parameter.type == LX::PinType::Float && before.size() == 1 && after.size() == 1 && before != after)
+            description.parameters.push_back({parameter.id, double(after.front())});
+        else if (parameter.type == LX::PinType::Color && before.size() >= 3 && after.size() >= 3 &&
+                 !std::equal(before.begin(), before.begin() + 3, after.begin()))
+            description.parameters.push_back({parameter.id, std::array<double, 4>{after[0], after[1], after[2], 1}});
+    }
+    if (!ConfigureMaterialGraph(material, description, error))
+        return false;
+    material.m_fileGuid = FileGuid(source.materialId);
+    return true;
+}
+
+bool DataSystem::ConfigureMaterialGraphAuthoring(Material& material, const LX::LXMaterialAsset& asset,
+                                                 const material_graph::InstanceDescription& description,
+                                                 std::string& error)
+{
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        error = "Material graph authoring requires an Editor project.";
+        return false;
+    }
+    auto generation = m_materialGraphGenerations.Load(
+        description.graphId,
+        [&](material_graph::CookedProgram& result, std::string& failure) {
+            return CompileAuthoringMaterial(asset, FileGuid(description.graphId.value), result, failure);
+        },
+        true, error);
+    return generation && ConfigureMaterialGraph(material, description, error);
+}
+
+bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph::InstanceDescription& description,
+                                        std::string& error, bool reload)
+{
+    FileGuid guid;
+    guid.m_guid = description.graphId.value;
+    auto generation = LoadMaterialGraphGeneration(guid, error, reload);
+    if (!generation)
+        return false;
+    const auto textureLoader = [this](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
+                                      std::string& failure) -> std::shared_ptr<Texture> {
+        for (const auto& model : m_modelAssetGenerations.SnapshotCurrent())
+        {
+            if (model->FindTexture(id.value))
+                return ResolveModelGenerationTexture(*model, id.value);
+        }
+        FileGuid textureGuid;
+        textureGuid.m_guid = id.value;
+        const auto catalog = GetCookedCatalog();
+        const auto* entry = catalog ? catalog->Find(id) : nullptr;
+        if ((entry && entry->kind != experiment::cooked::CookedAssetKind::Texture) ||
+            (!entry && !PathFinder::IsAssetAuthoringEnabled()))
+        {
+            failure = "LX texture override is not a cooked Texture asset: " + textureGuid.ToString();
+            return {};
+        }
+        const file::path path = ResolveCatalogAssetPath(textureGuid);
+        if (path.empty())
+        {
+            failure = "LX texture GUID has no registered asset path: " + textureGuid.ToString();
+            return {};
+        }
+        auto owner = LoadSharedMaterialTexture(path.string(), false, colorSpace == LX::LXColorSpace::SRGB);
+        if (!owner)
+            failure = "LX texture load failed: " + textureGuid.ToString();
+        return owner;
+    };
+    std::shared_ptr<const material_graph::Instance> candidate;
+    if (!material_graph::BuildInstance(std::move(generation), description, textureLoader, candidate, error))
+        return false;
+
+    // Publish after every value and texture owner is ready. ShaderMeta state is
+    // not a fallback for an explicitly authored graph material.
+    material.ResetShaderRuntime();
+    material.ResetTextureRuntime();
+    material.m_shaderMetaGuid = {};
+    material.m_propertyValues.clear();
+    material.m_keywordSelections.clear();
+    material.m_cbufferValues.clear();
+    material.m_baseColorTexName.clear();
+    material.m_normalTexName.clear();
+    material.m_ORM_TexName.clear();
+    material.m_AO_TexName.clear();
+    material.m_EmissiveTexName.clear();
+    material.m_materialGraphInstance = std::move(candidate);
+    return true;
+}
+
 bool DataSystem::DeserializeMaterialPayload(Material& material,
 	const Authoring::NodeView& view, experiment::Material* outAuthored)
 {
 	const Authoring::ReadNode readNode = Authoring::NodeViewAccess::Node(view);
 	if (!readNode || !readNode.IsMap()) return false;
 
-	// I5-M5 S1 — 읽기 이중화. 새 정본(schema + shaderAssetId)을 만나면
+    if (readNode["lattice_material"])
+    {
+        material_graph::InstanceDocument document;
+        std::string error;
+        if (!material_graph::ReadInstanceDocument(readNode, document, error) ||
+            !ConfigureMaterialGraph(material, document.description, error))
+        {
+            Debug::PrintLog(spdlog::level::err, "LX material load failed: " + error);
+            return false;
+        }
+        material.m_name = std::move(document.name);
+        material.m_fileGuid.m_guid = document.materialId.value;
+        material.m_doubleSided = document.doubleSided;
+        material.m_renderingMode = document.blendMode == "transparent" ? MaterialRenderingMode::Transparent :
+            document.blendMode == "masked" ? MaterialRenderingMode::Masked : MaterialRenderingMode::Opaque;
+        if (outAuthored)
+            *outAuthored = {};
+        return true;
+    }
+
+    // I5-M5 S1 — 읽기 이중화. 새 정본(schema + shaderAssetId)을 만나면
 	// experiment 코덱으로 읽고 legacy 런타임 재질로 변환한다. 런타임 소유가
 	// 아직 legacy인 동안(S2 이전)의 전환기 경로이며, 이름 기반 keywords는
 	// 실제 ShaderMeta를 로드해 인덱스로 정규화한다 — 짐작하지 않는다.
@@ -908,7 +1311,8 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 			Debug::PrintLog(spdlog::level::err, "Material 새 정본 변환 실패: " + error);
 			return false;
 		}
-		FinalizeMaterialRuntime(material);
+        material.m_materialGraphInstance.reset();
+        FinalizeMaterialRuntime(material);
 		// I5-D5c1 — 저작 원본을 버리지 않는다. 여기서 놓치면 소비자는 legacy를
 		// 다시 experiment로 되돌리는 수밖에 없고, 그 왕복이 colorSpace·string
 		// property를 깎는다(변환기 헤더가 명시한 손실).
@@ -944,7 +1348,8 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 		return false;
 	}
 
-	FinalizeMaterialRuntime(material);
+    material.m_materialGraphInstance.reset();
+    FinalizeMaterialRuntime(material);
 	return true;
 }
 
@@ -1031,7 +1436,11 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 
 void DataSystem::FinalizeMaterialRuntime(Material& material)
 {
-	// 디스크/scene 논리 값이 바뀌면 기존 schema가 가리키는 applied generation도
+    // Scene binding finalizes cloned materials too. An LX snapshot is already
+    // complete and must not be erased by the legacy ShaderMeta finalizer.
+    if (material.HasMaterialGraph())
+        return;
+    // 디스크/scene 논리 값이 바뀌면 기존 schema가 가리키는 applied generation도
 	// 더는 유효한 runtime 상태가 아니다. legacy CB bytes는 Configure에서 새 layout에
 	// repack할 입력이므로 ResetShaderRuntime은 그것을 보존한다.
 	material.ResetShaderRuntime();
@@ -1562,7 +1971,21 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 	case RuntimeAssetChangeKind::CatalogUpsert:
 		return RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
 	case RuntimeAssetChangeKind::ContentReload:
-		if (assetType == RuntimeAssetType::Model)
+
+        if (assetType == RuntimeAssetType::MaterialGraph)
+        {
+            const FileGuid guid = change.guid != FileGuid{} ? change.guid : m_assetMetaRegistry->GetGuid(change.path);
+            if (guid == FileGuid{} || !RegisterAssetMeta(*m_assetMetaRegistry, guid, change.path))
+                return false;
+            if (!ResolveMaterialGraphGeneration(guid))
+                return true;
+            std::string error;
+            if (LoadMaterialGraphGeneration(guid, error, true))
+                return true;
+            Debug::PrintLog(spdlog::level::err, "LX graph reload retained the accepted generation: " + error);
+            return false;
+        }
+        if (assetType == RuntimeAssetType::Model)
 		{
 			const FileGuid guid = change.guid != FileGuid{} ? change.guid
 				: m_assetMetaRegistry->GetGuid(change.path);
@@ -1595,7 +2018,15 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 	if (RuntimeAssetType::Auto == assetType)
 		assetType = ResolveRuntimeAssetType(path);
 	if (RuntimeAssetType::CatalogOnly == assetType) return;
-	if (RuntimeAssetType::ShaderMeta == assetType)
+    if (assetType == RuntimeAssetType::MaterialGraph)
+    {
+        if (guid == FileGuid{} && m_assetMetaRegistry)
+            guid = m_assetMetaRegistry->GetGuid(path);
+        if (remove)
+            m_materialGraphGenerations.Remove(experiment::AssetId{guid.m_guid});
+        return;
+    }
+    if (RuntimeAssetType::ShaderMeta == assetType)
 	{
 		if (FileGuid{} == guid && m_assetMetaRegistry)
 			guid = m_assetMetaRegistry->GetGuid(path);
@@ -2000,7 +2431,10 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 		m_cookedStaleAssets = std::move(stale);
 	}
 	if (packagedRegistry) m_assetMetaRegistry = std::move(packagedRegistry);
-	std::printf("[cooked.catalog] mount %s entries=%zu sources=%zu stale=%zu\n",
+    // A new cook transaction must be observable to subsequent GUID loads.
+    // Existing Material snapshots continue to own their accepted generation.
+    m_materialGraphGenerations.Clear();
+    std::printf("[cooked.catalog] mount %s entries=%zu sources=%zu stale=%zu\n",
 		manifestPath.string().c_str(), entryCount, sourceAssetCount, staleCount);
 	return true;
 }

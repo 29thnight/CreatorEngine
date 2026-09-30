@@ -1,3 +1,4 @@
+#include "../../../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ImGuiDx12Shell.h"
 
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -463,6 +464,7 @@ uint64_t ImGuiDx12Shell::GetCpuFrameTextureId(uint64_t key)
 
 bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"ImGuiDX12MainViewport">()};
     Impl& impl = *m_impl;
     if (!impl.active) return true;
     if (!impl.frameOpen)
@@ -621,7 +623,10 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
     ID3D12DescriptorHeap* heaps[] = { impl.srvHeap.Get() };
     commandList->SetDescriptorHeaps(1, heaps);
 
-    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
+    {
+        ce::profile_scope draw{ce::marker<"ImGuiDX12RecordDrawData">()};
+        ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), commandList);
+    }
 
     D3D12_RESOURCE_BARRIER toPresent = toRender;
     toPresent.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;

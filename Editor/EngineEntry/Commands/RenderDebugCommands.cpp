@@ -386,12 +386,23 @@ namespace ConsoleCmd
                 auto entry = CommandData::Object();
                 entry.Set("name", CommandData::String(timing.name));
                 entry.Set("ms", CommandData::Double(timing.milliseconds));
+                entry.Set("spanMs", CommandData::Double(timing.spanMilliseconds));
                 passes.Append(std::move(entry));
             }
             gpu.Set("passCount", CommandData::Int(
                 static_cast<std::int64_t>(snapshot.passTimings.size())));
             gpu.Set("passes", std::move(passes));
             data.Set("gpu", std::move(gpu));
+            auto geometry = CommandData::Object();
+            geometry.Set("uploads", CommandData::Int(snapshot.materialGeometryUploads));
+            geometry.Set("uploadedBytes", CommandData::Int(snapshot.materialGeometryUploadBytes));
+            geometry.Set("hits", CommandData::Int(snapshot.materialGeometryCacheHits));
+            geometry.Set("residentBytes", CommandData::Int(snapshot.materialGeometryResidentBytes));
+            geometry.Set("entries", CommandData::Int(snapshot.materialGeometryEntries));
+            geometry.Set("transforms", CommandData::Int(snapshot.materialGeometryTransforms));
+            geometry.Set("transformHits", CommandData::Int(snapshot.materialGeometryTransformHits));
+            geometry.Set("cachedOutputBytes", CommandData::Int(snapshot.materialGeometryOutputBytes));
+            data.Set("materialGeometry", std::move(geometry));
         }
         const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
         auto displayData = CommandData::Object();
@@ -417,7 +428,8 @@ namespace ConsoleCmd
             target.Set("lastMissingTextureMs", CommandData::Double(entry.lastMissingTextureMs));
             target.Set("maxMissingTextureMs", CommandData::Double(entry.maxMissingTextureMs));
             displayData.Set(i == static_cast<uint32_t>(EnhancedLiveDisplayTarget::Editor)
-                ? "scene" : "game", std::move(target));
+                ? "scene" : i == static_cast<uint32_t>(EnhancedLiveDisplayTarget::Game)
+                ? "game" : "material", std::move(target));
         }
         data.Set("display", std::move(displayData));
         return Ok(mode == "on" ? "Renderer enable requested" : "", std::move(data));
@@ -757,6 +769,7 @@ namespace ConsoleCmd
         reg.Result({ "render.backend" }, &Cmd_render_backend);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
         reg.Result({ "render.live.wait" }, &Cmd_render_live_wait);
+        reg.Result({ "render.live.fence" }, &Cmd_render_live_wait);
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);

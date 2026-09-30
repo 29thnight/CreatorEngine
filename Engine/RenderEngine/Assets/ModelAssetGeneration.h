@@ -287,6 +287,8 @@ namespace assets
         std::filesystem::path generationRoot{};
         std::filesystem::path generationPath{};
         std::filesystem::path canonicalSidecarPath{};
+        // Optional Editor cache. The source artifact is still hashed before a hit is accepted.
+        std::filesystem::path decodedTextureCacheRoot{};
         Uuid::Uuid16 expectedModelId{};
         std::uint64_t expectedGeneration{};
     };

@@ -96,6 +96,11 @@ createdAt: 2026-09-02T00:00:00Z
 
     $sourceHash = (Get-FileHash -LiteralPath $model -Algorithm SHA256).Hash
     $legacyHash = (Get-FileHash -LiteralPath $meta -Algorithm SHA256).Hash
+    $firstFailure = Invoke-Authoring 'fail-new-graphs' @('--model-authoring-fail', 'after-material-graph-publish')
+    if ($firstFailure.ExitCode -eq 0 -or (Get-FileHash $meta).Hash -ne $legacyHash -or
+        @(Get-ChildItem $assets -Recurse -File -Filter '*.shadergraph').Count -ne 0) {
+        Add-Failure '새 모델의 graph 게시 실패가 source graph 또는 sidecar를 남겼다.'
+    }
     $first = Invoke-Authoring 'first'
     if ($first.ExitCode -ne 0 -or -not [string]::IsNullOrWhiteSpace($first.Stderr)) {
         Add-Failure "첫 authoring 실패: exit=$($first.ExitCode) $($first.Stderr)"
@@ -111,6 +116,18 @@ createdAt: 2026-09-02T00:00:00Z
         Add-Failure '첫 schema v2/UUIDv8 sidecar 계약이 맞지 않는다.'
     }
     $generationOne = Join-Path $generations ($one.ModelId + '\1')
+    $graphFiles = @(Get-ChildItem (Join-Path $assets ('Materials/Models/' + $one.ModelId)) -Filter '*.shadergraph')
+    if ($graphFiles.Count -eq 0) { throw 'Model material graph was not authored' }
+    foreach ($graph in $graphFiles) {
+        if ([IO.File]::ReadAllText($graph.FullName + '.meta') -notmatch "^guid: $uuidV8") {
+            Add-Failure '모델 재질 그래프의 UUIDv8 identity가 없다.'
+        }
+        $document = Get-Content $graph.FullName -Raw | ConvertFrom-Json
+        $color = @($document.graph.nodes | Where-Object title -EQ 'Base Color')[0]
+        $color.sockets[0].default.value = @(0.17, 0.31, 0.47, 1.0)
+        [IO.File]::WriteAllText($graph.FullName, ($document | ConvertTo-Json -Depth 100), [Text.UTF8Encoding]::new($false))
+    }
+    $graphHashes = @($graphFiles | ForEach-Object { (Get-FileHash $_.FullName).Hash })
     foreach ($name in @('sidecar.meta', 'model.cemc', 'generation.asset')) {
         if (-not (Test-Path -LiteralPath (Join-Path $generationOne $name) -PathType Leaf)) {
             Add-Failure "generation 1 산출물이 없다: $name"
@@ -122,6 +139,9 @@ createdAt: 2026-09-02T00:00:00Z
         Add-Failure "두 번째 authoring 실패: exit=$($second.ExitCode) $($second.Stderr)"
     }
     $two = Get-SidecarSnapshot
+    if ((@($graphFiles | ForEach-Object { (Get-FileHash $_.FullName).Hash }) -join ',') -ne ($graphHashes -join ',')) {
+        Add-Failure '재임포트가 편집한 모델 재질 그래프를 덮었다.'
+    }
     if ($two.Generation -ne 2 -or $two.ModelId -ne $one.ModelId -or
         ($two.Ids -join "`n") -ne ($one.Ids -join "`n")) {
         Add-Failure 'reimport가 UUIDv8 closure를 보존하며 generation만 증가시키지 않았다.'
@@ -132,7 +152,7 @@ createdAt: 2026-09-02T00:00:00Z
     }
 
     foreach ($point in @('after-decode', 'after-identity', 'after-stage-write',
-        'after-stage-validation', 'after-generation-publish')) {
+        'after-stage-validation', 'after-generation-publish', 'after-material-graph-publish')) {
         $before = Get-SidecarSnapshot
         $beforeGenerations = @(Get-ChildItem -LiteralPath (
             Join-Path $generations $two.ModelId) -Directory).Count
@@ -141,7 +161,8 @@ createdAt: 2026-09-02T00:00:00Z
         $afterGenerations = @(Get-ChildItem -LiteralPath (
             Join-Path $generations $two.ModelId) -Directory).Count
         if ($failed.ExitCode -eq 0 -or $after.Hash -ne $before.Hash -or
-            $afterGenerations -ne $beforeGenerations) {
+            $afterGenerations -ne $beforeGenerations -or
+            (@($graphFiles | ForEach-Object { (Get-FileHash $_.FullName).Hash }) -join ',') -ne ($graphHashes -join ',')) {
             Add-Failure "실패 주입 원자성 위반: $point"
         }
     }
@@ -164,7 +185,7 @@ createdAt: 2026-09-02T00:00:00Z
         Add-Failure 'authoring transaction이 model source를 수정했다.'
     }
     $temporaryLeaks = @(Get-ChildItem -LiteralPath $project -Recurse -Force |
-        Where-Object { $_.Name -match 'model-authoring|\.staging-' })
+        Where-Object { $_.Name -match 'model-authoring|\.staging-|\.stage-' })
     if ($temporaryLeaks.Count -gt 0) {
         Add-Failure "transaction temporary가 남았다: $($temporaryLeaks.Count)"
     }
@@ -222,7 +243,7 @@ createdAt: 2026-09-02T00:00:00Z
         Add-Failure 'glTF exporter persistent ID 수집 배선이 없다.'
     }
 
-    "model-authoring-transaction model=$($two.ModelId) ids=$($two.Ids.Count) generations=2 failurePoints=5 collisions=1 failures=$($failures.Count)"
+    "model-authoring-transaction model=$($two.ModelId) ids=$($two.Ids.Count) graphs=$($graphFiles.Count) generations=2 failurePoints=7 collisions=1 failures=$($failures.Count)"
     if ($failures.Count -gt 0) {
         $failures | ForEach-Object { "  $_" }
         exit 1

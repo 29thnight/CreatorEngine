@@ -1,6 +1,8 @@
 #include "CookSupport.h"
 
 #include "ModelCookIdentity.h"
+#include "../../Assets/AssetIdentityProfile.h"
+#include "AuthoringParsedDocument.h"
 
 #include <fstream>
 
@@ -67,6 +69,13 @@ namespace experiment::cooked
         }
 
         std::vector<ModelIdentityIssue> issues;
+        if (path.filename().string().ends_with(".shadergraph.meta"))
+        {
+            std::string parseError;
+            const auto document = Authoring::ParsedDocument::ParseText(yaml, parseError);
+            if (document && assets::TryParseCanonicalUuidV8(document.Root()["guid"].AsString(), outId.value))
+                return true;
+        }
         if (!ReadAssetIdFromMeta(yaml, outId, issues))
         {
             outFailure = "meta GUID를 읽을 수 없다: " + path.string();

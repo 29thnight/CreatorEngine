@@ -205,6 +205,7 @@ private:
         {
         case RHICompareOp::Less:      return VK_COMPARE_OP_LESS;
         case RHICompareOp::LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case RHICompareOp::Equal: return VK_COMPARE_OP_EQUAL;
         default:                      return VK_COMPARE_OP_NEVER;
         }
     }

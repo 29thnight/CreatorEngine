@@ -228,7 +228,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     uint32_t cubeSize, uint32_t brdfSize, std::string& outError)
 {
     if (!equirect.IsValid() || RHIFormat::Unknown == equirectFormat ||
-        0 == cubeSize || 0 == brdfSize)
+        0 == cubeSize || 0 == brdfSize || m_generation == UINT64_MAX)
     {
         outError = "IBL 입력이 불완전하다";
         return false;
@@ -462,6 +462,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     transition(m_brdfLutHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
+    ++m_generation;
     return true;
 }
 

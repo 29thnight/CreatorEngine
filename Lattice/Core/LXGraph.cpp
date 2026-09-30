@@ -311,9 +311,11 @@ bool IsSocketValueValid(PinType type, const LXSocketValue& value)
         }
         return false;
     case PinType::Texture:
+    case PinType::Sampler:
         return std::holds_alternative<std::string>(value);
     case PinType::Flow:
     case PinType::Surface:
+    case PinType::Closure:
         return false;
     }
     return false;
@@ -330,7 +332,8 @@ bool LXGraph::AllowsPin(PinType type) const
     {
         return definitions_->AllowsPin(domain_, type);
     }
-    return (domain_ != "material" || type != PinType::Flow) && ((domain_ == "material") || type != PinType::Surface);
+    return (domain_ != "material" || type != PinType::Flow) &&
+           (domain_ == "material" || (type != PinType::Surface && type != PinType::Sampler && type != PinType::Closure));
 }
 
 bool LXGraph::CanEditNode(const Node& node) const
@@ -775,7 +778,8 @@ Id LXGraph::CreateGroupInstance(Id groupId, float x, float y)
     return id;
 }
 
-Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id idFloor)
+Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id idFloor,
+                            LXGroupCollapseMapping* mapping)
 {
     const std::unordered_set<Id> selected(nodeIds.begin(), nodeIds.end());
     if (name.empty() || selected.empty() || selected.size() != nodeIds.size() || selected.size() > kDocumentLimit)
@@ -820,6 +824,7 @@ Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id
     LXGraph body(domain_, definitions_);
     body.nextId_ = std::max(nextId_, idFloor);
     std::unordered_map<Id, Id> copiedPins;
+    LXGroupCollapseMapping copiedIds;
     std::unordered_map<Id, Id> copiedFrames;
     for (const Node& original : nodes_)
     {
@@ -833,12 +838,14 @@ Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id
         }
         Node copy = original;
         copy.id = body.nextId_++;
+        copiedIds.nodes.emplace(original.id, copy.id);
         for (Pin& pin : copy.pins)
         {
             const Id oldPin = pin.id;
             pin.id = body.nextId_++;
             pin.node = copy.id;
             copiedPins.emplace(oldPin, pin.id);
+            copiedIds.pins.emplace(oldPin, pin.id);
         }
         if (copy.groupId)
         {
@@ -1076,6 +1083,10 @@ Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id
     groups_ = std::move(proposed.groups_);
     layout_ = std::move(proposed.layout_);
     nextId_ = proposed.nextId_;
+    if (mapping)
+    {
+        *mapping = std::move(copiedIds);
+    }
     return instance;
 }
 
@@ -2184,14 +2195,14 @@ bool LXGraph::Redo()
 const char* PinTypeName(PinType type)
 {
     static constexpr const char* names[] = {"Flow",  "Bool",   "Int",     "Float",  "Vector",
-                                            "Color", "Normal", "Texture", "Surface"};
+                                            "Color", "Normal", "Texture", "Surface", "Sampler", "Closure"};
     const auto index = static_cast<unsigned>(type);
     return index < std::size(names) ? names[index] : "Unknown";
 }
 
 void LXGraph::Write(std::ostream& out) const
 {
-    out << "LXG 8 " << std::quoted(domain_) << ' ' << nextId_ << '\n';
+    out << "LXG 9 " << std::quoted(domain_) << ' ' << nextId_ << '\n';
     out << "N " << nodes_.size() << '\n';
     for (const Node& node : nodes_)
     {
@@ -2363,7 +2374,7 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
     std::string magic, domain, tag;
     int version = 0;
     Id nextId = 0;
-    if (!(in >> magic >> version >> std::quoted(domain) >> nextId) || magic != "LXG" || (version < 1 || version > 8) ||
+    if (!(in >> magic >> version >> std::quoted(domain) >> nextId) || magic != "LXG" || (version < 1 || version > 9) ||
         !nextId)
     {
         Fail(error, "Invalid LXG header");
@@ -2391,7 +2402,8 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
             (version >= 3 && !(in >> hasRule >> ruleDirection >> ruleType >> ruleMultiple >> ruleLimit)) ||
             (version >= 8 && !(in >> node.groupId)) || (collapsed != 0 && collapsed != 1) ||
             (hasRule != 0 && hasRule != 1) || ruleDirection < 0 || ruleDirection > 1 || ruleType < 0 ||
-            ruleType > static_cast<int>(PinType::Surface) || (ruleMultiple != 0 && ruleMultiple != 1) ||
+            ruleType > static_cast<int>(version >= 9 ? PinType::Closure : PinType::Surface) ||
+            (ruleMultiple != 0 && ruleMultiple != 1) ||
             pinCount > kDocumentLimit || propertyCount > kDocumentLimit || ruleLimit > kDocumentLimit)
         {
             Fail(error, "Invalid node record");
@@ -2410,7 +2422,8 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
             if (!(in >> pin.id >> std::quoted(pin.name)) || (version >= 4 && !(in >> std::quoted(pin.identifier))) ||
                 !(in >> direction >> type >> multiple) || (version >= 3 && !(in >> dynamic)) ||
                 (version >= 8 && !(in >> pin.interfaceId)) || (version >= 5 && !ReadSocketValue(in, pin.value)) ||
-                direction < 0 || direction > 1 || type < 0 || type > static_cast<int>(PinType::Surface) ||
+                direction < 0 || direction > 1 || type < 0 ||
+                type > static_cast<int>(version >= 9 ? PinType::Closure : PinType::Surface) ||
                 (multiple != 0 && multiple != 1) || (dynamic != 0 && dynamic != 1) ||
                 (version >= 4 && pin.identifier.empty()))
             {
@@ -2551,7 +2564,7 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
                 if (!(in >> socket.id >> std::quoted(socket.identifier) >> std::quoted(socket.name) >> direction >>
                       type >> socket.internalPin) ||
                     !ReadSocketValue(in, socket.value) || direction < 0 || direction > 1 || type < 0 ||
-                    type > static_cast<int>(PinType::Surface))
+                    type > static_cast<int>(version >= 9 ? PinType::Closure : PinType::Surface))
                 {
                     Fail(error, "Invalid group socket record");
                     return std::nullopt;

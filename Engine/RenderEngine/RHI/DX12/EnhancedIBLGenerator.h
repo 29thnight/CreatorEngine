@@ -71,6 +71,7 @@ public:
     // 핸들로 낸다. 소비처는 RHIBindingDesc::SrvCube/Srv2D로 그대로 받으며,
     // 실물 소유권은 CreateTexture를 수행한 backend resource table에 있다.
     RHITextureHandle GetCubeMap() const { return m_cubeMapHandle; }
+    uint64_t GetGeneration() const { return m_generation; }
     RHITextureHandle GetIrradianceMap() const { return m_irradianceHandle; }
     RHITextureHandle GetPrefilteredMap() const { return m_prefilteredHandle; }
     RHITextureHandle GetBrdfLut() const { return m_brdfLutHandle; }
@@ -85,6 +86,7 @@ private:
         std::string& outError);
 
     uint32_t m_cubeSize{ 0 };
+    uint64_t m_generation{ 0 };
     uint32_t m_brdfSize{ 0 };
     uint32_t m_importanceSize{ 0 };
     uint32_t m_importanceMip{ 0 };

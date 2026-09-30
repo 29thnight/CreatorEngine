@@ -190,7 +190,8 @@ public:
     /// wait N. 다음 명령을 N 프레임 뒤로 미룬다.
     void SetWaitFrames(int frames) noexcept;
 
-    // Commandlet-only: emit its terminal result after the engine publishes more frames.
+    // Emit the active commandlet/service result after more product frames.
+    // Polling runs on the game thread and retains the request's completion owner.
     void WaitForResult(std::function<std::optional<CommandCore::CommandResult>()> poll);
 
     /// help.

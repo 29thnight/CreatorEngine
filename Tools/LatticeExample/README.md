@@ -1,6 +1,6 @@
 # Lattice 독립 ImGui 예제
 
-LX 그래프 모델(`Lattice/Core`)과 자체 ImGui 캔버스(`Lattice/ImGui`)를
+LX 그래프 모델(`Lattice/Core`), Material 문서·IR(`Lattice/Material`)과 자체 ImGui 캔버스(`Lattice/ImGui`)를
 Editor/Engine 프로젝트 없이 실행하는 Win32·DX11 예제다. 저장소의 ImGui
 1.92.8 헤더와 정적 라이브러리를 사용한다. `imgui-node-editor`를 include하거나
 링크하지 않는다. 예제의 `.lxg`는 조작 검증용 형식이며 PHASE 4.25의 최종
@@ -20,6 +20,20 @@ ImGui와 독립인 `LXDocument`는 그래프 조회, 문서 ID·revision, 타입
 확인한다. Material 예제 UI의 그래프 변경·Undo/Redo·Save/Reload는 이 문서
 계층을 사용한다. 노드 드래그는 미리보기 후 놓을 때 한 명령으로 확정한다.
 Behavior 예제는 아직 직접 그래프를 조작한다. HTTP endpoint는 아직 없다.
+
+## MAT-2 Material 문서·IR
+
+2026-09-28: 독립 Debug/Release에서 `LX_MATERIAL_TEST_OK checks=95`와 기존
+`LX_SELF_TEST_OK`를 통과했다. `.shadergraph` schema 1의 typed default/Blackboard,
+색 공간·소켓 표시 상태·공유/중첩 그룹·layout의 exact 왕복, migration·unknown payload·
+backup·교체 실패 복구와 마지막 정상 IR 유지를 확인했다. Core에 Sampler/Closure를
+추가해 예제 형식은 LXG 9가 되었으며 LXG 1~8 읽기를 유지한다.
+
+현재 화면의 Open/Save는 계속 `.lxg`를 사용한다. Material 문서 전체의
+transaction/Undo/Redo와 Canvas adapter 연결은 LX-3에서 적용한다. `.shadergraph`
+API와 저장 형식은 [MaterialGraphSchema.md](../../docs/design/MaterialGraphSchema.md),
+고정 예시는 [fixtures/material](fixtures/material/README.md)에 있다. 새 third-party
+패키지는 추가하지 않았으며 Material parser는 기존 rapidyaml/c4core를 링크한다.
 
 ## 빌드와 자체 검사
 
@@ -307,3 +321,32 @@ Ctrl+클릭 다중 선택과 선택한 노드들의 동시 이동은 사용자�
 직접 조작해 정상 동작을 확인했다. 별도로 숨긴 ImGui 제스처 자체 검사도
 통과했다. LX-2 독립 예제 게이트는 통과했으며, LX-1의 남은 기능과 Editor
 제품 연결은 별도 작업이다.
+
+## MAT-6 Material 생성기 검증
+
+독립 예제 `--self-test`가 초기 Material 정의의 Slang 결정성·feature/Blackboard·group 경계와
+source map·저장 재개방·미지원 socket 진단을 검사한다. 기존 Material 95개 검사는 유지한다.
+`Lattice/Material/LXMaterialCompiler`는 Engine이나 Slang DLL을 링크하지 않는다.
+
+`Tools/regression/verify-material-codegen.ps1`의 별도 host는 pinned Slang/DXC로
+DXIL/SPIR-V CS/PS와 실제 D3D12 texture/sampler readback을 검증한다.
+[MaterialSlangCodegen.md](../../docs/design/MaterialSlangCodegen.md)의 지원 범위를 따른다.
+생성 source와 typed metadata·실패 generation 보존을 검증했으며 예제 창의 Material demo를
+Editor 제품 graph/Scene preview로 이관한 증거는 아니다. 제품 binding/PSO/cook route는 MAT-7이다.
+
+## 제품 Material 창 스타일 미리보기
+
+`--capture-material <absolute-png-path>`는 제품 창과 같은 순수 ImGui
+`MaterialGraphPresentation`/`LXCanvas`를 독립 D3D11 backbuffer에서 PNG로 저장한다.
+Engine 타입이나 Editor.vcxproj를 링크하지 않는다. 이 이미지는 제품 Editor 창의
+스크린샷이 아니며 [MaterialNodeEditor.md](../../docs/design/MaterialNodeEditor.md)의
+실제 Editor gate와 구분한다.
+
+Material 미리보기는 실행 파일 옆 `Fonts`의 Inter와 Material Symbols subset을
+제품 Editor와 같은 정렬 helper로 병합한다. 빌드 후 두 폰트와 라이선스를 함께 배치하며,
+73개 아이콘 역할을 모두 확인한 뒤 `LX_MATERIAL_ICON_FONT_OK roles=73`을 출력한다.
+상단바와 경로 표시의 아이콘은 폰트 글리프로 그린다.
+
+`--self-test`는 실제 Material definitions의 항목/핀 Y 정렬, 고급 section 표시,
+compact header와 저장 snapshot 이후 Undo/Redo를 추가로 확인한다. view 제스처 검사는
+monitor DPI 변경과 사용자 UI 배율 변경에서 논리 중심 위치 보존도 확인한다.

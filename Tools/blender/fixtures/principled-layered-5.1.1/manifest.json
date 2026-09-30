@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "blender_version": "5.1.1",
+  "reference_kind": "CreatorEngine CPU double closure numeric baseline; not Blender rendered parity",
+  "mask": 2047,
+  "cases": 35,
+  "views": 8,
+  "selected_fields": [
+    14,
+    19,
+    20,
+    21,
+    22,
+    24,
+    25
+  ],
+  "numeric_golden_rows": 1960,
+  "numeric_golden_sha256": "26AEF415D59000EB9876B5BF1B9951042A18B1A06A2DBB15660831A6D8047F2B",
+  "sheen_ltc_normalized_sha256": "AEB8870B010370633FF1EBF802F87A8045244CCD7E7DCF5D99BCCB2F5A511A14",
+  "thin_film_effective_wavelengths_nm": [
+    650,
+    550,
+    450
+  ],
+  "reference_evaluator": "Tools/regression/principled_layered_probe.cpp",
+  "created": "2026-09-28"
+}

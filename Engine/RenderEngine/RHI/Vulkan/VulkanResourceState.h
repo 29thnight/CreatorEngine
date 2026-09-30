@@ -105,6 +105,10 @@ inline VulkanBarrierState ToVulkan(RHIResourceState state, bool isSource)
         return { VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                  VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT };
 
+    case RHIResourceState::IndexBuffer:
+        return { VK_IMAGE_LAYOUT_GENERAL,
+                 VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT, VK_ACCESS_2_INDEX_READ_BIT };
+
     case RHIResourceState::Common:
     default:
         // 위 ★ — 어느 쪽이냐가 답을 바꾸는 유일한 상태다.

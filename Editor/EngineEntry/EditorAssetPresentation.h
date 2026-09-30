@@ -35,7 +35,7 @@ public:
 		Prefab,
 		Sound,
 		HDR,
-		VolumeProfile,
+		SceneRenderProfile,
 		Font,
 		End,
 	};

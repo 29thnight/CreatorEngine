@@ -484,6 +484,7 @@ passes:
             std::span<const RHIColorTargetDesc>, const RHIDepthTargetDesc*) override { return {}; }
         RHITextureInfo DescribeTexture(RHITextureHandle) const override { return {}; }
         void ReleaseTexture(RHITextureHandle) override {}
+        void ReleaseBuffer(RHIBufferHandle) override {}
         void TransitionResources(std::span<const RHITransition>) override {}
         void TransitionBuffers(std::span<const RHIBufferTransition>) override {}
 

@@ -627,8 +627,18 @@ void AnimationScheduler::Update(float deltaTime)
     }
 
     const auto updateJobCount = AnimationChunkCount(work.size());
+    // A single Animator has no parallel work to overlap. Keep both phase
+    // barriers, but avoid waking a worker only to immediately wait for it.
+    const auto submitChunks = [](std::size_t count, auto&& task) -> job_handle {
+        if (count <= 1)
+        {
+            if (count) task(0);
+            return {};
+        }
+        return ce::get_job_scheduler().submit_indexed(count, std::forward<decltype(task)>(task));
+    };
     const auto updateReady = sample ? Clock::now() : Clock::time_point{};
-    auto updateCompletion = ce::get_job_scheduler().submit_indexed(updateJobCount,
+    auto updateCompletion = submitChunks(updateJobCount,
         [this, &work, &timings, sample, deltaTime, updateJobCount](std::size_t chunk)
     {
         ce::profile_scope _profile{ ce::marker<"AnimationScheduler.Update">() };
@@ -677,7 +687,10 @@ void AnimationScheduler::Update(float deltaTime)
         if (failure) std::rethrow_exception(failure);
     });
     const auto updateSubmitted = sample ? Clock::now() : Clock::time_point{};
-    updateCompletion.wait();
+    {
+        ce::profile_scope wait{ ce::marker<"AnimationScheduler.UpdateWait">() };
+        updateCompletion.wait();
+    }
     const auto updateJoined = sample ? Clock::now() : Clock::time_point{};
 
     // This is the inter-Animator barrier: every event/time recipe is
@@ -771,7 +784,7 @@ void AnimationScheduler::Update(float deltaTime)
     }
     const auto executeJobCount = AnimationChunkCount(executeIndices.size());
     const auto executeReady = sample ? Clock::now() : Clock::time_point{};
-    auto executeCompletion = ce::get_job_scheduler().submit_indexed(executeJobCount,
+    auto executeCompletion = submitChunks(executeJobCount,
         [this, &work, &timings, &executeIndices, sample, executeJobCount](std::size_t chunk)
     {
         ce::profile_scope _profile{ ce::marker<"AnimationScheduler.Execute">() };
@@ -814,7 +827,10 @@ void AnimationScheduler::Update(float deltaTime)
         if (failure) std::rethrow_exception(failure);
     });
     const auto executeSubmitted = sample ? Clock::now() : Clock::time_point{};
-    executeCompletion.wait();
+    {
+        ce::profile_scope wait{ ce::marker<"AnimationScheduler.ExecuteWait">() };
+        executeCompletion.wait();
+    }
     const auto joined = sample ? Clock::now() : Clock::time_point{};
     for (auto& item : work)
     {
@@ -845,10 +861,16 @@ void AnimationScheduler::Update(float deltaTime)
         sample->m_executePassJobs = executeJobCount;
         sample->m_prepareUs = AnimationMeasurementScope::Microseconds(begin, updateReady)
             + AnimationMeasurementScope::Microseconds(updateJoined, executeReady);
-        sample->m_submitUs = AnimationMeasurementScope::Microseconds(updateReady, updateSubmitted)
-            + AnimationMeasurementScope::Microseconds(executeReady, executeSubmitted);
-        sample->m_updatePassWaitUs = AnimationMeasurementScope::Microseconds(updateSubmitted, updateJoined);
-        sample->m_executePassWaitUs = AnimationMeasurementScope::Microseconds(executeSubmitted, joined);
+        // Inline task time is already in the task/worker timings below; it is
+        // execution work, not scheduler submission overhead or join latency.
+        sample->m_submitUs = (updateJobCount > 1
+            ? AnimationMeasurementScope::Microseconds(updateReady, updateSubmitted) : 0.)
+            + (executeJobCount > 1
+            ? AnimationMeasurementScope::Microseconds(executeReady, executeSubmitted) : 0.);
+        sample->m_updatePassWaitUs = updateJobCount > 1
+            ? AnimationMeasurementScope::Microseconds(updateSubmitted, updateJoined) : 0.;
+        sample->m_executePassWaitUs = executeJobCount > 1
+            ? AnimationMeasurementScope::Microseconds(executeSubmitted, joined) : 0.;
         sample->m_waitUs = sample->m_updatePassWaitUs + sample->m_executePassWaitUs;
         auto first = joined, last = begin;
         for (std::size_t i = 0; i < work.size(); ++i)

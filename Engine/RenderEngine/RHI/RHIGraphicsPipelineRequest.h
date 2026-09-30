@@ -54,8 +54,26 @@ public:
         return true;
     }
 
-    bool Create(IRenderPipelineCache& cache, const RHIGraphicsPipelineDesc& source,
-        std::string& outError)
+    RHIPipelineRequestState Poll(IRenderPipelineCache& cache, std::string& outError)
+    {
+        if (m_handle.IsValid())
+        {
+            outError.clear();
+            return RHIPipelineRequestState::Ready;
+        }
+        RHIPipelineHandle handle;
+        const auto state = cache.RequestGraphics(m_desc, handle, outError);
+        if (state == RHIPipelineRequestState::Ready && !handle.IsValid())
+        {
+            outError = "Ready graphics request did not return a pipeline handle";
+            return RHIPipelineRequestState::Failed;
+        }
+        if (state == RHIPipelineRequestState::Ready)
+            m_handle = handle;
+        return state;
+    }
+
+    bool Create(IRenderPipelineCache& cache, const RHIGraphicsPipelineDesc& source, std::string& outError)
     {
         if (m_handle.IsValid())
         {

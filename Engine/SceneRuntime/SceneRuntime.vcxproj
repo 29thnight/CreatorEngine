@@ -198,7 +198,7 @@
     <ClCompile Include="SoundSystem.cpp" />
     <ClCompile Include="SpriteRenderer.cpp" />
     <ClCompile Include="SpriteSheetComponent.cpp" />
-    <ClCompile Include="VolumeComponent.cpp" />
+    <ClCompile Include="SceneRenderProfileComponent.cpp" />
     <ClCompile Include="EntityAuthoringRead.cpp" />
     <ClCompile Include="Entity.cpp" />
     <ClCompile Include="InputAction.cpp" />
@@ -251,7 +251,7 @@
     <ClInclude Include="SoundSystem.h" />
     <ClInclude Include="SoundDefinition.h" />
     <ClInclude Include="SpriteSheetComponent.h" />
-    <ClInclude Include="VolumeComponent.h" />
+    <ClInclude Include="SceneRenderProfileComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="EBodyType.h" />
     <ClInclude Include="PhysicsManager.h" />

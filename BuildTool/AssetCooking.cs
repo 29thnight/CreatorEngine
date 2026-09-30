@@ -29,7 +29,14 @@ internal static class AssetCooking
         {
             context.Cancellation.ThrowIfCancellationRequested();
             var sidecar = File.ReadAllText(model + ".meta");
-            if (library.Length == 0)
+            var modelId = Regex.Match(sidecar, @"(?m)^assetId:\s*([0-9a-f-]{36})\s*$");
+            var materials = Regex.Matches(sidecar, @"(?m)^\s*- kind: material\r?\n\s*stableKey:[^\r\n]*\r?\n\s*assetId:\s*([0-9a-f-]{36})\s*$");
+            var hasGraphs = modelId.Success && materials.All(material =>
+            {
+                var graph = Path.Combine(assets, "Materials", "Models", modelId.Groups[1].Value, material.Groups[1].Value + ".shadergraph");
+                return File.Exists(graph) && File.Exists(graph + ".meta");
+            });
+            if (library.Length == 0 || !hasGraphs)
             {
                 await context.Run(cooker, ["--author-model-asset", "--asset-root", assets, "--output", output, "--model", model]); ++authored;
             }
@@ -47,7 +54,7 @@ internal static class AssetCooking
     public static CookResult Validate(string output, int expected)
     {
         const string guid = "([0-9a-f]{8}-[0-9a-f]{4}-[48][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
-        var rules = new Dictionary<string, string> { ["Models"] = "", ["Textures"] = "png|hdr|dds|jpg", ["ShaderMeta"] = "shadermeta", ["Materials"] = "asset", ["Scenes"] = "creator", ["Prefabs"] = "prefab" };
+        var rules = new Dictionary<string, string> { ["Models"] = "", ["Textures"] = "png|hdr|dds|jpg", ["ShaderMeta"] = "shadermeta", ["Materials"] = "asset", ["MaterialPrograms"] = "lxmaterial", ["Scenes"] = "creator", ["Prefabs"] = "prefab" };
         var derived = Path.Combine(output, "Derived"); var manifest = Path.Combine(derived, "asset-manifest.cemf");
         if (!File.Exists(manifest)) throw new BuildException("Cooked asset manifest missing.");
         var files = Paths.Files(derived).ToArray(); var byFolder = rules.Keys.ToDictionary(k => k, _ => 0);
@@ -78,7 +85,7 @@ internal static class AssetCooking
         var stale = all.Where(p => Path.GetExtension(p).Equals(".asset", StringComparison.OrdinalIgnoreCase) && Paths.Relative(assets, p).StartsWith("Models/", StringComparison.OrdinalIgnoreCase)).ToHashSet(Paths.Comparer);
         var arguments = new List<string> { "--asset-root", assets, "--output", output, "--generation-root", generations };
         var counts = new Dictionary<string, int>();
-        foreach (var (option, extensions) in new (string, string[])[] { ("--model", [".fbx", ".glb", ".gltf"]), ("--texture", [".png", ".hdr", ".dds"]), ("--shadermeta", [".shadermeta"]), ("--material", [".asset"]), ("--scene", [".creator", ".prefab"]) })
+        foreach (var (option, extensions) in new (string, string[])[] { ("--model", [".fbx", ".glb", ".gltf"]), ("--texture", [".png", ".hdr", ".dds"]), ("--shadermeta", [".shadermeta"]), ("--shadergraph", [".shadergraph"]), ("--material", [".asset"]), ("--scene", [".creator", ".prefab"]) })
         {
             var sources = all.Where(p => extensions.Contains(Path.GetExtension(p).ToLowerInvariant()) && !stale.Contains(p)).ToArray(); counts[option] = sources.Length;
             foreach (var source in sources) { arguments.Add(option); arguments.Add(source); }
@@ -100,7 +107,7 @@ internal static class AssetCooking
         var log = await context.Run(cooker, ["--compile-runtime-documents", "--runtime-root", root]);
         var summary = Regex.Match(log.Output, @"(?m)^asset-cooker runtime-documents=(\d+) bytes=(\d+) format=CEDO1\r?$");
         if (!summary.Success) throw new BuildException("Runtime document cook summary missing.");
-        var extensions = new[] { ".inputmap", ".bt", ".blackboard", ".volume", ".terrain", ".foliage" };
+        var extensions = new[] { ".inputmap", ".bt", ".blackboard", ".renderprofile", ".terrain", ".foliage" };
         var documents = Paths.Files(Path.Combine(root, "ProjectSetting")).Where(p => Path.GetExtension(p).Equals(".asset", StringComparison.OrdinalIgnoreCase))
             .Concat(Paths.Files(Path.Combine(root, "Assets")).Where(p => extensions.Contains(Path.GetExtension(p).ToLowerInvariant()))).ToArray();
         var count = int.Parse(summary.Groups[1].Value); var bytes = long.Parse(summary.Groups[2].Value);

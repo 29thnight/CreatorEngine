@@ -38,8 +38,8 @@
     { "name": "gameinput", "$why": "InputManager" },
     {
       "name": "imgui",
-      "features": [ "docking-experimental", "dx11-binding", "dx12-binding", "vulkan-binding", "win32-binding" ],
-      "$why": "에디터 UI renderer backend. DX12와 Vulkan을 IImGuiRendererBackend 뒤에서 선택한다"
+      "features": [ "docking-experimental", "dx11-binding", "dx12-binding", "vulkan-binding", "win32-binding", "wchar32", "freetype" ],
+      "$why": "에디터 UI renderer backend. DX12와 Vulkan을 IImGuiRendererBackend 뒤에서 선택한다. wchar32와 FreeType은 보충 평면 문자 및 컬러 이모지 폰트용이며 소비자와 라이브러리에 같은 imconfig를 설치한다"
     },
     { "name": "imgui-node-editor", "$why": "애니메이터 상태 그래프 편집" },
     { "name": "imguizmo", "$why": "씬 뷰 기즈모 — SceneViewWindow" },

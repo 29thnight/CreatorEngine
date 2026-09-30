@@ -185,7 +185,7 @@ foreach ($extension in @(
     '.png', '.dds', '.jpg', '.jpeg', '.hdr',
     '.hlsl', '.shadermeta', '.shader', '.cpp', '.cs',
     '.wav', '.mp3', '.flac', '.spritefont',
-    '.terrain', '.bt', '.blackboard', '.prefab', '.volume',
+    '.terrain', '.bt', '.blackboard', '.prefab', '.renderprofile',
     # EditorAssetDatabase::m_registeredFiles 와 같은 범위여야 한다.
     # `.creator` 는 D5-b2c-4 에서 편입했다 — 그전까지 씬은 sidecar 가 없어
     # asset identity 자체를 갖지 못했다.

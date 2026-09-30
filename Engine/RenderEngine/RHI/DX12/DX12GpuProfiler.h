@@ -30,6 +30,7 @@ public:
     {
         std::string name;
         double      milliseconds{ 0.0 };
+        double      spanMilliseconds{ 0.0 };
     };
 
     /// 조각 하나의 raw 구간. 분할 패스는 조각마다 구간을 찍으므로 한 패스가
@@ -209,6 +210,7 @@ private:
         uint64_t begin{ 0 };
         uint64_t end{ 0 };
         uint32_t slices{ 0 };
+        uint64_t duration{ 0 };
     };
     std::vector<std::pair<std::string_view, MergedSpan>> m_mergeScratch;
 

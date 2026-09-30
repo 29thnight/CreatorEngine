@@ -204,6 +204,7 @@ public:
         uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
     void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
         uint64_t sourceOffset = 0, uint64_t bytes = 0) override;
+    bool CopyBuffer(const RHIBufferSlice& destination, const RHIBufferSlice& source) override;
 
     /// 미구현 호출 수와 마지막 이름. `vk.*` 검사의 판정에 쓴다.
     uint32_t    GetUnimplementedCount() const { return m_unimplemented; }

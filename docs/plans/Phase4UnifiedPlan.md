@@ -23,11 +23,11 @@ PHASE 4.5가 소유하던 `BASE-0` 6일이 새 페이즈로 옮겨갔을 뿐이�
 | 페이즈 | 단일 책임 | 활성 행 | 일 | 상태 |
 |---|---|---:|---:|---|
 | **4** | 현 제품 PBR `.slang`·Material·Renderer 배선 안정화 | 10 | 18 | W0~W9 완료(현재 DX12 제품 계약) |
-| **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | MAT-0 완료, 진행 중 |
+| **4.25** | Blender 5.1.1 Principled 기반 Material Graph와 artist workflow | 10 | 34 | MAT-0~MAT-6 완료(26일), 진행 중 |
 | **4.3** | 공통 밀봉 하네스와 RenderGraph 리소스 의존성·queue/fence RHI 계약 | 11 | 119 | 미착수 |
 | **4.5** | 모션 벡터·jitter·히스토리와 Temporal Upscaling·Frame Generation | 16 | 86 | 미착수 |
 | **4.75** | 라이트맵·일반 SRP·shadow/probe/post·GPU 기능 | 22 | 95.5 | 4일 완료 |
-| **합계** |  | **69** | **352.5** | **잔여 328.5** |
+| **합계** |  | **69** | **352.5** | **잔여 304.5** |
 
 `Q0`(queue/fence RHI 계약)은 미산정이며 위 119일에 포함되지 않는다.
 
@@ -306,21 +306,75 @@ CEMC8과 하위 ID 310개를 유지하며 재질별 sampler 전달이 다음 단
 | ID | 내용 | 상태 | 선행 | 일 |
 |---|---|---|---|---:|
 | `MAT-0` | Blender 5.1.1 reference·pre-tone HDR golden | ✓ | PBR-W9 | 2 |
-| `MAT-1` | `PrincipledSurface`·`MaterialFeatureMask` ABI | · | MAT-0 | 4 |
-| `MAT-2` | typed Material Graph IR·round-trip | · | MAT-1 | 4 |
-| `MAT-3` | core Principled 의미·기본값 | · | MAT-1 | 4 |
-| `MAT-4` | layered lobe | · | MAT-3 | 4 |
-| `MAT-5` | transmission/subsurface/volume | · | MAT-3 | 4 |
-| `MAT-6` | material graph→Slang codegen·diagnostic | · | MAT-2, MAT-3 | 4 |
-| `MAT-7` | 자동 route·cook specialization | · | MAT-4~MAT-6 | 3 |
-| `MAT-8` | artist preview·cost badge·fallback 설명 | · | MAT-2, MAT-7 | 3 |
+| `MAT-1` | `PrincipledSurface`·`MaterialFeatureMask` ABI | ✓ | MAT-0 | 4 |
+| `MAT-2` | typed Material Graph IR·round-trip | ✓ | MAT-1, LX-2 독립 게이트 | 4 |
+| `MAT-3` | core Principled 의미·기본값 | ✓ | MAT-1 | 4 |
+| `MAT-4` | layered lobe | ✓ | MAT-3 | 4 |
+| `MAT-5` | transmission/subsurface/volume | ✓ | MAT-4 공용 레이어 | 4 |
+| `MAT-6` | material graph→Slang codegen·diagnostic | ✓ | MAT-2, MAT-5 공용 의미 | 4 |
+| `MAT-7` | 제품 binding·generation/PSO 교체·자동 route·cook specialization | ✓ | MAT-4~MAT-6 | 3 |
+| `MAT-8` | artist preview·cost badge·fallback 설명 | ✓ | MAT-2, MAT-7 | 3 |
 | `MAT-9` | Blender golden·route parity·성능 gate | · | MAT-7, MAT-8 | 2 |
 
 구 `SRP-3`의 공용 graph 기반과 구 PBR 레인의 material 몫은 이 페이즈가 대체한다.
 완료선은 [`BlenderMaterialGraphPlan.md`](BlenderMaterialGraphPlan.md) §6을 따른다.
+2026-09-30 현재 MAT-0~MAT-8 완료(32/34일), MAT-9 rendered parity·성능 수용은 남는다. MAT-8의 Debug 1,337개 검사·5개 렌더 capture 및 실제 Windows preview/Inspector 조작 증거는 MaterialNodeEditor.md가 소유한다.
 `MAT-0`은 Blender 5.1.1 scene-linear RGBA32F golden과 고정 장면·입력 manifest를
 저장했고, 독립 재렌더 EXR 전체 픽셀 차이 `0.0`을 확인했다. 이는 Blender 기준선
 검증이며 엔진 Material Graph·렌더 결과 일치의 완료 판정은 아니다.
+`MAT-1`은 공용 Slang 평가 결과·정적 기능 마스크와 GBuffer/Deferred/Forward 소비를
+연결했다. 고정 Slang의 70개 엔트리·미지원 mask 거부 4건과 기존 Debug host의
+GPU readback 3종을 통과했다. 계약과 판정 범위는
+[`PrincipledMaterialAbi.md`](../design/PrincipledMaterialAbi.md)에 기록했다.
+`MAT-2`는 구조화된 `.shadergraph` 저장·복구와 typed IR을 독립 예제에서 검증했다.
+신규 95개 검사와 기존 LX 검사가 Debug/Release에서 통과했다. Editor 연결과 Slang
+생성은 LX-3/MAT-6에 남는다. [MaterialGraphSchema.md](../design/MaterialGraphSchema.md)를 따른다.
+`MAT-3`는 core 기본값·IOR/specular/F82·emission/alpha·normal과 공용 직접광/IBL 응답을
+구현했다. 독립 RTX 4070 Ti의 8,280개 수치 검사, core DXIL/SPIR-V·고정 pass 70개 컴파일,
+mask/미배선 route 거부 10건과 현행 Debug host GPU 회귀 3종을 통과했다.
+[PrincipledCoreSemantics.md](../design/PrincipledCoreSemantics.md)가 계약을 소유한다.
+비기본 IOR의 제품 lookup/MRT packing·graph binding과 Blender golden 판정은 후속이다.
+`MAT-4`는 coat/sheen/anisotropy/thin film의 공용 Layered 평가를 구현했다.
+216,776개 GPU/CPU 수치·독립성 검사, 5,712개 energy bound, 1,960행 numeric golden,
+DXIL/SPIR-V 14개·의존 mask 거부 8개와 기존 core/pass/제품 회귀를 통과했다.
+[PrincipledLayeredSemantics.md](../design/PrincipledLayeredSemantics.md)가 근사·비용·lookup 계약을 소유한다.
+EEVEE의 미사용 입력인 anisotropy/thin film은 Cycles 기준으로 분리하고, RGB thin film의
+rendered 수용·제품 binding/route·성능은 MAT-6~MAT-9에 남긴다.
+`MAT-5`는 Transmission/SSS/Volume 공용 평가와 명시적 Special Forward 자원 요구 조건을 구현했다.
+202,049개 GPU/CPU·독립성 검사, 4,410개 energy bound, 4,410행 numeric golden,
+DXIL/SPIR-V 28개·잘못된 route/의존성 거부 22개 및 기존 core/Layered/pass/제품 회귀를 통과했다.
+[PrincipledSpecialSemantics.md](../design/PrincipledSpecialSemantics.md)가 approximation과 transport 인계를 소유한다.
+게임용 diffusion·단일 경계 transmission·homogeneous single scattering의 구현 결과이며,
+제품 SSS/refraction/Volume 배선·cook 자동 route와 Blender rendered 판정은 MAT-7~MAT-9에 남는다.
+`MAT-6`은 초기 지원 graph의 결정적 Slang/typed metadata·source 진단과 실패 generation 복구를 구현했다.
+독립 texture/sampler GPU 대조·DXIL/SPIR-V CS/PS·저장 순서/재개방 결정성을 검증했다.
+[MaterialSlangCodegen.md](../design/MaterialSlangCodegen.md)가 지원 범위와 제품 경계를 소유한다.
+`MAT-7`은 [MaterialGraphProduct.md](../design/MaterialGraphProduct.md)의 reflection/binding,
+candidate PSO·owner fence, LXMC/CEMF·AssetCooker·loose/encrypted PAK 기반을 검증했다.
+DataSystem/Material GUID generation·typed instance 저장 왕복/실패 복구를 연결하고
+독립 runtime 43개와 실제 DataSystem 직접 호출 Debug/Release 각 26개를 검사했다.
+제품 b2·texture·독립 sampler render binding adapter도 실제 엔진 DX12 오프스크린
+draw에서 Debug/Release 각 168개 검사·64개 GPU 성분으로 검증했다. Scene 적용은 후속이다.
+Core/Layered evaluated-point IBL bake→별도 base/coat/sheen 응답 소비 draw는
+Debug/Release 각 19,351개 검사·18,240개 GPU 성분을 통과했다.
+[PrincipledIblBake.md](../design/PrincipledIblBake.md)의 Scene lookup 배치/보간/재사용,
+환경 MIS/수렴·실시간 예산은 남는다.
+[MaterialGraphScenePacket.md](../design/MaterialGraphScenePacket.md)의 graph instance·coverage/queue·PSO·
+IBL·recording binding 소유/게시 경계를 구현하고 실제 두 in-flight 제출의 교체/실패/abort/
+완료 해제를 검증했다. native 제출 성공 확인 없이 callback만으로 정상 packet을 바꾸지 않는다.
+진행 중이며 Scene의 graph pass 소비·실제 자동 route, 고급 lookup/transport와
+제품 host/compiler를 소유하는 자동 쿠킹은 남는다. 완료 공수는 늘리지 않는다.
+[MaterialGraphSurfaceBatch.md](../design/MaterialGraphSurfaceBatch.md)의 공간·시선 GPU 평가에서
+graph texture/typed input을 GPU point buffer로 낮춰 물리 bake와 bounded draw에 연결했다.
+잘못된 지점 진단과 완료 readback acceptance를 분리한다. 실제 mesh/skin sampling·lookup
+보간/예산·async Scene 게시는 아직 설치하지 않았다.
+[MaterialGraphSceneHost.md](../design/MaterialGraphSceneHost.md)에 실제 Scene GBuffer·공유 깊이·
+가림·Core/Layered 컬러 합성의 bounded host를 연결했다. 현재 4,096픽셀·64 draw 이하의
+정확도 기준용 적분 경로이며 full-resolution 제품 lookup·실시간 비용 수용은 남는다.
+Debug/Release 각 830,436개 검사·GPU 659,914성분, 실제 합성 graph 24개·가시 3,582픽셀·
+실패 거부 120개·GPU validation 0건을 확인했다. 실제 Editor Live Tick·Vulkan native
+실행과 Scene host의 자동 쿠킹은 별도이며 MAT-7의 진행 상태와 완료 공수는 유지한다.
+MAT-7 진행 중 판정과 완료 공수는 유지한다.
 
 ---
 

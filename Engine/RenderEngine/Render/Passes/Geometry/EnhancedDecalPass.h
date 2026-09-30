@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstdint>
 #include <vector>
 #include <wrl/client.h>
@@ -103,6 +104,12 @@ public:
 
     /// 이번 프레임에 그릴 데칼. PrepareFrame이 텍스처를 올리고 배치를 짠다.
     void SetDecals(const std::vector<Item>& decals) { m_decals = decals; }
+
+    bool HasPreparedDecals() const { return !m_batches.empty(); }
+    std::array<RGHandle, 3> GetBaseline() const
+    {
+        return { m_copiedDiffuse, m_copiedOrm, m_copiedNormal };
+    }
 
     /// 이 패스를 컬링 뿌리로 표시할지. 소비자(Deferred)가 붙기 전에는 켜 둔다.
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }

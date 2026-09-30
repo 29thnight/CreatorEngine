@@ -661,13 +661,16 @@ namespace
         const std::vector<SourceUnit>& units, std::string_view compilerIdentity)
     {
         Hash128 hash;
-        hash.Add("CreatorEngine.RHIShaderCompiler.v11.Slang.O3.column-major.dx-layout.permutation-key");
+        hash.Add("CreatorEngine.RHIShaderCompiler.v12.Slang.O3.column-major.dx-layout.include-paths.permutation-key");
         hash.Add(compilerIdentity);
         hash.Add(request.name);
         hash.Add(request.entryPoint);
         hash.Add(request.targetProfile);
         hash.Add(&request.output, sizeof(request.output));
-        hash.Add(&request.options, sizeof(request.options));
+        hash.Add(&request.options.strictMath, sizeof(request.options.strictMath));
+        hash.Add(&request.options.fineDerivatives, sizeof(request.options.fineDerivatives));
+        for (const auto& directory : request.options.includeDirectories)
+            hash.Add(PathUtf8(directory));
         for (const SourceUnit& unit : units)
         {
             hash.Add(NarrowUtf8(unit.path.generic_wstring()));
@@ -1016,10 +1019,20 @@ namespace
             return Process(request, nullptr, &outReflection, outError);
         }
 
+        bool Verify(const RHIShaderCompileRequest& request,
+            RHIShaderCompiler::VerifiedShader& outShader, std::string& outError)
+        {
+            RHIShaderCompiler::VerifiedShader candidate;
+            if (!Process(request, &candidate.bytecode, &candidate.reflection, outError, &candidate.dependencyIdentity))
+                return false;
+            outShader = std::move(candidate);
+            return true;
+        }
+
     private:
         bool Process(const RHIShaderCompileRequest& request,
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection,
-            std::string& outError)
+            std::string& outError, std::string* outIdentity = nullptr)
         {
             if (!EnsureSlang(outError)) return false;
 
@@ -1042,6 +1055,11 @@ namespace
             addArgument(RHIShaderBinary::Dxil == request.output ? "dxil" : "spirv");
             addArgument("-profile");
             addArgument(RHIShaderBinary::Dxil == request.output ? "sm_6_0" : "spirv_1_3");
+            if (request.output == RHIShaderBinary::SpirV && request.options.fineDerivatives)
+            {
+                addArgument("-capability");
+                addArgument("spvDerivativeControl");
+            }
             // 소스 언어는 확장자가 정한다. Slang은 HLSL의 상위집합이라 둘을
             // 한 세션 설정으로 묶고 싶어지지만, front-end 규칙이 갈린다 —
             // .slang은 `import`·`[shader(...)]`·모듈 가시성을 알고 .hlsl은
@@ -1055,6 +1073,11 @@ namespace
             addArgument("all");
             addArgument("-I");
             addArgument(PathUtf8(sourcePath.parent_path()));
+            for (const auto& directory : request.options.includeDirectories)
+            {
+                addArgument("-I");
+                addArgument(PathUtf8(directory));
+            }
             if (request.options.strictMath)
             {
                 addArgument("-fp-mode");
@@ -1216,7 +1239,8 @@ namespace
                     ++g_failures;
                     return false;
                 }
-                return true;
+                if (nullptr == outBlob)
+                    return true;
             }
 
             diagnostics.setNull();
@@ -1244,11 +1268,13 @@ namespace
                 g_memoryCache.emplace(cacheKey, std::move(bytes));
             }
             WriteCache(cacheKey, *outBlob);
+            if (nullptr != outIdentity)
+                *outIdentity = cacheKey;
             return true;
         }
     };
 
-    IRHIShaderCompiler& Compiler()
+    SlangShaderCompiler& Compiler()
     {
         static SlangShaderCompiler compiler;
         return compiler;
@@ -1296,6 +1322,14 @@ bool RHIShaderCompiler::ReflectFile(std::string_view name,
         name, entryPoint, targetProfile, output, &permutation, options
     };
     return Compiler().Reflect(request, outReflection, outError);
+}
+
+bool RHIShaderCompiler::VerifyFile(std::string_view name, std::string_view entryPoint, std::string_view targetProfile,
+    RHIShaderBinary output, const RHIShaderPermutation& permutation, VerifiedShader& outShader,
+    std::string& outError, RHIShaderCompileOptions options)
+{
+    const RHIShaderCompileRequest request{name, entryPoint, targetProfile, output, &permutation, std::move(options)};
+    return Compiler().Verify(request, outShader, outError);
 }
 
 RHIShaderCompiler::Stats RHIShaderCompiler::GetStats()

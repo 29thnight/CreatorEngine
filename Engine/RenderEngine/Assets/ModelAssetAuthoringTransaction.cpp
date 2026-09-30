@@ -1,6 +1,7 @@
 #include "ModelAssetAuthoringTransaction.h"
 
 #include "ModelSidecarV2.h"
+#include "ModelMaterialGraph.h"
 #include "../Experiment/Cooked/CookSupport.h"
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/Cooked/TextureCookProducer.h"
@@ -1057,6 +1058,12 @@ namespace assets
         }
 
         Mbc3Cleanup cleanup;
+        ModelMaterialGraphPublication materialGraphs;
+        if (!materialGraphs.Prepare(assetRoot, sidecar.assetId, draft.materials, failure))
+        {
+            Mbc3AddIssue(result, "material.graph", std::move(failure));
+            return result;
+        }
         cleanup.stage = Mbc3TemporarySibling(finalGeneration, "staging");
         cleanup.sidecarTemporary = Mbc3TemporarySibling(
             sidecarPath, "model-authoring");
@@ -1229,6 +1236,18 @@ namespace assets
             std::filesystem::remove_all(finalGeneration, error);
             return result;
         }
+        if (!materialGraphs.Publish(failure))
+        {
+            std::filesystem::remove_all(finalGeneration, error);
+            Mbc3AddIssue(result, "material.graph.publish", std::move(failure));
+            return result;
+        }
+        if (Mbc3Inject(request, ModelAuthoringFailurePoint::AfterMaterialGraphPublish,
+            result, "inject.after-material-graph-publish"))
+        {
+            std::filesystem::remove_all(finalGeneration, error);
+            return result;
+        }
         if (!Mbc3ReplaceFile(cleanup.sidecarTemporary, sidecarPath))
         {
             const DWORD replaceError = ::GetLastError();
@@ -1240,6 +1259,7 @@ namespace assets
         }
         cleanup.sidecarTemporary.clear();
         cleanup.Release();
+        materialGraphs.Commit();
 
         markPhase("publish");
         result.modelAssetId = sidecar.assetId;

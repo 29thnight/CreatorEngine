@@ -165,8 +165,12 @@ namespace ModelSceneInstantiation
                 return reject();
             DataSystems->FinalizeMaterialRuntime(*material);
             DataSystems->BindModelGenerationTextures(*material, *impl->generation);
+            if (!DataSystems->ConfigureModelMaterialGraph(*material, *impl->generation, materials[index], error))
+            {
+                Debug::PrintLog(spdlog::level::err, "Model material graph could not be prepared: " + error);
+                return reject();
+            }
             impl->materials[index] = std::move(material);
-            if (!materials[index].shaderAssetId.IsNil()) impl->authored[index] = std::move(converted);
         }
         impl->handles.resize(impl->objects.size());
         return std::unique_ptr<PendingInstance>(new PendingInstance(std::move(impl)));

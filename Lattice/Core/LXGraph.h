@@ -31,7 +31,9 @@ enum class PinType : std::uint8_t
     Color,
     Normal,
     Texture,
-    Surface
+    Surface,
+    Sampler,
+    Closure
 };
 
 using LXSocketValue =
@@ -161,6 +163,12 @@ struct GraphFragment
     std::map<Id, LXGroupDefinition> groups;
 };
 
+struct LXGroupCollapseMapping
+{
+    std::map<Id, Id> nodes;
+    std::map<Id, Id> pins;
+};
+
 struct Issue
 {
     enum class Severity : std::uint8_t
@@ -173,6 +181,7 @@ struct Issue
     Id node = 0;
     Id pin = 0;
     Severity severity = Severity::Error;
+    Id scope = 0;
 };
 
 struct NodeSpec
@@ -212,7 +221,8 @@ class LXGraph
     Id AddConnectedNode(const NodeSpec& spec, float x, float y, Id existingPin, std::size_t specPinIndex);
     Id CreateGroup(std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets);
     Id CreateGroupInstance(Id group, float x, float y);
-    Id CollapseToGroup(const std::vector<Id>& nodes, std::string name, Id idFloor = 0);
+    Id CollapseToGroup(const std::vector<Id>& nodes, std::string name, Id idFloor = 0,
+                       LXGroupCollapseMapping* mapping = nullptr);
     bool ReplaceGroupBody(Id group, const LXGraph& body);
     bool UpdateGroup(Id group, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets);
     bool RemoveNode(Id id);
@@ -248,6 +258,8 @@ class LXGraph
     bool Equals(const LXGraph& other) const;
 
   private:
+    friend class LXMaterialArchive;
+
     struct Snapshot
     {
         std::vector<Node> nodes;

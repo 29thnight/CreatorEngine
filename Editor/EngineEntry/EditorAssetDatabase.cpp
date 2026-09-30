@@ -1,4 +1,5 @@
 #include "EditorAssetDatabase.h"
+#include "Assets/ModelMaterialGraph.h"
 
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Assets/AudioClipSourceMetadata.h"
@@ -13,7 +14,7 @@
 #include "ReflectionYml.h"
 #include "RuntimeSettings.h"
 #include "StringHelper.h"
-#include "VolumeProfile.h"
+#include "SceneRenderProfile.h"
 
 #include <efsw/efsw.hpp>
 #include <DirectXTex.h>
@@ -637,7 +638,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		load.generationRoot = m_root.parent_path() / "Library/ModelAssetGenerations";
 		load.canonicalSidecarPath = meta;
 		load.expectedModelId = expectedId.m_guid;
-		if (assets::LoadModelAssetGeneration(load).Succeeded()) return true;
+        const auto current = assets::LoadModelAssetGeneration(load);
+        if (current.Succeeded() && assets::ModelMaterialGraphsPresent(m_root, *current.generation)) return true;
 
 		const auto inputs = std::array{ ReadModelSourceStamp(source),
 			ReadModelSourceStamp(meta), ReadModelSourceStamp(headerPath) };
@@ -1458,8 +1460,17 @@ private:
 			lower.find("~$") != std::string::npos;
 	}
 
-	bool IsTargetFile(const file::path& path) const
+    bool IsCookedArtifactPath(const file::path& path) const
+    {
+        const auto relative = path.lexically_normal().lexically_relative(m_root.lexically_normal());
+        return !relative.empty() && ToLower(relative.begin()->string()) == "derived";
+    }
+    bool IsTargetFile(const file::path& path) const
 	{
+        if (IsCookedArtifactPath(path))
+        {
+            return false;
+        }
 		const std::string filename = path.filename().string();
 		if (filename.find('~') != std::string::npos || ContainsTemporaryPath(path))
 			return false;
@@ -1509,6 +1520,10 @@ private:
 		for (const auto& entry : file::recursive_directory_iterator(
 			m_root, file::directory_options::skip_permission_denied))
 		{
+            if (IsCookedArtifactPath(entry.path()))
+            {
+                continue;
+            }
 			if (!entry.is_regular_file() || entry.path().extension() != ".meta")
 				continue;
 
@@ -1764,6 +1779,10 @@ private:
 
 	void HandleCreated(const file::path& filepath)
 	{
+        if (IsCookedArtifactPath(filepath))
+        {
+            return;
+        }
 		if (filepath.extension() == ".meta")
 		{
 			RegisterMetaFile(filepath);
@@ -1778,6 +1797,10 @@ private:
 	{
 		const file::path oldPath = directory / std::u8string(oldName.begin(), oldName.end());
 		const file::path newPath = directory / std::u8string(newName.begin(), newName.end());
+        if (IsCookedArtifactPath(oldPath) || IsCookedArtifactPath(newPath))
+        {
+            return;
+        }
 		if (newPath.extension() == ".meta")
 		{
 			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
@@ -1828,6 +1851,10 @@ private:
 
 	void HandleDeleted(const file::path& deletedPath)
 	{
+        if (IsCookedArtifactPath(deletedPath))
+        {
+            return;
+        }
 		if (deletedPath.extension() == ".meta")
 		{
 			// sidecar만 사라졌다면 본문의 identity를 버릴 이유가 없다. 다음
@@ -1885,6 +1912,10 @@ private:
 
 	void HandleModified(const file::path& filepath)
 	{
+        if (IsCookedArtifactPath(filepath))
+        {
+            return;
+        }
 		if (assets::IsModelAuthoringSource(filepath))
 		{
 			ReloadChangedModel(filepath);
@@ -1918,7 +1949,7 @@ private:
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
 		".hlsl", ".slang", ".shadermeta", ".shader", ".cpp", ".cs",
 		".wav", ".mp3", ".flac", ".spritefont",
-		".terrain", ".bt", ".blackboard", ".prefab", ".volume",
+		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
 		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity
 		//   자체가 없었다** — 지금은 경로로만 참조된다. D5-c 의 "Player 가
@@ -2119,7 +2150,7 @@ bool EditorAssetDatabase::SaveMaterial(Material* material)
 
 namespace
 {
-    /// 새 자산 이름 하나를 검사한다. 폴더와 Volume Profile 이 같은 규칙을 쓴다.
+    /// 새 자산 이름 하나를 검사한다. 폴더와 Scene Render Profile 이 같은 규칙을 쓴다.
     bool asset_database_valid_new_name(std::string_view name)
     {
         return !name.empty() && name != "." && name != ".."
@@ -2169,25 +2200,25 @@ bool EditorAssetDatabase::CreateFolder(const file::path& parent, std::string_vie
     return true;
 }
 
-// PHASE 21 W2-B — 예전에는 OS 저장 대화상자를 `VolumeProfilePath()` 에 열어 두고
+// PHASE 21 W2-B — 예전에는 OS 저장 대화상자를 `SceneRenderProfilePath()` 에 열어 두고
 // 거기서 고른 **이름만** 가져와 `directory` 에 썼다(다른 폴더를 골라도 무시). 같은
 // 이름이 있으면 말없이 숫자를 붙였고, 취소·쓰기 실패·메타 실패가 전부 같은 `false`
 // 였는데 호출자 둘 다 반환값을 버렸다. 이제 대상 폴더는 호출자가 정하고, 이름은
 // 폴더 만들기와 같은 규칙으로 검사하며, 실패마다 이유를 돌려준다.
-bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory, std::string_view name,
+bool EditorAssetDatabase::CreateSceneRenderProfile(const file::path& directory, std::string_view name,
 	file::path& createdPath, std::string& error)
 {
 	createdPath.clear();
 	error.clear();
 	if (!m_impl || !asset_database_valid_new_name(name))
 	{
-		error = "Enter a valid volume profile name.";
+		error = "Enter a valid scene render profile name.";
 		return false;
 	}
 	file::path target;
 	if (!asset_database_target_inside_assets(directory, target, error)) return false;
 	std::string fileName(name);
-	fileName += ".volume";
+	fileName += ".renderprofile";
 	const file::path candidate = target / file::u8path(fileName);
 	file::path metaPath = candidate;
 	metaPath += ".meta";
@@ -2198,7 +2229,7 @@ bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory, std::
 		return false;
 	}
 
-	VolumeProfile profile;
+	SceneRenderProfile profile;
 	profile.settings = RuntimeSettings::Get().GetRenderPassSettings();
 	bool written = false;
 	{
@@ -2214,30 +2245,30 @@ bool EditorAssetDatabase::CreateVolumeProfile(const file::path& directory, std::
 	if (!written)
 	{
 		file::remove(candidate, ec);
-		error = "Could not write the volume profile file.";
+		error = "Could not write the scene render profile file.";
 		return false;
 	}
 	if (CreateMeta(candidate) == FileGuid{})
 	{
-		// 반쯤 만든 자산을 남기지 않는다 — 메타 없는 .volume 은 참조할 수 없다.
+		// 반쯤 만든 자산을 남기지 않는다 — 메타 없는 .renderprofile 은 참조할 수 없다.
 		file::remove(candidate, ec);
 		file::remove(metaPath, ec);
-		error = "Could not create the .meta file for the volume profile.";
+		error = "Could not create the .meta file for the scene render profile.";
 		return false;
 	}
 	createdPath = candidate;
 	return true;
 }
 
-bool EditorAssetDatabase::SaveExistingVolumeProfile(
-	FileGuid guid, VolumeProfile* volume)
+bool EditorAssetDatabase::SaveExistingSceneRenderProfile(
+	FileGuid guid, SceneRenderProfile* volume)
 {
 	if (!m_impl || !volume) return false;
 	const file::path savePath = DataSystems->GetFilePath(guid);
 	if (savePath.empty())
 	{
 		Debug::PrintLog(spdlog::level::err,
-			"EditorAssetDatabase::SaveExistingVolumeProfile: path is empty");
+			"EditorAssetDatabase::SaveExistingSceneRenderProfile: path is empty");
 		return false;
 	}
 

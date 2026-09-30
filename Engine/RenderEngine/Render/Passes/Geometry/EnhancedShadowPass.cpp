@@ -349,6 +349,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     for (std::size_t i = 0; i < context.draws->size(); ++i)
     {
         const auto& draw = (*context.draws)[i];
+        if (draw.materialGraphInstance)
+        {
+            continue;
+        }
         const auto& coverage = draw.materialSnapshot ? draw.materialSnapshot->coverage : draw.coverage;
         if (!coverage.IsValid()) { outError = "Invalid shadow coverage"; return false; }
         if (!(coverage.flags & EnhancedMaterialCoverage::Masked)) continue;
@@ -374,6 +378,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // 올리지 않는다는 것이 캐시의 요점이다.
     for (const auto& draw : *context.draws)
     {
+        if (draw.materialGraphInstance)
+        {
+            continue;
+        }
         if (0 == enhanced_draw::GeometryKey(draw)) continue;
         if (m_drawGeometry.find(enhanced_draw::GeometryKey(draw)) != m_drawGeometry.end())
             continue;
@@ -401,6 +409,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // Product views share one upload; isolated fixtures retain a local one.
     for (const auto& draw : *context.draws)
     {
+        if (draw.materialGraphInstance)
+        {
+            continue;
+        }
         if (0 == enhanced_draw::GeometryKey(draw)) continue;
         if (nullptr == draw.bonePalette || 0 == draw.boneCount) continue;
         if (m_boneOffsets.find(draw.animatorKey) != m_boneOffsets.end()) continue;
@@ -434,6 +446,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     for (size_t index = 0; index < context.draws->size(); ++index)
     {
         const auto& draw = (*context.draws)[index];
+        if (draw.materialGraphInstance)
+        {
+            continue;
+        }
         const auto& coverage = draw.materialSnapshot ? draw.materialSnapshot->coverage : draw.coverage;
         if (0 != enhanced_draw::GeometryKey(draw) && !(coverage.flags & EnhancedMaterialCoverage::Blended))
             m_sortedDraws.push_back(index);

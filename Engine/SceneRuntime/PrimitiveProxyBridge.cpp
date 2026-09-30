@@ -10,6 +10,7 @@
 #include "MeshRenderer.h"
 #include "Mesh.h"
 #include "Material.h"
+#include "MaterialGraphSceneInput.h"
 #include "Experiment/MaterialInstance.h" // I5-D5c2-2: 저작 정본 스냅샷
 #include "DataSystem.h"
 #include "FoliageComponent.h"
@@ -67,6 +68,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
     if (nullptr != m_Material)
     {
         m_materialGuid = m_Material->m_materialGuid;
+        m_graphMaterialSource = material_graph::SceneMaterialSource::Capture(*m_Material);
     }
 
     // I5-D5c2-2 — 재질 저작 정본을 값으로 스냅샷한다(base+override 합성).
@@ -158,6 +160,11 @@ FoliageRenderProxy::FoliageRenderProxy(FoliageComponent* component) :
 	m_foliageInstances(component->GetFoliageInstances()),
 	m_foliageTypes(component->GetFoliageTypes())
 {
+    for (auto& type : m_foliageTypes)
+    {
+        type.m_graphMaterialSource = type.m_material
+            ? material_graph::SceneMaterialSource::Capture(*type.m_material) : nullptr;
+    }
     CopyWorldTransform(*this, component->GetOwner());
 
     if (nullptr != component->GetOwner())

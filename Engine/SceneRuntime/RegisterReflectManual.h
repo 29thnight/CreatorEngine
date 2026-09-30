@@ -33,7 +33,7 @@
 #include "FoliageInstance.h"
 #include "SoundComponent.h"
 #include "Scene.h"
-#include "VolumeProfile.h"
+#include "SceneRenderProfile.h"
 #include "FoliageType.h"
 #include "Navigation.h"
 #include "RenderPassSettings.h"
@@ -81,7 +81,7 @@
 #include "TransCondition.h"
 #include "Transform.h"
 #include "UIButton.h"
-#include "VolumeComponent.h"
+#include "SceneRenderProfileComponent.h"
 
 #define REFLECT_TYPE_LIST(X) \
     X(MeshRenderer) \
@@ -156,8 +156,8 @@
     X(Transform) \
     X(UIButton) \
     X(VignettePassSetting) \
-    X(VolumeComponent) \
-    X(VolumeProfile) \
+    X(SceneRenderProfileComponent) \
+    X(SceneRenderProfile) \
     X(VolumetricFogPassSetting) \
 
 inline void RegisterReflectManual()

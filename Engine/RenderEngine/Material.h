@@ -8,6 +8,7 @@
 #include "EngineResourceCensus.h"
 #include "MaterialPropertyValue.h"
 #include "ShaderMetaHandle.h"
+#include "MaterialGraphRuntime.h"
 #include "Texture.h"
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector2.hpp>
@@ -70,7 +71,17 @@ public:
 	Material(Material&& material) noexcept;
 	~Material();
 
-	bool operator==(const Material& other) const
+    // Snapshot owns the graph program, packed instance values and CPU texture
+    // generations. Render-thread resource registration is a separate step.
+    const std::shared_ptr<const material_graph::Instance>& GetMaterialGraphInstance() const
+    {
+        return m_materialGraphInstance;
+    }
+    bool HasMaterialGraph() const { return !!m_materialGraphInstance; }
+    bool TrySetMaterialGraphParameter(LX::Id parameter, LX::LXSocketValue value, std::string& error);
+    bool TrySetMaterialGraphParameters(std::span<const material_graph::ParameterOverride> values, std::string& error);
+
+    bool operator==(const Material& other) const
 	{
 		return m_materialGuid == other.m_materialGuid;
 	}
@@ -214,5 +225,5 @@ private:
 	// runtime-only. GUID는 디스크 정본이고 이 값은 적용한 cache generation이다.
 	ShaderMetaHandle m_shaderMetaHandle{};
 	std::vector<MaterialTextureOwner> m_textureOwners{};
+    std::shared_ptr<const material_graph::Instance> m_materialGraphInstance;
 };
-

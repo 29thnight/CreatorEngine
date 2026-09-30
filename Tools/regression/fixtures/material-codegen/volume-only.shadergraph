@@ -1,0 +1,40 @@
+{
+  "kind":"LatticeMaterial",
+  "schemaVersion":1,
+  "domain":"material",
+  "graphId":1,
+  "activeOutput":34,
+  "blackboard":[
+  ],
+  "graph":{
+    "domain":"material","nextId":53,
+    "nodes":[
+      {"id":34,"definition":"ShaderNodeOutputMaterial","schemaRevision":1,"title":"Material Output","groupId":0,"sockets":[
+        {"id":35,"identifier":"Surface","name":"Surface","direction":"input","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":36,"identifier":"Volume","name":"Volume","direction":"input","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":37,"identifier":"Displacement","name":"Displacement","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":38,"identifier":"Thickness","name":"Thickness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"}],"properties":{ "target":"ALL"},"dynamicRule":null},
+      {"id":40,"definition":"LXPrincipledVolume","schemaRevision":1,"title":"Homogeneous Principled Volume","groupId":0,"sockets":[
+        {"id":41,"identifier":"Color","name":"Color","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[0.5,0.5,0.5,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":42,"identifier":"Density","name":"Density","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":2},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":43,"identifier":"Anisotropy","name":"Anisotropy","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":-0.40000000000000002},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":44,"identifier":"Absorption Color","name":"Absorption Color","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[0.25,0,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":45,"identifier":"Emission Strength","name":"Emission Strength","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":3},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":46,"identifier":"Emission Color","name":"Emission Color","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[2,0,0.5,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":47,"identifier":"Volume","name":"Volume","direction":"output","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null},
+      {"id":48,"definition":"LXRerouteClosure","schemaRevision":1,"title":"Reroute","groupId":0,"sockets":[
+        {"id":49,"identifier":"Input","name":"Input","direction":"input","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":50,"identifier":"Output","name":"Output","direction":"output","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null}
+    ],
+    "links":[
+      {"id":51,"output":47,"input":49},
+      {"id":52,"output":50,"input":36}
+    ],
+    "groups":[
+    ],
+    "layout":{"nodes":[
+      {"id":34,"x":600,"y":0,"collapsed":false,"frame":0},
+      {"id":40,"x":0,"y":0,"collapsed":false,"frame":0},
+      {"id":48,"x":0,"y":0,"collapsed":false,"frame":0}],"frames":[],"view":{"saved":false,"centerX":0,"centerY":0,"zoom":1}}
+  }
+}

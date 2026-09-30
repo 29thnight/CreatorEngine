@@ -20,7 +20,7 @@ LX-0의 Blender 5.1.1 노드/소켓 기준선과 Material 목표 schema·대표 
 [Tools/LatticeExample/README.md](../../Tools/LatticeExample/README.md)에 기록한다.
 LX-1의 정의 레지스트리·도메인 검증, 표시 이름과 다른 안정 소켓 식별자,
 타입별 소켓 값, 노드의 위치·접힘·Frame 소속·화면 중심·확대율을 분리한
-`LXLayout`의 저장 왕복은 독립 예제에서 검증했다. `.lxg` 8은 예제 형식이며
+`LXLayout`의 저장 왕복은 독립 예제에서 검증했다. `.lxg` 9는 예제 형식이며
 제품 `.shadergraph` schema가 아니다.
 ImGui 비의존 `LXDocument`의 revision 검사·명령·dirty·Undo/Redo·Save도
 독립 검사에 넣고, Material 예제 UI의 그래프 조작을 이 명령에 연결했다.
@@ -65,7 +65,87 @@ DX11 캡처를 통과했다. 변경된 스타일의 보이는 창에서도 노�
 이로써 `LX-2`의 **독립 예제 게이트는 통과**했다. 제품 연결 게이트는
 끝나지 않았고, `LX-3` Editor 연결은 시작하지 않았다.
 
+2026-09-28 MAT-2: `Lattice/Material`의 `.shadergraph` 문서·Blackboard·소켓 색 공간/
+표시 상태·공유/중첩 그룹·typed IR과 마지막 정상 IR 유지가 독립 예제 Debug/Release
+95개 신규 검사 및 LX 전체 검사를 통과했다. 초기 Blender 6개 정의의 소켓 기준과
+Material 전체 transaction/Undo/Redo를 포함한다. [MaterialGraphSchema.md](../design/MaterialGraphSchema.md)가
+이 계약을 소유한다. LX-3는 기존 Canvas/명령을 이 문서에 연결하고 제품 경로를 검증해야 하며
+LX-3H 실시간 HTTP, MAT-6 Slang·MAT-7 GPU/asset generation은 아직 남는다.
+
+2026-09-28 MAT-3: 공용 core Principled 의미·직접광·IOR-aware IBL 응답을 독립 GPU에서
+8,280개 수치 검사로 검증했다. [PrincipledCoreSemantics.md](../design/PrincipledCoreSemantics.md)를 따른다.
+
+2026-09-28 MAT-4: 공용 Layered coat/sheen/anisotropy/thin film을 GPU 216,776개 수치·독립성
+검사와 energy bound/numeric golden으로 검증했다. [PrincipledLayeredSemantics.md](../design/PrincipledLayeredSemantics.md)를 따른다.
+이 결과는 LX-3 Editor 연결이나 MAT-6/MAT-7 graph→제품 lookup/route의 완료로 세지 않는다.
+이 결과는 LX Editor Canvas 이관, Slang codegen이나 제품 lookup/packing 완료를 뜻하지 않는다.
+
+2026-09-28 MAT-7: RenderEngine에 Lattice Material 소스를 연결하고 reflection/binding,
+후보 PSO·texture owner 수명, typed cooked generation·AssetCooker·loose/encrypted PAK의
+독립 검증을 진행했다. [MaterialGraphProduct.md](../design/MaterialGraphProduct.md)를 따른다.
+DataSystem/Material GUID generation·typed instance 저장 왕복/실패 복구를 연결했다.
+독립 runtime 43개 및 실제 DataSystem 직접 호출 Debug/Release 각 26개를 검사했다.
+제품 b2·texture·독립 sampler render binding adapter를 실제 엔진 DX12 오프스크린
+draw로 검증했다(Debug/Release 각 168개 검사·64개 GPU 성분). Scene/Editor 소비 증거는 아니다.
+Core/Layered evaluated-point IBL bake→lookup 소비 draw도 실제 엔진 RHI로 검사했다
+(Debug/Release 각 19,351개 검사·18,240개 GPU 성분). Scene lookup 배치/보간/재사용과
+환경 MIS/수렴·실시간 예산은 남는다. [PrincipledIblBake.md](../design/PrincipledIblBake.md)를 따른다.
+[MaterialGraphScenePacket.md](../design/MaterialGraphScenePacket.md)의 material render owner는
+graph instance·coverage/queue·PSO·IBL·binding을 함께 보존하고 제출 성공 확인 뒤 게시한다.
+실제 두 in-flight GPU 제출에서 교체·실패·abort·완료 해제를 검사했다. Scene pass 설치는 후속이다.
+Scene의 graph pass 소비·자동 route와 고급 transport는 남으며 LX-3 Editor
+Canvas/HTTP 이관 완료로 세지 않는다.
+[MaterialGraphSurfaceBatch.md](../design/MaterialGraphSurfaceBatch.md)의 공간·시선 graph CS는
+UV/LOD·world frame·eye·typed input을 evaluated GPU point buffer로 만들어 IBL bake/draw에
+전달한다. 잘못된 지점 진단과 완료 readback acceptance를 검사하는 제품 RHI 기반 경로다.
+[MaterialGraphMeshSurface.md](../design/MaterialGraphMeshSurface.md)의 제품 정점 형식·pose 복사와
+GPU skin/world 입력 생성, GPU Scene packet의 완료 검증 후 게시도 연결했다.
+큰 메시의 triangle 분할·원본 remap/예산 거부, UV/world frame 보간 후 재질·IBL 평가와
+명시적 footprint LOD도 추가했다. 실제 Scene visible sample/texture별 footprint,
+lookup 해상도/재사용/오차/실시간 예산·RenderGraph/async polling, LX Editor 편집 설치는 남는다.
+
+[MaterialGraphRasterSurface.md](../design/MaterialGraphRasterSurface.md)의 독립 RHI graph는
+depth/MRT의 가시 픽셀·원근 UV/frame·fine derivative를 graph/IBL 평가에 전달한다.
+동일 graph의 평가·IBL 준비/선언/병렬 기록은 [MaterialGraphPassRecording.md](../design/MaterialGraphPassRecording.md)에 구현했다. 단일 재질 chunk 묶음·4096픽셀 범위이며 제품 Scene의 공유 depth·조명/컬러·
+async 게시와 texture별 footprint, LX Editor 편집의 완료를 의미하지 않는다.
+
+[MaterialGraphSharedDepth.md](../design/MaterialGraphSharedDepth.md)에 current mesh/skin 생산과
+Core/Layered의 read-only depth·coplanar winner 공유를 같은 graph에 확장했다. 독립 RHI 범위이며
+실제 Scene GPU host·legacy/Masked depth·조명/컬러와 LX Editor 연결은 계속 남는다.
+
+[MaterialGraphSceneInput.md](../design/MaterialGraphSceneInput.md)에 producer의 Mesh/Foliage proxy/delta와
+실제 draw pool/per-view CPU 입력 밀봉을 연결했다. 같은 typed instance·복사한 geometry/pose·camera
+입력을 native shared-depth graph에 공급한다. 실제 Scene GBuffer composition host는 아직 거부하며
+이 입력 경계 설치를 Scene 렌더 활성화나 LX Editor 창 이관 완료로 세지 않는다.
+
 ## 머테리얼 우선 순서
+
+### 2026-09-29 Editor Material 창 연결
+
+[MaterialNodeEditor.md](../design/MaterialNodeEditor.md)에 현재 구현과 검증 경계를 기록한다.
+MeshRenderer의 재질 이름/More 메뉴가 등록된 Material Node Editor를 열며,
+Blender형 단일 상단바·캔버스 위 breadcrumb·Principled/Output 캔버스를 제공한다.
+왼쪽 context/메뉴·중앙 slot/material/문서 작업 아이콘·오른쪽 overlay 순서이며
+헤더와 캔버스는 외부 LX 스타일의 배경색을 공유한다. 작은 꺾쇠와 아이콘 묶음을
+사용하며 오른쪽 스냅 버튼은 다중 선택의 상대 위치를 보존하는 격자 스냅을 제어한다.
+상단 아이콘과 breadcrumb는 공통 Material Symbols 폰트로 통일한다.
+Material 기본 격자는 점으로 표시한다. 점 패턴·크기는 LXS 6 외부 스타일에 저장하고
+이전 스타일 파일도 계속 읽는다.
+typed 값·enum·texture preview와 고급 section을 실제 Material definitions에서 등록하고
+핀/항목/높이를 같은 row 목록으로 계산한다. 엔진 사용자 배율과 monitor DPI의 곱을 사용한다.
+
+저작 저장은 metadata를 보존한 `.shadergraph`, 적용은 검증된 authoring Slang/Scene
+generation, MeshRenderer 바인딩 영속화는 Scene 저장으로 나눈다. 실패 시 기존 정상
+generation을 유지한다. 재시작한 Editor는 새 graph source를 authoring compile로 읽으며
+Player는 기존 cooked bytecode 경계를 유지한다. 외부 창 스타일은
+`RuntimeDataRoot/Editor/Styles/Material.lxstyle`에서 Export/Reload한다.
+
+`material.editor` HTTP는 UI와 동일한 열린 LXDocument를 조작하며 문서 ID/revision
+두 값을 요구한다. typed 연결/해제·값·property·Undo/Redo·저장/Apply를 제공한다.
+전용 gate는 실제 ImGui frame·정확한 파일 bytes 왕복·충돌 무변경·compile 실패 보존·
+GBuffer 변화·새 Editor 재개방을 검사한다. 제품의 모든 마우스 제스처와 Vulkan Editor UI,
+group/Blackboard 전용 저작 패널까지 닫은 증거는 아니므로 LX-3/LX-3H는 진행 중이다.
+MAT-7 종료와 MAT-8/MAT-9의 남은 범위는 변경하지 않는다.
 
 | 순서 | 닫을 범위 | 선행 | 완료 증거 |
 |---|---|---|---|

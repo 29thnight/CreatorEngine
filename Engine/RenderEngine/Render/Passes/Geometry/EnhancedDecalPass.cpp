@@ -43,7 +43,8 @@ namespace
         math::matrix4x4 inverseProjection{};
         math::matrix4x4 viewProjection{};
         float         screenDimensions[2]{};
-        float         padding[2]{};
+        uint32_t      hasOwners{};
+        float         padding{};
     };
 
     static_assert(sizeof(DecalFrameConstants) == 208);
@@ -107,6 +108,7 @@ bool EnhancedDecalPass::CreatePipelines(const EnhancedFrameContext& context, std
         RHILayout::Srv(7, RHIShaderVisibility::All),
         RHILayout::SrvTable(4, 0, RHIShaderVisibility::Pixel),   // G버퍼
         RHILayout::SrvTable(3, 4, RHIShaderVisibility::Pixel),   // 데칼 텍스처
+        RHILayout::SrvTable(1, 8, RHIShaderVisibility::Pixel),   // LX/legacy channel ABI
     };
 
     const RHIStaticSamplerDesc samplers[] = {
@@ -335,16 +337,20 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
         });
 
     // ── 덧칠 ──
-    graph.AddPass("Decal.Apply",
-        {
-            { m_copiedDiffuse,     RHIResourceState::ShaderResource },
-            { m_copiedNormal,      RHIResourceState::ShaderResource },
-            { m_copiedOrm,         RHIResourceState::ShaderResource },
-            { m_inputs.depth,      RHIResourceState::DepthReadShaderResource },
-            { m_inputs.diffuse,    RHIResourceState::RenderTarget },
-            { m_inputs.normal,     RHIResourceState::RenderTarget },
-            { m_inputs.metalRough, RHIResourceState::RenderTarget },
-        },
+    std::vector<EnhancedRenderGraph::RGPassUsage> applyUses{
+        { m_copiedDiffuse,     RHIResourceState::ShaderResource },
+        { m_copiedNormal,      RHIResourceState::ShaderResource },
+        { m_copiedOrm,         RHIResourceState::ShaderResource },
+        { m_inputs.depth,      RHIResourceState::DepthReadShaderResource },
+        { m_inputs.diffuse,    RHIResourceState::RenderTarget },
+        { m_inputs.normal,     RHIResourceState::RenderTarget },
+        { m_inputs.metalRough, RHIResourceState::RenderTarget },
+    };
+    if (m_inputs.bitmask.IsValid())
+    {
+        applyUses.push_back({ m_inputs.bitmask, RHIResourceState::PixelShaderResource });
+    }
+    graph.AddPass("Decal.Apply", applyUses,
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
@@ -375,6 +381,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             constants.viewProjection = math::transpose(m_viewProjection);
             constants.screenDimensions[0] = static_cast<float>(m_width);
             constants.screenDimensions[1] = static_cast<float>(m_height);
+            constants.hasOwners = m_inputs.bitmask.IsValid();
 
             const auto frameCb = context.resources->UploadConstants(
                 &constants, sizeof(DecalFrameConstants));
@@ -396,6 +403,11 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             };
             const RHIBindingTable gbufferSrv = context.resources->CreateBindings(gbufferSrvs);
             if (!gbufferSrv.IsValid()) return;
+            const RHIBindingDesc ownerDesc = RHIBindingDesc::Srv2D(
+                constants.hasOwners ? executeContext.ResolveHandle(m_inputs.bitmask) : RHITextureHandle{},
+                RHIFormat::R32Uint).OrNull();
+            const auto owners = context.resources->CreateBindings({ &ownerDesc, 1 });
+            if (!owners.IsValid()) return;
 
             // ★ 예전에는 여기서 `SetPipeline(..., nullptr, m_rootSignature)` 로
             //   **루트 시그니처만** 걸었다. A-1 이후로 표현 불가능하다 — 핸들
@@ -425,6 +437,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameCb);
             encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, instanceBuffer);
             encoder.SetBindings(RHIBindPoint::Graphics, 2, gbufferSrv);
+            encoder.SetBindings(RHIBindPoint::Graphics, 4, owners);
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
             for (const auto& batch : m_batches)
@@ -465,4 +478,3 @@ void EnhancedDecalPass::Shutdown()
     m_batches.clear();
     for (auto& pipeline : m_pipelines) pipeline = {};
 }
-

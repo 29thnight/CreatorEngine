@@ -1,3 +1,4 @@
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <vector>
@@ -543,6 +544,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     {
         HRESULT hr = m_fence->SetEventOnCompletion(m_frameFenceValues[m_frameIndex], m_fenceEvent);
         if (FAILED(hr)) { outError = "펜스 대기 설정 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
+        ce::profile_scope wait{ce::marker<"DX12FrameFenceWait">()};
         WaitForSingleObject(m_fenceEvent, INFINITE);
     }
 
@@ -751,6 +753,7 @@ void DX12DeviceResources::AbortFrame()
 
 bool DX12DeviceResources::EndFrame(std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"DX12EnqueueCommands">()};
     if (!m_commandList)
     {
         outError = "종료할 DX12 command list가 없다";
@@ -1324,6 +1327,16 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.BufferCount = kFrameCount;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    // Present uses sync interval zero. Opt in at creation and preserve the
+    // flag through resize so windowed presentation does not throttle the
+    // shared submission thread behind the desktop composition cadence.
+    ComPtr<IDXGIFactory5> tearingFactory;
+    BOOL allowTearing = FALSE;
+    const bool supportsTearing = SUCCEEDED(m_factory.As(&tearingFactory)) &&
+        SUCCEEDED(tearingFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING,
+            &allowTearing, sizeof(allowTearing))) && allowTearing;
+    m_swapChainFlags = supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+    desc.Flags = m_swapChainFlags;
 
     ComPtr<IDXGISwapChain1> swapChain1;
     HRESULT hr = m_factory->CreateSwapChainForHwnd(m_queue.Get(), hwnd, &desc,
@@ -1382,7 +1395,7 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
     for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
 
     const HRESULT hr = m_swapChain->ResizeBuffers(kFrameCount, width, height,
-        DXGI_FORMAT_R8G8B8A8_UNORM, 0);
+        DXGI_FORMAT_R8G8B8A8_UNORM, m_swapChainFlags);
     if (FAILED(hr))
     {
         outError = "ResizeBuffers 실패 " + HrToString(hr);
@@ -1404,20 +1417,26 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
 
 bool DX12DeviceResources::Present(std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"DX12PresentWait">()};
     if (!m_swapChain)
     {
         outError = "스왑체인이 없다";
         return false;
     }
     return GetRHISubmissionThread().ExecuteAndWait(this, "DX12 Present",
-        [owner = this, swapChain = m_swapChain](std::string& error)
+        [owner = this, swapChain = m_swapChain, creationFlags = m_swapChainFlags](std::string& error)
         {
             if (!GetRHISubmissionThread().IsCurrentThread())
             {
                 error = "DX12 Present가 RHI thread 밖에서 호출됐다";
                 return false;
             }
-            const HRESULT hr = swapChain->Present(0, 0);
+            ce::profile_scope present{ce::marker<"DXGIPresent">()};
+            BOOL fullscreen = FALSE;
+            const bool windowed = SUCCEEDED(swapChain->GetFullscreenState(&fullscreen, nullptr)) && !fullscreen;
+            const UINT flags = windowed && (creationFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
+                ? DXGI_PRESENT_ALLOW_TEARING : 0;
+            const HRESULT hr = swapChain->Present(0, flags);
             if (FAILED(hr))
             {
                 error = "DX12 Present 실패 " + HrToString(hr);
@@ -1492,6 +1511,7 @@ D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
     case RHIResourceState::UnorderedAccess: return D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
     case RHIResourceState::CopySource:      return D3D12_RESOURCE_STATE_COPY_SOURCE;
     case RHIResourceState::CopyDest:        return D3D12_RESOURCE_STATE_COPY_DEST;
+    case RHIResourceState::IndexBuffer:     return D3D12_RESOURCE_STATE_INDEX_BUFFER;
     case RHIResourceState::Common:
     default:                                return D3D12_RESOURCE_STATE_COMMON;
     }
@@ -1907,6 +1927,7 @@ namespace
 bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     RHIBufferHandle& outHandle, std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"DX12CreateBuffer">()};
     if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
     if (0 == desc.bytes)     { outError = "버퍼 크기가 0이다"; return false; }
 
@@ -1965,6 +1986,7 @@ RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) con
 bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc,
     RHITextureHandle& outHandle, std::string& outError)
 {
+    ce::profile_scope profile{ce::marker<"DX12CreateTexture">()};
     if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
     if (0 == desc.width || 0 == desc.height)
     {

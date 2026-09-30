@@ -1,0 +1,136 @@
+{
+  "kind":"LatticeMaterial",
+  "schemaVersion":1,
+  "domain":"material",
+  "graphId":1,
+  "activeOutput":34,
+  "blackboard":[
+  ],
+  "graph":{
+    "domain":"material","nextId":77,
+    "nodes":[
+      {"id":1,"definition":"ShaderNodeBsdfPrincipled","schemaRevision":1,"title":"Principled BSDF","groupId":0,"sockets":[
+        {"id":2,"identifier":"Base Color","name":"Base Color","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[0.80000001192092896,0.80000001192092896,0.80000001192092896,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":3,"identifier":"Metallic","name":"Metallic","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":4,"identifier":"Roughness","name":"Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":5,"identifier":"IOR","name":"IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":6,"identifier":"Alpha","name":"Alpha","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":7,"identifier":"Normal","name":"Normal","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":8,"identifier":"Weight","name":"Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":false,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":9,"identifier":"Diffuse Roughness","name":"Diffuse Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":10,"identifier":"Subsurface Weight","name":"Subsurface Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":11,"identifier":"Subsurface Radius","name":"Subsurface Radius","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[1,0.20000000298023224,0.10000000149011612]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":12,"identifier":"Subsurface Scale","name":"Subsurface Scale","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.05000000074505806},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":13,"identifier":"Subsurface IOR","name":"Subsurface IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.3999999761581421},"enabled":false,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":14,"identifier":"Subsurface Anisotropy","name":"Subsurface Anisotropy","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":15,"identifier":"Specular IOR Level","name":"Specular IOR Level","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":16,"identifier":"Specular Tint","name":"Specular Tint","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":17,"identifier":"Anisotropic","name":"Anisotropic","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":18,"identifier":"Anisotropic Rotation","name":"Anisotropic Rotation","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":19,"identifier":"Tangent","name":"Tangent","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":20,"identifier":"Transmission Weight","name":"Transmission Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":21,"identifier":"Coat Weight","name":"Coat Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":22,"identifier":"Coat Roughness","name":"Coat Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.029999999329447746},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":23,"identifier":"Coat IOR","name":"Coat IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":24,"identifier":"Coat Tint","name":"Coat Tint","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":25,"identifier":"Coat Normal","name":"Coat Normal","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":26,"identifier":"Sheen Weight","name":"Sheen Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":27,"identifier":"Sheen Roughness","name":"Sheen Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":28,"identifier":"Sheen Tint","name":"Sheen Tint","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":29,"identifier":"Emission Color","name":"Emission Color","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":30,"identifier":"Emission Strength","name":"Emission Strength","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":31,"identifier":"Thin Film Thickness","name":"Thin Film Thickness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":32,"identifier":"Thin Film IOR","name":"Thin Film IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.3300000429153442},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":33,"identifier":"BSDF","name":"BSDF","direction":"output","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null},
+      {"id":34,"definition":"ShaderNodeOutputMaterial","schemaRevision":1,"title":"Material Output","groupId":0,"sockets":[
+        {"id":35,"identifier":"Surface","name":"Surface","direction":"input","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":36,"identifier":"Volume","name":"Volume","direction":"input","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":37,"identifier":"Displacement","name":"Displacement","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":38,"identifier":"Thickness","name":"Thickness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"}],"properties":{ "target":"ALL"},"dynamicRule":null},
+      {"id":72,"definition":"LX_GROUP","schemaRevision":1,"title":"Nested shared group","groupId":67,"sockets":[
+        {"id":73,"identifier":"factor","name":"Factor","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":68,"default":{"kind":"float","value":0.40000000000000002},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":74,"identifier":"factor_2","name":"Factor","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":69,"default":{"kind":"float","value":0.80000000000000004},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":75,"identifier":"result","name":"Result","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":70,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":76,"identifier":"result_2","name":"Result","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":71,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null}
+    ],
+    "links":[
+      {"id":39,"output":33,"input":35},
+      {"id":49,"output":75,"input":4},
+      {"id":50,"output":76,"input":3}
+    ],
+    "groups":[
+      {"id":40,"name":"Multiply group","interface":[
+        {"id":41,"identifier":"factor","name":"Factor","direction":"input","type":"Float","internalPin":2,"default":{"kind":"float","value":1}},
+        {"id":42,"identifier":"result","name":"Result","direction":"output","type":"Float","internalPin":4,"default":{"kind":"none"}}],"body":{
+          "domain":"material","nextId":5,
+          "nodes":[
+            {"id":1,"definition":"LXMultiplyFloat","schemaRevision":1,"title":"Multiply","groupId":0,"sockets":[
+              {"id":2,"identifier":"A","name":"A","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+              {"id":3,"identifier":"B","name":"B","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+              {"id":4,"identifier":"Result","name":"Result","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null}
+          ],
+          "links":[
+          ],
+          "groups":[
+          ],
+          "layout":{"nodes":[
+            {"id":1,"x":0,"y":0,"collapsed":false,"frame":0}],"frames":[],"view":{"saved":false,"centerX":0,"centerY":0,"zoom":1}}
+        }},
+      {"id":67,"name":"Nested shared group","interface":[
+        {"id":68,"identifier":"factor","name":"Factor","direction":"input","type":"Float","internalPin":59,"default":{"kind":"float","value":0.40000000000000002}},
+        {"id":69,"identifier":"factor_2","name":"Factor","direction":"input","type":"Float","internalPin":61,"default":{"kind":"float","value":0.80000000000000004}},
+        {"id":70,"identifier":"result","name":"Result","direction":"output","type":"Float","internalPin":63,"default":{"kind":"none"}},
+        {"id":71,"identifier":"result_2","name":"Result","direction":"output","type":"Float","internalPin":65,"default":{"kind":"none"}}],"body":{
+          "domain":"material","nextId":67,
+          "nodes":[
+            {"id":51,"definition":"LX_GROUP","schemaRevision":1,"title":"Multiply group","groupId":40,"sockets":[
+              {"id":52,"identifier":"factor","name":"Factor","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":41,"default":{"kind":"float","value":0.40000000000000002},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+              {"id":53,"identifier":"result","name":"Result","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":42,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null},
+            {"id":54,"definition":"LX_GROUP","schemaRevision":1,"title":"Multiply group","groupId":40,"sockets":[
+              {"id":55,"identifier":"factor","name":"Factor","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":41,"default":{"kind":"float","value":0.80000000000000004},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+              {"id":56,"identifier":"result","name":"Result","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":42,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null},
+            {"id":57,"definition":"LX_GROUP_INPUT","schemaRevision":1,"title":"Group Input","groupId":0,"sockets":[
+              {"id":59,"identifier":"factor","name":"Factor","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.40000000000000002},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+              {"id":61,"identifier":"factor_2","name":"Factor","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.80000000000000004},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null},
+            {"id":58,"definition":"LX_GROUP_OUTPUT","schemaRevision":1,"title":"Group Output","groupId":0,"sockets":[
+              {"id":63,"identifier":"result","name":"Result","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+              {"id":65,"identifier":"result_2","name":"Result","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null}
+          ],
+          "links":[
+            {"id":60,"output":59,"input":52},
+            {"id":62,"output":61,"input":55},
+            {"id":64,"output":53,"input":63},
+            {"id":66,"output":56,"input":65}
+          ],
+          "groups":[
+            {"id":40,"name":"Multiply group","interface":[
+              {"id":41,"identifier":"factor","name":"Factor","direction":"input","type":"Float","internalPin":2,"default":{"kind":"float","value":1}},
+              {"id":42,"identifier":"result","name":"Result","direction":"output","type":"Float","internalPin":4,"default":{"kind":"none"}}],"body":{
+                "domain":"material","nextId":5,
+                "nodes":[
+                  {"id":1,"definition":"LXMultiplyFloat","schemaRevision":1,"title":"Multiply","groupId":0,"sockets":[
+                    {"id":2,"identifier":"A","name":"A","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+                    {"id":3,"identifier":"B","name":"B","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+                    {"id":4,"identifier":"Result","name":"Result","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null}
+                ],
+                "links":[
+                ],
+                "groups":[
+                ],
+                "layout":{"nodes":[
+                  {"id":1,"x":0,"y":0,"collapsed":false,"frame":0}],"frames":[],"view":{"saved":false,"centerX":0,"centerY":0,"zoom":1}}
+              }}
+          ],
+          "layout":{"nodes":[
+            {"id":51,"x":200,"y":120,"collapsed":false,"frame":0},
+            {"id":54,"x":200,"y":220,"collapsed":false,"frame":0},
+            {"id":57,"x":20,"y":120,"collapsed":false,"frame":0},
+            {"id":58,"x":420,"y":120,"collapsed":false,"frame":0}],"frames":[],"view":{"saved":false,"centerX":0,"centerY":0,"zoom":1}}
+        }}
+    ],
+    "layout":{"nodes":[
+      {"id":1,"x":200,"y":0,"collapsed":false,"frame":0},
+      {"id":34,"x":600,"y":0,"collapsed":false,"frame":0},
+      {"id":72,"x":0,"y":0,"collapsed":false,"frame":0}],"frames":[],"view":{"saved":false,"centerX":0,"centerY":0,"zoom":1}}
+  }
+}

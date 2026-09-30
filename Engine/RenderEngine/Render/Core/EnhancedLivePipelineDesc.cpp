@@ -1,4 +1,5 @@
 #include "EnhancedLivePipelineDesc.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 
 #include <initializer_list>
 #include <unordered_set>
@@ -23,6 +24,14 @@ namespace
         }
         return true;
     }
+}
+
+void LivePipelineDesc::AddNode(LivePassNode node)
+{
+#if !CE_SHIPPING
+    node.declarationMarker = ce::intern_runtime_marker("RenderDeclare." + node.name, ce::marker_kind::cpu_scope);
+#endif
+    m_nodes.push_back(std::move(node));
 }
 
 bool LivePipelineDesc::Validate(std::string& outError) const
@@ -192,6 +201,7 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
         // 비활성 노드는 통째로 건너뛴다. modifies 슬롯은 값이 그대로 남으므로
         // 뒤 노드가 이전 값을 이어받는다 — 폴백 코드가 필요 없는 이유다.
         if (!node.IsActive()) continue;
+        ce::profile_scope profile{node.declarationMarker};
         node.declare(blackboard, graph, context, binding);
     }
 }

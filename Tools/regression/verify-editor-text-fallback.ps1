@@ -12,10 +12,18 @@ $exe = Join-Path $work 'text_fallback_probe.exe'
 $object = Join-Path $work 'text_fallback_probe.obj'
 $command = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++20 /utf-8 /MDd /Od /RTC1 /W4 ' +
     '/I"' + (Join-Path $repo 'Editor/ImGuiHelper') + '" /I"' + (Join-Path $dependencies 'include') + '" /Fo:"' + $object +
-    '" /Fe:"' + $exe + '" "' + $probe + '" "' + (Join-Path $dependencies 'debug/lib/imguid.lib') + '" user32.lib gdi32.lib imm32.lib'
+    '" /Fe:"' + $exe + '" "' + $probe + '" "' + (Join-Path $dependencies 'debug/lib/imguid.lib') +
+    '" "' + (Join-Path $dependencies 'debug/lib/freetyped.lib') + '" user32.lib gdi32.lib imm32.lib'
 & $env:ComSpec /d /s /c $command
 if ($LASTEXITCODE -ne 0) { throw 'Text fallback probe build failed.' }
 $korean = Join-Path ([Environment]::GetFolderPath('Fonts')) 'malgun.ttf'
 if (-not (Test-Path -LiteralPath $korean)) { throw 'This Korean coverage gate requires Windows Malgun Gothic.' }
-& $exe (Join-Path $repo 'Resources/Editor/Fonts/Inter-Regular.ttf') $korean (Join-Path $repo 'Resources/Editor/Fonts/MaterialSymbolsOutlined-Editor.ttf')
-if ($LASTEXITCODE -ne 0) { throw 'Text fallback coverage or primary font preservation failed.' }
+$emoji = Join-Path ([Environment]::GetFolderPath('Fonts')) 'seguiemj.ttf'
+if (-not (Test-Path -LiteralPath $emoji)) { throw 'This color emoji gate requires Windows Segoe UI Emoji.' }
+$previousPath = $env:PATH
+try {
+    $env:PATH = (Join-Path $dependencies 'debug/bin') + ';' + $env:PATH
+    & $exe (Join-Path $repo 'Resources/Editor/Fonts/Inter-Regular.ttf') $korean (Join-Path $repo 'Resources/Editor/Fonts/MaterialSymbolsOutlined-Editor.ttf') $emoji
+    if ($LASTEXITCODE -ne 0) { throw 'Text/emoji fallback coverage or primary font preservation failed.' }
+}
+finally { $env:PATH = $previousPath }

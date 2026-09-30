@@ -65,7 +65,7 @@ namespace ComponentTypeUUID
         // 이 값을 참조하게 된다).
         { "Transform",                   "5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d" },
         { "UIButton",                    "ca884274-e16c-446d-b008-fd172d774b14" },
-        { "VolumeComponent",             "54293993-11f7-47a0-a77f-0f5ef2bd88c7" },
+        { "SceneRenderProfileComponent",             "54293993-11f7-47a0-a77f-0f5ef2bd88c7" },
     } };
 
     // 기동 시 1회: kTable을 파싱해 TypeTrait::ComponentUUIDRegistry(전역 조회 표)에

@@ -65,6 +65,7 @@ FoliageRenderProxy::CaptureDrawSources() const
 
 			DrawSource draw{};
 			draw.material = type.m_material;
+            draw.graphMaterialSource = type.m_graphMaterialSource;
 			draw.authoredMaterial = type.m_authoredMaterial; // I5-D5c4
 			draw.modelGeneration = type.m_modelGeneration;    // MBC8
 			draw.modelMeshIndex = type.m_modelMeshIndex;

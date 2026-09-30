@@ -22,6 +22,8 @@ namespace experiment { class MaterialInstance; } // I5-D5c3
 // 곧 화면 갱신이다. 오타/타입 불일치는 false로 드러난다(조용히 삼키지 않는다).
 //
 // C# ABI(P/Invoke 시그니처)는 ClrHost가 유지하고, 이 경계는 그 구현만 바꾼다.
+// LX 재질은 노출 파라미터의 identifier로 같은 API를 해석한다. getter는
+// 그래프 기본값/인스턴스 override를 읽고 setter는 그래프 인스턴스를 갱신한다.
 namespace MaterialScriptBinding
 {
     // 검증 코어 — meta를 명시로 받는다(합성 meta로 검사 가능).

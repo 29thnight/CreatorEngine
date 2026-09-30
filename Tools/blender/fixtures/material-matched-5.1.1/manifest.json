@@ -1,0 +1,482 @@
+{
+  "schema": "creator.material.matched-reference.v1",
+  "blender": "5.1.1",
+  "renderer": "CYCLES",
+  "resolution": [
+    64,
+    64
+  ],
+  "samples": 1024,
+  "pixel_filter": {
+    "type": "GAUSSIAN",
+    "width": 0.01
+  },
+  "anisotropy_tangent": "explicit active UV tangent",
+  "camera": {
+    "eye": [
+      0,
+      0,
+      3
+    ],
+    "vertical_fov": 0.7853981633974483,
+    "near": 0.1,
+    "far": 10
+  },
+  "sun": {
+    "to_light": [
+      0.39070188999176025,
+      -0.22325824201107025,
+      0.893032968044281
+    ],
+    "irradiance": [
+      1,
+      1,
+      1
+    ],
+    "angle": 0
+  },
+  "furnace": {
+    "radiance": [
+      1,
+      1,
+      1
+    ]
+  },
+  "bounces": {
+    "max": 1,
+    "diffuse": 1,
+    "glossy": 1
+  },
+  "exclusions": [
+    "texture/normal-map filtering",
+    "special transport",
+    "original area-light/HDRI grid"
+  ],
+  "geometry_sha256": "604cc50946887fdfd750d0166eb549c87b87caa23c83c0b9d2f936e24d4b9aed",
+  "cases": [
+    {
+      "id": "sun-core_base",
+      "inputs": {
+        "Base Color": [
+          0.85,
+          0.42,
+          0.24,
+          1.0
+        ],
+        "Roughness": 0.45
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "575d2b0b90734b7caff476dc382053a3e81c21b20f14c445728596bc25f84b64"
+    },
+    {
+      "id": "sun-core_metal",
+      "inputs": {
+        "Base Color": [
+          0.8,
+          0.7,
+          0.45,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.18
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "a790668667e74f60bf3e97c97e7b300a512e0f1dec70b71cf26005bdd2c2960d"
+    },
+    {
+      "id": "sun-core_rough",
+      "inputs": {
+        "Base Color": [
+          0.72,
+          0.7,
+          0.68,
+          1.0
+        ],
+        "Roughness": 0.88
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "612e53c6c7925e407e9d26fda8e44a4d39be5f0bec89f69c0aa34db95ee4760d"
+    },
+    {
+      "id": "sun-core_normal",
+      "inputs": {
+        "Base Color": [
+          0.75,
+          0.75,
+          0.75,
+          1.0
+        ],
+        "Roughness": 0.42
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "53d72f8be32cb49b197dfe1aa0a9bfe271a6c3fc87f7ce5c0c7f65cad8627dd9"
+    },
+    {
+      "id": "sun-core_emission",
+      "inputs": {
+        "Base Color": [
+          0.1,
+          0.1,
+          0.1,
+          1.0
+        ],
+        "Emission Color": [
+          0.3,
+          0.55,
+          1.0,
+          1.0
+        ],
+        "Emission Strength": 5.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "65015bb0c885f2ea9879b7a7bfaa3525040132185924637d76036b4909858cc5"
+    },
+    {
+      "id": "sun-layer_coat",
+      "inputs": {
+        "Base Color": [
+          0.55,
+          0.25,
+          0.18,
+          1.0
+        ],
+        "Roughness": 0.35,
+        "Coat Weight": 0.85,
+        "Coat Roughness": 0.08
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "c461bf3f0b4021e7af14c7273973d260a2d24ecc77bfb635875021c98a77000f"
+    },
+    {
+      "id": "sun-layer_sheen",
+      "inputs": {
+        "Base Color": [
+          0.3,
+          0.52,
+          0.66,
+          1.0
+        ],
+        "Roughness": 0.55,
+        "Sheen Weight": 0.9,
+        "Sheen Tint": [
+          0.3,
+          0.9,
+          0.8,
+          1.0
+        ]
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "c43d3e72d7e4f68f997ad735ac208247586e44f23fc7e5930c70775adc8d9731"
+    },
+    {
+      "id": "sun-layer_anisotropic",
+      "inputs": {
+        "Base Color": [
+          0.76,
+          0.62,
+          0.38,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.3,
+        "Anisotropic": 0.8
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "83d831448d9201119fa981fc3abc1d90322a4ae4bbd7c42ecd7ba7214ff37421"
+    },
+    {
+      "id": "sun-layer_thin_film",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Coat Weight": 0.7,
+        "Thin Film Thickness": 550.0,
+        "Thin Film IOR": 1.4
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "8ce37c559605e5ea4210413d82ff358e0d380eb1dd004c94f9f4a1c31a13bf8e"
+    },
+    {
+      "id": "sun-layer_mixed",
+      "inputs": {
+        "Base Color": [
+          0.55,
+          0.48,
+          0.35,
+          1.0
+        ],
+        "Roughness": 0.32,
+        "Coat Weight": 0.5,
+        "Sheen Weight": 0.45,
+        "Anisotropic": 0.35
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "b6dd82d781f3ecbf9a999ea15a85ba37f3f26fe74ae1ffc4e71ae1321e562837"
+    },
+    {
+      "id": "sun-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "ea293dbeb0290eeaf4fc54ea04aac977fc4231f68e81223e026c986549ee55c9"
+    },
+    {
+      "id": "sun-control_white",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "IOR": 1,
+        "Roughness": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "c7b3ed296551a7a7dafdbe054be72aa25d313d7e231ae83e6fb0c68db4b0e5bd"
+    },
+    {
+      "id": "furnace-core_base",
+      "inputs": {
+        "Base Color": [
+          0.85,
+          0.42,
+          0.24,
+          1.0
+        ],
+        "Roughness": 0.45
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "59df2f92f966142b9206b9c8ad3c3dfcb14a643b233b29855436c66d06666323"
+    },
+    {
+      "id": "furnace-core_metal",
+      "inputs": {
+        "Base Color": [
+          0.8,
+          0.7,
+          0.45,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.18
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "cdc6558694e9e0e76b8735cb64394eeca32c5f4fae556f775cf3056cab918727"
+    },
+    {
+      "id": "furnace-core_rough",
+      "inputs": {
+        "Base Color": [
+          0.72,
+          0.7,
+          0.68,
+          1.0
+        ],
+        "Roughness": 0.88
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "494d468e6453139c1eea97b5345dc864c6fd1f70a2196889ce4da51e98e18c73"
+    },
+    {
+      "id": "furnace-core_normal",
+      "inputs": {
+        "Base Color": [
+          0.75,
+          0.75,
+          0.75,
+          1.0
+        ],
+        "Roughness": 0.42
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "a92b09cb822792b541f79305c8ff8c63fe1050f92bec7bfa55794f063885cb46"
+    },
+    {
+      "id": "furnace-core_emission",
+      "inputs": {
+        "Base Color": [
+          0.1,
+          0.1,
+          0.1,
+          1.0
+        ],
+        "Emission Color": [
+          0.3,
+          0.55,
+          1.0,
+          1.0
+        ],
+        "Emission Strength": 5.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "d14dda7f08007615f355d4f236ba0d583a313f23b78ac125a0f9c9d82779c1df"
+    },
+    {
+      "id": "furnace-layer_coat",
+      "inputs": {
+        "Base Color": [
+          0.55,
+          0.25,
+          0.18,
+          1.0
+        ],
+        "Roughness": 0.35,
+        "Coat Weight": 0.85,
+        "Coat Roughness": 0.08
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "51c45d80b438036ca59f5dd838b2cb334d454196f2fa34fd0c4fb97b2ae45661"
+    },
+    {
+      "id": "furnace-layer_sheen",
+      "inputs": {
+        "Base Color": [
+          0.3,
+          0.52,
+          0.66,
+          1.0
+        ],
+        "Roughness": 0.55,
+        "Sheen Weight": 0.9,
+        "Sheen Tint": [
+          0.3,
+          0.9,
+          0.8,
+          1.0
+        ]
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "6ae6d76739ec64e1e56e75db4bdcbfc54c7aa058ef14a5f4db79026951a92b83"
+    },
+    {
+      "id": "furnace-layer_anisotropic",
+      "inputs": {
+        "Base Color": [
+          0.76,
+          0.62,
+          0.38,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.3,
+        "Anisotropic": 0.8
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "2e6d1fcc3930e364da6673c6ba718682aefa639488a96183677438997367a9d8"
+    },
+    {
+      "id": "furnace-layer_thin_film",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Coat Weight": 0.7,
+        "Thin Film Thickness": 550.0,
+        "Thin Film IOR": 1.4
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "10af8d9ee4006b62e1466e5c2ab2d3b8c85788652b91edb5a081236f1774060d"
+    },
+    {
+      "id": "furnace-layer_mixed",
+      "inputs": {
+        "Base Color": [
+          0.55,
+          0.48,
+          0.35,
+          1.0
+        ],
+        "Roughness": 0.32,
+        "Coat Weight": 0.5,
+        "Sheen Weight": 0.45,
+        "Anisotropic": 0.35
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "3363dfc6b454077d8a6706b8e855705c76d26da7bb7a2f6e863788753b7bc7cf"
+    },
+    {
+      "id": "furnace-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "ea293dbeb0290eeaf4fc54ea04aac977fc4231f68e81223e026c986549ee55c9"
+    },
+    {
+      "id": "furnace-control_white",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "IOR": 1,
+        "Roughness": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "84a25cd4d726e2dda136f37ce5ad44dbcfa5c2f3e010c68ebbab295196c9e063"
+    }
+  ]
+}

@@ -12,7 +12,11 @@ internal static class PlayerVerification
         if (Directory.Exists(temp)) throw new BuildException("Player verify temp already exists.");
         Directory.CreateDirectory(temp);
         var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-        var result = await context.Run(Path.Combine(stage, "Player.exe"), ["--smoke", frames.ToString()], stage,
+        var arguments = new List<string> { "--smoke", frames.ToString() };
+        var promotions = context.Options.Number("smoke-promotions", 2, 2, 1000000);
+        arguments.AddRange(["--smoke-promotions", promotions.ToString()]);
+        if (context.Options.Flag("smoke-offscreen")) arguments.Add("--smoke-offscreen");
+        var result = await context.Run(Path.Combine(stage, "Player.exe"), arguments, stage,
             new() { ["TEMP"] = temp, ["TMP"] = temp, ["PATH"] = string.Join(Path.PathSeparator, stage, Path.Combine(windows, "System32"), windows) }, timeout, check: false);
         File.WriteAllText(Path.Combine(stage, "verify.stdout.log"), result.Output); File.WriteAllText(Path.Combine(stage, "verify.stderr.log"), result.Error);
         var combined = result.Output + "\n" + result.Error;
@@ -20,6 +24,7 @@ internal static class PlayerVerification
             if (Directory.Exists(logRoot)) foreach (var file in Paths.Files(logRoot).Where(p => Path.GetExtension(p).ToLowerInvariant() is ".html" or ".log" or ".txt")) combined += "\n" + File.ReadAllText(file);
         if (result.ExitCode != 0) throw new BuildException($"Player smoke failed with exit code {result.ExitCode}. Logs: {temp}");
         var metrics = ValidateMarkers(result.Output, combined, preflight, shipping, frames);
+        if (metrics.Int("promotions") < promotions) throw new BuildException("Player did not complete the requested display promotions.");
         var playerRoot = Path.Combine(temp, "CreatorEngine/Player");
         var owners = Directory.Exists(playerRoot) ? Directory.GetDirectories(playerRoot) : [];
         if (owners.Length != 1 || Path.GetFileName(owners[0]) != result.ProcessId.ToString()) throw new BuildException("Player runtime owner is not exactly the launched PID.");

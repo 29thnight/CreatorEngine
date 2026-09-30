@@ -36,7 +36,7 @@
 #include "TextComponent.h"
 #include "Transform.h"
 #include "UIButton.h"
-#include "VolumeComponent.h"
+#include "SceneRenderProfileComponent.h"
 
 namespace Lifecycle
 {
@@ -127,7 +127,7 @@ namespace Lifecycle
         // 순회로 도는 별도 경로이지 Component 생명주기 디스패치가 아니다.
         Register<Transform>();
         Register<UIButton>();
-        Register<VolumeComponent>();
+        Register<SceneRenderProfileComponent>();
 
         // K1-b: 영속 UUID 표를 채운다. 위 Register<T>() 목록과
         // ComponentTypeUUID::kTable은 서로 다른 자리에서 손으로 유지하는 두

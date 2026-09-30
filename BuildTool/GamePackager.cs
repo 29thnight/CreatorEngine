@@ -85,7 +85,11 @@ internal static class GamePackager
             var runtimeEntries = Metadata.Entries(candidate, runtimePaths); var runtimeDigest = Metadata.Digest(runtimeEntries);
             context.Log("[5/6 Pak]", "stage");
             PackageInputs.Materialize(template, Path.Combine(generated, "ProjectSetting/EngineSettings.asset"), options.Get("startup-scene"), options.Get("render-backend"));
-            Paths.CopyTree(baseRoot, merged, context.Cancellation); Paths.CopyTree(generated, merged, context.Cancellation);
+            // Automatic graph compilation also creates a private Library cache
+            // below Base. Only the two package mounts belong to runtime content.
+            foreach (var mount in new[] { "Assets", "ProjectSetting" })
+                Paths.CopyTree(Path.Combine(baseRoot, mount), Path.Combine(merged, mount), context.Cancellation);
+            Paths.CopyTree(generated, merged, context.Cancellation);
             var mergedCook = AssetCooking.Validate(Path.Combine(merged, "Assets"), cook.ArtifactCount);
             if (mergedCook.ManifestSha256 != cook.ManifestSha256 || mergedCook.ArtifactBytes != cook.ArtifactBytes) throw new BuildException("Merged cook output changed.");
             var settingsFile = Path.Combine(merged, "ProjectSetting/EngineSettings.asset"); var settingsHash = Metadata.Hash(settingsFile);

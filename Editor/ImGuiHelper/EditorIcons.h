@@ -65,7 +65,7 @@ namespace EditorIcon
     inline constexpr char Shader[] = "\xef\xa1\x8d"; // code_blocks, U+F84D
     inline constexpr char Script[] = "\xee\xa1\xaf"; // code, U+E86F
     inline constexpr char HDR[] = "\xee\x9a\x91"; // panorama, U+E691
-    inline constexpr char Volume[] = "\xee\x90\xa9"; // tune, U+E429
+    inline constexpr char RenderProfile[] = "\xee\x90\xa9"; // tune, U+E429
     inline constexpr char Font[] = "\xee\x89\xa2"; // text_fields, U+E262
     inline constexpr char Unknown[] = "\xee\x99\xad"; // draft, U+E66D
     inline constexpr char Menu[] = "\xee\x97\x92"; // menu, U+E5D2
@@ -74,6 +74,13 @@ namespace EditorIcon
     inline constexpr char Show[] = "\xee\xa3\xb4"; // visibility, U+E8F4
     inline constexpr char Lock[] = "\xee\xa2\x99"; // lock, U+E899
     inline constexpr char Unlock[] = "\xee\xa2\x98"; // lock_open, U+E898
+    inline constexpr char Save[] = "\xee\x85\xa1"; // save, U+E161
+    inline constexpr char Shield[] = "\xee\xa7\xa0"; // shield, U+E9E0
+    inline constexpr char Duplicate[] = "\xee\x85\x8d"; // content_copy, U+E14D
+    inline constexpr char Pin[] = "\xef\x84\x8d"; // push_pin, U+F10D
+    inline constexpr char Overlays[] = "\xee\xab\xb4"; // join_inner, U+EAF4
+    inline constexpr char NodeEditor[] = "\xee\x8e\xa2"; // blur_circular, U+E3A2
+    inline constexpr char FrameAll[] = "\xee\x8f\x9c"; // filter_center_focus, U+E3DC
 
     struct Role { const char* name; const char* symbol; unsigned int codepoint; };
     inline constexpr Role Roles[] = {
@@ -134,7 +141,7 @@ namespace EditorIcon
         { "Shader", "code_blocks", 0xf84d },
         { "Script", "code", 0xe86f },
         { "HDR", "panorama", 0xe691 },
-        { "Volume", "tune", 0xe429 },
+        { "RenderProfile", "tune", 0xe429 },
         { "Font", "text_fields", 0xe262 },
         { "Unknown", "draft", 0xe66d },
         { "Menu", "menu", 0xe5d2 },
@@ -143,6 +150,13 @@ namespace EditorIcon
         { "Show", "visibility", 0xe8f4 },
         { "Lock", "lock", 0xe899 },
         { "Unlock", "lock_open", 0xe898 },
+        { "Save", "save", 0xe161 },
+        { "Shield", "shield", 0xe9e0 },
+        { "Duplicate", "content_copy", 0xe14d },
+        { "Pin", "push_pin", 0xf10d },
+        { "Overlays", "join_inner", 0xeaf4 },
+        { "NodeEditor", "blur_circular", 0xe3a2 },
+        { "FrameAll", "filter_center_focus", 0xe3dc },
     };
 
     // Static storage: composed labels never point into a temporary string.

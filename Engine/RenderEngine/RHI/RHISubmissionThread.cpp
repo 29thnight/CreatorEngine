@@ -1,4 +1,5 @@
 #include "RHISubmissionThread.h"
+#include "../../EngineDiagnostics/ProfileScope.h"
 
 #include "IRHIDeviceResources.h"
 #include "RHIParallelCommandPool.h"
@@ -194,6 +195,7 @@ struct RHISubmissionThread::Impl
 
     void Run()
     {
+        ce::profiler().register_thread("[RHIThread]", ce::track_kind::command_thread, 1);
         {
             std::lock_guard lock(mutex);
             threadId = std::this_thread::get_id();
@@ -238,6 +240,7 @@ struct RHISubmissionThread::Impl
             bool success = false;
             try
             {
+                ce::profile_scope execute{ce::marker<"RHIExecuteWork">()};
                 success = entry.work && entry.work(error);
             }
             catch (const std::exception& exception)
@@ -287,6 +290,7 @@ struct RHISubmissionThread::Impl
             }
         }
 
+        ce::profiler().unregister_thread();
         {
             std::lock_guard lock(mutex);
             stats.running = false;
@@ -532,6 +536,7 @@ bool RHISubmissionThread::ExecuteAndWait(const void* owner, const char* label,
 bool RHISubmissionThread::Wait(const RHISubmissionTicket& ticket,
     std::string& outError) const
 {
+    ce::profile_scope profile{ce::marker<"RHITicketWait">()};
     if (!ticket.m_state)
     {
         outError = "유효하지 않은 RHI submission ticket";

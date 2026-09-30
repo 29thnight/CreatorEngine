@@ -2,6 +2,7 @@
 #include "Includes/MaterialEvaluation.slang"
 #include "Includes/PbrCoverage.slang"
 #include "Includes/PackedBones.slang"
+#include "Includes/StandardMaterialRoute.slang"
 
 // GBuffer 기록 패스. GBuffer.hlsl 의 이식본이다.
 //
@@ -221,39 +222,40 @@ PSOut PSMain(VSOut input, bool frontFace : SV_IsFrontFace)
     const float3 materialEmissive = usePropertyBlock
         ? emissive : float3(1.0, 1.0, 1.0);
 
-    PbrMaterial material = EvaluatePbrMaterial(
+    MaterialInputs materialInputs = MakeStandardMaterialInputs(
         baseColorMap.Sample(gSampler, MaterialUv(16, input.uv, input.uv1)),
         ormMap.Sample(gSampler, MaterialUv(18, input.uv, input.uv1)).rgb,
         emissiveMap.Sample(gSampler, MaterialUv(19, input.uv, input.uv1)).rgb,
         materialBaseColor, materialRoughness, materialMetallic, materialEmissive,
         usePropertyBlock ? emissiveStrength : 1.0);
 
-    const float authoredAlpha = material.albedo.a
+    const float authoredAlpha = materialInputs.alpha
         * (usePropertyBlock ? input.vertexAlpha : 1.0);
-    material.albedo.a = ApplyPbrCoverage(authoredAlpha,
+    materialInputs.alpha = ApplyPbrCoverage(authoredAlpha,
         usePropertyBlock ? alphaCutoff : input.coverageCutoff, input.coverageFlags, frontFace);
 
     // metallicRoughness.R has no AO meaning unless also authored as aoMap.
-    const float occlusion = EvaluatePbrOcclusion(aoMap.Sample(gSampler, MaterialUv(20, input.uv, input.uv1)).r,
+    materialInputs.occlusion = EvaluatePbrOcclusion(aoMap.Sample(gSampler, MaterialUv(20, input.uv, input.uv1)).r,
         usePropertyBlock ? occlusionStrength : 1.0);
     const bool useNormalMap = input.material.z != 0.0;
     float3 normalSample = float3(0.5, 0.5, 1.0);
     if (useNormalMap) normalSample = normalMap.Sample(gSampler, MaterialUv(17, input.uv, input.uv1)).rgb;
-    float3 normal = EvaluatePbrNormal(input.normal, input.tangent,
+    const float3 normal = EvaluatePbrNormal(input.normal, input.tangent,
         input.bitangent, normalSample, materialNormalScale, useNormalMap,
         SHADING_QUALITY == 1);
 
-    normal = OrientPbrNormal(normal, input.coverageFlags, frontFace);
+    materialInputs.normal = OrientPbrNormal(normal, input.coverageFlags, frontFace);
+    const PrincipledSurface material = EvaluateStandardMaterial(materialInputs);
     PSOut output;
-    output.diffuse    = material.albedo;
+    output.diffuse    = float4(material.baseColor, material.alpha);
     output.metalRough = float4(
-        occlusion,
+        material.occlusion,
         material.roughness,
         material.metallic,
         1.0);
-    output.normal     = float4(normal * 0.5 + 0.5, 1.0);
+    output.normal     = float4(material.normal * 0.5 + 0.5, 1.0);
     output.emissive   = float4(
-        material.emissive, 1.0);
+        material.emission, 1.0);
     output.bitmask    = 0xABCDu;
     return output;
 }

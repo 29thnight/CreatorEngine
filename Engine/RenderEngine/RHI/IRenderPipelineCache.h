@@ -31,6 +31,13 @@
 // 하는 규칙이고, 이 파일이 그 첫 조각이다.
 
 /// PSO 캐시. desc 해시로 파이프라인을 나눠 쓴다 — 뷰가 둘이어도 컴파일은 한 번이다.
+enum class RHIPipelineRequestState : std::uint8_t
+{
+    Ready,
+    Pending,
+    Failed
+};
+
 class IRenderPipelineCache
 {
 public:
@@ -40,6 +47,16 @@ public:
         const RHIGraphicsPipelineDesc& desc, std::string& outError) = 0;
     virtual RHIPipelineHandle GetOrCreateCompute(
         const RHIComputePipelineDesc& desc, std::string& outError) = 0;
+
+    // Call on the render owner. Async implementations copy borrowed inputs and
+    // return Pending without waiting. The base implementation is synchronous;
+    // owners must budget calls on backends which do not override this method.
+    virtual RHIPipelineRequestState RequestGraphics(const RHIGraphicsPipelineDesc& desc,
+        RHIPipelineHandle& result, std::string& outError)
+    {
+        result = GetOrCreate(desc, outError);
+        return result.IsValid() ? RHIPipelineRequestState::Ready : RHIPipelineRequestState::Failed;
+    }
 
     /// 지정한 live handle 하나만 lookup에서 제거하고 native pipeline을 retire한다.
     /// false면 이미 stale이거나 이 cache가 발급한 handle이 아니다. 다른 pipeline은

@@ -1,6 +1,6 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
-**정본 2026-09-28 · MAT-0 Blender 기준선 완료 · 나머지 미착수 항목은 그대로 미착수.**
+**정본 2026-09-30 · MAT-0~MAT-8 완료 · MAT-9 rendered parity·성능 수용 잔여 · 그 외 미착수 유지.**
 이 문서는 PHASE 4 계열의 현재 소유권·표시 순서·공수 원장이다. 이전 Asset-first SRP
 분할의 근거·이력은 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)에 보존했다.
 새 C# 저작/네이티브 실행 목표는
@@ -11,7 +11,7 @@
 | 표시 순서 | 단일 완료선 | 활성 행 | 산정 일 | 완료 | 별도 미산정 |
 |---|---|---:|---:|---:|---|
 | **4** | 현행 DX12 PBR 제품 배선 | 10 | 18 | 18 | — |
-| **4.25** | Material Graph·Principled/artist 계약 | 10 | 34 | 2 (`MAT-0`) | — |
+| **4.25** | Material Graph·Principled/artist 계약 | 10 | 34 | 32 (`MAT-0~MAT-8`) | — |
 | **4.3** | `BASE-0` → 단일 writer DAG → version/Modify DAG·RHI queue 기반 | 11 | 119 | 0 | `Q0` |
 | **4.5** | 모션/히스토리·업스케일·프레임 생성 | 16 | 86 | 0 | — |
 | **4.6** | C# Pipeline IR·PassSchema/Roslyn·native 조립 | 7 | 미산정 | 0 | `CSRP-0~6` 전부 |
@@ -19,7 +19,7 @@
 | **4.75** | renderer 품질: probe/AO·shadow·display/post | 3 | 20 | 0 | — |
 | **4.8** | GPU-driven·확률 조명·DXR 설계 판정 | 4 | 5.5 | 0 | 세 기능의 실제 구현 |
 | **4.9** | DX12/Vulkan PBR 교차 판정 복귀 | 0 | 미산정 | 0 | 시간 고정 이후 슬라이스 |
-| **현재 합계** | | **69 (산정 62·미산정 7)** | **산정 317.5** | **산정 22** | **잔여 산정 295.5일 + 미산정** |
+| **현재 합계** | | **69 (산정 62·미산정 7)** | **산정 317.5** | **산정 52** | **잔여 산정 265.5일 + 미산정** |
 
 구 원장의 **69행 352.5일·완료 22일**에서 Asset-first `4-1` 2일과
 `SRP-0/1/2/4/5/6` 33일, 총 7행 35일을 **새 C# 계획으로 이월하지 않고**
@@ -28,6 +28,43 @@
 나머지 항목은 ID·공수·상태를 보존한 순수 재배치다.
 새 `CSRP-0~6`은 0일 구현이 아니라 미산정이다. 숫자가 작아진 것을 작업량 감소나
 전체 기능 완료 예상으로 읽지 않는다.
+
+MAT-3 완료는 공용 core 의미와 독립 GPU 8,280개 대조, 현행 Standard 제품 회귀 판정이다.
+[PrincipledCoreSemantics.md](../design/PrincipledCoreSemantics.md)를 따른다.
+비기본 IOR를 담는 제품 lookup/packing·graph binding은 MAT-6/MAT-7, Blender 교차 판정은 MAT-9에 남는다.
+MAT-4는 Layered 공용 평가와 독립 GPU 216,776개 수치·독립성, energy bound/numeric golden 검증이다.
+MAT-5는 Special 공용 평가·명시적 Forward 자원 계약과 독립 GPU 202,049개 수치·독립성,
+energy bound/numeric golden 검증이다. [PrincipledSpecialSemantics.md](../design/PrincipledSpecialSemantics.md)의
+diffusion·단일 경계 glass·homogeneous volume 근사 범위를 따른다.
+MAT-6은 초기 지원 graph의 결정적 Slang/metadata·진단·실패 generation 복구와 독립 texture GPU 대조다.
+[MaterialSlangCodegen.md](../design/MaterialSlangCodegen.md)를 따른다. 제품 reflection/pass adapter,
+실제 자원/PSO/Scene 배선과 자동 cook route는 MAT-7에 남는다.
+MAT-7의 reflection·candidate PSO·texture owner fence와 LXMC/CEMF·AssetCooker·encrypted
+PAK 기반을 검증했다. [MaterialGraphProduct.md](../design/MaterialGraphProduct.md)를 따른다.
+DataSystem/Material GUID generation·typed instance 저장 왕복/실패 복구를 연결하고
+runtime 43개·제품 DataSystem Debug/Release 각 26개 검사로 검증했다.
+제품 b2·texture·독립 sampler render binding adapter는 실제 엔진 DX12 오프스크린
+draw에서 Debug/Release 각 168개 검사·64개 GPU 성분으로 검증했다. Scene 적용은 후속이다.
+Core/Layered evaluated-point IBL bake와 별도 base/coat/sheen 응답 소비 draw도
+Debug/Release 각 19,351개 검사·18,240개 GPU 성분을 통과했다.
+[PrincipledIblBake.md](../design/PrincipledIblBake.md)의 Scene lookup 배치/보간/재사용,
+환경 MIS/수렴·실시간 예산은 후속이다.
+[MaterialGraphScenePacket.md](../design/MaterialGraphScenePacket.md)의 graph instance·coverage/queue·PSO·
+IBL·recording binding을 함께 준비/게시하는 render owner와 실제 두 in-flight 제출의
+교체·실패·abort·완료 해제를 검증했다. 이 render owner 검증 자체를 Scene pass 설치로 세지 않는다.
+후속 [MaterialGraphSceneHost.md](../design/MaterialGraphSceneHost.md)는 실제 Scene GBuffer·
+공유 depth·legacy/LX Masked 가림·Core/Layered HDR 합성에 bounded host를 연결했다.
+현재 4,096픽셀·64 draw 이하의 정확도 기준용 IBL 적분 경로다. full-resolution lookup·
+재사용/실시간 비용 수용, Special/투명 transport와 자동 Scene host 쿠킹은 남는다.
+Debug/Release 각 830,436개 검사·GPU 659,914성분, 실제 합성 graph 24개·가시 3,582픽셀·
+실패 거부 120개·GPU validation 0건을 확인했다. 실제 Editor Live Tick·Vulkan native 실행은 별도다.
+위 MAT-7 기반 설명은 당시 진행 기록이다. 2026-09-29 제품 통합 종료 묶음과 2026-09-30 MAT-8 artist preview·비용/실패 안내를 완료했다. 현재 MAT 완료 공수는 32/34일이며 MAT-9 rendered parity·성능 수용은 남는다. 상세 현재 증거는 BlenderMaterialGraphPlan.md와 MaterialNodeEditor.md를 따른다.
+[MaterialGraphSurfaceBatch.md](../design/MaterialGraphSurfaceBatch.md)의 graph GPU 평가 →
+point buffer bake → bounded draw에서 UV/LOD·world frame·eye·typed override를 소비한다.
+완료 readback acceptance와 recording 성공을 구분하고 invalid 지점에 진단 표식을 남긴다.
+이 point bake의 Scene lookup 보간/예산·async 게시와 일반 해상도 route 설치는 후속이다.
+[PrincipledLayeredSemantics.md](../design/PrincipledLayeredSemantics.md)를 따른다.
+EEVEE가 사용하지 않는 anisotropy/thin film의 Cycles 비교·RGB 근사 수용과 제품 route/성능은 후속이다.
 
 ## 2. 선행 그래프
 

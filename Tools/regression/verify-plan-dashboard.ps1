@@ -178,7 +178,7 @@ foreach ($span in $entrySpans) {
     $body = $span.Text
     $idM = [regex]::Match($body, 'id:\s*"([^"]*)"')
     $stM = [regex]::Match($body, 'status:\s*"([^"]*)"')
-    $dayM = [regex]::Match($body, 'days:\s*(-?[\d.]+)')
+    $dayM = [regex]::Match($body, 'days:\s*(null|-?[\d.]+)')
     $phM = [regex]::Match($body, 'phase:\s*(?:"([^"]*)"|(-?[\d.]+))')
     $earnM = [regex]::Match($body, 'earnedDays:\s*(-?[\d.]+)')
 
@@ -195,7 +195,7 @@ foreach ($span in $entrySpans) {
     $entries.Add([pscustomobject]@{
             Id     = $id
             Status = $stM.Groups[1].Value
-            Days   = [double]$dayM.Groups[1].Value
+            Days   = if ($dayM.Groups[1].Value -eq 'null') { 0.0 } else { [double]$dayM.Groups[1].Value }
             Phase  = if ($phM.Groups[1].Success) { $phM.Groups[1].Value } else { $phM.Groups[2].Value }
             IsNum  = -not $phM.Groups[1].Success
             Earned = if ($earnM.Success) { [double]$earnM.Groups[1].Value } else { $null }
@@ -286,7 +286,8 @@ if ($metaErrors.Count -gt 0) {
 
 # ── 4. 전체 파싱(node 가 있을 때만) ───────────────────────────────────────────
 #
-# 위 단정은 TASKS 만 본다. 같은 파일의 렌더 코드가 깨지는 것은 실제 파서라야 잡는다.
+# 실제 script를 실행해 공수 집계도 확인한다. 문법이 정상이어도 모르는 status와
+# undefined 가중치를 곱하면 미산정 0일 행에서도 NaN이 전체 진행률로 전파된다.
 
 $fullParse = 'absent'
 $node = Get-Command node -ErrorAction SilentlyContinue
@@ -304,9 +305,51 @@ while ((m = re.exec(html)) !== null) {
   const line = html.slice(0, m.index).split('\n').length;
   try {
     new vm.Script(m[1], { filename: `script${index}` });
+    if (m[1].includes('const TASKS = [')) {
+      const makeElement = () => ({
+        textContent: '', innerHTML: '', dataset: {}, parentElement: null,
+        appendChild() {}, setAttribute() {}, scrollIntoView() {}
+      });
+      const elements = new Map();
+      const tables = [...html.matchAll(/<table class="tasks" data-phase="([\d.]+)"/g)].map(match => {
+        const element = makeElement();
+        element.dataset.phase = match[1];
+        return element;
+      });
+      const badges = [...html.matchAll(/data-phase-pct="([\d.]+)"/g)].map(match => {
+        const element = makeElement();
+        element.dataset.phasePct = match[1];
+        return element;
+      });
+      const context = vm.createContext({
+        document: {
+          getElementById(id) {
+            if (!elements.has(id)) elements.set(id, makeElement());
+            return elements.get(id);
+          },
+          querySelectorAll(selector) {
+            return selector === 'table.tasks' ? tables : selector === '.phase-pct' ? badges : [];
+          },
+          createElement: makeElement,
+          addEventListener() {}
+        },
+        window: { addEventListener() {} },
+        location: { hash: '' }
+      });
+      new vm.Script(m[1], { filename: `script${index}` }).runInContext(context);
+      new vm.Script(`
+        for (const task of TASKS) {
+          if (!Object.hasOwn(ST_WEIGHT, task.status)) throw new Error(task.id + ': unknown status ' + task.status);
+        }
+        for (const value of [overallPct, openPct, ...PHASE_IDS.map(phasePct)]) {
+          if (!Number.isFinite(value) || value < 0 || value > 100) throw new Error('Invalid progress percentage: ' + value);
+        }
+      `).runInContext(context);
+      console.log('dashboardRender=ok progressPercentages=finite');
+    }
   } catch (e) {
     bad += 1;
-    console.log(`script ${index} (${line}줄 시작): 파싱 실패 — ${e.message}`);
+    console.log(`script ${index} (${line}줄 시작): 파싱 또는 집계 실패 — ${e.message}`);
   }
 }
 console.log(`scriptBlocks=${index} broken=${bad}`);

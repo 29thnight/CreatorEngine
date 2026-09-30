@@ -93,6 +93,12 @@ struct LXWireStyle
     bool arrowAtMidpoint = false;
 };
 
+enum class LXGridPattern
+{
+    Lines,
+    Dots
+};
+
 struct LXCanvasStyle
 {
     ImVec4 background{0.145f, 0.145f, 0.145f, 1.0f};
@@ -104,6 +110,8 @@ struct LXCanvasStyle
     float maxZoom = 2.2f;
     float zoomStep = 1.12f;
     bool showGrid = true;
+    LXGridPattern gridPattern = LXGridPattern::Lines;
+    float gridDotRadius = 0.7f;
 };
 
 struct LXFrameStyle
@@ -151,6 +159,7 @@ class LXStyleSheet
     bool Equals(const LXStyleSheet& other) const;
     bool Save(const std::string& path, std::string* error = nullptr) const;
     static std::optional<LXStyleSheet> Load(const std::string& path, std::string* error = nullptr);
+    int SourceVersion() const noexcept { return sourceVersion_; }
 
   private:
     std::map<std::string, LXNodeStyle> typeStyles_;
@@ -161,6 +170,7 @@ class LXStyleSheet
     std::map<Id, LXWireStyle> wireStyles_;
     LXItemStyle defaultItem_;
     std::map<std::string, LXItemStyle> itemStyles_;
+    int sourceVersion_ = 6;
     static std::optional<LXStyleSheet> LoadExact(const std::string& path, std::string* error);
     void Write(std::ostream& out) const;
 };

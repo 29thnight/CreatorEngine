@@ -5,6 +5,7 @@
 #include "../Passes/Geometry/EnhancedGBufferPass.h"
 #include "../Graph/EnhancedDrawSealLedger.h"
 #include "../../Texture.h"
+#include "../../MaterialGraphSceneInput.h"
 #include <AuthoringRymlErrorPolicy.h>
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
@@ -134,6 +135,63 @@ struct EnhancedPbrCapture
         root["sealLedger"]["recorded"] << false;
     }
 
+    void RecordLatticeInput(const std::shared_ptr<const material_graph::SceneViewInput>& input)
+    {
+        if (!input)
+        {
+            return;
+        }
+        auto root = manifest.rootref();
+        for (const auto& draw : input->Draws())
+        {
+            auto item = root["draws"].append_child();
+            item |= ryml::MAP;
+            item["route"] << "lattice";
+            const auto& geometry = draw.geometry->Source()->Geometry();
+            item["modelId"] << FileGuid(geometry.handle.modelId).ToString();
+            item["meshId"] << FileGuid(geometry.handle.meshId).ToString();
+            item["modelGeneration"] << geometry.handle.generation;
+            const auto& instance = *draw.material;
+            auto graph = item["lattice"];
+            graph |= ryml::MAP;
+            graph["graphId"] << FileGuid(instance.generation->assetId.value).ToString();
+            graph["generation"] << instance.generation->generation;
+            graph["slot"] << draw.materialSlot;
+            graph["features"] << instance.generation->cooked.product.program.features;
+            graph["coverage"] << static_cast<uint32_t>(draw.queue);
+            graph["uniformBytes"] |= ryml::SEQ;
+            for (auto byte : instance.uniforms)
+            {
+                graph["uniformBytes"].append_child() << static_cast<uint32_t>(byte);
+            }
+            graph["textures"] |= ryml::SEQ;
+            for (const auto& texture : instance.textures)
+            {
+                auto binding = graph["textures"].append_child();
+                binding |= ryml::MAP;
+                binding["slot"] << texture.slot;
+                binding["assetId"] << FileGuid(texture.assetId.value).ToString();
+                binding["colorSpace"] << static_cast<uint32_t>(texture.colorSpace);
+                binding["authored"] << !!texture.owner;
+            }
+        }
+    }
+
+    // Begin captures the legacy list before graph readiness is known. Record
+    // the temporary PBR draws selected later in PreparePipelineFrame as well.
+    void RecordPendingLatticeFallback(const EnhancedDrawItem& draw)
+    {
+        if (result.state != EnhancedPbrCaptureState::Recording || !draw.materialSnapshot)
+            return;
+        auto item = manifest.rootref()["draws"].append_child();
+        item |= ryml::MAP;
+        item["route"] << "gbuffer-pending-lattice";
+        item["modelId"] << FileGuid(draw.modelMeshView.handle.modelId).ToString();
+        item["meshId"] << FileGuid(draw.modelMeshView.handle.meshId).ToString();
+        item["modelGeneration"] << draw.modelMeshView.handle.generation;
+        item["shaderMetaSlot"] << draw.materialSnapshot->shaderMetaHandle.slot;
+        item["sealHash"] << draw.materialSnapshot->seal.sealHash;
+    }
     // 패스가 이번 프레임의 배치를 확정한 뒤에 부른다. draw snapshot만으로는
     // 알 수 없는 축(어느 PSO로 그렸는가, 어떤 sampler를 걸었는가, descriptor
     // 배치가 갈리지 않았는가)을 여기서 적는다.

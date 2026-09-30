@@ -101,7 +101,7 @@ namespace
 		catch (...) { return {}; }
 	}
 
-	EngineLaunchConfig MakePlayerLaunchConfig()
+	EngineLaunchConfig MakePlayerLaunchConfig(bool smokeOffscreen)
 	{
 		EngineLaunchConfig config{};
 		config.compatibilityRunMode = EngineRunMode::Player;
@@ -154,6 +154,15 @@ namespace
 		config.window.fitNearestMonitor = true;
 		config.window.showOnCreate = true;
 		config.window.acceptFileDrops = true;
+		if (smokeOffscreen)
+		{
+			config.window.clientWidth = 64;
+			config.window.clientHeight = 64;
+			config.window.style = WS_OVERLAPPEDWINDOW;
+			config.window.fitNearestMonitor = false;
+			config.window.showOnCreate = false;
+			config.window.acceptFileDrops = false;
+		}
 		return config;
 	}
 }
@@ -163,6 +172,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	// --smoke N — 명령줄 파싱은 이 exe에 이것뿐이라 인프라를 들이지 않는다.
 	// 판정 규약(종료 코드 + 로그 마커)은 BuildPipelinePlan §2.3.
 	int argc = 0;
+	bool smokeOffscreen = false;
 	if (LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc))
 	{
 		for (int i = 1; i < argc; ++i)
@@ -170,6 +180,14 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 			if (0 == wcscmp(argv[i], L"--smoke") && i + 1 < argc)
 			{
 				Player::g_smoke.frameLimit = wcstoull(argv[i + 1], nullptr, 10);
+			}
+			else if (0 == wcscmp(argv[i], L"--smoke-offscreen"))
+			{
+				smokeOffscreen = true;
+			}
+			else if (0 == wcscmp(argv[i], L"--smoke-promotions") && i + 1 < argc)
+			{
+				Player::g_smoke.minimumPromotions = std::max<uint64_t>(2, wcstoull(argv[i + 1], nullptr, 10));
 			}
 			else if (0 == wcscmp(argv[i], L"--smoke-reload"))
 			{
@@ -184,7 +202,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		LocalFree(argv);
 	}
 
-	const EngineLaunchConfig launchConfig = MakePlayerLaunchConfig();
+	const EngineLaunchConfig launchConfig = MakePlayerLaunchConfig(smokeOffscreen && Player::g_smoke.frameLimit > 0);
 
 	// endpoint 파일은 **이 프로세스의** runtime 데이터 뿌리에 놓는다.
 	// Player 를 여럿 띄우는 것이 정상 경로라(각자 격리된 runtimeProcessRoot),

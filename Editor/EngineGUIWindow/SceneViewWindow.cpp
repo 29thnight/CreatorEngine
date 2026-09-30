@@ -172,7 +172,24 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     // 그 임시가 문장 끝에 죽어 매달린 참조가 된다.
     const EnhancedLiveDisplaySnapshot displaySnapshot =
         EnhancedSceneRenderer::GetLiveDisplaySnapshot();
-    if (!displaySnapshot.Get(EnhancedLiveDisplayTarget::Editor).active)
+    const auto& sceneDisplay = displaySnapshot.Get(EnhancedLiveDisplayTarget::Editor);
+    const double now = ImGui::GetTime();
+    if (!sceneDisplay.active || !sceneDisplay.ready ||
+        sceneDisplay.promotionCount < m_lastScenePromotionCount ||
+        now - m_lastSceneFpsSampleTime > 2.0)
+    {
+        m_lastScenePromotionCount = sceneDisplay.promotionCount;
+        m_lastSceneFpsSampleTime = now;
+        m_sceneFps = 0.f;
+    }
+    else if (now - m_lastSceneFpsSampleTime >= 0.5)
+    {
+        m_sceneFps = static_cast<float>(sceneDisplay.promotionCount - m_lastScenePromotionCount) /
+            static_cast<float>(now - m_lastSceneFpsSampleTime);
+        m_lastScenePromotionCount = sceneDisplay.promotionCount;
+        m_lastSceneFpsSampleTime = now;
+    }
+    if (!sceneDisplay.active)
     {
         const char* noCamera = "No editor camera";
         const ImVec2 textSize = ImGui::CalcTextSize(noCamera);
@@ -188,7 +205,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     }
     ImGuizmo::BeginFrame();
     ImGuizmo::SetDrawlist();
-    m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas);
+    m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas, m_sceneFps);
     if (!m_canvas.valid) return;
     // 기즈모는 image 사각형을 받는다 — 잘린 부분까지 포함한 소스 전체의 자리라야
     // 화면 밖으로 밀려난 조작점의 투영이 맞는다. 제목표시줄 보정은 없다(원점이 content).

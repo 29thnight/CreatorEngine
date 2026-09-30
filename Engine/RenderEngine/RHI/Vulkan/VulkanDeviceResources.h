@@ -146,7 +146,7 @@ public:
 
     /// backend-owned persistent buffer를 표와 네이티브 메모리에서 함께 놓는다.
     /// VulkanMeshCache의 completion graveyard가 안전 완료 뒤 호출한다.
-    void ReleaseBuffer(RHIBufferHandle handle)
+    void ReleaseBuffer(RHIBufferHandle handle) override
     {
         m_resourceTable.Release(m_device, handle);
     }

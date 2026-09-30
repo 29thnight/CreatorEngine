@@ -38,8 +38,8 @@ public:
 
 private:
 	using Scope = editor::windows::content_browser_scope;
-	/// 이름을 받아 만드는 것. 폴더 만들기와 Volume Profile 이 같은 대화상자를 쓴다.
-	enum class CreateKind : std::uint8_t { folder, volume_profile };
+	/// 이름을 받아 만드는 것. 폴더 만들기와 Scene Render Profile 이 같은 대화상자를 쓴다.
+	enum class CreateKind : std::uint8_t { folder, render_profile };
 
 	/// PHASE 21 W2-B — 이력의 한 칸은 **경로가 아니라 방문**이다.
 	///
@@ -86,8 +86,8 @@ private:
     void DrawFolderMenu(const file::path& directory);
     void DrawFolderDialog();
     void OpenCreateDialog(CreateKind kind, const file::path& directory);
-    /// Volume Profile 을 만들 수 있는 자리인가 — 폴더 메뉴·타일 메뉴·CLI 가 같은 술어를 쓴다.
-    bool CanCreateVolumeProfileIn(const file::path& directory) const;
+    /// Scene Render Profile 을 만들 수 있는 자리인가 — 폴더 메뉴·타일 메뉴·CLI 가 같은 술어를 쓴다.
+    bool CanCreateSceneRenderProfileIn(const file::path& directory) const;
     /// 대화상자의 Create 와 CLI 가 지나는 유일한 생성 경로. 실패하면 `m_error` 에 이유를 둔다.
     bool CreateNamedAsset(CreateKind kind, const file::path& directory, std::string_view name);
     void DrawSearch(float width);
@@ -112,7 +112,7 @@ private:
 	// 디스크에 묻던 것을 이 값과의 어휘 비교로 대신한다. 양쪽이 같은 정규형이라야
 	// 비교가 성립하므로 여기 담을 때 browser_canonical 을 거친다.
 	file::path m_prefabDirectory{};
-	file::path m_volumeProfileDirectory{};
+	file::path m_sceneRenderProfileDirectory{};
 	file::path		m_currentDirectory{};
 	Scope m_scope{ Scope::folder };
     std::vector<Visit> m_history;

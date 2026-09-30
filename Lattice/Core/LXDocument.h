@@ -269,6 +269,7 @@ class LXDocument
     std::uint64_t Revision() const { return revision_; }
     const std::string& Path() const { return path_; }
     bool Dirty() const { return dirty_; }
+    bool HasActivePreview() const { return previewActive_; }
     const LXGraph& Graph() const { return graph_; }
     LXGraph& GraphForCanvas() { return graph_; }
     LXCommandResult Execute(const LXCommand& command, std::uint64_t expectedRevision);
@@ -278,6 +279,9 @@ class LXDocument
     bool PreviewFramePosition(Id frame, float x, float y);
     LXCommandResult FinishFramePositionPreview(Id frame, float startX, float startY, float finalX, float finalY);
     bool Reload(std::string* error = nullptr);
+    // Product archives own their persistence. A successful exact archive write
+    // marks the current graph as saved without discarding its Undo history.
+    bool AcceptSavedSnapshot();
 
     static std::optional<LXDocument> Open(const std::string& path, std::string* error = nullptr,
                                           std::shared_ptr<const LXNodeDefinitionRegistry> definitions = nullptr);

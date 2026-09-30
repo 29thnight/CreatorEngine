@@ -3,6 +3,7 @@
 #include "Includes/PbrSurface.slang"
 #include "Includes/PbrCoverage.slang"
 #include "Includes/PackedBones.slang"
+#include "Includes/StandardMaterialRoute.slang"
 
 // MBC6: ModelAssetGeneration의 전체 mask가 입력 레이아웃과 shader 축을 함께
 // 만든다. Forward도 GBuffer/Shadow와 같은 palette 규약으로 skin pose를 계산한다.
@@ -386,15 +387,13 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
         mrSample = ormMap.Sample(gSampler, MaterialUv(18, resolvedUv, resolvedUv1)).rgb;
         emissionSample = emissiveMap.Sample(gSampler, MaterialUv(19, resolvedUv, resolvedUv1)).rgb;
     }
-    const PbrMaterial material = EvaluatePbrMaterial(baseSample, mrSample,
+    MaterialInputs materialInputs = MakeStandardMaterialInputs(baseSample, mrSample,
         emissionSample, resolvedBaseColor, resolvedRoughness, resolvedMetallic,
         useLegacyInstanceMaterial ? float3(1.0f) : emissive,
         useLegacyInstanceMaterial ? 1.0f : emissiveStrength);
-    float4 albedo = material.albedo;
-    albedo.a = ApplyPbrCoverage(albedo.a * (useLegacyInstanceMaterial ? 1.0 : input.vertexAlpha),
+    materialInputs.alpha = ApplyPbrCoverage(
+        materialInputs.alpha * (useLegacyInstanceMaterial ? 1.0 : input.vertexAlpha),
         useLegacyInstanceMaterial ? input.coverageCutoff : alphaCutoff, input.coverageFlags, frontFace);
-    const float rough = saturate(material.roughness);
-    const float materialMetallic = saturate(material.metallic);
     float3 representativeEmission = float3(0.0f);
     // P2d-b: authored speed/frequency와 immutable frame time·m_flowInfo를 함께
     // 사용한다. total=0, flow=0이면 P2c의 기존 authored phase와 정확히 같다.
@@ -406,7 +405,7 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
         + waveSpeed * (1.0f + input.flowUvTime.z) + flowPhase);
     const float waterResponse = saturate(
         waterTint + waveAmplitude * waterWave);
-    representativeEmission = material.emissive
+    representativeEmission = materialInputs.emissionColor * materialInputs.emissionStrength
         * float3(0.04f, 0.20f, 0.70f) * waterResponse;
 #elif defined(FORWARD_WIND_MATERIAL)
     const float windWave = 0.5f + 0.5f * sin(
@@ -414,23 +413,30 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
         + windSpeed * (1.0f + input.flowUvTime.z) + flowPhase);
     const float windResponse = saturate(
         windTint + windStrength * windWave);
-    representativeEmission = material.emissive
+    representativeEmission = materialInputs.emissionColor * materialInputs.emissionStrength
         * float3(0.08f, 0.65f, 0.14f) * windResponse;
 #endif
     const bool useNormalMap = hasTextures && input.material.z != 0.0f;
     float3 normalSample = float3(0.5f, 0.5f, 1.0f);
     if (useNormalMap) normalSample = normalMap.Sample(gSampler, MaterialUv(17, resolvedUv, resolvedUv1)).rgb;
-    float3 normal = EvaluatePbrNormal(input.normal, input.tangent,
+    const float3 normal = EvaluatePbrNormal(input.normal, input.tangent,
         input.bitangent, normalSample, resolvedNormalScale, useNormalMap,
         SHADING_QUALITY == 1);
-    normal = OrientPbrNormal(normal, input.coverageFlags, frontFace);
+    materialInputs.normal = OrientPbrNormal(normal, input.coverageFlags, frontFace);
+    if (gHasIbl != 0u)
+    {
+        materialInputs.occlusion = EvaluatePbrOcclusion(
+            hasTextures ? aoMap.Sample(gSampler, MaterialUv(20, resolvedUv, resolvedUv1)).r : 1.0,
+            useLegacyInstanceMaterial ? 1.0 : occlusionStrength);
+    }
+    const PrincipledSurface material = EvaluateStandardMaterial(materialInputs);
+    const float rough = saturate(material.roughness);
     const float3 view = normalize(gEyePosition.xyz - input.worldPos);
     float2 dfg = PbrNeutralDfg();
     if (gHasIbl != 0u)
         dfg = gBrdfLut.SampleLevel(gIblSampler,
-            float2(PbrNdotV(normal, view), rough), 0.0f).rg;
-    const PbrSurface surface = BuildPbrSurface(input.worldPos, normal, view,
-        albedo.rgb, rough, materialMetallic, dfg);
+            float2(PbrNdotV(material.normal, view), rough), 0.0f).rg;
+    const PbrSurface surface = BuildPbrSurface(input.worldPos, view, material, dfg);
 
     float3 lit = 0.0f;
 
@@ -460,20 +466,16 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
     float3 ambient = 0.0f;
     if (0 != gHasIbl)
     {
-        const float3 irradiance = gIrradiance.SampleLevel(gIblSampler, normal, 0.0f).rgb;
+        const float3 irradiance = gIrradiance.SampleLevel(gIblSampler, material.normal, 0.0f).rgb;
 
-        const float3 reflection = reflect(-surface.view, normal);
+        const float3 reflection = reflect(-surface.view, material.normal);
         const float3 prefiltered = gPrefiltered.SampleLevel(gIblSampler,
             reflection, rough * (IBL_PREFILTER_MIPS - 1)).rgb;
-        const float occlusion = EvaluatePbrOcclusion(
-            hasTextures ? aoMap.Sample(gSampler, MaterialUv(20, resolvedUv, resolvedUv1)).r : 1.0,
-            useLegacyInstanceMaterial ? 1.0 : occlusionStrength);
-        const IblAmbient evaluated = EvaluateIblAmbient(albedo.rgb, surface.f0,
-            rough, materialMetallic, surface.ndotv, occlusion,
+        const IblAmbient evaluated = EvaluateStandardIbl(material, surface,
             irradiance, prefiltered, dfg);
         ambient = evaluated.Sum();
     }
 
     // 알파는 베이스 컬러에서 온다 — 이것이 블렌드를 성립시킨다.
-    return float4(lit + ambient + material.emissive + representativeEmission, albedo.a);
+    return float4(lit + ambient + material.emission + representativeEmission, material.alpha);
 }

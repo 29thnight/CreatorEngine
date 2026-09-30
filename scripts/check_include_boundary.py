@@ -48,8 +48,8 @@ RE_EDITOR_PLATFORM_API = re.compile(
     r'\b(?:ShellExecute(?:A|W)?|CreateProcessW|Show(?:Open|Save|Folder)FileDialog)\s*\(')
 RE_EDITOR_ASSET_AUTHORING_IMPL = re.compile(
     r'\befsw::FileWatch(?:er|Listener)\b|'
-    r'\b(?:CreateYamlMeta|ScanAndCleanupInvalidMeta|SaveExistVolumeProfile|'
-    r'SaveMaterial|CreateVolumeProfile|ImportSourceAsset)\s*\(')
+    r'\b(?:CreateYamlMeta|ScanAndCleanupInvalidMeta|SaveExistSceneRenderProfile|'
+    r'SaveMaterial|CreateSceneRenderProfile|ImportSourceAsset)\s*\(')
 RE_DATA_SYSTEM_AUTHORING = re.compile(
     r'\b(?:copy_file|CopyHDRTexture|CopyTextureSelectType|SelectTextureType)\s*\(|'
     r'\bDataSystem::CopyTexture\s*\(|\bm_LoadTextureAssetQueue\b|'

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "PrincipledSurface.slang"
 #include "TangentFrame.slang"
 
 float3 PbrUnitNormal(float3 value, float3 fallback)
@@ -46,26 +47,21 @@ void TransformPbrFrame(float3 normal, float3 tangent, float3 bitangent,
     }
 }
 
-struct PbrMaterial
-{
-    float4 albedo;
-    float roughness;
-    float metallic;
-    float3 emissive;
-};
-
 // Inputs are sampled values or semantic defaults. Keep GBuffer's raw factor
 // products; lighting clamps roughness/metallic after the attachment boundary.
-PbrMaterial EvaluatePbrMaterial(float4 baseSample, float3 mrSample,
+MaterialInputs MakeStandardMaterialInputs(float4 baseSample, float3 mrSample,
     float3 emissiveSample, float4 baseFactor, float roughnessFactor,
     float metallicFactor, float3 emissiveFactor, float emissiveStrength)
 {
-    PbrMaterial material;
-    material.albedo = baseSample * baseFactor;
-    material.roughness = mrSample.g * roughnessFactor;
-    material.metallic = mrSample.b * metallicFactor;
-    material.emissive = emissiveSample * emissiveFactor * emissiveStrength;
-    return material;
+    MaterialInputs inputs = DefaultStandardMaterialInputs();
+    const float4 baseColor = baseSample * baseFactor;
+    inputs.baseColor = baseColor.rgb;
+    inputs.alpha = baseColor.a;
+    inputs.roughness = mrSample.g * roughnessFactor;
+    inputs.metallic = mrSample.b * metallicFactor;
+    inputs.emissionColor = emissiveSample * emissiveFactor * emissiveStrength;
+    inputs.emissionStrength = 1.0;
+    return inputs;
 }
 
 float3 EvaluatePbrNormal(float3 normal, float3 tangent, float3 bitangent,

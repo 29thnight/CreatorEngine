@@ -11,6 +11,7 @@
 #include "RenderScene.h"
 #include "ProxyCommandQueue.h"
 #include "Material.h"
+#include "MaterialGraphSceneInput.h"
 #include "SpriteRenderer.h"
 #include "DecalComponent.h"
 #include "LightComponent.h"
@@ -61,6 +62,8 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 		update.worldBounds = component->GetBoundingBox();
 	}
 	update.material = std::move(material);
+    update.graphMaterialSource = update.material
+        ? material_graph::SceneMaterialSource::Capture(*update.material) : nullptr;
 	if (update.material) update.materialGuid = update.material->m_materialGuid;
 	// I5-D5c3 — 저작 정본은 값 스냅샷이라 legacy처럼 저절로 따라오지 않는다.
 	// 세대(Revision)를 함께 실어 적용부가 변화만 반영한다 — 매 갱신마다
@@ -182,6 +185,11 @@ ProxyCommand::ProxyCommand(FoliageComponent* component, uint64_t sceneEpoch) :
 	update.worldMatrix = owner->Transform_().GetWorldMatrix();
 	update.worldPosition = owner->Transform_().GetWorldPosition();
 	update.foliageTypes = component->GetFoliageTypes();
+    for (auto& type : update.foliageTypes)
+    {
+        type.m_graphMaterialSource = type.m_material
+            ? material_graph::SceneMaterialSource::Capture(*type.m_material) : nullptr;
+    }
 	update.foliageInstances = component->GetFoliageInstances();
 
 	m_proxyGUID = component->GetInstanceID();
@@ -467,6 +475,8 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 					proxy->m_Material = update->material;
 					proxy->m_materialGuid = update->materialGuid;
 				}
+                // Instance replacement is independent of the legacy owner/GUID.
+                proxy->m_graphMaterialSource = update->graphMaterialSource;
 				// I5-D5c3 — 저작 스냅샷은 **세대**로 갱신한다. 재질 GUID가
 				// 그대로여도 property 편집이면 세대가 오르므로, 같은 재질의
 				// 값 편집이 여기서 화면까지 닿는다(위 GUID 조건과 별개 축).

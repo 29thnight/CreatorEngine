@@ -65,6 +65,30 @@ std::size_t RowCount(const Node& node)
     return std::max(inputs, outputs);
 }
 
+bool CompactPinVisible(const Node& node, const Pin& pin, const LXNodeItemRegistry* items)
+{
+    if (!items || !items->HasRows(node) || items->Connected(pin))
+    {
+        return true;
+    }
+    if (!items->PinRow(node, pin))
+    {
+        return false;
+    }
+    for (const auto& candidate : node.pins)
+    {
+        if (candidate.id == pin.id)
+        {
+            break;
+        }
+        if (candidate.direction == pin.direction && candidate.type == pin.type && items->PinRow(node, candidate))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 float ItemHeight(const Node& node, const std::string& key, const LXNodeStyle& style, const LXNodeItemRegistry& items)
 {
     const LXNodeItemSpec* item = items.Find(node, key);
@@ -145,7 +169,8 @@ std::string WriteColor(const ImVec4& color)
 
 std::string ItemValue(const Node& node, const std::string& key, const LXNodeItemRegistry& items)
 {
-    const auto property = node.properties.find(key);
+    const LXNodeItemSpec* spec = items.Find(node, key);
+    const auto property = node.properties.find(spec && !spec->propertyKey.empty() ? spec->propertyKey : key);
     const std::string fallback = property == node.properties.end() ? std::string{} : property->second;
     const Pin* pin = items.ValuePin(node, key);
     if (!pin || std::holds_alternative<std::monostate>(pin->value))
@@ -335,6 +360,18 @@ void DrawGrid(ImDrawList* draw, ImVec2 origin, ImVec2 size, const CanvasState& s
 
     const float spacing = style.gridSpacing * scale;
     const ImU32 color = Color(style.grid);
+    if (style.gridPattern == LXGridPattern::Dots)
+    {
+        const float radius = std::max(0.5f, style.gridDotRadius * scale);
+        for (float x = origin.x + std::fmod(state.pan.x, spacing); x < origin.x + size.x; x += spacing)
+        {
+            for (float y = origin.y + std::fmod(state.pan.y, spacing); y < origin.y + size.y; y += spacing)
+            {
+                draw->AddCircleFilled({x, y}, radius, color, 6);
+            }
+        }
+        return;
+    }
     for (float x = origin.x + std::fmod(state.pan.x, spacing); x < origin.x + size.x; x += spacing)
     {
         draw->AddLine({x, origin.y}, {x, origin.y + size.y}, color);
@@ -461,6 +498,12 @@ std::optional<LXHeaderLinkEndpoints> HeaderLinkEndpoints(const LXGraph& graph, c
     return endpoints;
 }
 
+float CanvasUiScale()
+{
+    const auto& style = ImGui::GetStyle();
+    return style.FontScaleMain * style.FontScaleDpi;
+}
+
 LXNodeGeometry MeasureNode(const Node& node, const NodeLayout& layout, const LXNodeStyle& style,
                            const LXNodeItemRegistry& items)
 {
@@ -470,6 +513,10 @@ LXNodeGeometry MeasureNode(const Node& node, const NodeLayout& layout, const LXN
         std::size_t outputs = 0;
         for (const Pin& pin : node.pins)
         {
+            if (!CompactPinVisible(node, pin, &items))
+            {
+                continue;
+            }
             (pin.direction == Direction::Input ? inputs : outputs)++;
         }
         const float titleWidth = static_cast<float>(node.title.size()) * style.fontSize * 0.65f + 42.0f;
@@ -477,6 +524,16 @@ LXNodeGeometry MeasureNode(const Node& node, const NodeLayout& layout, const LXN
         const float height =
             std::max(style.headerHeight + 4.0f, static_cast<float>(std::max(inputs, outputs)) * 12.0f + 10.0f);
         return {width, height};
+    }
+    if (items.HasRows(node))
+    {
+        float height = style.headerHeight + style.bodyBottomPadding;
+        for (const auto& row : items.VisibleRows(node))
+        {
+            height +=
+                row.key.empty() ? style.rowHeight : std::max(style.rowHeight, ItemHeight(node, row.key, style, items));
+        }
+        return {style.width, height};
     }
     const float rows = style.pinLayout == LXPinLayout::TopBottom ? 0.0f : static_cast<float>(RowCount(node));
     float contentHeight = style.headerHeight + rows * style.rowHeight + style.bodyBottomPadding;
@@ -504,6 +561,22 @@ LXNodeItemRect ItemRect(const Node& node, const NodeLayout& layout, const std::s
 {
     if (!style.showPropertyPreview || layout.collapsed || style.headerOnly)
     {
+        return {};
+    }
+    if (items.HasRows(node))
+    {
+        float y = layout.y + style.headerHeight;
+        for (const auto& row : items.VisibleRows(node))
+        {
+            const float height =
+                row.key.empty() ? style.rowHeight : std::max(style.rowHeight, ItemHeight(node, row.key, style, items));
+            if (row.key == key)
+            {
+                return {{layout.x + style.propertyMargin, y + 1.0f},
+                        {layout.x + style.width - style.propertyMargin, y + height - 1.0f}};
+            }
+            y += height;
+        }
         return {};
     }
 
@@ -536,10 +609,26 @@ LXNodeItemRect ItemRect(const Node& node, const NodeLayout& layout, const std::s
 ImVec2 PinPosition(const Node& node, const NodeLayout& layout, const Pin& pin, const LXNodeStyle& style,
                    const LXNodeItemRegistry* items)
 {
+    // Row layouts already determine the pin's position. Do not measure the
+    // entire node and search all its pins again for each visible socket.
+    if (items && items->HasRows(node) && !layout.collapsed && !style.headerOnly &&
+        style.pinLayout != LXPinLayout::TopBottom)
+    {
+        float rowY = layout.y + style.headerHeight;
+        for (const auto& row : items->VisibleRows(node))
+        {
+            const float height = row.key.empty() ? style.rowHeight
+                : std::max(style.rowHeight, ItemHeight(node, row.key, style, *items));
+            if (row.direction == pin.direction && row.pinIdentifier == pin.Identifier())
+                return {layout.x + (pin.direction == Direction::Output ? style.width : 0.f), rowY + height * .5f};
+            rowY += height;
+        }
+    }
     std::size_t index = 0;
     for (const Pin& candidate : node.pins)
     {
-        if (candidate.direction != pin.direction)
+        if (candidate.direction != pin.direction ||
+            ((layout.collapsed || style.headerOnly) && !CompactPinVisible(node, candidate, items)))
         {
             continue;
         }
@@ -551,7 +640,8 @@ ImVec2 PinPosition(const Node& node, const NodeLayout& layout, const Pin& pin, c
     }
     const std::size_t directionCount =
         static_cast<std::size_t>(std::count_if(node.pins.begin(), node.pins.end(), [&](const Pin& candidate) {
-            return candidate.direction == pin.direction;
+            return candidate.direction == pin.direction &&
+                   (!(layout.collapsed || style.headerOnly) || CompactPinVisible(node, candidate, items));
         }));
     if (style.pinLayout == LXPinLayout::TopBottom)
     {
@@ -562,7 +652,10 @@ ImVec2 PinPosition(const Node& node, const NodeLayout& layout, const Pin& pin, c
         const float y = layout.y + (pin.direction == Direction::Output ? geometry.height : 0.0f);
         return {x, y};
     }
-    const LXNodeGeometry geometry = MeasureNode(node, layout, style, items ? *items : LXNodeItemRegistry{});
+    // Both operands must remain lvalues: a temporary would copy the entire
+    // item registry for every pin position, including all node definitions.
+    const LXNodeItemRegistry emptyItems;
+    const LXNodeGeometry geometry = MeasureNode(node, layout, style, items ? *items : emptyItems);
     const float x = layout.x + (pin.direction == Direction::Output ? geometry.width : 0.0f);
     if (layout.collapsed || style.headerOnly)
     {
@@ -570,6 +663,20 @@ ImVec2 PinPosition(const Node& node, const NodeLayout& layout, const Pin& pin, c
                                   (static_cast<float>(directionCount) + 1.0f)};
     }
     const float y = layout.y + style.headerHeight + (static_cast<float>(index) + 0.5f) * style.rowHeight;
+    if (items && items->HasRows(node))
+    {
+        float rowY = layout.y + style.headerHeight;
+        for (const auto& row : items->VisibleRows(node))
+        {
+            const float height =
+                row.key.empty() ? style.rowHeight : std::max(style.rowHeight, ItemHeight(node, row.key, style, *items));
+            if (row.direction == pin.direction && row.pinIdentifier == pin.Identifier())
+            {
+                return {x, rowY + height * 0.5f};
+            }
+            rowY += height;
+        }
+    }
     return {x, y};
 }
 
@@ -577,6 +684,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                 LXDocument* document)
 {
     assert(!document || &graph == &document->GraphForCanvas());
+    const LXNodeItemRegistry::RowCacheScope rowCache(items);
     const auto connect = [&](Id first, Id second, std::string* reason) -> std::optional<Id> {
         if (!document)
         {
@@ -626,7 +734,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         return document ? document->Execute(LXSetSocketValue{pin, std::move(value)}, document->Revision()).applied
                         : graph.SetSocketValue(pin, std::move(value));
     };
-    const float dpi = ImGui::GetStyle().FontScaleDpi;
+    const float dpi = CanvasUiScale();
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 size = ImGui::GetContentRegionAvail();
     if (document && state.viewApplied && state.canvasSize.x > 0.0f && state.canvasSize.y > 0.0f &&
@@ -829,6 +937,14 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         }
         for (const Pin& pin : node.pins)
         {
+            if ((layout.collapsed || style.headerOnly) && !CompactPinVisible(node, pin, &items))
+            {
+                continue;
+            }
+            if (!layout.collapsed && !style.headerOnly && items.HasRows(node) && !items.PinRow(node, pin))
+            {
+                continue;
+            }
             if (style.headerOnly && hasHeaderConnectionOnDefaultSide(pin))
             {
                 continue;
@@ -1002,7 +1118,19 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
     }
     if (state.draggingNode && ImGui::IsMouseDown(ImGuiMouseButton_Left))
     {
-        const ImVec2 delta = Mul(Sub(mouse, state.dragStartMouse), 1.0f / scale);
+        ImVec2 delta = Mul(Sub(mouse, state.dragStartMouse), 1.0f / scale);
+        if (state.snapToGrid && styles.canvas.gridSpacing > 0.0f)
+        {
+            const auto anchor = std::ranges::find_if(state.dragStartNodes, [&](const NodePosition& position) {
+                return position.id == state.draggingNode;
+            });
+            if (anchor != state.dragStartNodes.end())
+            {
+                const float spacing = styles.canvas.gridSpacing;
+                delta.x = std::round((anchor->x + delta.x) / spacing) * spacing - anchor->x;
+                delta.y = std::round((anchor->y + delta.y) / spacing) * spacing - anchor->y;
+            }
+        }
         std::vector<NodePosition> positions = state.dragStartNodes;
         for (NodePosition& position : positions)
         {
@@ -1125,6 +1253,8 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         }
     }
 
+    // Connections, paste and Undo may have changed rows during interaction.
+    rowCache.Invalidate();
     for (const Node& node : graph.Nodes())
     {
         const NodeLayout& layout = *graph.FindLayout(node.id);
@@ -1132,6 +1262,15 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         const LXNodeGeometry geometry = MeasureNode(node, layout, style, items);
         const ImVec2 top = ToScreen(origin, state, {layout.x, layout.y}, scale);
         const ImVec2 bottom = Add(top, Mul({geometry.width, geometry.height}, scale));
+        // Keep active editors alive during a pan, but skip invisible idle nodes.
+        // Wires are drawn separately so crossing links remain visible.
+        const float margin = 24.f * scale;
+        if (!ImGui::IsAnyItemActive() && state.sliderNode != node.id && state.colorNode != node.id &&
+            state.editingNode != node.id &&
+            (bottom.x + margin < origin.x || top.x - margin > origin.x + size.x ||
+             bottom.y + margin < origin.y || top.y - margin > origin.y + size.y))
+            continue;
+        const auto itemKeys = items.Keys(node);
         const bool nodeSelected = selected(node.id);
         const ImVec2 shadowOffset{2.0f * scale, styles.canvas.shadowOffset * scale};
         const bool compact = layout.collapsed || style.headerOnly;
@@ -1184,7 +1323,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
 
         if (style.showPropertyPreview && !compact)
         {
-            for (const std::string& key : items.Keys(node))
+            for (const std::string& key : itemKeys)
             {
                 const std::string value = ItemValue(node, key, items);
                 const LXNodeItemRect rect = ItemRect(node, layout, key, style, items);
@@ -1192,6 +1331,29 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                 const ImVec2 itemBottom = ToScreen(origin, state, rect.maximum, scale);
                 const LXNodeItemSpec* spec = items.Find(node, key);
                 const LXNodeItemKind kind = spec ? spec->kind : LXNodeItemKind::Text;
+
+                if (kind == LXNodeItemKind::Section)
+                {
+                    const std::string id = "##section_" + std::to_string(node.id) + key;
+                    ImGui::SetCursorScreenPos(itemTop);
+                    if (ImGui::InvisibleButton(id.c_str(), Sub(itemBottom, itemTop)))
+                    {
+                        items.ToggleSection(node, key);
+                    }
+                    const bool open = items.SectionOpen(node, key);
+                    const ImVec2 center{itemTop.x + 7.0f * scale, (itemTop.y + itemBottom.y) * 0.5f};
+                    const ImVec2 first = open ? ImVec2{center.x - 4.0f * scale, center.y - 2.0f * scale}
+                                              : ImVec2{center.x - 2.0f * scale, center.y - 4.0f * scale};
+                    const ImVec2 middle =
+                        open ? ImVec2{center.x, center.y + 2.0f * scale} : ImVec2{center.x + 2.0f * scale, center.y};
+                    const ImVec2 last = open ? ImVec2{center.x + 4.0f * scale, center.y - 2.0f * scale}
+                                             : ImVec2{center.x - 2.0f * scale, center.y + 4.0f * scale};
+                    draw->AddLine(first, middle, Color(style.text), 1.5f * scale);
+                    draw->AddLine(middle, last, Color(style.text), 1.5f * scale);
+                    draw->AddText(ImGui::GetFont(), textSize, {itemTop.x + 19.0f * scale, itemTop.y + 5.0f * scale},
+                                  Color(style.text), key.c_str());
+                    continue;
+                }
 
                 if (kind == LXNodeItemKind::Card)
                 {
@@ -1219,6 +1381,21 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                     const float inset = 3.0f * scale;
                     DrawTexturePreview(draw, Add(itemTop, {inset, inset}), Sub(itemBottom, {inset, inset}), value,
                                        items.ResolveTexture(value), textSize * 0.8f);
+                    ImGui::SetCursorScreenPos(itemTop);
+                    const std::string identifier = "##resource_" + std::to_string(node.id) + key;
+                    ImGui::InvisibleButton(identifier.c_str(), Sub(itemBottom, itemTop));
+                    if (graph.IsNodeEditable(node.id))
+                    {
+                        if (auto resource = items.EditResource())
+                        {
+                            const Pin* valuePin = spec ? items.ValuePin(node, key) : nullptr;
+                            state.dirty |=
+                                valuePin
+                                    ? setSocketValue(valuePin->id, *resource)
+                                    : setProperty(node.id, spec && !spec->propertyKey.empty() ? spec->propertyKey : key,
+                                                  *resource);
+                        }
+                    }
                     continue;
                 }
 
@@ -1238,12 +1415,16 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                 const std::string nodeKey = std::to_string(node.id);
                 ImGui::PushID(nodeKey.c_str());
                 ImGui::PushID(key.c_str());
-                ImGui::BeginDisabled(!graph.IsNodeEditable(node.id));
+                const Pin* input = ItemInputPin(node, key, items);
+                const bool linked = input && std::any_of(graph.Links().begin(), graph.Links().end(),
+                                                         [&](const Link& link) { return link.input == input->id; });
+                ImGui::BeginDisabled(!graph.IsNodeEditable(node.id) || linked);
+                ImGui::PushFont(nullptr, style.fontSize * state.zoom * 0.85f);
+                ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2{3.0f * scale, 2.0f * scale});
                 if (kind == LXNodeItemKind::FloatSlider)
                 {
                     const float controlX = itemTop.x + (itemBottom.x - itemTop.x) * 0.40f;
                     const float controlWidth = itemBottom.x - controlX - padding;
-                    const Pin* input = ItemInputPin(node, key, items);
                     const bool connected =
                         input && std::any_of(graph.Links().begin(), graph.Links().end(),
                                              [&](const Link& link) { return link.input == input->id; });
@@ -1289,10 +1470,11 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                 else if (kind == LXNodeItemKind::Color)
                 {
                     const float buttonSize = itemBottom.y - itemTop.y - 6.0f * scale;
-                    const float buttonX = itemBottom.x - padding - buttonSize;
+                    const float buttonX = itemTop.x + (itemBottom.x - itemTop.x) * 0.52f;
                     ImGui::SetCursorScreenPos({buttonX, itemTop.y + 3.0f * scale});
                     const ImVec4 swatch = ItemColor(node, key, items);
-                    if (ImGui::ColorButton("##swatch", swatch, ImGuiColorEditFlags_NoTooltip, {buttonSize, buttonSize}))
+                    if (ImGui::ColorButton("##swatch", swatch, ImGuiColorEditFlags_NoTooltip,
+                                           {itemBottom.x - padding - buttonX, buttonSize}))
                     {
                         state.colorNode = node.id;
                         state.colorKey = key;
@@ -1331,6 +1513,100 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                         ImGui::EndPopup();
                     }
                 }
+                else
+                {
+                    const Pin* valuePin = items.ValuePin(node, key);
+                    const float controlX = itemTop.x + (itemBottom.x - itemTop.x) * 0.45f;
+                    ImGui::SetCursorScreenPos({controlX, itemTop.y + 3.0f * scale});
+                    ImGui::SetNextItemWidth(itemBottom.x - controlX - padding);
+                    if (kind == LXNodeItemKind::Choice && spec)
+                    {
+                        if (ImGui::BeginCombo("##choice", value.c_str()))
+                        {
+                            for (const auto& choice : spec->choices)
+                            {
+                                if (ImGui::Selectable(choice.c_str(), choice == value))
+                                {
+                                    state.dirty |= setProperty(node.id, key, choice);
+                                }
+                            }
+                            ImGui::EndCombo();
+                        }
+                    }
+                    else if (kind == LXNodeItemKind::Boolean && valuePin)
+                    {
+                        bool checked = std::get_if<bool>(&valuePin->value) && std::get<bool>(valuePin->value);
+                        if (ImGui::Checkbox("##bool", &checked))
+                        {
+                            state.dirty |= setSocketValue(valuePin->id, checked);
+                        }
+                    }
+                    else if (kind == LXNodeItemKind::Vector && valuePin)
+                    {
+                        auto components = state.vectorValue;
+                        if (state.editingPin != valuePin->id)
+                        {
+                            if (const auto* vector = std::get_if<std::array<double, 3>>(&valuePin->value))
+                            {
+                                std::transform(vector->begin(), vector->end(), components.begin(),
+                                               [](double number) { return static_cast<float>(number); });
+                            }
+                        }
+                        if (ImGui::DragFloat3("##vector", components.data(), 0.01f))
+                        {
+                            state.editingPin = valuePin->id;
+                            state.vectorValue = components;
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit())
+                        {
+                            state.dirty |= setSocketValue(
+                                valuePin->id, std::array<double, 3>{components[0], components[1], components[2]});
+                            state.editingPin = 0;
+                        }
+                    }
+                    else if (kind == LXNodeItemKind::Integer && valuePin)
+                    {
+                        auto number = state.editingPin == valuePin->id ? state.integerValue
+                                      : std::get_if<std::int64_t>(&valuePin->value)
+                                          ? std::get<std::int64_t>(valuePin->value)
+                                          : 0;
+                        if (ImGui::InputScalar("##integer", ImGuiDataType_S64, &number))
+                        {
+                            state.editingPin = valuePin->id;
+                            state.integerValue = number;
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit())
+                        {
+                            state.dirty |= setSocketValue(valuePin->id, number);
+                            state.editingPin = 0;
+                        }
+                    }
+                    else if (kind == LXNodeItemKind::String)
+                    {
+                        if (state.editingNode != node.id || state.editingProperty != key)
+                        {
+                            state.textValue.fill(0);
+                            std::copy_n(value.data(), std::min(value.size(), state.textValue.size() - 1),
+                                        state.textValue.data());
+                        }
+                        if (ImGui::InputText("##text", state.textValue.data(), state.textValue.size()))
+                        {
+                            state.editingNode = node.id;
+                            state.editingProperty = key;
+                        }
+                        if (ImGui::IsItemDeactivatedAfterEdit())
+                        {
+                            state.dirty |=
+                                valuePin
+                                    ? setSocketValue(valuePin->id, std::string(state.textValue.data()))
+                                    : setProperty(node.id, spec && !spec->propertyKey.empty() ? spec->propertyKey : key,
+                                                  state.textValue.data());
+                            state.editingNode = 0;
+                        }
+                    }
+                }
+                ImGui::PopStyleVar();
+                ImGui::PopFont();
                 ImGui::EndDisabled();
                 ImGui::PopID();
                 ImGui::PopID();
@@ -1339,6 +1615,14 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
 
         for (const Pin& pin : node.pins)
         {
+            if (compact && !CompactPinVisible(node, pin, &items))
+            {
+                continue;
+            }
+            if (!compact && items.HasRows(node) && !items.PinRow(node, pin))
+            {
+                continue;
+            }
             if (style.headerOnly && hasHeaderConnectionOnDefaultSide(pin))
             {
                 continue;
@@ -1360,7 +1644,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                                          : ImVec4{top.x + geometry.width * scale * 0.5f, point.y - textSize,
                                                   bottom.x - style.textPaddingX * scale, point.y + textSize};
             bool itemLabel = false;
-            for (const std::string& key : items.Keys(node))
+            for (const std::string& key : itemKeys)
             {
                 if (ItemInputPin(node, key, items) == &pin)
                 {

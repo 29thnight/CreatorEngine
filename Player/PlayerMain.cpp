@@ -554,7 +554,7 @@ void Player::PlayerMain::Update()
 			display.Get(EnhancedLiveDisplayTarget::Game);
 		const uint32_t slotMask = gameDisplay.promotedSlotMask;
 		const bool displayRotated = gameDisplay.ready &&
-			gameDisplay.promotionCount >= 2 && 0 != slotMask &&
+			gameDisplay.promotionCount >= g_smoke.minimumPromotions && 0 != slotMask &&
 			0 != (slotMask & (slotMask - 1u));
 		if (!displayRotated) return;
 

@@ -115,6 +115,7 @@
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
 #include "ProfileScope.h"
+#include "ProfileCaptureFile.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
@@ -1101,6 +1102,27 @@ namespace ConsoleCmd
         return Ok({}, ProfileStatePayload());
     }
 
+    static CommandCore::CommandResult Cmd_profile_save(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 2) return InvalidArguments("profile.save <new-absolute-path.ceprof>");
+        const auto path = std::filesystem::u8path(ctx.parts[1]);
+        if (!path.is_absolute() || path.extension() != ".ceprof" || std::filesystem::exists(path))
+            return InvalidArguments("Use a new absolute .ceprof path");
+        if (ce::profiler().state() == ce::recorder_state::recording)
+            return PreconditionFailed("profile.recording", "Pause the capture before saving");
+        ce::profiler().wait_until_idle();
+        const auto capture = ce::profiler().capture();
+        if (!capture) return PreconditionFailed("profile.empty", "No frozen capture");
+        const auto saved = ce::save_capture(*capture, path);
+        if (!saved) return Fail("profile.save_failed", ce::describe(saved.error()));
+        auto data = ProfileStatePayload();
+        data.Set("path", CommandData::String(ctx.parts[1]));
+        data.Set("frames", CommandData::Int(capture->frame_count()));
+        data.Set("events", CommandData::Int(capture->total_events()));
+        return Ok({}, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_profile_counter_mask(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1678,6 +1700,7 @@ namespace ConsoleCmd
         reg.Result({ "profile.frame" }, &Cmd_profile_frame);
         reg.Result({ "profile.record" }, &Cmd_profile_record);
         reg.Result({ "profile.pause" }, &Cmd_profile_pause);
+        reg.Result({ "profile.save" }, &Cmd_profile_save);
         reg.Result({ "profile.counter-mask" }, &Cmd_profile_counter_mask);
         reg.Result({ "memory.capture" }, &Cmd_memory_capture);
         reg.Result({ "memory.snapshot" }, &Cmd_memory_snapshot);

@@ -67,6 +67,7 @@ enum class RHIResourceState
     UnorderedAccess,
     CopySource,
     CopyDest,
+    IndexBuffer,
 };
 
 /// 전이 하나. 그래프 밖에서 상태를 바꿀 때 쓴다(그래프 안은 usage 선언이 한다).

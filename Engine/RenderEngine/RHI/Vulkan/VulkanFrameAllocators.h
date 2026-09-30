@@ -165,21 +165,21 @@ struct VulkanDescriptorRecyclerStats
 ///   마무리로 갔지만 실측은 남는다): "몇 개를 어느 종류로 쓸 것인가를
 ///   Vulkan 은 풀을 만들 때, DX12 는 자를 때 안다."
 ///
-///   그래서 예산이 여기 상수로 박힌다. 넘치면 조용히 넘어가지 않고 무효
-///   핸들을 주며, 인코더가 그것을 계수로 남긴다.
+///   pool 하나의 종류별 예산은 상수다. 기록 중 소진되면 같은 version에
+///   pool을 추가한다. 이미 기록한 set은 completion까지 보존하고, version을
+///   다시 획득할 때 그 version의 모든 pool을 reset한다.
 class VulkanDescriptorPoolRecycler
 {
-public:
+  public:
     bool Initialize(VkDevice device, uint32_t initialVersions, std::string& outError);
     void Shutdown(VkDevice device);
 
     void Collect(RHICompletionPoint completed);
-    bool BeginRecording(VkDevice device, uint64_t recordingId,
-        std::string& outError);
+    bool BeginRecording(VkDevice device, uint64_t recordingId, std::string& outError);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
 
-    /// 셋 하나를 잘라 온다. 예산이 다하면 `VK_NULL_HANDLE`.
+    /// 셋 하나를 할당한다. pool 생성/native 할당 실패는 `VK_NULL_HANDLE`.
     VkDescriptorSet Allocate(VkDevice device, VkDescriptorSetLayout setLayout);
     VulkanDescriptorRecyclerStats GetStats() const;
 
@@ -192,18 +192,18 @@ public:
     ///   `descriptorVersion` 이 writer 0 인 죽은 칸으로 남아 있던 이유다.
     uint64_t GetCurrentVersionToken() const { return m_activeVersion.ToToken(); }
 
-private:
-    bool EnsurePool(VkDevice device, uint32_t slot, std::string& outError);
+  private:
+    bool EnsurePool(VkDevice device, uint32_t slot, size_t page, std::string& outError);
     void RecordPeak(uint32_t used);
 
-    std::vector<VkDescriptorPool> m_pools;
+    std::vector<std::vector<VkDescriptorPool>> m_pools;
     RHIDescriptorVersionPolicy m_versions;
     RHIDescriptorVersionHandle m_activeVersion{};
-    VkDescriptorPool m_activePool{ VK_NULL_HANDLE };
-    uint32_t m_recordingSets{ 0 };
-    uint64_t m_allocations{ 0 };
-    uint64_t m_allocationFailures{ 0 };
-    uint32_t m_peakRecordingSets{ 0 };
+    VkDescriptorPool m_activePool{VK_NULL_HANDLE};
+    size_t m_activePage{0};
+    uint32_t m_recordingSets{0};
+    uint64_t m_allocations{0};
+    uint64_t m_allocationFailures{0};
+    uint32_t m_peakRecordingSets{0};
     std::mutex m_allocationMutex;
 };
-

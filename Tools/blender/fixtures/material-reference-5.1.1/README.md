@@ -33,3 +33,10 @@ gates. Shadows, AO, local probes, compositor, and post effects are outside this
 comparison. The volume case exposes EEVEE's visible volume bounds in the
 display preview; retain it as a separate special-material diagnostic when
 reviewing engine parity.
+
+MAT-4 clarified the feature boundary: Blender 5.1.1 EEVEE does not evaluate
+Principled anisotropy or thin film. Their cases in this grid preserve authored
+inputs, but do not prove those effects. Cycles feature references and acceptance
+of the engine's three-wavelength thin-film approximation remain MAT-9 work.
+The independently verified closure numeric baseline is in
+`../principled-layered-5.1.1`; it does not replace this rendered EXR.

@@ -11,7 +11,7 @@
 
 | 표면 | 현재 정본과 화면 | LX에서 맡을 부분 |
 |---|---|---|
-| Material Graph (4.25) | [BlenderMaterialGraphPlan.md](../plans/BlenderMaterialGraphPlan.md)의 `.shadergraph(domain=material)`과 typed IR·Slang 생성은 미착수 | 첫 typed graph 문서·검증·재개방·진단 UI |
+| Material Graph (4.25) | MAT-2의 `.shadergraph(domain=material)`·typed IR·복구는 독립 예제 검증 완료. [MaterialGraphSchema.md](MaterialGraphSchema.md) | LX-3의 Canvas/명령·진단 UI 연결, MAT-6 Slang 생성 |
 | Behavior Tree | [`BTBuildGraph.h`](../../Engine/SceneRuntime/BTBuildGraph.h)의 `.bt` 노드/자식, [`BTEditorBridge.h`](../../Editor/EngineGUIWindow/BTEditorBridge.h)와 [`MenuBarWindow.cpp`](../../Editor/EngineGUIWindow/MenuBarWindow.cpp)의 직접 `ax::NodeEditor` 호출 | 이후 BT 자산·창을 재작성할 때 LX를 사용. 기존 `.bt` 변환 없음 |
 | Animator state graph | [`AnimatorEditorWindows.cpp`](../../Editor/EngineGUIWindow/AnimatorEditorWindows.cpp)의 `NodeEditor`와 `Assets/NodeEditor/*.json` 위치 sidecar | 독립 예제에서 상태 이름만 보이는 제목 전용 노드와 방향 화살표 전이 스타일을 검증. 이후 controller·창을 재작성할 때 LX를 사용. 기존 위치 JSON 변환 없음 |
 | `NodeEditor` / `BlueprintBuilder` | [`NodeEditor.h`](../../Editor/ImGuiHelper/NodeEditor.h)는 프레임마다 노드를 만들고 이름으로 연결한다. [`BlueprintBuilder.h`](../../Editor/ImGuiHelper/BlueprintBuilder.h)는 node-editor 그리기 보조 | 공통 저작 모델로 승격하지 않고 소비자를 옮긴 뒤 은퇴 |
@@ -26,7 +26,7 @@ LX 이관 대상이 아니다.
 ## 2. 책임 경계와 이름
 
 ```text
-Material .shadergraph ── LXDocument ── LXGraph + LXLayout
+Material .shadergraph ── LXMaterialDocument ── LXMaterialAsset
                                           │
                                 LXNodeDefinition registry
                                           │
@@ -105,7 +105,7 @@ HTTP CLI → CommandService → Editor 명령 큐 → 같은 LXDocument commands
   ImGui 타입을 포함하지 않는다.
 
 Material의 목표 저장 정본은 새 `.shadergraph(domain=material)`이다. 그래프 값과
-별도 `LXLayout`을 같은 문서에 저장할 예정이다. 현재 독립 예제는 `.lxg` 8을
+별도 `LXLayout`을 같은 문서에 저장하며 MAT-2 독립 검사를 통과했다. 현재 예제 UI는 `.lxg` 9를
 사용한다. BT·Animator는 자산과 창을 재작성할 때
 새 정본을 정하며 기존 `.bt`/controller/위치 JSON 변환은 구현하지 않는다.
 LX는 이후 창에도 편집 명령과 캔버스를 제공하고 실행 의미는 각 시스템에 남긴다.
@@ -289,3 +289,12 @@ Blender 대응표의 약속한 노드·소켓·조작, 새 `.shadergraph` 저장
 K2에서 참고한 것은 [실행 핀과 데이터 핀의 구별](https://dev.epicgames.com/documentation/unreal-engine/nodes-in-unreal-engine)과
 [노드 처리기·중간 표현·백엔드를 나누는 컴파일 단계](https://dev.epicgames.com/documentation/en-us/unreal-engine/compiler-overview-for-blueprints-visual-scripting-in-unreal-engine)다.
 Lattice의 domain별 런타임 계약은 위 §2처럼 CreatorEngine의 현재 경계에 맞춘다.
+
+## 7. 2026-09-29 Material Editor host
+
+[MaterialNodeEditor.md](MaterialNodeEditor.md)의 등록 Editor 창이 독립 예제 검증 이후의
+첫 제품 LXCanvas 소비자다. MeshRenderer에서 진입하며 행 기반 항목/핀 정렬,
+Blender형 기본 스타일·외부 스타일 파일과 `.shadergraph` 저장을 사용한다.
+문서·revision을 검증하는 인증 HTTP도 같은 LXDocument에 연결된다.
+Scene 자원 게시와 Player cooked 실행은 기존 MAT 제품 경로가 소유한다.
+BT/Animator 교체나 `imgui-node-editor` 전체 제거를 이 연결의 완료로 세지 않는다.

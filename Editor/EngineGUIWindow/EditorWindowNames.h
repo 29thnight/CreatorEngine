@@ -37,6 +37,8 @@ namespace EditorWindowName
     inline constexpr const char* kBehaviorTree = "###Editor.BehaviorTree";
     inline constexpr const char* kBlackBoardLabel = "BlackBoard Editor";
     inline constexpr const char* kBlackBoard = "###Editor.BlackBoard";
+    inline constexpr const char* kMaterialGraphLabel = EditorIcon::Label<EditorIcon::Material, " Material Node Editor">;
+    inline constexpr const char* kMaterialGraph = "###Editor.MaterialGraph";
 
     // 아래 넷은 도크되지 않는 도구 창이다. M4 2단계가 선언으로 옮기면서
     // 흩어져 있던 리터럴을 여기로 모았다 — 이름이 곧 안정 식별자라

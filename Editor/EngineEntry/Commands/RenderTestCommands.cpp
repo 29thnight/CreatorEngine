@@ -820,12 +820,13 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         if (ctx.parts.size() < 2 || ctx.parts.size() > 4
-            || (ctx.parts.size() >= 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor")
+            || (ctx.parts.size() >= 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor" && ctx.parts[2] != "material")
             || (ctx.parts.size() == 4 && ctx.parts[3] != "controlled"))
-            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor] [controlled]");
+            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor|material] [controlled]");
         std::string error;
         const auto target = ctx.parts.size() >= 3 && ctx.parts[2] == "editor"
-            ? EnhancedLiveDisplayTarget::Editor : EnhancedLiveDisplayTarget::Game;
+            ? EnhancedLiveDisplayTarget::Editor : ctx.parts.size() >= 3 && ctx.parts[2] == "material"
+            ? EnhancedLiveDisplayTarget::MaterialPreview : EnhancedLiveDisplayTarget::Game;
         if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], target, error,
                 ctx.parts.size() == 4))
             return Fail("render.pbr.capture.rejected", error);
@@ -1341,6 +1342,7 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.uv" }, &Cmd_render_pbr_uv);
         reg.Result({ "render.pbr.mip" }, &Cmd_render_pbr_mip);
         reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture);
+        reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture);
         reg.Result({ "vk.decal" }, &Cmd_vk_decal);
         reg.Result({ "dx12.forward" }, &Cmd_dx12_forward);
         reg.Result({ "dx12.forwardshade" }, &Cmd_dx12_forwardshade);

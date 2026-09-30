@@ -72,6 +72,9 @@ private:
 	Camera* m_editorCamera{ nullptr };
 	editor::SceneViewportOverlay m_overlay;
     editor::ViewportCanvas m_canvas;
+	std::uint64_t m_lastScenePromotionCount{};
+	double m_lastSceneFpsSampleTime{};
+	float m_sceneFps{};
 	EditorCameraRig* m_editorCameraRig{ nullptr };
 	GizmoRenderer* m_gizmoRenderer{ nullptr };
 

@@ -62,6 +62,7 @@ namespace ConsoleCmd
     void RegisterDiagnosticsCommands(Registrar& reg);
     void RegisterScriptUiAnimatorCommands(Registrar& reg);
     void RegisterSceneObjectCommands(Registrar& reg);
+    void RegisterMaterialGraphCommands(Registrar& reg);
     void RegisterAssetAuthoringCommands(Registrar& reg);
     void RegisterCoreCommands(Registrar& reg);  // 라이브 조회·조정 8
 }

@@ -746,7 +746,11 @@ void Editor::EditorMain::Update()
 	// 필요가 없다. PresentationThread의 UI가 살아 있는 씬 객체를 읽는 구간과만
 	// 좁게 직렬화하고, 씬 전환과 파괴를 끝낸 뒤 호출자가 새 packet을 발행한다.
 	{
-		std::lock_guard<std::mutex> sceneLock(m_sceneStructureMutex);
+		std::unique_lock<std::mutex> sceneLock(m_sceneStructureMutex, std::defer_lock);
+		{
+			ce::profile_scope wait{ce::marker<"GameSceneLockWait">()};
+			sceneLock.lock();
+		}
 		Editor::ModelPlacement::Get().Tick();
 		EditorScriptAuthoring::Tick();
 		SceneManagers->ApplyPendingSceneStructureChange();

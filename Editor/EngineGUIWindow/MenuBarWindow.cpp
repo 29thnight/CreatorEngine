@@ -9,6 +9,7 @@
 #include "EditorChromeSnapshot.h"
 #include "LogSystem.h"
 #include "SceneManager.h"
+#include "ConsoleCommandSystem.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
 // 완전한 형이 필요하고, PhysicsManagers도 직접 받는다.
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 둘 다 공급했다.
@@ -319,7 +320,10 @@ void MenuBarWindow::RenderMenuBar()
 					);
                     if (!fileName.empty())
                     {
-                        SceneManagers->LoadSceneImmediate(fileName.string());
+                        // GUI runs on the presentation thread; scene construction
+                        // and activation belong to the scene owner thread.
+                        ConsoleCommandSystem::Get().EnqueueStructured(
+                            { "scene.switch", fileName.string() });
                     }
                     else
                     {
@@ -792,7 +796,7 @@ void MenuBarWindow::ShowAboutWindow()
     // 여는 이 창으로 옮겼다.
     const BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
 
-    ImGui::TextUnformatted(CreatorEngineVersion::ProductName);
+    ImGui::Text("%s \xF0\x9F\x8E\xB9\xE2\x9C\xA8", CreatorEngineVersion::ProductName); // 🎹✨ (UTF-8)
     ImGui::Separator();
 
     const auto row = [](const char* label, const char* value)

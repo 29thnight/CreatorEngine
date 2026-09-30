@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -163,6 +163,76 @@
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\ScreenSizedResource.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
+    <ClCompile Include="MaterialGraphProduct.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphRenderBindings.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphIblBake.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSurfaceBatch.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphMeshSurface.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphRasterSurface.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphScenePacket.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSceneInput.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSceneHost.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSceneCompiler.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSceneLookup.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSceneSubsurface.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSceneVolume.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphSceneRefraction.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedMaterialProgram.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Core\LXGraph.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Core\LXNodeDefinition.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialGraph.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialIR.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialNodes.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialOperators.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="..\..\Lattice\Material\LXMaterialCompiler.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="RHI\RHIShaderPermutation.cpp" />
     <ClCompile Include="RHI\RHIShaderReflection.cpp" />
     <ClCompile Include="RHI\RHIShaderSource.cpp" />
@@ -187,11 +257,15 @@
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp" />
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp" />
-    <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp" />
+    <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\DX12MeshCache.cpp" />
     <ClCompile Include="RHI\DX12\DX12GpuProfiler.cpp" />
     <ClCompile Include="RHI\DX12\DX12TextureCache.cpp" />
-    <ClCompile Include="Render\Passes\Geometry\EnhancedDeferredPass.cpp" />
+    <ClCompile Include="Render\Passes\Geometry\EnhancedDeferredPass.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedForwardPass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSAOPass.cpp" />
@@ -206,7 +280,9 @@
     <ClCompile Include="Render\Passes\PostProcess\EnhancedPostChainPass.cpp" />
     <ClCompile Include="Render\Passes\Lighting\EnhancedSSGIPass.cpp" />
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp" />
-    <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp" />
+    <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Render\Scene\ExperimentMaterialSealing.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />
     <ClCompile Include="Camera.cpp" />
@@ -404,6 +480,10 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Assets\ModelMaterialGraph.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Assets\ModelAnimationSampler.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
@@ -527,6 +607,21 @@
     <ClInclude Include="RHI\RHIValidationLedger.h" />
     <ClInclude Include="GpuDiagnostics.h" />
     <ClInclude Include="Material.h" />
+    <ClInclude Include="MaterialGraphProduct.h" />
+    <ClInclude Include="MaterialGraphRuntime.h" />
+    <ClInclude Include="MaterialGraphRenderBindings.h" />
+    <ClInclude Include="MaterialGraphIblBake.h" />
+    <ClInclude Include="MaterialGraphSurfaceBatch.h" />
+    <ClInclude Include="MaterialGraphMeshSurface.h" />
+    <ClInclude Include="MaterialGraphRasterSurface.h" />
+    <ClInclude Include="MaterialGraphScenePacket.h" />
+    <ClInclude Include="MaterialGraphSceneInput.h" />
+    <ClInclude Include="MaterialGraphSceneHost.h" />
+    <ClInclude Include="MaterialGraphSceneCompiler.h" />
+    <ClInclude Include="MaterialGraphSceneLookup.h" />
+    <ClInclude Include="MaterialGraphSceneSubsurface.h" />
+    <ClInclude Include="MaterialGraphSceneVolume.h" />
+    <ClInclude Include="MaterialGraphSceneRefraction.h" />
     <ClInclude Include="ShaderMetaHandle.h" />
     <ClInclude Include="ShaderMeta.h" />
     <ClInclude Include="MaterialPropertyPacker.h" />
@@ -557,7 +652,9 @@
     <ClInclude Include="LocalPose.h" />
     <ClInclude Include="ClipSamplingCursor.h" />
     <ClInclude Include="Assets\ModelAssetGeneration.h" />
+    <ClInclude Include="Assets\ModelMaterialGraph.h" />
     <ClInclude Include="Experiment\Cooked\CookedAssetManifest.h" />
+    <ClInclude Include="Experiment\Cooked\CookedMaterialProgram.h" />
     <ClInclude Include="Experiment\Cooked\CookedAudioClipFormat.h" />
     <ClInclude Include="Experiment\Cooked\CookedAudioClipSource.h" />
     <ClInclude Include="Experiment\Cooked\PakAudioClipByteSource.h" />
@@ -590,7 +687,7 @@
     <ClInclude Include="UIRenderProxy.h" />
     <ClInclude Include="Interfaces\VignettePassSetting.h" />
     <ClInclude Include="Interfaces\VolumetricFogPassSetting.h" />
-    <ClInclude Include="VolumeProfile.h" />
+    <ClInclude Include="SceneRenderProfile.h" />
     <ClInclude Include="EnhancedGizmoSceneBinding.h" />
     <ClInclude Include="EnhancedGizmoSceneTypes.h" />
     <ClInclude Include="FrameCameraSnapshot.h" />
@@ -642,6 +739,9 @@
   <ItemGroup>
     <ProjectReference Include="..\Utility_Framework\Utility_Framework.vcxproj">
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\EngineDiagnostics\EngineDiagnostics.vcxproj">
+      <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

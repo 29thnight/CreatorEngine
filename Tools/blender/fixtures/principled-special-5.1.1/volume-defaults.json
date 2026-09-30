@@ -1,0 +1,46 @@
+{
+  "blender_version": "5.1.1",
+  "blender_build_hash": "b70da489d7f4",
+  "type": "ShaderNodeVolumePrincipled",
+  "inputs": [
+    {
+      "identifier": "Color",
+      "default": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+      ]
+    },
+    {
+      "identifier": "Density",
+      "default": 1.0
+    },
+    {
+      "identifier": "Anisotropy",
+      "default": 0.0
+    },
+    {
+      "identifier": "Absorption Color",
+      "default": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    },
+    {
+      "identifier": "Emission Strength",
+      "default": 0.0
+    },
+    {
+      "identifier": "Emission Color",
+      "default": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ]
+    }
+  ]
+}

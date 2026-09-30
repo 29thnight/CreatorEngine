@@ -1139,7 +1139,15 @@
     <ClInclude Include="UIRenderProxy.h">
       <Filter>Objects\UIRenderProxy</Filter>
     </ClInclude>
-    <ClInclude Include="VolumeProfile.h">
+    <ClInclude Include="SceneRenderProfile.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="MaterialGraphSceneCompiler.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneCompiler.h">
       <Filter>Resources</Filter>
     </ClInclude>
   </ItemGroup>

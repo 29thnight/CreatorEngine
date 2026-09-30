@@ -23,6 +23,7 @@ struct CanvasState
     float viewDpi = 0.0f;
     bool viewApplied = false;
     bool panning = false;
+    bool snapToGrid = false;
     Id selectedNode = 0;
     Id selectedFrame = 0;
     std::vector<Id> selectedNodes;
@@ -48,6 +49,12 @@ struct CanvasState
     Id colorNode = 0;
     std::string colorKey;
     ImVec4 colorValue{};
+    Id editingPin = 0;
+    std::array<float, 3> vectorValue{};
+    std::int64_t integerValue = 0;
+    std::string editingProperty;
+    Id editingNode = 0;
+    std::array<char, 512> textValue{};
     std::string message;
     bool dirty = false;
 };
@@ -69,6 +76,9 @@ struct LXHeaderLinkEndpoints
     ImVec2 output{};
     ImVec2 input{};
 };
+
+// Uses the same user and monitor factors as ImGui font/widget sizes.
+float CanvasUiScale();
 
 LXNodeGeometry MeasureNode(const Node& node, const NodeLayout& layout, const LXNodeStyle& style,
                            const LXNodeItemRegistry& items);

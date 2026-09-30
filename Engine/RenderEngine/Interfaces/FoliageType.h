@@ -7,6 +7,10 @@
 // 데이터 경계 헤더는 렌더 본체를 include하지 않는다. shared_ptr는 불완전 타입을
 // 보관할 수 있으므로 Mesh·Material 정의 없이도 소유권 계약을 표현할 수 있다.
 class Material;
+namespace material_graph
+{
+struct SceneMaterialSource;
+}
 namespace experiment { struct Material; } // I5-D5c4
 namespace assets { class ModelAssetGeneration; } // PHASE 3.75 MBC8: typed 정본
 
@@ -22,6 +26,7 @@ struct FoliageType
            meta::field<&Self::m_modelName>);
    }
     std::shared_ptr<Material> m_material{};
+    std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource;
     // I5-D5c4(S2c-2c) — 재질의 저작 정본(비직렬화 런타임 필드). Foliage 자산은
     // 재질을 따로 저작하지 않고 모델 것을 그대로 쓰므로 정본도 같은 generation
     // 재질에서 온다(메시가 가리키는 MaterialId) — MeshRenderer처럼 씬 diff를 얹을

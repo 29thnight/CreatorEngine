@@ -1390,9 +1390,9 @@ SceneManager::CaptureRequiredRenderMaterials() const
     return materials;
 }
 
-void SceneManager::VolumeProfileApply()
+void SceneManager::RequestRenderProfileApply()
 {
-	m_volumeProfileApply = true;
+	m_renderProfileApplyPending = true;
 }
 
 // ── 씬 스냅샷 primitive (E3-1) ──

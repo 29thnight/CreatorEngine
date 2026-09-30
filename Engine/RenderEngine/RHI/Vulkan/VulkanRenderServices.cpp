@@ -134,19 +134,22 @@ struct VulkanTextureCache::Impl
         uint32_t width = 1;
         uint32_t height = 1;
         uint32_t mipLevels = 1;
+        uint32_t arraySize = 1;
         RHIFormat format = RHIFormat::RGBA8Unorm;
         const bool hasImage = !image.IsEmpty();
         if (hasImage)
         {
-            if (1 != image.ArraySize())
+            if (image.ArraySize() == 0 ||
+                (image.IsCube() && (image.ArraySize() % 6 != 0 || image.Width() != image.Height())))
             {
-                outError = "Vulkan 텍스처 캐시는 2D 단일 자산만 올린다";
+                outError = "Vulkan texture array/cube dimensions are invalid";
                 return false;
             }
             format = image.Format();
             width = image.Width();
             height = image.Height();
             mipLevels = image.MipLevels();
+            arraySize = image.ArraySize();
         }
         if (VK_FORMAT_UNDEFINED == ToVulkan(format))
         {
@@ -154,12 +157,19 @@ struct VulkanTextureCache::Impl
             return false;
         }
 
+        const uint64_t uploadAlignment = (std::max)(4u, RHIFormatBlockBytes(format));
+        const auto alignOffset = [uploadAlignment](uint64_t offset) {
+            return (offset + uploadAlignment - 1) / uploadAlignment * uploadAlignment;
+        };
         uint64_t totalBytes = 0;
-        for (uint32_t mip = 0; mip < mipLevels; ++mip)
+        for (uint32_t slice = 0; slice < arraySize; ++slice)
         {
-            const uint32_t mipWidth = (std::max)(1u, width >> mip);
-            const uint32_t mipHeight = (std::max)(1u, height >> mip);
-            totalBytes += RHIFormatSlicePitch(format, mipWidth, mipHeight);
+            for (uint32_t mip = 0; mip < mipLevels; ++mip)
+            {
+                const uint32_t mipWidth = (std::max)(1u, width >> mip);
+                const uint32_t mipHeight = (std::max)(1u, height >> mip);
+                totalBytes = alignOffset(totalBytes) + RHIFormatSlicePitch(format, mipWidth, mipHeight);
+            }
         }
 
         // 복사 오프셋 정렬을 링에 요구한다. Vulkan 은 vkCmdCopyBufferToImage
@@ -167,10 +177,8 @@ struct VulkanTextureCache::Impl
         // 요구한다 — 비압축만 올리던 시절에는 4로 충분해 1을 넘겨도 우연히
         // 맞았지만, 블록 압축(BC1 8바이트 · BC3 16바이트)이 들어오면
         // 검증 레이어가 잡는다.
-        const uint64_t uploadAlignment =
-            (std::max)(4u, RHIFormatBlockBytes(format));
-        const RHIBufferSlice upload = resources->AllocateUpload(
-            RHIUploadRequest{ totalBytes, RHIUploadUsage::TextureCopy, uploadAlignment });
+        const RHIBufferSlice upload =
+            resources->AllocateUpload(RHIUploadRequest{totalBytes, RHIUploadUsage::TextureCopy, uploadAlignment});
         if (!upload.IsWritable())
         {
             outError = "Vulkan 텍스처 업로드 링 공간이 부족하다";
@@ -178,77 +186,78 @@ struct VulkanTextureCache::Impl
         }
 
         std::vector<VkBufferImageCopy> copies;
-        copies.reserve(mipLevels);
+        copies.reserve(static_cast<size_t>(arraySize) * mipLevels);
         uint64_t localOffset = 0;
-        for (uint32_t mip = 0; mip < mipLevels; ++mip)
+        for (uint32_t slice = 0; slice < arraySize; ++slice)
         {
-            const uint32_t mipWidth = (std::max)(1u, width >> mip);
-            const uint32_t mipHeight = (std::max)(1u, height >> mip);
-            const size_t tightRow = static_cast<size_t>(
-                RHIFormatRowPitch(format, mipWidth));
-            std::byte* destination =
-                static_cast<std::byte*>(upload.cpuAddress) + localOffset;
-
-            if (hasImage)
+            for (uint32_t mip = 0; mip < mipLevels; ++mip)
             {
-                const TextureSubimage* source = image.Find(mip, 0);
-                const std::byte* sourcePixels = (nullptr != source)
-                    ? source->pixels : nullptr;
-                if (nullptr == source || nullptr == sourcePixels
-                    || source->rowPitch < tightRow)
-                {
-                    outError = "Vulkan 텍스처 밉 픽셀을 찾지 못했다";
-                    return false;
-                }
-                // 압축이면 한 행이 블록 한 줄이다 — RHIFormatRowCount 가 그
-                // 차이를 흡수하므로 여기 루프는 두 경우에 같다.
-                const uint32_t copyRows = RHIFormatRowCount(format, mipHeight);
-                CopyImageRows(destination, tightRow, sourcePixels, source->rowPitch,
-                    copyRows, tightRow);
+                localOffset = alignOffset(localOffset);
+                const uint32_t mipWidth = (std::max)(1u, width >> mip);
+                const uint32_t mipHeight = (std::max)(1u, height >> mip);
+                const size_t tightRow = static_cast<size_t>(RHIFormatRowPitch(format, mipWidth));
+                std::byte* destination = static_cast<std::byte*>(upload.cpuAddress) + localOffset;
 
-                // A/B 대조용 다이제스트. 이쪽 행 간격은 빈틈이 없어 그대로가
-                // 유효 바이트다. solid 폴백(image 없음)은 먹이지 않는다 —
-                // 대조하려는 것은 자산이지 기본 텍스처가 아니다.
-                if (RHIUploadDigestEnabled())
+                if (hasImage)
                 {
-                    for (uint32_t row = 0; row < copyRows; ++row)
+                    const TextureSubimage* source = image.Find(mip, slice);
+                    const std::byte* sourcePixels = (nullptr != source) ? source->pixels : nullptr;
+                    if (nullptr == source || nullptr == sourcePixels || source->rowPitch < tightRow)
                     {
-                        stats.uploadDigest.FeedRow(
-                            destination + static_cast<size_t>(row) * tightRow, tightRow);
+                        outError = "Vulkan 텍스처 밉 픽셀을 찾지 못했다";
+                        return false;
+                    }
+                    // 압축이면 한 행이 블록 한 줄이다 — RHIFormatRowCount 가 그
+                    // 차이를 흡수하므로 여기 루프는 두 경우에 같다.
+                    const uint32_t copyRows = RHIFormatRowCount(format, mipHeight);
+                    CopyImageRows(destination, tightRow, sourcePixels, source->rowPitch, copyRows, tightRow);
+
+                    // A/B 대조용 다이제스트. 이쪽 행 간격은 빈틈이 없어 그대로가
+                    // 유효 바이트다. solid 폴백(image 없음)은 먹이지 않는다 —
+                    // 대조하려는 것은 자산이지 기본 텍스처가 아니다.
+                    if (RHIUploadDigestEnabled())
+                    {
+                        for (uint32_t row = 0; row < copyRows; ++row)
+                        {
+                            stats.uploadDigest.FeedRow(destination + static_cast<size_t>(row) * tightRow, tightRow);
+                        }
                     }
                 }
-            }
-            else
-            {
-                std::memcpy(destination, solid, 4);
-            }
+                else
+                {
+                    std::memcpy(destination, solid, 4);
+                }
 
-            VkBufferImageCopy copy{};
-            copy.bufferOffset = upload.offset + localOffset;
-            copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-            copy.imageSubresource.mipLevel = mip;
-            copy.imageSubresource.layerCount = 1;
-            // imageExtent 는 블록이 아니라 텍셀 단위다(압축이어도 같다).
-            copy.imageExtent = { mipWidth, mipHeight, 1 };
-            copies.push_back(copy);
-            localOffset += RHIFormatSlicePitch(format, mipWidth, mipHeight);
+                VkBufferImageCopy copy{};
+                copy.bufferOffset = upload.offset + localOffset;
+                copy.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                copy.imageSubresource.mipLevel = mip;
+                copy.imageSubresource.baseArrayLayer = slice;
+                copy.imageSubresource.layerCount = 1;
+                // imageExtent 는 블록이 아니라 텍셀 단위다(압축이어도 같다).
+                copy.imageExtent = {mipWidth, mipHeight, 1};
+                copies.push_back(copy);
+                localOffset += RHIFormatSlicePitch(format, mipWidth, mipHeight);
+            }
         }
 
         RHITextureDesc desc{};
         desc.width = width;
         desc.height = height;
         desc.mipLevels = mipLevels;
+        desc.depthOrArraySize = arraySize;
         desc.format = format;
         desc.debugName = name;
         VulkanPersistentHeap::ImageAllocation allocation;
-        if (!persistentHeap.CreateTexture(desc, allocation, outError)) return false;
+        if (!persistentHeap.CreateTexture(desc, allocation, outError))
+            return false;
 
         VulkanImageEntry nativeEntry{};
         nativeEntry.image = allocation.image;
         nativeEntry.view = allocation.view;
         nativeEntry.width = width;
         nativeEntry.height = height;
-        nativeEntry.depthOrArraySize = 1;
+        nativeEntry.depthOrArraySize = arraySize;
         nativeEntry.mipLevels = mipLevels;
         nativeEntry.format = format;
         nativeEntry.layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -260,9 +269,8 @@ struct VulkanTextureCache::Impl
             return false;
         }
 
-        const RHITransition toCopy{
-            outEntry.handle, RHIResourceState::Common, RHIResourceState::CopyDest };
-        resources->TransitionResources({ &toCopy, 1 });
+        const RHITransition toCopy{outEntry.handle, RHIResourceState::Common, RHIResourceState::CopyDest};
+        resources->TransitionResources({&toCopy, 1});
 
         const VulkanBufferEntry buffer = resources->GetResourceTable().Resolve(upload.buffer);
         const VulkanImageEntry texture = resources->GetResourceTable().Resolve(outEntry.handle);
@@ -276,34 +284,33 @@ struct VulkanTextureCache::Impl
         }
 
         vkCmdCopyBufferToImage(resources->GetCommandBuffer(), buffer.buffer, texture.image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            static_cast<uint32_t>(copies.size()), copies.data());
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, static_cast<uint32_t>(copies.size()),
+                               copies.data());
 
-        const RHITransition toShader{
-            outEntry.handle, RHIResourceState::CopyDest,
-            RHIResourceState::PixelShaderResource };
-        resources->TransitionResources({ &toShader, 1 });
+        const RHITransition toShader{outEntry.handle, RHIResourceState::CopyDest,
+                                     RHIResourceState::PixelShaderResource};
+        resources->TransitionResources({&toShader, 1});
 
         outEntry.format = format;
         outEntry.width = width;
         outEntry.height = height;
         outEntry.mipLevels = mipLevels;
-        outEntry.arraySize = 1;
+        outEntry.arraySize = arraySize;
+        outEntry.isCube = hasImage && image.IsCube();
         outBytes = totalBytes;
         Track(outEntry.handle);
         outAllocation = std::move(allocation);
         return true;
     }
 
-    RHITextureEntry Solid(const uint8_t rgba[4], const wchar_t* name,
-        RHITextureEntry& cache,
-        VulkanPersistentHeap::ImageAllocation& allocation,
-        std::string& outError)
+    RHITextureEntry Solid(const uint8_t rgba[4], const wchar_t* name, RHITextureEntry& cache,
+                          VulkanPersistentHeap::ImageAllocation& allocation, std::string& outError)
     {
-        if (cache.IsValid()) return cache;
+        if (cache.IsValid())
+            return cache;
         uint64_t bytes = 0;
-        if (!UploadImage(TextureImageView{}, rgba, name, allocation, cache, bytes,
-            outError)) ++stats.failures;
+        if (!UploadImage(TextureImageView{}, rgba, name, allocation, cache, bytes, outError))
+            ++stats.failures;
         return cache;
     }
 };

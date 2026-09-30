@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <exception>
 
 using namespace VulkanApi;
 
@@ -12,6 +13,67 @@ namespace
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
     constexpr uint64_t kVkHashOffset = 1469598103934665603ull;
     constexpr uint64_t kVkHashPrime = 1099511628211ull;
+
+    // RHI compilation emits one entry per artifact. Use its actual SPIR-V name;
+    // generated Scene/material hosts do not use VSMain/PSMain/CSMain.
+    bool VkReadEntryPoint(const void* code, size_t bytes, uint32_t executionModel, std::string& name,
+                          std::string& error)
+    {
+        if (!code || bytes < 5 * sizeof(uint32_t) || bytes % sizeof(uint32_t))
+        {
+            error = "Vulkan shader is not a complete SPIR-V word stream";
+            return false;
+        }
+        const auto* data = static_cast<const uint8_t*>(code);
+        const auto word = [data](size_t offset) {
+            uint32_t value;
+            std::memcpy(&value, data + offset * sizeof(uint32_t), sizeof(value));
+            return value;
+        };
+        if (word(0) != 0x07230203u)
+        {
+            error = "Vulkan shader has an invalid SPIR-V header";
+            return false;
+        }
+        const size_t count = bytes / sizeof(uint32_t);
+        for (size_t offset = 5; offset < count;)
+        {
+            const uint32_t instruction = word(offset);
+            const size_t length = instruction >> 16;
+            if (!length || length > count - offset)
+            {
+                error = "Vulkan shader contains a truncated SPIR-V instruction";
+                return false;
+            }
+            constexpr uint32_t kOpEntryPoint = 15;
+            if ((instruction & 0xffffu) == kOpEntryPoint)
+            {
+                if (length < 4)
+                {
+                    error = "Vulkan shader contains a truncated SPIR-V entry point";
+                    return false;
+                }
+                if (word(offset + 1) == executionModel)
+                {
+                    const auto* begin = reinterpret_cast<const char*>(data + (offset + 3) * sizeof(uint32_t));
+                    const auto* end = static_cast<const char*>(std::memchr(begin, 0, (length - 3) * sizeof(uint32_t)));
+                    if (!end || end == begin || !name.empty())
+                    {
+                        error = "Vulkan shader requires one nonempty entry point for its stage";
+                        return false;
+                    }
+                    name.assign(begin, end);
+                }
+            }
+            offset += length;
+        }
+        if (name.empty())
+        {
+            error = "Vulkan shader has no SPIR-V entry point for its stage";
+            return false;
+        }
+        return true;
+    }
 
     void VkHashBytes(uint64_t& hash, const void* data, size_t bytes)
     {
@@ -61,6 +123,7 @@ namespace
         {
         case RHICompareOp::Less:      return VK_COMPARE_OP_LESS;
         case RHICompareOp::LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case RHICompareOp::Equal: return VK_COMPARE_OP_EQUAL;
         case RHICompareOp::None:
         default:                      return VK_COMPARE_OP_NEVER;
         }
@@ -149,6 +212,7 @@ namespace
         {
         case RHICompareOp::Less:      return VK_COMPARE_OP_LESS;
         case RHICompareOp::LessEqual: return VK_COMPARE_OP_LESS_OR_EQUAL;
+        case RHICompareOp::Equal: return VK_COMPARE_OP_EQUAL;
         default:                      return VK_COMPARE_OP_ALWAYS;
         }
     }
@@ -174,6 +238,26 @@ namespace
         }
     }
 }
+
+struct VulkanPipelineCache::PendingGraphics
+{
+    VkDevice device{VK_NULL_HANDLE};
+    VulkanPipelineLayoutEntry layout;
+    RHIGraphicsPipelineRequest input;
+    job_handle completion;
+    VkPipeline pipeline{VK_NULL_HANDLE};
+    std::string error;
+    bool worker{false};
+    bool checked{false};
+
+    ~PendingGraphics()
+    {
+        if (VK_NULL_HANDLE != pipeline)
+        {
+            vkDestroyPipeline(device, pipeline, nullptr);
+        }
+    }
+};
 
 uint64_t VulkanPipelineCache::ComputeHash(const RHIGraphicsPipelineDesc& desc) const
 {
@@ -233,9 +317,37 @@ VulkanPipelineCache::~VulkanPipelineCache()
     Shutdown();
 }
 
+void VulkanPipelineCache::Initialize(VkDevice device)
+{
+    Shutdown();
+    m_device = device;
+    m_stats = {};
+}
+
 void VulkanPipelineCache::Shutdown()
 {
     if (VK_NULL_HANDLE == m_device) return;
+
+    // This lifecycle boundary may wait. RequestGraphics and invalidation never do.
+    // Jobs own native results; join them before destroying layouts or the device.
+    const auto join = [](const std::shared_ptr<PendingGraphics>& request) {
+        try
+        {
+            if (request->completion.valid())
+                request->completion.wait();
+        }
+        catch (...)
+        {
+            // A failed job still releases its captures before wait returns.
+        }
+    };
+    for (const auto& [hash, request] : m_pendingGraphics)
+        join(request);
+    for (const auto& request : m_abandonedGraphics)
+        join(request);
+    m_pendingGraphics.clear();
+    m_abandonedGraphics.clear();
+    m_stats.asyncPending = 0;
 
     for (const PipelineSlot& slot : m_pipelines)
     {
@@ -266,12 +378,6 @@ void VulkanPipelineCache::Shutdown()
     }
     m_layouts.clear();
     m_layoutByHash.clear();
-
-    for (VkShaderModule module : m_modules)
-    {
-        if (VK_NULL_HANDLE != module) vkDestroyShaderModule(m_device, module, nullptr);
-    }
-    m_modules.clear();
 
     m_device = VK_NULL_HANDLE;
 }
@@ -561,6 +667,13 @@ bool VulkanPipelineCache::RetirePipeline(RHIPipelineHandle handle,
 
 std::uint32_t VulkanPipelineCache::InvalidatePipelines(RHICompletionPoint retireAfter)
 {
+    // Already accepted jobs finish against their owned inputs, but can no longer publish.
+    for (auto& [hash, request] : m_pendingGraphics)
+    {
+        m_abandonedGraphics.push_back(std::move(request));
+    }
+    m_pendingGraphics.clear();
+    CollectAbandonedGraphics();
     std::uint32_t invalidated = 0;
     for (std::uint32_t slotIndex = 0;
         slotIndex < static_cast<std::uint32_t>(m_pipelines.size()); ++slotIndex)
@@ -587,6 +700,7 @@ std::uint32_t VulkanPipelineCache::InvalidatePipelines(RHICompletionPoint retire
 std::uint32_t VulkanPipelineCache::CollectRetiredPipelines(
     RHICompletionPoint completed)
 {
+    CollectAbandonedGraphics();
     const RHIRetireCollection collected = m_retiredPipelines.Collect(
         completed, [this](VkPipeline& pipeline)
         {
@@ -657,7 +771,13 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreateCompute(const RHIComputePipeli
         return {};
     }
 
-    VkShaderModuleCreateInfo moduleInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+    std::string entryPoint;
+    if (!VkReadEntryPoint(desc.csBytecode, desc.csSize, 5, entryPoint, outError))
+    {
+        ++m_stats.failures;
+        return {};
+    }
+    VkShaderModuleCreateInfo moduleInfo{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
     moduleInfo.codeSize = desc.csSize;
     moduleInfo.pCode = static_cast<const uint32_t*>(desc.csBytecode);
     VkShaderModule module = VK_NULL_HANDLE;
@@ -668,23 +788,23 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreateCompute(const RHIComputePipeli
         outError = "컴퓨트 셰이더 모듈 생성 실패 — " + ResultToString(result);
         return {};
     }
-    m_modules.push_back(module);
-
-    VkPipelineShaderStageCreateInfo stage{
-        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    VkPipelineShaderStageCreateInfo stage{VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO};
     stage.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stage.module = module;
-    stage.pName = "CSMain";
+    stage.pName = entryPoint.c_str();
 
-    VkComputePipelineCreateInfo info{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    VkComputePipelineCreateInfo info{VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO};
     info.stage = stage;
     info.layout = layout.layout;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
     result = vkCreateComputePipelines(m_device, VK_NULL_HANDLE, 1, &info,
         nullptr, &pipeline);
+    vkDestroyShaderModule(m_device, module, nullptr);
     if (VK_SUCCESS != result)
     {
+        if (VK_NULL_HANDLE != pipeline)
+            vkDestroyPipeline(m_device, pipeline, nullptr);
         ++m_stats.failures;
         outError = "컴퓨트 파이프라인 생성 실패 — " + ResultToString(result);
         return {};
@@ -715,6 +835,27 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc
         return it->second;
     }
 
+    // Legacy synchronous callers can consume an accepted async request without compiling twice.
+    if (const auto pending = m_pendingGraphics.find(hash); pending != m_pendingGraphics.end())
+    {
+        try
+        {
+            if (pending->second->completion.valid())
+                pending->second->completion.wait();
+        }
+        catch (...)
+        {
+            // CompleteGraphics records the job diagnostic below.
+        }
+        RHIPipelineHandle result;
+        if (CompleteGraphics(hash, *pending->second, result, outError) == RHIPipelineRequestState::Ready)
+        {
+            m_pendingGraphics.erase(pending);
+        }
+        CollectAbandonedGraphics();
+        return result;
+    }
+
     // ★ 캐시가 레이아웃을 **기억한다** — 그것이 핸들이 짝을 들 수 있는 근거다.
     //   호출부는 desc 에 레이아웃 핸들을 넣었을 뿐이고, 거는 시점에는 아무것도
     //   안 넘긴다(RHIHandle.h ★).
@@ -726,7 +867,7 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc
         return {};
     }
 
-    VkPipeline pipeline = CreateOne(desc, layout.layout, outError);
+    VkPipeline pipeline = CreateOne(m_device, desc, layout.layout, outError);
     if (VK_NULL_HANDLE == pipeline)
     {
         ++m_stats.failures;
@@ -747,8 +888,155 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc
     return handle;
 }
 
-VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
-    VkPipelineLayout layout, std::string& outError)
+void VulkanPipelineCache::CollectAbandonedGraphics()
+{
+    std::erase_if(m_abandonedGraphics, [this](const auto& request) {
+        if (request->completion.valid() && !request->completion.is_complete())
+            return false;
+        if (!request->checked)
+        {
+            if (request->worker)
+                ++m_stats.asyncWorkerExecutions;
+            ++m_stats.asyncStaleCompletions;
+        }
+        return true;
+    });
+    m_stats.asyncPending = static_cast<uint32_t>(m_abandonedGraphics.size());
+    for (const auto& [hash, request] : m_pendingGraphics)
+    {
+        if (!request->checked)
+            ++m_stats.asyncPending;
+    }
+}
+
+RHIPipelineRequestState VulkanPipelineCache::CompleteGraphics(uint64_t hash, PendingGraphics& request,
+                                                              RHIPipelineHandle& result, std::string& outError)
+{
+    if (request.completion.valid() && !request.completion.is_complete())
+    {
+        return RHIPipelineRequestState::Pending;
+    }
+    if (!request.checked)
+    {
+        request.checked = true;
+        if (request.worker)
+            ++m_stats.asyncWorkerExecutions;
+        try
+        {
+            if (request.completion.valid())
+                request.completion.wait();
+        }
+        catch (const std::exception& exception)
+        {
+            request.error = std::string("Vulkan graphics pipeline job failed: ") + exception.what();
+        }
+        catch (...)
+        {
+            request.error = "Vulkan graphics pipeline job failed";
+        }
+        if (VK_NULL_HANDLE == request.pipeline)
+        {
+            if (request.error.empty())
+                request.error = "Vulkan graphics pipeline job returned no native pipeline";
+            ++m_stats.failures;
+        }
+        else
+        {
+            ++m_stats.compiles;
+            result = PublishPipeline(
+                {request.pipeline, request.layout.layout, request.layout.setLayout, request.input.GetDesc().layout});
+            if (result.IsValid())
+            {
+                request.pipeline = VK_NULL_HANDLE;
+                m_pipelineByHash.emplace(hash, result);
+                return RHIPipelineRequestState::Ready;
+            }
+            request.error = "Vulkan graphics pipeline handle table is full";
+            ++m_stats.failures;
+        }
+    }
+    outError = request.error;
+    return RHIPipelineRequestState::Failed;
+}
+
+RHIPipelineRequestState VulkanPipelineCache::RequestGraphics(const RHIGraphicsPipelineDesc& desc,
+                                                             RHIPipelineHandle& result, std::string& outError)
+{
+    result = {};
+    outError.clear();
+    CollectAbandonedGraphics();
+    if (VK_NULL_HANDLE == m_device)
+    {
+        outError = "Vulkan graphics pipeline cache is not initialized";
+        return RHIPipelineRequestState::Failed;
+    }
+    if ((desc.vsSize && !desc.vsBytecode) || (desc.psSize && !desc.psBytecode) ||
+        (desc.inputElementCount && !desc.inputElements) || desc.numRenderTargets > 8)
+    {
+        outError = "Vulkan graphics pipeline descriptor has invalid borrowed inputs";
+        return RHIPipelineRequestState::Failed;
+    }
+    const uint64_t hash = ComputeHash(desc);
+    if (const auto found = m_pipelineByHash.find(hash); found != m_pipelineByHash.end())
+    {
+        ++m_stats.memoryHits;
+        result = found->second;
+        return RHIPipelineRequestState::Ready;
+    }
+    if (const auto pending = m_pendingGraphics.find(hash); pending != m_pendingGraphics.end())
+    {
+        const auto state = CompleteGraphics(hash, *pending->second, result, outError);
+        if (state == RHIPipelineRequestState::Ready)
+            m_pendingGraphics.erase(pending);
+        CollectAbandonedGraphics();
+        return state;
+    }
+    if (!m_scheduler.is_running())
+    {
+        outError = "Vulkan graphics pipeline scheduler is stopped";
+        return RHIPipelineRequestState::Failed;
+    }
+    constexpr size_t kMaxRequests = 64;
+    if (m_pendingGraphics.size() + m_abandonedGraphics.size() >= kMaxRequests)
+    {
+        outError = "Vulkan graphics pipeline preparation budget exceeded";
+        return RHIPipelineRequestState::Failed;
+    }
+    auto request = std::make_shared<PendingGraphics>();
+    request->device = m_device;
+    request->layout = Resolve(desc.layout);
+    if (!request->layout.IsValid() || !request->input.Prepare(desc, outError))
+    {
+        if (outError.empty())
+            outError = "Vulkan graphics pipeline layout is invalid";
+        return RHIPipelineRequestState::Failed;
+    }
+    m_pendingGraphics.emplace(hash, request);
+    try
+    {
+        request->completion = m_scheduler.submit([request] {
+            request->worker = thread_pool::is_worker_thread();
+            request->pipeline =
+                CreateOne(request->device, request->input.GetDesc(), request->layout.layout, request->error);
+        });
+        ++m_stats.asyncSubmissions;
+    }
+    catch (const std::exception& exception)
+    {
+        request->error = std::string("Vulkan graphics pipeline submission failed: ") + exception.what();
+    }
+    catch (...)
+    {
+        request->error = "Vulkan graphics pipeline submission failed";
+    }
+    CollectAbandonedGraphics();
+    if (!request->completion.valid())
+        return CompleteGraphics(hash, *request, result, outError);
+    return RHIPipelineRequestState::Pending;
+}
+
+VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipelineDesc& desc, VkPipelineLayout layout,
+                                          std::string& outError)
 {
     if (nullptr == desc.vsBytecode || 0 == desc.vsSize)
     {
@@ -765,24 +1053,42 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
         return VK_NULL_HANDLE;
     }
 
-
+    std::string vertexEntry, pixelEntry;
+    if (!VkReadEntryPoint(desc.vsBytecode, desc.vsSize, 0, vertexEntry, outError) ||
+        (hasPixelShader && !VkReadEntryPoint(desc.psBytecode, desc.psSize, 4, pixelEntry, outError)))
+    {
+        return VK_NULL_HANDLE;
+    }
+    struct ShaderModules
+    {
+        VkDevice device;
+        VkShaderModule vs{VK_NULL_HANDLE};
+        VkShaderModule ps{VK_NULL_HANDLE};
+        ~ShaderModules()
+        {
+            if (vs != VK_NULL_HANDLE)
+                vkDestroyShaderModule(device, vs, nullptr);
+            if (ps != VK_NULL_HANDLE)
+                vkDestroyShaderModule(device, ps, nullptr);
+        }
+    } modules{device};
     auto createModule = [&](const void* code, size_t bytes, VkShaderModule& out) {
-        VkShaderModuleCreateInfo info{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+        VkShaderModuleCreateInfo info{VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO};
         info.codeSize = bytes;
         info.pCode = static_cast<const uint32_t*>(code);
-        const VkResult result = vkCreateShaderModule(m_device, &info, nullptr, &out);
+        const VkResult result = vkCreateShaderModule(device, &info, nullptr, &out);
         if (VK_SUCCESS != result)
         {
             outError = "셰이더 모듈 생성 실패 — " + ResultToString(result);
             return false;
         }
-        m_modules.push_back(out);
         return true;
     };
 
-    VkShaderModule vs = VK_NULL_HANDLE;
-    VkShaderModule ps = VK_NULL_HANDLE;
-    if (!createModule(desc.vsBytecode, desc.vsSize, vs)) return VK_NULL_HANDLE;
+    auto& vs = modules.vs;
+    auto& ps = modules.ps;
+    if (!createModule(desc.vsBytecode, desc.vsSize, vs))
+        return VK_NULL_HANDLE;
     if (hasPixelShader && !createModule(desc.psBytecode, desc.psSize, ps))
         return VK_NULL_HANDLE;
 
@@ -790,22 +1096,19 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     stages[0].module = vs;
-    stages[0].pName = "VSMain";
+    stages[0].pName = vertexEntry.c_str();
     if (hasPixelShader)
     {
         stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         stages[1].module = ps;
-        stages[1].pName = "PSMain";
+        stages[1].pName = pixelEntry.c_str();
     }
 
-    // ★ 진입점 이름이 서명에 없다. DX12 는 컴파일 시점에 정하고 바이트코드에는
-    //   진입점이 하나뿐이지만, SPIR-V 는 한 모듈에 여럿을 담을 수 있어
-    //   **파이프라인 생성 시점에** 고른다. 지금은 VSMain/PSMain 으로 박아 두고,
-    //   이것이 desc 로 올라와야 하는지는 소비자가 둘 이상 생길 때 정한다.
+    // Native stage names come from the owned artifact, so named generated hosts
+    // use the same RHI descriptor and cache key as legacy shaders.
 
-    VkPipelineVertexInputStateCreateInfo vertexInput{
-        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+    VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
     VkVertexInputBindingDescription vertexBinding{};
     std::vector<VkVertexInputAttributeDescription> vertexAttributes;
     if (0 != desc.inputElementCount)
@@ -828,8 +1131,8 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
                 outError = "Vulkan 정점 입력에 대응하지 않는 RHIFormat이다";
                 return VK_NULL_HANDLE;
             }
-            vertexAttributes.push_back(VkVertexInputAttributeDescription{
-                i, element.inputSlot, format, element.alignedByteOffset });
+            vertexAttributes.push_back(
+                VkVertexInputAttributeDescription{i, element.inputSlot, format, element.alignedByteOffset});
         }
 
         // stride는 RHIEncoder::SetVertexBuffer의 인자다. 파이프라인에 임의로
@@ -839,17 +1142,14 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
         vertexBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
         vertexInput.vertexBindingDescriptionCount = 1;
         vertexInput.pVertexBindingDescriptions = &vertexBinding;
-        vertexInput.vertexAttributeDescriptionCount =
-            static_cast<uint32_t>(vertexAttributes.size());
+        vertexInput.vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexAttributes.size());
         vertexInput.pVertexAttributeDescriptions = vertexAttributes.data();
     }
 
-    VkPipelineInputAssemblyStateCreateInfo inputAssembly{
-        VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO};
     inputAssembly.topology = VkTopologyOf(desc.topologyType);
 
-    VkPipelineViewportStateCreateInfo viewportState{
-        VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+    VkPipelineViewportStateCreateInfo viewportState{VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO};
     viewportState.viewportCount = 1;
     viewportState.scissorCount = 1;
 
@@ -970,10 +1270,11 @@ VkPipeline VulkanPipelineCache::CreateOne(const RHIGraphicsPipelineDesc& desc,
     info.layout = layout;
 
     VkPipeline pipeline = VK_NULL_HANDLE;
-    const VkResult result = vkCreateGraphicsPipelines(m_device, VK_NULL_HANDLE, 1, &info,
-        nullptr, &pipeline);
+    const VkResult result = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &info, nullptr, &pipeline);
     if (VK_SUCCESS != result)
     {
+        if (VK_NULL_HANDLE != pipeline)
+            vkDestroyPipeline(device, pipeline, nullptr);
         outError = "그래픽 파이프라인 생성 실패 — " + ResultToString(result);
         return VK_NULL_HANDLE;
     }

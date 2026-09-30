@@ -10,7 +10,8 @@
 
 namespace experiment::cooked
 {
-    // The pak owns its index and is kept alive by every opened clip source.
+    // Audio and LX material programs use the same immutable mounted archive.
+    // The pak owns its index and is kept alive by every opened byte source.
     // Pak::Archive::readRange decompresses only intersecting chunks.
     class PakAudioClipByteSource final : public ArtifactByteSource
     {
@@ -21,16 +22,16 @@ namespace experiment::cooked
         [[nodiscard]] bool Size(std::string_view path,
             std::uint64_t& out, std::string& failure) const override
         {
-            if (!archive_ || !IsAudioArtifactVirtualPath(path))
+            if (!archive_ || (!IsAudioArtifactVirtualPath(path) && !IsMaterialProgramArtifactVirtualPath(path)))
             {
-                failure = "pak audio virtual path is invalid";
+                failure = "pak artifact virtual path is invalid";
                 return false;
             }
             const std::string virtualPath = "Assets/" + std::string(path);
             const auto size = archive_->sizeOf(virtualPath);
             if (!size)
             {
-                failure = "audio artifact is missing from pak";
+                failure = "artifact is missing from pak";
                 return false;
             }
             out = *size;
@@ -45,7 +46,7 @@ namespace experiment::cooked
             if (!Size(path, size, failure)) return false;
             if (offset > size || out.size() > size - offset)
             {
-                failure = "pak audio read exceeds entry extent";
+                failure = "pak artifact read exceeds entry extent";
                 return false;
             }
             try
@@ -55,7 +56,7 @@ namespace experiment::cooked
             }
             catch (const std::exception& error)
             {
-                failure = std::string("pak audio range read failed: ") + error.what();
+                failure = std::string("pak artifact range read failed: ") + error.what();
                 return false;
             }
             return true;

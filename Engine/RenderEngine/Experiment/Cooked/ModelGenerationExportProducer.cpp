@@ -2,6 +2,7 @@
 
 #include "../../Assets/ModelAssetGeneration.h"
 #include "../../Assets/ModelSidecarV2.h"
+#include "../../Assets/ModelMaterialGraph.h"
 #include "AuthoringCookedDocument.h"
 #include "AuthoringParsedDocument.h"
 #include "Sha256.h"
@@ -225,11 +226,23 @@ namespace experiment::cooked
         product.manifestEntry.contentSha256 = digest;
         product.manifestEntry.artifactPath = product.recordArtifactPath;
 
+        for (const auto& material : loaded.generation->Materials())
+        {
+            const auto graphPath = assets::ModelMaterialGraphPath(request.assetRoot, sidecar.assetId, material.materialId);
+            if (!assets::ModelMaterialGraphIdentityMatches(graphPath, assets::ModelMaterialGraphId(material.materialId)))
+            {
+                AddIssue(result, "material.graph", "Model material source graph is missing; author the model first: " + graphPath.string());
+                return result;
+            }
+            product.manifestEntry.dependencies.push_back(AssetId{assets::ModelMaterialGraphId(material.materialId)});
+        }
+
         for (const assets::ModelMaterialAsset& material : loaded.generation->Materials())
         {
             CookedAssetManifestEntry entry = product.manifestEntry;
             entry.assetId = AssetId{ material.materialId };
             entry.kind = CookedAssetKind::Material;
+            entry.dependencies = { AssetId{assets::ModelMaterialGraphId(material.materialId)} };
             product.subAssetEntries.push_back(std::move(entry));
         }
         // 메시 subasset — 씬이 MeshRenderer::m_meshAssetId(UUIDv8 MeshId)로 참조한다(MBC7).

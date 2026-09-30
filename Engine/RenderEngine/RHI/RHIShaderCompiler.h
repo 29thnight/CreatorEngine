@@ -5,8 +5,10 @@
 #include "RHIShaderReflection.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
+#include <vector>
 
 enum class RHIShaderBinary : std::uint8_t
 {
@@ -18,6 +20,12 @@ struct RHIShaderCompileOptions
 {
     // 적분·감축처럼 부동소수점 재결합이 결과 계약을 깨는 셰이더만 켠다.
     bool strictMath{};
+    // Generated material modules can live in the runtime cache. Their common
+    // modules are resolved here; Slang reports the actual dependency files.
+    std::vector<std::filesystem::path> includeDirectories;
+    // Fine pixel-quad derivatives require explicit SPIR-V DerivativeControl.
+    // Request the capability only for hosts that use ddx_fine/ddy_fine.
+    bool fineDerivatives{};
 };
 
 struct RHIShaderCompileRequest
@@ -44,6 +52,13 @@ public:
 
 namespace RHIShaderCompiler
 {
+    struct VerifiedShader
+    {
+        RHIShaderBlob bytecode;
+        RHIShaderReflection reflection;
+        std::string dependencyIdentity;
+    };
+
     struct Stats
     {
         std::uint64_t memoryHits{};
@@ -93,6 +108,12 @@ namespace RHIShaderCompiler
         const RHIShaderPermutation& permutation,
         RHIShaderReflection& outReflection, std::string& outError,
         RHIShaderCompileOptions options = {});
+
+    // Compile, reflection and dependency identity come from one linked program.
+    // Failure leaves the previous verified result intact.
+    bool VerifyFile(std::string_view name, std::string_view entryPoint, std::string_view targetProfile,
+        RHIShaderBinary output, const RHIShaderPermutation& permutation,
+        VerifiedShader& outShader, std::string& outError, RHIShaderCompileOptions options = {});
 
     inline bool ReflectFile(std::string_view name, std::string_view entryPoint,
         std::string_view targetProfile, RHIShaderBinary output,

@@ -45,6 +45,7 @@ namespace editor
         bool          is_central{ false };
         bool          is_leaf{ false };
         bool          is_visible{ false };
+        std::uint32_t merged_flags{ 0 };
     };
 
     /// 선언된 창 하나가 이번 프레임에 어디 놓였는가.
@@ -139,6 +140,9 @@ namespace editor
         std::vector<dock_node_view>        nodes;
         std::vector<dock_tab_view>         tabs;
         std::vector<window_placement_view> placements;
+        std::string moving_window;
+        std::string hovered_window_under_moving;
+        bool docking_payload{ false };
 
         /// 스타일 값. 색은 RGBA8 로 접어 담는다(0xRRGGBBAA).
         std::vector<std::pair<std::string, std::uint32_t>> style_colors;

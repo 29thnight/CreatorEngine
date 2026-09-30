@@ -20,6 +20,21 @@ that host-supplied resource root instead of the current working directory.
 If Inter is absent, it tries Windows font candidates and then ImGui's built-in
 font. Korean text retains the separate system-font candidates.
 
+## Color emoji
+
+Every editor text face also merges the Windows-installed `seguiemj.ttf`
+(Segoe UI Emoji) before its Korean fallback, with FreeType's `LoadColor` flag.
+The system font is resolved from the OS font directory and is not copied into
+the engine distribution. If it is absent or rejected, the text face stays usable.
+The ImGui manifest enables `wchar32` and `freetype`; its generated `imconfig.h`
+is shared by ImGui and all consumers, including node-editor and ImGuizmo.
+
+The About heading includes `CreatorEngine 2 🎹✨` as a visual sample. Text faces
+reserve U+2728 and U+1F000–U+1FAFF for the emoji source when it is available;
+other BMP characters retain the normal text-font priority. Material Symbols
+keeps the private-use area. ImGui's text renderer handles single codepoints;
+combined emoji sequences and skin-tone modifiers are outside this integration.
+
 The current ImGui editor has no monospace font consumer. A separate Consolas
 and bundled monospace fallback chain will be added with such a consumer.
 
@@ -27,8 +42,12 @@ and bundled monospace fallback chain will be added with such a consumer.
 
 The editor uses Google Material Symbols Outlined for semantic UI/type icons.
 `MaterialSymbolsOutlined-Editor.ttf` is a modified static subset: optical size 20,
-weight 400, fill 0, grade 0. It contains 58 unique glyphs for 63 named roles (8,536 bytes).
+weight 400, fill 0, grade 0. It contains 68 unique glyphs for 73 named roles (10,376 bytes).
 The Scene toolbar adds Menu, World, Lit and Show to the existing semantic roles.
+The Lattice material toolbar also uses the Save, Shield, Duplicate, Pin, Overlays,
+NodeEditor and FrameAll roles. Its context, breadcrumb and dropdown arrows use
+the same font instead of assembling icon silhouettes from drawing primitives.
+Snap uses the existing `grid_on` symbol; this pinned font has no magnet symbol.
 There are no ASCII glyphs or ligatures, so merging it cannot replace body text.
 
 - Upstream: https://github.com/google/material-design-icons
@@ -52,6 +71,11 @@ icons in tabs, controls and smaller labels while preserving each symbol's shape.
 The offset scales with ImGui user/DPI sizing, including an explicitly sized default
 text-font fallback. See `EditorIconAlignment.h` and
 `docs/analysis/EditorIconAlignmentValidation.md` for the raster and Editor checks.
+
+Material toolbar icons have an 18 logical-pixel font size and are centered by
+their visible glyph bounds. Its dropdown chevrons use 10 logical pixels. The
+standalone Lattice material capture deploys Inter, the icon subset and both
+licenses beside its executable, then uses the same aligned font merge helper.
 
 Inter 4.1 also maps nine of the selected private-use codepoints. Text font configs
 reserve the UI private-use area U+E000–U+F8FF with one persistent

@@ -41,25 +41,17 @@ Material::Material()
 {
 }
 
-Material::Material(const Material& material) :
-    m_name(material.m_name),
-    m_baseColorTexName(material.m_baseColorTexName),
-    m_normalTexName(material.m_normalTexName),
-    m_ORM_TexName(material.m_ORM_TexName),
-    m_AO_TexName(material.m_AO_TexName),
-    m_EmissiveTexName(material.m_EmissiveTexName),
-    m_materialInfo(material.m_materialInfo),
-    m_flowInfo(material.m_flowInfo),
-    m_shaderMetaGuid(material.m_shaderMetaGuid),
-    m_propertyValues(material.m_propertyValues),
-    m_keywordSelections(material.m_keywordSelections),
-    m_fileGuid(material.m_fileGuid),
-    m_renderingMode(material.m_renderingMode),
-    m_doubleSided(material.m_doubleSided),
-    m_cbufferValues(material.m_cbufferValues),
-    m_runtimeSchema(material.m_runtimeSchema),
-	m_shaderMetaHandle(material.m_shaderMetaHandle),
-	m_textureOwners(material.m_textureOwners)
+Material::Material(const Material& material)
+    : m_name(material.m_name), m_baseColorTexName(material.m_baseColorTexName),
+      m_normalTexName(material.m_normalTexName), m_ORM_TexName(material.m_ORM_TexName),
+      m_AO_TexName(material.m_AO_TexName), m_EmissiveTexName(material.m_EmissiveTexName),
+      m_materialInfo(material.m_materialInfo), m_flowInfo(material.m_flowInfo),
+      m_shaderMetaGuid(material.m_shaderMetaGuid), m_propertyValues(material.m_propertyValues),
+      m_keywordSelections(material.m_keywordSelections), m_fileGuid(material.m_fileGuid),
+      m_renderingMode(material.m_renderingMode), m_doubleSided(material.m_doubleSided),
+      m_cbufferValues(material.m_cbufferValues), m_runtimeSchema(material.m_runtimeSchema),
+      m_shaderMetaHandle(material.m_shaderMetaHandle), m_textureOwners(material.m_textureOwners),
+      m_materialGraphInstance(material.m_materialGraphInstance)
 {
 }
 
@@ -84,18 +76,56 @@ Material::Material(Material&& material) noexcept
     m_keywordSelections = std::move(material.m_keywordSelections);
     m_runtimeSchema = std::move(material.m_runtimeSchema);
     m_cbufferValues = std::move(material.m_cbufferValues);
+    m_materialGraphInstance = std::move(material.m_materialGraphInstance);
 }
 
 Material::~Material()
 {
 }
 
+bool Material::TrySetMaterialGraphParameter(LX::Id parameter, LX::LXSocketValue value, std::string& error)
+{
+    const material_graph::ParameterOverride edit{parameter, std::move(value)};
+    return TrySetMaterialGraphParameters(std::span(&edit, 1), error);
+}
+
+bool Material::TrySetMaterialGraphParameters(std::span<const material_graph::ParameterOverride> values, std::string& error)
+{
+    if (!m_materialGraphInstance)
+    {
+        error = "Material has no LX graph instance.";
+        return false;
+    }
+    auto description = m_materialGraphInstance->description;
+    for (const auto& value : values)
+    {
+        const auto found = std::ranges::find(description.parameters, value.id, &material_graph::ParameterOverride::id);
+        if (found == description.parameters.end())
+        {
+            description.parameters.push_back(value);
+        }
+        else
+        {
+            found->value = value.value;
+        }
+    }
+    const auto textureLoader = [this](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
+                                      std::string&) -> std::shared_ptr<Texture> {
+        for (const auto& texture : m_materialGraphInstance->textures)
+            if (texture.assetId == id && texture.colorSpace == colorSpace)
+                return texture.owner;
+        return {};
+    };
+    return material_graph::BuildInstance(m_materialGraphInstance->generation, description, textureLoader,
+                                         m_materialGraphInstance, error);
+}
+
 std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, std::string_view newName)
 {
-	if (!origin)
-		return nullptr;
+    if (!origin)
+        return nullptr;
 
-	// Create a new Material instance
+    // Create a new Material instance
 	auto cloneMaterial = std::make_shared<Material>(*origin);
 
 	const std::string cloneSuffix = "_Clone";
@@ -335,7 +365,12 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
     const ShaderMetaBindingLayout& layout, std::string& outError,
 	ShaderMetaHandle shaderMetaHandle)
 {
-	if (!shaderMetaHandle.IsValid())
+    if (HasMaterialGraph())
+    {
+        outError = "An LX graph material cannot be configured as a ShaderMeta material.";
+        return false;
+    }
+    if (!shaderMetaHandle.IsValid())
 	{
 		outError = "Material ShaderMeta cache handle이 invalid다";
 		return false;
@@ -755,4 +790,3 @@ bool Material::TryGetMatrix(std::string_view q, math::matrix4x4& out) const {
     std::string cb, var; if (!SplitQualified(q, cb, var)) return false;
     return TryGetMatrix(cb, var, out);
 }
-

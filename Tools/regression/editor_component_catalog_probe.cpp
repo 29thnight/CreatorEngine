@@ -17,7 +17,7 @@ int main()
     check(Script("Component").label == "Component", "Script names retain Component suffix");
     for (const auto* type : {"BoxColliderComponent", "SphereColliderComponent", "CapsuleColliderComponent", "RigidBodyComponent", "CharacterControllerComponent", "RagdollComponent"})
         check(Native(type).category == "Physics", "Physics category");
-    for (const auto* type : {"CameraComponent", "LightComponent", "MeshRenderer", "SpriteRenderer", "DecalComponent", "VolumeComponent", "TerrainComponent", "FoliageComponent"})
+    for (const auto* type : {"CameraComponent", "LightComponent", "MeshRenderer", "SpriteRenderer", "DecalComponent", "SceneRenderProfileComponent", "TerrainComponent", "FoliageComponent"})
         check(Native(type).category == "Rendering", "Rendering category");
     for (const auto* type : {"Canvas", "ImageComponent", "TextComponent", "UIButton"})
         check(Native(type).category == "UI", "UI category");

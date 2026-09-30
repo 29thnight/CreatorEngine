@@ -5,7 +5,7 @@
 # 브라우저의 이력은 경로 목록이었다. 뒤로 가면 무엇을 찾고 있었는지(검색어)·무엇을
 # 골랐는지·어디까지 내렸는지가 사라졌고, 끌어 온 자산은 파일 이름만 실어 받는 자리
 # 17곳이 저마다 `<유형 폴더>\이름` 으로 경로를 다시 지었다 — 전체 자산에서
-# `Animation/Cha_Mon_5.fbx` 를 끌면 `Models/Cha_Mon_5.fbx` 가 열린다. Volume Profile
+# `Animation/Cha_Mon_5.fbx` 를 끌면 `Models/Cha_Mon_5.fbx` 가 열린다. Scene Render Profile
 # 은 OS 저장 대화상자에서 이름만 가져와 다른 폴더에 썼고, 같은 이름이면 말없이 숫자를
 # 붙였으며, 취소도 실패도 반환값을 버린 호출자 앞에서 같은 침묵이었다.
 #
@@ -16,7 +16,7 @@
 #
 # 실행 축 (에디터 한 번, 창 숨김)
 #   1  기준 — 뿌리 · 이력 0/1 · 뒤로/위로 불가
-#   2  ★ Volume Profile 생성 — 이름을 받아 VolumeProfile 폴더에 만들고 고른다.
+#   2  ★ Scene Render Profile 생성 — 이름을 받아 SceneRenderProfile 폴더에 만들고 고른다.
 #      같은 이름은 거부(말없는 숫자 붙이기 금지) · 잘못된 이름 거부 · 다른 폴더 거부 ·
 #      가상 위치 거부. 거부해도 디스크에 아무것도 늘지 않는다
 #   3  ★ 방문 복원 — 검색·선택한 채 떠났다가 뒤로 오면 검색어·선택이 돌아온다.
@@ -44,8 +44,8 @@
 #      자리가 늘어도 수는 같다
 #  14  이름만 저장하는 소비자(데칼 셋 · 스프라이트 시트 · 폴리지)는 다른 폴더의 동명
 #      파일을 거부한다
-#  15  Volume Profile 생성 본문에 OS 대화상자·숫자 붙이기가 없고, 브라우저의 두 메뉴가
-#      같은 술어(`CanCreateVolumeProfileIn`)와 같은 생성 경로(`CreateNamedAsset`)를 쓴다
+#  15  Scene Render Profile 생성 본문에 OS 대화상자·숫자 붙이기가 없고, 브라우저의 두 메뉴가
+#      같은 술어(`CanCreateSceneRenderProfileIn`)와 같은 생성 경로(`CreateNamedAsset`)를 쓴다
 #  16  "Show in Folder" 는 원래 폴더로 가서 그 자산을 고른다
 #
 # 프로젝트 전환 축 (임시 프로젝트 둘 · 같은 작업 공간 · 에디터 3 회)
@@ -54,9 +54,9 @@
 #      바꾸는 길이 없다 — 뿌리는 기동 때 `--development-project` 로 한 번 정해진다(App.cpp).
 #      그래서 전환은 **다른 프로젝트로 다시 띄우는 것**이고, 새어 나갈 수 있는 통로는 둘이다:
 #      같은 작업 공간(`CREATOR_EDITOR_WORKSPACE_DIR`)과 최근 항목 저장 파일.
-#      A 에서 Volume Profile 을 만들어 최근에 올리고 하위 폴더로 이동한다 → B 를 같은 작업
+#      A 에서 Scene Render Profile 을 만들어 최근에 올리고 하위 폴더로 이동한다 → B 를 같은 작업
 #      공간으로 띄운다 → B 는 뿌리·이력 0/1·선택 없음·최근 0 이어야 하고, 결과는 B 의 폴더다.
-#      B 에도 **같은 상대 경로** `VolumeProfile/Keep.volume` 을 둔다 — 최근 항목이 프로젝트가
+#      B 에도 **같은 상대 경로** `SceneRenderProfile/Keep.renderprofile` 을 둔다 — 최근 항목이 프로젝트가
 #      아니라 상대 경로로만 묶이면 B 에서 그것이 살아난다. 다시 A 를 띄우면 A 의 최근 1 이
 #      그대로다(B 가 덮지 않았다). A 의 저장 파일 바이트는 B 회차 앞뒤로 같아야 한다.
 #
@@ -107,7 +107,7 @@ $expectedSites = @(
     'HierarchyWindow.cpp:Font', 'HierarchyWindow.cpp:Model', 'HierarchyWindow.cpp:SPRITESHEET',
     'HierarchyWindow.cpp:Texture', 'HierarchyWindow.cpp:UI_TEXTURE',
     'ImGuiDrawHelperMeshRenderer.cpp:Texture', 'ImGuiDrawHelperTerrainComponent.cpp:Model',
-    'InspectorWindow.cpp:HDR', 'InspectorWindow.cpp:(payloadType)', 'InspectorWindow.cpp:VolumeProfile',
+    'InspectorWindow.cpp:HDR', 'InspectorWindow.cpp:(payloadType)', 'InspectorWindow.cpp:SceneRenderProfile',
     'SceneViewWindow.cpp:HDR', 'SceneViewWindow.cpp:Model', 'SceneViewWindow.cpp:Prefab'
 ) | Sort-Object
 
@@ -163,22 +163,22 @@ $terrainText = [IO.File]::ReadAllText((Join-Path $SourceRoot "Editor\EngineGUIWi
 Assert ($terrainText -match 'GetStemToGuid\(\s*filepath\.stem\(\)\.string\(\)\s*\)\s*!=\s*droppedGuid\s*\)\s*\{[^}]*\}\s*else if \(auto generation') `
     "14 폴리지가 stem 이 끌어 온 파일로 돌아오는지 보지 않는다"
 
-# 15 — Volume Profile 생성
+# 15 — Scene Render Profile 생성
 $databaseText = [IO.File]::ReadAllText($databaseCpp)
-$vp = [regex]::Match($databaseText, '(?s)bool EditorAssetDatabase::CreateVolumeProfile\(.*?\n\}')
-Assert $vp.Success "15 CreateVolumeProfile 본문을 찾지 못했다"
+$vp = [regex]::Match($databaseText, '(?s)bool EditorAssetDatabase::CreateSceneRenderProfile\(.*?\n\}')
+Assert $vp.Success "15 CreateSceneRenderProfile 본문을 찾지 못했다"
 if ($vp.Success) {
-    Assert (-not ($vp.Value -match 'ShowSaveFileDialog')) "15 CreateVolumeProfile 이 OS 저장 대화상자를 연다"
-    Assert (-not ($vp.Value -match 'suffix|to_string')) "15 CreateVolumeProfile 이 같은 이름에 숫자를 붙인다"
-    Assert ($vp.Value -match 'already exists') "15 CreateVolumeProfile 이 같은 이름을 거부하지 않는다"
-    Assert ($vp.Value -match 'std::string& error') "15 CreateVolumeProfile 이 이유를 돌려주지 않는다"
+    Assert (-not ($vp.Value -match 'ShowSaveFileDialog')) "15 CreateSceneRenderProfile 이 OS 저장 대화상자를 연다"
+    Assert (-not ($vp.Value -match 'suffix|to_string')) "15 CreateSceneRenderProfile 이 같은 이름에 숫자를 붙인다"
+    Assert ($vp.Value -match 'already exists') "15 CreateSceneRenderProfile 이 같은 이름을 거부하지 않는다"
+    Assert ($vp.Value -match 'std::string& error') "15 CreateSceneRenderProfile 이 이유를 돌려주지 않는다"
 }
-$createCalls = [regex]::Matches($browserText, 'CreateVolumeProfile\s*\(').Count
-Assert ($createCalls -eq 1) "15 브라우저의 CreateVolumeProfile 호출이 CreateNamedAsset 한 곳이 아니다($createCalls)"
-$menuItems = [regex]::Matches($browserText, 'CanCreateVolumeProfileIn\([^)]*\)\s*(\r?\n\s*)?&&\s*ImGui::MenuItem\("Create Volume Profile\.\.\."\)').Count
-Assert ($menuItems -eq 2) "15 Volume Profile 메뉴 둘이 같은 술어를 쓰지 않는다($menuItems)"
-$openDialogs = [regex]::Matches($browserText, 'OpenCreateDialog\(CreateKind::volume_profile').Count
-Assert ($openDialogs -eq 2) "15 Volume Profile 메뉴 둘이 같은 대화상자를 열지 않는다($openDialogs)"
+$createCalls = [regex]::Matches($browserText, 'CreateSceneRenderProfile\s*\(').Count
+Assert ($createCalls -eq 1) "15 브라우저의 CreateSceneRenderProfile 호출이 CreateNamedAsset 한 곳이 아니다($createCalls)"
+$menuItems = [regex]::Matches($browserText, 'CanCreateSceneRenderProfileIn\([^)]*\)\s*(\r?\n\s*)?&&\s*ImGui::MenuItem\("Create Scene Render Profile\.\.\."\)').Count
+Assert ($menuItems -eq 2) "15 Scene Render Profile 메뉴 둘이 같은 술어를 쓰지 않는다($menuItems)"
+$openDialogs = [regex]::Matches($browserText, 'OpenCreateDialog\(CreateKind::render_profile').Count
+Assert ($openDialogs -eq 2) "15 Scene Render Profile 메뉴 둘이 같은 대화상자를 열지 않는다($openDialogs)"
 
 # 16 — Show in Folder
 Assert ($browserText -match '(?s)MenuItem\("Show in Folder"\)\)\s*\{\s*const file::path asset = directory;\s*if \(Navigate\(asset\.parent_path\(\)\)\) SelectAsset\(asset\);') `
@@ -192,9 +192,9 @@ if (-not $SkipRuntime) {
     if (-not (Test-Path -LiteralPath $Exe)) { throw "Editor executable is missing: $Exe" }
     $ProjectRoot = (Resolve-Path -LiteralPath $ProjectRoot).Path
     $assets = Join-Path $ProjectRoot "Assets"
-    $volumeDir = Join-Path $assets "VolumeProfile"
+    $profileDirectory = Join-Path $assets "SceneRenderProfile"
     $recentsFile = Join-Path $ProjectRoot "Library\EditorState\ContentBrowserRecents.txt"
-    if (-not (Test-Path -LiteralPath $volumeDir)) { throw "VolumeProfile folder is missing: $volumeDir" }
+    if (-not (Test-Path -LiteralPath $profileDirectory)) { throw "SceneRenderProfile folder is missing: $profileDirectory" }
     if ([string]::IsNullOrWhiteSpace($Work)) {
         $Work = Join-Path ([IO.Path]::GetTempPath()) ("CE_BrowserNav_" + [guid]::NewGuid().ToString("N"))
     }
@@ -205,18 +205,18 @@ if (-not $SkipRuntime) {
     $tag = "W2BCheck_" + [guid]::NewGuid().ToString("N").Substring(0, 8)
     $fixture = Join-Path $assets $tag
     $profileName = "${tag}_Profile"
-    $profilePath = Join-Path $volumeDir "$profileName.volume"
-    $seedVolume = Get-ChildItem -LiteralPath $volumeDir -Filter *.volume -File | Select-Object -First 1
-    if ($null -eq $seedVolume) { throw "no .volume file to copy as a fixture" }
+    $profilePath = Join-Path $profileDirectory "$profileName.renderprofile"
+    $seedRenderProfile = Get-ChildItem -LiteralPath $profileDirectory -Filter *.renderprofile -File | Select-Object -First 1
+    if ($null -eq $seedRenderProfile) { throw "no .renderprofile file to copy as a fixture" }
     foreach ($dir in @('Alpha', 'Beta', 'Gamma', 'Doomed\Inner', 'Many')) {
         New-Item -ItemType Directory -Force -Path (Join-Path $fixture $dir) | Out-Null
     }
-    Copy-Item -LiteralPath $seedVolume.FullName -Destination (Join-Path $fixture 'Alpha\Twin.volume')
-    Copy-Item -LiteralPath $seedVolume.FullName -Destination (Join-Path $fixture 'Beta\Twin.volume')
+    Copy-Item -LiteralPath $seedRenderProfile.FullName -Destination (Join-Path $fixture 'Alpha\Twin.renderprofile')
+    Copy-Item -LiteralPath $seedRenderProfile.FullName -Destination (Join-Path $fixture 'Beta\Twin.renderprofile')
     for ($n = 0; $n -lt 120; $n++) {
-        Copy-Item -LiteralPath $seedVolume.FullName -Destination (Join-Path $fixture ('Many\Item_{0:D3}.volume' -f $n))
+        Copy-Item -LiteralPath $seedRenderProfile.FullName -Destination (Join-Path $fixture ('Many\Item_{0:D3}.renderprofile' -f $n))
     }
-    $volumeCountBefore = @(Get-ChildItem -LiteralPath $volumeDir -File).Count
+    $profileCountBefore = @(Get-ChildItem -LiteralPath $profileDirectory -File).Count
 
     # 최근 항목 파일은 개발자 것이다 — 통째로 보관했다가 되돌린다.
     $recentsBackup = $null
@@ -226,19 +226,19 @@ if (-not $SkipRuntime) {
     $lines = @(
         'wait 240',
         $B,                                                          # 0 기준
-        "$B go VolumeProfile", 'wait 5',
-        "$B create volume $profileName", 'wait 5',
+        "$B go SceneRenderProfile", 'wait 5',
+        "$B create renderprofile $profileName", 'wait 5',
         $B,                                                          # 1 생성·선택
-        "$B create volume $profileName", 'wait 5',
+        "$B create renderprofile $profileName", 'wait 5',
         $B,                                                          # 2 같은 이름
-        "$B create volume bad|name", 'wait 5',
+        "$B create renderprofile bad|name", 'wait 5',
         $B,                                                          # 3 잘못된 이름
         "$B search $tag", 'wait 5',
-        "$B select VolumeProfile/$profileName.volume", 'wait 5',
+        "$B select SceneRenderProfile/$profileName.renderprofile", 'wait 5',
         $B,                                                          # 4 검색·선택
         "$B go $tag/Gamma", 'wait 5',
         $B,                                                          # 5 검색어 비움
-        "$B create volume Nope", 'wait 5',
+        "$B create renderprofile Nope", 'wait 5',
         $B,                                                          # 6 다른 폴더 거부
         "$B back", 'wait 5',
         $B,                                                          # 7 복원
@@ -319,7 +319,7 @@ if (-not $SkipRuntime) {
                 Remove-Item -LiteralPath "$profilePath.meta" -Force -ErrorAction SilentlyContinue
                 # 결과 기억이 **내용이 바뀐 목록**을 알아채는지 — 에디터는 지금 이 폴더에
                 # 서 있고, 목록·범위·검색은 그대로다. 바뀌는 것은 디스크의 내용뿐이다.
-                Copy-Item -LiteralPath $seedVolume.FullName -Destination (Join-Path $signalDir 'Late.volume')
+                Copy-Item -LiteralPath $seedRenderProfile.FullName -Destination (Join-Path $signalDir 'Late.renderprofile')
                 $deletedAtMarker = $true
             }
             if ([DateTime]::UtcNow -gt $deadline) { $proc.Kill(); throw "editor did not exit in time" }
@@ -356,7 +356,7 @@ if (-not $SkipRuntime) {
     Assert ($snaps.Count -eq 23) "스냅샷 표본이 23 개가 아니다($($snaps.Count)) — 판정할 수 없다"
     if ($snaps.Count -eq 23) {
         $s = @($snaps | ForEach-Object { $_.data })
-        $vp = "VolumeProfile/$profileName.volume"
+        $vp = "SceneRenderProfile/$profileName.renderprofile"
 
         # 1
         Assert ($snaps[0].status -eq 'succeeded') "1 첫 표본이 실패했다: $($snaps[0].code)"
@@ -365,28 +365,28 @@ if (-not $SkipRuntime) {
 
         # 2
         Assert ($s[1].selected -eq $vp) "2 만든 프로파일이 선택되지 않았다(selected='$($s[1].selected)')"
-        Assert ($s[1].canCreateVolumeProfile) "2 VolumeProfile 폴더에서 생성 술어가 거짓이다"
+        Assert ($s[1].canCreateSceneRenderProfile) "2 SceneRenderProfile 폴더에서 생성 술어가 거짓이다"
         Assert ([int]$s[1].recentCount -ge 1) "2 만든 프로파일이 최근 항목에 오르지 않았다"
         Assert ([int]$s[2].requestsRejected -eq [int]$s[1].requestsRejected + 1 -and $s[2].lastRejection -match 'already exists') `
             "2 같은 이름이 거부되지 않았다(last='$($s[2].lastRejection)')"
-        Assert ([int]$s[3].requestsRejected -eq [int]$s[2].requestsRejected + 1 -and $s[3].lastRejection -match 'valid volume profile name') `
+        Assert ([int]$s[3].requestsRejected -eq [int]$s[2].requestsRejected + 1 -and $s[3].lastRejection -match 'valid scene render profile name') `
             "2 잘못된 이름이 거부되지 않았다(last='$($s[3].lastRejection)')"
-        Assert (-not $s[5].canCreateVolumeProfile) "2 다른 폴더에서 생성 술어가 참이다"
-        Assert ($s[6].lastRejection -match 'VolumeProfile folder') "2 다른 폴더의 생성이 거부되지 않았다(last='$($s[6].lastRejection)')"
+        Assert (-not $s[5].canCreateSceneRenderProfile) "2 다른 폴더에서 생성 술어가 참이다"
+        Assert ($s[6].lastRejection -match 'SceneRenderProfile folder') "2 다른 폴더의 생성이 거부되지 않았다(last='$($s[6].lastRejection)')"
         Assert ($s[19].lastRejection -match 'open a folder') "2 가상 위치의 생성이 거부되지 않았다(last='$($s[19].lastRejection)')"
 
         # 3
         Assert ($s[4].search -eq $tag -and $s[4].selected -eq $vp) "3 검색·선택이 서지 않았다('$($s[4].search)' '$($s[4].selected)')"
         Assert ($s[5].search -eq '' -and $s[5].directory -eq "$tag/Gamma") "3 정상 이동이 검색어를 비우지 않았다('$($s[5].search)')"
-        Assert ($s[7].directory -eq 'VolumeProfile' -and $s[7].search -eq $tag -and $s[7].selected -eq $vp) `
+        Assert ($s[7].directory -eq 'SceneRenderProfile' -and $s[7].search -eq $tag -and $s[7].selected -eq $vp) `
             "3 뒤로가 방문을 복원하지 않았다(dir='$($s[7].directory)' search='$($s[7].search)' selected='$($s[7].selected)')"
         Assert ($s[7].canForward) "3 뒤로 간 뒤 앞으로가 닫혀 있다"
 
         # 4
         $h8 = @($s[8].history)
         Assert (-not $s[8].canForward -and [int]$s[8].historyIndex + 1 -eq [int]$s[8].historySize) "4 새 이동 뒤 앞으로 이력이 남았다"
-        Assert ($h8.Count -ge 2 -and $h8[$h8.Count - 1] -eq "folder:$tag/Alpha" -and $h8[$h8.Count - 2] -eq 'folder:VolumeProfile') `
-            "4 이력 끝이 VolumeProfile→Alpha 가 아니다([$($h8 -join ', ')])"
+        Assert ($h8.Count -ge 2 -and $h8[$h8.Count - 1] -eq "folder:$tag/Alpha" -and $h8[$h8.Count - 2] -eq 'folder:SceneRenderProfile') `
+            "4 이력 끝이 SceneRenderProfile→Alpha 가 아니다([$($h8 -join ', ')])"
         Assert (-not ($h8 -contains "folder:$tag/Gamma")) "4 버려야 할 앞으로 칸(Gamma)이 이력에 남았다([$($h8 -join ', ')])"
 
         # 5
@@ -405,10 +405,10 @@ if (-not $SkipRuntime) {
             if ($lines[$k] -eq "$B ") { $latePolls += $rows[$k].data }
         }
         $lateSeen = @($latePolls + @($s[12]) | Where-Object {
-            $_.directory -eq "$tag/Gamma/Signal" -and (@($_.results) -contains "$tag/Gamma/Signal/Late.volume") })
+            $_.directory -eq "$tag/Gamma/Signal" -and (@($_.results) -contains "$tag/Gamma/Signal/Late.renderprofile") })
         Write-Host ("  늦게 생긴 파일: 표집 {0} 가운데 {1} 에서 보였다" -f ($latePolls.Count + 1), $lateSeen.Count)
         Assert ($latePolls.Count -eq 5) "8 늦은 파일 표집이 5 개가 아니다($($latePolls.Count))"
-        Assert ([int]$s[12].resultCount -eq 1 -and (@($s[12].results) -contains "$tag/Gamma/Signal/Late.volume")) `
+        Assert ([int]$s[12].resultCount -eq 1 -and (@($s[12].results) -contains "$tag/Gamma/Signal/Late.renderprofile")) `
             "8 표지 폴더에 늦게 생긴 파일이 마지막 표집에 없다([$(@($s[12].results) -join ' | ')]) — 결과 기억이 바뀐 목록을 못 알아챘다"
         Assert ($s[13].directory -eq $tag) "6 사라진 폴더에서 가장 가까운 조상으로 가지 않았다(dir='$($s[13].directory)')"
         Assert ($s[13].error -match 'no longer exists') "6 사라진 폴더의 이유가 없다(error='$($s[13].error)')"
@@ -446,7 +446,7 @@ if (-not $SkipRuntime) {
         Assert ([int]$s[17].resultCount -eq [int]$s[16].resultCount -and $s[17].everythingComplete) `
             "8 대기 뒤 결과 수가 바뀌었다($($s[16].resultCount) → $($s[17].resultCount))"
         $twins = @($s[18].results)
-        Assert ($twins.Count -eq 2 -and $twins[0] -eq "$tag/Alpha/Twin.volume" -and $twins[1] -eq "$tag/Beta/Twin.volume") `
+        Assert ($twins.Count -eq 2 -and $twins[0] -eq "$tag/Alpha/Twin.renderprofile" -and $twins[1] -eq "$tag/Beta/Twin.renderprofile") `
             "8 동명 두 파일이 경로 순서로 둘 다 나오지 않았다([$($twins -join ' | ')])"
 
         # 9
@@ -458,9 +458,9 @@ if (-not $SkipRuntime) {
     }
 
     # 2 — 거부가 디스크에 흔적을 남기지 않았다(표지에서 지운 하나를 빼면 원래 수)
-    $volumeCountAfter = @(Get-ChildItem -LiteralPath $volumeDir -File).Count
-    Assert ($volumeCountAfter -eq $volumeCountBefore) "2 VolumeProfile 폴더의 파일 수가 달라졌다($volumeCountBefore → $volumeCountAfter)"
-    Assert (-not (Get-ChildItem -LiteralPath $volumeDir -File | Where-Object { $_.Name -match 'Nope|bad' })) "2 거부된 이름의 파일이 생겼다"
+    $profileCountAfter = @(Get-ChildItem -LiteralPath $profileDirectory -File).Count
+    Assert ($profileCountAfter -eq $profileCountBefore) "2 SceneRenderProfile 폴더의 파일 수가 달라졌다($profileCountBefore → $profileCountAfter)"
+    Assert (-not (Get-ChildItem -LiteralPath $profileDirectory -File | Where-Object { $_.Name -match 'Nope|bad' })) "2 거부된 이름의 파일이 생겼다"
 
     # 11
     Assert ($exitCode -eq 0) "11 에디터 종료 코드가 $exitCode 다"
@@ -476,7 +476,7 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
     $projectA = Join-Path $switchRoot 'ProjA'
     $projectB = Join-Path $switchRoot 'ProjB'
     $switchWorkspace = Join-Path $switchRoot 'workspace'
-    foreach ($dir in @("$projectA\Assets\VolumeProfile", "$projectA\Assets\OnlyA", "$projectB\Assets\VolumeProfile", "$projectB\Assets\OnlyB", $switchWorkspace)) {
+    foreach ($dir in @("$projectA\Assets\SceneRenderProfile", "$projectA\Assets\OnlyA", "$projectB\Assets\SceneRenderProfile", "$projectB\Assets\OnlyB", $switchWorkspace)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
     $recentsA = Join-Path $projectA 'Library\EditorState\ContentBrowserRecents.txt'
@@ -519,8 +519,8 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
     try {
         # A — 최근 항목을 만들고, 이력을 늘리고, 선택한 채 끝낸다.
         $a1 = Invoke-ProjectRun $projectA 'a1' @(
-            'editor.browser go VolumeProfile', 'wait 5',
-            'editor.browser create volume Keep', 'wait 5',
+            'editor.browser go SceneRenderProfile', 'wait 5',
+            'editor.browser create renderprofile Keep', 'wait 5',
             'editor.browser go OnlyA', 'wait 5',
             'editor.browser')
         Assert ($a1.Count -eq 1) "17 a1 표본이 1 개가 아니다($($a1.Count))"
@@ -532,7 +532,7 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
         $recentsABytes = if (Test-Path -LiteralPath $recentsA) { [Convert]::ToBase64String([IO.File]::ReadAllBytes($recentsA)) } else { '' }
 
         # B 에 같은 상대 경로의 파일을 둔다(메타는 없다 — B 에서 고른 적이 없는 파일이다).
-        Copy-Item -LiteralPath (Join-Path $projectA 'Assets\VolumeProfile\Keep.volume') -Destination (Join-Path $projectB 'Assets\VolumeProfile\Keep.volume')
+        Copy-Item -LiteralPath (Join-Path $projectA 'Assets\SceneRenderProfile\Keep.renderprofile') -Destination (Join-Path $projectB 'Assets\SceneRenderProfile\Keep.renderprofile')
 
         $b1 = Invoke-ProjectRun $projectB 'b1' @(
             'editor.browser',

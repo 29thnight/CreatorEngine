@@ -13,9 +13,14 @@ $command='call "'+$vcvars+'" >nul && cl.exe /nologo /EHsc /std:c++20 /utf-8 /MDd
     '/I"'+(Join-Path $deps 'include')+'" /Fo"'+$work+'/" /Fe"'+$exe+'" '+
     '"'+(Join-Path $PSScriptRoot 'editor_workspace_probe.cpp')+'" '+
     '"'+(Join-Path $repo 'Editor/EngineGUIWindow/EditorWorkspaceFile.cpp')+'" '+
-    '"'+(Join-Path $deps 'debug/lib/imguid.lib')+'" user32.lib gdi32.lib imm32.lib'
+    '"'+(Join-Path $deps 'debug/lib/imguid.lib')+'" "'+(Join-Path $deps 'debug/lib/freetyped.lib')+'" user32.lib gdi32.lib imm32.lib'
 & $env:ComSpec /d /s /c $command
 if($LASTEXITCODE -ne 0){throw 'Workspace probe build failed'}
 $run=Join-Path $work ([Guid]::NewGuid().ToString('N'))
-& $exe (Join-Path $PSScriptRoot 'fixtures/imgui-ini') $run
-if($LASTEXITCODE -ne 0){throw 'Workspace storage regression failed'}
+$previousPath=$env:PATH
+try {
+    $env:PATH=(Join-Path $deps 'debug/bin')+';'+$env:PATH
+    & $exe (Join-Path $PSScriptRoot 'fixtures/imgui-ini') $run
+    if($LASTEXITCODE -ne 0){throw 'Workspace storage regression failed'}
+}
+finally { $env:PATH=$previousPath }

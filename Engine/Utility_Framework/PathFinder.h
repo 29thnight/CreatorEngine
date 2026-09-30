@@ -40,7 +40,7 @@ public:
 	file::path DumpPath{};
 	file::path LogPath{};
 	file::path NodeEditorPath{};
-	file::path volumeProfilePath{};
+	file::path sceneRenderProfilePath{};
 	file::path InputMapPath{};
 	file::path animatorPath{};
 	bool AssetAuthoringEnabled{ false };
@@ -104,7 +104,7 @@ public:
 		IconPath = (EngineResourceRoot / L"Icons").lexically_normal();
 		TerrainSourcePath = assetsRoot / "Terrain";
 		NodeEditorPath = assetsRoot / "NodeEditor";
-		volumeProfilePath = assetsRoot / "VolumeProfile";
+		sceneRenderProfilePath = assetsRoot / "SceneRenderProfile";
 		InputMapPath = assetsRoot / "InputMap";
 		// GameBuildSlnPath가 여기 있었다 — 게임 빌드가 MSBuild를 부르지
 		// 않게 되면서(B0-3, BuildPipelinePlan §2.0) 소비자와 함께 걷었다.
@@ -119,7 +119,7 @@ public:
 		ShaderSourcePath = ShaderSourcePath.lexically_normal();
 		TerrainSourcePath = TerrainSourcePath.lexically_normal();
 		NodeEditorPath = NodeEditorPath.lexically_normal();
-		volumeProfilePath = volumeProfilePath.lexically_normal();
+		sceneRenderProfilePath = sceneRenderProfilePath.lexically_normal();
 		InputMapPath = InputMapPath.lexically_normal();
 		animatorPath = animatorPath.lexically_normal();
 		//dir not exist -> create dir
@@ -136,7 +136,7 @@ public:
 			DynamicSolutionDir,
 			ProjectSettingsPath,
 			TerrainSourcePath,
-			volumeProfilePath,
+			sceneRenderProfilePath,
 			NodeEditorPath,
 			InputMapPath,
 			animatorPath,
@@ -291,9 +291,9 @@ public:
 		return file::path(InternalPath::GetInstance()->ManagedRoot) / path;
 	}
 
-	static inline file::path VolumeProfilePath()
+	static inline file::path SceneRenderProfilePath()
 	{
-		return InternalPath::GetInstance()->volumeProfilePath;
+		return InternalPath::GetInstance()->sceneRenderProfilePath;
 	}
 
 	static inline file::path DynamicSolutionPath(std::string_view path)
@@ -341,9 +341,9 @@ public:
 		return file::path(InternalPath::GetInstance()->BaseProjectPath) / path;
 	}
 
-	static inline file::path RelativeToVolumeProfile(std::string_view path)
+	static inline file::path RelativeToSceneRenderProfile(std::string_view path)
 	{
-		return file::path(InternalPath::GetInstance()->volumeProfilePath) / path;
+		return file::path(InternalPath::GetInstance()->sceneRenderProfilePath) / path;
 	}
 	static inline file::path InputMapPath()
 	{

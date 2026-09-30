@@ -1,4 +1,5 @@
 #include "Includes/PbrSurface.slang"
+#include "Includes/StandardMaterialRoute.slang"
 
 // Deferred 조명. GBuffer 를 읽어 직접광 + IBL 앰비언트를 적분한다.
 //
@@ -139,15 +140,16 @@ VSOut VSMain(uint id : SV_VertexID)
 [shader("fragment")]
 float4 PSMain(VSOut input) : SV_TARGET
 {
-    const float3 albedo   = gDiffuse.Sample(gSampler, input.uv).rgb;
+    const float4 baseColor = gDiffuse.Sample(gSampler, input.uv);
     const float3 normal   = normalize(gNormal.Sample(gSampler, input.uv).rgb * 2.0 - 1.0);
     const float3 emissive = gEmissive.Sample(gSampler, input.uv).rgb;
 
     // GBuffer 규약은 R 오클루전 · G 거칠기 · B 금속성이다.
     const float3 orm      = gMetalRough.Sample(gSampler, input.uv).rgb;
-    const float  rough     = saturate(orm.g);
-    const float  metallic  = saturate(orm.b);
     const float  depth     = gDepth.Sample(gSampler, input.uv).r;
+    PrincipledSurface material = UnpackStandardSurface(baseColor,
+        float4(orm, 1.0), normal, emissive);
+    const float rough = saturate(material.roughness);
 
     // ★ occlusion(R)은 GBuffer 가 정의된 값을 써 넣게 된 뒤부터 읽는다.
     //
@@ -160,9 +162,10 @@ float4 PSMain(VSOut input) : SV_TARGET
     //   이제 GBuffer.slang 이 그 자리에 중립 1 을 써 넣는다(aoMap 슬롯이
     //   생기기 전까지). 그래서 여기 R 은 "AO 아니면 1" 이 보장되고, 슬롯이
     //   생기는 날 이 소비 코드는 손댈 곳이 없다.
-    float occlusion = saturate(orm.r);
+    float occlusion = saturate(material.occlusion);
     if (gHasAmbientOcclusion != 0u)
         occlusion *= saturate(gAmbientOcclusion.SampleLevel(gIblSampler, input.uv, 0.0).r);
+    material.occlusion = occlusion;
 
     // 깊이에서 월드 위치를 복원한다. GBuffer 에 위치를 따로 저장하면 타깃이
     // 하나 늘고 대역폭이 그만큼 든다 — 깊이가 이미 있으니 역행렬로 푼다.
@@ -175,8 +178,7 @@ float4 PSMain(VSOut input) : SV_TARGET
     if (gHasIbl != 0u)
         dfg = gBrdfLut.SampleLevel(gIblSampler,
             float2(PbrNdotV(normal, view), rough), 0.0).rg;
-    const PbrSurface surface = BuildPbrSurface(worldPosition, normal, view,
-        albedo, rough, metallic, dfg);
+    const PbrSurface surface = BuildPbrSurface(worldPosition, view, material, dfg);
 
     float3 lit = float3(0.0);
     for (uint i = 0u; i < gLightCount; ++i)
@@ -225,10 +227,10 @@ float4 PSMain(VSOut input) : SV_TARGET
         const float3 prefiltered = gPrefiltered.SampleLevel(gIblSampler,
             reflection, rough * float(IBL_PREFILTER_MIPS - 1)).rgb;
 
-        const IblAmbient evaluated = EvaluateIblAmbient(albedo, surface.f0, rough,
-            metallic, surface.ndotv, occlusion, irradiance, prefiltered, dfg);
+        const IblAmbient evaluated = EvaluateStandardIbl(material, surface,
+            irradiance, prefiltered, dfg);
         ambient = evaluated.Sum();
     }
 
-    return float4(lit + ambient + emissive, 1.0);
+    return float4(lit + ambient + material.emission, 1.0);
 }

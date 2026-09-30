@@ -126,6 +126,7 @@ struct LiveFrameBinding
 struct LivePassNode
 {
     std::string name;
+    uint32_t declarationMarker{};
 
     // ── 데이터 절반 ──
 
@@ -189,7 +190,7 @@ struct LivePassNodeSnapshot
 class LivePipelineDesc
 {
 public:
-    void AddNode(LivePassNode node) { m_nodes.push_back(std::move(node)); }
+    void AddNode(LivePassNode node);
     void Clear() { m_nodes.clear(); }
     bool IsEmpty() const { return m_nodes.empty(); }
     size_t NodeCount() const { return m_nodes.size(); }

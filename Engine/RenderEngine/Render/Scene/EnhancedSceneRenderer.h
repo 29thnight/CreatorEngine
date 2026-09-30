@@ -22,8 +22,9 @@ struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
 struct IDisplayPresentationSink;
 struct ShaderMeta;
+namespace material_graph { struct SceneMaterialSource; }
 
-inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 2; // scene + game view
+inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 3; // scene, game, cached material preview
 
 /// ImGui composition이 요청하는 논리 표시 대상. 카메라의 소유권이나 backend
 /// 슬롯과 무관하며 Host가 요청마다 명시한다.
@@ -31,6 +32,7 @@ enum class EnhancedLiveDisplayTarget : uint8_t
 {
     Editor = 0,
     Game = 1,
+    MaterialPreview = 2,
     Count,
 };
 
@@ -92,6 +94,8 @@ struct EnhancedLiveViewPacket
     std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
+    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
@@ -102,6 +106,8 @@ struct EnhancedLiveViewRequest
     FrameCameraSnapshot camera{};
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
+    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.
@@ -271,6 +277,7 @@ inline constexpr uint32_t kEnhancedLiveDisplayTargetCount =
 /// presentation handle은 구현 안에 숨으며 조회 성공은 GPU present 성공과 구분한다.
 struct EnhancedLiveDisplayEntrySnapshot
 {
+    bool previewComplete{false};
     EnhancedLiveViewKey key{};
     uint64_t completedFrameId{ 0 };
     uint64_t promotionCount{ 0 };
@@ -416,6 +423,7 @@ struct EnhancedLivePassTiming
 {
     std::string name;
     double      milliseconds{ 0.0 };
+    double      spanMilliseconds{ 0.0 };
 };
 
 /// 파이프라인 설정 창이 조작하는 패스 파라미터의 미러.
@@ -622,6 +630,9 @@ struct EnhancedLiveDebugSnapshot
 
     /// 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 선언 순서 그대로다.
     std::vector<EnhancedLivePassTiming> passTimings;
+    uint64_t materialGeometryUploads{}, materialGeometryUploadBytes{}, materialGeometryCacheHits{};
+    uint64_t materialGeometryResidentBytes{}, materialGeometryEntries{};
+    uint64_t materialGeometryTransforms{}, materialGeometryTransformHits{}, materialGeometryOutputBytes{};
 
     /// 활성 백엔드에서 지금까지 처음 관측한 검증 메시지(Debug 빌드에서만 쌓인다).
     std::vector<std::string> validationMessages;

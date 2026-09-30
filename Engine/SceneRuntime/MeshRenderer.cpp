@@ -363,6 +363,9 @@ math::aabb MeshRenderer::GetBoundingBox() const
 void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 {
 	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
+    // Graph textures may be embedded in this model. Publish the immutable
+    // model owner before resolving an inline graph instance's texture GUIDs.
+    if (m_modelGuid != FileGuid{}) DataSystems->LoadModelAssetGeneration(m_modelGuid);
 	// typed 역직렬화가 m_Material의 소유 인스턴스를 이미 만들었다. 예전 경로는
 	// 이름으로 cache material을 꺼낸 뒤 scene snapshot을 그 공유 객체에 다시
 	// Deserialize해 다른 renderer까지 바꿨다. snapshot 소유권은 유지하고 runtime
@@ -404,12 +407,26 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 			SetExperimentMaterialBase(nullptr); // 부분 상태를 남기지 않는다
 		}
 	}
-	else if (const Authoring::ReadNode materialNode = node["m_Material"];
-		materialNode && materialNode.IsMap()
-		&& materialNode["schema"] && materialNode["shaderAssetId"])
-	{
-		auto decoded = std::make_shared<Material>();
-		auto authored = std::make_shared<experiment::Material>();
+    else if (const Authoring::ReadNode materialNode = node["m_Material"];
+             materialNode && materialNode.IsMap() && materialNode["lattice_material"])
+    {
+        auto decoded = std::make_shared<Material>();
+        if (DataSystems->DeserializeMaterialPayload(*decoded, Authoring::NodeViewAccess::Make(materialNode)))
+        {
+            m_Material = std::move(decoded);
+        }
+        else
+        {
+            Debug::PrintLog(spdlog::level::err, "MeshRenderer LX material decode failed; clearing the material.");
+            m_Material.reset();
+        }
+        SetExperimentMaterialBase(nullptr);
+    }
+    else if (const Authoring::ReadNode materialNode = node["m_Material"];
+             materialNode && materialNode.IsMap() && materialNode["schema"] && materialNode["shaderAssetId"])
+    {
+        auto decoded = std::make_shared<Material>();
+        auto authored = std::make_shared<experiment::Material>();
 		if (DataSystems->DeserializeMaterialPayload(*decoded,
 			Authoring::NodeViewAccess::Make(materialNode), authored.get()))
 		{
@@ -424,8 +441,8 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 			Debug::PrintLog(spdlog::level::err, "MeshRenderer m_Material 새 정본 해석 실패 — "
 				"typed 기본값 상태를 유지한다");
 		}
-	}
-	else if (m_Material)
+    }
+    else if (m_Material)
 	{
 		DataSystems->FinalizeMaterialRuntime(*m_Material);
 		// I5-D5c1 — legacy 표기 문서에는 저작 원본이 없다. 여기서 legacy를
@@ -551,6 +568,22 @@ bool MeshRenderer::BindModelGeneration(
 	std::uint32_t meshIndex)
 {
 	if (!generation || meshIndex >= generation->Meshes().size()) return false;
+    if (m_materialBaseGuid == FileGuid{} && m_Material && !m_Material->HasMaterialGraph())
+    {
+        const auto* source = generation->FindMaterial(generation->Meshes()[meshIndex].materialId);
+        std::string error;
+        auto candidate = std::make_shared<Material>(*m_Material);
+        if (source && !DataSystems->ConfigureModelMaterialGraph(*candidate, *generation, *source, error))
+        {
+            Debug::PrintLog(spdlog::level::err, "MeshRenderer model graph conversion failed: " + error);
+            return false;
+        }
+        if (source)
+        {
+            m_Material = std::move(candidate);
+            SetExperimentMaterialBase(nullptr);
+        }
+    }
 	m_modelGeneration = std::move(generation);
 	m_modelMeshIndex = meshIndex;
 	m_meshAssetId = FileGuid(m_modelGeneration->Meshes()[meshIndex].meshId);

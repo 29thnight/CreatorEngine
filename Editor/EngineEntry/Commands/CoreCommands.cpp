@@ -541,24 +541,10 @@ namespace ConsoleCmd
             return InvalidArguments("window.resize requires width >= 320 and height >= 240");
         }
 
-        // GetActiveWindow는 창이 포그라운드가 아니면 null을 준다. 스크립트 실행은
-        // 대개 백그라운드라 이 경로가 실제로 걸리므로, 프로세스의 보이는 최상위 창을
-        // 직접 찾아 대체한다.
-        HWND hwnd = ::GetActiveWindow();
-        if (nullptr == hwnd)
-        {
-            ::EnumWindows([](HWND candidate, LPARAM out) -> BOOL
-            {
-                DWORD pid = 0;
-                ::GetWindowThreadProcessId(candidate, &pid);
-                if (pid != ::GetCurrentProcessId()) return TRUE;
-                if (!::IsWindowVisible(candidate)) return TRUE;
-                if (::GetWindow(candidate, GW_OWNER) != nullptr) return TRUE;
-
-                *reinterpret_cast<HWND*>(out) = candidate;
-                return FALSE;
-            }, reinterpret_cast<LPARAM>(&hwnd));
-        }
+        // Resize the host window even when it is hidden for an offscreen probe.
+        // Active/visible window lookup loses that window and can select a dialog.
+        const auto* window = CoreWindow::GetForCurrentInstance();
+        const HWND hwnd = window ? window->GetHandle() : nullptr;
         if (nullptr == hwnd) { std::printf("[CLI] 창 핸들 없음\n"); return PreconditionFailed("window.unavailable", "No editor window"); }
 
         // 클라이언트 영역이 요청 크기가 되도록 창 전체 크기를 역산한다.
@@ -968,6 +954,18 @@ namespace ConsoleCmd
         data.Set("imguiRuntimeVersion", CommandData::String(snapshot.imgui_runtime_version));
         data.Set("binaryMatchesHeader", CommandData::Bool(audit.imgui_binary_matches_header));
         data.Set("clean", CommandData::Bool(audit.clean()));
+        data.Set("movingWindow", CommandData::String(snapshot.moving_window));
+        data.Set("hoveredWindowUnderMoving", CommandData::String(snapshot.hovered_window_under_moving));
+        data.Set("dockingPayload", CommandData::Bool(snapshot.docking_payload));
+        auto dockNodes = CommandData::Array();
+        for (const auto& node : snapshot.nodes)
+        {
+            auto row = CommandData::Object();
+            row.Set("id", CommandData::Int(node.id));
+            row.Set("flags", CommandData::Int(node.merged_flags));
+            dockNodes.Append(std::move(row));
+        }
+        data.Set("dockNodes", std::move(dockNodes));
 
         // PHASE 21 W6 — preset 이 지켜야 하는 두 축을 밖으로 낸다.
         //
@@ -1523,7 +1521,7 @@ namespace ConsoleCmd
         const auto& args = ctx.parts;
         const char* const usage = "editor.browser [go <assets-relative path>|@recent|@everything"
             " | back | forward | up | search [text] | select <assets-relative path> | scroll <px>"
-            " | create folder <name> | create volume <name>]";
+            " | create folder <name> | create renderprofile <name>]";
 
         // 공백이 든 이름을 받는다 — 파서가 자른 조각을 도로 붙인다(W6-2 와 같은 이유).
         const auto joined = [&](size_t from)
@@ -1554,9 +1552,9 @@ namespace ConsoleCmd
             else if ("up" == verb && 2 == args.size()) request.kind = Kind::up;
             else if ("search" == verb) { request.kind = Kind::search; request.text = joined(2); }
             else if ("select" == verb && args.size() >= 3) { request.kind = Kind::select; request.text = joined(2); }
-            else if ("create" == verb && args.size() >= 4 && ("folder" == args[2] || "volume" == args[2]))
+            else if ("create" == verb && args.size() >= 4 && ("folder" == args[2] || "renderprofile" == args[2]))
             {
-                request.kind = "folder" == args[2] ? Kind::create_folder : Kind::create_volume_profile;
+                request.kind = "folder" == args[2] ? Kind::create_folder : Kind::create_render_profile;
                 request.text = joined(3);
             }
             else if ("scroll" == verb && 3 == args.size())
@@ -1590,7 +1588,7 @@ namespace ConsoleCmd
         data.Set("canForward", CommandData::Bool(snapshot.canForward));
         data.Set("canUp", CommandData::Bool(snapshot.canUp));
         data.Set("canCreate", CommandData::Bool(snapshot.canCreate));
-        data.Set("canCreateVolumeProfile", CommandData::Bool(snapshot.canCreateVolumeProfile));
+        data.Set("canCreateSceneRenderProfile", CommandData::Bool(snapshot.canCreateSceneRenderProfile));
         data.Set("resultCount", CommandData::Int(static_cast<int64_t>(snapshot.resultCount)));
         auto results = CommandData::Array();
         for (const auto& result : snapshot.results) results.Append(CommandData::String(result));

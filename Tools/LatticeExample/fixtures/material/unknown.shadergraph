@@ -1,0 +1,89 @@
+{
+  "kind":"LatticeMaterial",
+  "schemaVersion":1,
+  "domain":"material",
+  "graphId":1,
+  "activeOutput":36,
+  "blackboard":[
+    {"id":1001,"identifier":"roughness","name":"Roughness","type":"Float","default":{"kind":"float","value":0.27000000000000002},"colorSpace":"data","exposed":true},
+    {"id":1002,"identifier":"texture","name":"Base Color Texture","type":"Texture","default":{"kind":"string","value":"asset://texture/001"},"colorSpace":"srgb","exposed":true},
+    {"id":1003,"identifier":"sampler","name":"Sampler","type":"Sampler","default":{"kind":"string","value":"linear-repeat"},"colorSpace":"data","exposed":false},
+    {"id":1004,"identifier":"bool","name":"Bool","type":"Bool","default":{"kind":"bool","value":true},"colorSpace":"data","exposed":true},
+    {"id":1005,"identifier":"int","name":"Integer","type":"Int","default":{"kind":"int","value":-9223372036854775808},"colorSpace":"data","exposed":true},
+    {"id":1006,"identifier":"vector","name":"Vector","type":"Vector","default":{"kind":"vector","value":[0.125,-2.7000000000000002,1e-08]},"colorSpace":"data","exposed":true},
+    {"id":1007,"identifier":"normal","name":"Normal","type":"Normal","default":{"kind":"vector","value":[0,1,0]},"colorSpace":"data","exposed":true},
+    {"id":1008,"identifier":"color","name":"HDR Color","type":"Color","default":{"kind":"color","value":[-1.5,12.699999999999999,0.25,1]},"colorSpace":"linear","exposed":true}
+  ],
+  "graph":{
+    "domain":"material","nextId":47,
+    "nodes":[
+      {
+  "id": 1,
+  "definition": "VendorFutureRGB",
+  "schemaRevision": 1,
+  "title": "Color",
+  "vendorPayload": {"array": [1,"한글",true],"revision": 99},
+  "groupId": 0,
+  "sockets": [
+    {"id": 2,"identifier": "Color","name": "Color","direction": "output","type": "Color","multiple": false,"dynamic": false,"interfaceId": 0,"default": {"kind": "color","value": [0.12345678901234566,9.9999999999999998e-13,11.5,0.75]},"enabled": true,"hidden": false,"hideValue": false,"colorSpace": "linear"}
+  ],
+  "properties": {},
+  "dynamicRule": null
+}
+,
+      {"id":3,"definition":"ShaderNodeBsdfPrincipled","schemaRevision":1,"title":"Principled BSDF","groupId":0,"sockets":[
+        {"id":4,"identifier":"Base Color","name":"Base Color","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[0.80000001192092896,0.80000001192092896,0.80000001192092896,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":5,"identifier":"Metallic","name":"Metallic","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":6,"identifier":"Roughness","name":"Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":7,"identifier":"IOR","name":"IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":8,"identifier":"Alpha","name":"Alpha","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":9,"identifier":"Normal","name":"Normal","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":10,"identifier":"Weight","name":"Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":false,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":11,"identifier":"Diffuse Roughness","name":"Diffuse Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":12,"identifier":"Subsurface Weight","name":"Subsurface Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":13,"identifier":"Subsurface Radius","name":"Subsurface Radius","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[1,0.20000000298023224,0.10000000149011612]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":14,"identifier":"Subsurface Scale","name":"Subsurface Scale","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.05000000074505806},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":15,"identifier":"Subsurface IOR","name":"Subsurface IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.3999999761581421},"enabled":false,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":16,"identifier":"Subsurface Anisotropy","name":"Subsurface Anisotropy","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":17,"identifier":"Specular IOR Level","name":"Specular IOR Level","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":18,"identifier":"Specular Tint","name":"Specular Tint","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":19,"identifier":"Anisotropic","name":"Anisotropic","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":20,"identifier":"Anisotropic Rotation","name":"Anisotropic Rotation","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":21,"identifier":"Tangent","name":"Tangent","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":22,"identifier":"Transmission Weight","name":"Transmission Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":23,"identifier":"Coat Weight","name":"Coat Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":24,"identifier":"Coat Roughness","name":"Coat Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.029999999329447746},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":25,"identifier":"Coat IOR","name":"Coat IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":26,"identifier":"Coat Tint","name":"Coat Tint","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":27,"identifier":"Coat Normal","name":"Coat Normal","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":28,"identifier":"Sheen Weight","name":"Sheen Weight","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":29,"identifier":"Sheen Roughness","name":"Sheen Roughness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0.5},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":30,"identifier":"Sheen Tint","name":"Sheen Tint","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":31,"identifier":"Emission Color","name":"Emission Color","direction":"input","type":"Color","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"color","value":[1,1,1,1]},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"linear"},
+        {"id":32,"identifier":"Emission Strength","name":"Emission Strength","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":33,"identifier":"Thin Film Thickness","name":"Thin Film Thickness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":34,"identifier":"Thin Film IOR","name":"Thin Film IOR","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":1.3300000429153442},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":35,"identifier":"BSDF","name":"BSDF","direction":"output","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ },"dynamicRule":null},
+      {"id":36,"definition":"ShaderNodeOutputMaterial","schemaRevision":1,"title":"Material Output","groupId":0,"sockets":[
+        {"id":37,"identifier":"Surface","name":"Surface","direction":"input","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":38,"identifier":"Volume","name":"Volume","direction":"input","type":"Closure","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"},
+        {"id":39,"identifier":"Displacement","name":"Displacement","direction":"input","type":"Vector","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"vector","value":[0,0,0]},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"},
+        {"id":40,"identifier":"Thickness","name":"Thickness","direction":"input","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"float","value":0},"enabled":true,"hidden":false,"hideValue":true,"colorSpace":"data"}],"properties":{ "target":"ALL"},"dynamicRule":null},
+      {"id":44,"definition":"LXParameterFloat","schemaRevision":1,"title":"Float Parameter","groupId":0,"sockets":[
+        {"id":45,"identifier":"Value","name":"Value","direction":"output","type":"Float","multiple":false,"dynamic":false,"interfaceId":0,"default":{"kind":"none"},"enabled":true,"hidden":false,"hideValue":false,"colorSpace":"data"}],"properties":{ "parameter":"1001"},"dynamicRule":null}
+    ],
+    "links":[
+      {"id":41,"output":2,"input":4},
+      {"id":42,"output":35,"input":37},
+      {"id":46,"output":45,"input":6}
+    ],
+    "groups":[
+    ],
+    "layout":{"nodes":[
+      {"id":1,"x":-220.5,"y":-41.25,"collapsed":true,"frame":43},
+      {"id":3,"x":40.25,"y":-20.5,"collapsed":false,"frame":43},
+      {"id":36,"x":420.75,"y":15.5,"collapsed":false,"frame":0},
+      {"id":44,"x":-220,"y":300,"collapsed":false,"frame":0}],"frames":[
+      {"id":43,"label":"Material\u000a색상 \"test\"","x":-260.5,"y":-80.25,"width":650.75,"height":500.5}],"view":{"saved":true,"centerX":100.25,"centerY":-24.5,"zoom":0.875}}
+  }
+}

@@ -401,7 +401,7 @@
     <ClCompile Include="UITickSystem.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
-    <ClCompile Include="VolumeComponent.cpp">
+    <ClCompile Include="SceneRenderProfileComponent.cpp">
       <Filter>Classes\Components\Volume</Filter>
     </ClCompile>
   </ItemGroup>
@@ -740,7 +740,7 @@
     <ClInclude Include="UITickSystem.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
-    <ClInclude Include="VolumeComponent.h">
+    <ClInclude Include="SceneRenderProfileComponent.h">
       <Filter>Classes\Components\Volume</Filter>
     </ClInclude>
     <ClInclude Include="WorldState.h">

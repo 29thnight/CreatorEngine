@@ -25,6 +25,7 @@ namespace assets
         AfterStageWrite,
         AfterStageValidation,
         AfterGenerationPublish,
+        AfterMaterialGraphPublish,
     };
 
     struct ModelAssetAuthoringRequest final

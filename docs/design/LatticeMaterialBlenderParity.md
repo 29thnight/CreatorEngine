@@ -43,6 +43,8 @@ Material의 첫 구현 후보는 `ShaderNodeRGB`, `ShaderNodeValue`,
 지원 여부를 결정한다. LX 계층은 이 판단과 관계없이 노드·소켓 구조를 보존할 수
 있어야 한다.
 
+아래 Canvas 표는 2026-09-24 조사 기록이다. 현재 native 문서/IR·생성기는 아래 MAT-2/MAT-6 절을 따른다.
+
 | Blender 저작 개념 | LX의 현재 상태 | Material에서 필요한 계약과 판정 |
 |---|---|---|
 | Node tree와 node instance | `LXGraph`의 domain·node/link 목록과 안정 ID. 위치·접힘·Frame·view는 별도 `LXLayout`에 있고 `.lxg` 8에서 왕복 | `.shadergraph(domain=material)` 정본에 graph/layout 저장. Node Group과 재개방 후 안정 ID 보존 |
@@ -85,9 +87,13 @@ socket은 interface ID에 대응하며 중첩 참조의 cycle을 검사한다. r
 보존해 읽기 전용으로 표시하고, 알려진 node의 schema 불일치는 진단한다.
 소켓 기본값은 bool/int/float, vector, 색 공간 의도가 있는 color, texture 자산
 참조, surface/closure 등 타입에 맞는 값으로 기록한다. 현재 Core의 bool/int/
-float/vector/color/texture typed value는 독립 `.lxg` 8에서 검증했지만 색 공간·
-closure와 제품 UI 위젯 결속은 남아 있다. 문자열 property는 Material 정본의 typed
+float/vector/color/texture typed value에 MAT-2의 Sampler/Closure·색 공간·Blackboard를
+추가했고 `.shadergraph` 저장과 typed IR을 독립 예제에서 검증했다.
+제품 UI 위젯 결속은 남아 있다. 초기 지원 Slang 생성은 아래 MAT-6 절을 따른다. 문자열 property는 Material 정본의 typed
 default value를 대신하지 못한다.
+
+위 표의 캔버스 대응은 독립 UI 기준이다. 2026-09-28 MAT-6에서 아래 native compiler
+지원 범위를 추가했으며 Editor 제품 지원 상태와 구분한다.
 
 대표 graph 계약은 다음 다섯 경우로 고정한다.
 
@@ -103,7 +109,7 @@ default value를 대신하지 못한다.
 
 독립 예제는 ImGui 1.92.8의 Win32·DX11 backend와 `imgui.lib`/`imguid.lib`,
 시스템 `d3d11.lib`·`dxgi.lib`를 사용한다. VS18/v145 x64 프로젝트는
-`Lattice/Core`·`Lattice/ImGui`만 컴파일하며 Engine/Editor나
+`Lattice/Core`·`Lattice/Material`·`Lattice/ImGui`를 컴파일하며 Engine/Editor나
 `imgui-node-editor`를 링크하지 않는다. 현재 Editor는 BT의
 [`MenuBarWindow.cpp`](../../Editor/EngineGUIWindow/MenuBarWindow.cpp)와 Animator의
 [`AnimatorEditorWindows.cpp`](../../Editor/EngineGUIWindow/AnimatorEditorWindows.cpp)가
@@ -115,5 +121,19 @@ node-editor를 사용한다. [`vcpkg.json`](../../vcpkg.json)의 직접 의존�
 - 첫 후보 밖의 84개 타입에 제품 지원 범위를 정하고, 각 enum **조합**에서
   달라지는 소켓을 노드 구현 시 검증한다. 현재 목록의 전 항목은 제품 Material
   compiler 기준 `미구현`이다.
-- 대표 graph는 목표 계약이다. 제품 `.shadergraph`의 저장→재개방과 컴파일은
-  MAT-2/LX-3에서 검증한다. 예제 `.lxg`를 제품 정본으로 취급하지 않는다.
+- MAT-2는 초기 6개 Blender 정의와 Parameter/Reroute, 상수·image/normal·그룹·배치의
+  `.shadergraph` 왕복과 typed IR을 독립 Debug/Release에서 검증했다.
+  [MaterialGraphSchema.md](MaterialGraphSchema.md)를 따른다. Mix와 전체 노드/enum
+  조합과 Editor UI·나머지 Slang operator는 별도 지원/제품 게이트에서 구현한다. 예제 `.lxg`를 제품 정본으로 취급하지 않는다.
+
+## MAT-6 native 생성기 지원 (2026-09-28)
+
+[MaterialSlangCodegen.md](MaterialSlangCodegen.md)가 실제 lowering·색 공간·진단·비용 계약을 소유한다.
+초기 RGB/Value, Image Texture, Normal Map, Principled BSDF, Material Output의 지원 설정을
+Slang으로 낮추고 실제 texture/sampler GPU와 DXIL/SPIR-V로 검증했다. 모든 Blender enum을
+지원한다는 뜻은 아니다. 미지원 설정은 소유 node/socket/property를 진단한다.
+
+공유/중첩 Group Input/Output과 인스턴스 입력 override, typed parameter/reroute·Closure reroute를
+해석한다. 엔진의 `LXMultiply*`·`LXTextureSample`·6입력 `LXPrincipledVolume`을 추가했다.
+이 정의를 Blender Math/Mix/full Volume의 1:1 구현으로 표시하지 않는다.
+Editor의 위젯/preview·HTTP 및 제품 ShaderMeta/Scene binding은 LX-3/LX-3H·MAT-7/MAT-8에 남는다.

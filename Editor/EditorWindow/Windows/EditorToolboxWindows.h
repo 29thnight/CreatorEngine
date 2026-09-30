@@ -15,6 +15,7 @@
 
 namespace editor::windows
 {
+    void draw_material_graph();
     void draw_behavior_tree();       bool has_behavior_tree();
     void draw_black_board();         bool has_black_board();
     void draw_input_action_maps();   bool has_input_action_maps();
@@ -44,6 +45,13 @@ struct editor_authoring_windows
     {
         using namespace editor;
         return window_set(
+            panel<&windows::draw_material_graph>(EditorWindowName::kMaterialGraph, EditorWindowName::kMaterialGraphLabel)
+                .dock(dock_slot::center)
+                .initial_size(1100.0f, 720.0f)
+                .min_size(600.0f, 350.0f)
+                .padding(0.0f, 0.0f)
+                .add_traits(window_trait::no_scrollbar | window_trait::no_scroll_with_mouse)
+                .open_by_default(false),
             // 도크 빌더가 이 둘을 가운데 노드에 넣는다(BuildInitialDockLayout).
             panel<&windows::draw_behavior_tree>(
                 EditorWindowName::kBehaviorTree, EditorWindowName::kBehaviorTreeLabel)

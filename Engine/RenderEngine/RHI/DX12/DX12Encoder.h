@@ -89,6 +89,7 @@ public:
         uint32_t slice = 0, uint32_t sourceSubresource = 0) override;
     void CopyBufferToReadback(const RHIReadback& readback, RHIBufferHandle source,
         uint64_t sourceOffset = 0, uint64_t bytes = 0) override;
+    bool CopyBuffer(const RHIBufferSlice& destination, const RHIBufferSlice& source) override;
     void CopyTexture(RHITextureHandle destination, RHITextureHandle source,
         uint32_t destinationSubresource = 0, uint32_t sourceSubresource = 0) override;
     void ClearRenderTargetRect(const RHIRenderTargetBinding& binding,

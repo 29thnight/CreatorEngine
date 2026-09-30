@@ -599,7 +599,7 @@ void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
         m_persistentHeap.Release(resident.allocation);
         --m_stats.residentCount;
         m_stats.residentBytes -= resident.bytes;
-        m_entries.erase(it);
+        it = m_entries.erase(it);
     }
 
     auto transaction = m_fallbackTransactions.begin();

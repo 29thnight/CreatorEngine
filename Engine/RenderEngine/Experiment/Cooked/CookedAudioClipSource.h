@@ -2,6 +2,7 @@
 
 #include "CookedAssetManifest.h"
 #include "CookedAudioClipFormat.h"
+#include "../../Assets/AssetIdentityProfile.h"
 
 #include <algorithm>
 #include <array>
@@ -48,6 +49,17 @@ namespace experiment::cooked
             begin = end + 1u;
         }
         return true;
+    }
+
+    [[nodiscard]] inline bool IsMaterialProgramArtifactVirtualPath(std::string_view path)
+    {
+        AssetId graphId;
+        const auto lastSlash = path.rfind('/');
+        return lastSlash != std::string_view::npos && path.ends_with(".lxmaterial") && path.size() >= lastSlash + 12 &&
+               (TryParseCanonicalAssetId(path.substr(lastSlash + 1, path.size() - lastSlash - 12), graphId) ||
+                assets::TryParseCanonicalUuidV8(path.substr(lastSlash + 1, path.size() - lastSlash - 12),
+                                                graphId.value)) &&
+               path == MakeDerivedMaterialProgramArtifactPath(graphId);
     }
 
     class LooseArtifactByteSource final : public ArtifactByteSource
@@ -110,7 +122,7 @@ namespace experiment::cooked
         [[nodiscard]] bool Resolve(std::string_view virtualPath,
             std::filesystem::path& out, std::string& failure) const
         {
-            if (!IsAudioArtifactVirtualPath(virtualPath))
+            if (!IsAudioArtifactVirtualPath(virtualPath) && !IsMaterialProgramArtifactVirtualPath(virtualPath))
             {
                 failure = "cooked artifact virtual path is invalid";
                 return false;

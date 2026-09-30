@@ -54,7 +54,7 @@
 #include "StateMachineComponent.h"
 #include "BehaviorTreeComponent.h"
 #include "FoliageComponent.h"
-#include "VolumeComponent.h"
+#include "SceneRenderProfileComponent.h"
 #include "RectTransformComponent.h"
 #include "DecalComponent.h"
 #include "SpriteRenderer.h"
@@ -116,7 +116,7 @@ namespace
 		if (entry.type == "TerrainComponent" || entry.type == "FoliageComponent")
 			return {images.GetFileIcon(FileType::TerrainTexture), EditorIcon::Terrain};
 		if (entry.type == "DecalComponent") return {images.GetFileIcon(FileType::MaterialTexture), EditorIcon::Material};
-		if (entry.type == "VolumeComponent") return {images.GetFileIcon(FileType::VolumeProfile), EditorIcon::Volume};
+		if (entry.type == "SceneRenderProfileComponent") return {images.GetFileIcon(FileType::SceneRenderProfile), EditorIcon::RenderProfile};
 		if (entry.type == "TextComponent") return {images.GetFileIcon(FileType::Font), EditorIcon::Font};
 		return component_category_visual(entry.category);
 	}
@@ -1284,44 +1284,44 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 	}
 }
 
-void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
+void InspectorWindow::ImGuiDrawHelperRenderProfile(SceneRenderProfileComponent* renderProfileComponent)
 {
-	if (!volumeComponent) return;
+	if (!renderProfileComponent) return;
 
 	{
 		const editor::widgets::property_sheet sheet(m_layout, { "Profile" });
 		const float width = sheet.line("Profile");
-		const std::string name = volumeComponent->m_volumeProfileName.empty()
-			? std::string("None (drag VolumeProfile)") : volumeComponent->m_volumeProfileName;
-		NameButton(name, "###VolumeProfileSlot", width);
+		const std::string name = renderProfileComponent->m_renderProfileName.empty()
+			? std::string("None (drag Scene Render Profile)") : renderProfileComponent->m_renderProfileName;
+		NameButton(name, "###SceneRenderProfileSlot", width);
 		if (DropTargetEnabled() && ImGui::BeginDragDropTarget())
 		{
-			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("VolumeProfile"))
+			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SceneRenderProfile"))
 			{
 				const file::path filepath = editor::asset_drag::path_of(*payload);
 				FileGuid guid = DataSystems->GetFileGuid(filepath);
 				if (guid != nullFileGuid)
 				{
 					// 이미 프로파일이 존재하는 경우
-					if (volumeComponent->m_volumeProfileGuid != nullFileGuid)
+					if (renderProfileComponent->m_renderProfileGuid != nullFileGuid)
 					{
-						Debug::PrintLog(spdlog::level::warn, "Volume profile already exists. Replacing with new profile.");
+						Debug::PrintLog(spdlog::level::warn, "Scene render profile already exists. Replacing with new profile.");
 					}
-					volumeComponent->m_volumeProfileGuid = guid;
-					volumeComponent->LoadProfile(guid);
+					renderProfileComponent->m_renderProfileGuid = guid;
+					renderProfileComponent->LoadProfile(guid);
 				}
 				else
 				{
-					Debug::PrintLog(spdlog::level::err, "Failed to load volume profile: " + filepath.string());
+					Debug::PrintLog(spdlog::level::err, "Failed to load scene render profile: " + filepath.string());
 				}
 			}
 			ImGui::EndDragDropTarget();
 		}
 	}
 
-	if (!volumeComponent->IsProfileLoaded()) return;
+	if (!renderProfileComponent->IsProfileLoaded()) return;
 
-	VolumeProfile& profile = volumeComponent->GetVolumeProfile();
+	SceneRenderProfile& profile = renderProfileComponent->GetRenderProfile();
 	const auto drawMembers = [](const char* header, auto& setting)
 	{
 		if (!ImGui::CollapsingHeader(header)) return;
@@ -1419,13 +1419,13 @@ void InspectorWindow::ImGuiDrawHelperVolume(VolumeComponent* volumeComponent)
 		drawMembers("ColorGradingPass", profile.settings.colorGrading);
 	}
 
-	volumeComponent->UpdateProfileEditMode();
+	renderProfileComponent->UpdateProfileEditMode();
 
 	ImGui::Separator();
-	if (ImGui::Button("Save VolumeProfile Asset", ImVec2(ImGui::GetContentRegionAvail().x, 0.f)))
+	if (ImGui::Button("Save Scene Render Profile Asset", ImVec2(ImGui::GetContentRegionAvail().x, 0.f)))
 	{
-		EditorAssetDatabase::Get().SaveExistingVolumeProfile(
-			volumeComponent->m_volumeProfileGuid, &profile);
+		EditorAssetDatabase::Get().SaveExistingSceneRenderProfile(
+			renderProfileComponent->m_renderProfileGuid, &profile);
 	}
 }
 
@@ -2275,12 +2275,12 @@ void InspectorWindow::Draw()
 						ImGuiDrawHelperPlayerInput(input);
 					}
 				}
-				else if (componentTypeID == type_guid(VolumeComponent))
+				else if (componentTypeID == type_guid(SceneRenderProfileComponent))
 				{
-					VolumeComponent* input = dynamic_cast<VolumeComponent*>(component.get());
+					SceneRenderProfileComponent* input = dynamic_cast<SceneRenderProfileComponent*>(component.get());
 					if (nullptr != input)
 					{
-						ImGuiDrawHelperVolume(input);
+						ImGuiDrawHelperRenderProfile(input);
 					}
 				}
 				else if (componentTypeID == type_guid(DecalComponent)) 

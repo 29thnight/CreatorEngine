@@ -44,7 +44,7 @@ namespace editor::windows
         select,         ///< text = Assets 기준 상대 경로. **지금 보이는 결과** 안에 있어야 한다
         scroll,         ///< value = 목록의 세로 스크롤(px)
         create_folder,          ///< text = 이름. 지금 폴더 안에 만든다 — 대화상자의 Create 와 같은 길
-        create_volume_profile,  ///< text = 이름(확장자 없이). VolumeProfile 폴더에서만
+        create_render_profile,  ///< text = 이름(확장자 없이). SceneRenderProfile 폴더에서만
     };
 
     struct content_browser_request
@@ -101,7 +101,7 @@ namespace editor::windows
         bool canForward{};
         bool canUp{};
         bool canCreate{};                  ///< New 가 눌리는가 — 가상 위치에서는 거짓이어야 한다
-        bool canCreateVolumeProfile{};     ///< 폴더 메뉴·타일 메뉴가 같은 술어로 연다
+        bool canCreateSceneRenderProfile{};     ///< 폴더 메뉴·타일 메뉴가 같은 술어로 연다
 
         std::size_t resultCount{};
         std::vector<std::string> results{}; ///< 보이는 결과의 상대 경로(앞에서 최대 256)

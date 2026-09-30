@@ -17,6 +17,7 @@ struct DecalInstance
     int      sliceNum;
 };
 StructuredBuffer<DecalInstance> gInstances : register(t7);
+Texture2D<uint> gOwners : register(t8);
 
 SamplerState gLinearSampler : register(s0);
 SamplerState gPointSampler  : register(s1);
@@ -27,7 +28,8 @@ cbuffer DecalFrame : register(b0)
     float4x4 gInverseProjection;
     float4x4 gViewProjection;
     float2   gScreenDimensions;
-    float2   gFramePadding;
+    uint     gHasOwners;
+    float    gFramePadding;
 };
 
 #define USE_DIFFUSE (1 << 0)
@@ -139,7 +141,10 @@ PSOut PSMain(VSOut input)
     const float3 normalWorld = normalize(mul(normalTexel, tbn));
 
     const float3 decalOrm = gDecalOrm.Sample(gLinearSampler, decalUV).xyz;
-    const float3 orm = float3(decalOrm.b, decalOrm.g, decalOrm.r);
+    const bool lattice = gHasOwners != 0u &&
+                         (gOwners.Load(int3(uint2(input.position.xy), 0)) & 0x80000000u) != 0u;
+    // Legacy GBuffer stores M/R/AO; LX stores AO/R/M. Keep both contracts.
+    const float3 orm = lattice ? decalOrm : float3(decalOrm.b, decalOrm.g, decalOrm.r);
 
     const float3 finalColor = lerp(baseAlbedo.rgb, decalSample.rgb, decalSample.a);
 

@@ -243,6 +243,10 @@ public:
     ///   놓는 것은 등록한 쪽의 책임이다 — 표는 펜스를 보지 않는다.
     virtual void ReleaseTexture(RHITextureHandle handle) = 0;
 
+    /// Persistent buffer owner releases after submission completion, just as
+    /// texture owners do. The resource table does not wait on a fence.
+    virtual void ReleaseBuffer(RHIBufferHandle handle) = 0;
+
     /// 그래프 밖에서 상태를 바꾼다. 지금 열려 있는 커맨드 리스트에 기록한다.
     ///
     /// ★ 그래프 안에서는 부르면 안 된다 — 거기서는 usage 선언이 배리어를

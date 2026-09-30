@@ -98,7 +98,7 @@ editor::SceneOverlaySnapshot editor::ReadSceneOverlaySnapshot()
 }
 
 void editor::SceneViewportOverlay::Draw(
-    EditorCameraRig& rig, GizmoRenderer* gizmos, const ViewportCanvas& canvas)
+    EditorCameraRig& rig, GizmoRenderer* gizmos, const ViewportCanvas& canvas, float sceneFps)
 {
     using namespace scene_overlay_detail;
     // 오버레이가 놓이는 자리는 **content** 다. image 가 아니다 — crop 에서
@@ -146,6 +146,7 @@ void editor::SceneViewportOverlay::Draw(
     };
     const auto showMenu = [&] {
         ImGui::MenuItem("Orientation gizmo", nullptr, &showViewGizmo);
+        ImGui::MenuItem("FPS", nullptr, &showFps);
         if (ImGui::MenuItem("Grid settings")) open_window(EditorWindowName::kGridSettings);
         if (ImGui::MenuItem("Render Statistics")) openStatistics = true;
     };
@@ -307,6 +308,18 @@ void editor::SceneViewportOverlay::Draw(
     }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) leftOwned = false;
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Right)) rightOwned = false;
+    if (showFps && canvas.valid)
+    {
+        char label[32]{};
+        std::snprintf(label, sizeof(label), "Scene %.1f FPS", sceneFps);
+        const ImVec2 size = ImGui::CalcTextSize(label);
+        const float pad = ThemePixels(7.f);
+        const ImVec2 max{imageMax.x - pad, imageMax.y - pad};
+        const ImVec2 min{max.x - size.x - 2.f * pad, max.y - size.y - 2.f * pad};
+        auto* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(min, max, IM_COL32(18, 21, 25, 205), ThemePixels(4.f));
+        draw->AddText({min.x + pad, min.y + pad}, IM_COL32(235, 239, 244, 255), label);
+    }
     ImGui::SetCursorScreenPos(savedCursor);
     ImGui::Dummy({0.f, 0.f}); // Complete the restored cursor's layout item (ImGui 1.92).
     std::lock_guard lock(snapshotMutex);

@@ -800,30 +800,61 @@ namespace EditorObjectOperations
         if (!renderer->m_Material)
             return PreconditionFailed("material.missing", "Mesh renderer has no material");
         experiment::MaterialInstance* instance = renderer->GetMaterialInstance();
-        if (nullptr == instance)
+        const bool graphMaterial = renderer->m_Material->HasMaterialGraph();
+        if (nullptr == instance && !graphMaterial)
             return PreconditionFailed("material.instance.missing",
-                "Mesh renderer has no authored base — override는 저작 정본이 있어야 얹힌다");
+                                      "Mesh renderer has no authored base — override는 저작 정본이 있어야 얹힌다");
+
+        const auto previous = renderer->m_Material;
+        const auto edited = graphMaterial ? std::make_shared<Material>(*previous) : previous;
 
         if (1 == values.size())
         {
-            if (!MaterialScriptBinding::SetFloat(*renderer->m_Material, property,
-                values[0], instance))
+            if (!MaterialScriptBinding::SetFloat(*edited, property, values[0], instance))
             {
-                return InvalidArguments("ShaderMeta에 없는 property이거나 스칼라가 아니다: "
-                    + property);
+                return InvalidArguments("Material has no editable scalar property: " + property);
             }
         }
         else if (property != std::string(standard_material::property::BaseColor))
         {
-            return InvalidArguments("Four components are only accepted for "
-                + std::string(standard_material::property::BaseColor));
+            return InvalidArguments("Four components are only accepted for " +
+                                    std::string(standard_material::property::BaseColor));
         }
         else
         {
-            MaterialScriptBinding::SetBaseColor(*renderer->m_Material,
-                math::color{ values[0], values[1], values[2], values[3] }, instance);
+            if (graphMaterial)
+            {
+                const auto& parameters =
+                    edited->GetMaterialGraphInstance()->generation->cooked.product.program.parameters;
+                if (!std::ranges::any_of(parameters, [&](const auto& parameter) {
+                        return parameter.identifier == property && parameter.type == LX::PinType::Color &&
+                               parameter.exposed;
+                    }))
+                {
+                    return InvalidArguments("Graph has no editable Base Color parameter");
+                }
+            }
+            MaterialScriptBinding::SetBaseColor(*edited, math::color{values[0], values[1], values[2], values[3]},
+                                                instance);
         }
-        renderer->PublishRenderProxyDirty(ProxyDirty::Material);
+        if (graphMaterial)
+        {
+            const auto apply = [handle = renderer->GetOwner()->GetScene()->HandleOf(renderer->GetOwner()->m_index),
+                                component = renderer->GetInstanceID()](const std::shared_ptr<Material>& material) {
+                auto* scene = SceneManagers->GetActiveScene();
+                auto* entity = scene ? scene->Resolve(handle) : nullptr;
+                auto* renderer = entity ? entity->GetComponent<MeshRenderer>() : nullptr;
+                if (renderer && renderer->GetInstanceID() == component)
+                {
+                    renderer->SetMaterial(material);
+                }
+            };
+            Meta::MakeCustomChangeCommand([apply, previous] { apply(previous); }, [apply, edited] { apply(edited); });
+        }
+        else
+        {
+            renderer->PublishRenderProxyDirty(ProxyDirty::Material);
+        }
 
         using D = CommandCore::CommandData;
         D data = D::Object();
@@ -831,10 +862,20 @@ namespace EditorObjectOperations
         data.Set("renderer", D::Int(rendererIndex));
         data.Set("renderers", D::Int(static_cast<int>(renderers.size())));
         data.Set("property", D::String(property));
+        if (values.size() == 1)
+        {
+            data.Set("resolvedValue", D::Double(MaterialScriptBinding::GetFloat(*edited, property, -1)));
+        }
         D applied = D::Array();
-        for (float value : values) applied.Append(D::Double(value));
+        for (float value : values)
+            applied.Append(D::Double(value));
         data.Set("values", std::move(applied));
-        data.Set("revision", D::Int(static_cast<std::int64_t>(instance->Revision())));
+        data.Set("revision", D::Int(instance ? static_cast<std::int64_t>(instance->Revision()) : 0));
+        if (const auto graph = edited->GetMaterialGraphInstance())
+        {
+            data.Set("graph", D::String(Uuid::ToString(graph->description.graphId.value)));
+            data.Set("graphGeneration", D::Int(static_cast<std::int64_t>(graph->generation->generation)));
+        }
 
         // ★ 캡처 manifest 의 draw 와 **같은 출처**로 적는다. 캡처는
         //   `draw.modelMeshView.handle` 을 쓰고 그 핸들은 BuildRHIModelMeshView 가

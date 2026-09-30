@@ -801,6 +801,32 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
     return RequestState::Pending;
 }
 
+RHIPipelineRequestState DX12PSOManager::RequestGraphics(const RHIGraphicsPipelineDesc& desc, RHIPipelineHandle& result,
+                                                        std::string& outError)
+{
+    result = {};
+    outError.clear();
+    switch (Request(desc, nullptr))
+    {
+    case RequestState::Pending:
+        return RHIPipelineRequestState::Pending;
+    case RequestState::Failed:
+        outError = "D3D12 asynchronous graphics pipeline request failed";
+        return RHIPipelineRequestState::Failed;
+    case RequestState::Ready:
+        break;
+    }
+    std::lock_guard guard(m_mutex);
+    const auto found = m_cache.find(ComputeHash(desc));
+    if (found == m_cache.end())
+    {
+        outError = "D3D12 ready graphics pipeline was invalidated before owner publication";
+        return RHIPipelineRequestState::Failed;
+    }
+    result = found->second.handle;
+    return RHIPipelineRequestState::Ready;
+}
+
 bool DX12PSOManager::SaveCache(std::string& outError)
 {
     if (!m_library) { outError = "라이브러리 없음"; return false; }

@@ -33,6 +33,9 @@
     <ClCompile Include="RHI\Vulkan\ImGuiVulkanShell.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Engine\EngineDiagnostics\EngineDiagnostics.vcxproj">
+      <Project>{b7d3f2a9-5c14-4e86-9d3b-7f2a45c8e1b6}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
     </ProjectReference>

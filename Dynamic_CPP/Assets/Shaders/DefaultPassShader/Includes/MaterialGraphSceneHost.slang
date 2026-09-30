@@ -1,0 +1,561 @@
+#pragma once
+#define LX_SCENE_VOLUME_TRANSPORT 1
+#include "MaterialGraphSurfacePoint.slang"
+#include "PrincipledIblLookup.slang"
+#include "PbrCoverage.slang"
+#if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
+#include "SpecialForwardSurface.slang"
+#include "MaterialGraphSceneSubsurface.slang"
+#else
+#include "PbrSurface.slang"
+#endif
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+#include "MaterialGraphSceneRefraction.slang"
+#endif
+
+struct LXSceneLight
+{
+    float4 position;
+    float4 direction;
+    float4 color;
+    float4 attenuation;
+};
+
+cbuffer LXSceneConstants : register(b0)
+{
+    float4x4 lx_viewProjection;
+    float4 lx_eye;
+    uint lx_drawOwner;
+    uint lx_coverage;
+    float lx_cutoff;
+    uint lx_hasEnvironment;
+    uint lx_lightCount;
+    uint lx_hasShadow;
+    float lx_shadowBlend;
+    uint lx_width;
+    uint lx_height;
+    uint lx_padding0;
+    uint lx_padding1;
+    uint lx_padding2;
+    float4x4 lx_shadowProjection[3];
+    float4 lx_shadowSplits;
+    float4 lx_shadowBias;
+    float4 lx_cameraForward;
+    // Flat host ABI: each light has position, direction, color, attenuation.
+    float4 lx_lights[256];
+};
+
+StructuredBuffer<LXSurfacePoint> lx_vertices : register(t0);
+TextureCube<float4> gEnvironment : register(t1);
+Texture2D<uint> lx_owners : register(t2);
+Texture2D<float2> lx_ao : register(t3);
+Texture2DArray<float> lx_shadow : register(t4);
+SamplerState gEnvironmentSampler : register(s0);
+SamplerComparisonState lx_shadowSampler : register(s1);
+StructuredBuffer<PrincipledIblBakeSample> lx_ibl : register(t5);
+Texture2D<float4> lx_decalColor : register(t9);
+Texture2D<float4> lx_decalOrm : register(t10);
+Texture2D<float4> lx_decalNormal : register(t11);
+Texture2D<float4> lx_beforeDecalColor : register(t12);
+Texture2D<float4> lx_beforeDecalOrm : register(t13);
+Texture2D<float4> lx_beforeDecalNormal : register(t14);
+cbuffer LXSceneDecalConstants : register(b3)
+{
+    uint lx_decalEnabled;
+    uint3 lx_decalPadding;
+};
+#if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
+StructuredBuffer<LXSceneSubsurfaceReflection> lx_subsurfaceReflection : register(t6);
+StructuredBuffer<float4> lx_subsurfaceIrradiance : register(t7);
+#endif
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+StructuredBuffer<LXSceneRefractionSample> lx_refraction : register(t8);
+#endif
+
+struct LXSceneVertex
+{
+    float4 clip : SV_Position;
+    float3 position : TEXCOORD0;
+    float3 normal : TEXCOORD1;
+    float3 tangent : TEXCOORD2;
+    float3 bitangent : TEXCOORD3;
+    float2 uv : TEXCOORD4;
+};
+
+[shader("vertex")]
+LXSceneVertex LXSceneVS(uint index : SV_VertexID)
+{
+    const LXSurfacePoint source = lx_vertices[index];
+    LXSceneVertex output;
+    output.clip = mul(float4(source.position.xyz, 1), lx_viewProjection);
+    output.position = source.position.xyz;
+    output.normal = source.normal.xyz;
+    output.tangent = source.tangent.xyz;
+    output.bitangent = source.bitangent.xyz;
+    output.uv = source.uvLod.xy;
+    return output;
+}
+
+cbuffer LXSceneShadowConstants : register(b4)
+{
+    float4x4 lx_shadowViewProjection;
+    uint lx_shadowCoverage;
+    float lx_shadowCutoff;
+    uint2 lx_shadowPadding;
+};
+
+[shader("vertex")]
+LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
+{
+    const LXSurfacePoint source = lx_vertices[index];
+    LXSceneVertex output;
+    output.clip = mul(float4(source.position.xyz, 1), lx_shadowViewProjection);
+    output.position = source.position.xyz;
+    output.normal = source.normal.xyz;
+    output.tangent = source.tangent.xyz;
+    output.bitangent = source.bitangent.xyz;
+    output.uv = source.uvLod.xy;
+    return output;
+}
+
+[shader("fragment")]
+void LXSceneShadowPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    const LXMaterialContext context = LXSceneContext(input);
+    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), lx_shadowCutoff, lx_shadowCoverage, frontFace);
+}
+
+MaterialInputs LXSceneDecalInputs(MaterialInputs raw, LXSceneVertex input, bool frontFace)
+{
+    if (lx_decalEnabled == 0u)
+        return raw;
+    const int3 pixel = int3(uint2(input.clip.xy), 0);
+    const float3 color = lx_decalColor.Load(pixel).rgb;
+    const float3 beforeColor = lx_beforeDecalColor.Load(pixel).rgb;
+    const float3 orm = lx_decalOrm.Load(pixel).rgb;
+    const float3 beforeOrm = lx_beforeDecalOrm.Load(pixel).rgb;
+    // Compare stored representations, not raw graph values: no-op decals and
+    // untouched channels must not introduce half-float rounding into lighting.
+    raw.baseColor = select(color != beforeColor, color, raw.baseColor);
+    raw.occlusion = orm.x != beforeOrm.x ? orm.x : raw.occlusion;
+    raw.roughness = orm.y != beforeOrm.y ? orm.y : raw.roughness;
+    raw.metallic = orm.z != beforeOrm.z ? orm.z : raw.metallic;
+    const float3 normal = lx_decalNormal.Load(pixel).rgb;
+    if (any(normal != lx_beforeDecalNormal.Load(pixel).rgb))
+    {
+        raw.normal = PrincipledUnitNormal(normal * 2.0 - 1.0, raw.normal);
+        if ((lx_coverage & PBR_COVERAGE_DOUBLE_SIDED) != 0u && !frontFace)
+            raw.normal = -raw.normal;
+    }
+    return raw;
+}
+
+PrincipledIblBakePoint LXScenePoint(LXSceneVertex input, bool frontFace)
+{
+    const LXMaterialContext context = LXSceneContext(input);
+    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    const MaterialInputs raw = LXSceneDecalInputs(generated.surfaceInputs, input, frontFace);
+    const float3 normal = PrincipledUnitNormal(raw.normal, context.normal);
+    // Preserve authored IOR/level and the unrotated tangent. The compute baker
+    // applies material evaluation once, exactly as the evaluated-point path.
+    PrincipledIblBakePoint point;
+    point.baseAlpha = float4(raw.baseColor, ApplyPbrCoverage(saturate(raw.alpha), lx_cutoff, lx_coverage, frontFace));
+    point.normalRoughness = float4(OrientPbrNormal(normal, lx_coverage, frontFace), raw.roughness);
+    point.metalIorLevelAo = float4(raw.metallic, raw.ior, raw.specularIorLevel, raw.occlusion);
+    point.tintAnisotropy = float4(raw.specularTint, raw.anisotropy);
+    point.emissionColorStrength = float4(raw.emissionColor, raw.emissionStrength);
+    point.coatWeightRoughIorFilmThickness = float4(raw.coatWeight, raw.coatRoughness, raw.coatIor, raw.thinFilmThickness);
+    point.coatTintFilmIor = float4(raw.coatTint, raw.thinFilmIor);
+    point.coatNormalSheenWeight = float4(OrientPbrNormal(PrincipledUnitNormal(raw.coatNormal, context.normal),
+                                                      lx_coverage, frontFace), raw.sheenWeight);
+    point.sheenTintRoughness = float4(raw.sheenTint, raw.sheenRoughness);
+    const float3 tangent = PrincipledUnitNormal(raw.tangent - normal * dot(raw.tangent, normal),
+                                               PrincipledProjectedTangent(context.tangent, normal));
+    const bool flipped = (lx_coverage & PBR_COVERAGE_DOUBLE_SIDED) != 0u && !frontFace;
+    point.tangentRotation = float4(tangent, flipped ? -raw.anisotropyRotation : raw.anisotropyRotation);
+    point.viewTier = float4(PrincipledUnitNormal(lx_eye.xyz - input.position, normal),
+                            (LX_MATERIAL_FEATURE_MASK & 0x1780u) != 0 ? 1 : 0);
+    // Fine UV derivatives and graph evaluation precede this divergent owner test.
+    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+        discard;
+    return point;
+}
+
+struct LXSceneLookup0
+{
+    float4 fields[8] : SV_Target;
+};
+
+struct LXSceneLookup1
+{
+    float4 fields[3] : SV_Target;
+};
+
+[shader("fragment")]
+LXSceneLookup0 LXSceneLookup0PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    const PrincipledIblBakePoint point = LXScenePoint(input, frontFace);
+    LXSceneLookup0 output;
+    output.fields[0] = point.baseAlpha;
+    output.fields[1] = point.normalRoughness;
+    output.fields[2] = point.metalIorLevelAo;
+    output.fields[3] = point.tintAnisotropy;
+    output.fields[4] = point.emissionColorStrength;
+    output.fields[5] = point.coatWeightRoughIorFilmThickness;
+    output.fields[6] = point.coatTintFilmIor;
+    output.fields[7] = point.coatNormalSheenWeight;
+    return output;
+}
+
+[shader("fragment")]
+LXSceneLookup1 LXSceneLookup1PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    const PrincipledIblBakePoint point = LXScenePoint(input, frontFace);
+    LXSceneLookup1 output;
+    output.fields[0] = point.sheenTintRoughness;
+    output.fields[1] = point.tangentRotation;
+    output.fields[2] = point.viewTier;
+    return output;
+}
+
+LXMaterialContext LXSceneContext(LXSceneVertex input)
+{
+    LXMaterialContext context;
+    context.uv = float3(input.uv, 0);
+    context.normal = PrincipledUnitNormal(input.normal, float3(0, 0, 1));
+    context.tangent = PrincipledUnitNormal(input.tangent, float3(1, 0, 0));
+    context.bitangent = PrincipledUnitNormal(input.bitangent, cross(context.normal, context.tangent));
+    // Scene image operations derive LOD from each final Vector expression and
+    // image dimensions. Explicit LOD remains available to compute/point hosts.
+    context.lod = 0.0;
+    return context;
+}
+
+PrincipledSurface LXSceneEvaluateMaterial(LXGeneratedMaterial generated, LXMaterialContext context, bool frontFace)
+{
+    PrincipledSurface surface = LXEvaluateGeneratedSurface(generated, context);
+    surface.alpha = ApplyPbrCoverage(surface.alpha, lx_cutoff, lx_coverage, frontFace);
+    surface.normal = OrientPbrNormal(surface.normal, lx_coverage, frontFace);
+    surface.coatNormal = OrientPbrNormal(surface.coatNormal, lx_coverage, frontFace);
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+    if (!frontFace)
+    {
+        // Coverage already oriented both normals. Only the medium ratio remains.
+        surface.transmissionFilmIor /= surface.transmissionIor;
+        surface.transmissionIor = rcp(surface.transmissionIor);
+    }
+#endif
+    return surface;
+}
+
+// The GBuffer precedes Decal. Keep its call graph free of Decal descriptors;
+// a runtime boolean inside a shared function still exposes those resources in SPIR-V.
+PrincipledSurface LXSceneUndecaledMaterial(LXSceneVertex input, bool frontFace)
+{
+    const LXMaterialContext context = LXSceneContext(input);
+    const LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    return LXSceneEvaluateMaterial(generated, context, frontFace);
+}
+
+PrincipledSurface LXSceneMaterial(LXSceneVertex input, bool frontFace)
+{
+    const LXMaterialContext context = LXSceneContext(input);
+    LXGeneratedMaterial generated = LXGenerateMaterial(context, LXBoundMaterialParameters());
+    generated.surfaceInputs = LXSceneDecalInputs(generated.surfaceInputs, input, frontFace);
+    return LXSceneEvaluateMaterial(generated, context, frontFace);
+}
+
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+struct LXSceneRefractionCapture
+{
+    float4 positionIor : SV_Target0;
+    float4 normalFilmIor : SV_Target1;
+};
+
+[shader("fragment")]
+LXSceneRefractionCapture LXSceneRefractionPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    const PrincipledSurface material = LXSceneMaterial(input, frontFace);
+    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    {
+        discard;
+    }
+    LXSceneRefractionCapture output;
+    output.positionIor = float4(input.position, material.transmissionIor);
+    output.normalFilmIor = float4(material.normal, material.transmissionFilmIor);
+    return output;
+}
+#endif
+
+struct LXSceneGBuffer
+{
+    float4 diffuse : SV_Target0;
+    float4 metalRough : SV_Target1;
+    float4 normal : SV_Target2;
+    float4 emissive : SV_Target3;
+    uint owner : SV_Target4;
+};
+
+[shader("fragment")]
+LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    const PrincipledSurface surface = LXSceneUndecaledMaterial(input, frontFace);
+    LXSceneGBuffer output;
+    output.diffuse = float4(surface.baseColor, surface.alpha);
+    output.metalRough = float4(surface.occlusion, surface.roughness, surface.metallic, 1);
+    output.normal = float4(surface.normal * 0.5 + 0.5, 1);
+    output.emissive = float4(surface.emission, 1);
+    output.owner = lx_drawOwner;
+    return output;
+}
+
+float LXSceneShadowCascade(uint cascade, float3 position, float slope)
+{
+    const float4 homogeneous = mul(float4(position, 1), lx_shadowProjection[cascade]);
+    const float3 projected = homogeneous.xyz / homogeneous.w;
+    if (any(abs(projected.xy) > 1.0) || projected.z > 1.0)
+        return 1.0;
+    const float2 uv = float2(projected.x * 0.5 + 0.5, 0.5 - projected.y * 0.5);
+    const float bias = lx_shadowBias[cascade] * (1.0 + lx_shadowBias.w * slope);
+    return lx_shadow.SampleCmpLevelZero(lx_shadowSampler, float3(uv, float(cascade)), projected.z - bias);
+}
+
+float LXSceneShadow(float3 position, float3 normal, float3 light)
+{
+    if (lx_hasShadow == 0u)
+        return 1.0;
+    const float distance = dot(position - lx_eye.xyz, lx_cameraForward.xyz);
+    uint cascade = distance > lx_shadowSplits.y ? 2u : distance > lx_shadowSplits.x ? 1u : 0u;
+    const float nl = saturate(dot(normal, light));
+    const float slope = min(sqrt(max(1.0 - nl * nl, 0.0)) / max(nl, 1e-3), 8.0);
+    float shadow = LXSceneShadowCascade(cascade, position, slope);
+    if (lx_shadowBlend > 0.0 && cascade < 2u)
+    {
+        const float split = lx_shadowSplits[cascade];
+        const float start = split * (1.0 - lx_shadowBlend);
+        if (distance > start)
+            shadow = lerp(shadow, LXSceneShadowCascade(cascade + 1u, position, slope),
+                          saturate((distance - start) / max(split - start, 1e-4)));
+    }
+    return shadow;
+}
+
+#if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
+SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 view, uint index)
+{
+    const PrincipledIblBakeSample sample = lx_ibl[index];
+    const LXSceneSubsurfaceReflection reflection = lx_subsurfaceReflection[index];
+    SpecialForwardIntegral integral;
+    integral.layers.base = ReadPrincipledIblIntegral(sample.baseSingleAlbedo, sample.baseAverage);
+    integral.layers.coat = ReadPrincipledIblIntegral(sample.coatSingleAlbedo, sample.coatAverage);
+    integral.metal = ReadPrincipledIblIntegral(reflection.metalSingleAlbedo, reflection.metalAverage);
+    integral.dielectric = ReadPrincipledIblIntegral(reflection.dielectricSingleAlbedo, reflection.dielectricAverage);
+    integral.glass = PrincipledEmptyIntegral();
+    integral.rawTransmission = float3(0);
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+    const LXSceneRefractionSample refraction = lx_refraction[index];
+    integral.glass = ReadPrincipledIblIntegral(refraction.glassSingleAlbedo, refraction.glassAverage);
+    integral.rawTransmission = refraction.rawTransmission.rgb;
+#endif
+    return BuildSpecialForwardSurface(material, view, integral);
+}
+
+float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float3 position, out float3 irradiance)
+{
+    float3 direct = float3(0);
+    irradiance = float3(0);
+    for (uint i = 0; i < lx_lightCount; ++i)
+    {
+        const float4 lightPosition = lx_lights[i * 4u];
+        const float4 direction = lx_lights[i * 4u + 1u];
+        const float4 color = lx_lights[i * 4u + 2u];
+        const float4 falloff = lx_lights[i * 4u + 3u];
+        const uint type = uint(lightPosition.w);
+        float3 toLight;
+        float attenuation;
+        if (type == 0u)
+        {
+            toLight = -normalize(direction.xyz);
+            attenuation = LXSceneShadow(position, surface.layers.material.normal, toLight);
+        }
+        else
+        {
+            const float3 offset = lightPosition.xyz - position;
+            const float distance = length(offset);
+            toLight = offset / max(distance, 1e-4);
+            attenuation = saturate(1.0 - distance / max(falloff.w, 1e-4))
+                / max(falloff.x + falloff.y * distance + falloff.z * distance * distance, 1e-6);
+            if (type == 2u)
+            {
+                const float cosine = dot(-toLight, normalize(direction.xyz));
+                const float cutoff = cos(direction.w * 0.5);
+                attenuation *= smoothstep(cutoff, lerp(cutoff, 1.0, 0.2), cosine);
+            }
+        }
+        const SpecialForwardLight light = EvaluateSpecialLight(surface, toLight, color.rgb * color.a * attenuation);
+        direct += light.local + light.transmission;
+        irradiance += light.subsurfaceSource;
+    }
+    return direct;
+}
+
+struct LXSceneSubsurfaceCapture
+{
+    float4 fields[7] : SV_Target;
+};
+
+[shader("fragment")]
+LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
+{
+    // Evaluate quad derivatives before alpha/face coverage can discard a lane.
+    const float area = length(cross(ddx_fine(input.position), ddy_fine(input.position)));
+    const PrincipledSurface material = LXSceneMaterial(input, frontFace);
+    const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
+    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    {
+        discard;
+    }
+    LXSceneSubsurfaceCapture output = (LXSceneSubsurfaceCapture)0;
+    if (lx_ibl[index].baseAverage.w < 0 || lx_subsurfaceReflection[index].metalAverage.w != 1.0
+        || material.subsurfaceWeight <= 0.0)
+    {
+        return output;
+    }
+    const float3 view = PrincipledUnitNormal(lx_eye.xyz - input.position, material.normal);
+    const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index);
+    float3 irradiance;
+    LXSceneSpecialDirect(surface, input.position, irradiance);
+    if (lx_hasEnvironment != 0u)
+    {
+        irradiance += lx_ibl[index].irradiance.rgb;
+    }
+    const PrincipledSubsurfaceProfile profile = surface.profile;
+    const uint localMask = (profile.local.x ? 1u : 0u) | (profile.local.y ? 2u : 0u)
+        | (profile.local.z ? 4u : 0u);
+    output.fields[0] = float4(irradiance, area);
+    output.fields[1] = float4(input.position, 1);
+    output.fields[2] = float4(material.normal, float(localMask));
+    output.fields[3] = float4(profile.realDepth, 0);
+    output.fields[4] = float4(profile.virtualDepth, 0);
+    output.fields[5] = float4(profile.attenuation, 0);
+    output.fields[6] = float4(profile.normalization, 0);
+    return output;
+}
+
+float4 LXSceneSpecialColor(PrincipledSurface material, float3 position, uint index)
+{
+    if (lx_ibl[index].baseAverage.w < 0 || lx_subsurfaceReflection[index].metalAverage.w != 1.0)
+    {
+        return float4(1, 0, 1, 1);
+    }
+    const float3 view = PrincipledUnitNormal(lx_eye.xyz - position, material.normal);
+    const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index);
+    float3 source;
+    const float3 direct = LXSceneSpecialDirect(surface, position, source);
+    const PrincipledIblBakeSample sample = lx_ibl[index];
+    const LXSceneSubsurfaceReflection reflection = lx_subsurfaceReflection[index];
+    SpecialForwardEnvironment environment = (SpecialForwardEnvironment)0;
+    environment.irradiance = sample.irradiance.rgb;
+    environment.coatPrefiltered = sample.coatPrefiltered.rgb;
+    environment.sheenIrradiance = sample.sheenIrradiance.rgb;
+    const float3 metal = material.metallic * surface.integral.metal.singleScatter;
+    const float3 dielectric = (1.0 - material.metallic) * (1.0 - material.transmissionWeight)
+        * surface.integral.dielectric.singleScatter;
+    environment.basePrefiltered = (metal * reflection.metalEnvironment.rgb
+        + dielectric * reflection.dielectricEnvironment.rgb) / max(metal + dielectric, 1e-20);
+    environment.subsurfaceIrradiance = lx_subsurfaceIrradiance[index].rgb;
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+    const LXSceneRefractionSample refraction = lx_refraction[index];
+    if (refraction.glassAverage.w != 1)
+    {
+        return float4(1, 0, 1, 1);
+    }
+    environment.glassPrefiltered = refraction.glassEnvironment.rgb;
+    environment.refractedRadiance = refraction.radiance.rgb;
+#endif
+    SpecialForwardAmbient ambient = EvaluateSpecialIbl(surface, environment);
+    // The prepared field already includes direct irradiance and per-channel
+    // zero-radius local fallback. Apply destination color and weight once.
+    ambient.subsurface = surface.layers.lowerTransmission * surface.subsurface
+        * environment.subsurfaceIrradiance;
+    return float4(direct + ambient.Sum() + ambient.emission, 1);
+}
+#endif
+
+[shader("fragment")]
+float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV_Target
+{
+    PrincipledSurface material = LXSceneMaterial(input, frontFace);
+    // Fine derivatives must be evaluated before the per-pixel owner branch.
+    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+        discard;
+    const float3 view = PrincipledUnitNormal(lx_eye.xyz - input.position, material.normal);
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) == 0
+    // SSAO is half resolution. Sample with full-view UVs, as Deferred does.
+    material.occlusion *= saturate(lx_ao.SampleLevel(gEnvironmentSampler,
+        input.clip.xy / float2(lx_width, lx_height), 0).r);
+#endif
+    // Scene SSAO describes the opaque background before refraction. A
+    // transmitting surface uses its authored AO instead of that other surface.
+    const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
+#if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
+    return LXSceneSpecialColor(material, input.position, index);
+#else
+    const PrincipledIblBakeSample sample = lx_ibl[index];
+    if (sample.baseAverage.w < 0)
+        return float4(1, 0, 1, 1);
+    PrincipledLayeredIntegral integral;
+    integral.base = ReadPrincipledIblIntegral(sample.baseSingleAlbedo, sample.baseAverage);
+#if (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0
+    integral.coat = ReadPrincipledIblIntegral(sample.coatSingleAlbedo, sample.coatAverage);
+    const PrincipledLayeredState layered = BuildLayeredState(material, view, integral);
+#else
+    integral.coat = PrincipledEmptyIntegral();
+#endif
+    float3 direct = float3(0);
+    for (uint i = 0; i < lx_lightCount; ++i)
+    {
+        LXSceneLight light;
+        light.position = lx_lights[i * 4u];
+        light.direction = lx_lights[i * 4u + 1u];
+        light.color = lx_lights[i * 4u + 2u];
+        light.attenuation = lx_lights[i * 4u + 3u];
+        const uint type = uint(light.position.w);
+        float3 toLight;
+        float attenuation = 1;
+        if (type == 0u)
+        {
+            toLight = -normalize(light.direction.xyz);
+            attenuation = LXSceneShadow(input.position, material.normal, toLight);
+        }
+        else
+        {
+            const float3 offset = light.position.xyz - input.position;
+            const float distance = length(offset);
+            toLight = offset / max(distance, 1e-4);
+            attenuation = PbrLocalLightFalloff(light.attenuation, distance);
+            if (type == 2u)
+                attenuation *= PbrSpotFalloff(toLight, light.direction);
+        }
+#if (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0
+        direct += EvaluateLayeredLight(layered, toLight, light.color.rgb * light.color.a * attenuation);
+#else
+        const PbrSurface surface = BuildPbrSurface(input.position, view, material, float2(1, 0));
+        if (dot(material.normal, view) > 0.0)
+            direct += surface.EvaluateLight(toLight, light.color.rgb * light.color.a * attenuation);
+#endif
+    }
+    float3 ambient = float3(0);
+    if (lx_hasEnvironment != 0u)
+    {
+        ambient = EvaluateBakedPrincipledIbl(material, view, (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0, sample);
+    }
+#if (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0
+    const float3 emission = layered.lowerTransmission * material.emission;
+#else
+    const float3 emission = material.emission;
+#endif
+    return float4(direct + ambient + emission, 1);
+#endif
+}

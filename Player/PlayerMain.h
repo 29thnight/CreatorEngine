@@ -39,6 +39,7 @@ namespace Player
 	struct SmokeOptions
 	{
 		uint64_t frameLimit{ 0 };
+		uint64_t minimumPromotions{ 2 };
 		bool reloadScene{ false };
 
 		bool IsActive() const { return 0 != frameLimit; }

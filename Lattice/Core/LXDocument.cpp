@@ -70,6 +70,18 @@ LXCommandResult LXDocument::FinishFramePositionPreview(Id frame, float startX, f
     return Execute(LXMoveFrame{frame, finalX, finalY}, revision_);
 }
 
+bool LXDocument::AcceptSavedSnapshot()
+{
+    if (previewActive_)
+    {
+        return false;
+    }
+    saved_ = graph_;
+    dirty_ = false;
+    unsavedInitial_ = false;
+    return true;
+}
+
 bool LXDocument::Reload(std::string* error)
 {
     if (path_.empty() || previewActive_)

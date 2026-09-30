@@ -47,7 +47,7 @@ private:
 	void ImGuiDrawHelperTransformComponent(Entity* gameObject);
 	void ImGuiDrawHelperFSM(class StateMachineComponent* FSMComponent);
 	void ImGuiDrawHelperBT(class BehaviorTreeComponent* BTComponent);
-	void ImGuiDrawHelperVolume(class VolumeComponent* volumeComponent);
+	void ImGuiDrawHelperRenderProfile(class SceneRenderProfileComponent* renderProfileComponent);
 	void ImGuiDrawHelperDecal(class DecalComponent* decalComponent);
 	void ImGuiDrawHelperImageComponent(class ImageComponent* imageComponent);
 	void ImGuiDrawHelperSpriteRenderer(class SpriteRenderer* spriteRenderer);

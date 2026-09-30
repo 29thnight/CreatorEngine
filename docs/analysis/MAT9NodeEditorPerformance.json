@@ -1,0 +1,508 @@
+{
+  "measuredAt": "2026-09-30",
+  "beforeReflgenMerge": true,
+  "threadTitle": "프로파일링으로 프레임 급감 원인 찾기",
+  "sceneResolution": [
+    1302,
+    614
+  ],
+  "sourceHashes": [
+    {
+      "path": "Editor/EngineGUIWindow/MaterialGraphWindow.cpp",
+      "sha256": "395D9CFD5DDB475B98E86D7E8812B13F240449A2C81DAFD0E6F4726CF4258309",
+      "modified": "2026-09-30T06:24:49.8719195Z"
+    },
+    {
+      "path": "Editor/EngineGUIWindow/MaterialGraphWindow.h",
+      "sha256": "DEC2EBBE7443B2BD7A3EEE079B0D9FFED279960B18C1207018428979F8837BF9",
+      "modified": "2026-09-30T06:18:58.1081523Z"
+    },
+    {
+      "path": "Editor/EngineGUIWindow/ImGuiDrawHelperMeshRenderer.cpp",
+      "sha256": "1BEBA77257864B1B7A769BC36D2748CE15902E577F1D6C9F3A923CD82A57F09B",
+      "modified": "2026-09-30T06:46:07.7322693Z"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+      "sha256": "3D1C790AE3A8B056907E5EAB54D6205315874C6F516862C357FDBF1A404E9BD2",
+      "modified": "2026-09-30T06:32:37.8913428Z"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h",
+      "sha256": "D7C1CC06095C01C428083E7C2F55A6CB0AD92D6A540E5B93F43C54E912DAEFC7",
+      "modified": "2026-09-30T06:20:43.9299936Z"
+    },
+    {
+      "path": "Lattice/ImGui/LXCanvas.cpp",
+      "sha256": "CF2FDAFF912EB40FAE01A60E157B0B7BCBE6FF05E7F7E63AC7D8C4BAE2ED3055",
+      "modified": "2026-09-30T06:16:05.9359877Z"
+    },
+    {
+      "path": "Lattice/ImGui/LXNodeItems.h",
+      "sha256": "5216593FE6C96EAEA5E048C56BDF9B06FA45A02F1D9029B5D817C9BF74EC1C56",
+      "modified": "2026-09-30T06:24:49.8889222Z"
+    },
+    {
+      "path": "Tools/regression/verify-material-node-editor.ps1",
+      "sha256": "9D576A01871CA7476B1EB6FF858B1327C691C63A99E791966909A764C99892A9",
+      "modified": "2026-09-30T06:22:32.9555587Z"
+    }
+  ],
+  "validation": {
+    "debugBuild": "2026-09-30T15:34:12.5579815+09:00",
+    "releaseBuild": "2026-09-30T15:47:47.897353+09:00",
+    "debugTests": "LX_MATERIAL_NODE_EDITOR_OK configuration=Debug checks=1341 captures=5 sources=1134 drift=0 exit=0",
+    "releaseTests": "LX_MATERIAL_NODE_EDITOR_OK configuration=Release checks=1339 captures=5 sources=1134 drift=0 exit=0"
+  },
+  "cleanup": {
+    "releaseWorkspaceRestored": true,
+    "validationAssetRemoved": true,
+    "editorExited": true
+  },
+  "measurements": [
+    {
+      "name": "Debug 수정 전 / 접힘",
+      "label": "debug-before-preview-collapsed",
+      "rate": {
+        "label": "debug-before-preview-collapsed",
+        "seconds": 18.10851249999996,
+        "first": 4867,
+        "last": 5392,
+        "sceneCompletionFps": 28.991889863952167
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": null,
+        "[PresentationThread]/PresentFrame": {
+          "n": 464,
+          "mean": 36.114256465517244,
+          "median": 33.57015,
+          "p95": 52.086600000000004,
+          "max": 84.0888,
+          "truncatedExcluded": 3
+        },
+        "[GameThread]/GameSceneLockWait": {
+          "n": 520,
+          "mean": 28.186266346153847,
+          "median": 30.9159,
+          "p95": 44.192,
+          "max": 84.4546,
+          "truncatedExcluded": 0
+        },
+        "[RHIThread]/DXGIPresent": {
+          "n": 465,
+          "mean": 0.3745666666666667,
+          "median": 0.36110000000000003,
+          "p95": 0.4883,
+          "max": 0.7090000000000001,
+          "truncatedExcluded": 0
+        },
+        "[RenderThread]/RenderThreadFrame": {
+          "n": 513,
+          "mean": 22.165422222222222,
+          "median": 20.2965,
+          "p95": 39.359300000000005,
+          "max": 60.0322,
+          "truncatedExcluded": 3
+        }
+      },
+      "previewCompletedFrames": [
+        0
+      ],
+      "captureSummary": "debug-before-preview-collapsed-verified-summary.json",
+      "dimensions": [
+        1302,
+        614
+      ]
+    },
+    {
+      "name": "Debug 수정 전 / 펼침",
+      "label": "debug-before-preview-expanded",
+      "rate": {
+        "label": "debug-before-preview-expanded",
+        "seconds": 18.50846460000048,
+        "first": 6550,
+        "last": 7089,
+        "sceneCompletionFps": 29.121810568770034
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": null,
+        "[PresentationThread]/PresentFrame": {
+          "n": 453,
+          "mean": 37.33236843267108,
+          "median": 34.6304,
+          "p95": 54.4968,
+          "max": 81.2104,
+          "truncatedExcluded": 4
+        },
+        "[GameThread]/GameSceneLockWait": {
+          "n": 539,
+          "mean": 27.59529461966605,
+          "median": 31.748,
+          "p95": 43.7486,
+          "max": 74.34140000000001,
+          "truncatedExcluded": 0
+        },
+        "[RHIThread]/DXGIPresent": {
+          "n": 454,
+          "mean": 0.3849169603524229,
+          "median": 0.36605,
+          "p95": 0.47950000000000004,
+          "max": 3.8847,
+          "truncatedExcluded": 0
+        },
+        "[RenderThread]/RenderThreadFrame": {
+          "n": 526,
+          "mean": 23.172977376425855,
+          "median": 20.8281,
+          "p95": 44.0865,
+          "max": 54.704100000000004,
+          "truncatedExcluded": 3
+        }
+      },
+      "previewCompletedFrames": [
+        29093
+      ],
+      "captureSummary": "debug-before-preview-expanded-verified-summary.json",
+      "dimensions": [
+        1302,
+        614
+      ]
+    },
+    {
+      "name": "Debug 계측 추가 / 수정 전",
+      "label": "debug-instrumented",
+      "rate": {
+        "label": "debug-instrumented",
+        "seconds": 18.693549399999938,
+        "first": 579,
+        "last": 1175,
+        "sceneCompletionFps": 31.88265573578028
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": {
+          "n": 511,
+          "mean": 26.341163209393347,
+          "median": 25.4025,
+          "p95": 33.042300000000004,
+          "max": 64.2213,
+          "truncatedExcluded": 0
+        },
+        "[PresentationThread]/PresentFrame": {
+          "n": 511,
+          "mean": 34.25064970645793,
+          "median": 31.8901,
+          "p95": 48.496900000000004,
+          "max": 72.32730000000001,
+          "truncatedExcluded": 4
+        },
+        "[GameThread]/GameSceneLockWait": {
+          "n": 598,
+          "mean": 25.353277759197326,
+          "median": 28.909350000000003,
+          "p95": 41.394800000000004,
+          "max": 68.5822,
+          "truncatedExcluded": 0
+        },
+        "[RHIThread]/DXGIPresent": {
+          "n": 512,
+          "mean": 0.38704140625,
+          "median": 0.3681,
+          "p95": 0.4872,
+          "max": 2.0563000000000002,
+          "truncatedExcluded": 0
+        },
+        "[RenderThread]/RenderThreadFrame": {
+          "n": 582,
+          "mean": 21.45184965635739,
+          "median": 19.3816,
+          "p95": 36.847100000000005,
+          "max": 59.531000000000006,
+          "truncatedExcluded": 4
+        }
+      },
+      "previewCompletedFrames": [
+        0
+      ],
+      "captureSummary": "debug-instrumented-verified-summary.json",
+      "dimensions": [
+        1302,
+        614
+      ]
+    },
+    {
+      "name": "Debug 수정 후 / 접힘",
+      "label": "debug-final-collapsed",
+      "rate": {
+        "label": "debug-final-collapsed",
+        "seconds": 20.809588399999484,
+        "first": 1285,
+        "last": 2181,
+        "sceneCompletionFps": 43.05707459355718
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": {
+          "n": 1106,
+          "mean": 9.272754159132008,
+          "median": 8.97075,
+          "p95": 11.6011,
+          "max": 19.7252,
+          "truncatedExcluded": 0
+        },
+        "[PresentationThread]/PresentFrame": {
+          "n": 1106,
+          "mean": 16.706,
+          "median": 15.321850000000001,
+          "p95": 25.903200000000002,
+          "max": 53.8166,
+          "truncatedExcluded": 2
+        },
+        "[GameThread]/GameSceneLockWait": {
+          "n": 1292,
+          "mean": 11.934435835913312,
+          "median": 13.2864,
+          "p95": 26.232200000000002,
+          "max": 52.8858,
+          "truncatedExcluded": 0
+        },
+        "[RHIThread]/DXGIPresent": {
+          "n": 1107,
+          "mean": 0.3692610659439928,
+          "median": 0.3521,
+          "p95": 0.4756,
+          "max": 0.8031,
+          "truncatedExcluded": 0
+        },
+        "[RenderThread]/RenderThreadFrame": {
+          "n": 868,
+          "mean": 22.41727914746544,
+          "median": 21.19275,
+          "p95": 33.306200000000004,
+          "max": 53.7209,
+          "truncatedExcluded": 6
+        }
+      },
+      "previewCompletedFrames": [
+        0
+      ],
+      "captureSummary": "debug-final-collapsed-verified-summary.json",
+      "dimensions": [
+        1302,
+        614
+      ]
+    },
+    {
+      "name": "Debug 수정 후 / 펼침",
+      "label": "debug-final-expanded",
+      "rate": {
+        "label": "debug-final-expanded",
+        "seconds": 20.907032099999924,
+        "first": 4394,
+        "last": 5266,
+        "sceneCompletionFps": 41.70845464000618
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": {
+          "n": 1060,
+          "mean": 9.697446320754718,
+          "median": 9.4526,
+          "p95": 12.0768,
+          "max": 31.2181,
+          "truncatedExcluded": 0
+        },
+        "[PresentationThread]/PresentFrame": {
+          "n": 1059,
+          "mean": 17.540246270066103,
+          "median": 16.0764,
+          "p95": 29.114700000000003,
+          "max": 61.870200000000004,
+          "truncatedExcluded": 1
+        },
+        "[GameThread]/GameSceneLockWait": {
+          "n": 1246,
+          "mean": 12.328382584269663,
+          "median": 13.852400000000001,
+          "p95": 25.991400000000002,
+          "max": 47.245000000000005,
+          "truncatedExcluded": 0
+        },
+        "[RHIThread]/DXGIPresent": {
+          "n": 1060,
+          "mean": 0.37226075471698117,
+          "median": 0.35425,
+          "p95": 0.4746,
+          "max": 1.6194000000000002,
+          "truncatedExcluded": 0
+        },
+        "[RenderThread]/RenderThreadFrame": {
+          "n": 845,
+          "mean": 23.08105727810651,
+          "median": 21.994500000000002,
+          "p95": 34.8723,
+          "max": 53.5469,
+          "truncatedExcluded": 6
+        }
+      },
+      "previewCompletedFrames": [
+        4450
+      ],
+      "captureSummary": "debug-final-expanded-verified-summary.json",
+      "dimensions": [
+        1302,
+        614
+      ]
+    },
+    {
+      "name": "Release 수정 후 / 접힘",
+      "label": "release-final-collapsed",
+      "rate": {
+        "label": "release-final-collapsed",
+        "seconds": 20.36696110000048,
+        "first": 40586,
+        "last": 46920,
+        "sceneCompletionFps": 310.9938674159814
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": {
+          "n": 3134,
+          "mean": 0.69693691767709,
+          "median": 0.70975,
+          "p95": 0.9334,
+          "max": 2.1569000000000003,
+          "truncatedExcluded": 0
+        },
+        "[PresentationThread]/PresentFrame": {
+          "n": 3134,
+          "mean": 2.967324377791959,
+          "median": 2.0978000000000003,
+          "p95": 8.4069,
+          "max": 26.6825,
+          "truncatedExcluded": 1
+        },
+        "[GameThread]/GameSceneLockWait": {
+          "n": 4183,
+          "mean": 1.8662545302414535,
+          "median": 1.4288,
+          "p95": 6.6263000000000005,
+          "max": 26.1217,
+          "truncatedExcluded": 0
+        },
+        "[RHIThread]/DXGIPresent": {
+          "n": 3134,
+          "mean": 0.4336135609444799,
+          "median": 0.32165,
+          "p95": 0.8327,
+          "max": 7.3748000000000005,
+          "truncatedExcluded": 0
+        },
+        "[RenderThread]/RenderThreadFrame": {
+          "n": 3531,
+          "mean": 2.5920930614556785,
+          "median": 1.8403,
+          "p95": 8.0076,
+          "max": 25.915000000000003,
+          "truncatedExcluded": 4
+        }
+      },
+      "previewCompletedFrames": [
+        0
+      ],
+      "captureSummary": "release-final-collapsed-verified-summary.json",
+      "dimensions": [
+        1302,
+        614
+      ]
+    },
+    {
+      "name": "Release 수정 후 / 펼침",
+      "label": "release-final-expanded",
+      "rate": {
+        "label": "release-final-expanded",
+        "seconds": 20.452934699998877,
+        "first": 66963,
+        "last": 73717,
+        "sceneCompletionFps": 330.2215598429682
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": {
+          "n": 3449,
+          "mean": 0.6180163525659612,
+          "median": 0.5959,
+          "p95": 0.8084,
+          "max": 9.3367,
+          "truncatedExcluded": 0
+        },
+        "[PresentationThread]/PresentFrame": {
+          "n": 3449,
+          "mean": 2.6169310234850682,
+          "median": 1.8218,
+          "p95": 8.2166,
+          "max": 29.2983,
+          "truncatedExcluded": 0
+        },
+        "[GameThread]/GameSceneLockWait": {
+          "n": 4190,
+          "mean": 1.797130047732697,
+          "median": 1.4804,
+          "p95": 5.3636,
+          "max": 24.4879,
+          "truncatedExcluded": 0
+        },
+        "[RHIThread]/DXGIPresent": {
+          "n": 3449,
+          "mean": 0.3529460423311105,
+          "median": 0.2636,
+          "p95": 0.5942000000000001,
+          "max": 6.2365,
+          "truncatedExcluded": 0
+        },
+        "[RenderThread]/RenderThreadFrame": {
+          "n": 3776,
+          "mean": 2.4113151747881356,
+          "median": 1.6596000000000002,
+          "p95": 7.916,
+          "max": 25.8469,
+          "truncatedExcluded": 2
+        }
+      },
+      "previewCompletedFrames": [
+        59229
+      ],
+      "captureSummary": "release-final-expanded-verified-summary.json",
+      "dimensions": [
+        1302,
+        614
+      ]
+    },
+    {
+      "name": "Release 평상시 / 펼침 (기록 중지)",
+      "label": "release-normal-expanded",
+      "rate": {
+        "label": "release-normal-expanded",
+        "seconds": 20.46889480000027,
+        "first": 85569,
+        "last": 92583,
+        "profilerRecording": false,
+        "sceneCompletionFps": 342.6662782008097,
+        "previewFirst": 59229,
+        "previewLast": 59229,
+        "sceneWidth": 1302,
+        "sceneHeight": 614
+      },
+      "cpuInclusiveMs": {
+        "[PresentationThread]/MaterialNodeCanvas": null,
+        "[PresentationThread]/PresentFrame": null,
+        "[GameThread]/GameSceneLockWait": null,
+        "[RHIThread]/DXGIPresent": null,
+        "[RenderThread]/RenderThreadFrame": null
+      },
+      "previewCompletedFrames": [
+        59229
+      ],
+      "captureSummary": null,
+      "dimensions": [
+        1302,
+        614
+      ]
+    }
+  ]
+}

@@ -132,6 +132,8 @@ namespace CommandCore
             // PBR-W8 — named input 은 스칼라 형태만 선언한다. CLI 는 4 성분
             // baseColor 도 받지만 위치 바인딩으로는 1 개와 4 개를 한 줄에 못 적고,
             // 억지로 적으면 HTTP 가 조용히 어긋난 인자를 만든다.
+            { "material.editor", CommandCost::Frames, "open|new <object> | state | <operation> <document-id> <revision> <arguments...>", "Open and edit the active LX Material document; revisions protect real-time edits", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "", true },
+            { "material.graph", CommandCost::Frames, "<object> [bind <graph-guid>|set <parameter-id> <value...>|reload]", "LX inline material instance query, replacement and typed overrides", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "", true },
             { "material.override", CommandCost::Frames, "<오브젝트> <렌더러색인> <속성> <값|r g b a>", "렌더러별 MaterialInstance override 를 얹는다(공유 재질을 값으로 가른다)", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,renderer:integer,property,value:number" },
             { "mem.delta", CommandCost::Immediate, "[라벨]", "기준선 대비 CRT 블록·바이트 증감(기준선이 없으면 지금을 기준선으로 삼는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "label=" },
             { "mem.hook", CommandCost::Immediate, "on|stack|off|top|status", "CRT 할당 훅 — 호출 계수, stack 은 귀속까지(디버그 CRT 전용)", CommandClass::EngineService, CommandLiveness::Live },
@@ -204,11 +206,14 @@ namespace CommandCore
             { "profile.frame", CommandCost::Immediate, "", "보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "profile.pause", CommandCost::Immediate, "", "녹화를 멈춰 그때까지를 얼린다(창이 그것을 집는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "profile.record", CommandCost::Immediate, "", "얼린 캡처를 남긴 채 기록만 다시 연다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "profile.save", CommandCost::Immediate, "<new-absolute-path.ceprof>", "Save a frozen profiling capture without replacing an existing file", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "path" },
             { "profile.stats", CommandCost::Immediate, "", "프로파일러 자체 비용과 용량 소진(교란 없음)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             // LC8 — 요약을 **호스트 중립으로 고쳤다.** 두 registry 가 같은 seed 를
             // 나눠 쓰므로 "에디터 종료" 는 Player 의 help 에서 거짓이 된다.
             { "quit", CommandCost::Immediate, "", "호스트를 종료한다", CommandClass::EngineService, CommandLiveness::TerminatesProcess, false, CommandRoles::Both },
             { "render.backend", CommandCost::Immediate, "status", "부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
+            { "render.live.capture", CommandCost::Long, "<new-absolute-directory> [game|editor] [controlled]", "Capture actual product attachments through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
+            { "render.live.fence", CommandCost::Long, "[timeout-seconds]", "Wait for a product frame through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.wait", CommandCost::Long, "[timeout-seconds]", "라이브 렌더러가 이 명령 뒤 발행된 프레임을 끝낼 때까지 다음 명령을 미룬다(프레임 수 대기 대신 예열 판정)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.livecheck", CommandCost::Immediate, "[너비 높이]", "resize·다중 뷰·표시 슬롯 회전 회귀 판정", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "render.matmode", CommandCost::Immediate, "<오브젝트> <opaque|transparent>", "오브젝트 재질의 렌더링 모드를 바꾼다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target,mode", true },
