@@ -98,7 +98,10 @@ public:
     void OnPropertyChanged(std::string_view propertyName,
         Meta::PropertyChangeSource source) override;
     void SetAnimation(int index);
-    [[reflgen::reflect, creator::hide_in_inspector]] void UpdateAnimation();
+
+    [[reflgen::reflect, creator::hide_in_inspector]]
+    void UpdateAnimation();
+
     void CreateController(std::string name);
     std::shared_ptr<AnimationController> CreateController_UI();
     std::shared_ptr<AnimationController> CreateController_UINoAni();
@@ -224,44 +227,72 @@ public:
     // 읽기는 구 씬 서브트리 폴백을 존치한다(OnDeserialized 참조).
     //
     // Reflection-only compatibility mirror. Runtime readers use GetSelectedClipIndex().
-    [[reflgen::hidden]] uint32_t m_AnimIndexChosen{};
+    [[reflgen::hidden]]
+    uint32_t m_AnimIndexChosen{};
+
     [[nodiscard]] AnimInstance& GetInstance() noexcept;
     [[nodiscard]] const AnimInstance& GetInstance() const noexcept;
     [[nodiscard]] uint32_t GetSelectedClipIndex() const noexcept { return GetInstance().selectedClipIndex; }
     void SetSelectedClipIndex(uint32_t index) noexcept { GetInstance().selectedClipIndex = index; }
     [[nodiscard]] AnimatorPlaybackControl& GetPlaybackControl() noexcept { return GetInstance().control; }
     [[nodiscard]] const AnimatorPlaybackControl& GetPlaybackControl() const noexcept { return GetInstance().control; }
-    [[reflgen::hidden]] int m_AnimIndex{};
+
+    [[reflgen::hidden]]
+    int m_AnimIndex{};
+
     FileGuid m_Motion{};
+
     // World-space approximation used when estimating on-screen character size.
-    [[reflgen::hidden]] float m_QualityRadius{ 1.f };
+    [[reflgen::hidden]]
+    float m_QualityRadius{ 1.f };
+
     // Authored parent-first prefix. Zero disables skeletal detail reduction.
-    [[reflgen::hidden]] std::uint32_t m_LowDetailBoneCount{};
+    [[reflgen::hidden]]
+    std::uint32_t m_LowDetailBoneCount{};
+
     // Gameplay attachments such as hitboxes may require every-frame L0.
-    [[reflgen::hidden]] bool m_ForceFullQuality{ false };
-    [[reflgen::hidden]] std::vector<TwoBoneIKConstraint> m_TwoBoneIKConstraints{};
-    [[reflgen::hidden]] std::vector<BoneTransformConstraint> m_BoneTransformConstraints{};
-    [[reflgen::ignore]] std::vector<Socket*> socketvec;
+    [[reflgen::hidden]]
+    bool m_ForceFullQuality{ false };
+
+    [[reflgen::hidden]]
+    std::vector<TwoBoneIKConstraint> m_TwoBoneIKConstraints{};
+
+    [[reflgen::hidden]]
+    std::vector<BoneTransformConstraint> m_BoneTransformConstraints{};
+
+    [[reflgen::ignore]]
+    std::vector<Socket*> socketvec;
+
     std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
     std::vector<ConditionParameter*> Parameters;
-    [[reflgen::ignore]] mutable std::mutex m_paramMutex;
-    [[reflgen::ignore]] std::uint64_t m_parameterVersion{ 1 };
+
+    [[reflgen::ignore]]
+    mutable std::mutex m_paramMutex;
+
+    [[reflgen::ignore]]
+    std::uint64_t m_parameterVersion{ 1 };
 
 private:
-    [[reflgen::ignore]] bool m_IsEnabled = false;
-    [[reflgen::ignore]] AnimInstanceHandle m_instance{};
+    [[reflgen::ignore]]
+    bool m_IsEnabled = false;
+
+    [[reflgen::ignore]]
+    AnimInstanceHandle m_instance{};
 
 public:
     // PHASE 3.75 MBC8/MBC9 — typed 재생 정본. m_Motion(ModelId)으로
     // EnsureAnimationBinding이 채운다. 비직렬화 — 영속 신원은 m_Motion이 진다.
-    [[reflgen::ignore]] std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+    [[reflgen::ignore]]
+    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+
     // Evaluation buffers, playback time and cursors live in the instance.
     void EnsureAnimationBinding();
     void BindModelGeneration(std::shared_ptr<const assets::ModelAssetGeneration> generation);
 
     // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.
-    [[reflgen::ignore]] std::vector<AnimatorClipOverride> m_clipOverrides{};
+    [[reflgen::ignore]]
+    std::vector<AnimatorClipOverride> m_clipOverrides{};
 
     void StopAnimation(float duration)
     {

@@ -69,8 +69,11 @@ private:
 	}
 
 	Camera m_Camera{};
+
 	// Editor picking용 2x2x2 unit box. 중심은 매 호출마다 owner position이다.
-	[[reflgen::ignore]] math::aabb m_editorBoundingBox{
+	[[reflgen::ignore]]
+	math::aabb m_editorBoundingBox{
 		math::vector3{}, math::vector3{ 1.0f, 1.0f, 1.0f } };
+
 	bool m_isPrimary{ false };
 };

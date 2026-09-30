@@ -149,9 +149,15 @@ public:
 	math::quaternion GetRotationOffset() override { return m_rotOffset; }
 
 private:
-	[[reflgen::ignore]] SphereColliderInfo m_Info;
-	[[reflgen::ignore]] EColliderType m_type;
-	[[reflgen::ignore]] unsigned int m_collsionCount = 0;
+	[[reflgen::ignore]]
+	SphereColliderInfo m_Info;
+
+	[[reflgen::ignore]]
+	EColliderType m_type;
+
+	[[reflgen::ignore]]
+	unsigned int m_collsionCount = 0;
+
 	// ICollider을(를) 통해 상속됨
 	void OnTriggerEnter(ICollider* other) override { ++m_collsionCount; }
 	void OnTriggerStay(ICollider* other) override {}

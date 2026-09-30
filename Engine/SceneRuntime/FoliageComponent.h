@@ -55,6 +55,9 @@ public:
 
     FileGuid m_foliageAssetGuid{};
 private:
-    [[reflgen::ignore]] std::vector<FoliageType> m_foliageTypes{};
-    [[reflgen::ignore]] std::vector<FoliageInstance> m_foliageInstances{};
+    [[reflgen::ignore]]
+    std::vector<FoliageType> m_foliageTypes{};
+
+    [[reflgen::ignore]]
+    std::vector<FoliageInstance> m_foliageInstances{};
 };

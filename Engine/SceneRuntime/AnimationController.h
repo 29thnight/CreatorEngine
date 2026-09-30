@@ -25,20 +25,30 @@ public:
 	std::string name = "None";
 	// Legacy scene key. Runtime selection belongs to ControllerPlayback.
 	AnimationState* m_curState = nullptr;
-	[[reflgen::ignore]] Animator* m_owner{};
+
+	[[reflgen::ignore]]
+	Animator* m_owner{};
+
 	std::vector<std::shared_ptr<AnimationState>> StateVec;
-	[[reflgen::ignore]] std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
-	[[reflgen::ignore]] std::set<std::string> StateNameSet;
+
+	[[reflgen::ignore]]
+	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
+
+	[[reflgen::ignore]]
+	std::set<std::string> StateNameSet;
 
 	std::shared_ptr<AnimationState> m_anyState;
 	AvatarMask* m_avatarMask{};
 private:
-	[[reflgen::ignore]] std::uint64_t m_playbackId{};
+	[[reflgen::ignore]]
+	std::uint64_t m_playbackId{};
 
 public:
 	//컨트롤러 바꿔치기용
 	bool useController = true;
-	[[reflgen::ignore]] bool m_useLayer = true;
+
+	[[reflgen::ignore]]
+	bool m_useLayer = true;
 
 	bool useMask = false;
 	// Opt-in overlay: evaluate a delta from this layer's clip at time zero.

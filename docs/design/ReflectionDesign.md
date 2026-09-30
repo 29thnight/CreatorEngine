@@ -22,16 +22,28 @@ class [[reflgen::reflect]] DoorComponent : public meta::identity<DoorComponent, 
 {
     friend struct reflgen::access;   // private 멤버를 서술이 읽는다
 public:
-    [[reflgen::reflect, creator::read_only_in_inspector]] bool IsOpen() const;
-    [[reflgen::reflect]] void Toggle();                            // 인스펙터 메서드 버튼
+    [[reflgen::reflect, creator::read_only_in_inspector]]
+    bool IsOpen() const;
+
+    [[reflgen::reflect]]
+    void Toggle();                   // 인스펙터 메서드 버튼
 
 private:
-    EDoorKind m_kind = EDoorKind::Hinged;                          // 반영된다 — 저장·인스펙터 대상
-    [[reflgen::range(0.0f, 1.0f)]] float m_damping = 0.5f;
-    [[reflgen::readonly, creator::debug_only]] HashedGuid m_lockID; // 저장한다. 인스펙터는 디버그 모드에서 읽기 전용
-    [[reflgen::ignore]] float m_openAmount = 0.0f;                 // 런타임 상태 — 서술에서 뺀다
+    EDoorKind m_kind = EDoorKind::Hinged;   // 반영된다 — 저장·인스펙터 대상
+
+    [[reflgen::range(0.0f, 1.0f)]]
+    float m_damping = 0.5f;
+
+    [[reflgen::readonly, creator::debug_only]]
+    HashedGuid m_lockID;             // 저장한다. 인스펙터는 디버그 모드에서 읽기 전용
+
+    [[reflgen::ignore]]
+    float m_openAmount = 0.0f;       // 런타임 상태 — 서술에서 뺀다
 };
 ```
+
+속성은 자기 줄에 두고 선언은 그 아래 줄에, 이어진 내용과는 빈 줄로 가른다 —
+[CodingConventions.md](CodingConventions.md) §7.4(게이트 `verify-reflgen-attribute-layout.ps1`).
 
 | 규칙 | 내용 |
 |---|---|
@@ -172,6 +184,8 @@ reflgen 표기다(`std::basic_string<char,std::char_traits<char>,…>` 등) — 
 | 컨테이너 | `verify-reflection-container`(빈 컨테이너 래칫은 `ReflgenAuthoring.h` 를 본다) · `verify-reflection-container-roundtrip`(28축, `reflection_container_roundtrip_probe.cpp`) |
 | 인스펙터 | `verify-inspector-drawer-layout` · `verify-inspector-spatial-policy` |
 | 컴파일 때 | §3.2 정체성 대조, `meta::identity` 이름 대조, reflgen 직렬화 가능성 검사 |
+| 기동 때 | `VerifyReflectRegistration()`(`RegisterReflectManual.h`) — `REFLECT_TYPE_LIST` 의 서술자가 쓰고 읽을 수 있어야 한다. 등록 함수가 serializer 특수화를 못 보면 critical 로그 후 abort |
+| 배치 | `verify-reflgen-attribute-layout.ps1` — 속성 배치 규약(CodingConventions.md §7.4) |
 
 ## 6. 함정
 

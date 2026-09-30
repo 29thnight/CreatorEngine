@@ -50,10 +50,18 @@ public:
 
 public:
 	std::vector<TransCondition> conditions{};
-	[[reflgen::ignore]] AnimationController* m_ownerController{};
+
+	[[reflgen::ignore]]
+	AnimationController* m_ownerController{};
+
 	std::string m_name = "NoName";
-	[[reflgen::ignore]] AnimationState* curState = nullptr;
-	[[reflgen::ignore]] AnimationState* nextState = nullptr;
+
+	[[reflgen::ignore]]
+	AnimationState* curState = nullptr;
+
+	[[reflgen::ignore]]
+	AnimationState* nextState = nullptr;
+
 	std::string curStateName{};
 	std::string nextStateName{};
 	float exitTime = 0.1f;

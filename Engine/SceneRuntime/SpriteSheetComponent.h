@@ -34,11 +34,18 @@ public:
 	// 함께 철거됐다.
 	void TickLayout(float tick);
 
-	[[reflgen::ignore]] ImageInfo				 uiinfo{};
-	[[reflgen::ignore]] std::shared_ptr<Texture> m_spriteSheetTexture{};
+	[[reflgen::ignore]]
+	ImageInfo				 uiinfo{};
+
+	[[reflgen::ignore]]
+	std::shared_ptr<Texture> m_spriteSheetTexture{};
+
 	std::string				 m_spriteSheetPath{};
 	float                    m_frameDuration{ 0.1f };
-	[[reflgen::ignore]] float                    m_deltaTime{};
+
+	[[reflgen::ignore]]
+	float                    m_deltaTime{};
+
 	float                    clipPercent{ 1.f };
 	ClipDirection            clipDirection{ ClipDirection::None };
 	bool                     m_isLoop{ true };

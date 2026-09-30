@@ -461,6 +461,56 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
 세션의 미커밋 변경이 있으면 통째로 휩쓸린다. 착수 전에 `git status`가 비어
 있는지 확인한다.
 
+### 7.4 리플렉션 속성 배치 (2026-09-30 확정)
+
+변수·메서드에 다는 리플렉션 속성(`[[reflgen::…]]`·`[[creator::…]]`)은 **자기 줄**에
+두고, 선언은 그 아래 줄에 둔다. 속성을 단 선언이 앞뒤 내용과 이어져 있으면
+**빈 줄**로 가른다.
+
+```cpp
+class [[reflgen::reflect]] DoorComponent : public meta::identity<DoorComponent, Component>
+{
+    friend struct reflgen::access;
+public:
+    [[reflgen::reflect, creator::read_only_in_inspector]]
+    bool IsOpen() const;
+
+    void Close();
+
+private:
+    EDoorKind m_kind = EDoorKind::Hinged;
+
+    // 열림 정도는 매 프레임 다시 계산한다
+    [[reflgen::ignore]]
+    float m_openAmount = 0.0f;
+
+    [[reflgen::ignore]]
+    float m_speed = 1.0f;
+};
+```
+
+- 선언 바로 위의 설명 주석은 그 선언과 한 덩어리다 — 빈 줄은 주석 위에 들어간다.
+- 범위의 경계와는 가르지 않는다: `{`로 끝나는 줄 다음, `}`로 시작하는 줄 앞,
+  접근 지정자(`public:` 등)의 앞뒤.
+- 여러 줄에 걸친 선언은 선언이 끝나는 줄(`;` 또는 `}`)까지가 한 덩어리다.
+- 클래스 머리의 속성(`class [[reflgen::reflect]] X`)과 `[[nodiscard]]` 같은 다른
+  속성은 대상이 아니다.
+
+**왜:** reflgen 전환 뒤 반영 범위는 opt-out이다 — 필드는 `[[reflgen::ignore]]`를
+달지 않는 한 저장된다([ReflectionDesign.md](ReflectionDesign.md) §1). 속성이 선언과
+한 줄에 붙어 있으면 무엇이 저장에서 빠졌는지가 긴 타입 이름 사이에 묻힌다. 자기 줄에
+두면 줄 머리만 훑어도 보이고, 빈 줄로 가르면 속성이 어느 선언에 붙는지 헷갈리지 않는다.
+
+강제와 도구:
+
+- `Tools/regression/verify-reflgen-attribute-layout.ps1` — 어긋난 배치가 하나라도 있으면
+  붉다. 변환 규칙은 합성 표본으로 먼저 자기 시험한다.
+- `python Tools/migration/reflgen_attribute_layout.py --apply` — 고친다(두 번 돌려도 같다).
+  `reflgen_codemod.py`도 속성을 단 뒤 이 배치를 거친다.
+- `.clang-format`의 `BreakAfterAttributes: Leave` — 재포맷이 속성 뒤 줄바꿈을 되돌리지
+  않는다(`Never`는 한 줄로 합치고, `Always`는 다른 속성까지 펼친다). VS 18 동봉
+  clang-format 22.1.3으로 확인했다.
+
 ---
 
 ## 8. 현재 실태와의 간극 — 그리고 이행
@@ -560,6 +610,7 @@ for (auto* component : entity.GetComponents())   // A는 Get…, B는 begin/end
 | 9-2 | `HashingString`·`BitFlag` 개명 | **(b)** `BitFlag`만 개명. `HashingString`은 새로 작성하며 층 B로 태어난다 | §5.3 |
 | 9-3 | `.clang-format` | **(a)** 전면 도입 + 재포맷 단독 커밋 + blame-ignore 등재 | §7.1~7.3 |
 | 9-4 | 게이트 강제 | 제안대로 — 9-1·9-2가 정해진 **뒤에** 만든다 (지금이 그 뒤다) | 아래 |
+| 9-5 | 리플렉션 속성 배치 (2026-09-30 추가) | 속성은 자기 줄, 선언은 그 아래 줄. 이어진 내용과는 빈 줄로 가른다. 게이트와 고치는 도구를 함께 둔다 | §7.4 |
 
 ### 9-4 후속 — 게이트
 

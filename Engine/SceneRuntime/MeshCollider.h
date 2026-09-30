@@ -152,12 +152,16 @@ public:
 	// ★ 남은 일: 같은 미러 필드를 여기에도 세우면 메시 콜라이더의 마찰·반발·밀도·
 	//   convexPolygonLimit이 처음으로 저장된다. 그건 저장 포맷이 늘어나는 별도
 	//   작업이라 C1에서 하지 않는다(현재 저장 인스턴스 0건이라 마이그레이션 위험은 없다).
-	[[reflgen::ignore]] ConvexMeshColliderInfo m_Info;
+	[[reflgen::ignore]]
+	ConvexMeshColliderInfo m_Info;
+
 	math::vector3 m_posOffset{};
 private:
-	[[reflgen::ignore]] EColliderType m_type;
+	[[reflgen::ignore]]
+	EColliderType m_type;
 public:
 	math::quaternion m_rotOffset{};
 private:
-	[[reflgen::ignore]] unsigned int m_collsionCount = 0;
+	[[reflgen::ignore]]
+	unsigned int m_collsionCount = 0;
 };

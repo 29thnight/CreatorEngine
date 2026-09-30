@@ -29,11 +29,20 @@ public:
 	void TickUpdate(float tick);
 	void TickLateUpdate(float tick);
 
-	[[reflgen::reflect]] void Play();
-	[[reflgen::reflect]] void Stop();
-	[[reflgen::reflect]] void Pause(bool pause);
-	[[reflgen::reflect, creator::read_only_in_inspector]] bool IsPlaying();
-	[[reflgen::reflect]] void PlayOneShot();
+	[[reflgen::reflect]]
+	void Play();
+
+	[[reflgen::reflect]]
+	void Stop();
+
+	[[reflgen::reflect]]
+	void Pause(bool pause);
+
+	[[reflgen::reflect, creator::read_only_in_inspector]]
+	bool IsPlaying();
+
+	[[reflgen::reflect]]
+	void PlayOneShot();
 
 	void EditorSet();
 
@@ -59,18 +68,26 @@ public:
 	Rolloff rolloff = Rolloff::Inverse;
 
 	// 3D 속성(엔진 좌표에서 받아 세팅)
-	[[reflgen::ignore]] math::vector3 position{ 0,0,0 };
+	[[reflgen::ignore]]
+	math::vector3 position{ 0,0,0 };
+
 	math::vector3 velocity{ 0,0,0 };
 	std::vector<CurvePoint> localRolloffCurve;
 
 private:
 	float SampleLocalRolloff(float d) const;
 
-	[[reflgen::ignore]] FMOD_VECTOR _pos{};
-	[[reflgen::ignore]] FMOD_VECTOR _velocity{};
+	[[reflgen::ignore]]
+	FMOD_VECTOR _pos{};
 
-	[[reflgen::ignore]] FMOD::Channel* channel2D = nullptr;
-	[[reflgen::ignore]] FMOD::Channel* channel3D = nullptr;
+	[[reflgen::ignore]]
+	FMOD_VECTOR _velocity{};
+
+	[[reflgen::ignore]]
+	FMOD::Channel* channel2D = nullptr;
+
+	[[reflgen::ignore]]
+	FMOD::Channel* channel3D = nullptr;
 
 public:
 	bool loop = false;

@@ -35,8 +35,15 @@ public:
 	void RemoveTransition(FSM::Transition* transition);
 	FSM::FSMState* FindStateByName(const std::string& name) const;
 private:
-	[[reflgen::ignore]] std::vector<std::shared_ptr<FSM::FSMState>> m_states;
-	[[reflgen::ignore]] std::vector<std::shared_ptr<FSM::Transition>> m_transitions;
-	[[reflgen::ignore]] FSM::FSMState* m_currentState = nullptr;
-	[[reflgen::ignore]] BlackBoard m_localBB;
+	[[reflgen::ignore]]
+	std::vector<std::shared_ptr<FSM::FSMState>> m_states;
+
+	[[reflgen::ignore]]
+	std::vector<std::shared_ptr<FSM::Transition>> m_transitions;
+
+	[[reflgen::ignore]]
+	FSM::FSMState* m_currentState = nullptr;
+
+	[[reflgen::ignore]]
+	BlackBoard m_localBB;
 };

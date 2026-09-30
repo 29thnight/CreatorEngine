@@ -182,18 +182,28 @@ public:
 	FileGuid m_fileGuid{};
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
     bool m_doubleSided{ false };
-	[[reflgen::ignore]] HashedGuid m_materialGuid{ make_guid() };
+
+	[[reflgen::ignore]]
+	HashedGuid m_materialGuid{ make_guid() };
+
 	// typed setter/getter와 legacy payload 왕복을 위한 CPU byte view. 값의 저장
 	// 정본은 위 m_propertyValues이고 제품 draw packet은 그 정본에서 다시 pack한다.
-    [[reflgen::ignore]] std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
+    [[reflgen::ignore]]
+    std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
 
 private:
 	friend class DataSystem;
 	void ResetShaderRuntime();
 	void ResetTextureRuntime();
-	[[reflgen::ignore]] std::shared_ptr<const RuntimeSchema> m_runtimeSchema{};
+
+	[[reflgen::ignore]]
+	std::shared_ptr<const RuntimeSchema> m_runtimeSchema{};
+
 	// runtime-only. GUID는 디스크 정본이고 이 값은 적용한 cache generation이다.
-	[[reflgen::ignore]] ShaderMetaHandle m_shaderMetaHandle{};
-	[[reflgen::ignore]] std::vector<MaterialTextureOwner> m_textureOwners{};
+	[[reflgen::ignore]]
+	ShaderMetaHandle m_shaderMetaHandle{};
+
+	[[reflgen::ignore]]
+	std::vector<MaterialTextureOwner> m_textureOwners{};
 };
 

@@ -12,8 +12,12 @@ struct [[reflgen::reflect]] FoliageInstance
     math::vector3 m_rotation{}; // Euler angles
     math::vector3 m_scale{ 1.f,1.f,1.f };
     std::uint32_t m_foliageTypeID{ 0 }; // index of FoliageType
-    [[reflgen::ignore]] bool m_isCulled{ false }; // whether this instance is culled or not
-	[[reflgen::ignore]] math::matrix4x4 m_worldMatrix{ math::matrix4x4::identity() };
+
+    [[reflgen::ignore]]
+    bool m_isCulled{ false }; // whether this instance is culled or not
+
+	[[reflgen::ignore]]
+	math::matrix4x4 m_worldMatrix{ math::matrix4x4::identity() };
 
 	// position/rotation/scale은 foliage asset의 정본이고 world는 런타임 파생값이다.
 	// Euler 적용 순서는 기존 SimpleMath S*Rx*Ry*Rz*T 규약을 그대로 보존한다.

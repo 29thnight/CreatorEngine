@@ -49,9 +49,14 @@ public:
 
 
 private:
-	[[reflgen::ignore]] EColliderType m_type;
-	[[reflgen::ignore]] CapsuleColliderInfo m_Info;
-	[[reflgen::ignore]] int m_collsionCount{ 0 };
+	[[reflgen::ignore]]
+	EColliderType m_type;
+
+	[[reflgen::ignore]]
+	CapsuleColliderInfo m_Info;
+
+	[[reflgen::ignore]]
+	int m_collsionCount{ 0 };
 
 public:
 	//info

@@ -50,9 +50,15 @@ public:
 
    // 마찰·반발 계수의 range는 속성 표기의 살아있는 예시다 — 어댑터는
    // 무시하고(골든 무영향), CT6 인스펙터가 슬라이더 한계로 소비한다.
-   [[reflgen::range(0.0f, 1.0f)]] float staticFriction = 0.5f;	//정적 물체 마찰 계수
-   [[reflgen::range(0.0f, 1.0f)]] float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
-   [[reflgen::range(0.0f, 1.0f)]] float restitution = 0.3f;	//탄성 계수
+   [[reflgen::range(0.0f, 1.0f)]]
+   float staticFriction = 0.5f;	//정적 물체 마찰 계수
+
+   [[reflgen::range(0.0f, 1.0f)]]
+   float dynamicFriction = 0.4f;	//동적 물체 마찰 계수
+
+   [[reflgen::range(0.0f, 1.0f)]]
+   float restitution = 0.3f;	//탄성 계수
+
    float density = 10.0f;	//밀도
 
 
@@ -160,7 +166,8 @@ public:
 
     math::quaternion GetRotationOffset() override;
     
-    [[reflgen::ignore]] BoxColliderInfo m_Info;
+    [[reflgen::ignore]]
+    BoxColliderInfo m_Info;
 private:  
 
     void OnTriggerEnter(ICollider* other) override;
@@ -175,6 +182,9 @@ private:
 
     void OnCollisionExit(ICollider* other) override;
 
-    [[reflgen::ignore]] EColliderType m_type;
-	[[reflgen::ignore]] unsigned int m_collsionCount = 0;
+    [[reflgen::ignore]]
+    EColliderType m_type;
+
+	[[reflgen::ignore]]
+	unsigned int m_collsionCount = 0;
 };

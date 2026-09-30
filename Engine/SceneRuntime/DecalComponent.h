@@ -47,16 +47,24 @@ private:
     Texture* m_occluroughmetalTexture{};
 
 	// 직렬화/인스펙터 호환 raw 별칭은 위에 남기되 실제 수명은 이 셋이 가진다.
-	[[reflgen::ignore]] std::shared_ptr<Texture> m_decalTextureOwner{};
-	[[reflgen::ignore]] std::shared_ptr<Texture> m_normalTextureOwner{};
-	[[reflgen::ignore]] std::shared_ptr<Texture> m_ormTextureOwner{};
+	[[reflgen::ignore]]
+	std::shared_ptr<Texture> m_decalTextureOwner{};
+
+	[[reflgen::ignore]]
+	std::shared_ptr<Texture> m_normalTextureOwner{};
+
+	[[reflgen::ignore]]
+	std::shared_ptr<Texture> m_ormTextureOwner{};
 
 public:
     uint32 sliceX = 1;
 	uint32 sliceY = 1;
     int sliceNumber = 0;
     float slicePerSeconds = 1.f;
-    [[reflgen::ignore]] float timer = 0.f;
+
+    [[reflgen::ignore]]
+    float timer = 0.f;
+
     bool useAnimation = false;
     bool isLoop = true;
 

@@ -6,8 +6,11 @@
 struct [[reflgen::reflect]] BTBuildGraph
 {
    public:
-	[[reflgen::ignore]] std::unordered_map<HashedGuid, BTBuildNode*> Nodes;
-	[[reflgen::ignore]] BTBuildNode* SelectedNode{ nullptr };
+	[[reflgen::ignore]]
+	std::unordered_map<HashedGuid, BTBuildNode*> Nodes;
+
+	[[reflgen::ignore]]
+	BTBuildNode* SelectedNode{ nullptr };
 
 	std::vector<BTBuildNode> NodeList;
 

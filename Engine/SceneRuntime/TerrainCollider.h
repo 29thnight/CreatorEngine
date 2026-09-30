@@ -59,10 +59,17 @@ public:
 	};
 
 private:
-	[[reflgen::ignore]] unsigned int m_colliderID;
-	[[reflgen::ignore]] HeightFieldColliderInfo m_heightFieldColliderInfo; // 콜라이더 정보
-	[[reflgen::ignore]] math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
-	[[reflgen::ignore]] EColliderType m_type{ EColliderType::COLLISION }; // 콜라이더 타입 --> 바닥은 기본 COLLISION 어차피 static 일꺼임 
+	[[reflgen::ignore]]
+	unsigned int m_colliderID;
+
+	[[reflgen::ignore]]
+	HeightFieldColliderInfo m_heightFieldColliderInfo; // 콜라이더 정보
+
+	[[reflgen::ignore]]
+	math::quaternion m_rotOffset{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+	[[reflgen::ignore]]
+	EColliderType m_type{ EColliderType::COLLISION }; // 콜라이더 타입 --> 바닥은 기본 COLLISION 어차피 static 일꺼임
 	
 
 	// ICollider을(를) 통해 상속됨

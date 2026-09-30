@@ -299,7 +299,8 @@ private:
     uint8_t m_lockFlags = 0;
 
     // 런타임 (직렬화 안 함)
-    [[reflgen::ignore]] BodyHandle m_handle{};
+    [[reflgen::ignore]]
+    BodyHandle m_handle{};
 };
 ```
 

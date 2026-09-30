@@ -138,9 +138,15 @@ public:
 	Component& GetComponent(HashedGuid typeof);
 
 protected:
-	[[reflgen::ignore]] uint8_t			m_lifecycleState{ 0 };
-	[[reflgen::ignore]] Entity*		m_pOwner{};
-	[[reflgen::ignore]] Transform*		m_pTransform{ nullptr };
+	[[reflgen::ignore]]
+	uint8_t			m_lifecycleState{ 0 };
+
+	[[reflgen::ignore]]
+	Entity*		m_pOwner{};
+
+	[[reflgen::ignore]]
+	Transform*		m_pTransform{ nullptr };
+
 	FileGuid m_FileID{};
 };
 

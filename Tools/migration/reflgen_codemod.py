@@ -24,6 +24,9 @@ import pathlib
 import re
 import sys
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from reflgen_attribute_layout import layout  # noqa: E402 — 옆 파일(속성 배치 규약)
+
 LLVM = pathlib.Path(r'C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64')
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 # meta 코어의 selftest 카나리아는 meta 로 둔다 — meta 코어를 지키는 것이 그것들의 일이다.
@@ -392,6 +395,8 @@ def apply_edits(path, edits):
     raw = pathlib.Path(path).read_bytes()
     for edit in sorted(edits, key=lambda e: e.offset, reverse=True):
         raw = raw[:edit.offset] + edit.text + raw[edit.offset + edit.remove:]
+    # 속성은 선언 앞에 한 줄로 끼워 넣었다 — 배치 규약(CodingConventions.md §7.4)대로 자기 줄에 두고 빈 줄로 가른다.
+    raw, _ = layout(raw)
     pathlib.Path(path).write_bytes(raw)
 
 

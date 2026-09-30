@@ -72,7 +72,8 @@ private:
 
     // D3-a-3c: 장기 보관 root의 마지막 하나. backend 노드를 값으로 들지 않으므로
     // D3-b가 backend를 바꿀 때 이 클래스는 손대지 않는다(§3.3).
-    [[reflgen::ignore]] Authoring::Document m_prefabData{};
+    [[reflgen::ignore]]
+    Authoring::Document m_prefabData{};
 
 	FileGuid m_fileGuid{};
 };

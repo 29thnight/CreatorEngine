@@ -36,7 +36,9 @@ public:
     virtual ~BoneComponent() = default;
 
     // 지금 캐시에 담긴 뼈 인덱스(-1이면 아직 못 풀었음). 진단용이다.
-    [[reflgen::reflect, creator::read_only_in_inspector]] int GetResolvedBoneIndex() { return m_boneIndex; }
+    [[reflgen::reflect, creator::read_only_in_inspector]]
+    int GetResolvedBoneIndex() { return m_boneIndex; }
+
     [[nodiscard]] math::matrix4x4 GetWorldTransform() const;
 
     // Explicit gameplay observation survives scene save/load. Automatic
@@ -44,12 +46,17 @@ public:
     // m_bPinned는 저작 설정이며, bone index/serial/owner와 자동 승격은
     // 현재 scene 및 skeleton에 종속된 런타임 캐시다(그래서 아래는 reflgen::ignore).
     bool m_bPinned{ false };
-    [[reflgen::ignore]] bool m_runtimeObserved{ false };
-    [[reflgen::ignore]] EntityHandle m_animatorOwner{};
+
+    [[reflgen::ignore]]
+    bool m_runtimeObserved{ false };
+
+    [[reflgen::ignore]]
+    EntityHandle m_animatorOwner{};
 
     // 마지막 binding의 FindBone 결과. -1은 아직 안 풀렸거나 그 skeleton에 없는
     // 본이라는 뜻이다. m_resolvedSerial이 같으면 negative 결과도 다시 찾지 않는다.
-    [[reflgen::ignore]] int m_boneIndex{ -1 };
+    [[reflgen::ignore]]
+    int m_boneIndex{ -1 };
 
     // m_boneIndex를 어느 스켈레톤에 대해 풀었는지 — Skeleton::m_serial 값이다.
     // 0은 "아직 아무 스켈레톤도 아님"(실제 스켈레톤의 일련번호는 1부터).
@@ -59,5 +66,6 @@ public:
     // 새 스켈레톤이 같은 주소를 재할당받으면 캐시가 우연히 적중해 다른 모델의
     // 뼈 인덱스를 조용히 재사용한다. 일련번호는 그 ABA를 원천 차단한다
     // (Skeleton.h의 m_serial 주석 참고).
-    [[reflgen::ignore]] uint64 m_resolvedSerial{ 0 };
+    [[reflgen::ignore]]
+    uint64 m_resolvedSerial{ 0 };
 };

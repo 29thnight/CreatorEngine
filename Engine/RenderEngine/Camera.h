@@ -44,19 +44,30 @@ public:
 	static constexpr math::vector3 kRight = math::vector3::unit_x();
 	static constexpr math::vector3 kUp = math::vector3::unit_y();
 
-	[[reflgen::ignore]] math::vector3 m_eyePosition{ 0.f, 1.f, -10.f };
-	[[reflgen::ignore]] math::vector3 m_forward{ kForward };
-	[[reflgen::ignore]] math::vector3 m_right{ kRight };
-	[[reflgen::ignore]] math::vector3 m_up{ kUp };
+	[[reflgen::ignore]]
+	math::vector3 m_eyePosition{ 0.f, 1.f, -10.f };
+
+	[[reflgen::ignore]]
+	math::vector3 m_forward{ kForward };
+
+	[[reflgen::ignore]]
+	math::vector3 m_right{ kRight };
+
+	[[reflgen::ignore]]
+	math::vector3 m_up{ kUp };
 
 	float m_nearPlane{ 0.1f };
 	float m_farPlane{ 500.f };
 	float m_fov{ 60.f };
 
-	[[reflgen::ignore]] float m_viewWidth{ 1.f };
-	[[reflgen::ignore]] float m_viewHeight{ 1.f };
+	[[reflgen::ignore]]
+	float m_viewWidth{ 1.f };
 
-	[[reflgen::ignore]] bool m_isOrthographic{ false };
+	[[reflgen::ignore]]
+	float m_viewHeight{ 1.f };
+
+	[[reflgen::ignore]]
+	bool m_isOrthographic{ false };
 
 };
 

@@ -18,7 +18,10 @@ public:
 
 
 	void ReCreateMask(AvatarMask* _otherMask);
-	[[reflgen::ignore]] BoneMask* RootMask{ nullptr };
+
+	[[reflgen::ignore]]
+	BoneMask* RootMask{ nullptr };
+
 	bool IsBoneEnabled(const std::string& name);
 	std::vector<BoneMask*> m_BoneMasks;
 	bool isHumanoid = true; 

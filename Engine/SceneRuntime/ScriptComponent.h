@@ -134,10 +134,14 @@ public:
 	std::uint64_t InitializationAttempts() const { return m_initializationAttempts; }
 
 private:
-	[[reflgen::ignore]] int m_instanceId{ -1 };
-	[[reflgen::ignore]] std::uint64_t m_initializationAttempts{};
+	[[reflgen::ignore]]
+	int m_instanceId{ -1 };
+
+	[[reflgen::ignore]]
+	std::uint64_t m_initializationAttempts{};
 
 	// EnsureInstance가 한 번 실패했는가. 편집 모드에서는 드레인이 매 프레임
 	// 부르므로 이것이 없으면 실패 로그가 프레임마다 쌓인다.
-	[[reflgen::ignore]] bool m_instanceCreateFailed{ false };
+	[[reflgen::ignore]]
+	bool m_instanceCreateFailed{ false };
 };

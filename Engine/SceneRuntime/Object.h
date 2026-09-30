@@ -64,19 +64,28 @@ public:
     // 아니라 인스펙터 상단의 이름 칸이고, 그쪽은
     // `EditorObjectOperations::Rename` 을 거쳐 씬의 이름 유일성까지
     // 맞춘다. 리플렉션 경로에서 직접 쓰면 그 단계를 건너뛴다.
-    [[reflgen::readonly, creator::debug_only]] HashingString           m_name{ "Object" };
+    [[reflgen::readonly, creator::debug_only]]
+    HashingString           m_name{ "Object" };
 protected:
-	[[reflgen::ignore]] HashedGuid              m_typeID{ type_guid(Object) };
+	[[reflgen::ignore]]
+	HashedGuid              m_typeID{ type_guid(Object) };
+
     // 인스턴스 식별자. `GUIDCreator` 의 전역 집합과 시스템 레지스트리
     // (`AnimationScheduler::m_animators` 등)의 키다. 손으로 고치면 등록은 옛
     // 키로 남고 해제는 새 키로 가서 레지스트리에 죽은 항목이 남는다.
-    [[reflgen::readonly, creator::debug_only]] HashedGuid              m_instanceID{ make_guid() };
-	[[reflgen::ignore]] bool                    m_destroyMark{ false };
-	[[reflgen::ignore]] bool                    m_dontDestroyOnLoad{ false };
+    [[reflgen::readonly, creator::debug_only]]
+    HashedGuid              m_instanceID{ make_guid() };
+
+	[[reflgen::ignore]]
+	bool                    m_destroyMark{ false };
+
+	[[reflgen::ignore]]
+	bool                    m_dontDestroyOnLoad{ false };
 
     // SetEnabled를 거치지 않으면 OnEnable/OnDisable이 호출되지 않는다 —
     // 훅이 전이 시점에 불리게 바뀐 뒤로(PHASE 9-2) 이 필드를 밖에서 직접 쓰는 것은
     // 곧 생명주기를 건너뛰는 것이다. 인스펙터 체크박스가 실제로 그러고 있었다.
     // 그래서 리플렉션은 이 필드를 그리지 않는다(hidden) — 전용 체크박스가 SetEnabled 를 거친다.
-    [[reflgen::hidden]] bool                    m_isEnabled{ true };
+    [[reflgen::hidden]]
+    bool                    m_isEnabled{ true };
 };

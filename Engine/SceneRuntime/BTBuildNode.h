@@ -25,5 +25,6 @@ struct [[reflgen::reflect]] BTBuildNode
 
 	math::vector2	Position; // 노드 위치 (에디터용)
 
-	[[reflgen::ignore]] std::string State;
+	[[reflgen::ignore]]
+	std::string State;
 };

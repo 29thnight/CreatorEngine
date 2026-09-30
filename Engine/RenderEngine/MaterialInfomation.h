@@ -16,12 +16,25 @@ cbuffer [[reflgen::reflect]] MaterialInfomation
     math::color   m_baseColor{ 1.0f, 1.0f, 1.0f, 1.0f };
     float		  m_metallic{ 0.0f };
     float		  m_roughness{ 1.0f };
-    [[reflgen::ignore]] bool32		  m_useBaseColor{};
-    [[reflgen::ignore]] bool32		  m_useOccRoughMetal{};
-    [[reflgen::ignore]] bool32		  m_useAOMap{};
-    [[reflgen::ignore]] bool32		  m_useEmissive{};
-    [[reflgen::ignore]] bool32		  m_useNormalMap{};
-    [[reflgen::ignore]] bool32		  m_convertToLinearSpace{ false };
+
+    [[reflgen::ignore]]
+    bool32		  m_useBaseColor{};
+
+    [[reflgen::ignore]]
+    bool32		  m_useOccRoughMetal{};
+
+    [[reflgen::ignore]]
+    bool32		  m_useAOMap{};
+
+    [[reflgen::ignore]]
+    bool32		  m_useEmissive{};
+
+    [[reflgen::ignore]]
+    bool32		  m_useNormalMap{};
+
+    [[reflgen::ignore]]
+    bool32		  m_convertToLinearSpace{ false };
+
     float         m_IOR{ 1.5f };
 
     MaterialInfomation() = default;

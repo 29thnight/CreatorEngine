@@ -62,9 +62,15 @@ public:
 	void SetConditionType(ConditionType _conditionType) { cType = _conditionType;}
 	//타입 ,값 ,함수
 	std::string valueName = "None";
-	[[reflgen::ignore]] ConditionParameter* valueParameter;
+
+	[[reflgen::ignore]]
+	ConditionParameter* valueParameter;
+
 	ConditionParameter CompareParameter;
-	[[reflgen::ignore]] AnimationController* m_ownerController{};
+
+	[[reflgen::ignore]]
+	AnimationController* m_ownerController{};
+
 	ConditionType cType = ConditionType::Equal;
 };
 

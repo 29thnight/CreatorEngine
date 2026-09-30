@@ -183,8 +183,12 @@ private:
 	math::vector4 position{ 0.f, 0.f, 0.f, 1.f };
 	math::vector4 rotation{ 0.f, 0.f, 0.f, 1.f };
 	math::vector4 scale{ 1.f, 1.f, 1.f, 1.f };
-	[[reflgen::ignore]] bool m_hasPendingLocalWrite = false;
-	[[reflgen::ignore]] TransformWriteReason m_pendingLocalWriteReason = TransformWriteReason::Reflection;
+
+	[[reflgen::ignore]]
+	bool m_hasPendingLocalWrite = false;
+
+	[[reflgen::ignore]]
+	TransformWriteReason m_pendingLocalWriteReason = TransformWriteReason::Reflection;
 
 	// ── 스토어 슬롯 해석 (SceneGraphRedesignPlan §4 트랙 S, S1) ──
 	//
@@ -242,5 +246,6 @@ private:
 	// 규칙의 영향을 받지 않는다).
 	uint32 m_parentID{ 0 };
 
-	[[reflgen::ignore]] mutable std::unique_ptr<LocalFallback> m_fallback;
+	[[reflgen::ignore]]
+	mutable std::unique_ptr<LocalFallback> m_fallback;
 };

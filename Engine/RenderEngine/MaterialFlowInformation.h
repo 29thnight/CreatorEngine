@@ -13,7 +13,9 @@ cbuffer [[reflgen::reflect]] MaterialFlowInformation
 
 	math::vector4         m_windVector{ 0.f, 0.f, 0.f, 0.f };
 	math::vector2         m_uvScroll{ 0.f, 0.f };
-	[[reflgen::ignore]] math::vector2         padding{ 0.f, 0.f };
+
+	[[reflgen::ignore]]
+	math::vector2         padding{ 0.f, 0.f };
 };
 
 static_assert(sizeof(MaterialFlowInformation) == 32);

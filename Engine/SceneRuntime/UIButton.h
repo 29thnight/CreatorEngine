@@ -27,7 +27,9 @@ public:
 	void UpdateHitbox();
 	bool CheckClick(math::vector2 _mousePos);
 	void SetFunction(std::string& funName,float key,std::function<void()> func) { m_clickFunction = func;}
-	[[reflgen::reflect]] void Click();
+
+	[[reflgen::reflect]]
+	void Click();
 
 	// 클릭 판정에 쓰이는 사각형. 렌더 좌표와 입력 좌표가 같은 사각형을 가리키는지
 	// 검증하기 위해 노출한다 — 둘이 어긋나면 "보이는 곳과 눌리는 곳"이 달라진다(PHASE 7-7).
@@ -44,11 +46,17 @@ public:
 	}
 
 private:
-	[[reflgen::ignore]] math::rect m_hitbox{};
-	[[reflgen::ignore]] std::function<void()> m_clickFunction;
-	[[reflgen::ignore]] bool m_wasClicked = false;
+	[[reflgen::ignore]]
+	math::rect m_hitbox{};
+
+	[[reflgen::ignore]]
+	std::function<void()> m_clickFunction;
+
+	[[reflgen::ignore]]
+	bool m_wasClicked = false;
 
 public:
-	[[reflgen::ignore]] bool isClick = false;
+	[[reflgen::ignore]]
+	bool isClick = false;
 };
 

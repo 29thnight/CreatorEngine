@@ -98,7 +98,8 @@ public:
     uint32 m_bitflag{ 0 };
 
 private:
-	[[reflgen::ignore]] bool m_isNeedUpdateCulling{ false };
+	[[reflgen::ignore]]
+	bool m_isNeedUpdateCulling{ false };
 
 public: 
     bool m_isSkinnedMesh{ false };
@@ -116,7 +117,8 @@ public:
     // 자산 GUID가 남고, 저장은 인라인 embed 대신 base 참조+인스턴스 diff를
     // 적는다(ref 표기). nil이면 인라인 소유(기존 S2b writer). reflect에는
     // 없다 — 영속은 m_Material 노드의 ref 키가 진다(훅 전담).
-    [[reflgen::ignore]] FileGuid m_materialBaseGuid{};
+    [[reflgen::ignore]]
+    FileGuid m_materialBaseGuid{};
 
     // PHASE 3.75 MBC7 — 메시의 영속 신원(UUIDv8 subasset MeshId). 이름은 semantic
     // stable key와 같은 축이라 로드가 이름으로 한 번 되찾아 여기로 이주하고, 그
@@ -127,8 +129,11 @@ public:
     // 메시 인덱스. 프록시는 이것으로 RHIModelMeshView를 만들어 패스에 싣고, 재질의
     // embedded texture는 이 generation closure에서 푼다. 비직렬화 — 영속 신원은
     // m_modelGuid + m_meshAssetId가 진다. null이면 legacy(v4)·해석 실패 모델이다.
-    [[reflgen::ignore]] std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
-    [[reflgen::ignore]] std::uint32_t m_modelMeshIndex{ 0 };
+    [[reflgen::ignore]]
+    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+
+    [[reflgen::ignore]]
+    std::uint32_t m_modelMeshIndex{ 0 };
 
     // I5-D5c1 — 재질의 experiment 병행 표현(base 저작 원본 + 인스턴스
     // override). 저작 경계가 채운다: 새 정본 문서는 자기 authored 원본을,
@@ -139,7 +144,9 @@ public:
     // 몫이고, 이 슬라이스의 소비자는 legacy와 CB bytes를 비트 단위로 대조하는
     // 게이트다(M1 패리티와 같은 축). unique_ptr인 이유: MaterialInstance가
     // 전방선언 타입이라 값 멤버로 둘 수 없다.
-    [[reflgen::ignore]] std::unique_ptr<experiment::MaterialInstance> m_materialInstance{};
+    [[reflgen::ignore]]
+    std::unique_ptr<experiment::MaterialInstance> m_materialInstance{};
+
     void SetExperimentMaterialBase(
         std::shared_ptr<const experiment::Material> base);
     [[nodiscard]] experiment::MaterialInstance* GetMaterialInstance() const

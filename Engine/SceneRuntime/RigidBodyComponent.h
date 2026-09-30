@@ -88,8 +88,12 @@ public:
 private:
 	EBodyType m_bodyType = EBodyType::DYNAMIC;
 
-	[[reflgen::ignore]] EForceMode forceMode{ EForceMode::NONE };
-	[[reflgen::ignore]] float AngularDamping =0.05f;
+	[[reflgen::ignore]]
+	EForceMode forceMode{ EForceMode::NONE };
+
+	[[reflgen::ignore]]
+	float AngularDamping =0.05f;
+
 	float LinearDamping = 0.01f;
 	float m_mass = 70.f;
 	float maxLinearVelocity = 1e+16;
@@ -100,11 +104,18 @@ private:
 	bool m_setTrigger = false; // 트리거 설정 여부
 	bool m_setKinematic = false; // 키네마틱 설정 여부
 	bool m_collisionEnabled = true; // 콜라이더 활성화 여부
-	[[reflgen::ignore]] math::vector3 velocity{};
-	[[reflgen::ignore]] math::vector3 m_scale{};
+
+	[[reflgen::ignore]]
+	math::vector3 velocity{};
+
+	[[reflgen::ignore]]
+	math::vector3 m_scale{};
 private:
-	[[reflgen::ignore]] math::vector3 m_linearVelocity;
-	[[reflgen::ignore]] math::vector3 m_angularVelocity;
+	[[reflgen::ignore]]
+	math::vector3 m_linearVelocity;
+
+	[[reflgen::ignore]]
+	math::vector3 m_angularVelocity;
 
 private:
 	// ---- 비트 플래그 정의 ----
@@ -119,7 +130,8 @@ private:
 	};
 
 	// 단일 바이트로 상태 보관 (초기값: dirty=false, 모든 lock=false)
-	[[reflgen::ignore]] uint8_t m_rbFlags{ 0 };
+	[[reflgen::ignore]]
+	uint8_t m_rbFlags{ 0 };
 
 	// ---- 헬퍼 ----
 	inline bool TestFlag(uint8_t m) const noexcept {

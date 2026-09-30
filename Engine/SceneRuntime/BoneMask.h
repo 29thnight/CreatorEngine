@@ -8,7 +8,10 @@ class [[reflgen::reflect]] BoneMask
 public:
 	BoneMask() = default;
 	std::string boneName;
-	[[reflgen::ignore]] std::vector<BoneMask*> m_children;
+
+	[[reflgen::ignore]]
+	std::vector<BoneMask*> m_children;
+
 	bool isEnabled = true;
 	float weight = 1.f;
 };

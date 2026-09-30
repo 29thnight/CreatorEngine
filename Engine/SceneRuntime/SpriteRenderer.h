@@ -38,7 +38,10 @@ private:
     std::string m_SpritePath{};
     int m_orderInLayer{ 0 };
     math::vector3 m_billboardAxis{ 0.f, 1.f, 0.f };
-    [[reflgen::ignore]] std::shared_ptr<Texture> m_Sprite = nullptr;
+
+    [[reflgen::ignore]]
+    std::shared_ptr<Texture> m_Sprite = nullptr;
+
     BillboardType m_billboardType{ BillboardType::None };
 	bool m_enableDepth{ false };
 };

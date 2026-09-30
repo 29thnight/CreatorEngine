@@ -22,7 +22,12 @@ public:
     FileGuid m_volumeProfileGuid{ nullFileGuid };
 
 private:
-    [[reflgen::ignore]] RenderPassSettings m_prevSettings{};
-    [[reflgen::ignore]] VolumeProfile m_profile{};
-    [[reflgen::ignore]] bool m_isProfileLoaded{ false };
+    [[reflgen::ignore]]
+    RenderPassSettings m_prevSettings{};
+
+    [[reflgen::ignore]]
+    VolumeProfile m_profile{};
+
+    [[reflgen::ignore]]
+    bool m_isProfileLoaded{ false };
 };

@@ -80,14 +80,21 @@ public:
 	// ScreenSpaceCamera에서 게임 카메라 앞에 놓을 거리.
 	float PlaneDistance = 100.f;
 
-	[[reflgen::ignore]] int PreCanvasOrder = 0;
+	[[reflgen::ignore]]
+	int PreCanvasOrder = 0;
+
 	int CanvasOrder = 0;
+
 	// 씬 소유 객체를 장기 소유하지 않는 세대 검증 캐시. DDOL 이송 때
 	// OnRemovingFromScene에서 비우고, 새 씬의 OnAddedToScene 이후 UIManager가
 	// 현재 sceneId/index/generation으로 다시 연결한다.
-	[[reflgen::ignore]] std::vector<EntityHandle> UIObjs;
+	[[reflgen::ignore]]
+	std::vector<EntityHandle> UIObjs;
+
 	std::string CanvasName = "Canvas";
-	[[reflgen::ignore]] std::string prevCanvasName{};
+
+	[[reflgen::ignore]]
+	std::string prevCanvasName{};
 };
 
 
