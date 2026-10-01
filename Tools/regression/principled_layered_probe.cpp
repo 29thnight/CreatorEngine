@@ -36,6 +36,49 @@ class Verification final
     double maximumError{};
     std::string maximumLabel;
 };
+
+void VerifyGgxClosureContract()
+{
+    Verification verification;
+    for (double roughness : {0.2, 0.5, 0.88})
+        for (double cosine : {0.1, 0.5, 0.9})
+        {
+            ProbeInput input;
+            input.normalRoughness.w = float(roughness);
+            input.baseAlpha = {1, 1, 1, 1};
+            Material white = Evaluate(input, 0x7ff);
+            const Vector view{std::sqrt(1 - cosine * cosine), 0, cosine};
+            const auto energy = Energy(white, view);
+            const double e = SampleTable(kGgxEnergy, 32, 32, roughness, cosine);
+            for (unsigned c = 0; c < 3; ++c)
+                verification.Scalar(energy.metal[c] * e, 1, "unit-Fss energy conservation", 1e-7);
+            white.ior = 1;
+            const auto absent = Energy(white, view);
+            for (unsigned c = 0; c < 3; ++c)
+            {
+                verification.Scalar(absent.dielectric[c], 1, "absent interface compensation", 1e-12);
+                verification.Scalar(absent.dielectricAlbedo[c], 0, "absent interface attenuation", 1e-12);
+            }
+            for (double thickness : {0.0, 550.0})
+            {
+                Material mixed = Evaluate(input, 0x7ff);
+                mixed.base = {0.15, 0.4, 0.8};
+                mixed.tint = {0.7, 0.9, 1};
+                mixed.metal = 0.6;
+                mixed.thickness = thickness;
+                mixed.filmIor = 1.4;
+                Material dielectric = mixed, metal = mixed;
+                dielectric.metal = 0;
+                metal.metal = 1;
+                const Vector a = CompensatedFresnel(mixed, Energy(mixed, view), 0.65);
+                const Vector b = CompensatedFresnel(dielectric, Energy(dielectric, view), 0.65) * 0.4 +
+                                 CompensatedFresnel(metal, Energy(metal, view), 0.65) * 0.6;
+                for (unsigned c = 0; c < 3; ++c)
+                    verification.Scalar(a[c], b[c], "independent closure metallic mix", 1e-12);
+            }
+        }
+    std::cout << "PRINCIPLED_GGX_CLOSURE_INVARIANTS_OK checks=" << verification.checks << '\n';
+}
 } // namespace
 
 int wmain(int argc, wchar_t** argv)
@@ -47,6 +90,7 @@ int wmain(int argc, wchar_t** argv)
             throw std::runtime_error("Expected repository root");
         }
         const auto root = std::filesystem::absolute(argv[1]);
+        VerifyGgxClosureContract();
         const auto source = root / "Tools" / "regression" / "principled_layered_probe.slang";
         const auto table =
             LoadSheenTable(root / "Tools" / "blender" / "fixtures" / "principled-layered-5.1.1" / "sheen-ltc.csv");
@@ -174,6 +218,47 @@ int wmain(int argc, wchar_t** argv)
             }
             compare("all_layers", "all_layers_ao_zero", 14);
             compare("all_layers", "all_layers_ao_zero", 23);
+            if (mask == 0x7ff)
+            {
+                std::vector<ProbeInput> whiteMetal;
+                for (const auto [roughness, anisotropy] : {std::pair{.5f, 0.f}, {.5f, 1.f}, {.88f, .9f}, {1.f, 1.f}})
+                {
+                    ProbeInput input;
+                    input.baseAlpha = {1, 1, 1, 1};
+                    input.metalIorLevelAo.x = 1;
+                    input.normalRoughness.w = roughness;
+                    input.tintAnisotropy.w = anisotropy;
+                    whiteMetal.push_back(input);
+                }
+                const auto budget = gpu.Run(dxil, whiteMetal, kAngles, kFields);
+                Verification invariant;
+                unsigned rawExcessViews = 0;
+                for (size_t index = 0; index < whiteMetal.size(); ++index)
+                    for (unsigned angle = 0; angle < kAngles; ++angle)
+                    {
+                        const double cosine = kCosines[angle % 4], sine = std::sqrt(1 - cosine * cosine);
+                        const Vector view = angle < 4 ? Vector{sine, 0, cosine} : Vector{0, sine, cosine};
+                        const auto expected = Reference(Evaluate(whiteMetal[index], mask), view, mask, table);
+                        const Float4* actual = budget.data() + (index * kAngles + angle) * kFields;
+                        for (unsigned field = 0; field < kFields; ++field)
+                        {
+                            invariant.Scalar(actual[field].x, expected.fields[field].x, "white metal x", 5e-5);
+                            invariant.Scalar(actual[field].y, expected.fields[field].y, "white metal y", 5e-5);
+                            invariant.Scalar(actual[field].z, expected.fields[field].z, "white metal z", 5e-5);
+                            invariant.Scalar(actual[field].w, expected.fields[field].w, "white metal w", 5e-5);
+                        }
+                        if (actual[6].x > 1)
+                        {
+                            ++rawExcessViews;
+                            for (double value : Rgb(actual[21]))
+                                invariant.Scalar(value, 1, "white metal compensated furnace", 1e-5);
+                        }
+                    }
+                if (!rawExcessViews)
+                    throw std::runtime_error("White metal test did not exercise the prepared energy budget");
+                std::cout << "PRINCIPLED_GGX_BUDGET_GPU_OK cases=4 rawExcessViews=" << rawExcessViews
+                          << " checks=" << invariant.checks << '\n';
+            }
             std::cout << "LAYERED_VARIANT_GPU_OK mask=" << mask << " cases=" << fixtures.size() << '\n';
         }
         for (unsigned mask : {0x80u, 0x100u, 0x200u, 0x400u})

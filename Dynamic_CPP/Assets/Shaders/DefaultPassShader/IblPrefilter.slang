@@ -23,7 +23,7 @@ float4 PSMain(VSOut input) : SV_TARGET
     float roughness = saturate(gParams.x);
     // A mirror must preserve the source texels, including small HDR emitters.
     if (roughness == 0.0)
-        return float4(SanitizeRadiance(gCube.SampleLevel(gSampler, n, 0.0).rgb), 1.0);
+        return float4(SanitizeEnvironmentRadiance(gCube.SampleLevel(gSampler, n, 0.0).rgb), 1.0);
 
     uint size = uint(gParams.y);
     float total = gImportanceMarginal.Load(int3(0, 6u * size - 1u, 0)).r;
@@ -57,5 +57,5 @@ float4 PSMain(VSOut input) : SV_TARGET
         sum += radiance * w;
         weight += w;
     }
-    return float4(SanitizeRadiance(sum / max(weight, 1e-20)), 1.0);
+    return float4(SanitizeEnvironmentRadiance(sum / max(weight, 1e-20)), 1.0);
 }

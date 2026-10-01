@@ -1,0 +1,83 @@
+{
+  "schema": "creator.material.hdri-controls-diagnostic.v1",
+  "accepted": false,
+  "scope": "fixed 7-condition subset only; cannot close full MAT-9",
+  "thresholds": {
+    "relative_rms": 0.01,
+    "p95_normalized": 0.01,
+    "max_normalized": 0.05,
+    "reference_seed_relative_rms": 0.0025
+  },
+  "cases": [
+    {
+      "id": "forest-control_emission",
+      "before_relative_rms": 0.0,
+      "after_relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_seed_relative_rms": 0.0,
+      "within_fixed_targets": true
+    },
+    {
+      "id": "forest-control_white",
+      "before_relative_rms": 0.0035738010221283588,
+      "after_relative_rms": 0.0035835054818790543,
+      "p95_normalized": 0.0029847919940948486,
+      "max_normalized": 0.0069925785064697266,
+      "reference_seed_relative_rms": 0.001097741994332459,
+      "within_fixed_targets": true
+    },
+    {
+      "id": "forest-control_mirror",
+      "before_relative_rms": 0.03128537200692257,
+      "after_relative_rms": 0.004693074592820446,
+      "p95_normalized": 0.0028108544647693634,
+      "max_normalized": 0.03592394915453883,
+      "reference_seed_relative_rms": 3.4653777566350475e-05,
+      "within_fixed_targets": true
+    },
+    {
+      "id": "autumn-layer_thin_film",
+      "before_relative_rms": 0.008607317893514127,
+      "after_relative_rms": 0.008631072500801635,
+      "p95_normalized": 0.006150305271148682,
+      "max_normalized": 0.012477755546569824,
+      "reference_seed_relative_rms": 0.0015865679769177807,
+      "within_fixed_targets": true
+    },
+    {
+      "id": "autumn-control_emission",
+      "before_relative_rms": 0.0,
+      "after_relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_seed_relative_rms": 0.0,
+      "within_fixed_targets": true
+    },
+    {
+      "id": "autumn-control_white",
+      "before_relative_rms": 0.004107386489790665,
+      "after_relative_rms": 0.004116868495842437,
+      "p95_normalized": 0.0046808719635009766,
+      "max_normalized": 0.006476260638660665,
+      "reference_seed_relative_rms": 0.001596856491737671,
+      "within_fixed_targets": true
+    },
+    {
+      "id": "autumn-control_mirror",
+      "before_relative_rms": 0.005530682884973449,
+      "after_relative_rms": 0.003275155519658804,
+      "p95_normalized": 0.0014154911041259766,
+      "max_normalized": 0.0037339969647764686,
+      "reference_seed_relative_rms": 3.2110030613982475e-05,
+      "within_fixed_targets": true
+    }
+  ],
+  "within_targets": 7,
+  "total": 7,
+  "reference_samples": 131072,
+  "reference_seeds": [
+    0,
+    11
+  ]
+}

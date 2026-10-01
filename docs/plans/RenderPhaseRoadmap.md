@@ -1,6 +1,6 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
-**정본 2026-10-01 · MAT-0~MAT-8 완료 · MAT-9 rendered parity·성능 수용 잔여 · RND-ENV 배경 슬라이스 진행 · 그 외 미착수 유지.**
+**정본 2026-10-01 · MAT-0~MAT-8 완료 · MAT-9 rendered parity·성능 수용 잔여 · RND-ENV 배경 슬라이스 진행 · GPU-1/GPU-3 상세 설계 진행 · 그 외 기존 상태 유지.**
 이 문서는 PHASE 4 계열의 현재 소유권·표시 순서·공수 원장이다. 이전 Asset-first SRP
 분할의 근거·이력은 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)에 보존했다.
 새 C# 저작/네이티브 실행 목표는
@@ -69,7 +69,7 @@ EEVEE가 사용하지 않는 anisotropy/thin film의 Cycles 비교·RGB 근사 �
 ## 2. 선행 그래프
 
 ```text
-PHASE 4 PBR-W9 → PHASE 4.25 MAT-9
+PHASE 4 PBR-W9 → PHASE 4.25 MAT-0~MAT-8 구현·검증 기반
                             ↓
 PHASE 4.3 BASE-0 → RG1(단일 writer DAG) → RG2(version/Modify DAG) → RG3~RG6(제품 전환)
                     ├─ PHASE 4.5 TR/TU/FG  (BASE-0 뒤부터 RG 본체와 병렬)
@@ -80,6 +80,8 @@ PHASE 4.3 BASE-0 → RG1(단일 writer DAG) → RG2(version/Modify DAG) → RG3~
                     └─ PHASE 4.8 GPU-1/2/3 → GPU-9 (구상·공수 확정)
 PHASE 4.9는 PHASE 4에서 미룬 교차 백엔드 판정. 시각 고정 뒤 별도 진행.
 ```
+
+**2026-10-01 선행 조정:** BASE-0과 후속 구조 정리는 구현·검증된 MAT-0~MAT-8의 Material/Scene/cook 계약을 소비한다. MAT-9 최종 완료를 일괄 선행으로 받지 않는다. 현재 1024/4096 IBL 품질 설정과 이미지 수용 상한을 고정하고, 미달 항목은 baseline에 명시한다. BASE-0의 통과는 같은 입력의 재현·계측·회귀 검출 판정이며 MAT-9 품질/성능 수용을 뜻하지 않는다. GPU-driven 실제 구현과 측정 뒤 동일 장면의 이미지 오차·Debug/Release CPU/GPU 시간·근접 이동 끊김을 MAT-9에서 다시 판정한다. SSS·투과 품질 오차는 성능과 별도 완료 조건으로 남긴다.
 
 번호는 대시보드의 **표시 순서**다. 모든 페이즈가 앞 번호의 전체 완료를 기다리는
 직선은 아니다. 특히 4.5는 `BASE-0`만 받고 RG 본체와 병렬이며, 4.7/4.75/4.8의
@@ -102,6 +104,8 @@ Pass/graph에 얹을 때의 `RG6`, `Q0`, `MAT-9`, 시간축 입력은 **항목�
 | 라이트맵 | [`LightmapBakerPlan.md`](LightmapBakerPlan.md) |
 | renderer probe/AO·shadow·display/post·Environment | [`RendererQualityPlan.md`](RendererQualityPlan.md) |
 | GPU-driven·확률 조명·DXR 설계 | [`GpuFeaturePlanningPlan.md`](GpuFeaturePlanningPlan.md) |
+| Meshlet/Mesh Shader raster + DXR 상세 배선 계약 | [`GpuDrivenMeshletDxrWiring.md`](../design/GpuDrivenMeshletDxrWiring.md) — GPU-1/GPU-3 설계 작성·진행, 구현/실측 미검증 |
+| 셰이더 탐색 DXR 전환의 가설·채택 실험 | [`DxrShaderTraversalExperimentPlan.md`](DxrShaderTraversalExperimentPlan.md) — GPU-3/GPU-9 판정 입력, 실험 미착수·공수 미산정 |
 | 백엔드 패리티 | [`BackendParityPlan.md`](BackendParityPlan.md) |
 | 분리 전 4.75 항목 감사 | [`Phase475AxisClassification.md`](../analysis/Phase475AxisClassification.md) |
 

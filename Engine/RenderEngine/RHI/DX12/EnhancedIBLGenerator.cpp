@@ -86,7 +86,7 @@ bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
 
     m_resources = context.resources;
 
-    // Cooked startup never needs the ten generation shaders/PSOs.
+    // Cooked startup never needs generation shaders/PSOs.
     return true;
 }
 
@@ -118,7 +118,7 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
 
     RHIShaderBlob faceVs;
     RHIShaderBlob fullscreenVs;
-    RHIShaderBlob rectPs;
+    RHIShaderBlob rectPs, sourcePs;
     RHIShaderBlob downsamplePs;
     RHIShaderBlob irradiancePs;
     RHIShaderBlob prefilterPs;
@@ -126,6 +126,7 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     RHIShaderBlob rowsPs, marginalPs, samplesPs;
     if (!CompileIblShader(kIblFaceVSFile, "VSMain", "vs_5_0", faceVs, outError) ||
         !CompileIblShader(kIblFullscreenVSFile, "VSMain", "vs_5_0", fullscreenVs, outError) ||
+        !CompileIblShader("IblSourceCopy.slang", "PSMain", "ps_5_0", sourcePs, outError) ||
         !CompileIblShader(kIblRectToCubePSFile, "PSMain", "ps_5_0", rectPs, outError) ||
         !CompileIblShader(kIblCubeDownsamplePSFile, "PSMain", "ps_5_0", downsamplePs, outError) ||
         !CompileIblShader(kIblIrradiancePSFile, "PSMain", "ps_5_0", irradiancePs, outError) ||
@@ -165,13 +166,25 @@ bool EnhancedIBLGenerator::CreatePipelines(const EnhancedFrameContext& context,
     if (!m_importanceMarginalPso.IsValid()) return false;
     m_importanceSamplesPso = makePso(fullscreenVs, samplesPs, kImportanceFormat);
     if (!m_importanceSamplesPso.IsValid()) return false;
-    m_rectToCubePso = makePso(faceVs, rectPs);
+    RHIShaderBlob sceneRows;
+    if (!CompileIblShader("IblSceneImportance.slang","CSMain","cs_6_0",sceneRows,outError,true)) return false;
+    const RHIPipelineLayoutParam sceneParams[]{RHILayout::Cbv(0),RHILayout::SrvTable(4,0),RHILayout::UavTable(1,0)};
+    const RHIStaticSamplerDesc sceneSampler[]{ {RHISampler::Linear(RHIAddressMode::Clamp),0} };
+    const auto sceneRoot=context.rootSignatures->GetOrCreate({sceneParams,sceneSampler},outError);
+    if (!sceneRoot.IsValid()) return false;
+    RHIComputePipelineDesc sceneDesc;
+    sceneDesc.layout=sceneRoot;sceneDesc.csBytecode=sceneRows.Data();sceneDesc.csSize=sceneRows.Size();
+    m_sceneImportanceRowsPso=context.psoManager->GetOrCreateCompute(sceneDesc,outError);
+    if(!m_sceneImportanceRowsPso.IsValid()) return false;
+    m_sourceCopyPso = makePso(fullscreenVs, sourcePs, kRadianceFormat);
+    if (!m_sourceCopyPso.IsValid()) return false;
+    m_rectToCubePso = makePso(faceVs, rectPs, kRadianceFormat);
     if (!m_rectToCubePso.IsValid()) return false;
-    m_cubeDownsamplePso = makePso(faceVs, downsamplePs);
+    m_cubeDownsamplePso = makePso(faceVs, downsamplePs, kRadianceFormat);
     if (!m_cubeDownsamplePso.IsValid()) return false;
     m_irradiancePso = makePso(faceVs, irradiancePs);
     if (!m_irradiancePso.IsValid()) return false;
-    m_prefilterPso = makePso(faceVs, prefilterPs);
+    m_prefilterPso = makePso(faceVs, prefilterPs, kRadianceFormat);
     if (!m_prefilterPso.IsValid()) return false;
     m_brdfPso = makePso(fullscreenVs, brdfPs);
     if (!m_brdfPso.IsValid()) return false;
@@ -192,7 +205,7 @@ bool EnhancedIBLGenerator::CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
 
     const auto makeTarget = [&](uint32_t size, uint32_t arraySize, uint32_t mips,
         const wchar_t* name, RHITextureHandle& out, uint32_t height = 0,
-        RHIFormat format = kFormat) -> bool
+        RHIFormat format = kFormat, bool uav = false) -> bool
     {
         RHITextureDesc desc{};
         desc.width = size;
@@ -201,23 +214,27 @@ bool EnhancedIBLGenerator::CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         desc.mipLevels = mips;
         desc.format = format;
         desc.allowRenderTarget = true;
+        desc.allowUnorderedAccess = uav;
         desc.initialState = RHIResourceState::RenderTarget;
         desc.debugName = name;
         return m_resources->CreateTexture(desc, out, outError);
     };
 
     // 환경 밉 체인과 convolution 산출물, 중요도 분포용 작업 텍스처.
-    if (!makeTarget(cubeSize, 6, CubeMipCount(cubeSize), L"IBL.CubeMap", m_cubeMapHandle) ||
-        !makeTarget(cubeSize, 6, 1, L"IBL.CubeSource", m_cubeSourceHandle) ||
+    if (!makeTarget(cubeSize, 6, CubeMipCount(cubeSize), L"IBL.CubeMap", m_cubeMapHandle, 0, kRadianceFormat) ||
+        !makeTarget(cubeSize, 6, 1, L"IBL.CubeSource", m_cubeSourceHandle, 0, kRadianceFormat) ||
         !makeTarget(GetIrradianceSize(), 6, 1, L"IBL.Irradiance", m_irradianceHandle) ||
-        !makeTarget(cubeSize, 6, kPrefilterMips, L"IBL.Prefiltered", m_prefilteredHandle) ||
+        !makeTarget(cubeSize, 6, kPrefilterMips, L"IBL.Prefiltered", m_prefilteredHandle, 0, kRadianceFormat) ||
         !makeTarget(brdfSize, 1, 1, L"IBL.BrdfLut", m_brdfLutHandle) ||
         !makeTarget(m_importanceSize, 1, 1, L"IBL.ImportanceRows", m_importanceRows,
             6 * m_importanceSize, kImportanceFormat) ||
         !makeTarget(1, 1, 1, L"IBL.ImportanceMarginal", m_importanceMarginal,
             6 * m_importanceSize, kImportanceFormat) ||
         !makeTarget(kImportanceSampleCount, 1, 1, L"IBL.ImportanceSamples", m_importanceSamples,
-            2, kImportanceFormat))
+            2, kImportanceFormat) ||
+        !makeTarget(cubeSize,1,1,L"IBL.SceneImportanceRows",m_sceneImportanceRows,6*cubeSize,kImportanceFormat,true) ||
+        !makeTarget(1,1,1,L"IBL.SceneImportanceMarginal",m_sceneImportanceMarginal,6*cubeSize,kImportanceFormat) ||
+        !makeTarget(kSceneImportanceSampleCount,1,1,L"IBL.SceneImportanceSamples",m_sceneImportanceSamples,2,kImportanceFormat))
     {
         ReleaseTargets();
         return false;
@@ -271,7 +288,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         for (uint32_t face = 0; face < 6; ++face)
         {
             const RHIColorTargetDesc color = RHIColorTargetDesc::Slice(
-                target, kFormat, mip, face);
+                target, m_resources->DescribeTexture(target).format, mip, face);
             const RHIRenderTargetBinding targets = m_resources->CreateRenderTargets(
                 std::span<const RHIColorTargetDesc>{ &color, 1 });
             if (!targets.IsValid()) return false;
@@ -319,6 +336,24 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         equirect, equirectFormat, 0, 1);
     const RHIBindingTable equirectTable = makeTable(equirectView);
     if (!equirectTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
+    const auto sourceDescription=m_resources->DescribeTexture(equirect);
+    if (!sourceDescription.width || !sourceDescription.height || sourceDescription.depthOrArraySize!=1 ||
+        sourceDescription.width>16384 || sourceDescription.height>16384)
+        {outError="IBL source dimensions differ";return false;}
+    RHITextureDesc retained;
+    retained.width=sourceDescription.width; retained.height=sourceDescription.height;
+    retained.format=kRadianceFormat; retained.allowRenderTarget=true; retained.debugName=L"IBL.Source";
+    if (!m_resources->CreateTexture(retained,m_sourceHandle,outError)) return false;
+    transition(m_sourceHandle,RHIResourceState::Common,RHIResourceState::RenderTarget);
+    const auto sourceColor=RHIColorTargetDesc::Slice(m_sourceHandle,kRadianceFormat,0,0);
+    const auto sourceTarget=m_resources->CreateRenderTargets({&sourceColor,1});
+    if (!sourceTarget.IsValid()) {outError="IBL source target failed";return false;}
+    encoder.SetViewportAndScissor(retained.width,retained.height);
+    encoder.SetPipeline(RHIBindPoint::Graphics,m_sourceCopyPso);
+    encoder.BindRenderTargets(sourceTarget);
+    encoder.SetBindings(RHIBindPoint::Graphics,1,equirectTable);
+    encoder.Draw(3,1);
+    transition(m_sourceHandle,RHIResourceState::RenderTarget,RHIResourceState::PixelShaderResource);
     {
         const float params[4]{ 0.f, 0.f, 0.f, 0.f };
         if (!drawFaces(m_rectToCubePso, m_cubeSourceHandle, 0,
@@ -333,7 +368,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
     const RHIBindingDesc sourceView = RHIBindingDesc::SrvCube(
-        m_cubeSourceHandle, kFormat, 1);
+        m_cubeSourceHandle, kRadianceFormat, 1);
     const RHIBindingTable sourceTable = makeTable(sourceView);
     if (!sourceTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
 
@@ -365,18 +400,18 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
     const RHIBindingDesc cubeView = RHIBindingDesc::SrvCube(
-        m_cubeMapHandle, kFormat, cubeMips);
+        m_cubeMapHandle, kRadianceFormat, cubeMips);
     const RHIBindingTable cubeTable = makeTable(cubeView);
     if (!cubeTable.IsValid()) { outError = "IBL 디스크립터 부족"; return false; }
 
     // Build the luminance CDF and cache environment samples once per bake.
     const auto drawImportance = [&](RHIPipelineHandle pso, RHITextureHandle target,
-        uint32_t width, uint32_t height, const RHIBindingTable& table) -> bool
+        uint32_t width, uint32_t height, const RHIBindingTable& table, uint32_t proposalSize = 0) -> bool
     {
         if (!table.IsValid()) return false;
         IblDrawConstants constants{};
         constants.params[1] = static_cast<float>(m_importanceMip);
-        constants.params[2] = static_cast<float>(m_importanceSize);
+        constants.params[2] = static_cast<float>(proposalSize ? proposalSize : m_importanceSize);
         const auto cb = m_resources->UploadConstants(&constants, sizeof(constants));
         const RHIColorTargetDesc color = RHIColorTargetDesc::Texture(target);
         const auto targets = m_resources->CreateRenderTargets(
@@ -466,6 +501,28 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     transition(m_brdfLutHandle,
         RHIResourceState::RenderTarget, RHIResourceState::PixelShaderResource);
 
+    // Full-resolution proposal for view-dependent material integration. One
+    // thread scans one row, avoiding the quadratic per-texel fragment scan.
+    IblDrawConstants sceneConstants{};sceneConstants.params[2]=float(cubeSize);
+    const auto sceneCb=m_resources->UploadConstants(&sceneConstants,sizeof(sceneConstants));
+    const RHIBindingDesc sceneOutput[]{RHIBindingDesc::Uav2D(m_sceneImportanceRows,kImportanceFormat)};
+    const auto sceneTable=m_resources->CreateBindings(sceneOutput);
+    if(!sceneCb.IsValid() || !sceneTable.IsValid()) {outError="Scene importance bindings failed";return false;}
+    transition(m_cubeMapHandle,RHIResourceState::PixelShaderResource,RHIResourceState::ShaderResource);
+    transition(m_sceneImportanceRows,RHIResourceState::RenderTarget,RHIResourceState::UnorderedAccess);
+    encoder.SetPipeline(RHIBindPoint::Compute,m_sceneImportanceRowsPso);
+    encoder.SetConstantBuffer(RHIBindPoint::Compute,0,sceneCb);
+    encoder.SetBindings(RHIBindPoint::Compute,1,cubeTable);
+    encoder.SetBindings(RHIBindPoint::Compute,2,sceneTable);
+    encoder.Dispatch((6*cubeSize+63)/64,1,1);
+    transition(m_sceneImportanceRows,RHIResourceState::UnorderedAccess,RHIResourceState::PixelShaderResource);
+    transition(m_cubeMapHandle,RHIResourceState::ShaderResource,RHIResourceState::PixelShaderResource);
+    if(!drawImportance(m_importanceMarginalPso,m_sceneImportanceMarginal,1,6*cubeSize,
+        makeTable(cubeView,m_sceneImportanceRows),cubeSize) ||
+       !drawImportance(m_importanceSamplesPso,m_sceneImportanceSamples,kSceneImportanceSampleCount,2,
+        makeTable(cubeView,m_sceneImportanceRows,m_sceneImportanceMarginal),cubeSize))
+        {outError="Scene importance generation failed";return false;}
+
     ++m_generation;
     return true;
 }
@@ -474,14 +531,16 @@ void EnhancedIBLGenerator::ReleaseTargets()
 {
     RHITextureHandle* handles[] = { &m_cubeMapHandle, &m_cubeSourceHandle,
         &m_irradianceHandle, &m_prefilteredHandle, &m_brdfLutHandle,
-        &m_importanceRows, &m_importanceMarginal, &m_importanceSamples };
+        &m_importanceRows, &m_importanceMarginal, &m_importanceSamples,
+        &m_sceneImportanceRows,&m_sceneImportanceMarginal,&m_sceneImportanceSamples, &m_sourceHandle };
     for (auto* handle : handles)
     {
         // Uploaded cooked images belong to the texture cache; generated targets
         // belong to this generator. Never release a cache-owned handle here.
         const bool cookedHandle = m_cookedTextures[0] &&
             (handle == &m_cubeMapHandle || handle == &m_irradianceHandle ||
-             handle == &m_prefilteredHandle || handle == &m_brdfLutHandle);
+             handle == &m_prefilteredHandle || handle == &m_brdfLutHandle ||
+             handle == &m_sceneImportanceRows || handle == &m_sceneImportanceMarginal || handle == &m_sceneImportanceSamples || handle == &m_sourceHandle);
         if (m_resources && !cookedHandle) m_resources->ReleaseTexture(*handle);
         *handle = {};
     }
@@ -495,10 +554,21 @@ bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
     { error = "Cooked environment context is invalid"; return false; }
     ReleaseTargets();
     m_cubeSize = value.cubeSize; m_brdfSize = value.brdfSize;
+    if (!value.importance[0].IsValid() && !assets::BuildEnvironmentImportance(value,error)) return false;
     for (size_t index=0; index<4; ++index)
     {
         m_cookedTextures[index] = Texture::CreateSharedFromImage("CookedEnvironment",std::move(value.images[index]));
         if (!m_cookedTextures[index]) { error = "Cooked environment image is invalid"; return false; }
+    }
+    for(size_t index=0;index<3;++index)
+    {
+        m_cookedTextures[index+4]=Texture::CreateSharedFromImage("CookedEnvironmentImportance",std::move(value.importance[index]));
+        if (!m_cookedTextures[index+4]) {error="Cooked importance image is invalid";return false;}
+    }
+    if (value.source.IsValid())
+    {
+        m_cookedTextures[7]=Texture::CreateSharedFromImage("CookedEnvironmentSource",std::move(value.source));
+        if (!m_cookedTextures[7]) {error="Cooked source image is invalid";return false;}
     }
     return TouchCooked(context,error);
 }
@@ -507,10 +577,12 @@ bool EnhancedIBLGenerator::TouchCooked(const EnhancedFrameContext& context, std:
 {
     error.clear();
     if (!m_cookedTextures[0]) return true;
-    RHITextureHandle* handles[]{&m_cubeMapHandle,&m_irradianceHandle,&m_prefilteredHandle,&m_brdfLutHandle};
+    RHITextureHandle* handles[]{&m_cubeMapHandle,&m_irradianceHandle,&m_prefilteredHandle,&m_brdfLutHandle,
+        &m_sceneImportanceRows,&m_sceneImportanceMarginal,&m_sceneImportanceSamples,&m_sourceHandle};
     bool changed = false;
-    for (size_t index=0; index<4; ++index)
+    for (size_t index=0; index<m_cookedTextures.size(); ++index)
     {
+        if (!m_cookedTextures[index]) continue;
         const auto entry = context.textureCache->GetOrUpload(m_cookedTextures[index].get(),error);
         const auto image = m_cookedTextures[index]->GetImageView();
         if (!error.empty() || !entry.IsValid() || entry.width!=image.Width() || entry.height!=image.Height() ||
@@ -527,15 +599,20 @@ bool EnhancedIBLGenerator::QueueCookedCapture(const std::filesystem::path& file,
     const assets::EnvironmentIdentity& identity, std::string& error)
 {
     CookedCapture capture;
-    const RHITextureHandle handles[]{m_cubeMapHandle,m_irradianceHandle,m_prefilteredHandle,m_brdfLutHandle};
-    for (uint32_t image=0; image<4; ++image)
+    const RHITextureHandle handles[]{m_cubeMapHandle,m_irradianceHandle,m_prefilteredHandle,m_brdfLutHandle,
+        m_sceneImportanceRows,m_sceneImportanceMarginal,m_sceneImportanceSamples,m_sourceHandle};
+    if (!m_sourceHandle.IsValid()) {error="Environment capture requires decoded source";return false;}
+    const auto sourceDescription=m_resources->DescribeTexture(m_sourceHandle);
+    capture.sourceWidth=sourceDescription.width; capture.sourceHeight=sourceDescription.height;
+    capture.sampleCount=m_resources->DescribeTexture(m_sceneImportanceSamples).width;
+    for (uint32_t image=0; image<8; ++image)
     {
         const auto description=m_resources->DescribeTexture(handles[image]);
         for (uint32_t mip=0; mip<description.mipLevels; ++mip)
         {
             CookedCaptureSlice slice; slice.image=image; slice.mip=mip;
             if (!m_resources->CreateReadback(std::max(1u,description.width>>mip),std::max(1u,description.height>>mip),
-                kFormat,image<3?6u:1u,slice.readback,error))
+                description.format,image<3?6u:1u,slice.readback,error))
             {
                 for (auto& previous:capture.slices) m_resources->ReleaseReadback(previous.readback);
                 capture.slices.clear(); return false;
@@ -544,7 +621,7 @@ bool EnhancedIBLGenerator::QueueCookedCapture(const std::filesystem::path& file,
         }
     }
     auto& encoder=m_resources->GetImmediateEncoder();
-    for (uint32_t image=0; image<4; ++image)
+    for (uint32_t image=0; image<8; ++image)
     {
         const RHITransition toCopy{handles[image],RHIResourceState::PixelShaderResource,RHIResourceState::CopySource};
         m_resources->TransitionResources({&toCopy,1});
@@ -584,16 +661,20 @@ bool EnhancedIBLGenerator::FinishCookedCapture(uint64_t completedFence,std::stri
     {
         const uint32_t size=image==1?std::min(cooked.cubeSize,64u):image==3?cooked.brdfSize:cooked.cubeSize;
         const uint32_t mips=image==0?CubeMipCount(size):image==2?kPrefilterMips:1;
-        cooked.images[image]=TextureImage::Allocate(kFormat,size,size,image<3?6u:1u,mips,image<3);
+        cooked.images[image]=TextureImage::Allocate(CookedImageFormat(image),size,size,image<3?6u:1u,mips,image<3);
     }
+    cooked.importance={TextureImage::Allocate(kImportanceFormat,cooked.cubeSize,6*cooked.cubeSize,1,1),
+        TextureImage::Allocate(kImportanceFormat,1,6*cooked.cubeSize,1,1),
+        TextureImage::Allocate(kImportanceFormat,capture.sampleCount,2,1,1)};
+    cooked.source=TextureImage::Allocate(kRadianceFormat,capture.sourceWidth,capture.sourceHeight,1,1);
     bool valid=true;
     for (auto& slice:capture.slices)
     {
         RHIReadbackImage mapped;
         if (!m_resources->MapReadback(slice.readback,mapped,error)) valid=false;
-        const auto& image=cooked.images[slice.image];
+        auto& image=slice.image<4?cooked.images[slice.image]:slice.image<7?cooked.importance[slice.image-4]:cooked.source;
         const auto* target=image.Find(slice.mip,0);
-        if (valid && (!mapped.IsValid() || mapped.format!=kFormat || mapped.width!=target->width ||
+        if (valid && (!mapped.IsValid() || mapped.format!=image.Format() || mapped.width!=target->width ||
             mapped.height!=target->height || mapped.sliceCount!=image.ArraySize() || mapped.rowPitch<target->rowPitch ||
             mapped.sliceBytes<size_t(mapped.rowPitch)*mapped.height ||
             mapped.data.size()<mapped.sliceBytes*mapped.sliceCount))
@@ -601,7 +682,7 @@ bool EnhancedIBLGenerator::FinishCookedCapture(uint64_t completedFence,std::stri
         if (valid)
             for (uint32_t face=0; face<mapped.sliceCount; ++face)
             {
-                auto& image=cooked.images[slice.image]; const auto& target=*image.Find(slice.mip,face);
+                const auto& target=*image.Find(slice.mip,face);
                 CopyImageRows(image.MutablePixelsAt(target),target.rowPitch,
                     reinterpret_cast<const std::byte*>(mapped.data.data()+face*mapped.sliceBytes),mapped.rowPitch,
                     target.height,target.rowPitch);
@@ -637,6 +718,7 @@ void EnhancedIBLGenerator::Shutdown()
     m_cookedCaptures.clear();
     ReleaseTargets();
     m_resources = nullptr;
+    m_sourceCopyPso = {};
     m_rectToCubePso = {};
     m_cubeDownsamplePso = {};
     m_irradiancePso = {};
@@ -645,6 +727,7 @@ void EnhancedIBLGenerator::Shutdown()
     m_importanceRowsPso = {};
     m_importanceMarginalPso = {};
     m_importanceSamplesPso = {};
+    m_sceneImportanceRowsPso = {};
     m_cubeSize = 0;
     m_brdfSize = 0;
     m_importanceSize = 0;

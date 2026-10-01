@@ -1,0 +1,112 @@
+{
+  "schema": "creator.material.special-image-assessment.v1",
+  "policy": {
+    "relative_rms": 0.01,
+    "p95_normalized": 0.01,
+    "max_normalized": 0.05,
+    "reference_noise_rms": 0.0025
+  },
+  "reference_recipe_accepted": true,
+  "accepted": true,
+  "comparison": "Build\\Obj\\Mat9Images-Release-special-volume-final\\comparison.json",
+  "scope": {
+    "geometry": "shared closed smooth 80-triangle icosphere, radius 0.5; within native 128-triangle volume budget",
+    "cycles": "closed-solid refraction and random-walk subsurface; RNA volume_bounces=0 for direct single scattering",
+    "native": "single-interface screen/environment refraction, screen-space diffusion, homogeneous single scattering",
+    "alpha": "opaque only; Scene blended queue unsupported and separately rejected",
+    "volume": "Volume Only=1 disconnects Surface; Volume.* addresses Principled Volume inputs",
+    "volume_light_visibility": "self-extinction enabled; no external occluders"
+  },
+  "diagnostics": {
+    "debug-normal": {
+      "max_abs": 0.0016411542892456055
+    },
+    "debug-view": {
+      "max_abs": 0.0018709301948547363
+    }
+  },
+  "geometry_sha256": "c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282",
+  "zero_scale_controls": {},
+  "passed": 8,
+  "count": 8,
+  "cases": [
+    {
+      "id": "sun-special_volume_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0009548530673584029,
+      "p95_normalized": 0.0013419764671215766,
+      "max_normalized": 0.0019306656699467379,
+      "reference_noise_rms": 4.089743694935163e-07
+    },
+    {
+      "id": "sun-special_volume_absorption",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0010097280762838264,
+      "p95_normalized": 0.0011608004570007324,
+      "max_normalized": 0.0016985535621643066,
+      "reference_noise_rms": 3.8199230932218895e-07
+    },
+    {
+      "id": "sun-special_volume_scattering",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0005151003958620322,
+      "p95_normalized": 3.918074071407318e-06,
+      "max_normalized": 6.692949682474136e-06,
+      "reference_noise_rms": 3.7097331846292124e-06
+    },
+    {
+      "id": "sun-control_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    },
+    {
+      "id": "furnace-special_volume_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0009548530673584029,
+      "p95_normalized": 0.0013419764671215766,
+      "max_normalized": 0.0019306656699467379,
+      "reference_noise_rms": 4.089743694935163e-07
+    },
+    {
+      "id": "furnace-special_volume_absorption",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0010097280762838264,
+      "p95_normalized": 0.0011608004570007324,
+      "max_normalized": 0.0016985535621643066,
+      "reference_noise_rms": 3.8199230932218895e-07
+    },
+    {
+      "id": "furnace-special_volume_scattering",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.000880061561121273,
+      "p95_normalized": 0.00010308623313903809,
+      "max_normalized": 0.0001434236764907837,
+      "reference_noise_rms": 0.0005431452515968817
+    },
+    {
+      "id": "furnace-control_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    }
+  ],
+  "exclusions": [
+    "texture/normal-map filtering",
+    "alpha blended queue",
+    "original area-light/HDRI grid",
+    "multiple volume scattering"
+  ]
+}

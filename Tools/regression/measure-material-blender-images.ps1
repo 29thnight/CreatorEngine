@@ -3,6 +3,7 @@ param(
  [string]$Label='matched',
  [string]$Reference='',
  [string]$ReferenceRepeat='',
+ [string]$ShaderRoot='',
  [string]$Python='C:\Python313\python.exe'
 )
 Set-StrictMode -Version Latest
@@ -24,15 +25,19 @@ $msbuild=Join-Path $vs 'MSBuild/Current/Bin/amd64/MSBuild.exe'
 if($LASTEXITCODE -ne 0) { throw "Native image probe build failed; see $case/build.log" }
 $previousPath=$env:PATH
 $previousValidation=$env:CREATOR_DX12_VALIDATION
+$previousShaderRoot=$env:CREATOR_MAT9_SHADER_ROOT
 try {
  $dependency=if($Configuration -eq 'Debug'){'vcpkg_installed/x64-windows/debug/bin'}else{'vcpkg_installed/x64-windows/bin'}
  $env:PATH=(Join-Path $repo $dependency)+';'+$previousPath
  $env:CREATOR_DX12_VALIDATION='gpu'
+ if($ShaderRoot) { $env:CREATOR_MAT9_SHADER_ROOT=(Resolve-Path -LiteralPath $ShaderRoot).Path }
+ else { $env:CREATOR_MAT9_SHADER_ROOT=$null }
  & "$repo/Bin/x64-$Configuration/Tools/MaterialMatchedImageProbe/MaterialMatchedImageProbe.exe" $repo $Reference "$case/Native" *> "$case/native.log"
  if($LASTEXITCODE -ne 0) { throw "Native image capture failed; see $case/native.log" }
 } finally {
  $env:PATH=$previousPath
  $env:CREATOR_DX12_VALIDATION=$previousValidation
+ $env:CREATOR_MAT9_SHADER_ROOT=$previousShaderRoot
 }
 $comparisonArguments=@("$PSScriptRoot/compare-material-blender-images.py",$Reference,"$case/Native","$case/comparison.json")
 if($ReferenceRepeat) { $comparisonArguments+=@('--reference-repeat',[IO.Path]::GetFullPath($ReferenceRepeat)) }

@@ -1,0 +1,15 @@
+{
+  "schema": "creator.environment-importance-verification.v1",
+  "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-forest-v4.ceibl",
+  "sha256": "fc0c61b3d72ad816585087d12ec0145a9bd0100ce3cf613a1fd18007f3af7ff7",
+  "cube_size": 512,
+  "samples": 1024,
+  "rows": 3072,
+  "cached_pdf_max_relative_error": 4.144204553326184e-07,
+  "importance_persisted": true,
+  "source_persisted": true,
+  "source_bytes_equal": true,
+  "lighting_baseline": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-forest-v3-final.ceibl",
+  "lighting_bytes_equal": true,
+  "bytes": 103028856
+}

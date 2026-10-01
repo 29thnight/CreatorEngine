@@ -37,6 +37,8 @@ def measure(output):
     sensitivities = [[complex(sum(a*b for a, b in zip(m, r[:3])), sum(a*b for a, b in zip(m, r[3:]))) / dc[c]
                       for c, m in enumerate(MATRIX)] for r in table]
     worst = {name: {'absolute': 0.} for name in ('table_vs_dense_order3', 'order3_vs_infinite')}
+    by_cosine = {}
+    records = []
     count = 0
     for ior in (1., 1.1, 1.33, 1.5, 2., 3.):
         for thickness in (.1, 1., 100., 200., 400., 800., 1000.):
@@ -79,15 +81,32 @@ def measure(output):
                         if any(not math.isfinite(x) for x in v): raise ValueError('Non-finite optical response')
                         for name, a, b in (('table_vs_dense_order3',v[0],v[1]), ('order3_vs_infinite',v[1],v[2])):
                             error = abs(a-b)
+                            group = by_cosine.setdefault(str(cosine), {}).setdefault(name,
+                                {'components': 0, 'max_abs': 0., 'squared_error': 0.})
+                            group['components'] += 1
+                            group['max_abs'] = max(group['max_abs'], error)
+                            group['squared_error'] += error*error
                             if error > worst[name]['absolute']:
                                 worst[name] = dict(absolute=error, film_ior=ior, thickness_nm=thickness, cosine=cosine,
                                     substrate_n=substrate.real, substrate_k=substrate.imag, f82=f82, channel=c, first=a, second=b)
+                        records.append(dict(film_ior=ior, thickness_nm=thickness, cosine=cosine,
+                            substrate_n=substrate.real, substrate_k=substrate.imag, f82=f82, channel=c,
+                            lut_order3=v[0], dense_order3=v[1], infinite=v[2],
+                            table_error=abs(v[0]-v[1]), truncation_error=abs(v[1]-v[2])))
                         count += 1
+    for group in by_cosine.values():
+        for values in group.values():
+            values['absolute_rms'] = math.sqrt(values.pop('squared_error')/values['components'])
     report = dict(samples=count, wavelength_spacing_nm=1, wavelength_count=473,
                   color_space='linear Rec.709', reference='infinite Airy series, direct wavelength quadrature',
-                  worst=worst, acceptance='measurement; grazing-angle/order-truncation limits remain explicit')
+                  worst=worst, by_cosine=by_cosine,
+                  acceptance='optical measurement; order-3 truncation is shared with pinned Cycles, not proof of image parity')
     output.parent.mkdir(parents=True,exist_ok=True)
     output.write_text(json.dumps(report,indent=2)+'\n')
+    with output.with_suffix('.csv').open('w', newline='') as stream:
+        writer = csv.DictWriter(stream, fieldnames=records[0].keys())
+        writer.writeheader()
+        writer.writerows(records)
     print(json.dumps(report,indent=2))
 
 

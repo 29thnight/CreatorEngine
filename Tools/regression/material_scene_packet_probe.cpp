@@ -230,7 +230,7 @@ void Run(const std::filesystem::path& root)
         point.normalRoughness[3] = 0;
         point.metalIorLevelAo[1] = ior;
         point.coatWeightRoughIorFilmThickness = {coat ? .35f : 0, 0, 1.5f, 0};
-        point.viewTier[3] = coat ? 1.f : 0;
+        point.viewTier[3] = 1.f;
         result.points.push_back(point);
         return result;
     };

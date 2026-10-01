@@ -67,16 +67,17 @@ float PrincipledDielectricFresnel(float cosine, float ior)
     return 0.5 * (s * s + p * p);
 }
 
-float3 EvaluatePrincipledFresnel(PrincipledReflection reflection, float cosine)
+void EvaluatePrincipledFresnelLobes(PrincipledReflection reflection, float cosine,
+    out float3 dielectric, out float3 metal)
 {
     const float cosineClamped = saturate(cosine);
     const float x = 1.0 - cosineClamped;
     const float xSquared = x * x;
     const float xFifth = xSquared * xSquared * x;
-    float3 metal = saturate(lerp(reflection.metalF0, float3(1.0), xFifth)
+    metal = saturate(lerp(reflection.metalF0, float3(1.0), xFifth)
         - reflection.metalF82Correction * cosineClamped * xFifth * x);
 
-    float3 dielectric = float3(0.0);
+    dielectric = float3(0.0);
     if (reflection.ior != 1.0)
     {
         const float f0Root = (reflection.ior - 1.0) / (reflection.ior + 1.0);
@@ -87,8 +88,10 @@ float3 EvaluatePrincipledFresnel(PrincipledReflection reflection, float cosine)
         dielectric = lerp(reflection.dielectricF0, float3(1.0), interpolation);
     }
 #if (LX_MATERIAL_FEATURE_MASK & 0x0400u) != 0
-    if (reflection.thinFilmThickness > 0.0 && reflection.thinFilmIor != 1.0)
+    if (reflection.thinFilmThickness > 0.1 && reflection.thinFilmIor != 1.0)
     {
+        // Cycles enables wave optics above 0.1nm and smooths only the film IOR
+        // below 1nm. Blending the final Fresnel again suppresses it twice.
         const float transition = smoothstep(0.0, 1.0, reflection.thinFilmThickness);
         const float filmIor = lerp(1.0, reflection.thinFilmIor, transition);
         float3 filmDielectric = EvaluateFilmRgb(cosineClamped, filmIor,
@@ -100,12 +103,18 @@ float3 EvaluatePrincipledFresnel(PrincipledReflection reflection, float cosine)
             const float3 interpolation = saturate((1.0 - filmDielectric) / (1.0 - physicalF0));
             filmDielectric *= lerp(float3(1.0), reflection.dielectricF0 / physicalF0, interpolation);
         }
-        dielectric = lerp(dielectric, saturate(filmDielectric), transition);
+        dielectric = saturate(filmDielectric);
         const float3 filmMetal = EvaluateFilmRgb(cosineClamped, filmIor, reflection.thinFilmThickness,
             reflection.metalIor, reflection.metalExtinction, reflection.metalF82);
-        metal = lerp(metal, filmMetal, transition);
+        metal = filmMetal;
     }
 #endif
+}
+
+float3 EvaluatePrincipledFresnel(PrincipledReflection reflection, float cosine)
+{
+    float3 dielectric, metal;
+    EvaluatePrincipledFresnelLobes(reflection, cosine, dielectric, metal);
     return lerp(dielectric, metal, reflection.metallic);
 }
 

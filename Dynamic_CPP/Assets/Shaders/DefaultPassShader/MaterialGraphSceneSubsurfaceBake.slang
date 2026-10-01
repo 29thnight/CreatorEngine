@@ -85,7 +85,7 @@ void LXSceneSubsurfaceBake(uint3 id : SV_DispatchThreadID)
     point.sheenTintRoughness = lx_inputs_8.Load(int3(pixel, 0));
     point.tangentRotation = lx_inputs_9.Load(int3(pixel, 0));
     point.viewTier = lx_inputs_10.Load(int3(pixel, 0));
-    if (!IsValidPrincipledIblBakePoint(point))
+    if (!IsValidScenePrincipledIblBakePoint(point))
     {
         lx_reflection[index] = sample;
         return;

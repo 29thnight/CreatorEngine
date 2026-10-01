@@ -52,24 +52,29 @@ Tangent=0/normal과 평행/NaN은 geometry tangent, 그것도 유효하지 않�
    Coat Normal이 활성화되면 sheen normal도 base/coat normal 사이에서 혼합한다.
 3. Coat는 별도 Normal·Roughness·물리 dielectric Fresnel을 사용한다. Base의 Specular Level,
    F0 tint, metallic, thin film을 coat에 적용하지 않는다. IOR=1이면 coat 반사는 0이다.
-4. Coat의 single/multiple scatter 반사량으로 하위 레이어를 감쇠하고, 굴절 경로 길이에 따른
+4. Coat의 GGX layering albedo와 darkened closure weight로 하위 레이어를 감쇠하고, 굴절 경로 길이에 따른
    `coatTint^(1/cosTransmitted)`를 곱한다. Emission도 같은 하위 레이어 감쇠를 받는다.
-5. Base·Coat GGX는 correlated Smith visibility를 사용한다. 부족한 multiple scatter는
-   directional albedo·평균 Fresnel에서 보상한다. Base diffuse는 최대 RGB 총반사량의 나머지를 사용한다.
-   색이 다른 채널 사이에서 에너지가 증가하지 않도록 보수적으로 분배한다.
+5. Base·Coat GGX는 correlated Smith visibility를 사용한다. 금속·유전체·coat를 각각 기판 Fss와
+   Blender 5.1.1 E/Eavg LUT로 보상한 뒤 혼합한다. 추가 Lambertian 보상 lobe는 없다.
+   Base diffuse는 유전체 layering albedo의 나머지에 `(1-metallic)`을 한 번 곱한다.
+   강한 비등방성의 LUT 근사는 prepared integral의 남은 에너지 budget으로 직접광·IBL을 함께 제한한다.
 6. Anisotropy는 `aspect=sqrt(1-0.9*anisotropy)`, `ax=roughness²/aspect`,
-   `ay=roughness²*aspect`다. alpha의 수치 하한은 0.001이다. 직접광과 IBL bake가 같은 분포를 사용한다.
+   `ay=roughness²*aspect`다. alpha의 수치 하한은 0.001, 축별 상한은 1이다.
+   직접광과 IBL bake가 같은 분포를 사용한다.
 7. Thin film은 dielectric 및 metallic base 반사에 적용한다. 금속 n+ik는 F0/F82에서 추정한다.
-   Thickness=0 또는 film IOR=1은 기존 반사와 같다. 0~1nm에서는 IOR와 결과를 smoothstep으로 연결한다.
+   Thickness≤0.1nm 또는 film IOR=1은 기존 반사와 같다. 0.1~1nm에서는 film IOR만 smoothstep으로 연결한다.
    상부 경계의 전반사와 스침각 반사도 포함한다.
 8. Alpha는 opacity로 남고 lobe나 emission에 미리 곱하지 않는다. AO는 IBL에만 적용한다.
 
-MAT-3의 core/glTF 계산은 유지한다. Layered permutation의 base는 위의 correlated GGX 적분과
-보수적 확산 분배를 사용한다. 이를 기존 2채널 DFG와 동일하다고 가정하지 않는다.
+MAT-3의 일반 core/glTF 함수와 legacy IBL 모델 0은 유지한다. Scene의 Principled 그래프는
+Core 기능 분류에서도 위의 GGX base를 사용한다. 박막을 끈다고 계산 모델이 바뀌지 않는다.
+이를 기존 2채널 DFG와 동일하다고 가정하지 않는다.
 
 ## IBL 계약과 후속 배선
 
-`PrincipledLayeredIntegral`은 base와 coat의 single-scatter RGB, directional albedo, 평균 Fresnel을 갖는다.
+`PrincipledLayeredIntegral`은 base와 coat의 보상된 반사 RGB, directional albedo, 평균 Fresnel을 갖는다.
+필드명 `singleScatter`는 ABI를 유지하지만 모델 1에서는 이미 GGX 보상을 포함한다.
+`viewTier.w=1`은 이 계산 모델을 뜻하며 Core/Layered 작가 기능 분류와 독립이다.
 `IntegrateLayeredIbl`은 1,024 GGX 표본과 64 Fresnel 표본으로 이를 생성하는 **bake/probe 함수**다.
 Roughness=0은 mirror 해석식을 사용한다. 제품 pixel shader에 이 표본 루프를 연결하지 않는다.
 
@@ -146,3 +151,24 @@ Thickness=0, film IOR=1, dielectric과 film IOR가 같은 경우의 기존 불�
 대시보드 JavaScript 파싱과 MAT 10행/34일/완료 18일 집계는 통과했다.
 전체 `verify-plan-dashboard.ps1`은 HEAD 기준과 동일하게 기존 미산정 `days: null` 처리 24건과
 PHASE 4.6 표시 계산 1건을 보고한다. 이 검사기의 범위 밖 결함을 MAT-4 통과로 덮지 않는다.
+
+### MAT-9 전환 경계와 확대 판정 — 2026-10-01
+
+Cycles의 >0.1nm cutoff와 IOR만 완화하는 전환에 맞춰 최종 반사색의 이중 보간을 제거했다.
+SceneHost identity는 3이다. 이전 spectral golden은 보존하고 두 0.1nm fixture의 CPU complex
+기준 112행을 `numeric-golden-transition.csv` / `transition-manifest.json`에 추가했다.
+0.1nm no-film 제어 224성분 일치를 요구한다. Layered 216,776개 검사·14개 DXIL/SPIR-V
+컴파일·8개 거부와 non-film 역사적 수치를 유지했다. 고정 film/off 8쌍·두 조명의 rendered
+16조건 중 내부 목표를 통과한 것은 4조건이며, 전체 rendered 수용은 미달이다.
+[확대 판정과 공통 BRDF 후속](../analysis/MAT9ThinFilmAcceptance.md)을 따른다.
+
+### MAT-9 공통 GGX 수정 이후의 현재 계약 — 2026-10-01
+
+위 4/16은 수정 전 기록이다. 현재 SceneHost identity는 **4**, numeric baseline은 별도
+`numeric-golden-ggx.csv` / `ggx-manifest.json` 버전 4다. 기판 Fss 보상은 금속·유전체를
+각각 계산한 뒤 혼합한다. 박막-off Core Principled 그래프도 같은 계산 모델을 사용한다.
+Raw compensated integral을 먼저 clamp하지 않고, prepared 에너지 budget을 최종 State에서
+직접광·IBL에 함께 적용한다. 순백 금속 4종·32시선의 GPU 대조 **3,352개 검사**에서 실제
+raw 에너지 초과 8시선을 포함해 이를 확인했다. 이전 광학/profile 기준 파일은 보존한다.
+고정 박막 on/off 32조건이 기존 목표를 통과했다.
+[현재 수용 범위와 한계](../analysis/MAT9GgxClosureComparison.md)를 따른다.

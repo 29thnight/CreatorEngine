@@ -1800,9 +1800,10 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
 
         const RHIBindingDesc frameSrvs[] = {
             RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : RHITextureHandle{},
-                kIblFormat, 1).OrNull(),
+                hasIbl ? context.resources->DescribeTexture(m_iblIrradiance).format : kIblFormat, 1).OrNull(),
             RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : RHITextureHandle{},
-                kIblFormat, hasIbl ? m_iblPrefilterMips : 1).OrNull(),
+                hasIbl ? context.resources->DescribeTexture(m_iblPrefiltered).format : kIblFormat,
+                hasIbl ? m_iblPrefilterMips : 1).OrNull(),
             RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : RHITextureHandle{}, kIblFormat).OrNull(),
             // 그림자 맵. 깊이 배열이라 포맷과 차원을 둘 다 바꿔 봐야 한다
             // (Deferred가 같은 설명으로 같은 자원을 읽는다).

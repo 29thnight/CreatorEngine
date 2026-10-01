@@ -604,6 +604,227 @@ MAT-9 progress·32/34일을 유지한다. 잔여는 재질별 rendered 오차 �
 원래 grid 대조, Deferred/Forward parity와 이동 카메라·tier별 성능 상한 판정이다.
 상세 수치·재현·라이선스는 [MAT9ThinFilmAndEnvironment](../analysis/MAT9ThinFilmAndEnvironment.md)가 소유한다.
 
+### MAT-9 박막 확대 수용 판정 — 2026-10-01
+
+고정 film/off 8쌍을 방향광/white furnace로 대조한 36장과 Blender seed 0/11을 추가했다.
+수정 전/후 native Release DX12 각각 597,673개 검사·GPU validation 0건·정상 종료다.
+0.1nm cutoff 및 1nm 미만의 IOR/반사색 이중 보간을 수정하고 SceneHost identity 3으로
+이전 artifact를 무효화했다. Layered 216,776개 검사와 기존 non-film 수치, 경계 no-film
+224성분을 검증했다. 이전 spectral golden을 보존하고 경계 변경 112행만 별도 고정했다.
+전체 박막 수용은 미달이다. 사전에 정한 scene-linear RMS 1%·p95 1%·max 5%·reference
+noise 0.25% 목표에 박막 16조건 중 4조건만 통과했다. 거친 혼합 금속의 film/off 차이는
+박막 밖의 공통 레이어 감쇠와 GGX 보상도 후속 판정 대상임을 보여준다.
+다음은 같은 MAT-9 정확도 범위의 공통 metal/dielectric 감쇠·GGX 보상 분리/수정과 재대조다.
+Special/texture·route·실제 Scene 성능으로 앞서 진행하지 않는다. MAT-9 progress·32/34일을
+유지하고 새 완료/공수 행은 추가하지 않는다.
+[MAT9ThinFilmAcceptance](../analysis/MAT9ThinFilmAcceptance.md)가 수치·한계·판정을 소유한다.
+
+### MAT-9 공통 GGX와 Core Principled 수정 — 2026-10-01
+
+앞의 4/16은 공통 GGX 수정 전 결과다. 금속·유전체 Fss/compensation을 분리하고
+Lambertian 보상을 GGX lobe의 곱셈 보상으로 교체했다. Blender의 E/Eavg·dielectric
+layering LUT 5,152 float를 라이선스·SHA와 함께 고정했다. Scene Core Principled 그래프도
+같은 base를 사용해 박막-off 시 기존 Core 근사로 되돌아가는 경로를 제거했다.
+CPU SurfaceEvaluator·Scene packet의 계산 모델 tag를 GPU host와 맞추고 host identity 4로
+이전 artifact를 무효화했다. 176/144 byte IBL ABI는 유지한다.
+
+고정 36장 최종 Release DX12 597,673개 검사·GPU validation 0건·정상 종료다.
+사전에 정한 RMS 1%·p95 1%·max 5%·reference noise 0.25% 목표에서 박막 on **16/16**과
+off **16/16**이 통과했다. 박막 RMS 최대 0.2050%, 거친 혼합 금속 off sun/furnace는
+35.5239/19.6764%에서 0.0427/0.1638%로 줄었다. 변경 전 광학 golden은 보존하고
+GGX 버전 4 수치 baseline을 별도 추가했다. 강한 anisotropy 에너지 상한을 완화하지 않았다.
+
+MAT-9 progress·32/34일을 유지한다. 다음은 원래 grid의 area-light/HDRI 및
+Special·texture/normal-map 대조, route parity·실제 Scene 성능 수용이다.
+[MAT9GgxClosureComparison](../analysis/MAT9GgxClosureComparison.md)이 상세 판정을 소유한다.
+
+### MAT-9 HDRI 대조와 Scene 필터 수정 — 2026-10-01
+
+고정 상수 재질 10종 × forest/autumn 및 발광·흰색 확산·거울 제어를 추가했다.
+기존 MAT-0 EEVEE 텍스처/면광원 grid는 보존하고 별도 Cycles scene-linear fixture로 측정했다.
+Blender 4,096 samples의 seed 0/11, source/cook SHA·좌표·밝기·geometry를 고정했다.
+Native 수정 전/후 Release DX12 각각 26장·433,367개 검사·validation 0건·정상 종료다.
+Scene field용 point sampler로 HDR cube도 읽던 부분을 linear IBL sampler로 수정하고
+SceneHost identity 5로 이전 artifact를 무효화했다. 같은 target에서 재질 1/20·제어 3/6이며
+HDRI 전체 수용은 미달이다. 거울 RMS는 forest 8.2410→2.6332%, autumn 0.7838→0.5034%다.
+
+기준 노이즈 목표를 넘는 4,096-sample 조건은 수렴 확인이 필요하다. 가장 큰 autumn 박막은
+131,072-sample seed 0/11의 차이 0.1587%에 비해 제품 RMS 84.1182%다. 별도 shader snapshot에서
+환경 적분만 1,024→32,768로 늘리면 13.7322%로 줄어 샘플링의 기여를 실측했다.
+이는 진단이며 product 기본 샘플 수는 유지한다. 큰 차이를 reference noise로 처리하지 않는다.
+다음은 같은 MAT-9 내 environment/BRDF MIS와 diffuse/source/cube 오차 개선·재수용이다.
+Product 기본 샘플 수를 올리는 방법을 성능 판정 없이 채택하지 않는다.
+면광원은 현재 EnhancedLight/Scene consumer의 directional/point/spot 계약 밖이다.
+원래 disk area를 point light로 대체해 grid 통과로 세지 않으며 extent/단위/방향/PDF와
+직접광 lobe 소비·수렴 기준 구현을 미충족 조명 gate로 명시한다. 새 행/공수는 추가하지 않는다.
+MAT-9 progress·32/34일은 유지한다. 상세 수치·재현·남은 수용 범위는
+[MAT9HdriImageComparison](../analysis/MAT9HdriImageComparison.md)을 따른다.
+
+### 2026-10-01 HDRI / BRDF MIS 연결
+
+Scene GGX base/coat와 Sheen에 환경 1,024 + BRDF 1,024 balance MIS를 적용했다.
+원본 cube mip 0의 선형 radiance를 소비하고, 기존 prepared albedo의 정규화 계약과
+거칠기 0 조회를 보존한다. SceneHost identity 6 및 중요도 맵 owner/generation·상태 전이를 연결했다.
+정확히 0인 반사 에너지는 convolution을 건너뛰며 제어 이미지의 변경은 없다.
+
+CEIBL002의 7-map 쿠킹·캐시·bootstrap을 연결하고 forest 배포 cook을 갱신했다.
+forest/autumn GPU 전체 roundtrip와 기존 4-map byte equality, CDF/PDF 독립 검증을 통과했다.
+전체 26장 native 검증 오류 0; 같은 target은 재질 3/20·제어 3/6으로 아직 미달이다.
+최종 v2 cook dense 박막 RMS는 84.1182→3.6083%로 줄었으나 1% 목표를 넘는다.
+반사 재계산 비용도 남으므로 실제 모델 FPS 수용으로 세지 않는다.
+
+다음은 source/cube·diffuse irradiance/forest 거울 오차 개선 후 수렴한 HDRI 재수용,
+기존 special·texture/normal-map·route parity·성능 순서다. MAT-9 progress·32/34일 유지.
+상세 측정·쿠킹 identity·비용·검증 범위는 [MAT9HdriMis](../analysis/MAT9HdriMis.md)을 따른다.
+
+### 2026-10-01 HDR 에너지 보존 / source-cube 대조
+
+autumn HDR 태양(최대 123904)이 half-float cube/sanitation에서 64000으로 잘려
+확산 적분이 원본과 5.5749% 달라지는 원인을 분리했다. Cube/prefilter를 float32로
+보존하고, cold 변환 시 4×4 solid-angle footprint와 CDF 셀 경계 정밀도 처리를 적용했다.
+CEIBL003 7-map cook/캐시·bootstrap과 실제 형식의 Forward/Deferred/SkyBox binding,
+SceneHost identity 7을 연결했다. 배포 cook은 58.26→90.26MiB다.
+
+Blender 131072-sample seed 0/11의 고정 7조건 전/후 Native 각 121540 checks,
+validation 0. 같은 RMS/p95/max/noise target에서 6/7 통과: autumn diffuse
+5.4994→0.4107%, 박막 3.6083→0.8607%. forest mirror는 footprint/filter 영향으로
+2.6413→3.1285%로 증가했으며 미달 상태다. 부분 집합으로 전체 MAT-9를 닫지 않는다.
+다음은 mirror source 보존·재구성과 normal/view/filter 기여도 분리, 전체 HDRI 수렴/수용,
+기존 special·texture/normal-map·route parity·실제 모델 성능 순서다.
+MAT-9 progress·32/34일 유지. [MAT9HdriRange](../analysis/MAT9HdriRange.md)를 따른다.
+
+### 2026-10-01 forest mirror source·픽셀 중심 보간
+
+원본 source와 Native normal/view에서의 직접 조회 RMS 1.2801%, 공유 triangle의
+픽셀 중심 ray에서는 0.4713%로 기여도를 분리했다. CEIBL004에 원본 linear RGBA32F
+2D source를 보존하고, 거칠기 0 반사의 wrap-U/clamp-V float bilinear 조회 및
+Scene fragment의 같은 triangle plane 픽셀 중심 보간을 적용했다. SceneHost identity 8.
+기존 7개 lighting/CDF 맵은 v3와 byte 일치하고 8-map GPU roundtrip·CDF/PDF 검증 통과.
+배포 cook 90.26→98.26MiB, 원본 EXR은 bootstrap 의존성이 아니다.
+
+기존 Blender 131072-sample seed 0/11, 동일 7조건과 target에서 7/7 통과.
+forest mirror RMS 3.1285→0.4693%, autumn mirror 0.5531→0.3275%, 박막 0.8631%.
+Native 121542 checks·validation 0. 기존 방향광/균일 환경 24장도 같은 target 24/24,
+상수 재질 20조건 RMS 최대 0.1792%. Debug Editor 전체 빌드, Release raster 21067374 checks,
+실제 Editor HTTP 11 checks·v4 bootstrap/캐시 영속화·손상 거부를 확인했다.
+부분 집합으로 전체 MAT-9를 닫지 않는다. 다음은 전체 HDRI 26조건의 수렴/수용,
+기존 special·texture/normal-map·route parity·실제 모델 성능 순서다.
+MAT-9 progress·32/34일 유지. [MAT9MirrorSampling](../analysis/MAT9MirrorSampling.md)를 따른다.
+
+### 2026-10-01 전체 HDRI 26조건 수렴·수용
+
+고정 26조건 전체를 Blender 5.1.1 Cycles CPU 131072 samples, seed 0/11로 새로 렌더했다.
+같은 입력·geometry·source·strength·공통 mask·target에서 forest 이방성 1.0659%,
+autumn 금속 2.3418%, autumn 이방성 1.6345%의 이전 미달을 확인했다.
+CEIBL005에 기존 1024 및 reflection 4096 bank를 쿠킹·캐싱·bootstrap으로 연결하고,
+GGX1024/environment4096 unequal-count MIS와 retained source radiance 조회를 적용했다.
+현재 제품의 별도 capture는 재질20/20·제어6/6, 기존 target 전체 통과다.
+RMS/p95/max 최대 0.4959/0.4681/3.5924%, seed 최대0.1717%.
+Native433369 checks·validation0·정상 종료, 8-map exact GPU roundtrip, Debug 전체 빌드 및
+실제 Editor HTTP11 checks·v5 bootstrap/캐시/손상 거부를 통과했다. 배포98.38MiB(+128KiB).
+기존 방향광·균일 환경 24조건 회귀도 target 24/24·Native400520 checks·validation0·정상 종료,
+RMS/p95/max 최대0.1792/0.1958/0.4487%로 통과했다.
+v4 대비 source·cube·irradiance·BRDF·CDF/base bank는 byte 일치하며 prefilter mip4의 작은 float
+차이는 별도 delta에 기록했다. 추가 반사 샘플 비용의 실제 모델 성능 수용은 아직 남아 있다.
+Special transport·texture/normal-map·route parity·cold/warm/이동 카메라/tier별 성능·원래
+area-light ABI/consumer 게이트는 기존 범위로 남긴다. 상수 두 HDRI 범위로 전체 MAT-9를 닫지 않는다.
+MAT-9 progress·32/34일 유지. [MAT9HdriConvergence](../analysis/MAT9HdriConvergence.md)를 따른다.
+
+### 2026-10-01 Special 대조·균질 단일 산란 Volume 검증
+
+지원 경계 안의 공유 smooth 80-triangle closed icosphere로 Special 24조건을 먼저 대조했다.
+Release Native394222 checks·validation0·정상 종료. 초기 v1 기준은 Volume bounce/내부 감쇠가
+단일 산란 엔진과 달라 전체 수용에서 제외한다. 숫자상 11/24 통과를 완료로 세지 않는다.
+투과 방향광 RMS33.9166%·glass34.7308%, SSS6.2429%를 기록했고 일부 기준 seed도 미수렴이다.
+SSS Scale=0/off는 제품에서 bit exact. flat 네 조건 진단은 diffuse geometry 기여를 보여주지만
+glass 미달이 남아 smooth 결과를 대체하지 않는다.
+
+비교 도구의 최종 Volume 합성을 연결하고 reference v2를 RNA volume_bounces=0·Volume 내부
+감쇠로 고정했다. Blender131072 samples·seed0/11의 새 Volume 8조건 전체가 기존 target 통과.
+RMS/p95/max 최대0.100973/0.134198/0.193067%, noise최대0.054315%.
+Release Native131590 checks·validation0·정상 종료, 독립96/192점 적분과 제품 RMS0.051739%.
+이번 묶음은 제품 Engine/Slang 구현 변경이 아닌 기준·측정 경로 수정과 제품 검증이다.
+실제 Scene Blended queue 거부도 검사했으며 alpha+transmission 완료 기준은 남는다.
+
+다음 기존 순서는 투과 출입 경계/SSS 품질·reference 수렴 → texture/factor/normal-map →
+Deferred/Forward 교차 비교·실제 모델 이동 카메라/tier/cold-warm 성능 → 원래 area-light 소비 경로다.
+큰/skinned/heterogeneous Volume나 multiple scattering 검증으로 확대하지 않는다.
+MAT-9 progress·32/34일 유지. [MAT9SpecialTransportComparison](../analysis/MAT9SpecialTransportComparison.md)를 따른다.
+
+
+### 2026-10-01 Special Surface 반경·스침각 수정과 기준 수렴
+
+Scene artist SSS Radius×Scale을 1/(4π)로 환산하고 공용 물리 profile/numeric golden은 유지했다.
+Glass 준비 적분을 공용 single-interface budget과 일치시켰다. Scene의 스침각/반대 shading normal을
+standalone bake의 N·V 조건으로 잘못 거부하여 가장자리에 오류색을 내던 SSS/굴절 준비도 수정했다.
+finite/tier/nonzero view 검사는 유지하며 standalone의 front-hemisphere 계약은 보존한다.
+SceneHost identity는 최종 10이다. Scale=0/off 제어는 상한을 바꾸지 않고 전체 이미지로 확대했다.
+
+Blender131072 samples·seed0/11로 기존 Surface18조건을 수렴시켰다. noise최대0.227574%로
+18조건 모두 기존0.25% 상한 이내다. 동일 새 기준 A/B의 sun SSS RMS6.2598→4.1009%,
+mixed sun2.0096→2.0373%로 소폭 악화, furnace SSS4.2380%는 그대로다.
+Glass budget 수정의 이미지 영향은 작고 폐곡면 투과 차이는 남는다. target은 7/18, 전체 미수용.
+
+최종 Debug/Release Native각18 frames·295717 checks·validation0·정상 종료와 294912 RGBA byte exact.
+Scale=0/off는 두 조명 모두 전체 이미지 byte exact, source589개 변경0, 전체 Debug Editor 빌드 통과.
+반경 수정 단계의 SSS12/굴절24 frame Debug/Release와 Special202049개 검사·golden 보존도 통과했다.
+기존 Volume8조건은 보존하며 다른 세대의 검증을 합산해 Special 전체 완료로 세지 않는다.
+실제 GUI·Vulkan GPU·cooked Player·모델 FPS 수용으로 확대하지 않는다.
+
+다음 기존 작업은 폐곡면 출구 경계·SSS 공간 응답·smooth grazing normal 개선 및 같은 target 재검증이다.
+Alpha+transmission, texture/normal-map, route parity·실제 모델 성능, area-light 소비 gate도 그대로 남는다.
+MAT-9 progress·32/34일 유지, 새 완료/공수 행을 추가하지 않는다.
+[MAT9SpecialProfileCorrection](../analysis/MAT9SpecialProfileCorrection.md)를 따른다.
+
+### 2026-10-01 근접 카메라 이동 성능 조사
+
+사용자 Debug 캡처의 `LX.Scene.LookupBake`는 유효 278표본 가운데 20개에서
+72.819..107.506ms를 기록했다. 현재 동일 화면 픽셀의 입력 11개를 bit equality로 검사하므로
+카메라 이동과 texture/normal/view 변화가 화면별 IBL 적분 miss로 이어진다.
+GPU 병목과 profiler timeline/scene-lock CPU 비용을 구분했다.
+
+고정 HDRI 26조건의 diagnostic 근사는 BRDF/environment 256/4096에서 기존 이미지 상한을
+26/26 만족했으나, 안정적인 전체 재질 speedup을 입증하지 못했다. 환경 bank를 1024로 줄인
+두 후보는 각각 22/26이며 제품 기본값으로 채택하지 않았다.
+패스별 timestamp 측정을 추가했고, 도구 변경 전후 해당 네 조건의 전체 픽셀은 byte 일치했다.
+제품 shader/renderer/cook 및 MAT-9 수용 상한은 이 조사에서 변경하지 않았다.
+
+기존 moving-camera 성능 게이트의 구현 후보는 환경 proposal의 decoded-source radiance 공유 준비 →
+BRDF LUT/basis 또는 제한된 sample 근사 → depth/normal/material/환경 generation을 검증하는
+IBL reprojection/refinement 순서다. 예상 speedup을 완료 성과로 세지 않는다.
+근접·전체 화면·grazing·texture/normal map·Special·disocclusion·정지 후 refinement와
+실제 render completion FPS를 같은 품질 상한 및 Debug/Release 조건에서 검증한다.
+MAT-9 progress·32/34일 유지, 새 완료/공수 행을 추가하지 않는다.
+[근접 카메라 조사와 근사 실험](../analysis/MAT9NearCameraPerformance.md)을 따른다.
+
+### 2026-10-01 후속 구조 정리와 최종 게이트 회수
+
+제품 IBL 1024/4096과 현재 이미지 수용 상한을 유지한다. BASE-0과 RenderGraph 후속 작업은 구현·검증된 MAT-0~MAT-8 기반을 선행으로 소비하며 MAT-9 전체 완료를 기다리지 않는다. GPU Scene 상주·변경분 갱신·재질/PSO 배칭·간접 드로우와 IBL 재사용/갱신을 함께 설계하되, 설계 완료로 성능 게이트를 닫지 않는다. 실제 구현 후 같은 장면·카메라·해상도·환경·샘플 설정의 이미지 오차, Debug/Release CPU/GPU 시간, 근접 이동 끊김을 재검증한다. SSS·투과 품질, texture/normal-map·route·area-light 잔여 조건도 별도로 유지한다. MAT-9 progress·32/34일 유지, 미산정 구현을 완료 공수에 더하지 않는다.
+
+### 2026-10-01 품질 기준선 유지·후속 페이즈 진행 결정
+
+사용자 결정으로 제품의 **BRDF 1024 / environment 4096**, CEIBL005와 SceneHost identity 10을
+현재 비교 기준선으로 유지한다. diagnostic 256/4096 후보는 제품 기본값으로 채택하지 않는다.
+**PHASE 4.25와 MAT-9는 열린 상태(`progress`, 32/34일)**로 남긴다. 새 완료/공수 행은 없다.
+
+- 후속 PHASE 4.3은 구현된 MAT-0~MAT-8의 typed graph·Principled ABI·Scene binding/cook을
+  입력으로 받고 BASE-0에서 현재 픽셀·실행·수명 기준선을 고정한다. MAT-9 전체 수용을
+  착수 선행으로 요구하지 않는다. 현재 미수용 결과도 기준선에 명시하며 품질 통과로 세지 않는다.
+- RenderGraph·RHI 수명/동기화·필요한 시간축 계약을 먼저 정리하고, PHASE 4.8 GPU-driven
+  설계에서 GPU Scene 상주·변경분 갱신·재질/PSO 묶음·간접 드로우와 IBL 재사용/갱신 배선을
+  함께 결정한다. [상세 배선 설계](../design/GpuDrivenMeshletDxrWiring.md)는 제안 계약이며
+  GPU-1/GPU-3 진행, GPU-9 교차 설계·구현 공수 확정은 아직 남는다.
+- 성능 게이트는 **실제 후속 구현 뒤** 같은 모델·해상도·재질·HDRI·카메라 궤적·warmup에서
+  Debug/Release CPU/GPU median·p95·max, 실제 render completion FPS와 입력 지연을 재판정한다.
+  IBL의 이동 중 spike를 별도로 측정하고 GPU-driven만으로 사라진다고 가정하지 않는다.
+- 기존 RMS≤1%·p95 normalized≤1%·max normalized≤5%·seed RMS≤0.25%를 낮추지 않는다.
+  재투영/갱신 최적화는 disocclusion·camera cut·재질/HDRI 변경·정지 후 refinement도 검사한다.
+- SSS/폐곡면 투과·alpha+transmission·texture/normal-map·route parity·area-light gate는
+  그대로 남긴다. GPU-driven 설계나 성능 통과로 이 품질 항목을 대체하지 않는다.
+
+[통합 체크포인트](../analysis/MAT9IntegrationCheckpoint20261001.md),
+[후속 선행 그래프](RenderPhaseRoadmap.md), [GPU 기능 계획](GpuFeaturePlanningPlan.md)을 따른다.
+
 ## 6. 완료 기준
 
 - `.shadergraph(domain=material)` 저장→닫기→재개방 뒤 node/pin/connection/layout/Blackboard,

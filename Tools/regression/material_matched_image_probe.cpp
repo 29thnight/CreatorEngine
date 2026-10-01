@@ -4,9 +4,35 @@
 #undef main
 #include <numeric>
 #include <iomanip>
+#include <map>
+#include <DirectXPackedVector.h>
+#include "RHI/DX12/EnhancedIBLGenerator.h"
+#include "Assets/CookedEnvironment.h"
 
 namespace
 {
+// Record each graph pass in its own GPU timestamp interval. A frame-wide
+// interval can include submission gaps and must not substitute for bake cost.
+struct MatchedPassTimer final : IRHIGpuProfiler
+{
+    static constexpr unsigned capacity = 128;
+    Microsoft::WRL::ComPtr<ID3D12QueryHeap> heap;
+    std::vector<std::string> names;
+    uint32_t BeginPass(RHIEncoder& encoder, const std::string& name) override
+    {
+        Check(names.size() < capacity, "Matched pass timestamp capacity");
+        const auto slot = static_cast<uint32_t>(names.size());
+        names.push_back(name);
+        static_cast<DX12Encoder&>(encoder).GetCommandList()->EndQuery(heap.Get(),D3D12_QUERY_TYPE_TIMESTAMP,2*slot);
+        return slot;
+    }
+    void EndPass(RHIEncoder& encoder, uint32_t slot) override
+    {
+        Check(slot < names.size(), "Matched pass timestamp pairing");
+        static_cast<DX12Encoder&>(encoder).GetCommandList()->EndQuery(heap.Get(),D3D12_QUERY_TYPE_TIMESTAMP,2*slot+1);
+    }
+};
+
 struct MatchedGeometry
 {
     std::vector<std::byte> vertices;
@@ -59,6 +85,7 @@ MatchedGeometry ReadMatchedGeometry(const std::filesystem::path& file)
 }
 
 std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& root,
+                                               const std::filesystem::path& shaderRoot,
                                                const std::filesystem::path& inputs,
                                                const std::filesystem::path& output,
                                                GenerationStore& store)
@@ -67,6 +94,8 @@ std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& roo
     const auto surface = asset.CreateNode("ShaderNodeBsdfPrincipled", 0, 0);
     const auto materialOutput = asset.CreateNode("ShaderNodeOutputMaterial", 400, 0);
     asset.activeOutput = materialOutput;
+    Id volume{};
+    bool volumeOnly{};
     std::ifstream stream(inputs);
     std::string name;
     unsigned components{};
@@ -80,10 +109,27 @@ std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& roo
         LXSocketValue value = components == 1 ? LXSocketValue{values[0]} : components == 3
                                   ? LXSocketValue{std::array<double, 3>{values[0], values[1], values[2]}}
                                   : LXSocketValue{values};
-        Check(asset.graph.SetSocketValue(Pin(asset.graph, surface, name, Direction::Input), value),
-              "Matched graph input " + name);
+        if (name == "Volume Only")
+        {
+            Check(components == 1 && values[0] == 1.0, "Matched volume-only declaration");
+            volumeOnly = true;
+            continue;
+        }
+        const bool volumeInput = name.starts_with("Volume.");
+        if (volumeInput && volume == 0)
+            volume = asset.CreateNode("LXPrincipledVolume", 0, 300);
+        const auto pin = Pin(asset.graph, volumeInput ? volume : surface,
+                             volumeInput ? name.substr(7) : name, Direction::Input);
+        asset.graph.SetSocketValue(pin, value); // A default-value assignment is a valid no-op.
+        Check(asset.graph.FindPin(pin)->value == value, "Matched graph input " + name);
     }
     Check(stream.eof(), "Matched input parse");
+    Check(!volumeOnly || volume != 0, "Matched volume-only requires volume");
+    if (volume != 0)
+        Check(asset.graph.Connect(Pin(asset.graph, volume, "Volume", Direction::Output),
+                                  Pin(asset.graph, materialOutput, "Volume", Direction::Input)).has_value(),
+              "Matched volume output connection");
+    if (!volumeOnly)
     Check(asset.graph.Connect(Pin(asset.graph, surface, "BSDF", Direction::Output),
                               Pin(asset.graph, materialOutput, "Surface", Direction::Input)).has_value(),
           "Matched output connection");
@@ -92,7 +138,7 @@ std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& roo
     Check(!!generated, "Matched graph code generation");
     std::string error;
     VerifiedProduct product;
-    Check(CompileSceneProduct(*generated, root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader",
+    Check(CompileSceneProduct(*generated, shaderRoot,
                               output / (inputs.stem().string() + ".slang"), {}, product, error),
           "Matched complete Scene compiler " + error);
     experiment::AssetId id;
@@ -118,6 +164,15 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     paths->BaseProjectPath = root / "Dynamic_CPP";
     paths->CacheRoot = output / "ShaderCache";
     paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
+    auto shaderRoot = paths->ShaderSourcePath / "DefaultPassShader";
+    if (const auto* overrideRoot = std::getenv("CREATOR_MAT9_SHADER_ROOT"))
+    {
+        shaderRoot = std::filesystem::absolute(overrideRoot);
+        Check(std::filesystem::is_regular_file(shaderRoot / "Includes/PrincipledEnvironmentBake.slang"),
+              "Matched diagnostic shader root");
+        paths->ShaderSourcePath = shaderRoot.parent_path();
+    }
+    std::ofstream(output / "shader-root.txt") << shaderRoot.string() << '\n';
     paths->AssetAuthoringEnabled = true;
     RecordingChangeDevice device;
     std::string error;
@@ -158,6 +213,48 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     auto geometry = ReadMatchedGeometry(output / "sphere.bin");
     const Environment environment{{{1,1,1},{1,1,1},{1,1,1},{1,1,1},{1,1,1},{1,1,1}}};
     const auto cube = Cube(environment);
+    struct MatchedEnvironment { std::filesystem::path file; float strength{}; assets::CookedEnvironment cooked; };
+    std::map<std::string, MatchedEnvironment> hdrEnvironments;
+    if (std::filesystem::exists(fixture / "environment.config"))
+    {
+        std::ifstream configuration(fixture / "environment.config");
+        std::string mode, path;
+        float strength{};
+        while (configuration >> mode >> std::quoted(path) >> strength)
+        {
+            Check((mode == "forest" || mode == "autumn") && strength == .35f &&
+                      !hdrEnvironments.contains(mode), "Matched environment config");
+            MatchedEnvironment value{std::filesystem::path(path), strength};
+            Check(assets::ReadCookedEnvironment(value.file, value.cooked, error), "Matched cooked environment " + error);
+            // Strength scales every lighting map once, preserving the cook on disk.
+            for (unsigned map = 0; map < 4; ++map)
+            {
+                auto& image = map < 3 ? value.cooked.images[map] : value.cooked.source;
+                if (!image.IsValid()) continue;
+                const bool half = image.Format() == RHIFormat::RGBA16Float;
+                Check(half || image.Format() == RHIFormat::RGBA32Float, "Matched cook lighting format");
+                const auto imageView = image.View();
+                for (unsigned slice = 0; slice < imageView.SubresourceCount(); ++slice)
+                {
+                    const auto* description = imageView.At(slice);
+                    auto* bytes = image.MutablePixelsAt(*description);
+                    auto* pixels = reinterpret_cast<std::uint16_t*>(bytes);
+                    auto* floats = reinterpret_cast<float*>(bytes);
+                    for (std::size_t pixel = 0; pixel < description->slicePitch / (half ? 8 : 16); ++pixel)
+                        for (unsigned c = 0; c < 3; ++c)
+                            if (half) pixels[pixel*4+c] = DirectX::PackedVector::XMConvertFloatToHalf(
+                                DirectX::PackedVector::XMConvertHalfToFloat(pixels[pixel*4+c]) * strength);
+                            else floats[pixel*4+c] *= strength;
+                }
+            }
+            hdrEnvironments.emplace(mode, std::move(value));
+        }
+        Check(configuration.eof() && hdrEnvironments.size() == 2, "Matched complete HDRI pair");
+        std::filesystem::copy_file(fixture / "environment.config", output / "environment.config");
+    }
+    EnhancedIBLGenerator hdri;
+    Check(hdri.Initialize(context, error), "Matched cooked IBL owner " + error);
+    std::string currentEnvironment;
     GenerationStore store;
     std::vector<std::filesystem::path> cases;
     for (const auto& file : std::filesystem::directory_iterator(fixture))
@@ -165,16 +262,24 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     std::ranges::sort(cases);
     unsigned frame{};
     const bool measureTiming=std::getenv("CREATOR_MAT9_TIMING")!=nullptr;
+    const bool forceRebake=std::getenv("CREATOR_MAT9_TIMING_REBAKE")!=nullptr;
+    const bool disableMis=std::getenv("CREATOR_MAT9_DISABLE_MIS")!=nullptr;
+    if(disableMis) std::ofstream(output/"mis-disabled.txt")<<"Diagnostic baseline; not product acceptance.\n";
     std::ofstream timing(output/"timing.csv");
     timing << "case,repeat,program_prepare_ms,frame_prepare_ms,gpu_frame_ms\n";
+    std::ofstream passTiming(output/"pass-timing.csv");
+    passTiming << "case,repeat,pass,gpu_ms\n";
     for (const auto& inputFile : cases)
     {
         const auto name = inputFile.stem().string();
         const bool furnace = name.starts_with("furnace-");
+        const auto mode = name.substr(0, name.find('-'));
+        const bool hdr = hdrEnvironments.contains(mode);
+        Check(furnace || hdr || mode == "sun", "Matched lighting mode");
         std::cerr << "MAT9_MATCHED_FRAME " << name << '\n';
         const auto capturedInput = output / inputFile.filename();
         std::filesystem::copy_file(inputFile, capturedInput);
-        geometry.draw.materialGraphInstance = MatchedInstance(root, capturedInput, output, store);
+        geometry.draw.materialGraphInstance = MatchedInstance(root, shaderRoot, capturedInput, output, store);
         geometry.draw.materialGraphSlot = 1;
         const auto programStart=std::chrono::steady_clock::now();
         WaitSceneProgram(host, context, geometry.draw.materialGraphInstance->generation);
@@ -182,9 +287,9 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         for (unsigned repeat=0;repeat<(measureTiming?9u:1u);++repeat)
         {
         context.frameId = ++frame;
-        context.sceneEpoch = 1;
+        context.sceneEpoch = forceRebake ? context.frameId : 1;
         lights.clear();
-        if (!furnace)
+        if (!furnace && !hdr)
         {
             const auto direction = Unit({.35, -.2, .8});
             EnhancedLight light;
@@ -199,14 +304,30 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         textures.BeginFrame(context.frameId);
         meshes.BeginFrame(static_cast<unsigned>(context.frameId));
         RHITextureHandle environmentHandle;
+        RHITextureHandle irradianceHandle, prefilteredHandle;
         if (furnace)
         {
             const auto uploaded = textures.GetOrUpload(cube.get(), error);
             Check(uploaded.IsValid(), "Matched furnace cube " + error);
             environmentHandle = uploaded.handle;
         }
+        if (hdr)
+        {
+            if (currentEnvironment != mode)
+            {
+                Check(hdri.InstallCooked(context, std::move(hdrEnvironments.at(mode).cooked), error),
+                      "Matched HDRI install " + error);
+                currentEnvironment = mode;
+            }
+            Check(hdri.TouchCooked(context, error), "Matched HDRI residency " + error);
+            environmentHandle = hdri.GetCubeMap();
+            irradianceHandle = hdri.GetIrradianceMap();
+            prefilteredHandle = hdri.GetPrefilteredMap();
+        }
         Microsoft::WRL::ComPtr<ID3D12QueryHeap> timer;
         RHIReadback timerReadback;
+        RHIReadback passTimerReadback;
+        MatchedPassTimer passTimer;
         uint64_t timerFrequency{};
         if (measureTiming)
         {
@@ -214,12 +335,31 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&timerDesc,IID_PPV_ARGS(&timer))) &&
                 SUCCEEDED(device.GetCommandQueue()->GetTimestampFrequency(&timerFrequency)) &&
                 device.CreateBufferReadback(16,timerReadback,error),"Matched GPU timer");
-            static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList()->EndQuery(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0);
+            const D3D12_QUERY_HEAP_DESC passDesc{D3D12_QUERY_HEAP_TYPE_TIMESTAMP,2*MatchedPassTimer::capacity,0};
+            Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&passDesc,IID_PPV_ARGS(&passTimer.heap))) &&
+                  device.CreateBufferReadback(16*MatchedPassTimer::capacity,passTimerReadback,error),
+                  "Matched pass GPU timers");
         }
         const auto prepareStart=std::chrono::steady_clock::now();
-        Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
-                  host.PrepareResidency(context, input, error) &&
-                  host.Prepare(context, input, environmentHandle, {}, {}, {}, {}, error, 1), "Matched prepare " + error);
+        if (frame == 1)
+        {
+            auto blendedDraw = geometry.draw;
+            blendedDraw.coverage.flags |= EnhancedMaterialCoverage::Blended;
+            std::shared_ptr<const SceneViewInput> blended;
+            Check(SceneViewInput::Seal(view, {&blendedDraw, 1}, {}, blended, error),
+                  "Matched blended queue classification");
+            Check(!host.Prepare(context, blended, {}, {}, {}, {}, {}, error, 1) &&
+                      error.find("Blended composition is not installed") != std::string::npos,
+                  "Matched unsupported alpha must be rejected, never treated as opaque");
+            error.clear();
+        }
+        const bool prepared = gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
+                              host.PrepareResidency(context, input, error) &&
+                              host.Prepare(context, input, environmentHandle, irradianceHandle, prefilteredHandle, {}, {}, error,
+                                           hdr ? hdri.GetGeneration() : 1,
+                                           hdr && !disableMis ? hdri.GetImportanceMaps() : std::array<RHITextureHandle,3>{},
+                                           hdr ? hdri.GetSourceMap() : RHITextureHandle{});
+        Check(prepared, "Matched prepare " + error);
         const auto prepareMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-prepareStart).count();
         auto graph = std::make_shared<EnhancedRenderGraph>(device);
         gbuffer.Declare(*graph, context);
@@ -244,9 +384,9 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         deferred.SetAmbientOcclusion(ao);
         deferred.Declare(*graph, context);
         host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
+        const auto color = host.DeclareVolume(*graph, deferred.GetOutput(), outputs.depth, {});
         RHIReadback readback;
         Check(device.CreateReadback(64, 64, RHIFormat::RGBA16Float, 1, readback, error), "Matched readback " + error);
-        const auto color = deferred.GetOutput();
         graph->AddPass("MAT9.ImageReadback", {{color, RHIResourceState::CopySource}},
                        [readback,color](const auto& execution) {
                            execution.encoder->CopyToReadback(readback, execution.ResolveHandle(color));
@@ -270,12 +410,19 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             }
         }
         if (!graph->Compile(error)) throw std::runtime_error("Matched graph compile: " + error);
+        if (measureTiming)
+        {
+            graph->SetProfiler(&passTimer);
+            static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList()->EndQuery(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0);
+        }
         if (!graph->Execute(error)) throw std::runtime_error("Matched graph execute: " + error);
         if (measureTiming)
         {
             auto* list=static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList();
             list->EndQuery(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,1);
             list->ResolveQueryData(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0,2,device.Resolve(timerReadback.buffer),0);
+            list->ResolveQueryData(passTimer.heap.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0,
+                                   static_cast<UINT>(2*passTimer.names.size()),device.Resolve(passTimerReadback.buffer),0);
         }
         if (!device.EndFrame(error)) throw std::runtime_error("Matched frame submit: " + error);
         if (!GetRHISubmissionThread().DrainSubmissions(&device, error))
@@ -294,6 +441,17 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             timing << name << ',' << repeat << ',' << programMs << ',' << prepareMs << ','
                    << double(ticks[1]-ticks[0])*1000/timerFrequency << '\n';
             device.ReleaseReadback(timerReadback);
+            RHIReadbackImage passTimes;
+            Check(device.MapReadback(passTimerReadback,passTimes,error),"Matched pass GPU timer map");
+            for (unsigned slot=0;slot<passTimer.names.size();++slot)
+            {
+                std::array<uint64_t,2> passTicks;
+                std::memcpy(passTicks.data(),passTimes.data.data()+16*slot,16);
+                Check(passTicks[1]>=passTicks[0],"Matched pass GPU timer order");
+                passTiming << name << ',' << repeat << ',' << std::quoted(passTimer.names[slot]) << ','
+                           << double(passTicks[1]-passTicks[0])*1000/timerFrequency << '\n';
+            }
+            device.ReleaseReadback(passTimerReadback);
         }
         RHIReadbackImage mapped;
         Check(device.MapReadback(readback, mapped, error), "Matched map " + error);
@@ -330,6 +488,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         }
     }
     host.ShutdownAfterIdle();
+    hdri.Shutdown();
     gbuffer.Shutdown(); deferred.Shutdown(); meshes.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown();
     device.Shutdown();
     std::filesystem::copy_file(fixture / "manifest.json",output / "reference-manifest.json");

@@ -1,0 +1,148 @@
+{
+  "schema": "creator.material.mirror-sampling-diagnostic.v1",
+  "interior_pixels": 344,
+  "reference": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-v4-controls-0",
+  "before": {
+    "native_mirror_vs_blender": {
+      "relative_rms": 0.031285371631383896,
+      "p95_normalized": 0.022948598489165306,
+      "max_normalized": 0.22203153371810913,
+      "reference_mean": [
+        0.3533453345298767,
+        0.356094628572464,
+        0.38287362456321716
+      ],
+      "actual_mean": [
+        0.35461750626564026,
+        0.35709282755851746,
+        0.3834855854511261
+      ]
+    },
+    "source_at_native_point_vs_blender": {
+      "relative_rms": 0.012800945988567744,
+      "p95_normalized": 0.010890133161434492,
+      "max_normalized": 0.04563444428756907,
+      "reference_mean": [
+        0.3533453345298767,
+        0.356094628572464,
+        0.38287362456321716
+      ],
+      "actual_mean": [
+        0.35439236528615364,
+        0.35696716100569686,
+        0.3837618255903702
+      ]
+    },
+    "normal_vs_pixel_center": {
+      "relative_rms": 8.636238844179723e-05,
+      "p95_normalized": 0.00010135764544526715,
+      "max_normalized": 0.00013215325961796198,
+      "reference_mean": [
+        0.005204905491242085,
+        0.005203838339043883,
+        0.861133296895704
+      ],
+      "actual_mean": [
+        0.005204663146287203,
+        0.005203906912356615,
+        0.8611321449279785
+      ]
+    },
+    "view_vs_pixel_center": {
+      "relative_rms": 1.4367368328850145e-05,
+      "p95_normalized": 1.8419525115622207e-05,
+      "max_normalized": 2.4799088723007068e-05,
+      "reference_mean": [
+        -0.0009696761002740608,
+        -0.0009696761002740626,
+        0.9954439754935082
+      ],
+      "actual_mean": [
+        -0.0009696367778815329,
+        -0.0009696836932562292,
+        0.9954432845115662
+      ]
+    }
+  },
+  "after": {
+    "native_mirror_vs_blender": {
+      "relative_rms": 0.004693074617534876,
+      "p95_normalized": 0.0028146952390670776,
+      "max_normalized": 0.035923950374126434,
+      "reference_mean": [
+        0.3533453345298767,
+        0.356094628572464,
+        0.38287362456321716
+      ],
+      "actual_mean": [
+        0.3530299961566925,
+        0.3558425009250641,
+        0.38275209069252014
+      ]
+    },
+    "source_at_native_point_vs_blender": {
+      "relative_rms": 0.00471256575016839,
+      "p95_normalized": 0.0027528938651696084,
+      "max_normalized": 0.03528063241300468,
+      "reference_mean": [
+        0.3533453345298767,
+        0.356094628572464,
+        0.38287362456321716
+      ],
+      "actual_mean": [
+        0.35317524229560016,
+        0.35596570798969457,
+        0.382862943483674
+      ]
+    },
+    "normal_vs_pixel_center": {
+      "relative_rms": 9.002066041966746e-08,
+      "p95_normalized": 1.0765513617227995e-07,
+      "max_normalized": 2.3414444105807064e-07,
+      "reference_mean": [
+        0.005204905491242085,
+        0.005203838339043883,
+        0.861133296895704
+      ],
+      "actual_mean": [
+        0.005204909946769476,
+        0.005203812848776579,
+        0.8611337542533875
+      ]
+    },
+    "view_vs_pixel_center": {
+      "relative_rms": 5.7862724138030694e-08,
+      "p95_normalized": 6.602413493705939e-08,
+      "max_normalized": 9.938801781572693e-08,
+      "reference_mean": [
+        -0.0009696761002740608,
+        -0.0009696761002740626,
+        0.9954439754935082
+      ],
+      "actual_mean": [
+        -0.0009696740307845175,
+        -0.0009696647175587714,
+        0.9954437613487244
+      ]
+    }
+  },
+  "source_sha256": "2a313b5fe8361435d4e52b6300e3431f586bc110906f2024e3eb2387b4cab460",
+  "geometry_sha256": "604cc50946887fdfd750d0166eb549c87b87caa23c83c0b9d2f936e24d4b9aed",
+  "pixel_center_source_vs_blender": {
+    "relative_rms": 0.0047132751029392425,
+    "p95_normalized": 0.0027591821649793832,
+    "max_normalized": 0.03527910740441356,
+    "reference_mean": [
+      0.3533453345298767,
+      0.356094628572464,
+      0.38287362456321716
+    ],
+    "actual_mean": [
+      0.3531751093575903,
+      0.35596555907326344,
+      0.3828627489888339
+    ]
+  },
+  "before_native": "Build/Obj/Mat9Images-Release-hdri-v3-controls/Native",
+  "after_native": "Build/Obj/Mat9Images-Release-hdri-v4-controls/Native"
+}

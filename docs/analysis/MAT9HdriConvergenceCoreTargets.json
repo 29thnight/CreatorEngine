@@ -1,0 +1,18 @@
+{
+  "scope": "existing 24-case punctual/furnace regression only",
+  "accepted": true,
+  "count": 24,
+  "policy": {
+    "relative_rms": 0.01,
+    "p95_normalized": 0.01,
+    "max_normalized": 0.05,
+    "reference_noise_rms": 0.0025
+  },
+  "maxima": {
+    "relative_rms": 0.0017917013377592218,
+    "p95_normalized": 0.001957714557647705,
+    "max_normalized": 0.004486560821533203
+  },
+  "reference_noise_rms": 0.0022358836596911703,
+  "native": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Images-Release-hdri-v5-core-regression\\Native"
+}

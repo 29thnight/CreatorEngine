@@ -1,0 +1,145 @@
+{
+  "schema": "creator.material.special-surface-verification.v1",
+  "date": "2026-10-01",
+  "head": "12f970c7ed3a4408d268479f5d5acb5f80372b8c",
+  "dirty_worktree": true,
+  "final_scene_host_identity": 10,
+  "final_native": {
+    "configurations": [
+      "Debug",
+      "Release"
+    ],
+    "backend": "DX12",
+    "frames_per_configuration": 18,
+    "checks_per_configuration": 295717,
+    "validation_per_configuration": 0,
+    "normal_exit": true,
+    "debug_release_byte_exact": true,
+    "rgba_components": 294912,
+    "full_image_zero_scale_off_byte_exact": {
+      "sun": true,
+      "furnace": true
+    },
+    "quality_passed": 7,
+    "quality_count": 18,
+    "quality_accepted": false,
+    "max_reference_noise_rms": 0.0022757397963459724
+  },
+  "radius_integration_stage": {
+    "scene_host_identity": 9,
+    "configurations": [
+      "Debug",
+      "Release"
+    ],
+    "subsurface_frames": 12,
+    "subsurface_checks": 119415,
+    "subsurface_gpu_components": 108072,
+    "refraction_frames": 24,
+    "refraction_checks": 185068,
+    "refraction_gpu_components": 155877,
+    "validation": 0,
+    "scope": "Head-on product fixtures after radius/budget and independent CPU oracle correction; grazing fix separately verified by final host 10 images"
+  },
+  "closure": {
+    "checks": 202049,
+    "cases": 35,
+    "views": 6,
+    "variants": 7,
+    "compiled": 28,
+    "rejected": 22,
+    "preserved_golden_rows": 4410
+  },
+  "final_ibl": {
+    "configurations": [
+      "Debug",
+      "Release"
+    ],
+    "checks_per_configuration": 19351,
+    "gpu_components": 18240,
+    "points": 152,
+    "frames": 3,
+    "compiled": 6,
+    "max_normalized_error": 5.45189E-06
+  },
+  "final_editor": "Full Debug build passed; GUI not exercised",
+  "sources": {
+    "snapshot": "Build/Obj/mat9-special-surface-final10-source-hashes.json",
+    "snapshot_sha256": "7143565cfeb86e3cfbf50b92970cc2eaf77e88fa2487cf4c7ad97e67d28d70f9",
+    "count": 589,
+    "runtime_drift": 0,
+    "critical": [
+      {
+        "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+        "sha256": "8dfbb4a38a7b74cb8c06d84dbda725597dfc685586e1908319e449d431ea7c66"
+      },
+      {
+        "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang",
+        "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e"
+      },
+      {
+        "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang",
+        "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac"
+      },
+      {
+        "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneRefractionBake.slang",
+        "sha256": "3552d20fd37c8e2f12383ca33d1c10b3cbc2e27b5bdaec2be15cc4cf9fec0185"
+      },
+      {
+        "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/MaterialGraphSceneSubsurfaceBake.slang",
+        "sha256": "1f05b7c50d4c5c47690167ccafb3615991859351e69b316fe99f657c80fd7854"
+      },
+      {
+        "path": "Engine/RenderEngine/MaterialGraphSceneCompiler.h",
+        "sha256": "7f94608f22f6b55058faa40a72ea2fa6faee81fefbae6ae959d7ab7052eec3a5"
+      },
+      {
+        "path": "Tools/regression/assess-special-material-images.py",
+        "sha256": "01700c289ef4fd1412602a8f101879c8f68bb02d6f350df85a261e16ff68315e"
+      },
+      {
+        "path": "Tools/regression/material_matched_image_probe.cpp",
+        "sha256": "a82c4f4fb50027a9fa3536b3b625702e9280d139a3bf1fcd3c8f74704974ef5b"
+      },
+      {
+        "path": "Tools/regression/material_scene_refraction_tests.inl",
+        "sha256": "2f7674bb2da6ccfb36e886c2328244d762399e999fc1bbbe4fff291016265e6f"
+      },
+      {
+        "path": "Tools/regression/material_scene_subsurface_tests.inl",
+        "sha256": "252ca64c2e9807d8ab50373eaae6789ef3a6290393373a4eb9a084eaa2324cfd"
+      }
+    ]
+  },
+  "binary_sha256": [
+    {
+      "path": "Bin/x64-Debug/Editor/CreatorEditor.runtime.dll",
+      "sha256": "f93b7f3b9bd84f0747f067caac841b275ec0684f7aea3d79c752e7b14e12ed1a"
+    },
+    {
+      "path": "Bin/x64-Debug/Tools/MaterialMatchedImageProbe/MaterialMatchedImageProbe.exe",
+      "sha256": "4adcbcb80dcfabee4fa3f8c7c071075c632beb36530f20f6a8b23f60772897a8"
+    },
+    {
+      "path": "Bin/x64-Release/Tools/MaterialMatchedImageProbe/MaterialMatchedImageProbe.exe",
+      "sha256": "a5fb7366f2356f9add25b341fe42b154a71f3f701e51b3ba1cdeb6f7761cdaad"
+    }
+  ],
+  "logs": [
+    "Build/Obj/mat9-special-profile-final10-editor-debug-build.log",
+    "Build/Obj/Mat9Images-Release-special-surface-final10/native.log",
+    "Build/Obj/Mat9Images-Debug-special-surface-final10/native.log",
+    "Build/Obj/mat9-special-profile-closure-gate.log",
+    "Build/Obj/mat9-special-profile-final10-ibl-gate.log",
+    "Build/Obj/mat9-special-profile-final10-dashboard-check.log",
+    "Build/Obj/mat9-special-profile-final10-web-build.log"
+  ],
+  "exclusions": [
+    "Editor GUI validation",
+    "Vulkan GPU runtime",
+    "Cooked Player runtime",
+    "Model FPS acceptance",
+    "Closed-solid glass transport",
+    "Random Walk SSS parity",
+    "Scene blended composition"
+  ]
+}

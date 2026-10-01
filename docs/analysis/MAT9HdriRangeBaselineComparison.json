@@ -1,0 +1,180 @@
+{
+  "schema": "creator.material.blender-image-comparison.v1",
+  "reference": "Build\\Obj\\Mat9Hdri-source-controls-0",
+  "native": "Build\\Obj\\Mat9Images-Release-hdri-v2-controls-baseline\\Native",
+  "control_passed": true,
+  "reference_repeat": "Build\\Obj\\Mat9Hdri-source-controls-11",
+  "acceptance": "diagnostic; material approximation tolerances remain unaccepted",
+  "mask": "common emission-control interior eroded by two pixels; no per-material cherry picking",
+  "contact_order": "manifest cases, each row Blender | native | absolute difference x10",
+  "cases": [
+    {
+      "id": "forest-control_emission",
+      "interior_pixels": 344,
+      "max_abs": 0.0,
+      "native_sha256": "3d216db78e165c3cec0c8222f56fc15b0750d86a1fcf2b094d5e33539aa9cb73",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "forest-control_white",
+      "interior_pixels": 344,
+      "max_abs": 0.0065042972564697266,
+      "native_sha256": "767429b48d5e1ba7604ecc99e58d602aa3aa9077af2b1337b70ceb6add6988bf",
+      "mean_abs": 0.0010666337095258773,
+      "max_normalized": 0.0065042972564697266,
+      "p95_normalized": 0.0028968453407287598,
+      "relative_rms": 0.0032478342064417905,
+      "reference_mean_rgb": [
+        0.3976800587504756,
+        0.39632582489054563,
+        0.4176117678194545
+      ],
+      "native_mean_rgb": [
+        0.39772282090297967,
+        0.39640062908793605,
+        0.41824571476426237
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0018929243087768555,
+        "relative_rms": 0.001097741994332459
+      }
+    },
+    {
+      "id": "forest-control_mirror",
+      "interior_pixels": 344,
+      "max_abs": 0.3233727216720581,
+      "native_sha256": "540433bffbf941413c73ef35325502ff6447f070e86704f3831ea95777c8aa3c",
+      "mean_abs": 0.006684105745249368,
+      "max_normalized": 0.17947322256588852,
+      "p95_normalized": 0.020091474056243896,
+      "relative_rms": 0.02641308146082132,
+      "reference_mean_rgb": [
+        0.3533452445184974,
+        0.35609475806758867,
+        0.38287371505032564
+      ],
+      "native_mean_rgb": [
+        0.3551139332527338,
+        0.3574945871220079,
+        0.38399565150571424
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00034308433532714844,
+        "relative_rms": 3.4653777566350475e-05
+      }
+    },
+    {
+      "id": "autumn-layer_thin_film",
+      "interior_pixels": 344,
+      "max_abs": 0.07463562488555908,
+      "native_sha256": "d168f087ae43709081427e341f295f241e1645d09ed89de3f9004f1421c53136",
+      "mean_abs": 0.007555172965472001,
+      "max_normalized": 0.0627773882322766,
+      "p95_normalized": 0.024319469928741455,
+      "relative_rms": 0.0360833634816205,
+      "reference_mean_rgb": [
+        0.10618859941822065,
+        0.21435293478912912,
+        0.36464446420283164
+      ],
+      "native_mean_rgb": [
+        0.09848619061847065,
+        0.20411704307378725,
+        0.36005880666333573
+      ],
+      "reference_repeat": {
+        "max_abs": 0.004429996013641357,
+        "relative_rms": 0.0015865679769177807
+      }
+    },
+    {
+      "id": "autumn-control_emission",
+      "interior_pixels": 344,
+      "max_abs": 0.0,
+      "native_sha256": "3d216db78e165c3cec0c8222f56fc15b0750d86a1fcf2b094d5e33539aa9cb73",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "autumn-control_white",
+      "interior_pixels": 344,
+      "max_abs": 0.09603917598724365,
+      "native_sha256": "dfffd69866f361cc243b696fbad11daa6f52870013d4a197bc6e0707a666f391",
+      "mean_abs": 0.02670414221667966,
+      "max_normalized": 0.08379161357879639,
+      "p95_normalized": 0.07877585409557467,
+      "relative_rms": 0.0549941870258815,
+      "reference_mean_rgb": [
+        0.6001678122597378,
+        0.5984251435066379,
+        0.5935274570487267
+      ],
+      "native_mean_rgb": [
+        0.554656982421875,
+        0.5706895340320676,
+        0.5870794251907704
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00508350133895874,
+        "relative_rms": 0.001596856491737671
+      }
+    },
+    {
+      "id": "autumn-control_mirror",
+      "interior_pixels": 344,
+      "max_abs": 0.014901876449584961,
+      "native_sha256": "750a35318006b74f5ce7d4d8906c5de61cbd4f7df4b60de86649151181f0d01a",
+      "mean_abs": 0.0005987681748071151,
+      "max_normalized": 0.013376856324263404,
+      "p95_normalized": 0.0015760064125061035,
+      "relative_rms": 0.005092678759217259,
+      "reference_mean_rgb": [
+        0.09833601560595251,
+        0.14505441958994367,
+        0.20901654124649804
+      ],
+      "native_mean_rgb": [
+        0.09897462711777798,
+        0.14564935551133268,
+        0.20956820110942043
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0001552104949951172,
+        "relative_rms": 3.2110030613982475e-05
+      }
+    }
+  ]
+}

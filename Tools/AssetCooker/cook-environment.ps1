@@ -22,11 +22,11 @@ $exe = Join-Path $repo "Bin/x64-$Configuration/Tools/EnvironmentCooker/Environme
 function Write-CookMetadata {
     # Refresh the human-readable record on a cook hit as well as a miss. The
     # runtime validates the binary header/checksum and does not read this JSON.
-    $header = New-Object byte[] 112
+    $header = New-Object byte[] 120
     $stream = [IO.File]::OpenRead($Output)
     try {
         if ($stream.Read($header,0,$header.Length) -ne $header.Length -or
-            [Text.Encoding]::ASCII.GetString($header,0,8) -ne 'CEIBL001') { throw 'Invalid environment cook header' }
+            [Text.Encoding]::ASCII.GetString($header,0,8) -ne 'CEIBL005') { throw 'Invalid environment cook header' }
     } finally { $stream.Dispose() }
     $cube = [BitConverter]::ToUInt32($header,40)
     $brdf = [BitConverter]::ToUInt32($header,44)
@@ -36,13 +36,18 @@ function Write-CookMetadata {
     $mips = 1; $mipSize = $cube
     while ($mipSize -gt 1 -and $mips -lt 7) { $mipSize = $mipSize -shr 1; ++$mips }
     $record = [ordered]@{
-        schemaVersion=1; artifact=[IO.Path]::GetFileName($Output)
+        schemaVersion=5; artifact=[IO.Path]::GetFileName($Output)
         artifactSha256=(Get-FileHash -LiteralPath $Output -Algorithm SHA256).Hash.ToLowerInvariant()
         source=$(if($isForest){'Blender 5.1.1 release/datafiles/studiolights/world/forest.exr'}else{[IO.Path]::GetFileName($Source)})
         sourceSha256=$sourceHash; recipeSha256=$recipeHash
         cubeSize=$cube; irradianceSize=[Math]::Min($cube,64); environmentMipLevels=$mips
-        prefilterMipLevels=6; brdfSize=$brdf; format='RGBA16Float'; colorSpace='linear Rec.709'
+        prefilterMipLevels=6; brdfSize=$brdf; colorSpace='linear Rec.709'
+        sourceWidth=[BitConverter]::ToUInt32($header,112); sourceHeight=[BitConverter]::ToUInt32($header,116)
+        sourceFormat='RGBA32Float'; sharpReflection='decoded source; float bilinear wrap-U/clamp-V'
+        radianceFormat='RGBA32Float'; irradianceFormat='RGBA16Float'; brdfFormat='RGBA16Float'
+        rectToCube='solid-angle-weighted 4x4 footprint; source mip 0'
         irradianceConvention='E/pi'; bytes=(Get-Item -LiteralPath $Output).Length
+        importanceFormat='RGBA32Float'; importanceSize=$cube; importanceSamples=5120; reflectionSamples=4096; baseSamples=1024; importancePersisted=$true
         producer='Tools/AssetCooker/cook-environment.ps1'
     }
     if ($isForest) { $record['license']='CC0; Greg Zaal / Poly Haven, ninomaru_teien' }

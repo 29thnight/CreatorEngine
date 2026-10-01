@@ -43,3 +43,13 @@ float3 SanitizeRadiance(float3 color)
                   SanitizeRadianceChannel(color.b));
 }
 
+// Environment source/prefilter cubes are float32. A tiny HDR sun can exceed
+// half-float range; clipping it changes diffuse and glossy illumination.
+// Keep valid positive radiance here, before any display/output conversion.
+float3 SanitizeEnvironmentRadiance(float3 color)
+{
+    return float3(!isinf(color.r) && !isnan(color.r) ? max(color.r, 0.0) : 0.0,
+                  !isinf(color.g) && !isnan(color.g) ? max(color.g, 0.0) : 0.0,
+                  !isinf(color.b) && !isnan(color.b) ? max(color.b, 0.0) : 0.0);
+}
+

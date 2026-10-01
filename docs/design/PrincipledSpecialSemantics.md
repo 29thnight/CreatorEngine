@@ -19,7 +19,7 @@ Volume은 BSDF 필드가 아니라 별도 Material Output closure다.
 |---|---|---|
 | Transmission Weight | 0 | saturate; Alpha와 독립 |
 | Subsurface Weight | 0 | saturate; 금속·Transmission 이후 남은 확산 비중 |
-| Subsurface Radius / Scale | (1, .2, .1) / .05 | 각 값 ≥0; 곱은 world 단위 평균 자유 경로 |
+| Subsurface Radius / Scale | (1, .2, .1) / .05 | 각 값 ≥0; Scene은 artist 반경을 `Radius×Scale/(4π)`로 환산 |
 | Subsurface IOR / Anisotropy | 1.4 / 0 | IOR≥1, anisotropy∈[0, .99] |
 | Volume Color / Density | (.5, .5, .5) / 1 | 각 값 ≥0; HDR Color 허용 |
 | Volume Absorption Color / Anisotropy | (0, 0, 0) / 0 | Color≥0, anisotropy∈[-.999, .999] |
@@ -57,9 +57,16 @@ Roughness=0도 environment의 mirror/delta와 direct alpha 하한 0.001을 구�
 [PrincipledSubsurface.slang](../../Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang)은
 [Jensen 등, SIGGRAPH 2001](https://graphics.stanford.edu/papers/bssrdf/bssrdf.pdf)의 diffusion dipole을
 바탕으로 **RGB별 정규화된 확산 근사**를 독립 구현한다. Cycles Random Walk/Random Walk Skin 구현은 아니다.
-Base Color를 albedo로, Radius×Scale을 mean free path로 해석한다. Reduced scattering에
+공용 `BuildSubsurfaceProfile`은 Base Color를 albedo로, Radius×Scale을 물리 mean free path로 해석한다. Reduced scattering에
 anisotropy를 적용하고 IOR의 diffuse Fresnel boundary로 real/virtual source depth를 만든다.
 평면의 radial integral이 1이 되도록 정규화한 profile density와 해석 CDF를 제공한다.
+
+**2026-10-01 Scene artist 반경 환산:** `LXSceneSubsurfacePS → BuildSceneSubsurfaceProfile`은
+그래프의 authored Radius×Scale을 **`1/(4π)`**로 환산하여 위 물리 profile에 공급한다.
+이는 [Cycles의 Random Walk/Burley radius 전처리](https://github.com/blender/blender/blob/v5.1.1/intern/cycles/kernel/closure/bssrdf.h#L61)와
+같은 길이 환산이다. 공용 물리 closure와 기존 독립 numeric golden의 입력 단위는 유지한다.
+Random Walk의 albedo remapping·폐곡면 내부 transport까지 구현했다는 의미는 아니다.
+SceneHost identity는 최종 10으로 올려 이전 Scene 셰이더/쿠킹 서명을 무효화한다.
 
 각 RGB 채널의 Radius/Scale 또는 albedo가 0이면 해당 채널은 local delta다.
 다른 채널의 확산을 함께 끄지 않는다. SSS Weight는 반사를 제외한 diffuse budget을 local과
@@ -170,6 +177,22 @@ Raw 결과는 `Build/Obj/PrincipledSpecialProbe/`, 기존 제품 회귀는
 `Build/Obj/MaterialAbiProbe/mat5-current-host-results.jsonl`에 있다.
 
 ## MAT-6 / MAT-7 인계
+
+### 2026-10-01 MAT-9 rendered 검증 경계
+
+현재 제품 경로의 고정 homogeneous single-scattering Volume 8조건을 Blender 독립 seed와
+비교하여 기존 target 전체 통과를 확인했다. 기준의 bounce/내부 감쇠와 비교 도구의 최종
+Volume 합성을 맞췄으며, 이 묶음에서 제품 Special 구현을 변경하지 않았다.
+지원 geometry 예산 안의 80-triangle static closed boundary 범위다.
+투과·SSS 초기 rendered 차이와 Scene Blended queue 미지원은 남아 있으며 이 문서의 수치
+closure 통과를 해당 품질 수용으로 해석하지 않는다.
+자세한 조건·오차·남은 gate는 [MAT9SpecialTransportComparison](../analysis/MAT9SpecialTransportComparison.md)을 따른다.
+
+후속 [Special Surface 수정](../analysis/MAT9SpecialProfileCorrection.md)은 Scene artist 반경 환산,
+glass 준비/소비 budget 일치와 스침각 입력의 잘못된 거부를 수정했다. Scene 유효성 검사는
+finite/tier/nonzero view를 유지하고, standalone directional bake는 기존 hemisphere 계약을 보존한다.
+최종 Debug/Release18장 byte exact, Scale=0/off 전체 이미지 byte exact를 확인했다.
+수렴한 독립 reference와의 target은 7/18로 Surface 전체 미수용이며 Volume8조건과 별도 범위다.
 
 1. MAT-6에서 초기 지원 node/socket의 deterministic Slang·feature extraction·source 진단을 연결했다.
    [MaterialSlangCodegen.md](MaterialSlangCodegen.md)를 따른다. full Blender Volume의 attribute/blackbody는

@@ -305,12 +305,18 @@ std::array<Float4, kSpecialFields> SpecialReference(SpecialInput input, unsigned
     Vector rawTransmission{};
     if (transmission > 0 && material.metal < 1)
     {
-        glassIntegral = Integrate(glass, view, false);
+        glassIntegral = Integrate(glass, view, false, false);
         rawTransmission = TransmissionIntegral(glass, view);
     }
-    const Vector metalMs = Multiple(metalIntegral), dielectricMs = Multiple(dielectricIntegral),
+    const Vector metalMs{}, dielectricMs{},
                  glassMs = Multiple(glassIntegral);
-    const double remainder = std::max(1 - Maximum(dielectricIntegral.single + dielectricMs), 0.0);
+    auto energy = Energy(material, view);
+    const auto baseIntegral = Integrate(material, view, false);
+    const auto baseDiffuse = LayeredBaseWeights(material, view, baseIntegral).diffuse;
+    const Vector reflectionNormalization = ReflectionBudget(baseDiffuse, baseIntegral.single);
+    energy.dielectric = energy.dielectric * reflectionNormalization;
+    energy.metal = energy.metal * reflectionNormalization;
+    const double remainder = std::max(1 - Maximum(energy.dielectricAlbedo), 0.0);
     const double dWeight = (1 - material.metal) * (1 - transmission), gWeight = (1 - material.metal) * transmission;
     const Vector diffuse = material.base * (dWeight * remainder * (1 - subsurface));
     Vector sss{}, trans{}, normalization{};
@@ -335,7 +341,7 @@ std::array<Float4, kSpecialFields> SpecialReference(SpecialInput input, unsigned
     // another light. Evaluate the top layers directly from their analytic terms.
     Vector top{};
     const Integral coatIntegral = Integrate(material, view, true);
-    const Vector coatMs = Multiple(coatIntegral);
+    const Vector coatMs{};
     const double sheenTransmission = layered.fields[10].w;
     if (material.coat > 0)
     {
@@ -343,7 +349,7 @@ std::array<Float4, kSpecialFields> SpecialReference(SpecialInput input, unsigned
         const double cnl = Clamp(Dot(material.coatNormal, light));
         if (cnl > 0 && Dot(material.coatNormal, view) > 0)
         {
-            top = (Fresnel(material, vh, true) * (Distribution(cf, half) * Visibility(cf, view, light)) +
+            top = (CompensatedFresnel(material, energy, vh, true) * (Distribution(cf, half) * Visibility(cf, view, light)) +
                    coatMs * (1 / kPi)) *
                   (sheenTransmission * material.coat * cnl);
         }
@@ -361,7 +367,7 @@ std::array<Float4, kSpecialFields> SpecialReference(SpecialInput input, unsigned
     }
     const Vector multiple = metalMs * material.metal + dielectricMs * dWeight + glassMs * gWeight;
     const Vector specular =
-        (Fresnel(metal, vh) * material.metal + Fresnel(dielectric, vh) * dWeight) * (distribution * visibility) +
+        (Fresnel(metal, vh) * energy.metal * material.metal + Fresnel(dielectric, vh) * energy.dielectric * dWeight) * (distribution * visibility) +
         Fresnel(glass, vh) * (gWeight * Distribution(glassFrame, half) * Visibility(glassFrame, view, light));
     const Vector direct = top + lower * (specular + (multiple + diffuse) * (1 / kPi)) * nl;
     Vector transmittedDirect{};
@@ -386,7 +392,7 @@ std::array<Float4, kSpecialFields> SpecialReference(SpecialInput input, unsigned
         (coatIntegral.single * coatAo + coatMs * material.ao) * (sheenTransmission * material.coat) +
         sheenColor * material.ao;
     const Vector localAmbient =
-        topAmbient + lower * ((metalIntegral.single * material.metal + dielectricIntegral.single * dWeight +
+        topAmbient + lower * (((metalIntegral.single * material.metal + dielectricIntegral.single * dWeight) * reflectionNormalization +
                                glassIntegral.single * gWeight) *
                                   ao +
                               (diffuse + multiple) * material.ao);

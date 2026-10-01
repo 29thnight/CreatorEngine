@@ -241,7 +241,7 @@ void LXSceneRefractionBake(uint3 id : SV_DispatchThreadID)
     point.sheenTintRoughness = lx_inputs_8.Load(int3(pixel, 0));
     point.tangentRotation = lx_inputs_9.Load(int3(pixel, 0));
     point.viewTier = lx_inputs_10.Load(int3(pixel, 0));
-    if (!IsValidPrincipledIblBakePoint(point))
+    if (!IsValidScenePrincipledIblBakePoint(point))
     {
         lx_samples[index] = sample;
         return;
@@ -255,7 +255,8 @@ void LXSceneRefractionBake(uint3 id : SV_DispatchThreadID)
         * max(point.tintAnisotropy.rgb, 0));
     const PrincipledSurface glass = SpecialGlass(material);
     const float3 view = normalize(point.viewTier.xyz);
-    const PrincipledIblIntegral integral = IntegrateLayeredReflection(glass, view, false);
+    // Match IntegrateSpecialForward's separate glass/transmission budget.
+    const PrincipledIblIntegral integral = IntegrateLayeredReflection(glass, view, false, false);
     sample.glassSingleAlbedo = float4(integral.singleScatter, integral.directionalAlbedo);
     sample.glassAverage = float4(integral.averageFresnel, 1);
     sample.rawTransmission = float4(IntegrateSpecialTransmission(glass, view), 0);

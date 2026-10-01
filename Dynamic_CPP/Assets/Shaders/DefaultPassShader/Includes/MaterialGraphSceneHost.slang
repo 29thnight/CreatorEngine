@@ -96,6 +96,39 @@ LXSceneVertex LXSceneVS(uint index : SV_VertexID)
     return output;
 }
 
+// Hardware coverage uses snapped subpixel vertices. Reconstruct attributes at
+// the true pixel-center ray on the original triangle plane. Attribute and
+// position derivatives span the same affine world-space barycentric plane;
+// solving its homogeneous projection avoids extra index/vertex buffer reads.
+// Coverage/depth remain owned by the rasterizer. Derivatives precede guards.
+LXSceneVertex LXScenePixelCenter(LXSceneVertex input)
+{
+    const float3 px=ddx_fine(input.position), py=ddy_fine(input.position);
+    const float3 nx=ddx_fine(input.normal), ny=ddy_fine(input.normal);
+    const float3 tx=ddx_fine(input.tangent), ty=ddy_fine(input.tangent);
+    const float3 bx=ddx_fine(input.bitangent), by=ddy_fine(input.bitangent);
+    const float2 ux=ddx_fine(input.uv), uy=ddy_fine(input.uv);
+    const float4 c=mul(float4(input.position,1),lx_viewProjection);
+    const float4 cx=mul(float4(px,0),lx_viewProjection), cy=mul(float4(py,0),lx_viewProjection);
+    const float2 target=input.clip.xy/float2(lx_width,lx_height)*float2(2,-2)+float2(-1,1);
+    const float2 x=cx.xy-target*cx.w, y=cy.xy-target*cy.w;
+    const float2 delta=target*c.w-c.xy;
+    const float determinant=x.x*y.y-x.y*y.x;
+    if (isfinite(determinant) && abs(determinant)>1e-12)
+    {
+        const float2 step=float2(delta.x*y.y-delta.y*y.x,x.x*delta.y-x.y*delta.x)/determinant;
+        if (all(isfinite(step)))
+        {
+            input.position+=px*step.x+py*step.y;
+            input.normal+=nx*step.x+ny*step.y;
+            input.tangent+=tx*step.x+ty*step.y;
+            input.bitangent+=bx*step.x+by*step.y;
+            input.uv+=ux*step.x+uy*step.y;
+        }
+    }
+    return input;
+}
+
 cbuffer LXSceneShadowConstants : register(b4)
 {
     float4x4 lx_shadowViewProjection;
@@ -175,7 +208,9 @@ PrincipledIblBakePoint LXScenePoint(LXSceneVertex input, bool frontFace)
     const bool flipped = (lx_coverage & PBR_COVERAGE_DOUBLE_SIDED) != 0u && !frontFace;
     point.tangentRotation = float4(tangent, flipped ? -raw.anisotropyRotation : raw.anisotropyRotation);
     point.viewTier = float4(PrincipledUnitNormal(lx_eye.xyz - input.position, normal),
-                            (LX_MATERIAL_FEATURE_MASK & 0x1780u) != 0 ? 1 : 0);
+                            (LX_MATERIAL_FEATURE_MASK & 0x17C0u) != 0 ? 1 : 0);
+    // Principled core graphs use the same GGX closures with film/coat disabled.
+    // This lookup tag describes the evaluation model, not the authoring tier.
     // Fine UV derivatives and graph evaluation precede this divergent owner test.
     if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
         discard;
@@ -195,6 +230,7 @@ struct LXSceneLookup1
 [shader("fragment")]
 LXSceneLookup0 LXSceneLookup0PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
+    input=LXScenePixelCenter(input);
     const PrincipledIblBakePoint point = LXScenePoint(input, frontFace);
     LXSceneLookup0 output;
     output.fields[0] = point.baseAlpha;
@@ -211,6 +247,7 @@ LXSceneLookup0 LXSceneLookup0PS(LXSceneVertex input, bool frontFace : SV_IsFront
 [shader("fragment")]
 LXSceneLookup1 LXSceneLookup1PS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
+    input=LXScenePixelCenter(input);
     const PrincipledIblBakePoint point = LXScenePoint(input, frontFace);
     LXSceneLookup1 output;
     output.fields[0] = point.sheenTintRoughness;
@@ -276,6 +313,7 @@ struct LXSceneRefractionCapture
 [shader("fragment")]
 LXSceneRefractionCapture LXSceneRefractionPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
+    input=LXScenePixelCenter(input);
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
     if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
     {
@@ -300,6 +338,7 @@ struct LXSceneGBuffer
 [shader("fragment")]
 LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
+    input=LXScenePixelCenter(input);
     const PrincipledSurface surface = LXSceneUndecaledMaterial(input, frontFace);
     LXSceneGBuffer output;
     output.diffuse = float4(surface.baseColor, surface.alpha);
@@ -408,6 +447,7 @@ struct LXSceneSubsurfaceCapture
 [shader("fragment")]
 LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace : SV_IsFrontFace)
 {
+    input=LXScenePixelCenter(input);
     // Evaluate quad derivatives before alpha/face coverage can discard a lane.
     const float area = length(cross(ddx_fine(input.position), ddy_fine(input.position)));
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
@@ -430,7 +470,7 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     {
         irradiance += lx_ibl[index].irradiance.rgb;
     }
-    const PrincipledSubsurfaceProfile profile = surface.profile;
+    const PrincipledSubsurfaceProfile profile = BuildSceneSubsurfaceProfile(material);
     const uint localMask = (profile.local.x ? 1u : 0u) | (profile.local.y ? 2u : 0u)
         | (profile.local.z ? 4u : 0u);
     output.fields[0] = float4(irradiance, area);
@@ -486,6 +526,7 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float3 position, uint ind
 [shader("fragment")]
 float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV_Target
 {
+    input=LXScenePixelCenter(input);
     PrincipledSurface material = LXSceneMaterial(input, frontFace);
     // Fine derivatives must be evaluated before the per-pixel owner branch.
     if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
@@ -507,7 +548,7 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
         return float4(1, 0, 1, 1);
     PrincipledLayeredIntegral integral;
     integral.base = ReadPrincipledIblIntegral(sample.baseSingleAlbedo, sample.baseAverage);
-#if (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0
+#if (LX_MATERIAL_FEATURE_MASK & 0x07C0u) != 0
     integral.coat = ReadPrincipledIblIntegral(sample.coatSingleAlbedo, sample.coatAverage);
     const PrincipledLayeredState layered = BuildLayeredState(material, view, integral);
 #else
@@ -538,7 +579,7 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
             if (type == 2u)
                 attenuation *= PbrSpotFalloff(toLight, light.direction);
         }
-#if (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0
+#if (LX_MATERIAL_FEATURE_MASK & 0x07C0u) != 0
         direct += EvaluateLayeredLight(layered, toLight, light.color.rgb * light.color.a * attenuation);
 #else
         const PbrSurface surface = BuildPbrSurface(input.position, view, material, float2(1, 0));
@@ -549,9 +590,9 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
     float3 ambient = float3(0);
     if (lx_hasEnvironment != 0u)
     {
-        ambient = EvaluateBakedPrincipledIbl(material, view, (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0, sample);
+        ambient = EvaluateBakedPrincipledIbl(material, view, (LX_MATERIAL_FEATURE_MASK & 0x07C0u) != 0, sample);
     }
-#if (LX_MATERIAL_FEATURE_MASK & 0x0780u) != 0
+#if (LX_MATERIAL_FEATURE_MASK & 0x07C0u) != 0
     const float3 emission = layered.lowerTransmission * material.emission;
 #else
     const float3 emission = material.emission;

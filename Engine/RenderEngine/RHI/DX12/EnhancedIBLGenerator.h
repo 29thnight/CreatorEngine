@@ -40,6 +40,10 @@ class EnhancedIBLGenerator
 {
 public:
     static constexpr RHIFormat kFormat = RHIFormat::RGBA16Float;
+    // Preserve small emitters above 65,504 without clipping their energy.
+    static constexpr RHIFormat kRadianceFormat = RHIFormat::RGBA32Float;
+    static constexpr RHIFormat CookedImageFormat(uint32_t image)
+        { return image == 0 || image == 2 ? kRadianceFormat : kFormat; }
 
     /// 프리필터 밉 수. DX11은 거칠기 i/5로 여섯 단계를 만든다.
     static constexpr uint32_t kPrefilterMips = 6;
@@ -48,6 +52,10 @@ public:
     static constexpr uint32_t kMaxEnvironmentMips = 7;
     static constexpr uint32_t kImportanceMaxSize = 128;
     static constexpr uint32_t kImportanceSampleCount = 1024;
+    // Retain the original proposal for diffuse/sheen and append the denser
+    // Scene reflection proposal. Both banks are cooked and uploaded once.
+    static constexpr uint32_t kSceneReflectionSampleCount = 4096;
+    static constexpr uint32_t kSceneImportanceSampleCount = kImportanceSampleCount + kSceneReflectionSampleCount;
     static constexpr RHIFormat kImportanceFormat = RHIFormat::RGBA32Float;
 
     static constexpr uint32_t CubeMipCount(uint32_t cubeSize)
@@ -86,24 +94,27 @@ public:
     // 핸들로 낸다. 소비처는 RHIBindingDesc::SrvCube/Srv2D로 그대로 받으며,
     // 실물 소유권은 CreateTexture를 수행한 backend resource table에 있다.
     RHITextureHandle GetCubeMap() const { return m_cubeMapHandle; }
+    RHITextureHandle GetSourceMap() const { return m_sourceHandle; }
     uint64_t GetGeneration() const { return m_generation; }
     RHITextureHandle GetIrradianceMap() const { return m_irradianceHandle; }
     RHITextureHandle GetPrefilteredMap() const { return m_prefilteredHandle; }
     RHITextureHandle GetBrdfLut() const { return m_brdfLutHandle; }
+    std::array<RHITextureHandle,3> GetImportanceMaps() const
+        { return {m_sceneImportanceRows,m_sceneImportanceMarginal,m_sceneImportanceSamples}; }
 
     uint32_t GetCubeSize() const { return m_cubeSize; }
     uint32_t GetIrradianceSize() const { return (m_cubeSize < 64u) ? m_cubeSize : 64u; }
 
 private:
     struct CookedCaptureSlice { RHIReadback readback; uint32_t image{}, mip{}; };
-    std::array<std::shared_ptr<class Texture>, 4> m_cookedTextures;
+    std::array<std::shared_ptr<class Texture>, 8> m_cookedTextures;
     struct CookedCapture
     {
         std::vector<CookedCaptureSlice> slices;
         std::filesystem::path path;
         assets::EnvironmentIdentity identity;
         uint64_t fence{};
-        uint32_t cube{}, brdf{};
+        uint32_t cube{}, brdf{}, sourceWidth{}, sourceHeight{}, sampleCount{};
     };
     // Selections may change while the preceding GPU copy/disk write is pending.
     std::vector<CookedCapture> m_cookedCaptures;
@@ -124,6 +135,7 @@ private:
     class IRenderDeviceServices* m_resources{ nullptr };
 
     RHITextureHandle m_cubeMapHandle;
+    RHITextureHandle m_sourceHandle;
     // rect→cube의 착지점. 밉 체인은 여기서 읽어 최종 큐브에 굽는다 —
     // RHITransition이 텍스처 전체만 전이해서, 한 리소스 안에서 밉을 읽으며
     // 다른 밉에 쓸 수가 없다.
@@ -134,8 +146,10 @@ private:
     RHITextureHandle m_importanceRows;
     RHITextureHandle m_importanceMarginal;
     RHITextureHandle m_importanceSamples;
+    RHITextureHandle m_sceneImportanceRows, m_sceneImportanceMarginal, m_sceneImportanceSamples;
 
     RHIPipelineHandle m_rectToCubePso;
+    RHIPipelineHandle m_sourceCopyPso;
     RHIPipelineHandle m_cubeDownsamplePso;
     RHIPipelineHandle m_irradiancePso;
     RHIPipelineHandle m_prefilterPso;
@@ -143,5 +157,5 @@ private:
     RHIPipelineHandle m_importanceRowsPso;
     RHIPipelineHandle m_importanceMarginalPso;
     RHIPipelineHandle m_importanceSamplesPso;
+    RHIPipelineHandle m_sceneImportanceRowsPso;
 };
-

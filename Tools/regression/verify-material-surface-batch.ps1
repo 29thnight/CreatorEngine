@@ -1,6 +1,7 @@
 param(
     [string]$VisualStudioInstallation = '',
-    [switch]$SkipDependencyRestore
+    [switch]$SkipDependencyRestore,
+    [ValidateSet('Debug','Release')][string[]]$Configurations = @('Debug','Release')
 )
 
 Set-StrictMode -Version Latest
@@ -16,7 +17,7 @@ $output = Join-Path $repo 'Build\Obj\MaterialProductProbe'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
 $dependencyOptions = @()
 if ($SkipDependencyRestore) { $dependencyOptions += '/p:VcpkgManifestInstall=false' }
-foreach ($configuration in @('Debug', 'Release')) {
+foreach ($configuration in $Configurations) {
     $buildOutput = @(& $msbuild (Join-Path $PSScriptRoot 'MaterialSurfaceBatchProbe.vcxproj') /m:2 /nologo `
         "/p:Configuration=$configuration" /p:Platform=x64 /p:UseDynamicDebugging=false /p:LinkIncremental=false @dependencyOptions /v:minimal 2>&1)
     $buildExit = $LASTEXITCODE

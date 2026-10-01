@@ -14,8 +14,9 @@ namespace material_graph
 {
 using IblVector = std::array<float, 4>;
 
-// Evaluated, spatially fixed sample. The final component of viewTier is 0 for
-// Core, 1 for Layered. This is not a material-wide isotropic 2D LUT.
+// Evaluated, spatially fixed sample. viewTier.w describes the reflection model:
+// 0 = legacy Core, 1 = compensated Principled GGX (including core graphs).
+// It is independent of the authoring tier and is not a material-wide 2D LUT.
 // Fields must be finite, magnitude <= 1e6, with a nonzero front-facing view
 // (NdotV >= 1e-4). Other zero directions use EvaluateMaterial's fallbacks.
 struct IblBakePoint
@@ -36,7 +37,9 @@ static_assert(sizeof(IblBakePoint) == 176);
 bool IsValidIblBakePoint(const IblBakePoint& point);
 class SurfaceBatch;
 
-// Matches Includes/PrincipledIblLookup.slang. Reflection is normalized by the
+// Matches Includes/PrincipledIblLookup.slang. For model 1, singleScatter includes
+// GGX compensation; it must not receive another Lambertian compensation term.
+// Reflection is normalized by the
 // RGB Fresnel-weighted sum; coat and sheen never reuse the base convolution.
 struct IblBakeSample
 {

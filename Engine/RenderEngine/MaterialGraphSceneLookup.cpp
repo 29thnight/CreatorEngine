@@ -18,6 +18,7 @@ struct LookupConstants
 {
     std::uint32_t width, height, count, reuse;
     std::uint32_t environment, first, dispatchCount, precomputed;
+    std::uint32_t importance, source, reserved[2]{};
 };
 bool Fail(std::string& error, const char* message)
 {
@@ -154,7 +155,7 @@ bool SceneLookupCache::Initialize(const EnhancedFrameContext& context, std::stri
         return false;
     const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(0), RHILayout::SrvTable(24, 0),
                                               RHILayout::UavBufferTable(2, 0), RHILayout::Srv(24),
-                                              RHILayout::SrvTable(2, 25)};
+                                              RHILayout::SrvTable(6, 25)};
     const RHIStaticSamplerDesc samplers[]{
         {RHISampler::Point(RHIAddressMode::Clamp), 0},
         {RHISampler::Linear(RHIAddressMode::Clamp), 1}};
@@ -181,7 +182,8 @@ bool SceneLookupCache::Initialize(const EnhancedFrameContext& context, std::stri
 bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_t viewId, RHITextureHandle environment,
                                RHITextureHandle irradiance, RHITextureHandle prefiltered,
                                std::uint64_t environmentGeneration, std::uint64_t memoryBudget,
-                               std::shared_ptr<const SceneLookupFrame>& result, std::string& error)
+                               std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
+                               std::array<RHITextureHandle,3> importance, RHITextureHandle source)
 {
     ce::profile_scope profile{ce::marker<"MaterialLookupPrepare">()};
     const auto count = std::uint64_t(context.width) * context.height;
@@ -194,7 +196,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
         if (cached->viewId_ == viewId && cached->sceneEpoch_ == context.sceneEpoch && cached->width_ == context.width &&
             cached->height_ == context.height && cached->environment_ == environment &&
             cached->irradiance_ == irradiance && cached->prefiltered_ == prefiltered &&
-            cached->environmentGeneration_ == environmentGeneration)
+            cached->environmentGeneration_ == environmentGeneration && cached->importance_ == importance && cached->source_ == source)
             previous = cached;
     if ((previous ? 2 : 1) * count * kBytesPerPixel + sizeof(SceneLookupStats) > memoryBudget)
         return Fail(error, "Scene lookup candidate plus previous owner exceeds its GPU memory budget.");
@@ -210,6 +212,30 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
     candidate->environment_ = environment;
     candidate->irradiance_ = irradiance;
     candidate->prefiltered_ = prefiltered;
+    const bool hasImportance=std::ranges::all_of(importance,[](auto handle){return handle.IsValid();});
+    if (std::ranges::any_of(importance,[](auto handle){return handle.IsValid();}) && !hasImportance)
+        return Fail(error,"Scene environment importance requires all three maps.");
+    if (hasImportance)
+    {
+        const auto rows=device_->DescribeTexture(importance[0]);
+        const auto marginal=device_->DescribeTexture(importance[1]);
+        const auto samples=device_->DescribeTexture(importance[2]);
+        if (!environment.IsValid() || !rows.width || rows.height!=6*rows.width || marginal.width!=1 ||
+            marginal.height!=rows.height || (samples.width!=1024 && samples.width!=5120) || samples.height!=2 ||
+            rows.format!=RHIFormat::RGBA32Float || marginal.format!=RHIFormat::RGBA32Float ||
+            samples.format!=RHIFormat::RGBA32Float || rows.depthOrArraySize!=1 ||
+            marginal.depthOrArraySize!=1 || samples.depthOrArraySize!=1)
+            return Fail(error,"Scene environment importance layout differs.");
+    }
+    if (source.IsValid())
+    {
+        const auto description=device_->DescribeTexture(source);
+        if (!environment.IsValid() || !description.width || !description.height ||
+            description.format!=RHIFormat::RGBA32Float || description.depthOrArraySize!=1 || description.mipLevels!=1)
+            return Fail(error,"Scene decoded environment source layout differs.");
+    }
+    candidate->source_=source;
+    candidate->importance_=importance;
     candidate->environmentGeneration_ = environmentGeneration;
     candidate->recording_ = device_->GetCurrentUploadRecordingId();
     candidate->descriptors_ = device_->GetDescriptorVersionToken();
@@ -267,7 +293,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
             environment.IsValid(),
             first,
             static_cast<std::uint32_t>((std::min)(count - first, std::uint64_t{kDispatchPixels})),
-            irradiance.IsValid() && prefiltered.IsValid()};
+            irradiance.IsValid() && prefiltered.IsValid(), hasImportance, source.IsValid()};
         const auto upload = device_->UploadConstants(&constants, sizeof(constants));
         if (!upload.IsValid())
             return Fail(error, "Scene lookup dispatch constants allocation failed.");
@@ -351,7 +377,7 @@ void SceneLookupFrame::DeclareBake(EnhancedRenderGraph& graph, RGHandle owners) 
             imported = graph.ImportTexture(environment_, RHIResourceState::PixelShaderResource, "LX.Scene.HDR");
         uses.push_back({imported, RHIResourceState::ShaderResource});
     }
-    for (const auto texture : {irradiance_, prefiltered_})
+    for (const auto texture : {irradiance_, prefiltered_,importance_[0],importance_[1],importance_[2],source_})
     {
         if (!texture.IsValid()) continue;
         auto imported = graph.FindImportedTexture(texture);
@@ -381,7 +407,11 @@ void SceneLookupFrame::DeclareBake(EnhancedRenderGraph& graph, RGHandle owners) 
             RHIBindingDesc::SrvCube(owner->irradiance_, owner->irradiance_.IsValid()
                 ? owner->device_->DescribeTexture(owner->irradiance_).format : RHIFormat::RGBA16Float, 1).OrNull(),
             RHIBindingDesc::SrvCube(owner->prefiltered_, owner->prefiltered_.IsValid()
-                ? owner->device_->DescribeTexture(owner->prefiltered_).format : RHIFormat::RGBA16Float, 6).OrNull()};
+                ? owner->device_->DescribeTexture(owner->prefiltered_).format : RHIFormat::RGBA16Float, 6).OrNull(),
+            RHIBindingDesc::Srv2D(owner->importance_[0],RHIFormat::RGBA32Float).OrNull(),
+            RHIBindingDesc::Srv2D(owner->importance_[1],RHIFormat::RGBA32Float).OrNull(),
+            RHIBindingDesc::Srv2D(owner->importance_[2],RHIFormat::RGBA32Float).OrNull(),
+            RHIBindingDesc::Srv2D(owner->source_,RHIFormat::RGBA32Float).OrNull()};
         const auto iblMaps = owner->device_->CreateBindings(maps);
         owner->CheckCurrent(*execution.graph);
         if (!inputs.IsValid() || !iblMaps.IsValid())
@@ -421,7 +451,7 @@ void SceneLookupFrame::DeclareReady(EnhancedRenderGraph& graph) const
         {graphSamples_, RHIResourceState::ShaderResource}};
     // Deferred and the next frame consume these retained maps as pixel SRVs.
     // Restore their exact state after the compute bake before graph submission.
-    for (const auto texture : {environment_, irradiance_, prefiltered_})
+    for (const auto texture : {environment_, irradiance_, prefiltered_,importance_[0],importance_[1],importance_[2],source_})
         if (texture.IsValid())
             uses.push_back({graph.FindImportedTexture(texture), RHIResourceState::PixelShaderResource});
     graph.AddPass(

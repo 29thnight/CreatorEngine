@@ -5,6 +5,7 @@ cbuffer SceneLookupConstants : register(b0)
 {
     uint lx_width, lx_height, lx_count, lx_reuse;
     uint lx_environment, lx_first, lx_dispatchCount, lx_precomputed;
+    uint lx_importance, lx_source, lx_reserved1, lx_reserved2;
 };
 Texture2D<float4> lx_inputs_0 : register(t0);
 Texture2D<float4> lx_inputs_1 : register(t1);
@@ -92,6 +93,7 @@ float4 LXLoadPreviousSceneInput(uint field, int3 pixel)
 }
 Texture2D<uint> lx_owners : register(t22);
 TextureCube<float4> gEnvironment : register(t23);
+Texture2D<float4> gEnvironmentSource : register(t30);
 StructuredBuffer<PrincipledIblBakeSample> lx_previous : register(t24);
 RWStructuredBuffer<PrincipledIblBakeSample> lx_samples : register(u0);
 RWStructuredBuffer<uint> lx_statistics : register(u1);
@@ -185,8 +187,11 @@ void LXSceneLookupBake(uint3 id : SV_DispatchThreadID)
     if (lx_environment != 0u)
     {
         sample.irradiance = float4(BakeDiffuse(material.normal), 0);
-        sample.basePrefiltered = float4(BakeReflection(material, view, layered, false), 0);
-        sample.coatPrefiltered = float4(layered && material.coatWeight > 0.0
+        // No radiance convolution is consumed when this lobe carries exactly
+        // zero energy (e.g. emission-only materials with Specular Level 0).
+        sample.basePrefiltered = float4(any(integral.base.singleScatter > 0.0)
+            ? BakeReflection(material, view, layered, false) : float3(0), 0);
+        sample.coatPrefiltered = float4(layered && material.coatWeight > 0.0 && any(integral.coat.singleScatter > 0.0)
             ? BakeReflection(material, view, true, true) : float3(0), 0);
         sample.coatIrradiance = float4(layered && material.coatWeight > 0.0
             ? BakeDiffuse(material.coatNormal) : float3(0), 0);

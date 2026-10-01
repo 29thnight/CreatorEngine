@@ -54,10 +54,10 @@ float4 PSMain(VSOut input) : SV_TARGET
 
             const float3 direction = normalize(
                 input.texCoord + gRight.xyz * u + gUp.xyz * v);
-            sum += SanitizeRadiance(
+            sum += SanitizeEnvironmentRadiance(
                 gCube.SampleLevel(gSampler, direction, 0.0).rgb);
         }
     }
 
-    return float4(SanitizeRadiance(sum / (float)(span * span)), 1.0);
+    return float4(SanitizeEnvironmentRadiance(sum / (float)(span * span)), 1.0);
 }

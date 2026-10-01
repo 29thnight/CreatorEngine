@@ -2,6 +2,7 @@
 
 #include "material_probe_gpu.h"
 #include "principled_thin_film_sensitivity.h"
+#include "principled_ggx_energy_tables.h"
 
 #include <algorithm>
 #include <array>
@@ -360,14 +361,14 @@ inline Vector Fresnel(const Material& material, double cosine, bool coat = false
         const double correction = f82 * (1 - Clamp(material.tint[channel])) / ((1.0 / 7.0) * std::pow(6.0 / 7.0, 6));
         double metal =
             Clamp(metalF0 + (1 - metalF0) * std::pow(1 - cosine, 5) - correction * cosine * std::pow(1 - cosine, 6));
-        if (material.thickness > 0 && material.filmIor != 1)
+        if (material.thickness > double(0.1f) && material.filmIor != 1)
         {
             double film = Film(cosine, filmIor, material.thickness, {ior, 0}, channel);
             if (normal > 1e-5)
             {
                 film *= 1 + (f0 / normal - 1) * Clamp((1 - film) / (1 - normal));
             }
-            dielectric += transition * (Clamp(film) - dielectric);
+            dielectric = Clamp(film);
             const double boundedF0 = std::clamp(metalF0, 0.0, 0.999);
             const double squareRoot = std::sqrt(boundedF0);
             const double nMin = (1 - boundedF0) / (1 + boundedF0);
@@ -377,7 +378,7 @@ inline Vector Fresnel(const Material& material, double cosine, bool coat = false
             const double kSquared = (boundedF0 * (n + 1) * (n + 1) - (n - 1) * (n - 1)) / (1 - boundedF0);
             film = Film(cosine, filmIor, material.thickness, {n, std::sqrt(std::max(kSquared, 0.0))},
                         channel, f82Tinted);
-            metal += transition * (film - metal);
+            metal = film;
         }
         result[channel] = (1 - material.metal) * dielectric + material.metal * metal;
     }
@@ -399,9 +400,116 @@ inline Frame MakeFrame(const Material& material, bool coat)
     const double roughness = coat ? material.coatRoughness : material.roughness;
     const double alpha = std::max(roughness * roughness, 1e-3);
     const double aspect = coat ? 1 : std::sqrt(1 - 0.9 * material.aniso);
-    frame.ax = alpha / aspect;
-    frame.ay = alpha * aspect;
+    frame.ax = Clamp(alpha / aspect);
+    frame.ay = Clamp(alpha * aspect);
     return frame;
+}
+
+template<size_t Size>
+inline double SampleTable(const std::array<double, Size>& table, unsigned width, unsigned height,
+                          double x, double y = 0, double z = 0)
+{
+    const unsigned depth = unsigned(Size) / (width * height);
+    const std::array<double, 3> p{Clamp(x) * (width - 1), Clamp(y) * (height - 1), Clamp(z) * (depth - 1)};
+    const std::array<unsigned, 3> dimensions{width, height, depth};
+    double value = 0;
+    for (unsigned corner = 0; corner < 8; ++corner)
+    {
+        std::array<unsigned, 3> index{};
+        double weight = 1;
+        for (unsigned axis = 0; axis < 3; ++axis)
+        {
+            const unsigned lower = unsigned(p[axis]);
+            const double fraction = p[axis] - lower;
+            const bool upper = (corner & (1u << axis)) != 0;
+            index[axis] = std::min(lower + unsigned(upper), dimensions[axis] - 1);
+            weight *= upper ? fraction : 1 - fraction;
+        }
+        value += weight * table[index[0] + width * (index[1] + height * index[2])];
+    }
+    return value;
+}
+
+inline double SubstrateIor(const Material& material)
+{
+    const double authoredF0 = std::pow((material.ior - 1) / (material.ior + 1), 2) * 2 * material.level;
+    const double root = std::sqrt(std::clamp(authoredF0, 0.0, 0.99));
+    const double adjusted = (1 + root) / (1 - root);
+    return material.level == 0.5 ? material.ior : material.ior < 1 ? 1 / adjusted : adjusted;
+}
+
+inline double DielectricMean(double ior)
+{
+    const auto outside = [](double eta) { return (eta - 1) / (4.08567 + 1.00071 * eta); };
+    return ior >= 1 ? outside(ior) : 1 - ior * ior * (1 - outside(1 / ior));
+}
+
+struct LayeredEnergy
+{
+    Vector dielectric, metal, coat, dielectricAlbedo;
+    double coatAlbedo;
+};
+
+inline LayeredEnergy Energy(const Material& material, Vector view)
+{
+    const auto scale = [](Vector fss, double roughness, double cosine) {
+        const double e = std::max(SampleTable(kGgxEnergy, 32, 32, roughness, cosine), 1e-6);
+        const double average = SampleTable(kGgxAverageEnergy, 32, 1, roughness);
+        Vector result{};
+        for (unsigned c = 0; c < 3; ++c)
+            result[c] = 1 + fss[c] * average / std::max(1 - fss[c] * (1 - average), 1e-6) * (1 - e) / e;
+        return result;
+    };
+    const auto albedo = [](double roughness, double cosine, double ior) {
+        return SampleTable(kGgxDielectricAlbedo, 16, 16, roughness, cosine,
+                           std::sqrt(std::abs((ior - 1) / (ior + 1))));
+    };
+    const auto frame = MakeFrame(material, false);
+    const double roughness = std::sqrt(std::sqrt(frame.ax * frame.ay));
+    const double cosine = Clamp(Dot(material.normal, view)), ior = SubstrateIor(material);
+    const double f0 = std::pow((ior - 1) / (ior + 1), 2);
+    const double fssWeight = Clamp((DielectricMean(ior) - f0) / std::max(1 - f0, 1e-20));
+    const double authoredF0 = std::pow((material.ior - 1) / (material.ior + 1), 2) * 2 * material.level;
+    Vector dielectricMean{}, metalMean{}, estimate{};
+    for (unsigned c = 0; c < 3; ++c)
+    {
+        const double tinted = Clamp(authoredF0 * material.tint[c]);
+        dielectricMean[c] = tinted + (1 - tinted) * fssWeight;
+        const double metalF0 = Clamp(material.base[c]);
+        const double correction = (metalF0 + (1 - metalF0) * std::pow(6.0 / 7.0, 5)) *
+                                  (1 - Clamp(material.tint[c])) * 7 / std::pow(6.0 / 7.0, 6);
+        metalMean[c] = metalF0 + (1 - metalF0) / 21 - correction / 126;
+        estimate[c] = ior == 1 ? 0 : tinted + (1 - tinted) * albedo(roughness, cosine, ior);
+    }
+    if (material.thickness > double(0.1f) && material.filmIor != 1 &&
+        (material.metal > 0 || material.filmIor != material.ior))
+    {
+        Material dielectric = material;
+        dielectric.metal = 0;
+        estimate = Fresnel(dielectric, cosine);
+    }
+    LayeredEnergy result;
+    result.dielectric = scale(dielectricMean, roughness, cosine);
+    result.metal = scale(metalMean, roughness, cosine);
+    result.dielectricAlbedo = estimate * result.dielectric * SampleTable(kGgxEnergy, 32, 32, roughness, cosine);
+    const double coatRough = std::sqrt(std::max(material.coatRoughness * material.coatRoughness, 1e-3));
+    const double coatCos = Clamp(Dot(material.coatNormal, view)), coatMean = DielectricMean(material.coatIor);
+    result.coat = scale({coatMean, coatMean, coatMean}, coatRough, coatCos);
+    const double coatF0 = std::pow((material.coatIor - 1) / (material.coatIor + 1), 2);
+    result.coatAlbedo = (coatF0 + (1 - coatF0) * albedo(coatRough, coatCos, material.coatIor)) *
+                       result.coat[0] * SampleTable(kGgxEnergy, 32, 32, coatRough, coatCos);
+    return result;
+}
+
+inline Vector CompensatedFresnel(const Material& material, const LayeredEnergy& energy, double cosine,
+                                 bool coat = false)
+{
+    if (coat) return Fresnel(material, cosine, true) * energy.coat;
+    Material dielectric = material, metal = material;
+    dielectric.metal = 0;
+    metal.metal = 1;
+    return Fresnel(dielectric, cosine) * energy.dielectric * (1 - material.metal) +
+           Fresnel(metal, cosine) * energy.metal * material.metal;
 }
 
 inline double Distribution(const Frame& frame, Vector halfVector)
@@ -429,9 +537,10 @@ struct Integral
     double albedo = 1;
 };
 
-inline Integral Integrate(const Material& material, Vector view, bool coat)
+inline Integral Integrate(const Material& material, Vector view, bool coat, bool compensate = true)
 {
     const Frame frame = MakeFrame(material, coat);
+    const auto energy = Energy(material, view);
     const double cosine = Clamp(Dot(frame.normal, view));
     Integral result;
     if (cosine <= 0 || (coat && material.coat == 0))
@@ -441,7 +550,7 @@ inline Integral Integrate(const Material& material, Vector view, bool coat)
     const double roughness = coat ? material.coatRoughness : material.roughness;
     if (roughness == 0)
     {
-        result.single = Fresnel(material, cosine, coat);
+        result.single = compensate ? CompensatedFresnel(material, energy, cosine, coat) : Fresnel(material, cosine, coat);
     }
     else
     {
@@ -465,15 +574,14 @@ inline Integral Integrate(const Material& material, Vector view, bool coat)
             {
                 const double factor =
                     4 * nl * Visibility(frame, view, light) * vh / std::max(Dot(frame.normal, half), 1e-6) / 1024;
-                result.single = result.single + Fresnel(material, vh, coat) * factor;
+                result.single = result.single + (compensate ? CompensatedFresnel(material, energy, vh, coat) : Fresnel(material, vh, coat)) * factor;
                 result.albedo += factor;
             }
         }
         result.albedo = Clamp(result.albedo);
-        for (double& component : result.single)
-        {
-            component = std::min(component, result.albedo);
-        }
+        if (!compensate)
+            for (double& component : result.single)
+                component = std::min(component, result.albedo);
     }
     for (unsigned index = 0; index < 64; ++index)
     {
@@ -552,37 +660,19 @@ inline Float4 Pack(Vector vector, double w = 0)
 }
 
 struct BaseWeights { Vector multiple, diffuse; };
+inline Vector ReflectionBudget(Vector diffuse, Vector reflection)
+{
+    Vector normalization{};
+    for (unsigned c = 0; c < 3; ++c)
+        normalization[c] = std::min(1.0, std::max(1 - diffuse[c], 0.0) / std::max(reflection[c], 1e-20));
+    return normalization;
+}
 inline BaseWeights LayeredBaseWeights(const Material& material, Vector view, const Integral& base)
 {
-    Vector baseMultiple = Multiple(base);
-    Vector diffuse =
-        material.base * ((1 - material.metal) * std::max(1 - Maximum(base.single + baseMultiple), 0.0));
-    if (material.thickness > 0 && material.filmIor != 1 && (material.metal > 0 || material.filmIor != material.ior))
-    {
-        const double authoredF0=std::pow((material.ior-1)/(material.ior+1),2)*2*material.level;
-        const double f0Root=std::sqrt(std::clamp(authoredF0,0.0,0.99));
-        const double adjusted=(1+f0Root)/(1-f0Root);
-        const double ior=material.level==0.5?material.ior:material.ior<1?1/adjusted:adjusted;
-        const double f0=std::pow((ior-1)/(ior+1),2);
-        const double fss=ior>=1?(ior-1)/(4.08567+1.00071*ior)
-            :1-ior*ior*(1-(1/ior-1)/(4.08567+1.00071/ior));
-        Integral compensation=base;
-        for (size_t channel=0;channel<3;++channel)
-        {
-            const double tintedF0=Clamp(authoredF0*material.tint[channel]);
-            const double dielectricFss=tintedF0+(1-tintedF0)*Clamp((fss-f0)/(1-f0));
-            const double metalF0=Clamp(material.base[channel]);
-            const double schlick82=metalF0+(1-metalF0)*std::pow(6.0/7.0,5);
-            const double correction=schlick82*(1-Clamp(material.tint[channel]))*7/std::pow(6.0/7.0,6);
-            const double metalFss=metalF0+(1-metalF0)/21-correction/126;
-            compensation.average[channel]=Clamp(dielectricFss*(1-material.metal)+metalFss*material.metal);
-        }
-        baseMultiple=Multiple(compensation);
-        Material dielectric = material;
-        dielectric.metal = 0;
-        diffuse = material.base * ((1 - material.metal) * std::max(1 - Maximum(Fresnel(dielectric, Dot(material.normal, view))), 0.0));
-    }
-    return {baseMultiple,diffuse};
+    (void)base;
+    const auto energy = Energy(material, view);
+    return {{0, 0, 0}, material.base * ((1 - material.metal) *
+            std::max(1 - Maximum(energy.dielectricAlbedo), 0.0))};
 }
 
 inline Expected Reference(const Material& material, Vector view, unsigned mask, const SheenTable& table)
@@ -593,13 +683,17 @@ inline Expected Reference(const Material& material, Vector view, unsigned mask, 
     const Integral base = Integrate(material, view, false), coat = Integrate(material, view, true);
     const auto terms = LayeredBaseWeights(material,view,base);
     const Vector baseMultiple=terms.multiple, diffuse=terms.diffuse;
-    const Vector coatMultiple=Multiple(coat);
+    const Vector coatMultiple{};
+    auto energy = Energy(material, view);
+    const Vector normalization = ReflectionBudget(diffuse, base.single);
+    energy.dielectric = energy.dielectric * normalization;
+    energy.metal = energy.metal * normalization;
     const Vector sheenNormal =
         Unit(material.normal * (1 - Clamp(material.coat)) + material.coatNormal * Clamp(material.coat));
     const Vector sheenCoefficients = Sheen(table, Clamp(Dot(sheenNormal, view)), material.sheenRoughness, mask);
     const Vector sheenColor = material.sheenTint * (material.sheen * sheenCoefficients[2]);
     const double sheenTransmission = std::max(1 - Maximum(sheenColor), 0.0);
-    const double coatTransmission = std::max(1 - material.coat * (coat.single[0] + coatMultiple[0]), 0.0);
+    const double coatTransmission = std::max(1 - material.coat * energy.coatAlbedo, 0.0);
     Vector transmission{1, 1, 1};
     if (material.coat > 0)
     {
@@ -619,14 +713,14 @@ inline Expected Reference(const Material& material, Vector view, unsigned mask, 
     const double nl = Clamp(Dot(material.normal, light));
     if (nl > 0 && Dot(material.normal, view) > 0)
     {
-        direct = transmission * (Fresnel(material, Dot(view, half)) *
+        direct = transmission * (CompensatedFresnel(material, energy, Dot(view, half)) *
                                      (nl * Distribution(frame, half) * Visibility(frame, view, light)) +
                                  (baseMultiple + diffuse) * (nl / kPi));
     }
     const double coatNl = Clamp(Dot(material.coatNormal, light));
     if (material.coat > 0 && coatNl > 0 && Dot(material.coatNormal, view) > 0)
     {
-        direct = direct + (Fresnel(material, Dot(view, half), true) *
+        direct = direct + (CompensatedFresnel(material, energy, Dot(view, half), true) *
                                (Distribution(coatFrame, half) * Visibility(coatFrame, view, light)) +
                            coatMultiple * (1 / kPi)) *
                               (sheenTransmission * material.coat * coatNl);
@@ -646,7 +740,7 @@ inline Expected Reference(const Material& material, Vector view, unsigned mask, 
                      material.ao);
     };
     const Vector ambientDiffuse = transmission * (diffuse + baseMultiple) * material.ao;
-    const Vector ambientSpecular = transmission * base.single * specularAo(material.normal, material.roughness);
+    const Vector ambientSpecular = transmission * base.single * normalization * specularAo(material.normal, material.roughness);
     const Vector ambientCoat =
         (coat.single * specularAo(material.coatNormal, material.coatRoughness) + coatMultiple * material.ao) *
         (sheenTransmission * material.coat);

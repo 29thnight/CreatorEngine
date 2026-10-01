@@ -1,0 +1,15 @@
+{
+  "schema_version": 3,
+  "blender_version": "5.1.1",
+  "mask": 2047,
+  "numeric_golden_rows": 112,
+  "numeric_golden_sha256": "0A3B41BDD05F8B1CF7458D3865539B46D6206D5CEC9AD79733C5AFE669950CB4",
+  "changed_cases": [
+    "film_sub_nm_transition",
+    "film_no_substrate_interface"
+  ],
+  "historical_baseline": "numeric-golden-spectral.csv",
+  "created": "2026-10-01",
+  "source": "Cycles v5.1.1 svm/types.h 0.1nm cutoff; bsdf_util.h film IOR transition only",
+  "oracle": "CPU double complex optical boundary; GPU is not used to generate this baseline"
+}

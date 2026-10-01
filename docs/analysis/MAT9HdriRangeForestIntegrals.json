@@ -1,0 +1,136 @@
+{
+  "schema": "creator.environment.integrals-diagnostic.v1",
+  "mode": "forest",
+  "decoded": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\EnvironmentCooker\\forest.rgba32f",
+  "decoded_sha256": "2a313b5fe8361435d4e52b6300e3431f586bc110906f2024e3eb2387b4cab460",
+  "source_sha256": "bdf2298244affa0f85509380fd130ac6d4dfaa3c856df065998f7f4c1a93dc0d",
+  "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-forest-v3-final.ceibl",
+  "cook_sha256": "df981ca1595ebce40a8d449c8dc199483f1db656879f02c3861b98fd8b083d89",
+  "interior_pixels": 344,
+  "source_dimensions": [
+    1024,
+    512
+  ],
+  "cube_size": 512,
+  "quadrature": "all source texel centers and cube texel centers, exact solid angles; E/pi",
+  "cube_centers_vs_source": {
+    "relative_rms": 0.014218759377241581,
+    "p95_normalized": 0.01523848814123589,
+    "max_normalized": 3.0892079689549234,
+    "reference_mean": [
+      0.811569715530435,
+      0.8285560577960415,
+      0.8714552825189639
+    ],
+    "actual_mean": [
+      0.8117132692769125,
+      0.8287114769349141,
+      0.8716200310806292
+    ]
+  },
+  "mirror_cube_resampling": {
+    "relative_rms": 0.03780184694204558,
+    "p95_normalized": 0.0246146549466777,
+    "max_normalized": 0.258249995712967,
+    "reference_mean": [
+      0.35439236528615364,
+      0.35696716100569686,
+      0.3837618255903702
+    ],
+    "actual_mean": [
+      0.3548222151171297,
+      0.3572983461769951,
+      0.3836964441260004
+    ]
+  },
+  "mirror_native_vs_cpu_cube": {
+    "relative_rms": 0.0012769789705502025,
+    "p95_normalized": 0.0005801125370172684,
+    "max_normalized": 0.007985334652768353,
+    "reference_mean": [
+      0.3548222151171297,
+      0.3572983461769951,
+      0.3836964441260004
+    ],
+    "actual_mean": [
+      0.35461750626564026,
+      0.35709282755851746,
+      0.3834855854511261
+    ]
+  },
+  "mirror_blender_vs_cpu_source": {
+    "relative_rms": 0.01273057831713038,
+    "p95_normalized": 0.010945434903978065,
+    "max_normalized": 0.043642828080956694,
+    "reference_mean": [
+      0.35439236528615364,
+      0.35696716100569686,
+      0.3837618255903702
+    ],
+    "actual_mean": [
+      0.3533453345298767,
+      0.356094628572464,
+      0.38287362456321716
+    ]
+  },
+  "diffuse_cube_vs_source": {
+    "relative_rms": 2.8437969993927515e-05,
+    "p95_normalized": 1.9779540213904488e-05,
+    "max_normalized": 2.5537380292789402e-05,
+    "reference_mean": [
+      0.3976436008182575,
+      0.39628619076286037,
+      0.41756502893832753
+    ],
+    "actual_mean": [
+      0.39765452622642455,
+      0.39629679694350173,
+      0.4175765262395554
+    ]
+  },
+  "diffuse_bake_vs_dense_cube": {
+    "relative_rms": 0.0035834694310782505,
+    "p95_normalized": 0.0030247875933643587,
+    "max_normalized": 0.0072727461697823514,
+    "reference_mean": [
+      0.39765452622642455,
+      0.39629679694350173,
+      0.4175765262395554
+    ],
+    "actual_mean": [
+      0.3983391551825229,
+      0.3970031937244857,
+      0.41872352676813623
+    ]
+  },
+  "diffuse_native_vs_bake": {
+    "relative_rms": 0.0002606218934782056,
+    "p95_normalized": 0.00023252958470055816,
+    "max_normalized": 0.0004088683868247456,
+    "reference_mean": [
+      0.3983391551825229,
+      0.3970031937244857,
+      0.41872352676813623
+    ],
+    "actual_mean": [
+      0.39833706617355347,
+      0.3970010578632355,
+      0.4187157154083252
+    ]
+  },
+  "diffuse_blender_vs_dense_source": {
+    "relative_rms": 0.0007703799690887014,
+    "p95_normalized": 0.00070539294852191,
+    "max_normalized": 0.0012694538697546331,
+    "reference_mean": [
+      0.3976436008182575,
+      0.39628619076286037,
+      0.41756502893832753
+    ],
+    "actual_mean": [
+      0.3976800739765167,
+      0.3963257074356079,
+      0.41761189699172974
+    ]
+  }
+}

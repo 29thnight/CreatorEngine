@@ -751,7 +751,8 @@ bool SceneHost::PrepareResidency(const EnhancedFrameContext& context,
 bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<const SceneViewInput> input,
                         RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                         const EnhancedShadowData& shadow, const SceneHostBudget& budget,
-                        std::string& error, std::uint64_t environmentGeneration)
+                        std::string& error, std::uint64_t environmentGeneration,
+                        std::array<RHITextureHandle,3> importance, RHITextureHandle source)
 {
     ce::profile_scope profile{ce::marker<"MaterialGraphScenePrepare">()};
     if (!input || input->Draws().empty())
@@ -800,7 +801,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
     candidate->shadow = shadow.enabled;
     if (!lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
                          environmentGeneration,
-                         budget.lookupBytes, candidate->lookup, error))
+                         budget.lookupBytes, candidate->lookup, error, importance, source))
         return false;
     const bool hasSpecial = std::ranges::any_of(candidate->input->Draws(), [](const auto& draw) {
         return (draw.material->generation->cooked.product.program.features & 0x1800u) != 0;

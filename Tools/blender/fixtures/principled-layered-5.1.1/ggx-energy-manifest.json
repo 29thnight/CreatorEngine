@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "blender_version": "5.1.1",
+  "source_sha256": "fbde5fea5750eb32e2a638b74b97ef6a39eed29283b2f46eb139893ca3af5175",
+  "source_url": "https://github.com/blender/blender/blob/v5.1.1/intern/cycles/scene/shader.tables",
+  "tables": {
+    "ggx_E": 1024,
+    "ggx_Eavg": 32,
+    "ggx_gen_schlick_ior_s": 4096
+  },
+  "generated_sha256": {
+    "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang": "250aa6a77726aed183d10c81b2189f0fbd7e7d05724f1177c5aa9818da482dea",
+    "Tools/regression/principled_ggx_energy_tables.h": "76269b1a2948f2a0c4b1802b0417ac1a4226ff661f642a30c7591556dd1dddfc"
+  }
+}

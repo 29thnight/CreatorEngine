@@ -1,0 +1,636 @@
+{
+  "schema": "creator.material.blender-image-comparison.v1",
+  "reference": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-reference-0",
+  "native": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Images-Release-hdri-linear\\Native",
+  "control_passed": true,
+  "reference_repeat": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-reference-11",
+  "acceptance": "diagnostic; material approximation tolerances remain unaccepted",
+  "mask": "common emission-control interior eroded by two pixels; no per-material cherry picking",
+  "contact_order": "manifest cases, each row Blender | native | absolute difference x10",
+  "cases": [
+    {
+      "id": "forest-core_base",
+      "interior_pixels": 344,
+      "max_abs": 0.02528756856918335,
+      "native_sha256": "09fe795bd231e4ca5f457ceca5e1b842a5a1d5ae41962fa832e4c354df106782",
+      "mean_abs": 0.0018252833825788757,
+      "max_normalized": 0.02528756856918335,
+      "p95_normalized": 0.0069422125816345215,
+      "relative_rms": 0.012842129375991572,
+      "reference_mean_rgb": [
+        0.338864209476945,
+        0.17510590138087093,
+        0.112794122236326
+      ],
+      "native_mean_rgb": [
+        0.33882815338844474,
+        0.17511820238690043,
+        0.11293344719465388
+      ],
+      "reference_repeat": {
+        "max_abs": 0.009263038635253906,
+        "relative_rms": 0.007622927621673282
+      }
+    },
+    {
+      "id": "forest-core_metal",
+      "interior_pixels": 344,
+      "max_abs": 0.30355167388916016,
+      "native_sha256": "cfaf0880cd1f045b456877075cdab5231c2803d2f04ae43939cc503fe7d990ea",
+      "mean_abs": 0.0050381242370687775,
+      "max_normalized": 0.21329742670059204,
+      "p95_normalized": 0.012903258204460144,
+      "relative_rms": 0.030335224897344946,
+      "reference_mean_rgb": [
+        0.3122041247552261,
+        0.2733694446235245,
+        0.18539888837759189
+      ],
+      "native_mean_rgb": [
+        0.31059183076370595,
+        0.2722609985706418,
+        0.18485253356223882
+      ],
+      "reference_repeat": {
+        "max_abs": 0.029050827026367188,
+        "relative_rms": 0.0024606488089795866
+      }
+    },
+    {
+      "id": "forest-core_rough",
+      "interior_pixels": 344,
+      "max_abs": 0.014980942010879517,
+      "native_sha256": "3332ef527ab63db415e6f7920274b44536aca52aa8e99c96afe6cef57d2174f1",
+      "mean_abs": 0.002106385276645653,
+      "max_normalized": 0.014980942010879517,
+      "p95_normalized": 0.007094293832778931,
+      "relative_rms": 0.010454234239064997,
+      "reference_mean_rgb": [
+        0.2884127031145401,
+        0.2797402308084244,
+        0.28662750811511
+      ],
+      "native_mean_rgb": [
+        0.2885179741438045,
+        0.27985062710074493,
+        0.287088438521984
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00865781307220459,
+        "relative_rms": 0.007209456235498013
+      }
+    },
+    {
+      "id": "forest-core_normal",
+      "interior_pixels": 344,
+      "max_abs": 0.025358915328979492,
+      "native_sha256": "24a6403854a0afd8b19cb59ebe96f972aa0d9489ee7ac17b89e4f8dd094addd2",
+      "mean_abs": 0.002081290345870016,
+      "max_normalized": 0.025358915328979492,
+      "p95_normalized": 0.007051557302474976,
+      "relative_rms": 0.01029220093001143,
+      "reference_mean_rgb": [
+        0.30098870769143105,
+        0.3001810550083255,
+        0.3164091560621421
+      ],
+      "native_mean_rgb": [
+        0.3010809255200763,
+        0.30027327426644257,
+        0.31685656170512355
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0090923011302948,
+        "relative_rms": 0.007261893892159141
+      }
+    },
+    {
+      "id": "forest-core_emission",
+      "interior_pixels": 344,
+      "max_abs": 0.01878678798675537,
+      "native_sha256": "0b61b0b0e3a4dadfcf44e01e4f2a7a092fcc1750bf60403b95e6dd18ee6a6b1b",
+      "mean_abs": 0.0022917295149130416,
+      "max_normalized": 0.011921006304037212,
+      "p95_normalized": 0.0026834510955359393,
+      "relative_rms": 0.0009588486753649958,
+      "reference_mean_rgb": [
+        1.5534421371859173,
+        2.803485527288082,
+        5.05650381986485
+      ],
+      "native_mean_rgb": [
+        1.5528280568677326,
+        2.80237668059593,
+        5.054403615552325
+      ],
+      "reference_repeat": {
+        "max_abs": 0.004781365394592285,
+        "relative_rms": 0.00022688417496794191
+      }
+    },
+    {
+      "id": "forest-layer_coat",
+      "interior_pixels": 344,
+      "max_abs": 0.015546202659606934,
+      "native_sha256": "1721ad4dd671186b38430b28fe34b9c1741a691092eb3844d6956e8aba452421",
+      "mean_abs": 0.0011965687578009774,
+      "max_normalized": 0.015546202659606934,
+      "p95_normalized": 0.004636973142623901,
+      "relative_rms": 0.01205489325351119,
+      "reference_mean_rgb": [
+        0.23094452684745193,
+        0.12147824280505437,
+        0.10130669487380357
+      ],
+      "native_mean_rgb": [
+        0.23097974200581395,
+        0.12153891629950944,
+        0.10143577220828034
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00708162784576416,
+        "relative_rms": 0.006890790498574965
+      }
+    },
+    {
+      "id": "forest-layer_sheen",
+      "interior_pixels": 344,
+      "max_abs": 0.03101286292076111,
+      "native_sha256": "b16388a10ca3c478eab117747e999d3660e7d5c25bb9cab85af24c3b9cb1307e",
+      "mean_abs": 0.0026310425533284973,
+      "max_normalized": 0.03101286292076111,
+      "p95_normalized": 0.0071395933628082275,
+      "relative_rms": 0.01775456180799724,
+      "reference_mean_rgb": [
+        0.1291085977518801,
+        0.21935238266840232,
+        0.28332742580840753
+      ],
+      "native_mean_rgb": [
+        0.12889737861101017,
+        0.2191677537075309,
+        0.28348062204760177
+      ],
+      "reference_repeat": {
+        "max_abs": 0.009390473365783691,
+        "relative_rms": 0.006968953344714378
+      }
+    },
+    {
+      "id": "forest-layer_anisotropic",
+      "interior_pixels": 344,
+      "max_abs": 0.6077491044998169,
+      "native_sha256": "986a2b4aa7ddbdf4604cc3e6db79b7f3fb9453827798183747c2bb162d6b62d7",
+      "mean_abs": 0.01359503387921136,
+      "max_normalized": 0.6077491044998169,
+      "p95_normalized": 0.06354129314422607,
+      "relative_rms": 0.10881681510907644,
+      "reference_mean_rgb": [
+        0.2862551696869263,
+        0.23422365762336655,
+        0.1518071895671012
+      ],
+      "native_mean_rgb": [
+        0.2830727599387945,
+        0.23214160564333894,
+        0.15087684365205986
+      ],
+      "reference_repeat": {
+        "max_abs": 0.038079261779785156,
+        "relative_rms": 0.00820129619938949
+      }
+    },
+    {
+      "id": "forest-layer_thin_film",
+      "interior_pixels": 344,
+      "max_abs": 0.15551161766052246,
+      "native_sha256": "8e5390722b10347b04948104496b93b813c219930693bd43c8865fe6c853316b",
+      "mean_abs": 0.007021542048341659,
+      "max_normalized": 0.15551161766052246,
+      "p95_normalized": 0.03331288695335388,
+      "relative_rms": 0.07183298816125085,
+      "reference_mean_rgb": [
+        0.08607947308743416,
+        0.15064206640885838,
+        0.27075767275595736
+      ],
+      "native_mean_rgb": [
+        0.08599520838537882,
+        0.15011805157328761,
+        0.27018950706304506
+      ],
+      "reference_repeat": {
+        "max_abs": 0.008636415004730225,
+        "relative_rms": 0.00610901645839277
+      }
+    },
+    {
+      "id": "forest-layer_mixed",
+      "interior_pixels": 344,
+      "max_abs": 0.019997894763946533,
+      "native_sha256": "92c970a7408c54a8a2bf229e3500a04fec2aa02436ea23cc88a31d3e5cd1be92",
+      "mean_abs": 0.001995102747870508,
+      "max_normalized": 0.019997894763946533,
+      "p95_normalized": 0.006675064563751221,
+      "relative_rms": 0.014628191911093207,
+      "reference_mean_rgb": [
+        0.23148977202038432,
+        0.20579708987023942,
+        0.16769574890129788
+      ],
+      "native_mean_rgb": [
+        0.23150856550349747,
+        0.20581764398619187,
+        0.16788527022960575
+      ],
+      "reference_repeat": {
+        "max_abs": 0.006294280290603638,
+        "relative_rms": 0.006782454497950166
+      }
+    },
+    {
+      "id": "forest-control_emission",
+      "interior_pixels": 344,
+      "max_abs": 0.0,
+      "native_sha256": "3d216db78e165c3cec0c8222f56fc15b0750d86a1fcf2b094d5e33539aa9cb73",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "forest-control_white",
+      "interior_pixels": 344,
+      "max_abs": 0.00955212116241455,
+      "native_sha256": "767429b48d5e1ba7604ecc99e58d602aa3aa9077af2b1337b70ceb6add6988bf",
+      "mean_abs": 0.001918378206648568,
+      "max_normalized": 0.00955212116241455,
+      "p95_normalized": 0.0052071213722229,
+      "relative_rms": 0.0058110261474783,
+      "reference_mean_rgb": [
+        0.39774010148505834,
+        0.39639284476897746,
+        0.41769018892718607
+      ],
+      "native_mean_rgb": [
+        0.39772282090297967,
+        0.39640062908793605,
+        0.41824571476426237
+      ],
+      "reference_repeat": {
+        "max_abs": 0.011596381664276123,
+        "relative_rms": 0.007057504110826053
+      }
+    },
+    {
+      "id": "forest-control_mirror",
+      "interior_pixels": 344,
+      "max_abs": 0.32457292079925537,
+      "native_sha256": "540433bffbf941413c73ef35325502ff6447f070e86704f3831ea95777c8aa3c",
+      "mean_abs": 0.006628289492445494,
+      "max_normalized": 0.18028586194051663,
+      "p95_normalized": 0.02000156044960022,
+      "relative_rms": 0.026331789305975524,
+      "reference_mean_rgb": [
+        0.3533553213394128,
+        0.35611921800625357,
+        0.38290152812251743
+      ],
+      "native_mean_rgb": [
+        0.3551139332527338,
+        0.3574945871220079,
+        0.38399565150571424
+      ],
+      "reference_repeat": {
+        "max_abs": 0.045375823974609375,
+        "relative_rms": 0.002361089371081101
+      }
+    },
+    {
+      "id": "autumn-core_base",
+      "interior_pixels": 344,
+      "max_abs": 1.2064951360225677,
+      "native_sha256": "b0d1eccc32a996fa8d7548537690f6cca293b65e187fd197a97b9d14bf730d8e",
+      "mean_abs": 0.0388909606660117,
+      "max_normalized": 1.2064951360225677,
+      "p95_normalized": 0.1280268132686615,
+      "relative_rms": 0.2616982512671255,
+      "reference_mean_rgb": [
+        0.5100539726161852,
+        0.26271813019547,
+        0.15872399453723499
+      ],
+      "native_mean_rgb": [
+        0.4742031540981559,
+        0.25321170895598655,
+        0.1594188601471657
+      ],
+      "reference_repeat": {
+        "max_abs": 0.04086494445800781,
+        "relative_rms": 0.012320032156401822
+      }
+    },
+    {
+      "id": "autumn-core_metal",
+      "interior_pixels": 344,
+      "max_abs": 14.539527893066406,
+      "native_sha256": "d2d674e2b0594fcd7cd72b45461ec91813aabf8f2f6b40b4da2cdccae1919ec1",
+      "mean_abs": 0.10582441205290587,
+      "max_normalized": 13.897323608398438,
+      "p95_normalized": 0.13055914640426636,
+      "relative_rms": 0.2720866991793631,
+      "reference_mean_rgb": [
+        0.41739773519234297,
+        0.36621986216659724,
+        0.23610545501795185
+      ],
+      "native_mean_rgb": [
+        0.36155528800432074,
+        0.3313000479409861,
+        0.22386539814084075
+      ],
+      "reference_repeat": {
+        "max_abs": 0.3114910125732422,
+        "relative_rms": 0.0057005328027154205
+      }
+    },
+    {
+      "id": "autumn-core_rough",
+      "interior_pixels": 344,
+      "max_abs": 0.1454353928565979,
+      "native_sha256": "b317eef7a45eac89849657180c467596eb53dad3e55b72848a15098a5b5ad470",
+      "mean_abs": 0.02824041647692175,
+      "max_normalized": 0.1454353928565979,
+      "p95_normalized": 0.0752793550491333,
+      "relative_rms": 0.07931880451838617,
+      "reference_mean_rgb": [
+        0.43508509179403965,
+        0.42211296836044204,
+        0.4070545525051827
+      ],
+      "native_mean_rgb": [
+        0.39509804304255997,
+        0.39602465962254724,
+        0.39673614501953125
+      ],
+      "reference_repeat": {
+        "max_abs": 0.03210186958312988,
+        "relative_rms": 0.011549104297487678
+      }
+    },
+    {
+      "id": "autumn-core_normal",
+      "interior_pixels": 344,
+      "max_abs": 0.6627698540687561,
+      "native_sha256": "e598858e61750a99364ec28090f59d182bd94777cff786037041ddfd980076e8",
+      "mean_abs": 0.03761258202987586,
+      "max_normalized": 0.6627698540687561,
+      "p95_normalized": 0.1348317265510559,
+      "relative_rms": 0.14698308181736808,
+      "reference_mean_rgb": [
+        0.45271186441789535,
+        0.4515295204121706,
+        0.4480713290313995
+      ],
+      "native_mean_rgb": [
+        0.4166806243186773,
+        0.4286465312159339,
+        0.44093784066133723
+      ],
+      "reference_repeat": {
+        "max_abs": 0.036931395530700684,
+        "relative_rms": 0.01147084380832037
+      }
+    },
+    {
+      "id": "autumn-core_emission",
+      "interior_pixels": 344,
+      "max_abs": 0.69338059425354,
+      "native_sha256": "99a15e77e7ecf92cf6bd22a9e4437f6182545b2073b31e4268f78c41ff766abd",
+      "mean_abs": 0.020231487792591717,
+      "max_normalized": 0.4075950545069664,
+      "p95_normalized": 0.0334372565588222,
+      "relative_rms": 0.0143627125109712,
+      "reference_mean_rgb": [
+        1.5791093467972999,
+        2.8290634099827257,
+        5.078754481881163
+      ],
+      "native_mean_rgb": [
+        1.564296988553779,
+        2.8165425145348837,
+        5.0687341024709305
+      ],
+      "reference_repeat": {
+        "max_abs": 0.020386695861816406,
+        "relative_rms": 0.0008095098611451458
+      }
+    },
+    {
+      "id": "autumn-layer_coat",
+      "interior_pixels": 344,
+      "max_abs": 0.6524977385997772,
+      "native_sha256": "488cd3fb1cf0d48f094e8c32b4c73ac50a8b3f5c0ab0ee490a35707beaf50de6",
+      "mean_abs": 0.024096673435726485,
+      "max_normalized": 0.6524977385997772,
+      "p95_normalized": 0.0777273178100586,
+      "relative_rms": 0.23044858007999702,
+      "reference_mean_rgb": [
+        0.33082371829943946,
+        0.16697187871174063,
+        0.13002443353125695
+      ],
+      "native_mean_rgb": [
+        0.3071598673975745,
+        0.16048387039539425,
+        0.12931726145189862
+      ],
+      "reference_repeat": {
+        "max_abs": 0.026481151580810547,
+        "relative_rms": 0.01133235593745268
+      }
+    },
+    {
+      "id": "autumn-layer_sheen",
+      "interior_pixels": 344,
+      "max_abs": 1.4511221945285797,
+      "native_sha256": "160af833c40829e7d34eff7a0084925aeed86a6aa69239f178b47cda34387f0d",
+      "mean_abs": 0.0502164620462112,
+      "max_normalized": 1.4511221945285797,
+      "p95_normalized": 0.12841665744781494,
+      "relative_rms": 0.3414910006774639,
+      "reference_mean_rgb": [
+        0.1933405963801454,
+        0.32872722883773753,
+        0.40048580242017673
+      ],
+      "native_mean_rgb": [
+        0.17767511412154796,
+        0.31076803872751635,
+        0.3942681246025618
+      ],
+      "reference_repeat": {
+        "max_abs": 0.023075580596923828,
+        "relative_rms": 0.010915133279255026
+      }
+    },
+    {
+      "id": "autumn-layer_anisotropic",
+      "interior_pixels": 344,
+      "max_abs": 13.777441024780273,
+      "native_sha256": "ef57e4945904a035c7e266468069ca0ba5ba7a8421953c7e8b2a73eb5f548aba",
+      "mean_abs": 0.19415740403951354,
+      "max_normalized": 9.114020232111216,
+      "p95_normalized": 0.5796348452568054,
+      "relative_rms": 0.7040639253339732,
+      "reference_mean_rgb": [
+        0.41552552427192285,
+        0.3374156273825657,
+        0.20511979443768344
+      ],
+      "native_mean_rgb": [
+        0.38168562290280367,
+        0.31893767866977424,
+        0.2003127696902253
+      ],
+      "reference_repeat": {
+        "max_abs": 0.37054443359375,
+        "relative_rms": 0.012633414981654708
+      }
+    },
+    {
+      "id": "autumn-layer_thin_film",
+      "interior_pixels": 344,
+      "max_abs": 5.591757893562317,
+      "native_sha256": "a4a3519394a9f918fbc11aecb717d2b65bc40617b28ebdd15ec0adeb8d22ce77",
+      "mean_abs": 0.08927483024804803,
+      "max_normalized": 5.2147103164452195,
+      "p95_normalized": 0.3758391737937927,
+      "relative_rms": 0.8425208895730708,
+      "reference_mean_rgb": [
+        0.10622028316111239,
+        0.21436206116016174,
+        0.3646282039604388
+      ],
+      "native_mean_rgb": [
+        0.08754082613213118,
+        0.16136027491369911,
+        0.2911108150038608
+      ],
+      "reference_repeat": {
+        "max_abs": 0.04154765605926514,
+        "relative_rms": 0.011045461212227931
+      }
+    },
+    {
+      "id": "autumn-layer_mixed",
+      "interior_pixels": 344,
+      "max_abs": 0.7569165825843811,
+      "native_sha256": "2369ad2ce3a310f5d8c167c049fd09e92479a2aa3feb7510a92d99009502fc1d",
+      "mean_abs": 0.03879873311262606,
+      "max_normalized": 0.7569165825843811,
+      "p95_normalized": 0.13433212041854858,
+      "relative_rms": 0.24230920640782244,
+      "reference_mean_rgb": [
+        0.3376831002316849,
+        0.29967496734718946,
+        0.22859170453536304
+      ],
+      "native_mean_rgb": [
+        0.31647411612577214,
+        0.2898561344590298,
+        0.23001231703647348
+      ],
+      "reference_repeat": {
+        "max_abs": 0.024764716625213623,
+        "relative_rms": 0.01125287326662752
+      }
+    },
+    {
+      "id": "autumn-control_emission",
+      "interior_pixels": 344,
+      "max_abs": 0.0,
+      "native_sha256": "3d216db78e165c3cec0c8222f56fc15b0750d86a1fcf2b094d5e33539aa9cb73",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "autumn-control_white",
+      "interior_pixels": 344,
+      "max_abs": 0.11045658588409424,
+      "native_sha256": "dfffd69866f361cc243b696fbad11daa6f52870013d4a197bc6e0707a666f391",
+      "mean_abs": 0.02702327648740868,
+      "max_normalized": 0.09861179101863371,
+      "p95_normalized": 0.07744478710782793,
+      "relative_rms": 0.05598422613984152,
+      "reference_mean_rgb": [
+        0.6005477320272908,
+        0.5987586837131963,
+        0.5937681728324224
+      ],
+      "native_mean_rgb": [
+        0.554656982421875,
+        0.5706895340320676,
+        0.5870794251907704
+      ],
+      "reference_repeat": {
+        "max_abs": 0.044367432594299316,
+        "relative_rms": 0.011502701221488684
+      }
+    },
+    {
+      "id": "autumn-control_mirror",
+      "interior_pixels": 344,
+      "max_abs": 0.014866232872009277,
+      "native_sha256": "750a35318006b74f5ce7d4d8906c5de61cbd4f7df4b60de86649151181f0d01a",
+      "mean_abs": 0.000594936838272468,
+      "max_normalized": 0.013344433452520506,
+      "p95_normalized": 0.0014908313751220703,
+      "relative_rms": 0.005034013650741196,
+      "reference_mean_rgb": [
+        0.09834227311359935,
+        0.14505448244338812,
+        0.20902199508232433
+      ],
+      "native_mean_rgb": [
+        0.09897462711777798,
+        0.14564935551133268,
+        0.20956820110942043
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0006389915943145752,
+        "relative_rms": 0.0001388514226843507
+      }
+    }
+  ]
+}

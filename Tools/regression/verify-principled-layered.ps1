@@ -89,6 +89,13 @@ if ($LASTEXITCODE -ne 0 -or
 }
 $result
 
+if (@($result | Where-Object { $_ -eq 'PRINCIPLED_GGX_CLOSURE_INVARIANTS_OK checks=135' }).Count -ne 1) {
+    throw 'Separate GGX closure and energy limit invariants did not finish'
+}
+if (@($result | Where-Object { $_ -match '^PRINCIPLED_GGX_BUDGET_GPU_OK cases=4 rawExcessViews=[1-9]\d* checks=\d+$' }).Count -ne 1) {
+    throw 'Raw compensated energy and direct/IBL budget gate did not finish'
+}
+
 if (@($result | Where-Object { $_ -eq 'PRINCIPLED_LAYERED_COMPILE_OK compiled=14 rejected=8' }).Count -ne 1) {
     throw 'Layered permutation/dependency gate did not finish'
 }

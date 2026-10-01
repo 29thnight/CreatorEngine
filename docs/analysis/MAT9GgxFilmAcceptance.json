@@ -1,0 +1,878 @@
+{
+  "schema": "creator.material.thin-film-acceptance.v2",
+  "policy": {
+    "relative_rms": 0.01,
+    "p95_normalized": 0.01,
+    "max_normalized": 0.05,
+    "reference_repeat_relative_rms": 0.0025
+  },
+  "target_kind": "scene-linear engineering target; no perceptual or FPS equivalence claim",
+  "comparison": "Build\\Obj\\Mat9Images-Release-ggx-budget-final\\comparison.json",
+  "accepted": true,
+  "film_accepted_count": 16,
+  "off_accepted_count": 16,
+  "scope": "8 film/off pairs; sun and white furnace; shared eroded interior; extreme grazing evaluated by optical oracle",
+  "geometry_sha256": "604cc50946887fdfd750d0166eb549c87b87caa23c83c0b9d2f936e24d4b9aed",
+  "diagnostics": {
+    "debug-normal": {
+      "max_abs": 7.869303226470947e-05
+    },
+    "debug-view": {
+      "max_abs": 1.4066696166992188e-05
+    }
+  },
+  "image_cosine_range": [
+    0.5740371596201257,
+    0.9984288720636698
+  ],
+  "cases": [
+    {
+      "id": "sun-film_subnanometer",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0005372588590277439,
+      "p95_normalized": 0.00014162063598632812,
+      "max_normalized": 0.00046262145042419434,
+      "reference_noise_rms": 6.765175218583993e-05,
+      "film_off_rms": 0.0005533256351180219,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.00015285611152648926,
+      "film_off_max_normalized": 0.0004768967628479004,
+      "film_off_reference_noise_rms": 6.7822677996873e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0003983681076454516,
+          "film_effect_residual_rms": 0.00028238596119538496
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0005461880323931691,
+          "film_effect_residual_rms": 0.0002763468195108449
+        }
+      ]
+    },
+    {
+      "id": "sun-film_dielectric_100",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.002038640021142314,
+      "p95_normalized": 0.0004873424768447876,
+      "max_normalized": 0.0006327182054519653,
+      "reference_noise_rms": 1.6364124227767726e-05,
+      "film_off_rms": 0.00040962718742282035,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.00010783970355987549,
+      "film_off_max_normalized": 0.0002022087574005127,
+      "film_off_reference_noise_rms": 1.6262566841897352e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0020455289641972563,
+          "film_effect_residual_rms": 0.0018003293080928338
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.002036450357926771,
+          "film_effect_residual_rms": 0.0016918659433031741
+        }
+      ]
+    },
+    {
+      "id": "sun-film_dielectric_1000",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.00045276527031172715,
+      "p95_normalized": 0.00011986494064331055,
+      "max_normalized": 0.00029414892196655273,
+      "reference_noise_rms": 2.841578711814791e-05,
+      "film_off_rms": 0.00040962718742282035,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.00010783970355987549,
+      "film_off_max_normalized": 0.0002022087574005127,
+      "film_off_reference_noise_rms": 1.6262566841897352e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.00042301686987703376,
+          "film_effect_residual_rms": 0.00028118030623077643
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.00045986098054413095,
+          "film_effect_residual_rms": 0.0003127171479654108
+        }
+      ]
+    },
+    {
+      "id": "sun-film_metal_100",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0006885586454818917,
+      "p95_normalized": 0.00014212727546691895,
+      "max_normalized": 0.0008196234703063965,
+      "reference_noise_rms": 9.425558685084868e-05,
+      "film_off_rms": 0.0006156212374291164,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.00018446147441864014,
+      "film_off_max_normalized": 0.0006495118141174316,
+      "film_off_reference_noise_rms": 9.411999977438371e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0004942609259560115,
+          "film_effect_residual_rms": 0.00035950962945410027
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0006900126502800818,
+          "film_effect_residual_rms": 0.0003861845547922503
+        }
+      ]
+    },
+    {
+      "id": "sun-film_metal_1000",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0006927846250756195,
+      "p95_normalized": 0.00015240907669067383,
+      "max_normalized": 0.0007361769676208496,
+      "reference_noise_rms": 9.42217665354605e-05,
+      "film_off_rms": 0.0006156212374291164,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.00018446147441864014,
+      "film_off_max_normalized": 0.0006495118141174316,
+      "film_off_reference_noise_rms": 9.411999977438371e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0004815508355295415,
+          "film_effect_residual_rms": 0.0003924050499152065
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0006943469536455074,
+          "film_effect_residual_rms": 0.0003849600923706669
+        }
+      ]
+    },
+    {
+      "id": "sun-film_high_ior",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0005942197385641835,
+      "p95_normalized": 0.00014065206050872803,
+      "max_normalized": 0.0006810426712036133,
+      "reference_noise_rms": 7.960737471515186e-05,
+      "film_off_rms": 0.0005533256351180219,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.00015285611152648926,
+      "film_off_max_normalized": 0.0004768967628479004,
+      "film_off_reference_noise_rms": 6.7822677996873e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0004111998945605993,
+          "film_effect_residual_rms": 0.00039997961602471406
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0006002187168136007,
+          "film_effect_residual_rms": 0.00033628509878641
+        }
+      ]
+    },
+    {
+      "id": "sun-film_rough",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0004212011841995089,
+      "p95_normalized": 7.943809032440186e-05,
+      "max_normalized": 0.00012736022472381592,
+      "reference_noise_rms": 1.3565923244190754e-05,
+      "film_off_rms": 0.0004273089702787664,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 8.9988112449646e-05,
+      "film_off_max_normalized": 0.00012536346912384033,
+      "film_off_reference_noise_rms": 1.3403512809748492e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.00041751549630190997,
+          "film_effect_residual_rms": 0.0003081435637607403
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0004224154141070302,
+          "film_effect_residual_rms": 0.0003183925297700521
+        }
+      ]
+    },
+    {
+      "id": "sun-film_coated",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0010793368046283227,
+      "p95_normalized": 0.00011895596981048584,
+      "max_normalized": 0.0018940567970275879,
+      "reference_noise_rms": 6.355809889436956e-05,
+      "film_off_rms": 0.0010267625243087647,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.00013890862464904785,
+      "film_off_max_normalized": 0.001979351043701172,
+      "film_off_reference_noise_rms": 6.806496455545607e-05,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0004279571024403113,
+          "film_effect_residual_rms": 0.0003074378977451919
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.00111865487828889,
+          "film_effect_residual_rms": 0.0004183770459013773
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_subnanometer",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0014437559308504426,
+      "p95_normalized": 0.0014688372611999512,
+      "max_normalized": 0.0029016733169555664,
+      "reference_noise_rms": 0.0018888691544793085,
+      "film_off_rms": 0.0014602419045779476,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.0015374422073364258,
+      "film_off_max_normalized": 0.002926051616668701,
+      "film_off_reference_noise_rms": 0.0018879917037495759,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0016970725890580118,
+          "film_effect_residual_rms": 0.0004416435132384044
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0013026375119592128,
+          "film_effect_residual_rms": 0.00035443903901087885
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_dielectric_100",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0020501325560746838,
+      "p95_normalized": 0.002068758010864258,
+      "max_normalized": 0.003581404685974121,
+      "reference_noise_rms": 0.0016997943885404146,
+      "film_off_rms": 0.0011759517834006427,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.001220792531967163,
+      "film_off_max_normalized": 0.0024341344833374023,
+      "film_off_reference_noise_rms": 0.0017263343347233547,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0020948109737093344,
+          "film_effect_residual_rms": 0.0017309984137268107
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0020276671517335944,
+          "film_effect_residual_rms": 0.0017915599727409129
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_dielectric_1000",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0013092564051973331,
+      "p95_normalized": 0.0015123486518859863,
+      "max_normalized": 0.002803325653076172,
+      "reference_noise_rms": 0.0018123356966435332,
+      "film_off_rms": 0.0011759517834006427,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.001220792531967163,
+      "film_off_max_normalized": 0.0024341344833374023,
+      "film_off_reference_noise_rms": 0.0017263343347233547,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0013870542276442238,
+          "film_effect_residual_rms": 0.0014177233559606603
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0012689940173125178,
+          "film_effect_residual_rms": 0.0014376318159511716
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_metal_100",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.001085662577610458,
+      "p95_normalized": 0.0009129047393798828,
+      "max_normalized": 0.001936793327331543,
+      "reference_noise_rms": 0.001119834800692997,
+      "film_off_rms": 0.0011417537402950953,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.0011298656463623047,
+      "film_off_max_normalized": 0.002415776252746582,
+      "film_off_reference_noise_rms": 0.0011584593996095457,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0012495542054546556,
+          "film_effect_residual_rms": 0.000744787706607347
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0010076906638450042,
+          "film_effect_residual_rms": 0.0005717266361142639
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_metal_1000",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0011518870577135309,
+      "p95_normalized": 0.0009088516235351562,
+      "max_normalized": 0.0016605257987976074,
+      "reference_noise_rms": 0.0011695371077766173,
+      "film_off_rms": 0.0011417537402950953,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.0011298656463623047,
+      "film_off_max_normalized": 0.002415776252746582,
+      "film_off_reference_noise_rms": 0.0011584593996095457,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.001317091785549343,
+          "film_effect_residual_rms": 0.0005226675403988252
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0010616289003905117,
+          "film_effect_residual_rms": 0.0005037400425766677
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_high_ior",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0012411140381008848,
+      "p95_normalized": 0.001246809959411621,
+      "max_normalized": 0.0022655725479125977,
+      "reference_noise_rms": 0.0015168131448758792,
+      "film_off_rms": 0.0014602419045779476,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.0015374422073364258,
+      "film_off_max_normalized": 0.002926051616668701,
+      "film_off_reference_noise_rms": 0.0018879917037495759,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.001351957080641917,
+          "film_effect_residual_rms": 0.0012994861563801073
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0011843597072463525,
+          "film_effect_residual_rms": 0.0011637971938608185
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_rough",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0016849177958347787,
+      "p95_normalized": 0.0014173388481140137,
+      "max_normalized": 0.00311887264251709,
+      "reference_noise_rms": 0.0020137865145621004,
+      "film_off_rms": 0.0016380660353867544,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.0015088021755218506,
+      "film_off_max_normalized": 0.003335237503051758,
+      "film_off_reference_noise_rms": 0.0020513747174496473,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0017524178901839637,
+          "film_effect_residual_rms": 0.0018124118494554687
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0016496566443945611,
+          "film_effect_residual_rms": 0.001904855460995546
+        }
+      ]
+    },
+    {
+      "id": "furnace-film_coated",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0017921093497931017,
+      "p95_normalized": 0.0017641186714172363,
+      "max_normalized": 0.004486560821533203,
+      "reference_noise_rms": 0.0022358836596911703,
+      "film_off_rms": 0.001670618395791051,
+      "film_off_accepted": true,
+      "film_off_failed_targets": [],
+      "film_off_p95_normalized": 0.0017708539962768555,
+      "film_off_max_normalized": 0.004037201404571533,
+      "film_off_reference_noise_rms": 0.002085398842540052,
+      "cosine_bands": [
+        {
+          "cosine": [
+            0,
+            0.25
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.25,
+            0.5
+          ],
+          "pixels": 0,
+          "measured": false
+        },
+        {
+          "cosine": [
+            0.5,
+            0.75
+          ],
+          "pixels": 113,
+          "measured": true,
+          "relative_rms": 0.0022590335998902127,
+          "film_effect_residual_rms": 0.001747792126178261
+        },
+        {
+          "cosine": [
+            0.75,
+            1
+          ],
+          "pixels": 232,
+          "measured": true,
+          "relative_rms": 0.0014952441755598583,
+          "film_effect_residual_rms": 0.0014089524212797565
+        }
+      ]
+    }
+  ]
+}

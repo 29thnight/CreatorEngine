@@ -9,7 +9,11 @@ float4 PSMain(float4 position : SV_POSITION) : SV_TARGET
 {
     uint size = uint(gParams.z);
     float total = gImportanceMarginal.Load(int3(0, 6u * size - 1u, 0)).r;
-    float2 xi = IblIntegrationXi(uint(position.x));
+    const uint index=uint(position.x);
+    // The first bank remains byte-compatible with the existing 1024 proposal.
+    // Scene reflections use the second bank with their own unequal-count MIS.
+    float2 xi = index < 1024u ? IblIntegrationXi(index)
+        : float2((float(index-1024u)+0.5)/4096.0,RadicalInverseVdC(index-1024u));
     if (total <= 0.0)
     {
         float z = 1.0 - 2.0 * xi.x;
@@ -30,7 +34,10 @@ float4 PSMain(float4 position : SV_POSITION) : SV_TARGET
     uint row = low;
     float before = row == 0u ? 0.0 : gImportanceMarginal.Load(int3(0, row - 1u, 0)).r;
     float after = gImportanceMarginal.Load(int3(0, row, 0)).r;
-    float fy = saturate((target - before) / max(after - before, 1e-20));
+    // Keep the stored float32 unit direction inside its selected CDF cell.
+    // Rounding a boundary onto the neighboring cell otherwise changes the PDF
+    // used by the other MIS leg. The guard is 0.01% of one cell, not an HDR clamp.
+    float fy = clamp((target - before) / max(after - before, 1e-20), 1e-4, 1.0-1e-4);
     float rowTotal = gImportanceRows.Load(int3(size - 1u, row, 0)).a;
     target = xi.y * rowTotal;
     low = 0u; high = size - 1u;
@@ -43,7 +50,7 @@ float4 PSMain(float4 position : SV_POSITION) : SV_TARGET
     uint x = low;
     before = x == 0u ? 0.0 : gImportanceRows.Load(int3(x - 1u, row, 0)).a;
     float4 cell = gImportanceRows.Load(int3(x, row, 0));
-    float fx = saturate((target - before) / max(cell.a - before, 1e-20));
+    float fx = clamp((target - before) / max(cell.a - before, 1e-20), 1e-4, 1.0-1e-4);
     float2 uv = (float2(x, row % size) + float2(fx, fy)) * (2.0 / float(size)) - 1.0;
     float2 center = (float2(x, row % size) + 0.5) * (2.0 / float(size)) - 1.0;
     return uint(position.y) == 0u

@@ -410,7 +410,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                     glassMaterial.metal = 0;
                     glassMaterial.ior = fixture == 3 ? 1 / ior : ior;
                     glassMaterial.level = .5;
-                    const auto integral = Integrate(glassMaterial, view, false);
+                    const auto integral = Integrate(glassMaterial, view, false, false);
                     const auto raw = SceneTransmissionIntegral(glassMaterial, view);
                     SceneRefractionSample sample;
                     std::memcpy(&sample, mapped[7].data.data() + (y * 24 + x) * sizeof(sample), sizeof(sample));
@@ -547,15 +547,20 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                     metal.metal = 1;
                     dielectric.metal = 0;
                     const auto mi = Integrate(metal, view, false), di = Integrate(dielectric, view, false);
-                    const Vector mm = Multiple(mi), dm = Multiple(di), gm = Multiple(integral);
+                    const Vector gm = Multiple(integral);
                     const double m = fixture == 6 ? .3 : 0, sss = fixture == 6 ? .4 : 0;
                     const double dw = (1 - m) * (1 - transmission), gw = (1 - m) * transmission;
-                    const double remaining = std::max(1 - Maximum(di.single + dm), 0.0);
+                    // Base reflection uses the common multiplicative GGX budget;
+                    // only glass keeps the single-interface multiple-scatter term.
+                    const double remaining = std::max(1 - Maximum(Energy(material, view).dielectricAlbedo), 0.0);
+                    const Vector normalization = ReflectionBudget(
+                        material.base * ((1 - m) * remaining), mi.single * m + di.single * (1 - m));
                     const Vector environmentColor = fixture == 4 ? Vector{} : Vector{2, 1, .5};
                     const double specularAo = 1;
                     Vector result =
-                        (mi.single * m + di.single * dw + integral.single * gw) * environmentColor * specularAo;
-                    result = result + (mm * m + dm * dw + gm * gw + Vector{1, 1, 1} * (dw * remaining * (1 - sss))) *
+                        (normalization * (mi.single * m + di.single * dw) + integral.single * gw) *
+                        environmentColor * specularAo;
+                    result = result + (gm * gw + Vector{1, 1, 1} * (dw * remaining * (1 - sss))) *
                                           environmentColor;
                     result = result + Vector{1, 1, 1} * (dw * remaining * sss) * environmentColor;
                     for (unsigned c = 0; c < 3; ++c)

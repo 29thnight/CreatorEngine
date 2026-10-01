@@ -153,6 +153,6 @@ class SurfaceEvaluator
     RHIPipelineHandle pipeline_;
     PassLayout layout_;
     std::string semanticKey_;
-    bool layered_{};
+    bool principledGgx_{};
 };
 } // namespace material_graph

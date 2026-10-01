@@ -36,7 +36,8 @@ class SceneLookupFrame
     mutable RHICompletionPoint completion_{};
     std::uint32_t width_{}, height_{};
     std::uint64_t frameId_{}, viewId_{}, sceneEpoch_{}, environmentGeneration_{}, recording_{}, descriptors_{};
-    RHITextureHandle environment_, irradiance_, prefiltered_;
+    RHITextureHandle environment_, irradiance_, prefiltered_, source_;
+    std::array<RHITextureHandle,3> importance_{};
     std::array<RHITextureHandle, 11> inputs_{};
     RHIBufferHandle samples_, statistics_, emptyPrevious_;
     RHIPipelineHandle bake_, clear_;
@@ -62,7 +63,8 @@ class SceneLookupCache : private IRHIUploadTransactionListener
     bool Prepare(const EnhancedFrameContext& context, std::uint64_t viewId, RHITextureHandle environment,
                  RHITextureHandle irradiance, RHITextureHandle prefiltered,
                  std::uint64_t environmentGeneration, std::uint64_t memoryBudget,
-                 std::shared_ptr<const SceneLookupFrame>& result, std::string& error);
+                 std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
+                 std::array<RHITextureHandle,3> importance = {}, RHITextureHandle source = {});
     // Called only after the entire owning graph has been successfully submitted.
     // A recorded callback or an upload prefix is not publication authorization.
     bool PublishSubmitted(const SceneLookupFrame& frame, std::uint64_t frameId, RHICompletionPoint completion,

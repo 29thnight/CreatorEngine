@@ -35,6 +35,15 @@ PrincipledSubsurfaceProfile BuildSubsurfaceProfile(PrincipledSurface material)
     return profile;
 }
 
+// The closure above consumes a physical mean free path. Scene graph sockets
+// carry the artist radius used by Cycles Random Walk/Burley, converted by 1/(4*pi).
+// Preserve the physical closure contract and its independent numeric baseline.
+PrincipledSubsurfaceProfile BuildSceneSubsurfaceProfile(PrincipledSurface material)
+{
+    material.subsurfaceScale *= 0.07957747154594767;
+    return BuildSubsurfaceProfile(material);
+}
+
 float3 SubsurfaceDipoleTerm(float3 depth, float3 attenuation, float distance)
 {
     const float3 length = sqrt(depth * depth + distance * distance);

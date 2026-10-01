@@ -39,6 +39,11 @@ generation 검증·배치/업로드, Shadow의 cascade·masked draw, GPU-driven�
 기능의 C++ 본체는 그대로 native Pass다. 일반 효과에 필요한 Fullscreen/Compute
 template는 별도 수직 슬라이스에서 열 수 있지만 C# 저작의 성립 조건은 아니다.
 
+Meshlet/Mesh Shader raster와 DXR의 공통 geometry·별도 visibility·BLAS/TLAS·동기화·
+fallback·수명 계약은 [GpuDrivenMeshletDxrWiring.md](GpuDrivenMeshletDxrWiring.md)가 소유한다.
+EnhancedSceneRenderer가 같은 frame/graph를 조율하고 Mesh Shader의 출력이 자동으로
+DXR geometry가 된다고 가정하지 않는다. 이 상세 설계는 제품 구현 완료의 증거가 아니다.
+
 기존 [`LivePipelineDesc`](../../Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h)는
 `std::function`/인스턴스 포인터를 갖는 native runtime 기술이다. 직렬화 IR로 직접
 노출하지 않는다. C#과 향후 시각 편집기·preset·C++ builder는 **같은 immutable IR**로

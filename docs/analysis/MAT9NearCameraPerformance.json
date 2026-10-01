@@ -1,0 +1,4796 @@
+{
+  "schema": "creator.material.near-camera-investigation.v1",
+  "date": "2026-10-01",
+  "policy": {
+    "relative_rms": 0.01,
+    "p95_normalized": 0.01,
+    "max_normalized": 0.05
+  },
+  "profile": {
+    "captures": [
+      {
+        "file": "Dynamic_CPP\\2026-10-01-1633.ceprof",
+        "sha256": "49fad1df161d15de24544a9ad3f1b5ce00bb4bdb35c788a826f57ae8a521ebe2",
+        "complete": false,
+        "unacked": 2,
+        "frames": 600,
+        "droppedEvents": 0
+      }
+    ],
+    "frameCount": 600,
+    "gpuSliceCounts": {
+      "47": 273,
+      "48": 4,
+      "49": 1
+    },
+    "expectedGpuSlices": 47,
+    "gpuTotalMs": {
+      "n": 273,
+      "mean": 7.7826611721611725,
+      "median": 1.0024,
+      "p95": 88.4409,
+      "max": 108.3381
+    },
+    "gpuQueueSpanMs": {
+      "n": 273,
+      "mean": 7.790579853479854,
+      "median": 1.0086,
+      "p95": 88.447,
+      "max": 108.34440000000001
+    },
+    "gpuPassSumMs": {
+      "LX.Scene.LookupBake": {
+        "n": 273,
+        "mean": 7.00505347985348,
+        "median": 0.3942,
+        "p95": 87.7035,
+        "max": 107.5056
+      },
+      "LX.Scene.Color": {
+        "n": 273,
+        "mean": 0.150414652014652,
+        "median": 0.126,
+        "p95": 0.19770000000000001,
+        "max": 0.21710000000000002
+      },
+      "LX.Scene.LookupCapture": {
+        "n": 273,
+        "mean": 0.1416820512820513,
+        "median": 0.1096,
+        "p95": 0.2232,
+        "max": 0.2335
+      },
+      "LX.Scene.GBuffer": {
+        "n": 273,
+        "mean": 0.07774688644688645,
+        "median": 0.0584,
+        "p95": 0.11460000000000001,
+        "max": 0.1198
+      },
+      "SSGI.Trace": {
+        "n": 273,
+        "mean": 0.06689157509157509,
+        "median": 0.0492,
+        "p95": 0.1085,
+        "max": 0.3604
+      },
+      "Deferred": {
+        "n": 273,
+        "mean": 0.06568498168498169,
+        "median": 0.0543,
+        "p95": 0.0993,
+        "max": 0.1044
+      },
+      "SSAO.Compute": {
+        "n": 273,
+        "mean": 0.04096007326007326,
+        "median": 0.0318,
+        "p95": 0.0666,
+        "max": 0.06960000000000001
+      },
+      "Shadow": {
+        "n": 273,
+        "mean": 0.023905128205128207,
+        "median": 0.0184,
+        "p95": 0.0409,
+        "max": 0.043000000000000003
+      },
+      "PostChain.BloomDown": {
+        "n": 273,
+        "mean": 0.022682051282051283,
+        "median": 0.019500000000000003,
+        "p95": 0.0328,
+        "max": 0.033900000000000007
+      },
+      "SSGI.Composite": {
+        "n": 273,
+        "mean": 0.01822710622710623,
+        "median": 0.0154,
+        "p95": 0.026600000000000002,
+        "max": 0.027700000000000002
+      },
+      "PostChain.BloomUp": {
+        "n": 273,
+        "mean": 0.017591208791208793,
+        "median": 0.0154,
+        "p95": 0.0246,
+        "max": 0.025600000000000005
+      },
+      "Forward+.Cull": {
+        "n": 273,
+        "mean": 0.013902564102564104,
+        "median": 0.011300000000000001,
+        "p95": 0.022500000000000003,
+        "max": 0.0246
+      },
+      "live_present": {
+        "n": 273,
+        "mean": 0.013484249084249085,
+        "median": 0.0103,
+        "p95": 0.0164,
+        "max": 0.3093
+      },
+      "PostChain.Uber": {
+        "n": 273,
+        "mean": 0.012586446886446888,
+        "median": 0.0102,
+        "p95": 0.0205,
+        "max": 0.021500000000000002
+      },
+      "PostChain.FXAA": {
+        "n": 273,
+        "mean": 0.011957875457875458,
+        "median": 0.0102,
+        "p95": 0.0184,
+        "max": 0.0194
+      },
+      "GBuffer": {
+        "n": 273,
+        "mean": 0.011035164835164837,
+        "median": 0.0092,
+        "p95": 0.0184,
+        "max": 0.0195
+      },
+      "SSGI.Resolve": {
+        "n": 273,
+        "mean": 0.009358608058608059,
+        "median": 0.0061,
+        "p95": 0.0092,
+        "max": 0.3113
+      },
+      "PostChain.BloomThreshold": {
+        "n": 273,
+        "mean": 0.00892930402930403,
+        "median": 0.007200000000000001,
+        "p95": 0.0143,
+        "max": 0.0154
+      },
+      "LX.Scene.Shadow": {
+        "n": 273,
+        "mean": 0.007835897435897436,
+        "median": 0.006200000000000001,
+        "p95": 0.013300000000000001,
+        "max": 0.0154
+      },
+      "SSGI.StoreHistory": {
+        "n": 273,
+        "mean": 0.007762271062271063,
+        "median": 0.0071,
+        "p95": 0.011300000000000001,
+        "max": 0.0123
+      },
+      "SSGI.Filter": {
+        "n": 273,
+        "mean": 0.007383882783882785,
+        "median": 0.006200000000000001,
+        "p95": 0.0103,
+        "max": 0.011300000000000001
+      },
+      "SkyBox": {
+        "n": 273,
+        "mean": 0.007326373626373627,
+        "median": 0.005200000000000001,
+        "p95": 0.013300000000000001,
+        "max": 0.0134
+      },
+      "Grid": {
+        "n": 273,
+        "mean": 0.006615384615384616,
+        "median": 0.0061,
+        "p95": 0.0092,
+        "max": 0.0103
+      },
+      "SSGI.HiZ.0": {
+        "n": 273,
+        "mean": 0.0060728937728937735,
+        "median": 0.005200000000000001,
+        "p95": 0.0082,
+        "max": 0.009300000000000001
+      },
+      "SSAO.Filter": {
+        "n": 273,
+        "mean": 0.0055758241758241765,
+        "median": 0.0051,
+        "p95": 0.0082,
+        "max": 0.009300000000000001
+      },
+      "SSGI.HiZ.6": {
+        "n": 273,
+        "mean": 0.005145054945054945,
+        "median": 0.0051,
+        "p95": 0.006200000000000001,
+        "max": 0.007200000000000001
+      },
+      "SSGI.HiZ.1": {
+        "n": 273,
+        "mean": 0.0031073260073260075,
+        "median": 0.0031000000000000003,
+        "p95": 0.0041,
+        "max": 0.0041
+      },
+      "SSGI.HiZ.5": {
+        "n": 273,
+        "mean": 0.0029131868131868134,
+        "median": 0.0031000000000000003,
+        "p95": 0.0041,
+        "max": 0.0041
+      },
+      "SSGI.HiZ.4": {
+        "n": 273,
+        "mean": 0.0028542124542124546,
+        "median": 0.003,
+        "p95": 0.0041,
+        "max": 0.0041
+      },
+      "SSGI.HiZ.7": {
+        "n": 273,
+        "mean": 0.0026835164835164837,
+        "median": 0.003,
+        "p95": 0.0041,
+        "max": 0.0041
+      },
+      "SSGI.HiZ.2": {
+        "n": 273,
+        "mean": 0.0025956043956043956,
+        "median": 0.0021000000000000003,
+        "p95": 0.0041,
+        "max": 0.0041
+      },
+      "SSGI.HiZ.3": {
+        "n": 273,
+        "mean": 0.0025750915750915753,
+        "median": 0.0021000000000000003,
+        "p95": 0.0041,
+        "max": 0.0041
+      },
+      "LX.Scene.LookupReady": {
+        "n": 273,
+        "mean": 8.315018315018316e-05,
+        "median": 0.0,
+        "p95": 0.001,
+        "max": 0.0011
+      },
+      "GizmoIcon": {
+        "n": 273,
+        "mean": 3.406593406593407e-05,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0011
+      },
+      "GizmoLine": {
+        "n": 273,
+        "mean": 4.0293040293040296e-06,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0011
+      },
+      "LX.MeshWorldReuse": {
+        "n": 273,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "max": 0.0
+      }
+    },
+    "cpuInclusiveMs": {
+      "[PresentationThread]/PresentFrame": {
+        "n": 508,
+        "mean": 9.609355118110237,
+        "median": 6.33685,
+        "p95": 31.677100000000003,
+        "max": 46.7753,
+        "truncatedExcluded": 1
+      },
+      "[RenderThread]/RenderView": {
+        "n": 279,
+        "mean": 8.944351254480287,
+        "median": 8.2636,
+        "p95": 14.336400000000001,
+        "max": 35.5629,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/PresentationUI": {
+        "n": 508,
+        "mean": 8.288866141732283,
+        "median": 5.9248,
+        "p95": 27.861500000000003,
+        "max": 38.7802,
+        "truncatedExcluded": 1
+      },
+      "[RenderThread]/RenderThreadFrame": {
+        "n": 454,
+        "mean": 7.41108832599119,
+        "median": 8.35305,
+        "p95": 16.7988,
+        "max": 37.848,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ImGuiPanels": {
+        "n": 508,
+        "mean": 5.781159842519686,
+        "median": 3.68035,
+        "p95": 25.3013,
+        "max": 36.2355,
+        "truncatedExcluded": 1
+      },
+      "[GameThread]/GameSceneLockWait": {
+        "n": 599,
+        "mean": 5.737170450751252,
+        "median": 4.200200000000001,
+        "p95": 24.5226,
+        "max": 38.188300000000005,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderQueueIdle": {
+        "n": 455,
+        "mean": 4.026516043956044,
+        "median": 0.0022,
+        "p95": 23.672800000000002,
+        "max": 39.932500000000005,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ProfilerWindow": {
+        "n": 508,
+        "mean": 3.039613779527559,
+        "median": 0.8130000000000001,
+        "p95": 21.6899,
+        "max": 33.5751,
+        "truncatedExcluded": 1
+      },
+      "[RenderThread]/RenderCommandRecord": {
+        "n": 280,
+        "mean": 2.978238928571429,
+        "median": 2.1878,
+        "p95": 7.444500000000001,
+        "max": 27.934,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderGraphBuild": {
+        "n": 280,
+        "mean": 2.753732142857143,
+        "median": 2.7211499999999997,
+        "p95": 4.3602,
+        "max": 5.9952000000000005,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ProfilerTimeline": {
+        "n": 508,
+        "mean": 2.4890387795275593,
+        "median": 0.6193500000000001,
+        "p95": 17.808600000000002,
+        "max": 30.0207,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialGraphScenePrepare": {
+        "n": 280,
+        "mean": 1.8051132142857145,
+        "median": 1.76,
+        "p95": 2.5679000000000003,
+        "max": 6.141900000000001,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ImGuiRenderPresent": {
+        "n": 508,
+        "mean": 1.5911456692913386,
+        "median": 1.32115,
+        "p95": 3.0314,
+        "max": 23.253,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/PresentationSceneLockWait": {
+        "n": 509,
+        "mean": 1.341469941060904,
+        "median": 0.1967,
+        "p95": 6.8956,
+        "max": 35.7674,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderGpuCollect": {
+        "n": 455,
+        "mean": 1.221505054945055,
+        "median": 0.1375,
+        "p95": 4.1765,
+        "max": 5.287100000000001,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ImGuiDX12MainViewport": {
+        "n": 508,
+        "mean": 1.1499722440944882,
+        "median": 1.0093,
+        "p95": 1.3752,
+        "max": 22.9236,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/GameLogic": {
+        "n": 599,
+        "mean": 0.9300016694490818,
+        "median": 0.8704000000000001,
+        "p95": 1.1420000000000001,
+        "max": 17.5656,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ImGuiBeginFrame": {
+        "n": 509,
+        "mean": 0.7731467583497054,
+        "median": 0.6782,
+        "p95": 0.9463,
+        "max": 31.422700000000003,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderViewCapture": {
+        "n": 280,
+        "mean": 0.6889153571428571,
+        "median": 0.6599,
+        "p95": 0.9092,
+        "max": 7.1757,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderGraphCompile": {
+        "n": 280,
+        "mean": 0.6784396428571429,
+        "median": 0.63435,
+        "p95": 1.0998,
+        "max": 2.0783,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/InternalAnimationUpdateEvent": {
+        "n": 599,
+        "mean": 0.6751343906510852,
+        "median": 0.647,
+        "p95": 0.8550000000000001,
+        "max": 5.42,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/DX12PresentWait": {
+        "n": 508,
+        "mean": 0.6381275590551181,
+        "median": 0.5005000000000001,
+        "p95": 0.7456,
+        "max": 22.3438,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialSceneInputSeal": {
+        "n": 280,
+        "mean": 0.6146842857142858,
+        "median": 0.58785,
+        "p95": 0.8075,
+        "max": 7.0879,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/PresentationQueueIdle": {
+        "n": 509,
+        "mean": 0.6083487229862475,
+        "median": 0.0009000000000000001,
+        "p95": 2.3295,
+        "max": 28.774800000000003,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialLookupPrepare": {
+        "n": 280,
+        "mean": 0.5631203571428571,
+        "median": 0.54765,
+        "p95": 0.8106,
+        "max": 3.9894000000000003,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderResourcePrepare": {
+        "n": 280,
+        "mean": 0.5168982142857144,
+        "median": 0.44415000000000004,
+        "p95": 0.9787,
+        "max": 1.7741,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/EndOfFrame": {
+        "n": 1198,
+        "mean": 0.5066813856427379,
+        "median": 0.07685,
+        "p95": 1.7294,
+        "max": 31.839100000000002,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.LX.Scene.Color": {
+        "n": 280,
+        "mean": 0.5036807142857143,
+        "median": 0.48685,
+        "p95": 0.8041,
+        "max": 2.1598,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.SSGI": {
+        "n": 280,
+        "mean": 0.41558464285714286,
+        "median": 0.39555,
+        "p95": 0.6948000000000001,
+        "max": 1.7703,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/AnimationScheduler.Execute": {
+        "n": 599,
+        "mean": 0.4042552587646077,
+        "median": 0.40940000000000004,
+        "p95": 0.4949,
+        "max": 1.9265,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.Shadow": {
+        "n": 280,
+        "mean": 0.36602535714285717,
+        "median": 0.3578,
+        "p95": 0.5876,
+        "max": 0.9670000000000001,
+        "truncatedExcluded": 0
+      },
+      "[RHIThread]/DXGIPresent": {
+        "n": 508,
+        "mean": 0.3460746062992126,
+        "median": 0.32545,
+        "p95": 0.4771,
+        "max": 0.7077,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderBeginFrame": {
+        "n": 280,
+        "mean": 0.3359810714285714,
+        "median": 0.19885000000000003,
+        "p95": 0.7179,
+        "max": 1.0801,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ImGuiDX12RecordDrawData": {
+        "n": 508,
+        "mean": 0.3269641732283465,
+        "median": 0.2908,
+        "p95": 0.43670000000000003,
+        "max": 0.7599,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialDeclareShadow": {
+        "n": 280,
+        "mean": 0.3183060714285714,
+        "median": 0.3129,
+        "p95": 0.5278,
+        "max": 0.8982,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/RHITicketWait": {
+        "n": 1017,
+        "mean": 0.3111911504424779,
+        "median": 0.0034000000000000002,
+        "p95": 0.6565000000000001,
+        "max": 22.3245,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.PostChain": {
+        "n": 280,
+        "mean": 0.2910132142857143,
+        "median": 0.2772,
+        "p95": 0.5115000000000001,
+        "max": 1.4091,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderGraphCull": {
+        "n": 280,
+        "mean": 0.25305714285714287,
+        "median": 0.2429,
+        "p95": 0.4239,
+        "max": 0.7445,
+        "truncatedExcluded": 0
+      },
+      "[RHIThread]/RHIExecuteWork": {
+        "n": 1856,
+        "mean": 0.2361522629310345,
+        "median": 0.18915,
+        "p95": 0.4818,
+        "max": 1.5558,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderGraphOrder": {
+        "n": 280,
+        "mean": 0.20698321428571428,
+        "median": 0.16344999999999998,
+        "p95": 0.4481,
+        "max": 1.1508,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialBindingsPrepare": {
+        "n": 1120,
+        "mean": 0.18183294642857142,
+        "median": 0.16935,
+        "p95": 0.2857,
+        "max": 4.1936,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderSubmit": {
+        "n": 279,
+        "mean": 0.1564326164874552,
+        "median": 0.1444,
+        "p95": 0.2281,
+        "max": 0.7758,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialMeshPlanForScene": {
+        "n": 1120,
+        "mean": 0.1432942857142857,
+        "median": 0.13295,
+        "p95": 0.19640000000000002,
+        "max": 6.4587,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ImGuiMenuBar": {
+        "n": 509,
+        "mean": 0.13874400785854618,
+        "median": 0.13570000000000002,
+        "p95": 0.1762,
+        "max": 0.6271,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialDeclareGeometry": {
+        "n": 560,
+        "mean": 0.13561357142857144,
+        "median": 0.07375,
+        "p95": 0.3912,
+        "max": 0.8143,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialFrameReplace": {
+        "n": 280,
+        "mean": 0.13166285714285714,
+        "median": 0.0008,
+        "p95": 0.40790000000000004,
+        "max": 0.7995,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/Update": {
+        "n": 599,
+        "mean": 0.10978697829716194,
+        "median": 0.0775,
+        "p95": 0.1013,
+        "max": 16.887900000000002,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderProxySync": {
+        "n": 455,
+        "mean": 0.08146989010989011,
+        "median": 0.0765,
+        "p95": 0.0989,
+        "max": 0.509,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.GBuffer": {
+        "n": 280,
+        "mean": 0.0759982142857143,
+        "median": 0.07164999999999999,
+        "p95": 0.1203,
+        "max": 0.3729,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderGraphTransients": {
+        "n": 280,
+        "mean": 0.07559714285714286,
+        "median": 0.06725,
+        "p95": 0.1517,
+        "max": 0.24830000000000002,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.LX.Scene.GBuffer": {
+        "n": 280,
+        "mean": 0.06777892857142857,
+        "median": 0.06545000000000001,
+        "p95": 0.1076,
+        "max": 0.2489,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/DX12EnqueueCommands": {
+        "n": 508,
+        "mean": 0.06403917322834646,
+        "median": 0.062,
+        "p95": 0.08170000000000001,
+        "max": 0.1847,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/FoliageSystem": {
+        "n": 599,
+        "mean": 0.05870350584307179,
+        "median": 0.030100000000000002,
+        "p95": 0.0392,
+        "max": 16.8312,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.Deferred": {
+        "n": 280,
+        "mean": 0.05826785714285714,
+        "median": 0.04375,
+        "p95": 0.0896,
+        "max": 2.2428,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.SSAO": {
+        "n": 280,
+        "mean": 0.0502475,
+        "median": 0.047400000000000005,
+        "p95": 0.08270000000000001,
+        "max": 0.1355,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialDeclareGBuffer": {
+        "n": 280,
+        "mean": 0.047711785714285714,
+        "median": 0.047400000000000005,
+        "p95": 0.0741,
+        "max": 0.21100000000000002,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/DX12EnqueueCommands": {
+        "n": 279,
+        "mean": 0.046251971326164876,
+        "median": 0.0393,
+        "p95": 0.06280000000000001,
+        "max": 0.6694,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.Forward+": {
+        "n": 280,
+        "mean": 0.03337071428571429,
+        "median": 0.0318,
+        "p95": 0.0568,
+        "max": 0.1676,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/TweenManager": {
+        "n": 599,
+        "mean": 0.03155893155258765,
+        "median": 0.029,
+        "p95": 0.0439,
+        "max": 0.3024,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.Grid": {
+        "n": 280,
+        "mean": 0.03009607142857143,
+        "median": 0.02815,
+        "p95": 0.049300000000000004,
+        "max": 0.1192,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/DestroyLight": {
+        "n": 599,
+        "mean": 0.02951552587646077,
+        "median": 0.027800000000000002,
+        "p95": 0.036500000000000005,
+        "max": 0.2122,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.SkyBox": {
+        "n": 280,
+        "mean": 0.024536428571428574,
+        "median": 0.022650000000000003,
+        "p95": 0.041800000000000004,
+        "max": 0.10650000000000001,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.live_present": {
+        "n": 280,
+        "mean": 0.023485714285714287,
+        "median": 0.0217,
+        "p95": 0.0405,
+        "max": 0.07200000000000001,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.GizmoIcon": {
+        "n": 280,
+        "mean": 0.021494642857142858,
+        "median": 0.019750000000000004,
+        "p95": 0.0339,
+        "max": 0.2184,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/InputEvents": {
+        "n": 599,
+        "mean": 0.020625709515859767,
+        "median": 0.0204,
+        "p95": 0.0253,
+        "max": 0.0887,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/DestroyComponents": {
+        "n": 599,
+        "mean": 0.02052704507512521,
+        "median": 0.02,
+        "p95": 0.0263,
+        "max": 0.1208,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.GizmoLine": {
+        "n": 280,
+        "mean": 0.020373928571428574,
+        "median": 0.01845,
+        "p95": 0.035,
+        "max": 0.1327,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.Decal": {
+        "n": 280,
+        "mean": 0.018623214285714288,
+        "median": 0.01695,
+        "p95": 0.0339,
+        "max": 0.061700000000000005,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/ImGuiBuildDrawData": {
+        "n": 508,
+        "mean": 0.016675000000000002,
+        "median": 0.015700000000000002,
+        "p95": 0.021,
+        "max": 0.2277,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/Editor": {
+        "n": 599,
+        "mean": 0.01608864774624374,
+        "median": 0.0131,
+        "p95": 0.024200000000000003,
+        "max": 0.8953000000000001,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.SSR": {
+        "n": 280,
+        "mean": 0.01562964285714286,
+        "median": 0.013800000000000002,
+        "p95": 0.0303,
+        "max": 0.0594,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialMeshGpuPrepare": {
+        "n": 1120,
+        "mean": 0.01360669642857143,
+        "median": 0.0118,
+        "p95": 0.0227,
+        "max": 0.19540000000000002,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/DestroyEntities": {
+        "n": 599,
+        "mean": 0.012836393989983307,
+        "median": 0.012100000000000001,
+        "p95": 0.0176,
+        "max": 0.0689,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/AnimationScheduler.Update": {
+        "n": 599,
+        "mean": 0.011734390651085143,
+        "median": 0.0114,
+        "p95": 0.016,
+        "max": 0.0626,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/PresentationMessages": {
+        "n": 509,
+        "mean": 0.010534577603143419,
+        "median": 0.002,
+        "p95": 0.028200000000000003,
+        "max": 0.18560000000000001,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialFrameRetirement": {
+        "n": 280,
+        "mean": 0.010229642857142857,
+        "median": 0.0099,
+        "p95": 0.0146,
+        "max": 0.0251,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.LX.Scene.Volume": {
+        "n": 280,
+        "mean": 0.010078928571428572,
+        "median": 0.008400000000000001,
+        "p95": 0.0193,
+        "max": 0.12350000000000001,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/MaterialPreviewRequest": {
+        "n": 599,
+        "mean": 0.009103505843071787,
+        "median": 0.008700000000000001,
+        "p95": 0.0129,
+        "max": 0.019200000000000002,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.SSS": {
+        "n": 280,
+        "mean": 0.007371071428571429,
+        "median": 0.0067,
+        "p95": 0.0125,
+        "max": 0.076,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/MaterialLookupPoolAcquire": {
+        "n": 280,
+        "mean": 0.007043214285714286,
+        "median": 0.00465,
+        "p95": 0.0103,
+        "max": 0.20350000000000001,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.Sprite": {
+        "n": 280,
+        "mean": 0.006394285714285714,
+        "median": 0.0059,
+        "p95": 0.0114,
+        "max": 0.019200000000000002,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/LateUpdate": {
+        "n": 599,
+        "mean": 0.006301335559265443,
+        "median": 0.0057,
+        "p95": 0.0078000000000000005,
+        "max": 0.24150000000000002,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/FlushPendingDestroy": {
+        "n": 599,
+        "mean": 0.006087646076794658,
+        "median": 0.0058000000000000005,
+        "p95": 0.0079,
+        "max": 0.0454,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/YieldNull": {
+        "n": 599,
+        "mean": 0.004446076794657763,
+        "median": 0.004,
+        "p95": 0.0073,
+        "max": 0.0212,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/CommitRenderProxies": {
+        "n": 599,
+        "mean": 0.004076961602671118,
+        "median": 0.0035,
+        "p95": 0.0051,
+        "max": 0.23820000000000002,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/PreAllUpdateWorldMatrix": {
+        "n": 599,
+        "mean": 0.0031270450751252087,
+        "median": 0.0031000000000000003,
+        "p95": 0.004,
+        "max": 0.0056,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/CameraSystem": {
+        "n": 599,
+        "mean": 0.002321535893155259,
+        "median": 0.0023,
+        "p95": 0.0028,
+        "max": 0.0036000000000000003,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/AnimatorSystem": {
+        "n": 599,
+        "mean": 0.0018130217028380635,
+        "median": 0.0018000000000000002,
+        "p95": 0.0025,
+        "max": 0.003,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/PresentationViewportExtent": {
+        "n": 509,
+        "mean": 0.00172475442043222,
+        "median": 0.0017000000000000001,
+        "p95": 0.0023,
+        "max": 0.0033,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderComplete": {
+        "n": 454,
+        "mean": 0.0013026431718061674,
+        "median": 0.0013000000000000002,
+        "p95": 0.0019,
+        "max": 0.0021000000000000003,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/LateAllUpdateWorldMatrix": {
+        "n": 599,
+        "mean": 0.0012614357262103507,
+        "median": 0.0013000000000000002,
+        "p95": 0.0017000000000000001,
+        "max": 0.004,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/UITickSystem": {
+        "n": 599,
+        "mean": 0.0011869782971619365,
+        "median": 0.0012000000000000001,
+        "p95": 0.0016,
+        "max": 0.0026000000000000003,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RHITicketWait": {
+        "n": 559,
+        "mean": 0.0009123434704830054,
+        "median": 0.0009000000000000001,
+        "p95": 0.0014,
+        "max": 0.0115,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderDeclare.UI": {
+        "n": 280,
+        "mean": 0.0007292857142857143,
+        "median": 0.0006000000000000001,
+        "p95": 0.0012000000000000001,
+        "max": 0.0015,
+        "truncatedExcluded": 0
+      },
+      "[PresentationThread]/PresentationComplete": {
+        "n": 508,
+        "mean": 0.0006962598425196851,
+        "median": 0.0007,
+        "p95": 0.0009000000000000001,
+        "max": 0.0016,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/DecalSystem": {
+        "n": 599,
+        "mean": 0.0006363939899833056,
+        "median": 0.0006000000000000001,
+        "p95": 0.001,
+        "max": 0.0014,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/SoundSystem": {
+        "n": 599,
+        "mean": 0.0005831385642737897,
+        "median": 0.0006000000000000001,
+        "p95": 0.0009000000000000001,
+        "max": 0.001,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/LightSystem": {
+        "n": 599,
+        "mean": 0.0005757929883138564,
+        "median": 0.0006000000000000001,
+        "p95": 0.0008,
+        "max": 0.003,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/AnimationScheduler.UpdateWait": {
+        "n": 599,
+        "mean": 0.0004868113522537563,
+        "median": 0.0005,
+        "p95": 0.0007,
+        "max": 0.0011,
+        "truncatedExcluded": 0
+      },
+      "[RenderThread]/RenderStateLockWait": {
+        "n": 455,
+        "mean": 0.000445934065934066,
+        "median": 0.0004,
+        "p95": 0.0007,
+        "max": 0.0019,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/MaterialPreviewRequestLockWait": {
+        "n": 599,
+        "mean": 0.0004312186978297162,
+        "median": 0.0004,
+        "p95": 0.0005,
+        "max": 0.0009000000000000001,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/PlayerInputSystem": {
+        "n": 599,
+        "mean": 0.0004156928213689483,
+        "median": 0.0004,
+        "p95": 0.0006000000000000001,
+        "max": 0.0027,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/AnimationScheduler.ExecuteWait": {
+        "n": 599,
+        "mean": 0.0003617696160267112,
+        "median": 0.00030000000000000003,
+        "p95": 0.0006000000000000001,
+        "max": 0.001,
+        "truncatedExcluded": 0
+      },
+      "[GameThread]/UpdateEvent": {
+        "n": 599,
+        "mean": 0.0003048414023372287,
+        "median": 0.00030000000000000003,
+        "p95": 0.0004,
+        "max": 0.0021000000000000003,
+        "truncatedExcluded": 0
+      }
+    },
+    "cpuExclusiveMs": {
+      "[GameThread]/GameSceneLockWait": {
+        "n": 599,
+        "mean": 5.737170450751252,
+        "median": 4.200200000000001,
+        "p95": 24.5226,
+        "max": 38.188300000000005
+      },
+      "[RenderThread]/RenderQueueIdle": {
+        "n": 455,
+        "mean": 4.026516043956044,
+        "median": 0.0022,
+        "p95": 23.672800000000002,
+        "max": 39.932500000000005
+      },
+      "[RenderThread]/RenderCommandRecord": {
+        "n": 280,
+        "mean": 2.978238928571429,
+        "median": 2.1878,
+        "p95": 7.444500000000001,
+        "max": 27.934
+      },
+      "[PresentationThread]/ImGuiPanels": {
+        "n": 508,
+        "mean": 2.741546062992126,
+        "median": 2.7147000000000006,
+        "p95": 3.9715000000000003,
+        "max": 6.1528
+      },
+      "[PresentationThread]/ProfilerTimeline": {
+        "n": 508,
+        "mean": 2.4890387795275593,
+        "median": 0.6193500000000001,
+        "p95": 17.808600000000002,
+        "max": 30.0207
+      },
+      "[PresentationThread]/PresentationSceneLockWait": {
+        "n": 509,
+        "mean": 1.341469941060904,
+        "median": 0.1967,
+        "p95": 6.8956,
+        "max": 35.7674
+      },
+      "[RenderThread]/RenderGpuCollect": {
+        "n": 455,
+        "mean": 1.221505054945055,
+        "median": 0.1375,
+        "p95": 4.1765,
+        "max": 5.287100000000001
+      },
+      "[PresentationThread]/ImGuiBeginFrame": {
+        "n": 509,
+        "mean": 0.7715768172888016,
+        "median": 0.6763,
+        "p95": 0.9450000000000001,
+        "max": 31.419500000000003
+      },
+      "[PresentationThread]/PresentationQueueIdle": {
+        "n": 509,
+        "mean": 0.6083487229862475,
+        "median": 0.0009000000000000001,
+        "p95": 2.3295,
+        "max": 28.774800000000003
+      },
+      "[RenderThread]/MaterialLookupPrepare": {
+        "n": 280,
+        "mean": 0.5560771428571429,
+        "median": 0.54135,
+        "p95": 0.8059000000000001,
+        "max": 3.9851
+      },
+      "[PresentationThread]/ProfilerWindow": {
+        "n": 508,
+        "mean": 0.550575,
+        "median": 0.18705000000000002,
+        "p95": 3.5544000000000002,
+        "max": 5.9973
+      },
+      "[RenderThread]/RenderResourcePrepare": {
+        "n": 280,
+        "mean": 0.5161235714285715,
+        "median": 0.44345,
+        "p95": 0.9780000000000001,
+        "max": 1.7731000000000001
+      },
+      "[RenderThread]/RenderDeclare.LX.Scene.Color": {
+        "n": 280,
+        "mean": 0.5036807142857143,
+        "median": 0.48685,
+        "p95": 0.8041,
+        "max": 2.1598
+      },
+      "[GameThread]/EndOfFrame": {
+        "n": 1198,
+        "mean": 0.46903347245409016,
+        "median": 0.04925,
+        "p95": 1.6592,
+        "max": 31.738100000000003
+      },
+      "[PresentationThread]/ImGuiRenderPresent": {
+        "n": 508,
+        "mean": 0.42449842519685044,
+        "median": 0.28175,
+        "p95": 0.4524,
+        "max": 14.7592
+      },
+      "[RenderThread]/RenderDeclare.SSGI": {
+        "n": 280,
+        "mean": 0.41558464285714286,
+        "median": 0.39555,
+        "p95": 0.6948000000000001,
+        "max": 1.7703
+      },
+      "[GameThread]/AnimationScheduler.Execute": {
+        "n": 599,
+        "mean": 0.4042552587646077,
+        "median": 0.40940000000000004,
+        "p95": 0.4949,
+        "max": 1.9265
+      },
+      "[RenderThread]/RenderView": {
+        "n": 279,
+        "mean": 0.3921168458781362,
+        "median": 0.35660000000000003,
+        "p95": 0.5736,
+        "max": 3.9713000000000003
+      },
+      "[RHIThread]/DXGIPresent": {
+        "n": 508,
+        "mean": 0.3460746062992126,
+        "median": 0.32545,
+        "p95": 0.4771,
+        "max": 0.7077
+      },
+      "[RenderThread]/RenderBeginFrame": {
+        "n": 280,
+        "mean": 0.33493428571428574,
+        "median": 0.1977,
+        "p95": 0.7167,
+        "max": 1.0792000000000002
+      },
+      "[PresentationThread]/ImGuiDX12RecordDrawData": {
+        "n": 508,
+        "mean": 0.3269641732283465,
+        "median": 0.2908,
+        "p95": 0.43670000000000003,
+        "max": 0.7599
+      },
+      "[RenderThread]/MaterialGraphScenePrepare": {
+        "n": 280,
+        "mean": 0.31834178571428573,
+        "median": 0.29585000000000006,
+        "p95": 0.4446,
+        "max": 0.9531000000000001
+      },
+      "[PresentationThread]/RHITicketWait": {
+        "n": 1017,
+        "mean": 0.3111911504424779,
+        "median": 0.0034000000000000002,
+        "p95": 0.6565000000000001,
+        "max": 22.3245
+      },
+      "[RenderThread]/RenderDeclare.PostChain": {
+        "n": 280,
+        "mean": 0.2910132142857143,
+        "median": 0.2772,
+        "p95": 0.5115000000000001,
+        "max": 1.4091
+      },
+      "[GameThread]/InternalAnimationUpdateEvent": {
+        "n": 599,
+        "mean": 0.2582961602671119,
+        "median": 0.24710000000000001,
+        "p95": 0.3962,
+        "max": 5.011
+      },
+      "[RenderThread]/RenderGraphCull": {
+        "n": 280,
+        "mean": 0.25305714285714287,
+        "median": 0.2429,
+        "p95": 0.4239,
+        "max": 0.7445
+      },
+      "[RenderThread]/RenderGraphOrder": {
+        "n": 280,
+        "mean": 0.20698321428571428,
+        "median": 0.16344999999999998,
+        "p95": 0.4481,
+        "max": 1.1508
+      },
+      "[RenderThread]/RenderThreadFrame": {
+        "n": 454,
+        "mean": 0.1851035242290749,
+        "median": 0.1781,
+        "p95": 0.2519,
+        "max": 0.7825000000000001
+      },
+      "[RenderThread]/MaterialBindingsPrepare": {
+        "n": 1120,
+        "mean": 0.18183294642857142,
+        "median": 0.16935,
+        "p95": 0.2857,
+        "max": 4.1936
+      },
+      "[RenderThread]/MaterialMeshPlanForScene": {
+        "n": 1120,
+        "mean": 0.1432942857142857,
+        "median": 0.13295,
+        "p95": 0.19640000000000002,
+        "max": 6.4587
+      },
+      "[RenderThread]/RenderGraphCompile": {
+        "n": 280,
+        "mean": 0.14280214285714288,
+        "median": 0.14165,
+        "p95": 0.2318,
+        "max": 0.3673
+      },
+      "[RHIThread]/RHIExecuteWork": {
+        "n": 1856,
+        "mean": 0.14142925646551724,
+        "median": 0.12145,
+        "p95": 0.46880000000000005,
+        "max": 1.5558
+      },
+      "[PresentationThread]/ImGuiMenuBar": {
+        "n": 509,
+        "mean": 0.13874400785854618,
+        "median": 0.13570000000000002,
+        "p95": 0.1762,
+        "max": 0.6271
+      },
+      "[RenderThread]/MaterialDeclareGeometry": {
+        "n": 560,
+        "mean": 0.13561357142857144,
+        "median": 0.07375,
+        "p95": 0.3912,
+        "max": 0.8143
+      },
+      "[RenderThread]/MaterialFrameReplace": {
+        "n": 280,
+        "mean": 0.13166285714285714,
+        "median": 0.0008,
+        "p95": 0.40790000000000004,
+        "max": 0.7995
+      },
+      "[PresentationThread]/ImGuiDX12MainViewport": {
+        "n": 508,
+        "mean": 0.12084133858267718,
+        "median": 0.11695,
+        "p95": 0.1542,
+        "max": 0.32020000000000004
+      },
+      "[RenderThread]/RenderSubmit": {
+        "n": 279,
+        "mean": 0.11018064516129032,
+        "median": 0.10450000000000001,
+        "p95": 0.1424,
+        "max": 0.6331
+      },
+      "[GameThread]/GameLogic": {
+        "n": 599,
+        "mean": 0.09761853088480801,
+        "median": 0.0974,
+        "p95": 0.1144,
+        "max": 0.32480000000000003
+      },
+      "[RenderThread]/RenderProxySync": {
+        "n": 455,
+        "mean": 0.08146989010989011,
+        "median": 0.0765,
+        "p95": 0.0989,
+        "max": 0.509
+      },
+      "[RenderThread]/RenderDeclare.GBuffer": {
+        "n": 280,
+        "mean": 0.0759982142857143,
+        "median": 0.07164999999999999,
+        "p95": 0.1203,
+        "max": 0.3729
+      },
+      "[RenderThread]/RenderGraphTransients": {
+        "n": 280,
+        "mean": 0.07559714285714286,
+        "median": 0.06725,
+        "p95": 0.1517,
+        "max": 0.24830000000000002
+      },
+      "[RenderThread]/RenderViewCapture": {
+        "n": 280,
+        "mean": 0.07423107142857144,
+        "median": 0.0687,
+        "p95": 0.098,
+        "max": 0.6214000000000001
+      },
+      "[PresentationThread]/DX12EnqueueCommands": {
+        "n": 508,
+        "mean": 0.06403917322834646,
+        "median": 0.062,
+        "p95": 0.08170000000000001,
+        "max": 0.1847
+      },
+      "[GameThread]/FoliageSystem": {
+        "n": 599,
+        "mean": 0.05870350584307179,
+        "median": 0.030100000000000002,
+        "p95": 0.0392,
+        "max": 16.8312
+      },
+      "[RenderThread]/RenderDeclare.Deferred": {
+        "n": 280,
+        "mean": 0.05826785714285714,
+        "median": 0.04375,
+        "p95": 0.0896,
+        "max": 2.2428
+      },
+      "[RenderThread]/RenderDeclare.SSAO": {
+        "n": 280,
+        "mean": 0.0502475,
+        "median": 0.047400000000000005,
+        "p95": 0.08270000000000001,
+        "max": 0.1355
+      },
+      "[RenderThread]/RenderDeclare.Shadow": {
+        "n": 280,
+        "mean": 0.047719285714285714,
+        "median": 0.045700000000000005,
+        "p95": 0.0682,
+        "max": 0.1451
+      },
+      "[RenderThread]/MaterialDeclareShadow": {
+        "n": 280,
+        "mean": 0.047513928571428575,
+        "median": 0.04575,
+        "p95": 0.07490000000000001,
+        "max": 0.30060000000000003
+      },
+      "[RenderThread]/MaterialDeclareGBuffer": {
+        "n": 280,
+        "mean": 0.047276785714285716,
+        "median": 0.046900000000000004,
+        "p95": 0.07350000000000001,
+        "max": 0.2107
+      },
+      "[RenderThread]/DX12EnqueueCommands": {
+        "n": 279,
+        "mean": 0.046251971326164876,
+        "median": 0.0393,
+        "p95": 0.06280000000000001,
+        "max": 0.6694
+      },
+      "[RenderThread]/MaterialSceneInputSeal": {
+        "n": 280,
+        "mean": 0.04150714285714286,
+        "median": 0.0379,
+        "p95": 0.0553,
+        "max": 0.1039
+      },
+      "[RenderThread]/RenderGraphBuild": {
+        "n": 280,
+        "mean": 0.03451214285714286,
+        "median": 0.034350000000000006,
+        "p95": 0.0458,
+        "max": 0.0818
+      },
+      "[RenderThread]/RenderDeclare.Forward+": {
+        "n": 280,
+        "mean": 0.03337071428571429,
+        "median": 0.0318,
+        "p95": 0.0568,
+        "max": 0.1676
+      },
+      "[GameThread]/TweenManager": {
+        "n": 599,
+        "mean": 0.03155893155258765,
+        "median": 0.029,
+        "p95": 0.0439,
+        "max": 0.3024
+      },
+      "[RenderThread]/RenderDeclare.Grid": {
+        "n": 280,
+        "mean": 0.03009607142857143,
+        "median": 0.02815,
+        "p95": 0.049300000000000004,
+        "max": 0.1192
+      },
+      "[GameThread]/DestroyLight": {
+        "n": 599,
+        "mean": 0.02951552587646077,
+        "median": 0.027800000000000002,
+        "p95": 0.036500000000000005,
+        "max": 0.2122
+      },
+      "[RenderThread]/RenderDeclare.SkyBox": {
+        "n": 280,
+        "mean": 0.024536428571428574,
+        "median": 0.022650000000000003,
+        "p95": 0.041800000000000004,
+        "max": 0.10650000000000001
+      },
+      "[RenderThread]/RenderDeclare.live_present": {
+        "n": 280,
+        "mean": 0.023485714285714287,
+        "median": 0.0217,
+        "p95": 0.0405,
+        "max": 0.07200000000000001
+      },
+      "[RenderThread]/RenderDeclare.GizmoIcon": {
+        "n": 280,
+        "mean": 0.021494642857142858,
+        "median": 0.019750000000000004,
+        "p95": 0.0339,
+        "max": 0.2184
+      },
+      "[GameThread]/InputEvents": {
+        "n": 599,
+        "mean": 0.020625709515859767,
+        "median": 0.0204,
+        "p95": 0.0253,
+        "max": 0.0887
+      },
+      "[GameThread]/DestroyComponents": {
+        "n": 599,
+        "mean": 0.02052704507512521,
+        "median": 0.02,
+        "p95": 0.0263,
+        "max": 0.1208
+      },
+      "[RenderThread]/RenderDeclare.GizmoLine": {
+        "n": 280,
+        "mean": 0.020373928571428574,
+        "median": 0.01845,
+        "p95": 0.035,
+        "max": 0.1327
+      },
+      "[RenderThread]/RenderDeclare.LX.Scene.GBuffer": {
+        "n": 280,
+        "mean": 0.02006714285714286,
+        "median": 0.018349999999999998,
+        "p95": 0.034300000000000004,
+        "max": 0.0654
+      },
+      "[RenderThread]/RenderDeclare.Decal": {
+        "n": 280,
+        "mean": 0.018623214285714288,
+        "median": 0.01695,
+        "p95": 0.0339,
+        "max": 0.061700000000000005
+      },
+      "[PresentationThread]/DX12PresentWait": {
+        "n": 508,
+        "mean": 0.016705708661417323,
+        "median": 0.0152,
+        "p95": 0.0212,
+        "max": 0.552
+      },
+      "[PresentationThread]/ImGuiBuildDrawData": {
+        "n": 508,
+        "mean": 0.016675000000000002,
+        "median": 0.015700000000000002,
+        "p95": 0.021,
+        "max": 0.2277
+      },
+      "[GameThread]/Editor": {
+        "n": 599,
+        "mean": 0.01608864774624374,
+        "median": 0.0131,
+        "p95": 0.024200000000000003,
+        "max": 0.8953000000000001
+      },
+      "[RenderThread]/RenderDeclare.SSR": {
+        "n": 280,
+        "mean": 0.01562964285714286,
+        "median": 0.013800000000000002,
+        "p95": 0.0303,
+        "max": 0.0594
+      },
+      "[RenderThread]/MaterialMeshGpuPrepare": {
+        "n": 1120,
+        "mean": 0.01360669642857143,
+        "median": 0.0118,
+        "p95": 0.0227,
+        "max": 0.19540000000000002
+      },
+      "[GameThread]/DestroyEntities": {
+        "n": 599,
+        "mean": 0.012836393989983307,
+        "median": 0.012100000000000001,
+        "p95": 0.0176,
+        "max": 0.0689
+      },
+      "[GameThread]/AnimationScheduler.Update": {
+        "n": 599,
+        "mean": 0.011734390651085143,
+        "median": 0.0114,
+        "p95": 0.016,
+        "max": 0.0626
+      },
+      "[PresentationThread]/PresentFrame": {
+        "n": 508,
+        "mean": 0.010824409448818899,
+        "median": 0.00895,
+        "p95": 0.012700000000000001,
+        "max": 0.2303
+      },
+      "[PresentationThread]/PresentationMessages": {
+        "n": 509,
+        "mean": 0.010534577603143419,
+        "median": 0.002,
+        "p95": 0.028200000000000003,
+        "max": 0.18560000000000001
+      },
+      "[RenderThread]/MaterialFrameRetirement": {
+        "n": 280,
+        "mean": 0.010229642857142857,
+        "median": 0.0099,
+        "p95": 0.0146,
+        "max": 0.0251
+      },
+      "[RenderThread]/RenderDeclare.LX.Scene.Volume": {
+        "n": 280,
+        "mean": 0.010078928571428572,
+        "median": 0.008400000000000001,
+        "p95": 0.0193,
+        "max": 0.12350000000000001
+      },
+      "[GameThread]/MaterialPreviewRequest": {
+        "n": 599,
+        "mean": 0.00867228714524207,
+        "median": 0.0082,
+        "p95": 0.0125,
+        "max": 0.0189
+      },
+      "[RenderThread]/RenderDeclare.SSS": {
+        "n": 280,
+        "mean": 0.007371071428571429,
+        "median": 0.0067,
+        "p95": 0.0125,
+        "max": 0.076
+      },
+      "[GameThread]/Update": {
+        "n": 599,
+        "mean": 0.007298664440734558,
+        "median": 0.0057,
+        "p95": 0.0067,
+        "max": 0.6826
+      },
+      "[RenderThread]/MaterialLookupPoolAcquire": {
+        "n": 280,
+        "mean": 0.007043214285714286,
+        "median": 0.00465,
+        "p95": 0.0103,
+        "max": 0.20350000000000001
+      },
+      "[RenderThread]/RenderDeclare.Sprite": {
+        "n": 280,
+        "mean": 0.006394285714285714,
+        "median": 0.0059,
+        "p95": 0.0114,
+        "max": 0.019200000000000002
+      },
+      "[GameThread]/FlushPendingDestroy": {
+        "n": 599,
+        "mean": 0.006087646076794658,
+        "median": 0.0058000000000000005,
+        "p95": 0.0079,
+        "max": 0.0454
+      },
+      "[GameThread]/YieldNull": {
+        "n": 599,
+        "mean": 0.004446076794657763,
+        "median": 0.004,
+        "p95": 0.0073,
+        "max": 0.0212
+      },
+      "[PresentationThread]/PresentationUI": {
+        "n": 508,
+        "mean": 0.004425787401574803,
+        "median": 0.0043,
+        "p95": 0.0054,
+        "max": 0.0553
+      },
+      "[GameThread]/CommitRenderProxies": {
+        "n": 599,
+        "mean": 0.004076961602671118,
+        "median": 0.0035,
+        "p95": 0.0051,
+        "max": 0.23820000000000002
+      },
+      "[GameThread]/PreAllUpdateWorldMatrix": {
+        "n": 599,
+        "mean": 0.0031270450751252087,
+        "median": 0.0031000000000000003,
+        "p95": 0.004,
+        "max": 0.0056
+      },
+      "[GameThread]/CameraSystem": {
+        "n": 599,
+        "mean": 0.002321535893155259,
+        "median": 0.0023,
+        "p95": 0.0028,
+        "max": 0.0036000000000000003
+      },
+      "[GameThread]/LateUpdate": {
+        "n": 599,
+        "mean": 0.002224373956594324,
+        "median": 0.0021000000000000003,
+        "p95": 0.003,
+        "max": 0.013900000000000001
+      },
+      "[GameThread]/AnimatorSystem": {
+        "n": 599,
+        "mean": 0.0018130217028380635,
+        "median": 0.0018000000000000002,
+        "p95": 0.0025,
+        "max": 0.003
+      },
+      "[PresentationThread]/PresentationViewportExtent": {
+        "n": 509,
+        "mean": 0.00172475442043222,
+        "median": 0.0017000000000000001,
+        "p95": 0.0023,
+        "max": 0.0033
+      },
+      "[RenderThread]/RenderComplete": {
+        "n": 454,
+        "mean": 0.0013026431718061674,
+        "median": 0.0013000000000000002,
+        "p95": 0.0019,
+        "max": 0.0021000000000000003
+      },
+      "[GameThread]/LateAllUpdateWorldMatrix": {
+        "n": 599,
+        "mean": 0.0012614357262103507,
+        "median": 0.0013000000000000002,
+        "p95": 0.0017000000000000001,
+        "max": 0.004
+      },
+      "[GameThread]/UITickSystem": {
+        "n": 599,
+        "mean": 0.0011869782971619365,
+        "median": 0.0012000000000000001,
+        "p95": 0.0016,
+        "max": 0.0026000000000000003
+      },
+      "[RenderThread]/RHITicketWait": {
+        "n": 559,
+        "mean": 0.0009123434704830054,
+        "median": 0.0009000000000000001,
+        "p95": 0.0014,
+        "max": 0.0115
+      },
+      "[RenderThread]/RenderDeclare.UI": {
+        "n": 280,
+        "mean": 0.0007292857142857143,
+        "median": 0.0006000000000000001,
+        "p95": 0.0012000000000000001,
+        "max": 0.0015
+      },
+      "[PresentationThread]/PresentationComplete": {
+        "n": 508,
+        "mean": 0.0006962598425196851,
+        "median": 0.0007,
+        "p95": 0.0009000000000000001,
+        "max": 0.0016
+      },
+      "[GameThread]/DecalSystem": {
+        "n": 599,
+        "mean": 0.0006363939899833056,
+        "median": 0.0006000000000000001,
+        "p95": 0.001,
+        "max": 0.0014
+      },
+      "[GameThread]/SoundSystem": {
+        "n": 599,
+        "mean": 0.0005831385642737897,
+        "median": 0.0006000000000000001,
+        "p95": 0.0009000000000000001,
+        "max": 0.001
+      },
+      "[GameThread]/LightSystem": {
+        "n": 599,
+        "mean": 0.0005757929883138564,
+        "median": 0.0006000000000000001,
+        "p95": 0.0008,
+        "max": 0.003
+      },
+      "[GameThread]/AnimationScheduler.UpdateWait": {
+        "n": 599,
+        "mean": 0.0004868113522537563,
+        "median": 0.0005,
+        "p95": 0.0007,
+        "max": 0.0011
+      },
+      "[RenderThread]/RenderStateLockWait": {
+        "n": 455,
+        "mean": 0.000445934065934066,
+        "median": 0.0004,
+        "p95": 0.0007,
+        "max": 0.0019
+      },
+      "[GameThread]/MaterialPreviewRequestLockWait": {
+        "n": 599,
+        "mean": 0.0004312186978297162,
+        "median": 0.0004,
+        "p95": 0.0005,
+        "max": 0.0009000000000000001
+      },
+      "[GameThread]/PlayerInputSystem": {
+        "n": 599,
+        "mean": 0.0004156928213689483,
+        "median": 0.0004,
+        "p95": 0.0006000000000000001,
+        "max": 0.0027
+      },
+      "[GameThread]/AnimationScheduler.ExecuteWait": {
+        "n": 599,
+        "mean": 0.0003617696160267112,
+        "median": 0.00030000000000000003,
+        "p95": 0.0006000000000000001,
+        "max": 0.001
+      },
+      "[GameThread]/UpdateEvent": {
+        "n": 599,
+        "mean": 0.0003048414023372287,
+        "median": 0.00030000000000000003,
+        "p95": 0.0004,
+        "max": 0.0021000000000000003
+      }
+    },
+    "lookupDistributionMs": {
+      "all": {
+        "n": 278,
+        "mean": 6.8902021582733814,
+        "median": 0.3942,
+        "p95": 87.7035,
+        "maximum": 107.5056
+      },
+      "under2": {
+        "n": 258,
+        "mean": 0.5099015503875969,
+        "median": 0.3922,
+        "p95": 1.0762,
+        "maximum": 1.28
+      },
+      "over20": {
+        "n": 20,
+        "mean": 89.19608,
+        "median": 90.44225,
+        "p95": 107.5056,
+        "maximum": 107.5056
+      }
+    },
+    "lookupSpikes": [
+      {
+        "submission": 6117,
+        "frame": 11392,
+        "startFrame": 11392,
+        "ms": 90.6475
+      },
+      {
+        "submission": 6118,
+        "frame": 11400,
+        "startFrame": 11400,
+        "ms": 84.7595
+      },
+      {
+        "submission": 6145,
+        "frame": 11454,
+        "startFrame": 11454,
+        "ms": 90.237
+      },
+      {
+        "submission": 6147,
+        "frame": 11469,
+        "startFrame": 11469,
+        "ms": 96.215
+      },
+      {
+        "submission": 6148,
+        "frame": 11470,
+        "startFrame": 11470,
+        "ms": 99.5595
+      },
+      {
+        "submission": 6149,
+        "frame": 11481,
+        "startFrame": 11481,
+        "ms": 92.7754
+      },
+      {
+        "submission": 6150,
+        "frame": 11491,
+        "startFrame": 11491,
+        "ms": 107.5056
+      },
+      {
+        "submission": 6151,
+        "frame": 11499,
+        "startFrame": 11499,
+        "ms": 93.6674
+      },
+      {
+        "submission": 6152,
+        "frame": 11512,
+        "startFrame": 11512,
+        "ms": 89.0501
+      },
+      {
+        "submission": 6153,
+        "frame": 11517,
+        "startFrame": 11517,
+        "ms": 98.3317
+      },
+      {
+        "submission": 6154,
+        "frame": 11527,
+        "startFrame": 11527,
+        "ms": 91.2803
+      },
+      {
+        "submission": 6155,
+        "frame": 11535,
+        "startFrame": 11535,
+        "ms": 93.3745
+      },
+      {
+        "submission": 6156,
+        "frame": 11543,
+        "startFrame": 11543,
+        "ms": 87.7035
+      },
+      {
+        "submission": 6157,
+        "frame": 11552,
+        "startFrame": 11552,
+        "ms": 80.2028
+      },
+      {
+        "submission": 6158,
+        "frame": 11560,
+        "startFrame": 11560,
+        "ms": 78.2725
+      },
+      {
+        "submission": 6159,
+        "frame": 11567,
+        "startFrame": 11567,
+        "ms": 89.7167
+      },
+      {
+        "submission": 6160,
+        "frame": 11576,
+        "startFrame": 11576,
+        "ms": 93.0417
+      },
+      {
+        "submission": 6161,
+        "frame": 11585,
+        "startFrame": 11585,
+        "ms": 76.2654
+      },
+      {
+        "submission": 6162,
+        "frame": 11598,
+        "startFrame": 11598,
+        "ms": 78.4968
+      },
+      {
+        "submission": 6163,
+        "frame": 11606,
+        "startFrame": 11606,
+        "ms": 72.8187
+      }
+    ],
+    "captureFrameRange": [
+      11388,
+      11987
+    ],
+    "engineWindowSeconds": 5.2210204,
+    "instantCounts": {},
+    "counterStats": [
+      {
+        "id": 24,
+        "category": 16,
+        "name": "GC provider cost",
+        "unit": "us",
+        "n": 599,
+        "mean": 6.405175292153589,
+        "median": 5.7,
+        "p95": 7.1,
+        "maximum": 34.2
+      },
+      {
+        "id": 12,
+        "category": 16,
+        "name": "GC Gen0",
+        "unit": "count",
+        "n": 599,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 13,
+        "category": 16,
+        "name": "GC Gen1",
+        "unit": "count",
+        "n": 599,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 14,
+        "category": 16,
+        "name": "GC Gen2",
+        "unit": "count",
+        "n": 599,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 15,
+        "category": 16,
+        "name": "GC heap",
+        "unit": "MB",
+        "n": 599,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 16,
+        "category": 16,
+        "name": "GC fragmented",
+        "unit": "MB",
+        "n": 599,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 17,
+        "category": 16,
+        "name": "GC pause",
+        "unit": "%",
+        "n": 599,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 1,
+        "category": 1,
+        "name": "CPU",
+        "unit": "%",
+        "n": 599,
+        "mean": 48.92227386738908,
+        "median": 49.80428906568748,
+        "p95": 64.02393198337322,
+        "maximum": 71.22174972861227
+      },
+      {
+        "id": 2,
+        "category": 1,
+        "name": "RAM",
+        "unit": "MB",
+        "n": 599,
+        "mean": 1836.1087098288815,
+        "median": 1836.45703125,
+        "p95": 1836.9765625,
+        "maximum": 1837.203125
+      },
+      {
+        "id": 6,
+        "category": 8,
+        "name": "Upload",
+        "unit": "B",
+        "n": 456,
+        "mean": 22065.964912280702,
+        "median": 35936.0,
+        "p95": 35936.0,
+        "maximum": 35936.0
+      },
+      {
+        "id": 7,
+        "category": 8,
+        "name": "Upload rejected batches",
+        "unit": "count",
+        "n": 456,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 8,
+        "category": 8,
+        "name": "Descriptors",
+        "unit": "count",
+        "n": 456,
+        "mean": 44.824561403508774,
+        "median": 73.0,
+        "p95": 73.0,
+        "maximum": 73.0
+      },
+      {
+        "id": 9,
+        "category": 8,
+        "name": "Descriptor overflow",
+        "unit": "count",
+        "n": 456,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 10,
+        "category": 8,
+        "name": "GBuffer draws",
+        "unit": "count",
+        "n": 456,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 11,
+        "category": 8,
+        "name": "GBuffer batches",
+        "unit": "count",
+        "n": 456,
+        "mean": 0.0,
+        "median": 0.0,
+        "p95": 0.0,
+        "maximum": 0.0
+      },
+      {
+        "id": 23,
+        "category": 8,
+        "name": "Render provider cost",
+        "unit": "us",
+        "n": 456,
+        "mean": 5.796052631578948,
+        "median": 5.0,
+        "p95": 9.6,
+        "maximum": 13.4
+      },
+      {
+        "id": 22,
+        "category": 1,
+        "name": "Process provider cost",
+        "unit": "us",
+        "n": 49,
+        "mean": 19.881632653061224,
+        "median": 19.3,
+        "p95": 25.7,
+        "maximum": 33.5
+      },
+      {
+        "id": 3,
+        "category": 2,
+        "name": "VRAM",
+        "unit": "MB",
+        "n": 20,
+        "mean": 2222.0,
+        "median": 2222.0,
+        "p95": 2222.0,
+        "maximum": 2222.0
+      }
+    ]
+  },
+  "experiment": {
+    "resolution": [
+      64,
+      64
+    ],
+    "backend": "DX12",
+    "configuration": "Release",
+    "validation": "off",
+    "timing": "forced scene epoch change; 9 frames per condition; first 2 excluded; full GPU graph timestamp",
+    "shader_products_changed": false,
+    "quality": "same 26 fixed HDRI cases, same 344 eroded pixels, seed 0/11 Cycles 131072 samples",
+    "product_acceptance": false,
+    "actual_model_fps_measured": false
+  },
+  "variants": [
+    {
+      "label": "env1024",
+      "brdf": 1024,
+      "environment": 1024,
+      "root": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9NearCamera-env1024-shader\\DefaultPassShader",
+      "shaders": [
+        {
+          "path": "Decal.slang",
+          "sha256": "4460a1709c2241d15aea1dd46b6b6bceb31c124a297cdc7f3eb734c842d8dd39"
+        },
+        {
+          "path": "Deferred.slang",
+          "sha256": "596c02fcfa49c6629933f40597dd24b3ae54ff7c8c2ad18fc5473a3a53b556c8"
+        },
+        {
+          "path": "FogAccumulate.slang",
+          "sha256": "bc238a008ab02b92117a304d21f37a1e62e6937c7a0cf5ea119302048c3209dd"
+        },
+        {
+          "path": "FogComposite.slang",
+          "sha256": "887a311a996773de718f7dc4652e2bb15fb6d1c1df2f229a44e46d3e59710d6f"
+        },
+        {
+          "path": "FogScatter.slang",
+          "sha256": "5b7be62464affdc85a4cdc102c6be1bae5a47560a5c3604218310cefcee75225"
+        },
+        {
+          "path": "ForwardCull.slang",
+          "sha256": "3aac2982684a7cd26393932dab4bf8d99e79f45d16b9936b44e88e82303c41d5"
+        },
+        {
+          "path": "ForwardShade.slang",
+          "sha256": "f8ea8e3324f42f972f73aefe3c51e6df1c45a5973abd51d1b8d929c467e66644"
+        },
+        {
+          "path": "ForwardWater.slang",
+          "sha256": "dbd93d30af6c6be7f8ba607cb8c27afee7e756c7e61449ef4a650d065f2ec14a"
+        },
+        {
+          "path": "ForwardWind.slang",
+          "sha256": "f1cf88b20bfc6f3ebd146dd9b6b77381d29cf45a1176f05f8bb0c060fe3e01b7"
+        },
+        {
+          "path": "GBuffer.slang",
+          "sha256": "71fd283d0fb5dfc13dc355a4291300c2736e4ad847557dc4a5e11504b813e7dc"
+        },
+        {
+          "path": "GizmoIcon.slang",
+          "sha256": "7ab14eeb0f5a96a2654d0c08746d56c47e9ad233b144d54bbcaa0632ecec7891"
+        },
+        {
+          "path": "GizmoLine.slang",
+          "sha256": "a6d5dde02760de60ae49b3e3c92ca03576a24bd7c8f0a08435acc4375e9b8e55"
+        },
+        {
+          "path": "Grid.slang",
+          "sha256": "82a7b6b552289bb0570f04878528ec0b9292339a4ed4b62e56c7214e92e90e74"
+        },
+        {
+          "path": "IblBrdf.slang",
+          "sha256": "5c2abbfba299ec6aa0e542fdf3699c05dc6078fc0a36a5f52a9b6ebf3c4f75ae"
+        },
+        {
+          "path": "IblCubeDownsample.slang",
+          "sha256": "6bf25f2515051701f30ebb7c0725ea97170316f5788fc5c213a4926f232ef168"
+        },
+        {
+          "path": "IblFace.slang",
+          "sha256": "71605882ddf102ff63bd3f43f420c94425325cccb9e064451f499803dfe013dd"
+        },
+        {
+          "path": "IblFullscreen.slang",
+          "sha256": "437fde81d77d53db7cfd7f86fc37ff0602ad1cec38c8a748dade7501071a49d3"
+        },
+        {
+          "path": "IblImportanceMarginal.slang",
+          "sha256": "51e6f7b0aeb2cb0fdfdfca022e138288964259add6f242dab189c70d4d30df50"
+        },
+        {
+          "path": "IblImportanceRows.slang",
+          "sha256": "1f82705c4c86d8c61723ef0545f2c3ea8b7011cdd187a2a374323a2371e59ccf"
+        },
+        {
+          "path": "IblImportanceSamples.slang",
+          "sha256": "bf3361deef18a09646852cf7baa94be4d00dd34d8a12af15ff6a2f1f8e9d6b22"
+        },
+        {
+          "path": "IblIrradiance.slang",
+          "sha256": "4d4f07d079ae3cc0fab35f6279ec5a7d12ddc7954b2cb92d7229ff679fcf7ecd"
+        },
+        {
+          "path": "IblPrefilter.slang",
+          "sha256": "fd9cdce7c1c765295888d62c4422e70ee20349fa637f08555eb14cb4839ec001"
+        },
+        {
+          "path": "IblRectToCube.slang",
+          "sha256": "308732c50ac68de0221471f3477f9166f2e7a9efec6d5a4309d4d2ac491778da"
+        },
+        {
+          "path": "IblSceneImportance.slang",
+          "sha256": "9d13f273e7c3c673a4d4b4576edeb42631cf063c63cf769cec61520c2e980b45"
+        },
+        {
+          "path": "IblSourceCopy.slang",
+          "sha256": "20f4dfa4cab248b4343f1022cf2aea6852347f2df7950422ff7b751a21d2f91b"
+        },
+        {
+          "path": "Includes\\Brdf.slang",
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d"
+        },
+        {
+          "path": "Includes\\FogCommon.slang",
+          "sha256": "516b631abfb7ebc24cf7a83b2bbff3bdd5515166e767a95ce767ca3402ab118a"
+        },
+        {
+          "path": "Includes\\GgxEnergyTables.slang",
+          "sha256": "250aa6a77726aed183d10c81b2189f0fbd7e7d05724f1177c5aa9818da482dea"
+        },
+        {
+          "path": "Includes\\Ibl.slang",
+          "sha256": "709674909945b2bcbd99907d8844662b22f85d7b4f56c6691b8d8c075f6a4286"
+        },
+        {
+          "path": "Includes\\IblImportance.slang",
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009"
+        },
+        {
+          "path": "Includes\\MaterialCoordinates.slang",
+          "sha256": "2a1ebf14d623bc28b1f10b705906f4471d0726b0eb691a81b74364d92207c49a"
+        },
+        {
+          "path": "Includes\\MaterialEvaluation.slang",
+          "sha256": "c7c93b4f0d40feea8f5de549856f81efe6de64dbd7e94410b921cf72771a894e"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneHost.slang",
+          "sha256": "8dfbb4a38a7b74cb8c06d84dbda725597dfc685586e1908319e449d431ea7c66"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneRefraction.slang",
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneSubsurface.slang",
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolume.slang",
+          "sha256": "e7d499d28f5c85d2c604ebf8724cfc33e2e1289d08046267be3063b0092a8805"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolumeCoefficients.slang",
+          "sha256": "43db128d83819663a998e6074dffe452fdb030a72231859a918e1f12b2aa5801"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolumeLighting.slang",
+          "sha256": "6948fb1dc59539e028a08412359d7fabbefaf5fc14ede849ada4cf11abda884e"
+        },
+        {
+          "path": "Includes\\MaterialGraphSurfaceHost.slang",
+          "sha256": "bf838b815cfe25b31da12f0bc3b8f6032406611dea3d9914eb3e34bf23d94b07"
+        },
+        {
+          "path": "Includes\\MaterialGraphSurfacePoint.slang",
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb"
+        },
+        {
+          "path": "Includes\\MaterialGraphTextureSample.slang",
+          "sha256": "4ad666a8e95ee0edeb99cbf18df0a6105c5965048d1cd5716c7517e476ac9d00"
+        },
+        {
+          "path": "Includes\\PackedBones.slang",
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782"
+        },
+        {
+          "path": "Includes\\PbrCoverage.slang",
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612"
+        },
+        {
+          "path": "Includes\\PbrSurface.slang",
+          "sha256": "d238aa154eef7ee337a97251ac9b7e66b30d7a6a926b4182163756969609c0bd"
+        },
+        {
+          "path": "Includes\\PostChainCommon.slang",
+          "sha256": "5f34d6adb81e18605c4fe75b354ff1941362dd83e40238d072464dd1b7c3b78f"
+        },
+        {
+          "path": "Includes\\PrincipledBrdf.slang",
+          "sha256": "c18200ee6b8488f03ceaeadb82ee1746d32d1bceb49cee9a2d7c3548b33f60cb"
+        },
+        {
+          "path": "Includes\\PrincipledEnvironmentBake.slang",
+          "sha256": "b1e612ccf9baee56e6ad1f082bb80a847cbc25715de3a6fe27cb1807fe1a832b"
+        },
+        {
+          "path": "Includes\\PrincipledIblLookup.slang",
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e"
+        },
+        {
+          "path": "Includes\\PrincipledLayered.slang",
+          "sha256": "11620e707514568ae78cda89b0ea5a8ddacf242e3526ec06b2911dccf6312033"
+        },
+        {
+          "path": "Includes\\PrincipledSubsurface.slang",
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac"
+        },
+        {
+          "path": "Includes\\PrincipledSurface.slang",
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d"
+        },
+        {
+          "path": "Includes\\PrincipledThinFilm.slang",
+          "sha256": "f3be3acf81988eb6372efb69b2d8c9baabb96636bd95eefcd88e1f4f6326a190"
+        },
+        {
+          "path": "Includes\\PrincipledThinFilmSensitivity.slang",
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1"
+        },
+        {
+          "path": "Includes\\PrincipledVolume.slang",
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a"
+        },
+        {
+          "path": "Includes\\Radiance.slang",
+          "sha256": "859d974fd4ea96d548e001369011d3ddc6c7d950bb6f7350ee91592493836094"
+        },
+        {
+          "path": "Includes\\SheenLtc.slang",
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2"
+        },
+        {
+          "path": "Includes\\SpecialForwardSurface.slang",
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc"
+        },
+        {
+          "path": "Includes\\SpecialMaterialRoute.slang",
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1"
+        },
+        {
+          "path": "Includes\\SsaoCommon.slang",
+          "sha256": "004d5b139189606209604eecfd54384b3dc34c94662d4234b5fb83d1aee353cc"
+        },
+        {
+          "path": "Includes\\StandardMaterialRoute.slang",
+          "sha256": "3fb8009b9724a479d80ec02b6bd432fad3b206507ca9c164e248bcc3a82fc489"
+        },
+        {
+          "path": "Includes\\TangentFrame.slang",
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7"
+        },
+        {
+          "path": "Includes\\TextureCoordinates.slang",
+          "sha256": "431ac4c01740c3aba3e8241bdab23648af3b6c157ca16c1d4849d176c4b2d8dc"
+        },
+        {
+          "path": "MaterialGraphMeshSurface.slang",
+          "sha256": "ed5d097274615e83742d9ec4c428a56f343e1f62d79e9af8cbd636b056468b26"
+        },
+        {
+          "path": "MaterialGraphRasterSurface.slang",
+          "sha256": "f1f53224e3ea795d09af632602c8604ec218638a27b2786f978559f6096934a5"
+        },
+        {
+          "path": "MaterialGraphSceneLookup.slang",
+          "sha256": "48a5975d7fb218d92aad5fb95e115297a27c5e534754036a1cdf2d3c61ab289d"
+        },
+        {
+          "path": "MaterialGraphSceneRefractionBake.slang",
+          "sha256": "3552d20fd37c8e2f12383ca33d1c10b3cbc2e27b5bdaec2be15cc4cf9fec0185"
+        },
+        {
+          "path": "MaterialGraphSceneSubsurfaceBake.slang",
+          "sha256": "1f05b7c50d4c5c47690167ccafb3615991859351e69b316fe99f657c80fd7854"
+        },
+        {
+          "path": "MaterialGraphSceneSubsurfaceFilter.slang",
+          "sha256": "66fa3d476017b9c6e072f501dadb0a6a90e3a78eb216d50d28afe00ac5ddca34"
+        },
+        {
+          "path": "MaterialGraphSceneVolumeBake.slang",
+          "sha256": "225c15578c9a2855439e590fbb228bf624f184c42bc62369c8cc9b7254be14a8"
+        },
+        {
+          "path": "PostChainDownsample.slang",
+          "sha256": "b21c17dfd80602824137c546ba51862bf3597b067bb30ca7391ee3135d6d1c7e"
+        },
+        {
+          "path": "PostChainFxaa.slang",
+          "sha256": "2374264028fd9829aed33df6ef943f65944aa40c659e5042d07f8933dec80f45"
+        },
+        {
+          "path": "PostChainThreshold.slang",
+          "sha256": "415bd424ee508104e835a453c8d433ee0f410af53743001aaeffa998e92b6bef"
+        },
+        {
+          "path": "PostChainUber.slang",
+          "sha256": "fdd1768210aca2d6f1dcf4e277e05718a56e5f0e5040eb0e59b268a443a3432c"
+        },
+        {
+          "path": "PostChainUberHDR.slang",
+          "sha256": "81cd4fca9f2144e0c05b9a075e87d5e64464bcba07320b671e75706ab4fc189d"
+        },
+        {
+          "path": "PostChainUpsample.slang",
+          "sha256": "6d11365e53528d533ea8d59ff6385147f994bb94aef42290f2d259f814fa3eb9"
+        },
+        {
+          "path": "PrincipledIblBake.slang",
+          "sha256": "59ea7c6e65835687a305a662d5610eccd6095dc50adfae919adcd59c89c92b4f"
+        },
+        {
+          "path": "SelfTest\\FogScene.slang",
+          "sha256": "3f0c0d5ad831de09723fd2e73b16249cada918cc72acbfcd37bd6650daa72ce0"
+        },
+        {
+          "path": "SelfTest\\PostChainScene.slang",
+          "sha256": "c6652a5026c88b35ad83605796ac0663ac6ab3b1b04421d63dc45126164b3667"
+        },
+        {
+          "path": "SelfTest\\ShaderMetaFixture.slang",
+          "sha256": "db2a7bd7f8d53564fab62318dbd4a70da457bff3b57f258b9c342055fae7e7ea"
+        },
+        {
+          "path": "SelfTest\\SsaoScene.slang",
+          "sha256": "5dc5f069b9ca53577c70a4ec04cc9ae37730a4c5877dd0899a87728f1c824685"
+        },
+        {
+          "path": "SelfTest\\SsgiRhiScene.slang",
+          "sha256": "2d27e790d829e6082d1d27a10bc44507574826b2389d829b5a4c79492ff98685"
+        },
+        {
+          "path": "SelfTest\\SsgiTestDepth.slang",
+          "sha256": "f088bbb93072d6afa9eae00a0bb00ef268db78683e0d4056e6f61536e303a083"
+        },
+        {
+          "path": "SelfTest\\SsrScene.slang",
+          "sha256": "8561787d9cc9df2f8cdcba03c7da25ec0d7258c09668f4e008e98f82d66493e0"
+        },
+        {
+          "path": "SelfTest\\SssScene.slang",
+          "sha256": "8e984e1e563d9b0d3d4fe41997085268cff79aa125624ec5d890cc9d69d326ae"
+        },
+        {
+          "path": "SelfTest\\StandardMaterialProbe.slang",
+          "sha256": "6cbb458e10c56915b179ce89e269393a42fb03ac0df3612e071d8b62d0496ac1"
+        },
+        {
+          "path": "SelfTest\\Triangle.slang",
+          "sha256": "7a887d1ec609ef9a822b93dd763f1123e24518dbc90ff96e86b91290b67ea466"
+        },
+        {
+          "path": "Shadow.slang",
+          "sha256": "44d4a585ec7de8f39b2591b84a056fe96f55dde1e1d19848981c1a62710f7e1c"
+        },
+        {
+          "path": "SkyBox.slang",
+          "sha256": "2ae0cf0e41a0ee89e05b0af3ab60459078e3c170ed58a4b2022e43dba4c7b5d5"
+        },
+        {
+          "path": "SsaoAO.slang",
+          "sha256": "5e874532729d5d8b620ad0a181ab16a2278feb8b77dd20f69741e0c04e717437"
+        },
+        {
+          "path": "SsaoFilter.slang",
+          "sha256": "6c23dc379e242885a428da34fc0d0668b53b6b815a53294ebc73584776c829ea"
+        },
+        {
+          "path": "SsgiComposite.slang",
+          "sha256": "2e88addfb9a4041a2a0a6f09a3307cb3c0661b7e02d0353f6d265d5a3cab524d"
+        },
+        {
+          "path": "SsgiFilter.slang",
+          "sha256": "61cde6cf9613f03ec3a3e68e74a41c5443f5a11e56e25f915be0302b0facd275"
+        },
+        {
+          "path": "SsgiHiZBuild.slang",
+          "sha256": "012714b1144d12b874cbe45db4429bffee73e5c464bb48464de457f84771ce2d"
+        },
+        {
+          "path": "SsgiResolve.slang",
+          "sha256": "35ff059123704e22412a17e09efbcf65078d211f2964e71437e5f3c0406a3b50"
+        },
+        {
+          "path": "SsgiTrace.slang",
+          "sha256": "9c99a9b8c861ba1cf7509614dc04428f12aa362f98f59d1027f87ab5e495da7b"
+        },
+        {
+          "path": "Ssr.slang",
+          "sha256": "4cbd02dd3d9e1a7b7afd21ea4c15a61d073489344ebd19e3536478cf7dd1e220"
+        },
+        {
+          "path": "Sss.slang",
+          "sha256": "83ebec97a483f9b0d3c25751afbd6a3396369ce18e792840b68b01097efc1422"
+        },
+        {
+          "path": "Tests\\IblGgxProbe.slang",
+          "sha256": "2e01dbf2b7a2ea8804efc644563a49284a41263b6e63829fe81439a7ba61e7be"
+        },
+        {
+          "path": "UI.slang",
+          "sha256": "6b2e9e80540b706b0609873bf02f30ac058709918a40ef6480af5dd4ec66a988"
+        },
+        {
+          "path": "WireFrame.slang",
+          "sha256": "b7aeec6f125d55d41fbf858a351dd02b1e378d8b54c73e5d8d39dcd6db49e785"
+        },
+        {
+          "path": "WorldSprite.slang",
+          "sha256": "c0bff448262bfeda171c6e445379c5a8ac4ea0202f6b1cfade0356d0b93a89c8"
+        }
+      ]
+    },
+    {
+      "label": "ggx256-env1024",
+      "brdf": 256,
+      "environment": 1024,
+      "root": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9NearCamera-ggx256-env1024-shader\\DefaultPassShader",
+      "shaders": [
+        {
+          "path": "Decal.slang",
+          "sha256": "4460a1709c2241d15aea1dd46b6b6bceb31c124a297cdc7f3eb734c842d8dd39"
+        },
+        {
+          "path": "Deferred.slang",
+          "sha256": "596c02fcfa49c6629933f40597dd24b3ae54ff7c8c2ad18fc5473a3a53b556c8"
+        },
+        {
+          "path": "FogAccumulate.slang",
+          "sha256": "bc238a008ab02b92117a304d21f37a1e62e6937c7a0cf5ea119302048c3209dd"
+        },
+        {
+          "path": "FogComposite.slang",
+          "sha256": "887a311a996773de718f7dc4652e2bb15fb6d1c1df2f229a44e46d3e59710d6f"
+        },
+        {
+          "path": "FogScatter.slang",
+          "sha256": "5b7be62464affdc85a4cdc102c6be1bae5a47560a5c3604218310cefcee75225"
+        },
+        {
+          "path": "ForwardCull.slang",
+          "sha256": "3aac2982684a7cd26393932dab4bf8d99e79f45d16b9936b44e88e82303c41d5"
+        },
+        {
+          "path": "ForwardShade.slang",
+          "sha256": "f8ea8e3324f42f972f73aefe3c51e6df1c45a5973abd51d1b8d929c467e66644"
+        },
+        {
+          "path": "ForwardWater.slang",
+          "sha256": "dbd93d30af6c6be7f8ba607cb8c27afee7e756c7e61449ef4a650d065f2ec14a"
+        },
+        {
+          "path": "ForwardWind.slang",
+          "sha256": "f1cf88b20bfc6f3ebd146dd9b6b77381d29cf45a1176f05f8bb0c060fe3e01b7"
+        },
+        {
+          "path": "GBuffer.slang",
+          "sha256": "71fd283d0fb5dfc13dc355a4291300c2736e4ad847557dc4a5e11504b813e7dc"
+        },
+        {
+          "path": "GizmoIcon.slang",
+          "sha256": "7ab14eeb0f5a96a2654d0c08746d56c47e9ad233b144d54bbcaa0632ecec7891"
+        },
+        {
+          "path": "GizmoLine.slang",
+          "sha256": "a6d5dde02760de60ae49b3e3c92ca03576a24bd7c8f0a08435acc4375e9b8e55"
+        },
+        {
+          "path": "Grid.slang",
+          "sha256": "82a7b6b552289bb0570f04878528ec0b9292339a4ed4b62e56c7214e92e90e74"
+        },
+        {
+          "path": "IblBrdf.slang",
+          "sha256": "5c2abbfba299ec6aa0e542fdf3699c05dc6078fc0a36a5f52a9b6ebf3c4f75ae"
+        },
+        {
+          "path": "IblCubeDownsample.slang",
+          "sha256": "6bf25f2515051701f30ebb7c0725ea97170316f5788fc5c213a4926f232ef168"
+        },
+        {
+          "path": "IblFace.slang",
+          "sha256": "71605882ddf102ff63bd3f43f420c94425325cccb9e064451f499803dfe013dd"
+        },
+        {
+          "path": "IblFullscreen.slang",
+          "sha256": "437fde81d77d53db7cfd7f86fc37ff0602ad1cec38c8a748dade7501071a49d3"
+        },
+        {
+          "path": "IblImportanceMarginal.slang",
+          "sha256": "51e6f7b0aeb2cb0fdfdfca022e138288964259add6f242dab189c70d4d30df50"
+        },
+        {
+          "path": "IblImportanceRows.slang",
+          "sha256": "1f82705c4c86d8c61723ef0545f2c3ea8b7011cdd187a2a374323a2371e59ccf"
+        },
+        {
+          "path": "IblImportanceSamples.slang",
+          "sha256": "bf3361deef18a09646852cf7baa94be4d00dd34d8a12af15ff6a2f1f8e9d6b22"
+        },
+        {
+          "path": "IblIrradiance.slang",
+          "sha256": "4d4f07d079ae3cc0fab35f6279ec5a7d12ddc7954b2cb92d7229ff679fcf7ecd"
+        },
+        {
+          "path": "IblPrefilter.slang",
+          "sha256": "fd9cdce7c1c765295888d62c4422e70ee20349fa637f08555eb14cb4839ec001"
+        },
+        {
+          "path": "IblRectToCube.slang",
+          "sha256": "308732c50ac68de0221471f3477f9166f2e7a9efec6d5a4309d4d2ac491778da"
+        },
+        {
+          "path": "IblSceneImportance.slang",
+          "sha256": "9d13f273e7c3c673a4d4b4576edeb42631cf063c63cf769cec61520c2e980b45"
+        },
+        {
+          "path": "IblSourceCopy.slang",
+          "sha256": "20f4dfa4cab248b4343f1022cf2aea6852347f2df7950422ff7b751a21d2f91b"
+        },
+        {
+          "path": "Includes\\Brdf.slang",
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d"
+        },
+        {
+          "path": "Includes\\FogCommon.slang",
+          "sha256": "516b631abfb7ebc24cf7a83b2bbff3bdd5515166e767a95ce767ca3402ab118a"
+        },
+        {
+          "path": "Includes\\GgxEnergyTables.slang",
+          "sha256": "250aa6a77726aed183d10c81b2189f0fbd7e7d05724f1177c5aa9818da482dea"
+        },
+        {
+          "path": "Includes\\Ibl.slang",
+          "sha256": "709674909945b2bcbd99907d8844662b22f85d7b4f56c6691b8d8c075f6a4286"
+        },
+        {
+          "path": "Includes\\IblImportance.slang",
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009"
+        },
+        {
+          "path": "Includes\\MaterialCoordinates.slang",
+          "sha256": "2a1ebf14d623bc28b1f10b705906f4471d0726b0eb691a81b74364d92207c49a"
+        },
+        {
+          "path": "Includes\\MaterialEvaluation.slang",
+          "sha256": "c7c93b4f0d40feea8f5de549856f81efe6de64dbd7e94410b921cf72771a894e"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneHost.slang",
+          "sha256": "8dfbb4a38a7b74cb8c06d84dbda725597dfc685586e1908319e449d431ea7c66"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneRefraction.slang",
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneSubsurface.slang",
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolume.slang",
+          "sha256": "e7d499d28f5c85d2c604ebf8724cfc33e2e1289d08046267be3063b0092a8805"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolumeCoefficients.slang",
+          "sha256": "43db128d83819663a998e6074dffe452fdb030a72231859a918e1f12b2aa5801"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolumeLighting.slang",
+          "sha256": "6948fb1dc59539e028a08412359d7fabbefaf5fc14ede849ada4cf11abda884e"
+        },
+        {
+          "path": "Includes\\MaterialGraphSurfaceHost.slang",
+          "sha256": "bf838b815cfe25b31da12f0bc3b8f6032406611dea3d9914eb3e34bf23d94b07"
+        },
+        {
+          "path": "Includes\\MaterialGraphSurfacePoint.slang",
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb"
+        },
+        {
+          "path": "Includes\\MaterialGraphTextureSample.slang",
+          "sha256": "4ad666a8e95ee0edeb99cbf18df0a6105c5965048d1cd5716c7517e476ac9d00"
+        },
+        {
+          "path": "Includes\\PackedBones.slang",
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782"
+        },
+        {
+          "path": "Includes\\PbrCoverage.slang",
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612"
+        },
+        {
+          "path": "Includes\\PbrSurface.slang",
+          "sha256": "d238aa154eef7ee337a97251ac9b7e66b30d7a6a926b4182163756969609c0bd"
+        },
+        {
+          "path": "Includes\\PostChainCommon.slang",
+          "sha256": "5f34d6adb81e18605c4fe75b354ff1941362dd83e40238d072464dd1b7c3b78f"
+        },
+        {
+          "path": "Includes\\PrincipledBrdf.slang",
+          "sha256": "9787029cf28a602a51fc7db2c86edb2fcde1e75d5e7545fc76fb6aea03332049"
+        },
+        {
+          "path": "Includes\\PrincipledEnvironmentBake.slang",
+          "sha256": "39d922ecb8e038dd1390990c98ae88ee9df0623355de1d99b93128c14e0476a9"
+        },
+        {
+          "path": "Includes\\PrincipledIblLookup.slang",
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e"
+        },
+        {
+          "path": "Includes\\PrincipledLayered.slang",
+          "sha256": "9c545a2ceb9a8155119b6ad5f306ccfd3a4cf892542149912381414350d983e4"
+        },
+        {
+          "path": "Includes\\PrincipledSubsurface.slang",
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac"
+        },
+        {
+          "path": "Includes\\PrincipledSurface.slang",
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d"
+        },
+        {
+          "path": "Includes\\PrincipledThinFilm.slang",
+          "sha256": "f3be3acf81988eb6372efb69b2d8c9baabb96636bd95eefcd88e1f4f6326a190"
+        },
+        {
+          "path": "Includes\\PrincipledThinFilmSensitivity.slang",
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1"
+        },
+        {
+          "path": "Includes\\PrincipledVolume.slang",
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a"
+        },
+        {
+          "path": "Includes\\Radiance.slang",
+          "sha256": "859d974fd4ea96d548e001369011d3ddc6c7d950bb6f7350ee91592493836094"
+        },
+        {
+          "path": "Includes\\SheenLtc.slang",
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2"
+        },
+        {
+          "path": "Includes\\SpecialForwardSurface.slang",
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc"
+        },
+        {
+          "path": "Includes\\SpecialMaterialRoute.slang",
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1"
+        },
+        {
+          "path": "Includes\\SsaoCommon.slang",
+          "sha256": "004d5b139189606209604eecfd54384b3dc34c94662d4234b5fb83d1aee353cc"
+        },
+        {
+          "path": "Includes\\StandardMaterialRoute.slang",
+          "sha256": "3fb8009b9724a479d80ec02b6bd432fad3b206507ca9c164e248bcc3a82fc489"
+        },
+        {
+          "path": "Includes\\TangentFrame.slang",
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7"
+        },
+        {
+          "path": "Includes\\TextureCoordinates.slang",
+          "sha256": "431ac4c01740c3aba3e8241bdab23648af3b6c157ca16c1d4849d176c4b2d8dc"
+        },
+        {
+          "path": "MaterialGraphMeshSurface.slang",
+          "sha256": "ed5d097274615e83742d9ec4c428a56f343e1f62d79e9af8cbd636b056468b26"
+        },
+        {
+          "path": "MaterialGraphRasterSurface.slang",
+          "sha256": "f1f53224e3ea795d09af632602c8604ec218638a27b2786f978559f6096934a5"
+        },
+        {
+          "path": "MaterialGraphSceneLookup.slang",
+          "sha256": "48a5975d7fb218d92aad5fb95e115297a27c5e534754036a1cdf2d3c61ab289d"
+        },
+        {
+          "path": "MaterialGraphSceneRefractionBake.slang",
+          "sha256": "3552d20fd37c8e2f12383ca33d1c10b3cbc2e27b5bdaec2be15cc4cf9fec0185"
+        },
+        {
+          "path": "MaterialGraphSceneSubsurfaceBake.slang",
+          "sha256": "1f05b7c50d4c5c47690167ccafb3615991859351e69b316fe99f657c80fd7854"
+        },
+        {
+          "path": "MaterialGraphSceneSubsurfaceFilter.slang",
+          "sha256": "66fa3d476017b9c6e072f501dadb0a6a90e3a78eb216d50d28afe00ac5ddca34"
+        },
+        {
+          "path": "MaterialGraphSceneVolumeBake.slang",
+          "sha256": "225c15578c9a2855439e590fbb228bf624f184c42bc62369c8cc9b7254be14a8"
+        },
+        {
+          "path": "PostChainDownsample.slang",
+          "sha256": "b21c17dfd80602824137c546ba51862bf3597b067bb30ca7391ee3135d6d1c7e"
+        },
+        {
+          "path": "PostChainFxaa.slang",
+          "sha256": "2374264028fd9829aed33df6ef943f65944aa40c659e5042d07f8933dec80f45"
+        },
+        {
+          "path": "PostChainThreshold.slang",
+          "sha256": "415bd424ee508104e835a453c8d433ee0f410af53743001aaeffa998e92b6bef"
+        },
+        {
+          "path": "PostChainUber.slang",
+          "sha256": "fdd1768210aca2d6f1dcf4e277e05718a56e5f0e5040eb0e59b268a443a3432c"
+        },
+        {
+          "path": "PostChainUberHDR.slang",
+          "sha256": "81cd4fca9f2144e0c05b9a075e87d5e64464bcba07320b671e75706ab4fc189d"
+        },
+        {
+          "path": "PostChainUpsample.slang",
+          "sha256": "6d11365e53528d533ea8d59ff6385147f994bb94aef42290f2d259f814fa3eb9"
+        },
+        {
+          "path": "PrincipledIblBake.slang",
+          "sha256": "59ea7c6e65835687a305a662d5610eccd6095dc50adfae919adcd59c89c92b4f"
+        },
+        {
+          "path": "SelfTest\\FogScene.slang",
+          "sha256": "3f0c0d5ad831de09723fd2e73b16249cada918cc72acbfcd37bd6650daa72ce0"
+        },
+        {
+          "path": "SelfTest\\PostChainScene.slang",
+          "sha256": "c6652a5026c88b35ad83605796ac0663ac6ab3b1b04421d63dc45126164b3667"
+        },
+        {
+          "path": "SelfTest\\ShaderMetaFixture.slang",
+          "sha256": "db2a7bd7f8d53564fab62318dbd4a70da457bff3b57f258b9c342055fae7e7ea"
+        },
+        {
+          "path": "SelfTest\\SsaoScene.slang",
+          "sha256": "5dc5f069b9ca53577c70a4ec04cc9ae37730a4c5877dd0899a87728f1c824685"
+        },
+        {
+          "path": "SelfTest\\SsgiRhiScene.slang",
+          "sha256": "2d27e790d829e6082d1d27a10bc44507574826b2389d829b5a4c79492ff98685"
+        },
+        {
+          "path": "SelfTest\\SsgiTestDepth.slang",
+          "sha256": "f088bbb93072d6afa9eae00a0bb00ef268db78683e0d4056e6f61536e303a083"
+        },
+        {
+          "path": "SelfTest\\SsrScene.slang",
+          "sha256": "8561787d9cc9df2f8cdcba03c7da25ec0d7258c09668f4e008e98f82d66493e0"
+        },
+        {
+          "path": "SelfTest\\SssScene.slang",
+          "sha256": "8e984e1e563d9b0d3d4fe41997085268cff79aa125624ec5d890cc9d69d326ae"
+        },
+        {
+          "path": "SelfTest\\StandardMaterialProbe.slang",
+          "sha256": "6cbb458e10c56915b179ce89e269393a42fb03ac0df3612e071d8b62d0496ac1"
+        },
+        {
+          "path": "SelfTest\\Triangle.slang",
+          "sha256": "7a887d1ec609ef9a822b93dd763f1123e24518dbc90ff96e86b91290b67ea466"
+        },
+        {
+          "path": "Shadow.slang",
+          "sha256": "44d4a585ec7de8f39b2591b84a056fe96f55dde1e1d19848981c1a62710f7e1c"
+        },
+        {
+          "path": "SkyBox.slang",
+          "sha256": "2ae0cf0e41a0ee89e05b0af3ab60459078e3c170ed58a4b2022e43dba4c7b5d5"
+        },
+        {
+          "path": "SsaoAO.slang",
+          "sha256": "5e874532729d5d8b620ad0a181ab16a2278feb8b77dd20f69741e0c04e717437"
+        },
+        {
+          "path": "SsaoFilter.slang",
+          "sha256": "6c23dc379e242885a428da34fc0d0668b53b6b815a53294ebc73584776c829ea"
+        },
+        {
+          "path": "SsgiComposite.slang",
+          "sha256": "2e88addfb9a4041a2a0a6f09a3307cb3c0661b7e02d0353f6d265d5a3cab524d"
+        },
+        {
+          "path": "SsgiFilter.slang",
+          "sha256": "61cde6cf9613f03ec3a3e68e74a41c5443f5a11e56e25f915be0302b0facd275"
+        },
+        {
+          "path": "SsgiHiZBuild.slang",
+          "sha256": "012714b1144d12b874cbe45db4429bffee73e5c464bb48464de457f84771ce2d"
+        },
+        {
+          "path": "SsgiResolve.slang",
+          "sha256": "35ff059123704e22412a17e09efbcf65078d211f2964e71437e5f3c0406a3b50"
+        },
+        {
+          "path": "SsgiTrace.slang",
+          "sha256": "9c99a9b8c861ba1cf7509614dc04428f12aa362f98f59d1027f87ab5e495da7b"
+        },
+        {
+          "path": "Ssr.slang",
+          "sha256": "4cbd02dd3d9e1a7b7afd21ea4c15a61d073489344ebd19e3536478cf7dd1e220"
+        },
+        {
+          "path": "Sss.slang",
+          "sha256": "83ebec97a483f9b0d3c25751afbd6a3396369ce18e792840b68b01097efc1422"
+        },
+        {
+          "path": "Tests\\IblGgxProbe.slang",
+          "sha256": "2e01dbf2b7a2ea8804efc644563a49284a41263b6e63829fe81439a7ba61e7be"
+        },
+        {
+          "path": "UI.slang",
+          "sha256": "6b2e9e80540b706b0609873bf02f30ac058709918a40ef6480af5dd4ec66a988"
+        },
+        {
+          "path": "WireFrame.slang",
+          "sha256": "b7aeec6f125d55d41fbf858a351dd02b1e378d8b54c73e5d8d39dcd6db49e785"
+        },
+        {
+          "path": "WorldSprite.slang",
+          "sha256": "c0bff448262bfeda171c6e445379c5a8ac4ea0202f6b1cfade0356d0b93a89c8"
+        }
+      ]
+    },
+    {
+      "label": "ggx256-env4096",
+      "brdf": 256,
+      "environment": 4096,
+      "root": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9NearCamera-ggx256-env4096-shader\\DefaultPassShader",
+      "shaders": [
+        {
+          "path": "Decal.slang",
+          "sha256": "4460a1709c2241d15aea1dd46b6b6bceb31c124a297cdc7f3eb734c842d8dd39"
+        },
+        {
+          "path": "Deferred.slang",
+          "sha256": "596c02fcfa49c6629933f40597dd24b3ae54ff7c8c2ad18fc5473a3a53b556c8"
+        },
+        {
+          "path": "FogAccumulate.slang",
+          "sha256": "bc238a008ab02b92117a304d21f37a1e62e6937c7a0cf5ea119302048c3209dd"
+        },
+        {
+          "path": "FogComposite.slang",
+          "sha256": "887a311a996773de718f7dc4652e2bb15fb6d1c1df2f229a44e46d3e59710d6f"
+        },
+        {
+          "path": "FogScatter.slang",
+          "sha256": "5b7be62464affdc85a4cdc102c6be1bae5a47560a5c3604218310cefcee75225"
+        },
+        {
+          "path": "ForwardCull.slang",
+          "sha256": "3aac2982684a7cd26393932dab4bf8d99e79f45d16b9936b44e88e82303c41d5"
+        },
+        {
+          "path": "ForwardShade.slang",
+          "sha256": "f8ea8e3324f42f972f73aefe3c51e6df1c45a5973abd51d1b8d929c467e66644"
+        },
+        {
+          "path": "ForwardWater.slang",
+          "sha256": "dbd93d30af6c6be7f8ba607cb8c27afee7e756c7e61449ef4a650d065f2ec14a"
+        },
+        {
+          "path": "ForwardWind.slang",
+          "sha256": "f1cf88b20bfc6f3ebd146dd9b6b77381d29cf45a1176f05f8bb0c060fe3e01b7"
+        },
+        {
+          "path": "GBuffer.slang",
+          "sha256": "71fd283d0fb5dfc13dc355a4291300c2736e4ad847557dc4a5e11504b813e7dc"
+        },
+        {
+          "path": "GizmoIcon.slang",
+          "sha256": "7ab14eeb0f5a96a2654d0c08746d56c47e9ad233b144d54bbcaa0632ecec7891"
+        },
+        {
+          "path": "GizmoLine.slang",
+          "sha256": "a6d5dde02760de60ae49b3e3c92ca03576a24bd7c8f0a08435acc4375e9b8e55"
+        },
+        {
+          "path": "Grid.slang",
+          "sha256": "82a7b6b552289bb0570f04878528ec0b9292339a4ed4b62e56c7214e92e90e74"
+        },
+        {
+          "path": "IblBrdf.slang",
+          "sha256": "5c2abbfba299ec6aa0e542fdf3699c05dc6078fc0a36a5f52a9b6ebf3c4f75ae"
+        },
+        {
+          "path": "IblCubeDownsample.slang",
+          "sha256": "6bf25f2515051701f30ebb7c0725ea97170316f5788fc5c213a4926f232ef168"
+        },
+        {
+          "path": "IblFace.slang",
+          "sha256": "71605882ddf102ff63bd3f43f420c94425325cccb9e064451f499803dfe013dd"
+        },
+        {
+          "path": "IblFullscreen.slang",
+          "sha256": "437fde81d77d53db7cfd7f86fc37ff0602ad1cec38c8a748dade7501071a49d3"
+        },
+        {
+          "path": "IblImportanceMarginal.slang",
+          "sha256": "51e6f7b0aeb2cb0fdfdfca022e138288964259add6f242dab189c70d4d30df50"
+        },
+        {
+          "path": "IblImportanceRows.slang",
+          "sha256": "1f82705c4c86d8c61723ef0545f2c3ea8b7011cdd187a2a374323a2371e59ccf"
+        },
+        {
+          "path": "IblImportanceSamples.slang",
+          "sha256": "bf3361deef18a09646852cf7baa94be4d00dd34d8a12af15ff6a2f1f8e9d6b22"
+        },
+        {
+          "path": "IblIrradiance.slang",
+          "sha256": "4d4f07d079ae3cc0fab35f6279ec5a7d12ddc7954b2cb92d7229ff679fcf7ecd"
+        },
+        {
+          "path": "IblPrefilter.slang",
+          "sha256": "fd9cdce7c1c765295888d62c4422e70ee20349fa637f08555eb14cb4839ec001"
+        },
+        {
+          "path": "IblRectToCube.slang",
+          "sha256": "308732c50ac68de0221471f3477f9166f2e7a9efec6d5a4309d4d2ac491778da"
+        },
+        {
+          "path": "IblSceneImportance.slang",
+          "sha256": "9d13f273e7c3c673a4d4b4576edeb42631cf063c63cf769cec61520c2e980b45"
+        },
+        {
+          "path": "IblSourceCopy.slang",
+          "sha256": "20f4dfa4cab248b4343f1022cf2aea6852347f2df7950422ff7b751a21d2f91b"
+        },
+        {
+          "path": "Includes\\Brdf.slang",
+          "sha256": "617b12bb6d9adf5ca6ddd9502aaaa0eb8627afa8573ea711089a4060d3621e1d"
+        },
+        {
+          "path": "Includes\\FogCommon.slang",
+          "sha256": "516b631abfb7ebc24cf7a83b2bbff3bdd5515166e767a95ce767ca3402ab118a"
+        },
+        {
+          "path": "Includes\\GgxEnergyTables.slang",
+          "sha256": "250aa6a77726aed183d10c81b2189f0fbd7e7d05724f1177c5aa9818da482dea"
+        },
+        {
+          "path": "Includes\\Ibl.slang",
+          "sha256": "709674909945b2bcbd99907d8844662b22f85d7b4f56c6691b8d8c075f6a4286"
+        },
+        {
+          "path": "Includes\\IblImportance.slang",
+          "sha256": "21a84275602d5f3d0cfbf45260b23aa59740e160b9435fc2bdc2875ef647d009"
+        },
+        {
+          "path": "Includes\\MaterialCoordinates.slang",
+          "sha256": "2a1ebf14d623bc28b1f10b705906f4471d0726b0eb691a81b74364d92207c49a"
+        },
+        {
+          "path": "Includes\\MaterialEvaluation.slang",
+          "sha256": "c7c93b4f0d40feea8f5de549856f81efe6de64dbd7e94410b921cf72771a894e"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneHost.slang",
+          "sha256": "8dfbb4a38a7b74cb8c06d84dbda725597dfc685586e1908319e449d431ea7c66"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneRefraction.slang",
+          "sha256": "681171d43aea773ce15bce34f7c01f839269d314d1526af8517ac1df7904c346"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneSubsurface.slang",
+          "sha256": "fc71f015690d331df20c0236c140f6969231c7970dd44beaaebcff17737e7829"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolume.slang",
+          "sha256": "e7d499d28f5c85d2c604ebf8724cfc33e2e1289d08046267be3063b0092a8805"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolumeCoefficients.slang",
+          "sha256": "43db128d83819663a998e6074dffe452fdb030a72231859a918e1f12b2aa5801"
+        },
+        {
+          "path": "Includes\\MaterialGraphSceneVolumeLighting.slang",
+          "sha256": "6948fb1dc59539e028a08412359d7fabbefaf5fc14ede849ada4cf11abda884e"
+        },
+        {
+          "path": "Includes\\MaterialGraphSurfaceHost.slang",
+          "sha256": "bf838b815cfe25b31da12f0bc3b8f6032406611dea3d9914eb3e34bf23d94b07"
+        },
+        {
+          "path": "Includes\\MaterialGraphSurfacePoint.slang",
+          "sha256": "465ee24dded5595090c605d372c54cee0dd91949adbbef7c81b0bc183c4d25fb"
+        },
+        {
+          "path": "Includes\\MaterialGraphTextureSample.slang",
+          "sha256": "4ad666a8e95ee0edeb99cbf18df0a6105c5965048d1cd5716c7517e476ac9d00"
+        },
+        {
+          "path": "Includes\\PackedBones.slang",
+          "sha256": "63802e2372fb7bad2085de944f101d5f9d411e5231f6c2eb690e92b4be731782"
+        },
+        {
+          "path": "Includes\\PbrCoverage.slang",
+          "sha256": "b2fc7083f0f125400f9e6514a20a0b5fadde3beeef7e74a45f704f1b36c9f612"
+        },
+        {
+          "path": "Includes\\PbrSurface.slang",
+          "sha256": "d238aa154eef7ee337a97251ac9b7e66b30d7a6a926b4182163756969609c0bd"
+        },
+        {
+          "path": "Includes\\PostChainCommon.slang",
+          "sha256": "5f34d6adb81e18605c4fe75b354ff1941362dd83e40238d072464dd1b7c3b78f"
+        },
+        {
+          "path": "Includes\\PrincipledBrdf.slang",
+          "sha256": "9787029cf28a602a51fc7db2c86edb2fcde1e75d5e7545fc76fb6aea03332049"
+        },
+        {
+          "path": "Includes\\PrincipledEnvironmentBake.slang",
+          "sha256": "13f58ed96c0661159711a8f6f28a20edb2f39079cd51be07aafcdefad89a4e4a"
+        },
+        {
+          "path": "Includes\\PrincipledIblLookup.slang",
+          "sha256": "e30a914268d7325ab897c4ba104ee4037669b86f906f682cedd8eec777dc8d5e"
+        },
+        {
+          "path": "Includes\\PrincipledLayered.slang",
+          "sha256": "9c545a2ceb9a8155119b6ad5f306ccfd3a4cf892542149912381414350d983e4"
+        },
+        {
+          "path": "Includes\\PrincipledSubsurface.slang",
+          "sha256": "b1128ae26135ba436f3f10d19a1bc4d690ca668250b41ed751ba3b2cf1c51fac"
+        },
+        {
+          "path": "Includes\\PrincipledSurface.slang",
+          "sha256": "f97bdb71c59a52c848c6f5483dd393bd049603214a63cf09c0e0d220d800634d"
+        },
+        {
+          "path": "Includes\\PrincipledThinFilm.slang",
+          "sha256": "f3be3acf81988eb6372efb69b2d8c9baabb96636bd95eefcd88e1f4f6326a190"
+        },
+        {
+          "path": "Includes\\PrincipledThinFilmSensitivity.slang",
+          "sha256": "948470ca625e7327ccc8c8308354d0989fc4db76818f576c7d53e17f4879dab1"
+        },
+        {
+          "path": "Includes\\PrincipledVolume.slang",
+          "sha256": "cbd0448bf00410c5d8b2e8803d1dff2a9d341cd5adca9edcfc257bd970be4e9a"
+        },
+        {
+          "path": "Includes\\Radiance.slang",
+          "sha256": "859d974fd4ea96d548e001369011d3ddc6c7d950bb6f7350ee91592493836094"
+        },
+        {
+          "path": "Includes\\SheenLtc.slang",
+          "sha256": "52bc5d8bbc75b2bae4ab7ebc9bd0de26e1885952b1e066c6bec628e627c17bc2"
+        },
+        {
+          "path": "Includes\\SpecialForwardSurface.slang",
+          "sha256": "7b5a4d12f0a06968030da4a88c3c943e1d98a9df940a3a4679eb1977c60071dc"
+        },
+        {
+          "path": "Includes\\SpecialMaterialRoute.slang",
+          "sha256": "f962d6fec3acc41235464ef376bf589ed70a6834801db69fc84ec7de5fb5bfe1"
+        },
+        {
+          "path": "Includes\\SsaoCommon.slang",
+          "sha256": "004d5b139189606209604eecfd54384b3dc34c94662d4234b5fb83d1aee353cc"
+        },
+        {
+          "path": "Includes\\StandardMaterialRoute.slang",
+          "sha256": "3fb8009b9724a479d80ec02b6bd432fad3b206507ca9c164e248bcc3a82fc489"
+        },
+        {
+          "path": "Includes\\TangentFrame.slang",
+          "sha256": "2c326daf266748e8cdb64ee8587fff82165656b90c2ac60dcaba0ee7c5ada8b7"
+        },
+        {
+          "path": "Includes\\TextureCoordinates.slang",
+          "sha256": "431ac4c01740c3aba3e8241bdab23648af3b6c157ca16c1d4849d176c4b2d8dc"
+        },
+        {
+          "path": "MaterialGraphMeshSurface.slang",
+          "sha256": "ed5d097274615e83742d9ec4c428a56f343e1f62d79e9af8cbd636b056468b26"
+        },
+        {
+          "path": "MaterialGraphRasterSurface.slang",
+          "sha256": "f1f53224e3ea795d09af632602c8604ec218638a27b2786f978559f6096934a5"
+        },
+        {
+          "path": "MaterialGraphSceneLookup.slang",
+          "sha256": "48a5975d7fb218d92aad5fb95e115297a27c5e534754036a1cdf2d3c61ab289d"
+        },
+        {
+          "path": "MaterialGraphSceneRefractionBake.slang",
+          "sha256": "3552d20fd37c8e2f12383ca33d1c10b3cbc2e27b5bdaec2be15cc4cf9fec0185"
+        },
+        {
+          "path": "MaterialGraphSceneSubsurfaceBake.slang",
+          "sha256": "1f05b7c50d4c5c47690167ccafb3615991859351e69b316fe99f657c80fd7854"
+        },
+        {
+          "path": "MaterialGraphSceneSubsurfaceFilter.slang",
+          "sha256": "66fa3d476017b9c6e072f501dadb0a6a90e3a78eb216d50d28afe00ac5ddca34"
+        },
+        {
+          "path": "MaterialGraphSceneVolumeBake.slang",
+          "sha256": "225c15578c9a2855439e590fbb228bf624f184c42bc62369c8cc9b7254be14a8"
+        },
+        {
+          "path": "PostChainDownsample.slang",
+          "sha256": "b21c17dfd80602824137c546ba51862bf3597b067bb30ca7391ee3135d6d1c7e"
+        },
+        {
+          "path": "PostChainFxaa.slang",
+          "sha256": "2374264028fd9829aed33df6ef943f65944aa40c659e5042d07f8933dec80f45"
+        },
+        {
+          "path": "PostChainThreshold.slang",
+          "sha256": "415bd424ee508104e835a453c8d433ee0f410af53743001aaeffa998e92b6bef"
+        },
+        {
+          "path": "PostChainUber.slang",
+          "sha256": "fdd1768210aca2d6f1dcf4e277e05718a56e5f0e5040eb0e59b268a443a3432c"
+        },
+        {
+          "path": "PostChainUberHDR.slang",
+          "sha256": "81cd4fca9f2144e0c05b9a075e87d5e64464bcba07320b671e75706ab4fc189d"
+        },
+        {
+          "path": "PostChainUpsample.slang",
+          "sha256": "6d11365e53528d533ea8d59ff6385147f994bb94aef42290f2d259f814fa3eb9"
+        },
+        {
+          "path": "PrincipledIblBake.slang",
+          "sha256": "59ea7c6e65835687a305a662d5610eccd6095dc50adfae919adcd59c89c92b4f"
+        },
+        {
+          "path": "SelfTest\\FogScene.slang",
+          "sha256": "3f0c0d5ad831de09723fd2e73b16249cada918cc72acbfcd37bd6650daa72ce0"
+        },
+        {
+          "path": "SelfTest\\PostChainScene.slang",
+          "sha256": "c6652a5026c88b35ad83605796ac0663ac6ab3b1b04421d63dc45126164b3667"
+        },
+        {
+          "path": "SelfTest\\ShaderMetaFixture.slang",
+          "sha256": "db2a7bd7f8d53564fab62318dbd4a70da457bff3b57f258b9c342055fae7e7ea"
+        },
+        {
+          "path": "SelfTest\\SsaoScene.slang",
+          "sha256": "5dc5f069b9ca53577c70a4ec04cc9ae37730a4c5877dd0899a87728f1c824685"
+        },
+        {
+          "path": "SelfTest\\SsgiRhiScene.slang",
+          "sha256": "2d27e790d829e6082d1d27a10bc44507574826b2389d829b5a4c79492ff98685"
+        },
+        {
+          "path": "SelfTest\\SsgiTestDepth.slang",
+          "sha256": "f088bbb93072d6afa9eae00a0bb00ef268db78683e0d4056e6f61536e303a083"
+        },
+        {
+          "path": "SelfTest\\SsrScene.slang",
+          "sha256": "8561787d9cc9df2f8cdcba03c7da25ec0d7258c09668f4e008e98f82d66493e0"
+        },
+        {
+          "path": "SelfTest\\SssScene.slang",
+          "sha256": "8e984e1e563d9b0d3d4fe41997085268cff79aa125624ec5d890cc9d69d326ae"
+        },
+        {
+          "path": "SelfTest\\StandardMaterialProbe.slang",
+          "sha256": "6cbb458e10c56915b179ce89e269393a42fb03ac0df3612e071d8b62d0496ac1"
+        },
+        {
+          "path": "SelfTest\\Triangle.slang",
+          "sha256": "7a887d1ec609ef9a822b93dd763f1123e24518dbc90ff96e86b91290b67ea466"
+        },
+        {
+          "path": "Shadow.slang",
+          "sha256": "44d4a585ec7de8f39b2591b84a056fe96f55dde1e1d19848981c1a62710f7e1c"
+        },
+        {
+          "path": "SkyBox.slang",
+          "sha256": "2ae0cf0e41a0ee89e05b0af3ab60459078e3c170ed58a4b2022e43dba4c7b5d5"
+        },
+        {
+          "path": "SsaoAO.slang",
+          "sha256": "5e874532729d5d8b620ad0a181ab16a2278feb8b77dd20f69741e0c04e717437"
+        },
+        {
+          "path": "SsaoFilter.slang",
+          "sha256": "6c23dc379e242885a428da34fc0d0668b53b6b815a53294ebc73584776c829ea"
+        },
+        {
+          "path": "SsgiComposite.slang",
+          "sha256": "2e88addfb9a4041a2a0a6f09a3307cb3c0661b7e02d0353f6d265d5a3cab524d"
+        },
+        {
+          "path": "SsgiFilter.slang",
+          "sha256": "61cde6cf9613f03ec3a3e68e74a41c5443f5a11e56e25f915be0302b0facd275"
+        },
+        {
+          "path": "SsgiHiZBuild.slang",
+          "sha256": "012714b1144d12b874cbe45db4429bffee73e5c464bb48464de457f84771ce2d"
+        },
+        {
+          "path": "SsgiResolve.slang",
+          "sha256": "35ff059123704e22412a17e09efbcf65078d211f2964e71437e5f3c0406a3b50"
+        },
+        {
+          "path": "SsgiTrace.slang",
+          "sha256": "9c99a9b8c861ba1cf7509614dc04428f12aa362f98f59d1027f87ab5e495da7b"
+        },
+        {
+          "path": "Ssr.slang",
+          "sha256": "4cbd02dd3d9e1a7b7afd21ea4c15a61d073489344ebd19e3536478cf7dd1e220"
+        },
+        {
+          "path": "Sss.slang",
+          "sha256": "83ebec97a483f9b0d3c25751afbd6a3396369ce18e792840b68b01097efc1422"
+        },
+        {
+          "path": "Tests\\IblGgxProbe.slang",
+          "sha256": "2e01dbf2b7a2ea8804efc644563a49284a41263b6e63829fe81439a7ba61e7be"
+        },
+        {
+          "path": "UI.slang",
+          "sha256": "6b2e9e80540b706b0609873bf02f30ac058709918a40ef6480af5dd4ec66a988"
+        },
+        {
+          "path": "WireFrame.slang",
+          "sha256": "b7aeec6f125d55d41fbf858a351dd02b1e378d8b54c73e5d8d39dcd6db49e785"
+        },
+        {
+          "path": "WorldSprite.slang",
+          "sha256": "c0bff448262bfeda171c6e445379c5a8ac4ea0202f6b1cfade0356d0b93a89c8"
+        }
+      ]
+    }
+  ],
+  "results": [
+    {
+      "label": "reference",
+      "shader_root": "C:\\Users\\lance\\source\\CreatorEngine\\Dynamic_CPP/Assets/Shaders\\DefaultPassShader",
+      "diagnostic": false,
+      "material_mean_of_case_medians_ms": 13.619452,
+      "within_image_thresholds": 26,
+      "case_count": 26,
+      "max_rms": 0.004958779763752924,
+      "cases": [
+        {
+          "id": "forest-core_base",
+          "gpu_frame_ms_median": 4.3905,
+          "gpu_frame_ms_mean": 4.2832542857142855,
+          "relative_rms": 0.003103274033277136,
+          "p95_normalized": 0.001591026782989502,
+          "max_normalized": 0.004523754119873047,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_metal",
+          "gpu_frame_ms_median": 4.49955,
+          "gpu_frame_ms_mean": 23.312237142857143,
+          "relative_rms": 0.0028191769022069047,
+          "p95_normalized": 0.0024654075244403637,
+          "max_normalized": 0.008975989997755857,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_rough",
+          "gpu_frame_ms_median": 4.0167,
+          "gpu_frame_ms_mean": 9.514772857142857,
+          "relative_rms": 0.0033163068974493737,
+          "p95_normalized": 0.0019815266132354736,
+          "max_normalized": 0.004643559455871582,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_normal",
+          "gpu_frame_ms_median": 25.3471,
+          "gpu_frame_ms_mean": 22.922972857142856,
+          "relative_rms": 0.0032389793578480835,
+          "p95_normalized": 0.002055436372756958,
+          "max_normalized": 0.004588335752487183,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_emission",
+          "gpu_frame_ms_median": 4.78838,
+          "gpu_frame_ms_mean": 7.6679571428571425,
+          "relative_rms": 0.0002453191748796318,
+          "p95_normalized": 0.0004850705489778181,
+          "max_normalized": 0.000669382762980654,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_coat",
+          "gpu_frame_ms_median": 8.18902,
+          "gpu_frame_ms_mean": 8.07687,
+          "relative_rms": 0.002914775601968301,
+          "p95_normalized": 0.00108376145362854,
+          "max_normalized": 0.0034543871879577637,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_sheen",
+          "gpu_frame_ms_median": 6.56246,
+          "gpu_frame_ms_mean": 19.61473,
+          "relative_rms": 0.003246595539813509,
+          "p95_normalized": 0.0015763193368911743,
+          "max_normalized": 0.003926068544387817,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_anisotropic",
+          "gpu_frame_ms_median": 13.3469,
+          "gpu_frame_ms_mean": 13.152042857142858,
+          "relative_rms": 0.004773799803055258,
+          "p95_normalized": 0.003206580877304077,
+          "max_normalized": 0.010547657070007573,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_thin_film",
+          "gpu_frame_ms_median": 15.7819,
+          "gpu_frame_ms_mean": 15.732285714285714,
+          "relative_rms": 0.0024850809739663166,
+          "p95_normalized": 0.0012593567371368408,
+          "max_normalized": 0.0034554004669189453,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_mixed",
+          "gpu_frame_ms_median": 20.0661,
+          "gpu_frame_ms_mean": 20.346514285714285,
+          "relative_rms": 0.0030264841604158545,
+          "p95_normalized": 0.0013616681098937988,
+          "max_normalized": 0.0028710365295410156,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_emission",
+          "gpu_frame_ms_median": 1.08861,
+          "gpu_frame_ms_mean": 1.0999,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_white",
+          "gpu_frame_ms_median": 1.74432,
+          "gpu_frame_ms_mean": 1.8819985714285714,
+          "relative_rms": 0.0035835054818790543,
+          "p95_normalized": 0.0029847919940948486,
+          "max_normalized": 0.0069925785064697266,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_mirror",
+          "gpu_frame_ms_median": 0.332864,
+          "gpu_frame_ms_mean": 0.5600871428571429,
+          "relative_rms": 0.004693074592820446,
+          "p95_normalized": 0.0028108544647693634,
+          "max_normalized": 0.03592394915453883,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_base",
+          "gpu_frame_ms_median": 4.45104,
+          "gpu_frame_ms_mean": 19.720757142857142,
+          "relative_rms": 0.003752793434678246,
+          "p95_normalized": 0.002971947193145752,
+          "max_normalized": 0.005309402942657471,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_metal",
+          "gpu_frame_ms_median": 3.87366,
+          "gpu_frame_ms_mean": 21.600822857142855,
+          "relative_rms": 0.004958779763752924,
+          "p95_normalized": 0.0012928098440170288,
+          "max_normalized": 0.0061447400617771495,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_rough",
+          "gpu_frame_ms_median": 17.1912,
+          "gpu_frame_ms_mean": 19.925128571428573,
+          "relative_rms": 0.0037670969546377896,
+          "p95_normalized": 0.00315093994140625,
+          "max_normalized": 0.004323482513427734,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_normal",
+          "gpu_frame_ms_median": 25.96,
+          "gpu_frame_ms_mean": 19.92284,
+          "relative_rms": 0.0037243510407556687,
+          "p95_normalized": 0.003432035446166992,
+          "max_normalized": 0.00516122579574585,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_emission",
+          "gpu_frame_ms_median": 16.0643,
+          "gpu_frame_ms_mean": 14.63117142857143,
+          "relative_rms": 0.00028406227439109857,
+          "p95_normalized": 0.0006305585720339505,
+          "max_normalized": 0.0020902142825118195,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_coat",
+          "gpu_frame_ms_median": 7.32147,
+          "gpu_frame_ms_mean": 17.51217,
+          "relative_rms": 0.003633917067222177,
+          "p95_normalized": 0.001958906650543213,
+          "max_normalized": 0.0037079453468322754,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_sheen",
+          "gpu_frame_ms_median": 27.7527,
+          "gpu_frame_ms_mean": 21.93449142857143,
+          "relative_rms": 0.004053292635925712,
+          "p95_normalized": 0.0025975704193115234,
+          "max_normalized": 0.003673374652862549,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_anisotropic",
+          "gpu_frame_ms_median": 37.5343,
+          "gpu_frame_ms_mean": 23.528950000000002,
+          "relative_rms": 0.002147782479022559,
+          "p95_normalized": 0.002023221350110199,
+          "max_normalized": 0.004880815216834901,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_thin_film",
+          "gpu_frame_ms_median": 16.0733,
+          "gpu_frame_ms_mean": 28.552742857142857,
+          "relative_rms": 0.003608336562695246,
+          "p95_normalized": 0.002332746982574463,
+          "max_normalized": 0.005222976207733154,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_mixed",
+          "gpu_frame_ms_median": 9.17846,
+          "gpu_frame_ms_mean": 9.009182857142857,
+          "relative_rms": 0.003932341877262093,
+          "p95_normalized": 0.002406001091003418,
+          "max_normalized": 0.0038553476333618164,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_emission",
+          "gpu_frame_ms_median": 2.12595,
+          "gpu_frame_ms_mean": 2.7340214285714284,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_white",
+          "gpu_frame_ms_median": 1.29677,
+          "gpu_frame_ms_mean": 1.4073557142857143,
+          "relative_rms": 0.004116868495842437,
+          "p95_normalized": 0.0046808719635009766,
+          "max_normalized": 0.006476260638660665,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_mirror",
+          "gpu_frame_ms_median": 0.308896,
+          "gpu_frame_ms_mean": 0.3143497142857143,
+          "relative_rms": 0.003275155519658804,
+          "p95_normalized": 0.0014154911041259766,
+          "max_normalized": 0.0037339969647764686,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        }
+      ],
+      "gpu_ratio_to_reference": 1.0
+    },
+    {
+      "label": "env1024",
+      "shader_root": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9NearCamera-env1024-shader\\DefaultPassShader",
+      "diagnostic": true,
+      "material_mean_of_case_medians_ms": 15.8363205,
+      "within_image_thresholds": 22,
+      "case_count": 26,
+      "max_rms": 0.016202122976585912,
+      "cases": [
+        {
+          "id": "forest-core_base",
+          "gpu_frame_ms_median": 25.451,
+          "gpu_frame_ms_mean": 16.046475714285716,
+          "relative_rms": 0.003208718886047159,
+          "p95_normalized": 0.0016936957836151123,
+          "max_normalized": 0.004523754119873047,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_metal",
+          "gpu_frame_ms_median": 15.4296,
+          "gpu_frame_ms_mean": 16.223828571428573,
+          "relative_rms": 0.005683211461010233,
+          "p95_normalized": 0.0034093856811523438,
+          "max_normalized": 0.013207557300853946,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_rough",
+          "gpu_frame_ms_median": 10.1941,
+          "gpu_frame_ms_mean": 10.185748571428572,
+          "relative_rms": 0.0033711628347720345,
+          "p95_normalized": 0.0019983649253845215,
+          "max_normalized": 0.004643559455871582,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_normal",
+          "gpu_frame_ms_median": 17.482,
+          "gpu_frame_ms_mean": 18.116885714285715,
+          "relative_rms": 0.003358766259081692,
+          "p95_normalized": 0.002163141965866089,
+          "max_normalized": 0.004832476377487183,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_emission",
+          "gpu_frame_ms_median": 11.4674,
+          "gpu_frame_ms_mean": 11.182627142857143,
+          "relative_rms": 0.0002478657377242678,
+          "p95_normalized": 0.0004981177287937773,
+          "max_normalized": 0.0007636740348700918,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_coat",
+          "gpu_frame_ms_median": 3.98269,
+          "gpu_frame_ms_mean": 16.79999857142857,
+          "relative_rms": 0.0030225041683793227,
+          "p95_normalized": 0.001127004623413086,
+          "max_normalized": 0.0029661059379577637,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_sheen",
+          "gpu_frame_ms_median": 23.0459,
+          "gpu_frame_ms_mean": 20.80212857142857,
+          "relative_rms": 0.003402001416688739,
+          "p95_normalized": 0.0016268491744995117,
+          "max_normalized": 0.003926068544387817,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_anisotropic",
+          "gpu_frame_ms_median": 15.211,
+          "gpu_frame_ms_mean": 16.056428571428572,
+          "relative_rms": 0.011645482480495125,
+          "p95_normalized": 0.006678551435470581,
+          "max_normalized": 0.03060008032453405,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms"
+          ]
+        },
+        {
+          "id": "forest-layer_thin_film",
+          "gpu_frame_ms_median": 10.1199,
+          "gpu_frame_ms_mean": 23.788798571428572,
+          "relative_rms": 0.005299098622024826,
+          "p95_normalized": 0.002325206995010376,
+          "max_normalized": 0.010433614253997803,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_mixed",
+          "gpu_frame_ms_median": 7.80909,
+          "gpu_frame_ms_mean": 17.00351857142857,
+          "relative_rms": 0.0033632787769387554,
+          "p95_normalized": 0.0015024542808532715,
+          "max_normalized": 0.0045836567878723145,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_emission",
+          "gpu_frame_ms_median": 0.855136,
+          "gpu_frame_ms_mean": 1.1824042857142858,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_white",
+          "gpu_frame_ms_median": 1.8705,
+          "gpu_frame_ms_mean": 2.6628314285714287,
+          "relative_rms": 0.0035835054818790543,
+          "p95_normalized": 0.0029847919940948486,
+          "max_normalized": 0.0069925785064697266,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_mirror",
+          "gpu_frame_ms_median": 0.29776,
+          "gpu_frame_ms_mean": 0.29690057142857146,
+          "relative_rms": 0.004693074592820446,
+          "p95_normalized": 0.0028108544647693634,
+          "max_normalized": 0.03592394915453883,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_base",
+          "gpu_frame_ms_median": 16.3112,
+          "gpu_frame_ms_mean": 17.767285714285713,
+          "relative_rms": 0.004533495660821122,
+          "p95_normalized": 0.003793954849243164,
+          "max_normalized": 0.006908801259807916,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_metal",
+          "gpu_frame_ms_median": 15.7802,
+          "gpu_frame_ms_mean": 17.075614285714288,
+          "relative_rms": 0.016202122976585912,
+          "p95_normalized": 0.0027499794960021973,
+          "max_normalized": 0.016991269600430806,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms"
+          ]
+        },
+        {
+          "id": "autumn-core_rough",
+          "gpu_frame_ms_median": 20.2202,
+          "gpu_frame_ms_mean": 15.082407142857143,
+          "relative_rms": 0.004010962392764565,
+          "p95_normalized": 0.0033379197120666504,
+          "max_normalized": 0.004811763763427734,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_normal",
+          "gpu_frame_ms_median": 16.235,
+          "gpu_frame_ms_mean": 16.4503,
+          "relative_rms": 0.004402225508066396,
+          "p95_normalized": 0.004251658916473389,
+          "max_normalized": 0.007529432643548568,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_emission",
+          "gpu_frame_ms_median": 16.2603,
+          "gpu_frame_ms_mean": 14.959385714285714,
+          "relative_rms": 0.0003198543106186266,
+          "p95_normalized": 0.000863820798704937,
+          "max_normalized": 0.003204886378487917,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_coat",
+          "gpu_frame_ms_median": 19.6308,
+          "gpu_frame_ms_mean": 22.054114285714284,
+          "relative_rms": 0.006365098394394494,
+          "p95_normalized": 0.00271761417388916,
+          "max_normalized": 0.012524520244935342,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_sheen",
+          "gpu_frame_ms_median": 20.2922,
+          "gpu_frame_ms_mean": 19.934914285714285,
+          "relative_rms": 0.004645938532831,
+          "p95_normalized": 0.0029892027378082275,
+          "max_normalized": 0.004461526870727539,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_anisotropic",
+          "gpu_frame_ms_median": 12.589,
+          "gpu_frame_ms_mean": 12.400985714285714,
+          "relative_rms": 0.01429659736401957,
+          "p95_normalized": 0.010396420955657959,
+          "max_normalized": 0.017758719323524793,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms",
+            "p95_normalized"
+          ]
+        },
+        {
+          "id": "autumn-layer_thin_film",
+          "gpu_frame_ms_median": 9.83283,
+          "gpu_frame_ms_mean": 9.78648142857143,
+          "relative_rms": 0.010034998153935118,
+          "p95_normalized": 0.007088601589202881,
+          "max_normalized": 0.014430880546569824,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms"
+          ]
+        },
+        {
+          "id": "autumn-layer_mixed",
+          "gpu_frame_ms_median": 29.382,
+          "gpu_frame_ms_mean": 23.71354714285714,
+          "relative_rms": 0.005744836158613415,
+          "p95_normalized": 0.0030170083045959473,
+          "max_normalized": 0.012120908025747928,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_emission",
+          "gpu_frame_ms_median": 2.07744,
+          "gpu_frame_ms_mean": 2.3721285714285716,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_white",
+          "gpu_frame_ms_median": 1.73571,
+          "gpu_frame_ms_mean": 1.8811157142857142,
+          "relative_rms": 0.004116868495842437,
+          "p95_normalized": 0.0046808719635009766,
+          "max_normalized": 0.006476260638660665,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_mirror",
+          "gpu_frame_ms_median": 0.311488,
+          "gpu_frame_ms_mean": 0.3120045714285714,
+          "relative_rms": 0.003275155519658804,
+          "p95_normalized": 0.0014154911041259766,
+          "max_normalized": 0.0037339969647764686,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        }
+      ],
+      "gpu_ratio_to_reference": 1.1627722246093306
+    },
+    {
+      "label": "ggx256-env1024",
+      "shader_root": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9NearCamera-ggx256-env1024-shader\\DefaultPassShader",
+      "diagnostic": true,
+      "material_mean_of_case_medians_ms": 12.074263,
+      "within_image_thresholds": 22,
+      "case_count": 26,
+      "max_rms": 0.02244413830180995,
+      "cases": [
+        {
+          "id": "forest-core_base",
+          "gpu_frame_ms_median": 14.361,
+          "gpu_frame_ms_mean": 12.430154285714286,
+          "relative_rms": 0.003280763255701452,
+          "p95_normalized": 0.0017186999320983887,
+          "max_normalized": 0.004523754119873047,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_metal",
+          "gpu_frame_ms_median": 13.7265,
+          "gpu_frame_ms_mean": 13.872685714285714,
+          "relative_rms": 0.012098355595168505,
+          "p95_normalized": 0.008426239437197978,
+          "max_normalized": 0.04354952036382403,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms"
+          ]
+        },
+        {
+          "id": "forest-core_rough",
+          "gpu_frame_ms_median": 12.5836,
+          "gpu_frame_ms_mean": 10.735067142857142,
+          "relative_rms": 0.003335790966561967,
+          "p95_normalized": 0.0019887536764144897,
+          "max_normalized": 0.004399418830871582,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_normal",
+          "gpu_frame_ms_median": 13.6186,
+          "gpu_frame_ms_mean": 12.823154285714285,
+          "relative_rms": 0.0034794984088922375,
+          "p95_normalized": 0.002266436815261841,
+          "max_normalized": 0.004832476377487183,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_emission",
+          "gpu_frame_ms_median": 11.0603,
+          "gpu_frame_ms_mean": 11.342087142857142,
+          "relative_rms": 0.000251983990460046,
+          "p95_normalized": 0.0005163958679441923,
+          "max_normalized": 0.0008519661598921422,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_coat",
+          "gpu_frame_ms_median": 9.8401,
+          "gpu_frame_ms_mean": 9.973064285714285,
+          "relative_rms": 0.003886655082416589,
+          "p95_normalized": 0.0013514459133148193,
+          "max_normalized": 0.004604697227478027,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_sheen",
+          "gpu_frame_ms_median": 13.5308,
+          "gpu_frame_ms_mean": 14.37742857142857,
+          "relative_rms": 0.003400834765811401,
+          "p95_normalized": 0.0016173720359802246,
+          "max_normalized": 0.004170209169387817,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_anisotropic",
+          "gpu_frame_ms_median": 15.6973,
+          "gpu_frame_ms_mean": 13.359202857142858,
+          "relative_rms": 0.02244413830180995,
+          "p95_normalized": 0.010530799627304077,
+          "max_normalized": 0.05495181218030363,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms",
+            "p95_normalized",
+            "max_normalized"
+          ]
+        },
+        {
+          "id": "forest-layer_thin_film",
+          "gpu_frame_ms_median": 4.51136,
+          "gpu_frame_ms_mean": 4.396731428571428,
+          "relative_rms": 0.006973545647727487,
+          "p95_normalized": 0.003357410430908203,
+          "max_normalized": 0.01094585657119751,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_mixed",
+          "gpu_frame_ms_median": 3.60739,
+          "gpu_frame_ms_mean": 16.875752857142857,
+          "relative_rms": 0.003629965751140304,
+          "p95_normalized": 0.00149516761302948,
+          "max_normalized": 0.0060485005378723145,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_emission",
+          "gpu_frame_ms_median": 0.309792,
+          "gpu_frame_ms_mean": 0.30395885714285714,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_white",
+          "gpu_frame_ms_median": 0.652256,
+          "gpu_frame_ms_mean": 0.6554194285714285,
+          "relative_rms": 0.0035835054818790543,
+          "p95_normalized": 0.0029847919940948486,
+          "max_normalized": 0.0069925785064697266,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_mirror",
+          "gpu_frame_ms_median": 0.302112,
+          "gpu_frame_ms_mean": 0.3044342857142857,
+          "relative_rms": 0.004693074592820446,
+          "p95_normalized": 0.0028108544647693634,
+          "max_normalized": 0.03592394915453883,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_base",
+          "gpu_frame_ms_median": 10.7343,
+          "gpu_frame_ms_mean": 11.73103,
+          "relative_rms": 0.004497296251527877,
+          "p95_normalized": 0.0037810802459716797,
+          "max_normalized": 0.00630022061163563,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_metal",
+          "gpu_frame_ms_median": 10.2833,
+          "gpu_frame_ms_mean": 11.349514285714285,
+          "relative_rms": 0.016994937339498736,
+          "p95_normalized": 0.0030689239501953125,
+          "max_normalized": 0.018024272413635915,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms"
+          ]
+        },
+        {
+          "id": "autumn-core_rough",
+          "gpu_frame_ms_median": 14.2604,
+          "gpu_frame_ms_mean": 13.393888571428572,
+          "relative_rms": 0.003988557948042882,
+          "p95_normalized": 0.003330230712890625,
+          "max_normalized": 0.004811763763427734,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_normal",
+          "gpu_frame_ms_median": 12.6064,
+          "gpu_frame_ms_mean": 12.141928571428572,
+          "relative_rms": 0.004344650808260005,
+          "p95_normalized": 0.004200279712677002,
+          "max_normalized": 0.007525963645274916,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_emission",
+          "gpu_frame_ms_median": 10.3457,
+          "gpu_frame_ms_mean": 12.43366,
+          "relative_rms": 0.00031947121018522924,
+          "p95_normalized": 0.000863820798704937,
+          "max_normalized": 0.003204886378487917,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_coat",
+          "gpu_frame_ms_median": 14.3566,
+          "gpu_frame_ms_mean": 15.977242857142857,
+          "relative_rms": 0.006065581196808155,
+          "p95_normalized": 0.002611130475997925,
+          "max_normalized": 0.012524520244935342,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_sheen",
+          "gpu_frame_ms_median": 16.1421,
+          "gpu_frame_ms_mean": 14.429694285714286,
+          "relative_rms": 0.004617134776191721,
+          "p95_normalized": 0.0029892027378082275,
+          "max_normalized": 0.004324555397033691,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_anisotropic",
+          "gpu_frame_ms_median": 6.90518,
+          "gpu_frame_ms_mean": 6.780981428571429,
+          "relative_rms": 0.014535107967103786,
+          "p95_normalized": 0.010451257228851318,
+          "max_normalized": 0.01645368403185454,
+          "within_image_thresholds": false,
+          "failed_thresholds": [
+            "relative_rms",
+            "p95_normalized"
+          ]
+        },
+        {
+          "id": "autumn-layer_thin_film",
+          "gpu_frame_ms_median": 4.13933,
+          "gpu_frame_ms_mean": 18.98931142857143,
+          "relative_rms": 0.009672972441596404,
+          "p95_normalized": 0.007080078125,
+          "max_normalized": 0.013564206683535843,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_mixed",
+          "gpu_frame_ms_median": 29.175,
+          "gpu_frame_ms_mean": 21.19206857142857,
+          "relative_rms": 0.0056681077377086575,
+          "p95_normalized": 0.0030076801776885986,
+          "max_normalized": 0.012120908025747928,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_emission",
+          "gpu_frame_ms_median": 0.725056,
+          "gpu_frame_ms_mean": 1.1454119999999999,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_white",
+          "gpu_frame_ms_median": 0.660992,
+          "gpu_frame_ms_mean": 1.4042228571428572,
+          "relative_rms": 0.004116868495842437,
+          "p95_normalized": 0.0046808719635009766,
+          "max_normalized": 0.006476260638660665,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_mirror",
+          "gpu_frame_ms_median": 0.320512,
+          "gpu_frame_ms_mean": 0.32324114285714284,
+          "relative_rms": 0.003275155519658804,
+          "p95_normalized": 0.0014154911041259766,
+          "max_normalized": 0.0037339969647764686,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        }
+      ],
+      "gpu_ratio_to_reference": 0.8865454351614147
+    },
+    {
+      "label": "ggx256-env4096",
+      "shader_root": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9NearCamera-ggx256-env4096-shader\\DefaultPassShader",
+      "diagnostic": true,
+      "material_mean_of_case_medians_ms": 17.4891975,
+      "within_image_thresholds": 26,
+      "case_count": 26,
+      "max_rms": 0.0098220730052633,
+      "cases": [
+        {
+          "id": "forest-core_base",
+          "gpu_frame_ms_median": 3.41821,
+          "gpu_frame_ms_mean": 12.921737142857141,
+          "relative_rms": 0.0031228429403605,
+          "p95_normalized": 0.001649409532546997,
+          "max_normalized": 0.004523754119873047,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_metal",
+          "gpu_frame_ms_median": 28.6942,
+          "gpu_frame_ms_mean": 25.137001428571427,
+          "relative_rms": 0.0063449508921600405,
+          "p95_normalized": 0.006857395172119141,
+          "max_normalized": 0.018552541732788086,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_rough",
+          "gpu_frame_ms_median": 8.69002,
+          "gpu_frame_ms_mean": 8.61713,
+          "relative_rms": 0.0033041709329653464,
+          "p95_normalized": 0.0019465982913970947,
+          "max_normalized": 0.004399418830871582,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_normal",
+          "gpu_frame_ms_median": 10.8426,
+          "gpu_frame_ms_mean": 11.862614285714285,
+          "relative_rms": 0.0032570491451778916,
+          "p95_normalized": 0.0020866692066192627,
+          "max_normalized": 0.004588335752487183,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-core_emission",
+          "gpu_frame_ms_median": 17.5717,
+          "gpu_frame_ms_mean": 16.39262857142857,
+          "relative_rms": 0.00024541171440938003,
+          "p95_normalized": 0.00048152523441665146,
+          "max_normalized": 0.000669382762980654,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_coat",
+          "gpu_frame_ms_median": 32.819,
+          "gpu_frame_ms_mean": 21.398452857142857,
+          "relative_rms": 0.0036426279732428863,
+          "p95_normalized": 0.0012423694133758545,
+          "max_normalized": 0.005895793437957764,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_sheen",
+          "gpu_frame_ms_median": 24.3994,
+          "gpu_frame_ms_mean": 26.068671428571427,
+          "relative_rms": 0.0032257115222349597,
+          "p95_normalized": 0.0015608668327331543,
+          "max_normalized": 0.003926068544387817,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_anisotropic",
+          "gpu_frame_ms_median": 31.7337,
+          "gpu_frame_ms_mean": 23.885755714285715,
+          "relative_rms": 0.0098220730052633,
+          "p95_normalized": 0.006414309144020081,
+          "max_normalized": 0.024568498134613037,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_thin_film",
+          "gpu_frame_ms_median": 10.2438,
+          "gpu_frame_ms_mean": 15.607128571428571,
+          "relative_rms": 0.0029218429452118086,
+          "p95_normalized": 0.0014726519584655762,
+          "max_normalized": 0.003463447093963623,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-layer_mixed",
+          "gpu_frame_ms_median": 6.93168,
+          "gpu_frame_ms_mean": 14.82894857142857,
+          "relative_rms": 0.0030881726688427842,
+          "p95_normalized": 0.0013639628887176514,
+          "max_normalized": 0.003457307815551758,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_emission",
+          "gpu_frame_ms_median": 0.349888,
+          "gpu_frame_ms_mean": 0.3496777142857143,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_white",
+          "gpu_frame_ms_median": 0.647008,
+          "gpu_frame_ms_mean": 0.6468022857142857,
+          "relative_rms": 0.0035835054818790543,
+          "p95_normalized": 0.0029847919940948486,
+          "max_normalized": 0.0069925785064697266,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "forest-control_mirror",
+          "gpu_frame_ms_median": 0.308128,
+          "gpu_frame_ms_mean": 0.308544,
+          "relative_rms": 0.004693074592820446,
+          "p95_normalized": 0.0028108544647693634,
+          "max_normalized": 0.03592394915453883,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_base",
+          "gpu_frame_ms_median": 32.0405,
+          "gpu_frame_ms_mean": 23.64578,
+          "relative_rms": 0.0037619501619144536,
+          "p95_normalized": 0.002971947193145752,
+          "max_normalized": 0.005309402942657471,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_metal",
+          "gpu_frame_ms_median": 23.7011,
+          "gpu_frame_ms_mean": 16.754615714285713,
+          "relative_rms": 0.005646810363373,
+          "p95_normalized": 0.001700758934020996,
+          "max_normalized": 0.006661241468379705,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_rough",
+          "gpu_frame_ms_median": 2.97914,
+          "gpu_frame_ms_mean": 14.737062857142858,
+          "relative_rms": 0.003761575648482248,
+          "p95_normalized": 0.0031447410583496094,
+          "max_normalized": 0.004323482513427734,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_normal",
+          "gpu_frame_ms_median": 17.9994,
+          "gpu_frame_ms_mean": 17.860057142857144,
+          "relative_rms": 0.0037412819411238377,
+          "p95_normalized": 0.003481626510620117,
+          "max_normalized": 0.004735112190246582,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-core_emission",
+          "gpu_frame_ms_median": 14.3998,
+          "gpu_frame_ms_mean": 16.7934,
+          "relative_rms": 0.0002835511589544997,
+          "p95_normalized": 0.0006305585720339505,
+          "max_normalized": 0.0020902142825118195,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_coat",
+          "gpu_frame_ms_median": 27.0186,
+          "gpu_frame_ms_mean": 28.071285714285715,
+          "relative_rms": 0.0036551079327005694,
+          "p95_normalized": 0.001958221197128296,
+          "max_normalized": 0.0037079453468322754,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_sheen",
+          "gpu_frame_ms_median": 19.581,
+          "gpu_frame_ms_mean": 24.21727142857143,
+          "relative_rms": 0.004058695896151073,
+          "p95_normalized": 0.0025975704193115234,
+          "max_normalized": 0.003673374652862549,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_anisotropic",
+          "gpu_frame_ms_median": 18.6578,
+          "gpu_frame_ms_mean": 18.17002857142857,
+          "relative_rms": 0.0023606601480460443,
+          "p95_normalized": 0.0021557211875915527,
+          "max_normalized": 0.004880815216834901,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_thin_film",
+          "gpu_frame_ms_median": 10.6022,
+          "gpu_frame_ms_mean": 23.279671428571426,
+          "relative_rms": 0.00369712764861066,
+          "p95_normalized": 0.002417249679881676,
+          "max_normalized": 0.005222976207733154,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-layer_mixed",
+          "gpu_frame_ms_median": 7.4601,
+          "gpu_frame_ms_mean": 24.716374285714288,
+          "relative_rms": 0.00395295847961356,
+          "p95_normalized": 0.002416074275970459,
+          "max_normalized": 0.0038553476333618164,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_emission",
+          "gpu_frame_ms_median": 0.619296,
+          "gpu_frame_ms_mean": 0.6197394285714286,
+          "relative_rms": 0.0,
+          "p95_normalized": 0.0,
+          "max_normalized": 0.0,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_white",
+          "gpu_frame_ms_median": 0.563712,
+          "gpu_frame_ms_mean": 0.5635611428571429,
+          "relative_rms": 0.004116868495842437,
+          "p95_normalized": 0.0046808719635009766,
+          "max_normalized": 0.006476260638660665,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        },
+        {
+          "id": "autumn-control_mirror",
+          "gpu_frame_ms_median": 0.278624,
+          "gpu_frame_ms_mean": 0.27780114285714286,
+          "relative_rms": 0.003275155519658804,
+          "p95_normalized": 0.0014154911041259766,
+          "max_normalized": 0.0037339969647764686,
+          "within_image_thresholds": true,
+          "failed_thresholds": []
+        }
+      ],
+      "gpu_ratio_to_reference": 1.2841337155121952
+    }
+  ],
+  "full_suite_binary": {
+    "path": "Bin/x64-Release/Tools/MaterialMatchedImageProbe/MaterialMatchedImageProbe.exe",
+    "sha256": "a5fb7366f2356f9add25b341fe42b154a71f3f701e51b3ba1cdeb6f7761cdaad"
+  },
+  "pass_timer_binary": {
+    "path": "Bin/x64-Release/Tools/MaterialMatchedImageProbe/MaterialMatchedImageProbe.exe",
+    "sha256": "69ddbc4f304a0babe2cb5c31877f191d320f1905556d2a74d29edf1f89c069f1"
+  },
+  "pass_timing": {
+    "scope": "four fixed diagnostic cases; 9 forced rebakes per case, first two excluded; before/after exact bake pass",
+    "pixel_preserved": true,
+    "results": [
+      {
+        "label": "reference",
+        "cases": [
+          {
+            "case": "autumn-core_metal",
+            "bake_median_ms": 4.10214,
+            "minimum_ms": 4.09702,
+            "maximum_ms": 4.69811
+          },
+          {
+            "case": "forest-core_metal",
+            "bake_median_ms": 14.1466,
+            "minimum_ms": 13.7738,
+            "maximum_ms": 14.167
+          },
+          {
+            "case": "forest-layer_anisotropic",
+            "bake_median_ms": 4.4503,
+            "minimum_ms": 4.13798,
+            "maximum_ms": 55.0584
+          },
+          {
+            "case": "forest-layer_thin_film",
+            "bake_median_ms": 15.1992,
+            "minimum_ms": 15.1962,
+            "maximum_ms": 15.4644
+          }
+        ],
+        "clocks": {
+          "samples": 127,
+          "graphics_mhz_min": 210.0,
+          "graphics_mhz_max": 2640.0,
+          "graphics_mhz_median": 450.0,
+          "pstates": [
+            "P0",
+            "P3",
+            "P5"
+          ]
+        }
+      },
+      {
+        "label": "env1024",
+        "cases": [
+          {
+            "case": "autumn-core_metal",
+            "bake_median_ms": 26.3567,
+            "minimum_ms": 2.03776,
+            "maximum_ms": 30.9514
+          },
+          {
+            "case": "forest-core_metal",
+            "bake_median_ms": 12.117,
+            "minimum_ms": 7.45677,
+            "maximum_ms": 13.1881
+          },
+          {
+            "case": "forest-layer_anisotropic",
+            "bake_median_ms": 17.065,
+            "minimum_ms": 14.4251,
+            "maximum_ms": 21.7262
+          },
+          {
+            "case": "forest-layer_thin_film",
+            "bake_median_ms": 9.28051,
+            "minimum_ms": 9.09517,
+            "maximum_ms": 9.39315
+          }
+        ],
+        "clocks": {
+          "samples": 129,
+          "graphics_mhz_min": 210.0,
+          "graphics_mhz_max": 2925.0,
+          "graphics_mhz_median": 300.0,
+          "pstates": [
+            "P0",
+            "P3",
+            "P5"
+          ]
+        }
+      },
+      {
+        "label": "ggx256-env1024",
+        "cases": [
+          {
+            "case": "autumn-core_metal",
+            "bake_median_ms": 10.8032,
+            "minimum_ms": 10.8022,
+            "maximum_ms": 11.8548
+          },
+          {
+            "case": "forest-core_metal",
+            "bake_median_ms": 10.9384,
+            "minimum_ms": 10.7203,
+            "maximum_ms": 12.4201
+          },
+          {
+            "case": "forest-layer_anisotropic",
+            "bake_median_ms": 11.2159,
+            "minimum_ms": 10.2369,
+            "maximum_ms": 11.991
+          },
+          {
+            "case": "forest-layer_thin_film",
+            "bake_median_ms": 25.0204,
+            "minimum_ms": 21.8542,
+            "maximum_ms": 47.6252
+          }
+        ],
+        "clocks": {
+          "samples": 123,
+          "graphics_mhz_min": 210.0,
+          "graphics_mhz_max": 2655.0,
+          "graphics_mhz_median": 255.0,
+          "pstates": [
+            "P0",
+            "P5"
+          ]
+        }
+      },
+      {
+        "label": "ggx256-env4096",
+        "cases": [
+          {
+            "case": "autumn-core_metal",
+            "bake_median_ms": 17.4572,
+            "minimum_ms": 17.1459,
+            "maximum_ms": 27.7699
+          },
+          {
+            "case": "forest-core_metal",
+            "bake_median_ms": 16.5837,
+            "minimum_ms": 15.1931,
+            "maximum_ms": 28.0904
+          },
+          {
+            "case": "forest-layer_anisotropic",
+            "bake_median_ms": 20.5414,
+            "minimum_ms": 12.5358,
+            "maximum_ms": 21.205
+          },
+          {
+            "case": "forest-layer_thin_film",
+            "bake_median_ms": 9.99629,
+            "minimum_ms": 9.99219,
+            "maximum_ms": 10.1857
+          }
+        ],
+        "clocks": {
+          "samples": 121,
+          "graphics_mhz_min": 210.0,
+          "graphics_mhz_max": 2640.0,
+          "graphics_mhz_median": 450.0,
+          "pstates": [
+            "P0",
+            "P3",
+            "P5"
+          ]
+        }
+      },
+      {
+        "label": "reference-repeat",
+        "cases": [
+          {
+            "case": "autumn-core_metal",
+            "bake_median_ms": 3.83693,
+            "minimum_ms": 3.8359,
+            "maximum_ms": 4.22912
+          },
+          {
+            "case": "forest-core_metal",
+            "bake_median_ms": 20.1155,
+            "minimum_ms": 17.8975,
+            "maximum_ms": 21.6463
+          },
+          {
+            "case": "forest-layer_anisotropic",
+            "bake_median_ms": 4.43802,
+            "minimum_ms": 4.2025,
+            "maximum_ms": 37.9812
+          },
+          {
+            "case": "forest-layer_thin_film",
+            "bake_median_ms": 15.9048,
+            "minimum_ms": 15.6221,
+            "maximum_ms": 16.3195
+          }
+        ],
+        "clocks": {
+          "samples": 132,
+          "graphics_mhz_min": 210.0,
+          "graphics_mhz_max": 2715.0,
+          "graphics_mhz_median": 630.0,
+          "pstates": [
+            "P0",
+            "P3",
+            "P5",
+            "P8"
+          ]
+        }
+      }
+    ]
+  },
+  "product_source_verification": {
+    "snapshot": "Build/Obj/mat9-special-surface-final10-source-hashes.json",
+    "count": 589,
+    "changed": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Tools\\regression\\material_matched_image_probe.cpp"
+    ],
+    "product_drift": 0
+  },
+  "initial_full_frame_timing_not_used_for_speedup": true
+}

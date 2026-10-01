@@ -1,0 +1,255 @@
+{
+  "schema": "creator.material.matched-reference.v1",
+  "blender": "5.1.1",
+  "renderer": "CYCLES",
+  "resolution": [
+    64,
+    64
+  ],
+  "samples": 131072,
+  "seed": 0,
+  "pixel_filter": {
+    "type": "GAUSSIAN",
+    "width": 0.01
+  },
+  "anisotropy_tangent": "explicit active UV tangent",
+  "camera": {
+    "eye": [
+      0,
+      0,
+      3
+    ],
+    "vertical_fov": 0.7853981633974483,
+    "near": 0.1,
+    "far": 10
+  },
+  "sun": {
+    "to_light": [
+      0.39070188999176025,
+      -0.22325824201107025,
+      0.893032968044281
+    ],
+    "irradiance": [
+      1,
+      1,
+      1
+    ],
+    "angle": 0
+  },
+  "furnace": {
+    "radiance": [
+      1,
+      1,
+      1
+    ]
+  },
+  "bounces": {
+    "max": 8,
+    "diffuse": 1,
+    "glossy": 1,
+    "transmission": 8,
+    "transparent": 16,
+    "volume": 0
+  },
+  "exclusions": [
+    "texture/normal-map filtering",
+    "alpha blended queue",
+    "original area-light/HDRI grid",
+    "multiple volume scattering"
+  ],
+  "geometry_sha256": "c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282",
+  "cases": [
+    {
+      "id": "sun-special_volume_emission",
+      "inputs": {
+        "Volume Only": 1,
+        "Volume.Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Volume.Density": 0,
+        "Volume.Emission Color": [
+          0.7,
+          0.4,
+          0.2,
+          1
+        ],
+        "Volume.Emission Strength": 2
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "ea2b761f606eacdc496fca30fd7ae2f3111c043d138f0d468e390e2ed66cc754"
+    },
+    {
+      "id": "sun-special_volume_absorption",
+      "inputs": {
+        "Volume Only": 1,
+        "Volume.Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Volume.Density": 0.8,
+        "Volume.Absorption Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Volume.Emission Color": [
+          0.7,
+          0.4,
+          0.2,
+          1
+        ],
+        "Volume.Emission Strength": 2
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "f68fbf58d674bc6100a118d82a61194f79a69d4e838317368f3f1e75621e979e"
+    },
+    {
+      "id": "sun-special_volume_scattering",
+      "inputs": {
+        "Volume Only": 1,
+        "Volume.Color": [
+          0.5,
+          0.5,
+          0.5,
+          1
+        ],
+        "Volume.Density": 0.18,
+        "Volume.Anisotropy": 0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "3135392d2e5015b8a3d4d6e669dbae196e10e245744dfdd6ea6437d7f85a2a02"
+    },
+    {
+      "id": "sun-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "2165a67abbc0c05b2defa21157b802406a9feda0a3485c32f9eec45f74ff02b7"
+    },
+    {
+      "id": "furnace-special_volume_emission",
+      "inputs": {
+        "Volume Only": 1,
+        "Volume.Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Volume.Density": 0,
+        "Volume.Emission Color": [
+          0.7,
+          0.4,
+          0.2,
+          1
+        ],
+        "Volume.Emission Strength": 2
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "ea2b761f606eacdc496fca30fd7ae2f3111c043d138f0d468e390e2ed66cc754"
+    },
+    {
+      "id": "furnace-special_volume_absorption",
+      "inputs": {
+        "Volume Only": 1,
+        "Volume.Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Volume.Density": 0.8,
+        "Volume.Absorption Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Volume.Emission Color": [
+          0.7,
+          0.4,
+          0.2,
+          1
+        ],
+        "Volume.Emission Strength": 2
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "f68fbf58d674bc6100a118d82a61194f79a69d4e838317368f3f1e75621e979e"
+    },
+    {
+      "id": "furnace-special_volume_scattering",
+      "inputs": {
+        "Volume Only": 1,
+        "Volume.Color": [
+          0.5,
+          0.5,
+          0.5,
+          1
+        ],
+        "Volume.Density": 0.18,
+        "Volume.Anisotropy": 0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "2a91f1dbdd35019cb349fba21aec449fa0ee043aad067d674c5a28f073d9b3af"
+    },
+    {
+      "id": "furnace-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "2165a67abbc0c05b2defa21157b802406a9feda0a3485c32f9eec45f74ff02b7"
+    }
+  ],
+  "suite": "special-volume",
+  "special_reference_version": 2,
+  "special_transport": {
+    "geometry": "shared closed smooth 80-triangle icosphere, radius 0.5; within native 128-triangle volume budget",
+    "cycles": "closed-solid refraction and random-walk subsurface; RNA volume_bounces=0 for direct single scattering",
+    "native": "single-interface screen/environment refraction, screen-space diffusion, homogeneous single scattering",
+    "alpha": "opaque only; Scene blended queue unsupported and separately rejected",
+    "volume": "Volume Only=1 disconnects Surface; Volume.* addresses Principled Volume inputs",
+    "volume_light_visibility": "self-extinction enabled; no external occluders"
+  }
+}

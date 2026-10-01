@@ -64,7 +64,8 @@ class SceneHost final : private IRHIUploadTransactionListener
     bool Prepare(const EnhancedFrameContext& context, std::shared_ptr<const SceneViewInput> input,
                  RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                  const EnhancedShadowData& shadow, const SceneHostBudget& budget,
-                 std::string& error, std::uint64_t environmentGeneration);
+                 std::string& error, std::uint64_t environmentGeneration,
+                 std::array<RHITextureHandle,3> importance = {}, RHITextureHandle source = {});
     void DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
     void DeclareGBuffer(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs) const;
     // Baseline is the existing Decal pass snapshot, ordered diffuse, ORM, normal.

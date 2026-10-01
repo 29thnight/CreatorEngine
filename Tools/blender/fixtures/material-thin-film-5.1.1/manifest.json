@@ -1,0 +1,744 @@
+{
+  "schema": "creator.material.matched-reference.v1",
+  "blender": "5.1.1",
+  "renderer": "CYCLES",
+  "resolution": [
+    64,
+    64
+  ],
+  "samples": 1024,
+  "seed": 0,
+  "pixel_filter": {
+    "type": "GAUSSIAN",
+    "width": 0.01
+  },
+  "anisotropy_tangent": "explicit active UV tangent",
+  "camera": {
+    "eye": [
+      0,
+      0,
+      3
+    ],
+    "vertical_fov": 0.7853981633974483,
+    "near": 0.1,
+    "far": 10
+  },
+  "sun": {
+    "to_light": [
+      0.39070188999176025,
+      -0.22325824201107025,
+      0.893032968044281
+    ],
+    "irradiance": [
+      1,
+      1,
+      1
+    ],
+    "angle": 0
+  },
+  "furnace": {
+    "radiance": [
+      1,
+      1,
+      1
+    ]
+  },
+  "bounces": {
+    "max": 1,
+    "diffuse": 1,
+    "glossy": 1
+  },
+  "exclusions": [
+    "texture/normal-map filtering",
+    "special transport",
+    "original area-light/HDRI grid"
+  ],
+  "geometry_sha256": "604cc50946887fdfd750d0166eb549c87b87caa23c83c0b9d2f936e24d4b9aed",
+  "cases": [
+    {
+      "id": "sun-film_subnanometer",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.25
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "038523ea7e38c3401ee347a5e3c1a65280942bd34fb756e19c7a94e3d33b2ed6"
+    },
+    {
+      "id": "sun-off_subnanometer",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "4f7a5c380866d7af8235cad27cef5ea70ca0fd8937d5987d242e3b749eb8be47"
+    },
+    {
+      "id": "sun-film_dielectric_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 100.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "ea86e00468d391e77bd4dc7a533e9a010ba61c606286fcde7c54a0ce72dcf95b"
+    },
+    {
+      "id": "sun-off_dielectric_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "78c0f48f514968a1dc2f300c5fda3617e5ce9a46bd2f6eeeb247894179856bac"
+    },
+    {
+      "id": "sun-film_dielectric_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 1000.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "55475ccde55ac383abba0d94ab4dbe455dbc63606d9416493bfdbeaec06c84a3"
+    },
+    {
+      "id": "sun-off_dielectric_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "78c0f48f514968a1dc2f300c5fda3617e5ce9a46bd2f6eeeb247894179856bac"
+    },
+    {
+      "id": "sun-film_metal_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 100.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "81bc7873067873da30e464d67222ccf84d522c53d00ed9160393b6d4be3e50bc"
+    },
+    {
+      "id": "sun-off_metal_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "c60249d4aa4570e6807701c86333f22f3fa86b96f245e57b2219340d1a8d0fbd"
+    },
+    {
+      "id": "sun-film_metal_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 1000.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "b9b376a2f13d26c6a0c95a6453c885f1195ba09ec0e1ba462258c685ed4e8ead"
+    },
+    {
+      "id": "sun-off_metal_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "c60249d4aa4570e6807701c86333f22f3fa86b96f245e57b2219340d1a8d0fbd"
+    },
+    {
+      "id": "sun-film_high_ior",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 3.0,
+        "Thin Film Thickness": 200.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "6414ca1b3843544073067559c15f2f7c2e471a2ae174f715c27ff3e2ae0814e7"
+    },
+    {
+      "id": "sun-off_high_ior",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 3.0,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "4f7a5c380866d7af8235cad27cef5ea70ca0fd8937d5987d242e3b749eb8be47"
+    },
+    {
+      "id": "sun-film_rough",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.88,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 550.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "8f1f27ef96e82c61b2c0a38225bbc14a364fd60d82eb230cda23d63488a8b363"
+    },
+    {
+      "id": "sun-off_rough",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.88,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "2dd1fdaaa8ec56ae35ec7a8064b186499035fd4755cb11e458f2f6370a14b6c4"
+    },
+    {
+      "id": "sun-film_coated",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.7,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 550.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "8ce37c559605e5ea4210413d82ff358e0d380eb1dd004c94f9f4a1c31a13bf8e"
+    },
+    {
+      "id": "sun-off_coated",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.7,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "a98cfc898a7094fff0a7231835de8a9cff523c3683efc560ffe15f5be12d2c5a"
+    },
+    {
+      "id": "sun-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "ea293dbeb0290eeaf4fc54ea04aac977fc4231f68e81223e026c986549ee55c9"
+    },
+    {
+      "id": "sun-control_white",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "IOR": 1,
+        "Roughness": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "c7b3ed296551a7a7dafdbe054be72aa25d313d7e231ae83e6fb0c68db4b0e5bd"
+    },
+    {
+      "id": "furnace-film_subnanometer",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.25
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "24a64fe3cd5b9f26cccc658eedb43a1ff044f36e1ac72441954d7f9194c4cf77"
+    },
+    {
+      "id": "furnace-off_subnanometer",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "30fa598471b07659683b8142c145fbca2a6a44d354cbaffb0369c70b1e60a7c3"
+    },
+    {
+      "id": "furnace-film_dielectric_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 100.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "3c12efef34daccba89d9f3f94102a47cdd097bc6bb1d4fac94c206468a783266"
+    },
+    {
+      "id": "furnace-off_dielectric_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "024ede59feed0a6d115d3e6274ebc853e793b6daa15adc7b6abeba597ccb844d"
+    },
+    {
+      "id": "furnace-film_dielectric_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 1000.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "1355d92963c9bfe5a40f8becd118d38cd7109af0772ccd664c39bc42638bb387"
+    },
+    {
+      "id": "furnace-off_dielectric_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "024ede59feed0a6d115d3e6274ebc853e793b6daa15adc7b6abeba597ccb844d"
+    },
+    {
+      "id": "furnace-film_metal_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 100.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "5f70257b7698478a924383efb7c56a1e0b351cbbc212acab0ca5a0e2d85e8167"
+    },
+    {
+      "id": "furnace-off_metal_100",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.5,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "271806312708389812800c9e19fb484059f2aa68690a523b09d76d5ca2d96140"
+    },
+    {
+      "id": "furnace-film_metal_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 1000.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "5a755b2b238a01e06c0bb5bd2a5429ce15bda0b35245a6003f36a3edf5c725ef"
+    },
+    {
+      "id": "furnace-off_metal_1000",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 1.0,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 2.0,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "271806312708389812800c9e19fb484059f2aa68690a523b09d76d5ca2d96140"
+    },
+    {
+      "id": "furnace-film_high_ior",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 3.0,
+        "Thin Film Thickness": 200.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "4970824db0094e7dd1e363d5737cd0d62023f840f3d21ce947db8d54e0b3d8b5"
+    },
+    {
+      "id": "furnace-off_high_ior",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 3.0,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "30fa598471b07659683b8142c145fbca2a6a44d354cbaffb0369c70b1e60a7c3"
+    },
+    {
+      "id": "furnace-film_rough",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.88,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 550.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "11ddb69995c6044341b6cdc5b8d1d4830445b77e0b4d489ef27aa9b9b3d25988"
+    },
+    {
+      "id": "furnace-off_rough",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.88,
+        "Coat Weight": 0.0,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "cafc1df2237ac4c1060e3bc1f8a8f01908fc0063123f2298d95900810a94e55a"
+    },
+    {
+      "id": "furnace-film_coated",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.7,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 550.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "10af8d9ee4006b62e1466e5c2ab2d3b8c85788652b91edb5a081236f1774060d"
+    },
+    {
+      "id": "furnace-off_coated",
+      "inputs": {
+        "Base Color": [
+          0.32,
+          0.42,
+          0.7,
+          1.0
+        ],
+        "Metallic": 0.6,
+        "Roughness": 0.5,
+        "Coat Weight": 0.7,
+        "Thin Film IOR": 1.4,
+        "Thin Film Thickness": 0.0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "39eee0aa5849d477219ce9ad25fd57e187d1858adf7bf3a1499bd81d29768b6c"
+    },
+    {
+      "id": "furnace-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "ea293dbeb0290eeaf4fc54ea04aac977fc4231f68e81223e026c986549ee55c9"
+    },
+    {
+      "id": "furnace-control_white",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "IOR": 1,
+        "Roughness": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "84a25cd4d726e2dda136f37ce5ad44dbcfa5c2f3e010c68ebbab295196c9e063"
+    }
+  ],
+  "suite": "thin-film"
+}

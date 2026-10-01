@@ -1,0 +1,48 @@
+{
+  "mode": "forced scene epoch change, same camera/pixels; 64x64; release; validation off",
+  "samples": 1024,
+  "cases": {
+    "autumn-control_emission": {
+      "baseline": {
+        "frame_prepare_ms": 0.394,
+        "gpu_frame_ms": 4.9214850000000006
+      },
+      "enabled": {
+        "frame_prepare_ms": 0.41990000000000005,
+        "gpu_frame_ms": 10.9209
+      },
+      "final": {
+        "frame_prepare_ms": 0.4692,
+        "gpu_frame_ms": 1.9443350000000001
+      }
+    },
+    "autumn-control_mirror": {
+      "baseline": {
+        "frame_prepare_ms": 0.3532,
+        "gpu_frame_ms": 0.30897600000000003
+      },
+      "enabled": {
+        "frame_prepare_ms": 0.35635,
+        "gpu_frame_ms": 0.308928
+      },
+      "final": {
+        "frame_prepare_ms": 0.46215,
+        "gpu_frame_ms": 0.30603199999999997
+      }
+    },
+    "autumn-layer_thin_film": {
+      "baseline": {
+        "frame_prepare_ms": 0.35015,
+        "gpu_frame_ms": 6.674945
+      },
+      "enabled": {
+        "frame_prepare_ms": 0.39005,
+        "gpu_frame_ms": 8.495840000000001
+      },
+      "final": {
+        "frame_prepare_ms": 0.44875,
+        "gpu_frame_ms": 9.224129999999999
+      }
+    }
+  }
+}

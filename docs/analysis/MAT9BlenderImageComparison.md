@@ -140,14 +140,46 @@ Local evidence:
   and an added case were all rejected; frozen input files were preserved.
 - Dashboard full parse: 435 entries, no malformed rows, all progress values finite.
 
+## Film sweep follow-up — 2026-10-01
+
+The [fixed eight-pair film sweep](MAT9ThinFilmAcceptance.md) adds 36 captures and an
+independent seed repeat. Only 4 of 16 film conditions meet the declared image target.
+The subnanometer double blend and 0.1nm cutoff have been corrected; the original
+550nm measurements above are unchanged. Mixed-metal film-off controls also show
+large residuals. Common metal/dielectric attenuation and GGX compensation must be
+resolved before rendered acceptance; increasing a tolerance is not a fix.
+
+The subsequent [GGX closure comparison](MAT9GgxClosureComparison.md) resolves those
+common terms and the Scene Core fallback. The same fixed film/off inputs now pass
+16/16 film and 16/16 off conditions under the unchanged targets. The values above
+remain the earlier measurement, not the current shader result.
+
 ## Next required work
 
-1. Film acceptance: judge the current wavelength-integrated replacement's residual
-   image differences, grazing-angle limits and measured cold/warm cost. The
-   implementation and first cost measurement are complete; rendered acceptance remains.
-2. Special transport and texture/factor/normal-map reference scenes, with shared
-   supported geometry/background/transport conditions and explicit approximation limits.
-3. Define material-specific acceptance bounds using repeated reference noise checks;
-   numerical closure tests do not substitute for the rendered-image bounds.
-4. Continue Deferred/Forward route parity and moving-camera/tier/cold-warm performance
-   acceptance after the first comparison's outstanding fidelity cases are addressed.
+The historical [HDRI follow-up](MAT9HdriImageComparison.md) did not accept parity.
+The subsequent [full HDRI convergence](MAT9HdriConvergence.md) passes the fixed
+forest/autumn constant-material 26 conditions under the unchanged image/noise targets.
+This does not close the original textured grid or the unimplemented area-light consumer.
+
+The [Special follow-up](MAT9SpecialTransportComparison.md) accepts eight fixed
+homogeneous single-scattering Volume conditions after matching the reference transport
+and capturing the final product Volume composite. Transmission/SSS remain unaccepted;
+the initial 24-condition reference is diagnostic, and Scene alpha blending is rejected.
+
+The subsequent [Special Surface correction](MAT9SpecialProfileCorrection.md) fixes
+Scene artist-radius units and grazing-angle residency rejection. Two 131072-sample
+references converge under the existing noise bound; the final product passes only
+7/18 fixed Surface conditions. Directional SSS RMS improves from 6.2598% to 4.1009%,
+while mixed directional SSS slightly worsens and furnace SSS is unchanged. Full-image
+zero-scale/off controls pass after removing the edge error colors. Transmission and
+SSS spatial-response acceptance remain pending.
+
+1. Correct transmission boundary and SSS spatial-response differences, converge their
+   independent references and recheck the same image/noise targets. Verify a real
+   blended-composition path for the existing alpha/transmission criterion.
+2. Measure texture-only, factor-times-texture and normal-map reference scenes with
+   shared supported geometry/background/transport conditions and explicit approximation limits.
+3. Continue Deferred/Forward parity and moving-camera/tier/cold-warm performance
+   acceptance, including the increased environment integration cost on actual models.
+4. Implement and measure the original area-light ABI/consumer and grid. Fixed constant
+   film/off, HDRI and bounded Volume results do not establish parity at every scene/angle.

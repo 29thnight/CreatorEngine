@@ -1,0 +1,319 @@
+{
+  "schema": "creator.material.special-profile-ab.v1",
+  "scope": "diagnostic A/B; not acceptance",
+  "reference": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9SpecialSurfaceReference-0",
+  "reference_repeat": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9SpecialSurfaceReference-11",
+  "before": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Images-Release-special-bounded-baseline\\Native",
+  "after": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Images-Release-special-surface-final10\\Native",
+  "before_reference_recipe": 1,
+  "after_reference_recipe": 2,
+  "geometry_sha256": "c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282",
+  "cases": [
+    {
+      "id": "sun-special_transmission",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.3396638017962703,
+        "p95_normalized": 0.07765123248100281,
+        "max_normalized": 0.9832868954929467,
+        "sha256": "e5a69096e1784ce4645f1522f287f419d1d97bcd01009f88f82fcd64095b75cc"
+      },
+      "after": {
+        "relative_rms": 0.3396638017962703,
+        "p95_normalized": 0.07765123248100281,
+        "max_normalized": 0.9832868954929467,
+        "sha256": "dfca81204bc2baf9256c3fb71151bc292ae1f29ede482a9155cafb72654c00c3"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "sun-special_glass",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.3478902017281297,
+        "p95_normalized": 0.03005191497504711,
+        "max_normalized": 0.9999957685081223,
+        "sha256": "e6192e67bd538db8193f0384f9fc1f00a0b2b9053230b8d797ae9d8e52be8ee1"
+      },
+      "after": {
+        "relative_rms": 0.3478902017281297,
+        "p95_normalized": 0.03005191497504711,
+        "max_normalized": 0.9999957685081223,
+        "sha256": "962276708cae492f7f7dc4c9d52263b8080dea85927b49323303abc9ccfbfd5e"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "sun-special_ior_one",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "f7c8e6e16cb79332dc748b27cbec50a96ebacf3db30800d0b8106859d337e00e"
+      },
+      "after": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "49b4d9e4c5be5d006f048cced25f9ee7110fbea226a14d511ffac8320eb4d68e"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "sun-special_subsurface",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.06259777710985003,
+        "p95_normalized": 0.014704793691635132,
+        "max_normalized": 0.024167001247406006,
+        "sha256": "f210b547f08883cfd7f41c9c4ad2adadd4ac9a6f4c0b93ab8660e5b2ee36985c"
+      },
+      "after": {
+        "relative_rms": 0.0410089929928649,
+        "p95_normalized": 0.009324178099632263,
+        "max_normalized": 0.013835132122039795,
+        "sha256": "9defe96ca42d2ed725603fb1efc85d20f541d5344a5e1d6c2fed0b370d28c7ad"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "sun-special_subsurface_local",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.0009145833618272907,
+        "p95_normalized": 0.0002763420343399048,
+        "max_normalized": 0.0005296468734741211,
+        "sha256": "891b04ca035c50e5d61e90c29d6bdefd540126db7fee288ae7e7eccb50b5842c"
+      },
+      "after": {
+        "relative_rms": 0.0009145833618272907,
+        "p95_normalized": 0.0002763420343399048,
+        "max_normalized": 0.0005296468734741211,
+        "sha256": "f209028e2df2557df0f876cf39496f70d4f2876a37f49cf2dbc61d3d05418882"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "sun-special_subsurface_off",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.0009145833618272907,
+        "p95_normalized": 0.0002763420343399048,
+        "max_normalized": 0.0005296468734741211,
+        "sha256": "f209028e2df2557df0f876cf39496f70d4f2876a37f49cf2dbc61d3d05418882"
+      },
+      "after": {
+        "relative_rms": 0.0009145833618272907,
+        "p95_normalized": 0.0002763420343399048,
+        "max_normalized": 0.0005296468734741211,
+        "sha256": "f209028e2df2557df0f876cf39496f70d4f2876a37f49cf2dbc61d3d05418882"
+      },
+      "native_byte_equal": true
+    },
+    {
+      "id": "sun-special_mixed",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.020095756936339974,
+        "p95_normalized": 0.004866696894168854,
+        "max_normalized": 0.012570023536682129,
+        "sha256": "d9b62e446aea28f5c2e97e8d2422cec21aa32c62763d8ff0774c002ad251f5c7"
+      },
+      "after": {
+        "relative_rms": 0.0203734403843103,
+        "p95_normalized": 0.004810824990272522,
+        "max_normalized": 0.010494828224182129,
+        "sha256": "102003cdc93b903d865317232647127c8e22ba9ff667a083a084d6a92a55f8e8"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "sun-control_emission",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee"
+      },
+      "after": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee"
+      },
+      "native_byte_equal": true
+    },
+    {
+      "id": "sun-control_white",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.0008734296434499214,
+        "p95_normalized": 0.0004101991653442383,
+        "max_normalized": 0.0005953609943389893,
+        "sha256": "40e54b158e86cc3ee1c2d02af7caf45dd3e8dfcde45ccd444957245ac433259a"
+      },
+      "after": {
+        "relative_rms": 0.0008734296434499214,
+        "p95_normalized": 0.0004101991653442383,
+        "max_normalized": 0.0005953609943389893,
+        "sha256": "40e54b158e86cc3ee1c2d02af7caf45dd3e8dfcde45ccd444957245ac433259a"
+      },
+      "native_byte_equal": true
+    },
+    {
+      "id": "furnace-special_transmission",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.15098682412397643,
+        "p95_normalized": 0.15919911861419678,
+        "max_normalized": 0.16108721494674683,
+        "sha256": "cd0a89bc489de91aa9087c896a84219d1d4de2cdcf60ea9fddd8c5e10c0ead72"
+      },
+      "after": {
+        "relative_rms": 0.15098682412397643,
+        "p95_normalized": 0.15919911861419678,
+        "max_normalized": 0.16108721494674683,
+        "sha256": "db85b5785276cf086c56a7c84da77c45a70634112eb0696a585ff9c08292f4e9"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "furnace-special_glass",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.006969209054252024,
+        "p95_normalized": 0.01089787483215332,
+        "max_normalized": 0.011698603630065918,
+        "sha256": "b08074efd9ed9001d859585b9c9a1b361f957aff4db1bebdfa90121ea1af53c7"
+      },
+      "after": {
+        "relative_rms": 0.006983465706824029,
+        "p95_normalized": 0.01089787483215332,
+        "max_normalized": 0.011793076992034912,
+        "sha256": "dafc17fae25510213953a9cf64bd0ebbabcfb51fecf3ff8904e9a747ae421c7e"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "furnace-special_ior_one",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "2399bc89c58da66fafcef723db22952ead5d77289415f2d5eed1740854b90e2c"
+      },
+      "after": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "9c47deb02f94600ada02ef4db78cabf0d769fd898862b8f76ccfc9bf0e3efb4e"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "furnace-special_subsurface",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.04237992796028266,
+        "p95_normalized": 0.03428533673286438,
+        "max_normalized": 0.03912284970283508,
+        "sha256": "8439c44d68e8017c412533018bcecbf2ffdea1bbb2b0a9212202214f9987ca93"
+      },
+      "after": {
+        "relative_rms": 0.04237992796028266,
+        "p95_normalized": 0.03428533673286438,
+        "max_normalized": 0.03912284970283508,
+        "sha256": "67cb1529c51e31a9f25ec787aabdb76ca828ed75db9bf69a97e66511862d0491"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "furnace-special_subsurface_local",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.009466565028901969,
+        "p95_normalized": 0.011523544788360596,
+        "max_normalized": 0.025462865829467773,
+        "sha256": "8439c44d68e8017c412533018bcecbf2ffdea1bbb2b0a9212202214f9987ca93"
+      },
+      "after": {
+        "relative_rms": 0.009466565028901969,
+        "p95_normalized": 0.011523544788360596,
+        "max_normalized": 0.025462865829467773,
+        "sha256": "67cb1529c51e31a9f25ec787aabdb76ca828ed75db9bf69a97e66511862d0491"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "furnace-special_subsurface_off",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.009466565028901969,
+        "p95_normalized": 0.011523544788360596,
+        "max_normalized": 0.025462865829467773,
+        "sha256": "67cb1529c51e31a9f25ec787aabdb76ca828ed75db9bf69a97e66511862d0491"
+      },
+      "after": {
+        "relative_rms": 0.009466565028901969,
+        "p95_normalized": 0.011523544788360596,
+        "max_normalized": 0.025462865829467773,
+        "sha256": "67cb1529c51e31a9f25ec787aabdb76ca828ed75db9bf69a97e66511862d0491"
+      },
+      "native_byte_equal": true
+    },
+    {
+      "id": "furnace-special_mixed",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.03217798837002714,
+        "p95_normalized": 0.020721405744552612,
+        "max_normalized": 0.024668484926223755,
+        "sha256": "95d7dc764e233a971e60307afea966921a995543ebb435bec54f3b549d8d251b"
+      },
+      "after": {
+        "relative_rms": 0.03217798837002714,
+        "p95_normalized": 0.020721405744552612,
+        "max_normalized": 0.024668484926223755,
+        "sha256": "9bfb502e703ffede14c4bff22564b8061f0053ae3a39e6b2693f8f2481be4664"
+      },
+      "native_byte_equal": false
+    },
+    {
+      "id": "furnace-control_emission",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee"
+      },
+      "after": {
+        "relative_rms": 0.0,
+        "p95_normalized": 0.0,
+        "max_normalized": 0.0,
+        "sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee"
+      },
+      "native_byte_equal": true
+    },
+    {
+      "id": "furnace-control_white",
+      "interior_pixels": 303,
+      "before": {
+        "relative_rms": 0.009965325325974937,
+        "p95_normalized": 0.019600212574005127,
+        "max_normalized": 0.0307159423828125,
+        "sha256": "17d190a2989fa1fd7af6e95d16830ad17473de45858287ff3ed0aaab192bd28c"
+      },
+      "after": {
+        "relative_rms": 0.009965325325974937,
+        "p95_normalized": 0.019600212574005127,
+        "max_normalized": 0.0307159423828125,
+        "sha256": "17d190a2989fa1fd7af6e95d16830ad17473de45858287ff3ed0aaab192bd28c"
+      },
+      "native_byte_equal": true
+    }
+  ]
+}

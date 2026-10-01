@@ -926,7 +926,7 @@ namespace
                     !graph.PrepareParallel(commandPool, outError)) return false;
                 if (!graphMaterials.Prepare(frameContext, graphInput, ibl.GetCubeMap(),
                         ibl.GetIrradianceMap(), ibl.GetPrefilteredMap(),
-                        shadow.GetShadowData(), {}, outError, ibl.GetGeneration())) return false;
+                        shadow.GetShadowData(), {}, outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap())) return false;
                 if (capture) capture->RecordLatticeInput(graphInput);
             }
             {
@@ -4239,7 +4239,7 @@ namespace
 
             if (!p.ibl.TouchCooked(p.frameContext,outError)) return false;
             // Bind the retained environment maps for this frame's consumers.
-            p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), EnhancedIBLGenerator::kFormat, 1);
+            p.skyBox.SetCubeMap(p.ibl.GetCubeMap(), p.frameContext.resources->DescribeTexture(p.ibl.GetCubeMap()).format, 1);
             p.deferred.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
                 EnhancedIBLGenerator::kPrefilterMips, p.ibl.GetBrdfLut());
             p.forward.SetIBL(p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
@@ -4352,7 +4352,7 @@ namespace
                     !graph.PrepareParallel(dx12.CommandPool(), outError)) return false;
                 if (!p.graphMaterials.Prepare(p.frameContext, p.graphInput, p.ibl.GetCubeMap(),
                         p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                        p.shadow.GetShadowData(), {}, outError, p.ibl.GetGeneration())) return false;
+                        p.shadow.GetShadowData(), {}, outError, p.ibl.GetGeneration(),p.ibl.GetImportanceMaps(),p.ibl.GetSourceMap())) return false;
                 if (capture) capture->RecordLatticeInput(p.graphInput);
             }
 

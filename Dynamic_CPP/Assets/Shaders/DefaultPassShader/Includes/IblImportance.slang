@@ -1,14 +1,20 @@
 #pragma once
 #include "Ibl.slang"
 
-// Equal counts from the environment distribution and the cosine/GGX distribution.
-// Radiance and the environment PDF use the same piecewise constant cube cells.
-// Filtering radiance across a tiny HDR sun while retaining a cell PDF introduces
-// high-variance samples even when the two sampling strategies are combined.
+// The original environment/cosine proposal has 1024 samples. Scene reflection
+// cooks append 4096 directions for continuous decoded-source radiance; their
+// consumer balances the unequal counts. CDF cells define the proposal PDF,
+// independently of the radiance reconstruction used by each consumer.
 static const uint kIblImportanceSamples = 1024u;
+#if defined(LX_SCENE_LOOKUP_PRECOMPUTED)
+Texture2D<float4> gImportanceRows : register(t27);
+Texture2D<float4> gImportanceMarginal : register(t28);
+Texture2D<float4> gImportanceSamples : register(t29);
+#else
 Texture2D<float4> gImportanceRows : register(t1); // RGB radiance, A row CDF
 Texture2D<float4> gImportanceMarginal : register(t2); // R marginal CDF
 Texture2D<float4> gImportanceSamples : register(t3); // direction/PDF, then radiance
+#endif
 
 float IblCellJacobian(float2 uv)
 {

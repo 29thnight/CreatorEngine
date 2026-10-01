@@ -1,0 +1,45 @@
+{
+  "schema": "creator.environment-v3-verification.v1",
+  "reports": {
+    "autumn-final": {
+      "schema": "creator.environment-importance-verification.v1",
+      "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-autumn-v3-final.ceibl",
+      "sha256": "21cda237e5f3f338f78293637fdb6b306323c703d1bd715f8015a0e8ff31189a",
+      "cube_size": 512,
+      "samples": 1024,
+      "rows": 3072,
+      "cached_pdf_max_relative_error": 4.10283262625582e-07,
+      "importance_persisted": true,
+      "lighting_baseline": null,
+      "lighting_bytes_equal": null,
+      "bytes": 94640240
+    },
+    "forest-final": {
+      "schema": "creator.environment-importance-verification.v1",
+      "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-forest-v3-final.ceibl",
+      "sha256": "df981ca1595ebce40a8d449c8dc199483f1db656879f02c3861b98fd8b083d89",
+      "cube_size": 512,
+      "samples": 1024,
+      "rows": 3072,
+      "cached_pdf_max_relative_error": 4.144204553326184e-07,
+      "importance_persisted": true,
+      "lighting_baseline": null,
+      "lighting_bytes_equal": null,
+      "bytes": 94640240
+    },
+    "runtime-autumn": {
+      "schema": "creator.environment-importance-verification.v1",
+      "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\NeutralEnvironment\\Debug-DX12-range\\Project\\Saved\\Editor\\Cache\\Environment\\e60470d3a0f219585df1d74c393b472361c5400a7ff8d071ebe6eca29b7fe2b0-fc859e1118ab07701e0a3944ec78ce7df7e3922bc3bb9ce7e46cb025cf93a0fe.ceibl",
+      "sha256": "21cda237e5f3f338f78293637fdb6b306323c703d1bd715f8015a0e8ff31189a",
+      "cube_size": 512,
+      "samples": 1024,
+      "rows": 3072,
+      "cached_pdf_max_relative_error": 4.10283262625582e-07,
+      "importance_persisted": true,
+      "lighting_baseline": null,
+      "lighting_bytes_equal": null,
+      "bytes": 94640240
+    }
+  },
+  "runtime_authoring_autumn_bytes_equal": true
+}

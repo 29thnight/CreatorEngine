@@ -1,0 +1,305 @@
+{
+  "schema": "creator.material.special-image-assessment.v1",
+  "policy": {
+    "relative_rms": 0.01,
+    "p95_normalized": 0.01,
+    "max_normalized": 0.05,
+    "reference_noise_rms": 0.0025
+  },
+  "reference_recipe_accepted": false,
+  "accepted": false,
+  "comparison": "Build\\Obj\\Mat9Images-Release-special-bounded-baseline\\comparison.json",
+  "scope": {
+    "geometry": "shared closed smooth 80-triangle icosphere, radius 0.5; within native 128-triangle volume budget",
+    "cycles": "closed-solid refraction and random-walk subsurface; single volume scattering",
+    "native": "single-interface screen/environment refraction, screen-space diffusion, homogeneous single scattering",
+    "alpha": "opaque only; Scene blended queue unsupported and separately rejected",
+    "volume": "Volume Only=1 disconnects Surface; Volume.* addresses Principled Volume inputs"
+  },
+  "diagnostics": {
+    "debug-normal": {
+      "max_abs": 0.0001952648162841797
+    },
+    "debug-view": {
+      "max_abs": 0.00023490190505981445
+    }
+  },
+  "geometry_sha256": "c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282",
+  "zero_scale_controls": {
+    "sun": {
+      "max_abs": 0.0,
+      "accepted": true
+    },
+    "furnace": {
+      "max_abs": 0.0,
+      "accepted": true
+    }
+  },
+  "passed": 11,
+  "count": 24,
+  "cases": [
+    {
+      "id": "sun-special_transmission",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise_rms"
+      ],
+      "relative_rms": 0.3391655528718384,
+      "p95_normalized": 0.07776331156492233,
+      "max_normalized": 0.9832107871781646,
+      "reference_noise_rms": 0.004582533101215648
+    },
+    {
+      "id": "sun-special_glass",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized"
+      ],
+      "relative_rms": 0.3473080691822314,
+      "p95_normalized": 0.030811144039034843,
+      "max_normalized": 0.999995757151745,
+      "reference_noise_rms": 0.0023757300966706506
+    },
+    {
+      "id": "sun-special_ior_one",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    },
+    {
+      "id": "sun-special_subsurface",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "reference_noise_rms"
+      ],
+      "relative_rms": 0.06242921901770993,
+      "p95_normalized": 0.014779582619667053,
+      "max_normalized": 0.024504482746124268,
+      "reference_noise_rms": 0.006747752927717658
+    },
+    {
+      "id": "sun-special_subsurface_local",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0004142132523737616,
+      "p95_normalized": 0.00011695921421051025,
+      "max_normalized": 0.00024235248565673828,
+      "reference_noise_rms": 7.660535702053979e-07
+    },
+    {
+      "id": "sun-special_subsurface_off",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0004142132523737616,
+      "p95_normalized": 0.00011695921421051025,
+      "max_normalized": 0.00024235248565673828,
+      "reference_noise_rms": 7.660535702053979e-07
+    },
+    {
+      "id": "sun-special_mixed",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "reference_noise_rms"
+      ],
+      "relative_rms": 0.020128776867055425,
+      "p95_normalized": 0.004828847944736481,
+      "max_normalized": 0.012405171990394592,
+      "reference_noise_rms": 0.003863233242283548
+    },
+    {
+      "id": "sun-special_volume_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.00045421225705673853,
+      "p95_normalized": 0.0007153983375949621,
+      "max_normalized": 0.0009785327859978875,
+      "reference_noise_rms": 6.578357430289901e-07
+    },
+    {
+      "id": "sun-special_volume_absorption",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0003981991529467678,
+      "p95_normalized": 0.00047093629837036133,
+      "max_normalized": 0.0005033016204833984,
+      "reference_noise_rms": 5.134762786066722e-07
+    },
+    {
+      "id": "sun-special_volume_scattering",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms"
+      ],
+      "relative_rms": 0.09511187123434144,
+      "p95_normalized": 0.0007047019898891449,
+      "max_normalized": 0.0007303357124328613,
+      "reference_noise_rms": 0.0009814608706063485
+    },
+    {
+      "id": "sun-control_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    },
+    {
+      "id": "sun-control_white",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0004690442115876776,
+      "p95_normalized": 0.00023284554481506348,
+      "max_normalized": 0.0002449154853820801,
+      "reference_noise_rms": 6.214195978991853e-07
+    },
+    {
+      "id": "furnace-special_transmission",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized"
+      ],
+      "relative_rms": 0.1510813341369529,
+      "p95_normalized": 0.15951800346374512,
+      "max_normalized": 0.16168922185897827,
+      "reference_noise_rms": 0.002209739365541419
+    },
+    {
+      "id": "furnace-special_glass",
+      "accepted": false,
+      "failed_targets": [
+        "p95_normalized"
+      ],
+      "relative_rms": 0.006856259917157389,
+      "p95_normalized": 0.010649561882019043,
+      "max_normalized": 0.01225215196609497,
+      "reference_noise_rms": 0.0007309883400571124
+    },
+    {
+      "id": "furnace-special_ior_one",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    },
+    {
+      "id": "furnace-special_subsurface",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "reference_noise_rms"
+      ],
+      "relative_rms": 0.04234392533061535,
+      "p95_normalized": 0.03476715087890625,
+      "max_normalized": 0.03949931263923645,
+      "reference_noise_rms": 0.006779665351347906
+    },
+    {
+      "id": "furnace-special_subsurface_local",
+      "accepted": false,
+      "failed_targets": [
+        "p95_normalized"
+      ],
+      "relative_rms": 0.009477916064709335,
+      "p95_normalized": 0.011622488498687744,
+      "max_normalized": 0.025486528873443604,
+      "reference_noise_rms": 0.00031866590278098727
+    },
+    {
+      "id": "furnace-special_subsurface_off",
+      "accepted": false,
+      "failed_targets": [
+        "p95_normalized"
+      ],
+      "relative_rms": 0.009477916064709335,
+      "p95_normalized": 0.011622488498687744,
+      "max_normalized": 0.025486528873443604,
+      "reference_noise_rms": 0.00031866590278098727
+    },
+    {
+      "id": "furnace-special_mixed",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "reference_noise_rms"
+      ],
+      "relative_rms": 0.03233893742601342,
+      "p95_normalized": 0.02124720811843872,
+      "max_normalized": 0.025370419025421143,
+      "reference_noise_rms": 0.004751124073255549
+    },
+    {
+      "id": "furnace-special_volume_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.00045421225705673853,
+      "p95_normalized": 0.0007153983375949621,
+      "max_normalized": 0.0009785327859978875,
+      "reference_noise_rms": 6.578357430289901e-07
+    },
+    {
+      "id": "furnace-special_volume_absorption",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0003981991529467678,
+      "p95_normalized": 0.00047093629837036133,
+      "max_normalized": 0.0005033016204833984,
+      "reference_noise_rms": 5.134762786066722e-07
+    },
+    {
+      "id": "furnace-special_volume_scattering",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "reference_noise_rms"
+      ],
+      "relative_rms": 0.032772484916360964,
+      "p95_normalized": 0.0028634145855903625,
+      "max_normalized": 0.003340795636177063,
+      "reference_noise_rms": 0.006305160937742617
+    },
+    {
+      "id": "furnace-control_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    },
+    {
+      "id": "furnace-control_white",
+      "accepted": false,
+      "failed_targets": [
+        "p95_normalized"
+      ],
+      "relative_rms": 0.00996278489989542,
+      "p95_normalized": 0.01959228515625,
+      "max_normalized": 0.03070068359375,
+      "reference_noise_rms": 0.00023592531358290286
+    }
+  ],
+  "exclusions": [
+    "texture/normal-map filtering",
+    "alpha blended queue",
+    "original area-light/HDRI grid",
+    "multiple volume scattering"
+  ]
+}

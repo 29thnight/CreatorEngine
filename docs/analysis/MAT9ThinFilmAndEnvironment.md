@@ -133,7 +133,11 @@ LFS SHA-256이 일치한다. Greg Zaal / Poly Haven
 | BRDF lookup | RGBA16Float 512×512, 1 mip |
 | 색 공간 | linear Rec.709 |
 
-`CookedEnvironment`의 `CEIBL001` 형식에는 원본·recipe identity, 크기, 네 맵의 모든
+위 표는 초기 CEIBL001 배포값이다. 2026-10-01 [HDRI MIS 후속](MAT9HdriMis.md)에서
+default forest를 CEIBL002로 갱신했다(61,090,928 bytes, mip-0 CDF·marginal·cached samples 포함).
+새 recipe/artifact SHA와 준비 비용은 후속 문서 및 `Resources/Environment/forest.cook.json`이 현재 정본이다.
+
+초기 `CookedEnvironment`의 `CEIBL001` 형식에는 원본·recipe identity, 크기, 네 맵의 모든
 face/mip와 payload SHA-256이 포함된다. 불일치·잘못된 크기·길이·checksum을 검증하고
 완료된 CPU 이미지만 게시한다. 쓰기는 임시 파일 뒤 원자적 교체로 완료한다.
 
@@ -237,7 +241,11 @@ MaterialMatchedImageProbe의 별도 shader root 실행으로 재현한다. 사�
 
 ## 7. 남은 MAT-9 판정
 
-1. 박막의 잔여 rendered 차이·grazing 차수 절단을 재질별 오차 상한으로 판정한다.
+1. [공통 GGX 수정 전 판정](MAT9ThinFilmAcceptance.md)은 전체 수용 미달이었다.
+   공통 metal/dielectric 레이어 감쇠·GGX 보상·Scene Core fallback을 수정해 같은 입력의
+   박막 on/off 32조건이 통과했다. [최신 GGX 판정](MAT9GgxClosureComparison.md)을 따른다.
+   원래 grid의 area-light/HDRI·grazing 조건과 현재 shader의 비용은 후속으로 확인한다.
+   0.1nm cutoff/이중 결과 보간 수정은 완료했으며, 3차 grazing 한계는 광학 측정으로 별도 기록했다.
 2. Special transport·texture/factor/normal-map·원래 area-light/HDRI grid를 대조한다.
 3. Deferred/Forward route parity 및 실제 화면 점유율·다중 조명·이동 카메라·tier별
    cold/warm 성능 상한을 판정한다. 이번 작은 probe의 수치를 FPS gate로 대신하지 않는다.

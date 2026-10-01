@@ -40,7 +40,9 @@ bool PrincipledValidBakeVector(float4 value)
 
 // Same domain as IsValidIblBakePoint on CPU. GPU-authored points need this
 // check before normalization/integration, including the explicit -1 marker.
-bool IsValidPrincipledIblBakePoint(PrincipledIblBakePoint point)
+// Rasterized Scene surfaces can have a grazing/back-facing shading normal.
+// That is a valid point with an empty reflection integral, not missing residency.
+bool IsValidScenePrincipledIblBakePoint(PrincipledIblBakePoint point)
 {
     if (!PrincipledValidBakeVector(point.baseAlpha) || !PrincipledValidBakeVector(point.normalRoughness)
         || !PrincipledValidBakeVector(point.metalIorLevelAo) || !PrincipledValidBakeVector(point.tintAnisotropy)
@@ -59,6 +61,17 @@ bool IsValidPrincipledIblBakePoint(PrincipledIblBakePoint point)
     {
         return false;
     }
+    return true;
+}
+
+// Standalone directional bake requests retain their front-hemisphere contract.
+bool IsValidPrincipledIblBakePoint(PrincipledIblBakePoint point)
+{
+    if (!IsValidScenePrincipledIblBakePoint(point))
+    {
+        return false;
+    }
+    const float viewLength = length(point.viewTier.xyz);
     const float3 normal = length(point.normalRoughness.xyz) <= 1e-10
         ? float3(0, 0, 1) : normalize(point.normalRoughness.xyz);
     return dot(normal, point.viewTier.xyz / viewLength) >= 1e-4

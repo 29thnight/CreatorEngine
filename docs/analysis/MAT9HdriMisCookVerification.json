@@ -1,0 +1,65 @@
+{
+  "forest-importance": {
+    "schema": "creator.environment-importance-verification.v1",
+    "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-forest-v2.ceibl",
+    "sha256": "ced62de8158fd344d97040a921757dadeb07a4197a678a1efb74560b1bfcbad6",
+    "cube_size": 512,
+    "samples": 1024,
+    "rows": 3072,
+    "cached_pdf_max_relative_error": 3.5387258044280555e-07,
+    "importance_persisted": true,
+    "lighting_baseline": "C:\\Users\\lance\\source\\CreatorEngine\\Resources\\Environment\\forest.ceibl",
+    "lighting_bytes_equal": true,
+    "bytes": 61090928
+  },
+  "autumn-importance": {
+    "schema": "creator.environment-importance-verification.v1",
+    "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-autumn-v2.ceibl",
+    "sha256": "f38a50d67450e970b85c5fa2a397a7104980d005389074a526ce88d5f4537903",
+    "cube_size": 512,
+    "samples": 1024,
+    "rows": 3072,
+    "cached_pdf_max_relative_error": 3.61650818353697e-07,
+    "importance_persisted": true,
+    "lighting_baseline": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-autumn.ceibl",
+    "lighting_bytes_equal": true,
+    "bytes": 61090928
+  },
+  "cook-migration": {
+    "forest": {
+      "old_sha256": "8c004884368a36ece50bf9e046aaf96f0d47b3e3232a024582eae7dc68b05579",
+      "new_sha256": "ced62de8158fd344d97040a921757dadeb07a4197a678a1efb74560b1bfcbad6",
+      "four_lighting_maps_sha256": "d109102f160ef7394927f458c46ce9d59ff42e0d03b3a7391aaade7865fcad1d",
+      "lighting_bytes_equal": true,
+      "archive": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-frozen-cooks\\8c004884368a36ece50bf9e046aaf96f0d47b3e3232a024582eae7dc68b05579.ceibl"
+    },
+    "autumn": {
+      "old_sha256": "5168733c0707985985c5000590589512718bc666f0642ccaa2b12ed202e90720",
+      "new_sha256": "f38a50d67450e970b85c5fa2a397a7104980d005389074a526ce88d5f4537903",
+      "four_lighting_maps_sha256": "b2fe7c76d25d8de4fc62eee9463a08ce9c0b9e30fc4333456cf6cf170f635530",
+      "lighting_bytes_equal": true,
+      "archive": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-frozen-cooks\\5168733c0707985985c5000590589512718bc666f0642ccaa2b12ed202e90720.ceibl"
+    }
+  },
+  "runtime-cook": {
+    "schema": "creator.environment-importance-verification.v1",
+    "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\NeutralEnvironment\\Debug-DX12-mis\\Project\\Saved\\Editor\\Cache\\Environment\\e60470d3a0f219585df1d74c393b472361c5400a7ff8d071ebe6eca29b7fe2b0-f11cadb4a011376fea68dc4b2a1120aa5dd1a4587e5c0b3f1f7460a6d0bfde9a.ceibl",
+    "sha256": "f38a50d67450e970b85c5fa2a397a7104980d005389074a526ce88d5f4537903",
+    "cube_size": 512,
+    "samples": 1024,
+    "rows": 3072,
+    "cached_pdf_max_relative_error": 3.61650818353697e-07,
+    "importance_persisted": true,
+    "lighting_baseline": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-autumn.ceibl",
+    "lighting_bytes_equal": true,
+    "bytes": 61090928
+  },
+  "editor-runtime": {
+    "pid": 39044,
+    "checks": 11,
+    "backend": "dx12",
+    "iblToggleAfter": 1,
+    "iblToggleBefore": 1,
+    "configuration": "Debug"
+  }
+}

@@ -429,7 +429,7 @@ IblBakePoint ExpectedPoint(const SurfacePoint& input, const SurfaceView& view, f
     result.coatNormalSheenWeight = Pack4(layered ? Unit(Rgb4(input.normal)) : Vector{0, 0, 1}, layered ? .2 : 0);
     result.tangentRotation =
         Pack4(Projected(layered ? Rgb4(input.tangent) : Vector{1, 0, 0}, Unit(Rgb4(input.normal))), layered ? .25 : 0);
-    result.viewTier = Pack4(Unit(Rgb4(view.eye) - Rgb4(input.position)), layered ? 1 : 0);
+    result.viewTier = Pack4(Unit(Rgb4(view.eye) - Rgb4(input.position)), 1);
     return result;
 }
 
@@ -1545,25 +1545,6 @@ std::uint64_t sceneGenerationStale{}, sceneGenerationCompiles{}, sceneGeneration
 double maxTextureFilterError{};
 std::array<double, 2> sceneLookupFullMs{};
 
-Vector SceneCoreDirect(const MaterialProbe::Reference::Material& material, Vector view)
-{
-    const Vector light = Unit({.35, -.2, .8});
-    const double nl = Clamp(Dot(material.normal, light));
-    const double nv = Clamp(Dot(material.normal, view)) + 1e-5;
-    const Vector half = Unit(view + light);
-    const double nh = Clamp(Dot(material.normal, half));
-    const double alpha = std::max(material.roughness * material.roughness, 1e-3);
-    const double a2 = alpha * alpha;
-    const double denominator = 1 - nh * nh + nh * nh * a2;
-    const double distribution = a2 / std::max(kPi * denominator * denominator, 1e-20);
-    const double visibility =
-        .5 / std::max(nl * std::sqrt(nv * nv * (1 - a2) + a2) + nv * std::sqrt(nl * nl * (1 - a2) + a2), 1e-6);
-    const Vector fresnel = Fresnel(material, Clamp(Dot(view, half)));
-    return (fresnel * (distribution * visibility) +
-            (Vector{1, 1, 1} - fresnel) * material.base * ((1 - material.metal) / kPi)) *
-           nl;
-}
-
 class FailingScenePipelines final : public IRenderPipelineCache
 {
   public:
@@ -2462,10 +2443,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     auto probe = std::bit_cast<MaterialProbe::Reference::ProbeInput>(point);
                     probe.options = {};
                     const auto material = Evaluate(probe, tier ? 0x7ff : 0x7f);
-                    const auto direct = tier ? Rgb(MaterialProbe::Reference::Reference(
-                                                       material, Unit(Rgb4(point.viewTier)), 0x7ff, table)
-                                                       .fields[14])
-                                             : SceneCoreDirect(material, Unit(Rgb4(point.viewTier)));
+                    const auto direct = Rgb(MaterialProbe::Reference::Reference(
+                        material, Unit(Rgb4(point.viewTier)), tier ? 0x7ff : 0x7f, table).fields[14]);
                     for (unsigned c = 0; c < 3; ++c)
                     {
                         const double expected = ambient[c] + direct[c];

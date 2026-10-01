@@ -1,0 +1,15 @@
+{
+  "schema_version": 4,
+  "blender_version": "5.1.1",
+  "mask": 2047,
+  "numeric_golden_rows": 1960,
+  "numeric_golden_sha256": "4ACCFE3D61372D4252256BBE5C3C10F5764D14A8607CB1DE06475A776D1C8E81",
+  "created": "2026-10-01",
+  "source": "Cycles v5.1.1 microfacet_ggx_preserve_energy and closure layering; pinned E/Eavg/dielectric albedo tables",
+  "oracle": "CPU double closed-form Fss, trilinear table weights and complex optics; GPU does not generate golden",
+  "changes": "Separate metal/dielectric compensated GGX; no Lambertian compensation; finite anisotropic energy budget; no glass transport redesign",
+  "historical_baselines_preserved": [
+    "numeric-golden.csv",
+    "numeric-golden-spectral.csv"
+  ]
+}

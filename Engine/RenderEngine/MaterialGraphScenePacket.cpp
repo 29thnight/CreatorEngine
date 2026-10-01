@@ -200,10 +200,10 @@ bool SceneMaterialSlot::Prepare(IRenderTextureCache& textures, IRenderPipelineCa
         pipeline.depthWriteMask != (blended ? RHIDepthWrite::Zero : RHIDepthWrite::All) ||
         pipeline.cullMode != (doubleSided ? RHICullMode::None : RHICullMode::Back) ||
         !std::ranges::all_of(evaluation.points, [&](const auto& point) {
-            return point.viewTier[3] == (candidate->selection.tier == Tier::Layered ? 1.f : 0.f);
+            return point.viewTier[3] == ((product.program.features & 0x17C0u) != 0 ? 1.f : 0.f);
         }))
     {
-        return Fail(error, "Scene PSO coverage or evaluated point tier disagrees with the owning material.");
+        return Fail(error, "Scene PSO coverage or evaluated reflection model disagrees with the owning material.");
     }
     auto description = pipeline;
     if (!InstallShaders(product, backend, description, error))

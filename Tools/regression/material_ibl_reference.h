@@ -74,13 +74,14 @@ inline ReflectionResult Reflection(const Material& material, Vector view, bool l
         return result;
     }
     const double roughness = coat ? material.coatRoughness : material.roughness;
+    const auto energy = Energy(material, view);
     if (layered)
     {
         result.integral = Integrate(material, view, coat);
     }
     if (roughness == 0)
     {
-        result.integral.single = Fresnel(material, nv, coat);
+        result.integral.single = layered ? CompensatedFresnel(material, energy, nv, coat) : Fresnel(material, nv, coat);
         result.filtered = Radiance(environment, frame.normal * (2 * nv) - view);
     }
     else
@@ -122,7 +123,7 @@ inline ReflectionResult Reflection(const Material& material, Vector view, bool l
             const double weight =
                 layered ? 4 * nl * Visibility(frame, view, light) * vh / std::max(Dot(frame.normal, half), 1e-6)
                         : geometry(nv) * geometry(nl) * vh / std::max(Dot(frame.normal, half) * nv, 1e-6);
-            const Vector response = Fresnel(material, vh, coat) * weight;
+            const Vector response = (layered ? CompensatedFresnel(material, energy, vh, coat) : Fresnel(material, vh, coat)) * weight;
             sum = sum + response * Radiance(environment, light);
             denominator = denominator + response;
             coreSum = coreSum + response * (1.0 / 1024);
@@ -204,7 +205,7 @@ inline Vector Ambient(const IblBakePoint& point, const IblBakeSample& sample, co
     const Integral base{Rgb4(sample.baseSingleAlbedo), Rgb4(sample.baseAverage), sample.baseSingleAlbedo[3]};
     const Integral coat{Rgb4(sample.coatSingleAlbedo), Rgb4(sample.coatAverage), sample.coatSingleAlbedo[3]};
     const auto baseWeights=LayeredBaseWeights(material,view,base);
-    const Vector multiple = layered ? baseWeights.multiple : Multiple(base), coatMultiple = Multiple(coat);
+    const Vector multiple = layered ? baseWeights.multiple : Multiple(base), coatMultiple{};
     const auto ao = [&](Vector normal, double roughness) {
         return Clamp(std::pow(Clamp(Dot(normal, view)) + material.ao, std::exp2(-16 * roughness - 1)) - 1 +
                      material.ao);
@@ -225,7 +226,7 @@ inline Vector Ambient(const IblBakePoint& point, const IblBakeSample& sample, co
     const Vector ltc = Sheen(table, Clamp(Dot(sheenNormal, view)), material.sheenRoughness, 0x7ff);
     const Vector sheenColor = material.sheenTint * (material.sheen * ltc[2]);
     const double sheenTransmission = std::max(1 - Maximum(sheenColor), 0.0);
-    const double coatTransmission = std::max(1 - material.coat * (coat.single[0] + coatMultiple[0]), 0.0);
+    const double coatTransmission = std::max(1 - material.coat * Energy(material, view).coatAlbedo, 0.0);
     Vector transmission;
     const double nv = Clamp(Dot(material.coatNormal, view));
     const double transmitted = std::sqrt(std::max(1 - (1 - nv * nv) / (material.coatIor * material.coatIor), 0.0));
@@ -238,7 +239,7 @@ inline Vector Ambient(const IblBakePoint& point, const IblBakeSample& sample, co
         transmission[c] = sheenTransmission * coatTransmission * (1 + Clamp(material.coat) * (absorption - 1));
     }
     return transmission * ((diffuse + multiple) * Rgb4(sample.irradiance) * material.ao +
-                           base.single * Rgb4(sample.basePrefiltered) * ao(material.normal, material.roughness)) +
+                           base.single * ReflectionBudget(diffuse, base.single) * Rgb4(sample.basePrefiltered) * ao(material.normal, material.roughness)) +
            (coat.single * Rgb4(sample.coatPrefiltered) * ao(material.coatNormal, material.coatRoughness) +
             coatMultiple * Rgb4(sample.coatIrradiance) * material.ao) *
                (sheenTransmission * material.coat) +

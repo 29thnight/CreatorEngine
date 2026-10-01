@@ -1,0 +1,389 @@
+{
+  "schema": "creator.material.matched-reference.v1",
+  "blender": "5.1.1",
+  "renderer": "CYCLES",
+  "resolution": [
+    64,
+    64
+  ],
+  "samples": 131072,
+  "seed": 0,
+  "pixel_filter": {
+    "type": "GAUSSIAN",
+    "width": 0.01
+  },
+  "anisotropy_tangent": "explicit active UV tangent",
+  "camera": {
+    "eye": [
+      0,
+      0,
+      3
+    ],
+    "vertical_fov": 0.7853981633974483,
+    "near": 0.1,
+    "far": 10
+  },
+  "sun": {
+    "to_light": [
+      0.39070188999176025,
+      -0.22325824201107025,
+      0.893032968044281
+    ],
+    "irradiance": [
+      1,
+      1,
+      1
+    ],
+    "angle": 0
+  },
+  "furnace": {
+    "radiance": [
+      1,
+      1,
+      1
+    ]
+  },
+  "bounces": {
+    "max": 8,
+    "diffuse": 1,
+    "glossy": 1,
+    "transmission": 8,
+    "transparent": 16,
+    "volume": 0
+  },
+  "exclusions": [
+    "texture/normal-map filtering",
+    "alpha blended queue",
+    "original area-light/HDRI grid",
+    "multiple volume scattering"
+  ],
+  "geometry_sha256": "c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282",
+  "cases": [
+    {
+      "id": "sun-special_transmission",
+      "inputs": {
+        "Base Color": [
+          0.72,
+          0.85,
+          0.95,
+          1
+        ],
+        "Roughness": 0.12,
+        "IOR": 1.45,
+        "Transmission Weight": 0.9
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "6e4173f9912ede6b615f1eb3047462c4adc01e330f22ede93435839f2785b908"
+    },
+    {
+      "id": "sun-special_glass",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "Roughness": 0.12,
+        "IOR": 1.45,
+        "Transmission Weight": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "5dd0ed0c185b850fceec5d7aa9bcba9996750d085add81983f221d29008dcadc"
+    },
+    {
+      "id": "sun-special_ior_one",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "Roughness": 0,
+        "IOR": 1,
+        "Transmission Weight": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "d840f5f629951936a2b8f5c7f0e2d94028e807902dfd5007cf3029237a456280"
+    },
+    {
+      "id": "sun-special_subsurface",
+      "inputs": {
+        "Base Color": [
+          0.86,
+          0.28,
+          0.22,
+          1
+        ],
+        "Roughness": 0.5,
+        "Subsurface Weight": 0.8,
+        "Subsurface Scale": 0.18
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "39dc8c25583e3a9e4b79326aaf303a2e5bf2e74980454b499ebe5e4656bf3f3b"
+    },
+    {
+      "id": "sun-special_subsurface_local",
+      "inputs": {
+        "Base Color": [
+          0.86,
+          0.28,
+          0.22,
+          1
+        ],
+        "Roughness": 0.5,
+        "Subsurface Weight": 0.8,
+        "Subsurface Scale": 0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "1f807b927dc13d6413350a7f17f2b278824be339461d1ed3bf43f8d60641d110"
+    },
+    {
+      "id": "sun-special_subsurface_off",
+      "inputs": {
+        "Base Color": [
+          0.86,
+          0.28,
+          0.22,
+          1
+        ],
+        "Roughness": 0.5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "1f807b927dc13d6413350a7f17f2b278824be339461d1ed3bf43f8d60641d110"
+    },
+    {
+      "id": "sun-special_mixed",
+      "inputs": {
+        "Base Color": [
+          0.65,
+          0.35,
+          0.2,
+          1
+        ],
+        "Roughness": 0.4,
+        "Metallic": 0.4,
+        "Subsurface Weight": 0.7,
+        "Subsurface Scale": 0.1,
+        "Coat Weight": 0.4,
+        "Coat Roughness": 0.2
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "a0ce4aee2e28af644a85c812e1cbbcc3bfe897084631e03caff17ed4d3d16b9a"
+    },
+    {
+      "id": "sun-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "2165a67abbc0c05b2defa21157b802406a9feda0a3485c32f9eec45f74ff02b7"
+    },
+    {
+      "id": "sun-control_white",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "IOR": 1,
+        "Roughness": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "12e471d868cf878e986993f210c1e3c9f54bc52ee1447bdf1c4d86e5bf6c4c40"
+    },
+    {
+      "id": "furnace-special_transmission",
+      "inputs": {
+        "Base Color": [
+          0.72,
+          0.85,
+          0.95,
+          1
+        ],
+        "Roughness": 0.12,
+        "IOR": 1.45,
+        "Transmission Weight": 0.9
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "9108b167c087fc9d4c5068723db64da4fff726cb18decef9f2b70726bb32a485"
+    },
+    {
+      "id": "furnace-special_glass",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "Roughness": 0.12,
+        "IOR": 1.45,
+        "Transmission Weight": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "170bbb005aacbd503a657c0f28c64c6e8b260c8a5af360df57835a17fbc8028e"
+    },
+    {
+      "id": "furnace-special_ior_one",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "Roughness": 0,
+        "IOR": 1,
+        "Transmission Weight": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "69c2c9773c5d5041fab394882e247cade131dc39eadf4eb74146d7e5e08d7017"
+    },
+    {
+      "id": "furnace-special_subsurface",
+      "inputs": {
+        "Base Color": [
+          0.86,
+          0.28,
+          0.22,
+          1
+        ],
+        "Roughness": 0.5,
+        "Subsurface Weight": 0.8,
+        "Subsurface Scale": 0.18
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "8a514ba26846a9957464ce2aa2fab28ab196587ba52865de2ac9f959fccad9a5"
+    },
+    {
+      "id": "furnace-special_subsurface_local",
+      "inputs": {
+        "Base Color": [
+          0.86,
+          0.28,
+          0.22,
+          1
+        ],
+        "Roughness": 0.5,
+        "Subsurface Weight": 0.8,
+        "Subsurface Scale": 0
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "dcfeee3a8a2fcb696af7c52b6ea8e97b5f4d21f31d7311b43f847648edc17f24"
+    },
+    {
+      "id": "furnace-special_subsurface_off",
+      "inputs": {
+        "Base Color": [
+          0.86,
+          0.28,
+          0.22,
+          1
+        ],
+        "Roughness": 0.5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "dcfeee3a8a2fcb696af7c52b6ea8e97b5f4d21f31d7311b43f847648edc17f24"
+    },
+    {
+      "id": "furnace-special_mixed",
+      "inputs": {
+        "Base Color": [
+          0.65,
+          0.35,
+          0.2,
+          1
+        ],
+        "Roughness": 0.4,
+        "Metallic": 0.4,
+        "Subsurface Weight": 0.7,
+        "Subsurface Scale": 0.1,
+        "Coat Weight": 0.4,
+        "Coat Roughness": 0.2
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "fd0f7b8b3a11ee6558bda1764e2c71a221f491bdf5f8ab46efd05cc1730d383c"
+    },
+    {
+      "id": "furnace-control_emission",
+      "inputs": {
+        "Base Color": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "Specular IOR Level": 0,
+        "Emission Color": [
+          0.3,
+          0.55,
+          1,
+          1
+        ],
+        "Emission Strength": 5
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "2165a67abbc0c05b2defa21157b802406a9feda0a3485c32f9eec45f74ff02b7"
+    },
+    {
+      "id": "furnace-control_white",
+      "inputs": {
+        "Base Color": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "IOR": 1,
+        "Roughness": 1
+      },
+      "normal_map": false,
+      "texture": false,
+      "reference_sha256": "d3b05d2370e083e8f5979e00c0b621748cd90e24d8eb58ca4dfc52a45c3cf55b"
+    }
+  ],
+  "suite": "special-surface",
+  "special_reference_version": 2,
+  "special_transport": {
+    "geometry": "shared closed smooth 80-triangle icosphere, radius 0.5; within native 128-triangle volume budget",
+    "cycles": "closed-solid refraction and random-walk subsurface; RNA volume_bounces=0 for direct single scattering",
+    "native": "single-interface screen/environment refraction, screen-space diffusion, homogeneous single scattering",
+    "alpha": "opaque only; Scene blended queue unsupported and separately rejected",
+    "volume": "Volume Only=1 disconnects Surface; Volume.* addresses Principled Volume inputs",
+    "volume_light_visibility": "self-extinction enabled; no external occluders"
+  }
+}

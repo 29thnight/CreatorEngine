@@ -1,0 +1,332 @@
+{
+  "schema": "creator.material.hdri-acceptance.v1",
+  "policy": {
+    "relative_rms": 0.01,
+    "p95_normalized": 0.01,
+    "max_normalized": 0.05,
+    "reference_repeat_relative_rms": 0.0025
+  },
+  "comparison": "Build\\Obj\\Mat9Images-Release-hdri-mis-full\\comparison.json",
+  "accepted": false,
+  "material_accepted_count": 3,
+  "material_count": 20,
+  "control_accepted_count": 3,
+  "control_count": 6,
+  "scope": "10 constant Core/Layered inputs, two HDRIs, no direct light; original area-light/textured grid excluded",
+  "geometry_sha256": "604cc50946887fdfd750d0166eb549c87b87caa23c83c0b9d2f936e24d4b9aed",
+  "diagnostics": {
+    "debug-normal": {
+      "max_abs": 8.028745651245117e-05
+    },
+    "debug-view": {
+      "max_abs": 5.751848220825195e-05
+    }
+  },
+  "cases": [
+    {
+      "id": "forest-core_base",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.0061824785380536085,
+      "p95_normalized": 0.0032377541065216064,
+      "max_normalized": 0.008371531963348389,
+      "reference_noise_rms": 0.007622927621673282
+    },
+    {
+      "id": "forest-core_metal",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.005924067210624905,
+      "p95_normalized": 0.0032196640968322754,
+      "max_normalized": 0.0226721872766186,
+      "reference_noise_rms": 0.0024606488089795866
+    },
+    {
+      "id": "forest-core_rough",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.005788275604918804,
+      "p95_normalized": 0.003678232431411743,
+      "max_normalized": 0.0068357884883880615,
+      "reference_noise_rms": 0.007209456235498013
+    },
+    {
+      "id": "forest-core_normal",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.00586909241028193,
+      "p95_normalized": 0.00398629903793335,
+      "max_normalized": 0.008899092674255371,
+      "reference_noise_rms": 0.007261893892159141
+    },
+    {
+      "id": "forest-core_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.00045539306303644597,
+      "p95_normalized": 0.0008309597416654289,
+      "max_normalized": 0.0024136147283766044,
+      "reference_noise_rms": 0.00022688417496794191
+    },
+    {
+      "id": "forest-layer_coat",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.006375420971114519,
+      "p95_normalized": 0.0024085193872451782,
+      "max_normalized": 0.007281601428985596,
+      "reference_noise_rms": 0.006890790498574965
+    },
+    {
+      "id": "forest-layer_sheen",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.005460959226315103,
+      "p95_normalized": 0.002754777669906616,
+      "max_normalized": 0.004681795835494995,
+      "reference_noise_rms": 0.006968953344714378
+    },
+    {
+      "id": "forest-layer_anisotropic",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "reference_noise"
+      ],
+      "relative_rms": 0.012625521146568524,
+      "p95_normalized": 0.006978094577789307,
+      "max_normalized": 0.032127030884734516,
+      "reference_noise_rms": 0.00820129619938949
+    },
+    {
+      "id": "forest-layer_thin_film",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.008678306505376663,
+      "p95_normalized": 0.0038617849349975586,
+      "max_normalized": 0.015730053186416626,
+      "reference_noise_rms": 0.00610901645839277
+    },
+    {
+      "id": "forest-layer_mixed",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.0062625501369353844,
+      "p95_normalized": 0.002619132399559021,
+      "max_normalized": 0.009676873683929443,
+      "reference_noise_rms": 0.006782454497950166
+    },
+    {
+      "id": "forest-control_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    },
+    {
+      "id": "forest-control_white",
+      "accepted": false,
+      "failed_targets": [
+        "reference_noise"
+      ],
+      "relative_rms": 0.0058110261474783,
+      "p95_normalized": 0.0052071213722229,
+      "max_normalized": 0.00955212116241455,
+      "reference_noise_rms": 0.007057504110826053
+    },
+    {
+      "id": "forest-control_mirror",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized"
+      ],
+      "relative_rms": 0.026331789305975524,
+      "p95_normalized": 0.02000156044960022,
+      "max_normalized": 0.18028586194051663,
+      "reference_noise_rms": 0.002361089371081101
+    },
+    {
+      "id": "autumn-core_base",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.07252063040110897,
+      "p95_normalized": 0.06916141510009766,
+      "max_normalized": 0.09750815485072836,
+      "reference_noise_rms": 0.012320032156401822
+    },
+    {
+      "id": "autumn-core_metal",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.06249680897908502,
+      "p95_normalized": 0.008477181196212769,
+      "max_normalized": 0.08953504788230163,
+      "reference_noise_rms": 0.0057005328027154205
+    },
+    {
+      "id": "autumn-core_rough",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.05737405844854725,
+      "p95_normalized": 0.05783921480178833,
+      "max_normalized": 0.08039426803588867,
+      "reference_noise_rms": 0.011549104297487678
+    },
+    {
+      "id": "autumn-core_normal",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.05650579540269482,
+      "p95_normalized": 0.061187803745269775,
+      "max_normalized": 0.08949142694473267,
+      "reference_noise_rms": 0.01147084380832037
+    },
+    {
+      "id": "autumn-core_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0018859567322818968,
+      "p95_normalized": 0.006859254854828972,
+      "max_normalized": 0.021274842550785603,
+      "reference_noise_rms": 0.0008095098611451458
+    },
+    {
+      "id": "autumn-layer_coat",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.0696580099666757,
+      "p95_normalized": 0.04324689507484436,
+      "max_normalized": 0.08558438936941785,
+      "reference_noise_rms": 0.01133235593745268
+    },
+    {
+      "id": "autumn-layer_sheen",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.043515556105802586,
+      "p95_normalized": 0.030357301235198975,
+      "max_normalized": 0.04189300537109375,
+      "reference_noise_rms": 0.010915133279255026
+    },
+    {
+      "id": "autumn-layer_anisotropic",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.07861558355196237,
+      "p95_normalized": 0.03668719530105591,
+      "max_normalized": 0.10522420059177673,
+      "reference_noise_rms": 0.012633414981654708
+    },
+    {
+      "id": "autumn-layer_thin_film",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.03588293788806085,
+      "p95_normalized": 0.025013834238052368,
+      "max_normalized": 0.06314319372177124,
+      "reference_noise_rms": 0.011045461212227931
+    },
+    {
+      "id": "autumn-layer_mixed",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.061926467662587095,
+      "p95_normalized": 0.043274521827697754,
+      "max_normalized": 0.08775959110240596,
+      "reference_noise_rms": 0.01125287326662752
+    },
+    {
+      "id": "autumn-control_emission",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.0,
+      "p95_normalized": 0.0,
+      "max_normalized": 0.0,
+      "reference_noise_rms": 0.0
+    },
+    {
+      "id": "autumn-control_white",
+      "accepted": false,
+      "failed_targets": [
+        "relative_rms",
+        "p95_normalized",
+        "max_normalized",
+        "reference_noise"
+      ],
+      "relative_rms": 0.05598422613984152,
+      "p95_normalized": 0.07744478710782793,
+      "max_normalized": 0.09861179101863371,
+      "reference_noise_rms": 0.011502701221488684
+    },
+    {
+      "id": "autumn-control_mirror",
+      "accepted": true,
+      "failed_targets": [],
+      "relative_rms": 0.005034013650741196,
+      "p95_normalized": 0.0014908313751220703,
+      "max_normalized": 0.013344433452520506,
+      "reference_noise_rms": 0.0001388514226843507
+    }
+  ]
+}

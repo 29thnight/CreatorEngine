@@ -108,7 +108,8 @@ SpecialForwardIntegral IntegrateSpecialForward(PrincipledSurface material, float
     if (material.transmissionWeight > 0.0 && material.metallic < 1.0)
     {
         const PrincipledSurface glass = SpecialGlass(material);
-        integral.glass = IntegrateLayeredReflection(glass, view, false);
+        // Glass retains its separate single-interface transmission budget.
+        integral.glass = IntegrateLayeredReflection(glass, view, false, false);
         integral.rawTransmission = IntegrateSpecialTransmission(glass, view);
     }
 #endif
@@ -144,11 +145,10 @@ SpecialForwardSurface BuildSpecialForwardSurface(PrincipledSurface material, flo
     surface.metalReflection = BuildPrincipledReflection(SpecialMetal(material));
     surface.dielectricReflection = BuildPrincipledReflection(SpecialDielectric(material));
     surface.glassReflection = BuildPrincipledReflection(surface.glass);
-    surface.metalMultiple = PrincipledMultipleScatter(integral.metal);
-    surface.dielectricMultiple = PrincipledMultipleScatter(integral.dielectric);
+    surface.metalMultiple = float3(0.0);
+    surface.dielectricMultiple = float3(0.0);
     surface.glassMultiple = PrincipledMultipleScatter(integral.glass);
-    const float remaining = max(1.0 - PrincipledMaxChannel(integral.dielectric.singleScatter
-        + surface.dielectricMultiple), 0.0);
+    const float remaining = max(1.0 - PrincipledMaxChannel(surface.layers.energy.dielectricAlbedo), 0.0);
     const float diffuseWeight = (1.0 - material.metallic) * (1.0 - material.transmissionWeight) * remaining;
     surface.diffuse = material.baseColor * diffuseWeight * (1.0 - material.subsurfaceWeight);
     surface.subsurface = saturate(material.baseColor) * diffuseWeight * material.subsurfaceWeight;
@@ -227,8 +227,8 @@ SpecialForwardLight EvaluateSpecialLight(SpecialForwardSurface surface, float3 t
             surface.layers.tangent, surface.layers.bitangent, surface.layers.alpha);
         const float dielectricWeight = (1.0 - material.metallic) * (1.0 - material.transmissionWeight);
         float3 reflection = distribution * visibility
-            * (material.metallic * EvaluatePrincipledFresnel(surface.metalReflection, vh)
-                + dielectricWeight * EvaluatePrincipledFresnel(surface.dielectricReflection, vh));
+            * (material.metallic * EvaluatePrincipledFresnel(surface.metalReflection, vh) * surface.layers.energy.metal
+                + dielectricWeight * EvaluatePrincipledFresnel(surface.dielectricReflection, vh) * surface.layers.energy.dielectric);
         const float glassAlpha = max(material.roughness * material.roughness, 1e-3);
         reflection += surface.glassWeight * EvaluatePrincipledFresnel(surface.glassReflection, vh)
             * DistributionGGX(saturate(dot(material.normal, halfVector)), glassAlpha)
@@ -279,8 +279,10 @@ SpecialForwardAmbient EvaluateSpecialIbl(SpecialForwardSurface surface, SpecialF
         material.occlusion, material.roughness);
     const PrincipledLayeredAmbient top = EvaluateLayeredIbl(surface.layers, environment.irradiance,
         environment.basePrefiltered, environment.coatPrefiltered, environment.sheenIrradiance);
-    const float3 baseReflection = material.metallic * surface.integral.metal.singleScatter
-        + dielectricWeight * surface.integral.dielectric.singleScatter;
+    const float3 normalization = min(float3(1.0), max(1.0 - surface.layers.baseDiffuse, 0.0)
+        / max(surface.integral.layers.base.singleScatter, 1e-20));
+    const float3 baseReflection = normalization * (material.metallic * surface.integral.metal.singleScatter
+        + dielectricWeight * surface.integral.dielectric.singleScatter);
     const float3 multiple = material.metallic * surface.metalMultiple
         + dielectricWeight * surface.dielectricMultiple + surface.glassWeight * surface.glassMultiple;
     SpecialForwardAmbient ambient;

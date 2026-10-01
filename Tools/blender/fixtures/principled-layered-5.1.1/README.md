@@ -30,9 +30,22 @@ reference against the pinned baseline, separately from the GPU/CPU comparison.
 EEVEE 5.1.1 does not evaluate Principled anisotropy or thin film. Those feature
 comparisons require a Cycles reference at MAT-9. The active film model now uses
 visible-spectrum Fourier sensitivity and three Airy terms. The historical
-`numeric-golden.csv`/`manifest.json` retain the former RGB-3 baseline. Active
-`numeric-golden-spectral.csv`/`spectral-manifest.json` pin the new double CPU
-baseline; the verifier also requires every non-film fixture to match history.
-Rendered material acceptance remains pending.
+`numeric-golden.csv`/`manifest.json` retain the former RGB-3 baseline.
+`numeric-golden-spectral.csv`/`spectral-manifest.json` pin the spectral-stage CPU
+baseline; non-film history was also checked before the common GGX correction.
+The prior per-case rendered acceptance is recorded separately below.
+
+`numeric-golden-transition.csv`/`transition-manifest.json` supplement the spectral
+baseline with 112 CPU rows for two 0.1nm boundary fixtures. They use the pinned
+Cycles cutoff and require 224 output components to equal the no-film control.
+Both earlier baselines remain immutable; this supplement does not accept images.
+
+`numeric-golden-ggx.csv`/`ggx-manifest.json` pin version 4's independent double
+CPU closure outputs after separate metal/dielectric GGX compensation and
+layering. `ggx-energy-manifest.json` pins Blender's unchanged E/Eavg/dielectric
+albedo tables, export source SHA and generated Slang/CPU header hashes. Earlier
+RGB-3, spectral and transition files remain immutable; optical/profile fields
+also remain checked against them. Same-input film/off images now pass their
+fixed targets: [GGX comparison](../../../../docs/analysis/MAT9GgxClosureComparison.md).
 
 Contract and validation scope: [PrincipledLayeredSemantics.md](../../../../docs/design/PrincipledLayeredSemantics.md).

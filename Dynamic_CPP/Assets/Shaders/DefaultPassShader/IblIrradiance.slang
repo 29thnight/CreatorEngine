@@ -45,5 +45,5 @@ float4 PSMain(VSOut input) : SV_TARGET
         float pdf = 0.5 * (cosinePdf + environmentPdf);
         sum += radiance * (cosinePdf / max(pdf, 1e-20));
     }
-    return float4(SanitizeRadiance(sum / float(2u * kIblImportanceSamples)), 1.0);
+    return float4(SanitizeEnvironmentRadiance(sum / float(2u * kIblImportanceSamples)), 1.0);
 }

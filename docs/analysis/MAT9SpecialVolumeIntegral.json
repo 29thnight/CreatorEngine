@@ -1,0 +1,34 @@
+{
+  "schema": "creator.material.single-volume-quadrature.v1",
+  "purpose": "independent fixed directional-light single scattering; no multiple-scattering claim",
+  "reference": "Build\\Obj\\Mat9SpecialVolumeReference-0",
+  "native_capture": "Build\\Obj\\Mat9Images-Release-special-volume-final\\Native",
+  "pixels": 303,
+  "geometry_sha256": "c14af82eea46c529393845d9c31724929931ea3e527f8bf5c488a4aa4df30282",
+  "quadrature_points": [
+    96,
+    192
+  ],
+  "convergence_relative_rms": 4.050973526004093e-07,
+  "native": {
+    "relative_rms": 0.0005173855538343456,
+    "mean_rgb": [
+      0.004893104545772076,
+      0.004893104545772076,
+      0.004893104545772076
+    ]
+  },
+  "cycles": {
+    "relative_rms": 5.1754566530530746e-05,
+    "mean_rgb": [
+      0.004895388148725033,
+      0.004895388148725033,
+      0.004895388148725033
+    ]
+  },
+  "quadrature_mean_rgb": [
+    0.004895412186103325,
+    0.004895412186103325,
+    0.004895412186103325
+  ]
+}

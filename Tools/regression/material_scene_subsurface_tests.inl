@@ -85,7 +85,8 @@ SceneSssProfile SssProfile(Vector color, double scale)
     const Vector radius{.25, .12, 0};
     for (unsigned c = 0; c < 3; ++c)
     {
-        const double extinction = 1 / std::max(radius[c] * scale, 1e-6);
+        const double meanFreePath = radius[c] * scale / (4 * kPi);
+        const double extinction = 1 / std::max(meanFreePath, 1e-6);
         const double absorption = extinction * (1 - Clamp(color[c]));
         const double reduced = std::max(absorption + extinction * Clamp(color[c]) * .8, 1e-8);
         const double diffusion = 1 / (3 * reduced);
@@ -444,27 +445,35 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                     const Vector viewDirection = Unit(Vector{0, 0, 2} - position);
                     const auto metalIntegral = Integrate(metalMaterial, viewDirection, false);
                     const auto dielectricIntegral = Integrate(dielectricMaterial, viewDirection, false);
-                    const Vector metalMultiple = Multiple(metalIntegral);
-                    const Vector dielectricMultiple = Multiple(dielectricIntegral);
-                    const double remainder = std::max(1 - Maximum(dielectricIntegral.single + dielectricMultiple), 0.0);
+                    // Independent double-precision GGX energy LUT evaluation;
+                    // compensation is multiplicative, without the retired diffuse lobe.
+                    auto energy = Energy(material, viewDirection);
+                    const double remainder = std::max(1 - Maximum(energy.dielectricAlbedo), 0.0);
+                    const Vector baseDiffuse = color * ((1 - material.metal) * remainder);
+                    const Vector normalization = ReflectionBudget(
+                        baseDiffuse, metalIntegral.single * material.metal +
+                                         dielectricIntegral.single * (1 - material.metal));
+                    energy.metal = energy.metal * normalization;
+                    energy.dielectric = energy.dielectric * normalization;
                     const Vector diffuse = color * ((1 - material.metal) * remainder * .2);
-                    const Vector multiple = metalMultiple * material.metal + dielectricMultiple * (1 - material.metal);
                     const Vector halfVector = Unit(viewDirection + light);
                     const auto frame = MakeFrame(material, false);
                     Vector result =
-                        (Fresnel(metalMaterial, Dot(viewDirection, halfVector)) * material.metal +
-                         Fresnel(dielectricMaterial, Dot(viewDirection, halfVector)) * (1 - material.metal)) *
+                        (Fresnel(metalMaterial, Dot(viewDirection, halfVector)) * energy.metal * material.metal +
+                         Fresnel(dielectricMaterial, Dot(viewDirection, halfVector)) * energy.dielectric *
+                             (1 - material.metal)) *
                         (Distribution(frame, halfVector) * Visibility(frame, viewDirection, light));
-                    result = (result + (multiple + diffuse) * (1 / kPi)) * light[2] * radiance;
+                    result = (result + diffuse * (1 / kPi)) * light[2] * radiance;
                     const Vector environmentColor = fixture == 2 ? Vector{} : Vector{2, 1, .5};
                     const double ao = Clamp(std::pow(Clamp(Dot(material.normal, viewDirection)) + .25,
                                                      std::exp2(-16 * material.roughness - 1)) -
                                             1 + .25);
                     result =
                         result +
-                        (metalIntegral.single * material.metal + dielectricIntegral.single * (1 - material.metal)) *
+                        normalization * (metalIntegral.single * material.metal +
+                                         dielectricIntegral.single * (1 - material.metal)) *
                             environmentColor * ao +
-                        (diffuse + multiple) * environmentColor * .25;
+                        diffuse * environmentColor * .25;
                     for (unsigned c = 0; c < 3; ++c)
                     {
                         float irradiance;

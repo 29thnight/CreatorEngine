@@ -186,7 +186,7 @@ bool SurfaceEvaluator::Initialize(IRenderDeviceServices& device, IRenderRootSign
     layout_ = std::move(layout);
     pipeline_ = pipeline;
     semanticKey_ = product.program.semanticKey;
-    layered_ = product.selection.tier == Tier::Layered;
+    principledGgx_ = (product.program.features & 0x17C0u) != 0;
     error.clear();
     return true;
 }
@@ -296,7 +296,7 @@ bool SurfaceEvaluator::PrepareInputs(IRenderDeviceServices& device, std::shared_
         std::array<std::uint32_t, 4> countTier;
         IblVector eye;
     };
-    const Constants constants{{candidate->Count(), layered_ ? 1u : 0u, 0, 0}, view.eye};
+    const Constants constants{{candidate->Count(), principledGgx_ ? 1u : 0u, 0, 0}, view.eye};
     candidate->inputs_ = candidate->mesh_ ? RHIBufferSlice::Whole(candidate->mesh_->Buffer())
                                           : device.AllocateUpload({points.size_bytes(), RHIUploadUsage::Raw, 16});
     candidate->uniform_ = device.UploadConstants(&constants, sizeof(constants));

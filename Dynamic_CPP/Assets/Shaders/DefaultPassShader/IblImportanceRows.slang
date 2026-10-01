@@ -19,7 +19,7 @@ float4 PSMain(float4 position : SV_POSITION) : SV_TARGET
     for (uint x = 0u; x <= pixel.x; ++x)
     {
         float2 uv = float2((float(x) + 0.5) * (2.0 / float(size)) - 1.0, v);
-        radiance = SanitizeRadiance(gCube.SampleLevel(gSampler,
+        radiance = SanitizeEnvironmentRadiance(gCube.SampleLevel(gSampler,
             IblFaceDirection(face, uv), gParams.y).rgb);
         weight += IblCellWeight(radiance, uv);
     }

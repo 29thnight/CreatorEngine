@@ -7,6 +7,7 @@
 #include "RHI/RHISubmissionThread.h"
 #include "Texture.h"
 #include "PathFinder.h"
+#include "RHI/RHIShaderCompiler.h"
 #include <chrono>
 #include <fstream>
 #include <iostream>
@@ -27,7 +28,7 @@ double EnvironmentElapsed(std::chrono::steady_clock::time_point start)
 }
 int wmain(int argc,wchar_t** argv)
 {
-    if (argc<4 || argc>5) { std::cerr<<"EnvironmentCooker <repo> <source-HDR/EXR> <output.ceibl> [decoded-RGBA32F]\n"; return 2; }
+    if (argc<4 || argc>5) { std::cerr<<"EnvironmentCooker <repo> <source-HDR/EXR> <output.ceibl> [decoded-RGBA32F|--check-cache|--check-shaders]\n"; return 2; }
     const HRESULT com=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
     try
     {
@@ -42,6 +43,26 @@ int wmain(int argc,wchar_t** argv)
         assets::EnvironmentIdentity identity;
         EnvironmentRequire(assets::EnvironmentSourceIdentity(source,identity.source,error),error);
         EnvironmentRequire(assets::EnvironmentRecipeIdentity(paths->ShaderSourcePath/"DefaultPassShader",cube,brdf,identity.recipe,error),error);
+        if(argc==5 && std::wstring_view(argv[4])==L"--check-shaders")
+        {
+            RHIShaderCompileOptions options;options.strictMath=true;
+            for(const auto backend:{RHIShaderBinary::Dxil,RHIShaderBinary::SpirV})
+            {
+                RHIShaderCompiler::VerifiedShader shader;
+                EnvironmentRequire(RHIShaderCompiler::VerifyFile(
+                    (paths->ShaderSourcePath/"DefaultPassShader/IblSceneImportance.slang").string(),
+                    "CSMain","cs_6_0",backend,{},shader,error,options),error);
+                options.strictMath=false;
+                for (const auto* stage : {"IblRectToCube.slang", "IblSourceCopy.slang", "IblCubeDownsample.slang",
+                     "IblIrradiance.slang", "IblPrefilter.slang", "IblImportanceSamples.slang"})
+                    EnvironmentRequire(RHIShaderCompiler::VerifyFile(
+                        (paths->ShaderSourcePath/"DefaultPassShader"/stage).string(),
+                        "PSMain","ps_5_0",backend,{},shader,error,options),error);
+                options.strictMath=true;
+            }
+            std::cout<<"ENVIRONMENT_IMPORTANCE_SHADER_OK DXIL=7 SPIRV=7\n";
+            CoUninitialize();return 0;
+        }
         assets::CookedEnvironment warm;
         const auto cacheStart=std::chrono::steady_clock::now();
         if (assets::ReadCookedEnvironment(output,warm,error,&identity))
@@ -92,6 +113,7 @@ int wmain(int argc,wchar_t** argv)
         } while (generator.HasPendingCookedCapture());
         assets::CookedEnvironment verify;
         EnvironmentRequire(assets::ReadCookedEnvironment(output,verify,error,&identity),error);
+        EnvironmentRequire(verify.importancePersisted && verify.source.IsValid(),"Cook must persist Scene importance maps and decoded source");
         // Re-upload every mip/face through the product texture cache and require
         // a second GPU readback to produce byte-identical cooked pixels.
         auto roundtrip=output; roundtrip += ".roundtrip";
@@ -110,10 +132,11 @@ int wmain(int argc,wchar_t** argv)
         EnvironmentRequire(assets::EnvironmentSourceIdentity(output,original,error) &&
             assets::EnvironmentSourceIdentity(roundtrip,copy,error) && original==copy,"Environment GPU upload roundtrip differs: "+error);
         std::filesystem::remove(roundtrip);
+        EnvironmentRequire(device.DrainDebugMessages(error)==0,"Environment GPU validation: "+error);
         const auto bytes=std::filesystem::file_size(output);
         generator.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown(); device.Shutdown();
         std::cout<<"ENVIRONMENT_COOK_OK generated_ms="<<generationMs<<" upload_readback_ms="<<uploadMs
-            <<" total_ms="<<EnvironmentElapsed(start)<<" bytes="<<bytes<<" maps=4 roundtrip=exact key="<<assets::EnvironmentCacheName(identity)<<'\n';
+            <<" total_ms="<<EnvironmentElapsed(start)<<" bytes="<<bytes<<" maps=8 roundtrip=exact importancePersisted=true validation=0 key="<<assets::EnvironmentCacheName(identity)<<'\n';
         CoUninitialize(); return 0;
     }
     catch(const std::exception& failure)

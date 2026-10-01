@@ -1,0 +1,403 @@
+{
+  "schema": "creator.material.hdri-convergence-baseline.v1",
+  "purpose": "historical native pixels vs new independent dense reference; not current product acceptance",
+  "native": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Images-Release-hdri-v4-full-initial\\Native",
+  "reference": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-v4-dense-0",
+  "repeat": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-v4-dense-11",
+  "capture_reference_samples": 4096,
+  "evaluation_reference_samples": 131072,
+  "geometry_and_material_and_environment_unchanged": true,
+  "captured_manifest_sha256": "1ce0539bfeec5376ee2aec14a7053aeea5593b39805f1c8824eb4d0b531fd27e",
+  "cases": [
+    {
+      "id": "forest-control_emission",
+      "reference": "dense131072",
+      "baseline": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "source_diagnostic": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "noise": 0.0
+    },
+    {
+      "id": "forest-control_mirror",
+      "reference": "dense131072",
+      "baseline": [
+        0.4693074592820445,
+        0.28108544647693634,
+        3.592394915453883
+      ],
+      "source_diagnostic": [
+        0.4693074592820445,
+        0.28108544647693634,
+        3.592394915453883
+      ],
+      "noise": 0.0034653777566350467
+    },
+    {
+      "id": "forest-control_white",
+      "reference": "dense131072",
+      "baseline": [
+        0.3583505481879054,
+        0.29847919940948486,
+        0.6992578506469727
+      ],
+      "source_diagnostic": [
+        0.3583505481879054,
+        0.29847919940948486,
+        0.6992578506469727
+      ],
+      "noise": 0.10977419943324587
+    },
+    {
+      "id": "forest-core_base",
+      "reference": "dense131072",
+      "baseline": [
+        0.31991014073531526,
+        0.1662924885749817,
+        0.4523754119873047
+      ],
+      "source_diagnostic": [
+        0.3208718886047159,
+        0.16936957836151123,
+        0.4523754119873047
+      ],
+      "noise": 0.12128762225594301
+    },
+    {
+      "id": "forest-core_emission",
+      "reference": "dense131072",
+      "baseline": [
+        0.024583672465079157,
+        0.049429323431506106,
+        0.07636740348700918
+      ],
+      "source_diagnostic": [
+        0.024786573772426778,
+        0.049811772879377735,
+        0.07636740348700918
+      ],
+      "noise": 0.004291074625475531
+    },
+    {
+      "id": "forest-core_metal",
+      "reference": "dense131072",
+      "baseline": [
+        0.4855795608395563,
+        0.30664801597595215,
+        1.356311803670735
+      ],
+      "source_diagnostic": [
+        0.5683211461010234,
+        0.3409385681152344,
+        1.3207557300853945
+      ],
+      "noise": 0.05932037431270375
+    },
+    {
+      "id": "forest-core_normal",
+      "reference": "dense131072",
+      "baseline": [
+        0.3363737021847449,
+        0.21482110023498535,
+        0.48324763774871826
+      ],
+      "source_diagnostic": [
+        0.3358766259081692,
+        0.2163141965866089,
+        0.48324763774871826
+      ],
+      "noise": 0.11238210259979357
+    },
+    {
+      "id": "forest-core_rough",
+      "reference": "dense131072",
+      "baseline": [
+        0.3373701659141745,
+        0.19983649253845215,
+        0.4643559455871582
+      ],
+      "source_diagnostic": [
+        0.33711628347720346,
+        0.19983649253845215,
+        0.4643559455871582
+      ],
+      "noise": 0.11149482743968558
+    },
+    {
+      "id": "forest-layer_anisotropic",
+      "reference": "dense131072",
+      "baseline": [
+        1.0659441026376042,
+        0.5791202187538147,
+        2.8860670906264794
+      ],
+      "source_diagnostic": [
+        1.1645482480495124,
+        0.6678551435470581,
+        3.060008032453405
+      ],
+      "noise": 0.0831959415960666
+    },
+    {
+      "id": "forest-layer_coat",
+      "reference": "dense131072",
+      "baseline": [
+        0.3233419976192283,
+        0.12022852897644043,
+        0.4034280776977539
+      ],
+      "source_diagnostic": [
+        0.30225041683793225,
+        0.1127004623413086,
+        0.29661059379577637
+      ],
+      "noise": 0.11765571110223184
+    },
+    {
+      "id": "forest-layer_mixed",
+      "reference": "dense131072",
+      "baseline": [
+        0.4102340388886041,
+        0.16137957572937012,
+        0.8001625537872314
+      ],
+      "source_diagnostic": [
+        0.3363278776938755,
+        0.15024542808532715,
+        0.45836567878723145
+      ],
+      "noise": 0.11523850549444675
+    },
+    {
+      "id": "forest-layer_sheen",
+      "reference": "dense131072",
+      "baseline": [
+        0.3435476106293916,
+        0.16402006149291992,
+        0.39260685443878174
+      ],
+      "source_diagnostic": [
+        0.3402001416688739,
+        0.16268491744995117,
+        0.39260685443878174
+      ],
+      "noise": 0.1089523984649448
+    },
+    {
+      "id": "forest-layer_thin_film",
+      "reference": "dense131072",
+      "baseline": [
+        0.6399671502392729,
+        0.275343656539917,
+        1.4339864253997803
+      ],
+      "source_diagnostic": [
+        0.5299098622024827,
+        0.2325206995010376,
+        1.0433614253997803
+      ],
+      "noise": 0.11289898727440463
+    },
+    {
+      "id": "autumn-control_emission",
+      "reference": "dense131072",
+      "baseline": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "source_diagnostic": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "noise": 0.0
+    },
+    {
+      "id": "autumn-control_mirror",
+      "reference": "dense131072",
+      "baseline": [
+        0.3275155519658804,
+        0.14154911041259766,
+        0.37339969647764687
+      ],
+      "source_diagnostic": [
+        0.3275155519658804,
+        0.14154911041259766,
+        0.37339969647764687
+      ],
+      "noise": 0.003211003061398248
+    },
+    {
+      "id": "autumn-control_white",
+      "reference": "dense131072",
+      "baseline": [
+        0.4116868495842437,
+        0.46808719635009766,
+        0.6476260638660666
+      ],
+      "source_diagnostic": [
+        0.4116868495842437,
+        0.46808719635009766,
+        0.6476260638660666
+      ],
+      "noise": 0.1596856491737671
+    },
+    {
+      "id": "autumn-core_base",
+      "reference": "dense131072",
+      "baseline": [
+        0.4418996175630705,
+        0.36820992827415466,
+        0.7529084744407267
+      ],
+      "source_diagnostic": [
+        0.4533495660821122,
+        0.3793954849243164,
+        0.6908801259807915
+      ],
+      "noise": 0.1714758004489837
+    },
+    {
+      "id": "autumn-core_emission",
+      "reference": "dense131072",
+      "baseline": [
+        0.030528938485212296,
+        0.07808672741594311,
+        0.32048863784879167
+      ],
+      "source_diagnostic": [
+        0.031985431061862656,
+        0.0863820798704937,
+        0.32048863784879167
+      ],
+      "noise": 0.01562720154746446
+    },
+    {
+      "id": "autumn-core_metal",
+      "reference": "dense131072",
+      "baseline": [
+        2.341792453946691,
+        0.24825632572174072,
+        2.473879069946913
+      ],
+      "source_diagnostic": [
+        1.6202122976585913,
+        0.2749979496002197,
+        1.6991269600430805
+      ],
+      "noise": 0.05422222467109623
+    },
+    {
+      "id": "autumn-core_normal",
+      "reference": "dense131072",
+      "baseline": [
+        0.4265024879132307,
+        0.4105031490325928,
+        0.760263204574585
+      ],
+      "source_diagnostic": [
+        0.44022255080663963,
+        0.42516589164733887,
+        0.7529432643548568
+      ],
+      "noise": 0.1599743159176951
+    },
+    {
+      "id": "autumn-core_rough",
+      "reference": "dense131072",
+      "baseline": [
+        0.3944800656212197,
+        0.32625794410705566,
+        0.48117637634277344
+      ],
+      "source_diagnostic": [
+        0.40109623927645655,
+        0.33379197120666504,
+        0.48117637634277344
+      ],
+      "noise": 0.1604144049316002
+    },
+    {
+      "id": "autumn-layer_anisotropic",
+      "reference": "dense131072",
+      "baseline": [
+        1.6344517134041674,
+        0.8991658687591553,
+        2.1745053702074175
+      ],
+      "source_diagnostic": [
+        1.429659736401957,
+        1.039642095565796,
+        1.7758719323524792
+      ],
+      "noise": 0.14941732229415322
+    },
+    {
+      "id": "autumn-layer_coat",
+      "reference": "dense131072",
+      "baseline": [
+        0.6214992165714452,
+        0.26078224182128906,
+        1.2524520244935342
+      ],
+      "source_diagnostic": [
+        0.6365098394394494,
+        0.271761417388916,
+        1.2524520244935342
+      ],
+      "noise": 0.17168196703369432
+    },
+    {
+      "id": "autumn-layer_mixed",
+      "reference": "dense131072",
+      "baseline": [
+        0.5311187965814175,
+        0.2803623676300049,
+        1.1667847633361816
+      ],
+      "source_diagnostic": [
+        0.5744836158613413,
+        0.3017008304595947,
+        1.2120908025747927
+      ],
+      "noise": 0.16261184774242485
+    },
+    {
+      "id": "autumn-layer_sheen",
+      "reference": "dense131072",
+      "baseline": [
+        0.4456042953080258,
+        0.2946019172668457,
+        0.43245553970336914
+      ],
+      "source_diagnostic": [
+        0.46459385328310004,
+        0.29892027378082275,
+        0.4461526870727539
+      ],
+      "noise": 0.15270116128588931
+    },
+    {
+      "id": "autumn-layer_thin_film",
+      "reference": "dense131072",
+      "baseline": [
+        0.8631072500801634,
+        0.6150305271148682,
+        1.2477755546569824
+      ],
+      "source_diagnostic": [
+        1.0034998153935117,
+        0.7088601589202881,
+        1.4430880546569824
+      ],
+      "noise": 0.1586567976917781
+    }
+  ]
+}

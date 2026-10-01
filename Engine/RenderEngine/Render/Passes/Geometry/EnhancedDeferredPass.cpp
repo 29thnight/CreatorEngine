@@ -192,9 +192,10 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
                               : RHITextureHandle{},
                     RHIFormat::R32Float, kShadowCascadeCount).OrNull(),
                 RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : RHITextureHandle{},
-                    kIblFormat, 1).OrNull(),
+                    hasIbl ? context.resources->DescribeTexture(m_iblIrradiance).format : kIblFormat, 1).OrNull(),
                 RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : RHITextureHandle{},
-                    kIblFormat, hasIbl ? m_iblPrefilterMips : 1).OrNull(),
+                    hasIbl ? context.resources->DescribeTexture(m_iblPrefiltered).format : kIblFormat,
+                    hasIbl ? m_iblPrefilterMips : 1).OrNull(),
                 RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : RHITextureHandle{},
                     kIblFormat).OrNull(),
                 RHIBindingDesc::Srv2D(m_ambientOcclusion.IsValid()

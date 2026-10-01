@@ -9,6 +9,10 @@ import shlex
 import struct
 import sys
 import zlib
+import re
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'blender'))
+from special_material_cases import BOUNCES as SPECIAL_BOUNCES, TRANSPORT as SPECIAL_TRANSPORT, definitions as special_definitions
+from special_material_cases import LEGACY_BOUNCES, LEGACY_TRANSPORT, volume_definitions, surface_definitions
 
 
 def read(path):
@@ -50,6 +54,15 @@ def validate_reference(root, manifest, reference_images=True):
     expected_camera = {'eye': [0, 0, 3], 'vertical_fov': math.pi / 4, 'near': .1, 'far': 10}
     light_length = math.sqrt(.35**2 + .2**2 + .8**2)
     direction = [.35/light_length, -.2/light_length, .8/light_length]
+    is_special = manifest.get('suite') in ('special','special-volume','special-surface')
+    recipe = manifest.get('special_reference_version',1)
+    if is_special and recipe not in (1,2):
+        raise ValueError('Unknown Special reference recipe')
+    bounces = dict(SPECIAL_BOUNCES if recipe==2 else LEGACY_BOUNCES) if is_special else {'max': 1, 'diffuse': 1, 'glossy': 1}
+    if is_special and 'diagnostic_volume_bounces' in manifest:
+        if manifest['diagnostic_volume_bounces'] not in (0,1):
+            raise ValueError('Unknown volume bounce diagnostic')
+        bounces['volume'] = manifest['diagnostic_volume_bounces']
     if (manifest['blender'] != '5.1.1' or manifest['renderer'] != 'CYCLES' or
             manifest['camera'] != expected_camera or
             manifest['pixel_filter'] != {'type': 'GAUSSIAN', 'width': .01} or
@@ -57,16 +70,55 @@ def validate_reference(root, manifest, reference_images=True):
             len(manifest['sun']['to_light']) != 3 or
             any(abs(a-b) > 1e-6 for a, b in zip(direction, manifest['sun']['to_light'])) or
             manifest['furnace'] != {'radiance': [1, 1, 1]} or
-            manifest['bounces'] != {'max': 1, 'diffuse': 1, 'glossy': 1}):
+            manifest['bounces'] != bounces):
         raise ValueError('Reference setup differs from native capture contract')
+    if is_special:
+        transport = dict(SPECIAL_TRANSPORT if recipe==2 else LEGACY_TRANSPORT)
+        if manifest.get('diagnostic_geometry'):
+            if manifest['diagnostic_geometry'] != 'flat-special-80':
+                raise ValueError('Unknown Special geometry diagnostic')
+            transport['geometry'] = transport['geometry'].replace('smooth', 'flat')
+        if manifest.get('diagnostic_volume_shadow', False) not in (False, True):
+            raise ValueError('Unknown volume visibility diagnostic')
+        if manifest.get('special_transport') != transport:
+            raise ValueError('Changed Special transport scope')
+    hdr = manifest.get('lighting') == 'hdri'
+    modes = ('forest', 'autumn') if hdr else ('sun', 'furnace')
+    if hdr:
+        if (set(manifest['environments']) != set(modes) or manifest['environment_coordinates'] !=
+                'Cycles outgoing (x,-z,y); engine longitude atan2(z,x), +Y up'):
+            raise ValueError('Changed HDRI setup')
+        config = {}
+        for line in (root/'environment.config').read_text(encoding='utf-8').splitlines():
+            match = re.fullmatch(r'(forest|autumn) (".*") (0\.35)', line)
+            if match is None or match[1] in config:
+                raise ValueError('Invalid environment configuration')
+            config[match[1]] = (json.loads(match[2]), float(match[3]))
+        for mode, record in manifest['environments'].items():
+            if config.get(mode) != (record['cooked'], record['strength']) or record['strength'] != .35:
+                raise ValueError('Environment capture contract differs')
+            for path_key, hash_key in (('source','source_sha256'), ('cooked','cooked_sha256')):
+                if hashlib.sha256(Path(record[path_key]).read_bytes()).hexdigest() != record[hash_key]:
+                    raise ValueError('Environment source/cook identity changed')
     expected = {case['id'] for case in manifest['cases']}
     if len(expected) != len(manifest['cases']) or {p.stem for p in root.glob('*.inputs')} != expected:
         raise ValueError('Changed or duplicate reference case list')
+    if is_special:
+        special_cases = (volume_definitions() if manifest['suite']=='special-volume' else
+                         surface_definitions() if manifest['suite']=='special-surface' else special_definitions())
+        fixed = {mode+'-'+name: {k: list(v) if isinstance(v, tuple) else v for k,v in values.items()}
+                 for mode in modes for name,values in special_cases}
+        # A subset must be explicitly declared as diagnostic, never full acceptance.
+        selected = manifest.get('diagnostic_subset', sorted(fixed))
+        if sorted(expected) != sorted(selected) or not expected <= fixed.keys():
+            raise ValueError('Changed fixed Special case list')
+        if any(case['inputs'] != fixed[case['id']] for case in manifest['cases']):
+            raise ValueError('Changed fixed Special input')
     if hashlib.sha256((root / 'sphere.bin').read_bytes()).hexdigest() != manifest['geometry_sha256']:
         raise ValueError('Reference geometry identity changed')
     for case in manifest['cases']:
         name = case['id']
-        if (case['normal_map'] or case['texture'] or name.split('-')[0] not in ('sun', 'furnace') or
+        if (case['normal_map'] or case['texture'] or name.split('-')[0] not in modes or
                 input_values(root / (name + '.inputs')) != case['inputs']):
             raise ValueError('Reference graph inputs changed: ' + name)
         if reference_images:
@@ -106,7 +158,8 @@ def main():
             raise ValueError('Noise comparison requires equal inputs/settings and distinct reference seeds')
         repeat = args.reference_repeat
     masks = {}
-    for mode in ('sun', 'furnace'):
+    modes = sorted({case['id'].split('-')[0] for case in manifest['cases']})
+    for mode in modes:
         a = read(args.reference / (mode + '-control_emission.f32'))
         b = read(args.native / (mode + '-control_emission.f32'))
         covered = [a[4*p+3] > .999 and b[4*p] > 1 for p in range(4096)]
@@ -125,6 +178,7 @@ def main():
         normalized = [abs(a[4*p+c]-b[4*p+c])/max(1,abs(a[4*p+c])) for p in indices for c in range(3)]
         reference_energy = sum(a[4*p+c]**2 for p in indices for c in range(3))
         row = {'id': name, 'interior_pixels': len(indices), 'max_abs': max(differences),
+               'native_sha256': hashlib.sha256((args.native/(name+'.f32')).read_bytes()).hexdigest(),
                'mean_abs': sum(differences)/len(differences), 'max_normalized': max(normalized),
                'p95_normalized': sorted(normalized)[int(.95*(len(normalized)-1))],
                'relative_rms': math.sqrt(sum(d*d for d in differences)/max(reference_energy,1e-20)),

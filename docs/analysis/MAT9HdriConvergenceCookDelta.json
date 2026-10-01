@@ -1,0 +1,85 @@
+{
+  "scope": "full lighting/source/CDF comparison; byte drift reported rather than hidden",
+  "environments": [
+    {
+      "environment": "forest",
+      "before": "Build\\Obj\\Mat9Hdri-forest-v4.ceibl",
+      "after": "Build\\Obj\\Mat9Hdri-forest-v5.ceibl",
+      "before_sha256": "fc0c61b3d72ad816585087d12ec0145a9bd0100ce3cf613a1fd18007f3af7ff7",
+      "after_sha256": "7b4e9ad53d806195b2fdf4af2cb0ac39dc2709524028eb2707d5dd3d9a631acb",
+      "lighting": [
+        {
+          "image": "environment",
+          "bytes_equal": true,
+          "different_components": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        {
+          "image": "irradiance",
+          "bytes_equal": true,
+          "different_components": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        {
+          "image": "prefilter",
+          "bytes_equal": false,
+          "different_components": 10212,
+          "max_abs": 0.0006046295166015625,
+          "relative_l2": 6.184961444776532e-08
+        },
+        {
+          "image": "brdf",
+          "bytes_equal": true,
+          "different_components": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        }
+      ],
+      "cdf_rows_marginal_bytes_equal": true,
+      "base_bank_bytes_equal": true,
+      "source_bytes_equal": true
+    },
+    {
+      "environment": "autumn",
+      "before": "Build\\Obj\\Mat9Hdri-autumn-v4.ceibl",
+      "after": "Build\\Obj\\Mat9Hdri-autumn-v5.ceibl",
+      "before_sha256": "f2ce3a108c33c82755a7e82932aaa50c8a5a9e087e4f7ac680fe5048ce0b8613",
+      "after_sha256": "63a59a27284f0a4ba0c6aa0cc17b7fb5d82d58ef0d1ad5bd040ec8828a168f58",
+      "lighting": [
+        {
+          "image": "environment",
+          "bytes_equal": true,
+          "different_components": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        {
+          "image": "irradiance",
+          "bytes_equal": true,
+          "different_components": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        },
+        {
+          "image": "prefilter",
+          "bytes_equal": false,
+          "different_components": 10625,
+          "max_abs": 9.5367431640625e-05,
+          "relative_l2": 3.629979836148887e-10
+        },
+        {
+          "image": "brdf",
+          "bytes_equal": true,
+          "different_components": 0,
+          "max_abs": 0.0,
+          "relative_l2": 0.0
+        }
+      ],
+      "cdf_rows_marginal_bytes_equal": true,
+      "base_bank_bytes_equal": true,
+      "source_bytes_equal": true
+    }
+  ]
+}

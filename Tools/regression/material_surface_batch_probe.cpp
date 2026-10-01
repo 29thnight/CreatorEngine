@@ -186,7 +186,7 @@ IblBakePoint ExpectedPoint(const SurfacePoint& input, const SurfaceView& view, f
     result.coatNormalSheenWeight = Pack4(layered ? Unit(Rgb4(input.normal)) : Vector{0, 0, 1}, layered ? .2 : 0);
     result.tangentRotation =
         Pack4(Projected(layered ? Rgb4(input.tangent) : Vector{1, 0, 0}, Unit(Rgb4(input.normal))), layered ? .25 : 0);
-    result.viewTier = Pack4(Unit(Rgb4(view.eye) - Rgb4(input.position)), layered ? 1 : 0);
+    result.viewTier = Pack4(Unit(Rgb4(view.eye) - Rgb4(input.position)), 1);
     return result;
 }
 
@@ -461,7 +461,7 @@ void Run(const std::filesystem::path& root)
                 std::array<std::uint32_t, 4> countTier;
                 IblVector eye;
             };
-            const Constants constants{{kPoints, tier, 0, 0}, view.eye};
+            const Constants constants{{kPoints, 1, 0, 0}, view.eye};
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, device.UploadConstants(&constants, sizeof(constants)));
             const auto spatial = device.AllocateUpload({points.size() * sizeof(SurfacePoint), RHIUploadUsage::Raw, 16});
             Check(spatial.IsWritable(), "Reference draw spatial upload");

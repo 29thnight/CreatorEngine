@@ -1,0 +1,15 @@
+{
+  "schema": "creator.environment-importance-verification.v1",
+  "cook": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-autumn-v4.ceibl",
+  "sha256": "f2ce3a108c33c82755a7e82932aaa50c8a5a9e087e4f7ac680fe5048ce0b8613",
+  "cube_size": 512,
+  "samples": 1024,
+  "rows": 3072,
+  "cached_pdf_max_relative_error": 4.10283262625582e-07,
+  "importance_persisted": true,
+  "source_persisted": true,
+  "source_bytes_equal": null,
+  "lighting_baseline": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Hdri-autumn-v3-final.ceibl",
+  "lighting_bytes_equal": true,
+  "bytes": 103028856
+}
