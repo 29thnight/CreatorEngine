@@ -65,6 +65,7 @@ staging/package/distribution 복사본과 `Build/ValidationArchive/RuntimeDistri
 | 검사 | 무엇을 지키는가 |
 |------|-----------------|
 | `verify-worker-pool.ps1` | PHASE 13 S0.5 공용 thread_pool·job_scheduler의 독립 Debug/Release 검사. 그룹 독립 대기·의존 fan-in·4096단계 빈 체인·parallel_for·외부 생산자·워커 대기 거부·capture 해제·예외 전파·종료 drain·재시작과, 대기를 제거한 변형의 실패를 확인한다. |
+| `verify-guid-registry.ps1` | 인스턴스 GUID 장부(`TypeTrait::GUIDCreator` — `make_guid()` · `InsertGUID` · `EraseGUID`)가 **프로그램에 하나**이고 동시 발급에서 겹치지 않는지. 장부는 원래 `TypeTrait.h` 의 `static std::set<HashedGuid> g_guids` 라 TU 마다 사본이 있었고 잠금이 없었다(PlayerModuleBoundaryAnalysis §10.6). ① 프로브를 `TypeTrait.cpp` **없이** 링크하면 GUIDCreator 정의 부재로 실패해야 한다 — 링크되면 정의가 헤더로 돌아와 TU 마다 사본이 된 것이고, 다른 이유의 실패는 통과로 읽지 않는다. ② 두 TU 의 8 스레드가 동시에 발급하고 다른 스레드가 넣고 지우며 흔드는 동안 발급값 16 만 개가 하나도 겹치지 않는다. CoCreateGuid 만 · MakeGUID · 경합 아래 비용을 `INFO` 로 남긴다(§10.6 의 "락 비용" 기록, 판정 아님). |
 | `verify-worker-pool-lifetime.ps1` | `-EnkiSourceDirectory <enkiTS 1.12의 src 폴더>`를 받아 별도 ASan 실행 파일을 만든다. 스케줄러 복사본의 pinned 게시/후속 읽기 사이를 1ms 넓혀 제출 중 조기 해제 변이는 `heap-use-after-free`로 실패하고 실제 어댑터는 통과하는지 검사한다. 설치된 라이브러리는 수정하지 않는다. |
 | `verify-worker-product.ps1` | `-Configuration Debug` 또는 `Release` Editor의 `worker.pool.probe` Commandlet. CreatorRobot을 실제 DataSystem 번들로 32회 요청하고 독립 완료 계수 32, 외부 생산자의 파일 읽기 64회·제출 스레드 실행 0회·실제 Foliage 73항목 갱신 완료를 검사한다. 실제 썸네일 UI 경로는 `verify-browser-thumbnail-contract.ps1`로 함께 검사한다. |
 | `verify-animation-playback.ps1` | PHASE 13 S0의 이벤트 구간·루프·역방향·레이어 선택 규칙. Debug/Release 격리 검사와 선택 제품 TU 컴파일(`-CompileProduct`). |

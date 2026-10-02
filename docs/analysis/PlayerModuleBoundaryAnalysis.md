@@ -594,6 +594,17 @@ Object·Texture·Material 생성은 비동기 로딩 경로에서도 일어난�
 항목은 Step 0의 지뢰 3종과 달리 **동작 변경을 수반한다**. 별도 슬라이스로
 떼어 락 비용을 재고(Release 기준) 진행할 것.
 
+**처리(2026-10-02)** — 단일화했다. `InsertGUID`·`EraseGUID`·`MakeGUID`의 정의와
+표(`std::set` + `std::mutex`)를 `TypeTrait.cpp`로 내리고 헤더에는 선언만 남겼다
+(`ComponentTypeIndex::Table()`과 같은 자리). `MakeGUID`는 확인과 삽입을 한 잠금
+안에서 한다. 표는 정적 소멸 순서에 걸리지 않게 일부러 해제하지 않는다
+(`ce::profiler()`와 같은 판단). 같은 헤더의 `static inline FileGuid nullFileGuid`도
+TU마다 사본이던 것을 `inline const`로 하나로 만들었다(쓰기 0건 확인).
+게이트는 `Tools/regression/verify-guid-registry.ps1` — 정의가 `TypeTrait.cpp`
+하나에만 있는지(없이 링크하면 실패해야 한다)와 두 TU·여러 스레드의 동시 발급
+유일성을 문다. ⚠ **락 비용은 아직 재지 않았다.** 같은 게이트가 CoCreateGuid 만 ·
+MakeGUID · 경합 아래 비용을 `INFO`로 내므로, Release 실행 결과를 여기에 적는다.
+
 ### 10.7 유리해진 조건 — Step 1의 절반이 이미 서 있다
 
 §9.2가 "신설"로 잡은 사이드카 배관이 실은 상당 부분 존재한다.

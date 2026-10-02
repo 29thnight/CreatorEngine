@@ -3,6 +3,9 @@
 #include <typeindex>
 #include <string_view>
 #include <unordered_map>
+// 이 헤더는 이제 std::set 을 쓰지 않는다(GUID 장부가 TypeTrait.cpp 로 내려갔다).
+// 그래도 남긴다 — 수백 TU 가 이 헤더를 지나므로 전이로 <set> 에 기대는 곳이 있을
+// 수 있고, 유니티 빌드는 그것을 가린다. 비유니티 정식 빌드로 확인한 뒤 뺀다.
 #include <set>
 #include <memory>
 #include <vector>
@@ -205,7 +208,13 @@ struct FileGuid
 
 };
 
-static inline FileGuid nullFileGuid{ Uuid::Nil() };
+// 비어 있는 FileGuid 의 비교 기준. 값으로만 읽힌다(비교·복사뿐, 쓰는 곳이 없다).
+//
+// ★ `static inline` 이었다. 이름공간 범위의 `static` 은 내부 연결이라 `inline` 이
+//   붙어도 include 한 TU 마다 사본이 따로 생긴다 — 사본 수백 개가 TU 마다 동적
+//   초기화를 치렀다. `inline const` 는 외부 연결이라 프로그램에 하나다. 초기화 순서가
+//   앞서는 정적 초기화에서 읽혀도 0 초기화된 값이 곧 Nil 이므로 뜻이 같다.
+inline const FileGuid nullFileGuid{ Uuid::Nil() };
 
 namespace std {
 	template <>
@@ -230,8 +239,6 @@ namespace std
 		}
 	};
 }
-
-static std::set<HashedGuid> g_guids;
 
 namespace TypeTrait
 {
@@ -284,30 +291,24 @@ namespace TypeTrait
 			return typeID;
 		}
 
-		static inline void InsertGUID(HashedGuid guid)
-		{
-			g_guids.insert(guid);
-		}
-
-		static inline void EraseGUID(HashedGuid guid)
-		{
-			g_guids.erase(guid);
-		}
-
-		static inline HashedGuid MakeGUID()
-		{
-			GUID guid = GenerateGUID();
-			HashedGuid hash = ConvertGUIDToHash(guid);
-			while (g_guids.find(hash) != g_guids.end())
-			{
-				guid = GenerateGUID();
-				hash = ConvertGUIDToHash(guid);
-			}
-			g_guids.insert(hash);
-
-			return hash;
-		}
-
+		// 인스턴스 GUID 장부. 정의와 표는 TypeTrait.cpp 에 있다.
+		//
+		// ★ 표가 이 헤더의 `static std::set<HashedGuid> g_guids;` 였다. 이름공간
+		//   범위 `static` 은 내부 연결이라 include 한 TU 마다(Core.Minimal 경유로
+		//   수백 개) 표가 따로 있었고, 이 세 함수는 inline 이라 링커가 TU 하나의
+		//   정의만 남겼다 — 어느 TU 의 표를 만지는지가 링커가 고른 사본에 달린
+		//   ODR 위반이었다. Object.h 의 InsertGUID 와 Object.cpp 의 EraseGUID 가
+		//   서로 다른 표를 볼 수 있었고, MakeGUID 의 충돌 회피는 그 표 하나에 들어간
+		//   것만 보았다. ConvertGUIDToHash 는 GUID 세 필드의 합(약 33 비트)이라
+		//   객체·자산이 수만 개면 충돌이 실제로 나는 크기다 — 회피는 프로그램 전체를
+		//   봐야 뜻이 있다.
+		//
+		// ★ 잠근다. 에셋 번들 적재(DataSystem::LoadAssetBundle)가 잡 스케줄러의
+		//   워커에서 Texture·Material 을 만들고, 그 멤버 초기화가 make_guid() 를
+		//   부른다. 전에는 같은 std::set 을 여러 워커가 잠금 없이 고쳤다.
+		static void InsertGUID(HashedGuid guid);
+		static void EraseGUID(HashedGuid guid);
+		static HashedGuid MakeGUID();
 	};
 
 	// 컴포넌트 타입의 런타임 순차 인덱스 + uint64 비트마스크 (SceneGraphRedesignPlan
