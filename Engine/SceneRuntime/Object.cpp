@@ -13,13 +13,6 @@
 #include "MeshRenderer.h"
 #include "Terrain.h"
 #include "FoliageComponent.h"
-#include "RigidBodyComponent.h"
-#include "BoxColliderComponent.h"
-#include "SphereColliderComponent.h"
-#include "CapsuleColliderComponent.h"
-#include "MeshCollider.h"
-#include "CharacterControllerComponent.h"
-#include "TerrainCollider.h"
 #include "TagManager.h"
 
 void Object::Destroy()
@@ -156,21 +149,21 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			sourceToClone[source->m_index] = newIndex;
 			rootFixups.push_back({ clone, sourceRootIndex });
 
-			if (!clone->m_tag.ToString().empty())
-				TagManager::GetInstance()->AddTagToObject(clone->m_tag.ToString(), clone);
-			if (!clone->m_layer.ToString().empty())
-				TagManager::GetInstance()->AddObjectToLayer(clone->m_layer.ToString(), clone);
+            if (!clone->m_tag.ToString().empty())
+                TagManager::GetInstance()->AddTagToObject(clone->m_tag.ToString(), clone);
 
-			if (sourceNode["m_components"])
-			{
-				for (const auto& componentNode : sourceNode["m_components"])
-				{
-					try { ComponentFactorys->LoadComponent(clone, Authoring::NodeViewAccess::Make(componentNode), true); }
+            if (!clone->SetLayer(clone->GetLayer()))
+                throw std::runtime_error("Invalid entity layer membership");
+            if (sourceNode["m_components"])
+            {
+                for (const auto& componentNode : sourceNode["m_components"])
+                {
+                    try { ComponentFactorys->LoadComponent(clone, Authoring::NodeViewAccess::Make(componentNode), true); }
 					catch (const std::exception& e) { Debug::PrintLog(spdlog::level::err, e.what()); }
-				}
-			}
+                }
+            }
 
-			if (nullptr != PrefabUtilitys && clone->m_prefabFileGuid != FileGuid{})
+            if (nullptr != PrefabUtilitys && clone->m_prefabFileGuid != FileGuid{})
 			{
 				if (Prefab* prefab = PrefabUtilitys->LoadPrefabGuid(clone->m_prefabFileGuid))
 					PrefabUtilitys->RegisterInstance(clone, prefab);

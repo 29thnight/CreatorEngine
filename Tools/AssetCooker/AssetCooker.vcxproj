@@ -90,6 +90,9 @@
     <ClCompile Include="AudioDecodeValidation.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Engine\Physics\Physics.vcxproj">
+      <Project>{2584186c-912c-4e2f-a8a3-f79a22591bca}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\..\Engine\RenderEngine\RenderEngine.vcxproj">
       <Project>{e9efbb7d-daf8-4744-a147-646c2ef38def}</Project>
     </ProjectReference>
@@ -97,6 +100,7 @@
       <Project>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</Project>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ItemGroup><ClInclude Include="CollisionGeometryCookProducer.h" /></ItemGroup>
+    <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

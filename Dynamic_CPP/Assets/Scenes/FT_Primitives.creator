@@ -5,11 +5,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 0
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -39,11 +38,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 1
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -77,11 +75,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 2
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -119,11 +116,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 3
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -191,11 +187,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 4
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -263,11 +258,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 5
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -335,11 +329,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 6
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -407,11 +400,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 7
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -479,11 +471,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 8
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -551,11 +542,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 9
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
@@ -623,11 +613,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 10
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d

@@ -215,12 +215,17 @@ namespace
 	{
 		ce::profiler_service service;
 		service.initialize();
+		service.publish_thread();
+		check_eq(service.thread_count(), std::uint32_t{ 0 },
+		         "publish-thread/no-registration — 안전 지점만으로 스레드를 등록하지 않는다");
+
 		service.register_thread("Probe");
 		service.record(1);
 
 		const ce::marker_id spanning = ce::marker<"SpanningScope">();
 
 		service.begin_scope(spanning);
+		service.publish_thread(); // Publishing a tail must preserve an open scope.
 		publish_frame_sync(service, 1);   // 열린 채로 프레임이 넘어간다
 		publish_frame_sync(service, 2);
 		service.end_scope();        // 3번째 프레임에서 닫힌다
@@ -3670,6 +3675,7 @@ ce::capture_session_ptr make_rich_capture(ce::profiler_service& service)
 	for (std::uint32_t frame = 1; frame <= 4; ++frame)
 	{
 		{
+			ce::profile_context_scope context{{0x100000002ULL, frame, 0x200000003ULL}};
 			ce::profile_scope outer{ service, ce::marker<"FileOuter">() };
 			busy_ticks(3);
 			{
@@ -3678,7 +3684,7 @@ ce::capture_session_ptr make_rich_capture(ce::profiler_service& service)
 			}
 			if (frame == 2)
 			{
-				service.mark_instant(ce::marker<"FileInstant">());
+				service.mark_instant(ce::marker<"FileInstant">(), ce::current_cpu_context);
 			}
 		}
 		if (frame == 3)
@@ -3699,7 +3705,8 @@ bool same_event(const ce::profile_event& a, const ce::profile_event& b)
 	       a.thread_slot == b.thread_slot && a.depth == b.depth &&
 	       a.flags == b.flags && a.queue == b.queue &&
 	       a.submission == b.submission && a.view == b.view &&
-	       a.reserved == b.reserved;
+	       a.reserved == b.reserved && a.cpu.session == b.cpu.session &&
+	       a.cpu.tick == b.cpu.tick && a.cpu.task == b.cpu.task;
 }
 
 // 두 캡처가 **뜻까지** 같은가. 수가 아니라 필드 전부를 본다.
@@ -3803,6 +3810,62 @@ void test_sparse_telemetry_attribution()
 		check((*decoded)->find_frame(10)->counters.size() == 1,
 		      "counter/missing — unavailable metrics are absent, not zero");
 	}
+}
+
+void test_owned_counters()
+{
+    ce::profiler_service service;
+    service.initialize({});
+    service.register_thread("OwnedCounterProbe");
+    service.set_counter_mask(ce::counter_bit(ce::counter_category::physics));
+    service.record(1);
+    const ce::cpu_span_context a{0x100000002ULL, 0x200000003ULL, 0};
+    const ce::cpu_span_context b{a.session, a.tick + 1, 0};
+    const ce::cpu_span_context c{a.session + 1, a.tick, 0};
+    const ce::profile_counter_sample samples[] = {
+        {ce::profile_counter_id::physics_bodies, 2, a},
+        {ce::profile_counter_id::physics_bodies, 3, a},
+        {ce::profile_counter_id::physics_bodies, 4, b},
+        {ce::profile_counter_id::physics_bodies, 8, c},
+    };
+    service.publish_counters(1, ce::counter_category::physics, samples);
+    publish_frame_sync(service, 1);
+    service.set_counter_mask(0);
+    service.publish_counters(2, ce::counter_category::physics, samples);
+    publish_frame_sync(service, 2);
+    pause_sync(service);
+    const auto capture = service.capture();
+    check(capture && capture->find_frame(1)->counters.size() == 3,
+          "owned-counter/merge — distinct scene/tick values survive one frame");
+    check(capture && capture->find_frame(2)->counters.empty(),
+          "owned-counter/mask — disabled physics produces no samples");
+    if (capture)
+    {
+        const auto& values = capture->find_frame(1)->counters;
+        check(values.size() == 3 && values[0].value == 3 && values[1].value == 4 && values[2].value == 8,
+              "owned-counter/replacement — only identical ownership replaces a sample");
+        const auto decoded = ce::decode_capture(ce::encode_capture(*capture));
+        bool preserved = decoded && (*decoded)->find_frame(1)->counters.size() == values.size();
+        if (preserved)
+            for (std::size_t i = 0; i < values.size(); ++i)
+            {
+                const auto& actual = (*decoded)->find_frame(1)->counters[i];
+                preserved &= actual.id == values[i].id && actual.value == values[i].value &&
+                    actual.cpu.session == values[i].cpu.session && actual.cpu.tick == values[i].cpu.tick;
+            }
+        check(preserved, "owned-counter/roundtrip — 64-bit scene/tick identities survive file encoding");
+        const auto legacy = ce::load_capture("Tools/regression/fixtures/physics-p3/profile-counter-v1.ceprof");
+        bool old_value = false;
+        if (legacy)
+            for (const auto& frame : (*legacy)->frames())
+                for (const auto& sample : frame.counters)
+                    old_value |= sample.id == ce::profile_counter_id::process_ram_mb && sample.value == 512 &&
+                        sample.cpu.session == 0 && sample.cpu.tick == 0 && sample.cpu.task == 0;
+        check(old_value, "owned-counter/legacy — counter chunk v1 retains value and has no ownership");
+        check(capture->dropped_counters() == 0, "owned-counter/no-loss — valid ownership is not dropped");
+    }
+    service.unregister_thread();
+    service.shutdown();
 }
 
  void test_counter_registry_and_mask()
@@ -4295,11 +4358,66 @@ void silence_crt_dialogs()
 #endif
 }
 
+void test_cpu_context()
+{
+    ce::profiler_service service;
+    service.initialize();
+    service.register_thread("ContextProbe");
+    service.record(1);
+    {
+        ce::profile_context_scope root{{0x100000002ULL, 0x200000003ULL, 0}};
+        ce::profile_scope outer{service, ce::marker<"ContextRoot">()};
+        {
+            ce::profile_context_scope task{{0x100000002ULL, 0x200000003ULL, 0x300000004ULL}};
+            ce::profile_scope inner{service, ce::marker<"ContextTask">()};
+            service.mark_instant(ce::marker<"ContextInstant">(), ce::current_cpu_context);
+        }
+        check(ce::current_cpu_context.task == 0, "context/restore — nested task restores tick context");
+        pause_sync(service); // The open root must retain its original ownership when truncated.
+    }
+    check(ce::current_cpu_context.session == 0, "context/exit — context does not leak into unrelated work");
+    const auto capture = service.capture();
+    check(bool(capture), "context/capture");
+    if (!capture) return;
+    unsigned found = 0;
+    for (const auto& frame : capture->frames())
+        for (const auto& event : frame.events)
+        {
+            const auto& name = capture->marker(event.marker).name;
+            if (!name.starts_with("Context")) continue;
+            ++found;
+            check(event.cpu.session == 0x100000002ULL && event.cpu.tick == 0x200000003ULL &&
+                  event.cpu.task == (name == "ContextRoot" ? 0 : 0x300000004ULL),
+                  "context/identity — scope, instant and truncated root preserve 64-bit ownership");
+            check(event.submission == 0 && event.queue == 0 && event.view == 0,
+                  "context/gpu — CPU ownership never occupies GPU fields");
+        }
+    check(found == 3, "context/events — task, instant and truncated root all survive");
+    const auto decoded = ce::decode_capture(ce::encode_capture(*capture));
+    check(bool(decoded), "context/decode");
+    if (decoded) check_same_capture(*capture, **decoded, "context/file");
+}
+
+void test_legacy_capture()
+{
+    const auto path = std::filesystem::path(__FILE__).parent_path() / "fixtures/physics-p3/profile-v1.ceprof";
+    const auto loaded = ce::load_capture(path);
+    check(loaded && (*loaded)->total_events() == 1, "file-v1/load — original 38-byte event remains readable");
+    if (loaded)
+    {
+        const auto& event = (*loaded)->frames()[0].events[0];
+        check(event.cpu.session == 0 && event.cpu.tick == 0 && event.cpu.task == 0,
+              "file-v1/context — absent ownership stays zero");
+    }
+}
+
 int main()
 {
 	silence_crt_dialogs();
 
 	test_marker_identity();
+	test_cpu_context();
+	test_legacy_capture();
 	test_basic_capture();
 	test_cross_frame_scope();
 	test_multithread_stress();
@@ -4359,6 +4477,7 @@ int main()
 	test_shutdown_retains_live_storage();
 	test_capture_vocabulary();
 	test_sparse_telemetry_attribution();
+	test_owned_counters();
 	test_counter_registry_and_mask();
 	test_counter_record_start_catches_up();
 	test_capture_file_round_trip();

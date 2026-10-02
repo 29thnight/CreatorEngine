@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "LightProperty.h"
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
@@ -7,13 +7,14 @@
 #include "SystemSchedule.h"
 #include "JobScheduler.h"
 #include "CameraSystem.h"
-#include "PhysicsManager.h"
 #include "AssetBundle.h"
 #include "TransformStore.h"
 #include "HierarchyStore.h"
 #include "DetachedEntityTransfer.h"
 #include "RenderProxyDirty.h"
-#include "EBodyType.h"
+#include "ScenePhysicsSimulation.h"
+#include "CollisionGeometryLibrary.h"
+#include "SceneLayerIndex.h"
 #include <mathematics/rect.hpp>
 // Entity.h를 온전히 include한다 — ReflectScene의 meta_property(m_Entities)가
 // vector<unique_ptr<Entity>> 리플렉션 등록에서 typeid(GameObject)를 요구하므로
@@ -38,6 +39,8 @@
 // (고정 기반 타입을 준 enum은 전방 선언이 가능하다)
 namespace Lifecycle { enum PhaseBits : uint16_t; }
 class Component;
+class PhysicsBodyComponent;
+class CharacterMovementComponent;
 class RenderScene;
 class SceneManager;
 class Scene;
@@ -45,7 +48,6 @@ template<typename Context> class BasicTweenManager;
 using TweenManager = BasicTweenManager<Scene>;
 class LightComponent;
 class MeshRenderer;
-class RigidBodyComponent;
 class TerrainComponent;
 class FoliageComponent;
 class DecalComponent;
@@ -54,12 +56,6 @@ class ImageComponent;
 class TextComponent;
 class SpriteSheetComponent;
 class ReferenceAssets;
-class BoxColliderComponent;
-class SphereColliderComponent;
-class CapsuleColliderComponent;
-class MeshColliderComponent;
-class CharacterControllerComponent;
-class TerrainColliderComponent;
 class Animator;
 struct TransformExecutionGraphState;
 struct SceneRenderRegistryState;
@@ -673,12 +669,38 @@ public:
 
     //Physics
     void FixedUpdate(float deltaSecond);
-    void OnTriggerEnter(const Collision& collider);
-    void OnTriggerStay(const Collision& collider);
-    void OnTriggerExit(const Collision& collider);
-    void OnCollisionEnter(const Collision& collider);
-    void OnCollisionStay(const Collision& collider);
-    void OnCollisionExit(const Collision& collider);
+    ce::physics::result<void> StartPhysicsSimulation();
+    ce::physics::result<void> StopPhysicsSimulation();
+    ce::physics::result<void> PreparePhysicsSceneExit();
+    ce::physics::result<void> RegisterPhysicsBody(PhysicsBodyComponent& component);
+    ce::physics::result<void> RegisterCharacterMovement(CharacterMovementComponent& component);
+    ce::physics::result<void> UnregisterCharacterMovement(CharacterMovementComponent& component);
+    ce::physics::result<void> UnregisterPhysicsBody(PhysicsBodyComponent& component);
+    ce::physics::result<PhysicsBodyComponent*> ResolvePhysicsBody(ce::physics::body_handle body) const;
+    ce::physics::result<ce::physics::query_result> RaycastPhysics(math::vector3 origin, math::vector3 direction, float distance,
+        std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter);
+    ce::physics::result<ce::physics::query_result> OverlapPhysics(const ce::physics::geometry& geometry, const ce::physics::pose& pose,
+        std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter);
+
+    template<class Publisher>
+    ce::physics::result<std::shared_ptr<const ce::physics::CollisionGeometry>>
+    PublishCollisionGeometry(const ce::physics::CollisionGeometrySource& source, Publisher&& publisher)
+    {
+        if (m_physicsSimulation.IsRunning())
+            return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0,
+                                                     "Geometry authoring is frozen during simulation"});
+
+        return m_collisionGeometry.Publish(source, std::forward<Publisher>(publisher));
+    }
+
+    ce::layers::result<void> AssignLayer(Entity& entity, ce::layers::layer_id layer);
+    ce::layers::result<std::span<const EntityHandle>> LayerMembers(ce::layers::layer_id layer) const;
+
+private:
+    [[reflgen::ignore]]
+    std::unique_ptr<SceneLayerIndex> m_layerIndex;
+
+public:
 
     //Game logic
     void Update(float deltaSecond);
@@ -690,7 +712,7 @@ public:
     // 그 뒤 DestroyLight/Components/GameObjects가 실제 해제를 한다.
     void EndFramePass();
 
-    void AllDestroyMark();
+    void AllDestroyMark(bool includePersistent = false);
 
 	// PHASE 15 H-b 잔존분(2026-09-05). `.data()`를 붙이면 string_view의 길이가
 	// 사라져 const char* 오버로드가 골라진다 — 널 종료가 없는 부분 뷰였다면
@@ -759,29 +781,6 @@ public:
 	void UnCollectSpriteSheetComponent(SpriteSheetComponent* ptr);
 
 public:
-	void CollectRigidBodyComponent(RigidBodyComponent* ptr);
-	void UnCollectRigidBodyComponent(RigidBodyComponent* ptr);
-
-	void CollectColliderComponent(BoxColliderComponent* ptr);
-	void CollectColliderComponent(SphereColliderComponent* ptr);
-	void CollectColliderComponent(CapsuleColliderComponent* ptr);
-	void CollectColliderComponent(MeshColliderComponent* ptr);
-	void CollectColliderComponent(CharacterControllerComponent* ptr);
-	void CollectColliderComponent(TerrainColliderComponent* ptr);
-
-public:
-	void UnCollectColliderComponent(BoxColliderComponent* ptr);
-	void UnCollectColliderComponent(SphereColliderComponent* ptr);
-	void UnCollectColliderComponent(CapsuleColliderComponent* ptr);
-	void UnCollectColliderComponent(MeshColliderComponent* ptr);
-	void UnCollectColliderComponent(CharacterControllerComponent* ptr);
-	void UnCollectColliderComponent(TerrainColliderComponent* ptr);
-
-	std::span<BoxColliderComponent* const> GetBoxColliderComponents() const;
-	std::span<SphereColliderComponent* const> GetSphereColliderComponents() const;
-	std::span<CapsuleColliderComponent* const> GetCapsuleColliderComponents() const;
-	std::span<CharacterControllerComponent* const> GetCharacterControllerComponents() const;
-
 public:
 	void AddCanvas(Entity* canvas);
 	void RemoveCanvas(Entity* canvas);
@@ -850,7 +849,6 @@ private:
 	static constexpr int kTraversalMaxDepth = 64;
 
 private:
-	void SetInternalPhysicData();
 
 public:
 	void AllUpdateWorldMatrix(
@@ -1080,35 +1078,28 @@ private:
     std::unordered_set<std::string> m_entityNameSet{};
 
 private:
-	friend class PhysicsManager;
-	using RigidBodyTypeLinkCallback = std::unordered_map<Entity*, std::function<void(const EBodyType&)>>;
-	using ColliderContainerType = std::unordered_map<PhysicsManager::ColliderID, PhysicsManager::ColliderInfo>;
+    friend class PhysicsBodyComponent;
+    friend class CharacterMovementComponent;
 
-	[[reflgen::ignore]]
-	std::vector<RigidBodyComponent*>            m_rigidBodyComponents;
+    ce::physics::result<void> CommitPhysicsLayers();
 
-	[[reflgen::ignore]]
-	std::vector<BoxColliderComponent*>          m_boxColliderComponents;
-
-	[[reflgen::ignore]]
-	std::vector<SphereColliderComponent*>       m_sphereColliderComponents;
-
-	[[reflgen::ignore]]
-	std::vector<CapsuleColliderComponent*>      m_capsuleColliderComponents;
-
-	[[reflgen::ignore]]
-	std::vector<MeshColliderComponent*>         m_meshColliderComponents;
-
-	[[reflgen::ignore]]
-	std::vector<CharacterControllerComponent*>  m_characterControllerComponents;
-
-	// m_terrainColliderComponents는 쓰기 전용(getter도 읽기도 없음)이라 걷어냈다 —
-	// 실제 물리 등록은 PhysicsManagers->AddCollider와 m_colliderContainer가 한다.
     [[reflgen::ignore]]
-    RigidBodyTypeLinkCallback					m_ColliderTypeLinkCallback;
+    std::vector<ScenePhysicsSimulation::layer_assignment> m_physicsLayerAssignments;
 
-	[[reflgen::ignore]]
-	ColliderContainerType						m_colliderContainer;
+    [[reflgen::ignore]]
+    ScenePhysicsSimulation m_physicsSimulation;
+
+    [[reflgen::ignore]]
+    ce::physics::CollisionGeometryLibrary m_collisionGeometry;
+
+    [[reflgen::ignore]]
+    std::unordered_map<ScenePhysicsSimulation::binding_id, PhysicsBodyComponent*> m_physicsBodies;
+
+    [[reflgen::ignore]]
+    std::unordered_map<ScenePhysicsSimulation::binding_id, CharacterMovementComponent*> m_physicsCharacters;
+
+    [[reflgen::ignore]]
+    std::vector<TransformWorldWrite> m_physicsTransformWrites;
 
 private:
 	// 이 씬에 속한 캔버스의 캐시. 소유가 아니다 — 수명은 m_Entities가 쥔다.

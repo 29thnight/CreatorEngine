@@ -27,6 +27,14 @@ namespace ce
 //   빈 껍데기가 된다 — 실제로 그렇게 썼다가 에디터의 이벤트가 0 이 됐고,
 //   "수집은 도는데 이벤트만 0" 이라는 모양으로 게이트가 잡았다.
 #if CE_SHIPPING
+	class profile_context_scope
+	{
+	public:
+		explicit profile_context_scope(cpu_span_context) {}
+		profile_context_scope(const profile_context_scope&) = delete;
+		profile_context_scope& operator=(const profile_context_scope&) = delete;
+	};
+
 
 	class profile_scope
 	{
@@ -42,6 +50,23 @@ namespace ce
 	inline void profile_instant(marker_id) {}
 
 #else
+	inline thread_local cpu_span_context current_cpu_context{};
+
+	class profile_context_scope
+	{
+	public:
+		explicit profile_context_scope(cpu_span_context value) noexcept : m_previous(current_cpu_context)
+		{
+			current_cpu_context = value;
+		}
+
+		~profile_context_scope() { current_cpu_context = m_previous; }
+		profile_context_scope(const profile_context_scope&) = delete;
+		profile_context_scope& operator=(const profile_context_scope&) = delete;
+
+	private:
+		cpu_span_context m_previous;
+	};
 
 	class profile_scope
 	{
@@ -58,7 +83,7 @@ namespace ce
 		profile_scope(profiler_service& service, marker_id id)
 			: m_service(&service)
 		{
-			m_service->begin_scope(id);
+			m_service->begin_scope(id, current_cpu_context);
 		}
 
 		~profile_scope()
@@ -81,12 +106,12 @@ namespace ce
 	//
 	//   짝은 부르는 쪽이 맞춰야 하므로, 훅을 받는 층에서 곧바로 RAII 로 다시
 	//   묶어라 — 실제로 렌더 스레드는 그렇게 쓴다.
-	inline void profile_scope_begin(marker_id id) { profiler().begin_scope(id); }
+	inline void profile_scope_begin(marker_id id) { profiler().begin_scope(id, current_cpu_context); }
 	inline void profile_scope_end() { profiler().end_scope(); }
 
 	// 길이가 없는 사건. RAII 로 묶을 짝이 없으므로 함수 하나다 —
 	// 짝이 없다는 것이 이 표기의 뜻 전부다.
-	inline void profile_instant(marker_id id) { profiler().mark_instant(id); }
+	inline void profile_instant(marker_id id) { profiler().mark_instant(id, current_cpu_context); }
 
 #endif
 }

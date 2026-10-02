@@ -1,4 +1,5 @@
-#pragma once
+﻿#pragma once
+class ProjectLayerSettings;
 #include "TimeSystem.h"
 #include "Entity.h"
 #include "DataSystem.h"
@@ -70,6 +71,8 @@ namespace Editor
 		void InvokeResizeFlag();
 
 	private:
+        std::shared_ptr<ProjectLayerSettings> m_projectLayers;
+
 		void StartPresentationThread();
 		void StopPresentationThread();
 		void PresentationThreadMain();

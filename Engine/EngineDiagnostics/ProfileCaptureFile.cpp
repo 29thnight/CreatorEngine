@@ -212,6 +212,9 @@ namespace ce::detail::capture_file_impl
 		out.put(value.submission);
 		out.put(value.view);
 		out.put(value.reserved);
+		out.put(value.cpu.session);
+		out.put(value.cpu.tick);
+		out.put(value.cpu.task);
 	}
 
 	std::vector<std::byte> encode_frames(const capture_session& capture)
@@ -249,6 +252,9 @@ namespace ce::detail::capture_file_impl
 				std::memcpy(&bits, &sample.value, sizeof(bits));
 				out.put(static_cast<std::uint16_t>(sample.id));
 				out.put(bits);
+				out.put(sample.cpu.session);
+				out.put(sample.cpu.tick);
+				out.put(sample.cpu.task);
 			}
 		}
 		return out.take();
@@ -330,7 +336,7 @@ namespace ce::detail::capture_file_impl
 			std::uint8_t kind = 0;
 			if (!in.get(value.slot) || !in.get(value.os_thread_id) || !in.get(kind) ||
 			    !in.get(value.track_order) || !in.get_string(value.name) ||
-			    kind > static_cast<std::uint8_t>(track_kind::other))
+			    kind > static_cast<std::uint8_t>(track_kind::physics_worker))
 			{
 				return std::unexpected(capture_file_error::malformed);
 			}
@@ -339,7 +345,7 @@ namespace ce::detail::capture_file_impl
 		return finish(in);
 	}
 
-	bool parse_event(byte_reader& in, profile_event& value)
+	bool parse_event(byte_reader& in, profile_event& value, std::uint32_t version)
 	{
 		std::uint64_t begin = 0;
 		std::uint64_t end = 0;
@@ -352,6 +358,13 @@ namespace ce::detail::capture_file_impl
 		{
 			return false;
 		}
+		if (version >= 2 && (!in.get(value.cpu.session) || !in.get(value.cpu.tick) || !in.get(value.cpu.task)))
+			return false;
+
+		if ((flags & static_cast<std::uint8_t>(event_flags::gpu_span)) != 0 &&
+		    (value.cpu.session != 0 || value.cpu.tick != 0 || value.cpu.task != 0))
+			return false;
+
 		value.tick_begin = begin;
 		value.tick_end = end;
 		value.marker = marker;
@@ -359,13 +372,13 @@ namespace ce::detail::capture_file_impl
 		return true;
 	}
 
-	parse_result parse_frame(byte_reader& in, frame_record& frame)
+	parse_result parse_frame(byte_reader& in, frame_record& frame, std::uint32_t version)
 	{
 		std::uint64_t begin = 0;
 		std::uint64_t end = 0;
 		std::uint32_t events = 0;
 		if (!in.get(frame.engine_frame) || !in.get(begin) || !in.get(end) ||
-		    !in.get(frame.dropped_events) || !in.get(events) || !in.can_hold(events, kEventBytes))
+		    !in.get(frame.dropped_events) || !in.get(events) || !in.can_hold(events, kEventBytes + (version >= 2 ? 24 : 0)))
 		{
 			return std::unexpected(capture_file_error::malformed);
 		}
@@ -375,7 +388,7 @@ namespace ce::detail::capture_file_impl
 		for (std::uint32_t eventIndex = 0; eventIndex < events; ++eventIndex)
 		{
 			profile_event& value = frame.events.mutable_at(eventIndex);
-			if (!parse_event(in, value))
+			if (!parse_event(in, value, version))
 			{
 				return std::unexpected(capture_file_error::malformed);
 			}
@@ -383,7 +396,7 @@ namespace ce::detail::capture_file_impl
 		return {};
 	}
 
-	parse_result parse_frames(byte_reader in, std::vector<frame_record>& frames)
+	parse_result parse_frames(byte_reader in, std::vector<frame_record>& frames, std::uint32_t version)
 	{
 		std::uint32_t count = 0;
 		if (!in.get(count) || !in.can_hold(count, kFrameHeadBytes))
@@ -393,7 +406,7 @@ namespace ce::detail::capture_file_impl
 		frames.resize(count);
 		for (std::size_t i = 0; i < frames.size(); ++i)
 		{
-			if (const parse_result parsed = parse_frame(in, frames[i]); !parsed)
+			if (const parse_result parsed = parse_frame(in, frames[i], version); !parsed)
 			{
 				return parsed;
 			}
@@ -408,7 +421,7 @@ namespace ce::detail::capture_file_impl
 	}
 
 	parse_result parse_counters(byte_reader in, std::vector<frame_record>& frames,
-	                            std::uint64_t& dropped)
+	                            std::uint64_t& dropped, std::uint32_t version)
 	{
 		std::uint32_t count = 0;
 		if (!in.get(dropped) || !in.get(count) || count != frames.size() || !in.can_hold(count, 8))
@@ -417,7 +430,7 @@ namespace ce::detail::capture_file_impl
 		{
 			std::uint32_t number = 0, samples = 0;
 			if (!in.get(number) || !in.get(samples) || number != frame.engine_frame ||
-			    !in.can_hold(samples, 10))
+			    !in.can_hold(samples, version >= 2 ? 34 : 10))
 				return std::unexpected(capture_file_error::malformed);
 			frame.counters.reserve(samples);
 			for (std::uint32_t i = 0; i < samples; ++i)
@@ -429,10 +442,13 @@ namespace ce::detail::capture_file_impl
 				profile_counter_sample sample{};
 				sample.id = static_cast<profile_counter_id>(id);
 				std::memcpy(&sample.value, &bits, sizeof(bits));
+				if (version >= 2 && (!in.get(sample.cpu.session) || !in.get(sample.cpu.tick) || !in.get(sample.cpu.task)))
+					return std::unexpected(capture_file_error::malformed);
 				if (!std::isfinite(sample.value))
 					return std::unexpected(capture_file_error::malformed);
 				for (const auto& existing : frame.counters)
-					if (existing.id == sample.id)
+					if (existing.id == sample.id && existing.cpu.session == sample.cpu.session &&
+				        existing.cpu.tick == sample.cpu.tick && existing.cpu.task == sample.cpu.task)
 						return std::unexpected(capture_file_error::malformed);
 				frame.counters.push_back(sample);
 			}
@@ -454,7 +470,7 @@ namespace ce::detail::capture_file_impl
 			if (!in.get(id) || !in.get(category) || !in.get_string(value.name) ||
 			    !in.get_string(value.unit) || id != i + 1 || value.name.empty() ||
 			    value.name.size() > 255 || value.unit.size() > 32 ||
-			    category == 0 || (category & (category - 1)) != 0 || category > counter_bit(counter_category::resources))
+			    category == 0 || (category & (category - 1)) != 0 || category > counter_bit(counter_category::physics))
 				return std::unexpected(capture_file_error::malformed);
 			value.id = static_cast<profile_counter_id>(id);
 			value.category = static_cast<counter_category>(category);
@@ -572,7 +588,7 @@ namespace ce
 		for (const auto& [type, body] : chunks)
 		{
 			out.put(static_cast<std::uint32_t>(type));
-			out.put(kChunkVersion);
+			out.put((type == chunk_type::frames || type == chunk_type::threads || type == chunk_type::counters) ? std::uint32_t{2} : kChunkVersion);
 			out.put(offset);
 			out.put(static_cast<std::uint64_t>(body.size()));
 			out.put(crc32(body));
@@ -610,6 +626,7 @@ namespace ce
 		std::uint64_t               droppedCounters = 0;
 		std::uint32_t               seen = 0;   // 필수 청크 넷의 비트
 		std::span<const std::byte> countersBody{};
+		std::uint32_t countersVersion = 1;
 
 		for (const chunk_entry& entry : *table)
 		{
@@ -619,7 +636,7 @@ namespace ce
 			{
 				return std::unexpected(capture_file_error::checksum_mismatch);
 			}
-			if (entry.version > kChunkVersion)
+			if (entry.version > ((entry.type == static_cast<std::uint32_t>(chunk_type::frames) || entry.type == static_cast<std::uint32_t>(chunk_type::threads) || entry.type == static_cast<std::uint32_t>(chunk_type::counters)) ? 2u : kChunkVersion))
 			{
 				return std::unexpected(capture_file_error::unsupported_version);
 			}
@@ -639,8 +656,8 @@ namespace ce
 				break;
 			case chunk_type::markers: parsed = parse_markers(byte_reader(body), markers); break;
 			case chunk_type::threads: parsed = parse_threads(byte_reader(body), threads); break;
-			case chunk_type::frames:  parsed = parse_frames(byte_reader(body), frames); break;
-			case chunk_type::counters: countersBody = body; break;
+			case chunk_type::frames:  parsed = parse_frames(byte_reader(body), frames, entry.version); break;
+			case chunk_type::counters: countersBody = body; countersVersion = entry.version; break;
 			case chunk_type::counter_descriptors:
 				parsed = parse_counter_descriptors(byte_reader(body), counterDescriptors); break;
 			default:
@@ -662,7 +679,7 @@ namespace ce
 		if (!countersBody.empty())
 		{
 			if (const parse_result parsed = parse_counters(byte_reader(countersBody), frames,
-			                                                droppedCounters); !parsed)
+			                                                droppedCounters, countersVersion); !parsed)
 				return std::unexpected(parsed.error());
 		}
 		const std::size_t knownCounters = counterDescriptors.empty() ? 5 : counterDescriptors.size();

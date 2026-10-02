@@ -91,6 +91,40 @@ namespace experiment::cooked
             .lexically_normal();
     }
 
+    bool CookedAssetCatalog::ReadCollisionGeometry(const AssetId& assetId, const ArtifactByteSource& bytes,
+        std::vector<std::byte>& out, std::string& failure) const
+    {
+        out.clear();
+        const auto* entry = Find(assetId);
+        std::uint64_t size = 0;
+        if (!entry || entry->kind != CookedAssetKind::CollisionGeometry || entry->formatVersion != 1 ||
+            !IsCollisionGeometryArtifactVirtualPath(entry->artifactPath) ||
+            !bytes.Size(entry->artifactPath, size, failure) || size != entry->byteSize || size < 68 || size > 256 * 1024 * 1024)
+        {
+            failure = "Collision geometry artifact missing or incompatible";
+            return false;
+        }
+        try
+        {
+            std::vector<std::byte> prepared(static_cast<std::size_t>(size));
+            if (!bytes.ReadAt(entry->artifactPath, 0, prepared, failure)) return false;
+
+            Sha256Digest digest;
+            if (!ComputeSha256(prepared, digest, failure) || digest != entry->contentSha256)
+            {
+                failure = "Collision geometry CEMF digest mismatch";
+                return false;
+            }
+            out.swap(prepared);
+            return true;
+        }
+        catch (const std::bad_alloc&)
+        {
+            failure = "Collision geometry artifact allocation failed";
+            return false;
+        }
+    }
+
     bool CookedAssetCatalog::OpenAudioClip(const AssetId& assetId,
         std::shared_ptr<const ArtifactByteSource> bytes,
         CookedAudioClipSource& out, std::string& failure) const

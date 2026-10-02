@@ -100,6 +100,7 @@ internal static class GamePackager
             foreach (var mount in new[] { "Assets", "ProjectSetting" })
                 Paths.CopyTree(Path.Combine(baseRoot, mount), Path.Combine(merged, mount), context.Cancellation);
             Paths.CopyTree(generated, merged, context.Cancellation);
+            PackageInputs.RemoveGeometrySources(merged);
             var mergedCook = AssetCooking.Validate(Path.Combine(merged, "Assets"), cook.ArtifactCount);
             if (mergedCook.ManifestSha256 != cook.ManifestSha256 || mergedCook.ArtifactBytes != cook.ArtifactBytes) throw new BuildException("Merged cook output changed.");
             var settingsFile = Path.Combine(merged, "ProjectSetting/EngineSettings.asset"); var settingsHash = Metadata.Hash(settingsFile);

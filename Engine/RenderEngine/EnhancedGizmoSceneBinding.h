@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <cstdint>
 #include <memory>
 #include <vector>
@@ -46,6 +46,8 @@ struct EnhancedGizmoSceneData
     uint32_t lightIcons{ 0 };
     uint32_t selectionShapes{ 0 };
     uint32_t colliderShapes{ 0 };
+    uint32_t unsupportedColliderShapes{ 0 }; // Cooked shape wireframes are not implemented yet.
+    uint32_t invalidColliderShapes{ 0 }; // Invalid primitive dimensions/scale/pose.
 };
 
 /// 활성 씬에서 기즈모 입력을 수집한다.

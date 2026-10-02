@@ -1,3 +1,4 @@
+#include "CollisionGeometryCookProducer.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedAudioClipFormat.h"
 #include "Experiment/Cooked/CookedModelCodec.h"
@@ -828,6 +829,8 @@ namespace
                         : ck::AudioSpatialKind::NonSpatial });
             }
 
+            if (source.extension() == ".cegeometry") continue; // Player uses the cooked UUID entry.
+
             entries.push_back(ck::AssetSourceManifestEntry{
                 assetId, sourcePath });
         }
@@ -1358,6 +1361,66 @@ namespace
             sceneProducts.push_back(std::move(product));
         }
 
+        std::vector<geometry_cook::Product> geometryProducts;
+        for (std::filesystem::recursive_directory_iterator iterator(assetRoot), end; iterator != end; ++iterator)
+        {
+            const auto relative = iterator->path().lexically_relative(assetRoot);
+            if (!relative.empty() && *relative.begin() == "Derived")
+            {
+                if (iterator->is_directory()) iterator.disable_recursion_pending();
+                continue;
+            }
+            if (!iterator->is_regular_file() || iterator->path().extension() != ".cegeometry") continue;
+
+            auto result = geometry_cook::Build(assetRoot, iterator->path());
+            if (!result || !artifactPaths.insert(result->entry.artifactPath).second)
+            {
+                std::cerr << "asset-cooker error: collision geometry cook/revision failed: " << iterator->path() << '\n';
+                return 3;
+            }
+            manifest.entries.push_back(result->entry);
+            geometryProducts.push_back(std::move(*result));
+        }
+
+        // UUID closure alone cannot prove a pinned geometry revision exists.
+        for (const auto& source : arguments.scenes)
+        {
+            std::string error;
+            const auto document = Authoring::ParsedDocument::ParseFile(source.string(), error);
+            if (!document) return 3;
+
+            std::vector<Authoring::ReadNode> pending{document.Root()};
+            while (!pending.empty())
+            {
+                const auto node = pending.back();
+                pending.pop_back();
+                if (node.IsMap())
+                {
+                    const auto asset = node["geometryAsset"];
+                    if (asset && asset.IsScalar() && !asset.AsString().empty())
+                    {
+                        experiment::AssetId id;
+                        const auto number = node["geometryRevision"];
+                        const auto text = number && number.IsScalar() ? number.AsString() : std::string{};
+                        std::uint64_t revision = 0;
+                        const auto parsed = std::from_chars(text.data(), text.data() + text.size(), revision);
+                        const auto found = std::ranges::find_if(geometryProducts, [&](const auto& product) {
+                            return Uuid::ToString(product.entry.assetId.value) == asset.AsString();
+                        });
+                        if (!experiment::TryParseCanonicalAssetId(asset.AsString(), id) || !revision ||
+                            parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() ||
+                            found == geometryProducts.end() || std::ranges::find(found->revisions, revision) == found->revisions.end())
+                        {
+                            std::cerr << "asset-cooker error: missing pinned collision geometry revision in " << source << '\n';
+                            return 3;
+                        }
+                    }
+                    for (const auto pair : node.Map()) pending.push_back(pair.value);
+                }
+                else if (node.IsSequence()) for (const auto child : node) pending.push_back(child);
+            }
+        }
+
         auto instanceSources = arguments.materials;
         instanceSources.insert(instanceSources.end(), arguments.scenes.begin(), arguments.scenes.end());
         for (const auto& source : instanceSources)
@@ -1571,6 +1634,15 @@ namespace
             if (!WriteAudioCookProduct(product, stagingRoot, failure))
             {
                 std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+        }
+
+        for (const auto& product : geometryProducts)
+        {
+            if (!WriteBinaryFile(stagingRoot / product.entry.artifactPath, product.bytes, failure))
+            {
+                std::cerr << "asset-cooker error: geometry artifact publication failed: " << failure << '\n';
                 return 5;
             }
         }

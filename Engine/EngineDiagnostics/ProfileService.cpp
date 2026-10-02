@@ -395,6 +395,14 @@ namespace ce
 		return tls_stream();
 	}
 
+	void profiler_service::publish_thread()
+	{
+		if (thread_stream* stream = tls_stream())
+		{
+			stream->publish_frame();
+		}
+	}
+
 	// ★ 상태 관문은 **여는 쪽에만** 있고, 그때도 짝을 예약하고 나간다.
 	//
 	//   두 쪽에 같은 관문을 걸면 pause·record 가 스코프 한가운데서 일어날 때
@@ -405,7 +413,7 @@ namespace ce
 	//   둘 다 조용하다 — 깊이만 밀릴 뿐 아무것도 실패하지 않는다. 툴바의
 	//   Pause 단추도 다른 스레드가 구간 안에 있을 때 눌리므로, CLI 를 붙이기
 	//   전에도 있던 결함이다.
-	void profiler_service::begin_scope(marker_id id)
+	void profiler_service::begin_scope(marker_id id, const cpu_span_context& cpu)
 	{
 		thread_stream* stream = current_stream();
 		if (!stream)
@@ -419,7 +427,7 @@ namespace ce
 			return;
 		}
 
-		stream->begin_scope(id, now(), m_engineFrame.load(std::memory_order_relaxed));
+		stream->begin_scope(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu);
 	}
 
 	void profiler_service::end_scope()
@@ -435,7 +443,7 @@ namespace ce
 		stream->end_scope(now());
 	}
 
-	void profiler_service::mark_instant(marker_id id)
+	void profiler_service::mark_instant(marker_id id, const cpu_span_context& cpu)
 	{
 		if (!m_initialized.load(std::memory_order_acquire))
 		{
@@ -449,7 +457,7 @@ namespace ce
 		thread_stream* stream = current_stream();
 		if (!stream) return;
 
-		stream->write_instant(id, now(), m_engineFrame.load(std::memory_order_relaxed));
+		stream->write_instant(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu);
 	}
 
 	void profiler_service::collect_sealed()

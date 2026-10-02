@@ -10,8 +10,6 @@
 #include "CameraComponent.h"
 #include "DataSystem.h"
 #include "AnimationController.h"
-#include "BoxColliderComponent.h"
-#include "CharacterControllerComponent.h"
 #include "Terrain.h"
 // I5-D5a: 죽은 include 청산 — Model 타입 사용 0건(착수 정찰 실측)
 #include "InvalidScriptComponent.h"

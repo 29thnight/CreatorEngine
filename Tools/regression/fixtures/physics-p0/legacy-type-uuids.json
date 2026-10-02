@@ -1,0 +1,10 @@
+{
+  "RigidBodyComponent": "7934f0df-0a5b-43d3-a645-d79e49d3aa82",
+  "BoxColliderComponent": "54adcb54-9e43-463a-b1fa-b1cef25fb788",
+  "SphereColliderComponent": "fc615921-be6a-4f34-9d48-36d9a13e724a",
+  "CapsuleColliderComponent": "aa90d64a-ddf5-4ebd-b82a-82d693843630",
+  "MeshColliderComponent": "ad4d45d9-15bc-4491-98ac-e916b53989b7",
+  "TerrainColliderComponent": "1f2ad305-15f7-4612-97ce-8dea548f19f2",
+  "CharacterControllerComponent": "c0ef9380-46b3-4c3d-83ca-36900f4ea9bc",
+  "RagdollComponent": "306b82eb-c865-4b89-97b7-f3b69a44688a"
+}

@@ -3,6 +3,8 @@ param([Parameter(Mandatory)][string]$EnkiSourceDirectory)
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
+. (Join-Path $PSScriptRoot 'Resolve-EnkiDependencies.ps1')
+$dependencies = Resolve-EnkiDependencies $repo
 $sourceDir = (Resolve-Path -LiteralPath $EnkiSourceDirectory).Path
 $vcRoot = 'C:/Program Files/Microsoft Visual Studio/18/Community/VC'
 $compiler = Get-ChildItem -LiteralPath (Join-Path $vcRoot 'Tools/MSVC') -Directory |
@@ -35,7 +37,7 @@ foreach ($mutant in @($true, $false)) {
     }
     $exe = Join-Path $variant 'probe.exe'
     $command = 'call "' + $vcRoot + '/Auxiliary/Build/vcvars64.bat" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /Zi /Od /MD /fsanitize=address /DWORKER_POOL_LIFETIME_STRESS ' +
-        '/I"' + (Join-Path $repo 'Engine/Utility_Framework') + '" /I"' + (Join-Path $repo 'vcpkg_installed/x64-windows/include') + '" /I"' + $sourceDir + '" ' +
+        '/I"' + (Join-Path $repo 'Engine/Utility_Framework') + '" /I"' + (Join-Path $dependencies 'include') + '" /I"' + $sourceDir + '" ' +
         '/Fo"' + $variant + '/" /Fd"' + $variant + '/probe.pdb" /Fe"' + $exe + '" "' + $worker + '" "' +
         (Join-Path $repo 'Engine/Utility_Framework/JobScheduler.cpp') + '" "' + (Join-Path $PSScriptRoot 'worker_pool_probe.cpp') + '" "' + $scheduler + '" /link /NODEFAULTLIB:enkiTS.lib'
     & $env:ComSpec /d /s /c $command

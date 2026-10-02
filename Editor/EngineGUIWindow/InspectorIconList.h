@@ -1,4 +1,5 @@
 #pragma once
+#include "PhysicsBodyComponent.h"
 // 타입 → 아이콘 지정 목록 (PHASE 21 W2-I4).
 //
 // **포크가 고치는 파일은 여기 하나다.** 자기 타입에 그림을 붙이려면 아래
@@ -107,14 +108,11 @@ CREATOR_INSPECTOR_ICON(Material, "Material")
 
 // ── 지형·식생 ───────────────────────────────────────────────────────────
 CREATOR_INSPECTOR_ICON(TerrainComponent, "Terrain")
-CREATOR_INSPECTOR_ICON(TerrainColliderComponent, "Terrain")
 CREATOR_INSPECTOR_ICON(FoliageComponent, "Terrain")
 
+CREATOR_INSPECTOR_ICON(PhysicsBodyComponent, "Bounds")
+
 // ── 물리 ────────────────────────────────────────────────────────────────
-CREATOR_INSPECTOR_ICON(BoxColliderComponent, "Bounds")
-CREATOR_INSPECTOR_ICON(SphereColliderComponent, "Bounds")
-CREATOR_INSPECTOR_ICON(CapsuleColliderComponent, "Bounds")
-CREATOR_INSPECTOR_ICON(MeshColliderComponent, "Bounds")
 CREATOR_INSPECTOR_ICON(Navigation, "Grid")
 
 // ── 애니메이션 ──────────────────────────────────────────────────────────
@@ -122,7 +120,6 @@ CREATOR_INSPECTOR_ICON(Animator, "AvatarMask")
 CREATOR_INSPECTOR_ICON(AnimationController, "AvatarMask")
 CREATOR_INSPECTOR_ICON(AvatarMask, "AvatarMask")
 CREATOR_INSPECTOR_ICON(BoneComponent, "AvatarMask")
-CREATOR_INSPECTOR_ICON(RagdollComponent, "AvatarMask")
 
 // ── 그래프 계통 ─────────────────────────────────────────────────────────
 CREATOR_INSPECTOR_ICON(BehaviorTreeComponent, "Graph")

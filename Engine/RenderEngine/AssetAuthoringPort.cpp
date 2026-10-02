@@ -1,4 +1,4 @@
-#include "Interfaces/AssetAuthoringPort.h"
+﻿#include "Interfaces/AssetAuthoringPort.h"
 
 #include <atomic>
 #include <mutex>
@@ -22,6 +22,8 @@ namespace
 		g_writeCollisionMatrixHandler{};
 	std::atomic<AssetAuthoringPort::WriteTagManagerHandler>
 		g_writeTagManagerHandler{};
+	std::atomic<AssetAuthoringPort::WriteLayerSettingsHandler>
+		g_writeLayerSettingsHandler{};
 	std::atomic<AssetAuthoringPort::WriteInputActionMapHandler>
 		g_writeInputActionMapHandler{};
 }
@@ -289,6 +291,35 @@ bool AssetAuthoringPort::WriteTagManager(
 {
 	const WriteTagManagerHandler handler =
 		g_writeTagManagerHandler.load(std::memory_order_acquire);
+	if (!handler) return false;
+	try
+	{
+		return handler(request);
+	}
+	catch (...)
+	{
+		return false;
+	}
+}
+
+void AssetAuthoringPort::InstallLayerSettingsWriter(
+	WriteLayerSettingsHandler handler) noexcept
+{
+	g_writeLayerSettingsHandler.store(handler, std::memory_order_release);
+}
+
+void AssetAuthoringPort::UninstallLayerSettingsWriter(
+	WriteLayerSettingsHandler handler) noexcept
+{
+	g_writeLayerSettingsHandler.compare_exchange_strong(
+		handler, nullptr, std::memory_order_acq_rel);
+}
+
+bool AssetAuthoringPort::WriteLayerSettings(
+	const UncatalogedAuthoringRequest& request) noexcept
+{
+	const WriteLayerSettingsHandler handler =
+		g_writeLayerSettingsHandler.load(std::memory_order_acquire);
 	if (!handler) return false;
 	try
 	{

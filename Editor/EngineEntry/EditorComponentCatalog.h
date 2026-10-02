@@ -42,8 +42,8 @@ namespace editor::components
         struct Group { std::string_view category, types; };
         constexpr std::array groups{
             Group{"Rendering", "|CameraComponent|LightComponent|MeshRenderer|SpriteRenderer|DecalComponent|SceneRenderProfileComponent|TerrainComponent|FoliageComponent|"},
-            Group{"Physics", "|BoxColliderComponent|SphereColliderComponent|CapsuleColliderComponent|RigidBodyComponent|CharacterControllerComponent|RagdollComponent|"},
             Group{"Animation", "|Animator|SpriteSheetComponent|"},
+            Group{"Physics", "|PhysicsBodyComponent|CharacterMovementComponent|"},
             Group{"Audio", "|SoundComponent|"},
             Group{"AI", "|StateMachineComponent|BehaviorTreeComponent|"},
             Group{"Input", "|PlayerInputComponent|"},

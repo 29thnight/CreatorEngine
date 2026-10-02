@@ -1,3 +1,4 @@
+﻿#include "ProjectLayerSettingsIO.h"
 #include "PlayerMain.h"
 
 // PHASE 14.5 LC8 — Player 명령 계층. Shipping 에서는 서비스 본문이 비고 lib 이
@@ -16,7 +17,6 @@
 #include "EngineBootstrap.h"
 #include "InputManager.h"
 #include "PathFinder.h"
-#include "Physx.h"
 #include "Scene.h"
 #include "SceneManager.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Editor와 같은 순서를 탄다.
@@ -123,7 +123,15 @@ Player::PlayerMain::~PlayerMain()
 
 void Player::PlayerMain::Initialize()
 {
+    if (!SceneManagers->ConfigureSimulationSession(SimulationSessionPolicy::mode::runtime))
+        throw std::runtime_error("Player simulation policy must be configured before startup");
+
 	TagManagers->Initialize();
+    const auto layers = ProjectLayerSettingsIO::Read(PathFinder::ProjectSettingPath(ProjectLayerSettingsIO::filename));
+    m_projectLayers = std::make_shared<ProjectLayerSettings>();
+    if (!layers || !m_projectLayers->Restore(*layers) || !SceneManagers->BindProjectLayerSettings(m_projectLayers))
+        throw std::runtime_error("Player requires valid CLYR project layers before scene startup");
+
 
 	// 화면 크기 버스의 첫 값 — 리사이즈 이후는
 	// CreateWindowSizeDependentResources가 같은 창에서 직접 읽어 알린다.
@@ -222,7 +230,6 @@ void Player::PlayerMain::Initialize()
 	});
 
 	SceneManagers->ManagerInitialize();
-	PhysicsManagers->Initialize();
 
 	// CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
@@ -471,6 +478,7 @@ void Player::PlayerMain::Finalize()
 
 	TagManagers->Finalize();
 	SceneManagers->Decommissioning();
+    m_projectLayers.reset();
 
 	// 에디터는 여기서 SaveSettings를 부른다 — 플레이어의 설정 루트는
 	// %TEMP% 언팩 사본이라 저장할 곳이 아니다.

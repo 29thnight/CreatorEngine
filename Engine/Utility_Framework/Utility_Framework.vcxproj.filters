@@ -334,4 +334,8 @@
       <Filter>Core.Memory\MemoryPool</Filter>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="LayerTypes.h" />
+    <ClInclude Include="LayerCatalog.h" />
+  </ItemGroup>
 </Project>

@@ -209,23 +209,11 @@
     <ClCompile Include="BlackBoard.cpp">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClCompile>
-    <ClCompile Include="BoxColliderComponent.cpp">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClCompile>
     <ClCompile Include="CameraSystem.cpp">
       <Filter>Classes\Components\CameraComponent</Filter>
     </ClCompile>
     <ClCompile Include="Canvas.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
-    </ClCompile>
-    <ClCompile Include="CapsuleColliderComponent.cpp">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="CharacterControllerComponent.cpp">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="CharacterControllerSystem.cpp">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
     <ClCompile Include="ClrHost.cpp">
       <Filter>Managers\ScriptHost</Filter>
@@ -305,9 +293,6 @@
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
     </ClCompile>
-    <ClCompile Include="PhysicsManager.cpp">
-      <Filter>Managers\PhysicsManager</Filter>
-    </ClCompile>
     <ClCompile Include="PlayerInput.cpp">
       <Filter>Classes\Components\InputComponent</Filter>
     </ClCompile>
@@ -329,12 +314,12 @@
     <ClCompile Include="RenderSceneBridge.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
-    <ClCompile Include="RigidBodyComponent.cpp">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClCompile>
     <ClCompile Include="RuntimeFrame.cpp">
       <Filter>Managers\SceneManager</Filter>
     </ClCompile>
+    <ClCompile Include="ScenePhysicsSimulation.cpp"><Filter>Scene</Filter></ClCompile>
+    <ClCompile Include="PhysicsBodyComponent.cpp"><Filter>Scene</Filter></ClCompile>
+    <ClCompile Include="CharacterMovementComponent.cpp"><Filter>Scene</Filter></ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
@@ -373,9 +358,6 @@
     </ClCompile>
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="TerrainCollider.cpp">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClCompile>
     <ClCompile Include="TextComponent.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
@@ -478,9 +460,6 @@
     <ClInclude Include="BoneMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="BoxColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="BTBuildGraph.h">
       <Filter>Classes\GameAI\AIFramework\BT\BuildEditHelper</Filter>
     </ClInclude>
@@ -507,15 +486,6 @@
     </ClInclude>
     <ClInclude Include="CanvasScaleMode.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
-    </ClInclude>
-    <ClInclude Include="CapsuleColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="CharacterControllerComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="CharacterControllerSystem.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="ClrHost.h">
       <Filter>Managers\ScriptHost</Filter>
@@ -619,9 +589,6 @@
     <ClInclude Include="ManagedAniBehavior.h">
       <Filter>Managers\ScriptHost</Filter>
     </ClInclude>
-    <ClInclude Include="MeshCollider.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="MaterialScriptBinding.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
@@ -631,6 +598,7 @@
     <ClInclude Include="ModelConsumptionDiagnostics.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="ModelCollisionGeometry.h" />
     <ClInclude Include="ModelSceneInstantiation.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
@@ -639,9 +607,6 @@
     </ClInclude>
     <ClInclude Include="Object.h">
       <Filter>Classes\Object</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsManager.h">
-      <Filter>Managers\PhysicsManager</Filter>
     </ClInclude>
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
@@ -655,22 +620,25 @@
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClInclude>
-    <ClInclude Include="RagdollComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="RectTransformComponent.h">
       <Filter>Classes\Components\Transform\2D</Filter>
     </ClInclude>
     <ClInclude Include="RenderableComponents.h">
       <Filter>Classes\Components\RenderableComponent\Base</Filter>
     </ClInclude>
-    <ClInclude Include="RigidBodyComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="RuntimeFrame.h">
       <Filter>Managers\SceneManager</Filter>
     </ClInclude>
     <ClInclude Include="AnimationDiagnostics.h" />
+    <ClInclude Include="ScenePhysicsSimulation.h"><Filter>Scene</Filter></ClInclude>
+    <ClInclude Include="SimulationSessionPolicy.h"><Filter>Scene</Filter></ClInclude>
+    <ClInclude Include="ScriptPhysicsABI.h" />
+    <ClInclude Include="PhysicsBodyComponent.h"><Filter>Scene</Filter></ClInclude>
+    <ClInclude Include="CharacterMovementComponent.h"><Filter>Scene</Filter></ClInclude>
+    <ClInclude Include="Scene.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterMotionPolicy.h"><Filter>Scene</Filter></ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>Scene</Filter>
     </ClInclude>
@@ -698,9 +666,6 @@
     <ClInclude Include="SoundSystem.h">
       <Filter>Classes\Components\SoundComponent</Filter>
     </ClInclude>
-    <ClInclude Include="SphereColliderComponent.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
-    </ClInclude>
     <ClInclude Include="SpriteRenderer.h">
       <Filter>Classes\Components\RenderableComponent\Sprite</Filter>
     </ClInclude>
@@ -715,9 +680,6 @@
     </ClInclude>
     <ClInclude Include="Terrain.h">
       <Filter>Classes\Components\TerrainComponent</Filter>
-    </ClInclude>
-    <ClInclude Include="TerrainCollider.h">
-      <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
     <ClInclude Include="TextComponent.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
@@ -757,5 +719,27 @@
     <None Include="Entity.inl">
       <Filter>Classes\GameObject</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SceneLayerIndex.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ProjectLayerSettings.h" />
+    <ClInclude Include="ProjectLayerSettingsCodec.h" />
+    <ClInclude Include="ProjectLayerSettingsIO.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EntityLayerSchema.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PhysicsPrimitivePreview.h" />
+    <ClInclude Include="PhysicsShapeDefinition.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CollisionGeometrySource.h" />
+    <ClInclude Include="CollisionGeometryCodec.h" />
+    <ClInclude Include="CollisionGeometryLibrary.h" />
+    <ClInclude Include="CollisionGeometryIO.h" />
+    <ClInclude Include="CookedCollisionGeometry.h" />
   </ItemGroup>
 </Project>

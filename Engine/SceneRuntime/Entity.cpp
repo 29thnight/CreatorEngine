@@ -1,4 +1,7 @@
+#include "PhysicsBodyComponent.h"
+#include "CharacterMovementComponent.h"
 #include "Entity.h"
+#include "EntityLayerSchema.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "Scene.h"
 #include "SceneManager.h"
@@ -104,19 +107,38 @@ void Entity::SetTag(std::string_view tag)
     }
 }
 
-void Entity::SetLayer(std::string_view layer)
+void Entity::OnBeforeDeserialize(const Authoring::NodeView& view) const
 {
-    if (layer.empty())
-    {
-        return;
-    }
+    const auto project = SceneManagers->ProjectLayers();
+    if (!project || !ce::layers::ReadEntityLayer(Authoring::NodeViewAccess::Node(view), project->Snapshot()->catalog))
+        throw std::runtime_error("Entity layer schema requires a registered stable ID; migrate legacy authoring first");
+}
 
-    if (TagManager::GetInstance()->HasLayer(layer))
-    {
-		size_t layerIndex = TagManager::GetInstance()->GetLayerIndex(layer); // Ensure layer is registered
-		m_layer = layer;
-		m_collisionType = (uint32)layerIndex;
-    }
+ce::layers::result<void> Entity::SetLayer(std::string_view name)
+{
+    const auto project = SceneManagers->ProjectLayers();
+    if (!project)
+        return std::unexpected(ce::layers::error::invalid_definition);
+
+    const auto snapshot = project->Snapshot();
+    const auto* layer = snapshot->catalog.Find(name);
+    if (!layer)
+        return std::unexpected(ce::layers::error::unknown_layer);
+
+    return SetLayer(layer->id);
+}
+
+ce::layers::result<void> Entity::SetLayer(ce::layers::layer_id layer)
+{
+    if (m_ownerScene && m_ownerScene->Resolve(m_ownerScene->HandleOf(m_index)) == this)
+        return m_ownerScene->AssignLayer(*this, layer);
+
+    const auto project = SceneManagers->ProjectLayers();
+    if (!project || !project->Snapshot()->catalog.Find(layer))
+        return std::unexpected(ce::layers::error::unknown_layer);
+
+    m_layerId = layer.value;
+    return {};
 }
 
 void Entity::Destroy()
@@ -132,14 +154,13 @@ void Entity::Destroy()
 	if (m_destroyMark)
 	{
 		return;
-	}
+    }
 
-	TagManager::GetInstance()->RemoveTagFromObject(m_tag.ToString(), this);
-	TagManager::GetInstance()->RemoveObjectFromLayer(m_layer.ToString(), this);
+    TagManager::GetInstance()->RemoveTagFromObject(m_tag.ToString(), this);
 
-	// 프리팹 인스턴스 목록에서 뺀다. 넣기만 하고 빼는 곳이 없어서 죽은 포인터가
-	// 목록에 남았고, 다음 UpdateInstances가 그것을 역참조했다.
-	PrefabUtilitys->UnregisterInstance(this);
+    // 프리팹 인스턴스 목록에서 뺀다. 넣기만 하고 빼는 곳이 없어서 죽은 포인터가
+    // 목록에 남았고, 다음 UpdateInstances가 그것을 역참조했다.
+    PrefabUtilitys->UnregisterInstance(this);
 
 	m_destroyMark = true;
 	TypeTrait::GUIDCreator::EraseGUID(m_instanceID);
@@ -211,6 +232,16 @@ void Entity::AttachComponentLifecycle(Component* component)
 	}
 }
 
+bool Entity::CanAttachComponentType(const HashedGuid& type) const
+{
+    if (type == type_guid(CharacterMovementComponent))
+        return FindComponentSlot(type_guid(PhysicsBodyComponent)) == kInvalidComponentSlot &&
+            FindComponentSlot(type_guid(CharacterMovementComponent)) == kInvalidComponentSlot;
+    if (type == type_guid(PhysicsBodyComponent))
+        return FindComponentSlot(type_guid(CharacterMovementComponent)) == kInvalidComponentSlot;
+    return true;
+}
+
 Component* Entity::AddComponent(const reflgen::type_descriptor& type)
 {
     const HashedGuid typeID = Meta::TypeIDOf(type);
@@ -224,6 +255,8 @@ Component* Entity::AddComponent(const reflgen::type_descriptor& type)
     // K2 스테이지 A: GameObject가 유일한 소유자이므로 고유 소유로 만든다.
     // reflgen 도입 P5: T* → Component* 는 서술자의 base 체인이 보정한다(옛 경로는 오프셋 0을 가정했다) —
     // Component 의 반영된 자손이 아니면 nullptr 이다. 삭제는 가상 소멸자(meta::polymorphic)가 파생 타입으로 한다.
+    if (!CanAttachComponentType(Meta::TypeIDOf(type))) return nullptr;
+
     std::unique_ptr<Component> component = Meta::Create<Component>(type);
 
     Component* rawComponent = component.get();
@@ -257,6 +290,8 @@ Component* Entity::AddComponent(const reflgen::type_descriptor& type)
 
 Component* Entity::AddComponentAllowMultiple(const reflgen::type_descriptor& type)
 {
+    if (!CanAttachComponentType(Meta::TypeIDOf(type))) return nullptr;
+
 	std::unique_ptr<Component> component = Meta::Create<Component>(type);
 
 	Component* rawComponent = component.get();
@@ -565,24 +600,12 @@ void Entity::SetEnabled(bool able)
 		{
 			childObj->SetEnabled(able);
 		}
-	}
-}
-
-void Entity::SetCollisionType()
-{
-	size_t index = TagManager::GetInstance()->GetLayerIndex(m_layer.ToString());
-	if (index >= TagManager::GetInstance()->GetLayers().size() || index > 32)
-	{
-		Debug::PrintLog(spdlog::level::err, "Invalid layer index: " + std::to_string(index));
-		return;
-	}
-
-	m_collisionType = (uint32)index; // Set the bit corresponding to the layer index
+    }
 }
 
 void Entity::RebuildComponentTypeMask()
 {
-	// 선언은 Entity.h — 여기 있는 이유(순환 회피)도 그쪽 주석에 있다.
+    // 선언은 Entity.h — 여기 있는 이유(순환 회피)도 그쪽 주석에 있다.
 	m_componentTypeMask = 0;
 	m_pTransformComponent = nullptr;
 	for (const auto& component : m_components)

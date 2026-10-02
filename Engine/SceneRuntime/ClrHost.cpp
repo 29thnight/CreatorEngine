@@ -1,10 +1,16 @@
-#include "EngineRuntimePaths.h"
+﻿#include "EngineRuntimePaths.h"
 #include "ScriptApiVersion.h"
 #include "ClrHost.h"
 #include "ProfileScope.h"
 #include "MaterialScriptBinding.h"
 #include "PathFinder.h"
 #include "Entity.h"
+#include "ScriptComponent.h"
+#include "PhysicsBodyComponent.h"
+#include "CharacterMovementComponent.h"
+#include "ScriptPhysicsABI.h"
+#include <array>
+#include <thread>
 #include "Transform.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -12,7 +18,6 @@
 #include "SoundComponent.h"
 #include "Animator.h"
 #include "ConditionParameter.h"
-#include "CharacterControllerComponent.h"
 #include "RectTransformComponent.h"
 #include "ImageComponent.h"
 #include "TextComponent.h"
@@ -24,11 +29,6 @@
 #include "LightComponent.h"
 #include "../RenderEngine/Material.h"
 #include "InputManager.h"
-#include "PhysicsManager.h"
-#include "RigidBodyComponent.h"
-#include "SphereColliderComponent.h"
-#include "BoxColliderComponent.h"
-#include "CapsuleColliderComponent.h"
 
 #include <nethost.h>
 #include <coreclr_delegates.h>
@@ -51,20 +51,8 @@ namespace
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
 	constexpr int kApiVersion = CreatorScriptApiVersion;
 
-	struct Float3 { float x, y, z; };
-
-	// 물리 질의 결과 하나. 관리 측 RaycastHit과 배치가 같아야 한다.
-	//
-	// 개수가 정해지지 않은 결과는 호출자가 준 버퍼에 채운다 — 경계 너머로 컨테이너를
-	// 넘기지 않고, 관리 측이 스택 버퍼를 쓰면 할당도 없다.
-	struct ScriptHitResult
-	{
-		ScriptObjectHandle object;
-		unsigned int layer;
-		Float3 point;
-		Float3 normal;
-		float distance;
-	};
+	using Float3 = ce::script::vector3;
+    std::thread::id g_physicsApiOwner;
 
 	// 쿼터니언 전용. math::vector4와 배치가 같아 그대로 오간다.
 	struct Float4 { float x, y, z, w; };
@@ -167,25 +155,6 @@ namespace
 		void  (__stdcall* Animator_SetUseLayer)(ScriptObjectHandle handle, int layerIndex, int useLayer);
 		void  (__stdcall* Animator_StopAnimation)(ScriptObjectHandle handle, float duration);
 
-		// CharacterControllerComponent (획득 47회 · 호출 약 60회 — 이동의 뼈대)
-		int   (__stdcall* Cct_Exists)(ScriptObjectHandle handle);
-		void  (__stdcall* Cct_Move)(ScriptObjectHandle handle, float inputX, float inputY);
-		void  (__stdcall* Cct_TriggerForcedMove)(ScriptObjectHandle handle, Float3 velocity, float duration);
-		void  (__stdcall* Cct_StopForcedMove)(ScriptObjectHandle handle);
-		int   (__stdcall* Cct_IsInForcedMove)(ScriptObjectHandle handle);
-		void  (__stdcall* Cct_SetAutomaticRotation)(ScriptObjectHandle handle, int useAuto);
-		void  (__stdcall* Cct_SetLookDirection)(ScriptObjectHandle handle, Float3 direction);
-		void  (__stdcall* Cct_ClearLookDirection)(ScriptObjectHandle handle);
-		void  (__stdcall* Cct_ForcedSetPosition)(ScriptObjectHandle handle, Float3 position);
-		float (__stdcall* Cct_GetBaseSpeed)(ScriptObjectHandle handle);
-		void  (__stdcall* Cct_SetBaseSpeed)(ScriptObjectHandle handle, float speed);
-		int   (__stdcall* Cct_IsOnMove)(ScriptObjectHandle handle);
-		void  (__stdcall* Cct_SetOnMove)(ScriptObjectHandle handle, int isMove);
-		int   (__stdcall* Cct_IsFalling)(ScriptObjectHandle handle);
-		float (__stdcall* Cct_GetRadius)(ScriptObjectHandle handle);
-		float (__stdcall* Cct_GetHeight)(ScriptObjectHandle handle);
-		unsigned int (__stdcall* Cct_GetId)(ScriptObjectHandle handle);
-
 		// RectTransformComponent (획득 28회 · SetAnchoredPosition만 39회)
 		int    (__stdcall* Rect_Exists)(ScriptObjectHandle handle);
 		Float2 (__stdcall* Rect_GetAnchoredPosition)(ScriptObjectHandle handle);
@@ -279,56 +248,23 @@ namespace
 		Float2 (__stdcall* Input_GetControllerThumbL)(int index);
 		Float2 (__stdcall* Input_GetControllerThumbR)(int index);
 
-		// 물리 질의 (Raycast 19 · SphereOverlap 16 — 타격 판정과 탐지의 뼈대)
-		int (__stdcall* Physics_Raycast)(Float3 origin, Float3 direction, float distance,
-			unsigned int layerMask, ScriptHitResult* hit);
-		int (__stdcall* Physics_RaycastAll)(Float3 origin, Float3 direction, float distance,
-			unsigned int layerMask, ScriptHitResult* buffer, int capacity);
-		int (__stdcall* Physics_OverlapSphere)(Float3 position, float radius,
-			unsigned int layerMask, ScriptHitResult* buffer, int capacity);
-
-		// RigidBodyComponent (실측 34회)
-		int   (__stdcall* Rigid_Exists)(ScriptObjectHandle handle);
-		Float3 (__stdcall* Rigid_GetLinearVelocity)(ScriptObjectHandle handle);
-		void  (__stdcall* Rigid_SetLinearVelocity)(ScriptObjectHandle handle, Float3 velocity);
-		void  (__stdcall* Rigid_AddLinearVelocity)(ScriptObjectHandle handle, Float3 velocity);
-		Float3 (__stdcall* Rigid_GetAngularVelocity)(ScriptObjectHandle handle);
-		void  (__stdcall* Rigid_SetAngularVelocity)(ScriptObjectHandle handle, Float3 velocity);
-		void  (__stdcall* Rigid_AddForce)(ScriptObjectHandle handle, Float3 force, int forceMode);
-		void  (__stdcall* Rigid_SetBodyType)(ScriptObjectHandle handle, int bodyType);
-		int   (__stdcall* Rigid_IsKinematic)(ScriptObjectHandle handle);
-		void  (__stdcall* Rigid_SetKinematic)(ScriptObjectHandle handle, int kinematic);
-		int   (__stdcall* Rigid_IsTrigger)(ScriptObjectHandle handle);
-		void  (__stdcall* Rigid_SetIsTrigger)(ScriptObjectHandle handle, int isTrigger);
-		int   (__stdcall* Rigid_IsColliderEnabled)(ScriptObjectHandle handle);
-		void  (__stdcall* Rigid_SetColliderEnabled)(ScriptObjectHandle handle, int enabled);
-		int   (__stdcall* Rigid_IsUsingGravity)(ScriptObjectHandle handle);
-		void  (__stdcall* Rigid_UseGravity)(ScriptObjectHandle handle, int useGravity);
-		float (__stdcall* Rigid_GetMass)(ScriptObjectHandle handle);
-		void  (__stdcall* Rigid_SetMass)(ScriptObjectHandle handle, float mass);
-		void  (__stdcall* Rigid_SetLinearDamping)(ScriptObjectHandle handle, float damping);
-		void  (__stdcall* Rigid_SetAngularDamping)(ScriptObjectHandle handle, float damping);
-		void  (__stdcall* Rigid_SetScale)(ScriptObjectHandle handle, Float3 scale);
-		void  (__stdcall* Rigid_SetLockLinear)(ScriptObjectHandle handle, int x, int y, int z);
-		void  (__stdcall* Rigid_SetLockAngular)(ScriptObjectHandle handle, int x, int y, int z);
-
-		// 콜라이더 3종. 표면이 거의 같아 종류를 인자로 받아 디스패치한다
-		// (kind: 0=Sphere 1=Box 2=Capsule).
-		int   (__stdcall* Collider_Exists)(ScriptObjectHandle handle, int kind);
-		float (__stdcall* Collider_GetRadius)(ScriptObjectHandle handle, int kind);
-		void  (__stdcall* Collider_SetRadius)(ScriptObjectHandle handle, int kind, float radius);
-		float (__stdcall* Collider_GetHeight)(ScriptObjectHandle handle, int kind);
-		void  (__stdcall* Collider_SetHeight)(ScriptObjectHandle handle, int kind, float height);
-		Float3 (__stdcall* Collider_GetExtents)(ScriptObjectHandle handle, int kind);
-		void  (__stdcall* Collider_SetExtents)(ScriptObjectHandle handle, int kind, Float3 extents);
-		Float3 (__stdcall* Collider_GetPositionOffset)(ScriptObjectHandle handle, int kind);
-		void  (__stdcall* Collider_SetPositionOffset)(ScriptObjectHandle handle, int kind, Float3 offset);
-		float (__stdcall* Collider_GetRestitution)(ScriptObjectHandle handle, int kind);
-		void  (__stdcall* Collider_SetRestitution)(ScriptObjectHandle handle, int kind, float value);
-		float (__stdcall* Collider_GetStaticFriction)(ScriptObjectHandle handle, int kind);
-		void  (__stdcall* Collider_SetStaticFriction)(ScriptObjectHandle handle, int kind, float value);
-		float (__stdcall* Collider_GetDynamicFriction)(ScriptObjectHandle handle, int kind);
-		void  (__stdcall* Collider_SetDynamicFriction)(ScriptObjectHandle handle, int kind, float value);
+        std::uint64_t (__stdcall* Body_Find)(ScriptObjectHandle owner);
+        std::uint64_t (__stdcall* Character_Find)(ScriptObjectHandle owner);
+        int (__stdcall* Character_Read)(ScriptObjectHandle owner, std::uint64_t instance, ce::script::physics_character_state* state);
+        int (__stdcall* Character_Velocity)(ScriptObjectHandle owner, std::uint64_t instance, Float3 velocity);
+        int (__stdcall* Character_Teleport)(ScriptObjectHandle owner, std::uint64_t instance, Float3 position);
+        int (__stdcall* Character_Jump)(ScriptObjectHandle owner, std::uint64_t instance);
+        int (__stdcall* Character_Force)(ScriptObjectHandle owner, std::uint64_t instance, Float3 velocity, double seconds);
+        int (__stdcall* Character_CancelForce)(ScriptObjectHandle owner, std::uint64_t instance);
+        int (__stdcall* Body_Read)(ScriptObjectHandle owner, std::uint64_t instance, ce::script::physics_body_state* state);
+        int (__stdcall* Body_Velocity)(ScriptObjectHandle owner, std::uint64_t instance, Float3 linear, Float3 angular);
+        int (__stdcall* Body_Force)(ScriptObjectHandle owner, std::uint64_t instance, Float3 linear, Float3 angular, int mode);
+        int (__stdcall* Body_ShapeCount)(ScriptObjectHandle owner, std::uint64_t instance, int* count);
+        int (__stdcall* Body_ShapeRead)(ScriptObjectHandle owner, std::uint64_t instance, int index, ce::script::physics_shape_state* shape);
+        int (__stdcall* Body_ShapeFlags)(ScriptObjectHandle owner, std::uint64_t instance, unsigned int shape, int sensor, int queryEnabled);
+        int (__stdcall* Physics_Query)(ScriptObjectHandle sceneAnchor, int kind, Float3 origin, Float3 direction,
+            float distanceOrRadius, unsigned int layers, int includeSensors, ce::script::physics_hit* hits,
+            int capacity, ce::script::physics_query_result* result);
 
 		// TextComponent (SetMessage 16 · SetAlpha 6)
 		int   (__stdcall* Text_Exists)(ScriptObjectHandle handle);
@@ -1008,118 +944,6 @@ namespace
 		if (auto* animator = ResolveAnimator(handle)) animator->StopAnimation(duration);
 	}
 
-	// ── CharacterControllerComponent ──
-	//
-	// 이동 입력은 Vector2를 그대로 넘기지 않고 float 둘로 편다 — 8바이트 구조체를
-	// ABI마다 다르게 다루는 위험을 굳이 떠안을 이유가 없다.
-
-	CharacterControllerComponent* ResolveCct(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object) ? object->GetComponent<CharacterControllerComponent>() : nullptr;
-	}
-
-	int __stdcall Api_Cct_Exists(ScriptObjectHandle handle)
-	{
-		return (nullptr != ResolveCct(handle)) ? 1 : 0;
-	}
-
-	void __stdcall Api_Cct_Move(ScriptObjectHandle handle, float inputX, float inputY)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->Move({ inputX, inputY });
-	}
-
-	void __stdcall Api_Cct_TriggerForcedMove(ScriptObjectHandle handle, Float3 velocity, float duration)
-	{
-		// 이징 곡선 인자는 넘기지 않는다 — 게임 스크립트 8곳 어디도 쓰지 않아서
-		// 엔진 기본값(None)으로 둔다. 필요해지면 enum을 C#에 미러링해 추가한다.
-		if (auto* cct = ResolveCct(handle))
-		{
-			cct->TriggerForcedMove({ velocity.x, velocity.y, velocity.z }, duration);
-		}
-	}
-
-	void __stdcall Api_Cct_StopForcedMove(ScriptObjectHandle handle)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->StopForcedMove();
-	}
-
-	int __stdcall Api_Cct_IsInForcedMove(ScriptObjectHandle handle)
-	{
-		auto* cct = ResolveCct(handle);
-		return (nullptr != cct && cct->IsInForcedMove()) ? 1 : 0;
-	}
-
-	void __stdcall Api_Cct_SetAutomaticRotation(ScriptObjectHandle handle, int useAuto)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->SetAutomaticRotation(0 != useAuto);
-	}
-
-	void __stdcall Api_Cct_SetLookDirection(ScriptObjectHandle handle, Float3 direction)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->SetLookDirection({ direction.x, direction.y, direction.z });
-	}
-
-	void __stdcall Api_Cct_ClearLookDirection(ScriptObjectHandle handle)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->ClearLookDirection();
-	}
-
-	void __stdcall Api_Cct_ForcedSetPosition(ScriptObjectHandle handle, Float3 position)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->ForcedSetPosition({ position.x, position.y, position.z });
-	}
-
-	float __stdcall Api_Cct_GetBaseSpeed(ScriptObjectHandle handle)
-	{
-		auto* cct = ResolveCct(handle);
-		return (nullptr != cct) ? cct->GetBaseSpeed() : 0.f;
-	}
-
-	void __stdcall Api_Cct_SetBaseSpeed(ScriptObjectHandle handle, float speed)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->SetBaseSpeed(speed);
-	}
-
-	int __stdcall Api_Cct_IsOnMove(ScriptObjectHandle handle)
-	{
-		auto* cct = ResolveCct(handle);
-		return (nullptr != cct && cct->IsOnMove()) ? 1 : 0;
-	}
-
-	void __stdcall Api_Cct_SetOnMove(ScriptObjectHandle handle, int isMove)
-	{
-		if (auto* cct = ResolveCct(handle)) cct->SetOnMove(0 != isMove);
-	}
-
-	int __stdcall Api_Cct_IsFalling(ScriptObjectHandle handle)
-	{
-		auto* cct = ResolveCct(handle);
-		return (nullptr != cct && cct->IsFalling()) ? 1 : 0;
-	}
-
-	// 아래 셋은 CharacterControllerInfo 구조체를 통째로 넘기는 대신 필드만 꺼낸다.
-	// 스크립트가 실제로 읽는 것은 radius(3회)와 id(2회)뿐이라, 구조체를 경계에
-	// 노출하면 필드가 하나 바뀔 때마다 양쪽 배치를 맞춰야 하는 부담만 남는다.
-
-	float __stdcall Api_Cct_GetRadius(ScriptObjectHandle handle)
-	{
-		auto* cct = ResolveCct(handle);
-		return (nullptr != cct) ? cct->GetControllerInfo().radius : 0.f;
-	}
-
-	float __stdcall Api_Cct_GetHeight(ScriptObjectHandle handle)
-	{
-		auto* cct = ResolveCct(handle);
-		return (nullptr != cct) ? cct->GetControllerInfo().height : 0.f;
-	}
-
-	unsigned int __stdcall Api_Cct_GetId(ScriptObjectHandle handle)
-	{
-		auto* cct = ResolveCct(handle);
-		return (nullptr != cct) ? cct->GetControllerInfo().id : 0u;
-	}
-
 	// ── RectTransformComponent ──
 
 	RectTransformComponent* ResolveRect(ScriptObjectHandle handle)
@@ -1685,395 +1509,263 @@ namespace
 		return { v.x, v.y };
 	}
 
-	// ── 물리 질의 ──
-	//
-	// 결과 개수가 정해지지 않아 호출자가 준 버퍼에 채우고 개수를 돌려준다.
-	// 반환값은 "실제로 맞은 개수"라 capacity보다 클 수 있다 — 잘렸는지 호출부가 알아야
-	// 버퍼를 늘릴지 판단할 수 있기 때문이다(버퍼에는 capacity까지만 쓴다).
-
-	void FillHitResult(ScriptHitResult& out, Entity* object, unsigned int layer,
-		const math::vector3& point, const math::vector3& normal, float distance)
-	{
-		out.object = (nullptr != object) ? ScriptObjectRegistry::Get().Register(object) : ScriptObjectHandle{};
-		out.layer = layer;
-		out.point = { point.x, point.y, point.z };
-		out.normal = { normal.x, normal.y, normal.z };
-		out.distance = distance;
-	}
-
-	int __stdcall Api_Physics_Raycast(Float3 origin, Float3 direction, float distance,
-		unsigned int layerMask, ScriptHitResult* hit)
-	{
-		if (nullptr == hit) return 0;
-
-		RayEvent rayEvent{};
-		rayEvent.origin = { origin.x, origin.y, origin.z };
-		rayEvent.direction = { direction.x, direction.y, direction.z };
-		rayEvent.distance = distance;
-		rayEvent.layerMask = layerMask;
-
-		RaycastHit result{};
-		if (!PhysicsManagers->Raycast(rayEvent, result)) return 0;
-
-		FillHitResult(*hit, result.hitObject, result.hitObjectLayer,
-			result.hitPoint, result.hitNormal, distance);
-		return 1;
-	}
-
-	int __stdcall Api_Physics_RaycastAll(Float3 origin, Float3 direction, float distance,
-		unsigned int layerMask, ScriptHitResult* buffer, int capacity)
-	{
-		if (nullptr == buffer || capacity <= 0) return 0;
-
-		RayEvent rayEvent{};
-		rayEvent.origin = { origin.x, origin.y, origin.z };
-		rayEvent.direction = { direction.x, direction.y, direction.z };
-		rayEvent.distance = distance;
-		rayEvent.layerMask = layerMask;
-
-		std::vector<RaycastHit> hits;
-		const int count = PhysicsManagers->Raycast(rayEvent, hits);
-
-		const int written = std::min(static_cast<int>(hits.size()), capacity);
-		for (int i = 0; i < written; ++i)
-		{
-			FillHitResult(buffer[i], hits[i].hitObject, hits[i].hitObjectLayer,
-				hits[i].hitPoint, hits[i].hitNormal, distance);
-		}
-
-		return count;
-	}
-
-	int __stdcall Api_Physics_OverlapSphere(Float3 position, float radius,
-		unsigned int layerMask, ScriptHitResult* buffer, int capacity)
-	{
-		if (nullptr == buffer || capacity <= 0) return 0;
-
-		OverlapInput input{};
-		input.position = { position.x, position.y, position.z };
-		input.rotation = math::quaternion::identity();
-		input.layerMask = layerMask;
-
-		std::vector<HitResult> hits;
-		const int count = PhysicsManagers->SphereOverlap(input, radius, hits);
-
-		const int written = std::min(static_cast<int>(hits.size()), capacity);
-		for (int i = 0; i < written; ++i)
-		{
-			FillHitResult(buffer[i], hits[i].gameObject, hits[i].layer,
-				hits[i].point, hits[i].normal, hits[i].distance);
-		}
-
-		return count;
-	}
-
-	// ── RigidBodyComponent ──
-
-	RigidBodyComponent* ResolveRigid(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object) ? object->GetComponent<RigidBodyComponent>() : nullptr;
-	}
-
-	int __stdcall Api_Rigid_Exists(ScriptObjectHandle handle)
-	{
-		return (nullptr != ResolveRigid(handle)) ? 1 : 0;
-	}
-
-	Float3 __stdcall Api_Rigid_GetLinearVelocity(ScriptObjectHandle handle)
-	{
-		auto* rigid = ResolveRigid(handle);
-		if (nullptr == rigid) return {};
-		const auto v = rigid->GetLinearVelocity();
-		return { v.x, v.y, v.z };
-	}
-
-	void __stdcall Api_Rigid_SetLinearVelocity(ScriptObjectHandle handle, Float3 velocity)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetLinearVelocity({ velocity.x, velocity.y, velocity.z });
-	}
-
-	void __stdcall Api_Rigid_AddLinearVelocity(ScriptObjectHandle handle, Float3 velocity)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->AddLinearVelocity({ velocity.x, velocity.y, velocity.z });
-	}
-
-	Float3 __stdcall Api_Rigid_GetAngularVelocity(ScriptObjectHandle handle)
-	{
-		auto* rigid = ResolveRigid(handle);
-		if (nullptr == rigid) return {};
-		const auto v = rigid->GetAngularVelocity();
-		return { v.x, v.y, v.z };
-	}
-
-	void __stdcall Api_Rigid_SetAngularVelocity(ScriptObjectHandle handle, Float3 velocity)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetAngularVelocity({ velocity.x, velocity.y, velocity.z });
-	}
-
-	void __stdcall Api_Rigid_AddForce(ScriptObjectHandle handle, Float3 force, int forceMode)
-	{
-		if (auto* rigid = ResolveRigid(handle))
-		{
-			rigid->AddForce({ force.x, force.y, force.z }, static_cast<EForceMode>(forceMode));
-		}
-	}
-
-	void __stdcall Api_Rigid_SetBodyType(ScriptObjectHandle handle, int bodyType)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetBodyType(static_cast<EBodyType>(bodyType));
-	}
-
-	int __stdcall Api_Rigid_IsKinematic(ScriptObjectHandle handle)
-	{
-		auto* rigid = ResolveRigid(handle);
-		return (nullptr != rigid && rigid->IsKinematic()) ? 1 : 0;
-	}
-
-	void __stdcall Api_Rigid_SetKinematic(ScriptObjectHandle handle, int kinematic)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetKinematic(0 != kinematic);
-	}
-
-	int __stdcall Api_Rigid_IsTrigger(ScriptObjectHandle handle)
-	{
-		auto* rigid = ResolveRigid(handle);
-		return (nullptr != rigid && rigid->IsTrigger()) ? 1 : 0;
-	}
-
-	void __stdcall Api_Rigid_SetIsTrigger(ScriptObjectHandle handle, int isTrigger)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetIsTrigger(0 != isTrigger);
-	}
-
-	int __stdcall Api_Rigid_IsColliderEnabled(ScriptObjectHandle handle)
-	{
-		auto* rigid = ResolveRigid(handle);
-		return (nullptr != rigid && rigid->IsColliderEnabled()) ? 1 : 0;
-	}
-
-	void __stdcall Api_Rigid_SetColliderEnabled(ScriptObjectHandle handle, int enabled)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetColliderEnabled(0 != enabled);
-	}
-
-	int __stdcall Api_Rigid_IsUsingGravity(ScriptObjectHandle handle)
-	{
-		auto* rigid = ResolveRigid(handle);
-		return (nullptr != rigid && rigid->IsUsingGravity()) ? 1 : 0;
-	}
-
-	void __stdcall Api_Rigid_UseGravity(ScriptObjectHandle handle, int useGravity)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->UseGravity(0 != useGravity);
-	}
-
-	float __stdcall Api_Rigid_GetMass(ScriptObjectHandle handle)
-	{
-		auto* rigid = ResolveRigid(handle);
-		return (nullptr != rigid) ? rigid->GetMass() : 0.f;
-	}
-
-	void __stdcall Api_Rigid_SetMass(ScriptObjectHandle handle, float mass)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetMass(mass);
-	}
-
-	void __stdcall Api_Rigid_SetLinearDamping(ScriptObjectHandle handle, float damping)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetLinearDamping(damping);
-	}
-
-	void __stdcall Api_Rigid_SetAngularDamping(ScriptObjectHandle handle, float damping)
-	{
-		if (auto* rigid = ResolveRigid(handle)) rigid->SetAngularDamping(damping);
-	}
-
-	void __stdcall Api_Rigid_SetScale(ScriptObjectHandle handle, Float3 scale)
-	{
-		auto* rigid = ResolveRigid(handle);
-		if (nullptr == rigid) return;
-
-		rigid->SetScale({ scale.x, scale.y, scale.z });
-	}
-
-	void __stdcall Api_Rigid_SetLockLinear(ScriptObjectHandle handle, int x, int y, int z)
-	{
-		auto* rigid = ResolveRigid(handle);
-		if (nullptr == rigid) return;
-
-		rigid->SetLockLinearX(0 != x);
-		rigid->SetLockLinearY(0 != y);
-		rigid->SetLockLinearZ(0 != z);
-	}
-
-	void __stdcall Api_Rigid_SetLockAngular(ScriptObjectHandle handle, int x, int y, int z)
-	{
-		auto* rigid = ResolveRigid(handle);
-		if (nullptr == rigid) return;
-
-		rigid->SetLockAngularX(0 != x);
-		rigid->SetLockAngularY(0 != y);
-		rigid->SetLockAngularZ(0 != z);
-	}
-
-	// ── 콜라이더 3종 ──
-	//
-	// Sphere·Box·Capsule은 표면이 거의 같은데 공통 기반(ICollider)에는 크기·마찰이
-	// 올라와 있지 않다. 타입마다 함수를 세 벌 만드는 대신 종류를 인자로 받아 디스패치한다.
-	// 없는 조합(구의 높이 등)은 조용히 기본값으로 빠진다.
-
-	enum class ColliderKind : int { Sphere = 0, Box = 1, Capsule = 2 };
-
-	template <typename TCollider>
-	TCollider* ResolveColliderAs(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object) ? object->GetComponent<TCollider>() : nullptr;
-	}
-
-	int __stdcall Api_Collider_Exists(ScriptObjectHandle handle, int kind)
-	{
-		switch (static_cast<ColliderKind>(kind))
-		{
-		case ColliderKind::Sphere:  return (nullptr != ResolveColliderAs<SphereColliderComponent>(handle)) ? 1 : 0;
-		case ColliderKind::Box:     return (nullptr != ResolveColliderAs<BoxColliderComponent>(handle)) ? 1 : 0;
-		case ColliderKind::Capsule: return (nullptr != ResolveColliderAs<CapsuleColliderComponent>(handle)) ? 1 : 0;
-		default: return 0;
-		}
-	}
-
-	float __stdcall Api_Collider_GetRadius(ScriptObjectHandle handle, int kind)
-	{
-		if (ColliderKind::Sphere == static_cast<ColliderKind>(kind))
-		{
-			auto* c = ResolveColliderAs<SphereColliderComponent>(handle);
-			return (nullptr != c) ? c->GetRadius() : 0.f;
-		}
-		if (ColliderKind::Capsule == static_cast<ColliderKind>(kind))
-		{
-			auto* c = ResolveColliderAs<CapsuleColliderComponent>(handle);
-			return (nullptr != c) ? c->GetRadius() : 0.f;
-		}
-		return 0.f;
-	}
-
-	void __stdcall Api_Collider_SetRadius(ScriptObjectHandle handle, int kind, float radius)
-	{
-		if (ColliderKind::Sphere == static_cast<ColliderKind>(kind))
-		{
-			if (auto* c = ResolveColliderAs<SphereColliderComponent>(handle)) c->SetRadius(radius);
-		}
-		else if (ColliderKind::Capsule == static_cast<ColliderKind>(kind))
-		{
-			if (auto* c = ResolveColliderAs<CapsuleColliderComponent>(handle)) c->SetRadius(radius);
-		}
-	}
-
-	float __stdcall Api_Collider_GetHeight(ScriptObjectHandle handle, int kind)
-	{
-		if (ColliderKind::Capsule != static_cast<ColliderKind>(kind)) return 0.f;
-
-		auto* c = ResolveColliderAs<CapsuleColliderComponent>(handle);
-		return (nullptr != c) ? c->GetHeight() : 0.f;
-	}
-
-	void __stdcall Api_Collider_SetHeight(ScriptObjectHandle handle, int kind, float height)
-	{
-		if (ColliderKind::Capsule != static_cast<ColliderKind>(kind)) return;
-		if (auto* c = ResolveColliderAs<CapsuleColliderComponent>(handle)) c->SetHeight(height);
-	}
-
-	Float3 __stdcall Api_Collider_GetExtents(ScriptObjectHandle handle, int kind)
-	{
-		if (ColliderKind::Box != static_cast<ColliderKind>(kind)) return {};
-
-		auto* c = ResolveColliderAs<BoxColliderComponent>(handle);
-		if (nullptr == c) return {};
-
-		const auto e = c->GetExtents();
-		return { e.x, e.y, e.z };
-	}
-
-	void __stdcall Api_Collider_SetExtents(ScriptObjectHandle handle, int kind, Float3 extents)
-	{
-		if (ColliderKind::Box != static_cast<ColliderKind>(kind)) return;
-		if (auto* c = ResolveColliderAs<BoxColliderComponent>(handle))
-		{
-			c->SetExtents({ extents.x, extents.y, extents.z });
-		}
-	}
-
-	// 아래 공통 항목들은 ICollider에 올라와 있지 않아 종류별로 갈라야 한다.
-	// 반복을 줄이려고 람다에 세 타입을 태워 돌린다.
-	template <typename TFunc>
-	auto WithCollider(ScriptObjectHandle handle, int kind, TFunc&& func)
-	{
-		using Result = decltype(func(std::declval<SphereColliderComponent&>()));
-
-		switch (static_cast<ColliderKind>(kind))
-		{
-		case ColliderKind::Sphere:
-			if (auto* c = ResolveColliderAs<SphereColliderComponent>(handle)) return func(*c);
-			break;
-		case ColliderKind::Box:
-			if (auto* c = ResolveColliderAs<BoxColliderComponent>(handle)) return func(*c);
-			break;
-		case ColliderKind::Capsule:
-			if (auto* c = ResolveColliderAs<CapsuleColliderComponent>(handle)) return func(*c);
-			break;
-		default: break;
-		}
-		return Result{};
-	}
-
-	Float3 __stdcall Api_Collider_GetPositionOffset(ScriptObjectHandle handle, int kind)
-	{
-		return WithCollider(handle, kind, [](auto& c) -> Float3
-		{
-			const auto p = c.GetPositionOffset();
-			return { p.x, p.y, p.z };
-		});
-	}
-
-	void __stdcall Api_Collider_SetPositionOffset(ScriptObjectHandle handle, int kind, Float3 offset)
-	{
-		WithCollider(handle, kind, [&](auto& c) -> int
-		{
-			c.SetPositionOffset({ offset.x, offset.y, offset.z });
-			return 0;
-		});
-	}
-
-	float __stdcall Api_Collider_GetRestitution(ScriptObjectHandle handle, int kind)
-	{
-		return WithCollider(handle, kind, [](auto& c) { return c.GetRestitution(); });
-	}
-
-	void __stdcall Api_Collider_SetRestitution(ScriptObjectHandle handle, int kind, float value)
-	{
-		WithCollider(handle, kind, [&](auto& c) -> int { c.SetRestitution(value); return 0; });
-	}
-
-	float __stdcall Api_Collider_GetStaticFriction(ScriptObjectHandle handle, int kind)
-	{
-		return WithCollider(handle, kind, [](auto& c) { return c.GetStaticFriction(); });
-	}
-
-	void __stdcall Api_Collider_SetStaticFriction(ScriptObjectHandle handle, int kind, float value)
-	{
-		WithCollider(handle, kind, [&](auto& c) -> int { c.SetStaticFriction(value); return 0; });
-	}
-
-	float __stdcall Api_Collider_GetDynamicFriction(ScriptObjectHandle handle, int kind)
-	{
-		return WithCollider(handle, kind, [](auto& c) { return c.GetDynamicFriction(); });
-	}
-
-	void __stdcall Api_Collider_SetDynamicFriction(ScriptObjectHandle handle, int kind, float value)
-	{
-		WithCollider(handle, kind, [&](auto& c) -> int { c.SetDynamicFriction(value); return 0; });
-	}
+    // Physics ABI: owner generation + component identity, explicit failures, no legacy adapters.
+    bool PhysicsApiEntered() { return g_physicsApiOwner == std::this_thread::get_id(); }
+
+    PhysicsBodyComponent* ResolveScriptBody(ScriptObjectHandle owner, std::uint64_t instance)
+    {
+        if (!instance) return nullptr;
+        auto* object = ScriptObjectRegistry::Get().Resolve(owner);
+        if (!object || object->IsDestroyMark()) return nullptr;
+
+        for (const auto& component : object->m_components)
+            if (component && component->GetInstanceID() == instance && !component->IsDestroyMark())
+                return dynamic_cast<PhysicsBodyComponent*>(component.get());
+
+        return nullptr;
+    }
+
+    int PhysicsFailure(ce::physics::error_code code) { return ce::script::PhysicsStatus(code); }
+    Float3 ScriptVector(math::vector3 value) { return {value.x, value.y, value.z}; }
+
+    std::uint64_t __stdcall Api_Body_Find(ScriptObjectHandle owner)
+    {
+        if (!PhysicsApiEntered()) return 0;
+        auto* object = ScriptObjectRegistry::Get().Resolve(owner);
+        if (!object || object->IsDestroyMark()) return 0;
+        std::uint64_t instance = 0;
+
+        for (const auto& component : object->m_components)
+            if (auto* body = dynamic_cast<PhysicsBodyComponent*>(component.get()); body && !body->IsDestroyMark())
+            {
+                if (instance) return 0; // Explicit instance selection is required for multiple bodies.
+                instance = body->GetInstanceID();
+            }
+
+        return instance;
+    }
+
+    CharacterMovementComponent* ResolveScriptCharacter(ScriptObjectHandle owner, std::uint64_t instance)
+    {
+        if (!instance) return nullptr;
+        auto* object = ScriptObjectRegistry::Get().Resolve(owner);
+        if (!object || object->IsDestroyMark()) return nullptr;
+
+        for (const auto& component : object->m_components)
+            if (component && component->GetInstanceID() == instance && !component->IsDestroyMark())
+                return dynamic_cast<CharacterMovementComponent*>(component.get());
+
+        return nullptr;
+    }
+
+    std::uint64_t __stdcall Api_Character_Find(ScriptObjectHandle owner)
+    {
+        if (!PhysicsApiEntered()) return 0;
+        auto* object = ScriptObjectRegistry::Get().Resolve(owner);
+        if (!object || object->IsDestroyMark()) return 0;
+        auto* character = object->GetComponent<CharacterMovementComponent>();
+        return character && !character->IsDestroyMark() ? character->GetInstanceID() : 0;
+    }
+
+    int __stdcall Api_Character_Read(ScriptObjectHandle owner, std::uint64_t instance,
+                                    ce::script::physics_character_state* output)
+    {
+        if (output) *output = {};
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if (!output) return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* character = ResolveScriptCharacter(owner, instance);
+        if (!character) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto state = character->ReadState();
+        if (!state) return PhysicsFailure(state.error().code);
+        const auto& collision = state->collision;
+        const std::uint32_t flags = (collision.sides ? 1u : 0u) | (collision.above ? 2u : 0u) |
+            (collision.below ? 4u : 0u) | (character->RuntimeHandle() ? 8u : 0u) |
+            (state->motion.forced_remaining > 0 ? 16u : 0u) | (state->motion.jump_requested ? 32u : 0u);
+        *output = {ScriptVector(collision.position), ScriptVector(collision.foot_position),
+                   ScriptVector(collision.actual_displacement), ScriptVector(state->desired_velocity),
+                   state->fall_velocity, flags, state->tick.value, ScriptVector(state->motion.velocity), state->motion.forced_remaining};
+        return 0;
+    }
+
+    int __stdcall Api_Character_Velocity(ScriptObjectHandle owner, std::uint64_t instance, Float3 velocity)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        auto* character = ResolveScriptCharacter(owner, instance);
+        if (!character) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto changed = character->SetDesiredVelocity({velocity.x, velocity.y, velocity.z});
+        return changed ? 0 : PhysicsFailure(changed.error().code);
+    }
+
+    int __stdcall Api_Character_Teleport(ScriptObjectHandle owner, std::uint64_t instance, Float3 position)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        auto* character = ResolveScriptCharacter(owner, instance);
+        if (!character) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto changed = character->Teleport({position.x, position.y, position.z});
+        return changed ? 0 : PhysicsFailure(changed.error().code);
+    }
+
+    int __stdcall Api_Character_Jump(ScriptObjectHandle owner, std::uint64_t instance)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        auto* character = ResolveScriptCharacter(owner, instance);
+        if (!character) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto changed = character->Jump();
+        return changed ? 0 : PhysicsFailure(changed.error().code);
+    }
+
+    int __stdcall Api_Character_Force(ScriptObjectHandle owner, std::uint64_t instance, Float3 velocity, double seconds)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        auto* character = ResolveScriptCharacter(owner, instance);
+        if (!character) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto changed = character->ForceVelocity({velocity.x, velocity.y, velocity.z}, seconds);
+        return changed ? 0 : PhysicsFailure(changed.error().code);
+    }
+
+    int __stdcall Api_Character_CancelForce(ScriptObjectHandle owner, std::uint64_t instance)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        auto* character = ResolveScriptCharacter(owner, instance);
+        if (!character) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto changed = character->CancelForcedVelocity();
+        return changed ? 0 : PhysicsFailure(changed.error().code);
+    }
+
+    int __stdcall Api_Body_Read(ScriptObjectHandle owner, std::uint64_t instance, ce::script::physics_body_state* output)
+    {
+        if (output) *output = {};
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if (!output) return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto state = body->ReadState();
+        if (!state) return PhysicsFailure(state.error().code);
+        const auto& rotation = state->transform.rotation;
+        *output = {static_cast<int>(state->kind), state->mass, ScriptVector(state->transform.position),
+                   {rotation.x, rotation.y, rotation.z, rotation.w}, ScriptVector(state->linear_velocity),
+                   ScriptVector(state->angular_velocity)};
+        return 0;
+    }
+
+    int __stdcall Api_Body_Velocity(ScriptObjectHandle owner, std::uint64_t instance, Float3 linear, Float3 angular)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto changed = body->SetVelocity({linear.x, linear.y, linear.z}, {angular.x, angular.y, angular.z});
+        return changed ? 0 : PhysicsFailure(changed.error().code);
+    }
+
+    int __stdcall Api_Body_Force(ScriptObjectHandle owner, std::uint64_t instance, Float3 linear, Float3 angular, int mode)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if (mode < 0 || mode > 3) return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto changed = body->ApplyForce({linear.x, linear.y, linear.z}, {angular.x, angular.y, angular.z},
+                                       static_cast<ce::physics::force_mode>(mode));
+        return changed ? 0 : PhysicsFailure(changed.error().code);
+    }
+
+    int __stdcall Api_Body_ShapeCount(ScriptObjectHandle owner, std::uint64_t instance, int* count)
+    {
+        if (count) *count = 0;
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if (!count) return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        *count = static_cast<int>(body->Shapes().size());
+        return 0;
+    }
+
+    int __stdcall Api_Body_ShapeRead(ScriptObjectHandle owner, std::uint64_t instance, int index,
+                                    ce::script::physics_shape_state* output)
+    {
+        if (output) *output = {};
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if (!output || index < 0) return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+        if (static_cast<std::size_t>(index) >= body->Shapes().size())
+            return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        const auto& shape = body->Shapes()[index];
+        const auto& rotation = shape.localRotation;
+        *output = {shape.shapeId, static_cast<int>(shape.kind), shape.sensor, shape.queryEnabled, shape.layerOverride,
+                   shape.radius, shape.halfHeight, ScriptVector(shape.halfExtent), ScriptVector(shape.localPosition),
+                   {rotation.x, rotation.y, rotation.z, rotation.w}};
+        return 0;
+    }
+
+    int __stdcall Api_Body_ShapeFlags(ScriptObjectHandle owner, std::uint64_t instance, unsigned int id,
+                                     int sensor, int queryEnabled)
+    {
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        if ((sensor != 0 && sensor != 1) || (queryEnabled != 0 && queryEnabled != 1))
+            return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* body = ResolveScriptBody(owner, instance);
+        if (!body) return PhysicsFailure(ce::physics::error_code::stale_handle);
+
+        try
+        {
+            std::vector<PhysicsShapeDefinition> shapes(body->Shapes().begin(), body->Shapes().end());
+            const auto shape = std::ranges::find(shapes, id, &PhysicsShapeDefinition::shapeId);
+            if (shape == shapes.end()) return PhysicsFailure(ce::physics::error_code::stale_handle);
+            shape->sensor = sensor != 0;
+            shape->queryEnabled = queryEnabled != 0;
+            auto changed = body->ReplaceShapes(std::move(shapes));
+            return changed ? 0 : PhysicsFailure(changed.error().code);
+        }
+        catch (const std::bad_alloc&) { return PhysicsFailure(ce::physics::error_code::out_of_memory); }
+        catch (...) { return PhysicsFailure(ce::physics::error_code::invalid_argument); }
+    }
+
+    int __stdcall Api_Physics_Query(ScriptObjectHandle anchor, int kind, Float3 origin, Float3 direction,
+                                   float distanceOrRadius, unsigned int layers, int includeSensors,
+                                   ce::script::physics_hit* output, int capacity, ce::script::physics_query_result* summary)
+    {
+        if (summary) *summary = {};
+        if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+        ce::profile_scope scope{ce::marker<"Physics.ScriptQuery">()};
+        if (!summary || capacity < 0 || capacity > ce::script::physics_query_capacity ||
+            (capacity > 0 && !output) || (kind != 0 && kind != 1) || (includeSensors != 0 && includeSensors != 1))
+            return PhysicsFailure(ce::physics::error_code::invalid_argument);
+        auto* entity = ScriptObjectRegistry::Get().Resolve(anchor);
+        if (!entity || entity->IsDestroyMark() || !entity->GetScene())
+            return PhysicsFailure(ce::physics::error_code::stale_handle);
+        auto& scene = *entity->GetScene();
+
+        try
+        {
+            std::array<ce::physics::query_hit, ce::script::physics_query_capacity> scratch;
+            const auto buffer = std::span{scratch}.first(static_cast<std::size_t>(capacity));
+            const ce::physics::query_filter filter{layers, includeSensors != 0};
+            auto queried = kind == 0
+                ? scene.RaycastPhysics({origin.x, origin.y, origin.z}, {direction.x, direction.y, direction.z}, distanceOrRadius, buffer, filter)
+                : scene.OverlapPhysics(ce::physics::sphere_geometry{distanceOrRadius}, {{origin.x, origin.y, origin.z}, {}}, buffer, filter);
+            if (!queried) return PhysicsFailure(queried.error().code);
+
+            for (std::size_t index = 0; index < queried->written; ++index)
+            {
+                const auto& hit = scratch[index];
+                auto resolved = scene.ResolvePhysicsBody(hit.body);
+                if (!resolved) return PhysicsFailure(resolved.error().code);
+                auto* body = *resolved;
+                auto* owner = body->GetOwner();
+                const auto shape = std::ranges::find(body->Shapes(), hit.shape.value, &PhysicsShapeDefinition::shapeId);
+                if (shape == body->Shapes().end()) return PhysicsFailure(ce::physics::error_code::stale_handle);
+                const auto object = ScriptObjectRegistry::Get().Register(owner);
+                output[index] = {object.index, object.generation, body->GetInstanceID(), hit.shape.value, hit.face,
+                    shape->layerOverride ? shape->layerOverride : owner->GetLayer().value,
+                    ScriptVector(hit.position), ScriptVector(hit.normal), hit.distance, hit.has_location};
+            }
+
+            *summary = {static_cast<int>(queried->written), static_cast<int>(queried->required_capacity), queried->truncated};
+            return 0;
+        }
+        catch (const std::bad_alloc&) { return PhysicsFailure(ce::physics::error_code::out_of_memory); }
+        catch (...) { return PhysicsFailure(ce::physics::error_code::invalid_argument); }
+    }
 
 	// ── TextComponent · UIComponent · Canvas ──
 
@@ -2316,6 +2008,7 @@ namespace
 
 	void FillApiTable()
 	{
+        g_physicsApiOwner = std::this_thread::get_id();
 		g_apiTable.version    = kApiVersion;
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
 
@@ -2379,23 +2072,22 @@ namespace
 		g_apiTable.Animator_SetUseLayer        = &Api_Animator_SetUseLayer;
 		g_apiTable.Animator_StopAnimation      = &Api_Animator_StopAnimation;
 
-		g_apiTable.Cct_Exists                  = &Api_Cct_Exists;
-		g_apiTable.Cct_Move                    = &Api_Cct_Move;
-		g_apiTable.Cct_TriggerForcedMove       = &Api_Cct_TriggerForcedMove;
-		g_apiTable.Cct_StopForcedMove          = &Api_Cct_StopForcedMove;
-		g_apiTable.Cct_IsInForcedMove          = &Api_Cct_IsInForcedMove;
-		g_apiTable.Cct_SetAutomaticRotation    = &Api_Cct_SetAutomaticRotation;
-		g_apiTable.Cct_SetLookDirection        = &Api_Cct_SetLookDirection;
-		g_apiTable.Cct_ClearLookDirection      = &Api_Cct_ClearLookDirection;
-		g_apiTable.Cct_ForcedSetPosition       = &Api_Cct_ForcedSetPosition;
-		g_apiTable.Cct_GetBaseSpeed            = &Api_Cct_GetBaseSpeed;
-		g_apiTable.Cct_SetBaseSpeed            = &Api_Cct_SetBaseSpeed;
-		g_apiTable.Cct_IsOnMove                = &Api_Cct_IsOnMove;
-		g_apiTable.Cct_SetOnMove               = &Api_Cct_SetOnMove;
-		g_apiTable.Cct_IsFalling               = &Api_Cct_IsFalling;
-		g_apiTable.Cct_GetRadius               = &Api_Cct_GetRadius;
-		g_apiTable.Cct_GetHeight               = &Api_Cct_GetHeight;
-		g_apiTable.Cct_GetId                   = &Api_Cct_GetId;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 		g_apiTable.Rect_Exists                 = &Api_Rect_Exists;
 		g_apiTable.Rect_GetAnchoredPosition    = &Api_Rect_GetAnchoredPosition;
@@ -2465,49 +2157,21 @@ namespace
 		g_apiTable.Input_GetControllerThumbL      = &Api_Input_GetControllerThumbL;
 		g_apiTable.Input_GetControllerThumbR      = &Api_Input_GetControllerThumbR;
 
-		g_apiTable.Physics_Raycast                = &Api_Physics_Raycast;
-		g_apiTable.Physics_RaycastAll             = &Api_Physics_RaycastAll;
-		g_apiTable.Physics_OverlapSphere          = &Api_Physics_OverlapSphere;
-
-		g_apiTable.Rigid_Exists                = &Api_Rigid_Exists;
-		g_apiTable.Rigid_GetLinearVelocity     = &Api_Rigid_GetLinearVelocity;
-		g_apiTable.Rigid_SetLinearVelocity     = &Api_Rigid_SetLinearVelocity;
-		g_apiTable.Rigid_AddLinearVelocity     = &Api_Rigid_AddLinearVelocity;
-		g_apiTable.Rigid_GetAngularVelocity    = &Api_Rigid_GetAngularVelocity;
-		g_apiTable.Rigid_SetAngularVelocity    = &Api_Rigid_SetAngularVelocity;
-		g_apiTable.Rigid_AddForce              = &Api_Rigid_AddForce;
-		g_apiTable.Rigid_SetBodyType           = &Api_Rigid_SetBodyType;
-		g_apiTable.Rigid_IsKinematic           = &Api_Rigid_IsKinematic;
-		g_apiTable.Rigid_SetKinematic          = &Api_Rigid_SetKinematic;
-		g_apiTable.Rigid_IsTrigger             = &Api_Rigid_IsTrigger;
-		g_apiTable.Rigid_SetIsTrigger          = &Api_Rigid_SetIsTrigger;
-		g_apiTable.Rigid_IsColliderEnabled     = &Api_Rigid_IsColliderEnabled;
-		g_apiTable.Rigid_SetColliderEnabled    = &Api_Rigid_SetColliderEnabled;
-		g_apiTable.Rigid_IsUsingGravity        = &Api_Rigid_IsUsingGravity;
-		g_apiTable.Rigid_UseGravity            = &Api_Rigid_UseGravity;
-		g_apiTable.Rigid_GetMass               = &Api_Rigid_GetMass;
-		g_apiTable.Rigid_SetMass               = &Api_Rigid_SetMass;
-		g_apiTable.Rigid_SetLinearDamping      = &Api_Rigid_SetLinearDamping;
-		g_apiTable.Rigid_SetAngularDamping     = &Api_Rigid_SetAngularDamping;
-		g_apiTable.Rigid_SetScale              = &Api_Rigid_SetScale;
-		g_apiTable.Rigid_SetLockLinear         = &Api_Rigid_SetLockLinear;
-		g_apiTable.Rigid_SetLockAngular        = &Api_Rigid_SetLockAngular;
-
-		g_apiTable.Collider_Exists             = &Api_Collider_Exists;
-		g_apiTable.Collider_GetRadius          = &Api_Collider_GetRadius;
-		g_apiTable.Collider_SetRadius          = &Api_Collider_SetRadius;
-		g_apiTable.Collider_GetHeight          = &Api_Collider_GetHeight;
-		g_apiTable.Collider_SetHeight          = &Api_Collider_SetHeight;
-		g_apiTable.Collider_GetExtents         = &Api_Collider_GetExtents;
-		g_apiTable.Collider_SetExtents         = &Api_Collider_SetExtents;
-		g_apiTable.Collider_GetPositionOffset  = &Api_Collider_GetPositionOffset;
-		g_apiTable.Collider_SetPositionOffset  = &Api_Collider_SetPositionOffset;
-		g_apiTable.Collider_GetRestitution     = &Api_Collider_GetRestitution;
-		g_apiTable.Collider_SetRestitution     = &Api_Collider_SetRestitution;
-		g_apiTable.Collider_GetStaticFriction  = &Api_Collider_GetStaticFriction;
-		g_apiTable.Collider_SetStaticFriction  = &Api_Collider_SetStaticFriction;
-		g_apiTable.Collider_GetDynamicFriction = &Api_Collider_GetDynamicFriction;
-		g_apiTable.Collider_SetDynamicFriction = &Api_Collider_SetDynamicFriction;
+        g_apiTable.Body_Find = &Api_Body_Find;
+        g_apiTable.Character_Find = &Api_Character_Find;
+        g_apiTable.Character_Read = &Api_Character_Read;
+        g_apiTable.Character_Velocity = &Api_Character_Velocity;
+        g_apiTable.Character_Teleport = &Api_Character_Teleport;
+        g_apiTable.Character_Jump = &Api_Character_Jump;
+        g_apiTable.Character_Force = &Api_Character_Force;
+        g_apiTable.Character_CancelForce = &Api_Character_CancelForce;
+        g_apiTable.Body_Read = &Api_Body_Read;
+        g_apiTable.Body_Velocity = &Api_Body_Velocity;
+        g_apiTable.Body_Force = &Api_Body_Force;
+        g_apiTable.Body_ShapeCount = &Api_Body_ShapeCount;
+        g_apiTable.Body_ShapeRead = &Api_Body_ShapeRead;
+        g_apiTable.Body_ShapeFlags = &Api_Body_ShapeFlags;
+        g_apiTable.Physics_Query = &Api_Physics_Query;
 
 		g_apiTable.Text_Exists                 = &Api_Text_Exists;
 		g_apiTable.Text_GetMessage             = &Api_Text_GetMessage;

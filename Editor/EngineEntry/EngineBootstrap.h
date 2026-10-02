@@ -14,10 +14,6 @@
 #include "ReflectionRegister.h"
 #include "ReflectionUndo.h"
 #include "ComponentFactory.h"
-// PhysicX/PhysicsManager 싱글턴 기동·종료 호출이 완전 타입을 요구한다.
-// 예전에는 Scene.h 전이(→PhysicsManager.h)로 우연히 왔지만 Entity.inl의
-// Scene.h include 제거로 전이가 끊겨 직접 세운다.
-#include "PhysicsManager.h"
 #include "InputActionManager.h"
 #include "EngineMode.h"
 #include "EngineLaunchConfig.h"
@@ -281,8 +277,6 @@ namespace EngineBootstrap
         InputManager::GetInstance();
         PrefabUtility::GetInstance();
         DataSystem::GetInstance();
-        PhysicX::GetInstance();
-        PhysicsManager::GetInstance();
         SceneManager::GetInstance();
         ComponentFactory::GetInstance();
 
@@ -301,8 +295,6 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(ComponentFactory::Destroy());
         SHUTDOWN_STEP(SceneManager::Destroy());
         SHUTDOWN_STEP(ce::get_job_scheduler().shutdown());
-        SHUTDOWN_STEP(PhysicsManager::Destroy());
-        SHUTDOWN_STEP(PhysicX::Destroy());
 		SHUTDOWN_STEP(TagManager::Destroy());
 		SHUTDOWN_STEP(InputManager::Destroy());
 		SHUTDOWN_STEP(DataSystem::Destroy());

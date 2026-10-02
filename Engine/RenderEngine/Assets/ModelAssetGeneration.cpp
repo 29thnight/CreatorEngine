@@ -9,10 +9,10 @@
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/ModelLoader.h"
 #include "../Texture.h"
+#include "../Interfaces/AssetAuthoringPort.h"
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <fstream>
 #include <limits>
 #include <ranges>
@@ -389,47 +389,48 @@ namespace assets
             return true;
         }
 
-        void WriteDecodedTextureCache(const std::filesystem::path& path,
+        void PublishDecodedTextureCache(const std::filesystem::path& path,
             const ModelTextureAsset& texture)
         {
-            std::error_code error;
-            std::filesystem::create_directories(path.parent_path(), error);
-            if (error) return;
-            static std::atomic<std::uint64_t> serial{};
-            const auto stage = std::filesystem::path(path.string() + ".stage-" +
-                std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) +
-                "-" + std::to_string(++serial));
-            std::ofstream stream(stage, std::ios::binary | std::ios::trunc);
-            if (!stream) return;
-            const auto write = [&stream](const auto& value) {
-                stream.write(reinterpret_cast<const char*>(&value), sizeof(value));
+            // Runtime prepares bytes; the Editor owns staging and atomic publication.
+            // A missing host writer leaves the decoded in-memory texture usable.
+            std::vector<std::byte> payload;
+            payload.reserve(44u + texture.subresources.size() * 32u + texture.pixels.size());
+
+            const auto append = [&payload](std::span<const std::byte> bytes) {
+                payload.insert(payload.end(), bytes.begin(), bytes.end());
             };
+            const auto write = [&append](const auto& value) {
+                append(std::as_bytes(std::span{ &value, std::size_t{ 1 } }));
+            };
+
             constexpr std::array<char, 8> magic{'C','E','I','M','0','0','0','1'};
-            stream.write(magic.data(), magic.size());
-            write(texture.width); write(texture.height);
-            write(texture.mipLevels); write(texture.arraySize);
+            append(std::as_bytes(std::span{ magic }));
+            write(texture.width);
+            write(texture.height);
+            write(texture.mipLevels);
+            write(texture.arraySize);
+
             const auto format = static_cast<std::uint32_t>(texture.format);
             const auto space = static_cast<std::uint32_t>(texture.colorSpace);
             const auto count = static_cast<std::uint32_t>(texture.subresources.size());
             const auto bytes = static_cast<std::uint64_t>(texture.pixels.size());
-            write(format); write(space); write(count); write(bytes);
+            write(format);
+            write(space);
+            write(count);
+            write(bytes);
+
             for (const auto& sub : texture.subresources)
             {
-                write(sub.width); write(sub.height); write(sub.offset);
-                write(sub.rowPitch); write(sub.slicePitch);
+                write(sub.width);
+                write(sub.height);
+                write(sub.offset);
+                write(sub.rowPitch);
+                write(sub.slicePitch);
             }
-            stream.write(reinterpret_cast<const char*>(texture.pixels.data()),
-                static_cast<std::streamsize>(texture.pixels.size()));
-            stream.close();
-            if (!stream)
-            {
-                std::filesystem::remove(stage, error);
-                return;
-            }
-            std::filesystem::remove(path, error);
-            error.clear();
-            std::filesystem::rename(stage, path, error);
-            if (error) std::filesystem::remove(stage, error);
+
+            append(texture.pixels);
+            (void)AssetAuthoringPort::WriteModelCache(path, payload);
         }
 
         [[nodiscard]] ModelInterpolationMode ConvertInterpolation(
@@ -992,7 +993,7 @@ namespace assets
                     "textures." + textureRecord->stableKey, failure);
                 return result;
             }
-            if (!cached && !decodedCache.empty()) WriteDecodedTextureCache(decodedCache, texture);
+            if (!cached && !decodedCache.empty()) PublishDecodedTextureCache(decodedCache, texture);
             textures.push_back(std::move(texture));
         }
 

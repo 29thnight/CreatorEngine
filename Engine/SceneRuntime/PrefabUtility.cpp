@@ -626,7 +626,9 @@ size_t PrefabUtility::UpdateInstances(const Prefab* prefab)
 		// Entity 자체 프로퍼티: 사용자 오버라이드와 슬롯 정체성은 새 값 적용에서
 		// 제외한다. 계층은 H3부터 리플렉션 프로퍼티가 아니라 Store topology를 우회할
 		// 경로 자체가 없다.
+        obj->OnBeforeDeserialize(Authoring::NodeViewAccess::Make(newData));
         Meta::DeserializePrefab(obj, newData, CollectGameObjectOverrideNames(*obj));
+        if (!obj->SetLayer(obj->GetLayer())) throw std::runtime_error("Invalid prefab entity layer");
 
         // 컴포넌트: 통짜 Dump 비교로 갱신 여부를 정하던 것(P-e)을 걷어낸 자리에
         // Destroy 후 재생성(P-f)까지 걷어낸다(P3) — 차집합 적용으로 유지 타입은

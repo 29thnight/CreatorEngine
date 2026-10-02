@@ -182,10 +182,6 @@
     <ClCompile Include="AvatarMask.cpp" />
     <ClCompile Include="BehaviorTreeComponent.cpp" />
     <ClCompile Include="BlackBoard.cpp" />
-    <ClCompile Include="BoxColliderComponent.cpp" />
-    <ClCompile Include="CapsuleColliderComponent.cpp" />
-    <ClCompile Include="CharacterControllerComponent.cpp" />
-    <ClCompile Include="CharacterControllerSystem.cpp" />
     <ClCompile Include="Component.cpp" />
     <ClCompile Include="ComponentFactory.cpp" />
     <ClCompile Include="Canvas.cpp" />
@@ -211,12 +207,13 @@
     <ClCompile Include="LifecycleTrace.cpp" />
     <ClCompile Include="LifecycleRegistry.cpp" />
     <ClCompile Include="Object.cpp" />
-    <ClCompile Include="PhysicsManager.cpp" />
     <ClCompile Include="PlayerInput.cpp" />
     <ClCompile Include="Prefab.cpp" />
     <ClCompile Include="PrefabUtility.cpp" />
-    <ClCompile Include="RigidBodyComponent.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="ScenePhysicsSimulation.cpp" />
+    <ClCompile Include="PhysicsBodyComponent.cpp" />
+    <ClCompile Include="CharacterMovementComponent.cpp" />
     <ClCompile Include="Socket.cpp" />
     <ClCompile Include="HeaderSelfSufficiency.cpp">
       <!-- 헤더 자급자족 프로브 — 블롭에 합쳐지면 전이 include로 무의미해진다 -->
@@ -254,7 +251,6 @@
     <ClInclude Include="SceneRenderProfileComponent.h" />
     <ClInclude Include="InvalidScriptComponent.h" />
     <ClInclude Include="EBodyType.h" />
-    <ClInclude Include="PhysicsManager.h" />
     <ClInclude Include="PlayerInput.h" />
     <ClInclude Include="Prefab.h" />
     <ClInclude Include="PrefabOverride.h" />
@@ -263,7 +259,6 @@
     </ClInclude>
     <ClCompile Include="TagManager.cpp" />
     <ClCompile Include="Terrain.cpp" />
-    <ClCompile Include="TerrainCollider.cpp" />
     <ClCompile Include="TextComponent.cpp" />
     <ClCompile Include="TransCondition.cpp" />
     <ClCompile Include="UIButton.cpp" />
@@ -294,14 +289,10 @@
     <ClInclude Include="BoneMask.h" />
     <ClInclude Include="ConditionParameter.h" />
     <ClInclude Include="AniTransition.h" />
-    <ClInclude Include="BoxColliderComponent.h" />
     <ClInclude Include="CameraComponent.h" />
     <ClInclude Include="CameraSystem.h" />
     <ClInclude Include="TweenManager.h" />
     <ClInclude Include="Canvas.h" />
-    <ClInclude Include="CapsuleColliderComponent.h" />
-    <ClInclude Include="CharacterControllerComponent.h" />
-    <ClInclude Include="CharacterControllerSystem.h" />
     <ClInclude Include="Component.h" />
     <ClInclude Include="ComponentFactory.h" />
     <ClInclude Include="FSMState.h" />
@@ -322,18 +313,22 @@
     <ClInclude Include="LightComponent.h" />
     <ClInclude Include="LightSystem.h" />
     <ClInclude Include="LinkData.h" />
-    <ClInclude Include="MeshCollider.h" />
     <ClInclude Include="MaterialScriptBinding.h" />
     <ClInclude Include="MeshRenderer.h" />
     <ClInclude Include="ModelConsumptionDiagnostics.h" />
+    <ClInclude Include="ModelCollisionGeometry.h" />
     <ClInclude Include="ModelSceneInstantiation.h" />
     <ClInclude Include="Object.h" />
     <ClInclude Include="PrefabUtility.h" />
-    <ClInclude Include="RagdollComponent.h" />
     <ClInclude Include="RenderableComponents.h" />
-    <ClInclude Include="RigidBodyComponent.h" />
     <ClInclude Include="AnimationDiagnostics.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="ScenePhysicsSimulation.h" />
+    <ClInclude Include="SimulationSessionPolicy.h" />
+    <ClInclude Include="ScriptPhysicsABI.h" />
+    <ClInclude Include="PhysicsBodyComponent.h" />
+    <ClInclude Include="CharacterMovementComponent.h" />
+    <ClInclude Include="CharacterMotionPolicy.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="ClrHost.h" />
     <ClInclude Include="ManagedAniBehavior.h" />
@@ -342,11 +337,9 @@
     <ClInclude Include="SceneManager.h" />
     <ClInclude Include="RuntimeFrame.h" />
     <ClInclude Include="SoundManager.h" />
-    <ClInclude Include="SphereColliderComponent.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="TagManager.h" />
     <ClInclude Include="Terrain.h" />
-    <ClInclude Include="TerrainCollider.h" />
     <ClInclude Include="TextComponent.h" />
     <ClInclude Include="TransCondition.h" />
     <ClInclude Include="Transition.h" />
@@ -370,6 +363,28 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <ClInclude Include="SceneLayerIndex.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ProjectLayerSettings.h" />
+    <ClInclude Include="ProjectLayerSettingsCodec.h" />
+    <ClInclude Include="ProjectLayerSettingsIO.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EntityLayerSchema.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PhysicsPrimitivePreview.h" />
+    <ClInclude Include="PhysicsShapeDefinition.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CollisionGeometrySource.h" />
+    <ClInclude Include="CollisionGeometryCodec.h" />
+    <ClInclude Include="CollisionGeometryLibrary.h" />
+    <ClInclude Include="CollisionGeometryIO.h" />
+    <ClInclude Include="CookedCollisionGeometry.h" />
+  </ItemGroup>
 </Project>
 
 

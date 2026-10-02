@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Object.h"
 #include "AssetBundle.h"
 #include "ReflectionYml.h"
@@ -10,10 +10,13 @@
 #include "GameObjectIndex.h"
 #include "DetachedEntityTransfer.h"
 #include "ScenePhase.h"
+#include "SimulationSessionPolicy.h"
 #include <future>
 #include <memory>
 #include <thread>
 
+class ProjectLayerSettings;
+struct project_layer_snapshot;
 class Scene;
 class Entity;
 class MeshRenderer;
@@ -44,24 +47,11 @@ public:
     bool HasPendingSceneStructureChange() const;
     void ApplyPendingSceneStructureChange();
 
-    // ── 씬 스냅샷 / 시뮬레이션 primitive (E3-1) ──
-    //
-    // 재생 왕복은 성격이 다른 세 가지 일이 한 함수에 뭉쳐 있었다: 씬을 직렬화해
-    // 백업하는 것, 백업으로 되채우는 것, 엔티티 phase를 전이시키는 것. 거기에
-    // Editor 정책(Undo 비우기·선택 해제)까지 같은 자리에 섞여 있어, 호출부에서
-    // 무엇이 런타임 primitive이고 무엇이 Editor 관심사인지 가릴 수 없었다.
-    // E3-2/E3-3이 Editor 몫을 들어내려면 런타임 몫에 먼저 이름이 있어야 한다.
-    //
-    // ⚠ 옛 이름 CreateEditorOnlyPlayScene은 사실과 어긋났다. 씬을 만들지 않고,
-    //   에디터 전용도 아니다 — **Player의 유일한 재생 진입 경로가 이 함수다.**
-    //   Player는 씬 로드 시 SceneManager.cpp의 Player 모드 분기가 SetGameStart(true)를
-    //   부르고, 다음 프레임의 ApplyPendingSceneStructureChange가 같은 코드를
-    //   탄다. 이름만 믿고 통째로 Editor로 옮기면 Player는 씬을 로드하고도
-    //   스크립트가 한 번도 돌지 않는 정지화면이 된다.
-    //
-    // ⚠ Player는 정지하지 않는다. m_isGameStart에 쓰는 곳은 SetGameStart 하나뿐이고
-    //   Player는 true만 부르므로, Player에서 스냅샷은 한 번 뜨고 **아무도 읽지 않는다**.
-    //   E3-6이 Player 분기를 걷어낼 때 이 죽은 직렬화도 함께 없어져야 한다.
+    // Hosts configure this before requesting Play. Player skips authoring serialization/restoration.
+    bool ConfigureSimulationSession(SimulationSessionPolicy::mode policy);
+    bool BindProjectLayerSettings(const std::shared_ptr<ProjectLayerSettings>& settings);
+    std::shared_ptr<ProjectLayerSettings> ProjectLayers() const { return m_projectLayers.lock(); }
+
     bool CaptureSceneSnapshot();
     bool RestoreSceneSnapshot();
     bool HasSceneSnapshot() const;
@@ -127,19 +117,9 @@ public:
 	bool IsGameStart() const { return m_isGameStart; }
 	void SetGameStart(bool isStart);
 
-	// ── 재생 상태 신호 셋 (PHASE 21 W5 선행 1) ──
-	//
-	// `IsGameStart` 는 **요청**이다 — 버튼·CLI 가 세우고 그 자리에서 참이 된다.
-	// 실제 전이는 프레임 경계의 ApplyPendingSceneStructureChange 가 하고, 그 안의
-	// 스냅샷이 실패하면 전이는 없다. 요청 하나만 읽는 UI 는 그때 "Stop 아이콘이
-	// 뜬 채 시뮬레이션은 없는" 상태를 보인다(계획서 §1.6 실측). 그래서 셋이다:
-	//
-	//   요청   IsGameStart()                       버튼을 눌렀는가
-	//   진행   HasPendingSceneStructureChange()    요청은 섰고 전이는 아직인가
-	//   확정   IsPlayCommitted()                   스냅샷·phase·통지까지 끝났는가
-	//
-	// 확정은 스냅샷이 뜬 **뒤**에만 참이 되고, 실패하면 요청까지 되돌린다 —
-	// 되돌리지 않으면 정지할 때 "백업이 없어 복원하지 못했다" 로 편집 씬을 잃는다.
+    // 요청은 UI/CLI가 설정하고 구조 경계에서 실제 전이를 확정한다.
+    // Editor는 문서 백업과 SDK 시작, Player는 SDK 시작 성공이 필요하다.
+    // 실패하면 요청을 내린다. IsPlayCommitted는 두 host의 공통 실행 신호다.
 	bool IsPlayCommitted() const { return m_isPlayCommitted; }
 
 	/// 전이가 거부된 횟수와 마지막 사유. 게이트가 "실패했는데 재생으로 보이지
@@ -160,7 +140,7 @@ public:
 	void SetGamePaused(bool isPaused);
 	void ToggleGamePaused();
 
-	bool IsEditorSceneLoaded() const { return m_isEditorSceneLoaded; }
+	bool IsEditorSceneLoaded() const { return m_sessionPolicy.RestoresAuthoring() && m_isSimulationSessionActive; }
     InputActionManager* GetInputActionManager() { return m_inputActionManager; }
     void SetInputActionManager(InputActionManager* inputActionManager) { m_inputActionManager = inputActionManager;}
 
@@ -216,7 +196,8 @@ public:
 
     std::atomic_bool                    m_isGameStart{ false };
     std::atomic_bool                    m_isGamePaused{ false };
-	std::atomic_bool			        m_isEditorSceneLoaded{ false };
+	std::atomic_bool                    m_isSimulationSessionActive{ false };
+    SimulationSessionPolicy m_sessionPolicy;
 	std::atomic_bool                    m_isPlayCommitted{ false };
 	std::atomic_uint32_t                m_playFailureCount{ 0 };
 	std::string                         m_lastPlayFailure{};
@@ -230,6 +211,8 @@ private:
     std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate);
     void CompleteSceneLoads(bool wait);
     Scene* BuildPreparedScene(const PendingSceneLoad& load);
+    bool PreparePhysicsSceneExit(Scene* scene);
+    bool ResumePhysicsAfterSceneActivation();
     void RequireSceneLoadOwner() const;
     std::thread::id m_sceneLoadOwner{std::this_thread::get_id()};
     std::vector<std::shared_ptr<PendingSceneLoad>> m_pendingSceneLoads;
@@ -271,7 +254,7 @@ private:
     };
     using LoadIndexBatch = std::vector<LoadIndexEntry>;
 
-    void DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
+    void DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr, bool strict = false);
     void DesirealizeGameObject(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
 	void DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
 
@@ -288,7 +271,10 @@ private:
     // D3-a-3: backend 노드를 값으로 들지 않고 문서 소유 타입이 감싼다(§3.3).
     // 이 헤더는 이 멤버 때문에 포맷 타입을 알 필요가 없다 — 실제 노드
     // 접근은 SceneManager.cpp가 `AuthoringDocumentAccess.h`로 얻는다.
+    std::weak_ptr<ProjectLayerSettings> m_projectLayers;
+    std::shared_ptr<const project_layer_snapshot> m_editorLayerBackup;
     Authoring::Document                 m_editorSceneBackup{};
+    std::vector<size_t>                 m_editorScenePersistentIds{};
     // 소유는 활성 Scene(또는 이송 중 아래 transfer vector)에만 있다.
     std::vector<Object*>                m_dontDestroyOnLoadObjects{};
     std::vector<DetachedEntityTransfer> m_detachedDontDestroyOnLoadObjects{};

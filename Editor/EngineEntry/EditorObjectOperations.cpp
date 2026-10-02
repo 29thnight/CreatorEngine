@@ -9,6 +9,11 @@
 #include "PrefabUtility.h"
 #include "Material.h"
 #include "Animator.h"
+#include "PhysicsBodyComponent.h"
+#include "CharacterMovementComponent.h"
+#include "PhysicsShapeDocument.h"
+#include "../../Engine/EngineDiagnostics/ProfileScope.h"
+#include "AuthoringParsedDocument.h"
 #include "MeshRenderer.h"
 // PBR-W8 — MeshRenderer.h 는 MaterialInstance·ModelMeshHandle 을 전방선언만 한다.
 #include "MaterialScriptBinding.h"
@@ -40,6 +45,47 @@ namespace EditorObjectOperations
                 if (scene && scene->GetSceneId() == handle.sceneId) { auto* object = scene->Resolve(handle); return object && !object->IsDestroyMark() ? object : nullptr; }
             return nullptr;
         }
+
+        class EntityLayerCommand final : public Meta::IUndoableCommand
+        {
+        public:
+            EntityLayerCommand(Entity* target, ce::layers::layer_id before, ce::layers::layer_id after)
+                : m_target(target), m_before(before), m_after(after),
+                  m_beforeOverrides(target->m_prefabOverrides), m_afterOverrides(m_beforeOverrides)
+            {
+                if (target->m_prefabFileGuid != nullFileGuid)
+                {
+                    auto found = std::ranges::find_if(m_afterOverrides, [](const auto& item) {
+                        return item.m_componentType.empty() && item.m_propertyName == "m_layerId";
+                    });
+                    if (found == m_afterOverrides.end())
+                    {
+                        PrefabOverride item;
+                        item.m_propertyName = "m_layerId";
+                        item.m_valueYaml = std::to_string(after.value);
+                        m_afterOverrides.push_back(std::move(item));
+                    }
+                    else found->m_valueYaml = std::to_string(after.value);
+                }
+            }
+
+            void Undo() override { Apply(m_before, m_beforeOverrides); }
+            void Redo() override { Apply(m_after, m_afterOverrides); }
+
+        private:
+            void Apply(ce::layers::layer_id layer, const std::vector<PrefabOverride>& overrides)
+            {
+                if (auto* object = m_target.Resolve())
+                {
+                    auto prepared = overrides;
+                    if (!object->SetLayer(layer)) throw std::runtime_error("Cannot assign entity layer");
+                    object->m_prefabOverrides = std::move(prepared);
+                }
+            }
+            Meta::EntityReference m_target;
+            ce::layers::layer_id m_before, m_after;
+            std::vector<PrefabOverride> m_beforeOverrides, m_afterOverrides;
+        };
 
         class RenameCommand final : public Meta::IUndoableCommand
         {
@@ -150,6 +196,17 @@ namespace EditorObjectOperations
             D data = D::Object();
             data.Set("id", D::String(ObjectId(handle)));
             data.Set("name", D::String(object.m_name.ToString()));
+            data.Set("layerId", D::String(std::to_string(object.GetLayer().value)));
+            if (const auto project = SceneManagers->ProjectLayers())
+            {
+                const auto settings = project->Snapshot();
+                if (const auto* layer = settings->catalog.Find(object.GetLayer()))
+                {
+                    data.Set("layer", D::String(layer->name));
+                    data.Set("layerSlot", D::Int(layer->slot.Value()));
+                }
+            }
+
             data.Set("editorIcon", D::String(object.m_editorIcon));
             data.Set("editorLocked", D::Bool(object.m_editorLocked));
             data.Set("enabled", D::Bool(object.IsEnabled()));
@@ -209,6 +266,23 @@ namespace EditorObjectOperations
         if (dynamic_cast<const RectTransformComponent*>(&component)) return { 0, false, false };
         if (dynamic_cast<const ::Transform*>(&component)) return { 1, false, false };
         return {};
+    }
+
+    CommandCore::CommandResult SetEntityLayer(EntityHandle target, ce::layers::layer_id layer)
+    {
+        using namespace CommandCore;
+        auto* object = Resolve(target);
+        if (!object) return PreconditionFailed("object.stale", "Object no longer exists");
+        if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity before editing");
+        const auto project = SceneManagers->ProjectLayers();
+        if (!project || !project->Snapshot()->catalog.Find(layer)) return InvalidArguments("Unknown layer ID");
+
+        if (object->GetLayer() != layer)
+        {
+            try { Meta::UndoManager::GetInstance()->Execute(std::make_unique<EntityLayerCommand>(object, object->GetLayer(), layer)); }
+            catch (const std::exception& e) { return Fail("layer.assign_failed", e.what()); }
+        }
+        return Ok("Entity layer assigned", Snapshot(target, *object));
     }
 
     CommandCore::CommandResult SetEntityEnabled(EntityHandle target, bool enabled)
@@ -549,15 +623,144 @@ namespace EditorObjectOperations
         if (field == "m_instanceID" || field == "m_index" || field == "m_typeID") return InvalidArguments("Identity fields are read-only");
         if (field == "m_isEnabled" && !PolicyOf(*component).individuallyToggleable)
             return PreconditionFailed("component.toggle_locked", "This component cannot be enabled or disabled on its own; toggle the entity with object.enable");
+        if (dynamic_cast<CharacterMovementComponent*>(component) && SceneManagers->IsGameStart())
+            return PreconditionFailed("character.authoring_frozen", "Character definition is frozen during Play");
+
+        if (dynamic_cast<PhysicsBodyComponent*>(component) && SceneManagers->IsGameStart())
+            return PreconditionFailed("physics.authoring_locked", "Physics body authoring is frozen during Play");
+
+        if (dynamic_cast<PhysicsBodyComponent*>(component) && (field == "m_shapes" || field == "m_shapeSchema"))
+            return PreconditionFailed("physics.shape_transaction_required", "Use the physics shape transaction");
+
         std::any value;
         if (!ParsePropertyValue(*property, raw, value)) return InvalidArguments("Value does not match property type", "property.value_invalid");
         auto before = Meta::SerializeDocument(component, *type);
         if (!AssignPropertyValue(*property, Meta::MostDerived(component), value))
             return InvalidArguments("Value does not match property type", "property.value_invalid");
+        if (auto* character = dynamic_cast<CharacterMovementComponent*>(component);
+            character)
+        {
+            if (auto validated = character->CaptureDefinition(); !validated)
+            {
+                Meta::Deserialize(component, *type, before.Root().Read());
+                return InvalidArguments(std::string(validated.error().message), "character.definition_invalid");
+            }
+        }
+
         const bool changed = CommitProperty(*component, field, std::move(before));
         auto data = Snapshot(target, *object); data.Set("changed", CommandData::Bool(changed));
         data.Set("field", CommandData::String(field)); data.Set("value", CommandData::String(raw));
         return Ok("object.property", std::move(data));
+    }
+
+    namespace
+    {
+        Authoring::WriteDocument ShapeDocument(std::span<const PhysicsShapeDefinition> shapes)
+        {
+            Authoring::WriteDocument result;
+            result.Root().SetSequence();
+            for (auto shape : shapes)
+            {
+                auto document = Meta::SerializeDocument(&shape);
+                result.Root().Append().Assign(document.Root().Read());
+            }
+            return result;
+        }
+
+        class PhysicsShapesCommand final : public Meta::IUndoableCommand
+        {
+          public:
+            PhysicsShapesCommand(Entity* owner, PhysicsBodyComponent& body, std::vector<PhysicsShapeDefinition> after)
+                : m_owner(owner), m_component("#" + std::to_string(body.GetInstanceID())),
+                  m_project(SceneManagers->ProjectLayers()), m_before(body.Shapes().begin(), body.Shapes().end()),
+                  m_after(std::move(after)), m_beforeDocument(ShapeDocument(m_before)), m_afterDocument(ShapeDocument(m_after)),
+                  m_slot(PrefabUtility::ComputeComponentSlot(*owner, &body)), m_type(Meta::Find(body.GetTypeID())->name())
+            {
+                for (const auto& item : owner->m_prefabOverrides)
+                    if (Matches(item)) m_beforeOverride = item;
+            }
+
+            void Undo() override { Apply(m_before, m_afterDocument, m_beforeOverride); }
+            void Redo() override
+            {
+                std::optional<PrefabOverride> override;
+                if (auto* owner = m_owner.Resolve(); owner && owner->m_prefabFileGuid != nullFileGuid)
+                {
+                    override.emplace();
+                    override->m_componentType = m_type;
+                    override->m_componentSlot = m_slot;
+                    override->m_propertyName = "m_shapes";
+                    override->m_valueYaml = m_afterDocument.Root().Read().Dump();
+                }
+                Apply(m_after, m_beforeDocument, override);
+            }
+
+          private:
+            bool Matches(const PrefabOverride& item) const
+            {
+                return item.m_componentType == m_type && item.m_componentSlot == m_slot && item.m_propertyName == "m_shapes";
+            }
+            void Apply(const std::vector<PhysicsShapeDefinition>& shapes, const Authoring::WriteDocument& expected,
+                       const std::optional<PrefabOverride>& override)
+            {
+                auto* owner = m_owner.Resolve();
+                const auto project = m_project.lock();
+                if (!owner || !project || project != SceneManagers->ProjectLayers() || SceneManagers->IsGameStart() || IsEditLocked(owner, true))
+                    throw std::runtime_error("Physics shape edit owner is stale, locked or in Play");
+
+                auto* body = dynamic_cast<PhysicsBodyComponent*>(FindComponent(owner, m_component));
+                if (!body || !Authoring::NodesEqual(ShapeDocument(body->Shapes()).Root().Read(), expected.Root()))
+                    throw std::runtime_error("Physics shape edit has stale component or values");
+
+                ce::profile_scope scope{ce::marker<"Physics.ShapeAuthoringPublish">()};
+                auto preparedShapes = shapes;
+                auto preparedOverrides = owner->m_prefabOverrides;
+                std::erase_if(preparedOverrides, [&](const auto& item) { return Matches(item); });
+                if (override) preparedOverrides.push_back(*override);
+                if (auto changed = body->SetShapes(std::move(preparedShapes)); !changed)
+                    throw std::runtime_error(std::string(changed.error().message));
+
+                owner->m_prefabOverrides.swap(preparedOverrides);
+            }
+            Meta::EntityReference m_owner;
+            std::string m_component;
+            std::weak_ptr<ProjectLayerSettings> m_project;
+            std::vector<PhysicsShapeDefinition> m_before, m_after;
+            Authoring::WriteDocument m_beforeDocument, m_afterDocument;
+            int m_slot;
+            std::string m_type;
+            std::optional<PrefabOverride> m_beforeOverride;
+        };
+    }
+
+    CommandCore::CommandResult PhysicsShapes(EntityHandle target, const std::string& component, const std::string& text,
+                                             const Authoring::WriteDocument* expected)
+    {
+        using namespace CommandCore;
+        auto* owner = Resolve(target);
+        if (!owner || IsEditLocked(owner, true) || SceneManagers->IsGameStart())
+            return PreconditionFailed("physics.authoring_locked", "Physics shapes require an unlocked Editor entity");
+
+        auto* body = dynamic_cast<PhysicsBodyComponent*>(FindComponent(owner, component));
+        if (!Meta::Find(type_guid(PhysicsShapeDefinition))) return Fail("physics.schema_missing", "Physics shape reflection is not registered");
+        if (!body) return InvalidArguments("PhysicsBodyComponent is missing or ambiguous; use #id");
+        try
+        {
+            auto parsed = Editor::ParsePhysicsShapeDocument(text);
+            if (!parsed) return InvalidArguments(std::string(parsed.error().message));
+            auto shapes = std::move(*parsed);
+            auto before = ShapeDocument(body->Shapes());
+            if (expected && !Authoring::NodesEqual(before.Root().Read(), expected->Root()))
+                return PreconditionFailed("physics.shapes_stale", "Shapes changed externally; reload the draft");
+            auto after = ShapeDocument(shapes);
+            const bool changed = !Authoring::NodesEqual(before.Root().Read(), after.Root().Read());
+            if (changed) Meta::UndoManager::GetInstance()->Execute(std::make_unique<PhysicsShapesCommand>(owner, *body, std::move(shapes)));
+            auto data = CommandData::Object();
+            data.Set("changed", CommandData::Bool(changed));
+            data.Set("count", CommandData::Int(body->Shapes().size()));
+            return Ok("physics.shapes", std::move(data));
+        }
+        catch (const std::exception& error) { return Fail("physics.shapes_failed", error.what()); }
     }
 
     CommandCore::CommandResult NavigateSelection(Scene* scene, int direction)
@@ -614,6 +817,11 @@ namespace EditorObjectOperations
         const auto found = ComponentFactorys->m_componentTypes.find(typeName);
         if (found == ComponentFactorys->m_componentTypes.end() || !found->second) return InvalidArguments("Unknown component type");
         const auto* type = found->second;
+        if (!object->CanAttachComponentType(Meta::TypeIDOf(*type)) && !object->GetComponent(*type))
+            return PreconditionFailed("physics.ownership_conflict", "Body and character require separate Entities");
+        if ((typeName == "PhysicsBodyComponent" || typeName == "CharacterMovementComponent") && SceneManagers->IsGameStart())
+            return PreconditionFailed("physics.authoring_frozen", "Physics authoring is frozen during Play");
+
         for (const auto& component : object->m_components)
             if (component && component->GetTypeID() == Meta::TypeIDOf(*type) && !component->IsDestroyMark())
                 {

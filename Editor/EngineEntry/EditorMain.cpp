@@ -1,3 +1,4 @@
+﻿#include "EditorProjectLayerSettings.h"
 #include "EditorObjectOperations.h"
 #include "EditorScriptAuthoring.h"
 #include "EditorMain.h"
@@ -13,7 +14,6 @@
 #include "ViewportHostWindow.h"
 #include "InputManager.h"
 #include "ImGui.h"
-#include "Physx.h"
 #include "SoundManager.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
@@ -85,6 +85,9 @@ Editor::EditorMain::~EditorMain()
 
 void Editor::EditorMain::Initialize()
 {
+    if (!SceneManagers->ConfigureSimulationSession(SimulationSessionPolicy::mode::editor_restore))
+        throw std::runtime_error("Editor simulation policy must be configured before Play");
+
 	BootProgress::Step(L"Initializing editor session", L"Registering the game thread and undo system");
 	// 초기화는 부트스트랩이 이미 했다(워커보다 먼저 서야 한다).
 	ce::profiler().register_thread("[GameThread]", ce::track_kind::game_thread);
@@ -291,7 +294,11 @@ void Editor::EditorMain::Initialize()
 	//   사라진다. 아래 CreateScene이 태그를 읽는 첫 지점이므로 그 사이가
 	//   유일하게 안전한 자리다.
 	BootProgress::Step(L"Loading tags and layers", L"Preparing project authoring settings");
+    m_projectLayers = LoadProjectLayerSettings();
 	TagManagers->Initialize();
+    if (!SceneManagers->BindProjectLayerSettings(m_projectLayers))
+        throw std::runtime_error("Project layers must bind before creating scenes");
+
 
 	BootProgress::Step(L"Opening project", L"Creating the active scene");
 	SceneManagers->CreateScene();
@@ -327,7 +334,6 @@ void Editor::EditorMain::Initialize()
 	reflgen::generated::register_Editor(Meta::Types());
 	SceneManagers->ManagerInitialize();
 	BootProgress::Step(L"Initializing physics", L"Starting the physics manager");
-	PhysicsManagers->Initialize();
 
 	// CoreCLR 스크립트 계층. 렌더 스레드를 띄우기 전에 올려둔다.
 	// 관리 어셈블리가 없으면 조용히 비활성 상태로 남고 엔진은 그대로 동작한다.
@@ -575,6 +581,7 @@ void Editor::EditorMain::Finalize()
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
 	SceneManagers->Decommissioning();
+    m_projectLayers.reset();
 	std::printf("[SHUTDOWN] SceneManagers 반환\n");
 
 	EditorSettingsStore::Get().Save();
@@ -744,7 +751,6 @@ void Editor::EditorMain::Update()
 
 		if (InputManagement->IsKeyReleased(VK_F9))
 		{
-			Physics->ConnectPVD();
 		}
 	}
 

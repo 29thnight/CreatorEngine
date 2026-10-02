@@ -144,10 +144,14 @@ namespace Meta
                 EditorObjectIdentity::Restore(*restored, record.object.guid);
                 restored->m_index = slot;
                 restored->m_name.SetString(record.name);
-                if (!restored->m_tag.ToString().empty()) TagManager::GetInstance()->AddTagToObject(restored->m_tag.ToString(), restored);
-                if (!restored->m_layer.ToString().empty()) TagManager::GetInstance()->AddObjectToLayer(restored->m_layer.ToString(), restored);
+                if (!restored->m_tag.ToString().empty())
+                    TagManager::GetInstance()->AddTagToObject(restored->m_tag.ToString(), restored);
+
+                if (!restored->SetLayer(restored->GetLayer()))
+                    throw std::runtime_error("Invalid entity layer membership");
                 if (restored->m_prefabFileGuid != FileGuid{})
-                    if (auto* prefab = PrefabUtilitys->LoadPrefabGuid(restored->m_prefabFileGuid)) PrefabUtilitys->RegisterInstance(restored, prefab);
+                    if (auto* prefab = PrefabUtilitys->LoadPrefabGuid(restored->m_prefabFileGuid))
+                        PrefabUtilitys->RegisterInstance(restored, prefab);
                 if (const auto components = node["m_components"])
                     for (const auto component : components)
                         ComponentFactorys->LoadComponent(restored, Authoring::NodeViewAccess::Make(component), false);

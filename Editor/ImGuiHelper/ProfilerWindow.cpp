@@ -309,6 +309,7 @@ namespace
 			ImGui::SameLine(); toggle("Render", ce::counter_category::render);
 			ImGui::SameLine(); toggle("Managed GC", ce::counter_category::managed);
 			ImGui::SameLine(); toggle("Resources", ce::counter_category::resources);
+			ImGui::SameLine(); toggle("Physics", ce::counter_category::physics);
 			ImGui::TextDisabled("Resources는 기본 꺼짐 · 켜면 0.5초마다 소유 프레임에서 집계합니다");
 			ImGui::TreePop();
 		}
@@ -494,7 +495,7 @@ namespace
 
 namespace editor::profiler_view
 {
-	enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive };
+	enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive, physics };
 	page selectedPage = page::timeline;
 	std::atomic_bool renderingLiveRequested{false};
 	void select_rendering_live() { renderingLiveRequested = true; }
@@ -564,6 +565,7 @@ void DrawProfilerHUD()
 	nav(page::memory, EditorIcon::Runtime, "메모리", "프로세스 RAM 작업 집합");
 	nav(page::gpu, EditorIcon::Game, "GPU", "Graphics 구간 시간과 VRAM");
 	nav(page::renderingLive, EditorIcon::Scene, "Rendering - Live", "Live renderer diagnostics without Record");
+	nav(page::physics, EditorIcon::Timing, "Physics", "씬별 물리 틱 카운터와 손실 진단");
 	nav(page::network, EditorIcon::World, "네트워크", "엔진 송수신량");
 	nav(page::animation, EditorIcon::AvatarMask, "Animation", "실시간 CPU 예산과 태스크 실행 기록");
 	ImGui::Separator();
@@ -619,6 +621,7 @@ void DrawProfilerHUD()
 	case page::memory: draw_memory_profiler(); break;
 	case page::gpu: draw_telemetry(telemetry_page::gpu); break;
 	case page::network: draw_telemetry(telemetry_page::network); break;
+	case page::physics: draw_physics_telemetry(); break;
 	case page::animation: draw_animation_budget(); break;
 	case page::renderingLive: editor::DrawRenderLiveDiagnostics(); break;
 	case page::hierarchy:

@@ -15,14 +15,14 @@
 #include <cstdlib>
 #include <string>
 #include "MeshRenderer.h"
-#include "BoxColliderComponent.h"
 #include "LightMapping.h"
 #include "ShadowMapPassSetting.h"
 #include "BlackBoardValue.h"
 #include "AssetEntry.h"
 #include "DecalComponent.h"
-#include "TerrainCollider.h"
 #include "CameraComponent.h"
+#include "PhysicsBodyComponent.h"
+#include "CharacterMovementComponent.h"
 #include "SpriteRenderer.h"
 #include "AssetBundle.h"
 #include "BloomSetting.h"
@@ -30,10 +30,7 @@
 #include "MaterialFlowInformation.h"
 #include "SSGIPassSetting.h"
 #include "Camera.h"
-#include "RigidBodyComponent.h"
 #include "ColorGradingPassSetting.h"
-#include "MeshCollider.h"
-#include "RagdollComponent.h"
 #include "FoliageComponent.h"
 #include "BitMaskPassSetting.h"
 #include "DeferredPassSetting.h"
@@ -67,12 +64,9 @@
 #include "BoneComponent.h"
 #include "BoneMask.h"
 #include "BTBuildGraph.h"
-#include "SphereColliderComponent.h"
 #include "PrefabOverride.h"
 #include "Canvas.h"
 #include "BTBuildNode.h"
-#include "CharacterControllerComponent.h"
-#include "CapsuleColliderComponent.h"
 #include "ImageComponent.h"
 #include "ConditionParameter.h"
 #include "SpriteSheetComponent.h"
@@ -92,7 +86,6 @@
 
 #define REFLECT_TYPE_LIST(X) \
     X(MeshRenderer) \
-    X(BoxColliderComponent) \
     X(LightMapping) \
     X(ShadowMapPassSetting) \
     X(AAPassSetting) \
@@ -114,9 +107,9 @@
     X(BoneMask) \
     X(Camera) \
     X(CameraComponent) \
+    X(PhysicsBodyComponent) \
+    X(CharacterMovementComponent) \
     X(Canvas) \
-    X(CapsuleColliderComponent) \
-    X(CharacterControllerComponent) \
     X(ColorGradingPassSetting) \
     X(Component) \
     X(ConditionParameter) \
@@ -136,26 +129,21 @@
     X(MaterialFlowInformation) \
     X(MaterialInfomation) \
     X(Mesh) \
-    X(MeshColliderComponent) \
     X(Navigation) \
     X(Object) \
     X(PlayerInputComponent) \
     X(Prefab) \
     X(PrefabOverride) \
-    X(RagdollComponent) \
     X(RectTransformComponent) \
     X(RenderPassSettings) \
-    X(RigidBodyComponent) \
     X(SSAOPassSetting) \
     X(SSGIPassSetting) \
     X(Scene) \
     X(ScriptComponent) \
     X(SoundComponent) \
-    X(SphereColliderComponent) \
     X(SpriteRenderer) \
     X(SpriteSheetComponent) \
     X(StateMachineComponent) \
-    X(TerrainColliderComponent) \
     X(TerrainComponent) \
     X(TextComponent) \
     X(ToneMapPassSetting) \

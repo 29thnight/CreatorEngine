@@ -357,7 +357,7 @@ namespace ce
 		m_pool.seal(chunk);
 	}
 
-	void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame)
+	void thread_stream::begin_scope(marker_id id, profile_tick now, std::uint32_t frame, const cpu_span_context& cpu)
 	{
 		if (!owned_by_caller()) return;
 		honor_seal_request();
@@ -382,6 +382,7 @@ namespace ce
 		scope.tick_begin = now;
 		scope.marker = id;
 		scope.frame = frame;
+		scope.cpu = cpu;
 		scope.flags = event_flags::none;
 		scope.generation = m_generation.load(std::memory_order_acquire);
 		scope.emitted = false;
@@ -435,6 +436,7 @@ namespace ce
 		value.tick_end = now;
 		value.marker = scope.marker;
 		value.frame = scope.frame;
+		value.cpu = scope.cpu;
 		value.depth = static_cast<std::uint16_t>(m_depth);
 		value.flags = scope.flags;
 		write(value);
@@ -470,7 +472,7 @@ namespace ce
 	}
 
 	void thread_stream::write_instant(marker_id id, profile_tick tick,
-	                                  std::uint32_t frame)
+	                                  std::uint32_t frame, const cpu_span_context& cpu)
 	{
 		if (!owned_by_caller()) return;
 
@@ -491,6 +493,7 @@ namespace ce
 		value.frame = frame;
 		value.depth = static_cast<std::uint16_t>(m_depth);
 		value.flags = event_flags::instant;
+		value.cpu = cpu;
 		write(value);
 	}
 
@@ -545,6 +548,7 @@ namespace ce
 			value.tick_end = freeze_tick;
 			value.marker = scope.marker;
 			value.frame = scope.frame;
+		value.cpu = scope.cpu;
 			value.depth = static_cast<std::uint16_t>(i - 1);
 			value.flags = scope.flags | event_flags::truncated_end;
 			write(value);
@@ -578,6 +582,7 @@ namespace ce
 			value.tick_end = now;
 			value.marker = scope.marker;
 			value.frame = scope.frame;
+		value.cpu = scope.cpu;
 			value.depth = static_cast<std::uint16_t>(m_depth);
 			value.flags = scope.flags | event_flags::truncated_end;
 			write(value);

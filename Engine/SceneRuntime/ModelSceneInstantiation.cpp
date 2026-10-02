@@ -1,4 +1,4 @@
-#include "ModelSceneInstantiation.h"
+﻿#include "ModelSceneInstantiation.h"
 
 #include "Scene.h"
 #include "Animator.h"
@@ -7,10 +7,11 @@
 #include "Entity.h"
 #include "ExperimentMaterialMigration.h"
 #include "Material.h"
-#include "MeshCollider.h"
 #include "MeshRenderer.h"
 #include "ModelConsumptionDiagnostics.h"
-#include "RigidBodyComponent.h"
+#include "PhysicsBodyComponent.h"
+#include "ModelCollisionGeometry.h"
+#include "../EngineDiagnostics/ProfileScope.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "Experiment/ModelData.h"
 
@@ -42,6 +43,8 @@ namespace ModelSceneInstantiation
         std::vector<std::uint32_t> meshMaterials;
         std::vector<EntityHandle> handles;
         std::vector<std::size_t> renderers;
+        std::vector<ce::physics::triangle_mesh_source> collisionMeshes;
+        std::vector<std::optional<ce::physics::geometry_asset_key>> collisionKeys;
         std::size_t created{ 0 };
         std::size_t activated{ 0 };
         bool animatorReady{ false };
@@ -68,12 +71,19 @@ namespace ModelSceneInstantiation
         if (nodes.empty() || nodes[0].parent != assets::kInvalidModelAssetIndex)
             return reject();
 
+        if (options.createMeshCollider && !options.collisionGeometry)
+            return reject();
+
         auto impl = std::make_unique<Impl>();
         impl->generation = std::move(generation);
         impl->options = options;
         const auto* skeleton = impl->generation->Skeleton();
         impl->hasBones = skeleton && !skeleton->bones.empty()
             && skeleton->rootBone < skeleton->bones.size();
+
+        if (options.createMeshCollider && impl->hasBones)
+            return reject(); // Static triangle assets cannot follow animated skin deformation.
+
         std::map<Uuid::Uuid16, std::uint32_t> meshIndices;
         std::map<Uuid::Uuid16, std::uint32_t> materialIndices;
         for (std::uint32_t i = 0; i < meshes.size(); ++i) meshIndices.emplace(meshes[i].meshId, i);
@@ -147,6 +157,28 @@ namespace ModelSceneInstantiation
         {
             if (impl->objects[i].name.empty()) return reject();
             if (impl->objects[i].mesh != assets::kInvalidModelAssetIndex) impl->renderers.push_back(i);
+        }
+
+        if (options.createMeshCollider)
+        {
+            ce::profile_scope scope{ce::marker<"Physics.ModelCollisionPrepare">()};
+            impl->collisionMeshes.resize(meshes.size());
+            impl->collisionKeys.resize(meshes.size());
+
+            for (const auto objectIndex : impl->renderers)
+            {
+                const auto meshIndex = impl->objects[objectIndex].mesh;
+                if (!impl->collisionMeshes[meshIndex].points.empty())
+                    continue;
+
+                const auto& mesh = meshes[meshIndex];
+                auto source = ce::physics::BuildModelCollisionMesh(mesh.vertexBytes, mesh.indices,
+                    mesh.vertexAttributeMask, mesh.vertexStride, mesh.vertexLayoutHash);
+                if (!source)
+                    return reject();
+
+                impl->collisionMeshes[meshIndex] = std::move(*source);
+            }
         }
 
         // 재질 변환, 외부 이미지 디코드/압축, embedded 이미지 owner 생성을 모두
@@ -251,12 +283,42 @@ namespace ModelSceneInstantiation
                 if (!object || object->IsDestroyMark()) return fail();
                 if (state.options.createMeshCollider)
                 {
-                    object->AddComponent<RigidBodyComponent>();
-                    auto* collider = object->AddComponent<MeshColliderComponent>();
-                    collider->SetDensity(0);
-                    collider->SetDynamicFriction(0);
-                    collider->SetStaticFriction(0);
-                    collider->SetRestitution(0);
+                    ce::profile_scope scope{ce::marker<"Physics.ModelCollisionAttach">()};
+                    const auto meshIndex = state.objects[state.renderers[state.activated]].mesh;
+
+                    if (!scene.EnsureResolved(scene.HandleOf(object->m_index)))
+                        return fail();
+
+                    auto& key = state.collisionKeys[meshIndex];
+
+                    if (!key)
+                    {
+                        auto resolved = state.options.collisionGeometry(scene, meshIndex, state.collisionMeshes[meshIndex]);
+                        if (!resolved)
+                        {
+                            Debug::PrintLog(spdlog::level::err, std::string(resolved.error().message));
+                            return fail();
+                        }
+
+                        key = *resolved;
+                    }
+
+                    PhysicsShapeDefinition shape;
+                    shape.kind = PhysicsShapeKind::triangle_mesh;
+                    shape.geometryAsset = Uuid::ToString(key->asset);
+                    shape.geometryRevision = key->revision;
+                    shape.staticFriction = shape.dynamicFriction = shape.restitution = 0;
+                    auto* body = object->AddComponent<PhysicsBodyComponent>(ce::physics::body_kind::static_body,
+                        std::vector<PhysicsShapeDefinition>{std::move(shape)});
+
+                    if (!body)
+                        return fail();
+
+                    if (auto registered = scene.RegisterPhysicsBody(*body); !registered)
+                    {
+                        Debug::PrintLog(spdlog::level::err, std::string(registered.error().message));
+                        return fail();
+                    }
                 }
                 object->GetComponent<MeshRenderer>()->SetEnabled(true);
                 ++state.activated;

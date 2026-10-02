@@ -13,6 +13,8 @@ internal static class PackageInputs
     private static bool ScriptSource(string relative) => relative.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase);
     public static int CopyProject(string project, string destination, CancellationToken token)
     {
+        ProjectLayerAsset.Require(project);
+
         var count = 0;
         foreach (var name in new[] { "Assets", "ProjectSetting" })
         {
@@ -30,6 +32,7 @@ internal static class PackageInputs
     public static async Task<int> CopyWorkspace(BuildContext context, string repository, string project, string destination)
     {
         RequireRepositoryProject(repository, project);
+        ProjectLayerAsset.Require(project);
         _ = Paths.Files(Path.Combine(project, "Assets")).Count(); _ = Paths.Files(Path.Combine(project, "ProjectSetting")).Count();
         var result = await context.Run("git", ["-C", repository, "-c", "core.quotepath=false", "ls-files", "--", "Dynamic_CPP/Assets/**", "Dynamic_CPP/ProjectSetting/**"], echo: false);
         var copied = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -44,6 +47,17 @@ internal static class PackageInputs
         }
         const string scene = "Assets/Scenes/FT_Primitives.creator";
         if (copied.Add(scene)) Paths.Copy(Paths.Child(project, scene), Paths.Child(destination, scene));
+        // Newly migrated definitions may be untracked while assembling a workspace package.
+        if (copied.Add(ProjectLayerAsset.RelativePath))
+            Paths.Copy(Paths.Child(project, ProjectLayerAsset.RelativePath), Paths.Child(destination, ProjectLayerAsset.RelativePath));
+        // Native geometry and immutable history must reach cook even when new/untracked.
+        foreach (var file in Paths.Files(Path.Combine(project, "Assets")).Where(p => p.EndsWith(".cegeometry", StringComparison.OrdinalIgnoreCase)))
+        {
+            var relative = "Assets/" + Paths.Relative(Path.Combine(project, "Assets"), file);
+            if (copied.Add(relative)) Paths.Copy(file, Paths.Child(destination, relative));
+            if (File.Exists(file + ".meta") && copied.Add(relative + ".meta"))
+                Paths.Copy(file + ".meta", Paths.Child(destination, relative + ".meta"));
+        }
         return copied.Count;
     }
     public static void RequireRepositoryProject(string repository, string project)
@@ -119,6 +133,17 @@ internal static class PackageInputs
         var lifecycleProbe = Regex.IsMatch(sceneText, @"(?m)^\s+m_scriptType:\s*PackageSmokeProbe\s*$");
         return new(scene, runtimeBackend.Groups[2].Value, counts, lifecycleProbe);
     }
+    public static void RemoveGeometrySources(string merged)
+    {
+        var assets = Paths.Child(merged, "Assets");
+        foreach (var file in Paths.Files(assets).Where(p => p.EndsWith(".cegeometry", StringComparison.OrdinalIgnoreCase)).ToArray())
+        {
+            Paths.AssertChild(file, assets);
+            File.Delete(file);
+            if (File.Exists(file + ".meta")) { Paths.AssertChild(file + ".meta", assets); File.Delete(file + ".meta"); }
+        }
+    }
+
     public static bool Excluded(string path)
     {
         // The generation reader validates this cooked companion at runtime.

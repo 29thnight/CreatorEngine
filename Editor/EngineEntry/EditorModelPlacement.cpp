@@ -1,4 +1,5 @@
-#include "EditorModelPlacement.h"
+﻿#include "EditorModelPlacement.h"
+#include "EditorModelCollisionGeometry.h"
 
 #include "DataSystem.h"
 #include "ModelSceneInstantiation.h"
@@ -25,6 +26,8 @@ namespace Editor
         std::string path;
         std::optional<math::vector3> position;
         bool gameMode{};
+        file::path assetRoot;
+        std::weak_ptr<ProjectLayerSettings> project;
         std::atomic<bool> cancelled{ false };
         std::atomic<bool> ready{ false };
         std::atomic<bool> finished{ false };
@@ -125,6 +128,29 @@ namespace Editor
                             ModelSceneInstantiation::Options options;
                             options.createMeshCollider = DataSystems->ReadModelCreateMeshCollider(
                                 FileGuid(generation->Identity().modelId));
+                            if (options.createMeshCollider)
+                            {
+                                const auto assetRoot = request->assetRoot;
+                                const auto expectedProject = request->project;
+                                const auto model = generation->Identity().modelId;
+                                std::vector<Uuid::Uuid16> meshes;
+
+                                for (const auto& mesh : generation->Meshes())
+                                    meshes.push_back(mesh.meshId);
+
+                                options.collisionGeometry = [assetRoot, expectedProject, model, meshes = std::move(meshes)](
+                                    Scene& scene, std::uint32_t meshIndex, const ce::physics::triangle_mesh_source& source)
+                                    -> ce::physics::result<ce::physics::geometry_asset_key> {
+                                    const auto current = expectedProject.lock();
+                                    if (!current || current != SceneManagers->ProjectLayers() || assetRoot != PathFinder::Relative() ||
+                                        SceneManagers->IsPlayCommitted() || meshIndex >= meshes.size())
+                                        return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0,
+                                            "Model collision authoring project changed or Play is active"});
+
+                                    return PublishModelCollisionGeometry(scene, assetRoot, model, meshes[meshIndex], source);
+                                };
+                            }
+
                             request->prepared = ModelSceneInstantiation::PendingInstance::Prepare(
                                 std::move(generation), options);
                             if (!request->prepared) request->error = "Model preparation failed: " + request->path;
@@ -157,6 +183,8 @@ namespace Editor
         request->path = path;
         request->position = position;
         request->gameMode = gameMode;
+        request->assetRoot = PathFinder::Relative();
+        request->project = SceneManagers->ProjectLayers();
         {
             std::lock_guard lock(m_impl->mutex);
             if (m_impl->stopping) return {};

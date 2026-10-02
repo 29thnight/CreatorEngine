@@ -188,6 +188,8 @@ struct Walk final
         // 는 AddEdge가 dedupe하므로 폐포는 정확하다.
         if (key == "m_fileGuid" || key == "m_modelGuid")
             counter = &product.modelEdges;
+        else if (key == "geometryAsset")
+            counter = &product.geometryEdges;
         else if (key == "m_prefabFileGuid")
             counter = &product.prefabEdges;
         else if (key == "m_textureGuid")
@@ -218,7 +220,7 @@ struct Walk final
             return true;
         }
         const std::string text = value.AsString();
-        if (IsNilGuidText(text))
+        if (IsNilGuidText(text) || (key == "geometryAsset" && text.empty()))
             return true;
 
         AssetId id{};

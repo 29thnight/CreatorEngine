@@ -4,6 +4,7 @@
 // (ReflectionTypedYml.h)가 파리티 재구현을 소유한다.
 // FindTypeByInstance가 IObject를 쓴다. IObject는 L1-2에서 코어로 내려왔다
 // (순수 인터페이스 + HashedGuid뿐이라 ScriptBinder 소속일 이유가 없었다).
+#include "AuthoringNodeViewAccess.h"
 #include "AuthoringReadNode.h" // D3-b-2b-1b
 #include "AuthoringWriteNode.h" // D3-b-3
 #include "ReflgenAuthoring.h" // Authoring 백엔드 — 서술자가 이 writer·reader 로 쓰고 읽는다
@@ -352,6 +353,9 @@ namespace Meta
 	template<class T>
 	inline void Deserialize(T* instance, const Authoring::ReadNode& node)
 	{
+        if constexpr (requires { instance->OnBeforeDeserialize(Authoring::NodeViewAccess::Make(node)); })
+            instance->OnBeforeDeserialize(Authoring::NodeViewAccess::Make(node));
+
 		if (const reflgen::type_descriptor* type = FindRegistered<T>("Deserialize"))
 		{
 			Deserialize(reinterpret_cast<void*>(instance), *type, node);

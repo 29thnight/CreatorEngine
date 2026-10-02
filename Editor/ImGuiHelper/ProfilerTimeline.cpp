@@ -556,6 +556,13 @@ namespace editor::profiler_view
 			else
 			{
 				ImGui::Text("depth %u", static_cast<unsigned>(hoveredSpan->depth));
+				if (hoveredSpan->cpu.session != 0)
+				{
+					ImGui::Text("session %llu / tick %llu / task %llu",
+						static_cast<unsigned long long>(hoveredSpan->cpu.session),
+						static_cast<unsigned long long>(hoveredSpan->cpu.tick),
+						static_cast<unsigned long long>(hoveredSpan->cpu.task));
+				}
 			}
 
 			if (truncated)

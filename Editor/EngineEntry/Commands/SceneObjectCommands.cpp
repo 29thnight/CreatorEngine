@@ -41,6 +41,7 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "CameraComponent.h"
+#include "CharacterMovementComponent.h"
 #include "CameraSystem.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
@@ -732,6 +733,87 @@ namespace ConsoleCmd
             ctx.parts[3], values);
     }
 
+    static CommandCore::CommandResult Cmd_character(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const bool query = ctx.cmd == "character.state";
+        const bool simple = query || ctx.cmd == "character.jump" || ctx.cmd == "character.cancel";
+        const bool force = ctx.cmd == "character.force";
+        if (ctx.parts.size() != (simple ? 2u : force ? 6u : 5u))
+            return InvalidArguments("character.state/jump/cancel <target> | velocity/teleport <target> <x y z> | force <target> <x y z> <seconds>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        auto* scene = SceneManagers->GetActiveScene();
+        auto* owner = scene ? scene->Resolve(target) : nullptr;
+        auto* character = owner ? owner->GetComponent<CharacterMovementComponent>() : nullptr;
+        if (!character || character->IsDestroyMark())
+            return PreconditionFailed("character.missing", "Character movement component is unavailable");
+
+        ce::profile_scope scope{ce::marker<"Physics.CharacterCommand">()};
+        if (!query)
+        {
+            ce::physics::result<void> changed;
+            if (ctx.cmd == "character.jump") changed = character->Jump();
+            else if (ctx.cmd == "character.cancel") changed = character->CancelForcedVelocity();
+            else
+            {
+                math::vector3 value;
+                if (!ParseNumber(ctx.parts[2], value.x) || !ParseNumber(ctx.parts[3], value.y) || !ParseNumber(ctx.parts[4], value.z))
+                    return InvalidArguments("Character input requires three finite values");
+                if (force)
+                {
+                    double seconds = 0;
+                    if (!ParseNumber(ctx.parts[5], seconds)) return InvalidArguments("Force duration requires finite seconds");
+                    changed = character->ForceVelocity(value, seconds);
+                }
+                else changed = ctx.cmd == "character.velocity" ? character->SetDesiredVelocity(value) : character->Teleport(value);
+            }
+            if (!changed) return PreconditionFailed("character.control_rejected", std::string(changed.error().message));
+        }
+        auto state = character->ReadState();
+        if (!state) return PreconditionFailed("character.state_unavailable", std::string(state.error().message));
+        const auto vector = [](math::vector3 value) {
+            auto result = CommandData::Array();
+            result.Append(CommandData::Double(value.x));
+            result.Append(CommandData::Double(value.y));
+            result.Append(CommandData::Double(value.z));
+            return result;
+        };
+        auto data = CommandData::Object();
+        data.Set("componentId", CommandData::String("#" + std::to_string(character->GetInstanceID())));
+        data.Set("position", vector(state->collision.position));
+        data.Set("footPosition", vector(state->collision.foot_position));
+        data.Set("actualDisplacement", vector(state->collision.actual_displacement));
+        data.Set("desiredVelocity", vector(state->desired_velocity));
+        data.Set("movementVelocity", vector(state->motion.velocity));
+        data.Set("forcedRemaining", CommandData::Double(state->motion.forced_remaining));
+        data.Set("forced", CommandData::Bool(state->motion.forced_remaining > 0));
+        data.Set("jumpQueued", CommandData::Bool(state->motion.jump_requested));
+        data.Set("fallVelocity", CommandData::Double(state->fall_velocity));
+        data.Set("sides", CommandData::Bool(state->collision.sides));
+        data.Set("above", CommandData::Bool(state->collision.above));
+        data.Set("below", CommandData::Bool(state->collision.below));
+        data.Set("tick", CommandData::String(std::to_string(state->tick.value)));
+        data.Set("simulating", CommandData::Bool(bool(character->RuntimeHandle())));
+        return Ok(ctx.cmd, std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_physics_shapes(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 4) return CommandCore::InvalidArguments("physics.shapes <target> <component-or-#id> <input-file>");
+        EntityHandle target;
+        auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!resolved.IsSuccess()) return resolved;
+        std::ifstream input(ctx.parts[3], std::ios::binary | std::ios::ate);
+        const auto size = input ? input.tellg() : std::streampos{-1};
+        if (size <= 0 || size > 16 * 1024 * 1024) return CommandCore::InvalidArguments("Shape input is missing or too large");
+        std::string text(static_cast<std::size_t>(size), '\0');
+        input.seekg(0);
+        if (!input.read(text.data(), static_cast<std::streamsize>(text.size()))) return CommandCore::Fail("physics.read_failed", "Shape input read failed");
+        return EditorObjectOperations::PhysicsShapes(target, ctx.parts[2], text);
+    }
+
     static CommandCore::CommandResult Cmd_object_property(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 5) return CommandCore::InvalidArguments("object.property <target> <component> <field> <value>");
@@ -833,6 +915,19 @@ namespace ConsoleCmd
         // 같다는 뜻이고, 이 명령은 그 상태를 답하는 조회다.
         CommandCore::CommandData data = CommandCore::CommandData::Object();
         data.Set("object", CommandCore::CommandData::String(objectName));
+        data.Set("isInstance", CommandCore::CommandData::Bool(isInstance));
+        auto overrides = CommandCore::CommandData::Array();
+        for (const auto& item : object->m_prefabOverrides)
+        {
+            auto row = CommandCore::CommandData::Object();
+            row.Set("componentType", CommandCore::CommandData::String(item.m_componentType));
+            row.Set("componentSlot", CommandCore::CommandData::Int(item.m_componentSlot));
+            row.Set("property", CommandCore::CommandData::String(item.m_propertyName));
+            row.Set("value", CommandCore::CommandData::String(item.m_valueYaml));
+            overrides.Append(std::move(row));
+        }
+        data.Set("overrides", std::move(overrides));
+
         return CommandCore::Ok("prefab.overrides", std::move(data));
     }
 
@@ -1519,6 +1614,8 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "object.duplicate" }, &Cmd_object_duplicate);
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);
         reg.Result({ "scene.populate" }, &Cmd_scene_populate);
+        reg.Result({ "physics.shapes" }, &Cmd_physics_shapes);
+        reg.Result({ "character.state", "character.velocity", "character.teleport", "character.jump", "character.force", "character.cancel" }, &Cmd_character);
         reg.Result({ "object.property" }, &Cmd_object_property);
         reg.Result({ "material.override" }, &Cmd_material_override);
         reg.Result({ "scene.select" }, &Cmd_scene_select);

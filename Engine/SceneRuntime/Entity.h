@@ -9,6 +9,7 @@
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
 #include <vector>
+#include "../Utility_Framework/LayerTypes.h"
 
 class Scene;
 class Bone;
@@ -46,7 +47,10 @@ public:
 
 	void SetName(std::string_view name) { m_name = name; }
     void SetTag(std::string_view tag);
-    void SetLayer(std::string_view layer);
+    void OnBeforeDeserialize(const Authoring::NodeView& node) const;
+    ce::layers::result<void> SetLayer(std::string_view name);
+    ce::layers::result<void> SetLayer(ce::layers::layer_id layer);
+    ce::layers::layer_id GetLayer() const noexcept { return {m_layerId}; }
 
 	virtual void Destroy() override final;
 
@@ -86,6 +90,7 @@ public:
 	// m_components 자체가 고유 소유라 shared_ptr을 새로 만들 근거가 없다 —
 	// 호출자는 이미 전부 raw 포인터로만 썼다(그린 상태 확인, GameObjectCommand.h
 	// 등은 반환값을 쓰지 않는다).
+    bool CanAttachComponentType(const HashedGuid& type) const;
 	Component* AddComponent(const reflgen::type_descriptor& type);
 
 	// 같은 타입을 여러 개 붙일 수 있는 형태.
@@ -236,8 +241,6 @@ public:
 	}
 
 	void SetEnabled(bool able) override final;
-	void SetCollisionType();
-	uint32 GetCollisionType() const { return m_collisionType; }
 	Scene* GetScene() const { return m_ownerScene; }
 
 	// Transform 컴포넌트 접근자 (S1-b: m_transform 값 멤버 소멸, 저장소는
@@ -278,7 +281,6 @@ public:
 	// m_components 안의 컴포넌트 블록으로 직렬화된다. Entity 스키마에서
 	// 빠지는 것이 의도된 형상 변경이다(리플렉션 골든 재기준선 필요).
 	Entity::Index m_index{ kInvalidIndex };
-	uint32 m_collisionType = 0;
 	FileGuid m_prefabFileGuid{ nullFileGuid };
 
 	// 이 인스턴스가 프리팹 원본 값을 지역적으로 덮어쓴 속성 목록 (SceneGraphRedesignPlan P1).
@@ -289,7 +291,8 @@ public:
 
 public:
     HashingString m_tag{ "Untagged" };
-    HashingString m_layer{ "Default" };
+    [[reflgen::hidden]]
+    std::uint64_t m_layerId = ce::layers::default_layer.value;
 
     // Authoring presentation only. Stable preset ID; empty keeps the default.
     // Stored with the entity so scene/prefab round trips and duplication retain it.

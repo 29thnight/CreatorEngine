@@ -1,7 +1,6 @@
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
-#include "TerrainCollider.h"
 //#include "IOnDestroy.h"
 //#include "IAwakable.h"
 #include "TerrainMesh.h"

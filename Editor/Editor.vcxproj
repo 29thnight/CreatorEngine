@@ -61,6 +61,7 @@
     <ClInclude Include="EngineEntry\BuildSettings.h" />
     <ClInclude Include="EngineEntry\EditorCommandServiceHost.h" />
     <ClInclude Include="EngineEntry\EditorObjectOperations.h" />
+    <ClInclude Include="EngineEntry\PhysicsShapeDocument.h" />
     <ClInclude Include="EngineEntry\EditorScriptAuthoring.h" />
     <ClInclude Include="EngineEntry\EditorComponentCatalog.h" />
     <ClInclude Include="EngineEntry\EditorProjectOperations.h" />
@@ -78,6 +79,8 @@
     <ClInclude Include="EngineEntry\Commands\CommandSupport.h" />
     <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
+    <ClInclude Include="EngineEntry\EditorModelCollisionAsset.h" />
+    <ClInclude Include="EngineEntry\EditorModelCollisionGeometry.h" />
     <ClInclude Include="EngineEntry\EditorModelPlacement.h" />
     <ClInclude Include="EngineEntry\EditorImGuiTexture.h" />
     <ClInclude Include="EngineEntry\EditorPlatform.h" />
@@ -501,5 +504,13 @@
     <ClCompile Include="..\Lattice\ImGui\LXStyle.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EngineEntry\EditorProjectLayerSettings.h" />
+    <ClInclude Include="EngineEntry\CollisionGeometryAuthoring.h" />
+    <ClInclude Include="EngineEntry\UndoHistoryTransaction.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EngineEntry\LegacyProjectLayerImport.h" />
   </ItemGroup>
 </Project>

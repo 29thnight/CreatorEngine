@@ -80,6 +80,9 @@ namespace experiment::cooked
             std::shared_ptr<const ArtifactByteSource> bytes,
             CookedAudioClipSource& out, std::string& failure) const;
 
+        [[nodiscard]] bool ReadCollisionGeometry(const AssetId& assetId, const ArtifactByteSource& bytes,
+            std::vector<std::byte>& out, std::string& failure) const;
+
         [[nodiscard]] bool OpenMaterialProgram(const AssetId& assetId,
             const ArtifactByteSource& bytes, const material_graph::Budget& budget,
             material_graph::CookedProgram& out, std::string& failure) const;

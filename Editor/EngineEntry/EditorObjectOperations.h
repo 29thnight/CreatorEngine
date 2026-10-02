@@ -1,4 +1,5 @@
 #pragma once
+#include "LayerTypes.h"
 #include "CommandCore/CommandResult.h"
 #include "EntityHandle.h"
 #include "AuthoringWriteNode.h"
@@ -47,6 +48,7 @@ namespace EditorObjectOperations
     ComponentEditPolicy PolicyOf(const Component& component);
 
     /// 엔티티 전체를 켜고 끈다(컴포넌트·자식으로 전파, Undo). 개별 활성 정책과 무관하다.
+    CommandCore::CommandResult SetEntityLayer(EntityHandle target, ce::layers::layer_id layer);
     CommandCore::CommandResult SetEntityEnabled(EntityHandle target, bool enabled);
     CommandCore::CommandResult Create(Scene* scene, const std::string& name, GameObjectType type, uint32_t parent = 0);
     CommandCore::CommandResult Delete(EntityHandle target);
@@ -65,6 +67,7 @@ namespace EditorObjectOperations
     PropertyEdit CapturePropertyEdit(Component& component, std::vector<std::string> fields);
     bool CommitPropertyEdits(std::vector<PropertyEdit> edits);
     bool CommitProperty(Component& component, const std::string& field, Authoring::WriteDocument before);
+    CommandCore::CommandResult PhysicsShapes(EntityHandle target, const std::string& component, const std::string& document, const Authoring::WriteDocument* expected = nullptr);
     CommandCore::CommandResult Property(EntityHandle target, const std::string& component, const std::string& field, const std::string& value);
     CommandCore::CommandResult AddComponent(EntityHandle target, const std::string& type);
     CommandCore::CommandResult AddManagedScript(EntityHandle target, const std::string& type);

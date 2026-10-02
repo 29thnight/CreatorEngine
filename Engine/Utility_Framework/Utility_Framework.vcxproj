@@ -263,4 +263,8 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
+  <ItemGroup>
+    <ClInclude Include="LayerTypes.h" />
+    <ClInclude Include="LayerCatalog.h" />
+  </ItemGroup>
 </Project>

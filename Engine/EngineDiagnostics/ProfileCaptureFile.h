@@ -16,6 +16,7 @@
 //   chunk table chunk_count × { u32 type · u32 version · u64 offset · u64 size ·
 //                               u32 crc32 · u32 reserved }
 //   chunks      environment · markers · threads · frames · counters(optional)
+//   counter chunk v1: id(u16)/value(f64); v2 adds CPU session/tick/task (3*u64).
 //
 // ★ 이벤트는 **필드 하나씩** 쓴다. `profile_event` 를 통째로 복사하면 구조체의
 //   패딩과 배치가 곧 파일 형식이 되는데, 그 구조체는 "크기가 바뀌면 이 줄을
@@ -34,7 +35,10 @@ namespace ce
 {
 	// 이 빌드가 쓰는 형식. 읽을 때 이보다 **새** 파일은 거절한다 — 모르는
 	// 뜻을 아는 척 읽는 것보다 "읽을 수 없다" 가 낫다(§8.1).
-	inline constexpr std::uint32_t kCaptureFileVersion = 1;
+	inline constexpr std::uint32_t kCaptureFileVersion = 2;
+	// v1 events: 38 wire bytes. v2 frames append three u64 CPU ownership IDs (62 bytes).
+	// v2 thread vocabulary adds physics_worker; existing track values stay unchanged.
+	// Native producer pages are version 2 / 64-byte records, independent of file layout.
 
 	// 왜 못 읽었는가. ★ 하나로 뭉치지 않는다 — "파일이 잘렸다" 와 "누가 고쳤다"
 	// 와 "더 새 빌드가 썼다" 는 사용자가 할 일이 다르다.

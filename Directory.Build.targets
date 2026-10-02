@@ -149,7 +149,12 @@
     <ReflgenAttributeHeaders>$(MSBuildThisFileDirectory)Engine\Utility_Framework\ReflgenAttributes.h</ReflgenAttributeHeaders>
   </PropertyGroup>
 
-  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Physics' or '$(MSBuildProjectName)' == 'EngineDiagnostics'">
+    <ReflgenRegistration>false</ReflgenRegistration>
+    <ReflgenRegistrationHeaders />
+    <ReflgenAttributeHeaders />
+  </PropertyGroup>
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'Physics' and '$(MSBuildProjectName)' != 'EngineDiagnostics'">
     <!-- [[reflgen::reflect]] 타입을 가진 모듈 — header 를 ClInclude 로 가진 프로젝트가 생성한다. -->
     <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\RenderEngine\RenderEngine.vcxproj" />
     <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\SceneRuntime\SceneRuntime.vcxproj" />
@@ -157,6 +162,12 @@
     <ReflgenReference Include="@(_EngineReflgenModule)" Exclude="$(MSBuildProjectFullPath)" />
   </ItemGroup>
 
+  <!-- Physics/diagnostics have no reflected engine types or Scene/Editor dependencies. -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectName)' == 'Physics'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(_EngineVcpkgInstalledDir)$(_EngineVcpkgTriplet)\include\physx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and Exists('$(EngineReflgenTargets)')" />
 
   <!--

@@ -60,6 +60,7 @@ struct SceneCookProduct final
     std::vector<std::byte> artifactBytes{};
     CookedAssetManifestEntry manifestEntry{};
 
+    std::size_t geometryEdges{};
     std::size_t modelEdges{};
     std::size_t prefabEdges{};
     std::size_t textureEdges{};

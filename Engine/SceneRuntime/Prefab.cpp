@@ -463,10 +463,8 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
         TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
     }
 
-    if (!obj->m_layer.ToString().empty())
-    {
-        TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
-    }
+    if (!obj->SetLayer(obj->GetLayer()))
+        throw std::runtime_error("Invalid entity layer membership");
 
     if (node["m_components"])
     {

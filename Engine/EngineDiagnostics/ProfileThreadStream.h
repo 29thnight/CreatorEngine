@@ -42,6 +42,7 @@ namespace ce
 		script_thread  = 3,   // managed/script
 		gpu_graphics   = 4,   // GPU Graphics queue
 		gpu_compute    = 5,   // GPU Compute/Copy queue
+		physics_worker = 7,   // PhysX SDK worker; independent from render command threads
 		other          = 6,   // 말하지 않은 것은 맨 아래
 	};
 
@@ -125,6 +126,7 @@ namespace ce
 	// 열린 스코프 하나. 깊이와 시작 시각을 들고 있다가 닫힐 때 이벤트가 된다.
 	struct open_scope
 	{
+		cpu_span_context cpu;
 		profile_tick  tick_begin = 0;
 		marker_id     marker = invalid_marker;
 		std::uint32_t frame = 0;
@@ -167,7 +169,7 @@ namespace ce
 		thread_stream(const thread_stream&) = delete;
 		thread_stream& operator=(const thread_stream&) = delete;
 
-		void begin_scope(marker_id id, profile_tick now, std::uint32_t frame);
+		void begin_scope(marker_id id, profile_tick now, std::uint32_t frame, const cpu_span_context& cpu = {});
 		void end_scope(profile_tick now);
 
 		// 열지 않은 스코프의 짝을 예약한다. 녹화 중이 아니어서 여는 쪽을 건너뛰었을
@@ -203,7 +205,7 @@ namespace ce
 		//   사실이 공짜로 남고, 0 으로 박았을 때의 사고도 함께 막는다 —
 		//   깊이 0 짜리 점은 트리에 들어가면 스택에서 부모를 밀어낸다
 		//   (event_flags::instant 의 주석).
-		void write_instant(marker_id id, profile_tick tick, std::uint32_t frame);
+		void write_instant(marker_id id, profile_tick tick, std::uint32_t frame, const cpu_span_context& cpu = {});
 
 		// 프레임 경계. 열려 있는 스코프는 닫지 않는다 — 그것이 프레임을 넘는
 		// 구간이고, 옛 코어가 스택 맨 위를 무조건 닫아 잃던 것이다. 대신

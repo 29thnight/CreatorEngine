@@ -8,31 +8,25 @@
 #include "Animator.h"
 #include "BehaviorTreeComponent.h"
 #include "BoneComponent.h"
-#include "BoxColliderComponent.h"
 #include "CameraComponent.h"
+#include "PhysicsBodyComponent.h"
+#include "CharacterMovementComponent.h"
 #include "Canvas.h"
-#include "CapsuleColliderComponent.h"
-#include "CharacterControllerComponent.h"
 #include "DecalComponent.h"
 #include "FoliageComponent.h"
 #include "ImageComponent.h"
 #include "InvalidScriptComponent.h"
 #include "LightComponent.h"
-#include "RagdollComponent.h"
 #include "RectTransformComponent.h"
 #include "StateMachineComponent.h"
 #include "UIComponent.h"
-#include "MeshCollider.h"
 #include "MeshRenderer.h"
 #include "PlayerInput.h"
-#include "RigidBodyComponent.h"
 #include "ScriptComponent.h"
 #include "SoundComponent.h"
-#include "SphereColliderComponent.h"
 #include "SpriteRenderer.h"
 #include "SpriteSheetComponent.h"
 #include "Terrain.h"
-#include "TerrainCollider.h"
 #include "TextComponent.h"
 #include "Transform.h"
 #include "UIButton.h"
@@ -84,11 +78,10 @@ namespace Lifecycle
 
         Register<Animator>();
         Register<BehaviorTreeComponent>();
-        Register<BoxColliderComponent>();
         Register<CameraComponent>();
+        Register<PhysicsBodyComponent>();
+        Register<CharacterMovementComponent>();
         Register<Canvas>();
-        Register<CapsuleColliderComponent>();
-        Register<CharacterControllerComponent>();
         Register<DecalComponent>();
         Register<FoliageComponent>();
         Register<ImageComponent>();
@@ -105,21 +98,16 @@ namespace Lifecycle
         // 컴포넌트. 생명주기 훅을 하나도 오버라이드하지 않는다(마스크 0,
         // 위 문단과 같은 사유로 등록 자체는 필요).
         Register<BoneComponent>();
-        Register<RagdollComponent>();
         Register<RectTransformComponent>();
         Register<StateMachineComponent>();
         Register<UIComponent>();
-        Register<MeshColliderComponent>();
         Register<MeshRenderer>();
         Register<PlayerInputComponent>();
-        Register<RigidBodyComponent>();
         Register<ScriptComponent>();
         Register<SoundComponent>();
-        Register<SphereColliderComponent>();
         Register<SpriteRenderer>();
         Register<SpriteSheetComponent>();
         Register<TerrainComponent>();
-        Register<TerrainColliderComponent>();
         Register<TextComponent>();
         // S1-b: Transform이 Component로 승격되며 신규 등록. OnInitialized 등
         // 어느 훅도 오버라이드하지 않는다(마스크 0, 위 문단과 같은 사유로

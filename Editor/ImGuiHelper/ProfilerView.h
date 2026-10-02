@@ -45,6 +45,7 @@ namespace editor::profiler_view
 	enum class telemetry_page { cpu, memory, gpu, network };
 	void draw_telemetry(telemetry_page page);
 	void draw_telemetry_dashboard();
+	void draw_physics_telemetry();
 	void draw_memory_profiler();
 	void draw_animation_budget();
 	void select_rendering_live();

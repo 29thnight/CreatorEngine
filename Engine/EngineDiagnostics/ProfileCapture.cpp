@@ -40,6 +40,41 @@ namespace ce
 				{ profile_counter_id::provider_render_us, "Render provider cost", "us", counter_category::render },
 				{ profile_counter_id::provider_gc_us, "GC provider cost", "us", counter_category::managed },
 				{ profile_counter_id::provider_resources_us, "Resource provider cost", "us", counter_category::resources },
+				{ profile_counter_id::physics_bodies, "Physics.Bodies", "bodies", counter_category::physics },
+				{ profile_counter_id::physics_shapes, "Physics.Shapes", "shapes", counter_category::physics },
+				{ profile_counter_id::physics_characters, "Physics.Characters", "characters", counter_category::physics },
+				{ profile_counter_id::physics_active_bodies, "Physics.Active bodies", "bodies/tick", counter_category::physics },
+				{ profile_counter_id::physics_active_shapes, "Physics.Active shapes", "shapes/tick", counter_category::physics },
+				{ profile_counter_id::physics_changed_bodies, "Physics.Changed bodies", "bodies/interval", counter_category::physics },
+				{ profile_counter_id::physics_changed_shapes, "Physics.Changed shapes", "shapes/interval", counter_category::physics },
+				{ profile_counter_id::physics_changed_characters, "Physics.Changed characters", "characters/interval", counter_category::physics },
+				{ profile_counter_id::physics_commands_applied, "Physics.Applied commands", "commands/tick", counter_category::physics },
+				{ profile_counter_id::physics_commands_failed, "Physics.Failed commands", "commands/tick", counter_category::physics },
+				{ profile_counter_id::physics_commands_cancelled, "Physics.Cancelled commands", "commands/tick", counter_category::physics },
+				{ profile_counter_id::physics_commands_queued, "Physics.Queued commands", "commands", counter_category::physics },
+				{ profile_counter_id::physics_events_stored, "Physics.Stored events", "events/tick", counter_category::physics },
+				{ profile_counter_id::physics_required_events, "Physics.Required events", "events/tick", counter_category::physics },
+				{ profile_counter_id::physics_dropped_events, "Physics.Dropped events", "events/tick", counter_category::physics },
+				{ profile_counter_id::physics_contacts_stored, "Physics.Stored contact points", "points/tick", counter_category::physics },
+				{ profile_counter_id::physics_required_contacts, "Physics.Required contact points", "points/tick", counter_category::physics },
+				{ profile_counter_id::physics_dropped_contacts, "Physics.Dropped contact points", "points/tick", counter_category::physics },
+				{ profile_counter_id::physics_unresolved_identities, "Physics.Unresolved identities", "pairs/tick", counter_category::physics },
+				{ profile_counter_id::physics_queries, "Physics.Queries", "queries/interval", counter_category::physics },
+				{ profile_counter_id::physics_query_hits, "Physics.Required query hits", "hits/interval", counter_category::physics },
+				{ profile_counter_id::physics_query_overflows, "Physics.Query overflows", "queries/interval", counter_category::physics },
+				{ profile_counter_id::physics_workers, "Physics.SDK workers", "workers", counter_category::physics },
+				{ profile_counter_id::physics_tasks_submitted, "Physics.SDK tasks submitted", "tasks/interval", counter_category::physics },
+				{ profile_counter_id::physics_tasks_completed, "Physics.SDK tasks completed", "tasks/interval", counter_category::physics },
+				{ profile_counter_id::physics_tasks_inline, "Physics.Inline SDK tasks", "tasks/interval", counter_category::physics },
+				{ profile_counter_id::physics_snapshot_buffers, "Physics.Snapshot buffers", "buffers", counter_category::physics },
+				{ profile_counter_id::physics_snapshot_buffers_in_use, "Physics.Snapshot buffers in use", "buffers", counter_category::physics },
+				{ profile_counter_id::physics_tick_buffer_bytes, "Physics.Tick buffer capacity", "B", counter_category::physics },
+				{ profile_counter_id::physics_tick_buffer_peak_bytes, "Physics.Peak tick buffer capacity", "B", counter_category::physics },
+				{ profile_counter_id::physics_query_scratch_peak_bytes, "Physics.Peak query stack scratch", "B", counter_category::physics },
+				{ profile_counter_id::physics_step_failed, "Physics.Step failed", "0/1", counter_category::physics },
+				{ profile_counter_id::physics_command_rejections, "Physics.Rejected input commands", "commands/interval", counter_category::physics },
+				{ profile_counter_id::physics_command_overflows, "Physics.Input queue overflows", "commands/interval", counter_category::physics },
+				{ profile_counter_id::physics_max_command_wait_ticks, "Physics.Maximum command residence", "ticks", counter_category::physics },
 			};
 		};
 		registry& instance()
@@ -87,6 +122,7 @@ namespace ce
 		if (number == 23) return counter_bit(counter_category::render);
 		if (number == 24) return counter_bit(counter_category::managed);
 		if (number == 25) return counter_bit(counter_category::resources);
+		if (number >= 26 && number <= 60) return counter_bit(counter_category::physics);
 		auto& registry = detail::counter_registry_impl::instance();
 		std::lock_guard guard(registry.lock);
 		if (number > 0 && number <= registry.entries.size())
@@ -513,7 +549,9 @@ namespace ce
 			if (it->engine_frame != engine_frame) continue;
 			for (auto& existing : it->counters)
 			{
-				if (existing.id == sample.id) { existing.value = sample.value; return; }
+				if (existing.id == sample.id && existing.cpu.session == sample.cpu.session &&
+				    existing.cpu.tick == sample.cpu.tick && existing.cpu.task == sample.cpu.task)
+				{ existing.value = sample.value; return; }
 			}
 			const std::size_t before = it->memory_bytes();
 			it->counters.push_back(sample);

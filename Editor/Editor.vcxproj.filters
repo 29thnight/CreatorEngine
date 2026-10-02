@@ -1,6 +1,10 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <ClInclude Include="EngineEntry\PhysicsShapeDocument.h">
+      <Filter>EngineEntry</Filter>
+    </ClInclude>
+
     <ClCompile Include="EngineGUIWindow\EditorWorkspaceStore.cpp">
       <Filter>EngineGUIWindow</Filter>
     </ClCompile>
@@ -151,6 +155,8 @@
     <ClInclude Include="EngineEntry\EditorAssetPresentation.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
+    <ClInclude Include="EngineEntry\EditorModelCollisionAsset.h" />
+    <ClInclude Include="EngineEntry\EditorModelCollisionGeometry.h" />
     <ClInclude Include="EngineEntry\EditorModelPlacement.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
@@ -717,5 +723,13 @@
     <ClCompile Include="..\Lattice\Core\LXDocument.cpp" />
     <ClCompile Include="..\Lattice\ImGui\LXCanvas.cpp" />
     <ClCompile Include="..\Lattice\ImGui\LXStyle.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EngineEntry\EditorProjectLayerSettings.h" />
+    <ClInclude Include="EngineEntry\CollisionGeometryAuthoring.h" />
+    <ClInclude Include="EngineEntry\UndoHistoryTransaction.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="EngineEntry\LegacyProjectLayerImport.h" />
   </ItemGroup>
 </Project>

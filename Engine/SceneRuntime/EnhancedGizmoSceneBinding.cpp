@@ -1,4 +1,4 @@
-#include <atomic>
+﻿#include <atomic>
 
 namespace
 {
@@ -12,10 +12,10 @@ namespace
 #include "CameraComponent.h"
 #include "LightComponent.h"
 #include "LightRenderProxy.h"
-#include "BoxColliderComponent.h"
-#include "SphereColliderComponent.h"
-#include "CapsuleColliderComponent.h"
-#include "CharacterControllerComponent.h"
+#include "PhysicsBodyComponent.h"
+#include "CharacterMovementComponent.h"
+#include "PhysicsPrimitivePreview.h"
+#include "../EngineDiagnostics/ProfileScope.h"
 
 #include <mathematics/scalar.hpp>
 #include <mathematics/transform.hpp>
@@ -37,12 +37,6 @@ namespace
         const float screenHeight = 2.0f * distanceLength * tanf(verticalFovRadians * 0.5f);
 
         return screenHeight * targetScreenHeightRatio;
-    }
-
-    math::vector3 EnhancedGizmoTransformScale(const math::matrix4x4& transform)
-    {
-        return math::vector3{ math::length(transform.right()),
-            math::length(transform.up()), math::length(transform.forward()) };
     }
 }
 
@@ -191,62 +185,77 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
         }
     }
 
-    // ── 콜라이더 와이어 — DX11의 디버그 모드 수집 그대로 ──
+    // Read scene-owned bodies at the existing GT snapshot boundary.
     if (collectColliders)
     {
-        for (auto* box : activeScene->GetBoxColliderComponents())
+        ce::profile_scope scope{ce::marker<"Physics.GizmoCollect">()};
+        std::vector<PhysicsBodyComponent*> bodies;
+
+        for (const auto& object : activeScene->m_Entities)
         {
-            if (!box) continue;
-            const math::matrix4x4& world = box->GetOwner()->Transform_().GetWorldMatrix();
-            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-				box->GetRotationOffset(), box->GetPositionOffset());
-            lineCollector.AddWireBox(offset * world,
-				box->GetExtents(),
-                { 1.f, 0.f, 0.f, 1.f });
-            ++out.colliderShapes;
-        }
-        for (auto* sphere : activeScene->GetSphereColliderComponents())
-        {
-            if (!sphere) continue;
-            const math::matrix4x4& world = sphere->GetOwner()->Transform_().GetWorldMatrix();
-            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-				sphere->GetRotationOffset(), sphere->GetPositionOffset());
-            const math::matrix4x4 transformMatrix = offset * world;
-            const math::vector3 center = transformMatrix.translation();
-            const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
-            const float radius =
-                sphere->GetRadius() * (std::max)({ scale.x, scale.y, scale.z });
-            lineCollector.AddWireSphere(center, radius, { 0.f, 1.f, 0.f, 1.f });
-            ++out.colliderShapes;
-        }
-        for (auto* capsule : activeScene->GetCapsuleColliderComponents())
-        {
-            if (!capsule) continue;
-            const math::matrix4x4& world = capsule->GetOwner()->Transform_().GetWorldMatrix();
-            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-				capsule->GetRotationOffset(), capsule->GetPositionOffset());
-            const math::matrix4x4 transformMatrix = offset * world;
-            const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
-            const float radius = capsule->GetRadius() * (std::max)({ scale.x, scale.z });
-            const float height = capsule->GetHeight() * scale.y;
-            lineCollector.AddWireCapsule(transformMatrix, radius, height, { 0.f, 0.f, 1.f, 1.f });
-            ++out.colliderShapes;
-        }
-        for (auto* characterController : activeScene->GetCharacterControllerComponents())
-        {
-            if (!characterController) continue;
-            const math::matrix4x4& world =
-                characterController->GetOwner()->Transform_().GetWorldMatrix();
-            const math::matrix4x4 offset = math::compose({ 1.f, 1.f, 1.f },
-				characterController->GetRotationOffset(),
-				characterController->GetPositionOffset());
-            const math::matrix4x4 transformMatrix = offset * world;
-            const math::vector3 scale = EnhancedGizmoTransformScale(transformMatrix);
-            const float radius =
-                characterController->m_radius * (std::max)({ scale.x, scale.z });
-            const float height = characterController->m_height * scale.y;
-            lineCollector.AddWireCapsule(transformMatrix, radius, height, { 0.f, 1.f, 1.f, 1.f });
-            ++out.colliderShapes;
+            if (!object || object->IsDestroyMark())
+                continue;
+
+            if (const auto* character = object->GetComponent<CharacterMovementComponent>();
+                character && !character->IsDestroyMark())
+            {
+                ce::profile_scope characterScope{ce::marker<"Physics.CharacterPreview">()};
+                const auto capsule = character->CaptureCapsule();
+                const auto preview = capsule ? ce::physics::BuildCharacterPreview(*capsule)
+                                             : std::unexpected(capsule.error());
+                if (preview)
+                {
+                    lineCollector.AddWireCapsule(preview->transform, preview->radius, preview->cylinder_height,
+                                                 {0, 1, 1, 1});
+                    lineCollector.AddWireCapsule(preview->transform, preview->contact_radius,
+                                                 preview->cylinder_height, {.5f, .5f, .5f, 1});
+                    lineCollector.AddWireCircle(preview->foot, preview->contact_radius, {0, 1, 0}, {0, 1, 0, 1});
+                    lineCollector.AddWireCircle(preview->step, preview->contact_radius, {0, 1, 0}, {1, .6f, 0, 1});
+                    ++out.colliderShapes;
+                }
+                else
+                    ++out.invalidColliderShapes;
+            }
+
+            object->CollectComponents(bodies);
+            const auto& transform = object->Transform_();
+            const ce::physics::pose bodyPose{transform.GetWorldPosition(), transform.GetWorldQuaternion()};
+
+            for (const auto* body : bodies)
+            {
+                if (body->IsDestroyMark())
+                    continue;
+
+                for (const auto& shape : body->Shapes())
+                {
+                    auto preview = ce::physics::BuildPhysicsPrimitivePreview(shape, transform.GetWorldScale(), bodyPose);
+                    if (!preview)
+                    {
+                        if (shape.kind == PhysicsShapeKind::convex || shape.kind == PhysicsShapeKind::triangle_mesh ||
+                            shape.kind == PhysicsShapeKind::heightfield)
+                            ++out.unsupportedColliderShapes;
+                        else
+                            ++out.invalidColliderShapes;
+
+                        continue;
+                    }
+
+                    const math::color color = preview->sensor ? math::color{1, 1, 0, 1} : math::color{0, 1, 1, 1};
+
+                    std::visit([&](const auto& form) {
+                        using T = std::remove_cvref_t<decltype(form)>;
+
+                        if constexpr (std::is_same_v<T, ce::physics::box_geometry>)
+                            lineCollector.AddWireBox(preview->transform, form.half_extent, color);
+                        else if constexpr (std::is_same_v<T, ce::physics::sphere_geometry>)
+                            lineCollector.AddWireSphere(preview->transform.translation(), form.radius, color);
+                        else
+                            lineCollector.AddWireCapsule(preview->transform, form.radius, form.half_height * 2, color);
+                    }, preview->form);
+
+                    ++out.colliderShapes;
+                }
+            }
         }
     }
 

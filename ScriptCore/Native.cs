@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace CreatorEngine;
@@ -115,25 +115,6 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, int, int, void> Animator_SetUseLayer;
     public delegate* unmanaged<ObjectHandle, float, void> Animator_StopAnimation;
 
-    // CharacterControllerComponent (획득 47회 — 이동의 뼈대)
-    public delegate* unmanaged<ObjectHandle, int> Cct_Exists;
-    public delegate* unmanaged<ObjectHandle, float, float, void> Cct_Move;
-    public delegate* unmanaged<ObjectHandle, Float3, float, void> Cct_TriggerForcedMove;
-    public delegate* unmanaged<ObjectHandle, void> Cct_StopForcedMove;
-    public delegate* unmanaged<ObjectHandle, int> Cct_IsInForcedMove;
-    public delegate* unmanaged<ObjectHandle, int, void> Cct_SetAutomaticRotation;
-    public delegate* unmanaged<ObjectHandle, Float3, void> Cct_SetLookDirection;
-    public delegate* unmanaged<ObjectHandle, void> Cct_ClearLookDirection;
-    public delegate* unmanaged<ObjectHandle, Float3, void> Cct_ForcedSetPosition;
-    public delegate* unmanaged<ObjectHandle, float> Cct_GetBaseSpeed;
-    public delegate* unmanaged<ObjectHandle, float, void> Cct_SetBaseSpeed;
-    public delegate* unmanaged<ObjectHandle, int> Cct_IsOnMove;
-    public delegate* unmanaged<ObjectHandle, int, void> Cct_SetOnMove;
-    public delegate* unmanaged<ObjectHandle, int> Cct_IsFalling;
-    public delegate* unmanaged<ObjectHandle, float> Cct_GetRadius;
-    public delegate* unmanaged<ObjectHandle, float> Cct_GetHeight;
-    public delegate* unmanaged<ObjectHandle, uint> Cct_GetId;
-
     // RectTransformComponent (획득 28회 · SetAnchoredPosition만 39회)
     public delegate* unmanaged<ObjectHandle, int> Rect_Exists;
     public delegate* unmanaged<ObjectHandle, Float2> Rect_GetAnchoredPosition;
@@ -212,52 +193,21 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<int, Float2> Input_GetControllerThumbL;
     public delegate* unmanaged<int, Float2> Input_GetControllerThumbR;
 
-    // 물리 질의 (Raycast 19 · SphereOverlap 16)
-    public delegate* unmanaged<Float3, Float3, float, uint, RaycastHit*, int> Physics_Raycast;
-    public delegate* unmanaged<Float3, Float3, float, uint, RaycastHit*, int, int> Physics_RaycastAll;
-    public delegate* unmanaged<Float3, float, uint, RaycastHit*, int, int> Physics_OverlapSphere;
-
-    // RigidBodyComponent (실측 34회)
-    public delegate* unmanaged<ObjectHandle, int> Rigid_Exists;
-    public delegate* unmanaged<ObjectHandle, Float3> Rigid_GetLinearVelocity;
-    public delegate* unmanaged<ObjectHandle, Float3, void> Rigid_SetLinearVelocity;
-    public delegate* unmanaged<ObjectHandle, Float3, void> Rigid_AddLinearVelocity;
-    public delegate* unmanaged<ObjectHandle, Float3> Rigid_GetAngularVelocity;
-    public delegate* unmanaged<ObjectHandle, Float3, void> Rigid_SetAngularVelocity;
-    public delegate* unmanaged<ObjectHandle, Float3, int, void> Rigid_AddForce;
-    public delegate* unmanaged<ObjectHandle, int, void> Rigid_SetBodyType;
-    public delegate* unmanaged<ObjectHandle, int> Rigid_IsKinematic;
-    public delegate* unmanaged<ObjectHandle, int, void> Rigid_SetKinematic;
-    public delegate* unmanaged<ObjectHandle, int> Rigid_IsTrigger;
-    public delegate* unmanaged<ObjectHandle, int, void> Rigid_SetIsTrigger;
-    public delegate* unmanaged<ObjectHandle, int> Rigid_IsColliderEnabled;
-    public delegate* unmanaged<ObjectHandle, int, void> Rigid_SetColliderEnabled;
-    public delegate* unmanaged<ObjectHandle, int> Rigid_IsUsingGravity;
-    public delegate* unmanaged<ObjectHandle, int, void> Rigid_UseGravity;
-    public delegate* unmanaged<ObjectHandle, float> Rigid_GetMass;
-    public delegate* unmanaged<ObjectHandle, float, void> Rigid_SetMass;
-    public delegate* unmanaged<ObjectHandle, float, void> Rigid_SetLinearDamping;
-    public delegate* unmanaged<ObjectHandle, float, void> Rigid_SetAngularDamping;
-    public delegate* unmanaged<ObjectHandle, Float3, void> Rigid_SetScale;
-    public delegate* unmanaged<ObjectHandle, int, int, int, void> Rigid_SetLockLinear;
-    public delegate* unmanaged<ObjectHandle, int, int, int, void> Rigid_SetLockAngular;
-
-    // 콜라이더 3종 (kind: 0=Sphere 1=Box 2=Capsule)
-    public delegate* unmanaged<ObjectHandle, int, int> Collider_Exists;
-    public delegate* unmanaged<ObjectHandle, int, float> Collider_GetRadius;
-    public delegate* unmanaged<ObjectHandle, int, float, void> Collider_SetRadius;
-    public delegate* unmanaged<ObjectHandle, int, float> Collider_GetHeight;
-    public delegate* unmanaged<ObjectHandle, int, float, void> Collider_SetHeight;
-    public delegate* unmanaged<ObjectHandle, int, Float3> Collider_GetExtents;
-    public delegate* unmanaged<ObjectHandle, int, Float3, void> Collider_SetExtents;
-    public delegate* unmanaged<ObjectHandle, int, Float3> Collider_GetPositionOffset;
-    public delegate* unmanaged<ObjectHandle, int, Float3, void> Collider_SetPositionOffset;
-    public delegate* unmanaged<ObjectHandle, int, float> Collider_GetRestitution;
-    public delegate* unmanaged<ObjectHandle, int, float, void> Collider_SetRestitution;
-    public delegate* unmanaged<ObjectHandle, int, float> Collider_GetStaticFriction;
-    public delegate* unmanaged<ObjectHandle, int, float, void> Collider_SetStaticFriction;
-    public delegate* unmanaged<ObjectHandle, int, float> Collider_GetDynamicFriction;
-    public delegate* unmanaged<ObjectHandle, int, float, void> Collider_SetDynamicFriction;
+    public delegate* unmanaged<ObjectHandle, ulong> Body_Find;
+    public delegate* unmanaged<ObjectHandle, ulong> Character_Find;
+    public delegate* unmanaged<ObjectHandle, ulong, CharacterMovementState*, int> Character_Read;
+    public delegate* unmanaged<ObjectHandle, ulong, Float3, int> Character_Velocity;
+    public delegate* unmanaged<ObjectHandle, ulong, Float3, int> Character_Teleport;
+    public delegate* unmanaged<ObjectHandle, ulong, int> Character_Jump;
+    public delegate* unmanaged<ObjectHandle, ulong, Float3, double, int> Character_Force;
+    public delegate* unmanaged<ObjectHandle, ulong, int> Character_CancelForce;
+    public delegate* unmanaged<ObjectHandle, ulong, PhysicsBodyState*, int> Body_Read;
+    public delegate* unmanaged<ObjectHandle, ulong, Float3, Float3, int> Body_Velocity;
+    public delegate* unmanaged<ObjectHandle, ulong, Float3, Float3, int, int> Body_Force;
+    public delegate* unmanaged<ObjectHandle, ulong, int*, int> Body_ShapeCount;
+    public delegate* unmanaged<ObjectHandle, ulong, int, PhysicsShapeState*, int> Body_ShapeRead;
+    public delegate* unmanaged<ObjectHandle, ulong, uint, int, int, int> Body_ShapeFlags;
+    public delegate* unmanaged<ObjectHandle, int, Float3, Float3, float, uint, int, PhysicsHit*, int, NativePhysicsQueryResult*, int> Physics_Query;
 
     // TextComponent (SetMessage 16 · SetAlpha 6)
     public delegate* unmanaged<ObjectHandle, int> Text_Exists;
@@ -311,7 +261,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 28;
+    public const int ExpectedVersion = 31;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -409,6 +359,8 @@ internal static unsafe class Native
 
     public static bool Bind(ScriptApiTable* table)
     {
+        _bound = false;
+        _api = default;
         _gameThreadId = Environment.CurrentManagedThreadId;
 
         if (table == null) return false;
@@ -850,86 +802,6 @@ internal static unsafe class Native
         if (Entered() && _api.Animator_StopAnimation != null) _api.Animator_StopAnimation(h, duration);
     }
 
-    // ── CharacterControllerComponent ──
-
-    public static bool HasCct(ObjectHandle h)
-        => Entered() && _api.Cct_Exists != null && _api.Cct_Exists(h) != 0;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctMove(ObjectHandle h, float inputX, float inputY)
-    {
-        if (Entered() && _api.Cct_Move != null) _api.Cct_Move(h, inputX, inputY);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctTriggerForcedMove(ObjectHandle h, Float3 velocity, float duration)
-    {
-        if (Entered() && _api.Cct_TriggerForcedMove != null) _api.Cct_TriggerForcedMove(h, velocity, duration);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctStopForcedMove(ObjectHandle h)
-    {
-        if (Entered() && _api.Cct_StopForcedMove != null) _api.Cct_StopForcedMove(h);
-    }
-
-    public static bool CctIsInForcedMove(ObjectHandle h)
-        => Entered() && _api.Cct_IsInForcedMove != null && _api.Cct_IsInForcedMove(h) != 0;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctSetAutomaticRotation(ObjectHandle h, bool useAuto)
-    {
-        if (Entered() && _api.Cct_SetAutomaticRotation != null) _api.Cct_SetAutomaticRotation(h, useAuto ? 1 : 0);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctSetLookDirection(ObjectHandle h, Float3 direction)
-    {
-        if (Entered() && _api.Cct_SetLookDirection != null) _api.Cct_SetLookDirection(h, direction);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctClearLookDirection(ObjectHandle h)
-    {
-        if (Entered() && _api.Cct_ClearLookDirection != null) _api.Cct_ClearLookDirection(h);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctForcedSetPosition(ObjectHandle h, Float3 position)
-    {
-        if (Entered() && _api.Cct_ForcedSetPosition != null) _api.Cct_ForcedSetPosition(h, position);
-    }
-
-    public static float CctGetBaseSpeed(ObjectHandle h)
-        => Entered() && _api.Cct_GetBaseSpeed != null ? _api.Cct_GetBaseSpeed(h) : 0f;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctSetBaseSpeed(ObjectHandle h, float speed)
-    {
-        if (Entered() && _api.Cct_SetBaseSpeed != null) _api.Cct_SetBaseSpeed(h, speed);
-    }
-
-    public static bool CctIsOnMove(ObjectHandle h)
-        => Entered() && _api.Cct_IsOnMove != null && _api.Cct_IsOnMove(h) != 0;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CctSetOnMove(ObjectHandle h, bool isMove)
-    {
-        if (Entered() && _api.Cct_SetOnMove != null) _api.Cct_SetOnMove(h, isMove ? 1 : 0);
-    }
-
-    public static bool CctIsFalling(ObjectHandle h)
-        => Entered() && _api.Cct_IsFalling != null && _api.Cct_IsFalling(h) != 0;
-
-    public static float CctGetRadius(ObjectHandle h)
-        => Entered() && _api.Cct_GetRadius != null ? _api.Cct_GetRadius(h) : 0f;
-
-    public static float CctGetHeight(ObjectHandle h)
-        => Entered() && _api.Cct_GetHeight != null ? _api.Cct_GetHeight(h) : 0f;
-
-    public static uint CctGetId(ObjectHandle h)
-        => Entered() && _api.Cct_GetId != null ? _api.Cct_GetId(h) : 0u;
-
     // ── RectTransformComponent ──
 
     public static bool HasRect(ObjectHandle h)
@@ -1209,208 +1081,96 @@ internal static unsafe class Native
     public static Float2 InputGetControllerThumbR(int index)
         => Entered() && _api.Input_GetControllerThumbR != null ? _api.Input_GetControllerThumbR(index) : default;
 
-    // ── 물리 질의 ──
-    //
-    // 결과는 호출자가 준 버퍼에 채운다. Span을 고정해 그대로 넘기므로 복사도 할당도 없다.
+    public static ulong BodyFind(ObjectHandle owner)
+        => Entered() && _api.Body_Find != null ? _api.Body_Find(owner) : 0;
 
-    public static bool PhysicsRaycast(Float3 origin, Float3 direction, float distance,
-        uint layerMask, out RaycastHit hit)
+    public static ulong CharacterFind(ObjectHandle owner)
+        => Entered() && _api.Character_Find != null ? _api.Character_Find(owner) : 0;
+
+    public static PhysicsError CharacterRead(ObjectHandle owner, ulong instance, out CharacterMovementState state)
     {
-        hit = default;
-        if (!Entered() || _api.Physics_Raycast == null) return false;
+        state = default;
+        if (!Entered() || _api.Character_Read == null) return PhysicsError.WrongPhase;
 
-        fixed (RaycastHit* p = &hit)
+        fixed (CharacterMovementState* output = &state)
+            return (PhysicsError)_api.Character_Read(owner, instance, output);
+    }
+
+    public static PhysicsError CharacterVelocity(ObjectHandle owner, ulong instance, Float3 velocity)
+        => Entered() && _api.Character_Velocity != null
+            ? (PhysicsError)_api.Character_Velocity(owner, instance, velocity) : PhysicsError.WrongPhase;
+
+    public static PhysicsError CharacterTeleport(ObjectHandle owner, ulong instance, Float3 position)
+        => Entered() && _api.Character_Teleport != null
+            ? (PhysicsError)_api.Character_Teleport(owner, instance, position) : PhysicsError.WrongPhase;
+
+    public static PhysicsError CharacterJump(ObjectHandle owner, ulong instance)
+        => Entered() && _api.Character_Jump != null
+            ? (PhysicsError)_api.Character_Jump(owner, instance) : PhysicsError.WrongPhase;
+
+    public static PhysicsError CharacterForce(ObjectHandle owner, ulong instance, Float3 velocity, double seconds)
+        => Entered() && _api.Character_Force != null
+            ? (PhysicsError)_api.Character_Force(owner, instance, velocity, seconds) : PhysicsError.WrongPhase;
+
+    public static PhysicsError CharacterCancelForce(ObjectHandle owner, ulong instance)
+        => Entered() && _api.Character_CancelForce != null
+            ? (PhysicsError)_api.Character_CancelForce(owner, instance) : PhysicsError.WrongPhase;
+
+    public static PhysicsError BodyRead(ObjectHandle owner, ulong instance, out PhysicsBodyState state)
+    {
+        state = default;
+        if (!Entered() || _api.Body_Read == null) return PhysicsError.WrongPhase;
+
+        fixed (PhysicsBodyState* output = &state)
+            return (PhysicsError)_api.Body_Read(owner, instance, output);
+    }
+
+    public static PhysicsError BodyVelocity(ObjectHandle owner, ulong instance, Float3 linear, Float3 angular)
+        => Entered() && _api.Body_Velocity != null
+            ? (PhysicsError)_api.Body_Velocity(owner, instance, linear, angular) : PhysicsError.WrongPhase;
+
+    public static PhysicsError BodyForce(ObjectHandle owner, ulong instance, Float3 linear, Float3 angular, PhysicsForceMode mode)
+        => Entered() && _api.Body_Force != null
+            ? (PhysicsError)_api.Body_Force(owner, instance, linear, angular, (int)mode) : PhysicsError.WrongPhase;
+
+    public static PhysicsError BodyShapeCount(ObjectHandle owner, ulong instance, out int count)
+    {
+        count = 0;
+        if (!Entered() || _api.Body_ShapeCount == null) return PhysicsError.WrongPhase;
+
+        fixed (int* output = &count)
+            return (PhysicsError)_api.Body_ShapeCount(owner, instance, output);
+    }
+
+    public static PhysicsError BodyShapeRead(ObjectHandle owner, ulong instance, int index, out PhysicsShapeState state)
+    {
+        state = default;
+        if (!Entered() || _api.Body_ShapeRead == null) return PhysicsError.WrongPhase;
+
+        fixed (PhysicsShapeState* output = &state)
+            return (PhysicsError)_api.Body_ShapeRead(owner, instance, index, output);
+    }
+
+    public static PhysicsError BodyShapeFlags(ObjectHandle owner, ulong instance, uint id, bool sensor, bool queryEnabled)
+        => Entered() && _api.Body_ShapeFlags != null
+            ? (PhysicsError)_api.Body_ShapeFlags(owner, instance, id, sensor ? 1 : 0, queryEnabled ? 1 : 0)
+            : PhysicsError.WrongPhase;
+
+    public static PhysicsQueryResult PhysicsQuery(ObjectHandle anchor, int kind, Float3 origin, Float3 direction,
+                                                 float distanceOrRadius, uint layers, bool sensors, Span<PhysicsHit> results)
+    {
+        if (!Entered() || _api.Physics_Query == null) return new(PhysicsError.WrongPhase, 0, 0, false);
+        if (results.Length > Physics.MaxQueryCapacity) return new(PhysicsError.InvalidArgument, 0, 0, false);
+        NativePhysicsQueryResult summary = default;
+
+        fixed (PhysicsHit* output = results)
         {
-            return _api.Physics_Raycast(origin, direction, distance, layerMask, p) != 0;
+            var error = (PhysicsError)_api.Physics_Query(anchor, kind, origin, direction, distanceOrRadius, layers,
+                                                        sensors ? 1 : 0, output, results.Length, &summary);
+            return error == PhysicsError.None
+                ? new(error, summary.Written, summary.RequiredCapacity, summary.Truncated != 0)
+                : new(error, 0, 0, false);
         }
-    }
-
-    public static int PhysicsRaycastAll(Float3 origin, Float3 direction, float distance,
-        uint layerMask, Span<RaycastHit> results)
-    {
-        if (!Entered() || _api.Physics_RaycastAll == null || results.IsEmpty) return 0;
-
-        fixed (RaycastHit* p = results)
-        {
-            return _api.Physics_RaycastAll(origin, direction, distance, layerMask, p, results.Length);
-        }
-    }
-
-    public static int PhysicsOverlapSphere(Float3 position, float radius,
-        uint layerMask, Span<RaycastHit> results)
-    {
-        if (!Entered() || _api.Physics_OverlapSphere == null || results.IsEmpty) return 0;
-
-        fixed (RaycastHit* p = results)
-        {
-            return _api.Physics_OverlapSphere(position, radius, layerMask, p, results.Length);
-        }
-    }
-
-    // ── RigidBodyComponent ──
-
-    public static bool HasRigid(ObjectHandle h)
-        => Entered() && _api.Rigid_Exists != null && _api.Rigid_Exists(h) != 0;
-
-    public static Float3 RigidGetLinearVelocity(ObjectHandle h)
-        => Entered() && _api.Rigid_GetLinearVelocity != null ? _api.Rigid_GetLinearVelocity(h) : default;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void RigidSetLinearVelocity(ObjectHandle h, Float3 v)
-    {
-        if (Entered() && _api.Rigid_SetLinearVelocity != null) _api.Rigid_SetLinearVelocity(h, v);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void RigidAddLinearVelocity(ObjectHandle h, Float3 v)
-    {
-        if (Entered() && _api.Rigid_AddLinearVelocity != null) _api.Rigid_AddLinearVelocity(h, v);
-    }
-
-    public static Float3 RigidGetAngularVelocity(ObjectHandle h)
-        => Entered() && _api.Rigid_GetAngularVelocity != null ? _api.Rigid_GetAngularVelocity(h) : default;
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void RigidSetAngularVelocity(ObjectHandle h, Float3 v)
-    {
-        if (Entered() && _api.Rigid_SetAngularVelocity != null) _api.Rigid_SetAngularVelocity(h, v);
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void RigidAddForce(ObjectHandle h, Float3 force, int mode)
-    {
-        if (Entered() && _api.Rigid_AddForce != null) _api.Rigid_AddForce(h, force, mode);
-    }
-
-    public static void RigidSetBodyType(ObjectHandle h, int bodyType)
-    {
-        if (Entered() && _api.Rigid_SetBodyType != null) _api.Rigid_SetBodyType(h, bodyType);
-    }
-
-    public static bool RigidIsKinematic(ObjectHandle h)
-        => Entered() && _api.Rigid_IsKinematic != null && _api.Rigid_IsKinematic(h) != 0;
-
-    public static void RigidSetKinematic(ObjectHandle h, bool v)
-    {
-        if (Entered() && _api.Rigid_SetKinematic != null) _api.Rigid_SetKinematic(h, v ? 1 : 0);
-    }
-
-    public static bool RigidIsTrigger(ObjectHandle h)
-        => Entered() && _api.Rigid_IsTrigger != null && _api.Rigid_IsTrigger(h) != 0;
-
-    public static void RigidSetIsTrigger(ObjectHandle h, bool v)
-    {
-        if (Entered() && _api.Rigid_SetIsTrigger != null) _api.Rigid_SetIsTrigger(h, v ? 1 : 0);
-    }
-
-    public static bool RigidIsColliderEnabled(ObjectHandle h)
-        => Entered() && _api.Rigid_IsColliderEnabled != null && _api.Rigid_IsColliderEnabled(h) != 0;
-
-    public static void RigidSetColliderEnabled(ObjectHandle h, bool v)
-    {
-        if (Entered() && _api.Rigid_SetColliderEnabled != null) _api.Rigid_SetColliderEnabled(h, v ? 1 : 0);
-    }
-
-    public static bool RigidIsUsingGravity(ObjectHandle h)
-        => Entered() && _api.Rigid_IsUsingGravity != null && _api.Rigid_IsUsingGravity(h) != 0;
-
-    public static void RigidUseGravity(ObjectHandle h, bool v)
-    {
-        if (Entered() && _api.Rigid_UseGravity != null) _api.Rigid_UseGravity(h, v ? 1 : 0);
-    }
-
-    public static float RigidGetMass(ObjectHandle h)
-        => Entered() && _api.Rigid_GetMass != null ? _api.Rigid_GetMass(h) : 0f;
-
-    public static void RigidSetMass(ObjectHandle h, float mass)
-    {
-        if (Entered() && _api.Rigid_SetMass != null) _api.Rigid_SetMass(h, mass);
-    }
-
-    public static void RigidSetLinearDamping(ObjectHandle h, float d)
-    {
-        if (Entered() && _api.Rigid_SetLinearDamping != null) _api.Rigid_SetLinearDamping(h, d);
-    }
-
-    public static void RigidSetAngularDamping(ObjectHandle h, float d)
-    {
-        if (Entered() && _api.Rigid_SetAngularDamping != null) _api.Rigid_SetAngularDamping(h, d);
-    }
-
-    public static void RigidSetScale(ObjectHandle h, Float3 s)
-    {
-        if (Entered() && _api.Rigid_SetScale != null) _api.Rigid_SetScale(h, s);
-    }
-
-    public static void RigidSetLockLinear(ObjectHandle h, bool x, bool y, bool z)
-    {
-        if (Entered() && _api.Rigid_SetLockLinear != null) _api.Rigid_SetLockLinear(h, x ? 1 : 0, y ? 1 : 0, z ? 1 : 0);
-    }
-
-    public static void RigidSetLockAngular(ObjectHandle h, bool x, bool y, bool z)
-    {
-        if (Entered() && _api.Rigid_SetLockAngular != null) _api.Rigid_SetLockAngular(h, x ? 1 : 0, y ? 1 : 0, z ? 1 : 0);
-    }
-
-    // ── 콜라이더 3종 ──
-
-    public static bool HasCollider(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_Exists != null && _api.Collider_Exists(h, kind) != 0;
-
-    public static float ColliderGetRadius(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_GetRadius != null ? _api.Collider_GetRadius(h, kind) : 0f;
-
-    public static void ColliderSetRadius(ObjectHandle h, int kind, float v)
-    {
-        if (Entered() && _api.Collider_SetRadius != null) _api.Collider_SetRadius(h, kind, v);
-    }
-
-    public static float ColliderGetHeight(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_GetHeight != null ? _api.Collider_GetHeight(h, kind) : 0f;
-
-    public static void ColliderSetHeight(ObjectHandle h, int kind, float v)
-    {
-        if (Entered() && _api.Collider_SetHeight != null) _api.Collider_SetHeight(h, kind, v);
-    }
-
-    public static Float3 ColliderGetExtents(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_GetExtents != null ? _api.Collider_GetExtents(h, kind) : default;
-
-    public static void ColliderSetExtents(ObjectHandle h, int kind, Float3 v)
-    {
-        if (Entered() && _api.Collider_SetExtents != null) _api.Collider_SetExtents(h, kind, v);
-    }
-
-    public static Float3 ColliderGetPositionOffset(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_GetPositionOffset != null ? _api.Collider_GetPositionOffset(h, kind) : default;
-
-    public static void ColliderSetPositionOffset(ObjectHandle h, int kind, Float3 v)
-    {
-        if (Entered() && _api.Collider_SetPositionOffset != null) _api.Collider_SetPositionOffset(h, kind, v);
-    }
-
-    public static float ColliderGetRestitution(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_GetRestitution != null ? _api.Collider_GetRestitution(h, kind) : 0f;
-
-    public static void ColliderSetRestitution(ObjectHandle h, int kind, float v)
-    {
-        if (Entered() && _api.Collider_SetRestitution != null) _api.Collider_SetRestitution(h, kind, v);
-    }
-
-    public static float ColliderGetStaticFriction(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_GetStaticFriction != null ? _api.Collider_GetStaticFriction(h, kind) : 0f;
-
-    public static void ColliderSetStaticFriction(ObjectHandle h, int kind, float v)
-    {
-        if (Entered() && _api.Collider_SetStaticFriction != null) _api.Collider_SetStaticFriction(h, kind, v);
-    }
-
-    public static float ColliderGetDynamicFriction(ObjectHandle h, int kind)
-        => Entered() && _api.Collider_GetDynamicFriction != null ? _api.Collider_GetDynamicFriction(h, kind) : 0f;
-
-    public static void ColliderSetDynamicFriction(ObjectHandle h, int kind, float v)
-    {
-        if (Entered() && _api.Collider_SetDynamicFriction != null) _api.Collider_SetDynamicFriction(h, kind, v);
     }
 
     // ── TextComponent ──

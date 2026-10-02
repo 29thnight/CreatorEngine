@@ -435,6 +435,91 @@ namespace editor::profiler_view
 		if (split) ImGui::EndTable();
 	}
 
+    void draw_physics_telemetry()
+    {
+        const auto* capture = reader().capture();
+        if (!capture) { ImGui::TextDisabled("Record a capture to inspect Physics counters."); return; }
+        std::vector<std::uint64_t> sessions;
+        for (const auto& frame : capture->frames())
+            for (const auto& sample : frame.counters)
+                if (sample.cpu.session && std::find(sessions.begin(), sessions.end(), sample.cpu.session) == sessions.end())
+                {
+                    const auto* descriptor = ce::find_counter(capture->counter_descriptors(), sample.id);
+                    if (descriptor && descriptor->category == ce::counter_category::physics)
+                        sessions.push_back(sample.cpu.session);
+                }
+        std::sort(sessions.begin(), sessions.end());
+        if (sessions.empty()) { ImGui::TextDisabled("No Physics samples. Enable Physics counters while recording."); return; }
+        static std::uint64_t session = 0;
+        static ce::profile_counter_id metric = ce::profile_counter_id::physics_bodies;
+        if (std::find(sessions.begin(), sessions.end(), session) == sessions.end()) session = sessions.front();
+        char label[96];
+        std::snprintf(label, sizeof(label), "Scene %llu", static_cast<unsigned long long>(session));
+        if (ImGui::BeginCombo("Scene", label))
+        {
+            for (const auto value : sessions)
+            {
+                std::snprintf(label, sizeof(label), "Scene %llu", static_cast<unsigned long long>(value));
+                if (ImGui::Selectable(label, session == value)) session = value;
+            }
+            ImGui::EndCombo();
+        }
+        const auto* descriptor = ce::find_counter(capture->counter_descriptors(), metric);
+        if (ImGui::BeginCombo("Metric", descriptor ? descriptor->name.c_str() : "Select metric"))
+        {
+            for (const auto& value : capture->counter_descriptors())
+                if (value.category == ce::counter_category::physics && ImGui::Selectable(value.name.c_str(), metric == value.id))
+                    metric = value.id;
+            ImGui::EndCombo();
+        }
+        descriptor = ce::find_counter(capture->counter_descriptors(), metric);
+        if (!descriptor) return;
+        struct point { std::uint32_t frame; std::uint64_t tick; double value; };
+        std::vector<point> points;
+        for (const auto& frame : capture->frames())
+        {
+            if (frame.engine_frame < reader().selected_first() || frame.engine_frame > reader().selected_last()) continue;
+            for (const auto& sample : frame.counters)
+                if (sample.id == metric && sample.cpu.session == session)
+                    points.push_back({frame.engine_frame, sample.cpu.tick, sample.value});
+        }
+        std::sort(points.begin(), points.end(), [](const point& a, const point& b) { return a.tick < b.tick; });
+        if (points.empty()) { ImGui::TextDisabled("No sample in the selected frame range."); return; }
+        double ceiling = 1;
+        for (const auto& value : points) ceiling = (std::max)(ceiling, value.value);
+        ImGui::Text("%s (%s), %zu tick samples", descriptor->name.c_str(), descriptor->unit.c_str(), points.size());
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const ImVec2 size{(std::max)(100.f, ImGui::GetContentRegionAvail().x), 210.f};
+        ImGui::InvisibleButton("##PhysicsTicks", size);
+        auto* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(origin, {origin.x + size.x, origin.y + size.y}, IM_COL32(25, 29, 36, 255));
+        const auto first = points.front().tick;
+        const double span = static_cast<double>((std::max)(std::uint64_t{1}, points.back().tick - first));
+        ImVec2 previous{};
+        for (std::size_t i = 0; i < points.size(); ++i)
+        {
+            const auto& value = points[i];
+            const ImVec2 position{origin.x + 6 + static_cast<float>((value.tick - first) / span) * (size.x - 12),
+                origin.y + size.y - 6 - static_cast<float>(value.value / ceiling) * (size.y - 12)};
+            if (i && value.tick == points[i - 1].tick + 1)
+                draw->AddLine(previous, position, IM_COL32(105, 184, 255, 255), 1.5f);
+            draw->AddCircleFilled(position, 3.f, IM_COL32(105, 184, 255, 255));
+            previous = position;
+            const auto mouse = ImGui::GetIO().MousePos;
+            if (ImGui::IsItemHovered() && std::abs(mouse.x - position.x) < 7 && std::abs(mouse.y - position.y) < 12)
+            {
+                ImGui::SetTooltip("Scene %llu / tick %llu / frame %u\n%.2f %s",
+                    static_cast<unsigned long long>(session), static_cast<unsigned long long>(value.tick), value.frame,
+                    value.value, descriptor->unit.c_str());
+            }
+        }
+        ImGui::TextDisabled("Tick %llu .. %llu; absent ticks are gaps. Samples belong to the completion frame.",
+            static_cast<unsigned long long>(first), static_cast<unsigned long long>(points.back().tick));
+        ImGui::TextWrapped("Counts are per Scene. Interval metrics cover work since the previous publication. Buffer bytes describe API storage, not SDK or GPU heap usage.");
+        const auto& latest = points.back();
+        ImGui::Text("Latest: tick %llu / frame %u / %.2f %s", static_cast<unsigned long long>(latest.tick), latest.frame, latest.value, descriptor->unit.c_str());
+    }
+
 	void draw_telemetry_dashboard()
 	{
 		const ce::capture_session* capture = reader().capture();

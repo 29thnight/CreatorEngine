@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "Core.Minimal.h"
 #include "TypeTrait.h"
@@ -91,6 +91,8 @@ public:
 		const UncatalogedAuthoringRequest& request);
 	using WriteTagManagerHandler = bool (*)(
 		const UncatalogedAuthoringRequest& request);
+	using WriteLayerSettingsHandler = bool (*)(
+		const UncatalogedAuthoringRequest& request);
 	using WriteInputActionMapHandler = bool (*)(
 		const UncatalogedAuthoringRequest& request);
 
@@ -151,6 +153,13 @@ public:
 	static void UninstallTagManagerWriter(
 		WriteTagManagerHandler handler) noexcept;
 	static bool WriteTagManager(
+		const UncatalogedAuthoringRequest& request) noexcept;
+
+	static void InstallLayerSettingsWriter(
+		WriteLayerSettingsHandler handler) noexcept;
+	static void UninstallLayerSettingsWriter(
+		WriteLayerSettingsHandler handler) noexcept;
+	static bool WriteLayerSettings(
 		const UncatalogedAuthoringRequest& request) noexcept;
 
 	static void InstallInputActionMapWriter(

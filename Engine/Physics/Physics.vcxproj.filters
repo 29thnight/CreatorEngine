@@ -38,124 +38,19 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="CharacterController.cpp">
-      <Filter>Character</Filter>
-    </ClCompile>
-    <ClCompile Include="CharacterMovement.cpp">
-      <Filter>Character</Filter>
-    </ClCompile>
-    <ClCompile Include="ConvexMeshResource.cpp">
-      <Filter>ResourceBase</Filter>
-    </ClCompile>
-    <ClCompile Include="DynamicRigidBody.cpp">
-      <Filter>PhysicsActor</Filter>
-    </ClCompile>
-    <ClCompile Include="HeightFieldResource.cpp">
-      <Filter>ResourceBase</Filter>
-    </ClCompile>
-    <ClCompile Include="pch.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="Physics.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="PhysicsDebug.cpp">
-      <Filter>Helper</Filter>
-    </ClCompile>
-    <ClCompile Include="PhysicsEventCallback.cpp">
-      <Filter>Main</Filter>
-    </ClCompile>
-    <ClCompile Include="Physx.cpp">
-      <Filter>Main</Filter>
-    </ClCompile>
-    <ClCompile Include="RagdollJoint.cpp">
-      <Filter>Ragdoll</Filter>
-    </ClCompile>
-    <ClCompile Include="RagdollLink.cpp">
-      <Filter>Ragdoll</Filter>
-    </ClCompile>
-    <ClCompile Include="RagdollPhysics.cpp">
-      <Filter>Ragdoll</Filter>
-    </ClCompile>
-    <ClCompile Include="ResourceBase.cpp">
-      <Filter>ResourceBase</Filter>
-    </ClCompile>
-    <ClCompile Include="RigidBody.cpp">
-      <Filter>PhysicsActor</Filter>
-    </ClCompile>
-    <ClCompile Include="StaticRigidBody.cpp">
-      <Filter>PhysicsActor</Filter>
-    </ClCompile>
-    <ClCompile Include="TriangleMeshResource.cpp">
-      <Filter>ResourceBase</Filter>
-    </ClCompile>
+    <ClInclude Include="PhysicsTypes.h" />
+    <ClInclude Include="PhysicsGeometry.h" />
+    <ClInclude Include="PhysicsStep.h" />
+    <ClInclude Include="PhysicsCharacter.h" />
+    <ClInclude Include="PhysicsScene.h" />
+    <ClInclude Include="PhysicsTestHooks.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CharacterController.h">
-      <Filter>Character</Filter>
-    </ClInclude>
-    <ClInclude Include="CharacterMovement.h">
-      <Filter>Character</Filter>
-    </ClInclude>
-    <ClInclude Include="ColliderDebugData.h">
-      <Filter>Data</Filter>
-    </ClInclude>
-    <ClInclude Include="ConvexMeshResource.h">
-      <Filter>ResourceBase</Filter>
-    </ClInclude>
-    <ClInclude Include="DynamicRigidBody.h">
-      <Filter>PhysicsActor</Filter>
-    </ClInclude>
-    <ClInclude Include="framework.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="HeightFieldResource.h">
-      <Filter>ResourceBase</Filter>
-    </ClInclude>
-    <ClInclude Include="ICollider.h">
-      <Filter>Interface</Filter>
-    </ClInclude>
-    <ClInclude Include="pch.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsCommon.h">
-      <Filter>Common</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsDebug.h">
-      <Filter>Helper</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsEventCallback.h">
-      <Filter>Main</Filter>
-    </ClInclude>
-    <ClInclude Include="PhysicsMathAdapter.h">
-      <Filter>Helper</Filter>
-    </ClInclude>
-    <ClInclude Include="Physx.h">
-      <Filter>Main</Filter>
-    </ClInclude>
-    <ClInclude Include="RagdollJoint.h">
-      <Filter>Ragdoll</Filter>
-    </ClInclude>
-    <ClInclude Include="RagdollLink.h">
-      <Filter>Ragdoll</Filter>
-    </ClInclude>
-    <ClInclude Include="RagdollPhysics.h">
-      <Filter>Ragdoll</Filter>
-    </ClInclude>
-    <ClInclude Include="ResourceBase.h">
-      <Filter>ResourceBase</Filter>
-    </ClInclude>
-    <ClInclude Include="RigidBody.h">
-      <Filter>PhysicsActor</Filter>
-    </ClInclude>
-    <ClInclude Include="StaticRigidBody.h">
-      <Filter>PhysicsActor</Filter>
-    </ClInclude>
-    <ClInclude Include="TriangleMeshResource.h">
-      <Filter>ResourceBase</Filter>
-    </ClInclude>
+    <ClCompile Include="PhysicsScene.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Text Include="PhysicsFlags.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PhysicsCollisionPolicy.h" />
   </ItemGroup>
 </Project>

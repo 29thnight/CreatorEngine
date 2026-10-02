@@ -1,4 +1,5 @@
-#pragma once
+﻿#pragma once
+class ProjectLayerSettings;
 #include "Delegate.h"
 
 #include <atomic>
@@ -88,6 +89,8 @@ namespace Player
 		double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
 
 	private:
+        std::shared_ptr<ProjectLayerSettings> m_projectLayers;
+
 		void StartPresentationThread();
 		void StopPresentationThread();
 		void PresentationThreadMain();

@@ -18,6 +18,8 @@
 #include "EditorAssetPresentation.h"
 #include "GameObjectCommand.h"
 #include "Animator.h"
+#include "PhysicsBodyComponent.h"
+#include "AuthoringNodeEquality.h"
 #include "MeshRenderer.h"
 #include "EditorImGuiTexture.h"
 #include "RenderScene.h"
@@ -68,28 +70,211 @@
 
 namespace ed = ax::NodeEditor;
 
-ed::EditorContext* m_fsmEditorContext{ nullptr };
-bool			   s_CreatingLink = false;
-ed::PinId		   s_LinkStartPin = 0;
-ed::LinkId		   s_EditLinkId = 0;
-bool			   s_RenameNodePopup{ false };
+ed::EditorContext* m_fsmEditorContext{nullptr};
+bool s_CreatingLink = false;
+ed::PinId s_LinkStartPin = 0;
+ed::LinkId s_EditLinkId = 0;
+bool s_RenameNodePopup{false};
 
-ed::EditorContext* s_BTEditorContext{ nullptr };
+ed::EditorContext* s_BTEditorContext{nullptr};
 
 // CT6-c: typed Draw 등록 — 전 타입의 위젯 트리 인스턴스화를 이 TU 한 곳에
 // 가둔다. 목록은 등록 정본(RegisterReflectManual.h)의 X-매크로를 공유한다.
 static void RegisterAllTypedDraws()
 {
 #define REFLECT_DRAW_ONE(T) Meta::TypedDraw::RegisterDraw<T>();
-	REFLECT_TYPE_LIST(REFLECT_DRAW_ONE)
+    REFLECT_TYPE_LIST(REFLECT_DRAW_ONE)
 #undef REFLECT_DRAW_ONE
 }
 
 namespace
 {
-	struct ComponentMenuVisual { Texture* image{}; const char* fallback{}; };
+Authoring::WriteDocument physics_shape_document(std::span<const PhysicsShapeDefinition> shapes)
+{
+    Authoring::WriteDocument document;
+    document.Root().SetSequence();
+    for (auto shape : shapes)
+    {
+        auto item = Meta::SerializeDocument(&shape);
+        document.Root().Append().Assign(item.Root().Read());
+    }
+    return document;
+}
 
-	ComponentMenuVisual component_category_visual(std::string_view category)
+void draw_physics_shapes(PhysicsBodyComponent& body)
+{
+    if (!Meta::Find(type_guid(PhysicsShapeDefinition)))
+    {
+        ImGui::TextDisabled("Physics shape schema unavailable");
+        return;
+    }
+    struct Draft
+    {
+        std::vector<PhysicsShapeDefinition> shapes;
+        Authoring::WriteDocument before;
+        std::string failure;
+    };
+    static EntityHandle owner;
+    static std::unordered_map<std::uint64_t, Draft> drafts;
+    const auto target = body.GetOwner()->GetScene()->HandleOf(body.GetOwner()->m_index);
+    if (target != owner)
+    {
+        drafts.clear();
+        owner = target;
+    }
+    const auto id = body.GetInstanceID();
+    const auto reload = [&]() {
+        Draft value;
+        value.shapes.assign(body.Shapes().begin(), body.Shapes().end());
+        value.before = physics_shape_document(body.Shapes());
+        drafts.insert_or_assign(id, std::move(value));
+    };
+    if (!drafts.contains(id))
+        reload();
+    auto& draft = drafts.at(id);
+    auto current = physics_shape_document(body.Shapes());
+    auto pending = physics_shape_document(draft.shapes);
+    if (!Authoring::NodesEqual(current.Root().Read(), draft.before.Root().Read()) &&
+        Authoring::NodesEqual(pending.Root().Read(), draft.before.Root().Read()))
+        reload();
+    ImGui::SeparatorText("Collision Shapes");
+    ImGui::BeginDisabled(SceneManagers->IsGameStart() || EditorObjectOperations::IsEditLocked(body.GetOwner(), true));
+    std::size_t remove = draft.shapes.size();
+    for (std::size_t index = 0; index < draft.shapes.size(); ++index)
+    {
+        ImGui::PushID(static_cast<int>(index));
+        if (ImGui::TreeNode("Shape", "Shape %u", draft.shapes[index].shapeId))
+        {
+            auto& shape = draft.shapes[index];
+
+            constexpr const char* kinds[]{"Box", "Sphere", "Capsule", "Convex", "Triangle Mesh", "Heightfield"};
+            int kind = std::to_underlying(shape.kind);
+
+            if (ImGui::Combo("Shape Type", &kind, kinds, 6))
+                shape.kind = static_cast<PhysicsShapeKind>(kind);
+
+            const auto project = SceneManagers->ProjectLayers();
+            const auto settings = project ? project->Snapshot() : nullptr;
+            const auto* layer = settings ? settings->catalog.Find(ce::layers::layer_id{shape.layerOverride}) : nullptr;
+            const char* preview = shape.layerOverride == 0 ? "Inherit Entity Layer"
+                                  : layer                  ? layer->name.c_str()
+                                                           : "Missing Layer";
+            if (ImGui::BeginCombo("Layer", preview))
+            {
+                if (ImGui::Selectable("Inherit Entity Layer", shape.layerOverride == 0))
+                    shape.layerOverride = 0;
+                if (settings)
+                    for (const auto& item : settings->catalog.definitions)
+                        if (item && !item->retired &&
+                            ImGui::Selectable(item->name.c_str(), shape.layerOverride == item->id.value))
+                            shape.layerOverride = item->id.value;
+                ImGui::EndCombo();
+            }
+            Meta::TypedDraw::DrawOwnMembers(shape);
+            if (ImGui::Button("Remove Shape"))
+                remove = index;
+            ImGui::TreePop();
+        }
+        ImGui::PopID();
+    }
+    if (remove < draft.shapes.size())
+        draft.shapes.erase(draft.shapes.begin() + remove);
+    if (ImGui::Button("Add Shape") && draft.shapes.size() < 65535)
+    {
+        std::uint32_t next = 0;
+        for (const auto& shape : draft.shapes)
+            next = (std::max)(next, shape.shapeId);
+        if (next != UINT32_MAX)
+        {
+            PhysicsShapeDefinition shape;
+            shape.shapeId = next + 1;
+            draft.shapes.push_back(shape);
+        }
+        else
+            draft.failure = "Shape ID limit reached";
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Apply Shapes"))
+    {
+        auto document = physics_shape_document(draft.shapes);
+        const auto result = EditorObjectOperations::PhysicsShapes(target, "#" + std::to_string(id),
+                                                                  document.Root().Read().Dump(), &draft.before);
+        if (result.IsSuccess())
+            reload();
+        else
+            draft.failure = result.message;
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Reload Shapes"))
+        reload();
+    ImGui::EndDisabled();
+    if (!draft.failure.empty())
+        ImGui::TextWrapped("%s", draft.failure.c_str());
+    ImGui::TextDisabled("Apply saves the complete shape list as one Undo entry.");
+}
+
+void draw_character_movement(CharacterMovementComponent& character)
+{
+    const auto target = character.GetOwner()->GetScene()->HandleOf(character.GetOwner()->m_index);
+    auto document = Meta::SerializeDocument(&character);
+    const auto root = document.Root().Read();
+    const auto fieldText = [](Authoring::ReadNode node) {
+        if (node.IsMap())
+            return std::string(node["x"].AsString()) + ", " + std::string(node["y"].AsString()) + ", " +
+                   std::string(node["z"].AsString());
+        return std::string(node.AsString());
+    };
+    static EntityHandle previousOwner;
+    static std::unordered_map<std::string, std::string> drafts;
+    static std::string failure;
+    if (previousOwner != target)
+    {
+        drafts.clear();
+        failure.clear();
+        previousOwner = target;
+    }
+
+    ImGui::TextDisabled("World +Y capsule. Positive uniform scale required.");
+    ImGui::BeginDisabled(SceneManagers->IsGameStart() ||
+                         EditorObjectOperations::IsEditLocked(character.GetOwner(), true));
+    const std::pair<const char*, const char*> fields[]{
+        {"m_radius", "Radius (m)"}, {"m_cylinderHeight", "Cylinder height (m)"},
+        {"m_contactOffset", "Contact offset (m)"}, {"m_stepOffset", "Step offset (m)"},
+        {"m_slopeLimitCosine", "Slope limit cosine (0 disables)"}, {"m_gravity", "Gravity (m/s squared)"},
+        {"m_minimumDistance", "Minimum move (m)"}, {"m_acceleration", "Acceleration (m/s squared)"},
+        {"m_brakingDecay", "Braking decay (1/s)"}, {"m_jumpSpeed", "Jump speed (m/s)"},
+        {"m_maxFallSpeed", "Maximum fall speed (m/s)"}, {"m_initialVelocity", "Initial velocity (x,y,z m/s)"}};
+    for (const auto& [field, label] : fields)
+    {
+        const auto key = std::to_string(character.GetInstanceID()) + field;
+        auto [entry, inserted] = drafts.try_emplace(key, fieldText(root[field]));
+        ImGui::PushID(field);
+        ImGui::InputText(label, &entry->second);
+        if (ImGui::IsItemDeactivatedAfterEdit())
+        {
+            const auto result = EditorObjectOperations::Property(target,
+                "#" + std::to_string(character.GetInstanceID()), field, entry->second);
+            failure = result.IsSuccess() ? std::string{} : result.message;
+            auto current = Meta::SerializeDocument(&character);
+            entry->second = fieldText(current.Root().Read()[field]);
+        }
+        if (!ImGui::IsItemActive())
+            entry->second = fieldText(root[field]);
+        ImGui::PopID();
+    }
+    ImGui::EndDisabled();
+    if (!failure.empty())
+        ImGui::TextWrapped("%s", failure.c_str());
+    ImGui::TextDisabled("Commit on focus loss. Each field uses validated Undo/Redo.");
+}
+
+struct ComponentMenuVisual
+{
+    Texture* image{};
+    const char* fallback{};
+};
+
+    ComponentMenuVisual component_category_visual(std::string_view category)
 	{
 		auto& images = EditorAssetPresentation::Get();
 		using FileType = EditorAssetPresentation::FileType;
@@ -217,7 +402,7 @@ namespace
 		std::uint64_t m_lines;
 		editor::widgets::property_field_tally m_tally;
 	};
-}
+    } // namespace
 
 void editor::windows::set_inspector_width(float logicalWidth) noexcept
 {
@@ -831,20 +1016,20 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		EditorObjectOperations::SetEntityEnabled(gameObject->GetScene()->HandleOf(gameObject->m_index), isEnabled);
 	ImGui::PopStyleColor(2);
 	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Object enabled");
-	ImGui::SameLine();
+    ImGui::SameLine();
 
-	auto& tags = TagManagers->GetTags();
-	auto& layers = TagManagers->GetLayers();
-	auto& selectedTag = gameObject->m_tag;
-	auto& selectedLayer = gameObject->m_layer;
-	const auto assignTag = [&](const std::string& tag)
-	{
-		TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
-		selectedTag = tag;
+    auto& tags = TagManagers->GetTags();
+    const auto projectLayers = SceneManagers->ProjectLayers();
+    const auto layerSnapshot = projectLayers ? projectLayers->Snapshot() : nullptr;
+    auto& selectedTag = gameObject->m_tag;
+    const auto* selectedLayer = layerSnapshot ? layerSnapshot->catalog.Find(gameObject->GetLayer()) : nullptr;
+    const auto assignTag = [&](const std::string& tag) {
+        TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
+        selectedTag = tag;
 		TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
-	};
+    };
 
-	// The tag button occupies the trailing part of the name field. Reserve that
+    // The tag button occupies the trailing part of the name field. Reserve that
 	// space outside InputText so long names cannot draw underneath the icon.
 	const ImGuiStyle& baseStyle = ImGui::GetStyle();
 	const float fieldHeight = ImGui::GetFrameHeight();
@@ -905,54 +1090,45 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	}
 	ImGui::PopStyleVar();
 
-	const editor::widgets::property_layout_metrics baseLayout =
-		editor::widgets::measure_property_layout(
-			editor::widgets::property_layout_inputs_now(0, InspectorTopLabelHint()), m_layout);
-	ImGui::SetNextItemWidth(editor::widgets::begin_property_line("Physics Layer", baseLayout));
-	if (ImGui::BeginCombo("##LayerCombo", selectedLayer.ToString().c_str()))
-	{
-		const int layerCount = static_cast<int>(layers.size());
-		for (int i = 0; i <= layerCount; ++i)
-		{
-			bool isSelected = false;
-			if (i == layerCount) // "Add Layer" 항목
-			{
-				if (ImGui::Selectable("Add Physics Layer"))
-				{
-					m_openNewLayerPopup = true; // 팝업 열기 플래그 설정
-				}
-			}
-			else
-			{
-				isSelected = (selectedLayer == layers[i]);
-				if (ImGui::Selectable(layers[i].c_str(), isSelected))
-				{
-					TagManagers->RemoveObjectFromLayer(selectedLayer.ToString(), gameObject);
-					selectedLayer = layers[i];
-					gameObject->SetCollisionType(); // 충돌 타입 업데이트
-					TagManagers->AddObjectToLayer(selectedLayer.ToString(), gameObject);
-				}
-			}
+    const editor::widgets::property_layout_metrics baseLayout = editor::widgets::measure_property_layout(
+        editor::widgets::property_layout_inputs_now(0, InspectorTopLabelHint()), m_layout);
+    ImGui::SetNextItemWidth(editor::widgets::begin_property_line("Layer", baseLayout));
+    if (ImGui::BeginCombo("##LayerCombo", selectedLayer ? selectedLayer->name.c_str() : "Invalid layer"))
+    {
+        if (layerSnapshot)
+            for (const auto& layer : layerSnapshot->catalog.definitions)
+            {
+                if (!layer || layer->retired)
+                    continue;
+                const bool selected = gameObject->GetLayer() == layer->id;
+                if (ImGui::Selectable(layer->name.c_str(), selected))
+                {
+                    const auto result = EditorObjectOperations::SetEntityLayer(
+                        gameObject->GetScene()->HandleOf(gameObject->m_index), layer->id);
+                    if (!result.IsSuccess())
+                        Debug::PrintLog(spdlog::level::err, result.message);
+                }
+                if (selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+        if (ImGui::Selectable("Add Layer"))
+            m_openNewLayerPopup = true;
+        ImGui::EndCombo();
+    }
 
-			if (isSelected)
-				ImGui::SetItemDefaultFocus();
-		}
-		ImGui::EndCombo();
-	}
-
-	if (m_openNewTagPopup)
-	{
-		ImGui::OpenPopup("New Tag");
+    if (m_openNewTagPopup)
+    {
+        ImGui::OpenPopup("New Tag");
 		m_openNewTagPopup = false; // 팝업 열기 플래그 초기화
-	}
+    }
 
-	if (m_openNewLayerPopup)
-	{
-		ImGui::OpenPopup("New Physics Layer");
-		m_openNewLayerPopup = false; // 팝업 열기 플래그 초기화
-	}
+    if (m_openNewLayerPopup)
+    {
+        ImGui::OpenPopup("New Layer");
+        m_openNewLayerPopup = false; // 팝업 열기 플래그 초기화
+    }
 
-	// New Tag 팝업
+    // New Tag 팝업
 	if (ImGui::BeginPopup("New Tag"))
 	{
 		static char newTagName[64] = "";
@@ -973,30 +1149,39 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
-	}
+    }
 
-	// New Layer 팝업
-	if (ImGui::BeginPopup("New Physics Layer"))
-	{
-		static char newLayerName[64] = "";
-		ImGui::InputText("Physics Layer Name", newLayerName, sizeof(newLayerName));
-		if (ImGui::Button("Add"))
-		{
-			if (strlen(newLayerName) > 0)
-			{
-				TagManagers->AddLayer(newLayerName);
-				selectedLayer = newLayerName;
-			}
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::SameLine();
+    // New Layer 팝업
+    if (ImGui::BeginPopup("New Layer"))
+    {
+        static char newLayerName[64] = "";
+        ImGui::InputText("Layer Name", newLayerName, sizeof(newLayerName));
+        if (ImGui::Button("Add"))
+        {
+            if (strlen(newLayerName) > 0)
+            {
+                const auto result = EditorProjectOperations::AddLayer(newLayerName);
+                if (result.IsSuccess())
+                {
+                    const auto snapshot = projectLayers->Snapshot();
+                    const auto* added = snapshot->catalog.Find(newLayerName);
+                    if (added)
+                        EditorObjectOperations::SetEntityLayer(gameObject->GetScene()->HandleOf(gameObject->m_index),
+                                                               added->id);
+                }
+                else
+                    Debug::PrintLog(spdlog::level::err, result.message);
+            }
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
 		if (ImGui::Button("Cancel"))
 		{
 			ImGui::CloseCurrentPopup();
 		}
 		ImGui::EndPopup();
-	}
-	ImGui::EndTable();
+    }
+    ImGui::EndTable();
 }
 
 // 트랜스폼 세 줄. 라벨과 값 열은 공통 배치 계층이 놓고(W2-I2) 이 함수는 값만
@@ -2175,7 +2360,10 @@ void InspectorWindow::Draw()
 			// 개별로 켜고 끌 수 없는 컴포넌트는 체크박스를 넘기지 않는다. 패널이 그 칸을 비워 두므로
 			// 이름은 다른 컴포넌트와 같은 x 에 선다. 체크박스를 숨기는 것만으로 정책이 서지는 않는다 —
 			// `object.property` 쪽도 같은 표로 거부한다.
-			componentPanel.enabled = policy.individuallyToggleable ? &isEnabled : nullptr;
+			const bool characterAuthoring = dynamic_cast<CharacterMovementComponent*>(component.get()) != nullptr;
+            componentPanel.enabled = policy.individuallyToggleable &&
+                !(characterAuthoring && (SceneManagers->IsGameStart() ||
+                    EditorObjectOperations::IsEditLocked(selectedSceneObject, true))) ? &isEnabled : nullptr;
 			const editor::widgets::inspector_panel_result componentHeaderState =
 				editor::widgets::begin_inspector_panel(componentPanel);
 			// isOpen은 프레임을 건너 사는 정적 변수라, 아래에서 ComponentMenu를
@@ -2191,7 +2379,14 @@ void InspectorWindow::Draw()
 			inspector_body_probe bodyProbe;
 			if (componentHeaderState.enabled_changed)
 			{
-				component->SetEnabled(isEnabled);
+                if (characterAuthoring)
+                {
+                    const auto target = selectedSceneObject->GetScene()->HandleOf(selectedSceneObject->m_index);
+                    EditorObjectOperations::Property(target, "#" + std::to_string(component->GetInstanceID()),
+                                                     "m_isEnabled", isEnabled ? "true" : "false");
+                }
+                else
+                    component->SetEnabled(isEnabled);
 			}
 
 			if (isHeaderOpen)
@@ -2312,6 +2507,17 @@ void InspectorWindow::Draw()
 					SoundComponent* snd = dynamic_cast<SoundComponent*>(component.get());
 					if (snd) ImGuiDrawHelperSoundComponent(snd);   // 커스텀 인스펙터 호출
 				}
+                else if (auto* character = dynamic_cast<CharacterMovementComponent*>(component.get()))
+                {
+                    draw_character_movement(*character);
+                }
+                else if (auto* body = dynamic_cast<PhysicsBodyComponent*>(component.get()))
+                {
+                    ImGui::BeginDisabled(SceneManagers->IsGameStart());
+                    Meta::DrawObject(component.get(), *type);
+                    ImGui::EndDisabled();
+                    draw_physics_shapes(*body);
+                }
 				else if (type)
 				{
 					// K2 스테이지 A: m_components 순회 변수(component)가 이제

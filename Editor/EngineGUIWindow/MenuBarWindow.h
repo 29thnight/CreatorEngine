@@ -35,7 +35,6 @@ private:
     // 로그 창은 자기 파일을 갖는다(3단계). 여기는 수명만 든다.
     ::editor::OutputLogWindow m_outputLog;
 	bool m_bShowNewScenePopup{ false };
-	std::vector<std::vector<uint8_t>> collisionMatrix; //32 x 32 행렬을 사용하여 충돌 매트릭스를 표시합니다.
 
 	// 이 창이 건 본문 열 개의 수명(PHASE 21 W3).
 	//

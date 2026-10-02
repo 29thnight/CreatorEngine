@@ -1,4 +1,6 @@
-#include "Scene.h"
+﻿#include "Scene.h"
+#include "PhysicsBodyComponent.h"
+#include "CharacterMovementComponent.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-5
 #include <chrono>
 #include <cstdio> // FireReentrancyStress가 stdout에도 낸다(회귀가 발화를 본다)
@@ -25,19 +27,10 @@
 #include "CameraSystem.h"
 #include "CameraComponent.h"
 #include "TweenManager.h"
-#include "CharacterControllerSystem.h"
 #include "BoneRegion.h"
 #include "BoneComponent.h"
 #include "Socket.h"
-#include "PhysicsManager.h"
-#include "BoxColliderComponent.h"
-#include "SphereColliderComponent.h"
-#include "CapsuleColliderComponent.h"
-#include "MeshCollider.h"
-#include "CharacterControllerComponent.h"
 #include "FoliageComponent.h"
-#include "TerrainCollider.h"
-#include "RigidBodyComponent.h"
 #include "ImageComponent.h"
 #include "TextComponent.h"
 #include "TagManager.h"
@@ -334,11 +327,11 @@ Scene::Scene()
     // 씬 식별자(트랙 W)는 생성자에서 딱 한 번 받는다 — Scene은 복사·이동이
     // 불가능한 타입이라(Scene.h의 m_sceneId 주석 참고) 이 값이 인스턴스 생애
     // 내내 유일하다는 전제가 깨지지 않는다.
-    : m_sceneId(NextSceneId()),
-	  m_executionGraphs(std::make_unique<TransformExecutionGraphState>()),
-	  m_renderRegistry(std::make_unique<SceneRenderRegistryState>())
+    : m_sceneId(NextSceneId()), m_executionGraphs(std::make_unique<TransformExecutionGraphState>()),
+      m_renderRegistry(std::make_unique<SceneRenderRegistryState>())
 {
     resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedEntity);
+    m_layerIndex = std::make_unique<SceneLayerIndex>(m_sceneId);
     m_Entities.reserve(3000);
     m_generations.reserve(3000);
     m_hierarchyStore.Reserve(3000);
@@ -366,6 +359,7 @@ uint32_t Scene::NextSceneId()
 
 Scene::~Scene()
 {
+    (void)m_physicsSimulation.Stop();
 	DrainAIUpdate();
     SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
     // 생명주기 델리게이트 15종의 Clear 연쇄가 여기 있었다(PHASE 9-3에서 철거).
@@ -797,9 +791,13 @@ std::unique_ptr<Entity> Scene::ReleaseSlot(Entity::Index index)
     // 축소 삼단이 발화하기 전에 핸들이 죽어 스크립트가 자기 마지막 훅에서 자기
     // 오브젝트에 닿지 못했다). DestroyEntities는 파괴 표시된 엔티티만 훑으므로
     // DDOL 이송(DetachEntityHierarchy)은 여전히 그 루프를 지나지 않는다.
-	const bool removedTopologyNode = nullptr != m_Entities[index]
-		&& m_hierarchyStore.IsOccupied(static_cast<size_t>(index));
-	std::unique_ptr<Entity> released = std::move(m_Entities[index]);
+    const bool removedTopologyNode =
+        nullptr != m_Entities[index] && m_hierarchyStore.IsOccupied(static_cast<size_t>(index));
+    if (const auto handle = HandleOf(index); handle.IsValid())
+        if (!m_layerIndex->Remove(handle))
+            throw std::runtime_error("Layer removal owner violation");
+
+    std::unique_ptr<Entity> released = std::move(m_Entities[index]);
 
     // 트랜스폼 스토어 슬롯 리셋(트랙 S, S1) — Transform::ResolveStore의 점유자
     // 확인이 이 시점부터 실패하므로(m_Entities[index]가 비었다) 이 리셋을
@@ -1405,7 +1403,10 @@ Scene::HierarchyBulkBuildScope Scene::BeginHierarchyBulkBuild()
 
 Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
 {
-	if (!sceneObject) return nullptr;
+    if (!sceneObject)
+        return nullptr;
+    if (!sceneObject->SetLayer(sceneObject->GetLayer()))
+        throw std::runtime_error("Invalid incoming entity layer");
     std::string uniqueName = GenerateUniqueEntityName(sceneObject->GetHashedName().ToString());
 
     sceneObject->SetName(uniqueName);
@@ -1436,10 +1437,8 @@ Entity* Scene::AddEntity(std::unique_ptr<Entity> sceneObject)
         TagManagers->AddTagToObject(added->m_tag.ToString(), added);
     }
 
-    if (!added->m_layer.ToString().empty())
-    {
-        TagManagers->AddObjectToLayer(added->m_layer.ToString(), added);
-    }
+    if (!added->SetLayer(added->GetLayer()))
+        throw std::runtime_error("Invalid entity layer membership");
 
     return added;
 }
@@ -1466,11 +1465,12 @@ void Scene::AddRootEntity(std::string_view name)
     }
 
 	m_Entities[index] = std::move(ptr);
-	m_hierarchyStore.OccupySlot(static_cast<size_t>(index), Entity::kInvalidIndex,
-		Entity::kSceneRootIndex);
-	RecordTopologyCreated();
-	if (Transform* transform = m_Entities[index]->GetComponent<Transform>())
-		transform->FlushPendingLocalWrite();
+    m_hierarchyStore.OccupySlot(static_cast<size_t>(index), Entity::kInvalidIndex, Entity::kSceneRootIndex);
+    RecordTopologyCreated();
+    if (!m_Entities[index]->SetLayer(m_Entities[index]->GetLayer()))
+        throw std::runtime_error("Invalid root layer");
+    if (Transform* transform = m_Entities[index]->GetComponent<Transform>())
+        transform->FlushPendingLocalWrite();
 }
 
 void Scene::OnBeforeSerialize() const
@@ -1547,10 +1547,8 @@ Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::
         TagManager::GetInstance()->AddTagToObject(created->m_tag.ToString(), created);
     }
 
-    if (!created->m_layer.ToString().empty())
-    {
-        TagManager::GetInstance()->AddObjectToLayer(created->m_layer.ToString(), created);
-    }
+    if (!created->SetLayer(created->GetLayer()))
+        throw std::runtime_error("Invalid entity layer membership");
 
     return created;
 }
@@ -1589,9 +1587,12 @@ Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectTy
 		transform->FlushPendingLocalWrite();
 	if (Entity::IsValidIndex(parentIndex))
 	{
-		if (Entity* parent = TryGetEntity(parentIndex); parent && parent != loaded)
-			parent->AttachChildIndex(index);
-	}
+        if (Entity* parent = TryGetEntity(parentIndex); parent && parent != loaded)
+            parent->AttachChildIndex(index);
+    }
+
+    if (!loaded->SetLayer(loaded->GetLayer()))
+        throw std::runtime_error("Invalid loaded entity layer");
 
     return loaded;
 }
@@ -1668,12 +1669,9 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
         {
             TagManager::GetInstance()->RemoveTagFromObject(node->m_tag.ToString(), node);
         }
-        if (!node->m_layer.ToString().empty())
-        {
-            TagManager::GetInstance()->RemoveObjectFromLayer(node->m_layer.ToString(), node);
-        }
-		if (Transform* transform = node->GetComponent<Transform>())
-			transform->CaptureSceneTransferState();
+
+        if (Transform* transform = node->GetComponent<Transform>())
+            transform->CaptureSceneTransferState();
 
         // 씬 이탈 통지(트랙 L1). 대칭짝은 AttachExistingEntity의 OnAddedToScene.
         // DDOL 이송은 오브젝트를 살려 둔 채 씬만 바꾸는 희귀 경로라, 기록이 없으면
@@ -1719,11 +1717,14 @@ std::string Scene::MakeUniqueName(std::string_view base)
 // === C안 구현: 단일 객체 부착 ===
 Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::Index parentIndex)
 {
-    if (!go) return Entity::kInvalidIndex;
-	Entity* object = go.get();
+    if (!go)
+        return Entity::kInvalidIndex;
+    if (!go->SetLayer(go->GetLayer()))
+        throw std::runtime_error("Invalid transferred entity layer");
+    Entity* object = go.get();
 
     // 이 씬 기준 유니크 네임 보장
-	if (Entity* existed = GetEntity(object->GetHashedName().ToString()); existed)
+    if (Entity* existed = GetEntity(object->GetHashedName().ToString()); existed)
 		object->SetName(MakeUniqueName(object->GetHashedName().ToString()));
 
     // 이 씬에 소속
@@ -1743,10 +1744,10 @@ Entity::Index Scene::AttachExistingEntity(std::unique_ptr<Entity> go, Entity::In
 
     // Tag/Layer 재등록
     if (!object->m_tag.ToString().empty())
-		TagManager::GetInstance()->AddTagToObject(object->m_tag.ToString(), object);
-    if (!object->m_layer.ToString().empty())
-		TagManager::GetInstance()->AddObjectToLayer(object->m_layer.ToString(), object);
+        TagManager::GetInstance()->AddTagToObject(object->m_tag.ToString(), object);
 
+    if (!object->SetLayer(object->GetLayer()))
+        throw std::runtime_error("Invalid entity layer membership");
     // Transform 부모 세팅.
     //
     // ★ 루트 규약이 여기서 갈렸다 (SceneGraphRedesignPlan 트랙 E, 2026-08-20 통일).
@@ -2564,105 +2565,299 @@ void Scene::DrainPendingLifecycle()
     DrainPendingPhases();
 }
 
-void Scene::FixedUpdate(float deltaSecond)
+ce::layers::result<void> Scene::AssignLayer(Entity& entity, ce::layers::layer_id layer)
 {
-    if (m_AIJob.valid() && m_AIJob.is_complete())
-    {
-        DrainAIUpdate();
-    }
-    {
-        ce::profile_scope _profile{ ce::marker<"AllUpdateWorldMatrix">() };
-    	AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
-    }
+    const auto handle = HandleOf(entity.m_index);
+    if (entity.GetScene() != this || Resolve(handle) != &entity)
+        return std::unexpected(ce::layers::error::wrong_scene);
 
-    {
-        ce::profile_scope _profile{ ce::marker<"SetInternalPhysicData">() };
-        SetInternalPhysicData();
-    }
+    const auto project = SceneManagers->ProjectLayers();
+    if (!project)
+        return std::unexpected(ce::layers::error::invalid_definition);
 
-    // 트랙 C2-0 — 여기 있던 PumpReentrancyStress("FixedUpdate") 폴백 호출을 뺐다.
-    //
-    // Player::PlayerMain::Update가 매 프레임 SceneManagers->Physics(FixedUpdate가
-    // 여기서 불린다)를 SceneManagers->GameLogic(Update·LateUpdate가 불린다) "앞에"
-    // 무조건 부른다(PlayerMain.cpp:335-336, SceneManager.cpp:354-359·370-388 —
-    // 고정 타임스텝 누산기로 걸러지는 게 아니라 매 프레임 정확히 한 번이다). 즉
-    // 이 자리에 폴백을 두면 Update의 CameraSystem 루프가 한 번도 돌기 전에
-    // 무장을 항상 먼저 가로챈다 — "순회 중 발화가 우선"이라는 순서 규약과
-    // 정면으로 부딪힌다. 무장은 이제 Update에서만 소비된다(CameraSystem 루프의
-    // 순회 중 지점이 우선이고, 그것이 못 잡으면 Update 안의 폴백이 같은 프레임
-    // 안에서 바로 뒤이어 잡는다) — FixedUpdate 자체엔 순회 중 발화점이 없으므로
-    // 여기서 더 할 일이 없다.
-    {
-        ce::profile_scope _profile{ ce::marker<"internalfixedBroadcast">() };
-        // 트랙 C3 잔여 — CharacterControllerComponent::FixedUpdate 이관분.
-        // ★ 자리가 PhysicsManagers->Update **이전**이어야 한다. 옛 구현은
-        // FixedUpdateList 안에서 Physics->AddInputMove 등으로 그 프레임의 이동 입력을
-        // 큐에 실었고 바로 다음 물리 스텝이 그것을 같은 프레임에 소비했다 —
-        // 순서가 뒤집히면 캐릭터 이동이 한 프레임 밀린다.
-        CharacterControllerSystems->FixedUpdate(deltaSecond);
-    }
-    // Internal Physics Update 작성
-    {
-        ce::profile_scope _profile{ ce::marker<"physxUpdate">() };
-        PhysicsManagers->Update(deltaSecond);
-    }
-    {
-        ce::profile_scope _profile{ ce::marker<"yield_WaitForFixedUpdate">() };
-        // OnTriggerEvent.Broadcast(); 작성
-        CoroutineManagers->yield_WaitForFixedUpdate();
-    }
+    const auto assigned = m_layerIndex->Assign(project->Snapshot()->catalog, handle, layer);
+    if (!assigned)
+        return assigned;
+
+    entity.m_layerId = layer.value;
+    return {};
 }
 
-namespace
+ce::layers::result<std::span<const EntityHandle>> Scene::LayerMembers(ce::layers::layer_id layer) const
 {
-    // C# 스크립트에 물리 콜백을 전달한다. 즉시 호출하지 않고 큐에만 담는다 —
-    // 충돌마다 경계를 넘으면 "틱당 1회" 원칙이 무너지기 때문이다(설계 문서 02절).
-    // 실제 전달은 틱 경계의 ClrHost::FlushPhysicsEvents가 한 번에 한다.
-    void QueueManagedCollision(const Collision& collider, ClrHost::PhysicsEventKind kind)
+    const auto project = SceneManagers->ProjectLayers();
+    if (!project)
+        return std::unexpected(ce::layers::error::invalid_definition);
+
+    return m_layerIndex->Members(project->Snapshot()->catalog, layer);
+}
+
+ce::physics::result<void> Scene::RegisterPhysicsBody(PhysicsBodyComponent& component)
+{
+    if (component.m_scene == this)
+        return {};
+    if (component.m_scene || !component.GetOwner() || component.GetOwner()->GetScene() != this
+        || component.GetOwner()->m_index == Entity::kSceneRootIndex)
+        return std::unexpected(ce::physics::error{ce::physics::error_code::invalid_argument, 0, "Invalid physics scene membership"});
+
+    if (std::ranges::any_of(component.GetOwner()->m_components, [](const auto& value) {
+            return value && !value->IsDestroyMark() && dynamic_cast<CharacterMovementComponent*>(value.get());
+        }))
+        return std::unexpected(ce::physics::error{ce::physics::error_code::invalid_argument, 0, "Body and character cannot share an Entity"});
+
+    auto definition = component.CaptureDefinition();
+    if (!definition) return std::unexpected(definition.error());
+
+    auto binding = m_physicsSimulation.Register(std::move(*definition), component.IsEnabled());
+    if (!binding) return std::unexpected(binding.error());
+
+    try { m_physicsBodies.emplace(*binding, &component); }
+    catch (const std::bad_alloc&)
     {
-        if (nullptr == collider.thisObj) return;
+        (void)m_physicsSimulation.Unregister(*binding);
+        return std::unexpected(ce::physics::error{ce::physics::error_code::out_of_memory, 0, "Physics component membership allocation failed"});
+    }
 
-        auto& clr = ClrHost::Get();
-        if (!clr.IsReady()) return;
+    component.m_scene = this;
+    component.m_binding = *binding;
+    return {};
+}
 
-        for (auto* script : collider.thisObj->GetComponents<ScriptComponent>())
+ce::physics::result<void> Scene::UnregisterPhysicsBody(PhysicsBodyComponent& component)
+{
+    if (component.m_scene != this) return {};
+
+    auto removed = m_physicsSimulation.Unregister(component.m_binding);
+    if (!removed) return removed;
+
+    m_physicsBodies.erase(component.m_binding);
+    component.m_binding = 0;
+    component.m_scene = nullptr;
+    return {};
+}
+
+ce::physics::result<void> Scene::RegisterCharacterMovement(CharacterMovementComponent& component)
+{
+    using namespace ce::physics;
+    if (component.m_scene == this) return {};
+    if (component.m_scene || !component.GetOwner() || component.GetOwner()->GetScene() != this ||
+        component.GetOwner()->m_index == Entity::kSceneRootIndex)
+        return std::unexpected(error{error_code::invalid_argument, 0, "Invalid character scene membership"});
+    if (std::ranges::any_of(component.GetOwner()->m_components, [&](const auto& value) {
+            return value && !value->IsDestroyMark() && value.get() != &component &&
+                (dynamic_cast<PhysicsBodyComponent*>(value.get()) || dynamic_cast<CharacterMovementComponent*>(value.get()));
+        }))
+        return std::unexpected(error{error_code::invalid_argument, 0, "Character requires exclusive physics ownership"});
+
+    auto definition = component.CaptureDefinition();
+    if (!definition) return std::unexpected(definition.error());
+    auto binding = m_physicsSimulation.RegisterCharacter(*definition, component.IsEnabled());
+    if (!binding) return std::unexpected(binding.error());
+    try { m_physicsCharacters.emplace(*binding, &component); }
+    catch (const std::bad_alloc&)
+    {
+        (void)m_physicsSimulation.UnregisterCharacter(*binding);
+        return std::unexpected(error{error_code::out_of_memory, 0, "Character membership allocation failed"});
+    }
+    component.m_scene = this;
+    component.m_binding = *binding;
+    return {};
+}
+
+ce::physics::result<void> Scene::UnregisterCharacterMovement(CharacterMovementComponent& component)
+{
+    if (component.m_scene != this) return {};
+    auto removed = m_physicsSimulation.UnregisterCharacter(component.m_binding);
+    if (!removed) return removed;
+    m_physicsCharacters.erase(component.m_binding);
+    component.m_binding = 0;
+    component.m_scene = nullptr;
+    return {};
+}
+
+ce::physics::result<void> Scene::StartPhysicsSimulation()
+{
+    AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
+
+    // Includes components whose OnAddedToScene hook is still pending at the Play boundary.
+    for (const auto& entity : m_Entities)
+    {
+        if (!entity || entity->IsDestroyMark()) continue;
+        for (auto* component : entity->GetComponents<PhysicsBodyComponent>())
         {
-            if (nullptr == script || !script->HasInstance()) continue;
+            if (!component || component->IsDestroyMark()) continue;
+            auto added = RegisterPhysicsBody(*component);
+            if (!added) return added;
 
-            clr.QueuePhysicsEvent(script->GetInstanceId(), kind,
-                collider.otherObj, collider.contactPoints);
+            auto definition = component->CaptureDefinition();
+            if (!definition) return std::unexpected(definition.error());
+            auto defined = m_physicsSimulation.Define(component->m_binding, std::move(*definition));
+            if (!defined) return defined;
+            auto enabled = m_physicsSimulation.SetEnabled(component->m_binding, component->IsEnabled());
+            if (!enabled) return enabled;
+        }
+        for (auto* component : entity->GetComponents<CharacterMovementComponent>())
+        {
+            if (!component || component->IsDestroyMark()) continue;
+            auto added = RegisterCharacterMovement(*component);
+            if (!added) return added;
+            auto definition = component->CaptureDefinition();
+            if (!definition) return std::unexpected(definition.error());
+            if (auto defined = m_physicsSimulation.DefineCharacter(component->m_binding, *definition); !defined) return defined;
+            if (auto enabled = m_physicsSimulation.SetCharacterEnabled(component->m_binding, component->IsEnabled()); !enabled) return enabled;
         }
     }
+
+    if (auto layers = CommitPhysicsLayers(); !layers)
+        return layers;
+
+    const auto started = m_physicsSimulation.Start();
+    if (started)
+    {
+        for (auto* component : m_physicsBodies | std::views::values) component->m_transferState.reset();
+        for (auto* component : m_physicsCharacters | std::views::values) component->m_transferState.reset();
+    }
+    return started;
 }
 
-void Scene::OnTriggerEnter(const Collision& collider)
+ce::physics::result<void> Scene::StopPhysicsSimulation()
 {
-    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::TriggerEnter);
+    return m_physicsSimulation.Stop();
 }
 
-void Scene::OnTriggerStay(const Collision& collider)
+ce::physics::result<void> Scene::PreparePhysicsSceneExit()
 {
-    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::TriggerStay);
+    if (m_physicsSimulation.IsRunning())
+    {
+        // Capture DDOL motion while SDK reads are still legal. No SDK handle crosses scenes.
+        for (auto* component : m_physicsBodies | std::views::values)
+        {
+            if (!component || component->IsDestroyMark() || !component->GetOwner()
+                || component->GetOwner()->IsDestroyMark() || !component->GetOwner()->IsDontDestroyOnLoad()) continue;
+
+            const auto state = m_physicsSimulation.Read(component->m_binding);
+            if (!state) return std::unexpected(state.error());
+            component->m_transferState = *state;
+        }
+        for (auto* component : m_physicsCharacters | std::views::values)
+        {
+            if (!component || component->IsDestroyMark() || !component->GetOwner() ||
+                component->GetOwner()->IsDestroyMark() || !component->GetOwner()->IsDontDestroyOnLoad()) continue;
+            auto state = m_physicsSimulation.ReadCharacter(component->m_binding);
+            if (!state) return std::unexpected(state.error());
+            component->m_transferState = *state;
+        }
+    }
+
+    return StopPhysicsSimulation();
 }
 
-void Scene::OnTriggerExit(const Collision& collider)
+ce::physics::result<void> Scene::CommitPhysicsLayers()
 {
-    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::TriggerExit);
+    ce::profile_scope scope{ce::marker<"Physics.LayerMembership">()};
+
+    using namespace ce::physics;
+    const auto project = SceneManagers->ProjectLayers();
+    if (!project)
+        return std::unexpected(error{error_code::wrong_phase, 0, "Project layer settings are not bound"});
+
+    const auto settings = project->Snapshot();
+    try
+    {
+        m_physicsLayerAssignments.clear();
+        m_physicsLayerAssignments.reserve(m_physicsBodies.size() + m_physicsCharacters.size());
+        for (const auto& [binding, component] : m_physicsBodies)
+        {
+            if (!component || !component->GetOwner())
+                return std::unexpected(error{error_code::invalid_argument, 0, "Invalid physics layer owner"});
+
+            const auto* layer = settings->catalog.Find(component->GetOwner()->GetLayer());
+            if (!layer)
+                return std::unexpected(error{error_code::invalid_argument, 0, "Unknown or retired entity layer"});
+
+            m_physicsLayerAssignments.push_back({binding, layer->id});
+        }
+
+        for (const auto& [binding, component] : m_physicsCharacters)
+        {
+            if (!component || !component->GetOwner())
+                return std::unexpected(error{error_code::invalid_argument, 0, "Invalid character layer owner"});
+            const auto* layer = settings->catalog.Find(component->GetOwner()->GetLayer());
+            if (!layer) return std::unexpected(error{error_code::invalid_argument, 0, "Unknown or retired character layer"});
+            m_physicsLayerAssignments.push_back({binding, layer->id});
+        }
+
+        std::ranges::sort(m_physicsLayerAssignments, {}, &ScenePhysicsSimulation::layer_assignment::binding);
+        return m_physicsSimulation.CommitLayers(*settings, m_physicsLayerAssignments);
+    }
+    catch (const std::bad_alloc&)
+    {
+        return std::unexpected(error{error_code::out_of_memory, 0, "Layer membership preparation failed"});
+    }
 }
 
-void Scene::OnCollisionEnter(const Collision& collider)
+void Scene::FixedUpdate(float deltaSecond)
 {
-    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::CollisionEnter);
-}
+    if (!m_physicsSimulation.IsRunning() || deltaSecond == 0) return;
+    if (m_AIJob.valid() && m_AIJob.is_complete()) DrainAIUpdate();
 
-void Scene::OnCollisionStay(const Collision& collider)
-{
-    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::CollisionStay);
-}
+    AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
 
-void Scene::OnCollisionExit(const Collision& collider)
-{
-    QueueManagedCollision(collider, ClrHost::PhysicsEventKind::CollisionExit);
+    if (const auto layers = CommitPhysicsLayers(); !layers)
+    {
+        Debug::PrintLog(spdlog::level::err, std::string(layers.error().message));
+        // Request teardown at the host's render-safe structure boundary, never from inside this tick.
+        SceneManagers->SetGameStart(false);
+        return;
+    }
+
+    const auto advanced = m_physicsSimulation.Advance(deltaSecond);
+    if (!advanced)
+    {
+        Debug::PrintLog(spdlog::level::err, std::string(advanced.error().message));
+        SceneManagers->SetGameStart(false);
+        return;
+    }
+    if (*advanced == 0) return;
+
+    {
+        const auto status = m_physicsSimulation.Runtime()->status();
+        ce::profile_context_scope context{{status.identity.value, status.last_tick.value, 0}};
+        ce::profile_scope scope{ce::marker<"Physics.ApplyTransforms">()};
+        m_physicsTransformWrites.clear();
+        m_physicsTransformWrites.reserve(m_physicsSimulation.ChangedPoses().size() + m_physicsSimulation.ChangedCharacters().size());
+        for (const auto& changed : m_physicsSimulation.ChangedPoses())
+        {
+            const auto found = m_physicsBodies.find(changed.binding);
+            if (found == m_physicsBodies.end()) continue;
+            auto* component = found->second;
+            if (!component || component->IsDestroyMark() || !component->GetOwner()
+                || component->GetOwner()->IsDestroyMark()) continue;
+
+            auto& transform = component->GetOwner()->Transform_();
+            m_physicsTransformWrites.push_back({HandleOf(component->GetOwner()->m_index),
+                math::compose(transform.GetWorldScale(), changed.value.rotation, changed.value.position)});
+        }
+
+        {
+            ce::profile_scope characters{ce::marker<"Physics.ApplyCharacterTransforms">()};
+            for (const auto& changed : m_physicsSimulation.ChangedCharacters())
+            {
+                const auto found = m_physicsCharacters.find(changed.binding);
+                if (found == m_physicsCharacters.end()) continue;
+                auto* component = found->second;
+                if (!component || component->IsDestroyMark() || !component->GetOwner() || component->GetOwner()->IsDestroyMark()) continue;
+                auto& transform = component->GetOwner()->Transform_();
+                m_physicsTransformWrites.push_back({HandleOf(component->GetOwner()->m_index),
+                    math::compose(transform.GetWorldScale(), transform.GetWorldQuaternion(), changed.state.collision.position)});
+            }
+        }
+
+        ApplyWorldWriteBatch(m_physicsTransformWrites, TransformWriteReason::Physics);
+    }
+
+    for (std::uint32_t tick = 0; tick < *advanced; ++tick)
+        CoroutineManagers->yield_WaitForFixedUpdate();
 }
 
 void Scene::Update(float deltaSecond)
@@ -2772,7 +2967,6 @@ void Scene::LateUpdate(float deltaSecond)
     // 트랙 C3 잔여 — LateUpdate를 오버라이드하던 둘. 옛 위치(LateUpdateList 안)와
     // 같은 창(RegistryTick 이후 · UpdateRenderData 이전)을 지킨다.
     SoundSystems->LateUpdate(deltaSecond);
-    CharacterControllerSystems->LateUpdate(deltaSecond);
 
     UpdateRenderData();
 }
@@ -2821,12 +3015,20 @@ void Scene::EndFramePass()
     }
 }
 
-void Scene::AllDestroyMark()
+void Scene::AllDestroyMark(bool includePersistent)
 {
     for (const auto& obj : m_Entities)
     {
-        if (obj && !obj->IsDestroyMark() && !obj->IsDontDestroyOnLoad())
+        if (obj && !obj->IsDestroyMark() && (includePersistent || !obj->IsDontDestroyOnLoad()))
             obj->Destroy();
+    }
+
+    // The synthetic root stays alive, but components added during Play must not leak into authoring.
+    if (includePersistent && !m_Entities.empty() && m_Entities[0])
+    {
+        auto& root = m_Entities[0];
+        for (const auto& component : root->m_components)
+            if (component && component.get() != root->m_pTransformComponent) component->Destroy();
     }
 }
 
@@ -3113,319 +3315,6 @@ void Scene::UnCollectSpriteSheetComponent(SpriteSheetComponent* ptr)
 	UnregisterRenderProxy(*m_renderRegistry, ptr);
 }
 
-void Scene::CollectRigidBodyComponent(RigidBodyComponent* ptr)
-{
-    if (ptr) push_unique(m_rigidBodyComponents, ptr);
-}
-
-void Scene::UnCollectRigidBodyComponent(RigidBodyComponent* ptr)
-{
-    if (ptr)
-    {
-        std::erase_if(m_rigidBodyComponents, [ptr](const auto& body) { return body == ptr; });
-    }
-}
-
-std::span<BoxColliderComponent* const> Scene::GetBoxColliderComponents() const
-{
-    return m_boxColliderComponents;
-}
-
-std::span<SphereColliderComponent* const> Scene::GetSphereColliderComponents() const
-{
-    return m_sphereColliderComponents;
-}
-
-std::span<CapsuleColliderComponent* const> Scene::GetCapsuleColliderComponents() const
-{
-    return m_capsuleColliderComponents;
-}
-
-std::span<CharacterControllerComponent* const>
-Scene::GetCharacterControllerComponents() const
-{
-    return m_characterControllerComponents;
-}
-
-void Scene::CollectColliderComponent(BoxColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        push_unique(m_boxColliderComponents, ptr);
-
-        PhysicsManagers->AddCollider(ptr);
-
-        auto callback = [=](const EBodyType& bodyType)
-        {
-            if (nullptr == ptr) return;
-
-            auto boxInfo = ptr->GetBoxInfo();
-            auto colliderID = boxInfo.colliderInfo.id;
-
-            if (bodyType == EBodyType::STATIC)
-            {
-                Physics->CreateStaticBody(boxInfo, ptr->GetColliderType());
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{ m_boxTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-            else
-            {
-                bool isKinematic = bodyType == EBodyType::KINEMATIC;
-                Physics->CreateDynamicBody(boxInfo, ptr->GetColliderType(), isKinematic);
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{
-                        m_boxTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-        };
-
-        m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
-    }
-}
-
-void Scene::UnCollectColliderComponent(BoxColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        std::erase_if(m_boxColliderComponents, [ptr](const auto& box) { return box == ptr; });
-
-        PhysicsManagers->RemoveCollider(ptr);
-    }
-}
-
-void Scene::CollectColliderComponent(SphereColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        push_unique(m_sphereColliderComponents, ptr);
-
-        PhysicsManagers->AddCollider(ptr);
-
-        auto callback = [=](const EBodyType& bodyType)
-        {
-            if (nullptr == ptr) return;
-
-            auto sphereInfo = ptr->GetSphereInfo();
-            auto colliderID = sphereInfo.colliderInfo.id;
-
-            if (bodyType == EBodyType::STATIC)
-            {
-                Physics->CreateStaticBody(sphereInfo, ptr->GetColliderType());
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{ m_sphereTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-            else
-            {
-                bool isKinematic = bodyType == EBodyType::KINEMATIC;
-                Physics->CreateDynamicBody(sphereInfo, ptr->GetColliderType(), isKinematic);
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{
-                        m_sphereTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-        };
-
-        m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
-    }
-}
-
-void Scene::UnCollectColliderComponent(SphereColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        std::erase_if(m_sphereColliderComponents, [ptr](const auto& sphere) { return sphere == ptr; });
-
-        PhysicsManagers->RemoveCollider(ptr);
-    }
-}
-
-void Scene::CollectColliderComponent(CapsuleColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        push_unique(m_capsuleColliderComponents, ptr);
-
-        PhysicsManagers->AddCollider(ptr);
-
-        auto callback = [=](const EBodyType& bodyType)
-        {
-            if (nullptr == ptr) return;
-
-            auto capsuleInfo = ptr->GetCapsuleInfo();
-            auto colliderID = capsuleInfo.colliderInfo.id;
-
-            if (bodyType == EBodyType::STATIC)
-            {
-                Physics->CreateStaticBody(capsuleInfo, ptr->GetColliderType());
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{ m_capsuleTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-            else
-            {
-                bool isKinematic = bodyType == EBodyType::KINEMATIC;
-                Physics->CreateDynamicBody(capsuleInfo, ptr->GetColliderType(), isKinematic);
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{
-                        m_capsuleTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-        };
-
-        m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
-    }
-}
-
-void Scene::UnCollectColliderComponent(CapsuleColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        std::erase_if(m_capsuleColliderComponents, [ptr](const auto& capsule) { return capsule == ptr; });
-
-        PhysicsManagers->RemoveCollider(ptr);
-    }
-}
-
-void Scene::CollectColliderComponent(MeshColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        push_unique(m_meshColliderComponents, ptr);
-
-        PhysicsManagers->AddCollider(ptr);
-
-        auto callback = [=](const EBodyType& bodyType)
-        {
-            if (nullptr == ptr) return;
-
-            auto convexMeshInfo = ptr->GetMeshInfo();
-            auto colliderID = convexMeshInfo.colliderInfo.id;
-
-            if (bodyType == EBodyType::STATIC)
-            {
-                Physics->CreateStaticBody(convexMeshInfo, ptr->GetColliderType());
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{ m_boxTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-            else
-            {
-                bool isKinematic = bodyType == EBodyType::KINEMATIC;
-                Physics->CreateDynamicBody(convexMeshInfo, ptr->GetColliderType(), isKinematic);
-                m_colliderContainer[colliderID] =
-                    PhysicsManager::ColliderInfo{
-                        m_boxTypeId,
-                        ptr,
-                        ptr->GetOwner(),
-                        ptr,
-                        false
-                };
-            }
-        };
-
-        m_ColliderTypeLinkCallback.insert({ ptr->GetOwner(), std::move(callback) });
-    }
-}
-
-void Scene::UnCollectColliderComponent(MeshColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        std::erase_if(m_meshColliderComponents, [ptr](const auto& mesh) { return mesh == ptr; });
-
-        PhysicsManagers->RemoveCollider(ptr);
-    }
-}
-
-void Scene::CollectColliderComponent(CharacterControllerComponent* ptr)
-{
-    if (ptr)
-    {
-        push_unique(m_characterControllerComponents, ptr);
-
-        PhysicsManagers->AddCollider(ptr);
-
-        auto controllerInfo = ptr->GetControllerInfo();
-        auto colliderID = controllerInfo.id;
-
-        m_colliderContainer[colliderID] =
-            PhysicsManager::ColliderInfo{ m_controllerTypeId,
-                ptr,
-                ptr->GetOwner(),
-                ptr,
-                false
-        };
-    }
-}
-
-void Scene::CollectColliderComponent(TerrainColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        PhysicsManagers->AddCollider(ptr);
-
-        auto gameObject = ptr->GetOwner();
-        auto heightFieldInfo = ptr->GetHeightFieldColliderInfo();
-        auto colliderID = heightFieldInfo.colliderInfo.id;
-
-        m_colliderContainer.insert({ colliderID, {
-            m_heightFieldTypeId,
-            ptr,
-            gameObject,
-            ptr,
-            false
-        } });
-    }
-}
-
-void Scene::UnCollectColliderComponent(CharacterControllerComponent* ptr)
-{
-    if (ptr)
-    {
-        std::erase_if(m_characterControllerComponents, [ptr](const auto& character) { return character == ptr; });
-
-        PhysicsManagers->RemoveCollider(ptr);
-    }
-}
-
-void Scene::UnCollectColliderComponent(TerrainColliderComponent* ptr)
-{
-    if (ptr)
-    {
-        PhysicsManagers->RemoveCollider(ptr);
-    }
-}
-
 void Scene::DestroyEntities()
 {
     std::unordered_set<uint32_t> deletedIndices;
@@ -3495,7 +3384,7 @@ void Scene::DestroyComponents()
 			bool executionGraphMembershipChanged = false;
             for (auto& component : obj->m_components)
             {
-                if (!component || !component->IsDestroyMark() || component->IsDontDestroyOnLoad())
+                if (!component || !component->IsDestroyMark())
                 {
                     continue;
                 }
@@ -4065,92 +3954,6 @@ void Scene::LayoutUISubtree(Entity* root)
 
     std::unordered_set<Entity*> visited;
     LayoutUINode(root, parentRect, parentScale, /*parentChanged=*/true, isTopLevel, 0, visited);
-}
-
-void Scene::SetInternalPhysicData()
-{
-    if (!m_colliderContainer.empty())
-    {
-        std::erase_if(m_colliderContainer,
-        [&](const auto& pair)
-        {
-            return pair.second.bIsDestroyed == true;
-        });
-    }
-
-    std::unordered_map<Entity*, EBodyType> m_bodyType;
-
-    for (auto& rigid : m_rigidBodyComponents)
-    {
-        auto gameObject = rigid->GetOwner();
-        m_bodyType[gameObject] = rigid->GetBodyType();
-    }
-
-    std::unordered_set<Entity*> linkCompleteSet;
-    for (auto& box : m_boxColliderComponents)
-    {
-        if (box && box->GetOwner())
-        {
-            auto gameObject = box->GetOwner();
-            auto iter = m_ColliderTypeLinkCallback.find(gameObject);
-            if (iter != m_ColliderTypeLinkCallback.end())
-            {
-                iter->second(m_bodyType[gameObject]);
-            }
-            linkCompleteSet.insert(gameObject);
-        }
-    }
-
-    for (auto& sphere : m_sphereColliderComponents)
-    {
-        if (sphere && sphere->GetOwner())
-        {
-            auto gameObject = sphere->GetOwner();
-            auto iter = m_ColliderTypeLinkCallback.find(gameObject);
-            if (iter != m_ColliderTypeLinkCallback.end())
-            {
-                iter->second(m_bodyType[gameObject]);
-            }
-            linkCompleteSet.insert(gameObject);
-        }
-    }
-
-    for (auto& capsule : m_capsuleColliderComponents)
-    {
-        if (capsule && capsule->GetOwner())
-        {
-            auto gameObject = capsule->GetOwner();
-            auto iter = m_ColliderTypeLinkCallback.find(gameObject);
-            if (iter != m_ColliderTypeLinkCallback.end())
-            {
-                iter->second(m_bodyType[gameObject]);
-            }
-            linkCompleteSet.insert(gameObject);
-        }
-    }
-
-    for (auto& mesh : m_meshColliderComponents)
-    {
-        if (mesh && mesh->GetOwner())
-        {
-            auto gameObject = mesh->GetOwner();
-            auto iter = m_ColliderTypeLinkCallback.find(gameObject);
-            if (iter != m_ColliderTypeLinkCallback.end())
-            {
-                iter->second(m_bodyType[gameObject]);
-            }
-            linkCompleteSet.insert(gameObject);
-        }
-    }
-
-    if (!m_ColliderTypeLinkCallback.empty())
-    {
-        std::erase_if(m_ColliderTypeLinkCallback,
-            [&linkCompleteSet](const auto& pair)
-            {
-                return linkCompleteSet.contains(pair.first);
-            });
-    }
 }
 
 uint64_t Scene::TakeSpatialDirtySnapshot(
@@ -5321,3 +5124,35 @@ Entity* Scene::FindCanvasName(std::string_view name)
 }
 
 
+ce::physics::result<PhysicsBodyComponent*> Scene::ResolvePhysicsBody(ce::physics::body_handle body) const
+{
+    auto binding = m_physicsSimulation.Binding(body);
+    if (!binding)
+        return std::unexpected(binding.error());
+
+    const auto found = m_physicsBodies.find(*binding);
+    if (found == m_physicsBodies.end() || !found->second || found->second->IsDestroyMark() ||
+        !found->second->GetOwner() || found->second->GetOwner()->IsDestroyMark() ||
+        found->second->GetOwner()->GetScene() != this)
+        return std::unexpected(ce::physics::error{ce::physics::error_code::stale_handle, 0, "Query body owner retired"});
+
+    return found->second;
+}
+
+ce::physics::result<ce::physics::query_result> Scene::RaycastPhysics(math::vector3 origin, math::vector3 direction, float distance,
+    std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter)
+{
+    auto* runtime = m_physicsSimulation.Runtime();
+    if (!runtime) return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0, "Physics simulation inactive"});
+
+    return runtime->raycast(origin, direction, distance, output, filter);
+}
+
+ce::physics::result<ce::physics::query_result> Scene::OverlapPhysics(const ce::physics::geometry& geometry, const ce::physics::pose& pose,
+    std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter)
+{
+    auto* runtime = m_physicsSimulation.Runtime();
+    if (!runtime) return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0, "Physics simulation inactive"});
+
+    return runtime->overlap(geometry, pose, output, filter);
+}

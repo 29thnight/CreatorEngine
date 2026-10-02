@@ -71,6 +71,14 @@ namespace ce
 	// 한 구간. 이름이 아니라 marker_id 만 들고 다니므로 프레임마다 도는
 	// 문자열 복사가 없다 — 옛 코어의 이름 예산(16,384B)과 DroppedNames 가
 	// 사라지는 것이 이 한 줄의 결과다.
+	// CPU ownership is independent of GPU submission/view/queue. Zero means absent.
+	struct cpu_span_context
+	{
+		std::uint64_t session = 0;
+		std::uint64_t tick = 0;
+		std::uint64_t task = 0;
+	};
+
 	struct profile_event
 	{
 		profile_tick  tick_begin = 0;
@@ -106,13 +114,14 @@ namespace ce
 		std::uint32_t submission = 0;   // 이 구간이 실린 GPU 제출 번호
 		std::uint16_t view = 0;         // 어느 뷰(카메라)의 제출인가
 		std::uint16_t reserved = 0;
+		cpu_span_context cpu; // Adds 24 bytes for session/tick/task correlation.
 	};
 
 	// ★ 이 수를 **못 박아 둔다.** 링의 메모리는 이 레코드 × 보존 프레임의
 	//   이벤트 수이고, 여기에 필드를 하나 더하는 일은 캡처 전체의 크기를
 	//   바꾸는 결정이다. 조용히 커지면 아무도 그 결정을 내린 적이 없게 된다 —
 	//   늘려야 한다면 이 줄을 함께 고치고, 왜 늘렸는지를 위에 적어라.
-	static_assert(sizeof(profile_event) == 40,
+	static_assert(sizeof(profile_event) == 64,
 	              "profile_event 의 크기가 바뀌었다 — 링 메모리가 그만큼 움직인다");
 
 	// GPU 구간이 들고 오는 귀속. 어느 제출의, 어느 뷰의, 어느 큐의 것인가.
@@ -132,7 +141,7 @@ namespace ce
 	// 숨기지 않는다(§6.2) — 부족하면 drop 이 아니라 봉인 빈도로 먼저 나타난다.
 	inline constexpr std::uint32_t kEventsPerChunk = 256;
 	inline constexpr std::uint32_t kProfilePageMagic = 0x43505246; // CPRF
-	inline constexpr std::uint16_t kProfilePageVersion = 1;
+	inline constexpr std::uint16_t kProfilePageVersion = 2;
 
 	// writer 전용 저장소. 봉인 전에는 오직 자기 스레드만, 봉인 뒤에는 오직
 	// 수집기만 만진다. 두 시기가 겹치지 않는다는 것이 이 타입의 계약 전부다.

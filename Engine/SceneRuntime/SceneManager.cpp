@@ -1,3 +1,4 @@
+﻿#include "ProjectLayerSettings.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "AnimationScheduler.h"
@@ -335,8 +336,8 @@ void SceneManager::ManagerInitialize()
 
 bool SceneManager::HasPendingSceneStructureChange() const
 {
-    const bool needsPlayScene    = m_isGameStart && !m_isEditorSceneLoaded;
-    const bool needsEditorScene  = !m_isGameStart && m_isEditorSceneLoaded;
+    const bool needsPlayScene    = m_isGameStart && !m_isSimulationSessionActive;
+    const bool needsEditorScene  = !m_isGameStart && m_isSimulationSessionActive;
     const bool needsActivation   = m_sceneToActivate.load() != nullptr;
     return needsPlayScene || needsEditorScene || needsActivation;
 }
@@ -344,6 +345,11 @@ bool SceneManager::HasPendingSceneStructureChange() const
 void SceneManager::ApplyPendingSceneStructureChange()
 {
     CompleteSceneLoads(false);
+    if (!m_isGameStart && m_isSimulationSessionActive)
+    {
+        EndPlayTransaction();
+        if (m_isSimulationSessionActive) return; // Failed restore: keep the original snapshot and defer activation.
+    }
     // 호출 지점이 렌더 정지 구간임을 전제로 한다(선언부 주석 참고).
 
     // 씬 교체도 같은 이유로 여기서 처리한다. 활성 씬을 갈아끼우고 이전 씬을
@@ -353,7 +359,7 @@ void SceneManager::ApplyPendingSceneStructureChange()
         BeforeAwakeSceneLoad();
     }
 
-    if (m_isGameStart && !m_isEditorSceneLoaded)
+    if (m_isGameStart && !m_isSimulationSessionActive)
     {
         auto activeScenePtr = m_activeScene.load();
         if (!activeScenePtr) return;
@@ -368,7 +374,7 @@ void SceneManager::ApplyPendingSceneStructureChange()
         if (!committed)
         {
             // 요청을 되돌린다(W5 선행 1). 예전에는 스냅샷이 실패해도 여기까지
-            // 내려와 m_isEditorSceneLoaded 를 세웠고, 그러면 "재생 중" 인데
+            // 내려와 m_isSimulationSessionActive 를 세웠고, 그러면 "재생 중" 인데
             // 되돌릴 백업이 없는 상태가 됐다 — 정지가 편집 씬을 잃는 자리다.
             // SetGameStart(false) 는 pause 와 CLR 지연 모드까지 함께 내린다.
             SetGameStart(false);
@@ -378,12 +384,12 @@ void SceneManager::ApplyPendingSceneStructureChange()
             ce::profile_scope _profile{ ce::marker<"Reset">() };
             activeScenePtr->Reset();
         }
-		m_isEditorSceneLoaded = true;
+		m_isSimulationSessionActive = true;
         // 확정은 맨 끝이다. 이 줄이 참이면 위의 전부가 끝났다는 뜻이라야
         // 읽는 쪽이 하나만 보고 판단할 수 있다.
         m_isPlayCommitted = true;
     }
-    else if (!m_isGameStart && m_isEditorSceneLoaded)
+    else if (!m_isGameStart && m_isSimulationSessionActive)
     {
         {
             ce::profile_scope _profile{ ce::marker<"EndPlayTransaction">() };
@@ -445,7 +451,7 @@ void SceneManager::Initialization()
 
 void SceneManager::Physics(float deltaSecond)
 {
-    if (!m_activeScene) return;
+    if (!m_activeScene || !IsPlayCommitted() || IsGamePaused() || HasPendingSceneStructureChange()) return;
     {
         ce::profile_scope _profile{ ce::marker<"FixedUpdate">() };
         m_activeScene.load()->FixedUpdate(deltaSecond);
@@ -555,7 +561,8 @@ void SceneManager::Decommissioning()
     {
         if (scene)
         {
-            scene->AllDestroyMark();
+            (void)scene->StopPhysicsSimulation();
+            scene->AllDestroyMark(true);
             scene->EndFramePass();
         }
     }
@@ -609,7 +616,12 @@ Scene* SceneManager::CreateScene(std::string_view name)
     if (m_activeScene)
     {
 		swapScene = m_activeScene.load();
-        
+        if (!PreparePhysicsSceneExit(swapScene)) { delete allocScene; return nullptr; }
+
+        for (auto* object : m_dontDestroyOnLoadObjects)
+            if (auto* entity = dynamic_cast<Entity*>(object))
+                swapScene->DetachEntityHierarchy(entity, m_detachedDontDestroyOnLoadObjects);
+
         sceneUnloadedEvent.Broadcast();
 
         swapScene->AllDestroyMark();
@@ -638,6 +650,9 @@ Scene* SceneManager::CreateScene(std::string_view name)
     m_scenes.push_back(allocScene);
     m_activeSceneIndex = m_scenes.size() - 1;
     allocScene->m_buildIndex = m_activeSceneIndex.load();
+    RebindEventDontDestroyOnLoadObjects(allocScene);
+    allocScene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
+    ResumePhysicsAfterSceneActivation();
     NotifyActiveSceneChanged();
     newSceneCreatedEvent.Broadcast();
 
@@ -716,6 +731,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         Scene* swapScene{};
         if (m_activeScene)
         {
+            if (!PreparePhysicsSceneExit(m_activeScene.load())) return nullptr;
             for(auto& object : m_dontDestroyOnLoadObjects)
             {
 				auto* go = dynamic_cast<Entity*>(object);
@@ -850,6 +866,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
 		RebindEventDontDestroyOnLoadObjects(m_activeScene.load());
 		m_activeScene.load()->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
+        ResumePhysicsAfterSceneActivation();
 
 		m_scenes.push_back(m_activeScene);
 		m_activeSceneIndex = m_scenes.size() - 1;
@@ -1113,7 +1130,6 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
             if (entity)
             {
                 TagManagers->RemoveTagFromObject(entity->m_tag.ToString(), entity.get());
-                TagManagers->RemoveObjectFromLayer(entity->m_layer.ToString(), entity.get());
                 entity->Destroy();
             }
         scene->EndFramePass();
@@ -1189,11 +1205,24 @@ void SceneManager::BeforeAwakeSceneLoad()
 {
     if (m_sceneToActivate.load())
     {
+        if (m_sceneToActivate.load() == m_activeScene.load())
+        {
+            m_sceneToActivate = nullptr;
+            m_asyncSceneToActivate = nullptr;
+            return;
+        }
+
         Benchmark debugTimer;
         Scene* oldScene{};
         if (m_activeScene.load())
         {
             oldScene = m_activeScene.load();
+            if (!PreparePhysicsSceneExit(oldScene))
+            {
+                m_sceneToActivate = nullptr;
+                m_asyncSceneToActivate = nullptr;
+                return;
+            }
             oldScene->ResetSelectedEntity();
 
             for (auto& object : m_dontDestroyOnLoadObjects)
@@ -1256,6 +1285,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 
         RebindEventDontDestroyOnLoadObjects(m_sceneToActivate.load());
 		m_activeScene.load()->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
+        ResumePhysicsAfterSceneActivation();
 
         NotifyActiveSceneChanged();
         sceneLoadedEvent.Broadcast();
@@ -1411,6 +1441,8 @@ bool SceneManager::HasSceneSnapshot() const
 void SceneManager::DiscardSceneSnapshot()
 {
     m_editorSceneBackup.Clear();
+    m_editorScenePersistentIds.clear();
+    m_editorLayerBackup.reset();
 }
 
 bool SceneManager::CaptureSceneSnapshot()
@@ -1433,6 +1465,13 @@ bool SceneManager::CaptureSceneSnapshot()
 
     try
     {
+        const auto project = ProjectLayers();
+        if (!project) throw std::runtime_error("Project layer settings missing before Editor Play");
+        m_editorLayerBackup = project->Snapshot();
+
+        std::vector<size_t> persistentIds;
+        for (const auto& entity : scene->m_Entities)
+            if (entity && entity->IsDontDestroyOnLoad()) persistentIds.push_back(entity->GetInstanceID());
         {
             ce::profile_scope _profile{ ce::marker<"Serialize">() };
             // 편집 중이던 최신 값이 담기도록 직렬화한다. 스크립트를 재우지 않는
@@ -1440,6 +1479,7 @@ bool SceneManager::CaptureSceneSnapshot()
             // 그대로 플레이 인스턴스가 된다.
     		m_editorSceneBackup = Authoring::DocumentAccess::Adopt(
     			Meta::SerializeDocument(scene));
+            m_editorScenePersistentIds = std::move(persistentIds);
         }
     }
     catch (const std::exception& e)
@@ -1482,19 +1522,12 @@ bool SceneManager::RestoreSceneSnapshot()
         return false;
     }
 
-    // 살아남은 오브젝트(DontDestroyOnLoad)는 백업에도 실려 있다. 그대로
-    // 역직렬화하면 같은 객체가 한 벌 더 생기므로 instanceID로 걸러낸다.
-    // DDOL을 파괴하지 않는 것은 현재 엔진의 정책을 그대로 둔 것이다 —
-    // 유니티는 재생 종료 때 DDOL도 버리지만, 그 정책 변경은 이 수정의
-    // 범위 밖이고 회귀 범위가 훨씬 넓다.
-    std::unordered_set<size_t> survivingIds;
-    for (const auto& object : scene->m_Entities)
-    {
-        if (object) survivingIds.insert(object->GetInstanceID());
-    }
-
     try
     {
+        const auto project = ProjectLayers();
+        if (!project || !m_editorLayerBackup || !project->Restore(*m_editorLayerBackup))
+            throw std::runtime_error("Project layer restoration failed; pre-Play backup retained");
+
 		{
 			ce::profile_scope _profile{ ce::marker<"RestoreEditorScene">() };
 			LoadIndexBatch loadBatch;
@@ -1506,34 +1539,53 @@ bool SceneManager::RestoreSceneSnapshot()
 	            const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
 	            if (!type)
 	            {
-	                Debug::PrintLog(spdlog::level::err, "Failed to extract type from YAML node.");
-	                continue;
+	                throw std::runtime_error("Snapshot contains an unknown entity type");
 	            }
 
-	            if (objNode["m_instanceID"] &&
-	                survivingIds.contains(objNode["m_instanceID"].As<size_t>()))
-	            {
-	                continue;
-	            }
-
-	            DesirealizeGameObject(type, Authoring::NodeViewAccess::Make(objNode), &loadBatch);
+            DesirealizeGameObject(type, Authoring::NodeViewAccess::Make(objNode), &loadBatch, true);
 	        }
 	        RemapLoadBatchIndices(scene, loadBatch);
 
-	        // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — DDOL로 살아남아
-	        // 되먹인 오브젝트(survivingIds로 걸러짐)는 이미 등록돼 있으니 중복 등록은
-	        // RegisterInstance의 existing-check가 걸러준다.
+            // Remap builds valid root membership from parents. Restore the authored sibling order too.
+            const auto rootEntry = std::ranges::find_if(loadBatch, [](const auto& entry)
+            {
+                return entry.object && entry.object->m_index == Entity::kSceneRootIndex;
+            });
+            if (rootEntry != loadBatch.end())
+            {
+                std::unordered_map<Entity::Index, Entity::Index> fileToSlot;
+                for (const auto& entry : loadBatch)
+                    if (entry.object) fileToSlot.emplace(entry.fileIndex, entry.object->m_index);
+
+                auto* root = rootEntry->object;
+                const auto currentChildren = root->GetChildrenIndices();
+                std::unordered_set<Entity::Index> remaining(currentChildren.begin(), currentChildren.end());
+                std::vector<Entity::Index> orderedChildren;
+                orderedChildren.reserve(currentChildren.size());
+                for (const auto fileIndex : rootEntry->fileChildrenIndices)
+                {
+                    const auto mapped = fileToSlot.find(fileIndex);
+                    if (mapped != fileToSlot.end() && remaining.erase(mapped->second))
+                        orderedChildren.push_back(mapped->second);
+                }
+                for (const auto child : currentChildren)
+                    if (remaining.erase(child)) orderedChildren.push_back(child);
+
+                root->SetChildrenIndices(std::move(orderedChildren));
+            }
+
+	        // Restore pre-Play persistence membership; this runtime flag is excluded from authoring serialization.
 			for (const auto& entry : loadBatch)
 			{
+				if (entry.object && std::ranges::contains(m_editorScenePersistentIds, entry.object->GetInstanceID()))
+					Object::SetDontDestroyOnLoad(entry.object);
 				ReconnectPrefabInstance(scene, entry.object);
 			}
 			hierarchyTransaction.Complete();
 
 		}
 
-        // InScene으로 되돌린다(트랙 L1) — 방금 복원한 오브젝트는 GameObject
-        // 생성자의 기본값이 이미 InScene이지만, DDOL이라 파괴 없이 살아남은
-        // 오브젝트는 Simulating에 머문 채라 여기서 함께 맞춘다.
+        // Runtime and persistent gameplay objects were rebuilt; return the authoring scene to InScene.
         SetSimulationPhase(ScenePhase::InScene);
 
 		scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
@@ -1564,58 +1616,58 @@ void SceneManager::SetSimulationPhase(ScenePhase phase)
     }
 }
 
+bool SceneManager::BindProjectLayerSettings(const std::shared_ptr<ProjectLayerSettings>& settings)
+{
+    if (!settings || m_isGameStart || m_isSimulationSessionActive || !m_scenes.empty()) return false;
+
+    m_projectLayers = settings;
+    return true;
+}
+
+bool SceneManager::ConfigureSimulationSession(SimulationSessionPolicy::mode policy)
+{
+    if (m_isGameStart || m_isSimulationSessionActive || HasSceneSnapshot()) return false;
+
+    m_sessionPolicy = SimulationSessionPolicy{policy};
+    return true;
+}
+
 bool SceneManager::BeginPlayTransaction()
 {
-    // 재생 시작. 씬을 복제하지 않고 지금 씬을 그대로 플레이한다.
-    //
-    // 예전에는 에디터 씬을 직렬화해 PlayScene을 따로 만들고 활성 씬을 그쪽으로
-    // 옮겼다. 그러면 두 씬이 메모리에 공존하는데, 렌더는 RenderScene 하나에
-    // 모든 프록시를 모아 두고 씬 구분 없이 그리므로 에디터 씬 오브젝트가
-    // 플레이 화면에 함께 보였다. 로직 쪽에서도 같은 문제가 먼저 나와
-    // SuspendSceneScripts로 스크립트가 두 벌 도는 것을 막고 있었다.
-    //
-    // 유니티가 쓰는 방식으로 바꾼다 — 씬을 백업해 두고 그 씬 자체로 플레이한 뒤
-    // 정지할 때 백업으로 되돌린다. 씬이 하나뿐이므로 '두 벌' 문제가 계층마다
-    // 반복될 여지가 사라진다. (언리얼은 반대로 PIE 월드를 복제하되 월드마다
-    // FScene을 따로 두는 쪽이다. 어느 한쪽을 온전히 따라야 하고, 지금 구조는
-    // 렌더 씬이 하나이므로 이쪽이 맞다.)
-    // ★ 순서가 계약이다(PHASE 21 W5 선행 1): **스냅샷 → phase → 통지.**
-    //
-    //   예전에는 통지가 맨 앞이었다. 그러면 구독자(EditorPlayModeController)가
-    //   Undo 스택을 비우고 게임 모드로 바꾼 **뒤에야** 스냅샷이 실패했고, 실패한
-    //   전이가 편집 이력을 먼저 죽였다. 통지는 "들어갔다" 의 뜻이라야 하므로
-    //   들어간 뒤에 던진다. Player 는 구독자가 없어 순서가 보이지 않는다.
+    // Common simulation startup; only Editor has a document rollback obligation.
     try
     {
-        // 직렬화가 실패하면 phase를 올리지 않는다 — 되돌릴 기준이 없는 채로
-        // 재생에 들어가면 정지할 때 씬을 잃는다. 호출자가 요청을 되돌린다.
-        if (!CaptureSceneSnapshot())
-        {
-            NotePlayFailure("scene snapshot was not captured");
-            return false;
-        }
-        resourceTrimEvent.Broadcast();
+        const bool begun = m_sessionPolicy.Begin(
+            [this]
+            {
+                if (CaptureSceneSnapshot()) return true;
+                NotePlayFailure("scene snapshot was not captured");
+                return false;
+            },
+            [this]
+            {
+                resourceTrimEvent.Broadcast();
+                auto* scene = m_activeScene.load();
+                if (!scene) { NotePlayFailure("no active scene for simulation"); return false; }
+                const auto started = scene->StartPhysicsSimulation();
+                if (started) return true;
+                NotePlayFailure(std::string(started.error().message));
+                return false;
+            },
+            [this] { DiscardSceneSnapshot(); });
+        if (!begun) return false;
     }
-    catch (const std::exception& e)
+    catch (const std::exception& error)
     {
-        Debug::PrintLog(spdlog::level::err, e.what());
-        NotePlayFailure(e.what());
+        if (auto* scene = m_activeScene.load()) (void)scene->StopPhysicsSimulation();
+        Debug::PrintLog(spdlog::level::err, error.what());
+        NotePlayFailure(error.what());
         return false;
     }
 
-    // Simulating 전이(SceneGraphRedesignPlan §4 트랙 L1) — 씬을 복제하지 않으므로
-    // 이 시점의 오브젝트 전원이 곧 플레이 인스턴스다.
     SetSimulationPhase(ScenePhase::Simulating);
-
-    // Editor 정책을 걸 자리. 예전에는 여기서 Undo 스택을 직접 비웠는데, 이
-    // 함수는 Player도 타므로(Player의 유일한 재생 진입 경로다) 출하 게임이
-    // 매번 Undo를 비우고 있었다. 지금은 통지만 하고, EditorPlayModeController가
-    // 구독해 그 일을 한다. Player는 구독자가 없어 아무 일도 일어나지 않는다.
-    {
-        ce::profile_scope _profile{ ce::marker<"PlayModeEvent(enter)">() };
-        ce::profile_instant(ce::marker<"PlayModeEntered">());
-        PlayModeEvent.Broadcast(true);
-    }
+    ce::profile_instant(ce::marker<"PlayModeEntered">());
+    PlayModeEvent.Broadcast(true);
     return true;
 }
 
@@ -1627,54 +1679,94 @@ void SceneManager::NotePlayFailure(std::string reason)
 
 void SceneManager::EndPlayTransaction()
 {
-    // 재생 정지. 같은 Scene 객체를 비우고 백업으로 되채운다.
-    //
-    // 확정은 맨 앞에서 내린다 — 아래의 어느 조기 반환도 "아직 재생 중" 을
-    // 남기면 안 된다. 진입이 확정을 맨 끝에 세우는 것과 대칭이다.
     m_isPlayCommitted = false;
     Scene* scene = m_activeScene.load();
-    if (nullptr == scene)
+    if (!scene)
     {
-        m_isEditorSceneLoaded = false;
+        NotePlayFailure("no active scene while ending simulation; snapshot retained");
         return;
     }
 
-    if (!HasSceneSnapshot())
-    {
-        // 백업이 없으면 되돌릴 기준이 없다. 씬을 비우면 복구 불가능한 손실이
-        // 되므로 그대로 둔다 — 재생 중 상태가 남는 편이 빈 씬보다 낫다.
-        Debug::PrintLog(spdlog::level::err, "[PIE] 에디터 씬 백업이 없어 복원하지 못했다");
-        m_isEditorSceneLoaded = false;
-        return;
-    }
+    const bool ended = m_sessionPolicy.End(
+        [this, scene]
+        {
+            const auto stopped = scene->StopPhysicsSimulation();
+            if (stopped) return true;
+            NotePlayFailure(std::string(stopped.error().message));
+            return false;
+        },
+        [this, scene]
+        {
+            if (!HasSceneSnapshot())
+            {
+                NotePlayFailure("editor scene snapshot missing; authoring restoration refused");
+                SetSimulationPhase(ScenePhase::InScene);
+                return false;
+            }
 
-    resetSelectedObjectEvent.Broadcast();
-    sceneUnloadedEvent.Broadcast();
+            resetSelectedObjectEvent.Broadcast();
+            sceneUnloadedEvent.Broadcast();
+            scene->AllDestroyMark(true);
+            std::erase_if(m_dontDestroyOnLoadObjects, [](Object* object)
+            {
+                return !object || object->IsDestroyMark();
+            });
+            scene->EndFramePass();
+            ClrHost::Get().NotifySceneUnload();
 
-    scene->AllDestroyMark();
-    scene->EndFramePass();
+            if (RestoreSceneSnapshot()) return true;
+            NotePlayFailure("editor scene restoration failed; pre-Play snapshot retained");
+            SetSimulationPhase(ScenePhase::InScene);
+            Debug::PrintLog(spdlog::level::err, "[PIE] Restore failed; pre-Play snapshot retained for recovery");
+            return false;
+        },
+        [this] { DiscardSceneSnapshot(); });
+    if (!ended) return;
 
-    // 파괴 뒤에 던진다(ClrHost.h 선언 주석 참고). 이 경로는 특히 DDOL이 살아남는
-    // 자리라, 파괴 전에 부르는 형태였다면 재생 종료마다 DDOL 스크립트가 죽었을 것이다.
-    ClrHost::Get().NotifySceneUnload();
-
-    RestoreSceneSnapshot();
-
-    DiscardSceneSnapshot();
-
-    // 이탈 통지. 씬이 복원된 뒤에 던진다 — 구독자가 씬을 들여다볼 수 있어야 한다.
-    // (현재 Editor 구독자는 진입만 쓰지만, 대칭을 지켜 두어야 이탈 정책이 생길 때
-    //  자리를 다시 정하지 않는다.)
+    SetSimulationPhase(ScenePhase::InScene);
+    m_isSimulationSessionActive = false;
     ce::profile_instant(ce::marker<"PlayModeExited">());
     PlayModeEvent.Broadcast(false);
 
-    NotifyActiveSceneChanged();
-    sceneLoadedEvent.Broadcast();
-
-	m_isEditorSceneLoaded = false;
+    if (m_sessionPolicy.RestoresAuthoring())
+    {
+        NotifyActiveSceneChanged();
+        sceneLoadedEvent.Broadcast();
+    }
 }
 
-void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
+bool SceneManager::PreparePhysicsSceneExit(Scene* scene)
+{
+    if (!scene) return true;
+    const auto prepared = scene->PreparePhysicsSceneExit();
+    if (prepared) return true;
+
+    NotePlayFailure(std::string(prepared.error().message));
+    Debug::PrintLog(spdlog::level::err, std::string(prepared.error().message));
+    SetGameStart(false);
+    return false;
+}
+
+bool SceneManager::ResumePhysicsAfterSceneActivation()
+{
+    if (!m_isSimulationSessionActive || !m_isGameStart) return true;
+    auto* scene = m_activeScene.load();
+    const auto started = scene->StartPhysicsSimulation();
+    if (!started)
+    {
+        // The previous scene is gone. Stop on the next structure boundary; Editor retains its original backup.
+        m_isPlayCommitted = false;
+        NotePlayFailure(std::string(started.error().message));
+        Debug::PrintLog(spdlog::level::err, std::string(started.error().message));
+        SetGameStart(false);
+        return false;
+    }
+
+    SetSimulationPhase(ScenePhase::Simulating);
+    return true;
+}
+
+void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch, bool strict)
 {
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (Meta::TypeIDOf(*type) == type_guid(Entity))
@@ -1686,12 +1778,19 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
 
 		Entity::SerializedHierarchy serializedHierarchy =
 			EntityAuthoring::ReadSerializedHierarchy(itNode);
-		auto obj = m_activeScene.load()->LoadEntity(
+        Scene* scene = m_activeScene.load();
+        const bool restoreRoot = strict && itNode["m_index"]
+            && itNode["m_index"].As<Entity::Index>() == Entity::kSceneRootIndex;
+        auto* root = restoreRoot ? scene->GetEntityRaw(Entity::kSceneRootIndex) : nullptr;
+        if (root) scene->RemoveEntityName(root->GetHashedName().ToString());
+        auto obj = restoreRoot ? root : scene->LoadEntity(
             itNode["m_instanceID"].As<size_t>(),
             itNode["m_name"].AsString(),
 			EntityAuthoring::InferCreationType(itNode),
 			Entity::kInvalidIndex
 		);
+
+        if (!obj && strict) throw std::runtime_error("Snapshot entity could not be restored");
 
         if (obj)
         {
@@ -1713,6 +1812,8 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
                 Meta::Deserialize(obj, itNode);
             }
 
+            if (restoreRoot) scene->RenameEntity(*obj, obj->GetHashedName().ToString());
+
             const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
             {
@@ -1732,10 +1833,8 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
                 TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
             }
 
-            if (!obj->m_layer.ToString().empty())
-            {
-                TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
-            }
+            if (!obj->SetLayer(obj->GetLayer()))
+                throw std::runtime_error("Invalid entity layer membership");
 
             // 구파일 승격(레인 2, SceneGraphRedesignPlan §5 예외 4) — 구스키마 m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
             LegacyTransformPromotion::PromoteLegacyTransform(obj, itNode);
@@ -1748,10 +1847,13 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
             {
                 try
                 {
+                    if (strict && !Meta::ExtractTypeFromYAML(componentNode))
+                        throw std::runtime_error("Snapshot contains an unknown component type");
                     ComponentFactorys->LoadComponent(obj, Authoring::NodeViewAccess::Make(componentNode), m_isGameStart);
                 }
                 catch (const std::exception& e)
                 {
+                    if (strict) throw;
                     Debug::PrintLog(spdlog::level::err, e.what());
                     continue;
                 }
@@ -1809,10 +1911,8 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const reflgen::type
                 TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
             }
 
-            if (!obj->m_layer.ToString().empty())
-            {
-                TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
-            }
+            if (!obj->SetLayer(obj->GetLayer()))
+                throw std::runtime_error("Invalid entity layer membership");
 
             // 구파일 승격(레인 2, SceneGraphRedesignPlan §5 예외 4) — 구스키마 m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
             LegacyTransformPromotion::PromoteLegacyTransform(obj, itNode);
@@ -1889,10 +1989,9 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             {
                 TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
             }
-            if (!obj->m_layer.ToString().empty())
-            {
-                TagManager::GetInstance()->AddObjectToLayer(obj->m_layer.ToString(), obj);
-            }
+
+            if (!obj->SetLayer(obj->GetLayer()))
+                throw std::runtime_error("Invalid entity layer membership");
 
             // 구파일 승격(레인 2, SceneGraphRedesignPlan §5 예외 4) — 구스키마 m_transform 키가 있으면 Transform 컴포넌트에 값을 쓴다(신파일은 무작용).
             LegacyTransformPromotion::PromoteLegacyTransform(obj, itNode);

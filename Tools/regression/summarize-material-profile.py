@@ -1,4 +1,4 @@
-"""Summarize complete scopes from the engine's version 1 continuous .ceprof format.
+"""Summarize complete scopes from the engine's version 1/2 continuous .ceprof format.
 
 RenderThreadFrame is a render cost; frameMs describes engine frames and must not
 be reported as display FPS. Throughput is measured separately by the HTTP runner.
@@ -12,10 +12,10 @@ class Reader:
  def string(self):
   n=self.get('I');v=self.b[self.p:self.p+n].decode('utf-8');self.p+=n;return v
 def analyze(path):
- b=Path(path).read_bytes();assert b[:8]==b'CEPROF\0\0';version,n=struct.unpack_from('<II',b,8);assert version==1
- chunks={}
+ b=Path(path).read_bytes();assert b[:8]==b'CEPROF\0\0';version,n=struct.unpack_from('<II',b,8);assert version in (1,2)
+ chunks={};chunk_versions={};cpu_sessions=set();cpu_ticks=set();cpu_tasks=set()
  for i in range(n):
-  t,v,o,s,c,r=struct.unpack_from('<IIQQII',b,16+32*i);data=b[o:o+s];assert zlib.crc32(data)==c;chunks[t]=Reader(data)
+  t,v,o,s,c,r=struct.unpack_from('<IIQQII',b,16+32*i);data=b[o:o+s];assert zlib.crc32(data)==c;chunks[t]=Reader(data);chunk_versions[t]=v
  hz=chunks[1].get('Q');complete=chunks[1].get('B');unacked=chunks[1].get('I')
  m=chunks[2];markers=[]
  for i in range(m.get('I')):kind=m.get('B');line=m.get('I');name=m.string();file=m.string();markers.append((name,file,line))
@@ -26,6 +26,10 @@ def analyze(path):
   fid,a,e,d,count=f.get('IQQQI');drops+=d;frames.append((e-a)*1000/hz)
   for j in range(count):
    a,e,mid,start,slot,dep,flags,q,sub,view,res=f.get('QQIIHHBBIHH');ms=(e-a)*1000/hz
+   cpu=f.get('QQQ') if chunk_versions[4]>=2 else (0,0,0)
+   if cpu[0]:
+    cpu_sessions.add(cpu[0]);cpu_ticks.add(cpu[:2])
+    if cpu[2]:cpu_tasks.add(cpu)
    if flags&8:continue
    if flags&3:
     boundary+=1
@@ -38,7 +42,26 @@ def analyze(path):
  for key,v in events.items():
   rows.append({'thread':key[0],'name':key[1],'gpu':key[2],'view':key[3],'calls':len(v),**stats(v),'perEngineFrame':sum(v)/len(frames),'file': next((m[1] for m in markers if m[0]==key[1]),'')})
  rows.sort(key=lambda x:x['perEngineFrame'],reverse=True)
- out={'path':str(path),'frames':len(frames),'frameMs':stats(frames),'complete':complete,'unacked':unacked,'droppedEvents':drops,'excludedBoundaryEvents':boundary,'markers':rows}
+ counter_rows=[];counter_owners=set();dropped_counters=0
+ if 5 in chunks:
+  descriptors={}
+  if 6 in chunks:
+   cr=chunks[6]
+   for _ in range(cr.get('I')):
+    cid,category=cr.get('HI');descriptors[cid]=(cr.string(),cr.string(),category)
+  cr=chunks[5];dropped_counters,counter_frames=cr.get('QI')
+  values=collections.defaultdict(list)
+  for _ in range(counter_frames):
+   fid,count=cr.get('II')
+   for _ in range(count):
+    cid,value=cr.get('Hd');owner=cr.get('QQQ') if chunk_versions[5]>=2 else (0,0,0)
+    if owner[0]:counter_owners.add(owner[:2])
+    values[(cid,owner[0])].append((fid,owner[1],value))
+  assert cr.p==len(cr.b)
+  for (cid,session),v in sorted(values.items()):
+   name,unit,category=descriptors.get(cid,(str(cid),'',0))
+   counter_rows.append({'name':name,'unit':unit,'category':category,'session':session,'samples':len(v),'min':min(x[2] for x in v),'max':max(x[2] for x in v),'last':v[-1][2],'lastTick':v[-1][1],'lastFrame':v[-1][0]})
+ out={'path':str(path),'frames':len(frames),'frameMs':stats(frames),'complete':complete,'unacked':unacked,'droppedEvents':drops,'excludedBoundaryEvents':boundary,'markers':rows,'droppedCounters':dropped_counters,'counterTicks':len(counter_owners),'counters':counter_rows,'cpuOwnership':{'sessions':len(cpu_sessions),'ticks':len(cpu_ticks),'tasks':len(cpu_tasks)}}
  Path(str(path)+'.summary.json').write_text(json.dumps(out,indent=2),encoding='utf-8')
  print(json.dumps({**out,'markers':rows[:35]},indent=2))
 for path in sys.argv[1:]:analyze(path)

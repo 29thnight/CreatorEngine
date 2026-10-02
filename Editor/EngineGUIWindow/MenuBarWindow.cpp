@@ -9,12 +9,12 @@
 #include "EditorChromeSnapshot.h"
 #include "LogSystem.h"
 #include "SceneManager.h"
+#include "EditorProjectOperations.h"
 #include "ConsoleCommandSystem.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
-// 완전한 형이 필요하고, PhysicsManagers도 직접 받는다.
+// 완전한 Scene 형이 필요하다.
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 둘 다 공급했다.
 #include "Scene.h"
-#include "PhysicsManager.h"
 #include "DataSystem.h"
 #include "FileDialog.h"
 #include "ProfilerHUD.h"
@@ -94,119 +94,62 @@ MenuBarWindow::MenuBarWindow()
         [this]() { SHowInputActionMap(); }));
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kBuildSceneSetting,
         [this]() { ShowBuildSceneSettingWindow(); }));
-    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kRenderPassDebug,
-        [this]() { ShowRenderDebugWindow(); }));
+    m_windowBodies.push_back(
+        editor::windows::bind_window_body(EditorWindowName::kRenderPassDebug, [this]() { ShowRenderDebugWindow(); }));
 
-    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kCollisionMatrix, [&]() 
-    {
-        const auto& layers = TagManager::GetInstance()->GetLayers();
-        const int layerCount = static_cast<int>(layers.size());
-        const int matrixSize = std::min(layerCount, 32); // 최대 32개 제한
-        const float checkboxSize = ImGui::GetFrameHeight();
-        const float cellSize = checkboxSize;
-
-        ImGui::Text("Collision Matrix");
-        ImGui::Separator();
-        //todo::grid matrix
-        if(collisionMatrix.empty()){
-            collisionMatrix = PhysicsManagers->GetCollisionMatrix();
-        }
-        if (ImGui::BeginChild("CollisionMatrix", ImVec2(0, 0), ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_AlwaysAutoResize))
+    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kCollisionMatrix, [&]() {
+        const auto project = SceneManagers->ProjectLayers();
+        if (!project)
         {
-            ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(editor::ThemePixels(editor::EditorThemeTokens::CompactGap), editor::ThemePixels(editor::EditorThemeTokens::CompactGap)));
-            // 행렬 축 이름은 기울이고 셀 경계는 숨긴다. 각도는 배율 대상이 아니다.
-            ImGui::PushStyleVar(ImGuiStyleVar_TableAngledHeadersAngle, 0.5f);
-            ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, editor::ThemeColorValue(editor::ThemeColor::Border, 0.f));
-            ImGui::PushStyleColor(ImGuiCol_TableBorderLight, editor::ThemeColorValue(editor::ThemeColor::Border, 0.f));
+            ImGui::TextUnformatted("Project layers are not loaded");
+            return;
+        }
+        const auto snapshot = project->Snapshot();
+        std::vector<const ce::layers::layer_definition*> layers;
+        for (const auto& layer : snapshot->catalog.definitions)
+            if (layer && !layer->retired)
+                layers.push_back(&*layer);
 
-            const ImGuiTableFlags tableFlags =
-                ImGuiTableFlags_SizingFixedFit |
-                ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY |
-                ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV |
-                ImGuiTableFlags_Resizable | ImGuiTableFlags_Reorderable |
-                ImGuiTableFlags_Hideable;
-
-            if (ImGui::BeginTable("CollisionMatrixTable", matrixSize + 1, tableFlags))
+        ImGui::TextUnformatted("Collision Matrix");
+        ImGui::Separator();
+        ImGui::PushStyleVar(ImGuiStyleVar_TableAngledHeadersAngle, .5f);
+        const auto count = static_cast<int>(layers.size());
+        if (ImGui::BeginTable("CollisionMatrixTable", count + 1,
+                              ImGuiTableFlags_ScrollX | ImGuiTableFlags_ScrollY | ImGuiTableFlags_RowBg |
+                                  ImGuiTableFlags_BordersOuter | ImGuiTableFlags_SizingFixedFit))
+        {
+            ImGui::TableSetupColumn(" ", ImGuiTableColumnFlags_NoHeaderLabel);
+            for (const auto* layer : layers)
+                ImGui::TableSetupColumn(layer->name.c_str(), ImGuiTableColumnFlags_AngledHeader);
+            ImGui::TableAngledHeadersRow();
+            for (int row = 0; row < count; ++row)
             {
-                // -------------------------
-                // 1. TableSetupColumn 설정
-                // -------------------------
-                ImGui::TableSetupColumn(" ", ImGuiTableColumnFlags_NoHeaderLabel); // 좌측 인덱스용
-                for (int col = 0; col < matrixSize; ++col)
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(layers[row]->name.c_str());
+                for (int col = 0; col < count; ++col)
                 {
-                    ImGui::TableSetupColumn(
-                        layers[col].c_str(),
-                        ImGuiTableColumnFlags_AngledHeader | ImGuiTableColumnFlags_NoHide
-                    );
-                }
-
-                // -------------------------
-                // 2. 헤더 렌더링
-                // -------------------------
-                ImGui::TableAngledHeadersRow(); // 대각선 헤더 출력
-
-                // -------------------------
-                // 3. 본문 렌더링
-                // -------------------------
-                for (int row = 0; row < matrixSize; ++row)
-                {
-                    ImGui::TableNextRow();
-                    for (int col = -1; col < matrixSize; ++col)
+                    ImGui::TableNextColumn();
+                    ImGui::PushID(row * 32 + col);
+                    if (row <= col)
                     {
-                        ImGui::TableNextColumn();
-                        if (col == -1)
+                        bool allowed = snapshot->policy.Allows(layers[row]->slot, layers[col]->slot);
+                        if (ImGui::Checkbox("##CollisionAllowed", &allowed))
                         {
-                            // 행 인덱스 이름 출력
-                            ImGui::TextUnformatted(layers[row].c_str());
-                        }
-                        else
-                        {
-                            ImGui::PushID(row * kMaxLayerSize + col);
-                            if (row <= col)
-                            {
-                                bool value = collisionMatrix[row][col] != 0;
-                                if (ImGui::Checkbox("##chk", &value))
-                                {
-                                    collisionMatrix[row][col] = (uint8_t)value;
-                                    collisionMatrix[col][row] = (uint8_t)value; // 대칭
-                                }
-                            }
-                            else
-                            {
-                                ImGui::Dummy(ImVec2(cellSize, checkboxSize));
-                            }
-                            ImGui::PopID();
+                            const auto result =
+                                EditorProjectOperations::SetCollision(layers[row]->id, layers[col]->id, allowed);
+                            if (!result.IsSuccess())
+                                Debug::PrintLog(spdlog::level::err, result.message);
                         }
                     }
+                    ImGui::PopID();
                 }
-
-                ImGui::EndTable();
             }
-
-            ImGui::PopStyleColor(2);
-            ImGui::PopStyleVar(2);
-            ImGui::EndChild();
+            ImGui::EndTable();
         }
-
-
-        ImGui::Separator();
-        if (ImGui::Button("Save"))
-        {
-            //적용된 충돌 매스릭스 저장
-            PhysicsManagers->SetCollisionMatrix(collisionMatrix);
-			PhysicsManagers->SaveCollisionMatrix();
-            editor::close_window(EditorWindowName::kCollisionMatrix);
-        }
-		ImGui::SameLine();
-        if (ImGui::Button("Load"))
-        {
-			PhysicsManagers->LoadCollisionMatrix();
-			collisionMatrix = PhysicsManagers->GetCollisionMatrix();
-            editor::close_window(EditorWindowName::kCollisionMatrix);
-		}
-        
+        ImGui::PopStyleVar();
+        ImGui::TextUnformatted("Changes are saved immediately. Undo/Redo is available.");
     }));
-   
 }
 
 void MenuBarWindow::RenderMenuBar()

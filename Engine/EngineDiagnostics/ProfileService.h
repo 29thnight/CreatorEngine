@@ -175,8 +175,12 @@ namespace ce
 
 		// --- 기록 --------------------------------------------------------
 		// hot path. 상태가 recording 이 아니면 곧바로 돌아온다.
-		void begin_scope(marker_id id);
+		void begin_scope(marker_id id, const cpu_span_context& cpu = {});
 		void end_scope();
+
+		// Owner-thread safe point: publish this producer's tail without creating
+		// an engine frame, an event, or an implicit thread registration.
+		void publish_thread();
 
 		// 길이가 없는 사건 하나(§7.3 의 첫째 트랙). 씬이 바뀌었다, Play 에
 		// 들어갔다 — 프레임의 성격이 왜 달라졌는지를 말해 주는 점이다.
@@ -185,7 +189,7 @@ namespace ce
 		//   그 레인의 주인이 정해지지 않기 때문이다 — 아무 스레드나 부를 수
 		//   있고, 스트림의 주인은 적는 스레드여야 한다. 타임라인은 이것들을
 		//   레인이 아니라 **프레임 경계 띠**에 모아 그린다.
-		void mark_instant(marker_id id);
+		void mark_instant(marker_id id, const cpu_span_context& cpu = {});
 
 		// 프레임 경계. 엔진 프레임 번호는 밖에서 받는다 — 프로파일러가
 		// 자기 카운터를 따로 세면 그 수가 엔진의 어느 프레임인지 아무도
@@ -193,6 +197,8 @@ namespace ce
 		// 봉인하고 다른 기록자에게 봉인을 요청한 뒤 경계만 수집 스레드에 넘긴다.
 		void publish_frame(std::uint32_t engine_frame);
 		// Owner-published sparse telemetry. The collector attributes by engine frame.
+		std::uint32_t current_frame() const noexcept { return m_engineFrame.load(std::memory_order_relaxed); }
+
 		void publish_counter(std::uint32_t engine_frame, profile_counter_id id, double value);
 		// Publish one provider's frame sample as a unit with respect to pause/control.
 		void publish_counters(std::uint32_t engine_frame, counter_category category,
@@ -446,7 +452,7 @@ namespace ce
 		std::atomic<recorder_state> m_state{ recorder_state::stopped };
 		std::atomic<counter_mask> m_counterMask{
 			counter_bit(counter_category::process) | counter_bit(counter_category::gpu) |
-			counter_bit(counter_category::render) | counter_bit(counter_category::managed) };
+			counter_bit(counter_category::render) | counter_bit(counter_category::managed) | counter_bit(counter_category::physics) };
 		std::atomic<std::uint64_t> m_latestVramUsed{ 0 };
 		std::atomic<std::uint64_t> m_latestVramBudget{ 0 };
 		std::atomic<std::uint32_t>  m_engineFrame{ 0 };

@@ -9,6 +9,7 @@
 // include하고, 수명은 EditorMain이 소유한다(Initialize/Finalize) — Player
 // 링크 사슬에는 이 타입이 없다.
 #include "MetaStateCommand.h"
+#include "UndoHistoryTransaction.h"
 #include "ClassProperty.h"
 #include <stack>
 #include <memory>
@@ -25,58 +26,22 @@ namespace Meta
     public:
         void Execute(std::unique_ptr<IUndoableCommand> cmd)
         {
-            if (false == m_isGameMode)
-            {
-                cmd->Redo();
-                m_undoStack.push(std::move(cmd));
-                while (!m_redoStack.empty()) m_redoStack.pop(); // Redo stack 초기화
-            }
-            else
-            {
-                cmd->Redo();
-                m_gameModeUndoStack.push(std::move(cmd));
-                while (!m_gameModeRedoStack.empty()) m_gameModeRedoStack.pop();
-            }
+            auto& undo = m_isGameMode ? m_gameModeUndoStack : m_undoStack;
+            auto& redo = m_isGameMode ? m_gameModeRedoStack : m_redoStack;
+
+            Editor::ExecuteUndoHistory(undo, redo, std::move(cmd));
         }
 
         void Undo()
         {
-            if (false == m_isGameMode)
-            {
-                if (m_undoStack.empty()) return;
-                m_undoStack.top()->Undo();
-                auto cmd = std::move(m_undoStack.top());
-                m_undoStack.pop();
-                m_redoStack.push(std::move(cmd));
-            }
-            else
-            {
-                if (m_gameModeUndoStack.empty()) return;
-                m_gameModeUndoStack.top()->Undo();
-                auto cmd = std::move(m_gameModeUndoStack.top());
-                m_gameModeUndoStack.pop();
-                m_gameModeRedoStack.push(std::move(cmd));
-            }
+            Transfer(m_isGameMode ? m_gameModeUndoStack : m_undoStack,
+                     m_isGameMode ? m_gameModeRedoStack : m_redoStack, true);
         }
 
         void Redo()
         {
-            if (false == m_isGameMode)
-            {
-                if (m_redoStack.empty()) return;
-                m_redoStack.top()->Redo();
-                auto cmd = std::move(m_redoStack.top());
-                m_redoStack.pop();
-                m_undoStack.push(std::move(cmd));
-            }
-            else
-            {
-                if (m_gameModeRedoStack.empty()) return;
-                m_gameModeRedoStack.top()->Redo();
-                auto cmd = std::move(m_gameModeRedoStack.top());
-                m_gameModeRedoStack.pop();
-                m_gameModeUndoStack.push(std::move(cmd));
-            }
+            Transfer(m_isGameMode ? m_gameModeRedoStack : m_redoStack,
+                     m_isGameMode ? m_gameModeUndoStack : m_undoStack, false);
         }
 
         void Clear()
@@ -110,6 +75,12 @@ namespace Meta
         bool m_isGameMode = false;
 
     private:
+        static void Transfer(std::stack<std::unique_ptr<IUndoableCommand>>& source,
+                             std::stack<std::unique_ptr<IUndoableCommand>>& destination, bool undo)
+        {
+            Editor::TransferUndoHistory(source, destination, undo);
+        }
+
         std::stack<std::unique_ptr<IUndoableCommand>> m_undoStack;
         std::stack<std::unique_ptr<IUndoableCommand>> m_redoStack;
 

@@ -62,6 +62,17 @@ namespace experiment::cooked
                path == MakeDerivedMaterialProgramArtifactPath(graphId);
     }
 
+    [[nodiscard]] inline bool IsCollisionGeometryArtifactVirtualPath(std::string_view path) noexcept
+    {
+        constexpr std::string_view prefix = "Derived/CollisionGeometry/";
+        if (!path.starts_with(prefix) || !path.ends_with(".cepg") || path.size() != prefix.size() + 3 + 41) return false;
+
+        AssetId id;
+        const auto uuid = path.substr(prefix.size() + 3, 36);
+        return path[prefix.size() + 2] == '/' && TryParseCanonicalAssetId(uuid, id) &&
+               path.substr(prefix.size(), 2) == uuid.substr(0, 2);
+    }
+
     class LooseArtifactByteSource final : public ArtifactByteSource
     {
     public:
@@ -122,7 +133,7 @@ namespace experiment::cooked
         [[nodiscard]] bool Resolve(std::string_view virtualPath,
             std::filesystem::path& out, std::string& failure) const
         {
-            if (!IsAudioArtifactVirtualPath(virtualPath) && !IsMaterialProgramArtifactVirtualPath(virtualPath))
+            if (!IsAudioArtifactVirtualPath(virtualPath) && !IsMaterialProgramArtifactVirtualPath(virtualPath) && !IsCollisionGeometryArtifactVirtualPath(virtualPath))
             {
                 failure = "cooked artifact virtual path is invalid";
                 return false;

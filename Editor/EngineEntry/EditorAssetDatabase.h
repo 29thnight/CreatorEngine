@@ -15,6 +15,7 @@ struct TerrainAuthoringResult;
 struct TextAssetAuthoringRequest;
 struct TextAssetAuthoringResult;
 struct UncatalogedAuthoringRequest;
+namespace ce::physics { struct CollisionGeometrySource; }
 
 // Editor-owned source asset database. It owns watcher/meta generation and all
 // authoring writes extracted from DataSystem; Core retains read-only catalog use.
@@ -59,6 +60,12 @@ public:
 		TextAssetAuthoringResult& result);
 	bool WriteCollisionMatrix(const UncatalogedAuthoringRequest& request);
 	bool WriteTagManager(const UncatalogedAuthoringRequest& request);
+	bool WriteLayerSettings(const UncatalogedAuthoringRequest& request);
+	bool CreateCollisionGeometry(const file::path& destination,
+		const ce::physics::CollisionGeometrySource& source);
+	bool ReplaceCollisionGeometry(const file::path& destination,
+		const ce::physics::CollisionGeometrySource& expected,
+		const ce::physics::CollisionGeometrySource& replacement);
 	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request);
 	file::path ImportSourceAsset(const file::path& source, ImportKind kind);
 	bool RecoverModel(const file::path& source, FileGuid expectedId);

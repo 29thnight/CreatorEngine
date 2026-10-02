@@ -39,6 +39,7 @@ namespace experiment::cooked
         Prefab = 6,
         AudioClip = 7,
         MaterialProgram = 8,
+        CollisionGeometry = 9,
     };
 
     using Sha256Digest = std::array<std::uint8_t, 32>;

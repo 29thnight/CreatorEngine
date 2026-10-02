@@ -1,9 +1,11 @@
 ﻿param(
-    [string]$EditorExe = ""
+    [string]$EditorExe = "",
+    [switch]$SourceOnly
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+. (Join-Path $PSScriptRoot "CommandResults.ps1")
 
 function Read-Source([string]$relativePath) {
     Get-Content -LiteralPath (Join-Path $repoRoot $relativePath) -Raw
@@ -85,10 +87,12 @@ if ($blackBoardPathPolicy -ne 1) {
 # 타입이 못 막는 짝을 여기서 문자로 못 박는다.
 # 프로젝트 설정 자산은 GUID로 참조되지 않고 ProjectSetting 폴더에 .meta가 하나도
 # 없다. meta를 만드는 저작 자산 경로를 재사용하면 없던 사이드카가 생기기 시작한다.
-Assert-DoesNotMatch "Engine\SceneRuntime\PhysicsManager.cpp" `
+Assert-DoesNotMatch "Engine\SceneRuntime\ProjectLayerSettingsIO.h" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Engine\SceneRuntime\PhysicsManager.cpp" `
-    'AssetAuthoringPort::WriteCollisionMatrix'
+Assert-Matches "Editor\EngineEntry\EditorProjectLayerSettings.h" `
+    'AssetAuthoringPort::WriteLayerSettings'
+Assert-Matches "Engine\RenderEngine\Assets\ModelAssetGeneration.cpp" `
+    'AssetAuthoringPort::WriteModelCache'
 # D4 Animator는 씬 reflection YAML만 쓴다. JSON reader/writer 또는 Editor
 # authoring handler가 다시 생기면 단일 정본 계약이 깨진다.
 Assert-DoesNotMatch "Engine\SceneRuntime\Animator.cpp" `
@@ -109,8 +113,8 @@ Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
     'AssetAuthoringPort::WriteTagManager'
 Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
     'tagsNode\.SetSequence\(\)'
-Assert-Matches "Engine\SceneRuntime\TagManager.cpp" `
-    'layersNode\.SetSequence\(\)'
+Assert-DoesNotMatch "Engine\SceneRuntime\TagManager.cpp" `
+    'layersNode|GetLayer|SetLayer|GetCollisionType'
 $tagManagerSource = Read-Source "Engine\SceneRuntime\TagManager.cpp"
 $tagPathPolicy = ([regex]::Matches($tagManagerSource, 'TagManager\.asset')).Count
 if ($tagPathPolicy -ne 1) {
@@ -146,7 +150,7 @@ Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
     'InstallTagManagerWriter\(&WriteTagManagerThroughEditor\)'
 
 Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
-    'InstallCollisionMatrixWriter\(\s*&WriteCollisionMatrixThroughEditor\)'
+    'InstallLayerSettingsWriter\(\s*&WriteLayerSettingsThroughEditor\)'
 $publishSettingBody = [regex]::Match((Read-Source "Editor\EngineEntry\EditorAssetDatabase.cpp"),
     'bool PublishUncatalogedLocked[\s\S]*?\n\t\}').Value
 if ([string]::IsNullOrWhiteSpace($publishSettingBody)) {
@@ -193,8 +197,13 @@ $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
         Get-Content -LiteralPath $_.FullName -Raw
     }
 $playerText = $playerSources -join "`n"
-if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|TagManagerWriter|InputActionMapWriter)') {
+if ($playerText -match 'Install(?:ModelCacheWriter|EmbeddedTextureWriter|TerrainWriter|FoliageWriter|BlackBoardWriter|CollisionMatrixWriter|LayerSettingsWriter|TagManagerWriter|InputActionMapWriter)') {
     throw "Player installs an Editor asset-authoring writer"
+}
+
+if ($SourceOnly) {
+    Write-Output "ASSET_AUTHORING_OWNERSHIP_SOURCE_OK product_probes=not_run"
+    return
 }
 
 if ([string]::IsNullOrWhiteSpace($EditorExe)) {
@@ -203,6 +212,21 @@ $EditorExe = Join-Path $repoRoot "Bin\x64-Release\Editor\CreatorEditor.exe"
 if (-not (Test-Path -LiteralPath $EditorExe)) {
     throw "Editor executable is missing: $EditorExe"
 }
+# Source-only evidence cannot bless a pre-cutover executable. The product probes
+# require a binary newer than the ownership and layer publication paths they exercise.
+$editorStamp = (Get-Item -LiteralPath $EditorExe).LastWriteTimeUtc
+foreach ($relative in @(
+    "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
+    "Engine/RenderEngine/AssetAuthoringPort.cpp",
+    "Engine/SceneRuntime/TagManager.cpp",
+    "Editor/EngineEntry/EditorAssetDatabase.cpp",
+    "Editor/EngineEntry/EditorProjectLayerSettings.h",
+    "Editor/EngineEntry/Commands/AssetAuthoringCommands.cpp")) {
+    if ((Get-Item -LiteralPath (Join-Path $repoRoot $relative)).LastWriteTimeUtc -gt $editorStamp) {
+        throw "Editor executable is stale for ownership probes; rebuild the cutover product first: $relative"
+    }
+}
+
 $editorRuntimeDirectory = Split-Path $EditorExe -Parent
 # 감시자 런타임(efsw)은 실행 파일 옆이 아니라 공유 배치의 `Runtime\Editor` 에
 # 있다(abbad0f6 엔진 배포·런처). 찾는 규칙은 `Tools\runtime\RuntimeLauncher.cpp`
@@ -330,8 +354,9 @@ function Test-ByteSequence([byte[]]$bytes, [byte[]]$needle) {
 function Invoke-Import([string]$suffix, [int]$ExpectedExitCode = 0) {
     $stdout = Join-Path $tempRoot ("stdout-" + $suffix + ".txt")
     $stderr = Join-Path $tempRoot ("stderr-" + $suffix + ".txt")
-    $process = Start-Process -FilePath $EditorExe `
-        -ArgumentList "--commandlet-script", $commandFile `
+    $resultPath = Join-Path $tempRoot ("results-" + $suffix + ".jsonl")
+    $process = Start-Process -FilePath $EditorExe -WindowStyle Hidden `
+        -ArgumentList "--commandlet-script", "`"$commandFile`"", "--result-file", "`"$resultPath`"" `
         -WorkingDirectory $editorRuntimeDirectory `
         -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru
     if (-not $process.WaitForExit(120000)) {
@@ -345,8 +370,12 @@ function Invoke-Import([string]$suffix, [int]$ExpectedExitCode = 0) {
         } else { "" }
         throw "asset-authoring probe failed ($suffix): exit=$($process.ExitCode) expected=$ExpectedExitCode $errorText"
     }
+    $script:lastResults = @(Read-CommandResults $resultPath)
     return Get-Content -LiteralPath $stdout -Raw
 }
+
+$tagOriginal = $null
+$matrixOriginal = $null
 
 try {
     New-Item -ItemType Directory -Path $sourceDirectory -Force | Out-Null
@@ -596,14 +625,16 @@ try {
 
     # 충돌 행렬은 프로젝트 설정 자산이다. 값을 뒤집어 저장하고 파일에서 다시 읽어
     # 왕복을 확인한 뒤 원래 값으로 되돌린다 — 저장소 파일이 그대로여야 한다.
-    $matrixAsset = Join-Path $repoRoot "Dynamic_CPP\ProjectSetting\CollisionMatrix.asset"
+    $matrixAsset = Join-Path $repoRoot "Dynamic_CPP\ProjectSetting\Layers.celayers"
+    $matrixOriginal = [IO.File]::ReadAllBytes($matrixAsset)
     $matrixBefore = (Get-FileHash -LiteralPath $matrixAsset -Algorithm SHA256).Hash
     [IO.File]::WriteAllLines($commandFile, @(
         "collisionmatrix.authoring.probe"
         "quit"
     ))
     $matrixOutput = Invoke-Import "collisionmatrix-commit"
-    if ($matrixOutput -notmatch '\[collisionmatrix\.authoring\.probe\] committed roundtrip=ok restored=ok') {
+    $matrixResult = Get-CommandResult $script:lastResults "collisionmatrix.authoring.probe"
+    if ($matrixResult.status -ne "succeeded" -or -not $matrixResult.data.roundTrip -or -not $matrixResult.data.restored) {
         throw "CollisionMatrix authoring transaction did not round-trip through disk"
     }
     if ((Get-FileHash -LiteralPath $matrixAsset -Algorithm SHA256).Hash -ne $matrixBefore) {
@@ -619,10 +650,11 @@ try {
         "quit"
     ))
     $matrixEscapeOutput = Invoke-Import "collisionmatrix-escape"
-    if ($matrixEscapeOutput -notmatch '\[collisionmatrix\.authoring\.probe\] rejected') {
+    $matrixEscapeResult = Get-CommandResult $script:lastResults "collisionmatrix.authoring.probe"
+    if ($matrixEscapeResult.status -ne "succeeded" -or $matrixEscapeResult.message -ne "Escaping path rejected") {
         throw "CollisionMatrix destination outside the project setting root was not rejected"
     }
-    if (Test-Path -LiteralPath (Join-Path $foliageRoot "CollisionMatrix.asset")) {
+    if (Test-Path -LiteralPath (Join-Path $foliageRoot "Layers.celayers")) {
         throw "rejected CollisionMatrix transaction wrote outside the setting root"
     }
 
@@ -630,6 +662,9 @@ try {
     # 메모리 상태만 보게 되므로, 추가하고 정상 종료한 뒤 **다시 켜서** 확인해야
     # authoring handler 수명 창 안에서 저장됐음이 증명된다.
     $tagAsset = Join-Path $repoRoot "Dynamic_CPP\ProjectSetting\TagManager.asset"
+    $tagOriginal = [IO.File]::ReadAllBytes($tagAsset)
+    [IO.File]::WriteAllLines($commandFile, @("quit"))
+    $null = Invoke-Import "tag-baseline"
     $tagBefore = (Get-FileHash -LiteralPath $tagAsset -Algorithm SHA256).Hash
     $tagProbeName = "CE_TagProbe_" + $probeName.Substring($probeName.Length - 12)
 
@@ -698,6 +733,8 @@ try {
 	"asset authoring ownership: PASS (legacy .asset 캐시 미생성=PASS, 임베디드 추출 미생성=PASS, source intake=PASS, runtime reload=PASS, terrain transaction=PASS, foliage transaction=PASS, blackboard transaction=PASS, collision matrix=PASS, tag manager=PASS, input map=PASS, animator single-truth=PASS)"
 }
 finally {
+    if ($null -ne $matrixOriginal) { [IO.File]::WriteAllBytes($matrixAsset, $matrixOriginal) }
+    if ($null -ne $tagOriginal) { [IO.File]::WriteAllBytes($tagAsset, $tagOriginal) }
     $verifiedAssets = @()
     foreach ($target in $createdModelAssets) {
         $absoluteTarget = [IO.Path]::GetFullPath($target)

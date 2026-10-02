@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 // PHASE 3.75 MBC9 — 모델 자산의 씬 인스턴스화. legacy `Model`/`ModelLoader`
 // (Assimp 산물·역브리지)와 experiment 핸들이 은퇴하고, 씬에 세우는 정본 입력은
 // immutable `assets::ModelAssetGeneration` 하나다.
@@ -15,6 +15,8 @@
 #include <memory>
 #include <string>
 #include <chrono>
+#include <functional>
+#include "CollisionGeometrySource.h"
 #include "EntityHandle.h"
 
 class Entity;
@@ -25,9 +27,11 @@ namespace ModelSceneInstantiation
 {
     struct Options final
     {
-        // 메시 엔티티마다 RigidBody + MeshCollider를 붙인다(sidecar
-        // ModelImporter.CreateMeshCollider — DataSystem::ReadModelCreateMeshCollider).
+        // Worker prepares triangle values; the owner-thread host publishes/resolves a shared asset.
         bool createMeshCollider{ false };
+        std::function<ce::physics::result<ce::physics::geometry_asset_key>(
+            Scene&, std::uint32_t, const ce::physics::triangle_mesh_source&)> collisionGeometry;
+
     };
 
     // Prepare는 씬을 건드리지 않는다. 호출자는 작업 스레드에 COM을 초기화하고,

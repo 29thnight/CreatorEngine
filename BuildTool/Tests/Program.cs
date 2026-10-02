@@ -58,7 +58,16 @@ try
     File.WriteAllText(Path.Combine(project, "Assets/Script/Example.cs.meta"), "guid: 11111111-1111-4111-8111-111111111111");
     File.WriteAllText(Path.Combine(project, "Assets/Shader.hlsl"), "shader");
     File.WriteAllText(Path.Combine(project, "Assets/Shader.hlsl.meta"), "guid: 22222222-2222-4222-8222-222222222222");
+    File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "Dynamic_CPP", ProjectLayerAsset.RelativePath), Paths.Child(project, ProjectLayerAsset.RelativePath));
     var cookInput = Path.Combine(root, "cook-input"); PackageInputs.CopyProject(project, cookInput, CancellationToken.None);
+    var geometrySource = Paths.Child(cookInput, "Assets/Geometry/shape.cegeometry");
+    var geometryHistory = Paths.Child(cookInput, "Assets/Derived/CollisionGeometry/id/1.cegeometry");
+    var geometryArtifact = Paths.Child(cookInput, "Assets/Derived/CollisionGeometry/ab/asset.cepg");
+    foreach (var path in new[] { geometrySource, geometryHistory, geometryArtifact }) { Directory.CreateDirectory(Path.GetDirectoryName(path)!); File.WriteAllText(path, "payload"); }
+    File.WriteAllText(geometrySource + ".meta", "identity");
+    PackageInputs.RemoveGeometrySources(cookInput);
+    Check(!File.Exists(geometrySource) && !File.Exists(geometrySource + ".meta") && !File.Exists(geometryHistory), "Geometry source/history leaked into runtime package");
+    Check(File.Exists(geometryArtifact) && File.Exists(Path.Combine(project, "Assets/Shader.hlsl")), "Cooked geometry or original project altered by source cleanup");
     Check(!Directory.Exists(Path.Combine(cookInput, "Assets/Script")), "C# source identities leaked into native cook input");
     Check(File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl.meta")) && File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl")), "Runtime source identity was removed from cook input");
     Check(!PackageInputs.Excluded(Path.Combine(cookInput, "Assets/Derived/Models/ab/id/1/sidecar.meta")), "Cooked model sidecar was excluded from the package");

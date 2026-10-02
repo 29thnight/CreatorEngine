@@ -50,6 +50,43 @@ namespace ce
 		provider_render_us = 23,
 		provider_gc_us = 24,
 		provider_resources_us = 25,
+		physics_bodies = 26,
+		physics_shapes = 27,
+		physics_characters = 28,
+		physics_active_bodies = 29,
+		physics_active_shapes = 30,
+		physics_changed_bodies = 31,
+		physics_changed_shapes = 32,
+		physics_changed_characters = 33,
+		physics_commands_applied = 34,
+		physics_commands_failed = 35,
+		physics_commands_cancelled = 36,
+		physics_commands_queued = 37,
+		physics_events_stored = 38,
+		physics_required_events = 39,
+		physics_dropped_events = 40,
+		physics_contacts_stored = 41,
+		physics_required_contacts = 42,
+		physics_dropped_contacts = 43,
+		physics_unresolved_identities = 44,
+		physics_queries = 45,
+		physics_query_hits = 46,
+		physics_query_overflows = 47,
+		physics_workers = 48,
+		physics_tasks_submitted = 49,
+		physics_tasks_completed = 50,
+		physics_tasks_inline = 51,
+		physics_snapshot_buffers = 52,
+		physics_snapshot_buffers_in_use = 53,
+		physics_tick_buffer_bytes = 54,
+		physics_tick_buffer_peak_bytes = 55,
+		physics_query_scratch_peak_bytes = 56,
+		physics_step_failed = 57,
+		physics_command_rejections = 58,
+		physics_command_overflows = 59,
+		physics_max_command_wait_ticks = 60,
+
+
 	};
 
 	// Descriptors are copied into each capture. Runtime providers may register
@@ -57,7 +94,7 @@ namespace ce
 	enum class counter_category : std::uint32_t
 	{
 		process = 1u << 0, gpu = 1u << 1, network = 1u << 2,
-		render = 1u << 3, managed = 1u << 4, resources = 1u << 5,
+		render = 1u << 3, managed = 1u << 4, resources = 1u << 5, physics = 1u << 6,
 	};
 	using counter_mask = std::uint32_t;
 	constexpr counter_mask counter_bit(counter_category category)
@@ -81,6 +118,7 @@ namespace ce
 	{
 		profile_counter_id id{};
 		double value = 0.0;
+		cpu_span_context cpu; // Counter identity is (id, session, tick, task); zero is the legacy frame gauge.
 	};
 	// 봉인된 producer 페이지를 그대로 참조한다. 프레임을 얼릴 때는 페이지
 	// 참조와 작은 인덱스만 복사한다. 파일에서 읽은 이벤트는 owned 구간에

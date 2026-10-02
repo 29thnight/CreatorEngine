@@ -789,6 +789,20 @@ $mutations = @(
         Why    = '리드백 실패가 Collector에서 사라지면 GPU 구간 누락을 구분할 수 없다'
     },
     @{
+        Name   = 'owned-counter-merge-loses-tick'
+        File   = 'ProfileCapture.cpp'
+        Old    = 'existing.cpu.tick == sample.cpu.tick &&'
+        New    = 'true &&'
+        Expect = 'owned-counter/merge'
+    },
+    @{
+        Name   = 'owned-counter-file-loses-tick'
+        File   = 'ProfileCaptureFile.cpp'
+        Old    = 'out.put(sample.cpu.tick);'
+        New    = 'out.put(std::uint64_t{0});'
+        Expect = 'owned-counter/roundtrip'
+    },
+    @{
         Name   = 'counter-registry-disabled-render'
         File   = 'ProfileCapture.cpp'
         Old    = 'if (number >= 6 && number <= 11) return counter_bit(counter_category::render);'
@@ -808,6 +822,24 @@ $mutations = @(
 
 # ★ 고른 것이 하나도 없으면 붉다. 오타 난 이름이 "변이 0 개 통과" 로 읽히면
 #   검사를 안 한 것이 통과로 남는다.
+$mutations += @(
+    @{
+        Name = 'cpu-context-loses-owner'
+        File = 'ProfileThreadStream.cpp'
+        Old = 'scope.cpu = cpu;'
+        New = '(void)cpu; scope.cpu = {};'
+        Expect = 'context/identity'
+        Why = 'Scope ownership must survive until completion and freeze.'
+    },
+    @{
+        Name = 'cpu-context-file-swaps-identity'
+        File = 'ProfileCaptureFile.cpp'
+        Old = 'out.put(value.cpu.session);'
+        New = 'out.put(value.cpu.tick);'
+        Expect = 'context/file/event-fields'
+        Why = 'Session and tick are independent 64-bit identities.'
+    }
+)
 $mutationTotal = $mutations.Count
 if ($Only.Count -gt 0) {
     $mutations = @($mutations | Where-Object {

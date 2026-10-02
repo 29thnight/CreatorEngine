@@ -1,4 +1,4 @@
-namespace CreatorEngine;
+﻿namespace CreatorEngine;
 
 /// <summary>
 /// 네이티브 컴포넌트를 가리키는 얇은 래퍼의 기반.
@@ -54,6 +54,13 @@ internal static class NativeComponentTable
         [typeof(Transform)]      = new(handle => new Transform      { OwnerHandle = handle }, Native.HasTransform),
 
         [typeof(SoundComponent)] = new(handle => new SoundComponent { OwnerHandle = handle }, Native.HasSoundComponent),
+        [typeof(PhysicsBodyComponent)] = new(handle => new PhysicsBodyComponent { OwnerHandle = handle, NativeInstance = Native.BodyFind(handle) },
+            handle => Native.BodyFind(handle) != 0),
+
+        [typeof(CharacterMovementComponent)] = new(handle => new CharacterMovementComponent
+            { OwnerHandle = handle, NativeInstance = Native.CharacterFind(handle) },
+            handle => Native.CharacterFind(handle) != 0),
+
         [typeof(Animator)]       = new(handle => new Animator       { OwnerHandle = handle }, Native.HasAnimator),
 
         // W2 — 저작 자산에 LightComponent 30건 · CameraComponent 20건이 있는데
@@ -63,9 +70,6 @@ internal static class NativeComponentTable
         [typeof(CameraComponent)] =
             new(handle => new CameraComponent { OwnerHandle = handle }, Native.CameraExists),
 
-        [typeof(CharacterControllerComponent)] =
-            new(handle => new CharacterControllerComponent { OwnerHandle = handle }, Native.HasCct),
-
         [typeof(RectTransformComponent)] =
             new(handle => new RectTransformComponent { OwnerHandle = handle }, Native.HasRect),
         [typeof(ImageComponent)] = new(handle => new ImageComponent { OwnerHandle = handle }, Native.HasImage),
@@ -74,18 +78,6 @@ internal static class NativeComponentTable
         [typeof(UIButton)]       = new(handle => new UIButton       { OwnerHandle = handle }, Native.HasButton),
         [typeof(MeshRenderer)]   = new(handle => new MeshRenderer   { OwnerHandle = handle }, Native.HasMesh),
 
-        [typeof(RigidBodyComponent)] =
-            new(handle => new RigidBodyComponent { OwnerHandle = handle }, Native.HasRigid),
-
-        [typeof(SphereColliderComponent)] = new(
-            handle => new SphereColliderComponent { OwnerHandle = handle },
-            handle => Native.HasCollider(handle, (int)ColliderKind.Sphere)),
-        [typeof(BoxColliderComponent)] = new(
-            handle => new BoxColliderComponent { OwnerHandle = handle },
-            handle => Native.HasCollider(handle, (int)ColliderKind.Box)),
-        [typeof(CapsuleColliderComponent)] = new(
-            handle => new CapsuleColliderComponent { OwnerHandle = handle },
-            handle => Native.HasCollider(handle, (int)ColliderKind.Capsule)),
     };
 
     public static Entry? Find(Type type) => _entries.TryGetValue(type, out var entry) ? entry : null;

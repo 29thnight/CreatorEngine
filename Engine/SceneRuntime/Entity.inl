@@ -22,6 +22,8 @@ inline T* Entity::AddComponent()
     // K2 스테이지 A: make_shared → make_unique. push_back으로 소유권을
     // 옮기기 전에 raw 포인터를 먼저 뽑아둔다 — move 후에는 로컬 component가
     // null이라 이후 줄에서 쓸 수 없다.
+    if (!CanAttachComponentType(TypeTrait::GUIDCreator::GetTypeID<T>())) return nullptr;
+
     std::unique_ptr<T> component = std::make_unique<T>();
     T* rawComponent = component.get();
     AttachComponentLifecycle(rawComponent);
@@ -45,6 +47,8 @@ inline T* Entity::AddComponent(Args && ...args)
     {
         return nullptr;
     }
+
+    if (!CanAttachComponentType(TypeTrait::GUIDCreator::GetTypeID<T>())) return nullptr;
 
     std::unique_ptr<T> component = std::make_unique<T>(std::forward<Args>(args)...);
     T* rawComponent = component.get();

@@ -78,7 +78,7 @@ public abstract class Component
     /// 6단계에서 드라이버를 네이티브 하나로 모은 것과 같은 이유다
     /// (ScriptLifecyclePhase.h 상단).
     /// </summary>
-    public bool Enabled
+    public virtual bool Enabled
     {
         get => _enabled;
         set

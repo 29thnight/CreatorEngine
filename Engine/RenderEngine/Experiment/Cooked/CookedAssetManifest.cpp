@@ -72,6 +72,7 @@ namespace experiment::cooked
             case CookedAssetKind::Scene:
             case CookedAssetKind::Prefab:
             case CookedAssetKind::AudioClip:
+            case CookedAssetKind::CollisionGeometry:
             case CookedAssetKind::MaterialProgram:
                 return true;
             }
@@ -301,10 +302,11 @@ namespace experiment::cooked
                 if ((entry.kind == CookedAssetKind::AudioClip
                      && entry.formatVersion != kAudioClipArtifactVersion) ||
                     (entry.kind == CookedAssetKind::MaterialProgram
-                     && entry.formatVersion != kMaterialProgramArtifactVersion))
+                     && entry.formatVersion != kMaterialProgramArtifactVersion) ||
+                    (entry.kind == CookedAssetKind::CollisionGeometry && entry.formatVersion != 1u))
                 {
                     AddIssue(issues, context + ".formatVersion",
-                        "지원하지 않는 audio/material program artifact version이다.");
+                        "지원하지 않는 audio/material program/collision geometry artifact version이다.");
                     valid = false;
                 }
                 if (!HasDigest(entry.contentSha256))

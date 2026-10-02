@@ -9,11 +9,10 @@ PrefabNode:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 1
-    m_collisionType: 0
     m_prefabFileGuid: 55ba5466-65ef-4cba-94ee-9ef0e81d74a5
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_components:
       - Transform: 13979161094353040123
         m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d

@@ -4,6 +4,9 @@
 #include "Texture.h"
 #include "../EditorDiagnostics.h"
 #include "../EditorProjectOperations.h"
+#include "../EditorObjectOperations.h"
+#include "../EditorProjectLayerSettings.h"
+#include "../CollisionGeometryAuthoring.h"
 // LC6 (PHASE 14.5) — AssetAuthoring 도메인 명령.
 //
 // `assets.*` · `asset.*` · `material.*` · `model.*` · `terrain.*` · `foliage.*` ·
@@ -163,6 +166,143 @@
 
 namespace ConsoleCmd
 {
+    class GeometryRevisionCommand final : public Meta::IUndoableCommand
+    {
+      public:
+        GeometryRevisionCommand(file::path destination, ce::physics::CollisionGeometrySource before, ce::physics::CollisionGeometrySource after)
+            : m_destination(std::move(destination)), m_edit(std::move(before), std::move(after)),
+              m_root(file::canonical(PathFinder::Relative())), m_project(SceneManagers->ProjectLayers()) {}
+
+        void Undo() override { m_edit.Undo([&](const auto& expected, const auto& source) { Apply(expected, source); }); }
+        void Redo() override { m_edit.Redo([&](const auto& expected, const auto& source) { Apply(expected, source); }); }
+
+      private:
+        void Apply(const ce::physics::CollisionGeometrySource& expected,
+                   const ce::physics::CollisionGeometrySource& source)
+        {
+            const auto project = m_project.lock();
+            Scene* scene = SceneManagers->GetActiveScene();
+            if (!project || project != SceneManagers->ProjectLayers() || !scene || SceneManagers->IsPlayCommitted() ||
+                file::canonical(PathFinder::Relative()) != m_root)
+                throw std::runtime_error("Geometry Undo target is not an idle active project");
+
+            const auto published = scene->PublishCollisionGeometry(source, [&](auto) {
+                return EditorAssetDatabase::Get().ReplaceCollisionGeometry(m_destination, expected, source);
+            });
+            if (!published)
+                throw std::runtime_error("Geometry revision publication failed or edit is stale");
+        }
+
+        file::path m_destination;
+        Editor::CollisionGeometryRevisionEdit m_edit;
+        file::path m_root;
+        std::weak_ptr<ProjectLayerSettings> m_project;
+    };
+
+    static CommandCore::CommandResult Cmd_geometry_update(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        using namespace ce::physics;
+        if (ctx.parts.size() != 4)
+            return InvalidArguments("geometry.update <asset-relative.cegeometry> <convex|mesh|heightfield> <input.txt>");
+
+        const file::path relative(ctx.parts[1]);
+        if (relative.is_absolute() || relative.has_root_path() || relative.extension() != ".cegeometry")
+            return InvalidArguments("Geometry destination must be an Assets-relative native asset");
+
+        const auto destination = PathFinder::Relative() / relative;
+        auto before = Editor::ReadCollisionGeometrySource(destination);
+        if (!before) return InvalidArguments("Existing geometry source is invalid");
+
+        auto revision = Editor::CollisionGeometryAuthoring::NextRevision(PathFinder::Relative(), before->key);
+        if (!revision) return Fail("geometry.revision_failed", "Cannot allocate next immutable revision");
+
+        std::ifstream input(file::path(ctx.parts[3]), std::ios::binary | std::ios::ate);
+        const auto size = input ? input.tellg() : std::streampos{-1};
+        if (size <= 0 || size > static_cast<std::streamoff>(CollisionGeometryCodec::max_bytes))
+            return InvalidArguments("Geometry text input missing or too large");
+
+        std::string text(static_cast<std::size_t>(size), '\0');
+        input.seekg(0);
+        if (!input.read(text.data(), static_cast<std::streamsize>(text.size())))
+            return Fail("geometry.read_failed", "Geometry text input read failed");
+
+        auto after = Editor::ParseCollisionGeometry(text, ctx.parts[2], {before->key.asset, *revision});
+        if (!after) return InvalidArguments("Invalid geometry input");
+
+        try
+        {
+            Meta::UndoManager::GetInstance()->Execute(
+                std::make_unique<GeometryRevisionCommand>(destination, *before, *after));
+        }
+        catch (const std::exception& error)
+        {
+            return Fail("geometry.update_failed", error.what());
+        }
+
+        auto data = CommandData::Object();
+        data.Set("uuid", CommandData::String(Uuid::ToString(after->key.asset)));
+        data.Set("revision", CommandData::String(std::to_string(after->key.revision)));
+        return Ok({}, std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_geometry_create(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        using namespace ce::physics;
+        if (ctx.parts.size() != 4)
+            return InvalidArguments("geometry.create <asset-relative.cegeometry> <convex|mesh|heightfield> <input.txt>");
+
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene || SceneManagers->IsPlayCommitted())
+            return Fail("geometry.authoring_unavailable", "Geometry creation requires an idle Editor scene");
+
+        const file::path relative(ctx.parts[1]);
+        if (relative.is_absolute() || relative.has_root_path())
+            return InvalidArguments("Geometry destination must be relative to Assets");
+
+        std::ifstream input(file::path(ctx.parts[3]), std::ios::binary | std::ios::ate);
+        const auto size = input ? input.tellg() : std::streampos{-1};
+        if (size <= 0 || size > static_cast<std::streamoff>(CollisionGeometryCodec::max_bytes))
+            return InvalidArguments("Geometry text input missing or too large");
+
+        std::string text(static_cast<std::size_t>(size), '\0');
+        input.seekg(0);
+        if (!input.read(text.data(), static_cast<std::streamsize>(text.size())))
+            return Fail("geometry.read_failed", "Geometry text input read failed");
+
+        const auto guid = FileGuid::CreateRandomV4();
+        auto source = Editor::ParseCollisionGeometry(text, ctx.parts[2], {guid.m_guid, 1});
+        if (!source)
+            return InvalidArguments("Invalid geometry input: counts, values, or trailing data");
+
+        const auto destination = PathFinder::Relative("") / relative;
+        auto published = scene->PublishCollisionGeometry(*source, [&](std::span<const std::byte>) {
+            return EditorAssetDatabase::Get().CreateCollisionGeometry(destination, *source);
+        });
+        if (!published)
+            return Fail("geometry.create_failed", "Geometry cook or atomic publication failed; destination may already exist");
+
+        bool catalogRegistered = true;
+        try
+        {
+            DataSystems->ApplyAssetChange({RuntimeAssetChangeKind::CatalogUpsert,
+                RuntimeAssetType::Auto, guid, destination});
+        }
+        catch (...)
+        {
+            // Durable source/cache committed; watcher can retry registration.
+            catalogRegistered = false;
+        }
+
+        auto data = CommandData::Object();
+        data.Set("path", CommandData::String(destination.string()));
+        data.Set("uuid", CommandData::String(guid.ToString()));
+        data.Set("revision", CommandData::Int(1));
+        data.Set("catalogRegistered", CommandData::Bool(catalogRegistered));
+        return Ok({}, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_model_load(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -566,6 +706,45 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("tag.list accepts no arguments");
         return EditorProjectOperations::Tags();
     }
+    static CommandCore::CommandResult Cmd_layer_list(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1) return CommandCore::InvalidArguments("layer.list");
+        return EditorProjectOperations::Layers();
+    }
+    static CommandCore::CommandResult Cmd_layer_add(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("layer.add <name>");
+        return EditorProjectOperations::AddLayer(ctx.parts[1]);
+    }
+    static CommandCore::CommandResult Cmd_layer_rename(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("layer.rename <name> <replacement>");
+        return EditorProjectOperations::RenameLayer(ctx.parts[1], ctx.parts[2]);
+    }
+    static CommandCore::CommandResult Cmd_layer_collision(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 4 || (ctx.parts[3] != "true" && ctx.parts[3] != "false"))
+            return CommandCore::InvalidArguments("layer.collision <left> <right> <true|false>");
+        const auto project = SceneManagers->ProjectLayers();
+        if (!project) return CommandCore::PreconditionFailed("layer.unbound", "Project layers are not bound");
+        const auto snapshot = project->Snapshot();
+        const auto* left = snapshot->catalog.Find(ctx.parts[1]);
+        const auto* right = snapshot->catalog.Find(ctx.parts[2]);
+        if (!left || !right) return CommandCore::InvalidArguments("Unknown collision layer");
+        return EditorProjectOperations::SetCollision(left->id, right->id, ctx.parts[3] == "true");
+    }
+    static CommandCore::CommandResult Cmd_entity_layer(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3) return CommandCore::InvalidArguments("entity.layer <entity> <layer>");
+        auto* entity = Entity::Find(ctx.parts[1]);
+        const auto project = SceneManagers->ProjectLayers();
+        if (!entity || !project) return CommandCore::PreconditionFailed("layer.target_missing", "Entity or layers not found");
+        const auto snapshot = project->Snapshot();
+        const auto* layer = snapshot->catalog.Find(ctx.parts[2]);
+        if (!layer) return CommandCore::InvalidArguments("Unknown layer name");
+        return EditorObjectOperations::SetEntityLayer(entity->GetScene()->HandleOf(entity->m_index), layer->id);
+    }
+
     static CommandCore::CommandResult Cmd_tag_add(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() != 2) return CommandCore::InvalidArguments("tag.add <name>");
@@ -589,57 +768,35 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_collisionmatrix_authoring_probe(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "escape")) return InvalidArguments("collisionmatrix.authoring.probe [escape]");
-        const bool escape = ctx.parts.size() >= 2 && ctx.parts[1] == "escape";
-        if (escape)
+        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "escape"))
+            return InvalidArguments("collisionmatrix.authoring.probe [escape]");
+        const auto project = SceneManagers->ProjectLayers();
+        if (!project) return PreconditionFailed("layer.unbound", "Project layers are not bound");
+        const auto before = project->Snapshot();
+        if (ctx.parts.size() == 2)
         {
+            const auto encoded = ce::layers::ProjectLayerSettingsCodec::Encode(*before);
+            if (!encoded) return Fail("layer.encode_failed", "Cannot encode project layers");
             UncatalogedAuthoringRequest request{};
-            request.destinationPath =
-                PathFinder::Relative("Foliage") / "CollisionMatrix.asset";
-            request.payload = "0:\n  0: true\n";
-            const bool written = AssetAuthoringPort::WriteCollisionMatrix(request);
-            std::printf("[collisionmatrix.authoring.probe] %s\n",
-                written ? "committed" : "rejected");
-            auto data = CommandData::Object(); data.Set("written", CommandData::Bool(written));
-            return !written ? Ok("Escaping path rejected", std::move(data)) : Fail("authoring.escape_accepted", "Escaping path was accepted", std::move(data));
+            request.destinationPath = PathFinder::Relative("Foliage") / ProjectLayerSettingsIO::filename;
+            request.payload.assign(reinterpret_cast<const char*>(encoded->data()), encoded->size());
+            const bool written = AssetAuthoringPort::WriteLayerSettings(request);
+            return !written ? Ok("Escaping path rejected") : Fail("authoring.escape_accepted", "Escaping path accepted");
         }
-
-        auto matrix = PhysicsManagers->GetCollisionMatrix();
-        if (matrix.size() < 2 || matrix[0].size() < 2)
-        {
-            std::printf("[collisionmatrix.authoring.probe] rejected matrix=%zu\n",
-                matrix.size());
-            return PreconditionFailed("collisionmatrix.coverage_missing", "Collision matrix requires at least two layers");
-        }
-
-        const uint8_t before = matrix[0][1];
-        matrix[0][1] = before ? 0 : 1;
-        PhysicsManagers->SetCollisionMatrix(matrix);
-        if (!PhysicsManagers->SaveCollisionMatrix())
-        {
-            std::printf("[collisionmatrix.authoring.probe] rejected\n");
-            matrix[0][1] = before; PhysicsManagers->SetCollisionMatrix(matrix);
-            return Fail("collisionmatrix.save_failed", "Collision matrix save failed");
-        }
-
-        // 메모리를 되돌린 뒤 파일에서 다시 읽는다. 디스크를 실제로 거치지 않았다면
-        // 여기서 뒤집힌 값이 돌아오지 않는다.
-        matrix[0][1] = before;
-        PhysicsManagers->SetCollisionMatrix(matrix);
-        PhysicsManagers->LoadCollisionMatrix();
-        const uint8_t reloaded = PhysicsManagers->GetCollisionMatrix()[0][1];
-
-        // 저장소의 CollisionMatrix.asset을 원래대로 돌려놓는다.
-        matrix[0][1] = before;
-        PhysicsManagers->SetCollisionMatrix(matrix);
-        const bool restored = PhysicsManagers->SaveCollisionMatrix();
-
-        std::printf("[collisionmatrix.authoring.probe] committed roundtrip=%s restored=%s\n",
-            reloaded != before ? "ok" : "mismatch", restored ? "ok" : "failed");
+        const auto* second = before->catalog.definitions[1] ? &*before->catalog.definitions[1] : nullptr;
+        if (!second || second->retired) return PreconditionFailed("layer.coverage_missing", "Requires two active layers");
+        const auto first = ce::layers::default_layer;
+        const bool allowed = before->policy.Allows(before->catalog.Find(first)->slot, second->slot);
+        const auto changed = EditorProjectOperations::SetCollision(first, second->id, !allowed);
+        if (!changed.IsSuccess()) return changed;
+        const auto reloaded = ProjectLayerSettingsIO::Read(PathFinder::ProjectSettingPath(ProjectLayerSettingsIO::filename));
+        const bool matched = reloaded && reloaded->policy.Allows(before->catalog.Find(first)->slot, second->slot) != allowed;
+        const auto restored = EditorProjectOperations::SetCollision(first, second->id, allowed);
         auto data = CommandData::Object();
-        data.Set("roundTrip", CommandData::Bool(reloaded != before));
-        data.Set("restored", CommandData::Bool(restored));
-        return reloaded != before && restored ? Ok({}, std::move(data)) : Fail("collisionmatrix.authoring.failed", "Commandlet verification failed", std::move(data));
+        data.Set("roundTrip", CommandData::Bool(matched));
+        data.Set("restored", CommandData::Bool(restored.IsSuccess()));
+        return matched && restored.IsSuccess() ? Ok({}, std::move(data))
+            : Fail("collisionmatrix.authoring.failed", "Layer policy roundtrip failed", std::move(data));
     }
 
 	// Blackboard는 Foliage와 달리 실제 runtime 타입의 직렬화 경로를 그대로 태운다.
@@ -1843,6 +2000,13 @@ namespace ConsoleCmd
         reg.Result({ "material.corpus.probe" }, &Cmd_material_corpus_probe);
         reg.Result({ "tag.list" }, &Cmd_tag_list);
         reg.Result({ "tag.has" }, &Cmd_tag_has);
+        reg.Result({ "layer.list" }, &Cmd_layer_list);
+        reg.Result({ "geometry.create" }, &Cmd_geometry_create);
+        reg.Result({ "geometry.update" }, &Cmd_geometry_update);
+        reg.Result({ "layer.add" }, &Cmd_layer_add);
+        reg.Result({ "layer.rename" }, &Cmd_layer_rename);
+        reg.Result({ "layer.collision" }, &Cmd_layer_collision);
+        reg.Result({ "entity.layer" }, &Cmd_entity_layer);
         reg.Result({ "tag.add" }, &Cmd_tag_add);
         reg.Result({ "tag.remove" }, &Cmd_tag_remove);
         reg.Result({ "inputmap.authoring.probe" }, &Cmd_inputmap_authoring_probe);

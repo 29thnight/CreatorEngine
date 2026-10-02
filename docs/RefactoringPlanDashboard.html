@@ -1292,12 +1292,13 @@
 
 <!-- ===== PHASE 19 ===== -->
 <section class="phase" id="phase-19">
-  <h2 class="sec"><span class="no">PHASE 19</span>물리 재설계 (컴포넌트·백엔드·스레딩 전면 재작성) <span class="phase-pct" data-phase-pct="19"></span></h2>
-  <div class="phase-meta">신설: 2026-08-18 · 설계 문서: <a href="plans/PhysicsRedesignPlan.md">PhysicsRedesignPlan.md</a> · 순서 제약: B2는 <a href="plans/archive/SceneGraphRedesignPlan.md">SceneGraph</a> 트랙 S(Transform 컴포넌트화) 확정 후 권장 · M2는 <a href="plans/SerializationPlan.md">직렬화</a> 마이그레이션에 등록 · 공수는 계획 추정치</div>
-  <div class="phase-goal"><b>목표:</b> 물리 계층 ~9,500줄을 기존 설계를 남기지 않고 재작성한다. 소유권 4분할 · 오브젝트당 콜라이더 1개 제약 ·
-  전량 푸시/풀 · 핫패스 <code>dynamic_cast</code> · 콜라이더의 RigidBody 필수 의존 · PhysX 헤더 전역 전이를 전부 뒤집는다.
-  실측 결론: <b>병렬화의 선결조건은 스레드가 아니라 자료구조다</b> — <code>unordered_map</code> 순회 + 원소마다 RTTI + 원소마다 <code>GetComponent</code> 위에는 어떤 스레딩 전략도 못 얹는다.
-  백엔드 교체(PhysX → Jolt)는 말이 아니라 스파이크 벤치(트랙 X)가 판정한다. 트랙 Z(지혈)는 재작성 일정과 무관하게 <b>순서 밖 최우선</b> — AI 스레드 데이터 레이스가 지금 보호 없이 열려 있다.</div>
+  <h2 class="sec"><span class="no">PHASE 19</span>C++23 PhysX API · 물리 빅뱅 재작성 <span class="phase-pct" data-phase-pct="19"></span></h2>
+  <div class="phase-meta">개정: 2026-10-01 · <a href="plans/PhysicsRedesignPlan.md">실행 계획</a> · <a href="design/PhysicsComponentDesign.md">컴포넌트 설계</a> · 순서: P0 → R0 → P1~P3 → B0/L0 → B/C/T → M · M1은 <a href="plans/SerializationPlan.md">직렬화</a> 이전 · 고정 틱은 PHASE 20 N3와 계약 조정 · 계획 공수 72인일(1인일=8시간, 검증 포함) · 위험 여유 별도 14~22인일 · 실제 소요시간 아님</div>
+  <div class="phase-goal"><b>목표:</b> 기존 PhysX 계층·컴포넌트·배선을 제거하고 새 API와 모든 소비자를 <b>하나의 빅뱅 변경</b>으로 완결한다. 병렬 배선·호환 어댑터·구 경로 fallback·선택 스위치는 없다. 삭제 전 기준선과 스키마 corpus를 보존하고 작업 중 미빌드를 허용하되 최종 제품 게이트는 전항 통과해야 한다.<br>
+  <b>API 선행:</b> RAII·expected 합성·강한 핸들·variant 명령·concepts·deducing this·mdspan·pmr를 계약에 적용한다. <b>ranges는 기본 선택</b>이며 <b>Mathematics view는 비핫패스에서 적극 도입</b>한다. P1~P3가 컴포넌트/실행 이전의 하드 선행이다.<br>
+  <b>구조:</b> PhysicsScene · PhysicsBodyComponent · CharacterMovementComponent · CollisionGeometry · ShapeInstance. 저작 친숙함 대신 완결된 바디 정의·단일 소유권·공유 형상·변경량 기반 처리를 우선한다.<br>
+  <b>계측 필수:</b> API 구현과 동시에 프로파일러 실행 계층과 PhysX 워커를 배선한다. 커맨드·캐릭터·쿼리·결과·이벤트·스냅샷, submit/solver/fetch 대기와 FrameId/PhysicsTickId/task 연관을 실제 캡처에서 구분한다. 전체 시간 stopwatch 하나로 완료 판정하지 않는다.<br>
+  <b>범위:</b> PhysX 유지. Jolt 도입·비교·어댑터는 미래 계획으로 이번 범위에서 제외한다. 물리 전용 스레드는 도입하지 않고 실제 계측 후 별도 판단한다. 기존 Z 결함은 새 API의 정확성·수명 회귀 조건에 흡수한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="19"><!-- JS 생성 --></table></div>
 </section>
 
@@ -2592,98 +2593,30 @@ const TASKS = [
     detail: "소비자 전원이 이미 Type*를 쥔 채 typeID로 되돌아 조회하던 구조 — Type이 create/createShared를 직접 들어 컴포넌트 생성 핫패스의 해시 조회 0회화. 등록 싱글턴은 Registry 하나만 잔존.",
     refs: "ReflectionRedesignPlan CT11", priority: "P1", days: 0.5, status: "done", note: "" },
 
-  // ---------- PHASE 19: 물리 재설계 ----------
-  // 트랙 Z — 지혈 (순서 밖 최우선, 재설계와 무관하게 지금 값이 있다)
-  { phase: 19, id: "Z0", title: "AI 스레드 ↔ 물리 데이터 레이스 차단",
-    detail: "Scene.cpp:1271이 std::async로 AI를 띄우고 :1135가 wait_for(0s)==ready일 때만 회수한다 — 안 끝났으면 기다리지 않고 물리 스텝으로 진행. 그런데 BT 액션이 AI 스레드에서 CharacterControllerComponent::Move()·StopForcedMove()→Physics->StopForcedMoveOnCCT()로 PhysicX 컨테이너를 직접 변경한다. sceneDesc에 eREQUIRE_RW_LOCK 없음. 물리 스텝 전 무조건 join 또는 커맨드 큐 경유로 전환.",
-    refs: "PhysicsRedesignPlan Z-①", priority: "P0", days: 1, status: "todo", note: "" },
-  { phase: 19, id: "Z1", title: "CollisionData 누수 봉합",
-    detail: "new CollisionData() 4곳(Physx.cpp:359,957,995,1656)의 delete가 생성 실패 경로에만 있다. 성공 경로는 맵에서 erase만 하고 해제하지 않음 — 바디마다 하나씩 씬 전환마다 누적. unique_ptr 컨테이너로 전환.",
-    refs: "PhysicsRedesignPlan Z-②", priority: "P0", days: 0.5, status: "todo", note: "" },
-  { phase: 19, id: "Z2", title: "GetRigidBodyData static 분기 널 역참조",
-    detail: "Physx.cpp:1124 — staticBody 분기 안에서 dynamicBody->GetScale() 호출. 그 시점 dynamicBody는 반드시 nullptr. 현재 GetPhysicData가 DYNAMIC만 호출해 안 터지고 있을 뿐인 지뢰.",
-    refs: "PhysicsRedesignPlan Z-③", priority: "P0", days: 0.5, status: "todo", note: "" },
-  { phase: 19, id: "Z3", title: "CUDA 폴백 부재 + createScene 널 미검사",
-    detail: "CUDA 초기화 실패 시 m_cudaContextManager만 null로 두고 eENABLE_GPU_DYNAMICS·broadPhaseType=eGPU 플래그는 그대로 남긴 채 'continuing without CUDA' 로그만 찍는다. 게다가 createScene 반환을 널 검사 없이 PxCreateControllerManager(*m_scene)에 역참조 — 실패가 곧 크래시다.",
-    refs: "PhysicsRedesignPlan Z-④", priority: "P0", days: 0.5, status: "todo", note: "" },
-  { phase: 19, id: "Z4", title: "솔버 워커 8 하드캡 해제",
-    detail: "Physx.cpp:165-172의 임의 산식(12 초과면 무조건 8)이 32스레드 워크스테이션에서도 8개만 쓰게 한다. hardware_concurrency 기반으로 정정하고 개선 폭을 PhysicsDrop 씬으로 실측 기록(X0 기준선 겸함).",
-    refs: "PhysicsRedesignPlan Z-⑤", priority: "P0", days: 0.5, status: "todo", note: "" },
-  { phase: 19, id: "Z5", title: "AngularDamping 직렬화 누락 정정",
-    detail: "RigidBodyComponent::reflect()에 LinearDamping은 있는데 AngularDamping이 빠져 있다 — 인스펙터에서 각 감쇠를 조정해도 저장되지 않고 로드 시 기본값 0.05로 되돌아온다. 한 줄 누락이고 저작 데이터가 지금 조용히 유실되는 중. B4가 스키마를 다시 쓰지만 그때까지 계속 잃는다.",
-    refs: "PhysicsRedesignPlan Z-⑥", priority: "P1", days: 0.25, status: "todo", note: "" },
+  // ---------- PHASE 19: C++23 PhysX API 선행 재작성 ----------
+  // 2026-10-01 범위 개정: Jolt는 미래 계획. P0/P1 증거로 공통 레이어 L0 포함 기본 공수 72인일 재산정; 위험 여유는 별도.
+  {phase: 19, id: "P0", title: "PhysX API 계약·기준선", detail: "SDK 판본, 소비자·생명주기·단위·스레드·지원 형상과 CPU 기준선을 확정. 삭제 전 기준선·스키마 corpus 보존과 C++23 기능 compile probe. 고정 tick·커맨드 적용 tick·AI 결과 마감·쿼리 창·워커 예산과 profiler 계층/카운터 계약을 확정.", refs: "PhysicsRedesignPlan P0 · PhysicsAPIContract", priority: "P0", days: 2, status: "done", note: "2026-10-01: C++23/Mathematics view Debug·Release 실행, PhysX CPU reference, 기존 Physics Debug·Release 재빌드 및 source/corpus hash snapshot 확보. HEAD Editor Release 빌드·HTTP 물리 씬/prefab 저작·저장/재로드·강체 낙하·stop pose 복원 통과. CCT+구 rigid 의존 구성에서 하강·강체 off/on·prefab 인스턴스·컴포넌트/엔티티 삭제 검증. P0 최소 기준선 완료. RHI freeze는 사용자 지시로 별도 backlog; 포괄 기능 gate는 M 잔여. SDK 수치는 제품 성능이 아님."},
+  {phase: 19, id: "R0", title: "기존 물리 계층·배선 제거", detail: "PhysicX/PhysicsManager/구 래퍼·컴포넌트·전역 접근자 제거. 작업 중 제품 미빌드 허용; 새 API와 소비자를 하나의 변경으로 완결.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 2, status: "progress", note: "2026-10-01: 구 구현 55파일/프로젝트/CUDA 편입·타입 등록·bootstrap 제거, hash backup 대조 및 Owners gate 통과. 소비자 12파일 미이전으로 Complete gate/제품 빌드 실패. 새 API P1~P3 및 B/C/T/M 교체 후 전체 gate 확정."},
+  {phase: 19, id: "P1", title: "C++23 PhysX API 기반", detail: "RAII release 소유권, expected 오류/rollback, 강한 핸들, PhysicsScene 수명과 CPU 초기화. ranges 기본 선택, Mathematics view 비핫패스 적극 적용. expected monadic 합성·nodiscard·typed variant 명령·concepts/deducing this·mdspan·pmr. profiler marker/thread stream 동시 배선.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 3, status: "done", note: "2026-10-01 CPU/GPU API 기반 완료. Debug/Release 모듈 빌드 및 각 402 checks/4160 CPU SDK tasks 통과; RTX 2080 Ti GPU 초기화/10 step/in-flight 종료 확인. CUDA 실패·GPU 씬 거부 후 GPU 설정 없는 CPU 전환 검증. Shipping 4 checks/51 tasks, 진단 의존 없음. GPU 실제 바디/cook/성능은 P2/M, live idle freeze·tick/task 계층은 P3. 제품 전체 빌드는 소비자 이전 대기."},
+  {phase: 19, id: "P2", title: "바디·형상·cook·쿼리 API", detail: "완결된 바디와 ShapeInstance, 공유 CollisionGeometry, shape별 sensor/filter, 실제 충돌/쿼리. ranges 기반 검증/cook 입력과 Mathematics view의 비핫패스 활용.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 7, status: "done", note: "2026-10-01 새 API 구현. static/kinematic/dynamic·compound·재질/sensor/filter·cook 공유·O(1) generational slots·raycast/sweep/overlap. Debug/Release/ASan 각 1065 checks, Shipping 진단 의존 없이 366 checks; CPU/RTX 2080 Ti GPU 실제 접촉·query·overflow 70 hits·rollback·핸들/공유 수명 검증. 모듈 빌드·P1 회귀 통과. cook/body/query capture complete=1/unacked=0/dropped=0. 제품 소비자/파일 이전·이벤트/CCT·tick/task는 후속."},
+  {phase: 19, id: "P3", title: "스텝·커맨드·이벤트·캐릭터 API", detail: "적용 tick, solver 콜백 동시성, body/shape 신원과 접촉점 수명, 저수준 CCT. B/C/T의 하드 선행. 커맨드·캐릭터·simulate 제출·fetch 대기·활성 pose·이벤트·스냅샷 계층과 tick/task 연관 노출.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 8, status: "done", note: "2026-10-01 저수준 API 범위 완료: step·소유 명령·접촉/센서·불변 스냅샷·capsule CCT·tick/task·35개 수치 counter와 Physics tick 그래프 배선. P3 3971×3/987, P1 35768×2/4, P2 1065×3/366 실제 CPU·GPU·ASan 통과. capture 79 frames/84 scene-ticks complete=1/drop=0. B0 착수 가능. 제품 고정 스케줄링·실제 UI·회귀/계측 비용은 B/T/M에서 검증."},
+  {phase: 19, id: "B0", title: "PhysicsBodyComponent·씬 연결", detail: "운동 종류·형상·질량·제약의 완결된 정의, 등록/해제 단일점.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 3, status: "progress", note: "2026-10-01 box baseline 컴포넌트/Scene 소유 세션/Play 준비·Stop drain·원래 문서·Transform·DDOL 복원과 실패 시 백업 보존 배선. Player 백업/복원 제외·Editor 전용 정책과 씬 재시작/DDOL 현재 속도 이송 배선. 독립 SDK CPU/GPU 4381×3/4377 및 제품/host 여섯 TU Debug 컴파일 통과. capture complete=1/drop=0. 구 소비자 10파일로 제품 빌드 미완료; 축 잠금 반사 저작·ReadState/SetVelocity/ApplyForce와 owner/idle/활성 검증 배선. 실제 에디터 HTTP Play/Stop 저장 왕복·씬 전환/DDOL·제약 저작 제품 게이트 잔여. 완료 판정 보류."},
+  {phase: 19, id: "L0", title: "공통 레이어·TagManager 책임 분리", detail: "LayerCatalog·SceneLayerIndex·PhysicsCollisionPolicy, 안정 ID와 0~31 slot, 단일 행렬·revision SDK 필터 적용. 기존 레이어 API/중복 Entity collisionType 제거와 파일/소비자 빅뱅 이전.", refs: "PhysicsRedesignPlan 공통 레이어 정리", priority: "P0", days: 4, status: "progress", note: "2026-10-01 Entity 안정 ID/Scene 핸들 소속과 TagManager tags-only 이전. 생성·로드·복제·프리팹/Undo·DDOL·슬롯 해제 연결, Inspector·단일 충돌 행렬·layer.* / entity.layer CLI, 저장 성공 후 pair 발행. 실제 22개 자산 74 Entity 변환·원본 ZIP 보존. core 7602×4, native import/스키마 1161×4, migration 1409, Release B0 4978 CPU/실제 GPU·rename ID 보존, 제품 17 TU 컴파일 통과. Owners 통과·모델 교체 후 구 소비자 6파일 잔여, 소유권 writer를 Editor 포트로 이전; 소스·MBC 동결 게이트 통과, 제품 탐침은 오래된 Editor로 미실행. CCT·dirty/계측·실제 Editor/HTTP/새 cooked Player 실행 잔여; L0 완료 아님."},
+  {phase: 19, id: "B1", title: "형상 저작·공유 자산", detail: "형상별 컴포넌트 대신 ShapeInstance와 cooked geometry. 독립 센서·자식 귀속 정책.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 4, status: "progress", note: "2026-10-01 CEPG v1 SDK cook bundle·CEMF CollisionGeometry·Scene/Prefab UUID/revision closure·BuildTool 원본/이력 cook 입력 및 배포 제거·Player strict SDK import 연결. GPU cook data, SDK/플랫폼/정책/FNV/CEMF SHA 검증. 실제 pak reader 독립 회귀와 제품 loose runtime 경로를 구분한다. geometry.create/update·UUID 고정 revision archive·Undo/Redo·stale/Play 거부·prepared cache 연결. BuildTool 48 checks, Debug/Release 제품 TU 10개 통과. Debug/Release/Shipping/ASan 각 1801 checks·실제 GPU, runtime cook=0. 증거 Phase19CookedGeometry; 전체 AssetCooker/패키지 Player/HTTP Editor/제품 capture는 미검증. 공통 layerOverride(0=Entity 상속)·정책 갱신 시 override 보존·unknown/retired 거부·idle ReplaceShapes/RefreshRuntimeShapes·pose/속도/disabled 유지·Transform resolve 연결. Debug/Release/ASan 129·Shipping 127 checks, 실제 GPU 및 비Shipping capture 통과. 자동 scale 추적은 B2. Inspector 값 초안·physics.shapes 공통 검증/Undo/prefab override·ShapeAuthoringPublish 연결. reader 및 중첩 YAML 문자열 왕복 Debug/Release/ASan 각 43 checks. M0 CLR ABI29 교체 후 전체 Editor Debug 빌드 통과. UUID 표 빈 항목 초기화 크래시·Prefab override HTTP 목록 누락·여러 줄 override 저장 ryml 종료 수정. HTTP gate 예상 400 거부/실제 runtime DLL freshness 판정 보강. 새 Editor HTTP 27명령 통과: 형상 Undo/Redo·거부 시 Undo 유지·Prefab override 저장/로드 동일·Play 저작 거부·시뮬레이션 이동·Stop 위치 [0,5,0] 복귀. 증거 http-6ee4c29729b143c280ff7acaed90a0ea. Inspector UI/cooked 제품 왕복 별도 필요. B1 progress."},
+  {phase: 19, id: "B2", title: "차등 동기화·보간", detail: "활성 dynamic 결과, kinematic target, static 명시 변경, 부모 Transform 환산과 이전/현재 pose. pose 수집/Transform 반영/보간 비용을 분리 계측.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 4, status: "todo", note: "선행 P3/B0. 고정 tick 계약과 부모 Transform 경계를 조정한다."},
+  {phase: 19, id: "C0", title: "CharacterMovementComponent", detail: "강체 의존 없는 캐릭터 입력·충돌 이동·결과.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 4, status: "progress", note: "2026-10-02 native C0: Scene 단일 물리 세션·1/60초 속도 적분·중력·충돌 결과·enable/teleport/Stop 복귀 연결. 공통 레이어의 body/character 원자적 commit, Entity 동시 부착 거부, SDK query-mask의 다른 레이어 CCT 접촉 제외 결함 수정. CPU/GPU Debug/Release/ASan 각 752 checks, Shipping 746 checks 및 계층 profiler capture 통과. P3 Debug 3971 checks/GPU 재검증. 전체 Editor Debug 빌드 및 캐릭터 HTTP 41명령 통과: 저장/로드·독립 이동/바닥 접촉·동시 부착 거부/Undo 불변·Play 저작 거부·teleport·enable·Stop 위치/입력/tick 복귀. 기존 shape HTTP 회귀도 통과. ABI31 C# 캐릭터 7슬롯·88-byte 상태·identity wrapper 연결. 전체 Editor Debug 및 CLR Release TU, ScriptCore/GameScripts Debug/Release 통과. ABI 167슬롯/각29 checks; 실제 PostPhysics 18 assertions와 HTTP67명령, Stop 후 이전 wrapper StaleHandle 통과. 캐릭터 Inspector 공통 Property/Undo·Play/잠금 차단, 공유 +Y 캡슐·contact/foot/step 기즈모·Physics.CharacterPreview 계층 연결. SDK 없는 preview Debug/Release/ASan 각29 checks, 전체 Editor Debug 및 새 HTTP74명령/C#18 assertions 통과. 캡슐 오류5종 Undo 불변·Stop 원상복귀 검증. DDOL 새 HTTP96명령/C#18 assertions+captured wrapper 유지·Scene CLI 핸들 만료·활성/비활성 이송·Stop 복귀 통과. GameScripts Debug/Release 및 Player Debug 빌드 통과. 직접 UI/렌더 캡처·새 Player/cooked 실행·DDOL 자식 계층은 잔여."},
+  {phase: 19, id: "C1", title: "캐릭터 저작값 이전", detail: "스텝당 legacy 값의 단위 변환과 경사·계단·강제 이동 회귀.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 3, status: "progress", note: "2026-10-02 구 코드 적분식 정찰→명시적 기준 tick의 offline 단위 보고서 구현. P0 캐릭터 1건 변환 제안·원본 SHA256 유지, 22 checks. 저장 maxSpeed=61.5m/s와 late-update 정상값=1.5m/s 충돌을 분리. 중력 -12m/s²·jump 3m/s·가속도 60m/s²·lerp 감쇠율 환산. 실제 CPU/GPU 경사20°/60° 및 제한해제, 0.2/0.8m 계단, 강제 속도/취소·teleport/중력 재개·Stop 검증: Debug/Release/ASan 각2020, Shipping2018 checks. Editor 저장/로드 계단 HTTP80명령 통과. 원본 자동 변경/구 runtime fallback 없음. 가속·초당 감쇠·grounded one-shot jump·낙하 속도 제한·시간제 force/취소/부분스텝 만료 구현. CPU/GPU Debug/Release/ASan 각2276, Shipping2274 checks. ABI31 167슬롯/각29 checks, 실제 C#18 assertions+HTTP67명령 및 Editor Debug 통과. invalid 저작값 원복/Undo 불변, disable 타이머 정지·Teleport/Stop 초기화 검증. 구 dynamic lerp/자동 회전 채택·companion body 소유권·실제 콘텐츠 이전, DDOL root 활성/비활성 제품 이송은 HTTP96명령으로 검증. Player/cooked 실행·DDOL 자식 계층/UI는 잔여."},
+  {phase: 19, id: "T0", title: "스레딩 계약 강제", detail: "소유 스레드, 불변 스냅샷, 커맨드 병합과 solver 콜백 수명.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 3, status: "todo", note: "선행 P3. 물리 전용 스레드 없이 소유 스레드/SDK 워커 경계를 강제한다."},
+  {phase: 19, id: "T1", title: "PhysX 실행 최적화", detail: "simulate/fetch 안전 overlap. 공용 dispatcher는 task 수명 검증 후 결정; Jolt 어댑터 제외. 게임 스레드 제출/대기와 solver 워커 실행을 중복 합산 없이 계측.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 3, status: "todo", note: "선행 P3/T0. 최적화는 profiler 증거로 판정하며 공용 dispatcher 통합은 필수 조건이 아니다."},
+  {phase: 19, id: "T2", title: "쿼리 배치", detail: "동시 쓰기 없는 읽기 창, query 구조 커밋, 버퍼 overflow/오류 정책. query 구조 갱신·대기·실행을 구분 계측.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 3, status: "todo", note: "선행 P3/T0. 필요한 동기 query와 읽기 창의 batch query를 구분한다."},
+  {phase: 19, id: "M0", title: "C++·C# 소비자 이전", detail: "C++/C# 공개 표면과 엔트리 전량 이전. 호환 어댑터·구 배선 없음.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 5, status: "progress", note: "2026-10-01 기즈모 구 Collider/CCT 목록 제거·PhysicsBody compound primitive 표시로 교체. 같은 scale/pose 검증 재사용, SDK/cook 호출 없음, Physics.GizmoCollect 및 unsupported/invalid 수치 연결. 실제 line collector 포함 Debug/Release/ASan 각 21 checks, 기즈모 제품 TU Debug/Release 컴파일. 모델 자동 충돌도 Editor GT shared geometry 게시→static PhysicsBody/triangle mesh로 교체. immutable layout 추출·UUID 재사용 및 전체 content/meta 충돌 검증·project/Play guard·Transform resolve·실패 회수 배선. native Debug/Release/ASan 각 129 checks, 모델/바디/Editor 3 TU×2 구성 컴파일. ABI29 CLR/C# body/shape/query 교체·캡처 component identity·명시적 error/거리/shape/layer/capacity 반환. 구 CCT 엔트리/래퍼/probe 삭제, 새 캐릭터 native/C# ABI31 연결 및 실제 HTTP67명령/PostPhysics18 assertions 통과. C1 회귀는 미완료. 실제 3 TU×2 구성, ScriptCore Debug/Release와 GameScripts Debug 빌드 통과. ABI gate 160 슬롯 순서 및 각 17 checks 통과. Owners/저작 소유권 소스 통과, lexical 구 소비자 0파일(제품 완료 아님). 전체 Editor Debug 빌드 및 HTTP 27명령 통과(형상 Undo/Redo·Prefab override 저장/로드·Play 이동/Stop 위치 복귀). UUID 표 자동 크기·중첩 YAML scalar 저장·Prefab HTTP 목록 수정. cooked wire/CCT preview·CLR bound callback/모델 Undo/Stop/Player/profile 미검증; 호환 어댑터 없음."},
+  {phase: 19, id: "M1", title: "씬·프리팹 스키마 이전", detail: "구 Rigidbody+Collider 조합을 새 바디 정의로 변환; Terrain 실제 경로 보존/이전.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 4, status: "todo", note: "선행 B/C. 일회성 파일 변환이며 런타임 구 스키마 지원을 남기지 않는다."},
+  {phase: 19, id: "M2", title: "경계·생명주기 게이트", detail: "backend include 격리와 씬 전환/DDOL, 기존 경계 검사 정합성 복구.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 3, status: "todo", note: "선행 M0/M1. 실제 생명주기·씬 전환/DDOL과 SDK include 격리를 확인한다."},
+  {phase: 19, id: "M3", title: "제품 회귀·성능 측정", detail: "실제 충돌·CCT·실패/해제, profiler 실행 계층·solver 워커·tick/task 연관 캡처와 활성/변경 비율별 평균/p99·메모리. 총/활성/변경 수·커맨드 지연/overflow·query/event/scratch 카운터 및 계측 on/off 비용.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 5, status: "todo", note: "선행 M0~M2. Debug/Release 실제 profiler 캡처와 필수 제품 회귀가 완료 근거다."},
+  {phase: 19, id: "M4", title: "빅뱅 완료 감사", detail: "구 계층·프로젝트 편입·선택 스위치·호환 어댑터 재유입 0, 제품 필수 게이트 전항 통과. profiler 계층 캡처 부재는 완료 불가.", refs: "PhysicsRedesignPlan §4", priority: "P0", days: 2, status: "todo", note: "선행 M3. 단계별 제품 전환 없이 하나의 통합 변경으로 빅뱅 완료한다."},
 
-  // 트랙 X — 백엔드 판정 게이트
-  { phase: 19, id: "X0", title: "Jolt vs PhysX 스파이크 벤치",
-    detail: "PhysicsDrop.creator 시나리오를 바디 100/1,000/10,000으로 올리며 (a)현 PhysX CPU (b)현 PhysX GPU(동작한다면) (c)Jolt 단독 콘솔의 스텝 시간(평균·p99)·메모리·스레드 점유 비교. 통합이 아니라 수치가 목적 — mem.bench 하네스 재활용. 실사용 표면 실측: 차량·클로스·조인트·디포머블 전부 0(주석뿐), PxArticulation 15회는 죽은 랙돌 전용 → PhysX 차별점을 하나도 안 쓰고 있다.",
-    refs: "PhysicsRedesignPlan §2.3", priority: "P0", days: 2, status: "todo", note: "" },
-  { phase: 19, id: "X1", title: "백엔드 결정 기록 + 되돌릴 수 없는 지점 명시",
-    detail: "판정 결과와 근거 수치를 계획 문서 §2.3에 기록. A1 착수 이후에는 재판정하지 않는다는 것을 못 박는다. 두 백엔드 동시 유지는 하지 않는다(추상화 비용이 이득을 먹음). ★ 미결정: 목표 동시 강체 수 — 수백~2천이면 Jolt 명백 우위, 수만이면 X0 결과 판정.",
-    refs: "PhysicsRedesignPlan §2.3", priority: "P0", days: 0.5, status: "todo", note: "" },
 
-  // 트랙 A — 경계 밀봉 · 죽은 자산 은퇴
-  { phase: 19, id: "A0", title: "죽은 자산 은퇴 (X와 독립 · 즉시 착수 가능)",
-    detail: "ColliderDebugData.h(참조 0, throw로 끝남) · PhysicsDebug.cpp(0바이트) · RagdollComponent(빈 override, 리플렉션엔 등록됨) · Physics/Ragdoll* 3종 736줄 · TriangleMeshResource(호출자 0) · TerrainCollider 경로(즉시 continue) 전량 삭제. 죽은 자산은 어느 백엔드로 가든 죽었다 — 먼저 지우면 X0 비교 대상과 A1 밀봉 범위가 준다.",
-    refs: "PhysicsRedesignPlan §1.4", priority: "P0", days: 1, status: "todo", note: "" },
-  { phase: 19, id: "A1", title: "불투명 핸들 API로 Physics/ 밀봉",
-    detail: "PhysicsTypes.h는 std + Mathf만 의존. 백엔드 헤더 include를 Physics/backend/ 안으로만 가둔다. ScriptBinder 12개 헤더의 ../Physics/Physx.h 직접 include 절단 → 유니티 빌드 전이 차단. check_include_boundary.py에 물리 규칙 추가해 CI 래칫 고정. 헤더 말미 static auto 싱글턴 2종(Physics·PhysicsManagers, TU마다 사본)도 함께 제거.",
-    refs: "PhysicsRedesignPlan S-8·S-9", priority: "P0", days: 3, status: "todo", note: "" },
-  { phase: 19, id: "A2", title: "레이어 필터 단일 진실",
-    detail: "PhysicsManager의 vector<vector<uint8_t>>(32×32)와 PhysicX의 unsigned int[32] 2중 진실을 하나로. 레이어 수 32 하드코딩을 상수로 승격하고 필터 판정을 백엔드 필터에 한 번만 넘긴다. .creator 저장분(저작 결과)은 보존.",
-    refs: "PhysicsRedesignPlan S-7", priority: "P1", days: 2, status: "todo", note: "" },
 
-  // 트랙 B — 바디·셰이프 코어
-  { phase: 19, id: "B0", title: "BodyHandle + 평탄 스토어",
-    detail: "{index:24, generation:8} 핸들로 unordered_map 전량 제거 → 배열 인덱싱. 세대 카운터로 파괴된 핸들 접근 검출. 스토어는 핫/콜드 SoA 분리 — 현 RigidBodyGetSetData는 ~180B 한 구조체에 매 프레임 바뀌는 것과 거의 안 바뀌는 것을 섞어 담고 게터 ~25회로 채워 세터 ~20회로 푼다. pull에 실제로 필요한 핫 데이터는 바디당 28B(pos 12 + rot 16)뿐, 캐시 라인 하나에 두 바디. 레인은 별도 스토어가 아니라 인덱스 목록으로 둬 SetBodyType에도 핸들이 유효하다.",
-    refs: "PhysicsRedesignPlan S-1·S-4 · PhysicsComponentDesign P1·P2·§4.1", priority: "P0", days: 3, status: "todo", note: "" },
-  { phase: 19, id: "B1", title: "셰이프 모델 — 다중 셰이프 · 콜라이더 단독 = 정적",
-    detail: "ID를 GameObject InstanceID에서 떼어 오브젝트당 콜라이더 1개 제약 해제(현재 m_ColliderTypeLinkCallback이 GameObject* 키 + insert라 두 번째가 조용히 무시된다). 등록 시 한 오브젝트의 ShapeDesc를 모아 컴파운드 바디 하나로. RigidBodyComponent 없으면 정적 바디 생성이 정상 경로(현재는 SetPhysicData가 continue로 죽인다) — 유니티는 되는데 현 엔진은 못 하던 것. ShapeDesc의 extent는 union이 아니라 Vector3(리플렉션이 union을 직렬화 못 한다). Scene의 7개 병렬 벡터 + 콜백표 은퇴 → PhysicsScene 등록표 하나. 3단계 지연 생성도 2단계로.",
-    refs: "PhysicsRedesignPlan S-2·S-5·S-10 · PhysicsComponentDesign P4", priority: "P0", days: 4, status: "todo", note: "" },
-  { phase: 19, id: "B2", title: "dirty 기반 차등 동기화",
-    detail: "컴포넌트 dirty 비트 순회(O(바디))를 커맨드 파이프(O(변경))로 대체 — 섀도는 즉시 갱신해 읽기 일관성을 지키고 백엔드 호출만 병합·지연. 물리→컴포넌트는 활성 바디만(eENABLE_ACTIVE_ACTORS는 켜두고 안 쓰고 있었다). ★ 되쓰기가 분해→합성→재분해를 돈다(S-12): scale·quat·pos로 행렬 조립 후 SetAndDecomposeMatrix가 행렬 비교 16f + XMMatrixDecompose + 정규화 + 부모 조회 — 이미 분해된 데이터를 옮기려고. pos/rot 직접 대입 경로로 대체하고 스케일은 왕복 자체를 없앤다. getShapes 프레임당 힙 할당 제거. ★ SceneGraph 트랙 S(Transform 컴포넌트화) 확정 후 착수 권장.",
-    refs: "PhysicsRedesignPlan S-3·S-12 · PhysicsComponentDesign P3·§4.2", priority: "P0", days: 3, status: "todo", note: "" },
-  { phase: 19, id: "B3", title: "파괴 단일점",
-    detail: "bIsDestroyed를 세 곳에서 각자 검사하던 구조를 PhysicsScene::DestroyBody(BodyHandle) 하나로. 씬 언로드 경로의 Physics->Update(1.0f) — 언로드 중 1초짜리 스텝을 한 번 시뮬레이션하는 코드 — 도 여기서 제거.",
-    refs: "PhysicsRedesignPlan S-1 · PhysicsManager.cpp:107", priority: "P0", days: 2, status: "todo", note: "" },
-  { phase: 19, id: "B4", title: "컴포넌트 재작성 (RigidBody + 콜라이더 4종)",
-    detail: "컴포넌트는 저작값 + BodyHandle만 든다 — m_linearVelocity·m_angularVelocity·m_scale·forceMode·velocity·RB_DIRTY가 전부 사라진다(셋은 reflect() 스키마에 없어 직렬화 호환 무영향). forceMode가 멤버였던 구조가 특히 나빴다: 힘을 쓰면 멤버에 모드를 적어 두고 다음 프레임 전량 push가 읽어 소비한 뒤 NONE으로 되돌렸다 — 커맨드 하나로 대체. ICollider(빈 몸통 이벤트 6개 + vtable) 폐기, 콜라이더는 비가상 Describe()->ShapeDesc만. 헤더 인라인 구현을 .cpp로 내린다. 스키마는 기존 필드명 유지 + AngularDamping 보강. 새 파일은 UTF-8 BOM.",
-    refs: "PhysicsRedesignPlan B4·S-11 · PhysicsComponentDesign P2·P4·§7", priority: "P0", days: 3, status: "todo", note: "" },
-
-  // 트랙 C — 캐릭터 컨트롤러
-  { phase: 19, id: "C0", title: "CCT를 RigidBody 기생에서 분리",
-    detail: "CCT 속도를 rigidbody->GetLinearVelocity()로 읽고 되돌려 쓰는 구조 해체 — CCT는 리지드바디가 아니다. CharacterControllerComponent에서 RigidBodyComponent 의존 제거. 게임 스크립트 56곳이 걸려 있어 M0과 짝.",
-    refs: "PhysicsRedesignPlan S-6", priority: "P0", days: 3, status: "todo", note: "" },
-  { phase: 19, id: "C1", title: "이동·중력·경사 모델 재작성",
-    detail: "CharacterController.cpp(359줄) + CharacterMovement(125줄) 재작성. Jolt이면 CharacterVirtual 기반. ★ 함정: 현 기본값(maxSpeed 0.025 · jumpSpeed 0.05 · gravityWeight 0.2)은 초당 단위가 아니라 스텝당으로 튜닝된 흔적(&&&&&speed 마커). 단위를 정규화하면 기존 씬의 모든 캐릭터가 다르게 움직인다 — 착수 전 결정 필요.",
-    refs: "PhysicsRedesignPlan C1 · 함정 2", priority: "P1", days: 3, status: "todo", note: "" },
-  { phase: 19, id: "C2", title: "강제 이동(ForcedMove) 재설계",
-    detail: "ApplyForcedMoveToCCT의 curveType 정수 인자를 명시적 타입으로. m_pendingControllerPositions 큐를 B3의 단일 커맨드 경로에 흡수.",
-    refs: "PhysicsRedesignPlan C2", priority: "P2", days: 1, status: "todo", note: "" },
-
-  // 트랙 T — 스레딩 · 프레임 구조
-  { phase: 19, id: "T0", title: "스레딩 계약 확정·강제",
-    detail: "확정안: 물리 상태를 읽는 것은 메인 스레드뿐, 다른 스레드는 커맨드 적재만. 워커는 잡 시작 시 발행된 불변 스냅샷을 읽는다 — 락이 없고 결정적이다. 이 계약 하나가 Z-① 레이스 · 읽기-쓰기 일관성 · 백엔드 락 정책(eREQUIRE_RW_LOCK / BodyLockInterface 불필요)을 함께 닫는다. 디버그 빌드에서 스토어 접근 시 스레드 ID assert. Z0의 임시 조치가 여기서 정식 구조가 된다.",
-    refs: "PhysicsRedesignPlan T0 · PhysicsComponentDesign §5", priority: "P0", days: 2, status: "todo", note: "" },
-  { phase: 19, id: "T1", title: "잡 시스템 통합",
-    detail: "Jolt이면 JobSystem 어댑터를 엔진 WorkerPool(Enqueue + NotifyAllAndWait 보유) 위에 구현 — JobSystemWithBarrier 상속으로 QueueJob/QueueJobs/GetMaxConcurrency만. PhysX면 simulate()와 fetchResults() 사이에 PxScene을 안 만지는 작업 배치(현재 둘 사이가 완전히 비어 메인 스레드가 시뮬레이션 내내 논다). Exit 조건은 어느 쪽이든 그 유휴를 없애는 것.",
-    refs: "PhysicsRedesignPlan T1 · §1.5 ③", priority: "P1", days: 3, status: "todo", note: "" },
-  { phase: 19, id: "T2", title: "쿼리 병렬화",
-    detail: "Raycast/Overlap/Sweep은 동시 읽기 안전(동시 쓰기 없음 전제). 24개 질의 호출부 중 배치 가능한 것(SphereOverlap 16)을 묶어 병렬 처리. sceneQueryUpdateMode 등 쿼리 구조 커밋 정책도 여기서 확정(현재 미설정 = 기본값).",
-    refs: "PhysicsRedesignPlan T2 · §1.5 ④", priority: "P2", days: 2, status: "todo", note: "" },
-
-  // 트랙 M — 소비자 이전 · 마이그레이션
-  { phase: 19, id: "M0", title: "C++ 게임 스크립트 이전 (82곳)",
-    detail: "GetComponent<CharacterControllerComponent> 56 · RigidBodyComponent 17 · 콜라이더 9. CCT 56곳이 C0와 짝. BT 액션의 물리 접근은 T0 계약에 맞춰 커맨드 큐 경유로 전환.",
-    refs: "PhysicsRedesignPlan §1.6", priority: "P0", days: 2, status: "todo", note: "" },
-  { phase: 19, id: "M1", title: "C# 경계 재배선 (Native 표 45개)",
-    detail: "Cct 17 · Rigid 21 · Collider 12 · 질의 3. Colliders.cs가 이미 '트리거·활성화가 콜라이더가 아니라 RigidBody에 있다(엔진 구조가 그렇다)'고 기형을 주석으로 기록해 뒀다 — 이 이전이 그 주석을 지우는 작업이다.",
-    refs: "PhysicsRedesignPlan M1", priority: "P0", days: 2, status: "todo", note: "" },
-  { phase: 19, id: "M2", title: "씬·프리팹 마이그레이션",
-    detail: "필드명 변경분 + RagdollComponent 제거분(리플렉션·ComponentTypeUUID·LifecycleRegistry 등록 해제 포함). SerializationPlan 마이그레이션 규칙에 등록. PHASE 18 typed 순회 위에서 수행하면 이름 기반 왕복이 안전하다.",
-    refs: "PhysicsRedesignPlan M2 · PHASE 17", priority: "P0", days: 2, status: "todo", note: "" },
-  { phase: 19, id: "M3", title: "회귀 세트",
-    detail: "PhysicsDrop 확장 — 다중 콜라이더 · 정적 단독 콜라이더 · CCT 경사/계단 · 트리거 이벤트 · 레이어 필터. pwsh로 돌린다(5.1은 한글 주석 인코딩이 깨져 거짓 실패). CI 등록. ★ 검증 기준은 '바디 개수'가 아니라 '충돌이 실제로 일어나는가'.",
-    refs: "PhysicsRedesignPlan M3 · 함정 1", priority: "P0", days: 2, status: "todo", note: "" },
 
   // ---------- PHASE 20: 네트워크 준비형 런타임 ----------
   // 공수는 dashboard 초기 추정치다. NetworkFrameworkPlan N0 기준선 뒤 갱신한다.

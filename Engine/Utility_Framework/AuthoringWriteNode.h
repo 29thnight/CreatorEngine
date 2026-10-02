@@ -91,10 +91,12 @@ namespace Authoring
 			if (m_tree->is_map(m_id) || m_tree->is_seq(m_id))
 				node.change_type(ryml::NodeType{ ryml::VAL });
 			const ryml::csubstr source(value.data(), value.size());
-			if (value.empty())
+			if (value.empty() || value.find_first_of("\r\n") != std::string_view::npos)
 			{
 				// yaml-cpp는 빈 문자열을 `""`로 고정한다. ryml 기본은 `''`라
 				// reflection golden 바이트 계약이 흔들리므로 double quote를 강제한다.
+				// Nested YAML (prefab overrides) contains indented newlines; ryml 0.16
+				// cannot infer a safe block scalar style. Quote explicitly to preserve bytes.
 				node.set_val(m_tree->copy_to_arena(source),
 					ryml::NodeType{ ryml::VAL_DQUO });
 			}

@@ -1,3 +1,6 @@
+#include "CollisionGeometryAuthoring.h"
+#include "../../Engine/EngineDiagnostics/ProfileScope.h"
+#include "ProjectLayerSettingsCodec.h"
 #include "EditorAssetDatabase.h"
 #include "Assets/ModelMaterialGraph.h"
 
@@ -248,6 +251,26 @@ namespace
 		catch (...)
 		{
 			Debug::PrintLog(spdlog::level::err, "Editor tag-manager authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
+	bool WriteLayerSettingsThroughEditor(
+		const UncatalogedAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteLayerSettings(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor layer-settings authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor layer-settings authoring failed with an "
 				"unknown error");
 		}
 		return false;
@@ -776,6 +799,40 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		return guid;
 	}
 
+	bool CreateCollisionGeometry(const file::path& destination,
+        const ce::physics::CollisionGeometrySource& source)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        ce::profile_scope publication{ce::marker<"Physics.GeometryAuthoringPublish">()};
+
+        if (!IsSafeAssetName(destination.filename().wstring())) return false;
+
+        return bool(Editor::CollisionGeometryAuthoring::Create(m_root, destination, source));
+    }
+
+    bool ReplaceCollisionGeometry(const file::path& destination,
+        const ce::physics::CollisionGeometrySource& expected,
+        const ce::physics::CollisionGeometrySource& replacement)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        ce::profile_scope publication{ce::marker<"Physics.GeometryRevisionPublish">()};
+
+        const auto meta = file::path(destination.string() + ".meta");
+        if (LoadGuidFromMeta(meta) != FileGuid(expected.key.asset)) return false;
+
+        std::string error;
+        auto document = Authoring::WriteDocument::ParseFile(meta, &error);
+        if (!document || !document->Root().Read().IsMap()) return false;
+
+        const auto revision = document->Root().Read()["geometryRevision"];
+        if (!revision || !revision.IsScalar() || revision.AsString() != std::to_string(expected.key.revision))
+            return false;
+
+        document->Root().Child("geometryRevision").SetScalar(replacement.key.revision);
+        return bool(Editor::CollisionGeometryAuthoring::Replace(m_root, destination, expected, replacement,
+                                                                 document->Dump()));
+    }
+
 	bool WriteModelCache(const file::path& destination,
 		std::span<const std::byte> bytes)
 	{
@@ -1162,6 +1219,17 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			PathFinder::ProjectSettingPath(""), request);
 	}
 
+	bool WriteLayerSettings(const UncatalogedAuthoringRequest& request)
+	{
+        if (request.destinationPath.filename() != "Layers.celayers" ||
+            !ce::layers::ProjectLayerSettingsCodec::Decode(std::as_bytes(std::span(request.payload))))
+            return false;
+
+		std::lock_guard lock(m_authoringMutex);
+		return PublishUncatalogedLocked("LayerSettings",
+			PathFinder::ProjectSettingPath(""), request);
+	}
+
 	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request)
 	{
 		std::lock_guard lock(m_authoringMutex);
@@ -1494,6 +1562,12 @@ private:
 		const file::path targetFile = RemoveMetaExtension(metaPath);
 		if (!file::exists(targetFile) || !IsTargetFile(targetFile)) return;
 		const FileGuid guid = LoadGuidFromMeta(metaPath);
+		if (ToLower(targetFile.extension().string()) == ".cegeometry")
+		{
+			const auto source = Editor::ReadCollisionGeometrySource(targetFile);
+			if (!source || !guid.IsRandomV4() || guid != FileGuid(source->key.asset)) return;
+		}
+
 		if (guid != FileGuid{})
 		{
 			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
@@ -1577,6 +1651,12 @@ private:
 	FileGuid LoadInitialIdentityHint(const file::path& targetFile) const
 	{
 		const std::string extension = ToLower(targetFile.extension().string());
+		if (extension == ".cegeometry")
+		{
+			const auto source = Editor::ReadCollisionGeometrySource(targetFile);
+			return source ? FileGuid(source->key.asset) : FileGuid{};
+		}
+
 		const bool prefab = extension == ".prefab";
 		const bool material = extension == ".asset"
 			&& ToLower(targetFile.parent_path().filename().string()) == "materials";
@@ -1622,6 +1702,17 @@ private:
 		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {})
 	{
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
+		if (ToLower(targetFile.extension().string()) == ".cegeometry")
+		{
+			const auto source = Editor::ReadCollisionGeometrySource(targetFile);
+			if (!source || !FileGuid(source->key.asset).IsRandomV4()) return {};
+
+			const auto sidecar = file::path(targetFile.string() + ".meta");
+			if ((preferredGuid != FileGuid{} && preferredGuid != FileGuid(source->key.asset)) ||
+				(file::exists(sidecar) && LoadGuidFromMeta(sidecar) != FileGuid(source->key.asset)))
+				return {};
+		}
+
 		// Audio import policy is explicit: an old .ogg sidecar must not make an
 		// unsupported source look cataloged through a direct CreateMeta call.
 		if (ToLower(targetFile.extension().string()) == ".ogg") return {};
@@ -1949,7 +2040,7 @@ private:
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
 		".hlsl", ".slang", ".shadermeta", ".shader", ".cpp", ".cs",
 		".wav", ".mp3", ".flac", ".spritefont",
-		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile",
+		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
 		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity
 		//   자체가 없었다** — 지금은 경로로만 참조된다. D5-c 의 "Player 가
@@ -1996,6 +2087,7 @@ bool EditorAssetDatabase::Initialize()
 	AssetAuthoringPort::InstallCollisionMatrixWriter(
 		&WriteCollisionMatrixThroughEditor);
 	AssetAuthoringPort::InstallTagManagerWriter(&WriteTagManagerThroughEditor);
+	AssetAuthoringPort::InstallLayerSettingsWriter(&WriteLayerSettingsThroughEditor);
 	AssetAuthoringPort::InstallInputActionMapWriter(
 		&WriteInputActionMapThroughEditor);
 	return true;
@@ -2007,6 +2099,7 @@ void EditorAssetDatabase::Shutdown() noexcept
 	AssetAuthoringPort::UninstallInputActionMapWriter(
 		&WriteInputActionMapThroughEditor);
 	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
+	AssetAuthoringPort::UninstallLayerSettingsWriter(&WriteLayerSettingsThroughEditor);
 	AssetAuthoringPort::UninstallCollisionMatrixWriter(
 		&WriteCollisionMatrixThroughEditor);
 	AssetAuthoringPort::UninstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
@@ -2098,6 +2191,12 @@ bool EditorAssetDatabase::WriteTagManager(
 	const UncatalogedAuthoringRequest& request)
 {
 	return m_impl && m_impl->WriteTagManager(request);
+}
+
+bool EditorAssetDatabase::WriteLayerSettings(
+	const UncatalogedAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteLayerSettings(request);
 }
 
 bool EditorAssetDatabase::WriteInputActionMap(
@@ -2278,4 +2377,17 @@ bool EditorAssetDatabase::SaveExistingSceneRenderProfile(
 	output << Meta::SerializeDocument(volume).Dump();
 	output.flush();
 	return output.good();
+}
+
+bool EditorAssetDatabase::CreateCollisionGeometry(const file::path& destination,
+    const ce::physics::CollisionGeometrySource& source)
+{
+    return m_impl && m_impl->CreateCollisionGeometry(destination, source);
+}
+
+bool EditorAssetDatabase::ReplaceCollisionGeometry(const file::path& destination,
+    const ce::physics::CollisionGeometrySource& expected,
+    const ce::physics::CollisionGeometrySource& replacement)
+{
+    return m_impl && m_impl->ReplaceCollisionGeometry(destination, expected, replacement);
 }
