@@ -93,6 +93,7 @@ float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
     if (gHasShadow == 0u) return 1.0;
 
     const float viewDepth = dot(worldPosition - gEyePosition.xyz, gCameraForward.xyz);
+    if (viewDepth > gCascadeSplits.z) return 1.0;
 
     uint cascade = 0u;
     if (viewDepth > gCascadeSplits.x) cascade = 1u;
@@ -193,7 +194,7 @@ float4 PSMain(VSOut input) : SV_TARGET
         {
             // 방향광 — 위치와 감쇠가 없다. 그림자는 이쪽에만 붙는다.
             toLight     = -normalize(light.direction.xyz);
-            attenuation = SampleShadow(worldPosition, normal, toLight);
+            attenuation = (i + 1u == uint(max(gCascadeSplits.w, 1.0))) ? SampleShadow(worldPosition, normal, toLight) : 1.0;
         }
         else
         {

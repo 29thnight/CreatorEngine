@@ -1397,6 +1397,7 @@ namespace
         uint32_t                      lastCulledDraws{ 0 };
 
         std::vector<EnhancedDrawItem> draws;
+        std::vector<EnhancedDrawItem> shadowDraws;
         std::vector<EnhancedDrawItem> forwardDraws;
         std::vector<EnhancedDrawItem> graphDraws;
         // Same ordering as graphDraws/SceneDrawInput::sourceIndex. These sealed
@@ -3257,6 +3258,7 @@ namespace
                 {
                     const math::aabb& bounds = proxy->m_modelGeneration
                         ->Meshes()[proxy->m_modelMeshIndex].bounds;
+                    pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
                     pooled.item.boundRadius = bounds.is_empty()
                         ? 0.f : math::length(bounds.extents);
                 }
@@ -3352,7 +3354,8 @@ namespace
                     {
                         const math::aabb& bounds = source.modelGeneration
                             ->Meshes()[source.modelMeshIndex].bounds;
-                        pooled.item.boundRadius = bounds.is_empty()
+                        pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
+                    pooled.item.boundRadius = bounds.is_empty()
                             ? 0.f : math::length(bounds.extents);
                     }
 
@@ -3456,7 +3459,8 @@ namespace
             for (PooledDraw& pooled : drawPool)
             {
                 if (pooled.graphMaterialSource) continue;
-                if (!pooled.isTransparent) continue;
+                const size_t shadowIndex = shadowDraws.size();
+                if (pooled.graphMaterialSource || !pooled.isTransparent) continue;
                 if (!pooled.materialSource)
                 {
                     outError = "Forward transparent draw에 owning Material source가 없다";
@@ -3911,6 +3915,7 @@ namespace
                 ? *viewPacket.gizmos : EnhancedGizmoSceneData{};
 
             draws.clear();
+            shadowDraws.clear();
             forwardDraws.clear();
             graphDraws.clear();
             graphFallbackDraws.clear();
@@ -4073,11 +4078,17 @@ namespace
             math::bounding_frustum frustum;
             const bool cullDraws = BuildViewFrustum(cameraSnapshot, frustum);
 
+            std::vector<size_t> opaqueShadowIndices, graphShadowIndices;
             uint32_t culled = 0;
             for (const PooledDraw& pooled : drawPool)
             {
                 // 상자를 믿을 수 없는 것(스키닝)은 자르지 않는다.
-                if (cullDraws && pooled.hasBounds &&
+                const size_t shadowIndex = shadowDraws.size();
+                if (pooled.graphMaterialSource || !pooled.isTransparent)
+                    shadowDraws.push_back(pooled.item);
+                // Graph geometry is shared by surface and shadow passes; retain
+                // offscreen graph casters until per-pass visibility is available.
+                if (!pooled.graphMaterialSource && cullDraws && pooled.hasBounds &&
                     !pooled.worldBounds.is_empty() &&
                     !math::intersects(frustum, pooled.worldBounds))
                 {
@@ -4091,13 +4102,18 @@ namespace
                     graphDraw.materialSnapshot.reset();
                     graphDraw.forwardMaterialSnapshot.reset();
                     graphDraws.push_back(std::move(graphDraw));
+                    graphShadowIndices.push_back(shadowIndex);
                     auto fallback = pooled.item;
                     fallback.materialGraphInstance.reset();
                     fallback.materialGraphSlot = 0;
                     graphFallbackDraws.push_back(std::move(fallback));
                 }
                 else if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
-                else                      draws.push_back(pooled.item);
+                else
+                {
+                    draws.push_back(pooled.item);
+                    opaqueShadowIndices.push_back(shadowIndex);
+                }
             }
 
             lastPoolDraws = static_cast<uint32_t>(drawPool.size());
@@ -4130,6 +4146,10 @@ namespace
                 {
                     draws.swap(stagedOpaque); forwardDraws.swap(stagedForward);
                     graphDraws.swap(stagedGraph); graphFallbackDraws.swap(stagedFallback);
+                    for (size_t i = 0; i < draws.size(); ++i)
+                        shadowDraws[opaqueShadowIndices[i]] = draws[i];
+                    for (size_t i = 0; i < graphDraws.size(); ++i)
+                        shadowDraws[graphShadowIndices[i]] = graphDraws[i];
                     pbrCapture->drawInputBytes = pbrCapture->drawReplay
                         ? pbrCapture->drawReplay->Encode() : selected.Encode();
                     if (pbrCapture->latticeReplayExtension)
@@ -4222,6 +4242,7 @@ namespace
             std::string& outError)
         {
             RHIShaderCompiler::ScopedOutput environmentOutput(output);
+            p.frameContext.shadowDraws = &shadowDraws;
             p.graphInput = graphViewInput;
             {
                 RHIShaderCompiler::ScopedOutput outputScope(output);
@@ -4250,6 +4271,7 @@ namespace
                 if (!graphSelected[i] && graphFallbackDraws[i].materialSnapshot)
                 {
                     draws.push_back(graphFallbackDraws[i]);
+                    shadowDraws.push_back(graphFallbackDraws[i]);
                     if (pbrCapture && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
                         pbrCapture->RecordPendingLatticeFallback(graphFallbackDraws[i]);
                 }
@@ -4357,7 +4379,7 @@ namespace
             p.ui.SetRects(&uiRects);
 
             if (!p.animationPalettes.Prepare(*p.frameContext.resources,
-                    p.frameContext.draws, p.frameContext.forwardDraws))
+                    p.frameContext.shadowDraws, p.frameContext.forwardDraws))
             {
                 outError = "공용 애니메이션 팔레트 업로드 실패";
                 return false;

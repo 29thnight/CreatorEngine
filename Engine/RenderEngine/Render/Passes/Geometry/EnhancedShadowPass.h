@@ -1,6 +1,8 @@
 #pragma once
 #include "../../../RHI/RHIFormat.h"
 #include <array>
+#include <algorithm>
+#include "../../Graph/ShadowMath.h"
 #include <atomic>
 #include <map>
 #include <unordered_map>
@@ -88,7 +90,10 @@ public:
     }
 
     // 기본 편향. 캐스케이드별로는 반지름 비만큼 키워 쓴다.
-    void SetBias(float bias) { m_baseBias = bias; }
+    // Compatibility setter: old normalized depth at a 4-radius depth span.
+    void SetBias(float bias) { m_baseBias = bias * (2.f * kShadowMapSize); }
+    void SetBiasTexels(float bias) { m_baseBias = (std::max)(0.f, bias); }
+    void SetShadowDistance(float distance) { m_shadowDistance = (std::max)(0.01f, distance); }
 
     // 경사 비례 계수 — 최종 편향 = 캐스케이드 편향 x (1 + 계수 x tan(경사각)).
     // 0이면 상수 편향만 쓴다(자가 검증의 A/B 재료).
@@ -136,6 +141,7 @@ private:
         math::vector3   center{};
         float          radius{ 0.f };
         float          splitDepth{ 0.f };
+        float          depthSpan{ 1.f };
     };
 
     struct Geometry
@@ -162,7 +168,8 @@ private:
     EnhancedShadowData m_shadowData{};
     math::vector3      m_lightDirection{ 0.f, -1.f, 0.f };
     bool               m_hasDirectionalLight{ false };
-    float              m_baseBias{ 0.0015f };
+    float              m_baseBias{ 0.5f };
+    float              m_shadowDistance{ 200.f };
 
     // 경사 비례 계수 2는 관행 범위(1~3)의 가운데다. tan은 셰이더에서 8로
     // 상한을 두므로 최악에도 편향이 기본의 17배를 넘지 않는다.
@@ -178,6 +185,8 @@ private:
 
     // 메시 기준으로 정렬한 드로우 인덱스. 원본을 건드리지 않으려고 인덱스만 든다.
     std::vector<size_t> m_sortedDraws;
+    std::vector<size_t> m_batchStarts{0};
+    std::vector<shadow_math::Sphere> m_casterBounds;
 
     // 프레임의 본 팔레트(GBuffer와 같은 수집 규칙). 스킨드 캐스터가 없으면 빈다.
     std::vector<PackedBoneMatrix>           m_bonePalettes;

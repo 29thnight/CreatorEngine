@@ -393,6 +393,7 @@ float LXSceneShadow(float3 position, float3 normal, float3 light)
     if (lx_hasShadow == 0u)
         return 1.0;
     const float distance = dot(position - lx_eye.xyz, lx_cameraForward.xyz);
+    if (distance > lx_shadowSplits.z) return 1.0;
     uint cascade = distance > lx_shadowSplits.y ? 2u : distance > lx_shadowSplits.x ? 1u : 0u;
     const float nl = saturate(dot(normal, light));
     const float slope = min(sqrt(max(1.0 - nl * nl, 0.0)) / max(nl, 1e-3), 8.0);
@@ -437,7 +438,8 @@ float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float2 pixel, float3 
     const uint count = LXSceneLightCount(pixel, tile, tiled);
     for (uint i = 0; i < count; ++i)
     {
-        const LXSceneLight record = LXSceneReadLight(tiled ? lx_forwardIndices[tile * 32u + i] : i);
+        const uint lightIndex = tiled ? lx_forwardIndices[tile * 32u + i] : i;
+        const LXSceneLight record = LXSceneReadLight(lightIndex);
         const float4 lightPosition = record.position;
         const float4 direction = record.direction;
         const float4 color = record.color;
@@ -448,7 +450,7 @@ float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float2 pixel, float3 
         if (type == 0u)
         {
             toLight = -normalize(direction.xyz);
-            attenuation = LXSceneShadow(position, surface.layers.material.normal, toLight);
+            attenuation = (lightIndex + 1u == uint(max(lx_shadowSplits.w, 1.0))) ? LXSceneShadow(position, surface.layers.material.normal, toLight) : 1.0;
         }
         else
         {
@@ -603,7 +605,7 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
         if (type == 0u)
         {
             toLight = -normalize(light.direction.xyz);
-            attenuation = LXSceneShadow(input.position, material.normal, toLight);
+            attenuation = (lightIndex + 1u == uint(max(lx_shadowSplits.w, 1.0))) ? LXSceneShadow(input.position, material.normal, toLight) : 1.0;
         }
         else
         {

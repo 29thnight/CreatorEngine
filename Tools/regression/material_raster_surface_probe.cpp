@@ -1,4 +1,6 @@
 #include "MaterialGraphRasterSurface.h"
+#include "Render/Passes/Geometry/EnhancedShadowPass.h"
+#include "Render/Graph/ShadowCasterBounds.h"
 #include "MaterialGraphScenePacket.h"
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphSceneHost.h"

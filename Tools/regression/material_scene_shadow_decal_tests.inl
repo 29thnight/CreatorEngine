@@ -1,3 +1,63 @@
+void CheckCsmContracts()
+{
+    EnhancedDrawItem caster;
+    caster.boundCenter = {4, 0, 0};
+    caster.boundRadius = 1;
+    caster.worldMatrix = math::matrix4x4::identity();
+    auto bounds = shadow_math::WorldBounds(caster);
+    Check(math::distance(bounds.center, math::vector3{4, 0, 0}) < 1e-5f, "CSM local bounds center");
+    auto bone = math::matrix4x4::identity();
+    bone.m[3][0] = 20;
+    caster.bonePalette = &bone;
+    caster.boneCount = 1;
+    bounds = shadow_math::WorldBounds(caster);
+    Check(math::distance(bounds.center, math::vector3{25, 0, 0}) <= bounds.radius,
+          "CSM bounds contain posed extremity outside bind pose");
+    caster.bonePalette = nullptr;
+    caster.boneCount = 0;
+    caster.boundCenter = {};
+    const auto direction = math::normalize(math::vector3{.3f, -1.f, .2f});
+    const auto position = math::vector3{0, 0, 5} - direction * 500.f;
+    caster.worldMatrix.m[3][0] = position.x;
+    caster.worldMatrix.m[3][1] = position.y;
+    caster.worldMatrix.m[3][2] = position.z;
+    std::vector<EnhancedDrawItem> casters{caster};
+    FrameCameraSnapshot camera;
+    camera.projection = math::perspective_fov_lh(1.f, 1.f, .1f, 1000.f);
+    camera.inverseView = math::matrix4x4::identity();
+    camera.nearPlane = .1f; camera.farPlane = 1000.f; camera.forward = {0, 0, 1};
+    std::vector<EnhancedLight> lights(2);
+    for (auto& light : lights) light.direction = {direction.x, direction.y, direction.z, 0};
+    lights[0].color.a = 1; lights[1].color.a = 2;
+    EnhancedFrameContext context;
+    context.camera = &camera; context.lights = &lights; context.shadowDraws = &casters;
+    EnhancedShadowPass pass;
+    std::string error;
+    Check(pass.PrepareFrame(context, error), "CSM isolated preparation " + error);
+    const auto data = pass.GetShadowData();
+    Check(data.enabled && data.splitDepths.w == 2, "CSM owns selected directional index");
+    Check(data.splitDepths.z == 200.f && data.splitDepths.x < 25.f, "CSM independent near coverage");
+    const float biases[3]{data.bias.x, data.bias.y, data.bias.z};
+    for (unsigned i = 0; i < 3; ++i)
+    {
+        const auto& m = data.lightViewProjection[i];
+        const float depthScale = math::length(math::vector3{m.m[0][2], m.m[1][2], m.m[2][2]});
+        const float xyScale = math::length(math::vector3{m.m[0][0], m.m[1][0], m.m[2][0]});
+        const float texel = 2.f / (2048.f * xyScale);
+        Check(std::fabs(biases[i] / depthScale - .5f * texel) < texel * 1e-4f,
+              "CSM bias remains half a world texel after depth-range conversion");
+    }
+    Check(shadow_math::IntersectsClip(shadow_math::WorldBounds(caster), data.lightViewProjection[0]),
+          "CSM upstream offscreen caster lies inside expanded light depth");
+    camera.isOrthographic = true; camera.nearPlane = -10;
+    camera.projection = math::orthographic_off_center_lh(-4, 6, -3, 7, -10, 1000);
+    Check(pass.PrepareFrame(context, error), "CSM orthographic preparation");
+    const auto orthographic = pass.GetShadowData();
+    for (const auto& matrix : orthographic.lightViewProjection)
+        for (const auto& row : matrix.m)
+            for (float value : row) Check(std::isfinite(value), "CSM finite orthographic cascade");
+    std::cout << "CSM_CONTRACTS_OK bounds pose light-owner distance bias upstream orthographic\n";
+}
 // Native SceneHost coverage and Decal regression. Reference material instances
 // use the observed GBuffer values, so derived lobes must be reevaluated as well.
 VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layered)
@@ -160,6 +220,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const std::shared_ptr<Texture>& image)
 {
+    CheckCsmContracts();
     const auto product = ShadowDecalProduct(root, false);
     GenerationStore store;
     experiment::AssetId id;

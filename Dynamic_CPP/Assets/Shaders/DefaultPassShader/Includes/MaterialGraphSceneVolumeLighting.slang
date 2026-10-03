@@ -72,7 +72,7 @@ float3 LXVolumeIncident(uint object, float3 position, float3 view)
         if (type == 0)
         {
             toLight = -normalize(direction.xyz);
-            attenuation = LXVolumeShadow(position);
+            attenuation = (i + 1u == uint(max(lx_volumeShadowSplits.w, 1.0))) ? LXVolumeShadow(position) : 1.0;
             limit = 1e9;
         }
         else

@@ -1,4 +1,5 @@
 #include "MaterialGraphSceneInput.h"
+#include "Render/Graph/ShadowCasterBounds.h"
 #include "Material.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 
@@ -129,6 +130,9 @@ bool SceneViewInput::Seal(const SceneInputView& view, std::span<const EnhancedDr
             return Fail(error, "Scene graph draw exceeds the source geometry budget.");
         }
         SceneDrawInput input;
+        const auto shadowBounds = shadow_math::WorldBounds(draw);
+        input.shadowCenter = shadowBounds.center;
+        input.shadowRadius = shadowBounds.radius;
         input.sourceIndex = sourceIndex;
         input.geometryKey = draw.geometryKey;
         input.viewDepth = math::dot(draw.worldMatrix.translation() - view.camera.eyePosition, view.camera.forward);
