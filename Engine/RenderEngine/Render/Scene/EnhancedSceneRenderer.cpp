@@ -2360,8 +2360,7 @@ namespace
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
                     p.shadow.Declare(graph, ctx);
-                    p.graphMaterials.DeclareShadow(graph, p.shadow.GetShadowMap());
-                    bb.Set(LiveSlots::kShadowMap, p.shadow.GetShadowMap());
+                    bb.Set(LiveSlots::kShadowMap, p.graphMaterials.DeclareShadow(graph, p.shadow.GetShadowMap()));
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -2402,7 +2401,13 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb));
+                    const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb));
+                    bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
+                    bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
+                    bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
+                    bb.Set(LiveSlots::kGBufferEmissive, outputs.emissive);
+                    bb.Set(LiveSlots::kGBufferBitmask, outputs.bitmask);
+                    bb.Set(LiveSlots::kGBufferDepth, outputs.depth);
                 };
                 p.desc.AddNode(std::move(node));
             }
@@ -2510,9 +2515,9 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    p.graphMaterials.DeclareColor(graph, GatherGBufferOutputs(bb),
+                    bb.Set(LiveSlots::kLitColor, p.graphMaterials.DeclareColor(graph, GatherGBufferOutputs(bb),
                         bb.Get(LiveSlots::kLitColor), bb.Get(LiveSlots::kAmbientOcclusion),
-                        bb.Get(LiveSlots::kShadowMap));
+                        bb.Get(LiveSlots::kShadowMap)));
                 };
                 p.desc.AddNode(std::move(node));
             }

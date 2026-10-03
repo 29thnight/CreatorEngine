@@ -9,7 +9,7 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 
 ## 집계 규칙
 
-2026-10-03 BASE-0 최종 완료로 기성 4인일을 회수했다. RG1도 검증 완료로 기성 8인일을 회수했다. RG2도 검증 완료로 기성 10인일을 회수했다. RG3도 검증 완료로 기성 8인일을 회수했다. 총 추정 355인일은 유지하며 현재 기성 82·잔여 273인일이다.
+2026-10-03 BASE-0 최종 완료로 기성 4인일을 회수했다. RG1도 검증 완료로 기성 8인일을 회수했다. RG2도 검증 완료로 기성 10인일을 회수했다. RG3도 검증 완료로 기성 8인일을 회수했다. RG4도 검증 완료로 기성 6인일을 회수했다. 총 추정 355인일은 유지하며 현재 기성 88·잔여 267인일이다.
 
 - 완료 기반의 기존 52인일(4=18, MAT-0~6/MAT-7-BASE/MAT-8=32, L0=2)은 그대로 보존한다. 2026-10-02 MAT-7의 기존 3인일을 검증된 LX 기반 MAT-7-BASE로 옮긴 뒤 공통 재질 통합·혼합 transport·제품 회귀를 완료했다. 재개방한 MAT-7의 `days:null`/기성 추가 0은 유지한다. 진행/미착수 행의 새 값은 남은 완료 조건의 예산이다. 이미 소모한 미기록 작업 시간을 역산하지 않는다.
 - 구현 범위가 같으면 유지한다. 비교 제거를 이유로 모든 행에 같은 할인율을 적용하지 않는다.
@@ -23,14 +23,14 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 |---|---:|---:|---:|---:|---|
 | 4 | 18 | 18 | 18 | 0 | 완료 이력 유지 |
 | 4.25 | 34 | 40 + 미산정 | 32 | 8 + 미산정 | 기존 기반 보존, 공통 재질 통합 재개방과 SSS/투과·Blender/route·성능 회수 |
-| 4.3 | 119 + Q0/RG-V 미산정 | 100 | 30 | 70 | BASE-0 및 RG1~RG3 현행 두 구성 최종 게이트 회수; Q0 6·viewer 4와 범위 유지 |
+| 4.3 | 119 + Q0/RG-V 미산정 | 100 | 36 | 64 | BASE-0 및 RG1~RG4 현행 두 구성 최종 게이트 회수; Q0 6·viewer 4와 범위 유지 |
 | 4.5 | 86 | 71 | 0 | 71 | 중립 SDK 계약 유지, DX12 구현/수용, Vulkan 비교 제외 |
 | 4.6 | 미산정 | 32 | 0 | 32 | native IR부터 C#/Roslyn/제품 전환까지 7행 최초 산정 |
 | 4.7 | 35 | 35 | 2 | 33 | 원래 DX12 베이크 범위; UV1/BVH/취소·progressive 범위 유지 |
 | 4.75 | 20 + ENV 미산정 | 28 | 0 | 28 | DX12 품질 18 + ENV 전체 route 10 |
 | 4.8 | 5.5 + 구현 미산정 | 9 + 구현 미산정 | 0 | 9 + 구현 미산정 | GPU Scene/IBL/AS 공유 설계와 실제 구현 공수 확정 보강 |
 | 4.9 | 미산정 | 22 | 0 | 22 | RenderDoc 6행, 캡처/리소스/픽셀/수정/재캡처 |
-| **합계** | **317.5 + 미산정** | **355 + 별도 미산정** | **82** | **273 + 별도 미산정** | **신규 산정 74 - 기존 범위 조정 36.5 = +37.5; BASE-0 4·RG1 8·RG2 10·RG3 8 회수** |
+| **합계** | **317.5 + 미산정** | **355 + 별도 미산정** | **88** | **267 + 별도 미산정** | **신규 산정 74 - 기존 범위 조정 36.5 = +37.5; BASE-0 4·RG1 8·RG2 10·RG3 8·RG4 6 회수** |
 
 ## ID별 재산정
 
@@ -61,8 +61,8 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 | 4.3 | `RG1` | 8 | 8 | done | 명시 access·stable RAW DAG·오류 거부·24 shuffle 및 Debug/Release GPU/제품 회귀 완료. 기성 8인일; 제품 이관은 RG5/6 |
 | 4.3 | `RG2` | 10 | 10 | done | version/Modify·RAW/WAR/WAW·stale/fork 거부·texture/buffer 240 shuffle 및 Debug/Release GPU/제품 회귀 완료; 기성 10인일 |
 | 4.3 | `RG3` | 8 | 8 | done | version producer 컬링·WAR/WAW 재연결·sorted lifetime/Transition/UAV, 120 shuffle 및 Debug/Release GPU/제품 회귀 완료; 기성 8인일 |
-| 4.3 | `RG4` | 7 | 6 | todo | 기존 병렬 recording 기반에 dependency wave 연결; DX12 순차/병렬 대조 |
-| 4.3 | `RG5` | 12 | 10 | todo | 현재 19 node 및 fixture 접근 선언 이관 7 + DX12 회귀 3 |
+| 4.3 | `RG4` | 7 | 6 | done | wave·target append·critical path, 24 shuffle·Debug/Release 1/2/4 워커 GPU·제품 16개 이미지 오차 0; 기성 6인일 |
+| 4.3 | `RG5` | 12 | 10 | progress | GBuffer·Shadow·정책 분리·Deferred/SkyBox·SSAO/SSGI·Forward Code·Lookup·Refraction·SSS·Volume·GraphSurface/Draw/반환 출력 묶음 완료; 전체 이관/수용은 열림, 기성 0. 현재 제품 59·게이트 217 호출; 잠정 10인일 유지 |
 | 4.3 | `RG6` | 8 | 4 | todo | DX12 제품 전환·별도 프로세스 전후 회귀 4; 교차 캡처 제외 |
 | 4.3 | `RG7` | 20 | 14 | todo | 기존 transient pool 위 buffer/alias 계획 9 + poison/수명·DX12 검증 5 |
 | 4.3 | `Q0` | 미산정 | 6 | todo | 중립 queue/capability·fence/ownership 계약 4 + DX12 실패/수명 검증 2; 공통 기반 한 번만 계산 |

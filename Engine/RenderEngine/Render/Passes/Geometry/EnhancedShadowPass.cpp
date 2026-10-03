@@ -447,6 +447,12 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
     desc.allowDepthStencil = true;
     desc.name = "Shadow.Cascades";
     m_shadowMap = graph.CreateTexture(desc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_shadowMap = graph.Write(m_shadowMap);
+    }
+    const auto outputAccess = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+        ? RGAccessMode::LegacyState : RGAccessMode::Write;
 
     // 방향광이 없으면 그리지 않는다. 다만 리소스는 선언해 두어야 Deferred가
     // 읽을 것이 있다 — 클리어만 된 맵은 '그림자 없음'과 같은 뜻이다.
@@ -458,7 +464,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
     //
     // 조각 경계는 두 층이다. 캐스케이드가 바깥, 드로우 범위가 안쪽 —
     // 캐스케이드가 셋뿐이라 그것만으로는 세 조각이 상한이 된다.
-    graph.AddSplitPass(GetName(), { { m_shadowMap, RHIResourceState::DepthWrite } },
+    graph.AddSplitPass(GetName(), { { m_shadowMap, RHIResourceState::DepthWrite, outputAccess } },
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext,
             uint32_t slice, uint32_t sliceCount)
         {

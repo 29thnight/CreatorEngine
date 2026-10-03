@@ -59,6 +59,8 @@ void EnhancedRenderGraph::Reset()
     m_passes.clear();
     m_executeOrder.clear();
     m_versionEdges.clear();
+    m_dependencyWaves.clear();
+    m_criticalPath.clear();
     m_compiled = false;
     m_stats = Stats{};
     m_resourceEpoch = NextResourceEpoch();
@@ -473,35 +475,52 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         }
         outError = "RG1 cycle"; return false;
     }
+    if (m_orderPolicy == RGOrderPolicy::PreserveDeclarationOrder)
+    {
+        // Validate the same live version DAG, then preserve authored order only
+        // if every dependency can be satisfied without reordering.
+        for (size_t from = 0; from < count; ++from)
+        {
+            for (const auto& edge : edges[from])
+            {
+                if (alive[from] && alive[edge.to] && from >= edge.to)
+                {
+                    outError = "Declaration order violates dependency: " + m_passes[from].name + " -> " +
+                               m_passes[edge.to].name + " resource=" + m_resources[edge.resource].name;
+                    return false;
+                }
+            }
+        }
+        std::sort(order.begin(), order.end());
+    }
     m_executeOrder.swap(order);
-    outError.clear(); return true;
+    outError.clear();
+    return true;
 }
 
 bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 {
-    if (m_scheduling != RGSchedulingMode::DeclarationOrder && m_scheduling != RGSchedulingMode::ExplicitSingleWriter && m_scheduling != RGSchedulingMode::ExplicitVersioned)
-    { m_executeOrder.clear(); outError = "Invalid RenderGraph scheduling mode"; return false; }
-    if (m_scheduling != RGSchedulingMode::DeclarationOrder) return BuildExplicitOrder(outError);
+    if (m_orderPolicy != RGOrderPolicy::DependencyOrder && m_orderPolicy != RGOrderPolicy::PreserveDeclarationOrder)
+    {
+        m_executeOrder.clear();
+        outError = "Invalid RenderGraph order policy";
+        return false;
+    }
+    if (m_scheduling != RGSchedulingMode::DeclarationOrder && m_scheduling != RGSchedulingMode::ExplicitSingleWriter &&
+        m_scheduling != RGSchedulingMode::ExplicitVersioned)
+    {
+        m_executeOrder.clear();
+        outError = "Invalid RenderGraph scheduling mode";
+        return false;
+    }
+    if (m_scheduling != RGSchedulingMode::DeclarationOrder)
+    {
+        return BuildExplicitOrder(outError);
+    }
     ce::profile_scope profile{ce::marker<"RenderGraphOrder">()};
-    // ── 실행 순서는 선언 순서다. 그래프가 다시 정렬하지 않는다. ──
-    //
-    // 처음에는 위상 정렬로 순서를 '유도'하게 짰다가 자가 검증에서 뒤집었다.
-    // 순수 데이터 흐름만으로는 순서가 정해지지 않기 때문이다 — 한 리소스에 두
-    // 패스가 쓰면 둘 중 무엇이 먼저인지 알 방법이 없고, 결국 선언 순서로
-    // 되돌아온다. 그러면 정렬은 선언 순서를 다시 만들어 내는 일이 되고,
-    // 어쩌다 뒤집히면 프레임이 실행마다 달라져 픽셀 대조가 흔들린다.
-    //
-    // 그래서 계약을 이렇게 정한다:
-    //   선언 순서 = 실행 순서(컬링된 것만 빠진다)
-    //   그래프가 하는 일은 검증·배리어·컬링·수명이다
-    //
-    // 대신 선언이 데이터 흐름과 어긋나면 잡아 준다: 그래프가 만든 리소스를
-    // 아무도 쓰기 전에 읽는 패스가 있으면 초기화되지 않은 메모리를 읽는 것이다.
-    // 그 증상은 검은 화면이 아니라 '이전 프레임 내용이 보인다'라서 알아채기
-    // 어렵다 — 컴파일에서 실패로 알린다.
-    //
-    // 임포트한 리소스는 다르다. 그래프 밖에서 이미 내용이 있고, 지난 프레임
-    // 결과를 읽는 것(히스토리 버퍼)이 정상 사용이라 검사 대상이 아니다.
+    // LegacyState compatibility branch only: retain authored order and reject
+    // uninitialized transient reads. Explicit modes above compile a dependency
+    // DAG; RGOrderPolicy chooses dependency order or validates authored order.
     const size_t passCount = m_passes.size();
     m_executeOrder.clear();
     if (0 == passCount) return true;
@@ -724,8 +743,8 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
     return true;
 }
 
-EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling)
-    : m_deviceServices(&services), m_scheduling(scheduling)
+EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling, RGOrderPolicy orderPolicy)
+    : m_deviceServices(&services), m_scheduling(scheduling), m_orderPolicy(orderPolicy)
 {
     // A live scene declares dozens of passes/resources per recording. Pass owns
     // several vectors; growing the outer array repeatedly also rebuilds their
@@ -908,6 +927,8 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         output.passes.push_back(std::move(copy));
     }
     output.versionEdges = m_versionEdges;
+    output.dependencyWaves = m_dependencyWaves;
+    output.criticalPath = m_criticalPath;
     if(m_scheduling==RGSchedulingMode::ExplicitVersioned)
     {
         for(const auto& edge:m_versionEdges)
@@ -925,6 +946,35 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
                         if (write.inferredWrite && write.resource == read.resource)
                             output.reachabilityEdges.push_back({producer, consumer, read.resource});
     return true;
+}
+
+void EnhancedRenderGraph::BuildDependencyWaves()
+{
+    m_dependencyWaves.assign(m_passes.size(),-1);
+    m_criticalPath.clear();
+    if(m_scheduling!=RGSchedulingMode::ExplicitVersioned) return;
+    std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
+    for(const auto& edge:m_versionEdges) predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
+    std::vector<uint16_t> parent(m_passes.size(),RGPassId::kInvalid);
+    uint16_t last=RGPassId::kInvalid;
+    for(const auto p:m_executeOrder)
+    {
+        m_dependencyWaves[p]=0;
+        for(const auto producer:predecessors[p])
+        {
+            const auto depth=m_dependencyWaves[producer]+1;
+            if(depth>m_dependencyWaves[p] || (depth==m_dependencyWaves[p] && producer<parent[p]))
+            { m_dependencyWaves[p]=depth; parent[p]=producer; }
+        }
+        if(last==RGPassId::kInvalid || m_dependencyWaves[p]>m_dependencyWaves[last] ||
+            (m_dependencyWaves[p]==m_dependencyWaves[last] && p<last)) last=p;
+    }
+    if(last!=RGPassId::kInvalid)
+    {
+        m_stats.dependencyWaveCount=static_cast<uint32_t>(m_dependencyWaves[last]+1);
+        for(auto p=last;p!=RGPassId::kInvalid;p=parent[p]) m_criticalPath.push_back(p);
+        std::reverse(m_criticalPath.begin(),m_criticalPath.end());
+    }
 }
 
 bool EnhancedRenderGraph::Compile(std::string& outError)
@@ -945,6 +995,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     if (!BuildOrder(outError)) return false;
 
     CullPasses();
+    BuildDependencyWaves();
 
     if (!CreateTransients(outError)) return false;
 
@@ -1173,6 +1224,26 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     {
         unitWorker[i] = static_cast<uint32_t>(i * workers / unitCount);
     }
+    std::vector<uint32_t> unitWave(unitCount,0);
+    uint32_t waveCount=1;
+    if(m_scheduling==RGSchedulingMode::ExplicitVersioned && workers>1)
+    {
+        std::vector<std::vector<uint16_t>> predecessors(m_passes.size());
+        for(const auto& edge:m_versionEdges) predecessors[edge.consumer].push_back(static_cast<uint16_t>(edge.producer));
+        std::vector<uint32_t> passWave(m_passes.size(),0), targetWave(workers,0);
+        for(size_t begin=0;begin<unitCount;)
+        {
+            size_t end=begin+1;
+            while(end<unitCount && units[end].order==units[begin].order) ++end;
+            const auto pass=m_executeOrder[units[begin].order];
+            uint32_t wave=0;
+            for(const auto producer:predecessors[pass]) wave=(std::max)(wave,passWave[producer]+1);
+            for(size_t i=begin;i<end;++i) wave=(std::max)(wave,targetWave[unitWorker[i]]);
+            for(size_t i=begin;i<end;++i) { unitWave[i]=wave; targetWave[unitWorker[i]]=wave; }
+            passWave[pass]=wave; waveCount=(std::max)(waveCount,wave+1); begin=end;
+        }
+    }
+    uint32_t activeWave=0; // owner changes only after every recording Job has joined
 
     const auto discardRecording = [&]
     {
@@ -1208,6 +1279,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
             for (size_t i = 0; i < unitCount; ++i)
             {
                 if (unitWorker[i] != worker) continue;
+                if (unitWave[i] != activeWave) continue;
 
                 const RecordUnit& unit = units[i];
                 Pass& pass = m_passes[m_executeOrder[unit.order]];
@@ -1259,7 +1331,11 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // RunParallel은 모든 콜백이 끝난 뒤 반환/throw하므로 아래에서 안전하게 닫는다.
     try
     {
-        pool.RunParallel(recordRange, workers);
+        for(activeWave=0;activeWave<waveCount;++activeWave)
+        {
+            pool.RunParallel(recordRange, workers);
+            if(failed.load(std::memory_order_relaxed)) break;
+        }
     }
     catch (const std::exception& e)
     {
@@ -1307,6 +1383,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     m_stats.recordWorkers = workers;
     m_stats.recordedLists = static_cast<uint32_t>(submission.size());
     m_stats.recordUnits = static_cast<uint32_t>(unitCount);
+    m_stats.recordingWaveCount=waveCount;
     return true;
 }
 

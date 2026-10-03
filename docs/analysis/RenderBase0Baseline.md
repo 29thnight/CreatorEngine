@@ -1,6 +1,6 @@
 # BASE-0 구현과 검증 기록
 
-2026-10-03 RG3 완료 이후 현행 소스/바이너리 기준선은 [RG3 검증 기록](RenderRg3LifetimeBarriers.md)을 따른다. 아래 BASE-0 v4는 구조 변경 전 해시와 이미지 증거로 보존한다.
+2026-10-03 RG5-8 GraphSurface·Draw/반환 출력 완료 이후 현행 소스/바이너리 기준선은 [GraphSurface·Draw/반환 출력 검증 기록](RenderRg5SurfaceMigration.md)을 따른다. Debug/Release 반복 실행 및 변경 전후/구성 간 16개 이미지 오차 0과 현행 해시를 확인했다. RG5 전체와 버전 기반 제품 GPU 수용은 아직 열려 있다. 아래 BASE-0와 이전 RG5-1/2 기록은 당시 증거로 보존한다.
 
 ## 현재 완료 계약 — 2026-10-02 범위 정리
 

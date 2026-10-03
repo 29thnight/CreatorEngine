@@ -955,6 +955,9 @@ RHISamplerTable EnhancedGBufferPass::SamplerTableFor(
 
 void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const auto outputAccess = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+        ? RGAccessMode::LegacyState : RGAccessMode::Write;
     // 타깃을 그래프에 선언한다. 실제 생성과 배리어는 그래프가 맡는다 —
     // 이 패스는 무엇을 어떤 상태로 쓸지만 말한다.
     static const char* kNames[kRenderTargetCount] = {
@@ -971,6 +974,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         desc.allowRenderTarget = true;
         desc.name = kNames[i];
         targets[i] = graph.CreateTexture(desc);
+        if (versioned)
+        {
+            targets[i] = graph.Write(targets[i]);
+        }
     }
 
     RGTextureDesc depthDesc{};
@@ -979,7 +986,11 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     depthDesc.format = kDepthFormat;
     depthDesc.allowDepthStencil = true;
     depthDesc.name = "GBuffer.Depth";
-    const RGHandle depth = graph.CreateTexture(depthDesc);
+    RGHandle depth = graph.CreateTexture(depthDesc);
+    if (versioned)
+    {
+        depth = graph.Write(depth);
+    }
 
     m_outputs.diffuse = targets[0];
     m_outputs.metalRough = targets[1];
@@ -992,9 +1003,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     usages.reserve(kRenderTargetCount + 1);
     for (uint32_t i = 0; i < kRenderTargetCount; ++i)
     {
-        usages.push_back({ targets[i], RHIResourceState::RenderTarget });
+        usages.push_back({ targets[i], RHIResourceState::RenderTarget, outputAccess });
     }
-    usages.push_back({ depth, RHIResourceState::DepthWrite });
+    usages.push_back({ depth, RHIResourceState::DepthWrite, outputAccess });
 
     // 소비자가 없을 때만 뿌리로 표시해 살려 둔다(SetKeepAlive).
     // Deferred가 붙으면 그쪽이 읽으므로 표시 없이도 살아남아야 한다.

@@ -379,6 +379,10 @@ void EnhancedSSGIPass::ReleaseHistory(const EnhancedFrameContext& context)
 
 void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
     if (!m_inputs.depth.IsValid() || !m_tracePSO.IsValid())
     {
         // 입력이 없으면 선언하지 않는다. 빈 패스를 넣으면 배리어와 컬링이
@@ -398,11 +402,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 한쪽만 들이면 나머지가 그래프 밖에 남아 같은 문제가 반복된다.
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
-        m_historyHandle[i] = graph.ImportTexture(m_history[i],
-            m_historyState[i], "SSGI.History" + std::to_string(i), &m_historyState[i]);
-        m_historyDepthHandle[i] = graph.ImportTexture(m_historyDepth[i],
-            m_historyDepthState[i], "SSGI.HistoryDepth" + std::to_string(i),
-            &m_historyDepthState[i]);
+        m_historyHandle[i] = graph.ImportTexture(m_history[i], m_historyState[i], "SSGI.History" + std::to_string(i),
+                                                 &m_historyState[i]);
+        m_historyDepthHandle[i] = graph.ImportTexture(m_historyDepth[i], m_historyDepthState[i],
+                                                      "SSGI.HistoryDepth" + std::to_string(i), &m_historyDepthState[i]);
     }
 
     // ── Hi-Z 밉 체인 선언 ──
@@ -418,6 +421,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         desc.allowUnorderedAccess = true;
         desc.name = "SSGI.HiZ." + std::to_string(mip);
         m_hiZMips[mip] = graph.CreateTexture(desc);
+        if (versioned)
+        {
+            m_hiZMips[mip] = graph.Write(m_hiZMips[mip]);
+        }
     }
 
     RGTextureDesc giDesc{};
@@ -428,12 +435,24 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
     giDesc.name = "SSGI.Trace";
     m_traceResult = graph.CreateTexture(giDesc);
+    if (versioned)
+    {
+        m_traceResult = graph.Write(m_traceResult);
+    }
 
     giDesc.name = "SSGI.Resolved";
     m_resolved = graph.CreateTexture(giDesc);
+    if (versioned)
+    {
+        m_resolved = graph.Write(m_resolved);
+    }
 
     giDesc.name = "SSGI.Filtered";
     m_filtered = graph.CreateTexture(giDesc);
+    if (versioned)
+    {
+        m_filtered = graph.Write(m_filtered);
+    }
 
     // 합성은 전 해상도다. 라이팅에 간접광을 더한 결과를 뒤 패스가 읽는다.
     //
@@ -449,6 +468,10 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     outDesc.allowRenderTarget = true;
     outDesc.name = "SSGI.Output";
     m_output = graph.CreateTexture(outDesc);
+    if (versioned)
+    {
+        m_output = graph.Write(m_output);
+    }
 
     // ── 1단계: Hi-Z 빌드 ──
     //
@@ -460,23 +483,21 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         if (0 == mip)
         {
-            usages.push_back({ m_inputs.depth, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.depth, RHIResourceState::ShaderResource, readAccess});
         }
         else
         {
-            usages.push_back({ m_hiZMips[mip - 1], RHIResourceState::ShaderResource });
+            usages.push_back({m_hiZMips[mip - 1], RHIResourceState::ShaderResource, readAccess});
         }
-        usages.push_back({ m_hiZMips[mip], RHIResourceState::UnorderedAccess });
+        usages.push_back({m_hiZMips[mip], RHIResourceState::UnorderedAccess, writeAccess});
 
-        graph.AddPass("SSGI.HiZ." + std::to_string(mip), usages,
-            [this, &context, mip](const EnhancedRenderGraph::ExecuteContext& executeContext)
-            {
+        graph.AddPass(
+            "SSGI.HiZ." + std::to_string(mip), usages,
+            [this, &context, mip](const EnhancedRenderGraph::ExecuteContext& executeContext) {
                 const uint32_t targetWidth = (std::max)(1u, m_giWidth >> mip);
                 const uint32_t targetHeight = (std::max)(1u, m_giHeight >> mip);
-                const uint32_t sourceWidth = (0 == mip) ? context.width
-                    : (std::max)(1u, m_giWidth >> (mip - 1));
-                const uint32_t sourceHeight = (0 == mip) ? context.height
-                    : (std::max)(1u, m_giHeight >> (mip - 1));
+                const uint32_t sourceWidth = (0 == mip) ? context.width : (std::max)(1u, m_giWidth >> (mip - 1));
+                const uint32_t sourceHeight = (0 == mip) ? context.height : (std::max)(1u, m_giHeight >> (mip - 1));
 
                 HiZParams params{};
                 params.targetWidth = targetWidth;
@@ -484,27 +505,28 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 params.sourceWidth = sourceWidth;
                 params.sourceHeight = sourceHeight;
 
-                const auto cb = context.resources->UploadConstants(
-                    &params, sizeof(HiZParams));
-                if (!cb.IsValid()) return;
-                const RHITextureHandle source = (0 == mip)
-                    ? executeContext.ResolveHandle(m_inputs.depth)
-                    : executeContext.ResolveHandle(m_hiZMips[mip - 1]);
+                const auto cb = context.resources->UploadConstants(&params, sizeof(HiZParams));
+                if (!cb.IsValid())
+                {
+                    return;
+                }
+                const RHITextureHandle source = (0 == mip) ? executeContext.ResolveHandle(m_inputs.depth)
+                                                           : executeContext.ResolveHandle(m_hiZMips[mip - 1]);
 
                 // SRV 테이블은 시그니처 크기만큼 잡는다. 안 쓰는 슬롯도
                 // 디스크립터가 있어야 검증 레이어가 조용하다 — 그래서 전부
                 // 같은 것으로 채운다.
                 std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
-                srvs.fill((0 == mip)
-                    ? RHIBindingDesc::SrvDepth(source)
-                    : RHIBindingDesc::Srv2D(source, kHiZFormat));
+                srvs.fill((0 == mip) ? RHIBindingDesc::SrvDepth(source) : RHIBindingDesc::Srv2D(source, kHiZFormat));
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_hiZMips[mip]),
-                        kHiZFormat),
+                    RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_hiZMips[mip]), kHiZFormat),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
-                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+                if (!srvTable.IsValid() || !uavTable.IsValid())
+                {
+                    return;
+                }
 
                 // 힙 바인딩은 인코더가 한다(R4-1c). 이 자리에서 그것을 손으로
                 // 부르다 빠뜨려 SetComputeRootDescriptorTable에서 죽은 적이
@@ -528,28 +550,25 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
         for (uint32_t mip = 0; mip < m_hiZMipCount; ++mip)
         {
-            usages.push_back({ m_hiZMips[mip], RHIResourceState::ShaderResource });
+            usages.push_back({m_hiZMips[mip], RHIResourceState::ShaderResource, readAccess});
         }
         if (m_inputs.normal.IsValid())
         {
-            usages.push_back({ m_inputs.normal, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.normal, RHIResourceState::ShaderResource, readAccess});
         }
         if (m_inputs.lighting.IsValid())
         {
-            usages.push_back({ m_inputs.lighting, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.lighting, RHIResourceState::ShaderResource, readAccess});
         }
-        usages.push_back({ m_traceResult, RHIResourceState::UnorderedAccess });
+        usages.push_back({m_traceResult, RHIResourceState::UnorderedAccess, writeAccess});
 
-        graph.AddPass("SSGI.Trace", usages,
-            [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
-            {
+        graph.AddPass(
+            "SSGI.Trace", usages, [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext) {
                 TraceParams params{};
                 if (nullptr != context.camera)
                 {
-                    params.projection =
-                        math::transpose(context.camera->projection);
-                    params.inverseProjection =
-                        math::transpose(context.camera->inverseProjection);
+                    params.projection = math::transpose(context.camera->projection);
+                    params.inverseProjection = math::transpose(context.camera->inverseProjection);
                 }
                 params.outputWidth = m_giWidth;
                 params.outputHeight = m_giHeight;
@@ -558,22 +577,20 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 params.mipCount = m_hiZMipCount;
                 params.frameIndex = m_frameIndex;
                 // 라이팅이 없으면 대체물(Hi-Z 0)이 꽂히므로 그 해상도를 준다.
-                params.lightingWidth = m_inputs.lighting.IsValid()
-                    ? context.width : m_giWidth;
-                params.lightingHeight = m_inputs.lighting.IsValid()
-                    ? context.height : m_giHeight;
-                params.normalWidth = m_inputs.normal.IsValid()
-                    ? context.width : m_giWidth;
-                params.normalHeight = m_inputs.normal.IsValid()
-                    ? context.height : m_giHeight;
+                params.lightingWidth = m_inputs.lighting.IsValid() ? context.width : m_giWidth;
+                params.lightingHeight = m_inputs.lighting.IsValid() ? context.height : m_giHeight;
+                params.normalWidth = m_inputs.normal.IsValid() ? context.width : m_giWidth;
+                params.normalHeight = m_inputs.normal.IsValid() ? context.height : m_giHeight;
                 // 실측으로 정할 값들이다. 지금은 눈으로 볼 수 있는 범위를
                 // 잡아 두고, 리졸브가 붙은 뒤 씬에 맞춰 조인다.
                 params.maxDistance = m_tuning.traceDistance;
                 params.thickness = m_tuning.traceThickness;
 
-                const auto cb = context.resources->UploadConstants(
-                    &params, sizeof(TraceParams));
-                if (!cb.IsValid()) return;
+                const auto cb = context.resources->UploadConstants(&params, sizeof(TraceParams));
+                if (!cb.IsValid())
+                {
+                    return;
+                }
                 // ★ 없어도 디스크립터는 반드시 만든다.
                 //
                 // 처음에는 nullptr이면 건너뛰었다. 그러자 그 슬롯이 초기화되지
@@ -594,24 +611,26 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                     // 안에서만 읽으므로 값은 안 쓰이지만, 디스크립터가 비어
                     // 있으면 검증 레이어가 잡는다.
                     const uint32_t index = (i < m_hiZMipCount) ? i : (m_hiZMipCount - 1);
-                    srvs[i] = RHIBindingDesc::Srv2D(
-                        executeContext.ResolveHandle(m_hiZMips[index]), kHiZFormat);
+                    srvs[i] = RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_hiZMips[index]), kHiZFormat);
                 }
-                srvs[kMaxHiZMips] = m_inputs.normal.IsValid()
-                    ? RHIBindingDesc::Srv2D(
-                        executeContext.ResolveHandle(m_inputs.normal), kColorFormat)
-                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
-                srvs[kMaxHiZMips + 1] = m_inputs.lighting.IsValid()
-                    ? RHIBindingDesc::Srv2D(
-                        executeContext.ResolveHandle(m_inputs.lighting), kColorFormat)
-                    : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
+                srvs[kMaxHiZMips] =
+                    m_inputs.normal.IsValid()
+                        ? RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.normal), kColorFormat)
+                        : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
+                srvs[kMaxHiZMips + 1] =
+                    m_inputs.lighting.IsValid()
+                        ? RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.lighting), kColorFormat)
+                        : RHIBindingDesc::Srv2D(fallback, kHiZFormat);
 
                 const RHIBindingDesc uavs[] = {
                     RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_traceResult), kGIFormat),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
-                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+                if (!srvTable.IsValid() || !uavTable.IsValid())
+                {
+                    return;
+                }
 
                 RHIEncoder& encoder = *executeContext.encoder;
                 encoder.SetPipeline(RHIBindPoint::Compute, m_tracePSO);
@@ -630,31 +649,26 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 종류의 실수가 난다 — 이 작업에서 이미 두 번 겪었다(대상 선택 계산,
     // 경계 측정).
     const auto declareStage = [this, &graph, &context](
-        const std::string& name,
-        const std::vector<EnhancedRenderGraph::RGPassUsage>& usages,
-        RHIPipelineHandle pso,
-        RGHandle target,
-        const std::vector<RGHandle>& srvHandles,
-        const std::vector<RHITextureHandle>& externalSrvs,
-        const void* constants, size_t constantBytes,
-        uint32_t dispatchWidth, uint32_t dispatchHeight,
-        bool hasSideEffect)
-    {
+                                  const std::string& name, const std::vector<EnhancedRenderGraph::RGPassUsage>& usages,
+                                  RHIPipelineHandle pso, RGHandle target, const std::vector<RGHandle>& srvHandles,
+                                  const std::vector<RHITextureHandle>& externalSrvs, const void* constants,
+                                  size_t constantBytes, uint32_t dispatchWidth, uint32_t dispatchHeight,
+                                  bool hasSideEffect) {
         // 상수는 값으로 복사해 둔다. 람다가 프레임 뒤에 실행되므로 호출부의
         // 지역 변수를 가리키면 그때는 이미 사라져 있다.
         std::vector<uint8_t> constantCopy(constantBytes);
         memcpy(constantCopy.data(), constants, constantBytes);
 
-        graph.AddPass(name, usages,
-            [this, &context, pso, target, srvHandles, externalSrvs, constantCopy,
-             dispatchWidth, dispatchHeight]
-            (const EnhancedRenderGraph::ExecuteContext& executeContext)
-            {
-
+        graph.AddPass(
+            name, usages,
+            [this, &context, pso, target, srvHandles, externalSrvs, constantCopy, dispatchWidth,
+             dispatchHeight](const EnhancedRenderGraph::ExecuteContext& executeContext) {
                 const auto cb = context.resources->AllocateUpload(
-                    RHIUploadRequest{ constantCopy.size(),
-                        RHIUploadUsage::ConstantBuffer, 1 });
-                if (!cb.IsValid()) return;
+                    RHIUploadRequest{constantCopy.size(), RHIUploadUsage::ConstantBuffer, 1});
+                if (!cb.IsValid())
+                {
+                    return;
+                }
                 memcpy(cb.cpuAddress, constantCopy.data(), constantCopy.size());
 
                 // 그래프 리소스와 외부 리소스를 순서대로 꽂는다.
@@ -671,14 +685,14 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 // ★ 남는 슬롯도 반드시 채운다. 비워 두면 GPU가 초기화되지
                 //   않은 디스크립터를 읽고 그 자리에서 죽는다 — 트레이스에서
                 //   이미 겪었다.
-                const RHITextureHandle fallback = sources.empty()
-                    ? executeContext.ResolveHandle(m_hiZMips[0]) : sources.front();
+                const RHITextureHandle fallback =
+                    sources.empty() ? executeContext.ResolveHandle(m_hiZMips[0]) : sources.front();
 
                 std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                 for (uint32_t i = 0; i < kMaxHiZMips + 2; ++i)
                 {
-                    const RHITextureHandle resource = (i < sources.size() && sources[i].IsValid())
-                        ? sources[i] : fallback;
+                    const RHITextureHandle resource =
+                        (i < sources.size() && sources[i].IsValid()) ? sources[i] : fallback;
                     // 깊이면 색 포맷으로 갈아 보고, 아니면 리소스 포맷 그대로다.
                     srvs[i] = RHIBindingDesc::SrvDepth(resource);
                 }
@@ -691,12 +705,14 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 //   `GetDesc()` 를 읽었고, 그것이 이 패스가 인터페이스 경유로
                 //   DX12 를 만지던 마지막 자리 중 하나였다.
                 const RHIBindingDesc uavs[] = {
-                    RHIBindingDesc::Uav2D(targetResource,
-                        context.resources->DescribeTexture(targetResource).format),
+                    RHIBindingDesc::Uav2D(targetResource, context.resources->DescribeTexture(targetResource).format),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
                 const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
-                if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+                if (!srvTable.IsValid() || !uavTable.IsValid())
+                {
+                    return;
+                }
 
                 RHIEncoder& encoder = *executeContext.encoder;
                 encoder.SetPipeline(RHIBindPoint::Compute, pso);
@@ -705,7 +721,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                 encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
                 encoder.Dispatch((dispatchWidth + 7) / 8, (dispatchHeight + 7) / 8, 1);
-            }, hasSideEffect);
+            },
+            hasSideEffect);
     };
 
     // ── 3단계: 리졸브(재투영 + 누적) ──
@@ -713,8 +730,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         ResolveParams params{};
         if (nullptr != context.camera)
         {
-            params.inverseProjection =
-                math::transpose(context.camera->inverseProjection);
+            params.inverseProjection = math::transpose(context.camera->inverseProjection);
             params.inverseView = math::transpose(context.camera->inverseView);
         }
         params.previousViewProjection = math::transpose(m_previousViewProjection);
@@ -729,17 +745,17 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         const uint32_t readIndex = (m_historyIndex + kHistoryCount - 1) % kHistoryCount;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_traceResult, RHIResourceState::ShaderResource });
-        usages.push_back({ m_hiZMips[0], RHIResourceState::ShaderResource });
+        usages.push_back({m_traceResult, RHIResourceState::ShaderResource, readAccess});
+        usages.push_back({m_hiZMips[0], RHIResourceState::ShaderResource, readAccess});
         // 지난 프레임 히스토리를 읽는다. 예전에는 이 읽기가 그래프에 안
         // 보였고, 상태가 늘 셰이더 자원으로 고정돼 있어서 우연히 맞았다.
-        usages.push_back({ m_historyHandle[readIndex], RHIResourceState::ShaderResource });
-        usages.push_back({ m_historyDepthHandle[readIndex], RHIResourceState::ShaderResource });
+        usages.push_back({m_historyHandle[readIndex], RHIResourceState::ShaderResource, readAccess});
+        usages.push_back({m_historyDepthHandle[readIndex], RHIResourceState::ShaderResource, readAccess});
         if (m_inputs.normal.IsValid())
         {
-            usages.push_back({ m_inputs.normal, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.normal, RHIResourceState::ShaderResource, readAccess});
         }
-        usages.push_back({ m_resolved, RHIResourceState::UnorderedAccess });
+        usages.push_back({m_resolved, RHIResourceState::UnorderedAccess, writeAccess});
 
         // ★ 슬롯 순서가 셰이더 선언과 맞아야 한다.
         //   t0 트레이스 · t1 히스토리 · t2 히스토리깊이 · t3 깊이 · t4 노멀
@@ -760,15 +776,13 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         //
         // 조건부로 슬롯 수가 바뀌는 것 자체가 위험하다. 자리는 고정하고
         // 없는 것만 대체물로 채운다.
-        std::vector<RGHandle> ordered{ m_traceResult, m_hiZMips[0] };
+        std::vector<RGHandle> ordered{m_traceResult, m_hiZMips[0]};
         ordered.push_back(m_inputs.normal.IsValid() ? m_inputs.normal : m_hiZMips[0]);
 
-        std::vector<RHITextureHandle> orderedExternal{
-            m_history[readIndex], m_historyDepth[readIndex] };
+        std::vector<RHITextureHandle> orderedExternal{m_history[readIndex], m_historyDepth[readIndex]};
 
-        declareStage("SSGI.Resolve", usages, m_resolvePSO, m_resolved,
-            ordered, orderedExternal, &params, sizeof(params),
-            m_giWidth, m_giHeight, false);
+        declareStage("SSGI.Resolve", usages, m_resolvePSO, m_resolved, ordered, orderedExternal, &params,
+                     sizeof(params), m_giWidth, m_giHeight, false);
     }
 
     // ── 4단계: bilateral 필터 ──
@@ -780,21 +794,20 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         params.normalPower = m_tuning.filterNormalPower;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_resolved, RHIResourceState::ShaderResource });
-        usages.push_back({ m_hiZMips[0], RHIResourceState::ShaderResource });
+        usages.push_back({m_resolved, RHIResourceState::ShaderResource, readAccess});
+        usages.push_back({m_hiZMips[0], RHIResourceState::ShaderResource, readAccess});
         if (m_inputs.normal.IsValid())
         {
-            usages.push_back({ m_inputs.normal, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.normal, RHIResourceState::ShaderResource, readAccess});
         }
-        usages.push_back({ m_filtered, RHIResourceState::UnorderedAccess });
+        usages.push_back({m_filtered, RHIResourceState::UnorderedAccess, writeAccess});
 
         // 자리를 고정한다(리졸브와 같은 이유).
-        std::vector<RGHandle> srvHandles{ m_resolved, m_hiZMips[0] };
+        std::vector<RGHandle> srvHandles{m_resolved, m_hiZMips[0]};
         srvHandles.push_back(m_inputs.normal.IsValid() ? m_inputs.normal : m_hiZMips[0]);
 
-        declareStage("SSGI.Filter", usages, m_filterPSO, m_filtered,
-            srvHandles, {}, &params, sizeof(params),
-            m_giWidth, m_giHeight, false);
+        declareStage("SSGI.Filter", usages, m_filterPSO, m_filtered, srvHandles, {}, &params, sizeof(params), m_giWidth,
+                     m_giHeight, false);
     }
 
     // ── 5단계: 업샘플 + 합성 ──
@@ -809,33 +822,34 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         params.hasMaterial = m_inputs.metalRough.IsValid() ? 1u : 0u;
 
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_filtered, RHIResourceState::ShaderResource });
-        usages.push_back({ m_hiZMips[0], RHIResourceState::ShaderResource });
+        usages.push_back({m_filtered, RHIResourceState::ShaderResource, readAccess});
+        usages.push_back({m_hiZMips[0], RHIResourceState::ShaderResource, readAccess});
         if (m_inputs.lighting.IsValid())
         {
-            usages.push_back({ m_inputs.lighting, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.lighting, RHIResourceState::ShaderResource, readAccess});
         }
-        usages.push_back({ m_inputs.depth, RHIResourceState::ShaderResource });
+        usages.push_back({m_inputs.depth, RHIResourceState::ShaderResource, readAccess});
         if (m_inputs.diffuse.IsValid())
         {
-            usages.push_back({ m_inputs.diffuse, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.diffuse, RHIResourceState::ShaderResource, readAccess});
         }
         if (m_inputs.ambientOcclusion.IsValid())
         {
-            usages.push_back({ m_inputs.ambientOcclusion, RHIResourceState::ShaderResource });
+            usages.push_back({m_inputs.ambientOcclusion, RHIResourceState::ShaderResource, readAccess});
         }
         if (m_inputs.metalRough.IsValid())
-            usages.push_back({ m_inputs.metalRough, RHIResourceState::ShaderResource });
-        usages.push_back({ m_output, RHIResourceState::UnorderedAccess });
+        {
+            usages.push_back({m_inputs.metalRough, RHIResourceState::ShaderResource, readAccess});
+        }
+        usages.push_back({m_output, RHIResourceState::UnorderedAccess, writeAccess});
 
         // t0 GI · t1 GI깊이 · t2 라이팅 · t3 깊이 · t4 디퓨즈 · t5 AO · t6 ORM
         // 자리를 고정한다(리졸브와 같은 이유).
-        std::vector<RGHandle> srvHandles{ m_filtered, m_hiZMips[0] };
+        std::vector<RGHandle> srvHandles{m_filtered, m_hiZMips[0]};
         srvHandles.push_back(m_inputs.lighting.IsValid() ? m_inputs.lighting : m_hiZMips[0]);
         srvHandles.push_back(m_inputs.depth);
         srvHandles.push_back(m_inputs.diffuse.IsValid() ? m_inputs.diffuse : m_hiZMips[0]);
-        srvHandles.push_back(m_inputs.ambientOcclusion.IsValid()
-            ? m_inputs.ambientOcclusion : m_hiZMips[0]);
+        srvHandles.push_back(m_inputs.ambientOcclusion.IsValid() ? m_inputs.ambientOcclusion : m_hiZMips[0]);
         srvHandles.push_back(m_inputs.metalRough.IsValid() ? m_inputs.metalRough : m_hiZMips[0]);
 
         if (m_inputs.ambientOcclusion.IsValid())
@@ -845,9 +859,8 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         }
 
         // 합성 결과는 그래프 밖으로 나간다 — 뿌리로 표시한다.
-        declareStage("SSGI.Composite", usages, m_compositePSO, m_output,
-            srvHandles, {}, &params, sizeof(params),
-            context.width, context.height, true);
+        declareStage("SSGI.Composite", usages, m_compositePSO, m_output, srvHandles, {}, &params, sizeof(params),
+                     context.width, context.height, true);
     }
 
     // ── 히스토리 갱신 ──
@@ -866,35 +879,39 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         //
         // 누적은 리졸브 결과를 이어가고, 필터는 화면에 낼 때만 쓴다.
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ m_resolved, RHIResourceState::CopySource });
-        usages.push_back({ m_hiZMips[0], RHIResourceState::CopySource });
+        usages.push_back({m_resolved, RHIResourceState::CopySource, readAccess});
+        usages.push_back({m_hiZMips[0], RHIResourceState::CopySource, readAccess});
         // 쓰는 쪽도 usage로 선언한다(R4-2b). 예전에는 여기서 손으로
         // SRV → COPY_DEST → SRV 전이를 걸었고, 그 앞뒤 상태를 단정하고 있었다.
-        usages.push_back({ m_historyHandle[m_historyIndex], RHIResourceState::CopyDest });
-        usages.push_back({ m_historyDepthHandle[m_historyIndex], RHIResourceState::CopyDest });
+        if (versioned)
+        {
+            m_historyHandle[m_historyIndex] = graph.Write(m_historyHandle[m_historyIndex]);
+            m_historyDepthHandle[m_historyIndex] = graph.Write(m_historyDepthHandle[m_historyIndex]);
+        }
+        usages.push_back({m_historyHandle[m_historyIndex], RHIResourceState::CopyDest, writeAccess});
+        usages.push_back({m_historyDepthHandle[m_historyIndex], RHIResourceState::CopyDest, writeAccess});
 
         const RGHandle historyTarget = m_historyHandle[m_historyIndex];
         const RGHandle historyDepthTarget = m_historyDepthHandle[m_historyIndex];
 
-        graph.AddPass("SSGI.StoreHistory", usages,
-            [this, historyTarget, historyDepthTarget]
-            (const EnhancedRenderGraph::ExecuteContext& executeContext)
-            {
+        graph.AddPass(
+            "SSGI.StoreHistory", usages,
+            [this, historyTarget, historyDepthTarget](const EnhancedRenderGraph::ExecuteContext& executeContext) {
                 RHIEncoder& encoder = *executeContext.encoder;
 
                 encoder.CopyResource(executeContext.ResolveHandle(historyTarget),
-                    executeContext.ResolveHandle(m_resolved));
+                                     executeContext.ResolveHandle(m_resolved));
                 encoder.CopyResource(executeContext.ResolveHandle(historyDepthTarget),
-                    executeContext.ResolveHandle(m_hiZMips[0]));
-            }, true);
+                                     executeContext.ResolveHandle(m_hiZMips[0]));
+            },
+            true);
     }
 
     // 이번 프레임 행렬을 다음 프레임의 '이전'으로 남긴다. Declare가 끝난
     // 뒤라야 이번 프레임 리졸브가 진짜 지난 프레임 값을 쓴다.
     if (nullptr != context.camera)
     {
-        m_previousViewProjection =
-            context.camera->view * context.camera->projection;
+        m_previousViewProjection = context.camera->view * context.camera->projection;
         m_hasPreviousFrame = true;
     }
     m_historyValid = true;
@@ -921,4 +938,3 @@ void EnhancedSSGIPass::Shutdown()
     m_filterPSO = {};
     m_compositePSO = {};
 }
-

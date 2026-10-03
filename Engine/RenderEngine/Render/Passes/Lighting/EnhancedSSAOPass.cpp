@@ -1,4 +1,4 @@
-﻿#include "EnhancedSSAOPass.h"
+#include "EnhancedSSAOPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -137,11 +137,14 @@ bool EnhancedSSAOPass::PrepareFrame(const EnhancedFrameContext& context, std::st
 
 void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
     m_output = RGHandle{};
     m_rawOutput = RGHandle{};
 
-    if (!m_inputs.depth.IsValid() || !m_inputs.normal.IsValid() ||
-        !m_aoPSO.IsValid() || !m_filterPSO.IsValid() ||
+    if (!m_inputs.depth.IsValid() || !m_inputs.normal.IsValid() || !m_aoPSO.IsValid() || !m_filterPSO.IsValid() ||
         0 == m_width || 0 == m_height)
     {
         return;
@@ -158,17 +161,20 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     RGTextureDesc filteredDesc = aoDesc;
     filteredDesc.name = "SSAO.Filtered";
     m_output = graph.CreateTexture(filteredDesc);
+    if (versioned)
+    {
+        m_rawOutput = graph.Write(m_rawOutput);
+        m_output = graph.Write(m_output);
+    }
 
     // 상수는 두 패스가 같은 것을 쓴다. 한 번 만들어 둘 다 가리키게 하면
     // 값이 갈릴 자리가 없어진다 — SSGI에서 크기 상수를 패스마다 따로
     // 채우다가 필터가 다른 해상도를 본 적이 있다.
-    const auto fillParams = [this, &context]() -> SSAOParams
-    {
+    const auto fillParams = [this, &context]() -> SSAOParams {
         SSAOParams params{};
         if (nullptr != context.camera)
         {
-            params.inverseProjection =
-                math::transpose(context.camera->inverseProjection);
+            params.inverseProjection = math::transpose(context.camera->inverseProjection);
             params.projection = math::transpose(context.camera->projection);
             params.view = math::transpose(context.camera->view);
         }
@@ -186,49 +192,52 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
     // ── AO ──
     graph.AddPass("SSAO.Compute",
-        { { m_inputs.depth, RHIResourceState::ShaderResource },
-          { m_inputs.normal, RHIResourceState::ShaderResource },
-          { m_rawOutput, RHIResourceState::UnorderedAccess } },
-        [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
-        {
+                  {{m_inputs.depth, RHIResourceState::ShaderResource, readAccess},
+                   {m_inputs.normal, RHIResourceState::ShaderResource, readAccess},
+                   {m_rawOutput, RHIResourceState::UnorderedAccess, writeAccess}},
+                  [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext) {
+                      const SSAOParams params = fillParams();
+                      const auto cb = context.resources->UploadConstants(&params, sizeof(SSAOParams));
+                      if (!cb.IsValid())
+                      {
+                          return;
+                      }
+                      // 테이블 둘을 잘라 받는다(R2) — 루트 파라미터가 SRV·UAV로 나뉘어 있다.
+                      const RHIBindingDesc srvs[] = {
+                          RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
+                          RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.normal)),
+                      };
+                      const RHIBindingDesc uavs[] = {
+                          RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_rawOutput), kAOFormat),
+                      };
+                      const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
+                      const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
+                      if (!srvTable.IsValid() || !uavTable.IsValid())
+                      {
+                          return;
+                      }
 
-            const SSAOParams params = fillParams();
-            const auto cb = context.resources->UploadConstants(
-                &params, sizeof(SSAOParams));
-            if (!cb.IsValid()) return;
-            // 테이블 둘을 잘라 받는다(R2) — 루트 파라미터가 SRV·UAV로 나뉘어 있다.
-            const RHIBindingDesc srvs[] = {
-                RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
-                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.normal)),
-            };
-            const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::Uav2D(executeContext.ResolveHandle(m_rawOutput), kAOFormat),
-            };
-            const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
-            const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
-            if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+                      RHIEncoder& encoder = *executeContext.encoder;
+                      encoder.SetPipeline(RHIBindPoint::Compute, m_aoPSO);
+                      encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
+                      encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
+                      encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
-            RHIEncoder& encoder = *executeContext.encoder;
-            encoder.SetPipeline(RHIBindPoint::Compute,
-                m_aoPSO);
-            encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, cb);
-            encoder.SetBindings(RHIBindPoint::Compute, 1, srvTable);
-            encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
-
-            encoder.Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
-        });
+                      encoder.Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
+                  });
 
     // ── 디노이즈 ──
-    graph.AddPass("SSAO.Filter",
-        { { m_rawOutput, RHIResourceState::ShaderResource },
-          { m_output, RHIResourceState::UnorderedAccess } },
-        [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext)
-        {
-
+    graph.AddPass(
+        "SSAO.Filter",
+        {{m_rawOutput, RHIResourceState::ShaderResource, readAccess},
+         {m_output, RHIResourceState::UnorderedAccess, writeAccess}},
+        [this, &context, fillParams](const EnhancedRenderGraph::ExecuteContext& executeContext) {
             const SSAOParams params = fillParams();
-            const auto cb = context.resources->UploadConstants(
-                &params, sizeof(SSAOParams));
-            if (!cb.IsValid()) return;
+            const auto cb = context.resources->UploadConstants(&params, sizeof(SSAOParams));
+            if (!cb.IsValid())
+            {
+                return;
+            }
             // ★ SRV 슬롯 수는 고정이다.
             //
             // 필터는 t0 하나만 쓰지만 테이블은 둘을 자른다. 조건에 따라
@@ -245,7 +254,10 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
-            if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+            if (!srvTable.IsValid() || !uavTable.IsValid())
+            {
+                return;
+            }
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute, m_filterPSO);
@@ -254,7 +266,8 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             encoder.SetBindings(RHIBindPoint::Compute, 2, uavTable);
 
             encoder.Dispatch((m_width + 7) / 8, (m_height + 7) / 8, 1);
-        }, m_keepAlive);
+        },
+        m_keepAlive);
 }
 
 void EnhancedSSAOPass::Shutdown()

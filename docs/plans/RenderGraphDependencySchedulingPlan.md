@@ -6,7 +6,7 @@
 2026-08-28 작성. `EnhancedRenderGraph`를 교체하지 않고, 명시적 리소스 접근과
 버전 계보로 실행 순서를 컴파일하는 그래프로 단계적으로 확장하는 구현 계획이다.
 
-상태: **2026-10-03 BASE-0 완료, RG1 완료, RG2 완료, RG3 완료, RG4~RG9 미착수.** 문서 작성과 정적 검증은 구현·빌드·픽셀 검증 완료를
+상태: **2026-10-03 BASE-0 완료, RG1 완료, RG2 완료, RG3 완료, RG4 완료, RG5 생산자 첫 묶음 완료·전체 이관 진행, RG6~RG9 미착수.** 문서 작성과 정적 검증은 구현·빌드·픽셀 검증 완료를
 뜻하지 않는다.
 
 ---
@@ -17,7 +17,7 @@
 graph 진단·변이, capture 계측·GPU validation·정상 종료와 구성 간 대조가 완료 조건이다.
 범용 frame packet·재질/애니메이션 재생은 선택 확장으로 분리하며 RG1 선행이 아니다.
 2026-10-03 현행 Debug/Release 기준선과 구성 간 16개 이미지 maxError=0, 현재 해시 및 `phaseComplete=true`를
-회수했다. [현재 완료 계약과 증거](../analysis/RenderBase0Baseline.md)를 따른다. RG1 이후 현행 기준선과 변경 전후 증거는 [RG1 검증 기록](../analysis/RenderRg1Scheduling.md)에 남긴다. RG2도 완료했으며 [버전·Modify 검증 기록](../analysis/RenderRg2Versions.md)에 현행 기준선을 남긴다. RG3도 완료했으며 [컬링·수명·배리어 검증 기록](../analysis/RenderRg3LifetimeBarriers.md)에 현행 기준선을 남긴다. 다음 구현은 RG4다.
+회수했다. [현재 완료 계약과 증거](../analysis/RenderBase0Baseline.md)를 따른다. RG1 이후 현행 기준선과 변경 전후 증거는 [RG1 검증 기록](../analysis/RenderRg1Scheduling.md)에 남긴다. RG2도 완료했으며 [버전·Modify 검증 기록](../analysis/RenderRg2Versions.md)에 현행 기준선을 남긴다. RG3도 완료했으며 [컬링·수명·배리어 검증 기록](../analysis/RenderRg3LifetimeBarriers.md)에 현행 기준선을 남긴다. RG4도 완료했으며 [wave·병렬 기록 검증 기록](../analysis/RenderRg4RecordingWaves.md)에 현행 기준선을 남긴다. 다음 구현은 RG5다.
 
 2026-10-03 RG1 구현 경계: 같은 `EnhancedRenderGraph` 생성자의 `ExplicitSingleWriter` 모드에서
 `RGPassUsage.access`를 반드시 명시한다. 최소 authored index를 먼저 꺼내는 안정적 Kahn 정렬이며
@@ -207,7 +207,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 
 ### RG3~RG4 — 기존 기능을 새 순서에 다시 연결한다
 
-2026-10-03 RG3 완료: version producer 역추적과 imported 최종 출력 root, dead writer/reader 제거 후 WAR/WAW 재연결·stable sort를 구현했다. compiled order의 수명/할당/Transition 계획을 검증하고 UAV read→read 배리어를 생략했다. 두 구성 120 shuffle 및 실제 GPU dead writer 미실행·이전 버전 픽셀 0, 제품 변경 전후/구성 간 16개 이미지 오차 0을 회수했다. 제품 기본 DeclarationOrder는 RG5/6 이관까지 유지한다. RG4 dependency wave 기록은 아직 미착수다.
+2026-10-03 RG3 완료: version producer 역추적과 imported 최종 출력 root, dead writer/reader 제거 후 WAR/WAW 재연결·stable sort를 구현했다. compiled order의 수명/할당/Transition 계획을 검증하고 UAV read→read 배리어를 생략했다. 두 구성 120 shuffle 및 실제 GPU dead writer 미실행·이전 버전 픽셀 0, 제품 변경 전후/구성 간 16개 이미지 오차 0을 회수했다. 제품 기본 DeclarationOrder는 RG5/6 이관까지 유지한다. 2026-10-03 RG4 완료: 살아남은 RAW/WAR/WAW의 dependency wave·pass-count critical path, target append 제약을 포함한 recording wave를 구현했다. compiled GPU 제출 순서와 split/cost fallback을 유지한다. 두 구성 24 shuffle·1/2/4 워커 GPU 픽셀 0 및 현재 HEAD의 변경 전후/구성 간 제품 16개 이미지 오차 0을 회수했다. [RG4 증거](../analysis/RenderRg4RecordingWaves.md)를 따른다.
 
 - culling은 "앞서 쓴 모든 Pass" 검색이 아니라 version producer edge를 역추적한다.
 - lifetime과 transient 회수는 declaration index가 아니라 compiled index를 사용한다.
@@ -216,6 +216,8 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
   보존한다. wave 수보다 record cost가 우선인 기존 split-pass 휴리스틱은 유지한다.
 
 ### RG5~RG6 — 제품을 한 번만 전환한다
+
+2026-10-03 RG5-1 완료: 실제 GBuffer 6출력·Shadow 1출력 생산자 선언을 버전 모드의 Write로 연결했다. 세 모드×두 선언 순서의 실제 Declare 계획 검사와 두 구성 제품 회귀를 통과했으며 변경 전후/구성 간 16개 이미지 오차는 0이다. 현재 정적 호출 위치는 제품 59·게이트 202(새 검사 1 포함)이며 Tools/regression의 포인터 호출 18도 게이트로 센다. [생산자 이관 기록](../analysis/RenderRg5ProducerMigration.md)을 따른다. 기본 DeclarationOrder 호환 분기는 아직 남아 있으므로 RG5 전체·legacy 추론 0·제품 versioned GPU 수용을 완료로 판정하지 않는다.
 
 > **과거 `SRP-1`과의 병합 판정 (2026-09-01, 현재 계획에는 미적용).** `Phase4UnifiedPlan` 백로그 산정 중
 > "RG5와 SRP-1이 같은 500줄을 만지니 병합하자"는 제안이 나왔다가 **전수 실측으로
@@ -358,3 +360,22 @@ RG4 wave/critical-path와 RG7~9 alias/queue/range 정보는 지원되는 세대�
   비용·메모리 상한과 Debug/Release UI를 확인한다. 단순 현재 pipeline 문자열 dump는 RG-V 완료가 아니다.
 - 4.6 CSRP-5/6의 C# Build → immutable IR → native compile 결과를 동일 viewer에 연결한다.
   Source가 C++/C#인 경우를 표시하되 두 개의 편집 가능한 graph SoT를 만들지 않는다.
+
+
+2026-10-03 RG5-2 정책 분리 검증 완료: 실행 순서 정책을 별도 RGOrderPolicy로 분리한다. 같은 버전 DAG로 의존성 정렬 또는 선언 순서 유효성을 검사한다. [정책 분리 기록](../analysis/RenderRg5OrderPolicy.md). 소비자 이관·제품 GPU 수용과 RG6 기본 전환은 열려 있다.
+
+
+2026-10-03 RG5-3: Deferred의 GBuffer·Shadow 읽기와 SkyBox의 Modify/ReadWrite를 이관했다. 두 구성 빌드·native 선언 검사·제품 전체 장면 회귀 통과, 변경 전후/구성 간 16개 이미지 오차 0으로 첫 소비 체인 묶음 완료. [소비 체인 기록](../analysis/RenderRg5ConsumerMigration.md). RG5 전체는 진행 상태다.
+
+
+2026-10-03 RG5-4 완료: SSAO·SSGI 및 현재 프레임 history 저장의 Read/Write·버전 계보를 이관했다. Debug/Release native 8개 조합·제품 회귀와 변경 전후/구성 간 16개 이미지 오차 0을 확인했다. Forward+는 Code/Graph 혼합 스트림과 재질 Graph 선언을 함께 이관하는 다음 묶음이다. [검증 기록](../analysis/RenderRg5IndirectMigration.md).
+
+
+2026-10-03 RG5-5 Code 경로 완료: Forward+ 타일 버퍼와 Code 색상 스트림을 이관했으며 두 구성 빌드·native·제품 회귀와 변경 전후/구성 간 16개 이미지 오차 0을 확인했다. Graph 혼합 경로는 Lookup/Refraction/Subsurface/Volume 자원 소유자와 함께 이관해야 하므로 아직 열림이며 명시 모드에서 구체적 오류로 거부한다. [범위 및 검증](../analysis/RenderRg5ForwardCodeMigration.md). RG5 전체 기성 0을 유지한다.
+
+
+2026-10-03 RG5-6 Lookup 소유자 이관 완료: 입력 캡처 출력 버전 반환·Bake sample/statistic Write·Ready Read를 연결했다. Debug/Release 최종 빌드·native 반복 2회·두 정책 및 제품 회귀 통과. 변경 전후/구성 간 각 16개 이미지 오차 0. Release 최초 120초 종료 제한 실패는 보존하고 240초 대기 재실행의 정상 종료로 수용했다. 나머지 Graph 소유자와 혼합 스트림 guard는 아직 열려 있다. [Lookup 기록](../analysis/RenderRg5LookupMigration.md).
+
+2026-10-03 RG5-7 Refraction·Subsurface·Volume 소유자 이관 완료: 최신 Lookup 입력 소비·캡처/배경/Bake/필터/합성 출력 버전을 연결했다. 두 구성 빌드·native·제품 반복 회귀 통과, 변경 전후/구성 간 각 16개 이미지 오차 0과 현재 해시를 확인했다. [소유자 검증 기록](../analysis/RenderRg5SpecialMigration.md). 제품 59·게이트 213 호출. GraphSurface/Draw·혼합 GPU 수용과 RG5 전체 기성 0은 유지한다.
+
+2026-10-03 RG5-8 GraphSurface·Draw 및 반환 출력 완료: Shadow/GBuffer/Color/Blended 출력 반환·블랙보드/Forward+ 전달, 깊이 Copy→Modify 및 색상 Modify, Mesh 정적 업로드·world 버전과 중복 읽기를 연결했다. 두 구성 빌드·native·제품 반복 회귀 통과, 변경 전후/구성 간 각 16개 이미지 오차 0 및 현재 해시 일치를 확인했다. [배선 및 검증](../analysis/RenderRg5SurfaceMigration.md). 제품 59·게이트 217 호출. 실제 versioned SceneHost/mixed GPU 수용·guard 제거와 RG5 전체 기성 0은 유지한다.

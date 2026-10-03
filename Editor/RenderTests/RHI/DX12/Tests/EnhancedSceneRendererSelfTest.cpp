@@ -13,6 +13,13 @@
 #include "Render/Core/EnhancedLivePipelineDesc.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 #include "Render/Passes/Geometry/EnhancedDeferredPass.h"
+#include "MaterialGraphSceneLookup.h"
+#include "MaterialGraphSceneRefraction.h"
+#include "MaterialGraphSceneSubsurface.h"
+#include "MaterialGraphSceneVolume.h"
+#include "MaterialGraphSceneAccess.h"
+#include "RHI/RHIShaderSource.h"
+#include "Render/Passes/Lighting/EnhancedSkyBoxPass.h"
 // ★ 자기가 쓰는 것은 자기가 포함한다. 유니티 빌드가 같은 덩어리의
 //   다른 파일에서 끌어와 주고 있어서 없어도 빌드가 됐는데, 파일 하나를
 //   프로젝트에 더한 것만으로 묶음이 바뀌어 갑자기 터졌다.
@@ -801,6 +808,1021 @@ passes:
         uint32_t first,last;
         if(!g.Compile(error) || g.GetTransientLifetime(stale,first,last)) return fail("stale lifetime accepted");
         error.clear(); return true;
+    }
+
+    bool ValidateRg4GraphFixtures(std::string& error, std::string& dump)
+    {
+        R6bFakeReadbackServices services;
+        using A=RGAccessMode;
+        RGTextureDesc d{}; d.width=4; d.height=4; d.allowRenderTarget=true; d.name="wave";
+        std::array<int,4> permutation{0,1,2,3};
+        do {
+            EnhancedRenderGraph g(services,RGSchedulingMode::ExplicitVersioned);
+            const auto a=g.Write(g.CreateTexture(d)), b=g.Write(g.CreateTexture(d));
+            for(const auto role:permutation) {
+                if(role==0) g.AddPass("A",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr);
+                if(role==1) g.AddPass("B",{{a,RHIResourceState::CopySource,A::Read},{b,RHIResourceState::CopyDest,A::Write}},nullptr);
+                if(role==2) g.AddPass("C",{{b,RHIResourceState::CopySource,A::Read}},nullptr,true);
+                if(role==3) g.AddPass("D",{},nullptr,true);
+            }
+            const auto dead=g.Write(g.CreateTexture(d));
+            g.AddPass("dead",{{dead,RHIResourceState::RenderTarget,A::Write}},nullptr);
+            EnhancedRenderGraph::DiagnosticSnapshot s;
+            if(!g.Compile(error) || !g.CaptureDiagnosticSnapshot(s)) return false;
+            for(size_t p=0;p<4;++p) if(s.dependencyWaves[p]!=(permutation[p]==3 ? 0 : permutation[p])) { error="dependency wave mismatch"; return false; }
+            std::vector<int> path; for(const auto p:s.criticalPath) path.push_back(permutation[p]);
+            if(path!=std::vector<int>{0,1,2} || s.dependencyWaves[4]!=-1 || g.GetStats().dependencyWaveCount!=3)
+            { error="critical path/culled wave mismatch"; return false; }
+            if(dump.empty()) {
+                dump="RG4_DIAGNOSTIC waves=";
+                for(size_t p=0;p<s.dependencyWaves.size();++p) dump+=s.passes[p].name+":"+std::to_string(s.dependencyWaves[p])+",";
+                dump+=" criticalPath="; for(const auto p:s.criticalPath) dump+=s.passes[p].name+",";
+                for(const auto& e:s.versionEdges) dump+=" edge="+s.passes[e.producer].name+"->"+s.passes[e.consumer].name+
+                    ":resource"+std::to_string(e.resource)+":v"+std::to_string(e.version)+":reason"+std::to_string(static_cast<int>(e.reason));
+                dump+="\n";
+            }
+        } while(std::next_permutation(permutation.begin(),permutation.end()));
+        error.clear(); return true;
+    }
+
+    bool ValidateRg5LookupDeclarations(DX12DeviceResources& resources, std::string& error)
+    {
+        DX12PSOManager psoManager;
+        DX12RootSignatureCache rootSignatures;
+        if (!psoManager.Initialize(&resources, L"dx12_rg5_lookup.cache", error) ||
+            !rootSignatures.Initialize(&resources, error) || !resources.BeginFrame(error))
+        {
+            return false;
+        }
+        material_graph::SceneLookupCache cache;
+        struct Scope
+        {
+            DX12DeviceResources& resources;
+            material_graph::SceneLookupCache& cache;
+            ~Scope()
+            {
+                resources.AbortFrame();
+                cache.ShutdownAfterIdle();
+            }
+        } scope{resources, cache};
+        EnhancedFrameContext frame{};
+        frame.resources = &resources;
+        frame.psoManager = &psoManager;
+        frame.rootSignatures = &rootSignatures;
+        frame.width = 4;
+        frame.height = 4;
+        frame.frameId = 1;
+        for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
+        {
+            std::shared_ptr<const material_graph::SceneLookupFrame> owner;
+            if (!cache.Prepare(frame, 1, {}, {}, {}, 0, 1024 * 1024, owner, error, {}, {}, true))
+            {
+                return false;
+            }
+            EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
+            EnhancedGBufferPass gbuffer;
+            gbuffer.Declare(graph, frame);
+            owner->DeclareInputs(graph);
+            bool rejected = false;
+            try
+            {
+                owner->DeclareCaptureOutputs(graph, 10, 2);
+            }
+            catch (const std::runtime_error&)
+            {
+                rejected = true;
+            }
+            if (!rejected)
+            {
+                error = "RG5 lookup accepted invalid capture range";
+                return false;
+            }
+            for (unsigned iteration = 0; iteration < 2; ++iteration)
+            {
+                for (unsigned part = 0; part < 2; ++part)
+                {
+                    const unsigned first = part ? 8 : 0;
+                    const unsigned count = part ? 3 : 8;
+                    const auto targets = owner->DeclareCaptureOutputs(graph, first, count);
+                    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                    for (unsigned i = first; i < first + count; ++i)
+                    {
+                        if (targets[i].version != iteration + 1)
+                        {
+                            error = "RG5 lookup capture owner returned stale version";
+                            return false;
+                        }
+                        uses.push_back({targets[i], RHIResourceState::RenderTarget, RGAccessMode::Write});
+                    }
+                    graph.AddPass("RG5.LookupCapture", uses, nullptr);
+                }
+                owner->DeclareBake(graph, gbuffer.GetOutputs().bitmask);
+                if (owner->GraphSamples(graph).version != iteration + 1 ||
+                    owner->GraphStatistics(graph).version != iteration + 1)
+                {
+                    error = "RG5 lookup bake outputs did not advance";
+                    return false;
+                }
+                owner->DeclareReady(graph);
+            }
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
+            {
+                return false;
+            }
+            for (const auto& pass : snapshot.passes)
+            {
+                for (const auto& usage : pass.usages)
+                {
+                    if (usage.access == RGAccessMode::LegacyState)
+                    {
+                        error = "RG5 lookup owner still declares legacy access";
+                        return false;
+                    }
+                }
+            }
+            bool hasWar = false;
+            for (const auto& edge : snapshot.versionEdges)
+            {
+                if (edge.reason == EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason::WAR)
+                {
+                    hasWar = true;
+                }
+            }
+            if (!hasWar)
+            {
+                error = "RG5 lookup repeated capture/bake lost old-reader dependency";
+                return false;
+            }
+            ++frame.frameId;
+        }
+        error.clear();
+        return true;
+    }
+    bool ValidateRg5SpecialDeclarations(DX12DeviceResources& resources, std::string& error)
+    {
+        using namespace material_graph;
+        DX12PSOManager psoManager;
+        DX12RootSignatureCache rootSignatures;
+        if (!psoManager.Initialize(&resources, L"dx12_rg5_special.cache", error) ||
+            !rootSignatures.Initialize(&resources, error) || !resources.BeginFrame(error))
+        {
+            return false;
+        }
+        SceneLookupCache cache;
+        SceneRefractionResources refractions;
+        SceneSubsurfaceResources subsurfaces;
+        SceneVolumeResources volumes;
+        struct Scope
+        {
+            DX12DeviceResources& resources;
+            SceneLookupCache& cache;
+            SceneRefractionResources& refractions;
+            SceneSubsurfaceResources& subsurfaces;
+            SceneVolumeResources& volumes;
+            ~Scope()
+            {
+                resources.AbortFrame();
+                cache.ShutdownAfterIdle();
+                refractions.ShutdownAfterIdle();
+                subsurfaces.ShutdownAfterIdle();
+                volumes.ShutdownAfterIdle();
+            }
+        } scope{resources, cache, refractions, subsurfaces, volumes};
+        EnhancedFrameContext frame{};
+        frame.resources = &resources;
+        frame.psoManager = &psoManager;
+        frame.rootSignatures = &rootSignatures;
+        frame.width = 4;
+        frame.height = 4;
+        frame.frameId = 1;
+        // A closed tetrahedron and retained synthetic material identify two media.
+        // These fixtures compile declarations; they do not dispatch material coefficients.
+        auto generation = std::make_shared<Generation>();
+        generation->generation = 1;
+        generation->cooked.product.program.volume = true;
+        auto instance = std::make_shared<Instance>();
+        instance->generation = generation;
+        instance->description.graphId = generation->assetId;
+        EnhancedDrawItem draw{};
+        draw.geometryKey = 1;
+        draw.materialGraphInstance = instance;
+        draw.worldMatrix = math::matrix4x4::identity();
+        draw.coverage.flags = EnhancedMaterialCoverage::Enabled;
+        auto& mesh = draw.modelMeshView;
+        if (!Uuid::TryParse("11111111-1111-8111-8111-111111111111", mesh.handle.modelId) ||
+            !Uuid::TryParse("22222222-2222-8222-8222-222222222222", mesh.handle.meshId))
+        {
+            error = "RG5 special mesh identity failed";
+            return false;
+        }
+        mesh.handle.generation = 1;
+        mesh.vertexAttributeMask = assets::kModelVertexMasks.front();
+        mesh.vertexStride = assets::StrideOf(mesh.vertexAttributeMask);
+        mesh.vertexLayoutHash = assets::VertexLayoutHash(mesh.vertexAttributeMask);
+        const std::array<std::array<float, 3>, 4> positions{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}};
+        const std::array<std::uint32_t, 12> indices{0, 2, 1, 0, 1, 3, 0, 3, 2, 1, 2, 3};
+        std::vector<std::byte> vertices(4 * mesh.vertexStride);
+        const std::array<float, 3> normal{0, 0, 1};
+        const std::array<float, 4> tangent{1, 0, 0, 1};
+        for (unsigned i = 0; i < 4; ++i)
+        {
+            const auto write = [&](assets::VertexAttribute attribute, const void* source, std::size_t bytes) {
+                std::memcpy(vertices.data() + i * mesh.vertexStride +
+                                assets::OffsetOf(mesh.vertexAttributeMask, attribute), source, bytes);
+            };
+            write(assets::VertexAttribute::Position, positions[i].data(), 12);
+            write(assets::VertexAttribute::Normal, normal.data(), 12);
+            write(assets::VertexAttribute::Tangent, tangent.data(), 16);
+        }
+        mesh.vertexData = vertices.data();
+        mesh.vertexBytes = vertices.size();
+        mesh.indexData = indices.data();
+        mesh.indexCount = indices.size();
+        auto second = draw;
+        second.geometryKey = 2;
+        const std::array<EnhancedDrawItem, 2> draws{draw, second};
+        SceneInputView view{1, 1, 1, 1, 4, 4};
+        view.camera.view = math::matrix4x4::identity();
+        view.camera.projection = math::matrix4x4::identity();
+        std::shared_ptr<const SceneViewInput> input;
+        if (!SceneViewInput::Seal(view, draws, {}, input, error))
+        {
+            return false;
+        }
+        LX::Runtime::CompiledCompute shader;
+        if (!LX::Runtime::CompileCompute(RHIShaderSource::Resolve("MaterialGraphSceneVolumeBake.slang").string(),
+                                        "LXSceneVolumeCompositeCS", {}, {}, shader, error))
+        {
+            return false;
+        }
+        const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(1), RHILayout::SrvTable(2, 0), RHILayout::Srv(17),
+            RHILayout::Srv(18), RHILayout::SrvTable(2, 19), RHILayout::UavTable(1, 0)};
+        const RHIStaticSamplerDesc samplers[]{
+            {RHISampler::Linear(RHIAddressMode::Clamp), 2},
+            {RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border, RHIBorderColor::OpaqueWhite), 3}};
+        RHIComputePipelineDesc desc{};
+        desc.layout = rootSignatures.GetOrCreate({parameters, samplers}, error);
+        desc.csBytecode = shader.stage.bytecode.Data();
+        desc.csSize = shader.stage.bytecode.Size();
+        LX::Runtime::ComputePipeline coefficientFixture;
+        if (!desc.layout.IsValid() || !coefficientFixture.Create(psoManager, desc, std::move(shader.description), error))
+        {
+            return false;
+        }
+        auto bindings = std::make_shared<RenderBindings>();
+        bindings->instance = instance;
+        const auto constants = resources.UploadConstants(normal.data(), sizeof(normal));
+        const SceneVolumeBinding binding{bindings, coefficientFixture.GetGeneration(), constants};
+        const std::array<SceneVolumeBinding, 2> coefficientBindings{binding, binding};
+        LX::Runtime::CompiledCompute transform;
+        MeshSurfaceEvaluator geometry;
+        if (!LX::Runtime::CompileCompute(RHIShaderSource::Resolve("MaterialGraphMeshSurface.slang").string(),
+                                        "LXTransformMesh", {}, {}, transform, error) ||
+            !geometry.Initialize(resources, rootSignatures, psoManager, transform.stage.bytecode, error,
+                                 std::move(transform.description)))
+        {
+            return false;
+        }
+        for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
+        {
+            std::shared_ptr<const SceneLookupFrame> lookup;
+            std::shared_ptr<const SceneVolumeFrame> volume;
+            std::shared_ptr<const SceneRefractionFrame> refraction;
+            std::shared_ptr<const SceneSubsurfaceFrame> subsurface;
+            if (!cache.Prepare(frame, 1, {}, {}, {}, 0, 1024 * 1024, lookup, error, {}, {}, true) ||
+                !volumes.Prepare(frame, *input, {}, {}, 1024 * 1024, volume, error) ||
+                !refractions.Prepare(frame, input->ViewProjection(), {}, 1024 * 1024, refraction, error, volume) ||
+                !subsurfaces.Prepare(frame, {}, 1024 * 1024, subsurface, error))
+            {
+                return false;
+            }
+            EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
+            std::shared_ptr<const MeshSurfaceBatch> meshBatch;
+            if (!geometry.Prepare(resources, input->Draws()[0].geometry->Chunks()[0].input, meshBatch, error, true) ||
+                !meshBatch->Declare(graph, error) || meshBatch->GraphOutput(graph).version != 1)
+            {
+                error = "RG5 mesh world version declaration failed: " + error;
+                return false;
+            }
+            EnhancedGBufferPass gbuffer;
+            gbuffer.Declare(graph, frame);
+            lookup->DeclareInputs(graph);
+            refraction->DeclareInputs(graph);
+            subsurface->DeclareInputs(graph);
+            volume->DeclareCoefficients(graph, coefficientBindings);
+            if (volume->GraphCoefficients(graph).version != 1)
+            {
+                error = "RG5 Volume coefficients lost v1";
+                return false;
+            }
+            RGTextureDesc colorDesc{4, 4};
+            colorDesc.format = RHIFormat::RGBA16Float;
+            colorDesc.name = "RG5.SpecialLighting";
+            auto lighting = graph.Write(graph.CreateTexture(colorDesc));
+            graph.AddPass("RG5.SpecialLighting", {{lighting, RHIResourceState::RenderTarget, RGAccessMode::Write}}, nullptr);
+            for (unsigned iteration = 0; iteration < 2; ++iteration)
+            {
+                std::vector<EnhancedRenderGraph::RGPassUsage> captures;
+                const auto lookupTargets = lookup->DeclareCaptureOutputs(graph, 0, 11);
+                const auto refractionTargets = refraction->DeclareCaptureOutputs(graph);
+                const auto subsurfaceTargets = subsurface->DeclareCaptureOutputs(graph);
+                for (const auto targets : {std::span<const RGHandle>(lookupTargets),
+                                          std::span<const RGHandle>(refractionTargets),
+                                          std::span<const RGHandle>(subsurfaceTargets)})
+                {
+                    for (const auto target : targets)
+                    {
+                        if (target.version != iteration + 1)
+                        {
+                            error = "RG5 Special capture did not advance";
+                            return false;
+                        }
+                        captures.push_back({target, RHIResourceState::RenderTarget, RGAccessMode::Write});
+                    }
+                }
+                graph.AddPass("RG5.SpecialCapture", captures, nullptr);
+                lookup->DeclareBake(graph, gbuffer.GetOutputs().bitmask);
+                lookup->DeclareReady(graph);
+                refraction->DeclareBackground(graph, lighting, gbuffer.GetOutputs().depth);
+                refraction->DeclareBake(graph, *lookup, gbuffer.GetOutputs().bitmask, {});
+                subsurface->DeclareReflection(graph, *lookup, gbuffer.GetOutputs().bitmask);
+                subsurface->DeclareFilter(graph, gbuffer.GetOutputs().bitmask);
+                if (refraction->GraphSamples(graph).version != iteration + 1 ||
+                    refraction->GraphBackgroundColor(graph).version != iteration ||
+                    refraction->GraphBackgroundDepth(graph).version != iteration ||
+                    subsurface->GraphReflection(graph).version != iteration + 1 ||
+                    subsurface->GraphIrradiance(graph).version != iteration + 1)
+                {
+                    error = "RG5 Special outputs did not advance";
+                    return false;
+                }
+                graph.AddPass("RG5.SpecialReader",
+                    {{refraction->GraphSamples(graph), RHIResourceState::ShaderResource, RGAccessMode::Read},
+                     {subsurface->GraphReflection(graph), RHIResourceState::ShaderResource, RGAccessMode::Read},
+                     {subsurface->GraphIrradiance(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
+            }
+            const auto output = volume->DeclareComposite(graph, lighting, gbuffer.GetOutputs().depth, {});
+            graph.AddPass("RG5.VolumeReader", {{output, RHIResourceState::ShaderResource, RGAccessMode::Read}},
+                          nullptr, true);
+            bool rejected = false;
+            try
+            {
+                volume->DeclareComposite(graph, lighting, gbuffer.GetOutputs().depth, {});
+            }
+            catch (const std::runtime_error&)
+            {
+                rejected = true;
+            }
+            if (output.version != 0 || !rejected || !graph.Compile(error))
+            {
+                error = "RG5 Volume output/duplicate contract failed: " + error;
+                return false;
+            }
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            if (!graph.CaptureDiagnosticSnapshot(snapshot))
+            {
+                error = "RG5 Special snapshot missing";
+                return false;
+            }
+            bool war = false;
+            unsigned refractionReads = 0, reflectionReads = 0;
+            for (const auto& pass : snapshot.passes)
+            {
+                const bool refractionPass = pass.name == "LX.Scene.RefractionBake";
+                const bool reflectionPass = pass.name == "LX.Scene.SubsurfaceReflection";
+                const auto expectedLookupVersion = refractionPass ? ++refractionReads :
+                    reflectionPass ? ++reflectionReads : 0;
+                unsigned lookupReads = 0;
+                for (const auto& use : pass.usages)
+                {
+                    if (expectedLookupVersion)
+                    {
+                        for (const auto input : lookup->GraphInputs(graph))
+                        {
+                            if (use.resource == input.index)
+                            {
+                                ++lookupReads;
+                                if (use.version != expectedLookupVersion || use.access != RGAccessMode::Read)
+                                {
+                                    error = "RG5 Special consumer read stale Lookup version";
+                                    return false;
+                                }
+                            }
+                        }
+                    }
+                    if (use.access == RGAccessMode::LegacyState)
+                    {
+                        error = "RG5 Special owner still uses LegacyState";
+                        return false;
+                    }
+                }
+                if (expectedLookupVersion && lookupReads != 11)
+                {
+                    error = "RG5 Special consumer missing Lookup reads";
+                    return false;
+                }
+            }
+            if (refractionReads != 2 || reflectionReads != 2)
+            {
+                error = "RG5 Special consumer repetitions missing";
+                return false;
+            }
+            for (const auto& edge : snapshot.versionEdges)
+            {
+                war |= edge.reason == EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason::WAR;
+            }
+            if (!war)
+            {
+                error = "RG5 Special repeated owners lost WAR";
+                return false;
+            }
+            ++frame.frameId;
+        }
+        error.clear();
+        return true;
+    }
+
+    bool ValidateRg5SurfaceDeclarations(DX12DeviceResources& resources, std::string& error)
+    {
+        using namespace material_graph;
+        for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
+        {
+            EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
+            RGTextureDesc desc{};
+            desc.width = 4;
+            desc.height = 4;
+            desc.format = RHIFormat::RGBA16Float;
+            desc.allowRenderTarget = true;
+            desc.name = "RG5.SurfaceColor";
+            auto lighting = graph.Write(graph.CreateTexture(desc));
+            EnhancedGBufferPass::Outputs surface;
+            for (auto* color : {&surface.diffuse, &surface.metalRough, &surface.normal, &surface.emissive, &surface.bitmask})
+            {
+                *color = graph.CreateTexture(desc);
+            }
+            desc.format = RHIFormat::D32Float;
+            desc.allowRenderTarget = false;
+            desc.allowDepthStencil = true;
+            desc.name = "RG5.SurfaceDepth";
+            surface.depth = graph.CreateTexture(desc);
+            const auto opaqueDepth = graph.Write(graph.CreateTexture(desc));
+            graph.AddPass("RG5.SurfaceInitial",
+                {{lighting, RHIResourceState::RenderTarget, RGAccessMode::Write},
+                 {opaqueDepth, RHIResourceState::DepthWrite, RGAccessMode::Write}}, nullptr);
+            for (unsigned iteration = 0; iteration < 3; ++iteration)
+            {
+                const auto copiedDepth = graph.Write(surface.depth);
+                graph.AddPass("Forward+.GraphDepthCopy",
+                    {{opaqueDepth, RHIResourceState::CopySource, RGAccessMode::Read},
+                     {copiedDepth, RHIResourceState::CopyDest, RGAccessMode::Write}}, nullptr);
+                surface.depth = copiedDepth;
+                surface = AdvanceSceneSurface(graph, surface, RGAccessMode::Write);
+                if (surface.diffuse.version != iteration || surface.depth.version != 2 * iteration + 1)
+                {
+                    error = "RG5 Surface output lineage lost copy/depth Modify";
+                    return false;
+                }
+                std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+                    {surface.depth, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite}};
+                for (const auto color : {surface.diffuse, surface.metalRough, surface.normal, surface.emissive, surface.bitmask})
+                {
+                    uses.push_back({color, RHIResourceState::RenderTarget, RGAccessMode::Write});
+                }
+                graph.AddPass("Forward+.GraphSurface", uses, nullptr);
+                // Simulate a Code -> Graph -> Code stream using the production
+                // color version function, including the returned handle handoff.
+                for (const auto* name : {"Forward+.CodeBefore", "Forward+.GraphBlend", "Forward+.CodeAfter"})
+                {
+                    const auto previous = lighting;
+                    lighting = AdvanceSceneColor(graph, lighting);
+                    if (lighting.version != previous.version + 1)
+                    {
+                        error = "RG5 Surface color output handoff stayed stale";
+                        return false;
+                    }
+                    uses = {{lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite},
+                            {surface.depth, RHIResourceState::DepthRead, RGAccessMode::Read},
+                            {surface.bitmask, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
+                            {surface.bitmask, RHIResourceState::ShaderResource, RGAccessMode::Read}};
+                    NormalizeSceneReads(graph, uses);
+                    if (uses.size() != 3 || uses[2].state != RHIResourceState::ShaderResource)
+                    {
+                        error = "RG5 Surface failed to combine shared reads";
+                        return false;
+                    }
+                    graph.AddPass(name, uses, nullptr, true);
+                }
+            }
+            bool writeRejected = false, stateRejected = false;
+            try
+            {
+                std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+                    {lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite},
+                    {lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}};
+                NormalizeSceneReads(graph, uses);
+            }
+            catch (const std::runtime_error&)
+            {
+                writeRejected = true;
+            }
+            try
+            {
+                std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+                    {opaqueDepth, RHIResourceState::CopySource, RGAccessMode::Read},
+                    {opaqueDepth, RHIResourceState::DepthRead, RGAccessMode::Read}};
+                NormalizeSceneReads(graph, uses);
+            }
+            catch (const std::runtime_error&)
+            {
+                stateRejected = true;
+            }
+            EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+            if (!writeRejected || !stateRejected || !graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
+            {
+                error = "RG5 Surface plan/rejection gate failed: " + error;
+                return false;
+            }
+            bool war = false;
+            for (const auto& edge : snapshot.versionEdges)
+            {
+                war |= edge.reason == EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason::WAR;
+            }
+            if (!war || lighting.version != 9 || surface.depth.version != 5)
+            {
+                error = "RG5 Surface old-reader hazards or final lineage missing";
+                return false;
+            }
+        }
+        error.clear();
+        return true;
+    }
+
+    bool ValidateRg5ForwardDeclarations(DX12DeviceResources& resources, std::string& error)
+    {
+        DX12PSOManager psoManager;
+        DX12RootSignatureCache rootSignatures;
+        if (!psoManager.Initialize(&resources, L"dx12_rg5_forward.cache", error) ||
+            !rootSignatures.Initialize(&resources, error))
+        {
+            return false;
+        }
+        EnhancedFrameContext frame{};
+        frame.resources = &resources;
+        frame.psoManager = &psoManager;
+        frame.rootSignatures = &rootSignatures;
+        frame.width = 4;
+        frame.height = 4;
+        std::vector<EnhancedLight> lights;
+        std::vector<EnhancedDrawItem> draws;
+        frame.lights = &lights;
+        frame.forwardDraws = &draws;
+        EnhancedForwardPass forward;
+        if (!forward.Initialize(frame, error) || !forward.PrepareFrame(frame, error))
+        {
+            return false;
+        }
+        if (!resources.BeginFrame(error))
+        {
+            return false;
+        }
+        struct RecordingScope
+        {
+            DX12DeviceResources& resources;
+            ~RecordingScope()
+            {
+                resources.AbortFrame();
+            }
+        } recording{resources};
+        // Synthetic draw ordering tests declaration batches; GPU draw execution
+        // is covered separately by the product regression scene.
+        draws.resize(3);
+        draws[0].geometryKey = 2;
+        draws[1].geometryKey = 1;
+        draws[2].geometryKey = 3;
+        for (auto& draw : draws)
+        {
+            draw.worldMatrix = math::matrix4x4::identity();
+        }
+        for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
+        {
+            for (const bool ownColor : {false, true})
+            {
+                EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
+                EnhancedGBufferPass gbuffer;
+                EnhancedShadowPass shadow;
+                EnhancedDeferredPass deferred;
+                gbuffer.Declare(graph, frame);
+                shadow.Declare(graph, frame);
+                deferred.SetInputs(gbuffer.GetOutputs());
+                deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
+                deferred.Declare(graph, frame);
+                EnhancedForwardPass::Inputs inputs{};
+                inputs.depth = gbuffer.GetOutputs().depth;
+                if (!ownColor)
+                {
+                    inputs.lighting = deferred.GetOutput();
+                }
+                forward.SetInputs(inputs);
+                forward.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
+                forward.Declare(graph, frame);
+                graph.AddPass("RG5.ForwardConsumer",
+                    {{forward.GetOutput(), RHIResourceState::CopySource, RGAccessMode::Read}}, nullptr, true);
+                EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
+                {
+                    return false;
+                }
+                size_t shades = 0;
+                size_t tileWrites = 0;
+                for (const auto& pass : snapshot.passes)
+                {
+                    for (const auto& usage : pass.usages)
+                    {
+                        if (usage.access == RGAccessMode::LegacyState)
+                        {
+                            error = "RG5 Forward Code chain still uses legacy access";
+                            return false;
+                        }
+                        if (pass.name == "Forward+.Cull" && usage.kind == RGResourceKind::Buffer)
+                        {
+                            if (usage.access != RGAccessMode::Write || usage.version != 1)
+                            {
+                                error = "RG5 Forward tile buffers lack Write/v1";
+                                return false;
+                            }
+                            ++tileWrites;
+                        }
+                    }
+                    if (pass.name == "Forward+.Shade")
+                    {
+                        ++shades;
+                        const auto& color = pass.usages.front();
+                        if (color.access != RGAccessMode::ReadWrite || color.version != shades)
+                        {
+                            error = "RG5 Forward batches lost consecutive Modify versions";
+                            return false;
+                        }
+                    }
+                }
+                if (shades != 3 || tileWrites != 2 || forward.GetOutput().version != 3)
+                {
+                    error = "RG5 Forward batch or output identity mismatch";
+                    return false;
+                }
+            }
+        }
+        error.clear();
+        return true;
+    }
+    bool ValidateRg5IndirectDeclarations(DX12DeviceResources& resources, std::string& error)
+    {
+        DX12PSOManager psoManager;
+        DX12RootSignatureCache rootSignatures;
+        if (!psoManager.Initialize(&resources, L"dx12_rg5_indirect.cache", error) ||
+            !rootSignatures.Initialize(&resources, error))
+        {
+            return false;
+        }
+        EnhancedFrameContext frame{};
+        frame.resources = &resources;
+        frame.psoManager = &psoManager;
+        frame.rootSignatures = &rootSignatures;
+        frame.width = 4;
+        frame.height = 4;
+        EnhancedSSAOPass ao;
+        EnhancedSSGIPass gi;
+        if (!ao.Initialize(frame, error) || !gi.Initialize(frame, error) ||
+            !ao.PrepareFrame(frame, error) || !gi.PrepareFrame(frame, error))
+        {
+            return false;
+        }
+        for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
+        {
+            for (const bool optionalInputs : {false, true})
+            {
+                for (uint32_t iteration = 0; iteration < 2; ++iteration)
+                {
+                    EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
+                    EnhancedGBufferPass gbuffer;
+                    EnhancedShadowPass shadow;
+                    EnhancedDeferredPass deferred;
+                    gbuffer.Declare(graph, frame);
+                    shadow.Declare(graph, frame);
+                    const auto inputs = gbuffer.GetOutputs();
+                    ao.SetInputs({inputs.depth, inputs.normal});
+                    ao.Declare(graph, frame);
+                    deferred.SetInputs(inputs);
+                    deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
+                    deferred.SetAmbientOcclusion(ao.GetOutput());
+                    deferred.Declare(graph, frame);
+                    EnhancedSSGIPass::Inputs giInputs{};
+                    giInputs.depth = inputs.depth;
+                    if (optionalInputs)
+                    {
+                        giInputs.normal = inputs.normal;
+                        giInputs.diffuse = inputs.diffuse;
+                        giInputs.metalRough = inputs.metalRough;
+                        giInputs.lighting = deferred.GetOutput();
+                        giInputs.ambientOcclusion = ao.GetOutput();
+                    }
+                    gi.SetInputs(giInputs);
+                    gi.Declare(graph, frame);
+                    graph.AddPass("RG5.IndirectConsumer",
+                        {{gi.GetOutput(), RHIResourceState::CopySource, RGAccessMode::Read}}, nullptr, true);
+                    EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                    if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
+                    {
+                        return false;
+                    }
+                    bool foundAo = false;
+                    bool foundStore = false;
+                    for (const auto& pass : snapshot.passes)
+                    {
+                        if (pass.name == "SSAO.Filter")
+                        {
+                            foundAo = true;
+                        }
+                        if (pass.name == "SSGI.StoreHistory")
+                        {
+                            foundStore = true;
+                            size_t destinations = 0;
+                            for (const auto& usage : pass.usages)
+                            {
+                                if (usage.state == RHIResourceState::CopyDest)
+                                {
+                                    if (usage.access != RGAccessMode::Write || usage.version != 1)
+                                    {
+                                        error = "RG5 history destination lacks imported-v0 to written-v1 lineage";
+                                        return false;
+                                    }
+                                    ++destinations;
+                                }
+                            }
+                            if (destinations != 2)
+                            {
+                                error = "RG5 history color/depth destinations missing";
+                                return false;
+                            }
+                        }
+                        for (const auto& usage : pass.usages)
+                        {
+                            if (usage.access == RGAccessMode::LegacyState)
+                            {
+                                error = "RG5 indirect chain still uses legacy access";
+                                return false;
+                            }
+                        }
+                    }
+                    if (!foundAo || !foundStore || !ao.GetOutput().IsValid() || !gi.GetOutput().IsValid())
+                    {
+                        error = "RG5 indirect outputs or history store missing";
+                        return false;
+                    }
+                }
+            }
+        }
+        error.clear();
+        return true;
+    }
+    bool ValidateRg5ConsumerDeclarations(DX12DeviceResources& resources, std::string& error)
+    {
+        DX12PSOManager psoManager;
+        DX12RootSignatureCache rootSignatures;
+        if (!psoManager.Initialize(&resources, L"dx12_rg5.cache", error) ||
+            !rootSignatures.Initialize(&resources, error))
+        {
+            return false;
+        }
+        EnhancedFrameContext frame{};
+        frame.resources = &resources;
+        frame.psoManager = &psoManager;
+        frame.rootSignatures = &rootSignatures;
+        frame.width = 4;
+        frame.height = 4;
+        EnhancedSkyBoxPass sky;
+        if (!sky.Initialize(frame, error) || !sky.PrepareFrame(frame, error))
+        {
+            return false;
+        }
+        for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
+        {
+            for (const bool standalone : {false, true})
+            {
+                EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
+                EnhancedGBufferPass gbuffer;
+                EnhancedShadowPass shadow;
+                EnhancedDeferredPass deferred;
+                RGHandle lighting;
+                if (!standalone)
+                {
+                    gbuffer.Declare(graph, frame);
+                    shadow.Declare(graph, frame);
+                    deferred.SetInputs(gbuffer.GetOutputs());
+                    deferred.SetShadow(shadow.GetShadowMap(), shadow.GetShadowData());
+                    deferred.Declare(graph, frame);
+                    lighting = deferred.GetOutput();
+                    // Keep an old-version reader alive to require WAR before SkyBox modifies color.
+                    graph.AddPass("RG5.OldLighting", {{lighting, RHIResourceState::CopySource, RGAccessMode::Read}},
+                                  nullptr, true);
+                    sky.SetInputs({lighting, gbuffer.GetOutputs().depth});
+                }
+                else
+                {
+                    sky.SetInputs({});
+                }
+                sky.Declare(graph, frame);
+                const auto output = sky.GetOutput();
+                if (!output.IsValid() || output.version != (standalone ? 0 : 1))
+                {
+                    error = "RG5 SkyBox output version mismatch";
+                    return false;
+                }
+                graph.AddPass("RG5.ColorConsumer", {{output, RHIResourceState::CopySource, RGAccessMode::Read}},
+                              nullptr, true);
+                EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
+                {
+                    return false;
+                }
+                const auto expectedPasses = standalone ? 2u : 6u;
+                if (snapshot.executeOrder.size() != expectedPasses)
+                {
+                    error = "RG5 consumer chain was unexpectedly culled";
+                    return false;
+                }
+                for (const auto& pass : snapshot.passes)
+                {
+                    for (const auto& usage : pass.usages)
+                    {
+                        if (usage.access == RGAccessMode::LegacyState)
+                        {
+                            error = "RG5 consumer chain still uses legacy access";
+                            return false;
+                        }
+                    }
+                }
+                if (!standalone)
+                {
+                    bool hasWar = false;
+                    for (const auto& edge : snapshot.versionEdges)
+                    {
+                        if (edge.resource == lighting.index && edge.producer == 3 && edge.consumer == 4 &&
+                            edge.reason == EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason::WAR)
+                        {
+                            hasWar = true;
+                        }
+                    }
+                    if (!hasWar || output.index != lighting.index || sky.GetDepth().version != 0)
+                    {
+                        error = "RG5 SkyBox Modify lost old-color dependency or depth identity";
+                        return false;
+                    }
+                }
+            }
+        }
+        error.clear();
+        return true;
+    }
+    bool ValidateRg5OrderPolicy(std::string& error)
+    {
+        R6bFakeReadbackServices services;
+        for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
+        {
+            for (const bool reverse : {false, true})
+            {
+                EnhancedRenderGraph graph(services, RGSchedulingMode::ExplicitVersioned, policy);
+                RGTextureDesc desc{};
+                desc.width = 4;
+                desc.height = 4;
+                desc.allowRenderTarget = true;
+                desc.name = "RG5.Policy";
+                const auto output = graph.Write(graph.CreateTexture(desc));
+                const auto producer = [&] {
+                    graph.AddPass("producer", {{output, RHIResourceState::RenderTarget, RGAccessMode::Write}}, nullptr);
+                };
+                const auto consumer = [&] {
+                    graph.AddPass("consumer", {{output, RHIResourceState::CopySource, RGAccessMode::Read}}, nullptr,
+                                  true);
+                };
+                if (reverse)
+                {
+                    consumer();
+                    producer();
+                }
+                else
+                {
+                    producer();
+                    consumer();
+                }
+                const bool compiled = graph.Compile(error);
+                if (policy == RGOrderPolicy::PreserveDeclarationOrder && reverse)
+                {
+                    if (compiled || error.find("Declaration order violates dependency") == std::string::npos)
+                    {
+                        error = "RG5 authored order accepted a reversed RAW";
+                        return false;
+                    }
+                    continue;
+                }
+                EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                if (!compiled || !graph.CaptureDiagnosticSnapshot(snapshot))
+                {
+                    return false;
+                }
+                const std::vector<uint16_t> expected =
+                    reverse ? std::vector<uint16_t>{1, 0} : std::vector<uint16_t>{0, 1};
+                if (snapshot.executeOrder != expected || snapshot.versionEdges.size() != 1)
+                {
+                    error = "RG5 order policy changed version DAG";
+                    return false;
+                }
+            }
+        }
+        error.clear();
+        return true;
+    }
+
+    bool ValidateRg5ProducerDeclarations(std::string& error)
+    {
+        if (!ValidateRg5OrderPolicy(error))
+        {
+            return false;
+        }
+        R6bFakeReadbackServices services;
+        for (const auto mode : {RGSchedulingMode::DeclarationOrder, RGSchedulingMode::ExplicitSingleWriter,
+                                RGSchedulingMode::ExplicitVersioned})
+        {
+            for (const bool reverse : {false, true})
+            {
+                EnhancedRenderGraph graph(services, mode);
+                EnhancedGBufferPass gbuffer;
+                EnhancedShadowPass shadow;
+                EnhancedFrameContext frame{};
+                frame.width = 4;
+                frame.height = 4;
+                if (reverse)
+                {
+                    gbuffer.Declare(graph, frame);
+                    shadow.Declare(graph, frame);
+                }
+                else
+                {
+                    shadow.Declare(graph, frame);
+                    gbuffer.Declare(graph, frame);
+                }
+                const auto output = gbuffer.GetOutputs();
+                const RGHandle handles[] = {output.diffuse, output.metalRough, output.normal,        output.emissive,
+                                            output.bitmask, output.depth,      shadow.GetShadowMap()};
+                std::vector<EnhancedRenderGraph::RGPassUsage> reads;
+                for (const auto handle : handles)
+                {
+                    if (!handle.IsValid() || (mode == RGSchedulingMode::ExplicitVersioned &&
+                                              (handle.version != 0 || handle.epoch != graph.ResourceEpoch() ||
+                                               handle.kind != RGResourceKind::Texture)))
+                    {
+                        error = "RG5 product output version identity mismatch";
+                        return false;
+                    }
+                    reads.push_back(
+                        {handle, RHIResourceState::CopySource,
+                         mode == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read});
+                }
+                graph.AddPass("RG5.OutputConsumer", reads, nullptr, true);
+                EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+                if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot))
+                {
+                    return false;
+                }
+                if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 2} || snapshot.resources.size() != 7 ||
+                    graph.GetStats().passesExecuted != 3)
+                {
+                    error = "RG5 product producer/consumer plan mismatch";
+                    return false;
+                }
+                if (mode != RGSchedulingMode::DeclarationOrder)
+                {
+                    for (size_t pass = 0; pass < 2; ++pass)
+                    {
+                        for (const auto& usage : snapshot.passes[pass].usages)
+                        {
+                            if (usage.access != RGAccessMode::Write)
+                            {
+                                error = "RG5 product producer lacks explicit Write";
+                                return false;
+                            }
+                        }
+                    }
+                }
+                if (mode == RGSchedulingMode::ExplicitVersioned && snapshot.versionEdges.size() != 7)
+                {
+                    error = "RG5 product output RAW edges missing";
+                    return false;
+                }
+            }
+        }
+        error.clear();
+        return true;
     }
 
     bool ValidateBase0GraphFixtures(std::string& error)
@@ -3092,6 +4114,12 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
     outLog += "RG2_DAG_OK shuffles=240 texture buffer RAW WAR WAW Modify fork stale kind missing import cycle\n";
     if(!ValidateRg3GraphFixtures(rg1Error)) { outLog += "RG3_PLAN_FAILED " + rg1Error + "\n"; return false; }
     outLog += "RG3_PLAN_OK shuffles=120 dead-version WAR-bridge sorted-lifetime transitions UAV-read-write import-final Modify stale\n";
+    std::string rg4Dump;
+    if(!ValidateRg4GraphFixtures(rg1Error,rg4Dump)) { outLog += "RG4_WAVES_FAILED "+rg1Error+"\n"; return false; }
+    outLog += "RG4_WAVES_OK shuffles=24 critical-path culled\n"+rg4Dump;
+    if (!ValidateRg5ProducerDeclarations(rg1Error))
+    { outLog += "RG5_PRODUCERS_FAILED " + rg1Error + "\n"; return false; }
+    outLog += "RG5_PRODUCERS_OK passes=GBuffer/Shadow modes=3 orders=2 outputs=7 RAW=7\n";
     if (replayExtensions)
     {
         std::string latticeError;
@@ -3129,6 +4157,42 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         return false;
     }
 
+    if (!ValidateRg5ConsumerDeclarations(resources, error))
+    {
+        outLog += "RG5_CONSUMERS_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_CONSUMERS_OK Deferred/SkyBox policies=2 paths=2 Modify/WAR/depth\n";
+    if (!ValidateRg5IndirectDeclarations(resources, error))
+    {
+        outLog += "RG5_INDIRECT_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_INDIRECT_OK SSAO/SSGI policies=2 optional=2 frames=2 history-v1\n";
+    if (!ValidateRg5ForwardDeclarations(resources, error))
+    {
+        outLog += "RG5_FORWARD_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_FORWARD_OK Code policies=2 paths=2 batches=3 tile-v1 color-v3\n";
+    if (!ValidateRg5LookupDeclarations(resources, error))
+    {
+        outLog += "RG5_LOOKUP_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_LOOKUP_OK policies=2 capture=11 iterations=2 outputs-v2 WAR range-rejection\n";
+    if (!ValidateRg5SpecialDeclarations(resources, error))
+    {
+        outLog += "RG5_SPECIAL_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_SPECIAL_OK policies=2 Refraction/SSS-v2 Volume-coeff-v1/output-v0 WAR duplicate-rejection\n";
+    if (!ValidateRg5SurfaceDeclarations(resources, error))
+    {
+        outLog += "RG5_SURFACE_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_SURFACE_OK policies=2 iterations=3 depth-v5 color-v9 dedup WAR writable/state-rejection\n";
     DX12TestTextureRegistration backbufferRegistration(
         resources, resources.GetRenderTarget());
     if (!backbufferRegistration.IsValid())
@@ -3142,7 +4206,8 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
 
     // ── [1/7] 실행 순서 = 선언 순서 ──
     //
-    // 그래프가 패스를 재정렬하지 않는 것이 계약이다. 재정렬하면 프레임이 실행마다
+    // 이 검사는 legacy DeclarationOrder 호환 계약만 검사한다. 명시 모드의 DAG 정렬은 별도 검사한다.
+    // 기존 설명: 재정렬하면 프레임이 실행마다
     // 달라질 수 있고, 그러면 픽셀 대조(3-6의 정확성 검증 수단)가 흔들린다.
     // 컬링된 것만 빠져야 한다.
     {
@@ -3392,6 +4457,68 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
             if(std::fabs(image.At(x,y,c)-DX12DeviceResources::kClearColor[c])>1.5f/255.f)
             { outLog += tag+"_GPU_FAILED pixel mismatch\n"; return false; }
         outLog += tag+(versioned ? "_GPU_OK reversed-RAW-WAR-WAW old-version-pixels=0\n" : "_GPU_OK reversed-RAW pixels=0\n");
+    }
+
+    // RG4: the same compiled order through immediate, one-target, two/four-target
+    // recording and cost fallback. Producer slices must finish before consumers.
+    {
+        DX12CommandListPool pool;
+        if(!pool.Initialize(resources,4,DX12DeviceResources::kFrameCount,error)) return false;
+        std::vector<uint8_t> expected;
+        for(const int variant:{0,1,2,4,-4})
+        {
+            if(!resources.BeginFrame(error)) return false;
+            pool.BeginFrame(0);
+            EnhancedRenderGraph g(resources,RGSchedulingMode::ExplicitVersioned);
+            g.SetParallelRecordCostThreshold(variant<0 ? 100 : 0);
+            RGTextureDesc d{}; d.width=resources.GetWidth(); d.height=resources.GetHeight(); d.allowRenderTarget=true; d.name="RG4.A";
+            std::copy_n(DX12DeviceResources::kClearColor,4,d.clearColor);
+            const auto a=g.Write(g.CreateTexture(d)); d.name="RG4.B";
+            const auto b=g.Write(g.CreateTexture(d));
+            std::atomic<uint32_t> slices{0}, independent{0}; std::atomic<bool> copied{false};
+            const uint32_t wantedSlices=variant>1 ? static_cast<uint32_t>(variant) : 1u;
+            g.AddPass("readback",{{b,RHIResourceState::CopySource,RGAccessMode::Read}},
+                [&](const EnhancedRenderGraph::ExecuteContext& c){
+                    if(!copied.load()) throw std::runtime_error("consumer recorded before copy");
+                    c.encoder->CopyToReadback(resources.GetFrameReadback(),c.ResolveHandle(b));
+                },true);
+            g.AddPass("copy",{{a,RHIResourceState::CopySource,RGAccessMode::Read},{b,RHIResourceState::CopyDest,RGAccessMode::Write}},
+                [&](const EnhancedRenderGraph::ExecuteContext& c){
+                    if(slices.load()!=wantedSlices) throw std::runtime_error("consumer recorded before producer slices joined");
+                    c.encoder->CopyTexture(c.ResolveHandle(b),c.ResolveHandle(a)); copied.store(true);
+                });
+            g.AddSplitPass("clear",{{a,RHIResourceState::RenderTarget,RGAccessMode::Write}},
+                [&](const EnhancedRenderGraph::ExecuteContext& c,uint32_t slice,uint32_t count){
+                    if(count!=wantedSlices) throw std::runtime_error("split/fallback count mismatch");
+                    if(slice==0) { const RHITextureHandle colors[]={c.ResolveHandle(a)};
+                        c.encoder->ClearRenderTargets(resources.CreateRenderTargets(colors),DX12DeviceResources::kClearColor); }
+                    ++slices;
+                },4,false,1);
+            g.AddPass("independent",{},[&](const EnhancedRenderGraph::ExecuteContext&){++independent;},true);
+            if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{2,1,0,3}) return false;
+            RHISubmissionTicket ticket;
+            if(variant==0) { if(!g.Execute(error)) return false; }
+            else {
+                RHIRecordedBatchDesc desc{}; desc.frameId=1;
+                desc.backendGeneration=GetRHISubmissionThread().GetOwnerGeneration(&resources);
+                RHIRecordedBatch batch;
+                if(!g.RecordParallel(pool,static_cast<uint32_t>(std::abs(variant)),desc,batch,error) ||
+                    !GetRHISubmissionThread().EnqueueRecordedBatch(&resources,resources,std::move(batch),ticket,error)) return false;
+                const auto stats=g.GetStats();
+                if(stats.recordUnits!=wantedSlices+3 || stats.recordingWaveCount!=(variant>1 ? 3u : 1u) ||
+                    stats.parallelDeclined!=(variant<0)) return false;
+            }
+            if(!resources.EndFrame(error)) return false;
+            resources.WaitForGpu();
+            if(variant!=0 && !GetRHISubmissionThread().Wait(ticket,error)) return false;
+            if(independent.load()!=1 || slices.load()!=wantedSlices) return false;
+            RHIReadbackImage image{};
+            if(!resources.MapReadback(resources.GetFrameReadback(),image,error)) return false;
+            if(variant==0) expected=image.data;
+            else if(expected!=image.data) { outLog+="RG4_GPU_FAILED image mismatch\n"; return false; }
+            std::string drop; if(pool.DrainEncoderDrops(drop)!=0) return false;
+        }
+        outLog+="RG4_GPU_OK immediate workers=1/2/4 fallback split join compiled-order pixels=0 drops=0\n";
     }
 
     // ── [6/7] 실제 실행 + 픽셀 확인 ──

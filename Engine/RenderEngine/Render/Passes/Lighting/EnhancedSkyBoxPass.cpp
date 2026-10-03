@@ -181,10 +181,25 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
         m_depth = m_inputs.depth;
     }
 
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
+        if (ownsDepth)
+        {
+            m_depth = graph.Write(m_depth);
+        }
+    }
+    const auto colorAccess = explicitAccess
+        ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite)
+        : RGAccessMode::LegacyState;
+    const auto depthAccess = explicitAccess
+        ? (ownsDepth ? RGAccessMode::Write : RGAccessMode::Read)
+        : RGAccessMode::LegacyState;
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RHIResourceState::RenderTarget });
+    usages.push_back({ m_output, RHIResourceState::RenderTarget, colorAccess });
     usages.push_back({ m_depth, ownsDepth
-        ? RHIResourceState::DepthWrite : RHIResourceState::DepthRead });
+        ? RHIResourceState::DepthWrite : RHIResourceState::DepthRead, depthAccess });
 
     graph.AddPass(GetName(), usages,
         [this, &context, ownsColor, ownsDepth](

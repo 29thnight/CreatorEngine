@@ -64,6 +64,8 @@ struct RGPassId
 
 enum class RGAccessMode { LegacyState, Read, Write, ReadWrite };
 enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVersioned };
+// Access/version declarations and execution ordering are independent contracts.
+enum class RGOrderPolicy { DependencyOrder, PreserveDeclarationOrder };
 
 // 그래프가 만들 리소스의 설명. transient(그래프 소유)만 이 설명을 쓴다.
 struct RGTextureDesc
@@ -193,6 +195,8 @@ public:
         // 것이 가장 나쁘다.
         bool     parallelDeclined{ false };
         uint32_t totalRecordCost{ 0 };
+        uint32_t dependencyWaveCount{0}; // DAG depth in passes, not elapsed GPU time.
+        uint32_t recordingWaveCount{0}; // Includes command-target append constraints.
     };
 
     /// 병렬로 갈 최소 기록량. 이 아래에서는 워커를 깨우는 비용이 기록보다 크다.
@@ -274,9 +278,11 @@ public:
     ///   따라서 이 생성자로 만든 그래프도 backend 중립 pool을 받아
     ///   `RecordParallel`을 실행할 수 있다.
     explicit EnhancedRenderGraph(IRenderDeviceServices& services,
-        RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder);
+        RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
+        RGOrderPolicy orderPolicy = RGOrderPolicy::DependencyOrder);
     const IRenderDeviceServices& DeviceServices() const { return *m_deviceServices; }
     uint64_t ResourceEpoch() const { return m_resourceEpoch; }
+    RGSchedulingMode GetSchedulingMode() const { return m_scheduling; }
     RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
     RGHandle FindImportedBuffer(RHIBufferHandle buffer) const;
     RGHandle FindImportedTexture(RHITextureHandle texture) const;
@@ -396,6 +402,8 @@ public:
         std::vector<uint16_t> executeOrder;
         std::vector<ReachabilityEdge> reachabilityEdges;
         std::vector<VersionEdge> versionEdges;
+        std::vector<int32_t> dependencyWaves; // authored pass index; -1 is culled/unavailable
+        std::vector<uint16_t> criticalPath;
     };
     bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 
@@ -496,7 +504,11 @@ private:
     IRHIGpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
     RGSchedulingMode m_scheduling{ RGSchedulingMode::DeclarationOrder };
+    RGOrderPolicy m_orderPolicy{ RGOrderPolicy::DependencyOrder };
     bool BuildExplicitOrder(std::string& outError);
+    void BuildDependencyWaves();
+    std::vector<int32_t> m_dependencyWaves;
+    std::vector<uint16_t> m_criticalPath;
     RGHandle VersionHandle(uint16_t index, uint16_t version) const;
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;

@@ -135,6 +135,9 @@ bool EnhancedDeferredPass::PrepareFrame(const EnhancedFrameContext& context, std
 
 void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
     RGTextureDesc outputDesc{};
     outputDesc.width = context.width;
     outputDesc.height = context.height;
@@ -142,25 +145,33 @@ void EnhancedDeferredPass::Declare(EnhancedRenderGraph& graph, const EnhancedFra
     outputDesc.allowRenderTarget = true;
     outputDesc.name = "Deferred.Lighting";
     m_output = graph.CreateTexture(outputDesc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = graph.Write(m_output);
+    }
 
     // GBuffer 넷을 읽고 하나에 쓴다. 이 선언만으로 그래프가
     // RENDER_TARGET → PIXEL_SHADER_RESOURCE 전이를 만들어 준다.
     std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
-        { m_inputs.diffuse,    RHIResourceState::ShaderResource },
-        { m_inputs.metalRough, RHIResourceState::ShaderResource },
-        { m_inputs.normal,     RHIResourceState::ShaderResource },
-        { m_inputs.emissive,   RHIResourceState::ShaderResource },
+        { m_inputs.diffuse,    RHIResourceState::ShaderResource, readAccess },
+        { m_inputs.metalRough, RHIResourceState::ShaderResource, readAccess },
+        { m_inputs.normal,     RHIResourceState::ShaderResource, readAccess },
+        { m_inputs.emissive,   RHIResourceState::ShaderResource, readAccess },
         // 깊이는 DEPTH_WRITE에서 읽기 상태로 넘어와야 한다. 그래프가 알아서
         // 전이를 만들지만, 여기서 선언하지 않으면 만들지 않는다.
-        { m_inputs.depth,      RHIResourceState::ShaderResource },
-        { m_output,            RHIResourceState::RenderTarget },
+        { m_inputs.depth,      RHIResourceState::ShaderResource, readAccess },
+        { m_output,            RHIResourceState::RenderTarget, writeAccess },
     };
     const bool hasShadowMap = m_shadowMap.IsValid();
     if (hasShadowMap)
-        usages.push_back({ m_shadowMap, RHIResourceState::ShaderResource });
+    {
+        usages.push_back({ m_shadowMap, RHIResourceState::ShaderResource, readAccess });
+    }
 
     if (m_ambientOcclusion.IsValid())
-        usages.push_back({ m_ambientOcclusion, RHIResourceState::ShaderResource });
+    {
+        usages.push_back({ m_ambientOcclusion, RHIResourceState::ShaderResource, readAccess });
+    }
 
     graph.AddPass(GetName(), usages,
         [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)

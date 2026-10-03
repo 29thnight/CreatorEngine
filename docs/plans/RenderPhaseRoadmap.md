@@ -12,14 +12,14 @@
 |---|---|---:|---:|---:|---:|
 | **4** | 현행 DX12 PBR 제품 배선 | 10 | 18 | 18 | 0 |
 | **4.25** | Graph→ShaderMeta/Slang·공통 재질·Blender 수용 | 11 | 40 + 미산정 | 32 | 8 + 미산정 |
-| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 30 | 70 |
+| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 36 | 64 |
 | **4.5** | 모션/히스토리·업스케일·프레임 생성, DX12 수용 | 16 | 71 | 0 | 71 |
 | **4.6** | C# Pipeline IR·PassSchema/Roslyn·native 조립 | 7 | 32 | 0 | 32 |
 | **4.7** | UV1·BVH·DX12 백그라운드 라이트맵 | 8 | 35 | 2 | 33 |
 | **4.75** | probe/AO·shadow·display/post·Environment | 4 | 28 | 0 | 28 |
 | **4.8** | GPU-driven·확률 조명·DXR 설계·구현 공수 확정 | 4 | 9 | 0 | 9 |
 | **4.9** | RenderDoc DX12/Vulkan 캡처 → 리소스 확인 → 픽셀별 비교 | 6 | 22 | 0 | 22 |
-| **현재 합계** | | **78** | **355 + 미산정** | **82** | **273 + 미산정** |
+| **현재 합계** | | **78** | **355 + 미산정** | **88** | **267 + 미산정** |
 
 **2026-10-01 사용자 지시 반영:** Vulkan 실행 비교·교차 동등성·픽셀 수용은 4.9가 단독 소유한다.
 4~4.8은 RHI 중립 구현을 유지하면서 **DX12 Debug/Release의 변경 전후 회귀**로 닫는다.
@@ -107,7 +107,7 @@ IBL 1024/4096·기존 이미지 상한은 유지한다. 범용 frame packet·모
 2026-10-03 현행 Debug/Release에서 구성별 독립 프로세스 2개 × 캡처 2개를 검증하고 구성 간 16개 이미지
 maxError=0, GPU validation/encoder drop/소스 변경 0, 정상 종료와 현재 해시를 확인했다.
 `Build/Obj/RenderBase0/current-static-v4-phase-complete.json`의 `phaseComplete=true`로 BASE-0을 done·기성 4인일로
-회수한다. 이전 재생 및 실패 기록은 보존한다. RG1도 명시적 단일 writer DAG·두 구성 native/GPU 검사 및 변경 전후 16개 이미지 maxError=0으로 완료했다. 제품 기본 순서는 RG5/6 이관 전까지 유지하며 RG2 version/Modify·RAW/WAR/WAW와 두 구성 240 shuffle/GPU·제품 회귀도 완료했다. RG3도 버전 producer 기준 컬링·정렬 후 수명/배리어와 두 구성 native/GPU·제품 회귀로 완료했다. 다음은 RG4 dependency wave 기반 병렬 기록·진단이다. [RG3 증거](../analysis/RenderRg3LifetimeBarriers.md)를 따른다. [RG2 증거](../analysis/RenderRg2Versions.md)를 따른다. [RG1 증거](../analysis/RenderRg1Scheduling.md)를 따른다.
+회수한다. 이전 재생 및 실패 기록은 보존한다. RG1도 명시적 단일 writer DAG·두 구성 native/GPU 검사 및 변경 전후 16개 이미지 maxError=0으로 완료했다. 제품 기본 순서는 RG5/6 이관 전까지 유지하며 RG2 version/Modify·RAW/WAR/WAW와 두 구성 240 shuffle/GPU·제품 회귀도 완료했다. RG3도 버전 producer 기준 컬링·정렬 후 수명/배리어와 두 구성 native/GPU·제품 회귀로 완료했다. RG4도 dependency wave·target append 제약·critical path 진단과 두 구성 native/GPU·제품 회귀로 완료했다. RG5-1 GBuffer·Shadow 생산자 이관은 두 구성 선언 검사·제품 회귀 및 16개 이미지 오차 0으로 완료했다. RG5 전체는 진행 상태이며 선언/정렬 정책 분리·consumer/ReadWrite·legacy 추론 제거·versioned 제품 GPU 수용이 남았다. [RG5 현행 증거](../analysis/RenderRg5ProducerMigration.md)를 따른다. [RG4 증거](../analysis/RenderRg4RecordingWaves.md)를 따른다. [RG3 증거](../analysis/RenderRg3LifetimeBarriers.md)를 따른다. [RG2 증거](../analysis/RenderRg2Versions.md)를 따른다. [RG1 증거](../analysis/RenderRg1Scheduling.md)를 따른다.
 Vulkan 비교·잔여 교차 오차는 [PHASE 4.9](BackendParityPlan.md), MAT-9 품질/실제 성능 수용은 해당 gate에 유지한다.
 
 번호는 대시보드의 **표시 순서**다. 모든 페이즈가 앞 번호의 전체 완료를 기다리는
@@ -161,3 +161,21 @@ RG6 제품 결과에서 닫으며 CSRP-5/6에서 같은 viewer로 C# IR을 표�
 MAT-7 기반에서 배경/IBL/캐시 계약을 닫는다. W9(Phase21)와 14-LIVE/14-7(Phase14)은
 이 4 계열 공수에 섞지 않는다. 정본은 [EditorRenderingSurfacesPlan.md](EditorRenderingSurfacesPlan.md),
 [EnvironmentRenderingPlan.md](EnvironmentRenderingPlan.md)다.
+
+
+2026-10-03 RG5-2 실행 순서 정책 분리 묶음은 Debug/Release 빌드·native 정책 검사·기존 RG1~4 GPU fixture로 완료했다. [검증 기록](../analysis/RenderRg5OrderPolicy.md). 제품 소비자/ReadWrite 이관·legacy 추론 제거·현행 전체 프레임 기준선·RG6 제품 정렬 전환은 아직 남아 있다.
+
+
+2026-10-03 RG5-3 Deferred·SkyBox 소비 체인 이관 완료: 두 구성 빌드·native 선언 검사와 제품 기본 경로의 변경 전후/구성 간 16개 이미지 오차 0을 확인했다. [현행 기준선 및 남은 범위](../analysis/RenderRg5ConsumerMigration.md). 제품 기본 DeclarationOrder, RG5 전체 진행 상태는 유지한다.
+
+
+2026-10-03 RG5-4 SSAO·SSGI·history 이관 완료: 두 구성 빌드·native 8개 조합·제품 회귀와 변경 전후/구성 간 16개 이미지 오차 0을 확인했다. [현행 기준선](../analysis/RenderRg5IndirectMigration.md). Forward+ 혼합 스트림과 남은 제품 선언/legacy 제거·RG6 기본 전환은 열려 있다.
+
+
+2026-10-03 RG5-5 Forward+ 타일 버퍼·Code 경로 이관 완료: 두 구성 빌드·native 선언 검사·제품 회귀와 변경 전후/구성 간 16개 이미지 오차 0. [현행 기준선 및 혼합 경로 미완료 범위](../analysis/RenderRg5ForwardCodeMigration.md). Graph 자원 소유자 이관 및 mixed GPU 수용 후 guard 제거가 필요하며 RG5 전체/RG6 전환은 열려 있다.
+
+2026-10-03 RG5-6 Lookup 소유자 완료: 캡처 출력 버전 반환·Bake Write·Ready Read 이관. 두 구성 최종 빌드·native·제품 반복 회귀 및 변경 전후/구성 간 각 16개 이미지 오차 0. [현행 검증과 종료 제한 재실행 기록](../analysis/RenderRg5LookupMigration.md). Refraction/Subsurface/Volume/GraphSurface 및 혼합 GPU 수용은 남아 있으며 RG5 전체 기성 0·RG6 미전환을 유지한다.
+
+2026-10-03 RG5-7 Refraction·SSS·Volume 소유자 완료: 입력 캡처·배경 복사·Bake/필터·Volume 계수/합성 출력 버전과 최신 Lookup 입력 소비를 이관했다. 두 구성 빌드·native·제품 반복 회귀와 변경 전후/구성 간 각 16개 이미지 오차 0. [현행 검증 기록](../analysis/RenderRg5SpecialMigration.md). GraphSurface/Draw·DeclareBlended 갱신 출력 및 실제 혼합 GPU 수용이 남아 RG5 전체 기성 0·RG6 미전환을 유지한다.
+
+2026-10-03 RG5-8 GraphSurface·Draw/반환 출력 완료: Shadow/GBuffer/Color/Blended의 결과를 블랙보드·Forward+로 전달하고 깊이 Copy→Modify, 색상 Modify, Mesh upload/world 버전·중복 읽기를 이관했다. 두 구성 빌드·native·제품 반복 회귀 및 변경 전후/구성 간 각 16개 이미지 오차 0. [현행 검증과 GPU 수용 경계](../analysis/RenderRg5SurfaceMigration.md). 실제 versioned SceneHost/mixed GPU 수용 및 guard 제거는 다음 조건이며 RG5 전체 기성 0·RG6 미전환을 유지한다.

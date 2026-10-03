@@ -1403,9 +1403,18 @@ void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& conte
 void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
     m_output = RGHandle{};
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
+    const auto blendAccess = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
+    if (explicitAccess && m_graphMaterials && (m_graphMaterials->HasDraws() || m_graphMaterials->VolumeFrame()))
+    {
+        throw std::runtime_error(
+            "RG5 Forward+ Graph stream requires mixed-stream versioned GPU acceptance.");
+    }
 
-    if (!m_inputs.depth.IsValid() || !m_cullPSO.IsValid() ||
-        !m_tileCountBuffer.IsValid() || nullptr == context.lights)
+    if (!m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)
     {
         return;
     }
@@ -1428,10 +1437,14 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     //   넘겼고, 그 두 줄이 **패스가 인터페이스 경유로 DX12 를 만지던 마지막
     //   자리**였다. 버퍼를 버퍼로 추적하는 모델은 아직 DX12 만 답할 수 있어
     //   그래프 안쪽에 있다(G-2b).
-    m_tileCountHandle = graph.ImportBuffer(m_tileCountBuffer,
-        m_tileCountState, "Forward+.TileCount", &m_tileCountState);
-    m_tileListHandle = graph.ImportBuffer(m_tileListBuffer,
-        m_tileListState, "Forward+.TileList", &m_tileListState);
+    m_tileCountHandle =
+        graph.ImportBuffer(m_tileCountBuffer, m_tileCountState, "Forward+.TileCount", &m_tileCountState);
+    m_tileListHandle = graph.ImportBuffer(m_tileListBuffer, m_tileListState, "Forward+.TileList", &m_tileListState);
+    if (versioned)
+    {
+        m_tileCountHandle = graph.Write(m_tileCountHandle);
+        m_tileListHandle = graph.Write(m_tileListHandle);
+    }
 
     EnhancedForwardLighting shared;
     shared.counts = m_tileCountBuffer;
@@ -1440,10 +1453,17 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     shared.graphIndices = m_tileListHandle;
     shared.reference = m_useReferencePath;
     const auto lightCount = static_cast<std::uint32_t>(context.lights->size());
-    shared.lights = context.resources->AllocateUpload({
-        (std::max)(std::uint64_t{1}, std::uint64_t{lightCount}) * sizeof(EnhancedLight), RHIUploadUsage::BufferCopy, 16});
-    if (!shared.lights.IsValid()) throw std::runtime_error("Forward+ shared light upload failed.");
-    if (lightCount) std::memcpy(shared.lights.cpuAddress, context.lights->data(), lightCount * sizeof(EnhancedLight));
+    shared.lights = context.resources->AllocateUpload(
+        {(std::max)(std::uint64_t{1}, std::uint64_t{lightCount}) * sizeof(EnhancedLight), RHIUploadUsage::BufferCopy,
+         16});
+    if (!shared.lights.IsValid())
+    {
+        throw std::runtime_error("Forward+ shared light upload failed.");
+    }
+    if (lightCount)
+    {
+        std::memcpy(shared.lights.cpuAddress, context.lights->data(), lightCount * sizeof(EnhancedLight));
+    }
     const auto volume = m_graphMaterials ? m_graphMaterials->VolumeFrame() : nullptr;
     if (volume)
     {
@@ -1459,28 +1479,28 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         shared.volumeConstants = context.resources->UploadConstants(empty.data(), empty.size());
         shared.volumeTriangles = context.resources->AllocateUpload({48, RHIUploadUsage::Raw, 16});
         if (!shared.volumeConstants.IsValid() || !shared.volumeTriangles.IsWritable())
+        {
             throw std::runtime_error("Forward+ empty medium allocation failed.");
+        }
         std::memset(shared.volumeTriangles.cpuAddress, 0, 48);
         shared.volumeCoefficients = shared.volumeTriangles;
     }
 
     // ── 광원 컬링 ──
-    graph.AddPass("Forward+.Cull",
-        { { m_inputs.depth,    RHIResourceState::ShaderResource },
-          { m_tileCountHandle, RHIResourceState::UnorderedAccess },
-          { m_tileListHandle,  RHIResourceState::UnorderedAccess } },
-        [this, &context, shared, cull = m_cullPSO.GetGeneration()](const EnhancedRenderGraph::ExecuteContext& executeContext)
-        {
-
-            const uint32_t lightCount =
-                static_cast<uint32_t>(context.lights->size());
+    graph.AddPass(
+        "Forward+.Cull",
+        {{m_inputs.depth, RHIResourceState::ShaderResource, readAccess},
+         {m_tileCountHandle, RHIResourceState::UnorderedAccess, writeAccess},
+         {m_tileListHandle, RHIResourceState::UnorderedAccess, writeAccess}},
+        [this, &context, shared,
+         cull = m_cullPSO.GetGeneration()](const EnhancedRenderGraph::ExecuteContext& executeContext) {
+            const uint32_t lightCount = static_cast<uint32_t>(context.lights->size());
 
             CullParams params{};
             if (nullptr != context.camera)
             {
                 params.view = math::transpose(context.camera->view);
-                params.inverseProjection =
-                    math::transpose(context.camera->inverseProjection);
+                params.inverseProjection = math::transpose(context.camera->inverseProjection);
             }
             params.screenWidth = context.width;
             params.screenHeight = context.height;
@@ -1488,23 +1508,26 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             params.tileGridY = m_tileCountY;
             params.lightCount = lightCount;
 
-            const auto cb = context.resources->UploadConstants(
-                &params, sizeof(CullParams));
-            if (!cb.IsValid()) return;
+            const auto cb = context.resources->UploadConstants(&params, sizeof(CullParams));
+            if (!cb.IsValid())
+            {
+                return;
+            }
             const uint32_t tileTotal = m_tileCountX * m_tileCountY;
 
             const RHIBindingDesc srvs[] = {
                 RHIBindingDesc::SrvDepth(executeContext.ResolveHandle(m_inputs.depth)),
             };
             const RHIBindingDesc uavs[] = {
-                RHIBindingDesc::UavBuffer(m_tileCountBuffer,
-                    tileTotal * 2, sizeof(uint32_t)),
-                RHIBindingDesc::UavBuffer(m_tileListBuffer,
-                    tileTotal * kMaxLightsPerTile, sizeof(uint32_t)),
+                RHIBindingDesc::UavBuffer(m_tileCountBuffer, tileTotal * 2, sizeof(uint32_t)),
+                RHIBindingDesc::UavBuffer(m_tileListBuffer, tileTotal * kMaxLightsPerTile, sizeof(uint32_t)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(srvs);
             const RHIBindingTable uavTable = context.resources->CreateBindings(uavs);
-            if (!srvTable.IsValid() || !uavTable.IsValid()) return;
+            if (!srvTable.IsValid() || !uavTable.IsValid())
+            {
+                return;
+            }
 
             RHIEncoder& encoder = *executeContext.encoder;
             encoder.SetPipeline(RHIBindPoint::Compute, cull->GetHandle());
@@ -1531,7 +1554,8 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     // 요구하기 때문이다 — 깊이 텍스처가 DSV로 만들어지지 않은 경로(컬링만 쓰는
     // 자가 검증 등)에서는 그 요구가 곧 검증 레이어 오류이자 디바이스 제거다.
     // 실제로 컬링 검증이 이것으로 죽었다.
-    const auto graphDraws = m_graphMaterials ? m_graphMaterials->BlendedDraws() : std::vector<material_graph::SceneHost::ForwardDraw>{};
+    const auto graphDraws =
+        m_graphMaterials ? m_graphMaterials->BlendedDraws() : std::vector<material_graph::SceneHost::ForwardDraw>{};
     const auto codeCount = context.forwardDraws ? context.forwardDraws->size() : 0;
     if ((!m_shadePipelineRequest.IsValid() || !codeCount) && graphDraws.empty())
     {
@@ -1564,58 +1588,96 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         outputDesc.allowRenderTarget = true;
         outputDesc.name = "Forward+.Shade";
         m_output = graph.CreateTexture(outputDesc);
+        if (versioned)
+        {
+            m_output = graph.Write(m_output);
+        }
     }
 
     if (m_graphMaterials)
+    {
         m_output = m_graphMaterials->DeclareVolume(graph, m_output, m_inputs.depth, m_shadowMap);
+    }
 
     // Code와 Graph 모두 opaque 깊이를 읽기 전용 DSV로 공유한다.
     // 그림자 맵은 있을 때만 선언한다. 없는데 선언하면 그래프가 무효 핸들을
     // 전이 대상으로 삼고, 자가 검증 경로는 애초에 그림자 패스가 없다.
     std::vector<EnhancedRenderGraph::RGPassUsage> shadeUsages = {
-        { m_output, RHIResourceState::RenderTarget },
-        { m_inputs.depth, RHIResourceState::DepthRead },
+        {m_output, RHIResourceState::RenderTarget, blendAccess},
+        {m_inputs.depth, RHIResourceState::DepthRead, readAccess},
         // 컬링이 쓴 것을 읽는다. 이 선언이 UAV → SRV 전이를 만들고,
         // 그 전이가 컬링의 쓰기가 끝났음을 함의한다.
-        { m_tileCountHandle, RHIResourceState::ShaderResource },
-        { m_tileListHandle,  RHIResourceState::ShaderResource },
+        {m_tileCountHandle, RHIResourceState::ShaderResource, readAccess},
+        {m_tileListHandle, RHIResourceState::ShaderResource, readAccess},
     };
     const bool hasShadowMap = m_shadowMap.IsValid();
     if (shared.graphVolumeCoefficients.IsValid())
-        shadeUsages.push_back({shared.graphVolumeCoefficients, RHIResourceState::PixelShaderResource});
+    {
+        shadeUsages.push_back({shared.graphVolumeCoefficients, RHIResourceState::PixelShaderResource, readAccess});
+    }
     if (shared.volumeEnvironment.IsValid())
-        shadeUsages.push_back({graph.FindImportedTexture(shared.volumeEnvironment), RHIResourceState::PixelShaderResource});
+    {
+        shadeUsages.push_back(
+            {graph.FindImportedTexture(shared.volumeEnvironment), RHIResourceState::PixelShaderResource, readAccess});
+    }
     if (hasShadowMap)
     {
-        shadeUsages.push_back({ m_shadowMap, RHIResourceState::ShaderResource });
+        shadeUsages.push_back({m_shadowMap, RHIResourceState::ShaderResource, readAccess});
     }
 
     if (!drawsOntoLighting)
-        graph.AddPass("Forward+.Clear", {{m_output, RHIResourceState::RenderTarget}},
-            [this, &context](const auto& execution) {
-                const RHITextureHandle color[]{execution.ResolveHandle(m_output)};
-                const auto targets = context.resources->CreateRenderTargets(color, nullptr);
-                if (!targets.IsValid()) throw std::runtime_error("Forward+ clear target failed.");
-                constexpr float zero[4]{};
-                execution.encoder->BindRenderTargets(targets);
-                execution.encoder->ClearRenderTargets(targets, zero);
-            });
-    struct Entry { bool graph; std::size_t index, key; float depth; };
+    {
+        const auto clearOutput = m_output;
+        graph.AddPass("Forward+.Clear", {{clearOutput, RHIResourceState::RenderTarget, writeAccess}},
+                      [clearOutput, &context](const auto& execution) {
+                          const RHITextureHandle color[]{execution.ResolveHandle(clearOutput)};
+                          const auto targets = context.resources->CreateRenderTargets(color, nullptr);
+                          if (!targets.IsValid())
+                          {
+                              throw std::runtime_error("Forward+ clear target failed.");
+                          }
+                          constexpr float zero[4]{};
+                          execution.encoder->BindRenderTargets(targets);
+                          execution.encoder->ClearRenderTargets(targets, zero);
+                      });
+    }
+    struct Entry
+    {
+        bool graph;
+        std::size_t index, key;
+        float depth;
+    };
     std::vector<Entry> order;
     order.reserve(codeCount + graphDraws.size());
     for (std::size_t i = 0; i < codeCount; ++i)
     {
         const auto& item = (*context.forwardDraws)[i];
         const float depth = context.camera ? math::dot(item.worldMatrix.translation() - context.camera->eyePosition,
-                                                       context.camera->forward) : 0.f;
-        if (!std::isfinite(depth)) throw std::runtime_error("Forward+ sorting depth is non-finite.");
+                                                       context.camera->forward)
+                                           : 0.f;
+        if (!std::isfinite(depth))
+        {
+            throw std::runtime_error("Forward+ sorting depth is non-finite.");
+        }
         order.push_back({false, i, item.geometryKey, depth});
     }
-    for (const auto& draw : graphDraws) order.push_back({true, draw.index, draw.geometryKey, draw.depth});
+    for (const auto& draw : graphDraws)
+    {
+        order.push_back({true, draw.index, draw.geometryKey, draw.depth});
+    }
     std::stable_sort(order.begin(), order.end(), [](const Entry& a, const Entry& b) {
-        if (a.depth != b.depth) return a.depth > b.depth;
-        if (a.key != b.key) return a.key < b.key;
-        if (a.graph != b.graph) return a.graph < b.graph;
+        if (a.depth != b.depth)
+        {
+            return a.depth > b.depth;
+        }
+        if (a.key != b.key)
+        {
+            return a.key < b.key;
+        }
+        if (a.graph != b.graph)
+        {
+            return a.graph < b.graph;
+        }
         return a.index < b.index;
     });
     for (std::size_t i = 0; i < order.size();)
@@ -1624,54 +1686,83 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         {
             // Graph lookup capture and bake are material preparation within this
             // same ordered Forward+ stream, followed by ordinary alpha blending.
-            m_graphMaterials->DeclareBlended(graph, order[i].index, m_output, m_shadowMap, shared);
+            m_output = m_graphMaterials->DeclareBlended(graph, order[i].index, m_output, m_shadowMap, shared);
             ++i;
             continue;
         }
         const auto first = order[i++].index;
         auto end = first + 1;
-        while (i < order.size() && !order[i].graph && order[i].index == end) { ++end; ++i; }
-        graph.AddPass("Forward+.Shade", shadeUsages,
-            [this, &context, hasShadowMap, shared, first, end](const auto& execution) mutable {
-                const RHITextureHandle colors[]{execution.ResolveHandle(m_output)};
-                const auto depth = RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(m_inputs.depth), kDepthFormat);
+        while (i < order.size() && !order[i].graph && order[i].index == end)
+        {
+            ++end;
+            ++i;
+        }
+        if (versioned)
+        {
+            m_output = graph.Modify(m_output);
+        }
+        const auto shadeOutput = m_output;
+        shadeUsages.front().handle = shadeOutput;
+        graph.AddPass(
+            "Forward+.Shade", shadeUsages,
+            [this, &context, hasShadowMap, shared, first, end, shadeOutput](const auto& execution) mutable {
+                const RHITextureHandle colors[]{execution.ResolveHandle(shadeOutput)};
+                const auto depth =
+                    RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(m_inputs.depth), kDepthFormat);
                 const auto targets = context.resources->CreateRenderTargets(colors, &depth);
-                if (!targets.IsValid()) throw std::runtime_error("Forward+ shared targets failed.");
+                if (!targets.IsValid())
+                {
+                    throw std::runtime_error("Forward+ shared targets failed.");
+                }
                 auto& encoder = *execution.encoder;
                 encoder.SetViewportAndScissor(context.width, context.height);
                 encoder.BindRenderTargets(targets);
                 const RHIBindingDesc medium[]{
-                    RHIBindingDesc::SrvArray(hasShadowMap ? execution.ResolveHandle(m_shadowMap) : RHITextureHandle{}, RHIFormat::R32Float, 3).OrNull(),
-                    RHIBindingDesc::SrvCube(shared.volumeEnvironment, shared.volumeEnvironment.IsValid()
-                        ? context.resources->DescribeTexture(shared.volumeEnvironment).format : RHIFormat::RGBA16Float, 1).OrNull()};
+                    RHIBindingDesc::SrvArray(hasShadowMap ? execution.ResolveHandle(m_shadowMap) : RHITextureHandle{},
+                                             RHIFormat::R32Float, 3)
+                        .OrNull(),
+                    RHIBindingDesc::SrvCube(shared.volumeEnvironment,
+                                            shared.volumeEnvironment.IsValid()
+                                                ? context.resources->DescribeTexture(shared.volumeEnvironment).format
+                                                : RHIFormat::RGBA16Float,
+                                            1)
+                        .OrNull()};
                 shared.volumeTable = context.resources->CreateBindings(medium);
-                if (!shared.volumeTable.IsValid()) throw std::runtime_error("Forward+ medium lighting failed.");
+                if (!shared.volumeTable.IsValid())
+                {
+                    throw std::runtime_error("Forward+ medium lighting failed.");
+                }
                 RecordShading(encoder, context, static_cast<std::uint32_t>(context.lights->size()),
-                    hasShadowMap ? execution.ResolveHandle(m_shadowMap) : RHITextureHandle{}, shared, first, end);
-            }, true);
+                              hasShadowMap ? execution.ResolveHandle(m_shadowMap) : RHITextureHandle{}, shared, first,
+                              end);
+            },
+            true);
     }
-
 }
 
 // 드로우 기록. 컬링 경로와 참조 경로가 이 함수를 공유한다 — 대조가 뜻을
 // 가지려면 PSO 말고는 아무것도 달라선 안 된다. 같은 것을 두 곳에서 따로
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
-bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
-    const EnhancedFrameContext& context, uint32_t lightCount,
-    RHITextureHandle shadowResource, const EnhancedForwardLighting& lighting, std::size_t first, std::size_t end)
+bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrameContext& context, uint32_t lightCount,
+                                        RHITextureHandle shadowResource, const EnhancedForwardLighting& lighting,
+                                        std::size_t first, std::size_t end)
 {
-    if (!m_shadePipelineRequest.IsValid() || !m_referencePipelineRequest.IsValid()
-        || nullptr == context.forwardDraws || context.forwardDraws->empty()
-        || m_batches.empty()) return false;
+    if (!m_shadePipelineRequest.IsValid() || !m_referencePipelineRequest.IsValid() || nullptr == context.forwardDraws ||
+        context.forwardDraws->empty() || m_batches.empty())
+    {
+        return false;
+    }
 
     const auto lightUpload = lighting.lights;
     // 인스턴스는 한 번에 올리고 드로우마다 주소만 옮긴다. 루트 SRV는 주소를
     // 받으므로 드로우별 재업로드가 필요 없다.
     const size_t drawCount = end - first;
     const auto instanceUpload = context.resources->AllocateUpload(
-        RHIUploadRequest{ drawCount * sizeof(ShadeInstance),
-            RHIUploadUsage::BufferCopy, sizeof(ShadeInstance) });
-    if (!instanceUpload.IsValid()) return false;
+        RHIUploadRequest{drawCount * sizeof(ShadeInstance), RHIUploadUsage::BufferCopy, sizeof(ShadeInstance)});
+    if (!instanceUpload.IsValid())
+    {
+        return false;
+    }
 
     auto* instances = static_cast<ShadeInstance*>(instanceUpload.cpuAddress);
     std::vector<MaterialView> materials(drawCount);
@@ -1680,7 +1771,10 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     {
         const EnhancedDrawItem& draw = (*context.forwardDraws)[first + i];
         MaterialView& material = materials[i];
-        if (!ResolveMaterialView(draw, material, materialError)) return false;
+        if (!ResolveMaterialView(draw, material, materialError))
+        {
+            return false;
+        }
         instances[i] = {}; // recycled upload memory must not supply legacy flow/UV state
         instances[i].world = math::transpose(draw.worldMatrix);
         instances[i].baseColor = material.baseColorFactor.rgba();
@@ -1688,30 +1782,31 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         instances[i].roughness = material.roughness;
         instances[i].useNormalMap = material.useNormalMap;
         const auto& coverage = material.snapshot ? material.snapshot->coverage : draw.coverage;
-        instances[i].coverageFlags = !material.snapshot && coverage.flags == 0
-            ? EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Blended
-            : coverage.flags; // legacy Forward retains backface rejection and authored alpha
+        instances[i].coverageFlags =
+            !material.snapshot && coverage.flags == 0
+                ? EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::Blended
+                : coverage.flags; // legacy Forward retains backface rejection and authored alpha
         instances[i].coverageCutoff = coverage.cutoff;
         instances[i].boneOffset = 0xFFFFFFFFu;
         if (nullptr != draw.bonePalette && 0 != draw.boneCount)
         {
-            const auto& offsets = context.animationPalettes
-                ? context.animationPalettes->Offsets() : m_boneOffsets;
+            const auto& offsets = context.animationPalettes ? context.animationPalettes->Offsets() : m_boneOffsets;
             const auto found = offsets.find(draw.animatorKey);
-            if (found != offsets.end()) instances[i].boneOffset = found->second;
+            if (found != offsets.end())
+            {
+                instances[i].boneOffset = found->second;
+            }
         }
 
         const MaterialKey key = MakeMaterialKey(draw);
         constexpr uint32_t kHasMaterialTextures = 1u << 0u;
         constexpr uint32_t kHasShaderMetaSnapshot = 1u << 1u;
         instances[i].materialFlags =
-            (m_materialTextures.find(key) != m_materialTextures.end()
-                ? kHasMaterialTextures : 0u)
-            | (material.snapshot ? kHasShaderMetaSnapshot : 0u);
+            (m_materialTextures.find(key) != m_materialTextures.end() ? kHasMaterialTextures : 0u) |
+            (material.snapshot ? kHasShaderMetaSnapshot : 0u);
         if (material.snapshot)
         {
-            const EnhancedForwardMaterialFlowSnapshot& flow =
-                material.snapshot->flow;
+            const EnhancedForwardMaterialFlowSnapshot& flow = material.snapshot->flow;
             instances[i].flowWindVector = flow.windVector;
             instances[i].flowUvScroll = flow.uvScroll;
             instances[i].flowTotalSeconds = flow.totalSeconds;
@@ -1722,8 +1817,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     ShadeParams params{};
     if (nullptr != context.camera)
     {
-        params.viewProjection = math::transpose(
-            context.camera->view * context.camera->projection);
+        params.viewProjection = math::transpose(context.camera->view * context.camera->projection);
     }
     params.tileGridX = m_tileCountX;
     params.tileGridY = m_tileCountY;
@@ -1731,10 +1825,9 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     if (nullptr != context.camera)
     {
         const math::vector3& eye = context.camera->eyePosition;
-        params.eyePosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
+        params.eyePosition = math::vector4{eye.x, eye.y, eye.z, 1.f};
     }
-    const bool hasIbl = m_iblIrradiance.IsValid()
-        && m_iblPrefiltered.IsValid() && m_iblBrdfLut.IsValid();
+    const bool hasIbl = m_iblIrradiance.IsValid() && m_iblPrefiltered.IsValid() && m_iblBrdfLut.IsValid();
     params.hasIbl = hasIbl ? 1u : 0u;
 
     // 그림자. 자원이 없으면 데이터가 있어도 끈다 — 셰이더가 널 SRV를 읽어
@@ -1744,8 +1837,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     {
         for (uint32_t i = 0; i < kShadowCascadeCount; ++i)
         {
-            params.lightViewProjection[i] =
-                math::transpose(m_shadowData.lightViewProjection[i]);
+            params.lightViewProjection[i] = math::transpose(m_shadowData.lightViewProjection[i]);
         }
         params.cameraForward = m_shadowData.cameraForward;
         params.cascadeSplits = m_shadowData.splitDepths;
@@ -1754,47 +1846,60 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     }
     params.hasShadow = hasShadow ? 1u : 0u;
 
-    const auto cb = context.resources->AllocateUpload(
-        RHIUploadRequest{ sizeof(ShadeParams), RHIUploadUsage::ConstantBuffer, 1 });
-    if (!cb.IsValid()) return false;
+    const auto cb =
+        context.resources->AllocateUpload(RHIUploadRequest{sizeof(ShadeParams), RHIUploadUsage::ConstantBuffer, 1});
+    if (!cb.IsValid())
+    {
+        return false;
+    }
     memcpy(cb.cpuAddress, &params, sizeof(params));
 
     RHIBufferSlice paletteBuffer{};
     if (context.animationPalettes)
+    {
         paletteBuffer = context.animationPalettes->Upload();
+    }
     else
     {
         const uint64_t paletteBytes = m_bonePalettes.empty()
-            ? sizeof(PackedBoneMatrix)
-            : sizeof(PackedBoneMatrix) * static_cast<uint64_t>(m_bonePalettes.size());
+                                          ? sizeof(PackedBoneMatrix)
+                                          : sizeof(PackedBoneMatrix) * static_cast<uint64_t>(m_bonePalettes.size());
         paletteBuffer = context.resources->AllocateUpload(
-            RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
-                sizeof(PackedBoneMatrix) });
-        if (!paletteBuffer.IsValid()) return false;
+            RHIUploadRequest{paletteBytes, RHIUploadUsage::BufferCopy, sizeof(PackedBoneMatrix)});
+        if (!paletteBuffer.IsValid())
+        {
+            return false;
+        }
         if (m_bonePalettes.empty())
         {
             const PackedBoneMatrix identity = PackedBoneMatrix::Identity();
             memcpy(paletteBuffer.cpuAddress, &identity, sizeof(identity));
         }
-        else memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
-            static_cast<size_t>(paletteBytes));
+        else
+        {
+            memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(), static_cast<size_t>(paletteBytes));
+        }
     }
-    if (!paletteBuffer.IsValid()) return false;
+    if (!paletteBuffer.IsValid())
+    {
+        return false;
+    }
 
     // Install the first layout before preparing frame bindings. Each batch
     // rebinds them because its reflected material table may change the layout.
-    const RHIPipelineHandle firstPipeline = m_useReferencePath
-        ? m_batches.front().referencePipeline : m_batches.front().shadePipeline;
-    if (!firstPipeline.IsValid()) return false;
+    const RHIPipelineHandle firstPipeline =
+        m_useReferencePath ? m_batches.front().referencePipeline : m_batches.front().shadePipeline;
+    if (!firstPipeline.IsValid())
+    {
+        return false;
+    }
     encoder.SetPipeline(RHIBindPoint::Graphics, firstPipeline);
     encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
 
     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 2, lightUpload);
-    encoder.SetRootBuffer(RHIBindPoint::Graphics, 3,
-        RHIBufferSlice::Whole(m_tileCountBuffer));
-    encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
-        RHIBufferSlice::Whole(m_tileListBuffer));
+    encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(m_tileCountBuffer));
+    encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, RHIBufferSlice::Whole(m_tileListBuffer));
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 9, paletteBuffer);
     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 11, lighting.volumeConstants);
     encoder.SetRootBuffer(RHIBindPoint::Graphics, 12, lighting.volumeTriangles);
@@ -1824,18 +1929,24 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
 
         const RHIBindingDesc frameSrvs[] = {
             RHIBindingDesc::SrvCube(hasIbl ? m_iblIrradiance : RHITextureHandle{},
-                hasIbl ? context.resources->DescribeTexture(m_iblIrradiance).format : kIblFormat, 1).OrNull(),
+                                    hasIbl ? context.resources->DescribeTexture(m_iblIrradiance).format : kIblFormat, 1)
+                .OrNull(),
             RHIBindingDesc::SrvCube(hasIbl ? m_iblPrefiltered : RHITextureHandle{},
-                hasIbl ? context.resources->DescribeTexture(m_iblPrefiltered).format : kIblFormat,
-                hasIbl ? m_iblPrefilterMips : 1).OrNull(),
+                                    hasIbl ? context.resources->DescribeTexture(m_iblPrefiltered).format : kIblFormat,
+                                    hasIbl ? m_iblPrefilterMips : 1)
+                .OrNull(),
             RHIBindingDesc::Srv2D(hasIbl ? m_iblBrdfLut : RHITextureHandle{}, kIblFormat).OrNull(),
             // 그림자 맵. 깊이 배열이라 포맷과 차원을 둘 다 바꿔 봐야 한다
             // (Deferred가 같은 설명으로 같은 자원을 읽는다).
-            RHIBindingDesc::SrvArray(hasShadow ? shadowResource : RHITextureHandle{},
-                RHIFormat::R32Float, kShadowCascadeCount).OrNull(),
+            RHIBindingDesc::SrvArray(hasShadow ? shadowResource : RHITextureHandle{}, RHIFormat::R32Float,
+                                     kShadowCascadeCount)
+                .OrNull(),
         };
         frameTable = context.resources->CreateBindings(frameSrvs);
-        if (!frameTable.IsValid()) return false;
+        if (!frameTable.IsValid())
+        {
+            return false;
+        }
 
         encoder.SetBindings(RHIBindPoint::Graphics, 6, frameTable);
     }
@@ -1845,12 +1956,20 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
     {
         const auto batchFirst = (std::max)(first, std::size_t{batch.firstDraw});
         const auto batchEnd = (std::min)(end, std::size_t{batch.firstDraw} + batch.drawCount);
-        if (batchEnd <= batchFirst) continue;
-        const RHIPipelineHandle pipeline = m_useReferencePath
-            ? batch.referencePipeline : batch.shadePipeline;
-        if (!pipeline.IsValid()) continue;
+        if (batchEnd <= batchFirst)
+        {
+            continue;
+        }
+        const RHIPipelineHandle pipeline = m_useReferencePath ? batch.referencePipeline : batch.shadePipeline;
+        if (!pipeline.IsValid())
+        {
+            continue;
+        }
         const auto geometry = m_drawGeometry.find(batch.geometryKey);
-        if (geometry == m_drawGeometry.end() || !geometry->second.IsValid()) continue;
+        if (geometry == m_drawGeometry.end() || !geometry->second.IsValid())
+        {
+            continue;
+        }
         const RHIMeshBinding& entry = geometry->second;
         encoder.SetPipeline(RHIBindPoint::Graphics, pipeline);
         // A different material table can invalidate all root arguments.
@@ -1863,20 +1982,15 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder,
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 12, lighting.volumeTriangles);
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 13, lighting.volumeCoefficients);
         encoder.SetBindings(RHIBindPoint::Graphics, 14, lighting.volumeTable);
-        encoder.SetSamplers(RHIBindPoint::Graphics, 7,
-            SamplerTableFor(context, batch.material.sampler));
+        encoder.SetSamplers(RHIBindPoint::Graphics, 7, SamplerTableFor(context, batch.material.sampler));
         encoder.SetBindings(RHIBindPoint::Graphics, 6, frameTable);
 
-        const bool hasSnapshot = batch.material.snapshot
-            && !batch.material.snapshot->propertyBytes.empty();
-        const void* materialData = hasSnapshot
-            ? static_cast<const void*>(batch.material.snapshot->propertyBytes.data())
-            : static_cast<const void*>(&kForwardLegacyMaterialConstants);
-        const std::size_t materialSize = hasSnapshot
-            ? batch.material.snapshot->propertyBytes.size()
-            : sizeof(kForwardLegacyMaterialConstants);
-        const auto materialConstants = context.resources->UploadConstants(
-            materialData, materialSize);
+        const bool hasSnapshot = batch.material.snapshot && !batch.material.snapshot->propertyBytes.empty();
+        const void* materialData = hasSnapshot ? static_cast<const void*>(batch.material.snapshot->propertyBytes.data())
+                                               : static_cast<const void*>(&kForwardLegacyMaterialConstants);
+        const std::size_t materialSize =
+            hasSnapshot ? batch.material.snapshot->propertyBytes.size() : sizeof(kForwardLegacyMaterialConstants);
+        const auto materialConstants = context.resources->UploadConstants(materialData, materialSize);
         if (!materialConstants.IsValid())
         {
             m_sealLedger.NoteDrop(EnhancedDrawDropReason::MaterialConstants);
