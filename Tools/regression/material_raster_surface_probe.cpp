@@ -1,4 +1,6 @@
 #include "MaterialGraphRasterSurface.h"
+#include "Render/Passes/Geometry/EnhancedShadowPass.h"
+#include "Render/Graph/ShadowCasterBounds.h"
 #include "MaterialGraphScenePacket.h"
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphSceneHost.h"
@@ -24,6 +26,7 @@
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
 #include "RHI/Vulkan/VulkanCommandBufferPool.h"
+#include "RHI/Vulkan/VulkanLoader.h"
 #endif
 
 #include <bit>
@@ -1006,6 +1009,51 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
               "Scene input failure preserves the complete previous view fixture=" + std::to_string(failure));
         ++sceneInputFailures;
     }
+    // These malformed inputs must fail before bounds reads any source/palette byte.
+    const std::array<std::byte, 1> tinyVertex{};
+    const auto oneBone = math::matrix4x4::identity();
+    for (unsigned invalidCase = 0; invalidCase < 2; ++invalidCase)
+    {
+        auto invalid = geometry.draw;
+        if (invalidCase == 0)
+        {
+            invalid.modelMeshView.vertexData = tinyVertex.data();
+            invalid.modelMeshView.vertexBytes = 1;
+            invalid.modelMeshView.vertexStride = 1;
+        }
+        else
+        {
+            invalid.boneCount = 257;
+            invalid.bonePalette = &oneBone;
+        }
+        const auto previous = accepted;
+        Check(!SceneViewInput::Seal(view, {&invalid, 1}, {}, accepted, error)
+                  && accepted == previous && !error.empty(),
+              "Malformed shadow bounds input rejected before dereference");
+    }
+    FrameCameraSnapshot selectionCamera;
+    selectionCamera.projection = math::perspective_fov_lh(1.f, 1.f, .1f, 100.f);
+    selectionCamera.inverseView = math::matrix4x4::identity();
+    selectionCamera.nearPlane = .1f; selectionCamera.farPlane = 100.f;
+    const math::vector3 selectionDirection{0, -1, 0};
+    const auto receivers = shadow_math::ReceiverCascades(selectionCamera, selectionDirection, 200, .15f);
+    std::vector<EnhancedDrawItem> selectedDraws;
+    for (unsigned i = 0; i < 4100; ++i)
+    {
+        auto candidate = geometry.draw;
+        candidate.boundRadius = 2;
+        candidate.worldMatrix = math::matrix4x4::identity();
+        candidate.worldMatrix.m[3][2] = 5;
+        if (i == 1) candidate.worldMatrix.m[3][1] = 1000; // offscreen caster, retained
+        if (i > 1) candidate.worldMatrix.m[3][0] = 10000.f + float(i); // unrelated, rejected
+        if (shadow_math::RelevantToView(i == 0, shadow_math::WorldBounds(candidate), receivers, selectionDirection, true))
+            selectedDraws.push_back(candidate);
+    }
+    std::shared_ptr<const SceneViewInput> selectedInput;
+    Check(selectedDraws.size() == 2 && SceneViewInput::Seal(view, selectedDraws, {}, selectedInput, error)
+              && selectedInput->Draws().size() == 2,
+          "Pre-budget union keeps visible/offscreen caster but rejects 4098 unrelated graph draws");
+    std::cout << "CSM_SELECTION_BUDGET_OK candidates=4100 sealed=2\n";
     auto coverageDraw = geometry.draw;
     coverageDraw.coverage.flags |= EnhancedMaterialCoverage::Masked;
     std::shared_ptr<const SceneViewInput> masked;
@@ -2552,6 +2600,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 #include "material_scene_subsurface_tests.inl"
 #include "material_scene_refraction_tests.inl"
 #include "material_scene_volume_tests.inl"
+#include "csm_vulkan_inflight.inl"
 #include "material_scene_shadow_decal_tests.inl"
 #include "material_scene_decal_tests.inl"
 #include "material_forward_blend_tests.inl"
@@ -2756,6 +2805,9 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         }
         else if (mode == "--shadow-decal-only")
         {
+#ifdef LX_PROBE_VULKAN
+            RunCsmVulkanInFlight(device);
+#endif
             RunSceneShadow(device, roots, pipelines, textures, pool, root, image);
             RunSceneDecal(device, roots, pipelines, textures, pool, root, image, cube);
         }

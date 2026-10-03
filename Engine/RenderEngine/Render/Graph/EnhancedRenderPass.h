@@ -238,6 +238,7 @@ struct EnhancedDrawItem
     // I6-C — 그림자 캐스터 반경. 예전에는 Shadow 패스가 draw.mesh를
     // 역참조해 읽었다(legacy Mesh의 **데이터** 소비 마지막 자리).
     float          boundRadius{ 0.f };
+    math::vector3 boundCenter{};
     // MBC6 제품 뷰. MBC7 scene cutover가 채우며, 패스/RHI는 이 값이 있으면
     // legacy Mesh보다 먼저 소비한다(MBC9: 모델은 이 뷰만 탄다).
     RHIModelMeshView modelMeshView{};
@@ -332,10 +333,11 @@ struct EnhancedShadowData
 
     // 각 캐스케이드가 끝나는 뷰 깊이(카메라 정면 방향 거리). 픽셀이 어느
     // 캐스케이드에 속하는지 셰이더가 이 값으로 고른다.
+    // w = selected directional-light array index + 1 (zero: legacy fixture index 0).
     math::vector4 splitDepths{};
 
     // xyz = 캐스케이드별 깊이 편향. 먼 캐스케이드는 텍셀 하나가 덮는 월드
-    // 범위가 넓어 같은 편향으로는 여드름이 남는다 — 반지름 비로 키운다.
+    // 범위에 비례한 월드 편향을 각 light-depth 범위로 나눈 값이다.
     // w = 경사 비례 계수. 표면이 빛과 비스듬할수록 텍셀 하나 안에서 깊이가
     // 크게 변해 상수 편향으로는 모자란다 — tan(경사각)에 비례해 키운다.
     math::vector4 bias{};
@@ -439,6 +441,8 @@ struct EnhancedFrameContext
     //
     // draws는 불투명(deferred) 큐다 — GBuffer가 그린다.
     const std::vector<EnhancedDrawItem>* draws{ nullptr };
+    // Camera visibility must not remove offscreen shadow casters.
+    const std::vector<EnhancedDrawItem>* shadowDraws{ nullptr };
 
     // 포워드 큐. Forward+가 그린다.
     //

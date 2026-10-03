@@ -1,3 +1,81 @@
+void CheckCsmContracts()
+{
+    EnhancedDrawItem caster;
+    caster.boundCenter = {4, 0, 0};
+    caster.boundRadius = 1;
+    caster.worldMatrix = math::matrix4x4::identity();
+    auto bounds = shadow_math::WorldBounds(caster);
+    Check(math::distance(bounds.center, math::vector3{4, 0, 0}) < 1e-5f, "CSM local bounds center");
+    auto bone = math::matrix4x4::identity();
+    bone.m[3][0] = 20;
+    caster.bonePalette = &bone;
+    caster.boneCount = 1;
+    bounds = shadow_math::WorldBounds(caster);
+    Check(math::distance(bounds.center, math::vector3{25, 0, 0}) <= bounds.radius,
+          "CSM bounds contain posed extremity outside bind pose");
+    caster.bonePalette = nullptr;
+    caster.boneCount = 0;
+    caster.boundCenter = {};
+    const auto direction = math::normalize(math::vector3{.3f, -1.f, .2f});
+    const auto position = math::vector3{0, 0, 5} - direction * 500.f;
+    caster.worldMatrix.m[3][0] = position.x;
+    caster.worldMatrix.m[3][1] = position.y;
+    caster.worldMatrix.m[3][2] = position.z;
+    std::vector<EnhancedDrawItem> casters{caster};
+    FrameCameraSnapshot camera;
+    camera.projection = math::perspective_fov_lh(1.f, 1.f, .1f, 1000.f);
+    camera.inverseView = math::matrix4x4::identity();
+    camera.nearPlane = .1f; camera.farPlane = 1000.f; camera.forward = {0, 0, 1};
+    std::vector<EnhancedLight> lights(2);
+    for (auto& light : lights) light.direction = {direction.x, direction.y, direction.z, 0};
+    lights[0].color.a = 1; lights[1].color.a = 2;
+    EnhancedFrameContext context;
+    context.camera = &camera; context.lights = &lights; context.shadowDraws = &casters;
+    EnhancedShadowPass pass;
+    std::string error;
+    Check(pass.PrepareFrame(context, error), "CSM isolated preparation " + error);
+    const auto data = pass.GetShadowData();
+    Check(data.enabled && data.splitDepths.w == 2, "CSM owns selected directional index");
+    Check(data.splitDepths.z == 200.f && data.splitDepths.x < 25.f, "CSM independent near coverage");
+    const float biases[3]{data.bias.x, data.bias.y, data.bias.z};
+    for (unsigned i = 0; i < 3; ++i)
+    {
+        const auto& m = data.lightViewProjection[i];
+        const float depthScale = math::length(math::vector3{m.m[0][2], m.m[1][2], m.m[2][2]});
+        const float xyScale = math::length(math::vector3{m.m[0][0], m.m[1][0], m.m[2][0]});
+        const float texel = 2.f / (2048.f * xyScale);
+        Check(std::fabs(biases[i] / depthScale - .5f * texel) < texel * 1e-4f,
+              "CSM bias remains half a world texel after depth-range conversion");
+    }
+    Check(shadow_math::IntersectsClip(shadow_math::WorldBounds(caster), data.lightViewProjection[0]),
+          "CSM upstream offscreen caster lies inside expanded light depth");
+    camera.isOrthographic = true; camera.nearPlane = -10;
+    camera.projection = math::orthographic_off_center_lh(-4, 6, -3, 7, -10, 1000);
+    Check(pass.PrepareFrame(context, error), "CSM orthographic preparation");
+    const auto orthographic = pass.GetShadowData();
+    for (const auto& matrix : orthographic.lightViewProjection)
+        for (const auto& row : matrix.m)
+            for (float value : row) Check(std::isfinite(value), "CSM finite orthographic cascade");
+    camera.nearPlane = -100; camera.farPlane = 100;
+    camera.projection = math::orthographic_off_center_lh(-1, 1, -1, 1, -100, 100);
+    for (auto& light : lights) light.direction = {1, 0, 0, 0};
+    context.shadowDraws = nullptr;
+    Check(pass.PrepareFrame(context, error), "CSM negative split preparation");
+    const auto negative = pass.GetShadowData();
+    const float split = negative.splitDepths.x;
+    for (float z : {split - .01f, split + .01f, shadow_math::BlendStart(split, .15f) + .01f, -32.f})
+    {
+        const unsigned primary = z > split ? 1 : 0;
+        for (unsigned cascade : {primary, 1u})
+        {
+            const auto clip = math::vector4{0, 0, z, 1} * negative.lightViewProjection[cascade];
+            Check(std::fabs(clip.x) <= clip.w && std::fabs(clip.y) <= clip.w
+                      && clip.z >= 0 && clip.z <= clip.w,
+                  "Negative split primary/blended receiver remains inside projection");
+        }
+    }
+    std::cout << "CSM_CONTRACTS_OK bounds pose light-owner distance bias upstream orthographic negative-overlap\n";
+}
 // Native SceneHost coverage and Decal regression. Reference material instances
 // use the observed GBuffer values, so derived lobes must be reevaluated as well.
 VerifiedProduct ShadowDecalProduct(const std::filesystem::path& root, bool layered)
@@ -156,10 +234,14 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
     Check(errors == 0, "Shadow/Decal GPU validation " + messages);
 }
 
+#include "csm_legacy_batch_tests.inl"
+
 void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const std::shared_ptr<Texture>& image)
 {
+    CheckCsmContracts();
+    RunCsmLegacyBatches(device, roots, pipelines, textures);
     const auto product = ShadowDecalProduct(root, false);
     GenerationStore store;
     experiment::AssetId id;
@@ -197,7 +279,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     WaitSceneProgram(host, context, generation);
     WaitSceneProgram(host, context, volumeGeneration);
     unsigned frames{}, coveredPixels{};
-    for (unsigned fixture = 0; fixture < 14; ++fixture)
+    for (unsigned fixture = 0; fixture < 15; ++fixture)
     {
         for (unsigned workers : {0u, 1u, 4u})
         {
@@ -208,6 +290,8 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             auto geometry = MakeGeometry(false, fixture != 6 && fixture != 7);
             ShadowDecalPlane(geometry, fixture < 2 ? .125f : fixture == 3 || fixture == 4 ? .625f : .875f);
             geometry.draw.geometryKey += fixture;
+            // Fixtures mutate immutable source bytes: give each shape a new generation.
+            geometry.draw.modelMeshView.handle.generation = 13000 + fixture;
             if (fixture >= 1 && fixture <= 5)
             {
                 geometry.draw.coverage.flags |= EnhancedMaterialCoverage::Masked;
@@ -279,6 +363,12 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 95, 1, 16, 16, camera},
                                        {fixture == 12 ? &volume.draw : &geometry.draw, 1}, sealBudget, input, error),
                   "Shadow seal " + error);
+            if (fixture != 12)
+            {
+                const auto& sealed = input->Draws()[0].geometry->Source()->Geometry();
+                Check(std::memcmp(sealed.indexData, geometry.indices.data(), 6 * sizeof(uint32_t)) == 0,
+                      "Shadow fixture sealed immutable source preserves winding");
+            }
             bones[0].m[3][0] = 999;
             Check(device.BeginFrame(error), "Shadow begin");
             textures.BeginFrame(context.frameId);
@@ -294,7 +384,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             for (unsigned cascade = 0; cascade < 3; ++cascade)
             {
                 shadow.lightViewProjection[cascade] = math::matrix4x4::identity();
-                shadow.lightViewProjection[cascade].m[3][0] = float(cascade) * .125f;
+                shadow.lightViewProjection[cascade].m[3][0] = fixture == 14 && cascade == 2 ? 10.f : float(cascade) * .125f;
             }
              Check(host.Prepare(context, input, {}, {}, {}, shadow, {}, error, 0), "Shadow prepare " + error);
             RHITextureDesc desc;
@@ -358,8 +448,9 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             SubmitShadowDecal(device, pool, graph, host, context.frameId, workers, false);
             RHIReadbackImage mapped;
             Check(device.MapReadback(readback, mapped, error), "Shadow map");
+            if (fixture == 14) Check(host.ShadowDrawCount() == 2, "Rejected cascade submits no draw");
             const bool casts = fixture == 0 || fixture == 2 || fixture == 4 || fixture == 7 || fixture == 9 ||
-                               fixture == 10 || fixture == 13;
+                               fixture == 10 || fixture == 13 || fixture == 14;
             for (unsigned cascade = 0; cascade < 3; ++cascade)
             {
                 const unsigned left = 2 + cascade + (fixture == 9 || fixture == 13 ? 2 : 0);
@@ -367,7 +458,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 {
                     for (unsigned x = 0; x < 16; ++x)
                     {
-                        const bool covered = casts && x >= left && x < left + 12 && y >= 2 && y < 14;
+                        const bool covered = casts && !(fixture == 14 && cascade == 2) && x >= left && x < left + 12 && y >= 2 && y < 14;
                         Near(mapped.At(x, y, 0, cascade), covered ? .4 : clear, "Graph alpha/cascade shadow");
                         coveredPixels += covered;
                     }

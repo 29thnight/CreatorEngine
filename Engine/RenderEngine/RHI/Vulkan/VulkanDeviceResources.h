@@ -399,7 +399,7 @@ private:
 
     /// 프레임 수명이다. `BeginFrame`의 frame-slot fence 대기 뒤에만 비운다.
     /// shader-visible descriptor version과 달리 기록 시점에 소비되는 view 표다.
-    VulkanRenderTargetTable m_renderTargetTable;
+    std::array<VulkanRenderTargetTable, kFrameCount> m_renderTargetTables;
 
     /// CreateBindings가 보관하는 프레임 수명 요청. backend에는 이 표의
     /// 1-based 슬롯만 들어가며, BeginFrame의 펜스 대기 뒤에 비운다.

@@ -211,6 +211,7 @@ float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
     if (gHasShadow == 0) return 1.0f;
 
     const float viewDepth = dot(worldPosition - gEyePosition.xyz, gCameraForward.xyz);
+    if (viewDepth > gCascadeSplits.z) return 1.0;
 
     uint cascade = 0;
     if (viewDepth > gCascadeSplits.x) cascade = 1;
@@ -224,7 +225,7 @@ float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
     if (gCascadeBlendBand > 0.0f && cascade < SHADOW_CASCADE_COUNT - 1)
     {
         const float split = (cascade == 0) ? gCascadeSplits.x : gCascadeSplits.y;
-        const float bandStart = split * (1.0f - gCascadeBlendBand);
+        const float bandStart = split - abs(split) * gCascadeBlendBand;
         if (viewDepth > bandStart)
         {
             const float blend = saturate((viewDepth - bandStart) / max(split - bandStart, 1e-4f));
@@ -328,7 +329,7 @@ float3 Contribute(uint lightIndex, PbrSurface surface)
         // 그림자는 방향광에만 붙는다 — Deferred가 같다(점광·스포트는
         // 그림자 맵 자체가 없다). gHasShadow가 0이면 1이 나오므로 그림자
         // 없는 경로(자가 검증)는 이 줄이 있어도 값이 그대로다.
-        falloff = SampleShadow(surface.position, surface.normal, toLight);
+        falloff = (lightIndex + 1u == uint(max(gCascadeSplits.w, 1.0))) ? SampleShadow(surface.position, surface.normal, toLight) : 1.0;
     }
     else
     {

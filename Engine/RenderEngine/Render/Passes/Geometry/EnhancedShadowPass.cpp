@@ -17,6 +17,8 @@
 #include <cmath>
 #include <cstring>
 #include <sstream>
+#include <tuple>
+#include "../../Graph/ShadowCasterBounds.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
@@ -178,6 +180,7 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     //   방향광을 세기순으로 앞에 세우지만(EnhancedLightPacking.h), 그 순서에
     //   말없이 기대면 목록을 만드는 쪽이 바뀔 때 조용히 깨진다.
     float strongest = -1.f;
+    uint32_t selectedLight = 0;
     for (const auto& light : *context.lights)
     {
         if (0 != static_cast<uint32_t>(light.position.w)) continue;
@@ -186,6 +189,7 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         if (intensity <= strongest) continue;
 
         strongest = intensity;
+        selectedLight = static_cast<uint32_t>(&light - context.lights->data());
         m_lightDirection = math::vector3{ light.direction.x, light.direction.y,
             light.direction.z };
         m_hasDirectionalLight = true;
@@ -196,75 +200,24 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         m_lightDirection = { 0.f, -1.f, 0.f };
     m_lightDirection = math::normalize(m_lightDirection);
 
-    const math::bounding_frustum frustum =
-        math::bounding_frustum_from_projection_lh(context.camera->projection);
-    const math::matrix4x4& inverseView = context.camera->inverseView;
-
-    const float nearPlane = context.camera->nearPlane;
-    const float farPlane = context.camera->farPlane;
-
-    // ── 분할 지점 ──
-    //
-    // 로그 분할은 원근 투영에 맞는 이론값이지만 그대로 쓰면 첫 캐스케이드가
-    // 지나치게 좁아진다(near가 작을수록 심하다). 균등 분할과 섞는다.
-    std::array<float, kCascadeCount + 1> splits{};
-    splits[0] = nearPlane;
-    splits[kCascadeCount] = farPlane;
-    for (uint32_t i = 1; i < kCascadeCount; ++i)
-    {
-        const float ratio = static_cast<float>(i) / static_cast<float>(kCascadeCount);
-        const float logSplit = nearPlane * std::pow(farPlane / (std::max)(nearPlane, 1e-4f), ratio);
-        const float uniformSplit = nearPlane + (farPlane - nearPlane) * ratio;
-        splits[i] = kSplitLambda * logSplit + (1.f - kSplitLambda) * uniformSplit;
-    }
-
-    const float slopes[4][2] = {
-        { frustum.right_slope, frustum.top_slope },
-        { frustum.right_slope, frustum.bottom_slope },
-        { frustum.left_slope,  frustum.top_slope },
-        { frustum.left_slope,  frustum.bottom_slope },
-    };
-
+    const auto receivers = shadow_math::ReceiverCascades(*context.camera, m_lightDirection,
+        m_shadowDistance, m_blendBand, kShadowMapSize);
     for (uint32_t index = 0; index < kCascadeCount; ++index)
     {
-        const float sliceNear = splits[index];
-        const float sliceFar = splits[index + 1];
-
-        std::array<math::vector3, 8> corners{};
-        for (int i = 0; i < 4; ++i)
-        {
-            corners[i] = math::transform_point(
-                { slopes[i][0] * sliceNear, slopes[i][1] * sliceNear, sliceNear },
-                inverseView);
-            corners[i + 4] = math::transform_point(
-                { slopes[i][0] * sliceFar, slopes[i][1] * sliceFar, sliceFar },
-                inverseView);
-        }
-
-        // 경계 구를 쓴다. 축 정렬 상자를 쓰면 카메라가 회전할 때 상자 크기가
-        // 출렁여 그림자 가장자리가 떨린다 — 구는 회전에 불변이다.
-        math::vector3 center{};
-        for (const auto& corner : corners) center += corner;
-        center /= 8.f;
-
-        float radius = 0.f;
-        for (const auto& corner : corners)
-        {
-            radius = (std::max)(radius, math::distance(center, corner));
-        }
-        // 반지름도 계단으로 만든다. 카메라가 앞뒤로 조금 움직일 때마다 반지름이
-        // 미세하게 달라지면 투영 배율이 바뀌고, 그것도 지글거림이 된다.
-        radius = std::ceil(radius * 16.f) / 16.f;
-
-        // 중심을 텍셀 단위로 양자화한다. 이게 없으면 카메라가 조금만 움직여도
-        // 그림자 가장자리가 지글거린다(shadow shimmering).
-        const float texelsPerUnit = static_cast<float>(kShadowMapSize) / (radius * 2.f);
-        center.x = std::floor(center.x * texelsPerUnit) / texelsPerUnit;
-        center.y = std::floor(center.y * texelsPerUnit) / texelsPerUnit;
-        center.z = std::floor(center.z * texelsPerUnit) / texelsPerUnit;
-
-        // 광원을 구 밖으로 충분히 물린다. 가까우면 상자 밖의 그림자 드리우개가 잘린다.
-        const float backOff = radius * 2.f;
+        const auto& receiver = receivers[index];
+        const auto center = receiver.bounds.center;
+        const float radius = receiver.bounds.radius;
+        const float sliceFar = receiver.split;
+        const float worldTexel = radius * 2.f / float(kShadowMapSize);
+        float backOff = radius * 2.f;
+        for (const auto& bounds : m_casterBounds)
+            {
+                const auto offset = bounds.center - center;
+                const float along = math::dot(offset, m_lightDirection);
+                const auto perpendicular = offset - m_lightDirection * along;
+                if (math::length(perpendicular) <= radius + bounds.radius)
+                    backOff = (std::max)(backOff, -along + bounds.radius + worldTexel);
+            }
         const math::vector3 lightPosition = center - m_lightDirection * backOff;
 
         // 광원이 정확히 위나 아래를 볼 때 up이 평행해지는 것을 피한다.
@@ -280,6 +233,7 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         cascade.lightViewProjection = lightView * lightProjection;
         cascade.center = center;
         cascade.radius = radius;
+        cascade.depthSpan = backOff + radius * 2.f;
         cascade.splitDepth = sliceFar;
 
         m_shadowData.lightViewProjection[index] = cascade.lightViewProjection;
@@ -290,16 +244,16 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     static_assert(3 == kCascadeCount, "splitDepths·bias가 float4 하나에 셋을 담는다");
 
     m_shadowData.splitDepths = math::vector4{ m_cascades[0].splitDepth,
-        m_cascades[1].splitDepth, m_cascades[2].splitDepth, 0.f };
+        m_cascades[1].splitDepth, m_cascades[2].splitDepth, float(selectedLight + 1) };
 
     // 먼 캐스케이드는 텍셀 하나가 덮는 월드 범위가 넓다. 같은 편향을 쓰면
     // 그쪽에만 여드름이 남으므로 반지름 비만큼 키운다.
-    const float baseRadius = (std::max)(m_cascades[0].radius, 1e-4f);
-    m_shadowData.bias = math::vector4{
-        m_baseBias,
-        m_baseBias * (m_cascades[1].radius / baseRadius),
-        m_baseBias * (m_cascades[2].radius / baseRadius),
-        m_slopeScale };
+    // Bias is expressed in shadow texels, then converted exactly once to light depth.
+    const auto bias = [&](uint32_t i) {
+        return m_baseBias * (2.f * m_cascades[i].radius / float(kShadowMapSize))
+            / m_cascades[i].depthSpan;
+    };
+    m_shadowData.bias = math::vector4{bias(0), bias(1), bias(2), m_slopeScale};
 
     m_shadowData.cascadeBlendBand = m_blendBand;
 
@@ -333,6 +287,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
 {
     m_drawGeometry.clear();
     m_sortedDraws.clear();
+    m_batchStarts.assign(1, 0);
     m_alphaTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
@@ -341,14 +296,18 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     m_lastBatchCount.store(0, std::memory_order_relaxed);
     m_lastSkinnedDrawCount.store(0, std::memory_order_relaxed);
 
+    m_casterBounds.clear();
+    const auto* frameDraws = context.shadowDraws ? context.shadowDraws : context.draws;
+    if (frameDraws)
+        for (const auto& draw : *frameDraws) m_casterBounds.push_back(shadow_math::WorldBounds(draw));
     ComputeCascades(context);
 
-    if (nullptr == context.draws || nullptr == context.meshCache) return true;
+    if (nullptr == (context.shadowDraws ? context.shadowDraws : context.draws) || nullptr == context.meshCache) return true;
 
-    m_alphaTextures.resize(context.draws->size());
-    for (std::size_t i = 0; i < context.draws->size(); ++i)
+    m_alphaTextures.resize((context.shadowDraws ? context.shadowDraws : context.draws)->size());
+    for (std::size_t i = 0; i < (context.shadowDraws ? context.shadowDraws : context.draws)->size(); ++i)
     {
-        const auto& draw = (*context.draws)[i];
+        const auto& draw = (*(context.shadowDraws ? context.shadowDraws : context.draws))[i];
         if (draw.materialGraphInstance)
         {
             continue;
@@ -376,7 +335,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
 
     // GBuffer가 이미 올려 둔 것을 캐시 히트로 받는다 — 같은 메시를 두 번
     // 올리지 않는다는 것이 캐시의 요점이다.
-    for (const auto& draw : *context.draws)
+    for (const auto& draw : *(context.shadowDraws ? context.shadowDraws : context.draws))
     {
         if (draw.materialGraphInstance)
         {
@@ -407,7 +366,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     }
 
     // Product views share one upload; isolated fixtures retain a local one.
-    for (const auto& draw : *context.draws)
+    for (const auto& draw : *(context.shadowDraws ? context.shadowDraws : context.draws))
     {
         if (draw.materialGraphInstance)
         {
@@ -440,12 +399,12 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // 여기는 애초에 깊이만 쓰고 색을 안 쓴다 — 어느 순서로 그리든 최종 깊이는
     // 가장 가까운 값 하나다.
     //
-    // 드로우 자체가 아니라 인덱스를 정렬한다. context.draws는 GBuffer도 같이
+    // 드로우 자체가 아니라 인덱스를 정렬한다. 입력은 다른 패스도 같이
     // 보는 것이라 건드리면 안 된다.
-    m_sortedDraws.reserve(context.draws->size());
-    for (size_t index = 0; index < context.draws->size(); ++index)
+    m_sortedDraws.reserve((context.shadowDraws ? context.shadowDraws : context.draws)->size());
+    for (size_t index = 0; index < (context.shadowDraws ? context.shadowDraws : context.draws)->size(); ++index)
     {
-        const auto& draw = (*context.draws)[index];
+        const auto& draw = (*(context.shadowDraws ? context.shadowDraws : context.draws))[index];
         if (draw.materialGraphInstance)
         {
             continue;
@@ -458,23 +417,23 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     // 스킨드 여부를 첫 키로 둔다. PSO가 둘이므로 섞여 있으면 배치마다
     // 파이프라인을 갈아야 하고, 그것이 이 패스가 아끼려는 상태 변경이다.
     // 뭉쳐 두면 전환이 그룹 경계 한 번뿐이다.
+    const auto batchKey = [&](size_t index) {
+        const auto& draw = (*(context.shadowDraws ? context.shadowDraws : context.draws))[index];
+        const auto geometry = enhanced_draw::GeometryKey(draw);
+        const auto found = m_drawGeometry.find(geometry);
+        const auto mask = found == m_drawGeometry.end() ? 0u : found->second.entry.vertexAttributeMask;
+        const bool skinned = draw.bonePalette && draw.boneCount
+            && (mask == 0 || (mask & assets::kSkinVertexAttributes) != 0);
+        return std::tuple{skinned, geometry, m_alphaTextures[index].handle.id};
+    };
     std::stable_sort(m_sortedDraws.begin(), m_sortedDraws.end(),
-        [&](size_t a, size_t b)
-        {
-            const auto& drawA = (*context.draws)[a];
-            const auto& drawB = (*context.draws)[b];
-
-            const bool skinnedA = (nullptr != drawA.bonePalette) && (0 != drawA.boneCount);
-            const bool skinnedB = (nullptr != drawB.bonePalette) && (0 != drawB.boneCount);
-            if (skinnedA != skinnedB) return skinnedA < skinnedB;
-
-            return enhanced_draw::GeometryKey(drawA) < enhanced_draw::GeometryKey(drawB);
-        });
-
-    // 조각 수를 정하는 근거. 컬링 전 후보라 상한이지만, '몇 조각으로 나눌까'에는
-    // 그것으로 충분하다 — 정확한 수는 그려 봐야 알고, 그때는 이미 늦다.
+        [&](size_t a, size_t b) { return batchKey(a) < batchKey(b); });
+    m_batchStarts.clear();
+    for (size_t i = 0; i < m_sortedDraws.size(); ++i)
+        if (i == 0 || batchKey(m_sortedDraws[i - 1]) != batchKey(m_sortedDraws[i]))
+            m_batchStarts.push_back(i);
+    m_batchStarts.push_back(m_sortedDraws.size());
     m_lastCasterCandidates = static_cast<uint32_t>(m_sortedDraws.size());
-
     return true;
 }
 
@@ -508,7 +467,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
             encoder.SetViewportAndScissor(kShadowMapSize, kShadowMapSize);
 
-            const bool draws = m_hasDirectionalLight && nullptr != context.draws;
+            const bool draws = m_hasDirectionalLight && nullptr != (context.shadowDraws ? context.shadowDraws : context.draws);
             if (draws)
             {
                 // 캐스케이드마다 상태를 다시 걸지 않는다. 루트 시그니처는 셋이
@@ -602,9 +561,9 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cbAllocation);
 
                 // 자기 몫의 드로우만 본다. 컬링 판정도 그 범위 안에서만 센다.
-                const size_t drawCount = m_sortedDraws.size();
-                const size_t drawBegin = drawCount * drawSlice / drawSliceCount;
-                const size_t drawEnd = drawCount * (drawSlice + 1) / drawSliceCount;
+                const size_t groupCount = m_batchStarts.size() - 1;
+                const size_t drawBegin = m_batchStarts[groupCount * drawSlice / drawSliceCount];
+                const size_t drawEnd = m_batchStarts[groupCount * (drawSlice + 1) / drawSliceCount];
 
                 // ── 배치를 여기서 만드는 이유 ──
                 //
@@ -714,21 +673,15 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
 
                 for (size_t sortedIndex = drawBegin; sortedIndex < drawEnd; ++sortedIndex)
                 {
-                    const auto& draw = (*context.draws)[m_sortedDraws[sortedIndex]];
+                    const auto& draw = (*(context.shadowDraws ? context.shadowDraws : context.draws))[m_sortedDraws[sortedIndex]];
 
                     const auto found = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
                     if (found == m_drawGeometry.end() || !found->second.entry.IsValid()) continue;
 
                     // 경계 구를 월드로 옮긴다. 비균등 배율에서는 최대 축으로
                     // 잡아야 보수적이다 — 작게 잡으면 그림자가 사라진다.
-                    const math::vector3 worldCenter = draw.worldMatrix.translation();
-                    const float scale = (std::max)({
-                        math::length(draw.worldMatrix.right()),
-                        math::length(draw.worldMatrix.up()),
-                        math::length(draw.worldMatrix.forward()) });
-
-                    if (!CastsInto(cascade, worldCenter,
-                        found->second.boundRadius * scale))
+                    const auto& bounds = m_casterBounds[m_sortedDraws[sortedIndex]];
+                    if (bounds.radius > 0.f && !CastsInto(cascade, bounds.center, bounds.radius))
                     {
                         m_lastCulledCount.fetch_add(1, std::memory_order_relaxed);
                         continue;
@@ -801,7 +754,7 @@ void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrame
         //
         // 후보 수(캐스케이드당 드로우 수)를 쓰지 않는 이유는 GBuffer에서와
         // 같다 — 실측이 비용을 정하는 것은 배치라고 말했다.
-        static_cast<uint32_t>(m_drawGeometry.size()) * kCascadeCount);
+        static_cast<uint32_t>(m_batchStarts.size() - 1) * kCascadeCount);
 }
 
 uint32_t EnhancedShadowPass::ComputeSliceCount() const
@@ -823,13 +776,12 @@ uint32_t EnhancedShadowPass::ComputeSliceCount() const
     // 배치 수는 Record에서 나오므로 Declare 시점에는 모른다. 대신 고유 메시
     // 수를 쓴다 — 정렬해서 같은 메시를 묶으므로 캐스케이드당 배치 수는
     // 정확히 그 값이 상한이다(컬링이 빼면 그보다 적어진다).
-    const uint32_t drawCount = (std::min)(
-        m_lastCasterCandidates, static_cast<uint32_t>(m_drawGeometry.size()));
+    const uint32_t drawCount = static_cast<uint32_t>(m_batchStarts.size() - 1);
 
     if (drawCount <= kMinDrawsPerSlice) return kCascadeCount;
 
     const uint32_t perCascade = (std::max)(1u, drawCount / kMinDrawsPerSlice);
-    return (std::min)(IRHIParallelCommandPool::kMaxWorkers, kCascadeCount * perCascade);
+    return kCascadeCount * (std::min)(IRHIParallelCommandPool::kMaxWorkers / kCascadeCount, perCascade);
 }
 
 void EnhancedShadowPass::Shutdown()

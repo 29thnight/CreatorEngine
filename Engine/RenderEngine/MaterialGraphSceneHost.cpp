@@ -1,4 +1,5 @@
 #include "MaterialGraphSceneHost.h"
+#include "Render/Graph/ShadowMath.h"
 #include "MaterialGraphSceneCompiler.h"
 
 #include "PathFinder.h"
@@ -80,6 +81,7 @@ struct SceneHost::Frame
         std::shared_ptr<const MeshSurfaceBatch> geometry;
         RHIBufferSlice indices, constants, referenceConstants;
         std::array<RHIBufferSlice, 3> shadowConstants;
+        std::array<bool, 3> shadowVisible{};
         bool doubleSided{}, blended{};
         std::size_t inputIndex{};
     };
@@ -89,6 +91,7 @@ struct SceneHost::Frame
     std::vector<Draw> draws;
     RHITextureHandle environment;
     bool shadow{};
+    mutable std::atomic<uint32_t> shadowDrawCount{};
     std::shared_ptr<const SceneLookupFrame> lookup, alphaLookup;
     mutable bool alphaInputsDeclared{};
     mutable std::set<std::size_t> alphaDeclared;
@@ -983,6 +986,8 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
             }
             for (unsigned cascade = 0; cascade < shadowConstants.size(); ++cascade)
             {
+                if (!shadow_math::IntersectsClip({draw.shadowCenter, draw.shadowRadius},
+                        shadow.lightViewProjection[cascade])) continue;
                 SceneShadowConstants shadowValues;
                 shadowValues.viewProjection = math::transpose(shadow.lightViewProjection[cascade]);
                 shadowValues.coverage = draw.coverage.flags;
@@ -1003,6 +1008,9 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
             item.bindings = bindings;
             item.shadowBindings = shadowBindings;
             item.shadowConstants = shadowConstants;
+            for (unsigned cascade = 0; cascade < 3; ++cascade)
+                item.shadowVisible[cascade] = shadow_math::IntersectsClip(
+                    {draw.shadowCenter, draw.shadowRadius}, shadow.lightViewProjection[cascade]);
             item.constants = uploaded;
             item.referenceConstants = reference;
             item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
@@ -1082,6 +1090,11 @@ void SceneHost::DeclareGeometry(EnhancedRenderGraph& graph) const
     frame->graphEpoch = graph.ResourceEpoch();
 }
 
+uint32_t SceneHost::ShadowDrawCount() const
+{
+    return frame_ ? frame_->shadowDrawCount.load(std::memory_order_relaxed) : 0;
+}
+
 void SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const
 {
     ce::profile_scope profile{ce::marker<"MaterialDeclareShadow">()};
@@ -1129,23 +1142,33 @@ void SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) co
                 throw std::runtime_error("LX Scene cascade target binding failed.");
             }
             encoder.BindRenderTargets(targets);
+            RHIPipelineHandle boundPipeline{};
+            const RenderBindings* boundBindings = nullptr;
             for (const auto& draw : frame->draws)
             {
-                if (!draw.shadowBindings)
+                if (!draw.shadowBindings || !draw.shadowVisible[cascade])
                 {
                     continue;
                 }
-                encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->shadow.GetHandle());
+                const auto pipeline = draw.program->shadow.GetHandle();
+                if (pipeline != boundPipeline)
+                {
+                    encoder.SetPipeline(RHIBindPoint::Graphics, pipeline);
+                    boundPipeline = pipeline;
+                    boundBindings = nullptr;
+                }
                 std::string error;
-                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.shadowBindings,
+                if (boundBindings != draw.shadowBindings.get() && !RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.shadowBindings,
                                               error))
                 {
                     throw std::runtime_error(error);
                 }
+                boundBindings = draw.shadowBindings.get();
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.shadowConstants[cascade]);
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
                 encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
                 encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
+                frame->shadowDrawCount.fetch_add(1, std::memory_order_relaxed);
             }
         }
     });

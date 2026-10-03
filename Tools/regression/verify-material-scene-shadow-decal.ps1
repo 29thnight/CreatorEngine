@@ -24,6 +24,8 @@ $sources = @(
         (Join-Path $PSScriptRoot 'material_scene_volume_tests.inl'),
         (Join-Path $PSScriptRoot 'material_scene_shadow_decal_tests.inl'),
         (Join-Path $PSScriptRoot 'material_scene_decal_tests.inl'),
+        (Join-Path $PSScriptRoot 'csm_legacy_batch_tests.inl'),
+        (Join-Path $PSScriptRoot 'csm_vulkan_inflight.inl'),
         (Join-Path $PSScriptRoot 'material_ibl_reference.h'),
         (Join-Path $PSScriptRoot 'principled_layered_reference.h'),
         (Join-Path $PSScriptRoot 'MaterialRasterSurfaceProbe.vcxproj'), $PSCommandPath,
@@ -68,13 +70,14 @@ foreach ($configuration in @('Debug', 'Release')) {
             } elseif ($mode -eq 'subsurface') {
                 '^LX_MATERIAL_SCENE_SUBSURFACE_OK frames=12 pixels=[1-9]\d* spread=[1-9]\d* boundaries=[1-9]\d* maskedHoles=[1-9]\d* checks=[1-9]\d* gpuComponents=[1-9]\d* validation=0$'
             } else {
-                '^LX_MATERIAL_RASTER_SURFACE_OK checks=[1-9]\d* gpuComponents=[1-9]\d* .*sceneCompositionFrames=56 .*sceneGenerationFrames=12 .*$'
+                # Generation step 11 validates an empty new epoch without submitting a GPU frame.
+                '^LX_MATERIAL_RASTER_SURFACE_OK checks=[1-9]\d* gpuComponents=[1-9]\d* .*sceneCompositionFrames=55 .*sceneGenerationFrames=11 .*$'
             }
             if ($resultExit -ne 0 -or @($result | Where-Object { $_ -match $signature }).Count -ne 1 -or
                 @($result | Where-Object { $_ -match 'DebugLayer=on GPUValidation=on' }).Count -lt 1) {
                 throw "Material $mode runtime failed ($configuration): $($result -join "`n")"
             }
-            if ($mode -eq 'shadow-decal' -and @($result | Where-Object { $_ -match '^LX_MATERIAL_SCENE_SHADOW_OK frames=42 covered=[1-9]\d* checks=[1-9]\d* gpuComponents=[1-9]\d* validation=0$' }).Count -ne 1) {
+            if ($mode -eq 'shadow-decal' -and @($result | Where-Object { $_ -match '^LX_MATERIAL_SCENE_SHADOW_OK frames=45 covered=[1-9]\d* checks=[1-9]\d* gpuComponents=[1-9]\d* validation=0$' }).Count -ne 1) {
                 throw 'Native LX shadow marker missing'
             }
             $result | Where-Object { $_ -match '^LX_MATERIAL_.*_OK ' }

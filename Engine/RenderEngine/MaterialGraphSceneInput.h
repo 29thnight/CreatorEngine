@@ -53,6 +53,8 @@ struct SceneDrawInput
     EnhancedMaterialCoverage coverage;
     SceneCoverage queue{};
     float viewDepth{};
+    math::vector3 shadowCenter{};
+    float shadowRadius{};
     std::shared_ptr<const MeshSurfacePlan> geometry;
 };
 
