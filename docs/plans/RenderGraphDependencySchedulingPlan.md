@@ -379,3 +379,31 @@ RG4 wave/critical-path와 RG7~9 alias/queue/range 정보는 지원되는 세대�
 2026-10-03 RG5-7 Refraction·Subsurface·Volume 소유자 이관 완료: 최신 Lookup 입력 소비·캡처/배경/Bake/필터/합성 출력 버전을 연결했다. 두 구성 빌드·native·제품 반복 회귀 통과, 변경 전후/구성 간 각 16개 이미지 오차 0과 현재 해시를 확인했다. [소유자 검증 기록](../analysis/RenderRg5SpecialMigration.md). 제품 59·게이트 213 호출. GraphSurface/Draw·혼합 GPU 수용과 RG5 전체 기성 0은 유지한다.
 
 2026-10-03 RG5-8 GraphSurface·Draw 및 반환 출력 완료: Shadow/GBuffer/Color/Blended 출력 반환·블랙보드/Forward+ 전달, 깊이 Copy→Modify 및 색상 Modify, Mesh 정적 업로드·world 버전과 중복 읽기를 연결했다. 두 구성 빌드·native·제품 반복 회귀 통과, 변경 전후/구성 간 각 16개 이미지 오차 0 및 현재 해시 일치를 확인했다. [배선 및 검증](../analysis/RenderRg5SurfaceMigration.md). 제품 59·게이트 217 호출. 실제 versioned SceneHost/mixed GPU 수용·guard 제거와 RG5 전체 기성 0은 유지한다.
+
+
+2026-10-03 원격 물리·CSM/RG5 통합 후 현행 기준선 갱신 완료: Debug/Release 빌드 및 구성별 독립 2회 × 캡처 2회 회귀 통과, 통합 전후/구성 간 각 16개 이미지 오차 0, 현행 소스·바이너리 SHA-256 및 phaseComplete=true. Release 최초 포트 충돌 실패는 보존하고 v2 정상 반복 실행으로 수용했다. [통합 후 검증 기록](../analysis/RenderRg5IntegrationBaseline.md). 다음은 실제 versioned SceneHost·Code/Graph 혼합 GPU 수용 및 guard 제거이며 RG5 progress/기성 0과 RG6 미전환은 유지한다.
+
+
+2026-10-03 RG5-9 실제 versioned SceneHost·Forward+ Code/Graph 혼합 GPU 수용 완료: 세 정책 × 24개 장면을 두 구성에서 실행하여 각 72 frames·정책 간 maxError=0·validation=0, cold/완료 geometry 재사용 및 최신 반환 writer를 확인했다. ExplicitVersioned Graph guard는 제거하고 SingleWriter 거부는 유지한다. 두 구성 빌드·기본 제품 반복 회귀·전후/구성 간 각 16개 이미지 오차 0·현행 해시 기준선 통과. [검증 범위 및 기록](../analysis/RenderRg5MixedGpuAcceptance.md). 제품 기본 DeclarationOrder, RG5 전체 progress/기성 0과 전체 SceneRenderer versioned GPU 수용/RG6 미전환은 유지한다. 다음은 나머지 소비자/ReadWrite 및 legacy 추론/adapter 제거다.
+
+2026-10-03 RG5-10 Decal 접근·출력 버전 이관 완료: snapshot Write·입력 Read, GBuffer Modify/ReadWrite와 원본 텍스처 Read를 명시하고 반환 버전을 블랙보드·SceneHost 후속 입력에 연결했다. 두 구성 빌드·각 3정책/342 frames·7개 첨부 정책 간 오차 0·validation 0, 기본 제품 반복 회귀·변경 전후/구성 간 각 16개 이미지 오차 0 및 현행 해시 기준선 통과. [검증 기록](../analysis/RenderRg5DecalMigration.md). 제품 기본 DeclarationOrder, RG5 전체 progress/기성 0 및 전체 제품 versioned GPU 수용/RG6 미전환을 유지한다.
+
+2026-10-03 RG5-11 Sprite 접근·출력 버전 이관 완료: 독립 출력 Write·기존 HDR Modify/ReadWrite, 깊이 Read 및 원본 텍스처 중복 import/Read 제거를 연결했다. 두 구성 최종 빌드·각 3정책/18 frames·전체 RGBA 정책 간 오차 0·validation 0, 기본 제품 반복 회귀·변경 전후/구성 간 각 16개 이미지 오차 0 및 현행 해시 기준선 통과. [검증 기록](../analysis/RenderRg5SpriteMigration.md). 정적 cpp/h 호출은 제품 59·게이트 221(신규 검사 헤더 포함)이며 inl 전체 목록과 구분한다. 제품 기본 DeclarationOrder, RG5 progress/기성 0 및 전체 제품 versioned GPU 수용/RG6 미전환을 유지한다. 다음은 화면 SSS/SSR 소비 체인 이관이다.
+
+2026-10-04 RG5-12 화면 SSS/SSR 접근·출력 이관 완료: 두 블러 축과 반사 pass의 입력 Read·새 출력 Write/v0 및 선언 당시 핸들 캡처를 연결했다. 두 구성 빌드·각 3정책/48 frames·네 단계 전체 RGBA 정책 간 오차 0·validation 0, 실제 블러/반사 기여와 비활성/마스크/입력 누락 경로, 기본 제품 반복 회귀·전후/구성 간 각 16개 이미지 오차 0 및 현행 해시 기준선 통과. [검증 기록](../analysis/RenderRg5ScreenMigration.md). 정적 cpp/h 호출은 제품 59·게이트 224(신규 검사 헤더 포함)이며 inl 전체 목록과 구분한다. 제품 기본 DeclarationOrder, RG5 progress/기성 0과 전체 제품 versioned GPU 수용/RG6 미전환을 유지한다. 다음은 VolumetricFog 소비 체인 이관이다.
+
+## RG5 남은 이관 순서 — 2026-10-04
+
+RG5-12 이후 현재 코드에서 남은 제품·Editor pass는 7개이며, 최종 출력·캡처 배선과 test/fixture 정리가 별도로 남아 있다.
+
+| 순서 | 대상 | 남은 접근·버전 배선 |
+|---|---|---|
+| 1 | VolumetricFog | Scatter→Accumulate→Composite, history 읽기·쓰기 및 출력 버전 전달 |
+| 2 | PostChain | 후처리 단계별 입력 Read·출력 Write, 중간·최종 출력 전달 |
+| 3 | UI | 색상 합성 Modify/ReadWrite, 원본 텍스처 Read |
+| 4 | Editor Grid·WireFrame | 색상·깊이 접근과 수정된 출력 전달 |
+| 5 | Editor GizmoIcon·GizmoLine | 아이콘 텍스처 Read, 색상·깊이 접근과 출력 전달 |
+| 6 | 최종 출력·캡처 | live_present와 capture/readback의 최신 출력 버전 소비 |
+| 7 | test/fixture·임시 adapter | 남은 명시 접근 이관, 의도적인 legacy 검증과 구분하여 임시 추론·adapter 정리 |
+
+위 배선과 전체 SceneRenderer의 versioned GPU 수용을 확인해야 RG5를 닫는다. RG6의 제품 기본 의존성 정렬 전환은 이후 단계다. 다음 구현은 VolumetricFog이며, 현행 제품 기본 DeclarationOrder와 IBL 1024/4096을 유지한다. MAT-9 SSS·투과 품질/성능 게이트는 별도 미완료 조건이다. Vulkan 비교는 PHASE 4.9 RenderDoc 캡처→리소스 확인→픽셀별 비교에만 둔다.

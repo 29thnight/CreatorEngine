@@ -22,6 +22,7 @@
     <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h" />
     <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h" />
+    <ClInclude Include="RHI\DX12\Tests\EnhancedScreenRg5Tests.h" />
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h" />
     <ClInclude Include="AssetIdentity\AssetIdentityTestVectors.inl" />
     <ClInclude Include="AssetIdentity\AssetSidecarSchemaSelfTest.h" />

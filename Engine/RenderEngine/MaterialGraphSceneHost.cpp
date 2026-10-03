@@ -1387,6 +1387,7 @@ namespace material_graph
                 "LX Scene Decal requires its GBuffer, a valid snapshot and one declaration before Color.");
         }
         frame->decalBaseline = baseline;
+        frame->gbuffer = inputs;
         frame->decalDeclared = true;
     }
 

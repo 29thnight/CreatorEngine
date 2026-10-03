@@ -2698,9 +2698,9 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         ShutdownNative(device, roots, pipelines, textures, pool);
         return;
     }
-    if (mode == "--forward-transport")
+    if (mode == "--forward-transport" || mode == "--rg5-mixed")
     {
-        RunForwardTransport(root, device, roots, pipelines, textures, pool, image, cube);
+        RunForwardTransport(root, device, roots, pipelines, textures, pool, image, cube, mode == "--rg5-mixed");
         ShutdownNative(device, roots, pipelines, textures, pool);
         return;
     }
@@ -2809,11 +2809,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
             RunCsmVulkanInFlight(device);
 #endif
             RunSceneShadow(device, roots, pipelines, textures, pool, root, image);
-            RunSceneDecal(device, roots, pipelines, textures, pool, root, image, cube);
+            RunSceneDecal(device, roots, pipelines, textures, pool, root, image, cube, mode == "--rg5-decal");
         }
-        else if (mode == "--decal-only")
+        else if (mode == "--decal-only" || mode == "--rg5-decal")
         {
-            RunSceneDecal(device, roots, pipelines, textures, pool, root, image, cube);
+            RunSceneDecal(device, roots, pipelines, textures, pool, root, image, cube, mode == "--rg5-decal");
         }
         else
         {
@@ -3278,7 +3278,7 @@ int main(int argc, char** argv)
         }
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
-                   (std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
+                   (std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
                     std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),

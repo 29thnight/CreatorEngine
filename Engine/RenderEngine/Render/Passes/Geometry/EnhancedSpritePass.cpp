@@ -1,9 +1,9 @@
 #include "EnhancedSpritePass.h"
-#include "EnhancedGBufferPass.h"
-#include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 #include "../../../Texture.h"
+#include "../../Graph/EnhancedRenderGraph.h"
+#include "EnhancedGBufferPass.h"
 
 #include <algorithm>
 #include <cstring>
@@ -11,21 +11,17 @@
 
 namespace
 {
-    constexpr const char* kWorldSpriteShaderFile = "WorldSprite.slang";
+    constexpr const char *kWorldSpriteShaderFile = "WorldSprite.slang";
 
-    bool CompileWorldSpriteShader(const char* entry, const char* target,
-        RHIShaderBlob& outBlob, std::string& outError)
+    bool CompileWorldSpriteShader(const char *entry, const char *target, RHIShaderBlob &outBlob, std::string &outError)
     {
-        return RHIShaderCompiler::CompileFile(
-            kWorldSpriteShaderFile, entry, target, outBlob, outError);
+        return RHIShaderCompiler::CompileFile(kWorldSpriteShaderFile, entry, target, outBlob, outError);
     }
-}
+} // namespace
 
-bool EnhancedSpritePass::Initialize(const EnhancedFrameContext& context,
-    std::string& outError)
+bool EnhancedSpritePass::Initialize(const EnhancedFrameContext &context, std::string &outError)
 {
-    if (nullptr == context.resources || nullptr == context.psoManager ||
-        nullptr == context.rootSignatures)
+    if (nullptr == context.resources || nullptr == context.psoManager || nullptr == context.rootSignatures)
     {
         outError = "스프라이트 패스 컨텍스트가 불완전하다";
         return false;
@@ -33,8 +29,7 @@ bool EnhancedSpritePass::Initialize(const EnhancedFrameContext& context,
     return CreatePipelines(context, outError);
 }
 
-bool EnhancedSpritePass::CreatePipelines(const EnhancedFrameContext& context,
-    std::string& outError)
+bool EnhancedSpritePass::CreatePipelines(const EnhancedFrameContext &context, std::string &outError)
 {
     const RHIPipelineLayoutParam params[] = {
         RHILayout::Cbv(0),
@@ -42,18 +37,24 @@ bool EnhancedSpritePass::CreatePipelines(const EnhancedFrameContext& context,
         RHILayout::SrvTable(1, 1),
     };
     const RHIStaticSamplerDesc samplers[] = {
-        { RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel },
+        {RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel},
     };
     RHIPipelineLayoutDesc layoutDesc{};
     layoutDesc.params = params;
     layoutDesc.staticSamplers = samplers;
     const auto layout = context.rootSignatures->GetOrCreate(layoutDesc, outError);
-    if (!layout.IsValid()) return false;
+    if (!layout.IsValid())
+    {
+        return false;
+    }
 
     RHIShaderBlob vs;
     RHIShaderBlob ps;
     if (!CompileWorldSpriteShader("VSMain", "vs_5_0", vs, outError) ||
-        !CompileWorldSpriteShader("PSMain", "ps_5_0", ps, outError)) return false;
+        !CompileWorldSpriteShader("PSMain", "ps_5_0", ps, outError))
+    {
+        return false;
+    }
 
     RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vs.Data();
@@ -73,7 +74,10 @@ bool EnhancedSpritePass::CreatePipelines(const EnhancedFrameContext& context,
 
     desc.depthEnable = false;
     m_overlayPso = context.psoManager->GetOrCreate(desc, outError);
-    if (!m_overlayPso.IsValid()) return false;
+    if (!m_overlayPso.IsValid())
+    {
+        return false;
+    }
 
     desc.depthEnable = true;
     desc.depthWriteMask = RHIDepthWrite::Zero;
@@ -82,35 +86,39 @@ bool EnhancedSpritePass::CreatePipelines(const EnhancedFrameContext& context,
     return m_depthPso.IsValid();
 }
 
-bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext& context,
-    std::string& outError)
+bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::string &outError)
 {
     m_width = context.width;
     m_height = context.height;
-    m_viewProjection = context.camera
-        ? context.camera->view * context.camera->projection
-        : math::matrix4x4::identity();
+    m_viewProjection = context.camera ? context.camera->view * context.camera->projection : math::matrix4x4::identity();
     m_instances.clear();
     m_batches.clear();
     m_lastItemCount = 0;
     m_lastBatchCount = 0;
-    if (nullptr == m_items || m_items->empty()) return true;
+    if (nullptr == m_items || m_items->empty())
+    {
+        return true;
+    }
 
     std::vector<uint32_t> order(m_items->size());
-    for (uint32_t i = 0; i < order.size(); ++i) order[i] = i;
-    std::stable_sort(order.begin(), order.end(), [this](uint32_t a, uint32_t b)
+    for (uint32_t i = 0; i < order.size(); ++i)
     {
-        const Item& lhs = (*m_items)[a];
-        const Item& rhs = (*m_items)[b];
+        order[i] = i;
+    }
+    std::stable_sort(order.begin(), order.end(), [this](uint32_t a, uint32_t b) {
+        const Item &lhs = (*m_items)[a];
+        const Item &rhs = (*m_items)[b];
         if (lhs.canvasOrder != rhs.canvasOrder)
+        {
             return lhs.canvasOrder < rhs.canvasOrder;
+        }
         return lhs.layerOrder < rhs.layerOrder;
     });
 
     m_instances.reserve(order.size());
     for (uint32_t index : order)
     {
-        const Item& item = (*m_items)[index];
+        const Item &item = (*m_items)[index];
         Instance instance{};
         instance.world = math::transpose(item.world);
         instance.uv = item.uv;
@@ -137,7 +145,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext& context,
     m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
     if (nullptr != context.textureCache)
     {
-        for (Batch& batch : m_batches)
+        for (Batch &batch : m_batches)
         {
             std::string uploadError;
             batch.uploaded = context.textureCache->GetOrUpload(batch.texture, uploadError);
@@ -151,12 +159,13 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext& context,
     return true;
 }
 
-void EnhancedSpritePass::Declare(EnhancedRenderGraph& graph,
-    const EnhancedFrameContext& context)
+void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrameContext &context)
 {
-    m_output = {};
-    if (!m_overlayPso.IsValid() || !m_depthPso.IsValid() ||
-        0 == m_width || 0 == m_height || m_instances.empty()) return;
+    m_output = m_inputs.color;
+    if (!m_overlayPso.IsValid() || !m_depthPso.IsValid() || 0 == m_width || 0 == m_height || m_instances.empty())
+    {
+        return;
+    }
 
     const bool ownsColor = !m_inputs.color.IsValid();
     if (ownsColor)
@@ -169,66 +178,116 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph& graph,
         desc.name = "Sprite.Output";
         m_output = graph.CreateTexture(desc);
     }
-    else m_output = m_inputs.color;
+    else
+    {
+        m_output = m_inputs.color;
+    }
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
+    }
+    const auto colorAccess =
+        explicitAccess ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto output = m_output;
+    const auto depth = m_inputs.depth;
 
     std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
-        { m_output, RHIResourceState::RenderTarget },
+        {output, RHIResourceState::RenderTarget, colorAccess},
     };
     if (m_inputs.depth.IsValid())
-        usages.push_back({ m_inputs.depth, RHIResourceState::DepthRead });
-
-    graph.AddPass(GetName(), usages,
-        [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& ec)
+    {
+        usages.push_back({depth, RHIResourceState::DepthRead, readAccess});
+    }
+    if (explicitAccess)
+    {
+        for (const auto &batch : m_batches)
         {
-            const RHITextureHandle colors[] = { ec.ResolveHandle(m_output) };
-            RHIRenderTargetBinding targets{};
-            if (m_inputs.depth.IsValid())
+            if (!batch.uploaded.IsValid())
             {
-                const auto depth = RHIDepthTargetDesc::DepthReadOnly(
-                    ec.ResolveHandle(m_inputs.depth), EnhancedGBufferPass::kDepthFormat);
-                targets = context.resources->CreateRenderTargets(colors, &depth);
+                continue;
             }
-            else targets = context.resources->CreateRenderTargets(colors);
-            if (!targets.IsValid()) return;
+            auto texture = graph.FindImportedTexture(batch.uploaded.handle);
+            if (!texture.IsValid())
+            {
+                texture =
+                    graph.ImportTexture(batch.uploaded.handle, RHIResourceState::PixelShaderResource, "Sprite.Texture");
+            }
+            if (std::none_of(usages.begin(), usages.end(), [texture](const auto &usage) {
+                    return usage.handle.index == texture.index && usage.handle.version == texture.version;
+                }))
+            {
+                usages.push_back({texture, RHIResourceState::PixelShaderResource, readAccess});
+            }
+        }
+    }
 
-            RHIEncoder& encoder = *ec.encoder;
+    graph.AddPass(
+        GetName(), usages, [this, &context, ownsColor, output, depth](const EnhancedRenderGraph::ExecuteContext &ec) {
+            const RHITextureHandle colors[] = {ec.ResolveHandle(output)};
+            RHIRenderTargetBinding targets{};
+            if (depth.IsValid())
+            {
+                const auto depthTarget =
+                    RHIDepthTargetDesc::DepthReadOnly(ec.ResolveHandle(depth), EnhancedGBufferPass::kDepthFormat);
+                targets = context.resources->CreateRenderTargets(colors, &depthTarget);
+            }
+            else
+            {
+                targets = context.resources->CreateRenderTargets(colors);
+            }
+            if (!targets.IsValid())
+            {
+                return;
+            }
+
+            RHIEncoder &encoder = *ec.encoder;
             encoder.SetViewportAndScissor(m_width, m_height);
             encoder.BindRenderTargets(targets);
             if (ownsColor)
             {
-                constexpr float clear[4] = { 0.f, 0.f, 0.f, 0.f };
+                constexpr float clear[4] = {0.f, 0.f, 0.f, 0.f};
                 encoder.ClearRenderTargets(targets, clear);
             }
             const math::matrix4x4 viewProjection = math::transpose(m_viewProjection);
-            const auto constants = context.resources->UploadConstants(
-                &viewProjection, sizeof(viewProjection));
-            if (!constants.IsValid()) return;
+            const auto constants = context.resources->UploadConstants(&viewProjection, sizeof(viewProjection));
+            if (!constants.IsValid())
+            {
+                return;
+            }
 
-            const uint64_t bytes = sizeof(Instance) *
-                static_cast<uint64_t>(m_instances.size());
+            const uint64_t bytes = sizeof(Instance) * static_cast<uint64_t>(m_instances.size());
             const auto upload = context.resources->AllocateUpload(
-                RHIUploadRequest{ bytes, RHIUploadUsage::BufferCopy, sizeof(Instance) });
-            if (!upload.IsValid()) return;
+                RHIUploadRequest{bytes, RHIUploadUsage::BufferCopy, sizeof(Instance)});
+            if (!upload.IsValid())
+            {
+                return;
+            }
             memcpy(upload.cpuAddress, m_instances.data(), static_cast<size_t>(bytes));
 
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleStrip);
-            for (const Batch& batch : m_batches)
+            for (const Batch &batch : m_batches)
             {
-                if (!batch.uploaded.IsValid()) continue;
+                if (!batch.uploaded.IsValid())
+                {
+                    continue;
+                }
                 const RHIBindingDesc texture[] = {
-                    RHIBindingDesc::Srv2D(batch.uploaded.handle,
-                        batch.uploaded.format, 0, batch.uploaded.mipLevels),
+                    RHIBindingDesc::Srv2D(batch.uploaded.handle, batch.uploaded.format, 0, batch.uploaded.mipLevels),
                 };
                 const auto table = context.resources->CreateBindings(texture);
-                if (!table.IsValid()) break;
+                if (!table.IsValid())
+                {
+                    break;
+                }
 
-                const RHIPipelineHandle pso = batch.enableDepth &&
-                    m_inputs.depth.IsValid() ? m_depthPso : m_overlayPso;
+                const RHIPipelineHandle pso = batch.enableDepth && depth.IsValid() ? m_depthPso : m_overlayPso;
                 encoder.SetPipeline(RHIBindPoint::Graphics, pso);
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, constants);
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                    upload.SubRange(sizeof(Instance) * static_cast<uint64_t>(batch.first),
-                        sizeof(Instance) * static_cast<uint64_t>(batch.count)));
+                                      upload.SubRange(sizeof(Instance) * static_cast<uint64_t>(batch.first),
+                                                      sizeof(Instance) * static_cast<uint64_t>(batch.count)));
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                 encoder.Draw(4, batch.count);
             }

@@ -22,3 +22,8 @@ rg5-surface-completion-v1.json은 sliceComplete=true, rg5Complete=false, version
 다음은 실제 versioned SceneHost와 Code/Graph 혼합 스트림 GPU 검증 및 guard 제거다. 준비·캐시 재사용·transmission/SSS/Volume 조합과 출력 전달을 실제 실행으로 수용해야 한다. 나머지 소비자/ReadWrite 이관·legacy 추론 제거·RG6 기본 전환 조건도 계속 열려 있다.
 
 커밋 통합 검증(2026-10-03): origin/master의 d6fa3fae까지 물리·CSM 변경 6개를 반영하고 SceneHost의 CSM 가시성·배칭·draw count와 RG5 반환 핸들 계약을 함께 보존했다. 통합 후 Debug 빌드(Build/rg5-sync-Debug-build.log) 및 Debug-sync-native-v1 RenderGraph 검사는 통과했다. 위 Debug/Release 이미지 비교와 current-baseline-phase-complete-v1.json은 원격 통합 이전 RG5-8 소스·바이너리에 대한 증거이며, 통합 후의 Release/전체 이미지 회귀 및 현행 해시 기준선 갱신은 이번 커밋·푸시 작업에서 실행하지 않았다.
+
+후속 갱신: 위 통합 후 Release/전체 이미지 회귀 미실행 공백은 [통합 후 현행 기준선 검증](RenderRg5IntegrationBaseline.md)으로 회수했다. 실제 versioned SceneHost/mixed GPU 수용은 계속 열려 있다.
+
+
+후속 갱신: [RG5-9 혼합 GPU 수용](RenderRg5MixedGpuAcceptance.md)에서 실제 versioned SceneHost/Forward+ Code·Graph 혼합 검증과 ExplicitVersioned guard 제거를 완료했다. 최신 기본 제품 기준선도 이 기록을 따른다. 전체 제품 versioned 수용/RG6 전환 및 나머지 소비자 이관은 계속 열린다.

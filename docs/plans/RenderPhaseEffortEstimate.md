@@ -62,7 +62,7 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 | 4.3 | `RG2` | 10 | 10 | done | version/Modify·RAW/WAR/WAW·stale/fork 거부·texture/buffer 240 shuffle 및 Debug/Release GPU/제품 회귀 완료; 기성 10인일 |
 | 4.3 | `RG3` | 8 | 8 | done | version producer 컬링·WAR/WAW 재연결·sorted lifetime/Transition/UAV, 120 shuffle 및 Debug/Release GPU/제품 회귀 완료; 기성 8인일 |
 | 4.3 | `RG4` | 7 | 6 | done | wave·target append·critical path, 24 shuffle·Debug/Release 1/2/4 워커 GPU·제품 16개 이미지 오차 0; 기성 6인일 |
-| 4.3 | `RG5` | 12 | 10 | progress | GBuffer·Shadow·정책 분리·Deferred/SkyBox·SSAO/SSGI·Forward Code·Lookup·Refraction·SSS·Volume·GraphSurface/Draw/반환 출력 묶음 완료; 전체 이관/수용은 열림, 기성 0. 현재 제품 59·게이트 217 호출; 잠정 10인일 유지 |
+| 4.3 | `RG5` | 12 | 10 | progress | GBuffer·Shadow·정책 분리·Deferred/SkyBox·SSAO/SSGI·Forward Code·Lookup·Refraction·SSS·Volume·GraphSurface/Draw/반환 출력 및 실제 versioned 혼합 GPU/guard 회수·Decal·Sprite·화면 SSS/SSR 접근/출력 버전 묶음 완료; 전체 이관/수용은 열림, 기성 0. 현재 제품 59·게이트 224 호출(cpp/h·신규 검사 헤더 포함); 잠정 10인일 유지 |
 | 4.3 | `RG6` | 8 | 4 | todo | DX12 제품 전환·별도 프로세스 전후 회귀 4; 교차 캡처 제외 |
 | 4.3 | `RG7` | 20 | 14 | todo | 기존 transient pool 위 buffer/alias 계획 9 + poison/수명·DX12 검증 5 |
 | 4.3 | `Q0` | 미산정 | 6 | todo | 중립 queue/capability·fence/ownership 계약 4 + DX12 실패/수명 검증 2; 공통 기반 한 번만 계산 |

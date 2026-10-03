@@ -2441,9 +2441,13 @@ namespace
                     const auto inputs = GatherGBufferOutputs(bb);
                     p.decal.SetInputs(inputs);
                     p.decal.Declare(graph, ctx);
+                    const auto outputs = p.decal.GetOutputs();
+                    bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
+                    bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
+                    bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
                     if (p.decal.HasPreparedDecals())
                     {
-                        p.graphMaterials.DeclareDecalInputs(graph, inputs, p.decal.GetBaseline());
+                        p.graphMaterials.DeclareDecalInputs(graph, outputs, p.decal.GetBaseline());
                     }
                 };
                 p.desc.AddNode(std::move(node));
@@ -2637,7 +2641,9 @@ namespace
                     p.sprite.SetInputs(inputs);
                     p.sprite.Declare(graph, ctx);
                     if (p.sprite.GetOutput().IsValid())
+                    {
                         bb.Set(LiveSlots::kLitColor, p.sprite.GetOutput());
+                    }
                 };
                 p.desc.AddNode(std::move(node));
             }

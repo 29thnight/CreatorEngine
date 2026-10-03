@@ -26,6 +26,7 @@
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "Render/Passes/Lighting/EnhancedSSGIPass.h"
 #include "Render/Passes/Geometry/EnhancedForwardPass.h"
+#include "Render/Passes/Geometry/EnhancedSpritePass.h"
 #include "Render/Passes/Lighting/EnhancedSSAOPass.h"
 #include "Render/Passes/PostProcess/EnhancedPostChainPass.h"
 #include "Render/Passes/UI/EnhancedUIPass.h"
@@ -76,6 +77,10 @@
 #include <algorithm>
 #include <limits>
 #include "RHI/RHIShaderCompiler.h"
+#include "Render/Passes/Lighting/EnhancedSSSPass.h"
+#include "Render/Passes/Lighting/EnhancedSSRPass.h"
+#include "EnhancedSpriteRg5Tests.h"
+#include "EnhancedScreenRg5Tests.h"
 
 namespace
 {
@@ -4193,6 +4198,18 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         return false;
     }
     outLog += "RG5_SURFACE_OK policies=2 iterations=3 depth-v5 color-v9 dedup WAR writable/state-rejection\n";
+    if (!ValidateRg5SpriteGpu(resources, error))
+    {
+        outLog += "RG5_SPRITE_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_SPRITE_GPU_OK policies=3 frames=18 maxError=0 shared-source depth empty-output\n";
+    if (!ValidateRg5ScreenGpu(resources, error))
+    {
+        outLog += "RG5_SCREEN_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_SCREEN_GPU_OK policies=3 frames=48 maxError=0 SSS/SSR enabled bypass mask missing sealed-inputs\n";
     DX12TestTextureRegistration backbufferRegistration(
         resources, resources.GetRenderTarget());
     if (!backbufferRegistration.IsValid())

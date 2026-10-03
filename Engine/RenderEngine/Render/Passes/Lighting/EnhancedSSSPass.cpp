@@ -1,7 +1,7 @@
 #include "EnhancedSSSPass.h"
-#include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
+#include "../../Graph/EnhancedRenderGraph.h"
 
 #include <cstring>
 #include <string>
@@ -16,28 +16,26 @@ namespace
     //   · 정점을 SV_VertexID 풀스크린 삼각형으로(DX11은 Fullscreen.vs + Draw(4))
     //   · MetalRough(t2) 선언 제거 — 원본이 읽지 않는다
     //   · direction을 상수로 받되 호출부가 축을 고정한다(원본과 같은 동작)
-    constexpr const char* kSSSShaderFile = "Sss.slang";
+    constexpr const char *kSSSShaderFile = "Sss.slang";
 
     struct SSSConstants
     {
         float direction[2]{};
-        float strength{ 0.f };
-        float width{ 0.f };
-        float cameraFov{ 0.f };
+        float strength{0.f};
+        float width{0.f};
+        float cameraFov{0.f};
         float padding[3]{};
     };
 
-    bool CompileSSSShader(const char* entry, const char* target,
-        RHIShaderBlob& outBlob, std::string& outError)
+    bool CompileSSSShader(const char *entry, const char *target, RHIShaderBlob &outBlob, std::string &outError)
     {
         return RHIShaderCompiler::CompileFile(kSSSShaderFile, entry, target, outBlob, outError);
     }
-}
+} // namespace
 
-bool EnhancedSSSPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedSSSPass::Initialize(const EnhancedFrameContext &context, std::string &outError)
 {
-    if (nullptr == context.resources || nullptr == context.psoManager ||
-        nullptr == context.rootSignatures)
+    if (nullptr == context.resources || nullptr == context.psoManager || nullptr == context.rootSignatures)
     {
         outError = "SSS 패스 컨텍스트가 불완전하다";
         return false;
@@ -46,7 +44,7 @@ bool EnhancedSSSPass::Initialize(const EnhancedFrameContext& context, std::strin
     return CreatePipelines(context, outError);
 }
 
-bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext &context, std::string &outError)
 {
     // b0 상수 · t0~t1 테이블(깊이·색) · s0 선형 클램프.
     //
@@ -58,7 +56,7 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     };
 
     const RHIStaticSamplerDesc samplers[] = {
-        { RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel },
+        {RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel},
     };
 
     RHIPipelineLayoutDesc rootDesc{};
@@ -66,12 +64,21 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     rootDesc.staticSamplers = samplers;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
-    if (!root.IsValid()) return false;
+    if (!root.IsValid())
+    {
+        return false;
+    }
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
-    if (!CompileSSSShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
-    if (!CompileSSSShader("PSMain", "ps_5_0", psBlob, outError)) return false;
+    if (!CompileSSSShader("VSMain", "vs_5_0", vsBlob, outError))
+    {
+        return false;
+    }
+    if (!CompileSSSShader("PSMain", "ps_5_0", psBlob, outError))
+    {
+        return false;
+    }
 
     RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
@@ -95,12 +102,15 @@ bool EnhancedSSSPass::CreatePipelines(const EnhancedFrameContext& context, std::
     desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (!m_pso.IsValid()) return false;
+    if (!m_pso.IsValid())
+    {
+        return false;
+    }
 
     return true;
 }
 
-bool EnhancedSSSPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedSSSPass::PrepareFrame(const EnhancedFrameContext &context, std::string &outError)
 {
     (void)outError;
 
@@ -108,13 +118,12 @@ bool EnhancedSSSPass::PrepareFrame(const EnhancedFrameContext& context, std::str
     m_height = context.height;
 
     // 스냅샷의 FOV 계약 자체가 도 단위다.
-    m_cameraFov = (nullptr != context.camera)
-        ? context.camera->fov : 60.f;
+    m_cameraFov = (nullptr != context.camera) ? context.camera->fov : 60.f;
 
     return true;
 }
 
-void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
+void EnhancedSSSPass::Declare(EnhancedRenderGraph &graph, const EnhancedFrameContext &context)
 {
     // 꺼져 있으면 입력을 그대로 흘린다. 뒤 패스가 '켜졌나'를 따지지 않고
     // GetOutput()만 이으면 되도록 — SSR과 같은 규약이다.
@@ -128,8 +137,14 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
     m_output = RGHandle{};
     m_horizontal = RGHandle{};
 
-    if (!m_pso.IsValid() || 0 == m_width || 0 == m_height) return;
-    if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid()) return;
+    if (!m_pso.IsValid() || 0 == m_width || 0 == m_height)
+    {
+        return;
+    }
+    if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid())
+    {
+        return;
+    }
 
     // ★ 복사가 사라진 자리.
     //
@@ -144,33 +159,47 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
 
     desc.name = "SSS.Horizontal";
     m_horizontal = graph.CreateTexture(desc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_horizontal = graph.Write(m_horizontal);
+    }
 
     desc.name = "SSS.Output";
     m_output = graph.CreateTexture(desc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = graph.Write(m_output);
+    }
+    const auto depth = m_inputs.depth;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
 
     // 두 축을 각각 선언한다. 그래프가 사이의 전이 배리어를 만들어 준다 —
     // 가로가 쓴 것을 세로가 읽으므로 RENDER_TARGET → SHADER_RESOURCE다.
     // isFinal은 예전에 rtvIndex가 겸하던 판단이다 — 힙 슬롯 번호가 '마지막
     // 축인가'까지 뜻하고 있었다. R2b가 슬롯을 걷어내면서 그 겸직이 드러나
     // 뜻하는 바를 그대로 적었다.
-    const auto declareAxis = [&](RGHandle source, RGHandle target,
-        bool isFinal, float dirX, float dirY, const char* name)
-    {
+    const auto declareAxis = [&](RGHandle source, RGHandle target, bool isFinal, float dirX, float dirY,
+                                 const char *name) {
         const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
-            { source,         RHIResourceState::ShaderResource },
-            { m_inputs.depth, RHIResourceState::ShaderResource },
-            { target,         RHIResourceState::RenderTarget },
+            {source, RHIResourceState::ShaderResource, readAccess},
+            {depth, RHIResourceState::ShaderResource, readAccess},
+            {target, RHIResourceState::RenderTarget, writeAccess},
         };
 
-        graph.AddPass(name, usages,
-            [this, &context, source, target, dirX, dirY](
-                const EnhancedRenderGraph::ExecuteContext& executeContext)
-            {
-                RHIEncoder& encoder = *executeContext.encoder;
+        graph.AddPass(
+            name, usages,
+            [this, &context, source, target, depth, dirX,
+             dirY](const EnhancedRenderGraph::ExecuteContext &executeContext) {
+                RHIEncoder &encoder = *executeContext.encoder;
 
-                const RHITextureHandle colors[] = { executeContext.ResolveHandle(target) };
+                const RHITextureHandle colors[] = {executeContext.ResolveHandle(target)};
                 const auto targets = context.resources->CreateRenderTargets(colors);
-                if (!targets.IsValid()) return;
+                if (!targets.IsValid())
+                {
+                    return;
+                }
 
                 encoder.SetViewportAndScissor(m_width, m_height);
                 encoder.BindRenderTargets(targets);
@@ -179,12 +208,14 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 // SRV로 읽는 것이라 포맷을 R32_FLOAT로 명시해야 하고,
                 // 색은 리소스가 아는 대로 보면 된다.
                 const RHIBindingDesc bindings[] = {
-                    RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.depth),
-                        RHIFormat::R32Float),
+                    RHIBindingDesc::Srv2D(executeContext.ResolveHandle(depth), RHIFormat::R32Float),
                     RHIBindingDesc::Srv(executeContext.ResolveHandle(source)),
                 };
                 const RHIBindingTable srvTable = context.resources->CreateBindings(bindings);
-                if (!srvTable.IsValid()) return;
+                if (!srvTable.IsValid())
+                {
+                    return;
+                }
 
                 SSSConstants constants{};
                 constants.direction[0] = dirX;
@@ -193,9 +224,11 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
                 constants.width = m_tuning.width;
                 constants.cameraFov = m_cameraFov;
 
-                const auto cb = context.resources->UploadConstants(
-                    &constants, sizeof(SSSConstants));
-                if (!cb.IsValid()) return;
+                const auto cb = context.resources->UploadConstants(&constants, sizeof(SSSConstants));
+                if (!cb.IsValid())
+                {
+                    return;
+                }
                 encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
                 encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
@@ -220,4 +253,3 @@ void EnhancedSSSPass::Shutdown()
     m_height = 0;
     m_pso = {};
 }
-

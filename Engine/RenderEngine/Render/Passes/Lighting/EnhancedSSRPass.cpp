@@ -1,7 +1,7 @@
 #include "EnhancedSSRPass.h"
-#include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
+#include "../../Graph/EnhancedRenderGraph.h"
 
 #include <cstring>
 #include <string>
@@ -25,39 +25,37 @@ namespace
     //   depth>=1 분기에 return이 없는 것, reflectFactor·edgeFade를 구해
     //   놓고 안 쓰는 것, screenSize가 (0,0)이라 비트플래그가 텍셀 (0,0)만
     //   보는 것. 고치면 그림이 바뀌고, 기준선은 DX11이다.
-    constexpr const char* kSSRShaderFile = "Ssr.slang";
+    constexpr const char *kSSRShaderFile = "Ssr.slang";
 
     struct SSRConstants
     {
-        math::matrix4x4 inverseProjection{ math::matrix4x4::identity() };
-        math::matrix4x4 inverseView{ math::matrix4x4::identity() };
-        math::matrix4x4 viewProjection{ math::matrix4x4::identity() };
+        math::matrix4x4 inverseProjection{math::matrix4x4::identity()};
+        math::matrix4x4 inverseView{math::matrix4x4::identity()};
+        math::matrix4x4 viewProjection{math::matrix4x4::identity()};
         math::vector4 cameraPosition{};
-        float          stepSize{ 0.f };
-        float          maxThickness{ 0.f };
-        float          time{ 0.f };
-        int32_t        maxRayCount{ 0 };
+        float stepSize{0.f};
+        float maxThickness{0.f};
+        float time{0.f};
+        int32_t maxRayCount{0};
 
         // ★ DX11이 채우지 않는 자리다. math::vector2가 SimpleMath라 기본
         // 생성자가 (0,0)을 넣고, 그 값이 그대로 셰이더로 간다. 여기서도
         // 0으로 둬야 같은 그림이 나온다 — 화면 크기를 넣으면 비트플래그
         // 게이트가 원본과 다르게 동작한다(그쪽이 옳은 동작이지만, 그것은
         // DX11을 고치는 일이지 이식하는 일이 아니다).
-        float          screenSize[2]{ 0.f, 0.f };
-        float          padding[2]{};
+        float screenSize[2]{0.f, 0.f};
+        float padding[2]{};
     };
 
-    bool CompileSSRShader(const char* entry, const char* target,
-        RHIShaderBlob& outBlob, std::string& outError)
+    bool CompileSSRShader(const char *entry, const char *target, RHIShaderBlob &outBlob, std::string &outError)
     {
         return RHIShaderCompiler::CompileFile(kSSRShaderFile, entry, target, outBlob, outError);
     }
-}
+} // namespace
 
-bool EnhancedSSRPass::Initialize(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedSSRPass::Initialize(const EnhancedFrameContext &context, std::string &outError)
 {
-    if (nullptr == context.resources || nullptr == context.psoManager ||
-        nullptr == context.rootSignatures)
+    if (nullptr == context.resources || nullptr == context.psoManager || nullptr == context.rootSignatures)
     {
         outError = "SSR 패스 컨텍스트가 불완전하다";
         return false;
@@ -66,7 +64,7 @@ bool EnhancedSSRPass::Initialize(const EnhancedFrameContext& context, std::strin
     return CreatePipelines(context, outError);
 }
 
-bool EnhancedSSRPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedSSRPass::CreatePipelines(const EnhancedFrameContext &context, std::string &outError)
 {
     // b0 상수 · t0~t4 테이블(깊이·색·금속거칠기·노멀·비트마스크) ·
     // s0 선형 클램프 · s1 포인트 클램프.
@@ -76,8 +74,8 @@ bool EnhancedSSRPass::CreatePipelines(const EnhancedFrameContext& context, std::
     };
 
     const RHIStaticSamplerDesc samplers[] = {
-        { RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel },
-        { RHISampler::Point(RHIAddressMode::Clamp),  1, RHIShaderVisibility::Pixel },
+        {RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel},
+        {RHISampler::Point(RHIAddressMode::Clamp), 1, RHIShaderVisibility::Pixel},
     };
 
     RHIPipelineLayoutDesc rootDesc{};
@@ -85,12 +83,21 @@ bool EnhancedSSRPass::CreatePipelines(const EnhancedFrameContext& context, std::
     rootDesc.staticSamplers = samplers;
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
-    if (!root.IsValid()) return false;
+    if (!root.IsValid())
+    {
+        return false;
+    }
 
     RHIShaderBlob vsBlob;
     RHIShaderBlob psBlob;
-    if (!CompileSSRShader("VSMain", "vs_5_0", vsBlob, outError)) return false;
-    if (!CompileSSRShader("PSMain", "ps_5_0", psBlob, outError)) return false;
+    if (!CompileSSRShader("VSMain", "vs_5_0", vsBlob, outError))
+    {
+        return false;
+    }
+    if (!CompileSSRShader("PSMain", "ps_5_0", psBlob, outError))
+    {
+        return false;
+    }
 
     RHIGraphicsPipelineDesc desc{};
     desc.vsBytecode = vsBlob.Data();
@@ -111,12 +118,15 @@ bool EnhancedSSRPass::CreatePipelines(const EnhancedFrameContext& context, std::
     desc.rtvFormats[0] = kOutputFormat;
 
     m_pso = context.psoManager->GetOrCreate(desc, outError);
-    if (!m_pso.IsValid()) return false;
+    if (!m_pso.IsValid())
+    {
+        return false;
+    }
 
     return true;
 }
 
-bool EnhancedSSRPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedSSRPass::PrepareFrame(const EnhancedFrameContext &context, std::string &outError)
 {
     (void)outError;
 
@@ -127,16 +137,15 @@ bool EnhancedSSRPass::PrepareFrame(const EnhancedFrameContext& context, std::str
     {
         m_inverseProjection = math::transpose(context.camera->inverseProjection);
         m_inverseView = math::transpose(context.camera->inverseView);
-        m_viewProjection =
-            math::transpose(context.camera->view * context.camera->projection);
-        const math::vector3& eye = context.camera->eyePosition;
-        m_cameraPosition = math::vector4{ eye.x, eye.y, eye.z, 1.f };
+        m_viewProjection = math::transpose(context.camera->view * context.camera->projection);
+        const math::vector3 &eye = context.camera->eyePosition;
+        m_cameraPosition = math::vector4{eye.x, eye.y, eye.z, 1.f};
     }
 
     return true;
 }
 
-void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
+void EnhancedSSRPass::Declare(EnhancedRenderGraph &graph, const EnhancedFrameContext &context)
 {
     // 꺼져 있으면 입력을 그대로 흘린다. 뒤 패스가 '켜졌나'를 따지지 않고
     // GetOutput()만 이으면 되도록 — DX11은 여기서 return해 씬 컬러가
@@ -149,10 +158,12 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
 
     m_output = RGHandle{};
 
-    if (!m_pso.IsValid() || 0 == m_width || 0 == m_height) return;
-    if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid() ||
-        !m_inputs.metalRough.IsValid() || !m_inputs.normal.IsValid() ||
-        !m_inputs.bitmask.IsValid())
+    if (!m_pso.IsValid() || 0 == m_width || 0 == m_height)
+    {
+        return;
+    }
+    if (!m_inputs.color.IsValid() || !m_inputs.depth.IsValid() || !m_inputs.metalRough.IsValid() ||
+        !m_inputs.normal.IsValid() || !m_inputs.bitmask.IsValid())
     {
         // 입력이 모자라면 켜져 있어도 그릴 수 없다. 입력을 흘려보내
         // 체인이 끊기지 않게 한다.
@@ -172,24 +183,36 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
     desc.allowRenderTarget = true;
     desc.name = "SSR.Output";
     m_output = graph.CreateTexture(desc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = graph.Write(m_output);
+    }
+    const auto inputs = m_inputs;
+    const auto output = m_output;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
 
     const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
-        { m_inputs.color,      RHIResourceState::ShaderResource },
-        { m_inputs.depth,      RHIResourceState::ShaderResource },
-        { m_inputs.metalRough, RHIResourceState::ShaderResource },
-        { m_inputs.normal,     RHIResourceState::ShaderResource },
-        { m_inputs.bitmask,    RHIResourceState::ShaderResource },
-        { m_output,            RHIResourceState::RenderTarget },
+        {inputs.color, RHIResourceState::ShaderResource, readAccess},
+        {inputs.depth, RHIResourceState::ShaderResource, readAccess},
+        {inputs.metalRough, RHIResourceState::ShaderResource, readAccess},
+        {inputs.normal, RHIResourceState::ShaderResource, readAccess},
+        {inputs.bitmask, RHIResourceState::ShaderResource, readAccess},
+        {output, RHIResourceState::RenderTarget, writeAccess},
     };
 
-    graph.AddPass(GetName(), usages,
-        [this, &context](const EnhancedRenderGraph::ExecuteContext& executeContext)
-        {
-            RHIEncoder& encoder = *executeContext.encoder;
+    graph.AddPass(
+        GetName(), usages,
+        [this, &context, inputs, output](const EnhancedRenderGraph::ExecuteContext &executeContext) {
+            RHIEncoder &encoder = *executeContext.encoder;
 
-            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
+            const RHITextureHandle colors[] = {executeContext.ResolveHandle(output)};
             const auto targets = context.resources->CreateRenderTargets(colors);
-            if (!targets.IsValid()) return;
+            if (!targets.IsValid())
+            {
+                return;
+            }
 
             encoder.SetViewportAndScissor(m_width, m_height);
             encoder.BindRenderTargets(targets);
@@ -197,15 +220,17 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             // 테이블 하나로 잘라 받는다(R2). 깊이만 포맷을 명시한다 —
             // D32_FLOAT 리소스를 SRV로 읽으려면 R32_FLOAT로 봐야 한다.
             const RHIBindingDesc bindings[] = {
-                RHIBindingDesc::Srv2D(executeContext.ResolveHandle(m_inputs.depth),
-                    RHIFormat::R32Float),
-                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.color)),
-                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.metalRough)),
-                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.normal)),
-                RHIBindingDesc::Srv(executeContext.ResolveHandle(m_inputs.bitmask)),
+                RHIBindingDesc::Srv2D(executeContext.ResolveHandle(inputs.depth), RHIFormat::R32Float),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(inputs.color)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(inputs.metalRough)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(inputs.normal)),
+                RHIBindingDesc::Srv(executeContext.ResolveHandle(inputs.bitmask)),
             };
             const RHIBindingTable srvTable = context.resources->CreateBindings(bindings);
-            if (!srvTable.IsValid()) return;
+            if (!srvTable.IsValid())
+            {
+                return;
+            }
 
             SSRConstants constants{};
             constants.inverseProjection = m_inverseProjection;
@@ -218,9 +243,11 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCon
             constants.maxRayCount = m_tuning.maxRayCount;
             // screenSize는 채우지 않는다 — 위 구조체 주석 참고.
 
-            const auto cb = context.resources->UploadConstants(
-                &constants, sizeof(SSRConstants));
-            if (!cb.IsValid()) return;
+            const auto cb = context.resources->UploadConstants(&constants, sizeof(SSRConstants));
+            if (!cb.IsValid())
+            {
+                return;
+            }
             encoder.SetPipeline(RHIBindPoint::Graphics, m_pso);
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, cb);
             encoder.SetBindings(RHIBindPoint::Graphics, 1, srvTable);
@@ -237,4 +264,3 @@ void EnhancedSSRPass::Shutdown()
     m_height = 0;
     m_pso = {};
 }
-

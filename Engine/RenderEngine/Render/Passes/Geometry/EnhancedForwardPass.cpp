@@ -1408,10 +1408,11 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
     const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
     const auto blendAccess = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-    if (explicitAccess && m_graphMaterials && (m_graphMaterials->HasDraws() || m_graphMaterials->VolumeFrame()))
+    if (explicitAccess && !versioned && m_graphMaterials &&
+        (m_graphMaterials->HasDraws() || m_graphMaterials->VolumeFrame()))
     {
         throw std::runtime_error(
-            "RG5 Forward+ Graph stream requires mixed-stream versioned GPU acceptance.");
+            "Forward+ Graph stream requires ExplicitVersioned resource declarations.");
     }
 
     if (!m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)

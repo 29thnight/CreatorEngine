@@ -106,6 +106,7 @@ public:
     void SetDecals(const std::vector<Item>& decals) { m_decals = decals; }
 
     bool HasPreparedDecals() const { return !m_batches.empty(); }
+    const EnhancedGBufferPass::Outputs& GetOutputs() const { return m_outputs; }
     std::array<RGHandle, 3> GetBaseline() const
     {
         return { m_copiedDiffuse, m_copiedOrm, m_copiedNormal };
@@ -159,6 +160,7 @@ private:
     };
 
     EnhancedGBufferPass::Outputs m_inputs{};
+    EnhancedGBufferPass::Outputs m_outputs{};
     std::vector<Item>            m_decals;
     bool                         m_keepAlive{ false };
 
