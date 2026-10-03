@@ -591,7 +591,7 @@ void VulkanDeviceResources::Shutdown()
         //   한곳에 모은 이유가 여기서도 같다.
         AccumulateEncoderDiagnostics();
         m_encoder.reset();
-        m_renderTargetTable.Reset(m_device);
+        for (auto& table : m_renderTargetTables) table.Reset(m_device);
         m_samplerTable.Shutdown(m_device);
         m_descriptorRecycler.Shutdown(m_device);
         m_uploadAllocator.Shutdown(m_device);
@@ -681,7 +681,7 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     // ★ 렌더 타깃 표는 프레임 수명이다 (5c-4c). 위에서 이 슬롯의 펜스를 이미
     //   기다렸으므로 표가 만든 부분 뷰를 여기서 놓아도 GPU 가 쓰는 중이 아니다
     //   — 표가 펜스를 보지 않는 계약이 성립하는 근거가 이 순서다.
-    m_renderTargetTable.Reset(m_device);
+    m_renderTargetTables[m_frameIndex].Reset(m_device);
     m_bindingTable.Reset();
     RefreshUploadBudget();
     RefreshPersistentMemoryBudgets();

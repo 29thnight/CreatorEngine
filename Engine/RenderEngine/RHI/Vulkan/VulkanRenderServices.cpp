@@ -1548,7 +1548,7 @@ RHIRenderTargetBinding VulkanDeviceResources::CreateRenderTargets(
 
     if (!binding.IsValid()) return result;
 
-    result.backend = m_renderTargetTable.Add(binding);
+    result.backend = m_renderTargetTables[m_frameIndex].Add(binding);
     result.colorCount = binding.colorCount;
     result.hasDepth = binding.HasDepth();
     return result;
@@ -1597,7 +1597,7 @@ VkImageView VulkanDeviceResources::ResolveColorView(const RHIColorTargetDesc& de
     if (VK_SUCCESS != vkCreateImageView(m_device, &view, nullptr, &result))
         return VK_NULL_HANDLE;
 
-    m_renderTargetTable.Own(result);
+    m_renderTargetTables[m_frameIndex].Own(result);
     outWidth = (std::max)(1u, entry.width >> desc.mipSlice);
     outHeight = (std::max)(1u, entry.height >> desc.mipSlice);
     outLayers = layers;
@@ -1628,7 +1628,7 @@ VkImageView VulkanDeviceResources::ResolveDepthView(const RHIDepthTargetDesc& de
     VkImageView view = VK_NULL_HANDLE;
     if (VK_SUCCESS != vkCreateImageView(m_device, &info, nullptr, &view)) return VK_NULL_HANDLE;
 
-    m_renderTargetTable.Own(view);
+    m_renderTargetTables[m_frameIndex].Own(view);
     return view;
 }
 
@@ -1647,7 +1647,7 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
 
     AccumulateEncoderDiagnostics();
     m_encoder = std::make_unique<VulkanEncoder>(
-        current, m_pipelineCache, &m_resourceTable, &m_renderTargetTable,
+        current, m_pipelineCache, &m_resourceTable, &m_renderTargetTables[m_frameIndex],
         m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable);
     return *m_encoder;
 }
