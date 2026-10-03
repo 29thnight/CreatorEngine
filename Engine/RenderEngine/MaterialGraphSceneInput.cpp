@@ -131,6 +131,8 @@ bool SceneViewInput::Seal(const SceneInputView& view, std::span<const EnhancedDr
         SceneDrawInput input;
         input.sourceIndex = sourceIndex;
         input.geometryKey = draw.geometryKey;
+        input.viewDepth = math::dot(draw.worldMatrix.translation() - view.camera.eyePosition, view.camera.forward);
+        if (!std::isfinite(input.viewDepth)) return Fail(error, "Scene draw has a non-finite sorting depth.");
         input.model = {geometry.handle.modelId, geometry.handle.generation};
         input.materialSlot = draw.materialGraphSlot;
         input.material = instance;

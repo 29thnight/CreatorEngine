@@ -1,5 +1,6 @@
 #pragma once
 #include "PrincipledVolume.slang"
+#include "MaterialGraphSceneVolumeTypes.slang"
 
 static const uint LX_VOLUME_MAX_OBJECTS = 16;
 static const uint LX_VOLUME_MAX_TRIANGLES = 128;
@@ -8,12 +9,12 @@ struct LXSceneVolumeTriangle
 {
     float4 a, b, c;
 };
-struct LXSceneVolumeCoefficient
-{
-    float4 scatteringAnisotropy, absorption, emission;
-};
-StructuredBuffer<LXSceneVolumeTriangle> lx_volumeTriangles : register(t17);
-StructuredBuffer<LXSceneVolumeCoefficient> lx_volumeCoefficients : register(t18);
+#ifndef LX_VOLUME_TRIANGLES_REGISTER
+#define LX_VOLUME_TRIANGLES_REGISTER t17
+#define LX_VOLUME_COEFFICIENTS_REGISTER t18
+#endif
+StructuredBuffer<LXSceneVolumeTriangle> lx_volumeTriangles : register(LX_VOLUME_TRIANGLES_REGISTER);
+StructuredBuffer<LXSceneVolumeCoefficient> lx_volumeCoefficients : register(LX_VOLUME_COEFFICIENTS_REGISTER);
 
 struct LXVolumeEvent
 {

@@ -40,6 +40,7 @@
 #include <shellapi.h>
 #include <chrono>
 #include <thread>
+#include "RHI/RHIShaderCompiler.h"
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
@@ -102,6 +103,20 @@ std::filesystem::path EditorPathArgument(const wchar_t* option)
         }
         LocalFree(arguments);
         return automation;
+    }
+
+    bool EditorWarmupCheckRequested()
+    {
+        int count{};
+        wchar_t** arguments = CommandLineToArgvW(GetCommandLineW(), &count);
+        bool requested = false;
+        if (arguments)
+        {
+            for (int i = 1; i < count; ++i)
+                requested |= std::wstring_view(arguments[i]) == L"--warmup-check";
+            LocalFree(arguments);
+        }
+        return requested;
     }
 
     std::filesystem::path ResolveEditorWorkspaceRoot(
@@ -240,7 +255,7 @@ void Core::App::Initialize(CoreWindow& coreWindow)
         };
     }
     // 자동화 실행은 첫 프레임 예열을 건너뛰므로 표시할 단계도 하나 적다.
-    BootProgress::Begin(BootProgress::kEditorBootSteps - (EditorHasAutomationArgument() ? 1 : 0));
+    BootProgress::Begin(BootProgress::kEditorBootSteps - (EditorHasAutomationArgument() && !EditorWarmupCheckRequested() ? 1 : 0));
     BootProgress::Step(L"Starting editor", L"Preparing core services");
 
 	// 덤프 종류 지정과 기록자 등록은 EngineBootstrap::InitializeRuntime이 이미 했다.
@@ -410,47 +425,101 @@ uint32_t Core::App::PublishRenderFrame()
 }
 
 /// 첫 그림이 설 때까지 프레임을 돌린다. 창을 보여주기 전에만 부른다.
-void Core::App::WarmUpFirstRenderedFrame()
+bool Core::App::WarmUpFirstRenderedFrame()
 {
-	if (EditorHasAutomationArgument()) return;
+    // Automation keeps its established asynchronous startup unless explicitly testing this gate.
+    if (EditorHasAutomationArgument() && !EditorWarmupCheckRequested()) return true;
 
-	BootProgress::Step(L"Preparing renderer", L"Waiting for the first scene view frame");
-
-	// 상한은 '예열이 실패해도 에디터는 뜬다'를 지키는 자다. 넘기면 예열
-	// 없이 예전과 같은 상태로 창을 띄운다 — 검정 씬뷰가 잠시 보일 뿐
-	// 부팅이 막히지는 않는다.
-	constexpr auto kWarmUpLimit = std::chrono::seconds(60);
-	const auto deadline = std::chrono::steady_clock::now() + kWarmUpLimit;
-
-	bool firstPass = true;
-	while (std::chrono::steady_clock::now() < deadline)
-	{
-		if (firstPass) BootProgress::Detail(L"Updating the scene for its first frame");
-		DataSystems->DrainQueuedAssetChanges();
-		m_main->Update();
-
-		// 넘길 뷰가 없으면 만들 그림도 없다. 여기서 기다리면 상한까지
-		// 헛돈다 — 카메라 없는 씬을 여는 실행이 그렇다.
-		if (firstPass) BootProgress::Detail(L"Submitting the first scene view frame");
-		if (0 == PublishRenderFrame()) return;
-
-		if (0 != EnhancedSceneRenderer::GetLiveDisplayTexture(
-				EnhancedLiveDisplayTarget::Editor).textureId)
-		{
-			return;
-		}
-		if (firstPass)
-		{
-			BootProgress::Detail(L"Waiting for the render thread to finish the first frame");
-			firstPass = false;
-		}
-
-		// RT가 완료한 슬롯을 표시로 승격하는 것은 다음 TickLive다. 잠깐
-		// 물러나 그 진행을 기다린다 — 붙어서 발행하면 큐만 덮어쓴다.
-		std::this_thread::sleep_for(std::chrono::milliseconds(4));
-	}
-
-	Debug::PrintLog(spdlog::level::warn, "[Boot] 렌더러 예열이 상한을 넘었다 — 예열 없이 창을 띄운다");
+    BootProgress::Step(L"Preparing renderer", L"Checking shader cache and preparing the first frame");
+    const auto started = std::chrono::steady_clock::now();
+    auto lastActivity = started;
+    auto nextStatus = started;
+    std::uint64_t revision = 0;
+    std::size_t stages = 0;
+    std::uint64_t loggedRevision = 0;
+    bool failed = false;
+    std::wstring failure;
+    const auto widen = [](const std::string& text) {
+        if (text.empty()) return std::wstring{};
+        const int size = MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+        std::wstring result(size, L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), result.data(), size);
+        return result;
+    };
+    for (;;)
+    {
+        MSG message{};
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE))
+        {
+            if (message.message == WM_QUIT) m_windowClosed = true;
+            else { TranslateMessage(&message); DispatchMessageW(&message); }
+        }
+        if (m_windowClosed || g_progressWindow->WarmupCancelRequested())
+        {
+            Debug::PrintLog(spdlog::level::info, "[BootWarmup] Cancelled; waiting for safe renderer shutdown");
+            return false;
+        }
+        const auto now = std::chrono::steady_clock::now();
+        const auto progress = RHIShaderCompiler::GetProgress();
+        const auto ledger = engine::warmup::read();
+        if (progress.revision != revision || ledger.reachedCount != stages)
+        {
+            revision = progress.revision;
+            stages = ledger.reachedCount;
+            lastActivity = now;
+        }
+        if (!failed)
+        {
+            const auto renderer = EnhancedSceneRenderer::GetWarmupStatus();
+            if (renderer.failed)
+            {
+                failed = true;
+                failure = widen(renderer.error);
+                Debug::PrintLog(spdlog::level::err, "[BootWarmup] Renderer initialization failed: " + renderer.error);
+            }
+            else if (renderer.ready && EnhancedSceneRenderer::GetLiveDisplayTexture(
+                EnhancedLiveDisplayTarget::Editor).textureId != 0)
+            {
+                Debug::PrintLog(spdlog::level::info, "[BootWarmup] Ready; GPU-completed editor frame=" + std::to_string(renderer.completedFrame));
+                return true;
+            }
+            else
+            {
+                DataSystems->DrainQueuedAssetChanges();
+                m_main->Update();
+                if (m_windowClosed) continue;
+                if (PublishRenderFrame() == 0)
+                {
+                    failed = true;
+                    failure = L"No scene view is available. Close the editor and check the startup scene and camera.";
+                }
+            }
+        }
+        if (now >= nextStatus)
+        {
+            const auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - started).count();
+            const auto quiet = std::chrono::duration_cast<std::chrono::seconds>(now - lastActivity).count();
+            std::wstring detail;
+            if (failed) detail = L"Renderer initialization failed: " + failure;
+            else if (quiet >= 120)
+                detail = L"No new preparation milestone for " + std::to_wstring(quiet) + L"s. A shader may still be compiling. Still waiting; use the X icon to cancel startup.";
+            else if (progress.active)
+                detail = (progress.recompiling ? std::wstring(L"Recompiling shader (cache miss). ") : std::wstring{}) + widen(progress.phase) + L": " + widen(std::filesystem::path(progress.name).filename().string()) +
+                    L" / " + widen(progress.entryPoint) + L". Completed shader requests: " +
+                    std::to_wstring(progress.completedRequests) + L". Elapsed: " + std::to_wstring(elapsed) + L"s.";
+            else detail = L"Preparing renderer and waiting for its first completed frame. Shader requests completed: " +
+                    std::to_wstring(progress.completedRequests) + L". Elapsed: " + std::to_wstring(elapsed) + L"s.";
+            g_progressWindow->SetWarmupStatus(std::move(detail), quiet >= 120, failed);
+            if (progress.revision != loggedRevision)
+            {
+                loggedRevision = progress.revision;
+                Debug::PrintLog(spdlog::level::info, "[BootWarmup] " + progress.phase + ": " + progress.entryPoint +
+                    " completed=" + std::to_string(progress.completedRequests));
+            }
+            nextStatus = now + std::chrono::milliseconds(250);
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(4));
+    }
 }
 
 void Core::App::Run()
@@ -475,7 +544,13 @@ void Core::App::Run()
 		//   기다릴 것도 없으므로 즉시 빠진다. 하네스 실행은 예열하지
 		//   않는다 — 명령 하나 돌리고 끝내는 실행에 16초를 물리면 게이트
 		//   타임아웃이 통째로 흔들린다.
-		WarmUpFirstRenderedFrame();
+        if (!WarmUpFirstRenderedFrame())
+        {
+            g_progressWindow->Close();
+            m_windowClosed = true;
+            PostQuitMessage(0);
+            return;
+        }
 
 		BootProgress::Complete();
 
@@ -483,6 +558,7 @@ void Core::App::Run()
 		// 반대 순서로 하면 서로 다른 스레드의 두 창 사이에서 활성화 전환이
 		// 일어나며 동기 SendMessage 교착이 비결정적으로 발생했다.
 		g_progressWindow->Close();
+        Debug::PrintLog(spdlog::level::info, "[BootWarmup] Editor visibility gate passed");
         if (!EditorSmokeOffscreen())
         {
             CoreWindow::GetForCurrentInstance()->Show();
@@ -496,6 +572,7 @@ void Core::App::Run()
 	})
 	.Then([&]
 	{
+		if (m_windowClosed) return;
 		// Watcher I/O thread가 게시한 asset 변경은 GT 프레임 경계에서만 적용한다.
 		// 이 뒤 Update와 frame packet 밀봉은 같은 ShaderMeta generation을 본다.
 		DataSystems->DrainQueuedAssetChanges();

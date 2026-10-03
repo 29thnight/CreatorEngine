@@ -2,6 +2,7 @@
 
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphRenderBindings.h"
+#include "LXMaterialPipeline.h"
 
 #include <array>
 
@@ -28,7 +29,7 @@ static_assert(sizeof(SceneVolumeCoefficient) == 48);
 struct SceneVolumeBinding
 {
     std::shared_ptr<const RenderBindings> material;
-    RHIPipelineHandle pipeline;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline;
     RHIBufferSlice constants;
 };
 
@@ -54,7 +55,7 @@ class SceneVolumeFrame
     RHIBufferSlice triangles_;
     RHIBufferHandle coefficients_;
     RHITextureHandle environment_;
-    RHIPipelineHandle composite_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> composite_;
     RHIBindingTable coefficientOutput_;
     std::vector<RHIBufferSlice> constants_;
     std::weak_ptr<const SceneVolumeFrame> self_;
@@ -74,7 +75,7 @@ class SceneVolumeResources
 
   private:
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle composite_;
+    LX::Runtime::ComputePipeline composite_;
     bool Initialize(const EnhancedFrameContext& context, std::string& error);
 };
 } // namespace material_graph

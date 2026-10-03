@@ -1245,7 +1245,7 @@ namespace
                 const auto source = assetRoot.parent_path() / "Library/LXSceneCook" /
                     (Uuid::ToString(graphId.value) + ".slang");
                 if (!generated || !material_graph::CompileSceneProduct(*generated, shaders, source,
-                        materialBudget, verifiedProduct, graphError))
+                        materialBudget, verifiedProduct, graphError, FileGuid{graphId.value}))
                 {
                     std::cerr << "asset-cooker error: automatic Scene material compilation failed: "
                         << (generated ? graphError : "graph generation failed") << '\n';

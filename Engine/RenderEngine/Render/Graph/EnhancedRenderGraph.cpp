@@ -30,12 +30,23 @@ namespace
             return false;
         }
     }
+    bool Writes(const EnhancedRenderGraph::RGPassUsage& usage)
+    {
+        return usage.access == RGAccessMode::LegacyState ? IsWriteState(usage.state)
+            : usage.access == RGAccessMode::Write || usage.access == RGAccessMode::ReadWrite;
+    }
+    bool Reads(const EnhancedRenderGraph::RGPassUsage& usage)
+    {
+        return usage.access == RGAccessMode::LegacyState ? !IsWriteState(usage.state)
+            : usage.access == RGAccessMode::Read || usage.access == RGAccessMode::ReadWrite;
+    }
 }
 
 RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle handle) const
 {
     if (nullptr == graph || !handle.IsValid()) return {};
     if (handle.index >= graph->m_resources.size()) return {};
+    if (graph->m_scheduling == RGSchedulingMode::ExplicitVersioned && !graph->ValidVersionHandle(handle)) return {};
 
     const Resource& resource = graph->m_resources[handle.index];
     return resource.IsBuffer() ? RHITextureHandle{} : resource.handle;
@@ -47,6 +58,7 @@ void EnhancedRenderGraph::Reset()
     m_resources.clear();
     m_passes.clear();
     m_executeOrder.clear();
+    m_versionEdges.clear();
     m_compiled = false;
     m_stats = Stats{};
     m_resourceEpoch = NextResourceEpoch();
@@ -57,6 +69,7 @@ void EnhancedRenderGraph::Reset()
 
 RHIBufferHandle EnhancedRenderGraph::ResolveBufferHandle(RGHandle handle) const
 {
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned && !ValidVersionHandle(handle)) return {};
     return handle.IsValid() && handle.index < m_resources.size() ? m_resources[handle.index].buffer : RHIBufferHandle{};
 }
 
@@ -68,7 +81,7 @@ RGHandle EnhancedRenderGraph::FindImportedBuffer(RHIBufferHandle buffer) const
         {
             if (m_resources[i].imported && m_resources[i].buffer == buffer)
             {
-                return {static_cast<uint16_t>(i)};
+                return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(static_cast<uint16_t>(i), 0) : RGHandle{static_cast<uint16_t>(i)};
             }
         }
     }
@@ -83,7 +96,7 @@ RGHandle EnhancedRenderGraph::FindImportedTexture(RHITextureHandle texture) cons
         {
             if (m_resources[i].imported && m_resources[i].handle == texture)
             {
-                return {static_cast<uint16_t>(i)};
+                return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(static_cast<uint16_t>(i), 0) : RGHandle{static_cast<uint16_t>(i)};
             }
         }
     }
@@ -121,11 +134,14 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     entry.state = currentState;
     entry.writeback = stateWriteback;
     entry.imported = true;
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned) entry.versions.push_back({RGHandle::kInvalid, false});
     entry.name = name;
 
     handle.index = static_cast<uint16_t>(m_resources.size());
     m_resources.push_back(std::move(entry));
-    return handle;
+    m_compiled = false;
+    return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
+        m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
 }
 
 RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
@@ -140,11 +156,14 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
     entry.state = currentState;
     entry.writeback = stateWriteback;
     entry.imported = true;
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned) entry.versions.push_back({RGHandle::kInvalid, false});
     entry.name = name;
 
     handle.index = static_cast<uint16_t>(m_resources.size());
     m_resources.push_back(std::move(entry));
-    return handle;
+    m_compiled = false;
+    return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
+        m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
 }
 
 RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
@@ -158,8 +177,40 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
     RGHandle handle{};
     handle.index = static_cast<uint16_t>(m_resources.size());
     m_resources.push_back(std::move(entry));
-    return handle;
+    m_compiled = false;
+    return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(handle.index,
+        m_resources[handle.index].imported ? 0 : RGHandle::kInvalid) : handle;
 }
+
+RGHandle EnhancedRenderGraph::VersionHandle(uint16_t index, uint16_t version) const
+{
+    if (index >= m_resources.size()) return {};
+    return {index, version, m_resources[index].IsBuffer() ? RGResourceKind::Buffer : RGResourceKind::Texture, m_resourceEpoch};
+}
+
+bool EnhancedRenderGraph::ValidVersionHandle(RGHandle h, bool allowUnwritten) const
+{
+    if (!h.IsValid() || h.index >= m_resources.size() || h.epoch != m_resourceEpoch) return false;
+    const auto& r = m_resources[h.index];
+    if (h.kind != (r.IsBuffer() ? RGResourceKind::Buffer : RGResourceKind::Texture)) return false;
+    return h.version < r.versions.size() || (allowUnwritten && !r.imported && h.version == RGHandle::kInvalid);
+}
+
+RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
+{
+    m_compiled = false;
+    if (m_scheduling != RGSchedulingMode::ExplicitVersioned || !ValidVersionHandle(previous, !modify)) return {};
+    auto& r = m_resources[previous.index];
+    if (r.versions.size() >= RGHandle::kInvalid) return {};
+    const auto version = static_cast<uint16_t>(r.versions.size());
+    // Keep fork declarations for Compile to reject, rather than silently
+    // choosing whichever writer happened to call this API first.
+    r.versions.push_back({previous.version, modify});
+    return VersionHandle(previous.index, version);
+}
+
+RGHandle EnhancedRenderGraph::Write(RGHandle previous) { return AdvanceVersion(previous, false); }
+RGHandle EnhancedRenderGraph::Modify(RGHandle previous) { return AdvanceVersion(previous, true); }
 
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
@@ -173,6 +224,7 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     RGPassId id{};
     id.index = static_cast<uint16_t>(m_passes.size());
     m_passes.push_back(std::move(pass));
+    m_compiled = false;
     return id;
 }
 
@@ -191,11 +243,245 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     RGPassId id{};
     id.index = static_cast<uint16_t>(m_passes.size());
     m_passes.push_back(std::move(pass));
+    m_compiled = false;
     return id;
+}
+
+bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
+{
+    m_executeOrder.clear();
+    const size_t count = m_passes.size();
+    if (count > RGPassId::kInvalid || m_resources.size() > RGHandle::kInvalid)
+    { outError = "RG1 declaration exceeds handle capacity"; return false; }
+    struct Edge { uint16_t to, resource; uint16_t version{0}; };
+    std::vector<std::vector<Edge>> edges(count);
+    std::vector<uint32_t> incoming(count, 0);
+    std::vector<bool> alive(count, true);
+    m_versionEdges.clear();
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
+    {
+        using Reason = DiagnosticSnapshot::VersionEdge::Reason;
+        std::vector<std::vector<int32_t>> producers(m_resources.size());
+        std::vector<std::vector<std::vector<uint16_t>>> consumers(m_resources.size());
+        const auto fail = [&](const std::string& why, size_t r, uint16_t v) {
+            outError = "RG2 " + why + ": " + m_resources[r].name + " v" + std::to_string(v); return false;
+        };
+        for (size_t r=0; r<m_resources.size(); ++r)
+        {
+            const auto& resource=m_resources[r];
+            // One physical storage must have one logical version chain.
+            if (resource.imported)
+                for(size_t other=0; other<r; ++other)
+                    if(m_resources[other].imported &&
+                        ((resource.IsBuffer() && m_resources[other].buffer==resource.buffer) ||
+                        (!resource.IsBuffer() && m_resources[other].handle==resource.handle)))
+                        return fail("duplicate physical import; reuse its handle",r,0);
+            producers[r].assign(resource.versions.size(), -1);
+            consumers[r].resize(resource.versions.size());
+            for (size_t v=resource.imported ? 1 : 0; v<resource.versions.size(); ++v)
+            {
+                const auto parent=resource.versions[v].parent;
+                if (parent != (v==0 ? RGHandle::kInvalid : v-1))
+                    return fail("forked/stale write parent",r,static_cast<uint16_t>(v));
+                if (resource.versions[v].modify && parent==RGHandle::kInvalid)
+                    return fail("Modify has no initialized input",r,static_cast<uint16_t>(v));
+            }
+        }
+        for (size_t p=0; p<count; ++p)
+        {
+            std::vector<uint16_t> seen;
+            for (const auto& u:m_passes[p].usages)
+            {
+                const auto bad = [&](const std::string& why) {
+                    outError="RG2 pass '"+m_passes[p].name+"': "+why;
+                    if(u.handle.index<m_resources.size()) outError += ": "+m_resources[u.handle.index].name;
+                    outError += " [resource="+std::to_string(u.handle.index)+", v"+std::to_string(u.handle.version)+"]";
+                    return false;
+                };
+                if (!ValidVersionHandle(u.handle)) return bad("stale/foreign/invalid resource version or kind");
+                const auto r=u.handle.index, v=u.handle.version;
+                if (std::find(seen.begin(),seen.end(),r)!=seen.end()) return bad("duplicate resource access; use Modify: "+m_resources[r].name);
+                seen.push_back(r);
+                if (u.access!=RGAccessMode::Read && u.access!=RGAccessMode::Write && u.access!=RGAccessMode::ReadWrite)
+                    return bad("explicit access required");
+                if (u.state<RHIResourceState::Common || u.state>RHIResourceState::IndexBuffer ||
+                    (Writes(u) && !IsWriteState(u.state)) ||
+                    (u.access==RGAccessMode::Read && IsWriteState(u.state) && u.state!=RHIResourceState::UnorderedAccess))
+                    return bad("access/state mismatch: "+m_resources[r].name);
+                if (Writes(u))
+                {
+                    if (m_resources[r].imported && v==0) return fail("cannot overwrite imported v0; call Write/Modify",r,v);
+                    const auto& declaration=m_resources[r].versions[v];
+                    if (declaration.modify!=(u.access==RGAccessMode::ReadWrite)) return fail("Write/Modify access mismatch",r,v);
+                    if (producers[r][v]>=0) return fail("multiple version producers",r,v);
+                    producers[r][v]=static_cast<int32_t>(p);
+                    if (declaration.modify) consumers[r][declaration.parent].push_back(static_cast<uint16_t>(p));
+                }
+                else consumers[r][v].push_back(static_cast<uint16_t>(p));
+            }
+        }
+        for(size_t r=0; r<m_resources.size(); ++r)
+            for(size_t v=0; v<producers[r].size(); ++v)
+                if(producers[r][v]<0 && !(m_resources[r].imported && v==0))
+                    return fail("missing version producer",r,static_cast<uint16_t>(v));
+        // Only data dependencies retain work. WAR/WAW constrain surviving
+        // accesses; they must not keep discarded versions or dead readers alive.
+        alive.assign(count, false);
+        std::vector<uint16_t> roots;
+        const auto retain = [&](uint16_t p) { if(!alive[p]) { alive[p]=true; roots.push_back(p); } };
+        for(size_t p=0; p<count; ++p) if(m_passes[p].hasSideEffect) retain(static_cast<uint16_t>(p));
+        for(size_t r=0; r<m_resources.size(); ++r)
+            if(m_resources[r].imported && producers[r].size()>1)
+                retain(static_cast<uint16_t>(producers[r].back()));
+        while(!roots.empty())
+        {
+            const auto p=roots.back(); roots.pop_back();
+            for(const auto& u:m_passes[p].usages)
+            {
+                if(!Reads(u)) continue;
+                const auto r=u.handle.index;
+                const auto v=u.access==RGAccessMode::ReadWrite ? m_resources[r].versions[u.handle.version].parent : u.handle.version;
+                const auto producer=producers[r][v];
+                if(producer>=0) retain(static_cast<uint16_t>(producer));
+            }
+        }
+        for(size_t p=0; p<count; ++p) m_passes[p].culled=!alive[p];
+        const auto edge = [&](int32_t from, uint16_t to, uint16_t r, uint16_t v, Reason reason) {
+            if (from<0 || from==to) return;
+            m_versionEdges.push_back({static_cast<uint32_t>(from),to,r,v,reason});
+            auto& outgoing=edges[from];
+            if (std::none_of(outgoing.begin(),outgoing.end(),[&](const Edge& e){return e.to==to;}))
+            { outgoing.push_back({to,r,v}); ++incoming[to]; }
+        };
+        for (size_t r=0; r<m_resources.size(); ++r)
+        {
+            int32_t previousWriter=-1;
+            uint16_t previousVersion=0;
+            std::vector<std::pair<uint16_t,uint16_t>> pendingReaders;
+            for (size_t v=0; v<producers[r].size(); ++v)
+            {
+                const auto producer=producers[r][v];
+                if (producer<0 && !(m_resources[r].imported && v==0)) return fail("missing version producer",r,static_cast<uint16_t>(v));
+                if(producer>=0 && alive[producer])
+                {
+                    edge(previousWriter,static_cast<uint16_t>(producer),static_cast<uint16_t>(r),previousVersion,Reason::WAW);
+                    for(const auto& [reader,readVersion]:pendingReaders)
+                        edge(reader,static_cast<uint16_t>(producer),static_cast<uint16_t>(r),readVersion,Reason::WAR);
+                    pendingReaders.clear(); previousWriter=producer; previousVersion=static_cast<uint16_t>(v);
+                }
+                for(const auto reader:consumers[r][v]) if(alive[reader])
+                {
+                    edge(producer,reader,static_cast<uint16_t>(r),static_cast<uint16_t>(v),Reason::RAW);
+                    pendingReaders.push_back({reader,static_cast<uint16_t>(v)});
+                }
+            }
+        }
+    }
+    else
+    {
+    std::vector<int32_t> writer(m_resources.size(), -1);
+    std::vector<std::vector<uint16_t>> readers(m_resources.size());
+    std::vector<bool> modifies(m_resources.size(), false);
+    for (size_t p = 0; p < count; ++p)
+    {
+        std::vector<uint16_t> seen;
+        for (const auto& u : m_passes[p].usages)
+        {
+            const auto fail = [&](const std::string& why) {
+                outError = "RG1 pass '" + m_passes[p].name + "': " + why; return false;
+            };
+            if (!u.handle.IsValid() || u.handle.index >= m_resources.size()) return fail("invalid resource handle");
+            const auto r = u.handle.index;
+            if (std::find(seen.begin(), seen.end(), r) != seen.end()) return fail("duplicate access: " + m_resources[r].name);
+            seen.push_back(r);
+            if (u.access != RGAccessMode::Read && u.access != RGAccessMode::Write && u.access != RGAccessMode::ReadWrite)
+                return fail("explicit Read/Write/ReadWrite required: " + m_resources[r].name);
+            if (u.state < RHIResourceState::Common || u.state > RHIResourceState::IndexBuffer)
+                return fail("invalid resource state: " + m_resources[r].name);
+            if ((Writes(u) && !IsWriteState(u.state)) ||
+                (u.access == RGAccessMode::Read && IsWriteState(u.state) && u.state != RHIResourceState::UnorderedAccess))
+                return fail("access/state mismatch: " + m_resources[r].name);
+            if (Writes(u))
+            {
+                if (writer[r] >= 0) return fail("multiple writers require RG2 versions: " + m_resources[r].name
+                    + " (first: " + m_passes[writer[r]].name + ")");
+                writer[r] = static_cast<int32_t>(p);
+                modifies[r] = u.access == RGAccessMode::ReadWrite;
+                if (modifies[r] && !m_resources[r].imported) return fail("ReadWrite needs initialized imported input: " + m_resources[r].name);
+            }
+            if (Reads(u)) readers[r].push_back(static_cast<uint16_t>(p));
+        }
+    }
+    for (size_t r = 0; r < m_resources.size(); ++r)
+        for (const auto consumer : readers[r])
+        {
+            if (writer[r] < 0)
+            {
+                if (!m_resources[r].imported)
+                { outError = "RG1 missing writer: " + m_resources[r].name + " read by " + m_passes[consumer].name; return false; }
+                continue;
+            }
+            const auto producer = static_cast<uint16_t>(writer[r]);
+            if (producer == consumer) continue; // sole imported ReadWrite
+            if (modifies[r])
+            { outError = "RG1 ambiguous ReadWrite chain requires RG2 versions: " + m_resources[r].name; return false; }
+            auto& outgoing = edges[producer];
+            if (std::none_of(outgoing.begin(), outgoing.end(), [&](const Edge& e) { return e.to == consumer; }))
+            { outgoing.push_back({consumer, static_cast<uint16_t>(r)}); ++incoming[consumer]; }
+        }
+    }
+    std::priority_queue<uint16_t, std::vector<uint16_t>, std::greater<uint16_t>> ready;
+    for (size_t p = 0; p < count; ++p) if (alive[p] && !incoming[p]) ready.push(static_cast<uint16_t>(p));
+    std::vector<uint16_t> order;
+    while (!ready.empty())
+    {
+        const auto p = ready.top(); ready.pop(); order.push_back(p);
+        for (const auto& e : edges[p]) if (--incoming[e.to] == 0) ready.push(e.to);
+    }
+    if (order.size() != static_cast<size_t>(std::count(alive.begin(),alive.end(),true)))
+    {
+        // Iterative DFS: report a real cycle with resource labels, without
+        // recursion depth depending on the number of authored passes.
+        std::vector<uint8_t> color(count, 0);
+        struct Visit { uint16_t pass; size_t next; };
+        std::vector<Visit> stack;
+        for (size_t root = 0; root < count; ++root)
+        {
+            if (!alive[root] || color[root]) continue;
+            stack.push_back({static_cast<uint16_t>(root), 0}); color[root] = 1;
+            while (!stack.empty())
+            {
+                auto& top = stack.back();
+                if (top.next == edges[top.pass].size()) { color[top.pass] = 2; stack.pop_back(); continue; }
+                const auto edge = edges[top.pass][top.next++];
+                if (color[edge.to] == 2) continue;
+                if (color[edge.to] == 1)
+                {
+                    outError = m_scheduling==RGSchedulingMode::ExplicitVersioned ? "RG2 cycle: " : "RG1 cycle: ";
+                    const auto start = std::find_if(stack.begin(), stack.end(), [&](const Visit& v) { return v.pass == edge.to; });
+                    for (auto it = start; it != stack.end(); ++it)
+                    {
+                        const auto resource = (it + 1 == stack.end()) ? edge.resource : edges[it->pass][it->next - 1].resource;
+                        const auto v=(it+1==stack.end()) ? edge.version : edges[it->pass][it->next-1].version;
+                        outError += m_passes[it->pass].name + " --" + m_resources[resource].name
+                            + (m_scheduling==RGSchedulingMode::ExplicitVersioned ? " v"+std::to_string(v) : "") + "--> ";
+                    }
+                    outError += m_passes[edge.to].name; return false;
+                }
+                color[edge.to] = 1; stack.push_back({edge.to, 0});
+            }
+        }
+        outError = "RG1 cycle"; return false;
+    }
+    m_executeOrder.swap(order);
+    outError.clear(); return true;
 }
 
 bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 {
+    if (m_scheduling != RGSchedulingMode::DeclarationOrder && m_scheduling != RGSchedulingMode::ExplicitSingleWriter && m_scheduling != RGSchedulingMode::ExplicitVersioned)
+    { m_executeOrder.clear(); outError = "Invalid RenderGraph scheduling mode"; return false; }
+    if (m_scheduling != RGSchedulingMode::DeclarationOrder) return BuildExplicitOrder(outError);
     ce::profile_scope profile{ce::marker<"RenderGraphOrder">()};
     // ── 실행 순서는 선언 순서다. 그래프가 다시 정렬하지 않는다. ──
     //
@@ -228,6 +514,8 @@ bool EnhancedRenderGraph::BuildOrder(std::string& outError)
 
         for (const auto& usage : pass.usages)
         {
+            if (usage.access != RGAccessMode::LegacyState)
+            { outError = "Explicit access requires ExplicitSingleWriter scheduling: " + pass.name; return false; }
             if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
             const size_t resourceIndex = usage.handle.index;
             const Resource& resource = m_resources[resourceIndex];
@@ -260,6 +548,11 @@ void EnhancedRenderGraph::CullPasses()
 {
     ce::profile_scope profile{ce::marker<"RenderGraphCull">()};
     const size_t passCount = m_passes.size();
+    if(m_scheduling==RGSchedulingMode::ExplicitVersioned)
+    {
+        m_stats.passesCulled=static_cast<uint32_t>(passCount-m_executeOrder.size());
+        return; // Version-producer reachability preceded the stable sort.
+    }
     for (auto& pass : m_passes) pass.culled = true;
 
     // Index writers once rather than scanning every pass and usage for each read.
@@ -267,7 +560,7 @@ void EnhancedRenderGraph::CullPasses()
     std::vector<std::vector<size_t>> writers(m_resources.size());
     for (size_t i = 0; i < passCount; ++i)
         for (const auto& usage : m_passes[i].usages)
-            if (usage.handle.IsValid() && usage.handle.index < writers.size() && IsWriteState(usage.state))
+            if (usage.handle.IsValid() && usage.handle.index < writers.size() && Writes(usage))
                 writers[usage.handle.index].push_back(i);
 
     // 뿌리: 부작용이 있는 패스(결과가 그래프 밖으로 나간다)와 외부 리소스에 쓰는 패스.
@@ -282,7 +575,7 @@ void EnhancedRenderGraph::CullPasses()
             for (const auto& usage : m_passes[i].usages)
             {
                 if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
-                if (m_resources[usage.handle.index].imported && IsWriteState(usage.state))
+                if (m_resources[usage.handle.index].imported && Writes(usage))
                 {
                     isRoot = true;
                     break;
@@ -305,7 +598,7 @@ void EnhancedRenderGraph::CullPasses()
 
         for (const auto& usage : m_passes[current].usages)
         {
-            if (IsWriteState(usage.state)) continue;
+            if (!Reads(usage)) continue;
             if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
 
             for (const size_t producer : writers[usage.handle.index])
@@ -431,8 +724,8 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
     return true;
 }
 
-EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services)
-    : m_deviceServices(&services)
+EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling)
+    : m_deviceServices(&services), m_scheduling(scheduling)
 {
     // A live scene declares dozens of passes/resources per recording. Pass owns
     // several vectors; growing the outer array repeatedly also rebuilds their
@@ -499,6 +792,7 @@ void EnhancedRenderGraph::ReleaseResources()
 
 void EnhancedRenderGraph::PlanBarriers()
 {
+    std::vector<bool> previousWrite(m_resources.size(),true);
     for (auto& pass : m_passes)
     {
         pass.transitions.clear();
@@ -529,13 +823,15 @@ void EnhancedRenderGraph::PlanBarriers()
             {
                 // 같은 상태로 연속해서 쓰는 경우, UAV만은 배리어가 필요하다 —
                 // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
-                if (RHIResourceState::UnorderedAccess == usage.state)
+                if (RHIResourceState::UnorderedAccess == usage.state &&
+                    (m_scheduling!=RGSchedulingMode::ExplicitVersioned || previousWrite[usage.handle.index] || Writes(usage)))
                 {
                     if (resource.IsBuffer())
                         pass.uavBufferBarriers.push_back(resource.buffer);
                     else
                         pass.uavBarriers.push_back(resource.handle);
                 }
+                previousWrite[usage.handle.index]=Writes(usage);
                 continue;
             }
 
@@ -551,6 +847,7 @@ void EnhancedRenderGraph::PlanBarriers()
             }
 
             resource.state = usage.state;
+            previousWrite[usage.handle.index]=Writes(usage);
         }
 
         const size_t barrierCount = pass.transitions.size() +
@@ -568,6 +865,68 @@ void EnhancedRenderGraph::PlanBarriers()
     }
 }
 
+bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const
+{
+    output = {};
+    if (!m_compiled) return false;
+    output.executeOrder = m_executeOrder;
+    for (const auto& resource : m_resources)
+        output.resources.push_back({resource.name, resource.imported, resource.IsBuffer(),
+            resource.used, resource.firstUse, resource.lastUse});
+    const auto textureIndex = [this](RHITextureHandle handle) -> uint32_t
+    {
+        for (uint32_t i = 0; i < m_resources.size(); ++i)
+            if (!m_resources[i].IsBuffer() && m_resources[i].handle == handle) return i;
+        return RGHandle::kInvalid;
+    };
+    const auto bufferIndex = [this](RHIBufferHandle handle) -> uint32_t
+    {
+        for (uint32_t i = 0; i < m_resources.size(); ++i)
+            if (m_resources[i].IsBuffer() && m_resources[i].buffer == handle) return i;
+        return RGHandle::kInvalid;
+    };
+    for (uint32_t i = 0; i < m_passes.size(); ++i)
+    {
+        const auto& pass = m_passes[i];
+        DiagnosticPass copy{pass.name, i, -1, pass.culled, pass.hasSideEffect,
+            pass.recordCost, pass.maxSlices, {}, {}};
+        const auto position = std::find(m_executeOrder.begin(), m_executeOrder.end(), i);
+        if (position != m_executeOrder.end())
+            copy.compiledIndex = static_cast<int32_t>(position - m_executeOrder.begin());
+        for (const auto& usage : pass.usages)
+            copy.usages.push_back({usage.handle.index, usage.state, Writes(usage), usage.access, usage.handle.version, usage.handle.kind});
+        for (const auto& barrier : pass.transitions)
+            copy.barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false});
+        for (const auto& barrier : pass.bufferTransitions)
+            copy.barriers.push_back({bufferIndex(barrier.buffer), barrier.before, barrier.after, false});
+        for (const auto handle : pass.uavBarriers)
+            copy.barriers.push_back({textureIndex(handle), RHIResourceState::UnorderedAccess,
+                RHIResourceState::UnorderedAccess, true});
+        for (const auto handle : pass.uavBufferBarriers)
+            copy.barriers.push_back({bufferIndex(handle), RHIResourceState::UnorderedAccess,
+                RHIResourceState::UnorderedAccess, true});
+        output.passes.push_back(std::move(copy));
+    }
+    output.versionEdges = m_versionEdges;
+    if(m_scheduling==RGSchedulingMode::ExplicitVersioned)
+    {
+        for(const auto& edge:m_versionEdges)
+            if(edge.reason==DiagnosticSnapshot::VersionEdge::Reason::RAW)
+                output.reachabilityEdges.push_back({edge.producer,edge.consumer,edge.resource});
+        return true;
+    }
+    // Matches legacy CullPasses: all state-inferred writers of a read resource.
+    // These are reachability edges, not a scheduled/versioned DAG.
+    for (uint32_t consumer = 0; consumer < output.passes.size(); ++consumer)
+        for (const auto& read : output.passes[consumer].usages)
+            if (!read.inferredWrite)
+                for (uint32_t producer = 0; producer < output.passes.size(); ++producer)
+                    for (const auto& write : output.passes[producer].usages)
+                        if (write.inferredWrite && write.resource == read.resource)
+                            output.reachabilityEdges.push_back({producer, consumer, read.resource});
+    return true;
+}
+
 bool EnhancedRenderGraph::Compile(std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"RenderGraphCompile">()};
@@ -579,6 +938,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
         return false;
     }
 
+    m_compiled = false;
     m_stats = Stats{};
     m_stats.passesDeclared = static_cast<uint32_t>(m_passes.size());
 
@@ -969,6 +1329,7 @@ bool EnhancedRenderGraph::GetTransientLifetime(RGHandle handle,
     uint32_t& outFirst, uint32_t& outLast) const
 {
     if (!handle.IsValid() || handle.index >= m_resources.size()) return false;
+    if(m_scheduling==RGSchedulingMode::ExplicitVersioned && !ValidVersionHandle(handle,true)) return false;
 
     const Resource& resource = m_resources[handle.index];
     if (!resource.used) return false;
@@ -977,4 +1338,3 @@ bool EnhancedRenderGraph::GetTransientLifetime(RGHandle handle,
     outLast = resource.lastUse;
     return true;
 }
-

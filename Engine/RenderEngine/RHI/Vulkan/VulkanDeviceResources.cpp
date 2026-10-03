@@ -112,6 +112,16 @@ bool VulkanDeviceResources::Initialize(uint32_t width, uint32_t height,
     bool enableValidation, std::string& outError)
 {
     if (IsInitialized()) return true;
+    // Diagnostic opt-in must cover both the scene and the ImGui device. A
+    // scene-only override mixes validated/unvalidated devices behind the
+    // current process-wide Vulkan dispatch pointers.
+    char validationMode[16]{};
+    const DWORD validationLength = GetEnvironmentVariableA(
+        "CREATOR_VULKAN_VALIDATION", validationMode, sizeof(validationMode));
+    if (validationLength > 0 && validationLength < sizeof(validationMode) &&
+        (std::strcmp(validationMode, "on") == 0 || std::strcmp(validationMode, "true") == 0 ||
+         std::strcmp(validationMode, "1") == 0))
+        enableValidation = true;
 
     if (!LoadLoader(outError)) return false;
     if (!CreateInstance(enableValidation, outError)) { Shutdown(); return false; }

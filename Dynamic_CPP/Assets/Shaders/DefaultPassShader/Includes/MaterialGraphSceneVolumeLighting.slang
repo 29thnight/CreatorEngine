@@ -1,7 +1,12 @@
 #pragma once
 #include "MaterialGraphSceneVolume.slang"
 
-cbuffer LXSceneVolumeConstants : register(b1)
+#ifndef LX_VOLUME_CONSTANTS_REGISTER
+#define LX_VOLUME_CONSTANTS_REGISTER b1
+#define LX_VOLUME_SHADOW_REGISTER t19
+#define LX_VOLUME_ENVIRONMENT_REGISTER t20
+#endif
+cbuffer LXSceneVolumeConstants : register(LX_VOLUME_CONSTANTS_REGISTER)
 {
     float4x4 lx_volumeInverseViewProjection;
     float4 lx_volumeEye;
@@ -14,10 +19,12 @@ cbuffer LXSceneVolumeConstants : register(b1)
     float4 lx_volumeShadowSplits, lx_volumeShadowBias, lx_volumeCameraForward;
     float4 lx_volumeLights[256];
 };
-Texture2DArray<float> lx_volumeShadowMap : register(t19);
-TextureCube<float4> lx_volumeEnvironmentMap : register(t20);
+Texture2DArray<float> lx_volumeShadowMap : register(LX_VOLUME_SHADOW_REGISTER);
+TextureCube<float4> lx_volumeEnvironmentMap : register(LX_VOLUME_ENVIRONMENT_REGISTER);
+#ifndef LX_VOLUME_SHARED_SAMPLERS
 SamplerState lx_volumeEnvironmentSampler : register(s2);
 SamplerComparisonState lx_volumeShadowSampler : register(s3);
+#endif
 
 float LXVolumeShadowCascade(uint cascade, float3 position)
 {

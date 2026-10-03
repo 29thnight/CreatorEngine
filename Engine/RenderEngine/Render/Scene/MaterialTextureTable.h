@@ -59,6 +59,9 @@ namespace MaterialTextureTable
         {
             if (resource.kind != RHIShaderResourceKind::Texture
                 || resource.registerIndex < FirstRegister) continue;
+            if (resource.registerSpace == 0 &&
+                ((resource.registerIndex == 133 && resource.name == "lx_volumeShadowMap") ||
+                 (resource.registerIndex == 134 && resource.name == "lx_volumeEnvironmentMap"))) continue;
             if (resource.arrayElements != 1)
             {
                 error = "Material texture arrays are unsupported: " + resource.name;

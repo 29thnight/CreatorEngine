@@ -819,16 +819,21 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_render_pbr_capture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() < 2 || ctx.parts.size() > 4
+        if (ctx.parts.size() < 2 || ctx.parts.size() > 7
             || (ctx.parts.size() >= 3 && ctx.parts[2] != "game" && ctx.parts[2] != "editor" && ctx.parts[2] != "material")
-            || (ctx.parts.size() == 4 && ctx.parts[3] != "controlled"))
-            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor|material] [controlled]");
+            || (ctx.parts.size() >= 4 && ctx.parts[3] != "controlled" && ctx.parts[3] != "controlled-replay"
+                && ctx.parts[3] != "controlled-lattice-replay"))
+            return InvalidArguments("render.pbr.capture <new-absolute-directory> [game|editor|material] [controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]");
         std::string error;
         const auto target = ctx.parts.size() >= 3 && ctx.parts[2] == "editor"
             ? EnhancedLiveDisplayTarget::Editor : ctx.parts.size() >= 3 && ctx.parts[2] == "material"
             ? EnhancedLiveDisplayTarget::MaterialPreview : EnhancedLiveDisplayTarget::Game;
         if (!EnhancedSceneRenderer::RequestLivePbrCapture(ctx.parts[1], target, error,
-                ctx.parts.size() == 4))
+                ctx.parts.size() >= 4, ctx.parts.size() >= 5 ? ctx.parts[4] : std::string{},
+                ctx.parts.size() >= 6 ? ctx.parts[5] : std::string{},
+                ctx.parts.size() == 7 ? ctx.parts[6] : std::string{},
+                ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-replay",
+                ctx.parts.size() >= 4 && ctx.parts[3] == "controlled-lattice-replay"))
             return Fail("render.pbr.capture.rejected", error);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
         ctx.system.WaitForResult([deadline]() -> std::optional<CommandResult>
@@ -1188,9 +1193,11 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
     {
+        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions"))
+            return CommandCore::InvalidArguments("dx12.rendergraph [replay-extensions]");
         // 렌더 그래프 자가 검증(PHASE 3-5).
         std::string log;
-        const bool passed = DX12Test::RunRenderGraphTest(log);
+        const bool passed = DX12Test::RunRenderGraphTest(log, ctx.parts.size() == 2);
 
         std::printf("%s", log.c_str());
         Debug::PrintLog(spdlog::level::warn, std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);

@@ -5,6 +5,7 @@
 #include "../../ExperimentMaterialResolveBinding.h" // I5-D5c3-2
 #include "../../DataSystem.h" // I7-C1: catalog 소유자
 #include "../../Material.h"
+#include "../../MaterialPropertyPacker.h"
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h" // I5-D5c5
 
@@ -45,10 +46,37 @@ namespace ExperimentMaterialSealing
         // legacy → experiment 변환은 ExperimentMaterialMigration이 단일
         // 정본이다(MaterialInfo 폴백 승계 포함). 여기서는 sealing 전용 부속만
         // 더한다: texture generation owner·flow·legacy 호환 스칼라.
-        if (!ExperimentMaterialMigration::ConvertLegacyMaterial(legacy, meta,
+        const bool hasMatrix = std::ranges::any_of(meta.properties, [](const auto& property) {
+            return property.type == ShaderPropertyType::Float4x4;
+        });
+        ShaderMeta compatibleMeta;
+        if (hasMatrix)
+        {
+            compatibleMeta = meta;
+            std::erase_if(compatibleMeta.properties, [](const auto& property) { return property.type == ShaderPropertyType::Float4x4; });
+        }
+        if (!ExperimentMaterialMigration::ConvertLegacyMaterial(legacy, hasMatrix ? compatibleMeta : meta,
             source.material, outError))
         {
             return false;
+        }
+        if (hasMatrix)
+        {
+            source.hasCodeValues = true;
+            const auto values = legacy.GetShaderPropertyValues();
+            for (const auto& property : meta.properties)
+            {
+                ::MaterialPropertyValue value;
+                const auto existing = std::ranges::find(values, property.name, &::MaterialPropertyValue::m_name);
+                const auto authored = std::ranges::find(source.material.properties, property.name, &experiment::MaterialProperty::name);
+                if (existing != values.end()) value = *existing;
+                else if (authored != source.material.properties.end())
+                {
+                    if (!experiment::TryConvertMaterialProperty(*authored, property, value, outError)) return false;
+                }
+                else if (!MaterialPropertyPacker::ApplyDefault(property, value, outError)) return false;
+                source.codeValues.push_back(std::move(value));
+            }
         }
 
         for (const ShaderPropertyDesc& desc : meta.properties)
@@ -144,6 +172,8 @@ namespace ExperimentMaterialSealing
     void ApplyAuthoredMaterial(SealSource& source,
         const experiment::Material& authored)
     {
+        source.codeValues.clear();
+        source.hasCodeValues = false;
         // debugName은 legacy 것을 유지한다 — 진단 로그의 이름이 슬라이스 경계에서
         // 바뀌면 기존 게이트 메시지 매칭이 조용히 깨진다.
         std::string debugName = std::move(source.debugName);
@@ -251,10 +281,25 @@ namespace ExperimentMaterialSealing
         const ShaderMetaBindingLayout& layout,
         std::vector<std::uint8_t>& outPropertyBytes,
         std::vector<EnhancedMaterialTextureBinding>& outTextureBindings,
-        std::string& outError)
+        std::string& outError,
+        std::shared_ptr<const LX::Runtime::Instance>* outRuntime,
+        ShaderMetaHandle handle)
     {
-        if (!experiment::BuildMaterialPropertyBlock(source.material, meta, layout,
-            outPropertyBytes, outError))
+        std::vector<MaterialTextureOwner> owners;
+        for (const auto& texture : source.textures) owners.push_back({texture.propertyName, texture.owner});
+        std::shared_ptr<const LX::Runtime::Instance> runtime;
+        bool prepared;
+        if (source.hasCodeValues)
+        {
+            std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
+            std::vector<std::uint16_t> keywords;
+            prepared = LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError) &&
+                experiment::NormalizeMaterialKeywordSelections(source.material, meta.keywords, keywords, outError) &&
+                LX::Runtime::BuildInstance(std::move(shader), source.codeValues, keywords, owners, runtime, outError);
+        }
+        else prepared = experiment::BuildMaterialRuntimeInstance(source.material, meta, layout, handle,
+            owners, runtime, outError);
+        if (!prepared)
         {
             return false;
         }
@@ -342,7 +387,9 @@ namespace ExperimentMaterialSealing
             bindings.push_back(std::move(binding));
         }
 
+        outPropertyBytes = runtime->uniforms;
         outTextureBindings = std::move(bindings);
+        if (outRuntime) *outRuntime = std::move(runtime);
         outError.clear();
         return true;
     }

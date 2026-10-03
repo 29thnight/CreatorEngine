@@ -1,5 +1,10 @@
 # Material Graph Scene Volume
 
+**2026-10-02 후속:** [공통 Forward+ transport](../analysis/MAT7ForwardTransportComposition.md)는
+opaque 배경에 Volume을 한 번 합성하고 각 alpha/SSS/굴절/Code 표면에는 그 깊이까지의
+카메라 매질 응답을 적용한다. 아래의 기존 full-screen·굴절 ray 매질 평가와
+닫힌 균질 경계/예산은 유지하며 현행 순서와 새 실행 결과는 후속 기록을 따른다.
+
 ## 1. 경계와 명칭
 
 `Output.Volume`은 머테리얼의 매질 closure다. 메시가 경계를 정의하며 Volume-only draw는

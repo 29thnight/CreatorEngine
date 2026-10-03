@@ -76,11 +76,10 @@ bool SceneSubsurfaceResources::Initialize(const EnhancedFrameContext& context, s
     const auto filterFile = RHIShaderSource::Resolve("MaterialGraphSceneSubsurfaceFilter.slang").string();
     RHIShaderCompileOptions options;
     options.strictMath = true;
-    RHIShaderCompiler::VerifiedShader bake, filter, verification;
-    if (!RHIShaderCompiler::VerifyFile(bakeFile, "LXSceneSubsurfaceBake", "cs_6_0", backend, {}, bake, error,
-                                       options) ||
-        !RHIShaderCompiler::VerifyFile(filterFile, "LXSceneSubsurfaceFilter", "cs_6_0", backend, {}, filter, error,
-                                       options) ||
+    LX::Runtime::CompiledCompute bake, filter;
+    RHIShaderCompiler::VerifiedShader verification;
+    if (!LX::Runtime::CompileCompute(bakeFile, "LXSceneSubsurfaceBake", {}, options, bake, error) ||
+        !LX::Runtime::CompileCompute(filterFile, "LXSceneSubsurfaceFilter", {}, options, filter, error) ||
         !RHIShaderCompiler::VerifyFile(bakeFile, "LXSceneSubsurfaceBake", "cs_6_0", other, {}, verification, error,
                                        options) ||
         !RHIShaderCompiler::VerifyFile(filterFile, "LXSceneSubsurfaceFilter", "cs_6_0", other, {}, verification, error,
@@ -98,19 +97,19 @@ bool SceneSubsurfaceResources::Initialize(const EnhancedFrameContext& context, s
     }
     RHIComputePipelineDesc desc;
     desc.layout = layout;
-    desc.csBytecode = bake.bytecode.Data();
-    desc.csSize = bake.bytecode.Size();
-    const auto bakePipeline = context.psoManager->GetOrCreateCompute(desc, error);
-    desc.csBytecode = filter.bytecode.Data();
-    desc.csSize = filter.bytecode.Size();
-    const auto filterPipeline = context.psoManager->GetOrCreateCompute(desc, error);
-    if (!bakePipeline.IsValid() || !filterPipeline.IsValid())
+    desc.csBytecode = bake.stage.bytecode.Data();
+    desc.csSize = bake.stage.bytecode.Size();
+    LX::Runtime::ComputePipeline bakePipeline, filterPipeline;
+    if (!bakePipeline.Create(*context.psoManager, desc, std::move(bake.description), error)) return false;
+    desc.csBytecode = filter.stage.bytecode.Data();
+    desc.csSize = filter.stage.bytecode.Size();
+    if (!filterPipeline.Create(*context.psoManager, desc, std::move(filter.description), error))
     {
         return false;
     }
     device_ = context.resources;
-    bake_ = bakePipeline;
-    filter_ = filterPipeline;
+    bake_ = std::move(bakePipeline);
+    filter_ = std::move(filterPipeline);
     return true;
 }
 
@@ -135,8 +134,8 @@ bool SceneSubsurfaceResources::Prepare(const EnhancedFrameContext& context, RHIT
     candidate->recording_ = device_->GetCurrentUploadRecordingId();
     candidate->descriptors_ = device_->GetDescriptorVersionToken();
     candidate->environment_ = environment;
-    candidate->bake_ = bake_;
-    candidate->filter_ = filter_;
+    candidate->bake_ = bake_.GetGeneration();
+    candidate->filter_ = filter_.GetGeneration();
     RHITextureDesc texture;
     texture.width = context.width;
     texture.height = context.height;
@@ -261,7 +260,7 @@ void SceneSubsurfaceFrame::DeclareReflection(EnhancedRenderGraph& graph, const S
             throw std::runtime_error("Scene SSS reflection input binding failed.");
         }
         auto& encoder = *execution.encoder;
-        encoder.SetPipeline(RHIBindPoint::Compute, owner->bake_);
+        encoder.SetPipeline(RHIBindPoint::Compute, owner->bake_->GetHandle());
         encoder.SetBindings(RHIBindPoint::Compute, 1, table);
         encoder.SetBindings(RHIBindPoint::Compute, 2, owner->outputs_);
         for (unsigned i = 0; i < owner->constants_.size(); ++i)
@@ -302,7 +301,7 @@ void SceneSubsurfaceFrame::DeclareFilter(EnhancedRenderGraph& graph, RGHandle ow
             throw std::runtime_error("Scene SSS filter input binding failed.");
         }
         auto& encoder = *execution.encoder;
-        encoder.SetPipeline(RHIBindPoint::Compute, owner->filter_);
+        encoder.SetPipeline(RHIBindPoint::Compute, owner->filter_->GetHandle());
         encoder.SetBindings(RHIBindPoint::Compute, 1, table);
         encoder.SetBindings(RHIBindPoint::Compute, 2, owner->outputs_);
         for (unsigned i = 0; i < owner->constants_.size(); ++i)

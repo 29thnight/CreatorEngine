@@ -1,6 +1,7 @@
 param(
     [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
-    [string]$EngineDistribution = ''
+    [string]$EngineDistribution = '',
+    [ValidateRange(180, 1200)][int]$SmokeTimeoutSeconds = 600
 )
 
 # Run after verify-material-scene-cook and building Player/Editor/AssetPacker/BuildTool.
@@ -17,6 +18,7 @@ $sourceFiles = @(
         Where-Object Extension -In '.cpp', '.h', '.cs', '.csproj', '.vcxproj' |
         Where-Object FullName -NotMatch '[\\/](obj|bin)[\\/]' | Select-Object -ExpandProperty FullName
     $PSCommandPath
+    (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1')
     (Join-Path $repo 'Engine/SceneRuntime/MeshRenderer.cpp')
     (Join-Path $repo 'Engine/SceneRuntime/MeshRenderer.h')
 ) | Sort-Object -Unique
@@ -29,6 +31,7 @@ foreach ($directory in @('Models', 'Scenes', 'Materials', 'Script', 'HDR', 'Shad
     New-Item -ItemType Directory -Path (Join-Path $assets $directory) -Force | Out-Null
 }
 New-Item -ItemType Directory -Path (Join-Path $project 'ProjectSetting') | Out-Null
+& (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1') -Project $project
 foreach ($name in @('AssetIdentity.asset', 'CollisionMatrix.asset', 'TagManager.asset')) {
     Copy-Item -LiteralPath (Join-Path $repo "Dynamic_CPP/ProjectSetting/$name") -Destination (Join-Path $project "ProjectSetting/$name")
 }
@@ -97,7 +100,7 @@ try {
     $env:CREATOR_DX12_VALIDATION = 'gpu'
     $package = @(& $tool package-game --repository $repo --engine-distribution $distribution --project $project `
         --config $Configuration --stage-root (Join-Path $caseRoot 'Stage') --startup-scene LX_CookFixture.creator `
-        --render-backend dx12 --smoke-offscreen --smoke-frames 120 --smoke-promotions 24 --smoke-timeout-sec 180 `
+        --render-backend dx12 --smoke-offscreen --smoke-frames 120 --smoke-promotions 120 --smoke-timeout-sec $SmokeTimeoutSeconds `
         --log-path (Join-Path $caseRoot 'package-live.log') 2>&1)
     $packageExit = $LASTEXITCODE
 } finally {
@@ -108,8 +111,8 @@ if ($packageExit -ne 0) { throw "Automatic material package/Player failed: $($pa
 $pointer = Get-Content (Join-Path $caseRoot 'Stage/Project.current.json') -Raw | ConvertFrom-Json
 $packageRoot = Join-Path $caseRoot "Stage/$($pointer.releaseDirectory)"
 $manifest = Get-Content (Join-Path $packageRoot 'package-manifest.json') -Raw | ConvertFrom-Json
-if ($manifest.verification -ne 'passed' -or $manifest.cook.byFolder.MaterialPrograms -ne 2 -or
-    $manifest.cook.byFolder.Materials -ne 1 -or $manifest.cook.SourceCounts.'--shadergraph' -ne 2 -or
+if ($manifest.verification -ne 'passed' -or $manifest.cook.byFolder.MaterialPrograms -ne 3 -or
+    $manifest.cook.byFolder.Materials -ne 1 -or $manifest.cook.SourceCounts.'--shadergraph' -ne 3 -or
     $manifest.smoke.textParserCalls -ne 0 -or $manifest.smoke.cookedSceneDocuments -lt 1 -or
     !($package -match '\[lx.scene.program\] source=cooked graph=11111111-1111-4111-8111-111111111111 ready=[1-9]\d* sceneCompiles=0')) {
     throw 'Published package is missing the real cooked Scene material readiness evidence.'
@@ -128,5 +131,5 @@ foreach ($entry in $sourceSnapshot) {
     if ((Get-FileHash -LiteralPath $entry.path -Algorithm SHA256).Hash -ne $entry.hash) { throw "Package source changed: $($entry.path)" }
 }
 $sourceSnapshot | ConvertTo-Json | Set-Content (Join-Path $caseRoot 'source-hashes.json') -Encoding utf8
-"LX_MATERIAL_SCENE_PACKAGE_OK configuration=$Configuration programs=2 materials=1 frames=$($manifest.smoke.gameThreadFrames) display=$($manifest.smoke.displayFrame) promotions=$($manifest.smoke.promotions) sceneCompiles=0 textParserCalls=0 payloadPreserved=true sources=$($sourceSnapshot.Count) drift=0"
+"LX_MATERIAL_SCENE_PACKAGE_OK configuration=$Configuration programs=3 materials=1 frames=$($manifest.smoke.gameThreadFrames) display=$($manifest.smoke.displayFrame) promotions=$($manifest.smoke.promotions) sceneCompiles=0 textParserCalls=0 payloadPreserved=true sources=$($sourceSnapshot.Count) drift=0"
 exit 0

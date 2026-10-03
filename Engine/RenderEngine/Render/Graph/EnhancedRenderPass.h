@@ -20,6 +20,9 @@
 #include <mathematics/vector4.hpp>
 
 #include "EnhancedMaterialSealIdentity.h"
+#include "../../LXMaterialRuntime.h"
+
+namespace LX::Runtime { struct GraphicsGeneration; }
 #include "PackedBoneMatrix.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
@@ -115,6 +118,8 @@ struct EnhancedMaterialCoverage
 
 struct EnhancedForwardMaterialDrawSnapshot
 {
+    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 이 packet이 어느 저작 값·어느 프레임의 것인지. 값 검증(IsValid)과는
     // 축이 다르다 — 값이 멀쩡해도 지난 프레임 것이면 섞인 것이다.
     EnhancedMaterialSealIdentity seal{};
@@ -150,6 +155,8 @@ struct EnhancedForwardMaterialDrawSnapshot
 // 어느 논리 property/GUID/register의 generation인지 함께 고정한다.
 struct EnhancedMaterialDrawSnapshot
 {
+    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 위 Forward packet과 같은 뜻이다. 밀봉한 쪽이 적고 패스가 대조한다.
     EnhancedMaterialSealIdentity seal{};
     EnhancedMaterialCoverage coverage{};

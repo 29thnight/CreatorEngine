@@ -6,6 +6,9 @@
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/PakAudioClipByteSource.h"
 #include "Render/Passes/Geometry/EnhancedDeferredPass.h"
+#include "Render/Passes/Geometry/EnhancedForwardPass.h"
+#include "Render/Scene/ExperimentMaterialSealing.h"
+#include "Render/Graph/EnhancedMaterialSealHash.h"
 #include "Render/Passes/Geometry/EnhancedDecalPass.h"
 #include "RHI/DX12/DX12MeshCache.h"
 #include "PathFinder.h"
@@ -1693,7 +1696,10 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
 {
     std::string error;
     Check(host.RequestProgram(context, generation, error), "Scene asynchronous request " + error);
-    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(90);
+    // A cold Vulkan driver can spend minutes preparing a Layered pipeline set.
+    // This is a correctness timeout, not a product latency acceptance target.
+    const auto deadline = std::chrono::steady_clock::now() +
+                          std::chrono::seconds(RHIShaderCompiler::GetOutput() == RHIShaderBinary::SpirV ? 600 : 90);
     while (!host.IsProgramReady(generation, RHIShaderCompiler::GetOutput()))
     {
         host.PollPrograms(context);
@@ -2548,6 +2554,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 #include "material_scene_volume_tests.inl"
 #include "material_scene_shadow_decal_tests.inl"
 #include "material_scene_decal_tests.inl"
+#include "material_forward_blend_tests.inl"
+#include "material_forward_transport_tests.inl"
 
 void Run(const std::filesystem::path& root, std::string_view mode = {}, const std::filesystem::path& cookedRoot = {})
 {
@@ -2635,6 +2643,18 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
 #endif
           "Native caches " + error);
     Check(pool.Initialize(device, 4, ProbeDevice::kFrameCount, error), "Native command pool " + error);
+    if (mode == "--forward-blend")
+    {
+        RunForwardBlend(root, device, roots, pipelines, textures, pool, instances, cube);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--forward-transport")
+    {
+        RunForwardTransport(root, device, roots, pipelines, textures, pool, image, cube);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
     if (mode == "--cooked-scene")
     {
         namespace ck = experiment::cooked;
@@ -3206,7 +3226,7 @@ int main(int argc, char** argv)
         }
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
-                   (std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
+                   (std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
                     std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),

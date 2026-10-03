@@ -39,7 +39,7 @@ foreach ($configuration in @('Debug', 'Release')) {
     $exe = Join-Path $repo "Bin\x64-$configuration\Tools\MaterialVulkanGenerationProbe\MaterialVulkanGenerationProbe.exe"
     $previousPath = $env:PATH
     try {
-        $dependencyRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed\x64-windows\debug\bin' } else { 'vcpkg_installed\x64-windows\bin' }
+        $dependencyRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed\x64-windows\x64-windows\debug\bin' } else { 'vcpkg_installed\x64-windows\x64-windows\bin' }
         $env:PATH = (Join-Path $repo $dependencyRoot) + ';' + $previousPath
         $result = @(& $exe $repo 2>&1)
         $resultExit = $LASTEXITCODE
@@ -48,7 +48,7 @@ foreach ($configuration in @('Debug', 'Release')) {
     }
     $result | Set-Content -LiteralPath (Join-Path $output "vulkan-generation-$configuration.log") -Encoding utf8
     if ($resultExit -ne 0 -or @($result | Where-Object {
-        $_ -match '^LX_MATERIAL_VULKAN_GENERATION_OK checks=[1-9]\d* pixels=768 scenePrograms=2 sceneReadyRequests=18 scenePsoWorkers=[1-9]\d* submissions=[1-9]\d* workers=[1-9]\d* stale=65 failures=2 validation=0 adapter=.+$'
+        $_ -match '^LX_MATERIAL_VULKAN_GENERATION_OK checks=[1-9]\d* pixels=768 scenePrograms=2 sceneReadyRequests=30 scenePsoWorkers=[1-9]\d* submissions=[1-9]\d* workers=[1-9]\d* stale=65 failures=2 validation=0 adapter=.+$'
     }).Count -ne 1) {
         throw "Material Vulkan generation runtime failed ($configuration): $($result -join "`n")"
     }

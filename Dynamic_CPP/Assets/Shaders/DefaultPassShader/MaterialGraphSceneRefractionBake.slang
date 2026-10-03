@@ -78,8 +78,8 @@ bool LXRefractionProject(float3 position, out float3 screen)
     return all(screen.xy >= 0) && all(screen.xy < 1) && screen.z >= 0 && screen.z <= 1;
 }
 
-// Finite visible-screen transport against the completed opaque Scene. No reads
-// from the target being composed, previous frames, or transmitting surfaces.
+// Snapshot of the completed farther Forward+ objects. The snapshot never reads
+// the target being composed, the current transmitting draw, or previous frames.
 float3 LXRefractionMedium(float3 origin, float3 direction, float distance, float3 background)
 {
 #ifdef LX_SCENE_REFRACTION_VOLUME
@@ -158,7 +158,24 @@ float3 LXRefractionBackground(float3 origin, float3 direction, out float hit, ou
                         return lx_environment != 0 ? BakeRadiance(direction) : float3(0);
                     }
                     transportDistance = upper;
-                    return SanitizeRadiance(lx_background.Load(int3(finalPixel, 0)).rgb);
+                    float3 color = SanitizeRadiance(lx_background.Load(int3(finalPixel, 0)).rgb);
+#ifdef LX_SCENE_REFRACTION_VOLUME
+                    // Forward+ backgrounds already contain camera-ray medium.
+                    // Remove that segment before integrating the refracted ray.
+                    if (lx_reserved != 0u)
+                    {
+                        const float2 ndc = float2((float(finalPixel.x) + .5) / lx_width * 2 - 1,
+                                                  1 - (float(finalPixel.y) + .5) / lx_height * 2);
+                        const float4 nearH = mul(float4(ndc, 0, 1), lx_inverseViewProjection);
+                        const float4 endH = mul(float4(ndc, lx_depth.Load(int3(finalPixel, 0)), 1), lx_inverseViewProjection);
+                        const float3 cameraOrigin = nearH.xyz / nearH.w;
+                        const float3 offset = endH.xyz / endH.w - cameraOrigin;
+                        const float cameraDistance = max(length(offset), 1e-6);
+                        const VolumeSegment cameraMedium = LXSceneVolumeTransport(cameraOrigin, offset / cameraDistance, cameraDistance);
+                        color = max(color - cameraMedium.radiance, float3(0)) / max(cameraMedium.transmittance, float3(1e-4));
+                    }
+#endif
+                    return color;
                 }
                 previousGap = gap;
             }

@@ -247,8 +247,9 @@ backend layout generation에 종속되며 재생성/retirement 대상이다. uns
 DX12는 실제 MeshShaderTier/RT tier·shader model·indirect 지원을 조회한다. Vulkan은
 VK_EXT_mesh_shader, VK_KHR_acceleration_structure/VK_KHR_ray_tracing_pipeline와 의존
 feature/extension·limits를 조회한다. extension 문자열만으로 지원 판정하지 않는다.
-첫 runtime acceptance는 DX12다. Vulkan은 같은 계약의 capability/fallback과 후속 native
-gate를 통과하기 전 기능 완료로 세지 않는다. Mesh 지원만으로 RT나 성능 향상을 추정하지 않는다.
+기능 페이즈의 runtime acceptance는 DX12다. Vulkan 실행·capability/fallback 대조는
+[PHASE 4.9](../plans/BackendParityPlan.md)가 소유하며 DX12 기능 완료를 역으로 막지 않는다.
+Mesh 지원만으로 RT나 성능 향상을 추정하지 않는다.
 
 ## 10. 게시·abort·retirement
 
@@ -274,7 +275,7 @@ trace의 ticket 완료까지 지연한다. memory pressure가 owner를 강제 �
 
 | ID | 변경·입력 | 완료 증거 | 공수 |
 |---|---|---|---|
-| GD0 | capability·typed RHI·cook schema; 기존 fallback 유지 | unsupported 조합/잘못된 slice 거부, DX12/Vulkan 기존 route 회귀 | null |
+| GD0 | capability·typed RHI·cook schema; 기존 fallback 유지 | unsupported 조합/잘못된 slice 거부, DX12 기존 route 회귀 | null |
 | GD1 | 정적 meshlet cook·direct Mesh GBuffer; RG6 소비 | indexed 동일 scene depth/coverage/material 비교, primitive remap | null |
 | GD2 | GPU frustum/bin/indirect; GD1 | CPU oracle visible set, capacity 경계/초과 fallback, validation 0 | null |
 | RT0 | 정적 BLAS/TLAS·RHI/table; GD0와 RG6 | CPU ray-triangle oracle와 hit/miss·instance remap 비교 | null |
@@ -298,7 +299,7 @@ depth·attribute를 수치 비교하고 silhouette boundary는 별도 coverage�
 fixture별 승인된 baseline 파일에 고정한다. RT shadow는 raster와 픽셀 일치를 요구하지 않고
 CPU 기하 oracle·bias fixture로 판정한다. bias 변화로 생긴 contact 오차는 따로 기록한다.
 runtime gate는 Editor Scene/Game view 및 DX12 GPU validation 0, fallback 선택 이유 표시,
-owner 조기 해제 0을 포함한다. Vulkan native 결과는 별도로 기록한다.
+owner 조기 해제 0을 포함한다. Vulkan native 비교 결과는 PHASE 4.9에서 RenderDoc으로 기록한다.
 
 성능은 동일 바이너리/asset/resolution/warmup/기록 길이로 4 route 조합을 비교하고 CPU
 prepare/record, cull/bin, AS build, raster, trace, 합성, 전체 GPU critical path의 p50/p95,

@@ -319,6 +319,11 @@ void Run(const std::filesystem::path& root)
                                 RHIShaderBinary::Dxil, capabilities, {}, result, error);
         };
         const auto draw = [&](unsigned target, const SceneMaterialPacket& value) {
+            const auto owner = value.pipeline->GetGeneration();
+            Check(owner && owner->shader.compile.backend == RHIShaderBinary::Dxil &&
+                      !owner->shader.compile.sealedProgramIdentity.empty() &&
+                      owner->pipeline.GetHandle() == value.pipeline->GetHandle(),
+                  "GPU packet retains accepted common LX graphics generation");
             auto& encoder = device.GetImmediateEncoder();
             Check(slot.Bind(encoder, value, error), "Native packet bind: " + error);
             const std::array<std::uint32_t, 4> constants{value.coverage.flags,

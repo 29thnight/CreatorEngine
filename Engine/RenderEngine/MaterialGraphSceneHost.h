@@ -7,6 +7,7 @@
 #include "MaterialGraphSceneRefraction.h"
 #include "MaterialGraphSceneVolume.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
+#include "Render/Graph/EnhancedForwardLighting.h"
 #include "JobScheduler.h"
 #include "RHI/RHISubmissionThread.h"
 
@@ -75,6 +76,10 @@ class SceneHost final : private IRHIUploadTransactionListener
                             const std::array<RGHandle, 3>& baseline) const;
     void DeclareColor(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs, RGHandle lighting,
                       RGHandle ambientOcclusion, RGHandle shadowMap) const;
+    struct ForwardDraw { std::size_t index{}, geometryKey{}; float depth{}; };
+    std::vector<ForwardDraw> BlendedDraws() const;
+    void DeclareBlended(EnhancedRenderGraph& graph, std::size_t index, RGHandle lighting,
+                        RGHandle shadowMap, const EnhancedForwardLighting& forward) const;
     RGHandle DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const;
     bool HasDraws() const;
     // Live callers provide the exact graph batch ticket; pending completion is
@@ -84,6 +89,8 @@ class SceneHost final : private IRHIUploadTransactionListener
     RHIBufferHandle LookupStatistics() const;
     RGHandle GraphLookupStatistics(const EnhancedRenderGraph& graph) const;
     std::shared_ptr<const SceneLookupFrame> LookupFrame() const;
+    std::shared_ptr<const SceneLookupFrame> ForwardLookupFrame() const;
+    EnhancedGBufferPass::Outputs ForwardSurfaceOutputs() const;
     std::shared_ptr<const SceneSubsurfaceFrame> SubsurfaceFrame() const;
     std::shared_ptr<const SceneRefractionFrame> RefractionFrame() const;
     std::shared_ptr<const SceneVolumeFrame> VolumeFrame() const;
@@ -128,9 +135,12 @@ class SceneHost final : private IRHIUploadTransactionListener
     void PollSubmittedFrames();
     void DeclareGeometry(EnhancedRenderGraph& graph) const;
     void DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs, RGHandle lighting,
-                        RGHandle ambientOcclusion, RGHandle shadowMap, bool transmissionStage) const;
-    void DeclareTransmissionGBuffer(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs) const;
-    void DeclareRefractionCapture(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs) const;
+                       RGHandle ambientOcclusion, RGHandle shadowMap, bool transmissionStage,
+                       std::optional<std::size_t> blended = {}, EnhancedForwardLighting forward = {}) const;
+    void DeclareForwardGBuffer(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs,
+                              std::size_t index) const;
+    void DeclareRefractionCapture(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs,
+                                  std::optional<std::size_t> index = {}) const;
     void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override;
     void OnUploadCompleted(std::uint64_t completed) override;
     void OnUploadAborted(std::uint64_t recording) override;

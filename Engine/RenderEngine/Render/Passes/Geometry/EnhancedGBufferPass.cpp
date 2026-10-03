@@ -57,13 +57,6 @@ namespace
     static_assert(offsetof(LegacyMaterialConstants, alphaCutoff) == 44u);
     constexpr LegacyMaterialConstants kLegacyMaterialConstants{};
 
-    bool CompileGBufferShader(const char* shaderFile, const char* entry, const char* target,
-        const RHIShaderPermutation& permutation,
-        RHIShaderBlob& outBlob, std::string& outError)
-    {
-        return RHIShaderCompiler::CompileFile(shaderFile, entry, target, permutation,
-            outBlob, outError);
-    }
 }
 
 bool EnhancedGBufferPass::MaterialKey::operator==(const MaterialKey& other) const
@@ -126,39 +119,46 @@ EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
     return key;
 }
 
+bool EnhancedGBufferPass::CaptureShaderVariant(EnhancedMaterialDrawSnapshot& snapshot) const
+{
+    std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> candidate;
+    const auto capture = [&](const LX::Runtime::GraphicsPipeline& request) {
+        const auto generation = request.GetGeneration();
+        if (!generation || !generation->shader.shader ||
+            generation->shader.shader->codeHandle != snapshot.shaderMetaHandle ||
+            generation->shader.materialPermutationKey != snapshot.permutationKey ||
+            generation->shader.shader->layout != snapshot.bindingLayout) return false;
+        candidate.push_back(generation);
+        return true;
+    };
+    if (snapshot.shaderMetaHandle == m_shaderMetaHandle && snapshot.permutationKey == m_defaultPermutationKey)
+    {
+        if (!capture(m_pipelineRequest)) return false;
+        for (const auto& [mask, request] : m_modelPipelineRequests) if (!capture(request)) return false;
+    }
+    else
+    {
+        const auto found = m_shaderVariants.find({snapshot.shaderMetaHandle, snapshot.permutationKey});
+        if (found == m_shaderVariants.end() || !capture(found->second.request)) return false;
+        for (const auto& [mask, request] : found->second.modelRequests) if (!capture(request)) return false;
+    }
+    snapshot.pipelineGenerations = std::move(candidate);
+    return true;
+}
+
 bool EnhancedGBufferPass::ResolveShaderVariant(
     const EnhancedMaterialDrawSnapshot& snapshot,
     uint32_t vertexAttributeMask, RHIPipelineHandle& outPipeline,
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout) const
 {
-    // I5-D34a/b: 마스크가 0이 아니면 experiment 레이아웃 짝(core/skin)을 준다.
-    // 짝이 없으면 실패다 — legacy PSO로 폴백하면 96B 레이아웃 PSO에 packed
-    // 버퍼가 물려 화면이 조용히 틀린다(fail-closed).
-    const bool experiment = vertexAttributeMask != 0;
-    const auto resolveModelPipeline = [vertexAttributeMask](const auto& requests)
-    {
-        const auto found = requests.find(vertexAttributeMask);
-        return found == requests.end() ? RHIPipelineHandle{} : found->second.GetHandle();
-    };
-    if (snapshot.shaderMetaHandle == m_shaderMetaHandle
-        && snapshot.permutationKey == m_defaultPermutationKey)
-    {
-        outPipeline = !experiment ? m_pipelineRequest.GetHandle()
-            : resolveModelPipeline(m_modelPipelineRequests);
-        outLayout = m_shaderBindingLayout;
-        return outPipeline.IsValid() && nullptr != outLayout;
-    }
-
-    const ShaderVariantKey key{ snapshot.shaderMetaHandle,
-        snapshot.permutationKey };
-    const auto found = m_shaderVariants.find(key);
-    if (found == m_shaderVariants.end()) return false;
-    outPipeline = !experiment ? found->second.request.GetHandle()
-        : resolveModelPipeline(found->second.modelRequests);
-    outLayout = found->second.layout;
-    return outPipeline.IsValid() && nullptr != outLayout;
+    // Recording consumes only the accepted generation sealed into this frame.
+    const auto generation = LX::Runtime::ResolveGraphicsGeneration(snapshot.pipelineGenerations,
+        snapshot.shaderMetaHandle, snapshot.permutationKey, snapshot.bindingLayout, vertexAttributeMask, false);
+    if (!generation) return false;
+    outPipeline = generation->pipeline.GetHandle();
+    outLayout = {generation->shader.shader, &generation->shader.shader->layout};
+    return true;
 }
-
 RHIPipelineHandle EnhancedGBufferPass::GetShaderVariantPipeline(
     ShaderMetaHandle handle, RHIShaderPermutationKey permutationKey) const
 {
@@ -481,7 +481,7 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     const ShaderRenderState* renderState,
     const RHIShaderPermutation& permutation, uint32_t experimentMask,
     RHIGraphicsPipelineDesc& outDesc,
-    RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError)
+    RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled)
 {
     // I5-D34a/b: experiment 짝은 호출자의 퍼뮤테이션 위에 레이아웃 매크로를
     // 얹는다. 키워드 축과 독립인 별도 축이라 여기서 합성한다 — 호출자마다
@@ -499,12 +499,12 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
         effectivePermutation = &experimentPermutation;
     }
 
-    if (!CompileGBufferShader(shaderFile, vertexEntry, "vs_5_0",
-            *effectivePermutation, outVs, outError))
-        return false;
-    if (!CompileGBufferShader(shaderFile, pixelEntry, "ps_5_0",
-            *effectivePermutation, outPs, outError))
-        return false;
+    LX::Runtime::CompiledGraphics verified;
+    if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
+            *effectivePermutation, {}, verified, outError)) return false;
+    verified.identity.vertexAttributeMask = experimentMask;
+    outVs = std::move(verified.vertex.bytecode);
+    outPs = std::move(verified.pixel.bytecode);
 
     // 루트 시그니처는 캐시가 식별자를 준다 — 손번호를 붙이지 않는 것이 3-4의 계약이다.
     //
@@ -516,8 +516,7 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     // 한 번이면 배치가 몇 개든 그대로 쓴다 — 인스턴스가 자기 오프셋을
     // 들고 있어서다.
     MaterialTextureTable::Schema textureSchema;
-    if (!MaterialTextureTable::Reflect(shaderFile, pixelEntry, *effectivePermutation,
-            textureSchema, outError)) return false;
+    if (!MaterialTextureTable::FromReflection(verified.pixel.reflection, textureSchema, outError)) return false;
     const RHIPipelineLayoutParam params[] = {
         RHILayout::Cbv(0, RHIShaderVisibility::Vertex),          // b0 — 프레임 상수
         RHILayout::Srv(4, RHIShaderVisibility::Vertex),          // t4 — 인스턴스 데이터
@@ -597,6 +596,7 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     if (nullptr != renderState) renderState->ApplyTo(outDesc);
     // W4 coverage owns sidedness per instance, including depth writes.
     outDesc.cullMode = RHICullMode::None;
+    if (compiled) *compiled = std::move(verified);
     return true;
 }
 
@@ -637,7 +637,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
     RHIShaderBlob& outPs, RHIShaderPermutationKey& outPermutationKey,
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
-    std::string& outError)
+    std::string& outError, LX::Runtime::GraphicsShaderDescription* shader, ShaderMetaHandle ownerHandle)
 {
     const auto passIt = std::find_if(meta.passes.begin(), meta.passes.end(),
         [](const ShaderPassDesc& pass) { return pass.name == "GBuffer"; });
@@ -686,9 +686,10 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
         return false;
     }
 
+    LX::Runtime::CompiledGraphics compiled;
     if (!BuildPipelineDesc(context, shaderFile.c_str(), pass.vertex->entry.c_str(),
             pass.pixel->entry.c_str(), &pass.state, permutation.defines,
-            experimentMask, outDesc, outVs, outPs, outError))
+            experimentMask, outDesc, outVs, outPs, outError, &compiled))
     {
         return false;
     }
@@ -696,16 +697,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     std::shared_ptr<const ShaderMetaBindingLayout> candidateLayout;
     if (!meta.properties.empty())
     {
-        std::vector<RHIShaderReflection> reflections(2);
-        if (!RHIShaderCompiler::ReflectFile(shaderFile, pass.vertex->entry, "vs_5_0",
-                RHIShaderCompiler::GetOutput(), permutation.defines,
-                reflections[0], outError)
-            || !RHIShaderCompiler::ReflectFile(shaderFile, pass.pixel->entry, "ps_5_0",
-                RHIShaderCompiler::GetOutput(), permutation.defines,
-                reflections[1], outError))
-        {
-            return false;
-        }
+        const RHIShaderReflection reflections[]{compiled.vertex.reflection, compiled.pixel.reflection};
 
         ShaderMetaBindingLayout layout;
         if (!ShaderMetaReflection::Resolve(meta, reflections, layout, outError))
@@ -722,6 +714,16 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
         candidateLayout = std::make_shared<ShaderMetaBindingLayout>(std::move(layout));
     }
 
+    if (shader)
+    {
+        LX::Runtime::GraphicsShaderDescription candidate;
+        const ShaderMetaBindingLayout empty;
+        if (!LX::Runtime::CreateCodeShader(meta, candidateLayout ? *candidateLayout : empty,
+                ownerHandle, candidate.shader, outError)) return false;
+        candidate.compile = std::move(compiled.identity);
+        candidate.materialPermutationKey = permutation.key;
+        *shader = std::move(candidate);
+    }
     outPermutationKey = permutation.key;
     outLayout = std::move(candidateLayout);
     return true;
@@ -729,7 +731,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
 
 bool EnhancedGBufferPass::BuildVariantCandidate(const EnhancedFrameContext& context,
     const ShaderMeta& meta, std::span<const std::uint16_t> selections,
-    ShaderVariant& candidate, RHIShaderPermutationKey& key, std::string& error)
+    ShaderVariant& candidate, RHIShaderPermutationKey& key, std::string& error, ShaderMetaHandle ownerHandle)
 {
     // A failed mask must not publish any part of this material generation.
     for (size_t i = 0; i <= assets::kModelVertexMasks.size(); ++i)
@@ -738,16 +740,17 @@ bool EnhancedGBufferPass::BuildVariantCandidate(const EnhancedFrameContext& cont
         RHIShaderBlob vs, ps;
         RHIGraphicsPipelineDesc desc{};
         RHIShaderPermutationKey resolved{};
+        LX::Runtime::GraphicsShaderDescription shader;
         std::shared_ptr<const ShaderMetaBindingLayout> layout;
         if (!BuildShaderMetaPipelineDesc(context, meta, selections, mask,
-                desc, vs, ps, resolved, layout, error)) return false;
+                desc, vs, ps, resolved, layout, error, &shader, ownerHandle)) return false;
         if (i == 0) { key = resolved; candidate.layout = layout; }
         // Bootstrap ShaderMeta has no properties, so all masks may have no layout.
         else if (bool(layout) != bool(candidate.layout)
             || (layout && *layout != *candidate.layout))
         { error = "GBuffer vertex mask changed material layout"; return false; }
         auto& request = i == 0 ? candidate.request : candidate.modelRequests[mask];
-        if (!request.Create(*context.psoManager, desc, error)) return false;
+        if (!request.Create(*context.psoManager, desc, std::move(shader), error)) return false;
     }
     return true;
 }
@@ -783,18 +786,18 @@ bool EnhancedGBufferPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     ShaderVariant candidate;
     RHIShaderPermutationKey key{};
     const std::vector<std::uint16_t> selections(meta.keywords.size(), 0);
-    if (!BuildVariantCandidate(context, meta, selections, candidate, key, outError)) return false;
+    if (!BuildVariantCandidate(context, meta, selections, candidate, key, outError, handle)) return false;
     std::vector<RHIPipelineHandle> removed{m_pipelineRequest.GetHandle()};
     for (const auto& [mask, request] : m_modelPipelineRequests) removed.push_back(request.GetHandle());
-    for (auto it = m_shaderVariants.begin(); it != m_shaderVariants.end();)
+    if (m_shaderMetaHandle.IsValid() && m_shaderBindingLayout)
     {
-        if (m_shaderMetaHandle.slot != 0 && it->first.meta.slot == m_shaderMetaHandle.slot)
-        {
-            removed.push_back(it->second.request.GetHandle());
-            for (const auto& [mask, request] : it->second.modelRequests) removed.push_back(request.GetHandle());
-            it = m_shaderVariants.erase(it);
-        }
-        else ++it;
+        ShaderVariant previous;
+        previous.request = std::move(m_pipelineRequest);
+        previous.modelRequests = std::move(m_modelPipelineRequests);
+        previous.layout = m_shaderBindingLayout;
+        // A later material/texture seal can still fail. Keep the last accepted
+        // generation until CommitShaderMetaFrame accepts the complete frame.
+        m_shaderVariants.insert_or_assign({m_shaderMetaHandle, m_defaultPermutationKey}, std::move(previous));
     }
     m_pipelineRequest = std::move(candidate.request);
     m_modelPipelineRequests = std::move(candidate.modelRequests);
@@ -851,7 +854,7 @@ bool EnhancedGBufferPass::EnsureShaderMetaVariant(
 
     ShaderVariant candidate;
     RHIShaderPermutationKey candidateKey{};
-    if (!BuildVariantCandidate(context, meta, keywordSelections, candidate, candidateKey, outError)) return false;
+    if (!BuildVariantCandidate(context, meta, keywordSelections, candidate, candidateKey, outError, handle)) return false;
     if (candidateKey != resolved.key || !candidate.layout)
     { outError = "GBuffer material permutation/layout mismatch"; return false; }
     auto [inserted, accepted] = m_shaderVariants.emplace(key, std::move(candidate));

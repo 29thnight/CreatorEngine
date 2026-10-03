@@ -909,7 +909,8 @@ namespace
 std::string MaterialGraphCacheInput(const LX::LXMaterialProgram& program,
                                     const file::path& shaderDirectory, std::string& error)
 {
-    std::string input = "lx-scene-authoring-cache-v1";
+    std::string input = "lx-scene-authoring-cache-v2-graph-shadermeta-" +
+        std::to_string(ShaderGeneratedMaterial::kAdapterVersion);
     const auto append = [&](std::string_view value) {
         const std::uint64_t size = value.size();
         input.append(reinterpret_cast<const char*>(&size), sizeof(size));
@@ -1031,12 +1032,13 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     if (!cacheInput.empty() && ReadMaterialGraphCache(cachePath, cacheInput, result) &&
         result.product.program.slang == program->slang &&
         result.metadata == LX::WriteMaterialProgramMetadata(*program) &&
+        result.product.materialShader &&
         result.product.program.semanticKey.ends_with(material_graph::SceneHostIdentity))
     {
         return true;
     }
     if (!material_graph::CompileSceneProduct(*program, shaderDirectory, source, {},
-                                             result.product, error))
+                                             result.product, error, guid))
     {
         return false;
     }
@@ -1077,10 +1079,12 @@ std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphG
             if (catalog)
             {
                 const experiment::cooked::LooseArtifactByteSource bytes(catalog->DerivedRoot());
-                if (material_graph::LoadCookedGeneration(*catalog, bytes, id, source ? &*source : nullptr, result, failure))
+                if (material_graph::LoadCookedGeneration(*catalog, bytes, id, source ? &*source : nullptr, result, failure) &&
+                    result.product.materialShader)
                 {
                     return true;
                 }
+                if (failure.empty()) failure = "Cooked graph has no generated ShaderMeta contract; regenerate the cook.";
             }
             // An Editor may reopen an edited or newly authored graph before the
             // next package cook. Player keeps the strict bytecode-only boundary.
@@ -1200,6 +1204,11 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
     auto generation = LoadMaterialGraphGeneration(guid, error, reload);
     if (!generation)
         return false;
+    if (!generation->cooked.product.materialShader)
+    {
+        error = "Graph material requires a cooked/generated ShaderMeta contract; regenerate the material cook.";
+        return false;
+    }
     const auto textureLoader = [this](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
                                       std::string& failure) -> std::shared_ptr<Texture> {
         for (const auto& model : m_modelAssetGenerations.SnapshotCurrent())
@@ -1232,8 +1241,8 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
     if (!material_graph::BuildInstance(std::move(generation), description, textureLoader, candidate, error))
         return false;
 
-    // Publish after every value and texture owner is ready. ShaderMeta state is
-    // not a fallback for an explicitly authored graph material.
+    // Publish the generated common schema, packed values and texture owners as
+    // one immutable instance. Authored ShaderMeta cache slots remain separate.
     material.ResetShaderRuntime();
     material.ResetTextureRuntime();
     material.m_shaderMetaGuid = {};
@@ -2364,9 +2373,15 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 			: catalog->SourceAssets())
 		{
 			const file::path sourcePath = catalog->ResolveSourcePath(source.assetId);
+			const auto* cooked = catalog->Find(source.assetId);
+            // Generated graph metadata/source and bytecode live in the v3
+            // artifact. Player keeps the source identity, not an authoring file.
+            const bool cookedGraph = cooked && sourcePath.extension() == ".shadergraph" &&
+                cooked->kind == experiment::cooked::CookedAssetKind::MaterialProgram &&
+                cooked->formatVersion == material_graph::CookedProgramVersion;
 			std::error_code sourceError;
 			if (sourcePath.empty()
-				|| !file::is_regular_file(sourcePath, sourceError) || sourceError)
+				|| (!cookedGraph && (!file::is_regular_file(sourcePath, sourceError) || sourceError)))
 			{
 				outError = "CEMF source asset이 package에 없다: "
 					+ source.sourcePath;

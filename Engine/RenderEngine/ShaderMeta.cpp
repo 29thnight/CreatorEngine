@@ -1,11 +1,13 @@
 #include "ShaderMeta.h"
 
 #include "AuthoringParsedDocument.h"
+#include "Sha256.h"
 
 #include <algorithm>
 #include <cmath>
 #include <fstream>
 #include <initializer_list>
+#include <regex>
 #include <sstream>
 #include <unordered_set>
 
@@ -225,7 +227,8 @@ namespace
         {
             const Authoring::ReadNode propertyNode = node.At(index);
             const std::string context = "properties[" + std::to_string(index) + "]";
-            if (!ValidateMap(propertyNode, { "name", "label", "type", "default" },
+            if (!ValidateMap(propertyNode, { "name", "label", "type", "default",
+                "parameterId", "semantic", "colorSpace", "exposed" },
                 context, outError)) return false;
 
             ShaderPropertyDesc property;
@@ -250,6 +253,29 @@ namespace
                 return Fail(context, "지원하지 않는 property type: " + typeName, outError);
             if (!ParsePropertyDefault(propertyNode["default"], property.type,
                 context + ".default", property.defaultValue, outError)) return false;
+            if (const auto id = propertyNode["parameterId"])
+            {
+                if (!id.IsScalar()) return Fail(context, "parameterId must be scalar", outError);
+                property.parameterId = id.As<std::uint64_t>();
+            }
+            if (propertyNode["exposed"] && !ReadStrictBool(propertyNode, "exposed", context,
+                property.exposed, outError)) return false;
+            if (propertyNode["semantic"] && !ReadRequiredScalar(propertyNode, "semantic", context,
+                property.semantic, outError)) return false;
+            if (propertyNode["colorSpace"] && !ReadRequiredScalar(propertyNode, "colorSpace", context,
+                property.colorSpace, outError)) return false;
+            if (property.semantic != "value" && property.semantic != "vector" &&
+                property.semantic != "color" && property.semantic != "normal" && property.semantic != "texture")
+                return Fail(context, "unknown property semantic", outError);
+            if ((property.semantic == "color" && property.type != ShaderPropertyType::Float4) ||
+                ((property.semantic == "normal" || property.semantic == "vector") &&
+                    property.type != ShaderPropertyType::Float3) ||
+                (property.semantic == "texture" && property.type != ShaderPropertyType::Texture2D))
+                return Fail(context, "property semantic/type mismatch", outError);
+            if (property.colorSpace != "data" && property.colorSpace != "linear" && property.colorSpace != "srgb")
+                return Fail(context, "unknown property colorSpace", outError);
+            if (property.colorSpace != "data" && property.semantic != "color" && property.semantic != "texture")
+                return Fail(context, "colorSpace requires a color or texture semantic", outError);
             outProperties.push_back(std::move(property));
         }
         return true;
@@ -448,6 +474,80 @@ namespace
         return true;
     }
 
+    bool ParseGeneratedMaterial(const Authoring::ReadNode& node,
+        const std::filesystem::path& source, ShaderMeta& meta, std::string& outError,
+        std::optional<std::string_view> sourceBytes = {})
+    {
+        if (!node) return true;
+        constexpr std::string_view context = "generatedMaterial";
+        if (!ValidateMap(node, { "graph", "adapter", "generation", "sourceSha256",
+            "features", "surface", "volume", "samplers" }, context, outError)) return false;
+        ShaderGeneratedMaterial generated;
+        std::string graph;
+        if (!ReadRequiredScalar(node, "graph", context, graph, outError) ||
+            !ReadRequiredScalar(node, "generation", context, generated.generation, outError) ||
+            !ReadRequiredScalar(node, "sourceSha256", context, generated.sourceSha256, outError) ||
+            !ReadStrictBool(node, "surface", context, generated.surface, outError) ||
+            !ReadStrictBool(node, "volume", context, generated.volume, outError)) return false;
+        generated.graphGuid = FileGuid{graph};
+        const auto adapter = node["adapter"], features = node["features"];
+        if (!adapter || !adapter.IsScalar() || !features || !features.IsScalar())
+            return Fail(context, "adapter/features must be scalars", outError);
+        generated.adapterVersion = adapter.As<std::uint32_t>();
+        generated.features = features.As<std::uint32_t>();
+        const auto digest = [](std::string_view value) {
+            return value.size() == 64 && std::ranges::all_of(value, [](char c) {
+                return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+            });
+        };
+        if (generated.graphGuid == FileGuid{} || generated.graphGuid != meta.guid ||
+            generated.adapterVersion != ShaderGeneratedMaterial::kAdapterVersion ||
+            !digest(generated.generation) || !digest(generated.sourceSha256) ||
+            (generated.features & ~0x3FFFu) != 0 || (!generated.surface && !generated.volume) ||
+            generated.volume != ((generated.features & 0x2000u) != 0))
+            return Fail(context, "invalid generated material identity/features", outError);
+        const auto samplers = node["samplers"];
+        if (!samplers || !samplers.IsSequence() || samplers.Size() > 64)
+            return Fail(context, "samplers must be a bounded sequence", outError);
+        std::unordered_set<std::string> names;
+        for (const auto& property : meta.properties) names.insert(property.name);
+        for (std::size_t index = 0; index < samplers.Size(); ++index)
+        {
+            const auto entry = samplers.At(index);
+            ShaderMaterialSampler sampler;
+            if (!ValidateMap(entry, { "name", "description", "parameterId", "exposed" }, context, outError) ||
+                !ReadIdentifier(entry, "name", context, sampler.name, outError) ||
+                !ReadRequiredScalar(entry, "description", context, sampler.description, outError) ||
+                !ReadStrictBool(entry, "exposed", context, sampler.exposed, outError)) return false;
+            const auto id = entry["parameterId"];
+            if (!id || !id.IsScalar()) return Fail(context, "sampler parameterId missing", outError);
+            sampler.parameterId = id.As<std::uint64_t>();
+            if (!names.insert(sampler.name).second || !std::regex_match(sampler.description,
+                std::regex("(linear|nearest)-(repeat|clamp)|(linear|nearest)-(linear|nearest)-"
+                           "(repeat|clamp|mirror)-(repeat|clamp|mirror)")))
+                return Fail(context, "duplicate or unsupported sampler", outError);
+            generated.samplers.push_back(std::move(sampler));
+        }
+        std::string fileText;
+        if (!sourceBytes)
+        {
+            std::error_code error;
+            const auto bytes = std::filesystem::file_size(source, error);
+            if (error || bytes == 0 || bytes > 16u * 1024u * 1024u)
+                return Fail(context, "generated source is missing or oversized", outError);
+            std::ifstream stream(source, std::ios::binary);
+            fileText.assign(std::istreambuf_iterator<char>(stream), {});
+            if (!stream) return Fail(context, "generated source read failed", outError);
+            sourceBytes = fileText;
+        }
+        const auto text = *sourceBytes;
+        if (text.empty() || text.size() > 16u * 1024u * 1024u ||
+            Hash::ToHex(Hash::Sha256::Compute(text.data(), text.size())) != generated.sourceSha256)
+            return Fail(context, "generated source SHA-256 mismatch", outError);
+        meta.generatedMaterial = std::move(generated);
+        return true;
+    }
+
     bool IsSafeRelativeSource(const std::filesystem::path& source)
     {
         if (source.empty() || source.is_absolute() || source.has_root_path()) return false;
@@ -534,16 +634,16 @@ bool ShaderMetaLoader::Parse(std::string_view text,
     return ParseDocument(document.Root(), originPath, guid, outMeta, outError);
 }
 
-bool ShaderMetaLoader::ParseDocument(const Authoring::ReadNode& root,
+static bool ParseShaderMetaDocument(const Authoring::ReadNode& root,
     const std::filesystem::path& originPath, const FileGuid& guid,
-    ShaderMeta& outMeta, std::string& outError)
+    ShaderMeta& outMeta, std::string& outError, std::optional<std::string_view> sourceBytes)
 {
     try
     {
         if (guid == FileGuid{})
             return Fail(originPath.string(), "asset GUID가 nil이다", outError);
         if (!ValidateMap(root,
-            { "schema", "name", "source", "properties", "keywords", "passes" },
+            { "schema", "name", "source", "properties", "keywords", "passes", "generatedMaterial" },
             originPath.string(), outError)) return false;
 
         const Authoring::ReadNode schemaNode = root["schema"];
@@ -573,13 +673,17 @@ bool ShaderMetaLoader::ParseDocument(const Authoring::ReadNode& root,
         meta.source = authoredSource.lexically_normal();
         const std::filesystem::path resolved = meta.ResolveSource(originPath);
         std::error_code sourceError;
-        if (!std::filesystem::is_regular_file(resolved, sourceError) || sourceError)
+        if (!sourceBytes && (!std::filesystem::is_regular_file(resolved, sourceError) || sourceError))
             return Fail(originPath.string(), "source 파일이 없다: " + resolved.string(), outError);
 
         if (!ParseProperties(root["properties"], meta.properties, outError)
             || !ParseKeywords(root["keywords"], meta.keywords, outError)
-            || !ParsePasses(root["passes"], meta.passes, outError))
+            || !ParsePasses(root["passes"], meta.passes, outError)
+            || !ParseGeneratedMaterial(root["generatedMaterial"], resolved, meta, outError, sourceBytes))
             return false;
+
+        if (sourceBytes && !meta.generatedMaterial)
+            return Fail(originPath.string(), "cooked source bytes require generated material metadata", outError);
 
         outMeta = std::move(meta);
         outError.clear();
@@ -594,4 +698,31 @@ bool ShaderMetaLoader::ParseDocument(const Authoring::ReadNode& root,
         return Fail(originPath.string(),
             "ShaderMeta 검증 실패: " + std::string(exception.what()), outError);
     }
+}
+
+bool ShaderMetaLoader::ParseDocument(const Authoring::ReadNode& root,
+    const std::filesystem::path& originPath, const FileGuid& guid,
+    ShaderMeta& outMeta, std::string& outError)
+{
+    return ParseShaderMetaDocument(root, originPath, guid, outMeta, outError, {});
+}
+
+bool ShaderMetaLoader::ParseGenerated(std::string_view text, std::string_view source,
+    const FileGuid& guid, ShaderMeta& outMeta, std::string& outError)
+{
+    if (text.empty() || text.size() > kMaxMetaBytes)
+        return Fail("generated material", "metadata is empty or oversized", outError);
+    const auto document = Authoring::ParsedDocument::ParseText(std::string(text), outError);
+    if (!document) return false;
+    return ParseShaderMetaDocument(document.Root(), "material.shadermeta", guid, outMeta, outError, source);
+}
+
+bool ShaderMetaLoader::ParseGeneratedCooked(std::span<const std::byte> bytes, std::string_view source,
+    const FileGuid& guid, ShaderMeta& outMeta, std::string& outError)
+{
+    if (bytes.empty() || bytes.size() > kMaxMetaBytes)
+        return Fail("generated material", "cooked metadata is empty or oversized", outError);
+    const auto document = Authoring::ParsedDocument::ParseCooked(bytes, outError);
+    if (!document) return false;
+    return ParseShaderMetaDocument(document.Root(), "material.shadermeta", guid, outMeta, outError, source);
 }

@@ -309,15 +309,28 @@ struct Session
             message = "Reload requires confirmation while the graph has unsaved edits.";
             return false;
         }
-        auto loaded = LXMaterialAsset::Load(path, asset.Definitions(), &message);
+        // Explicit reimport must validate the primary file. Load() may recover
+        // an older .bak at startup, which must not silently replace this document.
+        std::ifstream sourceFile(path, std::ios::binary);
+        if (!sourceFile)
+        {
+            message = "Import failed. The open graph and applied material are preserved. Cannot open shadergraph.";
+            return false;
+        }
+        std::string payload{std::istreambuf_iterator<char>(sourceFile), {}};
+        if (sourceFile.bad())
+        {
+            message = "Import failed. The open graph and applied material are preserved. Cannot read shadergraph.";
+            return false;
+        }
+        auto loaded = LXMaterialArchive::Read(payload, asset.Definitions(), &message);
         if (!loaded)
         {
             message = "Import failed. The open graph and applied material are preserved. " + message;
             return false;
         }
         asset = std::move(*loaded);
-        std::ifstream sourceFile(path, std::ios::binary);
-        diskPayload.assign(std::istreambuf_iterator<char>(sourceFile), {});
+        diskPayload = std::move(payload);
         document = LXDocument(asset.graph, {}, true);
         analysisRevision = std::numeric_limits<std::uint64_t>::max();
         analysisObservedRevision = std::numeric_limits<std::uint64_t>::max();

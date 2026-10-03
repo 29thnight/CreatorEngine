@@ -96,6 +96,13 @@ bool ShaderMetaReflection::Resolve(const ShaderMeta& meta,
                             + property.name;
                         return false;
                     }
+                    if (meta.generatedMaterial && (resource.arrayElements != 1 || resource.byteSize > 65536u ||
+                        field.byteSize != expected->rows * expected->columns * 4u || field.byteOffset % 4u != 0 ||
+                        static_cast<std::uint64_t>(field.byteOffset) + field.byteSize > resource.byteSize))
+                    {
+                        outError = "Generated ShaderMeta field exceeds its reflected buffer: " + property.name;
+                        return false;
+                    }
                     const ShaderMetaPropertyBinding candidate{
                         property.name, property.type, resource.kind, resource.name,
                         resource.registerIndex, resource.registerSpace,
@@ -129,9 +136,43 @@ bool ShaderMetaReflection::Resolve(const ShaderMeta& meta,
                 + property.name;
             return false;
         }
+        if (meta.generatedMaterial && selected->resourceKind == RHIShaderResourceKind::ConstantBuffer)
+            for (const auto& other : resolved.properties)
+                if (other.resourceKind == RHIShaderResourceKind::ConstantBuffer &&
+                    selected->byteOffset < other.byteOffset + other.byteSize &&
+                    other.byteOffset < selected->byteOffset + selected->byteSize)
+                {
+                    outError = "Generated ShaderMeta fields overlap: " + property.name;
+                    return false;
+                }
         resolved.properties.push_back(std::move(*selected));
     }
 
+    if (meta.generatedMaterial)
+    {
+        for (const auto& sampler : meta.generatedMaterial->samplers)
+        {
+            std::optional<RHIShaderResourceReflection> selected;
+            for (const auto& reflection : stageReflections)
+                for (const auto& resource : reflection.resources)
+                    if (resource.name == sampler.name)
+                    {
+                        if (resource.kind != RHIShaderResourceKind::Sampler || resource.arrayElements != 1 ||
+                            (selected && *selected != resource))
+                        {
+                            outError = "Generated ShaderMeta sampler differs from reflection: " + sampler.name;
+                            return false;
+                        }
+                        selected = resource;
+                    }
+            if (!selected)
+            {
+                outError = "Generated ShaderMeta sampler is missing: " + sampler.name;
+                return false;
+            }
+            resolved.samplers.push_back(std::move(*selected));
+        }
+    }
     outLayout = std::move(resolved);
     outError.clear();
     return true;

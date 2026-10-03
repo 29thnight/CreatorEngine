@@ -15,7 +15,17 @@ $vcvars = Join-Path $VisualStudioInstallation 'VC\Auxiliary\Build\vcvars64.bat'
 $output = Join-Path $repo 'Build\Obj\MaterialProductProbe'
 New-Item -ItemType Directory -Force -Path $output | Out-Null
 $exe = Join-Path $output 'material_product_probe.exe'
+$dependencies = Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
+if (!(Test-Path -LiteralPath (Join-Path $dependencies 'include/reflgen/runtime/registry.h'))) {
+    $dependencies = Join-Path $repo 'vcpkg_installed/x64-windows'
+}
 $sources = @('Tools/regression/material_product_probe.cpp', 'Engine/RenderEngine/MaterialGraphProduct.cpp',
+    'Engine/RenderEngine/LXMaterialRuntime.cpp',
+    'Engine/RenderEngine/MaterialGraphShaderMeta.cpp', 'Engine/RenderEngine/ShaderMeta.cpp',
+    'Engine/RenderEngine/ShaderMetaReflection.cpp', 'Engine/RenderEngine/MaterialPropertyPacker.cpp',
+    'Engine/Utility_Framework/AuthoringParsedDocument.cpp',
+    'Engine/Utility_Framework/AuthoringCookedDocument.cpp',
+    'Engine/Utility_Framework/TimeSystem.cpp',
     'Engine/RenderEngine/RHI/RHIShaderCompiler.cpp', 'Engine/RenderEngine/RHI/RHIShaderSource.cpp',
     'Engine/RenderEngine/RHI/RHIShaderReflection.cpp', 'Engine/RenderEngine/RHI/RHIShaderPermutation.cpp',
     'Lattice/Core/LXGraph.cpp', 'Lattice/Core/LXNodeDefinition.cpp', 'Lattice/Material/LXMaterialGraph.cpp',
@@ -28,19 +38,24 @@ $sources += @('Engine/RenderEngine/Experiment/Cooked/CookedMaterialProgram.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.cpp',
     'Engine/RenderEngine/Assets/AssetIdentityProfile.cpp')
 $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join ' '
-$compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++latest ' +
-    '/permissive- /utf-8 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /MD ' +
+$compile = 'call "' + $vcvars + '" >nul && cl.exe /nologo /MP2 /EHsc /std:c++latest ' +
+    '/permissive- /utf-8 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /W4 /WX /wd4005 /wd4189 /wd4456 /wd5030 /MD ' +
     '/I"' + (Join-Path $repo 'ThirdParty/Slang/include') + '" /I"' +
     (Join-Path $repo 'Engine/Utility_Framework') + '" /I"' +
     (Join-Path $repo 'ThirdParty/Mathematics/include') + '" /I"' +
-    (Join-Path $repo 'vcpkg_installed/x64-windows/include') + '" /Fo:"' + $output + '/" /Fe:"' + $exe + '" ' +
-    $quoted + ' /link /LIBPATH:"' + (Join-Path $repo 'vcpkg_installed/x64-windows/lib') +
+    (Join-Path $dependencies 'include') + '" /Fo:"' + $output + '/" /Fe:"' + $exe + '" ' +
+    $quoted + ' /link /LIBPATH:"' + (Join-Path $dependencies 'lib') +
     '" ryml.lib c4core.lib d3d12.lib dxgi.lib ole32.lib'
 & $env:ComSpec /d /s /c $compile
 if ($LASTEXITCODE -ne 0) { throw "Material product probe build failed: exit $LASTEXITCODE" }
-$result = @(& $exe $repo 2>&1)
+$previousPath = $env:PATH
+try {
+    $env:PATH = (Join-Path $dependencies 'bin') + ';' + $previousPath
+    $result = @(& $exe $repo 2>&1)
+    $probeExit = $LASTEXITCODE
+} finally { $env:PATH = $previousPath }
 $result | Set-Content -LiteralPath (Join-Path $output 'product.log') -Encoding utf8
-if ($LASTEXITCODE -ne 0 -or @($result | Where-Object { $_ -match '^LX_MATERIAL_PRODUCT_OK ' }).Count -ne 1 -or
+if ($probeExit -ne 0 -or @($result | Where-Object { $_ -match '^LX_MATERIAL_PRODUCT_OK ' }).Count -ne 1 -or
     @($result | Where-Object { $_ -match '^LX_MATERIAL_RUNTIME_OK ' }).Count -ne 1) {
     throw "Material product gate failed: $($result -join "`n")"
 }

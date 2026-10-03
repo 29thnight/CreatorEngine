@@ -14,9 +14,9 @@ namespace assets { class ModelAssetGeneration; } // MBC7 — closure texture 축
 // I5-M4 — M6 draw snapshot sealing의 experiment 치환.
 //
 // sealing이 읽는 유일한 입력은 SealSource다. legacy `::Material`은
-// BuildSealSourceFromLegacy에서 **한 번** 변환되고, 그 뒤의 keyword 정규화·
-// propertyBytes·textureBindings는 experiment 정본(NormalizeMaterialKeyword
-// Selections·MaterialPropertyPacker 경유 BuildMaterialPropertyBlock)만 탄다.
+// BuildSealSourceFromLegacy에서 한 번 변환된다. experiment 저작 값과 generic
+// code 값은 LX instance 어댑터로 내려가고, keyword 정규화·공통 property packing·
+// texture 검증이 성공하면 bytes와 runtime owner를 함께 게시한다.
 // I5-M5가 저작 경계를 옮기면 브리지 호출부가 사라지고, 브리지는 I6에서 legacy와
 // 함께 은퇴한다.
 namespace ExperimentMaterialSealing
@@ -30,6 +30,10 @@ namespace ExperimentMaterialSealing
     struct SealSource final
     {
         experiment::Material material{};
+        // Code shaders can carry generic values absent from the model authoring
+        // variant (notably Float4x4). Never lower those through a BSDF socket.
+        std::vector<::MaterialPropertyValue> codeValues;
+        bool hasCodeValues{};
         // 이름→generation owner. legacy에서는 GetTextureMapShared가 채운다.
         std::vector<SealTextureOwner> textures{};
         // ShaderMeta 논리 밖의 draw 상태 — Forward snapshot 전용. flow의
@@ -100,7 +104,7 @@ namespace ExperimentMaterialSealing
         std::size_t* outCooked = nullptr, std::size_t* outSourceFallback = nullptr,
         const assets::ModelAssetGeneration* generation = nullptr);
 
-    // layout 확보 후 호출 — propertyBytes(정본 packer)와 textureBindings
+    // layout 확보 후 호출 — LX runtime owner·propertyBytes와 textureBindings
     // (reflection register 검증·중복 거부, legacy SealMaterialTextureBindings와
     // 같은 규칙)를 만든다. keyword 정규화는
     // experiment::NormalizeMaterialKeywordSelections를 직접 쓴다(EnsureShaderMeta
@@ -113,5 +117,7 @@ namespace ExperimentMaterialSealing
         const ShaderMetaBindingLayout& layout,
         std::vector<std::uint8_t>& outPropertyBytes,
         std::vector<EnhancedMaterialTextureBinding>& outTextureBindings,
-        std::string& outError);
+        std::string& outError,
+        std::shared_ptr<const LX::Runtime::Instance>* outRuntime = nullptr,
+        ShaderMetaHandle handle = {});
 }

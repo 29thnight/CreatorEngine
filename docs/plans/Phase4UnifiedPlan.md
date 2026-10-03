@@ -1,5 +1,8 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
+**역사 설계 문서 — 2026-10-01 우선 정본:** 현재 작업/공수는 [RenderPhaseRoadmap](RenderPhaseRoadmap.md)과 [공수 원장](RenderPhaseEffortEstimate.md)을 따른다. 이 문서의 옛 4~4.8 검증 조건 중 Vulkan 비교는 모두 PHASE 4.9로 이관했으며 착수/완료 게이트로 재사용하지 않는다.
+
+
 > **2026-09-23 이력 원장.** 아래 69행·352.5일과 Asset-first SRP 배치는 당시
 > 계획의 기록이다. 현재 페이즈 소유권·순서·산정 합계는
 > [`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이며, C# 저작과 native 실행
@@ -111,7 +114,7 @@ Blender 5.1.1 Material Preview/EEVEE의 Principled 재질 의미와 pre-tone lin
 
 - `BASE-0` 공통 밀봉 하네스 — 구 `4-0` + `SRP-G0` + `RG0`의 통합물.
 - 트랙 `RG` — versioned resource API, stable DAG compiler, culling/lifetime/barrier 재계산,
-  dependency wave 병렬 기록, 제품 Pass 이관, DX12/Vulkan cutover, aliasing, async compute.
+  dependency wave 병렬 기록, 제품 Pass 이관, RHI 중립 cutover·DX12 수용, aliasing, async compute.
 - `Q0` — queue/fence RHI 계약. `RG8`과 PHASE 4.75 `L4`가 공유하는 기반이며 **미산정**이다.
 
 **분리 근거는 세 가지다.**
@@ -164,32 +167,17 @@ PHASE 4.75의 generic Pass graph는 PHASE 4.25의 graph editor/typed IR 기반�
 Material output/Principled 의미를 소유하지 않는다. 반대로 PHASE 4.25는 Pass topology,
 RenderGraph resource lifetime이나 post stack을 소유하지 않는다.
 
-### 1.6 PHASE 4.9 — 백엔드 패리티 (DX12/Vulkan 교차 판정)
+### 1.6 PHASE 4.9 — RenderDoc 백엔드 비교
 
-정본은 [`BackendParityPlan.md`](BackendParityPlan.md)다. **2026-09-15 사용자 결정**으로
-PHASE 4의 판정을 DX12 백엔드로만 하기로 하면서, 미룬 것들을 잃지 않으려고 세웠다.
+현행 정본은 [BackendParityPlan.md](BackendParityPlan.md)다. 2026-10-01 사용자 지시로
+BP-0~5 **6행·22인일**을 계획과 대시보드에 반영했다. 입력 고정 → RenderDoc DX12/Vulkan
+실제 프레임 캡처 → 대응 Pass의 리소스·바인딩 확인 → 선형 리소스의 픽셀별 비교 →
+원인 수정·재캡처 → 반복 회귀 순서다. 기존 스크린샷/float artifact만으로 RenderDoc 검증을 대체하지 않는다.
 
-- 교차 백엔드 제품 프레임 캡처 1:1 픽셀 대응과 `render.pbr.compare` 판정 복귀.
-- `verify-pbr-wiring-baseline.ps1`의 vulkan 회차·`vk.*` 4종 복구.
-- **DX12 전용 deferred 검사 신설** — `vk.*`를 끄며 생긴 구멍이다(아래).
-- Vulkan 기동 창 `gCubeMap` 결함(PHASE 4와 무관한 별건).
-
-**★ 미룬 것은 판정이지 배선이 아니다.** RHI 중립 어휘(enum·변환표)와 Vulkan 백엔드
-구현은 PHASE 4에서도 계속 **양쪽을 채운다**. 새 값 축을 더할 때 두 백엔드 변환표를
-모두 채우는 규약은 그대로다 — 어휘에 구멍을 내면 백엔드 비대칭이 생기고 그것이
-4.9에서 갚을 빚이 된다. 다른 세션은 PHASE 4에서 vulkan을 걱정하지 않는다.
-
-**`vk.*`는 이름이 범위를 속인다.** `vk.shadow`/`gbuffer`/`forward`/`deferred` 넷은
-vulkan 단독이 아니라 **DX12/Vulkan 대조** 검사다(`RunVulkanGBufferTest` 안에
-`dx12Capture`와 `vkCapture`가 나란히 있다). 그래서 끄면 **DX12 팔도 함께 꺼진다.**
-gbuffer는 `dx12.gbuffer`, forward는 `dx12.forwardshade`가 덮고 shadow는
-`dx12.shadowquality`가 축이 달라 절반만 덮으며, **deferred는 대체가 아예 없다**
-(`dx12.deferred`라는 명령이 없다). 이 자리가 결정의 실제 비용이고, 교차 백엔드가
-아니라 DX12 단독이라 시각 고정을 기다리지 않고 먼저 갚을 수 있다.
-
-**공수는 미산정이다.** 선행 조건인 시뮬레이션 시각 고정(`time.*` 부재)을 실측하기
-전에는 슬라이스를 끊을 수 없다. **총공수 352.5일은 변동 없다** — 지어낸 공수를
-정본에 넣지 않았고, 대시보드에도 행을 비워 두었다.
+다른 페이즈의 완료 판정은 DX12이며 Vulkan 비교를 선행·잔여·실패 조건으로 사용하지 않는다.
+RHI 중립 계약과 backend 구현 책임은 유지한다. 기존 Vulkan 관측·미통과 기록은 4.9로
+인계한다. 현행 4.x 공수는 [RenderPhaseEffortEstimate.md](RenderPhaseEffortEstimate.md)의
+산정 355인일·완료 52·잔여 303 + 별도 미산정 범위다. 아래 과거 총공수 기록을 현재 합계로 읽지 않는다.
 
 **항목 ID 개명 (2026-09-15).** 구 PHASE 4 시절 잔재인 `4-2`/`4-3`/`4-4`/`4-6`을
 `GPU-1`/`GPU-2`/`GPU-3`/`GPU-9`로 바꾼다. 하이픈 ID `4-3`이 새 페이즈 번호 `4.3`과
@@ -231,7 +219,7 @@ PHASE 4.5   PHASE 4.3에서 BASE-0만 입력으로 받는다
                                                           └─ FG0 → FG1 ∥ FG2 → FG3 ∥ FG4
                                                                               → TFG9
     ↓
-PHASE 4.9   BackendParityPlan — 시각 고정 → 교차 백엔드 판정 복귀 (슬라이스 미확정)
+PHASE 4.9   BackendParityPlan — BP-0~5 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교 (22인일)
     ↓
 PHASE 4.75  PHASE 4.3에서 BASE-0·RG5·RG6·Q0를 입력으로 받는다
               ├─ L1 ∥ L2 → L3 → Q0 → L4 → L5/L6 → L7
@@ -405,7 +393,7 @@ PHASE 4.5와 PHASE 4.75는 결과를 읽기 전용 입력으로 받는다. 하�
 | `RG3` | DAG 기준 culling/lifetime/barrier | · | RG2 | 8 |
 | `RG4` | dependency wave 병렬 기록·진단 | · | RG3 | 7 |
 | `RG5` | 제품 Pass·Pipeline compiler 이관 | · | RG4 | 12 |
-| `RG6` | DX12/Vulkan 제품 cutover | · | RG5, BASE-0 | 8 |
+| `RG6` | RHI 중립 제품 cutover·DX12 수용 | · | RG5, BASE-0 | 8 |
 | `RG7` | transient buffer·in-frame aliasing | · | RG6 | 20 |
 | `Q0` | queue/fence RHI 계약 | · | RG6 | 미산정 |
 | `RG8` | multi-queue·async compute | · | RG7, Q0 | 25 |
@@ -618,7 +606,7 @@ renderer golden과 성능 gate를 사용한다.
 - 같은 입력에서 compiled order와 dependency hash가 실행 간 동일하고, 독립 Pass tie-break가
   authored index로 명시된다.
 - `RG6` 제품 cutover가 같은 밀봉 입력의 별도 프로세스 live frame으로 판정되고 DX12 debug
-  layer·Vulkan validation error 0.
+  layer error 0.
 - `RG6` 뒤에만 aliasing과 async compute를 연다. `RG7` 이후가 늦어져도 declaration-order로
   되돌리지 않는다.
 

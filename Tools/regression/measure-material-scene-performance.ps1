@@ -16,6 +16,9 @@ $project="$case/Project"
 if(Test-Path $case) { throw "Measurement output already exists: $case" }
 New-Item -ItemType Directory -Force $case | Out-Null
 Copy-Item $FixtureProject $project -Recurse
+if($UiScale -eq 0) {
+ & (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1') -Project $project
+}
 if($UiScale -ne 0) {
  if($UiScale -lt 0.5 -or $UiScale -gt 2) { throw 'UI scale must be between 0.5 and 2' }
  $settings="$project/ProjectSetting/EngineSettings.asset"

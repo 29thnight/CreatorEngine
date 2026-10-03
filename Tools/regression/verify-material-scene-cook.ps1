@@ -1,6 +1,7 @@
 param(
     [string]$VisualStudioInstallation = '',
-    [switch]$SkipDependencyRestore
+    [switch]$SkipDependencyRestore,
+    [switch]$SkipProjectReferences
 )
 
 Set-StrictMode -Version Latest
@@ -30,6 +31,7 @@ $snapshot = @($sources | ForEach-Object {
 $snapshot | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'scene-cook-source-hashes.json') -Encoding utf8
 $dependencyOptions = @()
 if ($SkipDependencyRestore) { $dependencyOptions += '/p:VcpkgManifestInstall=false' }
+if ($SkipProjectReferences) { $dependencyOptions += '/p:BuildProjectReferences=false' }
 
 foreach ($configuration in @('Debug', 'Release')) {
     foreach ($project in @('Tools/regression/MaterialRasterSurfaceProbe.vcxproj', 'Tools/AssetCooker/AssetCooker.vcxproj')) {
@@ -47,7 +49,10 @@ foreach ($configuration in @('Debug', 'Release')) {
     $previousPath = $env:PATH
     $previousValidation = $env:CREATOR_DX12_VALIDATION
     try {
-        $dependencyRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed/x64-windows/debug/bin' } else { 'vcpkg_installed/x64-windows/bin' }
+        $dependencyRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed/x64-windows/x64-windows/debug/bin' } else { 'vcpkg_installed/x64-windows/x64-windows/bin' }
+        if (!(Test-Path -LiteralPath (Join-Path $repo $dependencyRoot))) {
+            $dependencyRoot = if ($configuration -eq 'Debug') { 'vcpkg_installed/x64-windows/debug/bin' } else { 'vcpkg_installed/x64-windows/bin' }
+        }
         $env:PATH = (Join-Path $repo $dependencyRoot) + ';' + $previousPath
         $env:CREATOR_DX12_VALIDATION = 'gpu'
         $export = @(& $probe $repo --export-cook-fixtures 2>&1)

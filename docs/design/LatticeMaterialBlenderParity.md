@@ -1,15 +1,24 @@
 # Lattice Material × Blender Shader Editor 대응표 초안
 
-**2026-09-24 · LX-0 기준선 고정.** 비교 기준은 Blender 5.1.1 Shader Editor다.
+**2026-10-02 현재 지원 재평가 · LX-0 실측 기준선은 2026-09-24 보존.** 비교 기준은 Blender 5.1.1 Shader Editor다.
 기준 자료는 Blender의 [Shader Nodes 설명](https://docs.blender.org/manual/en/5.1/render/shader_nodes/introduction.html),
 [노드 편집 동작](https://docs.blender.org/manual/en/5.1/interface/controls/nodes/editing.html),
 [NodeTree API](https://docs.blender.org/api/5.1/bpy.types.NodeTree.html)다.
 사용자가 제공한 Blender 화면은 외관 기준으로 사용한다.
 
 목표는 머테리얼 저작자가 Blender에서 보는 노드·소켓·연결·값·그룹과 편집
-동작을 LX에서도 거의 1:1로 다루는 것이다. 아래의 **현재**는 독립
-`LatticeExample` 소스 기준이다. `목표`나 `부분`은 Editor 제품 경로의 완료
+동작을 LX에서도 거의 1:1로 다루는 것이다. 접힌 Canvas 표의 **현재**는 2026-09-24 독립
+`LatticeExample` 조사 당시 상태다. `목표`나 `부분`은 Editor 제품 경로의 완료
 증거가 아니다. 기존 BT·Animator 자산의 변환은 이 표의 범위에 없다.
+
+## 현재 구현과 남은 지원
+
+- Material IR·Slang 생성/진단·그룹/중첩 해석·typed Reroute는 구현됐다. RGB/Value·Image Texture·Normal Map·Principled BSDF·Material Output의 지원 설정과 Separate Color, 엔진 보조 operator가 등록돼 있다. 기준선의 103개 Blender 타입 전체 지원을 뜻하지 않는다.
+- Frame·안정 ID·Undo/저장 왕복, Editor 창·Inspector·preview·HTTP 기본 연결은 구현됐다. 이 기반을 다시 구현하는 항목은 이력으로 옮겼다.
+- annotation와 wire Reroute 삽입 편집 계약은 LX-1, 그룹/Blackboard 제품 패널과 전체 조작은 LX-3, HTTP host 수명 마감은 LX-3H다.
+- Graph→ShaderMeta/Slang→공통 재질 소비는 MAT-7의 열린 목표다. 색/route/실제 모델 성능의 전체 수용은 MAT-9다.
+
+현재 소유/상태는 [LatticeAdoptionPlan](../plans/LatticeAdoptionPlan.md), [BlenderMaterialGraphPlan](../plans/BlenderMaterialGraphPlan.md)를 따른다. 이번 갱신은 현행 소스와 기존 증거의 재평가이며 새 실행 검증이 아니다.
 
 ## Blender 5.1.1 실측 기준
 
@@ -38,12 +47,15 @@ Material의 첫 구현 후보는 `ShaderNodeRGB`, `ShaderNodeValue`,
 `ShaderNodeVectorMath`, `ShaderNodeSeparateColor`, `ShaderNodeCombineColor`,
 `ShaderNodeTexCoord`, `ShaderNodeMapping`, `ShaderNodeBump`,
 `ShaderNodeGroup`, `NodeGroupInput`, `NodeGroupOutput`, `NodeReroute`,
-`NodeFrame`으로 고정한다. 이 후보의 제품 지원 상태도 현재는 모두 `미구현`이다.
+`NodeFrame`으로 고정했다. 2026-09-24 후보 선정 시점에는 제품 지원을 모두 `미구현`으로 기록했으며 현재 지원은 위 재평가와 아래 MAT-6 기록을 따른다.
 나머지 실측 타입은 목록에 남기고 Material compiler의 의미·비용 계약을 정할 때
 지원 여부를 결정한다. LX 계층은 이 판단과 관계없이 노드·소켓 구조를 보존할 수
 있어야 한다.
 
-아래 Canvas 표는 2026-09-24 조사 기록이다. 현재 native 문서/IR·생성기는 아래 MAT-2/MAT-6 절을 따른다.
+<details>
+<summary>2026-09-24 Canvas·편집 동작 조사 이력</summary>
+
+아래 표는 조사 당시 상태다. “Material 컴파일 없음”·“Reroute 없음”을 현재 잔여로 사용하지 않는다.
 
 | Blender 저작 개념 | LX의 현재 상태 | Material에서 필요한 계약과 판정 |
 |---|---|---|
@@ -71,6 +83,8 @@ Material의 첫 구현 후보는 `ShaderNodeRGB`, `ShaderNodeValue`,
 | frame 배치·view 저장 | 독립 예제 지원 | `.shadergraph` 정본과 Editor에서 저장·DPI 복원 확인 |
 | group/interface, reroute | group 정의·인스턴스·저장 왕복과 내부 graph·입출력 interface 편집은 독립 예제에서 부분 지원. Group Input/Output 경계·기본값 위젯과 선택 노드의 그룹 생성 UI를 지원. 중첩 복사본은 루트 정의의 수정에 동기화되며 참조 순환을 거부한다. Material 컴파일과 reroute는 미구현 | 새 graph/layout 계약으로 저작·저장·compile 확인 |
 | node별 enum에 따른 소켓 활성 전환 | 미구현 | 내부 identifier와 이전 링크·기본값을 보존하며 변경 |
+
+</details>
 
 ## 새 Material 문서의 목표 계약
 
@@ -119,8 +133,7 @@ node-editor를 사용한다. [`vcpkg.json`](../../vcpkg.json)의 직접 의존�
 ## 구현 단계에서 이어받을 조사
 
 - 첫 후보 밖의 84개 타입에 제품 지원 범위를 정하고, 각 enum **조합**에서
-  달라지는 소켓을 노드 구현 시 검증한다. 현재 목록의 전 항목은 제품 Material
-  compiler 기준 `미구현`이다.
+  달라지는 소켓을 노드 구현 시 검증한다. 추출 목록의 초기 `미구현` 표시는 기준선 생성 시점의 기록이며 지원 설정의 현재 lowering은 Material compiler 소스/fixture로 판정한다.
 - MAT-2는 초기 6개 Blender 정의와 Parameter/Reroute, 상수·image/normal·그룹·배치의
   `.shadergraph` 왕복과 typed IR을 독립 Debug/Release에서 검증했다.
   [MaterialGraphSchema.md](MaterialGraphSchema.md)를 따른다. Mix와 전체 노드/enum
@@ -136,4 +149,4 @@ Slang으로 낮추고 실제 texture/sampler GPU와 DXIL/SPIR-V로 검증했다.
 공유/중첩 Group Input/Output과 인스턴스 입력 override, typed parameter/reroute·Closure reroute를
 해석한다. 엔진의 `LXMultiply*`·`LXTextureSample`·6입력 `LXPrincipledVolume`을 추가했다.
 이 정의를 Blender Math/Mix/full Volume의 1:1 구현으로 표시하지 않는다.
-Editor의 위젯/preview·HTTP 및 제품 ShaderMeta/Scene binding은 LX-3/LX-3H·MAT-7/MAT-8에 남는다.
+Editor 위젯/preview·HTTP 기본 연결은 구현돼 있다. 전체 저작/수명 마감은 LX-3/LX-3H, 제품 ShaderMeta·공통 재질 소비는 MAT-7, 전체 rendered parity/성능은 MAT-9에 남는다.

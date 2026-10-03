@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Lattice/Material/LXMaterialCompiler.h"
-#include "RHI/RHIGraphicsPipelineRequest.h"
+#include "LXMaterialPipeline.h"
 #include "RHI/RHIShaderReflection.h"
 #include "RHI/RHIShaderCompiler.h"
 
@@ -10,6 +10,8 @@
 
 namespace material_graph
 {
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:12";
+struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {
     Standard,
@@ -101,6 +103,8 @@ struct VerifiedProduct
     BindingLayout layout;
     std::vector<LX::LXMaterialShaderArtifact> shaders;
     std::vector<CompileTarget> targets;
+    // Meta, source, common binding layout and bytecode share this generation.
+    std::shared_ptr<const GeneratedMaterialShader> materialShader;
 };
 
 // The file starts with BuildBoundSource(program), followed by a host pass.
@@ -108,7 +112,17 @@ struct VerifiedProduct
 bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& sourceFile,
                    std::span<const CompileTarget> targets, const RHIShaderPermutation& permutation,
                    RHIShaderCompileOptions options, const Capabilities& capabilities, const Budget& budget,
-                   VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                   VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics,
+                   std::vector<RHIShaderReflection>* materialReflections = nullptr);
+
+// Describe the selected cooked stages using their sealed compiler/dependency
+// identity. Empty entry names select an unambiguous single surface pair.
+bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary backend,
+    std::string_view vertex, std::string_view pixel, LX::Runtime::GraphicsShaderDescription& result,
+    std::string& error);
+
+bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backend,
+    std::string_view entry, LX::Runtime::ComputeShaderDescription& result, std::string& error);
 
 struct ParameterOverride
 {
@@ -141,6 +155,12 @@ bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOver
                       std::span<const TextureBinding> textures, ResourcePacket& result,
                       std::vector<LX::LXMaterialDiagnostic>& diagnostics);
 
+// The common Material packer has already produced this immutable instance's
+// uniform block. Build resource descriptors without packing those values again.
+bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,
+                      std::span<const TextureBinding> textures, ResourcePacket& result,
+                      std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+
 // Cook payloads use a versioned, bounded binary envelope. Backend/entry pairs
 // are unique and the exact dependency-bearing semantic key is retained.
 struct CookedProgram
@@ -150,7 +170,7 @@ struct CookedProgram
     std::string boundSource;
 };
 
-inline constexpr std::uint32_t CookedProgramVersion = 2;
+inline constexpr std::uint32_t CookedProgramVersion = 4;
 bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
                         std::string& error);
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,
@@ -163,7 +183,7 @@ struct PipelineGeneration
     Selection selection;
     BindingLayout layout;
     ResourcePacket resources;
-    RHIGraphicsPipelineRequest pipeline;
+    LX::Runtime::GraphicsPipeline pipeline;
 };
 
 // One render-thread owner publishes the PSO, route, uniform layout and texture

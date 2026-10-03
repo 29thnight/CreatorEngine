@@ -160,6 +160,9 @@ SamplerState gSampler    : register(s0);
 SamplerState gIblSampler : register(s1);
 // 그림자 비교 샘플러. 하드웨어가 이웃 텍셀 넷을 비교·평균해 준다(2x2 PCF).
 SamplerComparisonState gShadowSampler : register(s2);
+#define lx_volumeEnvironmentSampler gIblSampler
+#define lx_volumeShadowSampler gShadowSampler
+#include "Includes/MaterialGraphForwardVolume.slang"
 
 cbuffer ShadeParams : register(b0)
 {
@@ -452,10 +455,11 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
     const uint  tileIndex = min(tile.y, gTileGrid.y - 1) * gTileGrid.x
         + min(tile.x, gTileGrid.x - 1);
 
-    const uint count = gTileCount[tileIndex];
+    const bool overflow = gTileCount[gTileGrid.x * gTileGrid.y + tileIndex] > MAX_LIGHTS_PER_TILE;
+    const uint count = overflow ? gLightCount : gTileCount[tileIndex];
     for (uint i = 0; i < count; ++i)
     {
-        const uint lightIndex = gTileList[tileIndex * MAX_LIGHTS_PER_TILE + i];
+        const uint lightIndex = overflow ? i : gTileList[tileIndex * MAX_LIGHTS_PER_TILE + i];
         lit += Contribute(lightIndex, surface);
     }
 #endif
@@ -477,5 +481,5 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
     }
 
     // 알파는 베이스 컬러에서 온다 — 이것이 블렌드를 성립시킨다.
-    return float4(lit + ambient + material.emission + representativeEmission, material.alpha);
+    return float4(LXForwardVolume(input.position.xy, input.worldPos, lit + ambient + material.emission + representativeEmission), material.alpha);
 }

@@ -1,6 +1,7 @@
 #include "Material.h"
 #include "DataSystem.h"
 #include "MaterialPropertyPacker.h"
+#include "MaterialGraphShaderMeta.h"
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
 #include "StandardMaterialProperty.h"
@@ -8,12 +9,6 @@
 #include <array>
 #include <cstring>
 #include <type_traits>
-
-struct Material::RuntimeSchema
-{
-    ShaderMetaBindingLayout layout{};
-    std::vector<ShaderKeywordAxis> keywords{};
-};
 
 namespace
 {
@@ -49,7 +44,7 @@ Material::Material(const Material& material)
       m_shaderMetaGuid(material.m_shaderMetaGuid), m_propertyValues(material.m_propertyValues),
       m_keywordSelections(material.m_keywordSelections), m_fileGuid(material.m_fileGuid),
       m_renderingMode(material.m_renderingMode), m_doubleSided(material.m_doubleSided),
-      m_cbufferValues(material.m_cbufferValues), m_runtimeSchema(material.m_runtimeSchema),
+      m_cbufferValues(material.m_cbufferValues), m_runtimeInstance(material.m_runtimeInstance),
       m_shaderMetaHandle(material.m_shaderMetaHandle), m_textureOwners(material.m_textureOwners),
       m_materialGraphInstance(material.m_materialGraphInstance)
 {
@@ -74,7 +69,7 @@ Material::Material(Material&& material) noexcept
 	m_shaderMetaHandle = std::exchange(material.m_shaderMetaHandle, {});
     m_propertyValues = std::move(material.m_propertyValues);
     m_keywordSelections = std::move(material.m_keywordSelections);
-    m_runtimeSchema = std::move(material.m_runtimeSchema);
+    m_runtimeInstance = std::move(material.m_runtimeInstance);
     m_cbufferValues = std::move(material.m_cbufferValues);
     m_materialGraphInstance = std::move(material.m_materialGraphInstance);
 }
@@ -263,7 +258,16 @@ Material& Material::UseEmissiveMap(std::shared_ptr<Texture> texture)
 Material& Material::UseTextureMap(
 	std::string_view property, std::shared_ptr<Texture> texture)
 {
+	// Generated graph textures are changed by stable parameter GUID overrides,
+    // so this legacy owner-only API cannot detach their accepted generation.
+    if (HasMaterialGraph()) return *this;
 	if (property.empty()) return *this;
+    if (m_runtimeInstance)
+    {
+        std::string error;
+        if (!LX::Runtime::SetTextureOwner(*m_runtimeInstance, property, texture, m_runtimeInstance, error)) return *this;
+        SynchronizeCodeRuntime();
+    }
 
 	auto found = std::find_if(m_textureOwners.begin(), m_textureOwners.end(),
 		[property](const MaterialTextureOwner& candidate)
@@ -316,12 +320,13 @@ Material& Material::UseTextureMap(
 const std::shared_ptr<Texture>& Material::GetTextureMapShared(
 	std::string_view property) const noexcept
 {
-	const auto found = std::find_if(m_textureOwners.begin(), m_textureOwners.end(),
+	const auto owners = GetTextureOwners();
+    const auto found = std::find_if(owners.begin(), owners.end(),
 		[property](const MaterialTextureOwner& candidate)
 		{
 			return candidate.propertyName == property;
 		});
-	if (found != m_textureOwners.end()) return found->textureOwner;
+	if (found != owners.end()) return found->textureOwner;
 	static const std::shared_ptr<Texture> empty{};
 	return empty;
 }
@@ -386,13 +391,8 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
         return false;
     }
 
-    auto runtimeSchema = std::make_shared<RuntimeSchema>();
-    runtimeSchema->layout = layout;
-    runtimeSchema->keywords = meta.keywords;
-
     std::vector<MaterialPropertyValue> values;
     values.reserve(meta.properties.size());
-    std::vector<std::uint8_t> constantBuffer(layout.constantBufferByteSize, 0);
     for (const ShaderPropertyDesc& desc : meta.properties)
     {
         const ShaderMetaPropertyBinding* binding = FindBinding(layout, desc.name);
@@ -412,13 +412,6 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
         if (old != m_propertyValues.end()) value = *old;
         else if (!ApplyDefault(desc, value, outError)) return false;
 
-        if (!ValidateLogicalValue(desc, value, outError)
-            || !PackProperty(desc, *binding, value, constantBuffer, outError))
-        {
-            if (outError.empty())
-                outError = "Material texture property binding 종류가 다르다: " + desc.name;
-            return false;
-        }
         values.push_back(std::move(value));
     }
 
@@ -430,44 +423,83 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
             selections[index] = m_keywordSelections[index];
     }
 
-    m_shaderMetaGuid = meta.guid;
-    m_propertyValues = std::move(values);
-    m_keywordSelections = std::move(selections);
-    m_runtimeSchema = std::move(runtimeSchema);
-	m_shaderMetaHandle = shaderMetaHandle;
-    m_cbufferValues.clear();
-    if (!layout.constantBufferName.empty())
+    std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
+    std::shared_ptr<const LX::Runtime::Instance> instance;
+    std::vector<MaterialTextureOwner> owners;
+    for (const auto& owner : m_textureOwners)
     {
-        m_cbufferValues.emplace(layout.constantBufferName, std::move(constantBuffer));
+        const auto* binding = FindBinding(layout, owner.propertyName);
+        if (binding && binding->propertyType == ShaderPropertyType::Texture2D) owners.push_back(owner);
     }
+    if (!LX::Runtime::CreateCodeShader(meta, layout, shaderMetaHandle, shader, outError) ||
+        !LX::Runtime::BuildInstance(std::move(shader), values, selections, owners, instance, outError)) return false;
+    m_runtimeInstance = std::move(instance);
+    m_shaderMetaGuid = meta.guid;
+	m_shaderMetaHandle = shaderMetaHandle;
+    SynchronizeCodeRuntime();
     outError.clear();
     return true;
 }
 
 void Material::ResetShaderRuntime()
 {
-	m_runtimeSchema.reset();
+    m_runtimeInstance.reset();
 	m_shaderMetaHandle = {};
 }
 
 const ShaderMetaBindingLayout* Material::GetShaderBindingLayout() const
 {
-    return m_runtimeSchema ? &m_runtimeSchema->layout : nullptr;
+    const auto* instance = RuntimeInstance();
+    return instance && instance->shader ? &instance->shader->layout : nullptr;
+}
+
+const ShaderMeta* Material::GetGeneratedShaderMeta() const
+{
+    return m_materialGraphInstance && m_materialGraphInstance->generation->cooked.product.materialShader
+        ? &m_materialGraphInstance->generation->cooked.product.materialShader->meta : nullptr;
+}
+
+std::span<const MaterialPropertyValue> Material::GetShaderPropertyValues() const
+{
+    if (const auto* instance = RuntimeInstance()) return instance->properties;
+    return m_propertyValues;
 }
 
 std::span<const std::uint8_t> Material::GetConstantBufferData() const
 {
-    if (!m_runtimeSchema || m_runtimeSchema->layout.constantBufferName.empty()) return {};
-    const auto found = m_cbufferValues.find(m_runtimeSchema->layout.constantBufferName);
-    return found == m_cbufferValues.end()
-        ? std::span<const std::uint8_t>{}
-        : std::span<const std::uint8_t>{ found->second };
+    if (const auto* instance = RuntimeInstance()) return instance->uniforms;
+    return {};
+}
+
+void Material::SynchronizeCodeRuntime()
+{
+    if (!m_runtimeInstance) return;
+    m_propertyValues = m_runtimeInstance->properties;
+    m_keywordSelections = m_runtimeInstance->keywordSelections;
+    m_textureOwners = m_runtimeInstance->textureOwners;
+    m_cbufferValues.clear();
+    const auto& layout = m_runtimeInstance->shader->layout;
+    if (!layout.constantBufferName.empty()) m_cbufferValues.emplace(layout.constantBufferName, m_runtimeInstance->uniforms);
 }
 
 bool Material::BuildShaderPropertyBlock(const ShaderMeta& meta,
     const ShaderMetaBindingLayout& layout,
     std::vector<std::uint8_t>& outBytes, std::string& outError) const
 {
+    if (m_materialGraphInstance)
+    {
+        const auto* generated = GetGeneratedShaderMeta();
+        const auto* binding = GetShaderBindingLayout();
+        if (!generated || !binding || !meta.generatedMaterial || meta.guid != generated->guid ||
+            meta.generatedMaterial->generation != generated->generatedMaterial->generation || layout != *binding)
+        {
+            outError = "Material property block requires the accepted generated schema and layout.";
+            return false;
+        }
+        outBytes = m_materialGraphInstance->uniforms;
+        outError.clear();
+        return true;
+    }
     if (layout.properties.size() != meta.properties.size()
         || layout.constantBufferName.empty()
         || 0 == layout.constantBufferByteSize)
@@ -545,7 +577,23 @@ bool Material::TrySetTextureGuid(std::string_view property, const FileGuid& guid
     const VarView view = FindProperty(property);
     if (!view.binding || ShaderPropertyType::Texture2D != view.binding->propertyType)
         return false;
-    m_propertyValues[view.propertyIndex].m_textureGuid = guid;
+    if (m_materialGraphInstance)
+    {
+        const auto& desc = GetGeneratedShaderMeta()->properties[view.propertyIndex];
+        if (!desc.exposed || !desc.parameterId) return false;
+        auto description = m_materialGraphInstance->description;
+        const auto override = std::ranges::find(description.textures, desc.parameterId, &material_graph::TextureOverride::parameter);
+        if (override == description.textures.end()) description.textures.push_back({desc.parameterId, experiment::AssetId{guid.m_guid}});
+        else override->assetId.value = guid.m_guid;
+        std::string error;
+        return DataSystem::GetInstance()->ConfigureMaterialGraph(*this, description, error);
+    }
+    if (!m_runtimeInstance) return false;
+    auto value = m_runtimeInstance->properties[view.propertyIndex];
+    value.m_textureGuid = guid;
+    std::string error;
+    if (!LX::Runtime::SetValue(*m_runtimeInstance, value, m_runtimeInstance, error)) return false;
+    SynchronizeCodeRuntime();
     return true;
 }
 
@@ -554,44 +602,40 @@ bool Material::TryGetTextureGuid(std::string_view property, FileGuid& outGuid) c
     const VarView view = FindProperty(property);
     if (!view.binding || ShaderPropertyType::Texture2D != view.binding->propertyType)
         return false;
-    outGuid = m_propertyValues[view.propertyIndex].m_textureGuid;
+    outGuid = GetShaderPropertyValues()[view.propertyIndex].m_textureGuid;
     return true;
 }
 
 bool Material::TrySetKeywordSelection(std::string_view axis, std::string_view value)
 {
-    if (!m_runtimeSchema) return false;
-    for (std::size_t axisIndex = 0; axisIndex < m_runtimeSchema->keywords.size(); ++axisIndex)
-    {
-        const ShaderKeywordAxis& keyword = m_runtimeSchema->keywords[axisIndex];
-        if (keyword.name != axis) continue;
-        const auto found = std::find(keyword.values.begin(), keyword.values.end(), value);
-        if (found == keyword.values.end()) return false;
-        m_keywordSelections[axisIndex] = static_cast<std::uint16_t>(
-            std::distance(keyword.values.begin(), found));
-        return true;
-    }
-    return false;
+    if (!m_runtimeInstance) return false;
+    std::string error;
+    if (!LX::Runtime::SetKeyword(*m_runtimeInstance, axis, value, m_runtimeInstance, error)) return false;
+    SynchronizeCodeRuntime();
+    return true;
 }
 
 Material::VarView Material::FindVar(std::string_view cb, std::string_view var) const
 {
-    if (!m_runtimeSchema || cb != m_runtimeSchema->layout.constantBufferName) return {};
+    const auto* layout = GetShaderBindingLayout();
+    if (!layout || cb != layout->constantBufferName) return {};
     return FindProperty(var);
 }
 
 Material::VarView Material::FindProperty(std::string_view property) const
 {
-    if (!m_runtimeSchema) return {};
-    const ShaderMetaPropertyBinding* binding = FindBinding(m_runtimeSchema->layout, property);
+    const auto* layout = GetShaderBindingLayout();
+    if (!layout) return {};
+    const ShaderMetaPropertyBinding* binding = FindBinding(*layout, property);
     if (!binding) return {};
-    const auto value = std::find_if(m_propertyValues.begin(), m_propertyValues.end(),
+    const auto values = GetShaderPropertyValues();
+    const auto value = std::find_if(values.begin(), values.end(),
         [&](const MaterialPropertyValue& candidate)
         {
             return candidate.m_name == property;
         });
-    if (value == m_propertyValues.end()) return {};
-    return { binding, static_cast<std::size_t>(value - m_propertyValues.begin()) };
+    if (value == values.end()) return {};
+    return { binding, static_cast<std::size_t>(value - values.begin()) };
 }
 
 bool Material::SplitQualified(std::string_view q, std::string& outCB, std::string& outVar)
@@ -605,17 +649,35 @@ bool Material::SplitQualified(std::string_view q, std::string& outCB, std::strin
 
 bool Material::WriteBytes(const VarView& v, const void* src, size_t size)
 {
-    if (!v.binding || !src || v.propertyIndex >= m_propertyValues.size()) return false;
+    if (!v.binding || !src || v.propertyIndex >= GetShaderPropertyValues().size()) return false;
     if (size != LogicalByteSize(v.binding->propertyType)
         || size > v.binding->byteSize) return false;
-    auto it = m_cbufferValues.find(v.binding->resourceName);
-    if (it == m_cbufferValues.end()) return false;
-
-    auto& bytes = it->second;
-    if (v.binding->byteOffset + size > bytes.size()) return false;
-    std::memcpy(bytes.data() + v.binding->byteOffset, src, size);
-
-    MaterialPropertyValue& value = m_propertyValues[v.propertyIndex];
+    if (m_materialGraphInstance)
+    {
+        const auto& desc = GetGeneratedShaderMeta()->properties[v.propertyIndex];
+        if (!desc.parameterId || !desc.exposed) return false;
+        LX::LXSocketValue value;
+        switch (desc.type)
+        {
+        case ShaderPropertyType::Bool: { std::int32_t input; std::memcpy(&input, src, 4); value = input != 0; break; }
+        case ShaderPropertyType::Int: { std::int32_t input; std::memcpy(&input, src, 4); value = std::int64_t(input); break; }
+        case ShaderPropertyType::Float: { float input; std::memcpy(&input, src, 4); value = double(input); break; }
+          case ShaderPropertyType::Float3: case ShaderPropertyType::Float4:
+          {
+              std::array<float, 4> input{};
+              if (size > sizeof(input)) return false;
+              std::memcpy(input.data(), src, size);
+            if (desc.type == ShaderPropertyType::Float3) value = std::array<double, 3>{input[0], input[1], input[2]};
+            else value = std::array<double, 4>{input[0], input[1], input[2], input[3]};
+            break;
+        }
+        default: return false;
+        }
+        std::string error;
+        return TrySetMaterialGraphParameter(desc.parameterId, std::move(value), error);
+    }
+    if (!m_runtimeInstance) return false;
+    auto value = m_runtimeInstance->properties[v.propertyIndex];
     const std::size_t numericCount = NumericElementCount(v.binding->propertyType);
     if (0 != numericCount)
     {
@@ -631,12 +693,22 @@ bool Material::WriteBytes(const VarView& v, const void* src, size_t size)
         value.m_boolValue = 0 != encoded;
     }
 
+    std::string error;
+    if (!LX::Runtime::SetValue(*m_runtimeInstance, value, m_runtimeInstance, error)) return false;
+    SynchronizeCodeRuntime();
     return true;
 }
 
 bool Material::ReadBytes(const VarView& v, void* dst, size_t size) const
 {
     if (!v.binding || !dst || size > LogicalByteSize(v.binding->propertyType)) return false;
+    if (RuntimeInstance())
+    {
+        const auto bytes = GetConstantBufferData();
+        if (v.binding->byteOffset + size > bytes.size()) return false;
+        std::memcpy(dst, bytes.data() + v.binding->byteOffset, size);
+        return true;
+    }
     auto it = m_cbufferValues.find(v.binding->resourceName);
     if (it == m_cbufferValues.end()) return false;
 

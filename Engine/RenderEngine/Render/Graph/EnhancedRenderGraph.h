@@ -36,22 +36,23 @@ class IRenderDeviceServices;
 //   ④ transient 리소스의 수명을 알려 준다(힙 앨리어싱의 재료 — 실제 앨리어싱은
 //      실전 예산이 보이는 3-6에서 붙인다)
 //
-// 하지 않는 일: 패스 재정렬.
-//
-// 처음에는 위상 정렬로 순서를 유도하게 짰다가 자가 검증에서 뒤집었다. 순수
-// 데이터 흐름만으로는 순서가 정해지지 않는다 — 한 리소스에 두 패스가 쓰면 둘 중
-// 무엇이 먼저인지 알 방법이 없고 결국 선언 순서로 되돌아온다. 그러면 정렬은
-// 선언 순서를 다시 만들어 내는 일이 되고, 어쩌다 뒤집히면 프레임이 실행마다
-// 달라져 픽셀 대조가 흔들린다. 실행 순서 = 선언 순서(컬링된 것만 빠짐)가 계약이다.
+// RG1 ExplicitSingleWriter 모드는 명시적 접근으로 안정적 DAG 정렬을 수행한다.
+// ExplicitVersioned 모드는 RG2 Write/Modify 계보로 RAW/WAR/WAW를 정렬한다.
+// 제품 기본값은 RG5 선언 이관과 RG6 전환까지 기존 선언 순서를 유지한다.
+// 단일 writer로 순서가 결정되지 않는 입력은 DAG 모드에서 컴파일 오류다.
 //
 // 배리어를 사람이 붙이지 않는 것이 요점이다. DX11은 드라이버가 해 주던 일이라
 // 손으로 옮기면 빠뜨리기 쉽고, 빠뜨린 배리어는 '가끔 이상하게 보인다'로만 드러난다.
 
+enum class RGResourceKind { Texture, Buffer };
 struct RGHandle
 {
     uint16_t index{ 0xFFFF };
     static constexpr uint16_t kInvalid = 0xFFFF;
     bool IsValid() const { return kInvalid != index; }
+    uint16_t version{0};
+    RGResourceKind kind{RGResourceKind::Texture};
+    uint64_t epoch{0};
 };
 
 struct RGPassId
@@ -60,6 +61,9 @@ struct RGPassId
     static constexpr uint16_t kInvalid = 0xFFFF;
     bool IsValid() const { return kInvalid != index; }
 };
+
+enum class RGAccessMode { LegacyState, Read, Write, ReadWrite };
+enum class RGSchedulingMode { DeclarationOrder, ExplicitSingleWriter, ExplicitVersioned };
 
 // 그래프가 만들 리소스의 설명. transient(그래프 소유)만 이 설명을 쓴다.
 struct RGTextureDesc
@@ -269,7 +273,8 @@ public:
     ///   G-3에서 병렬 기록도 `IRHIParallelCommandPool` 계약으로 내려갔다.
     ///   따라서 이 생성자로 만든 그래프도 backend 중립 pool을 받아
     ///   `RecordParallel`을 실행할 수 있다.
-    explicit EnhancedRenderGraph(IRenderDeviceServices& services);
+    explicit EnhancedRenderGraph(IRenderDeviceServices& services,
+        RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder);
     const IRenderDeviceServices& DeviceServices() const { return *m_deviceServices; }
     uint64_t ResourceEpoch() const { return m_resourceEpoch; }
     RHIBufferHandle ResolveBufferHandle(RGHandle handle) const;
@@ -296,6 +301,10 @@ public:
     // 그래프가 소유할 리소스를 선언한다. 실제 생성은 Compile에서 한다 —
     // 컬링으로 사라진 패스만 쓰던 리소스는 만들지 않기 위해서다.
     RGHandle CreateTexture(const RGTextureDesc& desc);
+    // Version declarations do not mutate the physical resource. Compile validates
+    // their producer usages and rejects forks; old versions remain readable.
+    RGHandle Write(RGHandle previous);
+    RGHandle Modify(RGHandle previous);
 
     // 패스 선언. usages는 (핸들, 그 패스가 요구하는 상태) 목록이다.
     //
@@ -307,6 +316,7 @@ public:
     {
         RGHandle        handle;
         RHIResourceState state{ RHIResourceState::Common };
+        RGAccessMode access{ RGAccessMode::LegacyState };
     };
 
     RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
@@ -351,6 +361,43 @@ public:
     void SetProfiler(IRHIGpuProfiler* profiler) { m_profiler = profiler; }
 
     Stats GetStats() const { return m_stats; }
+
+    // Explicit diagnostic copy only. It owns no GPU objects and never drives execution.
+    // Legacy inference and explicit versioned accesses remain distinguishable.
+    struct DiagnosticUsage { uint32_t resource; RHIResourceState state; bool inferredWrite; RGAccessMode access{RGAccessMode::LegacyState}; uint16_t version{0}; RGResourceKind kind{RGResourceKind::Texture}; };
+    struct DiagnosticBarrier
+    {
+        uint32_t resource;
+        RHIResourceState before, after;
+        bool uav;
+    };
+    struct DiagnosticPass
+    {
+        std::string name;
+        uint32_t authoredIndex;
+        int32_t compiledIndex{-1};
+        bool culled, sideEffect;
+        uint32_t recordCost, maxSlices;
+        std::vector<DiagnosticUsage> usages;
+        std::vector<DiagnosticBarrier> barriers;
+    };
+    struct DiagnosticResource
+    {
+        std::string name;
+        bool imported, buffer, used;
+        uint32_t firstUse, lastUse;
+    };
+    struct DiagnosticSnapshot
+    {
+        struct VersionEdge { uint32_t producer, consumer, resource; uint16_t version; enum class Reason { RAW, WAR, WAW } reason; };
+        struct ReachabilityEdge { uint32_t producer, consumer, resource; };
+        std::vector<DiagnosticPass> passes;
+        std::vector<DiagnosticResource> resources;
+        std::vector<uint16_t> executeOrder;
+        std::vector<ReachabilityEdge> reachabilityEdges;
+        std::vector<VersionEdge> versionEdges;
+    };
+    bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 
     // 검증·진단용. Compile 뒤에 유효하다.
     const std::vector<uint16_t>& GetExecuteOrder() const { return m_executeOrder; }
@@ -408,6 +455,8 @@ private:
         uint32_t firstUse{ 0xFFFFFFFF };
         uint32_t lastUse{ 0 };
         std::string name;
+        struct Version { uint16_t parent; bool modify; };
+        std::vector<Version> versions;
     };
 
     struct Pass
@@ -446,6 +495,12 @@ private:
     std::vector<uint16_t> m_executeOrder;
     IRHIGpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
+    RGSchedulingMode m_scheduling{ RGSchedulingMode::DeclarationOrder };
+    bool BuildExplicitOrder(std::string& outError);
+    RGHandle VersionHandle(uint16_t index, uint16_t version) const;
+    RGHandle AdvanceVersion(RGHandle previous, bool modify);
+    bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;
+    std::vector<DiagnosticSnapshot::VersionEdge> m_versionEdges;
     Stats m_stats;
 
     uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };

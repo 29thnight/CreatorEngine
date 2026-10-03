@@ -74,7 +74,8 @@ bool IblBakeResult::MatchesGpu(const IRenderDeviceServices& device, const IblEnv
 }
 
 bool IblBaker::Initialize(IRenderDeviceServices& device, IRenderRootSignatureCache& roots,
-                          IRenderPipelineCache& pipelines, const RHIShaderBlob& shader, std::string& error)
+                          IRenderPipelineCache& pipelines, const RHIShaderBlob& shader, std::string& error,
+                          LX::Runtime::ComputeShaderDescription identity)
 {
     if (!shader.IsValid() || (device_ && device_ != &device))
     {
@@ -93,13 +94,13 @@ bool IblBaker::Initialize(IRenderDeviceServices& device, IRenderRootSignatureCac
     description.layout = layout;
     description.csBytecode = shader.Data();
     description.csSize = shader.Size();
-    const auto pipeline = pipelines.GetOrCreateCompute(description, error);
-    if (!pipeline.IsValid())
+    LX::Runtime::ComputePipeline pipeline;
+    if (!pipeline.Create(pipelines, description, std::move(identity), error))
     {
         return false;
     }
     device_ = &device;
-    pipeline_ = pipeline;
+    pipeline_ = pipeline.GetGeneration();
     error.clear();
     return true;
 }
@@ -175,7 +176,7 @@ bool IblBaker::PrepareInputs(IRenderDeviceServices& device, const IblEnvironment
     const bool validPoints = gpuPoints ? gpuPoints->Device() == &device && gpuPoints->Buffer().IsValid() &&
                                              (gpuPoints->RecordingId() == recordingId || gpuPoints->IsValidated())
                                        : std::ranges::all_of(cpuPoints, IsValidIblBakePoint);
-    if (device_ != &device || !pipeline_.IsValid() || recordingId == 0 || count == 0 || count > MaxPoints ||
+    if (device_ != &device || !(pipeline_ && pipeline_->IsValid()) || recordingId == 0 || count == 0 || count > MaxPoints ||
         !validPoints || !environment.owner || environment.generation == 0 || !cube.IsValid() || !cube.isCube ||
         cube.arraySize != 6 || cube.width == 0 || cube.width != cube.height || cube.mipLevels == 0 ||
         (cube.format != RHIFormat::RGBA16Float && cube.format != RHIFormat::RGBA32Float))
@@ -253,7 +254,7 @@ bool IblBakeResult::RecordCommands(RHIEncoder& encoder, std::string& error) cons
         error = "IBL recording is stale or has already been recorded.";
         return false;
     }
-    encoder.SetPipeline(RHIBindPoint::Compute, pipeline_);
+    encoder.SetPipeline(RHIBindPoint::Compute, pipeline_->GetHandle());
     encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform_);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, inputs_);
     encoder.SetBindings(RHIBindPoint::Compute, 2, sourceTable_);

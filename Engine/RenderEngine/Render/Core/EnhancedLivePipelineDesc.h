@@ -229,7 +229,8 @@ public:
     /// 노드 순서대로 declare를 부른다. 비활성 노드는 건너뛴다 —
     /// 그 노드의 modifies 슬롯은 값이 그대로 남아 뒤 노드가 이어받는다.
     void DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
-        const EnhancedFrameContext& context, const LiveFrameBinding& binding) const;
+        const EnhancedFrameContext& context, const LiveFrameBinding& binding,
+        const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare = {}) const;
 
     /// 렌더 디버그 창용. 노드 이름 · 활성 상태 · 슬롯 연결을 사람이 읽는 형태로.
     ///

@@ -7,6 +7,9 @@
 #include "DX12TestTextureRegistration.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "Render/Scene/EnhancedCameraReplayInput.h"
+#include "Render/Scene/EnhancedDrawReplayInput.h"
+#include "Render/Scene/EnhancedLatticeReplayInput.h"
 #include "Render/Core/EnhancedLivePipelineDesc.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 #include "Render/Passes/Geometry/EnhancedDeferredPass.h"
@@ -560,6 +563,299 @@ passes:
         uint32_t liveReadbacks{ 0 };
         uint32_t releasedReadbacks{ 0 };
     };
+
+    bool ValidateRg1GraphFixtures(std::string& error)
+    {
+        R6bFakeReadbackServices services;
+        const auto desc = [](const char* name) { RGTextureDesc d{}; d.width=4; d.height=4; d.allowRenderTarget=true; d.allowUnorderedAccess=true; d.name=name; return d; };
+        using A = RGAccessMode;
+        const auto mode = RGSchedulingMode::ExplicitSingleWriter;
+        const auto fail = [&](const char* why) { error=why; return false; };
+        std::array<int,4> permutation{0,1,2,3};
+        do {
+            EnhancedRenderGraph g(services,mode);
+            const auto a=g.CreateTexture(desc("a")), b=g.CreateTexture(desc("b"));
+            for(const auto p:permutation) {
+                if(p==0) g.AddPass("A",{{a,RHIResourceState::UnorderedAccess,A::Write}},nullptr);
+                if(p==1) g.AddPass("B",{{a,RHIResourceState::UnorderedAccess,A::Read},{b,RHIResourceState::RenderTarget,A::Write}},nullptr);
+                if(p==2) g.AddPass("C",{{b,RHIResourceState::ShaderResource,A::Read}},nullptr,true);
+                if(p==3) g.AddPass("independent",{},nullptr,true);
+            }
+            if(!g.Compile(error)) return false;
+            const auto& order=g.GetExecuteOrder();
+            std::vector<int> chain;
+            for(const auto i:order) if(permutation[i]!=3) chain.push_back(permutation[i]);
+            if(order.size()!=4 || chain!=std::vector<int>{0,1,2}) return fail("shuffle RAW chain/culling failure");
+            // The independent pass is always ready. It must win over every
+            // larger authored index while ready, including newly unblocked work.
+            const auto independent=std::find(permutation.begin(),permutation.end(),3)-permutation.begin();
+            for(const auto i:order) { if(i==independent) break; if(i>independent) return fail("unstable independent tie break"); }
+            int nextChain=0;
+            for(const auto i:order) {
+                if(permutation[i]!=3) { ++nextChain; continue; }
+                if(nextChain<3 && std::find(permutation.begin(),permutation.end(),nextChain)-permutation.begin()<independent)
+                    return fail("newly ready lower index lost stable tie break");
+            }
+            EnhancedRenderGraph::DiagnosticSnapshot snap;
+            if(!g.CaptureDiagnosticSnapshot(snap) || snap.reachabilityEdges.size()!=2) return fail("explicit UAV read lost dependency");
+        } while(std::next_permutation(permutation.begin(),permutation.end()));
+        EnhancedRenderGraph g(services,mode);
+        auto a=g.CreateTexture(desc("cycle-a")), b=g.CreateTexture(desc("cycle-b"));
+        g.AddPass("A",{{a,RHIResourceState::RenderTarget,A::Write},{b,RHIResourceState::ShaderResource,A::Read}},nullptr,true);
+        g.AddPass("B",{{b,RHIResourceState::RenderTarget,A::Write},{a,RHIResourceState::ShaderResource,A::Read}},nullptr,true);
+        if(g.Compile(error) || error.find("A --cycle-a--> B --cycle-b--> A")==std::string::npos
+            || !g.GetExecuteOrder().empty()) return fail("cycle chain not rejected transactionally");
+        g.Reset(); a=g.CreateTexture(desc("missing"));
+        g.AddPass("missing",{{a,RHIResourceState::ShaderResource,A::Read}},nullptr,true);
+        if(g.Compile(error) || error.find("missing writer")==std::string::npos) return fail("missing writer accepted");
+        g.Reset(); a=g.ImportTexture(RHITextureHandle{123},RHIResourceState::UnorderedAccess,"history");
+        g.AddPass("history",{{a,RHIResourceState::UnorderedAccess,A::ReadWrite}},nullptr);
+        if(!g.Compile(error) || g.GetExecuteOrder().size()!=1) return fail("sole imported ReadWrite lost");
+        g.AddPass("ambiguous",{{a,RHIResourceState::ShaderResource,A::Read}},nullptr,true);
+        if(g.Compile(error) || error.find("ambiguous ReadWrite")==std::string::npos) return fail("ambiguous Modify accepted");
+        g.Reset(); a=g.CreateTexture(desc("two-writers"));
+        g.AddPass("W1",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr);
+        g.AddPass("W2",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr,true);
+        if(g.Compile(error) || error.find("multiple writers")==std::string::npos) return fail("multiwriter accepted");
+        g.Reset(); a=g.CreateTexture(desc("legacy"));
+        g.AddPass("implicit",{{a,RHIResourceState::RenderTarget}},nullptr,true);
+        if(g.Compile(error)) return fail("implicit access accepted");
+        g.Reset(); g.AddPass("invalid",{{RGHandle{},RHIResourceState::ShaderResource,A::Read}},nullptr,true);
+        if(g.Compile(error)) return fail("invalid handle accepted");
+        g.Reset(); a=g.CreateTexture(desc("duplicate"));
+        g.AddPass("duplicate",{{a,RHIResourceState::RenderTarget,A::Write},{a,RHIResourceState::ShaderResource,A::Read}},nullptr,true);
+        if(g.Compile(error)) return fail("duplicate access accepted");
+        g.Reset(); a=g.CreateTexture(desc("wrong-state"));
+        g.AddPass("wrong-state",{{a,RHIResourceState::ShaderResource,A::Write}},nullptr,true);
+        if(g.Compile(error)) return fail("write in read state accepted");
+        g.Reset(); a=g.CreateTexture(desc("uninitialized-modify"));
+        g.AddPass("uninitialized-modify",{{a,RHIResourceState::UnorderedAccess,A::ReadWrite}},nullptr,true);
+        if(g.Compile(error)) return fail("uninitialized Modify accepted");
+        error.clear(); return true;
+    }
+
+    bool ValidateRg2GraphFixtures(std::string& error)
+    {
+        R6bFakeReadbackServices services;
+        using A=RGAccessMode;
+        const auto mode=RGSchedulingMode::ExplicitVersioned;
+        const auto fail=[&](const char* why){error=why; return false;};
+        RGTextureDesc d{}; d.width=4; d.height=4; d.allowRenderTarget=true; d.name="versioned";
+        // Same physical storage: old reads must finish before either Modify or
+        // a discard Write overwrites it, regardless of declaration order.
+        for (const bool buffer:{false,true})
+        {
+            std::array<int,5> permutation{0,1,2,3,4};
+            do {
+                EnhancedRenderGraph g(services,mode);
+                const auto initial=buffer ? g.ImportBuffer(RHIBufferHandle{124},RHIResourceState::Common,"buffer") : g.CreateTexture(d);
+                const auto a=g.Write(initial), b=g.Modify(a), c=g.Write(b);
+                if(!a.IsValid() || !b.IsValid() || !c.IsValid()) return fail("version declaration failed");
+                for(const auto p:permutation) {
+                    if(p==0) g.AddPass("W0",{{a,RHIResourceState::CopyDest,A::Write}},nullptr);
+                    if(p==1) g.AddPass("R0",{{a,RHIResourceState::CopySource,A::Read}},nullptr,true);
+                    if(p==2) g.AddPass("Modify",{{b,RHIResourceState::CopyDest,A::ReadWrite}},nullptr);
+                    if(p==3) g.AddPass("R1",{{b,RHIResourceState::CopySource,A::Read}},nullptr,true);
+                    if(p==4) g.AddPass("W2",{{c,RHIResourceState::CopyDest,A::Write}},nullptr,true);
+                }
+                if(!g.Compile(error)) return false;
+                std::vector<int> actual; for(const auto p:g.GetExecuteOrder()) actual.push_back(permutation[p]);
+                if(actual!=std::vector<int>{0,1,2,3,4}) return fail("RAW/WAR/WAW shuffle order");
+                EnhancedRenderGraph::DiagnosticSnapshot snap;
+                if(!g.CaptureDiagnosticSnapshot(snap)) return fail("version snapshot missing");
+                using Reason=EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason;
+                for(const auto reason:{Reason::RAW,Reason::WAR,Reason::WAW})
+                    if(std::none_of(snap.versionEdges.begin(),snap.versionEdges.end(),[&](const auto& e){return e.reason==reason;}))
+                        return fail("version edge reason missing");
+                if(snap.passes[0].usages[0].kind!=(buffer?RGResourceKind::Buffer:RGResourceKind::Texture)) return fail("resource kind lost");
+            } while(std::next_permutation(permutation.begin(),permutation.end()));
+        }
+        EnhancedRenderGraph g(services,mode);
+        auto initial=g.CreateTexture(d), a=g.Write(initial), b=g.Write(initial);
+        g.AddPass("fork-a",{{a,RHIResourceState::CopyDest,A::Write}},nullptr,true);
+        g.AddPass("fork-b",{{b,RHIResourceState::CopyDest,A::Write}},nullptr,true);
+        if(g.Compile(error) || error.find("forked")==std::string::npos || !g.GetExecuteOrder().empty()) return fail("fork accepted");
+        const auto stale=a; g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial);
+        g.AddPass("stale",{{stale,RHIResourceState::CopyDest,A::Write}},nullptr,true);
+        if(g.Compile(error) || error.find("stale")==std::string::npos) return fail("Reset stale accepted");
+        g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial); auto wrong=a; wrong.kind=RGResourceKind::Buffer;
+        g.AddPass("wrong-kind",{{wrong,RHIResourceState::CopyDest,A::Write}},nullptr,true);
+        if(g.Compile(error)) return fail("wrong kind accepted");
+        g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial);
+        EnhancedRenderGraph foreign(services,mode);
+        foreign.CreateTexture(d);
+        foreign.AddPass("foreign",{{a,RHIResourceState::CopyDest,A::Write}},nullptr,true);
+        if(foreign.Compile(error)) return fail("foreign epoch accepted");
+        g.AddPass("W0",{{a,RHIResourceState::CopyDest,A::Write}},nullptr);
+        auto unissued=a; ++unissued.version;
+        g.AddPass("unissued",{{unissued,RHIResourceState::CopySource,A::Read}},nullptr,true);
+        if(g.Compile(error)) return fail("unissued version accepted");
+        g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial); b=g.Modify(a);
+        g.AddPass("W0",{{a,RHIResourceState::CopyDest,A::Write}},nullptr);
+        g.AddPass("wrong-modify",{{b,RHIResourceState::CopyDest,A::Write}},nullptr,true);
+        if(g.Compile(error)) return fail("Modify represented as Write accepted");
+        g.Reset(); initial=g.ImportBuffer(RHIBufferHandle{124},RHIResourceState::Common,"alias-a");
+        auto alias=g.ImportBuffer(RHIBufferHandle{124},RHIResourceState::Common,"alias-b");
+        g.AddPass("alias",{{initial,RHIResourceState::CopySource,A::Read},{alias,RHIResourceState::CopySource,A::Read}},nullptr,true);
+        if(g.Compile(error) || error.find("duplicate physical import")==std::string::npos) return fail("physical alias accepted");
+        g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial);
+        g.AddPass("missing",{{a,RHIResourceState::CopySource,A::Read}},nullptr,true);
+        if(g.Compile(error) || error.find("missing version producer")==std::string::npos) return fail("missing accepted");
+        g.Reset(); initial=g.CreateTexture(d);
+        if(g.Modify(initial).IsValid()) return fail("uninitialized Modify accepted");
+        g.Reset(); initial=g.ImportTexture(RHITextureHandle{123},RHIResourceState::CopySource,"history"); b=g.Modify(initial);
+        g.AddPass("Modify",{{b,RHIResourceState::CopyDest,A::ReadWrite}},nullptr);
+        g.AddPass("external-read",{{initial,RHIResourceState::CopySource,A::Read}},nullptr,true);
+        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{1,0}) return fail("import v0 WAR failure");
+        g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial); b=g.Modify(a);
+        g.AddPass("cycle-old-read",{{a,RHIResourceState::CopySource,A::Read},{b,RHIResourceState::CopySource,A::Read}},nullptr,true);
+        g.AddPass("writer",{{a,RHIResourceState::CopyDest,A::Write}},nullptr);
+        g.AddPass("modify",{{b,RHIResourceState::CopyDest,A::ReadWrite}},nullptr);
+        // Duplicate physical access is rejected before scheduling; use a second
+        // resource to construct a genuine RAW/WAR cycle below.
+        if(g.Compile(error)) return fail("duplicate version access accepted");
+        g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial); b=g.Modify(a);
+        auto token=g.Write(g.CreateTexture(d));
+        g.AddPass("old-reader",{{a,RHIResourceState::CopySource,A::Read},{token,RHIResourceState::CopySource,A::Read}},nullptr,true);
+        g.AddPass("writer",{{a,RHIResourceState::CopyDest,A::Write}},nullptr);
+        g.AddPass("modify",{{b,RHIResourceState::CopyDest,A::ReadWrite},{token,RHIResourceState::CopyDest,A::Write}},nullptr);
+        if(g.Compile(error) || error.find("RG2 cycle:")==std::string::npos || error.find(" v0")==std::string::npos) return fail("version cycle accepted");
+        error.clear(); return true;
+    }
+
+    bool ValidateRg3GraphFixtures(std::string& error)
+    {
+        R6bFakeReadbackServices services;
+        using A=RGAccessMode;
+        const auto mode=RGSchedulingMode::ExplicitVersioned;
+        const auto fail=[&](const char* why){error=why; return false;};
+        RGTextureDesc d{}; d.width=4; d.height=4; d.allowRenderTarget=true; d.allowUnorderedAccess=true; d.name="live";
+        std::array<int,5> permutation{0,1,2,3,4};
+        do {
+            EnhancedRenderGraph g(services,mode);
+            const auto a=g.Write(g.CreateTexture(d)), dead=g.Write(a), b=g.Write(dead);
+            const auto unused=g.Write(g.CreateTexture(d));
+            for(const auto p:permutation) {
+                if(p==0) g.AddPass("W0",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr);
+                if(p==1) g.AddPass("R0",{{a,RHIResourceState::CopySource,A::Read}},nullptr,true);
+                if(p==2) g.AddPass("dead-W1",{{dead,RHIResourceState::UnorderedAccess,A::Write}},nullptr);
+                if(p==3) g.AddPass("W2",{{b,RHIResourceState::RenderTarget,A::Write}},nullptr);
+                if(p==4) g.AddPass("R2",{{b,RHIResourceState::CopySource,A::Read}},nullptr,true);
+            }
+            g.AddPass("dead-resource",{{unused,RHIResourceState::RenderTarget,A::Write}},nullptr);
+            if(!g.Compile(error)) return false;
+            std::vector<int> actual; for(const auto p:g.GetExecuteOrder()) { if(p>=permutation.size()) return fail("dead resource survived"); actual.push_back(permutation[p]); }
+            if(actual!=std::vector<int>{0,1,3,4} || g.GetStats().passesCulled!=2) return fail("dead version/order mismatch");
+            EnhancedRenderGraph::DiagnosticSnapshot snap;
+            if(!g.CaptureDiagnosticSnapshot(snap) || snap.resources[1].used || snap.resources[0].firstUse!=0 || snap.resources[0].lastUse!=3)
+                return fail("sorted lifetime/dead allocation mismatch");
+            uint32_t first=99,last=99;
+            if(!g.GetTransientLifetime(b,first,last) || first!=0 || last!=3 || g.GetTransientLifetime(unused,first,last)) return fail("lifetime query mismatch");
+            const auto index=[&](int role){return static_cast<size_t>(std::find(permutation.begin(),permutation.end(),role)-permutation.begin());};
+            if(!snap.passes[index(2)].culled || !snap.passes[index(2)].barriers.empty() || !snap.passes[5].barriers.empty()) return fail("dead barriers retained");
+            const auto transition=[&](int role,RHIResourceState before,RHIResourceState after){
+                const auto& barriers=snap.passes[index(role)].barriers;
+                return barriers.size()==1 && !barriers[0].uav && barriers[0].before==before && barriers[0].after==after;
+            };
+            if(!transition(0,RHIResourceState::Common,RHIResourceState::RenderTarget) ||
+                !transition(1,RHIResourceState::RenderTarget,RHIResourceState::CopySource) ||
+                !transition(3,RHIResourceState::CopySource,RHIResourceState::RenderTarget) ||
+                !transition(4,RHIResourceState::RenderTarget,RHIResourceState::CopySource)) return fail("sorted transition mismatch");
+            using Reason=EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason;
+            const auto& edges=snap.versionEdges;
+            if(std::none_of(edges.begin(),edges.end(),[&](const auto& e){return e.producer==index(1) && e.consumer==index(3) && e.reason==Reason::WAR;}))
+                return fail("WAR bridge lost across culled version");
+            if(std::any_of(edges.begin(),edges.end(),[&](const auto& e){return e.producer==index(2) || e.consumer==index(2);})) return fail("culled edge retained");
+        } while(std::next_permutation(permutation.begin(),permutation.end()));
+        EnhancedRenderGraph g(services,mode);
+        auto initial=g.ImportTexture(RHITextureHandle{123},RHIResourceState::ShaderResource,"output");
+        auto a=g.Write(initial), b=g.Write(a);
+        g.AddPass("discarded",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr);
+        g.AddPass("output",{{b,RHIResourceState::RenderTarget,A::Write}},nullptr);
+        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{1}) return fail("import final version root mismatch");
+        g.Reset(); a=g.Write(g.CreateTexture(d)); b=g.Write(a);
+        g.AddPass("output-read",{{b,RHIResourceState::CopySource,A::Read}},nullptr,true);
+        g.AddPass("dead-input",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr);
+        g.AddPass("dead-reader",{{a,RHIResourceState::CopySource,A::Read}},nullptr);
+        g.AddPass("output-write",{{b,RHIResourceState::RenderTarget,A::Write}},nullptr);
+        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{3,0}) return fail("WAR kept dead reader/producer alive");
+        g.Reset(); a=g.Write(g.CreateTexture(d));
+        g.AddPass("dead-invalid-access",{{a,RHIResourceState::RenderTarget}},nullptr);
+        if(g.Compile(error)) return fail("dead invalid declaration bypassed validation");
+        g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial); b=g.Modify(a);
+        g.AddPass("Modify",{{b,RHIResourceState::UnorderedAccess,A::ReadWrite}},nullptr,true);
+        g.AddPass("input",{{a,RHIResourceState::UnorderedAccess,A::Write}},nullptr);
+        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{1,0}) return fail("Modify input culled");
+        for(const bool buffer:{false,true}) {
+            g.Reset(); initial=buffer ? g.ImportBuffer(RHIBufferHandle{124},RHIResourceState::UnorderedAccess,"uav-buffer") : g.ImportTexture(RHITextureHandle{123},RHIResourceState::UnorderedAccess,"uav-texture");
+            a=g.Modify(initial); b=g.Modify(a);
+            g.AddPass("W1",{{a,RHIResourceState::UnorderedAccess,A::ReadWrite}},nullptr);
+            g.AddPass("R1",{{a,RHIResourceState::UnorderedAccess,A::Read}},nullptr,true);
+            g.AddPass("R1-again",{{a,RHIResourceState::UnorderedAccess,A::Read}},nullptr,true);
+            g.AddPass("W2",{{b,RHIResourceState::UnorderedAccess,A::ReadWrite}},nullptr);
+            if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{0,1,2,3}) return fail("UAV access order mismatch");
+            for(uint16_t p=0;p<4;++p) if(g.GetPassBarrierCount({p})!=(p==2?0u:1u)) return fail("UAV write/read hazard mismatch");
+        }
+        const auto stale=a; g.Reset(); initial=g.Write(g.CreateTexture(d));
+        g.AddPass("new",{{initial,RHIResourceState::RenderTarget,A::Write}},nullptr,true);
+        uint32_t first,last;
+        if(!g.Compile(error) || g.GetTransientLifetime(stale,first,last)) return fail("stale lifetime accepted");
+        error.clear(); return true;
+    }
+
+    bool ValidateBase0GraphFixtures(std::string& error)
+    {
+        R6bFakeReadbackServices services;
+        const auto fail = [&](const char* message) { error = message; return false; };
+        const auto texture = [](const char* name)
+        {
+            RGTextureDesc desc{};
+            desc.width = 4; desc.height = 4; desc.allowRenderTarget = true;
+            desc.name = name;
+            return desc;
+        };
+        EnhancedRenderGraph graph(services);
+        EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+        if (graph.CaptureDiagnosticSnapshot(snapshot)) return fail("uncompiled snapshot accepted");
+        const auto a = graph.CreateTexture(texture("raw"));
+        const auto dead = graph.CreateTexture(texture("culled"));
+        const auto history = graph.ImportTexture(RHITextureHandle{123},
+            RHIResourceState::ShaderResource, "history");
+        graph.AddPass("producer", {{a, RHIResourceState::RenderTarget}}, nullptr);
+        graph.AddPass("independent", {{history, RHIResourceState::ShaderResource}}, nullptr, true);
+        graph.AddPass("dead", {{dead, RHIResourceState::RenderTarget}}, nullptr);
+        graph.AddPass("consumer", {{a, RHIResourceState::ShaderResource}}, nullptr, true);
+        if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot)) return false;
+        if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 3}
+            || !snapshot.passes[2].culled || snapshot.passes[2].compiledIndex != -1
+            || snapshot.resources[0].firstUse != 0 || snapshot.resources[0].lastUse != 2
+            || snapshot.resources[1].used || snapshot.reachabilityEdges.size() != 1
+            || snapshot.reachabilityEdges[0].producer != 0
+            || snapshot.reachabilityEdges[0].consumer != 3
+            || snapshot.passes[3].barriers.size() != 1)
+            return fail("RAW/independent/culling/history snapshot mismatch");
+        graph.Reset();
+        if (graph.CaptureDiagnosticSnapshot(snapshot)) return fail("reset snapshot is stale");
+        EnhancedRenderGraph missing(services);
+        const auto uninitialized = missing.CreateTexture(texture("missing"));
+        missing.AddPass("read", {{uninitialized, RHIResourceState::ShaderResource}}, nullptr, true);
+        if (missing.Compile(error)) return fail("missing producer mutation accepted");
+        EnhancedRenderGraph reversed(services);
+        const auto output = reversed.CreateTexture(texture("reversed"));
+        reversed.AddPass("consumer", {{output, RHIResourceState::ShaderResource}}, nullptr, true);
+        reversed.AddPass("producer", {{output, RHIResourceState::RenderTarget}}, nullptr);
+        if (reversed.Compile(error)) return fail("reversed RAW mutation accepted");
+        EnhancedRenderGraph legacy(services);
+        const auto blend = legacy.CreateTexture(texture("blend"));
+        legacy.AddPass("clear", {{blend, RHIResourceState::RenderTarget}}, nullptr);
+        legacy.AddPass("blend", {{blend, RHIResourceState::RenderTarget}}, nullptr, true);
+        if (!legacy.Compile(error) || !legacy.CaptureDiagnosticSnapshot(snapshot)) return false;
+        // Legacy state cannot express Modify: this known gap is frozen, not claimed solved.
+        if (!snapshot.passes[0].culled || !snapshot.passes[1].usages[0].inferredWrite)
+            return fail("legacy multi-writer/implicit Modify baseline changed");
+        error.clear();
+        return true;
+    }
 
     bool ValidateR6bNeutralReadbackGraph(std::string& outError)
     {
@@ -2594,8 +2890,228 @@ bool DX12Test::RunDescriptorHeapTest(std::string& outLog)
 //   재는 대상이 없어진 검사를 남기면 "통과"가 아무것도 뜻하지 않는다
 //   (T6에서 리사이즈 [1/3]을 은퇴시킨 것과 같은 판단).
 
-bool DX12Test::RunRenderGraphTest(std::string& outLog)
+static bool ValidateBase0CameraReplay(std::string& error)
 {
+    EnhancedCameraReplayInput source;
+    source.width = 332; source.height = 202; source.target = 0; source.viewFlags = 7;
+    source.totalSeconds = 17.25f; source.deltaSeconds = 1.f / 60.f;
+    source.camera.view = math::matrix4x4::identity();
+    source.camera.projection = math::matrix4x4::identity();
+    source.camera.inverseView = math::matrix4x4::identity();
+    source.camera.inverseProjection = math::matrix4x4::identity();
+    source.camera.eyePosition = {1.25f, -2.f, 3.f};
+    source.camera.forward = {0.f, 0.f, 1.f};
+    source.camera.right = {1.f, 0.f, 0.f}; source.camera.up = {0.f, 1.f, 0.f};
+    source.camera.fov = 60.f; source.camera.nearPlane = 0.1f; source.camera.farPlane = 1000.f;
+    const auto bytes = source.Encode();
+    EnhancedCameraReplayInput accepted;
+    if (!EnhancedCameraReplayInput::Decode(bytes, accepted, error) || accepted.Encode() != bytes)
+    { error = "camera replay lost input bits"; return false; }
+    const auto reject = [&](std::vector<uint8_t> bad, bool reseal) {
+        if (reseal)
+        {
+            const auto hash = EnhancedCameraReplayInput::Checksum(std::span(bad).first(bad.size() - 8));
+            for (unsigned i = 0; i < 8; ++i) bad[bad.size() - 8 + i] = static_cast<uint8_t>(hash >> (8 * i));
+        }
+        std::string why;
+        return !EnhancedCameraReplayInput::Decode(bad, accepted, why)
+            && !why.empty() && accepted.Encode() == bytes;
+    };
+    auto bad = bytes; bad.pop_back();
+    if (!reject(bad, false)) { error = "truncated input accepted"; return false; }
+    bad = bytes; bad.push_back(0);
+    if (!reject(bad, false)) { error = "trailing input accepted"; return false; }
+    bad = bytes; bad[0] ^= 1;
+    if (!reject(bad, true)) { error = "bad magic accepted"; return false; }
+    bad = bytes; bad[80] ^= 1;
+    if (!reject(bad, false)) { error = "bad checksum accepted"; return false; }
+    bad = bytes; bad[8] = 2;
+    if (!reject(bad, true)) { error = "future version accepted"; return false; }
+    bad = bytes; bad[12] = bad[13] = bad[14] = bad[15] = 0;
+    if (!reject(bad, true)) { error = "zero extent accepted"; return false; }
+    bad = bytes; bad[20] = 2;
+    if (!reject(bad, true)) { error = "preview target accepted"; return false; }
+    bad = bytes; bad[24] = 16;
+    if (!reject(bad, true)) { error = "unknown flags accepted"; return false; }
+    bad = bytes; bad[28] = 2;
+    if (!reject(bad, true)) { error = "invalid boolean accepted"; return false; }
+    bad = bytes; bad[44] = 0; bad[45] = 0; bad[46] = 192; bad[47] = 127;
+    if (!reject(bad, true)) { error = "NaN camera accepted"; return false; }
+    source.camera.nearPlane = source.camera.farPlane;
+    if (!reject(source.Encode(), false)) { error = "invalid clip range accepted"; return false; }
+    error.clear();
+    return true;
+}
+
+static bool ValidateBase0DrawReplay(std::string& error)
+{
+    std::array<float, 16> vertex{};
+    std::array<uint32_t, 3> indices{0,0,0};
+    auto bone=math::matrix4x4::identity();
+    EnhancedDrawItem item;
+    assets::TryParseCanonicalUuidV8("11111111-1111-8111-8111-111111111111", item.modelMeshView.handle.modelId);
+    assets::TryParseCanonicalUuidV8("22222222-2222-8222-8222-222222222222", item.modelMeshView.handle.meshId);
+    item.modelMeshView.handle.generation=1;
+    item.modelMeshView.vertexData=vertex.data(); item.modelMeshView.vertexBytes=sizeof(vertex);
+    item.modelMeshView.vertexStride=sizeof(vertex);
+    item.modelMeshView.vertexAttributeMask=assets::kCoreVertexAttributes;
+    item.modelMeshView.vertexLayoutHash=assets::VertexLayoutHash(assets::kCoreVertexAttributes);
+    item.modelMeshView.indexData=indices.data(); item.modelMeshView.indexCount=3;
+    item.worldMatrix=math::matrix4x4::identity(); item.bonePalette=&bone; item.boneCount=1;
+    std::array<EnhancedDrawItem,1> opaque{item},forward{item},graph{item},fallback{item};
+    EnhancedDrawReplayInput sealed;
+    if (!EnhancedDrawReplayInput::Seal(opaque,forward,graph,sealed,error)) return false;
+    bone=math::matrix4x4{}; // Producer storage can change after sealing.
+    const auto bytes=sealed.Encode();
+    EnhancedDrawReplayInput accepted;
+    if (!EnhancedDrawReplayInput::Decode(bytes,accepted,error) || accepted.Encode()!=bytes)
+    { error="draw replay roundtrip lost bits"; return false; }
+    const auto reject=[&](std::vector<uint8_t> bad, bool reseal) {
+        if (reseal)
+        {
+            const auto hash=EnhancedCameraReplayInput::Checksum(std::span(bad).first(bad.size()-8));
+            for(unsigned i=0;i<8;++i) bad[bad.size()-8+i]=static_cast<uint8_t>(hash>>(8*i));
+        }
+        std::string why;
+        return !EnhancedDrawReplayInput::Decode(bad,accepted,why) && !why.empty() && accepted.Encode()==bytes;
+    };
+    auto bad=bytes; bad.pop_back(); if(!reject(bad,false)) return false;
+    bad=bytes; bad.push_back(0); if(!reject(bad,false)) return false;
+    bad=bytes; bad[0]^=1; if(!reject(bad,true)) return false;
+    bad=bytes; bad[70]^=1; if(!reject(bad,false)) return false;
+    bad=bytes; bad[8]=2; if(!reject(bad,true)) return false;
+    bad=bytes; bad[12]=bad[13]=bad[14]=bad[15]=255; if(!reject(bad,true)) return false;
+    bad=bytes; bad[16]=3; if(!reject(bad,true)) return false;
+    bad=bytes; bad[60]=bad[61]=bad[62]=bad[63]=255; if(!reject(bad,true)) return false;
+    bad=bytes; bad[64]=0;bad[65]=0;bad[66]=192;bad[67]=127; if(!reject(bad,true)) return false;
+    bad=bytes; bad[128]=0;bad[129]=0;bad[130]=128;bad[131]=127; if(!reject(bad,true)) return false;
+    // Late closure mismatch must not partially replace the first draw or pose.
+    accepted.draws.back().assetIds[0]^=1;
+    if(accepted.Apply(opaque,forward,graph,fallback,error) || opaque[0].bonePalette!=&bone) return false;
+    accepted=sealed;
+    vertex[0]=1.f;
+    if(accepted.Apply(opaque,forward,graph,fallback,error) || opaque[0].bonePalette!=&bone) return false;
+    vertex[0]=0.f;
+    opaque[0].boneCount=0;
+    if(accepted.Apply(opaque,forward,graph,fallback,error)) return false;
+    opaque[0].boneCount=1;
+    if(!accepted.Apply(opaque,forward,graph,fallback,error)
+        || opaque[0].bonePalette==&bone || graph[0].bonePalette!=fallback[0].bonePalette
+        || std::memcmp(opaque[0].bonePalette,&accepted.draws[0].bones[0],sizeof(bone))!=0
+        || opaque[0].animatorKey==forward[0].animatorKey) return false;
+    error.clear(); return true;
+}
+
+static bool ValidateBase0LatticeReplay(std::string& error)
+{
+    std::array<float,16> vertex{}; std::array<uint32_t,3> indices{0,0,0};
+    EnhancedDrawItem item;
+    assets::TryParseCanonicalUuidV8("11111111-1111-8111-8111-111111111111",item.modelMeshView.handle.modelId);
+    assets::TryParseCanonicalUuidV8("22222222-2222-8222-8222-222222222222",item.modelMeshView.handle.meshId);
+    item.modelMeshView.handle.generation=1;
+    item.modelMeshView.vertexData=vertex.data(); item.modelMeshView.vertexBytes=sizeof(vertex); item.modelMeshView.vertexStride=sizeof(vertex);
+    item.modelMeshView.vertexAttributeMask=assets::kCoreVertexAttributes;
+    item.modelMeshView.vertexLayoutHash=assets::VertexLayoutHash(assets::kCoreVertexAttributes);
+    item.modelMeshView.indexData=indices.data(); item.modelMeshView.indexCount=3; item.materialGraphSlot=7;
+    auto generation=std::make_shared<material_graph::Generation>();
+    experiment::TryParseCanonicalAssetId("11111111-1111-4111-8111-111111111111",generation->assetId);
+    generation->generation=1; auto& product=generation->cooked.product;
+    product.program.semanticKey="base0-native-lattice-fixture";
+    const auto parameter=[&](LX::Id id,LX::PinType type,LX::LXSocketValue value,uint32_t offset,uint32_t bytes) {
+        LX::LXMaterialParameter p; p.id=id; p.type=type; p.value=std::move(value); p.identifier="param"+std::to_string(id); p.exposed=true;
+        product.program.parameters.push_back(p); product.layout.parameters.push_back({p,offset,bytes});
+    };
+    parameter(900,LX::PinType::Float,0.5,0,4); parameter(902,LX::PinType::Bool,true,4,4);
+    parameter(903,LX::PinType::Int,int64_t(7),8,4);
+    parameter(904,LX::PinType::Vector,std::array<double,3>{1,2,3},12,12);
+    parameter(905,LX::PinType::Color,std::array<double,4>{1,.5,.25,1},24,16);
+    product.layout.uniformBytes=40;
+    experiment::AssetId textureId;
+    experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222",textureId);
+    LX::LXMaterialResource resource; resource.slot=0; resource.reference=Uuid::ToString(textureId.value); resource.colorSpace=LX::LXColorSpace::Data;
+    product.layout.textures.push_back(resource);
+    const uint32_t pixel=0xff4080c0;
+    auto texture=std::shared_ptr<Texture>(Texture::CreateFromPixels(1,1,"base0-lattice-owner",RHIFormat::RGBA8Unorm,&pixel));
+    material_graph::InstanceDescription description; description.graphId=generation->assetId;
+    std::shared_ptr<const material_graph::Instance> source;
+    if(!texture || !material_graph::BuildInstance(generation,description,[&](const auto&,auto,std::string&){return texture;},source,error)) return false;
+    item.materialGraphInstance=source;
+    std::array<EnhancedDrawItem,2> graph{item,item};
+    EnhancedLatticeReplayInput sealed;
+    if(!EnhancedLatticeReplayInput::Seal(graph,sealed,error)) return false;
+    auto bytes=sealed.Encode(); EnhancedLatticeReplayInput accepted;
+    if(!EnhancedLatticeReplayInput::Decode(bytes,accepted,error) || accepted.Encode()!=bytes) return false;
+    const auto reject=[&](std::vector<uint8_t> bad,bool reseal) {
+        if(reseal) {
+            const auto hash=EnhancedCameraReplayInput::Checksum(std::span(bad).first(bad.size()-8));
+            for(unsigned i=0;i<8;++i) bad[bad.size()-8+i]=static_cast<uint8_t>(hash>>(8*i));
+        }
+        std::string why;
+        return !EnhancedLatticeReplayInput::Decode(bad,accepted,why) && !why.empty() && accepted.Encode()==bytes;
+    };
+    auto bad=bytes; bad.pop_back(); if(!reject(bad,false)) return false;
+    bad=bytes; bad.push_back(0); if(!reject(bad,false)) return false;
+    bad=bytes; bad[0]^=1; if(!reject(bad,true)) return false;
+    bad=bytes; bad[70]^=1; if(!reject(bad,false)) return false;
+    bad=bytes; bad[8]=2; if(!reject(bad,true)) return false;
+    bad=bytes; bad[12]=bad[13]=bad[14]=bad[15]=255; if(!reject(bad,true)) return false;
+    bad=bytes; bad[72]=6; if(!reject(bad,true)) return false;
+    bad=bytes; bad[84]=bad[85]=bad[86]=bad[87]=255; if(!reject(bad,true)) return false;
+    bad=bytes; bad[96]=99; if(!reject(bad,true)) return false;
+    bad=bytes; bad[106]=248; bad[107]=127; if(!reject(bad,true)) return false;
+    bad=bytes; bad[96]=0; if(!reject(bad,true)) return false;
+    bad=bytes; bad[96]=1; std::fill_n(bad.begin()+100,8,255); bad[107]=127; if(!reject(bad,true)) return false;
+    bad=bytes; std::fill_n(bad.begin()+48,16,0); if(!reject(bad,true)) return false;
+    const auto rejectApply=[&](EnhancedLatticeReplayInput badInput) {
+        std::string why;
+        return !badInput.Apply(graph,why) && !why.empty() && graph[0].materialGraphInstance==source && graph[1].materialGraphInstance==source;
+    };
+    auto mutation=sealed; mutation.draws[0].program^=1; if(!rejectApply(mutation)) return false;
+    mutation=sealed; mutation.draws[0].textures[0].content^=1; if(!rejectApply(mutation)) return false;
+    mutation=sealed; mutation.draws[0].description.parameters[0].id=999; if(!rejectApply(mutation)) return false;
+    mutation=sealed; mutation.draws[0].description.parameters[0].value=true; if(!rejectApply(mutation)) return false;
+    mutation=sealed; mutation.draws[0].description.parameters[0].value=.25; if(!rejectApply(mutation)) return false; // shared slot conflict
+    mutation=sealed; mutation.draws[0].description.parameters[0].value=.25;
+    mutation.draws[1].description.graphId.value.data[0]^=1; if(!rejectApply(mutation)) return false; // late rejection is atomic
+    for(auto& d:accepted.draws) d.description.parameters[0].value=.25;
+    if(!accepted.Apply(graph,error) || graph[0].materialGraphInstance==source
+        || graph[0].materialGraphInstance!=graph[1].materialGraphInstance
+        || graph[0].materialGraphInstance->generation!=generation
+        || graph[0].materialGraphInstance->textures[0].owner!=texture) return false;
+    float replayed{}; std::memcpy(&replayed,graph[0].materialGraphInstance->uniforms.data(),sizeof(replayed));
+    if(replayed!=.25f || source->uniforms==graph[0].materialGraphInstance->uniforms) return false;
+    error.clear(); return true;
+}
+
+bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
+{
+    std::string rg1Error;
+    if(!ValidateRg1GraphFixtures(rg1Error)) { outLog += "RG1_DAG_FAILED " + rg1Error + "\n"; return false; }
+    outLog += "RG1_DAG_OK shuffles=24 stable RAW UAV-read cycle missing multiwriter Modify invalid duplicate access-state\n";
+    if(!ValidateRg2GraphFixtures(rg1Error)) { outLog += "RG2_DAG_FAILED " + rg1Error + "\n"; return false; }
+    outLog += "RG2_DAG_OK shuffles=240 texture buffer RAW WAR WAW Modify fork stale kind missing import cycle\n";
+    if(!ValidateRg3GraphFixtures(rg1Error)) { outLog += "RG3_PLAN_FAILED " + rg1Error + "\n"; return false; }
+    outLog += "RG3_PLAN_OK shuffles=120 dead-version WAR-bridge sorted-lifetime transitions UAV-read-write import-final Modify stale\n";
+    if (replayExtensions)
+    {
+        std::string latticeError;
+        if(!ValidateBase0LatticeReplay(latticeError))
+        { outLog += "BASE0_LATTICE_REPLAY_FAILED " + latticeError + "\n"; return false; }
+        outLog += "BASE0_LATTICE_REPLAY_OK roundtrip=1 rejection=13 closure=6 atomic=1 types=5 shared-slot=1 exact-owners=1\n";
+        std::string drawError;
+        if (!ValidateBase0DrawReplay(drawError))
+        { outLog += "BASE0_DRAW_REPLAY_FAILED " + drawError + "\n"; return false; }
+        outLog += "BASE0_DRAW_REPLAY_OK roundtrip=1 rejection=10 closure=3 atomic=1 owned-pose=1 routes=3\n";
+        std::string replayError;
+        if (!ValidateBase0CameraReplay(replayError))
+        { outLog += "BASE0_CAMERA_REPLAY_FAILED " + replayError + "\n"; return false; }
+        outLog += "BASE0_CAMERA_REPLAY_OK roundtrip=1 rejection=11 atomic=1\n";
+    }
+    std::string baselineError;
+    if (!ValidateBase0GraphFixtures(baselineError))
+    { outLog += "BASE0_GRAPH_FIXTURES_FAILED " + baselineError + "\n"; return false; }
+    outLog += "BASE0_GRAPH_FIXTURES_OK RAW independent culling history missing reversed multiwriter-modify stale\n";
+
     std::string neutralReadbackError;
     const bool neutralReadbackPassed =
         ValidateR6bNeutralReadbackGraph(neutralReadbackError);
@@ -2817,6 +3333,65 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog)
             + " (선언 " + std::to_string(stats.passesDeclared)
             + " · 컬링 " + std::to_string(stats.passesCulled)
             + " · transient 생성 " + std::to_string(stats.transientCreated) + "/2)\n";
+    }
+
+    // RG1: declare the copy before its producer, then verify real GPU pixels.
+    for(const int phase:{1,2,3})
+    {
+        const bool versioned=phase!=1;
+        const auto mode=versioned ? RGSchedulingMode::ExplicitVersioned : RGSchedulingMode::ExplicitSingleWriter;
+        const std::string tag="RG"+std::to_string(phase);
+        EnhancedRenderGraph graph(resources,mode);
+        RGTextureDesc d{}; d.width=resources.GetWidth(); d.height=resources.GetHeight();
+        d.allowRenderTarget=true; d.name="rg1.gpu.target";
+        std::copy_n(DX12DeviceResources::kClearColor,4,d.clearColor);
+        const auto initial=graph.CreateTexture(d);
+        const auto target=versioned ? graph.Write(initial) : initial;
+        RGHandle replacement;
+        RGHandle discarded;
+        bool discardedExecuted=false;
+        if(versioned)
+        {
+            if(phase==3) discarded=graph.Write(target);
+            const auto next=phase==3 ? graph.Write(discarded) : graph.Modify(target);
+            auto black=d; black.name="rg2.replacement";
+            std::fill_n(black.clearColor,3,0.f); black.clearColor[3]=1.f;
+            replacement=graph.Write(graph.CreateTexture(black));
+            graph.AddPass("rg2.overwrite",{{next,RHIResourceState::CopyDest,phase==3 ? RGAccessMode::Write : RGAccessMode::ReadWrite},
+                {replacement,RHIResourceState::CopySource,RGAccessMode::Read}},
+                [next,replacement](const EnhancedRenderGraph::ExecuteContext& c) {
+                    c.encoder->CopyTexture(c.ResolveHandle(next),c.ResolveHandle(replacement));
+                },true);
+        }
+        graph.AddPass("rg1.readback",{{target,RHIResourceState::CopySource,RGAccessMode::Read}},
+            [&resources,target](const EnhancedRenderGraph::ExecuteContext& c) {
+                c.encoder->CopyToReadback(resources.GetFrameReadback(),c.ResolveHandle(target));
+            },true);
+        graph.AddPass("rg1.clear",{{target,RHIResourceState::RenderTarget,RGAccessMode::Write}},
+            [&resources,target](const EnhancedRenderGraph::ExecuteContext& c) {
+                const RHITextureHandle colors[]={c.ResolveHandle(target)};
+                c.encoder->ClearRenderTargets(resources.CreateRenderTargets(colors),DX12DeviceResources::kClearColor);
+            });
+        if(phase==3) graph.AddPass("rg3.discarded",{{discarded,RHIResourceState::RenderTarget,RGAccessMode::Write}},
+            [&discardedExecuted](const EnhancedRenderGraph::ExecuteContext&) { discardedExecuted=true; });
+        if(versioned) graph.AddPass("rg2.black",{{replacement,RHIResourceState::RenderTarget,RGAccessMode::Write}},
+            [&resources,replacement](const EnhancedRenderGraph::ExecuteContext& c) {
+                const RHITextureHandle colors[]={c.ResolveHandle(replacement)};
+                const float black[]={0.f,0.f,0.f,1.f};
+                c.encoder->ClearRenderTargets(resources.CreateRenderTargets(colors),black);
+            });
+        if(!graph.Compile(error) || graph.GetExecuteOrder()!=(phase==3 ? std::vector<uint16_t>{2,1,4,0} : (versioned ? std::vector<uint16_t>{2,1,3,0} : std::vector<uint16_t>{1,0}))
+            || !resources.BeginFrame(error) || !graph.Execute(error) || !resources.EndFrame(error))
+        { outLog += tag+"_GPU_FAILED " + error + "\n"; return false; }
+        resources.WaitForGpu();
+        if(phase==3 && (discardedExecuted || graph.GetStats().passesCulled!=1))
+        { outLog += "RG3_GPU_FAILED dead writer executed\n"; return false; }
+        RHIReadbackImage image{};
+        if(!resources.MapReadback(resources.GetFrameReadback(),image,error)) return false;
+        for(uint32_t y=0;y<d.height;++y) for(uint32_t x=0;x<d.width;++x) for(uint32_t c=0;c<3;++c)
+            if(std::fabs(image.At(x,y,c)-DX12DeviceResources::kClearColor[c])>1.5f/255.f)
+            { outLog += tag+"_GPU_FAILED pixel mismatch\n"; return false; }
+        outLog += tag+(versioned ? "_GPU_OK reversed-RAW-WAR-WAW old-version-pixels=0\n" : "_GPU_OK reversed-RAW pixels=0\n");
     }
 
     // ── [6/7] 실제 실행 + 픽셀 확인 ──

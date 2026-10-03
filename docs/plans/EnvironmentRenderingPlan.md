@@ -1,6 +1,9 @@
 # Environment 배경·IBL 설정 (PHASE 4.75 RND-ENV)
 
-결정: 2026-10-01. 상태: 배경 토글 슬라이스 적용, 나머지 제품 환경 계약 미구현. 공수 미산정.
+**2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
+
+
+결정: 2026-10-01. 상태: 배경 토글 슬라이스 적용, 나머지 제품 환경 계약 미구현. 잔여 계획 추정 10인일(ENV-A 1, B 2, C 3, D 2, E 2).
 상위 UI/설정 소유권은 [EditorRenderingSurfacesPlan.md](EditorRenderingSurfacesPlan.md),
 쿠킹 기반은 [MAT9ThinFilmAndEnvironment.md](../analysis/MAT9ThinFilmAndEnvironment.md)를 따른다.
 
@@ -39,7 +42,7 @@ GBuffer normal의 표면 존재도 확인한다. 하늘 픽셀을 표면 radianc
 | ENV-B | reflected Environment schema·GUID/manifest resolver·default profile/Scene override | Inspector/프로젝트 Graphics/Player가 동일 설정을 소비. 기존 profile 전환·해제·실패 복원, unknown key 및 경로 진단 |
 | ENV-C | Standard Deferred/Forward와 LX Core/Layered/Special의 확산/정반사 별도 weight, background 색/세기 | 각 renderer route에서 diffuse-only/specular-only/off/둘 다 on·0/1/변경 세기를 고정 HDR 픽셀로 비교. direct-only/emission/coverage는 불변 |
 | ENV-D | 쿠킹·캐시·설정 변경 비용 | 토글/세기만 바꾸면 bake/PSO 재컴파일·환경 생성 0회. HDRI 참조/recipe 변경만 cache invalidation. cold/warm·overwrite/corrupt·마지막 정상 유지 |
-| ENV-E | 제품/멀티뷰/성능 수용 | Editor Scene override가 Game/Player에 누출되지 않음. Debug/Release 및 지원 DX12/Vulkan 실제 package, 최초 준비·동일 장면 GPU/CPU 비용 기록 |
+| ENV-E | 제품/멀티뷰/성능 수용 | Editor Scene override가 Game/Player에 누출되지 않음. DX12 Debug/Release 실제 package, 최초 준비·동일 장면 GPU/CPU 비용 기록 |
 
 ENV-C는 쉐이더 상수 ABI/생성 Slang/Scene host cache key와 IBL lobe를 함께 바꿔야 한다.
 하나의 대표 Pass에만 가중치를 넣고 전체 renderer 지원으로 세지 않는다. 새 weighted 결과 때문에
@@ -47,4 +50,4 @@ ENV-C는 쉐이더 상수 ABI/생성 Slang/Scene host cache key와 IBL lobe를 �
 
 선행: MAT-7의 제품/쿠킹 기반. RND-1 probe와 전역 환경의 blend/우선순위를 공유하며,
 W9 default profile 선택과 같은 resolver를 쓴다. RND-2 shadow와 독립이다. 미구현 weight를
-UI에 동작하는 스위치로 먼저 노출하지 않는다. 대시보드는 RND-ENV를 progress/days:null로 추적한다.
+UI에 동작하는 스위치로 먼저 노출하지 않는다. 대시보드는 RND-ENV를 progress/days:10로 추적한다.

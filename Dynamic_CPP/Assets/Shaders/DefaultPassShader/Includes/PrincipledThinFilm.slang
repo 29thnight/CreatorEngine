@@ -10,14 +10,26 @@ float2 FilmUnitPhase(float2 amplitude)
     return magnitude > 0.0 ? amplitude / magnitude : float2(1.0, 0.0);
 }
 
+#ifdef LX_FILM_SENSITIVITY_GPU_TABLE
+cbuffer FilmSensitivityConstants : register(b1)
+{
+    float4 filmSensitivityReal[512];
+    float4 filmSensitivityImag[512];
+};
+#endif
 void FilmSensitivity(float opd, out float3 real, out float3 imaginary)
 {
     const float coordinate = saturate(6.283185307179586 * opd / 60000.0) * 511.0;
     const uint index = min(uint(coordinate), 511u);
     const uint next = min(index + 1u, 511u);
     const float weight = coordinate - index;
+#ifdef LX_FILM_SENSITIVITY_GPU_TABLE
+    real = lerp(filmSensitivityReal[index].xyz, filmSensitivityReal[next].xyz, weight);
+    imaginary = lerp(filmSensitivityImag[index].xyz, filmSensitivityImag[next].xyz, weight);
+#else
     real = lerp(FilmSensitivityReal[index], FilmSensitivityReal[next], weight);
     imaginary = lerp(FilmSensitivityImag[index], FilmSensitivityImag[next], weight);
+#endif
 }
 
 // F82 controls the magnitude at the film/substrate boundary; n+ik supplies phase.

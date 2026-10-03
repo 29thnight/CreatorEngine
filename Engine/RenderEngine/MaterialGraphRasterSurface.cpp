@@ -249,7 +249,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
             throw std::runtime_error("Stale or repeated raster resolve recording.");
         }
         auto& encoder = *context.encoder;
-        encoder.SetPipeline(RHIBindPoint::Compute, owner->resolvePipeline_);
+        encoder.SetPipeline(RHIBindPoint::Compute, owner->resolvePipeline_->GetHandle());
         encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, owner->constants_);
         encoder.SetBindings(RHIBindPoint::Compute, 1, owner->inputs_);
         encoder.SetBindings(RHIBindPoint::Compute, 2, owner->output_);
@@ -316,15 +316,15 @@ bool RasterSurfaceCollector::Initialize(IRenderDeviceServices& device, IRenderRo
     compute.layout = computeLayout;
     compute.csBytecode = resolve.Data();
     compute.csSize = resolve.Size();
-    const auto resolved = pipelines.GetOrCreateCompute(compute, error);
-    if (!capture.IsValid() || !sharedDepth.IsValid() || !resolved.IsValid())
+    LX::Runtime::ComputePipeline resolved;
+    if (!capture.IsValid() || !sharedDepth.IsValid() || !resolved.Create(pipelines, compute, error))
     {
         return false;
     }
     device_ = &device;
     capturePipeline_ = capture;
     sharedDepthPipeline_ = sharedDepth;
-    resolvePipeline_ = resolved;
+    resolvePipeline_ = resolved.GetGeneration();
     doubleSided_ = doubleSided;
     error.clear();
     return true;

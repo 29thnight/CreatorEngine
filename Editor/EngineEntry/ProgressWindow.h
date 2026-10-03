@@ -1,10 +1,13 @@
-﻿#pragma once
+#pragma once
 #include "Core.Minimal.h"
 #include "EngineVersion.h"
+#include "Resource.h"
 #include <wingdi.h>
 #include <commctrl.h>
 #include <algorithm>
 #include <iterator>
+#include <atomic>
+#include <memory>
 
 #pragma comment(lib, "comctl32.lib")
 
@@ -26,6 +29,7 @@ public:
     {
         m_style = style;
         m_imagePath = imagePath;
+        m_cancelRequested = false;
         m_progress = 0;
         m_step = 0;
         m_totalSteps = 0;
@@ -97,6 +101,19 @@ public:
             SendMessageW(m_hWnd, kDetailMessage, 0, reinterpret_cast<LPARAM>(&detail));
     }
 
+    // Own the posted text until the UI thread consumes it. No callback to GT/RT.
+    void SetWarmupStatus(std::wstring detail, bool stalled = false, bool failed = false)
+    {
+        if (!m_hWnd || m_style != ProgressWindowStyle::InitStyle) return;
+        auto status = std::make_unique<WarmupUpdate>();
+        status->detail = std::move(detail);
+        status->stalled = stalled;
+        status->failed = failed;
+        if (PostMessageW(m_hWnd, kWarmupMessage, 0, reinterpret_cast<LPARAM>(status.get())))
+            status.release();
+    }
+    bool WarmupCancelRequested() const { return m_cancelRequested.load(); }
+
     void Close()
     {
 		// 100%가 표시된 것을 사용자가 볼 시간을 준다.
@@ -104,6 +121,7 @@ public:
 
 		// 창 파괴는 만든 스레드(ThreadProc)만 할 수 있다. 여기서 DestroyWindow를
 		// 직접 부르면 조용히 실패한다 — WM_CLOSE를 보내 그쪽에서 파괴하게 한다.
+        m_closing = true;
         if (m_hWnd)
             PostMessage(m_hWnd, WM_CLOSE, 0, 0);
 
@@ -135,6 +153,8 @@ public:
         m_hWnd = nullptr;
         m_hProgress = nullptr;
         m_hText = nullptr;
+        m_cancelButton = nullptr;
+        m_closing = false;
 
         if (m_hReadyEvent)
         {
@@ -146,6 +166,8 @@ public:
             DeleteObject(m_hBitmap);
             m_hBitmap = nullptr;
         }
+        if (m_hBrandIcon) { DestroyIcon(m_hBrandIcon); m_hBrandIcon = nullptr; }
+        if (m_hBrandFont) { DeleteObject(m_hBrandFont); m_hBrandFont = nullptr; }
         if (m_hFont)
         {
             DeleteObject(m_hFont);
@@ -222,7 +244,7 @@ private:
 
     void CreateInitUI()
     {
-        // The bitmap remains the same 512x300 resource; only its displayed size grows.
+        // The loading bitmap is authored at the window's native 666x390 size.
         const int width = 666;
         const int height = 390;
         int x = (GetSystemMetrics(SM_CXSCREEN) - width) / 2;
@@ -237,6 +259,17 @@ private:
             m_hBitmap = (HBITMAP)LoadImage(nullptr, m_imagePath.c_str(), IMAGE_BITMAP,
                                            0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION);
         }
+        HMODULE editorModule = nullptr;
+        if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                reinterpret_cast<LPCWSTR>(&ProgressWindow::WndProc), &editorModule))
+        {
+            m_hBrandIcon = static_cast<HICON>(LoadImageW(editorModule,
+                MAKEINTRESOURCEW(IDI_ACADEMY4Q), IMAGE_ICON, 72, 72, LR_DEFAULTCOLOR));
+        }
+        m_hBrandFont = CreateFontW(40, 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,
+            DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
+            CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_DONTCARE, L"Segoe UI");
 
         m_hStageFont = CreateFontW(19, 0, 0, 0, FW_SEMIBOLD, FALSE, FALSE, FALSE,
             DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
@@ -258,10 +291,17 @@ private:
             HBITMAP oldBitmap = static_cast<HBITMAP>(SelectObject(imageDC, m_hBitmap));
             BITMAP bitmap{};
             GetObjectW(m_hBitmap, sizeof(bitmap), &bitmap);
-            SetStretchBltMode(hdc, HALFTONE);
-            SetBrushOrgEx(hdc, 0, 0, nullptr);
-            StretchBlt(hdc, 0, 0, width, height, imageDC,
-                0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY);
+            if (bitmap.bmWidth == width && bitmap.bmHeight == height)
+            {
+                BitBlt(hdc, 0, 0, width, height, imageDC, 0, 0, SRCCOPY);
+            }
+            else
+            {
+                SetStretchBltMode(hdc, HALFTONE);
+                SetBrushOrgEx(hdc, 0, 0, nullptr);
+                StretchBlt(hdc, 0, 0, width, height, imageDC,
+                    0, 0, bitmap.bmWidth, bitmap.bmHeight, SRCCOPY);
+            }
             SelectObject(imageDC, oldBitmap);
             DeleteDC(imageDC);
         }
@@ -270,9 +310,36 @@ private:
             FillRect(hdc, &client, static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH)));
         }
 
-        const int left = MulDiv(width, 32, 512);
-        const int top = MulDiv(height, 222, 300);
+        // Center the icon and wordmark as one group; the BMP is background artwork only.
         SetBkMode(hdc, TRANSPARENT);
+        if (m_hBrandFont)
+        {
+            auto oldBrandFont = SelectObject(hdc, m_hBrandFont);
+            constexpr wchar_t brandText[] = L"Creator Engine";
+            SIZE textSize{};
+            GetTextExtentPoint32W(hdc, brandText,
+                static_cast<int>(std::size(brandText) - 1), &textSize);
+            constexpr int iconSize = 72;
+            const int iconWidth = m_hBrandIcon ? iconSize : 0;
+            const int gap = m_hBrandIcon ? 16 : 0;
+            const int brandLeft = (width - iconWidth - gap - textSize.cx) / 2;
+            if (m_hBrandIcon)
+                DrawIconEx(hdc, brandLeft, 133, m_hBrandIcon,
+                    iconSize, iconSize, 0, nullptr, DI_NORMAL);
+            SetTextColor(hdc, RGB(255, 255, 255));
+            RECT brandRect{ brandLeft + iconWidth + gap, 128, width, 208 };
+            DrawTextW(hdc, brandText, -1, &brandRect,
+                DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+            SelectObject(hdc, oldBrandFont);
+        }
+        else if (m_hBrandIcon)
+        {
+            DrawIconEx(hdc, (width - 72) / 2, 133, m_hBrandIcon,
+                72, 72, 0, nullptr, DI_NORMAL);
+        }
+
+        const int left = MulDiv(width, 32, 512);
+        const int top = height - 104;
         SetTextColor(hdc, RGB(185, 199, 211));
         const auto oldFont = SelectObject(hdc, m_hInfoFont);
         const std::wstring version = std::wstring(L"Version ") +
@@ -296,7 +363,7 @@ private:
         SetTextColor(hdc, RGB(205, 216, 225));
         RECT detailRect{ left, top + 52, width - left, height - kProgressBarHeight - 3 };
         DrawTextW(hdc, m_detailText.c_str(), -1, &detailRect,
-            DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+            DT_LEFT | DT_WORDBREAK | DT_END_ELLIPSIS | DT_NOPREFIX);
         SelectObject(hdc, oldFont);
 
         // Leave the unfilled portion as the bitmap's black background.
@@ -359,6 +426,59 @@ private:
                 InvalidateRect(hwnd, nullptr, FALSE);
             }
             return 0;
+        case kWarmupMessage:
+            if (lParam)
+            {
+                std::unique_ptr<WarmupUpdate> status(reinterpret_cast<WarmupUpdate*>(lParam));
+                if (self)
+                {
+                    self->m_detailText = std::move(status->detail);
+                    if (!self->m_cancelButton)
+                    {
+                        self->m_cancelButton = CreateWindowW(L"BUTTON", L"Cancel startup",
+                            WS_CHILD | WS_VISIBLE | BS_OWNERDRAW, 622, 12, 28, 28,
+                            hwnd, reinterpret_cast<HMENU>(kCancelButton), GetModuleHandleW(nullptr), nullptr);
+                    }
+                    SetWindowTextW(self->m_cancelButton, status->failed ? L"Close editor" : L"Cancel startup");
+
+                    InvalidateRect(hwnd, nullptr, FALSE);
+                }
+            }
+            return 0;
+        case WM_DRAWITEM:
+            if (self && wParam == kCancelButton && lParam)
+            {
+                const auto& item = *reinterpret_cast<const DRAWITEMSTRUCT*>(lParam);
+                HBRUSH background = CreateSolidBrush(RGB(12, 20, 28));
+                FillRect(item.hDC, &item.rcItem, background);
+                DeleteObject(background);
+                const COLORREF color = self->m_cancelRequested.load() ? RGB(100, 110, 120) : RGB(225, 232, 238);
+                HPEN pen = CreatePen(PS_SOLID, 2, color);
+                auto oldPen = SelectObject(item.hDC, pen);
+                const int cx = (item.rcItem.left + item.rcItem.right) / 2;
+                const int cy = (item.rcItem.top + item.rcItem.bottom) / 2;
+                MoveToEx(item.hDC, cx - 5, cy - 5, nullptr); LineTo(item.hDC, cx + 6, cy + 6);
+                MoveToEx(item.hDC, cx - 5, cy + 5, nullptr); LineTo(item.hDC, cx + 6, cy - 6);
+                SelectObject(item.hDC, oldPen); DeleteObject(pen);
+                return TRUE;
+            }
+            break;
+        case WM_COMMAND:
+            if (self && LOWORD(wParam) == kCancelButton)
+            {
+                self->m_cancelRequested = true;
+                SetWindowTextW(self->m_cancelButton, L"Stopping safely...");
+                EnableWindow(self->m_cancelButton, FALSE);
+                return 0;
+            }
+            break;
+        case WM_CLOSE:
+            if (self && self->m_cancelButton && !self->m_closing.load())
+            {
+                self->m_cancelRequested = true;
+                return 0;
+            }
+            break;
         case WM_NCHITTEST:
         {
             // InitStyle은 WS_POPUP이라 캡션이 없다. 클라이언트 영역 히트를
@@ -402,6 +522,9 @@ private:
             if (self && self->m_style == ProgressWindowStyle::InitStyle) return 1;
             break;
         case WM_DESTROY:
+            // Release any owned status payloads left in this window's queue.
+            { MSG pending{}; while (PeekMessageW(&pending, hwnd, kWarmupMessage, kWarmupMessage, PM_REMOVE))
+                delete reinterpret_cast<WarmupUpdate*>(pending.lParam); }
             PostQuitMessage(0);
             return 0;
         }
@@ -410,6 +533,11 @@ private:
     }
 
 private:
+    struct WarmupUpdate { std::wstring detail; bool stalled{}, failed{}; };
+    HWND m_cancelButton{};
+    std::atomic<bool> m_cancelRequested{}, m_closing{};
+    static constexpr UINT kWarmupMessage = WM_APP + 0x214;
+    static constexpr int kCancelButton = 0x510;
     struct BootStatus
     {
         const std::wstring& stage;
@@ -429,7 +557,9 @@ private:
     HWND m_hProgress = nullptr;
     HWND m_hText = nullptr;
     HBITMAP m_hBitmap = nullptr;
+    HICON m_hBrandIcon = nullptr;
     HFONT m_hFont = nullptr;
+    HFONT m_hBrandFont = nullptr;
     HFONT m_hStageFont = nullptr;
     HFONT m_hInfoFont = nullptr;
     HANDLE m_hThread = nullptr;

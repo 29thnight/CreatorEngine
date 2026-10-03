@@ -210,8 +210,10 @@ bool SceneMaterialSlot::Prepare(IRenderTextureCache& textures, IRenderPipelineCa
     {
         return false;
     }
-    auto request = std::make_shared<RHIGraphicsPipelineRequest>();
-    if (!request->Create(pipelines, description, error))
+    auto request = std::make_shared<LX::Runtime::GraphicsPipeline>();
+    LX::Runtime::GraphicsShaderDescription shader;
+    if (!DescribeGraphicsShader(product, backend, {}, {}, shader, error) ||
+        !request->Create(pipelines, description, std::move(shader), error))
     {
         return false;
     }

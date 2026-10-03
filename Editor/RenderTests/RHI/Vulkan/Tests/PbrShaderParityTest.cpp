@@ -34,6 +34,28 @@
 
 namespace
 {
+    bool CapturePipelines(EnhancedGBufferPass& gbuffer, EnhancedForwardPass& forward,
+        std::vector<EnhancedDrawItem>& draws, std::string& error)
+    {
+        for (auto& draw : draws)
+        {
+            if (draw.materialSnapshot)
+            {
+                auto packet = std::make_shared<EnhancedMaterialDrawSnapshot>(*draw.materialSnapshot);
+                if (!gbuffer.CaptureShaderVariant(*packet))
+                { error = "PBR fixture cannot capture its GBuffer LX generation"; return false; }
+                draw.materialSnapshot = std::move(packet);
+            }
+            if (draw.forwardMaterialSnapshot)
+            {
+                auto packet = std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*draw.forwardMaterialSnapshot);
+                if (!forward.CaptureShaderVariant(*packet))
+                { error = "PBR fixture cannot capture its Forward LX generation"; return false; }
+                draw.forwardMaterialSnapshot = std::move(packet);
+            }
+        }
+        return true;
+    }
     constexpr uint32_t kPbrSize = 32;
     struct PbrParityCapture
     {
@@ -909,7 +931,8 @@ namespace
             if (!resources.BeginFrame(error)) return fail(error);
             frameOpen = true;
             beginCaches();
-            if (!gbuffer.PrepareFrame(context, error) || !deferred.PrepareFrame(context, error)
+            if (!CapturePipelines(gbuffer, forward, draws, error) ||
+                !gbuffer.PrepareFrame(context, error) || !deferred.PrepareFrame(context, error)
                 || !forward.PrepareFrame(context, error)) return fail(error);
             EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
             gbuffer.Declare(graph, context);
@@ -1422,6 +1445,7 @@ namespace
                 draw.baseColorFactor.a = .875f; draw.baseColor = nullptr;
                 draw.coverage = {};
             }
+            if (!CapturePipelines(gbuffer, forward, draws, error)) return fail(error);
             opaqueDraws = blend ? std::vector<EnhancedDrawItem>{} : draws;
             if (!resources.BeginFrame(error)) return fail(error);
             frameOpen = true; beginCaches();

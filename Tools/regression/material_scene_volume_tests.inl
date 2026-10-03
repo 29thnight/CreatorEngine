@@ -80,6 +80,19 @@ VerifiedProduct VolumeProduct(const std::filesystem::path& root, bool surface)
         error += diagnostic.message + "\n";
     }
     Check(verified, "Volume product verification " + error);
+    for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
+    {
+        LX::Runtime::ComputeShaderDescription identity;
+        Check(DescribeComputeShader(product, backend, "LXSceneVolumeCoefficientCS", identity, error) &&
+              identity.compile.backend == backend && identity.compile.profile == "cs_6_0" &&
+              identity.compile.sealedProgramIdentity == product.program.semanticKey,
+              "Volume cooked compute identity: " + error);
+        const auto accepted = identity;
+        Check(!DescribeComputeShader(product, backend, "missing", identity, error) &&
+              identity.compile.entry == accepted.compile.entry &&
+              identity.compile.sealedProgramIdentity == accepted.compile.sealedProgramIdentity,
+              "Rejected cooked compute stage preserves accepted identity");
+    }
     return product;
 }
 
@@ -230,6 +243,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     Check(meshes.Initialize(&device, error), "Volume mesh cache");
     EnhancedGBufferPass gbuffer;
     EnhancedDeferredPass deferred;
+    EnhancedForwardPass forward;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -248,7 +262,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     SceneHost rejectedHost;
     Check(!rejectedHost.RequestProgram(context, spatial, error) && error.find("homogeneous") != std::string::npos,
           "Spatial Volume is rejected before native preparation");
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error), "Volume actual Scene passes");
+    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) && forward.Initialize(context, error), "Volume actual Scene passes");
     WaitSceneProgram(host, context, background->generation);
     for (const auto& generation : generations)
     {
@@ -463,8 +477,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             deferred.SetAmbientOcclusion(ao);
             deferred.Declare(*graph, context);
             host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, shadowMap);
-            const auto final = host.DeclareVolume(*graph, deferred.GetOutput(), outputs.depth, shadowMap);
-            std::array<RHIReadback, 4> readbacks;
+            std::array<RHIReadback, 8> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(16, 16, format, 1, readbacks[i], error), "Volume readback");
                 graph->AddPass(
@@ -474,11 +487,30 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     },
                     true);
             };
-            copy(0, hybrid ? host.RefractionFrame()->GraphBackgroundColor(*graph) : deferred.GetOutput(),
-                 RHIFormat::RGBA16Float);
+            copy(0, deferred.GetOutput(), RHIFormat::RGBA16Float);
+            forward.SetInputs({outputs.depth, deferred.GetOutput()});
+            forward.SetGraphMaterials(&host);
+            forward.SetShadow(shadowMap, shadow);
+            Check(forward.PrepareFrame(context, error), "Volume common Forward preparation");
+            forward.Declare(*graph, context);
+            const auto final = forward.GetOutput().IsValid() ? forward.GetOutput()
+                : host.DeclareVolume(*graph, deferred.GetOutput(), outputs.depth, shadowMap);
             copy(1, final, RHIFormat::RGBA16Float);
             copy(2, outputs.depth, RHIFormat::D32Float);
             copy(3, outputs.bitmask, RHIFormat::R32Uint);
+            if (hybrid)
+            {
+                const auto refracted = host.RefractionFrame();
+                copy(4, refracted->GraphBackgroundColor(*graph), RHIFormat::RGBA16Float);
+                copy(5, graph->FindImportedTexture(refracted->Inputs()[0]), RHIFormat::RGBA32Float);
+                copy(6, graph->FindImportedTexture(refracted->Inputs()[1]), RHIFormat::RGBA32Float);
+                Check(device.CreateBufferReadback(16 * 16 * sizeof(SceneRefractionSample), readbacks[7], error),
+                      "Volume refraction samples readback");
+                graph->AddPass("Probe.Volume.RefractionSamples", {{refracted->GraphSamples(*graph), RHIResourceState::CopySource}},
+                    [readback = readbacks[7], buffer = refracted->Samples()](const auto& execution) {
+                        execution.encoder->CopyBufferToReadback(readback, buffer);
+                    }, true);
+            }
             Check(graph->Compile(error), "Volume graph compile " + error);
             RHICompletionPoint completion;
             RHISubmissionTicket ticket;
@@ -509,8 +541,8 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                   "Volume publication " + error);
             device.WaitForGpu();
             Check(GetRHISubmissionThread().Drain(&device, error), "Volume retirement");
-            std::array<RHIReadbackImage, 4> mapped;
-            for (unsigned i = 0; i < 4; ++i)
+            std::array<RHIReadbackImage, 8> mapped;
+            for (unsigned i = 0; i < (hybrid ? 8u : 4u); ++i)
             {
                 Check(device.MapReadback(readbacks[i], mapped[i], error), "Volume map");
             }
@@ -522,7 +554,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                         hybrid ? x >= 5 && x < 11 && y >= 5 && y < 11 : x >= 2 && x < 14 && y >= 2 && y < 14;
                     const bool occluded = !oldDraws.empty() && x < 8;
                     Near(mapped[2].At(x, y, 0),
-                         hybrid     ? (covered ? .36 / 2.2 : .92 / 2.9)
+                         hybrid     ? .92 / 2.9
                          : occluded ? .4
                                     : .9,
                          "Volume does not replace opaque depth");
@@ -588,6 +620,14 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     {
                         const double expected = radiance[c] + transmittance * mapped[0].At(x, y, c);
                         const float actual = mapped[1].At(x, y, c);
+                        if (hybrid && covered)
+                        {
+                            SceneRefractionSample sample;
+                            std::memcpy(&sample, mapped[7].data.data() + (y * 16 + x) * sizeof(sample), sizeof(sample));
+                            Near(mapped[4].At(x, y, c), expected, "Camera Volume before refraction", 1.5e-3);
+                            Near(sample.radiance[c], expected, "Refracted Volume preserves camera attenuation", 1.5e-3);
+                            Near(mapped[5].At(x, y, 2), .2, "Volume scratch captures the front interface");
+                        }
                         if (fixture == 7 && covered)
                         {
                             Check(std::isfinite(actual) && actual > expected, "Environment in-scattering contributes");
@@ -596,7 +636,10 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                         else
                         {
                             Near(actual, expected,
-                                 "Independent Volume slab integral fixture=" + std::to_string(fixture),
+                                  "Independent Volume slab integral fixture=" + std::to_string(fixture) +
+                                      " pixel=" + std::to_string(x) + "," + std::to_string(y) +
+                                      " channel=" + std::to_string(c) + " background=" +
+                                      std::to_string(mapped[0].At(x, y, c)) + " T=" + std::to_string(transmittance),
                                  fixture == 6 ? 2e-3 : 1.5e-3);
                         }
                         ++gpuComponents;
@@ -605,9 +648,9 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     ++pixels;
                 }
             }
-            for (auto& readback : readbacks)
+            for (unsigned i = 0; i < (hybrid ? 8u : 4u); ++i)
             {
-                device.ReleaseReadback(readback);
+                device.ReleaseReadback(readbacks[i]);
             }
             graph->Reset();
             bool rejected = false;
@@ -633,6 +676,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
     deferred.Shutdown();
+    forward.Shutdown();
     meshes.Shutdown();
     std::string messages;
     const auto validation = device.DrainDebugMessages(messages);

@@ -39,8 +39,8 @@ SDF/procedural AABB의 내부 marching은 사용자 intersection shader에 남�
 못하면 그 원인을 기록하고 후보 확장을 자동으로 계속하지 않는다. 다른 효과는 독립 근거로
 선정한다. prototype은 독립 offscreen으로 시작할 수 있으며 RG6 전체를 일괄 선행으로 받지
 않는다. 기존 제품 renderer에 설치하는 EXP-3는 RG6·관련 version/수명 계약을 소비한다.
-GPU-2/C# 전체 완료는 실험의 선행이 아니다. Vulkan은 지원/fallback과 native 실행을 별도로
-판정하고 DX12 결과를 Vulkan 성능 증거로 이월하지 않는다.
+GPU-2/C# 전체 완료는 실험의 선행이 아니다. Vulkan 지원/fallback·native 실행 비교는
+[PHASE 4.9](BackendParityPlan.md)로 이관하며 DX12 실험 완료를 막지 않는다. DX12 결과를 Vulkan 성능 증거로 이월하지 않는다.
 
 ## 3. 비교 조건과 크기 sweep
 

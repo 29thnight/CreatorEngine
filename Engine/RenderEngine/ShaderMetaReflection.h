@@ -30,6 +30,7 @@ struct ShaderMetaBindingLayout
     std::uint32_t constantBufferSpace{};
     std::uint32_t constantBufferByteSize{};
     std::vector<ShaderMetaPropertyBinding> properties;
+    std::vector<RHIShaderResourceReflection> samplers;
 
     bool operator==(const ShaderMetaBindingLayout&) const = default;
 };

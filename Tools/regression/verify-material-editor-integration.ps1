@@ -11,19 +11,30 @@ $caseRoot = Join-Path $output ("EditorLX-$Configuration-" + [Guid]::NewGuid().To
 $project = Join-Path $caseRoot 'Project'
 New-Item -ItemType Directory -Path $caseRoot | Out-Null
 Copy-Item -LiteralPath (Join-Path $packageCase 'Project') -Destination $project -Recurse
+& (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1') -Project $project
 $assets = Join-Path $project 'Assets'
 Copy-Item -LiteralPath (Join-Path $repo 'Dynamic_CPP/Assets/Shaders/DefaultPassShader') -Destination (Join-Path $assets 'Shaders') -Recurse -Force
 $sourceFiles = @(
     Get-ChildItem (Join-Path $repo 'Engine'), (Join-Path $repo 'Editor'), (Join-Path $repo 'Lattice'),
         (Join-Path $repo 'Dynamic_CPP/Assets/Shaders/DefaultPassShader') -Recurse -File |
         Where-Object Extension -In '.cpp', '.h', '.slang', '.vcxproj', '.props', '.targets'
-    Get-Item $PSCommandPath
+    Get-Item $PSCommandPath, (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1')
 ) | Sort-Object FullName -Unique
 $snapshot = @($sourceFiles | ForEach-Object {
     [pscustomobject]@{ path = $_.FullName; hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash }
 })
 $snapshot | ConvertTo-Json | Set-Content (Join-Path $caseRoot 'source-hashes.json') -Encoding utf8
 $cooker = Join-Path $repo "Bin/x64-$Configuration/Tools/AssetCooker/AssetCooker.exe"
+$generationRoot = Join-Path $project 'Library/ModelAssetGenerations'
+# Package preparation can update model sidecars in the source fixture while its
+# newly published generations belong to the package stage. Recreate the complete
+# model/graph closure in this private project before enumerating cook inputs.
+foreach ($model in Get-ChildItem $assets -Recurse -File -Filter '*.glb' | Sort-Object FullName) {
+    $author = @(& $cooker --author-model-asset --asset-root $assets --output $generationRoot --model $model.FullName 2>&1)
+    $authorExit = $LASTEXITCODE
+    $author | Add-Content (Join-Path $caseRoot 'model-authoring.log') -Encoding utf8
+    if ($authorExit -ne 0) { throw "Editor fixture model preparation failed: $authorExit" }
+}
 $cook = @('--asset-root', $assets, '--generation-root', (Join-Path $project 'Library/ModelAssetGenerations'),
     '--material-shader-root', (Join-Path $assets 'Shaders/DefaultPassShader'), '--output', (Join-Path $caseRoot 'Cooked'))
 foreach ($file in Get-ChildItem $assets -Recurse -File | Sort-Object FullName) {
@@ -49,7 +60,7 @@ function Assert([bool]$Condition, [string]$Message) {
     if (!$Condition) { throw $Message }
     $script:checks++
 }
-function Invoke-Gate([string]$Name, [string[]]$Arguments = @(), [switch]$Reject) {
+function Invoke-Gate([string]$Name, [string[]]$Arguments = @(), [switch]$Reject, [switch]$AllowFirstFrameTimeout) {
     $body = @{ command = $Name; args = @($Arguments); mode = 'async' } | ConvertTo-Json -Compress
     $response = Invoke-WebRequest "$script:base/command" -Method Post -Headers $script:headers `
         -ContentType 'application/json' -Body $body -SkipHttpErrorCheck -TimeoutSec 30
@@ -71,6 +82,10 @@ function Invoke-Gate([string]$Name, [string[]]$Arguments = @(), [switch]$Reject)
         $result = $terminal
     }
     $response.Content | Add-Content $script:responses -Encoding utf8
+    if ($AllowFirstFrameTimeout -and $Name -eq 'render.live.fence' -and
+        $result.status -eq 'timed_out' -and $result.code -eq 'render.live.wait.timeout') {
+        return $result
+    }
     Assert (($result.status -eq 'succeeded') -ne [bool]$Reject) "$Name failed expectation: $($response.Content)"
     return $result
 }
@@ -151,12 +166,30 @@ try {
     } while ($true)
     $script:base = "http://127.0.0.1:$($endpoint.port)"
     $script:headers = @{ Authorization = "Bearer $($endpoint.token)" }
+    $expectedScale = [float]::Parse(([regex]::Match(
+        [IO.File]::ReadAllText((Join-Path $project 'ProjectSetting/EngineSettings.asset')),
+        '(?m)^imguiScale:\s*([^\r\n]+)')).Groups[1].Value,
+        [Globalization.CultureInfo]::InvariantCulture)
+    $theme = (Invoke-Gate 'editor.theme').data
+    Assert ($theme.scaleMatches -and $theme.preferenceScale -eq $expectedScale -and
+        $theme.fontScaleMain -eq $expectedScale) 'Editor must apply the inherited UI scale'
     Invoke-Gate 'play.foreground_override' @('off') | Out-Null
     Invoke-Gate 'play.cursor' @('show') | Out-Null
     Invoke-Gate 'scene.switch' @((Join-Path $assets 'Scenes/LX_CookFixture.creator')) | Out-Null
     Invoke-Gate 'camera.editor' @('follow', 'on') | Out-Null
     $original = State
     Assert ($original.enabled -and $original.graph -eq '11111111-1111-4111-8111-111111111111') 'Core graph must load'
+    # GPU validation patches cold native PSOs before the first completed frame.
+    # Bound that preparation separately; subsequent captures retain their fence
+    # timeout and every pixel/publication/validation assertion below.
+    $firstFrameTimer = [Diagnostics.Stopwatch]::StartNew()
+    do {
+        $firstFrame = Invoke-Gate 'render.live.fence' @('120') -AllowFirstFrameTimeout
+        if ($firstFrame.status -eq 'succeeded') { break }
+        if ($firstFrameTimer.Elapsed.TotalSeconds -ge 600) { throw 'Editor cold first-frame preparation exceeded 600 seconds' }
+    } while ($true)
+    $firstFrameTimer.Stop()
+    "LX_MATERIAL_EDITOR_FIRST_FRAME_READY configuration=$Configuration waitedMs=$($firstFrameTimer.ElapsedMilliseconds)"
     $baseline = Capture 'baseline'
     Invoke-Gate 'material.graph' @('Ground', 'set', '900', '1.3') | Out-Null
     $changed = State

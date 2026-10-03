@@ -1,4 +1,5 @@
 #include "MaterialGraphSceneCompiler.h"
+#include "MaterialGraphShaderMeta.h"
 
 #include <algorithm>
 #include <fstream>
@@ -17,6 +18,43 @@ bool Fail(std::string& error, std::string message)
 bool TargetLess(const CompileTarget& left, const CompileTarget& right)
 {
     return std::tie(left.binary, left.entry, left.profile) < std::tie(right.binary, right.entry, right.profile);
+}
+
+std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program)
+{
+    std::vector<ShaderPassDesc> passes;
+    const auto graphics = [&](std::string name, std::string vertex, std::string pixel,
+                              ShaderPassQueue queue = ShaderPassQueue::Opaque, bool writeDepth = false) {
+        ShaderPassDesc pass;
+        pass.name = std::move(name);
+        pass.vertex = ShaderStageEntry{std::move(vertex)};
+        pass.pixel = ShaderStageEntry{std::move(pixel)};
+        pass.queue = queue;
+        pass.state.cullMode = RHICullMode::None;
+        pass.state.depthTest = RHICompareOp::LessEqual;
+        pass.state.depthWrite = writeDepth;
+        passes.push_back(std::move(pass));
+    };
+    // ShaderMeta describes generated entry contracts, including the installed
+    // common Forward+ alpha consumer.
+    graphics("GBuffer", "LXSceneVS", "LXSceneGBufferPS", ShaderPassQueue::Opaque, true);
+    graphics("LXSceneColor", "LXSceneVS", "LXSceneColorPS");
+    graphics("Forward", "LXSceneVS", "LXSceneColorPS", ShaderPassQueue::Transparent);
+    passes.back().state.blendMode = ShaderBlendMode::Alpha;
+    graphics("LXSceneLookup0", "LXSceneVS", "LXSceneLookup0PS");
+    graphics("LXSceneLookup1", "LXSceneVS", "LXSceneLookup1PS");
+    if (program.surface) graphics("Shadow", "LXSceneShadowVS", "LXSceneShadowPS", ShaderPassQueue::Shadow, true);
+    if ((program.features & 0x1000u) != 0) graphics("Subsurface", "LXSceneVS", "LXSceneSubsurfacePS");
+    if ((program.features & 0x0800u) != 0) graphics("Refraction", "LXSceneVS", "LXSceneRefractionPS");
+    if (program.volume)
+    {
+        ShaderPassDesc pass;
+        pass.name = "VolumeCoefficients";
+        pass.compute = ShaderStageEntry{"LXSceneVolumeCoefficientCS"};
+        pass.queue = ShaderPassQueue::Compute;
+        passes.push_back(std::move(pass));
+    }
+    return passes;
 }
 } // namespace
 
@@ -54,7 +92,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
 
 bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& shaderDirectory,
                          const std::filesystem::path& sourceFile, const Budget& budget, VerifiedProduct& result,
-                         std::string& error)
+                         std::string& error, FileGuid graphGuid)
 {
     if (program.volume && program.slang.find("#define LX_MATERIAL_VOLUME_HOMOGENEOUS 1\n") == std::string::npos)
     {
@@ -73,13 +111,11 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     {
         return Fail(error, "LX Scene shader cache directory failed: " + ioError.message());
     }
+    std::string hostSource = BuildBoundSource(program) + suffix;
+    if (program.volume) hostSource += "\n#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
     {
         std::ofstream stream(sourceFile, std::ios::binary | std::ios::trunc);
-        stream << BuildBoundSource(program) << suffix;
-        if (program.volume)
-        {
-            stream << "\n#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
-        }
+        stream << hostSource;
         if (!stream)
         {
             return Fail(error, "LX Scene shader source write failed.");
@@ -99,9 +135,10 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     capabilities.coreForward = capabilities.layeredLookup = capabilities.refraction = capabilities.subsurface =
         capabilities.volume = true;
     VerifiedProduct candidate;
+    std::vector<RHIShaderReflection> reflections;
     std::vector<LX::LXMaterialDiagnostic> diagnostics;
     if (!VerifyProduct(program, sourceFile, SceneCompileTargets(program), permutation, options, capabilities, budget,
-                       candidate, diagnostics))
+                       candidate, diagnostics, &reflections))
     {
         error.clear();
         for (const auto& diagnostic : diagnostics)
@@ -111,6 +148,24 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
         return false;
     }
     candidate.program.semanticKey += SceneHostIdentity;
+    if (graphGuid != FileGuid{})
+    {
+        std::ifstream source(sourceFile, std::ios::binary);
+        const std::string text{std::istreambuf_iterator<char>(source), {}};
+        if (!source || text != hostSource)
+        {
+            return Fail(error, "Generated Scene source changed during verification.");
+        }
+        GeneratedMaterialShader generated;
+        if (!PublishMaterialShaderMeta(candidate.program, graphGuid, hostSource,
+            SceneMetaPasses(program), reflections,
+            sourceFile.parent_path() / (sourceFile.stem().string() + ".generated"), generated, error))
+        {
+            if (error.empty()) error = "Generated Scene material source cannot be read.";
+            return false;
+        }
+        candidate.materialShader = std::make_shared<GeneratedMaterialShader>(std::move(generated));
+    }
     result = std::move(candidate);
     error.clear();
     return true;

@@ -1,5 +1,8 @@
 # Scriptable Render Pipeline · Custom Pass 설계 (PHASE 4.75)
 
+**역사 설계 문서 — 2026-10-01 우선 정본:** 현재 작업/공수는 [RenderPhaseRoadmap](RenderPhaseRoadmap.md)과 [공수 원장](RenderPhaseEffortEstimate.md)을 따른다. 이 문서의 옛 4~4.8 검증 조건 중 Vulkan 비교는 모두 PHASE 4.9로 이관했으며 착수/완료 게이트로 재사용하지 않는다.
+
+
 > **2026-09-23 이력 문서.** 아래 Asset-first Pipeline Inspector 정본, `SRP-0~6`의
 > 33일 산정과 PHASE 4.75 소속은 현재 실행 계획이 아니다. 새 정본은
 > [`RenderPipelineTargetArchitecture.md`](../design/RenderPipelineTargetArchitecture.md),
@@ -30,10 +33,11 @@ CreatorEngine의 공개 렌더 확장 모델은 다음으로 고정한다.
    Fullscreen·Compute·RendererList·Copy/Resolve 템플릿을 제공하고, Shader Asset의 GPU
    코드는 Visual Shader Graph 또는 직접 작성한 `.slang` 중 한 모드로 만든다.
 3. **Visual 모드는 Graph Asset으로 완전하게 다시 열고 편집할 수 있어야 한다.**
-   `Graph Editor ⇄ .shadergraph → Graph IR → generated .slang` 흐름으로 고정한다.
+   `Graph Editor ⇄ .shadergraph → Graph IR → generated .shadermeta + .slang → 공통 재질 소비` 흐름으로 고정한다.
    `.shadergraph`는 노드·연결뿐 아니라 편집 상태까지 보존하는 Visual 모드 정본이고,
-   생성 `.slang`은 읽기 전용 파생물이다. Code 모드는 직접 작성한 `.slang`이 정본이다.
-   양쪽 모두 `.shadermeta`를 property·keyword·entry point·render state 정본으로 공유한다.
+   생성 `.shadermeta`/`.slang`은 읽기 전용 파생물이다. Code 모드는 직접 작성한 `.slang`과 코드용 metadata가 저작 원본이다.
+   양쪽 모두 `.shadermeta`의 property·keyword·entry point·render state 소비 계약을 공유한다. Visual property/기본값은 Graph/Blackboard에서 편집하며 별도 Meta 저작 입력을 만들지 않는다.
+   2026-10-02 Material 재평가에서 이 공통 산출물/소비 연결은 PHASE 4.25 MAT-7의 미완료 목표로 확인했다. [현재 판정](BlenderMaterialGraphPlan.md#0-현재-판정과-실행-범위-2026-10-02)을 따른다.
 4. **C#은 선택적인 Game 스레드 값 제어기다.**
    동적 값과 미리 검증된 variant key만 안정 핸들로 갱신할 수 있다. topology, 슬롯
    schema, render state, GPU 실행은 소유하지 않으며 Render/CommandBuild/RHI 제출
@@ -206,7 +210,7 @@ M1~M7의 산출물을 소비한다. 별도 셰이더 컴파일 경로를 만들�
   Shader Graph/직접 Slang으로 일반적인 Raster·Compute Pass를 파이프라인에 넣는다.
 - 프로젝트별로 Pass 순서·조건·품질·백엔드 폴백을 기술할 수 있다.
 - 입력/출력·리소스 형식·바인딩·기능 지원을 구축 시점에 검증한다.
-- 같은 파이프라인 기술이 DX12와 Vulkan에서 같은 토폴로지를 만든다.
+- 같은 파이프라인 기술이 DX12에서 결정적인 토폴로지를 만든다.
 - Game→Render 스냅샷, RenderGraph 자원 수명, RHI 중립성을 보존한다.
 - Asset·Shader hot reload 실패가 현재 정상 파이프라인을 파괴하지 않는다.
 - Visual Shader Graph를 저장·닫기·재개방해도 노드 의미와 편집 상태가 보존된다.
@@ -384,14 +388,16 @@ Visual: Graph Editor ⇄ ShaderGraphAsset(.shadergraph)
                               ↓ load/validate/migrate
                            typed Graph IR
                               ↓ deterministic codegen
-                    generated .slang (read-only)
+                    generated .shadermeta + .slang (read-only)
+                              ↓
+                       common Shader/Material consumption
 
 Code:   Code Editor ⇄ authored .slang
 ```
 
 | 파일/모드 | 정본 책임 | 편집 규칙 |
 |---|---|---|
-| `.shadermeta` | properties/labels, keywords, pass entry points, render state, queue | 양 모드 공통. Inspector/Graph Blackboard가 편집 |
+| `.shadermeta` | properties/labels, keywords, pass entry points, render state, queue의 공통 소비 계약 | Visual은 Graph에서 생성·읽기 전용. Code는 metadata Inspector에서 편집 |
 | Visual `.shadergraph` | node type/ID, pin value, connection, position, group/comment, Blackboard/subgraph 참조, graph/schema version | Visual 코드와 편집 상태의 정본. Graph Editor가 읽고 씀 |
 | Visual generated `.slang` | 결정적 codegen 결과와 node source mapping | 파생 캐시, 읽기 전용 |
 | Code `.slang` | 직접 작성한 GPU 모듈·함수 | 코드 정본 |
@@ -403,7 +409,7 @@ Visual 모드의 최소 보존 계약은 다음이다.
 - graph/schema version을 저장하고 loader가 단계별 migration을 수행한다.
 - 알 수 없는 node나 migration 실패 시 원본 payload를 덮어쓰지 않고 recovery/read-only로
   열어 진단한다.
-- generated `.slang`이 없어도 `.shadergraph`와 `.shadermeta`만으로 재생성할 수 있어야 한다.
+- Visual의 생성 Meta/Slang이 없어도 `.shadergraph`와 고정 compiler/host 의존으로 두 산출물을 같은 generation으로 재생성할 수 있어야 한다.
 - Editor 프로젝트에는 `.shadergraph`를 보존한다. Player에는 검증된 compiled shader만
   포함하고 graph 편집 데이터는 패키징 정책에 따라 제외할 수 있다.
 
@@ -556,7 +562,7 @@ packet**으로 나눈다. 임의 C# 제어 흐름을 GPU 기록 시점에 허용
 - GC pause가 Render/CommandBuild 스레드에 전파되지 않음
 - 관리 객체 수명과 인플라이트 GPU 수명 분리
 - C# 유무와 무관한 native Player 렌더 실행
-- DX12/Vulkan 공통 graph validation
+- DX12 graph validation
 - 병렬 command recording 유지
 
 ---
@@ -636,7 +642,7 @@ Slang `ParameterBlock` 기반 auto-binding은 Material M6 실제 소비가 닫�
 - DXR·업스케일러 같은 조건부 Pass는 모든 지원 행렬에 fallback 또는 명시적 pipeline
   invalid 사유를 가져야 한다. 벤더 ID가 아니라 런타임 기능 질의로 고른다.
 - 폴백 사슬의 끝은 "기능 없음"이 아니라 벤더 중립 경로여야 한다.
-- DX12 전용 Pass를 Vulkan variant가 조용히 건너뛰지 않는다.
+- DX12에서 capability별 조건부 Pass와 폴백을 검증한다. Vulkan 대조는 현행 PHASE 4.9가 소유한다.
 - fallback 전후 출력 슬롯 schema가 같아야 한다.
 
 ### 10.5 스레딩
@@ -664,10 +670,10 @@ Slang `ParameterBlock` 기반 auto-binding은 Material M6 실제 소비가 닫�
 정본은 다음이다.
 
 - Pipeline Asset의 Pass Stack·slot·ResourceSchema·condition·fallback·override
-- 공통 Shader metadata인 `.shadermeta`
+- Code 모드의 authored `.shadermeta` metadata (Visual metadata는 Graph 파생물)
 - Visual 모드의 재편집 가능한 `.shadergraph` 또는 Code 모드의 authored `.slang` 중 하나
 
-generated `.slang`, `PipelineBlueprint`, `CompiledPipelineDesc`, DXIL/SPIR-V와 PSO는
+Visual generated `.shadermeta`/`.slang`, `PipelineBlueprint`, `CompiledPipelineDesc`, DXIL/SPIR-V와 PSO는
 파생 캐시다.
 
 Compiled Pipeline은 파생 캐시다. 키에는 최소 다음이 들어간다.
@@ -711,7 +717,7 @@ Pipeline node editor는 후속이다. 추가하더라도 같은 Pipeline Asset�
   배리어, pass culling, transient pool·수명, RHI-neutral 병렬 기록. 트랙 RG는 이 기반을
   교체하지 않고 명시적 접근·버전 핸들·stable DAG 순서로 확장한다
 - Render Debug의 파이프라인 topology, 패스별 GPU timing, validation, SSAO·SSGI·SSS·SSR·
-  Fog·Post tuning과 DX12/Vulkan 공용 Pass 픽셀 fixture
+  Fog·Post tuning과 RHI 중립 Pass의 DX12 픽셀 fixture
 - Slang 기반 DXIL/SPIR-V 컴파일, `.shadermeta`, reflection, material logical value,
   keyword permutation·cache
 - glTF/GLB의 계층·스키닝·embedded texture와 기본 PBR material import
@@ -786,7 +792,7 @@ GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·St
 - **RG2~RG4:** stable single-queue DAG, edge 기반 culling·lifetime·barrier, dependency
   wave 병렬 기록과 cycle/resource 진단을 닫는다.
 - **RG5~RG6:** 기본 19개 node와 제품 28곳/test·fixture 80곳을 이관하고 동일 밀봉 입력의
-  DX12/Vulkan 전체 live frame 픽셀·validation gate로 제품 전환을 닫는다.
+  DX12 전체 live frame 전후 픽셀·validation gate로 제품 전환을 닫는다.
 - **RG7~RG9:** RG6 뒤에만 transient buffer/aliasing → multi-queue/async compute →
   subresource/split barrier/Resource Inspector 순으로 연다.
 - 활성 공수는 RG1~RG6 53일, RG7~RG9 60일, 총 113일이다. RG0 4일은 `BASE-0`에
@@ -803,7 +809,7 @@ GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·St
 > 그대로 승계되며, `RG6`의 하드 선행도 `BASE-0`이 진다.
 > 근거와 판정: [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.1.
 
-- backend는 부팅 고정이므로 동일 scene/frame/tuning을 DX12·Vulkan 별도 프로세스에 재생
+- 동일 scene/frame/tuning을 DX12의 변경 전후 별도 프로세스에 재생
 - final PNG·차영상·허용 오차와 CPU record·pass별 GPU timing·graph stats artifact
 - pass fixture 통과와 전체 live frame 통과를 별도 판정하고 둘 중 하나로 다른 하나를 대체하지 않음
 - RenderGraph resource Inspector는 기존 graph/snapshot의 읽기 전용 소비자이며 GPU resource를 소유하지 않음
@@ -831,7 +837,7 @@ GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·St
   Editor/Asset/Player packaging 분류
 - `.shadermeta` + authored `.slang` + Fullscreen Template
 - Inspector에서 프로젝트 전용 output 슬롯을 만든 Outline/Grayscale fixture
-- DX12/Vulkan 같은 출력과 binding validation
+- DX12 변경 전후 출력과 binding validation
 - 기존 HLSL 셰이더 전수 개명·제품 PBR 진입점 변경·`ParameterBlock` 자동 바인딩은 이
   슬라이스에 포함하지 않음
 
@@ -950,9 +956,9 @@ GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·St
 ## 13. 완료 기준
 
 1. **기본 파이프라인 무회귀** — Pipeline Asset이 현재 19개 노드의 이름·순서·슬롯을
-   동일하게 만들고 DX12/Vulkan 픽셀·validation 회귀를 통과한다.
+   동일하게 만들고 DX12 전후 픽셀·validation 회귀를 통과한다.
 2. **일반 신규 Pass는 Asset으로 완결** — C++/C# Pass 작성 없이 Fullscreen Raster와
-   Compute 예제 각각 하나가 양 backend에서 실행된다.
+   Compute 예제 각각 하나가 DX12에서 실행된다. Vulkan 비교는 현행 PHASE 4.9로 이관한다.
 3. **새 슬롯은 프로젝트 데이터로 완결** — Inspector의 `write`가 `ResourceSchema`와
    프로젝트 전용 슬롯을 만들고 후속 Pass가 소비한다. Core `LiveSlots` 수정은 없다.
 4. **Visual 재편집과 Code 정본 분리** — `.shadergraph` 저장·닫기·재개방 뒤 노드 의미와
@@ -970,7 +976,7 @@ GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·St
 10. **배포 일치** — Player 빌드가 Pipeline Asset, `.shadermeta`, 선택한 graph/authored
     Slang 산출물, shader permutation, 사용 시 C# assembly와 native Pass 모듈을 빠짐없이
     포함하며 editor 전용 API에 링크하지 않는다.
-11. **전체 backend 동등성·관측 가능성** — 동일한 밀봉 입력의 DX12/Vulkan live frame이
+11. **전체 backend 동등성·관측 가능성** — 동일한 밀봉 입력의 DX12 변경 전후 live frame이
     final 이미지 허용 오차와 validation 기준을 통과하고, 실패 시 pass timing·graph stats·
     resource state/lifetime·중간 이미지만으로 원인을 좁힐 수 있다.
 12. **Graph domain 분리** — `.shadergraph(domain=material)`은 PHASE 4.25의
@@ -979,7 +985,7 @@ GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·St
     domain의 의미나 topology를 재정의하지 않는다.
 13. **리소스 의존성 실행** — Pipeline Asset의 저작 순서와 compiled 실행 순서를 분리하고,
     명시적 resource version edge로 stable DAG를 만든다. RG6에서 기본 19개 node와 제품
-    Pass 이관, 양 backend live 픽셀·validation을 통과한 뒤에만 aliasing과 async compute를 연다.
+    Pass 이관, DX12 live 픽셀·validation을 통과한 뒤에만 aliasing과 async compute를 연다. Vulkan 비교는 PHASE 4.9이며 착수 선행이 아니다.
 
 ---
 
@@ -1012,7 +1018,7 @@ GPU 세 기능과 별도 완료선으로 분류했다. `GPU-9`는 GPU-driven·St
 - Pipeline Asset Inspector가 topology·Pass 데이터·슬롯 schema·조건·폴백의 정본이다.
 - 일반 Custom Pass는 네이티브 Template + Shader Asset으로 완결하며 C# Pass를 요구하지 않는다.
 - Shader 코드는 재편집 가능한 Visual `.shadergraph` 또는 authored `.slang` 중 하나가 정본이다.
-- `.shadermeta`는 양 모드의 property·keyword·entry·render state 정본이다.
+- `.shadermeta`는 양 모드의 property·keyword·entry·render state 소비 계약이다. Visual에서는 Graph가 저작 원본이며 Meta/Slang을 함께 생성한다.
 - `Graph Editor ⇄ .shadergraph` 저장·재개방 round-trip은 필수다.
 - generated `.slang`은 읽기 전용 파생 캐시이며 Slang→Graph 자동 역변환은 없다.
 - 프로젝트 전용 슬롯은 Inspector의 `write`와 `ResourceSchema`로 만들 수 있다.

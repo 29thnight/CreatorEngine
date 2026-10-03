@@ -1,5 +1,6 @@
 #include "../../Engine/RenderEngine/DataSystem.h"
 #include "../../Engine/RenderEngine/Material.h"
+#include "../../Engine/RenderEngine/ShaderMeta.h"
 #include "../../Engine/Utility_Framework/AuthoringNodeViewAccess.h"
 #include "../../Engine/Utility_Framework/AuthoringParsedDocument.h"
 #include "../../Engine/Utility_Framework/AuthoringWriteNode.h"
@@ -10,6 +11,11 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+
+namespace reflgen::generated
+{
+void register_RenderEngine(reflgen::registry& target);
+}
 
 struct ComApartment
 {
@@ -26,7 +32,8 @@ int main(int argc, char** argv)
     try
     {
         ComApartment apartment;
-        Meta::Register<Material>();
+        // Match the engine bootstrap; descriptors live in its registration TU.
+        reflgen::generated::register_RenderEngine(Meta::Types());
         Meta::Typed::RegisterOps<Material>();
         if (argc != 2)
             throw std::runtime_error("Expected packaged fixture Assets root.");
@@ -59,6 +66,28 @@ int main(int argc, char** argv)
         const auto format = original->textures[0].owner->GetImageView().Format();
         check(format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb,
               "Actual CPU texture storage preserves graph SRGB intent");
+        const auto* generated = material.GetGeneratedShaderMeta();
+        check(generated != nullptr, "Actual generated contract is owned by the Material");
+        const auto textureProperty = std::ranges::find(generated->properties, std::uint64_t{905},
+                                                       &ShaderPropertyDesc::parameterId);
+        check(textureProperty != generated->properties.end() &&
+                  textureProperty->type == ShaderPropertyType::Texture2D,
+              "Source texture ID resolves through the common schema");
+        FileGuid textureGuid;
+        check(material.TryGetTextureGuid(textureProperty->name, textureGuid) &&
+                  textureGuid.m_guid == original->textures[0].assetId.value &&
+                  material.GetTextureMapShared(textureProperty->name) == original->textures[0].owner,
+              "Common texture value and owner agree with the accepted LX instance");
+        check(material.TrySetTextureGuid(textureProperty->name, textureGuid) &&
+                  material.GetMaterialGraphInstance() != original &&
+                  material.GetMaterialGraphInstance()->generation == generation,
+              "Common texture setter publishes a stable-ID owning snapshot");
+        const auto textureAccepted = material.GetMaterialGraphInstance();
+        FileGuid unavailableTexture;
+        check(Uuid::TryParse("44444444-4444-4444-8444-444444444444", unavailableTexture.m_guid) &&
+                  !material.TrySetTextureGuid(textureProperty->name, unavailableTexture) &&
+                  material.GetMaterialGraphInstance() == textureAccepted,
+              "Common texture setter preserves the snapshot when an owner cannot load");
         check(material.TrySetMaterialGraphParameter(900, .47, error) &&
                   material.GetMaterialGraphInstance() != original &&
                   material.GetMaterialGraphInstance()->uniforms != original->uniforms,

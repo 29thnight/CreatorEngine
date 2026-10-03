@@ -1,6 +1,8 @@
 #pragma once
 
 #include "MaterialGraphProduct.h"
+#include "MaterialPropertyValue.h"
+#include "LXMaterialRuntime.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 
 #include <functional>
@@ -79,11 +81,10 @@ struct InstanceTexture
     std::shared_ptr<Texture> owner;
 };
 
-struct Instance
+struct Instance : LX::Runtime::Instance
 {
     std::shared_ptr<const Generation> generation;
     InstanceDescription description;
-    std::vector<std::uint8_t> uniforms;
     std::vector<InstanceTexture> textures;
 };
 
@@ -93,7 +94,7 @@ bool BuildInstance(std::shared_ptr<const Generation> generation, const InstanceD
                    const TextureLoader& loadTexture, std::shared_ptr<const Instance>& result, std::string& error);
 
 // Disk values contain stable parameter IDs and typed values, never byte offsets
-// or runtime generation numbers. ShaderMeta material documents stay separate.
+// or runtime generation numbers. Generated ShaderMeta is derived from the graph.
 struct InstanceDocument
 {
     std::string name;

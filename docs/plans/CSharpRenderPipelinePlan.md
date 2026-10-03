@@ -1,6 +1,9 @@
 # C# Render Pipeline 저작 계획 (PHASE 4.6)
 
-**2026-09-23 신설 · 계획 확정, 구현 미착수 · 공수 미산정.** 목표 구조는
+**2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
+
+
+**2026-09-23 신설 · 계획 확정, 구현 미착수 · 7행 32인일(계획 추정).** 목표 구조는
 [`RenderPipelineTargetArchitecture.md`](../design/RenderPipelineTargetArchitecture.md)가
 정본이다. 이 계획은 **C#에서 Pipeline Description을 작성해 불변 IR로 내리는 경계**만
 소유한다. 리소스 DAG·barrier·queue는
@@ -12,7 +15,7 @@ Material Graph/Principled는 [`BlenderMaterialGraphPlan.md`](BlenderMaterialGrap
 Inspector 정본·선택적 C# 값 제어·일반 Pass Shader Graph를 이 계획의 활성 항목으로
 승계하지 않는다. 기존 설계와 33일 산정은 구 방향의 역사 기록으로 보존하며, 아래
 슬라이스에 그대로 이식하지 않는다. 특히 Roslyn/interop/세대 교체가 포함된 새 범위는
-실측 전까지 0일로 계산하지 않고 **미산정**으로 둔다.
+2026-10-01 재산정에서는 경계별 구현·DX12 검증 작업으로 32인일을 배정한다. 세부 근거는 [공수 원장](RenderPhaseEffortEstimate.md)을 따른다.
 
 ## 1. 실제 소비 경로와 대체 범위
 
@@ -44,17 +47,17 @@ stable Pass ID·타입 있는 resource handle·설정 값만 운반한다.
 GPU fence가 끝날 때까지 유지한다. per-view history와 Host 기여 노드는 기존 수명
 계약을 그대로 소비한다.
 
-## 3. 구현 슬라이스 — 공수는 각 항목 착수 전 산정
+## 3. 구현 슬라이스 — 2026-10-01 재산정 32인일
 
-| ID | 닫을 책임 | 선행 | 검증 게이트 |
-|---|---|---|---|
-| `CSRP-0` | 현재 19 node·per-view·Host 기여·PassSchema/ShaderMeta 소비자 실측, sealed A/B fixture | `BASE-0` | 현재 C++ 경로의 node/slot·픽셀·실패 변이 기준선. 계획의 오래된 파일명·호출 수 재계수 |
-| `CSRP-1` | native immutable Pipeline IR, 안정 PassTypeId/slot/setting schema, C++ builder·registry | `CSRP-0`, RG1 단일 writer DAG 계약 | managed 없이 IR → `LivePipelineDesc` dump; missing producer, ID/schema/출력 root 오류를 GPU 전에 거부. version/Modify 경로는 RG2 이후 연다 |
-| `CSRP-2` | C# `RenderPipelineBuilder`, typed handle, 한 번의 immutable interop 게시, 관리 예외/세대 실패 처리 | `CSRP-1` | C# 기본 파이프라인을 native IR과 같은 hash/dump로 재생성; Render/CommandBuild/RHI 스레드 managed callback 0 |
-| `CSRP-3` | PassSchema–ShaderMeta/Keyword 합성, native/C# ID·layout와 permutation 일치 | `CSRP-2` | 키워드 중복·틀린 의미 슬롯·파라미터 범위·누락 필수 입력의 negative fixture |
-| `CSRP-4` | Roslyn generator/analyzer와 Editor schema metadata | `CSRP-3` | 타입 있는 builder/interop/Editor 필드 생성; 생성 출력을 변경·누락시키는 변이가 빌드/검증을 붉게 만듦 |
-| `CSRP-5` | 기본 19 node C# 저작 → native Pass 실행 제품 전환 | RG5·RG6, `CSRP-1~4` | 이전 C++ builder와 같은 밀봉 입력의 DX12/Vulkan node·slot·픽셀·validation; 구 builder는 fixture 뒤 제품 경로에서 제거 |
-| `CSRP-6` | native advanced Pass/조건·fallback·side effect·queue hint, reload·fence 수명 | `CSRP-5`; multi-queue hint는 Q0/RG8 | native escape가 graph에 사용/ownership을 알림, 지원 불가/재컴파일 실패 시 마지막 정상 generation 유지, per-view/history 회귀 |
+| ID | 닫을 책임 | 선행 | 검증 게이트 | 인일 |
+|---|---|---|---|---:|
+| `CSRP-0` | 현재 19 node·per-view·Host 기여·PassSchema/ShaderMeta 소비자 실측, sealed A/B fixture | `BASE-0` | 현재 C++ 경로의 node/slot·픽셀·실패 변이 기준선. 계획의 오래된 파일명·호출 수 재계수 | 3 |
+| `CSRP-1` | native immutable Pipeline IR, 안정 PassTypeId/slot/setting schema, C++ builder·registry | `CSRP-0`, RG1 단일 writer DAG 계약 | managed 없이 IR → `LivePipelineDesc` dump; missing producer, ID/schema/출력 root 오류를 GPU 전에 거부. version/Modify 경로는 RG2 이후 연다 | 6 |
+| `CSRP-2` | C# `RenderPipelineBuilder`, typed handle, 한 번의 immutable interop 게시, 관리 예외/세대 실패 처리 | `CSRP-1` | C# 기본 파이프라인을 native IR과 같은 hash/dump로 재생성; Render/CommandBuild/RHI 스레드 managed callback 0 | 5 |
+| `CSRP-3` | PassSchema–ShaderMeta/Keyword 합성, native/C# ID·layout와 permutation 일치 | `CSRP-2` | 키워드 중복·틀린 의미 슬롯·파라미터 범위·누락 필수 입력의 negative fixture | 4 |
+| `CSRP-4` | Roslyn generator/analyzer와 Editor schema metadata | `CSRP-3` | 타입 있는 builder/interop/Editor 필드 생성; 생성 출력을 변경·누락시키는 변이가 빌드/검증을 붉게 만듦 | 6 |
+| `CSRP-5` | 기본 19 node C# 저작 → native Pass 실행 제품 전환 | RG5·RG6, `CSRP-1~4` | 이전 C++ builder와 같은 밀봉 입력의 DX12 node·slot·픽셀·validation; 구 builder는 fixture 뒤 제품 경로에서 제거 | 4 |
+| `CSRP-6` | native advanced Pass/조건·fallback·side effect·queue hint, reload·fence 수명 | `CSRP-5`; multi-queue hint는 Q0/RG8 | native escape가 graph에 사용/ownership을 알림, 지원 불가/재컴파일 실패 시 마지막 정상 generation 유지, per-view/history 회귀 | 4 |
 
 `CSRP-1`의 native IR은 C#에 앞서 C++ builder로 검사한다. `CSRP-2`는 CLR 경계
 한 번의 generation 게시를 먼저 닫고, `CSRP-3~4`는 실제 반복 schema를 근거로
@@ -94,4 +97,4 @@ CSRP-6의 reload 실패/마지막 정상 세대·per-view/history 검증은 view
 실제 실행 세대가 일치하는지도 포함한다. 이 연결이 없으면 CSRP-5/6을 완료로 닫지 않는다.
 Project Settings Graphics의 pipeline 선택/설정은 W9의 shared schema를 소비한다.
 SceneRenderProfile은 파라미터이며 C# RenderPipeline.Build 조립의 대체 저작 정본이 아니다.
-공수는 현행 CSRP-0~6 미산정 규칙을 유지한다.
+공수는 CSRP-0~6 합계 32인일에 포함하며 viewer를 중복 계산하지 않는다.

@@ -102,6 +102,6 @@ PHASE 4.6은 native IR/C++ fixture → C# 저작·managed 경계 → schema/Rosl
 PHASE 4.8 GPU 설계는 C# 저작 구현 완료를 일괄 선행으로 받지 않는다.
 
 완료 증거는 잘못된 producer/version/semantic/queue/keyword 변이가 빌드 또는 graph
-compile에서 실패하는 것, sealed frame 기준 19 node dump와 DX12/Vulkan 픽셀·validation,
+compile에서 실패하는 것, sealed frame 기준 19 node dump와 DX12 픽셀·validation,
 관리 호출이 렌더 스레드에서 0건인 것, reload 실패 시 마지막 정상 세대와 GPU 자원이
 fence 완료까지 유지되는 것이다. 이 문서는 설계 결정이며 구현·런타임 완료 증거가 아니다.

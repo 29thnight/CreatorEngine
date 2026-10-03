@@ -134,9 +134,9 @@ bool SceneVolumeResources::Initialize(const EnhancedFrameContext& context, std::
     const auto file = RHIShaderSource::Resolve("MaterialGraphSceneVolumeBake.slang").string();
     RHIShaderCompileOptions options;
     options.strictMath = true;
-    RHIShaderCompiler::VerifiedShader shader, verification;
-    if (!RHIShaderCompiler::VerifyFile(file, "LXSceneVolumeCompositeCS", "cs_6_0", backend, {}, shader, error,
-                                       options) ||
+    LX::Runtime::CompiledCompute shader;
+    RHIShaderCompiler::VerifiedShader verification;
+    if (!LX::Runtime::CompileCompute(file, "LXSceneVolumeCompositeCS", {}, options, shader, error) ||
         !RHIShaderCompiler::VerifyFile(file, "LXSceneVolumeCompositeCS", "cs_6_0", other, {}, verification, error,
                                        options))
     {
@@ -155,15 +155,15 @@ bool SceneVolumeResources::Initialize(const EnhancedFrameContext& context, std::
     }
     RHIComputePipelineDesc desc;
     desc.layout = layout;
-    desc.csBytecode = shader.bytecode.Data();
-    desc.csSize = shader.bytecode.Size();
-    const auto pipeline = context.psoManager->GetOrCreateCompute(desc, error);
-    if (!pipeline.IsValid())
+    desc.csBytecode = shader.stage.bytecode.Data();
+    desc.csSize = shader.stage.bytecode.Size();
+    LX::Runtime::ComputePipeline pipeline;
+    if (!pipeline.Create(*context.psoManager, desc, std::move(shader.description), error))
     {
         return false;
     }
     device_ = context.resources;
-    composite_ = pipeline;
+    composite_ = std::move(pipeline);
     return true;
 }
 
@@ -234,7 +234,7 @@ bool SceneVolumeResources::Prepare(const EnhancedFrameContext& context, const Sc
     candidate->recording_ = device_->GetCurrentUploadRecordingId();
     candidate->descriptors_ = device_->GetDescriptorVersionToken();
     candidate->environment_ = environment;
-    candidate->composite_ = composite_;
+    candidate->composite_ = composite_.GetGeneration();
     candidate->triangles_ =
         device_->AllocateUpload({triangles.size() * sizeof(SceneVolumeTriangle), RHIUploadUsage::Raw, 16});
     if (!candidate->triangles_.IsWritable())
@@ -318,6 +318,9 @@ void SceneVolumeFrame::DeclareCoefficients(EnhancedRenderGraph& graph,
     {
         throw std::runtime_error("Scene Volume coefficients require one complete declaration.");
     }
+    for (const auto& draw : bindings)
+        if (!draw.material || !draw.pipeline || !draw.pipeline->IsValid() || !draw.constants.IsValid())
+            throw std::runtime_error("Scene Volume coefficients require retained LX compute owners and bindings.");
     graph_ = &graph;
     graphEpoch_ = graph.ResourceEpoch();
     CheckCurrent(graph);
@@ -337,7 +340,7 @@ void SceneVolumeFrame::DeclareCoefficients(EnhancedRenderGraph& graph,
         auto& encoder = *execution.encoder;
         for (const auto& draw : draws)
         {
-            encoder.SetPipeline(RHIBindPoint::Compute, draw.pipeline);
+            encoder.SetPipeline(RHIBindPoint::Compute, draw.pipeline->GetHandle());
             std::string error;
             if (!RenderBindingCache::Bind(*owner->device_, encoder, RHIBindPoint::Compute, *draw.material, error))
             {
@@ -363,6 +366,7 @@ RGHandle SceneVolumeFrame::DeclareComposite(EnhancedRenderGraph& graph, RGHandle
     desc.height = height_;
     desc.format = RHIFormat::RGBA16Float;
     desc.allowUnorderedAccess = true;
+    desc.allowRenderTarget = true;
     desc.name = "LX.Scene.VolumeColor";
     output_ = graph.CreateTexture(desc);
     std::vector<EnhancedRenderGraph::RGPassUsage> uses{{lighting, RHIResourceState::ShaderResource},
@@ -401,7 +405,7 @@ RGHandle SceneVolumeFrame::DeclareComposite(EnhancedRenderGraph& graph, RGHandle
             throw std::runtime_error("Scene Volume composite binding failed.");
         }
         auto& encoder = *execution.encoder;
-        encoder.SetPipeline(RHIBindPoint::Compute, owner->composite_);
+        encoder.SetPipeline(RHIBindPoint::Compute, owner->composite_->GetHandle());
         encoder.SetBindings(RHIBindPoint::Compute, 1, inputTable);
         encoder.SetRootBuffer(RHIBindPoint::Compute, 2, owner->triangles_);
         encoder.SetRootBuffer(RHIBindPoint::Compute, 3, RHIBufferSlice::Whole(owner->coefficients_));

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LXMaterialPipeline.h"
+
 #include "RHI/IRenderDeviceServices.h"
 #include "RHI/IRenderPipelineCache.h"
 #include "RHI/RHIEncoder.h"
@@ -84,7 +86,7 @@ class IblBakeResult
     std::vector<IblBakePoint> points_;
     std::shared_ptr<const SurfaceBatch> gpuPoints_;
     std::uint32_t count_{};
-    RHIPipelineHandle pipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
     RHIBufferSlice inputs_, uniform_;
     RHIBindingTable sourceTable_, targetTable_;
     std::uint64_t recordingId_{}, descriptorVersion_{};
@@ -102,7 +104,8 @@ class IblBaker
     // Accept compiled/cooked CS bytecode. This class does not install a runtime
     // Slang compiler. Failed initialization preserves the accepted pipeline.
     bool Initialize(IRenderDeviceServices& device, IRenderRootSignatureCache& roots, IRenderPipelineCache& pipelines,
-                    const RHIShaderBlob& shader, std::string& error);
+                    const RHIShaderBlob& shader, std::string& error,
+                    LX::Runtime::ComputeShaderDescription identity = {});
 
     // Graph-external bake on the active recording's encoder. The environment
     // must already be ShaderResource. Output leaves this call ShaderResource.
@@ -131,7 +134,7 @@ class IblBaker
 
   private:
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle pipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
     bool RecordInputs(IRenderDeviceServices& device, const IblEnvironment& environment,
                       std::span<const IblBakePoint> cpuPoints, std::shared_ptr<const SurfaceBatch> gpuPoints,
                       std::shared_ptr<const IblBakeResult>& result, std::string& error);

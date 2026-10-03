@@ -6,6 +6,7 @@
 #include "RHI/RHIShaderSource.h"
 
 #include <algorithm>
+#include <set>
 #include <atomic>
 #include <cstring>
 #include <cstdio>
@@ -34,8 +35,8 @@ struct SceneConstants
     math::vector4 shadowSplits, shadowBias, cameraForward;
     EnhancedLight lights[64];
 };
-  static_assert(sizeof(SceneConstants) == 4464);
-  static_assert(offsetof(SceneConstants, lights) == 368);
+static_assert(sizeof(SceneConstants) == 4464);
+static_assert(offsetof(SceneConstants, lights) == 368);
 
 struct SceneShadowConstants
 {
@@ -58,13 +59,13 @@ struct SceneHost::Program
     RHIShaderBinary backend{};
     PassLayout layout;
     PassLayout shadowLayout;
-    RHIGraphicsPipelineRequest shadow;
-    std::array<RHIGraphicsPipelineRequest, 2> gbuffer, color;
-    std::array<std::array<RHIGraphicsPipelineRequest, 2>, 2> lookup;
-    std::array<RHIGraphicsPipelineRequest, 2> subsurface;
-    std::array<RHIGraphicsPipelineRequest, 2> refraction;
+    LX::Runtime::GraphicsPipeline shadow;
+    std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, color, blendedColor;
+    std::array<std::array<LX::Runtime::GraphicsPipeline, 2>, 2> lookup, blendedLookup;
+    std::array<LX::Runtime::GraphicsPipeline, 2> subsurface;
+    std::array<LX::Runtime::GraphicsPipeline, 2> refraction;
     PassLayout volumeLayout;
-    RHIPipelineHandle volume;
+    LX::Runtime::ComputePipeline volume;
     bool hasSurface{}, hasVolume{};
     bool hasSubsurface{}, hasTransmission{}, hasSpecial{};
 };
@@ -77,9 +78,10 @@ struct SceneHost::Frame
         std::shared_ptr<const RenderBindings> bindings;
         std::shared_ptr<const RenderBindings> shadowBindings;
         std::shared_ptr<const MeshSurfaceBatch> geometry;
-        RHIBufferSlice indices, constants;
+        RHIBufferSlice indices, constants, referenceConstants;
         std::array<RHIBufferSlice, 3> shadowConstants;
-        bool doubleSided{};
+        bool doubleSided{}, blended{};
+        std::size_t inputIndex{};
     };
     IRenderDeviceServices* device{};
     std::uint64_t recording{}, descriptors{};
@@ -87,15 +89,20 @@ struct SceneHost::Frame
     std::vector<Draw> draws;
     RHITextureHandle environment;
     bool shadow{};
-    std::shared_ptr<const SceneLookupFrame> lookup;
+    std::shared_ptr<const SceneLookupFrame> lookup, alphaLookup;
+    mutable bool alphaInputsDeclared{};
+    mutable std::set<std::size_t> alphaDeclared;
     std::shared_ptr<const SceneSubsurfaceFrame> subsurface;
     std::shared_ptr<const SceneRefractionFrame> refraction;
     std::shared_ptr<const SceneVolumeFrame> volume;
     std::vector<SceneVolumeBinding> volumeBindings;
+    RHIBufferSlice emptyVolumeConstants, emptyVolumeBuffer;
     mutable const EnhancedRenderGraph* graph{};
     mutable std::uint64_t graphEpoch{};
     mutable EnhancedGBufferPass::Outputs gbuffer;
+    mutable EnhancedGBufferPass::Outputs forwardGbuffer;
     mutable bool colorDeclared{};
+    mutable bool volumeDeclared{};
     mutable bool gbufferDeclared{}, shadowDeclared{};
     mutable bool decalDeclared{};
     mutable std::array<RGHandle, 3> decalBaseline;
@@ -145,6 +152,30 @@ struct SceneHost::Frame
                                   decalConstants[decalDeclared && !transmissionStage]);
     }
 
+    void BindForward(RHIEncoder& encoder, const Draw& draw, const EnhancedForwardLighting& forward) const
+    {
+        const unsigned index = 6 + (draw.program->hasSpecial ? 2 : 0) + (draw.program->hasTransmission ? 1 : 0);
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, index, forward.lights.IsValid() ? forward.lights : draw.constants);
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 1,
+                              forward.counts.IsValid() ? RHIBufferSlice::Whole(forward.counts) : draw.constants);
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 2,
+                              forward.indices.IsValid() ? RHIBufferSlice::Whole(forward.indices) : draw.constants);
+        const bool medium = draw.blended && bool(volume);
+        encoder.SetConstantBuffer(RHIBindPoint::Graphics, index + 3,
+                                  medium ? volume->TransportConstants() : emptyVolumeConstants);
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 4,
+                              medium ? volume->Triangles() : emptyVolumeBuffer);
+        encoder.SetRootBuffer(RHIBindPoint::Graphics, index + 5,
+                              medium ? RHIBufferSlice::Whole(volume->Coefficients()) : emptyVolumeBuffer);
+        const std::array<RHIBindingDesc, 2> empty{
+            RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull(),
+            RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull()};
+        const auto table = medium && forward.volumeTable.IsValid()
+            ? forward.volumeTable : device->CreateBindings(empty);
+        if (!table.IsValid()) throw std::runtime_error("Forward medium binding failed.");
+        encoder.SetBindings(RHIBindPoint::Graphics, index + 6, table);
+    }
+
     void CheckCurrent(const EnhancedRenderGraph* currentGraph = nullptr) const
     {
         if (device->GetCurrentUploadRecordingId() != recording || device->GetDescriptorVersionToken() != descriptors)
@@ -163,6 +194,7 @@ struct SceneHost::Preparation
     struct Work : SceneShaderSet
     {
         std::shared_ptr<const Generation> generation;
+        std::shared_ptr<const VerifiedProduct> verified;
         RHIShaderBinary backend{};
         std::filesystem::path file, shaderDirectory;
         std::string error;
@@ -347,6 +379,13 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                 auto candidate = std::make_shared<Program>();
                 candidate->generation = preparation->generation;
                 candidate->backend = backend;
+                const auto& product = compiled->verified ? *compiled->verified : candidate->generation->cooked.product;
+                const auto prepare = [&](LX::Runtime::GraphicsPipeline& request, const RHIGraphicsPipelineDesc& desc,
+                                         std::string_view vs, std::string_view ps) {
+                    LX::Runtime::GraphicsShaderDescription shader;
+                    return DescribeGraphicsShader(product, backend, vs, ps, shader, error) &&
+                           request.Prepare(desc, std::move(shader), error);
+                };
                 candidate->hasSurface = candidate->generation->cooked.product.program.surface;
                 candidate->hasVolume = candidate->generation->cooked.product.program.volume;
                 candidate->hasSubsurface = (candidate->generation->cooked.product.program.features & 0x1000u) != 0;
@@ -367,6 +406,13 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                 }
                 host.push_back(RHILayout::SrvTable(6, 9, RHIShaderVisibility::Pixel));
                 host.push_back(RHILayout::Cbv(3, RHIShaderVisibility::Pixel));
+                host.push_back(RHILayout::Srv(128, RHIShaderVisibility::Pixel));
+                host.push_back(RHILayout::Srv(129, RHIShaderVisibility::Pixel));
+                host.push_back(RHILayout::Srv(130, RHIShaderVisibility::Pixel));
+                host.push_back(RHILayout::Cbv(5, RHIShaderVisibility::Pixel));
+                host.push_back(RHILayout::Srv(131, RHIShaderVisibility::Pixel));
+                host.push_back(RHILayout::Srv(132, RHIShaderVisibility::Pixel));
+                host.push_back(RHILayout::SrvTable(2, 133, RHIShaderVisibility::Pixel));
                 const RHIStaticSamplerDesc samplers[]{
                     {RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel},
                     {RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
@@ -397,7 +443,7 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                     desc.cullMode = RHICullMode::None;
                     desc.dsvFormat = RHIFormat::D32Float;
                     desc.numRenderTargets = 0;
-                    if (!candidate->shadow.Prepare(desc, error))
+                    if (!prepare(candidate->shadow, desc, "LXSceneShadowVS", "LXSceneShadowPS"))
                     {
                         return false;
                     }
@@ -414,8 +460,9 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                     desc.layout = candidate->volumeLayout.handle;
                     desc.csBytecode = compiled->volume.bytecode.Data();
                     desc.csSize = compiled->volume.bytecode.Size();
-                    candidate->volume = context.psoManager->GetOrCreateCompute(desc, error);
-                    if (!candidate->volume.IsValid())
+                    LX::Runtime::ComputeShaderDescription shader;
+                    if (!DescribeComputeShader(product, backend, "LXSceneVolumeCoefficientCS", shader, error) ||
+                        !candidate->volume.Create(*context.psoManager, desc, std::move(shader), error))
                     {
                         return false;
                     }
@@ -438,7 +485,7 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                     {
                         desc.rtvFormats[i] = EnhancedGBufferPass::GetRenderTargetFormat(i);
                     }
-                    if (!candidate->gbuffer[side].Prepare(desc, error))
+                    if (!prepare(candidate->gbuffer[side], desc, "LXSceneVS", "LXSceneGBufferPS"))
                     {
                         return false;
                     }
@@ -449,9 +496,17 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                     desc.numRenderTargets = 1;
                     desc.rtvFormats[0] = RHIFormat::RGBA16Float;
                     std::fill(std::begin(desc.rtvFormats) + 1, std::end(desc.rtvFormats), RHIFormat::Unknown);
-                    if (!candidate->color[side].Prepare(desc, error))
+                    if (!prepare(candidate->color[side], desc, "LXSceneVS", "LXSceneColorPS"))
                     {
                         return false;
+                    }
+                    if (candidate->hasSurface)
+                    {
+                        desc.depthFunc = RHICompareOp::LessEqual;
+                        desc.blendEnable = true;
+                        if (!prepare(candidate->blendedColor[side], desc, "LXSceneVS", "LXSceneColorPS")) return false;
+                        desc.blendEnable = false;
+                        desc.depthFunc = RHICompareOp::Equal;
                     }
                     if (candidate->hasSubsurface)
                     {
@@ -459,7 +514,7 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                         desc.psSize = compiled->subsurface.bytecode.Size();
                         desc.numRenderTargets = 7;
                         std::fill_n(std::begin(desc.rtvFormats), 7, RHIFormat::RGBA32Float);
-                        if (!candidate->subsurface[side].Prepare(desc, error))
+                        if (!prepare(candidate->subsurface[side], desc, "LXSceneVS", "LXSceneSubsurfacePS"))
                         {
                             return false;
                         }
@@ -471,7 +526,7 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                         desc.numRenderTargets = 2;
                         std::fill(std::begin(desc.rtvFormats), std::end(desc.rtvFormats), RHIFormat::Unknown);
                         std::fill_n(std::begin(desc.rtvFormats), 2, RHIFormat::RGBA32Float);
-                        if (!candidate->refraction[side].Prepare(desc, error))
+                        if (!prepare(candidate->refraction[side], desc, "LXSceneVS", "LXSceneRefractionPS"))
                         {
                             return false;
                         }
@@ -484,8 +539,16 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                         desc.numRenderTargets = part ? 3 : 8;
                         std::fill(std::begin(desc.rtvFormats), std::end(desc.rtvFormats), RHIFormat::Unknown);
                         std::fill_n(std::begin(desc.rtvFormats), desc.numRenderTargets, RHIFormat::RGBA32Float);
-                        if (!candidate->lookup[part][side].Prepare(desc, error))
+                        if (!prepare(candidate->lookup[part][side], desc, "LXSceneVS",
+                                     part ? "LXSceneLookup1PS" : "LXSceneLookup0PS"))
                             return false;
+                        if (candidate->hasSurface)
+                        {
+                            desc.depthFunc = RHICompareOp::LessEqual;
+                            if (!prepare(candidate->blendedLookup[part][side], desc, "LXSceneVS",
+                                         part ? "LXSceneLookup1PS" : "LXSceneLookup0PS")) return false;
+                            desc.depthFunc = RHICompareOp::Equal;
+                        }
                     }
                 }
 
@@ -502,9 +565,17 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
         if (!pollsRemaining)
             continue;
         auto& program = *preparation->program;
-        std::vector<RHIGraphicsPipelineRequest*> requests{
+        std::vector<LX::Runtime::GraphicsPipeline*> requests{
             &program.gbuffer[0],   &program.gbuffer[1],   &program.color[0],     &program.color[1],
             &program.lookup[0][0], &program.lookup[0][1], &program.lookup[1][0], &program.lookup[1][1]};
+        if (program.hasSurface)
+        {
+            for (unsigned side = 0; side < 2; ++side)
+            {
+                requests.push_back(&program.blendedColor[side]);
+                for (unsigned part = 0; part < 2; ++part) requests.push_back(&program.blendedLookup[part][side]);
+            }
+        }
         if (program.hasSurface)
         {
             requests.push_back(&program.shadow);
@@ -566,7 +637,9 @@ void SceneHost::PollPrograms(const EnhancedFrameContext& context)
                                         ? "LX Scene shader reflection differs from the exact instance layout."
                                         : work->error);
                     }
-                    return LoadSceneShaders(verified, work->backend, *work, work->error);
+                    if (!LoadSceneShaders(verified, work->backend, *work, work->error)) return false;
+                    work->verified = std::make_shared<VerifiedProduct>(std::move(verified));
+                    return true;
                 });
                 ++stats_.compileSubmissions;
             }
@@ -618,6 +691,10 @@ bool SceneHost::SelectReadyInput(const EnhancedFrameContext& context, std::share
     const auto sameCoverage = [](const auto& a, const auto& b) {
         return a.flags == b.flags && a.cutoff == b.cutoff && a.baseAlpha == b.baseAlpha;
     };
+    const auto supported = [](const SceneDrawInput& draw) {
+        const auto& program = draw.material->generation->cooked.product.program;
+        return program.surface || program.volume;
+    };
     // Validate shared Material identities before mutating request revisions.
     std::map<std::uint64_t, const SceneDrawInput*> sources;
     for (const auto& draw : requested->Draws())
@@ -642,8 +719,7 @@ bool SceneHost::SelectReadyInput(const EnhancedFrameContext& context, std::share
             slot->requestedCoverage = draw->coverage;
             slot->revision = ++selectionSerial_;
         }
-        if (draw->queue == SceneCoverage::Blended)
-            stats_.lastError = "LX Scene Blended replacement is not installed; keeping the submitted material.";
+        if (!supported(*draw)) stats_.lastError = "LX Scene material has no Surface or Volume output.";
         else
         {
             std::string preparationError;
@@ -662,30 +738,15 @@ bool SceneHost::SelectReadyInput(const EnhancedFrameContext& context, std::share
     std::map<assets::ModelAssetGenerationHandle, std::pair<bool, bool>> modelReadiness;
     for (const auto& draw : requested->Draws())
     {
-        if (draw.queue == SceneCoverage::Blended)
-            continue;
         const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
         auto& readiness = modelReadiness[draw.model];
-        const bool requestedReady = IsProgramReady(draw.material->generation, backend);
+        const bool requestedReady = supported(draw) && IsProgramReady(draw.material->generation, backend);
         const bool activeReady = slot->active && IsProgramReady(slot->active->generation, backend);
         if (!requestedReady) readiness.first = true;
         if (!activeReady) readiness.second = true;
     }
     for (auto draw : requested->Draws())
     {
-        if (draw.queue == SceneCoverage::Blended)
-        {
-            const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
-            if (slot->active && IsProgramReady(slot->active->generation, backend))
-            {
-                draw.material = slot->active;
-                draw.coverage = slot->activeCoverage;
-                if (!ClassifySceneCoverage(draw.coverage, draw.queue, error)) return false;
-                draw.selectionRevision = slot->revision;
-                selected->draws_.push_back(std::move(draw));
-            }
-            continue;
-        }
         const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
         const auto [hasPending, hasMissingActive] = modelReadiness.at(draw.model);
         if (hasPending && hasMissingActive)
@@ -773,19 +834,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
     {
         return Fail(error, "LX Scene composition exceeds its configured viewport/draw budget.");
     }
-    for (const auto& draw : input->Draws())
-    {
-        if (draw.queue == SceneCoverage::Blended)
-        {
-            return Fail(error, "LX Scene Blended composition is not installed.");
-        }
-    }
     if (!device_)
     {
-        RHIShaderBlob shader;
-        if (!RHIShaderCompiler::CompileFile(RHIShaderSource::Resolve("MaterialGraphMeshSurface.slang").string(),
-                                            "LXTransformMesh", "cs_6_0", shader, error) ||
-            !geometry_.Initialize(*context.resources, *context.rootSignatures, *context.psoManager, shader, error))
+        LX::Runtime::CompiledCompute shader;
+        if (!LX::Runtime::CompileCompute(RHIShaderSource::Resolve("MaterialGraphMeshSurface.slang").string(),
+                                        "LXTransformMesh", {}, {}, shader, error) ||
+            !geometry_.Initialize(*context.resources, *context.rootSignatures, *context.psoManager,
+                                  shader.stage.bytecode, error, std::move(shader.description)))
         {
             return false;
         }
@@ -799,10 +854,24 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
     candidate->input = std::move(input);
     candidate->environment = environment;
     candidate->shadow = shadow.enabled;
+    const std::array<std::byte, SceneVolumeConstantsBytes> emptyMedium{};
+    candidate->emptyVolumeConstants = device_->UploadConstants(emptyMedium.data(), emptyMedium.size());
+    candidate->emptyVolumeBuffer = device_->AllocateUpload({48, RHIUploadUsage::Raw, 16});
+    if (!candidate->emptyVolumeConstants.IsValid() || !candidate->emptyVolumeBuffer.IsWritable())
+        return Fail(error, "LX Scene empty medium allocation failed.");
+    std::memset(candidate->emptyVolumeBuffer.cpuAddress, 0, 48);
+    const bool hasAlpha = std::ranges::any_of(candidate->input->Draws(), [](const auto& draw) {
+        const auto& p = draw.material->generation->cooked.product.program;
+        return p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u) != 0);
+    });
+    const auto lookupBudget = hasAlpha ? budget.lookupBytes * 2 / 3 : budget.lookupBytes;
     if (!lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
                          environmentGeneration,
-                         budget.lookupBytes, candidate->lookup, error, importance, source))
+                         lookupBudget, candidate->lookup, error, importance, source))
         return false;
+    if (hasAlpha && !lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
+                                    environmentGeneration, budget.lookupBytes - lookupBudget,
+                                    candidate->alphaLookup, error, importance, source, true)) return false;
     const bool hasSpecial = std::ranges::any_of(candidate->input->Draws(), [](const auto& draw) {
         return (draw.material->generation->cooked.product.program.features & 0x1800u) != 0;
     });
@@ -849,7 +918,7 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
         if (program->hasVolume)
         {
             SceneVolumeBinding volume;
-            volume.pipeline = program->volume;
+            volume.pipeline = program->volume.GetGeneration();
             if (!bindings_.Prepare(*device_, *context.textureCache, draw.material, program->volumeLayout,
                                    volume.material, error))
             {
@@ -872,6 +941,10 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
         constants.width = context.width;
         constants.height = context.height;
         constants.coverage = draw.coverage.flags;
+        const bool ordered = program->hasSurface && (draw.queue == SceneCoverage::Blended || program->hasTransmission);
+        constants.padding[0] = ordered ? 1u : 0u;
+        constants.padding[1] = (context.width + EnhancedForwardLighting::TileSize - 1) / EnhancedForwardLighting::TileSize;
+        constants.padding[2] = ordered ? (draw.queue == SceneCoverage::Blended ? 1u : 2u) : 0u;
         constants.cutoff = draw.coverage.cutoff;
         constants.environment = environment.IsValid();
         constants.hasShadow = shadow.enabled;
@@ -885,17 +958,24 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
         }
         if (context.lights)
         {
-            constants.lightCount = static_cast<std::uint32_t>((std::min)(context.lights->size(), std::size_t{64}));
-            std::copy_n(context.lights->begin(), constants.lightCount, constants.lights);
+            const auto stored = (std::min)(context.lights->size(), std::size_t{64});
+            constants.lightCount = static_cast<std::uint32_t>(ordered ? context.lights->size() : stored);
+            std::copy_n(context.lights->begin(), stored, constants.lights);
         }
         const auto uploaded = device_->UploadConstants(&constants, sizeof(constants));
         if (!uploaded.IsValid())
         {
             return Fail(error, "LX Scene constants allocation failed.");
         }
+        const auto reference = [&] {
+            if (!ordered) return RHIBufferSlice{};
+            constants.padding[0] = 2;
+            return device_->UploadConstants(&constants, sizeof(constants));
+        }();
+        if (ordered && !reference.IsValid()) return Fail(error, "LX reference constants allocation failed.");
         std::shared_ptr<const RenderBindings> shadowBindings;
         std::array<RHIBufferSlice, 3> shadowConstants;
-        if (program->hasSurface && shadow.enabled)
+        if (program->hasSurface && shadow.enabled && draw.queue != SceneCoverage::Blended)
         {
             if (!RenderBindingCache::RebindPass(*device_, *bindings, program->shadowLayout, shadowBindings, error))
             {
@@ -918,10 +998,13 @@ bool SceneHost::Prepare(const EnhancedFrameContext& context, std::shared_ptr<con
         {
             Frame::Draw item;
             item.program = program;
+            item.blended = ordered;
+            item.inputIndex = static_cast<std::size_t>(&draw - candidate->input->Draws().data());
             item.bindings = bindings;
             item.shadowBindings = shadowBindings;
             item.shadowConstants = shadowConstants;
             item.constants = uploaded;
+            item.referenceConstants = reference;
             item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
             if (!geometry_.Prepare(*device_, chunk.input, item.geometry, error, true))
             {
@@ -1117,7 +1200,7 @@ void SceneHost::DeclareGBuffer(EnhancedRenderGraph& graph, const EnhancedGBuffer
         encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
         for (const auto& draw : frame->draws)
         {
-            if (!draw.program->hasSurface || draw.program->hasTransmission)
+            if (!draw.program->hasSurface || draw.program->hasTransmission || draw.blended)
             {
                 continue;
             }
@@ -1187,22 +1270,56 @@ void SceneHost::DeclareColor(EnhancedRenderGraph& graph, const EnhancedGBufferPa
         frame->subsurface->DeclareInputs(graph);
     }
     DeclareShading(graph, inputs, lighting, ambientOcclusion, shadowMap, false);
-    if (frame->refraction)
-    {
-        frame->refraction->DeclareInputs(graph);
-        frame->refraction->DeclareBackground(graph, lighting, inputs.depth);
-        DeclareTransmissionGBuffer(graph, inputs);
-        DeclareShading(graph, inputs, lighting, ambientOcclusion, shadowMap, true);
-    }
+    if (frame->refraction) frame->refraction->DeclareInputs(graph);
     frame->colorDeclared = true;
     frame->lookup->DeclareReady(graph);
+}
+
+std::vector<SceneHost::ForwardDraw> SceneHost::BlendedDraws() const
+{
+    std::vector<ForwardDraw> result;
+    if (!frame_) return result;
+    for (std::size_t i = 0; i < frame_->input->Draws().size(); ++i)
+    {
+        const auto& draw = frame_->input->Draws()[i];
+        const auto& p = draw.material->generation->cooked.product.program;
+        if (p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u) != 0))
+            result.push_back({i, draw.geometryKey, draw.viewDepth});
+    }
+    return result;
+}
+
+void SceneHost::DeclareBlended(EnhancedRenderGraph& graph, std::size_t index, RGHandle lighting,
+                              RGHandle shadowMap, const EnhancedForwardLighting& forward) const
+{
+    const auto frame = frame_;
+    if (!frame || !frame->colorDeclared || !frame->alphaLookup || !lighting.IsValid() ||
+        index >= frame->input->Draws().size() ||
+        !forward.lights.IsValid() || !forward.counts.IsValid() || !forward.indices.IsValid() ||
+        !forward.graphCounts.IsValid() || !forward.graphIndices.IsValid())
+        throw std::runtime_error("Graph Blend needs its exact prepared frame and common Forward+ resources.");
+    frame->CheckCurrent(&graph);
+    if (!frame->alphaDeclared.insert(index).second) throw std::runtime_error("Graph Blend draw declared twice.");
+    if (!frame->alphaInputsDeclared)
+    {
+        frame->alphaLookup->DeclareInputs(graph);
+        frame->alphaInputsDeclared = true;
+    }
+    const auto& p = frame->input->Draws()[index].material->generation->cooked.product.program;
+    const bool needsSurfaceBuffer = (p.features & 0x1800u) != 0;
+    if (needsSurfaceBuffer) DeclareForwardGBuffer(graph, frame->gbuffer, index);
+    if ((p.features & 0x0800u) != 0)
+        frame->refraction->DeclareBackground(graph, lighting, frame->gbuffer.depth);
+    DeclareShading(graph, needsSurfaceBuffer ? frame->forwardGbuffer : frame->gbuffer,
+                   lighting, {}, shadowMap, (p.features & 0x0800u) != 0, index, forward);
+    frame->alphaLookup->DeclareReady(graph);
 }
 
 RGHandle SceneHost::DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth,
                                   RGHandle shadowMap) const
 {
     const auto frame = frame_;
-    if (!frame || !frame->volume)
+    if (!frame || !frame->volume || frame->volumeDeclared)
     {
         return lighting;
     }
@@ -1211,11 +1328,42 @@ RGHandle SceneHost::DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting,
     {
         throw std::runtime_error("LX Scene Volume requires completed surface shading.");
     }
-    return frame->volume->DeclareComposite(graph, lighting, depth, shadowMap);
+    const auto result = frame->volume->DeclareComposite(graph, lighting, depth, shadowMap);
+    frame->volumeDeclared = true;
+    return result;
 }
-void SceneHost::DeclareTransmissionGBuffer(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs) const
+void SceneHost::DeclareForwardGBuffer(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& opaque,
+                                     std::size_t index) const
 {
     const auto frame = frame_;
+    if (!frame->forwardGbuffer.depth.IsValid())
+    {
+        RGTextureDesc desc;
+        desc.width = frame->input->View().width;
+        desc.height = frame->input->View().height;
+        desc.allowRenderTarget = true;
+        auto targets = std::array{&frame->forwardGbuffer.diffuse, &frame->forwardGbuffer.metalRough,
+                                  &frame->forwardGbuffer.normal, &frame->forwardGbuffer.emissive,
+                                  &frame->forwardGbuffer.bitmask};
+        for (unsigned i = 0; i < targets.size(); ++i)
+        {
+            desc.format = EnhancedGBufferPass::GetRenderTargetFormat(i);
+            desc.name = "Forward+.GraphSurface";
+            *targets[i] = graph.CreateTexture(desc);
+        }
+        desc.format = RHIFormat::D32Float;
+        desc.allowRenderTarget = false;
+        desc.allowDepthStencil = true;
+        desc.name = "Forward+.GraphDepth";
+        frame->forwardGbuffer.depth = graph.CreateTexture(desc);
+    }
+    const auto inputs = frame->forwardGbuffer;
+    graph.AddPass("Forward+.GraphDepthCopy",
+        {{opaque.depth, RHIResourceState::CopySource}, {inputs.depth, RHIResourceState::CopyDest}},
+        [frame, opaque, inputs](const auto& execution) {
+            frame->CheckCurrent(execution.graph);
+            execution.encoder->CopyResource(execution.ResolveHandle(inputs.depth), execution.ResolveHandle(opaque.depth));
+        });
     std::vector<EnhancedRenderGraph::RGPassUsage> uses{{inputs.depth, RHIResourceState::DepthWrite}};
     for (const auto target : Colors(inputs))
     {
@@ -1223,7 +1371,7 @@ void SceneHost::DeclareTransmissionGBuffer(EnhancedRenderGraph& graph, const Enh
     }
     for (const auto& draw : frame->draws)
     {
-        if (!draw.program->hasTransmission)
+        if (draw.inputIndex != index || !draw.program->hasSurface)
         {
             continue;
         }
@@ -1233,7 +1381,7 @@ void SceneHost::DeclareTransmissionGBuffer(EnhancedRenderGraph& graph, const Enh
             uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource});
         }
     }
-    graph.AddPass("LX.Scene.TransmissionGBuffer", uses, [frame, inputs](const auto& execution) {
+    graph.AddPass("Forward+.GraphSurface", uses, [frame, inputs, index](const auto& execution) {
         frame->CheckCurrent(execution.graph);
         std::array<RHITextureHandle, 5> colors;
         const auto handles = Colors(inputs);
@@ -1249,11 +1397,13 @@ void SceneHost::DeclareTransmissionGBuffer(EnhancedRenderGraph& graph, const Enh
         }
         auto& encoder = *execution.encoder;
         encoder.BindRenderTargets(targets);
+        const float clear[]{0, 0, 0, 0};
+        encoder.ClearRenderTargets(targets, clear);
         encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
         encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
         for (const auto& draw : frame->draws)
         {
-            if (!draw.program->hasTransmission)
+            if (draw.inputIndex != index || !draw.program->hasSurface)
             {
                 continue;
             }
@@ -1271,7 +1421,8 @@ void SceneHost::DeclareTransmissionGBuffer(EnhancedRenderGraph& graph, const Enh
     });
 }
 
-void SceneHost::DeclareRefractionCapture(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs) const
+void SceneHost::DeclareRefractionCapture(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs,
+                                        std::optional<std::size_t> index) const
 {
     const auto frame = frame_;
     std::vector<EnhancedRenderGraph::RGPassUsage> uses{{inputs.depth, RHIResourceState::DepthRead},
@@ -1282,7 +1433,7 @@ void SceneHost::DeclareRefractionCapture(EnhancedRenderGraph& graph, const Enhan
     }
     for (const auto& draw : frame->draws)
     {
-        if (!draw.program->hasTransmission)
+        if (!draw.program->hasTransmission || (index && draw.inputIndex != *index))
         {
             continue;
         }
@@ -1292,7 +1443,7 @@ void SceneHost::DeclareRefractionCapture(EnhancedRenderGraph& graph, const Enhan
             uses.push_back({graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource});
         }
     }
-    graph.AddPass("LX.Scene.RefractionCapture", uses, [frame, inputs](const auto& execution) {
+    graph.AddPass("LX.Scene.RefractionCapture", uses, [frame, inputs, index](const auto& execution) {
         frame->CheckCurrent(execution.graph);
         const auto depth =
             RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
@@ -1316,7 +1467,7 @@ void SceneHost::DeclareRefractionCapture(EnhancedRenderGraph& graph, const Enhan
         encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
         for (const auto& draw : frame->draws)
         {
-            if (!draw.program->hasTransmission)
+            if (!draw.program->hasTransmission || (index && draw.inputIndex != *index))
             {
                 continue;
             }
@@ -1338,14 +1489,26 @@ void SceneHost::DeclareRefractionCapture(EnhancedRenderGraph& graph, const Enhan
 
 void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs,
                                RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
-                               bool transmissionStage) const
+                               bool transmissionStage, std::optional<std::size_t> blended, EnhancedForwardLighting forward) const
 {
     const auto frame = frame_;
+    const auto lookup = blended ? frame->alphaLookup : frame->lookup;
+    const auto selected = [blended](const Frame::Draw& draw) {
+        return blended ? draw.blended && draw.inputIndex == *blended : !draw.blended;
+    };
     std::vector<EnhancedRenderGraph::RGPassUsage> uses{{lighting, RHIResourceState::RenderTarget},
                                                        {inputs.depth, RHIResourceState::DepthRead},
                                                        {inputs.bitmask, RHIResourceState::ShaderResource},
                                                        {ambientOcclusion, RHIResourceState::ShaderResource}};
-    frame->AddDecalUses(uses, transmissionStage);
+    if (blended) uses.pop_back();
+    frame->AddDecalUses(uses, transmissionStage || blended.has_value());
+    if (blended)
+    {
+        uses.push_back({forward.graphCounts, RHIResourceState::ShaderResource});
+        uses.push_back({forward.graphIndices, RHIResourceState::ShaderResource});
+        if (frame->volume)
+            uses.push_back({frame->volume->GraphCoefficients(graph), RHIResourceState::PixelShaderResource});
+    }
     if (frame->environment.IsValid())
     {
         auto environment = graph.FindImportedTexture(frame->environment);
@@ -1362,6 +1525,7 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
     }
     for (const auto& draw : frame->draws)
     {
+        if (!selected(draw)) continue;
         uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource});
         for (const auto& texture : draw.bindings->resources.textures)
         {
@@ -1371,18 +1535,19 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
     std::array<RGHandle, 11> lookupInputs;
     for (unsigned i = 0; i < lookupInputs.size(); ++i)
     {
-        lookupInputs[i] = graph.FindImportedTexture(frame->lookup->Inputs()[i]);
+        lookupInputs[i] = graph.FindImportedTexture(lookup->Inputs()[i]);
     }
     for (unsigned part = 0; part < 2; ++part)
     {
         std::vector<EnhancedRenderGraph::RGPassUsage> captureUses{{inputs.depth, RHIResourceState::DepthRead},
                                                                   {inputs.bitmask, RHIResourceState::ShaderResource}};
-        frame->AddDecalUses(captureUses, transmissionStage);
+        frame->AddDecalUses(captureUses, transmissionStage || blended.has_value());
         const unsigned first = part ? 8 : 0, count = part ? 3 : 8;
         for (unsigned i = first; i < first + count; ++i)
             captureUses.push_back({lookupInputs[i], RHIResourceState::RenderTarget});
         for (const auto& draw : frame->draws)
         {
+            if (!selected(draw)) continue;
             captureUses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource});
             for (const auto& texture : draw.bindings->resources.textures)
                 captureUses.push_back(
@@ -1390,10 +1555,10 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
         }
         graph.AddPass(
             "LX.Scene.LookupCapture", captureUses,
-            [frame, inputs, first, count, part, transmissionStage](const auto& execution) {
+            [frame, inputs, first, count, part, transmissionStage, blended, lookup, selected, forward](const auto& execution) {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
-                const auto handles = frame->lookup->Inputs().subspan(first, count);
+                const auto handles = lookup->Inputs().subspan(first, count);
                 const auto depth =
                     RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
                 const auto targets = frame->device->CreateRenderTargets(handles, &depth);
@@ -1403,7 +1568,7 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
                     RHIBindingDesc::Srv2D({}, RHIFormat::RG16Float).OrNull(),
                     RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull()};
                 const auto table = frame->device->CreateBindings(descriptions);
-                const auto decalTable = frame->DecalTable(execution, transmissionStage);
+                const auto decalTable = frame->DecalTable(execution, transmissionStage || blended.has_value());
                 frame->CheckCurrent();
                 if (!targets.IsValid() || !table.IsValid())
                     throw std::runtime_error("LX Scene lookup capture binding failed.");
@@ -1414,47 +1579,54 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
                 encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
                 for (const auto& draw : frame->draws)
                 {
-                    if (!draw.program->hasSurface)
+                    if (!draw.program->hasSurface || !selected(draw))
                     {
                         continue;
                     }
                     encoder.SetPipeline(RHIBindPoint::Graphics,
-                                        draw.program->lookup[part][draw.doubleSided].GetHandle());
+                                        (blended ? draw.program->blendedLookup : draw.program->lookup)[part][draw.doubleSided].GetHandle());
                     std::string error;
                     if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
                                                   error))
                         throw std::runtime_error(error);
-                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, blended && forward.reference ? draw.referenceConstants : draw.constants);
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
                     encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                    frame->BindDecal(encoder, draw, decalTable, transmissionStage);
+                    frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
+                    frame->BindForward(encoder, draw, forward);
                     encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
                     encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
                 }
             });
     }
-    frame->lookup->DeclareBake(graph, inputs.bitmask);
-    uses.push_back({frame->lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource});
+    lookup->DeclareBake(graph, inputs.bitmask);
+    uses.push_back({lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource});
     if (transmissionStage)
     {
-        DeclareRefractionCapture(graph, inputs);
-        frame->refraction->DeclareBake(graph, *frame->lookup, inputs.bitmask, shadowMap);
+        DeclareRefractionCapture(graph, inputs, blended);
+        frame->refraction->DeclareBake(graph, *lookup, inputs.bitmask, shadowMap);
         uses.push_back({frame->refraction->GraphSamples(graph), RHIResourceState::PixelShaderResource});
     }
-    if (frame->subsurface)
+    const bool special = !blended || (frame->input->Draws()[*blended].material->generation->cooked.product.program.features & 0x1800u) != 0;
+    if (frame->subsurface && special)
     {
         std::array<RGHandle, 7> targets;
         for (unsigned i = 0; i < targets.size(); ++i)
         {
             targets[i] = graph.FindImportedTexture(frame->subsurface->Inputs()[i]);
         }
-        frame->subsurface->DeclareReflection(graph, *frame->lookup, inputs.bitmask);
+        frame->subsurface->DeclareReflection(graph, *lookup, inputs.bitmask);
         std::vector<EnhancedRenderGraph::RGPassUsage> captureUses{
             {inputs.depth, RHIResourceState::DepthRead},
             {inputs.bitmask, RHIResourceState::ShaderResource},
-            {frame->lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource},
+            {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource},
             {frame->subsurface->GraphReflection(graph), RHIResourceState::PixelShaderResource}};
-        frame->AddDecalUses(captureUses, transmissionStage);
+        frame->AddDecalUses(captureUses, transmissionStage || blended.has_value());
+        if (blended)
+        {
+            captureUses.push_back({forward.graphCounts, RHIResourceState::ShaderResource});
+            captureUses.push_back({forward.graphIndices, RHIResourceState::ShaderResource});
+        }
         for (const auto target : targets)
         {
             captureUses.push_back({target, RHIResourceState::RenderTarget});
@@ -1482,7 +1654,7 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
         }
         graph.AddPass(
             "LX.Scene.SubsurfaceCapture", captureUses,
-            [frame, inputs, shadowMap, transmissionStage](const auto& execution) {
+            [frame, inputs, shadowMap, transmissionStage, blended, lookup, selected, forward](const auto& execution) {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
                 const auto depth =
@@ -1496,7 +1668,7 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
                                              RHIFormat::R32Float, 3)
                         .OrNull()};
                 const auto table = frame->device->CreateBindings(descriptions);
-                const auto decalTable = frame->DecalTable(execution, transmissionStage);
+                const auto decalTable = frame->DecalTable(execution, transmissionStage || blended.has_value());
                 if (!targets.IsValid() || !table.IsValid())
                 {
                     throw std::runtime_error("LX Scene SSS capture target binding failed.");
@@ -1508,7 +1680,7 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
                 encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
                 for (const auto& draw : frame->draws)
                 {
-                    if (!draw.program->hasSubsurface || (draw.program->hasTransmission && !transmissionStage))
+                    if (!selected(draw) || !draw.program->hasSubsurface || (draw.program->hasTransmission && !transmissionStage))
                     {
                         continue;
                     }
@@ -1519,11 +1691,12 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
                     {
                         throw std::runtime_error(error);
                     }
-                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, blended && forward.reference ? draw.referenceConstants : draw.constants);
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
                     encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                    frame->BindDecal(encoder, draw, decalTable, transmissionStage);
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(frame->lookup->Samples()));
+                    frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
+                    frame->BindForward(encoder, draw, forward);
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(lookup->Samples()));
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
                                           RHIBufferSlice::Whole(frame->subsurface->Reflection()));
                     if (draw.program->hasTransmission)
@@ -1540,8 +1713,8 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
         uses.push_back({frame->subsurface->GraphIrradiance(graph), RHIResourceState::PixelShaderResource});
     }
     graph.AddPass(
-        transmissionStage ? "LX.Scene.TransmissionColor" : "LX.Scene.Color", uses,
-        [frame, inputs, lighting, ambientOcclusion, shadowMap, transmissionStage](const auto& execution) {
+        blended ? "Forward+.GraphBlend" : transmissionStage ? "LX.Scene.TransmissionColor" : "LX.Scene.Color", uses,
+        [frame, inputs, lighting, ambientOcclusion, shadowMap, transmissionStage, blended, lookup, selected, forward](const auto& execution) mutable {
             frame->CheckCurrent(execution.graph);
             auto& encoder = *execution.encoder;
             const auto color = execution.ResolveHandle(lighting);
@@ -1556,12 +1729,18 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
                                         1)
                     .OrNull(),
                 RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
-                RHIBindingDesc::Srv2D(execution.ResolveHandle(ambientOcclusion), RHIFormat::RG16Float),
+                RHIBindingDesc::Srv2D(blended ? RHITextureHandle{} : execution.ResolveHandle(ambientOcclusion), RHIFormat::RG16Float).OrNull(),
                 RHIBindingDesc::SrvArray(frame->shadow ? execution.ResolveHandle(shadowMap) : RHITextureHandle{},
                                          RHIFormat::R32Float, 3)
                     .OrNull()};
             const auto table = frame->device->CreateBindings(descriptions);
-            const auto decalTable = frame->DecalTable(execution, transmissionStage);
+            const auto decalTable = frame->DecalTable(execution, transmissionStage || blended.has_value());
+            if (frame->volume && blended)
+            {
+                forward.volumeTable = frame->device->CreateBindings(frame->volume->LightingBindings(
+                    frame->shadow ? execution.ResolveHandle(shadowMap) : RHITextureHandle{}));
+                if (!forward.volumeTable.IsValid()) throw std::runtime_error("Graph medium lighting binding failed.");
+            }
             frame->CheckCurrent();
             if (!target.IsValid() || !table.IsValid())
             {
@@ -1572,21 +1751,22 @@ void SceneHost::DeclareShading(EnhancedRenderGraph& graph, const EnhancedGBuffer
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
             for (const auto& draw : frame->draws)
             {
-                if (!draw.program->hasSurface || draw.program->hasTransmission != transmissionStage)
+                if (!selected(draw) || !draw.program->hasSurface || draw.program->hasTransmission != transmissionStage)
                 {
                     continue;
                 }
-                encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->color[draw.doubleSided].GetHandle());
+                encoder.SetPipeline(RHIBindPoint::Graphics, (blended ? draw.program->blendedColor : draw.program->color)[draw.doubleSided].GetHandle());
                 std::string error;
                 if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
                 {
                     throw std::runtime_error(error);
                 }
-                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, blended && forward.reference ? draw.referenceConstants : draw.constants);
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
-                frame->BindDecal(encoder, draw, decalTable, transmissionStage);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(frame->lookup->Samples()));
+                frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
+                frame->BindForward(encoder, draw, forward);
+                encoder.SetRootBuffer(RHIBindPoint::Graphics, 3, RHIBufferSlice::Whole(lookup->Samples()));
                 if (draw.program->hasSpecial)
                 {
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, 4,
@@ -1650,6 +1830,14 @@ bool SceneHost::PublishSubmittedCache(std::uint64_t frameId, RHICompletionPoint 
 bool SceneHost::CommitSubmittedFrame(const std::shared_ptr<const Frame>& frame, RHICompletionPoint completion,
                                      std::string& error)
 {
+    const auto forwardCount = std::ranges::count_if(frame->input->Draws(), [](const auto& draw) {
+        const auto& p = draw.material->generation->cooked.product.program;
+        return p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u) != 0);
+    });
+    if (frame->alphaLookup && frame->alphaDeclared.size() != static_cast<std::size_t>(forwardCount))
+        return Fail(error, "LX alpha cache publication requires the complete Forward+ stream.");
+    if (frame->alphaLookup && !lookup_.PublishSubmitted(*frame->alphaLookup, frame->input->View().frameId, completion, error))
+        return false;
     if (!lookup_.PublishSubmitted(*frame->lookup, frame->input->View().frameId, completion, error))
         return false;
     for (const auto& draw : frame->draws)
@@ -1731,6 +1919,16 @@ RGHandle SceneHost::GraphLookupStatistics(const EnhancedRenderGraph& graph) cons
 std::shared_ptr<const SceneLookupFrame> SceneHost::LookupFrame() const
 {
     return HasDraws() ? frame_->lookup : nullptr;
+}
+
+std::shared_ptr<const SceneLookupFrame> SceneHost::ForwardLookupFrame() const
+{
+    return HasDraws() ? frame_->alphaLookup : nullptr;
+}
+
+EnhancedGBufferPass::Outputs SceneHost::ForwardSurfaceOutputs() const
+{
+    return HasDraws() ? frame_->forwardGbuffer : EnhancedGBufferPass::Outputs{};
 }
 
 std::shared_ptr<const SceneSubsurfaceFrame> SceneHost::SubsurfaceFrame() const

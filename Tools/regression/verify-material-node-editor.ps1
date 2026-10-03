@@ -9,9 +9,15 @@ $caseRoot = Join-Path $output ("NodeEditor-$Configuration-" + [Guid]::NewGuid().
 $project = Join-Path $caseRoot 'Project'
 New-Item -ItemType Directory -Path $caseRoot | Out-Null
 Copy-Item -LiteralPath (Join-Path $fixture 'Project') -Destination $project -Recurse
+& (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1') -Project $project
 $assets = Join-Path $project 'Assets'
-$sourceFiles = @(Get-ChildItem (Join-Path $repo 'Engine'), (Join-Path $repo 'Editor'), (Join-Path $repo 'Lattice') -Recurse -File |
-    Where-Object Extension -In '.cpp', '.h', '.vcxproj'; Get-Item $PSCommandPath) | Sort-Object FullName -Unique
+# The archived fixture can contain an older Scene host. Exercise the same
+# shader includes as the current Editor/cooker, not the fixture's old copy.
+Copy-Item -LiteralPath (Join-Path $repo 'Dynamic_CPP/Assets/Shaders/DefaultPassShader') -Destination (Join-Path $assets 'Shaders') -Recurse -Force
+$sourceFiles = @(Get-ChildItem (Join-Path $repo 'Engine'), (Join-Path $repo 'Editor'), (Join-Path $repo 'Lattice'),
+    (Join-Path $repo 'Dynamic_CPP/Assets/Shaders/DefaultPassShader') -Recurse -File |
+    Where-Object Extension -In '.cpp', '.h', '.slang', '.vcxproj'; Get-Item $PSCommandPath,
+    (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1')) | Sort-Object FullName -Unique
 $snapshot = @($sourceFiles | ForEach-Object { [pscustomobject]@{ path = $_.FullName; hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash } })
 $snapshot | ConvertTo-Json | Set-Content (Join-Path $caseRoot 'source-hashes.json') -Encoding utf8
 $script:checks = 0
@@ -130,6 +136,13 @@ function Start-Editor([string]$Label) {
     } while ($true)
     $script:base = "http://127.0.0.1:$($endpoint.port)"
     $script:headers = @{ Authorization = "Bearer $($endpoint.token)" }
+    $expectedScale = [float]::Parse(([regex]::Match(
+        [IO.File]::ReadAllText((Join-Path $project 'ProjectSetting/EngineSettings.asset')),
+        '(?m)^imguiScale:\s*([^\r\n]+)')).Groups[1].Value,
+        [Globalization.CultureInfo]::InvariantCulture)
+    $theme = (Invoke-Gate 'editor.theme').data
+    Assert ($theme.scaleMatches -and $theme.preferenceScale -eq $expectedScale -and
+        $theme.fontScaleMain -eq $expectedScale) 'Editor must apply the inherited UI scale on startup and restart'
     Invoke-Gate 'play.foreground_override' @('off') | Out-Null
     Invoke-Gate 'play.cursor' @('show') | Out-Null
 }
@@ -251,6 +264,36 @@ try {
     Assert ([Convert]::ToBase64String([IO.File]::ReadAllBytes($graphSource)) -eq [Convert]::ToBase64String($externalBytes)) 'Conflicting external edits must be preserved'
     Edit 'reload' | Out-Null
     Edit 'save' | Out-Null
+    # Reimport must inspect the primary archive even while a valid backup exists.
+    $beforeReimport = Doc
+    $beforeReimportMaterial = State
+    $primaryBytes = [IO.File]::ReadAllBytes($graphSource)
+    Assert (Test-Path -LiteralPath "$graphSource.bak") 'Reimport fixture must contain a valid backup'
+    try {
+        $invalidPrimary = '{"kind":"LatticeMaterial","graph":'
+        [IO.File]::WriteAllText($graphSource, $invalidPrimary)
+        Edit 'reload' -Reject | Out-Null
+        $preserved = Doc
+        Assert ($preserved.document -eq $beforeReimport.document -and $preserved.revision -eq $beforeReimport.revision) 'Malformed primary must preserve the open document rather than silently import a backup'
+        Assert ((State).generation -eq $beforeReimportMaterial.generation) 'Failed reimport must preserve accepted renderer generation'
+        Assert ([IO.File]::ReadAllText($graphSource) -ceq $invalidPrimary) 'Rejected reimport must preserve the external file'
+    } finally { [IO.File]::WriteAllBytes($graphSource, $primaryBytes) }
+    try {
+        $externalGraph = [IO.File]::ReadAllText($graphSource) | ConvertFrom-Json
+        $externalColor = @($externalGraph.graph.nodes | Where-Object id -EQ $rgb.id)[0].sockets[0]
+        $externalColor.default.value = @(0.1, 0.7, 0.2, 1.0)
+        [IO.File]::WriteAllText($graphSource, ($externalGraph | ConvertTo-Json -Depth 100))
+        Edit 'reload' | Out-Null
+        Edit 'save' | Out-Null
+        Edit 'apply' | Out-Null
+        $reimported = Capture 'external-reimport'
+        Assert ([LXEditorPixels]::Difference((Join-Path $changed 'baseColor.f32'), (Join-Path $reimported 'baseColor.f32')) -gt 0.01) 'Valid external graph reimport must change actual Scene pixels'
+    } finally { [IO.File]::WriteAllBytes($graphSource, $primaryBytes) }
+    Edit 'reload' | Out-Null
+    Edit 'save' | Out-Null
+    Edit 'apply' | Out-Null
+    SamePixels $changed (Capture 'external-reimport-restored')
+    $previewAfter = Wait-Preview
     $beforeBroken = State
     $baseLink = @((Doc).links | Where-Object input -EQ $color.id)[0]
     Edit 'disconnect' @([string]$baseLink.id) | Out-Null

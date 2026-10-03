@@ -1,6 +1,10 @@
 # Material Graph 실제 Scene 투과·굴절
 
-**2026-09-29 · MAT-7 완료. Opaque/Masked coverage의 단일 투과 표면.**
+**2026-10-02 후속:** [공통 Forward+ transport](../analysis/MAT7ForwardTransportComposition.md)는
+Opaque/Masked 및 alpha transmission을 Code·Graph와 함께 정렬하고 각 draw 직전의
+뒤쪽 합성 HDR을 읽는다. 임시 depth/owner를 사용하여 Scene의 opaque depth/owner를 보존한다.
+SceneHost identity 12로 재쿠킹한다. 아래 합성 배선/실행 수치는 2026-09-29 기반의 이력이고,
+현행 순서·지원 한계·새 검증은 위 후속 기록이 소유한다. 굴절의 물리 평가 수식은 유지한다.
 
 ## 1. Scene 합성 순서
 

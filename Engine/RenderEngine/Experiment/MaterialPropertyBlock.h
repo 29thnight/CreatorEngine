@@ -4,6 +4,7 @@
 #include "../MaterialPropertyValue.h"
 #include "../ShaderMeta.h"
 #include "../ShaderMetaReflection.h"
+#include "../LXMaterialRuntime.h"
 
 #include <cstdint>
 #include <string>
@@ -29,4 +30,8 @@ namespace experiment
     [[nodiscard]] bool BuildMaterialPropertyBlock(const Material& material,
         const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
         std::vector<std::uint8_t>& outBytes, std::string& outError);
+    [[nodiscard]] bool BuildMaterialRuntimeInstance(const Material& material,
+        const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
+        ShaderMetaHandle handle, std::span<const MaterialTextureOwner> textures,
+        std::shared_ptr<const LX::Runtime::Instance>& outInstance, std::string& outError);
 }

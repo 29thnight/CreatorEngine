@@ -34,9 +34,9 @@ cbuffer LXSceneConstants : register(b0)
     float lx_shadowBlend;
     uint lx_width;
     uint lx_height;
-    uint lx_padding0;
-    uint lx_padding1;
-    uint lx_padding2;
+    uint lx_forwardTiles;
+    uint lx_tileGridX;
+    uint lx_blended;
     float4x4 lx_shadowProjection[3];
     float4 lx_shadowSplits;
     float4 lx_shadowBias;
@@ -52,7 +52,34 @@ Texture2D<float2> lx_ao : register(t3);
 Texture2DArray<float> lx_shadow : register(t4);
 SamplerState gEnvironmentSampler : register(s0);
 SamplerComparisonState lx_shadowSampler : register(s1);
+#define lx_volumeEnvironmentSampler gEnvironmentSampler
+#define lx_volumeShadowSampler lx_shadowSampler
+#include "MaterialGraphForwardVolume.slang"
 StructuredBuffer<PrincipledIblBakeSample> lx_ibl : register(t5);
+StructuredBuffer<float4> lx_forwardLights : register(t128);
+StructuredBuffer<uint> lx_forwardCounts : register(t129);
+StructuredBuffer<uint> lx_forwardIndices : register(t130);
+
+uint LXSceneLightCount(float2 pixel, out uint tile, out bool tiled)
+{
+    tile = 0u;
+    tiled = false;
+    if (lx_forwardTiles == 0u) return lx_lightCount;
+    tile = uint(pixel.y) / 16u * lx_tileGridX + uint(pixel.x) / 16u;
+    const uint tiles = lx_tileGridX * ((lx_height + 15u) / 16u);
+    tiled = lx_forwardTiles == 1u && lx_forwardCounts[tiles + tile] <= 32u;
+    return tiled ? lx_forwardCounts[tile] : lx_lightCount;
+}
+
+LXSceneLight LXSceneReadLight(uint index)
+{
+    LXSceneLight light;
+    light.position = lx_forwardTiles != 0u ? lx_forwardLights[index * 4u] : lx_lights[index * 4u];
+    light.direction = lx_forwardTiles != 0u ? lx_forwardLights[index * 4u + 1u] : lx_lights[index * 4u + 1u];
+    light.color = lx_forwardTiles != 0u ? lx_forwardLights[index * 4u + 2u] : lx_lights[index * 4u + 2u];
+    light.attenuation = lx_forwardTiles != 0u ? lx_forwardLights[index * 4u + 3u] : lx_lights[index * 4u + 3u];
+    return light;
+}
 Texture2D<float4> lx_decalColor : register(t9);
 Texture2D<float4> lx_decalOrm : register(t10);
 Texture2D<float4> lx_decalNormal : register(t11);
@@ -212,7 +239,7 @@ PrincipledIblBakePoint LXScenePoint(LXSceneVertex input, bool frontFace)
     // Principled core graphs use the same GGX closures with film/coat disabled.
     // This lookup tag describes the evaluation model, not the authoring tier.
     // Fine UV derivatives and graph evaluation precede this divergent owner test.
-    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
         discard;
     return point;
 }
@@ -315,7 +342,7 @@ LXSceneRefractionCapture LXSceneRefractionPS(LXSceneVertex input, bool frontFace
 {
     input=LXScenePixelCenter(input);
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
-    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
     {
         discard;
     }
@@ -340,6 +367,7 @@ LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFront
 {
     input=LXScenePixelCenter(input);
     const PrincipledSurface surface = LXSceneUndecaledMaterial(input, frontFace);
+    if (lx_blended == 1u && surface.alpha <= 0.0) discard;
     LXSceneGBuffer output;
     output.diffuse = float4(surface.baseColor, surface.alpha);
     output.metalRough = float4(surface.occlusion, surface.roughness, surface.metallic, 1);
@@ -400,16 +428,20 @@ SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 v
     return BuildSpecialForwardSurface(material, view, integral);
 }
 
-float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float3 position, out float3 irradiance)
+float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float2 pixel, float3 position, out float3 irradiance)
 {
     float3 direct = float3(0);
     irradiance = float3(0);
-    for (uint i = 0; i < lx_lightCount; ++i)
+    uint tile;
+    bool tiled;
+    const uint count = LXSceneLightCount(pixel, tile, tiled);
+    for (uint i = 0; i < count; ++i)
     {
-        const float4 lightPosition = lx_lights[i * 4u];
-        const float4 direction = lx_lights[i * 4u + 1u];
-        const float4 color = lx_lights[i * 4u + 2u];
-        const float4 falloff = lx_lights[i * 4u + 3u];
+        const LXSceneLight record = LXSceneReadLight(tiled ? lx_forwardIndices[tile * 32u + i] : i);
+        const float4 lightPosition = record.position;
+        const float4 direction = record.direction;
+        const float4 color = record.color;
+        const float4 falloff = record.attenuation;
         const uint type = uint(lightPosition.w);
         float3 toLight;
         float attenuation;
@@ -452,7 +484,7 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     const float area = length(cross(ddx_fine(input.position), ddy_fine(input.position)));
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
     const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
-    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
     {
         discard;
     }
@@ -465,7 +497,7 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     const float3 view = PrincipledUnitNormal(lx_eye.xyz - input.position, material.normal);
     const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index);
     float3 irradiance;
-    LXSceneSpecialDirect(surface, input.position, irradiance);
+    LXSceneSpecialDirect(surface, input.clip.xy, input.position, irradiance);
     if (lx_hasEnvironment != 0u)
     {
         irradiance += lx_ibl[index].irradiance.rgb;
@@ -483,7 +515,7 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     return output;
 }
 
-float4 LXSceneSpecialColor(PrincipledSurface material, float3 position, uint index)
+float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 position, uint index)
 {
     if (lx_ibl[index].baseAverage.w < 0 || lx_subsurfaceReflection[index].metalAverage.w != 1.0)
     {
@@ -492,7 +524,7 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float3 position, uint ind
     const float3 view = PrincipledUnitNormal(lx_eye.xyz - position, material.normal);
     const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index);
     float3 source;
-    const float3 direct = LXSceneSpecialDirect(surface, position, source);
+    const float3 direct = LXSceneSpecialDirect(surface, pixel, position, source);
     const PrincipledIblBakeSample sample = lx_ibl[index];
     const LXSceneSubsurfaceReflection reflection = lx_subsurfaceReflection[index];
     SpecialForwardEnvironment environment = (SpecialForwardEnvironment)0;
@@ -519,7 +551,9 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float3 position, uint ind
     // zero-radius local fallback. Apply destination color and weight once.
     ambient.subsurface = surface.layers.lowerTransmission * surface.subsurface
         * environment.subsurfaceIrradiance;
-    return float4(direct + ambient.Sum() + ambient.emission, 1);
+    const float3 color = direct + ambient.Sum() + ambient.emission;
+    return float4(lx_blended != 0u ? LXForwardVolume(pixel, position, color) : color,
+                  lx_blended == 1u ? material.alpha : 1);
 }
 #endif
 
@@ -528,20 +562,21 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
 {
     input=LXScenePixelCenter(input);
     PrincipledSurface material = LXSceneMaterial(input, frontFace);
+    if (lx_blended == 1u && material.alpha <= 0.0) discard;
     // Fine derivatives must be evaluated before the per-pixel owner branch.
-    if (lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
+    if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
         discard;
     const float3 view = PrincipledUnitNormal(lx_eye.xyz - input.position, material.normal);
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) == 0
     // SSAO is half resolution. Sample with full-view UVs, as Deferred does.
-    material.occlusion *= saturate(lx_ao.SampleLevel(gEnvironmentSampler,
+    if (lx_blended == 0u) material.occlusion *= saturate(lx_ao.SampleLevel(gEnvironmentSampler,
         input.clip.xy / float2(lx_width, lx_height), 0).r);
 #endif
     // Scene SSAO describes the opaque background before refraction. A
     // transmitting surface uses its authored AO instead of that other surface.
     const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
-    return LXSceneSpecialColor(material, input.position, index);
+    return LXSceneSpecialColor(material, input.clip.xy, input.position, index);
 #else
     const PrincipledIblBakeSample sample = lx_ibl[index];
     if (sample.baseAverage.w < 0)
@@ -555,13 +590,13 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
     integral.coat = PrincipledEmptyIntegral();
 #endif
     float3 direct = float3(0);
-    for (uint i = 0; i < lx_lightCount; ++i)
+    uint tile = 0u;
+    bool tiled = false;
+    const uint count = LXSceneLightCount(input.clip.xy, tile, tiled);
+    for (uint i = 0; i < count; ++i)
     {
-        LXSceneLight light;
-        light.position = lx_lights[i * 4u];
-        light.direction = lx_lights[i * 4u + 1u];
-        light.color = lx_lights[i * 4u + 2u];
-        light.attenuation = lx_lights[i * 4u + 3u];
+        const uint lightIndex = tiled ? lx_forwardIndices[tile * 32u + i] : i;
+        const LXSceneLight light = LXSceneReadLight(lightIndex);
         const uint type = uint(light.position.w);
         float3 toLight;
         float attenuation = 1;
@@ -597,6 +632,8 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
 #else
     const float3 emission = material.emission;
 #endif
-    return float4(direct + ambient + emission, 1);
+    const float3 color = direct + ambient + emission;
+    return float4(lx_blended != 0u ? LXForwardVolume(input.clip.xy, input.position, color) : color,
+                  lx_blended == 1u ? material.alpha : 1);
 #endif
 }

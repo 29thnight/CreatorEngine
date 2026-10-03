@@ -429,7 +429,7 @@ value boundary, consumer, test를 함께 닫고 다음 슬라이스로 넘어간
 ### S2. Camera -> FrameCameraSnapshot -> Render 첫 수직 슬라이스
 
 첫 실제 소비자는 카메라 값 경계를 권장한다. 행렬, vector, inverse, view/projection,
-DX12/Vulkan 결과를 한 번에 검증하면서 Scene 소유권에는 손대지 않을 수 있다.
+DX12 결과를 검증하면서 Scene 소유권에는 손대지 않을 수 있다. RHI 중립 수학 계약은 유지하고 Vulkan 비교는 PHASE 4.9로 이관한다.
 
 변경:
 

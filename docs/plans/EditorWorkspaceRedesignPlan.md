@@ -501,7 +501,7 @@ committed play state는 §1.6대로 `atomic_bool` 하나뿐이고, input owner�
 - Edit/Play/Pause/Eject의 중앙 표시·입력·overlay 전환
 - 선택적 Game Preview와 visible-view demand
 - Hierarchy/Browser의 큰 데이터 표시 비용
-- DX12/Vulkan, DPI, layout, Play 왕복, 시각 회귀
+- DX12, DPI, layout, Play 왕복, 시각 회귀
 
 ### 2.2 의도적으로 하지 않는 것
 
@@ -2036,7 +2036,7 @@ Browser 검색창의 *"Search this folder"*, 계층 아이콘 경계, 하단 글
   엔티티 활성 왕복, 씬·프리팹 저장/재로드에서 값과 필드 신원이 보존돼야 한다.
 - UI 체크박스 생략만으로 개별 비활성화 제한을 통과 처리하지 않는다. 개별 변경 경로의 거부와
   엔티티 전체 비활성화·재활성화를 각각 확인한다. Transform 없는 엔티티에 더미 편집을 만들지 않는다.
-- DX12/Vulkan 캡처와 §8 성능 검증을 수행한다. W2의 필드 ID·축 색 검사 통과는 배치 검증을 대신하지 않는다.
+- DX12 캡처와 §8 성능 검증을 수행한다. W2의 필드 ID·축 색 검사 통과는 배치 검증을 대신하지 않는다.
   중복 호출·고정 폭 회귀·전환 시 ID 변경·개별 활성화 허용을 주입해 해당 단정의 실패도 확인한다.
 
 **선행:** W2 공통 위젯과 W1 폰트·geometry 계약. **후행:** W8 통합 회귀에 필수 포함.
@@ -2361,7 +2361,7 @@ W4의 첫 작업으로 canvas rect 생산·기존 소비자 교정을 먼저 제
 - 각 명령이 버튼/메뉴 중 어디에 있는지, 활성 명령·rect·입력 소비 결과, 방향 기즈모/HUD rect와
   표시 모드를 같은 프레임 스냅샷에 게시한다. 기존 창/dock rect 관측만으로 버튼 정렬을 통과 처리하지 않는다.
   창 원점 누락·기즈모 영역 미예약·전환 시 ID 변경·입력 제외 누락을 각각 주입해 검출도 확인한다.
-- DX12/Vulkan에서 첫 target 대기·resize·Edit/Play/Eject/Stop을 검증하고 §8 성능 gate를 적용한다.
+- DX12에서 첫 target 대기·resize·Edit/Play/Eject/Stop을 검증하고 §8 성능 gate를 적용한다.
   검은 뷰포트·target generation 문제는 W4와 별도로 판정하며 툴바 정렬 성공으로 해결됐다고 세지 않는다.
   이번 계획 반영은 빌드·실행·위 회귀 검증의 완료 실적이 아니다.
 
@@ -2725,7 +2725,7 @@ W3 저장/복원 연결과 W7 통합 결과는 W8에서 함께 판정한다. 추
 - New/우클릭의 대상 일치, 생성 성공·충돌·권한 실패·취소, 요청 뒤 다른 폴더/프로젝트 이동,
   파일 GUID/sidecar와 Inspector 선택을 검사한다. 빈 메뉴·잘못된 위치의 생성·실패를 성공처럼 표시하면 실패다.
 - 검색·정렬·타일/목록·타일 크기·썸네일 교체 전후 결과 신원과 선택/drag payload를 비교한다.
-  1k/10k/50k 목록의 비용·clipping·가시 썸네일 요청 검증은 W7과 공동 fixture로 수행하고 DX12/Vulkan은 W8에 포함한다.
+  1k/10k/50k 목록의 비용·clipping·가시 썸네일 요청 검증은 W7과 공동 fixture로 수행하고 DX12 회귀는 W8에 포함하고 Vulkan 비교는 PHASE 4.9에 인계한다.
 - 같은 프레임의 트리/분할선/본문/도구 rect, 선호/적용 폭, 현재 위치·검색 범위·이력 버튼 상태,
   결과 신원·선택·생성 완료 상태를 관측한다. 고정 폭·이력 분기 누락·생성 대상 혼동·동명 payload를
   각각 변이로 주입해 실패를 확인한다. 기존 창/dock 관측이나 유형 아이콘 완료만으로 이 항목을 통과 처리하지 않는다.
@@ -3270,7 +3270,7 @@ golden 이 닫을 자리다.
 **판정:** 결과/선택/drag-drop 의미가 동일하고 p95 CPU·allocation 개선 수치를 기록한다. 캐시만
 추가하고 실측 이득이 없으면 제거한다.
 썸네일은 로딩 중 입력·스크롤 유지, Ready 직후 교체, 타일 ID/선택/drag-drop 보존,
-실패·변경·삭제·늦은 완료와 DX12/Vulkan 자원 수명을 별도로 검증한다.
+실패·변경·삭제·늦은 완료와 DX12 자원 수명을 검증한다. RHI 중립 수명 계약은 유지하며 Vulkan 실행 비교는 PHASE 4.9로 이관한다.
 
 #### W7-0 착지 — 재는 법과 fixture, 그리고 기준선 (2026-09-14)
 
@@ -4062,7 +4062,7 @@ W2 후속에는 W2-I·W2-V·W2-B를 추가했다. W3 이후 작업과의 의존�
 | Game 화면에 gizmo/picking 잔존 | SceneInteraction과 GameInputSurface 분리, owner invariant |
 | custom draw가 nav/accessibility를 깨뜨림 | 4 family 제한, ImGui ID/nav/clip 계약 test |
 | theme만 바꾸고 창별 literal override가 남음 | W1 inventory와 semantic exception 목록 |
-| central resize가 render target thrash 유발 | debounce/generation, 2단계 도입, 양 backend gate |
+| central resize가 render target thrash 유발 | debounce/generation, 2단계 도입, DX12 gate; Vulkan 비교는 PHASE 4.9 |
 | Hierarchy cache가 두 번째 정본이 됨 | handle/depth 파생 cache만 허용, H3 source gate |
 | OS multi-viewport를 flag 하나로 켬 | 이번 범위 제외, renderer swapchain/DPI 계약 선행 |
 | **관측 표면이 없어 게이트가 “창이 떴다”만 단정** | W0에서 `editor.*` 관측 커맨드 5종 선행(§1.9), 변이로 이빨 증명 |

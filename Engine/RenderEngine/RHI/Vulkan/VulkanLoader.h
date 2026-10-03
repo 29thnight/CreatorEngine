@@ -56,6 +56,11 @@
     X(vkQueueSubmit2)                   \
     X(vkQueueWaitIdle)                  \
     X(vkCreateCommandPool)              \
+    X(vkCreateQueryPool)                \
+    X(vkDestroyQueryPool)               \
+    X(vkGetQueryPoolResults)            \
+    X(vkCmdResetQueryPool)              \
+    X(vkCmdWriteTimestamp)              \
     X(vkDestroyCommandPool)             \
     X(vkResetCommandPool)               \
     X(vkAllocateCommandBuffers)         \

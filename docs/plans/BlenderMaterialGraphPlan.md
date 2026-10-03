@@ -1,12 +1,15 @@
 # Blender형 PBR·Material Graph 계획 (PHASE 4.25)
 
-**신설 2026-09-03 · 10슬라이스 34일 · MAT-0~MAT-8 완료(32일), MAT-9 잔여 · 선행 PHASE 4**
+**2026-10-02 목표 재평가·통합 완료:** MAT-0~6·MAT-8 및 기존 MAT-7 기반의 32인일은 구현 이력으로 보존한다. 재개방한 공통 재질 소비 MAT-7은 혼합 transport·제품 회귀까지 완료했고, 미산정 작업 시간을 역산하여 기성에 더하지 않는다. MAT-9 잔여 8인일과 LX 제품 편집 마감은 별도다. 산정 범위는 **40인일 + 미산정**이며 전체 완료율/납기를 뜻하지 않는다. Vulkan 비교는 PHASE 4.9 소유다. [공수 근거](RenderPhaseEffortEstimate.md).
+
+
+**신설 2026-09-03 · 구현 기반 32인일 · MAT-7 공통 통합 완료 · LX 마감 미산정 · MAT-9 잔여 8인일 · PHASE 4.25 진행 중**
 
 공통 노드 저작 계층·UI의 설계 초안은
 [`LatticeNodeSystem.md`](../design/LatticeNodeSystem.md), Material 우선 순서와
 이후 창의 재작성 시점은 [`LatticeAdoptionPlan.md`](LatticeAdoptionPlan.md)가
 소유한다. LX 캔버스의 독립 ImGui 예제 빌드·조작 게이트 `LX-2`는 통과했고,
-Editor 제품 연결 `LX-3`은 후속이다. 이 문서의 34일은 Material 의미와
+Editor 기본 연결은 구현됐고 `LX-3`의 그룹/Blackboard·전체 조작 마감은 남는다. 산정된 40인일은 Material 의미와
 `MAT-2/MAT-6`의 기본 graph 산출물 산정이다. Blender Shader Editor에 가까운
 노드·소켓·그룹·편집 동작의 전 범위와 노드별 지원 확대는 `LX-0` 대응표를 만든 뒤 별도 산정한다.
 기존 BT·Animator 자산 변환 비용은 계획하지 않는다.
@@ -18,6 +21,105 @@ pre-tone linear HDR 결과**를 게임 엔진 비용 모델 안에서 검증한�
 
 PHASE 4가 현재 glTF PBR 배선을 안정화한 뒤 시작한다. RenderGraph·그림자·reflection probe·
 후처리와 generic Custom Pass authoring은 PHASE 4.75가 소유한다.
+
+---
+
+## 0. 현재 판정과 실행 범위 (2026-10-02)
+
+목표 재평가는 현행 소스·기존 실행 증거와 사용자 목표를 대조한 계획 정리다. 이후 생성 어댑터의 새 빌드·검증 결과는 아래 첫 구현 단계와 별도 검증 기록에서 구분한다.
+
+| 구분 | 현재 판정 | 소유 |
+|---|---|---|
+| Principled Core/Layered/Special 의미·ABI, typed Graph IR·왕복, Slang 생성/진단 | 구현 기반 완료. 기존 지원 범위를 재작성하지 않음 | MAT-0~6 |
+| reflection binding·generation/instance·PSO 수명·기존 쿠킹/캐시·특수 transport | 기존 LX 경로에서 검증된 기반. 기존 3인일만 보존 | MAT-7-BASE |
+| 모델 기본 graph·Inspector override·preview·비용/실패 안내 | 구현 기반 완료. 공통 소비에 재연결할 대상 | MAT-8 |
+| Graph→`.shadermeta`+`.slang`→공통 재질 소비 | **MAT-7 완료. 생성·공통 값/바인딩·LXMC v4·graphics/compute owner·Code/Graph alpha/SSS/transmission/Volume 공통 Forward+ 정렬·합성 및 DX12 Debug/Release 제품 편집/복구·cooked Player 회귀 완료. 지원 한계와 품질/비용 수용은 별도** | MAT-7 |
+| annotation/Reroute 삽입 문서 계약·그룹/Blackboard 제품 패널·전체 조작·HTTP host 수명 | 이미 구현된 Core·Editor/HTTP 연결과 분리해 잔여만 마감 | LX-1/3/3H |
+| 전체 Blender 품질·route parity·실제 모델 성능 | 진행 중. 부분 fixture 통과를 전체 수용으로 확대하지 않음 | MAT-9 |
+
+### MAT-7 통합 순서와 완료 게이트
+
+1. **재질 원본 단일화:** Blender형 재질 하나의 node tree/Blackboard/Material Output이 저작 원본이다. Graph 모드의 ShaderMeta·Slang은 읽기 전용 생성 산출물이고 인스턴스는 노출 값·텍스처만 override한다.
+2. **공통 산출물 생성:** 지원 typed property·기본값·자원·feature/coverage·entry 정보를 LX 실행 계약으로 내린다. ShaderMeta는 생성 계약의 표현으로 재사용하며, 물리 binding/offset은 Slang reflection으로 검증한다. 재질의 feature/coverage와 렌더러의 패스 실행 정책을 구분한다. Graph/compiler/include identity가 같은 계약·소스·bytecode를 함께 쿠킹·게시하고 실패 시 마지막 정상 재질을 유지한다.
+3. **LX 공통 재질 소비:** LX generation/instance·자원 owner·바인딩·PSO 교체가 공통 실행 환경을 소유한다. 기존 ShaderMeta 로더/packer/쿠킹 구현은 이 환경에서 재사용하며, 코드로 작성한 ShaderMeta/Slang 입력도 LX 실행 계약으로 변환한다. Graph를 기존 ShaderMeta runtime/cache에 삽입하는 구조로 고정하지 않는다. Preview·Scene·Game·cooked Player가 같은 계약을 소비하며 렌더 경로는 재질 특성으로 결정한다.
+4. **공통 Forward+:** light list·shadow·불투명 depth/HDR·정렬 계약을 공유한다. Code/Core/Layered/SSS의 일반 alpha와 physical transmission을 같은 순서에서 검사한다. 굴절은 현재까지 합성한 뒤쪽 alpha를 배경에 포함하고 불투명 depth/owner를 보존한다. Volume은 배경과 각 표면 깊이의 카메라 transport를 구별한다. SSS·굴절·Volume 보조 처리는 그 순서 안에서 실행한다.
+5. **제품 회귀:** 같은 그래프의 생성 결정성·Meta/reflection 일치·override·저장/재개방·실패 복구·재import·쿠킹/재실행을 DX12 Debug/Release에서 검사한다. 그래프 UI/위젯 마감은 LX, 색/route/성능 수용은 MAT-9가 소유한다.
+
+MAT-7-BASE와 MAT-6의 구현을 다시 만드는 항목은 활성 작업에서 제외한다. `.materialprogram.json`·기존 LX generation은 재사용할 구현 증거이며 공통 ShaderMeta 소비 완료의 증거가 아니다. BT/Animator 창 재작성과 imgui-node-editor 제거는 LX 횡단 후속으로 관리하고 4.25 종료 조건에서 제외한다.
+
+### MAT-7 첫 구현 단계 — 생성 어댑터 (2026-10-02)
+
+- `MaterialGraphShaderMeta`가 기존 generated Slang을 실제 ShaderMeta schema로 내린다. 숫자/Color/Normal/Texture의 기본값·stable parameter ID·노출·색공간과 독립 Sampler를 보존한다. 물리 이름/offset/register는 실제 DXIL/SPIR-V reflection으로 확인하고 기존 공통 property packer를 사용한다.
+- Editor authoring 준비와 AssetCooker의 자동 Scene compiler가 같은 어댑터를 호출한다. `.generated/<generation>/material.shadermeta`와 `material.slang`은 후보 폴더에서 함께 검증한 뒤 디렉터리 rename으로 게시한다. 공통 로더는 source SHA-256 불일치를 거부하며 생성 실패는 정상 쌍을 덮어쓰지 않는다.
+- 이 단계의 pass entry는 **현재 Scene host의 실제 entry**다. 공통 Forward+ 설치나 일반 alpha Blend 합성 완료를 뜻하지 않는다. 저작 원본은 `.shadergraph`이며 생성 쌍은 캐시 산출물이다.
+- 당시 후속은 common Material/override·binding·쿠킹 복구였다. 아래 두 번째 단계에서 값/바인딩·LXMC v3 복구를 연결했다. coverage·host compile 옵션/의존 계약과 공통 PSO/Forward+는 계속 남는다.
+- 게이트와 증거는 [생성 어댑터 검증 기록](../analysis/MAT7ShaderMetaAdapter.md)을 따른다. MAT-7은 `progress`, 잔여 공수는 미산정을 유지한다.
+
+### MAT-7 두 번째 구현 단계 — LX 소유의 공통 값/바인딩·쿠킹 복구 (2026-10-02)
+
+- 생성 메타·전체 host Slang·공통 reflection layout을 immutable `VerifiedProduct`/generation에 보존한다. 제품 Graph Material은 생성 계약 없는 세대를 거부한다.
+- `Material`의 typed 조회/수정, property block, texture owner 조회가 그래프의 공통 schema/값을 소비한다. stable parameter ID의 숫자/텍스처 override는 기존 공통 `MaterialPropertyPacker`로 패킹한다. 렌더 바인딩은 accepted uniform을 재사용하며 다시 LX 숫자 패킹을 하지 않는다.
+- LXMC/artifact v3에 실제 generated metadata/source와 검증된 backend bytecode를 함께 담는다. authoring warm cache와 cooked reader가 같은 세대를 복구한다. 기존 v2는 재쿠킹 대상으로 처리한다. 기존 CEMF schema는 유지한다.
+- 실제 DXIL/SPIR-V·실패 보존·복구 68항목, Debug/Release의 실제 DataSystem/Material·source-free package·warm cache 각각 25항목 및 반복 cook을 통과했다. 전체 Debug 에디터와 두 구성의 엔진/도구 빌드도 통과했다. GPU 렌더 이미지·PSO 통합·전체 모델 성능 수용으로 확대하지 않는다.
+- 증거와 실행 게이트는 [공통 Material 소비 검증 기록](../analysis/MAT7CommonMaterialConsumption.md)이 소유한다. 여기서 공통 PSO/renderer 전환이나 일반 alpha Blend 완료를 선언하지 않는다.
+- 당시 후속은 코드 입력의 LX 적응과 공통 PSO였다. 아래 세 번째 단계에서 코드 값/자원·frame snapshot을 연결했다. coverage·host compile 옵션/의존과 LX shader/PSO 소비, 공통 Forward+·일반 alpha Blend·제품 회귀는 계속 남는다. MAT-7 `progress`/미산정을 유지한다.
+
+### MAT-7 세 번째 구현 단계 — 코드 입력의 LX instance·frame snapshot 연결 (2026-10-02)
+
+- `LX::Runtime::ShaderGeneration/Instance`가 공통 계약·값·uniform·texture owner·keyword selection을 소유한다. generated Graph와 기존 코드 Material이 이 타입을 사용한다. Float2/Float4x4 등 generic property를 유지하며 Graph 전용 Principled/BSDF ABI를 강요하지 않는다.
+- 코드 Material의 typed 편집/조회와 실제 GBuffer/Forward `SealCore`를 연결한다. draw snapshot이 LX owner를 보존하며 값/자원 검증 실패는 accepted owner와 caller output을 유지한다. 같은 handle의 동일 계약/layout은 weak cache로 재사용한다.
+- 검증 범위와 실행 증거는 [코드 입력의 LX 연결 검증 기록](../analysis/MAT7CodeToLXRuntime.md)이 소유한다. generic shader compile/reflection·CPU frame sealing과 GPU 이미지/전체 모델 성능을 구분한다.
+- Debug/Release 코드 재질 각각 35항목·그래프 소비 25항목·texture DataSystem 31항목 및 반복 cook을 통과했다. 기존 adapter 68항목과 product/runtime 회귀, 전체 Debug 에디터 빌드도 통과했다.
+- 당시 코드 compatibility handle/native pass cache와 graph Scene host PSO는 유지됐다. 아래 네 번째 단계에서 graphics compile/PSO owner를 LX로 연결한다. 공통 Forward+·일반 alpha Blend·제품 회귀는 계속 남는다.
+
+### MAT-7 공통 graphics shader·PSO 소유권 연결 (네 번째 구현 단계 · 2026-10-02)
+
+- Code GBuffer/Forward와 Graph Scene host·packet·product slot이 `LX::Runtime::GraphicsGeneration`을 사용한다. 계약 owner·실제 effective compile/permutation/dependency/backend identity와 소유 바이트코드·고정 상태·PSO 요청을 함께 유지한다.
+- Code의 draw snapshot이 모델 mask·Forward Reference 변형까지 accepted owner를 보관한다. Graph cooked target/bytecode는 sealed identity로 복구한다. CPU 소유권과 native RHI 객체 수명/캐시 역할을 구분한다.
+- 새 후보가 성공해도 이전 프레임의 세대는 전체 sealing 성공 뒤의 commit까지 남긴다. 비동기 Pending 요청의 저장소 덮어쓰기를 거부하며, 공유 PSO는 마지막 cache holder가 없어질 때 fence 기준으로 retire한다.
+- 정확한 빌드·실행 범위는 [공통 graphics 소유권 검증 기록](../analysis/MAT7GraphicsPipelineOwnership.md)이 소유한다. API 실패 주입을 전체 제품 hot reload·GPU 이미지/성능 수용으로 확대하지 않는다.
+- Debug/Release 각각 소유권·실패 검사 186항목과 source-free identity 4항목, 실제 DX12 packet 169항목·GPU 16성분 및 Vulkan Scene host 768픽셀·Ready 요청 18개/validation 0을 통과했다. 기존 product/runtime 회귀와 전체 Debug 에디터 빌드도 통과했다.
+- 당시 후속인 공통 Forward+ light list·일반 Blend 혼합 정렬·depth/HDR 합성은 아래 다섯 번째 단계에서 연결했다. 네 번째 단계의 Ready 요청 18개는 당시 opaque PSO 집합의 실행 이력이며 새 alpha 집합의 결과와 구분한다.
+
+### MAT-7 공통 Forward+·일반 alpha Blend (다섯 번째 구현 단계 · 2026-10-02)
+
+- Code와 Core/Layered Graph가 한 번 업로드한 light buffer와 같은 Forward+ tile count/index를 소비한다. 타일당 32개 초과 시 전체 light list로 평가하여 광원을 누락하지 않는다. 같은 cascade shadow·읽기 전용 opaque depth·HDR target을 공유한다.
+- 카메라 방향 기준의 공통 back-to-front 순서에 Code 배치 구간과 Graph draw를 배치한다. Graph의 lookup capture/bake는 이 순서 안의 재질 준비이며 별도 transparency 합성 계층이 아니다. 알파는 SRC_ALPHA/INV_SRC_ALPHA, depth/opaque owner는 보존한다.
+- Graph의 생성 ShaderMeta에 실제 Forward entry/state를 추가했다. Core/Layered는 opaque·shadow와 함께 alpha color/lookup까지 15개 PSO 요청이 모두 Ready여야 선택한다. 기존 SSS/refraction·Volume 처리는 유지한다. 이 기능들과 일반 alpha의 동시 혼합·굴절 배경 순서는 제품 잔여 게이트다.
+- shader host ABI와 파생물이 변경되어 **SceneHost identity 11**로 올린다. 기존 identity 10 cook은 재생성한다. BRDF 1024/environment 4096과 이미지 품질 상한은 유지하며, 10을 사용한 MAT-9 과거 측정은 새 ABI의 재검증 결과로 세지 않는다.
+- 실제 native GPU 검증과 잔여 범위는 [공통 Forward Blend 검증 기록](../analysis/MAT7CommonForwardBlend.md)에 기록한다. 작가 UI·Preview/Scene/Game·encrypted cooked Player의 전체 통합이나 모델 이동 성능 완료로 확대하지 않는다.
+- DX12 Debug/Release 및 Vulkan Debug의 혼합 GPU 12조건·4,608 RGB 성분, Vulkan Debug/Release의 generation별 Ready 요청 30개·768픽셀을 validation 0으로 통과했다. 기존 Debug SSS/refraction/Volume·shadow/Decal, Scene/lookup/교체 55프레임과 최종 Debug 혼합 재실행 및 전체 Debug 에디터 빌드를 확인했다. Vulkan 냉간 PSO 준비는 첫 90초 제한을 넘었으며 600초 정확성 대기로 재검증했고, 로딩 성능 통과로 세지 않는다.
+- MAT-7은 `progress`/미산정, 4.25는 열린 상태다. 당시 후속인 보조 compute/RT compatibility 조회 정리는 아래 여섯 번째 단계에서 처리했다. 제품 저장·reload·재import·쿠킹 재실행 게이트는 남는다. object 정렬의 교차/자체 겹침 한계는 제품 지원 범위에 명시하고, 특수 transport 혼합의 순서·검증은 기존 alpha/transmission 게이트에서 회수한다. 품질·전체 CPU/GPU 비용은 MAT-9가 소유한다.
+
+### MAT-7 보조 compute·프레임 조회 분기 정리 (여섯 번째 구현 단계 · 2026-10-02)
+
+- `LX::Runtime::ComputeGeneration`이 CS bytecode·compile/cooked identity·layout/PSO를 보관한다. Scene transform/lookup/SSS/refraction/Volume과 공통 Forward+ culling, 독립 bake/evaluate/resolve의 frame/result도 소유자를 유지한다. 후보 실패 보존과 공유 native handle retirement 경계를 graphics와 맞춘다.
+- GBuffer/Forward RT draw는 프레임의 accepted graphics owner만 소비한다. 소유권 없이 최신 registry를 다시 조회하던 분기를 제거하고 렌더 fixture를 같은 준비 계약으로 전환했다. Code 입력용 ShaderMeta registry·variant preparation/진단 cache와 generic property는 유지한다.
+- ABI·SceneHost 11·BRDF 1024/environment 4096을 유지한다. 외부 precompiled helper의 계약 없는 입력과 동기 compute PSO API는 별도 경계로 남는다. 정확한 빌드·실행 범위와 한계는 [compute 소유권 검증 기록](../analysis/MAT7ComputePipelineOwnership.md)을 따른다.
+- 후속 DX12 회귀에서 MeshSurface 테스트의 Core/Layered product index와 IBL model 지정 혼동을 수정했다. 제품 수학·tolerance 변경 없이 Debug/Release 각각 1,117,767 checks·454,560 GPU 성분이 통과했고, Debug SurfaceBatch 19,387 checks·ScenePacket 169 checks도 통과했다. sampler 즉시 결과가 deferred transform으로 오인되지 않는 소유자 분리 검사도 포함한다. 최종 빌드 결과와 로그는 위 검증 기록에 둔다.
+- MAT-7 `progress`/미산정, PHASE 4.25 열린 상태를 유지한다. 당시 후속인 제품 편집 저장·reload·실패 보존·재import·재쿠킹 회귀는 아래 일곱 번째 단계에서 회수한다. alpha/특수 transport 혼합 순서와 MAT-9 품질·전체 비용 수용도 기존 게이트에 남긴다.
+
+### MAT-7 제품 편집·복구·쿠킹 회귀 (일곱 번째 구현 단계 · 2026-10-02)
+
+- 명시적 Reload가 손상된 primary 대신 오래된 `.bak`을 성공으로 읽던 경로를 수정했다. 거절 시 문서/적용 재질을 보존하고 정상 외부 수정은 재import→Save→Apply의 실제 Scene 픽셀로 확인했다.
+- **LXMC/artifact v4**는 생성 ShaderMeta 계약의 CEDO tree를 보관한다. cooked 복구뿐 아니라 generation 재검증·재쿠킹도 바이너리 계약을 사용한다. schema/typed defaults·자원·source digest·backend stage/reflection 검증을 유지하며 Player의 text parser 2회를 0회로 수정했다. v3는 재쿠킹, CEMF schema·SceneHost 11·1024/4096은 유지한다.
+- 생성/복구 72항목, Debug/Release 반복 cook·공통 consumer 26항목·Code runtime 35항목·pipeline runtime 212항목·source-free graphics identity 4항목 및 실제 encrypted PAK/Player를 검증했다. graph 준비 완료/Scene compile 0/parser 0과 패키지 bytes 보존을 요구한다.
+- 임시 fixture의 0.8 배율이 현재 1.5를 덮어 적용하던 검증 경로를 수정했다. 작업 프로젝트의 배율을 상속하고 에디터 시작·재시작의 실제 적용을 대조한다. 전체 LX 제스처/DPI 수용과 분리한다.
+- UI·Scene/Game·실제 Player의 실행 범위와 최종 결과는 [제품 편집·복구 검증 기록](../analysis/MAT7ProductEditingRecovery.md)을 따른다. MAT-7 `progress`/미산정과 4.25 열린 상태를 유지한다. 다음 MAT-7 게이트는 일반 alpha와 SSS/refraction/Volume의 혼합 순서·굴절 배경 수용이며 LX 편집 마감/MAT-9 품질·전체 비용은 별도다.
+
+### MAT-7 특수 transport·일반 alpha 혼합 (여덟 번째 구현 단계 · 2026-10-02)
+
+- Code/Core/Layered/SSS의 alpha와 physical transmission을 공통 Forward+의 카메라 깊이 순서에 넣었다. SSS의 overflow 광원도 같은 light list를 소비한다.
+- SSS/굴절만 임시 surface depth/owner를 만들고 Scene의 불투명 depth/owner를 보존한다. 굴절 직전 현재 HDR을 복사하여 뒤쪽 alpha를 배경에 포함한다. Volume은 배경과 각 Forward 표면 깊이까지의 transport를 구별한다.
+- **SceneHost identity 12**로 재쿠킹한다. LXMC/artifact v4·1024/4096은 유지한다. 혼합 24조건·Volume 33프레임을 각각 DX12 Debug/Release에서 통과했다. 기존 굴절/SSS와 실제 Editor/Player 회귀도 통과했다. 카메라 Volume ray가 far projection 때문에 뒤집히는 결함을 수정하고 배경/굴절 결과를 각각 독립 적분과 대조했다. [혼합 transport 검증 기록](../analysis/MAT7ForwardTransportComposition.md).
+- 정렬은 object/draw 단위다. 굴절 배경은 합성 컬러 한 장과 불투명 깊이를 사용한다. 교차 표면 OIT·층별 투명 ray 추적을 이번 지원 범위로 세지 않는다. 매질 역변환의 강한 흡수 오차, 활성/비활성 Volume 및 scratch/최초 준비의 전체 비용은 MAT-9가 수용한다.
+- 이 단계로 **MAT-7을 done**으로 판정한다. `days:null`/기성 추가 0을 유지한다. PHASE 4.25는 LX-1/3/3H 마감과 MAT-9 수용 때문에 계속 열린 상태다. 위 첫~일곱 번째 단계의 `progress`/identity 11은 당시 기록이다.
+
+**LX 공통 runtime 전환의 수용 조건:** 기존 코드 재질의 Float2/Float4x4 등 generic property를 지원하고 Graph 전용 Principled/BSDF ABI를 강요하지 않는다. authored ShaderMeta의 name 기반 값과 graph의 stable ID override를 입력 어댑터에서 해석한 뒤 동일 generation/instance·resource/PSO owner로 소비한다. reload 실패 보존, texture alias/색공간, mixed Graph/Code draw와 cooked 재실행의 완료 증거는 위 단계별 기록에 둔다. 그래프 UI는 LX-3, 품질/성능 수용은 MAT-9가 소유한다.
+
+현재 제품 기준선 **BRDF 1024 / environment 4096**과 품질 상한은 유지한다. BASE-0/후속 구조 작업은 현재 구현 기반을 사용할 수 있으며 MAT-7 재개방이나 MAT-9 전체 수용을 일괄 착수 선행으로 추가하지 않는다. 공통 통합 뒤 같은 입력의 회귀를 회수한다.
+
+압축 전 노트는 [구현·검증 이력](archive/Phase425ImplementationHistory.md), 날짜별 증거는 아래 접힌 기록에 보존한다.
 
 ---
 
@@ -62,7 +164,7 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 
 현재 활성 구현은 `domain=material`뿐이다. `pass`는 LX 공통 기반에서 나중에
 열 수 있는 별도 domain이며, 현재 [C# Pipeline 저작 계획](CSharpRenderPipelinePlan.md)의
-완료 조건이나 이 문서의 34일에 포함하지 않는다.
+완료 조건이나 이 문서의 40일에 포함하지 않는다.
 
 ---
 
@@ -72,12 +174,14 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 .shadergraph (domain=material)
     -> typed Graph IR
     -> constant fold / dead-lobe elimination / feature extraction
-    -> generated MaterialInputs + MaterialFeatureMask
-    -> shared Slang EvaluateMaterial
+    -> generated .shadermeta + .slang (같은 generation)
+    -> common Shader/Material compile·reflection·cook·binding/PSO
+    -> shared Slang EvaluateMaterial (MaterialInputs + MaterialFeatureMask)
     -> PrincipledSurface
          ├─ Standard : Deferred
-         ├─ Layered  : specialized Deferred 또는 Forward
-         └─ Special  : Forward (transmission/subsurface/volume)
+         ├─ Layered  : specialized Deferred 또는 공통 Forward+
+         ├─ Alpha Blend : 공통 Forward+
+         └─ Special : 공통 재질 + 필요한 SSS/refraction/volume 보조 처리
 ```
 
 핵심 규칙:
@@ -86,11 +190,12 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
    `VolumeInputs`→`PrincipledVolume` Output closure이며 surface density 필드로 저장하지 않는다.
 2. `MaterialFeatureMask`는 graph를 훑어 얻는 정적 feature 집합이다. artist가 pass/register를
    직접 고르지 않는다.
-3. Deferred와 Forward는 같은 `EvaluateMaterial`·BRDF·IBL 모듈을 소비한다. route 변경이
+3. Deferred와 Forward+는 같은 `EvaluateMaterial`·BRDF·IBL 모듈을 소비한다. route 변경이
    색 변화가 되어서는 안 된다.
 4. graph topology와 feature permutation은 cook 때 고정한다. runtime instance는 값과 texture만
    override한다.
-5. 무한 uber shader 하나를 만들지 않는다. coarse tier permutation + specialization + cook-time
+5. Graph 원본과 ShaderMeta를 두 개의 독립 저작 입력으로 유지하지 않는다. Graph 모드에서는 Meta/Slang을 함께 재생성한다. 직접 작성한 Code 모드도 같은 ShaderMeta/Material 소비 계약에 합류한다.
+6. 무한 uber shader 하나를 만들지 않는다. coarse tier permutation + specialization + cook-time
    constant folding으로 variant 폭과 분기 비용을 제한한다.
 
 ---
@@ -100,8 +205,8 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 | Tier | 기본 route | 재질 기능 | 저작 경험 |
 |---|---|---|---|
 | Standard | Deferred | base/MR/normal/IOR/specular/emission/mask | 기본값. 가장 싼 green 배지 |
-| Layered | specialized Deferred 또는 Forward | coat/sheen/aniso/iridescence | yellow 배지와 비용 증가 이유 표시 |
-| Special | Forward | transmission/subsurface/volume | red 배지, 겹침/화면 점유 비용 경고 |
+| Layered | specialized Deferred 또는 공통 Forward+ | coat/sheen/aniso/iridescence | yellow 배지와 비용 증가 이유 표시 |
+| Special | 공통 재질 + 필요한 transport 처리 | transmission/subsurface/volume | red 배지, 겹침/화면 점유 비용 경고 |
 
 - artist에게 descriptor register, MRT, PSO 키, Slang specialization을 노출하지 않는다.
 - Material Inspector는 예상 route, feature mask, texture sample 수, variant 수, 투명 overlap 위험을
@@ -123,10 +228,11 @@ pre-tone linear HDR 재질 응답**이다. 후처리 차이로 재질 오차를 
 | `MAT-4` | coat·sheen·anisotropy·iridescence layered lobe | ✓ | MAT-3 | 4 |
 | `MAT-5` | transmission·subsurface·volume와 Special route | ✓ | MAT-4 공용 레이어 | 4 |
 | `MAT-6` | material-domain graph→deterministic Slang codegen·diagnostic | ✓ | MAT-2, MAT-5 공용 의미 | 4 |
-| `MAT-7` | 제품 binding·generation/PSO 교체·자동 route·cook specialization | ✓ | MAT-4~MAT-6 | 3 |
+| `MAT-7-BASE` | 기존 LX binding·generation/PSO·쿠킹 구현 기반 보존 | ✓ 이력 | MAT-4~MAT-6 | 3 |
+| `MAT-7` | Graph→ShaderMeta/Slang·LX 공통 Material/Forward+·alpha/특수 transport 통합 | 완료 | MAT-6, MAT-7-BASE | 미산정·기성 추가 없음 |
 | `MAT-8` | artist Inspector·preview·cost badge·unsupported 설명 | 완료 | MAT-2, MAT-7 | 3 |
-| `MAT-9` | Blender material grid/furnace·route parity·성능 gate | 진행 | MAT-7, MAT-8 | 2 |
-| **합계** |  |  |  | **34** |
+| `MAT-9` | Blender material grid/furnace·route parity·성능 gate | 진행 | MAT-7, MAT-8 | 8 |
+| **합계** | 완료 기반 32 + MAT-9 잔여 8 | 4.25 진행 중 | 미산정 MAT-7 완료 공수 역산 없음·LX 별도 | **40 + 미산정** |
 
 구 PHASE 4의 `SRP-3` 공용 graph 기반과 단일 PBR 레인의 material 의미·lobe·codegen 몫을
 이 열 개 슬라이스가 대체한다. 옛 PBR ID는 새 작업과 병행하지 않는다.
@@ -136,6 +242,11 @@ Material domain의 typed IR에 적용하고, `MAT-6`은 그 결과를 Slang·res
 창 재작성과 `imgui-node-editor` 최종 제거는 LX 계획에서 별도로 판정한다.
 `MAT-2`의 4일을 Blender 노드 전체 목록 구현 완료로 간주하지 않는다. LX-0 대응표에서
 정한 지원 노드/소켓과 편집 기능을 별도 범위·공수·제품 게이트로 관리한다.
+
+<details id="implementation-history">
+<summary>날짜별 구현·측정 이력 — 당시 상태와 공수 표기 보존</summary>
+
+아래는 각 작업 시점의 기록이다. 현재 완료/잔여 판정은 §0과 실행 표가 소유한다. 과거의 “MAT-7 완료”, “MAT-0~8 완료”, “32/34”는 공통 재질 통합 완료나 현재 공수로 사용하지 않는다.
 
 ### MAT-0 고정 결과 (2026-09-28)
 
@@ -817,22 +928,32 @@ MAT-9 progress·32/34일 유지, 새 완료/공수 행을 추가하지 않는다
 - 성능 게이트는 **실제 후속 구현 뒤** 같은 모델·해상도·재질·HDRI·카메라 궤적·warmup에서
   Debug/Release CPU/GPU median·p95·max, 실제 render completion FPS와 입력 지연을 재판정한다.
   IBL의 이동 중 spike를 별도로 측정하고 GPU-driven만으로 사라진다고 가정하지 않는다.
+  공통 Forward+ 혼합 transport는 Volume 활성/비활성 shader GPU 비용·register/VRAM,
+  SSS/굴절의 픽셀당 40 byte scratch 및 cold/warm PSO 준비 시간을 함께 대조한다.
+  GBV가 켜진 정확도 실행의 준비 시간과 프레임 수를 제품 loading/FPS 수용으로 세지 않는다.
 - 기존 RMS≤1%·p95 normalized≤1%·max normalized≤5%·seed RMS≤0.25%를 낮추지 않는다.
   재투영/갱신 최적화는 disocclusion·camera cut·재질/HDRI 변경·정지 후 refinement도 검사한다.
 - SSS/폐곡면 투과·alpha+transmission·texture/normal-map·route parity·area-light gate는
   그대로 남긴다. GPU-driven 설계나 성능 통과로 이 품질 항목을 대체하지 않는다.
+  alpha가 포함된 굴절 배경의 단일 컬러/불투명 depth 근사와 강한 Volume의
+  `T >= 1e-4` 역변환 오차도 같은 pre-tone HDR 기준으로 수용 또는 명시적 미지원 판정한다.
 
 [통합 체크포인트](../analysis/MAT9IntegrationCheckpoint20261001.md),
 [후속 선행 그래프](RenderPhaseRoadmap.md), [GPU 기능 계획](GpuFeaturePlanningPlan.md)을 따른다.
 
+</details>
+
 ## 6. 완료 기준
 
+- `.shadergraph`에서 같은 identity의 `.shadermeta`와 `.slang`을 생성·검증·쿠킹한다. Graph 모드에서 생성 산출물을 별도로 편집하지 않는다.
+- LX가 소유하는 공통 Material 실행 환경에서 Graph와 코드 입력의 속성·텍스처·PSO·실패 복구·Preview/Scene/Game/Player의 같은 재질 generation을 확인한다. ShaderMeta는 생성 계약의 표현으로 소비한다.
+- 일반 alpha Blend 그래프와 코드 재질이 공통 Forward+의 light list·정렬·깊이·HDR 합성 경로를 사용한다. 물리 transmission은 별도 특성으로 검증한다.
 - `.shadergraph(domain=material)` 저장→닫기→재개방 뒤 node/pin/connection/layout/Blackboard,
   default, color-space intent와 subgraph가 보존된다.
 - LX-0 대응표에서 지원으로 표시한 Blender 노드의 소켓 이름·순서·기본값·표시 조건과 내부 컨트롤, 접힘·연결·그룹 조작이 독립 예제와 Editor 제품 경로에서 확인된다.
 - unknown node와 schema migration 실패는 graph와 마지막 정상 compiled generation을 보존한다.
 - Blender reference의 core·layered·special material grid가 pre-tone linear HDR 허용 오차를 통과한다.
-- 같은 지원 feature의 Deferred/Forward route 교차 비교가 허용 오차를 통과한다.
+- 같은 지원 feature의 Deferred/Forward+ route 교차 비교가 허용 오차를 통과한다.
 - constant-only emission, texture-only input, mixed factor×texture, alpha와 transmission 조합을
   독립 fixture로 판정한다.
 - Standard tier가 현행 Standard PBR GPU 시간·GBuffer 대역폭 회귀 상한을 넘지 않는다.
@@ -847,7 +968,7 @@ MAT-9 progress·32/34일 유지, 새 완료/공수 행을 추가하지 않는다
 
 PHASE 4.75는 다음을 읽기 전용 입력으로 받는다.
 
-- compiled material graph generation.
+- 공통 compiled material generation과 같은 identity의 생성 ShaderMeta/Slang.
 - `PrincipledSurface` ABI와 `MaterialFeatureMask`.
 - 자동 선택된 Standard/Layered/Special route.
 - backend-neutral material resource table과 variant/cost metadata.

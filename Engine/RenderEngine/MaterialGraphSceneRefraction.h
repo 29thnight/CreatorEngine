@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LXMaterialPipeline.h"
+
 #include "MaterialGraphSceneLookup.h"
 #include "MaterialGraphSceneVolume.h"
 
@@ -33,7 +35,7 @@ class SceneRefractionFrame
     RHITextureHandle environment_;
     std::array<RHITextureHandle, 2> inputs_{};
     RHIBufferHandle samples_;
-    RHIPipelineHandle bake_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> bake_;
     std::vector<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
     std::shared_ptr<const SceneVolumeFrame> volume_;
@@ -57,7 +59,7 @@ class SceneRefractionResources
 
   private:
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle bake_, volumeBake_;
+    LX::Runtime::ComputePipeline bake_, volumeBake_;
     bool Initialize(const EnhancedFrameContext& context, bool volume, std::string& error);
 };
 } // namespace material_graph

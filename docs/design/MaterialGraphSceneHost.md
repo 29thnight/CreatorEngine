@@ -17,7 +17,9 @@ compute에서 비교하고 변경 픽셀의 IBL만 적분한다. 컬러 fragment
 double-sided coverage다.
 [이미지별 Vector·LOD](MaterialGraphTextureFootprints.md)로 둘 이상의 텍스처도 처리한다.
 [균질 Volume](MaterialGraphSceneVolume.md)도 별도 transport 경로로 연결했다.
-Blended coverage와 cooked Scene host가 없는 packaged 실행은 진단과 함께 거부한다.
+Core/Layered·SSS/transmission의 Blended coverage와 비alpha transmission은
+[공통 Forward+ transport](../analysis/MAT7ForwardTransportComposition.md)에서 Code 재질과 혼합 정렬·합성한다.
+cooked Scene host가 없는 packaged 실행은 진단과 함께 거부한다.
 이전 preview shader를 Scene shader로 이름만 바꾸어 사용하지 않는다.
 
 ## 2. 실제 패스 순서
@@ -31,11 +33,16 @@ LX mesh skin/world producer (Shadow/GBuffer가 같은 생산을 공유)
   -> LX.Scene.LookupCapture (8 + 3 MRT) / LookupBake
   -> SSS draw가 있으면 SubsurfaceReflection / Capture (7 MRT) / Filter
   -> LX.Scene.Color (같은 HDR, 같은 D32, Equal, depth write 0)
-  -> 투과 draw가 있으면 HDR/D32 복사 -> TransmissionGBuffer
-     -> lookup 재수집/bake -> RefractionCapture/Bake
-     -> Special 반사/필요한 SSS -> TransmissionColor
   -> LX.Scene.LookupReady
-  -> Skybox / SSGI / 기존 Forward / SSR / 후처리
+  -> Skybox / SSGI
+  -> Forward+.Cull (Code/Graph 공통 light list)
+  -> Volume이 있으면 opaque 배경에 카메라 매질 합성 (한 번)
+  -> 혼합 back-to-front 순서:
+     Code Forward+.Shade / Graph lookup 준비 + alpha color
+     SSS·굴절은 draw별 임시 depth/owner -> reflection/source/filter
+     굴절은 현재 뒤쪽 HDR 복사 -> RefractionCapture/Bake -> surface color
+     각 Forward 표면에 해당 표면 깊이까지의 카메라 매질 적용
+  -> SSR / 후처리
 ```
 
 - LX GBuffer는 depth를 clear하지 않는다. 먼저 기록된 legacy Opaque/Masked와 같은
@@ -51,18 +58,22 @@ LX mesh skin/world producer (Shadow/GBuffer가 같은 생산을 공유)
   기존 SSAO 값, cascade shadow와 HDR environment를 소비한다.
   Layered 발광도 상위 lobe의 감쇠를 적용한다.
 
-투과 surface는 [refraction 계약](MaterialGraphSceneRefraction.md)에 따라 완성된 불투명 배경을
-읽고 최종 depth와 owner를 갱신한다. 배경 SSAO를 투과 surface에 적용하지 않는다.
+투과 surface는 자기 순서 직전에 뒤쪽 HDR을 복사하며 이미 합성된 반투명 객체도 읽는다.
+임시 GBuffer의 depth/owner를 사용하고 불투명 depth/owner를 보존한다.
+배경 SSAO를 투과 surface에 적용하지 않는다. 이전 depth 교체 방식과 후속 변경은
+[공통 transport 검증 기록](../analysis/MAT7ForwardTransportComposition.md)을 구분해서 읽는다.
 
-Decal의 LX lobe 수정, LX mesh의 shadow caster 설치, Volume·Blended transport,
-SSAO/SSR/SSGI와의 전체 Scene 시각 회귀는 별도 작업이다. 위 순서의 자원 연결만으로
+일반 Blend는 opaque depth/owner를 쓰지 않고 같은 HDR에 알파 합성한다. opaque SSAO/Decal을
+앞쪽 alpha surface에 적용하지 않는다. alpha draw는 opaque shadow caster에 넣지 않는다.
+SSS/refraction·Volume과 alpha의 혼합과 굴절 배경의 투명 객체 순서는 공통 transport 게이트에서 검사한다.
+SSAO/SSR/SSGI와의 전체 Scene 시각 회귀는 MAT-9 게이트다. 위 순서의 자원 연결만으로
 해당 renderer 기능 전부를 검증했다고 주장하지 않는다.
 
 ## 3. 준비·기록·수명
 
 1. `SelectReadyInput`에서 [비동기 generation 준비·마지막 정상 재질](MaterialGraphSceneGeneration.md)을
-   선택한다. 신규 generation의 Slang은 worker에서 검증하고 shadow를 포함한 Surface Core/Layered PSO 9개,
-   SSS 또는 transmission PSO 11개, 두 기능을 섞으면 13개가 모두 ready여야 선택한다.
+   선택한다. 신규 generation의 Slang은 worker에서 검증하고 shadow·opaque·alpha color/lookup 및
+   필요한 SSS/transmission 보조 PSO가 모두 ready여야 선택한다.
    pending/실패 슬롯은 이전 instance·coverage와 현재 geometry를 사용한다.
 2. legacy upload/IBL과 `SceneHost::PrepareResidency`의 LX texture 복사 준비 뒤
    빈 graph에 `PrepareParallel`로 native prefix를 확정한다.
@@ -83,9 +94,19 @@ shader/PSO·뒤쪽 draw 실패는 이전 accepted frame을 부분 결과로 덮�
 저작 모드에서는 exact Scene module의 VS/GBuffer PS/Color PS를 DXIL·SPIR-V로 검증한다.
 두 backend의 material reflection이 제품 layout과 일치해야 active backend PSO를 만든다.
 DX12/Vulkan shader/native PSO의 worker 준비·제출 성공 후 슬롯 교체는 연결 문서가 소유한다.
-Scene host artifact의 자동 cooking은 MAT-7 잔여다. 초기 CS의 동기 설치 제거와
+Scene host의 자동 cooking은 연결했고 현행 identity 12로 재쿠킹해야 한다. 새 transport와
+encrypted Player·Editor 제품 회귀 결과는 공통 transport 검증 기록을 따른다. 초기 CS의 동기 설치 제거와
 전체 cache 최적화는 별도 개선이며, 최종 실시간 시간/메모리 수용은 MAT-9에서 판정한다.
 lookup의 현재/이전 payload 예산과 Special·refraction의 프레임당 예산은 각각 연결 문서가 소유한다.
+
+alpha가 있으면 2 GiB lookup 예산 중 2/3을 opaque 현재/이전 쌍, 1/3을 alpha 임시 payload에
+배분한다. 하나의 alpha scratch를 draw마다 순서대로 clear/capture/bake/color에 재사용하고
+opaque temporal cache에 게시하지 않는다. 기록 owner가 scratch를 GPU 완료까지 보관한다.
+per-object 정렬이며 self-overlap/교차 표면을 층별로 분리하는 OIT는 구현하지 않았다.
+SSS·굴절이 있으면 한 개의 임시 5 MRT + D32를 draw 사이에 재사용한다.
+픽셀당 40 byte의 추가 표면 버퍼이며 Core/Layered 일반 Blend에는 생성하지 않는다.
+굴절 배경은 합성 컬러 한 장과 opaque depth다. 투명 층별 depth/교차점은 저장하지 않는다.
+alpha draw마다 1024/4096 적분 준비가 반복되므로 실제 모델 비용 수용은 MAT-9에서 판정한다.
 
 ## 4. 검증
 
@@ -129,7 +150,8 @@ SSS의 실제 Scene transport·독립 물리/HDR 비교와 GPU 검증은
 depth/owner·굴절 compute·HDR 합성 및 해당 native 검증을 소유한다.
 [MaterialGraphSceneVolume.md](MaterialGraphSceneVolume.md)는 닫힌 균질 매질의 coefficient CS,
 불투명 깊이까지의 흡수·발광·단일 산란과 굴절 ray의 내부 매질 합성을 소유한다.
-MAT-7은 진행 중이며 완료 공수를 추가하지 않는다.
+MAT-7은 [공통 혼합 transport·제품 회귀](../analysis/MAT7ForwardTransportComposition.md)까지
+완료했다. 미산정 작업 시간을 기성에 더하지 않는다. LX 편집·MAT-9는 남는다.
 
 [MaterialGraphSceneShadowDecal.md](MaterialGraphSceneShadowDecal.md)는 그래프 Alpha를 쓰는
 세 캐스케이드 shadow caster와 opaque Decal의 raw 입력·derived lobe·IBL 연결을 소유한다.

@@ -61,14 +61,14 @@ Live는 `.ceprof` reader의 선택 구간과 분리한다. Record/Stop/파일 �
 - topology 상세는 RG-V에 링크한다. Live가 별도의 실행 DAG·GPU 자원 소유권을 만들지 않는다.
 - 두 view 교대/preview pin/Scene 전환/resize·pause·Record on/off·`.ceprof` load 중 동일 귀속 확인,
   Debug/Release UI 동작, 페이지 off/on CPU/GPU 비용·메모리 상한 실측을 완료 gate로 둔다.
-- 2026-10-01 남은 재현: Release Vulkan offscreen fixture에서 새 설정 창의 UI frame은 진행하지만
-  `render.live.fence` 또는 `dx12.live` HTTP operation이 120초 내 완료되지 않았다. UI/렌더 수요와
-  `GetLiveStatus`의 renderStateMutex 경합을 구분해 원인을 규명하고 같은 실행에서 캡처까지 통과시킨다.
-  원인은 아직 확정하지 않았으며 Vulkan 전체 수용을 완료로 표시하지 않는다.
+- 2026-10-01 관측 기록: Release Vulkan offscreen fixture에서 새 설정 창의 UI frame은 진행하지만
+  `render.live.fence` 또는 `dx12.live` HTTP operation이 120초 내 완료되지 않았다. 원인은 미확정이다.
+  이 Vulkan 재현·원인 규명·비교는 [PHASE 4.9](BackendParityPlan.md)로 이관하며 14-LIVE 완료 조건에서 제외한다.
+  DX12의 view 귀속·UI 동작·비용 검증은 위 조건대로 유지한다.
 
 ## 4. 추적과 누락 방지
 
-대시보드의 `W9`(21), `14-LIVE`(14), `RG-V`(4.3), `RND-ENV`(4.75)는 별도 미산정 행이다.
+대시보드의 W9(21)·14-LIVE(14)는 미산정이며, RG-V(4.3)는 4일·RND-ENV(4.75)는 10일로 2026-10-01 산정했다.
 CSRP-5/6의 viewer 연결 및 14-7의 메뉴 착지는 기존 해당 행의 완료 조건에 편입한다.
 개별 후속 항목을 닫을 때 이 문서의 표와 canonical plan, dashboard 상태·검증 결과를 함께 갱신한다.
-현재 4.25의 34일과 MAT-9의 완료 조건을 이 UI 재배치의 미산정 비용으로 바꾸지 않는다.
+현재 4.25의 40일과 MAT-9의 완료 조건을 이 UI 재배치의 미산정 비용으로 바꾸지 않는다.

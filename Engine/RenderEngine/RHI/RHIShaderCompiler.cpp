@@ -1,5 +1,6 @@
 #include "EngineRuntimePaths.h"
 #include "RHIShaderCompiler.h"
+#include "RHIShaderVerifiedCache.h"
 
 #include "RHIShaderSource.h"
 #include "Vulkan/VulkanBindingModel.h"
@@ -80,6 +81,41 @@ namespace
     thread_local RHIShaderBinary g_output = RHIShaderBinary::Dxil;
     std::mutex g_cacheMutex;
     std::unordered_map<std::string, std::vector<std::uint8_t>> g_memoryCache;
+    std::unordered_map<std::string, RHIShaderCompiler::VerifiedShader> g_verifiedCache;
+    std::mutex g_progressMutex;
+    RHIShaderCompiler::Progress g_progress;
+    class CompileProgress final
+    {
+    public:
+        CompileProgress(const RHIShaderCompileRequest& request, const std::string& error) : error_(error)
+        {
+            std::lock_guard guard(g_progressMutex);
+            g_progress.active = true;
+            g_progress.recompiling = false;
+            g_progress.name = std::string(request.name);
+            g_progress.entryPoint = std::string(request.entryPoint);
+            g_progress.phase = "Resolving shader dependencies";
+            g_progress.lastError.clear();
+            ++g_progress.revision;
+        }
+        ~CompileProgress()
+        {
+            std::lock_guard guard(g_progressMutex);
+            g_progress.active = false;
+            g_progress.lastError = error_;
+            ++g_progress.completedRequests;
+            ++g_progress.revision;
+        }
+        void Phase(const char* phase, bool recompiling = false)
+        {
+            std::lock_guard guard(g_progressMutex);
+            g_progress.phase = phase;
+            g_progress.recompiling |= recompiling;
+            ++g_progress.revision;
+        }
+    private:
+        const std::string& error_;
+    };
     std::atomic<std::uint64_t> g_memoryHits{};
     std::atomic<std::uint64_t> g_diskHits{};
     std::atomic<std::uint64_t> g_compiles{};
@@ -657,16 +693,119 @@ namespace
         }
     }
 
+    constexpr std::uint32_t kVerifiedCacheMagic = 0x56534852u; // RHSV
+    constexpr std::uint32_t kVerifiedCacheSchema = 1u;
+    struct VerifiedCacheHeader
+    {
+        std::uint32_t magic{ kVerifiedCacheMagic };
+        std::uint32_t schema{ kVerifiedCacheSchema };
+        std::uint64_t byteCount{};
+        std::uint64_t contentLo{}, contentHi{};
+        std::uint64_t keyLo{}, keyHi{};
+    };
+
+    bool ReadVerifiedCache(const std::string& key, RHIShaderStage stage,
+        RHIShaderBlob* outBlob, RHIShaderReflection& outReflection)
+    {
+        {
+            std::lock_guard guard(g_cacheMutex);
+            if (const auto found = g_verifiedCache.find(key); found != g_verifiedCache.end())
+            {
+                if (found->second.reflection.stage != stage) return false;
+                if (outBlob) *outBlob = found->second.bytecode;
+                outReflection = found->second.reflection;
+                ++g_memoryHits;
+                return true;
+            }
+        }
+        const auto path = CacheDirectory() / (key + ".rsv");
+        std::ifstream file(path, std::ios::binary);
+        VerifiedCacheHeader header;
+        if (!file.read(reinterpret_cast<char*>(&header), sizeof(header)) ||
+            header.magic != kVerifiedCacheMagic || header.schema != kVerifiedCacheSchema ||
+            !header.byteCount || header.byteCount > rhi_shader_verified_cache::kMaxPayloadBytes)
+            return false;
+        const auto keyHash = HashBytes(key.data(), key.size());
+        if (header.keyLo != keyHash.lo || header.keyHi != keyHash.hi) return false;
+        std::error_code ec;
+        if (std::filesystem::file_size(path, ec) != sizeof(header) + header.byteCount || ec) return false;
+        std::vector<std::uint8_t> bytes(static_cast<std::size_t>(header.byteCount));
+        if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
+            return false;
+        const auto hash = HashBytes(bytes.data(), bytes.size());
+        if (hash.lo != header.contentLo || hash.hi != header.contentHi) return false;
+        RHIShaderCompiler::VerifiedShader candidate;
+        if (!rhi_shader_verified_cache::Decode(bytes, stage, candidate.bytecode, candidate.reflection))
+            return false;
+        candidate.dependencyIdentity = key;
+        if (outBlob) *outBlob = candidate.bytecode;
+        outReflection = candidate.reflection;
+        {
+            std::lock_guard guard(g_cacheMutex);
+            g_verifiedCache.emplace(key, std::move(candidate));
+        }
+        ++g_diskHits;
+        return true;
+    }
+
+    void WriteVerifiedCache(const std::string& key, const RHIShaderBlob& blob,
+        const RHIShaderReflection& reflection)
+    {
+        // Publish the pair together, never infer reflection from a bytecode-only hit.
+        {
+            std::lock_guard guard(g_cacheMutex);
+            g_verifiedCache.insert_or_assign(key,
+                RHIShaderCompiler::VerifiedShader{blob, reflection, key});
+        }
+        std::vector<std::uint8_t> bytes;
+        if (!rhi_shader_verified_cache::Encode(blob, reflection, bytes)) return;
+        const auto directory = CacheDirectory();
+        std::error_code ec;
+        std::filesystem::create_directories(directory, ec);
+        if (ec) return;
+        static std::atomic<std::uint64_t> serial{};
+        const auto path = directory / (key + ".rsv");
+        const auto temp = directory / (key + "." + std::to_string(GetCurrentProcessId()) + "."
+            + std::to_string(GetCurrentThreadId()) + "." + std::to_string(++serial) + ".rsv.tmp");
+        const auto hash = HashBytes(bytes.data(), bytes.size());
+        const auto keyHash = HashBytes(key.data(), key.size());
+        VerifiedCacheHeader header;
+        header.byteCount = bytes.size();
+        header.contentLo = hash.lo; header.contentHi = hash.hi;
+        header.keyLo = keyHash.lo; header.keyHi = keyHash.hi;
+        bool written = false;
+        {
+            std::ofstream file(temp, std::ios::binary | std::ios::trunc);
+            if (file)
+            {
+                file.write(reinterpret_cast<const char*>(&header), sizeof(header));
+                file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+                file.flush();
+                written = static_cast<bool>(file);
+            }
+        }
+        // Atomic replacement also repairs a corrupt/old record after fallback.
+        // Failure to persist a valid compile is not a compilation failure.
+        if (!written || !MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+            std::filesystem::remove(temp, ec);
+    }
+
     std::string BuildCacheKey(const RHIShaderCompileRequest& request,
         const std::vector<SourceUnit>& units, std::string_view compilerIdentity)
     {
         Hash128 hash;
-        hash.Add("CreatorEngine.RHIShaderCompiler.v12.Slang.O3.column-major.dx-layout.include-paths.permutation-key");
+        hash.Add("CreatorEngine.RHIShaderCompiler.v13.Slang.O3.column-major.dx-layout.verified-layout-v1.include-paths.permutation-key");
         hash.Add(compilerIdentity);
         hash.Add(request.name);
         hash.Add(request.entryPoint);
         hash.Add(request.targetProfile);
         hash.Add(&request.output, sizeof(request.output));
+        if (request.output == RHIShaderBinary::SpirV)
+        {
+            const std::array shifts{VulkanBindingModel::kConstantBufferShift, VulkanBindingModel::kShaderResourceShift,
+                VulkanBindingModel::kUnorderedAccessShift, VulkanBindingModel::kSamplerShift};
+            hash.Add(shifts.data(), sizeof(shifts));
+        }
         hash.Add(&request.options.strictMath, sizeof(request.options.strictMath));
         hash.Add(&request.options.fineDerivatives, sizeof(request.options.fineDerivatives));
         for (const auto& directory : request.options.includeDirectories)
@@ -1044,6 +1183,7 @@ namespace
 
             SlangRuntime& runtime = GetSlangRuntime();
             std::lock_guard<std::mutex> compileGuard(runtime.compileMutex);
+            CompileProgress progress(request, outError);
 
             std::vector<std::string> ownedArguments;
             ownedArguments.reserve(40);
@@ -1189,10 +1329,24 @@ namespace
                 ++g_failures;
                 return false;
             }
+            progress.Phase("Checking shader cache");
             const std::string cacheKey = BuildCacheKey(request, units, runtime.identity);
             if (nullptr == outReflection && ReadCache(cacheKey, *outBlob)) return true;
+            // Resolve current imports first: new/shadowed includes must invalidate
+            // a hit even if all previously recorded dependency files are unchanged.
+            if (outReflection)
+            {
+                const auto reflectionStage = MapReflectionStage(stage);
+                if (reflectionStage && ReadVerifiedCache(cacheKey, *reflectionStage, outBlob, *outReflection))
+                {
+                    if (outIdentity) *outIdentity = cacheKey;
+                    outError.clear();
+                    return true;
+                }
+            }
 
             diagnostics.setNull();
+            progress.Phase(outBlob ? "Recompiling shader (cache miss)" : "Reflecting shader", outBlob != nullptr);
             Slang::ComPtr<slang::IEntryPoint> entryPoint;
             if (SLANG_FAILED(shaderModule->findAndCheckEntryPoint(
                 std::string(request.entryPoint).c_str(), stage, entryPoint.writeRef(),
@@ -1245,6 +1399,7 @@ namespace
 
             diagnostics.setNull();
             Slang::ComPtr<slang::IBlob> code;
+            progress.Phase("Generating shader code", true);
             if (SLANG_FAILED(linked->getEntryPointCode(
                 0, 0, code.writeRef(), diagnostics.writeRef()))
                 || !code || 0 == code->getBufferSize())
@@ -1267,7 +1422,9 @@ namespace
                 std::lock_guard<std::mutex> guard(g_cacheMutex);
                 g_memoryCache.emplace(cacheKey, std::move(bytes));
             }
+            progress.Phase("Saving compiled shader cache");
             WriteCache(cacheKey, *outBlob);
+            if (outReflection) WriteVerifiedCache(cacheKey, *outBlob, *outReflection);
             if (nullptr != outIdentity)
                 *outIdentity = cacheKey;
             return true;
@@ -1346,9 +1503,16 @@ void RHIShaderCompiler::ResetStats()
     g_failures.store(0);
 }
 
+RHIShaderCompiler::Progress RHIShaderCompiler::GetProgress()
+{
+    std::lock_guard guard(g_progressMutex);
+    return g_progress;
+}
+
 void RHIShaderCompiler::ClearMemoryCache()
 {
     std::lock_guard<std::mutex> guard(g_cacheMutex);
     g_memoryCache.clear();
+    g_verifiedCache.clear();
 }
 

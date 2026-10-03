@@ -5,6 +5,8 @@ XYZ data: Blender Foundation, Apache-2.0. See the fixture NOTICE.md.
 import argparse
 import csv
 import hashlib
+import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -52,6 +54,10 @@ def main():
                 raise ValueError(f'Generated sensitivity differs: {path}')
         else:
             path.write_text(content, encoding='utf-8', newline='\n')
+    # Keep the Vulkan SceneLookup upload mirror in the same generation/check
+    # workflow as its canonical shader coefficients.
+    subprocess.run([sys.executable, str(ROOT / 'Tools/regression/generate-film-sensitivity-upload.py')]
+                   + (['--check'] if args.check else []), check=True)
     print('THIN_FILM_SENSITIVITY_OK entries=512 colorSpace=linear-rec709')
 
 

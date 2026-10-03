@@ -220,8 +220,9 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
             constants.viewProjection = math::transpose(m_viewProjection);
             constants.eyePositionScale = math::vector4(
                 m_eyePosition.x, m_eyePosition.y, m_eyePosition.z, m_scale);
+            // Keep the hidden-environment background below the neutral grid tone.
             constants.backgroundColor = math::vector4(
-                0.18f, 0.18f, 0.18f, m_showEnvironment ? 0.f : 1.f);
+                0.12f, 0.12f, 0.12f, m_showEnvironment ? 0.f : 1.f);
 
             const auto cb = context.resources->UploadConstants(
                 &constants, sizeof(SkyBoxConstants));

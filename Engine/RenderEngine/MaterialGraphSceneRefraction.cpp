@@ -67,14 +67,14 @@ bool SceneRefractionResources::Initialize(const EnhancedFrameContext& context, b
     const auto file = RHIShaderSource::Resolve("MaterialGraphSceneRefractionBake.slang").string();
     RHIShaderCompileOptions options;
     options.strictMath = true;
-    RHIShaderCompiler::VerifiedShader bake, verification;
+    LX::Runtime::CompiledCompute bake;
+    RHIShaderCompiler::VerifiedShader verification;
     RHIShaderPermutation permutation;
     if (volume && !permutation.Enable("LX_SCENE_REFRACTION_VOLUME", error))
     {
         return false;
     }
-    if (!RHIShaderCompiler::VerifyFile(file, "LXSceneRefractionBake", "cs_6_0", backend, permutation, bake, error,
-                                       options) ||
+    if (!LX::Runtime::CompileCompute(file, "LXSceneRefractionBake", permutation, options, bake, error) ||
         !RHIShaderCompiler::VerifyFile(file, "LXSceneRefractionBake", "cs_6_0", other, permutation, verification, error,
                                        options))
     {
@@ -94,15 +94,15 @@ bool SceneRefractionResources::Initialize(const EnhancedFrameContext& context, b
     }
     RHIComputePipelineDesc desc;
     desc.layout = layout;
-    desc.csBytecode = bake.bytecode.Data();
-    desc.csSize = bake.bytecode.Size();
-    const auto pipeline = context.psoManager->GetOrCreateCompute(desc, error);
-    if (!pipeline.IsValid())
+    desc.csBytecode = bake.stage.bytecode.Data();
+    desc.csSize = bake.stage.bytecode.Size();
+    LX::Runtime::ComputePipeline pipeline;
+    if (!pipeline.Create(*context.psoManager, desc, std::move(bake.description), error))
     {
         return false;
     }
     device_ = context.resources;
-    (volume ? volumeBake_ : bake_) = pipeline;
+    (volume ? volumeBake_ : bake_) = std::move(pipeline);
     return true;
 }
 
@@ -128,7 +128,7 @@ bool SceneRefractionResources::Prepare(const EnhancedFrameContext& context, cons
     candidate->recording_ = device_->GetCurrentUploadRecordingId();
     candidate->descriptors_ = device_->GetDescriptorVersionToken();
     candidate->environment_ = environment;
-    candidate->bake_ = volume ? volumeBake_ : bake_;
+    candidate->bake_ = (volume ? volumeBake_ : bake_).GetGeneration();
     candidate->volume_ = std::move(volume);
     if (!candidate->volume_)
     {
@@ -181,7 +181,7 @@ bool SceneRefractionResources::Prepare(const EnhancedFrameContext& context, cons
             environment.IsValid(),
             64,
             32,
-            0};
+            candidate->volume_ ? 1u : 0u};
         const auto uploaded = device_->UploadConstants(&constants, sizeof(constants));
         if (!uploaded.IsValid())
         {
@@ -229,10 +229,8 @@ const std::array<RGHandle, 2>& SceneRefractionFrame::DeclareInputs(EnhancedRende
 void SceneRefractionFrame::DeclareBackground(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth) const
 {
     CheckCurrent(graph);
-    if (backgroundColor_.IsValid())
+    if (!backgroundColor_.IsValid())
     {
-        throw std::runtime_error("Scene refraction background requires one snapshot.");
-    }
     RGTextureDesc desc;
     desc.width = width_;
     desc.height = height_;
@@ -243,6 +241,7 @@ void SceneRefractionFrame::DeclareBackground(EnhancedRenderGraph& graph, RGHandl
     desc.allowDepthStencil = true;
     desc.name = "LX.Scene.OpaqueDepth";
     backgroundDepth_ = graph.CreateTexture(desc);
+    }
     const auto owner = self_.lock();
     graph.AddPass("LX.Scene.RefractionBackground",
                   {{lighting, RHIResourceState::CopySource},
@@ -309,7 +308,7 @@ void SceneRefractionFrame::DeclareBake(EnhancedRenderGraph& graph, const SceneLo
                 throw std::runtime_error("Scene refraction input binding failed.");
             }
             auto& encoder = *execution.encoder;
-            encoder.SetPipeline(RHIBindPoint::Compute, owner->bake_);
+            encoder.SetPipeline(RHIBindPoint::Compute, owner->bake_->GetHandle());
             encoder.SetBindings(RHIBindPoint::Compute, 1, table);
             encoder.SetBindings(RHIBindPoint::Compute, 2, owner->outputs_);
             const std::array<RHIBindingDesc, 2> emptyLights{

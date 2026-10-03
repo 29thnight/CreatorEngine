@@ -71,6 +71,8 @@ class VulkanSamplerTable;
 class VulkanEncoder final : public RHIEncoder
 {
 public:
+    // Backend profiler only; graph/pass clients continue to use RHIEncoder.
+    VkCommandBuffer GetCommandBuffer() const { return m_commandBuffer; }
     /// ★ 캐시를 받는다(A-1b). DX12 인코더는 `DX12DeviceResources` 를 받아
     ///   거기 있는 표로 푸는데, Vulkan 은 캐시가 파이프라인 표를 들므로 캐시를
     ///   받는다. **핸들의 계약은 같고 표의 자리만 다르다** — 상위는 어느 쪽도

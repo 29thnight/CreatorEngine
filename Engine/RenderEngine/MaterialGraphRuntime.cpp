@@ -1,4 +1,6 @@
 #include "MaterialGraphRuntime.h"
+#include "MaterialGraphShaderMeta.h"
+#include "MaterialPropertyPacker.h"
 #include "Assets/AssetIdentityProfile.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "AuthoringReadNode.h"
@@ -10,6 +12,7 @@
 #include <limits>
 #include <set>
 #include <stdexcept>
+#include <type_traits>
 
 namespace material_graph
 {
@@ -124,6 +127,7 @@ std::shared_ptr<const Generation> GenerationStore::Load(const experiment::AssetI
         return {};
     std::vector<std::uint8_t> payload;
     if (!WriteCookedProgram(loaded.product, {}, payload, error) ||
+        (loaded.product.materialShader && loaded.product.materialShader->meta.guid.m_guid != id.value) ||
         loaded.boundSource != BuildBoundSource(loaded.product.program) ||
         loaded.metadata != LX::WriteMaterialProgramMetadata(loaded.product.program))
     {
@@ -202,7 +206,47 @@ bool BuildInstance(std::shared_ptr<const Generation> generation, const InstanceD
     std::ranges::sort(candidate->description.textures, {}, &TextureOverride::parameter);
     const auto& product = candidate->generation->cooked.product;
     std::vector<LX::LXMaterialDiagnostic> diagnostics;
-    if (!PrepareUniforms(product.layout, description.parameters, candidate->uniforms, diagnostics))
+    if (product.materialShader)
+    {
+        const auto& shader = *product.materialShader;
+        const auto& meta = shader.meta;
+        for (const auto& edit : description.parameters)
+        {
+            const auto property = std::ranges::find(meta.properties, edit.id, &ShaderPropertyDesc::parameterId);
+            if (property == meta.properties.end() || !property->exposed || property->type == ShaderPropertyType::Texture2D)
+                return Fail(error, "Unknown or private generated material numeric override.");
+        }
+        for (const auto& property : meta.properties)
+        {
+            MaterialPropertyValue value;
+            if (!MaterialPropertyPacker::ApplyDefault(property, value, error)) return false;
+            const auto edit = std::ranges::find(description.parameters, property.parameterId, &ParameterOverride::id);
+            if (edit != description.parameters.end())
+            {
+                const auto parameter = std::ranges::find(product.program.parameters, edit->id, &LX::LXMaterialParameter::id);
+                if (parameter == product.program.parameters.end() || !LX::IsSocketValueValid(parameter->type, edit->value))
+                    return Fail(error, "Generated material override type differs from its Blackboard type.");
+                std::visit([&](const auto& input) {
+                    using T = std::decay_t<decltype(input)>;
+                    if constexpr (std::is_same_v<T, bool>) value.m_boolValue = input;
+                    else if constexpr (std::is_same_v<T, std::int64_t>) value.m_integerValue = static_cast<std::int32_t>(input);
+                    else if constexpr (std::is_same_v<T, double>) value.m_numericValue = {static_cast<float>(input)};
+                    else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
+                    {
+                        value.m_numericValue.clear();
+                        for (const auto number : input) value.m_numericValue.push_back(static_cast<float>(number));
+                    }
+                }, edit->value);
+            }
+            if (property.type == ShaderPropertyType::Texture2D)
+            {
+                const auto texture = std::ranges::find(description.textures, property.parameterId, &TextureOverride::parameter);
+                if (texture != description.textures.end()) value.m_textureGuid = FileGuid{texture->assetId.value};
+            }
+            candidate->properties.push_back(std::move(value));
+        }
+    }
+    else if (!PrepareUniforms(product.layout, description.parameters, candidate->uniforms, diagnostics))
         return Fail(error, diagnostics.empty() ? "Invalid material instance uniforms." : diagnostics.front().message);
     for (const auto& texture : description.textures)
     {
@@ -233,6 +277,15 @@ bool BuildInstance(std::shared_ptr<const Generation> generation, const InstanceD
             return false;
         }
         candidate->textures.push_back({resource.slot, id, resource.colorSpace, std::move(owner)});
+        if (product.materialShader)
+            candidate->textureOwners.push_back({"lx_texture_" + std::to_string(resource.slot), candidate->textures.back().owner});
+    }
+    if (product.materialShader)
+    {
+        std::shared_ptr<const LX::Runtime::Instance> common;
+        if (!LX::Runtime::BuildInstance(product.materialShader, candidate->properties, {}, candidate->textureOwners,
+                                         common, error)) return false;
+        static_cast<LX::Runtime::Instance&>(*candidate) = *common;
     }
     result = std::move(candidate);
     return true;

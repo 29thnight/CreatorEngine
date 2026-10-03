@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LXMaterialPipeline.h"
+
 #include "MaterialGraphSurfaceBatch.h"
 #include "Render/Graph/EnhancedRenderPass.h"
 
@@ -178,7 +180,9 @@ class MeshSurfaceBatch final : public SurfaceGeometrySource
     std::uint32_t count_{};
     std::uint64_t recordingId_{};
     std::uint64_t descriptorVersion_{};
-    RHIPipelineHandle pipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
+    // Immediate sampler ownership must not make this a prepared world transform.
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> samplePipeline_;
     RHIBufferSlice vertices_, bones_, lods_, uniform_;
     RHIBindingTable output_;
     std::weak_ptr<const MeshSurfaceBatch> self_;
@@ -195,9 +199,11 @@ class MeshSurfaceEvaluator
   public:
     // Consume a compiled host artifact. Runtime initialization does not compile.
     bool Initialize(IRenderDeviceServices& device, IRenderRootSignatureCache& roots, IRenderPipelineCache& pipelines,
-                    const RHIShaderBlob& shader, std::string& error);
+                    const RHIShaderBlob& shader, std::string& error,
+                    LX::Runtime::ComputeShaderDescription identity = {});
     bool InitializeSampler(IRenderDeviceServices& device, IRenderRootSignatureCache& roots,
-                           IRenderPipelineCache& pipelines, const RHIShaderBlob& shader, std::string& error);
+                           IRenderPipelineCache& pipelines, const RHIShaderBlob& shader, std::string& error,
+                           LX::Runtime::ComputeShaderDescription identity = {});
     // Immediate preparation before RenderGraph recording. Output is ShaderResource;
     // retain the batch through submission completion and release before shutdown.
     bool Record(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
@@ -216,8 +222,8 @@ class MeshSurfaceEvaluator
 
   private:
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle pipeline_;
-    RHIPipelineHandle samplerPipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> samplerPipeline_;
     std::shared_ptr<MeshSurfaceBufferPool> bufferPool_;
     std::shared_ptr<MeshSurfaceStaticCache> staticCache_;
     std::vector<std::shared_ptr<const MeshSurfaceBatch>> transformedCache_;

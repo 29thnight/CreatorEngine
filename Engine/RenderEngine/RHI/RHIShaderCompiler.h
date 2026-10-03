@@ -101,8 +101,8 @@ namespace RHIShaderCompiler
             options);
     }
 
-    // 컴파일 cache와 reflection 수명을 섞지 않는다. 같은 요청으로 linked program의
-    // target layout만 읽으며 output은 명시해 DXIL/SPIR-V를 직접 대조할 수 있다.
+    // Reuses a validated bytecode/layout pair when current dependencies match.
+    // Reflection-only misses still extract layout from the linked program.
     bool ReflectFile(std::string_view name, std::string_view entryPoint,
         std::string_view targetProfile, RHIShaderBinary output,
         const RHIShaderPermutation& permutation,
@@ -124,6 +124,17 @@ namespace RHIShaderCompiler
         return ReflectFile(name, entryPoint, targetProfile, output, empty,
             outReflection, outError, options);
     }
+
+    // Short-lived snapshot mutex only; never waits for the compiler or renderer.
+    struct Progress
+    {
+        bool active{};
+        bool recompiling{};
+        std::uint64_t revision{};
+        std::uint64_t completedRequests{};
+        std::string name, entryPoint, phase, lastError;
+    };
+    Progress GetProgress();
 
     Stats GetStats();
     void ResetStats();

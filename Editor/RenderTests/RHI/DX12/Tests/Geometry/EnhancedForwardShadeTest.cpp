@@ -476,6 +476,7 @@ bool DX12Test::RunForwardPlusShadeTest(std::string& outLog)
             binding.textureOwner = material.GetTextureMapShared(desc.name);
             packet->textureBindings.push_back(std::move(binding));
         }
+        if (!forward.CaptureShaderVariant(*packet)) error = "Forward fixture cannot capture its LX generation";
         return packet;
     };
     std::shared_ptr<EnhancedForwardMaterialDrawSnapshot> windPacket =

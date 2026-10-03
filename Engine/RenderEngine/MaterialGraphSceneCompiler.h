@@ -1,11 +1,10 @@
 #pragma once
 
 #include "MaterialGraphProduct.h"
+#include "ShaderMeta.h"
 
 namespace material_graph
 {
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:10";
-
 struct SceneShaderSet
 {
     BindingLayout layout;
@@ -19,7 +18,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
 // Result publication is atomic; the source file is a caller-owned cache artifact.
 bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& shaderDirectory,
                          const std::filesystem::path& sourceFile, const Budget& budget, VerifiedProduct& result,
-                         std::string& error);
+                         std::string& error, FileGuid graphGuid = {});
 
 // Cooked consumers validate the complete stage set and copy bytecode without
 // reading shader sources, reflecting or loading the Slang compiler.

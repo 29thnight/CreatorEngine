@@ -1,4 +1,5 @@
 #include "MaterialGraphProduct.h"
+#include "MaterialGraphShaderMeta.h"
 
 #include <algorithm>
 #include <bit>
@@ -641,7 +642,8 @@ bool MergeMaterialReflections(std::span<const RHIShaderReflection* const> stages
 bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& sourceFile,
                    std::span<const CompileTarget> targets, const RHIShaderPermutation& permutation,
                    RHIShaderCompileOptions options, const Capabilities& capabilities, const Budget& budget,
-                   VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                   VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics,
+                   std::vector<RHIShaderReflection>* materialReflections)
 {
     VerifiedProduct candidate;
     candidate.program = program;
@@ -712,6 +714,7 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
         candidate.program.semanticKey +=
             "|rhi:" + std::to_string(shader.dependencyIdentity.size()) + ":" + shader.dependencyIdentity;
     }
+    std::vector<RHIShaderReflection> mergedReflections;
     for (const auto& [backend, consumingStages] : reflections)
     {
         std::vector<const RHIShaderReflection*> views;
@@ -731,11 +734,99 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
             return Fail(diagnostics, "product.backendLayout", "Material binding layout differs between backends.");
         }
         candidate.layout = std::move(reflected);
+        mergedReflections.push_back(std::move(merged));
         hasLayout = true;
     }
     if (!hasLayout)
         return Fail(diagnostics, "product.uniform", "Verified material has no consuming shader stage.");
     result = std::move(candidate);
+    if (materialReflections) *materialReflections = std::move(mergedReflections);
+    return true;
+}
+
+bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary backend,
+    std::string_view vertex, std::string_view pixel, LX::Runtime::GraphicsShaderDescription& result,
+    std::string& error)
+{
+    if (backend != RHIShaderBinary::Dxil && backend != RHIShaderBinary::SpirV)
+    { error = "LX graphics identity requires a supported backend."; return false; }
+    const auto select = [&](std::string_view entry, std::string_view stage) -> const CompileTarget* {
+        const CompileTarget* found = nullptr;
+        for (const auto& target : product.targets)
+            if (target.binary == backend && target.profile.starts_with(stage) &&
+                (entry.empty() || target.entry == entry))
+            {
+                if (found) return nullptr;
+                found = &target;
+            }
+        return found;
+    };
+    const auto* vs = select(vertex, "vs_");
+    const auto* ps = select(pixel, "ps_");
+    if (!vs || !ps || product.program.semanticKey.empty())
+    { error = "LX graphics stages or sealed program identity are missing or ambiguous."; return false; }
+    const auto binary = backend == RHIShaderBinary::Dxil ? "dxil" : "spirv";
+    for (const auto* target : {vs, ps})
+        if (!std::ranges::any_of(product.shaders, [&](const auto& artifact) {
+            return artifact.backend == binary && artifact.entryPoint == target->entry && !artifact.bytecode.empty();
+        }))
+        { error = "LX graphics stage has no owned cooked bytecode."; return false; }
+    LX::Runtime::GraphicsShaderDescription candidate;
+    candidate.shader = product.materialShader;
+    auto& id = candidate.compile;
+    id.backend = backend;
+    id.vertexEntry = vs->entry; id.vertexProfile = vs->profile;
+    id.pixelEntry = ps->entry; id.pixelProfile = ps->profile;
+    id.sealedProgramIdentity = product.program.semanticKey;
+    if (candidate.shader) id.source = candidate.shader->meta.source.generic_string();
+    // Physical include roots need not exist in the Player; their fingerprints
+    // and the actual compile flags remain in the verified sealed identity.
+    if (product.program.semanticKey.ends_with(SceneHostIdentity))
+    {
+        id.options.strictMath = id.options.fineDerivatives = true;
+        if (!id.permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error) ||
+            ((product.program.features & 0x3800u) != 0 && !id.permutation.Set("LX_MATERIAL_ROUTE", "2", error)))
+            return false;
+    }
+    result = std::move(candidate);
+    error.clear();
+    return true;
+}
+
+bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backend,
+    std::string_view entry, LX::Runtime::ComputeShaderDescription& result, std::string& error)
+{
+    if (backend != RHIShaderBinary::Dxil && backend != RHIShaderBinary::SpirV)
+    { error = "LX compute identity requires a supported backend."; return false; }
+    const CompileTarget* stage = nullptr;
+    for (const auto& target : product.targets)
+        if (target.binary == backend && target.profile.starts_with("cs_") &&
+            (entry.empty() || target.entry == entry))
+        {
+            if (stage) { error = "LX compute stage is ambiguous."; return false; }
+            stage = &target;
+        }
+    const auto binary = backend == RHIShaderBinary::Dxil ? "dxil" : "spirv";
+    if (!stage || product.program.semanticKey.empty() ||
+        !std::ranges::any_of(product.shaders, [&](const auto& artifact) {
+            return artifact.backend == binary && artifact.entryPoint == stage->entry && !artifact.bytecode.empty();
+        }))
+    { error = "LX compute stage or sealed bytecode identity is missing."; return false; }
+    LX::Runtime::ComputeShaderDescription candidate;
+    candidate.shader = product.materialShader;
+    auto& id = candidate.compile;
+    id.backend = backend; id.entry = stage->entry; id.profile = stage->profile;
+    id.sealedProgramIdentity = product.program.semanticKey;
+    if (candidate.shader) id.source = candidate.shader->meta.source.generic_string();
+    if (product.program.semanticKey.ends_with(SceneHostIdentity))
+    {
+        id.options.strictMath = id.options.fineDerivatives = true;
+        if (!id.permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error) ||
+            ((product.program.features & 0x3800u) != 0 && !id.permutation.Set("LX_MATERIAL_ROUTE", "2", error)))
+            return false;
+    }
+    result = std::move(candidate);
+    error.clear();
     return true;
 }
 
@@ -768,9 +859,20 @@ bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOver
                       std::span<const TextureBinding> textures, ResourcePacket& result,
                       std::vector<LX::LXMaterialDiagnostic>& diagnostics)
 {
-    ResourcePacket candidate;
-    if (!PrepareUniforms(layout, parameters, candidate.uniforms, diagnostics))
+    std::vector<std::uint8_t> uniforms;
+    if (!PrepareUniforms(layout, parameters, uniforms, diagnostics))
         return false;
+    return PrepareResourcesWithUniforms(layout, uniforms, textures, result, diagnostics);
+}
+
+bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,
+                      std::span<const TextureBinding> textures, ResourcePacket& result,
+                      std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+{
+    if (uniforms.size() != layout.uniformBytes || uniforms.size() > 65536)
+        return Fail(diagnostics, "product.uniform", "Prepared common material uniform block has an invalid size.");
+    ResourcePacket candidate;
+    candidate.uniforms.assign(uniforms.begin(), uniforms.end());
     if (textures.size() != layout.textures.size())
         return Fail(diagnostics, "product.texture", "Texture owner count differs from material resource table.");
     std::set<std::uint32_t> textureSlots;
@@ -897,6 +999,24 @@ bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, st
         Text(bytes, target.profile);
         Block(bytes, shader->bytecode);
     }
+    Word(bytes, product.materialShader ? 1u : 0u);
+    if (product.materialShader)
+    {
+        const auto& shader = *product.materialShader;
+        GeneratedMaterialShader restored;
+        if (shader.cookedContract.empty() || shader.cookedContract.size() > 1024u * 1024u ||
+            !RestoreMaterialShaderMeta(product, shader.meta.guid, shader.document, shader.source, restored, error,
+                shader.cookedContract) ||
+            restored.layout != shader.layout)
+        {
+            if (error.empty()) error = "Generated material binding differs from the verified product layout.";
+            return false;
+        }
+        Text(bytes, shader.meta.guid.ToString());
+        Text(bytes, shader.document);
+        Text(bytes, shader.source);
+        Block(bytes, {reinterpret_cast<const std::uint8_t*>(shader.cookedContract.data()), shader.cookedContract.size()});
+    }
     Wide(bytes, Checksum(bytes));
     result = std::move(bytes);
     error.clear();
@@ -997,10 +1117,24 @@ bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget
         product.targets.push_back(std::move(target));
         product.shaders.push_back(std::move(shader));
     }
+    std::uint32_t generated{};
+    std::string graphGuid, document, source;
+    std::span<const std::uint8_t> contract;
+    if (!reader.Word(generated) || generated > 1 ||
+        (generated && (!reader.Text(graphGuid, 36) || !reader.Text(document, 1024u * 1024u) || !reader.Text(source) ||
+            !reader.Block(contract, 1024u * 1024u))))
+        return invalid();
     if (!reader.Empty() || !ValidateProduct(product, budget, error) ||
         candidate.boundSource != BuildBoundSource(program) ||
         candidate.metadata != LX::WriteMaterialProgramMetadata(program))
         return invalid();
+    if (generated)
+    {
+        GeneratedMaterialShader shader;
+        if (contract.empty() || !RestoreMaterialShaderMeta(product, FileGuid{graphGuid}, document, source, shader, error,
+                {reinterpret_cast<const std::byte*>(contract.data()), contract.size()})) return false;
+        product.materialShader = std::make_shared<GeneratedMaterialShader>(std::move(shader));
+    }
     result = std::move(candidate);
     error.clear();
     return true;
@@ -1061,7 +1195,9 @@ bool PipelineSlot::Publish(IRenderPipelineCache& cache, const VerifiedProduct& p
     candidate->generation = active_ ? active_->generation + 1 : 1;
     if (active_)
         retired_.reserve(retired_.size() + 1);
-    if (!candidate->pipeline.Create(cache, description, error))
+    LX::Runtime::GraphicsShaderDescription shader;
+    if (!DescribeGraphicsShader(product, backend, {}, {}, shader, error) ||
+        !candidate->pipeline.Create(cache, description, std::move(shader), error))
         return Fail(diagnostics, "product.pipeline", error.empty() ? "Material pipeline creation failed." : error);
     const auto previous = active_;
     active_ = std::move(candidate);

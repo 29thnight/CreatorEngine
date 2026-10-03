@@ -169,6 +169,9 @@
     <ClCompile Include="MaterialGraphRuntime.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="LXMaterialRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="MaterialGraphRenderBindings.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
@@ -194,6 +197,9 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="MaterialGraphSceneCompiler.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="MaterialGraphShaderMeta.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="MaterialGraphSceneLookup.cpp">
@@ -586,6 +592,9 @@
     <ClInclude Include="RHI\DX12\DX12PSOManager.h" />
     <ClInclude Include="Render\Scene\EnhancedSceneRenderer.h" />
     <ClInclude Include="Render\Scene\EnhancedPbrCapture.h" />
+    <ClInclude Include="Render\Scene\EnhancedCameraReplayInput.h" />
+    <ClInclude Include="Render\Scene\EnhancedDrawReplayInput.h" />
+    <ClInclude Include="Render\Scene\EnhancedLatticeReplayInput.h" />
     <ClInclude Include="Render\Scene\ExperimentMaterialSealing.h" />
     <ClInclude Include="Render\Scene\MaterialTextureTable.h" />
     <ClInclude Include="Render\Scene\EnhancedSceneRendererLiveDX12Adapter.h" />
@@ -610,6 +619,9 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="MaterialGraphProduct.h" />
     <ClInclude Include="MaterialGraphRuntime.h" />
+    <ClInclude Include="LXMaterialRuntime.h" />
+    <ClInclude Include="LXMaterialPipeline.h" />
+    <ClInclude Include="Render\Graph\EnhancedForwardLighting.h" />
     <ClInclude Include="MaterialGraphRenderBindings.h" />
     <ClInclude Include="MaterialGraphIblBake.h" />
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
@@ -619,6 +631,7 @@
     <ClInclude Include="MaterialGraphSceneInput.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
     <ClInclude Include="MaterialGraphSceneCompiler.h" />
+    <ClInclude Include="MaterialGraphShaderMeta.h" />
     <ClInclude Include="MaterialGraphSceneLookup.h" />
     <ClInclude Include="MaterialGraphSceneSubsurface.h" />
     <ClInclude Include="MaterialGraphSceneVolume.h" />

@@ -16,7 +16,9 @@
 #include "../../Graph/PackedBoneMatrix.h"
 #include "../../Graph/EnhancedDrawSealLedger.h"
 #include "../../Scene/MaterialTextureTable.h"
-#include "../../../RHI/RHIGraphicsPipelineRequest.h"
+#include "../../../LXMaterialPipeline.h"
+#include "../../Graph/EnhancedForwardLighting.h"
+namespace material_graph { class SceneHost; }
 
 struct ShaderMeta;
 struct ShaderMetaBindingLayout;
@@ -95,7 +97,7 @@ class EnhancedForwardPass : public EnhancedRenderPass
 public:
     /// 타일 한 변(픽셀). 16은 컴퓨트 스레드 그룹과 일치시키기 좋고,
     /// 상용 엔진들의 통상값이다. 실측으로 바꿀 근거가 생기면 바꾼다.
-    static constexpr uint32_t kTileSize = 16;
+    static constexpr uint32_t kTileSize = EnhancedForwardLighting::TileSize;
 
     /// 타일당 최대 광원 수. 넘치면 앞에서부터 자르고, 자르기 전의 수를
     /// 타일 카운트 버퍼 뒤쪽 절반에 그대로 남긴다 — 조용히 자르면
@@ -105,7 +107,7 @@ public:
     ///   광원 1024개 배치에서 3446타일이 넘쳤고(최대 60), 그 지점의
     ///   Forward+ 시간은 '빨라진 것'이 아니라 '덜 그린 것'이었다.
     ///   256개까지는 최대 15로 여유가 있다.
-    static constexpr uint32_t kMaxLightsPerTile = 32;
+    static constexpr uint32_t kMaxLightsPerTile = EnhancedForwardLighting::MaxLightsPerTile;
 
     static constexpr RHIFormat kOutputFormat = RHIFormat::RGBA16Float;
 
@@ -131,6 +133,7 @@ public:
         RHIShaderPermutationKey& outPermutationKey,
         std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
         std::string& outError);
+    bool CaptureShaderVariant(EnhancedForwardMaterialDrawSnapshot& snapshot) const;
     /// 성공적으로 밀봉된 이번 frame packet의 generation만 남긴다. 일반/Reference
     /// 어느 쪽이든 다른 논리 key가 같은 cache handle을 공유하면 마지막 holder가
     /// 사라질 때만 targeted invalidation한다.
@@ -148,6 +151,7 @@ public:
     };
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
+    void SetGraphMaterials(material_graph::SceneHost* host) { m_graphMaterials = host; }
 
     /// 참조 경로(전 광원 루프)로 그린다. 대조와 성능 기준선 측정용이다.
     void SetUseReferencePath(bool use) { m_useReferencePath = use; }
@@ -246,7 +250,7 @@ private:
         const ShaderRenderState* renderState,
         const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
         RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
-        RHIShaderBlob& outPs, std::string& outError);
+        RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr);
     // modelVertexMask가 0이 아니면 동일 mask에서 입력 레이아웃과 shader 축을
     // 유도한다. color/skin 조합을 bool로 축약하지 않는다.
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
@@ -257,7 +261,7 @@ private:
         RHIShaderBlob& outVs, RHIShaderBlob& outPs,
         RHIShaderPermutationKey& outPermutationKey,
         std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
-        std::string& outError);
+        std::string& outError, LX::Runtime::GraphicsShaderDescription* shader = nullptr, ShaderMetaHandle ownerHandle = {});
     bool EnsureTileBuffers(const EnhancedFrameContext& context, std::string& outError);
     void BuildAdjacentBatches(const EnhancedFrameContext& context);
 
@@ -271,8 +275,10 @@ private:
     /// 옮기면서 마지막 쓰임이 사라졌다.
     bool RecordShading(class RHIEncoder& encoder,
         const EnhancedFrameContext& context, uint32_t lightCount,
-        RHITextureHandle shadowResource);
+        RHITextureHandle shadowResource, const EnhancedForwardLighting& lighting,
+        std::size_t first, std::size_t end);
 
+    material_graph::SceneHost* m_graphMaterials{};
     Inputs   m_inputs{};
     RGHandle m_output;
     RGHandle m_tileList;     // 타일별 광원 인덱스 (고정 슬롯)
@@ -322,16 +328,16 @@ private:
     std::unordered_set<const EnhancedForwardMaterialDrawSnapshot*> m_rejectedSnapshots;
     bool     m_useReferencePath{ false };
 
-    RHIPipelineHandle m_cullPSO;
+    LX::Runtime::ComputePipeline m_cullPSO;
     // 일반/Reference는 같은 material permutation의 대조 쌍이다. desc가 빌린
     // bytecode/input semantic 수명을 request가 함께 소유하고, 두 후보가 모두
     // 성공한 뒤 한 경계에서 교체한다.
-    RHIGraphicsPipelineRequest m_shadePipelineRequest;
-    RHIGraphicsPipelineRequest m_referencePipelineRequest;
+    LX::Runtime::GraphicsPipeline m_shadePipelineRequest;
+    LX::Runtime::GraphicsPipeline m_referencePipelineRequest;
     struct ModelPipelinePair
     {
-        RHIGraphicsPipelineRequest shade;
-        RHIGraphicsPipelineRequest reference;
+        LX::Runtime::GraphicsPipeline shade;
+        LX::Runtime::GraphicsPipeline reference;
     };
     // MBC6: 전체 vertexAttributeMask가 map key다. skin/color bool로 축약하지 않는다.
     std::map<uint32_t, ModelPipelinePair> m_modelPipelineRequests;
@@ -363,8 +369,8 @@ private:
 
     struct ShaderVariant
     {
-        RHIGraphicsPipelineRequest shade;
-        RHIGraphicsPipelineRequest reference;
+        LX::Runtime::GraphicsPipeline shade;
+        LX::Runtime::GraphicsPipeline reference;
         // MBC6 model 레이아웃 짝. variant 생성 시점에는 어떤 메시가
         // 올지 모르므로 넷을 함께 만들고, 배치가 메시 마스크로 고른다.
         std::map<uint32_t, ModelPipelinePair> modelRequests;

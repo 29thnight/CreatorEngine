@@ -1,5 +1,6 @@
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "MaterialGraphSceneLookup.h"
+#include "MaterialGraphThinFilmSensitivity.h"
 
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHIShaderSource.h"
@@ -18,7 +19,7 @@ struct LookupConstants
 {
     std::uint32_t width, height, count, reuse;
     std::uint32_t environment, first, dispatchCount, precomputed;
-    std::uint32_t importance, source, reserved[2]{};
+    std::uint32_t importance, source, standalone, reserved{};
 };
 bool Fail(std::string& error, const char* message)
 {
@@ -141,12 +142,12 @@ bool SceneLookupCache::Initialize(const EnhancedFrameContext& context, std::stri
     if (device_)
         return device_ == context.resources || Fail(error, "Scene lookup cache belongs to another device.");
     const auto backend = RHIShaderCompiler::GetOutput();
-    RHIShaderCompiler::VerifiedShader bake, clear;
+    LX::Runtime::CompiledCompute bake, clear;
     RHIShaderCompileOptions options;
     options.strictMath = true;
     const auto file = RHIShaderSource::Resolve("MaterialGraphSceneLookup.slang").string();
-    if (!RHIShaderCompiler::VerifyFile(file, "LXSceneLookupBake", "cs_6_0", backend, {}, bake, error, options) ||
-        !RHIShaderCompiler::VerifyFile(file, "LXSceneLookupClear", "cs_6_0", backend, {}, clear, error, options))
+    if (!LX::Runtime::CompileCompute(file, "LXSceneLookupBake", {}, options, bake, error) ||
+        !LX::Runtime::CompileCompute(file, "LXSceneLookupClear", {}, options, clear, error))
         return false;
     const auto other = backend == RHIShaderBinary::Dxil ? RHIShaderBinary::SpirV : RHIShaderBinary::Dxil;
     RHIShaderCompiler::VerifiedShader verification;
@@ -155,7 +156,7 @@ bool SceneLookupCache::Initialize(const EnhancedFrameContext& context, std::stri
         return false;
     const RHIPipelineLayoutParam parameters[]{RHILayout::Cbv(0), RHILayout::SrvTable(24, 0),
                                               RHILayout::UavBufferTable(2, 0), RHILayout::Srv(24),
-                                              RHILayout::SrvTable(6, 25)};
+                                              RHILayout::SrvTable(6, 25), RHILayout::Cbv(1)};
     const RHIStaticSamplerDesc samplers[]{
         {RHISampler::Point(RHIAddressMode::Clamp), 0},
         {RHISampler::Linear(RHIAddressMode::Clamp), 1}};
@@ -164,17 +165,17 @@ bool SceneLookupCache::Initialize(const EnhancedFrameContext& context, std::stri
         return false;
     RHIComputePipelineDesc desc;
     desc.layout = layout;
-    desc.csBytecode = bake.bytecode.Data();
-    desc.csSize = bake.bytecode.Size();
-    const auto bakePipeline = context.psoManager->GetOrCreateCompute(desc, error);
-    desc.csBytecode = clear.bytecode.Data();
-    desc.csSize = clear.bytecode.Size();
-    const auto clearPipeline = context.psoManager->GetOrCreateCompute(desc, error);
-    if (!bakePipeline.IsValid() || !clearPipeline.IsValid())
+    desc.csBytecode = bake.stage.bytecode.Data();
+    desc.csSize = bake.stage.bytecode.Size();
+    LX::Runtime::ComputePipeline bakePipeline, clearPipeline;
+    if (!bakePipeline.Create(*context.psoManager, desc, std::move(bake.description), error)) return false;
+    desc.csBytecode = clear.stage.bytecode.Data();
+    desc.csSize = clear.stage.bytecode.Size();
+    if (!clearPipeline.Create(*context.psoManager, desc, std::move(clear.description), error))
         return false;
     device_ = context.resources;
-    bake_ = bakePipeline;
-    clear_ = clearPipeline;
+    bake_ = std::move(bakePipeline);
+    clear_ = std::move(clearPipeline);
     device_->RegisterUploadTransactionListener(this);
     return true;
 }
@@ -183,7 +184,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
                                RHITextureHandle irradiance, RHITextureHandle prefiltered,
                                std::uint64_t environmentGeneration, std::uint64_t memoryBudget,
                                std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
-                               std::array<RHITextureHandle,3> importance, RHITextureHandle source)
+                               std::array<RHITextureHandle,3> importance, RHITextureHandle source, bool standalone)
 {
     ce::profile_scope profile{ce::marker<"MaterialLookupPrepare">()};
     const auto count = std::uint64_t(context.width) * context.height;
@@ -193,7 +194,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
         return Fail(error, "Scene lookup needs an identified view/environment and sufficient GPU memory budget.");
     std::shared_ptr<const SceneLookupFrame> previous;
     for (const auto& cached : published_)
-        if (cached->viewId_ == viewId && cached->sceneEpoch_ == context.sceneEpoch && cached->width_ == context.width &&
+        if (!standalone && cached->viewId_ == viewId && cached->sceneEpoch_ == context.sceneEpoch && cached->width_ == context.width &&
             cached->height_ == context.height && cached->environment_ == environment &&
             cached->irradiance_ == irradiance && cached->prefiltered_ == prefiltered &&
             cached->environmentGeneration_ == environmentGeneration && cached->importance_ == importance && cached->source_ == source)
@@ -239,10 +240,18 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
     candidate->environmentGeneration_ = environmentGeneration;
     candidate->recording_ = device_->GetCurrentUploadRecordingId();
     candidate->descriptors_ = device_->GetDescriptorVersionToken();
-    candidate->bake_ = bake_;
-    candidate->clear_ = clear_;
+    candidate->bake_ = bake_.GetGeneration();
+    candidate->clear_ = clear_.GetGeneration();
+    // The upload arena owns this immutable 16 KiB table through submission
+    // completion, exactly like the dispatch constants. No independent pool
+    // or borrowed CPU storage survives recording.
+    candidate->filmSensitivityConstants_ = device_->UploadConstants(
+        kFilmSensitivityConstants.data(), sizeof(kFilmSensitivityConstants));
+    if (!candidate->filmSensitivityConstants_.IsValid())
+        return Fail(error, "Scene lookup sensitivity table upload failed.");
     candidate->previous_ = previous;
     candidate->reuse_ = previous != nullptr;
+    candidate->standalone_ = standalone;
     {
         std::lock_guard lock(submissionMutex_);
         if (!resourcePool_) resourcePool_ = std::make_shared<SceneLookupResourcePool>(*device_);
@@ -293,7 +302,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
             environment.IsValid(),
             first,
             static_cast<std::uint32_t>((std::min)(count - first, std::uint64_t{kDispatchPixels})),
-            irradiance.IsValid() && prefiltered.IsValid(), hasImportance, source.IsValid()};
+            irradiance.IsValid() && prefiltered.IsValid(), hasImportance, source.IsValid(), standalone};
         const auto upload = device_->UploadConstants(&constants, sizeof(constants));
         if (!upload.IsValid())
             return Fail(error, "Scene lookup dispatch constants allocation failed.");
@@ -417,8 +426,9 @@ void SceneLookupFrame::DeclareBake(EnhancedRenderGraph& graph, RGHandle owners) 
         if (!inputs.IsValid() || !iblMaps.IsValid())
             throw std::runtime_error("Scene lookup input binding failed.");
         auto& encoder = *execution.encoder;
-        encoder.SetPipeline(RHIBindPoint::Compute, owner->clear_);
+        encoder.SetPipeline(RHIBindPoint::Compute, owner->clear_->GetHandle());
         encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, owner->constants_.front());
+        encoder.SetConstantBuffer(RHIBindPoint::Compute, 5, owner->filmSensitivityConstants_);
         encoder.SetBindings(RHIBindPoint::Compute, 1, inputs);
         encoder.SetBindings(RHIBindPoint::Compute, 2, owner->outputs_);
         encoder.SetRootBuffer(RHIBindPoint::Compute, 3,
@@ -427,7 +437,8 @@ void SceneLookupFrame::DeclareBake(EnhancedRenderGraph& graph, RGHandle owners) 
         encoder.Dispatch(1, 1, 1);
         const RHIBufferHandle statistics[]{owner->statistics_};
         encoder.UavBarrierBuffers(statistics);
-        encoder.SetPipeline(RHIBindPoint::Compute, owner->bake_);
+        encoder.SetPipeline(RHIBindPoint::Compute, owner->bake_->GetHandle());
+        encoder.SetConstantBuffer(RHIBindPoint::Compute, 5, owner->filmSensitivityConstants_);
         encoder.SetBindings(RHIBindPoint::Compute, 1, inputs);
         encoder.SetBindings(RHIBindPoint::Compute, 2, owner->outputs_);
         encoder.SetRootBuffer(RHIBindPoint::Compute, 3,
@@ -496,6 +507,11 @@ bool SceneLookupCache::PublishSubmitted(const SceneLookupFrame& frame, std::uint
         return Fail(error, "Scene lookup refuses duplicate or older frame publication.");
     }
     frame.completion_ = completion;
+    if (frame.standalone_)
+    {
+        error.clear();
+        return true;
+    }
     // The callback retains the previous frame through submission completion.
     // The published frame has only a weak history link, preventing a chain.
     std::erase_if(published_, [&](const auto& item) { return item->viewId_ == frame.viewId_; });
@@ -520,7 +536,7 @@ void SceneLookupCache::ShutdownAfterIdle()
         resourcePool_.reset();
     }
     submitted_.clear();
-    bake_ = clear_ = {};
+    bake_ = {}; clear_ = {};
     device_ = nullptr;
 }
 

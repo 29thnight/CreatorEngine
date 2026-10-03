@@ -194,7 +194,8 @@ void LivePipelineDesc::ShutdownAll(uint32_t viewCount) const
 }
 
 void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
-    const EnhancedFrameContext& context, const LiveFrameBinding& binding) const
+    const EnhancedFrameContext& context, const LiveFrameBinding& binding,
+    const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
 {
     for (const LivePassNode& node : m_nodes)
     {
@@ -203,6 +204,7 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
         if (!node.IsActive()) continue;
         ce::profile_scope profile{node.declarationMarker};
         node.declare(blackboard, graph, context, binding);
+        if (afterDeclare) afterDeclare(node, blackboard);
     }
 }
 

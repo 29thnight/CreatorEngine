@@ -145,8 +145,10 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
         uploaded.push_back({texture.slot, entry, texture.owner});
     }
     std::vector<LX::LXMaterialDiagnostic> diagnostics;
-    if (!PrepareResources(layout.material, candidate->instance->description.parameters, uploaded, candidate->resources,
-                          diagnostics) ||
+    const bool prepared = candidate->instance->generation->cooked.product.materialShader
+        ? PrepareResourcesWithUniforms(layout.material, candidate->instance->uniforms, uploaded, candidate->resources, diagnostics)
+        : PrepareResources(layout.material, candidate->instance->description.parameters, uploaded, candidate->resources, diagnostics);
+    if (!prepared ||
         candidate->resources.uniforms != candidate->instance->uniforms)
         return Fail(error, diagnostics.empty() ? "Material instance differs from its reflected uniform layout."
                                                : diagnostics.front().message);

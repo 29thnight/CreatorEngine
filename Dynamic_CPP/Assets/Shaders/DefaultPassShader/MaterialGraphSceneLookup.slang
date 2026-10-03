@@ -1,11 +1,15 @@
 #define LX_MATERIAL_FEATURE_MASK 0x07FFu
+#ifdef __spirv__
+// Avoid expanding dynamically indexed sensitivity constants into the kernel.
+#define LX_FILM_SENSITIVITY_GPU_TABLE 1
+#endif
 #include "Includes/PrincipledIblLookup.slang"
 
 cbuffer SceneLookupConstants : register(b0)
 {
     uint lx_width, lx_height, lx_count, lx_reuse;
     uint lx_environment, lx_first, lx_dispatchCount, lx_precomputed;
-    uint lx_importance, lx_source, lx_reserved1, lx_reserved2;
+    uint lx_importance, lx_source, lx_standalone, lx_reserved2;
 };
 Texture2D<float4> lx_inputs_0 : register(t0);
 Texture2D<float4> lx_inputs_1 : register(t1);
@@ -139,7 +143,8 @@ void LXSceneLookupBake(uint3 id : SV_DispatchThreadID)
     const int2 pixel = int2(index % lx_width, index / lx_width);
     PrincipledIblBakeSample sample = (PrincipledIblBakeSample)0;
     sample.baseAverage.w = -1;
-    if ((lx_owners.Load(int3(pixel, 0)) & 0x80000000u) == 0u)
+    if (lx_standalone != 0u ? lx_inputs_0.Load(int3(pixel, 0)).w <= 0.0
+                            : (lx_owners.Load(int3(pixel, 0)) & 0x80000000u) == 0u)
     {
         // Only this validity component is consumed for an uncovered pixel.
         // Avoid writing 144 bytes per background pixel on a full viewport.

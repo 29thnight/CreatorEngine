@@ -705,7 +705,8 @@ bool MeshSurfaceBatch::ValidateReadback(std::span<const SurfacePoint> points, st
 }
 
 bool MeshSurfaceEvaluator::Initialize(IRenderDeviceServices& device, IRenderRootSignatureCache& roots,
-                                      IRenderPipelineCache& pipelines, const RHIShaderBlob& shader, std::string& error)
+                                      IRenderPipelineCache& pipelines, const RHIShaderBlob& shader, std::string& error,
+                                      LX::Runtime::ComputeShaderDescription identity)
 {
     if ((device_ && device_ != &device) || !shader.IsValid())
     {
@@ -724,13 +725,13 @@ bool MeshSurfaceEvaluator::Initialize(IRenderDeviceServices& device, IRenderRoot
     description.layout = layout;
     description.csBytecode = shader.Data();
     description.csSize = shader.Size();
-    const auto pipeline = pipelines.GetOrCreateCompute(description, error);
-    if (!pipeline.IsValid())
+    LX::Runtime::ComputePipeline pipeline;
+    if (!pipeline.Create(pipelines, description, std::move(identity), error))
     {
         return false;
     }
     device_ = &device;
-    pipeline_ = pipeline;
+    pipeline_ = pipeline.GetGeneration();
     if (!bufferPool_) bufferPool_ = std::make_shared<MeshSurfaceBufferPool>(device);
     error.clear();
     return true;
@@ -769,7 +770,7 @@ bool MeshSurfaceEvaluator::Prepare(IRenderDeviceServices& device, std::shared_pt
                                    std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error, bool cacheStatic)
 {
     ce::profile_scope profile{ce::marker<"MaterialMeshGpuPrepare">()};
-    if (device_ != &device || !pipeline_.IsValid() || !device.GetCurrentUploadRecordingId() || !input)
+    if (device_ != &device || !(pipeline_ && pipeline_->IsValid()) || !device.GetCurrentUploadRecordingId() || !input)
     {
         return Fail(error, "Mesh surface transform needs a sealed input on its initialized device in a recording.");
     }
@@ -904,7 +905,7 @@ bool MeshSurfaceEvaluator::Prepare(IRenderDeviceServices& device, std::shared_pt
 
 bool MeshSurfaceBatch::IsPreparedForGraph() const
 {
-    return pipeline_.IsValid() && (recordedStages_.load() & 4) == 0 && recordingId_ != 0 &&
+    return (pipeline_ && pipeline_->IsValid()) && (recordedStages_.load() & 4) == 0 && recordingId_ != 0 &&
            device_->GetCurrentUploadRecordingId() == recordingId_ &&
            device_->GetDescriptorVersionToken() == descriptorVersion_;
 }
@@ -924,7 +925,7 @@ bool MeshSurfaceBatch::RecordCommands(RHIEncoder& encoder, std::string& error) c
         recordedStages_.fetch_or(4);
         return Fail(error, "Mesh transform has stale uploads/descriptors or was already recorded.");
     }
-    encoder.SetPipeline(RHIBindPoint::Compute, pipeline_);
+    encoder.SetPipeline(RHIBindPoint::Compute, pipeline_->GetHandle());
     encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform_);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, vertices_);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 2, bones_);
@@ -1026,9 +1027,9 @@ bool MeshSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) c
 
 bool MeshSurfaceEvaluator::InitializeSampler(IRenderDeviceServices& device, IRenderRootSignatureCache& roots,
                                              IRenderPipelineCache& pipelines, const RHIShaderBlob& shader,
-                                             std::string& error)
+                                             std::string& error, LX::Runtime::ComputeShaderDescription identity)
 {
-    if (device_ != &device || !pipeline_.IsValid() || !shader.IsValid())
+    if (device_ != &device || !(pipeline_ && pipeline_->IsValid()) || !shader.IsValid())
     {
         return Fail(error, "Mesh surface sampler needs a compiled artifact on its initialized transform device.");
     }
@@ -1043,12 +1044,12 @@ bool MeshSurfaceEvaluator::InitializeSampler(IRenderDeviceServices& device, IRen
     description.layout = layout;
     description.csBytecode = shader.Data();
     description.csSize = shader.Size();
-    const auto pipeline = pipelines.GetOrCreateCompute(description, error);
-    if (!pipeline.IsValid())
+    LX::Runtime::ComputePipeline pipeline;
+    if (!pipeline.Create(pipelines, description, std::move(identity), error))
     {
         return false;
     }
-    samplerPipeline_ = pipeline;
+    samplerPipeline_ = pipeline.GetGeneration();
     error.clear();
     return true;
 }
@@ -1058,7 +1059,7 @@ bool MeshSurfaceEvaluator::RecordSamples(IRenderDeviceServices& device,
                                          std::span<const MeshSurfaceSample> samples,
                                          std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error)
 {
-    if (device_ != &device || !samplerPipeline_.IsValid() || !device.GetCurrentUploadRecordingId() || !vertices ||
+    if (device_ != &device || !(samplerPipeline_ && samplerPipeline_->IsValid()) || !device.GetCurrentUploadRecordingId() || !vertices ||
         vertices->Device() != &device || !vertices->Buffer().IsValid() || !vertices->IsReadyForEvaluation() ||
         vertices->IsSampled() || samples.empty() || samples.size() > IblBaker::MaxPoints ||
         (vertices->RecordingId() != device.GetCurrentUploadRecordingId() && !vertices->IsValidated()))
@@ -1080,6 +1081,7 @@ bool MeshSurfaceEvaluator::RecordSamples(IRenderDeviceServices& device,
     candidate->device_ = &device;
     candidate->input_ = vertices->Input();
     candidate->source_ = std::move(vertices);
+    candidate->samplePipeline_ = samplerPipeline_;
     candidate->samples_.assign(samples.begin(), samples.end());
     candidate->count_ = static_cast<std::uint32_t>(samples.size());
     candidate->recordingId_ = device.GetCurrentUploadRecordingId();
@@ -1112,7 +1114,7 @@ bool MeshSurfaceEvaluator::RecordSamples(IRenderDeviceServices& device,
     auto& encoder = device.GetImmediateEncoder();
     const RHIBufferTransition before{candidate->buffer_, RHIResourceState::Common, RHIResourceState::UnorderedAccess};
     encoder.ResourceBarriers({{}, {&before, 1}});
-    encoder.SetPipeline(RHIBindPoint::Compute, samplerPipeline_);
+    encoder.SetPipeline(RHIBindPoint::Compute, samplerPipeline_->GetHandle());
     encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, uniform);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, RHIBufferSlice::Whole(candidate->source_->Buffer()));
     encoder.SetRootBuffer(RHIBindPoint::Compute, 2, indices);

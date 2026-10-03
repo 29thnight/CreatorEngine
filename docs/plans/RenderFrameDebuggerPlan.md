@@ -829,7 +829,7 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 - 2-in-flight heavy/light 교대가 올바른 capture에 붙음
 - fence 미완료 capture가 Frozen으로 노출되지 않음
 - resize/rebuild/teardown 실패 사유가 진단에 남음
-- DX12/Vulkan metadata event tree 동일
+- DX12 metadata event tree의 원본 submission 대응과 반복 재현 확인. RHI 중립 계약은 유지하며 Vulkan 비교는 PHASE 4.9로 이관
 
 ### RF2 — 오브젝트·배치·자산 의미 연결 (P0, 3일)
 
@@ -885,7 +885,7 @@ artifact budget과 공수를 다시 산정한다. 각 슬라이스는 별도 커
 - GBuffer MRT, depth, shadow, HDR, final LDR 대표 target preview
 - preview replay 전후 live display/history checksum 동일
 - unsupported format은 명시적 unavailable
-- DX12/Vulkan 대표 pass pixel이 허용 오차 내 일치
+- DX12 대표 pass의 원본/격리 replay pixel이 허용 오차 내 일치
 - packet eviction/device reset/backend teardown 뒤 metadata 유지·ticket expire
 
 ### RF5 — Draw/Dispatch 단위 정확한 step replay (P1, 4~5일)
@@ -1041,10 +1041,10 @@ Profiler 선택 frame/view 링크·조건부 trigger ─ optional adapter, RF0~R
 - Release|x64 non-unity leg
 - Editor와 Player
 - DX12와 Vulkan metadata capture
-- DX12/Vulkan 대표 preview pixel
+- DX12 대표 preview pixel과 원본 리소스 일치
 - `Tools/dx12-validation/Invoke-Dx12Suite.ps1`
 - 신규 `Tools/render-capture-validation/Invoke-RenderFrameCaptureValidation.ps1`
-- `render.livecheck` 양 backend
+- DX12 `render.livecheck`; Vulkan 실행 비교는 PHASE 4.9
 - include/project boundary ratchet
 
 ### 10.6 overhead
@@ -1112,7 +1112,7 @@ Diagnostics panel 또는 Frame Debugger banner에 최소 다음을 표시한다.
 9. **incomplete를 complete처럼 보이지 않는다.** 누락은 데이터 모델과 UI에 남긴다.
 10. **현재 live debug snapshot을 capture store로 쓰지 않는다.** status와 forensic capture를 분리한다.
 11. **내장 도구만으로 핵심 디버깅 흐름을 완결한다.** 외부 도구 실행을 기능의 전제로 두지 않는다.
-12. **Player와 Vulkan을 마지막에 몰아 넣지 않는다.** RF1부터 공용 metadata path를 검증한다.
+12. **RF1부터 Player와 공용 metadata path를 검증한다.** DX12 제품 검증과 RHI 중립 계약을 유지한다. Vulkan 비교는 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처·리소스 확인·픽셀별 비교가 소유하며 RF 완료의 선행이 아니다. 내장 `.ceframe` 디버거 개발 범위는 유지한다.
 13. **새 process-global registry를 만들지 않는다.** provider와 resolver는 composition root가 소유한다.
 14. **런타임 세대 handle을 영속 자산 ID로 쓰지 않는다.** catalog GUID와 capture-local revision을 구분한다.
 15. **프로파일러는 캡처의 진입점이 아니다.** profiler 없이 UI/CLI에서 Arm→한 완료 제출→Frozen→`.ceframe`을 완결한다.
@@ -1134,7 +1134,7 @@ Diagnostics panel 또는 Frame Debugger banner에 최소 다음을 표시한다.
 - [ ] `.ceframe` metadata/artifact round-trip
 - [ ] UI가 닫혀도 Development Player CLI capture/save 가능
 - [ ] Shipping compile-out/disabled 정책 검증
-- [ ] DX12/Vulkan metadata와 대표 preview 검증
+- [ ] DX12 metadata와 대표 preview 검증; Vulkan 비교 입력은 PHASE 4.9로 인계
 - [ ] Debug unity + Release non-unity + Editor + Player build 통과
 - [ ] capture idle/metadata/replay overhead와 budget 실측 기록
 - [ ] 프로파일러를 시작하지 않은 Editor/Development Player에서 수동 단일 캡처·저장·재열람 성공

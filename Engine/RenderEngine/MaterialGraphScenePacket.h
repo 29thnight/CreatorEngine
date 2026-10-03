@@ -56,7 +56,7 @@ struct SceneMaterialPacket
     SceneSurfaceEvaluation evaluation;
     IblEnvironment environment;
     std::shared_ptr<const RenderBindings> bindings;
-    std::shared_ptr<const RHIGraphicsPipelineRequest> pipeline;
+    std::shared_ptr<const LX::Runtime::GraphicsPipeline> pipeline;
     std::shared_ptr<const IblBakeResult> ibl;
     std::uint32_t iblSlot{};
 };

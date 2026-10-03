@@ -24,7 +24,7 @@ namespace experiment::cooked
     // 둔다. 저작 스키마가 바뀌면 **이 숫자를 함께 올려야 하고**, 안 올리면
     // 구형 artifact 가 새 리더에 조용히 들어간다.
     inline constexpr std::uint32_t kMaterialArtifactVersion = 2u;
-    inline constexpr std::uint32_t kMaterialProgramArtifactVersion = 2u;
+    inline constexpr std::uint32_t kMaterialProgramArtifactVersion = 4u;
 
     // scene/prefab artifact 의 버전. 저작 스키마가 바뀌면 함께 올려야 한다.
     inline constexpr std::uint32_t kSceneArtifactVersion = 2u;

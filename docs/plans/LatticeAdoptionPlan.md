@@ -1,18 +1,33 @@
 # Lattice (LX) 머테리얼 우선 도입 계획
 
-**2026-09-30 현재 상태 · 머테리얼 제품 연결 진행 · LX 공수 미산정.** 명칭과
+**2026-10-02 재평가 · 머테리얼 제품 편집 마감 진행 · LX 공수 미산정.** 명칭과
 공통 계약·UI는 [LatticeNodeSystem.md](../design/LatticeNodeSystem.md)가 소유한다.
 PHASE 4.25의 재질 의미와 Slang 생성은
 [BlenderMaterialGraphPlan.md](BlenderMaterialGraphPlan.md)의 `MAT-0`~`MAT-9`가
 소유한다. LX와 MAT의 같은 산출물을 중복 완료 처리하지 않는다.
 
 현재 Material Node Editor와 MeshRenderer Inspector는 LX 문서·캔버스 및
-실시간 HTTP 명령에 연결되어 있다. MAT-0~8은 완료, MAT-9의 렌더 대조·성능
-수용은 진행 중이다. LX-3/3H는 제품의 전체 조작·Vulkan Editor UI·그룹/Blackboard
+실시간 HTTP 명령에 연결되어 있다. MAT-0~6·MAT-8과 기존 MAT-7 기반은 구현 이력으로 보존한다.
+Graph→ShaderMeta/Slang→공통 재질 소비는 MAT-7의 열린 목표이고 MAT-9의 렌더 대조·성능
+수용은 진행 중이다. LX-3/3H는 제품의 전체 조작·그룹/Blackboard
 전용 저작 패널까지 닫은 상태가 아니므로 진행 중으로 유지한다.
 [편집기 설계](../design/MaterialNodeEditor.md)와
 [2026-09-30 다른 세션의 성능 개선](../analysis/MAT9NodeEditorPerformance.md)을 따른다.
 아래 날짜별 기록의 미구현·잔여 표기는 해당 측정 시점의 상태다.
+
+## 현재 잔여와 재작성 제외
+
+| ID | 남은 목표 | 재사용하는 구현 기반 |
+|---|---|---|
+| LX-0 | 완료·이력 | Blender 노드/소켓 대응 기준선. 전체 제품 노드 지원 완료로 사용하지 않음 |
+| LX-1 | annotation schema/왕복과 wire Reroute 삽입 transaction·Undo/진단 | registry·typed pin·ID·문서 명령·Frame·그룹/중첩, MAT-2/6의 IR/생성·Reroute lowering·안정 진단 |
+| LX-2 | 완료·이력 | 독립 예제 빌드·실제 조작·저장/재실행 |
+| LX-3 | 그룹 내부/interface·Blackboard 제품 패널과 전체 지원 조작/DPI/재개방 마감 | MeshRenderer 진입·Editor 창·스타일·typed 위젯·저장/Apply |
+| LX-3H | host health·씬/문서 전환·종료·충돌 무변경 수명 게이트 | 인증 material.editor·ID/revision·조회/수정·Undo·Save/Apply |
+| LX-4~6 | LX 횡단 후속. 4.25 완료 조건에서 분리 | 현재 Animator/BT 창 유지; 기존 자산 변환 작업 없음 |
+
+“Material 컴파일 없음”, “Reroute 없음”, “HTTP는 이관 뒤 연결”, “Editor 연결 미착수”는 현재 상태로 사용하지 않는다. 해당 기반은 구현돼 있으며 [기존 노트 원문](archive/Phase425ImplementationHistory.md)에 보존했다. 전체 노드/enum 지원과 자유 주석·전용 편집 제스처는 지원 대응표에서 별도로 판정한다.
+공통 ShaderMeta 생성·Material binding/PSO·Forward+ 통합은 MAT-7이 소유하고 LX는 문서/UI/HTTP 저작 계약을 닫는다.
 
 현재는 **Material Graph만 선행**한다. 기존 `.bt`·AnimatorController 자산은
 재작성 예정이므로 LX용 변환기, 의미 보존 migration, 기존 자산 fixture를 만들지
@@ -23,6 +38,9 @@ PHASE 4.25의 재질 의미와 Slang 생성은
 LX-0의 Blender 5.1.1 노드/소켓 기준선과 Material 목표 schema·대표 graph·
 패키지 소비 경계는 [대응표](../design/LatticeMaterialBlenderParity.md)에
 고정했다. 이는 제품의 Blender 노드 지원 완료가 아니다.
+
+<details>
+<summary>독립 예제에서 제품 연결까지의 구현 이력 — 당시 잔여 표기 보존</summary>
 
 독립 예제의 빌드·자체 검사·조작 증거와 재현 명령은
 [Tools/LatticeExample/README.md](../../Tools/LatticeExample/README.md)에 기록한다.
@@ -126,6 +144,8 @@ Core/Layered의 read-only depth·coplanar winner 공유를 같은 graph에 확�
 입력을 native shared-depth graph에 공급한다. 실제 Scene GBuffer composition host는 아직 거부하며
 이 입력 경계 설치를 Scene 렌더 활성화나 LX Editor 창 이관 완료로 세지 않는다.
 
+</details>
+
 ## 머테리얼 우선 순서
 
 ### 2026-09-29 Editor Material 창 연결
@@ -151,16 +171,16 @@ Player는 기존 cooked bytecode 경계를 유지한다. 외부 창 스타일은
 `material.editor` HTTP는 UI와 동일한 열린 LXDocument를 조작하며 문서 ID/revision
 두 값을 요구한다. typed 연결/해제·값·property·Undo/Redo·저장/Apply를 제공한다.
 전용 gate는 실제 ImGui frame·정확한 파일 bytes 왕복·충돌 무변경·compile 실패 보존·
-GBuffer 변화·새 Editor 재개방을 검사한다. 제품의 모든 마우스 제스처와 Vulkan Editor UI,
+GBuffer 변화·새 Editor 재개방을 검사한다. 제품의 모든 마우스 제스처와
 group/Blackboard 전용 저작 패널까지 닫은 증거는 아니므로 LX-3/LX-3H는 진행 중이다.
-MAT-7 종료와 MAT-8/MAT-9의 남은 범위는 변경하지 않는다.
+이 기록의 기본 창/HTTP 연결을 재작성하지 않는다. 2026-10-02 현재 공통 재질 소비는 MAT-7 재개방, UI/HTTP 마감은 LX-3/3H, 품질/성능 수용은 MAT-9로 구분한다.
 
 | 순서 | 닫을 범위 | 선행 | 완료 증거 |
 |---|---|---|---|
 | `LX-0` | Blender Shader Editor 대비 Material 노드·소켓·링크·그룹·기본값·편집 동작 대응표를 만들고 `.shadergraph` 목표 schema와 Editor/패키지 소비 경계를 확정. 독립 ImGui 예제의 pinned package/backend·빌드 입력 기록 | 없음 | 지원·미지원·예정 노드/조작 목록, 목표 schema와 대표 그래프 명세, `vcpkg.json`/프로젝트 링크 목록과 예제 빌드 입력 |
-| `LX-1` | ImGui 비의존 `LXGraph`/definition/pin/link/layout/command, Material 타입 검증, 안정 ID와 새 Material schema migration 규칙 | LX-0 | 연결 가능·거부, 동적 소켓, cycle, 미등록 노드 보존, Undo/Redo, `.lxg` 예제 저장 왕복의 headless 검사 |
+| `LX-1` | 구현된 ImGui 비의존 모델/명령을 재사용하고 annotation schema·wire Reroute 삽입 편집 계약 마감 | LX-0, 기존 Core/MAT-2/6 | annotation/reroute 삽입의 저장 왕복·단일 Undo·안정 진단; 기존 타입/ID/그룹 회귀 유지 |
 | `LX-2` | 독립 `LatticeExample.exe`에서 자체 `LXCanvas`와 Blender형 노드·소켓 UI, 검색, 접힘, 선택, pan/zoom, 타입별 내부 항목 구현 | LX-1 | Engine/Editor와 `imgui-node-editor` 링크 0, Debug/Release 빌드, 실제 조작·저장→재시작→재개방·DPI·resize·keyboard·다량 노드 확인 |
-| `LX-3` | LX를 Editor host에 연결하고 `.shadergraph(domain=material)` 문서와 `LXMaterialCompiler`를 MAT 작업에 적용 | **LX-2 독립 게이트**, MAT-1 | Editor DX12/Vulkan 조작, Material graph·layout·default 저장 왕복, MAT-2/MAT-6의 typed IR·Slang·진단·마지막 정상 generation 확인 |
+| `LX-3` | LX를 Editor host에 연결하고 `.shadergraph(domain=material)` 문서와 `LXMaterialCompiler`를 MAT 작업에 적용 | **LX-2 독립 게이트**, MAT-1 | Editor DX12 조작 (Vulkan 비교는 PHASE 4.9로 이관), Material graph·layout·default 저장 왕복, MAT-2/MAT-6의 typed IR·Slang·진단·마지막 정상 generation 확인 |
 | `LX-3H` | 실행 중인 Editor의 **열린 Material LXDocument**를 인증된 HTTP CommandService로 조회·수정 | LX-3의 열린 문서 수명 | `/health` 프레임 진행·idle, `/commands`, `POST /command`로 핀 연결·해제→같은 창 반영→Undo/Redo→저장·재개방, revision 충돌과 무변경 오류 |
 
 `LX-0`은 기존 BT·Animator 콘텐츠의 기준선 작업이 아니다. Material의 Blender

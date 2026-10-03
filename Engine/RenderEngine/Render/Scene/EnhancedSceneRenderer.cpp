@@ -32,6 +32,7 @@
 #include "../../RHI/RHIShaderCompiler.h"
 #include "../../RHI/RHIShaderSource.h"
 #include "../../RHI/Vulkan/VulkanLoader.h"
+#include "../../RHI/Vulkan/VulkanCaptureGpuProfiler.h"
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
@@ -898,6 +899,17 @@ namespace
                 }
             } frameGuard{ resources, committed, capture, outError };
 
+            // Keep the diagnostic reset guard alive through recording/submission,
+            // just as DX12 does. Resetting at prepare-scope exit changes the SSGI
+            // sample index/history ring after PrepareFrame has advanced them.
+            struct CaptureHistoryGuard
+            {
+                View& view;
+                bool active;
+                void Reset() { view.ssgi.ResetHistory(); view.fog.ResetHistory(); }
+                ~CaptureHistoryGuard() { if (active) Reset(); }
+            } historyGuard{ views[viewIndex], capture && capture->controlled };
+            if (historyGuard.active) historyGuard.Reset();
             const uint32_t frameIndex = static_cast<uint32_t>(frameCounter++);
             {
                 RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
@@ -929,6 +941,8 @@ namespace
                         shadow.GetShadowData(), {}, outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap())) return false;
                 if (capture) capture->RecordLatticeInput(graphInput);
             }
+            double compileMs = 0.0;
+            LiveStopwatch compileWatch;
             {
                 RenderThreadPhaseScope build(RenderPhase::graph_build);
                 blackboard.Reset();
@@ -941,7 +955,14 @@ namespace
                     ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
                 if (HasViewFlag(viewPacket.viewFlags, EnhancedLiveViewFlags::HideSkyBox))
                     binding.viewFlags |= LiveViewFlags::kHideSkyBox;
-                desc.DeclareAll(blackboard, graph, frameContext, binding);
+                bool stageCaptureOk = true;
+                desc.DeclareAll(blackboard, graph, frameContext, binding,
+                    [&](const LivePassNode& node, const LiveBlackboard& board) {
+                        if (capture && stageCaptureOk)
+                            stageCaptureOk = capture->DeclareStage(resources, graph, board, node,
+                                width, height, outError);
+                    });
+                if (!stageCaptureOk) return false;
                 if (capture && !capture->Declare(resources, graph, blackboard,
                         width, height, outError)) return false;
 
@@ -950,9 +971,25 @@ namespace
                     outError = "Vulkan 라이브 공통 scene graph의 표시 출력이 없다";
                     return false;
                 }
+                compileWatch.Start();
                 if (!graph.Compile(outError)) return false;
+                compileMs = compileWatch.ElapsedMs();
             }
 
+            VulkanCaptureGpuProfiler captureProfiler(resources);
+            // Graph slots persist across frames; never retain this stack-owned
+            // diagnostic profiler when the slot returns to ordinary rendering.
+            struct CaptureProfilerReset
+            {
+                EnhancedRenderGraph& graph;
+                ~CaptureProfilerReset() { graph.SetProfiler(nullptr); }
+            } profilerReset{graph};
+            graph.SetProfiler(nullptr);
+            if (capture)
+            {
+                if (!captureProfiler.Initialize(outError)) return false;
+                graph.SetProfiler(&captureProfiler);
+            }
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
             batchDesc.backendGeneration = backendGeneration;
@@ -968,6 +1005,8 @@ namespace
                     return false;
             }
             lastNativeRecordMs = recordWatch.ElapsedMs();
+            if (capture && !capture->RecordCompiledGraph(graph, lastNativeRecordMs, compileMs))
+            { outError = "capture graph is not compiled"; return false; }
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
@@ -1003,6 +1042,22 @@ namespace
                     gbuffer.GetSamplerIdentity(), forward.GetSealLedger(),
                     forward.GetSamplerIdentity(), stashedEncoderDrops,
                     stashedLastEncoderDrop, textureCache.GetUploadFailureCount());
+                capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
+                    EnhancedIBLGenerator::kSceneReflectionSampleCount,
+                    resources.DescribeTexture(ibl.GetImportanceMaps()[2]));
+                capture->manifest.rootref()["measurement"]["validationLayerEnabled"] << resources.IsValidationEnabled();
+                const auto memory = resources.QueryVideoMemory();
+                capture->RecordMemory(memory.usedMB, memory.budgetMB, memory.budgetMB > 0);
+                std::vector<VulkanCaptureGpuProfiler::Timing> nativeTimings;
+                EnhancedLiveGpuSpan captureSpan;
+                std::string timingError;
+                captureProfiler.Collect(nativeTimings, captureSpan.queueSpanMs,
+                    captureSpan.busyMs, timingError);
+                captureSpan.sliceCount = captureProfiler.SliceCount();
+                std::vector<EnhancedLivePassTiming> captureTimings;
+                for (const auto& timing : nativeTimings)
+                    captureTimings.push_back({timing.name, timing.milliseconds, timing.milliseconds});
+                capture->RecordGpuTiming(captureTimings, captureSpan, captureSpan.busyMs, timingError);
                 if (!capture->Save(resources, graph.GetStats(), outError,
                         validationCount, validation)) return false;
             }
@@ -2547,6 +2602,7 @@ namespace
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
                     inputs.lighting = bb.Get(LiveSlots::kLitColor);
                     p.forward.SetInputs(inputs);
+                    p.forward.SetGraphMaterials(&p.graphMaterials);
                     p.forward.Declare(graph, ctx);
                     if (p.forward.GetOutput().IsValid())
                     {
@@ -3539,6 +3595,8 @@ namespace
                         return false;
                     }
                     snapshot->bindingLayout = *layout;
+                    if (!pass.CaptureShaderVariant(*snapshot))
+                    { error = "Forward LX graphics generation capture failed."; return false; }
                     snapshot->flow = sealSource.flow;
                     snapshot->flow.totalSeconds = frameTotalSeconds;
                     snapshot->flow.deltaSeconds = frameDeltaSeconds;
@@ -3550,7 +3608,7 @@ namespace
                     if (!ExperimentMaterialSealing::SealCore(sealSource,
                             *materialShader.value, *layout,
                             snapshot->propertyBytes, snapshot->textureBindings,
-                            error))
+                            error, &snapshot->runtimeInstance, materialShader.handle))
                     {
                         if (!sealSource.debugName.empty())
                             error += " (material " + sealSource.debugName + ")";
@@ -3785,10 +3843,12 @@ namespace
                     return false;
                 }
                 snapshot->bindingLayout = *layout;
+                if (!pass.CaptureShaderVariant(*snapshot))
+                { outError = "GBuffer LX graphics generation capture failed."; return false; }
                 snapshot->useNormalMap = sealSource.useNormalMap;
                 if (!ExperimentMaterialSealing::SealCore(sealSource,
                         *materialShader.value, *layout, snapshot->propertyBytes,
-                        snapshot->textureBindings, outError))
+                        snapshot->textureBindings, outError, &snapshot->runtimeInstance, materialShader.handle))
                 {
                     if (!sealSource.debugName.empty())
                         outError += " (material " + sealSource.debugName + ")";
@@ -4043,6 +4103,41 @@ namespace
             lastPoolDraws = static_cast<uint32_t>(drawPool.size());
             lastCulledDraws = culled;
 
+            if (pbrCapture && pbrCapture->controlled && pbrCapture->replayExtensions
+                && pbrCapture->result.state == EnhancedPbrCaptureState::Pending
+                && pbrCapture->target == viewPacket.displayTarget && frame.frameId > pbrCapture->afterFrameId)
+            {
+                std::string replayError;
+                EnhancedDrawReplayInput selected;
+                EnhancedLatticeReplayInput selectedMaterials;
+                // Stage both slices: a material rejection must not leave an
+                // otherwise valid world/pose replay partly applied to live draws.
+                auto stagedOpaque=draws, stagedForward=forwardDraws;
+                auto stagedGraph=graphDraws, stagedFallback=graphFallbackDraws;
+                bool passed = pbrCapture->drawReplay
+                    ? pbrCapture->drawReplay->Apply(stagedOpaque, stagedForward, stagedGraph, stagedFallback, replayError)
+                    : EnhancedDrawReplayInput::Seal(draws, forwardDraws, graphDraws, selected, replayError);
+                if (passed && pbrCapture->latticeReplayExtension) passed = pbrCapture->latticeReplay
+                    ? pbrCapture->latticeReplay->Apply(stagedGraph, replayError)
+                    : EnhancedLatticeReplayInput::Seal(graphDraws, selectedMaterials, replayError);
+                if (!passed)
+                {
+                    // Apply validates all identities first: the normal live view
+                    // remains intact even when only this diagnostic request fails.
+                    pbrCapture->Fail(replayError);
+                }
+                else
+                {
+                    draws.swap(stagedOpaque); forwardDraws.swap(stagedForward);
+                    graphDraws.swap(stagedGraph); graphFallbackDraws.swap(stagedFallback);
+                    pbrCapture->drawInputBytes = pbrCapture->drawReplay
+                        ? pbrCapture->drawReplay->Encode() : selected.Encode();
+                    if (pbrCapture->latticeReplayExtension)
+                        pbrCapture->latticeInputBytes = pbrCapture->latticeReplay
+                            ? pbrCapture->latticeReplay->Encode() : selectedMaterials.Encode();
+                }
+            }
+
             {
                 material_graph::SceneInputView inputView;
                 inputView.frameId = frame.frameId;
@@ -4132,6 +4227,17 @@ namespace
                 RHIShaderCompiler::ScopedOutput outputScope(output);
                 if (!p.graphMaterials.SelectReadyInput(p.frameContext, p.graphInput, p.graphInput, outError))
                     return false;
+            }
+            if (pbrCapture && pbrCapture->latticeReplay
+                && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
+            {
+                const auto requested = graphViewInput->Draws();
+                if (!p.graphInput || p.graphInput->Draws().size() != requested.size())
+                { outError = "Lattice replay program is not ready; diagnostic fallback is forbidden"; return false; }
+                for (const auto& draw : p.graphInput->Draws())
+                    if (draw.sourceIndex >= requested.size()
+                        || draw.material != requested[draw.sourceIndex].material)
+                    { outError = "Lattice replay selected a stale material instance"; return false; }
             }
             // The graph selection is a subsequence of the sealed source view.
             // Draw the missing opaque slots through the existing PBR pass until
@@ -4365,6 +4471,8 @@ namespace
             // litColor 폴백 체인(`X.GetOutput().IsValid() ? X : 이전값`)이 통째로
             // 사라진 것에 주목할 것. 그 일은 이제 블랙보드 슬롯이 한다 —
             // 수정 노드가 꺼지면 슬롯 값이 그대로 남는다.
+            double compileMs = 0.0;
+            LiveStopwatch compileWatch;
             {
                 RenderThreadPhaseScope build(RenderPhase::graph_build);
                 p.blackboard.Reset();
@@ -4378,7 +4486,14 @@ namespace
 
                 if (HasViewFlag(view.viewFlags, EnhancedLiveViewFlags::HideSkyBox))
                     binding.viewFlags |= LiveViewFlags::kHideSkyBox;
-                p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding);
+                bool stageCaptureOk = true;
+                p.desc.DeclareAll(p.blackboard, graph, p.frameContext, binding,
+                    [&](const LivePassNode& node, const LiveBlackboard& board) {
+                        if (capture && stageCaptureOk)
+                            stageCaptureOk = capture->DeclareStage(dx12.Resources(), graph, board, node,
+                                p.width, p.height, outError);
+                    });
+                if (!stageCaptureOk) return false;
                 if (capture && !capture->Declare(dx12.Resources(), graph, p.blackboard,
                         p.width, p.height, outError)) return false;
 
@@ -4388,7 +4503,9 @@ namespace
                     return false;
                 }
 
+                compileWatch.Start();
                 if (!graph.Compile(outError)) return false;
+                compileMs = compileWatch.ElapsedMs();
             }
 
             RHIRecordedBatchDesc batchDesc{};
@@ -4406,6 +4523,8 @@ namespace
                     batch, outError)) return false;
             }
             p.lastNativeRecordMs = recordWatch.ElapsedMs();
+            if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
+            { outError = "capture graph is not compiled"; return false; }
             p.lastGraphStats = graph.GetStats();
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
@@ -4459,6 +4578,21 @@ namespace
                     p.gbuffer.GetSamplerIdentity(), p.forward.GetSealLedger(),
                     p.forward.GetSamplerIdentity(), encoderDrops, lastEncoderDrop,
                     dx12.TextureCache().GetUploadFailureCount());
+                capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
+                    EnhancedIBLGenerator::kSceneReflectionSampleCount,
+                    dx12.Resources().DescribeTexture(p.ibl.GetImportanceMaps()[2]));
+                uint64_t usedMB = 0, budgetMB = 0;
+                const bool memoryAvailable = dx12.QueryVideoMemory(usedMB, budgetMB);
+                capture->RecordMemory(usedMB, budgetMB, memoryAvailable);
+                std::vector<EnhancedLivePassTiming> captureTimings;
+                std::vector<EnhancedLiveGpuSlice> captureSlices;
+                EnhancedLiveGpuSpan captureSpan;
+                double captureTotalMs = 0.0;
+                std::string timingError;
+                if (!dx12.CollectProfiler(profilerToken, captureTimings, captureSlices,
+                        captureSpan, captureTotalMs, timingError) && timingError.empty())
+                    timingError = "capture submission timestamps unavailable";
+                capture->RecordGpuTiming(captureTimings, captureSpan, captureTotalMs, timingError);
                 if (!capture->Save(dx12.Resources(), graph.GetStats(), outError,
                         validationCount, validation)) return false;
             }
@@ -5575,14 +5709,51 @@ EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
 }
 
 bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
-    EnhancedLiveDisplayTarget target, std::string& outError, bool controlled)
+    EnhancedLiveDisplayTarget target, std::string& outError, bool controlled,
+    const std::string& cameraReplayPath, const std::string& drawReplayPath, const std::string& latticeReplayPath,
+    bool replayExtensions, bool latticeReplayExtension)
 {
+    std::optional<EnhancedCameraReplayInput> replay;
+    if (!cameraReplayPath.empty())
+    {
+        EnhancedCameraReplayInput candidate;
+        if (!controlled || !EnhancedCameraReplayInput::Load(cameraReplayPath, candidate, outError))
+        {
+            if (!controlled) outError = "camera replay requires controlled capture";
+            return false;
+        }
+        if (candidate.target != static_cast<uint32_t>(target))
+        { outError = "camera replay display target mismatch"; return false; }
+        replay = candidate;
+    }
+    std::optional<EnhancedDrawReplayInput> drawReplay;
+    if (!drawReplayPath.empty())
+    {
+        EnhancedDrawReplayInput candidate;
+        if (!controlled || !replay || target == EnhancedLiveDisplayTarget::MaterialPreview
+            || !EnhancedDrawReplayInput::Load(drawReplayPath, candidate, outError))
+        {
+            if (!controlled || !replay || target == EnhancedLiveDisplayTarget::MaterialPreview)
+                outError = "draw replay requires controlled camera replay for an editor/game view";
+            return false;
+        }
+        drawReplay = std::move(candidate);
+    }
+    std::optional<EnhancedLatticeReplayInput> latticeReplay;
+    if (!latticeReplayPath.empty())
+    {
+        EnhancedLatticeReplayInput candidate;
+        if (!drawReplay || !EnhancedLatticeReplayInput::Load(latticeReplayPath, candidate, outError))
+        {
+            if (!drawReplay) outError = "Lattice replay requires controlled camera and draw replay";
+            return false;
+        }
+        latticeReplay = std::move(candidate);
+    }
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.renderStateMutex);
     if (target >= EnhancedLiveDisplayTarget::Count || !state.enabled)
     { outError = "capture requires an enabled live renderer and valid display target"; return false; }
-    if (controlled && state.backend != EnhancedLiveBackend::DX12)
-    { outError = "controlled capture currently supports DX12 only (PHASE 4)"; return false; }
     if (state.pbrCapture && (state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
         || state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording))
     { outError = "a PBR capture is already pending"; return false; }
@@ -5593,6 +5764,12 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     state.pbrCapture = std::make_unique<EnhancedPbrCapture>();
     state.pbrCapture->target = target;
     state.pbrCapture->controlled = controlled;
+    state.pbrCapture->replayExtensions = replayExtensions || latticeReplayExtension
+        || !drawReplayPath.empty() || !latticeReplayPath.empty();
+    state.pbrCapture->latticeReplayExtension = latticeReplayExtension || !latticeReplayPath.empty();
+    state.pbrCapture->cameraReplay = std::move(replay);
+    state.pbrCapture->drawReplay = std::move(drawReplay);
+    state.pbrCapture->latticeReplay = std::move(latticeReplay);
     state.pbrCapture->afterFrameId = state.publishedFrameId.load();
     state.pbrCapture->result.directory = directory;
     state.pbrCapture->result.state = EnhancedPbrCaptureState::Pending;
@@ -5641,6 +5818,35 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         controlledFrame = inputFrame;
         controlledFrame->totalSeconds = 0.f;
         controlledFrame->deltaSeconds = 0.f;
+        if (state.pbrCapture->cameraReplay)
+        {
+            const auto& replay = *state.pbrCapture->cameraReplay;
+            bool applied = false;
+            if (replay.width == inputFrame.width && replay.height == inputFrame.height)
+            {
+                for (uint32_t i = 0; i < (std::min)(controlledFrame->viewCount, kMaxLiveCameraViews); ++i)
+                {
+                    auto& view = controlledFrame->views[i];
+                    if (view.displayTarget != state.pbrCapture->target) continue;
+                    // This slice restores camera/clock only. Other live view input
+                    // must still agree; silently switching overlay/sky state would
+                    // claim an archive of data that this file does not own.
+                    if (static_cast<uint32_t>(view.viewFlags) != replay.viewFlags
+                        || inputFrame.skyBoxEnabled != replay.skyBoxEnabled) break;
+                    view.camera = replay.camera;
+                    controlledFrame->totalSeconds = replay.totalSeconds;
+                    controlledFrame->deltaSeconds = replay.deltaSeconds;
+                    applied = true;
+                    break;
+                }
+            }
+            if (!applied)
+            {
+                state.pbrCapture->Fail("camera replay dimensions, target or view state mismatch");
+                controlledFrame.reset();
+                state.controlledCaptureFrame = false;
+            }
+        }
     }
     const EnhancedLiveFramePacket& frame = controlledFrame ? *controlledFrame : inputFrame;
     const std::thread::id currentThread = std::this_thread::get_id();
@@ -5847,6 +6053,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             const EnhancedLiveViewPacket& viewPacket =
                 frame.views[(startIndex + step) % cameraCount];
             if (!viewPacket.key.IsValid()) continue;
+            if (state.controlledCaptureFrame && viewPacket.displayTarget != state.pbrCapture->target)
+                continue;
             if (totalPending >= 2)
             {
                 ++state.framesInFlight;
@@ -6748,6 +6956,27 @@ EnhancedSceneRenderer::GetLiveSealDiagnostics()
             state.dx12.TextureCache().GetUploadFailureCount());
     }
     return out;
+}
+
+EnhancedSceneRenderer::WarmupStatus EnhancedSceneRenderer::GetWarmupStatus()
+{
+    LiveState& state = GetLiveState();
+    std::unique_lock<std::mutex> render(state.renderStateMutex, std::defer_lock);
+    std::unique_lock<std::mutex> display(state.displayLifetimeMutex, std::defer_lock);
+    WarmupStatus status;
+    if (std::try_lock(render, display) != -1)
+    {
+        status.busy = true;
+        return status;
+    }
+    status.failed = !state.enabled && !state.lastError.empty();
+    if (status.failed) status.error = state.lastError;
+    const auto index = static_cast<std::uint32_t>(EnhancedLiveDisplayTarget::Editor);
+    const auto& entry = state.displaySnapshot.targets[index];
+    status.ready = state.enabled && entry.active && entry.ready &&
+        entry.completedFrameId != 0 && state.displayPresentationKeys[index] != 0;
+    status.completedFrame = entry.completedFrameId;
+    return status;
 }
 
 std::string EnhancedSceneRenderer::GetLiveStatus()

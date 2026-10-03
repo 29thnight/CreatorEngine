@@ -4,9 +4,11 @@
 #include "TypeTrait.h"
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <variant>
@@ -46,17 +48,49 @@ struct ShaderPropertyDesc
     std::string label;
     ShaderPropertyType type{ ShaderPropertyType::Float };
     ShaderPropertyDefault defaultValue;
+    // Graph-generated names match reflected symbols; the stable source ID and
+    // authored label retain the Blackboard identity independently of registers.
+    std::uint64_t parameterId{};
+    std::string semantic{ "value" }; // value|vector|color|normal|texture
+    std::string colorSpace{ "data" }; // data|linear|srgb
+    bool exposed{ true };
+    bool operator==(const ShaderPropertyDesc&) const = default;
+};
+
+struct ShaderMaterialSampler
+{
+    std::string name;
+    std::string description;
+    std::uint64_t parameterId{};
+    bool exposed{};
+    bool operator==(const ShaderMaterialSampler&) const = default;
+};
+
+struct ShaderGeneratedMaterial
+{
+    static constexpr std::uint32_t kAdapterVersion = 1;
+    FileGuid graphGuid{};
+    std::uint32_t adapterVersion{ kAdapterVersion };
+    std::string generation;
+    std::string sourceSha256;
+    std::uint32_t features{};
+    bool surface{};
+    bool volume{};
+    std::vector<ShaderMaterialSampler> samplers;
+    bool operator==(const ShaderGeneratedMaterial&) const = default;
 };
 
 struct ShaderKeywordAxis
 {
     std::string name;
     std::vector<std::string> values;
+    bool operator==(const ShaderKeywordAxis&) const = default;
 };
 
 struct ShaderStageEntry
 {
     std::string entry;
+    bool operator==(const ShaderStageEntry&) const = default;
 };
 
 enum class ShaderPassQueue : std::uint8_t
@@ -86,6 +120,7 @@ struct ShaderRenderState
     RHITopologyType topologyType{ RHITopologyType::Triangle };
 
     void ApplyTo(RHIGraphicsPipelineDesc& desc) const;
+    bool operator==(const ShaderRenderState&) const = default;
 };
 
 struct ShaderPassDesc
@@ -98,6 +133,7 @@ struct ShaderPassDesc
     ShaderPassQueue queue{ ShaderPassQueue::Opaque };
 
     bool IsCompute() const { return compute.has_value(); }
+    bool operator==(const ShaderPassDesc&) const = default;
 };
 
 struct ShaderMeta
@@ -115,6 +151,9 @@ struct ShaderMeta
     std::vector<ShaderPropertyDesc> properties;
     std::vector<ShaderKeywordAxis> keywords;
     std::vector<ShaderPassDesc> passes;
+    // Present only on derived Graph outputs. Graph/Blackboard owns authoring.
+    std::optional<ShaderGeneratedMaterial> generatedMaterial;
+    bool operator==(const ShaderMeta&) const = default;
 
     std::filesystem::path ResolveSource(
         const std::filesystem::path& metaPath) const;
@@ -144,4 +183,14 @@ namespace ShaderMetaLoader
     bool ParseDocument(const Authoring::ReadNode& root,
         const std::filesystem::path& originPath, const FileGuid& guid,
         ShaderMeta& outMeta, std::string& outError);
+
+    // A verified cooked generation supplies the exact source bytes. Reuses the
+    // authoring schema and source digest checks without reading source files.
+    // This boundary accepts generated metadata only; it does not compile Slang.
+    bool ParseGenerated(std::string_view text, std::string_view source,
+        const FileGuid& guid, ShaderMeta& outMeta, std::string& outError);
+
+    // Player accepts only the cooked CEDO tree, without entering a text parser.
+    bool ParseGeneratedCooked(std::span<const std::byte> bytes, std::string_view source,
+        const FileGuid& guid, ShaderMeta& outMeta, std::string& outError);
 }

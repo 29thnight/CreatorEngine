@@ -1,6 +1,7 @@
 #include "MaterialPropertyBlock.h"
 
 #include "../MaterialPropertyPacker.h"
+#include "MaterialResolver.h"
 
 #include <algorithm>
 
@@ -103,7 +104,21 @@ namespace experiment
             return false;
         }
 
-        std::vector<std::uint8_t> bytes(layout.constantBufferByteSize, 0);
+        std::shared_ptr<const LX::Runtime::Instance> instance;
+        if (!BuildMaterialRuntimeInstance(material, meta, layout, {}, {}, instance, outError)) return false;
+        outBytes = instance->uniforms;
+        outError.clear();
+        return true;
+    }
+
+    bool BuildMaterialRuntimeInstance(const Material& material, const ShaderMeta& meta,
+        const ShaderMetaBindingLayout& layout, ShaderMetaHandle handle,
+        std::span<const MaterialTextureOwner> textures,
+        std::shared_ptr<const LX::Runtime::Instance>& outInstance, std::string& outError)
+    {
+        std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
+        if (!LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError)) return false;
+        std::vector<::MaterialPropertyValue> values;
         for (const ShaderPropertyDesc& desc : meta.properties)
         {
             const ShaderMetaPropertyBinding* binding =
@@ -131,21 +146,11 @@ namespace experiment
                 return false;
             }
 
-            if (!MaterialPropertyPacker::ValidateLogicalValue(desc, value, outError)
-                || !MaterialPropertyPacker::PackProperty(desc, *binding, value,
-                    bytes, outError))
-            {
-                if (outError.empty())
-                {
-                    outError = "experiment material texture property binding"
-                        " 종류가 다르다: " + desc.name;
-                }
-                return false;
-            }
+            values.push_back(std::move(value));
         }
 
-        outBytes = std::move(bytes);
-        outError.clear();
-        return true;
+        std::vector<std::uint16_t> keywords;
+        if (!NormalizeMaterialKeywordSelections(material, meta.keywords, keywords, outError)) return false;
+        return LX::Runtime::BuildInstance(std::move(shader), values, keywords, textures, outInstance, outError);
     }
 }

@@ -9,6 +9,7 @@ $case = Join-Path $output ("ModelSoT-$Configuration-" + [Guid]::NewGuid().ToStri
 $project = Join-Path $case 'Project'
 New-Item -ItemType Directory $case | Out-Null
 Copy-Item (Join-Path $fixture 'Project') $project -Recurse
+& (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1') -Project $project
 $assets = Join-Path $project 'Assets'
 # The saved integration fixture can predate a mesh host shader fix.
 Copy-Item (Join-Path $repo 'Dynamic_CPP/Assets/Shaders/DefaultPassShader') (Join-Path $assets 'Shaders') -Recurse -Force

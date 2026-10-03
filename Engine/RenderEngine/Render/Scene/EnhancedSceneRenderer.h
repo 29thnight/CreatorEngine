@@ -662,7 +662,10 @@ namespace EnhancedSceneRenderer
     // Diagnostic only: capture one subsequent product frame on the render thread.
     // The output directory must not exist; incomplete data is never overwritten.
     bool RequestLivePbrCapture(const std::string& directory,
-        EnhancedLiveDisplayTarget target, std::string& outError, bool controlled = false);
+        EnhancedLiveDisplayTarget target, std::string& outError, bool controlled = false,
+        const std::string& cameraReplayPath = {}, const std::string& drawReplayPath = {},
+        const std::string& latticeReplayPath = {}, bool replayExtensions = false,
+        bool latticeReplayExtension = false);
     EnhancedLivePbrCaptureStatus GetLivePbrCaptureStatus();
     void CancelLivePbrCapture();
 
@@ -826,6 +829,17 @@ namespace EnhancedSceneRenderer
     /// 상태 한 줄 요약(render.backend status / dx12.live 호환 명령).
     std::string GetLiveStatus();
 
+    struct WarmupStatus
+    {
+        bool busy{};
+        bool ready{};
+        bool failed{};
+        std::uint64_t completedFrame{};
+        std::string error;
+    };
+    // Never blocks on renderer initialization or shader compilation.
+    WarmupStatus GetWarmupStatus();
+
     /// W8/W9 — 세대 밀봉 진단. 사람이 읽는 한 줄이 아니라 **판정에 쓰는 수**다.
     ///
     /// ★ GetLiveStatus의 문장을 게이트가 파싱하게 두면, 문장을 다듬는 순간
@@ -887,4 +901,3 @@ namespace EnhancedSceneRenderer
     void ShutdownLive();
 
 } // namespace EnhancedSceneRenderer
-

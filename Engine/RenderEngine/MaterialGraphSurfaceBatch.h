@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LXMaterialPipeline.h"
+
 #include "MaterialGraphIblBake.h"
 #include "MaterialGraphRenderBindings.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
@@ -103,7 +105,7 @@ class SurfaceBatch
     std::shared_ptr<const RenderBindings> bindings_;
     std::uint64_t recordingId_{};
     std::uint64_t descriptorVersion_{};
-    RHIPipelineHandle pipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
     RHIBufferSlice inputs_, uniform_;
     RHIBindingTable output_;
     std::weak_ptr<const SurfaceBatch> self_;
@@ -150,7 +152,7 @@ class SurfaceEvaluator
                        std::shared_ptr<const SurfaceGeometrySource> source, std::shared_ptr<const SurfaceBatch>& result,
                        std::string& error);
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle pipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
     PassLayout layout_;
     std::string semanticKey_;
     bool principledGgx_{};

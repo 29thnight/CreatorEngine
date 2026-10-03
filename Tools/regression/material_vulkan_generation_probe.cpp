@@ -231,7 +231,7 @@ void CheckScenePrograms(const std::filesystem::path& root, VulkanDeviceResources
             host.PollPrograms(context);
             Check(!host.ProgramStats().failedPreparations, "Scene prepare " + host.ProgramStats().lastError);
             Check(std::chrono::steady_clock::now() < deadline, "Scene program timeout");
-            if (pipelines.ready < (scenePrograms + 1) * 9)
+            if (pipelines.ready < (scenePrograms + 1) * 15)
                 Check(!host.IsProgramReady(generation, RHIShaderBinary::SpirV), "Partial PSO set cannot publish");
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
@@ -242,8 +242,8 @@ void CheckScenePrograms(const std::filesystem::path& root, VulkanDeviceResources
           "Both Scene generations verified on workers");
     scenePsoWorkers = cache.GetStats().asyncWorkerExecutions - baseline;
     sceneReadyRequests = pipelines.ready;
-    Check(scenePsoWorkers >= 9 && scenePsoWorkers <= 18 && sceneReadyRequests == 18,
-          "Both nine-PSO sets include the native shadow caster and share identical descriptors");
+    Check(scenePsoWorkers >= 15 && scenePsoWorkers <= 30 && sceneReadyRequests == 30,
+          "Both fifteen-PSO sets include shadow, opaque and alpha variants and share identical descriptors");
     host.ShutdownAfterIdle();
 }
 

@@ -34,15 +34,8 @@ enum class MaterialRenderingMode
 // MaterialPropertyValue(디스크 정본 논리 값)는 MaterialPropertyValue.h로 이전됐다 —
 // packing 정본(MaterialPropertyPacker)이 Material.h 없이 그 타입을 받기 위해서다.
 
-// M6-P2d-c runtime-only texture generation owner. 디스크 정본은
-// MaterialPropertyValue의 (name, FileGuid)이고, 이 벡터는 임의 ShaderMeta texture
-// property 이름을 실제 Texture generation 수명과 결합한다.
-struct MaterialTextureOwner
-{
-	std::string propertyName{};
-	std::shared_ptr<Texture> textureOwner{};
-};
-
+// Model-facing authoring facade. Accepted execution values, shader contracts
+// and texture generations are owned by LX::Runtime::Instance.
 class [[reflgen::reflect]] Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
 {
    public:
@@ -59,6 +52,11 @@ public:
         return m_materialGraphInstance;
     }
     bool HasMaterialGraph() const { return !!m_materialGraphInstance; }
+    std::shared_ptr<const LX::Runtime::Instance> GetLXMaterialInstance() const
+    {
+        return m_materialGraphInstance ? std::static_pointer_cast<const LX::Runtime::Instance>(m_materialGraphInstance)
+                                       : m_runtimeInstance;
+    }
     bool TrySetMaterialGraphParameter(LX::Id parameter, LX::LXSocketValue value, std::string& error);
     bool TrySetMaterialGraphParameters(std::span<const material_graph::ParameterOverride> values, std::string& error);
 
@@ -96,7 +94,8 @@ public:
 		std::string_view property) const noexcept;
 	std::span<const MaterialTextureOwner> GetTextureOwners() const noexcept
 	{
-		return m_textureOwners;
+        if (const auto* instance = RuntimeInstance()) return instance->textureOwners;
+        return m_textureOwners;
 	}
 	const std::shared_ptr<Texture>& GetBaseColorMapShared() const noexcept;
 	const std::shared_ptr<Texture>& GetNormalMapShared() const noexcept;
@@ -115,10 +114,12 @@ public:
 		ShaderMetaHandle shaderMetaHandle);
 	ShaderMetaHandle GetShaderMetaHandle() const { return m_shaderMetaHandle; }
 	const ShaderMetaBindingLayout* GetShaderBindingLayout() const;
+    const ShaderMeta* GetGeneratedShaderMeta() const;
+    std::span<const MaterialPropertyValue> GetShaderPropertyValues() const;
 	std::span<const std::uint8_t> GetConstantBufferData() const;
-	// runtime schema를 Material에 설치하지 않고도 현재 논리 property를 reflection
-	// layout에 맞춰 소유 byte block으로 만든다. RT frame sealing은 이 const API만
-	// 사용하므로 Material*가 draw packet으로 새지 않는다.
+	// 기존 호출자의 논리 값을 reflection layout에 맞춰 byte block으로 만든다.
+	// 제품 RT sealing은 ExperimentMaterialSealing의 LX instance 어댑터를 사용한다.
+	// draw packet은 Material* 대신 소유 snapshot을 보존한다.
 	bool BuildShaderPropertyBlock(const ShaderMeta& meta,
 		const ShaderMetaBindingLayout& layout,
 		std::vector<std::uint8_t>& outBytes, std::string& outError) const;
@@ -127,7 +128,8 @@ public:
 	bool TrySetKeywordSelection(std::string_view axis, std::string_view value);
 	std::span<const std::uint16_t> GetKeywordSelections() const
 	{
-		return m_keywordSelections;
+        if (const auto* instance = RuntimeInstance()) return instance->keywordSelections;
+        return m_keywordSelections;
 	}
 
 	// ── Typed setters/getters (explicit cb/var) ──
@@ -176,7 +178,12 @@ private:
 	bool WriteBytes(const VarView& v, const void* src, size_t size);
 	bool ReadBytes(const VarView& v, void* dst, size_t size) const;
 
-	struct RuntimeSchema;
+    const LX::Runtime::Instance* RuntimeInstance() const
+    {
+        return m_materialGraphInstance ? static_cast<const LX::Runtime::Instance*>(m_materialGraphInstance.get())
+                                       : m_runtimeInstance.get();
+    }
+    void SynchronizeCodeRuntime();
 
 public:
 	std::string m_name{};
@@ -208,7 +215,7 @@ private:
 	void ResetTextureRuntime();
 
 	[[reflgen::ignore]]
-	std::shared_ptr<const RuntimeSchema> m_runtimeSchema{};
+    std::shared_ptr<const LX::Runtime::Instance> m_runtimeInstance{};
 
 	// runtime-only. GUID는 디스크 정본이고 이 값은 적용한 cache generation이다.
 	[[reflgen::ignore]]

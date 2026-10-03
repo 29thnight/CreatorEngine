@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LXMaterialPipeline.h"
+
 #include "MaterialGraphIblBake.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 
@@ -40,11 +42,12 @@ class SceneLookupFrame
     std::array<RHITextureHandle,3> importance_{};
     std::array<RHITextureHandle, 11> inputs_{};
     RHIBufferHandle samples_, statistics_, emptyPrevious_;
-    RHIPipelineHandle bake_, clear_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> bake_, clear_;
     std::vector<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
+    RHIBufferSlice filmSensitivityConstants_;
     std::weak_ptr<const SceneLookupFrame> previous_;
-    bool reuse_{};
+    bool reuse_{}, standalone_{};
     std::weak_ptr<const SceneLookupFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
@@ -64,7 +67,7 @@ class SceneLookupCache : private IRHIUploadTransactionListener
                  RHITextureHandle irradiance, RHITextureHandle prefiltered,
                  std::uint64_t environmentGeneration, std::uint64_t memoryBudget,
                  std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
-                 std::array<RHITextureHandle,3> importance = {}, RHITextureHandle source = {});
+                 std::array<RHITextureHandle,3> importance = {}, RHITextureHandle source = {}, bool standalone = false);
     // Called only after the entire owning graph has been successfully submitted.
     // A recorded callback or an upload prefix is not publication authorization.
     bool PublishSubmitted(const SceneLookupFrame& frame, std::uint64_t frameId, RHICompletionPoint completion,
@@ -73,7 +76,7 @@ class SceneLookupCache : private IRHIUploadTransactionListener
 
   private:
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle bake_, clear_;
+    LX::Runtime::ComputePipeline bake_, clear_;
     std::vector<std::shared_ptr<const SceneLookupFrame>> published_;
     std::shared_ptr<SceneLookupResourcePool> resourcePool_;
     std::mutex submissionMutex_;

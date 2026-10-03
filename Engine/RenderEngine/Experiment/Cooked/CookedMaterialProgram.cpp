@@ -1,6 +1,7 @@
 #include "CookedMaterialProgram.h"
 #include "CookedAudioClipSource.h"
 #include "../../Assets/AssetIdentityProfile.h"
+#include "../../MaterialGraphShaderMeta.h"
 
 #include <algorithm>
 #include <cstring>
@@ -45,6 +46,11 @@ bool BuildMaterialProgramCookProduct(const AssetId& graphId, const LX::LXMateria
         return false;
     }
     const auto generated = LX::GenerateMaterialSlang(graph);
+    if (verified.materialShader && verified.materialShader->meta.guid.m_guid != graphId.value)
+    {
+        error = "Generated material metadata belongs to a different graph identity.";
+        return false;
+    }
     if (!generated || generated->slang != verified.program.slang ||
         LX::WriteMaterialProgramMetadata(*generated) != LX::WriteMaterialProgramMetadata(verified.program))
     {
@@ -99,6 +105,8 @@ bool OpenCookedMaterialProgram(const CookedAssetManifestEntry& entry, const Arti
     if (!material_graph::ReadCookedProgram({reinterpret_cast<const std::uint8_t*>(payload.data()), payload.size()},
                                            budget, candidate, error))
         return false;
+    if (candidate.product.materialShader && candidate.product.materialShader->meta.guid.m_guid != entry.assetId.value)
+        return invalid();
     std::vector<AssetId> dependencies;
     if (!MaterialTextureDependencies(candidate.product.program, dependencies, error))
         return false;

@@ -609,7 +609,7 @@ namespace
         outCapture.activePipeline = gbuffer.GetPipelineHandle();
         outCapture.shaderMetaHandle = gbuffer.GetShaderMetaHandle();
 
-        for (const EnhancedDrawItem& draw : fixture.draws)
+        for (EnhancedDrawItem& draw : fixture.draws)
         {
             if (!draw.materialSnapshot) continue;
             const bool usesSecondaryMeta =
@@ -632,6 +632,9 @@ namespace
             {
                 return fail("material keyword variant identity/layout 불일치");
             }
+            auto packet = std::make_shared<EnhancedMaterialDrawSnapshot>(*draw.materialSnapshot);
+            if (!gbuffer.CaptureShaderVariant(*packet)) return fail("GBuffer fixture LX generation capture failed");
+            draw.materialSnapshot = std::move(packet);
         }
         outCapture.shaderVariants = gbuffer.GetShaderVariantCount();
         if (fixture.draws.size() >= 3 && fixture.draws[2].materialSnapshot)
@@ -832,10 +835,9 @@ namespace
         {
             return fail(outError);
         }
-        outCapture.retiredVariantStale = outCapture.retiredVariantPipeline.IsValid()
-            && !gbuffer.GetShaderVariantPipeline(materialProbeHandle,
-                fixture.draws[2].materialSnapshot->permutationKey).IsValid()
-            && 2 == gbuffer.GetShaderVariantCount();
+        if (outCapture.retiredVariantPipeline != gbuffer.GetShaderVariantPipeline(materialProbeHandle,
+                fixture.draws[2].materialSnapshot->permutationKey) || 4 != gbuffer.GetShaderVariantCount())
+            return fail("Previous material PSOs retired before complete frame sealing/commit");
         outCapture.secondaryMetaSurvivedPrimaryReload =
             outCapture.secondaryMetaPipeline == gbuffer.GetShaderVariantPipeline(
                 secondaryMetaHandle,
@@ -857,7 +859,10 @@ namespace
         const std::uint32_t generationRetired = gbuffer.CommitShaderMetaFrame(
             context, nextActiveMetaHandles,
             RHICompletionPoint{ resources.GetLastSignaledFenceValue() });
-        outCapture.secondaryMetaGenerationRetired = 1 == generationRetired
+        outCapture.retiredVariantStale = outCapture.retiredVariantPipeline.IsValid()
+            && !gbuffer.GetShaderVariantPipeline(materialProbeHandle,
+                fixture.draws[2].materialSnapshot->permutationKey).IsValid();
+        outCapture.secondaryMetaGenerationRetired = 3 == generationRetired
             && !gbuffer.GetShaderVariantPipeline(secondaryMetaHandle,
                 fixture.draws[3].materialSnapshot->permutationKey).IsValid()
             && outCapture.secondaryMetaPipeline
@@ -1277,7 +1282,7 @@ namespace
         {
             return fail(outError);
         }
-        for (const EnhancedDrawItem& draw : frameDraws)
+        for (EnhancedDrawItem& draw : frameDraws)
         {
             if (!draw.forwardMaterialSnapshot) continue;
             const EnhancedForwardMaterialDrawSnapshot& material =
@@ -1302,6 +1307,9 @@ namespace
             {
                 return fail("Forward material meta/permutation/layout identity 불일치");
             }
+            auto packet = std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*draw.forwardMaterialSnapshot);
+            if (!forward.CaptureShaderVariant(*packet)) return fail("Forward fixture LX generation capture failed");
+            draw.forwardMaterialSnapshot = std::move(packet);
         }
         outCapture.shadePipeline = forward.GetShadePSO();
         outCapture.referencePipeline = forward.GetReferencePSO();
@@ -1651,8 +1659,9 @@ namespace
         {
             return fail("Forward custom-float 다음-frame packet이 invalid다");
         }
-        frameDraws[mutationDrawIndex].forwardMaterialSnapshot =
-            std::move(nextFramePacket);
+        auto nextOwnedPacket = std::make_shared<EnhancedForwardMaterialDrawSnapshot>(*nextFramePacket);
+        if (!forward.CaptureShaderVariant(*nextOwnedPacket)) return fail("Forward mutation LX generation capture failed");
+        frameDraws[mutationDrawIndex].forwardMaterialSnapshot = std::move(nextOwnedPacket);
 
         if (!resources.BeginFrame(outError)) return fail(outError);
         frameOpen = true;

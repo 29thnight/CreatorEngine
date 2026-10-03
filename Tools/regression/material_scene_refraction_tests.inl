@@ -146,6 +146,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     Check(meshes.Initialize(&device, error), "Refraction mesh cache");
     EnhancedGBufferPass gbuffer;
     EnhancedDeferredPass deferred;
+    EnhancedForwardPass forward;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -161,7 +162,11 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     camera.projection.m[3][3] = 2;
     camera.eyePosition = math::vector3(0, 0, -2);
     context.camera = &camera;
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error), "Refraction actual Scene passes");
+    const std::vector<EnhancedLight> lights;
+    context.lights = &lights;
+    const std::vector<EnhancedDrawItem> forwardDraws;
+    context.forwardDraws = &forwardDraws;
+    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) && forward.Initialize(context, error), "Refraction actual Scene passes");
     WaitSceneProgram(host, context, background->generation);
     for (const auto& generation : generations)
     {
@@ -253,7 +258,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             meshes.BeginFrame(context.frameId);
             const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload(cube.get(), error).handle;
             Check(host.PrepareResidency(context, input, error), "Refraction residency " + error);
-            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
+            Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) && forward.PrepareFrame(context, error),
                   "Refraction Scene prepare " + error);
             auto graph = std::make_shared<EnhancedRenderGraph>(device);
             if (workers)
@@ -291,7 +296,11 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             deferred.SetAmbientOcclusion(ao);
             deferred.Declare(*graph, context);
             host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
-            std::array<RHIReadback, 10> readbacks;
+            forward.SetInputs({outputs.depth, deferred.GetOutput()});
+            forward.SetGraphMaterials(&host);
+            forward.Declare(*graph, context);
+            const auto surfaceOutputs = host.ForwardSurfaceOutputs();
+            std::array<RHIReadback, 11> readbacks;
             const auto copy = [&](unsigned i, RGHandle handle, RHIFormat format) {
                 Check(device.CreateReadback(24, 24, format, 1, readbacks[i], error), "Refraction readback");
                 graph->AddPass(
@@ -303,13 +312,14 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             };
             copy(0, accepted->GraphBackgroundColor(*graph), RHIFormat::RGBA16Float);
             copy(1, accepted->GraphBackgroundDepth(*graph), RHIFormat::D32Float);
-            copy(2, deferred.GetOutput(), RHIFormat::RGBA16Float);
-            copy(3, outputs.depth, RHIFormat::D32Float);
-            copy(4, outputs.bitmask, RHIFormat::R32Uint);
+            copy(2, forward.GetOutput(), RHIFormat::RGBA16Float);
+            copy(3, surfaceOutputs.depth, RHIFormat::D32Float);
+            copy(4, surfaceOutputs.bitmask, RHIFormat::R32Uint);
+            copy(10, outputs.depth, RHIFormat::D32Float);
             copy(5, graph->FindImportedTexture(accepted->Inputs()[0]), RHIFormat::RGBA32Float);
             copy(6, graph->FindImportedTexture(accepted->Inputs()[1]), RHIFormat::RGBA32Float);
-            copy(8, graph->FindImportedTexture(host.LookupFrame()->Inputs()[1]), RHIFormat::RGBA32Float);
-            copy(9, graph->FindImportedTexture(host.LookupFrame()->Inputs()[10]), RHIFormat::RGBA32Float);
+            copy(8, graph->FindImportedTexture(host.ForwardLookupFrame()->Inputs()[1]), RHIFormat::RGBA32Float);
+            copy(9, graph->FindImportedTexture(host.ForwardLookupFrame()->Inputs()[10]), RHIFormat::RGBA32Float);
             Check(device.CreateBufferReadback(24 * 24 * sizeof(SceneRefractionSample), readbacks[7], error),
                   "Refraction samples readback");
             graph->AddPass(
@@ -349,7 +359,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                   "Refraction publication " + error);
             device.WaitForGpu();
             Check(GetRHISubmissionThread().Drain(&device, error), "Refraction retirement");
-            std::array<RHIReadbackImage, 10> mapped;
+            std::array<RHIReadbackImage, 11> mapped;
             for (unsigned i = 0; i < mapped.size(); ++i)
             {
                 Check(device.MapReadback(readbacks[i], mapped[i], error), "Refraction map");
@@ -358,6 +368,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             {
                 for (unsigned x = 0; x < 24; ++x)
                 {
+                    Near(mapped[10].At(x,y,0), mapped[1].At(x,y,0), "Refraction preserves shared opaque depth");
                     std::uint32_t owner;
                     std::memcpy(&owner, mapped[4].data.data() + y * mapped[4].rowPitch + x * 4, 4);
                     if (fixture == 5 && x >= 3 && x < 21 && y >= 3 && y < 21 && !(x >= 9 && x < 15 && y >= 9 && y < 15))
@@ -379,7 +390,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                         }
                         continue;
                     }
-                    Near(mapped[3].At(x, y, 0), .4 / 2.25, "Refraction final depth is transmitting surface");
+                    Near(mapped[3].At(x, y, 0), .4 / 2.25, "Refraction scratch depth is transmitting surface");
                     Near(mapped[5].At(x, y, 3), fixture == 3 ? 1 / ior : ior, "Refraction face-dependent medium ratio");
                     Vector position{};
                     for (unsigned c = 0; c < 3; ++c)
@@ -599,6 +610,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     host.ShutdownAfterIdle();
     gbuffer.Shutdown();
     deferred.Shutdown();
+    forward.Shutdown();
     meshes.Shutdown();
     std::string messages;
     const auto validation = device.DrainDebugMessages(messages);

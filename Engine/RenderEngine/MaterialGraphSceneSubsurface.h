@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LXMaterialPipeline.h"
+
 #include "MaterialGraphSceneLookup.h"
 
 namespace material_graph
@@ -34,7 +36,7 @@ class SceneSubsurfaceFrame
     RHITextureHandle environment_;
     std::array<RHITextureHandle, 7> inputs_{};
     RHIBufferHandle reflection_, irradiance_;
-    RHIPipelineHandle bake_, filter_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> bake_, filter_;
     std::vector<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
     std::weak_ptr<const SceneSubsurfaceFrame> self_;
@@ -54,7 +56,7 @@ class SceneSubsurfaceResources
 
   private:
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle bake_, filter_;
+    LX::Runtime::ComputePipeline bake_, filter_;
     bool Initialize(const EnhancedFrameContext& context, std::string& error);
 };
 } // namespace material_graph

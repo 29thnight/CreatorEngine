@@ -1,16 +1,33 @@
 # RenderGraph 리소스 의존성 스케줄링 계획 (PHASE 4.3 · 트랙 RG)
 
+**2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
+
+
 2026-08-28 작성. `EnhancedRenderGraph`를 교체하지 않고, 명시적 리소스 접근과
 버전 계보로 실행 순서를 컴파일하는 그래프로 단계적으로 확장하는 구현 계획이다.
 
-상태: **계획 확정, 구현 미착수.** 문서 작성과 정적 검증은 구현·빌드·픽셀 검증 완료를
+상태: **2026-10-03 BASE-0 완료, RG1 완료, RG2 완료, RG3 완료, RG4~RG9 미착수.** 문서 작성과 정적 검증은 구현·빌드·픽셀 검증 완료를
 뜻하지 않는다.
 
 ---
 
 ## 0. 결정 요약
 
-2026-10-01 착수 판정: BASE-0은 구현·검증된 MAT-0~MAT-8 기반을 소비하며 MAT-9 최종 수용을 기다리지 않는다. 현재 IBL 1024/4096과 이미지 수용 상한을 유지하고, 기존 SSS·투과 품질 미달 및 이동 카메라 성능 미수용을 baseline의 알려진 공백으로 기록한다. 구조 변경의 회귀/재현 통과와 MAT-9 최종 품질/성능 수용은 별도 판정이다. RG6 뒤 필요한 GPU-driven/IBL 재사용 구현·실측을 거쳐 MAT-9 성능 게이트를 회수한다. 하네스 구현은 아직 미착수이며 상태·공수 완료를 올리지 않는다.
+**2026-10-02 BASE-0 범위 정리:** 현재 DX12 Debug/Release 바이너리·고정 대표 장면의 이미지,
+graph 진단·변이, capture 계측·GPU validation·정상 종료와 구성 간 대조가 완료 조건이다.
+범용 frame packet·재질/애니메이션 재생은 선택 확장으로 분리하며 RG1 선행이 아니다.
+2026-10-03 현행 Debug/Release 기준선과 구성 간 16개 이미지 maxError=0, 현재 해시 및 `phaseComplete=true`를
+회수했다. [현재 완료 계약과 증거](../analysis/RenderBase0Baseline.md)를 따른다. RG1 이후 현행 기준선과 변경 전후 증거는 [RG1 검증 기록](../analysis/RenderRg1Scheduling.md)에 남긴다. RG2도 완료했으며 [버전·Modify 검증 기록](../analysis/RenderRg2Versions.md)에 현행 기준선을 남긴다. RG3도 완료했으며 [컬링·수명·배리어 검증 기록](../analysis/RenderRg3LifetimeBarriers.md)에 현행 기준선을 남긴다. 다음 구현은 RG4다.
+
+2026-10-03 RG1 구현 경계: 같은 `EnhancedRenderGraph` 생성자의 `ExplicitSingleWriter` 모드에서
+`RGPassUsage.access`를 반드시 명시한다. 최소 authored index를 먼저 꺼내는 안정적 Kahn 정렬이며
+순환 오류에는 실제 패스·자원 경로를 기록한다. imported Read는 writer가 없으면 외부 초기값을 소비하고,
+writer가 있으면 그 결과를 소비한다. ReadWrite는 initialized imported 자원의 단독 사용만 허용하며
+다른 reader나 writer가 있으면 RG2 version/Modify를 요구한다. 제품 기본 모드는 RG5 이관 전까지
+`DeclarationOrder`이며 명시적 접근과 암묵 접근을 혼합하지 않는다. 이는 별도 실행 그래프가 아닌 같은
+Compile/Execute 경로의 선언 계약 선택이다. Debug/Release 빌드·24 shuffle native fixture·역순 RAW GPU 픽셀 검사 및 제품 변경 전후/구성 간 16개 이미지 maxError=0을 회수했다. RG1 완료이며 제품 이관은 RG5/6에 남긴다.
+
+2026-10-01 착수 판정: BASE-0은 구현·검증된 MAT-0~MAT-8 기반을 소비하며 MAT-9 최종 수용을 기다리지 않는다. 현재 IBL 1024/4096과 이미지 수용 상한을 유지하고, 기존 SSS·투과 품질 미달 및 이동 카메라 성능 미수용을 baseline의 알려진 공백으로 기록한다. 구조 변경의 회귀/재현 통과와 MAT-9 최종 품질/성능 수용은 별도 판정이다. RG6 뒤 필요한 GPU-driven/IBL 재사용 구현·실측을 거쳐 MAT-9 성능 게이트를 회수한다. 하네스·graph snapshot·capture 제출별 GPU 계측·변이 게이트를 구현했으며 DX12 Debug/Release의 재현·변이·계측 검증으로 판정한다. Vulkan 교차 비교는 PHASE 4.9로 이관하여 BASE-0의 실패/선행 조건에서 제거한다.
 
 1. **실행 그래프는 `EnhancedRenderGraph` 하나만 유지한다.** 별도 FrameGraph나 제품용
    이중 실행 경로를 만들지 않고 현재 Compile/Execute 경계를 확장한다.
@@ -21,7 +38,7 @@
    `ReadWrite` 연쇄는 추측하지 않고 오류로 거부한다. 다음 슬라이스에서 버전 핸들을
    도입해 `Write`/`Modify`의 연쇄를 연다.
 4. **단일 그래픽 큐를 먼저 완결한다.** 단일 writer DAG → 버전/Modify DAG → 기존 파이프라인 이관 →
-   DX12/Vulkan live 픽셀 게이트를 닫기 전에는 aliasing과 async compute를 열지 않는다.
+   DX12 live 전후 픽셀 게이트를 닫기 전에는 aliasing과 async compute를 열지 않는다.
 5. **그 뒤에 메모리와 큐 최적화를 연다.** transient buffer/aliasing을 먼저, 실제 GPU
    겹침 이득을 계측한 뒤 multi-queue/async compute를 도입한다.
 6. **빅뱅 전환을 금지한다.** 각 슬라이스는 독립 검사와 A/B 스위치를 가지며, 다음
@@ -36,7 +53,7 @@ handle과 state 기반 쓰기 추론만으로는 두 writer의 선후를 알 수
 
 ## 1. 현재 코드 기준선
 
-2026-08-28 워킹트리 정적 감사 기준이다.
+2026-10-01 워킹트리 정적 감사 기준이다. BASE-0은 현행 계약을 관측하며 DAG 스케줄러 구현은 RG1~RG2에 남긴다.
 
 | 영역 | 현재 보유 | 자동 의존성 실행까지 남은 공백 |
 |---|---|---|
@@ -46,13 +63,13 @@ handle과 state 기반 쓰기 추론만으로는 두 writer의 선후를 알 수
 | Pass 사용 | `RGPassUsage { handle, RHIResourceState }` | `IsWriteState`로 쓰기를 추론하므로 read와 read-modify-write를 구분할 수 없음 |
 | 서브리소스 | 텍스처 전체 단위 상태와 수명 | mip/array/range별 접근·배리어·alias 판단 없음 |
 | 큐 | DX12 `DIRECT` 큐 하나, Vulkan graphics family/queue 하나 | compute queue, queue ownership transfer, cross-queue fence 없음 |
-| 제품 표면 | 기본 live pipeline 15개 노드 + Editor 기여 4개, `AddPass`/`AddSplitPass` 정적 호출 108곳(제품 28, test/fixture 80) | 모든 생산 Pass의 접근 선언 이관과 양 backend cutover 필요 |
+| 제품 표면 | 기본 live pipeline 15개 노드 + Editor 기여 4개, `.cpp`/`.h`의 `.AddPass`/`->AddPass`·`AddSplitPass` 정적 호출 183곳(Engine 52, Editor 제품 4, Editor test 98, Tools 29; BASE-0 capture·film upload fixture 포함) | 모든 생산 Pass의 RHI 중립 접근 선언 이관과 DX12 제품 cutover 필요 |
 
 근거 위치:
 
 - `Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:40`, `:50`, `:286`, `:296`
 - `Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:12`, `:131`, `:192`, `:497`
-- `Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLive.cpp:1685`
+- `Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp` (`BuildPipelineDesc`, DX12/Vulkan 제품 캡처 경로)
 - `Editor/EngineEntry/EditorSceneOverlayContributor.cpp:82`
 - `Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp:295`
 - `Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp:390`, `:451`, `:521`
@@ -133,30 +150,22 @@ Compiler가 각 슬롯의 버전 핸들을 연결한 뒤에는 다음처럼 해�
 
 | ID | 슬라이스 | 선행 | 공수 | 종료 게이트 |
 |---|---|---:|---:|---|
-| ~~**RG0**~~ | **`BASE-0`에 흡수** — 4-0·SRP-G0와 같은 하네스·같은 artifact였다. graph dump와 변이 fixture는 `BASE-0`의 소비 항목으로 남는다 | 없음 | (BASE-0 6일에 포함) | [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.1 |
-| **RG1** | 명시적 access mode + 단일 writer stable DAG compiler | BASE-0 | 8일* | RAW, 독립 Pass tie-break, cycle chain, 선언 배열 shuffle fixture; 다중 writer와 모호한 ReadWrite 연쇄는 명시적 오류 |
-| **RG2** | versioned texture/buffer handle + 다중 writer/Modify DAG | RG1 | 10일* | `Write`/`Modify` 새 version, WAR/WAW, import/transient version dump, forked write·stale handle fail-closed |
+| ~~**RG0**~~ | **`BASE-0`에 흡수** — 4-0·SRP-G0와 같은 하네스·같은 artifact였다. graph dump와 변이 fixture는 `BASE-0`의 소비 항목으로 남는다 | 없음 | (BASE-0 4일에 포함) | [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md) §6.1 |
+| **RG1** | 명시적 access mode + 단일 writer stable DAG compiler | BASE-0 | 8일 | RAW, 독립 Pass tie-break, cycle chain, 선언 배열 shuffle fixture; 다중 writer와 모호한 ReadWrite 연쇄는 명시적 오류 |
+| **RG2** | versioned texture/buffer handle + 다중 writer/Modify DAG | RG1 | 10일 | `Write`/`Modify` 새 version, WAR/WAW, import/transient version dump, forked write·stale handle fail-closed |
 | **RG3** | DAG 기준 culling·lifetime·barrier 재계산 | RG2 | 8일 | 죽은 producer 제거, 마지막 소비 수명, Transition/UAV 계획이 sorted order 기준으로 일치 |
-| **RG4** | dependency wave 기반 병렬 recording·진단 | RG3 | 7일 | sequential/parallel compiled order와 픽셀 동일, wave·critical path·edge 원인 dump 제공 |
-| **RG5** | 제품 Pass 접근 선언 이관 | RG4 | 12일 | 기본 19개 node, 제품 호출과 test/fixture 접근 선언 이관; 임시 adapter 잔여 0. C# IR 조립은 PHASE 4.6 소유 |
-| **RG6** | DX12/Vulkan 제품 cutover — **이 페이즈의 완료선** | RG5, **BASE-0** | 8일 | 같은 밀봉 입력의 별도 프로세스 live frame, PNG/차영상/선형 오차, CPU record·pass GPU·graph stats, validation 0 |
-| **RG7** | transient buffer + in-frame aliasing | RG6 | 20일 | alias off/on 픽셀 동일, peak committed/resident byte 감소 실측, poison/overlap/lifetime 변이 통과 |
-| **RG8** | queue-neutral multi-queue + async compute | RG7 | 25일 | single-queue fallback, cross-queue fence/ownership, DX12/Vulkan validation, 겹침 GPU 이득 실측 |
-| **RG9** | subresource·split barrier·Resource Inspector 성숙 | RG8 | 15일 | mip/array/range 추적, split barrier parity, producer/consumer/version/order/lifetime/alias/queue 시각화 |
+| **RG4** | dependency wave 기반 병렬 recording·진단 | RG3 | 6일 | sequential/parallel compiled order와 픽셀 동일, wave·critical path·edge 원인 dump 제공 |
+| **RG5** | 제품 Pass 접근 선언 이관 | RG4 | 10일 | 기본 19개 node, 제품 호출과 test/fixture 접근 선언 이관; 임시 adapter 잔여 0. C# IR 조립은 PHASE 4.6 소유 |
+| **RG6** | RHI 중립 제품 cutover·DX12 수용 — **이 페이즈의 완료선** | RG5, **BASE-0** | 4일 | 같은 밀봉 입력의 별도 프로세스 live frame, PNG/차영상/선형 오차, CPU record·pass GPU·graph stats, validation 0 |
+| **RG7** | transient buffer + in-frame aliasing | RG6 | 14일 | alias off/on 픽셀 동일, peak committed/resident byte 감소 실측, poison/overlap/lifetime 변이 통과 |
+| **RG8** | queue-neutral multi-queue + async compute | RG7 | 16일 | single-queue fallback, cross-queue fence/ownership, DX12 validation, 겹침 GPU 이득 실측 |
+| **RG9** | subresource·split barrier·Resource Inspector 성숙 | RG8 | 10일 | mip/array/range 추적, split barrier parity, producer/consumer/version/order/lifetime/alias/queue 시각화 |
+| **Q0** | 중립 queue/capability·fence 기반 | RG8/L4 소비 전 | 6일 | DX12 큐·실패·수명 검증, 중복 구현 0 |
+| **RG-V** | compiled graph 기본 reader/viewer | RG3→RG6 | 4일 | 실제 generation·order·resource 표시, 별도 실행 그래프 0 |
 
-> **2026-09-01 정정** — `RG0` 4일은 `BASE-0`으로, `RG8`의 큐/펜스 RHI 계약 몫은 `Q0`으로 빠져나갔다.
-> 아래 합계는 정정 전 수다. 현재 통합 합계는 [`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이다.
-
-\* **2026-09-23 재배열:** RG1/RG2의 8/10일은 이전 총 18일의 임시 배분이다.
-단일 writer DAG와 버전 도입의 실제 표면을 구현 착수 전에 재계수한다. 현재 산정 합계는
-변경하지 않았고, 미확인 차이를 완료로 처리하지 않는다. 현재 통합 회계는
-[`RenderPhaseRoadmap.md`](RenderPhaseRoadmap.md)가 정본이다.
-
-- **RG0~RG6: 57일, 약 11.4 엔지니어 주.** Unreal RDG형 단일 큐 리소스 의존성
-  스케줄링과 제품 전환의 첫 완료선이다.
-- **RG7~RG9: 60일.** 메모리 aliasing, async compute, subresource/관측 성숙도다.
-- **전체: 117일, 약 23.4 엔지니어 주.** 안정화·리뷰·플랫폼 편차를 포함한 달력 일정은
-  1인 기준 약 6~9개월로 본다.
+**2026-10-01 재산정:** BASE-0 4 + RG1~6 46 + RG7~9 40 + Q0 6 + RG-V 4 = **100인일**.
+RG6 첫 제품 완료선은 BASE-0/RG1~6 50인일이며 기본 viewer 4일을 포함하면 54인일이다.
+Q0 공통 기반은 RG8/L4에 중복 산정하지 않는다. 상세는 [공수 원장](RenderPhaseEffortEstimate.md)을 따른다.
 
 RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으로 실행 순서를 결정하는
 제품 RenderGraph는 이미 성립하며, 뒤 단계가 늦어져도 declaration-order로 되돌리지 않는다.
@@ -169,7 +178,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 
 - 현행 `BuildOrder` 계약과 제품 graph dump를 artifact로 남긴다.
 - 독립 Pass, 연쇄 RAW, 두 writer, read-modify-write, culled branch, imported history fixture를
-  DX12/Vulkan 공용 테스트로 만든다.
+  RHI 중립 입력을 사용하는 DX12 테스트로 만든다.
 - UI/Grid처럼 같은 target을 읽고 다시 쓰는 Pass를 찾아 state만으로 `modify`가 표현되지
   않는 사례를 고정한다.
 - 테스트가 잘못된 구현을 잡는지 producer edge 삭제, version 재사용, 순서 뒤집기 변이로
@@ -179,13 +188,15 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 
 - 기존 `{handle, state}` aggregate 초기화는 임시 adapter에서만 받고 테스트와 이관 대상은
   `Read`/`Write`/`ReadWrite`를 상태와 별도로 선언한다.
-- 한 리소스에 writer가 하나일 때 RAW edge와 명시적 ordering token으로 stable topological
+- 한 리소스에 writer가 하나일 때 RAW edge로 stable topological
   sort를 수행한다. ready 집합은 authored index로 tie-break한다.
 - writer가 둘 이상이거나 `ReadWrite` 연쇄의 producer를 결정할 수 없으면 컴파일을 실패시킨다.
   선언 순서에서 암묵적인 writer 순서를 추측하지 않는다.
 - 독립 Pass 재배열, cycle, 누락 producer, 다중 writer 거부 fixture를 기준선과 대조한다.
 
 ### RG2 — 버전으로 다중 writer·Modify DAG를 연다
+
+2026-10-03 완료: ExplicitVersioned·resource ID/version/kind/epoch·Write/Modify·RAW/WAR/WAW를 구현했다. 두 구성 240 shuffle·오류 거부 및 실제 GPU 이전 버전 픽셀 0, 변경 전후/구성 간 16개 이미지 오차 0을 검증했다. 제품 기본 DeclarationOrder와 보수적 culling은 유지하며 RG3/5/6에서 정리·이관한다. transient buffer 생성은 RG7이다.
 
 - `Write`/`Modify`가 새 version handle을 반환하고 후속 consumer가 특정 버전을 읽게 한다.
 - texture와 buffer의 import/create, read/write/modify 계약을 대칭으로 닫는다.
@@ -195,6 +206,8 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 - debug에서는 전체 cycle 사슬, release에서는 짧은 오류와 stable ID를 남긴다.
 
 ### RG3~RG4 — 기존 기능을 새 순서에 다시 연결한다
+
+2026-10-03 RG3 완료: version producer 역추적과 imported 최종 출력 root, dead writer/reader 제거 후 WAR/WAW 재연결·stable sort를 구현했다. compiled order의 수명/할당/Transition 계획을 검증하고 UAV read→read 배리어를 생략했다. 두 구성 120 shuffle 및 실제 GPU dead writer 미실행·이전 버전 픽셀 0, 제품 변경 전후/구성 간 16개 이미지 오차 0을 회수했다. 제품 기본 DeclarationOrder는 RG5/6 이관까지 유지한다. RG4 dependency wave 기록은 아직 미착수다.
 
 - culling은 "앞서 쓴 모든 Pass" 검색이 아니라 version producer edge를 역추적한다.
 - lifetime과 transient 회수는 declaration index가 아니라 compiled index를 사용한다.
@@ -218,8 +231,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 >
 > **덤 — 호출 수가 늘었다.** §3 표와 아래 목록의 근거인 "제품 28곳 · test/fixture
 > 80곳(총 108)"이 2026-09-01 실측으로 **제품 38 · 게이트 82(총 120)**다. 제품만 **+36%**.
-> 이 절이 "호출 수는 착수 직전 다시 센다"고 적어 둔 그대로이며, 12일 재산정은
-> RG5 착수 시점의 일로 남긴다.
+> 이 절이 "호출 수는 착수 직전 다시 센다"고 적어 둔 그대로이며, 현재 RG5는 이관 7 + DX12 회귀 3의 10일 계획 추정으로 갱신했다.
 
 - base 15개 + Editor 4개 node를 작은 묶음으로 이관하고 각 묶음마다 현행/A-B 픽셀을
   비교한다.
@@ -227,7 +239,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
   제품 기본 경로에서 제거한다.
 - pass fixture와 전체 live frame을 별도 판정한다. 하나의 통과로 다른 하나를 대신하지
   않는다.
-- DX12/Vulkan은 동일 compiled graph stable ID와 dependency hash를 내야 한다.
+- DX12에서 같은 밀봉 입력의 compiled graph stable ID와 dependency hash가 재현되어야 한다.
 
 ### RG7 — aliasing은 정확성 완료 뒤 연다
 
@@ -263,8 +275,8 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 | 정적/API | implicit state-write 추론 제품 사용처 0, unversioned migration adapter 0, task/graph stable ID 중복 0 |
 | 그래프 | missing producer, forked write, cycle, culled branch, side effect, history import의 양·음성 fixture |
 | 결정성 | 동일 입력 100회 compiled order/dependency hash 동일, 독립 Pass 등록 순서 tie-break 명시 |
-| 배리어 | DX12 debug layer error 0, Vulkan validation error 0, 요구/실제 state mismatch 0 |
-| 픽셀 | pass fixture와 전체 live frame을 분리해 DX12/Vulkan PNG·linear RMSE·max error·changed pixel 판정 |
+| 배리어 | DX12 debug layer error 0, 요구/실제 state mismatch 0 |
+| 픽셀 | pass fixture와 전체 live frame을 분리해 DX12 변경 전후 PNG·linear RMSE·max error·changed pixel 판정 |
 | 병렬 | sequential/parallel pixels 동일, CPU record time과 critical path 기록 |
 | 메모리 | RG7 전후 peak committed/resident/transient byte와 alias reuse count, poison mode 오류 0 |
 | 큐 | RG8 single/multi queue 픽셀 동일, fence wait와 ownership transfer 누락 0, GPU frame time 이득 실측 |
@@ -295,7 +307,7 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 
 | 계획/트랙 | 소속 | 관계 |
 |---|---|---|
-| `BASE-0` | **같은 페이즈** | `RG0`의 graph dump·변이 fixture를 흡수한 공통 밀봉 하네스다. `RG1`이 선행으로 받고 `RG6`가 live 판정에 쓴다. 하네스는 한 벌만 만든다 |
+| `BASE-0` | **같은 페이즈** | `RG0`의 graph dump·변이 fixture를 흡수한 고정 장면 기준선 하네스다. `RG1`이 선행으로 받고 `RG6`가 live 판정에 쓴다. 하네스는 한 벌만 만든다 |
 | `CSharpRenderPipelinePlan.md` | PHASE 4.6 | C# `Build()`의 immutable IR이 RG1 단일 writer DAG, RG2 version/Modify 계약을 소비한다. 제품 조립 전환 `CSRP-5`는 RG6 이후 별도 판정한다 |
 | SRP-G0 | (`BASE-0`에 흡수) | RG0 기준선과 RG6 전체 live backend artifact를 공유한다. 별도 캡처 체계를 만들지 않는다 |
 | `LivePipelineDescPlan.md` | archive | 현재 nodes/reads/writes/modifies를 RG5의 첫 native compiler 입력으로 사용한다 |
@@ -331,7 +343,7 @@ UV/BVH/직접광 준비는 독립적으로 진행할 수 있다. 현재 통합 �
 
 ## RG-V — compiled graph 읽기 전용 viewer (2026-10-01 추가)
 
-PHASE 4.3의 별도 todo 미산정 행이다. RG9의 subresource/split barrier 구현 완료까지
+PHASE 4.3의 별도 todo 4인일 행이다. RG9의 subresource/split barrier 구현 완료까지
 기본 graph viewer를 미루지 않는다. RG3 compiled DAG/culling/lifetime/barrier 결과를 입력으로
 초기 viewer를 만들고 RG6 제품 cutover에서 Scene/Game view별 실제 compiled generation으로 검증한다.
 RG4 wave/critical-path와 RG7~9 alias/queue/range 정보는 지원되는 세대에서 같은 reader에 추가한다.

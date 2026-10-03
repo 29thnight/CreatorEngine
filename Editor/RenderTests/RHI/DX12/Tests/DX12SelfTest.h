@@ -80,7 +80,7 @@ namespace DX12Test
     /// 그래프가 하는 일은 전부 눈에 보이지 않는다 — 순서를 정하고, 배리어를 만들고,
     /// 안 쓰는 패스를 걷어낸다. 틀려도 화면에는 '가끔 이상하게 보인다'로만 나타나서
     /// 그때는 원인이 그래프인지 패스인지도 구분되지 않는다. 계약을 직접 단정한다.
-    bool RunRenderGraphTest(std::string& outLog);
+    bool RunRenderGraphTest(std::string& outLog, bool replayExtensions = false);
 
     /// GBuffer 패스 검증 (PHASE 3-6, 첫 패스).
     ///

@@ -52,6 +52,7 @@ struct SceneDrawInput
     std::shared_ptr<const Instance> material;
     EnhancedMaterialCoverage coverage;
     SceneCoverage queue{};
+    float viewDepth{};
     std::shared_ptr<const MeshSurfacePlan> geometry;
 };
 

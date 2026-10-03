@@ -18,7 +18,7 @@
 //   (중립)이 되면서 패스가 캐시 **구현 클래스**를 이름으로도 알 이유가
 //   사라졌다 — 인터페이스는 `RenderFrameServices.h` 로 들어온다.
 #include "../../../RHI/RHIParallelCommandPool.h"
-#include "../../../RHI/RHIGraphicsPipelineRequest.h"
+#include "../../../LXMaterialPipeline.h"
 #include "../../../ShaderMetaHandle.h"
 
 struct ShaderMeta;
@@ -76,6 +76,7 @@ public:
         RHIShaderPermutationKey& outPermutationKey,
         std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
         std::string& outError);
+    bool CaptureShaderVariant(EnhancedMaterialDrawSnapshot& snapshot) const;
     /// 이번 frame packet에서 성공적으로 준비한 generation만 남긴다. 제거할 키가
     /// 다른 키와 같은 cache handle을 공유하면 마지막 holder가 사라질 때만 retire한다.
     std::uint32_t CommitShaderMetaFrame(const EnhancedFrameContext& context,
@@ -153,7 +154,7 @@ private:
         const ShaderRenderState* renderState,
         const RHIShaderPermutation& permutation, uint32_t experimentMask,
         RHIGraphicsPipelineDesc& outDesc,
-        RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError);
+        RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr);
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
         const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,
@@ -161,7 +162,7 @@ private:
         RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
         RHIShaderBlob& outPs, RHIShaderPermutationKey& outPermutationKey,
         std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
-        std::string& outError);
+        std::string& outError, LX::Runtime::GraphicsShaderDescription* shader = nullptr, ShaderMetaHandle ownerHandle = {});
     bool CreatePipeline(const EnhancedFrameContext& context, std::string& outError);
 
     /// 이번 프레임의 드로우 수로 조각 수를 정한다.
@@ -249,14 +250,14 @@ private:
 
     struct ShaderVariant
     {
-        RHIGraphicsPipelineRequest request;
-        std::map<uint32_t, RHIGraphicsPipelineRequest> modelRequests;
+        LX::Runtime::GraphicsPipeline request;
+        std::map<uint32_t, LX::Runtime::GraphicsPipeline> modelRequests;
         std::shared_ptr<const ShaderMetaBindingLayout> layout{};
     };
 
     bool BuildVariantCandidate(const EnhancedFrameContext& context, const ShaderMeta& meta,
         std::span<const std::uint16_t> selections, ShaderVariant& candidate,
-        RHIShaderPermutationKey& key, std::string& error);
+        RHIShaderPermutationKey& key, std::string& error, ShaderMetaHandle ownerHandle);
     void RetireUnusedPipelines(const EnhancedFrameContext& context,
         const std::vector<RHIPipelineHandle>& candidates, RHICompletionPoint retireAfter);
 
@@ -334,8 +335,8 @@ private:
     // 상수의 root parameter 순서 정본이며, secondary ShaderMeta의 table 길이가 달라도
     // 아래 variant map에서 별도 PSO로 보관한다. 새 primary
     // generation은 같은 slot만, frame commit은 빠진 secondary key만 retire한다.
-    RHIGraphicsPipelineRequest m_pipelineRequest;
-    std::map<uint32_t, RHIGraphicsPipelineRequest> m_modelPipelineRequests;
+    LX::Runtime::GraphicsPipeline m_pipelineRequest;
+    std::map<uint32_t, LX::Runtime::GraphicsPipeline> m_modelPipelineRequests;
     ShaderMetaHandle           m_shaderMetaHandle{};
     RHIShaderPermutationKey     m_defaultPermutationKey{};
     std::shared_ptr<const ShaderMetaBindingLayout> m_shaderBindingLayout{};

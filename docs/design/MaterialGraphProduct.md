@@ -1,6 +1,13 @@
 # Material Graph 제품 generation·바인딩·쿠킹 계약
 
-**2026-09-29 · MAT-7 완료. DataSystem·Material·Scene·cook/package와 제품 통합 검증.**
+**2026-10-02 통합 완료 · 기존 LX 제품 기반은 MAT-7-BASE 이력 · 공통 재질 소비 MAT-7 완료. PHASE 4.25는 LX 마감·MAT-9 때문에 진행 중.**
+
+**2026-10-02 실행 환경 방향:** LX가 generation/instance·바인딩·자원/PSO 수명의 공통 runtime을 소유한다. ShaderMeta는 생성된 셰이더의 계약 표현이며 기존 authored 코드 셰이더 입력도 LX 계약으로 적응한다. 코드 입력 어댑터와 공통 graphics/compute owner를 연결했고, 코드 셰이더의 generic property도 유지한다. 프레임 owner 없는 RT registry 대체 조회를 제거했다. Code 입력 준비·진단 registry는 유지한다.
+
+Graph→실제 `.shadermeta`+`.slang` 생성과 공통 Material 값/바인딩·LXMC v4 복구를 연결했다. Code와 Scene host의 graphics shader/PSO는 [LX 공통 owner](../analysis/MAT7GraphicsPipelineOwnership.md), 보조 compute는 [compute owner](../analysis/MAT7ComputePipelineOwnership.md)를 사용한다. [Core/Layered 일반 Blend](../analysis/MAT7CommonForwardBlend.md)에 이어 [SSS/transmission/Volume 혼합 transport](../analysis/MAT7ForwardTransportComposition.md)를 같은 Forward+ 순서에 연결했다. 제품 편집/실패 복구·실제 cooked Player 회귀는 [제품 검증 기록](../analysis/MAT7ProductEditingRecovery.md)을 따른다. SceneHost identity 12로 재쿠킹한다. 기존 2026-09-29의 “MAT-7 완료”는 아래 LX 경로에서 검증한 기반의 이력이며, 현재 통합 완료선은 2026-10-02의 여덟 번째 단계다.
+현재 통합 순서·원본/파생물 소유·공통 Forward+/일반 alpha Blend·제품 회귀의 완료 기준은 [BlenderMaterialGraphPlan §0](../plans/BlenderMaterialGraphPlan.md#0-현재-판정과-실행-범위-2026-10-02)이 소유한다. 생성 어댑터의 검증 범위와 잔여는 [MAT7ShaderMetaAdapter](../analysis/MAT7ShaderMetaAdapter.md)에 분리한다.
+
+공통 Material 값/바인딩의 초기 검증 범위는 [MAT7CommonMaterialConsumption](../analysis/MAT7CommonMaterialConsumption.md)이 소유한다. 아래 LXMC v2/artifact v2 설명은 기존 구현 이력이며 현재 writer/reader는 **v4**다. 실제 생성 메타·전체 Slang·bytecode와 CEDO 생성 계약을 한 generation으로 복구한다. immutable owner의 바이너리 계약으로 재검증·재쿠킹하며 Player에서 저작용 텍스트 파서를 호출하지 않는다. v3 이하는 재쿠킹하고 CEMF 자체 schema는 유지한다.
 
 MAT-6의 [결정적 Slang 생성](MaterialSlangCodegen.md)을 제품의 reflection,
 텍스처 소유권, PSO 교체와 cooked 자산으로 내리는 경계다. 구현은
@@ -8,7 +15,7 @@ MAT-6의 [결정적 Slang 생성](MaterialSlangCodegen.md)을 제품의 reflecti
 `MaterialGraphRenderBindings.{h,cpp}`, `MaterialGraphIblBake.{h,cpp}`와
 `Experiment/Cooked/CookedMaterialProgram.{h,cpp}`에 있다.
 
-## 1. 현재 완료선
+## 1. 기존 LX 경로에서 검증된 구현 기반
 
 | 경로 | 현재 상태 |
 |---|---|
@@ -27,13 +34,13 @@ MAT-6의 [결정적 Slang 생성](MaterialSlangCodegen.md)을 제품의 reflecti
 | 실제 Scene의 이미지별 UV·LOD | 샘플별 Vector fine derivative·이미지 크기/mip 수; compute는 explicit LOD 유지 |
 | 실제 Scene generation 준비·교체 | Slang·DX12/Vulkan PSO worker 준비, exact batch 성공 뒤 마지막 정상 instance·coverage 게시 |
 | 실제 Scene 재질별 SSS | owner/profile 기반 유한 dipole transport·Special HDR 연결 |
-| 실제 Scene transmission/refraction | 불투명 HDR/depth 복사·단일 투과 표면·GGX 굴절·Special HDR 연결 |
+| 실제 Scene transmission/refraction | 뒤쪽 Code/Graph alpha가 합성된 현재 HDR·불투명 depth 복사, 자기 surface scratch depth/owner, GGX 굴절·공통 Forward+ 연결 |
 | 실제 Scene의 닫힌 균질 Volume | 계수 생성·깊이 제한 카메라/굴절 ray의 흡수·발광·단일 산란 합성 |
 | 실제 Editor Scene/Game 상태·수명 | HTTP 재질 변경·Undo/Redo·실패 복구·저장/재개방·Play/Stop·삭제/복구의 owner·픽셀 검증 |
 | native Vulkan 전체 Scene | Core/Layered·Shadow/Decal·SSS·Refraction·Volume·encrypted cook의 Debug/Release readback |
-| 일반 alpha Blended queue | 미설치; 고정한 MAT-7 transport 범위 밖 |
+| 일반 alpha Blended queue | Code/Core/Layered/SSS와 physical transmission의 공통 Forward+ 정렬·합성, Volume의 표면 깊이별 카메라 transport. DX12 Debug/Release mixed/Volume·제품 회귀 완료; 전체 색/비용 수용은 MAT-9 |
 
-MAT-7 종료 증거는 [MaterialGraphProductIntegration.md](MaterialGraphProductIntegration.md)가
+기존 LX 제품 기반의 종료 증거는 [MaterialGraphProductIntegration.md](MaterialGraphProductIntegration.md)가
 소유한다. LX-3 artist canvas 이관, MAT-8 preview와 MAT-9 rendered parity·성능 수용은 별도다.
 기존 Scene은 여전히 `m_renderingMode`로 opaque와 transparent draw를 나눈다.
 기존 Standard pass를 LX host로 바꾸지 않았다.

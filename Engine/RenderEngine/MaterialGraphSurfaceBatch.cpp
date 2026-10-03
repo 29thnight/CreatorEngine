@@ -177,14 +177,16 @@ bool SurfaceEvaluator::Initialize(IRenderDeviceServices& device, IRenderRootSign
     description.layout = layout.handle;
     description.csBytecode = shader->bytecode.data();
     description.csSize = shader->bytecode.size();
-    const auto pipeline = pipelines.GetOrCreateCompute(description, error);
-    if (!pipeline.IsValid())
+    LX::Runtime::ComputePipeline pipeline;
+    LX::Runtime::ComputeShaderDescription identity;
+    if (!DescribeComputeShader(product, backend, "LXEvaluateSurface", identity, error) ||
+        !pipeline.Create(pipelines, description, std::move(identity), error))
     {
         return false;
     }
     device_ = &device;
     layout_ = std::move(layout);
-    pipeline_ = pipeline;
+    pipeline_ = pipeline.GetGeneration();
     semanticKey_ = product.program.semanticKey;
     principledGgx_ = (product.program.features & 0x17C0u) != 0;
     error.clear();
@@ -259,7 +261,7 @@ bool SurfaceEvaluator::PrepareInputs(IRenderDeviceServices& device, std::shared_
 {
     const auto recordingId = device.GetCurrentUploadRecordingId();
     const auto descriptorVersion = device.GetDescriptorVersionToken();
-    if (device_ != &device || !pipeline_.IsValid() || recordingId == 0 || !bindings || !bindings->instance ||
+    if (device_ != &device || !(pipeline_ && pipeline_->IsValid()) || recordingId == 0 || !bindings || !bindings->instance ||
         !bindings->instance->generation || bindings->layout.handle != layout_.handle ||
         bindings->layout.material != layout_.material ||
         bindings->instance->generation->cooked.product.program.semanticKey != semanticKey_ || view.sceneEpoch == 0 ||
@@ -339,7 +341,7 @@ bool SurfaceBatch::RecordCommands(RHIEncoder& encoder, std::string& error) const
         recordedStages_.fetch_or(4);
         return Fail(error, "Surface recording has stale bindings or has already been recorded.");
     }
-    encoder.SetPipeline(RHIBindPoint::Compute, pipeline_);
+    encoder.SetPipeline(RHIBindPoint::Compute, pipeline_->GetHandle());
     if (!RenderBindingCache::Bind(*device_, encoder, RHIBindPoint::Compute, *bindings_, error))
     {
         recordedStages_.fetch_or(4);

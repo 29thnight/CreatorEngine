@@ -188,7 +188,8 @@ IblBakePoint ExpectedPoint(const SurfacePoint& input, const SurfaceView& view, f
     result.coatNormalSheenWeight = Pack4(layered ? Unit(Rgb4(input.normal)) : Vector{0, 0, 1}, layered ? .2 : 0);
     result.tangentRotation =
         Pack4(Projected(layered ? Rgb4(input.tangent) : Vector{1, 0, 0}, Unit(Rgb4(input.normal))), layered ? .25 : 0);
-    result.viewTier = Pack4(Unit(Rgb4(view.eye) - Rgb4(input.position)), layered ? 1 : 0);
+    // Core and Layered graphs both use compensated Principled GGX (IblBakePoint model 1).
+    result.viewTier = Pack4(Unit(Rgb4(view.eye) - Rgb4(input.position)), 1);
     return result;
 }
 
@@ -848,6 +849,8 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     std::shared_ptr<const IblBakeResult> bake;
     Check(meshEvaluator.Record(device, input, vertices, error), "Sample vertex transform");
     Check(meshEvaluator.RecordSamples(device, vertices, requests, sampled, error), "Triangle sampling " + error);
+    Check(!sampled->IsPreparedForGraph() && sampled->IsReadyForEvaluation(),
+          "Retained sampler owner does not turn an immediate result into a deferred world transform");
     Check(sampled->Count() == kSamples && sampled->Input()->Count() == kPoints,
           "Exact sample count is independent of its source vertex count");
     const auto accepted = sampled;
@@ -1305,7 +1308,9 @@ void Run(const std::filesystem::path& root)
                     std::array<std::uint32_t, 4> countTier;
                     IblVector eye;
                 };
-                const SurfaceConstants constants{{kPoints, tier, 0, 0}, view.eye};
+                // This field selects the IBL model, not the Core/Layered product index.
+                // Match the model used by SurfaceEvaluator and ExpectedPoint for both graphs.
+                const SurfaceConstants constants{{kPoints, 1, 0, 0}, view.eye};
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                           device.UploadConstants(&constants, sizeof(constants)));
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(mesh->Buffer()));

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "LXMaterialPipeline.h"
+
 #include "MaterialGraphMeshSurface.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 
@@ -60,7 +62,8 @@ class RasterSurfaceBatch final : public SurfaceGeometrySource
     RHIBindingTable inputs_, output_, opaqueOwners_;
     RHIBufferSlice constants_;
     std::vector<RHIBufferSlice> drawConstants_;
-    RHIPipelineHandle capturePipeline_, resolvePipeline_;
+    RHIPipelineHandle capturePipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> resolvePipeline_;
     bool doubleSided_{};
     std::uint64_t recordingId_{}, descriptorVersion_{};
     mutable std::atomic<unsigned> recordedStages_{};
@@ -102,7 +105,8 @@ class RasterSurfaceCollector
                      std::shared_ptr<const RasterSurfaceBatch> depthSource,
                      std::shared_ptr<const RasterSurfaceBatch>& result, std::string& error);
     IRenderDeviceServices* device_{};
-    RHIPipelineHandle capturePipeline_, sharedDepthPipeline_, resolvePipeline_;
+    RHIPipelineHandle capturePipeline_, sharedDepthPipeline_;
+    std::shared_ptr<const LX::Runtime::ComputeGeneration> resolvePipeline_;
     bool doubleSided_{};
 };
 } // namespace material_graph
