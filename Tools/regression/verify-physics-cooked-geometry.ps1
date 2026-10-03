@@ -1,4 +1,4 @@
-param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All', [switch]$RequireGpu)
+param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All', [switch]$RequireGpu, [string]$ConvexPoints='')
 
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -35,7 +35,9 @@ foreach($config in $configs){
         Copy-Item (Join-Path $toolset.FullName 'bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.dll') $out -Force
     }
     $fixture=Join-Path $out ('fixture-'+[guid]::NewGuid().ToString('N'))
-    $process=Start-Process $exe -ArgumentList ('"'+$fixture+'"') -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
+    $arguments = @('"'+$fixture+'"')
+    if($ConvexPoints){$arguments += '"'+[IO.Path]::GetFullPath($ConvexPoints)+'"'}
+    $process=Start-Process $exe -ArgumentList $arguments -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
     $handle=$process.Handle
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw 'Cooked geometry timeout'}
     $process.WaitForExit()

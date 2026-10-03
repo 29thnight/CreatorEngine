@@ -7,6 +7,7 @@
 #include <memory>
 #include <span>
 #include <vector>
+#include <algorithm>
 
 // Scene-owned runtime. Registration is authoring membership; no SDK scene exists in editor mode.
 class ScenePhysicsSimulation final
@@ -44,6 +45,12 @@ class ScenePhysicsSimulation final
     {
         binding_id binding;
         ce::physics::pose value;
+    };
+
+    struct render_pose
+    {
+        binding_id binding;
+        ce::physics::pose previous, current;
     };
 
     struct layer_assignment
@@ -96,6 +103,15 @@ class ScenePhysicsSimulation final
     ce::physics::result<void> ApplyForce(binding_id binding, math::vector3 linear, math::vector3 angular,
                                          ce::physics::force_mode mode = ce::physics::force_mode::force);
 
+    ce::physics::result<void> SetPose(binding_id binding, const ce::physics::pose& value);
+    ce::physics::result<void> SetKinematicTarget(binding_id binding, const ce::physics::pose& value);
+    ce::physics::result<ce::physics::pose> RenderPose(binding_id binding) const;
+    std::span<const render_pose> RenderPoses() const noexcept { return m_render; }
+    double InterpolationAlpha() const noexcept { return std::clamp(m_accumulator / fixed_seconds, 0.0, 1.0); }
+
+    ce::physics::result<void> QueryBatch(std::span<const ce::physics::query_request> requests,
+                                        std::span<ce::physics::result<ce::physics::query_result>> results);
+
     bool IsRunning() const noexcept { return bool(m_runtime); }
     std::span<const changed_pose> ChangedPoses() const noexcept { return m_changed; }
     std::span<const changed_character> ChangedCharacters() const noexcept { return m_changedCharacters; }
@@ -122,6 +138,10 @@ class ScenePhysicsSimulation final
         bool enabled = true;
         std::uint64_t publication = 0;
         std::size_t changed_index = 0;
+        ce::physics::pose previous{};
+        std::uint64_t pose_tick = 0;
+        std::uint64_t prepared_tick = 0;
+        std::size_t render_index = 0;
     };
 
     ce::physics::result<void> RequireOwner() const;
@@ -139,6 +159,9 @@ class ScenePhysicsSimulation final
     std::vector<changed_character> m_changedCharacters;
     std::unordered_map<std::uint64_t, binding_id> m_handles;
     std::vector<changed_pose> m_changed;
+    std::vector<render_pose> m_render, m_nextRender;
+    // Owner-only scratch; entry addresses are stable throughout one synchronous step.
+    std::vector<entry*> m_renderPrepared;
     std::unique_ptr<ce::physics::PhysicsScene> m_runtime;
     binding_id m_next = 1;
     std::uint64_t m_publication = 0;

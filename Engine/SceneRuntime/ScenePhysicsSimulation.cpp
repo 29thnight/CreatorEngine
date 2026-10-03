@@ -34,6 +34,9 @@ void ScenePhysicsSimulation::Reset(entry& value)
     value.state.linear_velocity = value.definition.properties.linear_velocity;
     value.state.angular_velocity = value.definition.properties.angular_velocity;
     value.state.mass = value.definition.properties.mass;
+    value.previous = value.state.transform;
+    value.pose_tick = 0;
+    value.prepared_tick = 0;
 }
 
 result<ScenePhysicsSimulation::binding_id> ScenePhysicsSimulation::Register(body_definition definition, bool enabled)
@@ -50,6 +53,9 @@ result<ScenePhysicsSimulation::binding_id> ScenePhysicsSimulation::Register(body
         Reset(value);
         // Secure maps and pose publication capacity before creating an SDK body.
         m_changed.reserve(m_entries.size() + 1);
+        m_render.reserve(m_entries.size() + 1);
+        m_nextRender.reserve(m_entries.size() + 1);
+        m_renderPrepared.reserve(m_entries.size() + 1);
         auto [position, inserted] = m_entries.emplace(id, std::move(value));
         (void)inserted;
         ++m_next;
@@ -96,6 +102,7 @@ result<void> ScenePhysicsSimulation::Unregister(binding_id id)
         m_handles.erase(Key(position->second.body));
     }
     m_entries.erase(position);
+    std::erase_if(m_render, [id](const render_pose& value) { return value.binding == id; });
     std::erase_if(m_changed, [id](const changed_pose& value) { return value.binding == id; });
     return {};
 }
@@ -241,6 +248,8 @@ result<void> ScenePhysicsSimulation::SetEnabled(binding_id id, bool enabled)
         }
     }
     value.enabled = enabled;
+    value.previous = value.state.transform;
+    std::erase_if(m_render, [id](const render_pose& item) { return item.binding == id; });
     return {};
 }
 
@@ -409,6 +418,9 @@ result<void> ScenePhysicsSimulation::Start(const scene_config& config)
         m_handles = std::move(handles);
         m_runtime = std::move(candidate);
         m_changed.clear();
+        m_render.clear();
+        m_nextRender.clear();
+        m_renderPrepared.clear();
         m_accumulator = m_dropped = 0;
         return {};
     }
@@ -423,6 +435,9 @@ result<void> ScenePhysicsSimulation::Stop()
     if (auto owner = RequireOwner(); !owner)
         return owner;
     ce::profile_scope scope{ce::marker<"Physics.PlayStop">()};
+    m_render.clear();
+    m_nextRender.clear();
+    m_renderPrepared.clear();
     m_runtime.reset(); // In-flight fetch/drain and controller/body owners precede authoring restoration.
     m_handles.clear();
     m_changed.clear();
@@ -472,11 +487,46 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
         auto begun = m_runtime->begin_step(static_cast<float>(fixed_seconds));
         if (!begun)
             return std::unexpected(begun.error());
+        // Measurements did not justify competing with SDK workers.
+        // Publish preparation stays after successful fetch.
+        const auto prepare = [&] {
+            const auto submitted = m_runtime->status();
+            ce::profile_context_scope context{{submitted.identity.value, submitted.last_tick.value, 0}};
+            ce::profile_scope scope{ce::marker<"Physics.RenderPrepare">()};
+            // Only owner-side completed values are read here. SDK workers never
+            // access these maps, and no engine callback or structural mutation runs.
+            m_nextRender.clear();
+            m_renderPrepared.clear();
+            for (const auto& old : m_render)
+            {
+                if (old.previous.position == old.current.position && old.previous.rotation == old.current.rotation)
+                    continue;
+
+                const auto found = m_entries.find(old.binding);
+                if (found == m_entries.end())
+                    continue;
+
+                auto& value = found->second;
+                value.prepared_tick = submitted.last_tick.value;
+                value.render_index = m_nextRender.size();
+                m_nextRender.push_back({old.binding, value.state.transform, value.state.transform});
+                m_renderPrepared.push_back(&value);
+            }
+        };
         const auto finished = m_runtime->finish_step();
         if (!finished)
+        {
+            m_nextRender.clear();
+            m_renderPrepared.clear();
             return std::unexpected(finished.error());
+        }
+        prepare();
         ++ticks;
         m_accumulator = (std::max)(0.0, m_accumulator - fixed_seconds);
+        const auto completedTick = m_runtime->status().last_tick.value;
+
+        ce::profile_context_scope mergeContext{{m_runtime->status().identity.value, completedTick, 0}};
+        ce::profile_scope mergeScope{ce::marker<"Physics.RenderMerge">()};
         for (const auto& active : m_runtime->latest_snapshot()->active_poses)
         {
             if (active.body.scene != m_runtime->status().identity)
@@ -485,7 +535,14 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
             if (found == m_handles.end())
                 continue;
             auto& value = m_entries.at(found->second);
+            value.previous = value.state.transform;
+            value.pose_tick = completedTick;
             value.state = active.state;
+            const render_pose rendered{found->second, value.previous, active.state.transform};
+            if (value.prepared_tick == completedTick)
+                m_nextRender[value.render_index] = rendered;
+            else
+                m_nextRender.push_back(rendered);
             if (value.publication != m_publication)
             {
                 value.publication = m_publication;
@@ -495,6 +552,14 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
             else
                 m_changed[value.changed_index].value = active.state.transform;
         }
+        // Commit convergence only after successful fetch. Preparation never changes
+        // public completed state or previous/current history on a failed step.
+        for (auto* value : m_renderPrepared)
+            if (value->pose_tick != completedTick)
+                value->previous = value->state.transform;
+
+        m_renderPrepared.clear();
+        m_render.swap(m_nextRender);
     }
     if (ticks)
     {
@@ -856,4 +921,63 @@ result<void> ScenePhysicsSimulation::MoveCharacters()
                 : step->fall_velocity;
     }
     return {};
+}
+
+
+result<void> ScenePhysicsSimulation::SetPose(binding_id id, const pose& requested)
+{
+    auto body = RequireActiveBody(id);
+    if (!body)
+        return std::unexpected(body.error());
+
+    if (auto moved = m_runtime->set_pose(*body, requested); !moved)
+        return moved;
+
+    auto& value = m_entries.at(id);
+    value.state.transform = requested;
+    value.previous = requested; // Explicit discontinuities never interpolate through old space.
+    for (auto& render : m_render)
+        if (render.binding == id)
+            render.previous = render.current = requested;
+
+    return {};
+}
+
+result<void> ScenePhysicsSimulation::SetKinematicTarget(binding_id id, const pose& requested)
+{
+    auto body = RequireActiveBody(id);
+    if (!body)
+        return std::unexpected(body.error());
+
+    return m_runtime->set_kinematic_target(*body, requested);
+}
+
+result<pose> ScenePhysicsSimulation::RenderPose(binding_id id) const
+{
+    if (auto owner = RequireOwner(); !owner)
+        return std::unexpected(owner.error());
+
+    const auto found = m_entries.find(id);
+    if (found == m_entries.end())
+        return std::unexpected(error{error_code::stale_handle, 0, "Unknown physics render binding"});
+
+    const auto& value = found->second;
+    if (!m_runtime || !value.body || value.state.kind == body_kind::static_body)
+        return value.state.transform;
+
+    const auto alpha = static_cast<float>(InterpolationAlpha());
+    return pose{value.previous.position + (value.state.transform.position - value.previous.position) * alpha,
+                math::slerp(value.previous.rotation, value.state.transform.rotation, alpha)};
+}
+
+result<void> ScenePhysicsSimulation::QueryBatch(std::span<const query_request> requests,
+                                               std::span<result<query_result>> results)
+{
+    if (auto owner = RequireOwner(); !owner)
+        return std::unexpected(owner.error());
+
+    if (!m_runtime)
+        return std::unexpected(error{error_code::wrong_phase, 0, "Physics simulation inactive"});
+
+    return m_runtime->query_batch(requests, results);
 }

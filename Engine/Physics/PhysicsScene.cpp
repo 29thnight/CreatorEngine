@@ -1,4 +1,4 @@
-#include "PhysicsScene.h"
+﻿#include "PhysicsScene.h"
 #include "PhysicsTestHooks.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <physx/PxPhysicsAPI.h>
@@ -13,6 +13,7 @@
 #include <concepts>
 #include <cstdio>
 #include <format>
+#include <limits>
 #include <mutex>
 #include <ranges>
 #include <thread>
@@ -153,7 +154,17 @@ class task_dispatcher final : public physx::PxCpuDispatcher
                         if (m_size == 0 && active_batch)
                         {
 #if !CE_SHIPPING
+                            // Keep this batch counted until publication finishes.
+                            // Only collecting batches can obstruct remaining SDK work.
+                            const bool concurrentPublication = m_outstanding != 0 &&
+                                ce::profiler().state() == ce::recorder_state::recording;
+                            if (concurrentPublication)
+                                lock.unlock();
+
                             ce::profiler().publish_thread();
+
+                            if (concurrentPublication)
+                                lock.lock();
 #endif
                             active_batch = false;
                             --m_active_batches;
@@ -282,6 +293,78 @@ result<scene_id> allocate_scene_id(std::source_location location)
 bool finite(math::vector3 value)
 {
     return std::ranges::all_of(math::components(value), [](float component) { return std::isfinite(component); });
+}
+
+// Reject point clouds without three-dimensional volume before SDK tolerance
+// handling can inflate them into a different shape. All tests use relative units.
+bool convex_has_volume(std::span<const math::vector3> points)
+{
+    using vector = std::array<double, 3>;
+    const auto first = math::components(points.front());
+    const auto offset = [&](math::vector3 point) -> vector {
+        const auto value = math::components(point);
+        return {double(value[0]) - first[0], double(value[1]) - first[1], double(value[2]) - first[2]};
+    };
+    const auto dot = [](const vector& a, const vector& b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; };
+    const auto cross = [](const vector& a, const vector& b) -> vector {
+        return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
+    };
+
+    vector axis{};
+    double lengthSquared = 0;
+    for (const auto point : points)
+    {
+        const auto value = offset(point);
+        const double length = dot(value, value);
+        if (length > lengthSquared)
+        {
+            lengthSquared = length;
+            axis = value;
+        }
+    }
+    if (lengthSquared == 0)
+        return false;
+
+    vector normal{};
+    double areaSquared = 0;
+    for (const auto point : points)
+    {
+        const auto value = cross(axis, offset(point));
+        const double area = dot(value, value);
+        if (area > areaSquared)
+        {
+            areaSquared = area;
+            normal = value;
+        }
+    }
+    if (areaSquared <= lengthSquared * lengthSquared * 1e-12)
+        return false;
+
+    return std::ranges::any_of(points, [&](const auto point) {
+        const double volume = dot(normal, offset(point));
+        return volume * volume > areaSquared * lengthSquared * 1e-12;
+    });
+}
+
+// SDK defaults assume metre-sized hulls. Thin assets need an area threshold based
+// on their own extent; authoring coordinates and the zero-area check stay intact.
+void configure_convex_area(physx::PxCookingParams& params, std::span<const math::vector3> points)
+{
+    const auto first = math::components(points.front());
+    std::array<double, 3> low{first[0], first[1], first[2]}, high = low;
+    for (const auto point : points)
+    {
+        const auto components = math::components(point);
+        for (std::size_t axis = 0; axis < 3; ++axis)
+        {
+            low[axis] = (std::min)(low[axis], double(components[axis]));
+            high[axis] = (std::max)(high[axis], double(components[axis]));
+        }
+    }
+
+    const double extent = (std::max)({high[0] - low[0], high[1] - low[1], high[2] - low[2]});
+    params.areaTestEpsilon = static_cast<float>(
+        std::clamp(extent * extent * 1e-6, double(std::numeric_limits<float>::min()), double(params.areaTestEpsilon)));
 }
 
 bool valid_pose(const pose& value)
@@ -699,8 +782,25 @@ bool CollisionGeometry::gpu_compatible() const noexcept
     return m_state->gpu_compatible;
 }
 
+struct PhysicsSceneChannel::storage
+{
+    scene_id identity;
+    std::atomic<bool> closed{false};
+    std::atomic<std::uint64_t> tick{0};
+    std::atomic<bool> failed{false};
+    std::atomic<std::uint32_t> fetch_failure{0};
+    std::mutex command_mutex;
+    std::vector<command> queued, ready;
+    std::array<std::uint64_t, 256> committed_sequences{};
+    std::uint64_t closed_tick = 0;
+    std::atomic<std::uint64_t> command_rejections{0}, command_overflows{0};
+    std::uint32_t command_capacity = 0;
+    std::atomic<std::shared_ptr<const tick_snapshot>> published;
+};
+
 struct PhysicsScene::implementation
 {
+    std::shared_ptr<PhysicsSceneChannel::storage> access = std::make_shared<PhysicsSceneChannel::storage>();
     std::shared_ptr<sdk_runtime> runtime;
 #if PX_SUPPORT_GPU_PHYSX
     sdk_owner<physx::PxCudaContextManager> cuda;
@@ -710,11 +810,11 @@ struct PhysicsScene::implementation
     sdk_owner<physx::PxScene> scene;                         // Released before dispatcher and SDK.
     sdk_owner<physx::PxControllerManager> character_manager; // Released before the SDK scene.
     std::thread::id owner = std::this_thread::get_id();
-    scene_id identity;
+    scene_id& identity = access->identity;
     bool stepping = false;
-    std::atomic<std::uint64_t> tick{0};
-    std::atomic<bool> failed{false};
-    std::atomic<std::uint32_t> fetch_failure{0};
+    std::atomic<std::uint64_t>& tick = access->tick;
+    std::atomic<bool>& failed = access->failed;
+    std::atomic<std::uint32_t>& fetch_failure = access->fetch_failure;
     std::atomic<scene_phase> phase{scene_phase::idle};
     bool gpu_requested = false;
     execution_backend backend = execution_backend::cpu;
@@ -724,11 +824,13 @@ struct PhysicsScene::implementation
     std::vector<character_slot> characters;
     std::uint32_t free_character_slot = UINT32_MAX;
     std::vector<std::unique_ptr<body_record>> retired;
-    std::mutex command_mutex;
-    std::vector<command> queued, ready;
-    std::array<std::uint64_t, 256> committed_sequences{};
-    std::uint64_t closed_tick = 0;
-    std::atomic<std::uint64_t> command_rejections{0}, command_overflows{0};
+    std::mutex& command_mutex = access->command_mutex;
+    std::vector<command>& queued = access->queued;
+    std::vector<command>& ready = access->ready;
+    std::array<std::uint64_t, 256>& committed_sequences = access->committed_sequences;
+    std::uint64_t& closed_tick = access->closed_tick;
+    std::atomic<std::uint64_t>& command_rejections = access->command_rejections;
+    std::atomic<std::uint64_t>& command_overflows = access->command_overflows;
     std::uint64_t body_count = 0, shape_count = 0, character_count = 0;
     std::uint64_t changed_bodies = 0, changed_shapes = 0, changed_characters = 0;
     std::uint64_t queries = 0, query_hits = 0, query_overflows = 0, query_scratch_peak = 0;
@@ -761,10 +863,11 @@ struct PhysicsScene::implementation
         query_scratch_peak = (std::max)(query_scratch_peak, static_cast<std::uint64_t>(scratch_bytes));
     }
 
-    std::uint32_t command_capacity = 0, event_capacity = 0;
+    std::uint32_t& command_capacity = access->command_capacity;
+    std::uint32_t event_capacity = 0;
     std::shared_ptr<snapshot_pool> snapshots;
     std::shared_ptr<tick_snapshot> pending;
-    std::atomic<std::shared_ptr<const tick_snapshot>> published;
+    std::atomic<std::shared_ptr<const tick_snapshot>>& published = access->published;
 
     result<void> require_idle(std::source_location location) const
     {
@@ -882,8 +985,22 @@ PhysicsScene::~PhysicsScene()
 {
     if (m_state->owner != std::this_thread::get_id())
         std::terminate();
+    // Close admission under the queue lock before joining SDK tasks. Channels do not
+    // touch this object, so racing submit/read operations cannot extend SDK lifetime.
+    {
+        ce::profile_context_scope context{{m_state->identity.value, m_state->tick.load(), 0}};
+        ce::profile_scope scope{ce::marker<"Physics.RequestClose">()};
+        std::lock_guard lock(m_state->command_mutex);
+        m_state->access->closed.store(true, std::memory_order_release);
+    }
     if (m_state->stepping)
         (void)finish_step();
+
+    {
+        std::lock_guard lock(m_state->command_mutex);
+        m_state->queued.clear();
+        m_state->ready.clear();
+    }
 
     m_state->phase.store(scene_phase::closing, std::memory_order_release);
     ce::profile_scope scope{ce::marker<"Physics.SceneDestroy">()};
@@ -959,12 +1076,43 @@ result<std::unique_ptr<PhysicsScene>> PhysicsScene::create(const scene_config& c
     }
 }
 
+result<PhysicsSceneChannel> PhysicsScene::channel(std::source_location location) const
+{
+    if (m_state->owner != std::this_thread::get_id())
+        return std::unexpected(error{error_code::wrong_phase, 0, "Channel acquisition requires the scene owner", location});
+
+    return PhysicsSceneChannel{m_state->access};
+}
+
+scene_id PhysicsSceneChannel::identity() const noexcept
+{
+    return m_storage ? m_storage->identity : scene_id{};
+}
+
+bool PhysicsSceneChannel::is_closed() const noexcept
+{
+    return !m_storage || m_storage->closed.load(std::memory_order_acquire);
+}
+
+std::shared_ptr<const tick_snapshot> PhysicsSceneChannel::latest_snapshot() const noexcept
+{
+    return m_storage ? m_storage->published.load(std::memory_order_acquire) : nullptr;
+}
+
 result<void> PhysicsScene::submit_command(command value, std::source_location location)
 {
+    return PhysicsSceneChannel{m_state->access}.submit(std::move(value), location);
+}
+
+result<void> PhysicsSceneChannel::submit(command value, std::source_location location) const
+{
+    if (!m_storage)
+        return std::unexpected(error{error_code::wrong_phase, 0, "Physics channel is empty", location});
+
     const auto rejected = [&](error failure) -> result<void> {
-        m_state->command_rejections.fetch_add(1, std::memory_order_relaxed);
+        m_storage->command_rejections.fetch_add(1, std::memory_order_relaxed);
         if (failure.code == error_code::capacity_exceeded)
-            m_state->command_overflows.fetch_add(1, std::memory_order_relaxed);
+            m_storage->command_overflows.fetch_add(1, std::memory_order_relaxed);
         return std::unexpected(failure);
     };
     if (value.payload.valueless_by_exception())
@@ -979,29 +1127,31 @@ result<void> PhysicsScene::submit_command(command value, std::source_location lo
         value.payload);
 
     const auto& stamp = value.stamp;
-    if (stamp.scene != m_state->identity)
+    if (stamp.scene != m_storage->identity)
         return rejected(error{error_code::wrong_scene, 0, "Command belongs to another scene", location});
-    if (stamp.tick.value == 0 || stamp.sequence == 0 || stamp.producer >= m_state->committed_sequences.size())
+    if (stamp.tick.value == 0 || stamp.sequence == 0 || stamp.producer >= m_storage->committed_sequences.size())
         return rejected(error{error_code::invalid_argument, 0, "Invalid command identity", location});
 
-    std::lock_guard lock(m_state->command_mutex);
-    if (m_state->failed.load(std::memory_order_acquire))
-        return rejected(error{error_code::backend_initialization, m_state->fetch_failure.load(),
+    std::lock_guard lock(m_storage->command_mutex);
+    if (m_storage->closed.load(std::memory_order_acquire))
+        return rejected(error{error_code::wrong_phase, 0, "Physics channel is closed", location});
+    if (m_storage->failed.load(std::memory_order_acquire))
+        return rejected(error{error_code::backend_initialization, m_storage->fetch_failure.load(),
                               "Scene is in terminal fetch failure", location});
-    if (stamp.tick.value <= m_state->closed_tick)
+    if (stamp.tick.value <= m_storage->closed_tick)
         return rejected(error{error_code::late_command, 0, "Command tick input is already closed", location});
     const auto same_sequence = [&](const command& pending) {
         return pending.stamp.producer == stamp.producer && pending.stamp.sequence == stamp.sequence;
     };
-    if (stamp.sequence <= m_state->committed_sequences[stamp.producer] ||
-        std::ranges::any_of(m_state->queued, same_sequence) || std::ranges::any_of(m_state->ready, same_sequence))
+    if (stamp.sequence <= m_storage->committed_sequences[stamp.producer] ||
+        std::ranges::any_of(m_storage->queued, same_sequence) || std::ranges::any_of(m_storage->ready, same_sequence))
         return rejected(
             error{error_code::duplicate_command, 0, "Producer sequence is already reserved or consumed", location});
-    if (m_state->queued.size() == m_state->command_capacity)
+    if (m_storage->queued.size() == m_storage->command_capacity)
         return rejected(error{error_code::capacity_exceeded, 0, "Command queue is full", location});
 
-    value.m_received_tick = m_state->tick.load(std::memory_order_relaxed);
-    m_state->queued.push_back(std::move(value)); // Storage and owned payload are already allocated.
+    value.m_received_tick = m_storage->tick.load(std::memory_order_relaxed);
+    m_storage->queued.push_back(std::move(value)); // Storage and owned payload are already allocated.
     return {};
 }
 
@@ -1196,8 +1346,15 @@ result<void> PhysicsScene::finish_step(std::source_location location)
     bool fetched = false;
     {
         ce::profile_scope scope{ce::marker<"Physics.FetchWait">()};
-        fetched = m_state->scene->fetchResults(true, &failure);
-        m_state->dispatcher->drain();
+        {
+            ce::profile_scope fetch{ce::marker<"Physics.FetchResults">()};
+            fetched = m_state->scene->fetchResults(true, &failure);
+        }
+
+        {
+            ce::profile_scope drain{ce::marker<"Physics.DispatcherDrain">()};
+            m_state->dispatcher->drain();
+        }
     }
 #if defined(CE_PHYSICS_TESTING)
     if (test::consume(test::failure_point::step_fetch))
@@ -1270,47 +1427,50 @@ result<void> PhysicsScene::finish_step(std::source_location location)
     if (snapshot.step_succeeded)
         m_state->retired.clear(); // Only after removed-shape reports have been copied.
     auto& statistics = snapshot.statistics;
-    statistics.bodies = m_state->body_count;
-    statistics.shapes = m_state->shape_count;
-    statistics.characters = m_state->character_count;
-    statistics.active_bodies = snapshot.active_poses.size();
-    for (const auto& value : snapshot.active_poses)
     {
-        const auto record = m_state->find(value.body, location);
-        if (record)
-            statistics.active_shapes += (*record)->shapes.size();
+        ce::profile_scope statisticsScope{ce::marker<"Physics.SnapshotStatistics">()};
+        statistics.bodies = m_state->body_count;
+        statistics.shapes = m_state->shape_count;
+        statistics.characters = m_state->character_count;
+        statistics.active_bodies = snapshot.active_poses.size();
+        for (const auto& value : snapshot.active_poses)
+        {
+            const auto record = m_state->find(value.body, location);
+            if (record)
+                statistics.active_shapes += (*record)->shapes.size();
+        }
+        statistics.changed_bodies = std::exchange(m_state->changed_bodies, 0);
+        statistics.changed_shapes = std::exchange(m_state->changed_shapes, 0);
+        statistics.changed_characters = std::exchange(m_state->changed_characters, 0);
+        statistics.queries = std::exchange(m_state->queries, 0);
+        statistics.query_hits = std::exchange(m_state->query_hits, 0);
+        statistics.query_overflows = std::exchange(m_state->query_overflows, 0);
+        statistics.query_scratch_peak_bytes = m_state->query_scratch_peak;
+        statistics.events_stored = snapshot.events.size();
+        for (const auto& event : snapshot.events)
+            statistics.contacts_stored += event.contact_count;
+        statistics.workers = m_state->dispatcher->getWorkerCount();
+        const auto submitted = m_state->dispatcher->submitted.load();
+        const auto completed = m_state->dispatcher->completed.load();
+        const auto inline_tasks = m_state->dispatcher->inline_tasks.load();
+        statistics.tasks_submitted = submitted - std::exchange(m_state->prior_submitted, submitted);
+        statistics.tasks_completed = completed - std::exchange(m_state->prior_completed, completed);
+        statistics.tasks_inline = inline_tasks - std::exchange(m_state->prior_inline, inline_tasks);
+        statistics.tick_buffer_bytes = snapshot.commands.capacity() * sizeof(command_outcome) +
+                                       snapshot.events.capacity() * sizeof(collision_event) +
+                                       snapshot.active_poses.capacity() * sizeof(active_body_pose) +
+                                       snapshot.characters.capacity() * sizeof(character_pose);
+        m_state->tick_buffer_peak = (std::max)(m_state->tick_buffer_peak, statistics.tick_buffer_bytes);
+        statistics.tick_buffer_peak_bytes = m_state->tick_buffer_peak;
+        statistics.step_failed = !snapshot.step_succeeded;
+        statistics.command_rejections = m_state->command_rejections.exchange(0);
+        statistics.command_overflows = m_state->command_overflows.exchange(0);
+        {
+            std::lock_guard lock(m_state->command_mutex);
+            statistics.commands_queued = m_state->queued.size();
+        }
+        m_state->snapshots->statistics(statistics);
     }
-    statistics.changed_bodies = std::exchange(m_state->changed_bodies, 0);
-    statistics.changed_shapes = std::exchange(m_state->changed_shapes, 0);
-    statistics.changed_characters = std::exchange(m_state->changed_characters, 0);
-    statistics.queries = std::exchange(m_state->queries, 0);
-    statistics.query_hits = std::exchange(m_state->query_hits, 0);
-    statistics.query_overflows = std::exchange(m_state->query_overflows, 0);
-    statistics.query_scratch_peak_bytes = m_state->query_scratch_peak;
-    statistics.events_stored = snapshot.events.size();
-    for (const auto& event : snapshot.events)
-        statistics.contacts_stored += event.contact_count;
-    statistics.workers = m_state->dispatcher->getWorkerCount();
-    const auto submitted = m_state->dispatcher->submitted.load();
-    const auto completed = m_state->dispatcher->completed.load();
-    const auto inline_tasks = m_state->dispatcher->inline_tasks.load();
-    statistics.tasks_submitted = submitted - std::exchange(m_state->prior_submitted, submitted);
-    statistics.tasks_completed = completed - std::exchange(m_state->prior_completed, completed);
-    statistics.tasks_inline = inline_tasks - std::exchange(m_state->prior_inline, inline_tasks);
-    statistics.tick_buffer_bytes = snapshot.commands.capacity() * sizeof(command_outcome) +
-                                   snapshot.events.capacity() * sizeof(collision_event) +
-                                   snapshot.active_poses.capacity() * sizeof(active_body_pose) +
-                                   snapshot.characters.capacity() * sizeof(character_pose);
-    m_state->tick_buffer_peak = (std::max)(m_state->tick_buffer_peak, statistics.tick_buffer_bytes);
-    statistics.tick_buffer_peak_bytes = m_state->tick_buffer_peak;
-    statistics.step_failed = !snapshot.step_succeeded;
-    statistics.command_rejections = m_state->command_rejections.exchange(0);
-    statistics.command_overflows = m_state->command_overflows.exchange(0);
-    {
-        std::lock_guard lock(m_state->command_mutex);
-        statistics.commands_queued = m_state->queued.size();
-    }
-    m_state->snapshots->statistics(statistics);
 #if !CE_SHIPPING
     if (ce::profiler().counter_enabled(ce::counter_category::physics))
     {
@@ -1505,7 +1665,9 @@ result<std::vector<std::byte>> PhysicsScene::cook_geometry_blob(const geometry_c
             if constexpr (std::same_as<T, convex_cook_input>)
             {
                 if (value.points.size() < 4 || value.points.size() > UINT32_MAX ||
-                    !std::ranges::all_of(value.points, finite)) return false;
+                    !std::ranges::all_of(value.points, finite) || !convex_has_volume(value.points)) return false;
+
+                configure_convex_area(params, value.points);
 
                 physx::PxConvexMeshDesc desc;
                 desc.points.count = static_cast<physx::PxU32>(value.points.size());
@@ -1618,8 +1780,8 @@ result<std::shared_ptr<const CollisionGeometry>> PhysicsScene::cook_convex(std::
         return std::unexpected(phase.error());
     ce::profile_scope scope{ce::marker<"Physics.CookConvex">()};
 
-    if (points.size() < 4 || points.size() > UINT32_MAX || !std::ranges::all_of(points, finite))
-        return std::unexpected(error{error_code::invalid_argument, 0, "Convex requires finite vertices", location});
+    if (points.size() < 4 || points.size() > UINT32_MAX || !std::ranges::all_of(points, finite) || !convex_has_volume(points))
+        return std::unexpected(error{error_code::invalid_argument, 0, "Convex requires finite vertices with nonzero volume", location});
     try
     {
         auto state = std::make_unique<CollisionGeometry::implementation>();
@@ -1627,6 +1789,8 @@ result<std::shared_ptr<const CollisionGeometry>> PhysicsScene::cook_convex(std::
         state->kind = geometry_kind::convex;
         physx::PxCookingParams params(m_state->runtime->physics->getTolerancesScale());
         params.buildGPUData = true;
+        configure_convex_area(params, points);
+
         physx::PxConvexMeshDesc desc;
         desc.points.stride = sizeof(math::vector3);
         desc.points.data = points.data();
@@ -2290,7 +2454,7 @@ result<query_result> PhysicsScene::raycast(math::vector3 origin, math::vector3 d
                                            std::span<query_hit> output, const query_filter& filter,
                                            std::source_location location)
 {
-    if (auto phase = m_state->require_idle(location); !phase)
+    if (auto phase = m_state->require_read(location); !phase)
         return std::unexpected(phase.error());
     if (auto valid = m_state->validate_query_filter(filter, location); !valid)
         return std::unexpected(valid.error());
@@ -2311,7 +2475,7 @@ result<query_result> PhysicsScene::sweep(const geometry& form, const pose& origi
                                          float distance, std::span<query_hit> output, const query_filter& filter,
                                          std::source_location location)
 {
-    if (auto phase = m_state->require_idle(location); !phase)
+    if (auto phase = m_state->require_read(location); !phase)
         return std::unexpected(phase.error());
     if (auto valid = m_state->validate_query_filter(filter, location); !valid)
         return std::unexpected(valid.error());
@@ -2337,7 +2501,7 @@ result<query_result> PhysicsScene::sweep(const geometry& form, const pose& origi
 result<query_result> PhysicsScene::overlap(const geometry& form, const pose& origin, std::span<query_hit> output,
                                            const query_filter& filter, std::source_location location)
 {
-    if (auto phase = m_state->require_idle(location); !phase)
+    if (auto phase = m_state->require_read(location); !phase)
         return std::unexpected(phase.error());
     if (auto valid = m_state->validate_query_filter(filter, location); !valid)
         return std::unexpected(valid.error());
@@ -2356,6 +2520,49 @@ result<query_result> PhysicsScene::overlap(const geometry& form, const pose& ori
     m_state->scene->overlap(resolved->any(), query_pose(form, origin), hits, query_data(), &selection);
     m_state->note_query(hits.summary, 32 * sizeof(physx::PxOverlapHit));
     return hits.summary;
+}
+
+result<void> PhysicsScene::query_batch(std::span<const query_request> requests,
+                                       std::span<result<query_result>> results,
+                                       std::source_location location)
+{
+    if (auto phase = m_state->require_idle(location); !phase)
+        return std::unexpected(phase.error());
+
+    if (results.size() != requests.size())
+        return std::unexpected(error{error_code::invalid_argument, 0,
+                                     "Batch requires one result slot per request", location});
+
+    if (requests.empty())
+        return {};
+
+    ce::profile_context_scope context{{m_state->identity.value,
+                                       m_state->tick.load(std::memory_order_relaxed), 0}};
+    ce::profile_scope batch{ce::marker<"Physics.QueryBatch">()};
+    scoped_scene_phase read_window{m_state->phase, scene_phase::query_read};
+
+    {
+        ce::profile_scope update{ce::marker<"Physics.QueryStructureUpdate">()};
+        m_state->scene->flushQueryUpdates();
+    }
+
+    for (std::size_t index : std::views::iota(std::size_t{0}, requests.size()))
+    {
+        const auto& request = requests[index];
+        results[index] = std::visit([&](const auto& input) -> result<query_result> {
+            using input_type = std::remove_cvref_t<decltype(input)>;
+
+            if constexpr (std::same_as<input_type, ray_query>)
+                return raycast(input.origin, input.direction, input.distance, request.output, request.filter, location);
+            else if constexpr (std::same_as<input_type, sweep_query>)
+                return sweep(input.form, input.origin, input.direction, input.distance,
+                             request.output, request.filter, location);
+            else
+                return overlap(input.form, input.origin, request.output, request.filter, location);
+        }, request.input);
+    }
+
+    return {};
 }
 
 } // namespace ce::physics

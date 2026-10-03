@@ -27,9 +27,17 @@ Check((uint)CharacterCollisionFlags.Simulating == 8 && (uint)CharacterCollisionF
 var assembly = typeof(Physics).Assembly;
 var native = assembly.GetType("CreatorEngine.Native", true)!;
 var version = native.GetField("ExpectedVersion", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
-Check((int)version.GetRawConstantValue()! == 31, "ABI version");
+Check((int)version.GetRawConstantValue()! == 32, "ABI version");
 var summary = assembly.GetType("CreatorEngine.NativePhysicsQueryResult", true)!;
 Check(Marshal.SizeOf(summary) == 12, "query summary layout");
+
+Check(Marshal.SizeOf<PhysicsQueryRequest>() == 48, "batch request layout");
+Check(Marshal.OffsetOf<PhysicsQueryRequest>(nameof(PhysicsQueryRequest.Offset)).ToInt32() == 40, "batch offset layout");
+Check(Marshal.SizeOf<PhysicsBatchResult>() == 16, "batch result layout");
+var batchRequests = new[] { PhysicsQueryRequest.Raycast(default, new Float3(0,-1,0), 10, 0, 0) };
+var batchResults = new PhysicsBatchResult[1];
+Check(Physics.QueryBatch(default, batchRequests, Span<PhysicsHit>.Empty, batchResults) == PhysicsError.WrongPhase,
+      "unbound batch phase contract");
 
 // Unbound calls must reset outputs and report wrong phase, including capacity discovery.
 var result = Physics.Raycast(default, default, new Float3(0, -1, 0), 10, Span<PhysicsHit>.Empty);
@@ -53,4 +61,4 @@ Check(Marshal.OffsetOf<CharacterMovementState>(nameof(CharacterMovementState.For
 Check(character.Jump() == PhysicsError.WrongPhase, "unbound jump");
 Check(character.ForceVelocity(default, 1) == PhysicsError.WrongPhase, "unbound force");
 Check(character.CancelForcedVelocity() == PhysicsError.WrongPhase, "unbound cancel");
-Console.WriteLine($"PHYSICS_SCRIPT_ABI_OK checks={checks} version=31");
+Console.WriteLine($"PHYSICS_SCRIPT_ABI_OK checks={checks} version=32");

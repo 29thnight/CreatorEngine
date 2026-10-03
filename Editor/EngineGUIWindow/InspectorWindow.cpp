@@ -20,6 +20,7 @@
 #include "Animator.h"
 #include "PhysicsBodyComponent.h"
 #include "AuthoringNodeEquality.h"
+#include "AuthoringParsedDocument.h"
 #include "MeshRenderer.h"
 #include "EditorImGuiTexture.h"
 #include "RenderScene.h"
@@ -213,12 +214,19 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
     ImGui::TextDisabled("Apply saves the complete shape list as one Undo entry.");
 }
 
-void draw_character_movement(CharacterMovementComponent& character)
+void draw_character_movement(CharacterMovementComponent& character, editor::widgets::property_layout_state& layoutState)
 {
     const auto target = character.GetOwner()->GetScene()->HandleOf(character.GetOwner()->m_index);
     auto document = Meta::SerializeDocument(&character);
     const auto root = document.Root().Read();
     const auto fieldText = [](Authoring::ReadNode node) {
+        std::string error;
+        auto parsed = Authoring::ParsedDocument{};
+        if (node.IsScalar() && node.Scalar().starts_with("{"))
+        {
+            parsed = Authoring::ParsedDocument::ParseText(node.AsString(), error);
+            if (parsed) node = parsed.Root();
+        }
         if (node.IsMap())
             return std::string(node["x"].AsString()) + ", " + std::string(node["y"].AsString()) + ", " +
                    std::string(node["z"].AsString());
@@ -234,7 +242,7 @@ void draw_character_movement(CharacterMovementComponent& character)
         previousOwner = target;
     }
 
-    ImGui::TextDisabled("World +Y capsule. Positive uniform scale required.");
+    ImGui::TextWrapped("World +Y capsule. Positive uniform scale required.");
     ImGui::BeginDisabled(SceneManagers->IsGameStart() ||
                          EditorObjectOperations::IsEditLocked(character.GetOwner(), true));
     const std::pair<const char*, const char*> fields[]{
@@ -244,12 +252,19 @@ void draw_character_movement(CharacterMovementComponent& character)
         {"m_minimumDistance", "Minimum move (m)"}, {"m_acceleration", "Acceleration (m/s squared)"},
         {"m_brakingDecay", "Braking decay (1/s)"}, {"m_jumpSpeed", "Jump speed (m/s)"},
         {"m_maxFallSpeed", "Maximum fall speed (m/s)"}, {"m_initialVelocity", "Initial velocity (x,y,z m/s)"}};
+    const editor::widgets::property_sheet sheet(layoutState,
+        {"Radius (m)", "Cylinder height (m)", "Contact offset (m)", "Step offset (m)",
+         "Slope limit cosine (0 disables)", "Gravity (m/s squared)", "Minimum move (m)",
+         "Acceleration (m/s squared)", "Braking decay (1/s)", "Jump speed (m/s)",
+         "Maximum fall speed (m/s)", "Initial velocity (x,y,z m/s)"});
+
     for (const auto& [field, label] : fields)
     {
         const auto key = std::to_string(character.GetInstanceID()) + field;
         auto [entry, inserted] = drafts.try_emplace(key, fieldText(root[field]));
         ImGui::PushID(field);
-        ImGui::InputText(label, &entry->second);
+        ImGui::SetNextItemWidth(sheet.line(label));
+        ImGui::InputText("##Value", &entry->second);
         if (ImGui::IsItemDeactivatedAfterEdit())
         {
             const auto result = EditorObjectOperations::Property(target,
@@ -265,7 +280,7 @@ void draw_character_movement(CharacterMovementComponent& character)
     ImGui::EndDisabled();
     if (!failure.empty())
         ImGui::TextWrapped("%s", failure.c_str());
-    ImGui::TextDisabled("Commit on focus loss. Each field uses validated Undo/Redo.");
+    ImGui::TextWrapped("Commit on focus loss. Each field uses validated Undo/Redo.");
 }
 
 struct ComponentMenuVisual
@@ -2509,7 +2524,7 @@ void InspectorWindow::Draw()
 				}
                 else if (auto* character = dynamic_cast<CharacterMovementComponent*>(component.get()))
                 {
-                    draw_character_movement(*character);
+                    draw_character_movement(*character, m_layout);
                 }
                 else if (auto* body = dynamic_cast<PhysicsBodyComponent*>(component.get()))
                 {

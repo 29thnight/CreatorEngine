@@ -1,4 +1,4 @@
-#include "CommandDescriptorSeeds.h"
+﻿#include "CommandDescriptorSeeds.h"
 
 #include <algorithm>
 #include <iterator>
@@ -218,9 +218,9 @@ namespace CommandCore
             { "prefab.update", CommandCost::Frames, "<소스 오브젝트> <프리팹 이름>", "기존 프리팹을 소스 오브젝트로 갱신한다", CommandClass::EngineService, CommandLiveness::Live },
             { "profile.counter-mask", CommandCost::Immediate, "[process|gpu|network|render|managed|resources on|off]", "프로파일러 counter 제공자 마스크를 조회·설정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "profile.frame", CommandCost::Immediate, "", "보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
-            { "profile.pause", CommandCost::Immediate, "", "녹화를 멈춰 그때까지를 얼린다(창이 그것을 집는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
-            { "profile.record", CommandCost::Immediate, "", "얼린 캡처를 남긴 채 기록만 다시 연다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
-            { "profile.save", CommandCost::Immediate, "<new-absolute-path.ceprof>", "Save a frozen profiling capture without replacing an existing file", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "path" },
+            { "profile.pause", CommandCost::Immediate, "", "녹화를 멈춰 그때까지를 얼린다(창이 그것을 집는다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both, "()" },
+            { "profile.record", CommandCost::Immediate, "", "얼린 캡처를 남긴 채 기록만 다시 연다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both, "()" },
+            { "profile.save", CommandCost::Immediate, "<new-absolute-path.ceprof>", "Save a frozen profiling capture without replacing an existing file", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both, "path" },
             { "profile.stats", CommandCost::Immediate, "", "프로파일러 자체 비용과 용량 소진(교란 없음)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             // LC8 — 요약을 **호스트 중립으로 고쳤다.** 두 registry 가 같은 seed 를
             // 나눠 쓰므로 "에디터 종료" 는 Player 의 help 에서 거짓이 된다.

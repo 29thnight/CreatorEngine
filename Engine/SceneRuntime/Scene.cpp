@@ -1,4 +1,5 @@
-﻿#include "Scene.h"
+﻿#include "PhysicsTransformPolicy.h"
+#include "Scene.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-5
@@ -260,6 +261,7 @@ struct SceneRenderRegistryState
 	std::vector<Ticket> dirtyQueue;
 	std::vector<Ticket> drainQueue;
 	std::vector<Dispatch> dispatchQueue;
+    std::vector<EntityHandle> physicsTraversal;
 	uint64_t nextRegistrationGeneration = 1;
 	RenderProxyCommitMetrics metrics{};
 
@@ -280,6 +282,7 @@ struct SceneRenderRegistryState
 		dirtyQueue.clear();
 		drainQueue.clear();
 		dispatchQueue.clear();
+        physicsTraversal.clear();
 		metrics = {};
     }
 };
@@ -1907,8 +1910,43 @@ void Scene::CommitRenderProxies()
     auto renderScene = SceneManagers->GetRenderScene();
     if (nullptr == renderScene) return;
 
+    auto& registry = *m_renderRegistry;
+
+    // Even a frame with no fixed step advances render alpha. Queue only bodies
+    // retained by the last completed tick, plus their render descendants.
+    if (m_physicsSimulation.IsRunning())
+    {
+        const auto status = m_physicsSimulation.Runtime()->status();
+        ce::profile_context_scope context{{status.identity.value, status.last_tick.value, 0}};
+        ce::profile_scope scope{ce::marker<"Physics.RenderInterpolation">()};
+        auto& pending = registry.physicsTraversal;
+        pending.clear();
+        for (const auto& pose : m_physicsSimulation.RenderPoses())
+        {
+            const auto found = m_physicsBodies.find(pose.binding);
+            if (found == m_physicsBodies.end() || !found->second || !found->second->GetOwner())
+                continue;
+
+            pending.push_back(HandleOf(found->second->GetOwner()->m_index));
+        }
+        while (!pending.empty())
+        {
+            const auto handle = pending.back();
+            pending.pop_back();
+            auto* entity = Resolve(handle);
+            if (!entity || entity->IsDestroyMark())
+                continue;
+
+            if (handle.index < registry.entityProxies.size())
+                for (auto* component : registry.entityProxies[handle.index])
+                    PublishRenderProxyDirty(component, ProxyDirty::Transform);
+
+            for (const auto child : entity->GetChildrenIndices())
+                pending.push_back(HandleOf(child));
+        }
+    }
+
 	using Kind = SceneRenderRegistryState::Kind;
-	auto& registry = *m_renderRegistry;
 	uint64_t stale = 0;
 	{
 		std::scoped_lock lock(registry.dirtyMutex);
@@ -2020,6 +2058,8 @@ bool Scene::PublishRenderProxyDirty(Component* component, ProxyDirty dirty)
 
 size_t Scene::PublishRenderProxyDirty(EntityHandle owner, ProxyDirty dirty)
 {
+    if ((static_cast<unsigned>(dirty) & static_cast<unsigned>(ProxyDirty::Transform)) != 0)
+        QueuePhysicsTransform(owner);
 	if (!owner.IsValid() || !AnyProxyDirty(dirty)) return 0;
 	auto& registry = *m_renderRegistry;
 	std::scoped_lock lock(registry.dirtyMutex);
@@ -2620,6 +2660,8 @@ ce::physics::result<void> Scene::RegisterPhysicsBody(PhysicsBodyComponent& compo
 
     component.m_scene = this;
     component.m_binding = *binding;
+    component.m_observedWorld = component.GetOwner()->Transform_().GetWorldMatrix();
+    component.m_observedScale = component.GetOwner()->Transform_().GetWorldScale();
     return {};
 }
 
@@ -2693,6 +2735,8 @@ ce::physics::result<void> Scene::StartPhysicsSimulation()
             if (!definition) return std::unexpected(definition.error());
             auto defined = m_physicsSimulation.Define(component->m_binding, std::move(*definition));
             if (!defined) return defined;
+            component->m_observedWorld = entity->Transform_().GetWorldMatrix();
+            component->m_observedScale = entity->Transform_().GetWorldScale();
             auto enabled = m_physicsSimulation.SetEnabled(component->m_binding, component->IsEnabled());
             if (!enabled) return enabled;
         }
@@ -2805,17 +2849,21 @@ void Scene::FixedUpdate(float deltaSecond)
 
     if (const auto layers = CommitPhysicsLayers(); !layers)
     {
-        Debug::PrintLog(spdlog::level::err, std::string(layers.error().message));
+        SceneManagers->ReportSimulationFailure(std::string(layers.error().message));
         // Request teardown at the host's render-safe structure boundary, never from inside this tick.
-        SceneManagers->SetGameStart(false);
+        return;
+    }
+
+    if (const auto transforms = CommitPhysicsTransforms(); !transforms)
+    {
+        SceneManagers->ReportSimulationFailure(std::string(transforms.error().message));
         return;
     }
 
     const auto advanced = m_physicsSimulation.Advance(deltaSecond);
     if (!advanced)
     {
-        Debug::PrintLog(spdlog::level::err, std::string(advanced.error().message));
-        SceneManagers->SetGameStart(false);
+        SceneManagers->ReportSimulationFailure(std::string(advanced.error().message));
         return;
     }
     if (*advanced == 0) return;
@@ -2854,6 +2902,12 @@ void Scene::FixedUpdate(float deltaSecond)
         }
 
         ApplyWorldWriteBatch(m_physicsTransformWrites, TransformWriteReason::Physics);
+        for (const auto& changed : m_physicsSimulation.ChangedPoses())
+        {
+            const auto found = m_physicsBodies.find(changed.binding);
+            if (found != m_physicsBodies.end() && found->second && found->second->GetOwner())
+                found->second->m_observedWorld = found->second->GetOwner()->Transform_().GetWorldMatrix();
+        }
     }
 
     for (std::uint32_t tick = 0; tick < *advanced; ++tick)
@@ -5139,20 +5193,122 @@ ce::physics::result<PhysicsBodyComponent*> Scene::ResolvePhysicsBody(ce::physics
     return found->second;
 }
 
+ce::physics::result<void> Scene::QueryPhysicsBatch(std::span<const ce::physics::query_request> requests,
+    std::span<ce::physics::result<ce::physics::query_result>> results)
+{
+    return m_physicsSimulation.QueryBatch(requests, results);
+}
+
 ce::physics::result<ce::physics::query_result> Scene::RaycastPhysics(math::vector3 origin, math::vector3 direction, float distance,
     std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter)
 {
-    auto* runtime = m_physicsSimulation.Runtime();
-    if (!runtime) return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0, "Physics simulation inactive"});
+    const std::array requests{ce::physics::query_request{ce::physics::ray_query{origin, direction, distance}, output, filter}};
+    std::array<ce::physics::result<ce::physics::query_result>, 1> results;
+    if (auto batch = QueryPhysicsBatch(requests, results); !batch)
+        return std::unexpected(batch.error());
 
-    return runtime->raycast(origin, direction, distance, output, filter);
+    return results.front();
 }
 
 ce::physics::result<ce::physics::query_result> Scene::OverlapPhysics(const ce::physics::geometry& geometry, const ce::physics::pose& pose,
     std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter)
 {
-    auto* runtime = m_physicsSimulation.Runtime();
-    if (!runtime) return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0, "Physics simulation inactive"});
+    const std::array requests{ce::physics::query_request{ce::physics::overlap_query{geometry, pose}, output, filter}};
+    std::array<ce::physics::result<ce::physics::query_result>, 1> results;
+    if (auto batch = QueryPhysicsBatch(requests, results); !batch)
+        return std::unexpected(batch.error());
 
-    return runtime->overlap(geometry, pose, output, filter);
+    return results.front();
+}
+
+
+void Scene::QueuePhysicsTransform(EntityHandle owner)
+{
+    if (!m_physicsSimulation.IsRunning())
+        return;
+
+    auto* entity = Resolve(owner);
+    if (!entity || !entity->GetComponent<PhysicsBodyComponent>())
+        return;
+
+    std::scoped_lock lock(m_physicsTransformMutex);
+    m_physicsTransformDirty.push_back(owner);
+}
+
+ce::physics::result<void> Scene::CommitPhysicsTransforms()
+{
+    ce::profile_scope scope{ce::marker<"Physics.TransformCommit">()};
+    m_physicsTransformDrain.clear();
+    {
+        std::scoped_lock lock(m_physicsTransformMutex);
+        m_physicsTransformDrain.swap(m_physicsTransformDirty);
+    }
+    std::ranges::sort(m_physicsTransformDrain, {}, [](const auto& handle) {
+        return std::pair{handle.index, handle.generation};
+    });
+    const auto duplicates = std::ranges::unique(m_physicsTransformDrain);
+    m_physicsTransformDrain.erase(duplicates.begin(), duplicates.end());
+    for (const auto owner : m_physicsTransformDrain)
+    {
+        auto* entity = Resolve(owner);
+        if (!entity || entity->IsDestroyMark())
+            continue;
+
+        auto* body = entity->GetComponent<PhysicsBodyComponent>();
+        if (!body || body->m_scene != this || !body->IsEnabled() || body->IsDestroyMark())
+            continue;
+
+        const auto world = entity->Transform_().GetWorldMatrix();
+        if (PhysicsTransformsNear(world, body->m_observedWorld))
+            continue;
+
+        const auto captured = CapturePhysicsTransform(world);
+        if (!captured)
+            return std::unexpected(captured.error());
+
+        if (captured->scale != body->m_observedScale)
+        {
+            if (const auto replaced = body->RefreshRuntimeShapes(); !replaced)
+                return replaced;
+
+            body->m_observedScale = captured->scale;
+        }
+        const auto moved = body->m_motion == ce::physics::body_kind::kinematic
+            ? m_physicsSimulation.SetKinematicTarget(body->m_binding, captured->pose)
+            : m_physicsSimulation.SetPose(body->m_binding, captured->pose);
+        if (!moved)
+            return moved;
+
+        body->m_observedWorld = world;
+    }
+    return {};
+}
+
+
+math::matrix4x4 Scene::PhysicsRenderMatrix(EntityHandle owner) const
+{
+    auto* entity = Resolve(owner);
+    if (!entity)
+        return math::matrix4x4::identity();
+
+    const auto world = entity->Transform_().GetWorldMatrix();
+    if (!m_physicsSimulation.IsRunning())
+        return world;
+
+    for (auto* ancestor = entity; ancestor; ancestor = ancestor->GetParentIndex() == ancestor->m_index
+            ? nullptr : Resolve(HandleOf(ancestor->GetParentIndex())))
+    {
+        auto* body = ancestor->GetComponent<PhysicsBodyComponent>();
+        if (!body || body->m_scene != this || !body->IsEnabled() || body->IsDestroyMark() || !body->RuntimeHandle())
+            continue;
+
+        const auto rendered = m_physicsSimulation.RenderPose(body->m_binding);
+        if (!rendered)
+            return world;
+
+        const auto& transform = ancestor->Transform_();
+        const auto interpolated = math::compose(transform.GetWorldScale(), rendered->rotation, rendered->position);
+        return world * math::inverse(transform.GetWorldMatrix()) * interpolated;
+    }
+    return world;
 }

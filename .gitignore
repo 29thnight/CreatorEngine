@@ -627,3 +627,37 @@ Dynamic_CPP/Assets/Prefabs/BTSmokeProbe.prefab
 !ThirdParty/DotNetHost/lib/nethost.lib
 !ThirdParty/DotNetHost/bin/
 !ThirdParty/DotNetHost/bin/nethost.dll
+
+# Cooked character Player regression inputs.
+!Tools/regression/fixtures/PhysicsCharacterPlayer.creator
+!Tools/regression/fixtures/PhysicsCharacterPlayer.creator.meta
+
+!Tools/regression/fixtures/PhysicsCharacterDestination.creator
+!Tools/regression/fixtures/PhysicsCharacterDestination.creator.meta
+
+!Tools/regression/fixtures/PhysicsCharacterHierarchy.creator
+!Tools/regression/fixtures/PhysicsCharacterHierarchy.creator.meta
+!Tools/regression/fixtures/PhysicsCharacterMesh.creator
+!Tools/regression/fixtures/PhysicsCharacterMesh.creator.meta
+!Tools/regression/fixtures/PhysicsPlayerFloor.cegeometry
+!Tools/regression/fixtures/PhysicsPlayerFloor.cegeometry.meta
+!Tools/regression/fixtures/PhysicsCharacterGeometry.creator
+!Tools/regression/fixtures/PhysicsCharacterGeometry.creator.meta
+!Tools/regression/fixtures/PhysicsPlayerConvex.cegeometry
+!Tools/regression/fixtures/PhysicsPlayerConvex.cegeometry.meta
+!Tools/regression/fixtures/PhysicsPlayerHeightfield.cegeometry
+!Tools/regression/fixtures/PhysicsPlayerHeightfield.cegeometry.meta
+
+# Real static dagger convex Player regression inputs.
+!Tools/regression/fixtures/PhysicsDaggerPlayer.creator
+!Tools/regression/fixtures/PhysicsDaggerPlayer.creator.meta
+!Tools/regression/fixtures/PhysicsDaggerConvex.cegeometry
+!Tools/regression/fixtures/PhysicsDaggerConvex.cegeometry.meta
+!Tools/regression/fixtures/PhysicsDagger.glb.meta
+
+!Tools/regression/fixtures/PhysicsB2Player.creator
+!Tools/regression/fixtures/PhysicsB2Player.creator.meta
+
+# HTTP-authored dense physics query regression scene.
+!Tools/regression/fixtures/PhysicsQueryStress.creator
+!Tools/regression/fixtures/PhysicsQueryStress.creator.meta

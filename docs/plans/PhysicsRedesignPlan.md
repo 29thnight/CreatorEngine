@@ -1302,3 +1302,1565 @@ Player는 시작 전 runtime session policy를 선택하고 공통 fixed simulat
 조회가 포함되어 실행마다 달라질 수 있다. Player 빌드 직후 공용 forest 배포 recipe 불일치로
 Editor 기동이 한 번 실패했으며, 기존 검증용 cooked 환경 자산 복원 후 위 새 실행이 통과했다.
 렌더링 원본 자산은 변경하지 않았다.
+
+
+### 2026-10-02 Debug cooked Player 캐릭터 제품 검증
+
+고정 Scene `Tools/regression/fixtures/PhysicsCharacterPlayer.creator`와
+`CharacterPlayerProbe`를 격리한 프로젝트에 복사하고 새 Debug 배포본으로 CEDO1/CEMF/pak를
+만드는 `build-physics-character-player-fixture.ps1`을 추가했다. 입력은 추적된 Prim_Cube
+모델·기본 셰이더·공통 레이어 설정이며 기존 게임 프로젝트/엔진 pin을 변경하지 않는다.
+Primitive 바닥·독립 캐릭터·카메라의 4 Entity/8 component Scene이다.
+
+실제 PostPhysics에서 완료 tick, 바닥 접촉, 입력·가속 이동, grounded jump·상승·공중 재점프
+거부, 착지, 시간제 force·만료 이동량, teleport와 motion reset을 12 checks로 검증한다.
+일반 상태 조회의 반복 횟수는 검사 수에 포함하지 않는다.
+`player.scene`의 읽기 전용 진단에 simulating/editorSceneLoaded/hasAuthoringSnapshot을 추가했다.
+`verify-physics-character-player.ps1`은 소유 PID/token endpoint만 사용하고, 시작/완료 시
+Editor restoration 상태와 snapshot이 명시적으로 false임을 확인한다. normal quit exit=0과
+immutable package 전체 파일 집합/해시도 대조한다.
+
+검증: Player·AssetCooker·AssetPacker·BuildTool Debug 및 GameScripts Debug/Release 빌드 통과.
+새 로컬 배포 buildId `38cc3d85-0f0f-48f7-97ae-827d4e00220a`에서 package smoke 통과:
+CEDO1 runtime documents 4개, CEMF cooked catalog, authoring text-parser calls=0.
+동일 최종 package의 smoke 및 독립 Player 실행 각각 12 checks/failed=0/tick=138.
+독립 실행은 simulating=true, editorSceneLoaded=false, hasAuthoringSnapshot=false를 시작/완료
+모두 확인하고 exit=0, package 243 files byte-identical을 검증했다.
+
+증거: `Build/Obj/Phase19Player/package-final.log`,
+`Build/Obj/Phase19Player/Fixture4/Staging/Game-ed0be4b7a0fb4582b564d3a898f4daea`,
+`Build/Obj/Phase19Player/run-32b02568625f42a1a90ab95c7919f926/result.json`.
+첫 후보의 필수 셰이더 입력 누락은 fixture 입력 수정으로 해결했다. 배포 직전 forest recipe는
+기존 검증된 cooked artifact를 사용했다. 제품 원본 렌더 자산은 변경하지 않았다.
+
+범위는 Debug CPU primitive/CCT cooked Player다. Release/Shipping, cooked mesh/geometry 충돌,
+Player DDOL 전환, 실제 콘텐츠 이전 및 DDOL 자식 계층/직접 Inspector는 잔여다.
+C0/C1/M0 전체를 완료로 판정하지 않으며 progress를 유지한다.
+
+
+### 2026-10-02 Editor DDOL 자식 계층 회귀
+
+`verify-physics-character-http.ps1 -ScriptProbe -MotionProbe -HierarchyProbe`를 추가했다.
+HierarchyProbe는 DdolProbe를 포함하며 HTTP로 회전30°/균일2배 스케일의 PersistentParent,
+활성 CharacterGateActor 자식, 중간 PersistentBranch, 비활성 캐릭터/강체 손자를 저작한다.
+손자 캐릭터는 Enemy, 강체는 Ground 공통 레이어를 사용한다.
+
+자식 CharacterGateActor에 DDOL을 지정해 상위 부모 승격·서브트리 이송을 실제 실행한다.
+모든 노드의 새 Scene 소속, 이전 CLI 핸들 거부, component instance/공통 레이어/활성 상태,
+parent remap과 children 정확한 신원·개수를 검사한다. 정적 부모·손자의 월드 위치·회전·스케일
+보존, 활성 자식의 motion 연속성과 목적지 낙하, 기존 C# wrapper 유지도 함께 확인한다.
+비활성 손자 캐릭터는 입력 2m/s와 위치가 보존되고 새 Scene에서 SDK controller를 활성화할
+수 있다. 두 번째 씬 이송도 기존 DDOL gate를 통과한다.
+
+Stop 후 전체 저작 계층의 월드 Transform·레이어·활성 상태와 부모 관계를 복원한다.
+비활성 저작 컴포넌트는 Stop 직후 물리 세션에 미등록일 수 있으므로 재Play에서 tick=0/
+simulating=false/initial input=2를 확인하고, 재활성화 및 두 번째 Stop의 disabled 복원을 검증한다.
+회전 부모의 왕복 좌표는 float 환산 차이를 허용하는 0.0001m 허용 오차로 비교한다.
+약1e-7m 차이를 상태 손실로 판정하지 않는다.
+
+최종 Editor Debug HTTP 145명령·실제 PostPhysics C# 기본18 assertions 성공.
+증거: `Build/Obj/Phase19C0/http-b61dd1be206b411e829ace6b7a167c83/result.json`,
+`Build/Obj/Phase19Hierarchy/http.log`. 제품 런타임 수정 없이 회귀 gate를 확장했다.
+Editor의 위 계층 범위이며 Player DDOL 전환, 동적 물리 부모의 중첩 제어·지원 정책,
+직접 UI/렌더 캡처, Release/Shipping/cooked mesh 및 실제 콘텐츠 이전은 잔여다.
+C0/C1 전체 완료로 판정하지 않는다.
+### 2026-10-02 C0/C1 — 실제 Inspector 입력·폭 전환·기즈모 화면 검증
+
+실제 Editor UI에서 긴 CharacterMovement 필드 이름이 오른쪽으로 넘치고 초기 속도가
+`{x: 0, y: 0, z: 0}` 문자열로 표시되는 문제를 확인했다. 공통 property_sheet 배치로
+12개 필드의 라벨·값 폭과 좁은 폭의 세로 배치를 통일했다. 복합 직렬화 스칼라는 문서
+수명을 유지하며 읽어 초기 속도를 Property 입력과 같은 `x, y, z`로 표시한다.
+안내·실패 문구도 가용 폭 안에서 줄바꿈한다. 물리 핫패스 변경은 없다.
+
+전체 Editor Debug 빌드 성공. Sky 실제 마우스·키 입력으로 Radius 변경을 커밋하고
+저장 파일/Undo/Redo를 확인했다(0.5 → 입력 75 → Undo 0.5 → Redo 75).
+UI의 -1 입력은 Invalid character capsule을 표시하고 값 75를 복원하며 Undo 깊이 6을
+유지했다. Play 중 필드/개별 enable가 비활성이고 실제 클릭·키 입력에도 값/Undo가
+변하지 않았다. simulating=true를 읽었으며 Stop 후 radius 0.5와 편집 가능 상태를 확인했다.
+
+uiScale 2.25의 실제 패널 및 논리 폭 240에서 12개 property lines, overflow=0,
+최소 값 폭 각각 410.5/495px를 확인했다. Scene 화면에서 cyan 물리 캡슐, contact 경계,
+green foot, amber step 표시를 직접 확인했다. `render.live.fence`의 afterFrame 38548보다
+completedFrame 38549가 커진 뒤 새 화면을 캡처했다. 좁은 배치 캡처도 별도 완료 대기 후
+보관했다. 초기 카메라 전환 시 sync 서비스 5초 제한을 만난 요청은 완료 증거로 사용하지
+않았으며 최종 async fence 성공을 사용했다. 보류한 RHI 내부 capture 이슈의 해결 주장은 없다.
+
+증거: `Build/Obj/Phase19InspectorUI/result.json` 11개 증거 단정 통과,
+`commands.jsonl`, `build.log`, `inspector-gizmo.png`, `inspector-narrow.png`.
+이는 실제 UI 회차와 저장된 증거에 대한 검증이며 무인 UI 자동화 gate 전체를 뜻하지 않는다.
+C0/C1은 진행 상태 유지. Release/Shipping cooked Player, Player DDOL, cooked mesh,
+실제 콘텐츠 이전과 지원 정책 확정은 잔여다.
+최종 수정 빌드에서 `verify-physics-character-http.ps1 -ScriptProbe -MotionProbe`도 재통과했다. 증거: `Build/Obj/Phase19C0/http-f0d9d91d1fe54f07aaa8402624ff4e31/result.json`.
+### 2026-10-02 C0/C1 — cooked Player Release / Shipping 실행 검증
+
+고정 `PhysicsCharacterPlayer.creator`를 Release와 Release+EngineShipping=true의 각각
+검증된 엔진 배포본으로 cook/pack했다. Release Editor/Player/AssetCooker/AssetPacker,
+Shipping Player 및 BuildTool 빌드 성공. Jolt나 별도 물리 레이어 경로는 추가하지 않았다.
+`build-physics-character-player-fixture.ps1`에 Shipping 패키징 분기를 추가했고 단일
+`--shipping` 인자가 문자별로 splat되지 않도록 string[]으로 전달한다.
+
+`verify-physics-character-player.ps1`의 Development 경로는 실제 HTTP player.scene으로
+simulating=true/editorSceneLoaded=false/hasAuthoringSnapshot=false를 확인하고 quit한다.
+Shipping 경로는 서비스가 컴파일에서 빠지므로 HTTP를 기다리지 않고 실제 PostPhysics
+C# 12개 검사, 요청한 2000 GT 프레임/최소8 display promotions 이후 smoke 종료,
+서비스 compiled=no/enabled=no, endpoint 없음, text-parser calls=0을 확인한다.
+Shipping의 저작 스냅샷 여부를 HTTP로 관측했다고 주장하지 않는다.
+
+두 패키지 모두 CEMF/cooked Scene, jump/airborne rejection/landing/force expiration/
+teleport reset 등을 실제로 실행해 각12/0, tick138, 종료0, 238파일 집합·바이트 보존 통과.
+Release의 개발용 서비스와 Shipping 서비스 부재는 별도 import/string 격리 gate에서도
+확인했다(Development WS2_32 있음 / Shipping 없음; WSAStartup/endpoint.json/
+CommandService 문자열도 Development에 있고 Shipping에 없음).
+
+Release 배포 ID df7f2fac-fdb4-4376-86cc-2c621dad5929,
+최종 Shipping 배포 ID db6d4d8c-71cd-42bc-9bae-065236d7eedd.
+Shipping 첫 패키징 시도의 인자 전달 오류 및 긴 .NET 배포 경로의 파일 매핑 오류는
+최종 성공에 포함하지 않았다. 새 `Build/Obj/P19RS`의 짧은 격리 경로에서 재실행했다.
+로컬 --no-pointer 배포본이며 저장소 push/공식 배포 포인터 변경은 없다.
+
+증거: `Build/Obj/Phase19PlayerRelease/result.json`(최종 묶음), 같은 폴더의 빌드/
+package-release/package-shipping-short/gate-release/gate-shipping/shipping-isolation 로그.
+독립 실행: `Build/Obj/Phase19Player/run-f92825a607a3495993e07675ec13bf11/result.json`,
+`Build/Obj/Phase19Player/run-bddea89074bb401ba67bfd5280b9e327/result.json`.
+기존 Debug 패키지도 수정 verifier로 재검증해12/0·종료0·243파일 보존을 통과했다.
+
+이번 증거는 DX12·CPU CCT·primitive 충돌·고정 cooked 캐릭터 씬의 D/R/Shipping 실행이다.
+Player DDOL 전환, cooked mesh 물리, 동적 물리 부모 정책, 실제 콘텐츠 이전과 성능 수용은
+잔여이며 C0/C1/M0 전체 완료로 올리지 않는다. 다음은 Player DDOL 전환의 실행 증거다.
+
+### 2026-10-02 Player DDOL cooked 재로드 실행 증거
+
+Debug Player의 기존 --smoke-reload 경로에 --smoke-ddol-character를 연결했다.
+첫 display promotion 이후 같은 cooked startup Scene을 비동기로 준비하고,
+활성화 직전 대상의 Teleport/desired velocity/10초 force를 설정해 DDOL 루트 계층을 이송한다.
+새 씬의 native binding과 30 fixed ticks, 활성화 이후 completed display를 기다린 뒤 정상 종료한다.
+새 공개 C# API나 Editor rollback 경로를 추가하지 않았다.
+
+실제 패키지의 기본 motion 12/0(tick138), DDOL 8/0(tick30) 통과.
+기존 C# wrapper를 재조회하지 않고 사용해 OnAdded 2회/OnRemoving 1회,
+Simulating, desired X=1.25, force 잔여 시간, 강제 이동/중력/낙하와 새 fixed tick을 검증했다.
+종료0, 243파일 집합 및 SHA256 보존, cooked Scene 2회 로드, CEMF,
+서비스 compiled=yes/enabled=no와 text-parser calls=0을 확인했다.
+DDOL 검증은 HTTP를 켜지 않으므로 snapshot 상태를 HTTP로 관측했다고 주장하지 않는다.
+
+증거: Build/Obj/Phase19Player/run-e5daef0567c84a5fa0d92288a13a1f5b/result.json,
+player.out 및 Runtime 로그. 빌드/격리 배포/패키징 로그는
+Build/Obj/Phase19Player/ddol-{build,publish,package,gate}.log.
+로컬 배포 d64b66ac-b62e-4cd6-a638-12bceca33f3d, Player.runtime SHA256
+779E83BB742C5B0EDDBC57B18579C738EE66344363FE06EB59A78353F7809ACA.
+
+범위는 Debug/DX12/CPU CCT/primitive/동일 cooked 씬 재로드의 활성 DDOL 루트다.
+서로 다른 목적지, Player 비활성 자식 계층 및 stale Scene CLI handle,
+Release/Shipping DDOL은 별도 실행 증거가 필요하다. C0/C1/M0는 progress를 유지한다.
+
+### 2026-10-02 서로 다른 cooked 목적지로 Player DDOL 전환 — D/R/Shipping
+
+Editor HTTP CLI scene.new/object.create/component.add/object.property/object.transform/
+scene.save로 PhysicsCharacterDestination 씬과 primary DestinationCamera를 저작했다.
+목적지 GUID 2ef81ba4-399d-4170-bd85-931c3264b423은 출발지 GUID와 다르며,
+목적지에는 PhysicsBody/CharacterMovement 컴포넌트가 없다. fixture와 meta를 고정하고
+격리 프로젝트 패키징에 포함했다. --smoke-reload-destination으로 기존 비동기 준비/
+owner 활성화 경로를 사용한다. C# 공개 API/ABI 변경은 없다.
+
+Debug/Release/Shipping을 새로 빌드하고 --no-pointer 로컬 배포본으로 패키징했다.
+각 실제 PostPhysics 기본12/0(tick138) + DDOL8/0(tick30), 다른 cooked GUID 로드,
+전환 후 completed display, 종료0 통과. 패키지 파일 집합과 SHA256도 각각
+243/238/238개 보존했다. CEMF entries13/sources111, runtime text-parser calls=0.
+기존 C# wrapper를 사용해 OnAdded2/OnRemoving1, Simulating, desired X=1.25,
+force 잔여9~9.51초, X=1.4~1.8/Y=3.3~4.2 범위, 낙하와 새 physics tick을 확인했다.
+
+Shipping은 서비스 compiled=no/enabled=no, endpoint 없음 및 최소8 display promotions
+뒤 정상 종료를 추가로 확인했다. 새 Development/Shipping 바이너리의 WS2_32/import와
+WSAStartup/endpoint.json/CommandService 문자열 격리 gate도 통과했다.
+이번 DDOL 실행은 모든 구성에서 HTTP를 켜지 않았다. 저작 snapshot 여부에 관한
+기존 Development 관측은 앞선 검사 증거이며 이번 실행의 관측값은 null이다.
+
+첫 목적지 fixture에는 카메라가 없어 physics8/0 이후 표시 대기 timeout이 발생했다.
+Object::SetDontDestroyOnLoad는 synthetic Scene root(index0)를 이송하지 않는다.
+이 출발지의 캐릭터는 Scene root 직속이므로 캐릭터만 이송되며, 출발지의 바닥과
+카메라는 이전 씬과 함께 정리된다. 목적지 카메라를 CLI로 저작한 뒤 재검증했다.
+실패/진단 실행은 최종 성공에 포함하지 않았다. 저작 Editor 종료도 timeout 후
+소유한 프로세스만 정리했으므로 Editor 정상 종료 검증으로 계산하지 않는다.
+
+최종 묶음: Build/Obj/P19DD2/result.json. 개별 실행:
+- Debug: Build/Obj/Phase19Player/run-5ad7919c947e40c2bcf7a4f3342ccba8/result.json
+- Release: Build/Obj/Phase19Player/run-d472809deec44c369749ac226d4efa7c/result.json
+- Shipping: Build/Obj/Phase19Player/run-bd641ad77a114af4b531b6bd366b5c91/result.json
+빌드/저작/격리 로그는 Build/Obj/P19DD2, Debug/Release 배포·패키징 로그는
+같은 폴더의 D2/R, Shipping은 긴 Windows .NET 경로를 피한 Build/Obj/DD/S에 있다.
+
+범위는 DX12/CPU CCT/primitive와 활성 top-level 캐릭터 1개의 전환이다.
+Player 비활성 자식 계층, stale Scene CLI handle, cooked mesh 물리,
+실제 콘텐츠 이전과 성능 수용은 잔여다. C0/C1/M0는 progress를 유지한다.
+
+### 2026-10-02 Player DDOL 비활성 자식 계층·Scene 핸들 — D/R/Shipping
+
+Editor HTTP CLI로 PhysicsCharacterHierarchy를 저작했다. GUID는
+af55790d-53c0-43b6-b4dc-6515b414e0e1이며 회전·균일 스케일 부모 아래의 활성 캐릭터,
+중간 부모, 비활성 CharacterMovement/PhysicsBody를 포함한 5개 노드를 이송한다.
+기존 Enemy/Ground 레이어를 사용한다. 목적지는 앞선 별도 cooked 카메라 씬이다.
+synthetic Scene root는 이송하지 않으며 실제 부모 계층의 pointer identity를 유지한다.
+
+최종 소스의 Debug/Release/Shipping 빌드, 격리 배포와 패키징 뒤 각 76/0 통과:
+기본 이동12/0(tick154), 기존 C# wrapper 이송8/0(tick30), native 계층56/0(tick90).
+5개 노드의 owner, 이전 Scene EntityHandle 거부, 새 핸들 resolve, 컴포넌트 identity,
+레이어·enabled, world pose와 부모·순서 있는 자식 remap을 검증했다.
+비활성 자식 입력/상태 및 SDK 핸들 부재, 재활성화 시 controller/body 재생성,
+중력·이동과 force 시간 진행, 다시 비활성화 후 자세·tick·양수 force 잔여 시간의
+정지를 확인했다. Scene별 SDK 핸들 숫자가 반드시 달라야 한다고 가정하지 않는다.
+
+기존 --smoke 2000 / 최소8 promotions와 slot rotation, 목적지 활성화 이후
+completed display를 유지했다. Offscreen을 사용하지 않았다. 세 구성 모두 종료0,
+243/238/238개 패키지 파일 집합·SHA256 보존, CEMF entries14/sources112,
+text-parser calls=0. Shipping 서비스 compiled=no/enabled=no, endpoint0 및
+최종 바이너리의 Development/Shipping 소켓·서비스 import/문자열 격리도 통과했다.
+DDOL 실행은 HTTP를 켜지 않으므로 저작 snapshot 관측값은 null이다.
+
+첫 계층 baseline은 절대 X좌표를 이동 거리로 사용해 실패했다. 시작 X 대비 변위로
+수정했다. 이후 Development 계층 verifier가 Hierarchy→Ddol 정규화 이전에 실행
+인자를 만들어 --smoke를 누락한 오류를 수정했다. 이 진단 timeout을 렌더러/RHI
+실패로 계산하지 않는다. 실제 인자를 launch.json에 기록하며 실패/임시 진단 배포본은
+최종 성공에 포함하지 않는다. 저작 Editor quit timeout도 정상 종료 증거가 아니다.
+
+최종 묶음: Build/Obj/P19DH/result.json. 개별 실행:
+- Debug: Build/Obj/Phase19Player/run-0a62075c972e4112ad2d1fda8edb1937/result.json
+- Release: Build/Obj/Phase19Player/run-7cc031c9436a4fa0b53c3a89bb9b20ba/result.json
+- Shipping: Build/Obj/Phase19Player/run-39359aa592d8475fb60c1260d1db8398/result.json
+빌드/저작/격리 로그는 Build/Obj/P19DH, 배포·패키징은 D3/R 및 Build/Obj/DH/S.
+범위는 DX12/CPU CCT/primitive와 고정 계층 fixture다. cooked mesh 물리,
+실제 콘텐츠 이전·캐릭터 전체 회귀·성능 수용은 잔여이며 C0/C1/M0는 progress다.
+
+### 2026-10-02 cooked triangle mesh 바닥 — 실제 Player D/R/Shipping
+
+Editor HTTP CLI geometry.create/physics.shapes/object.transform/scene.save로
+PhysicsPlayerFloor.cegeometry(revision1)와 PhysicsCharacterMesh를 저작했다.
+geometry UUID 578cd3b3-bd67-450c-a1d1-786ee613f24f, 씬 GUID
+40e1f75b-57d2-40d9-9e6f-1fc882869740. 바닥은 static PhysicsBody의 kind4
+triangle mesh 1개이며 primitive 바닥을 남기지 않았다. 저장한 source/meta를
+fixture로 고정하고 격리 프로젝트 cook→CEMF→Pak→Player 경로에 포함했다.
+
+최종 Debug/Release/Shipping 배포본에서 각각 기존 실제 PostPhysics 이동·접지·
+가속·force·낙하12/0(tick138), 해당 cooked Scene GUID 로드, 종료0 통과.
+실행 중 RuntimeContent의 .cepg 1개와 SHA256, 저작용 .cegeometry 0개를 확인했다.
+종료 시 임시 mount가 정리되므로 artifact 검사는 종료 전에 수행한다.
+패키지 파일 집합·SHA256은 243/238/238개 보존. CEMF entries16/sources113.
+Development 두 구성은 HTTP player.scene의 초기/최종 simulating=true,
+editorSceneLoaded=false/hasAuthoringSnapshot=false를 관측했다.
+Shipping은 서비스 compiled=no/enabled=no, endpoint0, parser0 및 기존
+--smoke 2000/최소8 promotions와 정상 종료를 확인했다. HTTP 관측은 null이다.
+
+기반 cooked geometry 검사도 Debug/Release/Shipping/ASan을 새로 빌드·실행하여
+각1809 checks, gpu_verified=true 통과. convex/triangle/heightfield의 producer
+출력, revision/source identity, 손상·잘림·SHA256 거부, source/loose artifact 제거
+후 CEMF/Pak 읽기·CPU/GPU SDK import·ray hit·해제, import3/cook0를 검증했다.
+
+첫 기반 Release/Shipping 실행은 별도 두 cook의 SDK blob 전체 바이트 동일성에서
+실패했다. 검사에 source_location 진단을 추가하고 실제 producer 출력의
+revision/종류/source hash를 검증한 뒤 그 출력 자체를 CEMF/Pak/import에 사용했다.
+개별 artifact의 SHA256 및 손상 거부 검사는 유지했다. 재cook 간 blob 바이트
+결정성을 확인했다고 주장하지 않는다. 첫 CLI geometry.create는 존재하지 않는
+부모 디렉터리 때문에 거부됐으며 Assets 루트의 새 파일로 저작했다.
+wrapper의 첫 검사는 Scene 로그 위치/종료 후 mount 정리를 고려하지 못해 실패했다.
+stdout을 포함하고 실행 중 artifact를 검사하도록 수정했다. 실패 로그는 성공에
+포함하지 않으며 저작 Editor quit timeout도 정상 종료 증거가 아니다.
+
+최종 묶음: Build/Obj/P19Mesh/result.json. 개별 Player 실행:
+- Debug: Build/Obj/Phase19Player/run-deeb3d9c92eb4e608999254bbfc4d92d/result.json
+- Release: Build/Obj/Phase19Player/run-5119ef78da614901862305fc67e7351e/result.json
+- Shipping: Build/Obj/Phase19Player/run-04dd5a43656c4032ac0e56d28e80afb7/result.json
+저작/배포·패키징/실행 로그는 Build/Obj/P19Mesh 및 Shipping Build/Obj/Mesh/S.
+기반 최종 로그는 P19Mesh/cooked-final.log, 개별 로그는 Phase19CookedGeometry.
+
+범위는 DX12/CPU CCT의 고정 triangle mesh 바닥이다. 기반 SDK 검사와 실제 Player
+범위를 구분한다. Player convex/heightfield·mesh DDOL, 실제 콘텐츠 이전,
+캐릭터 전체 회귀와 성능 수용은 잔여이며 B1/C0/C1/M0는 progress를 유지한다.
+
+### 2026-10-02 Player convex·heightfield 및 mesh DDOL — D/R/Shipping
+
+HTTP CLI geometry.create/physics.shapes/script.add/object.parent/scene.save로
+PhysicsCharacterGeometry(GUID 9e8090b1-8f12-46ee-b554-610bc247dd08)를 저작했다.
+triangle mesh 바닥 외에 별도 위치의 convex 상자 바닥과 평평한 2×2 heightfield,
+각각의 CharacterMovement/CharacterPlayerProbe를 배치했다. 모든 geometry는
+revision1이며 새 source/meta 두 쌍과 씬/meta를 fixture로 고정했다.
+GeometryPersistentParent 아래에 mesh 바닥·기존 캐릭터를 묶어 부모 계층을 DDOL한다.
+목적지는 기존 별도 cooked 카메라 씬이며 convex/heightfield 계층은 이송하지 않는다.
+
+최종 소스 Debug/Release/Shipping 빌드 및 격리 배포·패키징 뒤 각71/0 통과:
+세 바닥의 실제 PostPhysics 접지·이동·점프·착지·force·teleport 각각12/0=36/0,
+기존 C# 참조의 이송 lifecycle/input/force/gravity/tick8/0,
+native 캐릭터·mesh 바닥·부모 3노드 계층/핸들24/0과 목적지 body/import/cook3/0.
+이전 Scene EntityHandle 거부, 새 핸들 resolve, 컴포넌트 identity, layer/enabled,
+world pose, 부모·순서 있는 자식 remap을 확인했다. SDK 핸들 숫자 차이는 가정하지 않는다.
+목적지의 mesh RuntimeHandle 유효성 및 cache imports1/assets1/cooks0을 확인했고,
+출발지도 imports3/cooks0을 이송 전 필수 조건으로 확인했다.
+
+Scene 캐시는 비공개로 유지하고 ReadCollisionGeometryStatistics()가 owner-thread
+검사를 거친 수치 사본만 반환하도록 했다. 변경 가능한 cache/asset 접근이나 C# API를
+추가하지 않았다. cold regression 진단이며 물리 scheduling/solver 설정 변경은 없다.
+
+실행 중 CEPG3개·각 SHA256과 저작용 .cegeometry0개, CEMF entries19/sources114,
+서로 다른 cooked GUID 로드, 목적지 활성화 이후 completed display, 종료0 통과.
+패키지 파일 집합·SHA256은 243/238/238개 보존했다. Offscreen 없이 기존
+2000 GT frames/최소8 promotions·slot rotation을 유지했다. parser calls=0,
+Shipping service compiled=no/enabled=no·endpoint0 및 최종 바이너리의
+Development/Shipping 소켓·서비스 import/문자열 격리도 통과했다.
+이번 DDOL 실행은 HTTP를 켜지 않으므로 snapshot 관측값은 null이다.
+저작 Editor quit timeout은 별도 기록하며 정상 종료 검증으로 세지 않는다.
+
+최종 묶음: Build/Obj/P19Geo/result.json. 개별 실행:
+- Debug: Build/Obj/Phase19Player/run-2df96f26eda342b9b5aacb52f111d169/result.json
+- Release: Build/Obj/Phase19Player/run-32b947c2c3664b5889dd8bd232d5cbcb/result.json
+- Shipping: Build/Obj/Phase19Player/run-e3e8693a669840c4aac97296ab917101/result.json
+빌드/저작/격리 로그는 P19Geo, 배포·패키징은 같은 폴더 D/R 및 Build/Obj/GD/S.
+
+범위는 DX12/CPU CCT의 static convex·평평한 heightfield·triangle mesh와 mesh DDOL이다.
+목적지 mesh body 재생성까지 검증했으며 목적지에서 재착지하는 추가 contact gate는
+이번 검사에 포함하지 않았다. 실제 Player의 missing/corrupt/revision closure 실패,
+동적 convex·경사/계단·실제 콘텐츠 이전·전체 회귀·profiler/성능 수용은 잔여다.
+B1/C0/C1/M0는 progress를 유지한다.
+
+### 2026-10-02 목적지 재착지·실제 Player geometry 실패 — D/R/Shipping
+
+기존 geometry DDOL gate를 목적지 tick90까지 연장했다. mesh 바닥에서 Below와
+foot Y≈0, 계속된 X 이동과 양수 force 잔여 시간을 추가 검증한다. 세 바닥 motion36,
+C# 이송8, native 계층/재생성/재착지29로 최종 정상 경로는 각73/0이다.
+
+정상 배포본의 격리 사본만 변형하는 C++23 Pak mutator를 추가했다. 공식
+Pak::Archive/Builder와 CEMF reader/writer/SHA256을 사용해 Pak index는 정상으로
+유지한다. 대상은 mesh UUID 578cd3b3-bd67-450c-a1d1-786ee613f24f 하나다.
+- missing: CEMF 참조를 유지한 채 해당 CEPG entry만 제거.
+- corrupt: CEPG byte를 변경하고 기존 CEMF hash를 유지.
+- revision: Scene의 요청1은 유지하고 CEPG record를2로 변경; CEPG checksum과
+  CEMF artifact hash를 갱신해 단순 checksum 실패와 구분.
+
+최종 Debug/Release/Shipping 실제 Player에서 세 사례 각각5/0, 총15/0 통과.
+잘못된 mesh body와 캐릭터 controller의 RuntimeHandle 부재, 유효한 다른 geometry
+imports2/assets2, runtime cooks0, character tick0을 확인했다. 잘못된 body를
+제외한 부분 시뮬레이션이 아니라 Scene::StartPhysicsSimulation의 전체 시작 거부다.
+정상 접지12 성공은 나오지 않았고 runtime text-parser calls0 및 변형 사본 불변을
+확인했다. 원본 배포본의 전체 파일 집합·SHA256도 변형/실행 전후 보존했다.
+
+실패 selftest는 거부 상태를 확인하고 창을 닫아 종료0으로 판정한다. 일반 Player의
+필수 물리 자산 오류를 프로세스 fatal exit로 올리는 정책을 변경하거나 검증한 것은 아니다.
+첫 진단은 부분 시뮬레이션/낙하를 잘못 가정해 tick 대기 상태가 됐다. 소유한 프로세스를
+정리하고 현재 전체 시작 거부 계약에 맞춰 수정했다. 실패 진단은 최종 성공에서 제외했다.
+
+최종 세 구성 모두 정상73+실패15=88 checks. 정상 경로의 cooked Scene/CEMF,
+목적지 completed display·종료0·243/238/238파일 보존과 기존2000/min8/slot rotation,
+CEPG3/source geometry0을 유지했다. 최종 Shipping 바이너리 서비스/소켓 격리도 통과.
+DDOL/실패 실행은 HTTP를 켜지 않으므로 snapshot 관측값은 null이다.
+
+최종 묶음: Build/Obj/P19Fail/result.json. 정상/실패 증거 쌍:
+- Debug: Phase19Player/run-e7a39a5ed58343e698d8fdb6e64a3c66,
+  PhysicsGeometryFailure/run-f41de83a5c0547d9a8ece40b367e9562
+- Release: Phase19Player/run-439711cf5e474aac8e4b2c0415a1af0a,
+  PhysicsGeometryFailure/run-c1b469b458564326b20e4f121b6995f1
+- Shipping: Phase19Player/run-4746767397994b27bf3a6e67b2c141e3,
+  PhysicsGeometryFailure/run-9cab56876dc2492f88d2e83c856e6a9f
+개별 경로는 Build/Obj 아래이며 result.json/player.out/Runtime 로그를 포함한다.
+최종 빌드/배포·패키징은 P19Fail/D2/R 및 Build/Obj/FG/S, mutator 재현 빌드는
+Tools/regression/build-physics-geometry-pak-mutator.ps1을 사용한다.
+
+범위는 고정 fixture의 CPU CCT/DX12, mesh 자산1개와 Scene 물리 시작 거부다.
+프로세스 fatal 정책·SDK include 경계 전체 감사·동적 convex·경사/계단·실제 콘텐츠
+이전·전체 회귀·profiler/성능 수용은 잔여다. B1/C0/C1/M0는 progress 유지,
+M2는 검증된 생명주기/실패 범위를 부분 진행으로 기록하며 완료로 계산하지 않는다.
+
+
+### 2026-10-02 Player 필수 시뮬레이션 실패 종료 정책 — D/R/Shipping
+
+Player는 프레임의 시뮬레이션·구조 경계 뒤 SceneManager의 PlayFailureCount와
+LastPlayFailure를 확인한다. 시작 또는 씬 전환의 거부가 기록되면
+`[player.simulation.failed] exit=3 reason=...`를 stderr에 출력하고,
+실행 전제조건 실패 코드3을 설정한 뒤 WM_CLOSE로 기존 Finalize 경로를 탄다.
+Core/Editor의 실패·스냅샷 복원 정책은 변경하지 않았다. 진단 플래그는 관찰만 하며
+제품 종료 정책을 우회하지 않는다. 진단 자체의 단정 실패는 기존 selftest 코드4다.
+
+실제 최종 Debug/Release/Shipping 배포본마다 누락·손상·요청 revision 불일치의
+일반 실행(인자 없음)3건과 진단 실행3건, 총6건을 통과했다. 모든 자산 오류는
+종료3·비어 있지 않은 오류 사유·runtime text-parser0, fallback 접지 성공 없음,
+원본/변형 패키지의 파일 집합과 SHA256 보존을 검증했다. 진단3건은 각각
+body/controller 핸들 없음·유효 geometry import2/assets2·cook0·character tick0의
+5개 계약도 유지한다. 정상 geometry/DDOL/목적지 재착지는 각73/0·정상 종료0,
+completed display/2000 frames/min8/slot rotation을 유지했다.
+Shipping 서비스·소켓 격리도 최종 바이너리로 다시 통과했다.
+
+최종 묶음: `Build/Obj/P19Fatal/result.json`.
+- Debug 정상: Phase19Player/run-99c8e45c7fb54c24af7fd35764fc6157,
+  실패: PhysicsGeometryFailure/run-ad4329084ce94bda9c50243beb714e50.
+- Release 정상: Phase19Player/run-975eb2b86a414b44bb9ca1e39a7e2ad4,
+  실패: PhysicsGeometryFailure/run-c92a30a9fe554211ab06bbaa33e55e73.
+- Shipping 정상: Phase19Player/run-c729c0a8d96f4023a6ff9d09c7cadb25,
+  실패: PhysicsGeometryFailure/run-d3d0791c718a4f798332be6dd1c1838e.
+경로는 Build/Obj 아래다. 최종 빌드·배포·패키징/격리 로그는 P19Fatal 및 FT/S.
+
+앞 절의 일반 Player fatal 정책 미검증 항목을 이 시작 실패 범위에서 갱신한다.
+전환 실패도 동일 실패 기록을 소비하도록 배선했지만, 잘못된 목적지로 이동하는
+실제 Player 실패 회귀는 별도 잔여다. SDK include 전체 감사·동적 convex·제품 경사/계단,
+실제 콘텐츠 이전·전체 회귀·profiler/성능 수용도 잔여이며 Phase19 전체 완료가 아니다.
+B1/C0/C1/M0/M2는 progress를 유지한다.
+
+
+### 2026-10-02 잘못된 cooked 목적지의 Player 전환 실패 — D/R/Shipping
+
+fixture builder의 Transition 모드는 기존 PhysicsCharacterPlayer primitive 씬을 시작
+씬으로 선택하고 PhysicsCharacterGeometry를 cooked 목적지로 함께 포함한다.
+출발 씬에는 문제 geometry 참조가 없다. 정상 Pak 또는 목적지 mesh UUID
+578cd3b3-bd67-450c-a1d1-786ee613f24f만 missing/corrupt/revision으로 변형한 Pak을
+격리 사본에서 실행한다. 백엔드/Player 실패 정책을 우회하거나 수정하지 않았다.
+
+Debug/Release/Shipping 각각 정상 목적지1건과 오류 목적지3건, 총4건 통과.
+매 실행에서 출발 cooked GUID cf654e3e-050c-412f-81b2-1df250d4c806의 실제 이동/접지
+12/0을 확인한 뒤 목적지 GUID 9e8090b1-8f12-46ee-b554-610bc247dd08 로드를 확인한다.
+정상 전환은 gameStart=true/pending=false, 목적지 completed display와 종료0을
+검증한다. 오류 목적지는 비어 있지 않은 simulation 실패 사유와 종료3, 목적지
+fallback 접지 성공 및 displayedAfterActivation 성공의 부재를 검증한다.
+모든 경우 runtime text-parser0, 원본/실행 사본의 파일 집합과 SHA256 보존 통과.
+--smoke 2000/min8/slot rotation의 기존 렌더 완료 조건을 낮추지 않았다.
+
+최종 결과: Build/Obj/P19Transition/result.json.
+Debug 증거: PhysicsGeometryFailure/run-c55b1e07263049e0a3b7d6b62bc1f1da.
+Release 증거: PhysicsGeometryFailure/run-8e4bf32f43e84956ac99fdfc553ea407.
+Shipping 증거: PhysicsGeometryFailure/run-12ad106d33e34e84a1560d06d64aeb53.
+경로는 Build/Obj 아래이며 normal/missing/corrupt/revision의 Player 출력·오류·변형
+로그와 result.json을 포함한다. 패키징/게이트는 P19Transition/D2/R2/S2 결과로 묶었다.
+
+초기 병렬 Release 패키징의 렌더 대기 timeout과 초기 verifier의 stdout 순서 오판은
+성공에서 제외했다. C# Console 출력이 buffered C++ 시작 로그보다 앞설 수 있으므로
+출발 물리 성공이 목적지 로드보다 앞서는 조건으로 수정하고 순차 재실행했다.
+Debug/Shipping의 이미 성공한 패키지는 보존·재사용하고 Release는 새 패키지로 재검증했다.
+이는 SceneManager의 목적지 물리 시작 거부가 Player 종료 정책으로 전달되는 제품
+증거다. DDOL 객체를 동반한 실패 전환·Editor 실패 복원·SDK include 전체 감사와
+동적 convex/제품 경사·계단/실제 콘텐츠 이전/전체 회귀/profiler·성능 수용은 잔여다.
+B1/C0/C1/M0/M2는 progress 유지이며 Phase19 전체 완료가 아니다.
+
+
+### 2026-10-02 실제 단검 동적 convex — Debug/Release/Shipping Player
+
+Weapon_Dagger_G3_005_Separate.glb의 정적 메시를 사용했다. 원본 SHA256은
+50b2a38725557a7ce96e72c3c727349756a329c3194bad106821f9801298a0b7이며 변경하지 않았다.
+2832 POSITION / 중복 제거 2119점, identity node·skin/animation 없음.
+GltfImporter와 같은 Z 반사만 적용했으며 authored metre 좌표/scale1을 보존했다.
+HTTP CLI로 실제 메시와 같은 Entity에 mass1kg 동적 PhysicsBodyComponent,
+단일 convex ShapeInstance, 정적 box 바닥과 카메라·C# probe를 저작했다.
+레이어는 기존 Default/CollisionMatrix를 사용한다. 단일 hull이며 convex 분해 증거는 아니다.
+
+초기 native cook은 SDK eZERO_AREA_TEST_FAILED로 거부됐다. SDK 기본 면적 epsilon이
+얇은 실물 형상에 너무 커서, 최대 AABB extent 제곱에 비례한 1e-6 면적 기준을
+기본값 이하로 적용했다. 직접 cook과 geometry blob cook에 같은 정책을 적용했다.
+eCHECK_ZERO_AREA_TRIANGLES와 GPU cooking을 유지하고, 부피 없는 점군은 SDK 호출 전
+상대 크기의 double 연산으로 거부한다. 작은 tetra 1cm/10cm/1m, collinear 거부와
+실제 단검 direct/blob/import를 추가한 네이티브 회귀는 Debug/Release/Shipping/ASan
+각1824개 검사 및 실제 GPU 경로를 통과했다(cooked-all-final.log).
+
+PostPhysics는 고정 스텝 콜백이 아니라 게임 프레임 콜백이므로 누적 delta로 검사한다.
+각 실제 Player에서14/0: 동적 종류·mass·단일 convex, 0.5초 중력 낙하,
+4초 바닥 관통 방지/정지, 선속도·각속도 명령과 실제 회전 자세 변화,
+2 N·s X 임펄스의 속도 증가, 10초 재착지/정지 및 Entity Transform 위치 일치.
+X 속도는 약0.98→2.97m/s, 최종 높이 약0.0336m·속도0이다.
+이는 이 형상의 단일 바디/정적 바닥 충돌과 운동 증거이며 제품 전체 물리 수용이 아니다.
+
+최종 별도 실행은 테스트 소유 Player 창960×540, smoke12000/min8 및 기존 slot rotation
+조건을 사용했다. 실제 completed Game display, 정상 종료0, text-parser0,
+cooked .cepg1개/저작 .cegeometry0개, 패키지 파일 집합·SHA256 불변을 확인했다.
+Shipping은 compiled=no/enabled=no·endpoint 없음과 최종 DLL 소켓/서비스 격리도 통과했다.
+
+- Debug: 14/0, frames29653, promotions8, run-033e851de1c74005b6bddfaa058ee62e.
+- Release: 14/0, frames130201, promotions9, run-307e418bbad14586b5153a2dc39e89d9.
+- Release Shipping: 14/0, frames103664, promotions8, run-84b7facc7a97454aa3b60da7d6be52c6.
+
+최종 묶음: Build/Obj/P19Dagger/result.json. 개별 패키지/게이트: P19Dagger/D3/R3/S4.
+증거 디렉터리는 Build/Obj/Phase19DaggerPlayer 아래다. 재현 도구는
+prepare-physics-static-glb-convex.py, build-physics-dagger-player-fixture.ps1,
+verify-physics-dagger-player.ps1와 GameScripts/DaggerConvexPlayerProbe.cs.
+원본 GLB는 fixture builder의 SourceGlb 인자로 제공하며 fingerprint를 대조한다.
+
+초기 프레임 수 기반 낙하 단정 실패와 고해상도 Scene lookup candidate+previous의
+GPU 메모리 예산 초과(종료4)는 성공에서 제외했다. 후자는 물리 수정으로 해결했다고
+보지 않으며 고해상도 렌더 잔여다. Release Editor의 MSVC LNK1000 내부 오류는
+WholeProgramOptimization=false 호출 옵션으로 재빌드해 통과했다. 프로젝트 기본 설정은
+바꾸지 않았고 Release/Shipping 제품 증거는 이 옵션의 바이너리이며 성능 수용이 아니다.
+Shipping 초기 인자 전달 실패도 배열 수정 후 새 S4 패키지로 대체했다.
+
+B1/M0의 실물 단일 동적 convex Player 증거를 추가하며 progress 유지.
+제품 경사/계단·다중 콘텐츠 이전·전체 회귀·SDK include 전체 감사와 profiler/성능 수용,
+DDOL 실패 전환·Editor 실패 복원 등 기존 잔여를 완료로 올리지 않는다.
+
+#### B2 차등 Transform 동기화·렌더 보간 (2026-10-02)
+
+바디의 권위 상태는 완료된 고정 tick의 pose다. 렌더 소비자는 별도의 이전/현재 pose와
+accumulator 비율로 위치와 회전을 보간한다. 게임 Transform·저장·스크립트 ReadState에는
+보간 값을 쓰지 않는다. MeshRenderer의 bounds와 렌더 proxy는 같은 렌더 행렬을 소비한다.
+활성 바디와 정지 직후 한 tick의 수렴 항목만 렌더 dirty 대상에 넣으며 zero-tick 프레임에서도
+보간을 갱신한다. Stop·비활성화·삭제·teleport는 이력을 초기화한다.
+
+Transform dirty EntityHandle을 중복 제거한 뒤 고정 tick 전에 반영한다. static/dynamic의
+명시적 Transform 변경은 pose 재배치, kinematic은 target 요청이다. 물리 결과를 Transform에
+반영할 때 관측 행렬도 갱신해 출력이 다시 teleport 요청으로 들어가지 않게 한다.
+부모 이동·회전은 world pose로 환산하고 scale 변경은 기존 형상 교체 경로를 사용한다.
+C++23 ranges/zip과 Mathematics rows view로 행렬 비교·round-trip 검증을 수행한다.
+부모 비균등 scale과 자식 회전이 만드는 shear는 SDK 변경 전에 거부한다.
+
+Physics.TransformCommit과 Physics.RenderInterpolation 마커를 추가했다. 재사용하는 순회
+scratch는 Scene의 비공개 렌더 registry 상태가 소유한다. 전용 물리 스레드의 T0/T1/T2,
+전체 제품 프로파일 capture와 성능 수용 M3은 별도 잔여다.
+
+네이티브 검증: verify-physics-b2.ps1 -Configuration All -RequireGpu.
+Debug/Release/ASan 각각 472, Shipping 470 checks 및 실제 GPU 경로 통과.
+zero-tick 보간, catch-up 마지막 두 pose, 정지 후 목록 제거, teleport/static/kinematic,
+수명 초기화, 부모 변환·shear 거부를 포함한다. 증거:
+Build/Obj/P19Dagger/b2-all-final.log, Build/Obj/Phase19B2/<configuration>.
+
+에디터 HTTP 검증은 두 정상 플레이 각각 27/0, 두 Stop의 6개 객체 변환 복원,
+세 번째 플레이의 shear 실패 자동 Stop 및 6개 변환 복원을 통과했다.
+실패 사유는 Physics Transform contains unsupported shear, failureCount=1이다.
+검증 도구는 Tools/regression/verify-physics-b2-http.ps1이며 기본 입력은 HTTP로 저작한
+Dynamic_CPP/Assets/Scenes/PhysicsB2Player.creator다. 모델/geometry가 import된 프로젝트와
+현재 GameScripts 빌드가 필요하다. 증거:
+Build/Obj/P19Dagger/author-c723fb4b6dd34c768f11853ca8785c8f/result.json.
+
+Player 최종 구성별 검증 결과와 B2 상태는 아래 수용 기록에서 판정한다.
+초기 빈 stdout 처리 오류, scene.load를 활성화로 오해한 실행, 두 HTTP 변경 사이 자동
+Stop이 발생한 부정 테스트는 최종 수용 증거에서 제외했다.
+
+B2 최종 수용 기록 (2026-10-02): **B2 완료**, 공수 4일 유지.
+
+- 실제 Player Debug/Release/Shipping 각각 27/0 assertions 및 정상 exit 0.
+  완료 렌더 frames=26035/97457/102172, display promotions=8/8/9.
+- 각 구성의 지원 불가 shear 부정 테스트는 실패 사유를 기록하고 예상 exit 3으로 종료했다.
+- 추가한 저장소 HTTP 검증 도구를 재실행해 정상 두 플레이·Stop·실패 Stop의 변환 복원을 확인했다.
+  최종 Editor 증거: Build/Obj/Phase19B2Editor/run-1c12f2860eae4aaca95de194d44250ff/result.json.
+- Player staged 파일·해시 불변, runtime text parser calls=0, cooked Scene 신원,
+  Shipping 계측/서비스 격리 검증도 통과했다. 입력 GLB 원본 SHA256은 기존 기록과 일치한다.
+
+통합 증거: Build/Obj/P19B2/result.json. 개별 Player는 D1/R1/S1 및 각각 -shear 디렉터리,
+재현 도구는 build-physics-b2-player-fixture.ps1과 verify-physics-b2-player.ps1이다.
+네이티브와 제품 렌더 검증은 구분한다. GPU에 게시된 proxy 행렬의 수치 capture,
+전체 제품 profiler 계층 capture·성능 수용은 M3의 잔여이며 이번 완료에 포함하지 않는다.
+
+제품 렌더 검증은 960×540 조건이다. 기존 고해상도 Scene lookup GPU budget 초과 문제는
+별도 잔여다. Release·Shipping은 기존 MSVC LNK1000 우회를 위해 빌드 호출에
+WholeProgramOptimization=false를 사용했으며 프로젝트 기본값은 바꾸지 않았다.
+이 결과로 성능 수용을 주장하지 않는다. B1/C0/C1/M0의 전체 저작·캐릭터 회귀와
+T0/T1/T2/M3 등 다른 게이트 상태는 유지한다.
+
+#### T0 요청·스냅샷 수명과 스레딩 계약 (2026-10-02)
+
+PhysicsSceneChannel은 작업자가 복사하는 요청/완료 스냅샷 통로다. SDK Scene/body/controller를 소유하거나
+Scene/Component 포인터를 보관하지 않는다. Scene 소유 스레드가 통로를 발급하고,
+작업자는 값 명령을 제출하거나 shared_ptr<const tick_snapshot>을 읽는다.
+SDK 직접 변경과 통로 발급은 소유 스레드만 허용한다.
+
+요청 큐·시퀀스 이력·발행 저장소를 SDK implementation 수명에서 분리했다. owner가 큐
+mutex 아래 입력을 닫고 in-flight fetch를 완료한 뒤 미래 명령 payload를 폐기하고 SDK
+dispatcher를 drain한다. 통로를 보관한 작업자와 Scene 종료가 경합해도 SDK/Scene에
+접근하지 않으며 이후 유효 요청은 wrong_phase다. 마지막 완료 스냅샷과 이전에 읽은
+스냅샷은 Scene 파괴 뒤에도 유효하다. 재Play 통로의 identity는 바뀌며 이전 세션 신원은
+거부한다. is_closed는 입력 차단이고 SDK drain 완료 fence가 아니다.
+
+기존 P3의 (tick, producer, sequence) 병합, 마감/중복/용량 진단, force 비병합 및 solver
+콜백 값 복사·retired identity 수명을 유지한다. 요청 순서의 결정성을 검증하며 CPU/GPU
+solver 결과의 bitwise 결정성을 주장하지 않는다. Physics.RequestClose를 scene/tick과
+함께 계층 계측했다. 전용 물리 스레드와 simulate/fetch overlap은 이번에 추가하지 않는다.
+
+검증 도구: Tools/regression/verify-physics-t0.ps1 -Configuration All -RequireGpu.
+Debug/Release/ASan 각각 173 checks, Shipping 170 checks 및 실제 GPU 경로 통과.
+8 producer × 8 요청의 역순 도착·논리적 순서 적용, 다른 스레드 SDK 변경/발급 거부,
+종료 경합·종료 후 1000회 거부·snapshot 유지·새 세션 신원 격리를 CPU/GPU 모두 확인했다.
+RequestClose 계층과 complete/unacked=0 캡처도 확인했다.
+
+기존 P3 All/RequireGpu는 Debug/Release/ASan 각 3971, Shipping 987 checks;
+B2 All/RequireGpu는 Debug/Release/ASan 각 472, Shipping 470 checks로 모두 재통과했다.
+이는 SDK·커맨드·콜백·수명·보간 회귀이며 제품 실회귀와 구분한다.
+증거: Build/Obj/P19B2/t0-native-final.log 및 Build/Obj/Phase19T0/<configuration>.
+제품 빌드·에디터/Player 회귀를 마친 수용 기록은 아래에서 최종 판정한다.
+
+T0 최종 수용 기록 (2026-10-02): **T0 완료**, 추정 공수 3인일 유지.
+
+Debug/Release Editor·Player·AssetCooker 및 Shipping Player·AssetCooker 전체 빌드 통과.
+현재 SDK 변경으로 제품 에디터 두 Play/Stop·shear 오류 Stop의 6객체 변환 복원을 다시 확인했다.
+증거: Build/Obj/Phase19B2Editor/run-a00dc3ca9fcc45d2bfa52d8827759cd1/result.json.
+실제 Player Debug/Release/Shipping 각각 27/0 및 completed display·정상 exit 0,
+Debug shear 오류의 사유·exit 3도 통과했다. stage 파일/해시 불변·cooked Scene 신원·parser0,
+Shipping 소켓/서비스 격리도 유지한다. 이번 T0 제품 오류 종료 재실행은 Debug 범위이며
+Release/Shipping 오류 종료의 이전 B2 증거와 구분한다.
+
+통합 증거: Build/Obj/Phase19T0/result.json. native/P3/B2 구성별 결과·현재 소스 SHA256과
+제품 Editor/Player 결과를 연결했다. 초기 probe의 API 이름·friend 접근 컴파일 오류는 수정했으며
+최종 All 검증과 전체 제품 빌드 결과만 수용했다. Release/Shipping no-WPO 호출 옵션과
+960×540 제품 렌더 검증 조건은 B2 수용 기록과 같다. 고해상도 렌더러 문제는 별도 잔여다.
+전체 제품 profiler 캡처·성능 수용은 M3, 안전 overlap/워커 실행 최적화는 T1,
+읽기 창·쿼리 배치는 T2에 남는다. 전용 물리 스레드는 이번에 도입하지 않았다.
+
+
+## T1 실행 배치 후보 및 실측 기록 (2026-10-02, 후보 평가 이력)
+
+**T1 진행 중 — 안전성 검증 완료, 성능 수용 미통과.** 추정 공수 3인일 유지.
+
+ScenePhysicsSimulation은 완료된 owner-side render history만 읽는 준비 작업을
+simulate/fetch 사이에 배치했다. 256개 미만에서는 동일 작업을 fetch 이후 수행한다.
+Register에서 scratch 용량을 예약하고 동기 step 동안 안정된 entry 주소를 사용한다.
+SDK·Transform·Component·스크립트 변경이나 외부 callback은 이 창에서 실행하지 않는다.
+성공한 fetch 이후에만 active pose와 render history를 병합·게시한다. 실패한 fetch는
+staged scratch를 폐기하고 이전 게시 값을 유지한다. 작은 집합의 after-fetch 배치는
+별도 legacy 경로가 아니라 같은 작업의 실행 시점 정책이다.
+
+Physics.SimulateSubmit / Physics.InFlightRenderPrepare 또는 Physics.RenderPrepare /
+Physics.FetchWait를 scene/tick으로 연결했다. 실제 PhysXTask의 다른 worker thread와
+in-flight 준비 작업이 겹치는 것을 캡처로 검증했다. owner 대기와 worker 실행 시간은
+중복 합산하지 않는다. 전용 SDK dispatcher를 유지하며 공용 enkiTS dispatcher와 별도
+physics owner thread는 도입하지 않았다.
+
+최종 native Debug/Release/ASan 각 5078 checks, Shipping 3530 checks 및 실제 GPU 통과.
+캡처 complete/unacked=0, CPU/GPU 64·256·1024 active history 병합 및 fetch 실패의
+게시 불변성을 확인했다. 제품 Debug/Release/Shipping 빌드와 Player 각 27/0,
+completed display·exit0, Debug shear exit3, Shipping 격리를 통과했다.
+Editor 두 정상 Play/Stop와 오류 Stop에서 6객체 authored Transform을 복원했다.
+제품 조건은 960×540, Release/Shipping no-WPO 기존 빌드 우회다.
+
+동일 코드에서 준비 작업만 after-fetch로 강제한 **검증용 생성 소스**를 비교 기준으로
+사용했다. 제품에 serial 선택 스위치나 이전 PhysX 배선을 추가하지 않았다.
+Release /O2, CPU/GPU × active16/256/1024 × profiler off/on, ABBA 두 회전,
+총 96회 실행, 각 side/cell 4표본·표본당 240 ticks의 평균/p99 중앙값을 기록했다.
+각 지표 CV 10% 초과는 해당 지표의 수용 판단에서 제외한다.
+
+CPU256 평균은 off +2.74%, on +3.84%; CPU1024 계측 on p99는 +12.71%로 악화했다.
+GPU1024 계측 off 평균 -2.34%, p99 -10.21% 개선도 관측했지만 일반적인 개선이나
+256 임계값의 최적성을 입증하지 못했다. 측정 당시 배치는 검증된 후보였으며 **성능 수용은
+미통과**다. CPU 경합 및 GPU 계측 비용의 분리·배치 정책 재검증이 T1 잔여다.
+전체 제품 workload 계측/성능 수용 M3, 읽기 창·query batch T2도 남는다.
+
+통합 증거: Build/Obj/Phase19T1/result.json. 최종 source SHA256, 구성별 native,
+Editor/Player 결과, serial 생성 소스 해시와 ABBA summary를 연결했다.
+벤치마크 재현: Tools/regression/verify-physics-t1-benchmark.ps1.
+회귀 재현: Tools/regression/verify-physics-t1.ps1 -Configuration All -RequireGpu.
+
+
+### T1 성능 회귀 후보의 제품 철회 (2026-10-02)
+
+위 ABBA 측정에서 모든 backend/계측 조합의 개선을 입증하지 못했으므로 제품의
+256개 in-flight 준비 정책을 철회했다. 현재 제품은 **성공한 finish_step 이후**에
+Physics.RenderPrepare를 실행한다. 임계값·backend 조건·runtime overlap 선택은 없다.
+완료 history 병합, 등록 시 scratch 예약, 성공 후 게시 및 fetch 실패의 게시 불변성은
+유지한다. 계층은 SimulateSubmit → FetchWait → RenderPrepare이고 worker PhysXTask의
+scene/tick 계측도 유지한다. 전용 SDK dispatcher와 기존 owner 정책은 바뀌지 않는다.
+
+검증 도구의 candidate/serial은 각각 제품 소스에서 생성하는 비제품 비교 대상이다.
+serial은 현재 제품의 after-fetch 배치이고 candidate만 과거 256개 overlap 배치를
+생성한다. Tools/regression/verify-physics-t1-benchmark.ps1은 ABBA 순서로 이 둘을 비교한다.
+이 후보는 제품에서 사용하거나 런타임 fallback으로 선택하지 않는다.
+과거 96회 증거의 current 명칭은 당시 후보를 뜻하며 현 제품 바이너리를 뜻하지 않는다.
+안전 배치와 계측 작업은 구현했으나 성능 개선 수용은 T1 잔여로 유지한다.
+
+
+T1 후보 철회 후 최종 회귀 기록:
+현재 after-fetch 제품 native Debug/Release/ASan 각 **5079**, Shipping **3530** checks,
+실제 GPU 및 capture complete/unacked=0 통과. Release 계층 768 ticks에서 in-flight
+준비/worker 겹침은 0건이며 SDK worker 계층은 유지했다. Debug/Release/Shipping 제품
+빌드·Player 각각 27/0·completed display·exit0, Debug shear exit3, Shipping 격리 통과.
+Editor 정상 두 Play/Stop와 오류 Stop의 6객체 authored Transform 복원도 재통과했다.
+최종 Editor 증거: Build/Obj/Phase19B2Editor/run-e105202d5ba348ed8125e166eda7654c/result.json.
+최종 Player 증거: Build/Obj/P19B2/{DT1Serial,RT1Serial,ST1Serial,DT1Serial-shear}/result.json.
+
+격리된 candidate/serial 재비교도 ABBA96회 완료했다. CPU256 후보 평균은 profiler off
++2.22%, on +3.42%로 다시 악화했다. GPU1024 off 평균 +2.02% 악화, on 평균 -0.70%
+개선으로 backend만으로 정책을 선택할 근거도 부족했다. p99 CV10% 초과 셀은 수용 판단에서
+제외했다. 후보의 보편적 개선은 입증되지 않았으며 제품 철회와 T1 진행 중 상태를 유지한다.
+재현 결과: Build/Obj/Phase19T1Bench/run-c4c83d532d164736bad062da15a6c4cc/summary.json.
+통합 Build/Obj/Phase19T1/result.json은 현재 제품 source SHA256·최종 회귀·후보 생성 소스
+해시·최신 비교를 연결한다. 앞 절의 current 표본은 역사적 후보 측정으로 구분한다.
+벤치마크 wrapper의 인코딩 오류로 손상된 param 선언은 복구했고, 해당 실행은 중단·제외했다.
+최종 구문·param AST 확인과 새 96회 측정만 수용한다. 전체 제품 성능 M3는 여전히 잔여다.
+
+
+### T1 active-first 병합 후보 평가 (2026-10-03)
+
+제품 after-fetch 정책을 유지한 채 active pose를 먼저 한 번만 append하고, 직전 history에서
+이번 tick에 active가 아니었던 바디만 수렴 처리하는 독립 merge 후보를 평가했다.
+prepare 단계의 중복 render slot 쓰기·prepared index·pointer scratch 기록을 줄이는 방식이다.
+제품 소스를 변경하지 않고 generator의 merge side에서만 이 변형을 생성한다.
+
+후보 native Debug/Release/ASan 각각 5079, Shipping 3530 checks 및 실제 GPU 통과.
+fetch 실패의 게시 불변성, sleep convergence, zero-tick interpolation, transform 계층,
+active history 병합 및 SDK worker/profile 캡처 계약을 유지했다. 후보 Editor/Player 제품
+검증은 수행하지 않았으며 이전 제품 회귀 결과로 후보 수용을 대신하지 않는다.
+
+Release ABBA96회, CPU/GPU active16/256/1024, profiler off/on, 각 side/cell 4표본·
+표본당 240 ticks. 후보 CPU256 평균 off -1.24%, on -0.79% 개선에 그쳤고 CPU1024는
++1.68/+1.70%, GPU256 on은 +11.77% 악화했다. 모든 CPU p99와 여러 GPU p99는
+CV10% 초과라 수용 판단에서 제외했다. GPU1024 on 평균도 변동 기준을 넘었다.
+보편적인 비용 개선을 입증하지 못해 **후보를 제품에 적용하지 않는다**. T1은 진행 중이다.
+
+통합 증거 Build/Obj/Phase19T1Merge/result.json은 생성 소스 해시·도구 및 제품 소스 해시·
+구성별 후보 native 결과·고유 benchmark root/summary를 연결한다. native 누적 prepare/
+fetch 시간은 컴파일과 병행한 correctness 캡처이며 통제된 전후 성능 비교로 사용하지 않는다.
+최신 비교: Build/Obj/Phase19T1Bench/run-122df9bab7814ea0a9330bc91c2f8def/summary.json.
+재현: verify-physics-t1.ps1 -Configuration All -RequireGpu -MergeCandidate;
+verify-physics-t1-benchmark.ps1 -CandidateSide merge. 기본 native 검증은 현재 제품 경로다.
+다음 T1 작업은 solver/dispatcher와 snapshot/merge 비용 분리이며, 측정 근거 없이 공용
+작업 스케줄러나 별도 physics owner thread를 도입하지 않는다. T2/M3는 별도 잔여다.
+
+
+### T1 solver/dispatcher·snapshot/merge 비용 분리 (2026-10-03)
+
+**비용 분리 구현·검증 완료, T1 전체는 진행 중.** 제품 실행 순서와 SDK 전용 dispatcher를
+유지했다. FetchWait 하위에 FetchResults와 DispatcherDrain을 노출하고 SnapshotStatistics와
+RenderMerge를 추가했다. CPU SDK task span 및 TaskSubmit을 scene/tick/task로 연결한다.
+SDK task span은 run+release의 elapsed이며 CPU 사용 시간이나 순수 solver/GPU kernel 시간이
+아니다. inline/실제 worker task 수를 구분한다. owner 부모/자식 및 worker span 합을 중복
+합산하지 않는다. 자세한 의미는 PhysicsAPIContract의 T1 실행 비용 계층 계약을 따른다.
+
+최종 native Debug/Release/ASan 각각 8161, Shipping 3530 checks 및 실제 GPU 통과.
+제품 Debug/Release/Shipping 전체 빌드·Player 각27/0·completed display/정상 exit0,
+Debug shear exit3, Editor 두 정상 Play/Stop·오류 Stop의 6객체 복원, Shipping 격리 재통과.
+제품 해상도960×540, Release/Shipping no-WPO 우회 조건은 유지한다.
+최종 Editor 증거: Build/Obj/Phase19B2Editor/run-ac2bc9fdcb024e32a08ae084a4e5ff90/result.json.
+최종 Player 증거: Build/Obj/P19B2/{DT1Costs,RT1Costs,ST1Costs,DT1Costs-shear}/result.json.
+
+빌드/제품 GPU 실행 종료 후 독립 비용 sweep48회: CPU/GPU × active16/256/1024 ×
+profiler off/on, off/on/on/off 두 회전, 상태별4표본·240tick, 총1024 바디·SDK worker2개.
+24개의 실제 캡처 모두 complete/unacked0·event/counter drop0, owner 하위 depth/범위/스레드
+정합성과 SDK task 제출→실행 연결 누락0을 검증했다. 모든 owner 비용 span은240tick이다.
+길이0 span도 관측값으로 포함하고 instant와 구분했다. 처음 길이0 span을 제외한 집계는
+폐기하고 집계기 수정·새48회 실행 결과만 최종 기록에 사용했다.
+
+계측 on에서의 per-tick inclusive 평균 중앙값 (µs, 모듈 실험):
+
+| backend·active | fetchResults | dispatcher drain | active pose 수집 | snapshot 통계 | render 준비 | render 병합 |
+|---|---:|---:|---:|---:|---:|---:|
+| CPU16 | 88.38 | 1.76 | 1.45 | 0.19 | 0.50 | 1.03 |
+| CPU256 | 129.86 | 0.29 | 15.13 | 0.93 | 4.92 | 13.15 |
+| CPU1024 | 236.19 | 0.21 | 58.90 | 4.62 | 20.67 | 56.99 |
+| GPU16 | 1159.83 | 0.51 | 1.89 | 0.23 | 0.68 | 1.34 |
+| GPU256 | 1223.67 | 0.28 | 15.53 | 0.98 | 5.51 | 13.28 |
+| GPU1024 | 1276.21 | 0.33 | 61.13 | 4.69 | 22.08 | 57.60 |
+
+CPU Advance 평균 off→on: 16개67.57→108.35µs(+60.36%), 256개150.30→174.07µs
+(+15.82%), 1024개354.97→389.61µs(+9.76%). 이는 현재 전체 계측/counter 켜짐의 wall
+차이이며 새 marker만의 추가 비용을 분리한 비교가 아니다. GPU에서는 on/off wall 차이가
+음수(-7.20/-2.78/-4.37%)였으나 이를 음의 계측 비용이나 성능 개선으로 주장하지 않는다.
+SDK task 제출→실행 지연의 평균 중앙값은 CPU 약1.01/1.07/2.01µs, GPU 약2.61/2.99/3.42µs.
+모든 평균 wall cell은 CV10% 이하이며 CPU256 wall p99는 변동 기준을 넘어서 수용에서 제외.
+개별 phase·task 지연의 CV도 summary에 제공하며 변동 기준 초과 지표는 성능 수용에 쓰지 않는다.
+
+현재 자료에서 drain 자체보다 SDK 완료 지연과 active pose/render 후처리 비용이 크다.
+다음 T1 대상은 **SDK worker 예산(현재 제품 기본값은 hardware-derived)과 작은 씬의
+계측 비용**이다. worker2개 모듈 표만으로 제품 기본값을 교체하거나 공유 dispatcher/새
+physics owner thread를 도입하지 않는다. 전체 제품 workload/성능 수용 M3은 별도 잔여다.
+
+재현: Tools/regression/verify-physics-t1-costs.ps1. 최종 sweep:
+Build/Obj/Phase19T1Costs/run-f088211044324a7297711a6158a74883/result.json 및 summary.json.
+통합 증거: Build/Obj/Phase19T1Costs/result.json (현재 Phase19T1/result.json도 동일 최신 기록).
+source SHA256·native/제품 결과·비용 표·캡처를 연결했으며 과거 후보 비교와 구분한다.
+
+
+
+### T1 SDK worker 예산 비교 (2026-10-03)
+
+worker 예산 실험을 완료했다. **제품 코드와 기본값은 변경하지 않았다.** 현재 workers=0은
+min(256,max(1,hardware threads-4))이며 이 머신의12 logical threads에서는8 SDK workers다.
+benchmark CLI에 선택적 여섯째 workers 인수를 추가했고 기존 다섯 인수는2 workers를 유지한다.
+검증 도구 verify-physics-t1-workers.ps1은 요청값·실제 worker 수·backend·활성 수·정상 exit를
+확인한다. CPU/GPU active16/256/1024, budget auto/1/2/4, profiler off/on, 대칭 순서
+0/1/2/4/4/2/1/0 두 회전, 각 budget/state4표본·60warm+240측정 ticks, **최종192회** 실행했다.
+빌드나 다른 제품/GPU gate 없이 순차 측정했다. on96캡처는 complete/unacked0/drop0,
+SDK task 제출→실행과 owner 하위 계층 오류0 및 **모든 owner marker240 tick 보존**을 확인했다.
+
+계측 off Advance 평균 중앙값 (µs, 총1024 자유 이동 primitive boxes·접촉 없음):
+
+| backend·active | 자동8 workers | 1 worker | 2 workers | 4 workers |
+|---|---:|---:|---:|---:|
+| CPU16 | 438.75 | 57.97 | 67.45 | 120.48 |
+| CPU256 | 474.75 | 130.14 | 150.66 | 215.67 |
+| CPU1024 | 645.46 | 336.45 | 358.94 | 414.86 |
+| GPU16 | 1486.62 | 1187.81 | 1284.99 | 1200.78 |
+| GPU256 | 1483.33 | 1305.85 | 1282.85 | 1254.69 |
+| GPU1024 | 1673.58 | 1392.72 | 1431.38 | 1380.10 |
+
+평균은 최종 모든 budget/cell에서 CV10% 이하. p99는 여러 셀이 변동 기준을 넘었으며
+summary의 p99Stable=false 표본은 수용에서 제외한다. on CPU16 평균은 auto8=534.14µs,
+1=70.39,2=113.57,4=258.27로 동일한 증가 경향을 보였다. GPU의 최저 budget은 활성 수와
+계측 상태에 따라 달라졌다. 자유 이동1024바디 모듈 표로 접촉이 많은 대규모 씬이나 전체
+제품 기본 예산을 수용하지 않는다. 이번에 제품 회귀를 재실행했다고 주장하지 않으며,
+기존 제품 소스 SHA256이 Phase19T1Costs 기록과 동일함을 확인했다.
+
+현재 dispatcher는 submitTask마다 mutex 안에서 notify_one을 호출한다. SDK worker가
+현재 task의 release에서 successor를 발행한 경우에도 다른 잠든 worker를 깨우는 경로다.
+CPU16 계측 on 첫 대칭 구간의 제출→실행 지연 평균은1/2/4/8 workers에서 약0.58/0.99/3.20/
+7.85µs였다. SDK task 수도64/66/68/72 per tick으로 달라지므로 wake 비용만이 원인이라고
+단정하지 않는다. **다음 T1 후보는 worker successor의 wake/handoff 정책**이며 dependency
+fan-out·bounded queue saturation·inline fallback·종료 drain/수명 계약을 함께 검증해야 한다.
+기본값을 임의의1/2/4로 제한하거나 shared dispatcher·별도 physics owner thread를 도입하지
+않는다. 접촉 workload와 큰 활성 집합, 전체 제품 성능 M3 수용도 남는다. T1은 진행 중이다.
+
+처음128MiB 보존 예산의 일부8-worker 캡처는 early frame이 trim되어 owner237~239 또는
+219~228 tick만 보존했다. complete/unacked0/drop0는 측정 창 전체 보존의 보장이 아니다.
+처음 두 sweep은 최종 수용에서 제외했다. **벤치마크만**512MiB 예산으로 재빌드하고 전체
+192회를 새로 측정했다. 최종 최대 캡처 메모리는약134.32MiB다. 제품 profiler 예산은 그대로다.
+
+통합 증거 Build/Obj/Phase19T1Workers/result.json: source SHA256, 두 고유 sweep root,
+구성/예산별 평균·p99·CV·auto 대비 관측 차이. 최종 off root run-625e2600ba074f26a0a8006c82c14bba,
+on root run-7b0d44571bcb409ca9686b82a2c89098. 재현: verify-physics-t1-workers.ps1;
+계측 on 재현: 동일 도구 -EnableProfiler. 제품 설정을 바꾸는 도구가 아니다.
+
+### T1 SDK successor wake 후보 비교 (2026-10-03)
+
+제품 적용 전 독립 후보에서 실제 worker의 `release()`가 제출한 첫 successor를
+현재 worker가 이어서 처리하도록 했다. 게임 스레드 제출과 `run()` 중 중첩 제출은
+기존 wake를 유지하며, 대기 queue가 두 개 이상이면 다른 worker를 깨운다.
+inline 재귀 실행에는 release 문맥을 저장·복원한다. 제품 dispatcher는 변경하지 않았다.
+
+기존/후보 ABBA 두 반복, CPU/GPU × active16/256/1024 × 계측 off/on의96회 비교를
+수행했다. 양쪽 모두 현재 auto8 workers,1024 자유 이동 box,60 warm+240 측정 tick이다.
+계측48회는 owner240 tick 전체, 하위 계층 및 task 연결 정합을 요구했다.
+
+| backend / active | off 평균 변화 | on 평균 변화 |
+|---|---:|---:|
+| CPU16 | -41.43% | -45.75% |
+| CPU256 | -32.40% | -35.12% |
+| CPU1024 | -26.01% | -26.33% |
+| GPU16 | -7.76% | -13.45% |
+| GPU256 | -5.71% | -7.22% |
+| GPU1024 | -4.41% | -4.58% |
+
+표는 후보/기존 median wall mean 관측 변화이며 모든 평균의 CV는10% 이하다.
+GPU16 off p99는+4.99%로 증가했고, CPU16/256 off 및 GPU1024 off p99는
+CV10% 초과로 수용 판정에서 제외한다. 접촉 없는 모듈 workload 결과를 제품 전체
+성능 개선으로 일반화하지 않는다. 접촉·큰 활성 집합·제품 M3 수용 전까지 후보는
+독립 검증에만 남기고 T1은 진행 중으로 유지한다.
+
+재현: `verify-physics-t1-benchmark.ps1 -CandidateSide wake -Workers 0`.
+통합 증거: `Build/Obj/Phase19T1Wake/result.json`; 원본96회:
+`Build/Obj/Phase19T1Bench/run-1f22d17923ad467cb2900933eeadbf74/result.json`.
+
+후보 native Debug/Release/ASan 각8162,Shipping3531 및 실제GPU 검증 통과.
+SDK 시뮬레이션 검사에 더해 단일 release successor256개 체인(1/2/8 workers,
+queue1/4),64 leaf fan-out·queue1 포화·inline fallback, `run()` 중 자식 제출 후
+대기(2 workers)를 독립 합성 task로 검증했다. 이 스트레스 검사는 실제SDK workload와
+구분하며 모든 task의 run/release가 각각 한 번 수행되었는지 확인한다.
+재현: `verify-physics-t1.ps1 -Configuration All -RequireGpu -WakeCandidate`.
+
+### T1 지속 접촉·4096 바디 후보 비교 (2026-10-03)
+
+wake 후보와 기존 dispatcher를 auto8 workers에서 CPU/GPU × free4096,
+contact1024/contact4096 × 계측 off/on으로96회 ABBA 비교했다. 각 상태·후보별4실행,
+60 warm+240 측정 tick이다. contact는 마찰0 바닥 위에서 vx1m/s로 미끄러지는
+독립 dynamic box이며 바닥 static body 하나는 표의 dynamic 개수에 포함하지 않는다.
+복잡한 적층이나 dynamic-dynamic 접촉 장면을 대표하지 않는다.
+
+측정240 tick 모두 활성 바디 수 일치, 접촉 장면은 매 tick contacts_stored≥dynamic 개수,
+이벤트/접촉 누락0·미해결 식별자0을 요구했다. 계측48회 모두 owner240 tick 보존,
+task 연결·하위 계층 정합을 통과했다. SDK 오류 출력은 없으며 profiler 종료는
+abandoned/retained/foreign0이다. 프로파일러 확인 비용은 Advance wall 측정 밖에 둔다.
+
+| backend / workload | off 평균 변화 | on 평균 변화 | off p99 변화 |
+|---|---:|---:|---:|
+| CPU free4096 | -9.56% | -7.30% | CV>10%, 제외 |
+| CPU contact1024 | -9.41% | -9.39% | -9.23% |
+| CPU contact4096 | -0.63% | -0.84% | +4.33% |
+| GPU free4096 | +0.62% | -3.65% | CV>10%, 제외 |
+| GPU contact1024 | -1.37% | -11.43% | -2.96% |
+| GPU contact4096 | -7.92% | -3.17% | -5.83% |
+
+변화는 후보/기존 median의 관측치다. 평균 CV는 전부10% 이하이나 작은 차이가
+유의한 개선이라는 의미는 아니다. CPU contact4096의 on p99도+2.67%다.
+무접촉/독립 바닥 접촉에서의 평균 이득만으로 제품 최적화를 수용하지 않는다.
+제품 dispatcher·worker 기본값은 유지하며 다음은 dynamic-dynamic 적층·접촉 장면,
+worker 예산별 fan-out 거동 및 제품 M3 성능 수용이다. T1은 진행 중이다.
+
+재현: `verify-physics-t1-contact.ps1` (기존/후보 빌드 포함).
+완료 root 집계: `summarize-physics-t1-contact.py <root>`.
+통합 증거 `Build/Obj/Phase19T1Contact/result.json`; 원본96회
+`Build/Obj/Phase19T1Contact/run-8dc2d47d72fa4ce58cfd19473d8fd6e9/result.json`.
+
+### T1 dynamic-dynamic 적층·worker 예산 검증 (2026-10-03)
+
+**release-successor의 무조건적 handoff 후보는 현재 제품에 채택하지 않는다.**
+worker 수와 workload에 따라 평균/p99 이득이 달라지고, 두 worker의 GPU 평균 증가가
+추가 실행에서도 관측됐다. 크기는 일정하지 않아 통계적 유의성을 주장하지 않는다.
+전용 SDK dispatcher의 기존 wake 및 auto worker 예산을 유지한다. T1은 진행 중이다.
+
+최종 부하는 4개 높이의 dynamic box 적층으로, 회전 전체와 Z 이동을 잠그고 X/Y는
+허용한다. 마찰0·vx1m/s·중력을 사용하며 static 바닥 하나를 별도로 둔다. 이 조건은
+일정한 solver 접촉 부하를 비교하기 위한 제약 적층이며 비제약 적층 안정성이나
+전체 제품 장면 성능을 대표하지 않는다. Mathematics/SDK 제품 배선은 변경하지 않았다.
+
+CPU/GPU × dynamic1024/4096 × worker1/2/4/auto8 × 계측 off/on을 ABBA 두 번씩
+256회 실행했다. 각 상태/후보4표본,60 warm+240 측정 tick이다. 매 tick 활성 바디 수,
+이벤트/접촉 누락0·미해결 식별자0, 유한한 위치 및 높이0.2~5m를 확인했다.
+실행 중 최소 평균 높이1.5m와 접촉 부하를 요구하고, 최종 집계는 매 tick dynamic
+접촉 쌍≥바디 수/2를 재검증했다. 초기 프로그램의 접촉 하한은N/4였으나 최종 verifier와
+집계는N/2다. 모든 유효 실행의 실제 최솟값은N×0.75, 평균 높이 최솟값은1.99636m였다.
+
+| 계측 off 평균 관측 변화 | worker1 | worker2 | worker4 | auto8 |
+|---|---:|---:|---:|---:|
+| CPU1024 | -0.36% | -1.31% | -1.61% | -10.04% |
+| CPU4096 | +0.11% | -1.12% | -2.18% | -2.49% |
+| GPU1024 | +0.45% | +6.89% | -0.81% | -3.77% |
+| GPU4096 | +0.52% | +0.24% | -1.73% | -4.17% |
+
+auto8 CPU1024 off p99는-11.77%,CPU4096 off-1.93%,GPU4096 off-5.25%였다.
+GPU1024 auto8 off p99는+0.26%다. on 평균/p99와 각 CV는 통합 JSON에 기록했다.
+32개 상태의 평균 CV는 모두10% 이하지만 p99 8개 상태는10%를 초과하여 수용에서 제외했다.
+작은 평균 차이의 방향이나 CV 통과만으로 유의한 성능 개선을 주장하지 않는다.
+
+GPU1024/worker2만16회를 추가 실행했다. 추가 실행의 off/on 평균 변화는 각각
++0.67/+3.42%였다. 처음과 추가 실행의 후보별8표본을 합친 median은 off+4.97%,
+on+2.42%다. 두 실행 시점의 분포가 달라 합산 수치는 관측 집계이며 유의성 판정이 아니다.
+최종 유효272회 중 계측136회 모두 complete/unacked0/drop0,owner240 tick 전체,
+하위 계층·task 연결 정합 및 profiler 종료 abandoned/retained/foreign0을 확인했다.
+SDK 오류 출력은 없었다. 제품 Player/Editor M3 성능 수용은 별도다.
+
+처음 비제약 적층 sweep은192회 후 GPU4096/worker1 기준선이 접촉 하한N/2를
+239/240 tick만 만족해 중단됐다(최소1938쌍). 추가 진단에서 평균 높이1.48632m도
+관측되어 일정한 적층 부하로 수용하지 않았다. 그 부분 sweep은 제외했고, 제약 적층의
+전체256회를 새로 측정했다. 비제약 장면은 `stack-unconstrained` 진단 인자로 남긴다.
+이는 wake 후보에 의한 제품 회귀라는 판정이 아니며, 비제약 GPU 적층/solver 조건의
+안정성 비교는 M3에서 별도로 다룬다.
+
+재현: `verify-physics-t1-stack.ps1`; 표적 재측정은 같은 도구에
+`-Backends gpu -ActiveCounts 1024 -WorkerBudgets 2`를 지정한다.
+집계: `summarize-physics-t1-stack.py <root> [output-json]`.
+통합 증거 `Build/Obj/Phase19T1Stack/result.json`: source/binary SHA256,
+32개 상태·추가 비교·제외 조건·제품 미채택 결정을 기록했다.
+전체 root run-0a705619343d4ad594eaf4e048d4ecd9, 추가 root
+run-22fa61964b70445488673b3723edfd72. 제품 source SHA는 이전 접촉 검증과 동일하다.
+
+다음 T1 작업은 작은 씬의 SDK task 계측 비용 축소다. profiler 계층과 scene/tick/task
+연결을 보존해야 하며, worker 수를 벤치마크만으로 고정하거나 무조건적 handoff를
+제품에 넣지 않는다. 제품 M3 회귀·성능 수용도 남는다.
+
+### T1 SDK 계측 게시 비용 축소 — 제품 적용 (2026-10-03)
+
+worker의 `publish_thread()`가 SDK 작업 queue mutex를 잡고 실행되는 경로를 줄였다.
+**계측 recording 중이고 SDK outstanding 작업이 남아 있을 때만** mutex를 놓고 게시한다.
+게시가 끝나 mutex를 다시 얻은 뒤에 active batch를 감소시키므로 drain은 게시 완료까지
+기다린다. off/pause 및 마지막 SDK 작업 뒤의 게시와 Shipping은 기존 직렬 경로를 유지한다.
+SDK wake 정책·worker 기본값·after-fetch 렌더 준비·물리 소유권은 바꾸지 않았다.
+마커를 삭제하거나 task 계측을 샘플링하지 않았다.
+
+무조건적 mutex 해제 후보160회는 CPU 계측 on 이득을 보였지만 GPU256 on p99가
++7.88%여서 제품에 채택하지 않았다. 최종 제한 정책은1024 전체 바디의 active16/256/1024
+CPU/GPU × off/on96회와 실제16바디 씬의 worker2/auto8 CPU/GPU × off/on64회로 검증했다.
+각 후보/상태4표본,60 warm+240 측정 tick이다. auto8은 현재12 logical threads 기준이다.
+
+| CPU 계측 on 평균 관측 변화 | 전체 바디 | 활성 바디 | worker | 변화 |
+|---|---:|---:|---:|---:|
+| 작은 활성집합 | 1024 | 16 | auto8 | -16.11% |
+| 중간 활성집합 | 1024 | 256 | auto8 | -12.84% |
+| 전체 활성 | 1024 | 1024 | auto8 | -9.18% |
+| 실제 작은 씬 | 16 | 16 | auto8 | -15.32% |
+| 실제 작은 씬 | 16 | 16 | 2 | -6.35% |
+
+GPU on 평균은1024 전체 바디의 active16/256/1024에서-4.33/-6.08/-3.03%,
+실제16바디에서는 auto8 -6.05%,worker2 -0.01%였다. GPU off active16의 p99가
+처음+8.66%여서8회를 추가했다. 재측정은-4.76%로 방향이 반전되었으며 지속적인 증가나
+유의한 개선을 판정하지 않는다. CV10% 초과 지표는 각각 제외한다. 표는 모듈 owner wall
+관측이며 GPU 커널 시간·CPU 이용률·전체 제품 FPS 개선을 뜻하지 않는다.
+
+최종 정책168회 중 계측80회는 owner240 tick 전체·complete/unacked0/drop0,
+하위 계층과 Submit→PhysXTask(run+release)→Complete 연결을 확인했다.
+기존 제출 연결 검사에 completion 누락·역전 및 SDK span 수와 completion 수 일치를
+추가했다. 제품 profiler 예산은 그대로이며 벤치마크만512MiB를 사용한다.
+
+Editor Debug/Release와 Player·Cooker Debug/Release/Shipping 빌드 통과(no-WPO는 기존 환경 우회).
+동일 정책 native T1 D/R/ASan8161·Shipping3530 및 실제GPU 통과.
+제품 코드의 T0 수명·close/drain은 D/R/ASan173·Shipping170 및 실제GPU 통과.
+Player D/R/S는각27/0·완료된 game display·정상 종료0·불변 파일·cooked-only를 확인했다.
+Debug shear는예상 종료3,Editor 정상 Play/Stop 두 번과 오류 중단 한 번에서6객체 복원,
+Shipping 격리 통과. 제품은960×540 기준이며 높은 해상도 renderer backlog는 그대로다.
+
+통합 증거 `Build/Obj/Phase19T1Profile/result.json`; 초기 후보는
+`unconditional-result.json`으로 보존했다. 최종 large root
+run-8fa7b1259d5b4cab942e1895971375c5,small root run-7516f4c3a4694bbea42103bc7bce7a00,
+GPU off 재측정 root run-81c22448e80b4a879ad201e7e239bad5.
+Editor root run-c5c30dd690a6477b873446a9dd931a66; Player P19B2/*T1Profile/result.json.
+
+재현: `verify-physics-t1-benchmark.ps1 -CandidateSide profile -Workers 0` 및
+`verify-physics-t1-profile-small.ps1`. 비교할 때만 serial 빌드의 `-LegacyPublication`으로
+mutex 내부 게시 baseline을 생성한다. 현재 제품과 candidate 생성은 동일한 제한 정책이다.
+이전 정책은 테스트 생성 소스에만 있으며 제품에 이중 배선하지 않는다.
+통합 집계: `summarize-physics-t1-profile.py <large-root> <small-root> <confirm-root> [editor-root]`.
+
+계측 게시 최적화 한 항목을 제품에 반영했으며 T1은 진행 중이다. SDK 전체 worker 예산과
+다른 workload의 성능 수용,제품 M3 평균/p99·메모리·계측 on/off 수용은 남는다.
+이번 기능 회귀 통과를 전체 제품 성능 수용으로 바꾸지 않는다.
+
+
+### T2 owner query batch 첫 구현 (2026-10-03)
+
+혼합 raycast/sweep/overlap 입력을 variant로 받고 결과는 요청별 expected 슬롯으로 돌려준다.
+요청·hit·결과 span은 반환까지 빌리며, 비동기 작업이나 결과 lifetime을 숨기지 않는다.
+owner idle 진입 검사와 슬롯 수 검사가 실패하면 출력은 변경하지 않는다. 개별 입력 오류는
+다음 요청을 취소하지 않는다. overflow는 정확한 required_capacity와 truncated로 보고한다.
+
+쓰기 없는 query_read 창에서 SDK query 구조를 한 번 flush한 뒤 owner가 순차 실행한다.
+Physics.QueryBatch 아래 Physics.QueryStructureUpdate와 기존 쿼리별 scope를 유지한다.
+조회 후 idle 복원과 변경된 바디의 재조회, 외부 스레드/진행 중 simulate 거부를 검증한다.
+재현: Tools/regression/verify-physics-t2.ps1 -Configuration All -RequireGpu.
+초기 캡처 검사에서 Scene context 누락을 발견했다. 첫 gate는 marker 존재를 확인했고,
+후속 Scene 소비자 연결에서 context를 보완해 nonzero Scene ID를 다시 검증했다.
+추가 tick으로 기존 command tick을 바꾼 fixture 오류는 수정 후 결과만 수용한다.
+제품 소비자 연결·전체 배치 계측/성능 수용은 후속 작업이며 T2는 progress다.
+
+최종 네이티브 결과: Debug/Release/ASan 각201 checks, Shipping198 checks, 모두 GPU 검증 통과.
+비Shipping capture 완료·unacked0·QueryStructureUpdate 계층 존재를 확인했다.
+증거: Build/Obj/Phase19T2/result.json 및 구성별 result.jsonl/baseline.ceprof.
+제품 Editor/Player 빌드·배치 호출 게이트는 이번 네이티브 결과에 포함하지 않는다.
+
+
+### T2 Scene 세션·소비자 연결 (2026-10-03)
+
+Scene::QueryPhysicsBatch → ScenePhysicsSimulation::QueryBatch → PhysicsScene::query_batch로
+owner/active runtime 검사를 통일했다. Editor 상태와 Stop 후에는 SDK runtime을 만들지 않고
+wrong_phase를 반환한다. C++ Scene 소비자는 혼합 batch를 사용할 수 있다. 기존 CLR API의
+raycast/overlap은 Scene의 단일 요청 batch 경계로 연결하며 즉시 반환 계약과 ABI는 유지한다.
+관리형 다중 요청 ABI는 아직 제공하지 않는다. 단일 요청 경계 통합은 성능 개선 주장과 구분한다.
+
+QueryBatch/QueryStructureUpdate 및 하위 query scope에 Scene ID·현재 fixed tick을 명시한다.
+Tick 0은 simulate 이전/새 세션의 유효한 초기 조회이며, idle이라는 이유로 Scene 신원을
+비워 두지 않는다. 외부 스레드·진행 중 simulate는 batch 진입에서 거부한다.
+재현 도구: Tools/regression/verify-physics-t2-session.ps1.
+제품 및 최종 구성별 수용 결과는 통합 result.json의 실행 증거로 판정한다.
+T2 progress 유지: query workload 계측/성능 수용과 관리형 다중 요청 소비자 범위는 별도다.
+
+
+최종 세션 네이티브 결과: Debug/Release/ASan 각496, Shipping492 checks; 모든 구성 GPU 실행 확인.
+비Shipping capture complete/unacked0 및 QueryBatch·QueryStructureUpdate의 nonzero Scene ID 확인.
+Debug Editor의 두 정상 Play 각27/0, 두 Stop의 6개 객체 변환 복원과 shear 실패 자동 Stop 복원 통과.
+Editor 증거: Build/Obj/Phase19B2Editor/run-08fcbe31dd5645e9a4800e78aae18cb7/result.json.
+Debug Player 정상27/0·completedGameDisplay·exit0 및 shear 예상 exit3·패키지 불변 통과.
+초기 Windows PowerShell 5의 Environment 인자 미지원, 재링크 후 forest recipe 덮어쓰기의
+시작 거부는 실행 환경 실패로 제외했다. PowerShell 7 및 기존 검증 forest 리소스 배치 후 재실행했다.
+
+최종 제품 수용: Editor Debug/Release, Player/Cooker Debug/Release/Shipping 빌드 통과.
+Player Debug/Release/Shipping 각27/0, completedGameDisplay=true·exit0·원본 및 stage 불변 확인.
+Debug shear 예상 exit3 및 Shipping 소켓/CommandService 격리도 통과했다.
+통합 증거: Build/Obj/Phase19T2Session/result.json. Debug 최종 context 재링크 로그를 포함한다.
+재현 제품 게이트는 verify-physics-b2-http.ps1, build-physics-b2-player-fixture.ps1,
+verify-physics-b2-player.ps1 및 verify-player-shipping-isolation.ps1을 재사용한다.
+현재 제품 호출은 관리형 개별 overlap의 단일 요청 batch이며 혼합 다중 요청 제품 gate와
+query workload 평균/p99·계측 on/off 수용을 완료한 것으로 계산하지 않는다. T2는 progress다.
+
+
+### T2 C# 다중 요청 배치·제품 검증 (2026-10-03)
+
+Physics.QueryBatch의 요청/hit/요청별 결과 span을 하나의 Scene 읽기 창에 연결했다.
+raycast/overlap 혼합, 개별 오류 이후 계속 실행, zero-capacity 정확한 필요 용량 및 overflow,
+출력 구간 겹침/버퍼 alias/음수·과대 offset 거부, 출력 보존과 최대64개 요청을 검증한다.
+요청64/공용 hit4096/요청별 hit256 상한이다. 입력 구간은 순서와 무관하게 겹침을 거부한다.
+소유 scratch에서 native/managed hit를 변환한 뒤 성공한 결과만 커밋하며 외부 포인터를 보관하지 않는다.
+Native/managed 함수 테이블168슬롯과 ABI32를 함께 적용했다. 구 ABI 호환 배선은 남기지 않는다.
+
+ABI Debug/Release 각33 checks 통과. Editor 두 정상 Play 각 기존27+배치48 checks,
+두 Stop과 세 번째 shear 실패 Stop에서6개 객체 변환 복원을 확인했다.
+Player Debug/Release/Shipping 각 기존27+배치48=75 checks, 완료 display·exit0·패키지 불변 통과.
+Shipping 소켓/CommandService 격리도 통과했다. Editor D/R, Player/Cooker D/R/S 및
+배포에 포함되는 AssetPacker D/R을 ABI32로 빌드했다. 초기 AssetPacker ABI31의 배포 거부와
+검증 래퍼의 지원하지 않는 Shear 인자는 환경/도구 실패로 제외하고 최종 재실행만 수용했다.
+
+통합 증거: Build/Obj/Phase19T2Managed/result.json.
+재현: verify-physics-script-abi.ps1, verify-physics-query-batch-http.ps1,
+verify-physics-query-batch-player.ps1 (Tools/regression). 제품 다중 요청 검증은 완료했으나
+query workload 계층 capture/평균·p99·계측 on/off 성능 수용은 남는다. T2 progress 유지.
+
+## T2 네이티브 혼합 쿼리 계측 (2026-10-03)
+
+제품 코드는 변경하지 않았다. `physics_t2_benchmark.cpp`는 static body 1024개 씬에서
+ray/sphere sweep/sphere overlap을 요청1/16/64개로 반복하고 scalar와 batch의 body/shape/거리/개수를 비교한다.
+CPU 및 실제 GPU backend, Release /O2, profiler off/on, 각 조합 ABBA 두 회(4표본/측),
+60회 warmup 후600회 측정으로 총96개 프로세스를 실행했다. 프로세스별 원시 mean/p99를 보존한다.
+GPU backend 표기는 PhysX 씬 설정이며 이 수치는 CPU owner query wall time이다. GPU kernel 시간이나 FPS가 아니다.
+
+48개 capture 모두 complete·unacked0·dropped0. `Physics.QueryBatch` 아래
+`Physics.QueryStructureUpdate`와 개별 query의 thread/depth/시간 포함 관계 및 Scene identity/tick1/task0를 검증했다.
+배치 capture당 구조 갱신600회, 쿼리 요청수×600회. 전체 결과 일치·계층 위반0.
+벽시계 구간에 쿼리 실행만 포함하며 frame publication·초기화·결과 비교는 제외했다.
+profiler 수집 스레드의 경합은 on 비용에 포함된다. worker 시간을 더하지 않는다.
+
+| backend | 요청 | scalar 평균 μs | batch 평균 μs | batch on 평균 μs | 평균 비교 안정 | on/off 안정 |
+|---|---:|---:|---:|---:|---|---|
+| cpu | 1 | 0.374 | 0.385 | 3.903 | 통과 | 미수용 |
+| cpu | 16 | 5.973 | 6.012 | 7.096 | 통과 | 통과 |
+| cpu | 64 | 25.730 | 25.344 | 28.300 | 통과 | 통과 |
+| gpu | 1 | 0.338 | 0.381 | 3.787 | 통과 | 미수용 |
+| gpu | 16 | 6.000 | 6.039 | 7.298 | 통과 | 통과 |
+| gpu | 64 | 26.290 | 25.180 | 27.683 | 통과 | 통과 |
+
+48개 mean/p99 지표 중 CV≤10%는 24개다. 나머지는 원시 값을 보존하되 수용하지 않는다.
+변경 없는 씬의 native batch에서 일관된 속도 개선을 입증하지 못했다. 소규모 단일 요청은 추가 read-window/flush/scope 비용을 가진다.
+배치의 CLR 왕복 감소와 구조 갱신 단일화 효과는 이 native baseline으로 결론 내리지 않는다.
+T2 progress 유지. 다음은 실제 managed 반복 부하 및 moving-scene 갱신 부하의 동일 parity/capture 측정,
+불안정 p99 재측정과 성능 수용 기준 판정이다. 제품 전체 M3 수용과 별도다.
+
+증거: `Build/Obj/Phase19T2QueryBench/Release/result.json` 및 개별 `.ceprof`.
+재현: `pwsh -NoProfile -File Tools/regression/build-physics-t2-benchmark.ps1 -Configuration Release`,
+`pwsh -NoProfile -File Tools/regression/verify-physics-t2-benchmark.ps1`. 후자는 요약을 함께 생성한다.
+
+## T2 실제 managed moving-query 부하 (2026-10-03)
+
+`PhysicsB2PlayerProbe`에 `CE_PHYSICS_QUERY_BENCH=1`인 경우만 실행하는 반복 부하를 추가했다.
+기존 기능9 checks/role 및 batch16 checks/role 이후 dynamic convex 바디를 velocity(1,0,0)로 움직인다.
+각 PostPhysics block은 현재 body 위치를 기준으로 ray/overlap 요청16/64개를 구성한다.
+블록 사이의 physics 이동 및 현재 위치에서 자기 convex 충돌을 검증한다. 블록 내부는 synchronous query만
+반복하므로 SDK simulation과 동시 실행하지 않는다. 결과 개수·required capacity·truncation 및
+Entity/Component/Shape/거리 일치를 순서에 의존하지 않고 비교한다.
+
+Release 실제 Player 960×540, profiler off, 두 독립 프로세스에서 각각 ABBA 두 회,
+각 block60 warmup+600 timed samples. 입력/저장소 준비와 parity 검사는 wall-time 구간 밖이다.
+CLR 호출, native scratch/변환 및 bridge 검증 비용은 포함한다. 각 측·요청 크기별8개 block 결과의 median과 CV를 계산했다.
+초기 다른 Player와 겹친 실행은 성능 근거에서 제외했다.
+
+| 요청 | scalar 평균 median μs | batch 평균 median μs | 감소 관측 | scalar/batch CV | 수용 |
+|---:|---:|---:|---:|---:|---|
+| 16 | 23.932 | 14.563 | 39.1% | 17.4% / 30.0% | 미수용 |
+| 64 | 94.791 | 46.774 | 50.7% | 8.9% / 14.1% | 미수용 |
+
+평균상 batch가 더 짧았지만 CV10% 기준에서 scalar64 평균만 통과했다. 나머지 평균 및 모든 p99는
+변동폭이 커 성능 수용하지 않는다. 관측 감소율을 제품 성능 보장이나 FPS 개선으로 사용하지 않는다.
+두 프로세스의32개 block 모두 parity/moving collision 통과. 기존75 checks, 완료 Game display8회 이상,
+2000 smoke frames·exit0·패키지 불변·cooked-only geometry gate도 통과했다.
+기본 벤치 옵션을 끈 새 패키지의 기존75 checks 및12000 smoke frames도 별도 통과했다.
+
+통합 증거 `Build/Obj/Phase19T2QueryBench/Managed/result.json`. 원시 로그/블록 결과/제품 영수증/소스 hash 포함.
+새 패키지 `Build/Obj/P19B2/RT2QueryPerf1/result.json`.
+재현: `pwsh -NoProfile -File Tools/regression/verify-physics-managed-query-benchmark.ps1 -Stage <packaged-stage>`,
+`python Tools/regression/summarize-physics-managed-query-benchmark.py`. package build recipe는 기존 B2 fixture를 사용한다.
+
+T2 progress 유지. managed profiler on/off 및 Physics.ScriptQueryBatch 아래 제품 계층 capture,
+변동 원인 분석·안정적인 mean/p99 재측정과 대표 workload/M3 성능 수용이 남는다.
+이번 단계는 Release off 측정이며 Debug/Shipping 성능이나 제품 전체 성능을 대신하지 않는다.
+
+## T2 managed profiler on/off·제품 계층 capture (2026-10-03)
+
+Development Player에 기존 인증된 command service의 profile.record/pause/save를 연결했다.
+동일 descriptor의 host role을 Both로 확장하고 Shipping의 handler/등록은 제외했다.
+gate file을 설정한 probe는 profiler 명령 응답을 확인한 후에만 반복 부하를 시작한다.
+입력/저장소 준비·결과 비교·HTTP 제어·capture 저장은 timed query 구간 밖이다.
+
+첫 capture에서 Player의 profiler frame publication 누락을 확인했다. 이벤트가1프레임으로
+합쳐지고 counter1785개가 누락됐다. Player EndOfFrame 뒤 Time frame count를 발행하도록 수정했다.
+이전 capture는 수용 근거에서 제외하며 제품 profiler 메모리 예산은 변경하지 않았다.
+
+Release 실제 Player 독립4프로세스 off/on/on/off, 각 요청16/64 scalar/batch ABBA 두 회,
+60 warmup+600 samples/block, 총64블록을 측정했다. on capture 두 개는각600프레임,
+complete/unacked0/event drop0/counter drop0, Scene identity/양수 fixed tick/owner task0 및 계층 위반0.
+각 capture ScriptQueryBatch5305·QueryBatch217145·QueryStructureUpdate217145·ray/overlap423884개.
+유효 bridge batch와 scalar-as-batch를 함께 검증한다. warmup/parity/기존 기능 쿼리도 capture에 포함된다.
+capture 메모리는약67.8MiB이며 제품 전체 메모리 수용이나 GPU kernel 시간/FPS 측정이 아니다.
+
+| 요청 | scalar off 평균 median μs | batch off 평균 median μs | batch on 평균 median μs | on/off 평균 증가 관측 | 수용 |
+|---:|---:|---:|---:|---:|---|
+| 16 | 24.166 | 11.072 | 11.871 | 7.2% | 미수용 |
+| 64 | 95.220 | 42.194 | 48.783 | 15.6% | 미수용 |
+
+개별 지표 CV≤10% 기준은 그대로 유지한다. batch off 평균 CV16개20.4%/64개11.7%,
+batch on 평균 CV16개18.7%/64개6.9%다. 비교 쌍 중 한쪽 이상이 불안정하므로
+평균 감소율이나 on/off 비용을 성능 수용으로 올리지 않는다. p99 비교도 모두 미수용이다.
+네 실행 모두 moving convex parity·기존 body27 assertions·완료 Game display·2000 smoke frames·
+exit0·immutable package·cooked-only geometry gate 통과. 기존 batch16/role 출력도 보존되어 있다.
+Release/Shipping Player 빌드와 Shipping service/socket 격리를 확인했다. Release no-WPO는 기존 빌드 우회다.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedProfile/result.json`, 개별 capture와 profile-commands JSONL.
+실패/제외 이력: 최초 CommandRoles enum의 operator| 사용 compile 오류(Both로 수정),
+capture probe 초기 ThreadStream link 누락(수정), Player 프레임 발행 전 counter 누락.
+최종 빌드·구문·capture probe·제품 실행 결과만 수용한다.
+
+재현: `build-physics-managed-query-capture-probe.ps1`,
+`verify-physics-managed-query-profile.ps1 -Stage <fresh-stage>`,
+`summarize-physics-managed-query-profile.py` (Tools/regression).
+
+T2 managed on/off·제품 계층 capture 게이트는 검증했다. T2 progress 유지.
+다음은 tiered JIT/렌더 경합/초기화 등 변동 원인을 분리하여 안정적인 평균/p99를 다시 측정하고,
+대표 query 부하 성능 수용을 판정하는 작업이다. 전체 simulation/worker/메모리 M3는 별도 잔여다.
+
+## T2 변동 진단 — tiered JIT 비활성 조건 (2026-10-03)
+
+동일한 Release 패키지와 renderer/physics/query 부하를 유지하고 테스트 프로세스에만
+`DOTNET_TieredCompilation=0`, `COMPlus_TieredCompilation=0`을 전달했다.
+기본 실행에서는 해당 변수를 추가하지 않는다. 엔진/패키지/runtimeconfig의 기본 JIT 정책은 변경하지 않았다.
+별도 RunName을 사용하여 기존 ManagedProfile 증거를 덮어쓰지 않는다.
+
+off/on/on/off 독립4프로세스, 각16/64 요청 scalar/batch ABBA 두 회, 총64블록을 재측정했다.
+모든 parity/이동 충돌/기존 body 검사/2000 smoke frames/완료 display/exit0/패키지 불변 통과.
+on capture 두 개도 complete·unacked0·event/counter drop0·계층 위반0을 확인했다.
+
+| 요청 | batch off 평균 median μs | batch on 평균 median μs | off/on CV | 평균 비교 수용 |
+|---:|---:|---:|---:|---|
+| 16 | 11.483 | 13.113 | 21.8% / 18.5% | 미수용 |
+| 64 | 40.753 | 48.843 | 14.7% / 6.1% | 미수용 |
+
+평균 및 p99의 모든 비교 쌍은 기존 CV10% 기준에서 미수용이다.
+이 조건만으로 변동이 해소되지 않았다. JIT가 영향이 없다는 결론이나 렌더 경합이 원인이라는 확정으로 확대하지 않는다.
+기존 기본 JIT 측정과 시간상 분리된 비교이며 CPU/GPU 부하 및 OS 스케줄링의 차이도 있을 수 있다.
+다음은 완료 display 기준을 유지하며 렌더/OS 스케줄링 간섭을 통제하거나 관측하는 실험이다.
+제품 기본 정책 변경과 성능 수용은 하지 않았다. T2 progress 유지.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedProfileNoTier/result.json`.
+재현: `verify-physics-managed-query-profile.ps1 -Stage <same-stage> -DisableTieredCompilation -RunName ManagedProfileNoTier`,
+`summarize-physics-managed-query-profile.py ManagedProfileNoTier` (Tools/regression).
+
+## T2 CPU 배치 통제 진단 (2026-10-03)
+
+동일 Release 패키지와 tiered JIT off를 유지하고 query ready gate 전에 Player CPU 배치를 통제했다.
+Windows GetLogicalProcessorInformation의 physical-core mask를 읽어 LP0/1 코어(mask3)를 예약했다.
+CoreWindow::Then의 message-loop owner는 HWND owner thread와 같은 스레드이므로 해당 owner를 LP0(mask1)에 고정했다.
+ready 경계에 존재하는62개 Player 스레드 중 나머지는 LP2~11(mask4092)에 배치했다.
+부팅 당시 process allowed mask4095 및 스레드별 이전/적용 mask를 cpu-placement.json에 보존했다.
+프로세스 밖 OS 작업·kernel/GPU 작업·이후 새로 생긴 스레드까지 격리한 조건은 아니다.
+
+off/on/on/off4프로세스·64블록, 기존60 warmup/600 timed samples/ABBA 두 회다.
+모든 moving convex parity/body27 assertions/완료display/2000 smoke frames/exit0/패키지 불변 통과.
+on capture각228/215frames, complete·unacked0·event/counter drop0·계층 위반0 통과.
+각 ScriptQueryBatch5305/QueryBatch217145/QueryStructureUpdate217145/query423884를 확인했다.
+
+| 요청 | scalar off 평균 median μs | batch off 평균 median μs | scalar/batch CV | 평균 비교 |
+|---:|---:|---:|---:|---|
+| 16 | 24.898 | 11.114 | 6.6% / 23.7% | 미수용 |
+| 64 | 93.328 | 44.371 | 6.3% / 9.0% | 통제 조건에서 통과 |
+
+64개 off 평균 비교에서 batch가52.5% 짧았고 양측 CV≤10%를 확인했다.
+이 결과는 해당 CPU 배치·JIT·fixture 범위의 비교 수용이다. 제품 기본 정책에서의 성능 보장이나
+렌더 경합이 변동의 단독 원인이라는 확정으로 확대하지 않는다. 요청16, 모든 p99 비교와 on/off 비용은 미수용이다.
+CPU 고정을 후속 렌더 smoke까지 유지하면 처리량이 크게 떨어졌다. 측정16블록 완료 이후
+느린 한 실행은 기존 affinity로 수동 복원했고, 하네스에 측정 후 살아 있는 기존 스레드의 원래 mask 복원을 추가했다.
+복원은 timed query 구간 밖이며 모든 실행의 query 타이밍 구간은 같은 배치를 사용했다.
+이 고정 정책을 제품 기본값으로 적용하지 않는다. 초기 실행은 shutdown까지 고정을 유지한 기록도 포함된다.
+전체 렌더 처리량 수치는 별도로 집계하지 않았으므로 그 감소율은 주장하지 않는다.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedProfileCpuSplit/result.json` 및 cpu-placement.json/개별 capture.
+재현: `verify-physics-managed-query-profile.ps1 -Stage <same-stage> -DisableTieredCompilation -IsolateGameThread -RunName ManagedProfileCpuSplit`,
+`summarize-physics-managed-query-profile.py ManagedProfileCpuSplit` (Tools/regression).
+
+T2 progress 유지. 다음은 owner CPU 소비와 wall time을 구분하는 계측, p99의 원시 표본/스케줄링 지연 분석,
+실제 기본 스케줄링 조건에서 평균/p99·계측 비용 수용이다. 대표 workload·제품 전체 M3도 남는다.
+
+## T2 owner CPU 소비·원시 지연 계측 (2026-10-03)
+
+fixture probe에 Windows GetThreadTimes(kernel+user), QueryThreadCycleTime, OS thread ID를 추가했다.
+60 warmup 뒤600개 timed query loop의 경계에서만 읽으며 호출별 P/Invoke 계측은 추가하지 않는다.
+cycle은 시간/GHz로 환산하지 않는다. CPU block은 loop/timer와 accounting 경계 비용을 포함하므로
+개별 query scope 합과 다른 구간이다. rawUs는 정렬 전 실행 순서의600개 값을 보존한다.
+
+새 Release 패키지, tiered JIT off, 기본 CPU 배치, off/on/on/off4프로세스·64블록이다.
+동일 owner thread·원시 표본 수/유한 값·CPU counter 단조성을 검사했다.
+기존 body27 assertions·moving convex parity·완료display·2000 smoke frames·exit0·패키지 불변 통과.
+on capture 두 개 모두 complete/unacked0/event-counter drop0/계층 위반0 통과했다.
+
+| 상태 | 요청 | 호출 | block wall CV | cycle CV | wall/cycle 상관 |
+|---|---:|---|---:|---:|---:|
+| off | 16 | scalar | 22.4% | 22.6% | 1.000 |
+| off | 16 | batch | 17.1% | 16.7% | 0.997 |
+| off | 64 | scalar | 6.0% | 6.0% | 1.000 |
+| off | 64 | batch | 10.6% | 10.4% | 1.000 |
+| on | 16 | scalar | 8.1% | 8.0% | 0.999 |
+| on | 16 | batch | 14.9% | 14.9% | 1.000 |
+| on | 64 | scalar | 8.9% | 8.8% | 0.999 |
+| on | 64 | batch | 6.6% | 6.8% | 0.997 |
+
+8블록/조합에서 wall/cycle 상관0.997~1.000을 관측했다. wall 변동만 있고 cycle 소비는 일정한 패턴이 아니다.
+owner descheduling만을 전체 변동의 설명으로 삼을 근거는 부족하다. CPU/cache/allocator/실행 경로 등의
+어느 항목이 원인인지는 이 계측으로 확정하지 않는다. 과거 실행과 패키지/계측 경계가 달라 직접 성능 회귀 판정도 하지 않는다.
+GetThreadTimes의 표기는100ns지만 이번 CPU 차분 값은0/15625/31250/46875/62500/78125μs였다.
+64블록 중30개에서 CPU 차분이 wall보다 크다. wall-CPU를 정확한 wait 시간으로 해석하거나 음수를0으로 자르지 않는다.
+38,400개 원시 표본에서 block median의3배 초과37개를 관측했다. 위치/최대/처음-마지막 사분위 median도 보존한다.
+표본 제거·임계값 완화는 하지 않았다. 평균·p99 비교와 on/off 비용은 이번 실행에서 모두 CV 기준 미수용이다.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedProfileCpuAccounting/result.json` 및 원시 Player 로그.
+재현: fresh B2 fixture를 package한 뒤 `verify-physics-managed-query-profile.ps1 -Stage <new-stage> -DisableTieredCompilation -RequireCpuAccounting -RunName ManagedProfileCpuAccounting`,
+`summarize-physics-managed-query-profile.py ManagedProfileCpuAccounting`,
+`analyze-physics-query-cpu.py ManagedProfileCpuAccounting` (Tools/regression).
+
+T2 progress 유지. 다음은 managed/native 경계에서 검증·scratch 할당/변환·SDK query 실행 비용을 분리하여
+cycle 변동과 연결하고 원시 tail을 분석하는 작업이다. 기본 제품 정책 및 전체 M3 성능 수용은 변경하지 않는다.
+
+## T2 managed/native bridge 비용 분해 (2026-10-03)
+
+`Physics.ScriptQueryBatch`를 ABI 진입부터 계측하고 직계 자식으로 `ScriptQueryValidate`,
+`ScriptQueryPrepare`, 기존 `QueryBatch`, `ScriptQueryTranslate`, `ScriptQueryCommit`을 배치했다.
+검증은 phase/포인터/alias/anchor/출력 구간을 포함한다. 준비는 scratch/results/answers 할당,
+reserve 및 입력 변환을 포함한다. 변환은 translated 버퍼 할당, body/shape resolve, registry 등록을 포함한다.
+출력 반영은 성공한 요청의 hit 복사와 summary 게시다. 기존 batch 오류 시 출력 보존 순서는 유지한다.
+SDK 구간은 query 구조 갱신·ray/overlap 실행과 그 profiler 비용을 포함하는 inclusive `QueryBatch`다.
+부모에서 직계 자식 합을 뺀 잔여에는 해제·제어 흐름·scope 비용 등이 포함되며 순수 allocator 비용으로 해석하지 않는다.
+
+Release/Shipping 제품 빌드, Shipping 소켓·서비스 격리 통과. 새 dagger convex 패키지에서
+JIT off·기본 CPU 배치·off/on/on/off 4프로세스·64블록을 실행했다. 처음 빌드와 겹친 실행은 별도 보존하고
+성능 분석에서 제외했다. 최종 clean 실행은 빌드·Shipping 격리 종료 후 시작했다.
+각 Player body27 assertions, batch3역할 각16/0 로그, moving convex parity/운동, 완료 display,
+2000 이상 smoke frames, exit0·패키지 불변 통과. 원시 query-loop 38,400개를 보존했다.
+두 on capture 각600프레임, complete/unacked0/event-counter drop0/Scene·tick·계층 오류0 통과.
+기본128MiB 예산을 유지하며 각 capture 메모리는 약72.6MB였다.
+
+아래는 profiler-on 두 capture의 완전한 batch 호출을 pooled 집계한 평균이다.
+16/64개 실제 실행 요청을 기준으로 분류하며 warmup·timed·parity 호출을 포함한다.
+따라서 timed-only 평균, profiler-off SDK 시간, 성능 개선율과 구분한다.
+
+| 구간 | 16요청 평균 μs | 비중 | 64요청 평균 μs | 비중 |
+|---|---:|---:|---:|---:|
+| 검증 | 0.192 | 1.49% | 2.168 | 4.26% |
+| 준비·할당 | 1.393 | 10.80% | 4.465 | 8.77% |
+| SDK inclusive | 9.088 | 70.47% | 34.189 | 67.19% |
+| 변환·할당 | 1.463 | 11.35% | 7.884 | 15.49% |
+| 출력 반영 | 0.125 | 0.97% | 0.482 | 0.95% |
+| 잔여 | 0.636 | 4.93% | 1.699 | 3.34% |
+| 전체 | 12.896 | 100% | 50.886 | 100% |
+
+표본은16요청5296개,64요청5302개다. 실제 SDK 구간이 가장 큰 비중이지만 구간 비중만으로
+CPU-cycle 변동의 원인이나 최적화 효과를 확정하지 않는다. clean 실행의 scalar/batch 평균·p99 비교와
+on/off overhead 비교는 모두 CV≤10% 조건 미수용이다. 표본 제외·임계값 완화 없음.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedProfileBridgeCostsClean/result.json`.
+재현: fresh fixture 뒤 `verify-physics-managed-query-profile.ps1 -Stage <stage> -DisableTieredCompilation
+-RequireCpuAccounting -RequireBridgeCosts -RunName ManagedProfileBridgeCostsClean`,
+`summarize-physics-managed-query-profile.py`, `summarize-physics-query-bridge-costs.py`,
+`analyze-physics-query-cpu.py`에 동일 RunName을 전달한다.
+T2 progress 유지. 다음은 기존 capture의 SDK 구조 갱신/개별 query 비용과 tail을 분해하고,
+기본 조건의 평균·p99 안정성 및 전체 M3 성능 수용을 마무리하는 작업이다.
+
+## T2 SDK 내부·tail 분해 (2026-10-03)
+
+제품 코드/패키지 재실행 없이 직전 clean Player capture 두 개를 새 분석기로 재검증했다.
+원본 ceprof SHA256·분석기 소스/실행파일 SHA256을 별도 receipt에 기록한다.
+complete/unacked0/event-counter drop0/Scene·tick·계층0 조건을 다시 확인했다.
+호출마다 구조 갱신1회와 ray/overlap 반반 구성, 부모 시간의 자식 합·잔여 분해를 검사한다.
+16/64요청 각5296개의 완전한 호출을 CSV로 보존했다. 기존64요청 pooled5302개 중
+ray/overlap 반반이 아닌 검사6개는 이번 구성 비교에서 제외했으며 원본 capture는 보존한다.
+warmup·timed·parity 구간이 섞인 profiler-on 집계다. managed rawUs와 호출 ID로 연결하지 않았으므로
+이번 native tail이 기존 managed rawUs tail과 동일 호출이라는 주장은 하지 않는다.
+
+| 요청 | 전체 평균 μs | 구조 갱신 μs | ray 합 μs | overlap 합 μs | SDK 잔여 μs | median / p99 / max μs |
+|---|---:|---:|---:|---:|---:|---:|
+| 16 | 12.896 | 0.046 | 3.973 | 3.566 | 1.503 | 10.8 / 31.1 / 244.9 |
+| 64 | 50.906 | 0.059 | 15.260 | 13.409 | 5.475 | 43.6 / 103.5 / 226.0 |
+
+SDK 잔여는 dispatch/제어·자식 scope 사이 gap·계측 비용 등을 포함한다. 순수 SDK CPU 실행 시간이나
+대기로 단정하지 않는다. 구조 갱신 평균은 전체의0.36%/0.12% 미만이며 이번 fixture에서 지배 비용이 아니다.
+ray/overlap scope는 SDK 실행과 scope 내부의 profiler 비용·스케줄링 영향을 포함한다.
+
+nearest-rank p99 이상 호출은 각53개다. 16요청 tail 평균46.902μs에서 SDK31.525,
+준비5.543, 변환3.396, 부모 잔여5.847μs였다. 64요청 tail 평균113.409μs에서는 SDK66.640,
+준비9.902, 변환26.783, 부모 잔여5.443μs였다. 64요청에서 일반 평균 대비 tail 증가62.503μs 중
+SDK 증가32.437μs(약52%), 변환 증가18.891μs(약30%)를 관측했다. 모든 tail의 원인이 동일하다고
+단정하지 않으며 allocator/cache/descheduling 원인으로 확정하지 않는다.
+median3배 초과는16요청42개,64요청4개이며 제거하지 않았다. 가장 큰10호출의 Scene/tick과
+모든 분해 시간을 receipt에 보존했다. 제품 성능 수용은 여전히 false다.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedProfileBridgeCostsClean/SdkTail/result.json` 및 capture별 CSV.
+재현 `build-physics-managed-query-capture-probe.ps1` 뒤
+`analyze-physics-query-sdk-tail.py ManagedProfileBridgeCostsClean` (Tools/regression).
+T2 progress 유지. 다음은 결과 변환의 body/shape 조회·registry 등록·버퍼 초기화 비용을 더 분리하고,
+계측 off 기본 조건에서 의미 있는 최적화와 평균/p99 안정성을 검증하는 작업이다.
+
+## T2 결과 변환 내부 비용 분해 (2026-10-03)
+
+`ScriptQueryTranslate`의 자식으로 `ScriptHitInitialize`(버퍼 allocation/value initialization),
+`ScriptHitLookup`(hit별 body/shape 조회·layer 선택), `ScriptHitEncode`(hit별 registry 등록·hit 구성)를 추가했다.
+출력 반영 순서와 batch/요청별 오류 정책을 유지했다. Release/Shipping 제품 빌드와 Shipping 격리 통과.
+새 dagger convex 패키지에서 빌드 종료 후 JIT off·기본 CPU 배치·off/on/on/off4프로세스64블록 실행.
+각 body27 assertions·batch3역할 각16/0·moving parity·완료 display·2000 이상 frames·exit0·패키지 불변 통과.
+두 capture complete/unacked0/event-counter drop0/Scene·tick·계층0, 보존266/358프레임 및99.12/99.31MB.
+기본128MiB 예산을 유지했다. retention에 따라 프레임 수는 이전600과 다르며 완전한 benchmark 호출 수를 별도 검사했다.
+16/64요청 각5296개, 호출당 초기화1회·lookup/encode 각16/64회·부모 시간 분해 합을 검증하고 raw CSV를 보존했다.
+
+첫 capture의 빈 출력 버퍼 초기화 마커는0길이였고 다음 형제 commit과 같은 타임스탬프 경계에 있었다.
+기존 timestamp/depth 정렬이 다음 sibling을 부모로 골라 계층 오류1을 냈다. 분석기는0길이 ScriptHit 마커에
+대해 같은 부모 depth에서 해당 시간을 포함하는 유일한 Translate 구간을 확인한다. 이벤트 제외나 오류 임계값
+완화가 아니다. 기존 capture 재검증0 및 수정 분석기로 새4프로세스 실행 통과. 초기 중단 실행은 최종 성능 비교에서 제외했다.
+
+| 요청 | 변환 평균 μs | 초기화 μs | body/shape lookup 합 μs | registry/hit encode 합 μs | 변환 잔여 μs |
+|---|---:|---:|---:|---:|---:|
+| 16 | 4.253 | 0.304 | 1.263 | 0.838 | 1.849 |
+| 64 | 23.289 | 8.656 | 4.665 | 2.888 | 7.081 |
+
+64요청 초기화는 변환 평균의37.17%,lookup20.03%,encode12.40%였다.
+전체 호출 p99 이상 tail53개의 변환 평균52.343μs에서 초기화22.119μs(42.26%),
+lookup12.760μs,encode5.794μs,변환 잔여11.670μs를 관측했다. 16요청은 p99 경계 동률을 포함해54개였다.
+Profiler-on warmup/timed/parity pooled 값이며 per-hit marker가 계측 비용을 추가한다.
+이전 capture와 직접 성능 회귀/개선 비교를 하지 않는다. 변환 잔여에는 반복·summary·scope 사이 gap 등이
+포함된다. CPU/cache/allocator/descheduling 원인으로 확정하지 않는다. 평균/p99·on/off 비교는 모두CV 기준 미수용.
+
+현재 변환 버퍼는 실제 hit 합이 아니라 공유 output capacity 전체를 resize한다.
+이번 fixture에서64요청 capacity512에 실제 hit64였으므로 사용하지 않는 슬롯까지 초기화한다.
+다음 최적화는 실제 written 합 크기의 조밀한 변환 버퍼와 요청별 시작 offset을 사용하여
+공용 output offset으로 마지막에 복사하는 방식이다. batch 실패/요청 오류의 출력 보존·truncation·alias·
+zero-capacity·원래 요청 순서를 유지하고 profiler-off fresh Player 평균/p99 및 memory를 검증한다.
+장기 registry cache나 전역 ownership 변경은 이번 측정으로 정당화하지 않는다. 아직 최적화 구현/효과 수용은 아니다.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedProfileHitCostsClean/result.json` 및
+`SdkTail/result.json`, `SdkTail/hit-result.json`, capture별 CSV.
+재현 fresh fixture 뒤 `verify-physics-managed-query-profile.ps1 -Stage <stage> -DisableTieredCompilation
+-RequireCpuAccounting -RequireBridgeCosts -RunName ManagedProfileHitCostsClean`,
+`summarize-physics-managed-query-profile.py`, `analyze-physics-query-sdk-tail.py`,
+`analyze-physics-query-hit-costs.py`에 동일 RunName을 전달한다. T2 progress 유지.
+
+## T2 actual-written 변환 버퍼 최적화 (2026-10-03)
+
+ABI batch 결과에서 성공 요청의 written 합을 계산하고 그 수만큼만 translated vector를 resize한다.
+64개 고정 size_t 배열에 원래 요청 인덱스별 시작 위치를 기록한다. hit 입력은 기존 공유 scratch offset에서
+읽고, 변환 결과는 조밀한 prefix에 기록하며, 마지막 commit에서 원래 output offset으로 복사한다.
+오류 요청·빈 결과·zero-capacity는 output hit을 건드리지 않는다. 개별 변환 오류가 나면 해당 요청은 게시하지 않는다.
+전체 batch 실패/예외는 commit 이전에 반환한다. 요청 순서·required/truncated 및 alias 계약을 유지한다.
+전역 cache나 Scene/Editor 생명주기·소유권 변경은 없다. 기존 C++23 views 경로를 사용한다.
+
+직전 계측 분해에서 layer ID를 담던 임시 변수가uint32_t로 좁아진 문제도 발견해uint64_t로 복구했다.
+shape override, Entity layer ID, physics_hit ABI가 모두64비트다. 이 비교 fixture는 default layer ID 범위이므로
+큰 stable ID의 제품 런타임 동작을 이번 성능 측정으로 확인했다고 주장하지 않는다.
+
+새 Player probe에 별도 dense-batch6 checks/역할을 추가했다. 공용4096-hit 버퍼를0x5a로 채우고
+output offset4000→0 역순·큰 gap, 중간 invalid request, zero-capacity discovery, no-hit를 섞는다.
+성공 hit identity·원래 요청별 summary, 모든 gap/실패 요청/unwritten tail 바이트 보존을 검사한다.
+Release/Shipping 빌드 및 Shipping 소켓·서비스 격리 통과. 새 패키지의 초기93 checks 통과.
+최종 변경 패키지4실행 각 기존body27+batch48+dense18=93/0, moving convex parity·완료 display·
+2000 이상 smoke frames·exit0·패키지 불변 통과. 이전 패키지2실행도 기존75/0 통과.
+
+빌드 종료 후 fresh before/after/after/before profiler-off4프로세스, 이어after on/on2프로세스다.
+JIT off·기본 CPU 배치·각 프로세스 inner scalar/batch ABBA×2. 총96블록57,600 raw loop samples.
+이전 native binary를 포함한 패키지와 새 패키지를 모두 새 프로세스로 실행했다. binary SHA256 및 stage 불변을 기록한다.
+새 probe의 추가 저작/회귀 검사는 timed loop 밖이지만 heap/cache 상태에 영향을 줄 수 있으므로
+이 비교를 코드 변경만의 인과 효과로 단정하지 않는다. 이전 패키지는 이전64→32 layer 임시값도 포함하지만 default ID fixture다.
+
+64요청 batch block 평균 median은47.892→44.848μs(6.36% 단축 관측), CV6.40%/9.00%로 해당 평균 비교만 통과.
+scalar 평균 median87.935→90.153μs, CV3.55%/10.09%로 비교군 안정성 미수용이다.
+64요청p99와16요청평균/p99 비교는 CV기준 미수용. 임계값 완화·표본 제거 없이 모든 값을 보존했다.
+전체 성능 수용은false이며6.36%를 보편적/인과적 speedup으로 발표하지 않는다.
+
+두 변경 capture complete/unacked0/event-counter drop0/Scene·tick·계층0, 보존353/327프레임,
+99.30/99.22MB. 기본128MiB 예산 유지. 각16/64요청5296개의 완전 호출을 분해했다.
+64요청 profiler-on 초기화 평균0.285μs, tail0.585μs, 변환 평균14.270μs를 관측했다.
+과거 다른 capture의8.656μs와 직접 회귀/개선율을 산출하지 않는다.
+ABI physics_hit64B와 실제 hit수16/64를 확인했다. fixture의 요청 capacity는8배이므로 변환 hit 저장량은
+16요청8KiB→1KiB,64요청32KiB→4KiB(87.5% 감소)다. 새 offset 배열512B는 별도 stack 저장량이다.
+allocator metadata/capacity 또는 전체 query scratch·managed hit 버퍼의 감소를 뜻하지 않는다.
+
+증거 `Build/Obj/Phase19T2QueryBench/ManagedDenseComparison/result.json`,
+`After/result.json`, `After/SdkTail/result.json`, `After/SdkTail/hit-result.json` 및 원시 Player/CSV.
+재현 `verify-physics-query-dense-comparison.ps1 -BeforeStage <previous-stage> -AfterStage <new-stage>`,
+`analyze-physics-query-dense-comparison.py ManagedDenseComparison`, 이후 기존 profile/SDK/hit 분석기에
+`ManagedDenseComparison/After`를 전달한다. actual-written 최적화 구현/기능 검증 완료, T2 progress 유지.
+다음은 같은 managed probe를 사용한 before/after 패키지와 기본 tiered JIT 조건에서 대표 부하·p99 안정성을
+검증하고 전체 M3 성능/메모리 수용을 연결하는 작업이다.
+
+## T2 동일 probe·기본 JIT 재검증 (2026-10-03)
+
+이전 native distribution을 현재 PhysicsB2PlayerProbe로 새로 package하여 추가 dense 회귀 검사를 양쪽에 맞췄다.
+Before/After probe 소스 SHA256 동일, ScriptCore.dll SHA256 동일을 검사하고 receipt에 남겼다.
+DOTNET_TieredCompilation/COMPlus_TieredCompilation 환경 override는없고 ScriptCore runtimeconfig에
+System.Runtime.TieredCompilation 강제 설정이 없다. 제품 기본 JIT 정책을 사용하며 실제 각 메서드의 tier 승격
+시점까지 확인한 것은 아니다. 이전 JIT-off 비교는 별도 진단으로 보존한다.
+
+Fresh before/after/after/before profiler-off4프로세스, 기본 CPU 배치, inner scalar/batch ABBA×2.
+각 기존body27+batch48+dense18=93/0, 이동·충돌 parity·완료 display·2000 이상 frames·exit0·패키지 불변 통과.
+64블록38,400 raw query-loop samples와 CPU accounting을 보존했다. CPU pinning·JIT off·표본 제외 없음.
+이번 실행은 off-only이므로 새 on capture/overhead 검증을 주장하지 않는다. 기존 capture 증거와 구분한다.
+
+| 요청 | batch 평균 median before/after μs | 평균 CV before/after | p99 median before/after μs | p99 CV before/after |
+|---|---:|---:|---:|---:|
+| 16 | 14.378 / 14.668 | 25.53% / 24.47% | 27.4 / 27.6 | 56.35% / 15.52% |
+| 64 | 52.607 / 50.846 | 33.92% / 8.73% | 110.7 / 90.65 | 43.50% / 11.06% |
+
+16/64 batch 평균·p99 before/after 비교와 scalar control 비교는 모두CV≤10% 수용 조건 미달이다.
+64 평균 -3.35%,p99 -18.11%의 관측값은 speedup으로 수용하지 않는다. 이전JIT-off에서 관측한
+6.36%도 기본조건 개선율로 확정할 수 없다. 기본JIT가 모든 변동의 원인이라는 추론도 하지 않는다.
+actual-written 변환 버퍼의 구현/기능 검증과 요청 hit payload 감소는 유지하며 제품 성능 수용은false다.
+
+부하 범위는 실제 dagger convex를 포함한3개 body 역할, 이동하는 Scene의16/64 ray/overlap 혼합이다.
+주로 요청당1hit이며 다수 body·다중 hit/overflow가 많은 Scene까지 대표한다고 보지 않는다.
+다음은 HTTP CLI로 저작한 높은 body 밀도·다중 hit 부하에서 correctness/overflow/메모리와
+기본JIT 평균·p99를 검증하는 작업이다. 동일 소규모 fixture 반복만으로 T2/M3 완료 처리하지 않는다.
+
+증거 `Build/Obj/Phase19T2QueryBench/MatchedDefaultJit/result.json` 및 원시 Player 로그.
+Before fixture `Build/Obj/P19B2/MatchedDefaultBefore/fixture.json`, After는기존RT2Dense fixture다.
+재현 `verify-physics-query-dense-comparison.ps1 -BeforeStage <matched-before> -AfterStage <after>
+-DefaultJit -OffOnly -BeforeProbeSource <before-source> -AfterProbeSource <after-source> -RunName MatchedDefaultJit`,
+`analyze-physics-query-dense-comparison.py MatchedDefaultJit`. T2 progress 유지.
+
+## T2 HTTP 저작 고밀도·다중 hit Player 검증 (2026-10-03)
+
+기존 B2 씬을 HTTP CLI로 열고 remote cluster에 static sphere body128개를 추가했다.
+object.create/component.add/object.property/physics.shapes/object.transform 및 scene.save의
+저작·검증643명령(quit 별도)을 journal로 보존했다. 씬 문서를 손으로 편집하지 않았다.
+저장된 PhysicsQueryStress.creator 및 meta를 양쪽 Project에 그대로 복사하여 source SHA256 동일을 확인했다.
+같은 managed probe source, ScriptCore.dll, 기본 JIT(강제 override 없음), 기본 CPU 배치다.
+기존 공용 layer catalog를 그대로 사용하며 새 물리 layer 체계나 registry cache를 만들지 않는다.
+
+실제 Player에서 remote sphere overlap이 서로 다른128 body identity를 반환함을 검사했다.
+full128 hits,8-hit overflow(required128/truncated),zero-capacity(required128),중간 invalid request,
+그 뒤 no-hit 요청,역순/희소 output 위치 및 모든 미사용 바이트0x5a 보존을7 checks로 검증했다.
+양쪽 패키지의 초기93 checks 및 최종4실행 각기존93+stress7=100/0 통과.
+기존 dagger 이동·충돌과16/64 ray/overlap scalar/batch parity도 매 블록 검증했다.
+모든 overlap benchmark 요청은 written8/required128/truncated를 확인한다.
+cooked Scene GUID ebe286e4-199c-4405-967b-151ee5158a71,CEPG1/source geometry0,완료 display,
+2000 이상 frames·exit0·패키지 불변 통과. 새 Player source 코드 재링크는 없고 managed fixture를 새로 컴파일했다.
+
+Fresh before/after/after/before off4프로세스·64블록·38,400 raw loop samples다.
+
+| 요청 | batch 평균 median before/after μs | 평균 CV before/after | p99 median before/after μs | p99 CV before/after |
+|---|---:|---:|---:|---:|
+| 16 | 71.058 / 65.907 | 12.65% / 9.52% | 139.8 / 135.45 | 25.51% / 23.14% |
+| 64 | 229.590 / 225.955 | 3.65% / 4.64% | 371.15 / 370.8 | 12.57% / 16.49% |
+
+64 batch 평균 비교만CV≤10% 통과(-1.58% 관측),scalar 평균 비교도 안정적이나 -9.18%로 더 크게 변했다.
+따라서batch 차이를 최적화의 인과 효과로 확정하지 않는다. p99와16요청 비교는 미수용이며 표본 제외 없음.
+제품 전체 성능 수용은false다. 이번은off-only이며 높은 hit 밀도에서 새 on capture의 drop/계층 검증을
+수행했다고 주장하지 않는다. 기존 낮은 hit 밀도 capture 증거는 별도로 유지한다.
+
+100ms 단위 owned-process memory sampling을 추가해 working set lifetime peak 관측값과 sampled private
+최댓값을 남겼다. before peak WS624.78/632.81MiB,after625.66/623.29MiB였다.
+private sampled max는before637.33/671.05MiB,after645.93/649.43MiB다.
+렌더러·CLR·물리가 포함된 전체 Player 수치이며 물리 전용 또는 private lifetime peak/누수 검증이 아니다.
+희소5요청 correctness case의 실제 written합136을 확인했다. 변환 hit 요청 저장량은
+4096×64B=256KiB에서136×64B=8.5KiB로 줄며 offset array0.5KiB는 별도다.
+전체 query scratch·managed 버퍼·allocator capacity/metadata 감소로 해석하지 않는다.
+
+증거 `Build/Obj/Phase19T2QueryBench/Dense128DefaultJit/result.json`,HTTP author journal 및 Player memory-samples.json.
+저작 씬 `Dynamic_CPP/Assets/Scenes/PhysicsQueryStress.creator`;fixture receipts `Build/Obj/P19B2/StressBefore`
+및 `StressAfter/fixture.json`. 재현 fixture builder의 -SceneSource에 HTTP 저장 씬을 전달하고,
+`verify-physics-query-dense-comparison.ps1`에 -DefaultJit -OffOnly -QueryStress -ExpectedSceneGuid 및
+matched Before/AfterProbeSource를 지정한 뒤 `analyze-physics-query-dense-comparison.py Dense128DefaultJit` 실행.
+T2 progress 유지. 다음은 공유4096-hit 출력을 실제로 채우는 최대 경계, 더 높은 hit 수/다양한 동적 부하,
+범위를 제한한 고밀도 profiler capture 및 p99/M3 수용이다.
+
+### T2 공유 출력 4096-hit 최대 경계 검증 (2026-10-03)
+
+HTTP 저작 static sphere128 씬에서 실제 Release Player의 64개 overlap 요청에 각각64-hit 출력을
+할당해 공유4096-hit 버퍼를 모두 채웠다. 출력 offset은 요청 순서와 역순이다.
+모든 요청 written64/required128/truncated=true, 모든4096 hit의 소유권과 요청별64개 identity
+중복 없음, 출력 앞뒤 각각64바이트 보호값0x5a 보존을4 checks로 검증했다.
+기존93+stress7+최대경계4=104/0 통과. 완료 display8,frames90806,exit0,텍스트 parser0,
+CEPG1/source geometry0 및 패키지 불변 통과. 새 managed probe 컴파일·package smoke도 통과했다.
+기본 JIT·기본 CPU 배치이며 native 재링크 없이 기존 dense 배포판을 사용했다.
+이 검증은 Release 기능 경계이며 Shipping 실행·ASan·고밀도 profiler capture·성능 수용 증거가 아니다.
+
+재현: 새 stress fixture에 verify-physics-b2-player.ps1 -QueryStress -RequireMaximumBatch
+-ExpectedSceneGuid ebe286e4-199c-4405-967b-151ee5158a71 -SmokeFrames 2000.
+이전 stress 패키지 비교에는 RequireMaximumBatch를 지정하지 않아 기존7-check 재현을 유지한다.
+증거 Build/Obj/Phase19T2QueryBench/Max4096/result.json 및 연결된 Player query-stress.json.
+T2 progress 유지. 다음은 더 높은 hit 수/다양한 동적 부하, 범위를 제한한 고밀도 profiler capture,
+p99 및 M3 제품 수용이다.
+
+### T2 고밀도 제한 구간 profiler 캡처 (2026-10-03)
+
+고밀도128-body 씬의 실제 Release Player에서 독립 on/on 두 프로세스를 실행했다.
+기본 JIT·기본 CPU 배치이며 제품 캡처 예산을 변경하지 않았다. 별도 BoundedDenseCapture 모드로
+16블록(16/64 요청,scalar/batch ABBA ABBA)을 유지하고 블록당warmup2·samples20으로 제한한다.
+일반 성능 모드는 기존warmup60·samples600을 유지한다. 이번320 samples/프로세스는 성능/p99 수용용이 아니다.
+
+각 실행 기존104/0·scalar/batch identity/count/truncation parity·moving dagger 충돌,
+owner CPU/raw identity·cooked Scene·CEPG1·완료display8·exit0·패키지 불변 통과.
+캡처563/600frames,10,933,824/10,927,752bytes,complete=true/unacked0,
+event drop0/counter drop0/계층 위반0. 각캡처QueryBatch7903 및구조갱신7903,쿼리15661,Scene1.
+검증/준비/SDK/변환/commit 5단계와Scene/tick/task 소유권 계층 검증을 유지했다.
+16/64 요청의 혼합 배치 각각96회가 전부 보존됐으며,각batch당lookup/encode96/384개와
+initialize1회도 일치했다. 이 씬의 ray는수직4개 구를 반환하고 overlap은8개를기록(required128/truncated)한다.
+
+최초 verifier는ray1-hit 및시작전기능검사미포함으로 가정해coverage를거부했다.
+실제 씬의ray4-hit에맞추고 혼합half-ray/half-overlap요청을명시적으로식별하도록수정했다.
+원캡처 재검증 통과 후 두fresh 실행을완료했다. 이벤트제외나drop/계층기준완화는없다.
+기존600-loop 저밀도캡처도기본모드재검증통과,고밀도모드에서는exit6으로거부하는control을확인했다.
+
+재현: build-physics-managed-query-capture-probe.ps1 후 HTTP stress 씬으로새fixture를만들고
+verify-physics-dense-bounded-capture.ps1 -Stage <새stage> 실행.
+증거 Build/Obj/Phase19T2QueryBench/DenseBounded-016a6d228abf4a00b9c88a7e28078a6c/result.json,
+연결된query.ceprof/capture-result.json/bridge-costs.csv 및 DenseCaptureVerifierControl.
+T2 progress 및performanceAccepted=false 유지. 남은작업은더높은hit/다양한동적부하와p99/M3 제품수용이다.

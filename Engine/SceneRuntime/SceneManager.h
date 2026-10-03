@@ -116,6 +116,8 @@ public:
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
 	bool IsGameStart() const { return m_isGameStart; }
 	void SetGameStart(bool isStart);
+    // Record a required runtime failure, then request teardown at the safe boundary.
+    void ReportSimulationFailure(std::string reason);
 
     // 요청은 UI/CLI가 설정하고 구조 경계에서 실제 전이를 확정한다.
     // Editor는 문서 백업과 SDK 시작, Player는 SDK 시작 성공이 필요하다.

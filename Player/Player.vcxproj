@@ -130,6 +130,7 @@
   <ItemGroup>
     <ClInclude Include="PlayerApp.h" />
     <ClInclude Include="PlayerMain.h" />
+    <ClInclude Include="PlayerDdolProbe.h" />
     <ClInclude Include="PlayerCommands.h" />
     <ClInclude Include="PlayerCommandService.h" />
   </ItemGroup>

@@ -3,6 +3,7 @@
 #include <shellapi.h>
 #include <cstdio>
 #include <cstring>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <string>
@@ -92,6 +93,7 @@ namespace
 int wmain(int argc, wchar_t** argv)
 {
     try { return Run(argc, argv, SW_SHOWNORMAL); }
+    catch (const std::exception& error) { std::fprintf(stderr, "[CreatorEngine loader] %s\n", error.what()); return 161; }
     catch (...) { return Fail(L"Invalid runtime layout", ERROR_BAD_PATHNAME); }
 }
 
@@ -102,6 +104,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int show)
     if (!argv) return Fail(L"Cannot parse command line");
     int result{};
     try { result = Run(argc, argv, show); }
+    catch (const std::exception& error) { std::fprintf(stderr, "[CreatorEngine loader] %s\n", error.what()); result = 161; }
     catch (...) { result = Fail(L"Invalid runtime layout", ERROR_BAD_PATHNAME); }
     LocalFree(argv);
     return result;

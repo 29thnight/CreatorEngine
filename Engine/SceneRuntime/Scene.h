@@ -669,6 +669,7 @@ public:
 
     //Physics
     void FixedUpdate(float deltaSecond);
+    math::matrix4x4 PhysicsRenderMatrix(EntityHandle owner) const;
     ce::physics::result<void> StartPhysicsSimulation();
     ce::physics::result<void> StopPhysicsSimulation();
     ce::physics::result<void> PreparePhysicsSceneExit();
@@ -682,6 +683,9 @@ public:
     ce::physics::result<ce::physics::query_result> OverlapPhysics(const ce::physics::geometry& geometry, const ce::physics::pose& pose,
         std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter);
 
+    ce::physics::result<void> QueryPhysicsBatch(std::span<const ce::physics::query_request> requests,
+        std::span<ce::physics::result<ce::physics::query_result>> results);
+
     template<class Publisher>
     ce::physics::result<std::shared_ptr<const ce::physics::CollisionGeometry>>
     PublishCollisionGeometry(const ce::physics::CollisionGeometrySource& source, Publisher&& publisher)
@@ -694,6 +698,13 @@ public:
     }
 
     ce::layers::result<void> AssignLayer(Entity& entity, ce::layers::layer_id layer);
+    // Owner-thread diagnostics; callers cannot mutate or retain the geometry cache.
+    [[nodiscard]] ce::physics::result<ce::physics::CollisionGeometryLibrary::statistics>
+    ReadCollisionGeometryStatistics() const
+    {
+        return m_collisionGeometry.Stats();
+    }
+
     ce::layers::result<std::span<const EntityHandle>> LayerMembers(ce::layers::layer_id layer) const;
 
 private:
@@ -1082,6 +1093,15 @@ private:
     friend class CharacterMovementComponent;
 
     ce::physics::result<void> CommitPhysicsLayers();
+    ce::physics::result<void> CommitPhysicsTransforms();
+    void QueuePhysicsTransform(EntityHandle owner);
+
+    [[reflgen::ignore]]
+    std::mutex m_physicsTransformMutex;
+    [[reflgen::ignore]]
+    std::vector<EntityHandle> m_physicsTransformDirty;
+    [[reflgen::ignore]]
+    std::vector<EntityHandle> m_physicsTransformDrain;
 
     [[reflgen::ignore]]
     std::vector<ScenePhysicsSimulation::layer_assignment> m_physicsLayerAssignments;

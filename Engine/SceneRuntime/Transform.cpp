@@ -702,3 +702,28 @@ void Transform::UpdateDirty()
 		//m_pOwner->GetScene()->RegisterDirtyTransform(this);
 	}
 }
+
+
+math::matrix4x4 Transform::GetRenderWorldMatrix() const
+{
+    if (!m_pOwner || !m_pOwner->GetScene())
+        return GetWorldMatrix();
+
+    auto* scene = m_pOwner->GetScene();
+    return scene->PhysicsRenderMatrix(scene->HandleOf(m_pOwner->m_index));
+}
+
+math::vector3 Transform::GetRenderWorldPosition() const
+{
+    return math::transform_point(math::vector3{}, GetRenderWorldMatrix());
+}
+
+math::quaternion Transform::GetRenderWorldQuaternion() const
+{
+    math::vector3 scale, position;
+    math::quaternion rotation;
+    if (!math::decompose(GetRenderWorldMatrix(), scale, rotation, position))
+        return GetWorldQuaternion();
+
+    return math::normalize(rotation);
+}

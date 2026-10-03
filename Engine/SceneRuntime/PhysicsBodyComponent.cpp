@@ -1,4 +1,5 @@
-﻿#include "PhysicsBodyComponent.h"
+﻿#include "PhysicsTransformPolicy.h"
+#include "PhysicsBodyComponent.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Transform.h"
@@ -33,7 +34,11 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
         return std::unexpected(error{error_code::invalid_argument, 0, "Physics body has no owner"});
 
     const auto& transform = GetOwner()->Transform_();
-    const auto scale = transform.GetWorldScale();
+    const auto captured = CapturePhysicsTransform(transform.GetWorldMatrix());
+    if (!captured)
+        return std::unexpected(captured.error());
+
+    const auto scale = captured->scale;
 
     const auto project = SceneManagers->ProjectLayers();
     if (!project)
@@ -50,7 +55,7 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
 
     body_definition definition;
     definition.properties.kind = m_motion;
-    definition.properties.initial_pose = {transform.GetWorldPosition(), transform.GetWorldQuaternion()};
+    definition.properties.initial_pose = captured->pose;
     definition.properties.mass = m_mass;
     definition.properties.gravity_enabled = m_gravityEnabled;
     definition.properties.constraints = {m_translationLocks, m_rotationLocks};

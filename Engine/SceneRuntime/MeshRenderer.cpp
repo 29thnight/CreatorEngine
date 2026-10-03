@@ -348,6 +348,11 @@ void MeshRenderer::SetExperimentMaterialBase(
 
 math::aabb MeshRenderer::GetBoundingBox() const
 {
+    return GetBoundingBox(m_pOwner->Transform_().GetWorldMatrix());
+}
+
+math::aabb MeshRenderer::GetBoundingBox(const math::matrix4x4& world) const
+{
     // typed 정본의 바운드(immutable aggregate가 소유). MBC9: legacy Mesh 바운드 폴백은
     // 은퇴했다 — generation이 없으면 빈 상자다.
     if (m_modelGeneration
@@ -355,7 +360,7 @@ math::aabb MeshRenderer::GetBoundingBox() const
     {
         return math::transform(
             m_modelGeneration->Meshes()[m_modelMeshIndex].bounds,
-            m_pOwner->Transform_().GetWorldMatrix());
+            world);
     }
     return math::aabb{};
 }

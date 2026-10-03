@@ -67,6 +67,25 @@ struct physics_query_result
     std::int32_t written, required_capacity, truncated;
 };
 
+struct physics_query_request
+{
+    std::int32_t kind;
+    vector3 origin, direction;
+    float distance_or_radius;
+    std::uint32_t layers;
+    std::int32_t include_sensors, offset, capacity;
+};
+
+struct physics_batch_result
+{
+    std::int32_t error, written, required_capacity, truncated;
+};
+
+inline constexpr int physics_batch_capacity = 64;
+inline constexpr int physics_batch_hit_capacity = 4096;
+static_assert(sizeof(physics_query_request) == 48 && offsetof(physics_query_request, offset) == 40);
+static_assert(sizeof(physics_batch_result) == 16);
+
 static_assert(sizeof(vector3) == 12 && sizeof(vector4) == 16);
 static_assert(sizeof(physics_body_state) == 60);
 static_assert(sizeof(physics_character_state) == 88 && offsetof(physics_character_state, tick) == 56);

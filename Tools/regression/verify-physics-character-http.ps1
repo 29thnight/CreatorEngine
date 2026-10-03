@@ -1,5 +1,6 @@
-param([string]$EditorExe='', [switch]$ScriptProbe, [switch]$StepProbe, [switch]$MotionProbe, [switch]$DdolProbe)
+param([string]$EditorExe='', [switch]$ScriptProbe, [switch]$StepProbe, [switch]$MotionProbe, [switch]$DdolProbe, [switch]$HierarchyProbe)
 $ErrorActionPreference='Stop'
+if($HierarchyProbe){$DdolProbe=$true}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(!$EditorExe){$EditorExe=Join-Path $repo 'Bin/x64-Debug/Editor/CreatorEditor.exe'}
 $exe=Get-Item -LiteralPath $EditorExe
@@ -51,6 +52,14 @@ try {
         return $result
     }
 
+    function SamePosition($left,$right){
+        if($left.Count -ne $right.Count){return $false}
+        for($axis=0;$axis -lt $left.Count;$axis++){
+            if([Math]::Abs($left[$axis]-$right[$axis]) -gt 0.0001){return $false}
+        }
+        return $true
+    }
+
     [IO.File]::WriteAllText($valid,'[{"shapeId":12,"kind":0,"halfExtent":[20,0.5,20]}]')
     if($DdolProbe){
         $destination=Join-Path $repo "Dynamic_CPP/Assets/Scenes/PhysicsCharacterDestination-$id.creator"
@@ -96,10 +105,37 @@ try {
     $null=Command 'character.velocity' @('CharacterGateActor','1','0','0') -Reject
     $null=Command 'character.teleport' @('CharacterGateActor','0','3','0') -Reject
     if($ScriptProbe){$null=Command 'script.add' @('CharacterGateActor','CharacterMovementProbe')}
+    if($HierarchyProbe){
+        $null=Command 'object.create' @('PersistentParent')
+        $null=Command 'object.transform' @('PersistentParent','4','0','2','0','30','0','2','2','2')
+        $null=Command 'object.parent' @('CharacterGateActor','PersistentParent')
+        $null=Command 'object.create' @('PersistentBranch')
+        $null=Command 'object.transform' @('PersistentBranch','7','0','2')
+        $null=Command 'object.parent' @('PersistentBranch','PersistentParent')
+        $null=Command 'object.create' @('PersistentDisabledCharacter')
+        $null=Command 'object.transform' @('PersistentDisabledCharacter','10','5','2')
+        $null=Command 'component.add' @('PersistentDisabledCharacter','CharacterMovementComponent')
+        $null=Command 'object.property' @('PersistentDisabledCharacter','CharacterMovementComponent','m_initialVelocity','2, 0, 0')
+        $null=Command 'entity.layer' @('PersistentDisabledCharacter','Enemy')
+        $null=Command 'object.parent' @('PersistentDisabledCharacter','PersistentBranch')
+        $null=Command 'object.enable' @('PersistentDisabledCharacter','off')
+        $null=Command 'object.create' @('PersistentDisabledBody')
+        $null=Command 'object.transform' @('PersistentDisabledBody','13','5','2')
+        $null=Command 'component.add' @('PersistentDisabledBody','PhysicsBodyComponent')
+        $null=Command 'entity.layer' @('PersistentDisabledBody','Ground')
+        $null=Command 'object.parent' @('PersistentDisabledBody','PersistentBranch')
+        $null=Command 'object.enable' @('PersistentDisabledBody','off')
+    }
     $null=Command 'scene.save' @($scene)
     if([IO.File]::ReadAllText($scene) -notmatch 'm_characterSchema:\s*1'){throw 'Character schema was not serialized'}
     $null=Command 'scene.load' @($scene)
     $initial=(Command 'object.describe' @('CharacterGateActor')).data.position
+    if($HierarchyProbe){
+        $hierarchyNames=@('PersistentParent','PersistentBranch','PersistentDisabledCharacter','PersistentDisabledBody')
+        $hierarchyInitial=@{}
+        foreach($name in $hierarchyNames){$hierarchyInitial[$name]=(Command 'object.describe' @($name)).data}
+    }
+
     $null=Command 'play.foreground_override' @('on')
     $null=Command 'play'
     $null=Command 'character.velocity' @('CharacterGateActor','1','0','0')
@@ -155,11 +191,51 @@ try {
         $null=Command 'character.velocity' @('CharacterGateActor','1.25','0','0')
         $null=Command 'character.force' @('CharacterGateActor','3','0','0','10')
         $beforeTransfer=(Command 'character.state' @('CharacterGateActor')).data
+        if($HierarchyProbe){
+            $hierarchyBefore=@{}
+            foreach($name in $hierarchyNames){$hierarchyBefore[$name]=(Command 'object.describe' @($name)).data}
+            $disabledChildBefore=(Command 'character.state' @('PersistentDisabledCharacter')).data
+        }
         $null=Command 'scene.ddol' @('CharacterGateActor')
         $null=Command 'scene.switch' @($destination)
         $null=Command 'object.describe' @('DestinationMarker')
         $afterOwner=(Command 'object.describe' @('CharacterGateActor')).data
         $afterTransfer=(Command 'character.state' @('CharacterGateActor')).data
+        if($HierarchyProbe){
+            $hierarchyAfter=@{}
+            foreach($name in $hierarchyNames){
+                $before=$hierarchyBefore[$name]
+                $after=(Command 'object.describe' @($name)).data
+                $hierarchyAfter[$name]=$after
+                if($after.sceneId -ne $afterOwner.sceneId -or $after.id -eq $before.id -or
+                    $after.layerId -ne $before.layerId -or $after.enabled -ne $before.enabled){throw "Hierarchy membership/layer/activation lost: $name"}
+                foreach($field in @('position','scale','rotation')){
+                    for($axis=0;$axis -lt $before.$field.Count;$axis++){
+                        if([Math]::Abs($before.$field[$axis]-$after.$field[$axis]) -gt 0.0001){throw "Hierarchy world $field changed: $name"}
+                    }
+                }
+                if(($before.components.id|ConvertTo-Json -Compress) -ne ($after.components.id|ConvertTo-Json -Compress)){throw "Hierarchy component identity changed: $name"}
+                $null=Command 'character.state' @($before.id) -Reject
+            }
+            if($afterOwner.parent -ne $hierarchyAfter.PersistentParent.id -or
+                $hierarchyAfter.PersistentBranch.parent -ne $hierarchyAfter.PersistentParent.id -or
+                $hierarchyAfter.PersistentDisabledCharacter.parent -ne $hierarchyAfter.PersistentBranch.id -or
+                $hierarchyAfter.PersistentDisabledBody.parent -ne $hierarchyAfter.PersistentBranch.id){throw 'DDOL hierarchy parent links were not remapped'}
+            if(@($hierarchyAfter.PersistentParent.children).Count -ne 2 -or
+                @($hierarchyAfter.PersistentBranch.children).Count -ne 2 -or
+                $afterOwner.id -notin $hierarchyAfter.PersistentParent.children -or
+                $hierarchyAfter.PersistentBranch.id -notin $hierarchyAfter.PersistentParent.children -or
+                $hierarchyAfter.PersistentDisabledCharacter.id -notin $hierarchyAfter.PersistentBranch.children -or
+                $hierarchyAfter.PersistentDisabledBody.id -notin $hierarchyAfter.PersistentBranch.children){throw 'DDOL hierarchy children were lost or duplicated'}
+            $child=(Command 'character.state' @('PersistentDisabledCharacter')).data
+            if($child.simulating -or $child.componentId -ne $disabledChildBefore.componentId -or
+                $child.desiredVelocity[0] -ne 2 -or !(SamePosition $child.position $disabledChildBefore.position)){throw 'Disabled grandchild runtime state lost'}
+            $null=Command 'object.enable' @('PersistentDisabledCharacter','on')
+            if(!(Command 'character.state' @('PersistentDisabledCharacter')).data.simulating){throw 'Grandchild SDK controller not recreated'}
+            $null=Command 'object.enable' @('PersistentDisabledCharacter','off')
+            $hierarchyEvidence=@{before=$hierarchyBefore;after=$hierarchyAfter;disabledCharacterBefore=$disabledChildBefore;disabledCharacterAfter=$child}
+        }
+
         if($beforeOwner.sceneId -eq $afterOwner.sceneId -or $beforeOwner.id -eq $afterOwner.id){throw 'DDOL did not change Scene owner handle'}
         $null=Command 'character.state' @($beforeOwner.id) -Reject
         if($ScriptProbe -and (Command 'script.invoke' @('CharacterMovementProbe','Transferred')).data.returnValue -ne 'transferred'){
@@ -185,8 +261,7 @@ try {
         $disabledTransfer=(Command 'character.state' @('CharacterGateActor')).data
         $null=Command 'scene.switch' @($destination)
         $disabledArrival=(Command 'character.state' @('CharacterGateActor')).data
-        if($disabledArrival.simulating -or ($disabledArrival.position|ConvertTo-Json -Compress) -ne
-            ($disabledTransfer.position|ConvertTo-Json -Compress)){throw 'Disabled DDOL character activated or moved'}
+        if($disabledArrival.simulating -or !(SamePosition $disabledArrival.position $disabledTransfer.position)){throw 'Disabled DDOL character activated or moved'}
         $null=Command 'object.enable' @('CharacterGateActor','on')
         if(!(Command 'character.state' @('CharacterGateActor')).data.simulating){throw 'Disabled DDOL character could not activate in new Scene'}
         $ddolEvidence=@{destination=$destination;beforeOwner=$beforeOwner;afterOwner=$afterOwner;before=$beforeTransfer;after=$afterTransfer;continued=$continued;disabledBefore=$disabledTransfer;disabledAfter=$disabledArrival}
@@ -205,6 +280,33 @@ try {
     $null=Command 'stop'
     $restored=(Command 'object.describe' @('CharacterGateActor')).data.position
     if(($restored|ConvertTo-Json -Compress) -ne ($initial|ConvertTo-Json -Compress)){throw 'Editor Stop did not restore character Transform'}
+    if($HierarchyProbe){
+        $hierarchyRestored=@{}
+        foreach($name in $hierarchyNames){
+            $before=$hierarchyInitial[$name]
+            $after=(Command 'object.describe' @($name)).data
+            $hierarchyRestored[$name]=$after
+            if($after.enabled -ne $before.enabled -or $after.layerId -ne $before.layerId){throw "Stop hierarchy activation/layer differs: $name"}
+            foreach($field in @('position','scale','rotation')){
+                for($axis=0;$axis -lt $before.$field.Count;$axis++){
+                    if([Math]::Abs($before.$field[$axis]-$after.$field[$axis]) -gt 0.0001){throw "Stop hierarchy world $field differs: $name"}
+                }
+            }
+        }
+        $actorRestored=(Command 'object.describe' @('CharacterGateActor')).data
+        if($actorRestored.parent -ne $hierarchyRestored.PersistentParent.id -or
+            $hierarchyRestored.PersistentBranch.parent -ne $hierarchyRestored.PersistentParent.id -or
+            $hierarchyRestored.PersistentDisabledCharacter.parent -ne $hierarchyRestored.PersistentBranch.id -or
+            $hierarchyRestored.PersistentDisabledBody.parent -ne $hierarchyRestored.PersistentBranch.id){throw 'Stop did not restore parent relationships'}
+        $null=Command 'play'
+        $childStopped=(Command 'character.state' @('PersistentDisabledCharacter')).data
+        if($childStopped.simulating -or [long]$childStopped.tick -ne 0 -or $childStopped.desiredVelocity[0] -ne 2){throw 'RePlay grandchild runtime definition differs'}
+        $null=Command 'object.enable' @('PersistentDisabledCharacter','on')
+        if(!(Command 'character.state' @('PersistentDisabledCharacter')).data.simulating){throw 'Restored grandchild could not activate in RePlay'}
+        $null=Command 'stop'
+        if((Command 'object.describe' @('PersistentDisabledCharacter')).data.enabled){throw 'Second Stop lost authored disabled state'}
+        $hierarchyEvidence.restored=$hierarchyRestored
+    }
     $stopped=(Command 'character.state' @('CharacterGateActor')).data
     if($stopped.simulating -or [long]$stopped.tick -ne 0 -or $stopped.fallVelocity -ne 0 -or $stopped.desiredVelocity[0] -ne 0){throw 'Editor Stop did not reset character runtime state'}
     if($ScriptProbe){
@@ -213,7 +315,7 @@ try {
     }
     $null=Command 'component.remove' @('CharacterGateActor','CharacterMovementComponent')
     $null=Command 'character.state' @('CharacterGateActor') -Reject
-    @{result='PHYSICS_CHARACTER_HTTP_OK';scene=$scene;commands=$script:sequence;scriptProbe=[bool]$ScriptProbe;probe=$probe;stepProbe=[bool]$StepProbe;stepEvidence=$stepEvidence;motionProbe=[bool]$MotionProbe;motionEvidence=$motionEvidence;ddolProbe=[bool]$DdolProbe;ddolEvidence=$ddolEvidence;initial=$initial;moved=$moved;restored=$restored}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
+    @{result='PHYSICS_CHARACTER_HTTP_OK';scene=$scene;commands=$script:sequence;scriptProbe=[bool]$ScriptProbe;probe=$probe;stepProbe=[bool]$StepProbe;stepEvidence=$stepEvidence;motionProbe=[bool]$MotionProbe;motionEvidence=$motionEvidence;ddolProbe=[bool]$DdolProbe;ddolEvidence=$ddolEvidence;hierarchyProbe=[bool]$HierarchyProbe;hierarchyEvidence=$hierarchyEvidence;initial=$initial;moved=$moved;restored=$restored}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
     Write-Output "PHYSICS_CHARACTER_HTTP_OK evidence=$out"
 } finally {
     if(!$process.HasExited){$process.Kill();$process.WaitForExit()}

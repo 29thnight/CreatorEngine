@@ -1,5 +1,6 @@
 ﻿#include "ProjectLayerSettingsIO.h"
 #include "PlayerMain.h"
+#include "PlayerDdolProbe.h"
 
 // PHASE 14.5 LC8 — Player 명령 계층. Shipping 에서는 서비스 본문이 비고 lib 이
 // 링크에서 빠지지만, 이 두 include 는 그대로다 — 호출부에 `#if` 를 흩지 않는다.
@@ -18,6 +19,7 @@
 #include "InputManager.h"
 #include "PathFinder.h"
 #include "Scene.h"
+#include "CharacterMovementComponent.h"
 #include "SceneManager.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Editor와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
@@ -28,6 +30,9 @@
 #include "RuntimeSettings.h"
 #include "AuthoringParseTelemetry.h"
 #include "SerializationProfiler.h"
+#if !CE_SHIPPING
+#include "ProfileService.h"
+#endif
 #include "imgui.h"
 
 #include <cstdio>
@@ -71,12 +76,11 @@ namespace
 
 	void EmitTextParseTelemetry()
 	{
-		if (g_textParseTelemetryEmitted.exchange(true)) return;
+    if (g_textParseTelemetryEmitted.exchange(true))
+        return;
 
-		const Authoring::TextParseTelemetrySnapshot parseTelemetry =
-			Authoring::GetTextParseTelemetry();
-		std::printf("[runtime.text-parser] calls=%llu\n",
-			static_cast<unsigned long long>(parseTelemetry.calls));
+    const Authoring::TextParseTelemetrySnapshot parseTelemetry = Authoring::GetTextParseTelemetry();
+    std::printf("[runtime.text-parser] calls=%llu\n", static_cast<unsigned long long>(parseTelemetry.calls));
 		for (const std::string& context : parseTelemetry.contexts)
 			std::printf("[runtime.text-parser.call] source=%s\n", context.c_str());
 
@@ -93,23 +97,20 @@ namespace
 		//   `calls`를 함께 단정해 "켜지지 않아 0"을 "빨라서 0"으로 읽지 않는다.
 		const SerializationProfile::Snapshot sceneStages = SerializationProfile::Take();
 		const SerializationProfile::Snapshot bootStages = SerializationProfile::TakeBoot();
-		std::printf("[runtime.serialization] enabled=%s\n",
-			SerializationProfile::IsEnabled() ? "yes" : "no");
+    std::printf("[runtime.serialization] enabled=%s\n", SerializationProfile::IsEnabled() ? "yes" : "no");
 		for (uint32_t i = 0; i < SerializationProfile::kStageCount; ++i)
 		{
 			const auto stage = static_cast<SerializationProfile::Stage>(i);
 			const SerializationProfile::StageSample& sample =
-				(SerializationProfile::Stage::AssetCatalog == stage)
-				? bootStages[stage] : sceneStages[stage];
+            (SerializationProfile::Stage::AssetCatalog == stage) ? bootStages[stage] : sceneStages[stage];
 			const std::string_view stageName = SerializationProfile::StageName(stage);
-			std::printf("[runtime.serialization] stage=%.*s totalUs=%.3f calls=%llu\n",
-				static_cast<int>(stageName.size()), stageName.data(),
-				static_cast<double>(sample.nanoseconds) / 1000.0,
+        std::printf("[runtime.serialization] stage=%.*s totalUs=%.3f calls=%llu\n", static_cast<int>(stageName.size()),
+                    stageName.data(), static_cast<double>(sample.nanoseconds) / 1000.0,
 				static_cast<unsigned long long>(sample.calls));
 		}
 		std::fflush(stdout);
 	}
-}
+} // namespace
 
 Player::PlayerMain::PlayerMain()
 {
@@ -132,7 +133,6 @@ void Player::PlayerMain::Initialize()
     if (!layers || !m_projectLayers->Restore(*layers) || !SceneManagers->BindProjectLayerSettings(m_projectLayers))
         throw std::runtime_error("Player requires valid CLYR project layers before scene startup");
 
-
 	// 화면 크기 버스의 첫 값 — 리사이즈 이후는
 	// CreateWindowSizeDependentResources가 같은 창에서 직접 읽어 알린다.
 	{
@@ -145,23 +145,20 @@ void Player::PlayerMain::Initialize()
 		// 잡은 화면 크기를 남긴다. 플레이어는 테두리 없는 전체화면 창이라
 		// 이 값이 모니터 해상도와 같아야 한다 — "왜 전체화면이 아니냐"를
 		// 화면만 보고는 가릴 수 없고, 여기 한 줄이면 바로 갈린다.
-		std::printf("[PLAYER] 화면 %ux%u (모니터 %dx%d)\n",
-			clientWidth, clientHeight,
-			GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN));
+        std::printf("[PLAYER] 화면 %ux%u (모니터 %dx%d)\n", clientWidth, clientHeight, GetSystemMetrics(SM_CXSCREEN),
+                    GetSystemMetrics(SM_CYSCREEN));
 	}
-
 
 	// (텔레메트리 출력은 EmitTextParseTelemetry 가 한 번만 찍는다 — 아래 정의)
 
 	// 표시 sink 설치(E4-6a) — 렌더러 초기화(렌더 스레드 기동) 전이어야
 	// RT의 첫 리드백 프레임 게시부터 실린다. Core는 ImGui 셸을 모른다.
-	EnhancedSceneRenderer::SetDisplayPresentationSink(
-		std::make_shared<ImGuiHostPresentationSink>());
+    EnhancedSceneRenderer::SetDisplayPresentationSink(std::make_shared<ImGuiHostPresentationSink>());
 
 	std::string enhancedError;
-	const EnhancedLiveBackend startupBackend =
-		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
-		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
+    const EnhancedLiveBackend startupBackend = RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
+                                                   ? EnhancedLiveBackend::Vulkan
+                                                   : EnhancedLiveBackend::DX12;
 	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
 		// 렌더러 없이는 아무것도 못 한다 — 스모크가 이 실패를 종료 코드로
@@ -183,14 +180,10 @@ void Player::PlayerMain::Initialize()
 
 	// 에디터의 같은 자리 델리게이트는 새 씬에 기본 카메라·라이트를 저작한다.
 	// 플레이어의 씬은 파일에서 오므로 렌더 씬 갱신만 한다.
-	m_newSceneCreatedHandle = newSceneCreatedEvent.AddLambda([]()
-	{
-		EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
-	});
-	m_activeSceneChangedHandle = activeSceneChangedEvent.AddLambda([]()
-	{
-		EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene());
-	});
+    m_newSceneCreatedHandle = newSceneCreatedEvent.AddLambda(
+        []() { EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene()); });
+    m_activeSceneChangedHandle = activeSceneChangedEvent.AddLambda(
+        []() { EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene()); });
 
 	// DX12/Vulkan renderer backend 중 프로젝트 설정이 고른 표시 경로다.
 	//
@@ -207,8 +200,7 @@ void Player::PlayerMain::Initialize()
 			throw std::runtime_error("Player ImGui backend 초기화 실패: " + hostError);
 		}
 	}
-	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
-		GetImGuiHost().GetBackendKind();
+    const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan == GetImGuiHost().GetBackendKind();
 	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
 	{
 		EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
@@ -216,15 +208,13 @@ void Player::PlayerMain::Initialize()
 	}
 	std::printf("[RenderBackend] source=runtime.render.backend active=%s scene=%s imgui=%s\n",
 		RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
-		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
-		GetImGuiHost().GetBackendName());
+                EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12", GetImGuiHost().GetBackendName());
 
 	Sound->initialize(128);
 	DataSystems->Initialize();
 	SceneManagers->CreateScene();
 
-	m_inputEventHandle = InputEvent.AddLambda([](float)
-	{
+    m_inputEventHandle = InputEvent.AddLambda([](float) {
 		UIManagers->Update();
 		Sound->update();
 	});
@@ -306,8 +296,7 @@ void Player::PlayerMain::Initialize()
 	//   플래그를 주지 않은 실행에서도 찍는다. 이 한 줄이 없으면 스모크 로그에서
 	//   "서비스를 안 켰다" 와 "이 빌드에는 서비스가 없다" 가 똑같이 침묵으로
 	//   보이고, Shipping 격리 게이트가 무엇을 확인했는지도 로그에 남지 않는다.
-	std::printf("[player.service] compiled=%s enabled=%s\n",
-		PlayerCommandService::IsCompiledIn() ? "yes" : "no",
+    std::printf("[player.service] compiled=%s enabled=%s\n", PlayerCommandService::IsCompiledIn() ? "yes" : "no",
 		g_service.enabled ? "yes" : "no");
 
 	StartPresentationThread();
@@ -318,11 +307,9 @@ void Player::PlayerMain::StartPresentationThread()
 	m_presentationThreadTestDelayMs = 0;
 	char* delay = nullptr;
 	size_t delayLength = 0;
-	if (0 == _dupenv_s(&delay, &delayLength,
-		"CREATOR_PRESENTATION_THREAD_TEST_DELAY_MS") && nullptr != delay)
+    if (0 == _dupenv_s(&delay, &delayLength, "CREATOR_PRESENTATION_THREAD_TEST_DELAY_MS") && nullptr != delay)
 	{
-		m_presentationThreadTestDelayMs = static_cast<uint32_t>((std::min)(250,
-			(std::max)(0, std::atoi(delay))));
+        m_presentationThreadTestDelayMs = static_cast<uint32_t>((std::min)(250, (std::max)(0, std::atoi(delay))));
 		std::free(delay);
 	}
 
@@ -343,10 +330,12 @@ void Player::PlayerMain::StartPresentationThread()
 
 	std::unique_lock<std::mutex> lock(m_presentationMutex);
 	m_presentationWake.wait(lock, [this] { return m_presentationThreadStarted; });
-	if (!m_presentationThreadStartFailed) return;
+    if (!m_presentationThreadStartFailed)
+        return;
 
 	lock.unlock();
-	if (m_presentationThread.joinable()) m_presentationThread.join();
+    if (m_presentationThread.joinable())
+        m_presentationThread.join();
 	EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
 	throw std::runtime_error("Player PresentationThread COM 초기화 실패");
 }
@@ -363,16 +352,15 @@ void Player::PlayerMain::StopPresentationThread()
 		m_presentationStopRequested = true;
 	}
 	m_presentationWake.notify_all();
-	if (!m_presentationThread.joinable()) return;
+    if (!m_presentationThread.joinable())
+        return;
 
 	m_presentationThread.join();
 
 	std::lock_guard<std::mutex> lock(m_presentationMutex);
-	const uint64_t pending =
-		m_requestedPresentationFrameId > m_consumedPresentationFrameId ? 1ull : 0ull;
+    const uint64_t pending = m_requestedPresentationFrameId > m_consumedPresentationFrameId ? 1ull : 0ull;
 	const bool balanced = m_presentationRequests ==
-		m_presentationFrames + m_presentationLatestWins +
-		m_presentationShutdownDiscarded + pending;
+                          m_presentationFrames + m_presentationLatestWins + m_presentationShutdownDiscarded + pending;
 	std::printf("[PresentationThread] shutdown — request %llu / present %llu"
 		" / latest-wins %llu / shutdown-discard %llu / pending %llu / balanced %u\n",
 		static_cast<unsigned long long>(m_presentationRequests),
@@ -391,7 +379,8 @@ void Player::PlayerMain::PresentationThreadMain()
 		m_presentationThreadStarted = true;
 	}
 	m_presentationWake.notify_all();
-	if (FAILED(comResult)) return;
+    if (FAILED(comResult))
+        return;
 
 	SetThreadDescription(GetCurrentThread(), L"PresentationThread");
 	for (;;)
@@ -399,16 +388,14 @@ void Player::PlayerMain::PresentationThreadMain()
 		bool hasFrameRequest = false;
 		{
 			std::unique_lock<std::mutex> lock(m_presentationMutex);
-			m_presentationWake.wait(lock, [this]
-			{
-				return m_presentationStopRequested ||
-					m_isInvokeResize.load(std::memory_order_acquire) ||
+            m_presentationWake.wait(lock, [this] {
+                return m_presentationStopRequested || m_isInvokeResize.load(std::memory_order_acquire) ||
 					m_requestedPresentationFrameId > m_consumedPresentationFrameId;
 			});
-			if (m_presentationStopRequested) break;
+            if (m_presentationStopRequested)
+                break;
 
-			hasFrameRequest =
-				m_requestedPresentationFrameId > m_consumedPresentationFrameId;
+            hasFrameRequest = m_requestedPresentationFrameId > m_consumedPresentationFrameId;
 			if (hasFrameRequest)
 				m_consumedPresentationFrameId = m_requestedPresentationFrameId;
 		}
@@ -418,8 +405,7 @@ void Player::PlayerMain::PresentationThreadMain()
 
 		if (0 != m_presentationThreadTestDelayMs)
 		{
-			std::this_thread::sleep_for(
-				std::chrono::milliseconds(m_presentationThreadTestDelayMs));
+            std::this_thread::sleep_for(std::chrono::milliseconds(m_presentationThreadTestDelayMs));
 		}
 
 		PresentFrame();
@@ -438,8 +424,7 @@ void Player::PlayerMain::NotifyRenderFramePublished(uint64_t frameId)
 {
 	{
 		std::lock_guard<std::mutex> lock(m_presentationMutex);
-		if (m_presentationStopRequested ||
-			frameId <= m_requestedPresentationFrameId)
+        if (m_presentationStopRequested || frameId <= m_requestedPresentationFrameId)
 			return;
 
 		++m_presentationRequests;
@@ -486,7 +471,6 @@ void Player::PlayerMain::Finalize()
 	EnhancedSceneRenderer::ShutdownLive();
 	SceneManagers->SetRenderScene(nullptr);
 
-
 	// 표시 호스트 정리. 예전에는 m_imguiRenderer 멤버 소멸이 맡았는데,
 	// 멤버가 사라졌으므로 명시적으로 부른다 — 렌더 스레드는 위에서 이미
 	// 멈췄다(호스트 계약).
@@ -514,8 +498,7 @@ void Player::PlayerMain::Update()
 		return;
 	}
 
-	Time->Tick([&]
-	{
+    Time->Tick([&] {
 		m_frameDeltaTime = Runtime::ResolveFrameDelta();
 
 		InputManagement->Update(m_frameDeltaTime);
@@ -534,21 +517,61 @@ void Player::PlayerMain::Update()
 	SceneManagers->DisableOrEnable();
 	SceneManagers->EndOfFrame();
 
+#if !CE_SHIPPING
+    // Close the same engine frame used by runtime counter and CPU span producers.
+    ce::profiler().publish_frame(Time->GetFrameCount());
+#endif
+
+    // SceneManager records rejected startup and transition transactions. The Player
+    // host owns the fatal policy; normal window shutdown still drains its workers.
+    if (SceneManagers->PlayFailureCount() != 0)
+    {
+        EngineBootstrap::SetExitCode(3);
+        std::fprintf(stderr, "[player.simulation.failed] exit=3 reason=%s\n", SceneManagers->LastPlayFailure().c_str());
+        std::fflush(stderr);
+        if (g_smoke.geometryFailure)
+        {
+            auto* actor = Entity::Find("CharacterGateActor");
+            auto* floor = Entity::Find("CharacterGateFloor");
+            auto* character = actor ? actor->GetComponent<CharacterMovementComponent>() : nullptr;
+            auto* body = floor ? floor->GetComponent<PhysicsBodyComponent>() : nullptr;
+            const auto state =
+                character
+                    ? character->ReadState()
+                    : ce::physics::result<ScenePhysicsSimulation::character_motion_state>{std::unexpected(
+                          ce::physics::error{ce::physics::error_code::invalid_argument, 0, "Missing probe actor"})};
+
+            const auto stats =
+                actor ? actor->GetScene()->ReadCollisionGeometryStatistics()
+                      : ce::physics::result<ce::physics::CollisionGeometryLibrary::statistics>{std::unexpected(
+                            ce::physics::error{ce::physics::error_code::invalid_argument, 0, "Missing probe Scene"})};
+            const bool rejected = body && !body->RuntimeHandle() && stats && stats->imports == 2 &&
+                                  stats->assets == 2 && stats->cooks == 0 && character && !character->RuntimeHandle() &&
+                                  state && state->tick.value == 0;
+            std::printf(
+                "[physics.player.geometry.rejected] {\"passed\":%d,\"failed\":%d,\"tick\":%llu,\"complete\":true}\n",
+                rejected ? 5 : 0, rejected ? 0 : 1, static_cast<unsigned long long>(state ? state->tick.value : 0));
+            std::fflush(stdout);
+            if (!rejected)
+                EngineBootstrap::SetExitCode(4);
+        }
+
+        PostMessage(PlayerWindowHandle(), WM_CLOSE, 0, 0);
+        return;
+    }
+
 	HWND handle = PlayerWindowHandle();
 
 	if (g_smoke.IsActive() && Time->GetFrameCount() >= g_smoke.frameLimit)
 	{
-		const EnhancedLiveDebugSnapshot renderState =
-			EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        const EnhancedLiveDebugSnapshot renderState = EnhancedSceneRenderer::GetLiveDebugSnapshot();
 		if (!renderState.enabled && !renderState.lastError.empty())
 		{
 			// 파이프라인이 영구 비활성화됐으면 promotion은 절대 오지 않는다.
 			// 기다리기만 하면 CI가 timeout으로만 실패해 최초 원인을 잃으므로,
 			// renderer가 공개한 정본 오류와 전용 종료 코드를 함께 남긴다.
-			Debug::PrintLog(spdlog::level::err, "[SMOKE] render pipeline FAILED: " +
-				renderState.lastError);
-			std::printf("[SMOKE] render pipeline FAILED: %s\n",
-				renderState.lastError.c_str());
+            Debug::PrintLog(spdlog::level::err, "[SMOKE] render pipeline FAILED: " + renderState.lastError);
+            std::printf("[SMOKE] render pipeline FAILED: %s\n", renderState.lastError.c_str());
 			// §5.4 의 4 = 명령·selftest 판정 실패. 그대로 둔다(LC8 재검토) —
 			// 파이프라인이 스스로 "실패" 를 판정한 것이고 그것이 4 의 뜻이다.
 			EngineBootstrap::SetExitCode(4);
@@ -556,15 +579,28 @@ void Player::PlayerMain::Update()
 			return;
 		}
 
-		const EnhancedLiveDisplaySnapshot display =
-			EnhancedSceneRenderer::GetLiveDisplaySnapshot();
-		const EnhancedLiveDisplayEntrySnapshot& gameDisplay =
-			display.Get(EnhancedLiveDisplayTarget::Game);
+        const EnhancedLiveDisplaySnapshot display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+        const EnhancedLiveDisplayEntrySnapshot& gameDisplay = display.Get(EnhancedLiveDisplayTarget::Game);
 		const uint32_t slotMask = gameDisplay.promotedSlotMask;
-		const bool displayRotated = gameDisplay.ready &&
-			gameDisplay.promotionCount >= g_smoke.minimumPromotions && 0 != slotMask &&
-			0 != (slotMask & (slotMask - 1u));
-		if (!displayRotated) return;
+        const bool displayRotated = gameDisplay.ready && gameDisplay.promotionCount >= g_smoke.minimumPromotions &&
+                                    0 != slotMask && 0 != (slotMask & (slotMask - 1u));
+        if (m_smokeReloadStarted && SceneManagers->GetActiveScene() == m_smokeReloadScene &&
+            std::chrono::steady_clock::now() >= m_smokeReloadReport)
+        {
+            m_smokeReloadReport = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+            std::printf("[player.smoke.reload.wait] camera=%s loading=%s rotated=%s published=%llu completed=%llu "
+                        "promotions=%llu threshold=%llu\n",
+                        m_smokeReloadScene->Cameras().GetPrimaryCamera() ? "true" : "false",
+                        SceneManagers->IsSceneLoading() ? "true" : "false", displayRotated ? "true" : "false",
+                        static_cast<unsigned long long>(renderState.publishedFrameId),
+                        static_cast<unsigned long long>(gameDisplay.completedFrameId),
+                        static_cast<unsigned long long>(gameDisplay.promotionCount),
+                        static_cast<unsigned long long>(m_smokeReloadPublishedFrame));
+            std::fflush(stdout);
+        }
+
+        if (!displayRotated)
+            return;
 
         // Optional packaged-host regression: prepare through engine jobs, activate
         // at the normal owner boundary, then require a displayed post-load frame.
@@ -573,7 +609,10 @@ void Player::PlayerMain::Update()
             if (!m_smokeReloadStarted)
             {
                 auto path = PathFinder::Relative("Scenes");
+                if (g_smoke.reloadDestination.empty())
                 path.append(RuntimeSettings::Get().GetStartupSceneName());
+                else
+                    path.append(g_smoke.reloadDestination);
                 m_smokeReload = SceneManagers->LoadSceneAsync(path.string());
                 m_smokeReloadStarted = true;
                 return;
@@ -590,17 +629,80 @@ void Player::PlayerMain::Update()
                     PostMessage(handle, WM_CLOSE, 0, 0);
                     return;
                 }
+                if (!g_smoke.ddolCharacter.empty())
+                {
+                    auto* entity = Entity::Find(g_smoke.ddolCharacter);
+                    m_smokeDdolCharacter = entity ? entity->GetComponent<CharacterMovementComponent>() : nullptr;
+                    if (!m_smokeDdolCharacter || !m_smokeDdolCharacter->Teleport({0, 5, 0}) ||
+                        !m_smokeDdolCharacter->SetDesiredVelocity({1.25f, 0, 0}) ||
+                        !m_smokeDdolCharacter->ForceVelocity({3, 0, 0}, 10))
+                    {
+                        std::printf("[player.smoke.ddol] FAILED preparation\n");
+                        std::fflush(stdout);
+                        EngineBootstrap::SetExitCode(4);
+                        PostMessage(handle, WM_CLOSE, 0, 0);
+                        return;
+                    }
+
+                    try
+                    {
+                        m_smokeDdolProbe =
+                            std::make_unique<DdolProbe>(*entity, g_smoke.ddolHierarchy, g_smoke.ddolGeometry);
+                    }
+                    catch (const std::exception& error)
+                    {
+                        std::printf("[physics.player.hierarchy.failure] %s\n", error.what());
+                        std::fflush(stdout);
+                        EngineBootstrap::SetExitCode(4);
+                        PostMessage(handle, WM_CLOSE, 0, 0);
+                        return;
+                    }
+
+                    Object::SetDontDestroyOnLoad(entity);
+                }
+
                 SceneManagers->ActivateScene(m_smokeReloadScene);
                 return;
             }
-            if (SceneManagers->GetActiveScene() != m_smokeReloadScene) return;
+            if (SceneManagers->GetActiveScene() != m_smokeReloadScene)
+                return;
             if (!m_smokeReloadActivated)
             {
                 m_smokeReloadActivated = true;
                 m_smokeReloadPublishedFrame = renderState.publishedFrameId;
                 return;
             }
-            if (gameDisplay.completedFrameId <= m_smokeReloadPublishedFrame) return;
+            if (m_smokeDdolCharacter)
+            {
+                const auto state = m_smokeDdolCharacter->ReadState();
+                if (m_smokeDdolCharacter->GetOwner()->GetScene() != m_smokeReloadScene || !state)
+                {
+                    std::printf("[player.smoke.ddol] FAILED transferred binding\n");
+                    EngineBootstrap::SetExitCode(4);
+                    PostMessage(handle, WM_CLOSE, 0, 0);
+                    return;
+                }
+
+                if (state->tick.value < 30)
+                    return;
+
+                try
+                {
+                    if (!m_smokeDdolProbe->Poll(*m_smokeReloadScene, state->tick.value))
+                        return;
+                }
+                catch (const std::exception& error)
+                {
+                    std::printf("[physics.player.hierarchy.failure] %s\n", error.what());
+                    std::fflush(stdout);
+                    EngineBootstrap::SetExitCode(4);
+                    PostMessage(handle, WM_CLOSE, 0, 0);
+                    return;
+                }
+            }
+
+            if (gameDisplay.completedFrameId <= m_smokeReloadPublishedFrame)
+                return;
             std::printf("[player.smoke.reload] activated=true gameStart=%s pending=%s displayedAfterActivation=true\n",
                 SceneManagers->IsGameStart() ? "true" : "false",
                 SceneManagers->IsSceneLoading() ? "true" : "false");
@@ -619,26 +721,29 @@ void Player::PlayerMain::Update()
 		//   Player도 Grid/GizmoIcon/GizmoLine 노드의 PSO·버퍼를 만든다. 이 줄은 그
 		//   현재 상태를 못 박아 두어, E4-3이 노드를 실제로 걷어낼 때 변화가 드러나게 한다.
 		{
-			const EnhancedLiveDebugSnapshot pipelineState =
-				EnhancedSceneRenderer::GetLiveDebugSnapshot();
+            const EnhancedLiveDebugSnapshot pipelineState = EnhancedSceneRenderer::GetLiveDebugSnapshot();
             for (const auto& node : pipelineState.pipelineNodes)
             {
                 const std::string state = !node.conditional ? "always" : node.active ? "active" : "inactive";
                 Debug::PrintLog(spdlog::level::debug, "[SMOKE] pipeline.node " + node.name + "|" + state);
             }
-            Debug::PrintLog(spdlog::level::debug, "[SMOKE] pipeline.nodes 합계 " + std::to_string(pipelineState.pipelineNodes.size()));
+            Debug::PrintLog(spdlog::level::debug,
+                            "[SMOKE] pipeline.nodes 합계 " + std::to_string(pipelineState.pipelineNodes.size()));
 		}
 
 		// 성공 마커 — Verify는 이 줄과 "Scene loaded"(SceneManager), 종료
 		// 코드 0을 함께 본다. 락스텝 제거 뒤 GT frame 수만으로 끝내면 실제 GPU
 		// 완료가 0이어도 통과하므로 display 슬롯 회전도 함께 요구한다.
-		Debug::PrintLog(spdlog::level::debug, "[SMOKE] frame limit reached — clean exit ("
-			+ std::to_string(Time->GetFrameCount()) + " GT frames, display frame "
-			+ std::to_string(gameDisplay.completedFrameId) + ", promotions "
-			+ std::to_string(gameDisplay.promotionCount) + ")");
-        std::printf("[player.smoke] {\"schemaVersion\":1,\"ready\":%s,\"registeredScriptTypes\":%zu,\"frames\":%llu,\"displayPromotions\":%llu}\n",
+        Debug::PrintLog(spdlog::level::debug, "[SMOKE] frame limit reached — clean exit (" +
+                                                  std::to_string(Time->GetFrameCount()) + " GT frames, display frame " +
+                                                  std::to_string(gameDisplay.completedFrameId) + ", promotions " +
+                                                  std::to_string(gameDisplay.promotionCount) + ")");
+        std::printf("[player.smoke] "
+                    "{\"schemaVersion\":1,\"ready\":%s,\"registeredScriptTypes\":%zu,\"frames\":%llu,"
+                    "\"displayPromotions\":%llu}\n",
             ClrHost::Get().IsReady() ? "true" : "false", ClrHost::Get().GetComponentTypeNames().size(),
-            static_cast<unsigned long long>(Time->GetFrameCount()), static_cast<unsigned long long>(gameDisplay.promotionCount));
+                    static_cast<unsigned long long>(Time->GetFrameCount()),
+                    static_cast<unsigned long long>(gameDisplay.promotionCount));
 		EmitTextParseTelemetry();
 		PostMessage(handle, WM_CLOSE, 0, 0);
 		return;
@@ -669,15 +774,13 @@ void Player::PlayerMain::OnGui()
 	ImGui::SetNextWindowSize(viewport->Size);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-	constexpr ImGuiWindowFlags kFlags =
-		ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+    constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
 		ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoSavedSettings |
 		ImGuiWindowFlags_NoBringToFrontOnFocus;
 	if (ImGui::Begin("##PlayerGameView", nullptr, kFlags))
 	{
 		if (const uint64_t textureId =
-			EnhancedSceneRenderer::GetLiveDisplayImTextureId(
-				EnhancedLiveDisplayTarget::Game))
+                EnhancedSceneRenderer::GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget::Game))
 		{
 			ImGui::Image((ImTextureID)textureId, viewport->Size);
 		}
@@ -712,8 +815,7 @@ void Player::PlayerMain::CreateWindowSizeDependentResources()
 	const float height = static_cast<float>(rect.bottom - rect.top);
 
 	OnResizeEvent(width, height);
-	ScreenResizeBus::Get().BroadcastResize(
-		static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    ScreenResizeBus::Get().BroadcastResize(static_cast<uint32_t>(width), static_cast<uint32_t>(height));
 }
 
 void Player::PlayerMain::InvokeResizeFlag()

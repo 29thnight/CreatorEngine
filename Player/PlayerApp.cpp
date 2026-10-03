@@ -1,3 +1,5 @@
+#include <algorithm>
+#include <stdexcept>
 #include "PlayerApp.h"
 
 #include "Camera.h"
@@ -193,6 +195,44 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 			{
 				Player::g_smoke.reloadScene = true;
 			}
+            else if (0 == wcscmp(argv[i], L"--smoke-reload-destination") && i + 1 < argc)
+            {
+                const std::wstring name = argv[++i];
+                if (name.empty() || std::ranges::any_of(name, [](wchar_t c) {
+                        return c > 127 || c == L'/' || c == L'\\' || c == L':';
+                    }))
+                    throw std::invalid_argument("Smoke destination must be an ASCII Scene filename");
+
+                Player::g_smoke.reloadDestination.clear();
+                for (const auto character : name)
+                    Player::g_smoke.reloadDestination.push_back(static_cast<char>(character));
+
+                Player::g_smoke.reloadScene = true;
+            }
+            else if (0 == wcscmp(argv[i], L"--smoke-ddol-hierarchy"))
+            {
+                Player::g_smoke.ddolHierarchy = true;
+            }
+            else if (0 == wcscmp(argv[i], L"--smoke-ddol-geometry"))
+            {
+                Player::g_smoke.ddolGeometry = true;
+            }
+            else if (0 == wcscmp(argv[i], L"--smoke-geometry-failure"))
+            {
+                Player::g_smoke.geometryFailure = true;
+            }
+            else if (0 == wcscmp(argv[i], L"--smoke-ddol-character") && i + 1 < argc)
+            {
+                const std::wstring name = argv[++i];
+                // Regression fixture names are ASCII, independent of the current code page.
+                if (std::ranges::any_of(name, [](wchar_t c) { return c > 127; }))
+                    throw std::invalid_argument("Smoke DDOL character name must be ASCII");
+
+                Player::g_smoke.ddolCharacter.clear();
+                for (const auto character : name)
+                    Player::g_smoke.ddolCharacter.push_back(static_cast<char>(character));
+                Player::g_smoke.reloadScene = true;
+            }
 			else if (0 == wcscmp(argv[i], L"--command-service"))
 			{
 				// PHASE 14.5 LC8 — 기본 off. 켜는 것은 이 플래그뿐이다(§8 · §11.2).

@@ -2208,3 +2208,11 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
 			Object::SetDontDestroyOnLoad(entry.object);
 	}
 }
+
+
+void SceneManager::ReportSimulationFailure(std::string reason)
+{
+    Debug::PrintLog(spdlog::level::err, reason);
+    NotePlayFailure(std::move(reason));
+    SetGameStart(false);
+}

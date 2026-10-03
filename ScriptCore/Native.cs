@@ -209,6 +209,8 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, ulong, uint, int, int, int> Body_ShapeFlags;
     public delegate* unmanaged<ObjectHandle, int, Float3, Float3, float, uint, int, PhysicsHit*, int, NativePhysicsQueryResult*, int> Physics_Query;
 
+    public delegate* unmanaged<ObjectHandle, PhysicsQueryRequest*, int, PhysicsHit*, int, PhysicsBatchResult*, int> Physics_QueryBatch;
+
     // TextComponent (SetMessage 16 · SetAlpha 6)
     public delegate* unmanaged<ObjectHandle, int> Text_Exists;
     public delegate* unmanaged<ObjectHandle, byte*, int, int> Text_GetMessage;
@@ -261,7 +263,7 @@ internal unsafe struct ScriptApiTable
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 31;
+    public const int ExpectedVersion = 32;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -1171,6 +1173,19 @@ internal static unsafe class Native
                 ? new(error, summary.Written, summary.RequiredCapacity, summary.Truncated != 0)
                 : new(error, 0, 0, false);
         }
+    }
+
+    public static PhysicsError PhysicsQueryBatch(ObjectHandle anchor, ReadOnlySpan<PhysicsQueryRequest> requests,
+                                                 Span<PhysicsHit> hits, Span<PhysicsBatchResult> results)
+    {
+        if (!Entered() || _api.Physics_QueryBatch == null) return PhysicsError.WrongPhase;
+        if (requests.Length != results.Length || requests.Length > Physics.MaxBatchRequests ||
+            hits.Length > Physics.MaxBatchHitCapacity) return PhysicsError.InvalidArgument;
+
+        fixed (PhysicsQueryRequest* input = requests)
+        fixed (PhysicsHit* output = hits)
+        fixed (PhysicsBatchResult* summaries = results)
+            return (PhysicsError)_api.Physics_QueryBatch(anchor, input, requests.Length, output, hits.Length, summaries);
     }
 
     // ── TextComponent ──

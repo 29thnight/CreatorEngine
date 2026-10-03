@@ -1,0 +1,386 @@
+m_Entities:
+  - Entity: 8465162159729457626
+    m_name: PhysicsB2Player
+    m_instanceID: 19567317
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1036476669
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 1}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 1}
+        m_parentID: 4294967295
+    m_isStatic: false
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [2, 3, 5, 7]
+  - Entity: 8465162159729457626
+    m_name: B2Dynamic
+    m_instanceID: 2311775035
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 1
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3413514966
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 2
+      - MeshRenderer: 9621926846683343867
+        m_typeUUID: a84ed25a-31de-4289-92a0-546b27cee0ff
+        m_name: MeshRenderer
+        m_instanceID: 4254143591
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Material:
+          lattice_material: 1
+          name: Weapon_Dagger_G3_005_Default
+          assetId: 30df7fc2-1bb6-8c88-8af5-ca14a0bd93a6
+          graphAssetId: f3289c86-556f-8c98-9c50-c1bb354ce1fc
+          doubleSided: true
+          blendMode: opaque
+          parameters: []
+          textures: []
+        m_LightMapping:
+          lightmapIndex: -1
+          ligthmapResolution: 0
+          lightmapScale: 1
+          lightmapOffset: {x: 0, y: 0}
+          lightmapTiling: {x: 0, y: 0}
+        m_bitflag: 0
+        m_isSkinnedMesh: false
+        m_shadowRecive: true
+        m_shadowCast: true
+        m_isEnableLOD: false
+        m_modelGuid: 96ab44a6-cbf7-8885-9188-601ab9aa6d14
+        m_meshAssetId: d3f80276-8b4e-86d8-b6a0-6408980fa18b
+      - PhysicsBodyComponent: 6005066272611484821
+        m_typeUUID: 1bbfb80a-8bd9-440a-8557-537a0ff60cd8
+        m_name: PhysicsBodyComponent
+        m_instanceID: 427279637
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_motion: 2
+        m_shapeSchema: 1
+        m_shapes:
+          - shapeId: 1
+            kind: 3
+            halfExtent: {x: 0.5, y: 0.5, z: 0.5}
+            radius: 0.5
+            halfHeight: 0.5
+            geometryAsset: d0f01397-566b-41cd-b1cc-78bfb0075459
+            geometryRevision: 1
+            geometryScale: {x: 1, y: 1, z: 1}
+            localPosition: {x: 0, y: 0, z: 0}
+            localRotation: {x: 0, y: 0, z: 0, w: 1}
+            staticFriction: 0.5
+            dynamicFriction: 0.5
+            restitution: 0
+            sensor: false
+            queryEnabled: true
+            layerOverride: 0
+        m_mass: 1
+        m_gravityEnabled: false
+        m_translationLocks: 0
+        m_rotationLocks: 0
+        m_linearDamping: 0
+        m_angularDamping: 0.05
+        m_initialLinearVelocity: {x: 6, y: 0, z: 0}
+        m_initialAngularVelocity: {x: 0, y: 0, z: 0}
+      - ScriptComponent: 18288371625365795113
+        m_typeUUID: 16beda95-3967-4d95-838b-b9e6694b6609
+        m_name: ScriptComponent
+        m_instanceID: 406170393
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptType: PhysicsB2PlayerProbe
+        m_fieldData: ~
+    m_isStatic: false
+    m_parentIndex: 2
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: B2DynamicParent
+    m_instanceID: 3906460119
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 2
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1233951687
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 0}
+        rotation: {x: 0, y: 0.25881904, z: 0, w: 0.9659258}
+        scale: {x: 2, y: 2, z: 2, w: 0}
+        m_parentID: 0
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [1]
+  - Entity: 8465162159729457626
+    m_name: B2StaticParent
+    m_instanceID: 1135309172
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 3
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1612770847
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 0}
+        rotation: {x: 0, y: 0.25881904, z: 0, w: 0.9659258}
+        scale: {x: 2, y: 2, z: 2, w: 0}
+        m_parentID: 0
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [4]
+  - Entity: 8465162159729457626
+    m_name: B2Static
+    m_instanceID: 2266934043
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 4
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2555322026
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 10, y: 5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 3
+      - PhysicsBodyComponent: 6005066272611484821
+        m_typeUUID: 1bbfb80a-8bd9-440a-8557-537a0ff60cd8
+        m_name: PhysicsBodyComponent
+        m_instanceID: 1205131101
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_motion: 0
+        m_shapeSchema: 1
+        m_shapes:
+          - shapeId: 1
+            kind: 0
+            halfExtent: {x: 0.5, y: 0.5, z: 0.5}
+            radius: 0.5
+            halfHeight: 0.5
+            geometryAsset: ""
+            geometryRevision: 0
+            geometryScale: {x: 1, y: 1, z: 1}
+            localPosition: {x: 0, y: 0, z: 0}
+            localRotation: {x: 0, y: 0, z: 0, w: 1}
+            staticFriction: 0.5
+            dynamicFriction: 0.5
+            restitution: 0
+            sensor: false
+            queryEnabled: true
+            layerOverride: 0
+        m_mass: 1
+        m_gravityEnabled: false
+        m_translationLocks: 0
+        m_rotationLocks: 0
+        m_linearDamping: 0
+        m_angularDamping: 0.05
+        m_initialLinearVelocity: {x: 0, y: 0, z: 0}
+        m_initialAngularVelocity: {x: 0, y: 0, z: 0}
+      - ScriptComponent: 18288371625365795113
+        m_typeUUID: 16beda95-3967-4d95-838b-b9e6694b6609
+        m_name: ScriptComponent
+        m_instanceID: 777060648
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptType: PhysicsB2PlayerProbe
+        m_fieldData: ~
+    m_isStatic: false
+    m_parentIndex: 3
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: B2KinematicParent
+    m_instanceID: 2835616521
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 5
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2017704652
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 0}
+        rotation: {x: 0, y: 0.25881904, z: 0, w: 0.9659258}
+        scale: {x: 2, y: 2, z: 2, w: 0}
+        m_parentID: 0
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [6]
+  - Entity: 8465162159729457626
+    m_name: B2Kinematic
+    m_instanceID: 3355295933
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 6
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3508052772
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 20, y: 5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 5
+      - PhysicsBodyComponent: 6005066272611484821
+        m_typeUUID: 1bbfb80a-8bd9-440a-8557-537a0ff60cd8
+        m_name: PhysicsBodyComponent
+        m_instanceID: 1655615476
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_motion: 1
+        m_shapeSchema: 1
+        m_shapes:
+          - shapeId: 1
+            kind: 0
+            halfExtent: {x: 0.5, y: 0.5, z: 0.5}
+            radius: 0.5
+            halfHeight: 0.5
+            geometryAsset: ""
+            geometryRevision: 0
+            geometryScale: {x: 1, y: 1, z: 1}
+            localPosition: {x: 0, y: 0, z: 0}
+            localRotation: {x: 0, y: 0, z: 0, w: 1}
+            staticFriction: 0.5
+            dynamicFriction: 0.5
+            restitution: 0
+            sensor: false
+            queryEnabled: true
+            layerOverride: 0
+        m_mass: 1
+        m_gravityEnabled: false
+        m_translationLocks: 0
+        m_rotationLocks: 0
+        m_linearDamping: 0
+        m_angularDamping: 0.05
+        m_initialLinearVelocity: {x: 0, y: 0, z: 0}
+        m_initialAngularVelocity: {x: 0, y: 0, z: 0}
+      - ScriptComponent: 18288371625365795113
+        m_typeUUID: 16beda95-3967-4d95-838b-b9e6694b6609
+        m_name: ScriptComponent
+        m_instanceID: 4177027092
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptType: PhysicsB2PlayerProbe
+        m_fieldData: ~
+    m_isStatic: false
+    m_parentIndex: 5
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: B2Camera
+    m_instanceID: 1070123310
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 7
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 787297178
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 8, y: 5, z: -12, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - CameraComponent: 13209209574413295037
+        m_typeUUID: de554d88-0db0-40a0-a77d-0bc32b5d9dc7
+        m_name: CameraComponent
+        m_instanceID: 3731295525
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Camera:
+          rotate: {x: 0, y: 0, z: 0, w: 1}
+          m_nearPlane: 0.1
+          m_farPlane: 500
+          m_fov: 60
+        m_isPrimary: false
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+m_buildIndex: 0
+m_sceneName: PhysicsB2Player
+m_requiredLoadAssetsBundle:
+  name: ""
+  path: ""
+  assets: ~

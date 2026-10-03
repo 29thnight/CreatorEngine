@@ -177,6 +177,36 @@ struct query_hit
     bool has_location = false; // Overlap hits have identity only.
 };
 
+struct ray_query
+{
+    math::vector3 origin{};
+    math::vector3 direction{};
+    float distance = 0.f;
+};
+
+struct sweep_query
+{
+    geometry form;
+    pose origin{};
+    math::vector3 direction{};
+    float distance = 0.f;
+};
+
+struct overlap_query
+{
+    geometry form;
+    pose origin{};
+};
+
+using query_input = std::variant<ray_query, sweep_query, overlap_query>;
+
+struct query_request
+{
+    query_input input;
+    std::span<query_hit> output;
+    query_filter filter{};
+};
+
 struct query_result
 {
     std::size_t written = 0;

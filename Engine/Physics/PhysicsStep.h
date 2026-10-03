@@ -140,6 +140,7 @@ struct command
 
   private:
     friend class PhysicsScene;
+    friend class PhysicsSceneChannel;
     std::uint64_t m_received_tick = 0; // Overwritten by the accepting scene; never producer-supplied telemetry.
 };
 

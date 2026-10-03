@@ -123,6 +123,10 @@ public:
 
 	math::matrix4x4 GetLocalMatrix();
 	math::matrix4x4 GetWorldMatrix() const;
+    // Render bridge only: gameplay/serialization keep the completed simulation pose.
+    math::matrix4x4 GetRenderWorldMatrix() const;
+    math::vector3 GetRenderWorldPosition() const;
+    math::quaternion GetRenderWorldQuaternion() const;
 	math::matrix4x4 GetWorldMatrix_NoScale() const; //add joker1092 :: need for physics
 
 	void UpdateLocalMatrix();

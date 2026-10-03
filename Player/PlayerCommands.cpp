@@ -1,4 +1,4 @@
-#include "PlayerCommands.h"
+﻿#include "PlayerCommands.h"
 
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "CommandCore/CommandRegistry.h"
@@ -10,6 +10,11 @@
 #include "SceneManager.h"
 #include "TimeSystem.h"
 #include "Transform.h"
+
+#if !CE_SHIPPING
+#include "ProfileService.h"
+#include "ProfileCaptureFile.h"
+#endif
 
 #include <algorithm>
 #include <array>
@@ -102,6 +107,9 @@ namespace PlayerCmd
 				scene->GetSceneName().ToString()));
 			data.Set("objects", CommandCore::CommandData::Int(
 				static_cast<int64_t>(scene->m_Entities.size())));
+            data.Set("simulating", CommandCore::CommandData::Bool(SceneManagers->IsGameStart()));
+            data.Set("editorSceneLoaded", CommandCore::CommandData::Bool(SceneManagers->IsEditorSceneLoaded()));
+            data.Set("hasAuthoringSnapshot", CommandCore::CommandData::Bool(SceneManagers->HasSceneSnapshot()));
 			return CommandCore::Ok("scene", std::move(data));
 		}
 
@@ -257,6 +265,50 @@ namespace PlayerCmd
 			return CommandCore::Ok("이동 완료: " + parts[1], std::move(data));
 		}
 
+#if !CE_SHIPPING
+        CommandCore::CommandResult ProfileState()
+        {
+            auto data = CommandCore::CommandData::Object();
+            data.Set("recording", CommandCore::CommandData::Bool(ce::profiler().state() == ce::recorder_state::recording));
+            return CommandCore::Ok({}, std::move(data));
+        }
+
+        CommandCore::CommandResult Cmd_profile_record(const std::vector<std::string>& parts)
+        {
+            if (parts.size() != 1) return CommandCore::InvalidArguments("profile.record takes no arguments");
+            if (!ce::profiler().is_initialized()) return CommandCore::PreconditionFailed("profile.unavailable", "Profiler is not initialized");
+            ce::profiler().record(ce::profiler().summary().engine_frame);
+            return ProfileState();
+        }
+
+        CommandCore::CommandResult Cmd_profile_pause(const std::vector<std::string>& parts)
+        {
+            if (parts.size() != 1) return CommandCore::InvalidArguments("profile.pause takes no arguments");
+            ce::profiler().pause();
+            return ProfileState();
+        }
+
+        CommandCore::CommandResult Cmd_profile_save(const std::vector<std::string>& parts)
+        {
+            if (parts.size() != 2) return CommandCore::InvalidArguments("profile.save <new-absolute-path.ceprof>");
+            const auto path = std::filesystem::u8path(parts[1]);
+            if (!path.is_absolute() || path.extension() != ".ceprof" || std::filesystem::exists(path))
+                return CommandCore::InvalidArguments("Use a new absolute .ceprof path");
+            if (ce::profiler().state() == ce::recorder_state::recording)
+                return CommandCore::PreconditionFailed("profile.recording", "Pause the capture before saving");
+            ce::profiler().wait_until_idle();
+            const auto capture = ce::profiler().capture();
+            if (!capture) return CommandCore::PreconditionFailed("profile.empty", "No frozen capture");
+            const auto saved = ce::save_capture(*capture, path);
+            if (!saved) return CommandCore::Fail("profile.save_failed", ce::describe(saved.error()));
+            auto data = CommandCore::CommandData::Object();
+            data.Set("path", CommandCore::CommandData::String(parts[1]));
+            data.Set("complete", CommandCore::CommandData::Bool(capture->complete()));
+            data.Set("unacked", CommandCore::CommandData::Int(capture->unacked_streams()));
+            return CommandCore::Ok({}, std::move(data));
+        }
+#endif
+
 		// ── 표 ──────────────────────────────────────────────────────────
 
 		struct Registration
@@ -266,7 +318,12 @@ namespace PlayerCmd
 		};
 
 		constexpr Registration kPlayerCommands[] = {
-			{ "help",           &Cmd_help },
+			#if !CE_SHIPPING
+            { "profile.record", &Cmd_profile_record },
+            { "profile.pause", &Cmd_profile_pause },
+            { "profile.save", &Cmd_profile_save },
+#endif
+            { "help",           &Cmd_help },
 			{ "quit",           &Cmd_quit },
 			{ "player.status",  &Cmd_status },
 			{ "player.scene",   &Cmd_scene },

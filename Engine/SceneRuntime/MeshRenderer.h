@@ -58,6 +58,7 @@ public:
 	}
 
     [[nodiscard]] math::aabb GetBoundingBox() const;
+    [[nodiscard]] math::aabb GetBoundingBox(const math::matrix4x4& world) const;
 
     // I5-D5b — "그릴 메시가 있는가"의 창구(에디터 피킹·프록시 바운드). PHASE 3.75
     // MBC9: typed generation이 유일한 정본이다.

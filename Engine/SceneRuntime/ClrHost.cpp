@@ -266,6 +266,9 @@ namespace
             float distanceOrRadius, unsigned int layers, int includeSensors, ce::script::physics_hit* hits,
             int capacity, ce::script::physics_query_result* result);
 
+        int (__stdcall* Physics_QueryBatch)(ScriptObjectHandle anchor, const ce::script::physics_query_request* requests,
+            int count, ce::script::physics_hit* hits, int capacity, ce::script::physics_batch_result* results);
+
 		// TextComponent (SetMessage 16 · SetAlpha 6)
 		int   (__stdcall* Text_Exists)(ScriptObjectHandle handle);
 		int   (__stdcall* Text_GetMessage)(ScriptObjectHandle handle, char* buffer, int capacity);
@@ -1767,6 +1770,182 @@ namespace
         catch (...) { return PhysicsFailure(ce::physics::error_code::invalid_argument); }
     }
 
+    int __stdcall Api_Physics_QueryBatch(ScriptObjectHandle anchor, const ce::script::physics_query_request* input,
+                                         int count, ce::script::physics_hit* output, int capacity,
+                                         ce::script::physics_batch_result* summaries)
+    {
+        ce::profile_scope scope{ce::marker<"Physics.ScriptQueryBatch">()};
+        Entity* entity = nullptr;
+
+        {
+            ce::profile_scope validation{ce::marker<"Physics.ScriptQueryValidate">()};
+
+            if (!PhysicsApiEntered()) return PhysicsFailure(ce::physics::error_code::wrong_phase);
+            if (count < 0 || count > ce::script::physics_batch_capacity || capacity < 0 ||
+                capacity > ce::script::physics_batch_hit_capacity || (count && (!input || !summaries)) ||
+                (capacity && !output))
+                return PhysicsFailure(ce::physics::error_code::invalid_argument);
+
+            const auto overlaps = [](const void* a, std::size_t size_a, const void* b, std::size_t size_b) {
+                if (!size_a || !size_b) return false;
+                const auto begin_a = reinterpret_cast<std::uintptr_t>(a);
+                const auto begin_b = reinterpret_cast<std::uintptr_t>(b);
+                return begin_a <= begin_b ? begin_b - begin_a < size_a : begin_a - begin_b < size_b;
+            };
+            const auto input_bytes = static_cast<std::size_t>(count) * sizeof(*input);
+            const auto output_bytes = static_cast<std::size_t>(capacity) * sizeof(*output);
+            const auto summary_bytes = static_cast<std::size_t>(count) * sizeof(*summaries);
+            if (overlaps(input, input_bytes, output, output_bytes) || overlaps(input, input_bytes, summaries, summary_bytes) ||
+                overlaps(output, output_bytes, summaries, summary_bytes))
+                return PhysicsFailure(ce::physics::error_code::invalid_argument);
+
+            entity = ScriptObjectRegistry::Get().Resolve(anchor);
+            if (!entity || entity->IsDestroyMark() || !entity->GetScene())
+                return PhysicsFailure(ce::physics::error_code::stale_handle);
+
+            for (int i = 0; i < count; ++i)
+            {
+                const auto& request = input[i];
+                if (request.offset < 0 || request.capacity < 0 || request.capacity > ce::script::physics_query_capacity ||
+                    request.offset > capacity || request.capacity > capacity - request.offset)
+                    return PhysicsFailure(ce::physics::error_code::invalid_argument);
+
+                for (int j = 0; j < i; ++j)
+                    if (request.capacity && input[j].capacity && request.offset < input[j].offset + input[j].capacity &&
+                        input[j].offset < request.offset + request.capacity)
+                        return PhysicsFailure(ce::physics::error_code::invalid_argument);
+            }
+
+        }
+
+        auto& scene = *entity->GetScene();
+
+        try
+        {
+            using namespace ce::physics;
+            std::vector<query_hit> scratch;
+            std::vector<query_request> requests;
+            std::vector<std::size_t> indices;
+            std::vector<ce::script::physics_batch_result> results;
+            std::vector<result<query_result>> answers;
+
+            {
+                ce::profile_scope prepare{ce::marker<"Physics.ScriptQueryPrepare">()};
+
+                scratch.resize(static_cast<std::size_t>(capacity));
+                results.resize(static_cast<std::size_t>(count));
+                requests.reserve(count);
+                indices.reserve(count);
+
+                for (int i : std::views::iota(0, count))
+                {
+                    const auto& request = input[i];
+                    if ((request.kind != 0 && request.kind != 1) ||
+                        (request.include_sensors != 0 && request.include_sensors != 1))
+                    {
+                        results[i].error = PhysicsFailure(error_code::invalid_argument);
+                        continue;
+                    }
+
+                    query_input geometry = request.kind == 0
+                        ? query_input{ray_query{{request.origin.x, request.origin.y, request.origin.z},
+                                                 {request.direction.x, request.direction.y, request.direction.z},
+                                                 request.distance_or_radius}}
+                        : query_input{overlap_query{sphere_geometry{request.distance_or_radius},
+                                                     {{request.origin.x, request.origin.y, request.origin.z}, {}}}};
+                    requests.push_back({std::move(geometry), std::span{scratch}.subspan(request.offset, request.capacity),
+                                        {request.layers, request.include_sensors != 0}});
+                    indices.push_back(static_cast<std::size_t>(i));
+                }
+
+                answers.resize(requests.size());
+            }
+
+            if (auto batch = scene.QueryPhysicsBatch(requests, answers); !batch)
+                return PhysicsFailure(batch.error().code);
+
+            std::vector<ce::script::physics_hit> translated;
+            std::array<std::size_t, ce::script::physics_batch_capacity> translatedOffsets{};
+
+            {
+                ce::profile_scope translate{ce::marker<"Physics.ScriptQueryTranslate">()};
+
+                {
+                    ce::profile_scope initialize{ce::marker<"Physics.ScriptHitInitialize">()};
+                    std::size_t written = 0;
+                    for (std::size_t j : std::views::iota(std::size_t{0}, answers.size()))
+                    {
+                        translatedOffsets[indices[j]] = written;
+                        if (answers[j]) written += answers[j]->written;
+                    }
+
+                    translated.resize(written);
+                }
+
+                for (std::size_t j : std::views::iota(std::size_t{0}, requests.size()))
+                {
+                    const auto i = indices[j];
+                    const auto& queried = answers[j];
+                    auto& summary = results[i];
+                    if (!queried)
+                    {
+                        summary.error = PhysicsFailure(queried.error().code);
+                        continue;
+                    }
+
+                    for (std::size_t k : std::views::iota(std::size_t{0}, queried->written))
+                    {
+                        const auto offset = static_cast<std::size_t>(input[i].offset) + k;
+                        const auto& hit = scratch[offset];
+                        PhysicsBodyComponent* body = nullptr;
+                        Entity* owner = nullptr;
+                        std::uint64_t layer = 0;
+
+                        {
+                            ce::profile_scope lookup{ce::marker<"Physics.ScriptHitLookup">()};
+
+                            auto resolved = scene.ResolvePhysicsBody(hit.body);
+                            if (!resolved) { summary.error = PhysicsFailure(resolved.error().code); break; }
+
+                            body = *resolved;
+                            owner = body->GetOwner();
+                            const auto shape = std::ranges::find(body->Shapes(), hit.shape.value, &PhysicsShapeDefinition::shapeId);
+                            if (shape == body->Shapes().end()) { summary.error = PhysicsFailure(error_code::stale_handle); break; }
+
+                            layer = shape->layerOverride ? shape->layerOverride : owner->GetLayer().value;
+                        }
+
+                        ce::profile_scope encode{ce::marker<"Physics.ScriptHitEncode">()};
+                        const auto object = ScriptObjectRegistry::Get().Register(owner);
+                        translated[translatedOffsets[i] + k] = {object.index, object.generation, body->GetInstanceID(), hit.shape.value, hit.face,
+                            layer,
+                            ScriptVector(hit.position), ScriptVector(hit.normal), hit.distance, hit.has_location};
+                    }
+
+                    if (!summary.error)
+                        summary = {0, static_cast<int>(queried->written), static_cast<int>(queried->required_capacity),
+                                   queried->truncated};
+                }
+
+            }
+
+            {
+                ce::profile_scope commit{ce::marker<"Physics.ScriptQueryCommit">()};
+
+                for (int i : std::views::iota(0, count))
+                {
+                    if (!results[i].error && results[i].written)
+                        std::copy_n(translated.begin() + translatedOffsets[i], results[i].written, output + input[i].offset);
+                    summaries[i] = results[i];
+                }
+            }
+
+            return 0;
+        }
+        catch (const std::bad_alloc&) { return PhysicsFailure(ce::physics::error_code::out_of_memory); }
+        catch (...) { return PhysicsFailure(ce::physics::error_code::invalid_argument); }
+    }
+
 	// ── TextComponent · UIComponent · Canvas ──
 
 	TextComponent* ResolveText(ScriptObjectHandle handle)
@@ -2172,6 +2351,7 @@ namespace
         g_apiTable.Body_ShapeRead = &Api_Body_ShapeRead;
         g_apiTable.Body_ShapeFlags = &Api_Body_ShapeFlags;
         g_apiTable.Physics_Query = &Api_Physics_Query;
+        g_apiTable.Physics_QueryBatch = &Api_Physics_QueryBatch;
 
 		g_apiTable.Text_Exists                 = &Api_Text_Exists;
 		g_apiTable.Text_GetMessage             = &Api_Text_GetMessage;

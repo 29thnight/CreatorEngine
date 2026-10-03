@@ -1,0 +1,73 @@
+m_Entities:
+  - Entity: 8465162159729457626
+    m_name: PhysicsCharacterDestination
+    m_instanceID: 1781651387
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 125302812
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 1}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 1}
+        m_parentID: 4294967295
+    m_isStatic: false
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [1]
+  - Entity: 8465162159729457626
+    m_name: DestinationCamera
+    m_instanceID: 137972219
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 1
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 298113558
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0.95, z: -3.2, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - CameraComponent: 13209209574413295037
+        m_typeUUID: de554d88-0db0-40a0-a77d-0bc32b5d9dc7
+        m_name: CameraComponent
+        m_instanceID: 1471580898
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Camera:
+          rotate: {x: 0, y: 0, z: 0, w: 1}
+          m_nearPlane: 0.1
+          m_farPlane: 500
+          m_fov: 60
+        m_isPrimary: true
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+m_buildIndex: 0
+m_sceneName: PhysicsCharacterDestination
+m_requiredLoadAssetsBundle:
+  name: ""
+  path: ""
+  assets: ~

@@ -1,0 +1,38 @@
+schemaVersion: 2
+identityProfile: ce.uuidv8.sha256.v1
+identityEpoch: 2026-09-model-bigbang
+authoringKey: authoring:ad133de556e1972c976ab96c310ed19aa904cee88ce21911cf7f503e423b6da2
+assetId: 96ab44a6-cbf7-8885-9188-601ab9aa6d14
+generation: 1
+sourceFingerprint: sha256:50b2a38725557a7ce96e72c3c727349756a329c3194bad106821f9801298a0b7
+subAssets:
+  - kind: material
+    stableKey: name:Weapon_Dagger_G3_005_Default
+    assetId: 30df7fc2-1bb6-8c88-8af5-ca14a0bd93a6
+    binding: gltf/material/0
+    name: Weapon_Dagger_G3_005_Default
+    fingerprint: sha256:9a9f0601fa890f8d5dd31c18fa418f4d9ffd237ce375e8927767c0d941bd1a54
+  - kind: texture
+    stableKey: name:Weapon_Dagger_G3_005_D
+    assetId: d418e7c8-3657-82c4-a3af-50f5f573cffd
+    binding: gltf/image/2
+    name: Weapon_Dagger_G3_005_D
+    fingerprint: sha256:f40b937cb3d60e42b22336c96af4733437fae9acd94ac888e16c4896c8620026
+  - kind: texture
+    stableKey: name:Weapon_Dagger_G3_005_Reference_ORM
+    assetId: 8f783990-d5ec-8aa8-a70e-89a632f4fca6
+    binding: gltf/image/1
+    name: Weapon_Dagger_G3_005_Reference_ORM
+    fingerprint: sha256:0c86eb5f9883ff5ff85d827d4982e140fded49e99cc55e354bfecba2b7fc5a05
+  - kind: texture
+    stableKey: name:Weapon_Dagger_G3_005_Normal_OpenGL
+    assetId: de1bb21b-e313-8850-abe0-fb7f61ad8188
+    binding: gltf/image/0
+    name: Weapon_Dagger_G3_005_Normal_OpenGL
+    fingerprint: sha256:c82563b020d37325cfea57eae89c00d6ef0dbb30d1f0ddd453843a426bd45f2e
+  - kind: mesh
+    stableKey: name:Weapon_Dagger_G3_005.001
+    assetId: d3f80276-8b4e-86d8-b6a0-6408980fa18b
+    binding: mesh/0
+    name: Weapon_Dagger_G3_005.001
+    fingerprint: sha256:532dd1acb7f02590482cf73b3f70a4c9ec476161c02770d962fa1df97921f02f

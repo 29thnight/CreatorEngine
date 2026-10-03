@@ -1,0 +1,347 @@
+m_Entities:
+  - Entity: 8465162159729457626
+    m_name: PhysicsCharacterHierarchy
+    m_instanceID: 2771109486
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 0
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 2701560235
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0, z: 0, w: 1}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 1}
+        m_parentID: 4294967295
+    m_isStatic: false
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [1, 3, 4]
+  - Entity: 8465162159729457626
+    m_name: CharacterGateFloor
+    m_instanceID: 1380793926
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 1
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1170458609
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: -0.5, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - PhysicsBodyComponent: 6005066272611484821
+        m_typeUUID: 1bbfb80a-8bd9-440a-8557-537a0ff60cd8
+        m_name: PhysicsBodyComponent
+        m_instanceID: 2196611211
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_motion: 0
+        m_shapeSchema: 1
+        m_shapes:
+          - shapeId: 12
+            kind: 0
+            halfExtent: {x: 20, y: 0.5, z: 20}
+            radius: 0.5
+            halfHeight: 0.5
+            geometryAsset: ""
+            geometryRevision: 0
+            geometryScale: {x: 1, y: 1, z: 1}
+            localPosition: {x: 0, y: 0, z: 0}
+            localRotation: {x: 0, y: 0, z: 0, w: 1}
+            staticFriction: 0.5
+            dynamicFriction: 0.5
+            restitution: 0
+            sensor: false
+            queryEnabled: true
+            layerOverride: 0
+        m_mass: 1
+        m_gravityEnabled: true
+        m_translationLocks: 0
+        m_rotationLocks: 0
+        m_linearDamping: 0
+        m_angularDamping: 0.05
+        m_initialLinearVelocity: {x: 0, y: 0, z: 0}
+        m_initialAngularVelocity: {x: 0, y: 0, z: 0}
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: CharacterGateActor
+    m_instanceID: 3990255360
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 2
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1919739813
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 3, z: 0, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 4
+      - CharacterMovementComponent: 17579205194823809952
+        m_typeUUID: aeb7397b-e6d4-46b8-b830-1b1e9a50a467
+        m_name: CharacterMovementComponent
+        m_instanceID: 229513277
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_characterSchema: 1
+        m_radius: 0.5
+        m_cylinderHeight: 1
+        m_contactOffset: 0.05
+        m_stepOffset: 0.3
+        m_slopeLimitCosine: 0.70710677
+        m_gravity: -9.81
+        m_minimumDistance: 0.001
+        m_acceleration: 6
+        m_brakingDecay: 8
+        m_jumpSpeed: 5
+        m_maxFallSpeed: 55
+        m_initialVelocity: {x: 0, y: 0, z: 0}
+      - ScriptComponent: 18288371625365795113
+        m_typeUUID: 16beda95-3967-4d95-838b-b9e6694b6609
+        m_name: ScriptComponent
+        m_instanceID: 1399340847
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_scriptType: CharacterPlayerProbe
+        m_fieldData: ~
+    m_isStatic: false
+    m_parentIndex: 4
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: MainCamera
+    m_instanceID: 3017426043
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 3
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3157244545
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 0, y: 0.95, z: -3.2, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 0
+      - CameraComponent: 13209209574413295037
+        m_typeUUID: de554d88-0db0-40a0-a77d-0bc32b5d9dc7
+        m_name: CameraComponent
+        m_instanceID: 2271894954
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_Camera:
+          rotate: {x: 0, y: 0, z: 0, w: 1}
+          m_nearPlane: 0.1
+          m_farPlane: 500
+          m_fov: 60
+        m_isPrimary: true
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: PersistentParent
+    m_instanceID: 696644821
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 4
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 562099443
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 4, y: 0, z: 2, w: 0}
+        rotation: {x: 0, y: 0.25881904, z: 0, w: 0.9659258}
+        scale: {x: 2, y: 2, z: 2, w: 0}
+        m_parentID: 0
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: [2, 5]
+  - Entity: 8465162159729457626
+    m_name: PersistentBranch
+    m_instanceID: 2565781755
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 5
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 4245401359
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 7, y: 0, z: 2, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 4
+    m_isStatic: false
+    m_parentIndex: 4
+    m_rootIndex: 0
+    m_childrenIndices: [6, 7]
+  - Entity: 8465162159729457626
+    m_name: PersistentDisabledCharacter
+    m_instanceID: 1812744728
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 6
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 11
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3955147049
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 10, y: 5, z: 2, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 5
+      - CharacterMovementComponent: 17579205194823809952
+        m_typeUUID: aeb7397b-e6d4-46b8-b830-1b1e9a50a467
+        m_name: CharacterMovementComponent
+        m_instanceID: 1456702036
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_characterSchema: 1
+        m_radius: 0.5
+        m_cylinderHeight: 1
+        m_contactOffset: 0.05
+        m_stepOffset: 0.3
+        m_slopeLimitCosine: 0.70710677
+        m_gravity: -9.81
+        m_minimumDistance: 0.001
+        m_acceleration: 20
+        m_brakingDecay: 8
+        m_jumpSpeed: 5
+        m_maxFallSpeed: 55
+        m_initialVelocity: {x: 2, y: 0, z: 0}
+    m_isStatic: false
+    m_parentIndex: 5
+    m_rootIndex: 0
+    m_childrenIndices: []
+  - Entity: 8465162159729457626
+    m_name: PersistentDisabledBody
+    m_instanceID: 3824785845
+    m_isEnabled: false
+    m_attachedSoketID: 0
+    m_index: 7
+    m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 16
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 3054209230
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position: {x: 13, y: 5, z: 2, w: 0}
+        rotation: {x: 0, y: 0, z: 0, w: 1}
+        scale: {x: 1, y: 1, z: 1, w: 0}
+        m_parentID: 5
+      - PhysicsBodyComponent: 6005066272611484821
+        m_typeUUID: 1bbfb80a-8bd9-440a-8557-537a0ff60cd8
+        m_name: PhysicsBodyComponent
+        m_instanceID: 674680856
+        m_isEnabled: false
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_motion: 2
+        m_shapeSchema: 1
+        m_shapes:
+          - shapeId: 1
+            kind: 0
+            halfExtent: {x: 0.5, y: 0.5, z: 0.5}
+            radius: 0.5
+            halfHeight: 0.5
+            geometryAsset: ""
+            geometryRevision: 0
+            geometryScale: {x: 1, y: 1, z: 1}
+            localPosition: {x: 0, y: 0, z: 0}
+            localRotation: {x: 0, y: 0, z: 0, w: 1}
+            staticFriction: 0.5
+            dynamicFriction: 0.5
+            restitution: 0
+            sensor: false
+            queryEnabled: true
+            layerOverride: 0
+        m_mass: 1
+        m_gravityEnabled: true
+        m_translationLocks: 0
+        m_rotationLocks: 0
+        m_linearDamping: 0
+        m_angularDamping: 0.05
+        m_initialLinearVelocity: {x: 0, y: 0, z: 0}
+        m_initialAngularVelocity: {x: 0, y: 0, z: 0}
+    m_isStatic: false
+    m_parentIndex: 5
+    m_rootIndex: 0
+    m_childrenIndices: []
+m_buildIndex: 0
+m_sceneName: PhysicsCharacterPlayer
+m_requiredLoadAssetsBundle:
+  name: ""
+  path: ""
+  assets: ~

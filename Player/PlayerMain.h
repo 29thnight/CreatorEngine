@@ -1,8 +1,9 @@
-﻿#pragma once
+#pragma once
 class ProjectLayerSettings;
 #include "Delegate.h"
 
 #include <atomic>
+#include <chrono>
 #include <condition_variable>
 #include <cstdint>
 #include <future>
@@ -13,6 +14,7 @@ class ProjectLayerSettings;
 #include <thread>
 
 class Scene;
+class CharacterMovementComponent;
 
 // 게임 플레이어의 메인 루프 (BuildPipelinePlan B0-2).
 //
@@ -35,6 +37,7 @@ class Scene;
 
 namespace Player
 {
+    class DdolProbe;
 	// --smoke N: N프레임 렌더 후 스스로 종료하고, 성패를 종료 코드와 로그
 	// 마커로 알린다(BuildPipelinePlan §2.3 Verify). wWinMain이 파싱해 채운다.
 	struct SmokeOptions
@@ -42,6 +45,11 @@ namespace Player
 		uint64_t frameLimit{ 0 };
 		uint64_t minimumPromotions{ 2 };
 		bool reloadScene{ false };
+        std::string ddolCharacter;
+        std::string reloadDestination;
+        bool ddolHierarchy = false;
+        bool ddolGeometry = false;
+        bool geometryFailure = false;
 
 		bool IsActive() const { return 0 != frameLimit; }
 	};
@@ -125,9 +133,12 @@ namespace Player
 		double m_frameDeltaTime{ 0.0 };
 		std::future<Scene*> m_smokeReload;
 		Scene* m_smokeReloadScene{ nullptr };
+        CharacterMovementComponent* m_smokeDdolCharacter{ nullptr };
+        std::unique_ptr<DdolProbe> m_smokeDdolProbe;
 		bool m_smokeReloadStarted{ false };
 		bool m_smokeReloadActivated{ false };
 		uint64_t m_smokeReloadPublishedFrame{ 0 };
+        std::chrono::steady_clock::time_point m_smokeReloadReport{};
 		std::atomic_bool m_isInvokeResize = false;
 	};
 }

@@ -689,3 +689,142 @@ Scene-scoped EntityHandle은 Scene 이송으로 만료된다. C#의 ScriptObject
 component instance의 새 Scene 상태를 읽는다. SDK character_handle은 승계하지 않고 새
 Scene에서 생성한다. 입력과 motion memory만 전달한다. Editor Stop으로 Entity를 복원하면
 기존 managed wrapper는 StaleHandle을 반환하며 복원된 component에 재지정하지 않는다.
+
+### T0 작업자 요청 통로와 종료 계약 (2026-10-02)
+
+소유 스레드는 `PhysicsScene::channel()`로 `PhysicsSceneChannel` 값을 얻어 작업에 복사한다.
+통로는 scene/body/controller SDK 포인터를 보유하지 않는다. identity·요청 큐·시퀀스 이력·
+불변 완료 스냅샷만 공유하며 scene 소멸 후에도 값의 수명은 유효하다. 빈 통로의 요청과
+닫힌 통로의 유효 신원 요청은 wrong_phase다. SDK 직접 변경과 통로 획득은 소유 스레드만
+허용한다. 직접 PhysicsScene 접근에는 여전히 살아 있는 객체라는 전제가 필요하다.
+
+종료는 큐 mutex 아래에서 입력을 닫은 뒤 in-flight finish/fetch와 SDK dispatcher drain을
+수행한다. 아직 적용되지 않은 미래 요청은 종료 과정에서 폐기하고 그 payload를 소유
+스레드에서 해제한다. `is_closed()`는 **입력 차단 상태**이며 SDK drain 완료 fence가 아니다.
+입력 차단 뒤에도 이미 시작한 tick의 최종 스냅샷이 게시될 수 있다. 작업자는 닫힌 통로를
+통해 SDK를 접근하거나 새 씬에 요청을 재지정하지 않는다. 재Play/새 씬의 identity는 다르다.
+
+요청은 값 payload로 전달한다. 입력 마감·bounded capacity·duplicate/stale/foreign 진단과
+(tick, producer, sequence) 정렬은 기존 P3 계약을 그대로 사용한다. 도착 순서로 병합 순서를
+정하지 않으며 force를 임의로 coalesce하지 않는다. 이 계약은 요청 적용 순서에 관한 것으로,
+CPU/GPU solver의 물리 결과가 bitwise 동일하다는 보장은 아니다.
+
+solver 콜백은 기존 private event collector의 mutex와 값 contact 배열에 기록한다. userData와
+retired body record는 fetch 완료 전에 해제하지 않으며 통로 저장소에 전달하지 않는다.
+Physics.RequestClose는 scene/tick 소유 정보와 함께 종료 입력 차단을 계측한다.
+전용 물리 스레드, 게임 작업의 simulate/fetch overlap, AI 마감·쿼리 배치는 T1/T2의 별도 경계다.
+
+
+### T1 내부 실행 창 계약
+
+begin_step 이후 finish_step 이전의 준비 작업은 owner가 소유한 이전 완료 render history만
+읽으며 SDK·Component·Transform·스크립트 호출과 구조 변경을 허용하지 않는다.
+성능 회귀 후보 철회 후 제품은 모든 history 크기에서 성공한 fetch 이후 준비한다.
+256개 overlap 후보는 독립 벤치마크 생성 소스에만 남기며 제품 선택 경로가 아니다.
+entry scratch는 Register에서 예약하며 동기 step 안에서만 주소를 사용한다.
+fetch 성공 이후에만 pose/history를 게시하고 실패 시 scratch를 폐기한다.
+제품은 Physics.RenderPrepare를 사용하고 검증용 후보만 InFlightRenderPrepare를 사용하며
+SimulateSubmit/FetchWait/PhysXTask를 scene/tick으로 연결한다. SDK worker 시간과
+owner 대기를 중복 합산하지 않는다. SDK 전용 dispatcher 및 기존 owner를 유지한다.
+이 계약의 안전성은 검증했으나 overlap 성능 수용은 미통과이며 T1은 진행 중이다.
+
+
+### T1 실행 비용 계층 계약 (2026-10-03)
+
+Physics.FetchWait는 owner의 inclusive wall 시간이다. 그 하위 Physics.FetchResults는
+SDK fetchResults(true), Physics.DispatcherDrain은 SDK dispatcher 완료를 기다리는 구간이다.
+두 하위 구간은 같은 owner·scene/tick을 가지며 FetchWait 내부에서 순차 실행된다.
+부모와 하위를 합산하지 않는다. FetchResults를 순수 solver 계산 시간으로 부르지 않는다.
+
+Physics.SnapshotStatistics는 완료 snapshot 수치/용량 계산, Physics.RenderMerge는
+성공한 fetch 이후 render history·ChangedPoses 병합과 수렴/버퍼 교환을 계측한다.
+EventCollect/ActivePoseCollect/CharacterPoseCollect/Counters/SnapshotPublish와 함께
+owner의 후처리 비용을 구분한다. RenderPrepare와 RenderMerge는 현 제품에서는 순차다.
+
+PhysXTask는 SDK CPU task의 run 및 release를 포함한다. TaskSubmit instant와
+(scene,tick,task)로 연결한 제출→실행 지연은 enqueue/wake/계측 비용도 포함하는 latency다.
+worker 실행 합은 여러 thread의 누적 work이며 owner wall 시간과 더하지 않는다.
+GPU backend의 CPU task span은 GPU kernel 실행 시간이나 순수 GPU solver 시간의 대용이 아니다.
+프로파일 비용 표는 inclusive per-tick 평균/p99와 task 지연을 별도로 제공한다.
+계측 off에는 해당 비용이 미관측이며 0으로 해석하지 않는다.
+
+SDK task span 합은 스레드별 elapsed의 합이다. inline fallback과 실제 worker 수를 별도
+기록하며 이 합을 CPU 사용 시간으로 해석하지 않는다. 기록된 길이0 span은 관측값0이고,
+instant event 또는 계측 off의 미관측과 구별한다. 비용 캡처는 complete/unacked0/drop0과
+scene/tick owner 하위 계층, task 제출→실행 연결을 검증한 뒤 사용한다.
+
+
+### SDK worker 계측 게시와 drain (T1, 2026-10-03)
+
+SDK queue가 비었고 worker batch가 끝날 때, recording 중이며 SDK outstanding 작업이
+남아 있으면 queue mutex를 잠시 놓고 해당 worker의 계측 tail을 게시한다. 게시 중에도
+active batch는 살아 있고, mutex를 다시 얻은 뒤 감소한다. drain 완료는 task release와
+모든 batch 게시 완료를 포함한다. pause/off·최종 tail·Shipping은 기존 게시 경로를 유지한다.
+이는 profiler 저장소의 소유 thread에서 수행하는 게시이며 Scene/Component/SDK 접근을
+다른 thread에 허용하는 변경이 아니다. 상태가 게시 도중 바뀌어도 처음 선택한 lock 경로로
+복귀한다. Submit·PhysXTask(run+release)·Complete 마커와 scene/tick/task ID는 유지한다.
+계측 모듈의 wall 개선을 전체 제품 평균/p99 또는 GPU 커널 개선으로 일반화하지 않는다.
+
+
+### T2 owner query batch — 2026-10-03
+
+`PhysicsScene::query_batch` takes `span<const query_request>` and one `result<query_result>` slot per request.
+Requests use a C++23 variant of ray/sweep/overlap and borrow caller hit buffers only until return.
+The owner must be idle; in-flight and foreign-thread execution are rejected before writes.
+Size mismatch is a batch error with untouched outputs. Individual validation errors do not cancel later requests.
+No-hit succeeds; zero capacity still counts all hits and reports exact required capacity/truncation.
+Hit buffers must not alias request/result storage or each other; only written prefixes are valid.
+
+The batch commits pending SDK query updates once, then executes synchronously inside a mutation-excluding
+query_read window. Return restores idle, so no job lifetime, borrowed-buffer publication, or asynchronous join
+is exposed. QueryStructureUpdate and QueryBatch are separate scopes; each query retains its existing scope
+and hit/overflow/scratch counters. This first gate does not claim parallel query scheduling or product T2 closure.
+
+
+### T2 Scene consumer boundary — 2026-10-03
+
+Scene::QueryPhysicsBatch delegates to ScenePhysicsSimulation::QueryBatch. The session checks owner and
+active runtime before touching requests/results. Editor mode and Stop reject even an empty batch;
+a batch never creates an SDK Scene or retains borrowed buffers. Restart uses the newly created Scene identity.
+Existing Scene raycast/overlap consumers use one-request batches with unchanged synchronous expected results.
+The current CLR ABI still exposes individual raycast/overlap, not a managed multi-request batch.
+C++ consumers may submit mixed requests through the Scene entry point. Hit body identities remain resolved
+by Scene::ResolvePhysicsBody and cannot be reused across a Stop/restart or Scene ownership transfer.
+
+
+### T2 managed multi-query boundary — ABI 32 (2026-10-03)
+
+Physics.QueryBatch takes one live Scene anchor, ReadOnlySpan<PhysicsQueryRequest>, a shared hit span,
+and one PhysicsBatchResult per request. Raycast and OverlapSphere are supported. Each request specifies
+its hit offset/capacity in elements. Hit ranges must be disjoint; zero capacity performs discovery.
+Request limit is 64, shared hits limit 4096, each request capacity limit 256. Invalid lengths/ranges/aliasing
+are batch-level InvalidArgument. Failed batches preserve output buffers. Results are valid only after
+batch success; individual query failures have Error and zero counts while later queries continue.
+Only the successful request's Written prefix at Offset is valid. Unused hit entries remain untouched.
+
+The bridge pins borrowed spans only during the call, stages SDK/translated results in bounded owned
+storage, executes one Scene owner read window, then commits outputs. Native pointers do not escape.
+Input/hit/summary cross-buffer aliasing is rejected before execution. Scene inactive/wrong owner and
+retired anchors are rejected through the existing phase/identity guards. No editor runtime is created
+by a query. The table adds Physics_QueryBatch and bumps native/managed ABI to 32 together; old ABI
+is rejected rather than retained as a compatibility path. Query request/result layouts are 48/16 bytes.
+Physics.ScriptQueryBatch contains the existing Scene/tick QueryBatch→QueryStructureUpdate/query scopes.
+
+### Development Player profiler 제어 (2026-10-03)
+
+Development Player의 명시적 `--command-service` 세션에서 `profile.record`,
+`profile.pause`, `profile.save <new-absolute-path.ceprof>`를 지원한다.
+기존 인증/owner game-thread 명령 큐를 통하며 Editor와 동일한 명령 이름과 descriptor를 사용한다.
+record는 현재 engine frame에서 시작하고 pause는 비동기 freeze를 요청한다.
+save는 recording 상태를 거부하고 `wait_until_idle` 후 frozen capture를 저장한다.
+절대 경로·ceprof 확장자·기존 파일 없음 조건을 적용한다. 성공 응답에 complete/unacked를 포함한다.
+Shipping은 이 세 handler/등록 항목과 profiler frame publication을 컴파일하지 않는다.
+
+Player는 runtime EndOfFrame 뒤 `Time->GetFrameCount()`를 profiler에 발행한다.
+렌더 완료나 GPU retirement를 의미하지 않으며 physics fixed tick과도 별도 축이다.
+이 경계 없이 수집하면 CPU 이벤트가 한 frame으로 합쳐지고 deferred counter가 누락될 수 있다.
+제품 기본 메모리 예산은 변경하지 않는다.
+
+managed 반복 probe는 외부 gate file이 설정된 경우 HTTP profiler 상태 적용 뒤에만 시작한다.
+query 입력 준비·parity 비교와 HTTP 제어/저장은 timed query wall-time 밖이다.
+profile=false/true 로그는 harness가 실제 record/pause 응답과 대조한다.

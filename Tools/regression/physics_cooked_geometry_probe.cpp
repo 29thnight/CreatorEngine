@@ -4,25 +4,54 @@
 #include "../AssetCooker/CollisionGeometryCookProducer.h"
 #include <fstream>
 #include <iostream>
+#include <source_location>
 
 int main(int argc, char** argv)
 {
     using namespace ce::physics;
     namespace ck = experiment::cooked;
     std::size_t checks = 0;
-    const auto check = [&](bool value) {
+    const auto check = [&](bool value, std::source_location location = std::source_location::current()) {
         ++checks;
         if (!value)
-            throw std::runtime_error("Cooked check " + std::to_string(checks));
+            throw std::runtime_error("Cooked check " + std::to_string(checks) + " at line " +
+                                     std::to_string(location.line()));
     };
     try
     {
-        if (argc != 2)
+        if (argc != 2 && argc != 3)
             return 2;
         const std::filesystem::path root(argv[1]);
         const auto uuid = Uuid::Parse("91ea9b44-13a6-4aec-99ec-0963eef7eaa1");
         auto cooker = PhysicsScene::create();
         check(bool(cooker));
+        // Small physical objects must keep their authored metre units while cooking.
+        for (const float scale : {0.01f, 0.1f, 1.f})
+        {
+            const std::array<math::vector3, 4> points{{{0,0,0}, {scale,0,0}, {0,scale,0}, {0,0,scale}}};
+            check(bool((*cooker)->cook_convex(points)));
+            auto blob = (*cooker)->cook_geometry_blob(PhysicsScene::convex_cook_input{points});
+            check(bool(blob));
+            check(bool((*cooker)->load_geometry_blob(geometry_kind::convex, *blob)));
+        }
+        const std::array<math::vector3, 4> line{{{0,0,0}, {.01f,0,0}, {.02f,0,0}, {.03f,0,0}}};
+        check(!(*cooker)->cook_convex(line));
+        check(!(*cooker)->cook_geometry_blob(PhysicsScene::convex_cook_input{line}));
+
+        if (argc == 3)
+        {
+            std::ifstream input(argv[2]);
+            std::size_t count = 0;
+            check(bool(input >> count) && count >= 4 && count <= 1024*1024);
+            std::vector<math::vector3> points(count);
+            for (auto& point : points) if (!(input >> point.x >> point.y >> point.z))
+                throw std::runtime_error("Incomplete real-asset convex input");
+            check(bool((*cooker)->cook_convex(points)));
+            auto blob = (*cooker)->cook_geometry_blob(PhysicsScene::convex_cook_input{points});
+            check(bool(blob));
+            check(bool((*cooker)->load_geometry_blob(geometry_kind::convex, *blob)));
+        }
+
         std::array<CollisionGeometrySource, 3> sources{
             CollisionGeometrySource{{uuid, 1}, convex_source{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}}},
             CollisionGeometrySource{{uuid, 2}, triangle_mesh_source{{{0, 0, 0}, {0, 0, 1}, {1, 0, 0}}, {{0, 1, 2}}}},
@@ -85,7 +114,16 @@ int main(int argc, char** argv)
             writeSource(source, CollisionGeometryIO::RevisionPath(sourceRoot, source.key));
         auto product = geometry_cook::Build(sourceRoot, sourcePath);
         check(product && product->revisions == std::vector<std::uint64_t>{1, 2, 3});
-        check(product && product->bytes == *bundle);
+        // A separately cooked SDK blob is not the identity contract. Verify the
+        // producer's revision/source identity, then import its actual output below.
+        for (const auto& original : records)
+        {
+            auto produced = CookedCollisionGeometry::Decode(product->bytes, original.key);
+            check(produced && produced->kind == original.kind);
+            check(produced && produced->source_hash == original.source_hash);
+            check(produced && !produced->payload.empty());
+        }
+        *bundle = product->bytes;
         {
             std::ofstream meta(sourcePath.string() + ".meta");
             meta << "guid: 11111111-1111-4111-8111-111111111111\n";

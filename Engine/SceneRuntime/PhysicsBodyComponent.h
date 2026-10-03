@@ -59,6 +59,11 @@ class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<Ph
     math::vector3 m_initialAngularVelocity{};
 
     [[reflgen::ignore]]
+    math::matrix4x4 m_observedWorld = math::matrix4x4::identity();
+    [[reflgen::ignore]]
+    math::vector3 m_observedScale{1, 1, 1};
+
+    [[reflgen::ignore]]
     Scene* m_scene = nullptr;
 
     [[reflgen::ignore]]

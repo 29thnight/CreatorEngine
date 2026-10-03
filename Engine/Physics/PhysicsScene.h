@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "PhysicsTypes.h"
 #include "PhysicsGeometry.h"
 #include "PhysicsStep.h"
@@ -68,7 +68,27 @@ struct scene_status
     scene_phase phase = scene_phase::idle;
 };
 
-// Owner-thread object. submit_command/latest_snapshot also permit other threads.
+// Copyable job-side capability. Owns only request/publication storage, never the SDK scene.
+// Copies may outlive Scene/PhysicsScene destruction; submissions then fail with wrong_phase.
+class PhysicsSceneChannel final
+{
+  public:
+    PhysicsSceneChannel() = default;
+    [[nodiscard]] scene_id identity() const noexcept;
+    [[nodiscard]] bool is_closed() const noexcept;
+    [[nodiscard]] result<void> submit(command value,
+                                    std::source_location location = std::source_location::current()) const;
+    [[nodiscard]] std::shared_ptr<const tick_snapshot> latest_snapshot() const noexcept;
+
+  private:
+    friend class PhysicsScene;
+    struct storage;
+    explicit PhysicsSceneChannel(std::shared_ptr<storage> value) noexcept : m_storage(std::move(value)) {}
+    std::shared_ptr<storage> m_storage;
+};
+
+// Owner-thread object. Jobs use channel() copies, not a borrowed PhysicsScene pointer.
+// Direct submit_command/latest_snapshot also permit other threads while this object is alive.
 // Producers/readers must stop calling this object before owner-thread destruction.
 // The SDK implementation is private; engine Scene owns this object via unique_ptr.
 class PhysicsScene final
@@ -86,6 +106,8 @@ class PhysicsScene final
                                           std::source_location location = std::source_location::current());
     [[nodiscard]] result<void> finish_step(std::source_location location = std::source_location::current());
     [[nodiscard]] scene_status status() const noexcept;
+    [[nodiscard]] result<PhysicsSceneChannel> channel(
+        std::source_location location = std::source_location::current()) const;
 
     [[nodiscard]] result<character_handle> create_character(
         const character_desc& desc, std::source_location location = std::source_location::current());
@@ -157,6 +179,12 @@ class PhysicsScene final
     [[nodiscard]] result<query_result> overlap(const geometry& form, const pose& origin, std::span<query_hit> output,
                                                const query_filter& filter = {},
                                                std::source_location location = std::source_location::current());
+
+    // Owner idle only. Input/output storage is borrowed until return; hit buffers must not alias.
+    // Batch-level failure writes nothing. Per-request errors do not cancel later requests.
+    [[nodiscard]] result<void> query_batch(
+        std::span<const query_request> requests, std::span<result<query_result>> results,
+        std::source_location location = std::source_location::current());
 
   private:
     struct implementation;
