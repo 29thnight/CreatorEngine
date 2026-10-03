@@ -70,7 +70,8 @@ foreach ($configuration in @('Debug', 'Release')) {
             } elseif ($mode -eq 'subsurface') {
                 '^LX_MATERIAL_SCENE_SUBSURFACE_OK frames=12 pixels=[1-9]\d* spread=[1-9]\d* boundaries=[1-9]\d* maskedHoles=[1-9]\d* checks=[1-9]\d* gpuComponents=[1-9]\d* validation=0$'
             } else {
-                '^LX_MATERIAL_RASTER_SURFACE_OK checks=[1-9]\d* gpuComponents=[1-9]\d* .*sceneCompositionFrames=56 .*sceneGenerationFrames=12 .*$'
+                # Generation step 11 validates an empty new epoch without submitting a GPU frame.
+                '^LX_MATERIAL_RASTER_SURFACE_OK checks=[1-9]\d* gpuComponents=[1-9]\d* .*sceneCompositionFrames=55 .*sceneGenerationFrames=11 .*$'
             }
             if ($resultExit -ne 0 -or @($result | Where-Object { $_ -match $signature }).Count -ne 1 -or
                 @($result | Where-Object { $_ -match 'DebugLayer=on GPUValidation=on' }).Count -lt 1) {

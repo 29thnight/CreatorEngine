@@ -241,7 +241,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     const std::shared_ptr<Texture>& image)
 {
     CheckCsmContracts();
-    RunCsmLegacyBatches(device, roots, pipelines, textures, pool);
+    RunCsmLegacyBatches(device, roots, pipelines, textures);
     const auto product = ShadowDecalProduct(root, false);
     GenerationStore store;
     experiment::AssetId id;
