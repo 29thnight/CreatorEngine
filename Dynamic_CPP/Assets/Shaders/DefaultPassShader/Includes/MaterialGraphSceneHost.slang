@@ -401,7 +401,7 @@ float LXSceneShadow(float3 position, float3 normal, float3 light)
     if (lx_shadowBlend > 0.0 && cascade < 2u)
     {
         const float split = lx_shadowSplits[cascade];
-        const float start = split * (1.0 - lx_shadowBlend);
+        const float start = split - abs(split) * lx_shadowBlend;
         if (distance > start)
             shadow = lerp(shadow, LXSceneShadowCascade(cascade + 1u, position, slope),
                           saturate((distance - start) / max(split - start, 1e-4)));

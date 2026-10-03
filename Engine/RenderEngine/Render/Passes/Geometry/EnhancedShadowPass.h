@@ -94,6 +94,8 @@ public:
     void SetBias(float bias) { m_baseBias = bias * (2.f * kShadowMapSize); }
     void SetBiasTexels(float bias) { m_baseBias = (std::max)(0.f, bias); }
     void SetShadowDistance(float distance) { m_shadowDistance = (std::max)(0.01f, distance); }
+    float GetShadowDistance() const { return m_shadowDistance; }
+    float GetCascadeBlendBand() const { return m_blendBand; }
 
     // 경사 비례 계수 — 최종 편향 = 캐스케이드 편향 x (1 + 계수 x tan(경사각)).
     // 0이면 상수 편향만 쓴다(자가 검증의 A/B 재료).
@@ -169,7 +171,7 @@ private:
     math::vector3      m_lightDirection{ 0.f, -1.f, 0.f };
     bool               m_hasDirectionalLight{ false };
     float              m_baseBias{ 0.5f };
-    float              m_shadowDistance{ 200.f };
+    float              m_shadowDistance{ shadow_math::kDefaultDistance };
 
     // 경사 비례 계수 2는 관행 범위(1~3)의 가운데다. tan은 셰이더에서 8로
     // 상한을 두므로 최악에도 편향이 기본의 17배를 넘지 않는다.

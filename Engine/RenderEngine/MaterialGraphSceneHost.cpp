@@ -91,6 +91,7 @@ struct SceneHost::Frame
     std::vector<Draw> draws;
     RHITextureHandle environment;
     bool shadow{};
+    mutable std::atomic<uint32_t> shadowDrawCount{};
     std::shared_ptr<const SceneLookupFrame> lookup, alphaLookup;
     mutable bool alphaInputsDeclared{};
     mutable std::set<std::size_t> alphaDeclared;
@@ -1089,6 +1090,11 @@ void SceneHost::DeclareGeometry(EnhancedRenderGraph& graph) const
     frame->graphEpoch = graph.ResourceEpoch();
 }
 
+uint32_t SceneHost::ShadowDrawCount() const
+{
+    return frame_ ? frame_->shadowDrawCount.load(std::memory_order_relaxed) : 0;
+}
+
 void SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const
 {
     ce::profile_scope profile{ce::marker<"MaterialDeclareShadow">()};
@@ -1162,6 +1168,7 @@ void SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) co
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
                 encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
                 encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
+                frame->shadowDrawCount.fetch_add(1, std::memory_order_relaxed);
             }
         }
     });

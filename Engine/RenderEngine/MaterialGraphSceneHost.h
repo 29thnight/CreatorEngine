@@ -53,6 +53,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     bool IsProgramReady(const std::shared_ptr<const Generation>& generation, RHIShaderBinary backend) const;
     SceneProgramStats ProgramStats() const;
     MeshSurfaceCacheStats GeometryStats() const { return geometry_.CacheStats(); }
+    uint32_t ShadowDrawCount() const;
     // Current geometry/camera stay current. Pending/failed replacements use the
     // submitted instance and coverage for the same epoch/view/Material slot.
     // A cold slot has no accepted material and is omitted until preparation ends.

@@ -130,9 +130,6 @@ bool SceneViewInput::Seal(const SceneInputView& view, std::span<const EnhancedDr
             return Fail(error, "Scene graph draw exceeds the source geometry budget.");
         }
         SceneDrawInput input;
-        const auto shadowBounds = shadow_math::WorldBounds(draw);
-        input.shadowCenter = shadowBounds.center;
-        input.shadowRadius = shadowBounds.radius;
         input.sourceIndex = sourceIndex;
         input.geometryKey = draw.geometryKey;
         input.viewDepth = math::dot(draw.worldMatrix.translation() - view.camera.eyePosition, view.camera.forward);
@@ -152,6 +149,10 @@ bool SceneViewInput::Seal(const SceneInputView& view, std::span<const EnhancedDr
             error = "Scene graph geometry " + std::to_string(draw.geometryKey) + ": " + error;
             return false;
         }
+        // Bounds consume source bytes and palette only after their full validation.
+        const auto shadowBounds = shadow_math::WorldBounds(draw);
+        input.shadowCenter = shadowBounds.center;
+        input.shadowRadius = shadowBounds.radius;
         const auto& cost = input.geometry->Cost();
         auto& total = candidate->cost_;
         const auto chunks = input.geometry->Chunks().size();

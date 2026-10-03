@@ -200,66 +200,15 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
         m_lightDirection = { 0.f, -1.f, 0.f };
     m_lightDirection = math::normalize(m_lightDirection);
 
-    const auto inverseProjection = math::inverse(context.camera->projection);
-    const math::matrix4x4& inverseView = context.camera->inverseView;
-
-    const float nearPlane = context.camera->isOrthographic ? context.camera->nearPlane : (std::max)(context.camera->nearPlane, 0.001f);
-    const float farPlane = (std::max)(nearPlane + .001f, (std::min)(context.camera->farPlane, m_shadowDistance));
-
-    // ── 분할 지점 ──
-    //
-    // 로그 분할은 원근 투영에 맞는 이론값이지만 그대로 쓰면 첫 캐스케이드가
-    // 지나치게 좁아진다(near가 작을수록 심하다). 균등 분할과 섞는다.
-    std::array<float, kCascadeCount + 1> splits{};
-    splits[0] = nearPlane;
-    splits[kCascadeCount] = farPlane;
-    for (uint32_t i = 1; i < kCascadeCount; ++i)
-    {
-        const float ratio = static_cast<float>(i) / static_cast<float>(kCascadeCount);
-        const float logSplit = nearPlane * std::pow(farPlane / (std::max)(nearPlane, 1e-4f), ratio);
-        const float uniformSplit = nearPlane + (farPlane - nearPlane) * ratio;
-        splits[i] = context.camera->isOrthographic ? uniformSplit : kSplitLambda * logSplit + (1.f - kSplitLambda) * uniformSplit;
-    }
-
-    const float cornersXY[4][2] = {{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
-
+    const auto receivers = shadow_math::ReceiverCascades(*context.camera, m_lightDirection,
+        m_shadowDistance, m_blendBand, kShadowMapSize);
     for (uint32_t index = 0; index < kCascadeCount; ++index)
     {
-        const float sliceNear = index == 0 ? splits[0] : (std::max)(splits[0], splits[index] * (1.f - m_blendBand));
-        const float sliceFar = splits[index + 1];
-
-        std::array<math::vector3, 8> corners{};
-        for (int i = 0; i < 4; ++i)
-        {
-            corners[i] = math::transform_point(
-                shadow_math::ViewCorner(inverseProjection, cornersXY[i][0], cornersXY[i][1], sliceNear),
-                inverseView);
-            corners[i + 4] = math::transform_point(
-                shadow_math::ViewCorner(inverseProjection, cornersXY[i][0], cornersXY[i][1], sliceFar),
-                inverseView);
-        }
-
-        // 경계 구를 쓴다. 축 정렬 상자를 쓰면 카메라가 회전할 때 상자 크기가
-        // 출렁여 그림자 가장자리가 떨린다 — 구는 회전에 불변이다.
-        math::vector3 center{};
-        for (const auto& corner : corners) center += corner;
-        center /= 8.f;
-
-        float radius = 0.f;
-        for (const auto& corner : corners)
-        {
-            radius = (std::max)(radius, math::distance(center, corner));
-        }
-        // 반지름도 계단으로 만든다. 카메라가 앞뒤로 조금 움직일 때마다 반지름이
-        // 미세하게 달라지면 투영 배율이 바뀌고, 그것도 지글거림이 된다.
-        radius = std::ceil(radius * 16.f) / 16.f;
-
-        // 중심을 텍셀 단위로 양자화한다. 이게 없으면 카메라가 조금만 움직여도
-        // 그림자 가장자리가 지글거린다(shadow shimmering).
-        // Pad by a texel so snapping cannot clip the fitted receiver sphere.
-        radius *= float(kShadowMapSize) / float(kShadowMapSize - 2);
+        const auto& receiver = receivers[index];
+        const auto center = receiver.bounds.center;
+        const float radius = receiver.bounds.radius;
+        const float sliceFar = receiver.split;
         const float worldTexel = radius * 2.f / float(kShadowMapSize);
-        center = shadow_math::SnapCenter(center, m_lightDirection, worldTexel);
         float backOff = radius * 2.f;
         for (const auto& bounds : m_casterBounds)
             {

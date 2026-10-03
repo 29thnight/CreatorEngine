@@ -47,7 +47,7 @@ float LXVolumeShadow(float3 position)
     if (lx_volumeShadowBlend > 0 && cascade < 2)
     {
         const float split = lx_volumeShadowSplits[cascade];
-        const float start = split * (1 - lx_volumeShadowBlend);
+        const float start = split - abs(split) * lx_volumeShadowBlend;
         if (distance > start)
             visibility = lerp(visibility, LXVolumeShadowCascade(cascade + 1, position),
                                saturate((distance - start) / max(split - start, 1e-4)));

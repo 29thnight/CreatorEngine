@@ -225,7 +225,7 @@ float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
     if (gCascadeBlendBand > 0.0f && cascade < SHADOW_CASCADE_COUNT - 1)
     {
         const float split = (cascade == 0) ? gCascadeSplits.x : gCascadeSplits.y;
-        const float bandStart = split * (1.0f - gCascadeBlendBand);
+        const float bandStart = split - abs(split) * gCascadeBlendBand;
         if (viewDepth > bandStart)
         {
             const float blend = saturate((viewDepth - bandStart) / max(split - bandStart, 1e-4f));

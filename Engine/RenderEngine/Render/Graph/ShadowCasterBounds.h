@@ -8,7 +8,7 @@ inline Sphere WorldBounds(const EnhancedDrawItem& draw)
     auto localCenter = draw.boundRadius > 0.f || !draw.mesh
         ? draw.boundCenter : draw.mesh->GetBoundingSphere().center;
     float localRadius = enhanced_draw::BoundRadius(draw);
-    if (!(localRadius > 0.f) && draw.modelMeshView.IsComplete())
+    if (!(localRadius > 0.f) && draw.modelMeshView.IsComplete() && draw.modelMeshView.vertexStride >= 12)
     {
         // Isolated typed fixtures may omit the producer's cached bounds.
         // Every supported model layout places float3 POSITION at byte zero.
@@ -30,7 +30,7 @@ inline Sphere WorldBounds(const EnhancedDrawItem& draw)
     if (!(localRadius > 0.f)) return result;
     // A normalized weighted skin position lies in the convex hull of its bone
     // positions. Enclose every bone-transformed source sphere, not the bind pose.
-    if (draw.bonePalette && draw.boneCount)
+    if (draw.bonePalette && draw.boneCount && draw.boneCount <= 256)
         for (uint32_t i = 0; i < draw.boneCount; ++i)
         {
             const auto transform = draw.bonePalette[i] * draw.worldMatrix;

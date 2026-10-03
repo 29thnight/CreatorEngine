@@ -1,3 +1,4 @@
+#include "../Graph/ShadowCasterBounds.h"
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
 #include "EnhancedPbrCapture.h"
@@ -4078,24 +4079,50 @@ namespace
             math::bounding_frustum frustum;
             const bool cullDraws = BuildViewFrustum(cameraSnapshot, frustum);
 
+            const ViewLightSelection lightSelection =
+                SelectLightsForView(renderScene->GetLightProxySnapshot(), cameraSnapshot);
+            lights = lightSelection.lights;
+            lastLightSelection = lightSelection;
+            math::vector3 shadowDirection{0, -1, 0};
+            float strongestShadowLight = -1.f;
+            bool hasShadowLight = false;
+            for (const auto& light : lights)
+            {
+                if (uint32_t(light.position.w) != 0 || light.color.a <= strongestShadowLight) continue;
+                strongestShadowLight = light.color.a;
+                shadowDirection = {light.direction.x, light.direction.y, light.direction.z};
+                hasShadowLight = true;
+            }
+            if (math::length_sq(shadowDirection) < 1e-6f) shadowDirection = {0, -1, 0};
+            shadowDirection = math::normalize(shadowDirection);
+            const EnhancedShadowPass* shadowPass = backend == EnhancedLiveBackend::DX12
+                ? (pipeline ? &pipeline->shadow : nullptr)
+                : (vulkanPipeline ? &vulkanPipeline->shadow : nullptr);
+            const auto receivers = shadow_math::ReceiverCascades(cameraSnapshot, shadowDirection,
+                shadowPass ? shadowPass->GetShadowDistance() : shadow_math::kDefaultDistance,
+                shadowPass ? shadowPass->GetCascadeBlendBand() : .15f);
             std::vector<size_t> opaqueShadowIndices, graphShadowIndices;
             uint32_t culled = 0;
             for (const PooledDraw& pooled : drawPool)
             {
-                // 상자를 믿을 수 없는 것(스키닝)은 자르지 않는다.
-                const size_t shadowIndex = shadowDraws.size();
-                if (pooled.graphMaterialSource || !pooled.isTransparent)
-                    shadowDraws.push_back(pooled.item);
-                // Graph geometry is shared by surface and shadow passes; retain
-                // offscreen graph casters until per-pass visibility is available.
-                if (!pooled.graphMaterialSource && cullDraws && pooled.hasBounds &&
-                    !pooled.worldBounds.is_empty() &&
-                    !math::intersects(frustum, pooled.worldBounds))
+                // Select the visible/caster union before the bounded Graph seal.
+                // Unknown or posed bounds remain conservative, never camera-only.
+                const bool visible = !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
+                    || math::intersects(frustum, pooled.worldBounds);
+                if (!shadow_math::RelevantToView(visible, shadow_math::WorldBounds(pooled.item),
+                        receivers, shadowDirection, hasShadowLight))
                 {
                     ++culled;
                     continue;
                 }
-
+                const size_t shadowIndex = shadowDraws.size();
+                if (pooled.graphMaterialSource || !pooled.isTransparent)
+                    shadowDraws.push_back(pooled.item);
+                if (!pooled.graphMaterialSource && !visible)
+                {
+                    ++culled;
+                    continue;
+                }
                 if (pooled.graphMaterialSource)
                 {
                     auto graphDraw = pooled.item;
@@ -4225,11 +4252,7 @@ namespace
             // 다른 셰이더 배열 한도는 그대로지만, 목록이 정렬돼 있으므로
             // "앞의 N개"가 "가장 중요한 N개"가 된다 — 예전에는 등록 순서로
             // 잘렸다.
-            const ViewLightSelection lightSelection =
-                SelectLightsForView(renderScene->GetLightProxySnapshot(), cameraSnapshot);
 
-            lights = lightSelection.lights;
-            lastLightSelection = lightSelection;
 
             return true;
         }
