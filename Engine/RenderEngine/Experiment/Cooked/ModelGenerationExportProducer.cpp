@@ -256,17 +256,26 @@ namespace experiment::cooked
         }
         for (const assets::ModelTextureAsset& texture : loaded.generation->Textures())
         {
-            const std::string textureArtifact =
-                prefix + "textures/" + Uuid::ToString(texture.textureId) + ".png";
-            const auto file = std::find_if(product.files.begin(), product.files.end(),
-                [&textureArtifact](const ModelGenerationExportFile& candidate)
-                { return candidate.artifactPath == textureArtifact; });
+            const std::filesystem::path textureDirectory = prefix + "textures";
+            const std::string textureStem = Uuid::ToString(texture.textureId);
+            const auto matchesTexture = [&](const ModelGenerationExportFile& candidate) {
+                const std::filesystem::path path(candidate.artifactPath);
+                return path.parent_path() == textureDirectory && path.stem().string() == textureStem;
+            };
+            const auto file = std::ranges::find_if(product.files, matchesTexture);
             if (file == product.files.end())
             {
                 AddIssue(result, "generation.textures",
-                    "generation에 embedded texture 파일이 없다: " + textureArtifact);
+                    "generation에 embedded texture 파일이 없다: " + textureStem);
                 return result;
             }
+            if (std::ranges::count_if(product.files, matchesTexture) != 1)
+            {
+                AddIssue(result, "generation.textures", "Embedded texture identity has ambiguous payload files: " + textureStem);
+                return result;
+            }
+
+            const std::string& textureArtifact = file->artifactPath;
             Sha256Digest textureDigest{};
             if (!ComputeSha256(file->bytes, textureDigest, hashError))
             {

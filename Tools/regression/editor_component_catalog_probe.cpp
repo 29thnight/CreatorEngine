@@ -15,7 +15,7 @@ int main()
     check(Native("UIButton").label == "UI Button", "Acronym boundary");
     check(Script("Game.AI.PlayerController").label == "Player Controller", "Managed display name");
     check(Script("Component").label == "Component", "Script names retain Component suffix");
-    for (const auto* type : {"BoxColliderComponent", "SphereColliderComponent", "CapsuleColliderComponent", "RigidBodyComponent", "CharacterControllerComponent", "RagdollComponent"})
+    for (const auto* type : {"PhysicsBodyComponent", "CharacterMovementComponent"})
         check(Native(type).category == "Physics", "Physics category");
     for (const auto* type : {"CameraComponent", "LightComponent", "MeshRenderer", "SpriteRenderer", "DecalComponent", "SceneRenderProfileComponent", "TerrainComponent", "FoliageComponent"})
         check(Native(type).category == "Rendering", "Rendering category");
@@ -24,10 +24,10 @@ int main()
     check(Native("NewEngineFeature").category == "Other", "Uncategorized types remain discoverable");
     check(Script("Bobber").category == "Scripts", "Script category");
     check(Matches(Native("MeshRenderer"), "mEsH reN"), "Case-insensitive multiword search");
-    check(Matches(Native("BoxColliderComponent"), "PHYSICS box"), "Category search");
-    check(Matches(Native("BoxColliderComponent"), "BoxCollider"), "Raw class search");
+    check(Matches(Native("PhysicsBodyComponent"), "PHYSICS body"), "Category search");
+    check(Matches(Native("PhysicsBodyComponent"), "PhysicsBody"), "Raw class search");
     check(Matches(Script("Game.PlayerController"), "game.player scripts"), "Script namespace search");
-    check(!Matches(Native("BoxColliderComponent"), "box audio"), "All search terms required");
+    check(!Matches(Native("PhysicsBodyComponent"), "body audio"), "All search terms required");
     check(Matches(Native("LightComponent"), " \t "), "Whitespace search");
     check(!Matches(Native("LightComponent"), "no_such_component"), "Empty result");
     std::vector<Entry> entries{Script("B.Player"), Native("CameraComponent"), Script("A.Player")};

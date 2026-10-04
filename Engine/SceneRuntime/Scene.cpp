@@ -1,4 +1,4 @@
-﻿#include "PhysicsTransformPolicy.h"
+#include "PhysicsTransformPolicy.h"
 #include "Scene.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
@@ -5308,7 +5308,10 @@ math::matrix4x4 Scene::PhysicsRenderMatrix(EntityHandle owner) const
 
         const auto& transform = ancestor->Transform_();
         const auto interpolated = math::compose(transform.GetWorldScale(), rendered->rotation, rendered->position);
-        return world * math::inverse(transform.GetWorldMatrix()) * interpolated;
+        if (ancestor == entity)
+            return interpolated;
+
+        return PhysicsRenderDescendantMatrix(world, transform.GetWorldMatrix(), interpolated);
     }
     return world;
 }

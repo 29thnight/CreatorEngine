@@ -12,8 +12,8 @@ Copy-Item -LiteralPath (Join-Path $repo 'Dynamic_CPP/Assets/Shaders') -Destinati
 Copy-Item -LiteralPath (Join-Path $repo 'Dynamic_CPP/ProjectSetting') -Destination (Join-Path $project 'ProjectSetting') -Recurse
 if($Transition){$Geometry=$true}
 if($Geometry){$Mesh=$true}
-if($Mesh -and $Hierarchy){throw 'Mesh and Hierarchy fixtures are independent'}
-$startup=if($Transition){'PhysicsCharacterPlayer.creator'}elseif($Geometry){'PhysicsCharacterGeometry.creator'}elseif($Mesh){'PhysicsCharacterMesh.creator'}elseif($Hierarchy){'PhysicsCharacterHierarchy.creator'}else{'PhysicsCharacterPlayer.creator'}
+if($Mesh -and $Hierarchy -and !$Transition){throw 'Mesh and Hierarchy fixtures are independent'}
+$startup=if($Hierarchy){'PhysicsCharacterHierarchy.creator'}elseif($Transition){'PhysicsCharacterPlayer.creator'}elseif($Geometry){'PhysicsCharacterGeometry.creator'}elseif($Mesh){'PhysicsCharacterMesh.creator'}else{'PhysicsCharacterPlayer.creator'}
 foreach($file in @('PhysicsCharacterHierarchy.creator','PhysicsCharacterHierarchy.creator.meta','PhysicsCharacterPlayer.creator','PhysicsCharacterPlayer.creator.meta','PhysicsCharacterDestination.creator','PhysicsCharacterDestination.creator.meta')){
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "fixtures/$file") -Destination (Join-Path $assets 'Scenes')
 }

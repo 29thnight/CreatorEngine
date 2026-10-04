@@ -1,7 +1,7 @@
 #include <mathematics/mathematics.hpp>
 
 #include "FrameCameraSnapshot.h"
-#include "PhysicsMathAdapter.h"
+#include "PhysicsGeometry.h"
 #include "TransformStore.h"
 #include "TweenManager.h"
 
@@ -785,31 +785,6 @@ int main()
     Check(math::pack_rgba8(math::color::red()) == 0xff0000ffu,
           "color RGBA8 packing is explicit", failures);
 
-    const math::vector3 physics_vector{-3.5f, 2.25f, 17.0f};
-    const physx::PxVec3 px_vector = PhysicsMath::ToPx(physics_vector);
-    const math::vector3 physics_vector_round_trip = PhysicsMath::FromPx(px_vector);
-    Check(physics_vector_round_trip == physics_vector &&
-              Near(px_vector.x, physics_vector.x) &&
-              Near(px_vector.y, physics_vector.y) &&
-              Near(px_vector.z, physics_vector.z),
-          "PhysX vector adapter preserves xyz without raw copies", failures);
-
-    const math::quaternion physics_rotation = math::normalize(
-        math::quaternion{0.2f, -0.3f, 0.4f, 0.8f});
-    const physx::PxTransform px_transform = PhysicsMath::ToPxTransform(
-        physics_vector, physics_rotation);
-    math::vector3 physics_position_round_trip{};
-    math::quaternion physics_rotation_round_trip{};
-    PhysicsMath::FromPxTransform(px_transform, physics_position_round_trip,
-                                 physics_rotation_round_trip);
-    Check(physics_position_round_trip == physics_vector &&
-              Near(physics_rotation_round_trip.x, physics_rotation.x) &&
-              Near(physics_rotation_round_trip.y, physics_rotation.y) &&
-              Near(physics_rotation_round_trip.z, physics_rotation.z) &&
-              Near(physics_rotation_round_trip.w, physics_rotation.w),
-          "PhysX transform adapter preserves position and quaternion xyzw",
-          failures);
-
     const math::vector3 actor_position{4.0f, -2.0f, 7.5f};
     const math::quaternion actor_rotation = math::normalize(
         math::quaternion_from_pitch_yaw_roll(0.3f, -0.7f, 0.2f));
@@ -821,30 +796,17 @@ int main()
     const math::quaternion collider_rotation =
         collider_rotation_offset * actor_rotation;
 
-    const physx::PxTransform px_collider = PhysicsMath::ToPxTransform(
-        collider_position, collider_rotation);
-    math::vector3 collider_position_round_trip{};
-    math::quaternion collider_rotation_round_trip{};
-    PhysicsMath::FromPxTransform(px_collider, collider_position_round_trip,
-                                 collider_rotation_round_trip);
+    const ce::physics::pose collider_pose{collider_position, collider_rotation};
 
     const math::quaternion recovered_actor_rotation =
         math::inverse(collider_rotation_offset) *
-        collider_rotation_round_trip;
+        collider_pose.rotation;
     const math::vector3 recovered_actor_position =
-        collider_position_round_trip -
+        collider_pose.position -
         math::rotate(collider_offset, recovered_actor_rotation);
     Check(math::near_equal(recovered_actor_position, actor_position, epsilon) &&
               math::same_rotation(recovered_actor_rotation, actor_rotation, epsilon),
-          "rigid actor offset pose survives Mathematics-PhysX round trip",
-          failures);
-
-    const math::vector3 cct_position{128.25f, -3.5f, 2048.75f};
-    const physx::PxExtendedVec3 px_cct_position =
-        PhysicsMath::ToPxExtended(cct_position);
-    Check(math::near_equal(PhysicsMath::FromPx(px_cct_position), cct_position,
-                           epsilon),
-          "CCT extended position adapter preserves float coordinates",
+          "engine physics offset pose preserves actor reconstruction",
           failures);
 
     const math::quaternion cct_world_rotation =
@@ -879,34 +841,12 @@ int main()
     math::vector3 ignored_position{};
     const bool ragdoll_decomposed = math::decompose(
         ragdoll_world, preserved_scale, ignored_rotation, ignored_position);
-    const physx::PxTransform px_ragdoll_pose =
-        PhysicsMath::ToPxTransform(ragdoll_position, ragdoll_rotation);
-    math::vector3 ragdoll_position_round_trip{};
-    math::quaternion ragdoll_rotation_round_trip{};
-    PhysicsMath::FromPxTransform(
-        px_ragdoll_pose, ragdoll_position_round_trip,
-        ragdoll_rotation_round_trip);
     const math::matrix4x4 ragdoll_world_round_trip = math::compose(
-        preserved_scale, ragdoll_rotation_round_trip,
-        ragdoll_position_round_trip);
+        preserved_scale, ignored_rotation,
+        ignored_position);
     Check(ragdoll_decomposed &&
               math::near_equal(ragdoll_world_round_trip, ragdoll_world, epsilon),
-          "ragdoll root pose preserves authored scale across PhysX round trip",
-          failures);
-
-    physx::PxTransform moved_ragdoll_pose = px_ragdoll_pose;
-    moved_ragdoll_pose.p.x += 0.01f;
-    physx::PxTransform sign_equivalent_pose = px_ragdoll_pose;
-    sign_equivalent_pose.q = physx::PxQuat{
-        -sign_equivalent_pose.q.x, -sign_equivalent_pose.q.y,
-        -sign_equivalent_pose.q.z, -sign_equivalent_pose.q.w};
-    Check(!PhysicsMath::IsTransformDifferent(
-              px_ragdoll_pose, px_ragdoll_pose) &&
-              PhysicsMath::IsTransformDifferent(
-                  px_ragdoll_pose, moved_ragdoll_pose) &&
-              !PhysicsMath::IsTransformDifferent(
-                  px_ragdoll_pose, sign_equivalent_pose),
-          "PhysX transform dirty check handles motion and quaternion sign",
+          "physics pose decomposition preserves authored scale",
           failures);
 
     const math::matrix4x4 parent_joint_global = math::compose(

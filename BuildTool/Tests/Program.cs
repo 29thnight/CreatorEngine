@@ -25,6 +25,31 @@ async Task RejectAsync(Func<Task> action, string message)
 using var context = new BuildContext(new Options(["help"]), CancellationToken.None);
 try
 {
+    var textureCook = Path.Combine(root, "texture-cook");
+    var textureDerived = Path.Combine(textureCook, "Derived");
+    var modelTextures = Path.Combine(textureDerived, "Models/11/11111111-1111-4111-8111-111111111111/1/textures");
+    Directory.CreateDirectory(modelTextures);
+    File.WriteAllText(Path.Combine(textureDerived, "asset-manifest.cemf"), "fixture");
+
+    foreach (var extension in new[] { "png", "jpg" })
+    {
+        var texture = Path.Combine(modelTextures, "22222222-2222-8222-8222-222222222222." + extension);
+        File.WriteAllText(texture, "payload");
+        Check(AssetCooking.Validate(textureCook, 1).ArtifactCount == 1, "Model texture extension rejected: " + extension);
+        File.Delete(texture);
+    }
+
+    foreach (var relative in new[] { "Models/11/11111111-1111-4111-8111-111111111111/1/textures/name.jpg",
+        "Models/ff/11111111-1111-4111-8111-111111111111/1/textures/22222222-2222-8222-8222-222222222222.jpg",
+        "Models/11/11111111-1111-4111-8111-111111111111/1/textures/22222222-2222-8222-8222-222222222222.exe" })
+    {
+        var texture = Paths.Child(textureDerived, relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(texture)!);
+        File.WriteAllText(texture, "payload");
+        Reject(() => AssetCooking.Validate(textureCook, 1), "Invalid model texture path accepted: " + relative);
+        File.Delete(texture);
+    }
+
     Reject(() => new Options(["compile-game", "--project", "x", "--project", "y"]), "Duplicate CLI option accepted");
     Reject(() => new Options(["package-game", "--skpi-verify"]), "Unknown CLI option accepted");
     foreach (var value in new[] { @"\\?\C:\test", @"\\server\share", @"C:\test\a:stream", @"C:\test\CON.txt", @"C:\test\trailing.", @"C:\test\trailing " })

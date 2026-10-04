@@ -20,6 +20,8 @@ public sealed partial class PhysicsB2PlayerProbe : Component
     {
         if (_finished)
         {
+            RunDynamicQueries(delta);
+
             RunQueryBenchmark();
             return;
         }

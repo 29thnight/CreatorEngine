@@ -1,6 +1,8 @@
 #include "EnhancedLivePipelineDesc.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
+#include <cstdio>
+#include <cstdlib>
 #include <initializer_list>
 #include <unordered_set>
 
@@ -114,6 +116,21 @@ bool LivePipelineDesc::InitializeAll(const EnhancedFrameContext& context,
         const uint32_t rounds = node.perView ? viewCount : 1u;
         for (uint32_t view = 0; view < rounds; ++view)
         {
+            static const bool trace = [] {
+                char* value = nullptr;
+                std::size_t size = 0;
+                if (_dupenv_s(&value, &size, "CE_RENDER_PROGRESS_TRACE") != 0) return false;
+                const bool enabled = value && std::string_view(value) == "1";
+                std::free(value);
+                return enabled;
+            }();
+            if (trace)
+            {
+                std::printf("[render.pass.progress] phase=initialize.begin node=%s view=%u\n", node.name.c_str(), view);
+                std::fflush(stdout);
+            }
+
+
             if (node.initialize)
             {
                 if (!node.initialize(context, outError, view))

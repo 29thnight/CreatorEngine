@@ -1,0 +1,125 @@
+m_name: PhysicsShapeGate-6ee4c29729b143c280ff7acaed90a0ea
+m_instanceID: 3387528987
+m_isEnabled: true
+m_fileGuid: 6508cfa8-0056-4a29-a506-7fdfe8ab1973
+PrefabNode:
+  - Entity: 8465162159729457626
+    m_name: ShapeGateBody
+    m_instanceID: 3588733925
+    m_isEnabled: true
+    m_attachedSoketID: 0
+    m_index: 1
+    m_prefabFileGuid: 6508cfa8-0056-4a29-a506-7fdfe8ab1973
+    m_prefabOverrides: ~
+    m_tag: Untagged
+    m_layerId: 1
+    m_editorIcon: ""
+    m_editorLocked: false
+    m_components:
+      - Transform: 13979161094353040123
+        m_typeUUID: 5f3a1c9e-7d24-4b6a-9e0d-2c8f451a6b7d
+        m_name: Transform
+        m_instanceID: 1156884641
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        position:
+          x: 0
+          y: 5
+          z: 0
+          w: 0
+        rotation:
+          x: 0
+          y: 0
+          z: 0
+          w: 1
+        scale:
+          x: 1
+          y: 1
+          z: 1
+          w: 0
+        m_parentID: 0
+      - PhysicsBodyComponent: 6005066272611484821
+        m_typeUUID: 1bbfb80a-8bd9-440a-8557-537a0ff60cd8
+        m_name: PhysicsBodyComponent
+        m_instanceID: 3164645191
+        m_isEnabled: true
+        m_FileID: 00000000-0000-0000-0000-000000000000
+        m_motion: 2
+        m_shapeSchema: 1
+        m_shapes:
+          - shapeId: 12
+            kind: 0
+            halfExtent:
+              x: 0.5
+              y: 0.5
+              z: 0.5
+            radius: 0.5
+            halfHeight: 0.5
+            geometryAsset: ""
+            geometryRevision: 0
+            geometryScale:
+              x: 1
+              y: 1
+              z: 1
+            localPosition:
+              x: 0
+              y: 0
+              z: 0
+            localRotation:
+              x: 0
+              y: 0
+              z: 0
+              w: 1
+            staticFriction: 0.5
+            dynamicFriction: 0.5
+            restitution: 0
+            sensor: false
+            queryEnabled: true
+            layerOverride: 0
+          - shapeId: 33
+            kind: 1
+            halfExtent:
+              x: 0.5
+              y: 0.5
+              z: 0.5
+            radius: 1
+            halfHeight: 0.5
+            geometryAsset: ""
+            geometryRevision: 0
+            geometryScale:
+              x: 1
+              y: 1
+              z: 1
+            localPosition:
+              x: 3
+              y: 0
+              z: 0
+            localRotation:
+              x: 0
+              y: 0
+              z: 0
+              w: 1
+            staticFriction: 0.5
+            dynamicFriction: 0.5
+            restitution: 0
+            sensor: true
+            queryEnabled: true
+            layerOverride: 1
+        m_mass: 1
+        m_gravityEnabled: true
+        m_translationLocks: 0
+        m_rotationLocks: 0
+        m_linearDamping: 0
+        m_angularDamping: 0.05
+        m_initialLinearVelocity:
+          x: 0
+          y: 0
+          z: 0
+        m_initialAngularVelocity:
+          x: 0
+          y: 0
+          z: 0
+    m_isStatic: false
+    m_parentIndex: 0
+    m_rootIndex: 0
+    m_childrenIndices: []

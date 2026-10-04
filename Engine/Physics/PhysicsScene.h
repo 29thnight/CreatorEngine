@@ -1,12 +1,32 @@
-﻿#pragma once
+#pragma once
 #include "PhysicsTypes.h"
 #include "PhysicsGeometry.h"
 #include "PhysicsStep.h"
 #include <memory>
+#include <array>
 #include <mathematics/vector3.hpp>
 
 namespace ce::physics
 {
+// External ownership ledger, not a count of internal SDK allocations.
+// Enabled once at first physics use by CE_PHYSICS_RESOURCE_PROBE=1.
+enum class resource_kind : std::uint8_t
+{
+    sdk_owner, scene, body, character, geometry, dispatcher, worker, task, count
+};
+
+struct resource_statistics
+{
+    bool enabled = false;
+    std::array<std::uint64_t, static_cast<std::size_t>(resource_kind::count)> created{};
+    std::array<std::uint64_t, static_cast<std::size_t>(resource_kind::count)> released{};
+
+    bool balanced() const noexcept { return created == released; }
+};
+
+// Read only after all relevant producers have joined for a final verdict.
+resource_statistics read_resource_statistics() noexcept;
+
 enum class execution_preference : std::uint8_t
 {
     cpu,

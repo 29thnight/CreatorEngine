@@ -1,11 +1,12 @@
 #include "../../Engine/Physics/PhysicsScene.h"
+#include "physics_handle_lifetime_probe.h"
 #include <array>
 #include <cmath>
 #include <iostream>
 
 using namespace ce::physics;
 
-int main()
+int run_probe()
 {
     int checks = 0;
     const auto check = [&](bool value) {
@@ -53,7 +54,36 @@ int main()
                !scene->read_body(*dynamic)))
         return 7;
     scene.reset();
+
+    if (!verify_physics_handle_lifetime([&](bool valid, std::source_location) { return check(valid); }))
+        return 8;
+
     // No diagnostics sources or library are linked in this executable.
     std::cout << "{\"result\":\"PHYSICS_P2_OK\",\"checks\":" << checks
               << ",\"gpu_verified\":" << (gpu ? "true" : "false") << "}\n";
+    return 0;
+}
+
+
+int main(int argc, char** argv)
+{
+    const auto result = run_probe();
+    const auto resources = ce::physics::read_resource_statistics();
+
+    if (!resources.enabled || !resources.balanced() || resources.created[0] == 0)
+    {
+        std::cerr << "Physics resource ownership ledger failed\n";
+        return 90;
+    }
+
+    std::cerr << "[physics.resources] created=";
+    for (const auto count : resources.created)
+        std::cerr << count << ',';
+
+    std::cerr << " released=";
+    for (const auto count : resources.released)
+        std::cerr << count << ',';
+
+    std::cerr << " balanced=true\n";
+    return result;
 }

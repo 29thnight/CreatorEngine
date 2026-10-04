@@ -27,8 +27,10 @@ foreach($config in $configs){
 
     $fixture=$out
     foreach($dll in @('ryml.dll','c4core.dll')){if(Test-Path (Join-Path $lib ('bin/'+$dll))){Copy-Item (Join-Path $lib ('bin/'+$dll)) $out -Force}}
-    $inputRoot=Join-Path $repo 'Dynamic_CPP/ProjectSetting'
-    $process=Start-Process $exe -ArgumentList ('"'+$inputRoot+'" "'+$fixture+'"') -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
+    # Frozen pre-cutover settings remain separate from the current tags-only project.
+    $inputRoot=Join-Path $PSScriptRoot 'fixtures/LegacyProjectLayers'
+    $assetsRoot=Join-Path $repo 'Dynamic_CPP/Assets'
+    $process=Start-Process $exe -ArgumentList ('"'+$inputRoot+'" "'+$fixture+'" "'+$assetsRoot+'"') -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
     $handle=$process.Handle
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw 'Layer catalog timeout'}
     $process.WaitForExit()

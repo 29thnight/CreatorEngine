@@ -64,7 +64,7 @@ internal static class AssetCooking
             bytes += new FileInfo(file).Length;
             var relative = Paths.Relative(derived, file); var folder = relative.Split('/')[0];
             if (!rules.TryGetValue(folder, out var extensions)) throw new BuildException($"Unexpected Derived folder: {relative}");
-            var pattern = folder == "Models" ? "^Models/([0-9a-f]{2})/" + guid + "/[0-9]+/(generation\\.asset|model\\.cemc|sidecar\\.meta|textures/" + guid + "\\.png)$"
+            var pattern = folder == "Models" ? "^Models/([0-9a-f]{2})/" + guid + "/[0-9]+/(generation\\.asset|model\\.cemc|sidecar\\.meta|textures/" + guid + "\\.(png|jpg))$"
                 : "^" + folder + "/([0-9a-f]{2})/" + guid + "\\.(" + extensions + ")$";
             var match = Regex.Match(relative, pattern);
             if (!match.Success || match.Groups[1].Value != match.Groups[2].Value[..2]) throw new BuildException($"Cook artifact violates GUID path contract: {relative}");

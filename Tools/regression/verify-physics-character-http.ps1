@@ -1,5 +1,6 @@
-param([string]$EditorExe='', [switch]$ScriptProbe, [switch]$StepProbe, [switch]$MotionProbe, [switch]$DdolProbe, [switch]$HierarchyProbe)
+param([string]$EditorExe='', [switch]$ScriptProbe, [switch]$StepProbe, [switch]$MotionProbe, [switch]$DdolProbe, [switch]$HierarchyProbe, [switch]$TransitionFailureProbe)
 $ErrorActionPreference='Stop'
+if($TransitionFailureProbe){$HierarchyProbe=$true;$ScriptProbe=$true}
 if($HierarchyProbe){$DdolProbe=$true}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(!$EditorExe){$EditorExe=Join-Path $repo 'Bin/x64-Debug/Editor/CreatorEditor.exe'}
@@ -67,6 +68,19 @@ try {
         $null=Command 'object.create' @('DestinationMarker')
         $null=Command 'scene.save' @($destination)
     }
+    if($TransitionFailureProbe){
+        $failureDestination=Join-Path $repo "Dynamic_CPP/Assets/Scenes/PhysicsRejectedDestination-$id.creator"
+        $null=Command 'scene.new' @("PhysicsRejectedDestination-$id")
+        $null=Command 'object.create' @('RejectedParent')
+        $null=Command 'object.create' @('RejectedBody')
+        $null=Command 'component.add' @('RejectedBody','PhysicsBodyComponent')
+        $null=Command 'object.property' @('RejectedBody','PhysicsBodyComponent','m_motion','0')
+        $null=Command 'object.parent' @('RejectedBody','RejectedParent')
+        $null=Command 'object.transform' @('RejectedBody','0','0','0','0','45','0')
+        $null=Command 'object.transform' @('RejectedParent','0','0','0','0','0','0','2','1','1')
+        $null=Command 'scene.save' @($failureDestination)
+    }
+
     $null=Command 'scene.new' @("PhysicsCharacterGate-$id")
     $null=Command 'object.create' @('CharacterGateFloor')
     $null=Command 'component.add' @('CharacterGateFloor','PhysicsBodyComponent')
@@ -313,9 +327,94 @@ try {
         $retired=(Command 'script.invoke' @('CharacterMovementProbe','Retired')).data.returnValue
         if($retired -ne 'retired'){throw 'Captured CLR wrapper silently retargeted after Stop'}
     }
+    if($TransitionFailureProbe){
+        $names=@('CharacterGateActor','PersistentParent','PersistentBranch','PersistentDisabledCharacter','PersistentDisabledBody','CharacterGateFloor')
+        $authored=@{}
+
+        foreach($name in $names){$authored[$name]=(Command 'object.describe' @($name)).data}
+
+        $sourceHash=(Get-FileHash -LiteralPath $scene).Hash
+        $destinationHash=(Get-FileHash -LiteralPath $failureDestination).Hash
+        $failuresBefore=(Command 'play.state').data.failureCount
+        $null=Command 'play'
+        Start-Sleep -Milliseconds 300
+        $null=Command 'character.velocity' @('CharacterGateActor','1.25','0','0')
+        $null=Command 'character.force' @('CharacterGateActor','3','0','0','10')
+        $null=Command 'scene.ddol' @('CharacterGateActor')
+        $liveOwner=(Command 'object.describe' @('CharacterGateActor')).data
+        $liveState=(Command 'character.state' @('CharacterGateActor')).data
+        if(!$liveState.simulating -or !$liveState.forced -or $liveState.tick -le 0){throw 'Failure source did not simulate before transfer'}
+
+        $lifecycleBefore=(Command 'script.invoke' @('CharacterMovementProbe','Lifecycle')).data.returnValue|ConvertFrom-Json
+        $null=Command 'scene.switch' @($failureDestination)
+        $until=(Get-Date).AddSeconds(30)
+
+        do{
+            Start-Sleep -Milliseconds 100
+            $failure=(Command 'play.state').data
+            if((Get-Date) -gt $until){throw 'Rejected destination did not recover Editor'}
+        }until(!$failure.gameStart -and !$failure.committed -and !$failure.pending -and $failure.failureCount -gt $failuresBefore)
+
+        if($failure.lastFailure -notmatch 'unsupported shear'){throw 'Wrong destination failure cause'}
+        $lifecycleAfter=(Command 'script.invoke' @('CharacterMovementProbe','Lifecycle')).data.returnValue|ConvertFrom-Json
+        if($lifecycleAfter.added -lt $lifecycleBefore.added+1 -or $lifecycleAfter.removed -lt $lifecycleBefore.removed+2){throw 'DDOL failure detach/destroy and restored scene addition evidence missing'}
+        $failureOutput=[string](Get-Content "$out/editor.out" -Raw)
+        $ownership=[regex]::Match($failureOutput,'\[physics.scene.activation.failed\] transferredPersistent=(\d+)')
+        if(!$ownership.Success -or [int]$ownership.Groups[1].Value -lt 1){throw 'No live DDOL owner in failed destination'}
+        if((Command 'script.invoke' @('CharacterMovementProbe','Retired')).data.returnValue -ne 'retired'){throw 'Failed transition retained or retargeted captured wrapper'}
+
+        $failureRestored=@{}
+
+        foreach($name in $names){
+            $before=$authored[$name]
+            $after=(Command 'object.describe' @($name)).data
+            $failureRestored[$name]=$after
+            if($before.enabled -ne $after.enabled -or $before.layerId -ne $after.layerId){throw "Failure restore activation/layer mismatch: $name"}
+
+            foreach($field in @('position','rotation','scale')){
+                if(!(SamePosition $before.$field $after.$field)){throw "Failure restore $field mismatch: $name"}
+            }
+
+            if(($before.components.id|ConvertTo-Json -Compress) -ne ($after.components.id|ConvertTo-Json -Compress)){throw "Failure restore component identity mismatch: $name"}
+        }
+
+        if($failureRestored.CharacterGateActor.parent -ne $failureRestored.PersistentParent.id -or
+            $failureRestored.PersistentBranch.parent -ne $failureRestored.PersistentParent.id -or
+            $failureRestored.PersistentDisabledCharacter.parent -ne $failureRestored.PersistentBranch.id -or
+            $failureRestored.PersistentDisabledBody.parent -ne $failureRestored.PersistentBranch.id){throw 'Failure did not restore parent relationships'}
+
+        $null=Command 'character.state' @($liveOwner.id) -Reject
+        $null=Command 'object.describe' @('RejectedBody') -Reject
+        $null=Command 'scene.hierarchycheck'
+        $idle=(Command 'character.state' @('CharacterGateActor')).data
+        if($idle.simulating -or $idle.tick -ne 0 -or $idle.forced -or $idle.fallVelocity -ne 0 -or $idle.desiredVelocity[0] -ne 0){throw 'Failure restore retained runtime character state'}
+        $null=Command 'play'
+        Start-Sleep -Milliseconds 300
+        $recovered=(Command 'character.state' @('CharacterGateActor')).data
+        if(!$recovered.simulating -or $recovered.tick -le 0){throw 'Failure recovery could not replay authored source'}
+        $null=Command 'stop'
+
+        $until=(Get-Date).AddSeconds(30)
+        do{
+            Start-Sleep -Milliseconds 100
+            $stopped=(Command 'play.state').data
+            if((Get-Date) -gt $until){throw 'Recovery replay Stop did not complete'}
+        }until(!$stopped.gameStart -and !$stopped.committed -and !$stopped.pending)
+
+        foreach($name in $names){
+            $after=(Command 'object.describe' @($name)).data
+            foreach($field in @('position','rotation','scale')){
+                if(!(SamePosition $authored[$name].$field $after.$field)){throw "Recovery replay Stop mismatch: $name"}
+            }
+        }
+
+        if((Get-FileHash -LiteralPath $scene).Hash -ne $sourceHash -or (Get-FileHash -LiteralPath $failureDestination).Hash -ne $destinationHash){throw 'Runtime transition changed authored files'}
+        $transitionFailureEvidence=@{destination=$failureDestination;sourceState=$liveState;failure=$failure;transferredPersistent=[int]$ownership.Groups[1].Value;lifecycleBefore=$lifecycleBefore;lifecycleAfter=$lifecycleAfter;restored=$failureRestored;replay=$recovered;authoredFilesImmutable=$true}
+    }
+
     $null=Command 'component.remove' @('CharacterGateActor','CharacterMovementComponent')
     $null=Command 'character.state' @('CharacterGateActor') -Reject
-    @{result='PHYSICS_CHARACTER_HTTP_OK';scene=$scene;commands=$script:sequence;scriptProbe=[bool]$ScriptProbe;probe=$probe;stepProbe=[bool]$StepProbe;stepEvidence=$stepEvidence;motionProbe=[bool]$MotionProbe;motionEvidence=$motionEvidence;ddolProbe=[bool]$DdolProbe;ddolEvidence=$ddolEvidence;hierarchyProbe=[bool]$HierarchyProbe;hierarchyEvidence=$hierarchyEvidence;initial=$initial;moved=$moved;restored=$restored}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
+    @{result='PHYSICS_CHARACTER_HTTP_OK';transitionFailureProbe=[bool]$TransitionFailureProbe;transitionFailureEvidence=$transitionFailureEvidence;scene=$scene;commands=$script:sequence;scriptProbe=[bool]$ScriptProbe;probe=$probe;stepProbe=[bool]$StepProbe;stepEvidence=$stepEvidence;motionProbe=[bool]$MotionProbe;motionEvidence=$motionEvidence;ddolProbe=[bool]$DdolProbe;ddolEvidence=$ddolEvidence;hierarchyProbe=[bool]$HierarchyProbe;hierarchyEvidence=$hierarchyEvidence;initial=$initial;moved=$moved;restored=$restored}|ConvertTo-Json -Depth 30|Set-Content "$out/result.json" -Encoding utf8
     Write-Output "PHYSICS_CHARACTER_HTTP_OK evidence=$out"
 } finally {
     if(!$process.HasExited){$process.Kill();$process.WaitForExit()}

@@ -1,3 +1,5 @@
+#include <cstdio>
+#include <cstdlib>
 #include "EnhancedForwardPass.h"
 #include "../../../MaterialGraphSceneHost.h"
 #include "../../Graph/EnhancedMaterialSealHash.h" // W8
@@ -495,6 +497,23 @@ bool EnhancedForwardPass::Initialize(const EnhancedFrameContext& context, std::s
 
 bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)
 {
+    const auto traceForward = [](const char* phase, uint32_t mask = 0, bool reference = false) {
+        static const bool trace = [] {
+            char* value = nullptr;
+            std::size_t size = 0;
+            if (_dupenv_s(&value, &size, "CE_RENDER_PROGRESS_TRACE") != 0) return false;
+            const bool enabled = value && std::string_view(value) == "1";
+            std::free(value);
+            return enabled;
+        }();
+        if (trace)
+        {
+            std::printf("[render.forward.progress] phase=%s mask=%u reference=%s\n", phase, mask, reference ? "true" : "false");
+            std::fflush(stdout);
+        }
+    };
+    traceForward("root.begin");
+
     // 컬링 루트 시그니처: b0 상수 · t0 깊이(테이블) · t1 광원(루트 SRV)
     // · u0/u1 타일 버퍼(테이블).
     const RHIPipelineLayoutParam params[] = {
@@ -517,6 +536,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         || !forwardPermutation.Set("MAX_LIGHTS_PER_TILE", maxLights, outError))
         return false;
 
+    traceForward("cull.compile.begin");
     LX::Runtime::CompiledCompute blob;
     if (!CompileFwdShader(kCullShaderFile, forwardPermutation, blob, outError)) return false;
 
@@ -525,9 +545,11 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     desc.csSize = blob.stage.bytecode.Size();
     desc.layout = root;
 
+    traceForward("cull.pso.begin");
     LX::Runtime::ComputePipeline cullCandidate;
     if (!cullCandidate.Create(*context.psoManager, desc, std::move(blob.description), outError)) return false;
 
+    traceForward("texture.reflect.begin");
     if (!MaterialTextureTable::Reflect(kShadeShaderFile, "PSMain", forwardPermutation,
             m_legacyTextureSchema, outError)) return false;
 
@@ -597,9 +619,13 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         if (variant.reference && !permutation.Enable("REFERENCE_PATH", outError)) return false;
         RHIShaderBlob vs, ps;
         RHIGraphicsPipelineDesc desc{};
+        traceForward("shade.compile.begin", variant.modelVertexMask, variant.reference);
         if (!BuildShadePipelineDesc(context, kShadeShaderFile, "VSMain", "PSMain",
-                nullptr, permutation, variant.modelVertexMask, desc, vs, ps, outError)
-            || !variant.target->Create(*context.psoManager, desc, outError)) return false;
+                nullptr, permutation, variant.modelVertexMask, desc, vs, ps, outError)) return false;
+
+        traceForward("shade.pso.begin", variant.modelVertexMask, variant.reference);
+        if (!variant.target->Create(*context.psoManager, desc, outError)) return false;
+        traceForward("shade.end", variant.modelVertexMask, variant.reference);
     }
 
     m_cullPSO = std::move(cullCandidate);

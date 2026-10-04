@@ -5,6 +5,15 @@ public sealed partial class CharacterMovementProbe : Component
     private bool _checked;
     private static CharacterMovementComponent? _captured;
     private static int _completed, _passed, _failed;
+    private static int _sceneAdditions, _sceneRemovals;
+
+    [EngineCallable]
+    public static string Lifecycle() => FormattableString.Invariant(
+        $"{{\"added\":{_sceneAdditions},\"removed\":{_sceneRemovals}}}");
+
+    public override void OnAddedToScene() => ++_sceneAdditions;
+
+    public override void OnRemovingFromScene() => ++_sceneRemovals;
 
     [EngineCallable]
     public static string Results() => FormattableString.Invariant(

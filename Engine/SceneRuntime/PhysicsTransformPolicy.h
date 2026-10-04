@@ -39,3 +39,22 @@ inline ce::physics::result<PhysicsTransformState> CapturePhysicsTransform(const 
 
     return value;
 }
+
+// Scene transforms are affine. General inversion may round its homogeneous
+// component away from one; preserve the affine contract before transporting a
+// descendant through the interpolated rigid-body frame.
+inline math::matrix4x4 PhysicsRenderDescendantMatrix(const math::matrix4x4& world,
+                                                    const math::matrix4x4& bodyWorld,
+                                                    const math::matrix4x4& interpolated)
+{
+    auto inverse = math::try_inverse(bodyWorld);
+    if (!inverse)
+        return world;
+
+    inverse->m[0][3] = 0.f;
+    inverse->m[1][3] = 0.f;
+    inverse->m[2][3] = 0.f;
+    inverse->m[3][3] = 1.f;
+
+    return world * *inverse * interpolated;
+}

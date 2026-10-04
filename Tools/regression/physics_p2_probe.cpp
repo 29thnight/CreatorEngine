@@ -1,4 +1,5 @@
 #include "../../Engine/Physics/PhysicsScene.h"
+#include "physics_handle_lifetime_probe.h"
 #include "../../Engine/Physics/PhysicsTestHooks.h"
 #include "../../Engine/EngineDiagnostics/ProfileService.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
@@ -28,9 +29,10 @@ void check(bool condition, std::source_location where = std::source_location::cu
 }
 
 template<class T>
-void rejected(const result<T>& value, error_code code)
+void rejected(const result<T>& value, error_code code,
+              std::source_location where = std::source_location::current())
 {
-    check(!value && value.error().code == code);
+    check(!value && value.error().code == code, where);
 }
 
 body_handle body(PhysicsScene& scene, body_kind kind, geometry form, math::vector3 position,
@@ -65,7 +67,7 @@ const std::array<math::vector3, 8> cube = {{{-.5f, -.5f, -.5f},
                                             {.5f, .5f, .5f}}};
 } // namespace
 
-int main(int argc, char** argv)
+int run_probe(int argc, char** argv)
 {
     auto& profiler = ce::profiler();
     profiler.initialize();
@@ -278,12 +280,22 @@ int main(int argc, char** argv)
         auto scene = PhysicsScene::create(scene_config{{0, 0, 0}, 1});
         check(bool(scene));
         body(**scene, body_kind::static_body, cooked_geometry{retained}, {});
+        auto character = (*scene)->create_character(character_desc{});
+        check(bool(character));
+        check(bool((*scene)->destroy_character(*character)));
+        check(bool((*scene)->create_character(character_desc{}))); // Scene teardown owns the remaining controller.
+
         retained.reset();
         const std::array<math::vector3, 4> degenerate = {{{0, 0, 0}, {1, 0, 0}, {2, 0, 0}, {3, 0, 0}}};
-        rejected((*scene)->cook_convex(degenerate), error_code::cooking_failed);
+        rejected((*scene)->cook_convex(degenerate), error_code::invalid_argument);
         auto recovered = (*scene)->cook_convex(cube);
         check(bool(recovered));
     }
+
+    check(verify_physics_handle_lifetime([](bool valid, std::source_location where) {
+        check(valid, where);
+        return valid;
+    }));
 
     profiler.publish_frame(4);
     profiler.pause();
@@ -307,4 +319,29 @@ int main(int argc, char** argv)
     profiler.shutdown();
     std::cout << "{\"result\":\"PHYSICS_P2_OK\",\"checks\":" << checks
               << ",\"gpu_verified\":" << (gpu_verified ? "true" : "false") << "}\n";
+    return 0;
+}
+
+
+int main(int argc, char** argv)
+{
+    const auto result = run_probe(argc, argv);
+    const auto resources = ce::physics::read_resource_statistics();
+
+    if (!resources.enabled || !resources.balanced() || std::ranges::any_of(resources.created, [](auto count) { return count == 0; }))
+    {
+        std::cerr << "Physics resource ownership ledger failed\n";
+        return 90;
+    }
+
+    std::cerr << "[physics.resources] created=";
+    for (const auto count : resources.created)
+        std::cerr << count << ',';
+
+    std::cerr << " released=";
+    for (const auto count : resources.released)
+        std::cerr << count << ',';
+
+    std::cerr << " balanced=true\n";
+    return result;
 }

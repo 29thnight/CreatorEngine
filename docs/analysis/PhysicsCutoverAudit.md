@@ -38,3 +38,10 @@ Articulation/Link 등 구 ragdoll 데이터 참조도 새 지원 범위와 스�
 P1~P3 API를 먼저 작성하고 B/C/T/M 소비자 교체 후 Complete gate를 닫는다.
 R0 표의 '새 계약으로 전량 교체'는 후속 단계가 필요한 최종 cutover 조건이다.
 P1 새 PhysicsScene CPU 기반과 단독 모듈 Debug/Release 빌드를 검증했다. 제품 소비자 이전은 아직 남아 있다.
+
+## 2026-10-03 현재 판정
+
+Fresh Complete gate 통과: 구 파일55개 제거, 남은 파일/프로젝트 참조/소비자0.
+앞의 소비자12개 및 제품 미빌드 기록은 철거 당시 이력이다.
+새 API 제품 빌드·실행은 PhysicsRedesignPlan의 M2 수용 근거와 연결한다.
+R0는 완료로 갱신하며 AST/최종 링크/재유입 감사는 M4에서 수행한다.

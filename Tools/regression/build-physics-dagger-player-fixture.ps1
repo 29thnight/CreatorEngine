@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][string]$EngineDistribution, [Parameter(Mandatory)][string]$SourceGlb,
-    [ValidateSet('Debug','Release')][string]$Configuration='Debug', [Parameter(Mandatory)][string]$Work, [switch]$Shipping)
+    [ValidateSet('Debug','Release')][string]$Configuration='Debug', [Parameter(Mandatory)][string]$Work, [switch]$Shipping, [string]$MigratedScene='')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $Work=[IO.Path]::GetFullPath($Work)
@@ -15,6 +15,12 @@ New-Item -ItemType Directory -Force "$assets/Scenes","$assets/Script","$assets/M
 Copy-Item "$repo/Dynamic_CPP/Assets/Shaders" "$assets/Shaders" -Recurse
 Copy-Item "$repo/Dynamic_CPP/ProjectSetting" "$project/ProjectSetting" -Recurse
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDaggerPlayer.creator","$PSScriptRoot/fixtures/PhysicsDaggerPlayer.creator.meta" "$assets/Scenes"
+$migratedSceneHash=$null
+if($MigratedScene){
+    $migratedSceneHash=(Get-FileHash -LiteralPath $MigratedScene).Hash
+    Copy-Item -LiteralPath $MigratedScene -Destination "$assets/Scenes/PhysicsDaggerPlayer.creator" -Force
+    if((Get-FileHash "$assets/Scenes/PhysicsDaggerPlayer.creator").Hash -ne $migratedSceneHash){throw 'Migrated Scene changed during copy'}
+}
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDaggerConvex.cegeometry","$PSScriptRoot/fixtures/PhysicsDaggerConvex.cegeometry.meta" $assets
 Copy-Item -LiteralPath $SourceGlb -Destination "$assets/Models/PhysicsDagger.glb"
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDagger.glb.meta" "$assets/Models"
@@ -29,5 +35,5 @@ if($LASTEXITCODE){throw 'Dagger package verification failed'}
 $pointer=Get-Content "$Work/Staging/Project.current.json" -Raw|ConvertFrom-Json
 if($pointer.verification -ne 'passed'){throw 'Package smoke missing'}
 $stage=Join-Path "$Work/Staging" $pointer.releaseDirectory
-@{stage=$stage;configuration=$Configuration;shipping=[bool]$Shipping;sourceSha256=$expected;distribution=$EngineDistribution}|ConvertTo-Json|Set-Content "$Work/fixture.json" -Encoding utf8
+@{stage=$stage;configuration=$Configuration;shipping=[bool]$Shipping;sourceSha256=$expected;distribution=$EngineDistribution;migratedSceneHash=$migratedSceneHash}|ConvertTo-Json|Set-Content "$Work/fixture.json" -Encoding utf8
 "PHYSICS_DAGGER_PLAYER_STAGE $stage"

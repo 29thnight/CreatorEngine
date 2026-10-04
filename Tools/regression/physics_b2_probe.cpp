@@ -97,6 +97,23 @@ int main(int argc, char** argv) {
     const auto shear = math::compose(math::vector3{1,1,1}, rotation, math::vector3{}) *
                        math::compose(math::vector3{2,1,1}, math::quaternion{0,0,0,1}, math::vector3{});
     check(!CapturePhysicsTransform(shear), "parent induced shear rejected");
+    unsigned roundedHomogeneous = 0;
+    for (unsigned pose = 1; pose <= 128; ++pose)
+    {
+        const auto rotation = math::quaternion_from_axis_angle(math::vector3::unit_y(), pose * .017f);
+        const auto bodyWorld = math::compose(math::vector3{1.3f, 2.1f, .7f}, rotation, math::vector3{1, 2, 3});
+        const auto interpolated = math::compose(math::vector3{1.3f, 2.1f, .7f}, rotation, math::vector3{4, 5, 6});
+        const auto oldTransport = local * bodyWorld * math::inverse(bodyWorld) * interpolated;
+        roundedHomogeneous += oldTransport.m[3][3] != 1.f;
+        const auto rendered = PhysicsRenderDescendantMatrix(local * bodyWorld, bodyWorld, interpolated);
+        check(rendered.m[0][3] == 0.f && rendered.m[1][3] == 0.f &&
+              rendered.m[2][3] == 0.f && rendered.m[3][3] == 1.f, "descendant render matrix remains exactly affine");
+        check(PhysicsTransformsNear(rendered, local * interpolated, 1e-4f), "descendant retains local offset and scale");
+    }
+    std::cerr << "[physics.render.affine] roundedLegacy=" << roundedHomogeneous << " poses=128\n";
+    const auto singular = math::compose(math::vector3{0, 1, 1}, rotation, math::vector3{});
+    check(PhysicsTransformsNear(PhysicsRenderDescendantMatrix(local, singular, parent), local),
+          "singular parent preserves current world matrix");
     exercise(execution_preference::cpu);
     const auto gpu = exercise(execution_preference::prefer_gpu);
 #if !CE_SHIPPING

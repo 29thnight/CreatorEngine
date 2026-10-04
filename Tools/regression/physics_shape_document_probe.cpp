@@ -1,8 +1,10 @@
 #include "../../Editor/EngineEntry/PhysicsShapeDocument.h"
 #include "AuthoringWriteNode.h"
+#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <stdexcept>
-int main()
+int main(int argc, char** argv)
 {
     std::size_t checks = 0;
     const auto check = [&](bool value) {
@@ -12,6 +14,59 @@ int main()
     };
     try
     {
+        if (argc >= 2)
+        {
+            std::ifstream input(argv[1], std::ios::binary);
+            const std::string text{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+            check(bool(input) && !text.empty());
+
+            const auto migrated = Editor::ParsePhysicsShapeDocument(text);
+            check(migrated && migrated->size() == 1);
+            check(migrated && migrated->front().shapeId == 2522806044u &&
+                  migrated->front().halfExtent.x == .5f && migrated->front().dynamicFriction == .4f);
+        }
+
+        if (argc >= 3)
+        {
+            std::ifstream input(argv[2], std::ios::binary);
+            const std::string text{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+            check(bool(input) && !text.empty());
+
+            const auto capsules = Editor::ParsePhysicsShapeDocument(text);
+            check(capsules && capsules->size() == 2);
+            check(capsules && (*capsules)[0].kind == PhysicsShapeKind::capsule &&
+                  (*capsules)[0].halfHeight == 2 && (*capsules)[0].localRotation.z < -.707f);
+            check(capsules && (*capsules)[1].kind == PhysicsShapeKind::capsule &&
+                  (*capsules)[1].halfHeight == 1 && (*capsules)[1].localRotation.w == 1);
+
+            if (capsules && capsules->size() == 2)
+            {
+                const auto static_shapes = ce::physics::ValidatePhysicsShapes(
+                    std::span<const PhysicsShapeDefinition>(*capsules).first(1), {1, 1, 1}, {},
+                    ce::physics::body_kind::static_body);
+                const auto dynamic_shapes = ce::physics::ValidatePhysicsShapes(
+                    std::span<const PhysicsShapeDefinition>(*capsules).last(1), {1, 1, 1}, {},
+                    ce::physics::body_kind::dynamic);
+                check(bool(static_shapes));
+                check(bool(dynamic_shapes));
+            }
+        }
+
+        if (argc >= 4)
+        {
+            std::ifstream input(argv[3], std::ios::binary);
+            const std::string text{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
+            check(bool(input) && !text.empty());
+
+            const auto geometry = Editor::ParsePhysicsShapeDocument(text);
+            check(geometry && geometry->size() == 1);
+            check(geometry && geometry->front().kind == PhysicsShapeKind::convex &&
+                  geometry->front().geometryAsset == "d0f01397-566b-41cd-b1cc-78bfb0075459" &&
+                  geometry->front().geometryRevision == 1);
+            check(geometry && geometry->front().staticFriction == .4f &&
+                  geometry->front().geometryScale.x == 1);
+        }
+
         auto parsed = Editor::ParsePhysicsShapeDocument(
             R"([{"shapeId":11,"kind":0,"halfExtent":[1,2,3],"localPosition":[4,5,6],"sensor":true,"queryEnabled":false,"layerOverride":"18446744073709551615"},{"shapeId":22,"kind":1,"radius":2}])");
         check(parsed && parsed->size() == 2);

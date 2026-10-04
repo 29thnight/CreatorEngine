@@ -1,4 +1,4 @@
-param([ValidateSet('Debug','Release','ASan','All')][string]$Configuration='All')
+param([ValidateSet('Debug','Release','ASan','All')][string]$Configuration='All', [string]$MigrationShapes='', [string]$CapsuleMigrationShapes='', [string]$GeometryMigrationShapes='')
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $deps=Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
@@ -20,7 +20,7 @@ foreach($config in $configs){
         $toolset=Get-ChildItem 'C:/Program Files/Microsoft Visual Studio/18/Community/VC/Tools/MSVC' -Directory | Sort-Object Name -Descending | Select-Object -First 1
         Copy-Item (Join-Path $toolset.FullName 'bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.dll') $out -Force
     }
-    & $exe *> "$out/result.log"
+    if($GeometryMigrationShapes){ if(!$MigrationShapes -or !$CapsuleMigrationShapes){throw 'Primitive and capsule inputs required'}; & $exe $MigrationShapes $CapsuleMigrationShapes $GeometryMigrationShapes *> "$out/result.log" }elseif($CapsuleMigrationShapes){ if(!$MigrationShapes){throw 'Primitive migration input required'}; & $exe $MigrationShapes $CapsuleMigrationShapes *> "$out/result.log" }elseif($MigrationShapes){ & $exe $MigrationShapes *> "$out/result.log" }else{ & $exe *> "$out/result.log" }
     if($LASTEXITCODE){Get-Content "$out/result.log"; throw 'Shape document probe failed'}
     Get-Content "$out/result.log" | ForEach-Object {"$config $_"}
 }

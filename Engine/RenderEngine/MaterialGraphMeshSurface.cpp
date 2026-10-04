@@ -684,11 +684,29 @@ namespace material_graph
             return true;
         }
 
-        if (!Affine(draw.worldMatrix) || !view.sceneEpoch || !view.viewRevision || !view.geometryRevision ||
-            !Finite(view.eye) || draw.boneCount > 256 || draw.boneCount != reusable->source_->bones_.size() ||
-            (draw.boneCount && !draw.bonePalette))
+        if (!Affine(draw.worldMatrix))
         {
-            return Fail(error, "Scene mesh reuse needs a valid current view and matching pose layout.");
+            std::string values;
+            for (const float value : std::bit_cast<std::array<float, 16>>(draw.worldMatrix))
+                values += std::to_string(value) + "[" + std::to_string(std::bit_cast<std::uint32_t>(value)) + "],";
+
+            return Fail(error, "Scene mesh reuse rejected a nonfinite/nonaffine world transform: " + values);
+        }
+
+        if (!view.sceneEpoch || !view.viewRevision || !view.geometryRevision || !Finite(view.eye))
+        {
+            return Fail(error, "Scene mesh reuse needs a valid current view.");
+        }
+
+        if (draw.boneCount > 256 || (draw.boneCount && !draw.bonePalette))
+        {
+            return Fail(error, "Scene mesh reuse needs a valid bone palette.");
+        }
+
+        if (draw.boneCount != reusable->source_->bones_.size())
+        {
+            return Fail(error, "Scene mesh reuse pose layout mismatch: current=" + std::to_string(draw.boneCount) +
+                                   " cached=" + std::to_string(reusable->source_->bones_.size()) + ".");
         }
 
         auto candidate = std::shared_ptr<MeshSurfacePlan>(new MeshSurfacePlan);

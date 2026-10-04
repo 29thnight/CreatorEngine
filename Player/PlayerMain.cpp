@@ -1,4 +1,4 @@
-﻿#include "ProjectLayerSettingsIO.h"
+#include "ProjectLayerSettingsIO.h"
 #include "PlayerMain.h"
 #include "PlayerDdolProbe.h"
 
@@ -20,6 +20,7 @@
 #include "PathFinder.h"
 #include "Scene.h"
 #include "CharacterMovementComponent.h"
+#include "ScriptComponent.h"
 #include "SceneManager.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Editor와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
@@ -196,6 +197,7 @@ void Player::PlayerMain::Initialize()
 		if (!GetImGuiHost().Initialize(PlayerWindowHandle(), hostError))
 		{
 			GetImGuiHost().Shutdown();
+
 			EngineBootstrap::SetExitCode(5);   // infrastructure (§5.4 · LC8)
 			throw std::runtime_error("Player ImGui backend 초기화 실패: " + hostError);
 		}
@@ -475,6 +477,23 @@ void Player::PlayerMain::Finalize()
 	// 멤버가 사라졌으므로 명시적으로 부른다 — 렌더 스레드는 위에서 이미
 	// 멈췄다(호스트 계약).
 	GetImGuiHost().Shutdown();
+
+    const auto resources = ce::physics::read_resource_statistics();
+    if (resources.enabled || Player::g_smoke.frameLimit > 0)
+    {
+        std::printf("[physics.player.resources] {\"enabled\":%s,\"balanced\":%s,\"created\":[",
+                    resources.enabled ? "true" : "false", resources.balanced() ? "true" : "false");
+
+        for (std::size_t index = 0; index < resources.created.size(); ++index)
+            std::printf("%s%llu", index ? "," : "", static_cast<unsigned long long>(resources.created[index]));
+
+        std::printf("],\"released\":[");
+        for (std::size_t index = 0; index < resources.released.size(); ++index)
+            std::printf("%s%llu", index ? "," : "", static_cast<unsigned long long>(resources.released[index]));
+
+        std::printf("]}\n");
+        std::fflush(stdout); // The loader retains the runtime DLL until process termination.
+    }
 }
 
 void Player::PlayerMain::Update()
@@ -529,6 +548,33 @@ void Player::PlayerMain::Update()
         EngineBootstrap::SetExitCode(3);
         std::fprintf(stderr, "[player.simulation.failed] exit=3 reason=%s\n", SceneManagers->LastPlayFailure().c_str());
         std::fflush(stderr);
+        char wrapperProbe[2]{};
+        if (g_smoke.IsActive() && GetEnvironmentVariableA("CE_PHYSICS_WRAPPER_PROBE", wrapperProbe, 2) == 1 &&
+            wrapperProbe[0] == '1')
+        {
+            auto* actor = Entity::Find("CharacterGateActor");
+            auto* script = actor ? actor->GetComponent<ScriptComponent>() : nullptr;
+            int receiver = m_smokeWrapperInstance;
+            if (receiver < 0 && script)
+            {
+                // Instance creation is separate from lifecycle/simulation dispatch.
+                script->EnsureInstance();
+                receiver = script->GetInstanceId();
+            }
+
+            if (receiver >= 0)
+            {
+                ClrHost::Get().QueueScriptMessage(receiver, "VerifyFailedActivationWrappers");
+                ClrHost::Get().FlushScriptMessages();
+                std::fflush(stdout);
+            }
+            else
+            {
+                std::fprintf(stderr, "[physics.player.wrappers.failure] missing destination script\n");
+                EngineBootstrap::SetExitCode(4);
+            }
+        }
+
         if (g_smoke.geometryFailure)
         {
             auto* actor = Entity::Find("CharacterGateActor");
@@ -581,6 +627,28 @@ void Player::PlayerMain::Update()
 
         const EnhancedLiveDisplaySnapshot display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
         const EnhancedLiveDisplayEntrySnapshot& gameDisplay = display.Get(EnhancedLiveDisplayTarget::Game);
+        const auto progressNow = std::chrono::steady_clock::now();
+        if (progressNow >= m_smokeProgressReport)
+        {
+            m_smokeProgressReport = progressNow + std::chrono::seconds(10);
+            std::printf("[player.smoke.progress] {\"gtFrame\":%llu,\"rendered\":%llu,\"inFlight\":%llu,"
+                        "\"published\":%llu,\"consumed\":%llu,\"completed\":%llu,\"promotions\":%llu,"
+                        "\"requiredPromotions\":%llu,\"slotMask\":%u,\"ready\":%s}\n",
+                        static_cast<unsigned long long>(Time->GetFrameCount()),
+                        static_cast<unsigned long long>(renderState.framesRendered),
+                        static_cast<unsigned long long>(renderState.framesInFlight),
+                        static_cast<unsigned long long>(renderState.publishedFrameId),
+                        static_cast<unsigned long long>(renderState.consumedFrameId),
+                        static_cast<unsigned long long>(gameDisplay.completedFrameId),
+                        static_cast<unsigned long long>(gameDisplay.promotionCount),
+                        static_cast<unsigned long long>(g_smoke.minimumPromotions),
+                        gameDisplay.promotedSlotMask, gameDisplay.ready ? "true" : "false");
+            std::printf("[player.smoke.render.state] enabled=%s idle=%llu error=%s\n",
+                        renderState.enabled ? "true" : "false",
+                        static_cast<unsigned long long>(renderState.framesIdle), renderState.lastError.c_str());
+            std::fflush(stdout);
+        }
+
 		const uint32_t slotMask = gameDisplay.promotedSlotMask;
         const bool displayRotated = gameDisplay.ready && gameDisplay.promotionCount >= g_smoke.minimumPromotions &&
                                     0 != slotMask && 0 != (slotMask & (slotMask - 1u));
@@ -646,7 +714,7 @@ void Player::PlayerMain::Update()
 
                     try
                     {
-                        m_smokeDdolProbe =
+                    m_smokeDdolProbe =
                             std::make_unique<DdolProbe>(*entity, g_smoke.ddolHierarchy, g_smoke.ddolGeometry);
                     }
                     catch (const std::exception& error)
@@ -657,6 +725,9 @@ void Player::PlayerMain::Update()
                         PostMessage(handle, WM_CLOSE, 0, 0);
                         return;
                     }
+
+                    if (auto* script = entity->GetComponent<ScriptComponent>())
+                        m_smokeWrapperInstance = script->GetInstanceId();
 
                     Object::SetDontDestroyOnLoad(entity);
                 }

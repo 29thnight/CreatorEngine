@@ -1,3 +1,5 @@
+#include <cstdlib>
+#include <cstdio>
 #include "../Graph/ShadowCasterBounds.h"
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
@@ -1863,6 +1865,16 @@ namespace
 
         bool BuildPipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
         {
+            const auto traceBuild = [](const char* phase) {
+                const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE");
+                if (value && std::string_view(value) == "1")
+                {
+                    std::printf("[render.pipeline.progress] phase=%s\n", phase);
+                    std::fflush(stdout);
+                }
+            };
+            traceBuild("invalidate.begin");
+
             // ★ 락은 **구축 전체가 아니라 무효화에만** 잡는다 (2026-09-14 실측).
             //
             //   예전에는 이 함수가 반환할 때까지 displayLifetimeMutex를 쥐고
@@ -1897,6 +1909,7 @@ namespace
             //   LUID를 주지 않으면 DX12DeviceResources가 고성능 어댑터 0번을
             //   고른다. 그 선택이 결정적이라 라이브와 셸이 같은 것을 고르고,
             //   공유의 전제는 그대로 성립한다.
+            traceBuild("device.begin");
             if (!dx12.IsInitialized())
             {
                 if (!dx12.Initialize(newWidth, newHeight, outError)) return false;
@@ -1906,6 +1919,7 @@ namespace
                 return false;
             }
 
+            traceBuild("device.end");
             p.width = newWidth;
             p.height = newHeight;
 
@@ -1946,7 +1960,9 @@ namespace
             // 패스를 다 세운 뒤에 짰는데 순서가 뒤집혔다 — 노드가 패스를
             // 참조로만 잡으므로(초기화 여부와 무관) 이 순서가 성립하고,
             // 그래야 초기화 순서까지 목록이 정할 수 있다.
+            traceBuild("desc.begin");
             if (!BuildPipelineDesc(p, true, outError)) return false;
+            traceBuild("passes.begin");
 
             if (!p.desc.InitializeAll(p.frameContext,
                 static_cast<uint32_t>(LivePipeline::kMaxCameraViews), outError))
@@ -1954,12 +1970,15 @@ namespace
                 return false;
             }
 
+            traceBuild("passes.end");
             p.gbuffer.SetKeepAlive(false);
 
             // IBL 생성기는 패스가 아니라 생성기다 — 그래프에 선언하지 않고
             // 프레임 시작에 큐브맵·조도·프리필터를 만들어 소비 패스에 건넨다.
             // 노드가 될 것이 아니므로 여기 남는다.
+            traceBuild("ibl.begin");
             if (!p.ibl.Initialize(p.frameContext, outError)) return false;
+            traceBuild("ibl.end");
 
             // 예열 장부: 파이프라인 구축이 끝난 때. 2026-09-14 실측으로 이
             // 구간이 6.84s 였고 그 내내 표시 락을 쥐어 게임 스레드까지 멈췄다 —
@@ -2001,7 +2020,10 @@ namespace
                 p.postChain.SetTuning(tuning);
             }
 
-            return CreateDisplaySlots(p, outError);
+            traceBuild("display.begin");
+            const bool displayCreated = CreateDisplaySlots(p, outError);
+            traceBuild("display.end");
+            return displayCreated;
         }
 
         bool CreateDisplaySlots(LivePipeline& p, std::string& outError)
@@ -5912,6 +5934,16 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         "TickLive consumer changed threads without an ownership handoff");
     assert(frame.frameId > state.consumedFrameId &&
         "RenderFramePacket must be consumed exactly once in publication order");
+    const auto traceProgress = [&](const char* phase) {
+        static const bool enabled = [] { const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE"); return value && std::string_view(value) == "1"; }();
+        if (enabled && frame.frameId <= 3)
+        {
+            std::printf("[render.progress] frame=%llu phase=%s\n", static_cast<unsigned long long>(frame.frameId), phase);
+            std::fflush(stdout);
+        }
+    };
+    traceProgress("consume");
+
     state.consumedFrameId = frame.frameId;
     const uint32_t cameraCount = (std::min)(frame.viewCount, kMaxLiveCameraViews);
     const bool sceneLoading = frame.sceneLoading;
@@ -5925,7 +5957,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 
     // 창이 넣어 둔 패스 파라미터 변경을 여기서 적용한다. 프레임 입력을
     // 밀봉하기 전이어야 이번 프레임부터 반영된다.
+    traceProgress("tuning.begin");
     state.ApplyAndPublishTuning();
+    traceProgress("tuning.end");
 
     // 포그를 끈 전환의 실제 해제. 위가 락 안에서 표시만 해 둔 것을 여기서
     // 처리한다 — GPU 완주 대기를 락 안에서 하면 CE 렌더 스레드가 함께 선다.
@@ -5975,6 +6009,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             state.decals.clear();
         }
     }
+
+    traceProgress("proxy.end");
 
     // ── Vulkan editor TickLive 공통 scene graph 경로 ──
     //
@@ -6235,6 +6271,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         return;
     }
 
+    traceProgress("collect.begin");
+
     // 인플라이트 제출분의 완료 확인(논블로킹) — 뷰마다. 제출 순서대로,
     // 완료된 것을 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가
     // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
@@ -6464,6 +6502,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
     }
 
+    traceProgress("pipeline.begin");
     if (nullptr == state.pipeline)
     {
         std::string error;
@@ -6477,8 +6516,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
     }
 
+    traceProgress("pipeline.end");
     LivePipeline& p = *state.pipeline;
     {
+        traceProgress("seal.begin");
         // W8: 이 프레임의 신원을 패스가 볼 수 있는 자리에 둔다. sealing이 도장을
         // 찍고 패스가 대조하는데, 둘 다 frameContext만 받으므로 여기가 유일한
         // 공통 자리다. 초기화/리사이즈에서 한 번 채우면 늘 같은 수가 되어
@@ -6529,6 +6570,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             return;
         }
     }
+
+    traceProgress("seal.end");
 
     // 뷰 합산 인플라이트. '인플라이트 2 = 링(kFrameCount=3)의 안전 거리'는
     // 제출 총량 기준의 실측이다 — 뷰당 2씩 총 4를 들면 BeginFrame이

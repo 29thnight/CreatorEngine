@@ -26,7 +26,7 @@ void write(const std::filesystem::path& path, std::string_view text)
 
 int main(int argc, char** argv)
 {
-    check(argc == 3, "source project and fixture directory required");
+    check(argc == 4, "legacy settings, fixture directory and current assets required");
     const std::filesystem::path source(argv[1]), fixture(argv[2]);
     const auto imported = Editor::ImportLegacyProjectLayers(source);
     check(bool(imported), "real project legacy settings import");
@@ -76,7 +76,7 @@ int main(int argc, char** argv)
         for (const auto child : node)
             visit(child);
     };
-    for (const auto& asset : std::filesystem::recursive_directory_iterator(source.parent_path() / "Assets"))
+    for (const auto& asset : std::filesystem::recursive_directory_iterator(argv[3]))
     {
         if (!asset.is_regular_file() ||
             (asset.path().extension() != ".creator" && asset.path().extension() != ".prefab"))

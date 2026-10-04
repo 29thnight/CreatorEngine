@@ -32,7 +32,11 @@ foreach($config in $configs){
     }
     $capture=Join-Path $out 'baseline.ceprof'
     if(Test-Path -LiteralPath $capture){Remove-Item -LiteralPath $capture}
+    $previousResourceProbe=$env:CE_PHYSICS_RESOURCE_PROBE
+    $env:CE_PHYSICS_RESOURCE_PROBE="1"
+    try {
     $process=Start-Process $exe -ArgumentList ('"'+$capture+'"') -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
+    } finally { $env:CE_PHYSICS_RESOURCE_PROBE=$previousResourceProbe }
     $handle=$process.Handle
     if(!$process.WaitForExit(60000)){$process.Kill();$process.WaitForExit();throw 'P2 probe timeout'}
     $process.WaitForExit()

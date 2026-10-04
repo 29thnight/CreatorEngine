@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$Stage, [switch]$Shipping, [int]$TimeoutSeconds=600, [ValidateRange(2000,1000000)][int]$SmokeFrames=12000)
+param([Parameter(Mandatory)][string]$Stage, [switch]$Shipping, [int]$TimeoutSeconds=600, [ValidateRange(2000,1000000)][int]$SmokeFrames=12000, [ValidateRange(20,600)][int]$DisplayStallSeconds=60, [switch]$SkipWindowResize)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $Stage=[IO.Path]::GetFullPath($Stage)
@@ -35,7 +35,8 @@ try {
     } while($process.MainWindowHandle -eq [IntPtr]::Zero)
     [uint32]$windowOwner=0
     [DaggerProbeWindow]::GetWindowThreadProcessId($process.MainWindowHandle,[ref]$windowOwner)|Out-Null
-    if($windowOwner -ne $process.Id -or ![DaggerProbeWindow]::SetWindowPos($process.MainWindowHandle,[IntPtr]::Zero,0,0,960,540,4)){throw 'Owned Player test window resize failed'}
+    if($windowOwner -ne $process.Id){throw 'Unexpected Player window owner'}
+    if(!$SkipWindowResize -and ![DaggerProbeWindow]::SetWindowPos($process.MainWindowHandle,[IntPtr]::Zero,0,0,960,540,4)){throw 'Owned Player test window resize failed'}
     do {
         $stdout=Get-Content "$out/player.out" -Raw
         if($stdout -match '\[physics.player.dagger\] (\{[^\r\n]+\})'){$probe=$Matches[1]|ConvertFrom-Json;break}
@@ -44,7 +45,22 @@ try {
         Start-Sleep -Milliseconds 100
     } while($true)
     if($probe.passed -ne 14 -or $probe.failed -ne 0 -or !$probe.complete -or $probe.tick -lt 6){throw 'Dagger dynamic convex assertions failed'}
-    while(!$process.WaitForExit(1000)){if((Get-Date) -gt $deadline){throw 'Player shutdown timed out'}}
+    $lastDisplayChange=Get-Date
+    $displaySignature=$null
+    $latestProgress=$null
+    while(!$process.WaitForExit(1000)){
+        $text=Get-Content "$out/player.out" -Raw
+        $progress=[regex]::Matches($text,'\[player.smoke.progress\] (\{[^\r\n]+\})')
+        if($progress.Count){
+            $latestProgress=$progress[$progress.Count-1].Groups[1].Value|ConvertFrom-Json
+            $signature="$($latestProgress.rendered)/$($latestProgress.completed)/$($latestProgress.promotions)"
+            $phases=[regex]::Matches($text,'\[render\.(?:progress|pipeline\.progress|pass\.progress|forward\.progress)\] ([^\r\n]+)')
+            if($phases.Count){$signature+="/"+$phases[$phases.Count-1].Groups[1].Value}
+            if($signature -ne $displaySignature){$displaySignature=$signature;$lastDisplayChange=Get-Date}
+        }
+        if(((Get-Date)-$lastDisplayChange).TotalSeconds -gt $DisplayStallSeconds){throw 'Player render/display progress stalled after physics completion'}
+        if((Get-Date) -gt $deadline){throw 'Player shutdown timed out'}
+    }
     $stdout=Get-Content "$out/player.out" -Raw
     $stderr=Get-Content "$out/player.err" -Raw
     if($process.ExitCode -ne 0 -or $stderr -match '\[player.simulation.failed\]' -or $stdout -notmatch '\[runtime.text-parser\] calls=0'){
@@ -62,6 +78,10 @@ try {
     if($samples.Count -ne 6){throw 'Missing timed motion samples'}
     @{result='PHYSICS_DAGGER_PLAYER_OK';stage=$Stage;shipping=[bool]$Shipping;probe=$probe;samples=$samples;exitCode=$process.ExitCode;immutable=$true;completedGameDisplay=$true;render=$render;artifactSha256=(Get-FileHash $artifacts[0].FullName).Hash}|ConvertTo-Json -Depth 20|Set-Content "$out/result.json" -Encoding utf8
     "PHYSICS_DAGGER_PLAYER_OK evidence=$out"
+} catch {
+    @{result='PHYSICS_DAGGER_PLAYER_FAILED';reason=$_.Exception.Message;stage=$Stage;probe=$probe;lastProgress=$latestProgress;completedGameDisplay=$false}|ConvertTo-Json -Depth 20|Set-Content "$out/failure.json" -Encoding utf8
+    Write-Output "PHYSICS_DAGGER_PLAYER_FAILED evidence=$out"
+    throw
 } finally {
     if(!$process.HasExited){$process.Kill();$process.WaitForExit()}
 }

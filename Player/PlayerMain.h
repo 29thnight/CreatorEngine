@@ -134,11 +134,13 @@ namespace Player
 		std::future<Scene*> m_smokeReload;
 		Scene* m_smokeReloadScene{ nullptr };
         CharacterMovementComponent* m_smokeDdolCharacter{ nullptr };
+        int m_smokeWrapperInstance{ -1 };
         std::unique_ptr<DdolProbe> m_smokeDdolProbe;
 		bool m_smokeReloadStarted{ false };
 		bool m_smokeReloadActivated{ false };
 		uint64_t m_smokeReloadPublishedFrame{ 0 };
         std::chrono::steady_clock::time_point m_smokeReloadReport{};
+        std::chrono::steady_clock::time_point m_smokeProgressReport{};
 		std::atomic_bool m_isInvokeResize = false;
 	};
 }

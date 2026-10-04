@@ -661,3 +661,6 @@ Dynamic_CPP/Assets/Prefabs/BTSmokeProbe.prefab
 # HTTP-authored dense physics query regression scene.
 !Tools/regression/fixtures/PhysicsQueryStress.creator
 !Tools/regression/fixtures/PhysicsQueryStress.creator.meta
+
+!Tools/regression/fixtures/PhysicsQueryDynamic.creator
+!Tools/regression/fixtures/PhysicsQueryDynamic.creator.meta

@@ -1,4 +1,4 @@
-﻿# 물리 재설계 — C++23 PhysX API 선행 재작성 (PHASE 19)
+# 물리 재설계 — C++23 PhysX API 선행 재작성 (PHASE 19)
 
 수립일: 2026-08-18 · 빅뱅 범위 개정: 2026-10-01
 관련: [컴포넌트 설계](../design/PhysicsComponentDesign.md) · [잡 시스템 계약](../design/JobSchedulerDesign.md) · [직렬화](SerializationPlan.md) · [고정 Simulation Tick](NetworkFrameworkPlan.md)
@@ -2864,3 +2864,884 @@ verify-physics-dense-bounded-capture.ps1 -Stage <새stage> 실행.
 증거 Build/Obj/Phase19T2QueryBench/DenseBounded-016a6d228abf4a00b9c88a7e28078a6c/result.json,
 연결된query.ceprof/capture-result.json/bridge-costs.csv 및 DenseCaptureVerifierControl.
 T2 progress 및performanceAccepted=false 유지. 남은작업은더높은hit/다양한동적부하와p99/M3 제품수용이다.
+
+### T2 동적128-body 고밀도 쿼리 검증 (2026-10-03)
+
+HTTP CLI로 기존128개 DenseQuery 구를dynamic·중력 비활성으로 변경한 별도 씬을저작했다.
+258개저작/검증명령과quit를포함한259 journal entries,Scene GUID
+16037efe-0cd6-4802-a24a-aafd56644346이다. 원래stress 씬을수정저장하지않고새경로로저장했다.
+재현용동일바이트fixture는 Tools/regression/fixtures/PhysicsQueryDynamic.creator에보존한다.
+
+직전원격통합이포함된Release Editor/Player와새로빌드한AssetCooker로새배포본을검증·생성하고,
+관리probe를컴파일한새패키지로실제Player 두독립프로세스를실행했다. 기본JIT·기본CPU배치다.
+128개바디에+20m/s를적용해12m이상이동시킨후-20m/s로복귀하고0속도로정지한다.
+모든owner읽기구간에서128개바디의종류·상대병진·Y/Z보존과128-hit scalar 신원을검사했다.
+원래쿼리영역의hit128→0→128 및이동목적지영역복귀후0을검사해query구조갱신을확인했다.
+
+출발/이동/복귀각지점에서32개overlap×128hit=4096전체출력을역순offset으로기록하고,
+각요청written128/required128/truncated=false·128개고유body identity와앞뒤128B보호값을검증했다.
+동일각지점의16개혼합ray/overlap도scalar/batch 수·신원·Entity/shape/layer/거리·location 및중복없음을검사했다.
+ray4-hit/overlap128-hit이며중간physics step 없이동일owner읽기구간에서비교한다.
+기존stress/최대64-request/4096-hit truncation 및B2각역할의104개검사도각실행통과했다.
+
+| 최종 실행 | owner read windows | 관측된 pose 변경 | 동적 누적 assertions | 완료 GT frames | display promotions |
+|---|---:|---:|---:|---:|---:|
+| 1 | 1498 | 65 | 3060/0 | 169256 | 8 |
+| 2 | 1605 | 68 | 3274/0 | 160246 | 8 |
+
+PostPhysics호출과실제fixed tick은다르므로readWindows 및observedPoseChanges로구분한다.
+pose변경관측횟수도실제tick수나모든중간tick검사증거가아니다. 누적assertion수는읽기횟수에영향을받는다.
+초기실행의ticks명칭은정정했고해당실행을최종증거에서제외한후새패키지두번으로재검증했다.
+모두exit0/parser0/cookedScene·CEPG1/source geometry0/패키지불변통과했다.
+
+증거 Build/Obj/Phase19T2QueryBench/DynamicQueries-0c1f6c496f124489b4d44ab9340620cc/result.json,
+연결된query-dynamic.json/query-stress.json/Player result와HTTP author journal.
+재현:새배포본에build-physics-b2-player-fixture.ps1 -SceneSource <동적fixture>로패키징후
+verify-physics-query-dynamic-player.ps1 -Stage <새stage> 실행.
+중력비활성집단병진운동범위이며충돌적층·회전/kinematic혼합·GPU solver·Shipping 실행이나
+동적profiler capture·성능/p99 수용을주장하지않는다. T2 progress 및performanceAccepted=false 유지.
+대표부하확장과p99/M3 수용은남는다. 다음우선작업은M2 DDOL 동반전환실패와Editor 복원게이트다.
+
+### 2026-10-03 M2: DDOL 동반 Editor 활성화 실패와 반복 복원
+
+실제 Release Editor의 HTTP CLI로 정상 DDOL 전환/Stop/Replay에 이어,
+비균일 부모 스케일과 자식 회전으로 unsupported shear를 가진 목적지를 저작했다.
+실행 중인 Character와 부모·분기·비활성 자식까지 persistent 5개가 목적지로
+이송된 시점에서 물리 시작이 거부되는 것을 확인했다. 실패 자동 정지 후 원래
+6개 객체의 Transform·활성·레이어·컴포넌트 ID·부모 관계가 복원되며,
+목적지 객체와 기존 CLI/C# 핸들은 접근이 거부된다. runtime tick/force/velocity는
+초기화되고 다시 Play한 뒤 두 번째 Stop도 저작 Transform으로 복귀한다.
+출발·목적지 저장 파일 SHA256 불변, hierarchycheck 불일치/고아/도달 실패 0.
+
+재실행 후 Stop에서 발견한 실제 회귀를 수정했다. 슬롯 기반 엔티티 저장소의
+빈 슬롯이 null로 직렬화되는데 엄격한 복원 루프가 이를 알 수 없는 타입으로
+취급했다. null 슬롯만 건너뛰며 실제 알 수 없는 타입에 대한 거부는 유지한다.
+목적지 실패는 지연된 OnAddedToScene 이전이므로 콜백은 added +1 / removed +2;
+정상 전환과 같은 added +2를 요구하지 않는다. 소유권은 실패 시 native 진단으로
+별도 확인한다. Stop 요청 반환 이후 복원 완료 상태까지 기다려 검증한다.
+
+Release Editor 빌드 통과. 최종 PHYSICS_CHARACTER_HTTP_OK: HTTP 163명령,
+C# 18/0. evidence Build/Obj/Phase19C0/http-c7001c82e646406cbc5d52e856c15fec/result.json
+및 results.jsonl/editor.out. 이전 실패 실행은 최종 근거에서 제외한다.
+재현: verify-physics-character-http.ps1 -EditorExe <Release Editor> -TransitionFailureProbe.
+M2는 progress 유지. Player DDOL 동반 missing/corrupt/revision 전환 실패,
+전체 SDK include 경계 감사와 제품 전체 회귀는 남는다. 이번 근거는 Editor
+unsupported-shear 목적지 활성화 실패이며 Player 오류 종류 전체를 대체하지 않는다.
+
+### 2026-10-03 M2: Release Player DDOL 동반 목적지 geometry 실패
+
+최신 Release Player와 새 배포본/패키지에서 verify-physics-geometry-failure-player.ps1
+-Ddol을 실행했다. 정상 primitive 출발 씬의 이동·접지 12/0 이후 CharacterGateActor를
+DDOL로 지정하여 cooked geometry 목적지로 이송한다. 정상 대조군은 관리 생명주기·운동
+8/0과 네이티브 핸들 이송 8/0, 목적지 completed display 및 종료 0을 확인했다.
+missing/corrupt/revision 세 사본은 모두 출발 운동 12/0 이후 목적지의 살아 있는
+DDOL 소유 객체 1개를 확인한 시점에서 물리 시작이 거부되고 제품 fatal 정책으로
+종료 3이 됐다. missing/corrupt는 Player cooked geometry unavailable,
+revision은 Invalid or incompatible cooked geometry artifact이며 성공 DDOL simulation
+및 목적지 성공 display가 없다. 전 사례 runtime text parser 0, 원본·사본 SHA 불변.
+
+실제 표시 창 960×540, smoke 2000/minimum promotions 8 및 slot rotation 조건 유지.
+새 Release Player 빌드·배포 검증·패키징 통과. 이전 stale 환경맵 cook으로 인한
+패키징 실패와 구 CEMF 변이 도구 실행은 제외하고 현재 소스로 변이 도구를 재빌드했다.
+최종 evidence Build/Obj/P19DdolFailure/result.json 및 연결된
+PhysicsGeometryFailure/run-9f5cca199110439a8798c40a8482ac24/result.json.
+게이트는 정상 핸들/운동, 실패 시점 소유권·정확한 오류·종료, 파일 불변을 검사한다.
+M2 progress 유지. Debug/Shipping의 같은 DDOL 오류 조합, 복합 DDOL 계층 오류 조합,
+전체 SDK include 경계 감사는 남는다. 이번 실행은 Release 단일 Character DDOL 범위다.
+
+### 2026-10-03 M2: Debug/Shipping DDOL 목적지 오류 검증 확장
+
+Release와 같은 단일 Character DDOL 정상/missing/corrupt/revision 조합을 최신
+Debug와 Release-Shipping Player에서 각각 네 번 실행해 전부 통과했다. 정상은
+출발 운동 12/0, 관리 이송 생명주기·운동 8/0, 네이티브 핸들 이송 8/0,
+목적지 completed display와 종료 0이다. 각 오류는 출발 운동 12/0 이후 목적지
+persistent 1개 소유권을 확인한 시점에서 시작을 거부하고 제품 fatal 종료 3으로
+끝난다. missing/corrupt는 cooked geometry unavailable, revision은 incompatible
+artifact이며 성공 DDOL simulation/목적지 성공 display가 없다.
+전 사례 parser 0, 원본·사본 패키지 SHA 불변. 960×540 실제 표시와
+2000/minimum promotions 8·slot rotation 조건을 유지했다.
+
+Debug/Shipping Player 빌드, 새 배포본 검증·패키징 통과. Debug 최초 패키징의
+구 AssetCooker artifact 버전 불일치 실행은 제외하고 AssetCooker도 다시 빌드한
+새 배포본으로 재검증했다. 단계별 staged runtime SHA는 현재 빌드와 동일하다.
+Shipping 서비스 격리: WS2_32 import 없음, WSAStartup/endpoint.json/CommandService
+표식 없음; Development 대조군은 존재한다. EngineShipping=true의 별도 출력 사용.
+
+최종 evidence Build/Obj/P19DdolFailureDS/result.json.
+Debug: PhysicsGeometryFailure/run-822da353914c45fdb17057c3576bd0bb/result.json.
+Shipping: PhysicsGeometryFailure/run-c7bd4b5ade23453ebf7cd60647672301/result.json.
+기존 Release 근거와 합쳐 총 12사례. 단일 Character DDOL 오류 조합 D/R/Shipping은
+확인됐으며 M2 progress 유지. 복합 DDOL 계층 오류 조합과 전체 SDK include 경계
+감사는 남는다. 이번 작업은 실행 검증이며 추가 물리 런타임 정책 변경은 없다.
+
+### 2026-10-03 M2: 복합 DDOL 계층 목적지 geometry 실패 D/R/Shipping
+
+부모·분기·활성 Character·비활성 Character/Body 5개를 가진 기존 저작 fixture를
+정상 primitive 출발 씬으로 사용하고, geometry 목적지 정상/missing/corrupt/revision을
+Debug/Release/Shipping에서 각각 네 번 실행했다. 총 12사례 통과.
+정상은 출발 운동 12/0, 관리 이송 생명주기·운동 8/0, native 계층 56/0과
+목적지 completed display·종료 0을 확인한다. 계층 검사는 부모/자식 remap,
+원래 Scene 핸들 무효화·목적지 핸들 연결·레이어/활성/포즈 보존,
+비활성 자식 SDK 핸들 부재·재활성화 운동/force·재비활성화 정지를 포함한다.
+
+오류 세 종류는 출발 운동 12/0 이후 목적지 소유의 살아 있는 DDOL 객체 5개를
+실패 진단으로 확인한다. 물리 시작 거부 후 제품 fatal 종료 3,
+missing/corrupt는 Player cooked geometry unavailable, revision은 incompatible
+artifact이며 성공 DDOL simulation/목적지 성공 display가 없다.
+전 사례 parser 0·원본/사본 SHA 불변, 960×540·smoke2000/minimum promotions8·slot
+rotation 조건 유지. staged runtime SHA는 각 구성의 현재 빌드와 같다.
+기존 최신 배포본에서 새 managed script·계층 시작 씬으로 재패키징했다.
+
+초기 정상 계층 검증은 기존 단독 캐릭터의 고정 Y 범위 때문에 실패했다.
+진단 상태는 tick30에서 Y4.905/footY2.805/fall -1.471로 실제 하강 중이었다.
+스케일을 가진 계층과 다른 캐릭터가 있는 목적지에는 단독 궤적의 고정 높이
+기대값을 적용하지 않는다. 명시적인 계층 진단 환경에서 이송 높이5에서 하강,
+발의 바닥 위 위치 및 음의 수직 속도를 요구하며 기존 단독 경로의 조건은 유지한다.
+진단은 한 번 상태를 출력한다. 초기 기대값 실패·진단 실행은 최종 근거에서 제외했다.
+이번 변경은 fixture/managed probe/verifier이며 native 물리 정책 변경은 없다.
+
+최종 evidence Build/Obj/P19DdolFailureDS/Hierarchy/result.json.
+Debug: PhysicsGeometryFailure/run-371eeb94955142e68b20cd502efbb3b4/result.json.
+Release: PhysicsGeometryFailure/run-f39a764ddbd0492c933b4b2e50246447/result.json.
+Shipping: PhysicsGeometryFailure/run-acdb830edc484f0db68fe008ac95e509/result.json.
+재현: 새 배포본으로 build-physics-character-player-fixture.ps1 -Transition -Hierarchy,
+이후 verify-physics-geometry-failure-player.ps1 -Stage <stage> -Mutator <최신 도구> -Hierarchy.
+M2 progress 유지. 전체 SDK include 경계 감사와 제품 전체 해제/잔류 카운터 감사는
+남는다. 실패 경로의 모든 개별 stale SDK/C# 핸들을 추가 관측한 근거로 확장하지 않는다.
+
+### 2026-10-03 M2: SDK include 경계 전체 감사와 기존 검사 복구
+
+verify-physics-sdk-boundary.ps1로 git source inventory의 native 소스 1,252개,
+프로젝트/props/targets 35개를 검사했다. SDK include/타입/namespace 노출과
+구 PhysicsMathAdapter/PhysicsSystem/Collider/RigidBody/CharacterController/Ragdoll
+헤더 include 및 프로젝트 재편입을 거부한다. 헤더 include·SDK 타입·forward
+선언의 negative control 3개와 SDK-free facade 대조군을 통과했다.
+허용은 Engine/Physics/PhysicsScene.cpp backend 구현과 역사적 P0 직접 SDK
+기준선 Tools/regression/physics_p0_cpu_probe.cpp 두 파일뿐이다. 제품 소비자와
+public physics header에서 SDK 노출 0. SDK include directory는 Directory.Build.targets의
+Physics 프로젝트 조건 하나, backend project reference는 EngineDiagnostics 하나다.
+소스별 SHA256과 예외/위반 목록을 결과에 기록한다. 이 예외는 runtime facade 밖의
+제품 SDK 사용을 허용하는 정책이 아니다.
+
+기존 수학 게이트는 삭제된 PhysicsMathAdapter.h와 Px 타입을 요구해 깨져 있었다.
+이를 SDK-free PhysicsGeometry.h/pose와 Mathematics의 offset·scale/transform 계약으로
+정리했고 PhysX include directory/헤더 탐색 요구를 제거했다. 구 SDK conversion과
+backend dirty 비교 자체를 일반 Mathematics 공개 계약으로 계속 요구하지 않는다.
+수학 스캐너가 image fixture의 두 PackedVector half 픽셀 변환 함수를 vector math로
+오인하던 조건도 해당 파일의 완전 수식된 두 함수만 예외 처리했다. 다른 DirectXMath
+타입/함수/include 금지는 유지한다. full Mathematics Debug/Release compile/run 통과.
+에디터 카탈로그 회귀의 구 물리 타입 이름도 PhysicsBodyComponent와
+CharacterMovementComponent로 바꿨고 분류/검색 검사 29개 통과.
+
+최종 evidence Build/Obj/PhysicsSdkBoundary/Final-20261003/result.json,
+Build/Obj/P19DdolFailureDS/math-boundary-final.log 및 catalog-boundary.log.
+PowerShell parse·git diff --check 통과. 추가 제품 runtime 변경은 없다.
+SDK 경계 전체 감사 항목은 확인 완료. M2 전체 progress는 유지하며 제품 전체
+해제·잔류 카운터 감사와 실패 종료에서 모든 개별 SDK/C# 핸들의 추가 관측은 남는다.
+최종 빅뱅 제거 감사 M4와 성능/메모리 수용 M3를 완료로 올리지 않는다.
+
+### 2026-10-03 M2: 종료 소유권 ledger
+
+`CE_PHYSICS_RESOURCE_PROBE=1`일 때만 backend 소유권 생성/해제 수를 누적한다.
+SDK 외부 RAII owner, scene, body, character, geometry, dispatcher, worker,
+SDK task의 8종류를 SDK-free read-only API로 관측한다. 기본 실행에는 전역 atomic
+누적을 하지 않는다. 설정은 첫 사용에서 고정하며 실행 중 변경은 지원하지 않는다.
+소유자 token은 첫 멤버로 선언해 나머지 멤버 해제 뒤 회수되고, SDK task는
+run/release 완료 뒤, worker는 루프/프로파일러 등록 해제 뒤 회수한다.
+최종 판정은 생산자 join 뒤에만 가능하다. 동시 실행 중 snapshot은 일관된
+전체 시점 snapshot을 보장하지 않으며 balanced를 종료 판정으로 사용하지 않는다.
+
+P2 회귀는 지역 객체 소멸 후 ledger 균형을 검사한다. Debug/Release/ASan은
+8종류 전부의 생성 노출을 요구하며 캐릭터 명시 삭제와 씬 종료 자동 해제를
+함께 실행한다. Shipping 기존 body/query 전용 probe는 자기 노출 범위의
+잔류를 검사한다. 퇴화 convex는 사전 검증 invalid_argument 계약으로 정합성을
+복구했고 실패 진단은 호출 위치를 남긴다. D/R/ASan 1068, Shipping 366 검사 및
+실제 GPU 경로 통과. 생성/해제 배열과 executable SHA receipt는
+Build/Obj/Phase19P2/resources-result.json, 개별 stderr.log에 기록한다.
+
+Player는 계측 활성 또는 smoke 실행에서 enabled 상태를 함께 기록한다.
+비활성 smoke의 0 카운터는 수용 근거가 아니다. Player는 서비스 종료, 관리 runtime 종료, presentation/render join, 씬/DDOL
+삭제, renderer/표시 host 종료 이후 `[physics.player.resources]` JSON을 출력한다.
+로더가 runtime DLL을 유지하므로 출력은 명시적으로 flush한다. geometry 실패
+Player verifier의 -ResourceProbe는 정상/실패 exit 판정을 유지하며 별도로
+ledger 균형과 실제 자원 노출을 요구한다. 기본 기존 검증에는 강제하지 않는다.
+
+이 ledger는 SDK 외부 소유권/작업 해제 근거이며 SDK 내부 전체 할당, allocator
+byte peak, RSS/p99 수용을 대체하지 않는다. M2 progress 유지; Debug/Shipping
+제품 종료 ledger 조합, 실패 개별 C# stale wrapper 추가 관측 및 M3 메모리/성능
+수용은 별도 잔여다.
+
+Release 실제 복합 DDOL 계층 종료 ledger 4사례 통과:
+Build/Obj/PhysicsGeometryFailure/run-631f8db7d2fc425891b687fb1c16cad8/result.json.
+정상은 출발12/0, managed DDOL8/0, native hierarchy56/0, 목적지 완료 display,
+exit0, 8종류 생성/해제 일치. owner41/scene5/body5/character6/geometry3/
+dispatcher5/worker19/task296509 전부 회수. missing/corrupt/revision은
+출발12/0, 목적지 persistent5, 정확한 오류 이유와 exit3, 성공 DDOL 없음,
+owner9/scene1/body1/character1/geometry0/dispatcher1/worker8 및 제출 작업
+전부 회수. geometry0은 host 로드 거부로 SDK 자산 생성 이전에 실패한 결과다.
+네 사례 모두 enabled=true, balanced=true, 원본/사본 패키지 SHA 불변,
+저작 parser0. 수정된 현재 Release runtime DLL SHA를 포함한 추가 receipt는
+Build/Obj/Phase19P2/product-resources-result.json. 이전 marker 누락 시도 및
+offscreen 시간 제한 시도는 수용 근거에서 제외한다.
+
+Windows에서는 CRT 환경 사본 대신 프로세스 환경을 직접 읽는다. SDK include
+감사 ResourcesFinal-20261003, PowerShell parse, git diff --check 및 대시보드
+439항목/전체 parse 검사 통과. SDK 내부 allocator 메모리, 실패 개별 C# wrapper,
+제품 Debug/Shipping ledger 추가 검증은 미완료이며 M2 progress 유지.
+
+### 2026-10-03 M2: Debug/Shipping 제품 종료 ledger 수용
+
+현재 소스로 Debug/Shipping Player를 빌드하고 새 배포본/복합 DDOL 계층 패키지를
+생성했다. 각 구성 정상/missing/corrupt/revision 4사례, 합계8 통과.
+기존 Release4의 runtime DLL SHA도 현재 출력과 다시 대조하여 D/R/Shipping
+총12사례를 통합했다. 전체 enabled=true, balanced=true, 생성/해제 배열 일치.
+정상은 출발12/0 + managed DDOL8/0 + native hierarchy56/0·5노드,
+목적지 completed display 및 exit0. SDK owner41/scene5/body5/character6/
+geometry3/dispatcher5/worker19와 제출 작업 전부 회수.
+오류는 출발12/0, 목적지 transferredPersistent5, 정확한 missing/corrupt 또는
+revision 사유·exit3, 성공 DDOL/display 없음. SDK owner9/scene1/body1/
+character1/geometry0/dispatcher1/worker8 및 제출 작업 전부 회수.
+각 작업 수는 실행 중 tick/표시 대기 시간이 달라 구성 간 성능 비교 근거로 사용하지 않는다.
+parser0, 원본/사본 패키지 SHA 불변, 960×540·2000/min8·slot rotation 유지.
+Shipping native WS2_32 import와 서비스/endpoint marker 부재도 재검증 통과.
+
+통합 evidence:
+Build/Obj/P19DdolFailureDS/ResourcesDS-212528726db849ab9ad290159007c8d0/all-configurations.json.
+Debug: PhysicsGeometryFailure/run-a4d75339063047758180acc498d28071/result.json.
+Shipping: PhysicsGeometryFailure/run-370881dd9e29473c9e2e0050974e0568/result.json.
+각 DLL SHA/현재 빌드 일치, 개별 JSON ledger, exit와 패키지 불변을 저장했다.
+
+긴 Shipping 배포 경로에서 도구 프로세스 시작 실패가 발생하여 짧은 SD/SF 경로에
+새 배포본/패키지를 생성했다. 다음 초기 smoke는 오래된 forest recipe로 exit161.
+실제 shader closure16개의 현재 recipe dba493920d5395791e93ae8e5a9df649d88e09e6a85400eeea757c36ded4a917과
+일치하는 cooked artifact를 배포 입력에 복구했다. EnginePublisher는 Shipping
+Player의 별도 출력과 함께 공통 Resources는 Bin/x64-Release에서 읽으므로,
+그 경로를 복구한 후 다시 새 배포본을 생성했다. 기존 배포본을 덮어쓰지 않았다.
+첫 두 실패는 제품 수용에서 제외하고 SF-8dbcf236의 실패 로그와
+ResourcesDS 결과 폴더 environment-repair.json에 원인을 남겼다.
+제품 runtime 코드 변경은 없다; 빌드/검증 및 생성된 리소스 복구 작업이다.
+
+제품 Debug/Shipping 종료 ledger 잔여는 닫았다. M2는 progress 유지:
+실패 시 개별 SDK 핸들/C# wrapper의 stale 접근 진단을 추가 관측해야 한다.
+외부 SDK 소유권 ledger는 SDK 내부 allocator/peak/RSS 검사나 제품 profiler
+전체 계층·평균/p99 수용을 대체하지 않는다. 해당 M3/M4와 M1은 미완료다.
+
+### 2026-10-03 M2: native 개별 핸들 수명 게이트 보강
+
+`physics_handle_lifetime_probe.h`의 공용 검사를 진단/Shipping P2 실행 파일에
+연결했다. 캐릭터 삭제 직후 읽기·이동·텔레포트·필터 변경은 stale_handle,
+슬롯 재사용 후에는 이전 핸들의 삭제도 stale_handle로 거부한다.
+슬롯 재사용 전 중복 삭제는 기존 idempotent 계약대로 성공해야 한다.
+이전 핸들의 거부된 명령이 새 컨트롤러의 위치를 바꾸지 않음을 확인한다.
+잘못된 radius의 생성 요청은 invalid_argument이고 기존 컨트롤러는 유효하다.
+소유 씬을 실제 파괴한 다음 새 씬에서 보관된 캐릭터의 5개 API와 바디의
+읽기·삭제를 wrong_scene으로 거부하고, 새 캐릭터 생성/읽기를 확인한다.
+파괴된 씬이나 컴포넌트 포인터를 역참조하지 않는다.
+
+이 게이트는 native 값 핸들의 세대/씬 식별 계약이다. 제품 목적지 활성화
+실패 후 개별 C# wrapper 접근의 수용 근거로 확대하지 않는다. 삭제된 출발
+객체 wrapper는 StaleHandle을 검증해야 한다. DDOL로 생존한 객체 wrapper는
+객체 수명이 유지되므로 읽기가 성공할 수 있고, Simulating=false 및 실행
+명령 WrongPhase를 검증해야 한다. 이 제품 C# 검사는 후속 잔여이며 M2 progress 유지.
+
+검증: fresh Debug/Release/ASan 각1098, Shipping395 checks, 실제 GPU verified=true.
+4구성 모두 종료 resource ledger 생성=해제. D/R/ASan profiler abandoned/retained/foreign0.
+근거 Build/Obj/Phase19P2/handle-lifetime-result.json (소스/실행 파일/결과/로그 SHA 포함).
+SDK 경계 감사 native1253·위반0: PhysicsSdkBoundary/HandleLifetime-20261003.
+### 2026-10-03 M2: Release Player 실패 후 C# wrapper 수명 검증
+
+CharacterPlayerProbe가 출발 씬의 실제 완료 물리 틱에서 캐릭터·바디 wrapper,
+Entity 값 핸들과 shape ID를 보관한다. 새 WrapperProbe 옵션은 정상 대조에서는
+실패 콜백을 보내지 않고, Player가 목적지 활성화 실패를 기록한 뒤 기존
+QueueScriptMessage/FlushScriptMessages 경로로 검사 콜백 하나를 전달한다.
+새 고정 틱, 시뮬레이션 재시작, admin InvokeCallable/UserCodeScope 우회는 없다.
+일반 제품 실행에서는 환경 flag와 smoke가 없으므로 이 경로를 실행하지 않는다.
+
+DDOL은 이름 조회로 새 목적지 객체를 선택하지 않도록 출발 스크립트 인스턴스
+ID를 보관한다. 일반 전환은 출발 스크립트가 삭제되므로 목적지 수신 인스턴스만
+EnsureInstance로 만든다. 이는 생명주기/OnBeginSimulation 훅 전달과 분리된 기존
+API이며 실패한 물리 시뮬레이션을 실행하지 않는다. 파괴된 native 포인터를
+보관하거나 역참조하지 않는다. 일반 전환은 두 정본 healthy source GUID만 허용한다.
+
+fresh Release 빌드·새 배포본/계층 패키지로 DDOL 계층 유지와 전체 출발 객체 삭제
+각 정상/missing/corrupt/revision 4사례, 총8 통과. 오류6사례 각16 checks=96:
+- 삭제된 출발 바디의 읽기·속도·힘·shape count/read/flags는 StaleHandle.
+- 일반 전환의 삭제된 캐릭터는 읽기·속도·점프·강제 이동·취소·텔레포트 StaleHandle.
+- DDOL 캐릭터는 Entity 수명과 읽기를 유지하되 Simulating=false, 실행 명령 WrongPhase.
+- 실패 출력 기본값과 거부된 캐릭터 명령 후 위치/입력/timer/tick/flags 보존을 확인.
+
+정상2는 completed display·exit0이며 실패 콜백0회. 오류6은 콜백1회·exit3,
+정확한 missing/corrupt/revision 사유와 목적지 성공 표시 부재를 확인했다.
+DDOL 오류는 transferredPersistent5; 정상 managed8/native hierarchy56도 유지.
+8실행 모두 외부 SDK resource ledger 생성=해제, parser0, 원본/사본 패키지 불변.
+창960×540, smoke2000/min8 조건을 유지했다. 자원 수/시간을 성능 근거로 해석하지 않는다.
+
+통합 receipt: Build/Obj/P19DdolFailureDS/WR-22b4186a/result.json.
+DDOL: PhysicsGeometryFailure/run-ee7e061bfba3420b8c229c0ecc405bb1/result.json.
+삭제: PhysicsGeometryFailure/run-8f184621568748718b042a8d4ff2089d/result.json.
+현재 Release runtime DLL SHA BDE482721C02EE379B5655BB58B73B9B8676B69F33A78CE4EA6C95DF7A466E69와
+패키지 DLL 일치, 패키징된 managed 소스/현재 소스 일치 및 개별 로그 SHA를 기록했다.
+SDK 경계 감사1253·위반0: PhysicsSdkBoundary/ManagedFailure-20261003.
+
+첫 nullable Entity 사용의 managed compile 실패, 새 목적지 인스턴스 미생성/동명
+조회로 callback 수신이 실패한 run-3efd37ff..., PowerShell 주석 오류로 검증이
+중단된 run-3d1e8c3e...는 제외했다. 원본 로그/실패 후보는 보존했다.
+.NET Console과 native CRT stdout 버퍼의 출력 순서에 의존하지 않는다.
+실패 분기에서의 전달과 source Entity 수명/Simulating/명령 거부 상태로 검증한다.
+
+M2 progress 유지. 새 wrapper 검사의 Debug/Shipping 실제 제품 실행은 잔여다.
+기존 D/R/Shipping 종료 ledger12와 native 핸들4구성 수용은 유지한다.
+이 검사로 SDK 내부 allocator, managed heap/peak/RSS 또는 M3/M4 성능 수용을 주장하지 않는다.
+### 2026-10-03 M2 완료: Debug/Shipping wrapper 검증과 수용 근거 대조
+
+현재 소스로 Debug와 Shipping Player/AssetCooker를 빌드하고, 새 배포본과
+계층 씬 패키지를 생성했다. 각 구성 DDOL 유지/전체 출발 객체 삭제 각각
+정상/missing/corrupt/revision 4사례, 총16 통과. 기존 Release8의 현재 DLL,
+managed 소스와 로그 SHA도 다시 대조하여 D/R/Shipping 총24사례를 통합했다.
+오류18사례 각16 checks, 합계288. 삭제된 바디·캐릭터 wrapper는 StaleHandle,
+살아 있는 DDOL 캐릭터 wrapper는 읽기를 유지하고 Simulating=false 및 실행
+명령 WrongPhase를 확인했다. 거부된 명령 이후 상태 보존과 실패 출력 기본값도 확인.
+
+정상6은 completed display·exit0·실패 콜백0회. 오류18은 정확한 사유·exit3·
+실패 콜백1회·목적지 성공 표시 부재를 확인했다. DDOL 오류의 persistent5,
+정상 managed DDOL8/native hierarchy56도 유지한다. 24실행 전부 외부 SDK
+소유권 ledger 생성=해제, parser0, 원본/사본 패키지 불변. 960×540,
+smoke2000/min8 조건 유지. Shipping WS2_32 import와 WSAStartup/endpoint.json/
+CommandService marker 부재도 통과. 시간·작업 수 차이를 성능 근거로 쓰지 않는다.
+
+통합 evidence: Build/Obj/P19DdolFailureDS/WD-46a3b33f/result.json.
+Debug DDOL: PhysicsGeometryFailure/run-928726fe0faf4816a0f38015158ff4f6/result.json.
+Debug 삭제: PhysicsGeometryFailure/run-4aad3eb1b79f42b6a38ccf3905e9e746/result.json.
+Shipping DDOL: PhysicsGeometryFailure/run-086fdac65eeb45f98d2555189ad12344/result.json.
+Shipping 삭제: PhysicsGeometryFailure/run-01e1b82c2d334ab69a79a28fd678f1c9/result.json.
+현재 D/R/Shipping runtime DLL SHA와 각각의 패키지 DLL 일치, packaged managed
+소스 일치, 소스 snapshot/개별 로그 SHA를 저장했다. 새 runtime 수정은 없다.
+첫 matrix 러너의 단일 옵션이 문자로 분해된 호출은 Player 시작 전 실패했으며
+수용에서 제외했다. 인자 배열을 수정한 뒤 기존 Debug 패키지로 다시 검사했다.
+긴 경로/forest recipe 문제는 짧은 출력 경로와 현재 cooked 배포 입력으로 예방했다.
+
+M2의 기존 필수 근거를 함께 대조했다:
+- 최신 SDK 경계 감사: native1253/project35, negative controls3, 위반0.
+- Mathematics 경계 Debug/Release, 새 컴포넌트 catalog29 통과.
+- 실제 Release Editor HTTP163/C#18: DDOL 목적지 실패 후 6객체·Transform·활성·
+  레이어·컴포넌트 ID·부모 복원, stale 접근 거부, Replay/두 번째 Stop, 파일 불변.
+- native 핸들 수명: D/R/ASan1098·Shipping395, 실제 GPU, 세대/씬 수명과 자원 회수.
+- 실제 Player D/R/Shipping 24사례: 정상·실패·DDOL/삭제 wrapper 및 종료 ledger.
+
+수용 목록은 WD-46a3b33f/m2-acceptance.json. 위 근거로 M2를 done으로 변경한다.
+기존 M2 progress/잔여 기록은 당시의 판정이며 이 항목이 현재 판정이다.
+M1 스키마/corpus, M3 제품 성능·SDK 내부 allocator/managed heap/peak/RSS,
+M4 최종 빅뱅 재유입 감사는 완료로 올리지 않는다. Phase19 전체 완료가 아니다.
+
+## 2026-10-03 R0/B0/M0 수용 정리와 L0 검증기 수정
+
+이 절이 해당 항목의 현재 판정이다. 앞의 소비자 미이전/제품 미빌드 기록은
+철거 당시 이력이며 현재 잔여 구현 목록으로 해석하지 않는다.
+
+- R0 완료: fresh `audit-physics-cutover.ps1 -Gate Complete`에서 삭제55,
+  남은 파일/프로젝트 참조/구 소비자0. 새 API 제품 빌드·실행은 M2 수용 목록과 연결한다.
+  lexical 감사가 AST/링크 감사는 아니므로 최종 재유입·링크 확인은 M4에 남긴다.
+- B0 완료: fresh `verify-physics-b0.ps1 -Configuration All -RequireGpu`,
+  Debug/Release/ASan 각4978, Shipping4971 checks, 네 구성 실제 GPU 통과.
+  완결된 바디 정의·축 잠금·제어·등록/해제·실패 회수·필터 트랜잭션을 검증했다.
+  M2의 실제 Editor HTTP163/C#18과 Player D/R/Shipping24사례/288 checks를
+  제품 생명주기 수용 근거로 연결한다. Editor 실패 복원·Stop/Replay·DDOL/삭제와
+  Player의 저작 snapshot 제외를 포함하며 성능/내부 메모리는 M3이다.
+- M0 소비자 이관 범위 완료: 구 소비자0 및 fresh ABI32/168슬롯 순서·초기화,
+  Debug/Release 각33 checks. M2 wrapper/수명주기 및 기존 Body/Shape/Query/CCT
+  제품 검증을 연결한다. 구 데이터 변환은 M1, 모델 자동 충돌의 전체 저작 통합
+  회귀는 M3, 최종 소스/링크 재유입 감사는 M4로 구분한다.
+- L0 progress 유지: fresh catalog 네 구성 각7602, SDK 필터 D/R/ASan568·
+  Shipping564(실제 GPU), import/현재 자산 네 구성 각1715, migration1409,
+  package6, 저작 소유권 SourceOnly 통과. M2의 Editor 복원·Player cooked/DDOL
+  레이어 보존도 연결한다. 실제 Editor 정책 변경→Body/CCT refilter→Undo→
+  Stop/재시작을 한 경로로 확인하는 통합 게이트는 아직 확보하지 않았다.
+
+레이어 import 검사기의 첫 재실행은 현재 tags-only TagManager.asset에 구 layers
+구역이 없어 실패했다. 제품 회귀와 구 입력 검사기 불일치를 구분한다. 검사기는
+`fixtures/LegacyProjectLayers/`의 고정 변환 전 입력을 읽고, 별도 인자로 현재
+Dynamic_CPP/Assets를 검증하도록 수정했다. 런타임 구 스키마 fallback은 추가하지 않았다.
+수정 후 네 구성 모두 통과했으며 최초 실패를 수용 결과로 포함하지 않는다.
+
+Fresh 로그: Build/Obj/Phase19B0/closure-all.log,
+Phase19L0Sdk/closure-all.log, Phase19L0/closure-catalog.log,
+Phase19L0Import/closure-import.log, Phase19M0Script/closure-abi.log.
+철거 결과: Build/Obj/Phase19R0/cutover-audit.json.
+제품 수용 연결: Build/Obj/P19DdolFailureDS/WD-46a3b33f/m2-acceptance.json.
+제품을 이번 문서 정리에서 다시 구동한 것은 아니며 위 M2 보존 실행을 재사용한다.
+계획 공수는 유지한다. Phase19는 10/19 완료, progress6/todo3이다.
+다음은 L0 Editor 정책 변경 통합 게이트이며 M1/M3/M4 완료를 주장하지 않는다.
+
+## 2026-10-03 L0 완료: 실제 Editor 정책 변경/Undo/Stop 통합
+
+Fresh Release CreatorEditor를 현재 소스로 빌드한 뒤
+`Tools/regression/verify-physics-layer-http.ps1`을 실행했다.
+HTTP143명령/86 checks, 독립 동적 box와 CCT가 같은 공통 레이어 정책을 사용한다.
+
+실행 중 발견한 결함: LayerSettingsCommand가 게임 Undo 스택을 사용하면서도
+Layers.celayers에 실행 중 정책을 저장했다. Stop의 메모리 snapshot 복원만으로
+디스크 변경은 회수되지 않았다. 명령 생성 시 편집/Play publication 정책을
+고정했다. Play 변경과 Undo/Redo는 메모리 쌍/revision만 발행하며, 편집 모드는
+기존 Editor 저작 트랜잭션으로 파일을 저장한다. Inspector와 HTTP는 같은 경로다.
+엔진 런타임/Player에 저작 저장 경로를 추가하지 않았다.
+
+실제 제품 수용:
+- 편집 정책 차단의 파일 변경, Undo의 정확한 파일 복원, Redo 재게시와 재Undo.
+- Play의 이름 변경/Undo 후 layer ID·slot·Entity 소속 보존.
+- 허용 상태: body 중심 y0.499999, CCT foot y약0으로 접지.
+- 두 쌍 차단 후 기존 Body/CCT를 초기 위치로 재배치: body y-2.024974,
+  CCT 중심 y-2.39285로 실제 바닥 통과. 게임 Undo 깊이+2, 편집 스택 불변.
+- Undo 두 번 후 새 revision: Body/CCT 재접지. Body component 신원 유지.
+- Redo 두 번 후 다시 통과: body y-2.965099.
+- 차단 상태에서 Stop: 세 객체 pose/rotation/scale/layer/활성/component ID 복원,
+  캐릭터 simulating=false/tick0, 공통 정의 복원과 monotonic revision 확인.
+- Replay: 원래 허용 정책으로 다시 접지(body y0.4999991), 두 번째 Stop 복원.
+- Play/Undo/Redo/Stop 동안 저장 Scene·Layers.celayers·tags-only TagManager.asset
+  SHA 불변. owned Editor 종료 후 호출자 원본 Layers.celayers도 정확히 보존.
+
+최종 evidence: Build/Obj/Phase19L0Editor/http-93576c5699e0408c890e3e501fac9b49/result.json.
+receipt의 runtime DLL SHA는 현재 바이너리와 일치하며 probe 소스 SHA도 기록한다.
+빌드: Build/Obj/Phase19L0/editor-layer-host-fix-build.log 및 layer-probe-build.log.
+실행: Phase19L0/layer-http-final.log, 개별 results.jsonl.
+SourceOnly 저작 소유권 게이트도 통과했다.
+
+최초 loader exit161은 생성된 배포의 오래된 forest recipe였으며 현재 검증된
+cook 입력을 Bin 배포에 적용하고 재실행했다. 원본 Resources는 변경하지 않았다.
+수정 전 Play 파일 변형을 검출한 실행은 실패 증거다. 첫 수정 후 러너의 중복
+초기화로 누적 검사 수가4로 기록된 receipt도 제외했다. 중복 초기화를 제거하고
+다시 실행한 최종86 checks만 수용한다.
+
+앞 절의 native catalog/SDK/import/migration/package와 M2의 DDOL·cooked 제품
+검증에 이번 실제 Editor 게이트를 결합하여 L0를 done으로 변경한다.
+Phase19는 11/19 완료, progress5/todo3이다. 계획 공수는 유지한다.
+M1 데이터 스키마 변환, M3 대표 회귀/프로파일러 비용/내부 메모리, M4 최종
+소스/링크 재유입 감사는 남는다. 다음 구현은 M1 일회성 물리 스키마 변환이다.
+
+## 2026-10-03 M1 착수: primitive 일회성 변환/차단/원본 회수
+
+`Tools/regression/migrate-physics-schema.py` 및 사용 계약 PhysicsSchemaMigration.md를 추가했다.
+구 UUID와 P0 Scene/Prefab 저장값을 기준으로 Box/Sphere, compound, Rigidbody의
+static/dynamic/kinematic enum을 새 PhysicsBodyComponent/Shape schema1로 변환한다.
+Rigidbody instance ID는 유지하고 collider instance ID를 ShapeId로 사용한다.
+콜라이더만 있는 경우 명시적 static body를 만들며 같은 ID를 body에도 사용한다.
+파일/prefab UUID·meta는 유지한다. type UUID는 새 Body UUID로 바꾸고 원래 UUID를
+매핑 보고서에 보존한다. 비물리 값은 유지하되 변환 파일의 YAML 표기는 재작성된다.
+변경 없는 문서는 원본 바이트 그대로이며 반복 실행도 변경0이다.
+
+Rigidbody mass를 새 compound 질량/관성 계약에 적용한다. 구 density는 provenance에
+기록한다. 직렬화되지 않았던 locks/초기 속도는 복원 가능한 과거 값으로 주장하지
+않으며 초기화 정책을 보고한다. 구 속도/충격량 상한은 새 저작 필드가 없으므로
+기본 차단한다. explicit --reset-legacy-limits도 정확한 구 default 값에만 허용한다.
+custom 상한은 계속 차단한다. 실제 프로젝트에 이 정책으로 apply하지 않았다.
+
+안전 경계: duplicate YAML key/alias, 잘못된 값/신원, 독립 비활성 형상,
+동적 sensor-only, 충돌-disabled body, 기존 새 Body와 혼합 소유권, prefab override,
+asset-linked collider, 제거 collider의 외부 참조를 거부한다. 전체 프로젝트의
+하나라도 진단이 있으면 apply도 게시0이다. ZIP은 원본 bytes/CLYR/SHA256/매핑을
+보존하고 partial write failure는 게시된 파일을 역순 원복한다. symlink/범위 외
+저작 경로와 변경된 layer catalog/source도 거부한다.
+
+Fresh `verify_physics_schema_migration.py`: 37 checks. 실제 P0Drop prefab 기반,
+ID/shape/material/mass/Transform/UUID/layer, compound Box/Sphere, static 소유권,
+미지원 거부, dry-run 게시0, 프로젝트 전체 사전 검증, 둘째 파일 쓰기 실패 원복,
+ZIP/manifest/meta 보존과 반복 변경0을 확인했다.
+변환 Shape를 엔진 native ParsePhysicsShapeDocument에 전달하여 Debug/Release/ASan
+각46 checks 통과. Python 변환값만 확인한 것이 아니며 전체 제품 로드 증거도 아니다.
+증거 Build/Obj/Phase19M1/{migration-tests.json,native-shapes.log,
+primitive-converted.prefab,primitive-shapes.yaml,primitive-mappings.json}.
+
+현재 Dynamic_CPP dry-run은 P0 prefab/Scene의 구 solver limit 때문에 exit2.
+explicit default reset dry-run도 P0 Scene의 구 CCT 때문에 exit2이며 전체 게시0.
+보고서 project-dry-run.json/project-explicit-dry-run.json. 원본 P0 fixture와 실제
+프로젝트 파일을 변경하지 않았다. 새 runtime 구 스키마 fallback은 없다.
+
+M1은 progress다. Capsule/CCT(C1 단위·소유권 정책), mesh/terrain/ragdoll,
+reference/override remapping, 실제 대표 corpus의 native load/cook/package/제품
+회귀는 남는다. cooked 파일을 직접 고치지 않고 새 schema로 재쿠킹해야 한다.
+Phase19 11/19 완료, progress6/todo2. 공수는 유지한다.
+
+## 2026-10-03 M1 Capsule 축/높이 이전 및 CCT 진단 연결
+
+구 Physx.cpp의 static capsule은 PxCapsuleGeometry(radius,height)를 X축으로
+생성했다. dynamic/kinematic은 height/2와 local +90° Z 회전으로 Y축을 사용했다.
+새 API는 항상 Y축이므로 static 변환은 local -90° Z로 새 축 보정을 상쇄하고
+halfHeight=구 height를 사용한다. dynamic/kinematic은 halfHeight=구 height/2다.
+단순히 모든 저장 height를 절반으로 바꾸면 static의 길이와 축이 달라진다.
+
+migrate-physics-schema.py에 Capsule 저작 변환을 연결했다. 원래 shape ID와
+재질/반지름을 보존하고 매핑 manifest에 Capsule 정책을 기록한다. 구 dynamic의
+pre-scale 경로와 새 scale 1회 적용을 혼동하지 않도록, 이번 slice는 자산 내
+모든 Transform unit scale 및 Capsule offset0/rotation identity에 제한한다.
+비단위 scale·offset 합성은 명시적 진단이며 임의 근사하지 않는다.
+
+Python migration 51 checks: static/dynamic 축과 height, 정책 기록, 미지원 scale/
+offset 거부, 기존 primitive/rollback/ID/UUID 검증 및 CCT 보고 연결 통과.
+실제 변환 Capsule YAML을 native parser와 static/dynamic ValidatePhysicsShapes에
+전달하여 Debug/Release/ASan 각52 checks 통과. 실제 SDK 충돌/전체 native Scene
+로드·재쿠킹·제품 회귀를 이번 단독 parser/preflight 증거로 주장하지 않는다.
+증거 Build/Obj/Phase19M1/{capsule-migration-tests.json,capsule-shapes.yaml,
+capsule-native-final.log}. 초기 typed BuildPhysicsShapes 탐침은 독립 parser 실행파일의
+CollisionGeometry::kind 링크 의존 때문에 실패했으며 제외했다. 의도한 SDK-free
+저작 preflight를 검증하는 ValidatePhysicsShapes로 바꾼 최종 결과만 수용한다.
+
+CCT는 변환을 계속 차단한다. --baseline-seconds로 명시적 구 tick을 지정하면
+기존 C1 단위 도구를 연결하여 원본 SHA와 unit proposal/reviewRequired를 보고한다.
+이 옵션은 CCT 게시를 허용하지 않는다. 1/60 fixture 기준 P0 저장 maxSpeed는
+61.5m/s, late-update baseSpeed*multiplier는1.5m/s이며 이 차이를 모두 기록한다.
+gravity -12m/s², jump3m/s, acceleration60m/s² 제안과 감쇠 단위도 연결한다.
+새 movement API의 외부 desired-velocity 입력 정책, dynamic lerp/자동 회전,
+offset/scale, 동반 Rigidbody 소유권과 비직렬화 controller 설정은 미해결이다.
+C1 단위 회귀22 checks도 통과했다.
+
+현재 프로젝트 explicit reset + baseline dry-run은 구 CCT를 진단하며 게시0이다.
+보고서 Phase19M1/capsule-cct-dry-run.json에 source hash/characterUnitProposals를
+보존한다. 실제 P0 자산과 저작 프로젝트에는 apply하지 않았다.
+M1은 progress 유지. 다음은 CCT 입력/소유권 정책 확정과 참조/override remapping,
+복잡 지오메트리 및 전체 제품/corpus 이관 검증이다.
+
+
+### 2026-10-03 M1 CCT reviewed migration and reference closure
+
+원본 CCT+collider 없는 companion Rigidbody SHA에 연결된 명시 정책으로
+CharacterMovementComponent 변환과 velocity carrier 제거를 구현했다.
+입력 speed 선택·static decay·dynamic damping 폐기·외부 회전·fall limit을 기록하며
+게임 입력/회전 코드를 생성하지 않는다. 제한된 typed prefab override는
+Rigidbody mass/linear damping/gravity, CCT radius/height의 effective 원본 값에
+일치할 때만 변환한다. 다른 자산의 retired component 참조는 전체 게시를 차단하고,
+쓰기 직전 전체 inspected corpus 변경도 검사한다.
+
+Python 73 checks 통과. Release Editor에서 변환된 P0 fixture 이동·접지·점프와
+Play/Stop 두 회차 원상복귀, 씬/레이어 파일 불변을 확인했다.
+근거: Build/Obj/Phase19M1Editor/http-351781bf414343fc916efe2568d83ce2/result.json.
+점프는 completed-ground 전제 거부를 기록하고 조건을 만족한 요청의 수용을 검증했다.
+M1 progress 유지: 실제 게임 입력/회전, 복잡 geometry/override/typed reference remap,
+전체 corpus 및 cook/Player 검증은 잔여다. 실제 저작 자산에는 apply하지 않았다.
+
+
+### 2026-10-03 M1 external type-reference closure
+
+다른 Scene/Prefab의 ID 없는 구 물리 타입명·UUID 참조도 전체 사전 검증에
+포함했다. type key, override YAML 내 타입명, 대문자 UUID를 거부하며 새 타입
+참조는 허용한다. 자동 문자열 치환은 하지 않고 명시 typed remap을 요구한다.
+Python 78 checks 통과, 현재 Dynamic_CPP dry-run 2files/3bodies/1character,
+진단0·게시0. 실제 게임 입력/회전 소비 코드는 현재 저작 프로젝트에 없어
+연결 완료로 판정하지 않는다. M1 progress 유지.
+근거: Build/Obj/Phase19M1/type-closure-project-dry-run.json.
+
+
+### 2026-10-03 M1 geometry source recovery preflight
+
+삭제 전 revision 12f970c7ed3a4408d268479f5d5acb5f80372b8c의 MeshCollider.h,
+TerrainCollider.h, PhysicsManager.cpp를 대조했다. MeshCollider m_Info는
+직렬화 대상이 아니며 convex 정점을 채우는 배선도 없었다. Terrain 높이 데이터는
+TerrainComponent에서 공급했다. 콜라이더 YAML만으로 cooked 형상 복원은 불가능하다.
+
+변환 실패 보고서에 geometryRecoveryRequirements를 추가했다. 파일/컴포넌트 SHA,
+원본 값, 동일 Entity의 MeshRenderer/TerrainComponent 공급 후보와 필요한
+model/submesh·높이 순서/양자화·축 scale·재질/cook 정책·geometry UUID/revision을
+기록한다. Ragdoll은 별도 body/joint 소유권을 요구한다. 적용 허용 정책은 아니며
+누락 데이터가 있는 프로젝트는 전체 게시를 차단한다. Python84 checks 통과:
+공급 후보·원본 hash·Terrain/Ragdoll 누락·apply 무변경 검증 포함.
+M1 progress 유지. 실제 geometry 이전 및 native/cook/Player 수용은 잔여다.
+
+
+### 2026-10-03 M1 explicit geometry identity bindings
+
+geometry 이전 정책 schema1 검증기를 추가했다. authoring/component/supplier 및
+원본 파일·대상 geometry·meta SHA를 고정하고 UUID/revision/kind·CECG v1
+체크섬을 검증한다. Mesh는 convex, Terrain은 heightfield만 인정한다.
+프로젝트 밖 경로·중복 component·변경 hash/identity·손상 체크섬을 거부한다.
+실제 단검 geometry 파일의 신원 연결을 회귀에 사용했다. 원본 모델 fixture는
+합성 identity-only 데이터이므로 모델→형상 동등성 검증 근거가 아니다.
+Python97 checks. read-only identity_bound_native_validation_pending이며
+native payload decode/cook, 재질/pose/scale 정책, shape 변환/Player 수용은 잔여다.
+M1 progress 유지; 실제 자산 apply0.
+
+
+### 2026-10-03 M1 native geometry policy acceptance
+
+engine CollisionGeometryCodec decode→PhysX cook_geometry_blob→load_geometry_blob
+게이트를 추가했다. Release 실물 단검 convex(6030 cooked bytes), heightfield(102),
+triangle mesh(372) 수용. checksum을 재계산한 잘못된 point count payload는
+native decode 단계에서 거부된다. 파일/실행파일 SHA receipt를 정책 검증기에
+연결하고 hash/kind/revision/result 불일치를 거부한다. 실제 단검 receipt를 넣은
+Python102 checks 통과. evidence Phase19M1NativeGeometry/Release/.
+SDK cook/import 수용이며 바디 충돌이나 이전 source 동등성 증거는 아니다.
+재질/pose/scale/cook 정책·shape 변환·Player 수용이 남아 M1 progress 유지.
+
+
+### 2026-10-03 M1 reviewed geometry shape conversion
+
+geometry-policy/native-receipt를 오프라인 변환기에 연결했다. sourceSelection,
+재질/pose/geometryScale 명시 정책을 요구하며 실제 원본 pose 일치와 전체
+owner/ancestor unit scale을 확인한다. Mesh→convex shape3, Terrain→heightfield
+shape5; Terrain은 standalone static solid/identity 회전만 허용한다.
+unknown 필드·비활성 독립 shape·asset link·Ragdoll/geometry override는 차단한다.
+geometry UUID/revision·body/shape ID 보존, 파일 쓰기 전 의존 hash 재검증.
+임시 fixture apply·ZIP 원본 복구·재실행 no-op 포함 Python112 checks.
+실제 단검 native receipt 사용, 생성 convex YAML Release native parser56 checks.
+Terrain 검사는 정의 변환 fixture이며 실제 높이 원본→대상 동등성/cook 제품
+수용을 의미하지 않는다. 실제 저작 geometry apply 및 cooked Player는 잔여.
+M1 progress 유지.
+
+
+### 2026-10-03 M1 real dagger source equivalence and migrated package
+
+Weapon_Dagger_G3_005_Separate.glb SHA 50b2a38725557a7ce96e72c3c727349756a329c3194bad106821f9801298a0b7:
+static identity node/all primitives의 Z reflection·metre float32 고유점2119개가
+CECG convex 입력과 byte-record multiset으로 일치했다. point 변경 후 checksum을
+재계산한 geometry는 불일치로 거부된다. cooked hull topology 비교는 아니다.
+
+기존 단검 제품 fixture에서 구 Rigidbody/MeshCollider 구조를 재현해 명시 정책으로
+변환했다. 역사적 게임 저장 자산이 아닌 재현 fixture다. Shape ID 외에는 기존
+바디 정의와 동일하며 원본 ZIP과 변환 SHA를 보존했다. fresh Release distribution
+패키지의 Scene 및 Player.runtime.dll hash가 로컬 결과와 일치한다.
+패키지 smoke와 별도 Player 물리 각각14/0(낙하·접촉·회전·impulse·재착지).
+별도 completed display/정상종료 게이트는 600초 내 완료 결과가 없어 실패했다.
+소유 Player를 종료했고 제품 전체 수용으로 판정하지 않는다. 렌더/RHI 원인은
+확정하지 않았다. evidence Phase19M1Dagger/acceptance.json.
+
+
+### 2026-10-04 M1 Player timeout phase isolation
+
+Player smoke에10초 간격 GT/render/published/consumed/completed/promotion/slot
+진행 로그를 추가했다. fresh Release Player 빌드 통과. 기존 패키지 사본의 runtime을
+진단 빌드로 교체한 실행이며 정식 재패키지 제품 수용 근거가 아니다.
+resize/no-resize 두 실행 모두 물리14/0, GT frame 증가, snapshot은
+published1/consumed1/rendered0/inFlight0/completed0/promotion0/readyfalse.
+정상 shutdown 진입 전 display 전제 대기임을 확인했다. resize 단독 원인으로
+설명할 수 없으며 최초 frame 내부/GPU 단계 원인은 아직 미확정이다.
+30초 무진행 watchdog으로 두 실행을 실패 기록·소유 process 종료했다.
+verifier 기본은60초 무진행, 총 제한600초 유지. 완료 기준8promotion/slot rotation은
+유지한다. initial shader/cook warmup 가능성을 원인 분석에서 배제하지 않는다.
+근거 Phase19M1Dagger/progress-investigation.json, failure.json 두 건.
+M1 progress 유지; 다음은 frame1 내부 phase와 RHI 제출/완료 경계 진단이다.
+
+
+### 2026-10-04 M1 render startup versus steady sealing failure
+
+명시 CE_RENDER_PROGRESS_TRACE=1일 때 첫3 frame consume/tuning/proxy/collect,
+pipeline device/pass/IBL/display, pass 이름과 Forward shader/PSO 변형 진행을
+추적하도록 진단 로그 추가. 최종 Release Player 빌드 통과. 진단 runtime 사본
+실행이라 정식 제품 package 수용 근거는 아니다.
+
+Forward 초기화는 고정 정지가 아니라 실제 진행했다. 초기30초 watchdog이
+render count만 보아 예열을 무진행으로 오판한 한계를 확인하고 초기화 phase
+진행도 signature에 반영했다. 후속 실행에서 pipeline/IBL/display 구축·sealing과
+frame1/2 완료(display2/slotMask3/readytrue)를 확인했다. 이후 GT publish/consume은
+계속 증가하나 display2에서 멈추고 idle 증가, enabledtrue에 아래 오류가 반복된다:
+LX Scene input sealing failed: Scene graph geometry 7990584863953042883:
+Scene mesh reuse needs a valid current view and matching pose layout.
+
+직접 실패 경계는 MaterialGraphMeshSurface::BuildSceneZeroLod 재사용 preflight다.
+GPU hang이나 shutdown lock을 원인으로 확정하지 않는다. 다음은 current view,
+world affine, bone layout 중 실제 거부 조건 분리와 수정, fresh package 재검증.
+근거 Phase19M1Dagger/render-boundary-investigation.json 및 render-error-trace.log.
+M1 progress 유지, physics14/0과 최종display 실패를 분리한다.
+
+### 2026-10-04 M1 physics render affine transport fix
+
+재사용 preflight 오류를 world/view/palette/layout별로 분리한 실제 Player 실행에서
+world affine 거부를 확인했다. 정상 범위의 포즈 값이지만 정확한 homogeneous
+0/1 규약에 실패한다. Scene::PhysicsRenderMatrix의 world * inverse(bodyWorld) *
+interpolated 경로를 native 128포즈로 재현했으며, 기존 경로 62포즈에서 m[3][3]이
+정확한 1을 벗어났다. 진단 runtime 실행은 반복 중 통과/실패가 섞여, 단일 통과를
+해결 근거로 삼지 않는다.
+
+바디 자신은 compose한 interpolated 행렬을 직접 반환한다. 자식은 일반 inverse의
+homogeneous 열을 affine 상수로 복원한 뒤 상대 변환을 적용하며, 특이행렬이면
+현재 world를 보존한다. Render mesh 검사의 허용오차는 완화하지 않았다.
+Release B2 729 checks / GPU verified 통과: 128포즈에서 정확한 affine 성분과
+자식 local offset/scale, singular fallback을 검증했다. Release Player 빌드 통과.
+
+초기 fresh package는 forest cook recipe stale(exit161)로 차단됐다. 환경 recook
+(roundtrip exact/validation0) 및 Bin 배포 파일 갱신 후 새 distribution과 package를
+다시 만들었다. 변환 단검 fresh package smoke 통과; 별도 Player 물리14/0,
+displayPromotions8, frames175279, exit0, package immutable/cooked-only/parser0 통과.
+월드 affine sealing 거부 없이 완료했다. runtime SHA256
+1102167851643D4C40252D28561B809614F06277CEBAFD5E19C706FC3EDE89BA.
+근거 Build/Obj/Phase19M1Dagger/affine-fix.json, affine-current-package.log,
+Build/Obj/Phase19DaggerPlayer/run-80011cff680043a6886824f9474f6a30/result.json.
+M1 전체 corpus/복잡 override/reference/실제 Terrain 복구 및 입력·회전 검증은
+별도 잔여로 progress 유지. 새 Editor 재빌드/Play-Stop 검증은 이번 변경에서 미실행.
+### 2026-10-04 affine fix Editor lifecycle verification
+
+수정 Scene.cpp/PhysicsTransformPolicy.h를 포함한 Release CreatorEditor 재빌드 통과.
+B2 HTTP 게이트에서 dynamic/static/kinematic 각9 assertions를 두 실행에서 통과했다.
+두 Play/Stop 이후6 엔티티 position/rotation/scale을 최초 값과 비교해 원복을 확인했고,
+세 번째 shear 실패 실행은 idle 복귀 및 같은6 엔티티 원복을 확인했다.
+저작 Scene SHA 불변 검사와 affine 정책 header freshness 검사를 게이트에 추가했다.
+근거 Build/Obj/Phase19B2Editor/run-cdf8416241b047aca4e6b40ce04aebc9/result.json.
+
+새 Editor로 변환 CCT HTTP 게이트도 통과했다. 명시 CLI 이동/접지/점프,
+Play/Stop2회 변환·runtime tick0 원복, Scene/Layer 파일 불변 확인.
+근거 Build/Obj/Phase19M1Editor/http-99fdef9816834d1eb2facb0842526fa7/result.json.
+캐릭터 게이트의 freshness에 Scene.cpp/PhysicsTransformPolicy.h를 추가했다.
+이 검증은 lifecycle/저작 원복 근거이며 Editor Game display fence 수용이나
+실제 gameplay 입력 배선 검증을 대체하지 않는다. B2 종료 로그의 profiler
+RHIThread abandoned1/retained1 경고는 별도 계측 종료 진단으로 남긴다.
+M1 전체 corpus·복잡 참조·실제 Terrain 복구는 잔여로 progress 유지.
+### 2026-10-04 Editor completed display gate
+
+B2 HTTP gate에 Play 중 game 및 Stop 이후 scene 대상 완료 검사를 추가했다.
+render.live.fence는 RT completedFrame > 요청시 publishedFrame을 검증하고,
+dx12.live의 해당 target active/ready/completedFrame > 같은 요청 프레임을
+별도로 검증한다. HTTP sync는 고정5초 제한으로 긴 초기화 도중 timeout되므로
+fence만 async 요청/operation 완료 polling으로 실행하며, renderer 완료 조건은 유지한다.
+
+새 Release Editor 실행에서4경계 통과:
+game after639/RT14703/display14876, scene14889/14890/14906,
+game15364/15365/15438, scene15462/15466/15522. 모든 target ready true.
+B2 물리 각9 assertions 두 실행, Stop2회 및 shear 실패의6 엔티티 원복,
+저작 Scene 파일 SHA 불변도 함께 통과했다. shear 실패 후 표시 프레임은
+이번4경계 검사의 범위에 포함하지 않는다. 표시 슬롯 완료 근거이며 사용자
+모니터의 실제 scanout 또는 이미지 픽셀 비교를 주장하지 않는다.
+근거 Build/Obj/Phase19B2Editor/run-c29413cbda3e484f87abfee70ab9bd1d/result.json.
+M1 전체 corpus/복잡 참조/실제 Terrain 복구·게임 입력 배선은 잔여로 progress 유지.
+
+### 2026-10-04 M1 current corpus preflight
+
+Dynamic_CPP Scene/Prefab85개 조사. 기본 dry-run은 P0Drop prefab/P0Baseline scene의
+legacy default solver-limit 명시 동의 부재로2파일 차단. 보고서에 inspectedFiles 및
+각파일 path/SHA256/outcome 목록 추가. 임시 사본에서 reset-defaults만 허용하면
+프리팹1개 준비, P0Baseline 구CCT source-hashed policy 부재로 전체 apply 차단.
+부분 쓰기/backup0, 원본85개+Layers byte 불변 확인. 실제 authoring apply0 유지.
+새 verify-physics-migration-corpus.py는 임시 corpus preflight/apply, 차단시 무쓰기,
+성공시 변환 멱등성/ZIP 원본/after SHA/정확복구 및 원본불변을 검증한다.
+P0Drop 단독 positive corpus는1파일 변환·멱등·ZIP byte복구 통과. Python112 통과.
+근거 Build/Obj/Phase19M1Corpus/{dry-run,result,positive}.json.
+전체 corpus 완료 아님. 실제 P0 CCT 정책의 원본 일치 확인이 다음 선결 작업.
+
+
+### 2026-10-04 M1 current corpus reviewed CCT policy
+
+기존 character-mappings.json의 검증했던2169397090 정책을 복원해 현재 corpus에
+대조했다. CCT+동반 Rigidbody canonical source SHA
+0af2ffd862e1c6cad4692882d70c247b5862fa8bd886e6a4d647e40a45367894
+일치, baseline1/60·steady1.5m/s·external input/rotation 및 carrier 제거 정책 유지.
+corpus verifier에 --character-policy와 정책파일 SHA/실행중 불변 검사를 추가했다.
+현재85 Scene/Prefab 임시 사본:2파일/3body/1character 변환, 전체 재실행 변경0,
+ZIP 원본/after SHA 확인·정확 byte복구·원본85개+Layers 불변 통과.
+source SHA를0으로 바꾼 부정정책은 전체 apply 차단·부분쓰기0 확인. Python112 통과.
+근거 Phase19M1Corpus/with-policy.json 및 mismatched-policy-result.json.
+실제 authoring apply0, corpus cook/Editor/Player acceptance 및 meta identity 검증은
+이 임시 변환 검사와 별개로 남는다. M1 progress 유지.
+
+
+### 2026-10-04 converted corpus product handoff
+
+Dynamic_CPP Assets/ProjectSetting 전체를 Phase19M1CorpusProduct/Project로 복사하고
+검증된 CCT 정책으로2파일/3body/1CCT 변환·ZIP backup을 보존했다. 저작 원본 apply0.
+현재 프로젝트에 Assets/Script 폴더가 없어 사본에 현재 GameScripts 소스를 제공했다.
+전체 package managed compile 통과. 모델 cook은 Cha_Mon_5.fbx 메타가 요구하는
+926b7b0d-1c12-865a-b8b1-841cc4d8c1af generation7 저장소 부재에서 실패했다.
+원본 Library에도 해당 generation 없음. generation-audit.json에 총 모델 의존 누락
+목록을 기록했다. 첫 모델의 staging generation 재생성 로그와 authoring meta를
+구분했다. meta-audit.json은282개 meta 원본/사본 해시 동일(변경0)을 확인했다.
+전체 cook/Player 통과 주장하지 않는다.
+변환한 사본의 PhysicsP0Baseline.creator를 새 Release Editor로 직접 읽어
+CLI 이동·접지·점프 및 Play/Stop2회 원복/Scene-Layer 불변 통과.
+근거 Phase19M1Editor/http-a73e856629da4227b90674bab51149aa/result.json.
+전체 product gate 실패 근거 Phase19M1CorpusProduct/package.log, generation-audit.json,
+meta-audit.json 및 migration.json. 다음은 사본의 source-hashed model generation
+재생성·신원 검증 후 corpus cook 재시도. M1 progress 유지.
+
+
+### 2026-10-04 M1 corpus model generation recovery
+
+새 recover-corpus-model-generations.py는 독립 사본의 모델 source bytes를 원본과
+대조하고 native authoring 후 assetId/authoringKey/identity profile/epoch/sourceFingerprint
+및 subasset(kind,stableKey,assetId)을 비교한다. 현행 모델15개 generation 재생성·
+신원 보존 통과. generation 번호는 재생성으로 변경되며 구 generation7을
+그대로 복원했다는 의미가 아니다. 원본 meta는 변경하지 않았다.
+DX12ValidationPrimitives/Phase17_Infinian/Phase17_Sponza의 구 GUID 메타3개는
+현행 신원으로 바뀌므로 복구 수용에서 제외·사본 구meta 유지·명시 참조 이전 잔여.
+이 목록 때문에 receipt result는 CORPUS_MODEL_GENERATIONS_BLOCKED다.
+전체 package 재시도는 generation 부재를 넘어 Foliage_WeedPlant02의 embedded
+texture export에서 실패: generation 실제textures UUID.jpg, 요구 경로 UUID.png.
+임의 확장자 파일 복제 없이 export 경로 생성 오류로 남긴다. 신원 검사 통과가
+전체 generation payload cook 수용을 뜻하지 않는다. 전체 Player는 미실행.
+근거 Phase19M1CorpusProduct/generation-recovery.json 및 package-recovered.log.
+다음은 embedded texture export 경로와 실제 generation payload 경로 일치 수정.
+M1 progress 유지; 실제 authoring apply0.
+
+
+### 2026-10-04 generation texture export path correction
+
+ModelGenerationExportProducer가 texture UUID에 .png를 고정 부가하여 JPG generation
+payload를 찾지 못했다. 검증된 generation의 export 파일 목록에서 textures 디렉터리와
+UUID stem이 맞는 유일한 실제 파일 경로를 사용한다. 누락/동일UUID 복수파일은 거부.
+확장자 변경이나 bytes 재인코딩 없음. Release AssetCooker 빌드 통과.
+새 verify-model-texture-export.py 네이티브 JPG/PNG6payload 정확byte/확장자 유지,
+동일UUID JPG+PNG 모호성 거부 통과. Foliage 단일 native cook도 통과.
+근거 Phase19M1CorpusProduct/TextureExportRegression/result.json 및
+texture-export-positive.log. fresh distribution 전체 재시도는 texture export를 넘어
+manifest closure에서 exit4 실패했다. entry c86fb443-1481-493c-9f37-6ae76cdadf54
+Scene의 구 모델 GUID76cda096-f43a-4eb1-a98b-38fe7d25db52가 manifest에 없다.
+앞서 DX12ValidationPrimitives 구GUID 정책 잔여로 확인한 참조 이전 문제다.
+근거 package-texture-fixed.log. 전체 Player 미실행, M1 progress 유지.
+
+
+### 2026-10-04 explicit legacy model Scene reference migration
+
+사본의 legacy 모델3개를 native authoring으로 현행 신원/generation으로 발행했다.
+새 migrate-corpus-model-references.py는 source byte SHA·현행 sidecar fingerprint·
+UUIDv8 검증, 구/신 sidecar SHA 및 model GUID mapping을 receipt에 남긴다.
+재질 subasset은 binding+name 유일 대응만 허용, 미해결 legacy subasset 참조는 거부.
+MeshRenderer의 구model GUID+유일 mesh name으로 새 m_modelGuid/m_meshAssetId를
+명시 설정한다. 독립 사본만 허용하며 변경 전 입력 재검증·ZIP backup·실패 rollback.
+Scene/Prefab scope preflight/apply: DX12Validation1파일/6typed mesh binding 통과.
+재실행 변경0. 원본 저작 프로젝트는 미적용. backup/receipt는
+Phase19M1CorpusProduct/model-reference-{preflight,applied,idempotent}.json 및
+model-reference-backup.zip. 전체 material/참조 이전 완료를 주장하지 않는다.
+Phase17_Infinian.asset/Phase17_Sponza.asset는 CEMA v2 binary에 구model GUID가
+남는다. 전체 scope는 명시 native codec 필요 오류로 거부; YAML/byte 치환 없음.
+다음은 CEMA decode→typed GUID remap→encode/hash 검증 후 전체 cook 재시도.
+M1 progress 유지, 전체 Player 미실행.
+
+
+### 2026-10-04 CEMA classification correction and retirement
+
+앞선 CEMA2파일을 binary material로 분류한 판단을 정정한다. 엔진
+AuthoringParsedDocument.cpp는 CEMA를 구 모델 cache로 명시한다. 현재 모델은
+source-hashed schema2 generation으로 이미 발행했으므로 구cache codec 재도입 없음.
+새 retire-corpus-legacy-model-caches.py: 독립 사본 제한·source byte 고정·CEMA magic·
+asset GUID ASCII(대소문자)/raw UUID 양byte-order 참조 전수 검사·정확ZIP 검증 후
+2cache+2meta 제외. 실패 rollback, 원본불변 확인. 참조0으로 사본 retirement 통과.
+부정 fixture cache 참조를 주면 삭제0/backup0/4파일보존 통과.
+전체 text reference preflight 변경0 통과. corpus cook 재시도 중이며 Player 미확인.
+근거 Phase19M1CorpusProduct/legacy-cache-retirement.json, legacy-cache-backup.zip,
+CacheNegative/result.json 및 model-reference-full-preflight.json. M1 progress 유지.
+
+### 2026-10-04 full corpus cook and model JPG path contract
+
+- CEMA cache retirement 후 전체 native cook: 18 models, 331 artifacts, 36 generation companions, 71 scenes, 14 prefabs. Native cook 통과와 제품 패키징 완료는 별도 판정이다.
+- 모델 exporter가 보존한 JPG를 BuildTool의 모델 내부 texture 경로 규칙이 PNG로 제한하여 거부했다. GUID/version/shard 규칙을 유지하고 PNG/JPG만 허용하도록 수정했다.
+- BuildTool 회귀 검사 53개 통과: PNG/JPG 수용, 비 GUID 파일명/잘못된 shard/지원하지 않는 확장자 거부. 기존 full cook output 재검증 331 artifacts/36 companions 통과 (`Build/Obj/Phase19M1CorpusProduct/jpg-contract-validation.json`).
+- Fresh 전체 패키징 및 Player smoke 재실행 중 (`package-jpg-contract-fixed.log`). M1은 progress 유지, 실제 게임 프로젝트 apply 0.
+- Fresh 재실행은 [4/6 Stage], [5/6 Pak], [6/6 Verify]까지 진입했다. CEMF 555 entries/345 identities, stale=0, cooked 시작 씬 로드를 확인했다.
+- `PhysicsP0Baseline.creator`에는 CameraComponent가 없으며 Player는 `view_inactive`, rendered/completed/promotions=0 상태였다. 카메라 없는 fixture로 표시 완료를 요구하는 smoke를 실행한 검증 구성 오류다. 지정 candidate Player만 경로를 확인하여 종료했으며 정상 종료/표시 완료 통과로 판정하지 않는다.
+- 다음: 독립 사본의 검증 시작 씬에 카메라를 구성하거나 카메라가 있는 검증 씬을 선정한 후 전체 package/Player 수용을 완료한다. M1 progress 유지.
+
+### 2026-10-04 corpus smoke camera fixture and disk capacity blocker
+
+- 독립 corpus 사본의 PhysicsP0Baseline에 검증 fixture 기반 primary Camera 1개 추가. 기존 엔티티/물리 설정은 루트 children 목록 외 semantic 동일, 원본 Scene SHA 불변. 변경 전 byte 백업과 camera-fixture.json 기록.
+- Fresh camera 포함 native cook 18 models/331 artifacts 통과. [5/6 Pak]에서 디스크 공간 부족으로 중단, Player 미실행. 로그 package-camera-fixed.log.
+- C: 여유 약 736MB. 이전 실패 candidate 7개의 .package-input 생성 작업 폴더만 정리하는 경로 검증 포함 명령을 제안했으나 자동 승인 검토가 blocked by policy로 거부하여 삭제 실행 0. 사용자 승인 요청 상태. 원본/로그/백업/PAK 보존 범위.
+- 다음: 작업 사본 정리 승인 또는 디스크 공간 확보 후 package-camera-space-fixed.log로 재검증. M1 progress 유지.
+
+### 2026-10-04 preserved corpus relocation and fresh product retry
+
+- 시작 시 Build/Obj 대부분이 이미 정리되어 C: 여유 약232GiB 확인. 남은 검증 기록110개는 SHA 동일 확인 후 Build/Verification/Phase19Preserved/Evidence로 보존. Project 및 TextureFixDistribution은 해당 보존 폴더로 이동, preservation.json 기록. 남은 Build/Obj 약0.13GiB 삭제는 도구 정책 blocked by policy로 거부(삭제 실행0).
+- 새 보존 경로에서 full cook18models/331artifacts, CEDO1 문서19개, PAK 생성 및 729개 unpack, CEMF555entries/345identities stale0, cooked 시작 씬 로드 통과.
+- primary 카메라를 포함한 startupScene SHA 284a7bf4b47c33771be3ceb770912a4109bf77b5adf12b8f09df00a62224085a. view_inactive 해소, 첫 frame published1/consumed1/completed0/result_pending 지속. Player 90초 watchdog timeout, 정상 종료/표시 승격 미확인으로 제품 gate 실패. GPU hang/셰이더 지연 원인 확정 없음.
+- 근거 Build/Verification/Phase19Preserved/package-camera-space-fixed.log, Staging/.fe9620df49e9446d9fc31520d9d5f00f.candidate/package-manifest.json 및 .fe9620df.vt 로그. 이미 생성한 candidate를 다음 렌더 진단에 재사용하여 full corpus 재cook 반복을 피한다. M1 progress 유지.
+
+### 2026-10-04 corpus Player first-render wait resolved by measured readiness
+
+- 기존 candidate 재사용, full corpus recook 0. CE_RENDER_PROGRESS_TRACE=1은 Forward shader variant/PSO 초기화, pipeline.end 이후 ShaderMeta/material seal, seal.end, 실제 표시로 전진함을 확인. 진단 실행 exit0/display frame2/promotions2/parser0. 이전90초 timeout을 GPU hang/renderer deadlock 근거로 사용하지 않는다.
+- 추적 OFF fresh process 재검증 exit0, 실제 completed display/slot rotation 및 기존 BuildTool PlayerVerification.ValidateMarkers 통과. RenderAcceptance/marker-result.json 참조. 정상 lifecycle/RHI shutdown pending0 확인.
+- Manifest hash 기준 runtime236파일, unpack729파일 exact size/SHA 및 파일수 closure, PAK SHA 일치. 원본 Scene SHA 불변. RenderAcceptance/payload-result.json, result.json. diagnostic trace on/off 조건 분리.
+- 300초 watchdog 안에서 준비 완료 확인; 제품 smoke는 GPU/presentation 완료 조건 그대로 유지. renderer 코드 수정 없음. 패키지는 이전 실패 candidate에 유지하며 current pointer publish 없음.
+- 수용 범위는 full corpus package의 PhysicsP0Baseline 시작 씬 smoke다. 모든 씬의 gameplay/geometry/override 검증, 실제 프로젝트 migration apply, 대표 부하 성능 및 M3/M4는 잔여. M1 progress 유지.
+- 근거 Build/Verification/Phase19Preserved/RenderDiagnosis 및 RenderAcceptance/result.json. 다음 M1 복잡 prefab override/자산 참조와 실제 geometry 입력 복구 조건 검증을 진행한다.

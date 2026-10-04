@@ -1,4 +1,4 @@
-﻿#include "PhysicsScene.h"
+#include "PhysicsScene.h"
 #include "PhysicsTestHooks.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <physx/PxPhysicsAPI.h>
@@ -12,6 +12,8 @@
 #include <condition_variable>
 #include <concepts>
 #include <cstdio>
+#include <cstdlib>
+#include <string_view>
 #include <format>
 #include <limits>
 #include <mutex>
@@ -21,11 +23,55 @@
 #include <array>
 #include <mdspan>
 #include <mathematics/views.hpp>
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <Windows.h>
+#endif
 
 namespace ce::physics
 {
 namespace
 {
+bool resource_probe_enabled() noexcept
+{
+    static const bool enabled = [] {
+#if defined(_WIN32)
+        char value[2]{};
+        return GetEnvironmentVariableA("CE_PHYSICS_RESOURCE_PROBE", value, sizeof(value)) == 1 &&
+               value[0] == '1';
+#else
+        const auto* value = std::getenv("CE_PHYSICS_RESOURCE_PROBE");
+        return value && std::string_view{value} == "1";
+#endif
+    }();
+    return enabled;
+}
+
+constexpr auto resource_count = static_cast<std::size_t>(resource_kind::count);
+std::array<std::atomic<std::uint64_t>, resource_count> resources_created{};
+std::array<std::atomic<std::uint64_t>, resource_count> resources_released{};
+
+void record_resource(resource_kind kind, bool released = false) noexcept
+{
+    if (resource_probe_enabled())
+        (released ? resources_released : resources_created)[static_cast<std::size_t>(kind)]
+            .fetch_add(1, std::memory_order_relaxed);
+}
+
+class lifetime_token
+{
+  public:
+    explicit lifetime_token(resource_kind kind) noexcept : m_kind(kind) { record_resource(kind); }
+    ~lifetime_token() { record_resource(m_kind, true); }
+    lifetime_token(const lifetime_token&) = delete;
+    lifetime_token& operator=(const lifetime_token&) = delete;
+
+  private:
+    resource_kind m_kind;
+};
+
 template<class T>
 concept sdk_resource = requires(T& value) { value.release(); };
 
@@ -35,12 +81,38 @@ struct release_sdk
     void operator()(T* value) const noexcept
     {
         if (value)
+        {
             value->release();
+            record_resource(resource_kind::sdk_owner, true);
+        }
     }
 };
 
 template<sdk_resource T>
-using sdk_owner = std::unique_ptr<T, release_sdk<T>>;
+class sdk_owner
+{
+  public:
+    sdk_owner() = default;
+    explicit sdk_owner(T* value) { reset(value); }
+    sdk_owner(sdk_owner&&) noexcept = default;
+    sdk_owner& operator=(sdk_owner&&) noexcept = default;
+
+    void reset(T* value = nullptr) noexcept
+    {
+        if (value)
+            record_resource(resource_kind::sdk_owner);
+
+        m_value.reset(value);
+    }
+
+    T* get() const noexcept { return m_value.get(); }
+    T* operator->() const noexcept { return get(); }
+    T& operator*() const noexcept { return *get(); }
+    explicit operator bool() const noexcept { return bool(m_value); }
+
+  private:
+    std::unique_ptr<T, release_sdk<T>> m_value;
+};
 
 class sdk_errors final : public physx::PxErrorCallback
 {
@@ -138,6 +210,7 @@ class task_dispatcher final : public physx::PxCpuDispatcher
         m_workers.reserve(count);
         for (auto index : std::views::iota(0u, count))
             m_workers.emplace_back([this, index, identity](std::stop_token stop) {
+                lifetime_token lifetime{resource_kind::worker};
 #if !CE_SHIPPING
                 const bool registered = ce::profiler().is_initialized();
                 if (registered)
@@ -206,6 +279,8 @@ class task_dispatcher final : public physx::PxCpuDispatcher
 
     void submitTask(physx::PxBaseTask& task) override
     {
+        record_resource(resource_kind::task);
+
         const task_entry entry{&task,
                                {m_identity.value, current_tick.load(std::memory_order_relaxed),
                                 next_task.fetch_add(1, std::memory_order_relaxed)}};
@@ -256,6 +331,7 @@ class task_dispatcher final : public physx::PxCpuDispatcher
             ce::profile_scope scope{ce::marker<"Physics.PhysXTask">()};
             entry.task->run();
             entry.task->release(); // SDK task ownership ends here, including its dependency release.
+            record_resource(resource_kind::task, true);
         }
         ce::profile_instant(ce::marker<"Physics.TaskComplete">());
 
@@ -266,6 +342,7 @@ class task_dispatcher final : public physx::PxCpuDispatcher
             m_idle.notify_all();
     }
 
+    lifetime_token m_lifetime{resource_kind::dispatcher};
     std::mutex m_mutex;
     std::condition_variable_any m_wake;
     std::condition_variable m_idle;
@@ -472,6 +549,7 @@ struct shape_identity
 
 struct body_record
 {
+    lifetime_token lifetime{resource_kind::body};
     body_kind kind;
     body_handle handle;
     std::uint64_t changed_tick = 0;
@@ -483,6 +561,7 @@ struct body_record
 
 struct character_record
 {
+    lifetime_token lifetime{resource_kind::character};
     character_desc definition;
     character_state state;
     std::uint64_t changed_tick = 0;
@@ -760,8 +839,23 @@ class query_collector final : public physx::PxHitCallback<Hit>
 
 } // namespace
 
+resource_statistics read_resource_statistics() noexcept
+{
+    resource_statistics result;
+    result.enabled = resource_probe_enabled();
+
+    for (auto index : std::views::iota(std::size_t{0}, resource_count))
+    {
+        result.created[index] = resources_created[index].load(std::memory_order_relaxed);
+        result.released[index] = resources_released[index].load(std::memory_order_relaxed);
+    }
+
+    return result;
+}
+
 struct CollisionGeometry::implementation
 {
+    lifetime_token lifetime{resource_kind::geometry};
     std::shared_ptr<sdk_runtime> runtime;
     geometry_kind kind;
     bool gpu_compatible = false;
@@ -800,6 +894,7 @@ struct PhysicsSceneChannel::storage
 
 struct PhysicsScene::implementation
 {
+    lifetime_token lifetime{resource_kind::scene};
     std::shared_ptr<PhysicsSceneChannel::storage> access = std::make_shared<PhysicsSceneChannel::storage>();
     std::shared_ptr<sdk_runtime> runtime;
 #if PX_SUPPORT_GPU_PHYSX

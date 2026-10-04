@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$Stage, [ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$ExpectedSceneGuid='5703e1d4-b1f5-4a32-b047-dd351c713483', [switch]$Shipping, [switch]$Shear, [switch]$QueryBenchmark, [switch]$QueryStress, [switch]$BoundedDenseCapture, [switch]$RequireMaximumBatch, [switch]$DisableTieredCompilation, [switch]$IsolateGameThread, [switch]$RequireCpuAccounting, [ValidateSet('none','off','on')][string]$QueryProfile='none', [int]$TimeoutSeconds=600, [ValidateRange(2000,1000000)][int]$SmokeFrames=12000)
+param([Parameter(Mandatory)][string]$Stage, [ValidatePattern('^[0-9a-fA-F-]{36}$')][string]$ExpectedSceneGuid='5703e1d4-b1f5-4a32-b047-dd351c713483', [switch]$Shipping, [switch]$Shear, [switch]$QueryBenchmark, [switch]$QueryStress, [switch]$QueryDynamic, [switch]$BoundedDenseCapture, [switch]$RequireMaximumBatch, [switch]$DisableTieredCompilation, [switch]$IsolateGameThread, [switch]$RequireCpuAccounting, [ValidateSet('none','off','on')][string]$QueryProfile='none', [int]$TimeoutSeconds=600, [ValidateRange(2000,1000000)][int]$SmokeFrames=12000)
 $ErrorActionPreference='Stop'
 if($BoundedDenseCapture -and (!$QueryStress -or !$QueryBenchmark -or $QueryProfile -ne 'on')){throw 'Bounded dense capture requires profiled stress benchmark'}
 if($RequireMaximumBatch -and !$QueryStress){throw 'Maximum batch gate requires QueryStress'}
@@ -34,7 +34,7 @@ if($QueryProfile -ne 'none' -and !$QueryBenchmark){throw 'QueryProfile requires 
 $launchArgs=@("--smoke", "$SmokeFrames", "--smoke-promotions", "8")
 if($QueryProfile -ne 'none'){$launchArgs+='--command-service'}
 $benchmarkGate=if($QueryProfile -ne 'none'){Join-Path $out 'query.ready'}else{''}
-$launchEnvironment=@{CE_PHYSICS_QUERY_BOUNDED_CAPTURE=$(if($BoundedDenseCapture){'1'}else{'0'});CE_PHYSICS_QUERY_STRESS=$(if($QueryStress){'1'}else{'0'});TEMP=$runtime;TMP=$runtime;CE_PHYSICS_B2_SHEAR=$(if($Shear){'1'}else{'0'});CE_PHYSICS_QUERY_BENCH=$(if($QueryBenchmark){'1'}else{'0'});CE_PHYSICS_QUERY_GATE=$benchmarkGate;CE_PHYSICS_QUERY_PROFILE=$(if($QueryProfile -eq 'on'){'1'}else{'0'})}
+$launchEnvironment=@{CE_PHYSICS_QUERY_DYNAMIC=$(if($QueryDynamic){'1'}else{'0'});CE_PHYSICS_QUERY_BOUNDED_CAPTURE=$(if($BoundedDenseCapture){'1'}else{'0'});CE_PHYSICS_QUERY_STRESS=$(if($QueryStress){'1'}else{'0'});TEMP=$runtime;TMP=$runtime;CE_PHYSICS_B2_SHEAR=$(if($Shear){'1'}else{'0'});CE_PHYSICS_QUERY_BENCH=$(if($QueryBenchmark){'1'}else{'0'});CE_PHYSICS_QUERY_GATE=$benchmarkGate;CE_PHYSICS_QUERY_PROFILE=$(if($QueryProfile -eq 'on'){'1'}else{'0'})}
 if($DisableTieredCompilation){$launchEnvironment["DOTNET_TieredCompilation"]="0";$launchEnvironment["COMPlus_TieredCompilation"]="0"}
 $memorySamples=[Collections.Generic.List[object]]::new()
 function SampleMemory([int]$blockCount=-1){
@@ -127,6 +127,25 @@ try {
         Start-Sleep -Milliseconds 100
     } while($true)
     if((($probes.role|Sort-Object)-join ',') -ne 'B2Dynamic,B2Kinematic,B2Static' -or ($probes|Where-Object {$_.passed -ne 9 -or !$_.complete})){throw 'Incomplete B2 role assertions'}
+    if($QueryDynamic){
+        do{
+            SampleMemory
+            $motionOutput=[string](Get-Content "$out/player.out" -Raw)
+            if($motionOutput -match '\[physics.player.dynamic-query.failure\]'){throw 'Dynamic query motion failed'}
+            $motion=@([regex]::Matches($motionOutput,'\[physics.player.dynamic-query\] (\{[^\r\n]+\})')|ForEach-Object {$_.Groups[1].Value|ConvertFrom-Json})
+            if($motion.Count -eq 1){break}
+            if($process.HasExited -or (Get-Date) -gt $deadline){throw 'Dynamic query motion evidence missing'}
+            Start-Sleep -Milliseconds 100
+        }while($true)
+
+        if(!$motion[0].complete -or $motion[0].failed -ne 0 -or $motion[0].passed -lt 65 -or
+           $motion[0].bodies -ne 128 -or $motion[0].readWindows -lt 2 -or $motion[0].observedPoseChanges -lt 2 -or $motion[0].stages -ne 3 -or
+           $motion[0].writtenPerFullBatch -ne 4096 -or $motion[0].departedHits -ne 0 -or
+           $motion[0].returnedHits -ne 128 -or $motion[0].stoppedBodies -ne 128){throw 'Dynamic query receipt incomplete'}
+
+        $motion[0]|ConvertTo-Json|Set-Content "$out/query-dynamic.json" -Encoding utf8
+    }
+
     if($QueryProfile -ne 'none'){
         do{
             $queryStdout=[string](Get-Content "$out/player.out" -Raw)

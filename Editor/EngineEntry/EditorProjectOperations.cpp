@@ -49,7 +49,8 @@ class LayerSettingsCommand final : public Meta::IUndoableCommand
 {
   public:
     LayerSettingsCommand(project_layer_snapshot before, project_layer_snapshot after)
-        : m_before(std::move(before)), m_after(std::move(after)), m_project(SceneManagers->ProjectLayers())
+        : m_before(std::move(before)), m_after(std::move(after)), m_project(SceneManagers->ProjectLayers()),
+          m_persistAuthoring(!SceneManagers->IsGameStart())
     {
     }
 
@@ -63,8 +64,8 @@ class LayerSettingsCommand final : public Meta::IUndoableCommand
         if (!project || project != SceneManagers->ProjectLayers())
             throw std::runtime_error("Project layer Undo target is no longer active");
 
-        if (!project->Restore(definitions, [](const auto& prepared) -> ce::layers::result<void> {
-                if (!Editor::SaveProjectLayerSettings(prepared))
+        if (!project->Restore(definitions, [this](const auto& prepared) -> ce::layers::result<void> {
+                if (m_persistAuthoring && !Editor::SaveProjectLayerSettings(prepared))
                     return std::unexpected(ce::layers::error::io_failure);
                 return {};
             }))
@@ -73,6 +74,8 @@ class LayerSettingsCommand final : public Meta::IUndoableCommand
 
     project_layer_snapshot m_before, m_after;
     std::weak_ptr<ProjectLayerSettings> m_project;
+    // Keep the command's publication policy across Undo/Redo and host mode transitions.
+    const bool m_persistAuthoring;
 };
 
 template<class Operation>

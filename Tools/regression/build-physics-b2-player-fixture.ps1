@@ -24,6 +24,7 @@ Copy-Item "$PSScriptRoot/fixtures/PhysicsDaggerConvex.cegeometry","$PSScriptRoot
 Copy-Item -LiteralPath $SourceGlb -Destination "$assets/Models/PhysicsDagger.glb"
 Copy-Item "$PSScriptRoot/fixtures/PhysicsDagger.glb.meta" "$assets/Models"
 Copy-Item "$repo/GameScripts/PhysicsB2PlayerProbe.cs" "$assets/Script"
+Copy-Item "$repo/GameScripts/PhysicsB2DynamicQueryProbe.cs" "$assets/Script"
 if($Shear){
     Copy-Item "$repo/GameScripts/PhysicsB2ShearProbe.cs" "$assets/Script"
     $scenePath="$assets/Scenes/PhysicsB2Player.creator"

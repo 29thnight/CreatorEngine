@@ -76,7 +76,7 @@ foreach ($required in @(
     (Join-Path $vendorInclude 'mathematics\frustum.hpp'),
     (Join-Path $vendorInclude 'mathematics\tween.hpp'),
     (Join-Path $vendorInclude 'mathematics\tween_views.hpp'),
-    (Join-Path $physicsInclude 'PhysicsMathAdapter.h'),
+    (Join-Path $physicsInclude 'PhysicsGeometry.h'),
     (Join-Path $renderEngineInclude 'FrameCameraSnapshot.h'),
     (Join-Path $sceneRuntimeInclude 'TransformStore.h'),
     $tweenManagerHeader,
@@ -212,9 +212,13 @@ $directXMathIncludePattern =
     'directxtk12/SimpleMath)\.h[>"]'
 $rawDirectXMathOffenders = @(foreach ($relativePath in $trackedNative) {
     $absolutePath = Join-Path $repoRoot $relativePath
-    if ((Test-Path -LiteralPath $absolutePath -PathType Leaf) -and
-        (Select-String -LiteralPath $absolutePath -Pattern `
-            $rawDirectXMathPattern, $directXMathIncludePattern -Quiet)) {
+    if (-not (Test-Path -LiteralPath $absolutePath -PathType Leaf)) { continue }
+    $nativeText = Get-Content -LiteralPath $absolutePath -Raw
+    if ($relativePath -eq 'Tools/regression/material_matched_image_probe.cpp') {
+        # This image fixture encodes/decodes GPU half pixels, rather than engine vector math.
+        $nativeText = $nativeText -replace '\bDirectX::PackedVector::XMConvert(?:FloatToHalf|HalfToFloat)\b', 'packed_half_conversion'
+    }
+    if ($nativeText -match $rawDirectXMathPattern -or $nativeText -match $directXMathIncludePattern) {
         $relativePath
     }
 })
@@ -239,18 +243,13 @@ $manifestIncludeCandidates = @(
 )
 $manifestInclude = $manifestIncludeCandidates |
     Where-Object {
-        Test-Path -LiteralPath (Join-Path $_ 'physx\foundation\PxVec3.h') -PathType Leaf
+        Test-Path -LiteralPath $_ -PathType Container
     } |
     Select-Object -First 1
 if ([string]::IsNullOrWhiteSpace($manifestInclude)) {
-    throw 'PhysX headers were not found in the manifest install tree. Restore vcpkg dependencies first.'
+    throw 'Manifest include directory was not found. Restore vcpkg dependencies first.'
 }
 $manifestInclude = [IO.Path]::GetFullPath($manifestInclude)
-$physXInclude = Join-Path $manifestInclude 'physx'
-if (-not (Test-Path -LiteralPath (Join-Path $physXInclude 'foundation\PxVec3.h') -PathType Leaf)) {
-    throw 'PhysX foundation headers were not found in the manifest install tree.'
-}
-
 if ([string]::IsNullOrWhiteSpace($VisualStudioInstallation)) {
     $programFilesX86 = ${env:ProgramFiles(x86)}
     $vswhere = Join-Path $programFilesX86 'Microsoft Visual Studio\Installer\vswhere.exe'
@@ -337,7 +336,6 @@ foreach ($current in $configurations) {
         ('/I{0}' -f $renderEngineInclude),
         ('/I{0}' -f $sceneRuntimeInclude),
         ('/external:I{0}' -f $manifestInclude),
-        ('/external:I{0}' -f $physXInclude),
         '/external:W0',
         ('/Fo{0}' -f $object),
         ('/Fd{0}' -f $pdb),

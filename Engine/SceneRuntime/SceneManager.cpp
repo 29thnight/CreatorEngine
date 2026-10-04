@@ -1536,6 +1536,9 @@ bool SceneManager::RestoreSceneSnapshot()
 	        for (const Authoring::ReadNode objNode : SerializedEntities(
 	            Authoring::DocumentAccess::Read(m_editorSceneBackup)))
 	        {
+            // Slot storage can contain holes after a transfer or restoration. They are not entities.
+            if (objNode.IsNull()) continue;
+
 	            const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
 	            if (!type)
 	            {
@@ -1592,6 +1595,7 @@ bool SceneManager::RestoreSceneSnapshot()
     }
     catch (const std::exception& e)
     {
+        std::printf("[editor.scene.restore.failed] %s\n", e.what());
         Debug::PrintLog(spdlog::level::err, e.what());
         return false;
     }
@@ -1755,6 +1759,17 @@ bool SceneManager::ResumePhysicsAfterSceneActivation()
     if (!started)
     {
         // The previous scene is gone. Stop on the next structure boundary; Editor retains its original backup.
+        const auto persistent = std::ranges::count_if(m_dontDestroyOnLoadObjects, [scene](Object* object)
+        {
+            const auto* entity = dynamic_cast<Entity*>(object);
+            return entity && entity->GetScene() == scene && !entity->IsDestroyMark();
+        });
+
+        Debug::PrintLog(spdlog::level::err,
+            "[physics.scene.activation.failed] transferredPersistent=" + std::to_string(persistent));
+
+        std::printf("[physics.scene.activation.failed] transferredPersistent=%zu\n", static_cast<size_t>(persistent));
+
         m_isPlayCommitted = false;
         NotePlayFailure(std::string(started.error().message));
         Debug::PrintLog(spdlog::level::err, std::string(started.error().message));
