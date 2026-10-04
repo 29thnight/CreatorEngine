@@ -30,6 +30,8 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         DisplayToken token{ kInvalidDisplayToken };
         ComPtr<ID3D12Resource> texture;
         HANDLE sharedHandle{ nullptr };
+        std::shared_ptr<RHIDisplayConsumerLease> consumerLease{
+            std::make_shared<RHIDisplayConsumerLease>() };
     };
 
     DX12DeviceResources resources;
@@ -257,6 +259,27 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::GetLastSignaledFenceValue() const
     return m_impl->resources.GetLastSignaledFenceValue();
 }
 
+bool EnhancedSceneRendererLiveDX12Adapter::ConsumeSubmissionFailure(std::string& outError)
+{
+    Impl& impl = *m_impl;
+    if (GetRHISubmissionThread().ConsumeFailure(&impl.resources, outError))
+    {
+        return true;
+    }
+    if (ID3D12Device* device = impl.resources.GetDevice())
+    {
+        const HRESULT reason = device->GetDeviceRemovedReason();
+        if (FAILED(reason))
+        {
+            outError = "DX12 producer device was removed";
+            impl.resources.AppendDeviceRemovedReport(reason, outError);
+            GetRHISubmissionThread().MarkUnrecoverableDeviceError(&impl.resources, outError);
+            return true;
+        }
+    }
+    return false;
+}
+
 IRenderDeviceServices& EnhancedSceneRendererLiveDX12Adapter::Resources()
 {
     return m_impl->resources;
@@ -354,14 +377,36 @@ void EnhancedSceneRendererLiveDX12Adapter::RetireDisplayTexture(DisplayToken tok
     }
 }
 
-uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
-    IDisplayPresentationSink& sink, DisplayToken token) const
+bool EnhancedSceneRendererLiveDX12Adapter::CanReuseDisplayTexture(DisplayToken token) const
 {
-    if (kInvalidDisplayToken == token) return 0;
     for (const Impl::DisplayResource& display : m_impl->activeDisplays)
     {
         if (display.token == token)
-            return sink.OpenSharedTexture(display.sharedHandle);
+        {
+            return display.consumerLease.use_count() == 1 &&
+                !display.consumerLease->m_completionLost.load(std::memory_order_acquire);
+        }
+    }
+    return false;
+}
+
+uint64_t EnhancedSceneRendererLiveDX12Adapter::OpenDisplayTexture(
+    IDisplayPresentationSink& sink, DisplayToken token) const
+{
+    if (kInvalidDisplayToken == token)
+    {
+        return 0;
+    }
+    for (const Impl::DisplayResource& display : m_impl->activeDisplays)
+    {
+        if (display.token == token &&
+            !display.consumerLease->m_completionLost.load(std::memory_order_acquire))
+        {
+            // 호출자는 생산자 슬롯 선택과 같은 뮤텍스를 쥔다. sink는 잠금을
+            // 놓기 전에 이 참조를 확보해야 하며 CPU 드로우 데이터가 아직
+            // 기록·제출되지 않은 동안에도 참조를 유지한다.
+            return sink.OpenSharedTexture(display.sharedHandle, display.consumerLease);
+        }
     }
     return 0;
 }

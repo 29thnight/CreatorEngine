@@ -27,6 +27,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace
 {
@@ -266,7 +267,7 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     m_selectContentBrowserOnBuild = true;
 }
 
-void EditorRenderer::BeginRender()
+void EditorRenderer::BeginRender(std::unique_lock<std::mutex>& sceneLock)
 {
     m_uiFrameBegan = std::chrono::steady_clock::now();
     ::editor::windows::begin_shell_cost(
@@ -285,7 +286,11 @@ void EditorRenderer::BeginRender()
         const ::editor::windows::shell_cost_scope cost{
             ::editor::windows::shell_cost_section::host_beginframe };
         const ::editor::TabStyleScope tabs;
+        // 스왑체인 획득과 호스트 GPU 여유 대기가 씬 구조를 붙들면 안 된다.
+        // 위의 환경설정·작업공간과 아래의 라이브 패널은 계속 잠금으로 보호한다.
+        sceneLock.unlock();
         m_host->BeginFrame();
+        sceneLock.lock();
     }
 
     // 복원된 Game 모드나 접힌 도크에서도 예열이 끝나야 한다. 텍스처를 여는
@@ -451,7 +456,7 @@ void EditorRenderer::Render()
     }
 }
 
-void EditorRenderer::EndRender()
+void EditorRenderer::EndRender(std::function<void()> onRecorded)
 {
     ::editor::windows::begin_shell_cost(::editor::windows::shell_cost_section::shell_endrender);
     // PHASE 21 W0 전반(계획서 §1.9): 밖에서 배치를 볼 수단.
@@ -503,7 +508,7 @@ void EditorRenderer::EndRender()
     {
         const ::editor::windows::shell_cost_scope cost{
             ::editor::windows::shell_cost_section::present };
-        m_host->EndFrame();
+        m_host->EndFrame(std::move(onRecorded));
     }
 
     // draw data 는 `EndFrame` 안의 `ImGui::Render()` 뒤라야 유효하다

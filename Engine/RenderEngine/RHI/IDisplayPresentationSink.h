@@ -26,8 +26,10 @@ struct IDisplayPresentationSink
 
     /// 공유 핸들 텍스처(DX12 표시 슬롯)를 열어 presentation 텍스처 ID를
     /// 돌려준다. 호출자는 표시 수명 락 아래에서 부른다 — 핸들 retire와
-    /// 직렬화되는 것은 Core의 몫이고, 구현은 열기만 한다.
-    virtual uint64_t OpenSharedTexture(void* sharedHandle) = 0;
+    /// 직렬화되는 것은 Core의 몫이다. 성공한 구현은 consumerLease를 이번
+    /// 프레임의 GPU 사용이 실제 완료될 때까지 보유한다. 캐시만으로는 부족하다.
+    virtual uint64_t OpenSharedTexture(void* sharedHandle,
+        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) = 0;
 
     /// 리드백 프레임(CPU RGBA — Vulkan 표시 브리지)을 키로 게시한다.
     /// RenderThread에서 불린다 — 구현은 그 스레드에서 안전해야 한다
@@ -38,4 +40,8 @@ struct IDisplayPresentationSink
     /// 이번 Host 프레임의 UI 생성 전에 업로드 기록을 마친 픽셀과 신원.
     /// UI 생성 뒤 도착한 Submit은 다음 Host 프레임까지 이 결과를 바꾸지 않는다.
     virtual RHIDisplayTexture GetCpuFrameTexture(uint64_t key) = 0;
+
+    // 완료 표시 프레임을 게시한 뒤 수명 뮤텍스 밖에서 비차단 깨우기만 한다.
+    // 생산자 스레드에서 렌더링하거나 UI에 접근하지 않는다.
+    virtual void NotifyDisplayAvailable() {}
 };

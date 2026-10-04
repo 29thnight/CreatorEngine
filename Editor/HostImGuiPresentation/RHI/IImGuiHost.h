@@ -46,7 +46,9 @@ public:
     virtual void BeginFrame() = 0;
 
     /// ImGui::Render → 백버퍼 드로우 → Present → 멀티 뷰포트 플랫폼 창.
-    virtual void EndFrame() = 0;
+    /// 네이티브 기록이 리소스 수명을 확보한 뒤 onRecorded로 장면 소유권을
+    /// 놓을 수 있다. 제출 대기와 Present보다 먼저 호출한다.
+    virtual void EndFrame(std::function<void()> onRecorded = {}) = 0;
 
     /// 폰트 아틀라스 재빌드. 소비자가 io.Fonts를 바꾼 뒤 부른다 — 백엔드의
     /// 디바이스 오브젝트 재생성이 필요해서 계약에 있다(폰트 텍스처는 백엔드
@@ -64,7 +66,8 @@ public:
     /// RegisterTexture가 한다. 백엔드 세부는 IImGuiRendererBackend 주석 참조.
     virtual bool IsTextureReady(Texture* texture) const = 0;
 
-    virtual uint64_t OpenSharedTexture(void* sharedHandle) = 0;
+    virtual uint64_t OpenSharedTexture(void* sharedHandle,
+        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) = 0;
     virtual void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
         const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) = 0;
     virtual RHIDisplayTexture GetCpuFrameTexture(uint64_t key) = 0;

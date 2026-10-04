@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include "RHI/RHIDisplayFrame.h"
 
@@ -48,7 +49,8 @@ public:
 
     virtual void Resize(uint32_t width, uint32_t height) = 0;
     virtual void NewFrame() = 0;
-    virtual bool RenderAndPresent(std::string& outError) = 0;
+    virtual bool RenderAndPresent(std::string& outError,
+        const std::function<void()>& onRecorded) = 0;
     virtual void RebuildFontAtlas() = 0;
 
     // 반환 ID는 backend descriptor다. 표시하는 프레임마다 다시 호출해야
@@ -66,7 +68,8 @@ public:
     //   묻는 창구다. 부수 효과가 없다 — 업로드를 **일으키지 않는다**.
     //   올리려면 표시 프레임 안에서 RegisterTexture를 불러야 한다.
     virtual bool IsTextureReady(Texture* texture) const = 0;
-    virtual uint64_t OpenSharedTexture(void* sharedHandle) = 0;
+    virtual uint64_t OpenSharedTexture(void* sharedHandle,
+        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) = 0;
     virtual void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
         const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) = 0;
     virtual RHIDisplayTexture GetCpuFrameTexture(uint64_t key) = 0;

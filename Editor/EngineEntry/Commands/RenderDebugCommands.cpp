@@ -350,6 +350,30 @@ namespace ConsoleCmd
         data.Set("framesIdle", CommandData::Int(snapshot.framesIdle));
         data.Set("framesInFlight", CommandData::Int(snapshot.framesInFlight));
 
+        // 진입 나이는 실프레임 packet 캡처 이후 시간이며 입력-광자 지연이 아니다.
+        // 픽셀 제출 없이 CPU 소비만 진행할 수 있으므로 세 신원을 나누어 낸다.
+        const auto renderThread = EnhancedSceneRenderer::GetLiveRenderThreadStats();
+        auto admission = CommandData::Object();
+        admission.Set("capacity", CommandData::Int(renderThread.capacity));
+        admission.Set("pending", CommandData::Int(renderThread.pending));
+        admission.Set("inProgress", CommandData::Int(renderThread.inProgress));
+        admission.Set("highWatermark", CommandData::Int(renderThread.highWatermark));
+        admission.Set("publishedFrame", CommandData::Int(renderThread.publishedFrameId));
+        admission.Set("cpuCompletedFrame", CommandData::Int(renderThread.completedFrameId));
+        admission.Set("admittedFrame", CommandData::Int(renderThread.admittedFrameId));
+        admission.Set("coalescedFrames", CommandData::Int(renderThread.coalescedFrames));
+        admission.Set("coalescedDeltas", CommandData::Int(renderThread.coalescedDeltas));
+        admission.Set("backPressureWaits", CommandData::Int(renderThread.backPressureWaits));
+        admission.Set("gpuAdmissionWaits", CommandData::Int(renderThread.gpuAdmissionWaits));
+        admission.Set("stalePixelSkips", CommandData::Int(renderThread.stalePixelSkips));
+        admission.Set("overBudgetAdmissions", CommandData::Int(renderThread.overBudgetAdmissions));
+        admission.Set("displayLeaseSkips", CommandData::Int(renderThread.displayLeaseSkips));
+        admission.Set("lastAdmissionAgeMs", CommandData::Double(renderThread.lastAdmissionAgeMs));
+        admission.Set("maxAdmissionAgeMs", CommandData::Double(renderThread.maxAdmissionAgeMs));
+        admission.Set("pendingAgeMs", CommandData::Double(renderThread.pendingAgeMs));
+        admission.Set("softAgeBudgetMs", CommandData::Double(renderThread.softAgeBudgetMs));
+        data.Set("admission", std::move(admission));
+
         // ★ GPU 수집 장부를 내는 이유는 P4 기준선 때문이다. 패스별 GPU
         //   시간은 지금까지 렌더 디버그 창에만 있었고, 그래서 그 숫자가 올바른
         //   제출의 것인지를 물을 수단이 없었다 — 눈으로는 틀린 숫자도 그럴듯하다.
@@ -446,6 +470,13 @@ namespace ConsoleCmd
             target.Set("active", CommandData::Bool(entry.active));
             target.Set("ready", CommandData::Bool(entry.ready));
             target.Set("completedFrame", CommandData::Int(entry.completedFrameId));
+            target.Set("completedCaptureAgeMs", CommandData::Double(entry.completedAgeMs));
+            target.Set("lastTextureCaptureAgeMs", CommandData::Double(entry.lastTextureAgeMs));
+            target.Set("sourceFrame", CommandData::Int(entry.sourceFrameId));
+            target.Set("sourceInputSequence", CommandData::Int(entry.sourceInputSequence));
+            target.Set("sourceCameraRevision", CommandData::Int(entry.sourceCameraRevision));
+            target.Set("completedInputSequence", CommandData::Int(entry.completedCamera.editorInputSequence));
+            target.Set("completedCameraRevision", CommandData::Int(entry.completedCamera.editorCameraRevision));
             target.Set("completedResizeGeneration", CommandData::Int(entry.completedResizeGeneration));
             target.Set("textureQueries", CommandData::Int(entry.textureQueries));
             target.Set("missingTextureQueries", CommandData::Int(entry.missingTextureQueries));
@@ -479,6 +510,8 @@ namespace ConsoleCmd
     //
     // ★ 판정 값은 `completedFrameId`(TickLive 를 끝낸 id)다. 디버그 스냅샷의
     //   `consumedFrameId` 는 TickLive 시작에 적혀, 긴 첫 프레임 도중에도 이미 넘어간다.
+    // 낡은 픽셀 생략과 delta만 소비한 경우도 포함하는 CPU 소비 대기다.
+    // GPU 완료·호스트 sampling·Present 반환·실제 scan-out 완료를 기다리지 않는다.
     static CommandCore::CommandResult Cmd_render_live_wait(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -509,6 +542,7 @@ namespace ConsoleCmd
                 std::chrono::steady_clock::now() - began).count();
             auto data = CommandData::Object();
             data.Set("afterFrame", CommandData::Int(static_cast<int64_t>(afterFrame)));
+            data.Set("completionKind", CommandData::String("cpu_packet_consumed"));
             data.Set("completedFrame", CommandData::Int(static_cast<int64_t>(stats.completedFrameId)));
             data.Set("publishedFrame", CommandData::Int(static_cast<int64_t>(stats.publishedFrameId)));
             data.Set("waitedMs", CommandData::Double(waitedMs));
@@ -517,7 +551,7 @@ namespace ConsoleCmd
                 std::printf("[CLI] render.live.wait 완료 — frame %llu > %llu · %.0f ms\n",
                     static_cast<unsigned long long>(stats.completedFrameId),
                     static_cast<unsigned long long>(afterFrame), waitedMs);
-                return Ok("Live RenderThread completed a frame published after the wait began", std::move(data));
+                return Ok("Live RenderThread consumed a CPU frame packet published after the wait began", std::move(data));
             }
             if (!stats.running)
                 return Fail("render.live.not_running", "Live RenderThread stopped while waiting", std::move(data));

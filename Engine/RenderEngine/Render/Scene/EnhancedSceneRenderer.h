@@ -195,6 +195,9 @@ struct EnhancedRequiredAssetPacket
 struct EnhancedLiveFramePacket
 {
     uint64_t frameId{ 0 };
+    // 같은 프로세스 steady_clock의 캡처 시각이며 시뮬레이션 시간이나 fence가 아니다.
+    // 0은 관측 불가다. 병합해도 교체된 입력의 실제 캡처 시각을 그대로 보존한다.
+    uint64_t sourceCaptureNanoseconds{ 0 };
     uint64_t sceneEpoch{ 0 };
     uint64_t resizeGeneration{ 0 };
     float    deltaSeconds{ 0.f };
@@ -248,6 +251,17 @@ struct EnhancedRenderThreadStats
     uint64_t backPressureWaits{ 0 };
     uint64_t shutdownDrains{ 0 };
     uint64_t shutdownDiscardedDeltas{ 0 };
+    // 전용 RT의 완료 조회 대기 횟수이며, 스케줄러 worker의 대기 횟수가 아니다.
+    uint64_t gpuAdmissionWaits{ 0 };
+    uint64_t stalePixelSkips{ 0 };
+    uint64_t overBudgetAdmissions{ 0 };
+    uint64_t displayLeaseSkips{ 0 };
+    // 마지막 실제 장면 제출의 신원이다. 이 값이나 입력 나이가 GPU 완료를 뜻하지 않는다.
+    uint64_t admittedFrameId{ 0 };
+    double lastAdmissionAgeMs{ 0.0 };
+    double maxAdmissionAgeMs{ 0.0 };
+    double pendingAgeMs{ 0.0 };
+    double softAgeBudgetMs{ 0.0 };
     uint32_t pending{ 0 };
     uint32_t inProgress{ 0 };
     uint32_t highWatermark{ 0 };
@@ -257,7 +271,8 @@ struct EnhancedRenderThreadStats
     /// RenderThread 가 TickLive 를 **끝낸** 마지막 frame id.
     /// ★ EnhancedLiveDebugSnapshot::consumedFrameId 는 TickLive **시작**에 적힌다 —
     ///   첫 프레임의 ShaderMeta 반영처럼 긴 프레임 도중에도 이미 그 id 를 가리킨다.
-    ///   "이 시점 이후 발행된 프레임이 그려졌다"는 이 값으로만 판정한다.
+    ///   delta만 적용했거나 오래된 픽셀을 생략한 경우도 포함하는 CPU 완료다.
+    ///   장면 GPU 완료, Host 소비 완료, 실제 화면 출력의 증거는 아니다.
     uint64_t completedFrameId{ 0 };
     bool running{ false };
     bool accepting{ false };
@@ -284,8 +299,14 @@ struct EnhancedLiveDisplayEntrySnapshot
     uint64_t completedFrameId{ 0 };
     uint64_t completedSceneEpoch{ 0 };
     FrameCameraSnapshot completedCamera{};
+    uint64_t completedCaptureNanoseconds{ 0 };
+    // 캡처부터 생산자 완료를 관측할 때까지의 시간. 관측 불가일 때는 0이다.
+    double completedAgeMs{ 0.0 };
+    // 캡처부터 마지막 성공한 Host 텍스처 조회까지의 시간이며 실제 화면 출력 시각은 아니다.
+    double lastTextureAgeMs{ 0.0 };
     // RT가 마지막으로 소비한 불변 뷰 입력. GPU 완료 결과와 구분한다.
     uint64_t sourceFrameId{ 0 };
+    uint64_t sourceCaptureNanoseconds{ 0 };
     uint64_t sourceInputSequence{ 0 };
     uint64_t sourceCameraRevision{ 0 };
     uint64_t promotionCount{ 0 };
@@ -327,8 +348,9 @@ struct EnhancedLiveDisplaySnapshot
 };
 
 // 텍스처와 완료 프레임의 카메라·신원을 같은 수명 락 아래 한 번에 읽는다.
-// 이 값 복사는 CPU 조회의 정합성만 보장한다. Host GPU sampling이 끝날 때까지
-// 슬롯 재사용을 막는 lease는 아니다. CPU 브리지는 Host 업로드 기록의 신원을 돌려준다.
+// 이 값은 신원이며 소유권 자체는 아니다. DX12 조회는 같은 잠금을 풀기 전에
+// Host 소비자 lease도 등록하고, Host가 자신의 GPU 완료까지 그 소유권을 유지한다.
+// CPU 브리지는 Host 업로드 기록의 신원을 돌려준다.
 struct EnhancedLiveDisplayTexture
 {
     uint64_t textureId{ 0 };
@@ -815,8 +837,9 @@ namespace EnhancedSceneRenderer
         bool sceneLoading, const EnhancedRequiredAssetPacket& requiredAssets);
 
     /// 게임 스레드가 packet과 그 시점까지의 proxy delta를 하나의 제출 단위로
-    /// 발행한다. queue가 찼으면 가장 최신 pending frame을 교체하되 lifecycle
-    /// delta는 보존하고 같은 대상의 update만 latest-wins로 접는다.
+    /// 발행한다. 소비 중인 불변 입력 뒤에는 교체 가능한 입력 하나만 대기한다.
+    /// lifecycle delta는 보존하고 같은 대상의 update만 latest-wins로 접는다.
+    /// GPU credit 확보 뒤 최신 입력을 선택하며, 입력 나이는 절대 상한이 아닌 목표다.
     bool PublishLiveFrame(EnhancedLiveFramePacket frame);
 
     /// 렌더 소비 상태는 전용 RenderThread만 만진다. 외부 호출은

@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <memory>
+#include <utility>
 
 namespace
 {
@@ -180,7 +181,7 @@ namespace
             ImGui::NewFrame();
         }
 
-        void EndFrame() override
+        void EndFrame(std::function<void()> onRecorded) override
         {
             if (!m_renderer) return;
             {
@@ -192,19 +193,29 @@ namespace
             engine::warmup::mark(engine::warmup::stage::first_ui_frame);
             ImGuiWin32Cursor::PublishFrameCursor(static_cast<HWND>(m_windowHandle));
 
+            // 분리된 플랫폼 창도 드로우 콜백을 실행하므로 그 경로에서는
+            // 모든 기록이 끝날 때까지 장면 소유권을 유지한다.
+            ImGuiIO& io = ImGui::GetIO();
+            const bool hasPlatformWindows =
+                0 != (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable);
+            const std::function<void()> recordCallback =
+                hasPlatformWindows ? std::function<void()>{} : onRecorded;
             std::string presentError;
-            if (!m_renderer->RenderAndPresent(presentError))
+            if (!m_renderer->RenderAndPresent(presentError, recordCallback))
             {
                 std::printf("[ImGui] %s 렌더 실패: %s\n",
                     m_renderer->GetName(), presentError.c_str());
             }
 
-            ImGuiIO& io = ImGui::GetIO();
-            if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+            if (hasPlatformWindows)
             {
                 ce::profile_scope platforms{ce::marker<"ImGuiPlatformWindows">()};
                 ImGui::UpdatePlatformWindows();
                 ImGui::RenderPlatformWindowsDefault();
+                if (onRecorded)
+                {
+                    onRecorded();
+                }
             }
         }
 
@@ -223,9 +234,11 @@ namespace
             return m_renderer && m_renderer->IsTextureReady(texture);
         }
 
-        uint64_t OpenSharedTexture(void* sharedHandle) override
+        uint64_t OpenSharedTexture(void* sharedHandle,
+            std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override
         {
-            return m_renderer ? m_renderer->OpenSharedTexture(sharedHandle) : 0;
+            return m_renderer
+                ? m_renderer->OpenSharedTexture(sharedHandle, std::move(consumerLease)) : 0;
         }
 
         void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
