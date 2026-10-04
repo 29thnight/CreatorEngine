@@ -116,6 +116,7 @@
 #include "RHI/IImGuiHost.h"
 #include "ProfileScope.h"
 #include "ProfileCaptureFile.h"
+#include "JobScheduler.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
@@ -149,6 +150,7 @@
 #include <atomic>
 #include <cctype>
 #include <limits>
+#include <memory>
 #include <random>
 #include <stdexcept>
 #include <string_view>
@@ -656,6 +658,89 @@ namespace ConsoleCmd
     // 새 코어는 서비스를 인스턴스로 세울 수 있어 엔진을 띄우지 않고 검사할 수
     // 있다: Tools/regression/verify-profile-core.ps1 이 그 자리를 대신한다.
 
+    struct ProfileSaveOperation
+    {
+        std::atomic_bool done{ false };
+        std::string path;
+        std::string error = "Save was not accepted by the worker scheduler";
+        std::uint64_t frames = 0;
+        bool complete = false;
+    };
+
+    // 실행되지 않은 콜백의 마지막 소유자가 실패를 공개한다. 호출자는 기다리지 않는다.
+    struct ProfileSaveAdmission
+    {
+        explicit ProfileSaveAdmission(std::shared_ptr<ProfileSaveOperation> value) : operation(std::move(value)) {}
+
+        ~ProfileSaveAdmission()
+        {
+            if (!started.load(std::memory_order_acquire))
+            {
+                operation->done.store(true, std::memory_order_release);
+            }
+        }
+
+        std::shared_ptr<ProfileSaveOperation> operation;
+        std::atomic_bool started{ false };
+    };
+
+    static std::shared_ptr<ProfileSaveOperation>& ProfileSaveState()
+    {
+        static std::shared_ptr<ProfileSaveOperation> operation;
+        return operation;
+    }
+
+    static void AddRecordingPayload(CommandCore::CommandData& data)
+    {
+        using namespace CommandCore;
+        const ce::recording_status status = ce::profiler().recording_status();
+        const auto path = ce::profiler().recording_path().u8string();
+        auto recording = CommandData::Object();
+        recording.Set("path", CommandData::String(std::string(path.begin(), path.end())));
+        recording.Set("state", CommandData::String(status.error ? "failed" :
+            ce::profiler().state() == ce::recorder_state::starting ? "starting" : path.empty() ? "none" :
+            status.state == ce::recording_state::starting ? "starting" :
+            status.state == ce::recording_state::recording ? "recording" :
+            status.state == ce::recording_state::flushing ? "flushing" :
+            status.state == ce::recording_state::finalized ? "finalized" : "failed"));
+        recording.Set("queuedBytes", CommandData::Int(status.queued_bytes));
+        recording.Set("queuedBatches", CommandData::Int(status.queued_batches));
+        recording.Set("writtenBytes", CommandData::Int(status.written_bytes));
+        recording.Set("flushedBytes", CommandData::Int(status.flushed_bytes));
+        recording.Set("writtenFrames", CommandData::Int(status.written_frames));
+        recording.Set("submittedFrames", CommandData::Int(status.submitted_frames));
+        recording.Set("droppedFrames", CommandData::Int(status.dropped_frames));
+        recording.Set("droppedEvents", CommandData::Int(status.dropped_events));
+        recording.Set("droppedCounters", CommandData::Int(status.dropped_counters));
+        recording.Set("sourceDroppedCounters", CommandData::Int(status.source_dropped_counters));
+        recording.Set("sourceDroppedEvents", CommandData::Int(status.source_losses.dropped_events));
+        recording.Set("sourceDroppedFrameBoundaries", CommandData::Int(status.source_losses.dropped_frame_boundaries));
+        recording.Set("lateCpuEvents", CommandData::Int(status.source_losses.late_events));
+        recording.Set("lateGpuSpans", CommandData::Int(status.source_losses.late_gpu_spans));
+        recording.Set("error", CommandData::String(status.error ? ce::describe(*status.error) : ""));
+        data.Set("recording", std::move(recording));
+    }
+
+    static CommandCore::CommandData ProfileSavePayload()
+    {
+        using namespace CommandCore;
+        auto data = CommandData::Object();
+        AddRecordingPayload(data);
+        const auto operation = ProfileSaveState();
+        const bool done = operation && operation->done.load(std::memory_order_acquire);
+        data.Set("saveState", CommandData::String(!operation ? "idle" : !done ? "saving" :
+            operation->error.empty() ? "saved" : "failed"));
+        data.Set("pending", CommandData::Bool(operation && !done));
+        data.Set("path", CommandData::String(operation ? operation->path : ""));
+        if (done)
+        {
+            data.Set("frames", CommandData::Int(operation->frames));
+            data.Set("complete", CommandData::Bool(operation->complete));
+            data.Set("error", CommandData::String(operation->error));
+        }
+        return data;
+    }
+
     static CommandCore::CommandResult Cmd_profile_stats(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -669,6 +754,7 @@ namespace ConsoleCmd
         //   도는 이름 복사가 없고, 그래서 예산도 누락도 개념 자체가 없다. 0 을
         //   내면 "예산이 있는데 안 쓴다" 로 읽히므로 거짓말이 된다.
         data.Set("state", CommandData::String(
+            summary.state == ce::recorder_state::starting ? "starting" :
             summary.state == ce::recorder_state::recording ? "recording" :
             summary.state == ce::recorder_state::pausing ? "pausing" :
             summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
@@ -790,6 +876,7 @@ namespace ConsoleCmd
         data.Set("captureFrozen", CommandData::Bool(bool(capturedForThreads)));
         data.Set("threadCount", CommandData::Int(summary.thread_count));
         data.Set("threads", std::move(threads));
+        AddRecordingPayload(data);
         return Ok({}, std::move(data));
     }
 
@@ -810,18 +897,21 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1 && !gpuOnly)
             return InvalidArguments("profile.frame [gpu]");
 
-        // 읽으려면 얼려야 한다. 이미 얼어 있으면 그대로 쓴다.
-        const bool wasRecording = (ce::profiler().state() == ce::recorder_state::recording);
-        if (wasRecording)
-        {
-            ce::profiler().pause();
-        }
-        // 전용 수집 스레드가 앞선 프레임과 얼림을 모두 처리한 뒤 읽는다.
-        // 이 명령은 캡처를 즉시 돌려주는 조회이므로 비동기 공개를 기다려야 한다.
-        ce::profiler().wait_until_idle();
-
-        ce::capture_session_ptr capture = ce::profiler().capture();
+        ce::profiler_service& service = ce::profiler();
+        service.request_live_capture();
+        const ce::capture_session_ptr capture = service.capture();
         auto data = CommandData::Object();
+        const bool capturePending = !capture && (service.state() == ce::recorder_state::recording ||
+            service.state() == ce::recorder_state::starting || service.state() == ce::recorder_state::pausing);
+        data.Set("capturePending", CommandData::Bool(capturePending));
+        data.Set("hasCapture", CommandData::Bool(static_cast<bool>(capture)));
+        if (!capture)
+        {
+            data.Set("frames", CommandData::Array());
+            AddRecordingPayload(data);
+            return Ok(capturePending ? "No published capture yet; query again after publication" :
+                "No published capture; start a recording first", std::move(data));
+        }
 
         const double ticksPerSecond = static_cast<double>(ce::profiler_service::ticks_per_second());
         const double toMs = (ticksPerSecond > 0.0) ? (1000.0 / ticksPerSecond) : 0.0;
@@ -1034,34 +1124,21 @@ namespace ConsoleCmd
             }
         }
         data.Set("counterCoverage", std::move(counterCoverage));
-        data.Set("paused", CommandData::Bool(true));
+        data.Set("paused", CommandData::Bool(service.state() != ce::recorder_state::recording));
         data.Set("frames", std::move(frames));
 
-        // 읽기 위해 멈췄다면 다시 연다 — 관측이 관측 대상을 멈춰 두면 안 된다.
-        if (wasRecording)
-        {
-            ce::profiler().record(ce::profiler().summary().engine_frame);
-        }
+        AddRecordingPayload(data);
         return Ok({}, std::move(data));
     }
 
-    // 녹화 제어. 창 툴바의 Record/Pause 단추와 같은 두 동작이다.
-    //
-    // ★ `profile.frame` 으로는 이 자리를 대신할 수 없다. 그것은 **읽는** 명령이라
-    //   읽기 위해 얼렸다면 끝나기 전에 다시 열어 둔다 — 관측이 관측 대상을 멈춰
-    //   두면 안 되기 때문이다. 그래서 창은 얼린 상태를 한 번도 보지 못하고,
-    //   프레임마다 도는 adopt 관문(state == frozen)을 지나치지 않는다.
-    //
-    // ★ 타임라인을 그리게 하려면 **얼린 캡처가 있고 + 녹화 중** 이어야 한다.
-    //   얼린 캡처가 없으면 그릴 것이 없고, 녹화 중이 아니면 그렸다는 증거(ProfilerTimeline
-    //   마커)가 어디에도 남지 않는다. 두 명령을 갈라 둔 것이 그 상태를
-    //   CLI 로 만들 수 있게 하는 유일한 수단이다.
-
+    // 녹화 제어는 비동기다. Record는 새 전체 세션 파일을 만들고, Pause는
+    // 호출자를 기다리게 하지 않은 채 수집기 마감과 writer 최종화를 요청한다.
     static CommandCore::CommandData ProfileStatePayload()
     {
         const ce::live_summary summary = ce::profiler().summary();
         auto data = CommandCore::CommandData::Object();
         data.Set("state", CommandCore::CommandData::String(
+            summary.state == ce::recorder_state::starting ? "starting" :
             summary.state == ce::recorder_state::recording ? "recording" :
             summary.state == ce::recorder_state::pausing ? "pausing" :
             summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
@@ -1076,51 +1153,157 @@ namespace ConsoleCmd
                  CommandCore::CommandData::Bool(capture ? capture->complete() : true));
         data.Set("unackedStreams", CommandCore::CommandData::Int(
             capture ? static_cast<std::int64_t>(capture->unacked_streams()) : 0));
+        AddRecordingPayload(data);
         return data;
     }
 
     static CommandCore::CommandResult Cmd_profile_record(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() != 1) return InvalidArguments("profile.record takes no arguments");
-
-        // 얼린 캡처는 건드리지 않는다. 잡고 보던 것을 남겨 둔 채 기록만 다시
-        // 열려야 창이 그리던 것을 계속 그린다 — 창의 Record 단추도 같다.
-        //
-        // summary.engine_frame은 마지막으로 닫힌 프레임의 다음 번호다.
-        // 0으로 다시 열면 보존 구간이 되감겨 섞인다.
-        ce::profiler().record(ce::profiler().summary().engine_frame);
-        return Ok({}, ProfileStatePayload());
+        if (ctx.parts.size() != 1)
+        {
+            return InvalidArguments("profile.record takes no arguments");
+        }
+        ce::profiler_service& service = ce::profiler();
+        const ce::recorder_state state = service.state();
+        if (state == ce::recorder_state::recording || state == ce::recorder_state::starting)
+        {
+            return PreconditionFailed("profile.already_recording", "A recording is already active or starting");
+        }
+        const auto status = service.recording_status();
+        if (state == ce::recorder_state::pausing || (!service.recording_path().empty() &&
+            (status.state == ce::recording_state::starting || status.state == ce::recording_state::flushing)))
+        {
+            return PreconditionFailed("profile.finalizing", "The previous recording is still finalizing");
+        }
+        service.record(service.summary().engine_frame);
+        return Ok("New recording requested", ProfileStatePayload());
     }
 
     static CommandCore::CommandResult Cmd_profile_pause(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() != 1) return InvalidArguments("profile.pause takes no arguments");
-
+        if (ctx.parts.size() != 1)
+        {
+            return InvalidArguments("profile.pause takes no arguments");
+        }
+        if (ce::profiler().state() == ce::recorder_state::starting)
+        {
+            return PreconditionFailed("profile.starting", "The recording is still starting");
+        }
         ce::profiler().pause();
-        return Ok({}, ProfileStatePayload());
+        return Ok("Stop requested; profile.stats reports writer finalization", ProfileStatePayload());
     }
 
     static CommandCore::CommandResult Cmd_profile_save(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() != 2) return InvalidArguments("profile.save <new-absolute-path.ceprof>");
+        if (ctx.parts.size() != 2)
+        {
+            return InvalidArguments("profile.save <new-absolute-path.ceprof>|status");
+        }
+        if (ctx.parts[1] == "status")
+        {
+            const auto operation = ProfileSaveState();
+            auto data = ProfileSavePayload();
+            if (operation && operation->done.load(std::memory_order_acquire) && !operation->error.empty())
+            {
+                return Fail("profile.save_failed", operation->error, std::move(data));
+            }
+            return Ok({}, std::move(data));
+        }
         const auto path = std::filesystem::u8path(ctx.parts[1]);
-        if (!path.is_absolute() || path.extension() != ".ceprof" || std::filesystem::exists(path))
+        if (!path.is_absolute() || path.extension() != ".ceprof")
+        {
             return InvalidArguments("Use a new absolute .ceprof path");
-        if (ce::profiler().state() == ce::recorder_state::recording)
-            return PreconditionFailed("profile.recording", "Pause the capture before saving");
-        ce::profiler().wait_until_idle();
-        const auto capture = ce::profiler().capture();
-        if (!capture) return PreconditionFailed("profile.empty", "No frozen capture");
-        const auto saved = ce::save_capture(*capture, path);
-        if (!saved) return Fail("profile.save_failed", ce::describe(saved.error()));
-        auto data = ProfileStatePayload();
-        data.Set("path", CommandData::String(ctx.parts[1]));
-        data.Set("frames", CommandData::Int(capture->frame_count()));
-        data.Set("events", CommandData::Int(capture->total_events()));
-        return Ok({}, std::move(data));
+        }
+        const auto previous = ProfileSaveState();
+        if (previous && !previous->done.load(std::memory_order_acquire))
+        {
+            return PreconditionFailed("profile.save_pending", "A save is running; use profile.save status");
+        }
+        ce::profiler_service& service = ce::profiler();
+        const ce::recorder_state state = service.state();
+        if (state == ce::recorder_state::recording || state == ce::recorder_state::starting ||
+            state == ce::recorder_state::pausing)
+        {
+            return PreconditionFailed("profile.recording", "Stop the capture and wait for writer finalization before saving");
+        }
+        const auto source = service.recording_path();
+        if (source.empty())
+        {
+            return PreconditionFailed("profile.empty", "No continuous recording to save");
+        }
+        const auto status = service.recording_status();
+        if (status.state != ce::recording_state::finalized)
+        {
+            return PreconditionFailed("profile.not_finalized", "Writer is not finalized; inspect profile.stats");
+        }
+        auto operation = std::make_shared<ProfileSaveOperation>();
+        operation->path = ctx.parts[1];
+        ProfileSaveState() = operation;
+        try
+        {
+            const auto admission = std::make_shared<ProfileSaveAdmission>(operation);
+            (void)ce::get_job_scheduler().submit([operation, source, path, admission]
+            {
+                admission->started.store(true, std::memory_order_release);
+                operation->error.clear();
+                try
+                {
+                    std::error_code error;
+                    const bool exists = std::filesystem::exists(path, error);
+                    if (error || exists)
+                    {
+                        operation->error = "Destination must be a new writable absolute .ceprof path";
+                    }
+                    else
+                    {
+                        const auto recording = ce::open_capture_recording(source);
+                        if (!recording)
+                        {
+                            operation->error = ce::describe(recording.error());
+                        }
+                        else if (!(*recording)->finalized())
+                        {
+                            operation->error = "Source recording is not finalized";
+                        }
+                        else
+                        {
+                            operation->frames = (*recording)->frame_count();
+                            operation->complete = (*recording)->complete();
+                            if (const auto saved = ce::save_recording(**recording, path); !saved)
+                            {
+                                operation->error = ce::describe(saved.error());
+                            }
+                        }
+                    }
+                }
+                catch (const std::exception& exception)
+                {
+                    operation->error = exception.what();
+                }
+                catch (...)
+                {
+                    operation->error = "Unexpected recording save failure";
+                }
+                operation->done.store(true, std::memory_order_release);
+            });
+        }
+        catch (const std::exception& exception)
+        {
+            if (!operation->done.load(std::memory_order_acquire))
+            {
+                operation->error = exception.what();
+                operation->done.store(true, std::memory_order_release);
+            }
+            return Fail("profile.save_start_failed", operation->error, ProfileSavePayload());
+        }
+        if (operation->done.load(std::memory_order_acquire) && !operation->error.empty())
+        {
+            return Fail("profile.save_failed", operation->error, ProfileSavePayload());
+        }
+        return Ok("Entire recording save queued; use profile.save status for completion", ProfileSavePayload());
     }
 
     static CommandCore::CommandResult Cmd_profile_counter_mask(const ConsoleCommandContext& ctx)

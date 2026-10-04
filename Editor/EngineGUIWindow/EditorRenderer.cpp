@@ -19,6 +19,8 @@
 #include "EditorSessionState.h"
 #include "SceneManager.h"
 #include "Scene.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
+#include "../../Engine/Utility_Framework/WarmupLedger.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -286,6 +288,18 @@ void EditorRenderer::BeginRender()
         m_host->BeginFrame();
     }
 
+    // 복원된 Game 모드나 접힌 도크에서도 예열이 끝나야 한다. 텍스처를 여는
+    // 작업은 PT의 열린 Host 프레임에서만 하고, GT에는 원자 이정표만 전달한다.
+    const auto warmup = engine::warmup::read();
+    if (!warmup.stages[static_cast<std::size_t>(engine::warmup::stage::display_texture)].reached)
+    {
+        const auto displayed = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Editor);
+        if (displayed.textureId && displayed.frame.ready && displayed.width > 0 && displayed.height > 0)
+        {
+            engine::warmup::mark(engine::warmup::stage::display_texture);
+        }
+    }
+
     // W2-3: 주입된 포인터를 얹는다. **`BeginFrame`(= NewFrame) 뒤**여야 한다 —
     // 앞에 두면 `ImGui_ImplWin32_NewFrame` 이 자기 좌표를 뒤에 넣어 덮는다.
     ::editor::nav::apply_injected_pointer();
@@ -367,6 +381,12 @@ void EditorRenderer::RequestDockLayoutReset() noexcept
     ::editor::request_workspace_action(::editor::workspace_action::reset);
 }
 
+void EditorRenderer::RenderProfiler()
+{
+    m_windowFocusRequest = ::editor::apply_pending_window_requests(*m_windows);
+    ::editor::draw_windows(*m_windows, ::editor::window_draw_phase::profiler, m_windowFocusRequest);
+}
+
 void EditorRenderer::Render()
 {
     ::editor::windows::begin_shell_cost(::editor::windows::shell_cost_section::shell_prewindows);
@@ -392,7 +412,7 @@ void EditorRenderer::Render()
     // 재면 같은 시간이 두 번 잡혀 잔차가 음수가 된다.
     ::editor::windows::end_shell_cost(::editor::windows::shell_cost_section::shell_prewindows);
 
-    ::editor::draw_windows(*m_windows);
+    ::editor::draw_windows(*m_windows, ::editor::window_draw_phase::scene, m_windowFocusRequest);
 
     const ::editor::windows::shell_cost_scope postCost{
         ::editor::windows::shell_cost_section::shell_postwindows };

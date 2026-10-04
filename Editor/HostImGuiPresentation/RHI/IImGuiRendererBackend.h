@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include "RHI/RHIDisplayFrame.h"
 
 class Texture;
 
@@ -67,8 +68,8 @@ public:
     virtual bool IsTextureReady(Texture* texture) const = 0;
     virtual uint64_t OpenSharedTexture(void* sharedHandle) = 0;
     virtual void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
-        const void* rgba, uint32_t rowPitch) = 0;
-    virtual uint64_t GetCpuFrameTextureId(uint64_t key) = 0;
+        const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) = 0;
+    virtual RHIDisplayTexture GetCpuFrameTexture(uint64_t key) = 0;
     virtual uint64_t GetFallbackTextureId() const = 0;
 
     virtual void Shutdown() = 0;

@@ -952,13 +952,14 @@ namespace material_graph
         const auto lookupBudget = hasAlpha ? budget.lookupBytes * 2 / 3 : budget.lookupBytes;
         if (!lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
                              environmentGeneration, lookupBudget, candidate->lookup, error, importance, source, false,
-                             budget.lookupRefinePixels))
+                             budget.lookupApproximate))
         {
             return false;
         }
         if (hasAlpha && !lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
                                          environmentGeneration, budget.lookupBytes - lookupBudget,
-                                         candidate->alphaLookup, error, importance, source, true))
+                                         candidate->alphaLookup, error, importance, source, true,
+                                         budget.lookupApproximate))
         {
             return false;
         }

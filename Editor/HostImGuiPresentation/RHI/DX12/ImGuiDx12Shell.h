@@ -78,14 +78,14 @@ public:
 
     /// 다른 RHI 백엔드가 완성한 RGBA8 프레임을 셸 디바이스로 넘긴다.
     ///
-    /// Submit은 게임 스레드, GetCpuFrameTextureId/실제 업로드는 CE 스레드다.
+    /// Submit은 렌더 스레드, 업로드 기록과 조회는 CE 스레드다.
     /// key별 최신 프레임 하나만 보관하므로 Vulkan이 셸보다 빨라도 오래된
     /// 리드백이 줄을 서지 않는다. 행은 width * 4 바이트 이상이어야 한다.
     void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
-        const void* rgba, uint32_t rowPitch) override;
+        const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) override;
 
-    /// SubmitCpuRgbaFrame의 고정 SRV 슬롯. 첫 업로드 전에는 합법 null SRV다.
-    uint64_t GetCpuFrameTextureId(uint64_t key) override;
+    /// UI 생성 전에 업로드 기록한 픽셀과 메타데이터. 준비 전에는 빈 값을 돌려준다.
+    RHIDisplayTexture GetCpuFrameTexture(uint64_t key) override;
 
     /// 표시할 것이 없을 때 쓰는 폴백(null 디스크립터 — 0을 읽는 합법 SRV).
     ///

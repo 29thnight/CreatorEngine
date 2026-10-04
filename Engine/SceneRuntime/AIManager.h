@@ -9,10 +9,45 @@
 #include "BTBuildGraph.h"
 #include <mathematics/frustum.hpp>
 #include <optional>
+#include <mathematics/bounds.hpp>
+#include <cstdint>
+#include <memory>
+#include <vector>
+#include <utility>
 
 class StateMachineComponent;
 class BehaviorTreeComponent;
 class Entity;
+class Scene;
+
+// 워커에 넘기는 것은 소유 스레드에서 봉인한 값뿐이다. 컴포넌트 주소 대신
+// 등록 세대를 쓰므로 파괴·재등록·DDOL 이송 뒤의 결과는 새 객체에 적용되지 않는다.
+struct AIComponentSnapshot
+{
+    EntityHandle m_owner;
+    uint64_t m_registrationId = 0;
+    int m_treeInstanceId = -1;
+    uint64_t m_treeRevision = 0;
+    math::aabb m_bounds;
+    bool m_enabled = false;
+};
+
+struct AIUpdateSnapshot
+{
+    std::vector<AIComponentSnapshot> m_components;
+    std::optional<math::bounding_frustum> m_cameraFrustum;
+    float m_deltaSeconds = 0.0f;
+};
+
+struct AIUpdateBatch
+{
+    explicit AIUpdateBatch(AIUpdateSnapshot value) : m_snapshot(std::move(value)) {}
+
+    const AIUpdateSnapshot m_snapshot;
+    // 단일 워커만 쓰고 Scene이 완료 토큰을 회수한 뒤에만 읽는다.
+    std::vector<size_t> m_visibleIndices;
+};
+
 class AIManager : public Singleton<AIManager>
 {
 private:
@@ -34,8 +69,11 @@ public:
 
 	void UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
-	void InternalAIUpdate(float deltaSeconds,
-		const std::optional<math::bounding_frustum>& cameraFrustum);
+    // Capture/Apply는 게임 스레드 전용이고 Cull만 공용 워커에서 실행한다.
+    std::shared_ptr<AIUpdateBatch> CaptureAIUpdate(Scene& scene, float deltaSeconds,
+        const std::optional<math::bounding_frustum>& cameraFrustum);
+    static void CullAIUpdate(const AIUpdateSnapshot& snapshot, std::vector<size_t>& visibleIndices);
+    void ApplyAIUpdate(Scene& scene, const AIUpdateBatch& batch);
 	size_t GetRegisteredAIComponentCount() const;
 	bool IsAIComponentRegistered(const IAIComponent* aiComponent) const;
 
@@ -73,13 +111,21 @@ private:
 	BlackBoard m_globalBB;
 	std::unordered_map<std::string, BlackBoard*> m_blackBoardFind; // 각 AI에 대한 개별 블랙보드 : emplace 전용
 	plf::colony<BlackBoard> m_blackBoards;
-	// Scene이 유일한 소유자다. 레지스트리는 sceneId까지 포함한 세대 검증 핸들과
-	// 비소유 컴포넌트 포인터만 보관한다. DDOL 이송은 씬 편입/이탈 훅에서
-	// 옛 핸들을 제거하고 새 씬 핸들로 다시 등록한다.
-	plf::colony<std::pair<EntityHandle, IAIComponent*>> m_aiComponentMap;
-	// 업데이트는 Scene::m_AIJob에서, 등록/해지는 게임 스레드에서 일어난다.
-	// 컨테이너는 잠금 아래 snapshot만 만들고 실제 AI 코드는 잠금 밖에서 실행한다.
-	mutable std::mutex m_aiComponentMutex;
+    struct AIRegistration
+    {
+        EntityHandle m_owner;
+        IAIComponent* m_component = nullptr;
+        uint64_t m_registrationId = 0;
+    };
+
+    // Scene이 컴포넌트를 소유한다. 비소유 주소는 게임 스레드 레지스트리 안에만
+    // 남기며 colony의 기존 순서를 snapshot에도 유지한다.
+    plf::colony<AIRegistration> m_aiComponentMap;
+    std::unordered_map<uint64_t, IAIComponent*> m_aiRegistrationsById;
+    uint64_t m_nextAIRegistrationId = 1;
+    // 등록·해지·Capture·Apply는 게임 스레드가 직렬화한다. 이 잠금은 레지스트리
+    // 조회만 보호하며 컴포넌트 수명을 워커까지 연장하는 수단이 아니다.
+    mutable std::mutex m_aiComponentMutex;
 	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
 };
 

@@ -5,6 +5,7 @@
 
 #include <atomic>
 #include <memory>
+#include <string>
 namespace editor { class EditorWorkspaceStore; }
 #include <chrono>
 
@@ -41,6 +42,7 @@ public:
     ~EditorRenderer();
 
     void BeginRender();
+    void RenderProfiler();
     void Render();
     void EndRender();
 
@@ -58,6 +60,7 @@ private:
     std::unique_ptr<::editor::EditorWorkspaceStore> m_workspace;
     IImGuiHost* m_host{ nullptr };
     ::editor::window_table* m_windows{ nullptr };
+    std::string m_windowFocusRequest;
     float m_lastRequestedScale{ -1.f };
     float m_lastDpiScale{ -1.f };
 

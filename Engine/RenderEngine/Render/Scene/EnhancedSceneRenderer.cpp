@@ -154,13 +154,11 @@ namespace
 {
     const EnhancedLiveGpuSpanSink& GpuSpanSink() { return g_gpuSpanSink; }
 
-    // 살아 있는 화면의 재질 IBL 룩업은 바뀐 픽셀을 먼저 적은 표본으로 굽고,
-    // 입력이 그대로인 픽셀만 프레임마다 이만큼 기준 표본(1024/4096)으로 정제한다.
-    // 카메라 회전·애니메이션 동안의 비용을 이 수로 묶고, 멈추면 기준값에 수렴한다.
-    // 검사 도구는 SceneHostBudget 기본값(0, 전부 기준 표본)을 쓴다.
-    // 기준 표본 한 화소는 GPU 로 약 45~75 us 다(10-04 캡처: 2048 화소 정제 프레임이
-    // 90~155 ms). 32 화소면 정제 프레임이 약 1.5~2.5 ms 에 묶인다.
-    constexpr std::uint32_t kLiveLookupRefinePixels = 32;
+    // 살아 있는 화면의 재질 IBL 룩업은 바뀐 픽셀을 split-sum 근사로 굽고 끝낸다.
+    // 기준 적분(1024/4096 표본)은 한 화소 45~75 us 라 카메라 회전에서 화면 전체가
+    // 다시 구워지면 프레임당 1.5 s 까지 GPU 를 막았다(10-04 캡처). 기준값 수렴은
+    // 하지 않는다. 검사 도구는 SceneHostBudget 기본값(false, 기준 적분)을 쓴다.
+    constexpr bool kLiveLookupApproximate = true;
 }
 
 namespace
@@ -443,10 +441,9 @@ namespace
         // 한 프레임의 한 뷰를 그리는 동안에만 살아 있는 값이다.
         LiveBlackboard blackboard;
 
-        // 표시 슬롯 둘 — 비동기의 본체다. DX12가 한 슬롯에 그리는 동안
-        // DX11은 다른 슬롯을 표시한다. 슬롯은 펜스 값이 완료된 뒤에만
-        // 표시로 승격되므로(TickLive), DX11이 쓰기 중인 텍스처를 읽는
-        // 일이 구조적으로 없다 — WaitForGpu가 필요 없어지는 이유다.
+        // 표시 슬롯은 생산자 GPU 펜스가 완료된 뒤에만 승격한다. CPU 조회는
+        // displayLifetimeMutex로 보호하지만, 조회 뒤 Host GPU sampling 종료까지
+        // 지키는 lease는 아직 없다. 링의 슬롯 수만으로 재사용 안전을 증명하지 않는다.
         struct DisplaySlot
         {
             bool previewComplete{false};
@@ -456,6 +453,8 @@ namespace
             uint64_t fenceValue{ 0 };
             uint64_t frameId{ 0 };
             EnhancedLiveViewKey key{};
+            uint64_t sceneEpoch{ 0 };
+            FrameCameraSnapshot camera{};
 
             // 이 제출의 GPU 프로파일 표. 부른 자리에서 받아 보관했다가 펜스가
             // 끝났을 때 그대로 Collect 에 넘긴다.
@@ -605,6 +604,9 @@ namespace
             uint64_t promotionCount{ 0 };
             uint32_t promotedSlotMask{ 0 };
             uint64_t completedFrameId{ 0 };
+            uint64_t completedSceneEpoch{ 0 };
+            uint64_t completedResizeGeneration{ 0 };
+            FrameCameraSnapshot completedCamera{};
         };
         mutable std::mutex viewMutex;
         View views[EnhancedSceneRenderer::kMaxLiveCameraViews];
@@ -618,6 +620,9 @@ namespace
             uint32_t viewIndex{ 0 };
             EnhancedLiveViewKey key{};
             uint64_t frameId{ 0 };
+            uint64_t sceneEpoch{ 0 };
+            uint64_t resizeGeneration{ 0 };
+            FrameCameraSnapshot camera{};
             bool pending{ false };
         };
         Slot slots[kSlotCount];
@@ -850,13 +855,17 @@ namespace
                     {
                         std::lock_guard<std::mutex> lock(viewMutex);
                         View& view = views[slot.viewIndex];
-                        belongsToView = view.key == slot.key;
+                        // 슬롯 인덱스 순회가 완료 프레임을 역순으로 승격하지 않게 한다.
+                        belongsToView = view.key == slot.key && slot.frameId > view.completedFrameId;
                         if (belongsToView)
                         {
                             view.ready = true;
                             ++view.promotionCount;
                             view.promotedSlotMask |= (1u << slotIndex);
                             view.completedFrameId = slot.frameId;
+                            view.completedSceneEpoch = slot.sceneEpoch;
+                            view.completedResizeGeneration = slot.resizeGeneration;
+                            view.completedCamera = slot.camera;
                             view.previewComplete = slot.previewComplete;
                         }
                     }
@@ -870,7 +879,10 @@ namespace
                             presentationSink->SubmitCpuFrame(
                                 kDisplayKeyBase + slot.viewIndex + 1u,
                                 image.width, image.height, rgba.data(),
-                                image.width * 4u);
+                                image.width * 4u,
+                                RHIDisplayFrameMetadata{slot.frameId, slot.sceneEpoch,
+                                    slot.resizeGeneration, slot.key.viewId,
+                                    slot.key.historyRevision, slot.camera});
                         }
                         ++outPromoted;
                     }
@@ -891,7 +903,7 @@ namespace
         }
 
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
-            uint64_t sourceFrameId, uint64_t backendGeneration,
+            uint64_t sourceFrameId, uint64_t resizeGeneration, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
             std::string& outError, EnhancedPbrCapture* capture)
         {
@@ -973,7 +985,7 @@ namespace
                     !graph.PrepareParallel(commandPool, outError)) return false;
                 if (!graphMaterials.Prepare(frameContext, graphInput, ibl.GetCubeMap(),
                         ibl.GetIrradianceMap(), ibl.GetPrefilteredMap(),
-                        shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupRefinePixels = kLiveLookupRefinePixels},
+                        shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate},
                         outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap())) return false;
                 if (capture) capture->RecordLatticeInput(graphInput);
             }
@@ -1061,6 +1073,10 @@ namespace
             slot->viewIndex = viewIndex;
             slot->key = viewPacket.key;
             slot->frameId = sourceFrameId;
+            slot->sceneEpoch = frameContext.sceneEpoch;
+            slot->resizeGeneration = resizeGeneration;
+            // 최신 요청이 아니라 실제 패스가 소비한 카메라를 완료 슬롯에 붙인다.
+            slot->camera = *frameContext.camera;
             slot->previewComplete = graphInput && !graphInput->Draws().empty() &&
                 (!viewPacket.materialPreview || graphInput->Draws()[0].material == viewPacket.materialPreview->instance);
             slot->pending = true;
@@ -1291,7 +1307,8 @@ namespace
                 active[targetIndex] = true;
                 EnhancedLiveDisplayEntrySnapshot& entry =
                     displaySnapshot.targets[targetIndex];
-                if (entry.key != view.key)
+                if (entry.key != view.key ||
+                    (entry.ready && entry.completedSceneEpoch != frame.sceneEpoch))
                 {
                     entry = {};
                     displayPresentationKeys[targetIndex] = 0;
@@ -1299,6 +1316,9 @@ namespace
                 }
                 entry.key = view.key;
                 entry.active = true;
+                entry.sourceFrameId = frame.frameId;
+                entry.sourceInputSequence = view.camera.editorInputSequence;
+                entry.sourceCameraRevision = view.camera.editorCameraRevision;
             }
             for (uint32_t i = 0; i < kEnhancedLiveDisplayTargetCount; ++i)
             {
@@ -1320,6 +1340,8 @@ namespace
                 EnhancedLiveDisplayEntrySnapshot& entry = displaySnapshot.targets[i];
                 entry.ready = false;
                 entry.completedFrameId = 0;
+                entry.completedSceneEpoch = 0;
+                entry.completedCamera = {};
                 entry.completedResizeGeneration = 0;
                 entry.completedWidth = entry.completedHeight = 0;
                 entry.promotionCount = 0;
@@ -1344,15 +1366,21 @@ namespace
             const EnhancedLiveViewKey& key, uint64_t presentationKey,
             uint64_t completedFrameId, uint64_t promotionCount,
             uint32_t promotedSlotMask, uint32_t width, uint32_t height,
+            uint64_t completedSceneEpoch, const FrameCameraSnapshot& completedCamera,
             uint64_t resultResizeGeneration = 0, bool previewComplete = false)
         {
             const uint32_t targetIndex = DisplayTargetIndex(displayTarget);
             EnhancedLiveDisplayEntrySnapshot& entry =
                 displaySnapshot.targets[targetIndex];
-            if (!entry.active || entry.key != key) return;
+            if (!entry.active || entry.key != key || completedSceneEpoch != sceneEpoch.load())
+            {
+                return;
+            }
             entry.ready = 0 != presentationKey;
             entry.previewComplete = previewComplete;
             entry.completedFrameId = completedFrameId;
+            entry.completedSceneEpoch = completedSceneEpoch;
+            entry.completedCamera = completedCamera;
             entry.completedWidth = width;
             entry.completedHeight = height;
             entry.completedResizeGeneration = resultResizeGeneration != 0
@@ -1375,7 +1403,9 @@ namespace
                 PublishDisplayResultLocked(view.displayTarget, view.key,
                     VulkanLivePipeline::kDisplayKeyBase + i + 1u,
                     view.completedFrameId, view.promotionCount,
-                    view.promotedSlotMask, vulkanPipeline->width, vulkanPipeline->height, 0, view.previewComplete);
+                    view.promotedSlotMask, vulkanPipeline->width, vulkanPipeline->height,
+                    view.completedSceneEpoch, view.completedCamera,
+                    view.completedResizeGeneration, view.previewComplete);
             }
         }
 
@@ -4663,6 +4693,9 @@ namespace
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
             p.ibl.MarkCookedCaptureSubmitted(slot.fenceValue);
             slot.frameId = sourceFrameId;
+            slot.sceneEpoch = p.frameContext.sceneEpoch;
+            // cameraSnapshot은 다음 뷰에서 덮이므로 제출 슬롯에 값으로 봉인한다.
+            slot.camera = *p.frameContext.camera;
             slot.previewComplete = p.graphInput && !p.graphInput->Draws().empty() &&
                 (!materialPreviewView || (graphViewInput && !graphViewInput->Draws().empty() &&
                     p.graphInput->Draws()[0].material == graphViewInput->Draws()[0].material));
@@ -6219,8 +6252,11 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 continue;
             }
             if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
-                p.views[viewIndex].ready && p.views[viewIndex].previewComplete && !state.controlledCaptureFrame)
+                p.views[viewIndex].ready && p.views[viewIndex].previewComplete &&
+                p.views[viewIndex].completedSceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame)
+            {
                 continue;
+            }
             bool captured = false;
             {
                 RenderThreadPhaseScope capture(RenderPhase::view_capture);
@@ -6242,7 +6278,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             {
                 RenderThreadPhaseScope renderView(RenderPhase::view_render);
                 rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
-                    frame.frameId,
+                    frame.frameId, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
                     prepareFrame, error, state.BeginPbrCapture(frame, viewPacket));
             }
@@ -6375,8 +6411,9 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     state.PublishDisplayResultLocked(view.displayTarget, view.key,
                         view.slots[slotIndex].interopToken,
                         view.slots[slotIndex].frameId, view.promotionCount,
-                        view.promotedSlotMask, p.width, p.height, p.resizeGeneration,
-                        view.slots[slotIndex].previewComplete);
+                        view.promotedSlotMask, p.width, p.height,
+                        view.slots[slotIndex].sceneEpoch, view.slots[slotIndex].camera,
+                        p.resizeGeneration, view.slots[slotIndex].previewComplete);
                 }
                 view.pendingQueue.erase(view.pendingQueue.begin());
                 view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
@@ -6726,7 +6763,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 
         // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
         if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
-            view->displaySlot >= 0 && view->slots[view->displaySlot].previewComplete && !state.controlledCaptureFrame)
+            view->displaySlot >= 0 && view->slots[view->displaySlot].previewComplete &&
+            view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame)
         {
             // Reopening a hidden preview reuses its completed image. The public
             // demand snapshot was cleared while hidden, so publish it again.
@@ -6734,7 +6772,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             const auto& cached = view->slots[view->displaySlot];
             state.PublishDisplayResultLocked(view->displayTarget, view->key, cached.interopToken,
                 cached.frameId, view->promotionCount, view->promotedSlotMask, p.width, p.height,
-                p.resizeGeneration, true);
+                cached.sceneEpoch, cached.camera, p.resizeGeneration, true);
             continue;
         }
         int renderSlot = -1;
@@ -6843,8 +6881,12 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
     const uint32_t targetIndex = static_cast<uint32_t>(target);
-    if (targetIndex >= kEnhancedLiveDisplayTargetCount) return {};
+    if (targetIndex >= kEnhancedLiveDisplayTargetCount)
+    {
+        return {};
+    }
     auto& entry = state.displaySnapshot.targets[targetIndex];
+    auto acquiredFrame = entry;
     const auto observe = [&](uint64_t textureId, const char* reason)
     {
         ++entry.textureQueries;
@@ -6874,32 +6916,77 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
                 std::printf("[LiveDisplay] target=%u resize=%llu recovered=%.3fms frame=%llu\n",
                     targetIndex, static_cast<unsigned long long>(
                         state.displaySnapshot.resizeGeneration), elapsed,
-                    static_cast<unsigned long long>(entry.completedFrameId));
+                    static_cast<unsigned long long>(acquiredFrame.completedFrameId));
                 missingSince = {};
             }
         }
         if (textureId)
         {
-            entry.lastTextureFrameId = entry.completedFrameId;
-            entry.lastTextureResizeGeneration = entry.completedResizeGeneration;
+            entry.lastTextureFrameId = acquiredFrame.completedFrameId;
+            entry.lastTextureResizeGeneration = acquiredFrame.completedResizeGeneration;
         }
-        return EnhancedLiveDisplayTexture{textureId, textureId ? entry.completedWidth : 0,
-            textureId ? entry.completedHeight : 0};
+        acquiredFrame.ready = textureId != 0;
+        return EnhancedLiveDisplayTexture{textureId, textureId ? acquiredFrame.completedWidth : 0,
+            textureId ? acquiredFrame.completedHeight : 0, acquiredFrame, state.displaySnapshot.backend,
+            entry.completedFrameId, entry.completedCamera.editorInputSequence,
+            entry.completedCamera.editorCameraRevision};
     };
     // Host가 설치한 표시 sink가 ID를 해석한다(E4-6a). Core는 표시 수명 락만
     // 소유하고 ImGui 셸을 모른다 — 미설치·비활성이면 표시할 수단이 없다.
     const std::shared_ptr<IDisplayPresentationSink> sink =
         state.CopyPresentationSink();
-    if (!sink || !sink->IsActive()) return observe(0, "sink_inactive");
-    if (!state.enabled) return observe(0, "renderer_disabled");
+    if (!sink || !sink->IsActive())
+    {
+        return observe(0, "sink_inactive");
+    }
+    if (!state.enabled)
+    {
+        return observe(0, "renderer_disabled");
+    }
     const uint64_t presentationKey = state.displayPresentationKeys[targetIndex];
-    if (!entry.active) return observe(0, "view_inactive");
-    if (!entry.ready) return observe(0, "result_pending");
-    if (0 == presentationKey) return observe(0, "key_missing");
+    if (!entry.active)
+    {
+        return observe(0, "view_inactive");
+    }
+    if (!entry.ready)
+    {
+        return observe(0, "result_pending");
+    }
+    if (0 == presentationKey)
+    {
+        return observe(0, "key_missing");
+    }
 
+    if (entry.completedSceneEpoch != state.sceneEpoch.load())
+    {
+        return observe(0, "scene_changed");
+    }
+    if (entry.completedResizeGeneration != state.displaySnapshot.resizeGeneration)
+    {
+        return observe(0, "resize_changed");
+    }
     if (EnhancedLiveBackend::Vulkan == state.displaySnapshot.backend)
     {
-        return observe(sink->GetCpuFrameTextureId(presentationKey), "cpu_frame_missing");
+        const RHIDisplayTexture uploaded = sink->GetCpuFrameTexture(presentationKey);
+        if (0 == uploaded.m_textureId)
+        {
+            return observe(0, "cpu_frame_missing");
+        }
+        if (uploaded.m_frame.m_viewId != entry.key.viewId ||
+            uploaded.m_frame.m_historyRevision != entry.key.historyRevision ||
+            uploaded.m_frame.m_sceneEpoch != state.sceneEpoch.load() ||
+            uploaded.m_frame.m_resizeGeneration != state.displaySnapshot.resizeGeneration)
+        {
+            return observe(0, "cpu_frame_stale");
+        }
+        // RT 완료와 Host 업로드는 다른 시점이다. 실제 업로드한 픽셀의 카메라만 돌려준다.
+        acquiredFrame.completedFrameId = uploaded.m_frame.m_frameId;
+        acquiredFrame.completedSceneEpoch = uploaded.m_frame.m_sceneEpoch;
+        acquiredFrame.completedResizeGeneration = uploaded.m_frame.m_resizeGeneration;
+        acquiredFrame.completedCamera = uploaded.m_frame.m_camera;
+        acquiredFrame.completedWidth = uploaded.m_width;
+        acquiredFrame.completedHeight = uploaded.m_height;
+        return observe(uploaded.m_textureId, "cpu_frame_missing");
     }
     return observe(state.dx12.OpenDisplayTexture(*sink, presentationKey), "display_token_missing");
 }

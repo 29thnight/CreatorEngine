@@ -3,6 +3,7 @@
 #include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
 #include "Camera.h"
+#include "EditorCameraRig.h"
 #include "CameraComponent.h"
 #include "Scene.h"
 #include "InputManager.h"
@@ -343,6 +344,7 @@ void Core::App::Load()
 /// 넘긴 뷰의 수다 — 부팅 예열이 "만들 것이 있는가"를 이 수로 판정한다.
 uint32_t Core::App::PublishRenderFrame()
 {
+    auto sceneLock = m_main->LockSceneStructure();
 	// 유일한 씬 렌더러. Update가 GT의 구조 변경과 EndOfFrame을 끝낸 뒤
 	// 카메라와 delta batch를 밀봉해 전용 RenderThread에 발행한다.
 	//
@@ -374,7 +376,7 @@ uint32_t Core::App::PublishRenderFrame()
 	// 수요가 없어 만들지 않았다" 이지 "못 만들었다" 가 아니다. 둘을 섞으면
 	// 게임 카메라가 없는 씬에서 수요 문을 통째로 걷어도 수가 그대로여서,
 	// 그 수를 읽는 게이트가 씬이 무엇을 담고 있느냐에 기대게 된다.
-	Camera* const editorCamera = EditorSessionState::Get().EditorCamera();
+    EditorCameraRig* const editorCamera = EditorSessionState::Get().CameraRig();
 	if (editorDemanded && nullptr != editorCamera)
 	{
 		views[viewCount++] = {
@@ -415,7 +417,10 @@ uint32_t Core::App::PublishRenderFrame()
 		EnhancedSceneRenderer::BuildLiveFramePacket(
 		static_cast<float>(m_main->GetFrameDeltaTime()),
 		views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
-	const uint64_t publishedFrameId = renderFrame.frameId;
+    const uint64_t publishedFrameId = renderFrame.frameId;
+    // 카메라·gizmo 입력은 값/소유 handle로 확보했다. delta 병합과 queue 역압력은
+    // 기존 PublishLiveFrame 경로에 남기되 그 대기는 scene lock 밖에서 한다.
+    sceneLock.unlock();
 	if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 	{
 		m_main->NotifyRenderFramePublished(publishedFrameId);
@@ -477,8 +482,10 @@ bool Core::App::WarmUpFirstRenderedFrame()
                 failure = widen(renderer.error);
                 Debug::PrintLog(spdlog::level::err, "[BootWarmup] Renderer initialization failed: " + renderer.error);
             }
-            else if (renderer.ready && EnhancedSceneRenderer::GetLiveDisplayTexture(
-                EnhancedLiveDisplayTarget::Editor).textureId != 0)
+            // Host 텍스처 조회는 PT의 열린 프레임 전용이다. GT 예열은 PT가
+            // 실제 bundle을 취득한 뒤 원자로 게시한 첫 표시 이정표만 읽는다.
+            else if (renderer.ready && ledger.stages[static_cast<std::size_t>(
+                engine::warmup::stage::display_texture)].reached)
             {
                 Debug::PrintLog(spdlog::level::info, "[BootWarmup] Ready; GPU-completed editor frame=" + std::to_string(renderer.completedFrame));
                 return true;

@@ -195,9 +195,7 @@ PrincipledIblIntegral PrincipledEmptyIntegral()
 
 // Bake-only hemisphere integral of the same correlated-Smith GGX used below.
 // The view azimuth is required for anisotropy; a 2D isotropic DFG is insufficient.
-// Counts follow IntegratePrincipledIbl: defaults are the reference.
-PrincipledIblIntegral IntegrateLayeredReflection(PrincipledSurface material, float3 view, bool coat, bool compensate = true,
-    uint samples = 1024u, uint averageSamples = 64u)
+PrincipledIblIntegral IntegrateLayeredReflection(PrincipledSurface material, float3 view, bool coat, bool compensate = true)
 {
     const float3 normal = coat ? material.coatNormal : material.normal;
     const float3 tangent = PrincipledProjectedTangent(material.tangent, normal);
@@ -214,6 +212,7 @@ PrincipledIblIntegral IntegrateLayeredReflection(PrincipledSurface material, flo
         return integral;
     }
     integral.directionalAlbedo = 0.0;
+    const uint samples = 1024u;
     if (roughness == 0.0)
     {
         integral.singleScatter = compensate
@@ -249,6 +248,7 @@ PrincipledIblIntegral IntegrateLayeredReflection(PrincipledSurface material, flo
         if (!compensate)
             integral.singleScatter = min(integral.singleScatter, integral.directionalAlbedo);
     }
+    const uint averageSamples = 64u;
     for (uint index = 0u; index < averageSamples; ++index)
     {
         const float cosine = sqrt((float(index) + 0.5) / float(averageSamples));

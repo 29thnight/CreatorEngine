@@ -28,7 +28,6 @@
 #include <unordered_map>
 #include "DataSystem.h"
 #include "PrefabUtility.h"
-#include "InputManager.h"
 #include "Terrain.h"
 #include "EditorSessionState.h"
 #include "EditorAssetPresentation.h"
@@ -78,45 +77,36 @@ void editor::windows::draw_scene_view()
 
 void SceneViewWindow::RenderSceneViewWindow()
 {
-	// 빌린 것들은 매 프레임 정본에서 다시 유도한다(헤더 주석 참고).
-	m_editorCameraRig = EditorSessionState::Get().CameraRig();
-	m_editorCamera = m_editorCameraRig ? &m_editorCameraRig->GetCamera() : nullptr;
-	m_gizmoRenderer = GizmoRenderer::GetActive();
+    // 빌린 것들은 매 프레임 정본에서 다시 유도한다(헤더 주석 참고).
+    m_editorCameraRig = EditorSessionState::Get().CameraRig();
+    m_editorCamera = m_editorCameraRig ? &m_editorCameraRig->GetCamera() : nullptr;
+    m_gizmoRenderer = GizmoRenderer::GetActive();
 
-	auto scene = SceneManagers->GetActiveScene();
-	if (!scene || !m_editorCamera) return;
-	auto obj = scene->GetSelectedEntity();
-	if (obj)
-	{
-		math::matrix4x4 objMat{};
-		if (auto* rect = obj->GetComponent<RectTransformComponent>())
-		{
-			auto rectWorld = rect->GetWorldRect();
-			objMat = math::translation_matrix(math::vector3{
-				rectWorld.x + rectWorld.width * rect->GetPivot().x,
-				rectWorld.y + rectWorld.height * rect->GetPivot().y,
-				0.f });
-		}
-		else
-		{
-			objMat = obj->Transform_().GetWorldMatrix();
-		}
-
-		auto view = m_editorCamera->CalculateView();
-		auto projection = m_editorCamera->CalculateProjection();
-
-		RenderSceneView(&view.m[0][0], &projection.m[0][0],
-			&objMat.m[0][0], true, obj, m_editorCamera);
-
-	}
-	else
-	{
-		auto view = m_editorCamera->CalculateView();
-		auto projection = m_editorCamera->CalculateProjection();
-		auto identity = math::matrix4x4::identity();
-
-		RenderSceneView(&view.m[0][0], &projection.m[0][0], &identity.m[0][0], false, nullptr, m_editorCamera);
-	}
+    auto* scene = SceneManagers->GetActiveScene();
+    if (!scene || !m_editorCamera)
+    {
+        return;
+    }
+    auto* obj = scene->GetSelectedEntity();
+    auto matrix = math::matrix4x4::identity();
+    if (obj)
+    {
+        if (auto* rect = obj->GetComponent<RectTransformComponent>())
+        {
+            const auto rectWorld = rect->GetWorldRect();
+            matrix = math::translation_matrix(math::vector3{
+                rectWorld.x + rectWorld.width * rect->GetPivot().x,
+                rectWorld.y + rectWorld.height * rect->GetPivot().y,
+                0.f});
+        }
+        else
+        {
+            // 현재 편집 경로는 절대 월드 값을 부모의 현재 역행렬로 적용한다.
+            // drag revision/ack 계약 없이 과거 render world를 넣으면 최신 변환을 덮어쓴다.
+            matrix = obj->Transform_().GetWorldMatrix();
+        }
+    }
+    RenderSceneView(&matrix.m[0][0], obj, m_editorCamera);
 }
 
 // 최상위 오브젝트의 부모 월드 행렬은 항등이다.
@@ -141,24 +131,32 @@ static math::matrix4x4 ResolveParentWorldMatrix(const Entity* obj)
 	return parent->Transform_().GetWorldMatrix();
 }
 
-void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam)
+void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 {
     // 캔버스 규약의 **입력**을 만드는 자리는 여기 하나다(§1.5 ①). 원점은 창
     // 프레임이 아니라 content 이고, 제목표시줄 보정은 없다. 이 아래로는 좌표를
     // 다시 만들지 않는다 — 전부 `m_canvas` 를 읽는다.
     const ImVec2 contentOrigin = ImGui::GetCursorScreenPos();
     const ImVec2 contentSize = ImGui::GetContentRegionAvail();
-    if (contentSize.x <= 0.f || contentSize.y <= 0.f) return;
+    if (contentSize.x <= 0.f || contentSize.y <= 0.f)
+    {
+        return;
+    }
+    // Image, transform gizmo, ray가 이번 UI 프레임 내내 같은 완료 카메라를 쓴다.
     const auto displayed = EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Editor);
     // 예열 장부: 표시 텍스처가 처음 유효해진 때. 캔버스는 이 크기를 입력으로
     // 받으므로, 이것이 0 이면 아래 `LayoutViewportCanvas` 는 무효를 돌려준다 —
     // 두 단계를 따로 찍어야 "그림이 없다" 와 "자리가 없다" 를 가를 수 있다.
-    if (displayed.width > 0 && displayed.height > 0)
+    if (displayed.textureId && displayed.frame.ready && displayed.width > 0 && displayed.height > 0)
+    {
         engine::warmup::mark(engine::warmup::stage::display_texture);
+    }
     m_canvas = editor::LayoutViewportCanvas(editor::viewport_fit::fill, contentOrigin, contentSize,
         {static_cast<float>(displayed.width), static_cast<float>(displayed.height)}, ImGui::GetIO().DisplayFramebufferScale);
     if (m_canvas.valid)
+    {
         engine::warmup::mark(engine::warmup::stage::scene_canvas);
+    }
     // Reserve the canvas without taking ImGui's active/hovered item: transform
     // gizmos must be able to acquire the mouse over the rendered image.
     ImGui::Dummy(m_canvas.ContentExtent());
@@ -168,11 +166,8 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     // 있는가", 텍스처 ID 는 "그림이 준비됐는가" 이고 둘은 다른 프레임에 참이 된다.
     // 예전에는 씬 쪽이 둘째만 보아서, 카메라가 없는 것과 첫 프레임을 기다리는 것이
     // 똑같이 빈 검정으로 보였다 — 모드가 하나로 합쳐진 뒤에는 그 구분이 더 필요하다.
-    // 스냅샷을 값으로 받는다 — `Get` 이 돌려주는 참조를 임시 객체에서 바로 묶으면
-    // 그 임시가 문장 끝에 죽어 매달린 참조가 된다.
-    const EnhancedLiveDisplaySnapshot displaySnapshot =
-        EnhancedSceneRenderer::GetLiveDisplaySnapshot();
-    const auto& sceneDisplay = displaySnapshot.Get(EnhancedLiveDisplayTarget::Editor);
+    // 별도 조회를 하면 Image를 취득한 뒤 승격된 다른 프레임의 신원이 섞인다.
+    const auto& sceneDisplay = displayed.frame;
     const double now = ImGui::GetTime();
     if (!sceneDisplay.active || !sceneDisplay.ready ||
         sceneDisplay.promotionCount < m_lastScenePromotionCount ||
@@ -205,8 +200,24 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     }
     ImGuizmo::BeginFrame();
     ImGuizmo::SetDrawlist();
-    m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas, m_sceneFps);
-    if (!m_canvas.valid) return;
+    m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas, m_sceneFps, displayed);
+    // 카메라 조작에는 content 사각형과 PT 입력만 필요하다. 표시 결과가 없거나
+    // 오래됐다는 이유로 다음 카메라 스냅샷을 만드는 조작까지 막지 않는다.
+    const ImVec2 inputMin = m_canvas.valid ? m_canvas.clipMin : m_canvas.contentMin;
+    const ImVec2 inputMax = m_canvas.valid ? m_canvas.clipMax : m_canvas.contentMax;
+    const bool pointerInCanvas = ImGui::IsMouseHoveringRect(inputMin, inputMax) &&
+        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    const bool canvasInput = pointerInCanvas && !m_overlay.blocksPointer;
+    m_editorCameraRig->HandleMovement(canvasInput && ImGui::IsMouseDown(ImGuiMouseButton_Right));
+    m_editorCameraRig->PublishPresentationDiagnostics(displayed,
+        sceneDisplay.active && sceneDisplay.ready && displayed.textureId && m_canvas.valid);
+
+    const auto* renderScene = SceneManagers->GetRenderScene();
+    if (!m_canvas.valid || !displayed.textureId || !sceneDisplay.ready || !renderScene ||
+        sceneDisplay.completedSceneEpoch != renderScene->GetSceneEpoch())
+    {
+        return;
+    }
     // 기즈모는 image 사각형을 받는다 — 잘린 부분까지 포함한 소스 전체의 자리라야
     // 화면 밖으로 밀려난 조작점의 투영이 맞는다. 제목표시줄 보정은 없다(원점이 content).
     //
@@ -234,11 +245,10 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     } gizmoClip{ draw, draw->CmdBuffer.Size, m_canvas.clipMin, m_canvas.clipMax };
     const ImVec2 imageExtent = m_canvas.ImageExtent();
     ImGuizmo::SetRect(m_canvas.imageMin.x, m_canvas.imageMin.y, imageExtent.x, imageExtent.y);
-    ImGuizmo::SetOrthographic(cam->m_isOrthographic);
-    const auto view = cam->CalculateView();
-    const auto projection = cam->CalculateProjectionForAspect(m_canvas.sourceAspect);
-    std::memcpy(cameraView, &view.m[0][0], sizeof(view));
-    std::memcpy(cameraProjection, &projection.m[0][0], sizeof(projection));
+    const FrameCameraSnapshot& displayedCamera = sceneDisplay.completedCamera;
+    ImGuizmo::SetOrthographic(displayedCamera.isOrthographic);
+    const float* cameraView = &displayedCamera.view.m[0][0];
+    const float* cameraProjection = &displayedCamera.projection.m[0][0];
     const bool selectMode = m_overlay.operation == 0;
     const ImGuizmo::OPERATION operations[]{ImGuizmo::TRANSLATE, ImGuizmo::TRANSLATE, ImGuizmo::ROTATE, ImGuizmo::SCALE};
     const auto mCurrentGizmoOperation = operations[m_overlay.operation];
@@ -246,10 +256,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
     float* activeSnap = m_overlay.ActiveSnap();
     float snap[3]{activeSnap ? *activeSnap : 1.f, activeSnap ? *activeSnap : 1.f, activeSnap ? *activeSnap : 1.f};
     const bool useSnap = activeSnap != nullptr;
-    const bool pointerInCanvas = ImGui::IsMouseHoveringRect(m_canvas.clipMin, m_canvas.clipMax) &&
-        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-    const bool canvasInput = pointerInCanvas && !m_overlay.blocksPointer;
-
     auto* editScene = SceneManagers->GetActiveScene();
     const bool selectionEditable = !EditorObjectOperations::IsEditLocked(obj, true) &&
         std::all_of(editScene->m_selectedEntities.begin(), editScene->m_selectedEntities.end(),
@@ -406,11 +412,6 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		}
     }
 
-	if (canvasInput && ImGui::IsMouseDown(ImGuiMouseButton_Right))
-	{
-		m_editorCameraRig->HandleMovement(Time->GetElapsedSeconds());
-	}
-
 	if (selectionEditable && ImGui::IsWindowFocused() && !m_overlay.blocksShortcuts && ImGui::IsKeyPressed(ImGuiKey_G, false)) {
 		auto scene = SceneManagers->GetActiveScene();
 		auto selectedObjects = scene->m_selectedEntities;
@@ -448,7 +449,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 	if (useGizmo)
 	{
-		gizmoTimer += Time->GetElapsedSeconds();
+        gizmoTimer += ImGui::GetIO().DeltaTime;
 		if (gizmoTimer > 0.5f)
 		{
 			useGizmo = false;
@@ -472,7 +473,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 		{
 			float closest = FLT_MAX;
 			ImVec2 mousePos = ImGui::GetMousePos();
-			Ray ray = CreateRayFromCamera(cam, mousePos);
+            Ray ray = CreateRayFromCamera(displayedCamera, mousePos);
 
 			const auto& sceneObjects = SceneManagers->GetActiveScene()->m_Entities;
 			auto hits = editor::picking::GatherRayHits(ray, sceneObjects);
@@ -517,7 +518,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
             if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model", ImGuiDragDropFlags_AcceptBeforeDelivery))
             {
                 const ImVec2 mouse = ImGui::GetMousePos();
-                const Ray ray = CreateRayFromCamera(cam, mouse);
+                const Ray ray = CreateRayFromCamera(displayedCamera, mouse);
                 float distance = 0;
                 std::optional<math::vector3> position;
                 if (RayIntersectsPlane(ray, { 0, 1, 0 }, { 0, 0, 0 }, distance))
@@ -580,7 +581,7 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 				if (canvasInput)
 				{
 					ImVec2 mousePos = ImGui::GetMousePos();
-					Ray ray = CreateRayFromCamera(cam, mousePos);
+                    Ray ray = CreateRayFromCamera(displayedCamera, mousePos);
 					//    TerrainComponent 내부에서는 Y=0 평면 위에 heightMap이 있다고 가정
 					const math::vector3 origin = ray.origin;
 					const math::vector3 direction = ray.direction;
@@ -651,37 +652,33 @@ void SceneViewWindow::RenderSceneView(float* cameraView, float* cameraProjection
 
 }
 
-math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, float depth)
+math::vector3 SceneViewWindow::ConvertMouseToWorldPosition(
+    const FrameCameraSnapshot& camera, const ImVec2& mouseScreenPos, float depth)
 {
-	const auto uv = m_canvas.SourceUV(mouseScreenPos);
-	const float normX = uv.x;
-	const float normY = uv.y;
-
-	const float ndcX = normX * 2.0f - 1.0f;
-	const float ndcY = (1.0f - normY) * 2.0f - 1.0f;
-	const math::vector4 clipPosition{ ndcX, ndcY, depth, 1.0f };
-	const math::matrix4x4 inverseViewProjection =
-		math::inverse(cam->CalculateView() * cam->CalculateProjectionForAspect(m_canvas.sourceAspect));
-	const math::vector4 worldPosition = clipPosition * inverseViewProjection;
-
-	if (std::fabs(worldPosition.w) <= 1.0e-6f)
-	{
-		return { worldPosition.x, worldPosition.y, worldPosition.z };
-	}
-	const float inverseW = 1.0f / worldPosition.w;
-	return {
-		worldPosition.x * inverseW,
-		worldPosition.y * inverseW,
-		worldPosition.z * inverseW };
+    const auto uv = m_canvas.SourceUV(mouseScreenPos);
+    const float ndcX = uv.x * 2.0f - 1.0f;
+    const float ndcY = (1.0f - uv.y) * 2.0f - 1.0f;
+    const math::vector4 clipPosition{ndcX, ndcY, depth, 1.0f};
+    // row-vector 규약에서 inverse(V * P)는 inverse(P) * inverse(V)다.
+    // RMB 입력이 live camera를 이미 움직였어도 표시 이미지의 ray는 바뀌지 않는다.
+    const math::matrix4x4 inverseViewProjection = camera.inverseProjection * camera.inverseView;
+    const math::vector4 worldPosition = clipPosition * inverseViewProjection;
+    if (std::fabs(worldPosition.w) <= 1.0e-6f)
+    {
+        return {worldPosition.x, worldPosition.y, worldPosition.z};
+    }
+    const float inverseW = 1.0f / worldPosition.w;
+    return {
+        worldPosition.x * inverseW,
+        worldPosition.y * inverseW,
+        worldPosition.z * inverseW};
 }
 
-Ray SceneViewWindow::CreateRayFromCamera(Camera* cam, const ImVec2& mousePos)
+Ray SceneViewWindow::CreateRayFromCamera(const FrameCameraSnapshot& camera, const ImVec2& mousePos)
 {
-	const math::vector3 nearPoint = ConvertMouseToWorldPosition(
-		cam, mousePos, 0.0f);
-	const math::vector3 farPoint = ConvertMouseToWorldPosition(
-		cam, mousePos, 1.0f);
-	return Ray{ nearPoint, math::normalize(farPoint - nearPoint) };
+    const math::vector3 nearPoint = ConvertMouseToWorldPosition(camera, mousePos, 0.0f);
+    const math::vector3 farPoint = ConvertMouseToWorldPosition(camera, mousePos, 1.0f);
+    return Ray{nearPoint, math::normalize(farPoint - nearPoint)};
 }
 
 namespace editor::picking

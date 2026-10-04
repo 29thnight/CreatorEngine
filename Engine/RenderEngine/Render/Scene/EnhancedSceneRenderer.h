@@ -282,6 +282,12 @@ struct EnhancedLiveDisplayEntrySnapshot
     bool previewComplete{false};
     EnhancedLiveViewKey key{};
     uint64_t completedFrameId{ 0 };
+    uint64_t completedSceneEpoch{ 0 };
+    FrameCameraSnapshot completedCamera{};
+    // RT가 마지막으로 소비한 불변 뷰 입력. GPU 완료 결과와 구분한다.
+    uint64_t sourceFrameId{ 0 };
+    uint64_t sourceInputSequence{ 0 };
+    uint64_t sourceCameraRevision{ 0 };
     uint64_t promotionCount{ 0 };
     uint64_t completedResizeGeneration{ 0 };
     uint32_t completedWidth{ 0 };
@@ -320,12 +326,20 @@ struct EnhancedLiveDisplaySnapshot
     }
 };
 
-// Texture identity and its completed extent are read under the same lifetime
-// lock. The latest submitted frame may already belong to a different resize.
+// 텍스처와 완료 프레임의 카메라·신원을 같은 수명 락 아래 한 번에 읽는다.
+// 이 값 복사는 CPU 조회의 정합성만 보장한다. Host GPU sampling이 끝날 때까지
+// 슬롯 재사용을 막는 lease는 아니다. CPU 브리지는 Host 업로드 기록의 신원을 돌려준다.
 struct EnhancedLiveDisplayTexture
 {
     uint64_t textureId{ 0 };
     uint32_t width{ 0 }, height{ 0 };
+    EnhancedLiveDisplayEntrySnapshot frame{};
+    EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
+    // 같은 잠금 안에서 읽은 최신 완료 신원. CPU 업로드의 이전 픽셀 신원이
+    // frame에 들어가도 이 관측은 유지하며, 둘 다 실제 화면 출력의 증거는 아니다.
+    uint64_t latestCompletedFrameId{ 0 };
+    uint64_t latestCompletedInputSequence{ 0 };
+    uint64_t latestCompletedCameraRevision{ 0 };
 };
 
 /// 패스 하나의 GPU 시간. DX12GpuProfiler::PassTiming을 에디터로 옮기는 값
@@ -869,7 +883,9 @@ namespace EnhancedSceneRenderer
 
     /// 스냅샷의 논리 표시 대상을 ImTextureID 호환 값으로 연다. DX12 공유
     /// 핸들과 Vulkan CPU upload key는 구현 안의 불투명 presentation key다.
-    /// 셸이 없거나 해당 대상의 첫 GPU 완료 전이면 0.
+    /// 셸이 없거나 해당 대상의 첫 표시 기록 전이면 0.
+    /// PT의 열린 Host 프레임 안에서만 호출한다. 다른 스레드의 진단/예열은
+    /// GetLiveDisplaySnapshot 또는 게시된 warmup 이정표를 읽어야 한다.
     uint64_t GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget target);
     EnhancedLiveDisplayTexture GetLiveDisplayTexture(EnhancedLiveDisplayTarget target);
 

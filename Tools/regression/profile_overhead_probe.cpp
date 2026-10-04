@@ -24,6 +24,73 @@ namespace
 	using clock_type = std::chrono::steady_clock;
 	std::atomic<std::uint64_t> sink{ 0 };
 
+    bool record_sync(ce::profiler_service& service, std::uint32_t first_frame)
+    {
+        service.record(first_frame);
+        service.wait_until_idle();
+        if (service.state() != ce::recorder_state::recording)
+        {
+            std::fprintf(stderr, "Record did not start before the workload\n");
+            return false;
+        }
+        return true;
+    }
+
+    bool pause_sync(ce::profiler_service& service)
+    {
+        service.pause();
+        service.wait_until_idle();
+        const auto deadline = clock_type::now() + std::chrono::seconds(5);
+        ce::recording_status status = service.recording_status();
+        while (status.state != ce::recording_state::finalized &&
+               status.state != ce::recording_state::failed && clock_type::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            status = service.recording_status();
+        }
+        if (service.state() != ce::recorder_state::frozen ||
+            status.state != ce::recording_state::finalized)
+        {
+            std::fprintf(stderr, "Pause did not finalize the disk recording\n");
+            return false;
+        }
+        // finalized는 파일 봉인 완료만 뜻한다. 메모리 링의 기존 수치와
+        // 별개로 디스크 큐 및 원본 생산자 손실도 없어야 녹화를 유효하게 본다.
+        const ce::recording_source_losses& source = status.source_losses;
+        if (status.dropped_frames != 0 || status.dropped_events != 0 ||
+            status.dropped_counters != 0 || status.source_dropped_counters != 0 ||
+            source.dropped_events != 0 || source.dropped_frame_boundaries != 0 ||
+            source.late_events != 0 || source.late_gpu_spans != 0)
+        {
+            std::fprintf(stderr,
+                "Disk recording lost data: writerFrames=%llu writerEvents=%llu "
+                "writerCounters=%llu sourceCounters=%llu sourceEvents=%llu "
+                "sourceBoundaries=%llu sourceLateEvents=%llu sourceLateGpuSpans=%llu\n",
+                static_cast<unsigned long long>(status.dropped_frames),
+                static_cast<unsigned long long>(status.dropped_events),
+                static_cast<unsigned long long>(status.dropped_counters),
+                static_cast<unsigned long long>(status.source_dropped_counters),
+                static_cast<unsigned long long>(source.dropped_events),
+                static_cast<unsigned long long>(source.dropped_frame_boundaries),
+                static_cast<unsigned long long>(source.late_events),
+                static_cast<unsigned long long>(source.late_gpu_spans));
+            return false;
+        }
+        return true;
+    }
+
+    bool clear_sync(ce::profiler_service& service)
+    {
+        const std::uint64_t ticket = service.clear();
+        service.wait_until_idle();
+        if (ticket == 0 || !service.control_applied(ticket))
+        {
+            std::fprintf(stderr, "Clear was rejected or did not complete\n");
+            return false;
+        }
+        return true;
+    }
+
 	std::uint64_t thread_cpu_100ns(HANDLE handle)
 	{
 		if (!handle) return 0;
@@ -89,7 +156,10 @@ int main(int argc, char** argv)
 		ce::profiler_config config;
 		config.retained_frames = 600;
 		service.initialize(config);
-		if (!stopped) service.record(1);
+        if (!stopped && !record_sync(service, 1))
+        {
+            return 1;
+        }
 	}
 	const ce::marker_id cpuMarker = ce::marker<"OverheadCpu">();
 	const ce::marker_id gpuMarker = ce::marker<"OverheadGpu", ce::marker_kind::gpu_span>();
@@ -131,9 +201,16 @@ int main(int argc, char** argv)
 	}
 	if (!shipping && !stopped)
 	{
-		service.wait_until_idle();
-		service.clear();
-		service.record(kWarmup + 1);
+        // Warm-up is a separate finalized session. Complete all asynchronous
+        // controls before starting the measured producer/collector interval.
+        if (!pause_sync(service) || !clear_sync(service) || !record_sync(service, kWarmup + 1))
+        {
+            if (collector)
+            {
+                ::CloseHandle(collector);
+            }
+            return 1;
+        }
 	}
 	const std::uint64_t collectorCpuBefore = thread_cpu_100ns(collector);
 	std::vector<double> activeMs;
@@ -155,14 +232,19 @@ int main(int argc, char** argv)
 		}
 		pace_collector();
 	}
-	if (!shipping && !stopped)
-	{
-		service.wait_until_idle();
-		service.pause();
-		service.wait_until_idle();
-	}
-	const auto ended = clock_type::now();
-	const std::uint64_t collectorCpuAfter = thread_cpu_100ns(collector);
+    if (!shipping && !stopped)
+    {
+        // 제출한 프레임의 수집 비용까지 잰다. 정지 시 꼬리 제출은 디스크
+        // 여유를 기다릴 수 있으므로 Pause 전체를 아래 측정 경계 뒤로 미룬다.
+        service.wait_until_idle();
+    }
+    const auto ended = clock_type::now();
+    const std::uint64_t collectorCpuAfter = thread_cpu_100ns(collector);
+    bool recordingValid = true;
+    if (!shipping && !stopped)
+    {
+        recordingValid = pause_sync(service);
+    }
 	if (collector) ::CloseHandle(collector);
 	const ce::live_summary result = shipping ? ce::live_summary{} : service.summary();
 	peakCaptureBytes = (std::max)(peakCaptureBytes, result.memory_bytes);
@@ -180,7 +262,7 @@ int main(int argc, char** argv)
 	const std::uint64_t emittedEvents = (shipping || stopped) ? 0 :
 		static_cast<std::uint64_t>(frames)
 		* static_cast<std::uint64_t>(2 * kScopesPerFrame + (cpuGpu ? kGpuSpansPerFrame : 0));
-	const bool valid = (shipping || stopped ||
+    const bool valid = recordingValid && (shipping || stopped ||
 		(result.collector_dropped_frames == 0 && result.dropped_events == 0
 		 && result.malformed_pages == 0 && result.collector_queued_frames == 0))
 		&& (!shipping || ce::registered_marker_count() == 0)

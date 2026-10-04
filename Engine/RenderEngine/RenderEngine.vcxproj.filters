@@ -1019,6 +1019,9 @@
     <ClInclude Include="RHI\IDisplayPresentationSink.h">
       <Filter>RHI\Interfaces</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\RHIDisplayFrame.h">
+      <Filter>RHI\Interfaces</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\IRenderDeviceServices.h">
       <Filter>RHI\Interfaces</Filter>
     </ClInclude>

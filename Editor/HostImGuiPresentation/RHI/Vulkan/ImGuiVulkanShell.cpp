@@ -43,6 +43,7 @@ struct ImGuiVulkanShell::Impl
     uint32_t width{ 0 };
     uint32_t height{ 0 };
     uint64_t frameIndex{ 0 };
+    std::string frameError;
 
     VulkanDeviceResources resources;
     VulkanTextureCache textureCache;
@@ -62,9 +63,11 @@ struct ImGuiVulkanShell::Impl
         uint32_t width{ 0 };
         uint32_t height{ 0 };
         std::vector<uint8_t> rgba;
+        RHIDisplayFrameMetadata metadata{};
     };
     std::mutex cpuFrameMutex;
     std::unordered_map<uint64_t, CpuFrame> pendingCpuFrames;
+    std::unordered_map<uint64_t, CpuFrame> recordingCpuFrames;
 
     struct CpuFrameEntry
     {
@@ -73,9 +76,38 @@ struct ImGuiVulkanShell::Impl
         uint32_t width{ 0 };
         uint32_t height{ 0 };
         bool initialized{ false };
+        bool needsRecreate{ false };
+        RHIDisplayFrameMetadata metadata{};
         uint64_t lastUsedFrame{ 0 };
     };
     std::unordered_map<uint64_t, CpuFrameEntry> cpuFrames;
+
+    // 실패한 기록의 barrier가 실행됐다고 가정하지 않는다. 다음 업로드는 새
+    // 자원으로 시작하고, 옛 자원은 기존 제출 완료점 기반 은퇴 경로로 보낸다.
+    void AbortCpuFrames()
+    {
+        for (const auto& [key, frame] : recordingCpuFrames)
+        {
+            const auto found = cpuFrames.find(key);
+            if (found != cpuFrames.end())
+            {
+                found->second.metadata = {};
+                found->second.needsRecreate = true;
+            }
+        }
+        std::lock_guard<std::mutex> lock(cpuFrameMutex);
+        for (auto& [key, frame] : recordingCpuFrames)
+        {
+            const auto pending = pendingCpuFrames.find(key);
+            if (pending == pendingCpuFrames.end() ||
+                pending->second.metadata.m_frameId < frame.metadata.m_frameId)
+            {
+                pendingCpuFrames[key] = std::move(frame);
+            }
+        }
+        recordingCpuFrames.clear();
+    }
+
 
     struct RetiredTexture
     {
@@ -173,7 +205,8 @@ struct ImGuiVulkanShell::Impl
     bool UploadCpuFrame(uint64_t key, const CpuFrame& frame, std::string& outError)
     {
         CpuFrameEntry& entry = cpuFrames[key];
-        const bool recreate = !entry.handle.IsValid() || entry.width != frame.width ||
+        entry.metadata = {};
+        const bool recreate = entry.needsRecreate || !entry.handle.IsValid() || entry.width != frame.width ||
             entry.height != frame.height;
         if (recreate)
         {
@@ -184,10 +217,12 @@ struct ImGuiVulkanShell::Impl
             desc.format = RHIFormat::RGBA8Unorm;
             desc.debugName = L"ImGuiVulkan.CpuFrame";
             if (!resources.CreateTexture(desc, replacement.handle, outError))
+            {
                 return false;
+            }
             replacement.width = frame.width;
             replacement.height = frame.height;
-            replacement.lastUsedFrame = entry.lastUsedFrame;
+            replacement.lastUsedFrame = frameIndex;
             if (VK_NULL_HANDLE != entry.descriptorSet || entry.handle.IsValid())
             {
                 pendingFrameRetirements.push_back(
@@ -241,6 +276,7 @@ struct ImGuiVulkanShell::Impl
                 return false;
             }
         }
+        entry.metadata = frame.metadata;
         return true;
     }
 };
@@ -379,15 +415,18 @@ void ImGuiVulkanShell::NewFrame()
     impl.textureCache.SweepGraveyard(completed);
     impl.textureCache.BeginFrame(impl.frameIndex);
 
-    std::unordered_map<uint64_t, Impl::CpuFrame> pending;
+    auto& pending = impl.recordingCpuFrames;
     {
         std::lock_guard<std::mutex> lock(impl.cpuFrameMutex);
         pending.swap(impl.pendingCpuFrames);
     }
 
     std::string error;
+    impl.frameError.clear();
     if (!impl.resources.BeginFrame(error))
     {
+        impl.frameError = error;
+        impl.AbortCpuFrames();
         std::printf("[ImGui] Vulkan BeginFrame 실패: %s\n", error.c_str());
         return;
     }
@@ -398,10 +437,16 @@ void ImGuiVulkanShell::NewFrame()
 
     for (const auto& item : pending)
     {
-        if (impl.cpuFrames.end() == impl.cpuFrames.find(item.first)) continue;
         error.clear();
         if (!impl.UploadCpuFrame(item.first, item.second, error))
+        {
+            impl.frameError = error;
+            impl.resources.AbortFrame();
+            impl.frameOpen = false;
+            impl.AbortCpuFrames();
             std::printf("[ImGui] Vulkan CPU 프레임 업로드 실패: %s\n", error.c_str());
+            break;
+        }
     }
 
     ImGui_ImplVulkan_NewFrame();
@@ -413,7 +458,8 @@ bool ImGuiVulkanShell::RenderAndPresent(std::string& outError)
     if (!impl.active) return true;
     if (!impl.frameOpen)
     {
-        outError = "ImGui Vulkan 프레임이 열리지 않았다";
+        outError = impl.frameError.empty()
+            ? "ImGui Vulkan 프레임이 열리지 않았다" : impl.frameError;
         return false;
     }
 
@@ -422,6 +468,7 @@ bool ImGuiVulkanShell::RenderAndPresent(std::string& outError)
     {
         outError = "ImGui Vulkan 백버퍼 인덱스가 범위를 벗어났다";
         impl.resources.AbortFrame();
+        impl.AbortCpuFrames();
         impl.frameOpen = false;
         return false;
     }
@@ -474,9 +521,12 @@ bool ImGuiVulkanShell::RenderAndPresent(std::string& outError)
 
     if (!impl.resources.EndFrame(outError))
     {
+        impl.resources.AbortFrame();
+        impl.AbortCpuFrames();
         impl.frameOpen = false;
         return false;
     }
+    impl.recordingCpuFrames.clear();
     impl.frameOpen = false;
 
     const uint64_t completionValue = impl.resources.GetLastSignaledFenceValue();
@@ -581,16 +631,23 @@ uint64_t ImGuiVulkanShell::OpenSharedTexture(void* /*sharedHandle*/)
 }
 
 void ImGuiVulkanShell::SubmitCpuRgbaFrame(uint64_t key, uint32_t width,
-    uint32_t height, const void* rgba, uint32_t rowPitch)
+    uint32_t height, const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& metadata)
 {
     Impl& impl = *m_impl;
-    if (!impl.active || 0 == key || 0 == width || 0 == height || nullptr == rgba) return;
+    if (!impl.active || 0 == key || 0 == width || 0 == height || nullptr == rgba)
+    {
+        return;
+    }
     const uint32_t tightPitch = width * 4u;
-    if (rowPitch < tightPitch) return;
+    if (rowPitch < tightPitch)
+    {
+        return;
+    }
 
     Impl::CpuFrame frame{};
     frame.width = width;
     frame.height = height;
+    frame.metadata = metadata;
     frame.rgba.resize(static_cast<size_t>(tightPitch) * height);
     const uint8_t* source = static_cast<const uint8_t*>(rgba);
     for (uint32_t y = 0; y < height; ++y)
@@ -603,20 +660,22 @@ void ImGuiVulkanShell::SubmitCpuRgbaFrame(uint64_t key, uint32_t width,
     impl.pendingCpuFrames[key] = std::move(frame);
 }
 
-uint64_t ImGuiVulkanShell::GetCpuFrameTextureId(uint64_t key)
+RHIDisplayTexture ImGuiVulkanShell::GetCpuFrameTexture(uint64_t key)
 {
     Impl& impl = *m_impl;
-    auto found = impl.cpuFrames.find(key);
-    if (found == impl.cpuFrames.end())
+    if (!impl.active || !impl.frameOpen || 0 == key)
     {
-        if (!impl.active || !impl.frameOpen || 0 == key) return GetFallbackTextureId();
-        Impl::CpuFrameEntry entry{};
-        entry.lastUsedFrame = impl.frameIndex;
-        found = impl.cpuFrames.emplace(key, std::move(entry)).first;
+        return {};
     }
-    found->second.lastUsedFrame = impl.frameIndex;
-    if (VK_NULL_HANDLE == found->second.descriptorSet) return GetFallbackTextureId();
-    return ToImTextureId(found->second.descriptorSet);
+    const auto found = impl.cpuFrames.find(key);
+    if (found == impl.cpuFrames.end() || VK_NULL_HANDLE == found->second.descriptorSet ||
+        !found->second.initialized || 0 == found->second.metadata.m_frameId)
+    {
+        return {};
+    }
+    auto& entry = found->second;
+    entry.lastUsedFrame = impl.frameIndex;
+    return {ToImTextureId(entry.descriptorSet), entry.width, entry.height, entry.metadata};
 }
 
 uint64_t ImGuiVulkanShell::GetFallbackTextureId() const
@@ -668,6 +727,7 @@ void ImGuiVulkanShell::Shutdown()
         impl.resources.ReleaseTexture(item.second.handle);
     }
     impl.cpuFrames.clear();
+    impl.recordingCpuFrames.clear();
     if (VK_NULL_HANDLE != impl.fallbackSet)
     {
         ImGui_ImplVulkan_RemoveTexture(impl.fallbackSet);

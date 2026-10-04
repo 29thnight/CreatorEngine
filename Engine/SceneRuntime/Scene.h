@@ -59,6 +59,7 @@ class ReferenceAssets;
 class Animator;
 struct TransformExecutionGraphState;
 struct SceneRenderRegistryState;
+struct AIUpdateBatch;
 #pragma endregion forward_decl
 
 enum class TransformSyncPoint : uint8_t
@@ -469,6 +470,15 @@ private:
 	[[reflgen::ignore]]
 	std::unique_ptr<SceneRenderRegistryState> m_renderRegistry;
 
+    // 제출 중인 batch는 콜백과 공동 소유하고, 완료 batch는 게임 스레드만 보관한다.
+    // 느린 결과를 보관하는 동안 새 제출을 막아 미소비 batch는 하나로 제한한다.
+    [[reflgen::ignore]]
+    std::shared_ptr<AIUpdateBatch> m_aiUpdateBatch;
+    [[reflgen::ignore]]
+    std::vector<std::shared_ptr<AIUpdateBatch>> m_completedAIUpdates;
+    [[reflgen::ignore]]
+    bool m_aiTickBoundaryReached = false;
+
     // 슬롯 할당 단일점. free 리스트가 있으면 재사용하고(세대는 해제 시 이미
     // 올라가 있다), 없으면 새로 늘린다. CreateEntity/AddEntity/
     // LoadEntity/AttachExistingEntity가 공유한다.
@@ -480,9 +490,11 @@ private:
 	// H3 저장 어댑터: Entity node에 Store 정본을 기존 계층 키로 쓴다.
 	// Entity::OnAfterSerialize만 호출하며 detached/비점유 Entity에는 쓰지 않는다.
 	void SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& node) const;
-	// 비소유 AI registry/component snapshot이 Entity를 읽는 동안 파괴·이송하지
-	// 않도록 Scene의 구조 변경 경계에서 AI 작업을 회수한다.
-	void DrainAIUpdate();
+    // 완료 확인은 LateUpdate에서 비차단으로, 기존 EndFrame 경계에서만 대기한다.
+    void CollectAIUpdate(bool waitForCompletion);
+    void ApplyAIUpdate();
+    // 해체·DDOL 이송·종료는 작업을 회수하고 미적용 값 결과도 함께 폐기한다.
+    void DrainAIUpdate();
     // index를 부모(또는 부모가 없으면 씬 루트)의 children 목록에서 뗀다.
     void UnlinkFromParentChildren(Entity::Index index);
 

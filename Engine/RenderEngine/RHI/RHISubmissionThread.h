@@ -96,7 +96,9 @@ public:
 
     bool IsValid() const { return nullptr != m_state; }
     uint64_t GetSequence() const;
+    /// CPU 제출 결과의 acquire 경계다. GPU 완료와 자원 재사용은 별도 fence가 보장한다.
     bool IsComplete() const;
+    /// 예약된 식별 정보는 enqueue 뒤 읽을 수 있다. 제출 중 바뀌는 상태는 완료 뒤 읽는다.
     RHIRecordedBatch* GetRecordedBatch();
     const RHIRecordedBatch* GetRecordedBatch() const;
 
@@ -177,7 +179,8 @@ private:
         CompletionQuery completionQuery,
         std::shared_ptr<const void> lifetimeToken,
         EntryKind kind, bool allowTransition,
-        uint64_t expectedGeneration = 0);
+        uint64_t expectedGeneration = 0,
+        std::shared_ptr<RHIRecordedBatch> recordedBatch = {});
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;
