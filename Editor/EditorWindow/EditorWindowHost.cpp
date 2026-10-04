@@ -8,6 +8,7 @@
 #include "EditorWindowSurface.h"
 #include "EditorTheme.h"
 #include "EditorPanelCost.h"
+#include "EditorWindowNames.h"
 
 #include "ImGui.h"
 #include "ProfileScope.h"
@@ -128,11 +129,13 @@ namespace editor
         }
     }
 
-    void draw_windows(window_table& table)
+    void draw_windows(window_table& table, window_draw_phase phase, std::string_view requestedFocus)
     {
         // W7-0: CLI 가 건 표시 요청을 **여기서** 적용한다. 이 스레드가 표를
         // 읽는 유일한 곳이라, 적용도 여기서 해야 읽기와 쓰기가 갈리지 않는다.
-        const std::string focusId = apply_pending_window_requests(table);
+        const std::string pendingFocus = phase == window_draw_phase::all
+            ? apply_pending_window_requests(table) : std::string{};
+        const std::string_view focusId = phase == window_draw_phase::all ? pendingFocus : requestedFocus;
         // W2-4: 창 단위 비용. 색인은 선언 표의 자리다 — 건너뛴 창도 자리를
         // 차지해야 색인이 프레임마다 흔들리지 않는다. 그래서 `continue` 앞에서
         // 센다.
@@ -140,6 +143,12 @@ namespace editor
         for (window_entry& entry : table.entries)
         {
             const std::size_t thisIndex = costIndex++;
+            const bool profiler = entry.stable_id == EditorWindowName::kFrameProfiler;
+            if ((phase == window_draw_phase::profiler && !profiler) ||
+                (phase == window_draw_phase::scene && profiler))
+            {
+                continue;
+            }
             // 존재 조건이 거짓이면 프레임 자체를 열지 않는다. 애니메이터 창 셋이
             // 선택이 풀렸을 때 빈 창을 남기던 것과 다르다.
             if (nullptr != entry.available && !entry.available())

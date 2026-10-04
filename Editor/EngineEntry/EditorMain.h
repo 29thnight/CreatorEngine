@@ -65,7 +65,9 @@ namespace Editor
 		/// PublishLiveFrame이 성공한 frame id를 presentation 소비자에게 알린다.
 		/// GT는 기다리지 않고, 밀린 요청은 최신 frame 하나로 접힌다.
 		void NotifyRenderFramePublished(uint64_t frameId);
-		double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
+        double GetFrameDeltaTime() const noexcept { return m_frameDeltaTime; }
+        // PT의 카메라/선택 편집과 GT의 immutable render packet 봉인을 직렬화한다.
+        std::unique_lock<std::mutex> LockSceneStructure();
 
 		/// WM_SIZE가 세우는 깃발. 실제 리사이즈는 PresentationThread가 처리한다.
 		void InvokeResizeFlag();
@@ -127,8 +129,8 @@ namespace Editor
 		uint32_t m_presentationThreadTestDelayMs{ 0 };
 		double m_frameDeltaTime{ 0.0 };
 
-		// PresentationThread가 UI에서 씬 객체를 읽는 동안 GT의 OnUninitializing/씬 교체만 막는다.
-		// 프레임 진행을 맞추는 배리어가 아니라 구조 변경 구간의 좁은 상호 배제다.
+        // PT의 live 패널 수명과 GT의 구조 변경/카메라 캡처를 직렬화한다.
+        // 불변 profiler 표시는 제외하며 render queue 역압력까지 붙들지 않는다.
 		std::mutex m_sceneStructureMutex;
 
 		std::atomic_bool m_isInvokeResize{ false };

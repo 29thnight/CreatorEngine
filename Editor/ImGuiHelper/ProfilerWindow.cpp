@@ -501,7 +501,7 @@ namespace editor::profiler_view
 	void select_rendering_live() { renderingLiveRequested = true; }
 }
 
-void DrawProfilerHUD()
+void DrawProfilerHUD(std::mutex& sceneStructureMutex)
 {
 	using namespace editor::profiler_view;
 	if (renderingLiveRequested.exchange(false)) selectedPage = page::renderingLive;
@@ -622,8 +622,18 @@ void DrawProfilerHUD()
 	case page::gpu: draw_telemetry(telemetry_page::gpu); break;
 	case page::network: draw_telemetry(telemetry_page::network); break;
 	case page::physics: draw_physics_telemetry(); break;
-	case page::animation: draw_animation_budget(); break;
-	case page::renderingLive: editor::DrawRenderLiveDiagnostics(); break;
+    case page::animation:
+    {
+        std::lock_guard<std::mutex> sceneLock(sceneStructureMutex);
+        draw_animation_budget();
+        break;
+    }
+    case page::renderingLive:
+    {
+        std::lock_guard<std::mutex> sceneLock(sceneStructureMutex);
+        editor::DrawRenderLiveDiagnostics();
+        break;
+    }
 	case page::hierarchy:
 	case page::flat:
 		if (reader().has_capture())

@@ -3,10 +3,9 @@
 // §7.3 의 CPU 트랙이다. 스레드마다 레인 하나, 구간마다 사각형 하나, 깊이는
 // 아래로 쌓는다.
 //
-// ★ 이 파일에는 정렬도 집계도 없다. 그리는 스팬은 코어가 이미 전위 순서로
-//   세워 둔 것(frame_aggregate::spans())이고 레인 경계도 코어가 적어 둔
-//   것(thread_summary::span_begin/end)이다. 여기서 다시 정렬하면 두 정렬이
-//   갈리는 순간 표와 타임라인이 서로 다른 트리를 말하게 된다.
+// ★ 원본 스팬의 순서와 집계는 코어가 정한다. 표시용 인덱스는 그 순서를
+//   유지한 채 레인·깊이별 원본 위치만 보관한다. 화면의 밀도 표시는 원본
+//   이벤트나 집계 수치를 바꾸지 않는다.
 //
 // ★ 가로 시야(확대·이동)도 reader 가 든다. 구간 밖으로 나가지 않는다는 계약을
 //   코어 프로브가 물고 있어서, 여기서는 그 결과를 픽셀로 옮기기만 한다.
@@ -17,6 +16,10 @@
 #include <cstdio>
 #include <unordered_set>
 #include <vector>
+#include <map>
+#include <memory>
+#include <unordered_map>
+#include <utility>
 
 #include "ImGui.h"
 #include "EditorIcons.h"
@@ -32,6 +35,151 @@ namespace editor::profiler_view
 		constexpr float kMinimumLaneHeaderWidth = 220.0f;
 		constexpr float kLanePadding = 6.0f;
 		constexpr float kMinimumSpanWidth = 1.0f;
+
+        struct timeline_interval
+        {
+            std::uint32_t span_index_ = 0;
+            ce::profile_tick prefix_end_ = 0;
+        };
+
+        struct timeline_depth
+        {
+            std::uint16_t depth_ = 0;
+            std::vector<timeline_interval> intervals_;
+        };
+
+        struct timeline_cache
+        {
+            // 약한 소유권으로 주소 재사용을 구분하되, 닫힌 캡처를 붙잡지는 않는다.
+            std::weak_ptr<const ce::capture_session> capture_;
+            std::uint32_t graph_first_ = 0;
+            std::uint32_t graph_last_ = 0;
+            bool valid_ = false;
+            std::vector<ce::thread_summary> threads_;
+            std::unordered_map<std::uint16_t, std::vector<timeline_depth>> lanes_;
+            std::unordered_map<ce::marker_id, float> marker_widths_;
+            ImFont* font_ = nullptr;
+            float font_size_ = 0.0f;
+            float header_width_ = 0.0f;
+        };
+
+        void update_timeline_cache(timeline_cache& cache, const ce::capture_reader& view,
+                                   const ce::frame_aggregate& aggregate)
+        {
+            const ce::capture_session_ptr capture = view.capture_handle();
+            const bool captureChanged = cache.capture_.lock() != capture;
+            if (!cache.valid_ || captureChanged || cache.graph_first_ != view.graph_first() ||
+                cache.graph_last_ != view.graph_last())
+            {
+                ce::profile_scope indexProfile{ce::marker<"ProfilerTimeline.IndexBuild">()};
+                // 그래프 창 집계가 바뀔 때만 만든다. 확대·이동·세로 스크롤은
+                // 불변 원본에 대한 조회만 바꾸므로 다시 복사하거나 정렬하지 않는다.
+                cache.valid_ = false;
+                cache.threads_.assign(aggregate.threads().begin(), aggregate.threads().end());
+                cache.lanes_.clear();
+                const auto spans = aggregate.spans();
+                for (const ce::thread_summary& thread : cache.threads_)
+                {
+                    // 코어의 시작 tick 순서를 깊이별로 거르므로 행도 같은 순서다.
+                    // 파일의 깊이가 커도 실제 이벤트가 있는 행만 할당한다.
+                    std::map<std::uint16_t, std::vector<timeline_interval>> depths;
+                    for (std::uint32_t index = thread.span_begin;
+                         index < thread.span_end && index < spans.size(); ++index)
+                    {
+                        const ce::profile_event& span = spans[index];
+                        if (ce::has_flag(span.flags, ce::event_flags::instant))
+                        {
+                            continue;
+                        }
+                        auto& intervals = depths[span.depth];
+                        const ce::profile_tick previousEnd = intervals.empty() ? 0 : intervals.back().prefix_end_;
+                        intervals.push_back({index, (std::max)(previousEnd, span.tick_end)});
+                    }
+                    auto& rows = cache.lanes_[thread.thread_slot];
+                    rows.reserve(depths.size());
+                    for (auto& [depth, intervals] : depths)
+                    {
+                        rows.push_back({depth, std::move(intervals)});
+                    }
+                }
+
+                // 완료 이벤트가 없는 등록 렌더 스레드도 관측 결과이므로 남긴다.
+                for (const ce::thread_info& info : capture->threads())
+                {
+                    if (info.name != "[RenderThread]" || info.slot > UINT16_MAX)
+                    {
+                        continue;
+                    }
+                    const auto existing = std::find_if(cache.threads_.begin(), cache.threads_.end(),
+                        [&](const ce::thread_summary& thread) { return thread.thread_slot == info.slot; });
+                    if (existing == cache.threads_.end())
+                    {
+                        ce::thread_summary empty{};
+                        empty.thread_slot = static_cast<std::uint16_t>(info.slot);
+                        cache.threads_.push_back(empty);
+                    }
+                }
+                const auto infoFor = [&capture](std::uint16_t slot) -> const ce::thread_info*
+                {
+                    for (const ce::thread_info& info : capture->threads())
+                    {
+                        if (info.slot == slot)
+                        {
+                            return &info;
+                        }
+                    }
+                    return nullptr;
+                };
+                std::sort(cache.threads_.begin(), cache.threads_.end(),
+                    [&](const ce::thread_summary& left, const ce::thread_summary& right)
+                    {
+                        const ce::thread_info* a = infoFor(left.thread_slot);
+                        const ce::thread_info* b = infoFor(right.thread_slot);
+                        return a && b ? ce::track_precedes(*a, *b) : left.thread_slot < right.thread_slot;
+                    });
+                cache.capture_ = capture;
+                cache.graph_first_ = view.graph_first();
+                cache.graph_last_ = view.graph_last();
+                cache.header_width_ = 0.0f;
+                cache.valid_ = true;
+            }
+
+            // 실제 글자 크기는 창 배율·DPI를 포함한다. 이름 해석도 캡처의
+            // 사전을 쓰므로 다른 파일을 열면 같은 마커 번호라도 다시 잰다.
+            if (captureChanged || cache.font_ != ImGui::GetFont() || cache.font_size_ != ImGui::GetFontSize())
+            {
+                cache.marker_widths_.clear();
+                cache.font_ = ImGui::GetFont();
+                cache.font_size_ = ImGui::GetFontSize();
+                cache.header_width_ = 0.0f;
+            }
+            if (cache.header_width_ == 0.0f)
+            {
+                cache.header_width_ = kMinimumLaneHeaderWidth;
+                for (const ce::thread_summary& thread : cache.threads_)
+                {
+                    const char* name = thread_name(capture.get(), thread.thread_slot);
+                    cache.header_width_ = (std::max)(cache.header_width_, ImGui::CalcTextSize(name).x * 1.5f + 52.0f);
+                }
+            }
+        }
+
+        std::pair<std::size_t, std::size_t> timeline_interval_range(
+            const timeline_depth& row, std::span<const ce::profile_event> spans,
+            ce::profile_tick begin, ce::profile_tick end)
+        {
+            // 시작 시각만 lower_bound 하면 화면 왼쪽에서 시작한 긴 구간을
+            // 잃는다. 누적 최대 종료 시각은 단조 증가하므로 그 앞만 버린다.
+            const auto first = std::lower_bound(row.intervals_.begin(), row.intervals_.end(), begin,
+                [](const timeline_interval& interval, ce::profile_tick tick) { return interval.prefix_end_ < tick; });
+            const auto last = std::upper_bound(first, row.intervals_.end(), end,
+                [spans](ce::profile_tick tick, const timeline_interval& interval)
+                {
+                    return tick < spans[interval.span_index_].tick_begin;
+                });
+            return {static_cast<std::size_t>(first - row.intervals_.begin()),
+                    static_cast<std::size_t>(last - row.intervals_.begin())};
+        }
 
 		// ── 줄 높이는 폰트가 정한다 ────────────────────────────────────────
 		//
@@ -128,39 +276,9 @@ namespace editor::profiler_view
 		const ce::frame_aggregate& aggregate = view.window_aggregate();
 		const std::span<const ce::profile_event> spans = aggregate.spans();
 		const ce::capture_session* capture = view.capture();
-		std::vector<ce::thread_summary> visibleThreads(
-			aggregate.threads().begin(), aggregate.threads().end());
-		// A registered render thread with no span is an important observation:
-		// the renderer had no completed work in this window. Keep its lane visible
-		// and say so instead of silently omitting the thread.
-		if (capture)
-		{
-			const auto infoFor = [capture](std::uint16_t slot) -> const ce::thread_info*
-			{
-				for (const ce::thread_info& info : capture->threads())
-					if (info.slot == slot) return &info;
-				return nullptr;
-			};
-			for (const ce::thread_info& info : capture->threads())
-			{
-				if (info.name != "[RenderThread]" || info.slot > UINT16_MAX) continue;
-				const auto existing = std::find_if(visibleThreads.begin(), visibleThreads.end(),
-					[&](const ce::thread_summary& thread) { return thread.thread_slot == info.slot; });
-				if (existing == visibleThreads.end())
-				{
-					ce::thread_summary empty{};
-					empty.thread_slot = static_cast<std::uint16_t>(info.slot);
-					visibleThreads.push_back(empty);
-				}
-			}
-			std::sort(visibleThreads.begin(), visibleThreads.end(),
-				[&](const ce::thread_summary& left, const ce::thread_summary& right)
-				{
-					const ce::thread_info* a = infoFor(left.thread_slot);
-					const ce::thread_info* b = infoFor(right.thread_slot);
-					return a && b ? ce::track_precedes(*a, *b) : left.thread_slot < right.thread_slot;
-				});
-		}
+        static timeline_cache cache;
+        update_timeline_cache(cache, view, aggregate);
+        const auto& visibleThreads = cache.threads_;
 
 		const ce::profile_tick viewBegin = view.view_begin();
 		const ce::profile_tick viewSpan = view.view_span();
@@ -176,13 +294,7 @@ namespace editor::profiler_view
 		//   좁아서(에디터 배율 탓) 어떤 여백을 줘도 믿을 수가 없다.
 		static std::unordered_set<std::uint16_t> collapsedThreads;
 		const float availableWidth = (std::max)(ImGui::GetContentRegionAvail().x, 200.0f);
-		float headerWidth = kMinimumLaneHeaderWidth;
-		for (const ce::thread_summary& thread : visibleThreads)
-		{
-			const char* name = thread_name(view.capture(), thread.thread_slot);
-			headerWidth = (std::max)(headerWidth, ImGui::CalcTextSize(name).x * 1.5f + 52.0f);
-		}
-		headerWidth = (std::min)(headerWidth, availableWidth * 0.42f);
+        float headerWidth = (std::min)(cache.header_width_, availableWidth * 0.42f);
 		const double rulerStepMs = nice_step(
 			ticks_to_milliseconds(viewSpan) * kRulerLabelSpacing
 			/ (std::max)(availableWidth - headerWidth, 32.0f));
@@ -395,8 +507,14 @@ namespace editor::profiler_view
 		float laneTop = stripBottom + kLanePadding;
 		const ce::profile_event* hoveredSpan = nullptr;
 		const ce::thread_summary* hoveredThread = nullptr;
-		const float visibleTop = ImGui::GetWindowPos().y;
-		const float visibleBottom = visibleTop + ImGui::GetWindowSize().y;
+        const float visibleTop = draw->GetClipRectMin().y;
+        const float visibleBottom = draw->GetClipRectMax().y;
+        const ImVec2 mouse = ImGui::GetIO().MousePos;
+        std::uint64_t densitySpanCount = 0;
+        std::uint64_t candidateSpanCount = 0;
+        std::uint64_t visibleSpanCount = 0;
+        std::uint64_t drawnSpanCount = 0;
+        std::uint64_t markerMeasurementCount = 0;
 
 		for (const ce::thread_summary& thread : visibleThreads)
 		{
@@ -444,60 +562,122 @@ namespace editor::profiler_view
 				}
 			}
 
-			for (std::uint32_t i = thread.span_begin;
-			     i < thread.span_end && i < spans.size(); ++i)
-			{
-				const ce::profile_event& span = spans[i];
+            const auto indexedLane = cache.lanes_.find(thread.thread_slot);
+            if (indexedLane != cache.lanes_.end())
+            {
+                const auto& rows = indexedLane->second;
+                // 깊이를 먼저 잘라 화면 밖 행의 시간 조회·색·문자 폭 계산도 생략한다.
+                const auto firstRow = std::lower_bound(rows.begin(), rows.end(), visibleTop,
+                    [&](const timeline_depth& row, float top)
+                    {
+                        return laneTop + static_cast<float>(row.depth_) * rowHeight + rowHeight - 2.0f < top;
+                    });
+                for (auto row = firstRow; row != rows.end(); ++row)
+                {
+                    const float y0 = laneTop + static_cast<float>(row->depth_) * rowHeight;
+                    const float y1 = y0 + rowHeight - 2.0f;
+                    if (y0 > visibleBottom || (collapsed && row->depth_ != 0))
+                    {
+                        break;
+                    }
+                    const auto [first, last] = timeline_interval_range(*row, spans, viewBegin, viewBegin + viewSpan);
+                    candidateSpanCount += last - first;
+                    const bool rowHovered = hovered && mouse.y >= y0 && mouse.y <= y1;
+                    int densityPixel = -1;
+                    std::uint32_t densityCount = 0;
+                    float densityLeft = 0.0f;
+                    float densityRight = 0.0f;
+                    ImU32 densityColor = 0;
+                    const auto flushDensity = [&]()
+                    {
+                        if (densityCount == 0)
+                        {
+                            return;
+                        }
+                        if (densityCount > 1)
+                        {
+                            // 합쳐진 막대의 색을 특정 마커의 값으로 오인하지 않게 한다.
+                            const int lift = static_cast<int>((std::min)(densityCount, 8u)) * 8;
+                            densityColor = IM_COL32(80 + lift, 110 + lift, 145 + lift, 255);
+                            densitySpanCount += densityCount;
+                        }
+                        draw->AddRectFilled(ImVec2(densityLeft, y0), ImVec2(densityRight, y1), densityColor);
+                        ++drawnSpanCount;
+                        densityCount = 0;
+                    };
 
-				// 길이가 없는 사건은 위의 경계 띠가 그린다. 여기서도 그리면
-				// 폭 0 짜리 막대가 레인마다 겹쳐 서고, 같은 것이 두 자리에서
-				// 서로 다른 뜻으로 읽힌다.
-				if (ce::has_flag(span.flags, ce::event_flags::instant))
-				{
-					continue;
-				}
+                    for (std::size_t index = first; index < last; ++index)
+                    {
+                        const ce::profile_event& span = spans[row->intervals_[index].span_index_];
+                        // prefix 최대값으로 남은 후보 중 실제로 끝난 짧은 구간은 제외한다.
+                        if (span.tick_end < viewBegin)
+                        {
+                            continue;
+                        }
+                        const float x0 = (std::max)(tick_to_x(span.tick_begin), plotLeft);
+                        const float x1 = (std::min)((std::max)(tick_to_x(span.tick_end), x0 + kMinimumSpanWidth),
+                            origin.x + size.x);
+                        if (x1 <= x0)
+                        {
+                            continue;
+                        }
+                        ++visibleSpanCount;
 
-				if (span.tick_end < viewBegin || span.tick_begin > viewBegin + viewSpan)
-				{
-					continue;   // 시야 밖
-				}
-				if (collapsed && span.depth != 0) continue;
+                        // 밀도 막대가 아니라 원본 이벤트의 기존 최소 폭으로 판정한다.
+                        // 원본 순서를 유지하므로 겹친 구간의 마지막 이벤트 선택도 같다.
+                        if (rowHovered && mouse.x >= x0 && mouse.x <= x1)
+                        {
+                            hoveredSpan = &span;
+                        }
+                        const bool truncated = ce::has_flag(span.flags, ce::event_flags::truncated_begin) ||
+                            ce::has_flag(span.flags, ce::event_flags::truncated_end);
+                        const bool gpu = ce::has_flag(span.flags, ce::event_flags::gpu_span);
+                        const ImU32 color = span_color(span.marker, span.depth, truncated, gpu);
+                        const ce::profile_tick duration = span.tick_end > span.tick_begin
+                            ? span.tick_end - span.tick_begin : 0;
+                        if (static_cast<double>(duration) < ticksPerPixel)
+                        {
+                            const int pixel = static_cast<int>(std::floor(x0 - plotLeft));
+                            if (densityCount != 0 && pixel != densityPixel)
+                            {
+                                flushDensity();
+                            }
+                            if (densityCount == 0)
+                            {
+                                densityPixel = pixel;
+                                densityLeft = x0;
+                                densityRight = x1;
+                                densityColor = color;
+                            }
+                            densityRight = (std::max)(densityRight, x1);
+                            ++densityCount;
+                            continue;
+                        }
 
-				const float x0 = (std::max)(tick_to_x(span.tick_begin), plotLeft);
-				const float x1 = (std::min)((std::max)(tick_to_x(span.tick_end), x0 + kMinimumSpanWidth),
-					origin.x + size.x);
-				if (x1 <= x0) continue;
-				const float y0 = laneTop + static_cast<float>(span.depth) * rowHeight;
-				const float y1 = y0 + rowHeight - 2.0f;
-
-				const bool truncated =
-					ce::has_flag(span.flags, ce::event_flags::truncated_begin) ||
-					ce::has_flag(span.flags, ce::event_flags::truncated_end);
-				const bool gpu = ce::has_flag(span.flags, ce::event_flags::gpu_span);
-
-				draw->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1),
-				                    span_color(span.marker, span.depth, truncated, gpu));
-
-				// 이름은 칸이 넉넉할 때만. 잘라 그린 글자도 항목은 전체 폭을
-				// 차지하므로 DrawList 로 직접 그리고 클립으로 막는다.
-				const char* name = marker_name(view.capture(), span.marker);
-				if (x1 - x0 >= ImGui::CalcTextSize(name).x + 8.0f)
-				{
-					draw->PushClipRect(ImVec2(x0 + 2.0f, y0), ImVec2(x1 - 1.0f, y1), true);
-					draw->AddText(ImVec2(x0 + 3.0f, y0 + 1.0f), IM_COL32(20, 22, 26, 255),
-					              name);
-					draw->PopClipRect();
-				}
-
-				if (hovered)
-				{
-					const ImVec2 mouse = ImGui::GetIO().MousePos;
-					if (mouse.x >= x0 && mouse.x <= x1 && mouse.y >= y0 && mouse.y <= y1)
-					{
-						hoveredSpan = &span;
-					}
-				}
-			}
+                        // 긴 겹침 구간 앞에서 먼저 내보내 원본의 앞뒤 그리기 순서를 지킨다.
+                        flushDensity();
+                        draw->AddRectFilled(ImVec2(x0, y0), ImVec2(x1, y1), color);
+                        ++drawnSpanCount;
+                        if (x1 - x0 >= 8.0f)
+                        {
+                            const auto [widthEntry, inserted] = cache.marker_widths_.try_emplace(span.marker, 0.0f);
+                            const char* name = marker_name(capture, span.marker);
+                            if (inserted)
+                            {
+                                widthEntry->second = ImGui::CalcTextSize(name).x;
+                                ++markerMeasurementCount;
+                            }
+                            if (x1 - x0 >= widthEntry->second + 8.0f)
+                            {
+                                draw->PushClipRect(ImVec2(x0 + 2.0f, y0), ImVec2(x1 - 1.0f, y1), true);
+                                draw->AddText(ImVec2(x0 + 3.0f, y0 + 1.0f), IM_COL32(20, 22, 26, 255), name);
+                                draw->PopClipRect();
+                            }
+                        }
+                    }
+                    flushDensity();
+                }
+            }
 
 			laneTop += laneHeight;
 			draw->AddLine(ImVec2(origin.x, laneTop - kLanePadding * 0.5f),
@@ -609,6 +789,17 @@ namespace editor::profiler_view
 			}
 		}
 		ImGui::EndChild();
+
+        // 반복 재생에서도 조회·도형·문자 측정 비용을 구분해 확인할 수 있게 한다.
+        ImGui::TextDisabled("구간: 후보 %llu / 화면 %llu / 도형 %llu · 마커 폭 측정 %llu · 밀도 %llu",
+            static_cast<unsigned long long>(candidateSpanCount), static_cast<unsigned long long>(visibleSpanCount),
+            static_cast<unsigned long long>(drawnSpanCount), static_cast<unsigned long long>(markerMeasurementCount),
+            static_cast<unsigned long long>(densitySpanCount));
+        if (ImGui::IsItemHovered())
+        {
+            ImGui::SetTooltip("밀도: 같은 픽셀에서 묶어 그린 1 px 미만 원본 이벤트 수\n"
+                              "툴팁은 밀도 막대가 아닌 원본 이벤트의 범위로 선택합니다.");
+        }
 
 		// The navigator covers the complete retained recording, while the
 		// detailed timeline keeps a fixed readable scale. Dragging it also moves

@@ -367,6 +367,12 @@ void EditorRenderer::RequestDockLayoutReset() noexcept
     ::editor::request_workspace_action(::editor::workspace_action::reset);
 }
 
+void EditorRenderer::RenderProfiler()
+{
+    m_windowFocusRequest = ::editor::apply_pending_window_requests(*m_windows);
+    ::editor::draw_windows(*m_windows, ::editor::window_draw_phase::profiler, m_windowFocusRequest);
+}
+
 void EditorRenderer::Render()
 {
     ::editor::windows::begin_shell_cost(::editor::windows::shell_cost_section::shell_prewindows);
@@ -392,7 +398,7 @@ void EditorRenderer::Render()
     // 재면 같은 시간이 두 번 잡혀 잔차가 음수가 된다.
     ::editor::windows::end_shell_cost(::editor::windows::shell_cost_section::shell_prewindows);
 
-    ::editor::draw_windows(*m_windows);
+    ::editor::draw_windows(*m_windows, ::editor::window_draw_phase::scene, m_windowFocusRequest);
 
     const ::editor::windows::shell_cost_scope postCost{
         ::editor::windows::shell_cost_section::shell_postwindows };

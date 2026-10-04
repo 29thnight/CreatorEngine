@@ -59,7 +59,8 @@ namespace
     constexpr float kMenuBarFontSizePixels = ::editor::EditorThemeTokens::BodyFontSize;
 }
 
-MenuBarWindow::MenuBarWindow()
+MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
+    : m_sceneStructureMutex(sceneStructureMutex)
 {
     // 한글 폰트는 **선택**이다(PHASE 21 W1). 맑은 고딕은 언어 기능으로
     // 빠질 수 있고, 없으면 `PushFont(nullptr, 0.0f)` 이 "지금 폰트를 그대로"
@@ -2560,5 +2561,5 @@ void MenuBarWindow::ShowRenderDebugWindow()
 // BringWindowToFocusFront/DisplayFront 둘은 선언의 stacking 으로 갔다.
 void MenuBarWindow::ShowProfilerWindow()
 {
-    DrawProfilerHUD();
+    DrawProfilerHUD(m_sceneStructureMutex);
 }

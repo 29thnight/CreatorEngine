@@ -343,6 +343,7 @@ void Core::App::Load()
 /// 넘긴 뷰의 수다 — 부팅 예열이 "만들 것이 있는가"를 이 수로 판정한다.
 uint32_t Core::App::PublishRenderFrame()
 {
+    auto sceneLock = m_main->LockSceneStructure();
 	// 유일한 씬 렌더러. Update가 GT의 구조 변경과 EndOfFrame을 끝낸 뒤
 	// 카메라와 delta batch를 밀봉해 전용 RenderThread에 발행한다.
 	//
@@ -415,7 +416,10 @@ uint32_t Core::App::PublishRenderFrame()
 		EnhancedSceneRenderer::BuildLiveFramePacket(
 		static_cast<float>(m_main->GetFrameDeltaTime()),
 		views, viewCount, SceneManagers->IsSceneLoading(), requiredAssets);
-	const uint64_t publishedFrameId = renderFrame.frameId;
+    const uint64_t publishedFrameId = renderFrame.frameId;
+    // 카메라·gizmo 입력은 값/소유 handle로 확보했다. delta 병합과 queue 역압력은
+    // 기존 PublishLiveFrame 경로에 남기되 그 대기는 scene lock 밖에서 한다.
+    sceneLock.unlock();
 	if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 	{
 		m_main->NotifyRenderFramePublished(publishedFrameId);

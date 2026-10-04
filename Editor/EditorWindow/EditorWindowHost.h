@@ -20,6 +20,7 @@
 #include "EditorWindowRegistry.h"
 
 #include <string>
+#include <string_view>
 
 namespace editor
 {
@@ -28,7 +29,11 @@ namespace editor
     ///
     /// 표를 **인자로 받는다**(PHASE 21 W3). 셸이 전역을 직접 집으면 무엇을
     /// 그리는지가 서명에 없고, 다른 표 위에서 돌려 볼 수단도 없다.
-    void draw_windows(window_table& table);
+    enum class window_draw_phase { all, profiler, scene };
+
+    // 제품은 profiler를 먼저 그리고 나머지 창의 비소유 texture ID 수명 구간을 뒤에 묶는다.
+    void draw_windows(window_table& table, window_draw_phase phase = window_draw_phase::all,
+        std::string_view requestedFocus = {});
 
     /// `editor.windows` 덤프의 몸통. 창 하나가 한 줄이고 아홉 자리를 적는다.
     /// 게이트가 이 문자열을 읽으므로 열은 늘리기만 하고 줄이지 않는다.

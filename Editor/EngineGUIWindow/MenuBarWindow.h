@@ -4,13 +4,14 @@
 #include "OutputLogWindow.h"
 
 #include <vector>
+#include <mutex>
 
 struct EditorTitleBarLayout;
 
 class MenuBarWindow
 {
 public:
-	MenuBarWindow();
+    explicit MenuBarWindow(std::mutex& sceneStructureMutex);
 	~MenuBarWindow() = default;
 	void RenderMenuBar();
 	void ShowAboutWindow();
@@ -31,6 +32,7 @@ private:
 	void BehaviorTreeWindow(bool drawing);
 	void BlackBoardWindow(bool drawing);
 
+    std::mutex& m_sceneStructureMutex;
     ImFont* m_koreanFont{ nullptr };
     // 로그 창은 자기 파일을 갖는다(3단계). 여기는 수명만 든다.
     ::editor::OutputLogWindow m_outputLog;

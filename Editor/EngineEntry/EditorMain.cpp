@@ -251,7 +251,7 @@ void Editor::EditorMain::Initialize()
 	// 먼저일 필요가 없다 — 제품 표를 옆으로 치우고 돌게 고쳤다(M1).
 	::editor::register_editor_menus();
 
-	m_menuBarWindow = std::make_unique<MenuBarWindow>();
+	m_menuBarWindow = std::make_unique<MenuBarWindow>(m_sceneStructureMutex);
 
 	// 나머지 여섯은 자유 함수라 만들 객체가 없다(PHASE 21 W3). 표가
 	// 본문을 직접 부르고, UI 지역 상태는 각 창의 TU 가 든다.
@@ -483,23 +483,10 @@ void Editor::EditorMain::PresentationThreadMain()
 				std::chrono::milliseconds(m_presentationThreadTestDelayMs));
 		}
 
-		// UI는 살아 있는 씬 객체를 읽을 수 있다. GT의 파괴/교체 구간과만
-		// 상호 배제하고 프레임 진행 자체는 서로 기다리지 않는다.
-		{
-			// 등록만으로는 이 스레드가 캡처에 나오지 않는다 — 프레임은
-			// 이벤트가 있는 스레드만 싣는다. 잠금 대기까지 함께 재는 자리라야
-			// GT 의 파괴 구간과 겹쳐 멈춘 시간이 보인다.
-			ce::profile_scope _profile{ ce::marker<"PresentFrame">() };
-			std::unique_lock<std::mutex> sceneLock(m_sceneStructureMutex, std::defer_lock);
-			{
-				ce::profile_scope lockWait{ ce::marker<"PresentationSceneLockWait">() };
-				sceneLock.lock();
-			}
-			{
-				ce::profile_scope ui{ ce::marker<"PresentationUI">() };
-				PresentFrame();
-			}
-		}
+        {
+            ce::profile_scope present{ ce::marker<"PresentFrame">() };
+            PresentFrame();
+        }
 
 		if (hasFrameRequest)
 		{
@@ -835,29 +822,54 @@ void Editor::EditorMain::UpdateTitleBar()
 	SetWindowText(EditorWindowHandle(), m_appliedWindowTitle.c_str());
 }
 
+std::unique_lock<std::mutex> Editor::EditorMain::LockSceneStructure()
+{
+    ce::profile_scope wait{ ce::marker<"SceneSnapshotLockWait">() };
+    return std::unique_lock<std::mutex>(m_sceneStructureMutex);
+}
+
 void Editor::EditorMain::OnGui()
 {
-	if (EditorSessionState::Get().IsGameViewHidden())
-	{
-		return;
-	}
+    std::unique_lock<std::mutex> sceneLock(m_sceneStructureMutex, std::defer_lock);
+    {
+        ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
+        sceneLock.lock();
+    }
+    if (EditorSessionState::Get().IsGameViewHidden())
+    {
+        return;
+    }
 
-	{
-		ce::profile_scope begin{ ce::marker<"ImGuiBeginFrame">() };
-		m_editorRenderer->BeginRender();
-	}
-	{
-		ce::profile_scope menu{ ce::marker<"ImGuiMenuBar">() };
-		m_menuBarWindow->RenderMenuBar();
-	}
-	{
-		ce::profile_scope panels{ ce::marker<"ImGuiPanels">() };
-		m_editorRenderer->Render();
-	}
-	{
-		ce::profile_scope submit{ ce::marker<"ImGuiRenderPresent">() };
-		m_editorRenderer->EndRender();
-	}
+    {
+        ce::profile_scope begin{ ce::marker<"ImGuiBeginFrame">() };
+        m_editorRenderer->BeginRender();
+    }
+    // 아직 live 패널의 비소유 texture ID를 만들지 않았다. 불변 capture의 긴
+    // timeline 순회를 먼저 끝내야 GT가 이 표시 비용 때문에 기다리지 않는다.
+    sceneLock.unlock();
+    {
+        ce::profile_scope profiler{ ce::marker<"ImGuiProfilerPanel">() };
+        m_editorRenderer->RenderProfiler();
+    }
+    {
+        ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
+        sceneLock.lock();
+    }
+    // 나머지 패널은 live Scene과 texture를 참조한다. CPU draw data에 자원
+    // 소유권이 없으므로 제출까지 잠금을 유지하고, 무조건 unlock하지 않는다.
+    ce::profile_scope ui{ ce::marker<"PresentationUI">() };
+    {
+        ce::profile_scope menu{ ce::marker<"ImGuiMenuBar">() };
+        m_menuBarWindow->RenderMenuBar();
+    }
+    {
+        ce::profile_scope panels{ ce::marker<"ImGuiPanels">() };
+        m_editorRenderer->Render();
+    }
+    {
+        ce::profile_scope submit{ ce::marker<"ImGuiRenderPresent">() };
+        m_editorRenderer->EndRender();
+    }
 }
 
 void Editor::EditorMain::InvokeResizeFlag()
