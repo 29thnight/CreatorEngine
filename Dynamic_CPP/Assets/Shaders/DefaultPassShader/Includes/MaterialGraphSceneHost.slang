@@ -3,6 +3,7 @@
 #include "MaterialGraphSurfacePoint.slang"
 #include "PrincipledIblLookup.slang"
 #include "PbrCoverage.slang"
+#include "CascadedShadow.slang"
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
 #include "SpecialForwardSurface.slang"
 #include "MaterialGraphSceneSubsurface.slang"
@@ -377,36 +378,45 @@ LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFront
     return output;
 }
 
-float LXSceneShadowCascade(uint cascade, float3 position, float slope)
+// Deferred·Forward 와 같은 식(CascadedShadow.slang)을 쓴다.
+CascadedShadowView LXSceneShadowView()
 {
-    const float4 homogeneous = mul(float4(position, 1), lx_shadowProjection[cascade]);
-    const float3 projected = homogeneous.xyz / homogeneous.w;
-    if (any(abs(projected.xy) > 1.0) || projected.z > 1.0)
-        return 1.0;
-    const float2 uv = float2(projected.x * 0.5 + 0.5, 0.5 - projected.y * 0.5);
-    const float bias = lx_shadowBias[cascade] * (1.0 + lx_shadowBias.w * slope);
-    return lx_shadow.SampleCmpLevelZero(lx_shadowSampler, float3(uv, float(cascade)), projected.z - bias);
+    CascadedShadowView view;
+    view.lightViewProjection = lx_shadowProjection;
+    view.eye = lx_eye.xyz;
+    view.cameraForward = lx_cameraForward;
+    view.splits = lx_shadowSplits;
+    view.bias = lx_shadowBias;
+    view.blendBand = lx_shadowBlend;
+    return view;
 }
 
 float LXSceneShadow(float3 position, float3 normal, float3 light)
 {
     if (lx_hasShadow == 0u)
         return 1.0;
-    const float distance = dot(position - lx_eye.xyz, lx_cameraForward.xyz);
-    if (distance > lx_shadowSplits.z) return 1.0;
-    uint cascade = distance > lx_shadowSplits.y ? 2u : distance > lx_shadowSplits.x ? 1u : 0u;
-    const float nl = saturate(dot(normal, light));
-    const float slope = min(sqrt(max(1.0 - nl * nl, 0.0)) / max(nl, 1e-3), 8.0);
-    float shadow = LXSceneShadowCascade(cascade, position, slope);
-    if (lx_shadowBlend > 0.0 && cascade < 2u)
-    {
-        const float split = lx_shadowSplits[cascade];
-        const float start = split - abs(split) * lx_shadowBlend;
-        if (distance > start)
-            shadow = lerp(shadow, LXSceneShadowCascade(cascade + 1u, position, slope),
-                          saturate((distance - start) / max(split - start, 1e-4)));
-    }
-    return shadow;
+    return CascadedShadowVisibility(lx_shadow, lx_shadowSampler, LXSceneShadowView(), position, normal, light);
+}
+
+// 그림자 디버그 보기의 대상인가. 켜져 있으면 고른 방향광을 돌려준다.
+bool LXSceneShadowDebugLight(out uint mode, out LXSceneLight light, out float3 toLight)
+{
+    const CascadedShadowView view = LXSceneShadowView();
+    mode = CascadedShadowDebugView(view);
+    const uint owner = CascadedShadowOwner(view);
+    light = (LXSceneLight)0;
+    toLight = float3(0, 1, 0);
+    if (mode == CASCADED_SHADOW_DEBUG_OFF || lx_hasShadow == 0u || owner >= lx_lightCount)
+        return false;
+    light = LXSceneReadLight(owner);
+    toLight = -normalize(light.direction.xyz);
+    return true;
+}
+
+float3 LXSceneShadowDebugColor(uint mode, float3 position, float3 normal, float3 toLight, float3 lit, float3 selected)
+{
+    return CascadedShadowDebugColor(lx_shadow, lx_shadowSampler, LXSceneShadowView(), mode,
+        position, normal, toLight, lit, selected);
 }
 
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
@@ -554,6 +564,17 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 posi
     ambient.subsurface = surface.layers.lowerTransmission * surface.subsurface
         * environment.subsurfaceIrradiance;
     const float3 color = direct + ambient.Sum() + ambient.emission;
+    uint shadowDebug;
+    LXSceneLight shadowLight;
+    float3 shadowToLight;
+    if (LXSceneShadowDebugLight(shadowDebug, shadowLight, shadowToLight))
+    {
+        const SpecialForwardLight selected = EvaluateSpecialLight(surface, shadowToLight,
+            shadowLight.color.rgb * shadowLight.color.a);
+        return float4(LXSceneShadowDebugColor(shadowDebug, position, surface.layers.material.normal,
+                          shadowToLight, color, selected.local + selected.transmission),
+                      lx_blended == 1u ? material.alpha : 1);
+    }
     return float4(lx_blended != 0u ? LXForwardVolume(pixel, position, color) : color,
                   lx_blended == 1u ? material.alpha : 1);
 }
@@ -635,6 +656,22 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
     const float3 emission = material.emission;
 #endif
     const float3 color = direct + ambient + emission;
+    uint shadowDebug;
+    LXSceneLight shadowLight;
+    float3 shadowToLight;
+    if (LXSceneShadowDebugLight(shadowDebug, shadowLight, shadowToLight))
+    {
+        const float3 radiance = shadowLight.color.rgb * shadowLight.color.a;
+#if (LX_MATERIAL_FEATURE_MASK & 0x07C0u) != 0
+        const float3 selected = EvaluateLayeredLight(layered, shadowToLight, radiance);
+#else
+        const float3 selected = dot(material.normal, view) > 0.0
+            ? BuildPbrSurface(input.position, view, material, float2(1, 0)).EvaluateLight(shadowToLight, radiance)
+            : float3(0);
+#endif
+        return float4(LXSceneShadowDebugColor(shadowDebug, input.position, material.normal, shadowToLight,
+                          color, selected), lx_blended == 1u ? material.alpha : 1);
+    }
     return float4(lx_blended != 0u ? LXForwardVolume(input.clip.xy, input.position, color) : color,
                   lx_blended == 1u ? material.alpha : 1);
 #endif

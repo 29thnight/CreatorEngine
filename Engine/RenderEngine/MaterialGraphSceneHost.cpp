@@ -1199,6 +1199,27 @@ namespace material_graph
         return frame_ ? frame_->shadowDrawCount.load(std::memory_order_relaxed) : 0;
     }
 
+    std::array<uint32_t, 3> SceneHost::ShadowCasterCounts() const
+    {
+        std::array<uint32_t, 3> counts{};
+        if (!frame_ || !frame_->shadow)
+        {
+            return counts;
+        }
+        for (const auto& draw : frame_->draws)
+        {
+            if (!draw.shadowBindings)
+            {
+                continue;
+            }
+            for (unsigned cascade = 0; cascade < 3; ++cascade)
+            {
+                counts[cascade] += draw.shadowVisible[cascade] ? 1u : 0u;
+            }
+        }
+        return counts;
+    }
+
     RGHandle SceneHost::DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const
     {
         const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;

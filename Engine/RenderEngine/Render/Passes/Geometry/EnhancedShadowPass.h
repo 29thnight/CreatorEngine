@@ -104,6 +104,42 @@ public:
     // 캐스케이드 경계 블렌딩 폭(분할 깊이 비율). 0이면 하드 스위치.
     void SetCascadeBlendBand(float band) { m_blendBand = band; }
 
+    float GetBiasTexels() const { return m_baseBias; }
+    float GetSlopeScale() const { return m_slopeScale; }
+
+    // 그림자를 받는 셰이더 셋이 같은 판정으로 칠하는 디버그 보기.
+    // GetShadowData().cameraForward.w 로 실려 간다.
+    void SetDebugView(EnhancedShadowDebugView view) { m_debugView = view; }
+    EnhancedShadowDebugView GetDebugView() const { return m_debugView; }
+
+    // 그림자 가장자리 필터. 디버그 보기와 같은 성분에 실려 간다.
+    void SetFilter(EnhancedShadowFilter filter) { m_filter = filter; }
+    EnhancedShadowFilter GetFilter() const { return m_filter; }
+
+    /// 렌더 디버그 창이 읽는 캐스케이드 수치. 모두 마지막 PrepareFrame 의 값이다.
+    /// 길이는 월드 단위다 — 텍셀 폭을 장면의 물체 크기와 바로 대 보라는 것이다.
+    struct CascadeStats
+    {
+        float splitDepth{ 0.f };   // 이 캐스케이드가 끝나는 뷰 깊이
+        float radius{ 0.f };       // 덮는 구의 반지름
+        float worldTexel{ 0.f };   // 그림자 맵 텍셀 하나가 덮는 폭
+        float depthSpan{ 0.f };    // 광원 방향 깊이 범위
+        float constantBias{ 0.f }; // 상수 편향(광원 방향). 경사면은 x(1 + 경사 계수 x tan)
+    };
+
+    struct DebugStats
+    {
+        bool          hasDirectionalLight{ false };
+        uint32_t      lightIndex{ 0 };
+        math::vector3 lightDirection{};
+        float         shadowDistance{ 0.f };
+        float         slopeScale{ 0.f };
+        uint32_t      casterCandidates{ 0 }; // 이 패스가 맡은(재질 그래프가 아닌) 캐스터
+        std::array<CascadeStats, kCascadeCount> cascades{};
+    };
+
+    DebugStats GetDebugStats() const;
+
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
@@ -177,6 +213,11 @@ private:
     // 상한을 두므로 최악에도 편향이 기본의 17배를 넘지 않는다.
     float              m_slopeScale{ 2.f };
     float              m_blendBand{ 0.15f };
+    EnhancedShadowDebugView m_debugView{ EnhancedShadowDebugView::Off };
+    // 5x5 텐트가 기본이다. 하드웨어 2x2 한 표본은 텍셀이 화면 픽셀보다 촘촘한
+    // 거리에서 가장자리가 지글거리고, 비스듬한 면에서 계단이 드러났다(2026-10-04
+    // 렌더 디버그 보기로 확인).
+    EnhancedShadowFilter m_filter{ EnhancedShadowFilter::Tent5x5 };
     // 병렬 기록에서는 여러 워커가 동시에 센다. 단순 증가면 값이 조용히
     // 작아지고, 그러면 '컬링이 도는가'라는 단정이 우연히 통과한다.
     uint32_t              m_lastCasterCandidates{ 0 };

@@ -324,6 +324,34 @@ static_assert(std::is_trivially_copyable_v<EnhancedLight>);
 // 만큼의 화질을 돌려주지 않는다. 기존 DX11 경로(ShadowMapPass)도 셋이다.
 inline constexpr uint32_t kShadowCascadeCount = 3;
 
+// 그림자 디버그 보기. 셰이더(Includes/CascadedShadow.slang)의
+// CASCADED_SHADOW_DEBUG_* 와 번호가 같아야 한다. 그림자를 받는 셰이더 셋
+// (Deferred·ForwardShade·재질 그래프 호스트)이 모두 같은 판정으로 칠한다.
+enum class EnhancedShadowDebugView : uint32_t
+{
+    Off = 0,
+    Cascade,    // 캐스케이드 번호를 색으로 — 분할 위치와 경계 섞음 띠
+    TexelGrid,  // 그림자 맵 텍셀을 바둑판으로 — 화면 픽셀 몇 개가 텍셀 하나를 나눠 쓰는가
+    ShadowOnly, // 조명 없이 그림자 값만
+    DepthDelta, // 수신 깊이 - 맵 깊이 — 여드름인가, 편향이 그림자를 떼어 냈는가
+    Missing,    // 그림자 거리 밖·라이트 상자 밖처럼 표본이 조용히 1을 내는 자리
+    Contrast,   // 그림자가 이 픽셀을 최대 몇 할 어둡게 할 수 있는가
+    Count
+};
+
+// 그림자 가장자리 필터. 셰이더의 CASCADED_SHADOW_FILTER_* 와 번호가 같아야 한다.
+// 텐트 필터는 쌍선형 비교 표본 4·9·16 개로 너비 3·5·7 텍셀을 만든다. 넓을수록
+// 지글거림과 계단 경계가 줄고 반그림자가 넓어진다. 0 은 예전 그대로의 한 표본이라,
+// 상수를 손으로 채우는 쪽(cameraForward.w = 0)은 옛 결과를 그대로 받는다.
+enum class EnhancedShadowFilter : uint32_t
+{
+    Hardware2x2 = 0,
+    Tent3x3,
+    Tent5x5,
+    Tent7x7,
+    Count
+};
+
 // 그림자 패스가 만들고 라이팅 패스가 읽는 것. 두 패스가 이 구조를 공유하는 편이
 // 인자를 낱개로 넘기는 것보다 낫다 — 캐스케이드가 늘거나 줄 때 서명이 아니라
 // 이 구조만 바뀐다.
@@ -349,6 +377,9 @@ struct EnhancedShadowData
 
     // 뷰 깊이를 구하려면 카메라 정면이 필요하다. 뷰 행렬에서 뽑을 수도 있지만
     // 셰이더가 매 픽셀 그것을 하는 것보다 넘기는 편이 싸다.
+    // w = 디버그 보기 번호(EnhancedShadowDebugView, 0이면 꺼짐) + 16 x 가장자리
+    // 필터(EnhancedShadowFilter). 소비자 셋의 상수 배치를 바꾸지 않으려고 비어
+    // 있던 성분에 싣는다(splitDepths.w 와 같은 방식). 정수라 float 에 정확히 담긴다.
     math::vector4 cameraForward{};
 
     // 그림자를 드리우는 방향광의 방향(정규화). 라이팅은 광원 목록에서 같은

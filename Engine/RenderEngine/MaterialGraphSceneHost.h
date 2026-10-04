@@ -58,6 +58,8 @@ namespace material_graph
         bool IsProgramReady(const std::shared_ptr<const Generation>& generation, RHIShaderBinary backend) const;
         SceneProgramStats ProgramStats() const;
         uint32_t ShadowDrawCount() const;
+        // Prepared casters per cascade (after Prepare); render debug reads it.
+        std::array<uint32_t, 3> ShadowCasterCounts() const;
         MeshSurfaceCacheStats GeometryStats() const
         {
             return geometry_.CacheStats();

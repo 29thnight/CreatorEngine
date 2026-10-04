@@ -43,6 +43,80 @@ namespace EnhancedRenderDebugUi
 	{
 		LabeledValue(label, value, ImGui::GetStyleColorVec4(ImGuiCol_Text));
 	}
+
+	// EnhancedShadowDebugView 순서 그대로다(셰이더의 CASCADED_SHADOW_DEBUG_* 와도 같다).
+	constexpr const char* kShadowDebugViews[]{
+		"Off", "Cascade index", "Texel grid", "Shadow term only",
+		"Depth delta (bias)", "Missing samples", "Shadow contrast" };
+
+	// EnhancedShadowFilter 순서 그대로다(셰이더의 CASCADED_SHADOW_FILTER_* 와도 같다).
+	constexpr const char* kShadowFilters[]{
+		"Hardware 2x2 (1 tap)", "Tent 3x3 (4 taps)", "Tent 5x5 (9 taps)", "Tent 7x7 (16 taps)" };
+
+	// 고른 보기의 색 뜻. 색만 칠하고 읽는 법을 안 적으면 다음 사람이 다시 쫓는다.
+	const char* ShadowDebugViewLegend(int view)
+	{
+		switch (view)
+		{
+		case 1: return "Red/green/blue = cascade 0/1/2, blended near splits. Gray = beyond shadow distance, magenta = outside the light box.";
+		case 2: return "Each checker cell is one shadow-map texel. Cells many pixels wide mean blocky edges; moire means the texel is finer than a pixel.";
+		case 3: return "Visibility of the shadowing light only (1 lit, 0 occluded), without any lighting.";
+		case 4: return "Red = occluded beyond the bias. Yellow = only the bias keeps it lit (acne without it; with too much, contact shadows detach). Green = lit.";
+		case 5: return "Gray = beyond shadow distance, magenta = outside the light box. Both silently sample as lit.";
+		case 6: return "How dark a full shadow could make each pixel: blue = invisible (ambient dominates the light), yellow = black.";
+		default: return "";
+		}
+	}
+
+	// 캐스케이드 수치 표. 텍셀 폭을 장면의 물체 크기와 대 보라는 표다 —
+	// 1.8 짜리 캐릭터에 텍셀이 0.25 면 그 그림자는 일곱 칸짜리 덩어리다.
+	void DrawShadowStats(const EnhancedLiveShadowStats& stats)
+	{
+		if (!stats.valid)
+		{
+			ImGui::TextColored(kDimColor, "This view has not been prepared yet.");
+			return;
+		}
+		if (!stats.hasDirectionalLight)
+		{
+			ImGui::TextColored(kWarnColor, "No directional light: this view renders without shadows.");
+			return;
+		}
+		ImGui::Text("Light #%u  direction (%.3f, %.3f, %.3f)", stats.lightIndex,
+			stats.lightDirection[0], stats.lightDirection[1], stats.lightDirection[2]);
+		ImGui::Text("Distance %.2f  slope scale %.2f  non-graph casters %u",
+			stats.shadowDistance, stats.slopeScale, stats.casterCandidates);
+
+		constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg
+			| ImGuiTableFlags_SizingFixedFit;
+		if (!ImGui::BeginTable("ShadowCascades", 8, flags)) return;
+		ImGui::TableSetupColumn("Cascade");
+		ImGui::TableSetupColumn("Ends at");
+		ImGui::TableSetupColumn("Radius");
+		ImGui::TableSetupColumn("Texel");
+		ImGui::TableSetupColumn("Depth span");
+		ImGui::TableSetupColumn("Bias");
+		ImGui::TableSetupColumn("Bias (steep)");
+		ImGui::TableSetupColumn("Graph casters");
+		ImGui::TableHeadersRow();
+		for (uint32_t index = 0; index < stats.cascades.size(); ++index)
+		{
+			const EnhancedLiveShadowCascade& cascade = stats.cascades[index];
+			// 셰이더는 tan 을 8 로 자른다 — 가장 비스듬한 면의 편향이다.
+			const float steepBias = cascade.constantBias * (1.f + stats.slopeScale * 8.f);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn(); ImGui::Text("%u", index);
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", cascade.splitDepth);
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", cascade.radius);
+			ImGui::TableNextColumn(); ImGui::Text("%.4f", cascade.worldTexel);
+			ImGui::TableNextColumn(); ImGui::Text("%.2f", cascade.depthSpan);
+			ImGui::TableNextColumn(); ImGui::Text("%.4f", cascade.constantBias);
+			ImGui::TableNextColumn(); ImGui::Text("%.4f", steepBias);
+			ImGui::TableNextColumn(); ImGui::Text("%u", cascade.graphCasters);
+		}
+		ImGui::EndTable();
+		ImGui::TextColored(kDimColor, "Lengths are world units. Bias is along the light; steep = slope term at its cap.");
+	}
 }
 
 using namespace EnhancedRenderDebugUi;
@@ -76,6 +150,49 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 	}
 
 	bool changed = false;
+
+	if (ImGui::TreeNodeEx("Shadow", ImGuiTreeNodeFlags_DefaultOpen))
+	{
+		EnhancedLiveTuning::Shadow& shadow = m_editing.shadow;
+		changed |= ImGui::SliderFloat("Bias (texels)##shadow", &shadow.biasTexels, 0.f, 8.f, "%.2f");
+		changed |= ImGui::SliderFloat("Slope scale##shadow", &shadow.slopeScale, 0.f, 8.f, "%.2f");
+		changed |= ImGui::SliderFloat("Cascade blend##shadow", &shadow.cascadeBlendBand, 0.f, 0.5f, "%.2f");
+		changed |= ImGui::SliderFloat("Distance##shadow", &shadow.shadowDistance, 1.f, 1000.f, "%.1f",
+			ImGuiSliderFlags_Logarithmic);
+		changed |= ImGui::Combo("Edge filter##shadow", &shadow.filter, kShadowFilters,
+			static_cast<int>(std::size(kShadowFilters)));
+		if (ImGui::IsItemHovered())
+		{
+			// 반그림자 폭은 텍셀 단위라 먼 캐스케이드일수록 월드 폭이 넓다.
+			ImGui::SetTooltip("Wider filters remove shimmering and stair-stepped edges.\n"
+				"The penumbra is measured in shadow-map texels, so it widens in far cascades.");
+		}
+		changed |= ImGui::Combo("Debug view##shadow", &shadow.debugView, kShadowDebugViews,
+			static_cast<int>(std::size(kShadowDebugViews)));
+		if (0 != shadow.debugView)
+		{
+			ImGui::TextWrapped("%s", ShadowDebugViewLegend(shadow.debugView));
+			// 디버그 색은 HDR 조명 타깃에 들어가 노출·톤 매핑을 거친다.
+			ImGui::TextColored(kDimColor, "Post chain (exposure / tone map) tints these colors.");
+		}
+
+		// 조절하며 바로 보도록 씬 뷰의 수치를 여기에도 둔다. 다른 뷰는
+		// Profiler > Rendering - Live 의 View 에서 고른다.
+		static EnhancedLiveDebugSnapshot shadowSnapshot{};
+		static double shadowRefreshTime = -1.0;
+		const double now = ImGui::GetTime();
+		if (shadowRefreshTime < 0.0 || (now - shadowRefreshTime) >= kRefreshIntervalSeconds)
+		{
+			shadowSnapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+			shadowRefreshTime = now;
+		}
+		if (ImGui::TreeNodeEx("Scene view cascades##shadow"))
+		{
+			DrawShadowStats(shadowSnapshot.shadow[static_cast<uint32_t>(EnhancedLiveDisplayTarget::Editor)]);
+			ImGui::TreePop();
+		}
+		ImGui::TreePop();
+	}
 
 	if (ImGui::TreeNodeEx("SSAO", ImGuiTreeNodeFlags_DefaultOpen))
 	{
@@ -239,7 +356,7 @@ void EnhancedRenderDebugWindow::DrawPassSettings()
 	ImGui::TextColored(kDimColor,
 		"Other live passes expose no tunable parameters:");
 	ImGui::TextColored(kDimColor,
-		"  GBuffer, Shadow, Deferred, Forward+, SkyBox, Grid, Gizmo, UI");
+		"  GBuffer, Deferred, Forward+, SkyBox, Grid, Gizmo, UI");
 	ImGui::TextColored(kDimColor,
 		"SSR / SSS have Tuning but are not wired into the live graph yet,");
 	ImGui::TextColored(kDimColor,
@@ -390,6 +507,12 @@ void editor::DrawRenderLiveDiagnostics()
 	}
 
     if (ImGui::Button("Open RenderPass structure")) open_window(EditorWindowName::kRenderPass);
+
+	// ── 그림자 캐스케이드 ── 위 View 에서 고른 뷰의 값이다.
+	if (ImGui::CollapsingHeader("Shadow cascades"))
+	{
+		DrawShadowStats(displayed.shadow[static_cast<uint32_t>(selectedTarget)]);
+	}
 
 	// ── 프레임 비용 ──
 	if (ImGui::CollapsingHeader(EditorIcon::Label<EditorIcon::Timing, " Frame cost">, ImGuiTreeNodeFlags_DefaultOpen))

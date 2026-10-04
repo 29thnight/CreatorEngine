@@ -364,6 +364,30 @@ namespace
         }
     };
 
+    // 뷰 하나를 준비한 직후의 그림자 수치. 그림자 패스와 재질 그래프 호스트가
+    // 모두 그 뷰의 Prepare 를 마친 뒤에 불러야 같은 뷰의 값이 모인다.
+    template <typename PipelineT>
+    EnhancedLiveShadowStats CaptureShadowStats(const PipelineT& p)
+    {
+        const EnhancedShadowPass::DebugStats source = p.shadow.GetDebugStats();
+        const std::array<uint32_t, 3> graphCasters = p.graphMaterials.ShadowCasterCounts();
+        EnhancedLiveShadowStats stats;
+        stats.valid = true;
+        stats.hasDirectionalLight = source.hasDirectionalLight;
+        stats.lightIndex = source.lightIndex;
+        stats.lightDirection = { source.lightDirection.x, source.lightDirection.y, source.lightDirection.z };
+        stats.shadowDistance = source.shadowDistance;
+        stats.slopeScale = source.slopeScale;
+        stats.casterCandidates = source.casterCandidates;
+        for (uint32_t index = 0; index < kShadowCascadeCount; ++index)
+        {
+            const EnhancedShadowPass::CascadeStats& cascade = source.cascades[index];
+            stats.cascades[index] = { cascade.splitDepth, cascade.radius, cascade.worldTexel,
+                cascade.depthSpan, cascade.constantBias, graphCasters[index] };
+        }
+        return stats;
+    }
+
     // 파이프라인 번들. 켤 때마다 힙에 새로 만든다.
     //
     // ★ 멤버 재사용(Shutdown 후 같은 객체에 다시 Initialize)이 아니다.
@@ -1508,6 +1532,7 @@ namespace
         uint64_t lastMixedNewestGeneration{ 0 };
         std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewSpriteCounts{};
         std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewUICounts{};
+        std::array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> viewShadowStats{};
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
         double   lastNativeRecordMs{ 0.0 };
@@ -1814,6 +1839,7 @@ namespace
             debugSnapshot.spriteBatchCount = lastSpriteBatchCount;
             debugSnapshot.uiRectCount = lastUIRectCount;
             debugSnapshot.uiBatchCount = lastUIBatchCount;
+            debugSnapshot.shadow = viewShadowStats;
             debugSnapshot.cpuMs = lastCpuMs;
             debugSnapshot.gpuMs = lastGpuMs;
             debugSnapshot.gpuCollects = gpuCollects;
@@ -4548,6 +4574,7 @@ namespace
                         p.shadow.GetShadowData(), {}, outError, p.ibl.GetGeneration(),p.ibl.GetImportanceMaps(),p.ibl.GetSourceMap())) return false;
                 if (capture) capture->RecordLatticeInput(p.graphInput);
             }
+            viewShadowStats[targetIndex] = CaptureShadowStats(p);
 
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
@@ -4702,6 +4729,21 @@ namespace
         if (hasPendingTuning)
         {
             {
+                // 그림자 패스는 뷰들이 나눠 쓰는 인스턴스 하나다. 거리·섞음 폭은
+                // 장면 쪽 캐스터 선택이 다음 프레임에 같은 값을 읽는다.
+                const auto& shadow = pendingTuning.shadow;
+                p.shadow.SetBiasTexels(shadow.biasTexels);
+                p.shadow.SetSlopeScale((std::max)(0.f, shadow.slopeScale));
+                p.shadow.SetCascadeBlendBand(std::clamp(shadow.cascadeBlendBand, 0.f, 0.9f));
+                p.shadow.SetShadowDistance(shadow.shadowDistance);
+                const int lastView = static_cast<int>(EnhancedShadowDebugView::Count) - 1;
+                p.shadow.SetDebugView(static_cast<EnhancedShadowDebugView>(
+                    std::clamp(shadow.debugView, 0, lastView)));
+                const int lastFilter = static_cast<int>(EnhancedShadowFilter::Count) - 1;
+                p.shadow.SetFilter(static_cast<EnhancedShadowFilter>(
+                    std::clamp(shadow.filter, 0, lastFilter)));
+            }
+            {
                 EnhancedSSAOPass::Tuning tuning = p.ssao.GetTuning();
                 tuning.radius = pendingTuning.ssao.radius;
                 tuning.thickness = pendingTuning.ssao.thickness;
@@ -4811,6 +4853,14 @@ namespace
         // 적용 후의 실제 값을 미러에 싣는다. 패스가 값을 보정하거나 다른
         // 경로(환경변수 초기화 등)가 바꿨을 수 있으므로 요청값이 아니라
         // 패스에서 되읽는다 — 창이 거짓 값을 보여주지 않게 하는 유일한 방법이다.
+        {
+            tuningMirror.shadow.biasTexels = p.shadow.GetBiasTexels();
+            tuningMirror.shadow.slopeScale = p.shadow.GetSlopeScale();
+            tuningMirror.shadow.cascadeBlendBand = p.shadow.GetCascadeBlendBand();
+            tuningMirror.shadow.shadowDistance = p.shadow.GetShadowDistance();
+            tuningMirror.shadow.debugView = static_cast<int>(p.shadow.GetDebugView());
+            tuningMirror.shadow.filter = static_cast<int>(p.shadow.GetFilter());
+        }
         {
             const EnhancedSSAOPass::Tuning& tuning = p.ssao.GetTuning();
             tuningMirror.ssao.radius = tuning.radius;
@@ -6257,6 +6307,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 viewPacket.displayTarget);
             state.viewSpriteCounts[targetIndex] = state.lastSpriteCount;
             state.viewUICounts[targetIndex] = state.lastUIRectCount;
+            state.viewShadowStats[targetIndex] = CaptureShadowStats(p);
             state.lastGpuMs = 0.0; // Vulkan timestamp profiler는 후속 성능 슬라이스
             state.lastPassTimings = {
                 { "Shadow", 0.0 }, { "GBuffer", 0.0 },

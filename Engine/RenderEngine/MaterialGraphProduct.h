@@ -10,7 +10,11 @@
 
 namespace material_graph
 {
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:12";
+// 호스트(Includes/MaterialGraphSceneHost.slang)나 그것이 포함하는 셰이더를
+// 바꾸면 올린다 — 안 올리면 쿠킹된 옛 바이트코드가 조용히 재사용된다.
+// 13: 그림자 표본을 CascadedShadow.slang 으로 모으고 디버그 보기를 더했다.
+// 14: 그림자 가장자리 텐트 필터와 넓은 필터의 법선 오프셋을 더했다.
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:14";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {

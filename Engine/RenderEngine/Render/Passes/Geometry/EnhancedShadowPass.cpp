@@ -258,11 +258,38 @@ void EnhancedShadowPass::ComputeCascades(const EnhancedFrameContext& context)
     m_shadowData.cascadeBlendBand = m_blendBand;
 
     const math::vector3& cameraForward = context.camera->forward;
+    const uint32_t packedOptions = static_cast<uint32_t>(m_debugView)
+        | (static_cast<uint32_t>(m_filter) << 4u);
     m_shadowData.cameraForward = math::vector4{
-        cameraForward.x, cameraForward.y, cameraForward.z, 0.f };
+        cameraForward.x, cameraForward.y, cameraForward.z, static_cast<float>(packedOptions) };
     m_shadowData.lightDirection = math::vector4{ m_lightDirection.x, m_lightDirection.y,
         m_lightDirection.z, 0.f };
     m_shadowData.enabled = true;
+}
+
+EnhancedShadowPass::DebugStats EnhancedShadowPass::GetDebugStats() const
+{
+    DebugStats stats;
+    stats.hasDirectionalLight = m_hasDirectionalLight;
+    stats.lightIndex = (std::max)(1u, static_cast<uint32_t>(m_shadowData.splitDepths.w)) - 1u;
+    stats.lightDirection = m_lightDirection;
+    stats.shadowDistance = m_shadowDistance;
+    stats.slopeScale = m_slopeScale;
+    stats.casterCandidates = m_lastCasterCandidates;
+    if (!m_hasDirectionalLight) return stats;
+
+    for (uint32_t index = 0; index < kCascadeCount; ++index)
+    {
+        const Cascade& cascade = m_cascades[index];
+        CascadeStats& out = stats.cascades[index];
+        out.splitDepth = cascade.splitDepth;
+        out.radius = cascade.radius;
+        out.worldTexel = cascade.radius * 2.f / float(kShadowMapSize);
+        out.depthSpan = cascade.depthSpan;
+        // ComputeCascades 의 편향은 깊이 범위로 나눈 값이다 — 되곱해 월드로 돌린다.
+        out.constantBias = m_shadowData.bias[static_cast<int>(index)] * cascade.depthSpan;
+    }
+    return stats;
 }
 
 bool EnhancedShadowPass::CastsInto(const Cascade& cascade, const math::vector3& center,

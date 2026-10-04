@@ -4,6 +4,7 @@
 #include "Includes/PbrCoverage.slang"
 #include "Includes/PackedBones.slang"
 #include "Includes/StandardMaterialRoute.slang"
+#include "Includes/CascadedShadow.slang"
 
 // MBC6: ModelAssetGeneration의 전체 mask가 입력 레이아웃과 shader 축을 함께
 // 만든다. Forward도 GBuffer/Shadow와 같은 palette 규약으로 skin pose를 계산한다.
@@ -147,7 +148,7 @@ TextureCube gPrefiltered : register(t9);
 Texture2D   gBrdfLut     : register(t10);
 
 // 캐스케이드 그림자 맵. Deferred가 t5로 읽는 것과 같은 자원이다.
-Texture2DArray gShadowMap : register(t11);
+Texture2DArray<float> gShadowMap : register(t11);
 
 // 생성기(EnhancedIBLGenerator::kPrefilterMips)와 같아야 한다.
 #define IBL_PREFILTER_MIPS 6
@@ -184,57 +185,28 @@ cbuffer ShadeParams : register(b0)
     uint2    gPad2;
 };
 
-// ── 캐스케이드 그림자 (EnhancedDeferredPass와 같은 식) ──
+// ── 캐스케이드 그림자 (Includes/CascadedShadow.slang) ──
 //
-// 그림자 계산은 Deferred와 같은 캐스케이드 규약을 따른다.
-// 같은 주의가 붙는다: 값이 갈리면 같은 자리에서 불투명은 그늘인데 투명만
-// 밝은, 물체와 무관한 경계가 생긴다 — 고칠 때는 두 곳을 함께 고칠 것.
-float SampleShadowCascade(uint cascade, float3 worldPosition, float slopeTan)
+// Deferred·재질 그래프와 같은 식 하나를 쓴다. 값이 갈리면 같은 자리에서
+// 불투명은 그늘인데 투명만 밝은, 물체와 무관한 경계가 생긴다.
+CascadedShadowView ForwardShadowView()
 {
-    const float4 lightSpace = mul(float4(worldPosition, 1.0f), gLightViewProjection[cascade]);
-    const float3 projected = lightSpace.xyz / lightSpace.w;
-
-    // 라이트 상자 밖은 그림자 정보가 없다. 가려진 것으로 치면 맵 경계에
-    // 검은 띠가 생기므로 빛을 받는 것으로 둔다.
-    if (any(abs(projected.xy) > 1.0f) || projected.z > 1.0f) return 1.0f;
-
-    const float2 uv = float2(projected.x * 0.5f + 0.5f, 0.5f - projected.y * 0.5f);
-    const float bias = gShadowBias[cascade] * (1.0f + gShadowBias.w * slopeTan);
-
-    return gShadowMap.SampleCmpLevelZero(gShadowSampler,
-        float3(uv, (float)cascade), projected.z - bias);
+    CascadedShadowView view;
+    view.lightViewProjection = gLightViewProjection;
+    view.eye = gEyePosition.xyz;
+    view.cameraForward = gCameraForward;
+    view.splits = gCascadeSplits;
+    view.bias = gShadowBias;
+    view.blendBand = gCascadeBlendBand;
+    return view;
 }
 
 // 방향광 캐스케이드 그림자. 반환값 1은 빛을 받음, 0은 가려짐.
 float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
 {
     if (gHasShadow == 0) return 1.0f;
-
-    const float viewDepth = dot(worldPosition - gEyePosition.xyz, gCameraForward.xyz);
-    if (viewDepth > gCascadeSplits.z) return 1.0;
-
-    uint cascade = 0;
-    if (viewDepth > gCascadeSplits.x) cascade = 1;
-    if (viewDepth > gCascadeSplits.y) cascade = 2;
-
-    const float ndotl = saturate(dot(normal, toLight));
-    const float slopeTan = min(sqrt(max(1.0f - ndotl * ndotl, 0.0f)) / max(ndotl, 1e-3f), 8.0f);
-
-    float shadow = SampleShadowCascade(cascade, worldPosition, slopeTan);
-
-    if (gCascadeBlendBand > 0.0f && cascade < SHADOW_CASCADE_COUNT - 1)
-    {
-        const float split = (cascade == 0) ? gCascadeSplits.x : gCascadeSplits.y;
-        const float bandStart = split - abs(split) * gCascadeBlendBand;
-        if (viewDepth > bandStart)
-        {
-            const float blend = saturate((viewDepth - bandStart) / max(split - bandStart, 1e-4f));
-            shadow = lerp(shadow,
-                SampleShadowCascade(cascade + 1, worldPosition, slopeTan), blend);
-        }
-    }
-
-    return shadow;
+    return CascadedShadowVisibility(gShadowMap, gShadowSampler, ForwardShadowView(),
+        worldPosition, normal, toLight);
 }
 
 [shader("vertex")]
@@ -481,6 +453,21 @@ float4 PSMain(VSOut input, bool frontFace : SV_IsFrontFace) : SV_TARGET
         ambient = evaluated.Sum();
     }
 
+    const float3 color = lit + ambient + material.emission + representativeEmission;
+
+    // 그림자 디버그 보기 — Deferred와 같은 판정을 투명면에도 칠한다.
+    const CascadedShadowView shadowView = ForwardShadowView();
+    const uint debugView = CascadedShadowDebugView(shadowView);
+    const uint owner = CascadedShadowOwner(shadowView);
+    if (debugView != CASCADED_SHADOW_DEBUG_OFF && gHasShadow != 0 && owner < gLightCount)
+    {
+        const float3 toLight = -normalize(gLights[owner * 4 + 1].xyz);
+        const float4 lightColor = gLights[owner * 4 + 2];
+        const float3 selected = surface.EvaluateLight(toLight, lightColor.rgb * lightColor.a);
+        return float4(CascadedShadowDebugColor(gShadowMap, gShadowSampler, shadowView, debugView,
+            surface.position, surface.normal, toLight, color, selected), material.alpha);
+    }
+
     // 알파는 베이스 컬러에서 온다 — 이것이 블렌드를 성립시킨다.
-    return float4(LXForwardVolume(input.position.xy, input.worldPos, lit + ambient + material.emission + representativeEmission), material.alpha);
+    return float4(LXForwardVolume(input.position.xy, input.worldPos, color), material.alpha);
 }

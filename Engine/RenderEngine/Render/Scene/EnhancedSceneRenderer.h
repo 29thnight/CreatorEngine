@@ -439,7 +439,7 @@ struct EnhancedLivePassTiming
 /// TickLive에서 수행한다. 필드가 패스 Tuning과 중복되는 비용은 있지만,
 /// 그 대가로 스레드 경계가 한 곳(뮤텍스)에 모인다.
 ///
-/// 여기 없는 패스는 조정 파라미터 자체가 없다(GBuffer·Deferred·Shadow·
+/// 여기 없는 패스는 조정 파라미터 자체가 없다(GBuffer·Deferred·
 /// SkyBox·Forward·Sprite·UI·Grid·Gizmo·Decal 계열). Sprite/UI도 라이브
 /// 그래프에 배선되어 있지만 별도의 런타임 튜닝 값은 노출하지 않는다.
 ///
@@ -448,6 +448,23 @@ struct EnhancedLivePassTiming
 /// 그래서 켬/끔 스위치도 두지 않는다.
 struct EnhancedLiveTuning
 {
+    /// 캐스케이드 그림자(EnhancedShadowPass). 기본값은 패스 기본값 그대로다.
+    /// 거리와 경계 섞음 폭은 장면 쪽 캐스터 선택(ReceiverCascades)도 같은
+    /// 값을 읽으므로 바꿔도 두 쪽이 갈리지 않는다.
+    struct Shadow
+    {
+        float biasTexels{ 0.5f };        // 상수 편향(그림자 맵 텍셀 단위)
+        float slopeScale{ 2.f };         // 경사 비례 계수
+        float cascadeBlendBand{ 0.15f }; // 경계 섞음 폭(분할 깊이 비율)
+        float shadowDistance{ 200.f };   // 그림자를 그리는 최대 뷰 깊이(월드)
+        /// EnhancedShadowDebugView 번호(0 꺼짐). 에디터 계층이 렌더 패스
+        /// 헤더를 물지 않도록 정수로 나른다.
+        int   debugView{ 0 };
+        /// EnhancedShadowFilter 번호(0 하드웨어 2x2 · 1/2/3 텐트 3x3/5x5/7x7).
+        /// 기본 2 는 패스 기본값(Tent5x5)과 같아야 한다.
+        int   filter{ 2 };
+    } shadow;
+
     struct Ssao
     {
         float radius{ 0.5f };
@@ -535,6 +552,31 @@ struct EnhancedLiveTuning
     } postChain;
 };
 
+/// 렌더 디버그 창이 읽는 캐스케이드 하나의 수치. 길이는 월드 단위다.
+struct EnhancedLiveShadowCascade
+{
+    float    splitDepth{ 0.f };   // 이 캐스케이드가 끝나는 뷰 깊이
+    float    radius{ 0.f };       // 덮는 구의 반지름
+    float    worldTexel{ 0.f };   // 그림자 맵 텍셀 하나가 덮는 폭
+    float    depthSpan{ 0.f };    // 광원 방향 깊이 범위
+    float    constantBias{ 0.f }; // 상수 편향(광원 방향)
+    uint32_t graphCasters{ 0 };   // 이 캐스케이드에 그릴 재질 그래프 캐스터
+};
+
+/// 뷰 하나의 그림자 수치(마지막으로 그 뷰를 준비한 프레임의 값).
+/// EnhancedShadowPass::DebugStats 를 에디터가 패스 헤더 없이 읽도록 옮긴 것이다.
+struct EnhancedLiveShadowStats
+{
+    bool     valid{ false };            // 이번 실행에서 이 뷰를 한 번이라도 준비했는가
+    bool     hasDirectionalLight{ false };
+    uint32_t lightIndex{ 0 };
+    std::array<float, 3> lightDirection{};
+    float    shadowDistance{ 0.f };
+    float    slopeScale{ 0.f };
+    uint32_t casterCandidates{ 0 };     // 재질 그래프가 아닌 캐스터
+    std::array<EnhancedLiveShadowCascade, 3> cascades{};
+};
+
 /// 렌더 디버그 창이 읽는 상시 러너의 한 시점 스냅샷.
 ///
 /// 포인터가 아니라 값으로 옮기는 이유: 창은 내부 상태의 수명이나 갱신
@@ -570,6 +612,11 @@ struct EnhancedLiveDebugSnapshot
     uint32_t spriteBatchCount{ 0 };
     uint32_t uiRectCount{ 0 };
     uint32_t uiBatchCount{ 0 };
+
+    /// 표시 대상(EnhancedLiveDisplayTarget)마다의 그림자 수치. 그림자 패스
+    /// 인스턴스는 뷰들이 나눠 쓰므로 뷰마다 따로 담아 두어야 창이 고른 뷰의
+    /// 값을 보여 준다.
+    std::array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> shadow{};
     double   cpuMs{ 0.0 };
     double   gpuMs{ 0.0 };
 

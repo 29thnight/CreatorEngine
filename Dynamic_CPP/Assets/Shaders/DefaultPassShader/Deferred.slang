@@ -1,5 +1,6 @@
 #include "Includes/PbrSurface.slang"
 #include "Includes/StandardMaterialRoute.slang"
+#include "Includes/CascadedShadow.slang"
 
 // Deferred 조명. GBuffer 를 읽어 직접광 + IBL 앰비언트를 적분한다.
 //
@@ -52,7 +53,7 @@ Texture2D      gMetalRough : register(t1);
 Texture2D      gNormal     : register(t2);
 Texture2D      gEmissive   : register(t3);
 Texture2D      gDepth      : register(t4);
-Texture2DArray gShadowMap  : register(t5);
+Texture2DArray<float> gShadowMap : register(t5);
 
 TextureCube    gIrradiance  : register(t6);
 TextureCube    gPrefiltered : register(t7);
@@ -70,55 +71,24 @@ SamplerComparisonState gShadowSampler : register(s1);
 
 // ── 그림자 ──────────────────────────────────────────────────────────
 
-float SampleShadowCascade(uint cascade, float3 worldPosition, float slopeTan)
+// 식은 Includes/CascadedShadow.slang 하나다 — Forward·재질 그래프와 같은 것을 쓴다.
+CascadedShadowView DeferredShadowView()
 {
-    const float4 lightSpace = mul(float4(worldPosition, 1.0), gLightViewProjection[cascade]);
-    const float3 projected  = lightSpace.xyz / lightSpace.w;
-
-    // 라이트 상자 밖은 그림자 정보가 없다. 가려진 것으로 치면 맵 경계에
-    // 검은 띠가 생기므로 빛을 받는 것으로 둔다.
-    if (any(abs(projected.xy) > 1.0) || projected.z > 1.0) return 1.0;
-
-    const float2 uv = float2(projected.x * 0.5 + 0.5, 0.5 - projected.y * 0.5);
-
-    // 깊이 편향 = 캐스케이드 편향 x (1 + 경사 계수 x tan).
-    const float bias = gShadowBias[cascade] * (1.0 + gShadowBias.w * slopeTan);
-
-    return gShadowMap.SampleCmpLevelZero(gShadowSampler,
-        float3(uv, float(cascade)), projected.z - bias);
+    CascadedShadowView view;
+    view.lightViewProjection = gLightViewProjection;
+    view.eye = gEyePosition.xyz;
+    view.cameraForward = gCameraForward;
+    view.splits = gCascadeSplits;
+    view.bias = gShadowBias;
+    view.blendBand = gCascadeBlendBand;
+    return view;
 }
 
 float SampleShadow(float3 worldPosition, float3 normal, float3 toLight)
 {
     if (gHasShadow == 0u) return 1.0;
-
-    const float viewDepth = dot(worldPosition - gEyePosition.xyz, gCameraForward.xyz);
-    if (viewDepth > gCascadeSplits.z) return 1.0;
-
-    uint cascade = 0u;
-    if (viewDepth > gCascadeSplits.x) cascade = 1u;
-    if (viewDepth > gCascadeSplits.y) cascade = 2u;
-
-    // tan(경사각) = sqrt(1-cos^2)/cos. 수평에 가까울수록 폭주하므로 8로 자른다.
-    const float ndotl    = saturate(dot(normal, toLight));
-    const float slopeTan = min(sqrt(max(1.0 - ndotl * ndotl, 0.0)) / max(ndotl, 1e-3), 8.0);
-
-    float shadow = SampleShadowCascade(cascade, worldPosition, slopeTan);
-
-    // 경계 블렌딩 — 해상도가 다른 두 캐스케이드가 만나는 선을 지운다.
-    if (gCascadeBlendBand > 0.0 && cascade < uint(SHADOW_CASCADE_COUNT) - 1u)
-    {
-        const float split     = (cascade == 0u) ? gCascadeSplits.x : gCascadeSplits.y;
-        const float bandStart = split - abs(split) * gCascadeBlendBand;
-        if (viewDepth > bandStart)
-        {
-            const float blend = saturate((viewDepth - bandStart) / max(split - bandStart, 1e-4));
-            shadow = lerp(shadow,
-                SampleShadowCascade(cascade + 1u, worldPosition, slopeTan), blend);
-        }
-    }
-
-    return shadow;
+    return CascadedShadowVisibility(gShadowMap, gShadowSampler, DeferredShadowView(),
+        worldPosition, normal, toLight);
 }
 
 struct VSOut
@@ -233,5 +203,21 @@ float4 PSMain(VSOut input) : SV_TARGET
         ambient = evaluated.Sum();
     }
 
-    return float4(lit + ambient + material.emission, 1.0);
+    const float3 color = lit + ambient + material.emission;
+
+    // 그림자 디버그 보기. 배경(깊이 1)은 그대로 둔다 — 하늘이 덮지 않는
+    // 설정에서 배경까지 칠하면 장면의 경계가 사라진다.
+    const CascadedShadowView shadowView = DeferredShadowView();
+    const uint debugView = CascadedShadowDebugView(shadowView);
+    const uint owner = CascadedShadowOwner(shadowView);
+    if (debugView != CASCADED_SHADOW_DEBUG_OFF && gHasShadow != 0u && depth < 1.0 && owner < gLightCount)
+    {
+        const DeferredLight light = gLights[owner];
+        const float3 toLight = -normalize(light.direction.xyz);
+        const float3 selected = surface.EvaluateLight(toLight, light.color.rgb * light.color.a);
+        return float4(CascadedShadowDebugColor(gShadowMap, gShadowSampler, shadowView, debugView,
+            worldPosition, normal, toLight, color, selected), 1.0);
+    }
+
+    return float4(color, 1.0);
 }
