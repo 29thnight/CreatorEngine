@@ -44,9 +44,7 @@ float3 BakeRadiance(float3 direction)
 #endif
 }
 
-// Sample counts are powers of two. The defaults are the accepted reference;
-// Scene lookup passes smaller counts only for a provisional sample.
-float3 BakeDiffuse(float3 normal, uint samples = 1024u)
+float3 BakeDiffuse(float3 normal)
 {
     // Use the Scene renderer's MIS-convolved irradiance when available. The
     // per-pixel cosine sequence misses small bright HDR emitters and darkens
@@ -56,20 +54,17 @@ float3 BakeDiffuse(float3 normal, uint samples = 1024u)
         return SanitizeEnvironmentRadiance(gIrradiance.SampleLevel(gIblSampler, normal, 0).rgb);
 #endif
     float3 sum = float3(0);
-    for (uint i = 0; i < samples; ++i)
+    for (uint i = 0; i < 1024u; ++i)
     {
-        sum += BakeRadiance(SampleHemisphereCosine(Hammersley(i, samples), normal));
+        sum += BakeRadiance(SampleHemisphereCosine(Hammersley(i, 1024u), normal));
     }
-    return sum / float(samples);
+    return sum / 1024.0;
 }
 
 // View-dependent Fresnel-weighted directional convolution. Its RGB denominator
 // is essential for tinted dielectrics, F82 and thin film. A single isotropic
 // cubemap mip cannot replace this response when the tangent/view changes.
-// environmentLimit 0 uses the whole proposal bank. A smaller limit takes an
-// evenly strided subset and keeps the unequal-count MIS ratio consistent.
-float3 BakeReflection(PrincipledSurface material, float3 view, bool layered, bool coat,
-    uint brdfSamples = 1024u, uint environmentLimit = 0u)
+float3 BakeReflection(PrincipledSurface material, float3 view, bool layered, bool coat)
 {
     const float3 normal = coat ? material.coatNormal : material.normal;
     const float nv = saturate(dot(normal, view));
@@ -96,12 +91,9 @@ float3 BakeReflection(PrincipledSurface material, float3 view, bool layered, boo
 #if defined(LX_SCENE_LOOKUP_PRECOMPUTED)
     uint proposalWidth,proposalHeight;
     gImportanceSamples.GetDimensions(proposalWidth,proposalHeight);
-    const uint environmentBank=proposalWidth==5120u ? 4096u : 1024u;
+    const uint environmentSamples=proposalWidth==5120u ? 4096u : 1024u;
     const uint environmentOffset=proposalWidth==5120u ? 1024u : 0u;
-    const uint environmentStride=environmentLimit!=0u && environmentLimit<environmentBank
-        ? environmentBank/environmentLimit : 1u;
-    const uint environmentSamples=environmentBank/environmentStride;
-    const float environmentRatio=float(environmentSamples)/float(brdfSamples);
+    const float environmentRatio=float(environmentSamples)/1024.0;
 #endif
     const float3 tangent = PrincipledProjectedTangent(layered ? material.tangent : view, normal);
     const float3 bitangent = cross(normal, tangent);
@@ -111,16 +103,16 @@ float3 BakeReflection(PrincipledSurface material, float3 view, bool layered, boo
     const PrincipledLayeredEnergy energy = BuildLayeredEnergy(material, view);
     float3 sum = float3(0);
     float3 denominator = float3(0);
-    for (uint i = 0; i < brdfSamples; ++i)
+    for (uint i = 0; i < 1024u; ++i)
     {
         float3 halfVector;
         if (layered)
         {
-            halfVector = PrincipledSampleAnisotropic(Hammersley(i, brdfSamples), normal, tangent, bitangent, alpha);
+            halfVector = PrincipledSampleAnisotropic(Hammersley(i, 1024u), normal, tangent, bitangent, alpha);
         }
         else
         {
-            const float3 local = ImportanceSampleGGX(Hammersley(i, brdfSamples), float3(0, 0, 1), roughness);
+            const float3 local = ImportanceSampleGGX(Hammersley(i, 1024u), float3(0, 0, 1), roughness);
             halfVector = local.x * tangent + local.y * bitangent + local.z * normal;
         }
         const float vh = saturate(dot(view, halfVector));
@@ -160,11 +152,7 @@ float3 BakeReflection(PrincipledSurface material, float3 view, bool layered, boo
     if (lx_importance != 0u)
         for (uint i=0u;i<environmentSamples;++i)
         {
-            // The bank's x coordinate is (index+0.5)/count and its y is the
-            // radical inverse. A plain stride would pin y to one band, so the
-            // remainder cycles the bands. A stride of 1 is the whole bank.
-            const uint proposal=i*environmentStride+i%environmentStride;
-            const float4 sample=gImportanceSamples.Load(int3(proposal+environmentOffset,0,0));
+            const float4 sample=gImportanceSamples.Load(int3(i+environmentOffset,0,0));
             const float3 light=sample.xyz;
             const float nl=saturate(dot(normal,light));
             if(nl<=0.0) continue;
@@ -186,18 +174,18 @@ float3 BakeReflection(PrincipledSurface material, float3 view, bool layered, boo
     return select(denominator > 0.0, sum / max(denominator, 1e-20), float3(0));
 }
 
-float3 BakeSheen(PrincipledLayeredState state, uint samples = 1024u)
+float3 BakeSheen(PrincipledLayeredState state)
 {
     if (state.material.sheenWeight <= 0.0 || dot(state.sheenNormal, state.view) <= 0.0)
     {
         return float3(0);
     }
     float3 sum = float3(0);
-    for (uint i = 0; i < samples; ++i)
+    for (uint i = 0; i < 1024u; ++i)
     {
         // Inverse LTC applied to a cosine sample. M preserves hemisphere z;
         // its Jacobian gives the same density as EvaluateLayeredLight.
-        const float2 xi = Hammersley(i, samples);
+        const float2 xi = Hammersley(i, 1024u);
         const float phi = 2.0 * PI * xi.x;
         const float3 cosine = float3(sqrt(xi.y) * cos(phi), sqrt(xi.y) * sin(phi), sqrt(1.0 - xi.y));
         const float3 local = normalize(
@@ -220,11 +208,9 @@ float3 BakeSheen(PrincipledLayeredState state, uint samples = 1024u)
     }
 #if defined(LX_SCENE_LOOKUP_PRECOMPUTED)
     if(lx_importance!=0u)
-        for(uint i=0u;i<samples;++i)
+        for(uint i=0u;i<1024u;++i)
         {
-            // Equal counts keep the one-to-one MIS ratio of the 1024 bank.
-            const uint stride=1024u/samples;
-            const float4 sample=gImportanceSamples.Load(int3(i*stride+i%stride,0,0));
+            const float4 sample=gImportanceSamples.Load(int3(i,0,0));
             const float3 local=float3(dot(sample.xyz,state.sheenTangent),dot(sample.xyz,state.sheenBitangent),
                 dot(sample.xyz,state.sheenNormal));
             const float3 transformed=float3(state.sheenLtc.x*local.x+state.sheenLtc.y*local.z,
@@ -236,5 +222,5 @@ float3 BakeSheen(PrincipledLayeredState state, uint samples = 1024u)
             sum+=weight*BakeRadiance(sample.xyz);
         }
 #endif
-    return sum / float(samples);
+    return sum / 1024.0;
 }

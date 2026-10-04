@@ -19,7 +19,7 @@ namespace material_graph
         {
             std::uint32_t width, height, count, reuse;
             std::uint32_t environment, first, dispatchCount, precomputed;
-            std::uint32_t importance, source, standalone, refineBudget;
+            std::uint32_t importance, source, standalone, approximate;
         };
         bool Fail(std::string& error, const char* message)
         {
@@ -234,7 +234,7 @@ namespace material_graph
                                    RHITextureHandle prefiltered, std::uint64_t environmentGeneration,
                                    std::uint64_t memoryBudget, std::shared_ptr<const SceneLookupFrame>& result,
                                    std::string& error, std::array<RHITextureHandle, 3> importance,
-                                   RHITextureHandle source, bool standalone, std::uint32_t refineBudget)
+                                   RHITextureHandle source, bool standalone, bool approximate)
     {
         ce::profile_scope profile{ce::marker<"MaterialLookupPrepare">()};
         const auto count = std::uint64_t(context.width) * context.height;
@@ -395,8 +395,7 @@ namespace material_graph
                 hasImportance,
                 source.IsValid(),
                 standalone,
-                // A standalone frame never has a previous owner to refine from.
-                standalone ? 0u : refineBudget};
+                approximate};
             const auto upload = device_->UploadConstants(&constants, sizeof(constants));
             if (!upload.IsValid())
             {

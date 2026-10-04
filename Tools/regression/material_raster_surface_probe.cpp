@@ -1589,11 +1589,10 @@ void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeT
 unsigned sceneCompositionFrames{}, sceneCompositionPixels{}, sceneCompositionFailures{};
 std::uint64_t sceneLookupBaked{}, sceneLookupReused{};
 unsigned sceneLookupFullFrames{}, sceneLookupFullPixels{}, sceneLookupMutationFrames{};
-// expanded == 5: a still view under a refinement budget. Changed pixels start
-// provisional and must converge to the same reference samples and colors.
-constexpr std::uint32_t kProbeLookupRefinePixels = 128;
-unsigned sceneLookupProgressiveFrames{}, sceneLookupProvisionalPixels{};
-std::uint64_t sceneLookupProvisional{}, sceneLookupRefined{};
+// expanded == 5: a still view with the live split-sum lookup. Changed pixels take
+// the final approximation once; a still view reuses it and never re-integrates.
+unsigned sceneLookupApproximateFrames{}, sceneLookupApproximatePixels{};
+std::uint64_t sceneLookupApproximated{};
 unsigned sceneTextureFrames{}, sceneTexturePixels{}, sceneTextureFractionalLods{}, sceneTextureClampedLods{};
 unsigned sceneGenerationFrames{}, sceneGenerationFallbacks{}, sceneGenerationAborts{},
     sceneGenerationPendingSubmissions{};
@@ -2095,7 +2094,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             }
             const auto hostPrepared =
                 host.Prepare(context, input, fixture == 7 ? RHITextureHandle{} : environment.handle, {}, {}, {},
-                             SceneHostBudget{.lookupRefinePixels = expanded == 5 ? kProbeLookupRefinePixels : 0u},
+                             SceneHostBudget{.lookupApproximate = expanded == 5},
                              error, expanded == 1 && step >= 7 ? 2 : 1);
             Check(hostPrepared, "Scene host prepare " + error);
             for (unsigned failure = 0; failure < (expanded ? 4u : 3u); ++failure)
@@ -2339,30 +2338,24 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(device.MapReadback(lookupReadback, lookupMapped, error), "Scene lookup stats map");
             SceneLookupStats stats;
             std::memcpy(&stats, lookupMapped.data.data(), sizeof(stats));
-            Check(stats.rejected == 0 && stats.baked + stats.provisional + stats.reused == stats.visible,
+            Check(stats.rejected == 0 && stats.baked + stats.approximated + stats.reused == stats.visible,
                   "Scene lookup validates every visible point");
-            const bool progressive = expanded == 5;
-            Check(progressive || (stats.provisional == 0 && stats.refinementClaims == 0),
-                  "A zero refinement budget integrates every changed pixel at reference counts");
-            if (progressive)
+            const bool approximate = expanded == 5;
+            Check(approximate || stats.approximated == 0,
+                  "A reference lookup integrates every changed pixel at reference counts");
+            if (approximate)
             {
+                Check(stats.baked == 0, "The split-sum lookup never runs the reference integration");
                 if (step == 0)
-                    Check(stats.provisional == stats.visible && stats.baked == 0 && stats.reused == 0,
-                          "A cold progressive view takes provisional samples only");
+                    Check(stats.approximated == stats.visible && stats.reused == 0,
+                          "A cold approximate view takes split-sum samples only");
                 else
-                    Check(stats.provisional == 0 &&
-                              stats.baked == (std::min)(stats.refinementClaims, kProbeLookupRefinePixels),
-                          "Unchanged provisional pixels refine within the frame budget step=" + std::to_string(step) +
-                              " baked=" + std::to_string(stats.baked) +
-                              " claims=" + std::to_string(stats.refinementClaims));
-                if (step + 1 == workerModes.size())
-                    Check(stats.refinementClaims == 0 && stats.baked == 0 && stats.reused == stats.visible,
-                          "A still progressive view converges to reference samples");
-                sceneLookupProvisional += stats.provisional;
-                sceneLookupRefined += stats.baked;
-                ++sceneLookupProgressiveFrames;
+                    Check(stats.approximated == 0 && stats.reused == stats.visible,
+                          "A still approximate view reuses its split-sum samples step=" + std::to_string(step));
+                sceneLookupApproximated += stats.approximated;
+                ++sceneLookupApproximateFrames;
             }
-            const bool warm = progressive     ? false
+            const bool warm = approximate     ? false
                               : expanded == 4 ? step > 0 && step != 2 && step != 3 && step != 11 &&
                                                   selectedCore == previousSelectedCore
                               : expanded == 1 ? step == 1 || step == 3 || step == 6 || step == 8
@@ -2513,16 +2506,16 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                         // reference, especially for the zero-roughness specular peak.
                         point = std::bit_cast<IblBakePoint>(captured);
                     }
-                    // A provisional sample is a reduced-count estimate. Only its
-                    // finiteness is checked here; the frames after it must replace
-                    // it with the reference sample checked below.
+                    // A split-sum sample is an approximation, not the reference.
+                    // Only its finiteness is checked here; its distance from the
+                    // reference is a separate material-similarity measurement.
                     if (inspectPoint &&
                         mappedSample.Elements<IblBakeSample>()[y * context.width + x].baseAverage[3] == 1.f)
                     {
-                        Check(expanded == 5, "Only a refinement budget stores provisional lookup samples");
+                        Check(expanded == 5, "Only the approximate lookup stores split-sum samples");
                         for (unsigned c = 0; c < 3; ++c)
-                            Check(std::isfinite(mapped[1].At(x, y, c)), "Provisional Scene lighting is finite");
-                        ++sceneLookupProvisionalPixels;
+                            Check(std::isfinite(mapped[1].At(x, y, c)), "Split-sum Scene lighting is finite");
+                        ++sceneLookupApproximatePixels;
                         ++sceneCompositionPixels;
                         continue;
                     }
@@ -3287,9 +3280,9 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
               << " sceneGenerationCompiles=" << sceneGenerationCompiles
               << " sceneGenerationWorkers=" << sceneGenerationWorkers
               << " sceneGenerationPsoWorkers=" << sceneGenerationPsoWorkers
-              << " sceneLookupProgressiveFrames=" << sceneLookupProgressiveFrames
-              << " sceneLookupProvisional=" << sceneLookupProvisional << " sceneLookupRefined=" << sceneLookupRefined
-              << " sceneLookupProvisionalPixels=" << sceneLookupProvisionalPixels << '\n';
+              << " sceneLookupApproximateFrames=" << sceneLookupApproximateFrames
+              << " sceneLookupApproximated=" << sceneLookupApproximated
+              << " sceneLookupApproximatePixels=" << sceneLookupApproximatePixels << '\n';
 }
 } // namespace
 

@@ -9,19 +9,15 @@ cbuffer SceneLookupConstants : register(b0)
 {
     uint lx_width, lx_height, lx_count, lx_reuse;
     uint lx_environment, lx_first, lx_dispatchCount, lx_precomputed;
-    uint lx_importance, lx_source, lx_standalone, lx_refineBudget;
+    uint lx_importance, lx_source, lx_standalone, lx_approximate;
 };
 
-// lx_refineBudget 0 keeps every visible sample at the reference counts. A
-// positive budget makes a changed pixel take a provisional sample first, and
-// grants that many exact integrations per frame to pixels whose inputs held.
-// A camera move therefore costs the provisional kernel, and a still view
-// converges to the same reference result.
-static const uint kProvisionalBrdfSamples = 64u;
-static const uint kProvisionalAverageSamples = 16u;
-static const uint kProvisionalEnvironmentSamples = 256u;
-// baseAverage.w: -1 empty, 0 reference, 1 provisional. Consumers test < 0.
-static const float kProvisionalMarker = 1.0;
+// lx_approximate 0 integrates every changed pixel at the reference counts
+// (gates and offline captures). Otherwise a changed pixel takes the split-sum
+// approximation: analytic DFG with the prefiltered/irradiance cubemaps. It is
+// final; the live view does not converge to the reference integration.
+// baseAverage.w: -1 empty, 0 reference, 1 approximate. Consumers test < 0.
+static const float kApproximateMarker = 1.0;
 Texture2D<float4> lx_inputs_0 : register(t0);
 Texture2D<float4> lx_inputs_1 : register(t1);
 Texture2D<float4> lx_inputs_2 : register(t2);
@@ -128,14 +124,82 @@ void LXSceneLookupClear(uint3 id : SV_DispatchThreadID)
 }
 
 // Statistics: 0 reference integrations, 1 reused, 2 visible, 3 rejected,
-// 4 provisional integrations, 5 refinement claims (may exceed the budget).
-bool LXClaimRefinement()
+// 4 split-sum approximations.
+
+// Karis, "Real Shading in Unreal Engine 4" mobile EnvBRDFApprox: (A, B) of F0 * A + F90 * B.
+float2 LXEnvironmentBrdfApprox(float roughness, float nv)
 {
-    if (lx_refineBudget == 0u)
-        return true;
-    uint claim;
-    InterlockedAdd(lx_statistics[5], 1, claim);
-    return claim < lx_refineBudget;
+    const float4 c0 = float4(-1.0, -0.0275, -0.572, 0.022);
+    const float4 c1 = float4(1.0, 0.0425, 1.04, -0.04);
+    const float4 r = roughness * c0 + c1;
+    const float a004 = min(r.x * r.x, exp2(-9.28 * nv)) * r.x + r.y;
+    return float2(-1.04, 1.04) * a004 + r.zw;
+}
+
+PrincipledIblIntegral LXSplitSumIntegral(float roughness, float nv, float3 f0, float3 f90)
+{
+    PrincipledIblIntegral integral = PrincipledEmptyIntegral();
+    if (nv <= 0.0)
+        return integral;
+    const float2 ab = LXEnvironmentBrdfApprox(roughness, nv);
+    integral.singleScatter = f0 * ab.x + f90 * ab.y;
+    integral.directionalAlbedo = saturate(ab.x + ab.y);
+    // Schlick cosine-weighted hemisphere mean: F0 + (F90 - F0) / 21.
+    integral.averageFresnel = f0 + (f90 - f0) / 21.0;
+    return integral;
+}
+
+float3 LXSplitSumIrradiance(float3 normal)
+{
+    if (lx_precomputed != 0u)
+        return SanitizeEnvironmentRadiance(gIrradiance.SampleLevel(gIblSampler, normal, 0).rgb);
+    return BakeRadiance(normal);
+}
+
+float3 LXSplitSumPrefiltered(float3 normal, float3 view, float roughness)
+{
+    const float3 direction = reflect(-view, normal);
+    if (lx_precomputed != 0u)
+        return SanitizeEnvironmentRadiance(gPrefiltered.SampleLevel(gIblSampler, direction, roughness * 5.0).rgb);
+    return BakeRadiance(direction);
+}
+
+// Anisotropy, angular Fresnel detail (F82, thin film) and the sheen lobe shape
+// are reduced to the isotropic split-sum terms; sheen takes the base irradiance.
+PrincipledIblBakeSample LXSplitSumSample(PrincipledSurface material, float3 view, bool layered)
+{
+    PrincipledIblBakeSample sample = (PrincipledIblBakeSample)0;
+    const PrincipledReflection reflection = BuildPrincipledReflection(material);
+    const PrincipledLayeredEnergy energy = BuildLayeredEnergy(material, view);
+    const float baseNv = saturate(dot(material.normal, view));
+    const float3 baseF0 = layered ? EvaluateLayeredFresnel(reflection, energy, 1.0)
+                                  : EvaluatePrincipledFresnel(reflection, 1.0);
+    const float3 baseF90 = layered ? EvaluateLayeredFresnel(reflection, energy, 0.0)
+                                   : EvaluatePrincipledFresnel(reflection, 0.0);
+    const PrincipledIblIntegral base = LXSplitSumIntegral(material.roughness, baseNv, baseF0, baseF90);
+    const bool coat = layered && material.coatWeight > 0.0;
+    PrincipledIblIntegral coatIntegral = PrincipledEmptyIntegral();
+    if (coat)
+    {
+        coatIntegral = LXSplitSumIntegral(material.coatRoughness, saturate(dot(material.coatNormal, view)),
+            PrincipledCoatFresnel(material, 1.0) * energy.coat, PrincipledCoatFresnel(material, 0.0) * energy.coat);
+    }
+    sample.baseSingleAlbedo = float4(base.singleScatter, base.directionalAlbedo);
+    sample.baseAverage = float4(base.averageFresnel, kApproximateMarker);
+    sample.coatSingleAlbedo = float4(coatIntegral.singleScatter, coatIntegral.directionalAlbedo);
+    sample.coatAverage = float4(coatIntegral.averageFresnel, 0);
+    if (lx_environment != 0u)
+    {
+        const float3 irradiance = LXSplitSumIrradiance(material.normal);
+        sample.irradiance = float4(irradiance, 0);
+        sample.basePrefiltered = float4(any(base.singleScatter > 0.0)
+            ? LXSplitSumPrefiltered(material.normal, view, material.roughness) : float3(0), 0);
+        sample.coatPrefiltered = float4(coat && any(coatIntegral.singleScatter > 0.0)
+            ? LXSplitSumPrefiltered(material.coatNormal, view, material.coatRoughness) : float3(0), 0);
+        sample.coatIrradiance = float4(coat ? LXSplitSumIrradiance(material.coatNormal) : float3(0), 0);
+        sample.sheenIrradiance = float4(layered && material.sheenWeight > 0.0 ? irradiance : float3(0), 0);
+    }
+    return sample;
 }
 
 PrincipledIblBakePoint LXReadScenePoint(int2 pixel)
@@ -182,22 +246,11 @@ void LXSceneLookupBake(uint3 id : SV_DispatchThreadID)
                                == asuint(LXLoadPreviousSceneInput(field, int3(pixel, 0))));
         same = same && lx_previous[index].baseAverage.w >= 0;
     }
-    // A changed pixel is provisional unless every sample is the reference.
-    bool exact = lx_refineBudget == 0u;
     if (same)
     {
-        // A reference sample is never replaced. A provisional one is refined
-        // only while this frame's budget lasts; otherwise it is kept as is.
-        bool refine = lx_previous[index].baseAverage.w != 0.0;
-        if (refine)
-            refine = LXClaimRefinement();
-        if (!refine)
-        {
-            lx_samples[index] = lx_previous[index];
-            InterlockedAdd(lx_statistics[1], 1);
-            return;
-        }
-        exact = true;
+        lx_samples[index] = lx_previous[index];
+        InterlockedAdd(lx_statistics[1], 1);
+        return;
     }
     bool finite = true;
     for (uint field = 0; field < 11; ++field)
@@ -210,37 +263,37 @@ void LXSceneLookupBake(uint3 id : SV_DispatchThreadID)
         InterlockedAdd(lx_statistics[3], 1);
         return;
     }
-    const uint brdfSamples = exact ? 1024u : kProvisionalBrdfSamples;
-    const uint averageSamples = exact ? 64u : kProvisionalAverageSamples;
-    const uint environmentSamples = exact ? 0u : kProvisionalEnvironmentSamples;
     const PrincipledSurface material = EvaluateIblBakePoint(point);
     const float3 view = normalize(point.viewTier.xyz);
     const bool layered = point.viewTier.w == 1.0;
+    if (lx_approximate != 0u)
+    {
+        lx_samples[index] = LXSplitSumSample(material, view, layered);
+        InterlockedAdd(lx_statistics[4], 1);
+        return;
+    }
     PrincipledLayeredIntegral integral;
-    integral.base = layered ? IntegrateLayeredReflection(material, view, false, true, brdfSamples, averageSamples)
-                            : IntegratePrincipledIbl(material, saturate(dot(material.normal, view)), brdfSamples,
-                                                     averageSamples);
-    integral.coat = layered && material.coatWeight > 0.0
-                        ? IntegrateLayeredReflection(material, view, true, true, brdfSamples, averageSamples)
-                        : PrincipledEmptyIntegral();
+    integral.base = layered ? IntegrateLayeredReflection(material, view, false)
+                            : IntegratePrincipledIbl(material, saturate(dot(material.normal, view)));
+    integral.coat = layered && material.coatWeight > 0.0 ? IntegrateLayeredReflection(material, view, true)
+                                                       : PrincipledEmptyIntegral();
     sample.baseSingleAlbedo = float4(integral.base.singleScatter, integral.base.directionalAlbedo);
-    sample.baseAverage = float4(integral.base.averageFresnel, exact ? 0.0 : kProvisionalMarker);
+    sample.baseAverage = float4(integral.base.averageFresnel, 0);
     sample.coatSingleAlbedo = float4(integral.coat.singleScatter, integral.coat.directionalAlbedo);
     sample.coatAverage = float4(integral.coat.averageFresnel, 0);
     if (lx_environment != 0u)
     {
-        sample.irradiance = float4(BakeDiffuse(material.normal, brdfSamples), 0);
+        sample.irradiance = float4(BakeDiffuse(material.normal), 0);
         // No radiance convolution is consumed when this lobe carries exactly
         // zero energy (e.g. emission-only materials with Specular Level 0).
         sample.basePrefiltered = float4(any(integral.base.singleScatter > 0.0)
-            ? BakeReflection(material, view, layered, false, brdfSamples, environmentSamples) : float3(0), 0);
+            ? BakeReflection(material, view, layered, false) : float3(0), 0);
         sample.coatPrefiltered = float4(layered && material.coatWeight > 0.0 && any(integral.coat.singleScatter > 0.0)
-            ? BakeReflection(material, view, true, true, brdfSamples, environmentSamples) : float3(0), 0);
+            ? BakeReflection(material, view, true, true) : float3(0), 0);
         sample.coatIrradiance = float4(layered && material.coatWeight > 0.0
-            ? BakeDiffuse(material.coatNormal, brdfSamples) : float3(0), 0);
-        sample.sheenIrradiance = float4(layered ? BakeSheen(BuildLayeredState(material, view, integral), brdfSamples)
-                                                : float3(0), 0);
+            ? BakeDiffuse(material.coatNormal) : float3(0), 0);
+        sample.sheenIrradiance = float4(layered ? BakeSheen(BuildLayeredState(material, view, integral)) : float3(0), 0);
     }
     lx_samples[index] = sample;
-    InterlockedAdd(lx_statistics[exact ? 0 : 4], 1);
+    InterlockedAdd(lx_statistics[0], 1);
 }

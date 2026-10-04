@@ -11,13 +11,12 @@
 namespace material_graph
 {
     struct SceneLookupResourcePool;
-    // baked counts reference integrations, provisional the reduced-count ones.
-    // visible = baked + provisional + reused + rejected. refinementClaims may
-    // exceed the frame's budget; only the claims under it were integrated.
+    // baked counts reference integrations, approximated the split-sum ones.
+    // visible = baked + approximated + reused + rejected.
     struct SceneLookupStats
     {
         std::uint32_t baked{}, reused{}, visible{}, rejected{};
-        std::uint32_t provisional{}, refinementClaims{}, reserved0{}, reserved1{};
+        std::uint32_t approximated{}, reserved0{}, reserved1{}, reserved2{};
     };
     static_assert(sizeof(SceneLookupStats) == 32);
 
@@ -83,7 +82,7 @@ namespace material_graph
                      RHITextureHandle irradiance, RHITextureHandle prefiltered, std::uint64_t environmentGeneration,
                      std::uint64_t memoryBudget, std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
                      std::array<RHITextureHandle, 3> importance = {}, RHITextureHandle source = {},
-                     bool standalone = false, std::uint32_t refineBudget = 0);
+                     bool standalone = false, bool approximate = false);
         // Called only after the entire owning graph has been successfully submitted.
         // A recorded callback or an upload prefix is not publication authorization.
         bool PublishSubmitted(const SceneLookupFrame& frame, std::uint64_t frameId, RHICompletionPoint completion,

@@ -130,16 +130,14 @@ struct PrincipledIblIntegral
 
 // Bake/probe helper, never called in the production pixel shader. Integrate the
 // same Fresnel model used by direct lights instead of substituting F0=0.04.
-// The counts are powers of two; the defaults are the accepted reference. Scene
-// lookup passes smaller counts only for a provisional sample it later refines.
-PrincipledIblIntegral IntegratePrincipledIbl(PrincipledSurface material, float ndotv,
-    uint sampleCount = 1024u, uint averageSamples = 64u)
+PrincipledIblIntegral IntegratePrincipledIbl(PrincipledSurface material, float ndotv)
 {
     const float cosine = clamp(ndotv, 1e-4, 1.0);
     const float3 view = float3(sqrt(1.0 - cosine * cosine), 0.0, cosine);
     const float3 normal = float3(0.0, 0.0, 1.0);
     const PrincipledReflection reflection = BuildPrincipledReflection(material);
     const float geometryView = GeometrySchlickGgxIbl(cosine, material.roughness);
+    const uint sampleCount = 1024u;
     PrincipledIblIntegral integral;
     integral.singleScatter = float3(0.0);
     integral.directionalAlbedo = 0.0;
@@ -174,6 +172,7 @@ PrincipledIblIntegral IntegratePrincipledIbl(PrincipledSurface material, float n
         integral.directionalAlbedo = saturate(integral.directionalAlbedo / float(sampleCount));
     }
 
+    const uint averageSamples = 64u;
     for (uint index = 0u; index < averageSamples; ++index)
     {
         // Cosine-weighted hemisphere mean; midpoint avoids a grazing singularity.
