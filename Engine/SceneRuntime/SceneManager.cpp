@@ -817,6 +817,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		[[maybe_unused]] auto hierarchyTransaction =
 			m_activeScene.load()->BeginHierarchyBulkBuild();
 
+        // 지난번 이 장면이 쓴 재질 그래프를 병렬로 컴파일해 캐시를 채운다.
+        DataSystems->PrewarmSceneMaterials(sceneName);
         ce::profile_scope entitiesProfile{ ce::marker<"SceneLoad.Entities">() };
         for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
         {
@@ -858,6 +860,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 			}
 		}
 
+        DataSystems->CommitSceneMaterials(sceneName);
         RemapLoadBatchIndices(m_activeScene.load(), loadBatch);
 
         // 프리팹 인스턴스 재연결(SceneGraphRedesignPlan P2) — 리매핑 직후, m_Entities·
@@ -936,6 +939,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
 		[[maybe_unused]] auto ddolHierarchyTransaction =
 			m_activeScene.load()->BeginHierarchyBulkBuild();
 
+        DataSystems->PrewarmSceneMaterials(sceneName);
         {
         // 컴포넌트 적재가 모델·텍스처 읽기를 부르므로 그 하위 표지가 이 안에 쌓인다.
         ce::profile_scope entitiesProfile{ ce::marker<"SceneLoad.Entities">() };
@@ -964,6 +968,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
         }
         }
 
+        DataSystems->CommitSceneMaterials(sceneName);
         ce::profile_scope finalizeProfile{ ce::marker<"SceneLoad.Finalize">() };
         RemapLoadBatchIndices(scene, sceneBatch);
         RemapLoadBatchIndices(m_activeScene.load(), ddolBatch);
@@ -1120,10 +1125,12 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
         std::unordered_set<size_t> ddolIds;
         for (const auto node : root["DontDestroyOnLoadObjects"])
             if (node["m_instanceID"]) ddolIds.insert(node["m_instanceID"].As<size_t>());
+        DataSystems->PrewarmSceneMaterials(load.m_path);
         for (const auto node : SerializedEntities(root))
             if (!node["m_instanceID"] || !ddolIds.contains(node["m_instanceID"].As<size_t>()))
                 deserialize(node, false);
         for (const auto node : root["DontDestroyOnLoadObjects"]) deserialize(node, true);
+        DataSystems->CommitSceneMaterials(load.m_path);
         RemapLoadBatchIndices(scene.get(), batch);
         RemapLoadBatchIndices(ddolScene, ddolBatch);
         for (const auto& entry : batch) ReconnectPrefabInstance(scene.get(), entry.object);

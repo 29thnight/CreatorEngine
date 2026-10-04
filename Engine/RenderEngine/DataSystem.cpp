@@ -37,6 +37,7 @@
 #include "RHI/RHIFormat.h" // MBC7: generation embedded texture 포맷
 
 #include <algorithm>
+#include <iomanip>
 #include <array>
 #include <cctype>
 #include <chrono>
@@ -1134,44 +1135,172 @@ std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphG
 {
     ce::profile_scope profile{ ce::marker<"Material.GraphGeneration">() };
     const experiment::AssetId id{guid.m_guid};
+    // 이미 세대가 있는 그래프도 남긴다. 그래야 다음 열기에 세대가 비어 있을 때 선적재된다.
+    // 경로 해석은 다른 잠금을 잡으므로 기록 잠금 밖에서 한다.
+    bool recording = false;
+    {
+        std::lock_guard lock(m_sceneMaterialMutex);
+        recording = m_recordingSceneMaterials;
+    }
+    if (recording)
+    {
+        if (file::path sourcePath = GetMaterialGraphSourcePath(guid); !sourcePath.empty())
+        {
+            std::lock_guard lock(m_sceneMaterialMutex);
+            if (m_recordingSceneMaterials) m_sceneMaterials.emplace_back(guid, std::move(sourcePath));
+        }
+    }
     return m_materialGraphGenerations.Load(
         id,
-        [this, guid, id](material_graph::CookedProgram& result, std::string& failure) {
-            const auto catalog = GetCookedCatalog();
-            if (!catalog && !PathFinder::IsAssetAuthoringEnabled())
-            {
-                failure = "LX graph requires a mounted, verified cooked material catalog.";
-                return false;
-            }
-            std::optional<LX::LXMaterialAsset> source;
-            if (PathFinder::IsAssetAuthoringEnabled())
-            {
-                const file::path sourcePath = GetMaterialGraphSourcePath(guid);
-                if (Lowercase(sourcePath.extension().string()) != ".shadergraph")
-                {
-                    failure = "LX graph GUID does not resolve to its authoring source.";
-                    return false;
-                }
-                ce::profile_scope sourceProfile{ ce::marker<"Material.GraphSourceLoad">() };
-                source = LX::LXMaterialAsset::Load(sourcePath, LX::CreateMaterialDefinitions(), &failure);
-                if (!source)
-                    return false;
-            }
-            if (catalog)
-            {
-                const experiment::cooked::LooseArtifactByteSource bytes(catalog->DerivedRoot());
-                if (material_graph::LoadCookedGeneration(*catalog, bytes, id, source ? &*source : nullptr, result, failure) &&
-                    result.product.materialShader)
-                {
-                    return true;
-                }
-                if (failure.empty()) failure = "Cooked graph has no generated ShaderMeta contract; regenerate the cook.";
-            }
-            // An Editor may reopen an edited or newly authored graph before the
-            // next package cook. Player keeps the strict bytecode-only boundary.
-            return source && CompileAuthoringMaterial(*source, guid, result, failure);
+        [this, guid](material_graph::CookedProgram& result, std::string& failure) {
+            const file::path sourcePath =
+                PathFinder::IsAssetAuthoringEnabled() ? GetMaterialGraphSourcePath(guid) : file::path{};
+            return LoadMaterialGraphProgram(guid, sourcePath, result, failure);
         },
         reload, error);
+}
+
+bool DataSystem::LoadMaterialGraphProgram(FileGuid guid, const file::path& sourcePath,
+                                          material_graph::CookedProgram& result, std::string& failure) const
+{
+    const experiment::AssetId id{guid.m_guid};
+    const auto catalog = GetCookedCatalog();
+    if (!catalog && !PathFinder::IsAssetAuthoringEnabled())
+    {
+        failure = "LX graph requires a mounted, verified cooked material catalog.";
+        return false;
+    }
+    std::optional<LX::LXMaterialAsset> source;
+    if (PathFinder::IsAssetAuthoringEnabled())
+    {
+        if (Lowercase(sourcePath.extension().string()) != ".shadergraph")
+        {
+            failure = "LX graph GUID does not resolve to its authoring source.";
+            return false;
+        }
+        ce::profile_scope sourceProfile{ ce::marker<"Material.GraphSourceLoad">() };
+        source = LX::LXMaterialAsset::Load(sourcePath, LX::CreateMaterialDefinitions(), &failure);
+        if (!source)
+            return false;
+    }
+    if (catalog)
+    {
+        const experiment::cooked::LooseArtifactByteSource bytes(catalog->DerivedRoot());
+        if (material_graph::LoadCookedGeneration(*catalog, bytes, id, source ? &*source : nullptr, result, failure) &&
+            result.product.materialShader)
+        {
+            return true;
+        }
+        if (failure.empty()) failure = "Cooked graph has no generated ShaderMeta contract; regenerate the cook.";
+    }
+    // An Editor may reopen an edited or newly authored graph before the
+    // next package cook. Player keeps the strict bytecode-only boundary.
+    return source && CompileAuthoringMaterial(*source, guid, result, failure);
+}
+
+namespace
+{
+// 장면 경로마다 목록 하나. 이름이 같은 장면이 다른 폴더에 있어도 섞이지 않게 경로 해시로 이름 짓는다.
+file::path SceneMaterialListPath(const file::path& scene)
+{
+    std::error_code ignored;
+    const auto canonical = std::filesystem::weakly_canonical(
+        scene.is_absolute() ? scene : PathFinder::Relative() / scene, ignored);
+    // 한글 경로도 코드 페이지 변환 없이 다루도록 UTF-8 로 키를 만든다.
+    const auto utf8 = canonical.generic_u8string();
+    const auto key = Lowercase(std::string(utf8.begin(), utf8.end()));
+    std::uint64_t hash = 14695981039346656037ull;
+    for (const unsigned char c : key) hash = (hash ^ c) * 1099511628211ull;
+    std::ostringstream name;
+    name << std::hex << std::setw(16) << std::setfill('0') << hash << ".txt";
+    return PathFinder::CachePath("Lattice") / "ScenePreload" / name.str();
+}
+
+constexpr std::size_t kMaxSceneMaterials = 4096;
+} // namespace
+
+void DataSystem::PrewarmSceneMaterials(const file::path& scene)
+{
+    if (!PathFinder::IsAssetAuthoringEnabled()) return;
+    {
+        std::lock_guard lock(m_sceneMaterialMutex);
+        m_recordingSceneMaterials = true;
+        m_sceneMaterials.clear();
+    }
+    ce::profile_scope profile{ ce::marker<"Material.Prewarm">() };
+    std::vector<std::pair<FileGuid, file::path>> graphs;
+    {
+        std::ifstream list(SceneMaterialListPath(scene), std::ios::binary);
+        std::string line;
+        while (graphs.size() < kMaxSceneMaterials && std::getline(list, line))
+        {
+            const auto tab = line.find('\t');
+            FileGuid guid;
+            if (tab == std::string::npos || !Uuid::TryParse(line.substr(0, tab), guid.m_guid)) continue;
+            // 이미 세대가 있으면 엔티티 적재가 컴파일하지 않는다.
+            if (m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid})) continue;
+            graphs.emplace_back(guid, file::path(std::u8string(line.begin() + tab + 1, line.end())));
+        }
+    }
+    if (graphs.empty()) return;
+
+    // 결과는 버린다. 일은 디스크 컴파일 캐시를 채우는 것이고, 엔티티 적재가 그 캐시를 읽는다.
+    std::atomic<std::size_t> next{};
+    std::atomic<std::size_t> failures{};
+    const auto work = [&]() {
+        for (std::size_t index = next++; index < graphs.size(); index = next++)
+        {
+            material_graph::CookedProgram ignored;
+            std::string failure;
+            try
+            {
+                if (!LoadMaterialGraphProgram(graphs[index].first, graphs[index].second, ignored, failure)) ++failures;
+            }
+            catch (const std::exception&)
+            {
+                ++failures;
+            }
+        }
+    };
+    // 컴파일 칸 수만큼만 작업 스레드를 쓴다. 더 띄우면 칸을 기다리며 작업 스레드를 붙든다.
+    const std::size_t workers = std::min(graphs.size(), RHIShaderCompiler::MaxParallelCompiles());
+    if (thread_pool::is_worker_thread())
+    {
+        work(); // 작업 스레드는 다른 작업을 기다릴 수 없다.
+    }
+    else
+    {
+        ce::get_job_scheduler().submit_indexed(workers, [&](std::size_t) { work(); }).wait();
+    }
+    if (failures)
+    {
+        // 실패한 그래프는 엔티티 적재가 다시 시도하고 그 오류를 보고한다.
+        Debug::PrintLog(spdlog::level::warn, "Scene material prewarm skipped " + std::to_string(failures.load()) +
+                                                 " of " + std::to_string(graphs.size()) + " graphs.");
+    }
+}
+
+void DataSystem::CommitSceneMaterials(const file::path& scene)
+{
+    std::vector<std::pair<FileGuid, file::path>> graphs;
+    {
+        std::lock_guard lock(m_sceneMaterialMutex);
+        if (!m_recordingSceneMaterials) return;
+        m_recordingSceneMaterials = false;
+        graphs.swap(m_sceneMaterials);
+    }
+    std::ranges::sort(graphs);
+    graphs.erase(std::unique(graphs.begin(), graphs.end()), graphs.end());
+    if (graphs.size() > kMaxSceneMaterials) graphs.resize(kMaxSceneMaterials);
+    const auto path = SceneMaterialListPath(scene);
+    std::error_code ioError;
+    std::filesystem::create_directories(path.parent_path(), ioError);
+    std::ofstream list(path, std::ios::binary | std::ios::trunc);
+    for (const auto& [guid, source] : graphs)
+    {
+        const auto text = source.u8string();
+        list << guid.ToString() << '\t' << std::string(text.begin(), text.end()) << '\n';
+    }
 }
 
 std::shared_ptr<const material_graph::Generation> DataSystem::ResolveMaterialGraphGeneration(FileGuid guid) const

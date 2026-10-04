@@ -257,6 +257,12 @@ public:
                                                                                   bool reload = false);
     std::shared_ptr<const material_graph::Generation> ResolveMaterialGraphGeneration(FileGuid guid) const;
     file::path GetMaterialGraphSourcePath(FileGuid guid) const;
+    // Scene-open material warm-up (authoring only). Compiles the graphs this scene
+    // loaded last time on worker threads into the on-disk compile cache, so the
+    // entity pass that follows only reads caches. It also starts recording the graphs
+    // loaded until CommitSceneMaterials, which saves them for the next open.
+    void PrewarmSceneMaterials(const file::path& scene);
+    void CommitSceneMaterials(const file::path& scene);
     bool ConfigureModelMaterialGraph(Material& material, const assets::ModelAssetGeneration& model,
                                       const assets::ModelMaterialAsset& source, std::string& error);
     bool ConfigureMaterialGraph(Material& material, const material_graph::InstanceDescription& description,
@@ -370,6 +376,11 @@ private:
 	std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;
 	std::vector<std::uint32_t> m_shaderMetaFreeSlots;
     material_graph::GenerationStore m_materialGraphGenerations;
+    bool LoadMaterialGraphProgram(FileGuid guid, const file::path& sourcePath, material_graph::CookedProgram& result,
+                                  std::string& failure) const;
+    std::mutex m_sceneMaterialMutex;
+    bool m_recordingSceneMaterials{};
+    std::vector<std::pair<FileGuid, file::path>> m_sceneMaterials;
     std::mutex m_pendingAssetChangeMutex;
 	std::vector<RuntimeAssetChange> m_pendingAssetChanges;
 
