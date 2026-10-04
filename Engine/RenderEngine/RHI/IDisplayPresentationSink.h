@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include "RHIDisplayFrame.h"
 
 // 라이브 표시 결과를 presentation 계층에 여는 백엔드 중립 계약 (E4-6a).
 //
@@ -32,8 +33,9 @@ struct IDisplayPresentationSink
     /// RenderThread에서 불린다 — 구현은 그 스레드에서 안전해야 한다
     /// (기존 ImGui 셸의 SubmitCpuRgbaFrame과 같은 계약).
     virtual void SubmitCpuFrame(uint64_t key, uint32_t width, uint32_t height,
-        const void* rgba, uint32_t rowPitch) = 0;
+        const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) = 0;
 
-    /// 게시된 CPU 프레임의 presentation 텍스처 ID.
-    virtual uint64_t GetCpuFrameTextureId(uint64_t key) = 0;
+    /// 이번 Host 프레임의 UI 생성 전에 업로드 기록을 마친 픽셀과 신원.
+    /// UI 생성 뒤 도착한 Submit은 다음 Host 프레임까지 이 결과를 바꾸지 않는다.
+    virtual RHIDisplayTexture GetCpuFrameTexture(uint64_t key) = 0;
 };

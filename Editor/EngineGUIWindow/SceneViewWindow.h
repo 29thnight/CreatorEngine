@@ -11,6 +11,7 @@ class GizmoRenderer;
 class Entity;
 class Camera;
 class EditorCameraRig;
+struct FrameCameraSnapshot;
 struct Ray { math::vector3 origin, direction; };
 struct RayHitResult
 {
@@ -64,9 +65,10 @@ class SceneViewWindow
 public:
 	void RenderSceneViewWindow();
 private:
-	void RenderSceneView(float* cameraView, float* cameraProjection, float* matrix, bool editTransformDecomposition, Entity* obj, Camera* cam);
-	math::vector3 ConvertMouseToWorldPosition(Camera* cam, const ImVec2& mouseScreenPos, float depth);
-	Ray CreateRayFromCamera(Camera* cam, const ImVec2& mousePos);
+    void RenderSceneView(float* matrix, Entity* obj, Camera* cam);
+    math::vector3 ConvertMouseToWorldPosition(
+        const FrameCameraSnapshot& camera, const ImVec2& mouseScreenPos, float depth);
+    Ray CreateRayFromCamera(const FrameCameraSnapshot& camera, const ImVec2& mousePos);
 
 private:
 	Camera* m_editorCamera{ nullptr };

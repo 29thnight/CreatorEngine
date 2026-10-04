@@ -16,15 +16,17 @@ struct ImGuiHostPresentationSink final : IDisplayPresentationSink
     }
     uint64_t OpenSharedTexture(void* sharedHandle) override
     {
-        return GetImGuiHost().OpenSharedTexture(sharedHandle);
+        const uint64_t textureId = GetImGuiHost().OpenSharedTexture(sharedHandle);
+        // 폴백 검정 텍스처는 완료 장면의 픽셀이 아니므로 준비된 bundle로 게시하지 않는다.
+        return textureId == GetImGuiHost().GetFallbackTextureId() ? 0 : textureId;
     }
     void SubmitCpuFrame(uint64_t key, uint32_t width, uint32_t height,
-        const void* rgba, uint32_t rowPitch) override
+        const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) override
     {
-        GetImGuiHost().SubmitCpuRgbaFrame(key, width, height, rgba, rowPitch);
+        GetImGuiHost().SubmitCpuRgbaFrame(key, width, height, rgba, rowPitch, frame);
     }
-    uint64_t GetCpuFrameTextureId(uint64_t key) override
+    RHIDisplayTexture GetCpuFrameTexture(uint64_t key) override
     {
-        return GetImGuiHost().GetCpuFrameTextureId(key);
+        return GetImGuiHost().GetCpuFrameTexture(key);
     }
 };

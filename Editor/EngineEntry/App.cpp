@@ -481,8 +481,10 @@ bool Core::App::WarmUpFirstRenderedFrame()
                 failure = widen(renderer.error);
                 Debug::PrintLog(spdlog::level::err, "[BootWarmup] Renderer initialization failed: " + renderer.error);
             }
-            else if (renderer.ready && EnhancedSceneRenderer::GetLiveDisplayTexture(
-                EnhancedLiveDisplayTarget::Editor).textureId != 0)
+            // Host 텍스처 조회는 PT의 열린 프레임 전용이다. GT 예열은 PT가
+            // 실제 bundle을 취득한 뒤 원자로 게시한 첫 표시 이정표만 읽는다.
+            else if (renderer.ready && ledger.stages[static_cast<std::size_t>(
+                engine::warmup::stage::display_texture)].reached)
             {
                 Debug::PrintLog(spdlog::level::info, "[BootWarmup] Ready; GPU-completed editor frame=" + std::to_string(renderer.completedFrame));
                 return true;

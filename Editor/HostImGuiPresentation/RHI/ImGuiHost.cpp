@@ -229,15 +229,17 @@ namespace
         }
 
         void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
-            const void* rgba, uint32_t rowPitch) override
+            const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) override
         {
             if (m_renderer)
-                m_renderer->SubmitCpuRgbaFrame(key, width, height, rgba, rowPitch);
+            {
+                m_renderer->SubmitCpuRgbaFrame(key, width, height, rgba, rowPitch, frame);
+            }
         }
 
-        uint64_t GetCpuFrameTextureId(uint64_t key) override
+        RHIDisplayTexture GetCpuFrameTexture(uint64_t key) override
         {
-            return m_renderer ? m_renderer->GetCpuFrameTextureId(key) : 0;
+            return m_renderer ? m_renderer->GetCpuFrameTexture(key) : RHIDisplayTexture{};
         }
 
         uint64_t GetFallbackTextureId() const override

@@ -74,9 +74,11 @@ struct ImGuiDx12Shell::Impl
         uint32_t width{ 0 };
         uint32_t height{ 0 };
         std::vector<uint8_t> rgba;
+        RHIDisplayFrameMetadata metadata{};
     };
     std::mutex cpuFrameMutex;
     std::unordered_map<uint64_t, CpuFrame> pendingCpuFrames;
+    std::unordered_map<uint64_t, CpuFrame> recordingCpuFrames;
 
     struct CpuFrameEntry
     {
@@ -86,9 +88,38 @@ struct ImGuiDx12Shell::Impl
         uint32_t width{ 0 };
         uint32_t height{ 0 };
         bool initialized{ false };
+        bool needsRecreate{ false };
+        RHIDisplayFrameMetadata metadata{};
         uint64_t lastUsedFrame{ 0 };
     };
     std::unordered_map<uint64_t, CpuFrameEntry> cpuFrames;
+
+    // 실패한 기록의 barrier가 실행됐다고 가정하지 않는다. 다음 업로드는 새
+    // 자원으로 시작하고, 옛 자원은 기존 제출 완료점 기반 은퇴 경로로 보낸다.
+    void AbortCpuFrames()
+    {
+        for (const auto& [key, frame] : recordingCpuFrames)
+        {
+            const auto found = cpuFrames.find(key);
+            if (found != cpuFrames.end())
+            {
+                found->second.metadata = {};
+                found->second.needsRecreate = true;
+            }
+        }
+        std::lock_guard<std::mutex> lock(cpuFrameMutex);
+        for (auto& [key, frame] : recordingCpuFrames)
+        {
+            const auto pending = pendingCpuFrames.find(key);
+            if (pending == pendingCpuFrames.end() ||
+                pending->second.metadata.m_frameId < frame.metadata.m_frameId)
+            {
+                pendingCpuFrames[key] = std::move(frame);
+            }
+        }
+        recordingCpuFrames.clear();
+    }
+
 
     // descriptor와 그것이 직접 소유하는 리소스를 현재 제출의 완료점까지
     // 붙든다. 자산 텍스처 리소스는 DX12TextureCache graveyard가 따로 붙든다.
@@ -179,6 +210,160 @@ struct ImGuiDx12Shell::Impl
         resources.GetDevice()->CreateShaderResourceView(resource, &desc, cpu);
         return gpu.ptr;
     }
+    // UI가 본 메타데이터 뒤에 더 새 픽셀을 올리지 않도록 NewFrame에서만 소비한다.
+    bool UploadCpuFrames(std::string& outError)
+    {
+        Impl& impl = *this;
+        {
+            std::lock_guard<std::mutex> lock(impl.cpuFrameMutex);
+            impl.recordingCpuFrames.swap(impl.pendingCpuFrames);
+        }
+
+        auto* commandList = impl.resources.GetCommandList();
+
+        for (const auto& pending : impl.recordingCpuFrames)
+        {
+            auto found = impl.cpuFrames.find(pending.first);
+            if (found == impl.cpuFrames.end())
+            {
+                D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
+                D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
+                if (!impl.AllocateSlot(cpu, gpu))
+                {
+                    outError = "RHI CPU 프레임 표시 SRV 슬롯 부족";
+                    impl.resources.AbortFrame();
+                    impl.frameOpen = false;
+                    return false;
+                }
+                impl.WriteNullSrv(cpu);
+                Impl::CpuFrameEntry entry{};
+                entry.cpu = cpu;
+                entry.textureId = gpu.ptr;
+                entry.lastUsedFrame = impl.frameIndex;
+                found = impl.cpuFrames.emplace(pending.first, std::move(entry)).first;
+            }
+
+            Impl::CpuFrameEntry& entry = found->second;
+            entry.metadata = {};
+            const Impl::CpuFrame& frame = pending.second;
+            const bool recreate = entry.needsRecreate || !entry.resource || entry.width != frame.width ||
+                entry.height != frame.height;
+            if (recreate)
+            {
+                Impl::ComPtr<ID3D12Resource> replacement;
+                D3D12_HEAP_PROPERTIES heap{};
+                heap.Type = D3D12_HEAP_TYPE_DEFAULT;
+                D3D12_RESOURCE_DESC desc{};
+                desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+                desc.Width = frame.width;
+                desc.Height = frame.height;
+                desc.DepthOrArraySize = 1;
+                desc.MipLevels = 1;
+                desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                desc.SampleDesc.Count = 1;
+                if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap,
+                    D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
+                    nullptr, IID_PPV_ARGS(&replacement))))
+                {
+                    outError = "RHI CPU 프레임 표시 텍스처 생성 실패";
+                    impl.resources.AbortFrame();
+                    impl.frameOpen = false;
+                    return false;
+                }
+                if (entry.resource)
+                {
+                    D3D12_CPU_DESCRIPTOR_HANDLE newCpu{};
+                    D3D12_GPU_DESCRIPTOR_HANDLE newGpu{};
+                    if (!impl.AllocateSlot(newCpu, newGpu))
+                    {
+                        outError = "RHI CPU 프레임 표시 SRV 슬롯 부족";
+                        impl.resources.AbortFrame();
+                        impl.frameOpen = false;
+                        return false;
+                    }
+                    impl.pendingFrameRetirements.push_back(
+                        Impl::RetiredDescriptor{ entry.textureId,
+                            std::move(entry.resource) });
+                    entry.cpu = newCpu;
+                    entry.textureId = newGpu.ptr;
+                }
+                entry.resource = std::move(replacement);
+                entry.width = frame.width;
+                entry.height = frame.height;
+                entry.initialized = false;
+                entry.needsRecreate = false;
+            }
+
+            const uint32_t tightPitch = frame.width * 4u;
+            const uint32_t uploadPitch = (tightPitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
+                & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
+            const uint64_t uploadBytes = static_cast<uint64_t>(uploadPitch) * frame.height;
+            const RHIBufferSlice upload = impl.resources.AllocateUpload(
+                RHIUploadRequest{ uploadBytes, RHIUploadUsage::TextureCopy,
+                    D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT });
+            if (!upload.IsWritable())
+            {
+                outError = "RHI CPU 프레임 표시 업로드 공간 부족";
+                impl.resources.AbortFrame();
+                impl.frameOpen = false;
+                return false;
+            }
+            for (uint32_t y = 0; y < frame.height; ++y)
+            {
+                std::memcpy(static_cast<uint8_t*>(upload.cpuAddress) +
+                        static_cast<size_t>(y) * uploadPitch,
+                    frame.rgba.data() + static_cast<size_t>(y) * tightPitch, tightPitch);
+            }
+
+            if (entry.initialized)
+            {
+                D3D12_RESOURCE_BARRIER toCopy{};
+                toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+                toCopy.Transition.pResource = entry.resource.Get();
+                toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+                toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
+                toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+                commandList->ResourceBarrier(1, &toCopy);
+            }
+
+            D3D12_TEXTURE_COPY_LOCATION source{};
+            source.pResource = impl.resources.Resolve(upload.buffer);
+            source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+            source.PlacedFootprint.Offset = upload.offset;
+            source.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            source.PlacedFootprint.Footprint.Width = frame.width;
+            source.PlacedFootprint.Footprint.Height = frame.height;
+            source.PlacedFootprint.Footprint.Depth = 1;
+            source.PlacedFootprint.Footprint.RowPitch = uploadPitch;
+            D3D12_TEXTURE_COPY_LOCATION destination{};
+            destination.pResource = entry.resource.Get();
+            destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+            commandList->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
+
+            D3D12_RESOURCE_BARRIER toRead{};
+            toRead.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+            toRead.Transition.pResource = entry.resource.Get();
+            toRead.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
+            toRead.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
+            toRead.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+            commandList->ResourceBarrier(1, &toRead);
+            entry.initialized = true;
+            entry.metadata = frame.metadata;
+
+            if (recreate)
+            {
+                D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
+                srv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+                srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+                srv.Texture2D.MipLevels = 1;
+                impl.resources.GetDevice()->CreateShaderResourceView(
+                    entry.resource.Get(), &srv, entry.cpu);
+            }
+        }
+        return true;
+    }
+
 };
 
 ImGuiDx12Shell::ImGuiDx12Shell() : m_impl(new Impl()) {}
@@ -292,6 +477,11 @@ void ImGuiDx12Shell::NewFrame()
     else
     {
         impl.frameOpen = true;
+        if (!impl.UploadCpuFrames(impl.frameError))
+        {
+            impl.AbortCpuFrames();
+            std::printf("[ImGui] DX12 CPU 프레임 업로드 실패: %s\n", impl.frameError.c_str());
+        }
     }
     ImGui_ImplDX12_NewFrame();
 }
@@ -387,7 +577,10 @@ uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue)
 {
     Impl& impl = *m_impl;
     HANDLE sharedHandle = static_cast<HANDLE>(sharedHandleValue);
-    if (!impl.active || nullptr == sharedHandle) return 0;
+    if (!impl.active || !impl.frameOpen || nullptr == sharedHandle)
+    {
+        return 0;
+    }
 
     const auto found = impl.sharedTextures.find(sharedHandle);
     if (found != impl.sharedTextures.end())
@@ -415,16 +608,23 @@ uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue)
 }
 
 void ImGuiDx12Shell::SubmitCpuRgbaFrame(uint64_t key, uint32_t width,
-    uint32_t height, const void* rgba, uint32_t rowPitch)
+    uint32_t height, const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& metadata)
 {
     Impl& impl = *m_impl;
-    if (!impl.active || 0 == key || 0 == width || 0 == height || nullptr == rgba) return;
+    if (!impl.active || 0 == key || 0 == width || 0 == height || nullptr == rgba)
+    {
+        return;
+    }
     const uint32_t tightPitch = width * 4u;
-    if (rowPitch < tightPitch) return;
+    if (rowPitch < tightPitch)
+    {
+        return;
+    }
 
     Impl::CpuFrame frame{};
     frame.width = width;
     frame.height = height;
+    frame.metadata = metadata;
     frame.rgba.resize(static_cast<size_t>(tightPitch) * height);
     const auto* source = static_cast<const uint8_t*>(rgba);
     for (uint32_t y = 0; y < height; ++y)
@@ -437,29 +637,22 @@ void ImGuiDx12Shell::SubmitCpuRgbaFrame(uint64_t key, uint32_t width,
     impl.pendingCpuFrames[key] = std::move(frame);   // 최신 완성 프레임만 유지
 }
 
-uint64_t ImGuiDx12Shell::GetCpuFrameTextureId(uint64_t key)
+RHIDisplayTexture ImGuiDx12Shell::GetCpuFrameTexture(uint64_t key)
 {
     Impl& impl = *m_impl;
-    if (!impl.active || 0 == key) return 0;
-
-    const auto found = impl.cpuFrames.find(key);
-    if (found != impl.cpuFrames.end())
+    if (!impl.active || !impl.frameOpen || 0 == key)
     {
-        found->second.lastUsedFrame = impl.frameIndex;
-        return found->second.textureId;
+        return {};
     }
-
-    D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
-    D3D12_GPU_DESCRIPTOR_HANDLE gpu{};
-    if (!impl.AllocateSlot(cpu, gpu)) return impl.fallbackTextureId;
-    impl.WriteNullSrv(cpu);
-
-    Impl::CpuFrameEntry entry{};
-    entry.cpu = cpu;
-    entry.textureId = gpu.ptr;
+    const auto found = impl.cpuFrames.find(key);
+    if (found == impl.cpuFrames.end() || !found->second.initialized ||
+        0 == found->second.metadata.m_frameId)
+    {
+        return {};
+    }
+    auto& entry = found->second;
     entry.lastUsedFrame = impl.frameIndex;
-    impl.cpuFrames.emplace(key, std::move(entry));
-    return gpu.ptr;
+    return {entry.textureId, entry.width, entry.height, entry.metadata};
 }
 
 bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
@@ -474,134 +667,7 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
         return false;
     }
 
-    std::unordered_map<uint64_t, Impl::CpuFrame> cpuFrames;
-    {
-        std::lock_guard<std::mutex> lock(impl.cpuFrameMutex);
-        cpuFrames.swap(impl.pendingCpuFrames);
-    }
-
     auto* commandList = impl.resources.GetCommandList();
-
-    for (const auto& pending : cpuFrames)
-    {
-        auto found = impl.cpuFrames.find(pending.first);
-        if (found == impl.cpuFrames.end()) continue;   // 아직 ImGui가 슬롯을 요청하지 않음
-
-        Impl::CpuFrameEntry& entry = found->second;
-        const Impl::CpuFrame& frame = pending.second;
-        const bool recreate = !entry.resource || entry.width != frame.width ||
-            entry.height != frame.height;
-        if (recreate)
-        {
-            Impl::ComPtr<ID3D12Resource> replacement;
-            D3D12_HEAP_PROPERTIES heap{};
-            heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-            D3D12_RESOURCE_DESC desc{};
-            desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-            desc.Width = frame.width;
-            desc.Height = frame.height;
-            desc.DepthOrArraySize = 1;
-            desc.MipLevels = 1;
-            desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            desc.SampleDesc.Count = 1;
-            if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap,
-                D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&replacement))))
-            {
-                outError = "RHI CPU 프레임 표시 텍스처 생성 실패";
-                impl.resources.AbortFrame();
-                impl.frameOpen = false;
-                return false;
-            }
-            if (entry.resource)
-            {
-                D3D12_CPU_DESCRIPTOR_HANDLE newCpu{};
-                D3D12_GPU_DESCRIPTOR_HANDLE newGpu{};
-                if (!impl.AllocateSlot(newCpu, newGpu))
-                {
-                    outError = "RHI CPU 프레임 표시 SRV 슬롯 부족";
-                    impl.resources.AbortFrame();
-                    impl.frameOpen = false;
-                    return false;
-                }
-                impl.pendingFrameRetirements.push_back(
-                    Impl::RetiredDescriptor{ entry.textureId,
-                        std::move(entry.resource) });
-                entry.cpu = newCpu;
-                entry.textureId = newGpu.ptr;
-            }
-            entry.resource = std::move(replacement);
-            entry.width = frame.width;
-            entry.height = frame.height;
-            entry.initialized = false;
-        }
-
-        const uint32_t tightPitch = frame.width * 4u;
-        const uint32_t uploadPitch = (tightPitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u)
-            & ~(D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1u);
-        const uint64_t uploadBytes = static_cast<uint64_t>(uploadPitch) * frame.height;
-        const RHIBufferSlice upload = impl.resources.AllocateUpload(
-            RHIUploadRequest{ uploadBytes, RHIUploadUsage::TextureCopy,
-                D3D12_TEXTURE_DATA_PLACEMENT_ALIGNMENT });
-        if (!upload.IsWritable())
-        {
-            outError = "RHI CPU 프레임 표시 업로드 공간 부족";
-            impl.resources.AbortFrame();
-            impl.frameOpen = false;
-            return false;
-        }
-        for (uint32_t y = 0; y < frame.height; ++y)
-        {
-            std::memcpy(static_cast<uint8_t*>(upload.cpuAddress) +
-                    static_cast<size_t>(y) * uploadPitch,
-                frame.rgba.data() + static_cast<size_t>(y) * tightPitch, tightPitch);
-        }
-
-        if (entry.initialized)
-        {
-            D3D12_RESOURCE_BARRIER toCopy{};
-            toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            toCopy.Transition.pResource = entry.resource.Get();
-            toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-            toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
-            toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-            commandList->ResourceBarrier(1, &toCopy);
-        }
-
-        D3D12_TEXTURE_COPY_LOCATION source{};
-        source.pResource = impl.resources.Resolve(upload.buffer);
-        source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
-        source.PlacedFootprint.Offset = upload.offset;
-        source.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-        source.PlacedFootprint.Footprint.Width = frame.width;
-        source.PlacedFootprint.Footprint.Height = frame.height;
-        source.PlacedFootprint.Footprint.Depth = 1;
-        source.PlacedFootprint.Footprint.RowPitch = uploadPitch;
-        D3D12_TEXTURE_COPY_LOCATION destination{};
-        destination.pResource = entry.resource.Get();
-        destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
-        commandList->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
-
-        D3D12_RESOURCE_BARRIER toRead{};
-        toRead.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        toRead.Transition.pResource = entry.resource.Get();
-        toRead.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
-        toRead.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
-        toRead.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        commandList->ResourceBarrier(1, &toRead);
-        entry.initialized = true;
-
-        if (recreate)
-        {
-            D3D12_SHADER_RESOURCE_VIEW_DESC srv{};
-            srv.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-            srv.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-            srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-            srv.Texture2D.MipLevels = 1;
-            impl.resources.GetDevice()->CreateShaderResourceView(
-                entry.resource.Get(), &srv, entry.cpu);
-        }
-    }
 
     const uint32_t backBufferIndex = impl.resources.GetBackBufferIndex();
     ID3D12Resource* backBuffer = impl.resources.GetBackBuffer(backBufferIndex);
@@ -635,9 +701,12 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
 
     if (!impl.resources.EndFrame(outError))
     {
+        impl.resources.AbortFrame();
+        impl.AbortCpuFrames();
         impl.frameOpen = false;
         return false;
     }
+    impl.recordingCpuFrames.clear();
 
     const uint64_t completionValue = impl.resources.GetLastSignaledFenceValue();
     for (Impl::RetiredDescriptor& retired : impl.pendingFrameRetirements)
@@ -730,6 +799,7 @@ void ImGuiDx12Shell::Shutdown()
 
     impl.sharedTextures.clear();
     impl.cpuFrames.clear();
+    impl.recordingCpuFrames.clear();
     {
         std::lock_guard<std::mutex> lock(impl.cpuFrameMutex);
         impl.pendingCpuFrames.clear();

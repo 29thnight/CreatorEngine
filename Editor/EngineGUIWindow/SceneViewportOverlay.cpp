@@ -106,7 +106,8 @@ void editor::RequestSceneOverlayVisibility(SceneOverlayVisibility setting, bool 
 }
 
 void editor::SceneViewportOverlay::Draw(
-    EditorCameraRig& rig, GizmoRenderer* gizmos, const ViewportCanvas& canvas, float sceneFps)
+    EditorCameraRig& rig, GizmoRenderer* gizmos, const ViewportCanvas& canvas, float sceneFps,
+    const EnhancedLiveDisplayTexture& displayed)
 {
     using namespace scene_overlay_detail;
     {
@@ -333,14 +334,13 @@ void editor::SceneViewportOverlay::Draw(
             costs = EnhancedSceneRenderer::GetLiveDebugSnapshot();
             refresh = ImGui::GetTime();
         }
-        const auto displays = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
-        const auto& scene = displays.Get(EnhancedLiveDisplayTarget::Editor);
+        const auto& scene = displayed.frame;
         char label[224]{};
         char gpu[40] = "GPU unavailable";
         if (costs.lastGpuViewId == kEnhancedEditorViewId && costs.lastGpuSubmissionId && !costs.passTimings.empty())
             std::snprintf(gpu, sizeof(gpu), "GPU %.2f ms", costs.gpuMs);
         std::snprintf(label, sizeof(label), "%u x %u   %.1f FPS\nEnhanced / %s   %s\n%s",
-            scene.completedWidth, scene.completedHeight, sceneFps, displays.backend == EnhancedLiveBackend::Vulkan ? "Vulkan" : "DX12",
+            scene.completedWidth, scene.completedHeight, sceneFps, displayed.backend == EnhancedLiveBackend::Vulkan ? "Vulkan" : "DX12",
             scene.ready ? "ready" : "preparing", gpu);
         const ImVec2 textSize = ImGui::CalcTextSize(label);
         const float pad = ThemePixels(7.f);
