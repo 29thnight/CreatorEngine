@@ -1,5 +1,6 @@
 #include "DX12MeshCache.h"
 #include "DX12DeviceResources.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../Mesh.h"
 
 #include <array>
@@ -299,6 +300,7 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
     uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
     std::string& outError)
 {
+    ce::profile_scope profile{ ce::marker<"DX12MeshUpload">() };
     Entry empty{};
     // 히트 조회 — 핸들 진입점은 여기가 첫 조회이고, mesh 진입점은 선조회
     // miss 뒤라 중복 find 한 번이 업로드 경로에만 붙는다(업로드는 드물다).

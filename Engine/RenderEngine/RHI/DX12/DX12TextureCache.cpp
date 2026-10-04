@@ -1,5 +1,6 @@
 #include "DX12TextureCache.h"
 #include "DX12DeviceResources.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../Texture.h"
 
 // ★ <DirectXTex.h> 를 걷었다(축 A). 업로드가 받는 것이 중립 CPU 이미지가
@@ -300,6 +301,7 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     const wchar_t* debugName, DX12PersistentHeap::Allocation& outAllocation,
     Entry& outEntry, std::string& outError)
 {
+    ce::profile_scope profile{ ce::marker<"DX12TextureUpload">() };
     auto* device = m_resources->GetDevice();
     outEntry = {};
 

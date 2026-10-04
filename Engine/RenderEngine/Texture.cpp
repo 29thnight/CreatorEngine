@@ -4,6 +4,8 @@
 // Win32::ThrowIfFailed가 여기 있다. 유니티 빌드에서는 같은 블롭의 앞선
 // 파일이 공급했다.
 #include "DirectXHelper.h"
+#include "../EngineDiagnostics/ProfileScope.h"
+#include <optional>
 #include <DirectXTex.h>
 
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 이 using을 공급했다.
@@ -260,6 +262,7 @@ namespace
 	bool TextureDecodeImageBytes(std::span<const std::byte> bytes,
 		TexMetadata& metadata, ScratchImage& image, bool& outAlreadyFinal)
 	{
+		ce::profile_scope profile{ ce::marker<"Texture.Decode">() };
 		outAlreadyFinal = false;
 		if (bytes.empty()) return false;
 
@@ -347,6 +350,7 @@ std::shared_ptr<Texture> Texture::WithColorSpace(
 std::shared_ptr<Texture> Texture::WithMipChain(
     const std::shared_ptr<Texture>& source, std::string& outFailure)
 {
+    ce::profile_scope profile{ ce::marker<"Texture.MipChain">() };
     outFailure.clear();
     const auto fail = [&](std::string_view message) -> std::shared_ptr<Texture> {
         outFailure = message; return nullptr;
@@ -531,6 +535,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	TexMetadata metadata{};
 
     Benchmark banch3;
+    std::optional<ce::profile_scope> decodeProfile{ std::in_place, ce::marker<"Texture.Decode">() };
 	if (path.extension() == ".dds")
 	{
 		//load dds
@@ -577,11 +582,13 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 			)
 		);
 	}
-	if(isCompress)
+	decodeProfile.reset();
+	if (isCompress)
 	{
 		ScratchImage compressedImage{};
 		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
 		{
+			ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
 			DirectX::TexMetadata tempMetadata = metadata;
 
 			// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨)
@@ -606,7 +613,10 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	// 만들지 않는다(픽셀 없는 Texture는 캐시에서 흰색으로 나온다).
 	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
 	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = !image.IsAlphaAllOpaque();
+	const bool hasAlpha = [&image] {
+		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
+		return !image.IsAlphaAllOpaque();
+	}();
 
 	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
@@ -645,6 +655,7 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 	TexMetadata metadata{};
 
 	Benchmark banch3;
+	std::optional<ce::profile_scope> decodeProfile{ std::in_place, ce::marker<"Texture.Decode">() };
 	if (path.extension() == ".dds")
 	{
 		//load dds
@@ -692,11 +703,13 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 		);
 	}
 
+	decodeProfile.reset();
 	if (isCompress)
 	{
 		ScratchImage compressedImage{};
 		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
 		{
+			ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
 			DirectX::TexMetadata tempMetadata = metadata;
 
 			// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨)
@@ -728,7 +741,10 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 	const float imageHeight = float(image.GetMetadata().height);
 	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
 	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = !image.IsAlphaAllOpaque();
+	const bool hasAlpha = [&image] {
+		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
+		return !image.IsAlphaAllOpaque();
+	}();
 
 	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
@@ -759,6 +775,7 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 
 	if (isCompress && !alreadyFinal && !IsCompressed(metadata.format))
 	{
+		ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
 		ScratchImage compressedImage{};
 		// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨) — LoadSharedFromPath 와 같은 정책.
 		if (SUCCEEDED(DirectX::Compress(image.GetImages(), image.GetImageCount(),
@@ -775,7 +792,10 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 	const float imageHeight = float(image.GetMetadata().height);
 	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
 	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = !image.IsAlphaAllOpaque();
+	const bool hasAlpha = [&image] {
+		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
+		return !image.IsAlphaAllOpaque();
+	}();
 
 	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
@@ -812,6 +832,7 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 	TexMetadata metadata{};
 
 	Benchmark banch3;
+	std::optional<ce::profile_scope> decodeProfile{ std::in_place, ce::marker<"Texture.Decode">() };
 	if (path.extension() == ".dds")
 	{
 		//load dds
@@ -859,11 +880,13 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 		);
 	}
 
+	decodeProfile.reset();
 	if (isCompress)
 	{
 		ScratchImage compressedImage{};
 		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
 		{
+			ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
 			DirectX::TexMetadata tempMetadata = metadata;
 
 			// DXGI_FORMAT_BC1_UNORM (== DXT1)
@@ -886,7 +909,10 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 
 	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
 	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = !image.IsAlphaAllOpaque();
+	const bool hasAlpha = [&image] {
+		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
+		return !image.IsAlphaAllOpaque();
+	}();
 
 	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;

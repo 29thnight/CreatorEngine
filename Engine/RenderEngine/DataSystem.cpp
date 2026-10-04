@@ -8,6 +8,7 @@
 #include "MaterialGraphSceneCompiler.h"
 #include "Mesh.h"
 #include "Texture.h"
+#include "../EngineDiagnostics/ProfileScope.h"
 #include <fstream> // I7-C1: manifest 읽기
 #include <unordered_set>
 #include <future>
@@ -40,6 +41,7 @@
 #include <chrono>
 #include <istream>
 #include <limits>
+#include <optional>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -412,6 +414,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(FileGu
 assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGeneration(
 	FileGuid guid, bool allowEditorRecovery)
 {
+	ce::profile_scope profile{ ce::marker<"Asset.ModelGeneration">() };
 	// MBC11 — cooked catalog가 마운트돼 있고 이 모델의 generation 레코드가 신선하면
 	// 그 레코드(Derived/Models/xx/<id>/<gen>/generation.asset)를 읽는다. Player는 이
 	// 경로뿐이고 Editor는 마운트 없이 Library(저작 정본)를 읽는다. 어느 쪽도 실패하면
@@ -578,6 +581,7 @@ std::shared_ptr<Texture> DataSystem::ResolveModelGenerationTexture(
 		}
 	}
 
+	ce::profile_scope profile{ ce::marker<"Asset.GenerationTextureImage">() };
 	std::string error;
 	TextureImage image = BuildGenerationCpuImage(*texture, error);
 	std::shared_ptr<Texture> owner = image.IsValid()
@@ -901,6 +905,7 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
 bool DataSystem::DeserializeMaterialPayload(Material& material,
 	const Authoring::NodeView& view)
 {
+	ce::profile_scope profile{ ce::marker<"Asset.MaterialPayload">() };
 	return DeserializeMaterialPayload(material, view, nullptr);
 }
 
@@ -1006,9 +1011,12 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view input,
 bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, material_graph::CookedProgram& result,
                               std::string& error)
 {
+    ce::profile_scope profile{ ce::marker<"Material.CompileAuthoring">() };
     error.clear();
     std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"Material.GenerateSlang">() };
     const auto program = LX::GenerateMaterialSlang(asset, &diagnostics);
+    step.reset();
     if (!program)
     {
         for (const auto& diagnostic : diagnostics)
@@ -1027,8 +1035,11 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
         return false;
     }
     std::string cacheError;
+    step.emplace(ce::marker<"Material.CacheInput">());
     const std::string cacheInput = MaterialGraphCacheInput(*program, shaderDirectory, cacheError);
     const auto cachePath = file::path(source.string() + ".scene-cache");
+    step.reset();
+    step.emplace(ce::marker<"Material.CacheRead">());
     if (!cacheInput.empty() && ReadMaterialGraphCache(cachePath, cacheInput, result) &&
         result.product.program.slang == program->slang &&
         result.metadata == LX::WriteMaterialProgramMetadata(*program) &&
@@ -1037,6 +1048,8 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     {
         return true;
     }
+    step.reset();
+    step.emplace(ce::marker<"Material.CompileSceneProduct">());
     if (!material_graph::CompileSceneProduct(*program, shaderDirectory, source, {},
                                              result.product, error, guid))
     {
@@ -1044,6 +1057,8 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     }
     result.metadata = LX::WriteMaterialProgramMetadata(result.product.program);
     result.boundSource = material_graph::BuildBoundSource(result.product.program);
+    step.reset();
+    step.emplace(ce::marker<"Material.CacheWrite">());
     if (!cacheInput.empty()) WriteMaterialGraphCache(cachePath, cacheInput, result.product);
     return true;
 }
@@ -1053,6 +1068,7 @@ std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphG
                                                                                           std::string& error,
                                                                                           bool reload)
 {
+    ce::profile_scope profile{ ce::marker<"Material.GraphGeneration">() };
     const experiment::AssetId id{guid.m_guid};
     return m_materialGraphGenerations.Load(
         id,
@@ -1072,6 +1088,7 @@ std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphG
                     failure = "LX graph GUID does not resolve to its authoring source.";
                     return false;
                 }
+                ce::profile_scope sourceProfile{ ce::marker<"Material.GraphSourceLoad">() };
                 source = LX::LXMaterialAsset::Load(sourcePath, LX::CreateMaterialDefinitions(), &failure);
                 if (!source)
                     return false;
@@ -1445,6 +1462,7 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 
 void DataSystem::FinalizeMaterialRuntime(Material& material)
 {
+	ce::profile_scope profile{ ce::marker<"Asset.MaterialFinalize">() };
     // Scene binding finalizes cloned materials too. An LX snapshot is already
     // complete and must not be erased by the legacy ShaderMeta finalizer.
     if (material.HasMaterialGraph())
@@ -1591,6 +1609,7 @@ Material* DataSystem::LoadMaterial(std::string_view name)
 std::shared_ptr<const experiment::Material> DataSystem::LoadAuthoredMaterialShared(
 	FileGuid assetGuid)
 {
+	ce::profile_scope profile{ ce::marker<"Asset.AuthoredMaterial">() };
 	if (FileGuid{} == assetGuid) return nullptr;
 	{
 		std::lock_guard<std::mutex> guard(m_authoredMaterialMutex);
@@ -1691,7 +1710,11 @@ std::shared_ptr<Texture> DataSystem::LoadSharedTexture(std::string_view filePath
 			return found->second;
 	}
 
-	std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(assetPath.string());
+	std::shared_ptr<Texture> texture;
+	{
+		ce::profile_scope profile{ ce::marker<"Asset.Texture">() };
+		texture = Texture::LoadSharedFromPath(assetPath.string());
+	}
 	if (!texture)
 	{
 		Debug::PrintLog(spdlog::level::err, "DataSystem::LoadSharedTexture : texture file not found: " + assetPath.string());
@@ -1745,6 +1768,7 @@ std::shared_ptr<Texture> DataSystem::LoadSharedMaterialTexture(std::string_view 
 	//   새어 FinalizeMaterialRuntime → DeserializeMaterialPayload 를 뚫었다 — 텍스처
 	//   GUID 하나가 엉뚱한 자산(.shadermeta)을 가리키면 재질 복원 전체가 예외로
 	//   끊겼다. 없는 파일과 같은 자리에서 거절한다.
+	ce::profile_scope profile{ ce::marker<"Asset.MaterialTexture">() };
 	std::shared_ptr<Texture> loaded;
 	try
 	{
@@ -2164,6 +2188,7 @@ job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
 
 		jobs.add([&data, type, name, completed]
 		{
+			ce::profile_scope profile{ ce::marker<"Asset.BundleJob">() };
 			switch (type)
 			{
 			case ManagedAssetType::Model:
@@ -2194,6 +2219,7 @@ job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
 AssetBundleLoadResult DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 {
     auto completed = std::make_shared<std::atomic<std::size_t>>(0);
+    ce::profile_scope profile{ ce::marker<"Asset.BundleWait">() };
     ce::get_job_scheduler().submit(MakeAssetBundleJobs(*this, bundle, completed)).wait();
     return {bundle.assets.size(), completed->load(std::memory_order_acquire)};
 }

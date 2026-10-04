@@ -2,6 +2,8 @@
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "ReflectionYml.h"
 #include "DataSystem.h"
+#include "ProfileScope.h"
+#include <optional>
 #include "Entity.h"
 #include "Material.h"
 #include "SceneManager.h"
@@ -371,6 +373,8 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
     // Graph textures may be embedded in this model. Publish the immutable
     // model owner before resolving an inline graph instance's texture GUIDs.
     if (m_modelGuid != FileGuid{}) DataSystems->LoadModelAssetGeneration(m_modelGuid);
+    // 재질 해석 → 모델 묶기 단계를 캡처에 가른다.
+    std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"MeshRenderer.Material">() };
 	// typed 역직렬화가 m_Material의 소유 인스턴스를 이미 만들었다. 예전 경로는
 	// 이름으로 cache material을 꺼낸 뒤 scene snapshot을 그 공유 객체에 다시
 	// Deserialize해 다른 renderer까지 바꿨다. snapshot 소유권은 유지하고 runtime
@@ -470,6 +474,8 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	{
 		m_modelGuid = m_Material->m_fileGuid;
 	}
+	step.reset();
+	step.emplace(ce::marker<"MeshRenderer.BindModel">());
 	const std::shared_ptr<const assets::ModelAssetGeneration> generation =
 		DataSystems->LoadModelAssetGeneration(m_modelGuid);
 

@@ -1,5 +1,6 @@
 #include "ComponentFactory.h"
 #include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
+#include "ProfileScope.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "LifecycleRegistry.h"
 #include "Entity.h"
@@ -137,6 +138,9 @@ void ComponentFactory::LoadComponent(Entity* obj, const Authoring::NodeView& vie
             + obj->GetHashedName().ToString() + "\"");
         return;
     }
+    // 컴포넌트 종류별로 적재 시간을 가른다. 이름이 실행 중에만 정해지므로 등록 표를 쓴다.
+    ce::profile_scope componentProfile{ ce::intern_runtime_marker(
+        std::string("Component.").append(componentType->name()), ce::marker_kind::cpu_scope) };
 
     // ScriptComponent만 한 오브젝트에 여럿 붙을 수 있다.
     //

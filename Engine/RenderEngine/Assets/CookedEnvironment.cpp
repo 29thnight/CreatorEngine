@@ -1,6 +1,7 @@
 #include "CookedEnvironment.h"
 #include "../RHI/DX12/EnhancedIBLGenerator.h"
 #include "../Experiment/Cooked/CookedAssetManifest.h"
+#include "../../EngineDiagnostics/ProfileScope.h"
 #include <algorithm>
 #include <fstream>
 #include <set>
@@ -169,6 +170,7 @@ bool BuildEnvironmentImportance(CookedEnvironment& value, std::string& error)
 
 bool EnvironmentSourceIdentity(const std::filesystem::path& source, Hash::Sha256Digest& result, std::string& error)
 {
+    ce::profile_scope profile{ ce::marker<"Environment.SourceIdentity">() };
     std::ifstream input(source, std::ios::binary);
     if (!input) return EnvironmentError(error, "Environment source missing: " + source.string());
     Hash::Sha256 hash;
@@ -181,6 +183,7 @@ bool EnvironmentSourceIdentity(const std::filesystem::path& source, Hash::Sha256
 bool EnvironmentRecipeIdentity(const std::filesystem::path& shaders, uint32_t cubeSize,
     uint32_t brdfSize, Hash::Sha256Digest& result, std::string& error)
 {
+    ce::profile_scope profile{ ce::marker<"Environment.RecipeIdentity">() };
     if (!EnvironmentSizes(cubeSize, brdfSize)) return EnvironmentError(error, "Invalid environment cook sizes");
     constexpr const char* stages[]{"IblFace.slang", "IblFullscreen.slang", "IblRectToCube.slang",
         "IblSourceCopy.slang", "IblCubeDownsample.slang", "IblIrradiance.slang", "IblPrefilter.slang", "IblBrdf.slang",
@@ -210,6 +213,7 @@ std::string EnvironmentCacheName(const EnvironmentIdentity& identity)
 bool ReadCookedEnvironment(const std::filesystem::path& file, CookedEnvironment& result,
     std::string& error, const EnvironmentIdentity* expected)
 {
+    ce::profile_scope profile{ ce::marker<"Environment.ReadCooked">() };
     std::ifstream input(file, std::ios::binary | std::ios::ate);
     if (!input) return EnvironmentError(error, "Cooked environment missing: " + file.string());
     const auto size = input.tellg();
@@ -226,7 +230,7 @@ bool ReadCookedEnvironment(const std::filesystem::path& file, CookedEnvironment&
     const bool denseProposal = std::memcmp(magic.data(), kEnvironmentMagic, 8) == 0;
     const bool hasSource = denseProposal || std::memcmp(magic.data(), kEnvironmentSourceMagic, 8) == 0;
     if (!input || (!halfRadiance && !hasSource && std::memcmp(magic.data(), kEnvironmentFloatMagic, 8) != 0) ||
-        !experiment::cooked::ComputeSha256(body, actual, error) || actual != digest)
+        ![&] { ce::profile_scope shaProfile{ ce::marker<"Environment.Sha">() }; return experiment::cooked::ComputeSha256(body, actual, error); }() || actual != digest)
         return EnvironmentError(error, "Cooked environment signature/checksum differs");
     CookedEnvironment candidate;
     std::memcpy(&candidate.cubeSize, body.data(), 4); std::memcpy(&candidate.brdfSize, body.data()+4, 4);

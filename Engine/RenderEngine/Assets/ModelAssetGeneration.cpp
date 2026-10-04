@@ -9,12 +9,14 @@
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/ModelLoader.h"
 #include "../Texture.h"
+#include "../../EngineDiagnostics/ProfileScope.h"
 #include "../Interfaces/AssetAuthoringPort.h"
 
 #include <algorithm>
 #include <array>
 #include <fstream>
 #include <limits>
+#include <optional>
 #include <ranges>
 #include <set>
 #include <string_view>
@@ -588,6 +590,11 @@ namespace assets
         const ModelAssetGenerationLoadRequest& request)
     {
         ModelAssetGenerationLoadResult result;
+        ce::profile_scope profile{ ce::marker<"ModelGen.Load">() };
+        // markPhase 와 같은 경계로 캡처에도 남긴다. 다음 단계를 열기 전에 앞 단계를
+        // 닫으므로 이른 반환에서도 짝이 맞는다.
+        std::optional<ce::profile_scope> phaseProfile;
+        phaseProfile.emplace(ce::marker<"ModelGen.Identity">());
         auto phaseClock = std::chrono::steady_clock::now();
         const auto markPhase = [&result, &phaseClock](const char* phase)
             {
@@ -706,6 +713,8 @@ namespace assets
         }
 
         markPhase("identity+sidecar");
+        phaseProfile.reset();
+        phaseProfile.emplace(ce::marker<"ModelGen.CemcRead">());
         std::vector<std::byte> cookedBytes;
         if (!ReadBytes(generationPath / record.modelArtifactPath, cookedBytes)
             || cookedBytes.empty())
@@ -718,6 +727,8 @@ namespace assets
         //   `.asset` 읽기인데 legacy는 artifact를 해시하지 않았다 — 한 칸에 묶어
         //   두면 "축이 다르다"는 말을 수치로 보일 수 없다.
         markPhase("cemc-read");
+        phaseProfile.reset();
+        phaseProfile.emplace(ce::marker<"ModelGen.CemcSha">());
         if (record.modelArtifactFingerprint != Fingerprint(cookedBytes))
         {
             AddIssue(result, ModelAssetGenerationIssueCode::FingerprintMismatch,
@@ -726,6 +737,8 @@ namespace assets
         }
 
         markPhase("cemc-sha");
+        phaseProfile.reset();
+        phaseProfile.emplace(ce::marker<"ModelGen.CemcDecode">());
         experiment::ModelDraft draft;
         std::vector<experiment::ModelLoadIssue> cookedIssues;
         if (!ck::Read(cookedBytes, draft, cookedIssues))
@@ -750,6 +763,8 @@ namespace assets
         }
 
         markPhase("cemc-decode+validate");
+        phaseProfile.reset();
+        phaseProfile.emplace(ce::marker<"ModelGen.Build">());
         const auto meshRecords = RecordsOf(sidecar, SubAssetKind::Mesh);
         const auto materialRecords = RecordsOf(sidecar, SubAssetKind::Material);
         const auto textureRecords = RecordsOf(sidecar, SubAssetKind::Texture);
@@ -942,6 +957,8 @@ namespace assets
 
         std::vector<ModelTextureAsset> textures;
         markPhase("materials+meshes+skeleton");
+        phaseProfile.reset();
+        phaseProfile.emplace(ce::marker<"ModelGen.Textures">());
         textures.reserve(textureRecords.size());
         for (const ModelSubAssetRecord* textureRecord : textureRecords)
         {
@@ -955,6 +972,8 @@ namespace assets
                 return result;
             }
             std::vector<std::byte> encoded;
+            std::optional<ce::profile_scope> textureStep;
+            textureStep.emplace(ce::marker<"ModelGen.TextureRead">());
             if (!ReadBytes(generationPath / generationRecord->artifactPath, encoded)
                 || encoded.empty())
             {
@@ -963,6 +982,8 @@ namespace assets
                     "embedded texture artifact를 읽지 못했다.");
                 return result;
             }
+            textureStep.reset();
+            textureStep.emplace(ce::marker<"ModelGen.TextureSha">());
             if (Fingerprint(encoded) != generationRecord->artifactFingerprint)
             {
                 AddIssue(result, ModelAssetGenerationIssueCode::FingerprintMismatch,
@@ -986,19 +1007,30 @@ namespace assets
                     (Uuid::ToString(texture.textureId) + "-" + digest +
                      (colorSpace == ModelTextureColorSpace::Srgb ? "-srgb.ceim" : "-linear.ceim"));
             }
+            textureStep.reset();
+            textureStep.emplace(ce::marker<"ModelGen.TextureCacheRead">());
             const bool cached = !decodedCache.empty() && ReadDecodedTextureCache(decodedCache, colorSpace, texture);
+            textureStep.reset();
+            if (!cached) textureStep.emplace(ce::marker<"ModelGen.TextureDecode">());
             if (!cached && !CopyTexturePixels(encoded, colorSpace, texture, failure))
             {
                 AddIssue(result, ModelAssetGenerationIssueCode::TextureDecodeFailed,
                     "textures." + textureRecord->stableKey, failure);
                 return result;
             }
-            if (!cached && !decodedCache.empty()) PublishDecodedTextureCache(decodedCache, texture);
+            textureStep.reset();
+            if (!cached && !decodedCache.empty())
+            {
+                ce::profile_scope publish{ ce::marker<"ModelGen.TextureCachePublish">() };
+                PublishDecodedTextureCache(decodedCache, texture);
+            }
             textures.push_back(std::move(texture));
         }
 
         std::vector<ModelGpuUploadDescriptor> descriptors;
         markPhase("textures-read+sha+decode");
+        phaseProfile.reset();
+        phaseProfile.emplace(ce::marker<"ModelGen.Descriptors">());
         descriptors.reserve(meshes.size() * 2u + textures.size());
         for (std::size_t index = 0; index < meshes.size(); ++index)
         {
@@ -1043,6 +1075,7 @@ namespace assets
         }
 
         markPhase("assemble");
+        phaseProfile.reset();
         result.generation = ModelAssetGeneration::Shared(
             new ModelAssetGeneration(std::move(identity),
                 std::move(draft.metadata.name),

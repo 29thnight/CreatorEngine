@@ -713,6 +713,7 @@ Scene* SceneManager::SaveScene(std::string_view name)
 
 Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 {
+    ce::profile_scope profile{ ce::marker<"SceneLoad">() };
     DrainSceneLoads();
 	// D0(SerializationPlan): 이 함수 전체가 "씬 전환 1회"를 재는 자다. 하위 단계
 	// 합과 이 값의 차이가 곧 미귀속분이고, 그 차이를 숨기지 않는 것이 이 계측의 요점이다.
@@ -724,6 +725,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         Authoring::ParsedDocument sceneDocument;
         {
             // D0: 텍스트 → Node 트리 구축 구간만 따로 뗀다.
+            ce::profile_scope parseProfile{ ce::marker<"SceneLoad.Parse">() };
             SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneParse);
             sceneDocument = ParseSceneDocument(loadSceneName);
         }
@@ -794,6 +796,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
                                 }
                             }
                         }
+                        ce::profile_scope bundleProfile{ ce::marker<"SceneLoad.AssetBundle">() };
                         DataSystems->LoadAssetBundle(*assetBundle);
                     }
                 }
@@ -814,6 +817,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		[[maybe_unused]] auto hierarchyTransaction =
 			m_activeScene.load()->BeginHierarchyBulkBuild();
 
+        ce::profile_scope entitiesProfile{ ce::marker<"SceneLoad.Entities">() };
         for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
         {
             try
@@ -888,6 +892,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
 Scene* SceneManager::LoadScene(std::string_view name)
 {
+    // 장면 열기 전체. 하위 표지 합과의 차이가 미귀속분이다.
+    ce::profile_scope profile{ ce::marker<"SceneLoad">() };
     DrainSceneLoads();
     std::string loadSceneName = name.data();
     Scene* scene{ nullptr };
@@ -896,6 +902,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
     {
         Authoring::ParsedDocument sceneDocument;
         {
+            ce::profile_scope parseProfile{ ce::marker<"SceneLoad.Parse">() };
             // D0: 텍스트 → Node 트리 구축 구간만 따로 뗀다.
             SERIALIZATION_PROFILE_SCOPE(SerializationProfile::Stage::SceneParse);
             sceneDocument = ParseSceneDocument(loadSceneName);
@@ -912,6 +919,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
             }
             else
             {
+                ce::profile_scope bundleProfile{ ce::marker<"SceneLoad.AssetBundle">() };
                 Meta::Deserialize(&scene->m_requiredLoadAssetsBundle, assetsBundleNode);
                 DataSystems->LoadAssetBundle(scene->m_requiredLoadAssetsBundle);
             }
@@ -928,6 +936,9 @@ Scene* SceneManager::LoadScene(std::string_view name)
 		[[maybe_unused]] auto ddolHierarchyTransaction =
 			m_activeScene.load()->BeginHierarchyBulkBuild();
 
+        {
+        // 컴포넌트 적재가 모델·텍스처 읽기를 부르므로 그 하위 표지가 이 안에 쌓인다.
+        ce::profile_scope entitiesProfile{ ce::marker<"SceneLoad.Entities">() };
         for (const Authoring::ReadNode objNode : SerializedEntities(sceneNode))
         {
             const reflgen::type_descriptor* type = Meta::ExtractTypeFromYAML(objNode);
@@ -951,7 +962,9 @@ Scene* SceneManager::LoadScene(std::string_view name)
             }
             DesirealizeDontDestroyOnLoadObjects(m_activeScene.load(), type, Authoring::NodeViewAccess::Make(objNode), &ddolBatch);
         }
+        }
 
+        ce::profile_scope finalizeProfile{ ce::marker<"SceneLoad.Finalize">() };
         RemapLoadBatchIndices(scene, sceneBatch);
         RemapLoadBatchIndices(m_activeScene.load(), ddolBatch);
 
@@ -1036,6 +1049,7 @@ std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool aut
         // enqueue the asset batch and return; never wait inside this callback.
         load->m_preparation = ce::get_job_scheduler().submit([load]
         {
+            ce::profile_scope parseProfile{ ce::marker<"SceneLoad.Parse">() };
             load->m_document = ParseSceneDocument(load->m_path);
             const auto bundleNode = load->m_document.Root()["m_requiredLoadAssetsBundle"];
             if (bundleNode && !bundleNode.IsNull())
@@ -1212,6 +1226,7 @@ void SceneManager::BeforeAwakeSceneLoad()
             return;
         }
 
+        ce::profile_scope activateProfile{ ce::marker<"SceneActivate">() };
         Benchmark debugTimer;
         Scene* oldScene{};
         if (m_activeScene.load())
@@ -1783,6 +1798,7 @@ bool SceneManager::ResumePhysicsAfterSceneActivation()
 
 void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch, bool strict)
 {
+	ce::profile_scope entityProfile{ ce::marker<"SceneLoad.Entity">() };
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (Meta::TypeIDOf(*type) == type_guid(Entity))
     {
@@ -1879,6 +1895,7 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
 
 void SceneManager::DesirealizeGameObject(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
+	ce::profile_scope entityProfile{ ce::marker<"SceneLoad.Entity">() };
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (Meta::TypeIDOf(*type) == type_guid(Entity))
     {

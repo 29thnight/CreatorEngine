@@ -1,4 +1,5 @@
 #include "EnhancedIBLGenerator.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../RHIEncoder.h"
 
 #include <cstring>
@@ -550,6 +551,7 @@ void EnhancedIBLGenerator::ReleaseTargets()
 bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
     assets::CookedEnvironment value, std::string& error)
 {
+    ce::profile_scope profile{ ce::marker<"Environment.InstallCooked">() };
     if (!m_resources || m_resources != context.resources || !context.textureCache || m_generation == UINT64_MAX)
     { error = "Cooked environment context is invalid"; return false; }
     ReleaseTargets();
