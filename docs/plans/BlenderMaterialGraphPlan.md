@@ -35,7 +35,7 @@ PHASE 4가 현재 glTF PBR 배선을 안정화한 뒤 시작한다. RenderGraph�
 | 모델 기본 graph·Inspector override·preview·비용/실패 안내 | 구현 기반 완료. 공통 소비에 재연결할 대상 | MAT-8 |
 | Graph→`.shadermeta`+`.slang`→공통 재질 소비 | **MAT-7 완료. 생성·공통 값/바인딩·LXMC v4·graphics/compute owner·Code/Graph alpha/SSS/transmission/Volume 공통 Forward+ 정렬·합성 및 DX12 Debug/Release 제품 편집/복구·cooked Player 회귀 완료. 지원 한계와 품질/비용 수용은 별도** | MAT-7 |
 | annotation/Reroute 삽입 문서 계약·그룹/Blackboard 제품 패널·전체 조작·HTTP host 수명 | 이미 구현된 Core·Editor/HTTP 연결과 분리해 잔여만 마감 | LX-1/3/3H |
-| 전체 Blender 품질·route parity·실제 모델 성능 | 진행 중. 부분 fixture 통과를 전체 수용으로 확대하지 않음 | MAT-9 |
+| 전체 Blender 품질·route parity·실제 모델 성능 | 진행 중. 2026-10-04부터 살아 있는 화면은 split-sum 근사이며, Blender 대비 차이를 %로 표기하고 넘어간다(아래 10-04 결정) | MAT-9 |
 
 ### MAT-7 통합 순서와 완료 게이트
 
@@ -941,6 +941,43 @@ MAT-9 progress·32/34일 유지, 새 완료/공수 행을 추가하지 않는다
 [통합 체크포인트](../analysis/MAT9IntegrationCheckpoint20261001.md),
 [후속 선행 그래프](RenderPhaseRoadmap.md), [GPU 기능 계획](GpuFeaturePlanningPlan.md)을 따른다.
 
+### 2026-10-04 살아 있는 화면의 split-sum 전환·Blender 차이 % 표기 결정
+
+10-01 결정은 제품 IBL을 BRDF 1024 / environment 4096으로 구워 Blender 정확도를 가져오는 것이었다.
+실제 사용에서 그 굽기가 프레임을 무너뜨렸다. 카메라 회전·애니메이션이면 같은 화면 좌표의
+입력 bit equality가 거의 모든 픽셀에서 깨져, 사용자 Debug 캡처의 `LX.Scene.LookupBake`가
+GPU 37ms(중앙값)~1.52s(최대)였고 Scene 이미지가 약 1.5초 멈췄다. 셰이더는 빌드 구성과 무관하게
+`-O3`라 Release로도 줄지 않는다. 중간 단계로 넣었던 점진 정제(움직일 때 64/16/256 근사, 멈추면
+1024/4096으로 수렴, `cb4e0d38`)도 근사 표본의 고정 비용 때문에 넓게 덮이면 여전히 비쌌다.
+
+사용자 결정으로 다음과 같이 바꾼다(PR #117, `23a393cb`).
+
+- **살아 있는 화면은 split-sum 근사만 쓴다.** 바뀐 픽셀은 해석적 DFG(EnvBRDFApprox, 기존 Fresnel
+  모델의 F0/F90)와 irradiance·prefiltered cube로 한 번에 굽고, 입력이 그대로인 픽셀은 재사용한다.
+  정지해도 1024/4096으로 수렴하지 않는다. 회전 캡처에서 LookupBake p99 330ms→5.5ms, 표시 이미지
+  지연 163→3 입력 표본.
+- **기준 적분은 검사·오프라인 경로에 남긴다.** `SceneHostBudget::lookupApproximate = false`가
+  BRDF 1024 / environment 4096 경로이고, 위 MAT-9 대조 기록들의 수치는 그 경로의 결과로 보존한다.
+- **Blender 대조의 판정 방식을 바꾼다.** 살아 있는 화면(근사 경로)에 대해 RMS≤1%·p95≤1%·max≤5%를
+  통과 조건으로 두지 않는다. 대신 같은 fixture·입력·target으로 **근사 경로와 Blender의 차이를 재질·
+  조명 조건별 %(RMS·p95·max)로 표기하고 넘어간다.** 기준 경로의 수치와 나란히 적어 근사가 얼마를
+  잃는지 보이게 한다. 차이가 크다는 이유로 이 단계를 막지 않는다.
+- 첫 표기(같은 소스·Release DX12·고정 target, 두 경로 동시 측정). 근사 경로 수치를 기준 경로의
+  통과 결과로 옮겨 적지 않는다.
+
+  | 묶음 | 조건 | 기준 RMS 평균 / 최대 | 근사 RMS 평균 / 최대 | 근사에서 큰 차이 |
+  |---|---:|---:|---:|---|
+  | 평행광·균일 환경 | 24 | 0.08 / 0.18% | 1.94 / 14.27% | 박막 14.27·이방성 13.96·금속 9.45% (평행광 12조건은 차이 0) |
+  | HDRI forest·autumn | 26 | 0.30 / 0.50% | 8.97 / 60.42% | 이방성 31.15~60.42·금속 24.69~27.61·박막 15.88~21.20% |
+  | 특수 부피 | 8 | 0.07 / 0.10% | 0.07 / 0.10% | 차이 없음(룩업 미사용) |
+  | 특수 표면 SSS·유리 | 18 | 측정 불가 | 측정 불가 | 기준 경로도 유리 장에서 캐시 게시 거부, 별도 결함 |
+
+  환경광을 받는 거친 유전체는 1~3%대다. 큰 차이는 split-sum 이 표현하지 못하는 이방성 로브,
+  해석적 DFG 에 없는 박막 간섭, HDRI 에서 단일 prefiltered 조회로 대신하는 금속 반사에서 나온다.
+  조건별 수치·도구 수정·재현은 [MAT9SplitSumLiveLookupDifference](../analysis/MAT9SplitSumLiveLookupDifference.md)가 소유한다.
+- SSS·투과·alpha+transmission·texture/normal-map·route parity·area-light 잔여는 이 결정과 별개로
+  그대로 남는다. MAT-9 progress·32/34일 유지, 새 완료/공수 행은 없다.
+
 </details>
 
 ## 6. 완료 기준
@@ -952,7 +989,9 @@ MAT-9 progress·32/34일 유지, 새 완료/공수 행을 추가하지 않는다
   default, color-space intent와 subgraph가 보존된다.
 - LX-0 대응표에서 지원으로 표시한 Blender 노드의 소켓 이름·순서·기본값·표시 조건과 내부 컨트롤, 접힘·연결·그룹 조작이 독립 예제와 Editor 제품 경로에서 확인된다.
 - unknown node와 schema migration 실패는 graph와 마지막 정상 compiled generation을 보존한다.
-- Blender reference의 core·layered·special material grid가 pre-tone linear HDR 허용 오차를 통과한다.
+- Blender reference의 core·layered·special material grid가 기준 적분 경로(`lookupApproximate = false`)에서
+  pre-tone linear HDR 허용 오차를 통과한다. 살아 있는 화면의 split-sum 근사 경로는 같은 grid의 차이를
+  재질·조명 조건별 %로 표기한다(통과 조건 아님, 2026-10-04 결정).
 - 같은 지원 feature의 Deferred/Forward+ route 교차 비교가 허용 오차를 통과한다.
 - constant-only emission, texture-only input, mixed factor×texture, alpha와 transmission 조합을
   독립 fixture로 판정한다.

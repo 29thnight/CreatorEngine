@@ -265,6 +265,11 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     const bool forceRebake=std::getenv("CREATOR_MAT9_TIMING_REBAKE")!=nullptr;
     const bool disableMis=std::getenv("CREATOR_MAT9_DISABLE_MIS")!=nullptr;
     if(disableMis) std::ofstream(output/"mis-disabled.txt")<<"Diagnostic baseline; not product acceptance.\n";
+    // Live-view lookup path (split-sum approximation). The images report how far
+    // the live view sits from Blender; they are not reference-path acceptance.
+    material_graph::SceneHostBudget lookupBudget{};
+    lookupBudget.lookupApproximate=std::getenv("CREATOR_MAT9_LOOKUP_APPROXIMATE")!=nullptr;
+    if(lookupBudget.lookupApproximate) std::ofstream(output/"lookup-approximate.txt")<<"Live split-sum lookup; difference report, not reference acceptance.\n";
     std::ofstream timing(output/"timing.csv");
     timing << "case,repeat,program_prepare_ms,frame_prepare_ms,gpu_frame_ms\n";
     std::ofstream passTiming(output/"pass-timing.csv");
@@ -341,21 +346,13 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
                   "Matched pass GPU timers");
         }
         const auto prepareStart=std::chrono::steady_clock::now();
-        if (frame == 1)
-        {
-            auto blendedDraw = geometry.draw;
-            blendedDraw.coverage.flags |= EnhancedMaterialCoverage::Blended;
-            std::shared_ptr<const SceneViewInput> blended;
-            Check(SceneViewInput::Seal(view, {&blendedDraw, 1}, {}, blended, error),
-                  "Matched blended queue classification");
-            Check(!host.Prepare(context, blended, {}, {}, {}, {}, {}, error, 1) &&
-                      error.find("Blended composition is not installed") != std::string::npos,
-                  "Matched unsupported alpha must be rejected, never treated as opaque");
-            error.clear();
-        }
+        // The old frame-1 check required the host to reject a Blended draw
+        // ("Blended composition is not installed"). 8bfd0be5 installed the common
+        // Forward+ blended composition, so that premise no longer holds; the
+        // matched fixtures are opaque and blended coverage has its own gates.
         const bool prepared = gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
                               host.PrepareResidency(context, input, error) &&
-                              host.Prepare(context, input, environmentHandle, irradianceHandle, prefilteredHandle, {}, {}, error,
+                              host.Prepare(context, input, environmentHandle, irradianceHandle, prefilteredHandle, {}, lookupBudget, error,
                                            hdr ? hdri.GetGeneration() : 1,
                                            hdr && !disableMis ? hdri.GetImportanceMaps() : std::array<RHITextureHandle,3>{},
                                            hdr ? hdri.GetSourceMap() : RHITextureHandle{});

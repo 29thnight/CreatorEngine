@@ -1,0 +1,204 @@
+{
+  "schema": "creator.material.blender-image-comparison.v1",
+  "reference": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9SpecialVolumeReference-0",
+  "native": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Images-Release-split-approx-volume\\Native",
+  "control_passed": true,
+  "reference_repeat": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9SpecialVolumeReference-11",
+  "acceptance": "diagnostic; material approximation tolerances remain unaccepted",
+  "mask": "common emission-control interior eroded by two pixels; no per-material cherry picking",
+  "contact_order": "manifest cases, each row Blender | native | absolute difference x10",
+  "cases": [
+    {
+      "id": "sun-special_volume_emission",
+      "interior_pixels": 303,
+      "max_abs": 0.0025615692138671875,
+      "native_sha256": "d24e99de498d5b9405c414204f58afbf41f4659e6ad22e7d56e470417d827341",
+      "mean_abs": 0.0005470941988679573,
+      "max_normalized": 0.0019306656699467379,
+      "p95_normalized": 0.0013419764671215766,
+      "relative_rms": 0.0009548530673584029,
+      "reference_mean_rgb": [
+        1.095946491354763,
+        0.6262133315254753,
+        0.31310666576273766
+      ],
+      "native_mean_rgb": [
+        1.095413056930693,
+        0.6259459442037953,
+        0.3129729721018977
+      ],
+      "reference_repeat": {
+        "max_abs": 2.2649765014648438e-06,
+        "relative_rms": 4.089743694935163e-07
+      }
+    },
+    {
+      "id": "sun-special_volume_absorption",
+      "interior_pixels": 303,
+      "max_abs": 0.0016985535621643066,
+      "native_sha256": "de016c81285782949d23761922f726aca2f6a2017c360fe44993ef6918bd611f",
+      "mean_abs": 0.0004444827373796301,
+      "max_normalized": 0.0016985535621643066,
+      "p95_normalized": 0.0011608004570007324,
+      "relative_rms": 0.0010097280762838264,
+      "reference_mean_rgb": [
+        0.8108964233902027,
+        0.46342397414811765,
+        0.23171198707405882
+      ],
+      "native_mean_rgb": [
+        0.8106016656353136,
+        0.46320003094059403,
+        0.23160001547029702
+      ],
+      "reference_repeat": {
+        "max_abs": 1.7881393432617188e-06,
+        "relative_rms": 3.8199230932218895e-07
+      }
+    },
+    {
+      "id": "sun-special_volume_scattering",
+      "interior_pixels": 303,
+      "max_abs": 6.692949682474136e-06,
+      "native_sha256": "792b7483d40709e8dfa0cc2fd5f265155ccf2735947a376348b95055797ba7e5",
+      "mean_abs": 2.297031056910458e-06,
+      "max_normalized": 6.692949682474136e-06,
+      "p95_normalized": 3.918074071407318e-06,
+      "relative_rms": 0.0005170678045202672,
+      "reference_mean_rgb": [
+        0.004895389070058174,
+        0.004895389070058174,
+        0.004895389070058174
+      ],
+      "native_mean_rgb": [
+        0.004893092039001263,
+        0.004893092039001263,
+        0.004893092039001263
+      ],
+      "reference_repeat": {
+        "max_abs": 5.8673322200775146e-08,
+        "relative_rms": 3.7097331846292124e-06
+      }
+    },
+    {
+      "id": "sun-control_emission",
+      "interior_pixels": 303,
+      "max_abs": 0.0,
+      "native_sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "furnace-special_volume_emission",
+      "interior_pixels": 303,
+      "max_abs": 0.0025615692138671875,
+      "native_sha256": "d24e99de498d5b9405c414204f58afbf41f4659e6ad22e7d56e470417d827341",
+      "mean_abs": 0.0005470941988679573,
+      "max_normalized": 0.0019306656699467379,
+      "p95_normalized": 0.0013419764671215766,
+      "relative_rms": 0.0009548530673584029,
+      "reference_mean_rgb": [
+        1.095946491354763,
+        0.6262133315254753,
+        0.31310666576273766
+      ],
+      "native_mean_rgb": [
+        1.095413056930693,
+        0.6259459442037953,
+        0.3129729721018977
+      ],
+      "reference_repeat": {
+        "max_abs": 2.2649765014648438e-06,
+        "relative_rms": 4.089743694935163e-07
+      }
+    },
+    {
+      "id": "furnace-special_volume_absorption",
+      "interior_pixels": 303,
+      "max_abs": 0.0016985535621643066,
+      "native_sha256": "de016c81285782949d23761922f726aca2f6a2017c360fe44993ef6918bd611f",
+      "mean_abs": 0.0004444827373796301,
+      "max_normalized": 0.0016985535621643066,
+      "p95_normalized": 0.0011608004570007324,
+      "relative_rms": 0.0010097280762838264,
+      "reference_mean_rgb": [
+        0.8108964233902027,
+        0.46342397414811765,
+        0.23171198707405882
+      ],
+      "native_mean_rgb": [
+        0.8106016656353136,
+        0.46320003094059403,
+        0.23160001547029702
+      ],
+      "reference_repeat": {
+        "max_abs": 1.7881393432617188e-06,
+        "relative_rms": 3.8199230932218895e-07
+      }
+    },
+    {
+      "id": "furnace-special_volume_scattering",
+      "interior_pixels": 303,
+      "max_abs": 0.0001434236764907837,
+      "native_sha256": "f504dcc8bd61298792f3e1d6caab3ea7e2665315446f1ed3e4007d901b21e1c5",
+      "mean_abs": 4.552212534564557e-05,
+      "max_normalized": 0.0001434236764907837,
+      "p95_normalized": 0.00010308623313903809,
+      "relative_rms": 0.000880061561121273,
+      "reference_mean_rgb": [
+        0.06137931977610777,
+        0.06137931977610777,
+        0.06137931977610777
+      ],
+      "native_mean_rgb": [
+        0.06133519540918936,
+        0.06133519540918936,
+        0.06133519540918936
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0001056864857673645,
+        "relative_rms": 0.0005431452515968817
+      }
+    },
+    {
+      "id": "furnace-control_emission",
+      "interior_pixels": 303,
+      "max_abs": 0.0,
+      "native_sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    }
+  ]
+}

@@ -4,6 +4,7 @@ param(
  [string]$Reference='',
  [string]$ReferenceRepeat='',
  [string]$ShaderRoot='',
+ [switch]$LookupApproximate,
  [string]$Python='C:\Python313\python.exe'
 )
 Set-StrictMode -Version Latest
@@ -26,21 +27,25 @@ if($LASTEXITCODE -ne 0) { throw "Native image probe build failed; see $case/buil
 $previousPath=$env:PATH
 $previousValidation=$env:CREATOR_DX12_VALIDATION
 $previousShaderRoot=$env:CREATOR_MAT9_SHADER_ROOT
+$previousApproximate=$env:CREATOR_MAT9_LOOKUP_APPROXIMATE
 try {
  $dependency=if($Configuration -eq 'Debug'){'vcpkg_installed/x64-windows/debug/bin'}else{'vcpkg_installed/x64-windows/bin'}
  $env:PATH=(Join-Path $repo $dependency)+';'+$previousPath
  $env:CREATOR_DX12_VALIDATION='gpu'
  if($ShaderRoot) { $env:CREATOR_MAT9_SHADER_ROOT=(Resolve-Path -LiteralPath $ShaderRoot).Path }
  else { $env:CREATOR_MAT9_SHADER_ROOT=$null }
+ $env:CREATOR_MAT9_LOOKUP_APPROXIMATE=if($LookupApproximate){'1'}else{$null}
  & "$repo/Bin/x64-$Configuration/Tools/MaterialMatchedImageProbe/MaterialMatchedImageProbe.exe" $repo $Reference "$case/Native" *> "$case/native.log"
  if($LASTEXITCODE -ne 0) { throw "Native image capture failed; see $case/native.log" }
 } finally {
  $env:PATH=$previousPath
  $env:CREATOR_DX12_VALIDATION=$previousValidation
  $env:CREATOR_MAT9_SHADER_ROOT=$previousShaderRoot
+ $env:CREATOR_MAT9_LOOKUP_APPROXIMATE=$previousApproximate
 }
 $comparisonArguments=@("$PSScriptRoot/compare-material-blender-images.py",$Reference,"$case/Native","$case/comparison.json")
 if($ReferenceRepeat) { $comparisonArguments+=@('--reference-repeat',[IO.Path]::GetFullPath($ReferenceRepeat)) }
 & $Python @comparisonArguments | Tee-Object -FilePath "$case/comparison.log"
 if($LASTEXITCODE -ne 0) { throw 'Matched emission/input control failed' }
-Write-Output "MAT9_IMAGE_MEASUREMENT_OK configuration=$Configuration materialAcceptance=pending output=$case"
+$lookupPath=if($LookupApproximate){'approximate'}else{'reference'}
+Write-Output "MAT9_IMAGE_MEASUREMENT_OK configuration=$Configuration lookup=$lookupPath materialAcceptance=pending output=$case"
