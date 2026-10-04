@@ -284,6 +284,10 @@ struct EnhancedLiveDisplayEntrySnapshot
     uint64_t completedFrameId{ 0 };
     uint64_t completedSceneEpoch{ 0 };
     FrameCameraSnapshot completedCamera{};
+    // RT가 마지막으로 소비한 불변 뷰 입력. GPU 완료 결과와 구분한다.
+    uint64_t sourceFrameId{ 0 };
+    uint64_t sourceInputSequence{ 0 };
+    uint64_t sourceCameraRevision{ 0 };
     uint64_t promotionCount{ 0 };
     uint64_t completedResizeGeneration{ 0 };
     uint32_t completedWidth{ 0 };
@@ -331,6 +335,11 @@ struct EnhancedLiveDisplayTexture
     uint32_t width{ 0 }, height{ 0 };
     EnhancedLiveDisplayEntrySnapshot frame{};
     EnhancedLiveBackend backend{ EnhancedLiveBackend::DX12 };
+    // 같은 잠금 안에서 읽은 최신 완료 신원. CPU 업로드의 이전 픽셀 신원이
+    // frame에 들어가도 이 관측은 유지하며, 둘 다 실제 화면 출력의 증거는 아니다.
+    uint64_t latestCompletedFrameId{ 0 };
+    uint64_t latestCompletedInputSequence{ 0 };
+    uint64_t latestCompletedCameraRevision{ 0 };
 };
 
 /// 패스 하나의 GPU 시간. DX12GpuProfiler::PassTiming을 에디터로 옮기는 값

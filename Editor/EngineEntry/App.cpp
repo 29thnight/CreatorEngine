@@ -3,6 +3,7 @@
 #include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
 #include "Camera.h"
+#include "EditorCameraRig.h"
 #include "CameraComponent.h"
 #include "Scene.h"
 #include "InputManager.h"
@@ -375,7 +376,7 @@ uint32_t Core::App::PublishRenderFrame()
 	// 수요가 없어 만들지 않았다" 이지 "못 만들었다" 가 아니다. 둘을 섞으면
 	// 게임 카메라가 없는 씬에서 수요 문을 통째로 걷어도 수가 그대로여서,
 	// 그 수를 읽는 게이트가 씬이 무엇을 담고 있느냐에 기대게 된다.
-	Camera* const editorCamera = EditorSessionState::Get().EditorCamera();
+    EditorCameraRig* const editorCamera = EditorSessionState::Get().CameraRig();
 	if (editorDemanded && nullptr != editorCamera)
 	{
 		views[viewCount++] = {

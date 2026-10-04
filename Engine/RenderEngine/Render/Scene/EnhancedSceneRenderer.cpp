@@ -1318,6 +1318,9 @@ namespace
                 }
                 entry.key = view.key;
                 entry.active = true;
+                entry.sourceFrameId = frame.frameId;
+                entry.sourceInputSequence = view.camera.editorInputSequence;
+                entry.sourceCameraRevision = view.camera.editorCameraRevision;
             }
             for (uint32_t i = 0; i < kEnhancedLiveDisplayTargetCount; ++i)
             {
@@ -6926,7 +6929,9 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
         }
         acquiredFrame.ready = textureId != 0;
         return EnhancedLiveDisplayTexture{textureId, textureId ? acquiredFrame.completedWidth : 0,
-            textureId ? acquiredFrame.completedHeight : 0, acquiredFrame, state.displaySnapshot.backend};
+            textureId ? acquiredFrame.completedHeight : 0, acquiredFrame, state.displaySnapshot.backend,
+            entry.completedFrameId, entry.completedCamera.editorInputSequence,
+            entry.completedCamera.editorCameraRevision};
     };
     // Host가 설치한 표시 sink가 ID를 해석한다(E4-6a). Core는 표시 수명 락만
     // 소유하고 ImGui 셸을 모른다 — 미설치·비활성이면 표시할 수단이 없다.

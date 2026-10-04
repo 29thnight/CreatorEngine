@@ -94,12 +94,6 @@ namespace
 		service.wait_until_idle();
 	}
 
-	void pause_sync(ce::profiler_service& service)
-	{
-		service.pause();
-		service.wait_until_idle();
-	}
-
 	void check(bool condition, const char* what)
 	{
 		++g_checks;
@@ -122,6 +116,53 @@ namespace
 			             static_cast<unsigned long long>(actual));
 		}
 	}
+
+    // A collector barrier only completes control work; disk finalization has
+    // its own completion state and must finish before another Record is admitted.
+    void finalize_sync(ce::profiler_service& service)
+    {
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+        ce::recording_status status = service.recording_status();
+        while (status.state != ce::recording_state::finalized &&
+               status.state != ce::recording_state::failed &&
+               std::chrono::steady_clock::now() < deadline)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            status = service.recording_status();
+        }
+        check(status.state == ce::recording_state::finalized,
+              "control/finalized — disk recording finalizes without an error");
+    }
+
+    void record_sync(ce::profiler_service& service, std::uint32_t first_frame = 0)
+    {
+        if (service.state() == ce::recorder_state::frozen)
+        {
+            finalize_sync(service);
+        }
+        service.record(first_frame);
+        service.wait_until_idle();
+        check(service.state() == ce::recorder_state::recording,
+              "control/recording — asynchronous Record has started before producers run");
+    }
+
+    void pause_sync(ce::profiler_service& service)
+    {
+        service.pause();
+        service.wait_until_idle();
+        check(service.state() == ce::recorder_state::frozen,
+              "control/frozen — asynchronous Pause has published the capture");
+        finalize_sync(service);
+    }
+
+    void clear_sync(ce::profiler_service& service)
+    {
+        const std::uint64_t ticket = service.clear();
+        check(ticket != 0, "control/clear-accepted — stopped Clear returns a ticket");
+        service.wait_until_idle();
+        check(ticket != 0 && service.control_applied(ticket),
+              "control/clear-applied — Clear completes before inspecting the reset ring");
+    }
 
 	// 한 프레임의 이벤트 수를 센다.
 	std::size_t events_in(const ce::capture_session& capture, std::uint32_t frame)
@@ -170,7 +211,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Probe");
-		service.record(1);
+        record_sync(service, 1);
 
 		{
 			ce::profile_scope outer{ service, ce::marker<"Outer">() };
@@ -220,7 +261,7 @@ namespace
 		         "publish-thread/no-registration — 안전 지점만으로 스레드를 등록하지 않는다");
 
 		service.register_thread("Probe");
-		service.record(1);
+        record_sync(service, 1);
 
 		const ce::marker_id spanning = ce::marker<"SpanningScope">();
 
@@ -272,7 +313,7 @@ namespace
 		config.chunk_count = 512;
 		service.initialize(config);
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		std::atomic<int> ready{ 0 };
 		std::vector<std::thread> workers;
@@ -339,7 +380,7 @@ namespace
 		config.max_chunk_count = 1;
 		service.initialize(config);
 		service.register_thread("Probe");
-		service.record(1);
+        record_sync(service, 1);
 
 		// 청크 하나가 담는 것보다 훨씬 많이 찍는다. 프레임을 닫지 않으므로
 		// 봉인된 청크가 되돌아오지 않는다 — 반드시 고갈된다.
@@ -369,11 +410,11 @@ namespace
 		      "overflow/bounded — 청크 하나 넘게 담지 않는다");
 
 		// Clear 이후에는 앞 녹화의 producer 누락을 새 링에 다시 더하지 않는다.
-		service.clear();
+        clear_sync(service);
 		check_eq(service.summary().collector.frames_closed, std::uint64_t{ 0 },
 		         "overflow/clear-timing — 새 녹화는 수집 비용 기준선도 다시 시작한다");
 		capture.reset();
-		service.record(2);
+        record_sync(service, 2);
 		{
 			ce::profile_scope scope{ service, ce::marker<"AfterClear">() };
 		}
@@ -394,7 +435,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize(config);
 		service.register_thread("GrowingPool");
-		service.record(1);
+        record_sync(service, 1);
 		const ce::marker_id marker = ce::marker<"GrowingPoolScope">();
 		constexpr int kScopes = ce::kEventsPerChunk * 4;
 		for (int i = 0; i < kScopes; ++i)
@@ -430,8 +471,8 @@ namespace
 		live.register_thread("Live");
 		probe.register_thread("Probe");
 
-		live.record();
-		probe.record();
+        record_sync(live);
+        record_sync(probe);
 
 		// probe 에만 찍는다.
 		probe.begin_scope(ce::marker<"ProbeOnly">());
@@ -472,7 +513,7 @@ namespace
 		}
 		publish_frame_sync(service, 1);
 
-		service.record(1);
+        record_sync(service, 1);
 		{
 			ce::profile_scope scope{ service, ce::marker<"WhileRecording">() };
 		}
@@ -495,7 +536,7 @@ namespace
 		const std::uint32_t frames_before = frozen->frame_count();
 		const std::uint64_t events_before = frozen->total_events();
 
-		service.record(1);
+        record_sync(service, 1);
 		for (int i = 0; i < 10; ++i)
 		{
 			ce::profile_scope scope{ service, ce::marker<"AfterFreeze">() };
@@ -518,7 +559,7 @@ namespace
 		config.retained_frames = 8;
 		service.initialize(config);
 		service.register_thread("Probe");
-		service.record(1);
+        record_sync(service, 1);
 
 		for (std::uint32_t frame = 1; frame <= 32; ++frame)
 		{
@@ -590,7 +631,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		// Outer > (Inner, Inner, Leaf) — 같은 marker 를 두 번 부른다.
 		{
@@ -694,7 +735,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		for (std::uint32_t frame = 1; frame <= 4; ++frame)
 		{
@@ -759,7 +800,7 @@ namespace
 		config.chunk_count = 256;
 		service.initialize(config);
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		std::thread worker([&service]()
 		{
@@ -821,7 +862,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		{
 			ce::profile_scope a{ service, ce::marker<"ParentA">() };
@@ -883,7 +924,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		// 프레임을 넘는 구간을 만든다 — 1 프레임에서 열고 2 에서 닫는다.
 		{
@@ -921,7 +962,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		// 프레임마다 호출 수를 다르게 한다 — 과거 프레임을 골랐을 때 그
 		// 프레임의 자료가 나오는지 값으로 가릴 수 있어야 한다.
@@ -932,12 +973,17 @@ namespace
 				ce::profile_scope scope{ service, ce::marker<"ReaderTick">() };
 				busy_ticks(1);
 			}
-			publish_frame_sync(service, frame);
+            if (frame == 10)
+            {
+                service.request_live_capture();
+            }
+            publish_frame_sync(service, frame);
 		}
-		pause_sync(service);
+        const ce::capture_session_ptr published = service.capture();
+        pause_sync(service);
 
 		ce::capture_reader reader;
-		reader.adopt(service.capture());
+        reader.adopt(published);
 
 		check(reader.has_capture(), "reader/capture — 얼린 캡처를 받았다");
 		if (!reader.has_capture())
@@ -1008,7 +1054,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		for (std::uint32_t frame = 1; frame <= 3; ++frame)
 		{
@@ -1030,7 +1076,7 @@ namespace
 		check(beforeEvents > 0, "reader-frozen/before — 얼리기 전에 자료가 있다");
 
 		// 엔진이 계속 돈다. 녹화를 다시 켜고 다른 marker 로 여러 프레임.
-		service.record(4);
+        record_sync(service, 4);
 		for (std::uint32_t frame = 4; frame <= 40; ++frame)
 		{
 			for (int n = 0; n < 5; ++n)
@@ -1068,9 +1114,11 @@ namespace
 	void test_reader_live_follow()
 	{
 		ce::profiler_service service;
-		service.initialize();
+        ce::profiler_config config;
+        config.live_capture_interval_ms = 0;
+        service.initialize(config);
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		auto run_frames = [&service](std::uint32_t first, std::uint32_t last)
 		{
@@ -1083,12 +1131,15 @@ namespace
 					ce::profile_scope scope{ service, ce::marker<"FollowTick">() };
 					busy_ticks(1);
 				}
-				publish_frame_sync(service, frame);
+                if (frame == last)
+                {
+                    service.request_live_capture();
+                }
+                publish_frame_sync(service, frame);
 			}
 		};
 
 		run_frames(1, 5);
-		pause_sync(service);
 
 		ce::capture_reader reader;
 		reader.adopt(service.capture());
@@ -1098,9 +1149,7 @@ namespace
 		reader.set_live_follow(false);
 		reader.select_frame(2);
 
-		service.record(6);
 		run_frames(6, 12);
-		pause_sync(service);
 		reader.adopt(service.capture());
 
 		check_eq(reader.selected_first(), std::uint32_t{ 2 },
@@ -1113,9 +1162,7 @@ namespace
 		check_eq(reader.selected_first(), std::uint32_t{ 12 },
 		         "reader-follow/resume — 켜면 최신으로 간다");
 
-		service.record(13);
 		run_frames(13, 20);
-		pause_sync(service);
 		reader.adopt(service.capture());
 		check_eq(reader.selected_first(), std::uint32_t{ 20 },
 		         "reader-follow/latest — 켜 두면 계속 따라간다");
@@ -1124,6 +1171,7 @@ namespace
 		check(!reader.has_capture(), "reader-follow/reset — 놓으면 비어 있다");
 		check(reader.aggregate().hierarchy().empty(),
 		      "reader-follow/reset-empty — 놓은 뒤 집계가 비어 있다");
+        pause_sync(service);
 	}
 
 	//-------------------------------------------------------------------------
@@ -1135,9 +1183,11 @@ namespace
 	void test_reader_graph_window()
 	{
 		ce::profiler_service service;
-		service.initialize();
+        ce::profiler_config config;
+        config.live_capture_interval_ms = 0;
+        service.initialize(config);
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		auto run_frames = [&service](std::uint32_t first, std::uint32_t last)
 		{
@@ -1147,12 +1197,15 @@ namespace
 					ce::profile_scope scope{ service, ce::marker<"GraphTick">() };
 					busy_ticks(1);
 				}
-				publish_frame_sync(service, frame);
+                if (frame == last)
+                {
+                    service.request_live_capture();
+                }
+                publish_frame_sync(service, frame);
 			}
 		};
 
 		run_frames(1, 40);
-		pause_sync(service);
 
 		ce::capture_reader reader;
 		reader.adopt(service.capture());
@@ -1170,9 +1223,7 @@ namespace
 		check_eq(reader.graph_first(), std::uint32_t{ 31 }, "graph/span-first");
 
 		// 새 캡처가 오면 창이 흐른다 — 폭은 그대로, 오른쪽 끝만 최신으로.
-		service.record(41);
 		run_frames(41, 50);
-		pause_sync(service);
 		reader.adopt(service.capture());
 		check_eq(reader.graph_count(), std::uint32_t{ 10 }, "graph/flow-keeps-span");
 		check_eq(reader.graph_last(), std::uint32_t{ 50 }, "graph/flows");
@@ -1193,9 +1244,7 @@ namespace
 
 		// ★ 굴려 놓은 자리는 새 캡처가 와도 지켜진다. 이것이 "옛 기록이 왼쪽에
 		//   남는다" 의 실체다 — 여기서 최신으로 튀면 읽던 구간을 잃는다.
-		service.record(51);
 		run_frames(51, 60);
-		pause_sync(service);
 		reader.adopt(service.capture());
 		check_eq(reader.graph_first(), std::uint32_t{ 21 }, "graph/pan-held");
 		check_eq(reader.available_last(), std::uint32_t{ 60 }, "graph/pan-available");
@@ -1221,6 +1270,7 @@ namespace
 		reader.reset();
 		reader.adopt(service.capture());
 		check_eq(reader.graph_count(), std::uint32_t{ 60 }, "graph/reset-clears-window");
+        pause_sync(service);
 	}
 
 	//-------------------------------------------------------------------------
@@ -1232,7 +1282,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		for (std::uint32_t frame = 1; frame <= 5; ++frame)
 		{
@@ -1273,7 +1323,7 @@ namespace
 		config.chunk_count = 256;
 		service.initialize(config);
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		std::thread worker([&service]()
 		{
@@ -1366,7 +1416,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		// ★ 20 프레임이다. 여섯으로는 **창을 좁힐 수가 없다** —
 		//   kMinimumGraphFrames 가 8 이라 set_graph_span(3) 이 보존 전체로
@@ -1567,7 +1617,7 @@ namespace
 		ce::profiler_service service;
 		service.initialize();
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		// ㈚ 열고 나서 얼린다 — 닫는 쪽이 얼린 뒤에 온다.
 		{
@@ -1582,7 +1632,7 @@ namespace
 		{
 			ce::profile_scope outer{ service, ce::marker<"AcrossRecord">() };
 			busy_ticks(1);
-			service.record(2);
+            record_sync(service, 2);
 		}
 		check_eq(service.summary().unbalanced_scopes, static_cast<std::uint64_t>(0),
 		         "state-change/open-while-frozen — 얼린 채 연 것을 닫아도 짝이 맞는다");
@@ -1644,7 +1694,7 @@ namespace
 
 		auto take = [&service](std::uint32_t frame) -> ce::capture_session_ptr
 		{
-			service.record(frame);
+            record_sync(service, frame);
 			{
 				ce::profile_scope scope{ service, ce::marker<"SyncTick">() };
 				busy_ticks(2);
@@ -1711,7 +1761,7 @@ void test_gpu_lane()
 {
 	ce::profiler_service service;
 	service.initialize({});
-	service.record(1);
+    record_sync(service, 1);
 
 	// 프레임 1~5 를 돌린다. GPU 구간은 **프레임 2 의 것**인데 프레임 5 를
 	// 닫기 직전에야 도착한다.
@@ -1786,7 +1836,7 @@ void test_track_order()
 
 	// 슬롯 0 — 맨 아래로 가야 할 것을 맨 먼저 등록한다.
 	service.register_thread("Script", ce::track_kind::script_thread);
-	service.record(1);
+    record_sync(service, 1);
 
 	auto lane = [&service](const char* name, ce::track_kind kind, std::uint32_t order)
 	{
@@ -1891,7 +1941,7 @@ void test_live_capture_while_recording()
 	config.live_capture_interval_ms = 0.0;   // 검사에서는 청하는 대로 낸다
 	service.initialize(config);
 	service.register_thread("Main", ce::track_kind::game_thread);
-	service.record(1);
+    record_sync(service, 1);
 
 	// ① 아무도 안 보면 스냅샷이 없다.
 	for (std::uint32_t frame = 1; frame <= 3; ++frame)
@@ -1970,7 +2020,7 @@ void test_call_distribution()
 {
 	ce::profiler_service service;
 	service.initialize({});
-	service.record(1);
+    record_sync(service, 1);
 
 	const ce::profile_tick base = ce::profiler_service::now();
 	const ce::gpu_span_context origin;
@@ -2046,7 +2096,7 @@ void test_flat_distribution_union()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main", ce::track_kind::game_thread);
-	service.record(1);
+    record_sync(service, 1);
 
 	for (std::uint32_t frame = 1; frame <= 3; ++frame)
 	{
@@ -2114,7 +2164,7 @@ void test_frame_boundaries()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main", ce::track_kind::game_thread);
-	service.record(1);
+    record_sync(service, 1);
 
 	for (std::uint32_t frame = 1; frame <= 4; ++frame)
 	{
@@ -2177,7 +2227,7 @@ void test_instant_events()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main", ce::track_kind::game_thread);
-	service.record(1);
+    record_sync(service, 1);
 
 	{
 		ce::profile_scope outer{ service, ce::marker<"Outer">() };
@@ -2272,7 +2322,7 @@ void test_gpu_span_origin()
 {
 	ce::profiler_service service;
 	service.initialize({});
-	service.record(1);
+    record_sync(service, 1);
 
 	ce::gpu_span_context origin;
 	origin.submission = 4242;
@@ -2332,7 +2382,7 @@ void test_gpu_lane_deferred()
 {
 	ce::profiler_service service;
 	service.initialize({});
-	service.record(1);
+    record_sync(service, 1);
 
 	const ce::profile_tick base = ce::profiler_service::now();
 
@@ -2377,7 +2427,7 @@ void test_gpu_lane_dropped()
 
 	ce::profiler_service service;
 	service.initialize(config);
-	service.record(1);
+    record_sync(service, 1);
 
 	const ce::profile_tick base = ce::profiler_service::now();
 	for (std::uint32_t frame = 1; frame <= 8; ++frame)
@@ -2432,7 +2482,7 @@ void test_concurrent_publish()
 	config.retained_frames = 4096;
 	service.initialize(config);
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	std::atomic<int> finished{ 0 };
 	std::vector<std::thread> workers;
@@ -2534,7 +2584,7 @@ void test_pause_truncates_open_scope()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	service.begin_scope(ce::marker<"OpenAtPause">());
 	publish_frame_sync(service, 1);
@@ -2555,14 +2605,16 @@ void test_pause_truncates_open_scope()
 
 	// 짝을 맞춘다. 여기서 또 기록되면 같은 구간이 두 번 남는다.
 	service.end_scope();
-	service.record(2);
+    record_sync(service, 2);
 	publish_frame_sync(service, 2);
 	pause_sync(service);
 
 	const ce::capture_session_ptr second = service.capture();
 	if (second)
 	{
-		std::size_t total = 0;
+        std::size_t total = count_marker(*capture, ce::marker<"OpenAtPause">());
+        check_eq(count_marker(*second, ce::marker<"OpenAtPause">()), std::size_t{ 0 },
+                 "pause-open/new-session-clean — the finalized scope cannot enter a fresh Record");
 		for (const ce::frame_record& frame : second->frames())
 		{
 			for (const ce::profile_event& e : frame.events)
@@ -2585,7 +2637,7 @@ void test_late_cpu_attribution()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	std::atomic<int> step{ 0 };
 	std::thread worker([&service, &step]()
@@ -2628,16 +2680,15 @@ void test_late_cpu_attribution()
 
 // ③ Clear 이전 세대의 청크가 새 링으로 재유입되면 안 된다.
 //
-// ★ **녹화를 멈추지 않고** 지운다. 이것이 세대 검사가 필요한 유일한 자리다 —
-//   멈췄다 다시 켜면 새 프레임이 전부 Clear 뒤에 열리므로 시각만 봐도 옛
-//   이벤트가 갈 칸이 없다. 하지만 녹화 중에 지우면 **지금 열려 있는 프레임의
-//   시작 시각은 Clear 보다 앞**이고, 그 칸이 옛 이벤트를 그대로 받아 준다.
+// A parked producer can retain an old chunk across Pause, Clear and a fresh
+// Record. Its old events must not leak into the new session. The former active-
+// Clear mutation scenario is no longer reachable through the public API.
 void test_clear_generation()
 {
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 	publish_frame_sync(service, 1);
 
 	std::atomic<int> step{ 0 };
@@ -2663,8 +2714,12 @@ void test_clear_generation()
 	step.store(1, std::memory_order_release);
 	while (step.load(std::memory_order_acquire) < 2) { std::this_thread::yield(); }
 
-	// 녹화를 멈추지 않고 지운다.
-	service.clear();
+    // Finalize the old session before resetting the ring and starting a new one.
+    check_eq(service.clear(), std::uint64_t{ 0 },
+             "clear/active-refused — Clear cannot reset an active disk recording");
+    pause_sync(service);
+    clear_sync(service);
+    record_sync(service, 10);
 
 	step.store(3, std::memory_order_release);
 	while (step.load(std::memory_order_acquire) < 4) { std::this_thread::yield(); }
@@ -2697,7 +2752,7 @@ void test_pause_truncates_worker_scope()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	std::atomic<int> step{ 0 };
 	std::thread worker([&service, &step]()
@@ -2764,10 +2819,14 @@ void test_clear_keeps_new_events()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	{ ce::profile_scope scope{ service, ce::marker<"BeforeClear">() }; }
-	service.clear();
+    check_eq(service.clear(), std::uint64_t{ 0 },
+             "clear/active-refused — Clear cannot reset an active disk recording");
+    pause_sync(service);
+    clear_sync(service);
+    record_sync(service, 2);
 	{ ce::profile_scope scope{ service, ce::marker<"AfterClear">() }; }
 
 	publish_frame_sync(service, 2);
@@ -2794,10 +2853,14 @@ void test_clear_drops_scope_opened_before()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	service.begin_scope(ce::marker<"OpenedBeforeClear">());
-	service.clear();
+    check_eq(service.clear(), std::uint64_t{ 0 },
+             "clear/active-refused — Clear cannot reset an active disk recording");
+    pause_sync(service);
+    clear_sync(service);
+    record_sync(service, 2);
 	service.end_scope();
 
 	publish_frame_sync(service, 2);
@@ -2823,13 +2886,13 @@ void test_scope_pairing_after_resume()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	service.begin_scope(ce::marker<"OuterAcrossPause">());
 	publish_frame_sync(service, 1);
 	pause_sync(service);
 
-	service.record(2);
+    record_sync(service, 2);
 	{
 		ce::profile_scope scope{ service, ce::marker<"AfterResume">() };
 		busy_ticks(1);
@@ -2876,7 +2939,7 @@ void test_pause_ack_implies_delivery()
 		ce::profiler_service service;
 		service.initialize({});
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		std::atomic<int> step{ 0 };
 		std::thread worker([&service, &step]()
@@ -2933,7 +2996,7 @@ void test_capture_reports_incompleteness()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	std::atomic<int> step{ 0 };
 	std::thread worker([&service, &step]()
@@ -2973,7 +3036,7 @@ void test_capture_reports_completeness()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	{ ce::profile_scope scope{ service, ce::marker<"LoneTick">() }; }
 	publish_frame_sync(service, 1);
@@ -3002,7 +3065,7 @@ void test_shutdown_owns_only_its_stream()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 
 	std::atomic<int> step{ 0 };
 	std::thread worker([&service, &step]()
@@ -3040,6 +3103,8 @@ void test_tls_slot_epoch()
 	service.initialize({});
 	service.register_thread("Main");
 
+    record_sync(service, 1);
+
 	std::atomic<int> step{ 0 };
 	std::thread worker([&service, &step]()
 	{
@@ -3059,14 +3124,13 @@ void test_tls_slot_epoch()
 		service.unregister_thread();
 	});
 
-	service.record(1);
 	while (step.load(std::memory_order_acquire) < 1) { std::this_thread::yield(); }
 	publish_frame_sync(service, 1);
 	service.shutdown();
 
 	service.initialize({});
 	service.register_thread("Main");
-	service.record(10);
+    record_sync(service, 10);
 	step.store(2, std::memory_order_release);
 	while (step.load(std::memory_order_acquire) < 3) { std::this_thread::yield(); }
 
@@ -3098,7 +3162,7 @@ void test_control_from_other_thread()
 {
 	ce::profiler_service service;
 	service.initialize({});
-	service.record(1);
+    record_sync(service, 1);
 	check(service.summary().collector_os_thread_id != 0
 	      && service.summary().collector_os_thread_id != ::GetCurrentThreadId(),
 	      "control-thread/dedicated — 링 소유자는 호출자와 다른 스레드다");
@@ -3172,7 +3236,7 @@ void test_control_from_other_thread()
 	         "control-thread/owned — 남의 스트림을 만지지 않았다");
 
 	running.store(false, std::memory_order_release);
-	service.record(summary.engine_frame);
+    record_sync(service, summary.engine_frame);
 	collector.join();
 	service.shutdown();
 }
@@ -3184,7 +3248,7 @@ void test_gpu_issue_diagnostics()
 	service.report_gpu_issue(1, 2, true, "before record");
 	check_eq<std::uint64_t>(service.summary().gpu_query_overflow_passes, 0,
 		"gpu-issue/off — 녹화 전 손실은 캡처에 섞이지 않는다");
-	service.record(2);
+    record_sync(service, 2);
 	service.report_gpu_issue(4, 3, false, "GPU query slots exhausted");
 	service.report_gpu_issue(5, 0, true, "readback Map failed");
 	pause_sync(service);
@@ -3207,7 +3271,7 @@ void test_page_backed_snapshots()
 	ce::profiler_service service;
 	service.initialize(config);
 	service.register_thread("PageOwner");
-	service.record(1);
+    record_sync(service, 1);
 	const ce::marker_id cpu = ce::marker<"PageBackedCpu">();
 	const ce::marker_id gpu = ce::marker<"PageBackedGpu">();
 	{ ce::profile_scope scope{ service, cpu }; }
@@ -3244,7 +3308,7 @@ void test_live_snapshot_watermark()
 	ce::profiler_service service;
 	service.initialize(config);
 	service.register_thread("Main");
-	service.record(1);
+    record_sync(service, 1);
 	std::atomic<bool> opened{ false };
 	std::atomic<bool> resume{ false };
 	std::thread worker([&]()
@@ -3302,7 +3366,7 @@ void test_page_seal_wakes_collector()
 	ce::profiler_service service;
 	service.initialize(config);
 	service.register_thread("PageProducer");
-	service.record(1);
+    record_sync(service, 1);
 	const ce::marker_id marker = ce::marker<"SealedPage">();
 	for (std::uint32_t i = 0; i <= ce::kEventsPerChunk; ++i)
 	{
@@ -3335,7 +3399,7 @@ void test_async_frame_batch()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("AsyncSubmitter");
-	service.record(1);
+    record_sync(service, 1);
 	const ce::marker_id marker = ce::marker<"AsyncFrame">();
 	for (std::uint32_t frame = 1; frame <= 32; ++frame)
 	{
@@ -3364,9 +3428,10 @@ void test_async_frame_accounting()
 {
 	ce::profiler_config config;
 	config.retained_frames = 4096;
+    config.max_queued_frames = 2048;
 	ce::profiler_service service;
 	service.initialize(config);
-	service.record(1);
+    record_sync(service, 1);
 	for (std::uint32_t frame = 1; frame <= 2048; ++frame)
 	{
 		service.publish_frame(frame);
@@ -3376,7 +3441,7 @@ void test_async_frame_accounting()
 	check_eq(live.collector_queued_frames, 0u,
 	         "async/accounting-drained — 대량 제출 뒤 큐가 비었다");
 	check_eq(live.retained_frames, 2048u,
-	         "async/all-frames — 기본 확장 큐는 모든 프레임 경계를 수집한다");
+	         "async/all-frames — 설정한 유한 큐는 모든 프레임 경계를 수집한다");
 	check_eq(live.collector_dropped_frames, std::uint64_t{ 0 },
 	         "async/no-frame-drop — 대량 제출에서도 프레임 누락이 없다");
 	service.shutdown();
@@ -3396,7 +3461,7 @@ void test_pause_does_not_block_caller()
 {
 	ce::profiler_service service;
 	service.initialize({});
-	service.record(1);
+    record_sync(service, 1);
 
 	std::mutex sceneLock;
 	std::atomic<int> started{ 0 };
@@ -3425,7 +3490,7 @@ void test_pause_does_not_block_caller()
 		std::lock_guard<std::mutex> guard(sceneLock);
 
 		const auto begin = std::chrono::steady_clock::now();
-		pause_sync(service);
+        service.pause();
 		elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
 			std::chrono::steady_clock::now() - begin).count();
 	}
@@ -3447,7 +3512,7 @@ void test_pause_does_not_block_caller()
 	      "pause-nonblocking/capture — 그때 캡처가 선다");
 
 	running.store(false, std::memory_order_release);
-	service.record(service.summary().engine_frame);
+    record_sync(service, service.summary().engine_frame);
 	collector.join();
 	service.shutdown();
 }
@@ -3460,7 +3525,7 @@ void test_pause_requester_records_land()
 {
 	ce::profiler_service service;
 	service.initialize({});
-	service.record(1);
+    record_sync(service, 1);
 
 	std::atomic<int> started{ 0 };
 	std::atomic<bool> running{ true };
@@ -3505,7 +3570,7 @@ void test_pause_requester_records_land()
 	         "pause-requester/acked — 미응답이 없다");
 
 	running.store(false, std::memory_order_release);
-	service.record(summary.engine_frame);
+    record_sync(service, summary.engine_frame);
 	collector.join();
 	service.unregister_thread();
 	service.shutdown();
@@ -3524,7 +3589,7 @@ void test_shutdown_retains_live_storage()
 		ce::profiler_service service;
 		service.initialize({});
 		service.register_thread("Main");
-		service.record(1);
+        record_sync(service, 1);
 
 		std::atomic<int> step{ 0 };
 		std::thread worker([&service, &step]()
@@ -3563,7 +3628,7 @@ void test_capture_vocabulary()
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("VocabThread");
-	service.record(1);
+    record_sync(service, 1);
 
 	{
 		ce::profile_scope outer{ service, ce::marker<"VocabOuter">() };
@@ -3653,7 +3718,7 @@ ce::capture_session_ptr make_rich_capture(ce::profiler_service& service)
 {
 	service.initialize({});
 	service.register_thread("FileMain");
-	service.record(1);
+    record_sync(service, 1);
 
 	ce::gpu_span_context origin;
 	origin.submission = 9001;
@@ -3818,7 +3883,7 @@ void test_owned_counters()
     service.initialize({});
     service.register_thread("OwnedCounterProbe");
     service.set_counter_mask(ce::counter_bit(ce::counter_category::physics));
-    service.record(1);
+    record_sync(service, 1);
     const ce::cpu_span_context a{0x100000002ULL, 0x200000003ULL, 0};
     const ce::cpu_span_context b{a.session, a.tick + 1, 0};
     const ce::cpu_span_context c{a.session + 1, a.tick, 0};
@@ -3883,7 +3948,7 @@ void test_owned_counters()
 	service.initialize({});
 	service.register_thread("CounterProbe");
 	service.set_counter_mask(ce::counter_bit(ce::counter_category::process));
-	service.record(70);
+    record_sync(service, 70);
 	service.publish_counter(69, ce::profile_counter_id::process_ram_mb, 99.0);
 	service.publish_counter(70, dynamic, 9.0); // disabled provider must not enqueue
 	service.publish_counter(70, ce::profile_counter_id::draw_calls, 4.0);
@@ -3953,7 +4018,7 @@ void test_owned_counters()
 	ce::profiler_service service;
 	service.initialize({});
 	service.set_counter_mask(ce::counter_bit(ce::counter_category::render));
-	service.record(100);
+    record_sync(service, 100);
 	const ce::profile_counter_sample old[] = {
 		{ ce::profile_counter_id::upload_overflows, 2.0 },
 		{ ce::profile_counter_id::descriptor_overflows, 3.0 },
@@ -4254,7 +4319,7 @@ void test_capture_file_on_disk()
 	// 완료 조건 넷째 — 저장 중 새 녹화를 시작해도 저장 대상이 변하지 않는다.
 	// 얼린 캡처를 쥔 채 녹화를 다시 돌려 프레임을 더 쌓은 뒤 저장한다.
 	const std::uint32_t frozenFrames = capture->frame_count();
-	service.record(100);
+    record_sync(service, 100);
 	for (std::uint32_t frame = 100; frame < 106; ++frame)
 	{
 		{ ce::profile_scope scope{ service, ce::marker<"FileAfterFreeze">() }; }
@@ -4280,14 +4345,19 @@ ce::capture_session_ptr make_frames(std::uint32_t first, std::uint32_t last)
 	ce::profiler_service service;
 	service.initialize({});
 	service.register_thread("OpenProbe");
-	service.record(first);
+    record_sync(service, first);
 	for (std::uint32_t frame = first; frame <= last; ++frame)
 	{
 		{ ce::profile_scope scope{ service, ce::marker<"OpenTick">() }; }
-		publish_frame_sync(service, frame);
+        if (frame == last)
+        {
+            service.request_live_capture();
+        }
+        publish_frame_sync(service, frame);
 	}
-	pause_sync(service);
-	return service.capture();
+    const ce::capture_session_ptr published = service.capture();
+    pause_sync(service);
+    return published;
 }
 
 void test_reader_open_file()
@@ -4363,7 +4433,7 @@ void test_cpu_context()
     ce::profiler_service service;
     service.initialize();
     service.register_thread("ContextProbe");
-    service.record(1);
+    record_sync(service, 1);
     {
         ce::profile_context_scope root{{0x100000002ULL, 0x200000003ULL, 0}};
         ce::profile_scope outer{service, ce::marker<"ContextRoot">()};

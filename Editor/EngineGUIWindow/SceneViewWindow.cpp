@@ -28,7 +28,6 @@
 #include <unordered_map>
 #include "DataSystem.h"
 #include "PrefabUtility.h"
-#include "InputManager.h"
 #include "Terrain.h"
 #include "EditorSessionState.h"
 #include "EditorAssetPresentation.h"
@@ -202,6 +201,17 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
     ImGuizmo::BeginFrame();
     ImGuizmo::SetDrawlist();
     m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas, m_sceneFps, displayed);
+    // 카메라 조작에는 content 사각형과 PT 입력만 필요하다. 표시 결과가 없거나
+    // 오래됐다는 이유로 다음 카메라 스냅샷을 만드는 조작까지 막지 않는다.
+    const ImVec2 inputMin = m_canvas.valid ? m_canvas.clipMin : m_canvas.contentMin;
+    const ImVec2 inputMax = m_canvas.valid ? m_canvas.clipMax : m_canvas.contentMax;
+    const bool pointerInCanvas = ImGui::IsMouseHoveringRect(inputMin, inputMax) &&
+        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+    const bool canvasInput = pointerInCanvas && !m_overlay.blocksPointer;
+    m_editorCameraRig->HandleMovement(canvasInput && ImGui::IsMouseDown(ImGuiMouseButton_Right));
+    m_editorCameraRig->PublishPresentationDiagnostics(displayed,
+        sceneDisplay.active && sceneDisplay.ready && displayed.textureId && m_canvas.valid);
+
     const auto* renderScene = SceneManagers->GetRenderScene();
     if (!m_canvas.valid || !displayed.textureId || !sceneDisplay.ready || !renderScene ||
         sceneDisplay.completedSceneEpoch != renderScene->GetSceneEpoch())
@@ -246,10 +256,6 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
     float* activeSnap = m_overlay.ActiveSnap();
     float snap[3]{activeSnap ? *activeSnap : 1.f, activeSnap ? *activeSnap : 1.f, activeSnap ? *activeSnap : 1.f};
     const bool useSnap = activeSnap != nullptr;
-    const bool pointerInCanvas = ImGui::IsMouseHoveringRect(m_canvas.clipMin, m_canvas.clipMax) &&
-        ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
-    const bool canvasInput = pointerInCanvas && !m_overlay.blocksPointer;
-
     auto* editScene = SceneManagers->GetActiveScene();
     const bool selectionEditable = !EditorObjectOperations::IsEditLocked(obj, true) &&
         std::all_of(editScene->m_selectedEntities.begin(), editScene->m_selectedEntities.end(),
@@ -406,11 +412,6 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 		}
     }
 
-	if (canvasInput && ImGui::IsMouseDown(ImGuiMouseButton_Right))
-	{
-		m_editorCameraRig->HandleMovement(Time->GetElapsedSeconds());
-	}
-
 	if (selectionEditable && ImGui::IsWindowFocused() && !m_overlay.blocksShortcuts && ImGui::IsKeyPressed(ImGuiKey_G, false)) {
 		auto scene = SceneManagers->GetActiveScene();
 		auto selectedObjects = scene->m_selectedEntities;
@@ -448,7 +449,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 
 	if (useGizmo)
 	{
-		gizmoTimer += Time->GetElapsedSeconds();
+        gizmoTimer += ImGui::GetIO().DeltaTime;
 		if (gizmoTimer > 0.5f)
 		{
 			useGizmo = false;

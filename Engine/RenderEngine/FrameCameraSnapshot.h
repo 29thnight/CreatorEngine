@@ -2,6 +2,7 @@
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <type_traits>
+#include <cstdint>
 
 // 한 프레임 분량의 카메라 렌더 입력 (PHASE 3-2).
 //
@@ -31,6 +32,11 @@ struct FrameCameraSnapshot
     float nearPlane{ 0.f };
     float farPlane{ 0.f };
     bool  isOrthographic{ false };
+
+    // 에디터 진단용 신원이다. 런타임·재생 캡처 카메라는 0이며, 렌더 슬롯과
+    // CPU 표시 업로드를 거칠 때도 픽셀을 만든 카메라와 같은 묶음으로 운반한다.
+    std::uint64_t editorInputSequence{ 0 };
+    std::uint64_t editorCameraRevision{ 0 };
 };
 
 static_assert(std::is_standard_layout_v<FrameCameraSnapshot>);

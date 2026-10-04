@@ -14,10 +14,14 @@
 #if !CE_SHIPPING
 #include "ProfileService.h"
 #include "ProfileCaptureFile.h"
+#include "JobScheduler.h"
 #endif
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <exception>
+#include <memory>
 #include <bit>
 #include <cstdio>
 #include <cstdlib>
@@ -266,47 +270,271 @@ namespace PlayerCmd
 		}
 
 #if !CE_SHIPPING
-        CommandCore::CommandResult ProfileState()
+        struct ProfileSaveOperation
         {
+            std::atomic_bool done{ false };
+            std::string path;
+            std::string error = "Save was not accepted by the worker scheduler";
+            std::uint64_t frames = 0;
+            bool complete = false;
+            std::uint32_t unacked = 0;
+        };
+
+        // 실행되지 않은 콜백의 마지막 소유자가 실패를 공개한다. 호출자는 기다리지 않는다.
+        struct ProfileSaveAdmission
+        {
+            explicit ProfileSaveAdmission(std::shared_ptr<ProfileSaveOperation> value) : operation(std::move(value)) {}
+
+            ~ProfileSaveAdmission()
+            {
+                if (!started.load(std::memory_order_acquire))
+                {
+                    operation->done.store(true, std::memory_order_release);
+                }
+            }
+
+            std::shared_ptr<ProfileSaveOperation> operation;
+            std::atomic_bool started{ false };
+        };
+
+        static std::shared_ptr<ProfileSaveOperation>& ProfileSaveState()
+        {
+            static std::shared_ptr<ProfileSaveOperation> operation;
+            return operation;
+        }
+
+        static void AddRecordingPayload(CommandCore::CommandData& data)
+        {
+            using namespace CommandCore;
+            const ce::recording_status status = ce::profiler().recording_status();
+            const auto path = ce::profiler().recording_path().u8string();
+            auto recording = CommandData::Object();
+            recording.Set("path", CommandData::String(std::string(path.begin(), path.end())));
+            recording.Set("state", CommandData::String(status.error ? "failed" :
+                ce::profiler().state() == ce::recorder_state::starting ? "starting" : path.empty() ? "none" :
+                status.state == ce::recording_state::starting ? "starting" :
+                status.state == ce::recording_state::recording ? "recording" :
+                status.state == ce::recording_state::flushing ? "flushing" :
+                status.state == ce::recording_state::finalized ? "finalized" : "failed"));
+            recording.Set("queuedBytes", CommandData::Int(status.queued_bytes));
+            recording.Set("queuedBatches", CommandData::Int(status.queued_batches));
+            recording.Set("writtenBytes", CommandData::Int(status.written_bytes));
+            recording.Set("flushedBytes", CommandData::Int(status.flushed_bytes));
+            recording.Set("writtenFrames", CommandData::Int(status.written_frames));
+            recording.Set("submittedFrames", CommandData::Int(status.submitted_frames));
+            recording.Set("droppedFrames", CommandData::Int(status.dropped_frames));
+            recording.Set("droppedEvents", CommandData::Int(status.dropped_events));
+            recording.Set("droppedCounters", CommandData::Int(status.dropped_counters));
+            recording.Set("sourceDroppedCounters", CommandData::Int(status.source_dropped_counters));
+            recording.Set("sourceDroppedEvents", CommandData::Int(status.source_losses.dropped_events));
+            recording.Set("sourceDroppedFrameBoundaries", CommandData::Int(status.source_losses.dropped_frame_boundaries));
+            recording.Set("lateCpuEvents", CommandData::Int(status.source_losses.late_events));
+            recording.Set("lateGpuSpans", CommandData::Int(status.source_losses.late_gpu_spans));
+            recording.Set("error", CommandData::String(status.error ? ce::describe(*status.error) : ""));
+            data.Set("writer", std::move(recording));
+        }
+
+        static CommandCore::CommandData ProfileSavePayload()
+        {
+            using namespace CommandCore;
+            auto data = CommandData::Object();
+            AddRecordingPayload(data);
+            const auto operation = ProfileSaveState();
+            const bool done = operation && operation->done.load(std::memory_order_acquire);
+            data.Set("saveState", CommandData::String(!operation ? "idle" : !done ? "saving" :
+                operation->error.empty() ? "saved" : "failed"));
+            data.Set("pending", CommandData::Bool(operation && !done));
+            data.Set("path", CommandData::String(operation ? operation->path : ""));
+            if (done)
+            {
+                data.Set("frames", CommandData::Int(operation->frames));
+                data.Set("complete", CommandData::Bool(operation->complete));
+                data.Set("unacked", CommandData::Int(operation->unacked));
+                data.Set("error", CommandData::String(operation->error));
+            }
+            return data;
+        }
+
+        static CommandCore::CommandData ProfileStatePayload()
+        {
+            const ce::live_summary summary = ce::profiler().summary();
             auto data = CommandCore::CommandData::Object();
-            data.Set("recording", CommandCore::CommandData::Bool(ce::profiler().state() == ce::recorder_state::recording));
-            return CommandCore::Ok({}, std::move(data));
+            data.Set("recording", CommandCore::CommandData::Bool(summary.state == ce::recorder_state::recording));
+            data.Set("state", CommandCore::CommandData::String(
+                summary.state == ce::recorder_state::starting ? "starting" :
+                summary.state == ce::recorder_state::recording ? "recording" :
+                summary.state == ce::recorder_state::pausing ? "pausing" :
+                summary.state == ce::recorder_state::frozen ? "frozen" : "stopped"));
+            data.Set("engineFrame", CommandCore::CommandData::Int(summary.engine_frame));
+            const ce::capture_session_ptr capture = ce::profiler().capture();
+            data.Set("hasCapture", CommandCore::CommandData::Bool(bool(capture)));
+
+            // ★ "얼렸다" 와 "온전하게 얼렸다" 는 다르다. 잠든 워커는 봉인 요청에
+            //   응답하지 못하므로 그 꼬리가 캡처에 없는데, 이것을 내지 않으면
+            //   자동화는 빈 레인을 "그 스레드가 조용했다" 로 읽는다.
+            data.Set("captureComplete",
+                     CommandCore::CommandData::Bool(capture ? capture->complete() : true));
+            data.Set("unackedStreams", CommandCore::CommandData::Int(
+                capture ? static_cast<std::int64_t>(capture->unacked_streams()) : 0));
+            AddRecordingPayload(data);
+            return data;
         }
 
-        CommandCore::CommandResult Cmd_profile_record(const std::vector<std::string>& parts)
+        static CommandCore::CommandResult Cmd_profile_record(const std::vector<std::string>& parts)
         {
-            if (parts.size() != 1) return CommandCore::InvalidArguments("profile.record takes no arguments");
-            if (!ce::profiler().is_initialized()) return CommandCore::PreconditionFailed("profile.unavailable", "Profiler is not initialized");
-            ce::profiler().record(ce::profiler().summary().engine_frame);
-            return ProfileState();
+            using namespace CommandCore;
+            if (parts.size() != 1)
+            {
+                return InvalidArguments("profile.record takes no arguments");
+            }
+            ce::profiler_service& service = ce::profiler();
+            if (!service.is_initialized())
+            {
+                return PreconditionFailed("profile.unavailable", "Profiler is not initialized");
+            }
+            const ce::recorder_state state = service.state();
+            if (state == ce::recorder_state::recording || state == ce::recorder_state::starting)
+            {
+                return PreconditionFailed("profile.already_recording", "A recording is already active or starting");
+            }
+            const auto status = service.recording_status();
+            if (state == ce::recorder_state::pausing || (!service.recording_path().empty() &&
+                (status.state == ce::recording_state::starting || status.state == ce::recording_state::flushing)))
+            {
+                return PreconditionFailed("profile.finalizing", "The previous recording is still finalizing");
+            }
+            service.record(service.summary().engine_frame);
+            return Ok("New recording requested", ProfileStatePayload());
         }
 
-        CommandCore::CommandResult Cmd_profile_pause(const std::vector<std::string>& parts)
+        static CommandCore::CommandResult Cmd_profile_pause(const std::vector<std::string>& parts)
         {
-            if (parts.size() != 1) return CommandCore::InvalidArguments("profile.pause takes no arguments");
+            using namespace CommandCore;
+            if (parts.size() != 1)
+            {
+                return InvalidArguments("profile.pause takes no arguments");
+            }
+            if (ce::profiler().state() == ce::recorder_state::starting)
+            {
+                return PreconditionFailed("profile.starting", "The recording is still starting");
+            }
             ce::profiler().pause();
-            return ProfileState();
+            return Ok("Stop requested; profile.save status reports writer finalization", ProfileStatePayload());
         }
 
-        CommandCore::CommandResult Cmd_profile_save(const std::vector<std::string>& parts)
+        static CommandCore::CommandResult Cmd_profile_save(const std::vector<std::string>& parts)
         {
-            if (parts.size() != 2) return CommandCore::InvalidArguments("profile.save <new-absolute-path.ceprof>");
+            using namespace CommandCore;
+            if (parts.size() != 2)
+            {
+                return InvalidArguments("profile.save <new-absolute-path.ceprof>|status");
+            }
+            if (parts[1] == "status")
+            {
+                const auto operation = ProfileSaveState();
+                auto data = ProfileSavePayload();
+                if (operation && operation->done.load(std::memory_order_acquire) && !operation->error.empty())
+                {
+                    return Fail("profile.save_failed", operation->error, std::move(data));
+                }
+                return Ok({}, std::move(data));
+            }
             const auto path = std::filesystem::u8path(parts[1]);
-            if (!path.is_absolute() || path.extension() != ".ceprof" || std::filesystem::exists(path))
-                return CommandCore::InvalidArguments("Use a new absolute .ceprof path");
-            if (ce::profiler().state() == ce::recorder_state::recording)
-                return CommandCore::PreconditionFailed("profile.recording", "Pause the capture before saving");
-            ce::profiler().wait_until_idle();
-            const auto capture = ce::profiler().capture();
-            if (!capture) return CommandCore::PreconditionFailed("profile.empty", "No frozen capture");
-            const auto saved = ce::save_capture(*capture, path);
-            if (!saved) return CommandCore::Fail("profile.save_failed", ce::describe(saved.error()));
-            auto data = CommandCore::CommandData::Object();
-            data.Set("path", CommandCore::CommandData::String(parts[1]));
-            data.Set("complete", CommandCore::CommandData::Bool(capture->complete()));
-            data.Set("unacked", CommandCore::CommandData::Int(capture->unacked_streams()));
-            return CommandCore::Ok({}, std::move(data));
+            if (!path.is_absolute() || path.extension() != ".ceprof")
+            {
+                return InvalidArguments("Use a new absolute .ceprof path");
+            }
+            const auto previous = ProfileSaveState();
+            if (previous && !previous->done.load(std::memory_order_acquire))
+            {
+                return PreconditionFailed("profile.save_pending", "A save is running; use profile.save status");
+            }
+            ce::profiler_service& service = ce::profiler();
+            const ce::recorder_state state = service.state();
+            if (state == ce::recorder_state::recording || state == ce::recorder_state::starting ||
+                state == ce::recorder_state::pausing)
+            {
+                return PreconditionFailed("profile.recording", "Stop the capture and wait for writer finalization before saving");
+            }
+            const auto source = service.recording_path();
+            if (source.empty())
+            {
+                return PreconditionFailed("profile.empty", "No continuous recording to save");
+            }
+            const auto status = service.recording_status();
+            if (status.state != ce::recording_state::finalized)
+            {
+                return PreconditionFailed("profile.not_finalized", "Writer is not finalized; inspect profile.save status");
+            }
+            auto operation = std::make_shared<ProfileSaveOperation>();
+            operation->path = parts[1];
+            ProfileSaveState() = operation;
+            try
+            {
+                const auto admission = std::make_shared<ProfileSaveAdmission>(operation);
+                (void)ce::get_job_scheduler().submit([operation, source, path, admission]
+                {
+                    admission->started.store(true, std::memory_order_release);
+                    operation->error.clear();
+                    try
+                    {
+                        std::error_code error;
+                        const bool exists = std::filesystem::exists(path, error);
+                        if (error || exists)
+                        {
+                            operation->error = "Destination must be a new writable absolute .ceprof path";
+                        }
+                        else
+                        {
+                            const auto recording = ce::open_capture_recording(source);
+                            if (!recording)
+                            {
+                                operation->error = ce::describe(recording.error());
+                            }
+                            else if (!(*recording)->finalized())
+                            {
+                                operation->error = "Source recording is not finalized";
+                            }
+                            else
+                            {
+                                operation->frames = (*recording)->frame_count();
+                                operation->complete = (*recording)->complete();
+                                const auto metadata = (*recording)->metadata();
+                                operation->unacked = metadata ? metadata->unacked_streams() : 0;
+                                if (const auto saved = ce::save_recording(**recording, path); !saved)
+                                {
+                                    operation->error = ce::describe(saved.error());
+                                }
+                            }
+                        }
+                    }
+                    catch (const std::exception& exception)
+                    {
+                        operation->error = exception.what();
+                    }
+                    catch (...)
+                    {
+                        operation->error = "Unexpected recording save failure";
+                    }
+                    operation->done.store(true, std::memory_order_release);
+                });
+            }
+            catch (const std::exception& exception)
+            {
+                if (!operation->done.load(std::memory_order_acquire))
+                {
+                    operation->error = exception.what();
+                    operation->done.store(true, std::memory_order_release);
+                }
+                return Fail("profile.save_start_failed", operation->error, ProfileSavePayload());
+            }
+            if (operation->done.load(std::memory_order_acquire) && !operation->error.empty())
+            {
+                return Fail("profile.save_failed", operation->error, ProfileSavePayload());
+            }
+            return Ok("Entire recording save queued; use profile.save status for completion", ProfileSavePayload());
         }
+
 #endif
 
 		// ── 표 ──────────────────────────────────────────────────────────

@@ -33,6 +33,7 @@
     <ClCompile Include="ProfileAggregate.cpp" />
     <ClCompile Include="ProfileCapture.cpp" />
     <ClCompile Include="ProfileCaptureFile.cpp" />
+    <ClCompile Include="ProfileRecording.cpp" />
     <ClCompile Include="ProfileMarker.cpp" />
     <ClCompile Include="ProfileReader.cpp" />
     <ClCompile Include="ProfileService.cpp" />

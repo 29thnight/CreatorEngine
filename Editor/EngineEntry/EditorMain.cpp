@@ -837,6 +837,10 @@ void Editor::EditorMain::OnGui()
     }
     if (EditorSessionState::Get().IsGameViewHidden())
     {
+        if (auto* cameraRig = EditorSessionState::Get().CameraRig())
+        {
+            cameraRig->BeginPresentationFrame(false);
+        }
         return;
     }
 
@@ -854,6 +858,14 @@ void Editor::EditorMain::OnGui()
     {
         ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
         sceneLock.lock();
+    }
+    // NewFrame과 오래 걸릴 수 있는 프로파일러 표시 뒤에서 판독한다. 카메라를
+    // 조작하는 PT가 같은 주기로 읽으며, GT InputManager의 초기화와 무관하다.
+    if (auto* cameraRig = EditorSessionState::Get().CameraRig())
+    {
+        ce::profile_scope input{ ce::marker<"EditorCameraInput">() };
+        cameraRig->BeginPresentationFrame(!IsIconic(EditorWindowHandle()) &&
+            GetForegroundWindow() == EditorWindowHandle());
     }
     // 나머지 패널은 live Scene과 texture를 참조한다. CPU draw data에 자원
     // 소유권이 없으므로 제출까지 잠금을 유지하고, 무조건 unlock하지 않는다.

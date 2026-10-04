@@ -22,6 +22,8 @@ $sources = @(
     (Join-Path $core 'ProfileMarker.cpp'),
     (Join-Path $core 'ProfileThreadStream.cpp'),
     (Join-Path $core 'ProfileCapture.cpp'),
+    (Join-Path $core 'ProfileCaptureFile.cpp'),
+    (Join-Path $core 'ProfileRecording.cpp'),
     (Join-Path $core 'ProfileService.cpp'),
     (Join-Path $PSScriptRoot 'profile_collector_stress.cpp')
 )

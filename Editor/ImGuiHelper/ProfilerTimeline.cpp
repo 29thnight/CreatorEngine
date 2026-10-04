@@ -15,8 +15,6 @@
 #include <cmath>
 #include <cstdio>
 #include <unordered_set>
-#include <vector>
-#include <map>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -30,122 +28,28 @@
 
 namespace editor::profiler_view
 {
-	namespace
-	{
-		constexpr float kMinimumLaneHeaderWidth = 220.0f;
-		constexpr float kLanePadding = 6.0f;
-		constexpr float kMinimumSpanWidth = 1.0f;
-
-        struct timeline_interval
-        {
-            std::uint32_t span_index_ = 0;
-            ce::profile_tick prefix_end_ = 0;
-        };
-
-        struct timeline_depth
-        {
-            std::uint16_t depth_ = 0;
-            std::vector<timeline_interval> intervals_;
-        };
+    namespace
+    {
+        constexpr float kMinimumLaneHeaderWidth = 220.0f;
+        constexpr float kLanePadding = 6.0f;
+        constexpr float kMinimumSpanWidth = 1.0f;
 
         struct timeline_cache
         {
-            // 약한 소유권으로 주소 재사용을 구분하되, 닫힌 캡처를 붙잡지는 않는다.
+            std::weak_ptr<const ce::prepared_capture_window> prepared_;
             std::weak_ptr<const ce::capture_session> capture_;
-            std::uint32_t graph_first_ = 0;
-            std::uint32_t graph_last_ = 0;
-            bool valid_ = false;
-            std::vector<ce::thread_summary> threads_;
-            std::unordered_map<std::uint16_t, std::vector<timeline_depth>> lanes_;
             std::unordered_map<ce::marker_id, float> marker_widths_;
             ImFont* font_ = nullptr;
             float font_size_ = 0.0f;
             float header_width_ = 0.0f;
         };
 
-        void update_timeline_cache(timeline_cache& cache, const ce::capture_reader& view,
-                                   const ce::frame_aggregate& aggregate)
+        void update_timeline_cache(timeline_cache& cache, const ce::prepared_capture_window_ptr& prepared)
         {
-            const ce::capture_session_ptr capture = view.capture_handle();
+            const auto& capture = prepared->capture_;
             const bool captureChanged = cache.capture_.lock() != capture;
-            if (!cache.valid_ || captureChanged || cache.graph_first_ != view.graph_first() ||
-                cache.graph_last_ != view.graph_last())
-            {
-                ce::profile_scope indexProfile{ce::marker<"ProfilerTimeline.IndexBuild">()};
-                // 그래프 창 집계가 바뀔 때만 만든다. 확대·이동·세로 스크롤은
-                // 불변 원본에 대한 조회만 바꾸므로 다시 복사하거나 정렬하지 않는다.
-                cache.valid_ = false;
-                cache.threads_.assign(aggregate.threads().begin(), aggregate.threads().end());
-                cache.lanes_.clear();
-                const auto spans = aggregate.spans();
-                for (const ce::thread_summary& thread : cache.threads_)
-                {
-                    // 코어의 시작 tick 순서를 깊이별로 거르므로 행도 같은 순서다.
-                    // 파일의 깊이가 커도 실제 이벤트가 있는 행만 할당한다.
-                    std::map<std::uint16_t, std::vector<timeline_interval>> depths;
-                    for (std::uint32_t index = thread.span_begin;
-                         index < thread.span_end && index < spans.size(); ++index)
-                    {
-                        const ce::profile_event& span = spans[index];
-                        if (ce::has_flag(span.flags, ce::event_flags::instant))
-                        {
-                            continue;
-                        }
-                        auto& intervals = depths[span.depth];
-                        const ce::profile_tick previousEnd = intervals.empty() ? 0 : intervals.back().prefix_end_;
-                        intervals.push_back({index, (std::max)(previousEnd, span.tick_end)});
-                    }
-                    auto& rows = cache.lanes_[thread.thread_slot];
-                    rows.reserve(depths.size());
-                    for (auto& [depth, intervals] : depths)
-                    {
-                        rows.push_back({depth, std::move(intervals)});
-                    }
-                }
-
-                // 완료 이벤트가 없는 등록 렌더 스레드도 관측 결과이므로 남긴다.
-                for (const ce::thread_info& info : capture->threads())
-                {
-                    if (info.name != "[RenderThread]" || info.slot > UINT16_MAX)
-                    {
-                        continue;
-                    }
-                    const auto existing = std::find_if(cache.threads_.begin(), cache.threads_.end(),
-                        [&](const ce::thread_summary& thread) { return thread.thread_slot == info.slot; });
-                    if (existing == cache.threads_.end())
-                    {
-                        ce::thread_summary empty{};
-                        empty.thread_slot = static_cast<std::uint16_t>(info.slot);
-                        cache.threads_.push_back(empty);
-                    }
-                }
-                const auto infoFor = [&capture](std::uint16_t slot) -> const ce::thread_info*
-                {
-                    for (const ce::thread_info& info : capture->threads())
-                    {
-                        if (info.slot == slot)
-                        {
-                            return &info;
-                        }
-                    }
-                    return nullptr;
-                };
-                std::sort(cache.threads_.begin(), cache.threads_.end(),
-                    [&](const ce::thread_summary& left, const ce::thread_summary& right)
-                    {
-                        const ce::thread_info* a = infoFor(left.thread_slot);
-                        const ce::thread_info* b = infoFor(right.thread_slot);
-                        return a && b ? ce::track_precedes(*a, *b) : left.thread_slot < right.thread_slot;
-                    });
-                cache.capture_ = capture;
-                cache.graph_first_ = view.graph_first();
-                cache.graph_last_ = view.graph_last();
-                cache.header_width_ = 0.0f;
-                cache.valid_ = true;
-            }
-
-            // 실제 글자 크기는 창 배율·DPI를 포함한다. 이름 해석도 캡처의
-            // 사전을 쓰므로 다른 파일을 열면 같은 마커 번호라도 다시 잰다.
+            // PT에서는 글자 크기만 잰다. 집계·정렬·구간 인덱스는 준비
+            // 작업이 하나의 불변 결과로 함께 공개했다.
             if (captureChanged || cache.font_ != ImGui::GetFont() || cache.font_size_ != ImGui::GetFontSize())
             {
                 cache.marker_widths_.clear();
@@ -153,27 +57,33 @@ namespace editor::profiler_view
                 cache.font_size_ = ImGui::GetFontSize();
                 cache.header_width_ = 0.0f;
             }
+            if (cache.prepared_.lock() != prepared)
+            {
+                cache.header_width_ = 0.0f;
+            }
             if (cache.header_width_ == 0.0f)
             {
                 cache.header_width_ = kMinimumLaneHeaderWidth;
-                for (const ce::thread_summary& thread : cache.threads_)
+                for (const ce::thread_summary& thread : prepared->threads_)
                 {
                     const char* name = thread_name(capture.get(), thread.thread_slot);
                     cache.header_width_ = (std::max)(cache.header_width_, ImGui::CalcTextSize(name).x * 1.5f + 52.0f);
                 }
             }
+            cache.capture_ = capture;
+            cache.prepared_ = prepared;
         }
 
         std::pair<std::size_t, std::size_t> timeline_interval_range(
-            const timeline_depth& row, std::span<const ce::profile_event> spans,
+            const ce::timeline_depth& row, std::span<const ce::profile_event> spans,
             ce::profile_tick begin, ce::profile_tick end)
         {
             // 시작 시각만 lower_bound 하면 화면 왼쪽에서 시작한 긴 구간을
             // 잃는다. 누적 최대 종료 시각은 단조 증가하므로 그 앞만 버린다.
             const auto first = std::lower_bound(row.intervals_.begin(), row.intervals_.end(), begin,
-                [](const timeline_interval& interval, ce::profile_tick tick) { return interval.prefix_end_ < tick; });
+                [](const ce::timeline_interval& interval, ce::profile_tick tick) { return interval.prefix_end_ < tick; });
             const auto last = std::upper_bound(first, row.intervals_.end(), end,
-                [spans](ce::profile_tick tick, const timeline_interval& interval)
+                [spans](ce::profile_tick tick, const ce::timeline_interval& interval)
                 {
                     return tick < spans[interval.span_index_].tick_begin;
                 });
@@ -181,332 +91,389 @@ namespace editor::profiler_view
                     static_cast<std::size_t>(last - row.intervals_.begin())};
         }
 
-		// ── 줄 높이는 폰트가 정한다 ────────────────────────────────────────
-		//
-		// ★ 여기에 18 px 이 박혀 있었다. 에디터가 한글 폰트를 얹으면서 한 줄이
-		//   그보다 커졌고, 그때부터 레인 이름과 그 아래 ms 가 **서로 겹쳐**
-		//   그려졌다. 막대 안의 마커 이름도 위아래가 잘렸다.
-		//
-		//   수치로는 한 군데도 안 어긋난다 — 접는 일은 전부 코어가 하고 이
-		//   층은 그리기만 하므로, 프로브가 무는 숫자는 전부 그대로다. 눈으로만
-		//   잡히는 종류의 결함이라 화면을 한 번 떠 보기 전까지 몰랐다.
-		constexpr float kRowTextPadding = 4.0f;
+        // ── 줄 높이는 폰트가 정한다 ────────────────────────────────────────
+        //
+        // ★ 여기에 18 px 이 박혀 있었다. 에디터가 한글 폰트를 얹으면서 한 줄이
+        //   그보다 커졌고, 그때부터 레인 이름과 그 아래 ms 가 **서로 겹쳐**
+        //   그려졌다. 막대 안의 마커 이름도 위아래가 잘렸다.
+        //
+        //   수치로는 한 군데도 안 어긋난다 — 접는 일은 전부 코어가 하고 이
+        //   층은 그리기만 하므로, 프로브가 무는 숫자는 전부 그대로다. 눈으로만
+        //   잡히는 종류의 결함이라 화면을 한 번 떠 보기 전까지 몰랐다.
+        constexpr float kRowTextPadding = 4.0f;
 
-		// §7.3 의 첫째 트랙 — 프레임 경계와 길이 없는 사건이 사는 띠. 제 글자
-		// 한 줄이 들어갈 만큼만 높다.
-		constexpr float kStripTextPadding = 6.0f;
+        // §7.3 의 첫째 트랙 — 프레임 경계와 길이 없는 사건이 사는 띠. 제 글자
+        // 한 줄이 들어갈 만큼만 높다.
+        constexpr float kStripTextPadding = 6.0f;
 
-		// 레인 머리글은 이름과 ms 두 줄이다. 깊이가 0 인 레인이라도 두 줄은
-		// 확보해야 아래 레인의 이름 위에 ms 가 얹히지 않는다.
-		constexpr int kLaneHeaderRows = 2;
+        // 레인 머리글은 이름과 ms 두 줄이다. 깊이가 0 인 레인이라도 두 줄은
+        // 확보해야 아래 레인의 이름 위에 ms 가 얹히지 않는다.
+        constexpr int kLaneHeaderRows = 2;
 
-		constexpr float kInstantMarkRadius = 4.0f;
+        constexpr float kInstantMarkRadius = 4.0f;
 
-		// ── 위쪽 자 ────────────────────────────────────────────────────────
-		//
-		// ★ 막대만 그리면 "이게 몇 ms 짜리냐" 를 그림에서 읽을 수가 없다.
-		//   글로 적은 "시야 n ms" 는 전체 폭이 몇 ms 인지만 말하고, 눈앞의
-		//   막대 하나가 얼마인지는 여전히 가늠이다. 눈금을 위에 새긴다.
-		constexpr float kRulerTextPadding = 4.0f;
+        // ── 위쪽 자 ────────────────────────────────────────────────────────
+        //
+        // ★ 막대만 그리면 "이게 몇 ms 짜리냐" 를 그림에서 읽을 수가 없다.
+        //   글로 적은 "시야 n ms" 는 전체 폭이 몇 ms 인지만 말하고, 눈앞의
+        //   막대 하나가 얼마인지는 여전히 가늠이다. 눈금을 위에 새긴다.
+        constexpr float kRulerTextPadding = 4.0f;
 
-		// 눈금 하나가 최소 이만큼은 떨어져야 숫자가 겹치지 않는다.
-		constexpr float kRulerLabelSpacing = 90.0f;
+        // 눈금 하나가 최소 이만큼은 떨어져야 숫자가 겹치지 않는다.
+        constexpr float kRulerLabelSpacing = 90.0f;
 
-		// 1-2-5 계단. 눈금 간격을 이 중에서 고르면 숫자가 0.5·1·2·5 처럼
-		// 읽히는 값으로만 선다 — 0.347 ms 간격은 자가 아니다.
-		double nice_step(double raw)
-		{
-			if (raw <= 0.0) { return 1.0; }
-			const double magnitude = std::pow(10.0, std::floor(std::log10(raw)));
-			const double normalized = raw / magnitude;
-			if (normalized <= 1.0) { return magnitude; }
-			if (normalized <= 2.0) { return 2.0 * magnitude; }
-			if (normalized <= 5.0) { return 5.0 * magnitude; }
-			return 10.0 * magnitude;
-		}
+        // 1-2-5 계단. 눈금 간격을 이 중에서 고르면 숫자가 0.5·1·2·5 처럼
+        // 읽히는 값으로만 선다 — 0.347 ms 간격은 자가 아니다.
+        double nice_step(double raw)
+        {
+            if (raw <= 0.0)
+            {
+                return 1.0;
+            }
+            const double magnitude = std::pow(10.0, std::floor(std::log10(raw)));
+            const double normalized = raw / magnitude;
+            if (normalized <= 1.0)
+            {
+                return magnitude;
+            }
+            if (normalized <= 2.0)
+            {
+                return 2.0 * magnitude;
+            }
+            if (normalized <= 5.0)
+            {
+                return 5.0 * magnitude;
+            }
+            return 10.0 * magnitude;
+        }
 
-		// 깊이마다 색을 달리해 중첩이 눈에 들어오게 한다. 마커 id 를 섞어
-		// 같은 깊이의 이웃이 붙어 보이지 않게 한다.
-		ImU32 span_color(ce::marker_id marker, std::uint16_t depth, bool truncated,
-		                 bool gpu)
-		{
-			if (gpu)
-			{
-				// GPU 구간은 CPU 스코프와 **시각의 뜻이 다르다** — 늦게 도착해
-				// 제 프레임 칸으로 되돌려진 것이고, 깊이도 언제나 0 이다.
-				// 같은 색으로 그리면 나란히 선 CPU 구간과 한 트리처럼 읽힌다.
-				const std::uint32_t hash = (static_cast<std::uint32_t>(marker) * 2654435761u) >> 16;
-				const int lift = static_cast<int>(hash % 50);
-				return IM_COL32(70 + lift, 150 + lift, 200, 255);
-			}
+        // 깊이마다 색을 달리해 중첩이 눈에 들어오게 한다. 마커 id 를 섞어
+        // 같은 깊이의 이웃이 붙어 보이지 않게 한다.
+        ImU32 span_color(ce::marker_id marker, std::uint16_t depth, bool truncated,
+                         bool gpu)
+        {
+            if (gpu)
+            {
+                // GPU 구간은 CPU 스코프와 **시각의 뜻이 다르다** — 늦게 도착해
+                // 제 프레임 칸으로 되돌려진 것이고, 깊이도 언제나 0 이다.
+                // 같은 색으로 그리면 나란히 선 CPU 구간과 한 트리처럼 읽힌다.
+                const std::uint32_t hash = (static_cast<std::uint32_t>(marker) * 2654435761u) >> 16;
+                const int lift = static_cast<int>(hash % 50);
+                return IM_COL32(70 + lift, 150 + lift, 200, 255);
+            }
 
-			if (truncated)
-			{
-				// 잘린 구간은 길이가 실제보다 짧다. 색으로 구분해 두지 않으면
-				// 옆 구간과 나란히 읽힌다.
-				return IM_COL32(150, 110, 90, 255);
-			}
+            if (truncated)
+            {
+                // 잘린 구간은 길이가 실제보다 짧다. 색으로 구분해 두지 않으면
+                // 옆 구간과 나란히 읽힌다.
+                return IM_COL32(150, 110, 90, 255);
+            }
 
-			const std::uint32_t hash = (static_cast<std::uint32_t>(marker) * 2654435761u) >> 16;
-			const int base = 90 + static_cast<int>(hash % 60);
-			const int lift = 18 * (static_cast<int>(depth) % 4);
-			return IM_COL32((std::min)(base + lift + 40, 235),
-			                (std::min)(base + lift, 210),
-			                (std::min)(base + 60, 230), 255);
-		}
-	}
+            const std::uint32_t hash = (static_cast<std::uint32_t>(marker) * 2654435761u) >> 16;
+            const int base = 90 + static_cast<int>(hash % 60);
+            const int lift = 18 * (static_cast<int>(depth) % 4);
+            return IM_COL32((std::min)(base + lift + 40, 235),
+                            (std::min)(base + lift, 210),
+                            (std::min)(base + 60, 230), 255);
+        }
+    }
 
-	void draw_timeline()
-	{
-		// 타임라인이 **그려졌다** 는 증거. 탭은 선택돼야 본문이 돌므로,
-		// 창이 열린 것만으로는 여기까지 온다고 말할 수 없다.
-		ce::profile_scope _profile{ ce::marker<"ProfilerTimeline">() };
+    void draw_timeline()
+    {
+        // 타임라인이 **그려졌다** 는 증거. 탭은 선택돼야 본문이 돌므로,
+        // 창이 열린 것만으로는 여기까지 온다고 말할 수 없다.
+        ce::profile_scope _profile{ ce::marker<"ProfilerTimeline">() };
 
-		ce::capture_reader& view = reader();
-		if (!view.has_capture())
-		{
-			ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
-			return;
-		}
+        ce::capture_reader& view = reader();
+        if (!view.has_capture())
+        {
+            ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
+            return;
+        }
 
-		// ★ **보이는 창**을 그린다. 고른 한 프레임이 아니다 — 위 그래프가
-		//   244 프레임을 보여 주는 동안 아래가 1.6 ms 짜리 한 칸만 그리면
-		//   같은 화면의 두 그림이 서로 다른 범위를 말한다. 선택은 아래에서
-		//   띠로 표시한다.
-		const ce::frame_aggregate& aggregate = view.window_aggregate();
-		const std::span<const ce::profile_event> spans = aggregate.spans();
-		const ce::capture_session* capture = view.capture();
+        // ★ **보이는 창**을 그린다. 고른 한 프레임이 아니다 — 위 그래프가
+        //   244 프레임을 보여 주는 동안 아래가 1.6 ms 짜리 한 칸만 그리면
+        //   같은 화면의 두 그림이 서로 다른 범위를 말한다. 선택은 아래에서
+        //   띠로 표시한다.
+        const auto prepared = view.prepared_window();
+        if (!prepared)
+        {
+            ImGui::TextDisabled(view.preparation_failed()
+                ? "타임라인 준비 실패 - 다른 구간을 선택해 다시 시도하세요"
+                : "타임라인을 준비하고 있습니다");
+            return;
+        }
+        const ce::frame_aggregate& aggregate = prepared->aggregate_;
+        const std::span<const ce::profile_event> spans = aggregate.spans();
+        const ce::capture_session* capture = prepared->capture_.get();
+        const auto ticks_to_milliseconds = [capture](ce::profile_tick ticks)
+        {
+            return capture->milliseconds(ticks);
+        };
         static timeline_cache cache;
-        update_timeline_cache(cache, view, aggregate);
-        const auto& visibleThreads = cache.threads_;
+        update_timeline_cache(cache, prepared);
+        const auto& visibleThreads = prepared->threads_;
 
-		const ce::profile_tick viewBegin = view.view_begin();
-		const ce::profile_tick viewSpan = view.view_span();
-		if (viewSpan == 0)
-		{
-			return;
-		}
+        // 새 요청이 끝날 때까지 마지막으로 준비된 집계·인덱스를 그린다.
+        // 시계·이름·인덱스·시야도 모두 그 결과를 기준으로 맞춘다.
+        const ce::profile_tick low = aggregate.tick_begin();
+        const ce::profile_tick high = (std::max)(aggregate.tick_end(), low + 1);
+        const ce::profile_tick viewSpan = (std::min)(view.view_span(), high - low);
+        const ce::profile_tick viewBegin = (std::clamp)(view.view_begin(), low, high - viewSpan);
+        if (prepared->capture_ != view.capture_handle() || prepared->first_frame_ != view.graph_first() ||
+            prepared->last_frame_ != view.graph_last())
+        {
+            ImGui::TextDisabled(view.preparation_failed()
+                ? "새 구간 준비 실패 - 마지막으로 준비된 구간을 표시합니다"
+                : "새 구간 준비 중 - 마지막으로 준비된 구간을 표시합니다");
+        }
+        if (viewSpan == 0)
+        {
+            return;
+        }
 
-		// 배율을 글로도 낸다. 그림만 보면 지금 몇 ms 를 보고 있는지 모른다.
-		//
-		// ★ 자의 한 칸이 몇 ms 인지도 **여기** 적는다. 자 안에 적어 봤더니
-		//   첫 눈금 위에 얹혔다 — 그 자리는 ImGui 가 재는 글자 너비가 실제보다
-		//   좁아서(에디터 배율 탓) 어떤 여백을 줘도 믿을 수가 없다.
-		static std::unordered_set<std::uint16_t> collapsedThreads;
-		const float availableWidth = (std::max)(ImGui::GetContentRegionAvail().x, 200.0f);
+        // 배율을 글로도 낸다. 그림만 보면 지금 몇 ms 를 보고 있는지 모른다.
+        //
+        // ★ 자의 한 칸이 몇 ms 인지도 **여기** 적는다. 자 안에 적어 봤더니
+        //   첫 눈금 위에 얹혔다 — 그 자리는 ImGui 가 재는 글자 너비가 실제보다
+        //   좁아서(에디터 배율 탓) 어떤 여백을 줘도 믿을 수가 없다.
+        static std::unordered_set<std::uint16_t> collapsedThreads;
+        const float availableWidth = (std::max)(ImGui::GetContentRegionAvail().x, 200.0f);
         float headerWidth = (std::min)(cache.header_width_, availableWidth * 0.42f);
-		const double rulerStepMs = nice_step(
-			ticks_to_milliseconds(viewSpan) * kRulerLabelSpacing
-			/ (std::max)(availableWidth - headerWidth, 32.0f));
-		ImGui::Text("시야 %.3f ms  ·  창 %.3f ms (frame %u..%u)  ·  자 한 칸 %.4g ms",
-		            ticks_to_milliseconds(viewSpan),
-		            ticks_to_milliseconds(aggregate.tick_end() - aggregate.tick_begin()),
-		            view.graph_first(), view.graph_last(),
-		            rulerStepMs);
-		ImGui::SameLine();
-		if (ImGui::SmallButton(EditorIcon::Label<EditorIcon::Scale, " 전체 보기">))
-		{
-			view.reset_view();
-		}
-		ImGui::SameLine();
-		ImGui::TextDisabled("(휠: 한 프레임 안에서 확대 · 끌기: 이동)");
-		if (ImGui::SmallButton("계층 모두 펼치기")) collapsedThreads.clear();
-		ImGui::SameLine();
-		if (ImGui::SmallButton("계층 모두 접기"))
-			for (const ce::thread_summary& thread : visibleThreads)
-				collapsedThreads.insert(thread.thread_slot);
-		ImGui::SameLine();
-		ImGui::TextDisabled("스레드 이름을 누르면 해당 레인을 접거나 펼칩니다");
+        const double rulerStepMs = nice_step(
+            ticks_to_milliseconds(viewSpan) * kRulerLabelSpacing
+            / (std::max)(availableWidth - headerWidth, 32.0f));
+        ImGui::Text("시야 %.3f ms  ·  창 %.3f ms (frame %u..%u)  ·  자 한 칸 %.4g ms",
+                    ticks_to_milliseconds(viewSpan),
+                    ticks_to_milliseconds(aggregate.tick_end() - aggregate.tick_begin()),
+                    prepared->first_frame_, prepared->last_frame_,
+                    rulerStepMs);
+        ImGui::SameLine();
+        if (ImGui::SmallButton(EditorIcon::Label<EditorIcon::Scale, " 전체 보기">))
+        {
+            view.reset_view();
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("(휠: 한 프레임 안에서 확대 · 끌기: 이동)");
+        if (ImGui::SmallButton("계층 모두 펼치기"))
+        {
+            collapsedThreads.clear();
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("계층 모두 접기"))
+        {
+            for (const ce::thread_summary& thread : visibleThreads)
+            {
+                collapsedThreads.insert(thread.thread_slot);
+            }
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("스레드 이름을 누르면 해당 레인을 접거나 펼칩니다");
 
-		const float rowHeight = ImGui::GetTextLineHeight() + kRowTextPadding;
-		const float stripHeight = ImGui::GetTextLineHeight() + kStripTextPadding;
-		const float rulerHeight = ImGui::GetTextLineHeight() + kRulerTextPadding;
+        const float rowHeight = ImGui::GetTextLineHeight() + kRowTextPadding;
+        const float stripHeight = ImGui::GetTextLineHeight() + kStripTextPadding;
+        const float rulerHeight = ImGui::GetTextLineHeight() + kRulerTextPadding;
 
-		float canvasHeight = rulerHeight + stripHeight + kLanePadding;
-		for (const ce::thread_summary& thread : visibleThreads)
-		{
-			const bool collapsed = collapsedThreads.contains(thread.thread_slot);
-			const int laneRows = collapsed ? kLaneHeaderRows :
-				(std::max)(static_cast<int>(thread.max_depth) + 1, kLaneHeaderRows);
-			canvasHeight += static_cast<float>(laneRows) * rowHeight + kLanePadding;
-		}
-		const float viewportHeight = (std::min)(canvasHeight + ImGui::GetStyle().WindowPadding.y * 2.0f,
-			(std::max)(280.0f, (std::min)(ImGui::GetContentRegionAvail().y * 0.7f, 660.0f)));
-		ImGui::BeginChild("##ProfilerTimelineTracks", ImVec2(0.0f, viewportHeight), true);
-		const ImVec2 origin = ImGui::GetCursorScreenPos();
-		const float width = (std::max)(ImGui::GetContentRegionAvail().x, 200.0f);
-		headerWidth = (std::min)(headerWidth, width * 0.42f);
-		const ImVec2 size(width, canvasHeight);
+        float canvasHeight = rulerHeight + stripHeight + kLanePadding;
+        for (const ce::thread_summary& thread : visibleThreads)
+        {
+            const bool collapsed = collapsedThreads.contains(thread.thread_slot);
+            const int laneRows = collapsed ? kLaneHeaderRows :
+                (std::max)(static_cast<int>(thread.max_depth) + 1, kLaneHeaderRows);
+            canvasHeight += static_cast<float>(laneRows) * rowHeight + kLanePadding;
+        }
+        const float viewportHeight = (std::min)(canvasHeight + ImGui::GetStyle().WindowPadding.y * 2.0f,
+            (std::max)(280.0f, (std::min)(ImGui::GetContentRegionAvail().y * 0.7f, 660.0f)));
+        ImGui::BeginChild("##ProfilerTimelineTracks", ImVec2(0.0f, viewportHeight), true);
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const float width = (std::max)(ImGui::GetContentRegionAvail().x, 200.0f);
+        headerWidth = (std::min)(headerWidth, width * 0.42f);
+        const ImVec2 size(width, canvasHeight);
 
-		ImGui::InvisibleButton("##ProfilerTimeline", size,
-		                       ImGuiButtonFlags_MouseButtonLeft);
+        ImGui::InvisibleButton("##ProfilerTimeline", size,
+                               ImGuiButtonFlags_MouseButtonLeft);
 
-		// ★ 휠을 이 항목이 가져간다. 안 가져가면 확대하면서 창도 같이 굴러서
-		//   보려던 레인이 화면 밖으로 밀린다.
-		ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
+        // ★ 휠을 이 항목이 가져간다. 안 가져가면 확대하면서 창도 같이 굴러서
+        //   보려던 레인이 화면 밖으로 밀린다.
+        ImGui::SetItemKeyOwner(ImGuiKey_MouseWheelY);
 
-		const bool hovered = ImGui::IsItemHovered();
-		const bool active = ImGui::IsItemActive();
+        const bool hovered = ImGui::IsItemHovered();
+        const bool active = ImGui::IsItemActive();
 
-		ImDrawList* draw = ImGui::GetWindowDrawList();
-		draw->PushClipRect(origin, ImVec2(origin.x + size.x, origin.y + size.y), true);
-		draw->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y),
-		                    IM_COL32(20, 22, 26, 255));
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->PushClipRect(origin, ImVec2(origin.x + size.x, origin.y + size.y), true);
+        draw->AddRectFilled(origin, ImVec2(origin.x + size.x, origin.y + size.y),
+                            IM_COL32(20, 22, 26, 255));
 
-		const float plotLeft = origin.x + headerWidth;
-		const float plotWidth = (std::max)(size.x - headerWidth, 32.0f);
-		const double ticksPerPixel = static_cast<double>(viewSpan) / plotWidth;
+        const float plotLeft = origin.x + headerWidth;
+        const float plotWidth = (std::max)(size.x - headerWidth, 32.0f);
+        const double ticksPerPixel = static_cast<double>(viewSpan) / plotWidth;
 
-		auto tick_to_x = [&](ce::profile_tick tick) -> float
-		{
-			const double offset = static_cast<double>(tick) - static_cast<double>(viewBegin);
-			return plotLeft + static_cast<float>(offset / ticksPerPixel);
-		};
+        auto tick_to_x = [&](ce::profile_tick tick) -> float
+        {
+            const double offset = static_cast<double>(tick) - static_cast<double>(viewBegin);
+            return plotLeft + static_cast<float>(offset / ticksPerPixel);
+        };
 
-		// ── 위쪽 자 — ms ───────────────────────────────────────────────────
-		//
-		// 0 은 **선택한 구간의 시작**이다. 절대 tick 을 적으면 자릿수가 열
-		// 자리를 넘어 아무것도 읽히지 않고, 프레임마다 값이 통째로 바뀐다.
-		const float rulerTop = origin.y;
-		const float rulerBottom = rulerTop + rulerHeight;
-		draw->AddRectFilled(ImVec2(origin.x, rulerTop),
-		                    ImVec2(origin.x + size.x, rulerBottom),
-		                    IM_COL32(32, 35, 42, 255));
-		draw->AddText(ImVec2(origin.x + 4.0f, rulerTop + 2.0f),
-		              IM_COL32(150, 158, 172, 255), "ms");
+        // ── 위쪽 자 — ms ───────────────────────────────────────────────────
+        //
+        // 0 은 **선택한 구간의 시작**이다. 절대 tick 을 적으면 자릿수가 열
+        // 자리를 넘어 아무것도 읽히지 않고, 프레임마다 값이 통째로 바뀐다.
+        const float rulerTop = origin.y;
+        const float rulerBottom = rulerTop + rulerHeight;
+        draw->AddRectFilled(ImVec2(origin.x, rulerTop),
+                            ImVec2(origin.x + size.x, rulerBottom),
+                            IM_COL32(32, 35, 42, 255));
+        draw->AddText(ImVec2(origin.x + 4.0f, rulerTop + 2.0f),
+                      IM_COL32(150, 158, 172, 255), "ms");
 
-		{
-			const double originMs = ticks_to_milliseconds(aggregate.tick_begin());
-			const double beginMs = ticks_to_milliseconds(viewBegin) - originMs;
-			const double spanMs = ticks_to_milliseconds(viewSpan);
-			const double stepMs = nice_step(spanMs * kRulerLabelSpacing / plotWidth);
+        {
+            const double originMs = ticks_to_milliseconds(aggregate.tick_begin());
+            const double beginMs = ticks_to_milliseconds(viewBegin) - originMs;
+            const double spanMs = ticks_to_milliseconds(viewSpan);
+            const double stepMs = nice_step(spanMs * kRulerLabelSpacing / plotWidth);
 
-			// 첫 눈금은 시야 안의 첫 배수다.
-			double markMs = std::ceil(beginMs / stepMs) * stepMs;
-			for (; markMs <= beginMs + spanMs; markMs += stepMs)
-			{
-				const float x = plotLeft +
-					static_cast<float>((markMs - beginMs) / spanMs) * plotWidth;
+            // 첫 눈금은 시야 안의 첫 배수다.
+            double markMs = std::ceil(beginMs / stepMs) * stepMs;
+            for (; markMs <= beginMs + spanMs; markMs += stepMs)
+            {
+                const float x = plotLeft +
+                    static_cast<float>((markMs - beginMs) / spanMs) * plotWidth;
 
-				draw->AddLine(ImVec2(x, rulerBottom - 6.0f), ImVec2(x, rulerBottom),
-				              IM_COL32(170, 178, 192, 220));
+                draw->AddLine(ImVec2(x, rulerBottom - 6.0f), ImVec2(x, rulerBottom),
+                              IM_COL32(170, 178, 192, 220));
 
-				// 눈금선은 레인까지 내린다. 자와 막대를 눈으로 맞추는 일이
-				// 없어야 자가 자 노릇을 한다.
-				draw->AddLine(ImVec2(x, rulerBottom), ImVec2(x, origin.y + size.y),
-				              IM_COL32(255, 255, 255, 14));
+                // 눈금선은 레인까지 내린다. 자와 막대를 눈으로 맞추는 일이
+                // 없어야 자가 자 노릇을 한다.
+                draw->AddLine(ImVec2(x, rulerBottom), ImVec2(x, origin.y + size.y),
+                              IM_COL32(255, 255, 255, 14));
 
-				char label[32];
-				if (stepMs >= 1.0)      { std::snprintf(label, sizeof(label), "%.0f", markMs); }
-				else if (stepMs >= 0.1) { std::snprintf(label, sizeof(label), "%.1f", markMs); }
-				else                    { std::snprintf(label, sizeof(label), "%.2f", markMs); }
-				draw->AddText(ImVec2(x + 3.0f, rulerTop + 2.0f),
-				              IM_COL32(190, 198, 212, 255), label);
-			}
-		}
+                char label[32];
+                if (stepMs >= 1.0)
+                {
+                    std::snprintf(label, sizeof(label), "%.0f", markMs);
+                }
+                else if (stepMs >= 0.1)
+                {
+                    std::snprintf(label, sizeof(label), "%.1f", markMs);
+                }
+                else
+                {
+                    std::snprintf(label, sizeof(label), "%.2f", markMs);
+                }
+                draw->AddText(ImVec2(x + 3.0f, rulerTop + 2.0f),
+                              IM_COL32(190, 198, 212, 255), label);
+            }
+        }
 
-		// ── §7.3 트랙 1: 프레임 경계와 사건 ────────────────────────────────
-		//
-		// ★ 맨 위에 둔다. 아래 레인의 막대가 어느 프레임의 것인지는 이 띠가
-		//   없으면 읽을 수 없다 — 확대하면 프레임 번호가 화면에서 사라지고,
-		//   그때 타임라인은 "무언가 오래 걸린다" 까지만 말한다.
-		const float stripTop = rulerBottom;
-		const float stripBottom = stripTop + stripHeight;
-		const ce::frame_boundary* hoveredFrame = nullptr;
-		const ce::profile_event* hoveredInstant = nullptr;
+        // ── §7.3 트랙 1: 프레임 경계와 사건 ────────────────────────────────
+        //
+        // ★ 맨 위에 둔다. 아래 레인의 막대가 어느 프레임의 것인지는 이 띠가
+        //   없으면 읽을 수 없다 — 확대하면 프레임 번호가 화면에서 사라지고,
+        //   그때 타임라인은 "무언가 오래 걸린다" 까지만 말한다.
+        const float stripTop = rulerBottom;
+        const float stripBottom = stripTop + stripHeight;
+        const ce::frame_boundary* hoveredFrame = nullptr;
+        const ce::profile_event* hoveredInstant = nullptr;
 
-		draw->AddRectFilled(ImVec2(origin.x, stripTop), ImVec2(origin.x + size.x, stripBottom),
-		                    IM_COL32(28, 31, 37, 255));
-		draw->AddText(ImVec2(origin.x + 4.0f, stripTop + 3.0f),
-		              IM_COL32(150, 158, 172, 255), "Frames");
+        draw->AddRectFilled(ImVec2(origin.x, stripTop), ImVec2(origin.x + size.x, stripBottom),
+                            IM_COL32(28, 31, 37, 255));
+        draw->AddText(ImVec2(origin.x + 4.0f, stripTop + 3.0f),
+                      IM_COL32(150, 158, 172, 255), "Frames");
 
-		for (const ce::frame_boundary& boundary : aggregate.boundaries())
-		{
-			if (boundary.tick_end < viewBegin || boundary.tick_begin > viewBegin + viewSpan)
-			{
-				continue;
-			}
+        for (const ce::frame_boundary& boundary : aggregate.boundaries())
+        {
+            if (boundary.tick_end < viewBegin || boundary.tick_begin > viewBegin + viewSpan)
+            {
+                continue;
+            }
 
-			const float x0 = (std::max)(tick_to_x(boundary.tick_begin), plotLeft);
-			const float x1 = tick_to_x(boundary.tick_end);
+            const float x0 = (std::max)(tick_to_x(boundary.tick_begin), plotLeft);
+            const float x1 = tick_to_x(boundary.tick_end);
 
-			// ★ 고른 프레임을 띠로 칠한다. 창 전체를 그리게 된 뒤로는 "지금
-			//   어느 프레임을 표에서 보고 있는가" 가 그림에서 사라졌다.
-			if (boundary.engine_frame >= view.selected_first()
-			    && boundary.engine_frame <= view.selected_last())
-			{
-				draw->AddRectFilled(ImVec2(x0, stripTop),
-				                    ImVec2((std::max)(x1, x0 + 1.0f), origin.y + size.y),
-				                    IM_COL32(90, 150, 210, 30));
-			}
+            // ★ 고른 프레임을 띠로 칠한다. 창 전체를 그리게 된 뒤로는 "지금
+            //   어느 프레임을 표에서 보고 있는가" 가 그림에서 사라졌다.
+            if (boundary.engine_frame >= view.selected_first()
+                && boundary.engine_frame <= view.selected_last())
+            {
+                draw->AddRectFilled(ImVec2(x0, stripTop),
+                                    ImVec2((std::max)(x1, x0 + 1.0f), origin.y + size.y),
+                                    IM_COL32(90, 150, 210, 30));
+            }
 
-			// 경계선은 띠만이 아니라 **레인 전체를 가른다.** 띠 안에만 그으면
-			// 아래 막대와 눈으로 맞춰야 하고, 그 맞춤은 확대할수록 틀어진다.
-			draw->AddLine(ImVec2(x0, stripTop), ImVec2(x0, origin.y + size.y),
-			              IM_COL32(70, 78, 92, 255));
+            // 경계선은 띠만이 아니라 **레인 전체를 가른다.** 띠 안에만 그으면
+            // 아래 막대와 눈으로 맞춰야 하고, 그 맞춤은 확대할수록 틀어진다.
+            draw->AddLine(ImVec2(x0, stripTop), ImVec2(x0, origin.y + size.y),
+                          IM_COL32(70, 78, 92, 255));
 
-			// 번호 전체가 들어갈 때만 그린다. 좁은 칸의 잘린 숫자는 옆 칸과 섞인다.
-			char label[32];
-			std::snprintf(label, sizeof(label), "%u", boundary.engine_frame);
-			if (x1 - x0 >= ImGui::CalcTextSize(label).x + 8.0f)
-			{
-				draw->PushClipRect(ImVec2(x0 + 2.0f, stripTop), ImVec2(x1 - 1.0f, stripBottom), true);
-				draw->AddText(ImVec2(x0 + 3.0f, stripTop + 3.0f),
-				              IM_COL32(190, 198, 212, 255), label);
-				draw->PopClipRect();
-			}
+            // 번호 전체가 들어갈 때만 그린다. 좁은 칸의 잘린 숫자는 옆 칸과 섞인다.
+            char label[32];
+            std::snprintf(label, sizeof(label), "%u", boundary.engine_frame);
+            if (x1 - x0 >= ImGui::CalcTextSize(label).x + 8.0f)
+            {
+                draw->PushClipRect(ImVec2(x0 + 2.0f, stripTop), ImVec2(x1 - 1.0f, stripBottom), true);
+                draw->AddText(ImVec2(x0 + 3.0f, stripTop + 3.0f),
+                              IM_COL32(190, 198, 212, 255), label);
+                draw->PopClipRect();
+            }
 
-			if (hovered)
-			{
-				const ImVec2 mouse = ImGui::GetIO().MousePos;
-				if (mouse.x >= x0 && mouse.x <= x1 &&
-				    mouse.y >= stripTop && mouse.y <= stripBottom)
-				{
-					hoveredFrame = &boundary;
-				}
-			}
-		}
+            if (hovered)
+            {
+                const ImVec2 mouse = ImGui::GetIO().MousePos;
+                if (mouse.x >= x0 && mouse.x <= x1 &&
+                    mouse.y >= stripTop && mouse.y <= stripBottom)
+                {
+                    hoveredFrame = &boundary;
+                }
+            }
+        }
 
-		// 길이가 없는 사건. 레인이 아니라 여기 모인다 — 어느 스레드가 냈든
-		// "언제 일어났는가" 가 이 트랙이 답하는 물음이기 때문이다.
-		for (const ce::profile_event& instant : aggregate.instants())
-		{
-			if (instant.tick_begin < viewBegin || instant.tick_begin > viewBegin + viewSpan)
-			{
-				continue;
-			}
+        // 길이가 없는 사건. 레인이 아니라 여기 모인다 — 어느 스레드가 냈든
+        // "언제 일어났는가" 가 이 트랙이 답하는 물음이기 때문이다.
+        const auto instants = aggregate.instants();
+        const auto firstInstant = std::lower_bound(instants.begin(), instants.end(), viewBegin,
+            [](const ce::profile_event& event, ce::profile_tick tick) { return event.tick_begin < tick; });
+        for (auto item = firstInstant; item != instants.end() && item->tick_begin <= viewBegin + viewSpan; ++item)
+        {
+            const ce::profile_event& instant = *item;
+            if (instant.tick_begin < viewBegin || instant.tick_begin > viewBegin + viewSpan)
+            {
+                continue;
+            }
 
-			const float x = tick_to_x(instant.tick_begin);
-			if (x < plotLeft) continue;
+            const float x = tick_to_x(instant.tick_begin);
+            if (x < plotLeft)
+            {
+                continue;
+            }
+            const float y = stripBottom - kInstantMarkRadius - 1.0f;
+            const ImVec2 points[3] = {
+                ImVec2(x, y - kInstantMarkRadius),
+                ImVec2(x - kInstantMarkRadius, y + kInstantMarkRadius),
+                ImVec2(x + kInstantMarkRadius, y + kInstantMarkRadius),
+            };
+            draw->AddTriangleFilled(points[0], points[1], points[2],
+                                    IM_COL32(240, 190, 90, 255));
+            draw->AddLine(ImVec2(x, stripBottom), ImVec2(x, origin.y + size.y),
+                          IM_COL32(150, 120, 60, 160));
 
-			const float y = stripBottom - kInstantMarkRadius - 1.0f;
-			const ImVec2 points[3] = {
-				ImVec2(x, y - kInstantMarkRadius),
-				ImVec2(x - kInstantMarkRadius, y + kInstantMarkRadius),
-				ImVec2(x + kInstantMarkRadius, y + kInstantMarkRadius),
-			};
-			draw->AddTriangleFilled(points[0], points[1], points[2],
-			                        IM_COL32(240, 190, 90, 255));
-			draw->AddLine(ImVec2(x, stripBottom), ImVec2(x, origin.y + size.y),
-			              IM_COL32(150, 120, 60, 160));
+            if (hovered)
+            {
+                const ImVec2 mouse = ImGui::GetIO().MousePos;
+                if (std::abs(mouse.x - x) <= kInstantMarkRadius + 2.0f &&
+                    mouse.y >= stripTop && mouse.y <= stripBottom)
+                {
+                    hoveredInstant = &instant;
+                }
+            }
+        }
 
-			if (hovered)
-			{
-				const ImVec2 mouse = ImGui::GetIO().MousePos;
-				if (std::abs(mouse.x - x) <= kInstantMarkRadius + 2.0f &&
-				    mouse.y >= stripTop && mouse.y <= stripBottom)
-				{
-					hoveredInstant = &instant;
-				}
-			}
-		}
-
-		// 레인. 순서는 코어가 정한 §7.3 의 트랙 순서(game → command/worker →
-		// script → GPU)를 그대로 쓴다. 여기서 다시 세우면 그 순서가 옳은지
-		// 물을 수단이 눈뿐이 된다 — 지금은 코어 프로브가 묻는다.
-		float laneTop = stripBottom + kLanePadding;
-		const ce::profile_event* hoveredSpan = nullptr;
-		const ce::thread_summary* hoveredThread = nullptr;
+        // 레인. 순서는 코어가 정한 §7.3 의 트랙 순서(game → command/worker →
+        // script → GPU)를 그대로 쓴다. 여기서 다시 세우면 그 순서가 옳은지
+        // 물을 수단이 눈뿐이 된다 — 지금은 코어 프로브가 묻는다.
+        float laneTop = stripBottom + kLanePadding;
+        const ce::profile_event* hoveredSpan = nullptr;
+        const ce::thread_summary* hoveredThread = nullptr;
         const float visibleTop = draw->GetClipRectMin().y;
         const float visibleBottom = draw->GetClipRectMax().y;
         const ImVec2 mouse = ImGui::GetIO().MousePos;
@@ -516,59 +483,68 @@ namespace editor::profiler_view
         std::uint64_t drawnSpanCount = 0;
         std::uint64_t markerMeasurementCount = 0;
 
-		for (const ce::thread_summary& thread : visibleThreads)
-		{
-			const bool collapsed = collapsedThreads.contains(thread.thread_slot);
-			const int laneRows = collapsed ? kLaneHeaderRows :
-				(std::max)(static_cast<int>(thread.max_depth) + 1, kLaneHeaderRows);
-			const float laneHeight = static_cast<float>(laneRows) * rowHeight + kLanePadding;
-			if (laneTop + laneHeight < visibleTop || laneTop > visibleBottom)
-			{
-				laneTop += laneHeight;
-				continue;
-			}
-			draw->AddRectFilled(ImVec2(origin.x, laneTop),
-				ImVec2(plotLeft, laneTop + laneHeight - kLanePadding * 0.5f),
-				IM_COL32(25, 28, 33, 255));
-			draw->PushClipRect(ImVec2(origin.x, laneTop),
-				ImVec2(plotLeft - 2.0f, laneTop + laneHeight), true);
-			draw->AddText(ImVec2(origin.x + 5.0f, laneTop),
-				IM_COL32(175, 185, 200, 255), collapsed ? ">" : "v");
-			draw->AddText(ImVec2(origin.x + 24.0f, laneTop),
-			              IM_COL32(200, 205, 215, 255),
-			              thread_name(view.capture(), thread.thread_slot));
+        for (const ce::thread_summary& thread : visibleThreads)
+        {
+            const bool collapsed = collapsedThreads.contains(thread.thread_slot);
+            const int laneRows = collapsed ? kLaneHeaderRows :
+                (std::max)(static_cast<int>(thread.max_depth) + 1, kLaneHeaderRows);
+            const float laneHeight = static_cast<float>(laneRows) * rowHeight + kLanePadding;
+            if (laneTop + laneHeight < visibleTop || laneTop > visibleBottom)
+            {
+                laneTop += laneHeight;
+                continue;
+            }
+            draw->AddRectFilled(ImVec2(origin.x, laneTop),
+                ImVec2(plotLeft, laneTop + laneHeight - kLanePadding * 0.5f),
+                IM_COL32(25, 28, 33, 255));
+            draw->PushClipRect(ImVec2(origin.x, laneTop),
+                ImVec2(plotLeft - 2.0f, laneTop + laneHeight), true);
+            draw->AddText(ImVec2(origin.x + 5.0f, laneTop),
+                IM_COL32(175, 185, 200, 255), collapsed ? ">" : "v");
+            draw->AddText(ImVec2(origin.x + 24.0f, laneTop),
+                          IM_COL32(200, 205, 215, 255),
+                          thread_name(capture, thread.thread_slot));
 
-			char lane[64];
-			if (thread.event_count == 0)
-				std::snprintf(lane, sizeof(lane), "완료 이벤트 없음");
-			else
-				std::snprintf(lane, sizeof(lane), "%.3f ms",
-					ticks_to_milliseconds(thread.root_ticks));
-			draw->AddText(ImVec2(origin.x + 24.0f, laneTop + rowHeight),
-			              IM_COL32(130, 140, 155, 255), lane);
-			draw->PopClipRect();
-			if (hovered)
-			{
-				const ImVec2 mouse = ImGui::GetIO().MousePos;
-				if (mouse.x >= origin.x && mouse.x < plotLeft &&
-					mouse.y >= laneTop && mouse.y < laneTop + laneHeight)
-				{
-					hoveredThread = &thread;
-					if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-					{
-						if (collapsed) collapsedThreads.erase(thread.thread_slot);
-						else collapsedThreads.insert(thread.thread_slot);
-					}
-				}
-			}
+            char lane[64];
+            if (thread.event_count == 0)
+            {
+                std::snprintf(lane, sizeof(lane), "완료 이벤트 없음");
+            }
+            else
+            {
+                std::snprintf(lane, sizeof(lane), "%.3f ms", ticks_to_milliseconds(thread.root_ticks));
+            }
+            draw->AddText(ImVec2(origin.x + 24.0f, laneTop + rowHeight),
+                          IM_COL32(130, 140, 155, 255), lane);
+            draw->PopClipRect();
+            if (hovered)
+            {
+                const ImVec2 mouse = ImGui::GetIO().MousePos;
+                if (mouse.x >= origin.x && mouse.x < plotLeft &&
+                    mouse.y >= laneTop && mouse.y < laneTop + laneHeight)
+                {
+                    hoveredThread = &thread;
+                    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+                    {
+                        if (collapsed)
+                        {
+                            collapsedThreads.erase(thread.thread_slot);
+                        }
+                        else
+                        {
+                            collapsedThreads.insert(thread.thread_slot);
+                        }
+                    }
+                }
+            }
 
-            const auto indexedLane = cache.lanes_.find(thread.thread_slot);
-            if (indexedLane != cache.lanes_.end())
+            const auto indexedLane = prepared->lanes_.find(thread.thread_slot);
+            if (indexedLane != prepared->lanes_.end())
             {
                 const auto& rows = indexedLane->second;
                 // 깊이를 먼저 잘라 화면 밖 행의 시간 조회·색·문자 폭 계산도 생략한다.
                 const auto firstRow = std::lower_bound(rows.begin(), rows.end(), visibleTop,
-                    [&](const timeline_depth& row, float top)
+                    [&](const ce::timeline_depth& row, float top)
                     {
                         return laneTop + static_cast<float>(row.depth_) * rowHeight + rowHeight - 2.0f < top;
                     });
@@ -679,116 +655,120 @@ namespace editor::profiler_view
                 }
             }
 
-			laneTop += laneHeight;
-			draw->AddLine(ImVec2(origin.x, laneTop - kLanePadding * 0.5f),
-			              ImVec2(origin.x + size.x, laneTop - kLanePadding * 0.5f),
-			              IM_COL32(60, 64, 72, 255));
-		}
+            laneTop += laneHeight;
+            draw->AddLine(ImVec2(origin.x, laneTop - kLanePadding * 0.5f),
+                          ImVec2(origin.x + size.x, laneTop - kLanePadding * 0.5f),
+                          IM_COL32(60, 64, 72, 255));
+        }
 
-		draw->AddLine(ImVec2(plotLeft, origin.y), ImVec2(plotLeft, origin.y + size.y),
-		              IM_COL32(80, 86, 96, 255));
-		draw->PopClipRect();
+        draw->AddLine(ImVec2(plotLeft, origin.y), ImVec2(plotLeft, origin.y + size.y),
+                      IM_COL32(80, 86, 96, 255));
+        draw->PopClipRect();
 
-		if (hoveredInstant)
-		{
-			ImGui::BeginTooltip();
-			ImGui::TextUnformatted(marker_name(view.capture(), hoveredInstant->marker));
-			ImGui::Text("frame %u  ·  %s", hoveredInstant->frame,
-			            thread_name(view.capture(), hoveredInstant->thread_slot));
-			ImGui::TextDisabled("길이가 없는 사건 - 일어난 순간만 있다");
-			ImGui::EndTooltip();
-		}
-		else if (hoveredFrame)
-		{
-			const ce::profile_tick length = (hoveredFrame->tick_end > hoveredFrame->tick_begin)
-				? (hoveredFrame->tick_end - hoveredFrame->tick_begin) : 0;
-			ImGui::SetTooltip("frame %u\n%.4f ms", hoveredFrame->engine_frame,
-			                  ticks_to_milliseconds(length));
-		}
-		else if (hoveredSpan)
-		{
-			const ce::profile_tick length = (hoveredSpan->tick_end > hoveredSpan->tick_begin)
-				? (hoveredSpan->tick_end - hoveredSpan->tick_begin) : 0;
-			const bool truncated =
-				ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_begin) ||
-				ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_end);
+        if (hoveredInstant)
+        {
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(marker_name(capture, hoveredInstant->marker));
+            ImGui::Text("frame %u  ·  %s", hoveredInstant->frame,
+                        thread_name(capture, hoveredInstant->thread_slot));
+            ImGui::TextDisabled("길이가 없는 사건 - 일어난 순간만 있다");
+            ImGui::EndTooltip();
+        }
+        else if (hoveredFrame)
+        {
+            const ce::profile_tick length = (hoveredFrame->tick_end > hoveredFrame->tick_begin)
+                ? (hoveredFrame->tick_end - hoveredFrame->tick_begin) : 0;
+            ImGui::SetTooltip("frame %u\n%.4f ms", hoveredFrame->engine_frame,
+                              ticks_to_milliseconds(length));
+        }
+        else if (hoveredSpan)
+        {
+            const ce::profile_tick length = (hoveredSpan->tick_end > hoveredSpan->tick_begin)
+                ? (hoveredSpan->tick_end - hoveredSpan->tick_begin) : 0;
+            const bool truncated =
+                ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_begin) ||
+                ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_end);
 
-			ImGui::BeginTooltip();
-			ImGui::TextUnformatted(marker_name(view.capture(), hoveredSpan->marker));
-			ImGui::Text("%.4f ms  ·  frame %u", ticks_to_milliseconds(length),
-			            hoveredSpan->frame);
+            ImGui::BeginTooltip();
+            ImGui::TextUnformatted(marker_name(capture, hoveredSpan->marker));
+            ImGui::Text("%.4f ms  ·  frame %u", ticks_to_milliseconds(length),
+                        hoveredSpan->frame);
 
-			if (ce::has_flag(hoveredSpan->flags, ce::event_flags::gpu_span))
-			{
-				// §7.3 이 GPU bar 에 싣기로 한 것들. 패스 이름은 위의 마커다.
-				//
-				// ★ 제출 번호와 뷰가 있어야 쓸모가 있다. 같은 프레임에 씬뷰와
-				//   게임뷰의 제출이 나란히 서므로, 이름만으로는 같은 패스가
-				//   두 번 그려진 것처럼 보인다 — §0.5.10 이 83% 를 못 보던
-				//   이유가 정확히 그 구분의 부재였다.
-				ImGui::Separator();
-				ImGui::Text("GPU  ·  submission %u  ·  view %u  ·  queue %u",
-				            hoveredSpan->submission,
-				            static_cast<unsigned>(hoveredSpan->view),
-				            static_cast<unsigned>(hoveredSpan->queue));
-				ImGui::TextDisabled("펜스가 끝난 뒤에야 읽힌다 - 제 프레임 칸으로 돌려보낸 것이다");
-			}
-			else
-			{
-				ImGui::Text("depth %u", static_cast<unsigned>(hoveredSpan->depth));
-				if (hoveredSpan->cpu.session != 0)
-				{
-					ImGui::Text("session %llu / tick %llu / task %llu",
-						static_cast<unsigned long long>(hoveredSpan->cpu.session),
-						static_cast<unsigned long long>(hoveredSpan->cpu.tick),
-						static_cast<unsigned long long>(hoveredSpan->cpu.task));
-				}
-			}
+            if (ce::has_flag(hoveredSpan->flags, ce::event_flags::gpu_span))
+            {
+                // §7.3 이 GPU bar 에 싣기로 한 것들. 패스 이름은 위의 마커다.
+                //
+                // ★ 제출 번호와 뷰가 있어야 쓸모가 있다. 같은 프레임에 씬뷰와
+                //   게임뷰의 제출이 나란히 서므로, 이름만으로는 같은 패스가
+                //   두 번 그려진 것처럼 보인다 — §0.5.10 이 83% 를 못 보던
+                //   이유가 정확히 그 구분의 부재였다.
+                ImGui::Separator();
+                ImGui::Text("GPU  ·  submission %u  ·  view %u  ·  queue %u",
+                            hoveredSpan->submission,
+                            static_cast<unsigned>(hoveredSpan->view),
+                            static_cast<unsigned>(hoveredSpan->queue));
+                ImGui::TextDisabled("펜스가 끝난 뒤에야 읽힌다 - 제 프레임 칸으로 돌려보낸 것이다");
+            }
+            else
+            {
+                ImGui::Text("depth %u", static_cast<unsigned>(hoveredSpan->depth));
+                if (hoveredSpan->cpu.session != 0)
+                {
+                    ImGui::Text("session %llu / tick %llu / task %llu",
+                        static_cast<unsigned long long>(hoveredSpan->cpu.session),
+                        static_cast<unsigned long long>(hoveredSpan->cpu.tick),
+                        static_cast<unsigned long long>(hoveredSpan->cpu.task));
+                }
+            }
 
-			if (truncated)
-			{
-				ImGui::TextDisabled("잘린 구간 - 길이가 실제보다 짧다");
-			}
-			ImGui::EndTooltip();
-		}
-		else if (hoveredThread)
-		{
-			if (hoveredThread->event_count == 0)
-				ImGui::SetTooltip("%s\n선택 시야에 완료된 이벤트 없음\n작업 진행 중이거나 이 시야 밖일 수 있음",
-					thread_name(view.capture(), hoveredThread->thread_slot));
-			else
-				ImGui::SetTooltip("%s\n루트 %.3f ms · 깊이 %u\n클릭하여 계층 펼치기/접기",
-					thread_name(view.capture(), hoveredThread->thread_slot),
-					ticks_to_milliseconds(hoveredThread->root_ticks),
-					static_cast<unsigned>(hoveredThread->max_depth));
-		}
+            if (truncated)
+            {
+                ImGui::TextDisabled("잘린 구간 - 길이가 실제보다 짧다");
+            }
+            ImGui::EndTooltip();
+        }
+        else if (hoveredThread)
+        {
+            if (hoveredThread->event_count == 0)
+            {
+                ImGui::SetTooltip("%s\n선택 시야에 완료된 이벤트 없음\n작업 진행 중이거나 이 시야 밖일 수 있음",
+                    thread_name(capture, hoveredThread->thread_slot));
+            }
+            else
+            {
+                ImGui::SetTooltip("%s\n루트 %.3f ms · 깊이 %u\n클릭하여 계층 펼치기/접기",
+                    thread_name(capture, hoveredThread->thread_slot),
+                    ticks_to_milliseconds(hoveredThread->root_ticks),
+                    static_cast<unsigned>(hoveredThread->max_depth));
+            }
+        }
 
-		// 휠로 확대. 커서 아래의 tick 을 제자리에 둔다 — 그러지 않으면 확대할
-		// 때마다 보던 것이 화면 밖으로 밀려난다.
-		if (hovered && ImGui::GetIO().MousePos.x >= plotLeft)
-		{
-			const float wheel = ImGui::GetIO().MouseWheel;
-			if (wheel != 0.0f)
-			{
-				const double offset =
-					static_cast<double>(ImGui::GetIO().MousePos.x - plotLeft) * ticksPerPixel;
-				const ce::profile_tick pivot =
-					viewBegin + static_cast<ce::profile_tick>((std::max)(offset, 0.0));
-				view.zoom_view(wheel > 0.0f ? 0.8 : 1.25, pivot);
-			}
-		}
+        // 휠로 확대. 커서 아래의 tick 을 제자리에 둔다 — 그러지 않으면 확대할
+        // 때마다 보던 것이 화면 밖으로 밀려난다.
+        if (hovered && ImGui::GetIO().MousePos.x >= plotLeft)
+        {
+            const float wheel = ImGui::GetIO().MouseWheel;
+            if (wheel != 0.0f)
+            {
+                const double offset =
+                    static_cast<double>(ImGui::GetIO().MousePos.x - plotLeft) * ticksPerPixel;
+                const ce::profile_tick pivot =
+                    viewBegin + static_cast<ce::profile_tick>((std::max)(offset, 0.0));
+                view.zoom_view(wheel > 0.0f ? 0.8 : 1.25, pivot);
+            }
+        }
 
-		// 끌어서 이동. 화면에서 왼쪽으로 끌면 뒤쪽을 본다.
-		if (active && ImGui::GetIO().MousePos.x >= plotLeft &&
-			ImGui::IsMouseDragging(ImGuiMouseButton_Left))
-		{
-			const float dragX = ImGui::GetIO().MouseDelta.x;
-			if (dragX != 0.0f)
-			{
-				view.pan_view(static_cast<std::int64_t>(-dragX * ticksPerPixel));
-			}
-		}
-		ImGui::EndChild();
+        // 끌어서 이동. 화면에서 왼쪽으로 끌면 뒤쪽을 본다.
+        if (active && ImGui::GetIO().MousePos.x >= plotLeft &&
+            ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        {
+            const float dragX = ImGui::GetIO().MouseDelta.x;
+            if (dragX != 0.0f)
+            {
+                view.pan_view(static_cast<std::int64_t>(-dragX * ticksPerPixel));
+            }
+        }
+        ImGui::EndChild();
 
         // 반복 재생에서도 조회·도형·문자 측정 비용을 구분해 확인할 수 있게 한다.
         ImGui::TextDisabled("구간: 후보 %llu / 화면 %llu / 도형 %llu · 마커 폭 측정 %llu · 밀도 %llu",
@@ -801,157 +781,183 @@ namespace editor::profiler_view
                               "툴팁은 밀도 막대가 아닌 원본 이벤트의 범위로 선택합니다.");
         }
 
-		// The navigator covers the complete retained recording, while the
-		// detailed timeline keeps a fixed readable scale. Dragging it also moves
-		// the overview window to the relevant frames.
-		const auto retained = view.capture()->frames();
-		if (!retained.empty())
-		{
-			const ce::profile_tick recordingBegin = retained.front().tick_begin;
-			const ce::profile_tick recordingEnd = retained.back().tick_end;
-			const ce::profile_tick visible = view.view_span();
-			const ce::profile_tick recording = recordingEnd > recordingBegin
-				? recordingEnd - recordingBegin : visible;
-			ImGui::TextDisabled("전체 기록 %.1f ms  ·  현재 %.1f ms  ·  아래 막대를 끌어 이동",
-			                    ticks_to_milliseconds(recording), ticks_to_milliseconds(visible));
-			const float navigationHeight = (std::max)(ImGui::GetTextLineHeight() * 0.65f, 12.0f);
-			ImGui::Dummy(ImVec2(headerWidth, navigationHeight));
-			ImGui::SameLine(0.0f, 0.0f);
-			const ImVec2 navigationOrigin = ImGui::GetCursorScreenPos();
-			const float navigationWidth = (std::max)(ImGui::GetContentRegionAvail().x, 32.0f);
-			ImGui::InvisibleButton("##ProfilerTimeNavigator", ImVec2(navigationWidth, navigationHeight));
-			ImDrawList* navigator = ImGui::GetWindowDrawList();
-			navigator->AddRectFilled(navigationOrigin,
-				ImVec2(navigationOrigin.x + navigationWidth, navigationOrigin.y + navigationHeight),
-				IM_COL32(30, 34, 42, 255), 3.0f);
-			const float handleWidth = (std::min)(navigationWidth, (std::max)(16.0f,
-				static_cast<float>(static_cast<double>(visible) / recording) * navigationWidth));
-			const float travel = navigationWidth - handleWidth;
-			const double navigable = static_cast<double>(recording > visible ? recording - visible : 0);
-			const double offset = static_cast<double>(view.view_begin() > recordingBegin
-				? view.view_begin() - recordingBegin : 0);
-			const float handleX = navigationOrigin.x + (navigable > 0.0
-				? static_cast<float>(offset / navigable) * travel : 0.0f);
-			navigator->AddRectFilled(ImVec2(handleX, navigationOrigin.y),
-				ImVec2(handleX + handleWidth, navigationOrigin.y + navigationHeight),
-				IM_COL32(105, 173, 224, 235), 3.0f);
-			if (ImGui::IsItemHovered())
-				ImGui::SetTooltip("보존 프레임 %u..%u  |  현재 시야 %.1f ms",
-					retained.front().engine_frame, retained.back().engine_frame,
-					ticks_to_milliseconds(visible));
-			if (ImGui::IsItemActive() && travel > 0.0f)
-			{
-				const float mouse = ImGui::GetIO().MousePos.x - navigationOrigin.x - handleWidth * 0.5f;
-				const double ratio = static_cast<double>((std::clamp)(mouse / travel, 0.0f, 1.0f));
-				view.seek_view(recordingBegin + static_cast<ce::profile_tick>(ratio * navigable));
-			}
-		}
-	}
+        // 아래 이동 막대는 현재 적재 구간 전체를 나타낸다. 세부 타임라인의
+        // 읽기 쉬운 배율을 유지한 채 그래프 창도 해당 프레임으로 함께 옮긴다.
+        const auto retained = capture->frames();
+        if (!retained.empty())
+        {
+            const ce::profile_tick recordingBegin = retained.front().tick_begin;
+            const ce::profile_tick recordingEnd = retained.back().tick_end;
+            const ce::profile_tick visible = view.view_span();
+            const ce::profile_tick recording = recordingEnd > recordingBegin
+                ? recordingEnd - recordingBegin : visible;
+            ImGui::TextDisabled("전체 기록 %.1f ms  ·  현재 %.1f ms  ·  아래 막대를 끌어 이동",
+                                ticks_to_milliseconds(recording), ticks_to_milliseconds(visible));
+            const float navigationHeight = (std::max)(ImGui::GetTextLineHeight() * 0.65f, 12.0f);
+            ImGui::Dummy(ImVec2(headerWidth, navigationHeight));
+            ImGui::SameLine(0.0f, 0.0f);
+            const ImVec2 navigationOrigin = ImGui::GetCursorScreenPos();
+            const float navigationWidth = (std::max)(ImGui::GetContentRegionAvail().x, 32.0f);
+            ImGui::InvisibleButton("##ProfilerTimeNavigator", ImVec2(navigationWidth, navigationHeight));
+            ImDrawList* navigator = ImGui::GetWindowDrawList();
+            navigator->AddRectFilled(navigationOrigin,
+                ImVec2(navigationOrigin.x + navigationWidth, navigationOrigin.y + navigationHeight),
+                IM_COL32(30, 34, 42, 255), 3.0f);
+            const float handleWidth = (std::min)(navigationWidth, (std::max)(16.0f,
+                static_cast<float>(static_cast<double>(visible) / recording) * navigationWidth));
+            const float travel = navigationWidth - handleWidth;
+            const double navigable = static_cast<double>(recording > visible ? recording - visible : 0);
+            const double offset = static_cast<double>(view.view_begin() > recordingBegin
+                ? view.view_begin() - recordingBegin : 0);
+            const float handleX = navigationOrigin.x + (navigable > 0.0
+                ? static_cast<float>(offset / navigable) * travel : 0.0f);
+            navigator->AddRectFilled(ImVec2(handleX, navigationOrigin.y),
+                ImVec2(handleX + handleWidth, navigationOrigin.y + navigationHeight),
+                IM_COL32(105, 173, 224, 235), 3.0f);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("보존 프레임 %u..%u  |  현재 시야 %.1f ms",
+                    retained.front().engine_frame, retained.back().engine_frame,
+                    ticks_to_milliseconds(visible));
+            }
+            if (ImGui::IsItemActive() && travel > 0.0f)
+            {
+                const float mouse = ImGui::GetIO().MousePos.x - navigationOrigin.x - handleWidth * 0.5f;
+                const double ratio = static_cast<double>((std::clamp)(mouse / travel, 0.0f, 1.0f));
+                view.seek_view(recordingBegin + static_cast<ce::profile_tick>(ratio * navigable));
+            }
+        }
+    }
 
-	void draw_flame_graph()
-	{
-		const ce::capture_session* capture = reader().capture();
-		if (!capture) return;
-		const auto rows = reader().aggregate().hierarchy();
-		if (rows.empty())
-		{
-			ImGui::TextDisabled("선택 구간에 CPU 호출 구간이 없습니다.");
-			return;
-		}
-		const auto is_gpu = [capture](std::uint16_t slot)
-		{
-			for (const ce::thread_info& thread : capture->threads())
-				if (thread.slot == slot)
-					return thread.kind == ce::track_kind::gpu_graphics ||
-						thread.kind == ce::track_kind::gpu_compute;
-			return false;
-		};
-		double rootTotal = 0.0;
-		std::uint32_t maxDepth = 0;
-		for (std::uint32_t index = 0; index < rows.size();)
-		{
-			if (!is_gpu(rows[index].thread_slot)) rootTotal += static_cast<double>(rows[index].total_ticks);
-			index = (std::max)(rows[index].child_end, index + 1);
-		}
-		for (const auto& row : rows)
-			if (!is_gpu(row.thread_slot)) maxDepth = (std::max)(maxDepth, static_cast<std::uint32_t>(row.depth));
-		if (rootTotal <= 0.0)
-		{
-			ImGui::TextDisabled("선택 구간에 길이가 있는 CPU 호출 구간이 없습니다.");
-			return;
-		}
-		ImGui::TextUnformatted("CPU 호출 계층 · 선택 구간");
-		ImGui::SameLine();
-		ImGui::TextDisabled("막대 너비는 포함 시간, 색은 마커 식별용");
-		const float rowHeight = ImGui::GetTextLineHeight() + 8.0f;
-		const float canvasHeight = (maxDepth + 1) * rowHeight + 8.0f;
-		const float childHeight = (std::max)(220.0f,
-			(std::min)(canvasHeight + 20.0f, 420.0f));
-		if (!ImGui::BeginChild("##ProfilerFlameGraph", ImVec2(0.0f, childHeight), true))
-		{
-			ImGui::EndChild();
-			return;
-		}
-		const ImVec2 origin = ImGui::GetCursorScreenPos();
-		const float width = (std::max)(ImGui::GetContentRegionAvail().x, 80.0f);
-		ImGui::InvisibleButton("##FlameCanvas", ImVec2(width, canvasHeight));
-		const bool hovered = ImGui::IsItemHovered();
-		const ImVec2 mouse = ImGui::GetIO().MousePos;
-		ImDrawList* draw = ImGui::GetWindowDrawList();
-		draw->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + canvasHeight),
-			IM_COL32(24, 27, 33, 255));
-		const ce::aggregate_row* hoveredRow = nullptr;
-		const auto paint = [&](auto&& self, std::uint32_t index, float x, float w,
-		                       std::uint32_t depth) -> void
-		{
-			if (index >= rows.size() || w < 1.0f) return;
-			const ce::aggregate_row& row = rows[index];
-			const float y = origin.y + 4.0f + depth * rowHeight;
-			const std::uint32_t hash = row.marker * 2654435761u;
-			const ImU32 color = IM_COL32(90 + hash % 75, 105 + (hash >> 8) % 80,
-				135 + (hash >> 16) % 75, 255);
-			draw->AddRectFilled(ImVec2(x, y), ImVec2(x + w - 1.0f, y + rowHeight - 2.0f), color);
-			const char* name = marker_name(capture, row.marker);
-			if (w >= ImGui::CalcTextSize(name).x + 8.0f)
-				draw->AddText(ImVec2(x + 4.0f, y + 2.0f), IM_COL32(18, 22, 28, 255), name);
-			if (hovered && mouse.x >= x && mouse.x < x + w && mouse.y >= y && mouse.y < y + rowHeight)
-				hoveredRow = &row;
-			double childTotal = 0.0;
-			for (std::uint32_t child = row.child_begin; child < row.child_end && child < rows.size();)
-			{
-				childTotal += static_cast<double>(rows[child].total_ticks);
-				child = (std::max)(rows[child].child_end, child + 1);
-			}
-			const double denominator = (std::max)(static_cast<double>(row.total_ticks), childTotal);
-			if (denominator <= 0.0) return;
-			float childX = x;
-			for (std::uint32_t child = row.child_begin; child < row.child_end && child < rows.size();)
-			{
-				const float childWidth = w * static_cast<float>(rows[child].total_ticks / denominator);
-				self(self, child, childX, childWidth, depth + 1);
-				childX += childWidth;
-				child = (std::max)(rows[child].child_end, child + 1);
-			}
-		};
-		float rootX = origin.x;
-		for (std::uint32_t index = 0; index < rows.size();)
-		{
-			if (!is_gpu(rows[index].thread_slot))
-			{
-				const float rootWidth = width * static_cast<float>(rows[index].total_ticks / rootTotal);
-				paint(paint, index, rootX, rootWidth, 0);
-				rootX += rootWidth;
-			}
-			index = (std::max)(rows[index].child_end, index + 1);
-		}
-		if (hoveredRow)
-			ImGui::SetTooltip("%s\n%s · 포함 %.3f ms · Self %.3f ms · 호출 %llu%s",
-				marker_name(capture, hoveredRow->marker),
-				thread_name(capture, hoveredRow->thread_slot),
-				capture->milliseconds(hoveredRow->total_ticks),
-				capture->milliseconds(hoveredRow->self_ticks),
-				static_cast<unsigned long long>(hoveredRow->call_count),
-				hoveredRow->truncated ? " · 잘린 구간 포함" : "");
-		ImGui::EndChild();
-	}
+    void draw_flame_graph()
+    {
+        const ce::capture_session* capture = reader().capture();
+        if (!capture)
+        {
+            return;
+        }
+        const auto rows = reader().aggregate().hierarchy();
+        if (rows.empty())
+        {
+            ImGui::TextDisabled("선택 구간에 CPU 호출 구간이 없습니다.");
+            return;
+        }
+        const auto is_gpu = [capture](std::uint16_t slot)
+        {
+            for (const ce::thread_info& thread : capture->threads())
+            {
+                if (thread.slot == slot)
+                {
+                    return thread.kind == ce::track_kind::gpu_graphics ||
+                        thread.kind == ce::track_kind::gpu_compute;
+                }
+            }
+            return false;
+        };
+        double rootTotal = 0.0;
+        std::uint32_t maxDepth = 0;
+        for (std::uint32_t index = 0; index < rows.size();)
+        {
+            if (!is_gpu(rows[index].thread_slot))
+            {
+                rootTotal += static_cast<double>(rows[index].total_ticks);
+            }
+            index = (std::max)(rows[index].child_end, index + 1);
+        }
+        for (const auto& row : rows)
+        {
+            if (!is_gpu(row.thread_slot))
+            {
+                maxDepth = (std::max)(maxDepth, static_cast<std::uint32_t>(row.depth));
+            }
+        }
+        if (rootTotal <= 0.0)
+        {
+            ImGui::TextDisabled("선택 구간에 길이가 있는 CPU 호출 구간이 없습니다.");
+            return;
+        }
+        ImGui::TextUnformatted("CPU 호출 계층 · 선택 구간");
+        ImGui::SameLine();
+        ImGui::TextDisabled("막대 너비는 포함 시간, 색은 마커 식별용");
+        const float rowHeight = ImGui::GetTextLineHeight() + 8.0f;
+        const float canvasHeight = (maxDepth + 1) * rowHeight + 8.0f;
+        const float childHeight = (std::max)(220.0f,
+            (std::min)(canvasHeight + 20.0f, 420.0f));
+        if (!ImGui::BeginChild("##ProfilerFlameGraph", ImVec2(0.0f, childHeight), true))
+        {
+            ImGui::EndChild();
+            return;
+        }
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const float width = (std::max)(ImGui::GetContentRegionAvail().x, 80.0f);
+        ImGui::InvisibleButton("##FlameCanvas", ImVec2(width, canvasHeight));
+        const bool hovered = ImGui::IsItemHovered();
+        const ImVec2 mouse = ImGui::GetIO().MousePos;
+        ImDrawList* draw = ImGui::GetWindowDrawList();
+        draw->AddRectFilled(origin, ImVec2(origin.x + width, origin.y + canvasHeight),
+            IM_COL32(24, 27, 33, 255));
+        const ce::aggregate_row* hoveredRow = nullptr;
+        const auto paint = [&](auto&& self, std::uint32_t index, float x, float w,
+                               std::uint32_t depth) -> void
+        {
+            if (index >= rows.size() || w < 1.0f)
+            {
+                return;
+            }
+            const ce::aggregate_row& row = rows[index];
+            const float y = origin.y + 4.0f + depth * rowHeight;
+            const std::uint32_t hash = row.marker * 2654435761u;
+            const ImU32 color = IM_COL32(90 + hash % 75, 105 + (hash >> 8) % 80,
+                135 + (hash >> 16) % 75, 255);
+            draw->AddRectFilled(ImVec2(x, y), ImVec2(x + w - 1.0f, y + rowHeight - 2.0f), color);
+            const char* name = marker_name(capture, row.marker);
+            if (w >= ImGui::CalcTextSize(name).x + 8.0f)
+            {
+                draw->AddText(ImVec2(x + 4.0f, y + 2.0f), IM_COL32(18, 22, 28, 255), name);
+            }
+            if (hovered && mouse.x >= x && mouse.x < x + w && mouse.y >= y && mouse.y < y + rowHeight)
+            {
+                hoveredRow = &row;
+            }
+            double childTotal = 0.0;
+            for (std::uint32_t child = row.child_begin; child < row.child_end && child < rows.size();)
+            {
+                childTotal += static_cast<double>(rows[child].total_ticks);
+                child = (std::max)(rows[child].child_end, child + 1);
+            }
+            const double denominator = (std::max)(static_cast<double>(row.total_ticks), childTotal);
+            if (denominator <= 0.0)
+            {
+                return;
+            }
+            float childX = x;
+            for (std::uint32_t child = row.child_begin; child < row.child_end && child < rows.size();)
+            {
+                const float childWidth = w * static_cast<float>(rows[child].total_ticks / denominator);
+                self(self, child, childX, childWidth, depth + 1);
+                childX += childWidth;
+                child = (std::max)(rows[child].child_end, child + 1);
+            }
+        };
+        float rootX = origin.x;
+        for (std::uint32_t index = 0; index < rows.size();)
+        {
+            if (!is_gpu(rows[index].thread_slot))
+            {
+                const float rootWidth = width * static_cast<float>(rows[index].total_ticks / rootTotal);
+                paint(paint, index, rootX, rootWidth, 0);
+                rootX += rootWidth;
+            }
+            index = (std::max)(rows[index].child_end, index + 1);
+        }
+        if (hoveredRow)
+            ImGui::SetTooltip("%s\n%s · 포함 %.3f ms · Self %.3f ms · 호출 %llu%s",
+                marker_name(capture, hoveredRow->marker),
+                thread_name(capture, hoveredRow->thread_slot),
+                capture->milliseconds(hoveredRow->total_ticks),
+                capture->milliseconds(hoveredRow->self_ticks),
+                static_cast<unsigned long long>(hoveredRow->call_count),
+                hoveredRow->truncated ? " · 잘린 구간 포함" : "");
+        ImGui::EndChild();
+    }
 }
