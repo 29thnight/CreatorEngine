@@ -3,6 +3,7 @@
 #include "IAIComponent.h"
 #include "AIManager.h"
 #include "ClrHost.h"
+#include <cstdint>
 
 using namespace BT;
 
@@ -21,7 +22,9 @@ public:
 	void OnInitialized() override;
 	void OnAddedToScene() override;
 	void OnRemovingFromScene() override;
-	void InternalAIUpdate(float deltaSecond) override;
+    void InternalAIUpdate(float deltaSecond) override;
+    int GetTreeInstanceID() const { return m_treeInstanceId; }
+    uint64_t GetTreeRevision() const { return m_treeRevision; }
 	void OnUninitializing() override;
 	BlackBoard* GetBlackBoard();
 private:
@@ -30,16 +33,21 @@ private:
 	// ???洹몃옒?꾨? ?됲룊?섍쾶 ?댁꽌 愿由?痢≪뿉 ?섍린怨??몄뒪?댁뒪 id瑜?諛쏅뒗??(PHASE 9-8).
 	// 議곕┰怨??깆? ?꾨? 愿由?痢≪뿉???앸궃?????ㅼ씠?곕툕??id留??좊떎.
 	void SendGraphToManaged(const BTBuildGraph& graph);
+    void AdvanceTreeRevision();
 
 public:
 	void GraphToBuild();
-	void ClearTree()
-	{
-		// 愿由?痢??몃━瑜??대┛?? ?ㅼ씠?곕툕?먮뒗 ???댁긽 ?몃━ ?ㅼ껜媛 ?녿떎.
-		if (m_treeInstanceId < 0) return;
-		ClrHost::Get().DestroyBehaviorTree(m_treeInstanceId);
-		m_treeInstanceId = -1;
-	}
+    void ClearTree()
+    {
+        // 愿由?痢??몃━瑜??대┛?? ?ㅼ씠?곕툕?먮뒗 ???댁긽 ?몃━ ?ㅼ껜媛 ?녿떎.
+        if (m_treeInstanceId < 0)
+        {
+            return;
+        }
+        AdvanceTreeRevision();
+        ClrHost::Get().DestroyBehaviorTree(m_treeInstanceId);
+        m_treeInstanceId = -1;
+    }
 
 
 public:
@@ -54,4 +62,8 @@ private:
 	// m_root쨌m_built媛 ?덈뜕 ?먮━?????몃━ ?ㅼ껜???댁젣 愿由?痢≪뿉 ?덈떎.
 	[[reflgen::ignore]]
 	int m_treeInstanceId{ -1 };
+
+    // 관리 런타임이 정수 ID를 재사용해도 이전 그래프의 가시성 결과는 폐기한다.
+    [[reflgen::ignore]]
+    uint64_t m_treeRevision = 0;
 };

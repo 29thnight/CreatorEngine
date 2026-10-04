@@ -217,10 +217,10 @@ public:
 
 	// ⚠ 담는 쪽은 스레드 안전해야 한다.
 	//
-	// AI 갱신은 게임 스레드가 아니라 공용 job_scheduler 워커에서 돈다
-	// (Scene::EndFramePass 말미의 m_AIJob). 즉 QueueAITick은 그 스레드에서 불린다.
-	// 반대로 Flush는 게임 스레드 전용이다 — 관리 측 호출은 GC 때문에 그래야 한다.
-	// 애니메이션 키프레임(ScriptMessage)이 같은 상황이고 같은 규약을 쓴다.
+    // Scene의 AI 워커는 봉인된 값만 계산하고 LateUpdate가 게임 스레드에서
+    // identity를 검증한 뒤 QueueAITick을 호출한다. 큐의 기존 잠금은 유지한다.
+    // Flush 역시 게임 스레드 전용이다 — 관리 측 호출은 GC 때문에 그래야 한다.
+    // 큐를 거치는 이유는 기존 post-physics 틱 순서와 일괄 crossing을 보존하기 위해서다.
 	void QueueAITick(int instanceId, float deltaTime);
 	void FlushAITicks();
 

@@ -857,9 +857,42 @@ size_t Scene::CountHierarchyStoreMismatches() const
 	return mismatches;
 }
 
+void Scene::CollectAIUpdate(bool waitForCompletion)
+{
+    if (!m_AIJob.valid() || (!waitForCompletion && !m_AIJob.is_complete()))
+    {
+        return;
+    }
+
+    auto job = std::exchange(m_AIJob, {});
+    auto batch = std::exchange(m_aiUpdateBatch, {});
+    // is_complete만 보고 출력에 접근하지 않는다. wait는 콜백·캡처 해제까지
+    // 끝났음을 보장하므로 이 뒤에서만 워커가 쓴 결과를 읽거나 보관한다.
+    job.wait();
+    if (batch)
+    {
+        m_completedAIUpdates.push_back(std::move(batch));
+    }
+}
+
+void Scene::ApplyAIUpdate()
+{
+    CollectAIUpdate(false);
+    auto batches = std::exchange(m_completedAIUpdates, {});
+    for (const auto& batch : batches)
+    {
+        AIManagers->ApplyAIUpdate(*this, *batch);
+    }
+}
+
 void Scene::DrainAIUpdate()
 {
     auto job = std::exchange(m_AIJob, {});
+    // 콜백 자체도 batch를 소유한다. Scene 저장소를 먼저 비워도 워커는 값만
+    // 읽을 수 있으며, 수명 경계에서는 완료 결과로 새 틱을 큐에 넣지 않는다.
+    m_aiUpdateBatch.reset();
+    m_completedAIUpdates.clear();
+    m_aiTickBoundaryReached = false;
     job.wait();
 }
 
@@ -2843,7 +2876,6 @@ ce::physics::result<void> Scene::CommitPhysicsLayers()
 void Scene::FixedUpdate(float deltaSecond)
 {
     if (!m_physicsSimulation.IsRunning() || deltaSecond == 0) return;
-    if (m_AIJob.valid() && m_AIJob.is_complete()) DrainAIUpdate();
 
     AllUpdateWorldMatrix(TransformSyncPoint::FixedUpdate);
 
@@ -3023,13 +3055,32 @@ void Scene::LateUpdate(float deltaSecond)
     SoundSystems->LateUpdate(deltaSecond);
 
     UpdateRenderData();
+
+    // 기존 post-physics FlushAITicks보다 앞에서 한 번만 큐를 채운다. 완료가
+    // 늦으면 EndFrame의 기존 대기로 회수하고 다음 프레임에 먼저 적용한다.
+    ApplyAIUpdate();
+    m_aiTickBoundaryReached = true;
 }
 
 void Scene::EndFramePass()
 {
-	// 비소유 AI snapshot이 Entity/Component 주소를 읽는 동안 파괴가 겹치지 않게
-	// 실제 구조 변경 전에 AI 작업을 회수한다.
-	DrainAIUpdate();
+    const bool tickBoundaryReached = std::exchange(m_aiTickBoundaryReached, false);
+    const auto canUpdateAI = [this]
+    {
+        return SceneManagers->GetActiveScene() == this && SceneManagers->IsPlayCommitted()
+            && SceneManagers->IsGameStart() && !SceneManagers->IsGamePaused()
+            && !SceneManagers->HasPendingSceneStructureChange() && !SceneManagers->IsDecommissioning();
+    };
+    // 소비 경계가 없는 pause·편집·전환 구간에 snapshot을 쌓으면 메모리와 재개 시
+    // 틱이 누적된다. 그런 구간은 폐기하고 정상 프레임의 기존 join만 유지한다.
+    if (tickBoundaryReached && canUpdateAI())
+    {
+        CollectAIUpdate(true);
+    }
+    else
+    {
+        DrainAIUpdate();
+    }
     {
         ce::profile_scope _profile{ ce::marker<"FlushPendingDestroy">() };
         // 이 자리가 프레임 끝의 파괴 지점이다 — 바로 아래에서 DestroyComponents와
@@ -3053,19 +3104,26 @@ void Scene::EndFramePass()
         ce::profile_scope _profile{ ce::marker<"DestroyEntities">() };
         DestroyEntities();
     }
-    //여기서 병렬처리
-    if (!m_AIJob.valid() && !SceneManagers->IsDecommissioning())
+    // 늦은 batch가 남으면 다음 LateUpdate가 먼저 소비하게 한다. 소비자가 멈춰도
+    // 미소비 batch 수는 하나이며 새 캡처로 덮어쓰거나 무한히 누적하지 않는다.
+    if (tickBoundaryReached && canUpdateAI() && !m_AIJob.valid() && m_completedAIUpdates.empty())
     {
-        float deltaSecond = Time->GetElapsedSeconds();
-		if (CameraComponent* camera = m_cameraSystem.GetPrimaryCamera())
-		{
-			const auto cameraFrustum = camera->TryGetFrustum();
-			m_AIJob = ce::get_job_scheduler().submit(
-				[deltaSecond, cameraFrustum]
-				{
-					AIManagers->InternalAIUpdate(deltaSecond, cameraFrustum);
-				});
-		}
+        const float deltaSecond = Time->GetElapsedSeconds();
+        if (CameraComponent* camera = m_cameraSystem.GetPrimaryCamera())
+        {
+            auto batch = AIManagers->CaptureAIUpdate(*this, deltaSecond, camera->TryGetFrustum());
+            if (!batch->m_snapshot.m_components.empty())
+            {
+                // Scene이나 전역 레지스트리를 캡처하지 않는다. 콜백과 Scene이
+                // batch만 공동 소유하고 워커는 불변 입력과 자신의 출력만 만진다.
+                auto job = ce::get_job_scheduler().submit([batch]
+                {
+                    AIManager::CullAIUpdate(batch->m_snapshot, batch->m_visibleIndices);
+                });
+                m_aiUpdateBatch = std::move(batch);
+                m_AIJob = std::move(job);
+            }
+        }
     }
 }
 

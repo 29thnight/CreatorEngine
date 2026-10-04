@@ -2906,7 +2906,7 @@ void ClrHost::QueueAITick(int instanceId, float deltaTime)
 {
 	if (!m_ready || instanceId < 0) return;
 
-	// AI 갱신이 잡 스레드에서 도므로 담는 쪽을 보호한다(헤더 주석 참고).
+    // Scene의 게임 스레드 적용 경로가 생산자지만 큐의 기존 동기화 계약은 유지한다.
 	SpinLock lock(m_aiTickFlag);
 	m_aiTicks.push_back(ScriptAITick{ instanceId, deltaTime });
 }
@@ -2918,8 +2918,8 @@ void ClrHost::FlushAITicks()
 	// 오른다(항상 1.00이 나와 검사가 아무것도 말하지 않게 된다).
 	++m_aiCrossings.flushCalls;
 
-	// 전달 도중 새 틱이 쌓일 수 있으므로 비운 뒤 넘긴다(ScriptMessage와 같은 규약).
-	// 스왑 구간만 잠근다 — 관리 측 호출까지 잠그면 잡 스레드가 그동안 막힌다.
+    // 전달 전에 큐를 분리해 이번 배치만 넘긴다(ScriptMessage와 같은 규약).
+    // 스왑 구간만 잠그고 관리 측 호출 중에는 큐 잠금을 보유하지 않는다.
 	std::vector<ScriptAITick> batch;
 	{
 		SpinLock lock(m_aiTickFlag);
