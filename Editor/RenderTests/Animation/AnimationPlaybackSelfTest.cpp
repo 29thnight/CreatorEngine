@@ -499,9 +499,13 @@ namespace RenderTest
                     "Observed parent resolve does not write hidden descendant world");
                 bone->m_bPinned = false;
                 scene->AddSelectedEntity(boneEntity);
+                require(scene->PublishAnimatorPose(*animator).observedBones == 0,
+                    "Live selection is not read before the locked capture");
+                scene->CaptureSelectionForSimulation();
                 require(scene->PublishAnimatorPose(*animator).observedBones == 1,
                     "Selected bone enables projection");
                 scene->RemoveSelectedEntity(boneEntity);
+                scene->CaptureSelectionForSimulation();
                 scene->CreateEntity("ObservedAttachment", GameObjectType::Empty,
                     boneEntity->m_index);
                 scene->SyncDerivedState();

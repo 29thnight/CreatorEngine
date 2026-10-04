@@ -766,6 +766,10 @@ void Editor::EditorMain::Update()
 		Editor::ModelPlacement::Get().Tick();
 		EditorScriptAuthoring::Tick();
 		SceneManagers->ApplyPendingSceneStructureChange();
+		// UI 가 잠금 아래에서 고친 선택을 다음 프레임 시뮬레이션이 읽을 사본으로 뜬다.
+		// 씬 전환 뒤에 떠야 새 씬의 사본이 선다.
+		if (Scene* scene = SceneManagers->GetActiveScene())
+			scene->CaptureSelectionForSimulation();
 
 		// OnRender도 게임 상태를 진행시키는 코루틴 단계다. 다른 coroutine queue와
 		// 동시에 만지지 않도록 GT에서 실행하고, 결과를 이번 packet에 포함한다.

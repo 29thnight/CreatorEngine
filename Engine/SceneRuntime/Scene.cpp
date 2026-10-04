@@ -3123,6 +3123,14 @@ void Scene::ClearSelectedEntities()
     m_selectedEntity = nullptr;
 }
 
+void Scene::CaptureSelectionForSimulation()
+{
+    m_simulationSelection.assign(m_selectedEntities.begin(), m_selectedEntities.end());
+    if (m_selectedEntity && std::ranges::find(m_simulationSelection, m_selectedEntity)
+        == m_simulationSelection.end())
+        m_simulationSelection.push_back(m_selectedEntity);
+}
+
 std::span<MeshRenderer* const> Scene::MeshRendererComponents() const
 {
     return m_renderRegistry->meshes;
@@ -4533,9 +4541,10 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 		BoneComponent* bone = graph.boneComponents[exec];
 		Entity* boneEntity = Resolve(graph.execToEntity[exec]);
 		if (!bone || !boneEntity) continue;
+		// 살아 있는 선택 목록은 UI 스레드가 고치는 중일 수 있다 — 사본만 읽는다.
 		bool direct = bone->m_bPinned || bone->m_runtimeObserved
-			|| boneEntity == m_selectedEntity || binding.nonBoneChildByIndex[boneIndex]
-			|| std::ranges::find(m_selectedEntities, boneEntity) != m_selectedEntities.end();
+			|| binding.nonBoneChildByIndex[boneIndex]
+			|| std::ranges::find(m_simulationSelection, boneEntity) != m_simulationSelection.end();
 		if (!direct)
 		{
 			const std::string& name = binding.boneNameByIndex[boneIndex];

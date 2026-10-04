@@ -375,6 +375,10 @@ public:
 	void AddSelectedEntity(Entity* entity);
 	void RemoveSelectedEntity(Entity* entity);
 	void ClearSelectedEntities();
+	// 선택은 PresentationThread 의 UI 가 씬 구조 잠금 아래에서 고친다. 게임 스레드
+	// 시뮬레이션(애니메이션 포즈 게시)은 그 잠금 없이 돌므로 살아 있는 목록을 읽지
+	// 않고, 잠금을 쥔 자리에서 이 함수로 뜬 사본만 읽는다(한 프레임 늦어도 된다).
+	void CaptureSelectionForSimulation();
 	void AddRootEntity(std::string_view name);
 	void DestroyEntity(Entity* entity);
 	void DestroyEntity(Entity::Index index);
@@ -1156,6 +1160,11 @@ public:
 
 	[[reflgen::ignore]]
 	std::vector<Entity*>	m_selectedEntities;
+
+	// CaptureSelectionForSimulation 이 채우는 게임 스레드 전용 사본. 포인터는
+	// 비교에만 쓰고 역참조하지 않는다.
+	[[reflgen::ignore]]
+	std::vector<Entity*>	m_simulationSelection;
 
     [[reflgen::ignore]]
     Core::DelegateHandle		resetObjHandle{};
