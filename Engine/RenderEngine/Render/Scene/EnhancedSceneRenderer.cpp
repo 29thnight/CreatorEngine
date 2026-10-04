@@ -5699,7 +5699,7 @@ namespace
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
                         }
-                        if (!activeDeltaBatch.empty())
+                        if (activeDeltaBatch.size() != 0)
                         {
                             ProxyCommandQueue->DeferBatch(std::move(activeDeltaBatch));
                         }
