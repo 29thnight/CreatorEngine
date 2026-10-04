@@ -833,9 +833,15 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
         | ImGuiTreeNodeFlags_FramePadding;
     if (m_scope == Scope::folder && m_currentDirectory == directory) flags |= ImGuiTreeNodeFlags_Selected;
     if (children.empty()) flags |= ImGuiTreeNodeFlags_Leaf;
-    const auto currentRelative = m_currentDirectory.lexically_relative(directory);
-    if (m_revealDirectory && !currentRelative.empty() && *currentRelative.begin() != "..")
-        ImGui::SetNextItemOpen(true);
+    // 펼쳐 보여 줄 때만 상대 경로를 푼다. `lexically_relative` 는 경로를 요소마다
+    // 쪼개 비교해서 Debug 에서 노드당 80 µs 를 넘었고, 매 프레임 노드마다 풀던
+    // 자리가 트리 비용 3.3 ms 가운데 2.0 ms 였다(10-04 실측, 노드 24 개).
+    if (m_revealDirectory)
+    {
+        const auto currentRelative = m_currentDirectory.lexically_relative(directory);
+        if (!currentRelative.empty() && *currentRelative.begin() != "..")
+            ImGui::SetNextItemOpen(true);
+    }
     const bool open = ImGui::TreeNodeEx(id.c_str(), flags, "%s", "");
     browser_tree_label(name, EditorAssetPresentation::Get().GetDirectoryIcon(open && !children.empty()),
         EditorIcon::Folder);

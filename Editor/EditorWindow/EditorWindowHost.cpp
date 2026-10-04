@@ -10,10 +10,12 @@
 #include "EditorPanelCost.h"
 
 #include "ImGui.h"
+#include "ProfileScope.h"
 
 #include <cfloat>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace editor
 {
@@ -91,6 +93,22 @@ namespace editor
             if (!entry.stable_id.starts_with("###")) title.append("###");
             title.append(entry.stable_id);
             return title;
+        }
+
+        // 프로파일러 캡처에 창마다 "Panel.<고정 id>" 구간을 남긴다. 창 비용 표는
+        // CLI 로만 읽혀서, 녹화한 캡처에서는 ImGuiPanels 안이 한 덩어리였다.
+        // 이름은 표의 자리마다 한 번만 등록한다(이 표는 표시 스레드만 읽는다).
+        ce::marker_id panel_marker(std::size_t index, std::string_view stableId)
+        {
+            static std::vector<ce::marker_id> markers;
+            if (markers.size() <= index) markers.resize(index + 1, ce::invalid_marker);
+            if (ce::invalid_marker == markers[index])
+            {
+                while (stableId.starts_with('#')) stableId.remove_prefix(1);
+                markers[index] = ce::intern_runtime_marker("Panel." + std::string(stableId),
+                                                           ce::marker_kind::cpu_scope);
+            }
+            return markers[index];
         }
 
         void apply_stacking(window_stacking stacking)
@@ -200,6 +218,7 @@ namespace editor
             // 본문(`entry.draw`)을 함께 센다 — 밖에서 보면 그 둘이 한 창의
             // 비용이고, 나누면 합이 프레임 총계와 맞지 않는다.
             const ::editor::windows::window_cost_scope cost{ thisIndex, entry.stable_id.data() };
+            const ce::profile_scope profile{ panel_marker(thisIndex, entry.stable_id) };
 
             const std::string title = compose_title(entry);
 
