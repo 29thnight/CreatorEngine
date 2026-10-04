@@ -48,6 +48,7 @@
 #include "../../Material.h"
 #include "../../MaterialGraphSceneInput.h"
 #include "../../MaterialGraphSceneHost.h"
+#include "../../MaterialGraphSceneCompiler.h"
 #include "../../RenderScene.h"
 #include "../Core/EnhancedLightPacking.h"
 #include "../../Texture.h"
@@ -5474,6 +5475,9 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         // backend는 어떤 장치·pipeline·공유 표시 리소스도 만들기 전에 한 번만
         // 기록한다. 이 뒤에는 변경 API가 없다(Slice 8-c).
         state.backend = backend;
+        // 에디터 재질 저작은 이 백엔드 하나만 컴파일한다.
+        material_graph::SetAuthoringSceneBackend(backend == EnhancedLiveBackend::Vulkan
+            ? RHIShaderBinary::SpirV : RHIShaderBinary::Dxil);
         state.ResetDisplaySnapshot();
         state.renderScene = std::make_shared<RenderScene>();
         state.renderScene->Initialize();

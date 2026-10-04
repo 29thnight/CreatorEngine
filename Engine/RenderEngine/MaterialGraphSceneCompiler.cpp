@@ -2,6 +2,7 @@
 #include "MaterialGraphShaderMeta.h"
 
 #include <algorithm>
+#include <atomic>
 #include <fstream>
 #include <tuple>
 
@@ -58,11 +59,13 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
 }
 } // namespace
 
-std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program)
+std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program,
+                                               std::optional<RHIShaderBinary> only)
 {
     std::vector<CompileTarget> targets;
     for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
+        if (only && *only != backend) continue;
         targets.push_back({backend, "LXSceneVS", "vs_6_0"});
         for (const auto entry : {"LXSceneGBufferPS", "LXSceneColorPS", "LXSceneLookup0PS", "LXSceneLookup1PS"})
         {
@@ -92,7 +95,7 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
 
 bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& shaderDirectory,
                          const std::filesystem::path& sourceFile, const Budget& budget, VerifiedProduct& result,
-                         std::string& error, FileGuid graphGuid)
+                         std::string& error, FileGuid graphGuid, std::optional<RHIShaderBinary> backend)
 {
     if (program.volume && program.slang.find("#define LX_MATERIAL_VOLUME_HOMOGENEOUS 1\n") == std::string::npos)
     {
@@ -137,7 +140,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     VerifiedProduct candidate;
     std::vector<RHIShaderReflection> reflections;
     std::vector<LX::LXMaterialDiagnostic> diagnostics;
-    if (!VerifyProduct(program, sourceFile, SceneCompileTargets(program), permutation, options, capabilities, budget,
+    if (!VerifyProduct(program, sourceFile, SceneCompileTargets(program, backend), permutation, options, capabilities, budget,
                        candidate, diagnostics, &reflections))
     {
         error.clear();
@@ -174,7 +177,14 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
 bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, SceneShaderSet& result,
                       std::string& error)
 {
-    const auto expected = SceneCompileTargets(product.program);
+    // Every backend the product carries must be complete; the requested one must be carried.
+    std::vector<CompileTarget> expected;
+    for (const auto carried : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
+    {
+        if (!HasSceneBackend(product, carried)) continue;
+        const auto stages = SceneCompileTargets(product.program, carried);
+        expected.insert(expected.end(), stages.begin(), stages.end());
+    }
     auto actual = product.targets;
     std::ranges::sort(actual, TargetLess);
     if (!product.program.semanticKey.ends_with(SceneHostIdentity) || actual.size() != expected.size() ||
@@ -182,6 +192,10 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
         (backend != RHIShaderBinary::Dxil && backend != RHIShaderBinary::SpirV))
     {
         return Fail(error, "LX cooked Scene host identity or complete stage set is missing.");
+    }
+    if (!HasSceneBackend(product, backend))
+    {
+        return Fail(error, "LX cooked Scene product was compiled without the running backend.");
     }
     SceneShaderSet candidate;
     candidate.layout = product.layout;
@@ -227,5 +241,27 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
     result = std::move(candidate);
     error.clear();
     return true;
+}
+namespace
+{
+// 0 = unset, otherwise RHIShaderBinary + 1.
+std::atomic<int> authoringBackend{0};
+} // namespace
+
+void SetAuthoringSceneBackend(std::optional<RHIShaderBinary> backend)
+{
+    authoringBackend.store(backend ? static_cast<int>(*backend) + 1 : 0);
+}
+
+std::optional<RHIShaderBinary> AuthoringSceneBackend()
+{
+    const int value = authoringBackend.load();
+    if (value == 0) return std::nullopt;
+    return static_cast<RHIShaderBinary>(value - 1);
+}
+
+bool HasSceneBackend(const VerifiedProduct& product, RHIShaderBinary backend)
+{
+    return std::ranges::any_of(product.targets, [&](const auto& target) { return target.binary == backend; });
 }
 } // namespace material_graph

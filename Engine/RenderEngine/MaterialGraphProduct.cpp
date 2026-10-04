@@ -366,6 +366,21 @@ RHIShaderReflection LayoutReflection(const BindingLayout& layout)
     return reflection;
 }
 
+// A product may carry one backend (editor: only the running renderer's) or both
+// (AssetCooker). Whatever it carries must hold every surface/volume stage.
+bool BackendStagesComplete(const LX::LXMaterialProgram& program, std::map<RHIShaderBinary, unsigned>& stages)
+{
+    const auto required = (program.surface ? 3u : 0u) | (program.volume ? 4u : 0u);
+    bool carried = false;
+    for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
+    {
+        if (stages[backend] == 0) continue;
+        if ((stages[backend] & required) != required) return false;
+        carried = true;
+    }
+    return carried;
+}
+
 bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::string& error)
 {
     const auto invalid = [&]() {
@@ -441,9 +456,7 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
             return invalid();
         bytes += artifact->bytecode.size();
     }
-    const auto required = (program.surface ? 3u : 0u) | (program.volume ? 4u : 0u);
-    if ((stages[RHIShaderBinary::Dxil] & required) != required ||
-        (stages[RHIShaderBinary::SpirV] & required) != required)
+    if (!BackendStagesComplete(program, stages))
         return invalid();
     error.clear();
     return true;
@@ -675,10 +688,9 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
             return Fail(diagnostics, "product.target", "Unknown stage in a material specialization.");
         stages[target.binary] |= stage;
     }
-    const auto required = (program.surface ? 3u : 0u) | (program.volume ? 4u : 0u);
-    if ((stages[RHIShaderBinary::Dxil] & required) != required ||
-        (stages[RHIShaderBinary::SpirV] & required) != required)
-        return Fail(diagnostics, "product.target", "Material cook requires all DXIL/SPIR-V surface or volume stages.");
+    if (!BackendStagesComplete(program, stages))
+        return Fail(diagnostics, "product.target",
+                    "Each carried DXIL/SPIR-V backend requires all surface or volume stages.");
     bool hasLayout = false;
     std::uint64_t compiledBytes = 0;
     const std::string name = sourceFile.string();

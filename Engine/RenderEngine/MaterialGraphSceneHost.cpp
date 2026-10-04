@@ -683,7 +683,7 @@ namespace material_graph
                         VerifiedProduct verified;
                         const auto& product = work->generation->cooked.product;
                         if (!CompileSceneProduct(product.program, work->shaderDirectory, work->file, {}, verified,
-                                                 work->error) ||
+                                                 work->error, {}, work->backend) ||
                             verified.layout != product.layout)
                         {
                             return Fail(work->error,

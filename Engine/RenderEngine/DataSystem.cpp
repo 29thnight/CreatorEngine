@@ -1093,6 +1093,13 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
         error = filesystemError.message();
         return false;
     }
+    // 렌더러가 시작됐으면 그 백엔드만 컴파일한다. 다른 쪽은 이 프로세스에서 쓰이지 않는다.
+    const auto backend = material_graph::AuthoringSceneBackend();
+    const auto carriesWanted = [&](const material_graph::VerifiedProduct& product) {
+        return backend ? material_graph::HasSceneBackend(product, *backend)
+                       : material_graph::HasSceneBackend(product, RHIShaderBinary::Dxil) &&
+                             material_graph::HasSceneBackend(product, RHIShaderBinary::SpirV);
+    };
     const std::string cacheHeader = MaterialGraphCacheHeader(*program, shaderDirectory);
     const auto cachePath = file::path(source.string() + ".scene-cache");
     step.emplace(ce::marker<"Material.CacheRead">());
@@ -1100,14 +1107,15 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
         result.product.program.slang == program->slang &&
         result.metadata == LX::WriteMaterialProgramMetadata(*program) &&
         result.product.materialShader &&
-        result.product.program.semanticKey.ends_with(material_graph::SceneHostIdentity))
+        result.product.program.semanticKey.ends_with(material_graph::SceneHostIdentity) &&
+        carriesWanted(result.product))
     {
         return true;
     }
     step.reset();
     step.emplace(ce::marker<"Material.CompileSceneProduct">());
     if (!material_graph::CompileSceneProduct(*program, shaderDirectory, source, {},
-                                             result.product, error, guid))
+                                             result.product, error, guid, backend))
     {
         return false;
     }

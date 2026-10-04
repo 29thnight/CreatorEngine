@@ -7,6 +7,7 @@
 #include "../../Engine/Utility_Framework/AuthoringParseTelemetry.h"
 #include "../../Engine/Utility_Framework/PathFinder.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -311,6 +312,24 @@ RWStructuredBuffer<float4> result : register(u0);
     corrupt[corrupt.size() / 2] ^= 1;
     Check(!ReadCookedProgram(corrupt, {}, restoredProduct, error) && restoredProduct.product.materialShader == retained,
         "Corrupt cooked generation preserves prior schema owner");
+
+    // The editor compiles only its renderer's backend. That product must survive the
+    // editor cache format and load for its backend, and must refuse the other one.
+    VerifiedProduct dxilOnly;
+    Check(CompileSceneProduct(*generated, shaderRoot, work / "scene-dxil.slang", {}, dxilOnly, error, guid,
+        RHIShaderBinary::Dxil), "Editor compiles only the running backend: " + error);
+    Check(std::ranges::all_of(dxilOnly.targets, [](const auto& target) { return target.binary == RHIShaderBinary::Dxil; }) &&
+        dxilOnly.targets.size() * 2 == product.targets.size(),
+        "One-backend product carries exactly that backend's complete stage set");
+    std::vector<std::uint8_t> dxilPayload;
+    CookedProgram dxilRestored;
+    Check(WriteCookedProgram(dxilOnly, {}, dxilPayload, error) && ReadCookedProgram(dxilPayload, {}, dxilRestored, error),
+        "One-backend product round-trips the editor cache format: " + error);
+    SceneShaderSet dxilShaders;
+    Check(LoadSceneShaders(dxilRestored.product, RHIShaderBinary::Dxil, dxilShaders, error) &&
+        dxilShaders.color.bytecode.Size() > 0, "One-backend product loads for its backend: " + error);
+    Check(!LoadSceneShaders(dxilRestored.product, RHIShaderBinary::SpirV, dxilShaders, error),
+        "One-backend product refuses the backend it does not carry");
 
     std::size_t legacyFiles = 0;
     for (const auto& entry : std::filesystem::recursive_directory_iterator(shaderRoot))

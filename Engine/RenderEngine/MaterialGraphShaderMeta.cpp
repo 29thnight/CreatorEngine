@@ -352,17 +352,22 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             !candidate.meta.keywords.empty() || candidate.meta.properties != properties || generated.samplers != samplers)
             throw std::runtime_error("Generated typed contract differs from its verified program");
 
-        // Every declared stage must have both verified backend bytecodes. No
-        // extra entry may silently belong to a different generated contract.
+        // Every declared stage must have verified bytecode in each backend the
+        // product carries (the editor carries only its renderer's). No extra
+        // entry may silently belong to a different generated contract.
+        std::set<RHIShaderBinary> carried;
         std::set<std::tuple<RHIShaderBinary, std::string, std::string>> declared, compiled;
+        for (const auto& target : product.targets)
+        {
+            carried.insert(target.binary);
+            compiled.emplace(target.binary, target.entry, target.profile.substr(0, 3));
+        }
         for (const auto& pass : candidate.meta.passes)
             for (const auto& [stage, profile] : {std::pair{pass.vertex, "vs_"},
                 {pass.pixel, "ps_"}, {pass.compute, "cs_"}})
                 if (stage)
-                    for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
+                    for (const auto backend : carried)
                         declared.emplace(backend, stage->entry, profile);
-        for (const auto& target : product.targets)
-            compiled.emplace(target.binary, target.entry, target.profile.substr(0, 3));
         if (declared != compiled) throw std::runtime_error("Generated passes differ from verified backend stages");
 
         RHIShaderReflection reflection;

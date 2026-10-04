@@ -1276,6 +1276,15 @@ namespace
                 }
                 verifiedProduct = std::move(verified.product);
             }
+            // The player picks DX12 or Vulkan at boot, so a package must carry both.
+            // An editor-built program may hold only the editor's backend.
+            if (!material_graph::HasSceneBackend(verifiedProduct, RHIShaderBinary::Dxil) ||
+                !material_graph::HasSceneBackend(verifiedProduct, RHIShaderBinary::SpirV))
+            {
+                std::cerr << "asset-cooker error: material program must carry both DXIL and SPIR-V stages.
+";
+                return 3;
+            }
             ck::MaterialProgramCookProduct product;
             if (!ck::BuildMaterialProgramCookProduct(graphId, *graph, verifiedProduct, materialBudget, product, graphError))
             {
