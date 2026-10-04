@@ -1589,6 +1589,11 @@ void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeT
 unsigned sceneCompositionFrames{}, sceneCompositionPixels{}, sceneCompositionFailures{};
 std::uint64_t sceneLookupBaked{}, sceneLookupReused{};
 unsigned sceneLookupFullFrames{}, sceneLookupFullPixels{}, sceneLookupMutationFrames{};
+// expanded == 5: a still view under a refinement budget. Changed pixels start
+// provisional and must converge to the same reference samples and colors.
+constexpr std::uint32_t kProbeLookupRefinePixels = 128;
+unsigned sceneLookupProgressiveFrames{}, sceneLookupProvisionalPixels{};
+std::uint64_t sceneLookupProvisional{}, sceneLookupRefined{};
 unsigned sceneTextureFrames{}, sceneTexturePixels{}, sceneTextureFractionalLods{}, sceneTextureClampedLods{};
 unsigned sceneGenerationFrames{}, sceneGenerationFallbacks{}, sceneGenerationAborts{},
     sceneGenerationPendingSubmissions{};
@@ -1783,7 +1788,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     context.meshCache = &meshes;
     context.width = expanded == 2 ? 1920 : expanded == 1 ? 128 : 24;
     context.height = expanded == 2 ? 1080 : expanded == 1 ? 96 : 24;
-    const bool inspectPoint = expanded == 1 || expanded == 3 || expanded == 4;
+    const bool inspectPoint = expanded == 1 || expanded == 3 || expanded == 4 || expanded == 5;
     FrameCameraSnapshot camera;
     camera.view = camera.projection = math::matrix4x4::identity();
     camera.eyePosition = math::vector3(0, 0, 2);
@@ -1870,6 +1875,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                                               : expanded == 1 ? std::vector<unsigned>{0, 1, 4, 1, 0, 4, 1, 4, 0, 1}
                                               : expanded == 2 ? std::vector<unsigned>{0, 4}
                                               : expanded == 3 ? std::vector<unsigned>{0, 1, 4, 0, 4, 1, 0, 4}
+                                              : expanded == 5 ? std::vector<unsigned>{0, 1, 4, 0, 1, 4, 0, 1, 4, 0}
                                                               : std::vector<unsigned>{0, 1, 4};
     for (unsigned fixture = 0; fixture < (expanded ? 1u : 8u); ++fixture)
     {
@@ -2088,8 +2094,9 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 Check(graph->PrepareParallel(pool, error), "Scene native prefix " + error);
             }
             const auto hostPrepared =
-                host.Prepare(context, input, fixture == 7 ? RHITextureHandle{} : environment.handle, {}, {}, {}, {}, error,
-                             expanded == 1 && step >= 7 ? 2 : 1);
+                host.Prepare(context, input, fixture == 7 ? RHITextureHandle{} : environment.handle, {}, {}, {},
+                             SceneHostBudget{.lookupRefinePixels = expanded == 5 ? kProbeLookupRefinePixels : 0u},
+                             error, expanded == 1 && step >= 7 ? 2 : 1);
             Check(hostPrepared, "Scene host prepare " + error);
             for (unsigned failure = 0; failure < (expanded ? 4u : 3u); ++failure)
             {
@@ -2332,9 +2339,31 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(device.MapReadback(lookupReadback, lookupMapped, error), "Scene lookup stats map");
             SceneLookupStats stats;
             std::memcpy(&stats, lookupMapped.data.data(), sizeof(stats));
-            Check(stats.rejected == 0 && stats.baked + stats.reused == stats.visible,
+            Check(stats.rejected == 0 && stats.baked + stats.provisional + stats.reused == stats.visible,
                   "Scene lookup validates every visible point");
-            const bool warm = expanded == 4   ? step > 0 && step != 2 && step != 3 && step != 11 &&
+            const bool progressive = expanded == 5;
+            Check(progressive || (stats.provisional == 0 && stats.refinementClaims == 0),
+                  "A zero refinement budget integrates every changed pixel at reference counts");
+            if (progressive)
+            {
+                if (step == 0)
+                    Check(stats.provisional == stats.visible && stats.baked == 0 && stats.reused == 0,
+                          "A cold progressive view takes provisional samples only");
+                else
+                    Check(stats.provisional == 0 &&
+                              stats.baked == (std::min)(stats.refinementClaims, kProbeLookupRefinePixels),
+                          "Unchanged provisional pixels refine within the frame budget step=" + std::to_string(step) +
+                              " baked=" + std::to_string(stats.baked) +
+                              " claims=" + std::to_string(stats.refinementClaims));
+                if (step + 1 == workerModes.size())
+                    Check(stats.refinementClaims == 0 && stats.baked == 0 && stats.reused == stats.visible,
+                          "A still progressive view converges to reference samples");
+                sceneLookupProvisional += stats.provisional;
+                sceneLookupRefined += stats.baked;
+                ++sceneLookupProgressiveFrames;
+            }
+            const bool warm = progressive     ? false
+                              : expanded == 4 ? step > 0 && step != 2 && step != 3 && step != 11 &&
                                                   selectedCore == previousSelectedCore
                               : expanded == 1 ? step == 1 || step == 3 || step == 6 || step == 8
                               : expanded == 3 ? step == 1 || step == 2 || step == 4 || step == 7
@@ -2483,6 +2512,19 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                         // Keep that transport check separate from the independent BRDF
                         // reference, especially for the zero-roughness specular peak.
                         point = std::bit_cast<IblBakePoint>(captured);
+                    }
+                    // A provisional sample is a reduced-count estimate. Only its
+                    // finiteness is checked here; the frames after it must replace
+                    // it with the reference sample checked below.
+                    if (inspectPoint &&
+                        mappedSample.Elements<IblBakeSample>()[y * context.width + x].baseAverage[3] == 1.f)
+                    {
+                        Check(expanded == 5, "Only a refinement budget stores provisional lookup samples");
+                        for (unsigned c = 0; c < 3; ++c)
+                            Check(std::isfinite(mapped[1].At(x, y, c)), "Provisional Scene lighting is finite");
+                        ++sceneLookupProvisionalPixels;
+                        ++sceneCompositionPixels;
+                        continue;
                     }
                     const auto bake = ExpectedBake(point, environmentColors, table);
                     if (inspectPoint)
@@ -2784,6 +2826,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                                 table, 3);
             RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table);
             RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 1);
+            RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 5);
         }
         RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 2);
         ShutdownNative(device, roots, pipelines, textures, pool);
@@ -2852,6 +2895,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                         3);
     RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table);
     RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 1);
+    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 5);
     RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 2);
     RHIShaderBlob transform, vertex, pixel, sharedPixel, resolve, bake;
     for (auto backend : {RHIShaderBinary::SpirV, RHIShaderBinary::Dxil})
@@ -3242,7 +3286,10 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
               << " sceneGenerationStale=" << sceneGenerationStale
               << " sceneGenerationCompiles=" << sceneGenerationCompiles
               << " sceneGenerationWorkers=" << sceneGenerationWorkers
-              << " sceneGenerationPsoWorkers=" << sceneGenerationPsoWorkers << '\n';
+              << " sceneGenerationPsoWorkers=" << sceneGenerationPsoWorkers
+              << " sceneLookupProgressiveFrames=" << sceneLookupProgressiveFrames
+              << " sceneLookupProvisional=" << sceneLookupProvisional << " sceneLookupRefined=" << sceneLookupRefined
+              << " sceneLookupProvisionalPixels=" << sceneLookupProvisionalPixels << '\n';
 }
 } // namespace
 

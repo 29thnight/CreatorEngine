@@ -24,6 +24,11 @@ namespace material_graph
         std::uint32_t pixels = 4096u * 4096u;
         std::uint32_t draws = 4096;
         std::uint64_t lookupBytes = 2ull << 30;
+        // Exact lookup integrations per frame for pixels whose inputs held.
+        // 0 integrates every changed pixel at the reference counts (gates and
+        // offline captures). A positive value gives changed pixels a
+        // provisional sample and refines them over the following frames.
+        std::uint32_t lookupRefinePixels = 0;
         std::uint64_t subsurfaceBytes = 512ull << 20;
         std::uint64_t refractionBytes = 512ull << 20;
         std::uint64_t volumeBytes = 512ull << 20;

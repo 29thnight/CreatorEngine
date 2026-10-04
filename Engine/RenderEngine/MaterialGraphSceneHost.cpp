@@ -951,7 +951,8 @@ namespace material_graph
         });
         const auto lookupBudget = hasAlpha ? budget.lookupBytes * 2 / 3 : budget.lookupBytes;
         if (!lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
-                             environmentGeneration, lookupBudget, candidate->lookup, error, importance, source))
+                             environmentGeneration, lookupBudget, candidate->lookup, error, importance, source, false,
+                             budget.lookupRefinePixels))
         {
             return false;
         }

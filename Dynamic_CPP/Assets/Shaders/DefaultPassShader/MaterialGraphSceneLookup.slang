@@ -9,8 +9,19 @@ cbuffer SceneLookupConstants : register(b0)
 {
     uint lx_width, lx_height, lx_count, lx_reuse;
     uint lx_environment, lx_first, lx_dispatchCount, lx_precomputed;
-    uint lx_importance, lx_source, lx_standalone, lx_reserved2;
+    uint lx_importance, lx_source, lx_standalone, lx_refineBudget;
 };
+
+// lx_refineBudget 0 keeps every visible sample at the reference counts. A
+// positive budget makes a changed pixel take a provisional sample first, and
+// grants that many exact integrations per frame to pixels whose inputs held.
+// A camera move therefore costs the provisional kernel, and a still view
+// converges to the same reference result.
+static const uint kProvisionalBrdfSamples = 64u;
+static const uint kProvisionalAverageSamples = 16u;
+static const uint kProvisionalEnvironmentSamples = 256u;
+// baseAverage.w: -1 empty, 0 reference, 1 provisional. Consumers test < 0.
+static const float kProvisionalMarker = 1.0;
 Texture2D<float4> lx_inputs_0 : register(t0);
 Texture2D<float4> lx_inputs_1 : register(t1);
 Texture2D<float4> lx_inputs_2 : register(t2);
@@ -112,8 +123,19 @@ SamplerState gIblSampler : register(s1);
 [numthreads(1, 1, 1)]
 void LXSceneLookupClear(uint3 id : SV_DispatchThreadID)
 {
-    for (uint i = 0; i < 4; ++i)
+    for (uint i = 0; i < 8; ++i)
         lx_statistics[i] = 0;
+}
+
+// Statistics: 0 reference integrations, 1 reused, 2 visible, 3 rejected,
+// 4 provisional integrations, 5 refinement claims (may exceed the budget).
+bool LXClaimRefinement()
+{
+    if (lx_refineBudget == 0u)
+        return true;
+    uint claim;
+    InterlockedAdd(lx_statistics[5], 1, claim);
+    return claim < lx_refineBudget;
 }
 
 PrincipledIblBakePoint LXReadScenePoint(int2 pixel)
@@ -160,11 +182,22 @@ void LXSceneLookupBake(uint3 id : SV_DispatchThreadID)
                                == asuint(LXLoadPreviousSceneInput(field, int3(pixel, 0))));
         same = same && lx_previous[index].baseAverage.w >= 0;
     }
+    // A changed pixel is provisional unless every sample is the reference.
+    bool exact = lx_refineBudget == 0u;
     if (same)
     {
-        lx_samples[index] = lx_previous[index];
-        InterlockedAdd(lx_statistics[1], 1);
-        return;
+        // A reference sample is never replaced. A provisional one is refined
+        // only while this frame's budget lasts; otherwise it is kept as is.
+        bool refine = lx_previous[index].baseAverage.w != 0.0;
+        if (refine)
+            refine = LXClaimRefinement();
+        if (!refine)
+        {
+            lx_samples[index] = lx_previous[index];
+            InterlockedAdd(lx_statistics[1], 1);
+            return;
+        }
+        exact = true;
     }
     bool finite = true;
     for (uint field = 0; field < 11; ++field)
@@ -177,31 +210,37 @@ void LXSceneLookupBake(uint3 id : SV_DispatchThreadID)
         InterlockedAdd(lx_statistics[3], 1);
         return;
     }
+    const uint brdfSamples = exact ? 1024u : kProvisionalBrdfSamples;
+    const uint averageSamples = exact ? 64u : kProvisionalAverageSamples;
+    const uint environmentSamples = exact ? 0u : kProvisionalEnvironmentSamples;
     const PrincipledSurface material = EvaluateIblBakePoint(point);
     const float3 view = normalize(point.viewTier.xyz);
     const bool layered = point.viewTier.w == 1.0;
     PrincipledLayeredIntegral integral;
-    integral.base = layered ? IntegrateLayeredReflection(material, view, false)
-                            : IntegratePrincipledIbl(material, saturate(dot(material.normal, view)));
-    integral.coat = layered && material.coatWeight > 0.0 ? IntegrateLayeredReflection(material, view, true)
-                                                       : PrincipledEmptyIntegral();
+    integral.base = layered ? IntegrateLayeredReflection(material, view, false, true, brdfSamples, averageSamples)
+                            : IntegratePrincipledIbl(material, saturate(dot(material.normal, view)), brdfSamples,
+                                                     averageSamples);
+    integral.coat = layered && material.coatWeight > 0.0
+                        ? IntegrateLayeredReflection(material, view, true, true, brdfSamples, averageSamples)
+                        : PrincipledEmptyIntegral();
     sample.baseSingleAlbedo = float4(integral.base.singleScatter, integral.base.directionalAlbedo);
-    sample.baseAverage = float4(integral.base.averageFresnel, 0);
+    sample.baseAverage = float4(integral.base.averageFresnel, exact ? 0.0 : kProvisionalMarker);
     sample.coatSingleAlbedo = float4(integral.coat.singleScatter, integral.coat.directionalAlbedo);
     sample.coatAverage = float4(integral.coat.averageFresnel, 0);
     if (lx_environment != 0u)
     {
-        sample.irradiance = float4(BakeDiffuse(material.normal), 0);
+        sample.irradiance = float4(BakeDiffuse(material.normal, brdfSamples), 0);
         // No radiance convolution is consumed when this lobe carries exactly
         // zero energy (e.g. emission-only materials with Specular Level 0).
         sample.basePrefiltered = float4(any(integral.base.singleScatter > 0.0)
-            ? BakeReflection(material, view, layered, false) : float3(0), 0);
+            ? BakeReflection(material, view, layered, false, brdfSamples, environmentSamples) : float3(0), 0);
         sample.coatPrefiltered = float4(layered && material.coatWeight > 0.0 && any(integral.coat.singleScatter > 0.0)
-            ? BakeReflection(material, view, true, true) : float3(0), 0);
+            ? BakeReflection(material, view, true, true, brdfSamples, environmentSamples) : float3(0), 0);
         sample.coatIrradiance = float4(layered && material.coatWeight > 0.0
-            ? BakeDiffuse(material.coatNormal) : float3(0), 0);
-        sample.sheenIrradiance = float4(layered ? BakeSheen(BuildLayeredState(material, view, integral)) : float3(0), 0);
+            ? BakeDiffuse(material.coatNormal, brdfSamples) : float3(0), 0);
+        sample.sheenIrradiance = float4(layered ? BakeSheen(BuildLayeredState(material, view, integral), brdfSamples)
+                                                : float3(0), 0);
     }
     lx_samples[index] = sample;
-    InterlockedAdd(lx_statistics[0], 1);
+    InterlockedAdd(lx_statistics[exact ? 0 : 4], 1);
 }

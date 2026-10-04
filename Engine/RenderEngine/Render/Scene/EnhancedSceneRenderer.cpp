@@ -153,6 +153,14 @@ void SetEnhancedLiveGpuSpanSink(const EnhancedLiveGpuSpanSink& sink)
 namespace
 {
     const EnhancedLiveGpuSpanSink& GpuSpanSink() { return g_gpuSpanSink; }
+
+    // 살아 있는 화면의 재질 IBL 룩업은 바뀐 픽셀을 먼저 적은 표본으로 굽고,
+    // 입력이 그대로인 픽셀만 프레임마다 이만큼 기준 표본(1024/4096)으로 정제한다.
+    // 카메라 회전·애니메이션 동안의 비용을 이 수로 묶고, 멈추면 기준값에 수렴한다.
+    // 검사 도구는 SceneHostBudget 기본값(0, 전부 기준 표본)을 쓴다.
+    // 기준 표본 한 화소는 GPU 로 약 45~75 us 다(10-04 캡처: 2048 화소 정제 프레임이
+    // 90~155 ms). 32 화소면 정제 프레임이 약 1.5~2.5 ms 에 묶인다.
+    constexpr std::uint32_t kLiveLookupRefinePixels = 32;
 }
 
 namespace
@@ -941,7 +949,8 @@ namespace
                     !graph.PrepareParallel(commandPool, outError)) return false;
                 if (!graphMaterials.Prepare(frameContext, graphInput, ibl.GetCubeMap(),
                         ibl.GetIrradianceMap(), ibl.GetPrefilteredMap(),
-                        shadow.GetShadowData(), {}, outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap())) return false;
+                        shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupRefinePixels = kLiveLookupRefinePixels},
+                        outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap())) return false;
                 if (capture) capture->RecordLatticeInput(graphInput);
             }
             double compileMs = 0.0;
