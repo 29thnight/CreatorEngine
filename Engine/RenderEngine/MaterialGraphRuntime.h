@@ -8,6 +8,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 
 class Texture;
 namespace Authoring
@@ -28,9 +29,16 @@ struct Generation
     experiment::AssetId assetId;
     std::uint64_t generation{};
     CookedProgram cooked;
+    experiment::cooked::Sha256Digest contentDigest{};
+    // Explicit active-surface routing is carried by verified graph source, including cooked products.
+    std::optional<std::string> surfaceBlendMode;
 };
 
 using GenerationLoader = std::function<bool(CookedProgram&, std::string&)>;
+
+// Validate and own a candidate without changing any accepted graph or material.
+std::shared_ptr<const Generation> PrepareGeneration(const experiment::AssetId& id, const GenerationLoader& loader,
+                                                    std::string& error);
 
 // A failed reload does not return success or replace the accepted generation.
 // Existing instances retain their own immutable owner after reload or removal.
@@ -39,6 +47,8 @@ class GenerationStore
   public:
     std::shared_ptr<const Generation> Load(const experiment::AssetId& id, const GenerationLoader& loader, bool reload,
                                            std::string& error);
+    bool Publish(std::shared_ptr<const Generation> candidate, const std::shared_ptr<const Generation>& expected,
+                 std::string& error);
     std::shared_ptr<const Generation> Current(const experiment::AssetId& id) const;
     void Remove(const experiment::AssetId& id);
     void Clear();
@@ -51,7 +61,6 @@ class GenerationStore
     };
     mutable std::mutex mutex_;
     std::map<experiment::AssetId, Entry> entries_;
-    std::uint64_t serial_{};
 };
 
 // An authoring host supplies the current source graph for exact freshness.

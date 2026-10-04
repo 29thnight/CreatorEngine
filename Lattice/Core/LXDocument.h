@@ -121,6 +121,12 @@ struct LXConnectPins
     Id second = 0;
 };
 
+    struct LXReplaceInputConnection
+    {
+        Id first = 0;
+        Id second = 0;
+    };
+
 struct LXDisconnectLink
 {
     Id link = 0;
@@ -240,10 +246,11 @@ using LXCommand =
     std::variant<LXCreateNode, LXCreateNodeSpec, LXCreateGroup, LXCreateGroupInstance, LXCollapseToGroup,
                  LXReplaceGroupBody, LXUpdateGroup, LXAddGroupBoundaryNode, LXAddGroupBoundaryPin,
                  LXRemoveGroupBoundaryPin, LXRemoveNode, LXRemoveNodes, LXAddConnectedNode, LXAddConnectedNodeSpec,
-                 LXPasteNodes, LXConnectPins, LXDisconnectLink, LXSetSocketValue, LXSetProperty, LXSetNodePosition,
-                 LXSetNodePositions, LXSetNodeCollapsed, LXAddFrame, LXRemoveFrame, LXRenameFrame, LXMoveFrame,
-                 LXResizeFrame, LXSetNodeFrame, LXSetView, LXAddDynamicPin, LXRemoveDynamicPin, LXMoveDynamicPin,
-                 LXUndo, LXRedo, LXValidate, LXSave>;
+                 LXPasteNodes, LXConnectPins, LXReplaceInputConnection, LXDisconnectLink, LXSetSocketValue,
+                     LXSetProperty,
+                 LXSetNodePosition, LXSetNodePositions, LXSetNodeCollapsed, LXAddFrame, LXRemoveFrame, LXRenameFrame,
+                 LXMoveFrame, LXResizeFrame, LXSetNodeFrame, LXSetView, LXAddDynamicPin, LXRemoveDynamicPin,
+                 LXMoveDynamicPin, LXUndo, LXRedo, LXValidate, LXSave>;
 
 struct LXCommandResult
 {

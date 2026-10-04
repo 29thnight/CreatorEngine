@@ -103,6 +103,41 @@ void DrawHeaderIcon(ImDrawList* draw, HeaderIcon icon, ImVec2 center, float scal
     DrawSymbol(draw, HeaderGlyph(icon), center, 18.0f * scale);
 }
 
+const char* MaterialNodeDescription(const LX::Node& node)
+{
+    if (node.type == "ShaderNodeBsdfPrincipled")
+    {
+        return "Combines diffuse, metallic and specular reflection. Connect textures or values to its inputs, "
+               "then connect BSDF to Surface.";
+    }
+    if (node.type == "ShaderNodeOutputMaterial")
+    {
+        return "Defines the material's final surface. Connect a shader to Surface.";
+    }
+    if (node.type == "LXTextureSample")
+    {
+        return "Samples a texture at the supplied coordinates. Color and channel outputs can drive shader inputs.";
+    }
+    if (node.type.starts_with("LXParameter"))
+    {
+        return "Exposes a named material value. Each object can override exposed values in the Inspector.";
+    }
+    return "Connect inputs on the left to outputs on the right. Connected inputs use the incoming node's value.";
+}
+
+void DrawMaterialNodeInfo(const LX::Node& node, ImVec2 center, float scale, bool hovered)
+{
+    DrawSymbol(ImGui::GetWindowDrawList(), EditorIcon::Info, center, 18.0f * scale);
+    if (hovered)
+    {
+        ImGui::BeginTooltip();
+        ImGui::PushTextWrapPos(ImGui::GetFontSize() * 28.0f);
+        ImGui::TextUnformatted(MaterialNodeDescription(node));
+        ImGui::PopTextWrapPos();
+        ImGui::EndTooltip();
+    }
+}
+
 void DrawControlFrame(ImVec2 start, float width, bool selected = false)
 {
     const float scale = LX::CanvasUiScale();
@@ -293,9 +328,9 @@ MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editab
     const float nameWidth = std::clamp(right - left - fixed - 8.0f * scale, 44.0f * scale, 128.0f * scale);
     const float group = fixed + nameWidth;
     ImGui::SetCursorPosX(std::max(left, std::min((ImGui::GetWindowWidth() - group) * 0.5f, right - group)));
-    if (BeginHeaderCombo("##material_slot", HeaderIcon::None, "Slot 1", 76.0f))
+    if (BeginHeaderCombo("##material_slot", HeaderIcon::None, "Asset", 76.0f))
     {
-        ImGui::Selectable("Slot 1", true);
+        ImGui::Selectable("Asset", true);
         ImGui::EndCombo();
     }
     ImGui::SameLine(0.0f, 6.0f * scale);
@@ -316,16 +351,17 @@ MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editab
     ImGui::InputText("##material_name", &name);
     if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
     {
-        ImGui::SetTooltip("%s%s", name.c_str(), dirty ? " (unsaved graph)" : "");
+        ImGui::SetTooltip("%s%s", name.c_str(), dirty ? " (unsaved material)" : "");
     }
     MaterialBarAction action = MaterialBarAction::None;
     ImGui::SameLine();
-    if (IconButton("##save_graph", HeaderIcon::Save, dirty ? "Save Graph (unsaved edits)" : "Save Graph"))
+    if (IconButton("##save_graph", HeaderIcon::Save,
+        dirty ? "Save Material Asset (unsaved edits)" : "Save Material Asset"))
     {
         action = MaterialBarAction::Save;
     }
     ImGui::SameLine();
-    if (IconButton("##new_graph", HeaderIcon::New, "New Material Graph"))
+    if (IconButton("##new_graph", HeaderIcon::New, "New Material Asset"))
     {
         action = MaterialBarAction::NewGraph;
     }
@@ -337,7 +373,7 @@ MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editab
     }
     ImGui::SameLine(0.0f, 6.0f * scale);
     ImGui::BeginDisabled(!editable);
-    if (IconButton("##apply_graph", HeaderIcon::Apply, "Apply to MeshRenderer"))
+    if (IconButton("##apply_graph", HeaderIcon::Apply, "Apply to Material Asset"))
     {
         action = MaterialBarAction::Apply;
     }
@@ -482,6 +518,7 @@ LX::LXNodeItemRegistry MaterialItems(const LX::LXMaterialDefinitions& definition
 {
     using namespace LX;
     LXNodeItemRegistry items;
+    items.SetHeaderDecoration(20.0f, DrawMaterialNodeInfo);
     for (const auto& [type, schema] : definitions.schemas)
     {
         const auto* definition = definitions.nodes->Find(type);

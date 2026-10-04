@@ -14,6 +14,7 @@
 #include "ScriptObjectRegistry.h"
 #include "LightComponent.h"
 #include "MeshRenderer.h"
+#include "DataSystem.h"
 #include "SpriteRenderer.h"
 #include "Terrain.h"
 #include "RenderScene.h"
@@ -262,6 +263,7 @@ struct SceneRenderRegistryState
 	std::vector<Ticket> drainQueue;
 	std::vector<Dispatch> dispatchQueue;
     std::vector<EntityHandle> physicsTraversal;
+    std::uint64_t materialAssetRevision = ~std::uint64_t{};
 	uint64_t nextRegistrationGeneration = 1;
 	RenderProxyCommitMetrics metrics{};
 
@@ -283,6 +285,7 @@ struct SceneRenderRegistryState
 		drainQueue.clear();
 		dispatchQueue.clear();
         physicsTraversal.clear();
+        materialAssetRevision = ~std::uint64_t{};
 		metrics = {};
     }
 };
@@ -1944,6 +1947,22 @@ void Scene::CommitRenderProxies()
     if (nullptr == renderScene) return;
 
     auto& registry = *m_renderRegistry;
+
+    // Material Apply publishes immutable accepted bases on the game thread.
+    // One revision read skips the entire scan in unchanged frames, and rebinding
+    // queues ordinary material dirties before this frame's proxy commit drains.
+    const auto materialRevision = DataSystems->MaterialAssetRevision();
+    if (registry.materialAssetRevision != materialRevision)
+    {
+        registry.materialAssetRevision = materialRevision;
+        for (auto* renderer : registry.meshes)
+        {
+            if (renderer)
+            {
+                renderer->RefreshMaterialAsset();
+            }
+        }
+    }
 
     // Even a frame with no fixed step advances render alpha. Queue only bodies
     // retained by the last completed tick, plus their render descendants.

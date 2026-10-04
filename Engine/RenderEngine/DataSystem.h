@@ -214,6 +214,14 @@ public:
 	//Resource Material
 	void InsertMaterial(std::shared_ptr<Material> material);
 	std::shared_ptr<Material> FindCachedMaterial(std::string_view name);
+    std::shared_ptr<Material> FindCachedMaterial(FileGuid guid);
+    std::uint64_t MaterialAssetRevision() const noexcept
+    {
+        return m_materialAssetRevision.load(std::memory_order_relaxed);
+    }
+    bool ReloadMaterialAsset(FileGuid guid, std::string& error);
+    bool PublishMaterialAsset(std::shared_ptr<Material> candidate, const std::shared_ptr<Material>& expectedCurrent,
+                              std::string& error);
 	std::vector<std::pair<std::string, std::shared_ptr<Material>>> SnapshotMaterials();
 	std::shared_ptr<Material> RegisterImportedMaterial(
 		std::shared_ptr<Material> material, std::string_view baseName);
@@ -243,6 +251,7 @@ public:
 	// 소유권을 공유하는 조회. 컴포넌트처럼 참조를 보관하는 쪽은 이것을 써야
 	// 캐시에서 제거되어도 사용 중인 머티리얼이 파괴되지 않는다.
 	std::shared_ptr<Material> LoadMaterialShared(std::string_view name);
+    std::shared_ptr<Material> LoadMaterialShared(FileGuid guid);
 	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
         std::optional<bool> srgb = std::nullopt);
 	Material* CreateMaterial();
@@ -263,6 +272,16 @@ public:
                                  std::string& error, bool reload = false);
     bool ConfigureMaterialGraphAuthoring(Material& material, const LX::LXMaterialAsset& asset,
                                          const material_graph::InstanceDescription& description, std::string& error);
+    bool ConfigureMaterialGraph(Material& material, std::shared_ptr<const material_graph::Generation> generation,
+                                const material_graph::InstanceDescription& description, std::string& error);
+    bool PrepareMaterialGraphAuthoring(const Material& source, const LX::LXMaterialAsset& asset,
+                                      const material_graph::InstanceDescription& description,
+                                      std::shared_ptr<Material>& candidate, std::string& error);
+    // Capture paths on the caller thread. This CPU-only job owns all inputs and
+    // has no DataSystem lifetime dependency or shared generated-source filename.
+    static std::shared_ptr<const material_graph::Generation> CompileMaterialGraphAuthoring(
+        const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
+        const file::path& cacheDirectory, std::string& error);
     std::shared_ptr<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
 	bool LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
 		std::string& outError);
@@ -297,6 +316,7 @@ public:
 	// 조회·삽입 시 반드시 해당 뮤텍스를 잡아야 한다.
 	std::mutex m_textureMutex;
 	std::mutex m_materialMutex;
+    std::atomic<std::uint64_t> m_materialAssetRevision{};
 	std::mutex m_fontMutex;
 	mutable std::mutex m_retainedAssetsMutex;
 
@@ -344,6 +364,11 @@ private:
 	void SynchronizeLegacyMaterialProperties(Material& material) const;
 
 private:
+    bool PublishMaterialGraphGeneration(std::shared_ptr<const material_graph::Generation> generation,
+                                       const std::shared_ptr<const material_graph::Generation>& expectedGeneration,
+                                       std::shared_ptr<Material> candidate,
+                                       const std::shared_ptr<Material>& expectedMaterial, std::string& error);
+
 	//--------- current file count
 	uint32 currModelFileCount = 0;
 	uint32 currShaderFileCount = 0;

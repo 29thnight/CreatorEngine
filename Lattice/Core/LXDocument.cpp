@@ -235,6 +235,12 @@ LXCommandResult LXDocument::Execute(const LXCommand& command, std::uint64_t expe
                 result.created = link.value_or(0);
                 changed = link.has_value();
             }
+            else if constexpr (std::is_same_v<Request, LXReplaceInputConnection>)
+            {
+                const auto link = graph_.ReplaceInputConnection(request.first, request.second, &result.message);
+                result.created = link.value_or(0);
+                changed = link.has_value();
+            }
             else if constexpr (std::is_same_v<Request, LXDisconnectLink>)
             {
                 changed = graph_.Disconnect(request.link);

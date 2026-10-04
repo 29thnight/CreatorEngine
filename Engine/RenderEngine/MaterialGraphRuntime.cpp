@@ -7,6 +7,7 @@
 #include "AuthoringWriteNode.h"
 
 #include <algorithm>
+#include <atomic>
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -107,8 +108,8 @@ void WriteDouble(Authoring::WriteNode node, double value)
 }
 } // namespace
 
-std::shared_ptr<const Generation> GenerationStore::Load(const experiment::AssetId& id, const GenerationLoader& loader,
-                                                        bool reload, std::string& error)
+std::shared_ptr<const Generation> PrepareGeneration(const experiment::AssetId& id, const GenerationLoader& loader,
+                                                    std::string& error)
 {
     error.clear();
     if (!ValidTextureId(id) || !loader)
@@ -116,15 +117,11 @@ std::shared_ptr<const Generation> GenerationStore::Load(const experiment::AssetI
         error = "Material graph generation requires a canonical UUIDv4/UUIDv8 and a loader.";
         return {};
     }
-    // Serialize publication with reload/removal. A late candidate cannot revive
-    // a removed entry or overwrite a newer accepted candidate.
-    std::lock_guard lock(mutex_);
-    const auto found = entries_.find(id);
-    if (!reload && found != entries_.end())
-        return found->second.owner;
     CookedProgram loaded;
     if (!loader(loaded, error))
+    {
         return {};
+    }
     std::vector<std::uint8_t> payload;
     if (!WriteCookedProgram(loaded.product, {}, payload, error) ||
         (loaded.product.materialShader && loaded.product.materialShader->meta.guid.m_guid != id.value) ||
@@ -132,25 +129,97 @@ std::shared_ptr<const Generation> GenerationStore::Load(const experiment::AssetI
         loaded.metadata != LX::WriteMaterialProgramMetadata(loaded.product.program))
     {
         if (error.empty())
+        {
             error = "Material generation metadata differs from its verified product.";
-        return {};
-    }
-    ck::Sha256Digest digest;
-    if (!ck::ComputeSha256(std::as_bytes(std::span(payload)), digest, error))
-        return {};
-    if (found != entries_.end() && found->second.digest == digest)
-        return found->second.owner;
-    if (serial_ == UINT64_MAX)
-    {
-        error = "Material generation counter is exhausted.";
+        }
         return {};
     }
     auto generation = std::make_shared<Generation>();
+    if (!ck::ComputeSha256(std::as_bytes(std::span(payload)), generation->contentDigest, error))
+    {
+        return {};
+    }
+    // Both isolated previews and accepted products need unique runtime identities.
+    static std::atomic<std::uint64_t> serial{};
+    auto previous = serial.load(std::memory_order_relaxed);
+    do
+    {
+        if (previous == UINT64_MAX)
+        {
+            error = "Material generation counter is exhausted.";
+            return {};
+        }
+    } while (!serial.compare_exchange_weak(previous, previous + 1, std::memory_order_relaxed));
     generation->assetId = id;
-    generation->generation = ++serial_;
+    generation->generation = previous + 1;
+    // The compiler writes one canonical marker for the final active surface.
+    // It survives source-less cooked loading without changing the wire format.
+    // Marker-less legacy graphs continue to use their material document mode.
+    constexpr std::string_view marker = "#define LX_MATERIAL_SURFACE_ALPHA_MODE ";
+    const auto& slang = loaded.product.program.slang;
+    const auto position = slang.find(marker);
+    if (position != std::string::npos && (position == 0 || slang[position - 1] == '\n'))
+    {
+        const auto value = position + marker.size();
+        if (value + 1 < slang.size() && slang[value + 1] == '\n')
+        {
+            switch (slang[value])
+            {
+            case '0': generation->surfaceBlendMode = "opaque"; break;
+            case '1': generation->surfaceBlendMode = "masked"; break;
+            case '2': generation->surfaceBlendMode = "transparent"; break;
+            default:
+                error = "Invalid compiled surface alpha routing marker.";
+                return {};
+            }
+        }
+    }
     generation->cooked = std::move(loaded);
-    entries_[id] = {generation, digest};
     return generation;
+}
+
+std::shared_ptr<const Generation> GenerationStore::Load(const experiment::AssetId& id, const GenerationLoader& loader,
+                                                        bool reload, std::string& error)
+{
+    // Legacy/cooked loading keeps its serialized load/removal boundary.
+    std::lock_guard lock(mutex_);
+    const auto found = entries_.find(id);
+    if (!reload && found != entries_.end())
+    {
+        error.clear();
+        return found->second.owner;
+    }
+    auto candidate = PrepareGeneration(id, loader, error);
+    if (!candidate)
+    {
+        return {};
+    }
+    if (found != entries_.end() && found->second.digest == candidate->contentDigest &&
+        found->second.owner->surfaceBlendMode == candidate->surfaceBlendMode)
+    {
+        return found->second.owner;
+    }
+    entries_[id] = {candidate, candidate->contentDigest};
+    return candidate;
+}
+
+bool GenerationStore::Publish(std::shared_ptr<const Generation> candidate,
+                              const std::shared_ptr<const Generation>& expected, std::string& error)
+{
+    if (!candidate || candidate->generation == 0 || !ValidTextureId(candidate->assetId))
+    {
+        return Fail(error, "Only a verified, owned material graph generation can be published.");
+    }
+    std::lock_guard lock(mutex_);
+    const auto found = entries_.find(candidate->assetId);
+    const auto current = found == entries_.end() ? nullptr : found->second.owner;
+    if (current != expected)
+    {
+        return Fail(error, "The graph changed while preparing Apply. Reload before applying again.");
+    }
+    entries_[candidate->assetId] = {candidate, candidate->contentDigest};
+    error.clear();
+    return true;
 }
 
 std::shared_ptr<const Generation> GenerationStore::Current(const experiment::AssetId& id) const

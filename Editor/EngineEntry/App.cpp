@@ -288,6 +288,8 @@ void Core::App::Finalize()
 	ConsoleCommandSystem::Get().Shutdown();
 	std::printf("[SHUTDOWN] CLI Shutdown 반환\n");
 
+    editor::material_editing::Shutdown();
+
 	m_main->Finalize();
 	std::printf("[SHUTDOWN] EditorMain Finalize 반환\n");
 

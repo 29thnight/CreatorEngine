@@ -64,6 +64,9 @@ namespace
     void ApplyGraphParameter(MeshRenderer& renderer, LX::Id id, LX::LXSocketValue value)
     {
         const auto previous = renderer.m_Material;
+        const auto baseGuid = renderer.m_materialBaseGuid;
+        const auto acceptedBase = renderer.GetMaterialAssetBase();
+        const auto referenceState = renderer.GetMaterialAssetReferenceState();
         auto candidate = std::make_shared<Material>(*previous);
         std::string error;
         if (!candidate->TrySetMaterialGraphParameter(id, std::move(value), error))
@@ -73,13 +76,18 @@ namespace
         }
         const auto apply = [scene = renderer.GetOwner()->GetScene(),
                             handle = renderer.GetOwner()->GetScene()->HandleOf(renderer.GetOwner()->m_index),
-                            component = renderer.GetInstanceID()](const std::shared_ptr<Material>& material) {
+                            component = renderer.GetInstanceID(), baseGuid, acceptedBase,
+                                referenceState](const std::shared_ptr<Material>& material) {
             if (SceneManagers->GetActiveScene() != scene)
+            {
                 return;
+            }
             auto* object = scene->Resolve(handle);
             auto* target = object ? object->GetComponent<MeshRenderer>() : nullptr;
             if (target && target->GetInstanceID() == component)
-                target->SetMaterial(material);
+            {
+                target->SetMaterialAssetReference(material, baseGuid, acceptedBase, referenceState);
+            }
         };
         Meta::MakeCustomChangeCommand([apply, previous] { apply(previous); }, [apply, candidate] { apply(candidate); });
     }
@@ -88,26 +96,42 @@ namespace
     {
         const auto previous = renderer.m_Material;
         const auto previousBase = renderer.m_materialBaseGuid;
+        const auto previousSnapshot = renderer.GetMaterialAssetBase();
+        const auto previousState = renderer.GetMaterialAssetReferenceState();
         auto candidate = std::make_shared<Material>(*asset);
         const auto apply = [scene = renderer.GetOwner()->GetScene(),
                             handle = renderer.GetOwner()->GetScene()->HandleOf(renderer.GetOwner()->m_index),
-                            component = renderer.GetInstanceID()](const std::shared_ptr<Material>& material, FileGuid base) {
-            if (SceneManagers->GetActiveScene() != scene) return;
+                            component = renderer.GetInstanceID()](const std::shared_ptr<Material>& material,
+                                FileGuid base,
+                                                                  const std::shared_ptr<const Material>& snapshot,
+                                                                  const std::shared_ptr<const MaterialAssetReferenceState>& state) {
+            if (SceneManagers->GetActiveScene() != scene)
+            {
+                return;
+            }
             auto* object = scene->Resolve(handle);
             auto* target = object ? object->GetComponent<MeshRenderer>() : nullptr;
-            if (!target || target->GetInstanceID() != component) return;
-            target->SetMaterial(material);
-            target->m_materialBaseGuid = base;
+            if (!target || target->GetInstanceID() != component)
+            {
+                return;
+            }
+            target->SetMaterialAssetReference(material, base, snapshot, state);
         };
-        Meta::MakeCustomChangeCommand([apply, previous, previousBase] { apply(previous, previousBase); },
-                                      [apply, candidate, base = asset->m_fileGuid] { apply(candidate, base); });
+        Meta::MakeCustomChangeCommand([apply, previous, previousBase, previousSnapshot, previousState] {
+                                          apply(previous, previousBase, previousSnapshot, previousState);
+                                      },
+                                      [apply, candidate, asset] { apply(candidate, asset->m_fileGuid, asset, {}); });
     }
 
     void DrawMaterialAssetSelector(MeshRenderer& renderer)
     {
+        ImGui::PushID(renderer.GetOwner()->GetScene());
+        ImGui::PushID(std::to_string(renderer.GetOwner()->m_index).c_str());
+        ImGui::PushID(std::to_string(renderer.GetInstanceID()).c_str());
         static std::vector<std::filesystem::path> assets;
         static ImGuiTextFilter filter;
         static std::string name, error;
+        static bool assignSaved = false;
         const auto refresh = [&] {
             assets.clear();
             std::error_code ec;
@@ -134,15 +158,22 @@ namespace
                 {
                     const auto caption = std::filesystem::relative(path, PathFinder::RelativeToMaterial("")).replace_extension().generic_string();
                     if (!filter.PassFilter(caption.c_str())) continue;
+                    const auto assetGuid = DataSystems->GetFileGuid(path);
                     ImGui::PushID(path.string().c_str());
-                    if (ImGui::Selectable(caption.c_str(), renderer.m_materialBaseGuid == DataSystems->GetFileGuid(path)))
+                    if (ImGui::Selectable(caption.c_str(), renderer.m_materialBaseGuid == assetGuid))
                     {
                         try
                         {
-                            auto material = DataSystems->LoadMaterialShared(caption);
-                            if (material && material->m_fileGuid == DataSystems->GetFileGuid(path))
-                            { AssignMaterialAsset(renderer, material); ImGui::CloseCurrentPopup(); }
-                            else error = "Could not load material: " + caption;
+                            auto material = DataSystems->LoadMaterialShared(assetGuid);
+                            if (material && material->m_fileGuid == assetGuid)
+                            {
+                                AssignMaterialAsset(renderer, material);
+                                ImGui::CloseCurrentPopup();
+                            }
+                            else
+                            {
+                                error = "Could not load material: " + caption;
+                            }
                         }
                         catch (const std::exception& failure) { error = failure.what(); }
                     }
@@ -157,18 +188,30 @@ namespace
         ImGui::BeginDisabled(!renderer.m_Material || !PathFinder::IsAssetAuthoringEnabled());
         if (ImGui::Button("+##SaveMaterialAsset", ImVec2{button, button}))
         {
-            name = label + " Copy";
+            name = std::filesystem::path(label).filename().string() + " Copy";
+            assignSaved = false;
             error.clear();
-            ImGui::OpenPopup("Save as New Material");
+            ImGui::OpenPopup("Save Material Copy");
         }
         ImGui::EndDisabled();
-        if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save this material as a new asset");
-        if (ImGui::BeginPopup("Save as New Material"))
+        if (ImGui::IsItemHovered())
         {
-            ImGui::TextUnformatted("Save as New Material");
+            ImGui::SetTooltip("Save a material instance copy; graph-backed copies share their shader graph");
+        }
+        if (ImGui::BeginPopup("Save Material Copy"))
+        {
+            ImGui::TextUnformatted(renderer.m_Material && renderer.m_Material->HasMaterialGraph()
+                ? "Save Material Copy (shared graph)" : "Save Material Copy");
             ImGui::InputText("Name", &name);
+            ImGui::TextWrapped("Current instance values become defaults in the new material asset.");
+            if (renderer.m_Material && renderer.m_Material->HasMaterialGraph())
+            {
+                ImGui::TextWrapped("This copy shares its shader graph. Use Node Editor Save As Copy for an "
+                    "independent graph.");
+            }
+            ImGui::Checkbox("Assign this copy to this mesh", &assignSaved);
             if (!error.empty()) ImGui::TextWrapped("%s", error.c_str());
-            if (ImGui::Button("Save and Assign"))
+            if (ImGui::Button("Save Copy"))
             {
                 const auto path = PathFinder::RelativeToMaterial("") / (name + ".asset");
                 const bool valid = !name.empty() && name != "." && name != ".." &&
@@ -185,7 +228,10 @@ namespace
                     if (EditorAssetDatabase::Get().SaveMaterial(material.get()))
                     {
                         DataSystems->InsertMaterial(material);
-                        AssignMaterialAsset(renderer, material);
+                        if (assignSaved)
+                        {
+                            AssignMaterialAsset(renderer, material);
+                        }
                         refresh();
                         ImGui::CloseCurrentPopup();
                     }
@@ -194,6 +240,9 @@ namespace
             }
             ImGui::EndPopup();
         }
+        ImGui::PopID();
+        ImGui::PopID();
+        ImGui::PopID();
     }
 
     void DrawGraphSurface(MeshRenderer& renderer, const editor::widgets::property_sheet& sheet)
@@ -201,8 +250,10 @@ namespace
         // Keep the snapshot alive if a widget publishes a replacement instance.
         const auto instance = renderer.m_Material->GetMaterialGraphInstance();
         const auto& program = instance->generation->cooked.product.program;
-        if (!ImGui::CollapsingHeader("Surface", ImGuiTreeNodeFlags_DefaultOpen))
+        if (!ImGui::CollapsingHeader("Instance Overrides", ImGuiTreeNodeFlags_DefaultOpen))
+        {
             return;
+        }
         ReadOnlyLine(sheet, "Shader", program.surface ? "Surface shader" : "No surface output");
         for (const auto& parameter : program.parameters)
         {
@@ -280,6 +331,7 @@ namespace
     void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
     {
         ce::profile_scope profile{ce::marker<"MaterialInspectorDraw">()};
+        meshRenderer->RefreshMaterialAsset();
         const editor::widgets::property_sheet sheet = MaterialSheet();
 
         // PHASE 3.75 MBC8 — typed 정본의 read-only snapshot. 인스펙터는 generation을
@@ -314,7 +366,6 @@ namespace
             }
         }
 
-        const bool latticeMaterial = meshRenderer->m_Material && meshRenderer->m_Material->HasMaterialGraph();
         if (ImGui::CollapsingHeader("Material", ImGuiTreeNodeFlags_DefaultOpen))
         {
             DrawMaterialAssetSelector(*meshRenderer);
@@ -322,11 +373,23 @@ namespace
             {
                 std::string error;
                 if (!editor::material_editing::Open(*meshRenderer, error))
+                {
                     Debug::PrintLog(spdlog::level::err, error);
+                }
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("%s", meshRenderer->m_materialBaseGuid != FileGuid{}
+                    ? "Edit the shared material asset. Values below override this mesh only."
+                    : "Create a standalone material draft from this mesh. Assignment is a separate action.");
             }
             editor::material_editing::DrawInspectorPreview(*meshRenderer);
-            if (latticeMaterial) DrawGraphSurface(*meshRenderer, sheet);
+            if (meshRenderer->m_Material && meshRenderer->m_Material->HasMaterialGraph())
+            {
+                DrawGraphSurface(*meshRenderer, sheet);
+            }
         }
+        const bool latticeMaterial = meshRenderer->m_Material && meshRenderer->m_Material->HasMaterialGraph();
         if (!latticeMaterial && ImGui::CollapsingHeader("MaterialInfo", ImGuiTreeNodeFlags_DefaultOpen))
         {
             const auto& mat_type = Meta::Find(type_guid(Material)); // CT1: 문자열 → typeID 조회
