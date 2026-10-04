@@ -1214,6 +1214,9 @@ namespace
         static constexpr double kSceneSoftAgeBudgetMs = 50.0;
         static constexpr uint64_t kSceneProgressNanoseconds = 250000000;
         static constexpr uint32_t kSceneCompletionPollMs = 2;
+        // GT 는 앞 packet 이 소비될 때까지 이만큼만 기다린다. 넘으면 기존처럼 병합한다.
+        // 렌더 스레드가 셰이더 준비로 오래 멈춰도 GT 가 이 주기로는 계속 돈다.
+        static constexpr uint32_t kProducerPacingMs = 50;
         static constexpr size_t kMaxDeltasPerSubmission = 65536;
         mutable std::mutex renderQueueMutex;
         std::condition_variable renderQueueWake;
@@ -1240,6 +1243,10 @@ namespace
         uint64_t renderStalePixelSkips{ 0 };
         uint64_t renderOverBudgetAdmissions{ 0 };
         uint64_t renderDisplayLeaseSkips{ 0 };
+        uint64_t renderProducerPacingWaits{ 0 };
+        uint64_t renderDisplayLeaseWaits{ 0 };
+        // RT 전용. 직전 프레임에서 고려한 뷰가 모두 표시 lease 때문에 건너뛰어졌다.
+        bool renderDisplayLeaseBlocked{ false };
         uint64_t renderAdmittedFrameId{ 0 };
         uint64_t renderLastAdmissionNanoseconds{ 0 };
         double renderLastAdmissionAgeMs{ 0.0 };
@@ -5588,6 +5595,21 @@ namespace
                                 });
                             continue;
                         }
+                        if (renderDisplayLeaseBlocked && !renderThreadStopRequested)
+                        {
+                            // 표시 슬롯이 하나도 비지 않았는데 바로 다음 packet 을 집으면
+                            // 그릴 것 없이 packet 만 소비하며 돈다. 완료 조회 주기로 기다린다.
+                            renderDisplayLeaseBlocked = false;
+                            ++renderDisplayLeaseWaits;
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            renderQueueWake.wait_for(queueLock,
+                                std::chrono::milliseconds(kSceneCompletionPollMs), [this]
+                                {
+                                    return renderThreadStopRequested;
+                                });
+                            continue;
+                        }
                         // 이 시점에만 입력을 확정한다. 기다리는 동안에도 대기 입력은
                         // 교체 가능했고 lifecycle delta의 순서는 보존되었다.
                         submission = std::move(renderQueue.front());
@@ -5780,6 +5802,24 @@ namespace
             return false;
         }
 
+        // 씬 잠금 밖의 GT 에는 다른 속도 제한이 없다. 앞 packet 이 아직 대기 중이면
+        // RT 가 가져갈 때까지 기다려 GT 를 RT 소비 속도에 맞춘다(최신 입력 정책은 그대로).
+        if (renderQueue.size() >= kRenderQueueCapacity)
+        {
+            ++renderProducerPacingWaits;
+            renderQueueWake.wait_for(lock, std::chrono::milliseconds(kProducerPacingMs), [this]
+            {
+                return !renderThreadAccepting || renderQueue.size() < kRenderQueueCapacity;
+            });
+            if (!renderThreadAccepting)
+            {
+                renderShutdownDiscardedDeltas += submission.deltas.size();
+                ProxyCommandQueue->MarkShutdownDiscarded(
+                    static_cast<uint64_t>(submission.deltas.size()));
+                return false;
+            }
+        }
+
         if (renderQueue.size() < kRenderQueueCapacity)
         {
             renderQueue.push_back(std::move(submission));
@@ -5898,6 +5938,8 @@ namespace
         stats.stalePixelSkips = renderStalePixelSkips;
         stats.overBudgetAdmissions = renderOverBudgetAdmissions;
         stats.displayLeaseSkips = renderDisplayLeaseSkips;
+        stats.producerPacingWaits = renderProducerPacingWaits;
+        stats.displayLeaseWaits = renderDisplayLeaseWaits;
         stats.admittedFrameId = renderAdmittedFrameId;
         stats.lastAdmissionAgeMs = renderLastAdmissionAgeMs;
         stats.maxAdmissionAgeMs = renderMaxAdmissionAgeMs;
@@ -6968,6 +7010,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // frameContext가 draws/lights 벡터의 주소를 들므로 '뷰1 제출 완료 →
     // 뷰2 밀봉'의 순차 흐름만 성립한다. 밀봉을 몰아서 하고 렌더를 몰아서
     // 하면 뷰1의 기록 입력이 뷰2 밀봉으로 재구성되어 무효가 된다.
+    uint32_t consideredViews = 0;
+    uint32_t leaseSkippedViews = 0;
     const uint32_t startIndex = state.viewRotation++ % cameraCount;
     for (uint32_t step = 0; step < cameraCount; ++step)
     {
@@ -6977,6 +7021,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // The diagnostic clock must not enter another camera's temporal history.
         if (state.controlledCaptureFrame && viewPacket.displayTarget != state.pbrCapture->target)
             continue;
+        ++consideredViews;
 
         if (totalPending >= 2)
         {
@@ -7084,6 +7129,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             ++state.framesInFlight;
             std::lock_guard<std::mutex> queueLock(state.renderQueueMutex);
             ++state.renderDisplayLeaseSkips;
+            ++leaseSkippedViews;
             continue;
         }
 
@@ -7157,6 +7203,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     if (renderedAny) state.lastCpuMs = watch.ElapsedMs();
+    state.renderDisplayLeaseBlocked = consideredViews != 0 && leaseSkippedViews == consideredViews;
 }
 
 

@@ -368,6 +368,8 @@ namespace ConsoleCmd
         admission.Set("stalePixelSkips", CommandData::Int(renderThread.stalePixelSkips));
         admission.Set("overBudgetAdmissions", CommandData::Int(renderThread.overBudgetAdmissions));
         admission.Set("displayLeaseSkips", CommandData::Int(renderThread.displayLeaseSkips));
+        admission.Set("producerPacingWaits", CommandData::Int(renderThread.producerPacingWaits));
+        admission.Set("displayLeaseWaits", CommandData::Int(renderThread.displayLeaseWaits));
         admission.Set("lastAdmissionAgeMs", CommandData::Double(renderThread.lastAdmissionAgeMs));
         admission.Set("maxAdmissionAgeMs", CommandData::Double(renderThread.maxAdmissionAgeMs));
         admission.Set("pendingAgeMs", CommandData::Double(renderThread.pendingAgeMs));

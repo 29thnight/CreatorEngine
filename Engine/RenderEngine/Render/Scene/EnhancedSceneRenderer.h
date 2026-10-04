@@ -256,6 +256,8 @@ struct EnhancedRenderThreadStats
     uint64_t stalePixelSkips{ 0 };
     uint64_t overBudgetAdmissions{ 0 };
     uint64_t displayLeaseSkips{ 0 };
+    uint64_t producerPacingWaits{ 0 };
+    uint64_t displayLeaseWaits{ 0 };
     // 마지막 실제 장면 제출의 신원이다. 이 값이나 입력 나이가 GPU 완료를 뜻하지 않는다.
     uint64_t admittedFrameId{ 0 };
     double lastAdmissionAgeMs{ 0.0 };
