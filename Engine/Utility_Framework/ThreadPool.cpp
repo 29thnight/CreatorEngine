@@ -4,7 +4,9 @@
 #include <atomic>
 #include <condition_variable>
 #include <limits>
+#include <future>
 #include <stdexcept>
+#include <thread>
 #include <utility>
 #pragma comment(lib, "enkiTS.lib")
 
@@ -17,15 +19,19 @@ thread_local bool executing_pool_work = false;
 // 엔진 소유 영속 풀이 하나뿐이라 그것으로 충분하다.
 thread_pool::worker_hooks g_thread_pool_worker_hooks{};
 
+// 배정 스레드 하나가 enkiTS 외부 스레드 번호 1 을 차지해 워커 번호가 하나씩
+// 밀린다. 훅에는 예전과 같은 1..N 을 넘겨 프로파일러 레인 이름이 그대로 선다.
+constexpr uint32_t kDispatcherThreads = 1;
+
 void thread_pool_worker_thread_start(uint32_t threadnum)
 {
     if (g_thread_pool_worker_hooks.on_start)
-        g_thread_pool_worker_hooks.on_start(threadnum);
+        g_thread_pool_worker_hooks.on_start(threadnum - kDispatcherThreads);
 }
 void thread_pool_worker_thread_stop(uint32_t threadnum)
 {
     if (g_thread_pool_worker_hooks.on_stop)
-        g_thread_pool_worker_hooks.on_stop(threadnum);
+        g_thread_pool_worker_hooks.on_stop(threadnum - kDispatcherThreads);
 }
 }
 
@@ -85,6 +91,10 @@ struct thread_pool::state
 
     // One handoff per batch, not per item. Publishing from any host thread never
     // executes the user's callback there, even when an enkiTS pipe is full.
+    // Every handoff goes to the dispatcher thread, which only runs pinned tasks.
+    // It was pinned to the next worker in turn; a worker inside a long task
+    // cannot run pinned tasks, so the batch waited for that task to finish
+    // while the other workers sat idle (animation joins waited up to 33 ms).
     struct handoff : enki::IPinnedTask
     {
         state& owner_;
@@ -115,12 +125,25 @@ struct thread_pool::state
         }
     };
 
+    // Wakes the dispatcher for shutdown; it has nothing to publish.
+    struct wake : enki::IPinnedTask
+    {
+        using enki::IPinnedTask::IPinnedTask;
+        void Execute() override {}
+    };
+
     enki::TaskScheduler scheduler_;
     std::mutex submit_mutex_, done_mutex_;
     std::condition_variable done_;
     std::size_t pending_{};
-    uint32_t next_worker_{}, workers_{};
+    uint32_t workers_{};
     bool accepting_{true};
+    // Registered enkiTS external thread that only waits for and runs pinned
+    // handoffs, so it is never inside user work when a batch arrives.
+    static constexpr uint32_t dispatcher_thread_ = enki::TaskScheduler::GetNumFirstExternalTaskThread();
+    std::thread dispatcher_;
+    std::atomic<bool> dispatcher_stop_{false};
+    wake dispatcher_wake_{dispatcher_thread_};
 
     explicit state(std::size_t workers)
     {
@@ -129,11 +152,48 @@ struct thread_pool::state
         workers_ = workers ? static_cast<uint32_t>(workers) : (std::max)(1u, enki::GetNumHardwareThreads());
         enki::TaskSchedulerConfig config;
         config.numTaskThreadsToCreate = workers_;
+        config.numExternalTaskThreads = kDispatcherThreads;
         // 워커 수명을 밖으로 알린다. enkiTS 콜백은 함수 포인터라 userData 가
         // 없으므로 트램펄린이 정적 훅을 읽는다.
         config.profilerCallbacks.threadStart = &thread_pool_worker_thread_start;
         config.profilerCallbacks.threadStop  = &thread_pool_worker_thread_stop;
         scheduler_.Initialize(config);
+        std::promise<bool> registered;
+        auto ready = registered.get_future();
+        dispatcher_ = std::thread([this, &registered] {
+            const bool ok = scheduler_.RegisterExternalTaskThread(dispatcher_thread_);
+            registered.set_value(ok);
+            if (!ok)
+                return;
+            for (;;)
+            {
+                scheduler_.WaitForNewPinnedTasks();
+                scheduler_.RunPinnedTasks();
+                if (dispatcher_stop_.load(std::memory_order_acquire))
+                    break;
+            }
+            scheduler_.DeRegisterExternalTaskThread();
+        });
+        if (!ready.get())
+        {
+            dispatcher_.join();
+            scheduler_.WaitforAllAndShutdown();
+            throw std::runtime_error("thread_pool dispatcher registration failed");
+        }
+    }
+    ~state()
+    {
+        stop_dispatcher();
+    }
+    // Called after the last handoff has drained; the wake task is the final
+    // pinned task the dispatcher runs before it deregisters.
+    void stop_dispatcher() noexcept
+    {
+        if (!dispatcher_.joinable())
+            return;
+        dispatcher_stop_.store(true, std::memory_order_release);
+        scheduler_.AddPinnedTask(&dispatcher_wake_);
+        dispatcher_.join();
     }
     void dispatch(std::size_t count, std::function<void(std::size_t)> execute,
                   std::function<void(std::exception_ptr)> complete)
@@ -144,7 +204,7 @@ struct thread_pool::state
         if (!accepting_)
             throw std::runtime_error("thread_pool is stopped");
         auto task = std::make_unique<work>(*this, count, std::move(execute), std::move(complete));
-        auto delivery = std::make_unique<handoff>(*this, task.get(), 1u + next_worker_++ % workers_);
+        auto delivery = std::make_unique<handoff>(*this, task.get(), dispatcher_thread_);
         {
             std::lock_guard count_lock(done_mutex_);
             ++pending_;
@@ -170,6 +230,7 @@ struct thread_pool::state
             std::unique_lock lock(done_mutex_);
             done_.wait(lock, [this] { return pending_ == 0; });
         }
+        stop_dispatcher();
         scheduler_.WaitforAllAndShutdown();
     }
 };

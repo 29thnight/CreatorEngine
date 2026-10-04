@@ -175,6 +175,35 @@ int main()
             indexed_failed = std::string_view(error.what()) == "indexed failure";
         }
         require(indexed_failed, "indexed failure propagates");
+
+        // A worker inside a long task must not hold back a batch submitted
+        // elsewhere. Handoffs were pinned to the next worker in turn, so with
+        // one worker spinning, one of several consecutive submissions waited
+        // for it to finish. The watchdog only keeps a red run finite.
+        release = false;
+        entered = false;
+        auto occupied = scheduler.submit([&] {
+            entered = true;
+            while (!release.load())
+                std::this_thread::yield();
+        });
+        while (!entered.load())
+            std::this_thread::yield();
+        std::jthread occupied_watchdog([&] {
+            for (int tick = 0; tick < 200 && !release.load(); ++tick)
+                std::this_thread::sleep_for(10ms);
+            release = true;
+        });
+        std::array<std::atomic<unsigned>, 8> handoffs{};
+        for (unsigned i = 0; i < handoffs.size(); ++i)
+            scheduler.submit_indexed(2, [&, i](std::size_t) { ++handoffs[i]; }).wait();
+        const bool prompt_handoff = !release.load();
+        release = true;
+        occupied.wait();
+        occupied_watchdog.join();
+        for (const auto& handoff : handoffs)
+            require(handoff == 2, "handoff batch exactly once");
+        require(prompt_handoff, "a busy worker does not hold back other handoffs");
         scheduler.parallel_for(0, 1, [](auto, auto) { throw std::runtime_error("empty range executed"); }).wait();
         rejected = false;
         try
