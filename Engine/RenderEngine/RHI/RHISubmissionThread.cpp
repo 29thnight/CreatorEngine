@@ -6,6 +6,7 @@
 #include "RHIRecordedBatch.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -54,13 +55,33 @@ enum class RHISubmissionThread::EntryKind : uint8_t
 
 struct RHISubmissionTicket::State
 {
+    static_assert(std::atomic<bool>::is_always_lock_free,
+        "RHI ticket ready polling requires a lock-free bool atomic");
+
     mutable std::mutex mutex;
     std::condition_variable wake;
     uint64_t sequence{ 0 };
-    bool complete{ false };
+    std::atomic<bool> ready{ false };
     bool success{ false };
     std::string error;
     std::shared_ptr<RHIRecordedBatch> recordedBatch;
+
+    void PublishCompletion(bool completedSuccessfully, std::string completionError)
+    {
+        {
+            // 대기 진입과 같은 mutex로 게시해야 조건 확인 직후의 알림을 잃지 않는다.
+            // 성공·실패·취소 모두 이 경로만 쓰므로 게시한 결과는 다시 바뀌지 않는다.
+            std::lock_guard lock(mutex);
+            if (ready.load(std::memory_order_relaxed))
+            {
+                return;
+            }
+            success = completedSuccessfully;
+            error = std::move(completionError);
+            ready.store(true, std::memory_order_release);
+        }
+        wake.notify_all();
+    }
 };
 
 struct RHISubmissionThread::Impl
@@ -178,6 +199,7 @@ struct RHISubmissionThread::Impl
 
     void PollRetirementsLocked()
     {
+        // raw backend를 캡처한 조회의 수명을 owner 해체와 직렬화하므로 이 잠금을 유지한다.
         for (auto it = retirements.begin(); it != retirements.end();)
         {
             const uint64_t completed = it->completionQuery
@@ -212,10 +234,22 @@ struct RHISubmissionThread::Impl
             bool hasEntry = false;
             {
                 std::unique_lock lock(mutex);
-                workWake.wait_for(lock, std::chrono::milliseconds(1), [this]
+                const auto canExecuteOrStop = [this]
                 {
-                    return stopRequested || !queue.empty() || !retirements.empty();
-                });
+                    return !queue.empty() ||
+                        (stopRequested && (retirements.empty() || abandonRetirements));
+                };
+                if (retirements.empty())
+                {
+                    workWake.wait(lock, canExecuteOrStop);
+                }
+                else
+                {
+                    // 미완료 GPU retirement 자체는 깨어날 이유가 아니다. 새 제출은
+                    // 즉시 처리하되 완료 조회는 기한까지 쉬어 빈 큐의 busy-poll을 막는다.
+                    // 정상 종료도 retirement가 남으면 같은 기한으로 drain을 진행한다.
+                    workWake.wait_for(lock, std::chrono::milliseconds(1), canExecuteOrStop);
+                }
                 PollRetirementsLocked();
                 if (!queue.empty())
                 {
@@ -234,7 +268,10 @@ struct RHISubmissionThread::Impl
                 }
             }
 
-            if (!hasEntry) continue;
+            if (!hasEntry)
+            {
+                continue;
+            }
 
             std::string error;
             bool success = false;
@@ -251,15 +288,11 @@ struct RHISubmissionThread::Impl
             {
                 error = "RHI submission unknown exception";
             }
-            if (!success && error.empty()) error = entry.label + " 실패";
-
+            if (!success && error.empty())
             {
-                std::lock_guard ticketLock(entry.ticket->mutex);
-                entry.ticket->success = success;
-                entry.ticket->error = error;
-                entry.ticket->complete = true;
+                error = entry.label + " 실패";
             }
-            entry.ticket->wake.notify_all();
+            entry.ticket->PublishCompletion(success, error);
 
             {
                 std::lock_guard lock(mutex);
@@ -280,7 +313,9 @@ struct RHISubmissionThread::Impl
                         std::move(entry.lifetimeToken) });
                 }
                 if (stats.lastCompletedSequence + 1 != entry.sequence)
+                {
                     ++stats.orderingErrors;
+                }
                 stats.lastCompletedSequence = entry.sequence;
                 runningOwner = nullptr;
                 runningGeneration = 0;
@@ -308,9 +343,7 @@ uint64_t RHISubmissionTicket::GetSequence() const
 
 bool RHISubmissionTicket::IsComplete() const
 {
-    if (!m_state) return false;
-    std::lock_guard lock(m_state->mutex);
-    return m_state->complete;
+    return m_state && m_state->ready.load(std::memory_order_acquire);
 }
 
 const RHIRecordedBatch* RHISubmissionTicket::GetRecordedBatch() const
@@ -343,19 +376,18 @@ RHISubmissionThread::~RHISubmissionThread()
         impl.abandonRetirements = true;
         for (Impl::Entry& entry : impl.queue)
         {
-            {
-                std::lock_guard ticketLock(entry.ticket->mutex);
-                entry.ticket->success = false;
-                entry.ticket->error = "RHI submission thread 정적 종료";
-                entry.ticket->complete = true;
-            }
-            entry.ticket->wake.notify_all();
+            entry.ticket->PublishCompletion(false, "RHI submission thread 정적 종료");
         }
         impl.queue.clear();
         impl.retirements.clear();
     }
     impl.workWake.notify_all();
-    if (impl.thread.joinable()) impl.thread.join();
+    impl.spaceWake.notify_all();
+    impl.drainWake.notify_all();
+    if (impl.thread.joinable())
+    {
+        impl.thread.join();
+    }
 }
 
 bool RHISubmissionThread::AcquireClient(const void* owner, std::string& outError)
@@ -434,6 +466,7 @@ void RHISubmissionThread::ReleaseClient(const void* owner)
     if (shouldJoin)
     {
         impl.workWake.notify_all();
+        impl.spaceWake.notify_all();
         impl.thread.join();
     }
 }
@@ -452,7 +485,8 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
     Work work, RHISubmissionTicket& outTicket, std::string& outError,
     RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
     std::shared_ptr<const void> lifetimeToken, EntryKind kind,
-    bool allowTransition, uint64_t expectedGeneration)
+    bool allowTransition, uint64_t expectedGeneration,
+    std::shared_ptr<RHIRecordedBatch> recordedBatch)
 {
     if (nullptr == owner || !work)
     {
@@ -483,6 +517,7 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
             : "RHI submission owner가 lifecycle 전환 중이라 작업을 받지 않는다";
         return false;
     }
+    const uint64_t admittedGeneration = ownerState.generation;
     bool countedSaturation = false;
     std::chrono::steady_clock::time_point waitStarted{};
     while (impl.queue.size() >= kQueueCapacity && impl.stats.accepting)
@@ -509,9 +544,21 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
         outError = "RHI submission thread가 작업을 받지 않는다";
         return false;
     }
+    // 용량 대기는 mutex를 놓는다. 그 사이 닫히거나 교체된 owner에 오래된 작업을
+    // 다시 넣으면 취소·drain이 끝난 뒤에도 backend를 호출할 수 있어 재검증한다.
+    if (!ownerState.registered || ownerState.generation != admittedGeneration ||
+        ((!ownerState.accepting || ownerState.faulted || ownerState.transitioning) && !allowTransition))
+    {
+        outError = ownerState.faulted && !ownerState.fault.empty()
+            ? ownerState.fault
+            : "RHI submission 용량 대기 중 owner의 수락 상태/generation이 바뀌었다";
+        return false;
+    }
 
     const uint64_t sequence = impl.nextSequence++;
     state->sequence = sequence;
+    // worker가 즉시 완료해도 release 게시 뒤 ticket의 결과 포인터를 바꾸지 않는다.
+    state->recordedBatch = std::move(recordedBatch);
     impl.queue.push_back(Impl::Entry{
         sequence, ownerState.generation, owner, kind,
         label ? label : "RHI submission", std::move(work), state,
@@ -537,18 +584,26 @@ bool RHISubmissionThread::Wait(const RHISubmissionTicket& ticket,
     std::string& outError) const
 {
     ce::profile_scope profile{ce::marker<"RHITicketWait">()};
-    if (!ticket.m_state)
+    const auto state = ticket.m_state;
+    if (!state)
     {
         outError = "유효하지 않은 RHI submission ticket";
         return false;
     }
-    std::unique_lock lock(ticket.m_state->mutex);
-    ticket.m_state->wake.wait(lock, [&ticket]
+    if (!state->ready.load(std::memory_order_acquire))
     {
-        return ticket.m_state->complete;
-    });
-    if (!ticket.m_state->success) outError = ticket.m_state->error;
-    return ticket.m_state->success;
+        std::unique_lock lock(state->mutex);
+        state->wake.wait(lock, [&state]
+        {
+            return state->ready.load(std::memory_order_acquire);
+        });
+    }
+    // acquire로 완료를 본 뒤 결과는 불변이며, 지역 shared_ptr가 읽는 동안 수명을 잡는다.
+    if (!state->success)
+    {
+        outError = state->error;
+    }
+    return state->success;
 }
 
 bool RHISubmissionThread::DrainSubmissions(const void* owner, std::string& outError)
@@ -736,7 +791,11 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
 
     for (auto it = impl.queue.begin(); it != impl.queue.end();)
     {
-        if (it->owner != owner) { ++it; continue; }
+        if (it->owner != owner)
+        {
+            ++it;
+            continue;
+        }
         cancelled.push_back(it->ticket);
         it = impl.queue.erase(it);
     }
@@ -771,14 +830,11 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
 
     for (const auto& ticketState : cancelled)
     {
-        {
-            std::lock_guard ticketLock(ticketState->mutex);
-            ticketState->success = false;
-            ticketState->error = "device error로 제출이 폐기됐다";
-            ticketState->complete = true;
-        }
-        ticketState->wake.notify_all();
+        ticketState->PublishCompletion(false, "device error로 제출이 폐기됐다");
     }
+    // 실행할 entry 없이 취소만 끝나도 queue/drain 대기자가 새 상태를 확인해야 한다.
+    impl.workWake.notify_all();
+    impl.drainWake.notify_all();
     if (!outResult.IsClean())
     {
         outError = "device-error abandon 뒤 owner pending이 0이 아니다";
@@ -852,7 +908,10 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
         outError = "RHIRecordedBatch backend generation이 owner generation과 다르다";
         return false;
     }
-    if (!pool->PrepareRecordedBatchSubmission(batch, outError)) return false;
+    if (!pool->PrepareRecordedBatchSubmission(batch, outError))
+    {
+        return false;
+    }
 
     auto queuedBatch = std::make_shared<RHIRecordedBatch>(std::move(batch));
     const RHICompletionPoint completion = queuedBatch->GetCompletionPoint();
@@ -862,11 +921,10 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
             return pool->SubmitRecordedBatch(*queuedBatch, error);
         }, outTicket, outError, completion,
         [&completionSource] { return completionSource.GetCompletedFenceValue(); },
-        queuedBatch, EntryKind::RecordedBatch, false, generation))
+        queuedBatch, EntryKind::RecordedBatch, false, generation, queuedBatch))
     {
         return false;
     }
-    outTicket.m_state->recordedBatch = std::move(queuedBatch);
     return true;
 }
 
