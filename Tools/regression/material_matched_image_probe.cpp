@@ -8,6 +8,12 @@
 #include <DirectXPackedVector.h>
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include "Assets/CookedEnvironment.h"
+// Reads `error` only after `condition` ran. `Check(f(error), "label " + error)` builds
+// the message first under MSVC (unspecified argument order) and reports an empty error.
+void CheckWith(bool condition, const char* label, const std::string& error)
+{
+    Check(condition, condition ? std::string{} : label + error);
+}
 
 namespace
 {
@@ -138,9 +144,9 @@ std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& roo
     Check(!!generated, "Matched graph code generation");
     std::string error;
     VerifiedProduct product;
-    Check(CompileSceneProduct(*generated, shaderRoot,
+    CheckWith(CompileSceneProduct(*generated, shaderRoot,
                               output / (inputs.stem().string() + ".slang"), {}, product, error),
-          "Matched complete Scene compiler " + error);
+          "Matched complete Scene compiler ", error);
     experiment::AssetId id;
     Check(Uuid::TryParse("33333333-3333-8333-8333-333333333333", id.value), "Matched graph identity");
     const auto generation = store.Load(id, [&](CookedProgram& cooked, std::string&) {
@@ -148,7 +154,7 @@ std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& roo
         return true;
     }, true, error);
     std::shared_ptr<const Instance> result;
-    Check(generation && BuildInstance(generation, {id, {}, {}}, {}, result, error), "Matched instance " + error);
+    CheckWith(generation && BuildInstance(generation, {id, {}, {}}, {}, result, error), "Matched instance ", error);
     return result;
 }
 
@@ -176,16 +182,17 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     paths->AssetAuthoringEnabled = true;
     RecordingChangeDevice device;
     std::string error;
-    Check(device.Initialize(64, 64, error), "Matched native device " + error);
+    CheckWith(device.Initialize(64, 64, error), "Matched native device ", error);
     ProbeRoots roots;
     ProbePipelines pipelines;
     ProbeTextures textures;
     ProbeMeshes meshes;
-    Check(roots.Initialize(&device, error) && pipelines.Initialize(&device, L"", error) &&
-              textures.Initialize(&device, error) && meshes.Initialize(&device, error), "Matched caches " + error);
+    CheckWith(roots.Initialize(&device, error) && pipelines.Initialize(&device, L"", error) &&
+              textures.Initialize(&device, error) && meshes.Initialize(&device, error), "Matched caches ", error);
     SceneHost host;
     EnhancedGBufferPass gbuffer;
     EnhancedDeferredPass deferred;
+    EnhancedForwardPass forward;
     EnhancedFrameContext context;
     context.resources = &device;
     context.rootSignatures = &roots;
@@ -208,7 +215,8 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     context.draws = &empty;
     std::vector<EnhancedLight> lights;
     context.lights = &lights;
-    Check(gbuffer.Initialize(context, error) && deferred.Initialize(context, error), "Matched Scene passes " + error);
+    CheckWith(gbuffer.Initialize(context, error) && deferred.Initialize(context, error) &&
+              forward.Initialize(context, error), "Matched Scene passes ", error);
     std::filesystem::copy_file(fixture / "sphere.bin", output / "sphere.bin");
     auto geometry = ReadMatchedGeometry(output / "sphere.bin");
     const Environment environment{{{1,1,1},{1,1,1},{1,1,1},{1,1,1},{1,1,1},{1,1,1}}};
@@ -225,7 +233,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             Check((mode == "forest" || mode == "autumn") && strength == .35f &&
                       !hdrEnvironments.contains(mode), "Matched environment config");
             MatchedEnvironment value{std::filesystem::path(path), strength};
-            Check(assets::ReadCookedEnvironment(value.file, value.cooked, error), "Matched cooked environment " + error);
+            CheckWith(assets::ReadCookedEnvironment(value.file, value.cooked, error), "Matched cooked environment ", error);
             // Strength scales every lighting map once, preserving the cook on disk.
             for (unsigned map = 0; map < 4; ++map)
             {
@@ -253,7 +261,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         std::filesystem::copy_file(fixture / "environment.config", output / "environment.config");
     }
     EnhancedIBLGenerator hdri;
-    Check(hdri.Initialize(context, error), "Matched cooked IBL owner " + error);
+    CheckWith(hdri.Initialize(context, error), "Matched cooked IBL owner ", error);
     std::string currentEnvironment;
     GenerationStore store;
     std::vector<std::filesystem::path> cases;
@@ -304,8 +312,8 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         }
         SceneInputView view{context.frameId, context.sceneEpoch, 1, 1, 64, 64, camera};
         std::shared_ptr<const SceneViewInput> input;
-        Check(SceneViewInput::Seal(view, {&geometry.draw, 1}, {}, input, error), "Matched Scene seal " + error);
-        Check(device.BeginFrame(error), "Matched begin " + error);
+        CheckWith(SceneViewInput::Seal(view, {&geometry.draw, 1}, {}, input, error), "Matched Scene seal ", error);
+        CheckWith(device.BeginFrame(error), "Matched begin ", error);
         textures.BeginFrame(context.frameId);
         meshes.BeginFrame(static_cast<unsigned>(context.frameId));
         RHITextureHandle environmentHandle;
@@ -313,18 +321,18 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         if (furnace)
         {
             const auto uploaded = textures.GetOrUpload(cube.get(), error);
-            Check(uploaded.IsValid(), "Matched furnace cube " + error);
+            CheckWith(uploaded.IsValid(), "Matched furnace cube ", error);
             environmentHandle = uploaded.handle;
         }
         if (hdr)
         {
             if (currentEnvironment != mode)
             {
-                Check(hdri.InstallCooked(context, std::move(hdrEnvironments.at(mode).cooked), error),
-                      "Matched HDRI install " + error);
+                CheckWith(hdri.InstallCooked(context, std::move(hdrEnvironments.at(mode).cooked), error),
+                      "Matched HDRI install ", error);
                 currentEnvironment = mode;
             }
-            Check(hdri.TouchCooked(context, error), "Matched HDRI residency " + error);
+            CheckWith(hdri.TouchCooked(context, error), "Matched HDRI residency ", error);
             environmentHandle = hdri.GetCubeMap();
             irradianceHandle = hdri.GetIrradianceMap();
             prefilteredHandle = hdri.GetPrefilteredMap();
@@ -348,15 +356,16 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         const auto prepareStart=std::chrono::steady_clock::now();
         // The old frame-1 check required the host to reject a Blended draw
         // ("Blended composition is not installed"). 8bfd0be5 installed the common
-        // Forward+ blended composition, so that premise no longer holds; the
-        // matched fixtures are opaque and blended coverage has its own gates.
+        // Forward+ composition for Blended and transmission draws, so that premise
+        // no longer holds; those draws now go through the Forward+ pass below.
         const bool prepared = gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&
+                              forward.PrepareFrame(context, error) &&
                               host.PrepareResidency(context, input, error) &&
                               host.Prepare(context, input, environmentHandle, irradianceHandle, prefilteredHandle, {}, lookupBudget, error,
                                            hdr ? hdri.GetGeneration() : 1,
                                            hdr && !disableMis ? hdri.GetImportanceMaps() : std::array<RHITextureHandle,3>{},
                                            hdr ? hdri.GetSourceMap() : RHITextureHandle{});
-        Check(prepared, "Matched prepare " + error);
+        CheckWith(prepared, "Matched prepare ", error);
         const auto prepareMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-prepareStart).count();
         auto graph = std::make_shared<EnhancedRenderGraph>(device);
         gbuffer.Declare(*graph, context);
@@ -380,10 +389,20 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         deferred.SetInputs(outputs);
         deferred.SetAmbientOcclusion(ao);
         deferred.Declare(*graph, context);
-        host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
-        const auto color = host.DeclareVolume(*graph, deferred.GetOutput(), outputs.depth, {});
+        const auto lit = host.DeclareColor(*graph, outputs, deferred.GetOutput(), ao, {});
+        // Same order as the product renderer: the Forward+ pass declares every
+        // Blended/transmission draw (glass) over the lit color, and the graph
+        // Volume when it has forward draws; the LX.Scene.Volume step then declares
+        // the Volume if Forward+ skipped (DeclareVolume runs once per frame).
+        // Declaring only the Volume left glass out of the Forward+ stream, and the
+        // cache publication rejected the incomplete stream.
+        forward.SetInputs({outputs.depth, lit});
+        forward.SetGraphMaterials(&host);
+        forward.Declare(*graph, context);
+        const auto forwardColor = forward.GetOutput().IsValid() ? forward.GetOutput() : lit;
+        const auto color = host.DeclareVolume(*graph, forwardColor, outputs.depth, {});
         RHIReadback readback;
-        Check(device.CreateReadback(64, 64, RHIFormat::RGBA16Float, 1, readback, error), "Matched readback " + error);
+        CheckWith(device.CreateReadback(64, 64, RHIFormat::RGBA16Float, 1, readback, error), "Matched readback ", error);
         graph->AddPass("MAT9.ImageReadback", {{color, RHIResourceState::CopySource}},
                        [readback,color](const auto& execution) {
                            execution.encoder->CopyToReadback(readback, execution.ResolveHandle(color));
@@ -424,10 +443,10 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         if (!device.EndFrame(error)) throw std::runtime_error("Matched frame submit: " + error);
         if (!GetRHISubmissionThread().DrainSubmissions(&device, error))
             throw std::runtime_error("Matched submission drain: " + error);
-        Check(host.PublishSubmittedCache(context.frameId, {device.GetLastSignaledFenceValue()}, error),
-              "Matched publication " + error);
+        CheckWith(host.PublishSubmittedCache(context.frameId, {device.GetLastSignaledFenceValue()}, error),
+              "Matched publication ", error);
         device.WaitForGpu();
-        Check(GetRHISubmissionThread().Drain(&device, error), "Matched retirement " + error);
+        CheckWith(GetRHISubmissionThread().Drain(&device, error), "Matched retirement ", error);
         if (measureTiming)
         {
             RHIReadbackImage times;
@@ -451,7 +470,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             device.ReleaseReadback(passTimerReadback);
         }
         RHIReadbackImage mapped;
-        Check(device.MapReadback(readback, mapped, error), "Matched map " + error);
+        CheckWith(device.MapReadback(readback, mapped, error), "Matched map ", error);
         std::ofstream image(output / (name + ".f32"), std::ios::binary);
         // Canonical image coordinates match Blender's bottom-up pixel array.
         for (unsigned y = 0; y < 64; ++y)
@@ -486,7 +505,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     }
     host.ShutdownAfterIdle();
     hdri.Shutdown();
-    gbuffer.Shutdown(); deferred.Shutdown(); meshes.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown();
+    gbuffer.Shutdown(); deferred.Shutdown(); forward.Shutdown(); meshes.Shutdown(); textures.Shutdown(); pipelines.Shutdown(); roots.Shutdown();
     device.Shutdown();
     std::filesystem::copy_file(fixture / "manifest.json",output / "reference-manifest.json");
     std::cout << "MAT9_MATCHED_IMAGES_OK cases=" << cases.size() << " validation=0 checks=" << checks << '\n';

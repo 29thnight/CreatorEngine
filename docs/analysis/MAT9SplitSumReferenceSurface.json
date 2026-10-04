@@ -1,0 +1,444 @@
+{
+  "schema": "creator.material.blender-image-comparison.v1",
+  "reference": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9SpecialSurfaceReference-0",
+  "native": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9Images-Release-split-ref-surface\\Native",
+  "control_passed": true,
+  "reference_repeat": "C:\\Users\\lance\\source\\CreatorEngine\\Build\\Obj\\Mat9SpecialSurfaceReference-11",
+  "acceptance": "diagnostic; material approximation tolerances remain unaccepted",
+  "mask": "common emission-control interior eroded by two pixels; no per-material cherry picking",
+  "contact_order": "manifest cases, each row Blender | native | absolute difference x10",
+  "cases": [
+    {
+      "id": "sun-special_transmission",
+      "interior_pixels": 303,
+      "max_abs": 1.1090261936187744,
+      "native_sha256": "dfca81204bc2baf9256c3fb71151bc292ae1f29ede482a9155cafb72654c00c3",
+      "mean_abs": 0.04560670041457655,
+      "max_normalized": 0.9832868954929467,
+      "p95_normalized": 0.07765123248100281,
+      "relative_rms": 0.3396638017962703,
+      "reference_mean_rgb": [
+        0.06656559737454547,
+        0.07941051800012983,
+        0.0899372562495592
+      ],
+      "native_mean_rgb": [
+        0.03019240980494534,
+        0.033266401133521556,
+        0.035634459442037955
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0025104284286499023,
+        "relative_rms": 0.0013346025005083213
+      }
+    },
+    {
+      "id": "sun-special_glass",
+      "interior_pixels": 303,
+      "max_abs": 1.1973019242286682,
+      "native_sha256": "962276708cae492f7f7dc4c9d52263b8080dea85927b49323303abc9ccfbfd5e",
+      "mean_abs": 0.01306282468623268,
+      "max_normalized": 0.9999957685081223,
+      "p95_normalized": 0.03005191497504711,
+      "relative_rms": 0.3478902017281297,
+      "reference_mean_rgb": [
+        0.026231750775742954,
+        0.026231750775742954,
+        0.026231750775742954
+      ],
+      "native_mean_rgb": [
+        0.013168926089510272,
+        0.013168926089510272,
+        0.013168926089510272
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0011507794260978699,
+        "relative_rms": 0.0007302120220658566
+      }
+    },
+    {
+      "id": "sun-special_ior_one",
+      "interior_pixels": 303,
+      "max_abs": 0.0,
+      "native_sha256": "49b4d9e4c5be5d006f048cced25f9ee7110fbea226a14d511ffac8320eb4d68e",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "native_mean_rgb": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "sun-special_subsurface",
+      "interior_pixels": 303,
+      "max_abs": 0.013835132122039795,
+      "native_sha256": "9defe96ca42d2ed725603fb1efc85d20f541d5344a5e1d6c2fed0b370d28c7ad",
+      "mean_abs": 0.004778845051285064,
+      "max_normalized": 0.013835132122039795,
+      "p95_normalized": 0.009324178099632263,
+      "relative_rms": 0.0410089929928649,
+      "reference_mean_rgb": [
+        0.2107150958660412,
+        0.06567405052360135,
+        0.05222179502765141
+      ],
+      "native_mean_rgb": [
+        0.20825376605043316,
+        0.07177774662231848,
+        0.05764805759140367
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0013097524642944336,
+        "relative_rms": 0.0022757397963459724
+      }
+    },
+    {
+      "id": "sun-special_subsurface_local",
+      "interior_pixels": 303,
+      "max_abs": 0.0005296468734741211,
+      "native_sha256": "f209028e2df2557df0f876cf39496f70d4f2876a37f49cf2dbc61d3d05418882",
+      "mean_abs": 8.855153354677824e-05,
+      "max_normalized": 0.0005296468734741211,
+      "p95_normalized": 0.0002763420343399048,
+      "relative_rms": 0.0009145833618272907,
+      "reference_mean_rgb": [
+        0.20842954270517078,
+        0.07179962355557448,
+        0.057669938686411376
+      ],
+      "native_mean_rgb": [
+        0.20837241194822606,
+        0.07177774662231848,
+        0.05764805759140367
+      ],
+      "reference_repeat": {
+        "max_abs": 5.811452865600586e-07,
+        "relative_rms": 5.064681491711233e-07
+      }
+    },
+    {
+      "id": "sun-special_subsurface_off",
+      "interior_pixels": 303,
+      "max_abs": 0.0005296468734741211,
+      "native_sha256": "f209028e2df2557df0f876cf39496f70d4f2876a37f49cf2dbc61d3d05418882",
+      "mean_abs": 8.855153354677824e-05,
+      "max_normalized": 0.0005296468734741211,
+      "p95_normalized": 0.0002763420343399048,
+      "relative_rms": 0.0009145833618272907,
+      "reference_mean_rgb": [
+        0.20842954270517078,
+        0.07179962355557448,
+        0.057669938686411376
+      ],
+      "native_mean_rgb": [
+        0.20837241194822606,
+        0.07177774662231848,
+        0.05764805759140367
+      ],
+      "reference_repeat": {
+        "max_abs": 5.811452865600586e-07,
+        "relative_rms": 5.064681491711233e-07
+      }
+    },
+    {
+      "id": "sun-special_mixed",
+      "interior_pixels": 303,
+      "max_abs": 0.010494828224182129,
+      "native_sha256": "102003cdc93b903d865317232647127c8e22ba9ff667a083a084d6a92a55f8e8",
+      "mean_abs": 0.0024600189130003303,
+      "max_normalized": 0.010494828224182129,
+      "p95_normalized": 0.004810824990272522,
+      "relative_rms": 0.0203734403843103,
+      "reference_mean_rgb": [
+        0.13239135397690358,
+        0.07163688447633788,
+        0.04302541460386991
+      ],
+      "native_mean_rgb": [
+        0.13357674878816006,
+        0.07472002388227104,
+        0.04543206243231745
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0009427517652511597,
+        "relative_rms": 0.0013357815470879987
+      }
+    },
+    {
+      "id": "sun-control_emission",
+      "interior_pixels": 303,
+      "max_abs": 0.0,
+      "native_sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "sun-control_white",
+      "interior_pixels": 303,
+      "max_abs": 0.0005953609943389893,
+      "native_sha256": "40e54b158e86cc3ee1c2d02af7caf45dd3e8dfcde45ccd444957245ac433259a",
+      "mean_abs": 0.00017654241705098169,
+      "max_normalized": 0.0005953609943389893,
+      "p95_normalized": 0.0004101991653442383,
+      "relative_rms": 0.0008734296434499214,
+      "reference_mean_rgb": [
+        0.24598499478483357,
+        0.24598499478483357,
+        0.24598499478483357
+      ],
+      "native_mean_rgb": [
+        0.2458953353831477,
+        0.2458953353831477,
+        0.2458953353831477
+      ],
+      "reference_repeat": {
+        "max_abs": 4.470348358154297e-07,
+        "relative_rms": 3.759747647466396e-07
+      }
+    },
+    {
+      "id": "furnace-special_transmission",
+      "interior_pixels": 303,
+      "max_abs": 0.16108721494674683,
+      "native_sha256": "db85b5785276cf086c56a7c84da77c45a70634112eb0696a585ff9c08292f4e9",
+      "mean_abs": 0.11590468581884739,
+      "max_normalized": 0.16108721494674683,
+      "p95_normalized": 0.15919911861419678,
+      "relative_rms": 0.15098682412397643,
+      "reference_mean_rgb": [
+        0.6832897505744455,
+        0.8041987975831866,
+        0.8975883004295551
+      ],
+      "native_mean_rgb": [
+        0.8418049324463697,
+        0.9178333849009901,
+        0.9731525886963697
+      ],
+      "reference_repeat": {
+        "max_abs": 0.002148747444152832,
+        "relative_rms": 0.0007516088435346211
+      }
+    },
+    {
+      "id": "furnace-special_glass",
+      "interior_pixels": 303,
+      "max_abs": 0.011793076992034912,
+      "native_sha256": "dafc17fae25510213953a9cf64bd0ebbabcfb51fecf3ff8904e9a747ae421c7e",
+      "mean_abs": 0.006596570164457013,
+      "max_normalized": 0.011793076992034912,
+      "p95_normalized": 0.01089787483215332,
+      "relative_rms": 0.006983465706824029,
+      "reference_mean_rgb": [
+        0.9932326119725067,
+        0.9932326119725067,
+        0.9932326119725067
+      ],
+      "native_mean_rgb": [
+        0.9998291821369637,
+        0.9998291821369637,
+        0.9998291821369637
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0007874369621276855,
+        "relative_rms": 0.00026281046383259607
+      }
+    },
+    {
+      "id": "furnace-special_ior_one",
+      "interior_pixels": 303,
+      "max_abs": 0.0,
+      "native_sha256": "9c47deb02f94600ada02ef4db78cabf0d769fd898862b8f76ccfc9bf0e3efb4e",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "native_mean_rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "furnace-special_subsurface",
+      "interior_pixels": 303,
+      "max_abs": 0.03912284970283508,
+      "native_sha256": "67cb1529c51e31a9f25ec787aabdb76ca828ed75db9bf69a97e66511862d0491",
+      "mean_abs": 0.022019825342989335,
+      "max_normalized": 0.03912284970283508,
+      "p95_normalized": 0.03428533673286438,
+      "relative_rms": 0.04237992796028266,
+      "reference_mean_rgb": [
+        0.8816775726799918,
+        0.28408773199166404,
+        0.22970005737082794
+      ],
+      "native_mean_rgb": [
+        0.8654229192450495,
+        0.3104098984117162,
+        0.25299052122009075
+      ],
+      "reference_repeat": {
+        "max_abs": 0.004684329032897949,
+        "relative_rms": 0.0022647897392220322
+      }
+    },
+    {
+      "id": "furnace-special_subsurface_local",
+      "interior_pixels": 303,
+      "max_abs": 0.025462865829467773,
+      "native_sha256": "67cb1529c51e31a9f25ec787aabdb76ca828ed75db9bf69a97e66511862d0491",
+      "mean_abs": 0.003489581435689307,
+      "max_normalized": 0.025462865829467773,
+      "p95_normalized": 0.011523544788360596,
+      "relative_rms": 0.009466565028901969,
+      "reference_mean_rgb": [
+        0.8589900313037457,
+        0.30817792940847943,
+        0.2511940885691753
+      ],
+      "native_mean_rgb": [
+        0.8654229192450495,
+        0.3104098984117162,
+        0.25299052122009075
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00030094385147094727,
+        "relative_rms": 0.00011381630422370082
+      }
+    },
+    {
+      "id": "furnace-special_subsurface_off",
+      "interior_pixels": 303,
+      "max_abs": 0.025462865829467773,
+      "native_sha256": "67cb1529c51e31a9f25ec787aabdb76ca828ed75db9bf69a97e66511862d0491",
+      "mean_abs": 0.003489581435689307,
+      "max_normalized": 0.025462865829467773,
+      "p95_normalized": 0.011523544788360596,
+      "relative_rms": 0.009466565028901969,
+      "reference_mean_rgb": [
+        0.8589900313037457,
+        0.30817792940847943,
+        0.2511940885691753
+      ],
+      "native_mean_rgb": [
+        0.8654229192450495,
+        0.3104098984117162,
+        0.25299052122009075
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00030094385147094727,
+        "relative_rms": 0.00011381630422370082
+      }
+    },
+    {
+      "id": "furnace-special_mixed",
+      "interior_pixels": 303,
+      "max_abs": 0.024668484926223755,
+      "native_sha256": "9bfb502e703ffede14c4bff22564b8061f0053ae3a39e6b2693f8f2481be4664",
+      "mean_abs": 0.013627781218165743,
+      "max_normalized": 0.024668484926223755,
+      "p95_normalized": 0.020721405744552612,
+      "relative_rms": 0.03217798837002714,
+      "reference_mean_rgb": [
+        0.650566296215498,
+        0.35943302649869385,
+        0.22185792668227708
+      ],
+      "native_mean_rgb": [
+        0.6621657771245875,
+        0.37600879228547857,
+        0.2340132206580033
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00311887264251709,
+        "relative_rms": 0.0016446423877518753
+      }
+    },
+    {
+      "id": "furnace-control_emission",
+      "interior_pixels": 303,
+      "max_abs": 0.0,
+      "native_sha256": "2620256ee96f33edd9c6f4a248eed28aece38fc8d3f3b53af54a5d4108fdb1ee",
+      "mean_abs": 0.0,
+      "max_normalized": 0.0,
+      "p95_normalized": 0.0,
+      "relative_rms": 0.0,
+      "reference_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "native_mean_rgb": [
+        1.5,
+        2.75,
+        5.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.0,
+        "relative_rms": 0.0
+      }
+    },
+    {
+      "id": "furnace-control_white",
+      "interior_pixels": 303,
+      "max_abs": 0.0307159423828125,
+      "native_sha256": "17d190a2989fa1fd7af6e95d16830ad17473de45858287ff3ed0aaab192bd28c",
+      "mean_abs": 0.007820088477811404,
+      "max_normalized": 0.0307159423828125,
+      "p95_normalized": 0.019600212574005127,
+      "relative_rms": 0.009965325325974937,
+      "reference_mean_rgb": [
+        0.9921799115221887,
+        0.9921799115221887,
+        0.9921799115221887
+      ],
+      "native_mean_rgb": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "reference_repeat": {
+        "max_abs": 0.00025177001953125,
+        "relative_rms": 7.39937789251301e-05
+      }
+    }
+  ]
+}
