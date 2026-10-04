@@ -8,6 +8,7 @@
 #include "MaterialGraphSceneCompiler.h"
 #include "Mesh.h"
 #include "Texture.h"
+#include "Sha256.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <fstream> // I7-C1: manifest 읽기
 #include <unordered_set>
@@ -911,63 +912,103 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 
 namespace
 {
-std::string MaterialGraphCacheInput(const LX::LXMaterialProgram& program,
-                                    const file::path& shaderDirectory, std::string& error)
+// 재질 캐시는 Slang 이 이 재질을 컴파일하며 **실제로 읽은 파일**만으로 판정한다.
+// 예전 키는 DefaultPassShader 아래 .slang 전부였다. 그래서 그림자 셰이더 하나만 고쳐도
+// 모든 재질이 다시 컴파일됐고(재질당 ~5.5초, 게임 스레드 직렬), 재질마다 셰이더 폴더
+// 전체를 다시 읽었다(7개에 ~110 ms). 의존 목록은 컴파일러가 보고한 것을 그대로 쓴다 —
+// #include 를 따로 따라가 짐작하지 않는다.
+//
+// 놓치는 경우 하나: 이미 해석된 포함 파일보다 검색 경로 앞쪽에 같은 이름의 새 파일이
+// 생기면(가림) 기록된 파일은 그대로라 맞힌다. 생성 소스가 놓이는 캐시 폴더에는 생성
+// 파일만 있어 이 일이 생기지 않는다.
+constexpr std::array<char, 8> kMaterialGraphCacheMagic{'L','X','S','C','A','C','H','2'};
+constexpr std::uint32_t kMaterialGraphCacheMaxDependencies = 4096;
+
+// 생성 소스 자체를 정하는 것: 프로그램 본문·메타·호스트 셰이더. 호스트는 #include 가
+// 아니라 생성 소스 뒤에 이어 붙으므로 Slang 의존 목록에 나오지 않는다 — 직접 넣는다.
+std::string MaterialGraphCacheHeader(const LX::LXMaterialProgram& program,
+                                     const file::path& shaderDirectory)
 {
-    std::string input = "lx-scene-authoring-cache-v2-graph-shadermeta-" +
+    std::ifstream host(shaderDirectory / "Includes/MaterialGraphSceneHost.slang", std::ios::binary);
+    const std::string hostText{std::istreambuf_iterator<char>(host), {}};
+    if (hostText.empty()) return {};
+    std::string header = "lx-scene-authoring-cache-v3-graph-shadermeta-" +
         std::to_string(ShaderGeneratedMaterial::kAdapterVersion);
     const auto append = [&](std::string_view value) {
         const std::uint64_t size = value.size();
-        input.append(reinterpret_cast<const char*>(&size), sizeof(size));
-        input.append(value);
+        header.append(reinterpret_cast<const char*>(&size), sizeof(size));
+        header.append(value);
     };
     append(program.slang);
     append(LX::WriteMaterialProgramMetadata(program));
-    std::vector<file::path> shaders;
-    std::error_code filesystemError;
-    for (file::recursive_directory_iterator it(shaderDirectory, filesystemError), end;
-         !filesystemError && it != end; it.increment(filesystemError))
-    {
-        if (it->is_regular_file() && it->path().extension() == ".slang")
-            shaders.push_back(it->path());
-    }
-    if (filesystemError || shaders.empty())
-    {
-        error = "Cannot enumerate Scene shader dependencies for the authoring cache.";
-        return {};
-    }
-    std::ranges::sort(shaders);
-    for (const auto& path : shaders)
-    {
-        std::ifstream stream(path, std::ios::binary);
-        const std::string contents{std::istreambuf_iterator<char>(stream), {}};
-        if (!stream && !stream.eof())
-        {
-            error = "Cannot read Scene shader dependency: " + path.string();
-            return {};
-        }
-        append(path.lexically_relative(shaderDirectory).generic_string());
-        append(contents);
-    }
-    return input;
+    append(hostText);
+    return header;
 }
 
-bool ReadMaterialGraphCache(const file::path& path, std::string_view input,
-                            material_graph::CookedProgram& result)
+bool HashMaterialGraphDependency(const file::path& path, Hash::Sha256Digest& result)
+{
+    std::ifstream stream(path, std::ios::binary);
+    if (!stream) return false;
+    Hash::Sha256 hash;
+    std::array<char, 65536> chunk;
+    while (stream)
+    {
+        stream.read(chunk.data(), chunk.size());
+        hash.Update(chunk.data(), static_cast<std::size_t>(stream.gcount()));
+    }
+    if (!stream.eof()) return false;
+    result = hash.Finish();
+    return true;
+}
+
+// 셰이더 폴더 안의 파일은 상대 경로로 적어 프로젝트를 옮겨도 캐시가 산다.
+// 폴더 밖이면 절대 경로로 남긴다(그 경우만 위치에 묶인다).
+std::string MaterialGraphDependencyKey(const file::path& dependency, const file::path& shaderDirectory)
+{
+    std::error_code ignored;
+    const file::path root = std::filesystem::weakly_canonical(shaderDirectory, ignored);
+    const file::path relative = dependency.lexically_relative(root);
+    if (!relative.empty() && *relative.begin() != "..") return relative.generic_string();
+    return dependency.generic_string();
+}
+
+bool ReadMaterialGraphCache(const file::path& path, std::string_view header,
+                            const file::path& shaderDirectory, material_graph::CookedProgram& result)
 {
     std::ifstream file(path, std::ios::binary);
     if (!file) return false;
     std::array<char, 8> magic{};
-    std::uint64_t inputSize{}, productSize{};
+    std::uint64_t headerSize{};
     file.read(magic.data(), magic.size());
-    file.read(reinterpret_cast<char*>(&inputSize), sizeof(inputSize));
-    file.read(reinterpret_cast<char*>(&productSize), sizeof(productSize));
-    if (!file || magic != std::array<char, 8>{'L','X','S','C','A','C','H','1'} ||
-        inputSize != input.size() || productSize == 0 || productSize > (128ull << 20))
-        return false;
-    std::string recorded(input.size(), '\0');
+    file.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
+    if (!file || magic != kMaterialGraphCacheMagic || headerSize != header.size()) return false;
+    std::string recorded(header.size(), '\0');
     file.read(recorded.data(), static_cast<std::streamsize>(recorded.size()));
-    if (!file || recorded != input) return false;
+    if (!file || recorded != header) return false;
+
+    std::uint32_t dependencyCount{};
+    file.read(reinterpret_cast<char*>(&dependencyCount), sizeof(dependencyCount));
+    if (!file || dependencyCount == 0 || dependencyCount > kMaterialGraphCacheMaxDependencies) return false;
+    for (std::uint32_t index = 0; index < dependencyCount; ++index)
+    {
+        std::uint32_t keySize{};
+        file.read(reinterpret_cast<char*>(&keySize), sizeof(keySize));
+        if (!file || keySize == 0 || keySize > 4096) return false;
+        std::string key(keySize, '\0');
+        Hash::Sha256Digest expected{};
+        file.read(key.data(), static_cast<std::streamsize>(key.size()));
+        file.read(reinterpret_cast<char*>(expected.data()), static_cast<std::streamsize>(expected.size()));
+        if (!file) return false;
+        const file::path stored(key);
+        Hash::Sha256Digest actual{};
+        if (!HashMaterialGraphDependency(stored.is_absolute() ? stored : shaderDirectory / stored, actual) ||
+            actual != expected)
+            return false;
+    }
+
+    std::uint64_t productSize{};
+    file.read(reinterpret_cast<char*>(&productSize), sizeof(productSize));
+    if (!file || productSize == 0 || productSize > (128ull << 20)) return false;
     std::vector<std::uint8_t> bytes(static_cast<std::size_t>(productSize));
     file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     if (!file || file.peek() != std::char_traits<char>::eof()) return false;
@@ -975,9 +1016,19 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view input,
     return material_graph::ReadCookedProgram(bytes, {}, result, validation);
 }
 
-void WriteMaterialGraphCache(const file::path& path, std::string_view input,
-                             const material_graph::VerifiedProduct& product)
+void WriteMaterialGraphCache(const file::path& path, std::string_view header,
+                             const file::path& shaderDirectory, const material_graph::VerifiedProduct& product)
 {
+    // 의존 목록이 비면 무엇이 바뀌어도 맞히는 캐시가 된다. 그런 캐시는 쓰지 않는다.
+    if (product.dependencies.empty() || product.dependencies.size() > kMaterialGraphCacheMaxDependencies) return;
+    std::vector<std::pair<std::string, Hash::Sha256Digest>> dependencies;
+    dependencies.reserve(product.dependencies.size());
+    for (const auto& dependency : product.dependencies)
+    {
+        Hash::Sha256Digest digest{};
+        if (!HashMaterialGraphDependency(dependency, digest)) return;
+        dependencies.emplace_back(MaterialGraphDependencyKey(dependency, shaderDirectory), digest);
+    }
     std::vector<std::uint8_t> bytes;
     std::string error;
     if (!material_graph::WriteCookedProgram(product, {}, bytes, error)) return;
@@ -986,12 +1037,20 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view input,
                                "-" + std::to_string(++serial);
     {
         std::ofstream file(staging, std::ios::binary | std::ios::trunc);
-        constexpr std::array<char, 8> magic{'L','X','S','C','A','C','H','1'};
-        const std::uint64_t inputSize = input.size(), productSize = bytes.size();
-        file.write(magic.data(), magic.size());
-        file.write(reinterpret_cast<const char*>(&inputSize), sizeof(inputSize));
+        const std::uint64_t headerSize = header.size(), productSize = bytes.size();
+        const auto dependencyCount = static_cast<std::uint32_t>(dependencies.size());
+        file.write(kMaterialGraphCacheMagic.data(), kMaterialGraphCacheMagic.size());
+        file.write(reinterpret_cast<const char*>(&headerSize), sizeof(headerSize));
+        file.write(header.data(), static_cast<std::streamsize>(header.size()));
+        file.write(reinterpret_cast<const char*>(&dependencyCount), sizeof(dependencyCount));
+        for (const auto& [key, digest] : dependencies)
+        {
+            const auto keySize = static_cast<std::uint32_t>(key.size());
+            file.write(reinterpret_cast<const char*>(&keySize), sizeof(keySize));
+            file.write(key.data(), static_cast<std::streamsize>(key.size()));
+            file.write(reinterpret_cast<const char*>(digest.data()), static_cast<std::streamsize>(digest.size()));
+        }
         file.write(reinterpret_cast<const char*>(&productSize), sizeof(productSize));
-        file.write(input.data(), static_cast<std::streamsize>(input.size()));
         file.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
         file.close();
         if (!file)
@@ -1034,13 +1093,10 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
         error = filesystemError.message();
         return false;
     }
-    std::string cacheError;
-    step.emplace(ce::marker<"Material.CacheInput">());
-    const std::string cacheInput = MaterialGraphCacheInput(*program, shaderDirectory, cacheError);
+    const std::string cacheHeader = MaterialGraphCacheHeader(*program, shaderDirectory);
     const auto cachePath = file::path(source.string() + ".scene-cache");
-    step.reset();
     step.emplace(ce::marker<"Material.CacheRead">());
-    if (!cacheInput.empty() && ReadMaterialGraphCache(cachePath, cacheInput, result) &&
+    if (!cacheHeader.empty() && ReadMaterialGraphCache(cachePath, cacheHeader, shaderDirectory, result) &&
         result.product.program.slang == program->slang &&
         result.metadata == LX::WriteMaterialProgramMetadata(*program) &&
         result.product.materialShader &&
@@ -1059,7 +1115,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     result.boundSource = material_graph::BuildBoundSource(result.product.program);
     step.reset();
     step.emplace(ce::marker<"Material.CacheWrite">());
-    if (!cacheInput.empty()) WriteMaterialGraphCache(cachePath, cacheInput, result.product);
+    if (!cacheHeader.empty()) WriteMaterialGraphCache(cachePath, cacheHeader, shaderDirectory, result.product);
     return true;
 }
 }

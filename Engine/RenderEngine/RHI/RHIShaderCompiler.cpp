@@ -1162,7 +1162,8 @@ namespace
             RHIShaderCompiler::VerifiedShader& outShader, std::string& outError)
         {
             RHIShaderCompiler::VerifiedShader candidate;
-            if (!Process(request, &candidate.bytecode, &candidate.reflection, outError, &candidate.dependencyIdentity))
+            if (!Process(request, &candidate.bytecode, &candidate.reflection, outError, &candidate.dependencyIdentity,
+                    &candidate.dependencies))
                 return false;
             outShader = std::move(candidate);
             return true;
@@ -1171,7 +1172,8 @@ namespace
     private:
         bool Process(const RHIShaderCompileRequest& request,
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection,
-            std::string& outError, std::string* outIdentity = nullptr)
+            std::string& outError, std::string* outIdentity = nullptr,
+            std::vector<std::filesystem::path>* outDependencies = nullptr)
         {
             if (!EnsureSlang(outError)) return false;
 
@@ -1328,6 +1330,13 @@ namespace
             {
                 ++g_failures;
                 return false;
+            }
+            if (outDependencies)
+            {
+                // units[0] is the root source; the rest are what Slang resolved.
+                outDependencies->clear();
+                for (std::size_t index = 1; index < units.size(); ++index)
+                    outDependencies->push_back(units[index].path);
             }
             progress.Phase("Checking shader cache");
             const std::string cacheKey = BuildCacheKey(request, units, runtime.identity);

@@ -713,7 +713,12 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
                                      {begin, begin + shader.bytecode.Size()}});
         candidate.program.semanticKey +=
             "|rhi:" + std::to_string(shader.dependencyIdentity.size()) + ":" + shader.dependencyIdentity;
+        candidate.dependencies.insert(candidate.dependencies.end(), shader.dependencies.begin(),
+                                      shader.dependencies.end());
     }
+    std::ranges::sort(candidate.dependencies);
+    candidate.dependencies.erase(std::unique(candidate.dependencies.begin(), candidate.dependencies.end()),
+                                 candidate.dependencies.end());
     std::vector<RHIShaderReflection> mergedReflections;
     for (const auto& [backend, consumingStages] : reflections)
     {

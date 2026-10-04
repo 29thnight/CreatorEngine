@@ -109,6 +109,9 @@ struct VerifiedProduct
     std::vector<CompileTarget> targets;
     // Meta, source, common binding layout and bytecode share this generation.
     std::shared_ptr<const GeneratedMaterialShader> materialShader;
+    // Sorted union of the files every target compile read (root source excluded).
+    // In memory only: the cooked product format does not carry it.
+    std::vector<std::filesystem::path> dependencies;
 };
 
 // The file starts with BuildBoundSource(program), followed by a host pass.

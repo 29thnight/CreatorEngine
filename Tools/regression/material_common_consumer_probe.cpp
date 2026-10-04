@@ -130,6 +130,33 @@ int main(int argc, char** argv)
             "Warm authoring cache restores common generation without recompiling or source pair access");
         check(authored.GetGeneratedShaderMeta() && authored.TryGetFloat("LXMaterialProperties.lx_bound_p900", roughness) && roughness == .31f,
             "Warm generation preserves stable override through common Material API");
+
+        // 캐시 키는 Slang 이 실제로 읽은 파일만 본다. 셰이더 사본에서 셋을 단정한다:
+        // 옮겨도 맞히고, 재질이 안 읽는 셰이더를 고쳐도 맞히며, 기록된 의존 파일을 고치면
+        // 다시 컴파일한다. 옛 키(셰이더 폴더 전체)는 둘째에서 다시 컴파일했다.
+        const auto shaderCopy = root.parent_path() / "ShaderDependencyCopy";
+        std::filesystem::remove_all(shaderCopy);
+        std::filesystem::copy(std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders", shaderCopy,
+            std::filesystem::copy_options::recursive);
+        paths->ShaderSourcePath = shaderCopy;
+        const auto appendComment = [&](const std::filesystem::path& file) {
+            check(std::filesystem::exists(file), "Shader to edit exists: " + file.string());
+            std::ofstream stream(file, std::ios::binary | std::ios::app);
+            stream << "\n// material dependency cache probe\n";
+            check(static_cast<bool>(stream), "Edit shader copy: " + file.string());
+        };
+        check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
+            std::filesystem::last_write_time(cachePath) == cacheTime,
+            "Relocated shader tree keeps the warm cache: " + error);
+        appendComment(shaderCopy / "DefaultPassShader/IblBrdf.slang");
+        check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
+            std::filesystem::last_write_time(cachePath) == cacheTime,
+            "Editing a shader the material never reads keeps the warm cache: " + error);
+        appendComment(shaderCopy / "DefaultPassShader/Includes/CascadedShadow.slang");
+        check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
+            std::filesystem::last_write_time(cachePath) != cacheTime,
+            "Editing a recorded dependency recompiles the material: " + error);
+        paths->ShaderSourcePath = std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders";
         RunMaterialCodeRuntimeTests(paths->CacheRoot / "CodeRuntime");
         RunMaterialPipelineRuntimeTests(std::filesystem::absolute(argv[2]));
         data->Finalize();

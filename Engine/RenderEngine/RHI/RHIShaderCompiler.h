@@ -57,6 +57,9 @@ namespace RHIShaderCompiler
         RHIShaderBlob bytecode;
         RHIShaderReflection reflection;
         std::string dependencyIdentity;
+        // Files Slang actually read for this module, excluding the root source.
+        // Callers with their own caches key on exactly these, not a directory scan.
+        std::vector<std::filesystem::path> dependencies;
     };
 
     struct Stats
