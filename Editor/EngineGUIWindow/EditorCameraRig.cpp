@@ -1,6 +1,6 @@
 #include "EditorCameraRig.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
-#include "ProfileService.h"
+#include "ProfileScope.h"
 #include <wrl/client.h>
 #include <GameInput.h>
 #include "ImGui.h"
