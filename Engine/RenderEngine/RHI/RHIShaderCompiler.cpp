@@ -14,14 +14,18 @@
 #include <array>
 #include <atomic>
 #include <cctype>
+#include <condition_variable>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <sstream>
+#include <thread>
 #include <tuple>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -149,6 +153,14 @@ namespace
         decltype(&spReflection_GetParameterByIndex) parameter{};
     };
 
+    // A Slang global session is not thread-safe, so each concurrent compile owns
+    // one. Slot 0 is the bootstrap session; more are made on demand up to the cap.
+    struct SlangSlot final
+    {
+        Slang::ComPtr<slang::IGlobalSession> globalSession;
+        bool busy{};
+    };
+
     struct SlangRuntime final
     {
         HMODULE module{};
@@ -161,12 +173,15 @@ namespace
         std::string identity;
         std::string loadError;
         std::once_flag loadOnce;
-        std::mutex compileMutex;
+        std::mutex slotsMutex;
+        std::condition_variable slotFreed;
+        std::vector<std::unique_ptr<SlangSlot>> slots;
 
         ~SlangRuntime()
         {
             // Slang COM 객체의 vtable은 DLL에 있으므로 모든 인터페이스를 먼저
             // 해제한 뒤 모듈을 내린다.
+            slots.clear();
             globalSession.setNull();
             if (nullptr != module) FreeLibrary(module);
             if (nullptr != dxcModule) FreeLibrary(dxcModule);
@@ -179,6 +194,95 @@ namespace
         static SlangRuntime runtime;
         return runtime;
     }
+
+    // Each slot holds a full Slang core module, so the cap trades memory for
+    // parallel material compiles.
+    constexpr std::size_t kMaxSlangSlots = 4;
+
+    class SlotLease final
+    {
+    public:
+        SlotLease() = default;
+        SlotLease(SlangRuntime& runtime, SlangSlot& slot) : m_runtime(&runtime), m_slot(&slot) {}
+        SlotLease(SlotLease&& other) noexcept
+            : m_runtime(std::exchange(other.m_runtime, nullptr)), m_slot(std::exchange(other.m_slot, nullptr)) {}
+        SlotLease& operator=(SlotLease&& other) noexcept
+        {
+            if (this != &other)
+            {
+                Release();
+                m_runtime = std::exchange(other.m_runtime, nullptr);
+                m_slot = std::exchange(other.m_slot, nullptr);
+            }
+            return *this;
+        }
+        SlotLease(const SlotLease&) = delete;
+        SlotLease& operator=(const SlotLease&) = delete;
+        ~SlotLease() { Release(); }
+
+        SlangSlot* Slot() const { return m_slot; }
+
+    private:
+        void Release()
+        {
+            if (nullptr == m_slot) return;
+            {
+                std::lock_guard<std::mutex> lock(m_runtime->slotsMutex);
+                m_slot->busy = false;
+            }
+            m_runtime->slotFreed.notify_one();
+            m_slot = nullptr;
+        }
+
+        SlangRuntime* m_runtime{};
+        SlangSlot* m_slot{};
+    };
+
+    SlotLease AcquireSlot(SlangRuntime& runtime, std::string& outError)
+    {
+        const std::size_t cap = RHIShaderCompiler::MaxParallelCompiles();
+        std::unique_lock<std::mutex> lock(runtime.slotsMutex);
+        for (;;)
+        {
+            for (const auto& slot : runtime.slots)
+            {
+                if (!slot->busy)
+                {
+                    slot->busy = true;
+                    return SlotLease(runtime, *slot);
+                }
+            }
+            if (runtime.slots.size() < cap)
+            {
+                auto created = std::make_unique<SlangSlot>();
+                created->busy = true;
+                SlangSlot& slot = *created;
+                runtime.slots.push_back(std::move(created));
+                lock.unlock();
+                // Creating a global session loads the core module (hundreds of ms);
+                // other threads keep using the existing slots meanwhile.
+                SlangGlobalSessionDesc desc{};
+                if (SLANG_FAILED(runtime.createGlobalSession(&desc, slot.globalSession.writeRef())))
+                {
+                    lock.lock();
+                    std::erase_if(runtime.slots, [&](const auto& item) { return item.get() == &slot; });
+                    lock.unlock();
+                    runtime.slotFreed.notify_one();
+                    outError = "Slang global session 추가 생성 실패";
+                    return {};
+                }
+                return SlotLease(runtime, slot);
+            }
+            runtime.slotFreed.wait(lock);
+        }
+    }
+
+    struct ReusedModule final
+    {
+        std::string key;
+        Slang::ComPtr<slang::ISession> session;
+        Slang::ComPtr<slang::IModule> module;
+    };
 
     template <typename Proc>
     bool LoadSlangProc(HMODULE module, const char* name, Proc& outProc)
@@ -363,6 +467,8 @@ namespace
             runtime.loadError = "Slang global session 생성 실패";
             return;
         }
+        runtime.slots.push_back(std::make_unique<SlangSlot>());
+        runtime.slots.back()->globalSession = runtime.globalSession;
 
         Hash128 slangHash;
         Hash128 dxcHash;
@@ -1143,6 +1249,20 @@ namespace
         return true;
     }
 
+}
+
+// Members are destroyed in reverse order: modules go before the slot is released,
+// so no other thread touches that global session while they are freed.
+struct RHIShaderCompiler::ModuleReuseState final
+{
+    SlotLease lease;
+    std::vector<ReusedModule> modules;
+};
+
+namespace
+{
+    thread_local RHIShaderCompiler::ModuleReuseState* t_moduleReuse = nullptr;
+
     class SlangShaderCompiler final : public IRHIShaderCompiler
     {
     public:
@@ -1184,7 +1304,17 @@ namespace
             if (SLANG_STAGE_NONE == stage) return false;
 
             SlangRuntime& runtime = GetSlangRuntime();
-            std::lock_guard<std::mutex> compileGuard(runtime.compileMutex);
+            RHIShaderCompiler::ModuleReuseState* const reuse = t_moduleReuse;
+            SlotLease ownLease;
+            if (nullptr == reuse) ownLease = AcquireSlot(runtime, outError);
+            else if (nullptr == reuse->lease.Slot()) reuse->lease = AcquireSlot(runtime, outError);
+            SlangSlot* const slot = nullptr == reuse ? ownLease.Slot() : reuse->lease.Slot();
+            if (nullptr == slot)
+            {
+                ++g_failures;
+                return false;
+            }
+            slang::IGlobalSession& globalSession = *slot->globalSession;
             CompileProgress progress(request, outError);
 
             std::vector<std::string> ownedArguments;
@@ -1263,65 +1393,90 @@ namespace
             for (const std::string& argument : ownedArguments)
                 arguments.push_back(argument.c_str());
 
-            slang::SessionDesc sessionDesc{};
-            Slang::ComPtr<ISlangUnknown> auxiliary;
-            if (SLANG_FAILED(runtime.globalSession->parseCommandLineArguments(
-                static_cast<int>(arguments.size()), arguments.data(), &sessionDesc,
-                auxiliary.writeRef())))
+            // Session options carry no stage or entry, so a material's stages for one
+            // backend share both the session and the parsed module.
+            std::string reuseKey;
+            if (nullptr != reuse)
             {
-                ++g_failures;
-                outError = "Slang 세션 인자 매핑 실패: " + std::string(request.name);
-                return false;
+                for (const std::string& argument : ownedArguments)
+                    reuseKey.append(argument).push_back('\0');
+                reuseKey.append(PathUtf8(sourcePath)).push_back('\0');
+                reuseKey.append(sourceText);
             }
-
-            // Slang 2026.14의 command-line parser는 VulkanBindShift를
-            // SessionDesc와 TargetDesc 양쪽에 싣는다. 이 상태를 modern
-            // createSession API에 그대로 넘기면 shift가 중복 적용되어 리소스
-            // 종류 코드(0x01/0x02/0x03)가 binding 상위 바이트로 굽힌다.
-            // session 옵션 전체를 버리면 -D 매크로가 front-end에서 사라지므로,
-            // target에 이미 있는 VulkanBindShift 중복본만 session에서 제외한다.
-            // 전용 API probe와 동일 버전 slangc의 SPIR-V decoration을 대조해
-            // b0/t100/u200/s300을 확인했다.
-            std::vector<slang::CompilerOptionEntry> sessionOptions;
-            sessionOptions.reserve(sessionDesc.compilerOptionEntryCount);
-            for (std::uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
-            {
-                const slang::CompilerOptionEntry& option =
-                    sessionDesc.compilerOptionEntries[i];
-                if (slang::CompilerOptionName::VulkanBindShift == option.name) continue;
-                sessionOptions.push_back(option);
-            }
-            sessionDesc.compilerOptionEntries = sessionOptions.data();
-            sessionDesc.compilerOptionEntryCount =
-                static_cast<std::uint32_t>(sessionOptions.size());
-
             Slang::ComPtr<slang::ISession> session;
-            if (SLANG_FAILED(runtime.globalSession->createSession(
-                sessionDesc, session.writeRef())))
-            {
-                ++g_failures;
-                outError = "Slang session 생성 실패: " + std::string(request.name);
-                return false;
-            }
-
-            Hash128 moduleHash;
-            moduleHash.Add(PathUtf8(sourcePath));
-            moduleHash.Add(request.entryPoint);
-            moduleHash.Add(request.targetProfile);
-            const std::string moduleName = "CreatorEngine_" + moduleHash.Hex();
-            const std::string sourceName = PathUtf8(sourcePath);
-
+            Slang::ComPtr<slang::IModule> shaderModule;
             Slang::ComPtr<slang::IBlob> diagnostics;
-            Slang::ComPtr<slang::IModule> shaderModule(
-                session->loadModuleFromSourceString(moduleName.c_str(), sourceName.c_str(),
-                    sourceText.c_str(), diagnostics.writeRef()));
-            if (!shaderModule)
+            const ReusedModule* reused = nullptr;
+            if (nullptr != reuse)
             {
-                ++g_failures;
-                const std::string detail = ReadSlangDiagnostics(diagnostics.get());
-                outError = std::string(request.name) + " Slang 모듈 로드 실패: "
-                    + (detail.empty() ? "원인 미상" : detail);
-                return false;
+                const auto found = std::ranges::find(reuse->modules, reuseKey, &ReusedModule::key);
+                if (found != reuse->modules.end()) reused = &*found;
+            }
+            if (nullptr != reused)
+            {
+                session = reused->session;
+                shaderModule = reused->module;
+            }
+            else
+            {
+                slang::SessionDesc sessionDesc{};
+                Slang::ComPtr<ISlangUnknown> auxiliary;
+                if (SLANG_FAILED(globalSession.parseCommandLineArguments(
+                    static_cast<int>(arguments.size()), arguments.data(), &sessionDesc,
+                    auxiliary.writeRef())))
+                {
+                    ++g_failures;
+                    outError = "Slang 세션 인자 매핑 실패: " + std::string(request.name);
+                    return false;
+                }
+
+                // Slang 2026.14의 command-line parser는 VulkanBindShift를
+                // SessionDesc와 TargetDesc 양쪽에 싣는다. 이 상태를 modern
+                // createSession API에 그대로 넘기면 shift가 중복 적용되어 리소스
+                // 종류 코드(0x01/0x02/0x03)가 binding 상위 바이트로 굽힌다.
+                // session 옵션 전체를 버리면 -D 매크로가 front-end에서 사라지므로,
+                // target에 이미 있는 VulkanBindShift 중복본만 session에서 제외한다.
+                // 전용 API probe와 동일 버전 slangc의 SPIR-V decoration을 대조해
+                // b0/t100/u200/s300을 확인했다.
+                std::vector<slang::CompilerOptionEntry> sessionOptions;
+                sessionOptions.reserve(sessionDesc.compilerOptionEntryCount);
+                for (std::uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
+                {
+                    const slang::CompilerOptionEntry& option =
+                        sessionDesc.compilerOptionEntries[i];
+                    if (slang::CompilerOptionName::VulkanBindShift == option.name) continue;
+                    sessionOptions.push_back(option);
+                }
+                sessionDesc.compilerOptionEntries = sessionOptions.data();
+                sessionDesc.compilerOptionEntryCount =
+                    static_cast<std::uint32_t>(sessionOptions.size());
+
+                if (SLANG_FAILED(globalSession.createSession(
+                    sessionDesc, session.writeRef())))
+                {
+                    ++g_failures;
+                    outError = "Slang session 생성 실패: " + std::string(request.name);
+                    return false;
+                }
+
+                Hash128 moduleHash;
+                moduleHash.Add(PathUtf8(sourcePath));
+                moduleHash.Add(request.entryPoint);
+                moduleHash.Add(request.targetProfile);
+                const std::string moduleName = "CreatorEngine_" + moduleHash.Hex();
+                const std::string sourceName = PathUtf8(sourcePath);
+
+                shaderModule = session->loadModuleFromSourceString(moduleName.c_str(), sourceName.c_str(),
+                    sourceText.c_str(), diagnostics.writeRef());
+                if (!shaderModule)
+                {
+                    ++g_failures;
+                    const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+                    outError = std::string(request.name) + " Slang 모듈 로드 실패: "
+                        + (detail.empty() ? "원인 미상" : detail);
+                    return false;
+                }
+                if (nullptr != reuse) reuse->modules.push_back({std::move(reuseKey), session, shaderModule});
             }
 
             std::vector<SourceUnit> units;
@@ -1445,6 +1600,23 @@ namespace
         static SlangShaderCompiler compiler;
         return compiler;
     }
+}
+
+std::size_t RHIShaderCompiler::MaxParallelCompiles()
+{
+    return std::clamp<std::size_t>(std::thread::hardware_concurrency() / 2, 1, kMaxSlangSlots);
+}
+
+RHIShaderCompiler::ModuleReuseScope::ModuleReuseScope()
+    : m_state(new ModuleReuseState), m_previous(t_moduleReuse)
+{
+    t_moduleReuse = m_state;
+}
+
+RHIShaderCompiler::ModuleReuseScope::~ModuleReuseScope()
+{
+    t_moduleReuse = m_previous;
+    delete m_state;
 }
 
 RHIShaderBinary RHIShaderCompiler::GetOutput()

@@ -700,6 +700,8 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
     });
     candidate.targets = ordered;
     std::map<RHIShaderBinary, std::vector<RHIShaderReflection>> reflections;
+    // All stages of one backend share source and options: parse the module once.
+    RHIShaderCompiler::ModuleReuseScope moduleReuse;
     for (const auto& target : ordered)
     {
         RHIShaderCompiler::VerifiedShader shader;
