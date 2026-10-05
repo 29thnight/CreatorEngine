@@ -32,7 +32,7 @@ foreach ($directory in @('Models', 'Scenes', 'Materials', 'Script', 'HDR', 'Shad
 }
 New-Item -ItemType Directory -Path (Join-Path $project 'ProjectSetting') | Out-Null
 & (Join-Path $PSScriptRoot 'sync-material-editor-scale.ps1') -Project $project
-foreach ($name in @('AssetIdentity.asset', 'CollisionMatrix.asset', 'TagManager.asset')) {
+foreach ($name in @('AssetIdentity.asset', 'CollisionMatrix.asset', 'Layers.celayers', 'TagManager.asset')) {
     Copy-Item -LiteralPath (Join-Path $repo "Dynamic_CPP/ProjectSetting/$name") -Destination (Join-Path $project "ProjectSetting/$name")
 }
 Copy-Item -Path (Join-Path $repo 'Dynamic_CPP/Assets/Shaders/DefaultPassShader/*') -Destination (Join-Path $assets 'Shaders/DefaultPassShader') -Recurse
