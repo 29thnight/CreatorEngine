@@ -28,7 +28,10 @@
 #include "../../../ShaderPermutationDomain.h"
 #include "../../../StandardMaterialProperty.h"
 
+#include "JobScheduler.h"
+
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <functional>
 #include <sstream>
@@ -87,6 +90,134 @@ namespace
     // 달라져 무엇 때문에 다른지 알 수 없으므로, 광원을 고르는 부분만 다르게
     // 하고 나머지는 같은 코드를 쓴다.
     constexpr const char* kShadeShaderFile = "ForwardShade.slang";
+
+    // 셰이딩 변형(일반·참조 × 기본·모델 정점 mask)의 단계들을 작업 스레드에서 미리 컴파일해
+    // 셰이더 캐시를 채운다. 렌더 스레드가 하나씩 컴파일하면 셰이더를 고친 뒤 시작이 수십 초 걸린다.
+    // 결과와 실패는 버린다. 뒤따르는 직렬 경로가 같은 요청을 캐시에서 읽고, 실패하면 그 경로가
+    // 같은 오류를 다시 만나 보고한다. 선택값을 쌓는 순서(REFERENCE_PATH 뒤 mask)가 직렬 경로와
+    // 같아야 캐시 키가 맞는다.
+    void FwdPrecompileShadeVariants(const char* shaderFile, const char* vertexEntry,
+        const char* pixelEntry, const RHIShaderPermutation& base)
+    {
+        // 작업 스레드는 다른 작업을 기다릴 수 없다. 스케줄러가 없는 도구에서는 직렬 경로에 맡긴다.
+        if (thread_pool::is_worker_thread() || !ce::get_job_scheduler().is_running()) return;
+        struct Stage
+        {
+            RHIShaderPermutation permutation;
+            const char* entry;
+            const char* profile;
+        };
+        std::vector<Stage> stages;
+        std::string error;
+        for (const bool reference : { false, true })
+        {
+            RHIShaderPermutation pathPermutation = base;
+            if (reference && !pathPermutation.Enable("REFERENCE_PATH", error)) return;
+            std::vector<RHIShaderPermutation> permutations{ pathPermutation };
+            for (const uint32_t mask : assets::kModelVertexMasks)
+            {
+                RHIShaderPermutation model = pathPermutation;
+                if (!ModelVertexInput::ApplyShaderPermutation(mask, model, error)) return;
+                permutations.push_back(std::move(model));
+            }
+            for (RHIShaderPermutation& permutation : permutations)
+            {
+                stages.push_back({ permutation, vertexEntry, "vs_6_0" });
+                stages.push_back({ std::move(permutation), pixelEntry, "ps_6_0" });
+            }
+        }
+        const RHIShaderBinary output = RHIShaderCompiler::GetOutput();
+        std::atomic<std::size_t> next{};
+        const auto work = [&]()
+        {
+            for (std::size_t index = next++; index < stages.size(); index = next++)
+            {
+                RHIShaderCompiler::VerifiedShader ignored;
+                std::string ignoredError;
+                RHIShaderCompiler::VerifyFile(shaderFile, stages[index].entry, stages[index].profile, output,
+                    stages[index].permutation, ignored, ignoredError, {});
+            }
+        };
+        // 컴파일 칸 수만큼만 작업 스레드를 쓴다. 더 띄우면 칸을 기다리며 작업 스레드를 붙든다.
+        const std::size_t workers = std::min(stages.size(), RHIShaderCompiler::MaxParallelCompiles());
+        ce::get_job_scheduler().submit_indexed(workers, [&](std::size_t) { work(); }).wait();
+    }
+
+    // Forward ShaderMeta 패스의 원본 파일과 컴파일 선택값(REFERENCE_PATH 제외)을 정한다.
+    // 파이프라인을 만드는 경로와 미리 컴파일하는 경로가 같은 값을 쓰도록 한곳에 둔다.
+    bool FwdResolveMetaCompile(const ShaderMeta& meta, std::span<const std::uint16_t> keywordSelections,
+        const ShaderPassDesc*& outPass, ShaderMetaPermutation& outMaterialPermutation,
+        std::string& outShaderFile, RHIShaderPermutation& outPermutation, std::string& outError)
+    {
+        const auto passIt = std::find_if(meta.passes.begin(), meta.passes.end(),
+            [](const ShaderPassDesc& pass) { return pass.name == "Forward"; });
+        if (passIt == meta.passes.end())
+        {
+            outError = "Forward ShaderMeta에 Forward pass가 없다";
+            return false;
+        }
+        const ShaderPassDesc& pass = *passIt;
+        if (pass.IsCompute() || !pass.vertex || !pass.pixel
+            || ShaderPassQueue::Transparent != pass.queue)
+        {
+            outError = "Forward ShaderMeta pass는 transparent VS+PS graphics여야 한다";
+            return false;
+        }
+
+        const std::uint32_t passIndex = static_cast<std::uint32_t>(
+            std::distance(meta.passes.begin(), passIt));
+        if (!ShaderPermutationDomain::Resolve(meta, passIndex, keywordSelections,
+                outMaterialPermutation, outError))
+        {
+            return false;
+        }
+
+        std::filesystem::path shaderPath = meta.source;
+        if (!meta.originPath.empty())
+        {
+            std::error_code pathError;
+            shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
+                RHIShaderSource::Resolve(""), pathError);
+            const auto first = shaderPath.begin();
+            if (pathError || shaderPath.empty() || shaderPath.is_absolute()
+                || (first != shaderPath.end() && *first == ".."))
+            {
+                outError = "Forward ShaderMeta source가 shader root 밖이다";
+                return false;
+            }
+        }
+        outShaderFile = shaderPath.generic_string();
+        if (outShaderFile.empty() || pass.vertex->entry.empty() || pass.pixel->entry.empty())
+        {
+            outError = "Forward ShaderMeta source/entry가 비었다";
+            return false;
+        }
+
+        outPermutation = outMaterialPermutation.defines;
+        if (!outPermutation.Set("TILE_SIZE", std::to_string(EnhancedForwardPass::kTileSize), outError)
+            || !outPermutation.Set("MAX_LIGHTS_PER_TILE",
+                std::to_string(EnhancedForwardPass::kMaxLightsPerTile), outError))
+        {
+            return false;
+        }
+        outPass = &pass;
+        return true;
+    }
+
+    // ShaderMeta 변형 전부를 미리 컴파일한다. 풀이가 실패하면 아무것도 하지 않는다 —
+    // 직렬 경로가 같은 오류를 보고한다.
+    void FwdPrecompileMetaVariants(const ShaderMeta& meta, std::span<const std::uint16_t> keywordSelections)
+    {
+        const ShaderPassDesc* pass = nullptr;
+        ShaderMetaPermutation materialPermutation;
+        std::string shaderFile;
+        RHIShaderPermutation permutation;
+        std::string error;
+        if (!FwdResolveMetaCompile(meta, keywordSelections, pass, materialPermutation, shaderFile, permutation, error))
+            return;
+        FwdPrecompileShadeVariants(shaderFile.c_str(), pass->vertex->entry.c_str(), pass->pixel->entry.c_str(),
+            permutation);
+    }
 
     // snapshot이 없는 격리 selftest는 기존 ShadeInstance scalar를 쓰되 b2를
     // 비워 두지 않는다. 제품 draw는 reflection-packed 48B Standard prefix와
@@ -613,6 +744,7 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
         variants.push_back({ true, mask, &pair.reference });
     }
 
+    FwdPrecompileShadeVariants(kShadeShaderFile, "VSMain", "PSMain", forwardPermutation);
     for (const ShadeVariant& variant : variants)
     {
         RHIShaderPermutation permutation = forwardPermutation;
@@ -736,60 +868,17 @@ bool EnhancedForwardPass::BuildShaderMetaPipelineDesc(
     std::shared_ptr<const ShaderMetaBindingLayout>& outLayout,
     std::string& outError, LX::Runtime::GraphicsShaderDescription* shader, ShaderMetaHandle ownerHandle)
 {
-    const auto passIt = std::find_if(meta.passes.begin(), meta.passes.end(),
-        [](const ShaderPassDesc& pass) { return pass.name == "Forward"; });
-    if (passIt == meta.passes.end())
-    {
-        outError = "Forward ShaderMeta에 Forward pass가 없다";
-        return false;
-    }
-    const ShaderPassDesc& pass = *passIt;
-    if (pass.IsCompute() || !pass.vertex || !pass.pixel
-        || ShaderPassQueue::Transparent != pass.queue)
-    {
-        outError = "Forward ShaderMeta pass는 transparent VS+PS graphics여야 한다";
-        return false;
-    }
-
-    const std::uint32_t passIndex = static_cast<std::uint32_t>(
-        std::distance(meta.passes.begin(), passIt));
+    const ShaderPassDesc* passPointer = nullptr;
     ShaderMetaPermutation materialPermutation;
-    if (!ShaderPermutationDomain::Resolve(meta, passIndex, keywordSelections,
-            materialPermutation, outError))
+    std::string shaderFile;
+    RHIShaderPermutation compilePermutation;
+    if (!FwdResolveMetaCompile(meta, keywordSelections, passPointer, materialPermutation, shaderFile,
+            compilePermutation, outError)
+        || (referencePath && !compilePermutation.Enable("REFERENCE_PATH", outError)))
     {
         return false;
     }
-
-    std::filesystem::path shaderPath = meta.source;
-    if (!meta.originPath.empty())
-    {
-        std::error_code pathError;
-        shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
-            RHIShaderSource::Resolve(""), pathError);
-        const auto first = shaderPath.begin();
-        if (pathError || shaderPath.empty() || shaderPath.is_absolute()
-            || (first != shaderPath.end() && *first == ".."))
-        {
-            outError = "Forward ShaderMeta source가 shader root 밖이다";
-            return false;
-        }
-    }
-    const std::string shaderFile = shaderPath.generic_string();
-    if (shaderFile.empty() || pass.vertex->entry.empty() || pass.pixel->entry.empty())
-    {
-        outError = "Forward ShaderMeta source/entry가 비었다";
-        return false;
-    }
-
-    RHIShaderPermutation compilePermutation = materialPermutation.defines;
-    if (!compilePermutation.Set("TILE_SIZE", std::to_string(kTileSize), outError)
-        || !compilePermutation.Set("MAX_LIGHTS_PER_TILE",
-            std::to_string(kMaxLightsPerTile), outError)
-        || (referencePath
-            && !compilePermutation.Enable("REFERENCE_PATH", outError)))
-    {
-        return false;
-    }
+    const ShaderPassDesc& pass = *passPointer;
 
     LX::Runtime::CompiledGraphics compiled;
     if (!BuildShadePipelineDesc(context, shaderFile.c_str(),
@@ -834,6 +923,7 @@ bool EnhancedForwardPass::ApplyShaderMeta(const EnhancedFrameContext& context,
     if (handle == m_shaderMetaHandle) return true;
 
     const std::vector<std::uint16_t> defaultSelections(meta.keywords.size(), 0);
+    FwdPrecompileMetaVariants(meta, defaultSelections);
     RHIGraphicsPipelineDesc shadeDesc{};
     RHIGraphicsPipelineDesc referenceDesc{};
     RHIShaderBlob shadeVs, shadePs, referenceVs, referencePs;
@@ -1015,6 +1105,7 @@ bool EnhancedForwardPass::EnsureShaderMetaVariant(
             && existing->second.reference.IsValid() && nullptr != outLayout;
     }
 
+    FwdPrecompileMetaVariants(meta, keywordSelections);
     RHIGraphicsPipelineDesc shadeDesc{}, referenceDesc{};
     RHIShaderBlob shadeVs, shadePs, referenceVs, referencePs;
     RHIShaderPermutationKey shadeKey{}, referenceKey{};
