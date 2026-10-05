@@ -106,6 +106,23 @@ namespace Authoring
 			}
 		}
 
+        // Explicit string scalars must never be reinterpreted as YAML null
+        // (for example a typed audio String parameter containing "null" or "~").
+        void SetString(std::string_view value) const
+        {
+            if (!IsValid())
+            {
+                return;
+            }
+            auto node = Ref();
+            if (m_tree->is_map(m_id) || m_tree->is_seq(m_id))
+            {
+                node.change_type(ryml::NodeType{ ryml::VAL });
+            }
+            node.set_val(m_tree->copy_to_arena(ryml::csubstr(value.data(), value.size())),
+                ryml::NodeType{ ryml::VAL_DQUO });
+        }
+
 		void SetScalar(const std::string& value) const
 		{
 			SetScalar(std::string_view{ value });

@@ -30,26 +30,41 @@ namespace wave
         ClipScanReport report{};
 
         std::error_code error{};
-        if (!std::filesystem::is_directory(directory, error)) return report;
+        if (!std::filesystem::is_directory(directory, error))
+        {
+            return report;
+        }
 
         // 이미 적재된 것을 먼저 모은다. 두 번 훑어도 같은 결과여야 하고, 같은
         // 이름이 두 번 오면 **뒤엣것을 버렸다는 사실이 남아야** 한다.
         std::unordered_set<ClipKey> known;
-        for (const ClipKey& key : service.ListClipKeys()) known.insert(key);
+        for (const ClipKey& key : service.ListClipKeys())
+        {
+            known.insert(key);
+        }
 
         // ★ 예외를 던지는 순회를 쓰지 않는다. 권한 없는 하위 폴더 하나가 순회
         //   전체를 끊으면 "폴더가 비었다" 와 구분되지 않는다.
         std::filesystem::recursive_directory_iterator iterator(
             directory, std::filesystem::directory_options::skip_permission_denied, error);
-        if (error) return report;
+        if (error)
+        {
+            return report;
+        }
 
         const std::filesystem::recursive_directory_iterator end{};
         for (; iterator != end; iterator.increment(error))
         {
-            if (error) break;
+            if (error)
+            {
+                break;
+            }
 
             const std::filesystem::directory_entry& entry = *iterator;
-            if (entry.is_directory(error)) continue;
+            if (entry.is_directory(error))
+            {
+                continue;
+            }
 
             const std::filesystem::path& path = entry.path();
             if (!IsSupportedClipExtension(path))

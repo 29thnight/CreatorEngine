@@ -282,6 +282,49 @@ SceneManager::~SceneManager()
     DrainSceneLoads();
 }
 
+void SceneManager::BindAudioPlayback(wave::PlaybackService* playback, SoundSystem::AssetResolver resolver)
+{
+    if (m_audioPlayback)
+    {
+        m_audioPlayback->EndScope(m_audioSession);
+    }
+    m_audioSession = {};
+    m_audioPlayback = playback;
+    m_audioResolver = std::move(resolver);
+    for (auto* scene : m_scenes)
+    {
+        scene->Sounds().Bind(*scene, playback, m_audioResolver);
+    }
+    if (auto* scene = m_activeScene.load())
+    {
+        scene->Sounds().Activate();
+    }
+}
+
+void SceneManager::SynchronizeAudioWorld()
+{
+    const auto* active = m_activeScene.load();
+    for (auto* scene : m_scenes)
+    {
+        if (scene == active)
+        {
+            scene->Sounds().Activate();
+        }
+        else
+        {
+            scene->Sounds().EndWorld();
+        }
+    }
+}
+
+void SceneManager::RefreshAudioClipKeys()
+{
+    for (auto* scene : m_scenes)
+    {
+        scene->Sounds().RefreshClipKeys();
+    }
+}
+
 void SceneManager::SetGameStart(bool isStart)
 {
     if (!isStart)
@@ -400,6 +443,10 @@ void SceneManager::ApplyPendingSceneStructureChange()
 
 void SceneManager::NotifyActiveSceneChanged()
 {
+    if (auto* active = m_activeScene.load())
+    {
+        active->Sounds().Activate();
+    }
     // 길이가 없는 사건(§7.3 의 첫째 트랙). 씬이 바뀌면 그 뒤 프레임들의
     // 성격이 통째로 달라지는데, 그 까닭이 타임라인에 남지 않으면 "여기서부터
     // 갑자기 느려졌다" 까지만 읽힌다.
@@ -430,6 +477,7 @@ void SceneManager::Editor()
 
 void SceneManager::Initialization()
 {
+    SynchronizeAudioWorld();
     if(!m_isInitialized)
     {
 		m_isInitialized = true;
@@ -468,6 +516,7 @@ void SceneManager::InputEvents(float deltaSecond)
 
 void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
 {
+    SynchronizeAudioWorld();
     if (!m_activeScene) return;
 
     {
@@ -520,7 +569,11 @@ void SceneManager::EndOfFrame()
 
 void SceneManager::Pausing()
 {
-    if (!m_activeScene) return;
+    if (!m_activeScene)
+    {
+        return;
+    }
+    m_activeScene.load()->Sounds().Update(0.0f, false);
     m_activeScene.load()->UpdateRenderData();
 }
 
@@ -1691,6 +1744,16 @@ bool SceneManager::BeginPlayTransaction()
         return false;
     }
 
+    if (m_audioPlayback)
+    {
+        m_audioPlayback->EndScope(m_audioSession);
+        m_audioSession = m_audioPlayback->CreateScope(wave::ScopeKind::Session);
+        if (auto* scene = m_activeScene.load())
+        {
+            scene->Sounds().EndWorld();
+            scene->Sounds().Activate();
+        }
+    }
     SetSimulationPhase(ScenePhase::Simulating);
     ce::profile_instant(ce::marker<"PlayModeEntered">());
     PlayModeEvent.Broadcast(true);
@@ -1705,6 +1768,15 @@ void SceneManager::NotePlayFailure(std::string reason)
 
 void SceneManager::EndPlayTransaction()
 {
+    if (m_audioPlayback)
+    {
+        m_audioPlayback->EndScope(m_audioSession);
+        m_audioSession = {};
+        if (auto* active = m_activeScene.load())
+        {
+            active->Sounds().EndWorld();
+        }
+    }
     m_isPlayCommitted = false;
     Scene* scene = m_activeScene.load();
     if (!scene)
@@ -1765,7 +1837,11 @@ bool SceneManager::PreparePhysicsSceneExit(Scene* scene)
 {
     if (!scene) return true;
     const auto prepared = scene->PreparePhysicsSceneExit();
-    if (prepared) return true;
+    if (prepared)
+    {
+        scene->Sounds().EndWorld();
+        return true;
+    }
 
     NotePlayFailure(std::string(prepared.error().message));
     Debug::PrintLog(spdlog::level::err, std::string(prepared.error().message));

@@ -7,6 +7,7 @@
 #include "SystemSchedule.h"
 #include "JobScheduler.h"
 #include "CameraSystem.h"
+#include "SoundSystem.h"
 #include "AssetBundle.h"
 #include "TransformStore.h"
 #include "HierarchyStore.h"
@@ -474,8 +475,10 @@ private:
     // 느린 결과를 보관하는 동안 새 제출을 막아 미소비 batch는 하나로 제한한다.
     [[reflgen::ignore]]
     std::shared_ptr<AIUpdateBatch> m_aiUpdateBatch;
+
     [[reflgen::ignore]]
     std::vector<std::shared_ptr<AIUpdateBatch>> m_completedAIUpdates;
+
     [[reflgen::ignore]]
     bool m_aiTickBoundaryReached = false;
 
@@ -538,6 +541,8 @@ public:
     /// 네이티브 컴포넌트의 프레임 틱은 이제 이 API를 거치지 않고 전용 시스템
     /// (AnimatorSystem 등)의 조밀 vector가 돈다(SystemSchedule.h 클래스 주석 참고).
     SystemSchedule& Schedule() { return m_schedule; }
+	SoundSystem& Sounds() noexcept { return m_soundSystem; }
+	const SoundSystem& Sounds() const noexcept { return m_soundSystem; }
 	CameraSystem& Cameras() noexcept { return m_cameraSystem; }
 	const CameraSystem& Cameras() const noexcept { return m_cameraSystem; }
 	TweenManager& Tweens() noexcept;
@@ -648,6 +653,9 @@ private:
 
 	[[reflgen::ignore]]
 	CameraSystem m_cameraSystem;
+
+    [[reflgen::ignore]]
+    SoundSystem m_soundSystem;
 
 	// math::tween<T> 값과 engine binding의 Scene-scoped 소유자. 전방 선언 +
 	// unique_ptr로 Scene.h의 광범위한 소비자가 tween.hpp까지 전이 include하지 않게 한다.
@@ -1114,8 +1122,10 @@ private:
 
     [[reflgen::ignore]]
     std::mutex m_physicsTransformMutex;
+
     [[reflgen::ignore]]
     std::vector<EntityHandle> m_physicsTransformDirty;
+
     [[reflgen::ignore]]
     std::vector<EntityHandle> m_physicsTransformDrain;
 

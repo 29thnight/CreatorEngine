@@ -28,7 +28,7 @@ try {
     $vcpkgBin = Join-Path $VcpkgDirectory $(if ($Config -eq 'Debug') { 'debug\bin' } else { 'bin' })
     if (-not (Test-Path -LiteralPath $vcpkgBin)) { throw "vcpkg runtime directory missing: $vcpkgBin" }
     $roots = @($vcpkgBin, (Join-Path $Repository 'ThirdParty\Slang\bin'),
-        (Join-Path $Repository 'ThirdParty\DotNetHost\bin'), (Join-Path $Repository 'ThirdParty\Fmod\bin\x64'))
+        (Join-Path $Repository 'ThirdParty\DotNetHost\bin'))
     foreach ($dir in $roots) {
         foreach ($file in @(Get-ChildItem -LiteralPath $dir -Filter '*.dll' -File)) { $lookup[$file.Name] = $file.FullName }
     }
@@ -62,6 +62,7 @@ try {
     [void][IO.Directory]::CreateDirectory((Join-Path $runtime 'Editor'))
     while ($queue.Count) {
         $name = $queue.Dequeue()
+        if ($name -match '^(fmod(?:L|studio|studioL)?|miniaudio)\.dll$') { throw "Retired or non-source audio dependency imported by $HostName : $name" }
         if (-not $seen.Add($name)) { continue }
         if ([IO.Path]::GetFileName($name) -ne $name) { throw "Invalid import name: $name" }
         if ($name -match '^(api-ms-|ext-ms-)') { $systemImports.Add($name); continue }

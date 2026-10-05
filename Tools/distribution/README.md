@@ -69,7 +69,7 @@ assembly·source generator·사설 .NET 런타임·CreatorBuildTool EXE·라이�
 배포·컴파일·패키징 로직은 BuildTool 전용 C# 프로젝트가 소유한다. 배포본에 PowerShell 실행 환경을 포함하지 않는다.
 
 Debug 묶음은 개발 검증용이며 Debug CRT를 포함한다. 일반 사용자에게 발행하는 제품과 구별한다.
-현재 오디오 closure는 실제 소스에 연결된 FMOD를 포함하며, PHASE 22의 FMOD 제거 완료를 뜻하지 않는다.
+오디오는 고정 miniaudio 소스 구현을 정적으로 포함한다. runtime deploy와 배포·게임 package gate는 FMOD 및 miniaudio DLL을 거부한다. 실제 Windows PE closure·패키지 smoke는 별도의 Windows 검증이 필요하다.
 
 ## 게임 프로젝트에서 사용
 

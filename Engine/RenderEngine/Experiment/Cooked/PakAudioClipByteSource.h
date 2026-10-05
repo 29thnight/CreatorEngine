@@ -22,7 +22,8 @@ namespace experiment::cooked
         [[nodiscard]] bool Size(std::string_view path,
             std::uint64_t& out, std::string& failure) const override
         {
-            if (!archive_ || (!IsAudioArtifactVirtualPath(path) && !IsMaterialProgramArtifactVirtualPath(path) && !IsCollisionGeometryArtifactVirtualPath(path)))
+            if (!archive_ || (!IsAudioArtifactVirtualPath(path) && !IsMaterialProgramArtifactVirtualPath(path) && !IsCollisionGeometryArtifactVirtualPath(path)
+                && !IsSoundAssetArtifactVirtualPath(path)))
             {
                 failure = "pak artifact virtual path is invalid";
                 return false;

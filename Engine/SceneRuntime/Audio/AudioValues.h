@@ -22,7 +22,7 @@ namespace wave
     // 재생 중인 논리 보이스 하나를 가리키는 값. index 는 슬롯, generation 은 그
     // 슬롯의 몇 번째 사용인지다.
     //
-    // ★ generation 이 있는 이유. 옛 배선은 `FMOD::Channel*` 를 컴포넌트가 들고
+    // ★ generation 이 있는 이유. 옛 배선은 `vendor channel pointer` 를 컴포넌트가 들고
     //   있었는데, 백엔드는 채널을 재활용한다. 정지된 뒤 같은 주소가 다른 소리에
     //   쓰이면 옛 주인의 `setVolume` 이 남의 소리를 바꾼다. 세대를 함께 들면
     //   "그 슬롯은 이미 다른 사용" 임을 값만 보고 거부할 수 있다.
@@ -69,6 +69,65 @@ namespace wave
     {
         return !(left == right);
     }
+
+    // Stable values, independent of component enum ordinals and graph order.
+    namespace Buses
+    {
+        inline constexpr BusId BGM{ 1u };
+        inline constexpr BusId SFX{ 2u };
+        inline constexpr BusId Player{ 3u };
+        inline constexpr BusId Monster{ 4u };
+        inline constexpr BusId UI{ 5u };
+        inline constexpr BusId Master{ 6u };
+        inline constexpr BusId Room{ 7u };
+    }
+
+    struct ConcurrencyGroupId final
+    {
+        std::uint32_t value{ 0u };
+        [[nodiscard]] constexpr bool IsValid() const noexcept { return value != 0u; }
+    };
+
+    enum class StealPolicy : std::uint8_t
+    {
+        Reject,
+        Oldest,
+        Quietest,
+        LowestPriority,
+    };
+
+    enum class ReverbPreset : std::uint8_t
+    {
+        Off,
+        Room,
+        Hall,
+    };
+
+    struct RolloffPoint final
+    {
+        float distance{ 0.0f };
+        float gain{ 1.0f };
+    };
+
+    struct ClipInfo final
+    {
+        std::uint32_t channels{ 0u };
+        std::uint32_t sampleRate{ 48000u };
+        std::uint64_t frameCount{ 0u };
+        bool streaming{ false };
+    };
+
+    struct VoiceMetrics final
+    {
+        std::size_t active{ 0u };
+        std::size_t physical{ 0u };
+        std::size_t virtualized{ 0u };
+        std::size_t paused{ 0u };
+        std::uint64_t stolen{ 0u };
+        std::uint64_t dropped{ 0u };
+        std::uint64_t backendFailures{ 0u };
+        std::uint64_t rejectedUpdates{ 0u };
+    };
 
     // 클립을 가리키는 참조.
     //
@@ -125,7 +184,7 @@ namespace wave
     // 논리 보이스의 현재 상태.
     //
     // Virtual 은 "정책이 소리를 내주지 않기로 했지만 재생 위치는 유지한다" 는 뜻이다.
-    // 골격 단계에서는 상태를 들고만 있고 가상화 전환은 아직 하지 않는다.
+    // 재물리화할 때 같은 클립 세대와 재생 위치를 되살린다.
     enum class VoiceState : std::uint8_t
     {
         Free = 0,
@@ -139,6 +198,12 @@ namespace wave
     //
     // ★ 여기에 포인터를 담아도 이 헤더는 vendor 타입을 모른다 — 그것이 요점이다.
     //   상위 계층은 이 값을 **비교·전달만** 하고 절대 역참조하지 않는다.
+    struct BackendClipId final
+    {
+        std::uint64_t value{ 0u };
+        [[nodiscard]] constexpr bool IsValid() const noexcept { return value != 0u; }
+    };
+
     struct BackendVoiceId final
     {
         std::uint64_t value{ 0 };

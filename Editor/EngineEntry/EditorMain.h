@@ -1,5 +1,11 @@
 ﻿#pragma once
 class ProjectLayerSettings;
+namespace wave
+{
+    class AudioHost;
+    class PlaybackService;
+    class AudioCatalog;
+}
 #include "TimeSystem.h"
 #include "Entity.h"
 #include "DataSystem.h"
@@ -74,6 +80,10 @@ namespace Editor
 
 	private:
         std::shared_ptr<ProjectLayerSettings> m_projectLayers;
+        std::unique_ptr<wave::AudioHost> m_audioHost;
+        std::unique_ptr<wave::PlaybackService> m_audioPlayback;
+        std::unique_ptr<wave::AudioCatalog> m_audioCatalog;
+        std::uint64_t m_audioRevision{};
 
 		void StartPresentationThread();
 		void StopPresentationThread();

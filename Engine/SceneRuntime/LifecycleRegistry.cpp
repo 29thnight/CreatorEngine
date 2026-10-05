@@ -24,6 +24,7 @@
 #include "PlayerInput.h"
 #include "ScriptComponent.h"
 #include "SoundComponent.h"
+#include "AudioListenerComponent.h"
 #include "SpriteRenderer.h"
 #include "SpriteSheetComponent.h"
 #include "Terrain.h"
@@ -105,6 +106,7 @@ namespace Lifecycle
         Register<PlayerInputComponent>();
         Register<ScriptComponent>();
         Register<SoundComponent>();
+        Register<AudioListenerComponent>();
         Register<SpriteRenderer>();
         Register<SpriteSheetComponent>();
         Register<TerrainComponent>();

@@ -1,5 +1,11 @@
 #pragma once
 class ProjectLayerSettings;
+namespace wave
+{
+    class AudioHost;
+    class PlaybackService;
+    class AudioCatalog;
+}
 #include "Delegate.h"
 
 #include <atomic>
@@ -98,6 +104,9 @@ namespace Player
 
 	private:
         std::shared_ptr<ProjectLayerSettings> m_projectLayers;
+        std::unique_ptr<wave::AudioHost> m_audioHost;
+        std::unique_ptr<wave::PlaybackService> m_audioPlayback;
+        std::unique_ptr<wave::AudioCatalog> m_audioCatalog;
 
 		void StartPresentationThread();
 		void StopPresentationThread();

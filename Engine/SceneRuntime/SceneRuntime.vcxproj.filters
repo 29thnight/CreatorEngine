@@ -153,9 +153,6 @@
     <Filter Include="Managers\ScriptHost">
       <UniqueIdentifier>{0012eb47-4133-df2a-3a0a-1cf6ea46e425}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\SoundManager">
-      <UniqueIdentifier>{1c5fb144-16fb-4465-9b04-6989fed786ef}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Managers\TagManager">
       <UniqueIdentifier>{7326de3f-16cd-476a-9169-7a99837ccb03}</UniqueIdentifier>
     </Filter>
@@ -337,9 +334,6 @@
     </ClCompile>
     <ClCompile Include="SoundComponent.cpp">
       <Filter>Classes\Components\SoundComponent</Filter>
-    </ClCompile>
-    <ClCompile Include="SoundManager.cpp">
-      <Filter>Managers\SoundManager</Filter>
     </ClCompile>
     <ClCompile Include="SoundSystem.cpp">
       <Filter>Classes\Components\SoundComponent</Filter>
@@ -661,9 +655,6 @@
     <ClInclude Include="SoundDefinition.h">
       <Filter>Classes\Resources\Sound</Filter>
     </ClInclude>
-    <ClInclude Include="SoundManager.h">
-      <Filter>Managers\SoundManager</Filter>
-    </ClInclude>
     <ClInclude Include="SoundSystem.h">
       <Filter>Classes\Components\SoundComponent</Filter>
     </ClInclude>
@@ -742,5 +733,42 @@
     <ClInclude Include="CollisionGeometryLibrary.h" />
     <ClInclude Include="CollisionGeometryIO.h" />
     <ClInclude Include="CookedCollisionGeometry.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Audio\AudioCatalog.cpp" />
+    <ClCompile Include="Audio\AudioHost.cpp" />
+    <ClCompile Include="Audio\AudioProfileProvider.cpp" />
+    <ClCompile Include="Audio\AudioRuntime.cpp" />
+    <ClCompile Include="Audio\ClipDirectory.cpp" />
+    <ClCompile Include="Audio\MiniaudioBackend.cpp" />
+    <ClCompile Include="Audio\NullAudioBackend.cpp" />
+    <ClCompile Include="Audio\PlaybackService.cpp" />
+    <ClCompile Include="Audio\SoundAssetSerialization.cpp" />
+    <ClCompile Include="Audio\SoundGraph.cpp" />
+    <ClCompile Include="Audio\VoiceTable.cpp" />
+    <ClCompile Include="AudioListenerComponent.cpp" />
+    <ClInclude Include="Audio\AudioBackend.h" />
+    <ClInclude Include="Audio\AudioCatalog.h" />
+    <ClInclude Include="Audio\AudioHost.h" />
+    <ClInclude Include="Audio\AudioProfileProvider.h" />
+    <ClInclude Include="Audio\AudioRuntime.h" />
+    <ClInclude Include="Audio\AudioService.h" />
+    <ClInclude Include="Audio\AudioValues.h" />
+    <ClInclude Include="Audio\ClipDirectory.h" />
+    <ClInclude Include="Audio\ListenerState.h" />
+    <ClInclude Include="Audio\MiniaudioBackend.h" />
+    <ClInclude Include="Audio\NullAudioBackend.h" />
+    <ClInclude Include="Audio\PlayRequest.h" />
+    <ClInclude Include="Audio\PlaybackService.h" />
+    <ClInclude Include="Audio\SoundAssetSerialization.h" />
+    <ClInclude Include="Audio\SoundGraph.h" />
+    <ClInclude Include="Audio\VoiceTable.h" />
+    <ClInclude Include="AudioListenerComponent.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Audio\EditorAudioClipCache.cpp" />
+    <ClInclude Include="Audio\AudioSourceInspection.h" />
+    <ClInclude Include="Audio\AudioSourceValidation.h" />
+    <ClInclude Include="Audio\EditorAudioClipCache.h" />
   </ItemGroup>
 </Project>

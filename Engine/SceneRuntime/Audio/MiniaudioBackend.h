@@ -25,26 +25,14 @@ namespace wave
         std::string deviceName;
         std::uint32_t periodFrames{ 0 };
         std::uint32_t bufferFrames{ 0 };
+        bool outputInterrupted{ false };
+        std::uint64_t rerouteCount{ 0u };
+        std::uint64_t restartAttempts{ 0u };
+        std::uint64_t successfulRestarts{ 0u };
     };
 
-    // miniaudio 백엔드. **이 헤더에 `ma_*` 토큰이 하나도 없다** — 구현은 전부
-    // `MiniaudioBackend.cpp` 안에서 끝난다(ThirdParty/miniaudio/PROVENANCE.md 의 통합 규약).
-    //
-    // ★ 왜 miniaudio 인가. 계획서 §9 가 대안들을 기각한 근거는 그대로다 — 자체
-    //   device/decoder 구현은 WASAPI·리샘플러·device-loss 검증 범위가 외부 종속
-    //   절감 이익을 압도하고, DLL 배포는 ABI 보장이 없다. 소스 한 벌을 고정한 태그로
-    //   들고 구현 TU 하나만 컴파일한다.
-    //
-    // ★★ FMOD 백엔드는 이 계약 뒤에 **자리만 남긴다.** 같은 인터페이스를 구현하면
-    //   되고, 그 구현은 이 슬라이스의 범위가 아니다.
-    //
-    // ── 이 슬라이스가 구현하지 않은 것 ───────────────────────────────────
-    //
-    // - **spatialBlend 의 중간값.** 지금은 0 보다 크면 공간화를 켠다. 계획서 §4.2 의
-    //   equal-power 2D/3D 쌍(논리 보이스 하나 아래 소스 둘)은 AU5 소관이다. 중간값을
-    //   넣어도 오류는 아니지만 **섞이지 않는다** — 게이트도 그것을 단정하지 않는다.
-    // - **cap·steal·가상화.** 정책은 상위(`AudioRuntime`)가 갖는다.
-    // - **리버브 send.** 요청에는 값이 실려 오지만 여기서 소비하지 않는다(AU6).
+    // The backend owns the device, bounded decode workers, immutable mounted
+    // sources, equal-power source pairs, and the private room-reverb node.
     class MiniaudioBackend final : public AudioBackend
     {
     public:
@@ -54,15 +42,19 @@ namespace wave
         [[nodiscard]] bool Start(const DeviceSettings& settings) override;
         void Stop() override;
         [[nodiscard]] bool IsRunning() const override;
+        [[nodiscard]] bool IsOutputAvailable() const override;
 
         [[nodiscard]] bool LoadClip(const ClipKey& key,
             const std::filesystem::path& source) override;
         [[nodiscard]] bool LoadCookedClip(const ClipKey& key,
             const experiment::cooked::CookedAudioClipSource& source) override;
+        [[nodiscard]] BackendClipId RetainClip(const ClipKey& key) override;
+        void ReleaseClip(BackendClipId clip) override;
         void UnloadClip(const ClipKey& key) override;
         [[nodiscard]] bool HasClip(const ClipKey& key) const override;
 
         [[nodiscard]] BackendVoiceId StartVoice(const PlayRequest& request) override;
+        [[nodiscard]] BackendVoiceId StartVoice(const PlayRequest& request, BackendClipId clip) override;
         void StopVoice(BackendVoiceId voice) override;
         void SetVoicePaused(BackendVoiceId voice, bool paused) override;
         [[nodiscard]] bool IsVoicePlaying(BackendVoiceId voice) const override;
@@ -72,10 +64,18 @@ namespace wave
         void SetVoiceTransform(BackendVoiceId voice,
             const math::vector3& position, const math::vector3& velocity) override;
 
+        void SetVoiceSettings(BackendVoiceId voice, const PlayRequest& request) override;
+        void SetVoiceLooping(BackendVoiceId voice, bool loop) override;
+        [[nodiscard]] bool SeekVoice(BackendVoiceId voice, std::uint64_t frame) override;
+        [[nodiscard]] std::uint64_t VoicePlayhead(BackendVoiceId voice) const override;
+        [[nodiscard]] ClipInfo GetClipInfo(const ClipKey& key) const override;
+        void SetReverbPreset(ReverbPreset preset) override;
         void SetBusVolume(BusId bus, float linearGain) override;
         void SetListener(const ListenerState& listener) override;
 
         void Update() override;
+        // Safe main-thread recovery request. The graph and voice IDs survive.
+        void RequestDeviceRestart();
 
         // 마지막 실패 사유. 벤더 오류 코드를 그대로 흘리지 않고 문장으로 번역해 둔다.
         //
@@ -90,6 +90,11 @@ namespace wave
         // the audio thread does not allocate, log, or take a lock here.
         [[nodiscard]] AudioCallbackMetrics CallbackMetrics() const noexcept;
         [[nodiscard]] AudioDeviceDiagnostics DeviceDiagnostics() const;
+
+        // Offline capture is valid only when Start selected noDevice explicitly.
+        [[nodiscard]] bool Render(float* interleaved, std::uint32_t frames);
+        [[nodiscard]] std::uint64_t StreamReadFailures() const noexcept;
+        [[nodiscard]] std::uint64_t StreamBytesRead() const noexcept;
 
     private:
         struct Implementation;

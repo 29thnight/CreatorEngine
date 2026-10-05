@@ -28,6 +28,8 @@
 *.volume     text eol=lf
 *.renderprofile text eol=lf
 *.shadergraph text eol=lf
+*.soundgraph  text eol=lf
+*.soundpreset text eol=lf
 # Codegen golden fixtures preserve the generator's trailing blank line byte for byte.
 Tools/regression/fixtures/material-codegen/*.slang whitespace=-blank-at-eof
 *.bt         text eol=lf

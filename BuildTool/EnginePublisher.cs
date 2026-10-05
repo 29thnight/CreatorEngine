@@ -57,6 +57,7 @@ internal static class EnginePublisher
                 if (record.Int("schemaVersion") != 1 || record.Text("host") != name || record.Text("configuration") != config || Metadata.Digest(entries) != record.Text("digest"))
                     throw new BuildException($"Invalid native build record: {name}");
                 Metadata.Verify(source, entries, context.Cancellation);
+                Metadata.AssertSourceOnlyAudio(entries.Select(entry => entry.Path));
                 if (abi.Text("version") != version || abi.Text("productName") != metadata.Text("productName") ||
                     abi.Text("featureRelease") != metadata.Text("featureRelease") || abi.Bool("localDevelopment") != metadata.Bool("localDevelopment") ||
                     (abi.Int("debug") != 0) != (config == "Debug") || (abi.Int("shipping") != 0) != (name == "Player" && shipping))
@@ -105,10 +106,11 @@ internal static class EnginePublisher
                 Copy(Path.Combine(toolSource, name), Path.Combine(binaryTarget, "Tools/CreatorBuildTool", name));
             }
             Tree(Path.Combine(repository, "Tools/packaging/templates"), Path.Combine(candidate, "Tools/packaging/templates"));
-            foreach (var file in Paths.Files(Path.Combine(repository, "ThirdParty")).Where(p => Regex.IsMatch(Path.GetFileName(p), "^(LICENSE|COPYING|NOTICE|README)", RegexOptions.IgnoreCase) && Path.GetExtension(p) is not (".dll" or ".lib")))
+            foreach (var file in Paths.Files(Path.Combine(repository, "ThirdParty")).Where(p => Regex.IsMatch(Path.GetFileName(p), "^(LICENSE|COPYING|NOTICE|README|PROVENANCE)", RegexOptions.IgnoreCase) && Path.GetExtension(p) is not (".dll" or ".lib")))
                 Copy(file, Paths.Child(candidate, "Licenses/ThirdParty/" + Paths.Relative(Path.Combine(repository, "ThirdParty"), file)));
             foreach (var file in Paths.Files(Path.Combine(repository, "vcpkg_installed")).Where(p => Path.GetFileName(p).Equals("copyright", StringComparison.OrdinalIgnoreCase)))
                 Copy(file, Paths.Child(candidate, "Licenses/vcpkg/" + Paths.Relative(Path.Combine(repository, "vcpkg_installed"), file)));
+            Metadata.AssertSourceOnlyAudio(Paths.Files(candidate));
             var entriesAll = Metadata.Entries(candidate); var digest = Metadata.Digest(entriesAll); var buildId = Guid.NewGuid().ToString("D");
             var revision = (await context.Run("git", ["-C", repository, "rev-parse", "HEAD"], echo: false)).Output.Trim();
             var dirty = (await context.Run("git", ["-C", repository, "status", "--porcelain"], echo: false)).Output.Length > 0;

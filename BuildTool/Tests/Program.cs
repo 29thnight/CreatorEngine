@@ -25,6 +25,12 @@ async Task RejectAsync(Func<Task> action, string message)
 using var context = new BuildContext(new Options(["help"]), CancellationToken.None);
 try
 {
+    foreach (var retired in new[] { "Runtime/Common/fmod.dll", "Runtime/Common/FMODL.DLL", "fmodstudio.dll", "fmodstudioL.dll", "miniaudio.dll" })
+    {
+        Reject(() => Metadata.AssertSourceOnlyAudio([retired]), "Retired audio dependency accepted: " + retired);
+    }
+    Metadata.AssertSourceOnlyAudio(["Runtime/Common/normal.dll", "Licenses/ThirdParty/miniaudio/LICENSE"]);
+    ++checks;
     var textureCook = Path.Combine(root, "texture-cook");
     var textureDerived = Path.Combine(textureCook, "Derived");
     var modelTextures = Path.Combine(textureDerived, "Models/11/11111111-1111-4111-8111-111111111111/1/textures");
@@ -93,6 +99,25 @@ try
     PackageInputs.RemoveGeometrySources(cookInput);
     Check(!File.Exists(geometrySource) && !File.Exists(geometrySource + ".meta") && !File.Exists(geometryHistory), "Geometry source/history leaked into runtime package");
     Check(File.Exists(geometryArtifact) && File.Exists(Path.Combine(project, "Assets/Shader.hlsl")), "Cooked geometry or original project altered by source cleanup");
+    foreach (var extension in new[] { "wav", "mp3", "flac", "ogg", "soundgraph", "soundpreset" })
+    {
+        var source = Paths.Child(cookInput, "Assets/Audio/source." + extension);
+        Directory.CreateDirectory(Path.GetDirectoryName(source)!);
+        File.WriteAllText(source, "authoring");
+        File.WriteAllText(source + ".meta", "identity");
+        Check(PackageInputs.Excluded(source), "Raw audio source not excluded: " + extension);
+    }
+    var cookedAudio = new[] { "Audio/ce/test.ceac", "SoundGraphs/ce/test.cesg", "SoundPresets/ce/test.cesp" };
+    foreach (var relative in cookedAudio)
+    {
+        var artifact = Paths.Child(cookInput, "Assets/Derived/" + relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(artifact)!);
+        File.WriteAllText(artifact, "cooked");
+        Check(!PackageInputs.Excluded(artifact), "Cooked audio artifact was excluded: " + relative);
+    }
+    PackageInputs.RemoveAudioSources(cookInput);
+    Check(!Directory.EnumerateFiles(Paths.Child(cookInput, "Assets/Audio")).Any(), "Audio source or meta leaked into package");
+    Check(cookedAudio.All(relative => File.Exists(Paths.Child(cookInput, "Assets/Derived/" + relative))), "Audio cleanup removed cooked artifacts");
     Check(!Directory.Exists(Path.Combine(cookInput, "Assets/Script")), "C# source identities leaked into native cook input");
     Check(File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl.meta")) && File.Exists(Path.Combine(cookInput, "Assets/Shader.hlsl")), "Runtime source identity was removed from cook input");
     Check(!PackageInputs.Excluded(Path.Combine(cookInput, "Assets/Derived/Models/ab/id/1/sidecar.meta")), "Cooked model sidecar was excluded from the package");

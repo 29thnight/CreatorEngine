@@ -73,6 +73,21 @@ namespace experiment::cooked
                path.substr(prefix.size(), 2) == uuid.substr(0, 2);
     }
 
+    [[nodiscard]] inline bool IsSoundAssetArtifactVirtualPath(std::string_view path)
+    {
+        const auto slash = path.rfind('/');
+        if (slash == std::string_view::npos || path.size() - slash != 42u)
+        {
+            return false;
+        }
+        AssetId id;
+        if (!TryParseCanonicalAssetId(path.substr(slash + 1u, 36u), id))
+        {
+            return false;
+        }
+        return path == MakeDerivedSoundGraphArtifactPath(id) || path == MakeDerivedSoundPresetArtifactPath(id);
+    }
+
     class LooseArtifactByteSource final : public ArtifactByteSource
     {
     public:
@@ -133,7 +148,8 @@ namespace experiment::cooked
         [[nodiscard]] bool Resolve(std::string_view virtualPath,
             std::filesystem::path& out, std::string& failure) const
         {
-            if (!IsAudioArtifactVirtualPath(virtualPath) && !IsMaterialProgramArtifactVirtualPath(virtualPath) && !IsCollisionGeometryArtifactVirtualPath(virtualPath))
+            if (!IsAudioArtifactVirtualPath(virtualPath) && !IsMaterialProgramArtifactVirtualPath(virtualPath) && !IsCollisionGeometryArtifactVirtualPath(virtualPath)
+                && !IsSoundAssetArtifactVirtualPath(virtualPath))
             {
                 failure = "cooked artifact virtual path is invalid";
                 return false;

@@ -64,6 +64,7 @@ internal static class GamePackager
             context.Log("[4/6 Stage]", "stage");
             var runtimeRecord = Metadata.Read(Path.Combine(engine.BinaryRoot, "Runtime/Manifests/Player.json"));
             var runtimeSources = Metadata.ParseEntries(runtimeRecord.Array("entries")); Metadata.Verify(engine.BinaryRoot, runtimeSources, context.Cancellation);
+            Metadata.AssertSourceOnlyAudio(runtimeSources.Select(entry => entry.Path));
             var rootFiles = new List<string>();
             // The scene renderer boots from cooked environment pixels. They are
             // common engine resources; no authoring EXR is packaged with a game.
@@ -101,6 +102,7 @@ internal static class GamePackager
                 Paths.CopyTree(Path.Combine(baseRoot, mount), Path.Combine(merged, mount), context.Cancellation);
             Paths.CopyTree(generated, merged, context.Cancellation);
             PackageInputs.RemoveGeometrySources(merged);
+            PackageInputs.RemoveAudioSources(merged);
             var mergedCook = AssetCooking.Validate(Path.Combine(merged, "Assets"), cook.ArtifactCount);
             if (mergedCook.ManifestSha256 != cook.ManifestSha256 || mergedCook.ArtifactBytes != cook.ArtifactBytes) throw new BuildException("Merged cook output changed.");
             var settingsFile = Path.Combine(merged, "ProjectSetting/EngineSettings.asset"); var settingsHash = Metadata.Hash(settingsFile);

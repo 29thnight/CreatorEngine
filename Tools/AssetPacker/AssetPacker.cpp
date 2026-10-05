@@ -256,7 +256,8 @@ namespace
                 return false;
         }
         static const std::wstring_view kExcluded[] = {
-            L".cpp", L".h", L".hpp", L".cs", L".meta", L".json"
+            L".cpp", L".h", L".hpp", L".cs", L".meta", L".json",
+            L".wav", L".mp3", L".flac", L".ogg", L".soundgraph", L".soundpreset"
         };
 
         std::wstring extension = path.extension().native();

@@ -7,7 +7,7 @@
 ![Vulkan](https://img.shields.io/badge/Graphics-Vulkan-AC162C?style=flat-square&logo=vulkan&logoColor=white)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?style=flat-square&logo=dotnet&logoColor=white)
 ![PhysX](https://img.shields.io/badge/Physics-PhysX-76B900?style=flat-square&logo=nvidia&logoColor=white)
-![FMOD](https://img.shields.io/badge/Audio-FMOD-000000?style=flat-square)
+![miniaudio](https://img.shields.io/badge/Audio-miniaudio-000000?style=flat-square)
 ![AI Assisted](https://img.shields.io/badge/Development-AI%20Assisted-412991?style=flat-square)
 
 Windows x64용 C++23 게임 엔진과 Dear ImGui 에디터, 독립 Player, 콘텐츠 빌드 도구를 함께 개발하는 프로젝트입니다.
@@ -22,7 +22,7 @@ Editor와 Player는 같은 런타임 계층을 사용합니다. 렌더링은 Dir
 |---|---|
 | Editor | 중앙 ViewportHost, 도킹 도구 창, 씬·프리팹 문서, Inspector·Content Browser, 기즈모, Play/Stop 전환, 테마와 메뉴·창 선언 계층 |
 | Rendering | DX12/Vulkan RHI, 백엔드 공용 렌더 패스, `EnhancedRenderGraph`의 패스 검증·컬링·배리어·자원 수명 관리, Slang 셰이더 컴파일 |
-| Runtime | Scene·Component 수명주기, 렌더 프록시 발행, 입력, UI, PhysX 물리와 기존 FMOD 오디오 |
+| Runtime | Scene·Component 수명주기, 렌더 프록시 발행, 입력, UI, PhysX 물리와 miniaudio 오디오 |
 | Jobs & Animation | enkiTS 기반 `thread_pool`·`job_scheduler`, 태스크 기반 포즈 평가·LOD·CPU 버짓·청크 실행과 애니메이션 HUD |
 | Scripting | CoreCLR 호스트, .NET 10 `ScriptCore`, 교체 가능한 게임 C# 어셈블리, Roslyn 소스 제너레이터 |
 | Content | fastgltf·ufbx 모델 임포트, MikkTSpace 탄젠트 생성, ryml 기반 저작 YAML, 자산 메타데이터, AssetCooker와 AssetPacker |
@@ -41,7 +41,7 @@ flowchart TB
     Player["Player<br/>게임 실행"] --> Runtime
     Runtime --> Scripts["CoreCLR<br/>ScriptCore · 게임 C#"]
     Runtime --> Physics["Physics<br/>PhysX"]
-    Runtime --> Audio["SoundManager<br/>FMOD"]
+    Runtime --> Audio["AudioHost<br/>miniaudio"]
     Runtime -->|렌더 프록시| Renderer["RenderEngine<br/>렌더 씬"]
     Renderer --> Graph["EnhancedRenderGraph<br/>패스 · 자원 관리"]
     Graph --> RHI["공용 RHI"]
@@ -64,7 +64,7 @@ flowchart TB
 | [작업 스케줄러·애니메이션](docs/plans/AnimationSchedulerPlan.md) | 공용 스케줄러 이관, 포즈·태스크 평가, LOD·CPU 버짓·HUD | AnimationGraph 확장 AG0~AG5. 공용 스케줄러 이관 자체를 성능 향상으로 해석하지 않음 |
 | [프레임 프로파일러](docs/plans/ProfilingCapturePlan.md) | Record/Pause, CPU/GPU 구간·카운터 분석, 캡처 소유 이름·시계, `.ceprof` 저장·열기 | 장시간 녹화·오버헤드 등 잔여 게이트. 별도 단일 제출 캡처인 [Render Frame Debugger](docs/plans/RenderFrameDebuggerPlan.md)의 `.ceframe`은 계획 단계 |
 | [메모리 프로파일러](docs/plans/MemoryProfilerPlan.md) | GameThread 경계의 수동 스냅샷, 프로세스·힙·자산 객체·주소 지도와 A/B 비교 | 네이티브 할당 소유자, 관리 객체·참조, GPU 자원별 계측과 보존 확장 |
-| [오디오 전환](docs/plans/AudioBackendModernizationPlan.md) | `wave::AudioRuntime`, miniaudio·Null 백엔드, 보이스 정책과 cooked 클립 바이트 입력의 독립 구현 | SoundComponent·Editor/Player 제품 배선, FMOD 링크·배포 제거와 장치·재생 회귀. 현재 호스트에는 FMOD가 필요 |
+| [오디오 전환](docs/plans/AudioBackendModernizationPlan.md) | `wave::AudioRuntime`·PlaybackService, direct clip/preset와 SoundGraph, scene-owned emitter/listener, cooked bytes, FMOD-free 제품 배선 | Windows 전체 빌드·패키지·실장치·장시간 성능 gate는 미검증 |
 | [Lattice](docs/plans/LatticeAdoptionPlan.md)·[Material Graph](docs/plans/BlenderMaterialGraphPlan.md) | MAT-0~8 완료: 그래프를 재질 정본으로 사용, Slang·바인딩·PSO·쿠킹, Scene Surface/Volume·SSS·투과, 노드 창·Inspector 편집과 미리보기 | MAT-9 렌더 대조·성능 수용 진행. 박막의 Blender 이미지 차이, Special·텍스처 및 경로별 대조와 성능 게이트. BT·Animator 자산은 재작성 때 LX 사용 |
 | [리플렉션](docs/design/ReflectionDesign.md) | reflgen 1.0.0 생성기·런타임, Visual Studio 18용 확장, 생성된 모듈 등록과 기존 저작 포맷 어댑터 | 새 반영 필드는 기본 저장 대상이므로 런타임 캐시의 제외 속성과 기동 등록 검사를 함께 유지 |
 | [배포·Launcher](docs/plans/EngineDistributionAndLauncherPlan.md) | CreatorBuildTool, 엔진 배포본·프로젝트 pin과 패키징 | 정식 `.creatorproject` parser, Launcher·MSI 제품화 |
@@ -82,7 +82,7 @@ PHASE 4.25의 현재 완료 공수는 **32/34일**입니다. [동일 입력 Blen
 | 관리 코드·빌드 도구 | .NET 10, C#, CoreCLR hosting API, Roslyn |
 | 모델·텍스처 | fastgltf + simdjson, ufbx, MikkTSpace, meshoptimizer, DirectXTex, stb |
 | 작업 실행 | enkiTS, 엔진 공용 `thread_pool`·`job_scheduler` |
-| 물리·오디오 | NVIDIA PhysX, 현재 제품 경로의 FMOD Core API, 전환 중인 miniaudio 0.11.25 |
+| 물리·오디오 | NVIDIA PhysX, 소스 벤더링한 miniaudio 0.11.25 (MIT-0) |
 | 직렬화·패키징 | ryml 기반 저작 YAML, 도구·명령용 JSON, `.creator`·`.prefab`·`.meta`, 쿠킹된 런타임 문서, PAK |
 | 리플렉션 | reflgen 1.0.0, `[[reflgen::reflect]]` 타입의 생성된 서술자와 엔진 등록소, `creator::` Inspector 속성 |
 | 의존성 관리 | [`vcpkg.json`](vcpkg.json)의 manifest·baseline + [`ThirdParty/`](ThirdParty/README.md)의 고정 의존성 |
@@ -99,7 +99,6 @@ PHASE 4.25의 현재 완료 공수는 **32/34일**입니다. [동일 입력 Blen
 - Visual Studio **18 계열**의 **Desktop development with C++** 워크로드, **MSVC v145**, Windows SDK, x64 MSBuild
 - **.NET 10 SDK와 x64 Runtime** — ScriptCore, GameScripts, CreatorBuildTool 빌드용
 - **vcpkg**, **PowerShell 7 (`pwsh`)** — 네이티브 의존성과 빌드·배포 스크립트용
-- **FMOD Core API 2.02.26 x64 개발 파일** — 아래 로컬 배치 필요
 
 정적 경계 검사는 Python 3를 사용합니다. .NET 네이티브 호스트의 nethost 헤더·lib·DLL은 [`ThirdParty/DotNetHost`](ThirdParty/DotNetHost/README.md)에 고정되어 있으므로 설치된 SDK의 패치 폴더에 맞춰 경로를 수정하지 않습니다.
 
@@ -119,14 +118,7 @@ MSBuild의 manifest mode가 `vcpkg_installed/`에 필요한 패키지를 복원�
 
 reflgen은 [`ports/reflgen`](ports/reflgen/portfile.cmake)의 고정 버전을 복원합니다. 처음 설치되거나 생성기 설정이 바뀐 빌드는 MSBuild 설정을 다시 읽도록 재빌드를 안내할 수 있습니다. Visual Studio의 코드 탐색 지원은 [공식 VSIX 릴리스](https://github.com/29thnight/reflgen_cpp/releases/tag/v1.0.1)의 확장 1.0.1을 VS 18에 설치합니다. 확장은 편집 지원용이며 실제 생성은 MSBuild가 수행합니다.
 
-FMOD 개발 바이너리는 저장소에 포함되지 않으므로 로컬 SDK에서 다음 파일을 배치해야 합니다.
-
-```text
-ThirdParty/Fmod/lib/x64/fmod_vc.lib
-ThirdParty/Fmod/lib/x64/fmodL_vc.lib
-ThirdParty/Fmod/bin/x64/fmod.dll
-ThirdParty/Fmod/bin/x64/fmodL.dll
-```
+오디오 SDK를 별도로 배치하지 않습니다. `ThirdParty/miniaudio`의 고정 소스를 SceneRuntime의 private 구현 TU 하나에 컴파일합니다. [출처·해시·라이선스](ThirdParty/miniaudio/PROVENANCE.md)를 확인할 수 있습니다.
 
 의존성의 출처·판본·갱신 규칙은 [`ThirdParty/README.md`](ThirdParty/README.md)와 각 하위 문서를 기준으로 합니다.
 
@@ -263,7 +255,7 @@ Release 게임 패키지는 현재 **.NET 10 x64와 필요한 네이티브 런�
 
 ### 로컬 빌드 범위
 
-엔진 빌드는 MSVC v145가 설치된 Windows 개발 환경에서 검증합니다. 공개 GitHub Actions에는 [브랜드·문서 페이지 배포](.github/workflows/website.yml)만 남아 있으며, 엔진 빌드 결과를 확인하는 CI는 없습니다. FMOD 개발 바이너리도 저장소에 없으므로 Editor/Player 링크·실행과 실제 게임 패키징은 별도로 검증해야 합니다.
+엔진 빌드는 MSVC v145가 설치된 Windows 개발 환경에서 검증합니다. 공개 GitHub Actions에는 [브랜드·문서 페이지 배포](.github/workflows/website.yml)만 남아 있으며, 엔진 빌드 결과를 확인하는 CI는 없습니다. Editor/Player 링크·실행과 실제 게임 패키징은 Windows 환경에서 별도로 검증해야 합니다. 오디오 독립 회귀는 `python3 Tools/regression/audio/run_portable.py --config all`로 Linux에서도 실행할 수 있습니다.
 
 x64 Debug/Release는 기본 unity 구성을 사용합니다. 각 번역 단위의 include 자급성은 다음 Debug non-unity 빌드로 확인합니다.
 

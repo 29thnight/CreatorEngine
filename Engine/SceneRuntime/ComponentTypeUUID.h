@@ -50,6 +50,7 @@ namespace ComponentTypeUUID
         { "PlayerInputComponent",        "fb08e9f8-ba18-4444-85db-a042d822bd4c" },
         { "ScriptComponent",             "16beda95-3967-4d95-838b-b9e6694b6609" },
         { "SoundComponent",              "f2441c9e-234b-42cd-8067-2276a3c985fe" },
+        { "AudioListenerComponent",      "c942d1d3-04da-4bea-826b-32bd7d5d2124" },
         { "SpriteRenderer",              "637e2910-0658-42cd-a58c-7bae908a852c" },
         { "SpriteSheetComponent",        "94f8df82-d32c-4278-ba01-24bf9e494594" },
         { "TerrainComponent",            "8169a2f7-9f8d-4187-b35e-0d1314c1d303" },

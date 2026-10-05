@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
     에디터 통합 정적 라이브러리 (E7-d, 2026-08-24).
@@ -31,6 +31,8 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="EngineGUIWindow\SoundGraphEditor.h" />
+    <ClCompile Include="EngineGUIWindow\SoundGraphEditor.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h" />
     <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp" />
     <ClInclude Include="EngineGUIWindow\EditorPanelCost.h" />
@@ -432,7 +434,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <LanguageStandard>stdcpp23</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <!-- /we4834: [[nodiscard]] 무시를 오류로 올린다(PHASE 21 W3).
            이 프로젝트는 TurnOffAllWarnings 이라 경고로는 아무 힘이
@@ -462,7 +464,7 @@
       <!-- SceneRuntime와 같은 v145 C++23-preview + /GL CodeView 손상 회피.
            Release LTCG는 유지하고 Editor 정적 라이브러리의 타입 정보만 뺀다. -->
       <DebugInformationFormat>None</DebugInformationFormat>
-      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)ThirdParty\Fmod\inc\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)EditorMenu\;$(ProjectDir)EditorWindow\;$(ProjectDir)ImGuiHelper\;$(ProjectDir)EditorRender\;$(ProjectDir)EngineEntry\;$(ProjectDir)EngineGUIWindow\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Engine\Utility_Framework\;$(SolutionDir)Engine\EngineDiagnostics\;$(SolutionDir)Engine\Physics\;$(SolutionDir)Editor\HostImGuiPresentation\;$(SolutionDir)Editor\RenderTests\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;C:\Program Files\Mono\include\mono-2.0\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <!-- /we4834: [[nodiscard]] 무시를 오류로 올린다(PHASE 21 W3).
            이 프로젝트는 TurnOffAllWarnings 이라 경고로는 아무 힘이

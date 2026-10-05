@@ -44,7 +44,7 @@ namespace editor::components
             Group{"Rendering", "|CameraComponent|LightComponent|MeshRenderer|SpriteRenderer|DecalComponent|SceneRenderProfileComponent|TerrainComponent|FoliageComponent|"},
             Group{"Animation", "|Animator|SpriteSheetComponent|"},
             Group{"Physics", "|PhysicsBodyComponent|CharacterMovementComponent|"},
-            Group{"Audio", "|SoundComponent|"},
+            Group{"Audio", "|SoundComponent|AudioListenerComponent|"},
             Group{"AI", "|StateMachineComponent|BehaviorTreeComponent|"},
             Group{"Input", "|PlayerInputComponent|"},
             Group{"UI", "|Canvas|UIComponent|ImageComponent|TextComponent|UIButton|"}

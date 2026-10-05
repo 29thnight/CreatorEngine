@@ -42,6 +42,17 @@ internal static class Metadata
             if (!File.Exists(path) || new FileInfo(path).Length != entry.Bytes || Hash(path) != entry.Sha256) throw new BuildException($"Payload missing or changed: {entry.Path}");
         }
     }
+    public static void AssertSourceOnlyAudio(IEnumerable<string> paths)
+    {
+        foreach (var path in paths)
+        {
+            var name = Path.GetFileName(path.Replace('\\', '/'));
+            if (Regex.IsMatch(name, @"^(fmod(?:L|studio|studioL)?|miniaudio)\.dll$", RegexOptions.IgnoreCase))
+            {
+                throw new BuildException($"Retired or non-source audio dependency in payload: {path}");
+            }
+        }
+    }
     public static void Write(string path, object value)
     {
         Paths.NoReparseAncestors(path); Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);

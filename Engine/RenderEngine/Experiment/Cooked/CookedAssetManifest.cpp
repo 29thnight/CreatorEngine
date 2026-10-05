@@ -2,8 +2,12 @@
 #include "CookedAudioClipFormat.h"
 #include "../../Assets/AssetIdentityProfile.h" // MBC11: IsUuidV8
 
+#if defined(_WIN32)
 #include <Windows.h>
 #include <bcrypt.h>
+#else
+#include "../../../Utility_Framework/Sha256.h"
+#endif
 
 #include <algorithm>
 #include <cstring>
@@ -11,7 +15,9 @@
 #include <unordered_set>
 #include <utility>
 
+#if defined(_WIN32)
 #pragma comment(lib, "bcrypt.lib")
+#endif
 
 // PHASE 3.75 MBC11 — 모델·subasset 신원은 UUIDv8(ce.uuidv8.sha256.v1)이고 나머지 자산은
 // 아직 UUIDv4다. manifest는 둘 다 받는다(pseudo-v5 등 그 밖의 표기는 거부).
@@ -72,6 +78,8 @@ namespace experiment::cooked
             case CookedAssetKind::Scene:
             case CookedAssetKind::Prefab:
             case CookedAssetKind::AudioClip:
+            case CookedAssetKind::SoundGraph:
+            case CookedAssetKind::SoundPreset:
             case CookedAssetKind::CollisionGeometry:
             case CookedAssetKind::MaterialProgram:
                 return true;
@@ -303,7 +311,9 @@ namespace experiment::cooked
                      && entry.formatVersion != kAudioClipArtifactVersion) ||
                     (entry.kind == CookedAssetKind::MaterialProgram
                      && entry.formatVersion != kMaterialProgramArtifactVersion) ||
-                    (entry.kind == CookedAssetKind::CollisionGeometry && entry.formatVersion != 1u))
+                    (entry.kind == CookedAssetKind::CollisionGeometry && entry.formatVersion != 1u) ||
+                    ((entry.kind == CookedAssetKind::SoundGraph || entry.kind == CookedAssetKind::SoundPreset)
+                     && entry.formatVersion != kSoundAssetArtifactVersion))
                 {
                     AddIssue(issues, context + ".formatVersion",
                         "지원하지 않는 audio/material program/collision geometry artifact version이다.");
@@ -515,6 +525,26 @@ namespace experiment::cooked
             + ".prefab";
     }
 
+    std::string MakeDerivedSoundGraphArtifactPath(const AssetId& assetId)
+    {
+        if (!IsAssetIdV4(assetId))
+        {
+            return {};
+        }
+        const auto guid = Uuid::ToString(assetId.value);
+        return "Derived/SoundGraphs/" + guid.substr(0u, 2u) + "/" + guid + ".cesg";
+    }
+
+    std::string MakeDerivedSoundPresetArtifactPath(const AssetId& assetId)
+    {
+        if (!IsAssetIdV4(assetId))
+        {
+            return {};
+        }
+        const auto guid = Uuid::ToString(assetId.value);
+        return "Derived/SoundPresets/" + guid.substr(0u, 2u) + "/" + guid + ".cesp";
+    }
+
     std::string MakeDerivedAudioClipArtifactPath(const AssetId& audioClipAssetId)
     {
         if (!IsAssetIdV4(audioClipAssetId)) return {};
@@ -525,6 +555,7 @@ namespace experiment::cooked
     bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept
     {
+#if defined(_WIN32)
         BCRYPT_ALG_HANDLE algorithm{};
         BCRYPT_HASH_HANDLE hash{};
         std::vector<std::uint8_t> object;
@@ -597,6 +628,13 @@ namespace experiment::cooked
         outDigest = digest;
         outError.clear();
         return true;
+#else
+        Hash::Sha256 hash;
+        hash.Update(bytes.data(), bytes.size());
+        outDigest = hash.Finish();
+        outError.clear();
+        return true;
+#endif
     }
 
     AssetManifestWriteResult WriteAssetManifest(

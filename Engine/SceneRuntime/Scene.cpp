@@ -339,6 +339,7 @@ Scene::Scene()
     m_generations.reserve(3000);
     m_hierarchyStore.Reserve(3000);
     m_tweenManager = std::make_unique<TweenManager>();
+    m_soundSystem.Bind(*this, SceneManagers->AudioPlayback(), SceneManagers->AudioResolver());
 }
 
 TweenManager& Scene::Tweens() noexcept
@@ -362,6 +363,7 @@ uint32_t Scene::NextSceneId()
 
 Scene::~Scene()
 {
+    m_soundSystem.EndWorld();
     (void)m_physicsSimulation.Stop();
 	DrainAIUpdate();
     SceneManagers->resetSelectedObjectEvent -= resetObjHandle;
@@ -2987,7 +2989,7 @@ void Scene::Update(float deltaSecond)
 
     {
         ce::profile_scope _profile{ ce::marker<"SoundSystem">() };
-        SoundSystems->Update(deltaSecond);
+        m_soundSystem.Update(deltaSecond);
     }
 
     // 트랙 C2-0 — 재진입 시험의 순회 중 발화점(Scene.h의 TryFireReentrancyStressMidTraversal
@@ -3052,7 +3054,7 @@ void Scene::LateUpdate(float deltaSecond)
 
     // 트랙 C3 잔여 — LateUpdate를 오버라이드하던 둘. 옛 위치(LateUpdateList 안)와
     // 같은 창(RegistryTick 이후 · UpdateRenderData 이전)을 지킨다.
-    SoundSystems->LateUpdate(deltaSecond);
+    m_soundSystem.LateUpdate(deltaSecond);
 
     UpdateRenderData();
 

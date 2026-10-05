@@ -1,5 +1,6 @@
 #pragma once
 #include <filesystem>
+#include <string>
 #include <vector>
 
 #include "ListenerState.h"
@@ -60,6 +61,32 @@ namespace wave
 
         // ⑤ 엔진이 계산한 감쇠를 반영한다(custom rolloff 등).
         virtual void SetVoiceGain(VoiceHandle handle, float linearGain) = 0;
+
+        // Main-thread value controls. No callback may reach this interface.
+        virtual void SetVoiceSettings(VoiceHandle handle, const PlayRequest& request)
+        {
+            SetVoiceParameters(handle, request.volume, request.pitch, request.priority);
+            SetVoiceTransform(handle, request.position, request.velocity);
+        }
+        virtual void SetLooping(VoiceHandle, bool) {}
+        [[nodiscard]] virtual bool Seek(VoiceHandle, std::uint64_t) { return false; }
+        [[nodiscard]] virtual std::uint64_t GetPlayhead(VoiceHandle) const { return 0u; }
+        [[nodiscard]] virtual VoiceState GetVoiceState(VoiceHandle handle) const
+        {
+            return IsAlive(handle) ? VoiceState::Physical : VoiceState::Free;
+        }
+        virtual void SetBusVolume(BusId, float) {}
+        [[nodiscard]] virtual float GetBusVolume(BusId) const { return 1.0f; }
+        virtual void ConfigureBus(BusId, std::size_t, StealPolicy) {}
+        virtual void ConfigureConcurrencyGroup(ConcurrencyGroupId, std::size_t, StealPolicy) {}
+        virtual void SetPhysicalVoiceLimit(std::size_t) {}
+        virtual void SetReverbPreset(ReverbPreset) {}
+        [[nodiscard]] virtual VoiceMetrics Metrics() const { return {}; }
+        [[nodiscard]] virtual const std::string& LastError() const
+        {
+            static const std::string empty;
+            return empty;
+        }
 
         // 듣는 자. 세우는 자가 반드시 있어야 3D 가 의미를 갖는다.
         virtual void SetListener(const ListenerState& listener) = 0;

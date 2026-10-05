@@ -14,7 +14,12 @@
 #include "ViewportHostWindow.h"
 #include "InputManager.h"
 #include "ImGui.h"
-#include "SoundManager.h"
+#include "Audio/AudioHost.h"
+#include "Audio/AudioProfileProvider.h"
+#include "Audio/MiniaudioBackend.h"
+#include "Audio/PlaybackService.h"
+#include "Audio/AudioCatalog.h"
+#include "SoundGraphEditor.h"
 #include "TimeSystem.h"
 #include "DataSystem.h"
 #include "SceneManager.h"
@@ -80,6 +85,7 @@ Editor::EditorMain::EditorMain()
 
 Editor::EditorMain::~EditorMain()
 {
+    SceneManagers->BindAudioPlayback(nullptr);
 	Core::TimeSystem::Destroy();
 }
 
@@ -263,8 +269,42 @@ void Editor::EditorMain::Initialize()
 	// 그 표를 읽는 것이 인스펙터만이 아니라서 부팅의 일로 올렸다.
 	::editor::windows::register_inspector_typed_draws();
 
-	BootProgress::Step(L"Initializing audio", L"Starting the sound manager");
-	Sound->initialize(128);
+	BootProgress::Step(L"Initializing audio", L"Starting the audio runtime");
+	#if CE_SHIPPING
+    constexpr bool profileAudioCallbacks = false;
+#else
+    constexpr bool profileAudioCallbacks = true;
+#endif
+    m_audioHost = std::make_unique<wave::AudioHost>(std::make_unique<wave::MiniaudioBackend>(profileAudioCallbacks), 128u);
+    if (!m_audioHost->Start({}))
+    {
+        throw std::runtime_error("Audio runtime initialization failed");
+    }
+    if (m_audioHost->Mode() == wave::AudioHostMode::Null)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.runtime.null] Audio graph initialization failed; silent logical runtime active");
+    }
+    else if (m_audioHost->Mode() == wave::AudioHostMode::DegradedDevice)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.device.degraded] Output device unavailable; graph retained and output recovery will retry");
+    }
+    m_audioPlayback = std::make_unique<wave::PlaybackService>(*m_audioHost->Service());
+    m_audioCatalog = std::make_unique<wave::AudioCatalog>(*m_audioHost->Service(), *m_audioPlayback);
+    SceneManagers->BindAudioPlayback(m_audioPlayback.get(), [this](std::string_view key)
+    {
+        std::string error;
+        const auto resolved = m_audioCatalog->ResolveLegacyClip(key, error);
+        Uuid::Uuid16 guid;
+        if (!Uuid::TryParse(resolved, guid))
+        {
+            if (!key.empty())
+            {
+                Debug::PrintLog(spdlog::level::err, "[audio.clip.resolve] " + error);
+            }
+            return wave::ClipKey{};
+        }
+        return wave::ClipKey::FromGuid(guid);
+    });
 
 	BootProgress::Step(L"Loading assets", L"Initializing engine data services");
 
@@ -285,6 +325,15 @@ void Editor::EditorMain::Initialize()
 		throw std::runtime_error("Editor asset database initialization failed");
 	BootProgress::Step(L"Preparing asset previews", L"Loading editor icons and preview services");
 	EditorAssetPresentation::Get().Initialize();
+    {
+        std::string error;
+        if (!m_audioCatalog->LoadEditorAssets(PathFinder::Relative(),
+            PathFinder::Relative().parent_path() / "Library" / "AudioClipImports", error))
+        {
+            Debug::PrintLog(spdlog::level::err, "[audio.catalog] " + error);
+        }
+        m_audioRevision = EditorAssetDatabase::Get().AudioRevision();
+    }
 
 	// 콘텐츠 브라우저는 여기서 만들지 않는다(PHASE 21 W3). "presentation 이
 	// 아이콘·폰트를 올린 뒤" 라는 순서 제약은 실재하지 않았다 — 생성자가
@@ -329,7 +378,6 @@ void Editor::EditorMain::Initialize()
 		}
 
 		UIManagers->Update();
-		Sound->update();
 	});
 	BootProgress::Step(L"Initializing scene systems", L"Starting scene managers");
 	// Editor 모듈의 반영 타입(인스펙터 자극물 등)은 에디터만 링크한다 — 런타임 모듈의 등록(RegisterReflectManual,
@@ -566,6 +614,7 @@ void Editor::EditorMain::Finalize()
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
+    editor::sound_graph_editing::ShutdownPreview(m_audioPlayback.get());
 	// Asset and scene teardown may release proxies still referenced by a queued
 	// render frame. Drain the consumer before either owner starts shutting down.
 	EnhancedSceneRenderer::StopLiveRenderThread();
@@ -597,6 +646,10 @@ void Editor::EditorMain::Finalize()
 	EditorSessionState::Get().SetCameraRig({});
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
+    SceneManagers->BindAudioPlayback(nullptr);
+    m_audioPlayback->Shutdown();
+    m_audioCatalog->Clear();
+    m_audioHost->Shutdown();
 	SceneManagers->Decommissioning();
     m_projectLayers.reset();
 	std::printf("[SHUTDOWN] SceneManagers 반환\n");
@@ -798,6 +851,24 @@ void Editor::EditorMain::Update()
 			SceneManagers->EndOfFrame();
 		}
 	}
+
+
+    const auto audioRevision = EditorAssetDatabase::Get().AudioRevision();
+    if (audioRevision != m_audioRevision)
+    {
+        std::string error;
+        if (!m_audioCatalog->LoadEditorAssets(PathFinder::Relative(),
+            PathFinder::Relative().parent_path() / "Library" / "AudioClipImports", error))
+        {
+            Debug::PrintLog(spdlog::level::err, "[audio.catalog.reload] " + error);
+        }
+        m_audioRevision = audioRevision;
+        SceneManagers->RefreshAudioClipKeys();
+    }
+    editor::sound_graph_editing::TickPreview(m_audioPlayback.get());
+    m_audioHost->Update(static_cast<float>(m_frameDeltaTime));
+    m_audioPlayback->Update();
+    wave::PublishAudioProfile(*m_audioHost, *m_audioPlayback);
 
 	const std::uint32_t profileFrame = Time->GetFrameCount();
 	ResourceCounterWindow::PublishFromGameThread(profileFrame);
