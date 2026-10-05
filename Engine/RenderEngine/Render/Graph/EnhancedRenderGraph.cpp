@@ -16,6 +16,12 @@ namespace
         return next.fetch_add(1, std::memory_order_relaxed);
     }
 
+    uint64_t NextRenderGraphCompileGeneration()
+    {
+        static std::atomic<uint64_t> next{1};
+        return next.fetch_add(1, std::memory_order_relaxed);
+    }
+
     // 쓰기로 보는 상태. 의존성 유도와 컬링이 이 구분을 쓴다.
     bool IsWriteState(RHIResourceState state)
     {
@@ -57,6 +63,7 @@ void EnhancedRenderGraph::Reset()
     ReleaseResources();
     m_resources.clear();
     m_passes.clear();
+    m_finalStateRequirements.clear();
     m_executeOrder.clear();
     m_versionEdges.clear();
     m_dependencyWaves.clear();
@@ -214,6 +221,12 @@ RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
 RGHandle EnhancedRenderGraph::Write(RGHandle previous) { return AdvanceVersion(previous, false); }
 RGHandle EnhancedRenderGraph::Modify(RGHandle previous) { return AdvanceVersion(previous, true); }
 
+void EnhancedRenderGraph::RequireImportedFinalState(RGHandle handle, RHIResourceState state)
+{
+    m_finalStateRequirements.push_back({handle, state});
+    m_compiled = false;
+}
+
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
 {
@@ -306,10 +319,14 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 seen.push_back(r);
                 if (u.access!=RGAccessMode::Read && u.access!=RGAccessMode::Write && u.access!=RGAccessMode::ReadWrite)
                     return bad("explicit access required");
-                if (u.state<RHIResourceState::Common || u.state>RHIResourceState::IndexBuffer ||
+                if (u.state<RHIResourceState::Common || u.state>RHIResourceState::IndirectArgument ||
+                    (u.state==RHIResourceState::IndirectArgument &&
+                        (!m_resources[r].IsBuffer() || u.access!=RGAccessMode::Read)) ||
                     (Writes(u) && !IsWriteState(u.state)) ||
                     (u.access==RGAccessMode::Read && IsWriteState(u.state) && u.state!=RHIResourceState::UnorderedAccess))
+                {
                     return bad("access/state mismatch: "+m_resources[r].name);
+                }
                 if (Writes(u))
                 {
                     if (m_resources[r].imported && v==0) return fail("cannot overwrite imported v0; call Write/Modify",r,v);
@@ -398,8 +415,12 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             seen.push_back(r);
             if (u.access != RGAccessMode::Read && u.access != RGAccessMode::Write && u.access != RGAccessMode::ReadWrite)
                 return fail("explicit Read/Write/ReadWrite required: " + m_resources[r].name);
-            if (u.state < RHIResourceState::Common || u.state > RHIResourceState::IndexBuffer)
+            if (u.state < RHIResourceState::Common || u.state > RHIResourceState::IndirectArgument ||
+                (u.state == RHIResourceState::IndirectArgument &&
+                    (!m_resources[r].IsBuffer() || u.access != RGAccessMode::Read)))
+            {
                 return fail("invalid resource state: " + m_resources[r].name);
+            }
             if ((Writes(u) && !IsWriteState(u.state)) ||
                 (u.access == RGAccessMode::Read && IsWriteState(u.state) && u.state != RHIResourceState::UnorderedAccess))
                 return fail("access/state mismatch: " + m_resources[r].name);
@@ -809,15 +830,54 @@ void EnhancedRenderGraph::ReleaseResources()
     }
 }
 
+bool EnhancedRenderGraph::ValidateFinalStates(std::string& outError) const
+{
+    for (size_t index = 0; index < m_finalStateRequirements.size(); ++index)
+    {
+        const auto& requirement = m_finalStateRequirements[index];
+        const auto handle = requirement.handle;
+        if (!handle.IsValid() || handle.index >= m_resources.size() ||
+            (m_scheduling == RGSchedulingMode::ExplicitVersioned && !ValidVersionHandle(handle)))
+        {
+            outError = "RenderGraph final state requires a valid imported handle";
+            return false;
+        }
+        const auto& resource = m_resources[handle.index];
+        if (!resource.imported || resource.IsBuffer() || requirement.state < RHIResourceState::Common ||
+            requirement.state > RHIResourceState::IndirectArgument ||
+            requirement.state == RHIResourceState::IndexBuffer ||
+            requirement.state == RHIResourceState::IndirectArgument)
+        {
+            outError = "Invalid imported final state: " + resource.name;
+            return false;
+        }
+        for (size_t previous = 0; previous < index; ++previous)
+        {
+            const auto& other = m_finalStateRequirements[previous];
+            if (other.handle.index == handle.index && other.state != requirement.state)
+            {
+                outError = "Conflicting imported final states: " + resource.name;
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void EnhancedRenderGraph::PlanBarriers()
 {
     std::vector<bool> previousWrite(m_resources.size(),true);
+    for (auto& resource : m_resources)
+    {
+        resource.initialState = resource.state;
+    }
     for (auto& pass : m_passes)
     {
         pass.transitions.clear();
         pass.bufferTransitions.clear();
         pass.uavBarriers.clear();
         pass.uavBufferBarriers.clear();
+        pass.finalTransitions.clear();
     }
 
     // 실행 순서를 따라가며 상태를 추적한다. 요구 상태와 다르면 그 패스 앞에
@@ -876,6 +936,26 @@ void EnhancedRenderGraph::PlanBarriers()
         if (0 != barrierCount) ++m_stats.barrierBatches;
     }
 
+    // 다른 뷰·다음 프레임도 같은 캐시 상태로 시작하도록 마지막 소비 뒤 복구한다.
+    // 분할 패스의 마지막 조각에 기록하므로 일부 draw 앞에서 복구하지 않는다.
+    for (const auto& requirement : m_finalStateRequirements)
+    {
+        auto& resource = m_resources[requirement.handle.index];
+        if (!resource.used || resource.state == requirement.state)
+        {
+            continue;
+        }
+        auto& pass = m_passes[m_executeOrder[resource.lastUse]];
+        const bool firstFinalBarrier = pass.finalTransitions.empty();
+        pass.finalTransitions.push_back({resource.handle, resource.state, requirement.state});
+        resource.state = requirement.state;
+        ++m_stats.barriersEmitted;
+        if (firstFinalBarrier)
+        {
+            ++m_stats.barrierBatches;
+        }
+    }
+
     // 프레임을 넘겨 사는 리소스에 최종 상태를 돌려준다. 다음 프레임의
     // Import가 이 값을 '현재 상태'로 알려 줘야 첫 배리어가 맞는다.
     for (auto& resource : m_resources)
@@ -887,21 +967,41 @@ void EnhancedRenderGraph::PlanBarriers()
 bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const
 {
     output = {};
-    if (!m_compiled) return false;
+    if (!m_compiled)
+    {
+        return false;
+    }
+    output.generation = m_compileGeneration;
+    output.graphEpoch = m_resourceEpoch;
+    output.scheduling = m_scheduling;
+    output.orderPolicy = m_orderPolicy;
     output.executeOrder = m_executeOrder;
     for (const auto& resource : m_resources)
+    {
         output.resources.push_back({resource.name, resource.imported, resource.IsBuffer(),
-            resource.used, resource.firstUse, resource.lastUse});
+            resource.used, resource.firstUse, resource.lastUse,
+            static_cast<uint32_t>(resource.versions.size()), resource.initialState, resource.state});
+    }
     const auto textureIndex = [this](RHITextureHandle handle) -> uint32_t
     {
         for (uint32_t i = 0; i < m_resources.size(); ++i)
-            if (!m_resources[i].IsBuffer() && m_resources[i].handle == handle) return i;
+        {
+            if (!m_resources[i].IsBuffer() && m_resources[i].handle == handle)
+            {
+                return i;
+            }
+        }
         return RGHandle::kInvalid;
     };
     const auto bufferIndex = [this](RHIBufferHandle handle) -> uint32_t
     {
         for (uint32_t i = 0; i < m_resources.size(); ++i)
-            if (m_resources[i].IsBuffer() && m_resources[i].buffer == handle) return i;
+        {
+            if (m_resources[i].IsBuffer() && m_resources[i].buffer == handle)
+            {
+                return i;
+            }
+        }
         return RGHandle::kInvalid;
     };
     for (uint32_t i = 0; i < m_passes.size(); ++i)
@@ -911,40 +1011,147 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
             pass.recordCost, pass.maxSlices, {}, {}};
         const auto position = std::find(m_executeOrder.begin(), m_executeOrder.end(), i);
         if (position != m_executeOrder.end())
+        {
             copy.compiledIndex = static_cast<int32_t>(position - m_executeOrder.begin());
+        }
         for (const auto& usage : pass.usages)
+        {
             copy.usages.push_back({usage.handle.index, usage.state, Writes(usage), usage.access, usage.handle.version, usage.handle.kind});
+        }
         for (const auto& barrier : pass.transitions)
+        {
             copy.barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false});
+        }
         for (const auto& barrier : pass.bufferTransitions)
+        {
             copy.barriers.push_back({bufferIndex(barrier.buffer), barrier.before, barrier.after, false});
+        }
         for (const auto handle : pass.uavBarriers)
+        {
             copy.barriers.push_back({textureIndex(handle), RHIResourceState::UnorderedAccess,
                 RHIResourceState::UnorderedAccess, true});
+        }
         for (const auto handle : pass.uavBufferBarriers)
+        {
             copy.barriers.push_back({bufferIndex(handle), RHIResourceState::UnorderedAccess,
                 RHIResourceState::UnorderedAccess, true});
+        }
+        for (const auto& barrier : pass.finalTransitions)
+        {
+            copy.barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false, true});
+        }
         output.passes.push_back(std::move(copy));
     }
     output.versionEdges = m_versionEdges;
     output.dependencyWaves = m_dependencyWaves;
     output.criticalPath = m_criticalPath;
-    if(m_scheduling==RGSchedulingMode::ExplicitVersioned)
+    if (m_scheduling == RGSchedulingMode::ExplicitVersioned)
     {
-        for(const auto& edge:m_versionEdges)
-            if(edge.reason==DiagnosticSnapshot::VersionEdge::Reason::RAW)
+        for (const auto& edge : m_versionEdges)
+        {
+            if (edge.reason == DiagnosticSnapshot::VersionEdge::Reason::RAW)
+            {
                 output.reachabilityEdges.push_back({edge.producer,edge.consumer,edge.resource});
-        return true;
+            }
+        }
     }
-    // Matches legacy CullPasses: all state-inferred writers of a read resource.
-    // These are reachability edges, not a scheduled/versioned DAG.
-    for (uint32_t consumer = 0; consumer < output.passes.size(); ++consumer)
-        for (const auto& read : output.passes[consumer].usages)
-            if (!read.inferredWrite)
-                for (uint32_t producer = 0; producer < output.passes.size(); ++producer)
-                    for (const auto& write : output.passes[producer].usages)
-                        if (write.inferredWrite && write.resource == read.resource)
-                            output.reachabilityEdges.push_back({producer, consumer, read.resource});
+    else
+    {
+        // 기존 진단의 도달성 정보는 실제 version edge와 구분해 보존한다.
+        for (uint32_t consumer = 0; consumer < output.passes.size(); ++consumer)
+        {
+            for (const auto& read : output.passes[consumer].usages)
+            {
+                if (!read.inferredWrite)
+                {
+                    for (uint32_t producer = 0; producer < output.passes.size(); ++producer)
+                    {
+                        for (const auto& write : output.passes[producer].usages)
+                        {
+                            if (write.inferredWrite && write.resource == read.resource)
+                            {
+                                output.reachabilityEdges.push_back({producer, consumer, read.resource});
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 물리 핸들·epoch·풀의 이전 state는 같은 논리 의존성의 해시를 바꾸지 않는다.
+    uint64_t hash = 14695981039346656037ull;
+    const auto mix = [&hash](uint64_t value)
+    {
+        for (uint32_t byte = 0; byte < sizeof(value); ++byte)
+        {
+            hash ^= (value >> (byte * 8u)) & 0xFFu;
+            hash *= 1099511628211ull;
+        }
+    };
+    const auto mixName = [&mix](const std::string& name)
+    {
+        mix(name.size());
+        for (const unsigned char character : name)
+        {
+            mix(character);
+        }
+    };
+    mix(static_cast<uint64_t>(m_scheduling));
+    mix(static_cast<uint64_t>(m_orderPolicy));
+    mix(m_resources.size());
+    for (const auto& resource : m_resources)
+    {
+        mixName(resource.name);
+        mix(resource.imported);
+        mix(resource.IsBuffer());
+        mix(resource.used);
+        mix(resource.firstUse);
+        mix(resource.lastUse);
+        mix(resource.versions.size());
+        for (const auto& version : resource.versions)
+        {
+            mix(version.parent);
+            mix(version.modify);
+        }
+    }
+    mix(output.passes.size());
+    for (const auto& pass : output.passes)
+    {
+        mixName(pass.name);
+        mix(pass.culled);
+        mix(pass.sideEffect);
+        mix(pass.usages.size());
+        for (const auto& usage : pass.usages)
+        {
+            mix(usage.resource);
+            mix(usage.version);
+            mix(static_cast<uint64_t>(usage.kind));
+            mix(static_cast<uint64_t>(usage.access));
+            mix(static_cast<uint64_t>(usage.state));
+        }
+    }
+    mix(output.executeOrder.size());
+    for (const auto pass : output.executeOrder)
+    {
+        mix(pass);
+    }
+    mix(output.versionEdges.size());
+    for (const auto& edge : output.versionEdges)
+    {
+        mix(edge.producer);
+        mix(edge.consumer);
+        mix(edge.resource);
+        mix(edge.version);
+        mix(static_cast<uint64_t>(edge.reason));
+    }
+    mix(m_finalStateRequirements.size());
+    for (const auto& requirement : m_finalStateRequirements)
+    {
+        mix(requirement.handle.index);
+        mix(static_cast<uint64_t>(requirement.state));
+    }
+    output.dependencyHash = hash;
     return true;
 }
 
@@ -992,6 +1199,11 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     m_stats = Stats{};
     m_stats.passesDeclared = static_cast<uint32_t>(m_passes.size());
 
+    if (!ValidateFinalStates(outError))
+    {
+        return false;
+    }
+
     if (!BuildOrder(outError)) return false;
 
     CullPasses();
@@ -1002,6 +1214,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     PlanBarriers();
 
     m_stats.passesExecuted = static_cast<uint32_t>(m_executeOrder.size());
+    m_compileGeneration = NextRenderGraphCompileGeneration();
     m_compiled = true;
     return true;
 }
@@ -1074,6 +1287,7 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
             return false;
         }
 
+        RecordPassFinalBarriers(encoder, pass);
         if (nullptr != m_profiler) m_profiler->EndPass(encoder, timerSlot);
     }
 
@@ -1090,6 +1304,17 @@ void EnhancedRenderGraph::RecordPassBarriers(RHIEncoder& encoder, const Pass& pa
     batch.bufferTransitions = pass.bufferTransitions;
     batch.uavTextures = pass.uavBarriers;
     batch.uavBuffers = pass.uavBufferBarriers;
+    encoder.ResourceBarriers(batch);
+}
+
+void EnhancedRenderGraph::RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const
+{
+    if (pass.finalTransitions.empty())
+    {
+        return;
+    }
+    RHIBarrierBatch batch{};
+    batch.textureTransitions = pass.finalTransitions;
     encoder.ResourceBarriers(batch);
 }
 
@@ -1311,6 +1536,11 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
 
                 if (pass.splitExecute) pass.splitExecute(context, unit.slice, unit.sliceCount);
                 else if (pass.execute) pass.execute(context);
+
+                if (unit.slice + 1 == unit.sliceCount)
+                {
+                    RecordPassFinalBarriers(encoder, pass);
+                }
 
                 if (nullptr != m_profiler) m_profiler->EndPass(encoder, timerSlot);
             }

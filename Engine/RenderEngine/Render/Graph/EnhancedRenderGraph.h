@@ -38,7 +38,7 @@ class IRenderDeviceServices;
 //
 // RG1 ExplicitSingleWriter 모드는 명시적 접근으로 안정적 DAG 정렬을 수행한다.
 // ExplicitVersioned 모드는 RG2 Write/Modify 계보로 RAW/WAR/WAW를 정렬한다.
-// 제품 기본값은 RG5 선언 이관과 RG6 전환까지 기존 선언 순서를 유지한다.
+// 제품은 ExplicitVersioned를 명시한다. 기본 DeclarationOrder는 기존 진단 fixture의 계약을 보존한다.
 // 단일 writer로 순서가 결정되지 않는 입력은 DAG 모드에서 컴파일 오류다.
 //
 // 배리어를 사람이 붙이지 않는 것이 요점이다. DX11은 드라이버가 해 주던 일이라
@@ -312,6 +312,10 @@ public:
     RGHandle Write(RGHandle previous);
     RGHandle Modify(RGHandle previous);
 
+    // 캐시처럼 그래프 밖에서 상태를 고정한 소유자에게 마지막 소비 뒤 돌려준다.
+    // 유효성·서로 다른 최종 상태 요구는 Compile에서 진단한다.
+    void RequireImportedFinalState(RGHandle handle, RHIResourceState state);
+
     // 패스 선언. usages는 (핸들, 그 패스가 요구하는 상태) 목록이다.
     //
     // hasSideEffect는 컬링에서 뿌리가 되는 표시다. 화면에 내보내거나 외부가
@@ -376,6 +380,7 @@ public:
         uint32_t resource;
         RHIResourceState before, after;
         bool uav;
+        bool afterPass{false};
     };
     struct DiagnosticPass
     {
@@ -392,6 +397,9 @@ public:
         std::string name;
         bool imported, buffer, used;
         uint32_t firstUse, lastUse;
+        uint32_t versionCount{0};
+        RHIResourceState initialState{RHIResourceState::Common};
+        RHIResourceState finalState{RHIResourceState::Common};
     };
     struct DiagnosticSnapshot
     {
@@ -404,6 +412,14 @@ public:
         std::vector<VersionEdge> versionEdges;
         std::vector<int32_t> dependencyWaves; // authored pass index; -1 is culled/unavailable
         std::vector<uint16_t> criticalPath;
+        uint64_t generation{0};
+        uint64_t graphEpoch{0};
+        uint64_t dependencyHash{0};
+        RGSchedulingMode scheduling{RGSchedulingMode::DeclarationOrder};
+        RGOrderPolicy orderPolicy{RGOrderPolicy::DependencyOrder};
+        // 뷰 귀속은 게시자가 채운다. 그래프 복사본은 GPU 리소스를 소유하지 않는다.
+        uint64_t viewId{0}, frameId{0};
+        uint32_t width{0}, height{0};
     };
     bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 
@@ -457,6 +473,7 @@ private:
 
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
         RHIResourceState state{ RHIResourceState::Common };
+        RHIResourceState initialState{ RHIResourceState::Common };
         RHIResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
         bool imported{ false };
         bool used{ false };          // 살아남은 패스가 쓰는가 — 아니면 만들지 않는다
@@ -483,6 +500,13 @@ private:
         std::vector<RHIBufferTransition> bufferTransitions;
         std::vector<RHITextureHandle> uavBarriers;
         std::vector<RHIBufferHandle>  uavBufferBarriers;
+        std::vector<RHITransition> finalTransitions;
+    };
+
+    struct FinalStateRequirement
+    {
+        RGHandle handle;
+        RHIResourceState state;
     };
 
     void ReleaseResources();
@@ -492,14 +516,17 @@ private:
     /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
     bool CreateTransients(std::string& outError);
     void PlanBarriers();
+    bool ValidateFinalStates(std::string& outError) const;
 
     /// 계획한 네 부류를 인코더가 감싼 command target에 한 batch로 기록한다.
     /// 순차·병렬과 DX12·Vulkan이 모두 이 경로를 공유한다(G-2).
     void RecordPassBarriers(RHIEncoder& encoder, const Pass& pass) const;
+    void RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const;
 
     std::vector<Resource> m_resources;
     RGTransientPool* m_transientPool{ nullptr };
     std::vector<Pass>     m_passes;
+    std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
     IRHIGpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
@@ -517,8 +544,8 @@ private:
 
     uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };
     uint64_t m_resourceEpoch{1};
+    uint64_t m_compileGeneration{0};
     IRHIParallelCommandPool* m_preparedPool{nullptr};
     uint64_t m_preparedRecording{0}, m_preparedDescriptors{0};
     bool m_preparedRecordingConsumed{false};
 };
-
