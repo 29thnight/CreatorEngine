@@ -36,6 +36,8 @@ namespace
 #include "ProfileService.h"
 #include "ProfileCaptureFile.h"
 #include "JobScheduler.h"
+#include "RHI/DX12/DX12DeviceResources.h"
+#include "RuntimeSettings.h"
 #endif
 
 #include <algorithm>
@@ -433,6 +435,29 @@ namespace PlayerCmd
 		}
 
 #if !CE_SHIPPING
+		// 시험 전용: 다음 프레임 시작에 DX12 장치를 지워 장치 제거 경로를 재현한다.
+		// scene 은 렌더 장치, host 는 표시 장치지만 같은 어댑터라 실제로는 둘 다 지워진다.
+		CommandCore::CommandResult Cmd_device_remove(const std::vector<std::string>& parts)
+		{
+			if (parts.size() != 2 || (parts[1] != "scene" && parts[1] != "host"))
+			{
+				return CommandCore::InvalidArguments("player.device-remove: scene|host 가 필요하다");
+			}
+			if (RenderBackend::DX12 != RuntimeSettings::Get().GetRenderBackend())
+			{
+				return CommandCore::Fail("device.backend",
+					"player.device-remove: DX12 백엔드에서만 주입할 수 있다");
+			}
+			DX12DeviceResources::RequestTestDeviceRemoval(parts[1] == "scene"
+				? DX12DeviceResources::TestDeviceRemovalTarget::Scene
+				: DX12DeviceResources::TestDeviceRemovalTarget::Host);
+			auto data = CommandCore::CommandData::Object();
+			data.Set("target", CommandCore::CommandData::String(parts[1]));
+			return CommandCore::Ok("장치 제거 요청: " + parts[1], std::move(data));
+		}
+#endif
+
+#if !CE_SHIPPING
         struct ProfileSaveOperation
         {
             std::atomic_bool done{ false };
@@ -713,6 +738,7 @@ namespace PlayerCmd
             { "profile.record", &Cmd_profile_record },
             { "profile.pause", &Cmd_profile_pause },
             { "profile.save", &Cmd_profile_save },
+            { "player.device-remove", &Cmd_device_remove },
 #endif
             { "help",           &Cmd_help },
 			{ "quit",           &Cmd_quit },

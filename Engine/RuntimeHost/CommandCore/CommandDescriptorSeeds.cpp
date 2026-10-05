@@ -204,6 +204,7 @@ namespace CommandCore
             //   **관측 가능하게** 만드는 자리다. 쓰기만 있고 읽기가 없으면 반영을
             //   주장만 할 수 있다 — `player.object` 로 되읽어야 판정이 된다.
             { "player.animation", CommandCost::Immediate, "<이름>", "Animator의 현재 클립·시간·스킨 팔레트를 조회한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
+            { "player.device-remove", CommandCost::Immediate, "scene|host", "시험 전용: 다음 프레임에 DX12 장치를 지운다(DX12 백엔드만)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
             { "player.move", CommandCost::Frames, "<이름> <x> <y> <z>", "오브젝트의 로컬 위치를 옮긴다(재시작 없이 반영된다)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
             { "player.object", CommandCost::Immediate, "<이름>", "오브젝트 하나의 위치·회전·크기를 낸다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
             { "player.objects", CommandCost::Immediate, "[이름 조각]", "활성 씬의 오브젝트 이름을 나열한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Player },
