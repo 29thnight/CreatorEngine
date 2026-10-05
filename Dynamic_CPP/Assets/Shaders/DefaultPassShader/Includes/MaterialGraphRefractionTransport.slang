@@ -163,4 +163,3 @@ float3 LXRefractionTransport(PrincipledSurface glass, float3 view, float3 positi
     }
     return select(denominator > 0, numerator / max(denominator, 1e-20), float3(0));
 }
-

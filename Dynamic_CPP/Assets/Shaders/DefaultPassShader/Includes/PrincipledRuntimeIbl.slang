@@ -83,4 +83,3 @@ PrincipledIblBakeSample LXSplitSumSample(PrincipledSurface material, float3 view
     }
     return sample;
 }
-
