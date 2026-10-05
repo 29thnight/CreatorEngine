@@ -1,5 +1,6 @@
 #pragma once
 #include "../../RHI/RHIFormat.h"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -332,6 +333,22 @@ public:
     RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
         ExecuteCallback execute, bool hasSideEffect = false);
 
+    struct RepeatedPhase
+    {
+        std::string name;
+        std::vector<RGPassUsage> usages;
+    };
+    using RepeatedExecuteCallback =
+        std::function<void(const ExecuteContext&, uint32_t iterationIndex, uint32_t phaseIndex)>;
+    static constexpr uint32_t kMaxRepeatedPhases = 16;
+    static constexpr uint32_t kMaxPassRepetitions = 1024;
+
+    // 외부 버전은 한 번 발행한다. 내부 단계는 그 핸들을 그대로 쓰며,
+    // usage.state는 해당 자원의 첫 단계 상태다. 반복은 같은 인코더에서 직렬 기록한다.
+    RGPassId AddRepeatedPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+        const std::vector<RepeatedPhase>& phases, uint32_t repeatCount,
+        RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
+
     /// 여러 커맨드 리스트에 나눠 기록할 수 있는 패스.
     ///
     /// 왜 필요한가: 패스 단위 병렬화는 '가장 무거운 패스' 이상으로 빨라질 수
@@ -391,6 +408,14 @@ public:
         uint32_t recordCost, maxSlices;
         std::vector<DiagnosticUsage> usages;
         std::vector<DiagnosticBarrier> barriers;
+        struct Phase
+        {
+            std::string name;
+            std::vector<DiagnosticUsage> usages;
+            std::vector<DiagnosticBarrier> firstBarriers, repeatBarriers;
+        };
+        uint32_t repeatCount{1};
+        std::vector<Phase> phases;
     };
     struct DiagnosticResource
     {
@@ -484,6 +509,14 @@ private:
         std::vector<Version> versions;
     };
 
+    struct PhaseBarrierPlan
+    {
+        std::vector<RHITransition> transitions;
+        std::vector<RHIBufferTransition> bufferTransitions;
+        std::vector<RHITextureHandle> uavBarriers;
+        std::vector<RHIBufferHandle> uavBufferBarriers;
+    };
+
     struct Pass
     {
         std::string              name;
@@ -501,6 +534,11 @@ private:
         std::vector<RHITextureHandle> uavBarriers;
         std::vector<RHIBufferHandle>  uavBufferBarriers;
         std::vector<RHITransition> finalTransitions;
+        uint32_t repeatCount{1};
+        std::vector<RepeatedPhase> phases;
+        bool repeated{false};
+        RepeatedExecuteCallback repeatedExecute;
+        std::vector<PhaseBarrierPlan> firstPhaseBarriers, repeatPhaseBarriers;
     };
 
     struct FinalStateRequirement
@@ -510,6 +548,8 @@ private:
     };
 
     void ReleaseResources();
+    bool CheckDeclarationCapacity(std::size_t count, uint16_t limit,
+        const char* kind, const std::string& name);
     bool BuildOrder(std::string& outError);
     void CullPasses();
     /// 〃 (G-1). 이제 `IRenderDeviceServices::CreateTexture` 로 만든다 —
@@ -517,11 +557,15 @@ private:
     bool CreateTransients(std::string& outError);
     void PlanBarriers();
     bool ValidateFinalStates(std::string& outError) const;
+    bool ValidateRepeatedPasses(std::string& outError) const;
+    void PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite);
 
     /// 계획한 네 부류를 인코더가 감싼 command target에 한 batch로 기록한다.
     /// 순차·병렬과 DX12·Vulkan이 모두 이 경로를 공유한다(G-2).
     void RecordPassBarriers(RHIEncoder& encoder, const Pass& pass) const;
     void RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const;
+    void RecordPassBody(const ExecuteContext& context, const Pass& pass,
+        uint32_t slice, uint32_t sliceCount) const;
 
     std::vector<Resource> m_resources;
     RGTransientPool* m_transientPool{ nullptr };
@@ -530,6 +574,7 @@ private:
     std::vector<uint16_t> m_executeOrder;
     IRHIGpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
+    std::string m_declarationError;
     RGSchedulingMode m_scheduling{ RGSchedulingMode::DeclarationOrder };
     RGOrderPolicy m_orderPolicy{ RGOrderPolicy::DependencyOrder };
     bool BuildExplicitOrder(std::string& outError);
@@ -549,3 +594,4 @@ private:
     uint64_t m_preparedRecording{0}, m_preparedDescriptors{0};
     bool m_preparedRecordingConsumed{false};
 };
+

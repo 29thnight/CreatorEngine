@@ -69,6 +69,7 @@ void EnhancedRenderGraph::Reset()
     m_dependencyWaves.clear();
     m_criticalPath.clear();
     m_compiled = false;
+    m_declarationError.clear();
     m_stats = Stats{};
     m_resourceEpoch = NextResourceEpoch();
     m_preparedPool = nullptr;
@@ -131,12 +132,35 @@ bool EnhancedRenderGraph::PrepareParallel(IRHIParallelCommandPool& pool, std::st
     return true;
 }
 
+bool EnhancedRenderGraph::CheckDeclarationCapacity(std::size_t count, uint16_t limit,
+    const char* kind, const std::string& name)
+{
+    if (!m_declarationError.empty())
+    {
+        return false;
+    }
+    if (count >= limit)
+    {
+        // 무효 ID로 감싼 뒤 검사하면 핸들이 이전 자원을 가리킬 수 있다.
+        // 반환값을 무시해도 잘린 그래프를 Compile/Execute할 수 없도록 잠근다.
+        m_declarationError = "RenderGraph " + std::string(kind) + " declaration limit (" +
+            std::to_string(limit) + ") exceeded before '" + name + "'";
+        m_compiled = false;
+        return false;
+    }
+    return true;
+}
+
 RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     RHIResourceState currentState, const std::string& name,
     RHIResourceState* stateWriteback)
 {
     RGHandle handle{};
     if (!resource.IsValid()) return handle;
+    if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", name))
+    {
+        return {};
+    }
 
     Resource entry{};
     entry.buffer = resource;
@@ -159,6 +183,10 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
 {
     RGHandle handle{};
     if (!resource.IsValid()) return handle;
+    if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", name))
+    {
+        return {};
+    }
 
     Resource entry{};
     entry.handle = resource;
@@ -177,6 +205,10 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
 
 RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
 {
+    if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", desc.name))
+    {
+        return {};
+    }
     Resource entry{};
     entry.desc = desc;
     entry.state = RHIResourceState::Common;
@@ -230,6 +262,10 @@ void EnhancedRenderGraph::RequireImportedFinalState(RGHandle handle, RHIResource
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
 {
+    if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
+    {
+        return {};
+    }
     Pass pass{};
     pass.name = name;
     pass.usages = usages;
@@ -243,10 +279,32 @@ RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     return id;
 }
 
+RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
+    const std::vector<RGPassUsage>& usages, const std::vector<RepeatedPhase>& phases,
+    uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
+{
+    const auto id = AddPass(name, usages, {}, hasSideEffect);
+    if (!id.IsValid())
+    {
+        return {};
+    }
+    auto& pass = m_passes[id.index];
+    pass.repeated = true;
+    pass.phases = phases;
+    pass.repeatCount = repeatCount;
+    pass.repeatedExecute = std::move(execute);
+    pass.recordCost = recordCost;
+    return id;
+}
+
 RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
+    if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
+    {
+        return {};
+    }
     Pass pass{};
     pass.name = name;
     pass.usages = usages;
@@ -830,6 +888,125 @@ void EnhancedRenderGraph::ReleaseResources()
     }
 }
 
+bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
+{
+    for (const auto& pass : m_passes)
+    {
+        if (!pass.repeated)
+        {
+            continue;
+        }
+        const auto fail = [&](const std::string& reason)
+        {
+            outError = "RenderGraph repeated pass '" + pass.name + "': " + reason;
+            return false;
+        };
+        if (m_scheduling != RGSchedulingMode::ExplicitVersioned || !pass.repeatedExecute ||
+            pass.phases.empty() || pass.phases.size() > kMaxRepeatedPhases ||
+            pass.repeatCount == 0 || pass.repeatCount > kMaxPassRepetitions)
+        {
+            return fail("requires versioned access, a callback, and bounded nonempty phases/repetitions");
+        }
+        std::vector<bool> initialized(pass.usages.size()), used(pass.usages.size()), written(pass.usages.size());
+        for (size_t index = 0; index < pass.usages.size(); ++index)
+        {
+            initialized[index] = pass.usages[index].access != RGAccessMode::Write;
+        }
+        for (const auto& phase : pass.phases)
+        {
+            if (phase.name.empty() || phase.usages.empty())
+            {
+                return fail("phase names and resource contracts must be nonempty");
+            }
+            std::vector<uint16_t> seen;
+            for (const auto& usage : phase.usages)
+            {
+                const auto found = std::find_if(pass.usages.begin(), pass.usages.end(), [&](const auto& outer)
+                {
+                    return outer.handle.index == usage.handle.index;
+                });
+                if (found == pass.usages.end() || !ValidVersionHandle(usage.handle) ||
+                    found->handle.version != usage.handle.version || found->handle.kind != usage.handle.kind ||
+                    found->handle.epoch != usage.handle.epoch)
+                {
+                    return fail("undeclared or different resource version in phase '" + phase.name + "'");
+                }
+                const auto index = static_cast<size_t>(found - pass.usages.begin());
+                if (std::find(seen.begin(), seen.end(), usage.handle.index) != seen.end())
+                {
+                    return fail("duplicate resource in phase '" + phase.name + "'");
+                }
+                seen.push_back(usage.handle.index);
+                if (usage.access == RGAccessMode::LegacyState ||
+                    usage.access < RGAccessMode::Read || usage.access > RGAccessMode::ReadWrite ||
+                    usage.state < RHIResourceState::Common || usage.state > RHIResourceState::IndirectArgument ||
+                    (Writes(usage) && !IsWriteState(usage.state)) ||
+                    (Reads(usage) && usage.access == RGAccessMode::Read && IsWriteState(usage.state) &&
+                        usage.state != RHIResourceState::UnorderedAccess) ||
+                    (!m_resources[usage.handle.index].IsBuffer() &&
+                        (usage.state == RHIResourceState::IndexBuffer || usage.state == RHIResourceState::IndirectArgument)) ||
+                    (m_resources[usage.handle.index].IsBuffer() &&
+                        (usage.state == RHIResourceState::RenderTarget || usage.state == RHIResourceState::DepthWrite ||
+                            usage.state == RHIResourceState::DepthRead || usage.state == RHIResourceState::DepthReadShaderResource)) ||
+                    (usage.state == RHIResourceState::IndirectArgument && usage.access != RGAccessMode::Read))
+                {
+                    return fail("access/state mismatch in phase '" + phase.name + "'");
+                }
+                if (!used[index] && found->state != usage.state)
+                {
+                    return fail("external state must match first phase use: " + m_resources[usage.handle.index].name);
+                }
+                if ((found->access == RGAccessMode::Read && Writes(usage)) ||
+                    (Reads(usage) && !initialized[index]))
+                {
+                    return fail("phase writes an external Read or reads an uninitialized output: " +
+                        m_resources[usage.handle.index].name);
+                }
+                used[index] = true;
+                if (Writes(usage))
+                {
+                    initialized[index] = true;
+                    written[index] = true;
+                }
+            }
+        }
+        for (size_t index = 0; index < pass.usages.size(); ++index)
+        {
+            if (!used[index] || (Writes(pass.usages[index]) && !written[index]))
+            {
+                return fail("external resource contract has no corresponding phase access/write");
+            }
+        }
+    }
+    // 진단 카운터의 표현 한계도 선언 단계에서 닫는다. 실제 배리어 수는
+    // 접근 수 이하이므로 이 상한 안에서는 반복 통계가 잘리거나 감기지 않는다.
+    uint64_t maximumBarriers = m_finalStateRequirements.size();
+    for (const auto& pass : m_passes)
+    {
+        if (pass.culled)
+        {
+            continue;
+        }
+        if (pass.repeated)
+        {
+            for (const auto& phase : pass.phases)
+            {
+                maximumBarriers += uint64_t(phase.usages.size()) * pass.repeatCount;
+            }
+        }
+        else
+        {
+            maximumBarriers += pass.usages.size();
+        }
+        if (maximumBarriers > UINT32_MAX)
+        {
+            outError = "RenderGraph repeated resource accesses exceed barrier counter capacity";
+            return false;
+        }
+    }
+    return true;
+}
+
 bool EnhancedRenderGraph::ValidateFinalStates(std::string& outError) const
 {
     for (size_t index = 0; index < m_finalStateRequirements.size(); ++index)
@@ -864,6 +1041,59 @@ bool EnhancedRenderGraph::ValidateFinalStates(std::string& outError) const
     return true;
 }
 
+void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite)
+{
+    // 첫 반복만 외부 상태에서 출발한다. 이후 반복은 고정된 마지막 단계에서
+    // 돌아오므로 배리어 표 두 벌이면 타일 수와 무관하게 같은 계약을 표현한다.
+    const uint32_t templates = pass.repeatCount > 1 ? 2u : 1u;
+    for (uint32_t iteration = 0; iteration < templates; ++iteration)
+    {
+        auto& plans = iteration == 0 ? pass.firstPhaseBarriers : pass.repeatPhaseBarriers;
+        plans.resize(pass.phases.size());
+        for (size_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
+        {
+            auto& plan = plans[phaseIndex];
+            for (const auto& usage : pass.phases[phaseIndex].usages)
+            {
+                auto& resource = m_resources[usage.handle.index];
+                if (resource.state == usage.state)
+                {
+                    if (usage.state == RHIResourceState::UnorderedAccess &&
+                        (previousWrite[usage.handle.index] || Writes(usage)))
+                    {
+                        if (resource.IsBuffer())
+                        {
+                            plan.uavBufferBarriers.push_back(resource.buffer);
+                        }
+                        else
+                        {
+                            plan.uavBarriers.push_back(resource.handle);
+                        }
+                    }
+                }
+                else if (resource.IsBuffer())
+                {
+                    plan.bufferTransitions.push_back({resource.buffer, resource.state, usage.state});
+                }
+                else
+                {
+                    plan.transitions.push_back({resource.handle, resource.state, usage.state});
+                }
+                resource.state = usage.state;
+                previousWrite[usage.handle.index] = Writes(usage);
+            }
+            const auto count = plan.transitions.size() + plan.bufferTransitions.size() +
+                plan.uavBarriers.size() + plan.uavBufferBarriers.size();
+            const uint32_t repetitions = iteration == 0 ? 1 : pass.repeatCount - 1;
+            m_stats.barriersEmitted += static_cast<uint32_t>(uint64_t(count) * repetitions);
+            if (count != 0)
+            {
+                m_stats.barrierBatches += repetitions;
+            }
+        }
+    }
+}
+
 void EnhancedRenderGraph::PlanBarriers()
 {
     std::vector<bool> previousWrite(m_resources.size(),true);
@@ -878,6 +1108,8 @@ void EnhancedRenderGraph::PlanBarriers()
         pass.uavBarriers.clear();
         pass.uavBufferBarriers.clear();
         pass.finalTransitions.clear();
+        pass.firstPhaseBarriers.clear();
+        pass.repeatPhaseBarriers.clear();
     }
 
     // 실행 순서를 따라가며 상태를 추적한다. 요구 상태와 다르면 그 패스 앞에
@@ -886,6 +1118,12 @@ void EnhancedRenderGraph::PlanBarriers()
     for (uint16_t passIndex : m_executeOrder)
     {
         Pass& pass = m_passes[passIndex];
+
+        if (pass.repeated)
+        {
+            PlanRepeatedBarriers(pass, previousWrite);
+            continue;
+        }
 
         for (const auto& usage : pass.usages)
         {
@@ -1040,6 +1278,47 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         {
             copy.barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false, true});
         }
+        copy.repeatCount = pass.repeatCount;
+        for (size_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
+        {
+            DiagnosticPass::Phase phase;
+            phase.name = pass.phases[phaseIndex].name;
+            for (const auto& usage : pass.phases[phaseIndex].usages)
+            {
+                phase.usages.push_back({usage.handle.index, usage.state, Writes(usage), usage.access,
+                    usage.handle.version, usage.handle.kind});
+            }
+            const auto copyPlan = [&](const PhaseBarrierPlan& plan, std::vector<DiagnosticBarrier>& barriers)
+            {
+                for (const auto& barrier : plan.transitions)
+                {
+                    barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false});
+                }
+                for (const auto& barrier : plan.bufferTransitions)
+                {
+                    barriers.push_back({bufferIndex(barrier.buffer), barrier.before, barrier.after, false});
+                }
+                for (const auto handle : plan.uavBarriers)
+                {
+                    barriers.push_back({textureIndex(handle), RHIResourceState::UnorderedAccess,
+                        RHIResourceState::UnorderedAccess, true});
+                }
+                for (const auto handle : plan.uavBufferBarriers)
+                {
+                    barriers.push_back({bufferIndex(handle), RHIResourceState::UnorderedAccess,
+                        RHIResourceState::UnorderedAccess, true});
+                }
+            };
+            if (phaseIndex < pass.firstPhaseBarriers.size())
+            {
+                copyPlan(pass.firstPhaseBarriers[phaseIndex], phase.firstBarriers);
+            }
+            if (phaseIndex < pass.repeatPhaseBarriers.size())
+            {
+                copyPlan(pass.repeatPhaseBarriers[phaseIndex], phase.repeatBarriers);
+            }
+            copy.phases.push_back(std::move(phase));
+        }
         output.passes.push_back(std::move(copy));
     }
     output.versionEdges = m_versionEdges;
@@ -1130,6 +1409,21 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
             mix(static_cast<uint64_t>(usage.access));
             mix(static_cast<uint64_t>(usage.state));
         }
+        mix(pass.repeatCount);
+        mix(pass.phases.size());
+        for (const auto& phase : pass.phases)
+        {
+            mixName(phase.name);
+            mix(phase.usages.size());
+            for (const auto& usage : phase.usages)
+            {
+                mix(usage.resource);
+                mix(usage.version);
+                mix(static_cast<uint64_t>(usage.kind));
+                mix(static_cast<uint64_t>(usage.access));
+                mix(static_cast<uint64_t>(usage.state));
+            }
+        }
     }
     mix(output.executeOrder.size());
     for (const auto pass : output.executeOrder)
@@ -1199,12 +1493,22 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     m_stats = Stats{};
     m_stats.passesDeclared = static_cast<uint32_t>(m_passes.size());
 
+    if (!m_declarationError.empty())
+    {
+        outError = m_declarationError;
+        return false;
+    }
+
     if (!ValidateFinalStates(outError))
     {
         return false;
     }
 
     if (!BuildOrder(outError)) return false;
+    if (!ValidateRepeatedPasses(outError))
+    {
+        return false;
+    }
 
     CullPasses();
     BuildDependencyWaves();
@@ -1267,10 +1571,7 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
         // 것이 계약이고, 순차 경로가 그 계약의 기준이 된다.
         try
         {
-            if (pass.splitExecute)
-                pass.splitExecute(context, 0, 1);
-            else if (pass.execute)
-                pass.execute(context);
+            RecordPassBody(context, pass, 0, 1);
         }
         catch (const std::exception& exception)
         {
@@ -1305,6 +1606,40 @@ void EnhancedRenderGraph::RecordPassBarriers(RHIEncoder& encoder, const Pass& pa
     batch.uavTextures = pass.uavBarriers;
     batch.uavBuffers = pass.uavBufferBarriers;
     encoder.ResourceBarriers(batch);
+}
+
+void EnhancedRenderGraph::RecordPassBody(const ExecuteContext& context, const Pass& pass,
+    uint32_t slice, uint32_t sliceCount) const
+{
+    if (pass.repeated)
+    {
+        for (uint32_t iteration = 0; iteration < pass.repeatCount; ++iteration)
+        {
+            const auto& plans = iteration == 0 ? pass.firstPhaseBarriers : pass.repeatPhaseBarriers;
+            for (uint32_t phase = 0; phase < pass.phases.size(); ++phase)
+            {
+                const auto& plan = plans[phase];
+                RHIBarrierBatch barriers{};
+                barriers.textureTransitions = plan.transitions;
+                barriers.bufferTransitions = plan.bufferTransitions;
+                barriers.uavTextures = plan.uavBarriers;
+                barriers.uavBuffers = plan.uavBufferBarriers;
+                if (!barriers.IsEmpty())
+                {
+                    context.encoder->ResourceBarriers(barriers);
+                }
+                pass.repeatedExecute(context, iteration, phase);
+            }
+        }
+    }
+    else if (pass.splitExecute)
+    {
+        pass.splitExecute(context, slice, sliceCount);
+    }
+    else if (pass.execute)
+    {
+        pass.execute(context);
+    }
 }
 
 void EnhancedRenderGraph::RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const
@@ -1534,8 +1869,7 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
                     RecordPassBarriers(encoder, pass);
                 }
 
-                if (pass.splitExecute) pass.splitExecute(context, unit.slice, unit.sliceCount);
-                else if (pass.execute) pass.execute(context);
+                RecordPassBody(context, pass, unit.slice, unit.sliceCount);
 
                 if (unit.slice + 1 == unit.sliceCount)
                 {

@@ -342,7 +342,7 @@ struct EnhancedPbrCapture
         auto root = manifest.rootref();
         auto node = root["compiledGraph"];
         node |= ryml::MAP;
-        node["schemaVersion"] << 2;
+        node["schemaVersion"] << 3;
         node["generation"] << snapshot.generation;
         node["graphEpoch"] << snapshot.graphEpoch;
         node["dependencyHash"] << snapshot.dependencyHash;
@@ -413,6 +413,41 @@ struct EnhancedPbrCapture
             entry["sideEffect"] << pass.sideEffect;
             entry["recordCost"] << pass.recordCost;
             entry["maxSlices"] << pass.maxSlices;
+            entry["repeatCount"] << pass.repeatCount;
+            entry["phases"] |= ryml::SEQ;
+            for (const auto& phase : pass.phases)
+            {
+                auto phaseEntry = entry["phases"].append_child();
+                phaseEntry |= ryml::MAP;
+                phaseEntry["name"] << phase.name;
+                phaseEntry["usages"] |= ryml::SEQ;
+                for (const auto& usage : phase.usages)
+                {
+                    auto item = phaseEntry["usages"].append_child();
+                    item |= ryml::MAP;
+                    item["resource"] << usage.resource;
+                    item["state"] << static_cast<uint32_t>(usage.state);
+                    item["access"] << static_cast<uint32_t>(usage.access);
+                    item["version"] << usage.version;
+                    item["kind"] << static_cast<uint32_t>(usage.kind);
+                }
+                const auto appendPhaseBarriers = [&](const char* name, const auto& barriers)
+                {
+                    phaseEntry[name] |= ryml::SEQ;
+                    for (const auto& barrier : barriers)
+                    {
+                        auto item = phaseEntry[name].append_child();
+                        item |= ryml::MAP;
+                        item["resource"] << barrier.resource;
+                        item["before"] << static_cast<uint32_t>(barrier.before);
+                        item["after"] << static_cast<uint32_t>(barrier.after);
+                        item["uav"] << barrier.uav;
+                        item["afterPass"] << barrier.afterPass;
+                    }
+                };
+                appendPhaseBarriers("firstBarriers", phase.firstBarriers);
+                appendPhaseBarriers("repeatBarriers", phase.repeatBarriers);
+            }
             entry["usages"] |= ryml::SEQ;
             for (const auto& usage : pass.usages)
             {

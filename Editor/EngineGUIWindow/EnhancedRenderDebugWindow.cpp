@@ -206,6 +206,40 @@ namespace EnhancedRenderDebugUi
                                 GraphStateName(barrier.after), barrier.uav ? " (UAV ordering)" : "");
                         }
                     }
+                    if (!pass.phases.empty())
+                    {
+                        ImGui::Text("%u serial iterations / %zu phases / one unsplit recording unit",
+                            pass.repeatCount, pass.phases.size());
+                        for (uint32_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
+                        {
+                            const auto& phase = pass.phases[phaseIndex];
+                            ImGui::PushID(static_cast<int>(phaseIndex));
+                            if (ImGui::TreeNode("Phase", "Phase %u: %s", phaseIndex, phase.name.c_str()))
+                            {
+                                for (const auto& usage : phase.usages)
+                                {
+                                    ImGui::BulletText("%s r%u v%u %s | %s", GraphAccessName(usage.access),
+                                        usage.resource, static_cast<unsigned int>(usage.version),
+                                        resourceName(usage.resource), GraphStateName(usage.state));
+                                }
+                                for (uint32_t iterationTemplate = 0; iterationTemplate < 2; ++iterationTemplate)
+                                {
+                                    ImGui::TextUnformatted(iterationTemplate == 0
+                                        ? "First iteration barriers" : "Subsequent iteration barriers");
+                                    const auto& barriers = iterationTemplate == 0
+                                        ? phase.firstBarriers : phase.repeatBarriers;
+                                    for (const auto& barrier : barriers)
+                                    {
+                                        ImGui::BulletText("r%u %s: %s -> %s%s", barrier.resource,
+                                            resourceName(barrier.resource), GraphStateName(barrier.before),
+                                            GraphStateName(barrier.after), barrier.uav ? " (UAV ordering)" : "");
+                                    }
+                                }
+                                ImGui::TreePop();
+                            }
+                            ImGui::PopID();
+                        }
+                    }
                     ImGui::TreePop();
                 }
                 ImGui::PopID();
