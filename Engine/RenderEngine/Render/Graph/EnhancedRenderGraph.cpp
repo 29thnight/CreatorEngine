@@ -1959,11 +1959,31 @@ bool EnhancedRenderGraph::IsPassCulled(RGPassId pass) const
 
 uint32_t EnhancedRenderGraph::GetPassBarrierCount(RGPassId pass) const
 {
-    if (!pass.IsValid() || pass.index >= m_passes.size()) return 0;
+    if (!pass.IsValid() || pass.index >= m_passes.size())
+    {
+        return 0;
+    }
     const Pass& planned = m_passes[pass.index];
-    return static_cast<uint32_t>(planned.transitions.size() +
+    uint64_t count = planned.transitions.size() +
         planned.bufferTransitions.size() + planned.uavBarriers.size() +
-        planned.uavBufferBarriers.size());
+        planned.uavBufferBarriers.size() + planned.finalTransitions.size();
+    const auto phaseCount = [](const std::vector<PhaseBarrierPlan>& plans)
+    {
+        uint64_t total = 0;
+        for (const auto& phase : plans)
+        {
+            total += phase.transitions.size() + phase.bufferTransitions.size() +
+                phase.uavBarriers.size() + phase.uavBufferBarriers.size();
+        }
+        return total;
+    };
+    count += phaseCount(planned.firstPhaseBarriers);
+    if (planned.repeatCount > 1)
+    {
+        count += uint64_t(planned.repeatCount - 1) * phaseCount(planned.repeatPhaseBarriers);
+    }
+    // Compile bounds total emitted accesses before creating these barrier plans.
+    return static_cast<uint32_t>(count);
 }
 
 bool EnhancedRenderGraph::GetTransientLifetime(RGHandle handle,

@@ -551,6 +551,24 @@ void VulkanTextureCache::OnUploadCompleted(uint64_t completedValue)
     }
 }
 
+void VulkanTextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
+{
+    if (!m_impl)
+    {
+        return;
+    }
+    for (Impl::Transaction& transaction : m_impl->transactions)
+    {
+        if (transaction.recordingId == recordingId && transaction.completionValue == completion.value &&
+            (transaction.state == RHIUploadTransactionState::Queued ||
+                transaction.state == RHIUploadTransactionState::Resident))
+        {
+            transaction.state = RHIUploadTransactionState::Recording;
+        }
+    }
+    OnUploadAborted(recordingId);
+}
+
 void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
 {
     auto transaction = m_impl->transactions.begin();
@@ -946,6 +964,29 @@ void VulkanMeshCache::OnUploadCompleted(uint64_t completedValue)
             && buffers.completionValue <= completedValue)
             buffers.state = RHIUploadTransactionState::Resident;
     }
+}
+
+void VulkanMeshCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
+{
+    if (!m_impl)
+    {
+        return;
+    }
+    const auto reject = [recordingId, completion](auto& entries)
+    {
+        for (auto& [key, buffers] : entries)
+        {
+            if (buffers.recordingId == recordingId && buffers.completionValue == completion.value &&
+                (buffers.state == RHIUploadTransactionState::Queued ||
+                    buffers.state == RHIUploadTransactionState::Resident))
+            {
+                buffers.state = RHIUploadTransactionState::Recording;
+            }
+        }
+    };
+    reject(m_impl->entries);
+    reject(m_impl->modelEntries);
+    OnUploadAborted(recordingId);
 }
 
 void VulkanMeshCache::OnUploadAborted(uint64_t recordingId)

@@ -108,6 +108,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override;
     void OnUploadCompleted(std::uint64_t completed) override;
     void OnUploadAborted(std::uint64_t recording) override;
+    void OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint completion) override;
 
     IRenderDeviceServices* m_device{};
     LX::Runtime::ComputePipeline m_reset, m_cull;

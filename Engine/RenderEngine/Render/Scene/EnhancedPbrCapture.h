@@ -26,6 +26,7 @@
 struct EnhancedPbrCapture
 {
     EnhancedLivePbrCaptureStatus result;
+    EnhancedLiveBackend resourceBackend{ EnhancedLiveBackend::DX12 };
     EnhancedLiveDisplayTarget target{ EnhancedLiveDisplayTarget::Game };
     uint64_t afterFrameId{};
     bool controlled{ false }; // Static scene repeatability; not a simulation clock.
@@ -70,6 +71,7 @@ struct EnhancedPbrCapture
         std::span<const EnhancedLight> lights, const std::string& skyBoxPath)
     {
         result.state = EnhancedPbrCaptureState::Recording;
+        resourceBackend = backend;
         result.frameId = frame.frameId;
         Authoring::EnsureRymlErrorPolicy();
         auto root = manifest.rootref();
@@ -678,6 +680,18 @@ struct EnhancedPbrCapture
             return true;
         }
         catch (const std::exception& exception) { error = exception.what(); return false; }
+    }
+
+    bool HasResources() const
+    {
+        for (const auto& readback : readbacks)
+        {
+            if (readback.IsValid())
+            {
+                return true;
+            }
+        }
+        return !stages.empty();
     }
 
     void Release(IRenderDeviceServices& resources)

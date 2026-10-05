@@ -130,6 +130,8 @@ public:
     /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
     bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
         std::string& outError);
+    void AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket);
+    void RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion);
     bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists,
         RHICompletionPoint completion, std::string& outError);
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
@@ -140,10 +142,11 @@ public:
         return m_lastLifecycleResult;
     }
 
-    /// 마지막으로 EndFrame이 서명한 펜스 값. 상시 러너의 비동기 표시가
-    /// '이 프레임이 끝났는가'를 논블로킹으로 물을 때 GetCompletedFenceValue와
+    /// 큐 admission이 확인된 마지막 완료 예약. CPU 제출 성공은 ticket이,
+    /// GPU 완료는 GetCompletedFenceValue가 따로 증명한다. 거절된 예약은 제외한다.
+    /// 상시 러너의 비동기 표시가 GetCompletedFenceValue와
     /// 짝으로 쓴다 — 완료 확인이 CPU 대기 없이 되므로 WaitForGpu가 필요 없다.
-    uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
+    uint64_t GetLastSignaledFenceValue() const override { return m_lastAdmittedFenceValue; }
     uint64_t GetCompletedFenceValue() const override
     {
         const uint64_t completed = m_fence ? m_fence->GetCompletedValue() : 0;
@@ -524,6 +527,7 @@ private:
     ComPtr<ID3D12Fence>                m_fence;
     HANDLE                             m_fenceEvent{ nullptr };
     uint64_t                           m_nextFenceValue{ 1 };
+    uint64_t                           m_lastAdmittedFenceValue{ 0 };
     uint32_t                           m_frameIndex{ 0 };
     bool                               m_submissionClient{ false };
     RHILifecycleResult                 m_lastLifecycleResult{};

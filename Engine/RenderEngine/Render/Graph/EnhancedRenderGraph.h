@@ -111,6 +111,8 @@ public:
         RHITextureHandle handle;
         RHIResourceState state{ RHIResourceState::Common };
     };
+    // 대여·반납·비우기는 동일한 producer 스레드가 소유한다. GPU 완료 토큰도 그
+    // 스레드에서 회수해 graph를 파괴하며, 풀 소유자는 모든 토큰을 drain한 뒤 파괴한다.
     std::unordered_map<uint64_t, std::vector<Entry>> freeList;
 };
 
@@ -474,6 +476,8 @@ public:
 
 
     bool IsPassCulled(RGPassId pass) const;
+    /// Total planned resource barriers, including repeated phases and final-state
+    /// restoration. Counts emitted barriers, not barrier batches or templates.
     uint32_t GetPassBarrierCount(RGPassId pass) const;
 
     // transient 리소스의 수명(첫 사용 패스 ~ 마지막 사용 패스, 실행 순서 기준).
@@ -594,4 +598,3 @@ private:
     uint64_t m_preparedRecording{0}, m_preparedDescriptors{0};
     bool m_preparedRecordingConsumed{false};
 };
-

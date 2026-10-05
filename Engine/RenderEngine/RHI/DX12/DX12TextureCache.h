@@ -123,6 +123,7 @@ public:
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion) override;
 
     /// 재질에 텍스처가 없을 때 쓸 1x1 흰색. 분기 없이 항상 뭔가를 바인딩할 수
     /// 있게 해 준다 — 셰이더에서 "텍스처가 있으면" 분기를 없애는 쪽이 빠르다.

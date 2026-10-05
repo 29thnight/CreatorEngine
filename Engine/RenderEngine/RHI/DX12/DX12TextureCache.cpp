@@ -579,6 +579,29 @@ void DX12TextureCache::OnUploadCompleted(uint64_t completedValue)
     }
 }
 
+void DX12TextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
+{
+    for (auto& [key, resident] : m_entries)
+    {
+        if (resident.recordingId == recordingId && resident.completionValue == completion.value &&
+            (resident.uploadState == RHIUploadTransactionState::Queued ||
+                resident.uploadState == RHIUploadTransactionState::Resident))
+        {
+            resident.uploadState = RHIUploadTransactionState::Recording;
+        }
+    }
+    for (FallbackTransaction& transaction : m_fallbackTransactions)
+    {
+        if (transaction.recordingId == recordingId && transaction.completionValue == completion.value &&
+            (transaction.state == RHIUploadTransactionState::Queued ||
+                transaction.state == RHIUploadTransactionState::Resident))
+        {
+            transaction.state = RHIUploadTransactionState::Recording;
+        }
+    }
+    OnUploadAborted(recordingId);
+}
+
 void DX12TextureCache::OnUploadAborted(uint64_t recordingId)
 {
     auto it = m_entries.begin();

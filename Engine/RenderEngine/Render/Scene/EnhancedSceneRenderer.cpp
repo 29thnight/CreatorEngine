@@ -78,6 +78,7 @@
 #include <chrono>
 #include <string_view>
 #include <type_traits>
+#include <exception>
 #include <unordered_map>
 #include <set>
 #include <mathematics/transform.hpp>
@@ -574,6 +575,21 @@ namespace
     // external-memory 직접 공유는 별도 성능 단계다.
     struct VulkanLivePipeline
     {
+        bool shutdownComplete{ false };
+
+        ~VulkanLivePipeline()
+        {
+            if (!shutdownComplete && resources.IsInitialized())
+            {
+                std::string error;
+                if (!Shutdown(error))
+                {
+                    OutputDebugStringA("[Vulkan live] Forced destruction cannot prove GPU idle or device loss; refusing unsafe member destruction.\n");
+                    std::terminate();
+                }
+            }
+        }
+
         static constexpr uint32_t kSlotCount = 3;
         static constexpr uint64_t kDisplayKeyBase = 0x564B4C4956450000ull; // "VKLIVE"
 
@@ -582,6 +598,7 @@ namespace
         uint64_t frameCounter{ 0 };
 
         VulkanDeviceResources resources;
+        std::shared_ptr<VulkanCaptureGpuProfiler> retainedCaptureProfiler;
         VulkanPipelineCache pipelines;
         VulkanMeshCache meshCache;
         VulkanTextureCache textureCache;
@@ -784,21 +801,38 @@ namespace
             return true;
         }
 
-        void Shutdown()
+        bool Shutdown(std::string& outError, EnhancedPbrCapture* capture = nullptr)
         {
+            if (shutdownComplete)
+            {
+                return true;
+            }
             if (resources.IsInitialized())
             {
                 std::string lifecycleError;
-                if (!resources.DrainForLifecycle(
-                        RHILifecycleCommand::BackendShutdown, lifecycleError))
+                bool drained = resources.DrainForLifecycle(
+                    RHILifecycleCommand::BackendShutdown, lifecycleError);
+                if (!drained && GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    drained = resources.DrainForLifecycle(
+                        RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+                }
+                if (!drained)
                 {
                     OutputDebugStringA(("[Vulkan live] backend shutdown drain 실패: " +
                         lifecycleError + "\n").c_str());
-                    std::string abandonError;
-                    resources.DrainForLifecycle(
-                        RHILifecycleCommand::UnrecoverableDeviceError,
-                        abandonError);
+                    outError = "Vulkan pipeline retained: GPU idle or device loss was not established: " + lifecycleError;
+                    return false;
                 }
+            }
+            if (retainedCaptureProfiler)
+            {
+                retainedCaptureProfiler->ReleaseAfterIdle();
+                retainedCaptureProfiler.reset();
+            }
+            if (capture && capture->resourceBackend == EnhancedLiveBackend::Vulkan)
+            {
+                capture->Release(resources);
             }
             for (Slot& slot : slots)
             {
@@ -816,6 +850,8 @@ namespace
             meshCache.Shutdown();
             pipelines.Shutdown();
             resources.Shutdown();
+            shutdownComplete = true;
+            return true;
         }
 
         int FindOrAssignView(const EnhancedLiveViewPacket& requested,
@@ -950,6 +986,21 @@ namespace
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
             preparationDeferred = false;
+            if (retainedCaptureProfiler)
+            {
+                if (!resources.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError))
+                {
+                    return false;
+                }
+                retainedCaptureProfiler->ReleaseAfterIdle();
+                retainedCaptureProfiler.reset();
+                backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&resources);
+                if (GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    outError = "Vulkan capture cleanup observed device loss.";
+                    return false;
+                }
+            }
             Slot* slot = nullptr;
             for (Slot& candidate : slots)
             {
@@ -976,18 +1027,38 @@ namespace
                 const bool& committed;
                 EnhancedPbrCapture* capture;
                 std::string& error;
+                std::shared_ptr<VulkanCaptureGpuProfiler>& profiler;
                 ~FrameGuard()
                 {
                     if (!committed) resources.AbortFrame();
                     if (capture)
                     {
-                        resources.WaitForGpu();
-                        capture->Release(resources);
+                        std::string releaseError;
+                        bool safe = resources.DrainForLifecycle(
+                            RHILifecycleCommand::OfflineReadbackCapture, releaseError);
+                        if (!safe && GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                        {
+                            safe = resources.DrainForLifecycle(
+                                RHILifecycleCommand::UnrecoverableDeviceError, releaseError);
+                        }
+                        if (safe)
+                        {
+                            capture->Release(resources);
+                            if (profiler)
+                            {
+                                profiler->ReleaseAfterIdle();
+                                profiler.reset();
+                            }
+                        }
+                        else
+                        {
+                            capture->Fail("Capture resources retained until GPU idle: " + releaseError);
+                        }
                         if (capture->result.state == EnhancedPbrCaptureState::Recording)
                             capture->Fail(error);
                     }
                 }
-            } frameGuard{ resources, committed, capture, outError };
+            } frameGuard{ resources, committed, capture, outError, retainedCaptureProfiler };
 
             // Keep the diagnostic reset guard alive through recording/submission,
             // just as DX12 does. Resetting at prepare-scope exit changes the SSGI
@@ -1085,7 +1156,12 @@ namespace
                     sourceFrameId, width, height);
             }
 
-            VulkanCaptureGpuProfiler captureProfiler(resources);
+            // The pipeline retains a query owner if a capture cannot prove idle.
+            // A stack destructor must not free queries still referenced by the GPU.
+            if (capture)
+            {
+                retainedCaptureProfiler = std::make_shared<VulkanCaptureGpuProfiler>(resources);
+            }
             // Graph slots persist across frames; never retain this stack-owned
             // diagnostic profiler when the slot returns to ordinary rendering.
             struct CaptureProfilerReset
@@ -1096,8 +1172,8 @@ namespace
             graph.SetProfiler(nullptr);
             if (capture)
             {
-                if (!captureProfiler.Initialize(outError)) return false;
-                graph.SetProfiler(&captureProfiler);
+                if (!retainedCaptureProfiler->Initialize(outError)) return false;
+                graph.SetProfiler(retainedCaptureProfiler.get());
             }
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
@@ -1119,14 +1195,25 @@ namespace
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
-                        resources, std::move(batch), batchTicket, outError)) return false;
+                        resources, std::move(batch), batchTicket, outError))
+                {
+                    return false;
+                }
+                // Queue admission already transferred graph ownership. Attach its
+                // completion before a separate immediate tail submission can fail.
+                const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
+                        graphCompletion, outError, batchTicket))
+                {
+                    return false;
+                }
                 lastGraphStats = graph.GetStats();
-                if (!resources.EndFrame(outError)) return false;
+                if (!resources.EndFrame(outError))
+                {
+                    return false;
+                }
             }
             committed = true;
-            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
-            if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
-                    graphCompletion, outError, batchTicket)) return false;
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
@@ -1144,7 +1231,12 @@ namespace
             slot->pending = true;
             if (capture)
             {
-                resources.WaitForGpu();
+                if (!resources.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError)
+                    || GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    capture->Fail(outError.empty() ? "Vulkan capture cannot read data after device loss." : outError);
+                    return false;
+                }
                 std::string validation;
                 const uint32_t validationCount = resources.DrainDebugMessages(validation);
                 // W8: 패스가 배치를 확정한 뒤라야 알 수 있는 축을 여기서 싣는다.
@@ -1165,9 +1257,14 @@ namespace
                 std::vector<VulkanCaptureGpuProfiler::Timing> nativeTimings;
                 EnhancedLiveGpuSpan captureSpan;
                 std::string timingError;
-                captureProfiler.Collect(nativeTimings, captureSpan.queueSpanMs,
-                    captureSpan.busyMs, timingError);
-                captureSpan.sliceCount = captureProfiler.SliceCount();
+                if (!retainedCaptureProfiler->Collect(nativeTimings, captureSpan.queueSpanMs,
+                        captureSpan.busyMs, timingError))
+                {
+                    outError = timingError;
+                    capture->Fail(outError);
+                    return false;
+                }
+                captureSpan.sliceCount = retainedCaptureProfiler->SliceCount();
                 std::vector<EnhancedLivePassTiming> captureTimings;
                 for (const auto& timing : nativeTimings)
                     captureTimings.push_back({timing.name, timing.milliseconds, timing.milliseconds});
@@ -1181,6 +1278,20 @@ namespace
 
     struct LiveState
     {
+        ~LiveState()
+        {
+            // The submission service intentionally has process lifetime. Drain
+            // while every pass/cache member is still alive, before member teardown.
+            StopRenderThread();
+            const bool dx12Released = TeardownPipeline();
+            const bool vulkanReleased = TeardownVulkanPipeline();
+            if (!dx12Released || !vulkanReleased)
+            {
+                OutputDebugStringA("[EnhancedRenderer] Forced destruction cannot prove GPU idle or device loss; retaining GPU owners is no longer possible.\n");
+                std::terminate();
+            }
+        }
+
         std::unique_ptr<EnhancedPbrCapture> pbrCapture;
 
         EnhancedPbrCapture* BeginPbrCapture(const EnhancedLiveFramePacket& frame,
@@ -2063,6 +2174,11 @@ namespace
 
         bool BuildPipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
         {
+            if (pipeline)
+            {
+                outError = "DX12 pipeline is still retained; complete its safe teardown before rebuilding.";
+                return false;
+            }
             const auto traceBuild = [](const char* phase) {
                 const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE");
                 if (value && std::string_view(value) == "1")
@@ -2303,6 +2419,11 @@ namespace
         bool BuildVulkanPipeline(uint32_t newWidth, uint32_t newHeight,
             std::string& outError)
         {
+            if (vulkanPipeline)
+            {
+                outError = "Vulkan pipeline is still retained; complete its safe teardown before rebuilding.";
+                return false;
+            }
             // 락 범위는 DX12 쪽 BuildPipeline과 같은 규약이다 — 무효화만 잡고
             // 구축은 밖에서 한다. 두 백엔드에 같은 규약을 적어 두지 않으면
             // 한쪽만 고쳐진 채로 남는다.
@@ -2319,7 +2440,12 @@ namespace
             if (!vulkanPipeline->Initialize(newWidth, newHeight, cameraSnapshot,
                 draws, forwardDraws, lights, outError))
             {
-                vulkanPipeline->Shutdown();
+                std::string shutdownError;
+                if (!vulkanPipeline->Shutdown(shutdownError))
+                {
+                    outError += "\n" + shutdownError;
+                    return false;
+                }
                 vulkanPipeline.reset();
                 return false;
             }
@@ -2338,42 +2464,56 @@ namespace
             forwardShaderMetaError.clear();
         }
 
-        void TeardownVulkanPipeline()
+        bool TeardownVulkanPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (!vulkanPipeline)
             {
                 ReleaseForwardShaderMetaOwnerIfUnused();
-                return;
+                return true;
             }
             InvalidateDisplayResultsLocked();
-            vulkanPipeline->Shutdown();
+            std::string error;
+            if (!vulkanPipeline->Shutdown(error, pbrCapture.get()))
+            {
+                lastError = error;
+                enabled = false;
+                return false;
+            }
             vulkanPipeline.reset();
             ReleaseForwardShaderMetaOwnerIfUnused();
+            return true;
         }
 
         /// 파이프라인 해체. DX11에 보이는 것은 묘지로 보낸다(수명 규약).
-        void TeardownPipeline()
+        bool TeardownPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (nullptr == pipeline)
             {
                 ReleaseForwardShaderMetaOwnerIfUnused();
-                return;
+                return true;
             }
             InvalidateDisplayResultsLocked();
             LivePipeline& p = *pipeline;
 
             {
                 std::string lifecycleError;
-                if (!dx12.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError))
+                bool drained = dx12.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError);
+                if (!drained && dx12.HasDeviceLossProof())
+                {
+                    drained = dx12.DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+                }
+                if (!drained)
                 {
                     lastError = "DX12 lifecycle drain 실패: " + lifecycleError;
-                    std::string abandonError;
-                    dx12.DrainForLifecycle(
-                        RHILifecycleCommand::UnrecoverableDeviceError,
-                        abandonError);
+                    enabled = false;
+                    return false;
                 }
+            }
+            if (pbrCapture && pbrCapture->resourceBackend == EnhancedLiveBackend::DX12)
+            {
+                pbrCapture->Release(dx12.Resources());
             }
             ReleaseSizeResources(p);
 
@@ -2402,6 +2542,7 @@ namespace
 
             pipeline.reset();
             ReleaseForwardShaderMetaOwnerIfUnused();
+            return true;
         }
 
         /// 포그가 처음 켜질 때 부른다. 프레임이 열려 있어야 한다(업로드 링과
@@ -4348,6 +4489,9 @@ namespace
                 : (vulkanPipeline && vulkanPipeline->resources.GetIndirectDrawCapabilities().indexedDraw);
             std::vector<size_t> opaqueShadowIndices, graphShadowIndices;
             uint32_t culled = 0;
+            const material_graph::SceneInputBudget sceneInputBudget;
+            uint32_t optionalGpuCandidates = 0;
+            bool hasOptionalGraphCandidates = false;
             for (const PooledDraw& pooled : drawPool)
             {
                 // Select the visible/caster union before the bounded Graph seal.
@@ -4373,6 +4517,18 @@ namespace
                 {
                     ++culled;
                     continue;
+                }
+                // Optional offscreen work must not grow CPU staging without a
+                // bound or displace the original visible/caster working set.
+                if (!relevantToShadow)
+                {
+                    if (optionalGpuCandidates >= sceneInputBudget.draws)
+                    {
+                        ++culled;
+                        continue;
+                    }
+                    ++optionalGpuCandidates;
+                    hasOptionalGraphCandidates |= bool(pooled.graphMaterialSource);
                 }
                 size_t shadowIndex = static_cast<size_t>(-1);
                 if (relevantToShadow && (pooled.graphMaterialSource || !pooled.isTransparent))
@@ -4468,7 +4624,36 @@ namespace
                 inputView.height = frame.height;
                 inputView.camera = cameraSnapshot;
                 std::string inputError;
-                if (!material_graph::SceneViewInput::Seal(inputView, graphDraws, {}, graphViewInput, inputError))
+                bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
+                    sceneInputBudget, graphViewInput, inputError);
+                if (!sealed && hasOptionalGraphCandidates)
+                {
+                    // Aggregate geometry budgets can be tighter than the draw
+                    // limit. Retry the original selection, keeping source-index
+                    // aligned fallback owners and shadow eligibility together.
+                    size_t retained = 0;
+                    for (size_t i = 0; i < graphDraws.size(); ++i)
+                    {
+                        if (!graphFallbackShadowEligible[i])
+                        {
+                            ++lastCulledDraws;
+                            continue;
+                        }
+                        if (retained != i)
+                        {
+                            graphDraws[retained] = std::move(graphDraws[i]);
+                            graphFallbackDraws[retained] = std::move(graphFallbackDraws[i]);
+                            graphFallbackShadowEligible[retained] = graphFallbackShadowEligible[i];
+                        }
+                        ++retained;
+                    }
+                    graphDraws.resize(retained);
+                    graphFallbackDraws.resize(retained);
+                    graphFallbackShadowEligible.resize(retained);
+                    sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
+                        sceneInputBudget, graphViewInput, inputError);
+                }
+                if (!sealed)
                 {
                     lastError = "LX Scene input sealing failed: " + inputError;
                     ++frameFailures;
@@ -4734,8 +4919,22 @@ namespace
                     if (!committed) backend.AbortFrame();
                     if (capture)
                     {
-                        backend.WaitForGpu();
-                        capture->Release(backend.Resources());
+                        std::string releaseError;
+                        bool safe = backend.DrainForLifecycle(
+                            RHILifecycleCommand::OfflineReadbackCapture, releaseError);
+                        if (!safe && backend.HasDeviceLossProof())
+                        {
+                            safe = backend.DrainForLifecycle(
+                                RHILifecycleCommand::UnrecoverableDeviceError, releaseError);
+                        }
+                        if (safe)
+                        {
+                            capture->Release(backend.Resources());
+                        }
+                        else
+                        {
+                            capture->Fail("Capture resources retained until GPU idle: " + releaseError);
+                        }
                         if (capture->result.state == EnhancedPbrCaptureState::Recording)
                             capture->Fail(error);
                     }
@@ -4875,16 +5074,25 @@ namespace
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
-                    outError)) return false;
+                    outError))
+                {
+                    return false;
+                }
+                const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
+                        graphCompletion, outError, batchTicket))
+                {
+                    return false;
+                }
 
                 dx12.ResolveProfilerFrame(profilerToken);
 
-                if (!dx12.EndFrame(outError)) return false;
+                if (!dx12.EndFrame(outError))
+                {
+                    return false;
+                }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
-            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
-            if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
-                    graphCompletion, outError, batchTicket)) return false;
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
             // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
@@ -4920,7 +5128,12 @@ namespace
             view.pendingQueue.push_back(slotIndex);
             if (capture)
             {
-                dx12.WaitForGpu();
+                if (!dx12.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError)
+                    || dx12.HasDeviceLossProof())
+                {
+                    capture->Fail(outError.empty() ? "DX12 capture cannot read data after device loss." : outError);
+                    return false;
+                }
                 std::string validation;
                 const uint32_t validationCount = dx12.DrainDebugMessages(validation);
                 // W8: Vulkan 경로와 같은 자리에 같은 기록을 남긴다.
@@ -6589,6 +6802,11 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     if (state.pbrCapture && (state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
         || state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording))
     { outError = "a PBR capture is already pending"; return false; }
+    if (state.pbrCapture && state.pbrCapture->HasResources())
+    {
+        outError = "Previous capture resources are retained until GPU idle or device-loss cleanup.";
+        return false;
+    }
     std::error_code error;
     const std::filesystem::path path(directory);
     if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
@@ -6806,7 +7024,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         if (state.vulkanPipeline &&
             (rtWidth != state.vulkanPipeline->width || rtHeight != state.vulkanPipeline->height))
         {
-            state.TeardownVulkanPipeline();
+            if (!state.TeardownVulkanPipeline())
+            {
+                return;
+            }
         }
         if (!state.vulkanPipeline)
         {
@@ -8242,8 +8463,13 @@ void EnhancedSceneRenderer::ShutdownLive()
     state.StopRenderThread();
     std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
     state.enabled = false;
-    state.TeardownPipeline();
-    state.TeardownVulkanPipeline();
+    const bool dx12Released = state.TeardownPipeline();
+    const bool vulkanReleased = state.TeardownVulkanPipeline();
+    if (!dx12Released || !vulkanReleased)
+    {
+        // Keep scene/interop owners alive for a later proven-idle recovery.
+        return;
+    }
     state.ResetDisplaySnapshot();
 
     state.dx12.ShutdownInterop();

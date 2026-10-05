@@ -9,6 +9,9 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdio>
+#include <exception>
+#include <stdexcept>
 #include <deque>
 #include <mutex>
 #include <thread>
@@ -96,6 +99,9 @@ struct RHISubmissionThread::Impl
         bool accepting{ false };
         bool transitioning{ false };
         bool faulted{ false };
+        bool submissionBlocked{ false };
+        bool gpuIdleVerified{ false };
+        std::string submissionError;
         std::string fault;
     };
 
@@ -122,6 +128,8 @@ struct RHISubmissionThread::Impl
         RHICompletionPoint point{};
         CompletionQuery completionQuery;
         std::shared_ptr<const void> lifetimeToken;
+        bool failedSubmission{ false };
+        bool releaseReady{ false };
     };
 
     mutable std::mutex mutex;
@@ -157,6 +165,7 @@ struct RHISubmissionThread::Impl
             result.accepting = state->second.accepting;
             result.transitioning = state->second.transitioning;
             result.faulted = state->second.faulted;
+            result.submissionBlocked = state->second.submissionBlocked;
         }
 
         const auto countEntry = [&result, owner](const Entry& entry)
@@ -173,7 +182,10 @@ struct RHISubmissionThread::Impl
         }
         for (const Retirement& retirement : retirements)
         {
-            if (retirement.owner != owner) continue;
+            if (retirement.owner != owner || retirement.releaseReady)
+            {
+                continue;
+            }
             ++result.pendingRetirements;
             if (EntryKind::RecordedBatch == retirement.kind)
                 ++result.pendingBatches;
@@ -193,23 +205,31 @@ struct RHISubmissionThread::Impl
         return std::any_of(retirements.begin(), retirements.end(),
             [owner](const Retirement& retirement)
             {
-                return retirement.owner == owner;
+                return retirement.owner == owner && !retirement.releaseReady;
             });
+    }
+
+    bool HasPendingRetirementsLocked() const
+    {
+        return std::any_of(retirements.begin(), retirements.end(),
+            [](const Retirement& retirement) { return !retirement.releaseReady; });
     }
 
     void PollRetirementsLocked()
     {
         // raw backend를 캡처한 조회의 수명을 owner 해체와 직렬화하므로 이 잠금을 유지한다.
-        for (auto it = retirements.begin(); it != retirements.end();)
+        for (Retirement& retirement : retirements)
         {
-            const uint64_t completed = it->completionQuery
-                ? it->completionQuery() : 0;
-            if (completed < it->point.value)
+            if (retirement.releaseReady)
             {
-                ++it;
                 continue;
             }
-            it = retirements.erase(it);
+            const uint64_t completed = retirement.completionQuery ? retirement.completionQuery() : 0;
+            if (completed < retirement.point.value)
+            {
+                continue;
+            }
+            retirement.releaseReady = true;
             ++stats.retired;
             drainWake.notify_all();
         }
@@ -237,9 +257,9 @@ struct RHISubmissionThread::Impl
                 const auto canExecuteOrStop = [this]
                 {
                     return !queue.empty() ||
-                        (stopRequested && (retirements.empty() || abandonRetirements));
+                        (stopRequested && (!HasPendingRetirementsLocked() || abandonRetirements));
                 };
-                if (retirements.empty())
+                if (!HasPendingRetirementsLocked())
                 {
                     workWake.wait(lock, canExecuteOrStop);
                 }
@@ -262,7 +282,7 @@ struct RHISubmissionThread::Impl
                     spaceWake.notify_one();
                 }
                 else if (stopRequested &&
-                    (retirements.empty() || abandonRetirements))
+                    (!HasPendingRetirementsLocked() || abandonRetirements))
                 {
                     break;
                 }
@@ -301,8 +321,13 @@ struct RHISubmissionThread::Impl
                 {
                     ++stats.failed;
                     failures.emplace_back(entry.owner, error);
+                    OwnerState& owner = owners[entry.owner];
+                    owner.submissionBlocked = true;
+                    owner.gpuIdleVerified = false;
+                    owner.submissionError = error;
+                    owner.accepting = false;
                 }
-                else if (!abandonRetirements && entry.retirementPoint.IsValid() &&
+                if (entry.retirementPoint.IsValid() &&
                     entry.completionQuery && (entry.lifetimeToken ||
                         EntryKind::RecordedBatch == entry.kind))
                 {
@@ -310,7 +335,7 @@ struct RHISubmissionThread::Impl
                         entry.sequence, entry.generation, entry.owner, entry.kind,
                         entry.retirementPoint,
                         std::move(entry.completionQuery),
-                        std::move(entry.lifetimeToken) });
+                        std::move(entry.lifetimeToken), !success });
                 }
                 if (stats.lastCompletedSequence + 1 != entry.sequence)
                 {
@@ -364,22 +389,50 @@ RHISubmissionThread::RHISubmissionThread()
 RHISubmissionThread::~RHISubmissionThread()
 {
     Impl& impl = *m_impl;
+    std::vector<Impl::Retirement> completed;
     {
-        std::lock_guard lock(impl.mutex);
-        // 함수-local singleton의 소멸 순서는 이를 늦게 획득한 render singleton보다
-        // 앞설 수 있다. 정상 owner는 ReleaseClient에서 drain하지만, CRT 정리의
-        // fallback에서 GPU retirement를 계속 poll하면 이미 소멸한 completionSource를
-        // 호출하거나 영원히 join하지 못한다. 프로세스 종료 시점에는 새 제출을
-        // 금지하고 아직 남은 값 수명만 놓은 뒤 worker를 끝낸다.
+        std::unique_lock lock(impl.mutex);
         impl.stats.accepting = false;
         impl.stopRequested = true;
-        impl.abandonRetirements = true;
-        for (Impl::Entry& entry : impl.queue)
+        impl.workWake.notify_all();
+        impl.spaceWake.notify_all();
+        // 정상 진행 중인 작업은 끝낸다. 완료되지 않은 자원을 조용히 폐기하지 않는다.
+        impl.drainWake.wait(lock, [&impl]
         {
-            entry.ticket->PublishCompletion(false, "RHI submission thread 정적 종료");
+            if (!impl.queue.empty() || impl.runningOwner != nullptr)
+            {
+                return false;
+            }
+            bool uncertain = false;
+            for (Impl::Retirement& retirement : impl.retirements)
+            {
+                if (retirement.releaseReady)
+                {
+                    continue;
+                }
+                const auto owner = impl.owners.find(retirement.owner);
+                if (owner != impl.owners.end())
+                {
+                    if (owner->second.faulted || owner->second.gpuIdleVerified)
+                    {
+                        retirement.releaseReady = true;
+                    }
+                    else
+                    {
+                        uncertain = uncertain || owner->second.submissionBlocked;
+                    }
+                }
+            }
+            return uncertain || !impl.HasPendingRetirementsLocked();
+        });
+        if (impl.HasPendingRetirementsLocked())
+        {
+            std::fputs("Fatal RHI teardown invariant: forced service destruction retains uncertain accepted "
+                "native work without verified GPU idle/device loss or an owner-retention path\n", stderr);
+            std::fflush(stderr);
+            std::terminate();
         }
-        impl.queue.clear();
-        impl.retirements.clear();
+        completed.swap(impl.retirements);
     }
     impl.workWake.notify_all();
     impl.spaceWake.notify_all();
@@ -426,6 +479,10 @@ bool RHISubmissionThread::AcquireClient(const void* owner, std::string& outError
     ownerState.transitioning = false;
     ownerState.faulted = false;
     ownerState.fault.clear();
+    ownerState.submissionBlocked = false;
+    ownerState.gpuIdleVerified = false;
+    ownerState.submissionError.clear();
+    ownerState.lastCommand = RHILifecycleCommand::None;
     ++impl.clientCount;
     return true;
 }
@@ -443,6 +500,7 @@ void RHISubmissionThread::ReleaseClient(const void* owner)
     {
         Drain(owner, ignored);
     }
+    CollectCompletedLifetimes(owner);
 
     Impl& impl = *m_impl;
     bool shouldJoin = false;
@@ -451,6 +509,14 @@ void RHISubmissionThread::ReleaseClient(const void* owner)
         const auto found = impl.owners.find(owner);
         if (found != impl.owners.end())
         {
+            if (found->second.submissionBlocked && !found->second.gpuIdleVerified && !found->second.faulted)
+            {
+                std::fprintf(stderr, "Fatal RHI invariant: releasing owner %p after uncertain native submission "
+                    "without verified GPU idle or device loss: %s\n", owner,
+                    found->second.submissionError.c_str());
+                std::fflush(stderr);
+                std::terminate();
+            }
             found->second.registered = false;
             found->second.accepting = false;
             found->second.transitioning = false;
@@ -476,6 +542,10 @@ bool RHISubmissionThread::Enqueue(const void* owner, const char* label, Work wor
     RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
     std::shared_ptr<const void> lifetimeToken)
 {
+    if (!IsCurrentThread())
+    {
+        CollectCompletedLifetimes(owner);
+    }
     return EnqueueInternal(owner, label, std::move(work), outTicket, outError,
         retirementPoint, std::move(completionQuery), std::move(lifetimeToken),
         EntryKind::Submission, false, 0);
@@ -491,6 +561,11 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
     if (nullptr == owner || !work)
     {
         outError = "RHI submission owner/work가 없다";
+        return false;
+    }
+    if (lifetimeToken && (!retirementPoint.IsValid() || !completionQuery))
+    {
+        outError = "자원 수명 토큰에는 실제 완료점과 완료 질의가 필요하다";
         return false;
     }
 
@@ -555,7 +630,7 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
         return false;
     }
 
-    const uint64_t sequence = impl.nextSequence++;
+    const uint64_t sequence = impl.nextSequence;
     state->sequence = sequence;
     // worker가 즉시 완료해도 release 게시 뒤 ticket의 결과 포인터를 바꾸지 않는다.
     state->recordedBatch = std::move(recordedBatch);
@@ -563,6 +638,13 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label,
         sequence, ownerState.generation, owner, kind,
         label ? label : "RHI submission", std::move(work), state,
         retirementPoint, std::move(completionQuery), std::move(lifetimeToken) });
+    ++impl.nextSequence;
+    ownerState.gpuIdleVerified = false;
+    if (state->recordedBatch)
+    {
+        // 이 잠금을 놓기 전에는 worker가 꺼낼 수 없다. admission의 유일한 경계다.
+        state->recordedBatch->m_admitted = true;
+    }
     ++impl.stats.enqueued;
     impl.stats.maxQueueDepth = (std::max)(impl.stats.maxQueueDepth,
         static_cast<uint32_t>(impl.queue.size()));
@@ -616,6 +698,7 @@ bool RHISubmissionThread::DrainSubmissions(const void* owner, std::string& outEr
         return !impl.HasSubmissionLocked(owner);
     });
     lock.unlock();
+    CollectCompletedLifetimes(owner);
     return !ConsumeFailure(owner, outError);
 }
 
@@ -627,11 +710,41 @@ bool RHISubmissionThread::Drain(const void* owner, std::string& outError)
     impl.workWake.notify_all();
     impl.drainWake.wait(lock, [&impl, owner]
     {
+        const auto found = impl.owners.find(owner);
+        const bool blocked = found != impl.owners.end() && found->second.submissionBlocked;
         return !impl.HasSubmissionLocked(owner) &&
-            !impl.HasRetirementLocked(owner);
+            (blocked || !impl.HasRetirementLocked(owner));
     });
     lock.unlock();
+    CollectCompletedLifetimes(owner);
     return !ConsumeFailure(owner, outError);
+}
+
+void RHISubmissionThread::CollectCompletedLifetimes(const void* owner)
+{
+    if (IsCurrentThread())
+    {
+        throw std::logic_error("RHI lifetime collection requires the producer thread");
+    }
+    for (;;)
+    {
+        Impl::Retirement completed;
+        {
+            std::lock_guard lock(m_impl->mutex);
+            const auto found = std::find_if(m_impl->retirements.begin(), m_impl->retirements.end(),
+                [owner](const Impl::Retirement& retirement)
+                {
+                    return retirement.owner == owner && retirement.releaseReady;
+                });
+            if (found == m_impl->retirements.end())
+            {
+                return;
+            }
+            completed = std::move(*found);
+            m_impl->retirements.erase(found);
+        }
+        // 추가 할당 없이 한 토큰씩 잠금 밖 producer에서 파괴한다.
+    }
 }
 
 bool RHISubmissionThread::ConsumeFailure(const void* owner, std::string& outError)
@@ -643,6 +756,12 @@ bool RHISubmissionThread::ConsumeFailure(const void* owner, std::string& outErro
         if (it->first != owner) continue;
         outError = std::move(it->second);
         impl.failures.erase(it);
+        return true;
+    }
+    const auto found = impl.owners.find(owner);
+    if (found != impl.owners.end() && found->second.submissionBlocked)
+    {
+        outError = found->second.submissionError;
         return true;
     }
     return false;
@@ -708,14 +827,24 @@ bool RHISubmissionThread::ExecuteLifecycleDrain(const void* owner,
         std::lock_guard lock(impl.mutex);
         Impl::OwnerState& state = impl.owners[owner];
         state.transitioning = false;
-        state.faulted = true;
-        state.fault = outError;
+        state.submissionBlocked = true;
+        state.submissionError = outError;
+        state.accepting = false;
         ++impl.stats.lifecycleFailures;
         return false;
     }
 
     std::unique_lock lock(impl.mutex);
     ++impl.stats.drainCount;
+    // native GPU-idle가 성공했다. 실패한 제출의 C가 영원히 signal되지 않아도
+    // 이 명시적 경계에서는 토큰을 놓을 수 있다. 완료 fence를 꾸미지는 않는다.
+    for (Impl::Retirement& retirement : impl.retirements)
+    {
+        if (retirement.owner == owner)
+        {
+            retirement.releaseReady = true;
+        }
+    }
     impl.workWake.notify_all();
     impl.drainWake.wait(lock, [&impl, owner]
     {
@@ -723,26 +852,17 @@ bool RHISubmissionThread::ExecuteLifecycleDrain(const void* owner,
             !impl.HasRetirementLocked(owner);
     });
 
-    for (auto it = impl.failures.begin(); it != impl.failures.end(); ++it)
-    {
-        if (it->first != owner) continue;
-        outError = std::move(it->second);
-        impl.failures.erase(it);
-        Impl::OwnerState& state = impl.owners[owner];
-        state.transitioning = false;
-        state.faulted = true;
-        state.fault = outError;
-        ++impl.stats.lifecycleFailures;
-        return false;
-    }
+    impl.failures.erase(std::remove_if(impl.failures.begin(), impl.failures.end(),
+        [owner](const auto& failure) { return failure.first == owner; }), impl.failures.end());
 
     Impl::OwnerState& state = impl.owners[owner];
+    state.gpuIdleVerified = true;
     ++state.generation;
     ++state.lifecycleCommands;
     ++state.drainCommands;
     state.lastCommand = command;
     state.transitioning = false;
-    state.accepting = RHILifecycleCommand::BackendShutdown != command;
+    state.accepting = !state.submissionBlocked && RHILifecycleCommand::BackendShutdown != command;
     ++impl.stats.lifecycleCommands;
 
     const RHISubmissionOwnerStats ownerStats = impl.GetOwnerStatsLocked(owner);
@@ -754,12 +874,14 @@ bool RHISubmissionThread::ExecuteLifecycleDrain(const void* owner,
     if (!outResult.IsClean())
     {
         outError = "lifecycle drain 뒤 owner pending이 0이 아니다";
-        state.faulted = true;
-        state.fault = outError;
+        state.submissionBlocked = true;
+        state.submissionError = outError;
         state.accepting = false;
         ++impl.stats.lifecycleFailures;
         return false;
     }
+    lock.unlock();
+    CollectCompletedLifetimes(owner);
     return true;
 }
 
@@ -776,6 +898,7 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
 
     Impl& impl = *m_impl;
     std::vector<std::shared_ptr<RHISubmissionTicket::State>> cancelled;
+    std::vector<Impl::Entry> cancelledEntries;
     std::unique_lock lock(impl.mutex);
     const auto found = impl.owners.find(owner);
     if (found == impl.owners.end() || !found->second.registered)
@@ -783,6 +906,13 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
         outError = "device-error owner가 등록돼 있지 않다";
         return false;
     }
+    if (!found->second.faulted)
+    {
+        outError = "native device-loss 확인 없이 제출 수명을 폐기할 수 없다";
+        return false;
+    }
+    cancelled.reserve(impl.queue.size());
+    cancelledEntries.reserve(impl.queue.size());
     Impl::OwnerState& state = found->second;
     outResult.previousGeneration = state.generation;
     state.accepting = false;
@@ -797,6 +927,7 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
             continue;
         }
         cancelled.push_back(it->ticket);
+        cancelledEntries.push_back(std::move(*it));
         it = impl.queue.erase(it);
     }
     impl.spaceWake.notify_all();
@@ -804,11 +935,13 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
     {
         return impl.runningOwner != owner;
     });
-    impl.retirements.erase(std::remove_if(impl.retirements.begin(),
-        impl.retirements.end(), [owner](const Impl::Retirement& retirement)
+    for (Impl::Retirement& retirement : impl.retirements)
+    {
+        if (retirement.owner == owner)
         {
-            return retirement.owner == owner;
-        }), impl.retirements.end());
+            retirement.releaseReady = true;
+        }
+    }
     impl.failures.erase(std::remove_if(impl.failures.begin(), impl.failures.end(),
         [owner](const auto& failure) { return failure.first == owner; }),
         impl.failures.end());
@@ -830,8 +963,13 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
 
     for (const auto& ticketState : cancelled)
     {
+        if (ticketState->recordedBatch)
+        {
+            ticketState->recordedBatch->m_state = RHIRecordedBatchState::SubmissionFailed;
+        }
         ticketState->PublishCompletion(false, "device error로 제출이 폐기됐다");
     }
+    CollectCompletedLifetimes(owner);
     // 실행할 entry 없이 취소만 끝나도 queue/drain 대기자가 새 상태를 확인해야 한다.
     impl.workWake.notify_all();
     impl.drainWake.notify_all();
@@ -869,14 +1007,23 @@ RHISubmissionThreadStats RHISubmissionThread::GetStats() const
     RHISubmissionThreadStats result = m_impl->stats;
     result.pendingTasks = static_cast<uint32_t>(m_impl->queue.size()) +
         (nullptr != m_impl->runningOwner ? 1u : 0u);
-    result.pendingRetirements = static_cast<uint32_t>(m_impl->retirements.size());
+    result.pendingRetirements = 0;
     for (const Impl::Entry& entry : m_impl->queue)
         if (EntryKind::RecordedBatch == entry.kind) ++result.pendingBatches;
     if (nullptr != m_impl->runningOwner &&
         EntryKind::RecordedBatch == m_impl->runningKind)
         ++result.pendingBatches;
     for (const Impl::Retirement& retirement : m_impl->retirements)
-        if (EntryKind::RecordedBatch == retirement.kind) ++result.pendingBatches;
+    {
+        if (!retirement.releaseReady)
+        {
+            ++result.pendingRetirements;
+            if (EntryKind::RecordedBatch == retirement.kind)
+            {
+                ++result.pendingBatches;
+            }
+        }
+    }
     return result;
 }
 
@@ -902,6 +1049,12 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
         outError = "RHIRecordedBatch에 command pool이 없다";
         return false;
     }
+    std::shared_ptr<RHIRecordedBatch> queuedBatch;
+    RHIRecordingAdmissionGuard admission([&]
+    {
+        pool->RejectPreparedRecordedBatch(queuedBatch ? *queuedBatch : batch);
+    });
+    CollectCompletedLifetimes(owner);
     const uint64_t generation = GetOwnerGeneration(owner);
     if (0 == generation || batch.GetBackendGeneration() != generation)
     {
@@ -913,18 +1066,22 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
         return false;
     }
 
-    auto queuedBatch = std::make_shared<RHIRecordedBatch>(std::move(batch));
+    queuedBatch = std::make_shared<RHIRecordedBatch>(std::move(batch));
     const RHICompletionPoint completion = queuedBatch->GetCompletionPoint();
+    // 완료 뒤에도 남는 ticket은 식별 정보만 보관한다. 그래프 자원은 retirement가 소유한다.
+    auto lifetimeToken = std::move(queuedBatch->m_lifetimeToken);
     if (!EnqueueInternal(owner, "recorded batch submit",
         [pool, queuedBatch](std::string& error)
         {
             return pool->SubmitRecordedBatch(*queuedBatch, error);
         }, outTicket, outError, completion,
         [&completionSource] { return completionSource.GetCompletedFenceValue(); },
-        queuedBatch, EntryKind::RecordedBatch, false, generation, queuedBatch))
+        std::move(lifetimeToken), EntryKind::RecordedBatch, false, generation, queuedBatch))
     {
         return false;
     }
+    admission.Accept();
+    pool->AcceptPreparedRecordedBatch(*queuedBatch, outTicket);
     return true;
 }
 

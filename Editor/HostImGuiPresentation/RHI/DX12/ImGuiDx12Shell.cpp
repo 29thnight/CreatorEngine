@@ -17,6 +17,8 @@
 #include <mutex>
 #include <cstring>
 #include <utility>
+#include <cstdio>
+#include <exception>
 
 // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 namespace
@@ -916,28 +918,40 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
 void ImGuiDx12Shell::Shutdown()
 {
     Impl& impl = *m_impl;
-    if (!impl.active) return;
 
-    if (impl.frameOpen)
+    if (impl.active && impl.frameOpen)
     {
         impl.resources.AbortFrame();
         impl.frameOpen = false;
     }
     std::string lifecycleError;
-    const bool drained = impl.resources.DrainForLifecycle(
-        RHILifecycleCommand::BackendShutdown, lifecycleError);
+    bool drained = true;
+    if (GetRHISubmissionThread().GetOwnerStats(&impl.resources).registered)
+    {
+        drained = impl.resources.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError);
+        if (!drained && GetRHISubmissionThread().GetOwnerStats(&impl.resources).faulted)
+        {
+            drained = impl.resources.DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+        }
+    }
+    if (!drained)
+    {
+        OutputDebugStringA(("[ImGui DX12] Fatal: forced destruction before verified GPU idle/device loss: " +
+            lifecycleError + "\n").c_str());
+        std::fprintf(stderr, "Fatal ImGui DX12 teardown invariant: GPU idle/device loss unproven: %s\n",
+            lifecycleError.c_str());
+        std::fflush(stderr);
+        std::terminate();
+    }
+    // 부분 초기화 실패의 멤버 파괴도 위의 동일한 수명 증명을 지난다.
+    if (!impl.active)
+    {
+        return;
+    }
     const bool gpuCompletionProven = drained &&
         impl.resources.GetLastLifecycleResult().command !=
             RHILifecycleCommand::UnrecoverableDeviceError &&
         SUCCEEDED(impl.resources.GetDevice()->GetDeviceRemovedReason());
-    if (!drained)
-    {
-        std::printf("[ImGui] DX12 shutdown drain 실패: %s\n",
-            lifecycleError.c_str());
-        std::string abandonError;
-        impl.resources.DrainForLifecycle(
-            RHILifecycleCommand::UnrecoverableDeviceError, abandonError);
-    }
     // 장치 오류로 제출을 포기한 것은 GPU 완료가 아니다. 호스트 참조를 놓기
     // 전에 관련 생산자 슬롯을 사용 불가로 표시해 재사용을 차단한다.
     impl.DrainDisplayUses(gpuCompletionProven);

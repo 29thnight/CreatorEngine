@@ -194,6 +194,27 @@ bool VulkanCommandBufferPool::HasRecorded(uint32_t worker) const
         m_slots[m_frameIndex][worker].opened;
 }
 
+uint64_t VulkanCommandBufferPool::GetCurrentRecordingId() const
+{
+    return m_resources ? m_resources->GetCurrentUploadRecordingId() : 0;
+}
+
+void VulkanCommandBufferPool::RejectPreparedCommands(uint64_t recordingId, RHICompletionPoint completion)
+{
+    if (m_resources)
+    {
+        m_resources->RejectNeverEnqueuedRecording(recordingId, completion);
+    }
+}
+
+void VulkanCommandBufferPool::AcceptPreparedCommands(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
+{
+    if (m_resources)
+    {
+        m_resources->AcceptParallelSubmission(completion, ticket);
+    }
+}
+
 bool VulkanCommandBufferPool::PrepareRecordedCommands(uint32_t frameSlot,
     RHICompletionPoint& outCompletion, std::string& outError)
 {

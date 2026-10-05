@@ -119,7 +119,7 @@ public:
         return m_lastLifecycleResult;
     }
 
-    uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
+    uint64_t GetLastSignaledFenceValue() const override { return m_lastAdmittedFenceValue; }
     uint64_t GetCompletedFenceValue() const override;
     // RHI 잠금 밖의 직렬 RT·PT 소유자만 호출한다. 완료 조회 콜백에서 부르면
     // submission 잠금을 재진입하므로 GetCompletedFenceValue와 분리한다.
@@ -345,6 +345,8 @@ private:
     bool AcquireCommandContext(std::string& outError);
     bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
         std::string& outError);
+    void AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket);
+    void RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion);
     bool SubmitParallelCommandBuffers(std::span<const VkCommandBuffer> buffers,
         RHICompletionPoint completion, std::string& outError);
     void RetireCurrentCommandContext(uint64_t completionValue);
@@ -371,6 +373,7 @@ private:
     // 타임라인 세마포어 하나가 DX12 의 ID3D12Fence 자리다.
     VkSemaphore m_timeline{ VK_NULL_HANDLE };
     uint64_t    m_nextFenceValue{ 1 };
+    uint64_t    m_lastAdmittedFenceValue{ 0 };
     std::array<uint64_t, kFrameCount> m_frameFenceValues{};
     std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
     bool m_submissionClient{ false };
@@ -527,6 +530,7 @@ public:
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion) override;
 
     void BeginFrame(uint64_t frameIndex);
     uint64_t RetireUnused(uint64_t completionValue,
@@ -589,6 +593,7 @@ public:
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion) override;
 
     void BeginFrame(uint64_t frameIndex);
     uint64_t RetireUnused(uint64_t completionValue,

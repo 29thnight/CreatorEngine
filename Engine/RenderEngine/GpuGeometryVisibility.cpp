@@ -499,6 +499,17 @@ void GpuGeometryVisibility::OnUploadCompleted(std::uint64_t completed)
     });
 }
 
+void GpuGeometryVisibility::OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint completion)
+{
+    std::lock_guard lock(m_recordingMutex);
+    const auto found = m_recordings.find(recording);
+    if (found != m_recordings.end() &&
+        (!found->second.submitted || found->second.completion == completion.value))
+    {
+        m_recordings.erase(found);
+    }
+}
+
 void GpuGeometryVisibility::OnUploadAborted(std::uint64_t recording)
 {
     std::lock_guard lock(m_recordingMutex);

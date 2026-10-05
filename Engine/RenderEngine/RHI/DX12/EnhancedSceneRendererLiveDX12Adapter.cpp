@@ -17,6 +17,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <exception>
 #include <utility>
 #include <vector>
 #include <wrl/client.h>
@@ -114,15 +115,24 @@ bool EnhancedSceneRendererLiveDX12Adapter::Resize(
 void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
 {
     Impl& impl = *m_impl;
-    if (impl.resources.IsInitialized())
+    if (impl.resources.IsInitialized() &&
+        GetRHISubmissionThread().GetOwnerStats(&impl.resources).registered)
     {
         std::string lifecycleError;
-        impl.resources.DrainForLifecycle(
+        bool drained = impl.resources.DrainForLifecycle(
             RHILifecycleCommand::BackendShutdown, lifecycleError);
-        if (!lifecycleError.empty())
+        if (!drained && GetRHISubmissionThread().GetOwnerStats(&impl.resources).faulted)
         {
-            OutputDebugStringA(("[DX12 live] backend shutdown drain 실패: " +
+            drained = impl.resources.DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+        }
+        if (!drained)
+        {
+            OutputDebugStringA(("[DX12 live] Fatal: releasing pipeline before verified GPU idle/device loss: " +
                 lifecycleError + "\n").c_str());
+            std::fprintf(stderr, "Fatal DX12 pipeline teardown invariant: GPU idle/device loss unproven: %s\n",
+                lifecycleError.c_str());
+            std::fflush(stderr);
+            std::terminate();
         }
     }
 
@@ -247,6 +257,11 @@ bool EnhancedSceneRendererLiveDX12Adapter::DrainForLifecycle(
 {
     return !IsInitialized() ||
         m_impl->resources.DrainForLifecycle(command, outError);
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::HasDeviceLossProof() const
+{
+    return GetRHISubmissionThread().GetOwnerStats(&m_impl->resources).faulted;
 }
 
 uint64_t EnhancedSceneRendererLiveDX12Adapter::GetCompletedFenceValue() const
