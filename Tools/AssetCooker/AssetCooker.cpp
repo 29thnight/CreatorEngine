@@ -1281,8 +1281,7 @@ namespace
             if (!material_graph::HasSceneBackend(verifiedProduct, RHIShaderBinary::Dxil) ||
                 !material_graph::HasSceneBackend(verifiedProduct, RHIShaderBinary::SpirV))
             {
-                std::cerr << "asset-cooker error: material program must carry both DXIL and SPIR-V stages.
-";
+                std::cerr << "asset-cooker error: material program must carry both DXIL and SPIR-V stages.\n";
                 return 3;
             }
             ck::MaterialProgramCookProduct product;
