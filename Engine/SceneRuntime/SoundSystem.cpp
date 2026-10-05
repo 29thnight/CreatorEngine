@@ -211,7 +211,7 @@ void SoundSystem::Update(float tick, bool recordLifecycle)
             {
                 return true;
             }
-            const auto* owner = m_scene->Resolve(attached.entity);
+            auto* owner = m_scene->Resolve(attached.entity);
             if (!owner || owner->IsDestroyMark() || owner->GetScene() != m_scene)
             {
                 m_playback->OwnerDestroyed(attached.scope, attached.ownerId);
