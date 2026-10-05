@@ -150,6 +150,10 @@ public:
 
     bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) override;
+    RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
+    {
+        return m_indirectDrawCapabilities;
+    }
     bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) override;
 
@@ -357,6 +361,7 @@ private:
     uint32_t         m_queueFamily{ UINT32_MAX };
     bool             m_memoryBudgetSupported{ false };
     bool             m_nullDescriptorSupported{ false };
+    RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
     bool             m_uploadMemoryPressure{ false };
     RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;
 

@@ -119,6 +119,7 @@
     X(vkCmdClearColorImage)             \
     X(vkCmdDraw)                        \
     X(vkCmdDrawIndexed)                 \
+    X(vkCmdDrawIndexedIndirect)         \
     X(vkCmdDispatch)                    \
     X(vkCmdBindVertexBuffers)           \
     X(vkCmdBindVertexBuffers2)          \

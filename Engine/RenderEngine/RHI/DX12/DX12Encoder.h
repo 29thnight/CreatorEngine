@@ -34,6 +34,7 @@ public:
         : m_commandList(commandList), m_resources(resources) {}
 
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
+    bool SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
     void SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline) override;
     void SetPrimitiveTopology(RHIPrimitiveTopology topology) override;
 
@@ -66,6 +67,7 @@ public:
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
     void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
+    bool DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
 
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 

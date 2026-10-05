@@ -92,11 +92,13 @@ public:
         VkDevice device = VK_NULL_HANDLE,
         VulkanDescriptorPoolRecycler* descriptors = nullptr,
         const VulkanBindingTable* bindingTables = nullptr,
-        const VulkanSamplerTable* samplerTables = nullptr)
+        const VulkanSamplerTable* samplerTables = nullptr,
+        RHIIndirectDrawCapabilities indirectDrawCapabilities = {})
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
         , m_resources(resources), m_renderTargets(renderTargets)
         , m_device(device), m_descriptors(descriptors)
-        , m_bindingTables(bindingTables), m_samplerTables(samplerTables) {}
+        , m_bindingTables(bindingTables), m_samplerTables(samplerTables)
+        , m_indirectDrawCapabilities(indirectDrawCapabilities) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
@@ -109,6 +111,7 @@ public:
     ///   향한다. 높이를 음수로 주어 백엔드가 맞춘다 — 어느 층이 좌표계를
     ///   맞추는지가 계약의 문제라서 셰이더에 숨기지 않는다.
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
+    bool SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
 
     /// ★ 인자 둘은 `RHIEncoder::SetPipeline` 과 같은데 **근거가 반대다.**
     ///   `RHIEncoder.h` ③은 "Vulkan 은 레이아웃이 파이프라인에 구워지므로
@@ -134,6 +137,7 @@ public:
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
     void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
+    bool DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
     /// 불투명 값을 표의 슬롯으로 읽어 백엔드 실물로 푼다 (5c-4c).
@@ -280,6 +284,7 @@ private:
     VulkanDescriptorPoolRecycler*  m_descriptors{ nullptr };
     const VulkanBindingTable*      m_bindingTables{ nullptr };
     const VulkanSamplerTable*      m_samplerTables{ nullptr };
+    RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
 
     std::vector<PendingBinding> m_pending[2];
     bool m_descriptorsDirty[2]{ false, false };

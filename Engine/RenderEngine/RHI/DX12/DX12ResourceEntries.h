@@ -33,6 +33,16 @@
 // 소스 호환 별칭. 실체는 RHI/의 중립 값 타입이고 DX12 전용 포맷을 내지 않는다.
 using DX12TextureEntry = RHITextureEntry;
 
+/// 생성 때 확정된 범위·용도다. indirect draw마다 COM 질의를 반복하지 않는다.
+struct DX12BufferEntry
+{
+    ID3D12Resource* resource{ nullptr };
+    uint64_t bytes{ 0 };
+    bool allowIndirectArguments{ false };
+
+    bool IsValid() const { return nullptr != resource; }
+};
+
 // ── 파이프라인 표가 드는 것 (A-1) ──
 //
 // ★ `DX12RootSignatureEntry` 가 여기 있었다. 캐시가 `{signature, id}` 를 밖으로

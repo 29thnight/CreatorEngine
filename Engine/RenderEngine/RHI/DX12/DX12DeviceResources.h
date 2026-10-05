@@ -410,6 +410,20 @@ public:
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
+    DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
+    {
+        return m_resourceTable.DescribeBuffer(handle);
+    }
+
+    RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
+    {
+        const bool available = nullptr != m_drawIndexedIndirectSignature.Get();
+        return { available, available };
+    }
+    ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const
+    {
+        return m_drawIndexedIndirectSignature.Get();
+    }
 
     /// 버퍼의 GPU 주소 (A-4). 인코더의 드로우 루프가 쓴다 — 근거는 표에 있다.
     D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
@@ -489,6 +503,7 @@ private:
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
     ComPtr<ID3D12Device>               m_device;
+    ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
     // 포인터 하나 검사로 끝난다.

@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <cstddef>
 #include <cstring>
 
 #include "RHIFormat.h"
@@ -648,6 +649,33 @@ struct RHIUploadStats
     uint32_t registryHighWater{ 0 };
 };
 
+/// 두 백엔드의 단건 indexed indirect 명령과 같은 20바이트 계약이다.
+/// GPU 생산자도 이 순서와 부호를 지켜야 하며, instanceCount=0으로 숨길 수 있다.
+struct RHIDrawIndexedIndirectArguments
+{
+    uint32_t indexCount{ 0 };
+    uint32_t instanceCount{ 0 };
+    uint32_t firstIndex{ 0 };
+    int32_t baseVertex{ 0 };
+    uint32_t firstInstance{ 0 };
+};
+
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == 20);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) == 0);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) == 4);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) == 8);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) == 12);
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) == 16);
+
+/// 실제 생성·활성화한 기능만 보고한다. 기본값이면 CPU DrawIndexed를 쓴다.
+/// 단건만 보장하며 count buffer·multi-draw·mesh shader·DXR은 전제하지 않는다.
+struct RHIIndirectDrawCapabilities
+{
+    bool indexedDraw{ false };
+    // false면 모든 GPU 인자에서 firstInstance를 0으로 써야 한다.
+    bool nonZeroFirstInstance{ false };
+};
+
 struct RHIBufferDesc
 {
     uint64_t bytes{ 0 };
@@ -660,6 +688,10 @@ struct RHIBufferDesc
 
     /// PIX·DRED에서 읽히는 이름. 비우지 말 것.
     const wchar_t* debugName{ nullptr };
+
+    /// Vulkan은 생성 때 INDIRECT_BUFFER 용도가 필요하다. DX12도 같은
+    /// 선언을 검사해 한쪽에서만 우연히 동작하는 인자 버퍼를 막는다.
+    bool allowIndirectArguments{ false };
 };
 
 struct RHITextureDesc

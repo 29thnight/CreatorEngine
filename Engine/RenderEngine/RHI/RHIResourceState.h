@@ -68,6 +68,8 @@ enum class RHIResourceState
     CopySource,
     CopyDest,
     IndexBuffer,
+    // 버퍼 전용 읽기. GPU가 쓴 명령을 draw-indirect 단계가 소비한다.
+    IndirectArgument,
 };
 
 /// 전이 하나. 그래프 밖에서 상태를 바꿀 때 쓴다(그래프 안은 usage 선언이 한다).

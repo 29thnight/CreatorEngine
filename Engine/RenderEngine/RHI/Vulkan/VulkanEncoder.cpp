@@ -7,6 +7,18 @@
 
 #include <algorithm>
 
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(VkDrawIndexedIndirectCommand));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
+    offsetof(VkDrawIndexedIndirectCommand, indexCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
+    offsetof(VkDrawIndexedIndirectCommand, instanceCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
+    offsetof(VkDrawIndexedIndirectCommand, firstIndex));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
+    offsetof(VkDrawIndexedIndirectCommand, vertexOffset));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) ==
+    offsetof(VkDrawIndexedIndirectCommand, firstInstance));
+
 using namespace VulkanApi;
 
 namespace
@@ -60,6 +72,19 @@ void VulkanEncoder::SetViewportAndScissor(uint32_t width, uint32_t height)
 
     VkRect2D scissor{ { 0, 0 }, { width, height } };
     vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+}
+
+bool VulkanEncoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    constexpr uint32_t kMaxScissorCoordinate = INT32_MAX;
+    if (VK_NULL_HANDLE == m_commandBuffer || x > kMaxScissorCoordinate || y > kMaxScissorCoordinate ||
+        width > kMaxScissorCoordinate - x || height > kMaxScissorCoordinate - y)
+    {
+        return false;
+    }
+    const VkRect2D scissor{ { static_cast<int32_t>(x), static_cast<int32_t>(y) }, { width, height } };
+    vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+    return true;
 }
 
 void VulkanEncoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
@@ -272,6 +297,34 @@ void VulkanEncoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
     FlushDescriptors(RHIBindPoint::Graphics);
     vkCmdDrawIndexed(m_commandBuffer, indexCount, instanceCount, firstIndex,
         baseVertex, firstInstance);
+}
+
+bool VulkanEncoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        !m_indirectDrawCapabilities.indexedDraw || nullptr == vkCmdDrawIndexedIndirect ||
+        !m_renderingOpen || 0 != byteOffset % 4)
+    {
+        return false;
+    }
+    const VulkanBufferEntry entry = m_resources->Resolve(arguments);
+    if (!entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+
+    const uint32_t errorsBeforeFlush = m_unimplemented;
+    FlushDescriptors(RHIBindPoint::Graphics);
+    if (errorsBeforeFlush != m_unimplemented)
+    {
+        return false;
+    }
+
+    // multiDrawIndirect는 요구하지 않는다. firstInstance 제약은 생산자가 지킨다.
+    vkCmdDrawIndexedIndirect(m_commandBuffer, entry.buffer, byteOffset, 1,
+        sizeof(RHIDrawIndexedIndirectArguments));
+    return true;
 }
 
 void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)

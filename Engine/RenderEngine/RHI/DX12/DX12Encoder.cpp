@@ -3,6 +3,18 @@
 
 #include <vector>
 
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(D3D12_DRAW_INDEXED_ARGUMENTS));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, IndexCountPerInstance));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, InstanceCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartIndexLocation));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, BaseVertexLocation));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartInstanceLocation));
+
 namespace
 {
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
@@ -29,6 +41,20 @@ void DX12Encoder::SetViewportAndScissor(uint32_t width, uint32_t height)
 
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissor);
+}
+
+bool DX12Encoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    constexpr uint32_t kMaxScissorCoordinate = INT32_MAX;
+    if (nullptr == m_commandList || x > kMaxScissorCoordinate || y > kMaxScissorCoordinate ||
+        width > kMaxScissorCoordinate - x || height > kMaxScissorCoordinate - y)
+    {
+        return false;
+    }
+    const D3D12_RECT scissor{ static_cast<LONG>(x), static_cast<LONG>(y),
+        static_cast<LONG>(x + width), static_cast<LONG>(y + height) };
+    m_commandList->RSSetScissorRects(1, &scissor);
+    return true;
 }
 
 void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline)
@@ -224,6 +250,25 @@ void DX12Encoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
     if (nullptr == m_commandList || 0 == indexCount || 0 == instanceCount) return;
     m_commandList->DrawIndexedInstanced(indexCount, instanceCount, firstIndex,
         baseVertex, firstInstance);
+}
+
+bool DX12Encoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (nullptr == m_commandList || nullptr == m_resources || 0 != byteOffset % 4)
+    {
+        return false;
+    }
+    ID3D12CommandSignature* const signature = m_resources->GetDrawIndexedIndirectSignature();
+    const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
+    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+
+    // 개수 버퍼가 없고 최대 개수도 1이다. CPU 바인딩은 signature가 바꾸지 않는다.
+    m_commandList->ExecuteIndirect(signature, 1, entry.resource, byteOffset, nullptr, 0);
+    return true;
 }
 
 void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)

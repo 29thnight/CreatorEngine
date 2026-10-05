@@ -157,7 +157,7 @@ RHIEncoder& VulkanCommandBufferPool::AcquireEncoder(uint32_t worker)
         slot.buffer, m_resources->m_pipelineCache, &m_resources->m_resourceTable,
         &m_resources->m_renderTargetTables[m_resources->m_frameIndex], m_device,
         &m_resources->m_descriptorRecycler, &m_resources->m_bindingTable,
-        &m_resources->m_samplerTable);
+        &m_resources->m_samplerTable, m_resources->GetIndirectDrawCapabilities());
     return *slot.encoder;
 }
 

@@ -187,6 +187,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 {
     m_width = width;
     m_height = height;
+    m_drawIndexedIndirectSignature.Reset();
 
     const ValidationMode validationMode = ReadValidationMode();
     const bool debugLayerEnabled = ValidationMode::Off != validationMode;
@@ -302,6 +303,23 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     ::rhi::validation::declare_layer(nullptr != m_infoQueue,
         ValidationMode::Gpu == validationMode ? "gpu" :
         ValidationMode::Basic == validationMode ? "basic" : "off");
+
+    // 바인딩은 기존 그래픽 경로가 유지하므로 루트 시그니처 없는 단건 draw만 굽는다.
+    // 준비 실패는 capability=false로 남겨 CPU 경로를 유지한다.
+    D3D12_INDIRECT_ARGUMENT_DESC indexedArgument{};
+    indexedArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+    D3D12_COMMAND_SIGNATURE_DESC indirectSignature{};
+    indirectSignature.ByteStride = sizeof(RHIDrawIndexedIndirectArguments);
+    indirectSignature.NumArgumentDescs = 1;
+    indirectSignature.pArgumentDescs = &indexedArgument;
+    const HRESULT indirectResult = m_device->CreateCommandSignature(
+        &indirectSignature, nullptr, IID_PPV_ARGS(&m_drawIndexedIndirectSignature));
+    if (FAILED(indirectResult))
+    {
+        m_drawIndexedIndirectSignature.Reset();
+        OutputDebugStringA(("[DX12] Indexed indirect unavailable: " +
+            HrToString(indirectResult) + "\n").c_str());
+    }
 
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
@@ -471,6 +489,7 @@ void DX12DeviceResources::Shutdown()
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
     m_commandList.Reset();
+    m_drawIndexedIndirectSignature.Reset();
     for (auto& lists : m_retiredCommandLists) lists.clear();
     m_immediateEncoder.reset();
 
@@ -1629,6 +1648,8 @@ D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
     case RHIResourceState::CopySource:      return D3D12_RESOURCE_STATE_COPY_SOURCE;
     case RHIResourceState::CopyDest:        return D3D12_RESOURCE_STATE_COPY_DEST;
     case RHIResourceState::IndexBuffer:     return D3D12_RESOURCE_STATE_INDEX_BUFFER;
+    case RHIResourceState::IndirectArgument:
+        return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
     case RHIResourceState::Common:
     default:                                return D3D12_RESOURCE_STATE_COMMON;
     }
@@ -2045,8 +2066,14 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     RHIBufferHandle& outHandle, std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"DX12CreateBuffer">()};
+    outHandle = {};
     if (nullptr == m_device) { outError = "디바이스가 없다"; return false; }
     if (0 == desc.bytes)     { outError = "버퍼 크기가 0이다"; return false; }
+    if (RHIResourceState::IndirectArgument == desc.initialState && !desc.allowIndirectArguments)
+    {
+        outError = "IndirectArgument 상태에는 allowIndirectArguments가 필요하다";
+        return false;
+    }
 
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -2080,7 +2107,12 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     DevResApplyDebugName(resource.Get(), desc.debugName);
 
     // 표가 소유를 가져간다 — 호출부에는 핸들만 남는다(V2-a).
-    outHandle = m_resourceTable.AddBuffer(std::move(resource));
+    outHandle = m_resourceTable.AddBuffer(std::move(resource), desc.allowIndirectArguments);
+    if (!outHandle.IsValid())
+    {
+        outError = "버퍼 핸들 표가 가득 찼다";
+        return false;
+    }
     return true;
 }
 

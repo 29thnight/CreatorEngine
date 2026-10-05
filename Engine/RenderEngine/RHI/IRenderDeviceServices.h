@@ -266,6 +266,12 @@ public:
     virtual bool CreateBuffer(const RHIBufferDesc& desc,
         RHIBufferHandle& outHandle, std::string& outError) = 0;
 
+    /// 초기화 때 실제 준비한 기능의 스냅샷이다. 미지원 구현은 CPU 경로를 쓴다.
+    virtual RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const
+    {
+        return {};
+    }
+
     virtual bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) = 0;
 

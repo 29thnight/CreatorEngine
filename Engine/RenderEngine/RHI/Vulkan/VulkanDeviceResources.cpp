@@ -456,6 +456,10 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 
 bool VulkanDeviceResources::CreateDevice(std::string& outError)
 {
+    m_indirectDrawCapabilities = {};
+    VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &availableFeatures);
+
     const float priority = 1.f;
     VkDeviceQueueCreateInfo queueInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
     queueInfo.queueFamilyIndex = m_queueFamily;
@@ -510,6 +514,8 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     // EnhancedWireFramePass의 RHIFillMode::Wireframe은
     // VkPipelineRasterizationStateCreateInfo::polygonMode=LINE으로 번역된다.
     features2.features.fillModeNonSolid = VK_TRUE;
+    // 선택 기능이 없는 장치도 firstInstance=0인 단건 경로는 사용할 수 있다.
+    features2.features.drawIndirectFirstInstance = availableFeatures.features.drawIndirectFirstInstance;
     features2.pNext = &features11;
 
     VkDeviceCreateInfo deviceInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
@@ -527,6 +533,10 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     }
 
     if (!LoadDevice(m_device, outError)) return false;
+
+    m_indirectDrawCapabilities.indexedDraw = nullptr != vkCmdDrawIndexedIndirect;
+    m_indirectDrawCapabilities.nonZeroFirstInstance = m_indirectDrawCapabilities.indexedDraw &&
+        VK_TRUE == features2.features.drawIndirectFirstInstance;
 
     vkGetDeviceQueue(m_device, m_queueFamily, 0, &m_queue);
     return true;
@@ -633,6 +643,7 @@ void VulkanDeviceResources::Shutdown()
     m_queueFamily = UINT32_MAX;
     m_memoryBudgetSupported = false;
     m_nullDescriptorSupported = false;
+    m_indirectDrawCapabilities = {};
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
     m_pipelineCache = nullptr;
