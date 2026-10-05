@@ -6,8 +6,46 @@
 2026-08-28 작성. `EnhancedRenderGraph`를 교체하지 않고, 명시적 리소스 접근과
 버전 계보로 실행 순서를 컴파일하는 그래프로 단계적으로 확장하는 구현 계획이다.
 
-상태: **2026-10-03 BASE-0 완료, RG1 완료, RG2 완료, RG3 완료, RG4 완료, RG5 생산자 첫 묶음 완료·전체 이관 진행, RG6~RG9 미착수.** 문서 작성과 정적 검증은 구현·빌드·픽셀 검증 완료를
-뜻하지 않는다.
+상태: **2026-10-05 BASE-0·RG1~RG4 및 RG5-1~RG5-12의 기존 수용 기록 유지. 요청 범위의 RG5 후속·RG6·RG-V 소스 구현 완료·동결, 영역별 및 전체 diff 독립 최종 정적 검토 완료. 신규 수용 검증 전부 미실행. RG7~RG9·Q0 미착수.** 소스 구현 완료는 빌드·실행·픽셀·성능 수용 완료를 뜻하지 않으며 게시 반영 여부는 PR #122 이력에서 별도 확인한다.
+
+## 2026-10-05 소스 구현 동결·독립 최종 정적 검토 완료 — 실행 수용과 분리
+
+이번 작업은 GPU-driven geometry와 Unreal RDG의 명시적 의존성·수명 원칙을 참고한
+runtime lookup/조명 분리를 같은 `EnhancedRenderGraph`에 연결하는 코드 이관이다.
+요청 범위의 소스 구현과 영역별·전체 diff 독립 최종 정적 검토는 끝났다.
+게시 반영 여부는 PR #122 커밋 이력과 원격 head를 대조해 별도 확인한다. 이 문서는
+소스·정적 검토 범위를 기록하며 게시·실행 수용 완료를 선언하지 않는다.
+빌드·테스트·renderer 실행·capture·GPU validation·성능 측정은 사용자 요청에 따라 실행하지 않는다.
+기존 `BASE-0`·`RG1~RG4`·`RG5-1~RG5-12` 증거는 해당 소스의 역사적 수용 기록이며,
+이번 변경의 통과 증거로 재사용하지 않는다. 후속 RG5·RG6·RG-V의 완료 판정과 기성은 올리지 않는다.
+
+| 영역 | 현행 코드 진행 | 남은 확인·경계 |
+|---|---|---|
+| RG5 후속 제품 선언 | VolumetricFog·PostChain·UI·Editor Grid/WireFrame/GizmoIcon/GizmoLine의 Read/Write/Modify 및 반환 출력 배선, Decal 중복 읽기 정리 | 전체 제품·test/fixture 접근 감사, 임시 추론·adapter 잔여와 실제 versioned GPU 수용은 미판정 |
+| RG6 제품 전환 | SceneRenderer의 `ExplicitVersioned` + `DependencyOrder`, 최신 최종 출력·capture 소비 배선 | 현행 Debug/Release 빌드, 별도 프로세스 live 전후 픽셀·validation·정상 종료·CPU/GPU 계측 미실행 |
+| RG-V·graph 진단 | compile generation·dependency hash, immutable snapshot reader/viewer, PBR capture의 compiledGraph schema 3(바깥 manifest schema 1 유지), imported final-state를 마지막 소비 뒤 복구하는 배선 | Scene/Game/Material Preview·resize·세대 교체 일치, stale/missing-edge 변이, viewer 비용·메모리·UI 검증 미실행 |
+| GPU-driven geometry | backend-neutral 단일 indexed-indirect, reset→frustum cull·atomic compaction→간접 인자 생성 및 Enhanced/LX GBuffer 연결. static opaque/masked 대상, CPU material/PSO bin과 LX per-geometry bin 유지. encoder는 capability·usage·offset/range를 검사하고 graph가 `IndirectArgument` 전이를 소유 | 선택적 화면 밖 추가 후보를 기존 draw 예산으로 제한하고 확장된 Graph Seal 실패 시 원래 visible/caster 집합으로 재시도. skinned/custom·미지원 direct fallback 및 기존 Seal 예산 검사를 유지하며 native 현재 state 검증·실제 draw/픽셀·성능 수용은 주장하지 않음 |
+| runtime lookup·조명 | 사용자 승인에 따라 DX12·Vulkan live 경로 모두 split-sum으로 통일, GPU scene/material 입력 재사용. 기본 live에서 320 B/pixel의 전체 화면 lookup bake 저장소 할당 제거 | 정밀 적분과 기존 approximate-cache API는 bake/reference/diagnostics에 보존. 과거 DX12 정밀 경로와 픽셀 동일성·실제 4K 전체 peak 메모리는 미판정. Scene host ABI 16으로 해당 재질 프로그램 재생성 필요 |
+| 특수 재질 | 264×264의 ordered 14-RGBA32F + D32 scratch, float32 D32 tile-depth 초기화·4-pixel halo SSS·전역 HDR/depth ray 입력. 특수 stream마다 repeated graph node 1개와 compiler-planned phase 4개로 타일 반복 | 타일마다 graph node를 늘리지 않음. full-screen reference 경로 보존. 4K 메모리·타일 경계·SSS/투과 품질·성능 수용 미실행 |
+| 제출·자원 수명 | reserved/admitted/native-confirmed/GPU-complete/rejected 구분, never-admitted만 정확한 예약 취소, producer 측 token 소멸 | native 실행 불명확 시 소유권 유지·일반 제출 차단. capture/resize/shutdown 공통 proof gate의 실행 검증 미실행 |
+
+화면 밖 추가 후보의 상한은 `SceneInputBudget.draws`(현재 4096)이며 원래 visible/caster
+집합의 예산을 확대하지 않는다. 확장 입력의 Seal 실패 시 해당 원래 집합과 대응 fallback
+소유자로 재시도하고, 재시도 역시 기존 draw·geometry·payload 예산 검사를 통과해야 한다.
+기본 live에서 제거한 320 B/pixel은 11×RGBA32F 입력 176 B와 `IblBakeSample` 출력 144 B의
+합계다. 현재 live는 capture 입력을 끄고 sample 레코드 1개만 남기며, reference·명시적 capture와
+특수 재질 scratch/snapshot까지 없애거나 실제 전체 VRAM을 측정했다는 뜻은 아니다.
+
+메모리 수치는 **소스의 정적 산술이며 측정 peak VRAM이 아니다.** 타일 payload는
+15,890,688 bytes(약 15.15 MiB), ledger charge는 16.0625 MiB에 타일별 상수를 더한다
+(3840×2160에서 135×256 bytes). 굴절의 전역 HDR+depth snapshot ledger charge는 같은
+4K에서 95 MiB다. native driver 계상은 backend가 소유한다. 일반 budget/rejection은
+nonfatal이다. 드문 강제 소멸에서 GPU idle과 실제 device-loss 입증이 모두 실패하고 유지할
+owner도 없는 경우에만 기존 fatal invariant가 적용될 수 있다. 세부 수명 경계는 아래 전환 기록을 따른다.
+
+세부 소스 범위와 잔여 검증은 [GPU-driven 전환 기록](../analysis/GpuDrivenRenderGraphTransition.md)을 따른다.
+이 절은 기존 슬라이스 번호·종료 게이트를 바꾸지 않으며 RG7 aliasing, async queue,
+Mesh Shader, DXR, WorkGraph, compiled-plan/shadow cache를 이번 작업에 포함하지 않는다.
 
 ---
 
@@ -392,9 +430,9 @@ RG4 wave/critical-path와 RG7~9 alias/queue/range 정보는 지원되는 세대�
 
 2026-10-04 RG5-12 화면 SSS/SSR 접근·출력 이관 완료: 두 블러 축과 반사 pass의 입력 Read·새 출력 Write/v0 및 선언 당시 핸들 캡처를 연결했다. 두 구성 빌드·각 3정책/48 frames·네 단계 전체 RGBA 정책 간 오차 0·validation 0, 실제 블러/반사 기여와 비활성/마스크/입력 누락 경로, 기본 제품 반복 회귀·전후/구성 간 각 16개 이미지 오차 0 및 현행 해시 기준선 통과. [검증 기록](../analysis/RenderRg5ScreenMigration.md). 정적 cpp/h 호출은 제품 59·게이트 224(신규 검사 헤더 포함)이며 inl 전체 목록과 구분한다. 제품 기본 DeclarationOrder, RG5 progress/기성 0과 전체 제품 versioned GPU 수용/RG6 미전환을 유지한다. 다음은 VolumetricFog 소비 체인 이관이다.
 
-## RG5 남은 이관 순서 — 2026-10-04
+## RG5 남은 이관 순서 — 2026-10-04 기준선 이력
 
-RG5-12 이후 현재 코드에서 남은 제품·Editor pass는 7개이며, 최종 출력·캡처 배선과 test/fixture 정리가 별도로 남아 있다.
+RG5-12 직후 남았던 제품·Editor pass는 7개이며, 당시 최종 출력·캡처 배선과 test/fixture 정리가 별도로 남아 있었다. 아래는 당시의 이관 순서다. 2026-10-05 코드 진행과 미검증 경계는 위의 별도 절을 따른다.
 
 | 순서 | 대상 | 남은 접근·버전 배선 |
 |---|---|---|
@@ -406,4 +444,4 @@ RG5-12 이후 현재 코드에서 남은 제품·Editor pass는 7개이며, 최�
 | 6 | 최종 출력·캡처 | live_present와 capture/readback의 최신 출력 버전 소비 |
 | 7 | test/fixture·임시 adapter | 남은 명시 접근 이관, 의도적인 legacy 검증과 구분하여 임시 추론·adapter 정리 |
 
-위 배선과 전체 SceneRenderer의 versioned GPU 수용을 확인해야 RG5를 닫는다. RG6의 제품 기본 의존성 정렬 전환은 이후 단계다. 다음 구현은 VolumetricFog이며, 현행 제품 기본 DeclarationOrder와 IBL 1024/4096을 유지한다. MAT-9 SSS·투과 품질/성능 게이트는 별도 미완료 조건이다. Vulkan 비교는 PHASE 4.9 RenderDoc 캡처→리소스 확인→픽셀별 비교에만 둔다.
+위 배선과 전체 SceneRenderer의 versioned GPU 수용을 확인해야 RG5를 닫는다. 2026-10-04 수용 기준선은 제품 기본 DeclarationOrder와 IBL 1024/4096이었다. 2026-10-05 의존성 정렬 전환 코드는 그 이후의 미검증 변경이며 RG6 수용을 뜻하지 않는다. MAT-9 SSS·투과 품질/성능 게이트는 별도 미완료 조건이다. Vulkan 비교는 PHASE 4.9 RenderDoc 캡처→리소스 확인→픽셀별 비교에만 둔다.
