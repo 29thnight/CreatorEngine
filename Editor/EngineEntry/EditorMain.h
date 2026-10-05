@@ -79,6 +79,7 @@ namespace Editor
 		void StopPresentationThread();
 		void PresentationThreadMain();
 		void PresentFrame();
+        void NotifyDisplayAvailable();
 		void UpdateTitleBar();
 		void OnGui();
 		void HandleWindowResize();
@@ -120,6 +121,7 @@ namespace Editor
 		bool m_presentationThreadStarted{ false };
 		bool m_presentationThreadStartFailed{ false };
 		bool m_presentationStopRequested{ false };
+        bool m_displayUpdateRequested{ false };
 		uint64_t m_requestedPresentationFrameId{ 0 };
 		uint64_t m_consumedPresentationFrameId{ 0 };
 		uint64_t m_presentationRequests{ 0 };

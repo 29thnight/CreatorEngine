@@ -451,6 +451,14 @@ void DX12DeviceResources::Shutdown()
     for (auto& backBuffer : m_backBuffers) backBuffer.Reset();
     m_backBufferRtvHeap.Reset();
     m_swapChain.Reset();
+    if (nullptr != m_frameLatencyWaitableObject)
+    {
+        CloseHandle(m_frameLatencyWaitableObject);
+        m_frameLatencyWaitableObject = nullptr;
+    }
+    m_frameLatencyReady = false;
+    m_hostSubmissionTicket = {};
+    m_hostFenceValue = 0;
 
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
     m_uploadAllocator.Shutdown();
@@ -536,17 +544,43 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
         return false;
     }
 
-    auto& allocator = m_allocators[m_frameIndex];
-
-    // 이 얼로케이터로 기록했던 프레임을 GPU가 끝냈는지 — 인플라이트 회전의 핵심.
-    const uint64_t completed = m_fence->GetCompletedValue();
-    if (completed < m_frameFenceValues[m_frameIndex])
+    if (HasSwapChain())
     {
-        HRESULT hr = m_fence->SetEventOnCompletion(m_frameFenceValues[m_frameIndex], m_fenceEvent);
-        if (FAILED(hr)) { outError = "펜스 대기 설정 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
-        ce::profile_scope wait{ce::marker<"DX12FrameFenceWait">()};
-        WaitForSingleObject(m_fenceEvent, INFINITE);
+        // CPU 제출 ticket만으로는 호스트 GPU 작업량을 제한할 수 없다.
+        // 기록을 시작하기 전에 이 소유자의 직전 GPU 프레임 완료도 기다린다.
+        if ((m_hostSubmissionTicket.IsValid() && !submission.Wait(m_hostSubmissionTicket, outError)) ||
+            !WaitForFenceValue(m_hostFenceValue, outError))
+        {
+            return false;
+        }
+        if (!m_frameLatencyReady)
+        {
+            ce::profile_scope wait{ce::marker<"DX12HostAdmissionWait">()};
+            // 창 가림·최소화가 표시 소유자의 리사이즈·종료 처리를 막아서는 안 된다.
+            // 시간 초과면 새 프레임을 허용하지 않는다. 다음 표시 요청에서 다시
+            // 시도하므로 바쁜 대기나 큐 누적이 생기지 않는다.
+            constexpr DWORD kHostAdmissionWaitMilliseconds = 100;
+            const DWORD result = WaitForSingleObject(m_frameLatencyWaitableObject, kHostAdmissionWaitMilliseconds);
+            if (WAIT_TIMEOUT == result)
+            {
+                outError = "DX12 host frame admission timed out";
+                return false;
+            }
+            if (WAIT_OBJECT_0 != result)
+            {
+                outError = "DX12 frame latency wait failed " +
+                    std::to_string(WAIT_FAILED == result ? GetLastError() : result);
+                return false;
+            }
+            // 기록을 취소하면 실제 Present까지 이 허용 상태를 유지한다.
+            m_frameLatencyReady = true;
+        }
     }
+    if (!WaitForFenceValue(m_frameFenceValues[m_frameIndex], outError))
+    {
+        return false;
+    }
+    auto& allocator = m_allocators[m_frameIndex];
 
     HRESULT hr = allocator->Reset();
     if (FAILED(hr)) { outError = "얼로케이터 Reset 실패 " + HrToString(hr); AppendDeviceRemovedReport(hr, outError); return false; }
@@ -583,12 +617,15 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     // frame index가 아니라 실제 fence 완료값으로 업로드 세그먼트를 회수한다.
     RefreshUploadBudget();
     RefreshPersistentMemoryBudget();
-    m_uploadAllocator.Collect(m_fence->GetCompletedValue());
+    const uint64_t completed = GetCompletedFenceValue();
+    m_uploadAllocator.Collect(completed);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
-        listener->OnUploadCompleted(m_fence->GetCompletedValue());
+    {
+        listener->OnUploadCompleted(completed);
+    }
     m_currentRecordingId = m_nextRecordingId++;
     m_uploadAllocator.BeginRecording(m_currentRecordingId);
-    m_descriptorRecycler.Collect(RHICompletionPoint{ m_fence->GetCompletedValue() });
+    m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
     if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
     {
         m_uploadAllocator.AbortRecording(m_currentRecordingId);
@@ -662,6 +699,11 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
         return false;
     }
     m_frameSubmissionTickets[frameSlot] = ticket;
+    if (HasSwapChain())
+    {
+        m_hostSubmissionTicket = ticket;
+        m_hostFenceValue = fenceValue;
+    }
 
     // 같은 allocator는 되감지 않고 새 command-list 객체만 연다. 이전 객체는
     // RHI thread가 아직 Execute하지 않았을 수 있어 여기서 Reset할 수 없다.
@@ -807,7 +849,47 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
         return false;
     }
     m_frameSubmissionTickets[frameSlot] = ticket;
+    if (HasSwapChain())
+    {
+        m_hostSubmissionTicket = ticket;
+        m_hostFenceValue = fenceValue;
+    }
     m_frameIndex = (m_frameIndex + 1) % kFrameCount;
+    return true;
+}
+
+bool DX12DeviceResources::WaitForFenceValue(uint64_t value, std::string& outError)
+{
+    uint64_t completed = m_fence->GetCompletedValue();
+    if (UINT64_MAX != completed && completed < value)
+    {
+        const HRESULT result = m_fence->SetEventOnCompletion(value, m_fenceEvent);
+        if (FAILED(result))
+        {
+            outError = "DX12 fence wait setup failed " + HrToString(result);
+            AppendDeviceRemovedReport(result, outError);
+            return false;
+        }
+        ce::profile_scope wait{ce::marker<"DX12FrameFenceWait">()};
+        if (WAIT_OBJECT_0 != WaitForSingleObject(m_fenceEvent, INFINITE))
+        {
+            outError = "DX12 fence wait failed " + std::to_string(GetLastError());
+            return false;
+        }
+        completed = m_fence->GetCompletedValue();
+    }
+    if (UINT64_MAX == completed)
+    {
+        outError = "DX12 fence reports device removal";
+        AppendDeviceRemovedReport(DXGI_ERROR_DEVICE_REMOVED, outError);
+        GetRHISubmissionThread().MarkUnrecoverableDeviceError(this, outError);
+        return false;
+    }
+    if (completed < value)
+    {
+        outError = "DX12 fence event did not establish GPU completion";
+        return false;
+    }
     return true;
 }
 
@@ -863,8 +945,7 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
 
     const uint64_t fenceValue = m_nextFenceValue++;
     if (!submission.ExecuteLifecycleDrain(this, command,
-        [owner = this, queue = m_queue, fence = m_fence,
-            fenceEvent = m_fenceEvent, fenceValue](std::string& taskError)
+        [owner = this, queue = m_queue, fence = m_fence, fenceValue](std::string& taskError)
         {
             if (!GetRHISubmissionThread().IsCurrentThread())
             {
@@ -885,22 +966,10 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command,
                 }
                 return false;
             }
-            if (fence->GetCompletedValue() < fenceValue)
-            {
-                const HRESULT waitResult = fence->SetEventOnCompletion(
-                    fenceValue, fenceEvent);
-                if (FAILED(waitResult))
-                {
-                    taskError = "DX12 lifecycle fence wait 설정 실패 " +
-                        HrToString(waitResult);
-                    return false;
-                }
-                WaitForSingleObject(fenceEvent, INFINITE);
-            }
-            return true;
+            return owner->WaitForFenceValue(fenceValue, taskError);
         }, m_lastLifecycleResult, outError)) return false;
 
-    const uint64_t completed = m_fence->GetCompletedValue();
+    const uint64_t completed = GetCompletedFenceValue();
     m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(completed);
@@ -1327,15 +1396,15 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.BufferCount = kFrameCount;
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    // Present uses sync interval zero. Opt in at creation and preserve the
-    // flag through resize so windowed presentation does not throttle the
-    // shared submission thread behind the desktop composition cadence.
+    // tearing은 선택 사항이다. 데스크톱 합성이 표시 주기를 정하더라도
+    // waitable swapchain이 DXGI의 새 프레임 허용량을 별도로 제한한다.
     ComPtr<IDXGIFactory5> tearingFactory;
     BOOL allowTearing = FALSE;
     const bool supportsTearing = SUCCEEDED(m_factory.As(&tearingFactory)) &&
         SUCCEEDED(tearingFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING,
             &allowTearing, sizeof(allowTearing))) && allowTearing;
-    m_swapChainFlags = supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+    m_swapChainFlags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT |
+        (supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
     desc.Flags = m_swapChainFlags;
 
     ComPtr<IDXGISwapChain1> swapChain1;
@@ -1351,6 +1420,21 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
         outError = "IDXGISwapChain3 질의 실패";
         return false;
     }
+    hr = m_swapChain->SetMaximumFrameLatency(1);
+    if (FAILED(hr))
+    {
+        outError = "SetMaximumFrameLatency failed " + HrToString(hr);
+        m_swapChain.Reset();
+        return false;
+    }
+    m_frameLatencyWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+    if (nullptr == m_frameLatencyWaitableObject)
+    {
+        outError = "DX12 frame latency waitable object is unavailable";
+        m_swapChain.Reset();
+        return false;
+    }
+    m_frameLatencyReady = false;
     // 전체 화면 전환은 셸(창 계층)이 관리한다 — DXGI의 암묵 Alt+Enter를 끈다.
     m_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER);
 
@@ -1423,32 +1507,39 @@ bool DX12DeviceResources::Present(std::string& outError)
         outError = "스왑체인이 없다";
         return false;
     }
-    return GetRHISubmissionThread().ExecuteAndWait(this, "DX12 Present",
-        [owner = this, swapChain = m_swapChain, creationFlags = m_swapChainFlags](std::string& error)
+    RHISubmissionThread& submission = GetRHISubmissionThread();
+    if (submission.ConsumeFailure(this, outError) ||
+        (m_hostSubmissionTicket.IsValid() && !submission.Wait(m_hostSubmissionTicket, outError)))
+    {
+        return false;
+    }
+
+    // 직렬 표시 소유자가 자신의 직전 큐 제출까지만 기다린 뒤 공용 RHI FIFO
+    // 밖에서 Present를 동기 호출한다. 리사이즈도 같은 소유자가 프레임 사이에
+    // 처리하고, 종료는 그 소유자를 join한 뒤 자원을 파괴한다. 반환 전에는 다음
+    // 호스트 제출이 없어 느린 Present가 씬 제출을 붙잡지 않는다.
+    // PHASE 4.5의 FG proxy·pacing·수명 관리는 이 네이티브 셸 경계의 책임이다.
+    // 에디터 뷰포트 live_present는 오프스크린 복사이므로 FG를 켜서는 안 된다.
+    ce::profile_scope present{ce::marker<"DXGIPresent">()};
+    BOOL fullscreen = FALSE;
+    const bool windowed = SUCCEEDED(m_swapChain->GetFullscreenState(&fullscreen, nullptr)) && !fullscreen;
+    const UINT flags = windowed && (m_swapChainFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
+        ? DXGI_PRESENT_ALLOW_TEARING : 0;
+    const HRESULT result = m_swapChain->Present(0, flags);
+    if (FAILED(result))
+    {
+        outError = "DX12 Present 실패 " + HrToString(result);
+        if (DXGI_ERROR_DEVICE_REMOVED == result || DXGI_ERROR_DEVICE_RESET == result ||
+            DXGI_ERROR_DEVICE_HUNG == result || DXGI_ERROR_DRIVER_INTERNAL_ERROR == result)
         {
-            if (!GetRHISubmissionThread().IsCurrentThread())
-            {
-                error = "DX12 Present가 RHI thread 밖에서 호출됐다";
-                return false;
-            }
-            ce::profile_scope present{ce::marker<"DXGIPresent">()};
-            BOOL fullscreen = FALSE;
-            const bool windowed = SUCCEEDED(swapChain->GetFullscreenState(&fullscreen, nullptr)) && !fullscreen;
-            const UINT flags = windowed && (creationFlags & DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING)
-                ? DXGI_PRESENT_ALLOW_TEARING : 0;
-            const HRESULT hr = swapChain->Present(0, flags);
-            if (FAILED(hr))
-            {
-                error = "DX12 Present 실패 " + HrToString(hr);
-                if (DXGI_ERROR_DEVICE_REMOVED == hr ||
-                    DXGI_ERROR_DEVICE_RESET == hr ||
-                    DXGI_ERROR_DEVICE_HUNG == hr ||
-                    DXGI_ERROR_DRIVER_INTERNAL_ERROR == hr)
-                    GetRHISubmissionThread().MarkUnrecoverableDeviceError(owner, error);
-                return false;
-            }
-            return true;
-        }, outError);
+            submission.MarkUnrecoverableDeviceError(this, outError);
+        }
+        return false;
+    }
+    // 창이 가려졌으면 새 표시 프레임이 큐에 들어가지 않았다. AbortFrame처럼
+    // 허용 상태를 유지해 건너뛴 Present의 신호를 복구 과정에서 기다리지 않는다.
+    m_frameLatencyReady = DXGI_STATUS_OCCLUDED == result;
+    return true;
 }
 
 uint32_t DX12DeviceResources::GetBackBufferIndex() const

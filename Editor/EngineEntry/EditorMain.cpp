@@ -140,7 +140,10 @@ void Editor::EditorMain::Initialize()
 	// 게시하기 전에 있어야 한다. 셸이 아직 Initialize 전이어도 위임은
 	// 안전하다(비활성 셸은 no-op/0).
 	EnhancedSceneRenderer::SetDisplayPresentationSink(
-		std::make_shared<ImGuiHostPresentationSink>());
+		std::make_shared<ImGuiHostPresentationSink>([this]
+        {
+            NotifyDisplayAvailable();
+        }));
 
 	std::string enhancedError;
 	const EnhancedLiveBackend startupBackend =
@@ -364,6 +367,7 @@ void Editor::EditorMain::StartPresentationThread()
 		m_presentationThreadStarted = false;
 		m_presentationThreadStartFailed = false;
 		m_presentationStopRequested = false;
+        m_displayUpdateRequested = false;
 		m_requestedPresentationFrameId = 0;
 		m_consumedPresentationFrameId = 0;
 		m_presentationRequests = 0;
@@ -442,9 +446,11 @@ void Editor::EditorMain::PresentationThreadMain()
 			{
 				return m_presentationStopRequested ||
 					m_isInvokeResize.load(std::memory_order_acquire) ||
+                    m_displayUpdateRequested ||
 					m_requestedPresentationFrameId > m_consumedPresentationFrameId;
 			});
 			if (m_presentationStopRequested) break;
+            m_displayUpdateRequested = false;
 
 			hasFrameRequest =
 				m_requestedPresentationFrameId > m_consumedPresentationFrameId;
@@ -501,6 +507,21 @@ void Editor::EditorMain::PresentationThreadMain()
 	// 가리키는 구간이 생기지 않는다.
 	ce::profiler().unregister_thread();
 	CoUninitialize();
+}
+
+void Editor::EditorMain::NotifyDisplayAvailable()
+{
+    {
+        std::lock_guard<std::mutex> lock(m_presentationMutex);
+        if (m_presentationStopRequested)
+        {
+            return;
+        }
+        // 마지막 GT 요청을 소비한 뒤에도 두 번째 뷰나 마지막 GPU 제출이 끝날 수 있다.
+        // 더 큰 GT frame ID가 없어도 완성된 이미지는 PT를 깨워야 한다.
+        m_displayUpdateRequested = true;
+    }
+    m_presentationWake.notify_one();
 }
 
 void Editor::EditorMain::NotifyRenderFramePublished(uint64_t frameId)
@@ -846,7 +867,7 @@ void Editor::EditorMain::OnGui()
 
     {
         ce::profile_scope begin{ ce::marker<"ImGuiBeginFrame">() };
-        m_editorRenderer->BeginRender();
+        m_editorRenderer->BeginRender(sceneLock);
     }
     // 아직 live 패널의 비소유 texture ID를 만들지 않았다. 불변 capture의 긴
     // timeline 순회를 먼저 끝내야 GT가 이 표시 비용 때문에 기다리지 않는다.
@@ -867,8 +888,9 @@ void Editor::EditorMain::OnGui()
         cameraRig->BeginPresentationFrame(!IsIconic(EditorWindowHandle()) &&
             GetForegroundWindow() == EditorWindowHandle());
     }
-    // 나머지 패널은 live Scene과 texture를 참조한다. CPU draw data에 자원
-    // 소유권이 없으므로 제출까지 잠금을 유지하고, 무조건 unlock하지 않는다.
+    // 라이브 패널과 사용자 draw callback은 아직 씬을 읽는다. 백엔드 기록이
+    // 이를 호스트 소유 GPU 자원과 표시 소비 lease로 바꿀 때까지만 잠근다.
+    // 이후 큐 진입·GPU 대기·Present는 씬 잠금 밖에서 진행한다.
     ce::profile_scope ui{ ce::marker<"PresentationUI">() };
     {
         ce::profile_scope menu{ ce::marker<"ImGuiMenuBar">() };
@@ -880,7 +902,10 @@ void Editor::EditorMain::OnGui()
     }
     {
         ce::profile_scope submit{ ce::marker<"ImGuiRenderPresent">() };
-        m_editorRenderer->EndRender();
+        m_editorRenderer->EndRender([&sceneLock]
+        {
+            sceneLock.unlock();
+        });
     }
 }
 

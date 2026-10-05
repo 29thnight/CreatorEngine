@@ -5,6 +5,8 @@
 
 #include <atomic>
 #include <memory>
+#include <mutex>
+#include <functional>
 #include <string>
 namespace editor { class EditorWorkspaceStore; }
 #include <chrono>
@@ -41,10 +43,12 @@ public:
     EditorRenderer(void* windowHandle, ::editor::window_table& windows);
     ~EditorRenderer();
 
-    void BeginRender();
+    // 백엔드의 프레임 진입·획득 대기만 라이브 씬 잠금 밖에서 실행한다.
+    void BeginRender(std::unique_lock<std::mutex>& sceneLock);
     void RenderProfiler();
     void Render();
-    void EndRender();
+    // 네이티브 draw 기록이 호스트 소유 자원을 모두 확보한 뒤 콜백을 부른다.
+    void EndRender(std::function<void()> onRecorded);
 
     /// 다음 BeginRender가 기본 도크 레이아웃을 다시 세운다. imgui.ini에는
     /// 재생성 경로가 없어서 한 번 어긋난 배치를 되돌릴 방법이 없었다.

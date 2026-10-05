@@ -121,12 +121,24 @@ public:
 
     uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
     uint64_t GetCompletedFenceValue() const override;
+    // RHI 잠금 밖의 직렬 RT·PT 소유자만 호출한다. 완료 조회 콜백에서 부르면
+    // submission 잠금을 재진입하므로 GetCompletedFenceValue와 분리한다.
+    bool ConsumeSubmissionFailure(std::string& outError);
 
     bool AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError) override;
     bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError) override;
+    // 직렬 표시 소유자가 EndFrame 뒤에 호출한다. 리사이즈는 프레임 사이에
+    // 처리하며, 호출자는 종료·파괴 전에 그 소유자를 join해야 한다.
     bool Present(std::string& outError) override;
     bool HasSwapChain() const override { return VK_NULL_HANDLE != m_swapChain; }
+    bool NeedsSwapChainRecreation() const
+    {
+        // 네이티브 surface·device 손실은 swapchain 교체만으로 복구할 수 없다.
+        return VK_ERROR_OUT_OF_DATE_KHR == m_swapChainError ||
+            VK_ERROR_OUT_OF_HOST_MEMORY == m_swapChainError ||
+            VK_ERROR_OUT_OF_DEVICE_MEMORY == m_swapChainError;
+    }
     uint32_t GetBackBufferIndex() const override { return m_backBufferIndex; }
 
     uint32_t DrainDebugMessages(std::string& outMessages) override;
@@ -333,6 +345,7 @@ private:
     void DestroySwapChain();
     bool CreateSwapChainInternal(uint32_t width, uint32_t height, std::string& outError);
     bool WaitForFenceValue(uint64_t value, std::string& outError);
+    bool PresentAcquiredImage(std::string& outError);
     void AccumulateEncoderDiagnostics();
 
     VkInstance       m_instance{ VK_NULL_HANDLE };
@@ -385,7 +398,11 @@ private:
     std::vector<VkSemaphore> m_presentSemaphores;
     uint32_t m_semaphoreIndex{ 0 };
     bool     m_imageAcquired{ false };
+    VkResult m_swapChainError{ VK_SUCCESS };
     bool     m_acquireConsumed{ false };
+    // 미완료 호스트 GPU 프레임은 하나다. WSI 허용량은 이미지 가용성이 따로 제한한다.
+    RHISubmissionTicket m_hostSubmissionTicket;
+    uint64_t m_hostFenceValue{ 0 };
 
     uint32_t m_width{ 0 };
     uint32_t m_height{ 0 };

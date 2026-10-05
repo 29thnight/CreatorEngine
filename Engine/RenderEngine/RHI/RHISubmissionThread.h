@@ -108,7 +108,9 @@ private:
     std::shared_ptr<State> m_state;
 };
 
-/// 프로세스의 native queue 호출을 하나의 bounded FIFO와 전용 스레드로 모은다.
+/// 네이티브 제출과 수명 작업을 하나의 bounded FIFO·전용 스레드로 모은다.
+/// 직렬화된 표시 소유자는 자기 제출 ticket 뒤 네이티브 Present를 직접 부를 수 있다.
+/// 그 호출이 끝나기 전에는 다음 제출·resize·shutdown을 시작하지 않는다.
 ///
 /// 각 DeviceResources가 client 하나를 잡고 owner=this로 작업을 넣는다. owner drain은
 /// 그 디바이스의 CPU 제출과 GPU completion 기반 lifetime retirement가 모두 끝날 때만

@@ -138,7 +138,9 @@ public:
     uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
     uint64_t GetCompletedFenceValue() const override
     {
-        return m_fence ? m_fence->GetCompletedValue() : 0;
+        const uint64_t completed = m_fence ? m_fence->GetCompletedValue() : 0;
+        // UINT64_MAX는 장치 제거를 뜻한다. 모든 GPU 소비자의 완료가 아니다.
+        return UINT64_MAX == completed ? 0 : completed;
     }
 
     // ── 스왑체인 (3-9 교체 — ImGui/셸이 DX12로 출력하는 경로) ──
@@ -153,6 +155,8 @@ public:
     bool AttachSwapChain(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError) override;
     bool ResizeSwapChain(uint32_t width, uint32_t height, std::string& outError) override;
+    // 직렬 표시 소유자가 EndFrame 뒤에 호출한다. 리사이즈는 프레임 사이에
+    // 처리하며, 호출자는 종료·파괴 전에 그 소유자를 join해야 한다.
     bool Present(std::string& outError) override;
     bool HasSwapChain() const override { return nullptr != m_swapChain.Get(); }
     uint32_t GetBackBufferIndex() const override;
@@ -464,6 +468,7 @@ private:
     RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
     void RefreshUploadBudget();
     void RefreshPersistentMemoryBudget();
+    bool WaitForFenceValue(uint64_t value, std::string& outError);
 
     // 핸들 → 리소스. 등록 경로는 둘뿐이다 — Create* 가 만들면서, 그래프가
     // transient 를 만들면서(V2-c).
@@ -508,6 +513,11 @@ private:
     // 스왑체인(셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다).
     ComPtr<IDXGISwapChain3>            m_swapChain;
     UINT                             m_swapChainFlags{ 0 };
+    HANDLE                           m_frameLatencyWaitableObject{ nullptr };
+    bool                             m_frameLatencyReady{ false };
+    // allocator·백버퍼 링과 별개로 미완료 호스트 프레임은 하나만 허용한다.
+    RHISubmissionTicket              m_hostSubmissionTicket;
+    uint64_t                         m_hostFenceValue{ 0 };
     std::array<ComPtr<ID3D12Resource>, kFrameCount> m_backBuffers;
     ComPtr<ID3D12DescriptorHeap>       m_backBufferRtvHeap;
     uint32_t                           m_backBufferRtvSize{ 0 };

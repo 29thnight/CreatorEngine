@@ -17,7 +17,9 @@
 // 별개다. 라이브의 프레임 구조(슬롯·펜스·풀)를 건드리지 않기 위해서다.
 // 씬 뷰는 라이브가 이미 만드는 공유 핸들을 이쪽 디바이스에서
 // OpenSharedHandle로 열어 표시한다 — DX11이 하던 일을 DX12가 이어받는
-// 것뿐이라 동기화 계약(펜스 완료 슬롯만 표시)도 그대로 성립한다.
+// 것이다. 생산 펜스가 완료된 슬롯만 열고, 열린 슬롯은 CPU 기록부터
+// 셸 GPU 펜스 완료까지 consumer lease로 붙들어 생산 측 덮어쓰기를 막는다.
+// 서로 다른 디바이스의 COM 참조만으로는 이 재사용 동기화가 성립하지 않는다.
 // 완전 통합(디바이스 하나)은 교체 완주 시점의 몫이다.
 //
 // ── 백엔드 선택은 부팅 시 고정 ──
@@ -55,7 +57,8 @@ public:
 
     /// 대기 업로드 처리 → 백버퍼에 드로우 데이터 렌더 → Present.
     /// EndRender의 DX11 RenderDrawData + DX11 Present 자리를 합쳐 맡는다.
-    bool RenderAndPresent(std::string& outError) override;
+    bool RenderAndPresent(std::string& outError,
+        const std::function<void()>& onRecorded) override;
 
     /// 창 크기 변경. CE 스레드(BeginRender의 크기 감지 자리)에서 부른다.
     void Resize(uint32_t width, uint32_t height) override;
@@ -74,7 +77,8 @@ public:
     bool IsTextureReady(Texture* texture) const override;
 
     /// 라이브 러너의 공유 텍스처(NT 핸들)를 열어 ImTextureID로. 핸들별 캐시.
-    uint64_t OpenSharedTexture(void* sharedHandle) override;
+    uint64_t OpenSharedTexture(void* sharedHandle,
+        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override;
 
     /// 다른 RHI 백엔드가 완성한 RGBA8 프레임을 셸 디바이스로 넘긴다.
     ///

@@ -164,6 +164,17 @@ namespace
 
 namespace
 {
+    uint64_t capture_steady_nanoseconds()
+    {
+        return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count());
+    }
+
+    double capture_age_milliseconds(uint64_t captured, uint64_t now)
+    {
+        return captured != 0 && now >= captured ? static_cast<double>(now - captured) / 1.0e6 : 0.0;
+    }
+
     // Built-in preview geometry has a reserved, stable identity and immutable
     // storage. SceneViewInput copies/seals it before any GPU submission.
     struct MaterialPreviewSphere
@@ -442,9 +453,9 @@ namespace
         // 한 프레임의 한 뷰를 그리는 동안에만 살아 있는 값이다.
         LiveBlackboard blackboard;
 
-        // 표시 슬롯은 생산자 GPU 펜스가 완료된 뒤에만 승격한다. CPU 조회는
-        // displayLifetimeMutex로 보호하지만, 조회 뒤 Host GPU sampling 종료까지
-        // 지키는 lease는 아직 없다. 링의 슬롯 수만으로 재사용 안전을 증명하지 않는다.
+        // 생산자 완료는 게시 조건일 뿐 재사용 조건이 아니다. 슬롯 선택과 Host 조회는
+        // displayLifetimeMutex로 직렬화하고, 소비자 lease도 없어야 덮어쓸 수 있다.
+        // 링 슬롯 수만으로 GPU 소유권을 대신하지 않는다.
         struct DisplaySlot
         {
             bool previewComplete{false};
@@ -453,6 +464,8 @@ namespace
                 EnhancedSceneRendererLiveDX12Adapter::kInvalidDisplayToken };
             uint64_t fenceValue{ 0 };
             uint64_t frameId{ 0 };
+            uint64_t sourceCaptureNanoseconds{ 0 };
+            double completedAgeMs{ 0.0 };
             EnhancedLiveViewKey key{};
             uint64_t sceneEpoch{ 0 };
             FrameCameraSnapshot camera{};
@@ -606,6 +619,8 @@ namespace
             uint32_t promotedSlotMask{ 0 };
             uint64_t completedFrameId{ 0 };
             uint64_t completedSceneEpoch{ 0 };
+            uint64_t completedCaptureNanoseconds{ 0 };
+            double completedAgeMs{ 0.0 };
             uint64_t completedResizeGeneration{ 0 };
             FrameCameraSnapshot completedCamera{};
         };
@@ -621,6 +636,7 @@ namespace
             uint32_t viewIndex{ 0 };
             EnhancedLiveViewKey key{};
             uint64_t frameId{ 0 };
+            uint64_t sourceCaptureNanoseconds{ 0 };
             uint64_t sceneEpoch{ 0 };
             uint64_t resizeGeneration{ 0 };
             FrameCameraSnapshot camera{};
@@ -865,6 +881,9 @@ namespace
                             view.promotedSlotMask |= (1u << slotIndex);
                             view.completedFrameId = slot.frameId;
                             view.completedSceneEpoch = slot.sceneEpoch;
+                            view.completedCaptureNanoseconds = slot.sourceCaptureNanoseconds;
+                            view.completedAgeMs = capture_age_milliseconds(
+                                slot.sourceCaptureNanoseconds, capture_steady_nanoseconds());
                             view.completedResizeGeneration = slot.resizeGeneration;
                             view.completedCamera = slot.camera;
                             view.previewComplete = slot.previewComplete;
@@ -883,7 +902,7 @@ namespace
                                 image.width * 4u,
                                 RHIDisplayFrameMetadata{slot.frameId, slot.sceneEpoch,
                                     slot.resizeGeneration, slot.key.viewId,
-                                    slot.key.historyRevision, slot.camera});
+                                    slot.key.historyRevision, slot.camera, slot.sourceCaptureNanoseconds});
                         }
                         ++outPromoted;
                     }
@@ -904,7 +923,8 @@ namespace
         }
 
         bool Render(uint32_t viewIndex, const EnhancedLiveViewPacket& viewPacket,
-            uint64_t sourceFrameId, uint64_t resizeGeneration, uint64_t backendGeneration,
+            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
+            uint64_t resizeGeneration, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
             std::string& outError, EnhancedPbrCapture* capture)
         {
@@ -1074,6 +1094,7 @@ namespace
             slot->viewIndex = viewIndex;
             slot->key = viewPacket.key;
             slot->frameId = sourceFrameId;
+            slot->sourceCaptureNanoseconds = sourceCaptureNanoseconds;
             slot->sceneEpoch = frameContext.sceneEpoch;
             slot->resizeGeneration = resizeGeneration;
             // 최신 요청이 아니라 실제 패스가 소비한 카메라를 완료 슬롯에 붙인다.
@@ -1188,7 +1209,15 @@ namespace
             ProxyCommandQueueController::Batch deltas;
         };
 
-        static constexpr uint32_t kRenderQueueCapacity = 2;
+        // 교체 가능한 대기 입력 하나와 TickLive가 이미 소비 중인 불변 입력 하나.
+        // lifecycle delta는 순서대로 보존하고, 적재 상한에서는 생산자에 역압을 건다.
+        static constexpr uint32_t kRenderQueueCapacity = 1;
+        static constexpr double kSceneSoftAgeBudgetMs = 50.0;
+        static constexpr uint64_t kSceneProgressNanoseconds = 250000000;
+        static constexpr uint32_t kSceneCompletionPollMs = 2;
+        // GT 는 앞 packet 이 소비될 때까지 이만큼만 기다린다. 넘으면 기존처럼 병합한다.
+        // 렌더 스레드가 셰이더 준비로 오래 멈춰도 GT 가 이 주기로는 계속 돈다.
+        static constexpr uint32_t kProducerPacingMs = 50;
         static constexpr size_t kMaxDeltasPerSubmission = 65536;
         mutable std::mutex renderQueueMutex;
         std::condition_variable renderQueueWake;
@@ -1211,12 +1240,31 @@ namespace
         uint64_t renderBackPressureWaits{ 0 };
         uint64_t renderShutdownDrains{ 0 };
         uint64_t renderShutdownDiscardedDeltas{ 0 };
+        uint64_t renderGpuAdmissionWaits{ 0 };
+        uint64_t renderStalePixelSkips{ 0 };
+        uint64_t renderOverBudgetAdmissions{ 0 };
+        uint64_t renderDisplayLeaseSkips{ 0 };
+        uint64_t renderProducerPacingWaits{ 0 };
+        uint64_t renderDisplayLeaseWaits{ 0 };
+        // RT 전용. 직전 프레임에서 고려한 뷰가 모두 표시 lease 때문에 건너뛰어졌다.
+        bool renderDisplayLeaseBlocked{ false };
+        uint64_t renderAdmittedFrameId{ 0 };
+        uint64_t renderLastAdmissionNanoseconds{ 0 };
+        double renderLastAdmissionAgeMs{ 0.0 };
+        double renderMaxAdmissionAgeMs{ 0.0 };
 
         // status/검증/PIX wait가 RT의 pipeline 포인터와 통계를 직접 읽을 때만
         // 잡는다. 일반 CE display 조회는 더 좁은 displayLifetimeMutex를 쓴다.
         mutable std::mutex renderStateMutex;
         ProxyCommandQueueController::Batch activeDeltaBatch; // RT 전용
+        bool activeFrameDrainOnly{ false }; // 종료는 delta만 순서대로 소비하고 새 GPU 작업은 제출하지 않는다
 
+        // RT가 renderStateMutex 아래에서만 호출한다. 상태 조회의 잠금 순서와
+        // 맞추기 위해 renderQueueMutex를 잡은 채 renderStateMutex를 잡지 않는다.
+        void CollectCompletedDisplays();
+        uint32_t PendingGpuSubmissions() const;
+        bool ShouldSkipScenePixels(const EnhancedLiveFramePacket& frame);
+        void RecordSceneAdmission(const EnhancedLiveFramePacket& frame);
         bool StartRenderThread(std::string& outError);
         bool PublishFrame(FrameSubmission submission);
         void StopRenderThread();
@@ -1318,6 +1366,7 @@ namespace
                 entry.key = view.key;
                 entry.active = true;
                 entry.sourceFrameId = frame.frameId;
+                entry.sourceCaptureNanoseconds = frame.sourceCaptureNanoseconds;
                 entry.sourceInputSequence = view.camera.editorInputSequence;
                 entry.sourceCameraRevision = view.camera.editorCameraRevision;
             }
@@ -1343,6 +1392,8 @@ namespace
                 entry.completedFrameId = 0;
                 entry.completedSceneEpoch = 0;
                 entry.completedCamera = {};
+                entry.completedCaptureNanoseconds = 0;
+                entry.completedAgeMs = 0.0;
                 entry.completedResizeGeneration = 0;
                 entry.completedWidth = entry.completedHeight = 0;
                 entry.promotionCount = 0;
@@ -1363,25 +1414,28 @@ namespace
             displayMissingSince.fill({});
         }
 
-        void PublishDisplayResultLocked(EnhancedLiveDisplayTarget displayTarget,
+        bool PublishDisplayResultLocked(EnhancedLiveDisplayTarget displayTarget,
             const EnhancedLiveViewKey& key, uint64_t presentationKey,
             uint64_t completedFrameId, uint64_t promotionCount,
             uint32_t promotedSlotMask, uint32_t width, uint32_t height,
             uint64_t completedSceneEpoch, const FrameCameraSnapshot& completedCamera,
-            uint64_t resultResizeGeneration = 0, bool previewComplete = false)
+            uint64_t resultResizeGeneration = 0, bool previewComplete = false,
+            uint64_t completedCaptureNanoseconds = 0, double completedAgeMs = 0.0)
         {
             const uint32_t targetIndex = DisplayTargetIndex(displayTarget);
             EnhancedLiveDisplayEntrySnapshot& entry =
                 displaySnapshot.targets[targetIndex];
             if (!entry.active || entry.key != key || completedSceneEpoch != sceneEpoch.load())
             {
-                return;
+                return false;
             }
             entry.ready = 0 != presentationKey;
             entry.previewComplete = previewComplete;
             entry.completedFrameId = completedFrameId;
             entry.completedSceneEpoch = completedSceneEpoch;
             entry.completedCamera = completedCamera;
+            entry.completedCaptureNanoseconds = completedCaptureNanoseconds;
+            entry.completedAgeMs = completedAgeMs;
             entry.completedWidth = width;
             entry.completedHeight = height;
             entry.completedResizeGeneration = resultResizeGeneration != 0
@@ -1390,24 +1444,41 @@ namespace
             entry.promotedSlotMask = promotedSlotMask;
             displayPresentationKeys[targetIndex] = presentationKey;
             ++displaySnapshot.revision;
+            return true;
         }
 
-        void PublishVulkanDisplayResults()
+        bool PublishVulkanDisplayResults()
         {
-            if (!vulkanPipeline) return;
+            if (!vulkanPipeline)
+            {
+                return false;
+            }
+            bool published = false;
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             std::lock_guard<std::mutex> viewLock(vulkanPipeline->viewMutex);
             for (uint32_t i = 0; i < EnhancedSceneRenderer::kMaxLiveCameraViews; ++i)
             {
                 const VulkanLivePipeline::View& view = vulkanPipeline->views[i];
-                if (!view.ready || !view.key.IsValid()) continue;
-                PublishDisplayResultLocked(view.displayTarget, view.key,
+                if (!view.ready || !view.key.IsValid())
+                {
+                    continue;
+                }
+                const auto& entry = displaySnapshot.targets[DisplayTargetIndex(view.displayTarget)];
+                if (entry.ready && entry.key == view.key && entry.completedFrameId == view.completedFrameId &&
+                    entry.completedSceneEpoch == view.completedSceneEpoch &&
+                    entry.completedResizeGeneration == view.completedResizeGeneration)
+                {
+                    continue;
+                }
+                published |= PublishDisplayResultLocked(view.displayTarget, view.key,
                     VulkanLivePipeline::kDisplayKeyBase + i + 1u,
                     view.completedFrameId, view.promotionCount,
                     view.promotedSlotMask, vulkanPipeline->width, vulkanPipeline->height,
                     view.completedSceneEpoch, view.completedCamera,
-                    view.completedResizeGeneration, view.previewComplete);
+                    view.completedResizeGeneration, view.previewComplete,
+                    view.completedCaptureNanoseconds, view.completedAgeMs);
             }
+            return published;
         }
 
         // 프레임 입력. frameContext가 이들의 주소를 들므로 파이프라인과 무관한
@@ -4516,7 +4587,7 @@ namespace
         // 공유 텍스처로 복사한다. 그 소비 선언이 있어야 그래프가 체인을
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
         bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
-            uint64_t sourceFrameId,
+            uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
             std::string& outError, EnhancedPbrCapture* capture)
         {
             LivePipeline& p = *pipeline;
@@ -4694,6 +4765,7 @@ namespace
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
             p.ibl.MarkCookedCaptureSubmitted(slot.fenceValue);
             slot.frameId = sourceFrameId;
+            slot.sourceCaptureNanoseconds = sourceCaptureNanoseconds;
             slot.sceneEpoch = p.frameContext.sceneEpoch;
             // cameraSnapshot은 다음 뷰에서 덮이므로 제출 슬롯에 값으로 봉인한다.
             slot.camera = *p.frameContext.camera;
@@ -5047,6 +5119,334 @@ namespace
         return superseded;
     }
 
+    void LiveState::CollectCompletedDisplays()
+    {
+        LiveState& state = *this;
+        const uint64_t previousRendered = framesRendered;
+        bool displayPromoted = false;
+        if (EnhancedLiveBackend::Vulkan == backend)
+        {
+            if (state.vulkanPipeline)
+            {
+                RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
+                uint64_t promoted = 0;
+                std::string validation;
+                state.vulkanPipeline->PromoteCompleted(
+                    state.CopyPresentationSink(), promoted, validation);
+                displayPromoted = state.PublishVulkanDisplayResults();
+                state.framesRendered += promoted;
+                if (0 != promoted && !state.vulkanFirstFrameReported)
+                {
+                    state.vulkanFirstFrameReported = true;
+                    const VulkanMeshCache::Stats meshStats =
+                        state.vulkanPipeline->meshCache.GetStats();
+                    Debug::PrintLog(spdlog::level::warn, "[vulkan.live] editor TickLive 첫 프레임 완성"
+                        " · 공통 LivePipelineDesc→live_present"
+                        " · draw " + std::to_string(state.lastDrawCount) +
+                        " / batch " + std::to_string(state.lastBatchCount) +
+                        " · mesh resident " + std::to_string(meshStats.residentCount) +
+                        " / upload " + std::to_string(meshStats.uploads) +
+                        " / failure " + std::to_string(meshStats.failures) +
+                        " · parallel workers " +
+                        std::to_string(state.vulkanPipeline->lastGraphStats.recordWorkers) +
+                        " / batch " +
+                        std::to_string(state.vulkanPipeline->lastGraphStats.recordedLists) +
+                        " · persistent segment " +
+                        std::to_string(meshStats.persistentHeap.activeSegments));
+                }
+                if (!validation.empty() && state.reportedValidation.insert(validation).second)
+                {
+                    std::printf("[vulkan.live 검증] %s\n", validation.c_str());
+                    Debug::PrintLog(spdlog::level::err, "[vulkan.live 검증] " + validation);
+                }
+            }
+        }
+        else
+        {
+            // 인플라이트 제출분의 완료 확인(논블로킹) — 뷰마다. 제출 순서대로,
+            // 완료된 것을 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가
+            // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
+            if (nullptr != state.pipeline)
+            {
+                RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
+                LivePipeline& p = *state.pipeline;
+
+                // ── 자산 상주 관리 (②-b · ③) ──
+                //
+                // 셋 다 같은 규약이다: 펜스가 지나야 놓는다. 슬롯 승격이 바로 아래에서
+                // 같은 판정을 하고 있고, 그 옆에 두는 것이 규약을 하나로 유지하는
+                // 방법이다 — "GPU 유휴 시점에 부르라"를 주석에만 적어 두었더니
+                // 아무도 안 불러 128MB가 종료까지 잡혀 있었다(실측).
+                // 프레임 번호 통지, pressure 은퇴, 펜스 완료 묘지 sweep은 backend가
+                // 자기 캐시 구현을 아는 한 경계에서 수행한다.
+                state.dx12.MaintainAssetCaches(state.frameCounter);
+
+                for (LivePipeline::CameraView& view : p.views)
+                {
+                    while (!view.pendingQueue.empty())
+                    {
+                        const int slotIndex = view.pendingQueue.front();
+                        if (state.dx12.GetCompletedFenceValue() <
+                            view.slots[slotIndex].fenceValue)
+                        {
+                            break;
+                        }
+
+                        const bool belongsToView =
+                            view.slots[slotIndex].key == view.key;
+                        if (belongsToView)
+                        {
+                            std::lock_guard<std::mutex> displayLock(
+                                state.displayLifetimeMutex);
+                            view.displaySlot = slotIndex;
+                            ++view.promotionCount;
+                            view.promotedSlotMask |=
+                                (1u << static_cast<uint32_t>(slotIndex));
+                            view.slots[slotIndex].completedAgeMs = capture_age_milliseconds(
+                                view.slots[slotIndex].sourceCaptureNanoseconds, capture_steady_nanoseconds());
+                            displayPromoted |= state.PublishDisplayResultLocked(view.displayTarget, view.key,
+                                view.slots[slotIndex].interopToken,
+                                view.slots[slotIndex].frameId, view.promotionCount,
+                                view.promotedSlotMask, p.width, p.height,
+                                view.slots[slotIndex].sceneEpoch, view.slots[slotIndex].camera,
+                                p.resizeGeneration, view.slots[slotIndex].previewComplete,
+                                view.slots[slotIndex].sourceCaptureNanoseconds,
+                                view.slots[slotIndex].completedAgeMs);
+                        }
+                        view.pendingQueue.erase(view.pendingQueue.begin());
+                        view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
+                        view.slots[slotIndex].key = {};
+
+                        // ★ 검증 레이어를 읽는다. 배선 오류(포맷·상태·디스크립터)는 여기에만
+                        //   남는데 아무도 안 읽으면 증상만 보고 추측하게 된다 — 실제로 그
+                        //   상태로 며칠을 쫓았다.
+                        //
+                        //   W8-3: 그 가드가 `_DEBUG` 였다. 그래서 출하 구성에서는 레이어를
+                        //   켜도 이 자리가 닫혀 있었고, 계획서 W8 이 판정하라는 "검증 오류 0"
+                        //   을 잴 수단이 없었다. 꺼진 실행의 비용은 포인터 하나 검사다.
+                        {
+                            std::string validation;
+                            if (0 != state.dx12.DrainDebugMessages(validation) &&
+                                !validation.empty())
+                            {
+                                if (state.reportedValidation.insert(validation).second)
+                                {
+                                    std::printf("[dx12.live 검증] %s\n", validation.c_str());
+                                }
+                            }
+                        }
+
+                        // ★ 수집은 **그 제출의 표로** 한다.
+                        //
+                        //   예전에는 Collect() 가 token 을 받지 않아 "지금 기록 중인 슬롯" 을
+                        //   읽었다. BeginProfilerFrame 은 **뷰마다** 불리고 제출은 인플라이트로
+                        //   겈리므로, 펜스가 끝난 제출의 기록을 뒤에 온 제출이 이미 덮어썼을 수
+                        //   있었고, 실측에서 수집의 83% 가 그러고 있었다(§0.5.10).
+                        //
+                        //   이제는 표가 낡았으면 Collect 가 **실패한다.** 그럴듯한 숫자를 내는
+                        //   대신 세서 드러낸다 — mismatches 가 0 이 아니면 링이 모자란다는 뜻이고,
+                        //   그것은 숫자가 틀렸다는 것보다 훨씬 고치기 쉬운 신호다.
+                        ++state.gpuCollects;
+
+                        std::vector<EnhancedLiveGpuSlice> slices;
+                        std::vector<EnhancedLivePassTiming> timings;
+                        EnhancedLiveGpuSpan span{};
+                        std::string collectError;
+                        double totalMilliseconds = 0.0;
+                        if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
+                            timings, slices, span, totalMilliseconds, collectError))
+                        {
+                            state.lastGpuMs = totalMilliseconds;
+                            // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
+                            // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
+                            // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
+                            state.lastPassTimings = std::move(timings);
+                            state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
+                            state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
+                            state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
+                            state.lastGpuSpan = span;
+                            state.gpuQueryOverflowPasses += span.queryOverflowPasses;
+                            if (span.queryOverflowPasses > 0)
+                            {
+                                const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                                if (sink.on_issue)
+                                {
+                                    sink.on_issue(static_cast<uint32_t>(
+                                        view.slots[slotIndex].profilerToken.engineFrameId),
+                                        span.queryOverflowPasses, false, "GPU query slots exhausted");
+                                }
+                            }
+
+                            // 길이 셋의 관계를 여기서 묻는다. 둘 다 손에 있는 자리가
+                            // 여기뿐이고, 여기서 세야 모든 뷰의 모든 수집이 검사를 받는다.
+                            state.gpuDroppedSlices += span.droppedSlices;
+                            state.gpuZeroLengthSlices += span.zeroLengthSlices;
+                            if (span.busyMs > span.queueSpanMs + 1e-9)
+                            {
+                                ++state.gpuSpanViolations;
+                            }
+                            // ── 통합 축의 검산(§5.1) ─────────────────────────────────
+                            //
+                            // 변환한 GPU 구간은 **제출을 연 뒤에 시작해서 수집하기 전에**
+                            // 끝나야 한다. 그 바깥으로 나가면 두 시계가 맞지 않는 것이고,
+                            // 그때 GPU 트랙은 그럴듯한 거짓말이 된다. 임계값이 아니라
+                            // 인과라서 하드웨어가 달라도 그대로 선다.
+                            if (!span.cpuAligned)
+                            {
+                                ++state.gpuUnalignedCollects;
+                            }
+                            else
+                            {
+                                if (span.submitToGpuBeginMs < 0.0 || span.gpuEndToCollectMs < 0.0)
+                                {
+                                    ++state.gpuAlignmentViolations;
+                                }
+                                // 여유의 **최솟값**을 든다. 평균은 한 번의 큰 어긋남을 가린다.
+                                if (0 == state.gpuAlignedCollects)
+                                {
+                                    state.gpuMinSubmitToBeginMs = span.submitToGpuBeginMs;
+                                    state.gpuMinEndToCollectMs = span.gpuEndToCollectMs;
+                                }
+                                else
+                                {
+                                    state.gpuMinSubmitToBeginMs = (std::min)(
+                                        state.gpuMinSubmitToBeginMs, span.submitToGpuBeginMs);
+                                    state.gpuMinEndToCollectMs = (std::min)(
+                                        state.gpuMinEndToCollectMs, span.gpuEndToCollectMs);
+                                }
+                                state.gpuMaxSubmitToCollectMs = (std::max)(
+                                    state.gpuMaxSubmitToCollectMs, span.submitToCollectMs);
+                                ++state.gpuAlignedCollects;
+
+                                // ── EngineDiagnostics 로 귀속(§7.3) ──────────
+                                //
+                                // ★ 여기서만 흘린다. 통합 축이 살아 있고 정렬도
+                                //   맞은 수집만 내보낸다 — 맞지 않는 구간을 레인에
+                                //   얹으면 그럴듯한 자리에 거짓이 그려진다.
+                                const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                                if (sink.on_span && span.submitToGpuBeginMs >= 0.0 &&
+                                    span.gpuEndToCollectMs >= 0.0)
+                                {
+                                    const uint32_t frameLabel = static_cast<uint32_t>(
+                                        view.slots[slotIndex].profilerToken.engineFrameId);
+
+                                    // 귀속은 **그 제출의 표**에서 뽑는다. "지금 기록 중인
+                                    // 슬롯" 을 읽으면 §0.5.10 의 83% 가 그대로 돌아온다.
+                                    EnhancedLiveGpuSpanOrigin origin{};
+                                    origin.submissionId = static_cast<uint32_t>(
+                                        view.slots[slotIndex].profilerToken.submissionId);
+                                    origin.renderViewId = static_cast<uint16_t>(
+                                        view.slots[slotIndex].profilerToken.renderViewId);
+                                    origin.queueId = view.slots[slotIndex].profilerToken.queueId;
+
+                                    for (const EnhancedLiveGpuSlice& slice : slices)
+                                    {
+                                        sink.on_span(slice.name.c_str(), slice.beginCpuTick,
+                                                     slice.endCpuTick, frameLabel, origin);
+                                        ++state.gpuSpansEmitted;
+                                    }
+                                    if (sink.on_flush && !slices.empty())
+                                    {
+                                        sink.on_flush();
+                                    }
+                                }
+                            }
+
+                            if (span.sliceCount < state.lastPassTimings.size())
+                            {
+                                ++state.gpuSliceUnderflows;
+                            }
+                        }
+                        else
+                        {
+                            ++state.gpuCollectMismatches;
+                            state.lastGpuCollectError = collectError;
+                            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                            if (sink.on_issue)
+                            {
+                                sink.on_issue(static_cast<uint32_t>(
+                                    view.slots[slotIndex].profilerToken.engineFrameId),
+                                    0, true, collectError.c_str());
+                            }
+                        }
+                        ++state.framesRendered;
+                    }
+                }
+            }
+        }
+        if (framesRendered != previousRendered)
+        {
+            PublishDebugSnapshot();
+            // 장면 생산자 GPU의 완료 알림이다. sink는 표시 작업만 깨우며,
+            // Host CPU 제출이나 실제 화면 출력의 완료로 해석하지 않는다.
+            const auto sink = CopyPresentationSink();
+            if (sink && displayPromoted)
+            {
+                sink->NotifyDisplayAvailable();
+            }
+        }
+    }
+
+    uint32_t LiveState::PendingGpuSubmissions() const
+    {
+        if (EnhancedLiveBackend::Vulkan == backend)
+        {
+            return vulkanPipeline ? vulkanPipeline->PendingCount() : 0;
+        }
+        uint32_t pending = 0;
+        if (pipeline)
+        {
+            for (const LivePipeline::CameraView& view : pipeline->views)
+            {
+                pending += static_cast<uint32_t>(view.pendingQueue.size());
+            }
+        }
+        return pending;
+    }
+
+    bool LiveState::ShouldSkipScenePixels(const EnhancedLiveFramePacket& frame)
+    {
+        if (controlledCaptureFrame)
+        {
+            return false;
+        }
+        const uint64_t now = capture_steady_nanoseconds();
+        if (capture_age_milliseconds(frame.sourceCaptureNanoseconds, now) <= kSceneSoftAgeBudgetMs)
+        {
+            return false;
+        }
+        std::lock_guard<std::mutex> queueLock(renderQueueMutex);
+        // 마지막 입력은 나이가 많다는 이유로 버리지 않는다. 다만 뷰별 credit/lease
+        // 부족으로 일부 뷰가 생략될 수 있고, TickLive를 재실행하지는 않는다.
+        // CPU 준비가 목표 시간을 넘겨도 주기적인 진행 허용으로 기아를 막는다.
+        // 이미 제출한 GPU 작업의 취소나 절대적인 표시 지연 상한은 보장하지 않는다.
+        if (renderQueue.empty() || renderThreadStopRequested || renderLastAdmissionNanoseconds == 0 ||
+            now - renderLastAdmissionNanoseconds >= kSceneProgressNanoseconds)
+        {
+            return false;
+        }
+        ++renderStalePixelSkips;
+        return true;
+    }
+
+    void LiveState::RecordSceneAdmission(const EnhancedLiveFramePacket& frame)
+    {
+        std::lock_guard<std::mutex> queueLock(renderQueueMutex);
+        if (renderAdmittedFrameId == frame.frameId)
+        {
+            return;
+        }
+        renderAdmittedFrameId = frame.frameId;
+        renderLastAdmissionNanoseconds = capture_steady_nanoseconds();
+        renderLastAdmissionAgeMs = capture_age_milliseconds(
+            frame.sourceCaptureNanoseconds, renderLastAdmissionNanoseconds);
+        renderMaxAdmissionAgeMs = (std::max)(renderMaxAdmissionAgeMs, renderLastAdmissionAgeMs);
+        if (renderLastAdmissionAgeMs > kSceneSoftAgeBudgetMs)
+        {
+            ++renderOverBudgetAdmissions;
+        }
+    }
+
     bool LiveState::StartRenderThread(std::string& outError)
     {
         std::unique_lock<std::mutex> lock(renderQueueMutex);
@@ -5097,40 +5497,128 @@ namespace
                 auto nextVideoMemorySample = std::chrono::steady_clock::now();
                 for (;;)
                 {
+                    // GT 발행이 멈춰도 마지막 생산자 GPU 결과를 수집한다.
+                    // 전용 RT만 기다리며 작업 스케줄러의 worker는 점유하지 않는다.
+                    uint32_t pendingGpu = 0;
+                    {
+                        std::lock_guard<std::mutex> stateLock(renderStateMutex);
+                        try
+                        {
+                            std::string submissionError;
+                            const bool failed = enabled && (backend == EnhancedLiveBackend::DX12
+                                ? (pipeline && dx12.ConsumeSubmissionFailure(submissionError))
+                                : (vulkanPipeline &&
+                                    vulkanPipeline->resources.ConsumeSubmissionFailure(submissionError)));
+                            if (failed)
+                            {
+                                lastError = "Scene submission failed: " + submissionError;
+                                ++frameFailures;
+                                enabled = false;
+                                Debug::PrintLog(spdlog::level::err, lastError);
+                            }
+                            CollectCompletedDisplays();
+                            pendingGpu = enabled ? PendingGpuSubmissions() : 0;
+                        }
+                        catch (const std::exception& exception)
+                        {
+                            lastError = std::string("RenderThread completion exception: ") + exception.what();
+                            ++frameFailures;
+                            enabled = false;
+                            Debug::PrintLog(spdlog::level::err, lastError);
+                        }
+                        catch (...)
+                        {
+                            lastError = "RenderThread completion unknown exception";
+                            ++frameFailures;
+                            enabled = false;
+                            Debug::PrintLog(spdlog::level::err, lastError);
+                        }
+                    }
+
                     FrameSubmission submission;
                     {
                         std::unique_lock<std::mutex> queueLock(renderQueueMutex);
+                        if (renderQueue.empty())
                         {
                             EnhancedSceneRenderer::RenderThreadPhaseScope idle(
                                 EnhancedSceneRenderer::RenderPhase::queue_idle);
-                            // A render thread can stay asleep for the entire capture
-                            // when no live frame is consumed. Close bounded idle
-                            // scopes so the profiler records that idle time and the
-                            // lane does not disappear from a live recording.
-                            renderQueueWake.wait_for(queueLock, std::chrono::milliseconds(100), [this]
+                            // 기존의 짧게 닫히는 유휴 프로파일 구간을 보존한다.
+                            // 빠른 완료 조회는 아직 GPU 작업이 남았을 때만 수행한다.
+                            renderQueueWake.wait_for(queueLock, std::chrono::milliseconds(
+                                pendingGpu != 0 ? kSceneCompletionPollMs : 100), [this]
                             {
                                 return renderThreadStopRequested || !renderQueue.empty();
                             });
-                        }
-                        if (renderQueue.empty())
-                        {
-                            if (renderThreadStopRequested) break;
+                            // 대기에서 깨어난 뒤 완료를 다시 수집하고 최신 입력을 고른다.
+                            if (renderThreadStopRequested && renderQueue.empty())
+                            {
+                                break;
+                            }
                             continue;
                         }
-
+                        if (renderThreadTestDelayMs != 0 && !renderThreadStopRequested)
+                        {
+                            EnhancedSceneRenderer::RenderThreadPhaseScope delay(
+                                EnhancedSceneRenderer::RenderPhase::test_delay);
+                            renderQueueWake.wait_for(queueLock,
+                                std::chrono::milliseconds(renderThreadTestDelayMs), [this]
+                                {
+                                    return renderThreadStopRequested;
+                                });
+                        }
+                        // 보통의 Editor + Game 두 뷰가 쓸 공용 credit을 먼저 확보한 뒤
+                        // 같은 입력을 확정한다. 이 보수적인 묶음 승인은 GPU 작업의
+                        // 겹침을 줄일 수 있고, 모든 뷰의 표시 슬롯 확보를 보장하지 않는다.
+                        const auto& waitingFrame = renderQueue.front().frame;
+                        uint32_t requiredCredits = 0;
+                        if (!waitingFrame.sceneLoading && waitingFrame.width != 0 && waitingFrame.height != 0)
+                        {
+                            const uint32_t viewCount = (std::min)(waitingFrame.viewCount, kEnhancedMaxLiveCameraViews);
+                            for (uint32_t i = 0; i < viewCount && requiredCredits < 2; ++i)
+                            {
+                                if (waitingFrame.views[i].key.IsValid())
+                                {
+                                    ++requiredCredits;
+                                }
+                            }
+                        }
+                        if (requiredCredits != 0 && pendingGpu + requiredCredits > 2 && !renderThreadStopRequested)
+                        {
+                            ++renderGpuAdmissionWaits;
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            // 새 발행은 대기 입력을 교체하지만, 알림이 반복돼도
+                            // 완료 조회가 대기 없는 반복으로 바뀌지 않게 한다.
+                            renderQueueWake.wait_for(queueLock,
+                                std::chrono::milliseconds(kSceneCompletionPollMs), [this]
+                                {
+                                    return renderThreadStopRequested;
+                                });
+                            continue;
+                        }
+                        if (renderDisplayLeaseBlocked && !renderThreadStopRequested)
+                        {
+                            // 표시 슬롯이 하나도 비지 않았는데 바로 다음 packet 을 집으면
+                            // 그릴 것 없이 packet 만 소비하며 돈다. 완료 조회 주기로 기다린다.
+                            renderDisplayLeaseBlocked = false;
+                            ++renderDisplayLeaseWaits;
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            renderQueueWake.wait_for(queueLock,
+                                std::chrono::milliseconds(kSceneCompletionPollMs), [this]
+                                {
+                                    return renderThreadStopRequested;
+                                });
+                            continue;
+                        }
+                        // 이 시점에만 입력을 확정한다. 기다리는 동안에도 대기 입력은
+                        // 교체 가능했고 lifecycle delta의 순서는 보존되었다.
                         submission = std::move(renderQueue.front());
                         renderQueue.pop_front();
                         renderInProgress = 1;
+                        activeFrameDrainOnly = renderThreadStopRequested;
                     }
                     renderQueueWake.notify_all();
-
-                    if (0 != renderThreadTestDelayMs)
-                    {
-                        EnhancedSceneRenderer::RenderThreadPhaseScope delay(
-                            EnhancedSceneRenderer::RenderPhase::test_delay);
-                        std::this_thread::sleep_for(
-                            std::chrono::milliseconds(renderThreadTestDelayMs));
-                    }
 
                     activeDeltaBatch = std::move(submission.deltas);
                     {
@@ -5234,7 +5722,10 @@ namespace
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
                         }
-                        activeDeltaBatch.clear();
+                        if (activeDeltaBatch.size() != 0)
+                        {
+                            ProxyCommandQueue->DeferBatch(std::move(activeDeltaBatch));
+                        }
                     }
 
                     {
@@ -5312,7 +5803,24 @@ namespace
             return false;
         }
 
-        ++renderPublished;
+        // 씬 잠금 밖의 GT 에는 다른 속도 제한이 없다. 앞 packet 이 아직 대기 중이면
+        // RT 가 가져갈 때까지 기다려 GT 를 RT 소비 속도에 맞춘다(최신 입력 정책은 그대로).
+        if (renderQueue.size() >= kRenderQueueCapacity)
+        {
+            ++renderProducerPacingWaits;
+            renderQueueWake.wait_for(lock, std::chrono::milliseconds(kProducerPacingMs), [this]
+            {
+                return !renderThreadAccepting || renderQueue.size() < kRenderQueueCapacity;
+            });
+            if (!renderThreadAccepting)
+            {
+                renderShutdownDiscardedDeltas += submission.deltas.size();
+                ProxyCommandQueue->MarkShutdownDiscarded(
+                    static_cast<uint64_t>(submission.deltas.size()));
+                return false;
+            }
+        }
+
         if (renderQueue.size() < kRenderQueueCapacity)
         {
             renderQueue.push_back(std::move(submission));
@@ -5332,7 +5840,13 @@ namespace
                 {
                     return !renderThreadAccepting || renderQueue.size() < kRenderQueueCapacity;
                 });
-                if (!renderThreadAccepting) return false;
+                if (!renderThreadAccepting)
+                {
+                    renderShutdownDiscardedDeltas += submission.deltas.size();
+                    ProxyCommandQueue->MarkShutdownDiscarded(
+                        static_cast<uint64_t>(submission.deltas.size()));
+                    return false;
+                }
                 renderQueue.push_back(std::move(submission));
             }
             else
@@ -5351,6 +5865,7 @@ namespace
             }
         }
 
+        ++renderPublished;
         renderQueueHighWatermark = (std::max)(renderQueueHighWatermark,
             static_cast<uint32_t>(renderQueue.size()));
         lock.unlock();
@@ -5420,6 +5935,18 @@ namespace
         stats.backPressureWaits = renderBackPressureWaits;
         stats.shutdownDrains = renderShutdownDrains;
         stats.shutdownDiscardedDeltas = renderShutdownDiscardedDeltas;
+        stats.gpuAdmissionWaits = renderGpuAdmissionWaits;
+        stats.stalePixelSkips = renderStalePixelSkips;
+        stats.overBudgetAdmissions = renderOverBudgetAdmissions;
+        stats.displayLeaseSkips = renderDisplayLeaseSkips;
+        stats.producerPacingWaits = renderProducerPacingWaits;
+        stats.displayLeaseWaits = renderDisplayLeaseWaits;
+        stats.admittedFrameId = renderAdmittedFrameId;
+        stats.lastAdmissionAgeMs = renderLastAdmissionAgeMs;
+        stats.maxAdmissionAgeMs = renderMaxAdmissionAgeMs;
+        stats.pendingAgeMs = renderQueue.empty() ? 0.0 : capture_age_milliseconds(
+            renderQueue.front().frame.sourceCaptureNanoseconds, capture_steady_nanoseconds());
+        stats.softAgeBudgetMs = kSceneSoftAgeBudgetMs;
         stats.pending = static_cast<uint32_t>(renderQueue.size());
         stats.inProgress = renderInProgress;
         stats.highWatermark = renderQueueHighWatermark;
@@ -5693,6 +6220,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         "BuildLiveFramePacket must stay on the game-thread producer");
 
     EnhancedLiveFramePacket frame{};
+    frame.sourceCaptureNanoseconds = capture_steady_nanoseconds();
     std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
     {
         std::lock_guard<std::mutex> lock(state.gizmoIconMutex);
@@ -6081,32 +6609,46 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         RenderThreadPhaseScope proxy(RenderPhase::proxy_sync);
         if (state.runtimeInitialized && state.renderScene && !sceneLoading)
         {
-			if (state.renderScene->BeginProxyFrame(frame.sceneEpoch))
-				ProxyCommandQueue->ExecuteBatch(*state.renderScene, frame.sceneEpoch,
-					std::move(state.activeDeltaBatch));
-			else
-				ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
-            state.BuildDrawPool();
+            if (state.renderScene->BeginProxyFrame(frame.sceneEpoch))
+            {
+                ProxyCommandQueue->ExecuteBatch(*state.renderScene, frame.sceneEpoch,
+                    std::move(state.activeDeltaBatch));
+            }
+            else
+            {
+                ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
+            }
         }
         else
         {
-        // 로딩 중에는 frame은 건너뛰어도 delta를 잃으면 안 된다. consumer 보류
-        // 큐에 두었다가 다음 renderable packet에서 epoch 규칙과 함께 적용한다.
-        ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
-        // 이번 프레임에 갱신하지 않았다면 풀을 비운다.
-        //
-        // ★ 풀은 값 snapshot과 shared owner를 함께 들지만, 갱신을 건너뛴
-        //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
-        //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
-        state.drawPool.clear();
-        state.graphDraws.clear();
-        state.graphFallbackDraws.clear();
-        state.graphViewInput.reset();
+            // 로딩 중에는 frame은 건너뛰어도 delta를 잃으면 안 된다. consumer 보류
+            // 큐에 두었다가 다음 renderable packet에서 epoch 규칙과 함께 적용한다.
+            ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
+            // 이번 프레임에 갱신하지 않았다면 풀을 비운다.
+            //
+            // ★ 풀은 값 snapshot과 shared owner를 함께 들지만, 갱신을 건너뛴
+            //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
+            //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
+            state.drawPool.clear();
+            state.graphDraws.clear();
+            state.graphFallbackDraws.clear();
+            state.graphViewInput.reset();
             state.decals.clear();
         }
     }
 
     traceProgress("proxy.end");
+    traceProgress("collect.begin");
+    state.CollectCompletedDisplays();
+    if (state.activeFrameDrainOnly || state.ShouldSkipScenePixels(frame))
+    {
+        return;
+    }
+    if (state.runtimeInitialized && state.renderScene && !sceneLoading)
+    {
+        RenderThreadPhaseScope proxy(RenderPhase::proxy_sync);
+        state.BuildDrawPool();
+    }
 
     // ── Vulkan editor TickLive 공통 scene graph 경로 ──
     //
@@ -6116,41 +6658,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // 브리지로 승격한다.
     if (EnhancedLiveBackend::Vulkan == state.backend)
     {
-        if (state.vulkanPipeline)
-        {
-            RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
-            uint64_t promoted = 0;
-            std::string validation;
-            state.vulkanPipeline->PromoteCompleted(
-                state.CopyPresentationSink(), promoted, validation);
-            state.PublishVulkanDisplayResults();
-            state.framesRendered += promoted;
-            if (0 != promoted && !state.vulkanFirstFrameReported)
-            {
-                state.vulkanFirstFrameReported = true;
-                const VulkanMeshCache::Stats meshStats =
-                    state.vulkanPipeline->meshCache.GetStats();
-                Debug::PrintLog(spdlog::level::warn, "[vulkan.live] editor TickLive 첫 프레임 완성"
-                    " · 공통 LivePipelineDesc→live_present"
-                    " · draw " + std::to_string(state.lastDrawCount) +
-                    " / batch " + std::to_string(state.lastBatchCount) +
-                    " · mesh resident " + std::to_string(meshStats.residentCount) +
-                    " / upload " + std::to_string(meshStats.uploads) +
-                    " / failure " + std::to_string(meshStats.failures) +
-                    " · parallel workers " +
-                    std::to_string(state.vulkanPipeline->lastGraphStats.recordWorkers) +
-                    " / batch " +
-                std::to_string(state.vulkanPipeline->lastGraphStats.recordedLists) +
-                    " · persistent segment " +
-                    std::to_string(meshStats.persistentHeap.activeSegments));
-            }
-            if (!validation.empty() && state.reportedValidation.insert(validation).second)
-            {
-                std::printf("[vulkan.live 검증] %s\n", validation.c_str());
-                Debug::PrintLog(spdlog::level::err, "[vulkan.live 검증] " + validation);
-            }
-        }
-
         if (sceneLoading || 0 == cameraCount)
         {
             ++state.framesIdle;
@@ -6230,6 +6737,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 return;
             }
         }
+        if (state.ShouldSkipScenePixels(frame))
+        {
+            return;
+        }
         uint32_t totalPending = p.PendingCount();
         LiveStopwatch watch;
         watch.Start();
@@ -6272,6 +6783,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 continue;
             }
 
+            if (state.ShouldSkipScenePixels(frame))
+            {
+                return;
+            }
             std::string error;
             const auto prepareFrame = [&state, &p, viewIndex](std::string& prepareError)
             {
@@ -6282,7 +6797,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             {
                 RenderThreadPhaseScope renderView(RenderPhase::view_render);
                 rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
-                    frame.frameId, frame.resizeGeneration,
+                    frame.frameId, frame.sourceCaptureNanoseconds, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
                     prepareFrame, error, state.BeginPbrCapture(frame, viewPacket));
             }
@@ -6316,6 +6831,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
 
             state.consecutiveFrameFailures = 0;
+            state.RecordSceneAdmission(frame);
             // W8: 인코더가 버린 명령을 프레임마다 비우며 모은다. 성공한 프레임에
             // 쌓이는 것이 특히 중요하다 — 실패 경로는 이미 소리를 내지만 이쪽은
             // "그려졌다"고 보고되면서 물체가 빠진 경우다.
@@ -6371,204 +6887,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         return;
     }
 
-    traceProgress("collect.begin");
-
-    // 인플라이트 제출분의 완료 확인(논블로킹) — 뷰마다. 제출 순서대로,
-    // 완료된 것을 전부 표시로 승격한다 — DX11이 읽는 슬롯은 항상 '펜스가
-    // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
-    if (nullptr != state.pipeline)
-    {
-        RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
-        LivePipeline& p = *state.pipeline;
-
-        // ── 자산 상주 관리 (②-b · ③) ──
-        //
-        // 셋 다 같은 규약이다: 펜스가 지나야 놓는다. 슬롯 승격이 바로 아래에서
-        // 같은 판정을 하고 있고, 그 옆에 두는 것이 규약을 하나로 유지하는
-        // 방법이다 — "GPU 유휴 시점에 부르라"를 주석에만 적어 두었더니
-        // 아무도 안 불러 128MB가 종료까지 잡혀 있었다(실측).
-        // 프레임 번호 통지, pressure 은퇴, 펜스 완료 묘지 sweep은 backend가
-        // 자기 캐시 구현을 아는 한 경계에서 수행한다.
-        state.dx12.MaintainAssetCaches(state.frameCounter);
-
-        for (LivePipeline::CameraView& view : p.views)
-        {
-            while (!view.pendingQueue.empty())
-            {
-                const int slotIndex = view.pendingQueue.front();
-                if (state.dx12.GetCompletedFenceValue() <
-                    view.slots[slotIndex].fenceValue)
-                {
-                    break;
-                }
-
-                const bool belongsToView =
-                    view.slots[slotIndex].key == view.key;
-                if (belongsToView)
-                {
-                    std::lock_guard<std::mutex> displayLock(
-                        state.displayLifetimeMutex);
-                    view.displaySlot = slotIndex;
-                    ++view.promotionCount;
-                    view.promotedSlotMask |=
-                        (1u << static_cast<uint32_t>(slotIndex));
-                    state.PublishDisplayResultLocked(view.displayTarget, view.key,
-                        view.slots[slotIndex].interopToken,
-                        view.slots[slotIndex].frameId, view.promotionCount,
-                        view.promotedSlotMask, p.width, p.height,
-                        view.slots[slotIndex].sceneEpoch, view.slots[slotIndex].camera,
-                        p.resizeGeneration, view.slots[slotIndex].previewComplete);
-                }
-                view.pendingQueue.erase(view.pendingQueue.begin());
-                view.slots[slotIndex].graph.reset();   // GPU가 끝났다 — transient가 풀로 돌아간다
-                view.slots[slotIndex].key = {};
-
-                // ★ 검증 레이어를 읽는다. 배선 오류(포맷·상태·디스크립터)는 여기에만
-                //   남는데 아무도 안 읽으면 증상만 보고 추측하게 된다 — 실제로 그
-                //   상태로 며칠을 쫓았다.
-                //
-                //   W8-3: 그 가드가 `_DEBUG` 였다. 그래서 출하 구성에서는 레이어를
-                //   켜도 이 자리가 닫혀 있었고, 계획서 W8 이 판정하라는 "검증 오류 0"
-                //   을 잴 수단이 없었다. 꺼진 실행의 비용은 포인터 하나 검사다.
-                {
-                    std::string validation;
-                    if (0 != state.dx12.DrainDebugMessages(validation) &&
-                        !validation.empty())
-                    {
-                        if (state.reportedValidation.insert(validation).second)
-                        {
-                            std::printf("[dx12.live 검증] %s\n", validation.c_str());
-                        }
-                    }
-                }
-
-                // ★ 수집은 **그 제출의 표로** 한다.
-                //
-                //   예전에는 Collect() 가 token 을 받지 않아 "지금 기록 중인 슬롯" 을
-                //   읽었다. BeginProfilerFrame 은 **뷰마다** 불리고 제출은 인플라이트로
-                //   겈리므로, 펜스가 끝난 제출의 기록을 뒤에 온 제출이 이미 덮어썼을 수
-                //   있었고, 실측에서 수집의 83% 가 그러고 있었다(§0.5.10).
-                //
-                //   이제는 표가 낡았으면 Collect 가 **실패한다.** 그럴듯한 숫자를 내는
-                //   대신 세서 드러낸다 — mismatches 가 0 이 아니면 링이 모자란다는 뜻이고,
-                //   그것은 숫자가 틀렸다는 것보다 훨씬 고치기 쉬운 신호다.
-                ++state.gpuCollects;
-
-                std::vector<EnhancedLiveGpuSlice> slices;
-                std::vector<EnhancedLivePassTiming> timings;
-                EnhancedLiveGpuSpan span{};
-                std::string collectError;
-                double totalMilliseconds = 0.0;
-                if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
-                    timings, slices, span, totalMilliseconds, collectError))
-                {
-                    state.lastGpuMs = totalMilliseconds;
-                    // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
-                    // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
-                    // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
-                    state.lastPassTimings = std::move(timings);
-                    state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
-                    state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
-                    state.lastGpuViewId = view.slots[slotIndex].profilerToken.renderViewId;
-                    state.lastGpuSpan = span;
-                    state.gpuQueryOverflowPasses += span.queryOverflowPasses;
-                    if (span.queryOverflowPasses > 0)
-                    {
-                        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                        if (sink.on_issue)
-                            sink.on_issue(static_cast<uint32_t>(
-                                view.slots[slotIndex].profilerToken.engineFrameId),
-                                span.queryOverflowPasses, false, "GPU query slots exhausted");
-                    }
-
-                    // 길이 셋의 관계를 여기서 묻는다. 둘 다 손에 있는 자리가
-                    // 여기뿐이고, 여기서 세야 모든 뷰의 모든 수집이 검사를 받는다.
-                    state.gpuDroppedSlices += span.droppedSlices;
-                    state.gpuZeroLengthSlices += span.zeroLengthSlices;
-                    if (span.busyMs > span.queueSpanMs + 1e-9) ++state.gpuSpanViolations;
-                    // ── 통합 축의 검산(§5.1) ─────────────────────────────────
-                    //
-                    // 변환한 GPU 구간은 **제출을 연 뒤에 시작해서 수집하기 전에**
-                    // 끝나야 한다. 그 바깥으로 나가면 두 시계가 맞지 않는 것이고,
-                    // 그때 GPU 트랙은 그럴듯한 거짓말이 된다. 임계값이 아니라
-                    // 인과라서 하드웨어가 달라도 그대로 선다.
-                    if (!span.cpuAligned)
-                    {
-                        ++state.gpuUnalignedCollects;
-                    }
-                    else
-                    {
-                        if (span.submitToGpuBeginMs < 0.0 || span.gpuEndToCollectMs < 0.0)
-                        {
-                            ++state.gpuAlignmentViolations;
-                        }
-                        // 여유의 **최솟값**을 든다. 평균은 한 번의 큰 어긋남을 가린다.
-                        if (0 == state.gpuAlignedCollects)
-                        {
-                            state.gpuMinSubmitToBeginMs = span.submitToGpuBeginMs;
-                            state.gpuMinEndToCollectMs = span.gpuEndToCollectMs;
-                        }
-                        else
-                        {
-                            state.gpuMinSubmitToBeginMs = (std::min)(
-                                state.gpuMinSubmitToBeginMs, span.submitToGpuBeginMs);
-                            state.gpuMinEndToCollectMs = (std::min)(
-                                state.gpuMinEndToCollectMs, span.gpuEndToCollectMs);
-                        }
-                        state.gpuMaxSubmitToCollectMs = (std::max)(
-                            state.gpuMaxSubmitToCollectMs, span.submitToCollectMs);
-                        ++state.gpuAlignedCollects;
-
-                        // ── EngineDiagnostics 로 귀속(§7.3) ──────────
-                        //
-                        // ★ 여기서만 흘린다. 통합 축이 살아 있고 정렬도
-                        //   맞은 수집만 내보낸다 — 맞지 않는 구간을 레인에
-                        //   얹으면 그럴듯한 자리에 거짓이 그려진다.
-                        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                        if (sink.on_span && span.submitToGpuBeginMs >= 0.0 &&
-                            span.gpuEndToCollectMs >= 0.0)
-                        {
-                            const uint32_t frameLabel = static_cast<uint32_t>(
-                                view.slots[slotIndex].profilerToken.engineFrameId);
-
-                            // 귀속은 **그 제출의 표**에서 뽑는다. "지금 기록 중인
-                            // 슬롯" 을 읽으면 §0.5.10 의 83% 가 그대로 돌아온다.
-                            EnhancedLiveGpuSpanOrigin origin{};
-                            origin.submissionId = static_cast<uint32_t>(
-                                view.slots[slotIndex].profilerToken.submissionId);
-                            origin.renderViewId = static_cast<uint16_t>(
-                                view.slots[slotIndex].profilerToken.renderViewId);
-                            origin.queueId = view.slots[slotIndex].profilerToken.queueId;
-
-                            for (const EnhancedLiveGpuSlice& slice : slices)
-                            {
-                                sink.on_span(slice.name.c_str(), slice.beginCpuTick,
-                                             slice.endCpuTick, frameLabel, origin);
-                                ++state.gpuSpansEmitted;
-                            }
-                            if (sink.on_flush && !slices.empty()) sink.on_flush();
-                        }
-                    }
-
-                    if (span.sliceCount < state.lastPassTimings.size())
-                    {
-                        ++state.gpuSliceUnderflows;
-                    }
-                }
-                else
-                {
-                    ++state.gpuCollectMismatches;
-                    state.lastGpuCollectError = collectError;
-                    const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                    if (sink.on_issue)
-                        sink.on_issue(static_cast<uint32_t>(
-                            view.slots[slotIndex].profilerToken.engineFrameId),
-                            0, true, collectError.c_str());
-                }
-                ++state.framesRendered;
-            }
-        }
-    }
 
     if (sceneLoading || 0 == cameraCount)
     {
@@ -6673,6 +6991,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     traceProgress("seal.end");
+    if (state.ShouldSkipScenePixels(frame))
+    {
+        return;
+    }
 
     // 뷰 합산 인플라이트. '인플라이트 2 = 링(kFrameCount=3)의 안전 거리'는
     // 제출 총량 기준의 실측이다 — 뷰당 2씩 총 4를 들면 BeginFrame이
@@ -6692,6 +7014,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     // frameContext가 draws/lights 벡터의 주소를 들므로 '뷰1 제출 완료 →
     // 뷰2 밀봉'의 순차 흐름만 성립한다. 밀봉을 몰아서 하고 렌더를 몰아서
     // 하면 뷰1의 기록 입력이 뷰2 밀봉으로 재구성되어 무효가 된다.
+    uint32_t consideredViews = 0;
+    uint32_t leaseSkippedViews = 0;
     const uint32_t startIndex = state.viewRotation++ % cameraCount;
     for (uint32_t step = 0; step < cameraCount; ++step)
     {
@@ -6701,6 +7025,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // The diagnostic clock must not enter another camera's temporal history.
         if (state.controlledCaptureFrame && viewPacket.displayTarget != state.pbrCapture->target)
             continue;
+        ++consideredViews;
 
         if (totalPending >= 2)
         {
@@ -6776,23 +7101,39 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             const auto& cached = view->slots[view->displaySlot];
             state.PublishDisplayResultLocked(view->displayTarget, view->key, cached.interopToken,
                 cached.frameId, view->promotionCount, view->promotedSlotMask, p.width, p.height,
-                cached.sceneEpoch, cached.camera, p.resizeGeneration, true);
+                cached.sceneEpoch, cached.camera, p.resizeGeneration, true,
+                cached.sourceCaptureNanoseconds, cached.completedAgeMs);
             continue;
         }
         int renderSlot = -1;
-        for (int i = 0; i < LivePipeline::kSlotsPerView; ++i)
         {
-            if (i == view->displaySlot) continue;
-            bool pending = false;
-            for (const int pendingIndex : view->pendingQueue)
+            // OpenDisplayTexture도 같은 잠금 아래 소비자 lease를 등록한다.
+            // 선택할 token은 게시 목록에서도 빠져 있어야 잠금을 푼 뒤 새 Host
+            // 조회와 이 슬롯의 기록이 경합하지 않는다.
+            std::lock_guard<std::mutex> displayLock(state.displayLifetimeMutex);
+            for (int i = 0; i < LivePipeline::kSlotsPerView; ++i)
             {
-                if (pendingIndex == i) { pending = true; break; }
+                const auto token = view->slots[i].interopToken;
+                if (i == view->displaySlot ||
+                    std::find(view->pendingQueue.begin(), view->pendingQueue.end(), i) != view->pendingQueue.end() ||
+                    std::find(state.displayPresentationKeys.begin(), state.displayPresentationKeys.end(), token) !=
+                        state.displayPresentationKeys.end())
+                {
+                    continue;
+                }
+                if (state.dx12.CanReuseDisplayTexture(token))
+                {
+                    renderSlot = i;
+                    break;
+                }
             }
-            if (!pending) { renderSlot = i; break; }
         }
         if (renderSlot < 0)
         {
             ++state.framesInFlight;
+            std::lock_guard<std::mutex> queueLock(state.renderQueueMutex);
+            ++state.renderDisplayLeaseSkips;
+            ++leaseSkippedViews;
             continue;
         }
 
@@ -6807,11 +7148,15 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             continue;
         }
 
+        if (state.ShouldSkipScenePixels(frame))
+        {
+            return;
+        }
         std::string error;
         bool rendered = false;
         {
             RenderThreadPhaseScope renderView(RenderPhase::view_render);
-            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, error,
+            rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, error,
                 state.BeginPbrCapture(frame, viewPacket));
         }
         if (!rendered)
@@ -6853,6 +7198,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             continue;
         }
         state.consecutiveFrameFailures = 0;
+        state.RecordSceneAdmission(frame);
         ++totalPending;
         state.gpuMaxPendingSubmissions = (std::max)(
             state.gpuMaxPendingSubmissions, static_cast<uint32_t>(totalPending));
@@ -6861,6 +7207,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     if (renderedAny) state.lastCpuMs = watch.ElapsedMs();
+    state.renderDisplayLeaseBlocked = consideredViews != 0 && leaseSkippedViews == consideredViews;
 }
 
 
@@ -6928,6 +7275,9 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
         {
             entry.lastTextureFrameId = acquiredFrame.completedFrameId;
             entry.lastTextureResizeGeneration = acquiredFrame.completedResizeGeneration;
+            entry.lastTextureAgeMs = capture_age_milliseconds(
+                acquiredFrame.completedCaptureNanoseconds, capture_steady_nanoseconds());
+            acquiredFrame.lastTextureAgeMs = entry.lastTextureAgeMs;
         }
         acquiredFrame.ready = textureId != 0;
         return EnhancedLiveDisplayTexture{textureId, textureId ? acquiredFrame.completedWidth : 0,
@@ -6984,10 +7334,17 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
             return observe(0, "cpu_frame_stale");
         }
         // RT 완료와 Host 업로드는 다른 시점이다. 실제 업로드한 픽셀의 카메라만 돌려준다.
+        if (acquiredFrame.completedFrameId != uploaded.m_frame.m_frameId)
+        {
+            // 업로드 메타데이터에는 원본 캡처 시각만 있고 이전 생산자 완료
+            // 관측 시각은 없다. 새 결과의 완료 시간을 옛 픽셀에 붙이지 않는다.
+            acquiredFrame.completedAgeMs = 0.0;
+        }
         acquiredFrame.completedFrameId = uploaded.m_frame.m_frameId;
         acquiredFrame.completedSceneEpoch = uploaded.m_frame.m_sceneEpoch;
         acquiredFrame.completedResizeGeneration = uploaded.m_frame.m_resizeGeneration;
         acquiredFrame.completedCamera = uploaded.m_frame.m_camera;
+        acquiredFrame.completedCaptureNanoseconds = uploaded.m_frame.m_sourceCaptureNanoseconds;
         acquiredFrame.completedWidth = uploaded.m_width;
         acquiredFrame.completedHeight = uploaded.m_height;
         return observe(uploaded.m_textureId, "cpu_frame_missing");

@@ -22,12 +22,14 @@ public:
 
     void Resize(uint32_t width, uint32_t height) override;
     void NewFrame() override;
-    bool RenderAndPresent(std::string& outError) override;
+    bool RenderAndPresent(std::string& outError,
+        const std::function<void()>& onRecorded) override;
     void RebuildFontAtlas() override;
 
     uint64_t RegisterTexture(Texture* texture) override;
     bool IsTextureReady(Texture* texture) const override;
-    uint64_t OpenSharedTexture(void* sharedHandle) override;
+    uint64_t OpenSharedTexture(void* sharedHandle,
+        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override;
     void SubmitCpuRgbaFrame(uint64_t key, uint32_t width, uint32_t height,
         const void* rgba, uint32_t rowPitch, const RHIDisplayFrameMetadata& frame) override;
     RHIDisplayTexture GetCpuFrameTexture(uint64_t key) override;

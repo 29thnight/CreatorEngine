@@ -16,6 +16,7 @@
 #include <unordered_set>
 #include <mutex>
 #include <cstring>
+#include <utility>
 
 // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 namespace
@@ -61,10 +62,72 @@ struct ImGuiDx12Shell::Impl
     struct SharedEntry
     {
         ComPtr<ID3D12Resource> resource;
+        // 생산 측 종료 뒤 핸들 값이 재사용될 수 있으므로 lease 소유자로 식별한다.
+        // 캐시 자체가 강한 참조를 가지면 슬롯 재사용을 막으므로 약한 참조만 둔다.
+        std::weak_ptr<RHIDisplayConsumerLease> m_consumerLease;
         uint64_t textureId{ 0 };
         uint64_t lastUsedFrame{ 0 };
     };
     std::unordered_map<HANDLE, SharedEntry> sharedTextures;
+
+    struct DisplayUse
+    {
+        std::shared_ptr<RHIDisplayConsumerLease> m_lease;
+        ComPtr<ID3D12Resource> m_resource;
+    };
+    std::vector<DisplayUse> m_pendingDisplayUses;
+    RHICompletionRetireQueue<std::vector<DisplayUse>> m_displayUseRetireQueue;
+
+    void RetainDisplayUse(std::shared_ptr<RHIDisplayConsumerLease> consumerLease,
+        const ComPtr<ID3D12Resource>& resource)
+    {
+        for (const DisplayUse& use : m_pendingDisplayUses)
+        {
+            if (use.m_lease == consumerLease)
+            {
+                return;
+            }
+        }
+        m_pendingDisplayUses.push_back(DisplayUse{ std::move(consumerLease), resource });
+    }
+
+    void RetireDisplayUses(uint64_t completionValue)
+    {
+        if (!m_pendingDisplayUses.empty())
+        {
+            m_displayUseRetireQueue.Enqueue(RHICompletionPoint{ completionValue },
+                std::move(m_pendingDisplayUses));
+            m_pendingDisplayUses.clear();
+        }
+    }
+
+    void CollectDisplayUses(uint64_t completedValue)
+    {
+        // D3D12 장치 제거 표식은 GPU 읽기 완료를 증명하지 않는다.
+        if (0 == completedValue || ~uint64_t{ 0 } == completedValue)
+        {
+            return;
+        }
+        m_displayUseRetireQueue.Collect(RHICompletionPoint{ completedValue },
+            [](std::vector<DisplayUse>& uses) { uses.clear(); });
+    }
+
+    void DrainDisplayUses(bool gpuCompletionProven)
+    {
+        RetireDisplayUses(0);
+        m_displayUseRetireQueue.Drain(
+            [gpuCompletionProven](std::vector<DisplayUse>& uses)
+            {
+                if (!gpuCompletionProven)
+                {
+                    for (DisplayUse& use : uses)
+                    {
+                        use.m_lease->m_completionLost.store(true, std::memory_order_release);
+                    }
+                }
+                uses.clear();
+            });
+    }
 
     // Vulkan 같은 비-DX12 RHI의 최종 화면은 CPU 리드백 뒤 이 표를 거쳐
     // 셸 디바이스의 RGBA8 텍스처가 된다. pending 쪽만 두 스레드가 공유하고,
@@ -367,7 +430,11 @@ struct ImGuiDx12Shell::Impl
 };
 
 ImGuiDx12Shell::ImGuiDx12Shell() : m_impl(new Impl()) {}
-ImGuiDx12Shell::~ImGuiDx12Shell() { delete m_impl; }
+ImGuiDx12Shell::~ImGuiDx12Shell()
+{
+    Shutdown();
+    delete m_impl;
+}
 
 bool ImGuiDx12Shell::IsActive() const { return m_impl->active; }
 
@@ -465,6 +532,7 @@ void ImGuiDx12Shell::NewFrame()
     if (!impl.active || impl.frameOpen) return;
 
     const uint64_t completed = impl.resources.GetCompletedFenceValue();
+    impl.CollectDisplayUses(completed);
     impl.SweepRetired(completed);
     impl.textureCache.SweepGraveyard(completed);
     impl.textureCache.BeginFrame(impl.frameIndex);
@@ -476,6 +544,8 @@ void ImGuiDx12Shell::NewFrame()
     }
     else
     {
+        // BeginFrame의 호스트 프레임 수 제한 대기 중 완료됐을 수도 있다.
+        impl.CollectDisplayUses(impl.resources.GetCompletedFenceValue());
         impl.frameOpen = true;
         if (!impl.UploadCpuFrames(impl.frameError))
         {
@@ -573,11 +643,19 @@ bool ImGuiDx12Shell::IsTextureReady(Texture* texture) const
     return found != impl.textureSlots.end() && found->second.uploaded;
 }
 
-uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue)
+uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue,
+    std::shared_ptr<RHIDisplayConsumerLease> consumerLease)
 {
     Impl& impl = *m_impl;
     HANDLE sharedHandle = static_cast<HANDLE>(sharedHandleValue);
-    if (!impl.active || !impl.frameOpen || nullptr == sharedHandle)
+    if (!impl.active || !impl.frameOpen || nullptr == sharedHandle || !consumerLease ||
+        consumerLease->m_completionLost.load(std::memory_order_acquire))
+    {
+        return 0;
+    }
+    // 분리된 ImGui 창의 별도 큐·펜스는 이 셸이 추적하지 않는다.
+    // 소비자 수명을 증명할 수 없으므로 공유 이미지를 게시하지 않는다.
+    if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
     {
         return 0;
     }
@@ -585,12 +663,22 @@ uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue)
     const auto found = impl.sharedTextures.find(sharedHandle);
     if (found != impl.sharedTextures.end())
     {
-        found->second.lastUsedFrame = impl.frameIndex;
-        return found->second.textureId;
+        if (found->second.m_consumerLease.lock() == consumerLease)
+        {
+            found->second.lastUsedFrame = impl.frameIndex;
+            impl.RetainDisplayUse(std::move(consumerLease), found->second.resource);
+            return found->second.textureId;
+        }
+        // 재사용된 핸들이 이전 생산자의 descriptor를 가리키면 안 된다.
+        // 이전 descriptor도 현재 기록의 GPU 완료까지 보관한다.
+        impl.pendingFrameRetirements.push_back(Impl::RetiredDescriptor{
+            found->second.textureId, std::move(found->second.resource) });
+        impl.sharedTextures.erase(found);
     }
 
-
     Impl::SharedEntry entry{};
+    // 별도 디바이스에서 핸들을 여는 성공 여부로 디바이스 간 호환성을 확인한다.
+    // 열린 리소스와 생산자 lease를 모두 소비자 GPU 완료까지 보관한다.
     if (FAILED(impl.resources.GetDevice()->OpenSharedHandle(sharedHandle,
         IID_PPV_ARGS(&entry.resource))))
     {
@@ -600,11 +688,16 @@ uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue)
     const D3D12_RESOURCE_DESC desc = entry.resource->GetDesc();
     entry.textureId = impl.CreateSrvSlot(entry.resource.Get(), desc.Format,
         static_cast<uint32_t>(desc.MipLevels));
-    if (0 == entry.textureId) return impl.fallbackTextureId;
+    if (0 == entry.textureId)
+    {
+        return impl.fallbackTextureId;
+    }
     entry.lastUsedFrame = impl.frameIndex;
-
-    impl.sharedTextures.emplace(sharedHandle, entry);
-    return entry.textureId;
+    entry.m_consumerLease = consumerLease;
+    impl.RetainDisplayUse(std::move(consumerLease), entry.resource);
+    const uint64_t textureId = entry.textureId;
+    impl.sharedTextures.emplace(sharedHandle, std::move(entry));
+    return textureId;
 }
 
 void ImGuiDx12Shell::SubmitCpuRgbaFrame(uint64_t key, uint32_t width,
@@ -655,7 +748,8 @@ RHIDisplayTexture ImGuiDx12Shell::GetCpuFrameTexture(uint64_t key)
     return {entry.textureId, entry.width, entry.height, entry.metadata};
 }
 
-bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
+bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
+    const std::function<void()>& onRecorded)
 {
     ce::profile_scope profile{ce::marker<"ImGuiDX12MainViewport">()};
     Impl& impl = *m_impl;
@@ -699,16 +793,29 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError)
     toPresent.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
     commandList->ResourceBarrier(1, &toPresent);
 
+    // 드로우 콜백과 장면 CPU 읽기가 끝났고 공유 표시 사용은 lease를 확보했다.
+    // 이후 작업은 보관된 네이티브 리소스와 캐시 상태만 만진다.
+    if (onRecorded)
+    {
+        onRecorded();
+    }
+
     if (!impl.resources.EndFrame(outError))
     {
         impl.resources.AbortFrame();
         impl.AbortCpuFrames();
+        // 네이티브 작업이 이미 제출된 뒤 Enqueue가 실패할 수도 있다.
+        // 완료를 증명할 수 없으므로 수명 전환 GPU drain까지 소유권을 격리한다.
+        impl.RetireDisplayUses(0);
         impl.frameOpen = false;
         return false;
     }
     impl.recordingCpuFrames.clear();
 
     const uint64_t completionValue = impl.resources.GetLastSignaledFenceValue();
+    // CPU 제출이나 Present 반환은 소비자 GPU 완료가 아니다.
+    // 생산자와 독립적인 호스트 디바이스 펜스로만 이 큐를 회수한다.
+    impl.RetireDisplayUses(completionValue);
     for (Impl::RetiredDescriptor& retired : impl.pendingFrameRetirements)
     {
         impl.RetireDescriptor(retired.textureId, completionValue,
@@ -786,8 +893,13 @@ void ImGuiDx12Shell::Shutdown()
         impl.frameOpen = false;
     }
     std::string lifecycleError;
-    if (!impl.resources.DrainForLifecycle(
-            RHILifecycleCommand::BackendShutdown, lifecycleError))
+    const bool drained = impl.resources.DrainForLifecycle(
+        RHILifecycleCommand::BackendShutdown, lifecycleError);
+    const bool gpuCompletionProven = drained &&
+        impl.resources.GetLastLifecycleResult().command !=
+            RHILifecycleCommand::UnrecoverableDeviceError &&
+        SUCCEEDED(impl.resources.GetDevice()->GetDeviceRemovedReason());
+    if (!drained)
     {
         std::printf("[ImGui] DX12 shutdown drain 실패: %s\n",
             lifecycleError.c_str());
@@ -795,6 +907,9 @@ void ImGuiDx12Shell::Shutdown()
         impl.resources.DrainForLifecycle(
             RHILifecycleCommand::UnrecoverableDeviceError, abandonError);
     }
+    // 장치 오류로 제출을 포기한 것은 GPU 완료가 아니다. 호스트 참조를 놓기
+    // 전에 관련 생산자 슬롯을 사용 불가로 표시해 재사용을 차단한다.
+    impl.DrainDisplayUses(gpuCompletionProven);
     ImGui_ImplDX12_Shutdown();
 
     impl.sharedTextures.clear();

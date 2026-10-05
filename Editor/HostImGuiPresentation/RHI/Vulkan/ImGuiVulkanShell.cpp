@@ -383,7 +383,12 @@ void ImGuiVulkanShell::Resize(uint32_t width, uint32_t height)
 {
     Impl& impl = *m_impl;
     if (!impl.active || 0 == width || 0 == height ||
-        (width == impl.width && height == impl.height)) return;
+        (width == impl.width && height == impl.height && !impl.resources.NeedsSwapChainRecreation()))
+    {
+        return;
+    }
+    // 크기가 같아도 OUT_OF_DATE가 생길 수 있다. 이 소유자가 재구축해야
+    // 이미지 뷰도 스왑체인과 함께 은퇴하고 다시 생성된다.
 
     std::string error;
     if (!impl.resources.DrainForLifecycle(
@@ -426,6 +431,9 @@ void ImGuiVulkanShell::NewFrame()
     if (!impl.resources.BeginFrame(error))
     {
         impl.frameError = error;
+        // 얼로케이터·기록 트랜잭션을 연 뒤에도 이미지 획득이 실패할 수 있다.
+        // 재시도나 스왑체인 재구축 전에 해당 트랜잭션을 닫는다.
+        impl.resources.AbortFrame();
         impl.AbortCpuFrames();
         std::printf("[ImGui] Vulkan BeginFrame 실패: %s\n", error.c_str());
         return;
@@ -452,7 +460,8 @@ void ImGuiVulkanShell::NewFrame()
     ImGui_ImplVulkan_NewFrame();
 }
 
-bool ImGuiVulkanShell::RenderAndPresent(std::string& outError)
+bool ImGuiVulkanShell::RenderAndPresent(std::string& outError,
+    const std::function<void()>& onRecorded)
 {
     Impl& impl = *m_impl;
     if (!impl.active) return true;
@@ -518,6 +527,13 @@ bool ImGuiVulkanShell::RenderAndPresent(std::string& outError)
     dependency.pImageMemoryBarriers = &toPresent;
     VulkanApi::vkCmdPipelineBarrier2(impl.resources.GetCommandBuffer(), &dependency);
     impl.backBufferInitialized[index] = true;
+
+    // 장면 CPU 읽기와 드로우 콜백이 모두 끝났다. 이후 제출은
+    // 보관된 네이티브 리소스와 캐시 기록만 사용한다.
+    if (onRecorded)
+    {
+        onRecorded();
+    }
 
     if (!impl.resources.EndFrame(outError))
     {
@@ -623,7 +639,8 @@ bool ImGuiVulkanShell::IsTextureReady(Texture* texture) const
         static_cast<uint64_t>(texture->m_assetId.m_ID_Data)) != impl.textureSets.end();
 }
 
-uint64_t ImGuiVulkanShell::OpenSharedTexture(void* /*sharedHandle*/)
+uint64_t ImGuiVulkanShell::OpenSharedTexture(void* /*sharedHandle*/,
+    std::shared_ptr<RHIDisplayConsumerLease> /*consumerLease*/)
 {
     // DXGI shared handle은 Vulkan descriptor가 아니다. Vulkan scene path는 공통
     // SubmitCpuRgbaFrame 브리지를 사용하며 이 호출은 합법 폴백으로 닫는다.
