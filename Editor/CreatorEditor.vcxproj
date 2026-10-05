@@ -180,8 +180,8 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
   <ItemGroup>
     <ClInclude Include="EngineEntry\App.h" />
     <ClInclude Include="EngineEntry\BootProgress.h" />
-    <ClInclude Include="EngineEntry\EngineBootstrap.h" />
-    <ClInclude Include="EngineEntry\EngineLaunchConfig.h" />
+    <ClInclude Include="..\Engine\RuntimeHost\EngineBootstrap.h" />
+    <ClInclude Include="..\Engine\RuntimeHost\EngineLaunchConfig.h" />
     <ClInclude Include="EngineEntry\EditorMain.h" />
     <ClInclude Include="EngineEntry\framework.h" />
     <ClInclude Include="EngineEntry\ProgressWindow.h" />
@@ -237,6 +237,11 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
     <Manifest>
       <AdditionalManifestFiles>$(ProjectDir)EngineEntry\CreatorEditor.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
     </Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\RuntimeHost\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

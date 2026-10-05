@@ -313,10 +313,14 @@ struct IRenderFeatureContributor
 `ImGui 사용 == Editor 전용`으로 일괄 분류하지 않는다.
 
 - Inspector, picker, Editor overlay: `EditorUI` 또는 `EditorRender`.
-- DX12/Vulkan ImGui backend: 과도기에는 `HostImGuiPresentation`.
+- Editor ImGui backend: DX12 concrete `HostImGuiPresentation`.
 - runtime 게임 UI: RenderCore의 `EnhancedUIPass` 계통.
-- Player가 ImGui presentation을 필요로 하지 않게 되면 `Player.vcxproj`의
-  `ImGuiHelper` 참조를 제거한다.
+- Player: ImGui 없는 native DX12/Vulkan 최종 합성·swapchain Present.
+  공용 bootstrap/CommandCore는 `Engine/RuntimeHost`에 두며 Editor 프로젝트를 참조하지 않는다.
+
+2026-10-05 소스 변경과 남은 빌드/실행 수용 범위는
+[PlayerNativePresentation.md](../design/PlayerNativePresentation.md)에 기록한다.
+과거 E4의 과도기 검증 기록은 당시 snapshot의 기록이며 현재 바이너리 검증으로 재사용하지 않는다.
 
 ---
 

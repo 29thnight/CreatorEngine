@@ -51,6 +51,10 @@ internal static class PlayerVerification
         Require(combined, @"Scene loaded:[^\r\n]*" + Regex.Escape(preflight.StartupScene), "startup scene success");
         var rows = stdout.Split('\n').Where(p => p.StartsWith("[player.smoke] ")).Select(p => JsonNode.Parse(p[15..])!).ToArray();
         if (rows.Length != 1 || rows[0].Int("schemaVersion") != 1 || !rows[0].Bool("ready") || rows[0].Int("registeredScriptTypes") <= 0) throw new BuildException("Invalid managed runtime readiness result.");
+        if (rows[0].Int("submittedGameFrames") <= 0 || rows[0].Int("submittedGameFrameId") <= 0)
+        {
+            throw new BuildException("Player did not submit a completed game texture through its native presenter.");
+        }
         if (preflight.RequiresManagedLifecycle)
         {
             var initialized = Regex.Matches(stdout, @"\[SMOKE\]\s*managed OnInitialized:\s*PackageSmokeProbe");
@@ -64,6 +68,7 @@ internal static class PlayerVerification
             @"\[CRASH\]", @"\[CLR\].*실패", @"\[RenderBackend\].*(실패|오류)", @"Failed to load PhysXGpu_64\.dll", "GPU solver/Bp pipeline failed", "typed ops 미등록 타입", @"PxScene::simulate\(\) called with a zero elapsedTime" })
             if (Regex.IsMatch(combined, pattern, RegexOptions.IgnoreCase)) throw new BuildException($"Player failure marker: {pattern}");
         return Metadata.Object(new { exitCode = 0, gameThreadFrames = gameFrames, displayFrame = display, promotions,
+            submittedGameFrames = rows[0].Int("submittedGameFrames"), submittedGameFrameId = rows[0].Int("submittedGameFrameId"),
             registeredScripts = rows[0].Int("registeredScriptTypes"), managedLifecycle = preflight.RequiresManagedLifecycle,
             catalogSource = "cemf", metaParsed = 0, sourceIdentities = int.Parse(catalog.Groups[1].Value), cookedEntries = int.Parse(cooked.Groups[1].Value), cookedSceneDocuments, textParserCalls = 0 });
     }

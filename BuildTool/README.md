@@ -100,3 +100,46 @@ dotnet run --project BuildTool/Tests/CreatorBuildTool.Tests.csproj -c Debug -- -
 관련 정본: [BuildPipelinePlan](../docs/plans/BuildPipelinePlan.md),
 [EngineDistributionAndLauncherPlan](../docs/plans/EngineDistributionAndLauncherPlan.md),
 [EngineVersionPolicy](../docs/design/EngineVersionPolicy.md).
+
+## Player Development Build
+
+Development/Shipping is the existing `EngineShipping` axis, independent of compiler
+`Debug`/`Release`. `publish-engine --config Release` publishes an optimized Development
+Player; add `--shipping` to publish Shipping. `package-game` and `Tools/build.ps1`
+select the same mode using `--shipping` / `-Shipping`. Packaging requires a matching
+published distribution and project engine pin, and does not enable diagnostics by
+changing a runtime settings file.
+
+Editor Build Settings persists `build.development` (Development Build, default true).
+Export checks that choice against the selected distribution and reports a mismatch;
+select/publish the matching engine before exporting. `engine.runtime.json`, the
+package manifest and current pointer record `shipping` and `developmentBuild` alongside
+compiler configuration.
+
+Development bundles the matching `Player.runtime.pdb` through the native runtime
+manifest. Attach the existing native debugger to Player.exe; optimized Release code
+retains its optimization, and engine-module symbol coverage follows each module's
+existing compiler policy. Existing logs and profiler markers remain available.
+This does not add a remote debugger protocol or a managed/C# debugger integration.
+
+Local Development Player inputs use the same role-filtered registry as HTTP:
+
+- `Player.exe --exec "player.status" --exec quit`
+- `Player.exe --exec-args player.object "Big Boss" -- --exec quit`
+- `Player.exe --script commands.txt` (UTF-8, one command per line, `#`/`//` comment lines)
+- `Player.exe --commandlet player.status` (run one registered Player command and exit)
+- `Player.exe --commandlet-script commands.txt --fail-fast --result-file results.jsonl`
+
+Structured `--exec-args` and `--commandlet` arguments run until `--` or argv end.
+`--exec`/`--script` remain live until an explicit `quit`; commandlets exit after the
+batch. Command results use the existing schema-v1 JSONL envelope, with optional
+`--result-format jsonl` and `--result-file`. Stdout also contains engine logs; use the
+result file for a pure JSONL stream. Session exit codes aggregate failures
+(0 success, 2 arguments, 3 precondition, 4 failed/cancelled/timeout, 5 internal error).
+Local batches cannot be mixed with smoke or HTTP service execution. These are
+Player runtime commands, not Editor authoring/test commandlets.
+
+HTTP still requires explicit `--command-service`; Development does not open a
+listener automatically. Existing loopback binding, token authentication and user-code
+policy are unchanged. Shipping compile-excludes the registry, CLI execution, profiler
+command handlers and HTTP implementation, and rejects local developer switches.

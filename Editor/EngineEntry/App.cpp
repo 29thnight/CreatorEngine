@@ -40,6 +40,7 @@
 #include "SceneManager.h"
 #include <shellapi.h>
 #include <chrono>
+#include <cstdio>
 #include <thread>
 #include "RHI/RHIShaderCompiler.h"
 
@@ -144,14 +145,14 @@ std::filesystem::path EditorPathArgument(const wchar_t* option)
 		return {};
 	}
 
-	bool InitializeEditorHostSettings() noexcept
-	{
-		return EditorSettingsStore::Get().Initialize();
-	}
+    bool InitializeEditorHostSettings() noexcept
+    {
+        return EditorSettingsStore::Get().Initialize();
+    }
 
 	EngineLaunchConfig MakeEditorLaunchConfig()
 	{
-		EngineLaunchConfig config{};
+		EngineLaunchConfig config{ RuntimeRenderBackendPolicy::FixedDX12 };
 		config.compatibilityRunMode = EngineRunMode::Editor;
 		config.logSessionName = "Editor";
 

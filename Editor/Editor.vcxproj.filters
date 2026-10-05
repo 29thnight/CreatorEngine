@@ -128,22 +128,22 @@
     <ClInclude Include="EngineEntry\BuildSettings.h">
       <Filter>EditorRuntime\Settings</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\CommandCore\CommandParser.h">
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandParser.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptor.h">
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptor.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\CommandCore\CommandDescriptorSeeds.h">
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptorSeeds.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\CommandCore\CommandRegistry.h">
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\CommandCore\CommandResult.h">
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandResult.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\CommandCore\CommandSession.h">
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandSession.h">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
@@ -524,19 +524,19 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp">
       <Filter>EditorRender\Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\CommandCore\CommandParser.cpp">
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandParser.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\CommandCore\CommandDescriptorSeeds.cpp">
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptorSeeds.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\CommandCore\CommandRegistry.cpp">
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\CommandCore\CommandResult.cpp">
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandResult.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\CommandCore\CommandSession.cpp">
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandSession.cpp">
       <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">

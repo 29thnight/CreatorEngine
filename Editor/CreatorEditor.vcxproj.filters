@@ -43,10 +43,10 @@
     <ClInclude Include="EngineEntry\EditorMain.h">
       <Filter>EditorMain</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\EngineBootstrap.h">
+    <ClInclude Include="..\Engine\RuntimeHost\EngineBootstrap.h">
       <Filter>App</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\EngineLaunchConfig.h">
+    <ClInclude Include="..\Engine\RuntimeHost\EngineLaunchConfig.h">
       <Filter>App</Filter>
     </ClInclude>
     <ClInclude Include="EngineEntry\framework.h">

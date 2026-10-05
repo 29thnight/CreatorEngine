@@ -60,9 +60,8 @@ param(
 #   ② **예산 창구가 실물인가.** 비교가 상수를 직접 읽으면 `budget` 명령은 아무
 #      일도 하지 않고, 장부 C 는 `evicted 0` 을 낸다. 그때 이 게이트가 붉어지긴
 #      하지만 "자극하지 못했다" 와 "지키지 않는다" 를 못 가른다.
-#   ③ **Vulkan 팔이 배선돼 있는가.** 이 회차는 DX12 다. PHASE 21 은 DX12 판정이고
-#      Vulkan 은 이 페이즈의 대상이 아니지만, **미루는 것은 판정이지 배선이
-#      아니다** — 자를 한 팔에만 달면 다음 페이즈가 없는 자를 물려받는다.
+#   ③ **DX12 Editor의 GPU 준비 조회가 끝까지 배선돼 있는가.** 호스트는 concrete
+#      DX12 셸만 소유한다. Player의 native Vulkan 표시는 썸네일 UI를 소비하지 않는다.
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -363,16 +362,13 @@ try {
         -not ($trimmed.StartsWith('//') -or $trimmed.StartsWith('*') -or $trimmed.StartsWith('/*'))
     })
 
-    # S1 — `IsTextureReady` 가 인터페이스 둘과 셸 둘, 그리고 호스트에 모두 있다.
-    #      런타임 회차는 DX12 뿐이라 Vulkan 팔은 소스로만 지킬 수 있다.
+    # S1 — `IsTextureReady`가 Editor 인터페이스, concrete DX12 셸, 호스트를 잇는다.
+    #      존재하지 않는 Vulkan ImGui 셸을 지원 대상으로 보고하지 않는다.
     $readyWiring = @{
-        'Editor/HostImGuiPresentation/RHI/IImGuiRendererBackend.h' = 1
         'Editor/HostImGuiPresentation/RHI/IImGuiHost.h'            = 1
         'Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp'           = 1
         'Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.h'   = 1
         'Editor/HostImGuiPresentation/RHI/DX12/ImGuiDx12Shell.cpp' = 1
-        'Editor/HostImGuiPresentation/RHI/Vulkan/ImGuiVulkanShell.h'   = 1
-        'Editor/HostImGuiPresentation/RHI/Vulkan/ImGuiVulkanShell.cpp' = 1
     }
     foreach ($relative in $readyWiring.Keys) {
         $full = Join-Path $repo $relative
@@ -386,8 +382,7 @@ try {
             ($_ -match 'IsTextureReady(?![A-Za-z0-9_])')
         })
         Assert ($hits.Count -ge $readyWiring[$relative]) `
-            ("$relative 에 IsTextureReady 가 없다 — 판정은 DX12 지만 **배선은 미루지 않는다**. " +
-             "한 팔에만 자를 달면 다음 페이즈가 없는 자를 물려받는다.")
+            "$relative 에 IsTextureReady 가 없다 — DX12 Editor의 실제 GPU 준비 조회가 끊겼다."
     }
 
     # S2 — 디코딩은 작업 스레드 몫이다. 호출이 하나뿐이고 그 자리가 풀 안이어야 한다.

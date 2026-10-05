@@ -12,7 +12,6 @@
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "ReflectionRegister.h"
-#include "ReflectionUndo.h"
 #include "ComponentFactory.h"
 #include "InputActionManager.h"
 #include "EngineMode.h"
@@ -247,7 +246,7 @@ namespace EngineBootstrap
 			return false;
 		}
 
-		if (!RuntimeSettings::Initialize())
+		if (!RuntimeSettings::Initialize(config.renderBackendPolicy))
 		{
 			std::fputs("[RuntimeSettings] EngineSettings 초기화 실패 — 부팅을 중단한다\n",
 				stderr);

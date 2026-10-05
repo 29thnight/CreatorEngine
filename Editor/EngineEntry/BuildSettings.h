@@ -19,7 +19,13 @@ struct BuildSettings
     RenderBackend GetRenderBackend() const noexcept { return renderBackend; }
     void SetRenderBackend(RenderBackend value) noexcept { renderBackend = value; }
 
+    // Independent of Debug/Release compiler optimization. Export requires a matching
+    // prebuilt EngineShipping=false/true distribution; it never rebuilds the engine.
+    bool IsDevelopmentBuild() const noexcept { return developmentBuild; }
+    void SetDevelopmentBuild(bool value) noexcept { developmentBuild = value; }
+
 private:
+    bool developmentBuild{ true };
     std::string projectName{};
     std::wstring startupSceneName{ L"SampleScene" };
     RenderBackend renderBackend{ RenderBackend::DX12 };

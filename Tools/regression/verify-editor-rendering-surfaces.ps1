@@ -6,6 +6,10 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
+# Reject before creating artifacts or changing settings; never label a DX12 run Vulkan.
+if ($Backend -contains 'vulkan') {
+    throw 'CreatorEditor supports DX12 only; Vulkan Editor runs are unsupported. Use native Vulkan RHI probes or Player validation instead.'
+}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $case=[IO.Path]::GetFullPath($OutputDirectory)
 if(Test-Path -LiteralPath $case){throw 'Use a new output directory'}
@@ -16,10 +20,6 @@ foreach($folder in @('Assets','ProjectSetting','Saved')){
     if(Test-Path $source){Copy-Item -LiteralPath $source -Destination $project -Recurse}
 }
 Copy-Item -LiteralPath "$repo/Dynamic_CPP/Assets/Shaders/DefaultPassShader" -Destination "$project/Assets/Shaders" -Recurse -Force
-$settings="$project/ProjectSetting/EngineSettings.asset"
-$yaml=Get-Content $settings -Raw
-$yaml=[regex]::Replace($yaml,'(?m)(backend:\s*)dx12\b',('${1}'+$Backend))
-[IO.File]::WriteAllText($settings,$yaml,[Text.UTF8Encoding]::new($false))
 $draftFolder="$project/Saved/Editor/MaterialDrafts"
 New-Item -ItemType Directory -Path $draftFolder -Force|Out-Null
 $existingDraft="$draftFolder/Scene_2_Document_1.shadergraph"

@@ -82,7 +82,7 @@ try {
         $stdout=Get-Content "$out/player.out" -Raw
         if($stdout -match '\[physics.player.ddol\] (\{[^\r\n]+\})'){$ddolProbe=$Matches[1]|ConvertFrom-Json}
         if(!$ddolProbe -or !$ddolProbe.complete -or $ddolProbe.failed -ne 0 -or $ddolProbe.passed -ne 8){throw 'Cooked Player DDOL probe failed or missing'}
-        if($stdout -notmatch '\[player.smoke.reload\] activated=true gameStart=true pending=false displayedAfterActivation=true'){throw 'Missing completed destination display'}
+        if($stdout -notmatch '\[player.smoke.reload\] activated=true gameStart=true pending=false compositionSubmittedAfterActivation=true'){throw 'Missing submitted destination composition'}
     }
 
     if($Hierarchy){

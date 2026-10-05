@@ -225,7 +225,7 @@ namespace CommandCore
             // LC8 — 요약을 **호스트 중립으로 고쳤다.** 두 registry 가 같은 seed 를
             // 나눠 쓰므로 "에디터 종료" 는 Player 의 help 에서 거짓이 된다.
             { "quit", CommandCost::Immediate, "", "호스트를 종료한다", CommandClass::EngineService, CommandLiveness::TerminatesProcess, false, CommandRoles::Both },
-            { "render.backend", CommandCost::Immediate, "status", "부팅 시 고정된 scene/ImGui RHI 조회(변경은 Settings)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
+            { "render.backend", CommandCost::Immediate, "status", "Editor scene/ImGui DX12 고정 상태 조회(Player 백엔드는 Build Settings)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
             { "render.environment", CommandCost::Immediate, "<HDR-or-ceibl-path> | status | background on|off", "Select environment; reuse cooked maps or generate and cache once", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "path", true },
             { "render.live.capture", CommandCost::Long, "<new-absolute-directory> [game|editor|material] [controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]", "Capture actual product attachments through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.fence", CommandCost::Long, "[timeout-seconds]", "Wait for a product frame through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },

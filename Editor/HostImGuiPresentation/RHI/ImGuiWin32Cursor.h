@@ -1,5 +1,9 @@
 #pragma once
 
+#if defined(CE_PLAYER)
+#error "Editor ImGui presentation is unavailable to Player; use native RHI presentation."
+#endif
+
 #include <Windows.h>
 #include <optional>
 

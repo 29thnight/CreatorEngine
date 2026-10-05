@@ -757,8 +757,7 @@ void MenuBarWindow::ShowAboutWindow()
     ImGui::Separator();
     // 에디터가 실제로 돌고 있는 백엔드와 Player가 받을 백엔드를 나란히 둔다.
     // 하나만 보이면 "설정을 바꿨는데 왜 그대로냐"를 가릴 수 없다.
-    row("Editor render backend",
-        RenderBackendName(RuntimeSettings::Get().GetRenderBackend()));
+    row("Editor render backend", "dx12 (build-fixed)");
     row("Player build backend",
         RenderBackendName(buildSettings.GetRenderBackend()));
     ImGui::TextDisabled(
@@ -2546,6 +2545,16 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
 		}
 		ImGui::TextDisabled("Packaging projects this value into runtime render.backend.");
 		ImGui::TextDisabled("The Player reads only runtime render.backend at process startup.");
+
+        ImGui::Separator();
+        bool developmentBuild = buildSettings.IsDevelopmentBuild();
+        if (ImGui::Checkbox("Development Build", &developmentBuild))
+        {
+            buildSettings.SetDevelopmentBuild(developmentBuild);
+            EditorSettingsStore::Get().Save();
+        }
+        ImGui::TextDisabled("Enable native debugging, profiling, and local CLI capabilities.");
+        ImGui::TextDisabled("The local command listener still requires --command-service.");
 	}
 }
 void MenuBarWindow::ShowRenderDebugWindow()

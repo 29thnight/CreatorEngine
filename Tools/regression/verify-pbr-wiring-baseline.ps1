@@ -18,9 +18,9 @@
 #     DX12는 `dx12.gbuffer`·`dx12.forwardshade`·`dx12.iblshade` 및 실제 제품
 #     AO/emission 픽셀로 판정한다. Vulkan 교차 축의 소유권은 BackendParityPlan이다.
 #
-#   그래서 기본값을 dx12 하나로 두되, vulkan 은 **조용히 사라지지 않는다** — 축 회계에
-#   `deferred` 로 이름이 남고 요약이 그것을 부른다. `-Backend dx12,vulkan` 으로
-#   언제든 되돌려 잴 수 있다.
+#   Editor 제품 캡처는 DX12 전용이다. -Backend vulkan은 설정 변경 전에 거절한다.
+#   Vulkan 축은 PHASE 4.9의 native RHI/Player 검증으로 옮길 과제로 명시한다.
+#   -IncludeVulkanSelfTest의 별도 RHI 대조 검사는 계속 사용할 수 있다.
 param(
     [string]$Editor = (Join-Path $PSScriptRoot '..\..\Bin\x64-Debug\Editor\CreatorEditor.exe'),
     [string]$Work = $env:TEMP,
@@ -36,6 +36,10 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Reject before creating artifacts or changing settings; never label a DX12 run Vulkan.
+if ($Backend -contains 'vulkan') {
+    throw 'CreatorEditor supports DX12 only; Vulkan Editor runs are unsupported. Use native Vulkan RHI probes or Player validation instead.'
+}
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 . (Join-Path $PSScriptRoot 'PbrProductPixels.ps1')
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -94,7 +98,7 @@ function Set-AxisDeferred([string]$Name, [string]$Owner) {
 # ★ 처음에는 해당 블록에 닿았을 때 등록했는데, 게이트가 그 앞에서 죽으면 미룬 축이
 #   통째로 사라졌다. 미룬 축은 인자만 보면 알 수 있으므로 실행과 무관하게 먼저 적는다.
 if ($Backend -notcontains 'vulkan') {
-    Set-AxisDeferred 'vulkan/제품 캡처' 'PHASE 4.9 BackendParityPlan (2026-09-15 결정) · -Backend dx12,vulkan 로 되돌려 잰다'
+    Set-AxisDeferred 'vulkan/제품 캡처' 'PHASE 4.9 BackendParityPlan · native RHI/Player capture required; Vulkan Editor is unsupported'
 }
 if (-not $IncludeVulkanSelfTest) {
     Set-AxisDeferred 'vk/* 백엔드 대조' ('PHASE 4.9 BackendParityPlan · -IncludeVulkanSelfTest 로 되돌린다 · ' +
@@ -383,16 +387,12 @@ function Assert-Capture([string]$Directory, [string]$ExpectedBackend, [string[]]
 
 try {
     if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) {
-        throw 'Close the running Editor before this test; it temporarily selects the startup backend.'
+        throw 'Close the running Editor before this test; it uses the build-fixed DX12 host.'
     }
     New-Item -ItemType Directory -Path $run | Out-Null
     $original = [IO.File]::ReadAllBytes($settings)
-    $text = $utf8.GetString($original)
-    $backendPattern = '(?m)(^render:\r?\n\s{2}backend: )\w+'
-    if ([regex]::Matches($text, $backendPattern).Count -ne 1) { throw 'Runtime backend setting is ambiguous.' }
     $captureDirs = @{}
     foreach ($api in $Backend) {
-        [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, "`${1}$api"), $utf8)
         $primitive = Join-Path $run "$api-primitives"
         $primitiveRepeat = Join-Path $run "$api-primitives-repeat"
         $robot = Join-Path $run "$api-robot"
@@ -636,9 +636,8 @@ try {
         Write-Output "PBR PRODUCT-ONLY PASS (not full baseline or cutover): $run"
         return
     }
-    # The paired harness owns both DX12 and Vulkan test devices; keep its Editor
-    # host on DX12 independently of the final product-capture backend above.
-    [IO.File]::WriteAllText($settings, [regex]::Replace($text, $backendPattern, '${1}dx12'), $utf8)
+    # The paired harness owns separate DX12 and Vulkan test devices;
+    # its Editor host remains build-fixed DX12.
     # ★ `vk.*` 는 이름이 범위를 속인다 — 넷 다 **DX12/Vulkan 대조** 테스트다
     #   (`RunVulkanGBufferTest` 안에 `dx12Capture` 와 `vkCapture` 가 함께 있다).
     #   그래서 끄면 vulkan 팔만이 아니라 **DX12 팔도 함께 꺼진다.** 2026-09-15 결정은

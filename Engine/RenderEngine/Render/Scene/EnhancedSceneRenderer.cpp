@@ -7218,12 +7218,6 @@ EnhancedLiveDisplaySnapshot EnhancedSceneRenderer::GetLiveDisplaySnapshot()
     return state.displaySnapshot;
 }
 
-uint64_t EnhancedSceneRenderer::GetLiveDisplayImTextureId(
-    EnhancedLiveDisplayTarget target)
-{
-    return GetLiveDisplayTexture(target).textureId;
-}
-
 EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
     EnhancedLiveDisplayTarget target)
 {

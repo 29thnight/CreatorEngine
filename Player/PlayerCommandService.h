@@ -20,8 +20,23 @@
 #include <cstdint>
 #include <string>
 
+namespace CommandCore
+{
+    struct CommandResult;
+}
+namespace PlayerCmd
+{
+    struct Timing;
+}
+
 namespace PlayerCommandService
 {
+#if CE_DEVELOPMENT
+    // Local JSONL and HTTP use the existing schema-v1 codec, without opening a socket.
+    std::string FormatResult(const std::string& command,
+        const CommandCore::CommandResult& result, const PlayerCmd::Timing& timing);
+#endif
+
 	/// `--command-service` 로 켠다. **기본은 off** 다(§8 · §11.2).
 	///
 	/// 실패해도 게임은 계속 돈다 — 서비스가 안 열린 것과 게임이 못 뜨는 것은

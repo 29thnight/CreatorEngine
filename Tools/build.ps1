@@ -8,6 +8,8 @@ param(
     [string]$RenderBackend = '', [string]$StartupScene = '',
     [switch]$BuildNative, [switch]$SkipVerify,
     [string]$EngineDistribution = '', [string]$GameScriptsAssembly = '',
+    # EngineShipping controls diagnostics independently of -Config Debug/Release.
+    # Omit -Shipping for a Development Player, including optimized Release builds.
     [switch]$Shipping,
     [ValidateRange(1,1000000)][int]$SmokeFrames = 120,
     [ValidateRange(10,3600)][int]$SmokeTimeoutSec = 180,

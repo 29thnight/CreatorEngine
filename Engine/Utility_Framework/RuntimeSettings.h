@@ -18,13 +18,21 @@ struct AnimationBudgetSettings final
     double hysteresis{ .05 };
 };
 
+// 호스트 구성에서만 정한다. Editor는 설정 파일의 백엔드 키를 해석하지 않는다.
+enum class RuntimeRenderBackendPolicy
+{
+    ProjectSettings,
+    FixedDX12,
+};
+
 // Core-owned settings for the running process. Editor preferences and product-build
 // choices are deliberately absent; the packaging pipeline projects those choices into
 // the same runtime schema consumed by Player.
 class RuntimeSettings final
 {
 public:
-    static bool Initialize() noexcept;
+    static bool Initialize(
+        RuntimeRenderBackendPolicy backendPolicy = RuntimeRenderBackendPolicy::ProjectSettings) noexcept;
     static void Shutdown() noexcept;
     static RuntimeSettings& Get() noexcept;
     static RuntimeSettings* TryGet() noexcept;
@@ -67,9 +75,13 @@ public:
     }
 
 private:
-    RuntimeSettings() = default;
+    explicit RuntimeSettings(RuntimeRenderBackendPolicy backendPolicy) noexcept
+        : m_backendPolicy(backendPolicy)
+    {
+    }
     bool Load() noexcept;
 
+    const RuntimeRenderBackendPolicy m_backendPolicy;
     RenderBackend m_renderBackend{ RenderBackend::DX12 };
     mutable std::mutex m_renderPassSettingsMutex;
     RenderPassSettings m_renderPassSettings{};

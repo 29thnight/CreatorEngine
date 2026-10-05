@@ -26,7 +26,7 @@ namespace material_graph { struct SceneMaterialSource; }
 
 inline constexpr uint32_t kEnhancedMaxLiveCameraViews = 3; // scene, game, cached material preview
 
-/// ImGui composition이 요청하는 논리 표시 대상. 카메라의 소유권이나 backend
+/// Host composition이 요청하는 논리 표시 대상. 카메라의 소유권이나 backend
 /// 슬롯과 무관하며 Host가 요청마다 명시한다.
 enum class EnhancedLiveDisplayTarget : uint8_t
 {
@@ -328,7 +328,7 @@ struct EnhancedLiveDisplayEntrySnapshot
     bool ready{ false };
 };
 
-/// RenderThread -> CE ImGui의 불변 출력 경계. sourceFrameId의 입력 역할과
+/// RenderThread -> Host presentation의 불변 출력 경계. sourceFrameId의 입력 역할과
 /// GPU 완료된 표시 결과를 함께 담되 Camera*, DX12/Vulkan 객체는 담지 않는다.
 struct EnhancedLiveDisplaySnapshot
 {
@@ -796,7 +796,7 @@ namespace EnhancedSceneRenderer
         std::shared_ptr<IRenderFeatureContributor> contributor);
 
     /// Host가 표시 sink를 설치한다(E4-6a). RT의 리드백 프레임 게시와
-    /// GetLiveDisplayImTextureId의 ID 해석이 이 sink를 소비한다 — Core는
+    /// GetLiveDisplayTexture의 ID 해석이 이 sink를 소비한다 — Core는
     /// ImGui 셸을 직접 부르지 않는다. 미설치면 표시 ID는 0이다.
     /// 렌더러 초기화(렌더 스레드 기동) 전에 설치하고, 렌더 스레드가 멎은
     /// 뒤에 해제({})한다.
@@ -906,12 +906,11 @@ namespace EnhancedSceneRenderer
     /// Camera 객체나 backend 파이프라인을 CE/UI가 다시 조회하지 않는다.
     EnhancedLiveDisplaySnapshot GetLiveDisplaySnapshot();
 
-    /// 스냅샷의 논리 표시 대상을 ImTextureID 호환 값으로 연다. DX12 공유
+    /// 스냅샷의 논리 표시 대상을 Host의 불투명 texture ID로 연다. DX12 공유
     /// 핸들과 Vulkan CPU upload key는 구현 안의 불투명 presentation key다.
     /// 셸이 없거나 해당 대상의 첫 표시 기록 전이면 0.
     /// PT의 열린 Host 프레임 안에서만 호출한다. 다른 스레드의 진단/예열은
     /// GetLiveDisplaySnapshot 또는 게시된 warmup 이정표를 읽어야 한다.
-    uint64_t GetLiveDisplayImTextureId(EnhancedLiveDisplayTarget target);
     EnhancedLiveDisplayTexture GetLiveDisplayTexture(EnhancedLiveDisplayTarget target);
 
     /// 상태 한 줄 요약(render.backend status / dx12.live 호환 명령).
