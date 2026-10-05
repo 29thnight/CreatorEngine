@@ -30,10 +30,26 @@ struct ImGuiDx12Shell::Impl
 
     bool active{ false };
     bool frameOpen{ false };
+    bool deviceLost{ false };
     uint64_t frameIndex{ 0 };
     std::string frameError;
     DX12DeviceResources resources;
     DX12TextureCache    textureCache;
+
+    // 셸은 제거된 장치를 되살리지 않는다. 처음 본 제거만 알리고 이후 GPU 호출을
+    // 멈춘다. 그대로 두면 실패가 즉시 반환돼 표시 스레드가 헛돌며 같은 오류를 찍는다.
+    bool ObserveDeviceRemoval(const std::string& error)
+    {
+        ID3D12Device* device = resources.GetDevice();
+        if (deviceLost || nullptr == device || S_OK == device->GetDeviceRemovedReason())
+        {
+            return deviceLost;
+        }
+        deviceLost = true;
+        std::printf("[ImGui] DX12 장치 제거 — 표시를 멈춘다: %s\n", error.c_str());
+        std::fflush(stdout);
+        return true;
+    }
 
     // ImGui 전용 셰이더 가시 SRV 힙 + 프리리스트 할당기.
     // ImGui_ImplDX12의 Srv{Alloc,Free}Fn 콜백이 이 할당기를 쓰고,
@@ -437,6 +453,7 @@ ImGuiDx12Shell::~ImGuiDx12Shell()
 }
 
 bool ImGuiDx12Shell::IsActive() const { return m_impl->active; }
+bool ImGuiDx12Shell::IsDeviceLost() const { return m_impl->deviceLost; }
 
 bool ImGuiDx12Shell::Initialize(void* windowHandle, uint32_t width, uint32_t height,
     std::string& outError)
@@ -530,6 +547,11 @@ void ImGuiDx12Shell::NewFrame()
 {
     Impl& impl = *m_impl;
     if (!impl.active || impl.frameOpen) return;
+    if (impl.deviceLost)
+    {
+        ImGui_ImplDX12_NewFrame();
+        return;
+    }
 
     const uint64_t completed = impl.resources.GetCompletedFenceValue();
     impl.CollectDisplayUses(completed);
@@ -540,7 +562,8 @@ void ImGuiDx12Shell::NewFrame()
     impl.frameError.clear();
     if (!impl.resources.BeginFrame(impl.frameError))
     {
-        std::printf("[ImGui] DX12 BeginFrame 실패: %s\n", impl.frameError.c_str());
+        if (!impl.ObserveDeviceRemoval(impl.frameError))
+            std::printf("[ImGui] DX12 BeginFrame 실패: %s\n", impl.frameError.c_str());
     }
     else
     {
@@ -754,6 +777,11 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
     ce::profile_scope profile{ce::marker<"ImGuiDX12MainViewport">()};
     Impl& impl = *m_impl;
     if (!impl.active) return true;
+    if (impl.deviceLost)
+    {
+        outError = "ImGui DX12 장치가 제거됐다";
+        return false;
+    }
     if (!impl.frameOpen)
     {
         outError = impl.frameError.empty()
@@ -808,6 +836,7 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
         // 완료를 증명할 수 없으므로 수명 전환 GPU drain까지 소유권을 격리한다.
         impl.RetireDisplayUses(0);
         impl.frameOpen = false;
+        impl.ObserveDeviceRemoval(outError);
         return false;
     }
     impl.recordingCpuFrames.clear();
@@ -879,7 +908,9 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
         }
     }
 
-    return impl.resources.Present(outError);
+    const bool presented = impl.resources.Present(outError);
+    if (!presented) impl.ObserveDeviceRemoval(outError);
+    return presented;
 }
 
 void ImGuiDx12Shell::Shutdown()

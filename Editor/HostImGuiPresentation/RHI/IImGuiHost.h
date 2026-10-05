@@ -28,6 +28,8 @@ public:
     /// backend 대신 다른 renderer를 만드는 fallback은 이 계약에 없다.
     virtual bool Initialize(void* windowHandle, std::string& outError) = 0;
     virtual bool IsActive() const = 0;
+    // 표시 장치가 제거돼 표시가 멈춘 상태. 표시 스레드가 헛돌지 않게 속도를 늦추는 데 쓴다.
+    virtual bool IsDisplayLost() const = 0;
     virtual const char* GetBackendName() const = 0;
 
     /// OS 창의 contents scale. UI 배율을 NewFrame의 폰트 계산 전에 적용한다.

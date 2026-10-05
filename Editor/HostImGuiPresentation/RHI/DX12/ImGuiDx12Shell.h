@@ -68,6 +68,8 @@ public:
     bool Initialize(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError);
     bool IsActive() const;
+    // 장치가 제거돼 다시는 표시할 수 없는 상태. 셸은 장치를 되살리지 않는다.
+    bool IsDeviceLost() const;
 
     /// ImGui_ImplDX12_NewFrame. BeginRender의 DX11 NewFrame 자리에 온다.
     void NewFrame();
