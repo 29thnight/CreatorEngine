@@ -81,7 +81,7 @@ namespace CommandCore
             { "dx12.grid", CommandCost::Frames, "", "그리드 패스 검증(라인·셀 내부·밀도·카메라 반응)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.ibl", CommandCost::Frames, "", "IBL 생성 체인 검증(rect→cube·조도·프리필터·BRDF LUT)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.iblshade", CommandCost::Frames, "", "IBL 앰비언트 소비 검증(끔=검정·조도 방향성·금속 정반사)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
-            { "dx12.live", CommandCost::Immediate, "on|status", "EnhancedRenderer 메인 런타임 상태", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
+            { "dx12.live", CommandCost::Immediate, "on|status|remove-device scene|host", "EnhancedRenderer 메인 런타임 상태", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
             { "dx12.parallel", CommandCost::Frames, "", "커맨드 기록 병렬화 검증(링 원자성·순차 대비 동일성)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.post", CommandCost::Frames, "", "DX12 후처리 패스를 리드백으로 판정한다", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "dx12.psocache", CommandCost::Frames, "[파일]", "PSO 캐시 자가 검증(2회차 컴파일 0건)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

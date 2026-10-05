@@ -129,6 +129,7 @@
 #include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
 #include "CoreWindow.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
 #include "RHI/IImGuiHost.h"
@@ -334,6 +335,19 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         const std::string mode = ctx.parts.size() >= 2 ? ctx.parts[1] : "status";
+#if !CE_SHIPPING
+        if (mode == "remove-device")
+        {
+            if (ctx.parts.size() != 3 || (ctx.parts[2] != "scene" && ctx.parts[2] != "host"))
+                return InvalidArguments("dx12.live remove-device scene|host");
+            DX12DeviceResources::RequestTestDeviceRemoval(ctx.parts[2] == "scene"
+                ? DX12DeviceResources::TestDeviceRemovalTarget::Scene
+                : DX12DeviceResources::TestDeviceRemovalTarget::Host);
+            auto data = CommandData::Object();
+            data.Set("target", CommandData::String(ctx.parts[2]));
+            return Ok("Device removal queued for the next frame of that device", std::move(data));
+        }
+#endif
         if (ctx.parts.size() > 2 || (mode != "on" && mode != "status"))
             return InvalidArguments("dx12.live [on|status]; the main renderer cannot be disabled");
         if (mode == "on") EnhancedSceneRenderer::EnableLive();

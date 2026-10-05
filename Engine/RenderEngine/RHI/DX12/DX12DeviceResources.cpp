@@ -4,6 +4,7 @@
 #include <vector>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <cstdio>
 #include <sstream>
@@ -534,8 +535,33 @@ RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
     return *m_immediateEncoder;
 }
 
+#if !CE_SHIPPING
+namespace
+{
+    std::atomic<uint32_t> g_testDeviceRemovalRequests{ 0 };
+}
+
+void DX12DeviceResources::RequestTestDeviceRemoval(TestDeviceRemovalTarget target)
+{
+    g_testDeviceRemovalRequests.fetch_or(static_cast<uint32_t>(target));
+}
+#endif
+
 bool DX12DeviceResources::BeginFrame(std::string& outError)
 {
+#if !CE_SHIPPING
+    const uint32_t removalBit = static_cast<uint32_t>(
+        HasSwapChain() ? TestDeviceRemovalTarget::Host : TestDeviceRemovalTarget::Scene);
+    if (0 != (g_testDeviceRemovalRequests.fetch_and(~removalBit) & removalBit))
+    {
+        Microsoft::WRL::ComPtr<ID3D12Device5> device5;
+        const bool removed = SUCCEEDED(m_device.As(&device5));
+        if (removed) device5->RemoveDevice();
+        std::printf("[test.device-removal] target=%s removed=%d\n",
+            HasSwapChain() ? "host" : "scene", removed ? 1 : 0);
+        std::fflush(stdout);
+    }
+#endif
     RHISubmissionThread& submission = GetRHISubmissionThread();
     if (submission.ConsumeFailure(this, outError)) return false;
     if (m_frameSubmissionTickets[m_frameIndex].IsValid() &&

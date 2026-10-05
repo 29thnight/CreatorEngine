@@ -57,6 +57,14 @@ public:
 
     static constexpr uint32_t kFrameCount = 3;
 
+#if !CE_SHIPPING
+    // 시험 전용 장치 제거 주입. 해당 종류 장치의 다음 BeginFrame 이
+    // ID3D12Device5::RemoveDevice 를 불러 실제 제거 경로를 태운다.
+    // 씬은 스왑체인이 없는 장치, 호스트는 스왑체인을 붙인 장치다.
+    enum class TestDeviceRemovalTarget : uint32_t { Scene = 1u << 0, Host = 1u << 1 };
+    static void RequestTestDeviceRemoval(TestDeviceRemovalTarget target);
+#endif
+
     // 렌더 타깃의 최적화 클리어 값. 생성 힌트와 실제 클리어가 일치해야 검증
     // 레이어가 조용하다 — 힌트를 안 주는 쪽도, 다른 값으로 지우는 쪽도 경고를 쌓는다
     // (둘 다 실측). 그래서 클리어 색은 여기 상수 하나로 고정한다.
