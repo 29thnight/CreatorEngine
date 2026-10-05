@@ -36,6 +36,17 @@ namespace material_graph
         {
             return statistics_;
         }
+        bool UsesRuntimeEvaluation() const
+        {
+            return runtimeEvaluation_;
+        }
+        bool RequiresCapture() const
+        {
+            return capture_;
+        }
+        void DeclareShadingInputs(EnhancedRenderGraph& graph,
+                                  std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const;
+        void BindRuntime(RHIEncoder& encoder, unsigned firstRootSlot) const;
         const std::array<RGHandle, 11>& DeclareInputs(EnhancedRenderGraph& graph) const;
         const std::array<RGHandle, 11>& GraphInputs(const EnhancedRenderGraph& graph) const;
         std::array<RGHandle, 11> DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned first,
@@ -53,6 +64,7 @@ namespace material_graph
         mutable RHICompletionPoint completion_{};
         std::uint32_t width_{}, height_{};
         std::uint64_t frameId_{}, viewId_{}, sceneEpoch_{}, environmentGeneration_{}, recording_{}, descriptors_{};
+        std::uint64_t resourceBytes_{}, exclusiveBytes_{};
         RHITextureHandle environment_, irradiance_, prefiltered_, source_;
         std::array<RHITextureHandle, 3> importance_{};
         std::array<RHITextureHandle, 11> inputs_{};
@@ -60,9 +72,11 @@ namespace material_graph
         std::shared_ptr<const LX::Runtime::ComputeGeneration> bake_, clear_;
         std::vector<RHIBufferSlice> constants_;
         RHIBindingTable outputs_;
+        RHIBindingTable runtimeInputs_;
+        RHIBufferSlice runtimeConstants_;
         RHIBufferSlice filmSensitivityConstants_;
         std::weak_ptr<const SceneLookupFrame> previous_;
-        bool reuse_{}, standalone_{};
+        bool reuse_{}, standalone_{}, runtimeEvaluation_{}, capture_ = true;
         std::weak_ptr<const SceneLookupFrame> self_;
         mutable const EnhancedRenderGraph* graph_{};
         mutable std::uint64_t graphEpoch_{};
@@ -82,7 +96,16 @@ namespace material_graph
                      RHITextureHandle irradiance, RHITextureHandle prefiltered, std::uint64_t environmentGeneration,
                      std::uint64_t memoryBudget, std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
                      std::array<RHITextureHandle, 3> importance = {}, RHITextureHandle source = {},
-                     bool standalone = false, bool approximate = false);
+                     bool standalone = false, bool approximate = false, bool capture = true,
+                     bool runtimeEvaluation = false);
+        void ResetPreparationStatus()
+        {
+            preparationDeferred_ = false;
+        }
+        bool PreparationDeferred() const
+        {
+            return preparationDeferred_;
+        }
         // Called only after the entire owning graph has been successfully submitted.
         // A recorded callback or an upload prefix is not publication authorization.
         bool PublishSubmitted(const SceneLookupFrame& frame, std::uint64_t frameId, RHICompletionPoint completion,
@@ -96,6 +119,7 @@ namespace material_graph
         std::shared_ptr<SceneLookupResourcePool> resourcePool_;
         std::mutex submissionMutex_;
         std::map<std::uint64_t, RHICompletionPoint> submitted_;
+        bool preparationDeferred_{};
         void OnUploadSubmitted(std::uint64_t recordingId, RHICompletionPoint completion) override;
         void OnUploadCompleted(std::uint64_t completed) override;
         void OnUploadAborted(std::uint64_t recordingId) override;

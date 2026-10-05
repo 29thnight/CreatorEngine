@@ -81,6 +81,9 @@ namespace material_graph
             std::shared_ptr<const RenderBindings> shadowBindings;
             std::shared_ptr<const MeshSurfaceBatch> geometry;
             RHIBufferSlice indices, constants, referenceConstants;
+            RHIBufferSlice visibleOwner;
+            std::uint32_t visibilityBin{UINT32_MAX}, visibleIdOffset{};
+            bool cameraVisible{};
             std::array<RHIBufferSlice, 3> shadowConstants;
             std::array<bool, 3> shadowVisible{};
             bool doubleSided{}, blended{};
@@ -90,6 +93,7 @@ namespace material_graph
         std::uint64_t recording{}, descriptors{};
         std::shared_ptr<const SceneViewInput> input;
         std::vector<Draw> draws;
+        std::shared_ptr<const GpuGeometryVisibility::Frame> visibility;
         RHITextureHandle environment;
         bool shadow{};
         mutable std::atomic<uint32_t> shadowDrawCount{};
@@ -182,6 +186,19 @@ namespace material_graph
                 throw std::runtime_error("Forward medium binding failed.");
             }
             encoder.SetBindings(RHIBindPoint::Graphics, index + 6, table);
+            const auto& sceneLookup = draw.blended ? alphaLookup : lookup;
+            sceneLookup->BindRuntime(encoder, index + 7);
+        }
+
+        void BindGeometry(RHIEncoder& encoder, const Draw& draw, bool indirect = false) const
+        {
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+            // Runtime IBL owns the preceding two slots; material bindings follow
+            // this final host slot and are resolved by the reflected PassLayout.
+            const unsigned index = 15 + (draw.program->hasSpecial ? 2 : 0) +
+                                   (draw.program->hasTransmission ? 1 : 0);
+            encoder.SetRootBuffer(RHIBindPoint::Graphics, index,
+                indirect ? visibility->VisibleIds(draw.visibleIdOffset, 1) : draw.visibleOwner);
         }
 
         void CheckCurrent(const EnhancedRenderGraph* currentGraph = nullptr) const
@@ -444,6 +461,9 @@ namespace material_graph
                     host.push_back(RHILayout::Srv(131, RHIShaderVisibility::Pixel));
                     host.push_back(RHILayout::Srv(132, RHIShaderVisibility::Pixel));
                     host.push_back(RHILayout::SrvTable(2, 133, RHIShaderVisibility::Pixel));
+                    host.push_back(RHILayout::SrvTable(3, 135, RHIShaderVisibility::Pixel));
+                    host.push_back(RHILayout::Cbv(6, RHIShaderVisibility::Pixel));
+                    host.push_back(RHILayout::Srv(138, RHIShaderVisibility::Vertex));
                     const RHIStaticSamplerDesc samplers[]{
                         {RHISampler::Linear(RHIAddressMode::Clamp), 0, RHIShaderVisibility::Pixel},
                         {RHISampler::Comparison(RHICompareOp::LessEqual, RHIAddressMode::Border,
@@ -899,6 +919,7 @@ namespace material_graph
                             RHITextureHandle source)
     {
         ce::profile_scope profile{ce::marker<"MaterialGraphScenePrepare">()};
+        lookup_.ResetPreparationStatus();
         if (!input || input->Draws().empty())
         {
             frame_.reset();
@@ -949,17 +970,24 @@ namespace material_graph
             const auto& p = draw.material->generation->cooked.product.program;
             return p.surface && (draw.queue == SceneCoverage::Blended || (p.features & 0x0800u) != 0);
         });
-        const auto lookupBudget = hasAlpha ? budget.lookupBytes * 2 / 3 : budget.lookupBytes;
+        const bool opaqueCapture = std::ranges::any_of(candidate->input->Draws(), [](const auto& draw) {
+            const auto features = draw.material->generation->cooked.product.program.features;
+            return (features & 0x1000u) != 0 && draw.queue != SceneCoverage::Blended && (features & 0x0800u) == 0;
+        });
+        const bool forwardCapture = std::ranges::any_of(candidate->input->Draws(), [](const auto& draw) {
+            const auto features = draw.material->generation->cooked.product.program.features;
+            return (features & 0x1800u) != 0 && (draw.queue == SceneCoverage::Blended || (features & 0x0800u) != 0);
+        });
         if (!lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
-                             environmentGeneration, lookupBudget, candidate->lookup, error, importance, source, false,
-                             budget.lookupApproximate))
+                             environmentGeneration, budget.lookupBytes, candidate->lookup, error, importance, source,
+                             false, budget.lookupApproximate, opaqueCapture, budget.lookupRuntimeEvaluation))
         {
             return false;
         }
         if (hasAlpha && !lookup_.Prepare(context, candidate->input->View().viewId, environment, irradiance, prefiltered,
-                                         environmentGeneration, budget.lookupBytes - lookupBudget,
+                                         environmentGeneration, budget.lookupBytes,
                                          candidate->alphaLookup, error, importance, source, true,
-                                         budget.lookupApproximate))
+                                         budget.lookupApproximate, forwardCapture, budget.lookupRuntimeEvaluation))
         {
             return false;
         }
@@ -998,6 +1026,8 @@ namespace material_graph
             }
         }
         std::uint32_t owner = 0x80000000u;
+        std::vector<GpuGeometryVisibility::Candidate> visibilityCandidates;
+        std::vector<GpuGeometryVisibility::Bin> visibilityBins;
         for (const auto& draw : candidate->input->Draws())
         {
             std::shared_ptr<const Program> program;
@@ -1061,6 +1091,12 @@ namespace material_graph
             {
                 return Fail(error, "LX Scene constants allocation failed.");
             }
+            const auto visibleOwner = device_->AllocateUpload({sizeof(constants.owner), RHIUploadUsage::BufferCopy, 256});
+            if (!visibleOwner.IsValid() || !visibleOwner.IsWritable())
+            {
+                return Fail(error, "LX Scene visible owner allocation failed.");
+            }
+            std::memcpy(visibleOwner.cpuAddress, &constants.owner, sizeof(constants.owner));
             const auto reference = [&] {
                 if (!ordered)
                 {
@@ -1114,6 +1150,9 @@ namespace material_graph
                                                                               shadow.lightViewProjection[cascade]);
                 }
                 item.constants = uploaded;
+                item.visibleOwner = visibleOwner;
+                item.cameraVisible = shadow_math::IntersectsClip({draw.shadowCenter, draw.shadowRadius},
+                                                                 candidate->input->ViewProjection());
                 item.referenceConstants = reference;
                 item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
                 if (!geometry_.Prepare(*device_, chunk.input, item.geometry, error, true))
@@ -1121,6 +1160,19 @@ namespace material_graph
                     return false;
                 }
                 const auto& source = chunk.input->Geometry();
+                // Per-draw transformed geometry and material constants still
+                // define CPU bins. Visibility, owner compaction and instanceCount
+                // are GPU-produced for static opaque/masked geometry only.
+                if (device_->GetIndirectDrawCapabilities().indexedDraw && program->hasSurface &&
+                    !ordered && chunk.input->Bones().empty())
+                {
+                    item.visibilityBin = static_cast<std::uint32_t>(visibilityBins.size());
+                    item.visibleIdOffset = item.visibilityBin * GpuGeometryVisibility::kOutputAlignment;
+                    visibilityBins.push_back({source.indexCount, 0, 0, 0});
+                    visibilityCandidates.push_back({
+                        math::vector4{draw.shadowCenter.x, draw.shadowCenter.y, draw.shadowCenter.z, draw.shadowRadius},
+                        item.visibilityBin, constants.owner, item.visibleIdOffset, 0});
+                }
                 const auto bytes = std::size_t(source.indexCount) * sizeof(std::uint32_t);
                 item.indices = item.geometry->Indices();
                 if (!item.indices.IsValid())
@@ -1134,6 +1186,11 @@ namespace material_graph
                 }
                 candidate->draws.push_back(std::move(item));
             }
+        }
+        if (!visibility_.Prepare(context, candidate->input->ViewProjection(), visibilityCandidates, visibilityBins,
+                                 candidate->visibility, error))
+        {
+            return false;
         }
         try
         {
@@ -1334,6 +1391,11 @@ namespace material_graph
         DeclareGeometry(graph);
         const auto inputs = AdvanceSceneSurface(graph, incoming, RGAccessMode::ReadWrite);
         std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+        if (frame->visibility)
+        {
+            frame->visibility->Declare(graph);
+            frame->visibility->AddReadUsages(graph, uses);
+        }
         for (const auto& draw : frame->draws)
         {
             uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
@@ -1373,6 +1435,11 @@ namespace material_graph
                 {
                     continue;
                 }
+                const bool indirect = frame->visibility && draw.visibilityBin != UINT32_MAX;
+                if (!indirect && !draw.cameraVisible)
+                {
+                    continue;
+                }
                 encoder.SetPipeline(RHIBindPoint::Graphics, draw.program->gbuffer[draw.doubleSided].GetHandle());
                 std::string error;
                 if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
@@ -1380,9 +1447,20 @@ namespace material_graph
                     throw std::runtime_error(error);
                 }
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                frame->BindGeometry(encoder, draw, indirect);
                 encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
-                encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
+                if (indirect)
+                {
+                    if (!encoder.DrawIndexedIndirect(frame->visibility->Arguments(),
+                                                     frame->visibility->ArgsOffset(draw.visibilityBin)))
+                    {
+                        throw std::runtime_error("LX Scene indexed indirect submission failed.");
+                    }
+                }
+                else
+                {
+                    encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
+                }
             }
         });
         frame->gbufferDeclared = true;
@@ -1621,7 +1699,7 @@ namespace material_graph
                     throw std::runtime_error(error);
                 }
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                frame->BindGeometry(encoder, draw);
                 encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
                 encoder.DrawIndexed(draw.geometry->Input()->Geometry().indexCount, 1);
             }
@@ -1692,7 +1770,7 @@ namespace material_graph
                     throw std::runtime_error(error);
                 }
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-                encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                frame->BindGeometry(encoder, draw);
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                 frame->BindDecal(encoder, draw, decalTable, true);
                 encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
@@ -1726,6 +1804,7 @@ namespace material_graph
             uses.pop_back();
         }
         frame->AddDecalUses(uses, transmissionStage || blended.has_value(), readAccess);
+        lookup->DeclareShadingInputs(graph, uses);
         if (blended)
         {
             uses.push_back({forward.graphCounts, RHIResourceState::ShaderResource, readAccess});
@@ -1766,7 +1845,7 @@ namespace material_graph
         const bool explicitLookup = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         const auto lookupRead = explicitLookup ? RGAccessMode::Read : RGAccessMode::LegacyState;
         const auto lookupWrite = explicitLookup ? RGAccessMode::Write : RGAccessMode::LegacyState;
-        for (unsigned part = 0; part < 2; ++part)
+        for (unsigned part = 0; part < (lookup->RequiresCapture() ? 2u : 0u); ++part)
         {
             std::vector<EnhancedRenderGraph::RGPassUsage> captureUses{
                 {inputs.depth, RHIResourceState::DepthRead, lookupRead},
@@ -1839,8 +1918,7 @@ namespace material_graph
                         encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                                   blended && forward.reference ? draw.referenceConstants
                                                                                : draw.constants);
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                                              RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                        frame->BindGeometry(encoder, draw);
                         encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                         frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
                         frame->BindForward(encoder, draw, forward);
@@ -1857,9 +1935,9 @@ namespace material_graph
             frame->refraction->DeclareBake(graph, *lookup, inputs.bitmask, shadowMap);
             uses.push_back({frame->refraction->GraphSamples(graph), RHIResourceState::PixelShaderResource, readAccess});
         }
-        const bool special =
-            !blended ||
-            (frame->input->Draws()[*blended].material->generation->cooked.product.program.features & 0x1800u) != 0;
+        const bool special = std::ranges::any_of(frame->draws, [&](const auto& draw) {
+            return selected(draw) && draw.program->hasSpecial && draw.program->hasTransmission == transmissionStage;
+        });
         if (frame->subsurface && special)
         {
             const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
@@ -1873,6 +1951,7 @@ namespace material_graph
                 {lookup->GraphSamples(graph), RHIResourceState::PixelShaderResource, readAccess},
                 {frame->subsurface->GraphReflection(graph), RHIResourceState::PixelShaderResource, readAccess}};
             frame->AddDecalUses(captureUses, transmissionStage || blended.has_value(), readAccess);
+            lookup->DeclareShadingInputs(graph, captureUses);
             if (blended)
             {
                 captureUses.push_back({forward.graphCounts, RHIResourceState::ShaderResource, readAccess});
@@ -1916,7 +1995,10 @@ namespace material_graph
                         RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
                     const auto targets = frame->device->CreateRenderTargets(frame->subsurface->Inputs(), &depth);
                     const RHIBindingDesc descriptions[]{
-                        RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull(),
+                        RHIBindingDesc::SrvCube(lookup->UsesRuntimeEvaluation() ? frame->environment : RHITextureHandle{},
+                                                frame->environment.IsValid()
+                                                    ? frame->device->DescribeTexture(frame->environment).format
+                                                    : RHIFormat::RGBA16Float, 1).OrNull(),
                         RHIBindingDesc::Srv2D(execution.ResolveHandle(inputs.bitmask), RHIFormat::R32Uint),
                         RHIBindingDesc::Srv2D({}, RHIFormat::RG16Float).OrNull(),
                         RHIBindingDesc::SrvArray(frame->shadow ? execution.ResolveHandle(shadowMap)
@@ -1952,8 +2034,7 @@ namespace material_graph
                         encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                                   blended && forward.reference ? draw.referenceConstants
                                                                                : draw.constants);
-                        encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
-                                              RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                        frame->BindGeometry(encoder, draw);
                         encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                         frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
                         frame->BindForward(encoder, draw, forward);
@@ -2040,7 +2121,7 @@ namespace material_graph
                     }
                     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0,
                                               blended && forward.reference ? draw.referenceConstants : draw.constants);
-                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
+                    frame->BindGeometry(encoder, draw);
                     encoder.SetBindings(RHIBindPoint::Graphics, 2, table);
                     frame->BindDecal(encoder, draw, decalTable, transmissionStage || blended.has_value());
                     frame->BindForward(encoder, draw, forward);
@@ -2263,6 +2344,7 @@ namespace material_graph
             device_->UnregisterUploadTransactionListener(this);
         }
         frame_.reset();
+        visibility_.ShutdownAfterIdle();
         lookup_.ShutdownAfterIdle();
         subsurface_.ShutdownAfterIdle();
         refraction_.ShutdownAfterIdle();

@@ -14,7 +14,8 @@ namespace material_graph
 // 바꾸면 올린다 — 안 올리면 쿠킹된 옛 바이트코드가 조용히 재사용된다.
 // 13: 그림자 표본을 CascadedShadow.slang 으로 모으고 디버그 보기를 더했다.
 // 14: 그림자 가장자리 텐트 필터와 넓은 필터의 법선 오프셋을 더했다.
-inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:14";
+// 15: GPU-visible owner IDs and direct runtime split-sum IBL bindings.
+inline constexpr std::string_view SceneHostIdentity = "|lx-scene-host:15";
 struct GeneratedMaterialShader;
 enum class Tier : std::uint8_t
 {

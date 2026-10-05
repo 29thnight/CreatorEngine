@@ -31,6 +31,7 @@ namespace material_graph
         std::uint64_t subsurfaceBytes = 512ull << 20;
         std::uint64_t refractionBytes = 512ull << 20;
         std::uint64_t volumeBytes = 512ull << 20;
+        bool lookupRuntimeEvaluation = false;
     };
 
     struct SceneProgramStats
@@ -77,6 +78,10 @@ namespace material_graph
                      const EnhancedShadowData& shadow, const SceneHostBudget& budget, std::string& error,
                      std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance = {},
                      RHITextureHandle source = {});
+        bool PreparationDeferred() const
+        {
+            return lookup_.PreparationDeferred();
+        }
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
         EnhancedGBufferPass::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
                                                     const EnhancedGBufferPass::Outputs& inputs) const;
@@ -130,6 +135,7 @@ namespace material_graph
                             std::shared_ptr<const Program>& result, std::string& error);
         IRenderDeviceServices* device_{};
         MeshSurfaceEvaluator geometry_;
+        GpuGeometryVisibility visibility_;
         RenderBindingCache bindings_;
         SceneLookupCache lookup_;
         SceneSubsurfaceResources subsurface_;
