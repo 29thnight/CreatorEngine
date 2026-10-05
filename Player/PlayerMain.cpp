@@ -130,7 +130,12 @@ Player::PlayerMain::~PlayerMain()
         EnhancedSceneRenderer::ShutdownLive();
         SceneManagers->SetRenderScene(nullptr);
     }
-    SceneManagers->BindAudioPlayback(nullptr);
+    // Finalize already unbound audio before Decommissioning freed the scenes;
+    // a second unbind would walk those freed scenes.
+    if (!m_finalized)
+    {
+        SceneManagers->BindAudioPlayback(nullptr);
+    }
     Core::TimeSystem::Destroy();
 }
 
