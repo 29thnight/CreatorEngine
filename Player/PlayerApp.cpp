@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include "PlayerApp.h"
+#include "PlayerCommands.h"
 
 #include "Camera.h"
 #include "CameraComponent.h"
@@ -171,14 +172,23 @@ namespace
 
 MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
-	// --smoke N — 명령줄 파싱은 이 exe에 이것뿐이라 인프라를 들이지 않는다.
+	// Smoke and Development-only local command inputs share the Windows argv scan.
 	// 판정 규약(종료 코드 + 로그 마커)은 BuildPipelinePlan §2.3.
 	int argc = 0;
 	bool smokeOffscreen = false;
+    std::string commandLineError;
 	if (LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc))
 	{
 		for (int i = 1; i < argc; ++i)
 		{
+            if (PlayerCmd::ParseCommandLineArgument(argc, argv, i, commandLineError))
+            {
+                if (!commandLineError.empty())
+                {
+                    break;
+                }
+                continue;
+            }
 			if (0 == wcscmp(argv[i], L"--smoke") && i + 1 < argc)
 			{
 				Player::g_smoke.frameLimit = wcstoull(argv[i + 1], nullptr, 10);
@@ -242,6 +252,13 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 		LocalFree(argv);
 	}
 
+    if (!commandLineError.empty() || !PlayerCmd::ValidateCommandLine(
+        Player::g_service.enabled, Player::g_smoke.IsActive(), commandLineError))
+    {
+        std::fprintf(stderr, "[PLAYER CLI] %s\n", commandLineError.c_str());
+        return 2;
+    }
+
 	const EngineLaunchConfig launchConfig = MakePlayerLaunchConfig(smokeOffscreen && Player::g_smoke.frameLimit > 0);
 
 	// endpoint 파일은 **이 프로세스의** runtime 데이터 뿌리에 놓는다.
@@ -292,10 +309,8 @@ void Player::App::Initialize(CoreWindow& coreWindow)
 {
 	m_hWnd = coreWindow.GetHandle();
 
-	// scene·ImGui 표시 RHI는 패키징이 빌드 선택을 runtime
-	// render.backend로 투영한 값을 함께 쓴다. Player도 Editor와 같은
-	// IImGuiHost 경계를 쓰며, 선택은
-	// RuntimeSettings 로드 시 한 번 고정된다.
+    // The packaged runtime backend selects both scene rendering and the native
+    // game-only presenter. The choice is fixed for this Player session.
 
 	RegisterHandler(coreWindow);
 	Load();
@@ -379,21 +394,11 @@ LRESULT Player::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
 LRESULT Player::App::HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 {
-	if (wParam == SIZE_MINIMIZED)
-	{
-		m_isMinimized = true;
-		return 0;
-	}
-
-	if (m_isMinimized)
-	{
-		if (wParam == SIZE_RESTORED || wParam == SIZE_MAXIMIZED)
-		{
-			m_isMinimized = false;
-			return 0;
-		}
-	}
-
-	m_main->InvokeResizeFlag();
-	return 0;
+    // Notify on minimize and the first restore too. The PT alone owns resize,
+    // so WM_SIZE never races swapchain acquisition or native Present.
+    if (m_main)
+    {
+        m_main->InvokeResizeFlag();
+    }
+    return 0;
 }

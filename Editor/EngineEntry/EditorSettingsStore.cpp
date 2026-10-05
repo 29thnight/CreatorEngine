@@ -85,9 +85,7 @@ bool EditorSettingsStore::Initialize() noexcept
 {
     EditorPreferences preferences{};
     BuildSettings buildSettings{};
-    // 에디터 프로세스의 백엔드는 사람이 고르는 값이 아니다 (DX12 고정).
-    // 사람이 고르는 유일한 노브는 build.render.backend — Player만 받는다.
-    buildSettings.SetRenderBackend(RuntimeSettings::Get().GetRenderBackend());
+    // Player의 빌드 설정은 Editor의 빌드 고정 DX12 정책과 독립적이다.
     buildSettings.SetStartupSceneName(RuntimeSettings::Get().GetStartupSceneName());
 
     const std::filesystem::path settingsPath =
@@ -140,7 +138,18 @@ bool EditorSettingsStore::Initialize() noexcept
             if (buildNode)
             {
                 if (!buildNode.IsMap())
+                {
                     return ReportSettingsError("build must be a map.");
+                }
+
+                if (const Authoring::ReadNode developmentNode = buildNode["development"])
+                {
+                    if (!developmentNode.IsScalar())
+                    {
+                        return ReportSettingsError("build.development must be true or false.");
+                    }
+                    buildSettings.SetDevelopmentBuild(developmentNode.As<bool>());
+                }
 
 				const Authoring::ReadNode buildRenderNode = buildNode["render"];
                 if (buildRenderNode)
@@ -246,16 +255,11 @@ bool EditorSettingsStore::Save() noexcept
         root.Child("imguiScale").SetScalar(m_preferences.GetImGuiScale());
         // W3: read the legacy personal width for migration only; workspace owns future writes.
         root.Child("projectName").SetScalar(m_buildSettings.GetProjectName());
-        // render.backend에는 사람이 고른 값이 아니라 **지금 돌고 있는** 백엔드를
-        // 적는다. 에디터 호스트는 DX12 고정이라 이 키는 GUI에 노브가 없고,
-        // verify-pbr-wiring-baseline.ps1이 에디터를 Vulkan으로 몰 때 쓰는
-        // 하네스 전용 재정의로만 남는다. 돌고 있는 값을 되쓰면 그 재정의가
-        // 그대로 왕복하면서, 키가 없는 새 프로젝트에서도 한 번은 씨앗이 선다
-        // (그 게이트는 이 키가 정확히 한 번 나타날 것을 단정한다).
-        root.Child("render").Child("backend").SetScalar(
-            RenderBackendName(RuntimeSettings::Get().GetRenderBackend()));
+        // Editor 호스트는 백엔드 키를 읽거나 덮어쓰지 않는다.
+        // 패키징이 build.render.backend를 Player의 런타임 설정에 투영한다.
         root.Child("build").Child("render").Child("backend").SetScalar(
             RenderBackendName(m_buildSettings.GetRenderBackend()));
+        root.Child("build").Child("development").SetScalar(m_buildSettings.IsDevelopmentBuild());
         root.RemoveChild("renderBackendDx12");
         root.RemoveChild("imguiBackendDx12");
 

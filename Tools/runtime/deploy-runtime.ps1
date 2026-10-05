@@ -105,6 +105,17 @@ try {
     $infoText = & $launcher --engine-info | Out-String
     if ($LASTEXITCODE -ne 0) { throw "Host loading probe failed: $HostName ($LASTEXITCODE)" }
     $info = ($infoText | Select-Object -Last 1) | ConvertFrom-Json
+    # Mode comes from the compiled ABI, independently of Debug/Release optimization.
+    # Package the matching native Player symbols only for Development distributions.
+    if ($HostName -eq 'Player' -and $info.shipping -eq 0) {
+        $symbols = Assert-EngineChildPath ([IO.Path]::ChangeExtension($HostPath, '.pdb')) $BinaryRoot
+        if (-not (Test-Path -LiteralPath $symbols -PathType Leaf)) {
+            throw "Development Player native symbols missing: $symbols"
+        }
+        $symbolEntries = @(Get-EngineEntries $BinaryRoot @([IO.Path]::GetRelativePath($BinaryRoot, $symbols).Replace('\','/')))
+        Test-EngineEntries $BinaryRoot $symbolEntries
+        $entries += $symbolEntries
+    }
     $manifest = [ordered]@{ schemaVersion = 1; host = $HostName; configuration = $Config;
         abi = $info; entries = $entries; digest = Get-EngineDigest $entries; systemImports = @($systemImports | Sort-Object) }
     Write-EngineJson (Join-Path $runtime "Manifests\$HostName.json") $manifest

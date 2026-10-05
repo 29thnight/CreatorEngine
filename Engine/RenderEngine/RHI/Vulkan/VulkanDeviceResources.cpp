@@ -738,8 +738,16 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     if (HasSwapChain())
     {
         const uint32_t slot = m_semaphoreIndex;
-        const VkResult acquired = vkAcquireNextImageKHR(m_device, m_swapChain, UINT64_MAX,
+        // The window can become minimized after the host's pre-acquire size check.
+        // A bounded admission wait lets the presentation owner service resize/stop.
+        constexpr uint64_t kHostAdmissionWaitNanoseconds = 100'000'000;
+        const VkResult acquired = vkAcquireNextImageKHR(m_device, m_swapChain, kHostAdmissionWaitNanoseconds,
             m_acquireSemaphores[slot], VK_NULL_HANDLE, &m_backBufferIndex);
+        if (VK_TIMEOUT == acquired || VK_NOT_READY == acquired)
+        {
+            outError = "Vulkan host frame admission timed out";
+            return false;
+        }
         if (VK_SUCCESS != acquired && VK_SUBOPTIMAL_KHR != acquired)
         {
             m_swapChainError = acquired;
@@ -1499,6 +1507,7 @@ bool VulkanDeviceResources::CreateSwapChainInternal(uint32_t width, uint32_t hei
     }
 
     m_swapChainFormat = chosen.format;
+    m_swapChainExtent = extent;
 
     uint32_t actualCount = 0;
     vkGetSwapchainImagesKHR(m_device, m_swapChain, &actualCount, nullptr);
@@ -1540,6 +1549,7 @@ void VulkanDeviceResources::DestroySwapChain()
     m_acquireSemaphores.clear();
     m_presentSemaphores.clear();
     m_backBuffers.clear();
+    m_swapChainExtent = {};
 
     if (VK_NULL_HANDLE != m_swapChain)
     {
@@ -1576,6 +1586,7 @@ bool VulkanDeviceResources::ResizeSwapChain(uint32_t width, uint32_t height,
     m_backBuffers.clear();
     vkDestroySwapchainKHR(m_device, m_swapChain, nullptr);
     m_swapChain = VK_NULL_HANDLE;
+    m_swapChainExtent = {};
 
     if (!CreateSwapChainInternal(width, height, outError)) return false;
 

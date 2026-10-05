@@ -2,10 +2,8 @@
 #include "IImGuiHost.h"
 #include "ImGuiWin32Cursor.h"
 #include "DX12/ImGuiDx12Shell.h"
-#include "Vulkan/ImGuiVulkanShell.h"
 #include "GlobalImGuiContext.h"
 #include "LogSystem.h"
-#include "RuntimeSettings.h"
 #include "../../../Engine/Utility_Framework/PathFinder.h"
 #include "../../../Engine/Utility_Framework/WarmupLedger.h"
 
@@ -87,13 +85,9 @@ namespace
                 return false;
             }
 
-            // Scene renderer와 같은 active backend를 소비한다. 선택 값에는 setter가
-            // 없고, 초기화 실패 시 다른 backend를 만들지 않는다(Slice 8-c).
-            if (RenderBackend::DX12 ==
-                RuntimeSettings::Get().GetRenderBackend())
-                m_renderer = std::make_unique<ImGuiDx12Shell>();
-            else
-                m_renderer = std::make_unique<ImGuiVulkanShell>();
+            // Editor 표시 정책은 타입으로 고정한다. Vulkan 셸이나 공통 renderer
+            // 인터페이스를 저장할 수 없으므로 설정에 따른 런타임 분기도 없다.
+            m_renderer = std::make_unique<ImGuiDx12Shell>();
 
             RECT clientRect{};
             GetClientRect(hwnd, &clientRect);
@@ -120,11 +114,6 @@ namespace
         bool IsActive() const override
         {
             return m_renderer && m_renderer->IsActive();
-        }
-
-        ImGuiRendererBackendKind GetBackendKind() const override
-        {
-            return m_renderer ? m_renderer->GetKind() : ImGuiRendererBackendKind::DX12;
         }
 
         const char* GetBackendName() const override
@@ -273,7 +262,7 @@ namespace
 
     private:
         void* m_windowHandle{ nullptr };
-        std::unique_ptr<IImGuiRendererBackend> m_renderer;
+        std::unique_ptr<ImGuiDx12Shell> m_renderer;
     };
 }
 

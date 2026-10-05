@@ -64,6 +64,14 @@ internal static class GamePackager
             context.Log("[4/6 Stage]", "stage");
             var runtimeRecord = Metadata.Read(Path.Combine(engine.BinaryRoot, "Runtime/Manifests/Player.json"));
             var runtimeSources = Metadata.ParseEntries(runtimeRecord.Array("entries")); Metadata.Verify(engine.BinaryRoot, runtimeSources, context.Cancellation);
+            if ((runtimeRecord["abi"]!.Int("shipping") != 0) != shipping)
+            {
+                throw new BuildException("Compiled Player mode differs from the requested Development/Shipping package.");
+            }
+            if (!shipping && !runtimeSources.Any(entry => entry.Path == "Player/Player.runtime.pdb"))
+            {
+                throw new BuildException("Development Player symbols are missing. Rebuild and publish the matching engine.");
+            }
             var rootFiles = new List<string>();
             // The scene renderer boots from cooked environment pixels. They are
             // common engine resources; no authoring EXR is packaged with a game.
@@ -87,7 +95,7 @@ internal static class GamePackager
             }
             var runtimeMetadata = Metadata.Object(new { schemaVersion = 1, version = engine.Manifest.Text("version"), buildId = engine.Manifest.Text("buildId"),
                 productName = engine.Manifest.Text("productName"), featureRelease = engine.Manifest.Text("featureRelease"), channel = engine.Manifest.Text("channel"),
-                localDevelopment = engine.Manifest.Bool("localDevelopment"), payloadDigest = engine.Manifest.Text("payloadDigest"), hostAbi = engine.Manifest.Int("hostAbi"), scriptApi = engine.Manifest.Int("scriptApi"), configuration = config });
+                localDevelopment = engine.Manifest.Bool("localDevelopment"), payloadDigest = engine.Manifest.Text("payloadDigest"), hostAbi = engine.Manifest.Int("hostAbi"), scriptApi = engine.Manifest.Int("scriptApi"), configuration = config, shipping, developmentBuild = !shipping });
             Metadata.Write(Path.Combine(candidate, "engine.runtime.json"), runtimeMetadata); rootFiles.Add("engine.runtime.json");
             File.WriteAllText(Path.Combine(candidate, "engine.runtime.info"), Metadata.Info(engine.Manifest)); rootFiles.Add("engine.runtime.info");
             foreach (var relative in GameCompiler.ManagedFiles) Paths.Copy(Paths.Child(managed, relative), Paths.Child(candidate, "Managed/" + relative));
@@ -111,7 +119,7 @@ internal static class GamePackager
             var contentDigest = Metadata.Digest(entries); var distributionDigest = Metadata.Digest(runtimeEntries.Append(new("GameAssets.logical", 0, contentDigest)));
             var manifest = Metadata.Object(new { schemaVersion = 2, workspaceHead = gitCommit, workspaceDirty = dirty, packageInputRevision = packageRevision,
                 nativeSource = "ENGINE_DISTRIBUTION", engineVersion = engine.Manifest.Text("version"), engineBuildId = engine.Manifest.Text("buildId"), nativeBuildRequested = options.Flag("build-native"),
-                config, inputMode = mode, baseFileCount = baseCount, generatedFileCount = 1 + cook.DerivedFileCount, entryCount = entries.Length, contentDigest,
+                config, shipping, developmentBuild = !shipping, inputMode = mode, baseFileCount = baseCount, generatedFileCount = 1 + cook.DerivedFileCount, entryCount = entries.Length, contentDigest,
                 settingsTemplateSha256 = Metadata.Hash(template), runtimeSettingsSha256 = Metadata.Hash(settingsFile), authoringRuntimeSettingsSha256 = settingsHash,
                 startupScene = preflight.StartupScene, renderBackend = preflight.RuntimeBackend, startupSceneSha256 = Metadata.Hash(Path.Combine(merged, "Assets/Scenes/" + preflight.StartupScene)),
                 startupSceneScriptComponentCount = preflight.SceneCounts["Script"], managedLifecycleRequired = preflight.RequiresManagedLifecycle,
@@ -144,7 +152,8 @@ internal static class GamePackager
             ValidateClosure(candidate, runtimePaths.Concat(["GameAssets.pak", "package-manifest.json"]));
             if (options.Flag("skip-verify")) { context.Log("Unverified candidate retained; current package unchanged."); context.Result(candidate); return; }
             var publish = Metadata.Object(new { schemaVersion = 2, releaseDirectory = Path.GetFileName(release), buildId = id, workspaceHead = gitCommit,
-                workspaceDirty = dirty, packageInputRevision = packageRevision, config, contentDigest, runtimeDigest, distributionDigest,
+                workspaceDirty = dirty, packageInputRevision = packageRevision, config, shipping, developmentBuild = !shipping,
+                contentDigest, runtimeDigest, distributionDigest,
                 pakFileSha256 = manifest.Text("pakFileSha256"), verification = "passed" });
             await Publish(context, candidate, release, pointer, stage, publish);
             context.Log($"[BUILD] current pointer: {pointer}"); context.Result(release);

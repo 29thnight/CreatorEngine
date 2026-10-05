@@ -283,6 +283,8 @@ public:
     VkCommandBuffer GetCommandBuffer() const;
     VkImage         GetBackBuffer(uint32_t index) const;
     VkFormat        GetBackBufferFormat() const { return m_swapChainFormat; }
+    // Surface capabilities may choose an extent different from the requested window size.
+    VkExtent2D      GetBackBufferExtent() const { return m_swapChainExtent; }
     uint32_t        GetBackBufferCount() const
     {
         return static_cast<uint32_t>(m_backBuffers.size());
@@ -385,6 +387,7 @@ private:
     VkSurfaceKHR   m_surface{ VK_NULL_HANDLE };
     VkSwapchainKHR m_swapChain{ VK_NULL_HANDLE };
     VkFormat       m_swapChainFormat{ VK_FORMAT_UNDEFINED };
+    VkExtent2D     m_swapChainExtent{};
     std::vector<VkImage> m_backBuffers;
     uint32_t m_backBufferIndex{ 0 };
 

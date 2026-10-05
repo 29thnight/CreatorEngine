@@ -1,27 +1,20 @@
 #pragma once
-#include "IImGuiRendererBackend.h"
+#if defined(CE_PLAYER)
+#error "Editor ImGui presentation is unavailable to Player; use native RHI presentation."
+#endif
+
+#include "RHI/RHIDisplayFrame.h"
+#include <functional>
+#include <memory>
 #include <cstdint>
 #include <string>
 
 class Texture;
 
-// ImGui 표시 호스트의 백엔드 중립 계약 (EditorRenderer 재작성, 2026-08-10).
-//
-// ── 왜 경계인가 ──
-//
-// 구 ImGuiRenderer는 두 층의 일을 한 몸에 겸직했다: 백엔드 가동(컨텍스트·
-// 플랫폼 백엔드·GPU renderer backend·프레젠트)과 에디터 오케스트레이션(독스페이스·
-// 창 펌프·스케일·폰트). 그 겸직의 값은 Player가 치렀다 — 에디터 창이 하나도
-// 없는데 화면에 픽셀을 내려면 ImGuiRenderer를 통째로 들어야 했고, 그 바람에
-// 에디터 독스페이스 빌더와 ImGuiRegister 펌프가 Player에서도 매 프레임 돌았다.
-//
-// 이 계약이 절단면이다. 백엔드 일은 전부 이 인터페이스 뒤(RHI)에 살고,
-// 소비자 둘은 층이 다르다:
-//   · Player         — BeginFrame/EndFrame만 부르는 표시 소비자
-//   · EditorRenderer — 그 위에 에디터 오케스트레이션을 얹는다 (Academy_4Q,
-//                      Editor 필터)
-//
-// R축이 패스에 한 처방과 같다: 상위 개념은 백엔드 폴더 밖, DX12는 경계 뒤.
+// Editor 전용 ImGui 표시 호스트. Win32 입력과 ImGui 컨텍스트를 소유하고,
+// GPU 표시는 concrete ImGuiDx12Shell만 사용한다. Scene/Game/material preview도
+// Editor 부팅 정책으로 DX12에 고정된다. Player는 이 계약을 소비하지 않고
+// native RHI 스왑체인으로 표시한다.
 class IImGuiHost
 {
 public:
@@ -35,7 +28,6 @@ public:
     /// backend 대신 다른 renderer를 만드는 fallback은 이 계약에 없다.
     virtual bool Initialize(void* windowHandle, std::string& outError) = 0;
     virtual bool IsActive() const = 0;
-    virtual ImGuiRendererBackendKind GetBackendKind() const = 0;
     virtual const char* GetBackendName() const = 0;
 
     /// OS 창의 contents scale. UI 배율을 NewFrame의 폰트 계산 전에 적용한다.
@@ -55,15 +47,15 @@ public:
     /// 소유물이다).
     virtual void RebuildFontAtlas() = 0;
 
-    /// ImGui::Image가 소비할 백엔드별 텍스처 ID. 상위 에디터 코드는 더 이상
-    /// DX12 descriptor handle 또는 Vulkan descriptor set을 구분하지 않는다.
+    /// ImGui::Image가 소비할 DX12 텍스처 ID. 상위 에디터 코드는 descriptor의
+    /// 저장 방식에 의존하지 않는다.
     /// ID를 영구 캐시하지 말고 실제 표시 프레임마다 호출해 수명 표식을 남긴다.
     virtual uint64_t RegisterTexture(Texture* texture) = 0;
 
     /// 그 텍스처의 픽셀이 실제로 GPU에 올라가 있는가(PHASE 21 W7 비동기 썸네일).
     /// RegisterTexture의 반환값은 이것을 말하지 않는다 — 업로드 전에도 0이 아닌
     /// ID가 나온다. 부수 효과가 없으며, 올리는 일은 표시 프레임의
-    /// RegisterTexture가 한다. 백엔드 세부는 IImGuiRendererBackend 주석 참조.
+    /// RegisterTexture가 한다. 프레임 밖 등록은 null SRV 슬롯만 예약한다.
     virtual bool IsTextureReady(Texture* texture) const = 0;
 
     virtual uint64_t OpenSharedTexture(void* sharedHandle,
@@ -77,5 +69,5 @@ public:
     virtual void Shutdown() = 0;
 };
 
-/// 부팅 때 선택된 DX12/Vulkan 렌더러 백엔드를 감싼 공통 Win32 호스트.
+/// DX12 렌더러 셸을 감싼 Editor 전용 Win32 호스트.
 IImGuiHost& GetImGuiHost();

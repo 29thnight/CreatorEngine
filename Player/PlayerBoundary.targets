@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- Keep this target-local: Player may select either native RHI backend, while
+       the Editor Host has a separate DX12-only presentation policy.
+
+       Removing HostImGuiPresentation's ProjectReference alone does not hide
+       imgui.h: vcpkg supplies a shared include root. These poison headers precede
+       that root and turn ordinary ImGui includes into explicit compiler errors.
+       Host's public headers separately reject CE_PLAYER, including relative paths.
+       This is compile/build enforcement, not a claim about inspected link symbols. -->
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectName)' == 'Player'">
+    <ClCompile>
+      <PreprocessorDefinitions>CE_PLAYER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <!-- Every native runtime library is in Player's transitive link closure. -->
+      <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)ForbiddenIncludes;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+
+  <!-- Reject accidental project, generated-schema, source and include-path
+       dependencies before compilation. EngineShipping uses this same target. -->
+  <Target Name="EnforcePlayerDependencyBoundary"
+          BeforeTargets="ResolveProjectReferences;ReflgenGenerate;ClCompile;Link">
+    <ItemGroup>
+      <_PlayerBoundaryDependency Include="@(ProjectReference);@(ReflgenReference);@(ClCompile);@(ClInclude)" />
+      <_PlayerForbiddenDependency Include="@(_PlayerBoundaryDependency)"
+          Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(_PlayerBoundaryDependency.FullPath)', '(?i)[\\/]Editor[\\/]'))" />
+      <_PlayerBoundaryInclude Include="@(ClCompile->'%(AdditionalIncludeDirectories)');$(IncludePath);$(ExternalIncludePath)" />
+      <_PlayerForbiddenInclude Include="@(_PlayerBoundaryInclude)"
+          Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(_PlayerBoundaryInclude.Identity)', '(?i)(^|[\\/])Editor([\\/]|$)'))" />
+      <_PlayerRuntimeReference Include="@(ProjectReference);@(ReflgenReference)" />
+      <_PlayerForbiddenReference Include="@(_PlayerRuntimeReference)"
+          Condition="!$([System.String]::Copy('%(_PlayerRuntimeReference.FullPath)').StartsWith('$(SolutionDir)Engine\'))" />
+    </ItemGroup>
+    <Error Condition="'@(_PlayerForbiddenDependency)' != ''"
+           Text="$(MSBuildProjectName) belongs to Player's runtime closure and cannot depend on Editor/Host sources, projects or generated reflection: @(_PlayerForbiddenDependency). Put role-neutral code under Engine." />
+    <Error Condition="'@(_PlayerForbiddenInclude)' != ''"
+           Text="$(MSBuildProjectName) belongs to Player's runtime closure and cannot expose Editor/Host include directories: @(_PlayerForbiddenInclude)." />
+    <Error Condition="'@(_PlayerForbiddenReference)' != ''"
+           Text="$(MSBuildProjectName) runtime project/schema references must stay under Engine: @(_PlayerForbiddenReference)." />
+  </Target>
+</Project>

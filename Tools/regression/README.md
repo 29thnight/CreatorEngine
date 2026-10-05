@@ -3,6 +3,25 @@
 에디터로 손수 확인하면 놓치는 것들을 기계로 잡기 위한 검사 묶음이다.
 전부 종료 코드로 판정하므로 CI에 그대로 걸 수 있다.
 
+## Editor 표시 백엔드 정책 (2026-10-05)
+
+Editor의 Scene, Game, material preview와 ImGui 표시는 빌드에서 DX12로 고정된다.
+Editor는 `EngineSettings.asset`의 최상위 `render.backend`와 레거시
+`renderBackendDx12`·`imguiBackendDx12` 선택자를 읽거나 검증하지 않는다.
+따라서 이 키에 Vulkan 또는 잘못된 값이 있어도 Editor 백엔드 선택에는 관여하지 않는다.
+Player는 패키징이 `build.render.backend`에서 투영한 런타임 설정을 계속 읽고 검증하며,
+DX12·Vulkan 및 공용 Vulkan RHI는 계속 지원한다.
+
+`verify-editor-theme.ps1`, `verify-editor-rendering-surfaces.ps1`,
+`verify-pbr-wiring-baseline.ps1`, `verify-pbr-soak.ps1`, `verify-render-base0.ps1`은
+Vulkan Editor 인자를 산출물 생성·설정 변경 전에 거절한다. DX12 실행을 Vulkan PASS로
+표시하지 않으며 Editor 백엔드를 바꾸려고 설정 파일을 다시 쓰지 않는다.
+theme 기본값도 DX12 하나다. `verify-render-base0.ps1 -Phase49`의
+독립 native Vulkan timing probe와 `-IncludeVulkanSelfTest`의 공용 RHI 대조는 유지한다.
+Vulkan 제품 캡처의 Editor 경로는 지원하지 않으며 native RHI/Player 검증으로 옮겨야 한다.
+`verify-material-vulkan-scene.ps1`, `verify-material-vulkan-generation.ps1` 및
+`verify-prebuilt-project.ps1 -RenderBackend vulkan`은 별도 Vulkan 검증 경로다.
+
 ## 완료된 이행 도구 정리 (2026-09-28)
 
 PHASE 3.75 모델 UUIDv8 전환과 PHASE 17 텍스처 GUID 이주를 다시 수행하는 도구는 은퇴했다.

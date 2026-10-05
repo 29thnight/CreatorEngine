@@ -1,5 +1,5 @@
 #include "EditorCommandlets.h"
-#include "../CommandCore/CommandRegistry.h"
+#include "CommandCore/CommandRegistry.h"
 #include "../../RenderTests/ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
 #include "../../RenderTests/ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 #include "../../RenderTests/ExperimentParity/ExperimentMaterialScriptSelfTest.h"

@@ -247,7 +247,7 @@ namespace EngineBootstrap
 			return false;
 		}
 
-		if (!RuntimeSettings::Initialize())
+		if (!RuntimeSettings::Initialize(config.renderBackendPolicy))
 		{
 			std::fputs("[RuntimeSettings] EngineSettings 초기화 실패 — 부팅을 중단한다\n",
 				stderr);

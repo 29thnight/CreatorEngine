@@ -37,7 +37,7 @@ $failures = New-Object System.Collections.Generic.List[string]
 $ratchetPath = Join-Path $PSScriptRoot 'cli_exit_spine.ratchet.json'
 $ratchet = Get-Content -LiteralPath $ratchetPath -Raw | ConvertFrom-Json
 
-$sessionAdapter = 'Editor/EngineEntry/CommandCore/CommandSession.cpp'
+$sessionAdapter = 'Engine/RuntimeHost/CommandCore/CommandSession.cpp'
 $scanRoots = @('Editor', 'Player', 'Engine') |
     ForEach-Object { Join-Path $repoRoot $_ } |
     Where-Object { Test-Path -LiteralPath $_ -PathType Container }
@@ -49,7 +49,7 @@ foreach ($root in $scanRoots) {
         if ($relative -eq $sessionAdapter) { continue }
 
         # 선언부(EngineBootstrap.h)는 호출이 아니다.
-        if ($relative -eq 'Editor/EngineEntry/EngineBootstrap.h') { continue }
+        if ($relative -eq 'Engine/RuntimeHost/EngineBootstrap.h') { continue }
 
         $hits = Select-String -LiteralPath $file.FullName -Pattern 'EngineBootstrap::SetExitCode\('
         foreach ($hit in $hits) {

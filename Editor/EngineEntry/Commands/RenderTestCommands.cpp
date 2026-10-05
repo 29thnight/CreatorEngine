@@ -537,22 +537,15 @@ namespace ConsoleCmd
             ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[2].c_str())))
             : ScreenResizeBus::Get().GetHeight();
 
-		const RenderBackend configured = RuntimeSettings::Get().GetRenderBackend();
         const EnhancedLiveBackend scene = EnhancedSceneRenderer::GetLiveBackend();
-        const bool backendMatch =
-            ((RenderBackend::DX12 == configured && EnhancedLiveBackend::DX12 == scene) ||
-             (RenderBackend::Vulkan == configured && EnhancedLiveBackend::Vulkan == scene)) &&
-            ((RenderBackend::DX12 == configured &&
-                0 == std::strcmp(GetImGuiHost().GetBackendName(), "DX12")) ||
-             (RenderBackend::Vulkan == configured &&
-                0 == std::strcmp(GetImGuiHost().GetBackendName(), "Vulkan")));
+        const bool backendMatch = EnhancedLiveBackend::DX12 == scene &&
+            0 == std::strcmp(GetImGuiHost().GetBackendName(), "DX12");
 
         std::string log;
         const bool displayPassed = EnhancedSceneRenderer::RunLiveDisplayRegression(
             expectedWidth, expectedHeight, log);
         const bool passed = backendMatch && displayPassed;
-        std::printf("[render.livecheck] backend configured=%s scene=%s imgui=%s — %s\n",
-            RenderBackendName(configured),
+        std::printf("[render.livecheck] backend policy=editor-build-fixed-dx12 scene=%s imgui=%s — %s\n",
             EnhancedLiveBackend::Vulkan == scene ? "vulkan" : "dx12",
             GetImGuiHost().GetBackendName(), backendMatch ? "일치" : "불일치");
         std::printf("%s", log.c_str());

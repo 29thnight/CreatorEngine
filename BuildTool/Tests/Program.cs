@@ -111,6 +111,9 @@ try
     File.WriteAllText(closureSettings, "lastWindowSize:\n  x: 1280\n  y: 720\nrenderPassSettings:\nstartupSceneName: Demo.creator\nrender:\n  backend: dx12\nbuild:\n  render:\n    backend: dx12\n");
     var spriteShader = Path.Combine(shaderClosure, "Assets/Shaders/DefaultPassShader/WorldSprite.slang");
     File.WriteAllText(spriteShader, "// current renderer shader");
+    var playerShader = Path.Combine(shaderClosure, "Assets/Shaders/DefaultPassShader/PlayerPresentation.slang");
+    Reject(() => PackageInputs.Validate(shaderClosure, closureSettings), "Missing Player presentation shader accepted");
+    File.WriteAllText(playerShader, "// native Player presentation shader");
     Check(PackageInputs.Validate(shaderClosure, closureSettings).StartupScene == "Demo.creator", "Slang shader closure rejected");
     File.Move(spriteShader, Path.ChangeExtension(spriteShader, ".hlsl"));
     Reject(() => PackageInputs.Validate(shaderClosure, closureSettings), "Legacy-only shader closure accepted");
@@ -128,11 +131,17 @@ try
 
     const string smoke = "[asset.catalog] source=cemf identities=1 metaParsed=0\n[cooked.catalog] mount test entries=2 sources=1 stale=0\n" +
         "[scene.document] source=cooked guid=11111111-1111-4111-8111-111111111111\n[player.service] compiled=yes enabled=no\n" +
-        "[runtime.text-parser] calls=0\nScene loaded: Demo.creator\n[player.smoke] {\"schemaVersion\":1,\"ready\":true,\"registeredScriptTypes\":1}\n" +
+        "[runtime.text-parser] calls=0\nScene loaded: Demo.creator\n[player.smoke] {\"schemaVersion\":1,\"ready\":true,\"registeredScriptTypes\":1,\"submittedGameFrames\":90,\"submittedGameFrameId\":100}\n" +
         "[SMOKE] frame limit reached (120 GT frames, display frame 100, promotions 90)\n";
     var preflight = new Preflight("Demo.creator", "dx12", new(), false);
     PlayerVerification.ValidateMarkers(smoke, smoke, preflight, false, 120); ++checks;
     Reject(() => PlayerVerification.ValidateMarkers(smoke, smoke, preflight, true, 120), "Wrong Shipping binary accepted");
+    Reject(() => PlayerVerification.ValidateMarkers(smoke.Replace(",\"submittedGameFrames\":90,\"submittedGameFrameId\":100", ""), smoke,
+        preflight, false, 120), "Stale Player without native presentation metrics accepted");
+    Reject(() => PlayerVerification.ValidateMarkers(smoke.Replace("\"submittedGameFrames\":90", "\"submittedGameFrames\":0"), smoke,
+        preflight, false, 120), "Player without native game submissions accepted");
+    Reject(() => PlayerVerification.ValidateMarkers(smoke.Replace("\"submittedGameFrameId\":100", "\"submittedGameFrameId\":0"), smoke,
+        preflight, false, 120), "Player without a submitted game frame accepted");
     Reject(() => PlayerVerification.ValidateMarkers(smoke.Replace("calls=0", "calls=1"), smoke, preflight, false, 120), "Text parser use accepted");
     Reject(() => PlayerVerification.ValidateMarkers(smoke, smoke + "[model.generation] 게시 전 검증 실패", preflight, false, 120), "Failed model generation accepted");
     Reject(() => PlayerVerification.ValidateMarkers(smoke.Replace("\"ready\":true", "\"ready\":false"), smoke, preflight, false, 120), "Unready CLR accepted");

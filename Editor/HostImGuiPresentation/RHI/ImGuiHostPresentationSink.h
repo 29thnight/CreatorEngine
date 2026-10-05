@@ -1,13 +1,16 @@
 #pragma once
 
+#if defined(CE_PLAYER)
+#error "Editor ImGui presentation is unavailable to Player; use native RHI presentation."
+#endif
+
 #include "IImGuiHost.h"
 #include "RHI/IDisplayPresentationSink.h"
 #include <functional>
 #include <utility>
 
-// IImGuiHost를 Core의 표시 sink 계약 뒤로 위임하는 공용 어댑터(E4-6c).
-// E4-6a 때 Editor/Player 각자에 있던 ~20줄 중복이 여기로 합쳐졌다 —
-// 두 Host 모두 이 타입을 SetDisplayPresentationSink로 설치한다.
+// Editor의 IImGuiHost를 Core의 표시 sink 계약 뒤로 위임한다.
+// Player는 native RHI 표시 경로를 사용하며 이 어댑터를 설치하지 않는다.
 // 셸이 아직 Initialize 전이어도 위임은 안전하다(비활성 셸은 no-op/0).
 struct ImGuiHostPresentationSink final : IDisplayPresentationSink
 {

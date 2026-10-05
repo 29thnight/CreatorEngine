@@ -37,6 +37,7 @@ namespace PlayerCommandService
 #include "../Engine/CommandService/CommandGateway.h"
 #include "../Engine/CommandService/CommandService.h"
 #include "../Engine/CommandService/JsonValue.h"
+#include "../Engine/CommandService/ResultEnvelope.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -313,6 +314,15 @@ namespace PlayerCommandService
 		PlayerGateway&           Gateway()  { static PlayerGateway gateway; return gateway; }
 		CommandService::Service& Instance() { static CommandService::Service service; return service; }
 	}
+
+    std::string FormatResult(const std::string& command,
+        const CommandCore::CommandResult& result, const PlayerCmd::Timing& timing)
+    {
+        return CommandService::BuildResultEnvelope(command,
+            std::string(CommandCore::ToString(result.status)), result.code, result.message,
+            ToJson(result.data).Serialize(), timing.queuedMs, timing.waitedFrames,
+            timing.executedMs).Serialize();
+    }
 
 	bool Start(const std::string& projectRoot, std::string& outError)
 	{

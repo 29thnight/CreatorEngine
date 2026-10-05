@@ -2,13 +2,17 @@
 param(
     [string]$Exe = (Join-Path $PSScriptRoot '../../Bin/x64-Debug/Editor/CreatorEditor.exe'),
     [string]$Work = (Join-Path $env:TEMP 'creator-editor-theme'),
-    [ValidateSet('dx12', 'vulkan')][string[]]$Backends = @('dx12', 'vulkan')
+    [ValidateSet('dx12', 'vulkan')][string[]]$Backends = @('dx12')
 )
-# W1: backend별 시작 user scale 1.0 -> 1.5 -> 1.0, token/font/DPI 제품 관측.
+# W1: DX12 Editor 시작 user scale 1.0 -> 1.5 -> 1.0, token/font/DPI 제품 관측.
 # selftest의 합성 DPI 왕복과 실제 모니터 DPI 관측을 구분한다.
 # 실제 창을 100%/150% 모니터 사이로 이동하는 검사는 이 게이트에 없다.
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+# Reject before creating artifacts or changing settings; never label a DX12 run Vulkan.
+if ($Backends -contains 'vulkan') {
+    throw 'CreatorEditor supports DX12 only; Vulkan Editor runs are unsupported. Use native Vulkan RHI probes or Player validation instead.'
+}
 $Exe = [IO.Path]::GetFullPath($Exe)
 $Work = [IO.Path]::GetFullPath($Work)
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
@@ -33,9 +37,7 @@ $settingsBytes = [IO.File]::ReadAllBytes($settingsPath)
 $settingsText = [IO.File]::ReadAllText($settingsPath)
 $hadIni = Test-Path -LiteralPath $iniPath
 $iniBytes = if ($hadIni) { [IO.File]::ReadAllBytes($iniPath) } else { [byte[]]@() }
-$backendPattern = '(?m)(^render:\r?\n\s{2}backend: )\w+'
 $scalePattern = '(?m)(^imguiScale: )[^\r\n]+'
-Assert ([regex]::Matches($settingsText, $backendPattern).Count -eq 1) 'Expected one top-level render.backend.'
 Assert ([regex]::Matches($settingsText, $scalePattern).Count -eq 1) 'Expected one imguiScale setting.'
 $utf8 = [Text.UTF8Encoding]::new($false)
 $summary = [Collections.Generic.List[object]]::new()
@@ -51,8 +53,7 @@ try {
             $index++
             $case = "$backend-$index"
             $scaleText = $userScale.ToString('0.0', [Globalization.CultureInfo]::InvariantCulture)
-            $configured = [regex]::Replace($settingsText, $backendPattern, '${1}' + $backend)
-            $configured = [regex]::Replace($configured, $scalePattern, '${1}' + $scaleText)
+            $configured = [regex]::Replace($settingsText, $scalePattern, '${1}' + $scaleText)
             [IO.File]::WriteAllText($settingsPath, $configured, $utf8)
             $scriptPath = Join-Path $Work "$case.txt"
             $resultPath = Join-Path $Work "$case.jsonl"
@@ -100,7 +101,7 @@ try {
             Assert ($theme.iconRoles -eq @($iconSpec.roles.PSObject.Properties).Count -and $theme.missingIconRoles -eq 0) "$case semantic icon coverage failed."
             Assert ($theme.iconSourcePolicyValid) "$case text fonts can override Material Symbols codepoints."
             $stdout = [IO.File]::ReadAllText($stdoutPath)
-            Assert ($stdout -match "\[RenderBackend\].*active=$backend scene=$backend imgui=$backend") "$case did not run the requested scene/ImGui backend."
+            Assert ($stdout -match "\[RenderBackend\].*active=$backend scene=$backend imgui=$backend") "$case did not run the build-fixed DX12 scene/ImGui backend."
             Assert ($stdout -match '(?m)^body\t[^\r\n]*Fonts[\\/]Inter-Regular\.ttf\s*$') "$case bundled Inter was not consumed; see $stdoutPath"
             Assert ($stdout -match '(?m)^icons\t[^\r\n]*Fonts[\\/]MaterialSymbolsOutlined-Editor\.ttf\s*$') "$case Material Symbols subset was not consumed."
             Assert ($exitCode -eq 0) "$case exited $exitCode despite successful command data."

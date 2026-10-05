@@ -320,11 +320,19 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_render_backend(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        if (ctx.parts.size() > 2) return InvalidArguments("render.backend [status]");
+        if (ctx.parts.size() > 2)
+        {
+            return InvalidArguments("render.backend [status]");
+        }
         if (ctx.parts.size() == 2 && ctx.parts[1] != "status")
-            return InvalidArguments("Backend is fixed at startup; configure Settings and restart", "render.backend_fixed");
+        {
+            return InvalidArguments(
+                "Editor Scene/Game/material preview and ImGui are DX12-only; "
+                "Settings > Build Settings selects the Player backend", "render.backend_fixed");
+        }
         auto data = CommandData::Object();
-        data.Set("configured", CommandData::String(RenderBackendName(RuntimeSettings::Get().GetRenderBackend())));
+        data.Set("policy", CommandData::String("editor-build-fixed-dx12"));
+        data.Set("buildBackend", CommandData::String("dx12"));
         data.Set("scene", CommandData::String(EnhancedLiveBackend::Vulkan == EnhancedSceneRenderer::GetLiveBackend() ? "vulkan" : "dx12"));
         data.Set("imgui", CommandData::String(GetImGuiHost().GetBackendName()));
         data.Set("status", CommandData::String(EnhancedSceneRenderer::GetLiveStatus()));

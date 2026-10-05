@@ -48,7 +48,7 @@ namespace
 	}
 
 	bool RunPackageOrchestrator(const file::path& projectRoot,
-		const std::wstring& startupScene, RenderBackend backend)
+		const std::wstring& startupScene, RenderBackend backend, bool developmentBuild)
 	{
 		std::error_code pathError;
 		if (!file::is_directory(projectRoot, pathError) || pathError ||
@@ -73,7 +73,14 @@ namespace
 			Debug::PrintLog(spdlog::level::err, "선택 가능한 엔진 배포본이 없습니다. CreatorBuildTool publish-engine으로 배포본을 생성하세요.");
 			return false;
 		}
-		const file::path repositoryRoot = distribution.root;
+        if (distribution.shipping == developmentBuild)
+        {
+            Debug::PrintLog(spdlog::level::err,
+                "Development Build 설정과 선택한 엔진 배포본의 Player 모드가 다릅니다. "
+                "Development는 EngineShipping=false, Shipping은 EngineShipping=true 배포본을 선택하세요.");
+            return false;
+        }
+        const file::path repositoryRoot = distribution.root;
 		const file::path buildToolPath = repositoryRoot / L"Bin" / (L"x64-" + distribution.configuration) /
 			L"Tools" / L"CreatorBuildTool" / L"CreatorBuildTool.exe";
 		pathError.clear();
@@ -101,7 +108,10 @@ namespace
 			L"-RenderBackend",
 			backendName,
 		};
-		if (distribution.shipping) arguments.push_back(L"-Shipping");
+        if (!developmentBuild)
+        {
+            arguments.push_back(L"-Shipping");
+        }
 
 		std::wstring commandLine;
 		for (const auto& argument : arguments)
@@ -164,7 +174,7 @@ bool GameBuilderSystem::BuildGame()
 	const BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
 	const std::wstring startupScene = buildSettings.GetStartupSceneName();
 	if (!RunPackageOrchestrator(projectRoot, startupScene,
-		buildSettings.GetRenderBackend()))
+		buildSettings.GetRenderBackend(), buildSettings.IsDevelopmentBuild()))
 	{
 		return false;
 	}

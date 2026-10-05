@@ -21,7 +21,6 @@
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Player와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
 #include "ClrHost.h"
-#include "RuntimeSettings.h"
 #include "EditorSettingsStore.h"
 #include "EditorSessionState.h"
 #include "EditorPlatform.h"
@@ -69,8 +68,7 @@ namespace
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
 
-	// 표시 sink 어댑터는 HostImGuiPresentation의 공용 타입을 쓴다(E4-6c) —
-	// E4-6a 때 여기 있던 ~20줄이 Player 쪽 중복과 함께 그리로 합쳐졌다.
+	// Editor 표시 sink는 DX12 ImGui 호스트로 위임한다. Player 표시는 native RHI가 소유한다.
 }
 
 Editor::EditorMain::EditorMain()
@@ -146,9 +144,9 @@ void Editor::EditorMain::Initialize()
         }));
 
 	std::string enhancedError;
-	const EnhancedLiveBackend startupBackend =
-		RenderBackend::Vulkan == RuntimeSettings::Get().GetRenderBackend()
-		? EnhancedLiveBackend::Vulkan : EnhancedLiveBackend::DX12;
+    // 모든 Editor 뷰(Scene, Game, material preview)는 빌드에서 DX12로 고정한다.
+    // 런타임 설정 선택이나 거절 경로 없이 렌더러/PSO를 생성한다.
+    constexpr EnhancedLiveBackend startupBackend = EnhancedLiveBackend::DX12;
 	BootProgress::Step(L"Starting render backend", L"Creating the scene renderer");
 	if (!EnhancedSceneRenderer::InitializeRuntime(startupBackend, enhancedError))
 	{
@@ -225,21 +223,15 @@ void Editor::EditorMain::Initialize()
 	BootProgress::Step(L"Registering editor windows", L"Building the editor panel registry");
 	::editor::register_editor_windows();
 
-	// 호스트(IImGuiHost → DX12/Vulkan backend)가 여기서 선다. 구 ImGuiRenderer는 HWND
+	// Editor 호스트(IImGuiHost → concrete DX12 shell)가 여기서 선다. 구 ImGuiRenderer는 HWND
 	// 하나 때문에 DX11 DeviceResources를 통째로 들었다 — 이제 핸들만 넘긴다.
 	// 그릴 표를 넘긴다(PHASE 21 W3). 표는 위 `register_editor_windows` 가
 	// 이미 채워 두었다.
 	BootProgress::Step(L"Starting editor interface", L"Initializing the ImGui presentation host");
 	m_editorRenderer = std::make_unique<EditorRenderer>(
 		EditorWindowHandle(), ::editor::process_windows());
-	const bool imguiIsVulkan = ImGuiRendererBackendKind::Vulkan ==
-		GetImGuiHost().GetBackendKind();
-	if ((EnhancedLiveBackend::Vulkan == startupBackend) != imguiIsVulkan)
-		throw std::runtime_error("Editor scene/ImGui backend 설정 불일치");
-	std::printf("[RenderBackend] source=render.backend active=%s scene=%s imgui=%s\n",
-		RenderBackendName(RuntimeSettings::Get().GetRenderBackend()),
-		EnhancedLiveBackend::Vulkan == startupBackend ? "vulkan" : "dx12",
-		GetImGuiHost().GetBackendName());
+    std::printf("[RenderBackend] source=editor-build active=dx12 scene=dx12 imgui=%s policy=build-fixed-dx12\n",
+        GetImGuiHost().GetBackendName());
 
 	BootProgress::Step(L"Preparing editor tools", L"Connecting gizmos, menus and inspectors");
 	m_gizmoRenderer = std::make_shared<GizmoRenderer>(

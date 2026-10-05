@@ -13,8 +13,9 @@ param(
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-if (($Backend -contains 'vulkan') -and !$Phase49) {
-    throw 'Vulkan comparison belongs to PHASE 4.9; use explicit -Phase49 for its diagnostic runs only.'
+# Reject unsupported Editor runs before creating artifacts or mutating project settings.
+if ($Backend -contains 'vulkan') {
+    throw 'CreatorEditor supports DX12 only; Vulkan Editor runs are unsupported. Use native Vulkan RHI probes or Player validation instead.'
 }
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $output = [IO.Path]::GetFullPath($OutputDirectory)
@@ -80,7 +81,8 @@ $env:CREATOR_VULKAN_VALIDATION='on'
 try {
     & $Python (Join-Path $PSScriptRoot 'generate-film-sensitivity-upload.py') --check > "$output/film-table-mirror.log"
     if ($LASTEXITCODE -ne 0) { throw 'Sensitivity upload mirror differs from canonical shader values' }
-    if ($Phase49 -and ($Backend -contains 'vulkan')) {
+    # The standalone native Vulkan timing fixture does not require a Vulkan Editor.
+    if ($Phase49) {
         if (!(Test-Path $timingProbe)) { throw 'Build Tools/regression/Base0VulkanTimingProbe.vcxproj first' }
         $report.timingProbeSha256=(Get-FileHash $timingProbe -Algorithm SHA256).Hash
         $probePath=$env:PATH
@@ -110,8 +112,6 @@ try {
             $settings="$project/ProjectSetting/EngineSettings.asset"
             if (!(Test-Path $settings)) { throw 'Fixture must include explicit EngineSettings.asset' }
             $text=Get-Content $settings -Raw
-            $text=[regex]::Replace($text,'(?m)(backend:\s*)(dx12|vulkan)\b',('${1}'+$api))
-            [IO.File]::WriteAllText($settings,$text,[Text.UTF8Encoding]::new($false))
             # The same native graph fixtures are a separate gate from live pixels.
             if ($api -eq 'dx12' -and $repeat -eq 0) {
                 $commands="$case/graph-fixtures.txt"
@@ -143,7 +143,7 @@ try {
             $inputs | ConvertTo-Json -Depth 4 | Set-Content "$case/preparation-input-files.json" -Encoding utf8
             $proc=$null
             $run=[ordered]@{backend=$api;repeat=$repeat;directory=$case;passed=$false;captures=@()
-                tuningIdentity=[regex]::Replace($text,'(?m)(backend:\s*)(dx12|vulkan)\b','${1}baseline-backend')}
+                tuningIdentity=$text}
             try {
                 $start=[Diagnostics.ProcessStartInfo]::new($exe)
                 foreach ($arg in @('--development-project',$project,'--command-service','--smoke-offscreen')) {
@@ -170,8 +170,7 @@ try {
                     $body=@{command=$Name;args=@($Arguments);mode='async'} | ConvertTo-Json -Compress
                     $r=Invoke-RestMethod "$base/command" -Method Post -Headers $headers -ContentType 'application/json' -Body $body -TimeoutSec 650
                     if($Name -eq 'quit'){return}
-                    # Vulkan's first immutable LX compute PSO can spend minutes in
-                    # the driver compiler. This is readiness, outside capture timing.
+                    # Immutable PSO readiness is outside capture timing.
                     $deadline=[DateTime]::UtcNow.AddSeconds(660)
                     if($r.PSObject.Properties['operationId']){
                         $poll=$r.poll
