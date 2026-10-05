@@ -20,6 +20,7 @@
 #include "../../../RHI/RHIParallelCommandPool.h"
 #include "../../../LXMaterialPipeline.h"
 #include "../../../ShaderMetaHandle.h"
+#include "../../../GpuGeometryVisibility.h"
 
 struct ShaderMeta;
 struct ShaderMetaBindingLayout;
@@ -83,11 +84,15 @@ public:
         std::span<const ShaderMetaHandle> activeHandles,
         RHICompletionPoint retireAfter);
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    // Call after the graph's parallel upload-prefix boundary. These uploads and
+    // descriptors belong to the recording that will execute the graph itself.
+    bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
+    bool HasGpuVisibilityCandidates() const;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
 
-    // 이번 프레임에 실제로 그린 드로우 수. 씬 연결이 됐는지 확인하는 값이다.
-    /// 이번 프레임에 그릴 드로우 수(같은 메시라도 드로우마다 센다).
+    // Prepared CPU candidates, not the post-cull GPU-visible instance count.
+    // Reading back visibility just for this counter would add a frame dependency.
     uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
 
     /// 올린 메시 종류와 재질 종류. 둘이 드로우 수와 다른 것이 정상이다 —
@@ -173,6 +178,7 @@ private:
 
     /// 같은 (메시, 재질)을 묶어 배치를 만든다. PrepareFrame이 부른다.
     void BuildBatches(const EnhancedFrameContext& context);
+    bool UsesVisibleInstanceIds(const EnhancedMaterialDrawSnapshot* snapshot, uint32_t vertexMask) const;
 
     // 같은 texture를 쓰더라도 ShaderMeta generation, keyword 또는 property bytes가
     // 다르면 b2/PSO 상태가 다르므로 한 draw로 합치지 않는다.
@@ -230,6 +236,10 @@ private:
         RHIPipelineHandle pipeline{};
         uint32_t     firstInstance{ 0 };   // m_instances 안에서의 시작
         uint32_t     instanceCount{ 0 };
+        bool usesVisibleIds{};
+        bool gpuEligible{};
+        uint32_t visibilityBin{ UINT32_MAX };
+        uint32_t visibleIdOffset{};
     };
 
     struct ShaderVariantKey
@@ -300,6 +310,10 @@ private:
     // 연속이라, 배치 하나가 [firstInstance, +instanceCount) 구간을 가리킨다.
     std::vector<InstanceData> m_instances;
     std::vector<DrawBatch>    m_batches;
+    std::vector<math::vector4> m_instanceBounds;
+    GpuGeometryVisibility m_visibility;
+    std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibilityFrame;
+    std::unordered_set<uint64_t> m_visibilityLayouts;
 
     // 프레임의 모든 본 팔레트를 이어 붙인 것. 애니메이터별로 한 번씩만 담기고,
     // 인스턴스의 boneOffset이 자기 구간의 시작을 가리킨다.

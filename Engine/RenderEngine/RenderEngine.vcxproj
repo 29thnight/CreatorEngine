@@ -196,6 +196,9 @@
     <ClCompile Include="MaterialGraphSceneHost.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
+    <ClCompile Include="GpuGeometryVisibility.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="MaterialGraphSceneCompiler.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
@@ -631,6 +634,7 @@
     <ClInclude Include="MaterialGraphScenePacket.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
+    <ClInclude Include="GpuGeometryVisibility.h" />
     <ClInclude Include="MaterialGraphSceneCompiler.h" />
     <ClInclude Include="MaterialGraphShaderMeta.h" />
     <ClInclude Include="MaterialGraphSceneLookup.h" />

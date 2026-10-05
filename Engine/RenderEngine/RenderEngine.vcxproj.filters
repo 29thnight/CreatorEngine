@@ -435,6 +435,9 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="GpuGeometryVisibility.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
@@ -909,6 +912,9 @@
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuGeometryVisibility.h">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Render\Passes\Geometry\EnhancedShadowPass.h">

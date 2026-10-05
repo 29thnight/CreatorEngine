@@ -64,6 +64,9 @@ struct InstanceData
 };
 
 StructuredBuffer<InstanceData> gInstances : register(t4);
+// The CPU fallback binds identity indices; GPU bins bind their compacted slice.
+// Indirect firstInstance stays zero on every backend.
+StructuredBuffer<uint> gVisibleInstanceIds : register(t6);
 
 // 프레임의 모든 본 팔레트를 이어 붙인 것. 인스턴스의 boneOffset이 자기
 // 구간의 시작을 가리킨다.
@@ -142,7 +145,7 @@ struct VSOut
 [shader("vertex")]
 VSOut VSMain(VSIn input, uint instanceId : SV_InstanceID)
 {
-    const InstanceData instance = gInstances[instanceId];
+    const InstanceData instance = gInstances[gVisibleInstanceIds[instanceId]];
     const float4x4 gWorld = instance.world;
 
 #ifdef MODEL_VERTEX_LAYOUT
