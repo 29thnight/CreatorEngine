@@ -7,6 +7,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 
 namespace material_graph
 {
@@ -16,6 +17,7 @@ namespace material_graph
     struct SceneLookupStats
     {
         std::uint32_t baked{}, reused{}, visible{}, rejected{};
+        // reserved0 == 1은 픽셀 cache/readback 대신 fragment 평가를 사용한 프레임이다.
         std::uint32_t approximated{}, reserved0{}, reserved1{}, reserved2{};
     };
     static_assert(sizeof(SceneLookupStats) == 32);
@@ -30,6 +32,7 @@ namespace material_graph
         }
         RHIBufferHandle Samples() const
         {
+            // UsesRuntimeEvaluation()이면 legacy root용 단일 sentinel이다.
             return samples_;
         }
         RHIBufferHandle Statistics() const
@@ -62,6 +65,7 @@ namespace material_graph
         IRenderDeviceServices* device_{};
         std::shared_ptr<SceneLookupResourcePool> resourcePool_;
         mutable RHICompletionPoint completion_{};
+        mutable bool submissionConfirmed_{};
         std::uint32_t width_{}, height_{};
         std::uint64_t frameId_{}, viewId_{}, sceneEpoch_{}, environmentGeneration_{}, recording_{}, descriptors_{};
         std::uint64_t resourceBytes_{}, exclusiveBytes_{};
@@ -110,6 +114,8 @@ namespace material_graph
         // A recorded callback or an upload prefix is not publication authorization.
         bool PublishSubmitted(const SceneLookupFrame& frame, std::uint64_t frameId, RHICompletionPoint completion,
                               std::string& error);
+        // 큐 접수의 수명 증거를 먼저 보관한다. native 성공과 cache 게시는 별도다.
+        bool TrackAcceptedSubmission(const SceneLookupFrame& frame, RHICompletionPoint completion, std::string& error);
         void ShutdownAfterIdle();
 
       private:
@@ -119,10 +125,12 @@ namespace material_graph
         std::shared_ptr<SceneLookupResourcePool> resourcePool_;
         std::mutex submissionMutex_;
         std::map<std::uint64_t, RHICompletionPoint> submitted_;
+        std::set<std::uint64_t> acceptedRecordings_;
         bool preparationDeferred_{};
         void OnUploadSubmitted(std::uint64_t recordingId, RHICompletionPoint completion) override;
         void OnUploadCompleted(std::uint64_t completed) override;
         void OnUploadAborted(std::uint64_t recordingId) override;
+        void OnUploadSubmissionRejected(std::uint64_t recordingId, RHICompletionPoint reservedCompletion) override;
         bool Initialize(const EnhancedFrameContext& context, std::string& error);
     };
 } // namespace material_graph

@@ -27,6 +27,10 @@ public:
         RHICompletionPoint completion) = 0;
     virtual void OnUploadCompleted(uint64_t completedValue) = 0;
     virtual void OnUploadAborted(uint64_t recordingId) = 0;
+
+    /// 예약한 R,C가 큐에 한 번도 들어가지 않았다는 producer의 확정 통지다.
+    /// 제출을 시작한 뒤의 실패에는 호출하지 않는다. 기존 소비자는 보수적으로 보존한다.
+    virtual void OnUploadSubmissionRejected(uint64_t, RHICompletionPoint) {}
 };
 
 // 프레임 동안 쓰는 백엔드 서비스 — 백엔드 중립 (5c-4c 에서 갈렸다).

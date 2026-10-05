@@ -3,6 +3,7 @@
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphRenderBindings.h"
 #include "MaterialGraphSceneLookup.h"
+#include "MaterialGraphSceneRuntimeEffects.h"
 #include "MaterialGraphSceneSubsurface.h"
 #include "MaterialGraphSceneRefraction.h"
 #include "MaterialGraphSceneVolume.h"
@@ -31,6 +32,8 @@ namespace material_graph
         std::uint64_t subsurfaceBytes = 512ull << 20;
         std::uint64_t refractionBytes = 512ull << 20;
         std::uint64_t volumeBytes = 512ull << 20;
+        // 기존 approximate cache/readback과 분리된 live 경로. split-sum 정책을
+        // 명시적으로 선택한 경우에만 켜며 special 효과도 제한된 tile로 평가한다.
         bool lookupRuntimeEvaluation = false;
     };
 
@@ -80,7 +83,7 @@ namespace material_graph
                      RHITextureHandle source = {});
         bool PreparationDeferred() const
         {
-            return lookup_.PreparationDeferred();
+            return lookup_.PreparationDeferred() || runtimeEffects_.PreparationDeferred();
         }
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
         EnhancedGBufferPass::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
@@ -129,7 +132,7 @@ namespace material_graph
             std::shared_ptr<const Frame> publication;
             RHISubmissionTicket ticket;
             std::uint64_t completion{};
-            bool submitted{}, decided{};
+            bool submitted{}, accepted{}, decided{};
         };
         bool PrepareProgram(const EnhancedFrameContext& context, const Instance& instance,
                             std::shared_ptr<const Program>& result, std::string& error);
@@ -138,6 +141,7 @@ namespace material_graph
         GpuGeometryVisibility visibility_;
         RenderBindingCache bindings_;
         SceneLookupCache lookup_;
+        SceneRuntimeEffectsResources runtimeEffects_;
         SceneSubsurfaceResources subsurface_;
         SceneRefractionResources refraction_;
         SceneVolumeResources volume_;
@@ -159,6 +163,10 @@ namespace material_graph
                                 RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
                                 bool transmissionStage, std::optional<std::size_t> blended = {},
                                 EnhancedForwardLighting forward = {}) const;
+        RGHandle DeclareRuntimeEffects(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs,
+                                       RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,
+                                       bool transmissionStage, std::optional<std::size_t> blended,
+                                       EnhancedForwardLighting forward) const;
         void DeclareForwardGBuffer(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs,
                                    std::size_t index) const;
         void DeclareRefractionCapture(EnhancedRenderGraph& graph, const EnhancedGBufferPass::Outputs& inputs,
@@ -166,5 +174,6 @@ namespace material_graph
         void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override;
         void OnUploadCompleted(std::uint64_t completed) override;
         void OnUploadAborted(std::uint64_t recording) override;
+        void OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint reservedCompletion) override;
     };
 } // namespace material_graph

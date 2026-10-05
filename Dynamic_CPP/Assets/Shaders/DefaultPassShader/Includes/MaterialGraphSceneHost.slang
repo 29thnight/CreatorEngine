@@ -133,6 +133,46 @@ cbuffer LXSceneDecalConstants : register(b3)
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
 StructuredBuffer<LXSceneSubsurfaceReflection> lx_subsurfaceReflection : register(t6);
 StructuredBuffer<float4> lx_subsurfaceIrradiance : register(t7);
+#include "MaterialGraphRuntimeEffectContract.slang"
+Texture2D<float4> lx_runtimeEffect0 : register(t139);
+Texture2D<float4> lx_runtimeEffect1 : register(t140);
+Texture2D<float4> lx_runtimeEffect2 : register(t141);
+Texture2D<float4> lx_runtimeEffect3 : register(t142);
+Texture2D<float4> lx_runtimeEffect4 : register(t143);
+Texture2D<float4> lx_runtimeEffect5 : register(t144);
+Texture2D<float4> lx_runtimeEffect6 : register(t145);
+Texture2D<float4> lx_runtimeEffect7 : register(t146);
+Texture2D<float4> lx_runtimeEffect8 : register(t147);
+Texture2D<float4> lx_runtimeEffect9 : register(t148);
+Texture2D<float4> lx_runtimeEffect10 : register(t149);
+Texture2D<float4> lx_runtimeEffect11 : register(t150);
+Texture2D<float4> lx_runtimeEffect12 : register(t151);
+Texture2D<float4> lx_runtimeEffect13 : register(t152);
+Texture2D<float4> lx_runtimeBackgroundColor : register(t153);
+Texture2D<float> lx_runtimeBackgroundDepth : register(t154);
+SamplerState lx_runtimeReferenceSampler : register(s2);
+#define gEnvironmentSampler lx_runtimeReferenceSampler
+#include "PrincipledEnvironmentBake.slang"
+#undef gEnvironmentSampler
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+#define LX_SCENE_REFRACTION_VOLUME 1
+#define lx_inverseViewProjection lx_effectInverseViewProjection
+#define lx_steps lx_effectSteps
+#define lx_rays lx_effectRays
+#define lx_reserved lx_effectBackgroundHasMedium
+#define lx_depth lx_runtimeBackgroundDepth
+#define lx_background lx_runtimeBackgroundColor
+#define lx_environment lx_runtimeEnvironment
+#include "MaterialGraphRefractionTransport.slang"
+#undef lx_inverseViewProjection
+#undef lx_steps
+#undef lx_rays
+#undef lx_reserved
+#undef lx_depth
+#undef lx_background
+#undef lx_environment
+#undef LX_SCENE_REFRACTION_VOLUME
+#endif
 #endif
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
 StructuredBuffer<LXSceneRefractionSample> lx_refraction : register(t8);
@@ -479,10 +519,63 @@ float3 LXSceneShadowDebugColor(uint mode, float3 position, float3 normal, float3
 }
 
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
-SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 view, uint index,
-    PrincipledIblBakeSample sample)
+LXSceneRuntimeEffectSample LXSceneLoadRuntimeSource(uint index)
 {
-    const LXSceneSubsurfaceReflection reflection = lx_subsurfaceReflection[index];
+    const uint2 pixel = uint2(index % lx_width, index / lx_width);
+    const int3 local = int3(pixel - uint2(lx_effectSourceX, lx_effectSourceY), 0);
+    LXSceneRuntimeEffectSample sample = (LXSceneRuntimeEffectSample)0;
+    sample.sourceArea = lx_runtimeEffect0.Load(local);
+    sample.positionValid = lx_runtimeEffect1.Load(local);
+    sample.normal = lx_runtimeEffect2.Load(local).xyz;
+    sample.owner = lx_owners.Load(int3(pixel, 0));
+    return sample;
+}
+
+LXSceneRuntimeEffectSample LXSceneLoadRuntimeEffect(uint index)
+{
+    const uint2 pixel = uint2(index % lx_width, index / lx_width);
+    const int3 local = int3(pixel - uint2(lx_effectSourceX, lx_effectSourceY), 0);
+    LXSceneRuntimeEffectSample sample = LXSceneLoadRuntimeSource(index);
+    sample.reflection.metalSingleAlbedo = lx_runtimeEffect3.Load(local);
+    sample.reflection.metalAverage = lx_runtimeEffect4.Load(local);
+    sample.reflection.dielectricSingleAlbedo = lx_runtimeEffect5.Load(local);
+    sample.reflection.dielectricAverage = lx_runtimeEffect6.Load(local);
+    sample.reflection.metalEnvironment = lx_runtimeEffect7.Load(local);
+    sample.reflection.dielectricEnvironment = lx_runtimeEffect8.Load(local);
+    sample.refraction.glassSingleAlbedo = lx_runtimeEffect9.Load(local);
+    sample.refraction.glassAverage = lx_runtimeEffect10.Load(local);
+    sample.refraction.glassEnvironment = lx_runtimeEffect11.Load(local);
+    sample.refraction.rawTransmission = lx_runtimeEffect12.Load(local);
+    sample.refraction.radiance = lx_runtimeEffect13.Load(local);
+    return sample;
+}
+
+LXSceneSubsurfaceReflection LXSceneReadReflection(uint index)
+{
+    if (lx_runtimeLookup != 0u)
+    {
+        return LXSceneLoadRuntimeEffect(index).reflection;
+    }
+    return lx_subsurfaceReflection[index];
+}
+
+LXSceneRefractionSample LXSceneReadRefraction(uint index)
+{
+    LXSceneRefractionSample sample = (LXSceneRefractionSample)0;
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+    if (lx_runtimeLookup != 0u)
+    {
+        return LXSceneLoadRuntimeEffect(index).refraction;
+    }
+    return lx_refraction[index];
+#else
+    return sample;
+#endif
+}
+
+SpecialForwardSurface LXSceneSpecialSurfaceFromSamples(PrincipledSurface material, float3 view,
+    PrincipledIblBakeSample sample, LXSceneSubsurfaceReflection reflection, LXSceneRefractionSample refraction)
+{
     SpecialForwardIntegral integral;
     integral.layers.base = ReadPrincipledIblIntegral(sample.baseSingleAlbedo, sample.baseAverage);
     integral.layers.coat = ReadPrincipledIblIntegral(sample.coatSingleAlbedo, sample.coatAverage);
@@ -491,11 +584,17 @@ SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 v
     integral.glass = PrincipledEmptyIntegral();
     integral.rawTransmission = float3(0);
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
-    const LXSceneRefractionSample refraction = lx_refraction[index];
     integral.glass = ReadPrincipledIblIntegral(refraction.glassSingleAlbedo, refraction.glassAverage);
     integral.rawTransmission = refraction.rawTransmission.rgb;
 #endif
     return BuildSpecialForwardSurface(material, view, integral);
+}
+
+SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 view, uint index,
+    PrincipledIblBakeSample sample)
+{
+    return LXSceneSpecialSurfaceFromSamples(material, view, sample, LXSceneReadReflection(index),
+        LXSceneReadRefraction(index));
 }
 
 float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float2 pixel, float3 position, out float3 irradiance)
@@ -541,6 +640,8 @@ float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float2 pixel, float3 
     }
     return direct;
 }
+
+#include "MaterialGraphRuntimeSpecial.slang"
 
 struct LXSceneSubsurfaceCapture
 {
@@ -590,7 +691,7 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
 float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 position, uint index,
     PrincipledIblBakeSample sample)
 {
-    if (sample.baseAverage.w < 0 || lx_subsurfaceReflection[index].metalAverage.w != 1.0)
+    if (sample.baseAverage.w < 0 || LXSceneReadReflection(index).metalAverage.w != 1.0)
     {
         return float4(1, 0, 1, 1);
     }
@@ -598,7 +699,7 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 posi
     const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index, sample);
     float3 source;
     const float3 direct = LXSceneSpecialDirect(surface, pixel, position, source);
-    const LXSceneSubsurfaceReflection reflection = lx_subsurfaceReflection[index];
+    const LXSceneSubsurfaceReflection reflection = LXSceneReadReflection(index);
     SpecialForwardEnvironment environment = (SpecialForwardEnvironment)0;
     environment.irradiance = sample.irradiance.rgb;
     environment.coatPrefiltered = sample.coatPrefiltered.rgb;
@@ -608,9 +709,16 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 posi
         * surface.integral.dielectric.singleScatter;
     environment.basePrefiltered = (metal * reflection.metalEnvironment.rgb
         + dielectric * reflection.dielectricEnvironment.rgb) / max(metal + dielectric, 1e-20);
-    environment.subsurfaceIrradiance = lx_subsurfaceIrradiance[index].rgb;
+    if (lx_runtimeLookup != 0u)
+    {
+        environment.subsurfaceIrradiance = LXSceneRuntimeSubsurface(material, index);
+    }
+    else
+    {
+        environment.subsurfaceIrradiance = lx_subsurfaceIrradiance[index].rgb;
+    }
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
-    const LXSceneRefractionSample refraction = lx_refraction[index];
+    const LXSceneRefractionSample refraction = LXSceneReadRefraction(index);
     if (refraction.glassAverage.w != 1)
     {
         return float4(1, 0, 1, 1);

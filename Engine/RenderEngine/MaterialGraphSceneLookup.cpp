@@ -155,7 +155,7 @@ namespace material_graph
 
         bool Recycle(const SceneLookupFrame& frame)
         {
-            if (!frame.completion_.IsValid())
+            if (!frame.completion_.IsValid() || !frame.submissionConfirmed_)
             {
                 ce::profile_instant(ce::marker<"MaterialLookupUnsubmittedDiscard">());
                 return false;
@@ -203,6 +203,16 @@ namespace material_graph
         {
             std::lock_guard lock(mutex);
             if (const auto found = uploads.find(recording); found != uploads.end())
+            {
+                uploadBytes -= found->second.bytes;
+                uploads.erase(found);
+            }
+        }
+
+        void Rejected(std::uint64_t recording)
+        {
+            std::lock_guard lock(mutex);
+            if (const auto found = uploads.find(recording); found != uploads.end() && !found->second.completion)
             {
                 uploadBytes -= found->second.bytes;
                 uploads.erase(found);
@@ -861,6 +871,30 @@ namespace material_graph
         return graphStatistics_;
     }
 
+    bool SceneLookupCache::TrackAcceptedSubmission(const SceneLookupFrame& frame, RHICompletionPoint completion,
+                                                   std::string& error)
+    {
+        if (frame.device_ != device_ || !completion.IsValid())
+        {
+            return Fail(error, "Scene lookup submission ownership differs from its accepted graph.");
+        }
+        {
+            std::lock_guard lock(submissionMutex_);
+            const auto submitted = submitted_.find(frame.recording_);
+            if (submitted == submitted_.end() || completion.value < submitted->second.value)
+            {
+                return Fail(error, "Scene lookup accepted graph has no matching recording evidence.");
+            }
+            acceptedRecordings_.insert(frame.recording_);
+        }
+        frame.completion_ = completion;
+        if (frame.resourcePool_)
+        {
+            frame.resourcePool_->Submitted(frame.recording_, completion);
+        }
+        return true;
+    }
+
     bool SceneLookupCache::PublishSubmitted(const SceneLookupFrame& frame, std::uint64_t frameId,
                                             RHICompletionPoint completion, std::string& error)
     {
@@ -889,11 +923,11 @@ namespace material_graph
             ce::profile_instant(ce::marker<"MaterialLookupPublicationOutOfOrder">());
             return Fail(error, "Scene lookup refuses duplicate or older frame publication.");
         }
-        frame.completion_ = completion;
-        if (frame.resourcePool_)
+        if (!TrackAcceptedSubmission(frame, completion, error))
         {
-            frame.resourcePool_->Submitted(frame.recording_, completion);
+            return false;
         }
+        frame.submissionConfirmed_ = true;
         if (frame.standalone_ || frame.runtimeEvaluation_)
         {
             if (frame.runtimeEvaluation_ && !frame.standalone_)
@@ -904,6 +938,7 @@ namespace material_graph
             {
                 std::lock_guard lock(submissionMutex_);
                 submitted_.erase(frame.recording_);
+                acceptedRecordings_.erase(frame.recording_);
             }
             error.clear();
             return true;
@@ -919,6 +954,7 @@ namespace material_graph
         {
             std::lock_guard lock(submissionMutex_);
             submitted_.erase(frame.recording_);
+            acceptedRecordings_.erase(frame.recording_);
         }
         error.clear();
         return true;
@@ -936,6 +972,7 @@ namespace material_graph
             resourcePool_.reset();
         }
         submitted_.clear();
+        acceptedRecordings_.clear();
         bake_ = {};
         clear_ = {};
         device_ = nullptr;
@@ -948,6 +985,7 @@ namespace material_graph
         // Legacy-only frames also notify this listener. Keep recent evidence bounded.
         while (submitted_.size() > 128)
         {
+            acceptedRecordings_.erase(submitted_.begin()->first);
             submitted_.erase(submitted_.begin());
         }
     }
@@ -968,10 +1006,33 @@ namespace material_graph
     void SceneLookupCache::OnUploadAborted(std::uint64_t recordingId)
     {
         std::lock_guard lock(submissionMutex_);
+        if (acceptedRecordings_.contains(recordingId))
+        {
+            return;
+        }
         submitted_.erase(recordingId);
         if (resourcePool_)
         {
             resourcePool_->Aborted(recordingId);
+        }
+    }
+
+    void SceneLookupCache::OnUploadSubmissionRejected(std::uint64_t recordingId, RHICompletionPoint completion)
+    {
+        std::lock_guard lock(submissionMutex_);
+        const auto found = submitted_.find(recordingId);
+        if (acceptedRecordings_.contains(recordingId) ||
+            (found != submitted_.end() && found->second.value != completion.value))
+        {
+            return;
+        }
+        if (found != submitted_.end())
+        {
+            submitted_.erase(found);
+        }
+        if (resourcePool_)
+        {
+            resourcePool_->Rejected(recordingId);
         }
     }
 } // namespace material_graph

@@ -1159,6 +1159,12 @@
     <ClCompile Include="MaterialGraphSceneCompiler.cpp">
       <Filter>Resources</Filter>
     </ClCompile>
+    <ClCompile Include="MaterialGraphSceneRuntimeEffects.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneRuntimeEffects.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
     <ClCompile Include="MaterialGraphShaderMeta.cpp">
       <Filter>Resources</Filter>
     </ClCompile>

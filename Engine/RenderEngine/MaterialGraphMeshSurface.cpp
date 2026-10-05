@@ -84,6 +84,18 @@ namespace material_graph
         mutable std::mutex mutex;
         std::vector<std::shared_ptr<MeshSurfaceStaticBuffers>> entries;
         std::map<std::uint64_t, std::vector<std::shared_ptr<MeshSurfaceStaticBuffers>>> recordings;
+        struct ProvisionalEntry
+        {
+            std::shared_ptr<MeshSurfaceStaticBuffers> entry;
+            std::uint64_t previousCompletion{};
+            bool initialUpload{};
+        };
+        struct ProvisionalSubmission
+        {
+            RHICompletionPoint completion;
+            std::vector<ProvisionalEntry> entries;
+        };
+        std::map<std::uint64_t, ProvisionalSubmission> provisional;
         std::uint64_t completed{};
         MeshSurfaceCacheStats stats;
         static constexpr std::uint64_t maxBytes = 128ull << 20;
@@ -103,8 +115,15 @@ namespace material_graph
             std::lock_guard lock(mutex);
             if (auto found = recordings.find(recording); found != recordings.end())
             {
+                auto& submission = provisional[recording];
+                submission.completion = completion;
                 for (auto& entry : found->second)
                 {
+                    if (std::ranges::none_of(submission.entries, [&](const auto& prior) { return prior.entry == entry; }))
+                    {
+                        submission.entries.push_back({entry, entry->completion,
+                            entry->state == RHIUploadTransactionState::Recording && entry->recording == recording});
+                    }
                     entry->completion = std::max(entry->completion, completion.value);
                     if (!completion.IsValid())
                     {
@@ -129,6 +148,9 @@ namespace material_graph
                     entry->state = RHIUploadTransactionState::Resident;
                 }
             }
+            std::erase_if(provisional, [&](const auto& item) {
+                return item.second.completion.IsValid() && item.second.completion.value <= completed;
+            });
         }
         void OnUploadAborted(std::uint64_t recording) override
         {
@@ -143,6 +165,43 @@ namespace material_graph
                 stats.residentBytes -= entry->bytes;
                 return true;
             });
+        }
+        void OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint completion) override
+        {
+            std::lock_guard lock(mutex);
+            const auto found = provisional.find(recording);
+            if (found != provisional.end() && found->second.completion.IsValid() &&
+                found->second.completion.value != completion.value)
+            {
+                return;
+            }
+            if (found != provisional.end())
+            {
+                for (const auto& pending : found->second.entries)
+                {
+                    const auto& entry = pending.entry;
+                    if (!pending.initialUpload && entry->completion == completion.value)
+                    {
+                        // 이미 resident인 입력의 거절된 read lease는 이전 사용
+                        // 완료점만 복원한다. 실제 자산 내용은 폐기하지 않는다.
+                        entry->completion = pending.previousCompletion;
+                    }
+                }
+                provisional.erase(found);
+            }
+            // Submitted 통지 도중 예외가 난 경우 아직 Recording인 입력도
+            // 같은 never-admitted R의 일부다. 완료된 기존 자산은 건드리지 않는다.
+            std::erase_if(entries, [&](const auto& entry) {
+                if (entry->recording != recording)
+                {
+                    return false;
+                }
+                entry->usable = false;
+                entry->state = RHIUploadTransactionState::Quarantined;
+                stats.residentBytes -= entry->bytes;
+                return true;
+            });
+            recordings.erase(recording);
         }
         MeshSurfaceCacheStats Stats() const
         {
