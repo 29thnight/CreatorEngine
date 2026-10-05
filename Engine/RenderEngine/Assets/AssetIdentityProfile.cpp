@@ -297,25 +297,6 @@ namespace assets
         return DeriveIdentity(input);
     }
 
-    bool IsUuidV8(const Uuid::Uuid16& value) noexcept
-    {
-        return !value.IsNil()
-            && (value.data[6] & 0xF0u) == 0x80u
-            && (value.data[8] & 0xC0u) == 0x80u;
-    }
-
-    bool TryParseCanonicalUuidV8(std::string_view text, Uuid::Uuid16& out) noexcept
-    {
-        Uuid::Uuid16 parsed{};
-        if (!Uuid::TryParse(text, parsed)) return false;
-        if (!IsUuidV8(parsed)) return false;
-        // 소문자 8-4-4-4-12만. Uuid::TryParse가 받는 대문자·brace·무하이픈은 여기서
-        // 걸린다(재표기가 원문과 다르다).
-        if (Uuid::ToString(parsed) != text) return false;
-        out = parsed;
-        return true;
-    }
-
     bool IsWellFormedUtf8(std::string_view text) noexcept
     {
         // RFC 3629 §4 문법 그대로. overlong·surrogate·>U+10FFFF·절단을 거부한다.

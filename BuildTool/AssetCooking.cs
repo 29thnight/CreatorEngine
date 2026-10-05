@@ -54,7 +54,7 @@ internal static class AssetCooking
     public static CookResult Validate(string output, int expected)
     {
         const string guid = "([0-9a-f]{8}-[0-9a-f]{4}-[48][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
-        var rules = new Dictionary<string, string> { ["Models"] = "", ["Textures"] = "png|hdr|dds|jpg", ["ShaderMeta"] = "shadermeta", ["Materials"] = "asset", ["MaterialPrograms"] = "lxmaterial", ["Scenes"] = "creator", ["Prefabs"] = "prefab", ["CollisionGeometry"] = "cepg" };
+        var rules = new Dictionary<string, string> { ["Models"] = "", ["Textures"] = "png|hdr|dds|jpg", ["ShaderMeta"] = "shadermeta", ["Materials"] = "asset", ["MaterialPrograms"] = "lxmaterial", ["Scenes"] = "creator", ["Prefabs"] = "prefab", ["CollisionGeometry"] = "cepg", ["Audio"] = "ceac", ["SoundGraphs"] = "cesg", ["SoundPresets"] = "cesp" };
         var derived = Path.Combine(output, "Derived"); var manifest = Path.Combine(derived, "asset-manifest.cemf");
         if (!File.Exists(manifest)) throw new BuildException("Cooked asset manifest missing.");
         var files = Paths.Files(derived).ToArray(); var byFolder = rules.Keys.ToDictionary(k => k, _ => 0);
@@ -90,6 +90,10 @@ internal static class AssetCooking
             var sources = all.Where(p => extensions.Contains(Path.GetExtension(p).ToLowerInvariant()) && !stale.Contains(p)).ToArray(); counts[option] = sources.Length;
             foreach (var source in sources) { arguments.Add(option); arguments.Add(source); }
         }
+        // Audio sources are discovered by the cooker's GUID sidecar scan.
+        counts["audio-clips"] = all.Count(p => Path.GetExtension(p).ToLowerInvariant() is ".wav" or ".mp3" or ".flac");
+        counts["sound-graphs"] = all.Count(p => Path.GetExtension(p).Equals(".soundgraph", StringComparison.OrdinalIgnoreCase));
+        counts["sound-presets"] = all.Count(p => Path.GetExtension(p).Equals(".soundpreset", StringComparison.OrdinalIgnoreCase));
         var argumentsFile = Path.Combine(Path.GetDirectoryName(output)!, "cook.arguments");
         if (arguments.Any(a => a.IndexOfAny(['\r', '\n', '\0']) >= 0)) throw new BuildException("Cook argument contains an unsupported control character.");
         await File.WriteAllLinesAsync(argumentsFile, arguments, new System.Text.UTF8Encoding(false), context.Cancellation);

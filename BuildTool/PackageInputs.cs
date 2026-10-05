@@ -148,6 +148,22 @@ internal static class PackageInputs
         }
     }
 
+    public static void RemoveAudioSources(string merged)
+    {
+        var assets = Paths.Child(merged, "Assets");
+        foreach (var file in Paths.Files(assets).Where(p =>
+            Path.GetExtension(p).ToLowerInvariant() is ".wav" or ".mp3" or ".flac" or ".ogg" or ".soundgraph" or ".soundpreset").ToArray())
+        {
+            Paths.AssertChild(file, assets);
+            File.Delete(file);
+            if (File.Exists(file + ".meta"))
+            {
+                Paths.AssertChild(file + ".meta", assets);
+                File.Delete(file + ".meta");
+            }
+        }
+    }
+
     public static bool Excluded(string path)
     {
         // The generation reader validates this cooked companion at runtime.
@@ -155,6 +171,7 @@ internal static class PackageInputs
         if (Path.GetFileName(path).Equals("sidecar.meta", StringComparison.OrdinalIgnoreCase) &&
             path.Replace('\\', '/').Contains("/Assets/Derived/Models/", StringComparison.OrdinalIgnoreCase))
             return false;
-        return Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".meta" or ".json";
+        return Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".meta" or ".json"
+            or ".wav" or ".mp3" or ".flac" or ".ogg" or ".soundgraph" or ".soundpreset";
     }
 }

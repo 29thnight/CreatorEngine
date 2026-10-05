@@ -270,7 +270,9 @@ void EditorAssetPresentation::LoadPresentationResources()
 		{ ".shadermeta", FileType::Shader }, { ".shader", FileType::Shader },
 		{ ".cpp", FileType::CppScript }, { ".h", FileType::CppScript },
 		{ ".cs", FileType::CSharpScript }, { ".wav", FileType::Sound },
-		{ ".mp3", FileType::Sound }, { ".terrain", FileType::TerrainTexture },
+		{ ".mp3", FileType::Sound }, { ".flac", FileType::Sound },
+        { ".soundgraph", FileType::Sound }, { ".soundpreset", FileType::Sound },
+        { ".terrain", FileType::TerrainTexture },
 		{ ".prefab", FileType::Prefab }, { ".renderprofile", FileType::SceneRenderProfile },
 		{ ".spritefont", FileType::Font },
 	};

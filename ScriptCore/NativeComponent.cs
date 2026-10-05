@@ -53,6 +53,7 @@ internal static class NativeComponentTable
         // Transform 없는 오브젝트에서 null이 나온다.
         [typeof(Transform)]      = new(handle => new Transform      { OwnerHandle = handle }, Native.HasTransform),
 
+        [typeof(AudioListenerComponent)] = new(handle => new AudioListenerComponent { OwnerHandle = handle }, Native.HasAudioListener),
         [typeof(SoundComponent)] = new(handle => new SoundComponent { OwnerHandle = handle }, Native.HasSoundComponent),
         [typeof(PhysicsBodyComponent)] = new(handle => new PhysicsBodyComponent { OwnerHandle = handle, NativeInstance = Native.BodyFind(handle) },
             handle => Native.BodyFind(handle) != 0),

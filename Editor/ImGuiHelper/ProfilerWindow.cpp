@@ -661,6 +661,7 @@ namespace
             ImGui::SameLine(); toggle("Managed GC", ce::counter_category::managed);
             ImGui::SameLine(); toggle("Resources", ce::counter_category::resources);
             ImGui::SameLine(); toggle("Physics", ce::counter_category::physics);
+            ImGui::SameLine(); toggle("Audio", ce::counter_category::audio);
             ImGui::TextDisabled("Resources는 기본 꺼짐 · 켜면 0.5초마다 소유 프레임에서 집계합니다");
             ImGui::TreePop();
         }
@@ -859,7 +860,7 @@ namespace
 
 namespace editor::profiler_view
 {
-    enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive, physics };
+    enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive, physics, audio };
     page selectedPage = page::timeline;
     std::atomic_bool renderingLiveRequested{false};
     void select_rendering_live() { renderingLiveRequested = true; }
@@ -965,6 +966,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
     nav(page::gpu, EditorIcon::Game, "GPU", "Graphics 구간 시간과 VRAM");
     nav(page::renderingLive, EditorIcon::Scene, "Rendering - Live", "Live renderer diagnostics without Record");
     nav(page::physics, EditorIcon::Timing, "Physics", "씬별 물리 틱 카운터와 손실 진단");
+    nav(page::audio, EditorIcon::Timing, "Audio", "논리 재생·보이스·오디오 callback 진단");
     nav(page::network, EditorIcon::World, "네트워크", "엔진 송수신량");
     nav(page::animation, EditorIcon::AvatarMask, "Animation", "실시간 CPU 예산과 태스크 실행 기록");
     ImGui::Separator();
@@ -1034,6 +1036,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
     case page::gpu: draw_telemetry(telemetry_page::gpu); break;
     case page::network: draw_telemetry(telemetry_page::network); break;
     case page::physics: draw_physics_telemetry(); break;
+    case page::audio: draw_audio_telemetry(); break;
     case page::animation:
     {
         std::lock_guard<std::mutex> sceneLock(sceneStructureMutex);

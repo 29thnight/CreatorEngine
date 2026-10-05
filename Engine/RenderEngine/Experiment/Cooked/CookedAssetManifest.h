@@ -40,6 +40,8 @@ namespace experiment::cooked
         AudioClip = 7,
         MaterialProgram = 8,
         CollisionGeometry = 9,
+        SoundGraph = 10,
+        SoundPreset = 11,
     };
 
     using Sha256Digest = std::array<std::uint8_t, 32>;
@@ -130,6 +132,10 @@ namespace experiment::cooked
 
     [[nodiscard]] std::string MakeDerivedAudioClipArtifactPath(
         const AssetId& audioClipAssetId);
+
+    inline constexpr std::uint32_t kSoundAssetArtifactVersion = 1u;
+    [[nodiscard]] std::string MakeDerivedSoundGraphArtifactPath(const AssetId& assetId);
+    [[nodiscard]] std::string MakeDerivedSoundPresetArtifactPath(const AssetId& assetId);
 
     [[nodiscard]] bool ComputeSha256(std::span<const std::byte> bytes,
         Sha256Digest& outDigest, std::string& outError) noexcept;

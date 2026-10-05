@@ -494,7 +494,7 @@ namespace ce::detail::capture_file_impl
             if (!in.get(id) || !in.get(category) || !in.get_string(value.name) ||
                 !in.get_string(value.unit) || id != i + 1 || value.name.empty() ||
                 value.name.size() > 255 || value.unit.size() > 32 ||
-                category == 0 || (category & (category - 1)) != 0 || category > counter_bit(counter_category::physics))
+                category == 0 || (category & (category - 1)) != 0 || category > counter_bit(counter_category::audio))
             {
                 return std::unexpected(capture_file_error::malformed);
             }

@@ -1,6 +1,5 @@
 #include "CookedAssetCatalog.h"
 #include "CookedAudioClipSource.h"
-#include "CookedMaterialProgram.h"
 
 #include <algorithm>
 #include <set>
@@ -9,28 +8,6 @@
 
 namespace experiment::cooked
 {
-    bool CookedAssetCatalog::OpenMaterialProgram(const AssetId& assetId,
-        const ArtifactByteSource& bytes, const material_graph::Budget& budget,
-        material_graph::CookedProgram& out, std::string& failure) const
-    {
-        const auto* entry = Find(assetId);
-        if (!entry || entry->kind != CookedAssetKind::MaterialProgram)
-        {
-            failure = "Material graph has no cooked program in the catalog.";
-            return false;
-        }
-        for (const auto& dependency : entry->dependencies)
-        {
-            const auto* texture = Find(dependency);
-            if (!texture || texture->kind != CookedAssetKind::Texture)
-            {
-                failure = "Cooked material texture dependency is missing or has the wrong kind.";
-                return false;
-            }
-        }
-        return OpenCookedMaterialProgram(*entry, bytes, budget, out, failure);
-    }
-
     CookedAssetCatalog CookedAssetCatalog::Load(
         std::span<const std::byte> manifestBytes,
         std::filesystem::path derivedRoot,

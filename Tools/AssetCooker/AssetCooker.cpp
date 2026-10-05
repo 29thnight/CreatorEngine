@@ -1,3 +1,4 @@
+#include "SoundAssetCookProducer.h"
 #include "CollisionGeometryCookProducer.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookedAudioClipFormat.h"
@@ -700,7 +701,7 @@ namespace
                     failure = "OGG audio source는 지원하지 않는다: " + source.string();
                     return false;
                 }
-                if (assets::IsAudioClipSource(source))
+                if (assets::IsAudioClipSource(source) || extension == ".soundgraph" || extension == ".soundpreset")
                 {
                     std::filesystem::path metaPath = source;
                     metaPath += ".meta";
@@ -783,6 +784,12 @@ namespace
                 const Authoring::ReadNode hash = audio["sourceContentHash"];
                 assets::AudioClipSourceMetadata inspected{};
                 std::string inspectionError;
+                if (audio.HasChild("loopStartFrame") || audio.HasChild("loopEndFrame")
+                    || document.Root().HasChild("loopStartFrame") || document.Root().HasChild("loopEndFrame"))
+                {
+                    failure = "Audio loop markers require a newer CEAC schema; only whole-clip looping is supported: " + source.string();
+                    return false;
+                }
                 if (!audio.IsMap() || audio["schemaVersion"].Scalar() != "1"
                     || !mode.IsScalar() || !assets::IsAudioLoadMode(mode.Scalar())
                     || !spatial.IsScalar() || !assets::IsAudioSpatialKind(spatial.Scalar())
@@ -1460,7 +1467,33 @@ namespace
             return 3;
         }
         for (const AudioCookProduct& product : audioProducts)
+        {
             totalArtifactBytes += product.manifestEntry.byteSize;
+        }
+        std::vector<sound_cook::Product> soundProducts;
+        if (!sound_cook::Build(assetRoot, manifest, artifactPaths, soundProducts, sourceIdentityFailure)
+            || !sound_cook::RewriteScenes(sceneProducts, manifest, sourceIdentityFailure))
+        {
+            std::cerr << "asset-cooker error: " << sourceIdentityFailure << '\n';
+            return 3;
+        }
+        for (const auto& product : soundProducts)
+        {
+            totalArtifactBytes += product.entry.byteSize;
+        }
+        totalSceneBytes = 0u;
+        for (const auto& scene : sceneProducts)
+        {
+            totalSceneBytes += scene.artifactBytes.size();
+        }
+        // Audio runtime uses cooked GUID entries only. The source identity
+        // table must not become a Player fallback to authoring audio paths.
+        std::erase_if(manifest.sourceAssets, [&](const auto& source)
+        {
+            const auto* entry = manifest.Find(source.assetId);
+            return entry && (entry->kind == ck::CookedAssetKind::AudioClip
+                || entry->kind == ck::CookedAssetKind::SoundGraph || entry->kind == ck::CookedAssetKind::SoundPreset);
+        });
         if (manifest.entries.empty())
         {
             std::cerr << "asset-cooker error: cook할 cooked asset이 없다.\n";
@@ -1642,6 +1675,15 @@ namespace
             if (!WriteAudioCookProduct(product, stagingRoot, failure))
             {
                 std::cerr << "asset-cooker error: " << failure << '\n';
+                return 5;
+            }
+        }
+
+        for (const auto& product : soundProducts)
+        {
+            if (!WriteBinaryFile(stagingRoot / product.entry.artifactPath, product.bytes, failure))
+            {
+                std::cerr << "asset-cooker error: sound artifact publication failed: " << failure << '\n';
                 return 5;
             }
         }
@@ -1970,7 +2012,8 @@ namespace
             << " textureBytes=" << totalTextureBytes
             << " shaderMetaBytes=" << totalShaderMetaBytes
             << " manifest=Derived/asset-manifest.cemf\n";
-        std::cout << "asset-cooker audioClips=" << audioProducts.size() << '\n';
+        std::cout << "asset-cooker audioClips=" << audioProducts.size()
+            << " soundAssets=" << soundProducts.size() << '\n';
         for (const ck::ShaderMetaCookProduct& product : shaderMetaProducts)
         {
             // ★ source 셰이더 GUID 를 여기서 소비한다. 해소는 증명해 놓고

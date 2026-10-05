@@ -40,6 +40,8 @@ public:
 	bool Initialize();
 	void Shutdown() noexcept;
 	bool IsInitialized() const noexcept;
+    // Event revision only: the host refreshes its AudioCatalog on the game thread.
+    [[nodiscard]] std::uint64_t AudioRevision() const noexcept;
 
 	FileGuid CreateMeta(const file::path& filepath,
 		const FileGuid& preferredGuid = {});

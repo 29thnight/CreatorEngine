@@ -8,7 +8,7 @@
   AU0 의 "유효 FMOD 항목 A/B" 가 성립하지 않고, ② AU8 이 지목한 `Tools/build.ps1` stage 는
   `Tools/runtime/deploy-runtime.ps1` 의 PE import 폐포로 이사했으며, ③ 배포본이 FMOD 로깅 빌드를
   라이선스 등재 없이 싣고 있다.
-- 상태: **부분 구현 — AU0·AU1·AU2·AU3 진행, AU4~AU9 미착수** (2026-09-24)
+- 상태: **소스 구현·FMOD 철거 및 클라우드 회귀 통과 — Windows/실장치 acceptance PENDING** (2026-10-05). Debug·Release·ASan/UBSan 각각 3,825 단정 통과. 최신 소비 설계·검증 구분은 §12, [검증 보고서](../analysis/Phase22AudioCloudValidation.md)가 정본이다. 과거 §11의 측정은 당시 SHA의 기록이다.
 - 배치: PHASE 17 직렬화·Asset/Cook 경계와 PHASE 12.5 package gate 뒤, PHASE 23 MSI·Launcher 제품화 앞
 - 초기 추정: **45 인일**. AU0 기준선과 device/backend 스파이크 뒤 갱신
 - 확정 포맷: **WAV · MP3 · FLAC만 지원**. OGG/Vorbis와 그 밖의 포맷은 importer에서 명시적으로 거부
@@ -41,7 +41,7 @@
    포함한 importer 오류를 낸다. 조용히 무시하거나 확장자만 바꾸는 동작은 금지한다.
 2. miniaudio는 `ma_sound*`를 게임·컴포넌트·Editor API에 노출하는 대체 SDK가 아니다.
    CreatorEngine의 backend-neutral 계약 뒤에 숨은 **첫 구현체**다.
-3. `SoundComponent`는 `AudioClipId`와 generation이 있는 `AudioVoiceHandle`만 보유한다.
+3. `SoundComponent`는 GUID clip/preset/graph 참조와 generation이 있는 논리 `PlaybackHandle`을 보유한다. 하나의 재생 인스턴스가 하나 이상의 내부 `VoiceHandle`을 소유한다.
    `FMOD::Channel*`, `ma_sound*`, `void* ownerTag`는 공개·직렬화·managed 경계를 넘지 않는다.
 4. 오디오 서비스는 Runtime Host가 소유한다. 새 process-global registry나 새 singleton을 만들지 않는다.
    기존 `SoundManager` singleton은 이행 façade로만 쓰고 AU7에서 소비자를 옮긴 뒤 은퇴한다.
@@ -90,7 +90,7 @@
 직접 의존은 SceneRuntime의 SoundManager/SoundComponent, Editor Inspector, Editor/Player 프로젝트와
 build/stage 경로에 집중되어 있다. `FMOD::Studio`, `.bank`, EventDescription/EventInstance 소비자는
 발견되지 않았다. 따라서 middleware
-authoring workflow를 재현하는 작업은 이 페이즈의 범위가 아니다.
+FMOD Studio 호환 authoring workflow는 범위가 아니다. 2026-10-05 합의로 CreatorEngine 고유 Sound Cue 수준 SoundGraph 저작·재생은 §12 범위에 포함한다.
 
 ### 1.2 포맷과 asset 경로의 현재 모순
 
@@ -489,7 +489,7 @@ AU5/AU9 -> PHASE 14 Audio profiler provider
 
 - AU0/AU1/AU3은 PHASE 22 정식 착수 전에 독립 slice로 진행할 수 있다.
 - AU2는 PHASE 17의 `.meta`/cooked manifest 정본을 복제하지 않고 소비한다.
-- AU3은 사용자가 앞서 정한 **기능 수집 후 코드 작성, 아직 제품 배선 없음**의 경계다.
+- AU3의 과거 미배선 경계는 2026-10-05 구현 승인으로 해제했다. AU7 제품 이행과 AU8 FMOD 제거까지 진행한다.
 - AU7 전에는 기본 Editor/Player backend를 바꾸지 않는다.
 - `efsw`는 이 페이즈의 제거·교체 대상이 아니다. AudioRuntime에 watcher dependency를 추가하지 않는 것으로
   계층을 닫는다.
@@ -1002,3 +1002,79 @@ Debug·Release x64 AssetPacker 빌드와 `verify-audio-cooked-byte-source.ps1`
 수명을 고정한다. loose cooked tree reader는 여전히 경로 기반이며, 실제
 stream decode 작업자·취소·drain과 `Auto`의 cooked resident/stream 결정은
 후속 단계다.
+
+
+## 12. 2026-10-05 소비 설계 확정·클라우드 분리 검증·제품 이행
+
+### 12.1 승인된 범위와 두 소비 경로
+
+간단한 음원도 그래프를 만들어야 하는 설계는 채택하지 않는다. 다음 둘은 같은 수명·믹스 정책을 공유한다.
+
+1. **AudioClip / 선택적 SoundPreset 직접 재생**: GUID clip과 bus·gain·pitch·loop·spatial·attenuation·concurrency 기본값을 소비한다. Preset은 clip 또는 graph를 참조할 수 있다.
+2. **첫 클래스 SoundGraph**: `.soundgraph` 저작 에셋과 GUID `.meta`, 전용 편집·검증·미리듣기, immutable compile 결과와 cooked artifact를 갖춘다. Clip·Random·Switch·Layer·Gain/Pitch·Parameter·Output과 typed initial parameters가 첫 범위다.
+
+SoundGraph는 Sound Cue 수준의 재생 조합이다. oscillator, sample-DSP graph, sample-accurate trigger, MetaSound 호환, 여러 audible world의 독립 DSP mix와 split-listener는 이번 완료 주장에 포함하지 않는다. 기존 Lattice의 범용 canvas 기반만 재사용하며 Material IR이나 PR #119/#120 변경을 끌어오지 않는다.
+
+### 12.2 소비 계약과 수명
+
+- Scene 소유의 thin `SoundComponent`가 clip/preset/graph를 같은 `PlaybackRequest`로 낸다. component에는 backend 포인터가 없다.
+- Host가 AudioHost·PlaybackService·AudioCatalog를 소유하고 Scene마다 SoundSystem 등록부와 World scope를 바인딩한다. 새 process-global singleton은 추가하지 않는다.
+- `Play2D`, `PlayAt`, `PlayAttached`는 world/session/editor-preview scope를 명시한다. BGM의 scene 간 지속은 명시적 Session scope로만 요청한다.
+- 공개 `PlaybackHandle(index,generation)`은 **Play 요청 한 번**을 가리킨다. `PlaybackInstance`가 자식 VoiceHandle들을 소유한다. emitter 기본 재생 handle과 fire-and-forget one-shot은 분리한다.
+- graph 정의/프로그램은 공유 immutable data이고 random seed·typed parameter·선택된 branch·자식 voice는 인스턴스별 상태다. graph compile은 clip 누락, 순환, 출력, pin/parameter 타입, 최대 voice 수를 검증한다.
+- owner 파괴 기본값은 전체 child stop. 명시적 DetachAndFinish는 현재 위치에서 loop를 끄고 scope 안에서 tail을 마친다. Scene 종료는 detached tail도 정리한다. managed GC는 voice 수명의 소유자가 아니다.
+- scope 종료·slot 재사용은 generation을 바꾼다. scene/session이 끝난 핸들은 다음 세션의 재생을 건드리지 못한다. generation overflow slot은 재사용하지 않는다.
+- play별 stop/pause/resume/gain/pitch/state/typed parameter를 제공한다. gain parameter 변경은 기존 playhead를 유지하고 Switch 변경은 바뀐 branch만 교체한다. random은 parameter 변경마다 재추첨하지 않는다.
+- owner/game thread가 자산·그래프를 평가한다. worker/Inspector 입력은 bounded value mailbox로 전달하고 완료/queued-play 결과는 game thread에서 가져간다. callback은 Entity/C#/파일 경로/게임 객체를 참조하지 않는다.
+- AudioListenerComponent는 Camera와 독립이다. v1은 하나의 audible world에서 explicit active listener 하나를 쓴다. legacy primary-camera fallback은 진단을 내며 이행 편의 경로임을 드러낸다.
+- Inspector와 C#의 변경은 다음 owner tick에 동일한 full-settings 경로로 살아 있는 재생에 반영한다.
+
+### 12.3 자산·마이그레이션·배포
+
+- 기존 `clipKey` serialized field는 읽되 GUID가 정본이다. legacy basename은 catalog에서 유일한 경우만 GUID로 이관하며 동명 충돌·미해결 참조는 오류로 막는다. 첫 파일 선택이나 다른 폴더로의 묵시적 retarget은 하지 않는다.
+- `sourceKind`, `soundPresetKey`, `soundGraphKey`로 소비 대상을 명시한다. graph/preset cook dependency는 scene/prefab 참조부터 추적한다. cooked runtime은 원본 authoring path 대신 CEMF와 bounded byte source를 소비한다.
+- EditorAssetDatabase의 기존 파일 감시가 revision을 게시한 뒤 game thread에서 catalog를 갱신한다. 오디오 전용 폴링/detached loader thread는 없다.
+- bus는 Master/BGM/SFX/Player/Monster/UI와 named Room send를 공유한다. bus cap과 concurrency group cap은 다른 정책이다. 우선순위·steal·virtualization·attenuation·stream cancellation/drain은 저수준 Runtime/Backend가 책임진다.
+- `reverbIndex`는 legacy migration 입력이며 Room/Hall 같은 새 preset과 named send로 투영한다. 실제 wet/dry impulse gate 없이 청각적 품질을 검증했다고 표시하지 않는다.
+- SoundManager와 raw SDK 소비를 철거하고 제품 vcxproj·link·runtime deployment·regression probe에서 FMOD를 제거한다. ThirdParty/Fmod 헤더도 제거한다. runtime/배포/package gate는 FMOD DLL 및 miniaudio runtime DLL 유입을 거부하고 miniaudio license/provenance를 묶는다.
+
+### 12.4 분리 테스트의 경계
+
+검증은 사용자의 PC나 진행 중인 다른 PR 작업 공간에서 수행하지 않는다. 최신 master `86f7efd30314de4dd19e3dbb30da9f820506e3dd`를 고정한 클라우드 Linux 복사본에서 기준선을 만들고, 새 구현 branch의 실제 source로 다시 실행한다. 기존 PR #119/#120 충돌 작업은 대기 상태를 유지한다.
+
+기준선은 846개 distinct assertions(core 43, PCM decode 11, miniaudio Null-device 59, cook validation 20, CEAC/CEMF 670, cooked resident 43)를 통과했다. core/decode/Null 113개는 Debug·Release·ASan/UBSan으로 반복했다. 기준선의 Linux portability adaptation 사본 통과를 원본 또는 새 branch 통과로 바꿔 쓰지 않는다. LeakSanitizer는 executor ptrace 제약으로 실행 불가였고 성공한 ASan/UBSan 실행은 leak detection을 명시적으로 껐다.
+
+새 branch의 반복 가능한 gate는 repository의 portable script와 Windows wrapper로 제공한다. 수정 뒤 같은 gate를 다시 실행하고 명령·compiler·source hash·assertion counts·실패 canary·관찰치를 보존한다. 핵심 항목은 다음과 같다.
+
+- 실제 vendored decoder WAV/MP3/FLAC, 손상·tail truncation·unsupported format
+- GUID/cooked bounds·digest·잘못된 참조, 동일 basename 충돌
+- VoiceHandle/PlaybackHandle/scope generation, owner/detach/session/preview cleanup
+- graph validate/typed params/random independence/layer/branch 변경, one-shot 분리
+- bus/group caps·steal·virtualization·playhead, bounded queue/shutdown
+- no-device PCM rendering, stream EOF/loop/seek/cancel/drain, reverb dry/wet impulse
+- bounded repeated lifecycle/soak와 generation/missing-clip 방어를 깨는 negative canary
+
+**장치가 없는 결과를 device pass로 세지 않는다.** 클라우드 `/dev/snd`가 없으므로 Null backend·miniaudio Null/no-device mixer·offline decoder만 실행 가능하다. Windows WASAPI 실제 출력, default-device/loss 20회, Editor Play 100회 실 UI, Windows MSVC Editor/Player 전체 build, 실제 pak/package smoke, PE import 폐쇄와 30분 hardware stream·callback p99/제품 CPU budget은 별도 **PENDING**이다. 짧은 Linux soak나 파일 decode 시간으로 이를 대체하지 않는다.
+
+### 12.5 v1의 명시적 경계
+
+- CEAC v1은 **클립 전체 loop**를 지원한다. 이 포맷에 저장되지 않는 `loopStartFrame` / `loopEndFrame`을 입력하면 Editor·catalog·cook 모두 오류를 낸다. 부분 loop 구간을 조용히 버리지 않는다.
+- 기존 scene/prefab의 legacy basename은 cook에서 SoundComponent identity를 확인한 뒤 유일한 GUID로 이관한다. Player에서 스크립트가 새로 전달하는 동적 basename은 지원하지 않는다. 스크립트는 `AudioAssetId` 또는 GUID를 사용하며, 잘못된 값은 실패 진단을 확인한다.
+- SoundGraph v1 편집기는 typed property/입력 연결 picker와 topology overview를 제공한다. 범용 Lattice/Material IR 변환 계층을 만들지 않았으며 드래그 기반의 완성형 DSP canvas·sample-accurate graph가 아니다. overview는 64 node로 그리기 비용을 제한하지만 모든 node는 속성 편집에서 접근할 수 있다.
+- bus cap은 Physical 상태의 VoiceHandle 수, concurrency group cap은 해당 그룹의 전체 VoiceHandle 수를 센다. 하나의 layered PlaybackInstance가 여러 voice 예산을 쓸 수 있다. public PlaybackHandle과 backend source pair 수를 cap 단위로 혼동하지 않는다.
+- callback histogram·runtime update·active/physical/virtual·stolen/dropped/rejected·stream read byte/failure 관찰과 실제 underrun/decode CPU 측정은 구별한다. 이번 구현에서 직접 수집하지 않는 수치를 0으로 보고하지 않는다.
+- 장치 재개방 실패는 동일 graph/resource/voice를 유지한 degraded output에서 1/2/4/5초 retry로 처리한다. 초기 장치 개방만 실패한 경우도 같은 경로를 쓴다. graph/resource 초기화 실패는 true Null fallback이며, 이 경우도 알려진 길이의 one-shot은 host 시간으로 끝난다.
+
+### 12.6 구현과 acceptance 표시
+
+구현 착지와 제품 acceptance는 별개다. AU1~AU8 소스 구현/portable test가 진행되어도 Windows·hardware 조건이 남아 있으면 AU9와 PHASE 22 최종 완료를 표시하지 않는다. Draft PR에는 구현 목록, 실행한 테스트, 실패/미실행 항목을 분리해 적는다. 이 문서와 dashboard는 최신 branch 증거로 갱신하고 역사적 §11 측정은 보존한다.
+
+
+### 12.7 이번 구현의 검증 정산
+
+- 최종 클라우드 결과: **Debug / Release / ASan+UBSan 각각 3,825 / 3,825 단정 통과**. 구성 반복을 서로 다른 시나리오로 합산하지 않는다. 실제 파일·명령·수치·제외 항목은 [Phase22AudioCloudValidation](../analysis/Phase22AudioCloudValidation.md)에 기록했다.
+- 처음에는 새 출력 디렉터리에서 object 재사용 없이 각각 3,817 단정을 통과했다. 마지막 UTF-8 별칭 수정은 compiler `-MM`으로 영향받는 TU 하나를 증명하고 세 구성 모두 재컴파일·재링크했다(해당 cook 단정 30→38). [최종 source ledger](../../Tools/regression/audio/evidence/source-sha256.json)와 [dependency proof](../../Tools/regression/audio/evidence/targeted-recheck.json)가 코드 identity를 고정한다.
+- generation/missing-clip/graph-voice-bound negative canary 3개가 컴파일 후 단정 실패로 검출됐다. fixture 25개는 두 번 새로 생성한 결과가 바이트 단위로 같다. 실제 PCM에서 blend·distance·좌우 handedness·reverb dry/wet를 검사했다.
+- 별도 consumer gate는 실제 SoundComponent/SoundSystem/Listener/Playback/Graph와 추출한 native binding을 컴파일하되 Scene/Entity 의존은 stub이다. API 33의 native/managed table 187개 field와 audio binding 31개를 대조했다. C# 실행이나 실제 Windows Scene 통합 통과로 세지 않는다.
+- `verify-audio-retirement.py`는 source/project/deploy closure 1,732개 점검에서 실패 0. 새 Audio TU의 누락·중복 등록도 검사한다. `git diff --check`, 수정 project XML parsing, dashboard JavaScript syntax, miniaudio upstream blob 3종 대조도 통과했다.
+- 실제 장치가 없는 클라우드에서 동작한 세 경로(logical Null / miniaudio software device / no-device PCM)와 native Windows·하드웨어·실제 Pak·패키지·C# 제품·LeakSanitizer 미실행을 구분한다. **AU9 및 PHASE 22 최종 acceptance는 완료 처리하지 않는다.**

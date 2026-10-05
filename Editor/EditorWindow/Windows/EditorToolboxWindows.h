@@ -16,6 +16,7 @@
 namespace editor::windows
 {
     void draw_material_graph();
+    void draw_sound_graph();
     void draw_behavior_tree();       bool has_behavior_tree();
     void draw_black_board();         bool has_black_board();
     void draw_input_action_maps();   bool has_input_action_maps();
@@ -45,6 +46,10 @@ struct editor_authoring_windows
     {
         using namespace editor;
         return window_set(
+            panel<&windows::draw_sound_graph>("###Editor.SoundGraph", "Sound Graph / Preset")
+                .initial_size(820.0f, 700.0f)
+                .min_size(440.0f, 300.0f)
+                .open_by_default(false),
             panel<&windows::draw_material_graph>(EditorWindowName::kMaterialGraph, EditorWindowName::kMaterialGraphLabel)
                 .dock(dock_slot::center)
                 .initial_size(1100.0f, 720.0f)

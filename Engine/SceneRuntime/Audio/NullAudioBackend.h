@@ -28,15 +28,19 @@ namespace wave
         [[nodiscard]] bool Start(const DeviceSettings& settings) override;
         void Stop() override;
         [[nodiscard]] bool IsRunning() const override { return m_running; }
+        [[nodiscard]] bool IsOutputAvailable() const override { return false; }
 
         [[nodiscard]] bool LoadClip(const ClipKey& key,
             const std::filesystem::path& source) override;
         [[nodiscard]] bool LoadCookedClip(const ClipKey& key,
             const experiment::cooked::CookedAudioClipSource& source) override;
+        [[nodiscard]] BackendClipId RetainClip(const ClipKey& key) override;
+        void ReleaseClip(BackendClipId clip) override;
         void UnloadClip(const ClipKey& key) override;
         [[nodiscard]] bool HasClip(const ClipKey& key) const override;
 
         [[nodiscard]] BackendVoiceId StartVoice(const PlayRequest& request) override;
+        [[nodiscard]] BackendVoiceId StartVoice(const PlayRequest& request, BackendClipId clip) override;
         void StopVoice(BackendVoiceId voice) override;
         void SetVoicePaused(BackendVoiceId voice, bool paused) override;
         [[nodiscard]] bool IsVoicePlaying(BackendVoiceId voice) const override;
@@ -46,10 +50,17 @@ namespace wave
         void SetVoiceTransform(BackendVoiceId voice,
             const math::vector3& position, const math::vector3& velocity) override;
 
+        void SetVoiceSettings(BackendVoiceId voice, const PlayRequest& request) override;
+        void SetVoiceLooping(BackendVoiceId voice, bool loop) override;
+        [[nodiscard]] bool SeekVoice(BackendVoiceId voice, std::uint64_t frame) override;
+        [[nodiscard]] std::uint64_t VoicePlayhead(BackendVoiceId voice) const override;
+        [[nodiscard]] ClipInfo GetClipInfo(const ClipKey& key) const override;
+        void SetReverbPreset(ReverbPreset preset) override { m_reverbPreset = preset; }
         void SetBusVolume(BusId bus, float linearGain) override;
         void SetListener(const ListenerState& listener) override;
 
         void Update() override;
+        void Advance(float deltaSeconds) override;
 
         // ── 판정용 관찰 창구 ──────────────────────────────────────────────
         //
@@ -79,6 +90,10 @@ namespace wave
             float pitch{ 1.0f };
             math::vector3 position{ 0.0f, 0.0f, 0.0f };
             math::vector3 velocity{ 0.0f, 0.0f, 0.0f };
+            bool loop{ false };
+            double playhead{ 0.0 };
+            ClipInfo info{};
+            bool active{ false };
             bool paused{ false };
             bool playing{ false };
         };
@@ -91,10 +106,15 @@ namespace wave
         ListenerState m_listener{};
 
         std::unordered_set<ClipKey> m_clips;
+        std::unordered_map<ClipKey, ClipInfo> m_clipInfo;
+        std::unordered_map<std::uint64_t, ClipInfo> m_clipLeases;
+        std::uint64_t m_nextClipLease{ 1u };
+        ReverbPreset m_reverbPreset{ ReverbPreset::Room };
         std::unordered_map<std::uint16_t, float> m_busVolumes;
 
         // id 는 1부터 매긴다 — 0 은 언제나 무효다.
         std::deque<Voice> m_voices;
+        std::vector<std::size_t> m_freeVoices;
         std::size_t m_startAttempts{ 0 };
     };
 }

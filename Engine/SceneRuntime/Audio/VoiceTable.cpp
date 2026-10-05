@@ -2,18 +2,6 @@
 
 namespace wave
 {
-    namespace
-    {
-        // 세대는 0 을 건너뛴다 — 값 초기화한 핸들(generation 0)이 유효해 보이면 안 된다.
-        [[nodiscard]] std::uint32_t NextGeneration(
-            std::uint32_t current, std::uint32_t generationNamespace) noexcept
-        {
-            std::uint32_t sequence = ((current & 0x7FFFFFFFu) + 1u) & 0x7FFFFFFFu;
-            if (0u == sequence) sequence = 1u;
-            return generationNamespace | sequence;
-        }
-    }
-
     VoiceTable::VoiceTable(std::size_t capacity, std::uint32_t generationNamespace)
         : m_generationNamespace(generationNamespace & 0x80000000u)
     {
@@ -26,7 +14,10 @@ namespace wave
 
     VoiceHandle VoiceTable::Acquire(const PlayRequest& request, std::uint64_t frame)
     {
-        if (m_freeSlots.empty()) return VoiceHandle{};
+        if (m_freeSlots.empty())
+        {
+            return VoiceHandle{};
+        }
 
         const std::uint32_t index = m_freeSlots.front();
         m_freeSlots.pop_front();
@@ -35,6 +26,7 @@ namespace wave
         slot.generation = NextGeneration(slot.generation, m_generationNamespace);
 
         slot.record = VoiceRecord{};
+        slot.record.request = request;
         slot.record.clip = request.clip;
         slot.record.bus = request.bus;
         slot.record.ownerId = request.ownerId;
@@ -51,7 +43,10 @@ namespace wave
     bool VoiceTable::Release(VoiceHandle handle)
     {
         VoiceRecord* const record = Find(handle);
-        if (nullptr == record) return false;
+        if (nullptr == record)
+        {
+            return false;
+        }
 
         record->state = VoiceState::Free;
         record->backendVoice = BackendVoiceId{};
@@ -61,19 +56,37 @@ namespace wave
         // ★ 세대는 여기서 올리지 않는다. Acquire 가 올린다 — 슬롯이 실제로 다시
         //   쓰이는 순간이 세대가 바뀌어야 할 순간이다. 상태가 Free 인 것만으로
         //   낡은 핸들은 이미 거부된다.
-        m_freeSlots.push_back(handle.index);
-        if (m_aliveCount > 0) --m_aliveCount;
+        if ((handle.generation & 0x7FFFFFFFu) != 0x7FFFFFFFu)
+        {
+            m_freeSlots.push_back(handle.index);
+        }
+        if (m_aliveCount > 0)
+        {
+            --m_aliveCount;
+        }
         return true;
     }
 
     const VoiceTable::Slot* VoiceTable::ResolveSlot(VoiceHandle handle) const noexcept
     {
-        if (!handle.IsValid()) return nullptr;
-        if (handle.index >= m_slots.size()) return nullptr;
+        if (!handle.IsValid())
+        {
+            return nullptr;
+        }
+        if (handle.index >= m_slots.size())
+        {
+            return nullptr;
+        }
 
         const Slot& slot = m_slots[handle.index];
-        if (slot.generation != handle.generation) return nullptr;
-        if (VoiceState::Free == slot.record.state) return nullptr;
+        if (slot.generation != handle.generation)
+        {
+            return nullptr;
+        }
+        if (VoiceState::Free == slot.record.state)
+        {
+            return nullptr;
+        }
         return &slot;
     }
 
@@ -91,7 +104,10 @@ namespace wave
     const VoiceRecord* VoiceTable::Find(VoiceHandle handle) const noexcept
     {
         const Slot* const slot = ResolveSlot(handle);
-        if (nullptr == slot) return nullptr;
+        if (nullptr == slot)
+        {
+            return nullptr;
+        }
         return &slot->record;
     }
 }

@@ -23,7 +23,13 @@
 #include "SceneManager.h"
 // 시뮬레이션 프레임의 단일 소유자(E3-7) — Editor와 같은 순서를 탄다.
 #include "RuntimeFrame.h"
-#include "SoundManager.h"
+#include "Audio/AudioHost.h"
+#include "Audio/AudioProfileProvider.h"
+#include "Audio/MiniaudioBackend.h"
+#include "Audio/PlaybackService.h"
+#include "Audio/AudioCatalog.h"
+#include "Experiment/Cooked/CookedAssetCatalog.h"
+#include "Experiment/Cooked/CookedAudioClipSource.h"
 #include "TagManager.h"
 #include "TimeSystem.h"
 #include "UIManager.h"
@@ -124,6 +130,7 @@ Player::PlayerMain::~PlayerMain()
         EnhancedSceneRenderer::ShutdownLive();
         SceneManagers->SetRenderScene(nullptr);
     }
+    SceneManagers->BindAudioPlayback(nullptr);
     Core::TimeSystem::Destroy();
 }
 
@@ -207,13 +214,55 @@ void Player::PlayerMain::Initialize()
         startupBackend == EnhancedLiveBackend::Vulkan ? "vulkan" : "dx12", m_presentation->GetName(),
         startupBackend == EnhancedLiveBackend::Vulkan ? "cpu-readback-upload" : "shared-image");
 
-	Sound->initialize(128);
+	#if CE_SHIPPING
+    constexpr bool profileAudioCallbacks = false;
+#else
+    constexpr bool profileAudioCallbacks = true;
+#endif
+    m_audioHost = std::make_unique<wave::AudioHost>(std::make_unique<wave::MiniaudioBackend>(profileAudioCallbacks), 128u);
+    if (!m_audioHost->Start({}))
+    {
+        throw std::runtime_error("Audio runtime initialization failed");
+    }
+    if (m_audioHost->Mode() == wave::AudioHostMode::Null)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.runtime.null] Audio graph initialization failed; silent logical runtime active");
+    }
+    else if (m_audioHost->Mode() == wave::AudioHostMode::DegradedDevice)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[audio.device.degraded] Output device unavailable; graph retained and output recovery will retry");
+    }
+    m_audioPlayback = std::make_unique<wave::PlaybackService>(*m_audioHost->Service());
+    m_audioCatalog = std::make_unique<wave::AudioCatalog>(*m_audioHost->Service(), *m_audioPlayback);
+    SceneManagers->BindAudioPlayback(m_audioPlayback.get(), [this](std::string_view key)
+    {
+        std::string error;
+        const auto resolved = m_audioCatalog->ResolveLegacyClip(key, error);
+        Uuid::Uuid16 guid;
+        if (!Uuid::TryParse(resolved, guid))
+        {
+            if (!key.empty())
+            {
+                Debug::PrintLog(spdlog::level::err, "[audio.clip.resolve] " + error);
+            }
+            return wave::ClipKey{};
+        }
+        return wave::ClipKey::FromGuid(guid);
+    });
 	DataSystems->Initialize();
+    if (const auto catalog = DataSystems->GetCookedCatalog())
+    {
+        std::string error;
+        auto bytes = std::make_shared<experiment::cooked::LooseArtifactByteSource>(catalog->DerivedRoot());
+        if (!m_audioCatalog->LoadCookedAssets(*catalog, std::move(bytes), error))
+        {
+            throw std::runtime_error("Cooked audio catalog failed: " + error);
+        }
+    }
 	SceneManagers->CreateScene();
 
     m_inputEventHandle = InputEvent.AddLambda([](float) {
 		UIManagers->Update();
-		Sound->update();
 	});
 
 	SceneManagers->ManagerInitialize();
@@ -527,6 +576,10 @@ void Player::PlayerMain::Finalize()
     }
 
 	TagManagers->Finalize();
+    SceneManagers->BindAudioPlayback(nullptr);
+    m_audioPlayback->Shutdown();
+    m_audioCatalog->Clear();
+    m_audioHost->Shutdown();
 	SceneManagers->Decommissioning();
     m_projectLayers.reset();
 
@@ -593,6 +646,9 @@ void Player::PlayerMain::Update()
 	CoroutineManagers->yield_OnRender();
 	SceneManagers->DisableOrEnable();
 	SceneManagers->EndOfFrame();
+    m_audioHost->Update(static_cast<float>(m_frameDeltaTime));
+    m_audioPlayback->Update();
+    wave::PublishAudioProfile(*m_audioHost, *m_audioPlayback);
 
 #if !CE_SHIPPING
     // Close the same engine frame used by runtime counter and CPU span producers.

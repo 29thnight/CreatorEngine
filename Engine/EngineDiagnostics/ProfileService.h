@@ -463,7 +463,7 @@ namespace ce
         std::atomic<recorder_state> m_state{ recorder_state::stopped };
         std::atomic<counter_mask> m_counterMask{
             counter_bit(counter_category::process) | counter_bit(counter_category::gpu) |
-            counter_bit(counter_category::render) | counter_bit(counter_category::managed) | counter_bit(counter_category::physics) };
+            counter_bit(counter_category::render) | counter_bit(counter_category::managed) | counter_bit(counter_category::physics) | counter_bit(counter_category::audio) };
         std::atomic<std::uint64_t> m_latestVramUsed{ 0 };
         std::atomic<std::uint64_t> m_latestVramBudget{ 0 };
         std::atomic<std::uint32_t>  m_engineFrame{ 0 };

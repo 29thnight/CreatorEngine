@@ -520,6 +520,73 @@ namespace editor::profiler_view
         ImGui::Text("Latest: tick %llu / frame %u / %.2f %s", static_cast<unsigned long long>(latest.tick), latest.frame, latest.value, descriptor->unit.c_str());
     }
 
+    void draw_audio_telemetry()
+    {
+        const auto* capture = reader().capture();
+        if (!capture)
+        {
+            ImGui::TextDisabled("Record a capture with Audio counters enabled.");
+            return;
+        }
+        ImGui::TextWrapped("Audio counters are sampled on the game thread. Missing callback values mean unavailable, not zero. Output mode: 0 stopped, 1 device, 2 Null, 3 degraded/retrying, 4 offline. Null/offline output does not prove hardware playback or latency.");
+        if (ImGui::BeginTable("##AudioCounters", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Metric");
+            ImGui::TableSetupColumn("Latest");
+            ImGui::TableSetupColumn("Maximum");
+            ImGui::TableSetupColumn("Unit");
+            ImGui::TableHeadersRow();
+            for (const auto& descriptor : capture->counter_descriptors())
+            {
+                if (descriptor.category != ce::counter_category::audio)
+                {
+                    continue;
+                }
+                std::optional<double> latest;
+                double maximum = 0.0;
+                for (const auto& frame : capture->frames())
+                {
+                    if (frame.engine_frame < reader().selected_first() || frame.engine_frame > reader().selected_last())
+                    {
+                        continue;
+                    }
+                    for (const auto& sample : frame.counters)
+                    {
+                        if (sample.id == descriptor.id)
+                        {
+                            latest = sample.value;
+                            maximum = (std::max)(maximum, sample.value);
+                        }
+                    }
+                }
+                ImGui::TableNextRow();
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(descriptor.name.c_str());
+                ImGui::TableNextColumn();
+                if (latest)
+                {
+                    ImGui::Text("%.3f", *latest);
+                }
+                else
+                {
+                    ImGui::TextDisabled("Unavailable");
+                }
+                ImGui::TableNextColumn();
+                if (latest)
+                {
+                    ImGui::Text("%.3f", maximum);
+                }
+                else
+                {
+                    ImGui::TextDisabled("Unavailable");
+                }
+                ImGui::TableNextColumn();
+                ImGui::TextUnformatted(descriptor.unit.c_str());
+            }
+            ImGui::EndTable();
+        }
+    }
+
 	void draw_telemetry_dashboard()
 	{
 		const ce::capture_session* capture = reader().capture();

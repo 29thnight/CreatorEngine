@@ -1310,7 +1310,7 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         if (ctx.parts.size() != 1 && ctx.parts.size() != 3)
-            return InvalidArguments("profile.counter-mask [process|gpu|network|render|managed|resources on|off]");
+            return InvalidArguments("profile.counter-mask [process|gpu|network|render|managed|resources|audio on|off]");
         auto& service = ce::profiler();
         if (ctx.parts.size() == 3)
         {
@@ -1322,6 +1322,7 @@ namespace ConsoleCmd
             else if (name == "render") category = ce::counter_category::render;
             else if (name == "managed") category = ce::counter_category::managed;
             else if (name == "resources") category = ce::counter_category::resources;
+            else if (name == "audio") category = ce::counter_category::audio;
             else return InvalidArguments("unknown counter category");
             if (ctx.parts[2] != "on" && ctx.parts[2] != "off")
                 return InvalidArguments("counter category state must be on or off");

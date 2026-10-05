@@ -39,7 +39,7 @@ public:
 private:
 	using Scope = editor::windows::content_browser_scope;
 	/// 이름을 받아 만드는 것. 폴더 만들기와 Scene Render Profile 이 같은 대화상자를 쓴다.
-	enum class CreateKind : std::uint8_t { folder, render_profile };
+	enum class CreateKind : std::uint8_t { folder, render_profile, SoundGraph, SoundPreset };
 
 	/// PHASE 21 W2-B — 이력의 한 칸은 **경로가 아니라 방문**이다.
 	///

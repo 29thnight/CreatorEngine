@@ -1,3 +1,4 @@
+#include <atomic>
 #include "CollisionGeometryAuthoring.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ProjectLayerSettingsCodec.h"
@@ -614,6 +615,11 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 		// still alive, then let the rest of Impl be released.
 		m_watcher.reset();
 	}
+
+    std::uint64_t AudioRevision() const noexcept
+    {
+        return m_audioRevision.load(std::memory_order_acquire);
+    }
 
 	bool IsSupportExtension(std::string_view extension) const
 	{
@@ -1358,6 +1364,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 			default:
 				break;
 			}
+            if (IsAudioAssetPath(filepath) || IsAudioAssetPath(directoryPath / oldFilename))
+            {
+                m_audioRevision.fetch_add(1u, std::memory_order_release);
+            }
 		}
 		catch (const std::exception& exception)
 		{
@@ -1527,6 +1537,16 @@ private:
 		return lower.find(".tmp") != std::string::npos ||
 			lower.find("~$") != std::string::npos;
 	}
+
+    bool IsAudioAssetPath(file::path path) const
+    {
+        if (path.extension() == ".meta")
+        {
+            path.replace_extension();
+        }
+        const auto extension = ToLower(path.extension().string());
+        return assets::IsAudioClipSource(path) || extension == ".soundgraph" || extension == ".soundpreset";
+    }
 
     bool IsCookedArtifactPath(const file::path& path) const
     {
@@ -1783,9 +1803,22 @@ private:
 		std::string audioSpatialKind = "NonSpatial";
 		if (audioSource)
 		{
+            if (root.Read().HasChild("loopStartFrame") || root.Read().HasChild("loopEndFrame"))
+            {
+                Debug::PrintLog(spdlog::level::err,
+                    "Audio .meta loop markers are unsupported by CEAC v1: " + metaPath.string());
+                return {};
+            }
 			const Authoring::ReadNode prior = root.Read()["audioClip"];
 			if (prior)
 			{
+                if (prior.HasChild("loopStartFrame") || prior.HasChild("loopEndFrame")
+                    || root.Read().HasChild("loopStartFrame") || root.Read().HasChild("loopEndFrame"))
+                {
+                    Debug::PrintLog(spdlog::level::err,
+                        "Audio .meta loop markers require a newer CEAC schema; only whole-clip looping is supported: " + metaPath.string());
+                    return {};
+                }
 				if (!prior.IsMap() || prior["schemaVersion"].As(0u)
 					!= assets::kAudioClipMetaSchemaVersion
 					|| !prior["loadMode"].IsScalar()
@@ -1865,6 +1898,10 @@ private:
 
 		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
 			RuntimeAssetType::Auto, guid, targetFile });
+        if (IsAudioAssetPath(targetFile))
+        {
+            m_audioRevision.fetch_add(1u, std::memory_order_release);
+        }
 		return guid;
 	}
 
@@ -2012,6 +2049,13 @@ private:
 			ReloadChangedModel(filepath);
 			return;
 		}
+        if (assets::IsAudioClipSource(filepath))
+        {
+            // Reinspect import metadata through the existing watcher event.
+            // Playback reload itself is deferred to the host's game thread.
+            (void)CreateMeta(filepath);
+            return;
+        }
 		// M5-C3a는 generation 계약이 이미 있는 ShaderMeta만 연다. HLSL include
 		// dependency와 다른 asset cache의 reload 정책은 같은 이벤트라는 이유로
 		// 추측해 넓히지 않는다.
@@ -2029,6 +2073,7 @@ private:
 			RuntimeAssetType::ShaderMeta, guid, filepath });
 	}
 
+    std::atomic<std::uint64_t> m_audioRevision{ 1u };
 	file::path m_root;
 	std::mutex m_authoringMutex;
 	std::map<file::path, std::array<ModelSourceStamp, 3>> m_failedModelRecovery;
@@ -2039,7 +2084,7 @@ private:
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
 		".hlsl", ".slang", ".shadermeta", ".shader", ".cpp", ".cs",
-		".wav", ".mp3", ".flac", ".spritefont",
+		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont",
 		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
 		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity
@@ -2390,4 +2435,9 @@ bool EditorAssetDatabase::ReplaceCollisionGeometry(const file::path& destination
     const ce::physics::CollisionGeometrySource& replacement)
 {
     return m_impl && m_impl->ReplaceCollisionGeometry(destination, expected, replacement);
+}
+
+std::uint64_t EditorAssetDatabase::AudioRevision() const noexcept
+{
+    return m_impl ? m_impl->AudioRevision() : 0u;
 }

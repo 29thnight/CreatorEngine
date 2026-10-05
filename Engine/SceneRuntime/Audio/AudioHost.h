@@ -12,6 +12,21 @@ namespace wave
         Stopped,
         Device,
         Null,
+        DegradedDevice,
+        Offline,
+    };
+
+    struct AudioHostCounters final
+    {
+        VoiceMetrics voices;
+        std::uint64_t runtimeUpdateNanoseconds{};
+        std::uint64_t callbackCount{};
+        std::uint64_t callbackP99Nanoseconds{};
+        std::uint64_t callbackMaxNanoseconds{};
+        std::uint64_t callbackOverHalfPeriod{};
+        std::uint64_t streamBytesRead{};
+        std::uint64_t streamReadFailures{};
+        bool backendCountersAvailable{};
     };
 
     // Host-owned audio lifetime. A failed device start is stopped before the
@@ -34,7 +49,8 @@ namespace wave
 
         [[nodiscard]] AudioService* Service() noexcept { return m_active; }
         [[nodiscard]] const AudioService* Service() const noexcept { return m_active; }
-        [[nodiscard]] AudioHostMode Mode() const noexcept { return m_mode; }
+        [[nodiscard]] AudioHostMode Mode() const noexcept;
+        [[nodiscard]] AudioHostCounters Counters() const;
 
     private:
         std::unique_ptr<AudioBackend> m_deviceBackend;
@@ -43,5 +59,6 @@ namespace wave
         std::unique_ptr<AudioRuntime> m_nullRuntime;
         AudioRuntime* m_active{ nullptr };
         AudioHostMode m_mode{ AudioHostMode::Stopped };
+        std::uint64_t m_updateNanoseconds{};
     };
 }

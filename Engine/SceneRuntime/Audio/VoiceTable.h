@@ -16,12 +16,14 @@ namespace wave
     //   정책(cap · steal · 가상화)이 백엔드 구현과 무관해진다.
     struct VoiceRecord final
     {
+        PlayRequest request;
         ClipKey clip;
         BusId bus{};
         std::uint64_t ownerId{ 0 };
 
         // 백엔드가 자기 자원을 되찾는 데 쓰는 불투명 값. 상위 계층은 역참조하지 않는다.
         BackendVoiceId backendVoice{};
+        BackendClipId backendClip{};
 
         int priority{ 128 };
         bool loop{ false };
@@ -36,8 +38,15 @@ namespace wave
         // 정책이 비교에 쓰는 이득. 백엔드의 가청도(getAudibility)에 의존하지 않는다.
         float baseGain{ 1.0f };
         float attenuationGain{ 1.0f };
+        float userGain{ 1.0f };
+        float busGain{ 1.0f };
+        double playheadFrame{ 0.0 };
+        ClipInfo clipInfo{};
+        bool paused{ false };
+        bool transformDirty{ false };
+        bool settingsDirty{ false };
 
-        [[nodiscard]] float EffectiveGain() const noexcept { return baseGain * attenuationGain; }
+        [[nodiscard]] float EffectiveGain() const noexcept { return baseGain * userGain * attenuationGain * busGain; }
     };
 
     // 고정 용량 슬롯 표. 세대가 붙은 핸들을 발급하고, 낡은 핸들을 거부한다.
@@ -48,6 +57,18 @@ namespace wave
     {
     public:
         explicit VoiceTable(std::size_t capacity, std::uint32_t generationNamespace = 0u);
+
+        // Exhausted slots retire rather than making an ancient handle valid again.
+        [[nodiscard]] static constexpr std::uint32_t NextGeneration(
+            std::uint32_t current, std::uint32_t generationNamespace) noexcept
+        {
+            const std::uint32_t sequence = current & 0x7FFFFFFFu;
+            if (sequence == 0x7FFFFFFFu)
+            {
+                return 0u;
+            }
+            return (generationNamespace & 0x80000000u) | (sequence + 1u);
+        }
 
         // 빈 슬롯을 하나 잡아 기록을 채우고 핸들을 준다. 자리가 없으면 무효 핸들.
         //
@@ -74,10 +95,27 @@ namespace wave
             for (std::size_t index = 0; index < m_slots.size(); ++index)
             {
                 Slot& slot = m_slots[index];
-                if (VoiceState::Free == slot.record.state) continue;
+                if (VoiceState::Free == slot.record.state)
+                {
+                    continue;
+                }
 
                 const VoiceHandle handle{ static_cast<std::uint32_t>(index), slot.generation };
                 visitor(handle, slot.record);
+            }
+        }
+
+        template <typename Visitor>
+        void ForEachAlive(Visitor&& visitor) const
+        {
+            for (std::size_t index = 0; index < m_slots.size(); ++index)
+            {
+                const Slot& slot = m_slots[index];
+                if (VoiceState::Free == slot.record.state)
+                {
+                    continue;
+                }
+                visitor(VoiceHandle{ static_cast<std::uint32_t>(index), slot.generation }, slot.record);
             }
         }
 

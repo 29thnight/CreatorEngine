@@ -11,6 +11,7 @@
 #include "DetachedEntityTransfer.h"
 #include "ScenePhase.h"
 #include "SimulationSessionPolicy.h"
+#include "SoundSystem.h"
 #include <future>
 #include <memory>
 #include <thread>
@@ -49,6 +50,12 @@ public:
 
     // Hosts configure this before requesting Play. Player skips authoring serialization/restoration.
     bool ConfigureSimulationSession(SimulationSessionPolicy::mode policy);
+    void BindAudioPlayback(wave::PlaybackService* playback, SoundSystem::AssetResolver resolver = {});
+    [[nodiscard]] wave::PlaybackService* AudioPlayback() const noexcept { return m_audioPlayback; }
+    [[nodiscard]] const SoundSystem::AssetResolver& AudioResolver() const noexcept { return m_audioResolver; }
+    [[nodiscard]] wave::PlaybackScope AudioSessionScope() const noexcept { return m_audioSession; }
+    void RefreshAudioClipKeys();
+    void SynchronizeAudioWorld();
     bool BindProjectLayerSettings(const std::shared_ptr<ProjectLayerSettings>& settings);
     std::shared_ptr<ProjectLayerSettings> ProjectLayers() const { return m_projectLayers.lock(); }
 
@@ -209,6 +216,9 @@ public:
 
     InputActionManager*                 m_inputActionManager{ nullptr };
 private:
+    wave::PlaybackService* m_audioPlayback{};
+    SoundSystem::AssetResolver m_audioResolver;
+    wave::PlaybackScope m_audioSession;
     struct PendingSceneLoad;
     std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate);
     void CompleteSceneLoads(bool wait);

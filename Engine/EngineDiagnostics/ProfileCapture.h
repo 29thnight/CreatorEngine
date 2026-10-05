@@ -94,7 +94,7 @@ namespace ce
     enum class counter_category : std::uint32_t
     {
         process = 1u << 0, gpu = 1u << 1, network = 1u << 2,
-        render = 1u << 3, managed = 1u << 4, resources = 1u << 5, physics = 1u << 6,
+        render = 1u << 3, managed = 1u << 4, resources = 1u << 5, physics = 1u << 6, audio = 1u << 7,
     };
     using counter_mask = std::uint32_t;
     constexpr counter_mask counter_bit(counter_category category)

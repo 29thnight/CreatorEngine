@@ -217,16 +217,6 @@ foreach ($current in $configurations) {
     if (-not (Test-Path -LiteralPath (Join-Path $hostLibDir 'nethost.lib') -PathType Leaf)) {
         throw "고정된 nethost.lib 가 없다: $hostLibDir"
     }
-    # ★ FMOD 도 같은 이유로 필요하다 — `SceneRuntime` 의 `SoundManager` 가 건다.
-    #   구성별 이름이 다르다(Debug 는 로깅판 `fmodL_vc`), exe 프로젝트들이 쓰는
-    #   것과 같은 이름을 그대로 쓴다.
-    $fmodLibDir = Join-Path $repoRoot 'ThirdParty\Fmod\lib\x64'
-    $fmodLibName = if ($current -eq 'Debug') { 'fmodL_vc.lib' } else { 'fmod_vc.lib' }
-    $fmodLib = Join-Path $fmodLibDir $fmodLibName
-    if (-not (Test-Path -LiteralPath $fmodLib -PathType Leaf)) {
-        throw "FMOD 라이브러리가 없다: $fmodLib"
-    }
-    $libArguments += '"' + $fmodLib + '"'
     Write-Host ("[EXPERIMENT CONTRACT] {0} 링크" -f $current)
     $linkCommand = 'call "' + $vcvars + '" >nul && link.exe /nologo /OUT:"' +
         $executable + '" /LIBPATH:"' + $hostLibDir + '" ' +
