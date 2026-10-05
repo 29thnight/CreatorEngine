@@ -56,7 +56,9 @@ struct EnhancedPbrCapture
         if (!resources.CreateReadback(width, height, RHIFormat::RGBA16Float, 1, readback, error))
             return false;
         stages.push_back({ "hdr-" + std::to_string(stages.size()) + "-" + node.name, readback });
-        graph.AddPass("PBR.Stage." + node.name, { { handle, RHIResourceState::CopySource } },
+        graph.AddPass("PBR.Stage." + node.name, { { handle, RHIResourceState::CopySource,
+                graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder
+                    ? RGAccessMode::Read : RGAccessMode::LegacyState } },
             [handle, readback](const EnhancedRenderGraph::ExecuteContext& context)
             { context.encoder->CopyToReadback(readback, context.ResolveHandle(handle)); }, true);
         return true;
@@ -340,10 +342,16 @@ struct EnhancedPbrCapture
         auto root = manifest.rootref();
         auto node = root["compiledGraph"];
         node |= ryml::MAP;
-        node["schemaVersion"] << 1;
-        node["orderContract"] << "legacy-declaration-order";
-        node["accessContract"] << "inferred-from-state";
-        node["versionsSupported"] << false;
+        node["schemaVersion"] << 2;
+        node["generation"] << snapshot.generation;
+        node["graphEpoch"] << snapshot.graphEpoch;
+        node["dependencyHash"] << snapshot.dependencyHash;
+        node["orderContract"] << (snapshot.scheduling == RGSchedulingMode::DeclarationOrder
+            ? "legacy-declaration-order" : snapshot.orderPolicy == RGOrderPolicy::DependencyOrder
+                ? "dependency-order" : "preserve-declaration-order");
+        node["accessContract"] << (snapshot.scheduling == RGSchedulingMode::DeclarationOrder
+            ? "inferred-from-state" : "explicit-access");
+        node["versionsSupported"] << (snapshot.scheduling == RGSchedulingMode::ExplicitVersioned);
         node["reachabilityEdges"] |= ryml::SEQ;
         for (const auto& edge : snapshot.reachabilityEdges)
         {
@@ -352,6 +360,27 @@ struct EnhancedPbrCapture
             item["producer"] << edge.producer;
             item["consumer"] << edge.consumer;
             item["resource"] << edge.resource;
+        }
+        node["versionEdges"] |= ryml::SEQ;
+        for (const auto& edge : snapshot.versionEdges)
+        {
+            auto item = node["versionEdges"].append_child();
+            item |= ryml::MAP;
+            item["producer"] << edge.producer;
+            item["consumer"] << edge.consumer;
+            item["resource"] << edge.resource;
+            item["version"] << edge.version;
+            item["reason"] << static_cast<uint32_t>(edge.reason);
+        }
+        node["dependencyWaves"] |= ryml::SEQ;
+        for (const auto wave : snapshot.dependencyWaves)
+        {
+            node["dependencyWaves"].append_child() << wave;
+        }
+        node["criticalPath"] |= ryml::SEQ;
+        for (const auto index : snapshot.criticalPath)
+        {
+            node["criticalPath"].append_child() << index;
         }
         node["executeOrder"] |= ryml::SEQ;
         for (auto index : snapshot.executeOrder) node["executeOrder"].append_child() << index;
@@ -368,6 +397,9 @@ struct EnhancedPbrCapture
             entry["used"] << resource.used;
             entry["firstUse"] << resource.firstUse;
             entry["lastUse"] << resource.lastUse;
+            entry["versionCount"] << resource.versionCount;
+            entry["initialState"] << static_cast<uint32_t>(resource.initialState);
+            entry["finalState"] << static_cast<uint32_t>(resource.finalState);
         }
         node["passes"] |= ryml::SEQ;
         for (const auto& pass : snapshot.passes)
@@ -389,6 +421,9 @@ struct EnhancedPbrCapture
                 item["resource"] << usage.resource;
                 item["state"] << static_cast<uint32_t>(usage.state);
                 item["inferredWrite"] << usage.inferredWrite;
+                item["access"] << static_cast<uint32_t>(usage.access);
+                item["version"] << usage.version;
+                item["kind"] << static_cast<uint32_t>(usage.kind);
             }
             entry["barriers"] |= ryml::SEQ;
             for (const auto& barrier : pass.barriers)
@@ -399,6 +434,7 @@ struct EnhancedPbrCapture
                 item["before"] << static_cast<uint32_t>(barrier.before);
                 item["after"] << static_cast<uint32_t>(barrier.after);
                 item["uav"] << barrier.uav;
+                item["afterPass"] << barrier.afterPass;
             }
         }
         root["measurement"] |= ryml::MAP;
@@ -472,7 +508,9 @@ struct EnhancedPbrCapture
                 return false;
             const auto readback = readbacks[i];
             graph.AddPass(std::string("PBR.Capture.") + slots[i],
-                { { handle, RHIResourceState::CopySource } },
+                { { handle, RHIResourceState::CopySource,
+                graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder
+                    ? RGAccessMode::Read : RGAccessMode::LegacyState } },
                 [handle, readback](const EnhancedRenderGraph::ExecuteContext& context)
                 { context.encoder->CopyToReadback(readback, context.ResolveHandle(handle)); }, true);
         }

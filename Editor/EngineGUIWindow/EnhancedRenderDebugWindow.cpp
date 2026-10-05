@@ -117,6 +117,184 @@ namespace EnhancedRenderDebugUi
 		ImGui::EndTable();
 		ImGui::TextColored(kDimColor, "Lengths are world units. Bias is along the light; steep = slope term at its cap.");
 	}
+
+    const char* GraphStateName(RHIResourceState state)
+    {
+        switch (state)
+        {
+        case RHIResourceState::Common: return "Common";
+        case RHIResourceState::RenderTarget: return "RenderTarget";
+        case RHIResourceState::DepthWrite: return "DepthWrite";
+        case RHIResourceState::DepthRead: return "DepthRead";
+        case RHIResourceState::ShaderResource: return "ShaderResource";
+        case RHIResourceState::PixelShaderResource: return "PixelShaderResource";
+        case RHIResourceState::DepthReadShaderResource: return "DepthReadShaderResource";
+        case RHIResourceState::UnorderedAccess: return "UnorderedAccess";
+        case RHIResourceState::CopySource: return "CopySource";
+        case RHIResourceState::CopyDest: return "CopyDest";
+        case RHIResourceState::IndexBuffer: return "IndexBuffer";
+        case RHIResourceState::IndirectArgument: return "IndirectArgument";
+        default: return "Unknown";
+        }
+    }
+
+    const char* GraphAccessName(RGAccessMode access)
+    {
+        switch (access)
+        {
+        case RGAccessMode::Read: return "Read";
+        case RGAccessMode::Write: return "Write";
+        case RGAccessMode::ReadWrite: return "Modify";
+        default: return "LegacyState";
+        }
+    }
+
+    const char* GraphEdgeReason(EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason reason)
+    {
+        using Reason = EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason;
+        switch (reason)
+        {
+        case Reason::RAW: return "RAW";
+        case Reason::WAR: return "WAR";
+        case Reason::WAW: return "WAW";
+        default: return "Unknown";
+        }
+    }
+
+    void DrawCompiledGraph(const EnhancedRenderGraph::DiagnosticSnapshot& snapshot,
+        const ImGuiTextFilter& filter)
+    {
+        const auto resourceName = [&snapshot](uint32_t index)
+        {
+            return index < snapshot.resources.size() ? snapshot.resources[index].name.c_str() : "Invalid resource";
+        };
+        if (!ImGui::BeginTabBar("CompiledGraphDetails"))
+        {
+            return;
+        }
+        if (ImGui::BeginTabItem("Passes"))
+        {
+            for (const auto& pass : snapshot.passes)
+            {
+                if (!filter.PassFilter(pass.name.c_str()))
+                {
+                    continue;
+                }
+                ImGui::PushID(static_cast<int>(pass.authoredIndex));
+                const int wave = pass.authoredIndex < snapshot.dependencyWaves.size()
+                    ? snapshot.dependencyWaves[pass.authoredIndex] : -1;
+                if (ImGui::TreeNode("Pass", "#%u %s | compiled %d | wave %d%s",
+                    pass.authoredIndex, pass.name.c_str(), pass.compiledIndex, wave,
+                    pass.culled ? " | culled" : ""))
+                {
+                    ImGui::Text("Side effect: %s | record cost %u | max slices %u",
+                        pass.sideEffect ? "yes" : "no", pass.recordCost, pass.maxSlices);
+                    for (const auto& usage : pass.usages)
+                    {
+                        ImGui::BulletText("%s r%u v%u %s | %s", GraphAccessName(usage.access),
+                            usage.resource, static_cast<unsigned int>(usage.version),
+                            resourceName(usage.resource), GraphStateName(usage.state));
+                    }
+                    if (!pass.barriers.empty())
+                    {
+                        ImGui::TextUnformatted("Pass barriers");
+                        for (const auto& barrier : pass.barriers)
+                        {
+                            ImGui::BulletText("%s r%u %s: %s -> %s%s",
+                                barrier.afterPass ? "After" : "Before", barrier.resource,
+                                resourceName(barrier.resource), GraphStateName(barrier.before),
+                                GraphStateName(barrier.after), barrier.uav ? " (UAV ordering)" : "");
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Resources"))
+        {
+            for (uint32_t index = 0; index < snapshot.resources.size(); ++index)
+            {
+                const auto& resource = snapshot.resources[index];
+                if (!filter.PassFilter(resource.name.c_str()))
+                {
+                    continue;
+                }
+                ImGui::PushID(static_cast<int>(index));
+                if (ImGui::TreeNode("Resource", "r%u %s | %s | %s%s", index, resource.name.c_str(),
+                    resource.buffer ? "buffer" : "texture", resource.imported ? "imported" : "transient",
+                    resource.used ? "" : " | unused"))
+                {
+                    ImGui::Text("Versions: %u | state %s -> %s", resource.versionCount,
+                        GraphStateName(resource.initialState), GraphStateName(resource.finalState));
+                    if (resource.used)
+                    {
+                        ImGui::Text("Compiled lifetime: %u to %u", resource.firstUse, resource.lastUse);
+                    }
+                    for (const auto& pass : snapshot.passes)
+                    {
+                        for (const auto& usage : pass.usages)
+                        {
+                            if (usage.resource == index)
+                            {
+                                ImGui::BulletText("v%u %s: #%u %s%s", static_cast<unsigned int>(usage.version),
+                                    GraphAccessName(usage.access), pass.authoredIndex, pass.name.c_str(),
+                                    pass.culled ? " (culled)" : "");
+                            }
+                        }
+                    }
+                    ImGui::TreePop();
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Dependencies"))
+        {
+            ImGui::TextUnformatted("Compiled submission order");
+            for (uint32_t index = 0; index < snapshot.executeOrder.size(); ++index)
+            {
+                const auto authored = snapshot.executeOrder[index];
+                if (authored < snapshot.passes.size())
+                {
+                    ImGui::Text("%u: #%u %s", index, static_cast<unsigned int>(authored),
+                        snapshot.passes[authored].name.c_str());
+                }
+            }
+            ImGui::Separator();
+            ImGui::TextUnformatted("Retained version edges");
+            for (const auto& edge : snapshot.versionEdges)
+            {
+                if (edge.producer >= snapshot.passes.size() || edge.consumer >= snapshot.passes.size())
+                {
+                    continue;
+                }
+                const auto& producer = snapshot.passes[edge.producer];
+                const auto& consumer = snapshot.passes[edge.consumer];
+                if (!filter.PassFilter(producer.name.c_str()) && !filter.PassFilter(consumer.name.c_str()) &&
+                    !filter.PassFilter(resourceName(edge.resource)))
+                {
+                    continue;
+                }
+                ImGui::BulletText("#%u %s -> r%u v%u %s [%s] -> #%u %s",
+                    edge.producer, producer.name.c_str(), edge.resource, static_cast<unsigned int>(edge.version),
+                    resourceName(edge.resource), GraphEdgeReason(edge.reason), edge.consumer, consumer.name.c_str());
+            }
+            ImGui::Separator();
+            ImGui::TextUnformatted("Critical path (pass count, not GPU duration)");
+            for (const auto authored : snapshot.criticalPath)
+            {
+                if (authored < snapshot.passes.size())
+                {
+                    ImGui::BulletText("#%u %s", static_cast<unsigned int>(authored),
+                        snapshot.passes[authored].name.c_str());
+                }
+            }
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
 }
 
 using namespace EnhancedRenderDebugUi;
@@ -416,14 +594,53 @@ void editor::OpenRenderLiveDiagnostics()
 
 void EnhancedRenderDebugWindow::Draw()
 {
-    ImGui::TextUnformatted("RenderPass - pipeline structure");
-    ImGui::TextWrapped("Compiled graph visualization is not available yet. Active pipeline declarations are shown below.");
-    if (ImGui::Button("Graphics settings")) editor::open_window(EditorWindowName::kProjectSettings);
+    ImGui::TextUnformatted("RenderPass - compiled graph");
+    constexpr const char* targets[]{"Scene", "Game", "Material Preview"};
+    if (ImGui::Combo("View", &m_graphTarget, targets, 3))
+    {
+        m_graphSnapshot.reset();
+        m_graphLastRefresh = -1.0;
+    }
+    const double now = ImGui::GetTime();
+    if (m_graphLastRefresh < 0.0 || now - m_graphLastRefresh >= kRefreshIntervalSeconds)
+    {
+        m_graphSnapshot = EnhancedSceneRenderer::GetLiveGraphSnapshot(
+            static_cast<EnhancedLiveDisplayTarget>(m_graphTarget));
+        m_graphLastRefresh = now;
+    }
+    if (ImGui::Button("Graphics settings"))
+    {
+        editor::open_window(EditorWindowName::kProjectSettings);
+    }
     ImGui::SameLine();
-    if (ImGui::Button("Rendering - Live")) editor::OpenRenderLiveDiagnostics();
-    const auto snapshot = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+    if (ImGui::Button("Rendering - Live"))
+    {
+        editor::OpenRenderLiveDiagnostics();
+    }
     ImGui::Separator();
-    ImGui::TextUnformatted(snapshot.pipelineDescription.empty() ? "No pipeline description available." : snapshot.pipelineDescription.c_str());
+    if (!m_graphSnapshot)
+    {
+        ImGui::TextDisabled("Waiting for a compiled frame for this view.");
+        const auto debug = EnhancedSceneRenderer::GetLiveDebugSnapshot();
+        if (!debug.lastError.empty())
+        {
+            ImGui::TextWrapped("Latest renderer error: %s", debug.lastError.c_str());
+        }
+        return;
+    }
+    const auto& snapshot = *m_graphSnapshot;
+    ImGui::Text("Generation %llu | epoch %llu | frame %llu | view %llu | %u x %u",
+        static_cast<unsigned long long>(snapshot.generation), static_cast<unsigned long long>(snapshot.graphEpoch),
+        static_cast<unsigned long long>(snapshot.frameId), static_cast<unsigned long long>(snapshot.viewId),
+        snapshot.width, snapshot.height);
+    ImGui::Text("Dependency hash %016llx | %zu declared / %zu executed / %zu resources",
+        static_cast<unsigned long long>(snapshot.dependencyHash), snapshot.passes.size(),
+        snapshot.executeOrder.size(), snapshot.resources.size());
+    ImGui::TextDisabled("Native C++ source | %s | %s | read-only compiled snapshot",
+        snapshot.scheduling == RGSchedulingMode::ExplicitVersioned ? "versioned" : "legacy/single writer",
+        snapshot.orderPolicy == RGOrderPolicy::DependencyOrder ? "dependency order" : "authored order");
+    m_graphFilter.Draw("Filter passes/resources");
+    DrawCompiledGraph(snapshot, m_graphFilter);
 }
 
 void editor::windows::draw_preferences()

@@ -1,5 +1,6 @@
 #pragma once
 #include "../Core/EnhancedLivePipelineDesc.h"
+#include "../Graph/EnhancedRenderGraph.h"
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -974,6 +975,11 @@ namespace EnhancedSceneRenderer
     /// 함수는 락을 잡고 그 완성본을 복사만 한다. 값은 한 프레임 늦을 수
     /// 있지만 디버그 HUD에는 문제되지 않는다.
     EnhancedLiveDebugSnapshot GetLiveDebugSnapshot();
+
+    /// Request a snapshot on the next submitted frame and read the last requested
+    /// immutable graph. No GPU resources are owned by this diagnostic value.
+    std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot> GetLiveGraphSnapshot(
+        EnhancedLiveDisplayTarget target);
 
     /// 현재 패스 파라미터. 파이프라인이 아직 없으면 기본값을 돌려준다.
     /// GetLiveDebugSnapshot과 같은 스레드 규약(락으로 복사)이다.

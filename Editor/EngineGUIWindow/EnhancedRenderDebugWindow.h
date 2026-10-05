@@ -9,7 +9,7 @@ namespace editor
 	void OpenRenderLiveDiagnostics();
 }
 
-// RenderPass shows the active pipeline declaration until the RG-V viewer exists.
+// RenderPass reads the current view's immutable compiled graph snapshot.
 // Project Settings owns live tuning; Profiler Rendering - Live owns diagnostics.
 // Both DX12 and Vulkan publish through the same renderer snapshot interface.
 class EnhancedRenderDebugWindow
@@ -20,6 +20,11 @@ public:
 	~EnhancedRenderDebugWindow() = default;
 
 private:
+
+    int m_graphTarget{0};
+    double m_graphLastRefresh{-1.0};
+    ImGuiTextFilter m_graphFilter;
+    std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot> m_graphSnapshot;
 
 	bool m_sortByDuration{ false };
 
