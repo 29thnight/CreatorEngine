@@ -1200,14 +1200,24 @@ bool DataSystem::LoadMaterialGraphProgram(FileGuid guid, const file::path& sourc
 
 namespace
 {
+// 프로젝트 안의 경로는 프로젝트 기준 상대 경로로 바꾼다. 프로젝트 폴더를 옮기거나 복사해도
+// 목록 이름과 목록 안의 경로가 그대로 맞는다. 프로젝트 밖이면 절대 경로를 그대로 둔다.
+file::path ProjectRelative(const file::path& path)
+{
+    std::error_code ignored;
+    const auto root = std::filesystem::weakly_canonical(PathFinder::Relative(), ignored);
+    const auto canonical = std::filesystem::weakly_canonical(
+        path.is_absolute() ? path : PathFinder::Relative() / path, ignored);
+    auto relative = canonical.lexically_relative(root);
+    if (relative.empty() || *relative.begin() == "..") return canonical;
+    return relative;
+}
+
 // 장면 경로마다 목록 하나. 이름이 같은 장면이 다른 폴더에 있어도 섞이지 않게 경로 해시로 이름 짓는다.
 file::path SceneMaterialListPath(const file::path& scene)
 {
-    std::error_code ignored;
-    const auto canonical = std::filesystem::weakly_canonical(
-        scene.is_absolute() ? scene : PathFinder::Relative() / scene, ignored);
     // 한글 경로도 코드 페이지 변환 없이 다루도록 UTF-8 로 키를 만든다.
-    const auto utf8 = canonical.generic_u8string();
+    const auto utf8 = ProjectRelative(scene).generic_u8string();
     const auto key = Lowercase(std::string(utf8.begin(), utf8.end()));
     std::uint64_t hash = 14695981039346656037ull;
     for (const unsigned char c : key) hash = (hash ^ c) * 1099511628211ull;
@@ -1239,7 +1249,9 @@ void DataSystem::PrewarmSceneMaterials(const file::path& scene)
             if (tab == std::string::npos || !Uuid::TryParse(line.substr(0, tab), guid.m_guid)) continue;
             // 이미 세대가 있으면 엔티티 적재가 컴파일하지 않는다.
             if (m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid})) continue;
-            graphs.emplace_back(guid, file::path(std::u8string(line.begin() + tab + 1, line.end())));
+            file::path source(std::u8string(line.begin() + tab + 1, line.end()));
+            if (source.is_relative()) source = PathFinder::Relative() / source;
+            graphs.emplace_back(guid, std::move(source));
         }
     }
     if (graphs.empty()) return;
@@ -1298,7 +1310,7 @@ void DataSystem::CommitSceneMaterials(const file::path& scene)
     std::ofstream list(path, std::ios::binary | std::ios::trunc);
     for (const auto& [guid, source] : graphs)
     {
-        const auto text = source.u8string();
+        const auto text = ProjectRelative(source).generic_u8string();
         list << guid.ToString() << '\t' << std::string(text.begin(), text.end()) << '\n';
     }
 }
