@@ -122,6 +122,11 @@ namespace
             return m_renderer && m_renderer->IsActive();
         }
 
+        bool IsDisplayLost() const override
+        {
+            return m_renderer && m_renderer->IsDeviceLost();
+        }
+
         ImGuiRendererBackendKind GetBackendKind() const override
         {
             return m_renderer ? m_renderer->GetKind() : ImGuiRendererBackendKind::DX12;
@@ -201,7 +206,9 @@ namespace
             const std::function<void()> recordCallback =
                 hasPlatformWindows ? std::function<void()>{} : onRecorded;
             std::string presentError;
-            if (!m_renderer->RenderAndPresent(presentError, recordCallback))
+            // 장치 제거는 셸이 한 번만 알린다. 이후 매 프레임 같은 실패를 다시 찍지 않는다.
+            if (!m_renderer->RenderAndPresent(presentError, recordCallback) &&
+                !m_renderer->IsDeviceLost())
             {
                 std::printf("[ImGui] %s 렌더 실패: %s\n",
                     m_renderer->GetName(), presentError.c_str());

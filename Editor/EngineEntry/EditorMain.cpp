@@ -500,6 +500,15 @@ void Editor::EditorMain::PresentationThreadMain()
 			std::lock_guard<std::mutex> lock(m_presentationMutex);
 			++m_presentationFrames;
 		}
+
+		// 장치가 제거되면 진입 대기와 Present 가 즉시 실패해 속도 제한이 사라진다.
+		// 평소 진입 대기 상한과 같은 100 ms 를 잔다. GT 가 프레임마다 깨우는 조건
+		// 변수로 기다리면 초당 수천 번 깨어나므로 잠든다. 종료는 다음 바퀴에서 본다.
+		if (GetImGuiHost().IsDisplayLost())
+		{
+			ce::profile_scope lost{ ce::marker<"PresentationDisplayLost">() };
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
 	}
 
 	// 스레드가 죽기 전에 스트림을 끊는다. 서비스가 나중에 정리하기도 하지만,

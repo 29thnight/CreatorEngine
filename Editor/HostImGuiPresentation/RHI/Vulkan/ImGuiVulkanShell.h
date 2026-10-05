@@ -19,6 +19,7 @@ public:
     bool Initialize(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError) override;
     bool IsActive() const override;
+    bool IsDeviceLost() const override;
 
     void Resize(uint32_t width, uint32_t height) override;
     void NewFrame() override;

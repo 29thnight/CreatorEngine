@@ -51,6 +51,7 @@ public:
     bool Initialize(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError) override;
     bool IsActive() const override;
+    bool IsDeviceLost() const override;
 
     /// ImGui_ImplDX12_NewFrame. BeginRender의 DX11 NewFrame 자리에 온다.
     void NewFrame() override;

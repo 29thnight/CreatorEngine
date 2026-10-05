@@ -46,6 +46,8 @@ public:
     virtual bool Initialize(void* windowHandle, uint32_t width, uint32_t height,
         std::string& outError) = 0;
     virtual bool IsActive() const = 0;
+    // 장치가 제거돼 다시는 표시할 수 없는 상태. 셸은 장치를 되살리지 않는다.
+    virtual bool IsDeviceLost() const = 0;
 
     virtual void Resize(uint32_t width, uint32_t height) = 0;
     virtual void NewFrame() = 0;

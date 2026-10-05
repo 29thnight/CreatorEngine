@@ -285,6 +285,8 @@ ImGuiVulkanShell::ImGuiVulkanShell() : m_impl(new Impl()) {}
 ImGuiVulkanShell::~ImGuiVulkanShell() { delete m_impl; }
 
 bool ImGuiVulkanShell::IsActive() const { return m_impl->active; }
+// Vulkan 셸은 장치 손실을 고정 상태로 두지 않는다. 에디터 표시 백엔드는 DX12 다.
+bool ImGuiVulkanShell::IsDeviceLost() const { return false; }
 
 bool ImGuiVulkanShell::Initialize(void* windowHandle, uint32_t width, uint32_t height,
     std::string& outError)
