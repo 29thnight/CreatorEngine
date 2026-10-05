@@ -1659,7 +1659,7 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     m_encoder = std::make_unique<VulkanEncoder>(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTables[m_frameIndex],
         m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable,
-        GetIndirectDrawCapabilities());
+        GetIndirectDrawCapabilities(), m_viewportLimits);
     return *m_encoder;
 }
 

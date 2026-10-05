@@ -362,6 +362,7 @@ private:
     bool             m_memoryBudgetSupported{ false };
     bool             m_nullDescriptorSupported{ false };
     RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
+    VulkanViewportLimits m_viewportLimits;
     bool             m_uploadMemoryPressure{ false };
     RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;
 

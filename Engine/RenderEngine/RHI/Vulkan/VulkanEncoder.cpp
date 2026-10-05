@@ -6,6 +6,7 @@
 #include "VulkanBindingTable.h"
 
 #include <algorithm>
+#include <cmath>
 
 static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(VkDrawIndexedIndirectCommand));
 static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
@@ -72,6 +73,39 @@ void VulkanEncoder::SetViewportAndScissor(uint32_t width, uint32_t height)
 
     VkRect2D scissor{ { 0, 0 }, { width, height } };
     vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+}
+
+bool VulkanEncoder::SetViewport(float x, float y, uint32_t width, uint32_t height)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || !std::isfinite(x) || !std::isfinite(y) ||
+        width == 0 || height == 0 || width > m_viewportLimits.maxWidth || height > m_viewportLimits.maxHeight)
+    {
+        return false;
+    }
+    const double right = static_cast<double>(x) + width;
+    const double bottom = static_cast<double>(y) + height;
+    if (x < m_viewportLimits.lowerBound || y < m_viewportLimits.lowerBound ||
+        right > m_viewportLimits.upperBound || bottom > m_viewportLimits.upperBound)
+    {
+        return false;
+    }
+
+    // 기존 전체 화면 경로와 같은 Y 반전이다. 음수 오프셋도 논리 좌상단을 뜻한다.
+    const VkViewport viewport{ x, y + static_cast<float>(height),
+        static_cast<float>(width), -static_cast<float>(height), 0.f, 1.f };
+    const double nativeRight = static_cast<double>(viewport.x) + viewport.width;
+    const double nativeTop = static_cast<double>(viewport.y) + viewport.height;
+    if (!std::isfinite(viewport.y) ||
+        static_cast<double>(viewport.width) > m_viewportLimits.maxWidth ||
+        -static_cast<double>(viewport.height) > m_viewportLimits.maxHeight ||
+        nativeRight > m_viewportLimits.upperBound ||
+        viewport.y < m_viewportLimits.lowerBound || viewport.y > m_viewportLimits.upperBound ||
+        nativeTop < m_viewportLimits.lowerBound || nativeTop > m_viewportLimits.upperBound)
+    {
+        return false;
+    }
+    vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
+    return true;
 }
 
 bool VulkanEncoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)

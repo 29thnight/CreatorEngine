@@ -131,6 +131,13 @@ public:
     /// 뷰포트와 시저를 같은 크기로 건다. 전체 화면 경로의 기본 상태다.
     virtual void SetViewportAndScissor(uint32_t width, uint32_t height) = 0;
 
+    /// 논리 좌상단과 전체 화면 크기를 보존한 채 작은 타깃으로 평행 이동한다.
+    /// 깊이 범위는 0..1이며 시저는 바꾸지 않는다. false면 상태도 그대로다.
+    virtual bool SetViewport(float, float, uint32_t, uint32_t)
+    {
+        return false;
+    }
+
     /// 뷰포트를 보존하고 화면 좌표의 사각형만 제한한다. 타일 렌더링도
     /// SV_Position과 깊이 조회가 전체 화면 좌표를 유지해야 하기 때문이다.
     /// false면 상태를 바꾸지 않았다. 미지원 구현이 전체 화면에 쓰지 않게 한다.

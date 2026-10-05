@@ -34,6 +34,7 @@ public:
         : m_commandList(commandList), m_resources(resources) {}
 
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
+    bool SetViewport(float x, float y, uint32_t width, uint32_t height) override;
     bool SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
     void SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline) override;
     void SetPrimitiveTopology(RHIPrimitiveTopology topology) override;

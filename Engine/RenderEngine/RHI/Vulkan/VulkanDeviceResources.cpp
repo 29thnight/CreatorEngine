@@ -428,6 +428,8 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
     m_physicalDevice = best;
     m_adapterName = bestProps.deviceName;
     m_apiVersion = bestProps.apiVersion;
+    m_viewportLimits = { bestProps.limits.maxViewportDimensions[0], bestProps.limits.maxViewportDimensions[1],
+        bestProps.limits.viewportBoundsRange[0], bestProps.limits.viewportBoundsRange[1] };
 
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(best, nullptr, &extensionCount, nullptr);
@@ -644,6 +646,7 @@ void VulkanDeviceResources::Shutdown()
     m_memoryBudgetSupported = false;
     m_nullDescriptorSupported = false;
     m_indirectDrawCapabilities = {};
+    m_viewportLimits = {};
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
     m_pipelineCache = nullptr;

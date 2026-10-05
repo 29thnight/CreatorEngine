@@ -67,6 +67,15 @@ class VulkanSamplerTable;
 //   **베낀 것이 지워지는 것이 이동의 값이다** — 폴더가 바뀐 것이 아니라
 //   같은 어휘를 두 벌 들고 있던 상태가 끝났다.
 
+/// 장치가 보고한 값만 허용한다. 기본값은 미설정이므로 viewport-only 요청을 거절한다.
+struct VulkanViewportLimits
+{
+    uint32_t maxWidth{ 0 };
+    uint32_t maxHeight{ 0 };
+    float lowerBound{ 0.f };
+    float upperBound{ 0.f };
+};
+
 /// 커맨드 버퍼 하나를 감싼다. 수명은 한 번의 기록이다 — `DX12Encoder` 와 같다.
 class VulkanEncoder final : public RHIEncoder
 {
@@ -93,12 +102,13 @@ public:
         VulkanDescriptorPoolRecycler* descriptors = nullptr,
         const VulkanBindingTable* bindingTables = nullptr,
         const VulkanSamplerTable* samplerTables = nullptr,
-        RHIIndirectDrawCapabilities indirectDrawCapabilities = {})
+        RHIIndirectDrawCapabilities indirectDrawCapabilities = {},
+        VulkanViewportLimits viewportLimits = {})
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
         , m_resources(resources), m_renderTargets(renderTargets)
         , m_device(device), m_descriptors(descriptors)
         , m_bindingTables(bindingTables), m_samplerTables(samplerTables)
-        , m_indirectDrawCapabilities(indirectDrawCapabilities) {}
+        , m_indirectDrawCapabilities(indirectDrawCapabilities), m_viewportLimits(viewportLimits) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
@@ -111,6 +121,7 @@ public:
     ///   향한다. 높이를 음수로 주어 백엔드가 맞춘다 — 어느 층이 좌표계를
     ///   맞추는지가 계약의 문제라서 셰이더에 숨기지 않는다.
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
+    bool SetViewport(float x, float y, uint32_t width, uint32_t height) override;
     bool SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height) override;
 
     /// ★ 인자 둘은 `RHIEncoder::SetPipeline` 과 같은데 **근거가 반대다.**
@@ -285,6 +296,7 @@ private:
     const VulkanBindingTable*      m_bindingTables{ nullptr };
     const VulkanSamplerTable*      m_samplerTables{ nullptr };
     RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
+    VulkanViewportLimits m_viewportLimits;
 
     std::vector<PendingBinding> m_pending[2];
     bool m_descriptorsDirty[2]{ false, false };

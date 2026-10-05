@@ -2,6 +2,7 @@
 #include "DX12DeviceResources.h"
 
 #include <vector>
+#include <cmath>
 
 static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(D3D12_DRAW_INDEXED_ARGUMENTS));
 static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
@@ -41,6 +42,25 @@ void DX12Encoder::SetViewportAndScissor(uint32_t width, uint32_t height)
 
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissor);
+}
+
+bool DX12Encoder::SetViewport(float x, float y, uint32_t width, uint32_t height)
+{
+    if (nullptr == m_commandList || !std::isfinite(x) || !std::isfinite(y) || width == 0 || height == 0)
+    {
+        return false;
+    }
+    const double right = static_cast<double>(x) + width;
+    const double bottom = static_cast<double>(y) + height;
+    if (x < D3D12_VIEWPORT_BOUNDS_MIN || y < D3D12_VIEWPORT_BOUNDS_MIN ||
+        right > D3D12_VIEWPORT_BOUNDS_MAX || bottom > D3D12_VIEWPORT_BOUNDS_MAX)
+    {
+        return false;
+    }
+
+    const D3D12_VIEWPORT viewport{ x, y, static_cast<float>(width), static_cast<float>(height), 0.f, 1.f };
+    m_commandList->RSSetViewports(1, &viewport);
+    return true;
 }
 
 bool DX12Encoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
