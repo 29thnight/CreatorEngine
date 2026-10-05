@@ -22,6 +22,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <ranges>
 #include <sstream>
 #include <thread>
 #include <tuple>
@@ -936,6 +937,99 @@ namespace
         return hash.Hex();
     }
 
+    // 캐시 키에는 Slang 이 실제로 읽은 의존 파일이 들어간다. 그 목록을 알려면 Slang 이
+    // 소스를 구문·의미 분석까지 해야 해서, 캐시에 있어도 셰이더 하나에 수십~수백 ms 가 든다.
+    // 그래서 요청마다 지난번 목록을 따로 적어 두고, 다음에는 그 파일들의 지금 내용으로 키를
+    // 만들어 먼저 찾는다. 키가 내용을 담으므로 파일이 바뀌면 빗나가고 Slang 경로로 간다.
+    constexpr std::string_view kDependencyListMagic = "CreatorEngine.ShaderDependencies.v1";
+
+    std::filesystem::path DependencyListPath(const RHIShaderCompileRequest& request,
+        const std::filesystem::path& root, std::string_view compilerIdentity)
+    {
+        // 의존 목록 없이 루트 경로만 넣은 키다. 내용은 넣지 않아 원본을 고쳐도 같은 목록을 찾는다.
+        const std::string key = BuildCacheKey(request, { SourceUnit{ root } }, compilerIdentity);
+        return CacheDirectory() / (key + ".rsd");
+    }
+
+    std::optional<std::vector<std::filesystem::path>> ReadDependencyList(const std::filesystem::path& path)
+    {
+        std::ifstream file(path, std::ios::binary);
+        std::string line;
+        if (!std::getline(file, line) || line != kDependencyListMagic) return std::nullopt;
+        std::vector<std::filesystem::path> dependencies;
+        while (std::getline(file, line))
+        {
+            if (!line.empty()) dependencies.emplace_back(WidenUtf8(line));
+        }
+        return dependencies;
+    }
+
+    void WriteDependencyList(const std::filesystem::path& path, const std::vector<SourceUnit>& units)
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(path.parent_path(), ec);
+        if (ec) return;
+        static std::atomic<std::uint64_t> serial{};
+        const auto temp = path.parent_path() / (path.filename().string() + "." + std::to_string(GetCurrentProcessId())
+            + "." + std::to_string(GetCurrentThreadId()) + "." + std::to_string(++serial) + ".tmp");
+        bool written = false;
+        {
+            std::ofstream file(temp, std::ios::binary | std::ios::trunc);
+            if (file)
+            {
+                file << kDependencyListMagic << '\n';
+                for (std::size_t index = 1; index < units.size(); ++index)
+                    file << PathUtf8(units[index].path) << '\n';
+                file.flush();
+                written = static_cast<bool>(file);
+            }
+        }
+        // 목록은 힌트일 뿐이라 쓰기 실패는 컴파일 실패가 아니다.
+        if (!written || !MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING))
+            std::filesystem::remove(temp, ec);
+    }
+
+    // 기록한 의존 파일과 같은 이름의 파일이 다른 검색 위치에 생기면 Slang 은 그쪽을 읽을 수 있다.
+    // 기록한 파일만 보면 이 변화를 못 보므로, 그런 후보가 하나라도 있으면 빠른 길을 쓰지 않는다.
+    // 표기는 파일 이름과 폴더 하나를 붙인 이름("Includes/X.slang")까지 본다.
+    bool HasShadowCandidate(const std::vector<SourceUnit>& units, const RHIShaderCompileRequest& request)
+    {
+        std::vector<std::filesystem::path> locations;
+        const auto addLocation = [&locations](const std::filesystem::path& directory)
+        {
+            if (directory.empty() || std::ranges::find(locations, directory) != locations.end()) return;
+            locations.push_back(directory);
+        };
+        for (const SourceUnit& unit : units)
+        {
+            addLocation(unit.path.parent_path());
+            addLocation(unit.path.parent_path().parent_path()); // "../X.slang" 표기
+        }
+        for (const auto& directory : request.options.includeDirectories)
+        {
+            const std::filesystem::path normalized = NormalizePath(directory);
+            addLocation(normalized);
+            addLocation(normalized.parent_path());
+        }
+        for (std::size_t index = 1; index < units.size(); ++index)
+        {
+            const std::filesystem::path& path = units[index].path;
+            const std::filesystem::path spellings[] = {
+                path.filename(), path.parent_path().filename() / path.filename() };
+            for (const auto& location : locations)
+            {
+                for (const auto& spelling : spellings)
+                {
+                    const std::filesystem::path candidate = (location / spelling).lexically_normal();
+                    if (candidate == path) continue;
+                    std::error_code ec;
+                    if (std::filesystem::exists(candidate, ec) || ec) return true;
+                }
+            }
+        }
+        return false;
+    }
+
     std::optional<RHIShaderStage> MapReflectionStage(SlangStage stage)
     {
         switch (stage)
@@ -1290,6 +1384,45 @@ namespace
         }
 
     private:
+        // 지난번 의존 목록으로 캐시를 찾는다. Slang 을 부르지 않으므로 컴파일 칸도 잡지 않는다.
+        // 빗나가거나 목록을 믿을 수 없으면 false 를 돌려 Slang 경로가 다시 해석하게 한다.
+        static bool ReadCachedWithoutSlang(const RHIShaderCompileRequest& request,
+            const std::filesystem::path& sourcePath, const std::string& sourceText, SlangStage stage,
+            const std::vector<std::filesystem::path>& recordedDependencies, std::string_view compilerIdentity,
+            RHIShaderBlob* outBlob, RHIShaderReflection* outReflection, std::string& outError,
+            std::string* outIdentity, std::vector<std::filesystem::path>* outDependencies)
+        {
+            std::vector<SourceUnit> units;
+            units.reserve(recordedDependencies.size() + 1);
+            units.push_back({ NormalizePath(sourcePath), sourceText });
+            for (const auto& path : recordedDependencies)
+            {
+                SourceUnit unit{ path };
+                std::string ignored;
+                if (!ReadSourceFile(path, unit.text, ignored)) return false;
+                units.push_back(std::move(unit));
+            }
+            if (HasShadowCandidate(units, request)) return false;
+
+            CompileProgress progress(request, outError);
+            progress.Phase("Checking shader cache");
+            const std::string cacheKey = BuildCacheKey(request, units, compilerIdentity);
+            if (nullptr == outReflection)
+            {
+                if (!ReadCache(cacheKey, *outBlob)) return false;
+            }
+            else
+            {
+                const auto reflectionStage = MapReflectionStage(stage);
+                if (!reflectionStage || !ReadVerifiedCache(cacheKey, *reflectionStage, outBlob, *outReflection))
+                    return false;
+                if (outIdentity) *outIdentity = cacheKey;
+            }
+            if (outDependencies) *outDependencies = recordedDependencies;
+            outError.clear();
+            return true;
+        }
+
         bool Process(const RHIShaderCompileRequest& request,
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection,
             std::string& outError, std::string* outIdentity = nullptr,
@@ -1304,6 +1437,16 @@ namespace
             if (SLANG_STAGE_NONE == stage) return false;
 
             SlangRuntime& runtime = GetSlangRuntime();
+            const std::filesystem::path dependencyListPath =
+                DependencyListPath(request, NormalizePath(sourcePath), runtime.identity);
+            const auto recordedDependencies = ReadDependencyList(dependencyListPath);
+            if (recordedDependencies &&
+                ReadCachedWithoutSlang(request, sourcePath, sourceText, stage, *recordedDependencies,
+                    runtime.identity, outBlob, outReflection, outError, outIdentity, outDependencies))
+            {
+                return true;
+            }
+
             RHIShaderCompiler::ModuleReuseState* const reuse = t_moduleReuse;
             SlotLease ownLease;
             if (nullptr == reuse) ownLease = AcquireSlot(runtime, outError);
@@ -1493,6 +1636,9 @@ namespace
                 for (std::size_t index = 1; index < units.size(); ++index)
                     outDependencies->push_back(units[index].path);
             }
+            if (!recordedDependencies ||
+                !std::ranges::equal(*recordedDependencies, units | std::views::drop(1), {}, {}, &SourceUnit::path))
+                WriteDependencyList(dependencyListPath, units);
             progress.Phase("Checking shader cache");
             const std::string cacheKey = BuildCacheKey(request, units, runtime.identity);
             if (nullptr == outReflection && ReadCache(cacheKey, *outBlob)) return true;
