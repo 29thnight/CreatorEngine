@@ -758,8 +758,9 @@ void MenuBarWindow::ShowAboutWindow()
     // 에디터가 실제로 돌고 있는 백엔드와 Player가 받을 백엔드를 나란히 둔다.
     // 하나만 보이면 "설정을 바꿨는데 왜 그대로냐"를 가릴 수 없다.
     row("Editor render backend", "dx12 (build-fixed)");
-    row("Player build backend",
-        RenderBackendName(buildSettings.GetRenderBackend()));
+    row("Player build backend", buildSettings.HasRecognizedRenderBackend()
+        ? RenderBackendName(buildSettings.GetRenderBackend())
+        : ("unrecognized: " + buildSettings.GetUnrecognizedRenderBackend()).c_str());
     ImGui::TextDisabled(
         "The Editor host is fixed; only the Player build backend is configurable\n"
         "(Settings > Build Settings).");
@@ -2542,6 +2543,11 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
 			buildSettings.SetRenderBackend(
 				1 == buildBackend ? RenderBackend::Vulkan : RenderBackend::DX12);
 			EditorSettingsStore::Get().Save();
+		}
+		if (!buildSettings.HasRecognizedRenderBackend())
+		{
+			ImGui::TextDisabled("Current value '%s' is not dx12 or vulkan; export is blocked until one is chosen.",
+				buildSettings.GetUnrecognizedRenderBackend().c_str());
 		}
 		ImGui::TextDisabled("Packaging projects this value into runtime render.backend.");
 		ImGui::TextDisabled("The Player reads only runtime render.backend at process startup.");

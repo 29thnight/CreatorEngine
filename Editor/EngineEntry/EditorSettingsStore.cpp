@@ -151,29 +151,25 @@ bool EditorSettingsStore::Initialize() noexcept
                     buildSettings.SetDevelopmentBuild(developmentNode.As<bool>());
                 }
 
+                // build.render.backend 는 Player 패키징 선택이다. 에디터 시작은 이 값에
+                // 기대지 않으므로 검사하지 않는다. 알아볼 수 없으면 원문만 남기고
+                // 패키징 때 거절한다(GameBuilderSystem::BuildGame).
 				const Authoring::ReadNode buildRenderNode = buildNode["render"];
-                if (buildRenderNode)
+				const Authoring::ReadNode buildBackendNode = buildRenderNode && buildRenderNode.IsMap()
+					? buildRenderNode["backend"] : Authoring::ReadNode{};
+                if (buildRenderNode && !buildRenderNode.IsMap())
                 {
-                    if (!buildRenderNode.IsMap())
-                        return ReportSettingsError("build.render must be a map.");
-
-					const Authoring::ReadNode buildBackendNode = buildRenderNode["backend"];
-                    if (buildBackendNode)
-                    {
-                        if (!buildBackendNode.IsScalar())
-                            return ReportSettingsError(
-                                "build.render.backend must be dx12 or vulkan.");
-						const std::string backendName =
-							buildBackendNode.AsString();
-                        RenderBackend backend{};
-                        if (!TryParseRenderBackend(backendName, backend))
-                        {
-                            return ReportSettingsError(
-                                "Unsupported build.render.backend '" + backendName +
-                                "' (expected dx12 or vulkan).");
-                        }
+                    buildSettings.SetUnrecognizedRenderBackend("(build.render is not a map)");
+                }
+                else if (buildBackendNode)
+                {
+                    RenderBackend backend{};
+                    const std::string backendName = buildBackendNode.IsScalar()
+                        ? buildBackendNode.AsString() : std::string("(not a scalar)");
+                    if (TryParseRenderBackend(backendName, backend))
                         buildSettings.SetRenderBackend(backend);
-                    }
+                    else
+                        buildSettings.SetUnrecognizedRenderBackend(backendName);
                 }
             }
         }
@@ -257,8 +253,10 @@ bool EditorSettingsStore::Save() noexcept
         root.Child("projectName").SetScalar(m_buildSettings.GetProjectName());
         // Editor 호스트는 백엔드 키를 읽거나 덮어쓰지 않는다.
         // 패키징이 build.render.backend를 Player의 런타임 설정에 투영한다.
-        root.Child("build").Child("render").Child("backend").SetScalar(
-            RenderBackendName(m_buildSettings.GetRenderBackend()));
+        // 알아볼 수 없는 값은 사용자가 고를 때까지 원문 그대로 둔다.
+        if (m_buildSettings.HasRecognizedRenderBackend())
+            root.Child("build").Child("render").Child("backend").SetScalar(
+                RenderBackendName(m_buildSettings.GetRenderBackend()));
         root.Child("build").Child("development").SetScalar(m_buildSettings.IsDevelopmentBuild());
         root.RemoveChild("renderBackendDx12");
         root.RemoveChild("imguiBackendDx12");

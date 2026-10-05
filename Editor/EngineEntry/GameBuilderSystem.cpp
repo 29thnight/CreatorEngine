@@ -173,6 +173,12 @@ bool GameBuilderSystem::BuildGame()
 	const file::path projectRoot = PathFinder::BaseProjectPath();
 	const BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
 	const std::wstring startupScene = buildSettings.GetStartupSceneName();
+	if (!buildSettings.HasRecognizedRenderBackend())
+	{
+		Debug::PrintLog(spdlog::level::err, "Player 빌드 백엔드 '{}' 를 알아볼 수 없다. Build Settings 에서 DX12 또는 Vulkan 을 고른 뒤 다시 내보낸다.",
+			buildSettings.GetUnrecognizedRenderBackend());
+		return false;
+	}
 	if (!RunPackageOrchestrator(projectRoot, startupScene,
 		buildSettings.GetRenderBackend(), buildSettings.IsDevelopmentBuild()))
 	{
