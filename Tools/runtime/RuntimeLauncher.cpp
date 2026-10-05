@@ -20,6 +20,16 @@ namespace
         return error ? static_cast<int>(error) : 126;
     }
 
+    // 모듈 경로가 MAX_PATH 아래여도 로더가 그 폴더에서 의존 DLL 경로를 만들며 한계를
+    // 넘긴다(모듈 경로 255자에서 ERROR_FILENAME_EXCED_RANGE 실측). 길이와 무관하게
+    // 확장 경로 접두를 붙인다. 경로는 GetModuleFileNameW 에서 온 절대 경로다.
+    std::wstring ExtendedPath(const std::filesystem::path& path)
+    {
+        const std::wstring value = path.wstring();
+        if (value.starts_with(L"\\\\?\\")) return value;
+        return value.starts_with(L"\\\\") ? L"\\\\?\\UNC\\" + value.substr(2) : L"\\\\?\\" + value;
+    }
+
     int Run(int argc, wchar_t** argv, int show)
     {
         // Crash reporting must run without loading the possibly broken engine DLL.
@@ -46,19 +56,15 @@ namespace
         if (!SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_SYSTEM32 | LOAD_LIBRARY_SEARCH_USER_DIRS))
             return Fail(L"Cannot set DLL search policy");
         const auto common = root / L"Runtime" / L"Common";
-        if (!AddDllDirectory(common.c_str())) return Fail(L"Cannot add shared runtime directory");
+        if (!AddDllDirectory(ExtendedPath(common).c_str())) return Fail(L"Cannot add shared runtime directory");
         // Only the editor can resolve editor-only dependencies.
         if (exe.stem() == L"CreatorEditor")
         {
             const auto editor = root / L"Runtime" / L"Editor";
-            if (!AddDllDirectory(editor.c_str())) return Fail(L"Cannot add editor runtime directory");
+            if (!AddDllDirectory(ExtendedPath(editor).c_str())) return Fail(L"Cannot add editor runtime directory");
         }
         const auto hostPath = directory / (exe.stem().wstring() + L".runtime.dll");
-        // The DLL loader still needs the extended-length prefix for long module
-        // names even when ordinary file operations are longPathAware.
-        auto loadPath = hostPath.wstring();
-        if (loadPath.size() >= MAX_PATH && !loadPath.starts_with(L"\\\\?\\"))
-            loadPath = loadPath.starts_with(L"\\\\") ? L"\\\\?\\UNC\\" + loadPath.substr(2) : L"\\\\?\\" + loadPath;
+        const std::wstring loadPath = ExtendedPath(hostPath);
         HMODULE host = LoadLibraryExW(loadPath.c_str(), nullptr,
             LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!host) return Fail(hostPath.c_str());
