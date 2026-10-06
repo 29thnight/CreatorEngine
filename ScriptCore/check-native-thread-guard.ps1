@@ -19,56 +19,156 @@
 # _bound 를 직접 읽는 것이 된다. 판정 3이 없으면 Entered 의 속을 비워도 1·2가
 # 초록으로 남는다 — 이름만 맞으면 통과하는 게이트가 된다.
 #
-# 사용법: pwsh ScriptCore\check-native-thread-guard.ps1
+# 사용법: pwsh ScriptCore\check-native-thread-guard.ps1 [-Configuration Release]
+#         -GeneratedDirectory 로 빌드와 같은 생성 디렉터리를 지정할 수 있다.
+[CmdletBinding()]
+param(
+    [string]$GeneratedDirectory = '',
+    [string]$Declarations = '',
+    [ValidateSet('Debug', 'Release')][string]$Configuration = 'Debug',
+    [ValidateSet('x64')][string]$Platform = 'x64',
+    [ValidateSet('true', 'false')][string]$EngineShipping = 'false'
+)
 
+Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$nativePath = Join-Path $PSScriptRoot "Native.cs"
-if (-not (Test-Path $nativePath)) { "Native.cs가 없다: $nativePath"; exit 1 }
-
-$text = Get-Content -LiteralPath $nativePath -Raw
-$classAt = $text.IndexOf('internal static unsafe class Native')
-if ($classAt -lt 0) { "Native 클래스 선언을 찾지 못했다 — 이 게이트의 전제가 깨졌다."; exit 1 }
-
-$lines = ($text.Substring($classAt) -split "`r?`n")
-
-# 진단이 나가는 통로 자체는 면제한다. Log가 자기 검사에 막히면 거부가 조용해져
-# 저작자에게는 "왜 갑자기 빈 값이지"만 남는다.
-$exempt = @('Log')
-
-# _bound 원본을 읽어도 되는 자리. 표 연결 그 자체를 다루거나(Bind·IsReady),
-# 검사의 구현이거나(Entered), 면제 대상(Log)이다.
-$boundAllowed = @('Bind', 'IsReady', 'Entered', 'Log')
-
-# 메서드 경계: 들여쓰기 4칸의 정적 멤버 선언.
-$starts = @()
-for ($i = 0; $i -lt $lines.Count; ++$i) {
-    if ($lines[$i] -match '^    (public|private|internal) static ') { $starts += $i }
+if ([string]::IsNullOrWhiteSpace($GeneratedDirectory))
+{
+    $configurationKey = $Configuration
+    if ($EngineShipping -eq 'true')
+    {
+        $configurationKey += '-Shipping'
+    }
+    $GeneratedDirectory = Join-Path (Split-Path -Parent $PSScriptRoot) "Build/Generated/ScriptBindings/$Platform-$configurationKey"
 }
-if ($starts.Count -lt 100) {
-    "정적 멤버를 $($starts.Count) 개밖에 찾지 못했다 — 파싱 전제가 깨졌다(파일 구조 변경?)."
-    exit 1
-}
-$starts += $lines.Count
-
-$members = @()
-for ($k = 0; $k -lt $starts.Count - 1; ++$k) {
-    $a = $starts[$k]; $b = $starts[$k + 1]
-    $decl = $lines[$a]
-    $name = if ($decl -match '\b(\w+)\s*(\(|=>|\{)') { $Matches[1] } else { $decl.Trim() }
-    # 필드 선언은 멤버 경계로는 잡히지만 무언가를 "읽지"는 않는다. 본문이 있는
-    # 것만 판정 대상으로 삼는다 — 그러지 않으면 `private static bool _bound;`
-    # 선언 자체가 우회로로 잡힌다.
-    $isField = ($decl -notmatch '[(]' -and $decl -notmatch '=>' -and $decl -notmatch '\{')
-
-    $members += [pscustomobject]@{
-        Name    = $name
-        IsField = $isField
-        Body    = ($lines[$a..($b - 1)] -join "`n")
+$nativePath = Join-Path $PSScriptRoot 'Native.cs'
+$generatedPath = Join-Path $GeneratedDirectory 'Native.Light.g.cs'
+foreach ($path in @($nativePath, $generatedPath))
+{
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf))
+    {
+        throw "Missing Native source: $path. Generate through the approved SceneRuntime/ScriptCore build first (Tools/ScriptBindings/BUILD.md), or supply -GeneratedDirectory. This checker never runs generation."
     }
 }
 
+# The same read-only preflight checks all seven outputs and their input/output
+# hashes, including the declaration manifest. It never builds or generates.
+& (Join-Path $PSScriptRoot 'check-api-table.ps1') -GeneratedDirectory $GeneratedDirectory `
+    -Declarations $Declarations -Configuration $Configuration -Platform $Platform -EngineShipping $EngineShipping
+if ($LASTEXITCODE -ne 0)
+{
+    throw 'Generated API table preflight failed; thread-guard coverage cannot be trusted.'
+}
+
+# 진단이 나가는 통로 자체는 면제한다. Log가 자기 검사에 막히면 거부가 조용해져
+# 저작자에게는 "왜 갑자기 빈 값이지"만 남는다. 실제 표 호출은 PrintLog가 한다.
+# 둘을 재검사하면 ReportOffThread → Log → PrintLog에서 같은 진단으로 재진입한다.
+$exempt = @('Log', 'PrintLog')
+
+# _bound 원본을 읽어도 되는 자리. 표 연결 그 자체를 다루거나(Bind·IsReady),
+# 검사의 구현이거나(Entered), 면제 대상(Log)이다.
+$boundAllowed = @('Bind', 'IsReady', 'Entered', 'Log', 'PrintLog')
+
+function Get-NativeMembers
+{
+    param([string]$Path)
+
+    $text = Get-Content -LiteralPath $Path -Raw
+    # 주석 속 Entered()는 검사로 세지 않는다. 문자열의 //는 주석으로 지우지 않는다.
+    $text = [regex]::Replace($text, '"(?:\\.|[^"\\])*"|/\*[\s\S]*?\*/|//[^\r\n]*', {
+        param($match)
+        if ($match.Value.StartsWith('"', [StringComparison]::Ordinal))
+        {
+            return $match.Value
+        }
+        return ($match.Value -replace '[^\r\n]', ' ')
+    })
+    $pattern = '(?ms)^(?<indent>[ \t]*)internal\s+static\s+unsafe\s+(?:partial\s+)?class\s+Native\s*\{(?<body>.*?)^\k<indent>\}'
+    $classes = [regex]::Matches($text, $pattern)
+    if ($classes.Count -ne 1)
+    {
+        throw "Expected one complete Native class body in $Path, found $($classes.Count)."
+    }
+    $lines = $classes[0].Groups['body'].Value -split "`r?`n"
+    $indent = [regex]::Escape($classes[0].Groups['indent'].Value + '    ')
+    $starts = @()
+    for ($i = 0; $i -lt $lines.Count; ++$i)
+    {
+        if ($lines[$i] -match ('^' + $indent + '(public|private|internal) static '))
+        {
+            $starts += $i
+        }
+    }
+    $starts += $lines.Count
+    for ($k = 0; $k -lt $starts.Count - 1; ++$k)
+    {
+        $a = $starts[$k]
+        $b = $starts[$k + 1]
+        $decl = $lines[$a]
+        $name = if ($decl -match '\b(\w+)\s*(\(|=>|\{)') { $Matches[1] } else { $decl.Trim() }
+        # 선언뿐인 _bound는 읽기가 아니다. 초기화식이 있는 필드는 검사한다.
+        $isField = ($decl -notmatch '[(]' -and $decl -notmatch '=>' -and $decl -notmatch '\{' -and $decl -notmatch '=')
+        [pscustomobject]@{
+            Name    = $name
+            IsField = $isField
+            Body    = ($lines[$a..($b - 1)] -join "`n")
+            Path    = $Path
+        }
+    }
+}
+
+$baseMembers = @(Get-NativeMembers $nativePath)
+$generatedMembers = @(Get-NativeMembers $generatedPath)
+if ($baseMembers.Count -lt 100)
+{
+    throw "Native.cs static member count $($baseMembers.Count) is below 100; parsing coverage has collapsed."
+}
+$members = @($baseMembers) + @($generatedMembers)
 $failed = New-Object System.Collections.Generic.List[string]
+
+# 생성된 13개 helper는 허용된 짧은 형식 전체를 검사한다. 이름만 포함한 주석,
+# null 검사 삭제, ||로 바꾼 조건, 검사 전/후의 별도 호출, _bound 우회는 통과하지 못한다.
+$lightFields = @(
+    'Exists', 'GetColor', 'SetColor', 'GetIntensity', 'SetIntensity', 'GetRange', 'SetRange',
+    'GetSpotAngle', 'SetSpotAngle', 'GetLightType', 'SetLightType', 'GetLightStatus', 'SetLightStatus'
+)
+if ($generatedMembers.Count -ne 13)
+{
+    "생성 Native.Light.g.cs 멤버 $($generatedMembers.Count)개 (기대 13)"
+    $failed.Add('생성(범위)')
+}
+foreach ($field in $lightFields)
+{
+    $name = "Light$field"
+    $helpers = @($generatedMembers | Where-Object { $_.Name -ceq $name })
+    if ($helpers.Count -ne 1 -or @($baseMembers | Where-Object { $_.Name -ceq $name }).Count -ne 0)
+    {
+        "생성 helper $name 정의가 없거나 중복됐다."
+        $failed.Add("생성($name)")
+        continue
+    }
+    $body = ($helpers[0].Body -replace '\s+', ' ').Trim()
+    $prefix = '^public static \w+ ' + [regex]::Escape($name) + '\(ObjectHandle handle'
+    $slot = [regex]::Escape("_api.Light.$field")
+    if ($field -ceq 'Exists')
+    {
+        $guarded = $prefix + '\) => Entered\(\) && ' + $slot + ' != null && ' + $slot + '\(handle\) != 0;$'
+    }
+    elseif ($field.StartsWith('Get', [StringComparison]::Ordinal))
+    {
+        $guarded = $prefix + '\) => Entered\(\) && ' + $slot + ' != null \? ' + $slot + '\(handle\) : (?:Color4\.White|0f|0);$'
+    }
+    else
+    {
+        $guarded = $prefix + ', \w+ value\) \{ if \(Entered\(\) && ' + $slot + ' != null\) \{ ' + $slot + '\(handle, value\); \} \}$'
+    }
+    if ($body -cnotmatch $guarded)
+    {
+        "생성 helper $name 의 Entered()/null/호출 순서가 보장되지 않는다."
+        $failed.Add("생성($name)")
+    }
+}
 
 # ── 판정 1: _api 를 만지는 메서드는 전부 Entered() 를 거친다 ──────────────────
 

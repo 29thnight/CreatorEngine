@@ -2,8 +2,11 @@
 """Compile real audio consumer source against small scene stubs and check native/managed ABI.
 This does not compile the Windows product, exercise the real scene lifecycle, or run C#.
 Run: python3 Tools/regression/verify-audio-consumer-contract.py
+Requires prior binding generation; use --generated-directory for a custom build output.
 """
 from pathlib import Path
+import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -90,14 +93,97 @@ STUBS = {'Component.h': '#pragma once\n'
             '};\n',
  'LifecycleTrace.h': '#pragma once\n#define LIFECYCLE_TRACE(...)\n'}
 
+def binding_directory():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--generated-directory", type=Path)
+    parser.add_argument("--declarations", type=Path)
+    parser.add_argument("--configuration", choices=("Debug", "Release"), default="Debug")
+    parser.add_argument("--engine-shipping", choices=("true", "false"), default="false")
+    args = parser.parse_args()
+    key = args.configuration + ("-Shipping" if args.engine_shipping == "true" else "")
+    generated = args.generated_directory or ROOT / "Build/Generated/ScriptBindings" / ("x64-" + key)
+    declarations = args.declarations or ROOT / "Build/Obj/SceneRuntime" / ("x64-" + key) / "reflgen/SceneRuntime.declarations.json"
+    return generated, declarations
+
+
+def table_body(source, name, managed):
+    # These ABI structs contain declarations only, with no string literals.
+    source = re.sub(r"/\*.*?\*/|//[^\r\n]*", "", source, flags=re.S)
+    declaration = r"internal\s+unsafe\s+struct" if managed else "struct"
+    ending = r"\}" if managed else r"\};"
+    matches = re.findall(r"^\s*" + declaration + r"\s+" + re.escape(name) +
+                         r"\s*\{(.*?)^\s*" + ending, source, flags=re.M | re.S)
+    assert len(matches) == 1, f"Expected exactly one {name} declaration"
+    return matches[0]
+
+
+def expanded_slots(table, light, managed):
+    pointer = (r"public\s+delegate\*\s+unmanaged(?:\[Stdcall\])?\s*<[^>]+>\s+(\w+)\s*;"
+               if managed else r"\(\s*__stdcall\s*\*\s*(\w+)\s*\)")
+    expected_light = ["Exists", "GetColor", "SetColor", "GetIntensity", "SetIntensity",
+                      "GetRange", "SetRange", "GetSpotAngle", "SetSpotAngle",
+                      "GetLightType", "SetLightType", "GetLightStatus", "SetLightStatus"]
+    light_names = re.findall(pointer, light)
+    assert light_names == expected_light, "Generated Light block must contain the 13 ABI-v34 slots"
+    names = []
+    nested_count = 0
+    for match in re.finditer(pointer + r"|\bScriptLightApi\s+Light\s*;", table):
+        if match.group(1) is not None:
+            names.append(match.group(1))
+        else:
+            assert len(names) == 85, "Generated Light block moved from slot 85 (byte 688)"
+            nested_count += 1
+            names.extend("Light_" + name for name in light_names)
+    assert nested_count == 1 and len(names) == 187, "Incomplete ABI-v34 table; expected 187 expanded slots"
+    assert len(set(names)) == 187, "Duplicate API slot"
+    assert names[84] == "Camera_GetPrimaryHandle" and names[98] == "Mesh_Exists", "Light boundary moved"
+    return names
+
+
+def checked_binding_sources(generated, declarations):
+    if not declarations.is_file():
+        raise RuntimeError(f"Missing declaration manifest: {declarations}. Generate through the approved build first. "
+                           "If ReflgenOutputDirectory was overridden, pass its SceneRuntime.declarations.json with "
+                           "--declarations. This checker never runs generation.")
+    filenames = ("ScriptLightApi.g.h", "ScriptLightApi.Thunks.g.inc", "ScriptLightApi.Fill.g.inc",
+                 "ScriptLightApi.g.cs", "Native.Light.g.cs", "LightComponent.g.cs", "ScriptBindings.contract.json")
+    for filename in filenames:
+        if not (generated / filename).is_file():
+            raise RuntimeError(f"Missing generated binding file: {generated / filename}. "
+                               "Generate through the approved SceneRuntime/ScriptCore build first "
+                               "(Tools/ScriptBindings/BUILD.md), or supply --generated-directory. "
+                               "This checker never runs generation.")
+    contract = json.loads((generated / "ScriptBindings.contract.json").read_text(encoding="utf-8-sig"))
+    expected = {"format": "creator.script-bindings", "version": 1, "api_version": 34,
+                "function_slot_count": 187, "light_first_slot": 85, "light_slot_count": 13,
+                "table_size": 1512, "fingerprint_offset": 1504}
+    assert all(contract.get(key) == value for key, value in expected.items()), "Wrong generated ABI contract"
+    input_paths = {"declarations": declarations,
+                   "native_source": ROOT / "Engine/SceneRuntime/ClrHost.cpp",
+                   "managed_source": ROOT / "ScriptCore/Native.cs",
+                   "generator": ROOT / "Tools/ScriptBindings/Generate-ScriptBindings.ps1"}
+    for name, path in input_paths.items():
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == contract["input_hashes"][name], \
+            f"Stale generated bindings after {path.name} changed; regenerate through the build"
+    for filename in filenames[:-1]:
+        assert hashlib.sha256((generated / filename).read_bytes()).hexdigest() == contract["output_hashes"][filename], \
+            f"Generated output differs from contract: {filename}; regenerate through the build"
+    return contract
+
+
 def main():
+    generated, declarations = binding_directory()
+    contract = checked_binding_sources(generated, declarations)
     native = (ROOT / "Engine/SceneRuntime/ClrHost.cpp").read_text(encoding="utf-8-sig")
     managed = (ROOT / "ScriptCore/Native.cs").read_text(encoding="utf-8-sig")
-    native_table = native.split("struct ScriptApiTable", 1)[1].split("ScriptApiTable g_apiTable", 1)[0]
-    managed_table = managed.split("internal static unsafe class Native", 1)[0]
-    native_names = re.findall(r"\(__stdcall\*\s*(\w+)\)", native_table)
-    managed_names = re.findall(r"delegate\* unmanaged<[^;]+>\s+(\w+)\s*;", managed_table)
-    assert native_names == managed_names, "Native/managed API table order mismatch"
+    native_table = table_body(native, "ScriptApiTable", False)
+    managed_table = table_body(managed, "ScriptApiTable", True)
+    native_light = table_body((generated / "ScriptLightApi.g.h").read_text(encoding="utf-8-sig"), "ScriptLightApi", False)
+    managed_light = table_body((generated / "ScriptLightApi.g.cs").read_text(encoding="utf-8-sig"), "ScriptLightApi", True)
+    native_names = expanded_slots(native_table, native_light, False)
+    managed_names = expanded_slots(managed_table, managed_light, True)
+    assert native_names == managed_names == [slot["name"] for slot in contract["slots"]], \
+        "Native/managed/generated-contract API table order mismatch"
     native_version = re.search(r"CreatorScriptApiVersion\s*=\s*(\d+)",
         (ROOT / "Engine/Utility_Framework/ScriptApiVersion.h").read_text()).group(1)
     managed_version = re.search(r"ExpectedVersion\s*=\s*(\d+)", managed).group(1)
@@ -153,6 +239,12 @@ def main():
         # Compile the actual native binding implementation separately. Windows
         # calling convention, CLR loading and real Entity/Scene remain outside this probe.
         abi_structs = native.split("    struct AudioAssetId", 1)[1].split("\tstruct ScriptApiTable", 1)[0]
+        # This isolated audio probe predates the generated Light include now
+        # inserted before ScriptApiTable. Keep only the audio POD declarations;
+        # do not make scene/Light dependencies part of the stubbed audio probe.
+        light_include = r'^\s*#include\s+"ScriptLightApi\.g\.h"\s*$'
+        assert len(re.findall(light_include, abi_structs, re.M)) == 1, "Light include boundary changed"
+        abi_structs = re.sub(light_include, "", abi_structs, flags=re.M)
         abi_functions = native.split("    bool AudioApiEntered()", 1)[1].split("\t// ── Animator ──", 1)[0]
         preamble = (target / "probe.cpp").read_text().split("int main()", 1)[0]
         glue = preamble + r"""
