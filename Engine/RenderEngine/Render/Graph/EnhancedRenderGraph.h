@@ -5,6 +5,7 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <mutex>
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
@@ -110,6 +111,10 @@ public:
         RHITextureHandle handle;
         RHIResourceState state{ RHIResourceState::Common };
     };
+    // 빌리는 쪽은 렌더 스레드(Compile)이고, 반납은 그래프 소멸 때라 마지막
+    // 참조를 쥔 RHISubmissionThread 의 회수에서도 일어난다. 반납의 operator[] 가
+    // 새 키를 넣어 표를 다시 짜는 동안 빌리면 깨진다(재생 시작 때 실측된 충돌).
+    std::mutex mutex;
     std::unordered_map<uint64_t, std::vector<Entry>> freeList;
 };
 

@@ -694,6 +694,7 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
 
         if (nullptr != m_transientPool)
         {
+            std::lock_guard poolLock(m_transientPool->mutex);
             auto found = m_transientPool->freeList.find(resource.poolKey);
             if (found != m_transientPool->freeList.end() && !found->second.empty())
             {
@@ -798,6 +799,7 @@ void EnhancedRenderGraph::ReleaseResources()
         //   한쪽을 빠뜨린다 — 실제로 빠뜨렸다.
         if (nullptr != m_transientPool)
         {
+            std::lock_guard poolLock(m_transientPool->mutex);
             m_transientPool->freeList[resource.poolKey].push_back(
                 { resource.handle, resource.state });
         }

@@ -2203,6 +2203,7 @@ namespace
                 }
                 view.ssgi.ReleaseHistory(p.frameContext);
             }
+            std::lock_guard poolLock(p.transientPool.mutex);
             for (auto& [key, entries] : p.transientPool.freeList)
             {
                 (void)key;
