@@ -18,6 +18,8 @@
 <Project>
   <PropertyGroup>
     <EngineAsan Condition="'$(EngineAsan)' == ''">false</EngineAsan>
+    <!-- Optional development-only ETW collector. Never downloads or installs an SDK. -->
+    <EngineDxDeepCapture Condition="'$(EngineDxDeepCapture)' == ''">false</EngineDxDeepCapture>
 
     <!--
       ── EngineShipping — Development/Shipping 구분 (PHASE 14.5 LC8) ──

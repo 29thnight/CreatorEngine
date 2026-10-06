@@ -38,6 +38,9 @@ namespace editor::profiler_view
 	//   std::min/std::max 를 깨뜨리지 않게.
 	std::filesystem::path pick_capture_to_open();
 	std::filesystem::path pick_capture_to_save();
+    std::filesystem::path pick_dx_capture_to_open();
+    std::filesystem::path pick_dx_capture_to_save();
+    void draw_dx_capture();
 
 	// 프레임 그래프. 클릭으로 한 프레임, 끌어서 범위를 고른다.
 	void draw_frame_overview();

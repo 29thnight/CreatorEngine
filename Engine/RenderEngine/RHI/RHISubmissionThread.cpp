@@ -1073,6 +1073,9 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner,
     if (!EnqueueInternal(owner, "recorded batch submit",
         [pool, queuedBatch](std::string& error)
         {
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+            const ce::dx_capture::submission_context_scope captureContext(queuedBatch->GetCaptureContext());
+#endif
             return pool->SubmitRecordedBatch(*queuedBatch, error);
         }, outTicket, outError, completion,
         [&completionSource] { return completionSource.GetCompletedFenceValue(); },

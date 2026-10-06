@@ -116,6 +116,7 @@
 #include "RHI/IImGuiHost.h"
 #include "ProfileScope.h"
 #include "ProfileCaptureFile.h"
+#include "DxCaptureService.h"
 #include "JobScheduler.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
@@ -693,6 +694,20 @@ namespace ConsoleCmd
     static void AddRecordingPayload(CommandCore::CommandData& data)
     {
         using namespace CommandCore;
+        const auto deep = ce::dx_capture::deep_capture().status();
+        auto deepData = CommandData::Object();
+        deepData.Set("busy", CommandData::Bool(deep.busy));
+        deepData.Set("opening", CommandData::Bool(deep.opening));
+        deepData.Set("helperState", CommandData::String(ce::dx_capture::describe(deep.process.state)));
+        deepData.Set("message", CommandData::String(deep.message));
+        deepData.Set("win32Error", CommandData::Int(deep.process.win32_error));
+        deepData.Set("records", CommandData::Int(deep.recording.record_count));
+        deepData.Set("complete", CommandData::Bool(deep.recording.complete));
+        deepData.Set("issues", CommandData::Int(deep.recording.issues));
+        deepData.Set("transportDrops", CommandData::Int(deep.process.dropped_records));
+        deepData.Set("unmatchedExecutions", CommandData::Int(deep.recording.unmatched_executions));
+        deepData.Set("ambiguousExecutions", CommandData::Int(deep.recording.ambiguous_executions));
+        data.Set("dxDeepCapture", std::move(deepData));
         const ce::recording_status status = ce::profiler().recording_status();
         const auto path = ce::profiler().recording_path().u8string();
         auto recording = CommandData::Object();

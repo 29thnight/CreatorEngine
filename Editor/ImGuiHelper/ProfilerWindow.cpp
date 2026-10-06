@@ -860,7 +860,7 @@ namespace
 
 namespace editor::profiler_view
 {
-    enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive, physics, audio };
+    enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive, physics, audio, dxCapture };
     page selectedPage = page::timeline;
     std::atomic_bool renderingLiveRequested{false};
     void select_rendering_live() { renderingLiveRequested = true; }
@@ -964,6 +964,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
     nav(page::cpu, EditorIcon::Timing, "CPU", "프로세스 사용률과 CPU Self 상위 마커");
     nav(page::memory, EditorIcon::Runtime, "메모리", "프로세스 RAM 작업 집합");
     nav(page::gpu, EditorIcon::Game, "GPU", "Graphics 구간 시간과 VRAM");
+    nav(page::dxCapture, EditorIcon::Timing, "DX12 Deep Capture", "별도 ETW 수집 프로세스와 제출→실행 기록");
     nav(page::renderingLive, EditorIcon::Scene, "Rendering - Live", "Live renderer diagnostics without Record");
     nav(page::physics, EditorIcon::Timing, "Physics", "씬별 물리 틱 카운터와 손실 진단");
     nav(page::audio, EditorIcon::Timing, "Audio", "논리 재생·보이스·오디오 callback 진단");
@@ -982,6 +983,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
         selectedPage == page::cpu ? "CPU" :
         selectedPage == page::memory ? "메모리" :
         selectedPage == page::gpu ? "GPU" :
+        selectedPage == page::dxCapture ? "DX12 Deep Capture" :
         selectedPage == page::network ? "네트워크" :
         selectedPage == page::animation ? "Animation Budget" :
         selectedPage == page::renderingLive ? "Rendering - Live" :
@@ -1034,6 +1036,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
         break;
     case page::memory: draw_memory_profiler(); break;
     case page::gpu: draw_telemetry(telemetry_page::gpu); break;
+    case page::dxCapture: draw_dx_capture(); break;
     case page::network: draw_telemetry(telemetry_page::network); break;
     case page::physics: draw_physics_telemetry(); break;
     case page::audio: draw_audio_telemetry(); break;

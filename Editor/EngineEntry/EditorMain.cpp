@@ -39,6 +39,7 @@
 #include "EditorWindowChrome.h"
 #include "UIManager.h"
 #include "ProfileScope.h"
+#include "DxCaptureService.h"
 #include "ResourceCounterWindow.h"
 #include "MemoryProfilerSnapshot.h"
 #include "ThreadPool.h"
@@ -673,6 +674,7 @@ void Editor::EditorMain::Finalize()
 	//   해체된 뒤라 새 작업이 들어올 곳이 없다.
 	ce::get_thread_pool().shutdown();
 
+    ce::dx_capture::deep_capture().shutdown();
 	ce::profiler().shutdown();
 }
 
@@ -996,4 +998,3 @@ void Editor::EditorMain::InvokeResizeFlag()
 	m_isInvokeResize.store(true, std::memory_order_release);
 	m_presentationWake.notify_one();
 }
-

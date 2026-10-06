@@ -19,6 +19,18 @@
 
 namespace editor::profiler_view
 {
+    std::filesystem::path pick_dx_capture_to_open()
+    {
+        constexpr wchar_t filter[] = L"Creator DX12 Deep Capture (*.cedx)\0*.cedx\0";
+        return std::filesystem::path(ShowOpenFileDialog(filter, L"Open DX12 Deep Capture"));
+    }
+
+    std::filesystem::path pick_dx_capture_to_save()
+    {
+        constexpr wchar_t filter[] = L"Creator DX12 Deep Capture (*.cedx)\0*.cedx\0";
+        return std::filesystem::path(ShowSaveFileDialog(filter, L"Record DX12 Deep Capture"));
+    }
+
 	std::filesystem::path pick_capture_to_open()
 	{
 		constexpr wchar_t filter[] = L"Creator Profiler Capture (*.ceprof)\0*.ceprof\0";
