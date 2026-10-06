@@ -90,7 +90,9 @@ namespace
     std::mutex g_progressMutex;
     RHIShaderCompiler::Progress g_progress;
     class CompileProgress;
-    std::vector<CompileProgress*> g_activeCompiles;
+    CompileProgress* g_firstActiveCompile{};
+    CompileProgress* g_lastActiveCompile{};
+    std::uint64_t g_activeCompileCount{};
 
     class CompileProgress final
     {
@@ -99,18 +101,20 @@ namespace
             : m_name(request.name), m_entryPoint(request.entryPoint), m_error(error)
         {
             std::lock_guard guard(g_progressMutex);
-            g_activeCompiles.push_back(this);
-            g_progress.lastError.clear();
-            RefreshSnapshot(*this);
+            // Request views and intrusive links allocate nothing. Once linked,
+            // optional progress text cannot throw out of this constructor.
+            Append();
+            ++g_activeCompileCount;
+            RefreshSnapshot(*this, true);
         }
 
-        ~CompileProgress()
+        ~CompileProgress() noexcept
         {
             std::lock_guard guard(g_progressMutex);
-            std::erase(g_activeCompiles, this);
-            g_progress.lastError = m_error;
+            Detach();
+            --g_activeCompileCount;
             ++g_progress.completedRequests;
-            RefreshSnapshot(*this);
+            RefreshSnapshot(*this, false, &m_error);
         }
 
         CompileProgress(const CompileProgress&) = delete;
@@ -123,33 +127,95 @@ namespace
             m_recompiling |= recompiling;
             // Keep a representative stage for each live request so completing
             // the newest one can immediately reveal another request's stage.
-            std::erase(g_activeCompiles, this);
-            g_activeCompiles.push_back(this);
+            Detach();
+            Append();
             RefreshSnapshot(*this);
         }
 
     private:
-        // All access to the active list and request stages holds g_progressMutex.
-        static void RefreshSnapshot(const CompileProgress& completed)
+        void Append() noexcept
         {
-            g_progress.activeRequests = static_cast<std::uint64_t>(g_activeCompiles.size());
-            g_progress.active = !g_activeCompiles.empty();
-            g_progress.recompiling = std::ranges::any_of(g_activeCompiles, [](const CompileProgress* request)
+            m_previous = g_lastActiveCompile;
+            m_next = nullptr;
+            if (m_previous)
             {
-                return request->m_recompiling;
-            });
-            const auto& representative = g_activeCompiles.empty() ? completed : *g_activeCompiles.back();
-            g_progress.name = representative.m_name;
-            g_progress.entryPoint = representative.m_entryPoint;
-            g_progress.phase = representative.m_phase;
-            ++g_progress.revision;
+                m_previous->m_next = this;
+            }
+            else
+            {
+                g_firstActiveCompile = this;
+            }
+            g_lastActiveCompile = this;
         }
 
-        const std::string m_name;
-        const std::string m_entryPoint;
+        void Detach() noexcept
+        {
+            if (m_previous)
+            {
+                m_previous->m_next = m_next;
+            }
+            else
+            {
+                g_firstActiveCompile = m_next;
+            }
+            if (m_next)
+            {
+                m_next->m_previous = m_previous;
+            }
+            else
+            {
+                g_lastActiveCompile = m_previous;
+            }
+            m_previous = nullptr;
+            m_next = nullptr;
+        }
+
+        // All access to the active list and request stages holds g_progressMutex.
+        // Diagnostics are best effort: keep counts truthful even if a text copy
+        // cannot allocate, and never replace or throw over the compiler's error.
+        static void RefreshSnapshot(const CompileProgress& completed, bool clearError = false,
+                                    const std::string* error = nullptr) noexcept
+        {
+            g_progress.activeRequests = g_activeCompileCount;
+            g_progress.active = g_activeCompileCount != 0;
+            g_progress.recompiling = false;
+            for (const auto* request = g_firstActiveCompile; request; request = request->m_next)
+            {
+                g_progress.recompiling |= request->m_recompiling;
+            }
+            ++g_progress.revision;
+            const auto& representative = g_lastActiveCompile ? *g_lastActiveCompile : completed;
+            try
+            {
+                g_progress.name = representative.m_name;
+                g_progress.entryPoint = representative.m_entryPoint;
+                g_progress.phase = representative.m_phase;
+                if (error)
+                {
+                    g_progress.lastError = *error;
+                }
+                else if (clearError)
+                {
+                    g_progress.lastError.clear();
+                }
+            }
+            catch (...)
+            {
+                g_progress.name.clear();
+                g_progress.entryPoint.clear();
+                g_progress.phase.clear();
+                g_progress.lastError.clear();
+            }
+        }
+
+        // The request's text outlives its Process scope, including this tracker.
+        const std::string_view m_name;
+        const std::string_view m_entryPoint;
         const std::string& m_error;
         const char* m_phase = "Resolving shader dependencies";
         bool m_recompiling{};
+        CompileProgress* m_previous{};
+        CompileProgress* m_next{};
     };
     std::atomic<std::uint64_t> g_memoryHits{};
     std::atomic<std::uint64_t> g_diskHits{};
