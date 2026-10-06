@@ -159,6 +159,9 @@ namespace RHIShaderCompiler
         bool recompiling{};
         std::uint64_t revision{};
         std::uint64_t completedRequests{};
+        std::uint64_t activeRequests{};
+        // Name/entry/phase belong to the most recently updated active request.
+        // Completing another parallel request cannot hide the remaining work.
         std::string name, entryPoint, phase, lastError;
     };
     Progress GetProgress();
@@ -167,4 +170,3 @@ namespace RHIShaderCompiler
     void ResetStats();
     void ClearMemoryCache();
 }
-
