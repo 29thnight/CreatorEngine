@@ -436,6 +436,25 @@ void editor::windows::draw_preferences()
     float width = preferences.GetContentTreeWidth();
     if (ImGui::SliderFloat("Content Browser tree width", &width, 120.f, 600.f))
     { preferences.SetContentTreeWidth(width); changed = true; }
+
+    ImGui::SeparatorText("Frame rate");
+    int mode = static_cast<int>(preferences.GetFrameRateMode());
+    if (ImGui::Combo("Editor frame rate", &mode, "Display refresh\0Unlimited\0Custom\0"))
+    { preferences.SetFrameRateMode(static_cast<EditorFrameRateMode>(mode)); changed = true; }
+    if (EditorFrameRateMode::Custom == preferences.GetFrameRateMode())
+    {
+        int rate = static_cast<int>(preferences.GetCustomFrameRate());
+        if (ImGui::SliderInt("Custom fps", &rate,
+                static_cast<int>(EditorPreferences::kMinCustomFrameRate),
+                static_cast<int>(EditorPreferences::kMaxCustomFrameRate), "%d", ImGuiSliderFlags_AlwaysClamp))
+        { preferences.SetCustomFrameRate(static_cast<std::uint32_t>(rate)); changed = true; }
+    }
+    int background = static_cast<int>(preferences.GetBackgroundFrameRate());
+    if (ImGui::SliderInt("Background fps (0 = off)", &background, 0,
+            static_cast<int>(EditorPreferences::kMaxBackgroundFrameRate), "%d", ImGuiSliderFlags_AlwaysClamp))
+    { preferences.SetBackgroundFrameRate(static_cast<std::uint32_t>(background)); changed = true; }
+    ImGui::TextDisabled("Play mode is uncapped. Background limit pauses while loading or compiling shaders.");
+
     if (changed) EditorSettingsStore::Get().Save();
     ImGui::TextWrapped("Manage workspace layouts from Window > Workspace.");
 }

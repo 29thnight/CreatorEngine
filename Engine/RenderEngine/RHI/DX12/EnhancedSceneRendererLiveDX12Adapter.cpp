@@ -254,6 +254,11 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::GetCompletedFenceValue() const
     return m_impl->resources.GetCompletedFenceValue();
 }
 
+bool EnhancedSceneRendererLiveDX12Adapter::SignalEventOnFenceValue(uint64_t value, void* event) const
+{
+    return IsInitialized() && m_impl->resources.SignalEventOnFenceValue(value, static_cast<HANDLE>(event));
+}
+
 uint64_t EnhancedSceneRendererLiveDX12Adapter::GetLastSignaledFenceValue() const
 {
     return m_impl->resources.GetLastSignaledFenceValue();

@@ -150,6 +150,12 @@ public:
         // UINT64_MAX는 장치 제거를 뜻한다. 모든 GPU 소비자의 완료가 아니다.
         return UINT64_MAX == completed ? 0 : completed;
     }
+    /// 펜스가 value 에 닿으면 event 를 신호한다(이미 지났으면 즉시). 완료를
+    /// 시간 조회로 엿보면 타이머 눈금(15.6 ms)에 묶이므로 이 신호로 깨어난다.
+    bool SignalEventOnFenceValue(uint64_t value, HANDLE event) const
+    {
+        return m_fence && SUCCEEDED(m_fence->SetEventOnCompletion(value, event));
+    }
 
     // ── 스왑체인 (3-9 교체 — ImGui/셸이 DX12로 출력하는 경로) ──
     //

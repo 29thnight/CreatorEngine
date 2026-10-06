@@ -258,6 +258,7 @@ struct EnhancedRenderThreadStats
     uint64_t displayLeaseSkips{ 0 };
     uint64_t producerPacingWaits{ 0 };
     uint64_t displayLeaseWaits{ 0 };
+    uint64_t displayPacingWaits{ 0 };
     // 마지막 실제 장면 제출의 신원이다. 이 값이나 입력 나이가 GPU 완료를 뜻하지 않는다.
     uint64_t admittedFrameId{ 0 };
     double lastAdmissionAgeMs{ 0.0 };
@@ -279,6 +280,23 @@ struct EnhancedRenderThreadStats
     bool running{ false };
     bool accepting{ false };
     bool producerConsumerSeparated{ false };
+};
+
+/// RenderThread 가 새 프레임을 받아들이는 속도. 정하는 쪽은 호스트다 —
+/// 에디터는 포커스·실행 중 여부·설정으로, Player 는 기본값으로.
+enum class EnhancedLivePacingMode : uint8_t
+{
+    Display,    // 합성기 시계 한 번에 하나. 시계가 없으면(윈도우 10) 상한 없음.
+    Unlimited,  // 상한 없음. 성능 측정과 실행 중 게임용.
+    FixedRate,  // 초당 framesPerSecond 개. 0 이면 상한 없음.
+};
+
+struct EnhancedLivePacing
+{
+    EnhancedLivePacingMode mode{ EnhancedLivePacingMode::Display };
+    uint32_t framesPerSecond{ 0 };
+
+    bool operator==(const EnhancedLivePacing&) const = default;
 };
 
 /// 라이브 씬이 부팅 시 고정할 RHI 백엔드. 엔트리 계층이
@@ -852,6 +870,10 @@ namespace EnhancedSceneRenderer
     /// SceneManager가 RenderScene을 Finalize하기 전에 호출해야 한다.
     void StopLiveRenderThread();
     EnhancedRenderThreadStats GetLiveRenderThreadStats();
+
+    /// 어느 스레드에서나 부를 수 있다. 바뀌면 RenderThread 를 깨워 바로 따른다.
+    void SetLivePacing(EnhancedLivePacing pacing);
+    EnhancedLivePacing GetLivePacing();
 
     /// RenderThread 수명·프레임 구간 훅(PHASE 14 P2).
     ///

@@ -127,6 +127,32 @@ bool EditorSettingsStore::Initialize() noexcept
                     preferences.SetContentTreeWidth(width);
             }
 
+            if (root["frameRateMode"])
+            {
+                const std::string mode = root["frameRateMode"].AsString();
+                if (mode == "display") preferences.SetFrameRateMode(EditorFrameRateMode::Display);
+                else if (mode == "unlimited") preferences.SetFrameRateMode(EditorFrameRateMode::Unlimited);
+                else if (mode == "custom") preferences.SetFrameRateMode(EditorFrameRateMode::Custom);
+                else return ReportSettingsError("frameRateMode must be display, unlimited or custom.");
+            }
+
+            if (root["customFrameRate"])
+            {
+                const int rate = root["customFrameRate"].As<int>();
+                if (rate < static_cast<int>(EditorPreferences::kMinCustomFrameRate)
+                    || rate > static_cast<int>(EditorPreferences::kMaxCustomFrameRate))
+                    return ReportSettingsError("customFrameRate must be between 10 and 1000.");
+                preferences.SetCustomFrameRate(static_cast<std::uint32_t>(rate));
+            }
+
+            if (root["backgroundFrameRate"])
+            {
+                const int rate = root["backgroundFrameRate"].As<int>();
+                if (rate < 0 || rate > static_cast<int>(EditorPreferences::kMaxBackgroundFrameRate))
+                    return ReportSettingsError("backgroundFrameRate must be between 0 and 60.");
+                preferences.SetBackgroundFrameRate(static_cast<std::uint32_t>(rate));
+            }
+
             if (root["startupSceneName"])
             {
 				const std::filesystem::path startupScene =
@@ -249,6 +275,11 @@ bool EditorSettingsStore::Save() noexcept
             std::filesystem::path(
                 m_buildSettings.GetStartupSceneName()).string());
         root.Child("imguiScale").SetScalar(m_preferences.GetImGuiScale());
+        root.Child("frameRateMode").SetScalar(std::string(
+            EditorFrameRateMode::Unlimited == m_preferences.GetFrameRateMode() ? "unlimited"
+            : EditorFrameRateMode::Custom == m_preferences.GetFrameRateMode() ? "custom" : "display"));
+        root.Child("customFrameRate").SetScalar(static_cast<int>(m_preferences.GetCustomFrameRate()));
+        root.Child("backgroundFrameRate").SetScalar(static_cast<int>(m_preferences.GetBackgroundFrameRate()));
         // W3: read the legacy personal width for migration only; workspace owns future writes.
         root.Child("projectName").SetScalar(m_buildSettings.GetProjectName());
         // Editor 호스트는 백엔드 키를 읽거나 덮어쓰지 않는다.

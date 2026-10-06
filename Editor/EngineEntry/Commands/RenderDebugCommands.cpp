@@ -58,6 +58,7 @@
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
 #include "EditorSessionState.h"
+#include "EditorSettingsStore.h"
 #include "EngineBootstrap.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
@@ -339,6 +340,59 @@ namespace ConsoleCmd
         return Ok({}, std::move(data));
     }
 
+    // Preferences 화면과 같은 값을 바꾸고 같이 저장한다. 메모리에만 두면 다른
+    // 경로의 Save() 가 결국 써 버려, "세션 한정" 은 거짓이 된다(실측).
+    // 적용은 다음 발행 프레임의 App::ResolveLivePacing 이 한다.
+    static CommandCore::CommandResult Cmd_render_pacing(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        constexpr const char* kUsage = "render.pacing [status | display | unlimited | <fps> | background <fps>]";
+        EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
+        const auto parseRate = [](const std::string& text, int& rate) {
+            try { size_t used = 0; rate = std::stoi(text, &used); return used == text.size(); }
+            catch (...) { return false; }
+        };
+        if (ctx.parts.size() == 3 && ctx.parts[1] == "background")
+        {
+            int rate = 0;
+            if (!parseRate(ctx.parts[2], rate) || rate < 0
+                || rate > static_cast<int>(EditorPreferences::kMaxBackgroundFrameRate))
+                return InvalidArguments("background fps must be 0..60 (0 = off)");
+            preferences.SetBackgroundFrameRate(static_cast<std::uint32_t>(rate));
+        }
+        else if (ctx.parts.size() == 2 && ctx.parts[1] == "display")
+            preferences.SetFrameRateMode(EditorFrameRateMode::Display);
+        else if (ctx.parts.size() == 2 && ctx.parts[1] == "unlimited")
+            preferences.SetFrameRateMode(EditorFrameRateMode::Unlimited);
+        else if (ctx.parts.size() == 2 && ctx.parts[1] != "status")
+        {
+            int rate = 0;
+            if (!parseRate(ctx.parts[1], rate)
+                || rate < static_cast<int>(EditorPreferences::kMinCustomFrameRate)
+                || rate > static_cast<int>(EditorPreferences::kMaxCustomFrameRate))
+                return InvalidArguments(kUsage);
+            preferences.SetCustomFrameRate(static_cast<std::uint32_t>(rate));
+            preferences.SetFrameRateMode(EditorFrameRateMode::Custom);
+        }
+        else if (ctx.parts.size() > 2)
+            return InvalidArguments(kUsage);
+        if (ctx.parts.size() > 1 && ctx.parts[1] != "status" && !EditorSettingsStore::Get().Save())
+            return Fail("render.pacing_save_failed", "Pacing changed for this session but EngineSettings.asset was not written");
+
+        const EditorFrameRateMode mode = preferences.GetFrameRateMode();
+        const EnhancedLivePacing applied = EnhancedSceneRenderer::GetLivePacing();
+        auto data = CommandData::Object();
+        data.Set("mode", CommandData::String(EditorFrameRateMode::Unlimited == mode ? "unlimited"
+            : EditorFrameRateMode::Custom == mode ? "custom" : "display"));
+        data.Set("customFps", CommandData::Int(preferences.GetCustomFrameRate()));
+        data.Set("backgroundFps", CommandData::Int(preferences.GetBackgroundFrameRate()));
+        // 지금 렌더 스레드에 걸린 값. 바꾼 직후에는 다음 프레임 발행 전이라 이전 값일 수 있다.
+        data.Set("appliedMode", CommandData::String(EnhancedLivePacingMode::Unlimited == applied.mode ? "unlimited"
+            : EnhancedLivePacingMode::FixedRate == applied.mode ? "fixed" : "display"));
+        data.Set("appliedFps", CommandData::Int(applied.framesPerSecond));
+        return Ok({}, std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_dx12_live(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -392,6 +446,7 @@ namespace ConsoleCmd
         admission.Set("displayLeaseSkips", CommandData::Int(renderThread.displayLeaseSkips));
         admission.Set("producerPacingWaits", CommandData::Int(renderThread.producerPacingWaits));
         admission.Set("displayLeaseWaits", CommandData::Int(renderThread.displayLeaseWaits));
+        admission.Set("displayPacingWaits", CommandData::Int(renderThread.displayPacingWaits));
         admission.Set("lastAdmissionAgeMs", CommandData::Double(renderThread.lastAdmissionAgeMs));
         admission.Set("maxAdmissionAgeMs", CommandData::Double(renderThread.maxAdmissionAgeMs));
         admission.Set("pendingAgeMs", CommandData::Double(renderThread.pendingAgeMs));
@@ -854,6 +909,7 @@ namespace ConsoleCmd
         reg.Result({ "render.matmode" }, &Cmd_render_matmode);
         reg.Result({ "render.environment" }, &Cmd_render_environment);
         reg.Result({ "render.backend" }, &Cmd_render_backend);
+        reg.Result({ "render.pacing" }, &Cmd_render_pacing);
         reg.Result({ "dx12.live" }, &Cmd_dx12_live);
         reg.Result({ "render.live.wait" }, &Cmd_render_live_wait);
         reg.Result({ "render.live.fence" }, &Cmd_render_live_wait);

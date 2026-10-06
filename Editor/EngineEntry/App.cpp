@@ -341,6 +341,36 @@ void Core::App::Load()
 	}
 }
 
+/// 이번 프레임의 렌더 속도. 실행 중 게임은 편집 상한을 받지 않는다(게임 쪽 상한 설정이
+/// 아직 없어 무제한). 창이 뒤로 가면 배경 속도로 낮추되, 장면 로드·셰이더 컴파일 중에는
+/// 그 일을 늦추지 않도록 풀고, 자동화 실행은 측정이 흔들리지 않도록 아예 낮추지 않는다.
+/// 포그라운드 판정은 프로세스 단위다 — ImGui 멀티뷰포트 창도 에디터 창이다.
+static EnhancedLivePacing ResolveLivePacing(HWND mainWindow)
+{
+    if (SceneManagers->IsGameStart())
+        return { EnhancedLivePacingMode::Unlimited, 0 };
+
+    const EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
+    static const bool automation = EditorHasAutomationArgument();
+    const uint32_t background = preferences.GetBackgroundFrameRate();
+    if (0 != background && !automation)
+    {
+        DWORD foregroundProcess = 0;
+        if (const HWND foreground = GetForegroundWindow())
+            GetWindowThreadProcessId(foreground, &foregroundProcess);
+        const bool inBackground = IsIconic(mainWindow) || foregroundProcess != GetCurrentProcessId();
+        if (inBackground && !SceneManagers->IsSceneLoading() && !RHIShaderCompiler::GetProgress().active)
+            return { EnhancedLivePacingMode::FixedRate, background };
+    }
+
+    switch (preferences.GetFrameRateMode())
+    {
+    case EditorFrameRateMode::Unlimited: return { EnhancedLivePacingMode::Unlimited, 0 };
+    case EditorFrameRateMode::Custom: return { EnhancedLivePacingMode::FixedRate, preferences.GetCustomFrameRate() };
+    default: return { EnhancedLivePacingMode::Display, 0 };
+    }
+}
+
 /// 이번 상태를 밀봉해 전용 RenderThread에 발행한다. 돌려주는 것은 이번에
 /// 넘긴 뷰의 수다 — 부팅 예열이 "만들 것이 있는가"를 이 수로 판정한다.
 uint32_t Core::App::PublishRenderFrame()
@@ -422,6 +452,7 @@ uint32_t Core::App::PublishRenderFrame()
     // 카메라·gizmo 입력은 값/소유 handle로 확보했다. delta 병합과 queue 역압력은
     // 기존 PublishLiveFrame 경로에 남기되 그 대기는 scene lock 밖에서 한다.
     sceneLock.unlock();
+	EnhancedSceneRenderer::SetLivePacing(ResolveLivePacing(m_hWnd));
 	if (EnhancedSceneRenderer::PublishLiveFrame(std::move(renderFrame)))
 	{
 		m_main->NotifyRenderFramePublished(publishedFrameId);

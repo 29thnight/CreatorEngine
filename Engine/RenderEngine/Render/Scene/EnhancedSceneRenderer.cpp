@@ -79,6 +79,9 @@
 #include <string_view>
 #include <unordered_map>
 #include <set>
+#include <wrl/wrappers/corewrappers.h>
+#include <dwmapi.h>
+#pragma comment(lib, "dwmapi.lib")
 #include <mathematics/transform.hpp>
 #include <mathematics/scalar.hpp>
 
@@ -1252,6 +1255,45 @@ namespace
         uint64_t renderLastAdmissionNanoseconds{ 0 };
         double renderLastAdmissionAgeMs{ 0.0 };
         double renderMaxAdmissionAgeMs{ 0.0 };
+        uint64_t renderDisplayPacingWaits{ 0 };
+
+        // ── RT 깨움과 화면 주기 맞춤 ──
+        //
+        // RT 는 시간 조회로 깨지 않는다. 2 ms 로 적은 wait_for 가 이 기계에서
+        // 실제로는 15.6 ms 타이머 눈금으로 자서, 눈금마다 두 장만 그리고
+        // 나머지 시간을 잤다(초당 129장, 10-06 실측). 대신 GT 발행·정지는
+        // renderWakeEvent 로, GPU 완료는 가장 오래된 진행 중 제출의 펜스 값에
+        // 건 gpuCompletionEvent 로 깨운다. 둘 다 자동 재설정이라, 잠금을 놓은 뒤
+        // 신호가 와도 다음 대기가 바로 돌아온다.
+        //
+        // 깨움만 바꾸면 RT 가 화면이 실을 수 없는 프레임을 초당 500장 넘게 그린다.
+        // 표시 쪽은 수직 동기 없이 완성본마다 출력하므로 화면 주기의 기준점은
+        // 합성기 시계뿐이다. 진입은 시계 한 번에 한 번이다.
+        //
+        // ★ 합성기 프레임 번호(DCompositionGetFrameId)로 세면 안 된다. 수직 동기
+        //   없는 출력마다 합성 프레임이 생겨 에디터가 돌면 초당 250 가까이 오른다
+        //   (60 Hz 화면, 10-06 실측). 시계 대기의 반환값만이 화면 주기를 센다.
+        static constexpr DWORD kRenderWakeBackstopMs = 100;
+        // 시계 대기의 상한. 시계가 멈추면(화면 꺼짐 등) 이 간격으로 깨어 아래
+        // 경과 시간 규칙으로 진입한다.
+        static constexpr DWORD kCompositorStallMs = 50;
+        // RT 가 바빠 시계를 놓쳤으면 한 주기에서 이만큼 모자라도 진입한다.
+        static constexpr uint64_t kMissedTickSlackNanoseconds = 2000000;
+        Microsoft::WRL::Wrappers::Event renderWakeEvent{
+            CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS) };
+        Microsoft::WRL::Wrappers::Event gpuCompletionEvent{
+            CreateEventExW(nullptr, nullptr, 0, EVENT_ALL_ACCESS) };
+        // FixedRate 의 다음 진입 시각. 시간 대기는 타이머 눈금에 묶이므로
+        // 고해상도 대기 타이머를 같은 대기 목록에 넣는다.
+        Microsoft::WRL::Wrappers::HandleT<Microsoft::WRL::Wrappers::HandleTraits::HANDLENullTraits> pacingTimer{
+            CreateWaitableTimerExW(nullptr, nullptr, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS) };
+        std::atomic<EnhancedLivePacing> livePacing{};
+        uint64_t armedGpuFenceValue{ 0 };          // RT 전용
+        bool compositorTickSinceAdmission{ true };  // RT 전용
+        uint64_t pacedAdmissionNanoseconds{ 0 };    // RT 전용
+        // 윈도우 11 의 dcomp 함수. 없으면 Display 진입을 제한하지 않는다.
+        using CompositorWaitFn = DWORD(WINAPI*)(UINT, const HANDLE*, DWORD);
+        CompositorWaitFn compositorWait{ nullptr };
 
         // status/검증/PIX wait가 RT의 pipeline 포인터와 통계를 직접 읽을 때만
         // 잡는다. 일반 CE display 조회는 더 좁은 displayLifetimeMutex를 쓴다.
@@ -1263,6 +1305,11 @@ namespace
         // 맞추기 위해 renderQueueMutex를 잡은 채 renderStateMutex를 잡지 않는다.
         void CollectCompletedDisplays();
         uint32_t PendingGpuSubmissions() const;
+        // RT 전용. Arm 은 renderStateMutex 아래에서, 나머지는 잠금 없이 부른다.
+        void ArmGpuCompletionEvent(uint32_t pendingGpu);
+        bool PacingAllowsAdmission() const;
+        void MarkPacedAdmission();
+        void WaitForRenderWork(bool untilPacingSlot, DWORD timeoutMs);
         bool ShouldSkipScenePixels(const EnhancedLiveFramePacket& frame);
         void RecordSceneAdmission(const EnhancedLiveFramePacket& frame);
         bool StartRenderThread(std::string& outError);
@@ -5405,6 +5452,104 @@ namespace
         return pending;
     }
 
+    void LiveState::ArmGpuCompletionEvent(uint32_t pendingGpu)
+    {
+        // Vulkan 은 이벤트를 걸지 않는다. 걸지 못하면 armedGpuFenceValue 가 0 이고,
+        // 대기 쪽이 kSceneCompletionPollMs 조회로 물러선다.
+        if (0 == pendingGpu || EnhancedLiveBackend::DX12 != backend || !pipeline)
+        {
+            armedGpuFenceValue = 0;
+            return;
+        }
+        uint64_t oldest = UINT64_MAX;
+        for (const LivePipeline::CameraView& view : pipeline->views)
+        {
+            if (!view.pendingQueue.empty())
+                oldest = (std::min)(oldest, view.slots[view.pendingQueue.front()].fenceValue);
+        }
+        // 같은 값에 다시 걸면 펜스의 대기 목록만 쌓인다.
+        if (UINT64_MAX == oldest || oldest == armedGpuFenceValue) return;
+        armedGpuFenceValue = dx12.SignalEventOnFenceValue(oldest, gpuCompletionEvent.Get()) ? oldest : 0;
+    }
+
+    bool LiveState::PacingAllowsAdmission() const
+    {
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        const uint64_t elapsed = capture_steady_nanoseconds() - pacedAdmissionNanoseconds;
+        switch (pacing.mode)
+        {
+        case EnhancedLivePacingMode::Unlimited:
+            return true;
+        case EnhancedLivePacingMode::FixedRate:
+            return 0 == pacing.framesPerSecond || elapsed >= 1000000000ull / pacing.framesPerSecond;
+        case EnhancedLivePacingMode::Display:
+            break;
+        }
+        if (!compositorWait || compositorTickSinceAdmission) return true;
+        // 시계를 대기 밖에서 놓쳤거나 시계가 멈췄다. 주기는 모니터를 옮기면
+        // 바뀌므로 그때그때 묻는다(1 us 남짓).
+        DWM_TIMING_INFO timing{};
+        timing.cbSize = sizeof(timing);
+        LARGE_INTEGER frequency{};
+        if (FAILED(DwmGetCompositionTimingInfo(nullptr, &timing)) || 0 == timing.qpcRefreshPeriod ||
+            !QueryPerformanceFrequency(&frequency) || 0 == frequency.QuadPart)
+        {
+            return true;
+        }
+        const uint64_t periodNanoseconds =
+            timing.qpcRefreshPeriod * 1000000000ull / static_cast<uint64_t>(frequency.QuadPart);
+        return elapsed + kMissedTickSlackNanoseconds >= periodNanoseconds;
+    }
+
+    void LiveState::MarkPacedAdmission()
+    {
+        compositorTickSinceAdmission = false;
+        const uint64_t now = capture_steady_nanoseconds();
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        if (EnhancedLivePacingMode::FixedRate == pacing.mode && 0 != pacing.framesPerSecond)
+        {
+            // 타이머 깨어남 지연(~0.5 ms)이 주기마다 쌓이면 초당 144 가 133 이 된다.
+            // 이상적인 격자에 붙이고, 두 주기 넘게 밀렸으면 격자를 지금으로 옮긴다.
+            const uint64_t interval = 1000000000ull / pacing.framesPerSecond;
+            pacedAdmissionNanoseconds = now - pacedAdmissionNanoseconds < 2 * interval
+                ? pacedAdmissionNanoseconds + interval : now;
+            return;
+        }
+        pacedAdmissionNanoseconds = now;
+    }
+
+    void LiveState::WaitForRenderWork(bool untilPacingSlot, DWORD timeoutMs)
+    {
+        // 진입 시점을 기다리는 동안에도 같은 두 이벤트로 깬다. 끝난 GPU 제출을
+        // 바로 회수해야 표시가 늦지 않는다.
+        const HANDLE handles[] = { renderWakeEvent.Get(), gpuCompletionEvent.Get(), pacingTimer.Get() };
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        if (untilPacingSlot && EnhancedLivePacingMode::Display == pacing.mode && compositorWait)
+        {
+            // 시계가 울려 돌아오면 WAIT_OBJECT_0 + 핸들 수를 돌려준다.
+            if (WAIT_OBJECT_0 + 2 == compositorWait(2, handles, timeoutMs))
+                compositorTickSinceAdmission = true;
+            return;
+        }
+        if (untilPacingSlot && EnhancedLivePacingMode::FixedRate == pacing.mode &&
+            0 != pacing.framesPerSecond && pacingTimer.IsValid())
+        {
+            const uint64_t interval = 1000000000ull / pacing.framesPerSecond;
+            const uint64_t elapsed = capture_steady_nanoseconds() - pacedAdmissionNanoseconds;
+            // 음수는 상대 시각이고 단위는 100 ns 다.
+            LARGE_INTEGER due{};
+            due.QuadPart = -static_cast<LONGLONG>(elapsed < interval ? (interval - elapsed) / 100 + 1 : 1);
+            if (SetWaitableTimer(pacingTimer.Get(), &due, 0, nullptr, nullptr, FALSE))
+            {
+                WaitForMultipleObjects(3, handles, FALSE, timeoutMs);
+                return;
+            }
+        }
+        // 기다릴 진입 시점이 없으면(Unlimited, 시계 없음) 짧게 조회로 물러선다.
+        WaitForMultipleObjects(2, handles, FALSE,
+            untilPacingSlot ? (std::min)(timeoutMs, DWORD{ kSceneCompletionPollMs }) : timeoutMs);
+    }
+
     bool LiveState::ShouldSkipScenePixels(const EnhancedLiveFramePacket& frame)
     {
         if (controlledCaptureFrame)
@@ -5412,7 +5557,17 @@ namespace
             return false;
         }
         const uint64_t now = capture_steady_nanoseconds();
-        if (capture_age_milliseconds(frame.sourceCaptureNanoseconds, now) <= kSceneSoftAgeBudgetMs)
+        // 고정 속도로 일부러 늦출 때는 나이가 늘 기준을 넘는다 — GT 가 찍은 뒤
+        // 생산자 대기(최대 kProducerPacingMs)를 치르고, RT 가 다시 한 주기를 기다려
+        // 집기 때문이다. 그 몫을 빼지 않으면 늦춘 그림을 "밀렸다"며 버린다
+        // (초당 10 에서 그림 3~4장으로 실측).
+        double budgetMs = kSceneSoftAgeBudgetMs;
+        const EnhancedLivePacing pacing = livePacing.load(std::memory_order_relaxed);
+        if (EnhancedLivePacingMode::FixedRate == pacing.mode && 0 != pacing.framesPerSecond)
+        {
+            budgetMs += 2.0 * (std::min)(1000.0 / pacing.framesPerSecond, double{ kProducerPacingMs });
+        }
+        if (capture_age_milliseconds(frame.sourceCaptureNanoseconds, now) <= budgetMs)
         {
             return false;
         }
@@ -5469,6 +5624,21 @@ namespace
             std::free(delay);
         }
 
+        // 윈도우 11 합성기 시계. 정적 연결하면 윈도우 10 에서 엔진 DLL 적재가 실패한다.
+        if (!compositorWait)
+        {
+            if (const HMODULE dcomp = LoadLibraryExW(L"dcomp.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32))
+            {
+                compositorWait = reinterpret_cast<CompositorWaitFn>(
+                    GetProcAddress(dcomp, "DCompositionWaitForCompositorClock"));
+            }
+            if (!compositorWait)
+            {
+                Debug::PrintLog(spdlog::level::warn,
+                    "[RenderThread] 합성기 시계가 없어 화면 주기 맞춤을 건너뛴다");
+            }
+        }
+
         try
         {
             renderThread = std::thread([this]
@@ -5496,6 +5666,12 @@ namespace
                 }
 
                 auto nextVideoMemorySample = std::chrono::steady_clock::now();
+                // 펜스 이벤트를 걸지 못했으면(Vulkan) 예전처럼 완료를 조회한다.
+                const auto wakeTimeout = [this](uint32_t pendingGpu) -> DWORD
+                {
+                    return pendingGpu != 0 && 0 == armedGpuFenceValue
+                        ? kSceneCompletionPollMs : kRenderWakeBackstopMs;
+                };
                 for (;;)
                 {
                     // GT 발행이 멈춰도 마지막 생산자 GPU 결과를 수집한다.
@@ -5519,6 +5695,7 @@ namespace
                             }
                             CollectCompletedDisplays();
                             pendingGpu = enabled ? PendingGpuSubmissions() : 0;
+                            ArmGpuCompletionEvent(pendingGpu);
                         }
                         catch (const std::exception& exception)
                         {
@@ -5541,20 +5718,16 @@ namespace
                         std::unique_lock<std::mutex> queueLock(renderQueueMutex);
                         if (renderQueue.empty())
                         {
-                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
-                                EnhancedSceneRenderer::RenderPhase::queue_idle);
-                            // 기존의 짧게 닫히는 유휴 프로파일 구간을 보존한다.
-                            // 빠른 완료 조회는 아직 GPU 작업이 남았을 때만 수행한다.
-                            renderQueueWake.wait_for(queueLock, std::chrono::milliseconds(
-                                pendingGpu != 0 ? kSceneCompletionPollMs : 100), [this]
-                            {
-                                return renderThreadStopRequested || !renderQueue.empty();
-                            });
-                            // 대기에서 깨어난 뒤 완료를 다시 수집하고 최신 입력을 고른다.
-                            if (renderThreadStopRequested && renderQueue.empty())
+                            if (renderThreadStopRequested)
                             {
                                 break;
                             }
+                            // 새 발행·정지·GPU 완료 중 하나로 깬다. 깨어난 뒤 완료를
+                            // 다시 수집하고 최신 입력을 고른다.
+                            queueLock.unlock();
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            WaitForRenderWork(false, wakeTimeout(pendingGpu));
                             continue;
                         }
                         if (renderThreadTestDelayMs != 0 && !renderThreadStopRequested)
@@ -5586,30 +5759,37 @@ namespace
                         if (requiredCredits != 0 && pendingGpu + requiredCredits > 2 && !renderThreadStopRequested)
                         {
                             ++renderGpuAdmissionWaits;
+                            // 가장 오래된 제출의 펜스 완료가 깨운다. 새 발행이 깨워도
+                            // credit 이 그대로면 다시 여기로 와서 잔다.
+                            queueLock.unlock();
                             EnhancedSceneRenderer::RenderThreadPhaseScope idle(
                                 EnhancedSceneRenderer::RenderPhase::queue_idle);
-                            // 새 발행은 대기 입력을 교체하지만, 알림이 반복돼도
-                            // 완료 조회가 대기 없는 반복으로 바뀌지 않게 한다.
-                            renderQueueWake.wait_for(queueLock,
-                                std::chrono::milliseconds(kSceneCompletionPollMs), [this]
-                                {
-                                    return renderThreadStopRequested;
-                                });
+                            WaitForRenderWork(false, wakeTimeout(pendingGpu));
                             continue;
                         }
                         if (renderDisplayLeaseBlocked && !renderThreadStopRequested)
                         {
                             // 표시 슬롯이 하나도 비지 않았는데 바로 다음 packet 을 집으면
-                            // 그릴 것 없이 packet 만 소비하며 돈다. 완료 조회 주기로 기다린다.
+                            // 그릴 것 없이 packet 만 소비하며 돈다. 슬롯을 놓는 표시 쪽은
+                            // 알림이 없으므로 다음 합성 주기에 다시 본다.
                             renderDisplayLeaseBlocked = false;
                             ++renderDisplayLeaseWaits;
+                            MarkPacedAdmission();
+                            queueLock.unlock();
                             EnhancedSceneRenderer::RenderThreadPhaseScope idle(
                                 EnhancedSceneRenderer::RenderPhase::queue_idle);
-                            renderQueueWake.wait_for(queueLock,
-                                std::chrono::milliseconds(kSceneCompletionPollMs), [this]
-                                {
-                                    return renderThreadStopRequested;
-                                });
+                            WaitForRenderWork(true, kCompositorStallMs);
+                            continue;
+                        }
+                        // 진입 속도 맞춤(livePacing). 종료 중에는 delta 를 순서대로
+                        // 흘려야 하므로 기다리지 않는다.
+                        if (!renderThreadStopRequested && !PacingAllowsAdmission())
+                        {
+                            ++renderDisplayPacingWaits;
+                            queueLock.unlock();
+                            EnhancedSceneRenderer::RenderThreadPhaseScope idle(
+                                EnhancedSceneRenderer::RenderPhase::queue_idle);
+                            WaitForRenderWork(true, kCompositorStallMs);
                             continue;
                         }
                         // 이 시점에만 입력을 확정한다. 기다리는 동안에도 대기 입력은
@@ -5618,6 +5798,7 @@ namespace
                         renderQueue.pop_front();
                         renderInProgress = 1;
                         activeFrameDrainOnly = renderThreadStopRequested;
+                        MarkPacedAdmission();
                     }
                     renderQueueWake.notify_all();
 
@@ -5871,6 +6052,7 @@ namespace
             static_cast<uint32_t>(renderQueue.size()));
         lock.unlock();
         renderQueueWake.notify_one();
+        SetEvent(renderWakeEvent.Get());
         return true;
     }
 
@@ -5887,6 +6069,7 @@ namespace
             }
         }
         renderQueueWake.notify_all();
+        SetEvent(renderWakeEvent.Get());
         if (shouldJoin)
         {
             renderThread.join();
@@ -5942,6 +6125,7 @@ namespace
         stats.displayLeaseSkips = renderDisplayLeaseSkips;
         stats.producerPacingWaits = renderProducerPacingWaits;
         stats.displayLeaseWaits = renderDisplayLeaseWaits;
+        stats.displayPacingWaits = renderDisplayPacingWaits;
         stats.admittedFrameId = renderAdmittedFrameId;
         stats.lastAdmissionAgeMs = renderLastAdmissionAgeMs;
         stats.maxAdmissionAgeMs = renderMaxAdmissionAgeMs;
@@ -6394,6 +6578,19 @@ bool EnhancedSceneRenderer::PublishLiveFrame(EnhancedLiveFramePacket frame)
     submission.frame = std::move(frame);
     submission.deltas = ProxyCommandQueue->CapturePending();
     return state.PublishFrame(std::move(submission));
+}
+
+void EnhancedSceneRenderer::SetLivePacing(EnhancedLivePacing pacing)
+{
+    LiveState& state = GetLiveState();
+    // 호스트는 매 프레임 부른다. 바뀐 때만 RT 를 깨워 느린 주기의 대기를 끊는다.
+    if (state.livePacing.exchange(pacing, std::memory_order_relaxed) != pacing)
+        SetEvent(state.renderWakeEvent.Get());
+}
+
+EnhancedLivePacing EnhancedSceneRenderer::GetLivePacing()
+{
+    return GetLiveState().livePacing.load(std::memory_order_relaxed);
 }
 
 void EnhancedSceneRenderer::SetRenderThreadHooks(const RenderThreadHooks& hooks)

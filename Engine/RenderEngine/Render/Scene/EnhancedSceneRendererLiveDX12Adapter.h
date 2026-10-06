@@ -69,6 +69,7 @@ public:
     void WaitForGpu();
     bool DrainForLifecycle(RHILifecycleCommand command, std::string& outError);
     uint64_t GetCompletedFenceValue() const;
+    bool SignalEventOnFenceValue(uint64_t value, void* event) const;
     uint64_t GetLastSignaledFenceValue() const;
     bool ConsumeSubmissionFailure(std::string& outError);
 
