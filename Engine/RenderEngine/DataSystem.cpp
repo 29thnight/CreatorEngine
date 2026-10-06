@@ -467,6 +467,11 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
                                                 detail + ")");
         return {};
     }
+    for (const auto& warning : loaded.warnings)
+    {
+        Debug::PrintLog(spdlog::level::warn, "[model.generation] optional geometry fallback: "
+            + sourceLabel + " (" + warning.context + ": " + warning.message + ")");
+    }
     // Authoring graphs are required even when an Editor project mounts a
     // previously cooked geometry generation. Player needs only the cooked closure.
     if (PathFinder::IsAssetAuthoringEnabled() && !GetFilePath(guid).empty() &&

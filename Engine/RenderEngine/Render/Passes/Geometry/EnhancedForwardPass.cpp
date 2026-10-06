@@ -32,8 +32,11 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstring>
 #include <filesystem>
 #include <functional>
+#include <limits>
+#include <stdexcept>
 #include <sstream>
 #include <string_view>
 #include <vector>
@@ -1312,6 +1315,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastDrawCount = 0;
     m_lastMaterialCount = 0;
     m_lastBatchCount = 0;
+    m_visibilityStats = {};
     m_batches.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
@@ -1321,6 +1325,11 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
 
     if (nullptr != context.forwardDraws)
     {
+        if (context.forwardDraws->size() > (std::numeric_limits<std::uint32_t>::max)())
+        {
+            outError = "Forward+ draw count exceeds 32-bit instance addressing.";
+            return false;
+        }
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
             MaterialView material{};
@@ -1425,6 +1434,16 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastMaterialCount = static_cast<uint32_t>(m_materialTextures.size());
     BuildAdjacentBatches(context);
     return EnsureTileBuffers(context, outError);
+}
+
+bool EnhancedForwardPass::PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError)
+{
+    if (m_batches.empty())
+    {
+        outError.clear();
+        return true;
+    }
+    return m_visibility.PreparePipelines(context, outError);
 }
 
 void EnhancedForwardPass::BuildAdjacentBatches(const EnhancedFrameContext& context)
@@ -1798,6 +1817,89 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         }
         return a.index < b.index;
     });
+    // Preserve the exact existing command boundary after the global depth
+    // merge. A Graph draw can split a native batch; each such range must retain
+    // its original local SV_InstanceID = 0..N-1 and instance-buffer slice.
+    // One GPU zero/full-count command per range avoids atomic order changes and
+    // needs neither a custom t6 binding nor nonportable base-instance behavior.
+    auto visibility = std::make_shared<OrderedVisibility>();
+    std::vector<GpuGeometryVisibility::Candidate> candidates;
+    std::vector<GpuGeometryVisibility::Bin> bins;
+    std::uint64_t outputOffset = 0;
+    constexpr auto maximum = (std::numeric_limits<std::uint32_t>::max)();
+    if (context.resources->GetIndirectDrawCapabilities().indexedDraw)
+    {
+        for (std::size_t i = 0; i < order.size();)
+        {
+            if (order[i].graph)
+            {
+                ++i;
+                continue;
+            }
+            const auto first = order[i++].index;
+            auto end = first + 1;
+            while (i < order.size() && !order[i].graph && order[i].index == end)
+            {
+                ++end;
+                ++i;
+            }
+            for (const auto& batch : m_batches)
+            {
+                const auto rangeFirst = (std::max)(first, batch.firstDraw);
+                const auto rangeEnd = (std::min)(end, batch.firstDraw + batch.drawCount);
+                if (rangeEnd <= rangeFirst)
+                {
+                    continue;
+                }
+                const auto count = rangeEnd - rangeFirst;
+                if (bins.size() >= maximum || count > maximum || outputOffset > maximum ||
+                    count > maximum - outputOffset || candidates.size() > maximum - count)
+                {
+                    throw std::runtime_error("Forward+ visibility ranges exceed 32-bit addressing.");
+                }
+                const auto bin = static_cast<std::uint32_t>(bins.size());
+                visibility->bins.emplace(std::make_pair(rangeFirst, rangeEnd), bin);
+                bins.push_back({m_drawGeometry.at(batch.geometryKey).indexCount, 0, 0,
+                                static_cast<std::uint32_t>(count)});
+                for (std::uint32_t local = 0; local < count; ++local)
+                {
+                    // Forward accepts arbitrary vertex programs without the
+                    // GBuffer deformation/bounds promise. Preserve every valid
+                    // custom/skinned effect conservatively until a sealed bound
+                    // contract proves rejection safe. No HZB rejection is used.
+                    candidates.push_back({{}, bin, local, static_cast<std::uint32_t>(outputOffset),
+                        GpuGeometryVisibility::kConservative | GpuGeometryVisibility::kNoOcclusion});
+                }
+                outputOffset += (std::uint64_t(count) + GpuGeometryVisibility::kOutputAlignment - 1u) /
+                    GpuGeometryVisibility::kOutputAlignment * GpuGeometryVisibility::kOutputAlignment;
+            }
+        }
+    }
+    std::string visibilityError;
+    const auto viewProjection = context.camera ? context.camera->view * context.camera->projection
+                                               : math::matrix4x4::identity();
+    if (!m_visibility.Prepare(context, viewProjection, candidates, bins, visibility->frame, visibilityError))
+    {
+        throw std::runtime_error(visibilityError);
+    }
+    if (visibility->frame)
+    {
+        const auto stats = visibility->frame->GetPreparedStats();
+        const auto accumulate = [](std::uint32_t& total, std::uint32_t count) {
+            if (count > (std::numeric_limits<std::uint32_t>::max)() - total)
+            {
+                throw std::runtime_error("Forward+ prepared visibility statistics exceed 32-bit addressing.");
+            }
+            total += count;
+        };
+        accumulate(m_visibilityStats.candidateCount, stats.candidateCount);
+        accumulate(m_visibilityStats.compactedBins, stats.compactedBins);
+        accumulate(m_visibilityStats.preservedBins, stats.preservedBins);
+        accumulate(m_visibilityStats.conservativeCandidates, stats.conservativeCandidates);
+        visibility->frame->Declare(graph);
+        visibility->frame->AddReadUsages(graph, shadeUsages);
+    }
+
     for (std::size_t i = 0; i < order.size();)
     {
         if (order[i].graph)
@@ -1823,7 +1925,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         shadeUsages.front().handle = shadeOutput;
         graph.AddPass(
             "Forward+.Shade", shadeUsages,
-            [this, &context, hasShadowMap, shared, first, end, shadeOutput](const auto& execution) mutable {
+            [this, &context, hasShadowMap, shared, first, end, shadeOutput, visibility](const auto& execution) mutable {
                 const RHITextureHandle colors[]{execution.ResolveHandle(shadeOutput)};
                 const auto depth =
                     RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(m_inputs.depth), kDepthFormat);
@@ -1852,7 +1954,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 }
                 RecordShading(encoder, context, static_cast<std::uint32_t>(context.lights->size()),
                               hasShadowMap ? execution.ResolveHandle(m_shadowMap) : RHITextureHandle{}, shared, first,
-                              end);
+                              end, *visibility);
             },
             true);
     }
@@ -1863,7 +1965,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 // 기록하면 그 차이가 결과에 섞여 무엇이 원인인지 알 수 없게 된다.
 bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrameContext& context, uint32_t lightCount,
                                         RHITextureHandle shadowResource, const EnhancedForwardLighting& lighting,
-                                        std::size_t first, std::size_t end)
+                                        std::size_t first, std::size_t end, const OrderedVisibility& visibility)
 {
     if (!m_shadePipelineRequest.IsValid() || !m_referencePipelineRequest.IsValid() || nullptr == context.forwardDraws ||
         context.forwardDraws->empty() || m_batches.empty())
@@ -1875,14 +1977,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
     // 인스턴스는 한 번에 올리고 드로우마다 주소만 옮긴다. 루트 SRV는 주소를
     // 받으므로 드로우별 재업로드가 필요 없다.
     const size_t drawCount = end - first;
-    const auto instanceUpload = context.resources->AllocateUpload(
-        RHIUploadRequest{drawCount * sizeof(ShadeInstance), RHIUploadUsage::BufferCopy, sizeof(ShadeInstance)});
-    if (!instanceUpload.IsValid())
-    {
-        return false;
-    }
-
-    auto* instances = static_cast<ShadeInstance*>(instanceUpload.cpuAddress);
+    std::vector<ShadeInstance> instances(drawCount);
     std::vector<MaterialView> materials(drawCount);
     std::string materialError;
     for (size_t i = 0; i < drawCount; ++i)
@@ -1893,7 +1988,7 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
         {
             return false;
         }
-        instances[i] = {}; // recycled upload memory must not supply legacy flow/UV state
+        instances[i] = {}; // keep every legacy flow/UV field and padding byte deterministic
         instances[i].world = math::transpose(draw.worldMatrix);
         instances[i].baseColor = material.baseColorFactor.rgba();
         instances[i].metallic = material.metallic;
@@ -1930,6 +2025,47 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
             instances[i].flowTotalSeconds = flow.totalSeconds;
             instances[i].flowDeltaSeconds = flow.deltaSeconds;
         }
+    }
+
+    // Every original command keeps the same element-zero and range length.
+    // Pad only between commands so Vulkan storage-buffer offsets are portable;
+    // changing byte allocation must not change custom SV_InstanceID semantics.
+    std::vector<std::uint64_t> batchOffsets(m_batches.size());
+    std::uint64_t instanceBytes = 0;
+    for (std::size_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
+    {
+        const auto& batch = m_batches[batchIndex];
+        const auto batchFirst = (std::max)(first, batch.firstDraw);
+        const auto batchEnd = (std::min)(end, batch.firstDraw + batch.drawCount);
+        if (batchEnd <= batchFirst)
+        {
+            continue;
+        }
+        instanceBytes = (instanceBytes + 255u) & ~std::uint64_t{255u};
+        batchOffsets[batchIndex] = instanceBytes;
+        instanceBytes += (batchEnd - batchFirst) * sizeof(ShadeInstance);
+    }
+    if (instanceBytes == 0)
+    {
+        return false;
+    }
+    const auto instanceUpload = context.resources->AllocateUpload(
+        {instanceBytes, RHIUploadUsage::BufferCopy, 256});
+    if (!instanceUpload.IsValid() || !instanceUpload.IsWritable())
+    {
+        return false;
+    }
+    for (std::size_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
+    {
+        const auto& batch = m_batches[batchIndex];
+        const auto batchFirst = (std::max)(first, batch.firstDraw);
+        const auto batchEnd = (std::min)(end, batch.firstDraw + batch.drawCount);
+        if (batchEnd <= batchFirst)
+        {
+            continue;
+        }
+        std::memcpy(static_cast<std::byte*>(instanceUpload.cpuAddress) + batchOffsets[batchIndex],
+                    instances.data() + (batchFirst - first), (batchEnd - batchFirst) * sizeof(ShadeInstance));
     }
 
     ShadeParams params{};
@@ -2070,8 +2206,9 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
     }
 
     bool drewAnything = false;
-    for (const DrawBatch& batch : m_batches)
+    for (std::size_t batchIndex = 0; batchIndex < m_batches.size(); ++batchIndex)
     {
+        const DrawBatch& batch = m_batches[batchIndex];
         const auto batchFirst = (std::max)(first, std::size_t{batch.firstDraw});
         const auto batchEnd = (std::min)(end, std::size_t{batch.firstDraw} + batch.drawCount);
         if (batchEnd <= batchFirst)
@@ -2141,12 +2278,26 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
 
         encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
             instanceUpload.SubRange(
-                static_cast<uint64_t>(batchFirst - first) * sizeof(ShadeInstance),
+                batchOffsets[batchIndex],
                 static_cast<uint64_t>(batchEnd - batchFirst) * sizeof(ShadeInstance)));
 
         encoder.SetVertexBuffer(entry.vertices, entry.vertexStride);
         encoder.SetIndexBuffer(entry.indices, entry.indexFormat);
-        encoder.DrawIndexed(entry.indexCount, static_cast<std::uint32_t>(batchEnd - batchFirst));
+        if (visibility.frame)
+        {
+            const auto bin = visibility.bins.find({batchFirst, batchEnd});
+            if (bin == visibility.bins.end() ||
+                !encoder.DrawIndexedIndirect(visibility.frame->Arguments(), visibility.frame->ArgsOffset(bin->second)))
+            {
+                throw std::runtime_error("Forward+ ordered indexed indirect submission failed.");
+            }
+        }
+        else
+        {
+            // Capability-only compatibility path, never selected by material,
+            // blending, skinning or arbitrary vertex-program semantics.
+            encoder.DrawIndexed(entry.indexCount, static_cast<std::uint32_t>(batchEnd - batchFirst));
+        }
         drewAnything = true;
     }
 
@@ -2155,6 +2306,8 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
 
 void EnhancedForwardPass::Shutdown()
 {
+    m_visibility.ShutdownAfterIdle();
+    m_visibilityStats = {};
     m_graphMaterials = nullptr;
     m_tileCountBuffer = {};
     m_tileListBuffer = {};

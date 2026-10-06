@@ -109,6 +109,10 @@ inline VulkanBarrierState ToVulkan(RHIResourceState state, bool isSource)
         return { VK_IMAGE_LAYOUT_GENERAL,
                  VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT, VK_ACCESS_2_INDEX_READ_BIT };
 
+    case RHIResourceState::VertexAndShaderResource:
+        return { VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT,
+                 VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_2_SHADER_READ_BIT };
+
     case RHIResourceState::IndirectArgument:
         return { VK_IMAGE_LAYOUT_GENERAL,
                  VK_PIPELINE_STAGE_2_DRAW_INDIRECT_BIT, VK_ACCESS_2_INDIRECT_COMMAND_READ_BIT };

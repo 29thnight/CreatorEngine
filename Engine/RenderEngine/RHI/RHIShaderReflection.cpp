@@ -31,6 +31,7 @@ std::string_view ToString(RHIShaderStage stage)
     case RHIShaderStage::Vertex: return "vertex";
     case RHIShaderStage::Pixel: return "pixel";
     case RHIShaderStage::Compute: return "compute";
+    case RHIShaderStage::Mesh: return "mesh";
     }
     return "unknown";
 }

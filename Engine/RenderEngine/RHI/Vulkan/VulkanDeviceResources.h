@@ -154,6 +154,10 @@ public:
     {
         return m_indirectDrawCapabilities;
     }
+    RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override
+    {
+        return m_meshShaderCapabilities;
+    }
     bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) override;
 
@@ -269,7 +273,7 @@ public:
     ///   사는데, 여기서는 캐시가 셰이더 모듈·셋 레이아웃까지 들어서 수명이
     ///   더 크고 live pipeline/자가 검증이 직접 소유한다. 인코더 resolve와
     ///   BeginFrame completion retirement를 위해 **가리키기만** 한다.
-    void SetPipelineCache(VulkanPipelineCache* cache) { m_pipelineCache = cache; }
+    void SetPipelineCache(VulkanPipelineCache* cache);
 
     // ── 자가 검증이 쓰는 원시 표면 (인터페이스 밖) ──
     //
@@ -363,7 +367,9 @@ private:
     uint32_t         m_queueFamily{ UINT32_MAX };
     bool             m_memoryBudgetSupported{ false };
     bool             m_nullDescriptorSupported{ false };
+    bool             m_meshShaderExtensionSupported{ false };
     RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
+    RHIMeshShaderCapabilities m_meshShaderCapabilities;
     VulkanViewportLimits m_viewportLimits;
     bool             m_uploadMemoryPressure{ false };
     RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;
@@ -560,6 +566,10 @@ public:
         // 구분되지 않는다.
         // I5-D4b: DX12와 대칭 — 핸들 진입점 계수.
         uint32_t modelGenerationUploads{ 0 };
+        uint32_t meshletUploads{ 0 };
+        uint32_t meshletFallbacks{ 0 };
+        uint32_t coarseLodUploads{ 0 };
+        uint32_t coarseLodFallbacks{ 0 };
         uint32_t failures{ 0 };
         uint64_t bytesUploaded{ 0 };
         uint32_t residentCount{ 0 };
@@ -610,9 +620,8 @@ private:
         const assets::ModelMeshHandle* modelKey, const void* vertexData,
         uint64_t vertexBytes, uint32_t vertexStride, uint32_t attributeMask,
         const uint32_t* indexData, uint32_t indexCount,
-        std::string& outError);
+        std::string& outError, const RHIModelMeshView* modelView = nullptr);
 
     struct Impl;
     std::unique_ptr<Impl> m_impl;
 };
-

@@ -11,6 +11,7 @@ namespace VulkanApi
     VK_GLOBAL_FUNCTIONS(VK_DEFINE_FN)
     VK_INSTANCE_FUNCTIONS(VK_DEFINE_FN)
     VK_DEVICE_FUNCTIONS(VK_DEFINE_FN)
+    VK_OPTIONAL_DEVICE_FUNCTIONS(VK_DEFINE_FN)
 #undef VK_DEFINE_FN
 }
 
@@ -121,6 +122,11 @@ bool VulkanApi::LoadDevice(VkDevice device, std::string& outError)
     VK_DEVICE_FUNCTIONS(VK_LOAD_DEVICE)
 #undef VK_LOAD_DEVICE
 
+#define VK_LOAD_OPTIONAL_DEVICE(name) \
+    name = reinterpret_cast<PFN_##name>(vkGetDeviceProcAddr(device, #name));
+    VK_OPTIONAL_DEVICE_FUNCTIONS(VK_LOAD_OPTIONAL_DEVICE)
+#undef VK_LOAD_OPTIONAL_DEVICE
+
     return true;
 }
 
@@ -130,6 +136,7 @@ void VulkanApi::Unload()
     VK_GLOBAL_FUNCTIONS(VK_CLEAR_FN)
     VK_INSTANCE_FUNCTIONS(VK_CLEAR_FN)
     VK_DEVICE_FUNCTIONS(VK_CLEAR_FN)
+    VK_OPTIONAL_DEVICE_FUNCTIONS(VK_CLEAR_FN)
 #undef VK_CLEAR_FN
 
     vkGetInstanceProcAddr = nullptr;
@@ -170,4 +177,3 @@ std::string VulkanApi::ResultToString(VkResult result)
     oss << "VkResult " << static_cast<int>(result);
     return oss.str();
 }
-

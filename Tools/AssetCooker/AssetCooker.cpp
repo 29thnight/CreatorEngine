@@ -30,6 +30,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <optional>
 #include <process.h>
 #include <objbase.h> // MBC11: CoInitializeEx
 #include <set>
@@ -76,6 +77,8 @@ namespace
         std::vector<std::filesystem::path> scenes{};
         std::string identityEpoch{};
         assets::ModelAuthoringFailurePoint modelAuthoringFailurePoint{};
+        std::optional<bool> buildMeshlets{};
+        std::optional<std::uint32_t> lodLevels{};
     };
 
     void PrintUsage()
@@ -88,7 +91,7 @@ namespace
             << "       [--material-program-root <preverified-program-tree>]\n"
             << "       (--model은 게시된 generation을 내보낸다 — 먼저 --author-model-asset)\n"
             << "       AssetCooker --author-model-asset "
-               "--asset-root <Assets> --output <generation-root> --model <source>\n"
+               "--asset-root <Assets> --output <generation-root> --model <source> [--build-meshlets true|false] [--lod-levels 0..7]\n"
             << "       AssetCooker --issue-model-identity-epoch "
                "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
@@ -223,6 +226,25 @@ namespace
                     return false;
                 }
                 out.generationRoot = value;
+            }
+            else if (option == L"--lod-levels")
+            {
+                const auto text = value.native();
+                if (out.lodLevels.has_value() || text.size() != 1u || text[0] < L'0' || text[0] > L'7')
+                {
+                    failure = "--lod-levels requires one integer from 0 to 7.";
+                    return false;
+                }
+                out.lodLevels = static_cast<std::uint32_t>(text[0] - L'0');
+            }
+            else if (option == L"--build-meshlets")
+            {
+                if (out.buildMeshlets.has_value() || (value != L"true" && value != L"false"))
+                {
+                    failure = "--build-meshlets requires one true or false value.";
+                    return false;
+                }
+                out.buildMeshlets = value == L"true";
             }
             else if (option == L"--model")
             {
@@ -2068,6 +2090,12 @@ int wmain(int argc, wchar_t** argv)
         PrintUsage();
         return 2;
     }
+    if ((arguments.buildMeshlets.has_value() || arguments.lodLevels.has_value())
+        && arguments.mode != Arguments::Mode::AuthorModelAsset)
+    {
+        std::cerr << "--build-meshlets is an authoring setting; cook only exports published generations.\n";
+        return 2;
+    }
     if (arguments.mode == Arguments::Mode::AuthorModelAsset)
     {
         const std::filesystem::path source = arguments.models.front().is_relative()
@@ -2080,6 +2108,8 @@ int wmain(int argc, wchar_t** argv)
             / "ProjectSetting" / "AssetIdentity.asset";
         request.generationRoot = arguments.outputRoot;
         request.failurePoint = arguments.modelAuthoringFailurePoint;
+        request.buildMeshlets = arguments.buildMeshlets;
+        request.lodLevels = arguments.lodLevels;
         const assets::ModelAssetAuthoringResult result =
             assets::AuthorModelAsset(request);
         if (!result.Succeeded())
@@ -2088,6 +2118,10 @@ int wmain(int argc, wchar_t** argv)
                 std::cerr << "asset-cooker error [" << issue.stage << "]: "
                     << issue.message << '\n';
             return 7;
+        }
+        for (const auto& warning : result.warnings)
+        {
+            std::cerr << "asset-cooker warning [" << warning.stage << "]: " << warning.message << '\n';
         }
         std::cout << "asset-cooker model-authoring model="
             << Uuid::ToString(result.modelAssetId)

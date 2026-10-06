@@ -60,9 +60,15 @@ namespace material_graph
         void PollPrograms(const EnhancedFrameContext& context);
         bool IsProgramReady(const std::shared_ptr<const Generation>& generation, RHIShaderBinary backend) const;
         SceneProgramStats ProgramStats() const;
+        // Submitted commands, not a GPU-visible draw count.
         uint32_t ShadowDrawCount() const;
-        // Prepared casters per cascade (after Prepare); render debug reads it.
+        // GPU candidates per cascade (direct compatibility uses CPU-visible
+        // casters). No GPU visibility counter is read back here.
         std::array<uint32_t, 3> ShadowCasterCounts() const;
+        // CPU-prepared route categories, not GPU-visible counts. Graph raster
+        // bins contain one candidate each and produce a GPU 0/1 instance count.
+        GpuGeometryVisibility::PreparedStats CameraVisibilityStats() const;
+        std::array<GpuGeometryVisibility::PreparedStats, 3> ShadowVisibilityStats() const;
         MeshSurfaceCacheStats GeometryStats() const
         {
             return geometry_.CacheStats();

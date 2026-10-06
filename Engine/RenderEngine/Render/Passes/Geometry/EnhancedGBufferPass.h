@@ -21,6 +21,8 @@
 #include "../../../LXMaterialPipeline.h"
 #include "../../../ShaderMetaHandle.h"
 #include "../../../GpuGeometryVisibility.h"
+#include "../../../GpuMeshletVisibility.h"
+#include "../../../GpuGeometryOcclusion.h"
 
 struct ShaderMeta;
 struct ShaderMetaBindingLayout;
@@ -104,6 +106,27 @@ public:
     /// 실제로 발행한 DrawIndexedInstanced 횟수. 드로우 수보다 작을수록 병합이
     /// 잘 된 것이다 — 이 둘이 늘 같으면 인스턴싱이 죽은 것이다.
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
+    // CPU-prepared route accounting, never a GPU-visible/readback count.
+    GpuGeometryVisibility::PreparedStats GetGpuVisibilityStats() const
+    {
+        return m_visibilityFrame ? m_visibilityFrame->GetPreparedStats()
+                                 : GpuGeometryVisibility::PreparedStats{};
+    }
+    uint32_t GetLastMeshletBatchCount() const { return m_lastMeshletBatchCount; }
+    const std::string& GetLastMeshletFallback() const { return m_lastMeshletFallback; }
+    bool HasCurrentFrameOcclusion() const { return bool(m_occlusionPyramid); }
+    const std::string& GetLastOcclusionFallback() const { return m_lastOcclusionFallback; }
+    const std::string& GetLastSkinningFallback() const { return m_lastSkinningFallback; }
+    struct GeometryRouteAudit final
+    {
+        std::uint64_t geometryKey{}, materialSeal{};
+        std::uint32_t sourcePipeline{}, recordedPipeline{}, lodCount{};
+        std::uint32_t occluderPipeline{}, occluderLodCount{};
+        bool meshShader{};
+    };
+    // W8 continues auditing the accepted source shader generation. This records
+    // the exact front-end PSO selected after all mesh/indexed fallback decisions.
+    std::span<const GeometryRouteAudit> GetGeometryRouteAudit() const { return m_geometryRouteAudit; }
 
     /// 스킨드 드로우 수와 올린 팔레트 종류. 팔레트 수가 스킨드 드로우 수와
     /// 늘 같으면 애니메이터 중복 제거가 죽은 것이다(한 캐릭터의 메시 여럿이
@@ -159,7 +182,8 @@ private:
         const ShaderRenderState* renderState,
         const RHIShaderPermutation& permutation, uint32_t experimentMask,
         RHIGraphicsPipelineDesc& outDesc,
-        RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr);
+        RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr,
+        ShaderGeometryVisibility visibilityContract = ShaderGeometryVisibility::Direct);
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
         const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,
@@ -177,8 +201,19 @@ private:
     uint32_t ComputeSliceCount() const;
 
     /// 같은 (메시, 재질)을 묶어 배치를 만든다. PrepareFrame이 부른다.
-    void BuildBatches(const EnhancedFrameContext& context);
-    bool UsesVisibleInstanceIds(const EnhancedMaterialDrawSnapshot* snapshot, uint32_t vertexMask) const;
+    bool BuildBatches(const EnhancedFrameContext& context, std::string& outError);
+    void CaptureGeometryRoutes();
+    RGHandle DeclareDrawPass(EnhancedRenderGraph& graph, const EnhancedFrameContext& context, bool occluders);
+    const LX::Runtime::GraphicsCompileIdentity* VisibilityContract(
+        const EnhancedMaterialDrawSnapshot* snapshot, uint32_t vertexMask) const;
+    std::shared_ptr<const LX::Runtime::GraphicsGeneration> ResolveVisibilityGeneration(
+        const EnhancedMaterialDrawSnapshot* snapshot, uint32_t vertexMask) const;
+    RHIPipelineHandle ResolveMeshletPipeline(const EnhancedFrameContext& context,
+        const std::shared_ptr<const LX::Runtime::GraphicsGeneration>& source, std::string& diagnostic);
+    RHIPipelineHandle ResolveOccluderPipeline(const EnhancedFrameContext& context,
+        const std::shared_ptr<const LX::Runtime::GraphicsGeneration>& source, std::string& diagnostic);
+    bool HasSafeSkinningBounds(const EnhancedFrameContext& context, const EnhancedDrawItem& draw,
+        bool& unsafeSkinAccess);
 
     // 같은 texture를 쓰더라도 ShaderMeta generation, keyword 또는 property bytes가
     // 다르면 b2/PSO 상태가 다르므로 한 draw로 합치지 않는다.
@@ -212,17 +247,24 @@ private:
         uint32_t      coverageFlags{};
         float         coverageCutoff{ 0.5f };
         uint32_t      usePropertyBlock{};
-        uint32_t      padding{};
+        uint32_t      boneCount{};
     };
 
     static_assert(sizeof(InstanceData) == 112u);
     static_assert(offsetof(InstanceData, coverageFlags) == 96u);
     static_assert(offsetof(InstanceData, usePropertyBlock) == 104u);
+    static_assert(offsetof(InstanceData, boneCount) == 108u);
     static_assert(offsetof(InstanceData, baseColorFactor) == 64u);
     static_assert(std::is_same_v<decltype(InstanceData::baseColorFactor), math::color>);
     static_assert(std::is_trivially_copyable_v<InstanceData>);
 
     static constexpr uint32_t kNoSkinning = 0xFFFFFFFFu;
+
+    struct MeshletDraw final
+    {
+        RHIMeshletBinding geometry;
+        std::shared_ptr<const GpuMeshletVisibility::Frame> visibility;
+    };
 
     // 한 번의 DrawIndexedInstanced로 그릴 묶음.
     //
@@ -237,9 +279,21 @@ private:
         uint32_t     firstInstance{ 0 };   // m_instances 안에서의 시작
         uint32_t     instanceCount{ 0 };
         bool usesVisibleIds{};
+        uint32_t paletteExtentRoot{UINT32_MAX}, meshletPaletteExtentRoot{UINT32_MAX};
+        // Only the explicit semantic contract permits compacting instance IDs.
+        // Other shaders keep their original instance stream and GPU zero/full count.
+        bool compactsVisibleIds{};
         bool gpuEligible{};
         uint32_t visibilityBin{ UINT32_MAX };
         uint32_t visibleIdOffset{};
+        // Indexed pipeline remains available until mesh prerequisites and bounded
+        // GPU work storage have succeeded, before any graph work is submitted.
+        RHIPipelineHandle meshletPipeline{};
+        math::vector4 meshletLocalSphere{};
+        std::vector<MeshletDraw> meshletDraws;
+        RHIPipelineHandle occluderPipeline{}, meshletOccluderPipeline{};
+        std::vector<MeshletDraw> occluderMeshletDraws;
+        bool occlusionEligible{};
     };
 
     struct ShaderVariantKey
@@ -313,12 +367,47 @@ private:
     std::vector<math::vector4> m_instanceBounds;
     GpuGeometryVisibility m_visibility;
     std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibilityFrame;
-    std::unordered_set<uint64_t> m_visibilityLayouts;
+    // Independent frustum-only arguments for the HZB donor pass. Main arguments
+    // may depend on that donor depth and must never be read by the prepass.
+    std::shared_ptr<const GpuGeometryVisibility::Frame> m_occluderVisibilityFrame;
+    GpuMeshletVisibility m_meshletVisibility;
+    struct MeshletPipeline final
+    {
+        std::shared_ptr<const LX::Runtime::GraphicsGeneration> source;
+        RHIPipelineHandle pipeline{};
+        RHIPipelineHandle occluderPipeline{};
+        uint32_t paletteExtentRoot{UINT32_MAX};
+        std::string diagnostic;
+        std::string occluderDiagnostic;
+    };
+    // The retained source generation makes pointer keys non-reusable. Mesh PSOs
+    // are never keyed by a shared root layout or a mutable ShaderMeta pointer.
+    std::map<const LX::Runtime::GraphicsGeneration*, MeshletPipeline> m_meshletPipelines;
+    std::map<const LX::Runtime::GraphicsGeneration*, MeshletPipeline> m_occluderPipelines;
+    std::map<assets::ModelMeshHandle, math::vector4> m_meshletLocalBounds;
+    uint32_t m_lastMeshletBatchCount{};
+    std::string m_lastMeshletFallback;
+    std::vector<GeometryRouteAudit> m_geometryRouteAudit;
+    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_occlusionPyramid;
+    GpuGeometryOcclusion m_depthPyramid;
+    std::string m_lastOcclusionFallback;
+    std::string m_lastSkinningFallback;
+    struct SkinningBoundsContract
+    {
+        const void* vertices{};
+        uint64_t bytes{};
+        uint32_t mask{}, stride{}, requiredBones{};
+        bool valid{};
+    };
+    // Immutable model generations are inspected once, not once per animated
+    // instance/frame. Entries absent from the current draw set are retired.
+    std::map<assets::ModelMeshHandle, SkinningBoundsContract> m_skinningBounds;
 
     // 프레임의 모든 본 팔레트를 이어 붙인 것. 애니메이터별로 한 번씩만 담기고,
     // 인스턴스의 boneOffset이 자기 구간의 시작을 가리킨다.
     std::vector<PackedBoneMatrix>          m_bonePalettes;
     std::unordered_map<uint64_t, uint32_t> m_boneOffsets;   // 애니메이터 키 → 오프셋
+    std::unordered_map<uint64_t, uint32_t> m_boneCounts;
     RHISamplerTable                                 m_sampler{};
     // W7 — 재질이 선언한 샘플러마다 테이블 하나. 배치 키가 샘플러로 갈리므로
     // 실제 개수는 프레임의 **서로 다른 샘플러 수**이지 draw 수가 아니다

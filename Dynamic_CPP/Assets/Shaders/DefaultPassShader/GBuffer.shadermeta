@@ -19,6 +19,7 @@ keywords:
   - { axis: SHADING_QUALITY, values: [full, reduced] }
 passes:
   - name: GBuffer
+    geometryVisibility: indexed-instance-v1
     vs: { entry: VSMain }
     ps: { entry: PSMain }
     state:

@@ -646,6 +646,10 @@ namespace
         if ("gs" == stage) return SLANG_STAGE_GEOMETRY;
         if ("ps" == stage) return SLANG_STAGE_FRAGMENT;
         if ("cs" == stage) return SLANG_STAGE_COMPUTE;
+        if ("ms" == stage)
+        {
+            return SLANG_STAGE_MESH;
+        }
         outError = "지원하지 않는 셰이더 스테이지다: " + std::string(profile);
         return SLANG_STAGE_NONE;
     }
@@ -906,6 +910,10 @@ namespace
         hash.Add(request.name);
         hash.Add(request.entryPoint);
         hash.Add(request.targetProfile);
+        if (request.targetProfile.starts_with("ms_"))
+        {
+            hash.Add("mesh-v1.sm_6_5.spirv_1_5.spvMeshShadingEXT");
+        }
         hash.Add(&request.output, sizeof(request.output));
         if (request.output == RHIShaderBinary::SpirV)
         {
@@ -1037,6 +1045,7 @@ namespace
         case SLANG_STAGE_VERTEX: return RHIShaderStage::Vertex;
         case SLANG_STAGE_FRAGMENT: return RHIShaderStage::Pixel;
         case SLANG_STAGE_COMPUTE: return RHIShaderStage::Compute;
+        case SLANG_STAGE_MESH: return RHIShaderStage::Mesh;
         default: return std::nullopt;
         }
     }
@@ -1469,7 +1478,15 @@ namespace
             addArgument("-target");
             addArgument(RHIShaderBinary::Dxil == request.output ? "dxil" : "spirv");
             addArgument("-profile");
-            addArgument(RHIShaderBinary::Dxil == request.output ? "sm_6_0" : "spirv_1_3");
+            const bool meshStage = stage == SLANG_STAGE_MESH;
+            addArgument(RHIShaderBinary::Dxil == request.output
+                ? (meshStage ? "sm_6_5" : "sm_6_0")
+                : (meshStage ? "spirv_1_5" : "spirv_1_3"));
+            if (meshStage && request.output == RHIShaderBinary::SpirV)
+            {
+                addArgument("-capability");
+                addArgument("spvMeshShadingEXT");
+            }
             if (request.output == RHIShaderBinary::SpirV && request.options.fineDerivatives)
             {
                 addArgument("-capability");

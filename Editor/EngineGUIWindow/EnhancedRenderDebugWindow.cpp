@@ -87,6 +87,14 @@ namespace EnhancedRenderDebugUi
 		ImGui::Text("Distance %.2f  slope scale %.2f  non-graph casters %u",
 			stats.shadowDistance, stats.slopeScale, stats.casterCandidates);
 
+        if (stats.gpuVisibilityActive)
+        {
+            ImGui::Text("GPU shadow visibility: %llu submitted candidates / %llu bins",
+                static_cast<unsigned long long>(stats.gpuSubmittedCandidates),
+                static_cast<unsigned long long>(stats.gpuSubmittedBins));
+            ImGui::TextColored(kDimColor, "Visible/culled counts are not read back from the GPU.");
+        }
+
 		constexpr ImGuiTableFlags flags = ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg
 			| ImGuiTableFlags_SizingFixedFit;
 		if (!ImGui::BeginTable("ShadowCascades", 8, flags)) return;
@@ -134,6 +142,7 @@ namespace EnhancedRenderDebugUi
         case RHIResourceState::CopyDest: return "CopyDest";
         case RHIResourceState::IndexBuffer: return "IndexBuffer";
         case RHIResourceState::IndirectArgument: return "IndirectArgument";
+        case RHIResourceState::VertexAndShaderResource: return "VertexAndShaderResource";
         default: return "Unknown";
         }
     }
@@ -597,6 +606,36 @@ void editor::DrawRenderRuntime(const EnhancedLiveDebugSnapshot& displayed)
 		std::snprintf(buffer, sizeof(buffer), "%u draws / %u batches",
 			displayed.drawCount, displayed.batchCount);
 		LabeledValue("GBuffer", buffer, 0u == displayed.drawCount ? kWarnColor : kOkColor);
+        std::snprintf(buffer, sizeof(buffer), "%u prepared batches (no GPU readback)",
+            displayed.preparedMeshletBatchCount);
+        LabeledValue("Mesh shader", buffer);
+        std::snprintf(buffer, sizeof(buffer), "%llu compacted / %llu preserved bins",
+            static_cast<unsigned long long>(displayed.preparedGpuCompactedBins),
+            static_cast<unsigned long long>(displayed.preparedGpuPreservedBins));
+        LabeledValue("Prepared indirect routes", buffer);
+        LabeledValue("Indirect capabilities",
+            displayed.indexedIndirectSupported
+                ? (displayed.nonIndexedIndirectSupported ? "Indexed + procedural" : "Indexed only")
+                : (displayed.nonIndexedIndirectSupported ? "Procedural only" : "Unavailable: hardware direct path"));
+        std::snprintf(buffer, sizeof(buffer), "%llu / %llu candidates keep visible",
+            static_cast<unsigned long long>(displayed.preparedGpuConservativeCandidates),
+            static_cast<unsigned long long>(displayed.preparedGpuCandidates));
+        LabeledValue("Conservative inputs", buffer);
+        ImGui::TextColored(kDimColor, "Prepared input categories, not GPU-visible counts or culling measurements.");
+        LabeledValue("Current-frame HZB", displayed.currentFrameOcclusion ? "Enabled" : "Frustum fallback");
+        if (!displayed.occlusionFallback.empty())
+        {
+            LabeledValue("Occlusion fallback", displayed.occlusionFallback.c_str(), kWarnColor);
+        }
+        if (!displayed.skinningFallback.empty())
+        {
+            LabeledValue("Skin bounds fallback", displayed.skinningFallback.c_str(), kWarnColor);
+        }
+        if (!displayed.meshletFallback.empty())
+        {
+            LabeledValue("Indexed fallback", displayed.meshletFallback.c_str(), kWarnColor);
+        }
+
 
 		// 데칼은 없는 씬이 정상이라 0을 경고로 칠하지 않는다. 볼 것은
 		// 둘의 관계다 — 데칼이 있는데 배치가 0이면 텍스처 운반이 실패한

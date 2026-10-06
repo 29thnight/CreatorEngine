@@ -48,6 +48,13 @@ public:
     virtual RHIPipelineHandle GetOrCreateCompute(
         const RHIComputePipelineDesc& desc, std::string& outError) = 0;
 
+    virtual RHIPipelineHandle GetOrCreateMesh(
+        const RHIMeshPipelineDesc&, std::string& outError)
+    {
+        outError = "Mesh shader pipelines are not supported by this backend.";
+        return {};
+    }
+
     // Call on the render owner. Async implementations copy borrowed inputs and
     // return Pending without waiting. The base implementation is synchronous;
     // owners must budget calls on backends which do not override this method.

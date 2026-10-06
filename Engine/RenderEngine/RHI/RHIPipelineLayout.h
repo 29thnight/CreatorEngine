@@ -37,6 +37,7 @@ enum class RHIShaderVisibility
     All,
     Vertex,
     Pixel,
+    Mesh,
 };
 
 // ── 샘플러 ──

@@ -5,6 +5,7 @@
 #include <wrl/client.h>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../../GpuGeometryVisibility.h"
 #include "EnhancedGBufferPass.h"
 
 // 데칼 패스 (PHASE 3-6, 미구현 패스 이식 2차).
@@ -95,6 +96,13 @@ public:
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    // Called after the upload prefix, under the backend shader-output scope.
+    bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
+    GpuGeometryVisibility::PreparedStats GetGpuVisibilityStats() const
+    {
+        return m_visibilityFrame ? m_visibilityFrame->GetPreparedStats() : GpuGeometryVisibility::PreparedStats{};
+    }
+
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
 
@@ -124,6 +132,11 @@ public:
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
 private:
+    GpuGeometryVisibility m_visibility;
+    std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibilityFrame;
+    bool m_gpuVisibilityEnabled{ false };
+    std::vector<math::vector4> m_visibilitySpheres;
+
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);

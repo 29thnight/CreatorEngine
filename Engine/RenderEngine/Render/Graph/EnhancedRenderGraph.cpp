@@ -377,8 +377,8 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 seen.push_back(r);
                 if (u.access!=RGAccessMode::Read && u.access!=RGAccessMode::Write && u.access!=RGAccessMode::ReadWrite)
                     return bad("explicit access required");
-                if (u.state<RHIResourceState::Common || u.state>RHIResourceState::IndirectArgument ||
-                    (u.state==RHIResourceState::IndirectArgument &&
+                if (u.state<RHIResourceState::Common || u.state>RHIResourceState::VertexAndShaderResource ||
+                    ((u.state==RHIResourceState::IndirectArgument || u.state==RHIResourceState::VertexAndShaderResource) &&
                         (!m_resources[r].IsBuffer() || u.access!=RGAccessMode::Read)) ||
                     (Writes(u) && !IsWriteState(u.state)) ||
                     (u.access==RGAccessMode::Read && IsWriteState(u.state) && u.state!=RHIResourceState::UnorderedAccess))
@@ -473,8 +473,8 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
             seen.push_back(r);
             if (u.access != RGAccessMode::Read && u.access != RGAccessMode::Write && u.access != RGAccessMode::ReadWrite)
                 return fail("explicit Read/Write/ReadWrite required: " + m_resources[r].name);
-            if (u.state < RHIResourceState::Common || u.state > RHIResourceState::IndirectArgument ||
-                (u.state == RHIResourceState::IndirectArgument &&
+            if (u.state < RHIResourceState::Common || u.state > RHIResourceState::VertexAndShaderResource ||
+                ((u.state == RHIResourceState::IndirectArgument || u.state == RHIResourceState::VertexAndShaderResource) &&
                     (!m_resources[r].IsBuffer() || u.access != RGAccessMode::Read)))
             {
                 return fail("invalid resource state: " + m_resources[r].name);
@@ -939,16 +939,18 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
                 seen.push_back(usage.handle.index);
                 if (usage.access == RGAccessMode::LegacyState ||
                     usage.access < RGAccessMode::Read || usage.access > RGAccessMode::ReadWrite ||
-                    usage.state < RHIResourceState::Common || usage.state > RHIResourceState::IndirectArgument ||
+                    usage.state < RHIResourceState::Common || usage.state > RHIResourceState::VertexAndShaderResource ||
                     (Writes(usage) && !IsWriteState(usage.state)) ||
                     (Reads(usage) && usage.access == RGAccessMode::Read && IsWriteState(usage.state) &&
                         usage.state != RHIResourceState::UnorderedAccess) ||
                     (!m_resources[usage.handle.index].IsBuffer() &&
-                        (usage.state == RHIResourceState::IndexBuffer || usage.state == RHIResourceState::IndirectArgument)) ||
+                        (usage.state == RHIResourceState::IndexBuffer || usage.state == RHIResourceState::IndirectArgument ||
+                            usage.state == RHIResourceState::VertexAndShaderResource)) ||
                     (m_resources[usage.handle.index].IsBuffer() &&
                         (usage.state == RHIResourceState::RenderTarget || usage.state == RHIResourceState::DepthWrite ||
                             usage.state == RHIResourceState::DepthRead || usage.state == RHIResourceState::DepthReadShaderResource)) ||
-                    (usage.state == RHIResourceState::IndirectArgument && usage.access != RGAccessMode::Read))
+                    ((usage.state == RHIResourceState::IndirectArgument || usage.state == RHIResourceState::VertexAndShaderResource)
+                        && usage.access != RGAccessMode::Read))
                 {
                     return fail("access/state mismatch in phase '" + phase.name + "'");
                 }
@@ -1021,9 +1023,10 @@ bool EnhancedRenderGraph::ValidateFinalStates(std::string& outError) const
         }
         const auto& resource = m_resources[handle.index];
         if (!resource.imported || resource.IsBuffer() || requirement.state < RHIResourceState::Common ||
-            requirement.state > RHIResourceState::IndirectArgument ||
+            requirement.state > RHIResourceState::VertexAndShaderResource ||
             requirement.state == RHIResourceState::IndexBuffer ||
-            requirement.state == RHIResourceState::IndirectArgument)
+            requirement.state == RHIResourceState::IndirectArgument ||
+            requirement.state == RHIResourceState::VertexAndShaderResource)
         {
             outError = "Invalid imported final state: " + resource.name;
             return false;

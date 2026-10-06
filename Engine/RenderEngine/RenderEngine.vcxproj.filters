@@ -348,6 +348,14 @@
     <ClCompile Include="Experiment\Import\VertexWelding.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
+    <ClCompile Include="GpuMeshletVisibility.cpp" />
+    <ClCompile Include="GpuGeometryOcclusion.cpp" />
+    <ClCompile Include="Experiment\Import\MeshLodBuilder.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
+    <ClCompile Include="Experiment\Import\MeshletBuilder.cpp">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\VertexCacheOptimization.cpp">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClCompile>
@@ -735,6 +743,21 @@
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\VertexWelding.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="GpuMeshletVisibility.h" />
+    <ClInclude Include="GpuGeometryOcclusion.h" />
+    <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
+    <ClInclude Include="Experiment\MeshLodData.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\MeshLodBuilder.h">
+      <Filter>Resources\Model\Experiment\Import</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\MeshletData.h">
+      <Filter>Resources\Model\Experiment</Filter>
+    </ClInclude>
+    <ClInclude Include="Experiment\Import\MeshletBuilder.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
     <ClInclude Include="Experiment\Import\VertexCacheOptimization.h">

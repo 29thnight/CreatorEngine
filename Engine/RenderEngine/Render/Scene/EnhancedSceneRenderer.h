@@ -631,6 +631,10 @@ struct EnhancedLiveShadowStats
     float    shadowDistance{ 0.f };
     float    slopeScale{ 0.f };
     uint32_t casterCandidates{ 0 };     // 재질 그래프가 아닌 캐스터
+    bool gpuVisibilityActive{ false };
+    bool visibilityCountsExact{ true };
+    uint64_t gpuSubmittedCandidates{ 0 };
+    uint64_t gpuSubmittedBins{ 0 };
     std::array<EnhancedLiveShadowCascade, 3> cascades{};
 };
 
@@ -657,6 +661,18 @@ struct EnhancedLiveDebugSnapshot
     uint64_t resizeGeneration{ 0 };
     uint32_t drawCount{ 0 };
     uint32_t batchCount{ 0 };
+    // CPU-prepared route count, not GPU-visible meshlets or a readback measurement.
+    uint32_t preparedMeshletBatchCount{ 0 };
+    bool indexedIndirectSupported{ false };
+    bool nonIndexedIndirectSupported{ false };
+    uint64_t preparedGpuCandidates{ 0 };
+    uint64_t preparedGpuCompactedBins{ 0 };
+    uint64_t preparedGpuPreservedBins{ 0 };
+    uint64_t preparedGpuConservativeCandidates{ 0 };
+    std::string meshletFallback{};
+    bool currentFrameOcclusion{ false };
+    std::string occlusionFallback{};
+    std::string skinningFallback{};
 
     /// 이번 프레임에 그린 데칼 수와 실제 발행한 드로우 수. 데칼은 씬에
     /// 프록시가 없으면 패스가 통째로 빠지므로, 0이 고장인지 '데칼이 없는

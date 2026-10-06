@@ -1,3 +1,4 @@
+#include <optional>
 #include <atomic>
 #include "CollisionGeometryAuthoring.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
@@ -631,6 +632,46 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener
 	{
 		std::lock_guard lock(m_authoringMutex);
 		return CreateMetaLocked(targetFile, preferredGuid);
+	}
+
+	bool SetModelMeshletsAndReimport(const file::path& requestedSource, bool enabled)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const file::path source = file::weakly_canonical(requestedSource, error);
+		if (error || !IsPathInside(source, file::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source))
+		{
+			return false;
+		}
+		file::path sidecar = source;
+		sidecar += ".meta";
+		const FileGuid existing = LoadGuidFromMeta(sidecar);
+		if (!assets::IsUuidV8(existing.m_guid))
+		{
+			return false;
+		}
+		return CreateMetaLocked(source, {}, existing, enabled) == existing;
+	}
+
+	bool SetModelLodsAndReimport(const file::path& requestedSource, std::uint32_t levels)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const file::path source = file::weakly_canonical(requestedSource, error);
+		if (error || levels > 7u || !IsPathInside(source, file::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source))
+		{
+			return false;
+		}
+		file::path sidecar = source;
+		sidecar += ".meta";
+		const FileGuid existing = LoadGuidFromMeta(sidecar);
+		if (!assets::IsUuidV8(existing.m_guid))
+		{
+			return false;
+		}
+		return CreateMetaLocked(source, {}, existing, {}, levels) == existing;
 	}
 
 	bool RecoverModel(const file::path& requestedSource, FileGuid expectedId)
@@ -1719,7 +1760,8 @@ private:
 	}
 
 	FileGuid CreateMetaLocked(const file::path& targetFile,
-		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {})
+		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {},
+		std::optional<bool> buildMeshlets = {}, std::optional<std::uint32_t> lodLevels = {})
 	{
 		if (targetFile.empty() || !file::exists(targetFile)) return {};
 		if (ToLower(targetFile.extension().string()) == ".cegeometry")
@@ -1752,6 +1794,8 @@ private:
 			request.generationRoot = m_root.parent_path()
 				/ "Library" / "ModelAssetGenerations";
 			request.expectedModelId = expectedModelId.m_guid;
+			request.buildMeshlets = buildMeshlets;
+			request.lodLevels = lodLevels;
 			const assets::ModelAssetAuthoringResult result =
 				assets::AuthorModelAsset(request);
 			if (!result.Succeeded())
@@ -1761,6 +1805,10 @@ private:
 						+ issue.message + " (" + targetFile.string() + ")");
 				return {};
 			}
+            for (const auto& warning : result.warnings)
+            {
+                Debug::PrintLog(spdlog::level::warn, "Model authoring [" + warning.stage + "]: " + warning.message);
+            }
 			const FileGuid guid(result.modelAssetId);
 			m_modelSourceImports[targetFile.lexically_normal()] = ReadModelSourceStamp(targetFile);
 			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
@@ -2440,4 +2488,15 @@ bool EditorAssetDatabase::ReplaceCollisionGeometry(const file::path& destination
 std::uint64_t EditorAssetDatabase::AudioRevision() const noexcept
 {
     return m_impl ? m_impl->AudioRevision() : 0u;
+}
+
+// Called through the game-thread command service by the Content Browser menu.
+bool EditorAssetDatabase::SetModelMeshletsAndReimport(const file::path& source, bool enabled)
+{
+	return m_impl && m_impl->SetModelMeshletsAndReimport(source, enabled);
+}
+
+bool EditorAssetDatabase::SetModelLodsAndReimport(const file::path& source, std::uint32_t levels)
+{
+	return m_impl && m_impl->SetModelLodsAndReimport(source, levels);
 }

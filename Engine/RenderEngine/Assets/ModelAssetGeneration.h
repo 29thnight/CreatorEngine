@@ -11,6 +11,8 @@
 #include "TextureCoordinates.h"
 #include "TextureSampler.h"
 #include "../RHI/RHIFormat.h"
+#include "../Experiment/MeshletData.h"
+#include "../Experiment/MeshLodData.h"
 
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
@@ -139,6 +141,8 @@ namespace assets
         std::vector<std::byte> vertexBytes{};
         std::vector<std::uint32_t> indices{};
         math::aabb bounds{};
+        experiment::MeshletPayload meshlets{};
+        experiment::MeshLodChain coarseLods{};
     };
 
     struct ModelTextureSubresource final
@@ -382,6 +386,8 @@ namespace assets
     {
         ModelAssetGeneration::Shared generation{};
         std::vector<ModelAssetGenerationIssue> issues{};
+        // Recoverable optional acceleration-data failures; indexed geometry remains valid.
+        std::vector<ModelAssetGenerationIssue> warnings{};
         // 단계별 경과(ms, 순서대로) — 진단 전용. 실패 시엔 도달한 단계까지만 남는다.
         ModelAssetPhaseTimeline phases{};
 

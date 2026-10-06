@@ -12,7 +12,7 @@ DXR 직접광 그림자를 같은 RenderGraph에 연결하는 것이다. 이 문
 |---|---|---|
 | `Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp`, `BuildPipelineDesc` | Shadow/GBuffer와 LX Scene GBuffer 수정 노드를 조립한다 | 새 native Pass와 기존 geometry route를 같은 LivePipelineDesc에 조립 |
 | `Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h`, `EnhancedLiveFramePacket` | 프레임 입력 계약의 기존 위치 | 같은 sealed frame에서 GPU scene 입력을 생성 |
-| `Engine/RenderEngine/RHI/RHIEncoder.h` | Draw/DrawIndexed/Dispatch와 buffer barrier/copy 계약이 있다. Mesh/indirect/RT 명령은 없다 | 중립 명령·capability·resource 계약을 먼저 추가 |
+| `Engine/RenderEngine/RHI/RHIEncoder.h` | indexed indirect와 buffer barrier/copy 계약이 있다. Mesh 명령은 GPU-driven 구현 슬라이스에서 추가 중이며 RT는 별도다 | 중립 명령·capability·resource 계약을 먼저 추가 |
 | `Engine/RenderEngine/RHI/RHIResourceTypes.h`, `RHIMeshBinding` | Vertex/Index slice, stride, attribute mask를 전달 | 기존 indexed fallback 보존; 별도 meshlet/RT binding 도입 |
 | `Engine/RenderEngine/Mesh.h`, `Vertex` | legacy vertex stride 96B를 정적 단정한다 | 기존 ABI 유지; cook stream의 layout ID로 해석 |
 | `Engine/RenderEngine/Experiment/Import/ImportedScene.h` | `buildMeshlets` 옵션이 있다 | 옵션 존재를 meshlet cook/제품 소비 구현의 증거로 세지 않음 |
@@ -332,3 +332,12 @@ baseline 기반 예산, GD/RT/HY 구현 공수와 실행 순서를 확정해야 
 
 위 backend 규칙은 공식 사양을 근거로 한 설계다. 현재 프로젝트 SDK/device에서 모든
 기능이 지원된다는 확인은 없으며 GD0의 실제 probe가 그 판정을 소유한다.
+
+
+## 2026-10-06 구현 진행 정정
+
+위 문서는 제안 계약이며 구현 완료 증거가 아니다. indexed indirect는 이미 master에
+통합되었고, meshlet 저작/세대 저장, GPU LOD 및 mesh dispatch의 코드 통합 상태와
+fallback 범위는 [GPU-driven 구현 계획](../plans/GpuDrivenGeometryImplementationPlan.md)을
+따른다. 이 작업에서는 DXR를 추가하지 않는다. 빌드·셰이더 컴파일·GPU 실행 검증은
+수행하지 않았으며, native HZB와 shadow visibility는 별도 순서로 연결한다.

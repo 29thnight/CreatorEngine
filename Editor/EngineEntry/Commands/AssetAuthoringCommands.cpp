@@ -1984,8 +1984,45 @@ namespace ConsoleCmd
         return Ok(log);
     }
 
+    static file::path ModelImportSourcePath(const std::string& utf8)
+    {
+        return file::path(std::u8string(reinterpret_cast<const char8_t*>(utf8.data()), utf8.size()));
+    }
+
+    static CommandCore::CommandResult Cmd_assets_model_meshlets(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3 || (ctx.parts[2] != "true" && ctx.parts[2] != "false"))
+        {
+            return CommandCore::InvalidArguments("assets.model.meshlets <source-path> true|false");
+        }
+        if (!EditorAssetDatabase::Get().SetModelMeshletsAndReimport(
+            ModelImportSourcePath(ctx.parts[1]), ctx.parts[2] == "true"))
+        {
+            return CommandCore::Fail("assets.model.meshlets.failed",
+                "Model reimport failed; the previous published generation remains unchanged.");
+        }
+        return CommandCore::Ok("Model meshlet setting saved and a new generation published.");
+    }
+
+    static CommandCore::CommandResult Cmd_assets_model_lods(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 3 || ctx.parts[2].size() != 1u || ctx.parts[2][0] < '0' || ctx.parts[2][0] > '7')
+        {
+            return CommandCore::InvalidArguments("assets.model.lods <source-path> 0..7");
+        }
+        if (!EditorAssetDatabase::Get().SetModelLodsAndReimport(ModelImportSourcePath(ctx.parts[1]),
+            static_cast<std::uint32_t>(ctx.parts[2][0] - '0')))
+        {
+            return CommandCore::Fail("assets.model.lods.failed",
+                "Model LOD reimport failed; the previous published generation remains unchanged.");
+        }
+        return CommandCore::Ok("Model LOD setting saved and a new generation published; see authoring warnings for skipped meshes.");
+    }
+
     void RegisterAssetAuthoringCommands(Registrar& reg)
     {
+        reg.Result({ "assets.model.meshlets" }, &Cmd_assets_model_meshlets);
+        reg.Result({ "assets.model.lods" }, &Cmd_assets_model_lods);
         reg.Result({ "scene.loadjobs" }, &Cmd_scene_loadjobs);
         reg.Result({ "worker.pool.probe" }, &Cmd_worker_pool_probe);
         reg.Result({ "assets.decodeab" }, &Cmd_assets_decodeab);

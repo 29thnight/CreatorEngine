@@ -20,7 +20,10 @@
 #include "../../Graph/ShadowCasterBounds.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstring>
 #include <functional>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 
@@ -42,6 +45,127 @@ namespace
     // 나머지가 비어 있어도 '그려지긴 한다'로 보이는 것을 막는다.
 
     constexpr const char* kGBufferShaderFile = "GBuffer.slang";
+
+    bool GBufferSkinPaletteExtentContract(const RHIShaderReflection& reflection,
+        bool& declared, std::string& error)
+    {
+        declared = false;
+        constexpr std::array<const char*, 4> fields{
+            "gGBufferSkinPaletteMatrixCount", "gGBufferSkinPaletteVersion",
+            "gGBufferSkinPalettePadding0", "gGBufferSkinPalettePadding1"};
+        for (const auto& resource : reflection.resources)
+        {
+            if (resource.name != "GBufferSkinPaletteExtentV1")
+            {
+                continue;
+            }
+            if (declared || resource.kind != RHIShaderResourceKind::ConstantBuffer ||
+                resource.registerIndex != 4u || resource.registerSpace != 0u ||
+                resource.arrayElements != 1u || resource.byteSize != 16u || resource.fields.size() != fields.size())
+            {
+                error = "GBufferSkinPaletteExtentV1 requires its exact 16-byte b4/space0 uniform layout.";
+                return false;
+            }
+            for (std::size_t index = 0; index < fields.size(); ++index)
+            {
+                const auto& field = resource.fields[index];
+                if (field.name != fields[index] || field.byteOffset != index * sizeof(std::uint32_t) ||
+                    field.byteSize != sizeof(std::uint32_t) || field.type.scalar != RHIShaderScalarKind::UInt32 ||
+                    field.type.rows != 1u || field.type.columns != 1u || field.type.arrayElements != 1u)
+                {
+                    error = "GBufferSkinPaletteExtentV1 field names, types and offsets must match the V1 ABI.";
+                    return false;
+                }
+            }
+            declared = true;
+        }
+        return true;
+    }
+
+    bool GBufferStandardDepthSource(const LX::Runtime::GraphicsGeneration& source)
+    {
+        const auto& identity = source.shader.compile;
+        const auto& indexed = source.pipeline.GetDesc();
+        return source.pipeline.IsValid() && identity.visibleInstanceIds && !identity.referencePath
+            && identity.geometryVisibility == ShaderGeometryVisibility::IndexedInstanceV1
+            && assets::IsSupportedModelVertexLayout(identity.vertexAttributeMask)
+            && std::filesystem::path(identity.source).lexically_normal() == std::filesystem::path(kGBufferShaderFile)
+            && identity.vertexEntry == "VSMain" && identity.pixelEntry == "PSMain"
+            && !(source.shader.shader && source.shader.shader->meta.generatedMaterial)
+            && !indexed.blendEnable && !indexed.independentBlend && indexed.depthEnable
+            && indexed.depthWriteMask == RHIDepthWrite::All
+            && (indexed.depthFunc == RHICompareOp::Less || indexed.depthFunc == RHICompareOp::LessEqual)
+            && indexed.topologyType == RHITopologyType::Triangle && indexed.sampleCount == 1;
+    }
+
+    bool VerifyGBufferGeneration(const LX::Runtime::GraphicsCompileIdentity& identity,
+        RHIShaderCompiler::VerifiedShader& vertexProof, RHIShaderCompiler::VerifiedShader& pixelProof,
+        std::string& diagnostic)
+    {
+        if (!RHIShaderCompiler::VerifyFile(identity.source, identity.vertexEntry, identity.vertexProfile,
+                identity.backend, identity.permutation, vertexProof, diagnostic, identity.options)
+            || !RHIShaderCompiler::VerifyFile(identity.source, identity.pixelEntry, identity.pixelProfile,
+                identity.backend, identity.permutation, pixelProof, diagnostic, identity.options))
+        {
+            return false;
+        }
+        if (vertexProof.dependencyIdentity != identity.vertexDependencies
+            || pixelProof.dependencyIdentity != identity.pixelDependencies)
+        {
+            diagnostic = "Derivative shader source no longer matches the accepted GBuffer generation.";
+            return false;
+        }
+        return true;
+    }
+
+    math::vector4 GBufferMeshletLocalBounds(const experiment::MeshletPayload& payload)
+    {
+        if (payload.descriptors.empty())
+        {
+            return {};
+        }
+        std::array<double, 3> minimum{}, maximum{};
+        for (size_t axis = 0; axis < 3; ++axis)
+        {
+            minimum[axis] = std::numeric_limits<double>::infinity();
+            maximum[axis] = -std::numeric_limits<double>::infinity();
+        }
+        for (const auto& descriptor : payload.descriptors)
+        {
+            for (size_t axis = 0; axis < 3; ++axis)
+            {
+                const double center = descriptor.sphereCenter[axis];
+                minimum[axis] = (std::min)(minimum[axis], center - descriptor.sphereRadius);
+                maximum[axis] = (std::max)(maximum[axis], center + descriptor.sphereRadius);
+            }
+        }
+        std::array<float, 3> center{};
+        for (size_t axis = 0; axis < 3; ++axis)
+        {
+            const double midpoint = (minimum[axis] + maximum[axis]) * 0.5;
+            if (!std::isfinite(midpoint) || std::abs(midpoint) > (std::numeric_limits<float>::max)())
+            {
+                return {};
+            }
+            center[axis] = static_cast<float>(midpoint);
+        }
+        double radius = 0.0;
+        for (const auto& descriptor : payload.descriptors)
+        {
+            const double x = static_cast<double>(center[0]) - descriptor.sphereCenter[0];
+            const double y = static_cast<double>(center[1]) - descriptor.sphereCenter[1];
+            const double z = static_cast<double>(center[2]) - descriptor.sphereCenter[2];
+            radius = (std::max)(radius, std::sqrt(x * x + y * y + z * z) + descriptor.sphereRadius);
+        }
+        if (!std::isfinite(radius) || radius > (std::numeric_limits<float>::max)())
+        {
+            return {};
+        }
+        const float outward = radius > 0.0
+            ? std::nextafter(static_cast<float>(radius), std::numeric_limits<float>::infinity()) : 0.0f;
+        // Unknown bounds force LOD0; they never permit additional simplification.
+        return std::isfinite(outward) ? math::vector4{center[0], center[1], center[2], outward} : math::vector4{};
+    }
 
     // Isolated fixtures have an explicit instance flag for the property block.
     // alphaCutoff is only a coverage threshold.
@@ -188,6 +312,8 @@ RHIFormat EnhancedGBufferPass::GetRenderTargetFormat(uint32_t index)
 bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
     m_visibilityFrame.reset();
+    m_occluderVisibilityFrame.reset();
+    m_occlusionPyramid.reset();
     m_batches.clear();
     m_instances.clear();
     m_instanceBounds.clear();
@@ -195,9 +321,15 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_drawTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
+    m_boneCounts.clear();
     m_lastDrawCount = 0;
     m_lastSkinnedCount = 0;
     m_lastBatchCount = 0;
+    m_lastMeshletBatchCount = 0;
+    m_lastMeshletFallback.clear();
+    m_geometryRouteAudit.clear();
+    m_lastOcclusionFallback.clear();
+    m_lastSkinningFallback.clear();
     // W8: 장부는 프레임마다 비운다. 비우지 않으면 지난 프레임의 배치가 이번
     // 프레임의 충돌로 보고된다.
     m_sealLedger.Begin(context.frameId, context.sceneEpoch);
@@ -297,6 +429,11 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
         //
         // 한 캐릭터의 메시가 여럿이면 프록시도 여럿인데 팔레트는 하나다 —
         // 중복 제거가 없으면 같은 512행렬(32KB)을 메시 수만큼 올린다.
+        if (!draw.bonePalette && draw.boneCount != 0)
+        {
+            outError = "GBuffer draw declares a palette count without palette storage.";
+            return false;
+        }
         if (nullptr != draw.bonePalette && 0 != draw.boneCount)
         {
             if (m_boneOffsets.find(draw.animatorKey) == m_boneOffsets.end())
@@ -309,11 +446,36 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
                 }
                 else
                 {
+                    if (m_bonePalettes.size() > (std::numeric_limits<uint32_t>::max)()
+                        || draw.boneCount > (std::numeric_limits<uint32_t>::max)() - m_bonePalettes.size())
+                    {
+                        outError = "GBuffer local palette upload exceeds 32-bit addressing.";
+                        return false;
+                    }
                     const uint32_t offset = static_cast<uint32_t>(m_bonePalettes.size());
-                    m_bonePalettes.resize(offset + draw.boneCount);
+                    m_bonePalettes.resize(m_bonePalettes.size() + draw.boneCount);
                     for (uint32_t i = 0; i < draw.boneCount; ++i)
                         m_bonePalettes[offset + i] = PackedBoneMatrix::From(draw.bonePalette[i]);
                     m_boneOffsets.emplace(draw.animatorKey, offset);
+                    m_boneCounts.emplace(draw.animatorKey, draw.boneCount);
+                }
+            }
+            else if (!context.animationPalettes)
+            {
+                const auto offset = m_boneOffsets.at(draw.animatorKey);
+                if (m_boneCounts.at(draw.animatorKey) != draw.boneCount)
+                {
+                    outError = "GBuffer local animator key refers to different palette counts.";
+                    return false;
+                }
+                for (uint32_t bone = 0; bone < draw.boneCount; ++bone)
+                {
+                    const auto expected = PackedBoneMatrix::From(draw.bonePalette[bone]);
+                    if (std::memcmp(&m_bonePalettes[offset + bone], &expected, sizeof(expected)) != 0)
+                    {
+                        outError = "GBuffer local animator key refers to different poses in one frame.";
+                        return false;
+                    }
                 }
             }
             ++m_lastSkinnedCount;
@@ -325,45 +487,222 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastMeshCount = static_cast<uint32_t>(m_drawGeometry.size());
     m_lastMaterialCount = static_cast<uint32_t>(m_drawTextures.size());
 
-    BuildBatches(context);
+    if (!BuildBatches(context, outError))
+    {
+        return false;
+    }
+    std::erase_if(m_skinningBounds, [this](const auto& entry) {
+        return !m_drawGeometry.contains(HashModelMeshHandle(entry.first));
+    });
+    std::erase_if(m_meshletLocalBounds, [this](const auto& entry) {
+        return !m_drawGeometry.contains(HashModelMeshHandle(entry.first));
+    });
     return true;
 }
 
 bool EnhancedGBufferPass::HasGpuVisibilityCandidates() const
 {
     return std::any_of(m_batches.begin(), m_batches.end(), [](const auto& batch) {
-        return batch.gpuEligible;
+        return batch.gpuEligible || batch.meshletPipeline.IsValid();
     });
 }
 
 bool EnhancedGBufferPass::PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError)
 {
+    m_occluderVisibilityFrame.reset();
+    m_lastMeshletBatchCount = 0;
+    m_occlusionPyramid.reset();
+    const bool hasPotentialOccluders = std::any_of(m_batches.begin(), m_batches.end(), [](const auto& batch) {
+        return batch.occluderPipeline.IsValid() || batch.meshletOccluderPipeline.IsValid();
+    });
+    const bool hasIndexedCandidates = std::any_of(m_batches.begin(), m_batches.end(), [](const auto& batch) {
+        return batch.gpuEligible;
+    });
+    const bool hasMeshletCandidates = std::any_of(m_batches.begin(), m_batches.end(), [](const auto& batch) {
+        return batch.meshletPipeline.IsValid();
+    });
+    if (hasPotentialOccluders
+        && (!m_depthPyramid.Prepare(context, m_frameViewProjection, m_occlusionPyramid, m_lastOcclusionFallback)
+            || (hasIndexedCandidates && !m_visibility.PrepareOcclusionPipelines(context, m_lastOcclusionFallback))
+            || (hasMeshletCandidates && !m_meshletVisibility.PrepareOcclusionPipelines(context, m_lastOcclusionFallback))))
+    {
+        // A missing optional pyramid prerequisite retains the complete frustum
+        // route. No donor pass or partially usable depth is declared in that case.
+        m_occlusionPyramid.reset();
+    }
     std::vector<GpuGeometryVisibility::Candidate> candidates;
     std::vector<GpuGeometryVisibility::Bin> bins;
-    uint32_t outputOffset = 0;
+    std::uint64_t outputOffset = 0;
+    constexpr auto maximum = (std::numeric_limits<std::uint32_t>::max)();
     for (auto& batch : m_batches)
     {
+        batch.visibilityBin = UINT32_MAX;
+        batch.meshletDraws.clear();
+        batch.occluderMeshletDraws.clear();
+        const auto& geometry = m_drawGeometry.at(batch.geometryKey);
+        if (batch.meshletPipeline.IsValid())
+        {
+            std::vector<math::matrix4x4> worlds;
+            worlds.reserve(batch.instanceCount);
+            for (uint32_t local = 0; local < batch.instanceCount; ++local)
+            {
+                worlds.push_back(math::transpose(m_instances[batch.firstInstance + local].world));
+            }
+            std::string meshletError;
+            std::array<RHIMeshletBinding, kRHIMaxCoarseMeshLods + 1> lods;
+            std::array<float, kRHIMaxCoarseMeshLods + 1> errors{};
+            std::vector<std::shared_ptr<const GpuMeshletVisibility::Frame>> frames;
+            lods[0] = geometry.meshlets;
+            if (geometry.coarseLodCount > kRHIMaxCoarseMeshLods)
+            {
+                outError = "GBuffer coarse LOD binding count exceeds its immutable ABI.";
+                return false;
+            }
+            const auto levelCount = geometry.coarseLodCount + 1u;
+            for (uint32_t level = 0; level < geometry.coarseLodCount; ++level)
+            {
+                lods[level + 1u] = geometry.coarseLods[level].meshlets;
+                errors[level + 1u] = geometry.coarseLods[level].geometricError;
+            }
+            if (!m_meshletVisibility.PrepareLods(context, m_frameViewProjection,
+                    std::span(lods.data(), levelCount), std::span(errors.data(), levelCount),
+                    batch.meshletLocalSphere, worlds, frames, meshletError))
+            {
+                outError = std::move(meshletError);
+                return false;
+            }
+            if (!frames.empty())
+            {
+                if (frames.size() != levelCount
+                    || std::any_of(frames.begin(), frames.end(), [](const auto& frame) { return !frame; }))
+                {
+                    outError = "GBuffer meshlet LOD preparation returned a partial chain.";
+                    return false;
+                }
+                for (uint32_t level = 0; level < levelCount; ++level)
+                {
+                    batch.occluderMeshletDraws.push_back({lods[level], frames[level]});
+                    batch.meshletDraws.push_back({lods[level], std::move(frames[level])});
+                }
+                if (m_occlusionPyramid)
+                {
+                    // Main HZB filtering consumes the exact already-selected
+                    // GPU pair list; LOD is never recomputed by another variant.
+                    for (uint32_t level = 0; level < levelCount; ++level)
+                    {
+                        std::shared_ptr<const GpuMeshletVisibility::Frame> rechecked;
+                        if (!m_meshletVisibility.PrepareOcclusionRecheck(context,
+                                batch.occluderMeshletDraws[level].visibility, rechecked, meshletError))
+                        {
+                            outError = std::move(meshletError);
+                            return false;
+                        }
+                        if (!rechecked)
+                        {
+                            m_lastOcclusionFallback = std::move(meshletError);
+                            m_occlusionPyramid.reset();
+                            break;
+                        }
+                        batch.meshletDraws[level].visibility = std::move(rechecked);
+                    }
+                }
+                ++m_lastMeshletBatchCount;
+                continue;
+            }
+            // Capability/work-budget/compiler prerequisites failed before
+            // submission. The unchanged indexed batch is still a valid route.
+            if (!meshletError.empty())
+            {
+                m_lastMeshletFallback = std::move(meshletError);
+            }
+            else
+            {
+                m_lastMeshletFallback = "Meshlet work prerequisites or capacity are unavailable; using indexed geometry.";
+            }
+        }
         if (!batch.gpuEligible)
         {
             continue;
         }
+        if (bins.size() >= maximum || outputOffset > maximum ||
+            batch.instanceCount > maximum - outputOffset || candidates.size() > maximum - batch.instanceCount)
+        {
+            outError = "GBuffer visibility ranges exceed 32-bit addressing.";
+            return false;
+        }
         batch.visibilityBin = static_cast<uint32_t>(bins.size());
-        batch.visibleIdOffset = outputOffset;
-        const auto& geometry = m_drawGeometry.at(batch.geometryKey);
-        bins.push_back({geometry.indexCount, 0, 0, 0});
+        batch.visibleIdOffset = static_cast<uint32_t>(outputOffset);
+        bins.push_back({geometry.indexCount, 0, 0,
+                        batch.compactsVisibleIds ? 0u : batch.instanceCount});
         for (uint32_t local = 0; local < batch.instanceCount; ++local)
         {
             candidates.push_back({m_instanceBounds[batch.firstInstance + local], batch.visibilityBin,
-                                  local, outputOffset, 0});
+                                  local, static_cast<uint32_t>(outputOffset),
+                                  batch.occlusionEligible ? 0u : GpuGeometryVisibility::kNoOcclusion});
         }
-        outputOffset += (batch.instanceCount + GpuGeometryVisibility::kOutputAlignment - 1u) /
+        outputOffset += (std::uint64_t(batch.instanceCount) + GpuGeometryVisibility::kOutputAlignment - 1u) /
                         GpuGeometryVisibility::kOutputAlignment * GpuGeometryVisibility::kOutputAlignment;
     }
-    return m_visibility.Prepare(context, m_frameViewProjection, candidates, bins, m_visibilityFrame, outError);
+    if (!m_occlusionPyramid)
+    {
+        for (auto& batch : m_batches)
+        {
+            if (!batch.occluderMeshletDraws.empty())
+            {
+                batch.meshletDraws = batch.occluderMeshletDraws;
+            }
+        }
+    }
+    const bool hasIndexedDonors = std::any_of(m_batches.begin(), m_batches.end(), [](const auto& batch) {
+        return batch.meshletDraws.empty() && batch.occluderPipeline.IsValid() && batch.gpuEligible;
+    });
+    if (m_occlusionPyramid && hasIndexedDonors &&
+        !m_visibility.Prepare(context, m_frameViewProjection, candidates, bins, m_occluderVisibilityFrame, outError))
+    {
+        return false;
+    }
+    // The donor frame has independent zeroed/reset/cull arguments and no depth
+    // dependency. Only the main frame can consume the pyramid produced from it.
+    if (!m_visibility.Prepare(context, m_frameViewProjection, candidates, bins, m_visibilityFrame, outError,
+            bool(m_occlusionPyramid)))
+    {
+        return false;
+    }
+    CaptureGeometryRoutes();
+    return true;
 }
 
-bool EnhancedGBufferPass::UsesVisibleInstanceIds(const EnhancedMaterialDrawSnapshot* snapshot,
-                                                uint32_t vertexMask) const
+void EnhancedGBufferPass::CaptureGeometryRoutes()
+{
+    m_geometryRouteAudit.clear();
+    m_geometryRouteAudit.reserve(m_batches.size());
+    for (const auto& batch : m_batches)
+    {
+        const bool meshShader = !batch.meshletDraws.empty();
+        GeometryRouteAudit route;
+        route.geometryKey = batch.geometryKey;
+        route.materialSeal = batch.material.snapshot ? batch.material.snapshot->seal.sealHash : 0u;
+        route.sourcePipeline = batch.pipeline.id;
+        route.recordedPipeline = (meshShader ? batch.meshletPipeline : batch.pipeline).id;
+        route.lodCount = meshShader ? static_cast<uint32_t>(batch.meshletDraws.size()) : 1u;
+        route.meshShader = meshShader;
+        route.occluderPipeline = meshShader
+            ? (batch.occluderMeshletDraws.empty() ? 0u : batch.meshletOccluderPipeline.id) : batch.occluderPipeline.id;
+        route.occluderLodCount = route.occluderPipeline == 0u ? 0u
+            : (meshShader ? static_cast<uint32_t>(batch.occluderMeshletDraws.size()) : 1u);
+        m_geometryRouteAudit.push_back(route);
+    }
+}
+
+const LX::Runtime::GraphicsCompileIdentity* EnhancedGBufferPass::VisibilityContract(
+    const EnhancedMaterialDrawSnapshot* snapshot, uint32_t vertexMask) const
+{
+    const auto generation = ResolveVisibilityGeneration(snapshot, vertexMask);
+    return generation ? &generation->shader.compile : nullptr;
+}
+
+std::shared_ptr<const LX::Runtime::GraphicsGeneration> EnhancedGBufferPass::ResolveVisibilityGeneration(
+    const EnhancedMaterialDrawSnapshot* snapshot, uint32_t vertexMask) const
 {
     std::shared_ptr<const LX::Runtime::GraphicsGeneration> generation;
     if (snapshot)
@@ -379,18 +718,304 @@ bool EnhancedGBufferPass::UsesVisibleInstanceIds(const EnhancedMaterialDrawSnaps
     {
         generation = found->second.GetGeneration();
     }
-    return generation && m_visibilityLayouts.contains(generation->pipeline.GetDesc().layout.id);
+    return generation;
 }
 
-void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
+RHIPipelineHandle EnhancedGBufferPass::ResolveMeshletPipeline(const EnhancedFrameContext& context,
+    const std::shared_ptr<const LX::Runtime::GraphicsGeneration>& source, std::string& diagnostic)
+{
+    diagnostic.clear();
+    if (!source || !context.resources || !context.psoManager || !context.rootSignatures)
+    {
+        return {};
+    }
+    const auto caps = context.resources->GetMeshShaderCapabilities();
+    // 64 vertices * a conservatively padded 128-byte VSOut plus primitive
+    // outputs fit this profile without relying on a particular driver packing.
+    if (!caps.meshShader || !caps.meshIndirect || caps.maxOutputVertices < 64u
+        || caps.maxOutputPrimitives < 126u || caps.maxThreadsPerGroup < 64u
+        || caps.maxThreadGroupSizeX < 64u || caps.maxThreadGroupSizeY < 1u
+        || caps.maxThreadGroupSizeZ < 1u || caps.maxOutputMemoryBytes < 16384u
+        || !caps.SupportsDispatch(1u, 1u, 1u))
+    {
+        return {};
+    }
+    const auto& identity = source->shader.compile;
+    const auto& indexed = source->pipeline.GetDesc();
+    if (!GBufferStandardDepthSource(*source)
+        || assets::Has(identity.vertexAttributeMask, assets::VertexAttribute::BoneIndices))
+    {
+        return {};
+    }
+    if (const auto found = m_meshletPipelines.find(source.get()); found != m_meshletPipelines.end())
+    {
+        diagnostic = found->second.diagnostic;
+        return found->second.pipeline;
+    }
+
+    MeshletPipeline candidate;
+    candidate.source = source;
+    const auto build = [&]() -> bool
+    {
+        // Re-prove the currently compiled source against this exact accepted
+        // indexed generation. A pending source hot reload cannot replace its
+        // pixel or vertex semantics behind a retained material snapshot.
+        RHIShaderCompiler::ModuleReuseScope module;
+        RHIShaderCompiler::VerifiedShader vertexProof, pixelProof, meshShader;
+        if (!VerifyGBufferGeneration(identity, vertexProof, pixelProof, candidate.diagnostic))
+        {
+            return false;
+        }
+        auto permutation = identity.permutation;
+        if (!permutation.Enable("GBUFFER_MESH_SHADER", candidate.diagnostic)
+            || !RHIShaderCompiler::VerifyFile(identity.source, "MSMain", "ms_6_5", identity.backend,
+                permutation, meshShader, candidate.diagnostic, identity.options))
+        {
+            return false;
+        }
+        MaterialTextureTable::Schema textures;
+        if (!MaterialTextureTable::FromReflection(pixelProof.reflection, textures, candidate.diagnostic))
+        {
+            return false;
+        }
+        std::vector<RHIPipelineLayoutParam> parameters{
+            RHILayout::Cbv(0, RHIShaderVisibility::Mesh),
+            RHILayout::Srv(4, RHIShaderVisibility::Mesh),
+            RHILayout::SrvTable(static_cast<uint32_t>(textures.size()), MaterialTextureTable::FirstRegister,
+                RHIShaderVisibility::Pixel),
+            RHILayout::SamplerTable(1, 0, RHIShaderVisibility::Pixel),
+            RHILayout::Srv(5, RHIShaderVisibility::Mesh),
+            RHILayout::Cbv(2, RHIShaderVisibility::Pixel),
+            RHILayout::Cbv(3, RHIShaderVisibility::Pixel),
+            RHILayout::Srv(6, RHIShaderVisibility::Mesh),
+            RHILayout::Srv(7, RHIShaderVisibility::Mesh),
+            RHILayout::Srv(8, RHIShaderVisibility::Mesh)};
+        bool paletteExtent = false;
+        if (!GBufferSkinPaletteExtentContract(meshShader.reflection, paletteExtent, candidate.diagnostic))
+        {
+            return false;
+        }
+        if (paletteExtent)
+        {
+            candidate.paletteExtentRoot = static_cast<std::uint32_t>(parameters.size());
+            parameters.push_back(RHILayout::Cbv(4, RHIShaderVisibility::Mesh));
+        }
+        RHIPipelineLayoutDesc layoutDescription;
+        layoutDescription.params = parameters;
+        layoutDescription.allowInputAssembler = false;
+        const auto layout = context.rootSignatures->GetOrCreate(layoutDescription, candidate.diagnostic);
+        if (!layout.IsValid())
+        {
+            return false;
+        }
+        RHIMeshPipelineDesc description;
+        description.msBytecode = meshShader.bytecode.Data();
+        description.msSize = meshShader.bytecode.Size();
+        // Reuse the exact accepted pixel bytecode and complete raster state.
+        description.psBytecode = indexed.psBytecode;
+        description.psSize = indexed.psSize;
+        description.layout = layout;
+        description.fillMode = indexed.fillMode;
+        description.cullMode = indexed.cullMode;
+        description.depthEnable = indexed.depthEnable;
+        description.blendEnable = indexed.blendEnable;
+        description.depthWriteMask = indexed.depthWriteMask;
+        description.depthFunc = indexed.depthFunc;
+        description.independentBlend = indexed.independentBlend;
+        description.numRenderTargets = indexed.numRenderTargets;
+        description.dsvFormat = indexed.dsvFormat;
+        description.sampleCount = indexed.sampleCount;
+        std::copy_n(indexed.renderTargetBlend, 8, description.renderTargetBlend);
+        std::copy_n(indexed.rtvFormats, 8, description.rtvFormats);
+        candidate.pipeline = context.psoManager->GetOrCreateMesh(description, candidate.diagnostic);
+        if (candidate.pipeline.IsValid())
+        {
+            RHIShaderCompiler::VerifiedShader depthShader;
+            if (RHIShaderCompiler::VerifyFile(identity.source, "PSDepthOnly", identity.pixelProfile, identity.backend,
+                    identity.permutation, depthShader, candidate.occluderDiagnostic, identity.options))
+            {
+                description.psBytecode = depthShader.bytecode.Data();
+                description.psSize = depthShader.bytecode.Size();
+                description.numRenderTargets = 0;
+                std::fill_n(description.rtvFormats, 8, RHIFormat::Unknown);
+                candidate.occluderPipeline = context.psoManager->GetOrCreateMesh(description, candidate.occluderDiagnostic);
+            }
+        }
+        return candidate.pipeline.IsValid();
+    };
+    if (!build() && candidate.diagnostic.empty())
+    {
+        candidate.diagnostic = "Mesh shader prerequisites failed; retaining the indexed GBuffer generation.";
+    }
+    diagnostic = candidate.diagnostic;
+    const auto pipeline = candidate.pipeline;
+    m_meshletPipelines.emplace(source.get(), std::move(candidate));
+    return pipeline;
+}
+
+RHIPipelineHandle EnhancedGBufferPass::ResolveOccluderPipeline(const EnhancedFrameContext& context,
+    const std::shared_ptr<const LX::Runtime::GraphicsGeneration>& source, std::string& diagnostic)
+{
+    diagnostic.clear();
+    if (!source || !context.psoManager || !GBufferStandardDepthSource(*source))
+    {
+        return {};
+    }
+    if (const auto found = m_occluderPipelines.find(source.get()); found != m_occluderPipelines.end())
+    {
+        diagnostic = found->second.diagnostic;
+        return found->second.pipeline;
+    }
+    MeshletPipeline candidate;
+    candidate.source = source;
+    const auto& identity = source->shader.compile;
+    RHIShaderCompiler::ModuleReuseScope module;
+    RHIShaderCompiler::VerifiedShader vertexProof, pixelProof, depthShader;
+    if (VerifyGBufferGeneration(identity, vertexProof, pixelProof, candidate.diagnostic)
+        && RHIShaderCompiler::VerifyFile(identity.source, "PSDepthOnly", identity.pixelProfile, identity.backend,
+            identity.permutation, depthShader, candidate.diagnostic, identity.options))
+    {
+        // Preserve the accepted VS bytecode, raster/depth state and root layout.
+        // Only the pixel coverage entry and absence of color attachments differ.
+        auto description = source->pipeline.GetDesc();
+        description.psBytecode = depthShader.bytecode.Data();
+        description.psSize = depthShader.bytecode.Size();
+        description.numRenderTargets = 0;
+        std::fill_n(description.rtvFormats, 8, RHIFormat::Unknown);
+        candidate.pipeline = context.psoManager->GetOrCreate(description, candidate.diagnostic);
+    }
+    diagnostic = candidate.diagnostic;
+    const auto pipeline = candidate.pipeline;
+    m_occluderPipelines.emplace(source.get(), std::move(candidate));
+    return pipeline;
+}
+
+bool EnhancedGBufferPass::HasSafeSkinningBounds(
+    const EnhancedFrameContext& context, const EnhancedDrawItem& draw, bool& unsafeSkinAccess)
+{
+    unsafeSkinAccess = false;
+    const bool finitePose = shadow_math::FinitePose(draw);
+    if (draw.boneCount == 0)
+    {
+        return finitePose;
+    }
+    const auto& mesh = draw.modelMeshView;
+    // Legacy mutable bytes carry no immutable generation to cache/verify.
+    // They retain their instance stream and unknown (non-rejecting) posed bounds.
+    if (!mesh.IsComplete() || mesh.vertexStride != assets::StrideOf(mesh.vertexAttributeMask) ||
+        !assets::Has(mesh.vertexAttributeMask, assets::VertexAttribute::BoneIndices) ||
+        !assets::Has(mesh.vertexAttributeMask, assets::VertexAttribute::BoneWeights))
+    {
+        return false;
+    }
+    auto [found, inserted] = m_skinningBounds.try_emplace(mesh.handle);
+    auto& contract = found->second;
+    if (inserted)
+    {
+        contract.vertices = mesh.vertexData;
+        contract.bytes = mesh.vertexBytes;
+        contract.mask = mesh.vertexAttributeMask;
+        contract.stride = mesh.vertexStride;
+        contract.valid = true;
+        for (uint64_t offset = 0; offset < mesh.vertexBytes; offset += mesh.vertexStride)
+        {
+            const auto* vertex = static_cast<const std::byte*>(mesh.vertexData) + offset;
+            std::array<uint8_t, 4> indices;
+            std::array<float, 4> weights;
+            std::memcpy(indices.data(), vertex + assets::OffsetOf(mesh.vertexAttributeMask,
+                assets::VertexAttribute::BoneIndices), sizeof(indices));
+            std::memcpy(weights.data(), vertex + assets::OffsetOf(mesh.vertexAttributeMask,
+                assets::VertexAttribute::BoneWeights), sizeof(weights));
+            double sum = 0;
+            for (size_t i = 0; i < weights.size(); ++i)
+            {
+                if (!std::isfinite(weights[i]) || weights[i] < 0.f || weights[i] > 1.f)
+                {
+                    contract.valid = false;
+                }
+                sum += weights[i];
+                if (weights[i] > 0.f)
+                {
+                    contract.requiredBones = (std::max)(contract.requiredBones, uint32_t(indices[i]) + 1u);
+                }
+            }
+            if (!std::isfinite(sum) || (sum != 0.0 &&
+                (std::abs(sum - 1.0) > 0.00001 || weights[0] <= 0.f)))
+            {
+                contract.valid = false;
+            }
+        }
+    }
+    if (contract.vertices != mesh.vertexData || contract.bytes != mesh.vertexBytes ||
+        contract.mask != mesh.vertexAttributeMask || contract.stride != mesh.vertexStride ||
+        contract.requiredBones > draw.boneCount)
+    {
+        // A canonical skinning route must not retain an out-of-range positive
+        // bone fetch or accept mutable bytes under an immutable handle.
+        unsafeSkinAccess = true;
+        return false;
+    }
+    if (!contract.valid)
+    {
+        unsafeSkinAccess = true;
+        return false;
+    }
+    if (!finitePose)
+    {
+        return false;
+    }
+
+    // Bounds must enclose the actual uploaded palette, not merely a source
+    // pointer sharing an animator key with a different pose in this frame.
+    const auto& offsets = context.animationPalettes ? context.animationPalettes->Offsets() : m_boneOffsets;
+    const auto palette = offsets.find(draw.animatorKey);
+    if (palette == offsets.end())
+    {
+        return false;
+    }
+    const void* uploaded = m_bonePalettes.data();
+    uint64_t uploadedBytes = m_bonePalettes.size() * sizeof(PackedBoneMatrix);
+    if (context.animationPalettes)
+    {
+        const auto slice = context.animationPalettes->Upload();
+        uploaded = slice.cpuAddress;
+        uploadedBytes = slice.size;
+    }
+    const uint64_t begin = uint64_t(palette->second) * sizeof(PackedBoneMatrix);
+    const uint64_t bytes = uint64_t(draw.boneCount) * sizeof(PackedBoneMatrix);
+    if (!uploaded || begin > uploadedBytes || bytes > uploadedBytes - begin)
+    {
+        return false;
+    }
+    for (uint32_t bone = 0; bone < draw.boneCount; ++bone)
+    {
+        const auto expected = PackedBoneMatrix::From(draw.bonePalette[bone]);
+        if (std::memcmp(static_cast<const std::byte*>(uploaded) + begin +
+                uint64_t(bone) * sizeof(PackedBoneMatrix), &expected, sizeof(expected)) != 0)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context, std::string& outError)
 {
     m_instances.clear();
     m_instanceBounds.clear();
     m_batches.clear();
     m_lastBatchCount = 0;
 
-    if (nullptr == context.draws) return;
+    if (nullptr == context.draws)
+    {
+        return true;
+    }
 
+    if (context.draws->size() > (std::numeric_limits<std::uint32_t>::max)())
+    {
+        outError = "GBuffer draw count exceeds 32-bit instance addressing.";
+        return false;
+    }
     m_instances.reserve(context.draws->size());
 
     // 같은 (메시, 재질)을 묶는다.
@@ -451,14 +1076,91 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         const MaterialKey key = MakeMaterialKey(draw);
         const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
         const uint32_t vertexMask = geometry->second.vertexAttributeMask;
-        const bool usesVisibleIds = UsesVisibleInstanceIds(key.snapshot.get(), vertexMask);
-        const bool skinned = draw.bonePalette && draw.boneCount != 0;
-        const bool gpuEligible = context.resources->GetIndirectDrawCapabilities().indexedDraw &&
-                                 usesVisibleIds && !skinned;
-        const auto bounds = shadow_math::WorldBounds(draw);
-        // Unsupported devices, custom vertex contracts and skinned draws retain
-        // conservative CPU visibility and the direct indexed submission path.
-        if (!gpuEligible && !shadow_math::IntersectsClip(bounds, m_frameViewProjection))
+        const auto sourceGeneration = ResolveVisibilityGeneration(key.snapshot.get(), vertexMask);
+        const auto* contract = sourceGeneration ? &sourceGeneration->shader.compile : nullptr;
+        const bool usesVisibleIds = contract && contract->visibleInstanceIds;
+        const bool knownDeformation = contract &&
+            contract->geometryVisibility == ShaderGeometryVisibility::IndexedInstanceV1;
+        bool unsafeSkinAccess = false;
+        // Canonical skin weights are a promise of IndexedInstanceV1 only.
+        // An arbitrary accepted vertex program may normalize, reinterpret or
+        // ignore those attributes; do not reject it using another shader's ABI.
+        const bool safePose = knownDeformation && HasSafeSkinningBounds(context, draw, unsafeSkinAccess);
+        if (unsafeSkinAccess)
+        {
+            outError = "GBuffer skin weights/indices are invalid for the supplied palette or its immutable vertex contract changed.";
+            return false;
+        }
+        if (draw.boneCount != 0 && !safePose)
+        {
+            m_lastSkinningFallback = "Skin bounds are unproven for this pose or legacy layout; preserving the full indexed instance stream.";
+        }
+        // Indirect execution preserves any accepted VS/PS pipeline. Only
+        // compaction needs the versioned visible-ID/deformation promise.
+        const bool gpuEligible = context.resources->GetIndirectDrawCapabilities().indexedDraw;
+        const bool compactsVisibleIds = usesVisibleIds && knownDeformation && safePose;
+        const auto& coverage = key.snapshot ? key.snapshot->coverage : draw.coverage;
+        RHIPipelineHandle meshletPipeline;
+        math::vector4 meshletLocalSphere{};
+        const auto* authoredMeshlets = draw.modelMeshView.Meshlets();
+        if (safePose && draw.boneCount == 0 && geometry->second.meshlets.IsValid()
+            && authoredMeshlets && draw.modelMeshView.sourceLodIndex == 0
+            && geometry->second.meshlets.profileVersion == experiment::kMeshletProfileVersion
+            && geometry->second.vertices.size <= (std::numeric_limits<uint32_t>::max)()
+            && !assets::Has(vertexMask, assets::VertexAttribute::BoneIndices)
+            && (coverage.flags & (EnhancedMaterialCoverage::Masked | EnhancedMaterialCoverage::Blended)) == 0)
+        {
+            std::string diagnostic;
+            meshletPipeline = ResolveMeshletPipeline(context, sourceGeneration, diagnostic);
+            if (!diagnostic.empty())
+            {
+                m_lastMeshletFallback = std::move(diagnostic);
+            }
+            if (meshletPipeline.IsValid())
+            {
+                auto [bounds, inserted] = m_meshletLocalBounds.try_emplace(draw.modelMeshView.handle);
+                if (inserted)
+                {
+                    bounds->second = GBufferMeshletLocalBounds(*authoredMeshlets);
+                }
+                meshletLocalSphere = bounds->second;
+            }
+        }
+        RHIPipelineHandle occluderPipeline, meshletOccluderPipeline;
+        bool occlusionEligible = false;
+        if (sourceGeneration)
+        {
+            // The vertex visibility contract alone says nothing about a custom
+            // PS writing SV_Depth. Only the shared Standard surface preserves
+            // the rasterized depth enclosed by the geometry sphere.
+            occlusionEligible = GBufferStandardDepthSource(*sourceGeneration)
+                && (coverage.flags & EnhancedMaterialCoverage::Blended) == 0;
+        }
+        if ((gpuEligible || meshletPipeline.IsValid()) && safePose && draw.modelMeshView.SourceMesh()
+            && (coverage.flags & (EnhancedMaterialCoverage::Masked | EnhancedMaterialCoverage::Blended)) == 0)
+        {
+            std::string diagnostic;
+            occluderPipeline = ResolveOccluderPipeline(context, sourceGeneration, diagnostic);
+            if (!diagnostic.empty())
+            {
+                m_lastOcclusionFallback = std::move(diagnostic);
+            }
+            if (meshletPipeline.IsValid())
+            {
+                const auto& prepared = m_meshletPipelines.at(sourceGeneration.get());
+                meshletOccluderPipeline = prepared.occluderPipeline;
+                if (!prepared.occluderDiagnostic.empty())
+                {
+                    m_lastOcclusionFallback = prepared.occluderDiagnostic;
+                }
+            }
+        }
+        // Unknown custom position semantics and malformed/legacy poses cannot
+        // borrow a bind-pose sphere as a rejection proof. Their GPU bin keeps
+        // the entire original instance stream visible, without a shader rewrite.
+        const auto bounds = knownDeformation && safePose
+            ? shadow_math::WorldBounds(draw) : shadow_math::Sphere{};
+        if (!gpuEligible && !meshletPipeline.IsValid() && !shadow_math::IntersectsClip(bounds, m_frameViewProjection))
         {
             continue;
         }
@@ -466,13 +1168,26 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         if (m_batches.empty()
             || m_batches.back().geometryKey != enhanced_draw::GeometryKey(draw)
             || m_batches.back().material != key
-            || m_batches.back().gpuEligible != gpuEligible)
+            || m_batches.back().gpuEligible != gpuEligible
+            || m_batches.back().compactsVisibleIds != compactsVisibleIds
+            || m_batches.back().meshletPipeline != meshletPipeline
+            || m_batches.back().occluderPipeline != occluderPipeline
+            || m_batches.back().occlusionEligible != occlusionEligible)
         {
             DrawBatch batch{};
             batch.geometryKey = enhanced_draw::GeometryKey(draw);
             batch.material = key;
             batch.usesVisibleIds = usesVisibleIds;
+            batch.paletteExtentRoot = contract ? contract->gbufferSkinPaletteExtentV1Root : UINT32_MAX;
+            batch.meshletPaletteExtentRoot = meshletPipeline.IsValid()
+                ? m_meshletPipelines.at(sourceGeneration.get()).paletteExtentRoot : UINT32_MAX;
+            batch.compactsVisibleIds = compactsVisibleIds;
             batch.gpuEligible = gpuEligible;
+            batch.meshletPipeline = meshletPipeline;
+            batch.meshletLocalSphere = meshletLocalSphere;
+            batch.occluderPipeline = occluderPipeline;
+            batch.meshletOccluderPipeline = meshletOccluderPipeline;
+            batch.occlusionEligible = occlusionEligible;
             // I5-D34a: 메시 바인딩의 마스크가 레이아웃 축이다. 배치는 메시별로
             // 갈리므로 마스크가 배치 안에서 섞일 수 없다.
             const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
@@ -504,6 +1219,9 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
                 // 같은 key.sampler 에서 나온다.
                 binding.samplerIdentity = EnhancedMaterialSeal::ComputeSamplerIdentity(
                     key.sampler.ToDesc());
+                // Source-generation identity stays stable across legitimate
+                // indexed/mesh front-end choices. CaptureGeometryRoutes records
+                // and Record verifies the actual prepared derivative PSO.
                 binding.pipelineId = batch.pipeline.id;
                 // W0 — 이 배치의 descriptor 가 어느 버전에서 잘렸는지. 기록만 하고
                 // 신원(operator==)에는 넣지 않는다(장부 주석 참조).
@@ -529,7 +1247,6 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         // draw.useNormalMap은 snapshot이 없는 격리 fixture 호환 경계에만 남는다.
         instance.useNormalMap = key.snapshot
             ? key.snapshot->useNormalMap : draw.useNormalMap;
-        const auto& coverage = key.snapshot ? key.snapshot->coverage : draw.coverage;
         instance.coverageFlags = coverage.flags;
         instance.coverageCutoff = coverage.cutoff;
         instance.usePropertyBlock = key.snapshot ? 1u : 0u;
@@ -542,7 +1259,22 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
             const auto& offsets = context.animationPalettes
                 ? context.animationPalettes->Offsets() : m_boneOffsets;
             const auto found = offsets.find(draw.animatorKey);
-            if (found != offsets.end()) instance.boneOffset = found->second;
+            if (found != offsets.end())
+            {
+                const uint64_t paletteCount = context.animationPalettes
+                    ? context.animationPalettes->Upload().size / sizeof(PackedBoneMatrix)
+                    : m_bonePalettes.size();
+                if (found->second > paletteCount || draw.boneCount > paletteCount - found->second
+                    || draw.boneCount > (std::numeric_limits<uint32_t>::max)() - found->second)
+                {
+                    outError = "GBuffer skin palette offset/count is outside the sealed upload.";
+                    return false;
+                }
+                instance.boneOffset = found->second;
+                // Only the explicit instance contract owns this former padding
+                // word. Direct wrappers use the separate palette-extent uniform.
+                instance.boneCount = knownDeformation ? draw.boneCount : 0u;
+            }
         }
 
         m_instances.push_back(instance);
@@ -551,6 +1283,8 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
     }
 
     m_lastBatchCount = static_cast<uint32_t>(m_batches.size());
+    CaptureGeometryRoutes();
+    return true;
 }
 
 bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
@@ -558,7 +1292,8 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     const ShaderRenderState* renderState,
     const RHIShaderPermutation& permutation, uint32_t experimentMask,
     RHIGraphicsPipelineDesc& outDesc,
-    RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled)
+    RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError,
+    LX::Runtime::CompiledGraphics* compiled, ShaderGeometryVisibility visibilityContract)
 {
     // I5-D34a/b: experiment 짝은 호출자의 퍼뮤테이션 위에 레이아웃 매크로를
     // 얹는다. 키워드 축과 독립인 별도 축이라 여기서 합성한다 — 호출자마다
@@ -604,17 +1339,34 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
         RHILayout::Cbv(2, RHIShaderVisibility::Pixel),           // b2 — M6 Material property block
         RHILayout::Cbv(3, RHIShaderVisibility::Pixel), // texture coordinates by reflected register
     };
-    // Opt in from the verified vertex contract, never from a filename. Custom
-    // ShaderMeta shaders without the index indirection continue to draw directly.
+    // Reflection verifies binding shape only. Semantic eligibility is an
+    // explicit versioned ShaderMeta promise retained with this generation.
     const bool visibleIds = std::any_of(verified.vertex.reflection.resources.begin(),
         verified.vertex.reflection.resources.end(), [](const auto& resource) {
             return resource.name == "gVisibleInstanceIds" &&
                    resource.kind == RHIShaderResourceKind::StructuredBuffer &&
-                   resource.registerIndex == 6 && resource.registerSpace == 0;
+                   resource.registerIndex == 6 && resource.registerSpace == 0 && resource.arrayElements == 1;
         });
+    if (visibilityContract != ShaderGeometryVisibility::Direct && !visibleIds)
+    {
+        outError = "indexed-instance-v1 requires StructuredBuffer<uint> gVisibleInstanceIds at t6/space0";
+        return false;
+    }
+    verified.identity.visibleInstanceIds = visibleIds;
+    verified.identity.geometryVisibility = visibilityContract;
     if (visibleIds)
     {
         params.push_back(RHILayout::Srv(6, RHIShaderVisibility::Vertex));
+    }
+    bool paletteExtent = false;
+    if (!GBufferSkinPaletteExtentContract(verified.vertex.reflection, paletteExtent, outError))
+    {
+        return false;
+    }
+    if (paletteExtent)
+    {
+        verified.identity.gbufferSkinPaletteExtentV1Root = static_cast<std::uint32_t>(params.size());
+        params.push_back(RHILayout::Cbv(4, RHIShaderVisibility::Vertex));
     }
 
     RHIPipelineLayoutDesc rootDesc{};
@@ -623,10 +1375,6 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
-    if (visibleIds)
-    {
-        m_visibilityLayouts.insert(root.id);
-    }
 
     // 입력 레이아웃. 정점 구조체와 순서가 맞아야 하고, 어긋나면 검증 레이어가
     // 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
@@ -701,11 +1449,19 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
     const RHIShaderPermutation emptyPermutation;
     if (!MaterialTextureTable::Reflect(kGBufferShaderFile, "PSMain", emptyPermutation,
             m_legacyTextureSchema, outError)) return false;
+    LX::Runtime::CompiledGraphics compiled;
     if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain", nullptr,
-            emptyPermutation, 0, desc, vsBlob, psBlob, outError)) return false;
-
-    if (!m_pipelineRequest.Create(*context.psoManager, desc, outError))
+            emptyPermutation, 0, desc, vsBlob, psBlob, outError, &compiled,
+            ShaderGeometryVisibility::IndexedInstanceV1))
+    {
         return false;
+    }
+    LX::Runtime::GraphicsShaderDescription shader;
+    shader.compile = std::move(compiled.identity);
+    if (!m_pipelineRequest.Create(*context.psoManager, desc, std::move(shader), outError))
+    {
+        return false;
+    }
 
     for (std::size_t i = 0; i < assets::kModelVertexMasks.size(); ++i)
     {
@@ -715,8 +1471,15 @@ bool EnhancedGBufferPass::CreatePipeline(const EnhancedFrameContext& context, st
         RHIGraphicsPipelineDesc modelDesc{};
         if (!BuildPipelineDesc(context, kGBufferShaderFile, "VSMain", "PSMain",
                 nullptr, emptyPermutation, assets::kModelVertexMasks[i], modelDesc,
-                modelVsBlob, modelPsBlob, outError)
-            || !m_modelPipelineRequests[assets::kModelVertexMasks[i]].Create(*context.psoManager, modelDesc, outError))
+                modelVsBlob, modelPsBlob, outError, &compiled,
+                ShaderGeometryVisibility::IndexedInstanceV1))
+        {
+            return false;
+        }
+        LX::Runtime::GraphicsShaderDescription modelShader;
+        modelShader.compile = std::move(compiled.identity);
+        if (!m_modelPipelineRequests[assets::kModelVertexMasks[i]].Create(
+                *context.psoManager, modelDesc, std::move(modelShader), outError))
         {
             return false;
         }
@@ -782,7 +1545,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     LX::Runtime::CompiledGraphics compiled;
     if (!BuildPipelineDesc(context, shaderFile.c_str(), pass.vertex->entry.c_str(),
             pass.pixel->entry.c_str(), &pass.state, permutation.defines,
-            experimentMask, outDesc, outVs, outPs, outError, &compiled))
+            experimentMask, outDesc, outVs, outPs, outError, &compiled, pass.geometryVisibility))
     {
         return false;
     }
@@ -864,6 +1627,12 @@ void EnhancedGBufferPass::RetireUnusedPipelines(const EnhancedFrameContext& cont
             || std::find(invalidated.begin(), invalidated.end(), pipeline.id) != invalidated.end()
             || std::any_of(m_shaderVariants.begin(), m_shaderVariants.end(), [&](const auto& entry) {
                 return entry.second.request.GetHandle() == pipeline || contains(entry.second.modelRequests, pipeline);
+            })
+            || std::any_of(m_meshletPipelines.begin(), m_meshletPipelines.end(), [&](const auto& entry) {
+                return entry.second.pipeline == pipeline || entry.second.occluderPipeline == pipeline;
+            })
+            || std::any_of(m_occluderPipelines.begin(), m_occluderPipelines.end(), [&](const auto& entry) {
+                return entry.second.pipeline == pipeline;
             })) continue;
         context.psoManager->InvalidatePipeline(pipeline, retireAfter);
         invalidated.push_back(pipeline.id);
@@ -992,6 +1761,35 @@ std::uint32_t EnhancedGBufferPass::CommitShaderMetaFrame(
         }
     }
 
+    for (auto it = m_meshletPipelines.begin(); it != m_meshletPipelines.end();)
+    {
+        const auto& source = it->second.source;
+        if (source->shader.shader && !isActive(source->shader.shader->codeHandle))
+        {
+            removedPipelines.push_back(it->second.pipeline);
+            removedPipelines.push_back(it->second.occluderPipeline);
+            it = m_meshletPipelines.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    for (auto it = m_occluderPipelines.begin(); it != m_occluderPipelines.end();)
+    {
+        const auto& source = it->second.source;
+        if (source->shader.shader && !isActive(source->shader.shader->codeHandle))
+        {
+            removedPipelines.push_back(it->second.pipeline);
+            it = m_occluderPipelines.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
     RetireUnusedPipelines(context, removedPipelines, retireAfter);
     return removedKeys;
 }
@@ -1048,7 +1846,53 @@ RHISamplerTable EnhancedGBufferPass::SamplerTableFor(
 
 void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
-    const auto visibility = m_visibilityFrame;
+    const bool hasDonors = std::any_of(m_batches.begin(), m_batches.end(), [](const auto& batch) {
+        return batch.meshletDraws.empty() ? batch.occluderPipeline.IsValid()
+            : (batch.meshletOccluderPipeline.IsValid() && !batch.occluderMeshletDraws.empty());
+    });
+    if (m_occlusionPyramid && graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned && hasDonors)
+    {
+        // Separate depth keeps the original GBuffer clear/compare untouched.
+        // Prepass work has only frustum/LOD dependencies, never its own HZB.
+        const auto depth = DeclareDrawPass(graph, context, true);
+        m_occlusionPyramid->Declare(graph, depth);
+        if (m_visibilityFrame)
+        {
+            m_visibilityFrame->DeclareWithOcclusion(graph, m_occlusionPyramid);
+        }
+        for (const auto& batch : m_batches)
+        {
+            for (const auto& level : batch.meshletDraws)
+            {
+                level.visibility->DeclareWithOcclusion(graph, m_occlusionPyramid);
+            }
+        }
+    }
+    else
+    {
+        m_occlusionPyramid.reset();
+        for (auto& batch : m_batches)
+        {
+            if (!batch.occluderMeshletDraws.empty())
+            {
+                batch.meshletDraws = batch.occluderMeshletDraws;
+            }
+        }
+        CaptureGeometryRoutes();
+    }
+    (void)DeclareDrawPass(graph, context, false);
+}
+
+RGHandle EnhancedGBufferPass::DeclareDrawPass(
+    EnhancedRenderGraph& graph, const EnhancedFrameContext& context, bool occluders)
+{
+    const bool hasMeshletWork = std::any_of(m_batches.begin(), m_batches.end(), [occluders](const auto& batch) {
+        return !(occluders ? batch.occluderMeshletDraws : batch.meshletDraws).empty();
+    });
+    // Once depth has hidden receivers, silently dropping its donors in the main
+    // pass would leave phantom occluders. Advanced routes must fail atomically.
+    const bool requireCompleteGeometry = hasMeshletWork || occluders || bool(m_occlusionPyramid);
+    const auto visibility = occluders ? m_occluderVisibilityFrame : m_visibilityFrame;
     if (visibility)
     {
         visibility->Declare(graph);
@@ -1063,7 +1907,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         "GBuffer.Emissive", "GBuffer.Bitmask" };
 
     RGHandle targets[kRenderTargetCount]{};
-    for (uint32_t i = 0; i < kRenderTargetCount; ++i)
+    const uint32_t colorCount = occluders ? 0u : kRenderTargetCount;
+    for (uint32_t i = 0; i < colorCount; ++i)
     {
         RGTextureDesc desc{};
         desc.width = context.width;
@@ -1083,23 +1928,26 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     depthDesc.height = context.height;
     depthDesc.format = kDepthFormat;
     depthDesc.allowDepthStencil = true;
-    depthDesc.name = "GBuffer.Depth";
+    depthDesc.name = occluders ? "GBuffer.OccluderDepth" : "GBuffer.Depth";
     RGHandle depth = graph.CreateTexture(depthDesc);
     if (versioned)
     {
         depth = graph.Write(depth);
     }
 
-    m_outputs.diffuse = targets[0];
-    m_outputs.metalRough = targets[1];
-    m_outputs.normal = targets[2];
-    m_outputs.emissive = targets[3];
-    m_outputs.bitmask = targets[4];
-    m_outputs.depth = depth;
+    if (!occluders)
+    {
+        m_outputs.diffuse = targets[0];
+        m_outputs.metalRough = targets[1];
+        m_outputs.normal = targets[2];
+        m_outputs.emissive = targets[3];
+        m_outputs.bitmask = targets[4];
+        m_outputs.depth = depth;
+    }
 
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
     usages.reserve(kRenderTargetCount + 1);
-    for (uint32_t i = 0; i < kRenderTargetCount; ++i)
+    for (uint32_t i = 0; i < colorCount; ++i)
     {
         usages.push_back({ targets[i], RHIResourceState::RenderTarget, outputAccess });
     }
@@ -1108,10 +1956,42 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     {
         visibility->AddReadUsages(graph, usages);
     }
+    for (const auto& batch : m_batches)
+    {
+        if (occluders && !batch.meshletOccluderPipeline.IsValid())
+        {
+            continue;
+        }
+        const auto& meshletDraws = occluders ? batch.occluderMeshletDraws : batch.meshletDraws;
+        if (!meshletDraws.empty())
+        {
+            for (const auto& level : meshletDraws)
+            {
+                level.visibility->AddReadUsages(graph, usages);
+            }
+            const auto& geometry = m_drawGeometry.at(batch.geometryKey);
+            auto vertices = graph.FindImportedBuffer(geometry.vertices.buffer);
+            if (!vertices.IsValid())
+            {
+                vertices = graph.ImportBuffer(geometry.vertices.buffer, RHIResourceState::VertexAndShaderResource,
+                    "GBuffer.MeshletVertices");
+            }
+            const auto existing = std::find_if(usages.begin(), usages.end(), [&](const auto& usage) {
+                return usage.handle.index == vertices.index && usage.handle.version == vertices.version
+                    && usage.handle.kind == vertices.kind && usage.handle.epoch == vertices.epoch;
+            });
+            if (existing == usages.end())
+            {
+                usages.push_back({vertices, RHIResourceState::VertexAndShaderResource,
+                    graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+                        ? RGAccessMode::LegacyState : RGAccessMode::Read});
+            }
+        }
+    }
 
     // 소비자가 없을 때만 뿌리로 표시해 살려 둔다(SetKeepAlive).
     // Deferred가 붙으면 그쪽이 읽으므로 표시 없이도 살아남아야 한다.
-    const bool keepAlive = m_keepAlive;
+    const bool keepAlive = !occluders && m_keepAlive;
 
     // 쪼갤 수 있는 패스로 선언한다.
     //
@@ -1120,8 +2000,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     //
     // 조각 상한은 워커 상한과 맞춘다. 그보다 잘게 쪼개도 같은 워커가 연달아
     // 맡게 되고, 그러면 조각마다 상태를 다시 거는 비용만 늘어난다.
-    graph.AddSplitPass(GetName(), usages,
-        [this, &context, targets, depth, visibility](const EnhancedRenderGraph::ExecuteContext& executeContext,
+    graph.AddSplitPass(occluders ? "GBuffer.Occluders" : GetName(), usages,
+        [this, &context, targets, depth, visibility, requireCompleteGeometry, occluders, colorCount](const EnhancedRenderGraph::ExecuteContext& executeContext,
             uint32_t slice, uint32_t sliceCount)
         {
             RHIEncoder& encoder = *executeContext.encoder;
@@ -1133,15 +2013,23 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             //   한 벌을 나눠 쓰면 만드는 쪽과 거는 쪽이 어긋날 수 있다 —
             //   프레임 힙에서 조각별로 잘라 오면 그 경합 자체가 없다.
             RHITextureHandle colors[kRenderTargetCount]{};
-            for (uint32_t i = 0; i < kRenderTargetCount; ++i)
+            for (uint32_t i = 0; i < colorCount; ++i)
             {
                 colors[i] = executeContext.ResolveHandle(targets[i]);
             }
 
             const auto depthDesc = RHIDepthTargetDesc::Depth(
                 executeContext.ResolveHandle(depth), kDepthFormat);
-            const auto boundTargets = context.resources->CreateRenderTargets(colors, &depthDesc);
-            if (!boundTargets.IsValid()) return;
+            const auto boundTargets = context.resources->CreateRenderTargets(
+                std::span<const RHITextureHandle>(colors, colorCount), &depthDesc);
+            if (!boundTargets.IsValid())
+            {
+                if (requireCompleteGeometry)
+                {
+                    throw std::runtime_error("Mesh GBuffer render-target binding failed.");
+                }
+                return;
+            }
 
             encoder.SetViewportAndScissor(context.width, context.height);
 
@@ -1155,7 +2043,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             constexpr float kZero[4] = { 0.f, 0.f, 0.f, 0.f };
             if (0 == slice)
             {
-                encoder.ClearRenderTargets(boundTargets, kZero);
+                if (!occluders)
+                {
+                    encoder.ClearRenderTargets(boundTargets, kZero);
+                }
                 encoder.ClearDepthTarget(boundTargets, 1.f);
             }
 
@@ -1171,11 +2062,25 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const math::matrix4x4 viewProjection = math::transpose(m_frameViewProjection);
             const auto frameConstants = context.resources->UploadConstants(
                 &viewProjection, sizeof(viewProjection));
-            if (!frameConstants.IsValid()) return;
+            if (!frameConstants.IsValid())
+            {
+                if (requireCompleteGeometry)
+                {
+                    throw std::runtime_error("Mesh GBuffer frame constant upload failed.");
+                }
+                return;
+            }
             encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants);
 
             // 그릴 것이 없으면 클리어만 하고 끝난다 — 빈 씬도 정상 경로다.
-            if (nullptr == context.draws) return;
+            if (nullptr == context.draws)
+            {
+                if (requireCompleteGeometry)
+                {
+                    throw std::runtime_error("Prepared GBuffer geometry input is unavailable during recording.");
+                }
+                return;
+            }
 
             encoder.SetSamplers(RHIBindPoint::Graphics, 3, m_sampler);
 
@@ -1199,7 +2104,14 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 paletteBuffer = context.resources->AllocateUpload(
                     RHIUploadRequest{ paletteBytes, RHIUploadUsage::BufferCopy,
                         sizeof(PackedBoneMatrix) });
-                if (!paletteBuffer.IsValid()) return;
+                if (!paletteBuffer.IsValid() || !paletteBuffer.IsWritable())
+                {
+                    if (requireCompleteGeometry)
+                    {
+                        throw std::runtime_error("Mesh GBuffer palette placeholder upload failed.");
+                    }
+                    return;
+                }
                 if (m_bonePalettes.empty())
                 {
                     const PackedBoneMatrix identity = PackedBoneMatrix::Identity();
@@ -1208,7 +2120,14 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 else memcpy(paletteBuffer.cpuAddress, m_bonePalettes.data(),
                     static_cast<size_t>(paletteBytes));
             }
-            if (!paletteBuffer.IsValid()) return;
+            if (!paletteBuffer.IsValid())
+            {
+                if (requireCompleteGeometry)
+                {
+                    throw std::runtime_error("Mesh GBuffer palette binding is unavailable.");
+                }
+                return;
+            }
 
             encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer);
 
@@ -1223,6 +2142,29 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             const size_t sliceBegin = batchCount * slice / sliceCount;
             const size_t sliceEnd = batchCount * (slice + 1) / sliceCount;
             if (sliceBegin >= sliceEnd) return;
+
+            RHIBufferSlice paletteExtentConstants;
+            const bool needsPaletteExtent = std::any_of(m_batches.begin() + sliceBegin, m_batches.begin() + sliceEnd,
+                [occluders](const auto& batch) {
+                    const auto& meshlets = occluders ? batch.occluderMeshletDraws : batch.meshletDraws;
+                    return (meshlets.empty() ? batch.paletteExtentRoot : batch.meshletPaletteExtentRoot) != UINT32_MAX;
+                });
+            if (needsPaletteExtent)
+            {
+                const std::uint64_t matrixCount = context.animationPalettes
+                    ? context.animationPalettes->MatrixCount() : m_bonePalettes.size();
+                if (matrixCount > (std::numeric_limits<std::uint32_t>::max)() ||
+                    matrixCount > paletteBuffer.size / sizeof(PackedBoneMatrix))
+                {
+                    throw std::runtime_error("GBuffer sealed palette extent exceeds its uploaded matrix storage.");
+                }
+                const std::array<std::uint32_t, 4> extent{static_cast<std::uint32_t>(matrixCount), 1u, 0u, 0u};
+                paletteExtentConstants = context.resources->UploadConstants(extent.data(), sizeof(extent));
+                if (!paletteExtentConstants.IsValid())
+                {
+                    throw std::runtime_error("GBufferSkinPaletteExtentV1 constant upload failed.");
+                }
+            }
 
             // ── 조각의 인스턴스를 블록 하나로 올린다 (일괄 할당) ──
             //
@@ -1240,7 +2182,9 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 batchOffsets[batchIndex - sliceBegin] = sliceInstanceBytes;
                 sliceInstanceBytes += sizeof(InstanceData) * uint64_t(m_batches[batchIndex].instanceCount);
                 const auto& batch = m_batches[batchIndex];
-                if (batch.usesVisibleIds && (!visibility || batch.visibilityBin == UINT32_MAX))
+                const auto& meshletDraws = occluders ? batch.occluderMeshletDraws : batch.meshletDraws;
+                if (meshletDraws.empty() && batch.usesVisibleIds
+                    && (!visibility || batch.visibilityBin == UINT32_MAX || !batch.compactsVisibleIds))
                 {
                     identityCount = (std::max)(identityCount, batch.instanceCount);
                 }
@@ -1253,6 +2197,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 RHIUploadRequest{ sliceInstanceBytes, RHIUploadUsage::BufferCopy, 256 });
             if (!instanceBlock.IsValid() || !instanceBlock.IsWritable())
             {
+                if (requireCompleteGeometry)
+                {
+                    throw std::runtime_error("Mesh GBuffer instance upload failed.");
+                }
                 // W8: 조각 전체가 빠진다. 조용히 돌아가면 그 프레임은 물체
                 // 여럿이 없는 채로 성공으로 보고된다.
                 m_sealLedger.NoteDrop(EnhancedDrawDropReason::Instances,
@@ -1279,9 +2227,32 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
             {
                 const DrawBatch& batch = m_batches[batchIndex];
-                if (0 == batch.instanceCount) continue;
-                if (!batch.pipeline.IsValid())
+                const bool meshlet = !batch.meshletDraws.empty();
+                const auto& meshletDraws = occluders ? batch.occluderMeshletDraws : batch.meshletDraws;
+                const auto recordedPipeline = occluders
+                    ? (meshlet ? batch.meshletOccluderPipeline : batch.occluderPipeline)
+                    : (meshlet ? batch.meshletPipeline : batch.pipeline);
+                if (occluders && (!recordedPipeline.IsValid() || (meshlet && meshletDraws.empty())))
                 {
+                    continue;
+                }
+                if (batchIndex >= m_geometryRouteAudit.size()
+                    || (occluders ? m_geometryRouteAudit[batchIndex].occluderPipeline
+                        : m_geometryRouteAudit[batchIndex].recordedPipeline) != recordedPipeline.id
+                    || m_geometryRouteAudit[batchIndex].meshShader != meshlet
+                    || (occluders ? m_geometryRouteAudit[batchIndex].occluderLodCount
+                        : m_geometryRouteAudit[batchIndex].lodCount) != (meshlet ? meshletDraws.size() : 1u))
+                {
+                    m_sealLedger.NoteDrop(EnhancedDrawDropReason::Pipeline);
+                    throw std::runtime_error("GBuffer geometry route changed after its prepared PSO audit.");
+                }
+                if (0 == batch.instanceCount) continue;
+                if (!recordedPipeline.IsValid())
+                {
+                    if (requireCompleteGeometry)
+                    {
+                        throw std::runtime_error("Prepared mesh GBuffer pipeline is unavailable.");
+                    }
                     m_sealLedger.NoteDrop(EnhancedDrawDropReason::Pipeline);
                     continue;
                 }
@@ -1289,6 +2260,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 const auto mesh = m_drawGeometry.find(batch.geometryKey);
                 if (mesh == m_drawGeometry.end() || !mesh->second.IsValid())
                 {
+                    if (requireCompleteGeometry)
+                    {
+                        throw std::runtime_error("Prepared mesh GBuffer geometry is unavailable.");
+                    }
                     m_sealLedger.NoteDrop(EnhancedDrawDropReason::Geometry);
                     continue;
                 }
@@ -1296,12 +2271,17 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 // M6-P1b2b1: PSO는 pass 전역 한 번이 아니라 material batch 직전에
                 // 고른다. 같은 texture/property라도 keyword permutation이 다르면
                 // 서로 다른 pipeline handle로 기록된다.
-                encoder.SetPipeline(RHIBindPoint::Graphics, batch.pipeline);
+                encoder.SetPipeline(RHIBindPoint::Graphics, recordedPipeline);
                 // A material may change the reflected table length/root layout.
                 encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, frameConstants);
                 encoder.SetSamplers(RHIBindPoint::Graphics, 3,
                     SamplerTableFor(context, batch.material.sampler));
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 4, paletteBuffer);
+                const auto paletteExtentRoot = meshlet ? batch.meshletPaletteExtentRoot : batch.paletteExtentRoot;
+                if (paletteExtentRoot != UINT32_MAX)
+                {
+                    encoder.SetConstantBuffer(RHIBindPoint::Graphics, paletteExtentRoot, paletteExtentConstants);
+                }
 
                 // M6-P1a: property bytes는 batch key의 일부다. 같은 texture/mesh라도
                 // 값이 다르면 batch가 갈리고, 그 batch를 기록하기 직전에 b2를
@@ -1320,6 +2300,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     materialData, materialSize);
                 if (!materialConstants.IsValid())
                 {
+                    if (requireCompleteGeometry)
+                    {
+                        throw std::runtime_error("Mesh GBuffer material upload failed.");
+                    }
                     m_sealLedger.NoteDrop(EnhancedDrawDropReason::MaterialConstants);
                     continue;
                 }
@@ -1327,6 +2311,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 const auto coordinates = MaterialTextureTable::UploadCoordinates(*context.resources, batch.material.coordinates);
                 if (!coordinates.IsValid())
                 {
+                    if (requireCompleteGeometry)
+                    {
+                        throw std::runtime_error("Mesh GBuffer texture-coordinate upload failed.");
+                    }
                     m_sealLedger.NoteDrop(EnhancedDrawDropReason::Coordinates);
                     continue;
                 }
@@ -1337,22 +2325,35 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                         batchOffsets[batchIndex - sliceBegin],
                         sizeof(InstanceData) * batch.instanceCount));
                 const bool indirect = visibility && batch.visibilityBin != UINT32_MAX;
-                if (batch.usesVisibleIds)
+                if (meshlet)
+                {
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 9, mesh->second.vertices);
+                }
+                else if (batch.usesVisibleIds)
                 {
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, 7,
-                        indirect ? visibility->VisibleIds(batch.visibleIdOffset, batch.instanceCount)
-                                 : identityVisibleIds);
+                        indirect && batch.compactsVisibleIds
+                            ? visibility->VisibleIds(batch.visibleIdOffset, batch.instanceCount)
+                            : identityVisibleIds);
                 }
 
                 const auto textures = m_drawTextures.find(batch.material);
                 if (textures == m_drawTextures.end())
                 {
+                    if (requireCompleteGeometry)
+                    {
+                        throw std::runtime_error("Mesh GBuffer material textures are unavailable.");
+                    }
                     m_sealLedger.NoteDrop(EnhancedDrawDropReason::TextureTable);
                     continue;
                 }
                 const auto srvTable = context.resources->CreateBindings(textures->second.views);
                 if (!srvTable.IsValid())
                 {
+                    if (requireCompleteGeometry)
+                    {
+                        throw std::runtime_error("Mesh GBuffer texture bindings failed.");
+                    }
                     // descriptor 버전이 만료됐거나 구간이 찼다. 인코더는 이 표를
                     // 걸어도 조용히 돌아가므로 여기서 세지 않으면 증거가 없다.
                     m_sealLedger.NoteDrop(EnhancedDrawDropReason::Bindings);
@@ -1360,10 +2361,29 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 }
                 encoder.SetBindings(RHIBindPoint::Graphics, 2, srvTable);
 
-                encoder.SetVertexBuffer(mesh->second.vertices, mesh->second.vertexStride);
-                encoder.SetIndexBuffer(mesh->second.indices, mesh->second.indexFormat);
-                if (indirect)
+                if (meshlet)
                 {
+                    // GPU selection admits exactly one LOD per instance. Every
+                    // prepared level must be submitted with its matching data;
+                    // omitting a level would omit those instances completely.
+                    for (const auto& level : meshletDraws)
+                    {
+                        if (!level.geometry.IsValid())
+                        {
+                            throw std::runtime_error("Mesh GBuffer lost a validated meshlet LOD binding.");
+                        }
+                        encoder.SetRootBuffer(RHIBindPoint::Graphics, 7, level.visibility->VisibleIds());
+                        encoder.SetRootBuffer(RHIBindPoint::Graphics, 8, level.geometry.data);
+                        if (!encoder.DispatchMeshIndirect(level.visibility->Arguments(), level.visibility->ArgsOffset()))
+                        {
+                            throw std::runtime_error("GBuffer mesh indirect submission failed.");
+                        }
+                    }
+                }
+                else if (indirect)
+                {
+                    encoder.SetVertexBuffer(mesh->second.vertices, mesh->second.vertexStride);
+                    encoder.SetIndexBuffer(mesh->second.indices, mesh->second.indexFormat);
                     if (!encoder.DrawIndexedIndirect(visibility->Arguments(),
                                                      visibility->ArgsOffset(batch.visibilityBin)))
                     {
@@ -1372,6 +2392,8 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                 }
                 else
                 {
+                    encoder.SetVertexBuffer(mesh->second.vertices, mesh->second.vertexStride);
+                    encoder.SetIndexBuffer(mesh->second.indices, mesh->second.indexFormat);
                     encoder.DrawIndexed(mesh->second.indexCount, batch.instanceCount);
                 }
             }
@@ -1398,6 +2420,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         // 병렬 이득도 배치를 따라간다: 배치 11이면 드로우 11264에서도
         // 0.95~1.52배로 갈리고, 배치 704면 드로우 704에서 이미 1.43~2.10배다.
         m_lastBatchCount);
+    return depth;
 }
 
 uint32_t EnhancedGBufferPass::ComputeSliceCount() const
@@ -1417,14 +2440,26 @@ uint32_t EnhancedGBufferPass::ComputeSliceCount() const
 
 void EnhancedGBufferPass::Shutdown()
 {
+    // Batches hold meshlet Frames too. Drop those owners while device services
+    // are still alive, before the visibility manager releases recording owners.
+    m_batches.clear();
     m_visibilityFrame.reset();
+    m_occluderVisibilityFrame.reset();
+    m_occlusionPyramid.reset();
     m_visibility.ShutdownAfterIdle();
-    m_visibilityLayouts.clear();
+    m_meshletVisibility.ShutdownAfterIdle();
+    m_depthPyramid.ShutdownAfterIdle();
+    m_meshletPipelines.clear();
+    m_occluderPipelines.clear();
+    m_meshletLocalBounds.clear();
+    m_geometryRouteAudit.clear();
+    m_skinningBounds.clear();
     m_instanceBounds.clear();
     m_drawGeometry.clear();
     m_drawTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
+    m_boneCounts.clear();
     m_shaderVariants.clear();
     m_pipelineRequest = {};
     m_modelPipelineRequests.clear();

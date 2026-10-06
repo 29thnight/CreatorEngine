@@ -425,7 +425,7 @@ namespace
             const Authoring::ReadNode passNode = node.At(index);
             const std::string context = "passes[" + std::to_string(index) + "]";
             if (!ValidateMap(passNode,
-                { "name", "vs", "ps", "cs", "state", "queue" }, context, outError))
+                { "name", "vs", "ps", "cs", "state", "queue", "geometryVisibility" }, context, outError))
                 return false;
 
             ShaderPassDesc pass;
@@ -443,6 +443,29 @@ namespace
                 return false;
             if (!ParseQueue(queueName, pass.queue))
                 return Fail(context, "queue는 opaque|transparent|shadow|compute여야 한다", outError);
+
+            if (passNode["geometryVisibility"])
+            {
+                std::string contract;
+                if (!ReadRequiredScalar(passNode, "geometryVisibility", context, contract, outError))
+                {
+                    return false;
+                }
+                if (contract == "indexed-instance-v1")
+                {
+                    pass.geometryVisibility = ShaderGeometryVisibility::IndexedInstanceV1;
+                }
+                else if (contract != "direct")
+                {
+                    return Fail(context, "unknown geometryVisibility contract", outError);
+                }
+                if (pass.geometryVisibility != ShaderGeometryVisibility::Direct &&
+                    (pass.name != "GBuffer" || pass.queue != ShaderPassQueue::Opaque ||
+                     !pass.vertex || !pass.pixel || pass.compute))
+                {
+                    return Fail(context, "indexed-instance-v1 requires an opaque GBuffer VS+PS pass", outError);
+                }
+            }
 
             const bool compute = pass.compute.has_value();
             if (compute)

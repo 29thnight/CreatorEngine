@@ -132,18 +132,20 @@ public:
     //   "이미 놓인 핸들이 남의 파이프라인으로 풀리는" 사고가 성립한다.
     //   **모델이 그것을 허용해 두는 것**이 V8-a 가 요구한 것이다(§7.2.5).
 
-    RHIPipelineHandle AddPipeline(ID3D12PipelineState* pipeline, ID3D12RootSignature* signature)
+    RHIPipelineHandle AddPipeline(ID3D12PipelineState* pipeline, ID3D12RootSignature* signature,
+        bool meshPipeline = false, bool computePipeline = false)
     {
         if (nullptr == pipeline) return {};
         return RHIPipelineHandle{ AcquirePipeline(m_pipelines, m_pipelineFree,
-            DX12PipelineEntry{ pipeline, signature }) };
+            DX12PipelineEntry{ pipeline, signature, meshPipeline, computePipeline }) };
     }
 
-    RHIPipelineLayoutHandle AddPipelineLayout(ID3D12RootSignature* signature, uint64_t stableHash)
+    RHIPipelineLayoutHandle AddPipelineLayout(ID3D12RootSignature* signature, uint64_t stableHash,
+        bool allowInputAssembler = true)
     {
         if (nullptr == signature) return {};
         return RHIPipelineLayoutHandle{ AcquireLayout(m_layouts, m_layoutFree,
-            DX12PipelineLayoutEntry{ signature, stableHash }) };
+            DX12PipelineLayoutEntry{ signature, stableHash, allowInputAssembler }) };
     }
 
     DX12PipelineEntry Resolve(RHIPipelineHandle handle) const

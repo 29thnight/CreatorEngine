@@ -186,6 +186,7 @@ namespace
         {
         case RHIShaderVisibility::Vertex: return VK_SHADER_STAGE_VERTEX_BIT;
         case RHIShaderVisibility::Pixel:  return VK_SHADER_STAGE_FRAGMENT_BIT;
+        case RHIShaderVisibility::Mesh:   return VK_SHADER_STAGE_MESH_BIT_EXT;
         // All은 graphics 한정이 아니다. Forward+의 compute layout이 기본
         // visibility를 쓰므로 compute stage까지 포함해야 한다.
         default:                          return VK_SHADER_STAGE_ALL;
@@ -265,8 +266,17 @@ uint64_t VulkanPipelineCache::ComputeHash(const RHIGraphicsPipelineDesc& desc) c
 {
     uint64_t hash = kVkHashOffset;
 
-    if (nullptr != desc.vsBytecode) VkHashBytes(hash, desc.vsBytecode, desc.vsSize);
-    if (nullptr != desc.psBytecode) VkHashBytes(hash, desc.psBytecode, desc.psSize);
+    VkHashValue(hash, VulkanPipelineKind::Graphics);
+    VkHashValue(hash, desc.vsSize);
+    if (nullptr != desc.vsBytecode)
+    {
+        VkHashBytes(hash, desc.vsBytecode, desc.vsSize);
+    }
+    VkHashValue(hash, desc.psSize);
+    if (nullptr != desc.psBytecode)
+    {
+        VkHashBytes(hash, desc.psBytecode, desc.psSize);
+    }
 
     // ★ DX12 쪽은 여기서 핸들을 **안정 해시로 풀어** 넣어야 했다. PSO 디스크
     //   캐시의 키가 실행을 넘어 안정해야 하기 때문이다. Vulkan 쪽에는 아직
@@ -307,10 +317,26 @@ uint64_t VulkanPipelineCache::ComputeHash(const RHIGraphicsPipelineDesc& desc) c
 uint64_t VulkanPipelineCache::ComputeHash(const RHIComputePipelineDesc& desc) const
 {
     uint64_t hash = kVkHashOffset;
-    constexpr uint32_t kComputeTag = 0x4353504Fu;
-    VkHashValue(hash, kComputeTag);
-    if (nullptr != desc.csBytecode) VkHashBytes(hash, desc.csBytecode, desc.csSize);
+    VkHashValue(hash, VulkanPipelineKind::Compute);
+    VkHashValue(hash, desc.csSize);
+    if (nullptr != desc.csBytecode)
+    {
+        VkHashBytes(hash, desc.csBytecode, desc.csSize);
+    }
     VkHashValue(hash, desc.layout.id);
+    return hash;
+}
+
+uint64_t VulkanPipelineCache::ComputeHash(const RHIMeshPipelineDesc& desc) const
+{
+    uint64_t hash = kVkHashOffset;
+    VkHashValue(hash, VulkanPipelineKind::Mesh);
+    VkHashValue(hash, desc.msSize);
+    if (desc.msBytecode)
+    {
+        VkHashBytes(hash, desc.msBytecode, desc.msSize);
+    }
+    VkHashValue(hash, ComputeHash(desc.RasterState()));
     return hash;
 }
 
@@ -323,11 +349,13 @@ void VulkanPipelineCache::Initialize(VkDevice device)
 {
     Shutdown();
     m_device = device;
+    m_meshShaderCapabilities = {};
     m_stats = {};
 }
 
 void VulkanPipelineCache::Shutdown()
 {
+    m_meshShaderCapabilities = {};
     if (VK_NULL_HANDLE == m_device) return;
 
     // This lifecycle boundary may wait. RequestGraphics and invalidation never do.
@@ -387,6 +415,16 @@ void VulkanPipelineCache::Shutdown()
 RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     const RHIPipelineLayoutDesc& desc, std::string& outError)
 {
+    if (!m_meshShaderCapabilities.meshShader &&
+        (std::any_of(desc.params.begin(), desc.params.end(), [](const auto& param) {
+            return param.visibility == RHIShaderVisibility::Mesh;
+        }) || std::any_of(desc.staticSamplers.begin(), desc.staticSamplers.end(), [](const auto& sampler) {
+            return sampler.visibility == RHIShaderVisibility::Mesh;
+        })))
+    {
+        outError = "Vulkan mesh shader visibility requires an enabled mesh shader device.";
+        return {};
+    }
     // desc 를 내용으로 해시한다. span 이 가리키는 배열은 호출 동안만 살아
     // 있으면 된다는 계약이라(RHIPipelineLayout.h) 붙들지 않는다.
     uint64_t hash = kVkHashOffset;
@@ -515,6 +553,7 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
 
     VulkanPipelineLayoutEntry entry{};
     entry.paramSlots = std::move(paramSlots);
+    entry.allowInputAssembler = desc.allowInputAssembler;
 
     // ── 정적 샘플러 (V8-b) ──
     //
@@ -599,11 +638,7 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
         return {};
     }
 
-    // ★ `allowInputAssembler` 를 여기서 쓰지 않는다. DX12 는 루트 시그니처
-    //   **플래그**로 받지만 Vulkan 은 파이프라인의 정점 입력 상태로 받는다 —
-    //   RHIPipelineLayout.h 가 "어느 쪽이든 상위가 아는 사실은 하나뿐이라
-    //   bool 로 든다"고 적어 둔 것이 맞았고, 그 bool 이 두 백엔드에서 서로
-    //   다른 객체로 흘러간다는 것까지 확인된다.
+    // Vulkan has no native IA layout flag; retain it to reject mesh/IA mismatches.
 
     // 핸들의 슬롯이 곧 배열 인덱스다. 세대는 아직 안 든다 — 놓는 호출자가 0.
     m_layouts.push_back(std::move(entry));
@@ -814,12 +849,63 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreateCompute(const RHIComputePipeli
 
     ++m_stats.compiles;
     const RHIPipelineHandle handle = PublishPipeline(
-        { pipeline, layout.layout, layout.setLayout, desc.layout });
+        { pipeline, layout.layout, layout.setLayout, desc.layout, VulkanPipelineKind::Compute });
     if (!handle.IsValid())
     {
         vkDestroyPipeline(m_device, pipeline, nullptr);
         ++m_stats.failures;
         outError = "컴퓨트 파이프라인 핸들 발급 실패 — 표가 가득 찼다";
+        return {};
+    }
+    m_pipelineByHash.emplace(hash, handle);
+    return handle;
+}
+
+RHIPipelineHandle VulkanPipelineCache::GetOrCreateMesh(const RHIMeshPipelineDesc& desc,
+    std::string& outError)
+{
+    outError.clear();
+    if (VK_NULL_HANDLE == m_device || !m_meshShaderCapabilities.meshShader ||
+        nullptr == vkCmdDrawMeshTasksEXT)
+    {
+        ++m_stats.failures;
+        outError = "Vulkan EXT mesh shaders are not enabled on this device.";
+        return {};
+    }
+    if (!desc.msBytecode || !desc.msSize || desc.numRenderTargets > 8 || desc.sampleCount == 0 ||
+        ((nullptr != desc.psBytecode) != (0 != desc.psSize)))
+    {
+        ++m_stats.failures;
+        outError = "Vulkan mesh pipeline has invalid shader bytecode, render-target count, or sample count.";
+        return {};
+    }
+    const auto layout = Resolve(desc.layout);
+    if (!layout.IsValid() || layout.allowInputAssembler)
+    {
+        ++m_stats.failures;
+        outError = "Vulkan mesh pipeline requires a valid layout with input assembler disabled.";
+        return {};
+    }
+    const uint64_t hash = ComputeHash(desc);
+    if (const auto found = m_pipelineByHash.find(hash); found != m_pipelineByHash.end())
+    {
+        ++m_stats.memoryHits;
+        return found->second;
+    }
+    const VkPipeline pipeline = CreateMeshOne(m_device, desc, layout.layout, outError);
+    if (pipeline == VK_NULL_HANDLE)
+    {
+        ++m_stats.failures;
+        return {};
+    }
+    ++m_stats.compiles;
+    const auto handle = PublishPipeline(
+        { pipeline, layout.layout, layout.setLayout, desc.layout, VulkanPipelineKind::Mesh });
+    if (!handle.IsValid())
+    {
+        vkDestroyPipeline(m_device, pipeline, nullptr);
+        ++m_stats.failures;
+        outError = "Vulkan mesh pipeline handle table is full.";
         return {};
     }
     m_pipelineByHash.emplace(hash, handle);
@@ -1040,9 +1126,29 @@ RHIPipelineRequestState VulkanPipelineCache::RequestGraphics(const RHIGraphicsPi
 VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipelineDesc& desc, VkPipelineLayout layout,
                                           std::string& outError)
 {
-    if (nullptr == desc.vsBytecode || 0 == desc.vsSize)
+    return CreateRaster(device, desc, layout, VK_SHADER_STAGE_VERTEX_BIT, desc.vsBytecode, desc.vsSize, outError);
+}
+
+VkPipeline VulkanPipelineCache::CreateMeshOne(VkDevice device, const RHIMeshPipelineDesc& desc,
+                                             VkPipelineLayout layout, std::string& outError)
+{
+    return CreateRaster(device, desc.RasterState(), layout, VK_SHADER_STAGE_MESH_BIT_EXT,
+                        desc.msBytecode, desc.msSize, outError);
+}
+
+VkPipeline VulkanPipelineCache::CreateRaster(VkDevice device, const RHIGraphicsPipelineDesc& desc,
+                                            VkPipelineLayout layout, VkShaderStageFlagBits geometryStage,
+                                            const void* geometryCode, size_t geometryBytes, std::string& outError)
+{
+    const bool meshShader = geometryStage == VK_SHADER_STAGE_MESH_BIT_EXT;
+    if (nullptr == geometryCode || 0 == geometryBytes)
     {
-        outError = "정점 셰이더 바이트코드가 없다";
+        outError = "Vulkan graphics pipeline has no geometry-stage bytecode.";
+        return VK_NULL_HANDLE;
+    }
+    if (desc.numRenderTargets > 8 || (desc.inputElementCount && !desc.inputElements))
+    {
+        outError = "Vulkan graphics pipeline has invalid render-target or vertex-input state.";
         return VK_NULL_HANDLE;
     }
 
@@ -1055,8 +1161,9 @@ VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipe
         return VK_NULL_HANDLE;
     }
 
-    std::string vertexEntry, pixelEntry;
-    if (!VkReadEntryPoint(desc.vsBytecode, desc.vsSize, 0, vertexEntry, outError) ||
+    std::string geometryEntry, pixelEntry;
+    // SPIR-V ExecutionModel MeshEXT (5365), not the incompatible MeshNV model.
+    if (!VkReadEntryPoint(geometryCode, geometryBytes, meshShader ? 5365u : 0u, geometryEntry, outError) ||
         (hasPixelShader && !VkReadEntryPoint(desc.psBytecode, desc.psSize, 4, pixelEntry, outError)))
     {
         return VK_NULL_HANDLE;
@@ -1069,9 +1176,13 @@ VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipe
         ~ShaderModules()
         {
             if (vs != VK_NULL_HANDLE)
+            {
                 vkDestroyShaderModule(device, vs, nullptr);
+            }
             if (ps != VK_NULL_HANDLE)
+            {
                 vkDestroyShaderModule(device, ps, nullptr);
+            }
         }
     } modules{device};
     auto createModule = [&](const void* code, size_t bytes, VkShaderModule& out) {
@@ -1089,16 +1200,20 @@ VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipe
 
     auto& vs = modules.vs;
     auto& ps = modules.ps;
-    if (!createModule(desc.vsBytecode, desc.vsSize, vs))
+    if (!createModule(geometryCode, geometryBytes, vs))
+    {
         return VK_NULL_HANDLE;
+    }
     if (hasPixelShader && !createModule(desc.psBytecode, desc.psSize, ps))
+    {
         return VK_NULL_HANDLE;
+    }
 
     VkPipelineShaderStageCreateInfo stages[2]{};
     stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+    stages[0].stage = geometryStage;
     stages[0].module = vs;
-    stages[0].pName = vertexEntry.c_str();
+    stages[0].pName = geometryEntry.c_str();
     if (hasPixelShader)
     {
         stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -1113,7 +1228,7 @@ VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipe
     VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
     VkVertexInputBindingDescription vertexBinding{};
     std::vector<VkVertexInputAttributeDescription> vertexAttributes;
-    if (0 != desc.inputElementCount)
+    if (!meshShader && 0 != desc.inputElementCount)
     {
         // 현재 RHIEncoder는 vertex slot 0 하나만 바인딩한다. 지원하지 않는
         // multi-stream/instance 입력을 조용히 slot 0으로 접지 않는다.
@@ -1233,10 +1348,15 @@ VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipe
     std::vector<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR,
-        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
     };
-    if (0 != desc.inputElementCount)
+    if (!meshShader)
+    {
+        dynamicStates.push_back(VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY);
+    }
+    if (!meshShader && 0 != desc.inputElementCount)
+    {
         dynamicStates.push_back(VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE);
+    }
     VkPipelineDynamicStateCreateInfo dynamic{
         VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
     dynamic.dynamicStateCount = static_cast<uint32_t>(dynamicStates.size());
@@ -1261,8 +1381,8 @@ VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipe
     info.pNext = &rendering;
     info.stageCount = hasPixelShader ? 2u : 1u;
     info.pStages = stages;
-    info.pVertexInputState = &vertexInput;
-    info.pInputAssemblyState = &inputAssembly;
+    info.pVertexInputState = meshShader ? nullptr : &vertexInput;
+    info.pInputAssemblyState = meshShader ? nullptr : &inputAssembly;
     info.pViewportState = &viewportState;
     info.pRasterizationState = &raster;
     info.pMultisampleState = &multisample;
@@ -1276,11 +1396,12 @@ VkPipeline VulkanPipelineCache::CreateOne(VkDevice device, const RHIGraphicsPipe
     if (VK_SUCCESS != result)
     {
         if (VK_NULL_HANDLE != pipeline)
+        {
             vkDestroyPipeline(device, pipeline, nullptr);
+        }
         outError = "그래픽 파이프라인 생성 실패 — " + ResultToString(result);
         return VK_NULL_HANDLE;
     }
 
     return pipeline;
 }
-

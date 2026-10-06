@@ -18,6 +18,7 @@
 #include "EditorCoreMenus.h"
 
 #include "ConsoleCommandSystem.h"
+#include "Assets/ModelAssetAuthoringTransaction.h"
 #include "ImGui.h"
 #include "Core.Minimal.h"
 
@@ -28,6 +29,12 @@ namespace editor::menus
 {
     namespace
     {
+        std::string model_source_argument(const file::path& path)
+        {
+            const auto utf8 = path.u8string();
+            return { reinterpret_cast<const char*>(utf8.data()), utf8.size() };
+        }
+
         void put_on_clipboard(const std::string& text, const char* what)
         {
             if (text.empty())
@@ -40,9 +47,12 @@ namespace editor::menus
         }
 
         /// 명령 하나를 게임 스레드로 넘긴다. completion 은 GT 에서 불리므로 짧다.
-        void run_command(std::string name)
+        void run_command(std::string name, std::vector<std::string> arguments = {})
         {
-            std::vector<std::string> arguments{ name };
+            if (arguments.empty())
+            {
+                arguments.push_back(name);
+            }
             const bool accepted = ConsoleCommandSystem::Get().EnqueueStructured(
                 std::move(arguments),
                 [name](const CommandCore::CommandResult& result,
@@ -98,6 +108,31 @@ namespace editor::menus
     void copy_meta_path(const asset_target& target)
     {
         put_on_clipboard(file::path(target.path).concat(".meta").string(), ".meta 경로");
+    }
+
+    bool is_model_source(const asset_target& target)
+    {
+        return assets::IsModelAuthoringSource(target.path);
+    }
+
+    void enable_model_meshlets(const asset_target& target)
+    {
+        run_command("assets.model.meshlets", { "assets.model.meshlets", model_source_argument(target.path), "true" });
+    }
+
+    void disable_model_meshlets(const asset_target& target)
+    {
+        run_command("assets.model.meshlets", { "assets.model.meshlets", model_source_argument(target.path), "false" });
+    }
+
+    void enable_model_lods(const asset_target& target)
+    {
+        run_command("assets.model.lods", { "assets.model.lods", model_source_argument(target.path), "3" });
+    }
+
+    void disable_model_lods(const asset_target& target)
+    {
+        run_command("assets.model.lods", { "assets.model.lods", model_source_argument(target.path), "0" });
     }
 
     void report_declared_windows()
