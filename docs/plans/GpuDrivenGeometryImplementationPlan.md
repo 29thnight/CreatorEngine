@@ -1,0 +1,157 @@
+# GPU-driven geometry implementation slices
+
+Baseline: `ef829373c41138b8f47dd4011b076e1ec4d5829f` (2026-10-06).
+This is implementation work in progress, not a completed or runtime-validated feature.
+
+## Goal and boundaries
+
+For supported production opaque/masked geometry, the GPU selects visibility and LOD,
+compacts bounded work, and produces draw/dispatch arguments. CPU scene publication,
+material/PSO bins and command submission remain explicit responsibilities. Existing
+indexed rendering remains the capability and authoring-contract fallback. Arbitrary
+custom vertex deformation and sorted transparency are not implicitly supported.
+No DXR, Work Graphs, shadow-cache resurrection or frame-pacing changes are included.
+
+## Reviewed incremental sequence
+
+1. Build meshlets from the finalized authoring ModelDraft, before CEMC serialization,
+   hashing and staging. Store descriptor/bounds, uint32 vertex remap, byte triangle
+   indices and source primitive remap in the same immutable model generation.
+   Preserve indexed geometry. Version the builder/profile and bind derived data to
+   the finalized vertex/index content. Never rebuild model geometry in player cook.
+2. Extend indexed GPU visibility coherently to supported skinned geometry in Enhanced
+   and LX GBuffer. Carry conservative animated bounds and bone offsets; an instance-ID
+   resource declaration alone is not a custom shader semantic contract.
+3. Add GPU LOD selection and conservative occlusion as separate graph-owned stages.
+   Current depth/history validity must cover camera cuts, resize, device/view/scene
+   generations and disocclusion. Invalid/near-plane/uncertain cases remain visible.
+4. Add capability-gated mesh shader compilation, pipelines, generation-owned uploads
+   and bounded dispatch to both DX12 and Vulkan. Preserve indexed fallback. Disable
+   unsafe bind-pose cone tests for skinned/deformed/mirrored/non-uniform geometry.
+5. Independently review all producer/consumer ABI, resource lifetime, bounds, barriers,
+   counters/overflow and fallback contracts before treating the slices as integrated.
+
+LOD0-only meshlet authoring is infrastructure, not GPU LOD selection. Indexed indirect
+is already implemented at the baseline; it is not evidence of mesh shader/HZB support.
+The existing design document is a proposal and includes stale pre-indirect observations.
+
+## Authoring and storage contract
+
+- Model identity stays unchanged; no standalone meshlet GUID or global DDC is added
+- Editor publishes `Library/ModelAssetGenerations/<ModelId>/<generation>/model.cemc`
+- Cook validates/exports that generation to `Derived/Models/<xx>/<ModelId>/<generation>/`
+- Meshlets never cross mesh/material or LOD boundaries
+- The pinned vcpkg baseline `9e593bb18ea69cc5095e012465dcd675a822ed0d`
+  selects meshoptimizer 1.2. Its API supports the 64-vertex/126-triangle profile
+- Bad or unavailable derived meshlet data must never be interpreted as valid GPU work
+- CEMC v9 remains indexed-only, v10 retains meshlets, and v11 appends coarse LODs
+  without changing base mesh records. No source fallback at runtime or silent replacement
+  of an immutable published generation is introduced
+
+## Verification status
+
+Only source inspection and static diff/contract reviews are authorized for this task.
+Builds, shader compilation, automated tests, executable probes, GPU captures and runtime
+measurements are deliberately unrun. Review findings and these unrun acceptance gates
+must accompany each published slice. No merge or runtime verification is implied.
+
+## Initial meshlet authoring usage
+
+Meshlet generation is explicitly opt-in and defaults off for existing and new assets.
+The choice is persisted as `importSettings.buildMeshlets` in the model sidecar. In the
+Content Browser, a model source offers `Model import / Enable meshlets and reimport`
+and the corresponding disable action. Both use the game-thread command service and
+the same atomic authoring transaction. CLI authoring accepts `--build-meshlets true`
+or `false` with `--author-model-asset`; ordinary cook rejects this authoring override.
+Reimport without an override retains the persisted setting. Enabling/disabling creates
+a new immutable generation; it never patches or silently rebuilds an existing one.
+The profile/builder/library versions and all finalized vertex/index bytes are included
+in the meshlet digest. Each enabled authoring transaction rebuilds before CEMC hashing,
+so source timestamps and stable model identity cannot make old acceleration data fresh.
+
+## Runtime checkpoint 1 (source integrated, execution unverified)
+
+- Exact standard static opaque GBuffer generations can use capability-gated DX12/Vulkan
+  mesh pipelines and GPU meshlet frustum compaction with bounded indirect dispatch
+- Opt-in static coarse LODs retain the original vertices/indices and material boundary;
+  each coarse meshlet primitive remap names that level's own finalized triangle ordinal
+- GPU selection uses the stored simplification metric, transformed/projection-scaled to
+  a one-pixel threshold. This is not a certified Hausdorff error or measured quality guarantee
+- All level frames publish atomically; one unsupported level falls back to indexed LOD0
+- Standard skinned Enhanced/LX geometry uses indexed GPU visibility with sealed pose
+  validation. Unknown custom deformation stays conservative/direct; custom indexed ID
+  indirection requires the explicit versioned ShaderMeta semantic contract
+- LX has current-frame HZB from the earlier native depth version. Native HZB is the next
+  separate slice; it requires depth and main draws to use the same selected LOD topology
+- Shadows retain the original independent caster set and raster path at this checkpoint
+- Skinned, masked, custom/generated-special mesh shading/LOD, and sorted transparent
+  rendering retain existing paths. No unsafe deformation error or cone test is invented
+- The existing debug view reports prepared mesh batches and a fallback diagnostic. These
+  are CPU route observations, not GPU-visible counts or performance measurements
+
+Coarse LOD authoring is opt-in (`importSettings.lodLevels`, 0 by default, at most 7).
+The Content Browser offers three-level generation/reimport and disabling coarse LODs;
+CLI authoring accepts `--lod-levels 0..7`. Positive requests enable meshlets too; disabling
+meshlets disables coarse generation. Skinned/unreducible meshes retain LOD0 with authoring
+warnings. The default simplifier locks borders and uses direct-from-base reductions.
+
+Static reviews corrected pose overflow and shared-palette mismatches, conservative camera
+admission, optional payload range/count amplification, typed PSO binding checks, and
+recording-owner teardown. These reviews do not substitute for the deliberately unrun
+C++/Slang builds, backend validation, image parity, animation/camera-cut/resize cases or
+GPU timing and memory measurements.
+
+## Runtime checkpoint 2 (source integrated, execution unverified)
+
+Native GBuffer now has a separate current-frame D32 occluder pass and one shared
+farthest-depth pyramid. Only proved standard opaque depth writers donate depth;
+masked/custom/ordered geometry does not silently become an opaque occluder. Depth and
+color use the same vertex evaluation and fragment discard logic. For mesh-shader LOD
+batches, color visibility filters the exact prior GPU-selected pair list/count, so the
+donor silhouette cannot differ because another shader recomputed LOD. The original
+GBuffer clear/depth comparison remains unchanged. Invalid bounds, near-plane/W crossings,
+nonfinite depth and ambiguous boundary comparisons retain geometry. Nonstandard/custom
+pixel-depth semantics bypass occlusion. Missing optional prerequisites restore the whole
+view's frustum route; failures after donor recording abort rather than leave phantom depth.
+
+Native directional shadows now compact independent LOD0 caster candidates per cascade
+and produce indexed indirect arguments on the GPU. The receiver-cylinder selection,
+cascade fitting, alpha coverage, sidedness and independent LX shadow modification remain.
+Camera-visible lists/HZB are never used to choose shadow casters. Unproven skin/custom
+bounds stay conservative; submitted candidates/bins are labeled separately from unknown
+GPU-visible counts. Existing cascade fit behavior for malformed legacy skin is not a
+correctness guarantee for unsupported deformation data.
+
+Both production backends establish the existing upload-prefix boundary before preparing
+recording-owned visibility and refresh the already-sealed animation palette into that
+consuming recording. Native skin shaders bounds-check active bone indices and never fetch
+zero-weight sentinel influences. Invalid legacy skin is a compatibility/diagnostic path,
+not a new promise of equivalent malformed-data animation.
+
+Coverage limits remain explicit:
+
+- GPU LOD is enabled only for eligible mesh-shader assets/devices; indexed compatibility
+  retains GPU instance visibility and LOD0
+- Skinned LOD/mesh shading, arbitrary custom deformation, ordered transparency and DXR
+  are not implemented by this milestone
+- Cone rejection is disabled; nonuniform/mirrored/deformed geometry is never rejected
+  using an unsafe bind-pose cone
+- The depth prepass itself processes selected geometry. No saved vertex work, speedup,
+  memory reduction or visual parity has been measured
+- Extreme finite source coordinates may exceed meshoptimizer's useful floating-point
+  conditioning before post-build bounds checks; normalized authoring inputs are a future
+  robustness extension, not a verified capability of this profile
+
+Completed verification here consists only of independent source-contract reviews,
+whitespace/diff checks, and reading project XML/source registrations. No compiler, shader
+compiler, tests, executable probe, renderer, capture or GPU timing was run.
+
+## Material coverage extension (current source checkpoint)
+
+Material-based direct submission gates have been removed from accepted native and LX
+scene geometry routes. Transparency, refraction, custom/skinned Forward, special captures,
+independent shadows, decals and simple world sprites now use GPU-produced arguments on
+capable backends while preserving original shaders, order and effects. Unknown semantics
+use conservative preserved-stream indirect commands. Hardware compatibility remains.
+See [material coverage](../analysis/GpuDrivenMaterialCoverage.md) for exact route semantics,
+pre-existing unsupported features, diagnostics and deliberately unrun acceptance.
