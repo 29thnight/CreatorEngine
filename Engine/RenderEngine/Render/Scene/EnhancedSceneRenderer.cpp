@@ -59,6 +59,7 @@
 #include "../../Mesh.h"
 #include "../../RenderState.h"
 #include "../../../Utility_Framework/PathFinder.h"
+#include "../../../Utility_Framework/JobScheduler.h"
 
 // ★ <d3d11_1.h> include가 여기 있었다 (E, 2026-08-09).
 //   공유 텍스처를 DX11에서 열어 SRV를 만들던 자리를 D4에서 걷은 뒤로 이
@@ -81,6 +82,7 @@
 #include <exception>
 #include <unordered_map>
 #include <set>
+#include <fstream>
 #include <wrl/wrappers/corewrappers.h>
 #include <dwmapi.h>
 #pragma comment(lib, "dwmapi.lib")
@@ -1303,10 +1305,270 @@ namespace
         }
     };
 
+    struct EnvironmentPreparationRequest
+    {
+        uint64_t id{ 0 };
+        uint64_t generation{ 0 };
+        std::string selection;
+        file::path source;
+        file::path shaders;
+        file::path cache;
+        file::path project;
+    };
+
+    struct PreparedEnvironment
+    {
+        EnvironmentPreparationRequest request;
+        std::optional<assets::CookedEnvironment> cooked;
+        std::shared_ptr<Texture> equirect;
+        std::optional<assets::EnvironmentIdentity> identity;
+        file::path cachePath;
+    };
+
+    // Workers own only this CPU mailbox, never LiveState, settings, or an RHI
+    // object. At most one job runs and one newer request waits to replace it.
+    struct EnvironmentPreparationState
+    {
+        std::mutex mutex;
+        bool accepting{ false };
+        bool running{ false };
+        uint64_t generation{ 1 };
+        uint64_t nextRequest{ 0 };
+        std::optional<EnvironmentPreparationRequest> pending;
+        std::unique_ptr<PreparedEnvironment> ready;
+        EnhancedSceneRenderer::EnvironmentPreparationProgress progress;
+    };
+
+    bool SetEnvironmentPreparationPhase(EnvironmentPreparationState& state,
+        const EnvironmentPreparationRequest& request, const char* phase)
+    {
+        std::lock_guard<std::mutex> lock(state.mutex);
+        if (!state.accepting || state.generation != request.generation
+            || state.progress.requestId != request.id)
+        {
+            return false;
+        }
+        state.progress.phase = phase;
+        return true;
+    }
+
+    bool PrepareEnvironmentCpu(EnvironmentPreparationState& state,
+        PreparedEnvironment& result, std::string& error)
+    {
+        const auto& request = result.request;
+        if (!SetEnvironmentPreparationPhase(state, request, "Reading environment"))
+        {
+            return false;
+        }
+        std::error_code fileError;
+        if (!file::is_regular_file(request.source, fileError))
+        {
+            error = "Select an existing HDR or cooked .ceibl environment";
+            return false;
+        }
+        assets::CookedEnvironment cooked;
+        if (request.source.extension() == ".ceibl")
+        {
+            if (!assets::ReadCookedEnvironment(request.source, cooked, error))
+            {
+                return false;
+            }
+            if (!SetEnvironmentPreparationPhase(state, request, "Validating environment"))
+            {
+                return false;
+            }
+            Hash::Sha256Digest recipe;
+            if (!assets::EnvironmentRecipeIdentity(request.shaders,
+                    cooked.cubeSize, cooked.brdfSize, recipe, error))
+            {
+                return false;
+            }
+            if (cooked.identity.recipe != recipe)
+            {
+                error = "Cooked environment recipe changed; recook the selected environment";
+                return false;
+            }
+            result.cooked = std::move(cooked);
+            return true;
+        }
+
+        assets::EnvironmentIdentity identity;
+        if (!assets::EnvironmentSourceIdentity(request.source, identity.source, error)
+            || !assets::EnvironmentRecipeIdentity(request.shaders, 512, 512, identity.recipe, error))
+        {
+            return false;
+        }
+        if (!SetEnvironmentPreparationPhase(state, request, "Reading environment cache"))
+        {
+            return false;
+        }
+        result.identity = identity;
+        result.cachePath = request.cache / assets::EnvironmentCacheName(identity);
+        std::string cacheError;
+        if (assets::ReadCookedEnvironment(result.cachePath, cooked, cacheError, &identity))
+        {
+            result.cooked = std::move(cooked);
+            return true;
+        }
+        if (!SetEnvironmentPreparationPhase(state, request, "Decoding HDR environment"))
+        {
+            return false;
+        }
+        // Decode owned bytes rather than consulting mutable PathFinder/settings
+        // from a worker. The second digest rejects a source changed after lookup.
+        std::ifstream input(request.source, std::ios::binary | std::ios::ate);
+        if (!input || input.tellg() <= 0)
+        {
+            error = "HDR source could not be read";
+            return false;
+        }
+        const auto length = static_cast<std::streamsize>(input.tellg());
+        std::vector<std::byte> bytes(static_cast<size_t>(length));
+        input.seekg(0);
+        if (!input.read(reinterpret_cast<char*>(bytes.data()), length))
+        {
+            error = "HDR source read failed";
+            return false;
+        }
+        Hash::Sha256 hash;
+        hash.Update(bytes.data(), bytes.size());
+        if (hash.Finish() != identity.source)
+        {
+            error = "HDR source changed during preparation; select it again";
+            return false;
+        }
+        const std::string_view encoded(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+        if (!encoded.starts_with("#?RADIANCE") && !encoded.starts_with("#?RGBE"))
+        {
+            error = "Selected .hdr source is not a Radiance HDR image";
+            return false;
+        }
+        result.equirect = Texture::LoadSharedFromMemory(bytes);
+        if (!result.equirect)
+        {
+            error = "HDR decode failed";
+            return false;
+        }
+        const auto image = result.equirect->GetImageView();
+        if (image.IsEmpty() || image.IsCube() || image.ArraySize() != 1
+            || image.MipLevels() != 1 || image.Format() != RHIFormat::RGBA32Float)
+        {
+            error = "HDR environment must decode to one 2D linear float image";
+            return false;
+        }
+        return true;
+    }
+
+    void RunEnvironmentPreparation(const std::shared_ptr<EnvironmentPreparationState>& state)
+    {
+        for (;;)
+        {
+            EnvironmentPreparationRequest request;
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                if (!state->accepting || !state->pending)
+                {
+                    state->running = false;
+                    return;
+                }
+                request = std::move(*state->pending);
+                state->pending.reset();
+            }
+            const uint64_t requestId = request.id;
+            const uint64_t generation = request.generation;
+            std::unique_ptr<PreparedEnvironment> result;
+            std::string error;
+            bool prepared = false;
+            try
+            {
+                result = std::make_unique<PreparedEnvironment>();
+                result->request = std::move(request);
+                prepared = PrepareEnvironmentCpu(*state, *result, error);
+            }
+            catch (const std::exception& exception)
+            {
+                error = exception.what();
+            }
+            catch (...)
+            {
+                error = "Environment preparation failed";
+            }
+            std::unique_ptr<PreparedEnvironment> retired;
+            bool failed = false;
+            {
+                std::lock_guard<std::mutex> lock(state->mutex);
+                if (state->accepting && state->generation == generation
+                    && state->progress.requestId == requestId)
+                {
+                    if (prepared)
+                    {
+                        retired = std::move(state->ready);
+                        state->ready = std::move(result);
+                        state->progress.phase = "Waiting for render thread";
+                    }
+                    else
+                    {
+                        state->progress.activeRequests = 0;
+                        state->progress.phase = "Failed";
+                        state->progress.error = error;
+                        failed = true;
+                    }
+                }
+            }
+            if (failed)
+            {
+                Debug::PrintLog(spdlog::level::err, "[EnvironmentPreparation] " + error);
+            }
+            // Large stale payloads are destroyed without either renderer lock.
+        }
+    }
+
+    void InvalidateEnvironmentPreparation(EnvironmentPreparationState& state, bool stop)
+    {
+        std::unique_ptr<PreparedEnvironment> retired;
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            ++state.generation;
+            if (stop)
+            {
+                state.accepting = false;
+                state.progress.appliedRequestId = 0;
+            }
+            state.pending.reset();
+            retired = std::move(state.ready);
+            state.progress.activeRequests = 0;
+            state.progress.applied = false;
+            state.progress.phase = "Cancelled";
+            state.progress.error.clear();
+        }
+    }
+
+    std::unique_ptr<PreparedEnvironment> FailEnvironmentPreparation(
+        EnvironmentPreparationState& state, const std::string& error)
+    {
+        std::unique_ptr<PreparedEnvironment> retired;
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            if (state.progress.activeRequests == 0)
+            {
+                return {};
+            }
+            ++state.generation;
+            state.pending.reset();
+            retired = std::move(state.ready);
+            state.progress.activeRequests = 0;
+            state.progress.applied = false;
+            state.progress.phase = "Failed";
+            state.progress.error = error.empty() ? "Renderer is unavailable" : error;
+        }
+        return retired;
+    }
+
     struct LiveState
     {
         ~LiveState()
         {
+            InvalidateEnvironmentPreparation(*environmentPreparation, true);
             // The submission service intentionally has process lifetime. Drain
             // while every pass/cache member is still alive, before member teardown.
             StopRenderThread();
@@ -1496,12 +1758,73 @@ namespace
         // Cooked data is loaded before decode/generation. A raw HDR cache miss
         // generates the four maps once and publishes their pixels asynchronously.
         std::string                 skyBoxPath;
-        std::unique_ptr<Texture> skyEquirect;
+        std::shared_ptr<Texture> skyEquirect;
         std::optional<assets::CookedEnvironment> skyCooked;
         std::optional<assets::EnvironmentIdentity> skyCookIdentity;
         std::filesystem::path skyCookCachePath;
         bool                        skyBoxDirty{ true };
         bool                        skyBoxEnabled{ true };
+        std::shared_ptr<EnvironmentPreparationState> environmentPreparation{
+            std::make_shared<EnvironmentPreparationState>() };
+        uint64_t skyPreparationRequest{ 0 };
+        uint64_t skyPreparationGeneration{ 0 };
+
+        void ApplyPreparedEnvironment(std::unique_ptr<PreparedEnvironment>& retired)
+        {
+            auto& preparation = *environmentPreparation;
+            std::lock_guard<std::mutex> lock(preparation.mutex);
+            if (!preparation.ready)
+            {
+                return;
+            }
+            retired = std::move(preparation.ready);
+            const auto& request = retired->request;
+            if (!preparation.accepting || preparation.generation != request.generation
+                || preparation.progress.requestId != request.id
+                || request.project != PathFinder::BaseProjectPath())
+            {
+                preparation.progress.activeRequests = 0;
+                preparation.progress.phase = "Cancelled";
+                return;
+            }
+            skyBoxPath = request.selection;
+            skyEquirect.swap(retired->equirect);
+            skyCooked.swap(retired->cooked);
+            skyCookIdentity.swap(retired->identity);
+            skyCookCachePath.swap(retired->cachePath);
+            skyPreparationRequest = request.id;
+            skyPreparationGeneration = request.generation;
+            skyBoxDirty = true;
+            preparation.progress.phase = "Applying environment on render thread";
+            if (auto* settings = RuntimeSettings::TryGet())
+            {
+                settings->SetEnvironmentSelection(skyBoxPath, true);
+            }
+            lastError.clear();
+        }
+
+        void FinishEnvironmentPreparation(const std::string& error)
+        {
+            auto& preparation = *environmentPreparation;
+            std::lock_guard<std::mutex> lock(preparation.mutex);
+            if (skyPreparationRequest != 0 && preparation.generation == skyPreparationGeneration)
+            {
+                if (error.empty())
+                {
+                    // A newer request may arrive while this upload is recorded.
+                    // Keep the actual installation event independently of it.
+                    preparation.progress.appliedRequestId = skyPreparationRequest;
+                }
+                if (preparation.progress.requestId == skyPreparationRequest)
+                {
+                    preparation.progress.activeRequests = 0;
+                    preparation.progress.applied = error.empty();
+                    preparation.progress.phase = error.empty() ? "Upload recorded" : "Failed";
+                    preparation.progress.error = error;
+                }
+            }
+            skyPreparationRequest = 0;
+        }
 
         // ── 볼류메트릭 포그 입력 ──
         //
@@ -4910,92 +5233,121 @@ namespace
             }
             if (!p.iblGenerated || skyBoxDirty)
             {
-                // Default CPU data was checked during InitializeLive. Other
-                // selections check a content+recipe cache once, before decode.
-                if (!skyCooked)
+                const auto prepareIbl = [&]() -> bool
                 {
-                    assets::CookedEnvironment cached;
-                    if (file::path(skyBoxPath).extension() == ".ceibl")
+                    // Startup and pipeline rebuilds retain their existing
+                    // synchronous path. Explicit selections arrive prepared.
+                    if (!skyCooked && !skyEquirect)
                     {
-                        if (!assets::ReadCookedEnvironment(skyBoxPath,cached,outError)) return false;
-                        Hash::Sha256Digest recipe;
-                        if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                                cached.cubeSize,cached.brdfSize,recipe,outError)) return false;
-                        if (cached.identity.recipe != recipe)
-                        { outError="Cooked environment recipe changed; recook the selected environment"; return false; }
-                        skyCooked = std::move(cached);
+                        assets::CookedEnvironment cached;
+                        if (file::path(skyBoxPath).extension() == ".ceibl")
+                        {
+                            if (!assets::ReadCookedEnvironment(skyBoxPath, cached, outError))
+                            {
+                                return false;
+                            }
+                            Hash::Sha256Digest recipe;
+                            if (!assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath() / "DefaultPassShader",
+                                    cached.cubeSize, cached.brdfSize, recipe, outError))
+                            {
+                                return false;
+                            }
+                            if (cached.identity.recipe != recipe)
+                            {
+                                outError = "Cooked environment recipe changed; recook the selected environment";
+                                return false;
+                            }
+                            skyCooked = std::move(cached);
+                        }
+                        else
+                        {
+                            if (!skyCookIdentity)
+                            {
+                                assets::EnvironmentIdentity identity;
+                                if (!assets::EnvironmentSourceIdentity(skyBoxPath, identity.source, outError)
+                                    || !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath() / "DefaultPassShader",
+                                        512, 512, identity.recipe, outError))
+                                {
+                                    return false;
+                                }
+                                skyCookIdentity = identity;
+                                skyCookCachePath = PathFinder::CachePath() / "Environment" / assets::EnvironmentCacheName(identity);
+                            }
+                            std::string cacheError;
+                            if (assets::ReadCookedEnvironment(skyCookCachePath, cached, cacheError, &*skyCookIdentity))
+                            {
+                                skyCooked = std::move(cached);
+                                Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] hit " + skyCookCachePath.string());
+                            }
+                        }
+                    }
+                    if (skyCooked)
+                    {
+                        if (!p.ibl.InstallCooked(p.frameContext, std::move(*skyCooked), outError))
+                        {
+                            return false;
+                        }
+                        skyCooked.reset();
+                        Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] uploaded cooked maps " + skyBoxPath);
                     }
                     else
                     {
-                        if (!skyCookIdentity)
+                        if (!skyEquirect)
                         {
-                            assets::EnvironmentIdentity identity;
-                            if (!assets::EnvironmentSourceIdentity(skyBoxPath,identity.source,outError) ||
-                                !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                                    512,512,identity.recipe,outError)) return false;
-                            skyCookIdentity=identity;
-                            skyCookCachePath=PathFinder::CachePath()/"Environment"/assets::EnvironmentCacheName(identity);
+                            try
+                            {
+                                skyEquirect = Texture::LoadManagedFromPath(file::path(skyBoxPath));
+                            }
+                            catch (const std::exception& exception)
+                            {
+                                outError = "HDR 로드 실패: " + std::string(exception.what());
+                                return false;
+                            }
                         }
-                        std::string cacheError;
-                        if (assets::ReadCookedEnvironment(skyCookCachePath,cached,cacheError,&*skyCookIdentity))
+
+                        if (!skyEquirect)
                         {
-                            skyCooked=std::move(cached);
-                            Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] hit " + skyCookCachePath.string());
+                            outError = "HDR 로드 실패: " + skyBoxPath;
+                            return false;
                         }
-                    }
-                }
-                if (skyCooked)
-                {
-                    if (!p.ibl.InstallCooked(p.frameContext,std::move(*skyCooked),outError)) return false;
-                    skyCooked.reset();
-                    Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] uploaded cooked maps " + skyBoxPath);
-                }
-                else
-                {
-                if (!skyEquirect)
-                {
-                    try
-                    {
-                        skyEquirect = Texture::LoadManagedFromPath(file::path(skyBoxPath));
-                    }
-                    catch (const std::exception& exception)
-                    {
-                        outError = "HDR 로드 실패: " + std::string(exception.what());
-                        return false;
-                    }
-                }
 
-                if (!skyEquirect)
+                        std::string skyUploadError;
+                        const RHITextureEntry skyEntry = p.frameContext.textureCache->GetOrUpload(
+                            skyEquirect.get(), skyUploadError);
+                        if (!skyEntry.IsValid() || skyEntry.isCube)
+                        {
+                            outError = "equirect HDR 운반 실패";
+                            if (!skyUploadError.empty())
+                            {
+                                outError += ": " + skyUploadError;
+                            }
+                            return false;
+                        }
+
+                        if (!p.ibl.Generate(p.frameContext, skyEntry.handle, skyEntry.format, 512, 512, outError))
+                        {
+                            outError = "HDR→Cube/IBL 생성 실패: " + outError;
+                            return false;
+                        }
+                        if (!p.ibl.QueueCookedCapture(skyCookCachePath, *skyCookIdentity, outError))
+                        {
+                            return false;
+                        }
+                        Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] generated; queued " + skyCookCachePath.string());
+                    }
+
+                    p.iblGenerated = true;
+                    skyBoxDirty = false;
+                    std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
+                    ++displaySnapshot.iblGenerationCount;
+                    return true;
+                };
+                if (!prepareIbl())
                 {
-                    outError = "HDR 로드 실패: " + skyBoxPath;
+                    FinishEnvironmentPreparation(outError);
                     return false;
                 }
-
-                std::string skyUploadError;
-                const RHITextureEntry skyEntry =
-                    p.frameContext.textureCache->GetOrUpload(
-                        skyEquirect.get(), skyUploadError);
-                if (!skyEntry.IsValid() || skyEntry.isCube)
-                {
-                    outError = "equirect HDR 운반 실패";
-                    if (!skyUploadError.empty()) outError += ": " + skyUploadError;
-                    return false;
-                }
-
-                if (!p.ibl.Generate(p.frameContext, skyEntry.handle, skyEntry.format,
-                    512, 512, outError))
-                {
-                    outError = "HDR→Cube/IBL 생성 실패: " + outError;
-                    return false;
-                }
-                if (!p.ibl.QueueCookedCapture(skyCookCachePath,*skyCookIdentity,outError)) return false;
-                Debug::PrintLog(spdlog::level::info,"[EnvironmentCache] generated; queued " + skyCookCachePath.string());
-                }
-
-                p.iblGenerated = true;
-                skyBoxDirty = false;
-                std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
-                ++displaySnapshot.iblGenerationCount;
+                FinishEnvironmentPreparation({});
             }
 
             if (!p.ibl.TouchCooked(p.frameContext,outError)) return false;
@@ -6135,6 +6487,7 @@ namespace
                     // GT 발행이 멈춰도 마지막 생산자 GPU 결과를 수집한다.
                     // 전용 RT만 기다리며 작업 스케줄러의 worker는 점유하지 않는다.
                     uint32_t pendingGpu = 0;
+                    std::unique_ptr<PreparedEnvironment> failedEnvironment;
                     {
                         std::lock_guard<std::mutex> stateLock(renderStateMutex);
                         try
@@ -6168,6 +6521,12 @@ namespace
                             ++frameFailures;
                             enabled = false;
                             Debug::PrintLog(spdlog::level::err, lastError);
+                        }
+                        if (!enabled)
+                        {
+                            // Fail pending/applying work even if no more frames
+                            // are admitted; release its pixels outside this lock.
+                            failedEnvironment = FailEnvironmentPreparation(*environmentPreparation, lastError);
                         }
                     }
 
@@ -6352,6 +6711,7 @@ namespace
                             std::lock_guard<std::mutex> stateLock(renderStateMutex);
                             lastError = std::string("RenderThread frame exception: ") +
                                 exception.what();
+                            FinishEnvironmentPreparation(lastError);
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
                         }
@@ -6359,6 +6719,7 @@ namespace
                         {
                             std::lock_guard<std::mutex> stateLock(renderStateMutex);
                             lastError = "RenderThread frame unknown exception";
+                            FinishEnvironmentPreparation(lastError);
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
                         }
@@ -6692,6 +7053,11 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
             return false;
         }
 
+        {
+            std::lock_guard<std::mutex> lock(state.environmentPreparation->mutex);
+            state.environmentPreparation->accepting = true;
+        }
+
         return true;
     }
     catch (const std::exception& exception)
@@ -6714,7 +7080,11 @@ void EnhancedSceneRenderer::SetActiveScene(Scene* scene)
     LiveState& state = GetLiveState();
     if (state.renderScene)
     {
-        if (state.renderScene->GetScene() != scene) ++state.sceneEpoch;
+        if (state.renderScene->GetScene() != scene)
+        {
+            InvalidateEnvironmentPreparation(*state.environmentPreparation, false);
+            ++state.sceneEpoch;
+        }
         state.renderScene->SetScene(scene, state.sceneEpoch);
     }
 }
@@ -6746,10 +7116,9 @@ void EnhancedSceneRenderer::SetDisplayPresentationSink(
 bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& outError)
 {
     LiveState& state = GetLiveState();
-    std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
-    if (!state.runtimeInitialized)
+    if (!state.enabled)
     {
-        outError = "EnhancedRenderer 런타임이 초기화되지 않았다";
+        outError = "EnhancedRenderer is not enabled";
         return false;
     }
     if (path.empty())
@@ -6757,35 +7126,100 @@ bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& 
         outError = "HDR 경로가 비어 있다";
         return false;
     }
-    std::error_code fileError;
     const file::path source(path);
-    if (!std::filesystem::is_regular_file(source,fileError) ||
-        (source.extension()!=".hdr" && source.extension()!=".ceibl"))
-    { outError="Select an existing HDR or cooked .ceibl environment"; return false; }
-    std::optional<assets::CookedEnvironment> cooked;
-    if (source.extension()==".ceibl")
+    if (source.extension() != ".hdr" && source.extension() != ".ceibl")
     {
-        assets::CookedEnvironment candidate;
-        Hash::Sha256Digest recipe;
-        if (!assets::ReadCookedEnvironment(source,candidate,outError) ||
-            !assets::EnvironmentRecipeIdentity(PathFinder::ShaderPath()/"DefaultPassShader",
-                candidate.cubeSize,candidate.brdfSize,recipe,outError)) return false;
-        if (candidate.identity.recipe!=recipe)
-        { outError="Cooked environment recipe changed; recook the selected environment"; return false; }
-        cooked=std::move(candidate);
+        outError = "Select an HDR or cooked .ceibl environment";
+        return false;
     }
-    state.skyBoxPath = path;
-    state.skyEquirect.reset();
-    state.skyCooked=std::move(cooked);
-    state.skyCookIdentity.reset();
-    state.skyCookCachePath.clear();
-    state.skyBoxDirty = true;
-    if (state.pipeline) state.pipeline->iblGenerated = false;
-    if (auto* settings = RuntimeSettings::TryGet())
-        settings->SetEnvironmentSelection(path, true);
-    state.lastError.clear();
+    // Capture every path on the caller. Worker admission and progress never
+    // acquire renderStateMutex, even while the first frame compiles shaders.
+    EnvironmentPreparationRequest request;
+    request.selection = path;
+    request.source = file::absolute(source);
+    request.shaders = PathFinder::ShaderPath() / "DefaultPassShader";
+    request.cache = PathFinder::CachePath() / "Environment";
+    request.project = PathFinder::BaseProjectPath();
+    EnvironmentPreparationProgress progress;
+    progress.activeRequests = 1;
+    progress.phase = "Queued";
+    progress.name = source.filename().string();
+    const auto preparation = state.environmentPreparation;
+    bool launch = false;
+    std::unique_ptr<PreparedEnvironment> retired;
+    {
+        std::lock_guard<std::mutex> lock(preparation->mutex);
+        if (!preparation->accepting)
+        {
+            outError = "EnhancedRenderer environment preparation is not running";
+            return false;
+        }
+        request.id = ++preparation->nextRequest;
+        request.generation = preparation->generation;
+        progress.requestId = request.id;
+        progress.appliedRequestId = preparation->progress.appliedRequestId;
+        preparation->pending = std::move(request);
+        retired = std::move(preparation->ready);
+        preparation->progress = std::move(progress);
+        launch = !preparation->running;
+        preparation->running = true;
+    }
+    if (launch)
+    {
+        try
+        {
+            const auto job = ce::get_job_scheduler().submit([preparation]
+            {
+                try
+                {
+                    RunEnvironmentPreparation(preparation);
+                }
+                catch (...)
+                {
+                    // Includes allocation failure outside the decoder. Clear
+                    // admission state without allocating another error string.
+                    std::unique_ptr<PreparedEnvironment> retired;
+                    std::lock_guard<std::mutex> lock(preparation->mutex);
+                    preparation->running = false;
+                    preparation->pending.reset();
+                    retired = std::move(preparation->ready);
+                    preparation->progress.activeRequests = 0;
+                    preparation->progress.phase = "Failed";
+                }
+            });
+            // Dependency-free dispatch failures are completed before submit
+            // returns. Observe them without ever waiting for running work.
+            if (job.is_complete())
+            {
+                job.wait();
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            std::lock_guard<std::mutex> lock(preparation->mutex);
+            preparation->running = false;
+            preparation->pending.reset();
+            preparation->progress.activeRequests = 0;
+            preparation->progress.phase = "Failed";
+            preparation->progress.error = exception.what();
+            outError = preparation->progress.error;
+            return false;
+        }
+    }
     outError.clear();
     return true;
+}
+
+EnhancedSceneRenderer::EnvironmentPreparationProgress EnhancedSceneRenderer::GetEnvironmentPreparationProgress()
+{
+    const auto preparation = GetLiveState().environmentPreparation;
+    std::lock_guard<std::mutex> lock(preparation->mutex);
+    return preparation->progress;
+}
+
+void EnhancedSceneRenderer::CancelEnvironmentPreparation()
+{
+    InvalidateEnvironmentPreparation(*GetLiveState().environmentPreparation, false);
 }
 
 void EnhancedSceneRenderer::EnableLive()
@@ -7058,7 +7492,9 @@ void EnhancedSceneRenderer::SetRenderThreadHooks(const RenderThreadHooks& hooks)
 
 void EnhancedSceneRenderer::StopLiveRenderThread()
 {
-    GetLiveState().StopRenderThread();
+    LiveState& state = GetLiveState();
+    InvalidateEnvironmentPreparation(*state.environmentPreparation, true);
+    state.StopRenderThread();
 }
 
 EnhancedRenderThreadStats EnhancedSceneRenderer::GetLiveRenderThreadStats()
@@ -7163,11 +7599,14 @@ bool EnhancedSceneRenderer::WaitForLiveRenderThreadIdle(uint32_t timeoutMillisec
 void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 {
     LiveState& state = GetLiveState();
+    // Declared before the lock so old CPU pixels are freed after it is released.
+    std::unique_ptr<PreparedEnvironment> retiredEnvironment;
     std::unique_lock<std::mutex> stateLock(state.renderStateMutex, std::defer_lock);
     {
         RenderThreadPhaseScope lockWait(RenderPhase::state_lock_wait);
         stateLock.lock();
     }
+    state.ApplyPreparedEnvironment(retiredEnvironment);
 	state.profileFrameDrawCount = 0;
 	state.profileFrameBatchCount = 0;
     state.controlledCaptureFrame = state.pbrCapture && state.pbrCapture->controlled
@@ -8774,6 +9213,7 @@ void EnhancedSceneRenderer::SetLiveTuning(const EnhancedLiveTuning& tuning)
 void EnhancedSceneRenderer::ShutdownLive()
 {
     LiveState& state = GetLiveState();
+    InvalidateEnvironmentPreparation(*state.environmentPreparation, true);
     state.StopRenderThread();
     std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
     state.enabled = false;

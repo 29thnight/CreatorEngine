@@ -8,6 +8,7 @@
 #include "CoreWindow.h"
 #include "BootProgress.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "SceneViewportOverlay.h"
 #include "RHI/IImGuiHost.h"
 #include "RHI/ImGuiHostPresentationSink.h"
 #include "RHI/ScreenSizedResource.h"
@@ -927,6 +928,15 @@ void Editor::EditorMain::OnGui()
     {
         ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
         sceneLock.lock();
+    }
+    // Acceptance is not installation. Show the new environment only after its
+    // render-thread application was recorded; failures preserve overlay state.
+    // Keep this before the hidden-UI return so completion is consumed there too.
+    const auto environment = EnhancedSceneRenderer::GetEnvironmentPreparationProgress();
+    if (environment.appliedRequestId != 0 && environment.appliedRequestId != m_lastAppliedEnvironmentRequest)
+    {
+        m_lastAppliedEnvironmentRequest = environment.appliedRequestId;
+        editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
     }
     if (EditorSessionState::Get().IsGameViewHidden())
     {

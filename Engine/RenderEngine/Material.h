@@ -202,7 +202,7 @@ public:
     bool m_doubleSided{ false };
 
 	[[reflgen::ignore]]
-	HashedGuid m_materialGuid{ make_guid() };
+	HashedGuid m_materialGuid{ TypeTrait::MakeRuntimeResourceId() };
 
 	// typed setter/getter와 legacy payload 왕복을 위한 CPU byte view. 값의 저장
 	// 정본은 위 m_propertyValues이고 제품 draw packet은 그 정본에서 다시 pack한다.

@@ -235,6 +235,11 @@ static std::set<HashedGuid> g_guids;
 
 namespace TypeTrait
 {
+    // Process-runtime cache identity for Texture and Material only. Never use
+    // this for Entity IDs, persisted UUIDs, type IDs or content fingerprints.
+    // One out-of-line allocator is shared by all producer threads.
+    HashedGuid MakeRuntimeResourceId() noexcept;
+
 	// 컴파일타임 타입 이름 (MSVC __FUNCSIG__ 기반) — MakeTypeID의 입력.
 	// 원래 참조만 있고 정의가 없어 MakeTypeID는 인스턴스화 불가능한 죽은
 	// 코드였다(CT4-b에서 구현). 선행 class/struct/enum 키워드는 벗긴다 —

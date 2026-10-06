@@ -542,10 +542,6 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 				{
 					Debug::PrintLog(spdlog::level::err, "SkyBox 변경 실패: " + skyError);
 				}
-				else
-				{
-					editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
-				}
 			}
 
 			if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))

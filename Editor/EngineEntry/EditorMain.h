@@ -84,6 +84,7 @@ namespace Editor
         std::unique_ptr<wave::PlaybackService> m_audioPlayback;
         std::unique_ptr<wave::AudioCatalog> m_audioCatalog;
         std::uint64_t m_audioRevision{};
+        std::uint64_t m_lastAppliedEnvironmentRequest{};
 
 		void StartPresentationThread();
 		void StopPresentationThread();
