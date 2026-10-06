@@ -123,246 +123,196 @@ namespace ce
 		std::counting_semaphore<INT_MAX>* m_signal = nullptr;
 	};
 
-	// 열린 스코프 하나. 깊이와 시작 시각을 들고 있다가 닫힐 때 이벤트가 된다.
-	struct open_scope
-	{
-		cpu_span_context cpu;
-		profile_tick  tick_begin = 0;
-		marker_id     marker = invalid_marker;
-		std::uint32_t frame = 0;
-		event_flags   flags = event_flags::none;
+    // 논리적인 begin 하나의 자리. 기록하지 않은 begin도 token == 0인 자리를
+    // 차지해야, 녹화 도중 들어온 안쪽 scope의 end가 바깥쪽 skip을 소비하지 않는다.
+    struct open_scope
+    {
+        cpu_span_context cpu;
+        profile_tick tick_begin = 0;
+        marker_id marker = invalid_marker;
+        std::uint32_t frame = 0;
+        std::uint16_t depth = 0;
+        event_flags flags = event_flags::none;
+        std::uint64_t generation = 0;
+        std::uint64_t token = 0;
+    };
 
-		// 이 구간을 연 녹화 세대. Clear 는 세대를 올리므로, 지우기 전에 열린
-		// 구간은 나중에 닫혀도 새 캡처의 것이 아니다.
-		//
-		// ★ 세대를 청크에만 찍으면 이것을 못 막는다. 스코프는 청크보다 오래
-		//   산다 — 청크는 프레임마다 봉인되지만 구간은 그것을 넘어 열려 있다.
-		std::uint64_t generation = 0;
+    inline constexpr std::uint32_t kMaxScopeDepth = 64;
 
-		// 얼림에서 이미 잘려 기록됐다. 진짜 종료가 와도 다시 적지 않는다.
-		//
-		// ★ 예전에는 이것을 개수(m_skippedDepth)로만 예약했다. 그런데 깊이
-		//   상한으로 못 연 구간은 언제나 가장 **안쪽**인 반면 잘린 구간은 가장
-		//   **바깥**이라, 개수로 세면 다시 녹화한 뒤의 새 구간의 종료가 그
-		//   예약을 먼저 먹고 자기는 열린 채 남았다. 짝은 자리로 맞춰야 한다.
-		bool          emitted = false;
-	};
+    // 스택과 현재 청크는 주인만 만진다. 수집기는 원자적으로 공개한 시작점과
+    // 봉인된 청크만 읽고, 실제 종료와 Stop의 잘린 종료는 같은 token을 선점한다.
+    class thread_stream
+    {
+    public:
+        thread_stream(chunk_pool& pool, thread_info info);
+        ~thread_stream();
 
-	// 스코프 스택 상한. 넘으면 **버리고 센다** — 옛 코어는 넘긴 Push 가
-	// TLS 의 다음 멤버를 덮어썼고, NDEBUG 에서는 assert 가 사라져 조용히
-	// 힙을 망가뜨렸다(결함 6).
-	inline constexpr std::uint32_t kMaxScopeDepth = 64;
+        thread_stream(const thread_stream&) = delete;
+        thread_stream& operator=(const thread_stream&) = delete;
 
-	// writer 하나가 소유한다. 이 타입의 어떤 멤버도 다른 스레드가 쓰지 않는다.
-	//
-	// ★ 그것이 **규약**일 때는 아무도 지키지 않았다. 수집기가 남의 현재 청크를
-	//   직접 봉인했고, 실측에서 Debug·Release 모두 ACCESS_VIOLATION 이었다.
-	//   그래서 이제 소유를 **강제**한다: 주인이 아닌 스레드의 호출은 아무것도
-	//   하지 않고 세어진다(`foreign_touches`). 세지 않고 거절만 하면 "조용한
-	//   스트림" 과 "거절당한 호출" 이 구분되지 않는다.
-	class thread_stream
-	{
-	public:
-		thread_stream(chunk_pool& pool, thread_info info);
-		~thread_stream();
+        void begin_scope(marker_id id, profile_tick now, std::uint32_t frame,
+                         const cpu_span_context& cpu = {});
+        void begin_scope(marker_id id, profile_tick now, std::uint32_t frame,
+                         const cpu_span_context& cpu, std::uint64_t generation);
+        void end_scope(profile_tick now);
+        void skip_scope();
 
-		thread_stream(const thread_stream&) = delete;
-		thread_stream& operator=(const thread_stream&) = delete;
+        void write_span(marker_id id, profile_tick begin, profile_tick end,
+                        std::uint32_t frame, std::uint16_t depth, const gpu_span_context& gpu);
+        void write_instant(marker_id id, profile_tick tick, std::uint32_t frame,
+                           const cpu_span_context& cpu = {});
+        void write_instant(marker_id id, profile_tick tick, std::uint32_t frame,
+                           const cpu_span_context& cpu, std::uint64_t generation);
 
-		void begin_scope(marker_id id, profile_tick now, std::uint32_t frame, const cpu_span_context& cpu = {});
-		void end_scope(profile_tick now);
+        void publish_frame();
+        void truncate_open_scopes(profile_tick freeze_tick);
+        void freeze_self(profile_tick freeze_tick);
+        void finish(profile_tick now);
 
-		// 열지 않은 스코프의 짝을 예약한다. 녹화 중이 아니어서 여는 쪽을 건너뛰었을
-		// 때 쓴다 — 여는 쪽만 건너뛰면 그 짝이 스택에서 **남의 구간을 닫는다.**
-		// 깊이 상한을 넘겨 못 열었을 때와 정확히 같은 기제다(begin_scope 의 주석).
-		//
-		// ★ 버렸다고 세지는 않는다. 이것은 용량 부족으로 **잃은** 것이 아니라
-		//   녹화하지 않기로 해서 안 재는 것이다. 들어서 세면 pause 를 누를 때마다
-		//   손실 계수기가 오른다.
-		void skip_scope()
-		{
-			if (!owned_by_caller()) return;
+        void request_seal()
+        {
+            m_sealRequest.fetch_add(1, std::memory_order_release);
+        }
 
-			// 얼어 있는 동안에도 이 자리는 지난다. 여기서 요청을 보지 않으면
-			// 워커는 다음 녹화까지 얼림을 모른다 — pause 가 여는 쪽을 막으므로
-			// write() 를 더는 타지 않기 때문이다.
-			honor_seal_request();
-			++m_skippedDepth;
-		}
+        // 제어 호출끼리는 서비스의 stream lock으로 직렬화한다. 기록자는
+        // 잠금 없이 요청 한 벌의 버전을 확인하고, 처리한 그 요청만 응답한다.
+        void request_freeze(profile_tick freeze_tick);
 
-		// 이미 끝난 구간을 그대로 적는다. 스코프 스택을 쓰지 않는다 —
-		// GPU 구간은 나중에, 완성된 채로, 시작 시각까지 들고 온다.
-		//
-		// ★ 틱은 **CPU(QPC) 축으로 옮긴 뒤**의 값이어야 한다. 이 층은 GPU 틱을
-		//   모르고, 옮기는 일은 두 시계를 가진 백엔드의 몫이다.
-		void write_span(marker_id id, profile_tick begin, profile_tick end,
-		                std::uint32_t frame, std::uint16_t depth,
-		                const gpu_span_context& gpu);
+        std::uint64_t freeze_request() const
+        {
+            return m_freezeRequest.load(std::memory_order_acquire);
+        }
+        std::uint64_t freeze_ack() const
+        {
+            return m_freezeAck.load(std::memory_order_acquire);
+        }
+        std::uint64_t seal_request() const
+        {
+            return m_sealRequest.load(std::memory_order_acquire);
+        }
+        std::uint64_t seal_ack() const
+        {
+            return m_sealAck.load(std::memory_order_acquire);
+        }
+        bool pending_work() const
+        {
+            return m_pendingState.load(std::memory_order_seq_cst) != 0;
+        }
+        void set_generation(std::uint64_t value)
+        {
+            m_generation.store(value, std::memory_order_release);
+        }
 
-		// 길이가 없는 사건 하나를 적는다(§7.3 의 첫째 트랙).
-		//
-		// ★ 깊이는 **지금 열려 있는 깊이**다. 그 자리에서 일어난 일이라는
-		//   사실이 공짜로 남고, 0 으로 박았을 때의 사고도 함께 막는다 —
-		//   깊이 0 짜리 점은 트리에 들어가면 스택에서 부모를 밀어낸다
-		//   (event_flags::instant 의 주석).
-		void write_instant(marker_id id, profile_tick tick, std::uint32_t frame, const cpu_span_context& cpu = {});
+        // 호출자는 스트림의 수명을 보장한다. 두 함수 모두 TLS/현재 청크를
+        // 읽지 않으며, end_tick 뒤에 시작한 구간과 다른 세대는 제외한다.
+        // snapshot은 일시적인 표시용이다. 완성 이벤트와 함께 저장하지 않는다.
+        std::uint32_t snapshot_open_scopes(std::uint64_t generation, profile_tick end_tick,
+                                          profile_event* output, std::uint32_t capacity) const;
 
-		// 프레임 경계. 열려 있는 스코프는 닫지 않는다 — 그것이 프레임을 넘는
-		// 구간이고, 옛 코어가 스택 맨 위를 무조건 닫아 잃던 것이다. 대신
-		// 지금까지 쓴 청크를 봉인해 수집기가 이번 프레임을 볼 수 있게 한다.
-		//
-		// ★ **주인 스레드만 부른다.** 남이 부르면 m_writer 를 비우는 동안 주인이
-		//   그 포인터로 쓰고 있을 수 있다. 실측: 워커 넷이 적는 동안 수집기가
-		//   이 함수를 돌리자 Debug·Release 모두 ACCESS_VIOLATION 으로 죽었다.
-		void publish_frame();
+        // Stop의 미응답 스트림에만 쓴다. 반환된 구간은 호출자가 캡처에 넣어야
+        // 한다. 선점 후 주인이 깨어나도 같은 구간을 다시 적을 수 없다.
+        std::uint32_t claim_open_scopes(std::uint64_t generation, profile_tick end_tick,
+                                       profile_event* output, std::uint32_t capacity);
 
-		// 수집기가 "지금 봉인해 달라" 고 **요청**만 한다. 실제 봉인은 주인
-		// 스레드가 자기 안전한 자리에서 한다.
-		//
-		// ★ 이것이 경계의 전부다. 수집기는 writer 의 현재 청크를 만지지 않는다.
-		// 열려 있는 구간을 그 시각에서 잘라 기록한다. 짝은 예약해 두므로
-		// 나중에 실제 end_scope 가 와도 **두 번 기록하지 않고 남의 구간도
-		// 닫지 않는다** — 깊이 상한을 넘겼을 때와 같은 기제다.
-		void truncate_open_scopes(profile_tick freeze_tick);
+        const thread_info& info() const { return m_info; }
+        std::uint32_t slot() const { return m_info.slot; }
+        std::uint32_t open_depth() const { return m_publishedDepth.load(std::memory_order_acquire); }
+        std::thread::id owner_thread() const { return m_ownerThread; }
 
-		void request_seal()
-		{
-			m_sealRequest.fetch_add(1, std::memory_order_release);
-		}
+        std::uint64_t dropped_events() const
+        {
+            return m_droppedEvents.load(std::memory_order_relaxed);
+        }
+        std::uint64_t dropped_scopes() const
+        {
+            return m_droppedScopes.load(std::memory_order_relaxed);
+        }
+        std::uint64_t unbalanced_scopes() const
+        {
+            return m_unbalancedScopes.load(std::memory_order_relaxed);
+        }
+        std::uint64_t stale_scopes() const
+        {
+            return m_staleScopes.load(std::memory_order_relaxed);
+        }
+        std::uint64_t stale_events() const
+        {
+            return m_staleEvents.load(std::memory_order_relaxed);
+        }
+        std::uint64_t foreign_touches() const
+        {
+            return m_foreignTouches.load(std::memory_order_relaxed);
+        }
 
-		// 봉인에 더해 **열려 있는 구간을 그 시각에서 잘라 달라**고 요청한다.
-		// pause 가 쓴다 — 얼린 캡처에는 다음 프레임이 없으므로, 여기서 남기지
-		// 않으면 그 구간은 영영 사라진다(§6.1).
-		void request_freeze(profile_tick freeze_tick)
-		{
-			m_freezeTick.store(freeze_tick, std::memory_order_release);
-			m_freezeRequest.fetch_add(1, std::memory_order_release);
-			m_sealRequest.fetch_add(1, std::memory_order_release);
-		}
+    private:
+        // token의 최하위 비트가 1이면 열린 구간이다. 같은 자리를 재사용할
+        // 때마다 다른 token을 쓰므로, 복사 도중 재사용된 metadata는 선점하지 못한다.
+        // 모든 필드가 원자적이어야 실패한 복사도 C++ data race가 되지 않는다.
+        struct published_scope
+        {
+            std::atomic<std::uint64_t> token{ 0 };
+            std::atomic<std::uint64_t> generation{ 0 };
+            std::atomic<profile_tick> tick_begin{ 0 };
+            std::atomic<marker_id> marker{ invalid_marker };
+            std::atomic<std::uint32_t> frame{ 0 };
+            std::atomic<std::uint16_t> depth{ 0 };
+            std::atomic<event_flags> flags{ event_flags::none };
+            std::atomic<std::uint64_t> session{ 0 };
+            std::atomic<std::uint64_t> tick{ 0 };
+            std::atomic<std::uint64_t> task{ 0 };
+        };
 
-		// 주인이 자기 스트림을 그 자리에서 잠근다. 기다리는 쪽은 자기 봉인
-		// 요청에 응답할 자리를 지나지 못하므로, 기다리기 **전에** 자기 것을
-		// 끝내야 한다 — 부른 쪽에서도 수집기에서도 같다.
-		void freeze_self(profile_tick freeze_tick);
+        bool ensure_chunk(std::uint64_t generation);
+        void write(const profile_event& value, std::uint64_t generation, bool late_ingest = false);
+        void seal_current(bool writing = false);
+        void honor_seal_request();
+        bool owned_by_caller() const;
+        void push_skipped_scope();
+        std::uint16_t recording_depth(std::uint64_t generation) const;
+        void publish_open_scope(std::uint32_t index);
+        bool claim_scope(std::uint32_t index);
+        bool read_open_scope(std::uint32_t index, std::uint64_t generation,
+                             profile_tick end_tick, profile_event& value, std::uint64_t& token) const;
+        void truncate_open_scopes(profile_tick freeze_tick, std::uint64_t generation);
 
-		// 얼림에 응답했는가. ★ 평범한 프레임 봉인(request_seal)과 갈라 센다.
-		//   둘을 한 통에 넣었더니, 등록만 해 두고 조용한 스레드가 **언제나**
-		//   미응답으로 잡혀 얼린 캡처가 늘 "온전하지 않다" 가 됐다.
-		std::uint64_t freeze_request() const
-		{
-			return m_freezeRequest.load(std::memory_order_acquire);
-		}
-		std::uint64_t freeze_ack() const
-		{
-			return m_freezeAck.load(std::memory_order_acquire);
-		}
+        chunk_pool& m_pool;
+        thread_info m_info;
+        event_chunk* m_writer = nullptr;
+        std::uint64_t m_sequence = 0;
 
-		// 아직 넘기지 않은 것이 있는가(쓰던 청크 또는 열린 구간). false 면
-		// 이 스트림은 얼림에 응답할 것이 없다 — 꼬리가 이미 다 넘어갔다.
-		bool pending_work() const
-		{
-			return m_pendingWork.load(std::memory_order_acquire);
-		}
+        open_scope m_stack[kMaxScopeDepth]{};
+        published_scope m_publishedScopes[kMaxScopeDepth]{};
+        std::uint32_t m_depth = 0;
+        std::atomic<std::uint32_t> m_publishedDepth{ 0 };
+        // 상한 밖의 자리만 개수로 센다. 이 구간에는 어떤 begin도 기록하지
+        // 않으므로 언제나 스택보다 안쪽이며, 세대가 바뀌어도 짝이 유지된다.
+        std::uint64_t m_overflowDepth = 0;
+        std::uint64_t m_nextScopeToken = 1;
 
-		// 이 스트림이 쓰는 녹화 세대. 수집기가 올리면 다음 청크부터 새 세대다.
-		void set_generation(std::uint64_t value)
-		{
-			m_generation.store(value, std::memory_order_release);
-		}
+        std::atomic<std::uint64_t> m_sealRequest{ 0 };
+        std::atomic<std::uint64_t> m_sealAck{ 0 };
+        std::atomic<std::uint64_t> m_freezeVersion{ 0 };
+        std::atomic<profile_tick> m_freezeTick{ 0 };
+        std::atomic<std::uint64_t> m_freezeGeneration{ 0 };
+        std::atomic<std::uint64_t> m_freezeRequest{ 0 };
+        std::atomic<std::uint64_t> m_freezeAck{ 0 };
+        std::atomic<profile_tick> m_frozenTick{ 0 };
+        std::atomic<std::uint64_t> m_frozenGeneration{ UINT64_MAX };
+        // 두 상태를 한 원자에 두어 seal과 begin의 중간을 idle로 읽지 않는다.
+        // admission/cutoff/관측의 seq_cst 순서가, 서로 다른 두 원자의 옛 값을
+        // 양쪽에서 함께 읽어 Stop이 새 begin을 놓치는 store-buffering을 막는다.
+        static constexpr std::uint8_t kPendingWork = 1;
+        static constexpr std::uint8_t kPendingAdmission = 2;
+        std::atomic<std::uint8_t> m_pendingState{ 0 };
+        bool m_inHonor = false;
+        std::atomic<std::uint64_t> m_generation{ 0 };
 
-		// 요청한 봉인이 처리됐는가. 수집기가 청크를 만지지 않고 물을 수 있는
-		// 유일한 수단이다.
-		std::uint64_t seal_request() const
-		{
-			return m_sealRequest.load(std::memory_order_acquire);
-		}
-		std::uint64_t seal_ack() const
-		{
-			return m_sealAck.load(std::memory_order_acquire);
-		}
-
-		// 이 스레드의 기록을 끝낸다. 남은 청크를 봉인하고, 아직 열려 있는
-		// 스코프가 있으면 truncated_end 로 닫아 **잃지 않는다**.
-		void finish(profile_tick now);
-
-		const thread_info& info() const { return m_info; }
-		std::uint32_t      slot() const { return m_info.slot; }
-		std::uint32_t      open_depth() const { return m_depth; }
-
-		// ★ 원자로 둔다. 적는 것은 주인 스레드이고 읽는 것은 수집기·요약이라,
-		//   평범한 정수면 그 자체로 경합이다(계획서 §0.5.15).
-		std::uint64_t dropped_events() const
-		{
-			return m_droppedEvents.load(std::memory_order_relaxed);
-		}
-		std::uint64_t dropped_scopes() const
-		{
-			return m_droppedScopes.load(std::memory_order_relaxed);
-		}
-		std::uint64_t unbalanced_scopes() const
-		{
-			return m_unbalancedScopes.load(std::memory_order_relaxed);
-		}
-
-		// 지운 세대에서 열려 닫힐 때 버려진 구간 수.
-		std::uint64_t stale_scopes() const
-		{
-			return m_staleScopes.load(std::memory_order_relaxed);
-		}
-
-		// 주인이 아닌 스레드가 이 스트림을 만지려 한 횟수. 0 이 아니면
-		// 소유 경계가 깨진 것이고, 그 호출이 한 일은 아무것도 없다.
-		std::uint64_t foreign_touches() const
-		{
-			return m_foreignTouches.load(std::memory_order_relaxed);
-		}
-
-		std::thread::id owner_thread() const { return m_ownerThread; }
-
-	private:
-		bool ensure_chunk();
-		void write(const profile_event& value);
-		void seal_current();
-
-		// 요청이 와 있으면 지금 봉인한다. 주인 스레드의 안전한 자리에서만
-		// 불린다 — write() 가 청크를 만지기 **전**과 스코프가 다 닫힌 뒤다.
-		void honor_seal_request();
-
-		// 부르는 쪽이 주인인가. 아니면 세고 false 를 낸다.
-		bool owned_by_caller() const;
-
-		chunk_pool&   m_pool;
-		thread_info   m_info;
-
-		event_chunk*  m_writer = nullptr;
-		std::uint64_t m_sequence = 0;
-
-		open_scope    m_stack[kMaxScopeDepth]{};
-		std::uint32_t m_depth = 0;
-
-		// 깊이 상한을 넘겨 열지 못한 스코프 수. 그 스코프들도 닫히므로,
-		// end_scope 가 스택을 건드리기 전에 이 수를 먼저 소비해야 짝이 맞는다.
-		std::uint32_t m_skippedDepth = 0;
-
-		// 수집기가 올리고 주인이 따라 올린다. 둘이 같으면 요청이 다 처리된 것이다.
-		std::atomic<std::uint64_t> m_sealRequest{ 0 };
-		std::atomic<std::uint64_t> m_sealAck{ 0 };
-		std::atomic<profile_tick>  m_freezeTick{ 0 };
-		std::atomic<std::uint64_t> m_freezeRequest{ 0 };
-		std::atomic<std::uint64_t> m_freezeAck{ 0 };
-		std::atomic<bool>          m_pendingWork{ false };
-
-		// 봉인 처리 중인가. 주인 스레드만 읽고 쓴다.
-		bool m_inHonor = false;
-		std::atomic<std::uint64_t> m_generation{ 0 };
-
-		std::atomic<std::uint64_t> m_droppedEvents{ 0 };    // free 청크가 없어 잃은 이벤트
-		std::atomic<std::uint64_t> m_droppedScopes{ 0 };    // 깊이 상한을 넘겨 못 연 스코프
-		std::atomic<std::uint64_t> m_unbalancedScopes{ 0 };
-		std::atomic<std::uint64_t> m_staleScopes{ 0 };
-		mutable std::atomic<std::uint64_t> m_foreignTouches{ 0 };
-
-		// 이 스트림을 만든 스레드. 만드는 자리가 곧 주인이다.
-		const std::thread::id m_ownerThread = std::this_thread::get_id(); // 열지 않고 닫은 횟수
-	};
+        std::atomic<std::uint64_t> m_droppedEvents{ 0 };
+        std::atomic<std::uint64_t> m_droppedScopes{ 0 };
+        std::atomic<std::uint64_t> m_unbalancedScopes{ 0 };
+        std::atomic<std::uint64_t> m_staleScopes{ 0 };
+        std::atomic<std::uint64_t> m_staleEvents{ 0 };
+        mutable std::atomic<std::uint64_t> m_foreignTouches{ 0 };
+        const std::thread::id m_ownerThread = std::this_thread::get_id();
+    };
 }
