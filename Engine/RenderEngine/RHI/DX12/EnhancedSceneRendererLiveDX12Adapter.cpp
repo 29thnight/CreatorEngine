@@ -520,9 +520,9 @@ void EnhancedSceneRendererLiveDX12Adapter::ReleaseFogCloudNeutral(
 }
 
 GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
-    uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId)
+    uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId, uint64_t captureGeneration)
 {
-    return m_impl->profiler.BeginFrame(engineFrameId, submissionId, renderViewId);
+    return m_impl->profiler.BeginFrame(engineFrameId, submissionId, renderViewId, captureGeneration);
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameToken& token)

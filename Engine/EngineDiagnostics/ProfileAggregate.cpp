@@ -197,6 +197,17 @@ namespace ce
 			result.m_boundaries.push_back(boundary);
 		}
 
+		// GPU submissions admitted before Stop may finish after the CPU boundary.
+		// Keep frame ownership unchanged, but let the timeline reach their true end.
+		for (const profile_event& event : events)
+		{
+			if (has_flag(event.flags, event_flags::gpu_span))
+			{
+				result.m_tickBegin = (std::min)(result.m_tickBegin, event.tick_begin);
+				result.m_tickEnd = (std::max)(result.m_tickEnd, event.tick_end);
+			}
+		}
+
 		result.m_eventCount = events.size();
 		if (events.empty())
 		{

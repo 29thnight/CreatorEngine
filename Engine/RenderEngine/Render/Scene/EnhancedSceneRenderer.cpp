@@ -80,6 +80,7 @@
 #include <string_view>
 #include <type_traits>
 #include <exception>
+#include <utility>
 #include <unordered_map>
 #include <set>
 #include <fstream>
@@ -178,6 +179,34 @@ void SetEnhancedLiveGpuSpanSink(const EnhancedLiveGpuSpanSink& sink)
 namespace
 {
     const EnhancedLiveGpuSpanSink& GpuSpanSink() { return g_gpuSpanSink; }
+
+    void finish_gpu_capture(GpuFrameToken& token, bool complete, const char* reason)
+    {
+        const uint64_t generation = std::exchange(token.captureGeneration, 0);
+        const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+        if (generation != 0 && sink.on_finish_capture)
+        {
+            sink.on_finish_capture(generation, static_cast<uint32_t>(token.engineFrameId), complete, reason);
+        }
+    }
+
+    struct GpuCaptureCompletion
+    {
+        GpuFrameToken& token;
+        bool complete{ false };
+        const char* reason{ "GPU query collection did not complete" };
+
+        ~GpuCaptureCompletion()
+        {
+            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+            if (token.captureGeneration != 0 && sink.on_flush)
+            {
+                // Also publish any partial result if collection exits by exception.
+                sink.on_flush();
+            }
+            finish_gpu_capture(token, complete, reason);
+        }
+    };
 
     // 살아 있는 화면의 재질 IBL 룩업은 바뀐 픽셀을 split-sum 근사로 굽고 끝낸다.
     // 기준 적분(1024/4096 표본)은 한 화소 45~75 us 라 카메라 회전에서 화면 전체가
@@ -1069,6 +1098,21 @@ namespace
                 }
             } frameGuard{ resources, committed, capture, outError, retainedCaptureProfiler };
 
+            // The live Vulkan path has no calibrated timestamp producer. Its
+            // offline capture profiler cannot be drained here without a GPU wait.
+            // Account for this admitted submission explicitly instead of claiming
+            // a complete GPU capture with an empty lane.
+            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+            if (sink.on_begin_capture && sink.on_finish_capture)
+            {
+                const uint64_t generation = sink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
+                if (generation != 0)
+                {
+                    sink.on_finish_capture(generation, static_cast<uint32_t>(sourceFrameId), false,
+                        "Vulkan live GPU timestamps are unavailable");
+                }
+            }
+
             // Keep the diagnostic reset guard alive through recording/submission,
             // just as DX12 does. Resetting at prepare-scope exit changes the SSGI
             // sample index/history ring after PrepareFrame has advanced them.
@@ -1741,6 +1785,7 @@ namespace
         // RT가 renderStateMutex 아래에서만 호출한다. 상태 조회의 잠금 순서와
         // 맞추기 위해 renderQueueMutex를 잡은 채 renderStateMutex를 잡지 않는다.
         void CollectCompletedDisplays();
+        void FailPendingGpuCaptures(const char* reason);
         uint32_t PendingGpuSubmissions() const;
         // RT 전용. Arm 은 renderStateMutex 아래에서, 나머지는 잠금 없이 부른다.
         void ArmGpuCompletionEvent(uint32_t pendingGpu);
@@ -2806,7 +2851,12 @@ namespace
             for (LivePipeline::CameraView& view : p.views)
             {
                 // Graph destruction returns its transient textures to the pool.
-                for (LivePipeline::DisplaySlot& slot : view.slots) slot.graph.reset();
+                for (LivePipeline::DisplaySlot& slot : view.slots)
+                {
+                    finish_gpu_capture(slot.profilerToken, false,
+                        "DX12 display resources retired before GPU query collection");
+                    slot.graph.reset();
+                }
                 view.pendingQueue.clear();
                 view.displaySlot = -1;
                 view.promotionCount = 0;
@@ -5405,15 +5455,24 @@ namespace
             // BeginFrame의 얼로케이터 Reset이 E_FAIL로 죽고, 원래 사유가
             // 그 2차 오류로 덮인다. 반환 지점이 스무 곳이 넘어 가드로 건다.
             bool frameCommitted = false;
+            GpuFrameToken profilerToken{};
             struct FrameGuard
             {
                 EnhancedSceneRendererLiveDX12Adapter& backend;
                 const bool& committed;
+                GpuFrameToken& profilerToken;
                 EnhancedPbrCapture* capture;
                 std::string& error;
                 ~FrameGuard()
                 {
-                    if (!committed) backend.AbortFrame();
+                    if (!committed)
+                    {
+                        backend.AbortFrame();
+                    }
+                    // A committed frame still owns admission until it transfers
+                    // the token into its retained display slot.
+                    finish_gpu_capture(profilerToken, false,
+                        "DX12 frame ended before GPU query collection ownership was retained");
                     if (capture)
                     {
                         std::string releaseError;
@@ -5436,10 +5495,16 @@ namespace
                             capture->Fail(error);
                     }
                 }
-            } frameGuard{ dx12, frameCommitted, capture, outError };
+            } frameGuard{ dx12, frameCommitted, profilerToken, capture, outError };
 
-            const GpuFrameToken profilerToken =
-                dx12.BeginProfilerFrame(sourceFrameId, frameCounter++, view.key.viewId);
+            const EnhancedLiveGpuSpanSink& captureSink = GpuSpanSink();
+            profilerToken.engineFrameId = sourceFrameId;
+            if (captureSink.on_begin_capture && captureSink.on_finish_capture)
+            {
+                profilerToken.captureGeneration = captureSink.on_begin_capture(static_cast<uint32_t>(sourceFrameId));
+            }
+            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
+                view.key.viewId, profilerToken.captureGeneration);
             const uint32_t viewIndex = static_cast<uint32_t>(&view - &p.views[0]);
             // Restart only the captured view. Also discard this diagnostic history
             // afterward, so the next interactive frame cannot blend with time zero.
@@ -5626,7 +5691,10 @@ namespace
                 (!materialPreviewView || (graphViewInput && !graphViewInput->Draws().empty() &&
                     p.graphInput->Draws()[0].material == graphViewInput->Draws()[0].material));
             slot.key = view.key;
+            finish_gpu_capture(slot.profilerToken, false,
+                "DX12 display slot reused before GPU query collection");
             slot.profilerToken = profilerToken;
+            profilerToken.captureGeneration = 0;
 
             // W8: 기록이 끝난 자리에서 인코더가 버린 명령을 비우며 모은다.
             // Vulkan 경로와 같은 뜻이고 같은 수를 센다.
@@ -5977,6 +6045,21 @@ namespace
         return superseded;
     }
 
+    void LiveState::FailPendingGpuCaptures(const char* reason)
+    {
+        if (!pipeline)
+        {
+            return;
+        }
+        for (LivePipeline::CameraView& view : pipeline->views)
+        {
+            for (LivePipeline::DisplaySlot& slot : view.slots)
+            {
+                finish_gpu_capture(slot.profilerToken, false, reason);
+            }
+        }
+    }
+
     void LiveState::CollectCompletedDisplays()
     {
         LiveState& state = *this;
@@ -6026,6 +6109,11 @@ namespace
             // 끝난' 슬롯뿐이라는 것이 비동기의 계약이다.
             if (nullptr != state.pipeline)
             {
+                if (state.dx12.HasDeviceLossProof())
+                {
+                    state.FailPendingGpuCaptures("DX12 device lost before GPU query collection");
+                    return;
+                }
                 RenderThreadPhaseScope collect(RenderPhase::gpu_collect);
                 LivePipeline& p = *state.pipeline;
 
@@ -6110,6 +6198,7 @@ namespace
                         std::vector<EnhancedLivePassTiming> timings;
                         EnhancedLiveGpuSpan span{};
                         std::string collectError;
+                        GpuCaptureCompletion captureCompletion{ view.slots[slotIndex].profilerToken };
                         double totalMilliseconds = 0.0;
                         if (state.dx12.CollectProfiler(view.slots[slotIndex].profilerToken,
                             timings, slices, span, totalMilliseconds, collectError))
@@ -6127,11 +6216,12 @@ namespace
                             if (span.queryOverflowPasses > 0)
                             {
                                 const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                                if (sink.on_issue)
+                                if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
                                 {
                                     sink.on_issue(static_cast<uint32_t>(
                                         view.slots[slotIndex].profilerToken.engineFrameId),
-                                        span.queryOverflowPasses, false, "GPU query slots exhausted");
+                                        span.queryOverflowPasses, false, "GPU query slots exhausted",
+                                        view.slots[slotIndex].profilerToken.captureGeneration);
                                 }
                             }
 
@@ -6182,8 +6272,8 @@ namespace
                                 //   맞은 수집만 내보낸다 — 맞지 않는 구간을 레인에
                                 //   얹으면 그럴듯한 자리에 거짓이 그려진다.
                                 const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                                if (sink.on_span && span.submitToGpuBeginMs >= 0.0 &&
-                                    span.gpuEndToCollectMs >= 0.0)
+                                if (sink.on_span && view.slots[slotIndex].profilerToken.captureGeneration != 0 &&
+                                    span.submitToGpuBeginMs >= 0.0 && span.gpuEndToCollectMs >= 0.0)
                                 {
                                     const uint32_t frameLabel = static_cast<uint32_t>(
                                         view.slots[slotIndex].profilerToken.engineFrameId);
@@ -6196,16 +6286,13 @@ namespace
                                     origin.renderViewId = static_cast<uint16_t>(
                                         view.slots[slotIndex].profilerToken.renderViewId);
                                     origin.queueId = view.slots[slotIndex].profilerToken.queueId;
+                                    origin.captureGeneration = view.slots[slotIndex].profilerToken.captureGeneration;
 
                                     for (const EnhancedLiveGpuSlice& slice : slices)
                                     {
                                         sink.on_span(slice.name.c_str(), slice.beginCpuTick,
                                                      slice.endCpuTick, frameLabel, origin);
                                         ++state.gpuSpansEmitted;
-                                    }
-                                    if (sink.on_flush && !slices.empty())
-                                    {
-                                        sink.on_flush();
                                     }
                                 }
                             }
@@ -6214,17 +6301,35 @@ namespace
                             {
                                 ++state.gpuSliceUnderflows;
                             }
+
+                            // Completion follows every span and the owner-side
+                            // flush, so Stop cannot freeze before the final chunk.
+                            const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
+                            const bool timestampsPublished = span.sliceCount == 0 ||
+                                (span.cpuAligned && span.submitToGpuBeginMs >= 0.0 &&
+                                    span.gpuEndToCollectMs >= 0.0 && sink.on_span && sink.on_flush &&
+                                    slices.size() == span.sliceCount);
+                            captureCompletion.complete = timestampsPublished &&
+                                span.queryOverflowPasses == 0 && span.droppedSlices == 0;
+                            if (!captureCompletion.complete)
+                            {
+                                captureCompletion.reason = timestampsPublished
+                                    ? "DX12 GPU query coverage was incomplete"
+                                    : "DX12 GPU timestamps could not be published on the CPU timeline";
+                            }
                         }
                         else
                         {
                             ++state.gpuCollectMismatches;
                             state.lastGpuCollectError = collectError;
+                            captureCompletion.reason = collectError.c_str();
                             const EnhancedLiveGpuSpanSink& sink = GpuSpanSink();
-                            if (sink.on_issue)
+                            if (sink.on_issue && view.slots[slotIndex].profilerToken.captureGeneration != 0)
                             {
                                 sink.on_issue(static_cast<uint32_t>(
                                     view.slots[slotIndex].profilerToken.engineFrameId),
-                                    0, true, collectError.c_str());
+                                    0, true, collectError.c_str(),
+                                    view.slots[slotIndex].profilerToken.captureGeneration);
                             }
                         }
                         ++state.framesRendered;
@@ -6500,6 +6605,7 @@ namespace
                             if (failed)
                             {
                                 lastError = "Scene submission failed: " + submissionError;
+                                FailPendingGpuCaptures(lastError.c_str());
                                 ++frameFailures;
                                 enabled = false;
                                 Debug::PrintLog(spdlog::level::err, lastError);
@@ -6511,6 +6617,7 @@ namespace
                         catch (const std::exception& exception)
                         {
                             lastError = std::string("RenderThread completion exception: ") + exception.what();
+                            FailPendingGpuCaptures(lastError.c_str());
                             ++frameFailures;
                             enabled = false;
                             Debug::PrintLog(spdlog::level::err, lastError);
@@ -6518,6 +6625,7 @@ namespace
                         catch (...)
                         {
                             lastError = "RenderThread completion unknown exception";
+                            FailPendingGpuCaptures(lastError.c_str());
                             ++frameFailures;
                             enabled = false;
                             Debug::PrintLog(spdlog::level::err, lastError);
@@ -6711,6 +6819,7 @@ namespace
                             std::lock_guard<std::mutex> stateLock(renderStateMutex);
                             lastError = std::string("RenderThread frame exception: ") +
                                 exception.what();
+                            FailPendingGpuCaptures(lastError.c_str());
                             FinishEnvironmentPreparation(lastError);
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
@@ -6719,6 +6828,7 @@ namespace
                         {
                             std::lock_guard<std::mutex> stateLock(renderStateMutex);
                             lastError = "RenderThread frame unknown exception";
+                            FailPendingGpuCaptures(lastError.c_str());
                             FinishEnvironmentPreparation(lastError);
                             ++frameFailures;
                             Debug::PrintLog(spdlog::level::err, lastError);
@@ -6749,6 +6859,10 @@ namespace
                     renderQueueWake.notify_all();
                 }
 
+                {
+                    std::lock_guard<std::mutex> stateLock(renderStateMutex);
+                    FailPendingGpuCaptures("DX12 collection owner stopped before GPU query completion");
+                }
                 {
                     std::lock_guard<std::mutex> queueLock(renderQueueMutex);
                     renderThreadRunning = false;

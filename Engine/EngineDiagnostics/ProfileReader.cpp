@@ -342,6 +342,10 @@ namespace ce::detail::profile_reader_impl
 
 namespace ce
 {
+    namespace
+    {
+        constexpr profile_tick kMinimumViewTicks = 16;
+    }
     capture_reader::capture_reader(preparation_dispatch dispatch) : m_dispatch(std::move(dispatch))
     {
         if (m_dispatch)
@@ -440,9 +444,29 @@ namespace ce
                 ready = m_preparation->window_ready_;
             }
         }
-        if (ready)
+        if (ready && ready != m_preparedWindow)
         {
             m_preparedWindow = std::move(ready);
+            if (m_preparedWindow->capture_ == m_capture &&
+                m_preparedWindow->first_frame_ == graph_first() &&
+                m_preparedWindow->last_frame_ == graph_last())
+            {
+                if (m_viewAutoDefault)
+                {
+                    m_viewValid = false;
+                }
+                else if (m_viewSpansWholeWindow)
+                {
+                    const auto [low, high] = window_ticks();
+                    m_viewBegin = low;
+                    m_viewEnd = (std::max)(high, low + kMinimumViewTicks);
+                    m_viewValid = true;
+                }
+                else
+                {
+                    clamp_view();
+                }
+            }
         }
         return m_preparedWindow;
     }
@@ -580,6 +604,20 @@ namespace ce
         {
             low = (std::min)(low, frame->tick_begin);
             high = (std::max)(high, frame->tick_end);
+        }
+        // Use only already prepared bounds; never scan event arrays on the UI thread.
+        if (m_preparedWindow && m_preparedWindow->capture_ == m_capture &&
+            m_preparedWindow->first_frame_ == m_viewWindowFirst &&
+            m_preparedWindow->last_frame_ == m_viewWindowLast)
+        {
+            low = (std::min)(low, m_preparedWindow->aggregate_.tick_begin());
+            high = (std::max)(high, m_preparedWindow->aggregate_.tick_end());
+        }
+        else if (!m_preparation && m_windowAggregateValid &&
+                 m_windowAggregateFirst == m_viewWindowFirst && m_windowAggregateLast == m_viewWindowLast)
+        {
+            low = (std::min)(low, m_windowAggregate.tick_begin());
+            high = (std::max)(high, m_windowAggregate.tick_end());
         }
         return {low, high};
     }
@@ -960,10 +998,6 @@ namespace ce
     //
     // 최소 폭. 이 아래로 좁히면 스팬이 픽셀 하나에 뭉개지고, tick 이 정수라
     // 반올림이 시야를 뒤집을 수 있다(begin > end).
-    namespace
-    {
-        constexpr profile_tick kMinimumViewTicks = 16;
-    }
 
     // ★ 기준이 선택에서 **창**으로 옮겨졌다. 고른 한 프레임을 기준으로 삼으면
     //   위 그래프가 244 프레임을 보여 주는 동안 아래 타임라인은 1.6 ms 짜리
@@ -1194,6 +1228,17 @@ namespace ce
         m_windowAggregateFirst = first;
         m_windowAggregateLast = last;
         m_windowAggregateValid = true;
+        if (m_viewAutoDefault)
+        {
+            m_viewValid = false;
+        }
+        else if (m_viewSpansWholeWindow)
+        {
+            const auto [low, high] = window_ticks();
+            m_viewBegin = low;
+            m_viewEnd = (std::max)(high, low + kMinimumViewTicks);
+            m_viewValid = true;
+        }
         return m_windowAggregate;
     }
 

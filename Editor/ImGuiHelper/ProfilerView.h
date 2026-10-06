@@ -10,6 +10,7 @@
 //   이 층은 이미 접힌 것을 그리기만 한다.
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 
 #include "ProfileReader.h"
 
@@ -30,6 +31,10 @@ namespace editor::profiler_view
 	// registry 를 읽으므로, 파일에서 읽은 캡처에서는 같은 id 가 전혀 다른
 	// 이름을 가리킨다(P6). 화면이 남의 이름을 조용히 그리는 길이라 막았다.
 	const char* marker_name(const ce::capture_session* capture, ce::marker_id id);
+
+    // Only a recorded stop counter identifies a final stop boundary. A window's
+    // last frame alone does not establish that the recording stopped there.
+    std::optional<ce::profile_tick> capture_stop_tick(const ce::capture_session& capture);
 
 	// `.ceprof` 파일 대화상자(P6-3). 취소하면 빈 경로다.
 	//

@@ -126,3 +126,83 @@ scope-ignores-generation, pause-truncate-unmarked 네 항목은 사유를 보존
 
 legacy v1/v2 Open은 CRC·청크·프레임·계수 구조를 우선 검사한다. 이벤트와 계수의 세부
 의미 검증은 선택 구간을 읽을 때 한다. v3에서는 전체 스캔 때 이벤트 소유권도 검사한다.
+
+## 캡처 경계·종료 꼬리 보완 (2026-10-06)
+
+이 절의 구현과 회귀 소스는 정적으로만 검토했다. 빌드·테스트·엔진 실행·성능 측정은
+실행하지 않았다. 특히 DX12 fence 완료와 실제 RT 오류/종료 경로는 Windows 검증이 필요하다.
+
+### CPU 시작·종료와 진행 중인 구간
+
+- 녹화하지 않은 scope도 논리 스택에 제 자리를 갖는다. 녹화 전 A 안에서 녹화 후 B를
+  열었을 때 B의 End가 A의 skip을 소비하지 않는다. 기록 깊이는 현재 세대에 기록된
+  조상만 센다. 깊이 64를 넘은 scope는 안쪽 overflow로만 예약하고 손실에 포함한다.
+- Begin의 세대와 admission을 고정한다. Stop된 세대의 늦은 Begin/instant는 받지 않고,
+  이전 세대의 End와 GPU token은 새 녹화에 섞지 않는다. 녹화 전에 관측하지 않은 A의
+  이름·시작 시간을 만들어 내지는 않는다.
+- 활성 scope의 시작·이름·깊이·CPU context는 고정 크기 atomic 슬롯에 공개한다.
+  수집기는 다른 스레드의 TLS 스택이나 쓰는 중인 청크를 읽지 않는다. 슬롯마다 재사용하지
+  않는 token이 있고, 주인의 End와 수집기의 종료 절단 중 CAS에 성공한 한쪽만 기록한다.
+- live snapshot은 공개된 열린 구간을 현재 상세 창 끝까지 투영한다. 이 구간에는
+  truncated_end가 있으며 실제 종료를 관측했다는 뜻이 아니다. 투영은 불변 보기 사본에만
+  들어가고, 링이나 연속 파일에 반복 저장하지 않는다. 메모리 예산을 넘는 투영은 생략한다.
+
+### Stop과 GPU 소유권
+
+Stop은 CPU 신규 admission을 닫고 하나의 배타적 종료 경계(QPC 한 단위 뒤)를 정한다.
+Starting 중 받은 Stop도 시작 적용 뒤 처리한다. UI/GT/RT는 꼬리 응답이나 디스크를 기다리지
+않는다. 전용 collector가 CPU freeze 응답과 이미 승인한 GPU 제출의 종료를 최대
+stop_drain_timeout_ms(기본 250 ms, 0..5000 ms) 동안 확인한다. 대기 횟수/yield로 시간을
+추정하지 않는다. 기록 시작/종료 제어는 직렬로 적용하며 이전 writer의 Finalized/Failed 전에
+다음 Record를 받지 않는다.
+
+GPU backend는 제출을 열 때 승인받은 capture generation을 token에 보관하고,
+해당 제출의 마지막 span 청크를 공개한 뒤 정확히 한 번 완료/실패를 알린다. Stop 뒤에는
+새 제출을 승인하지 않지만 이미 승인한 제출의 결과는 drain 동안 받는다. deadline 뒤에
+남은 제출 수는 불완전 사유이며, 이를 late_gpu_spans와 같은 뜻으로 읽지 않는다.
+
+- DX12: 기존 RT 소유의 fence 완료 polling/CollectCompletedDisplays에서 수집한다.
+  Stop을 위해 GT/collector가 query를 읽거나 GPU를 기다리는 경로를 추가하지 않는다.
+  abort, 슬롯 폐기/재사용, query 부족, 정렬 실패, device/RT 종료도 미완료로 퇴역시킨다.
+- Vulkan live: 현재 timestamp 계측이 없으므로 명시적으로 unavailable을 남긴다.
+  별도의 offline 진단 profiler를 live Stop에서 호출하지 않는다. CPU 자료는 계속 쓸 수
+  있지만, GPU까지 온전한 캡처라고 표시하지 않는다.
+- 승인된 GPU 제출이 0이면 coverage는 미관측이다. backend 지원, GPU 무작업 또는
+  0 ms 실행을 추정하지 않는다. 현재 live GPU sink에는 별도 사용자 enable 토글이 없다.
+
+미응답 CPU의 공개된 열린 구간은 collector가 emission 권한을 가져와 Stop 시각에서
+truncated_end로 보존한다. producer가 이후 재개되어도 같은 scope를 다시 적지 않는다.
+전역 Stop 경계와 개별 freeze 통지 사이에 종료된 CPU span은 collector가 새로 받은
+봉인 페이지를 아직 단독 소유할 때 같은 Stop 경계로 자른다. GPU timestamp는 자르지
+않고, 이미 불변 캡처가 참조하는 페이지도 고치지 않는다. 이 통지 지연 interleaving은
+정적 검토만 했으며 실행으로 검증하지 않았다.
+아직 게시되지 않은 완료 이벤트나 Begin 중간에서 멈춘 슬롯까지 복구할 수 있다는 보장은
+없다. 해당 스레드는 미응답으로 남고 캡처도 incomplete다. 메모리 풀 소진으로 진단 이벤트
+자체를 넣지 못하면 source loss를 올린다.
+
+### CEPROF v3 진단 표현
+
+파일 version, 레코드 종류, footer, 이벤트 62바이트, counter 34바이트 및 CRC 계약을
+바꾸지 않는다. 기존 descriptor/instant/counter 표현만 사용하므로 v1/v2/v3 reader 경로를
+유지한다. 이전 v3 reader도 이름과 값을 볼 수 있다.
+
+마지막 tail frame에는 다음 자료를 보존한다.
+
+- Capture.Incomplete.CpuProducerTimeout instant: 실제 producer의 thread slot과 이름
+- Capture.Incomplete.Gpu: <reason> instant: 마지막 대표 GPU 실패 이유 또는 drain timeout
+- Capture.UnackedCpuStreams / Capture.OpenScopesAtStop
+- Capture.AdmittedGpuSubmissions / Capture.PendingGpuSubmissions / Capture.FailedGpuSubmissions
+- Capture.StopDrainMilliseconds
+
+OpenScopesAtStop은 실제 종료를 못 본 절단 구간의 수다. CPU timeout instant가 있는
+스레드만 미응답이며, 모든 truncated_end를 timeout이나 완료 시간으로 해석하지 않는다.
+파일의 앞/중간 상세 창에는 마지막 진단이 없을 수 있으므로 UI는 마지막 프레임으로
+이동하는 동작을 제공한다. 없는 진단을 0이나 complete로 해석하지 않는다.
+
+메모리 캡처의 complete도 미응답/미회수 GPU뿐 아니라 알려진 source/late/프레임 경계
+손실을 반영한다. writer의 큐/디스크 손실과 Finalized는 별도 상태이며 파일 footer가 함께
+검증한다. 정상 파일 마무리 이후의 이벤트를 다시 녹화된 것으로 주장하지 않는다.
+
+추가한 회귀 소스는 disabled parent, 재귀/깊이 초과, Stop/새 세대, 주인 종료,
+미응답 producer의 공개 시작점과 CAS 선점 양방향, 늦은 GPU 결과/옛 token,
+v3 불완전 EOF 복구와 legacy reader를 다룬다. 이 목록은 실행 통과 목록이 아니다.

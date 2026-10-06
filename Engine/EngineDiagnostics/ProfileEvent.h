@@ -134,6 +134,10 @@ namespace ce
 		std::uint32_t submission = 0;
 		std::uint16_t view = 0;
 		std::uint8_t  queue = 0;
+
+		// GPU readback이 늦어져도 새 녹화 세대의 청크에 섞이지 않게 한다.
+		// 0은 직접 쓰는 스트림 호출의 현재 세대를 뜻한다. 파일 레코드에는 없다.
+		std::uint64_t generation = 0;
 	};
 
 	// 청크 하나의 이벤트 수. 프레임당 27~38 개가 현재 실측이므로 256 이면

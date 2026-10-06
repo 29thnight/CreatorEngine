@@ -135,6 +135,8 @@ namespace ce
         }
 
         m_liveCaptureIntervalMs = config.live_capture_interval_ms;
+        m_stopDrainTimeoutMs = std::isfinite(config.stop_drain_timeout_ms)
+            ? std::clamp(config.stop_drain_timeout_ms, 0.0, 5000.0) : 250.0;
         m_collectorTiming = {};
         m_maxQueuedFrames = config.max_queued_frames > 0 ? config.max_queued_frames : 600;
         m_memoryBudget = config.memory_budget > 0 ? config.memory_budget : kDefaultMemoryBudget;
@@ -159,6 +161,7 @@ namespace ce
         {
             std::lock_guard<std::mutex> guard(m_workLock);
             m_stopWorker = false;
+            m_stopAfterStart.store(false, std::memory_order_relaxed);
         }
         m_initialized.store(true, std::memory_order_release);
         m_collectorWorker = std::thread([this] { collector_loop(); });
@@ -177,6 +180,7 @@ namespace ce
         {
             std::lock_guard<std::mutex> guard(m_workLock);
             m_stopWorker = true;
+            m_gpuAcceptGeneration.store(0, std::memory_order_release);
         }
         m_workSignal.release();
         if (m_collectorWorker.joinable())
@@ -290,7 +294,14 @@ namespace ce
         //   **세어 둔다.** 조용히 넘기면 "그 스레드가 조용했다" 로 읽힌다.
         const bool owned = (entry.stream->owner_thread() == std::this_thread::get_id());
 
-        m_retiredDropped.fetch_add(entry.stream->dropped_events(), std::memory_order_relaxed);
+        if (owned)
+        {
+            // finish may itself lose a truncation on an exhausted pool. Retire its
+            // counters afterward, before the producer can disappear from the registry.
+            entry.stream->finish(now());
+        }
+
+        m_retiredDropped.fetch_add((entry.stream->dropped_events() + entry.stream->dropped_scopes()), std::memory_order_relaxed);
         m_retiredUnbalanced.fetch_add(entry.stream->unbalanced_scopes(), std::memory_order_relaxed);
         m_retiredForeign.fetch_add(entry.stream->foreign_touches(), std::memory_order_relaxed);
 
@@ -303,7 +314,6 @@ namespace ce
 
         if (owned)
         {
-            entry.stream->finish(now());
             entry.stream.reset();
         }
         else
@@ -450,13 +460,14 @@ namespace ce
             return;
         }
 
-        if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
+        const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+        if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
         {
             stream->skip_scope();
             return;
         }
 
-        stream->begin_scope(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu);
+        stream->begin_scope(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu, generation);
     }
 
     void profiler_service::end_scope()
@@ -478,7 +489,8 @@ namespace ce
         {
             return;
         }
-        if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
+        const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+        if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
         {
             return;
         }
@@ -489,7 +501,7 @@ namespace ce
             return;
         }
 
-        stream->write_instant(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu);
+        stream->write_instant(id, now(), m_engineFrame.load(std::memory_order_relaxed), cpu, generation);
     }
 
     void profiler_service::collect_sealed()
@@ -510,8 +522,44 @@ namespace ce
             return;
         }
         const profile_tick start = now();
-        m_ring.ingest(sealed, m_pool, m_generation.load(std::memory_order_acquire),
-                      frame_begin_tick);
+        const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+        profile_tick cutoff = 0;
+        {
+            // Stop chooses its cutoff and changes state under the same lock. A
+            // collector already handling a live frame must observe both together.
+            std::lock_guard<std::mutex> guard(m_workLock);
+            if (m_state.load(std::memory_order_acquire) == recorder_state::pausing)
+            {
+                cutoff = m_freezeTick.load(std::memory_order_acquire);
+            }
+        }
+        if (cutoff != 0)
+        {
+            // These pages are sealed and exclusively owned by the collector until
+            // ingest creates immutable references. An owner can finish between the
+            // global Stop cutoff and its individual freeze notification; retain that
+            // known interval at the cutoff rather than dropping its entire tail.
+            for (event_chunk* page = sealed; page; page = page->next)
+            {
+                if (page->magic != kProfilePageMagic || page->version != kProfilePageVersion ||
+                    page->event_bytes != sizeof(profile_event) || page->count > kEventsPerChunk ||
+                    page->generation != generation)
+                {
+                    continue;
+                }
+                for (std::uint32_t index = 0; index < page->count; ++index)
+                {
+                    profile_event& event = page->events[index];
+                    if (!has_flag(event.flags, event_flags::gpu_span) &&
+                        event.tick_begin <= cutoff && event.tick_end > cutoff)
+                    {
+                        event.tick_end = cutoff;
+                        event.flags = event.flags | event_flags::truncated_end;
+                    }
+                }
+            }
+        }
+        m_ring.ingest(sealed, m_pool, generation, frame_begin_tick);
         m_collectorTiming.page_ingest_ticks += now() - start;
         ++m_collectorTiming.ingest_batches;
     }
@@ -582,6 +630,52 @@ namespace ce
         return created;
     }
 
+    std::uint64_t profiler_service::begin_gpu_submission(std::uint32_t frame)
+    {
+        std::lock_guard<std::mutex> guard(m_workLock);
+        if (!m_initialized.load(std::memory_order_acquire) || m_stopWorker ||
+            m_state.load(std::memory_order_acquire) != recorder_state::recording ||
+            frame < m_recordStartFrame.load(std::memory_order_acquire))
+        {
+            return 0;
+        }
+        const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+        m_gpuPendingSubmissions.fetch_add(1, std::memory_order_release);
+        m_gpuAdmittedSubmissions.fetch_add(1, std::memory_order_relaxed);
+        return generation;
+    }
+
+    void profiler_service::finish_gpu_submission(std::uint64_t generation, std::uint32_t frame,
+                                                 bool complete, const char* reason)
+    {
+        // The backend publishes its last chunk before retiring this watermark.
+        // Stop observes the pending count with acquire, then consumes sealed pages.
+        std::lock_guard<std::mutex> guard(m_workLock);
+        if (generation == 0 || generation != m_gpuAcceptGeneration.load(std::memory_order_acquire) ||
+            m_gpuPendingSubmissions.load(std::memory_order_relaxed) == 0)
+        {
+            return;
+        }
+        if (!complete)
+        {
+            m_gpuFailedSubmissions.fetch_add(1, std::memory_order_relaxed);
+            std::lock_guard<std::mutex> issueGuard(m_gpuIssueLock);
+            m_gpuIssueLastFrame.store(frame, std::memory_order_relaxed);
+            try
+            {
+                m_gpuIssueLastError = reason ? reason : "GPU submission incomplete";
+            }
+            catch (const std::bad_alloc&)
+            {
+                // Backend completion also runs from unwind guards. Keep the bounded
+                // failure count even when there is no memory for its optional text.
+                m_gpuIssueLastError.clear();
+            }
+        }
+        m_gpuPendingSubmissions.fetch_sub(1, std::memory_order_release);
+        m_workSignal.release();
+    }
+
     void profiler_service::submit_gpu_span(marker_id id, profile_tick begin,
                                            profile_tick end, std::uint32_t frame,
                                            const gpu_span_context& gpu)
@@ -590,18 +684,20 @@ namespace ce
         {
             return;
         }
-        if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
+        const recorder_state state = m_state.load(std::memory_order_acquire);
+        const std::uint64_t generation = gpu.generation != 0 ? gpu.generation
+            : m_generation.load(std::memory_order_acquire);
+        if ((state != recorder_state::recording && state != recorder_state::pausing) ||
+            (gpu.generation == 0 && state != recorder_state::recording) ||
+            generation != m_gpuAcceptGeneration.load(std::memory_order_acquire) ||
+            (gpu.generation == 0 && frame < m_recordStartFrame.load(std::memory_order_acquire)))
         {
             return;
         }
 
-        // 끝이 시작보다 앞선 구간은 받지 않는다. 길이 0 은 받는다 — 그 패스는
-        // 실제로 돌았고 비용이 timestamp 분해능 아래일 뿐이다.
-        if (end < begin)
-        {
-            return;
-        }
-
+        // The owner stream validates the interval and counts malformed admitted data
+        // as source loss. A silent early return here would leave a complete footer.
+        // Zero-length spans remain valid timestamp-resolution samples.
         thread_stream* stream = gpu_stream();
         if (!stream)
         {
@@ -610,7 +706,9 @@ namespace ce
 
         // 깊이는 0 이다. 한 큐의 구간들은 중첩하지 않는다 — BeginPass/EndPass
         // 가 커맨드 리스트에 순서대로 놓이기 때문이다.
-        stream->write_span(id, begin, end, frame, 0, gpu);
+        gpu_span_context admitted = gpu;
+        admitted.generation = generation;
+        stream->write_span(id, begin, end, frame, 0, admitted);
     }
 
     void profiler_service::publish_gpu_spans()
@@ -858,9 +956,13 @@ namespace ce
     }
 
     void profiler_service::report_gpu_issue(std::uint32_t frame,
-        std::uint32_t lost_passes, bool collect_failed, const char* reason)
+        std::uint32_t lost_passes, bool collect_failed, const char* reason, std::uint64_t generation)
     {
-        if (m_state.load(std::memory_order_relaxed) != recorder_state::recording)
+        std::lock_guard<std::mutex> workGuard(m_workLock);
+        const recorder_state state = m_state.load(std::memory_order_acquire);
+        if ((state != recorder_state::recording && state != recorder_state::pausing) ||
+            (generation == 0 && state != recorder_state::recording) ||
+            (generation != 0 && generation != m_gpuAcceptGeneration.load(std::memory_order_acquire)))
         {
             return;
         }
@@ -940,7 +1042,7 @@ namespace ce
             {
                 if (entry.stream)
                 {
-                    sourceDropped += entry.stream->dropped_events();
+                    sourceDropped += (entry.stream->dropped_events() + entry.stream->dropped_scopes());
                 }
             }
             sourceDropped += m_retiredDropped.load(std::memory_order_relaxed);
@@ -1205,17 +1307,23 @@ namespace ce
         {
             // UI와 콘솔의 중복 Stop이 서로 다른 종료 시각을 덮어쓰지 않게 한다.
             std::lock_guard<std::mutex> guard(m_workLock);
+            if (m_state.load(std::memory_order_acquire) == recorder_state::starting)
+            {
+                m_stopAfterStart.store(true, std::memory_order_release);
+                return;
+            }
             if (m_state.load(std::memory_order_acquire) != recorder_state::recording)
             {
                 return;
             }
-            freezeTick = now();
+            // Frame ownership is (begin, end]. One clock quantum keeps even an
+            // immediate Record/Stop diagnostic tail strictly after its last boundary.
+            freezeTick = now() + 1;
             m_freezeTick.store(freezeTick, std::memory_order_release);
             m_state.store(recorder_state::pausing, std::memory_order_release);
         }
 
         {
-            thread_stream* const self = tls_stream();
             std::lock_guard<std::mutex> guard(m_streamLock);
             for (stream_entry& entry : m_streams)
             {
@@ -1223,7 +1331,7 @@ namespace ce
                 {
                     continue;
                 }
-                if (entry.stream.get() == self)
+                if (entry.stream->owner_thread() == std::this_thread::get_id())
                 {
                     entry.stream->freeze_self(freezeTick);
                 }
@@ -1275,6 +1383,8 @@ namespace ce
         previous.reset();
         if (!started)
         {
+            std::lock_guard<std::mutex> guard(m_workLock);
+            m_stopAfterStart.store(false, std::memory_order_release);
             m_state.store(recorder_state::stopped, std::memory_order_release);
             return;
         }
@@ -1296,8 +1406,20 @@ namespace ce
         m_lastLiveCapture = 0;
         m_lastEngineFrame = first_frame > 0 ? first_frame - 1 : 0;
 
-        m_state.store(recorder_state::recording, std::memory_order_release);
+        bool stopAfterStart = false;
+        {
+            // pause() reads Starting and remembers Stop under this same lock.
+            // Publish Recording and consume that request as one transition.
+            std::lock_guard<std::mutex> guard(m_workLock);
+            m_gpuAcceptGeneration.store(m_generation.load(std::memory_order_acquire), std::memory_order_release);
+            m_state.store(recorder_state::recording, std::memory_order_release);
+            stopAfterStart = m_stopAfterStart.exchange(false, std::memory_order_acq_rel);
+        }
         publish_ring_stats();
+        if (stopAfterStart)
+        {
+            pause();
+        }
     }
 
     void profiler_service::pause_now()
@@ -1332,75 +1454,160 @@ namespace ce
             }
         }
 
-        // ★ 남의 청크를 만지지 않는다. 응답을 **짧게** 기다린 뒤, 아직
-        //   응답하지 않은 스트림을 **센다**. 잠든 워커는 다음에 깨어날 때
-        //   봉인하므로 그때까지의 꼬리가 이 캡처에 없을 수 있고, 그것을
-        //   성공처럼 덮으면 "얼린 캡처가 온전하다" 가 거짓이 된다.
-        // 응답을 기다린다. 상한을 두는 이유는 잠든 producer 가 영영 안 깨어날
-        // 수 있기 때문이다 — 관측 도구가 관측 대상을 기다리며 멈추면 안 된다.
+        // Only the collector waits. A wall-clock budget replaces scheduler-dependent
+        // yield counts, while owner threads keep publishing their own chunks/query results.
+        const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+        const auto elapsed = [freezeTick]()
+        {
+            const profile_tick tick = now();
+            return static_cast<double>(tick > freezeTick ? tick - freezeTick : 0) * 1000.0 /
+                static_cast<double>(ticks_per_second());
+        };
+        const double elapsedMs = elapsed();
+        const auto deadline = std::chrono::steady_clock::now() +
+            std::chrono::duration<double, std::milli>((std::max)(0.0, m_stopDrainTimeoutMs - elapsedMs));
         std::uint32_t unacked = 0;
-        for (int attempt = 0; attempt < kPauseAckAttempts; ++attempt)
+        std::uint64_t pendingGpu = 0;
+        for (;;)
         {
             unacked = 0;
             {
                 std::lock_guard<std::mutex> guard(m_streamLock);
-                for (stream_entry& entry : m_streams)
+                for (const stream_entry& entry : m_streams)
                 {
-                    if (!entry.stream)
-                    {
-                        continue;
-                    }
-                    // ★ **얼림** 응답만 센다. 평범한 프레임 봉인 요청까지 함께
-                    //   세면 등록만 해 두고 조용한 스레드가 언제나 미응답으로
-                    //   잡혀, 얼린 캡처가 늘 "온전하지 않다" 가 된다.
-                    //   넘길 것이 없는 스트림도 응답할 일이 없으므로 뺀다.
-                    if (entry.stream->freeze_ack() != entry.stream->freeze_request()
-                        && entry.stream->pending_work())
+                    if (entry.stream && entry.stream.get() != m_gpuStream.load(std::memory_order_acquire) &&
+                        entry.stream->freeze_ack() != entry.stream->freeze_request() &&
+                        entry.stream->pending_work())
                     {
                         ++unacked;
                     }
                 }
             }
-            if (0 == unacked)
+            pendingGpu = m_gpuPendingSubmissions.load(std::memory_order_acquire);
+            m_pauseUnacked.store(unacked, std::memory_order_relaxed);
+            m_pausePendingGpu.store(pendingGpu, std::memory_order_relaxed);
+            m_pauseFailedGpu.store(m_gpuFailedSubmissions.load(std::memory_order_relaxed), std::memory_order_relaxed);
+            m_pauseDrainMs.store(elapsed(), std::memory_order_relaxed);
+            collect_sealed();
+            if ((unacked == 0 && pendingGpu == 0) || std::chrono::steady_clock::now() >= deadline ||
+                !m_initialized.load(std::memory_order_acquire))
             {
                 break;
             }
-            std::this_thread::yield();
+            // Do not consume workSignal here: its tokens also own queued control/barrier work.
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
+
+        // Close GPU ingestion before taking the final producer watermark. Any still pending
+        // submission is reported explicitly; an old token can never enter the next capture.
+        std::uint64_t failedGpu = 0;
+        {
+            std::lock_guard<std::mutex> guard(m_workLock);
+            m_gpuAcceptGeneration.store(0, std::memory_order_release);
+            pendingGpu = m_gpuPendingSubmissions.load(std::memory_order_acquire);
+            failedGpu = m_gpuFailedSubmissions.load(std::memory_order_relaxed);
+        }
+        m_pausePendingGpu.store(pendingGpu, std::memory_order_relaxed);
+        m_pauseFailedGpu.store(failedGpu, std::memory_order_relaxed);
+
+        // Published open metadata is separate from the producer's mutable writer/TLS stack.
+        // Claiming transfers emission ownership atomically, so a resumed producer cannot
+        // duplicate the synthesized truncated span. Keep each stream alive while claiming.
+        const marker_id timeoutMarker = marker<"Capture.Incomplete.CpuProducerTimeout", marker_kind::instant>();
+        event_chunk* timeoutPages = nullptr;
+        event_chunk* timeoutTail = nullptr;
+        unacked = 0;
+        {
+            std::lock_guard<std::mutex> guard(m_streamLock);
+            for (const stream_entry& entry : m_streams)
+            {
+                if (!entry.stream || entry.stream.get() == m_gpuStream.load(std::memory_order_acquire) ||
+                    entry.stream->freeze_ack() == entry.stream->freeze_request() || !entry.stream->pending_work())
+                {
+                    continue;
+                }
+                ++unacked;
+                event_chunk* diagnostic = m_pool->acquire();
+                if (!diagnostic)
+                {
+                    m_ring.note_dropped(1);
+                    continue;
+                }
+                diagnostic->reset(entry.stream->slot(), 0);
+                diagnostic->generation = generation;
+                diagnostic->count = entry.stream->claim_open_scopes(
+                    generation, freezeTick, diagnostic->events, kMaxScopeDepth);
+                profile_event timeout{};
+                timeout.tick_begin = freezeTick;
+                timeout.tick_end = freezeTick;
+                timeout.marker = timeoutMarker;
+                timeout.frame = m_engineFrame.load(std::memory_order_relaxed);
+                timeout.thread_slot = static_cast<std::uint16_t>(entry.stream->slot());
+                timeout.flags = event_flags::instant;
+                diagnostic->events[diagnostic->count++] = timeout;
+                if (timeoutTail)
+                {
+                    timeoutTail->next = diagnostic;
+                }
+                else
+                {
+                    timeoutPages = diagnostic;
+                }
+                timeoutTail = diagnostic;
+            }
+        }
+        // ingest snapshots the Stop cutoff under workLock. Never nest it under
+        // streamLock: frame publication takes those locks in the opposite order.
+        ingest_pages(timeoutPages, m_frameBeginTick);
         m_pauseUnacked.store(unacked, std::memory_order_relaxed);
 
-        // ★ 온전하지 않다는 것만으로는 고칠 자리를 못 짚는다. 누가 응답하지
-        //   않았는지 적는다 - 그 스레드가 안전한 자리를 안 지났다는 뜻이다.
-        if (0 != unacked)
+        // These are ordinary v3 instant/counter records, not a new file layout. Even an
+        // existing reader retains their names, producer slots and exact bounded counts.
+        if (pendingGpu != 0 || failedGpu != 0)
         {
-            std::string names;
+            std::string reason = pendingGpu != 0 ? "GPU drain deadline expired" : "GPU submission incomplete";
+            if (failedGpu != 0)
             {
-                std::lock_guard<std::mutex> guard(m_streamLock);
-                for (std::size_t i = 0; i < m_streams.size(); ++i)
+                std::lock_guard<std::mutex> guard(m_gpuIssueLock);
+                if (!m_gpuIssueLastError.empty())
                 {
-                    const stream_entry& entry = m_streams[i];
-                    if (!entry.stream)
-                    {
-                        continue;
-                    }
-                    if (entry.stream->freeze_ack() == entry.stream->freeze_request())
-                    {
-                        continue;
-                    }
-                    if (!entry.stream->pending_work())
-                    {
-                        continue;
-                    }
-                    if (!names.empty())
-                    {
-                        names += ", ";
-                    }
-                    names += (i < m_threadInfo.size()) ? m_threadInfo[i].name : std::string("?");
+                    reason = m_gpuIssueLastError;
                 }
             }
-            std::fprintf(stderr, "[profiler] freeze incomplete - unacked=%u: %s\n",
-                         unacked, names.c_str());
-            std::fflush(stderr);
+            const marker_id issue = intern_runtime_marker("Capture.Incomplete.Gpu: " + reason, marker_kind::instant);
+            std::uint32_t slot = 0;
+            {
+                std::lock_guard<std::mutex> guard(m_streamLock);
+                if (thread_stream* gpu = m_gpuStream.load(std::memory_order_acquire))
+                {
+                    slot = gpu->slot();
+                }
+                else
+                {
+                    slot = static_cast<std::uint32_t>(m_streams.size());
+                    m_streams.emplace_back();
+                    m_threadInfo.push_back(thread_info{ "[Capture diagnostics]", 0, slot, track_kind::other, 0 });
+                }
+            }
+            if (event_chunk* diagnostic = m_pool->acquire())
+            {
+                diagnostic->reset(slot, 0);
+                diagnostic->generation = generation;
+                diagnostic->count = 1;
+                profile_event& event = diagnostic->events[0];
+                event = {};
+                event.tick_begin = freezeTick;
+                event.tick_end = freezeTick;
+                event.frame = m_engineFrame.load(std::memory_order_relaxed);
+                event.thread_slot = static_cast<std::uint16_t>(slot);
+                event.marker = issue;
+                event.flags = event_flags::instant;
+                ingest_pages(diagnostic, m_frameBeginTick);
+            }
+            else
+            {
+                m_ring.note_dropped(1);
+            }
         }
 
         collect_sealed();
@@ -1417,7 +1624,7 @@ namespace ce
             {
                 if (entry.stream)
                 {
-                    sourceDropped += entry.stream->dropped_events();
+                    sourceDropped += (entry.stream->dropped_events() + entry.stream->dropped_scopes());
                 }
             }
             sourceDropped += m_retiredDropped.load(std::memory_order_relaxed);
@@ -1432,11 +1639,11 @@ namespace ce
         //   모인 것 — pause 에서 잘라 남긴 열린 구간이 바로 그것이다 — 이
         //   얼린 캡처에 들어가지 못한다. freeze() 는 닫힌 프레임만 본다.
         account_counter_queue_loss();
+        const std::uint32_t tailFrame = m_firstRecordBoundaryPending
+            ? m_engineFrame.load(std::memory_order_relaxed)
+            : (std::max)(m_lastEngineFrame + 1, m_engineFrame.load(std::memory_order_relaxed));
         if (freezeTick > m_frameBeginTick)
         {
-            const std::uint32_t tailFrame = m_firstRecordBoundaryPending
-                ? m_engineFrame.load(std::memory_order_relaxed)
-                : (std::max)(m_lastEngineFrame + 1, m_engineFrame.load(std::memory_order_relaxed));
             close_frame(tailFrame, m_frameBeginTick, freezeTick);
             m_lastEngineFrame = tailFrame;
             m_frameBeginTick = freezeTick;
@@ -1450,9 +1657,44 @@ namespace ce
             threads = m_threadInfo;
         }
 
+        std::uint64_t openScopes = 0;
+        const auto tail = m_ring.freeze(threads, capture_environment{ ticks_per_second() }, false, unacked);
+        if (!tail->frames().empty())
+        {
+            for (const profile_event& event : tail->frames().back().events)
+            {
+                if (event.tick_end == freezeTick && has_flag(event.flags, event_flags::truncated_end) &&
+                    !has_flag(event.flags, event_flags::gpu_span))
+                {
+                    ++openScopes;
+                }
+            }
+        }
+        m_pauseOpenScopes.store(openScopes, std::memory_order_relaxed);
+        const double drainMs = elapsed();
+        m_pauseDrainMs.store(drainMs, std::memory_order_relaxed);
+        const auto diagnosticCounter = [this, tailFrame](std::string_view name, double value, std::string_view unit)
+        {
+            const auto id = register_counter(name, unit, counter_category::process);
+            m_ring.record_counter(tailFrame, { id, value });
+        };
+        diagnosticCounter("Capture.UnackedCpuStreams", static_cast<double>(unacked), "streams");
+        diagnosticCounter("Capture.OpenScopesAtStop", static_cast<double>(openScopes), "scopes");
+        diagnosticCounter("Capture.PendingGpuSubmissions", static_cast<double>(pendingGpu), "submissions");
+        diagnosticCounter("Capture.FailedGpuSubmissions", static_cast<double>(failedGpu), "submissions");
+        diagnosticCounter("Capture.AdmittedGpuSubmissions", static_cast<double>(m_gpuAdmittedSubmissions.load()), "submissions");
+        diagnosticCounter("Capture.StopDrainMilliseconds", drainMs, "ms");
+        const bool complete = unacked == 0 && pendingGpu == 0 && failedGpu == 0 &&
+            m_gpuQueryOverflowPasses.load(std::memory_order_relaxed) == 0 &&
+            m_gpuCollectFailures.load(std::memory_order_relaxed) == 0 &&
+            m_ring.dropped_events() == 0 && m_ring.dropped_counters() == 0 &&
+            m_ring.late_events_dropped() == 0 && m_ring.late_spans_dropped() == 0 &&
+            m_droppedFrameBoundaries.load(std::memory_order_relaxed) ==
+                m_droppedFrameBaseline.load(std::memory_order_relaxed);
+
         const profile_tick snapshotStart = now();
         capture_session_ptr frozen = m_ring.freeze(
-            threads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);
+            threads, capture_environment{ ticks_per_second() }, complete, unacked);
         {
             std::lock_guard<std::mutex> guard(m_captureLock);
             m_capture = std::move(frozen);
@@ -1463,7 +1705,7 @@ namespace ce
 
         // 공개까지 끝난 뒤에야 frozen 이다. 그 전에는 pausing 이고, 읽는 쪽은
         // "아직 손에 없다" 를 그 상태로 안다.
-        finalize_recording(0 == unacked, unacked);
+        finalize_recording(complete, unacked);
         m_state.store(recorder_state::frozen, std::memory_order_release);
     }
 
@@ -1526,6 +1768,50 @@ namespace ce
         const profile_tick snapshotStart = now();
         capture_session_ptr live = m_ring.freeze(
             threads, capture_environment{ ticks_per_second() }, 0 == unacked, unacked);
+        if (!live->frames().empty())
+        {
+            // A live-only projection never enters the ring or continuous file. The owner
+            // claims completion before writing its event; snapshots taken after the sealed
+            // drain therefore cannot duplicate an already collected completed event.
+            std::vector<frame_record> frames(live->frames().begin(), live->frames().end());
+            frame_record& last = frames.back();
+            const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
+            bool projected = false;
+            const std::size_t remainingBytes = m_memoryBudget > live->memory_bytes()
+                ? m_memoryBudget - live->memory_bytes() : 0;
+            const std::size_t maximumProjected = remainingBytes > 8 * sizeof(profile_event)
+                ? (remainingBytes - 8 * sizeof(profile_event)) / (2 * sizeof(profile_event)) : 0;
+            std::size_t projectedCount = 0;
+            {
+                std::lock_guard<std::mutex> guard(m_streamLock);
+                for (const stream_entry& entry : m_streams)
+                {
+                    if (!entry.stream || entry.stream.get() == m_gpuStream.load(std::memory_order_acquire))
+                    {
+                        continue;
+                    }
+                    profile_event open[kMaxScopeDepth]{};
+                    const std::uint32_t count = entry.stream->snapshot_open_scopes(
+                        generation, last.tick_end, open, kMaxScopeDepth);
+                    for (std::uint32_t index = 0; index < count; ++index)
+                    {
+                        if (projectedCount >= maximumProjected)
+                        {
+                            break;
+                        }
+                        last.events.push_back(open[index]);
+                        ++projectedCount;
+                        projected = true;
+                    }
+                }
+            }
+            if (projected)
+            {
+                live = std::make_shared<const capture_session>(std::move(frames), std::move(threads),
+                    snapshot_markers(), live->environment(), false, unacked,
+                    live->dropped_counters(), snapshot_counters());
+            }
+        }
         {
             std::lock_guard<std::mutex> guard(m_captureLock);
             m_capture = std::move(live);
@@ -1541,7 +1827,19 @@ namespace ce
         // ★ 세대를 먼저 올린다. 이 뒤에 도착하는 옛 청크는 세대가 어긋나
         //   수집기가 버린다 — 잠든 워커가 Clear **전에** 적은 것을 들고 깨어나
         //   새 녹화에 섞는 것이 감사에서 재현된 결함이다.
-        const std::uint64_t next = m_generation.fetch_add(1, std::memory_order_acq_rel) + 1;
+        std::uint64_t next = 0;
+        {
+            std::lock_guard<std::mutex> guard(m_workLock);
+            m_gpuAcceptGeneration.store(0, std::memory_order_release);
+            next = m_generation.fetch_add(1, std::memory_order_acq_rel) + 1;
+            m_gpuPendingSubmissions.store(0, std::memory_order_relaxed);
+            m_gpuFailedSubmissions.store(0, std::memory_order_relaxed);
+            m_gpuAdmittedSubmissions.store(0, std::memory_order_relaxed);
+            m_pausePendingGpu.store(0, std::memory_order_relaxed);
+            m_pauseFailedGpu.store(0, std::memory_order_relaxed);
+            m_pauseOpenScopes.store(0, std::memory_order_relaxed);
+            m_pauseDrainMs.store(0.0, std::memory_order_relaxed);
+        }
 
         {
             std::lock_guard<std::mutex> guard(m_streamLock);
@@ -1589,7 +1887,7 @@ namespace ce
             {
                 if (entry.stream)
                 {
-                    m_accountedSourceDropped += entry.stream->dropped_events();
+                    m_accountedSourceDropped += (entry.stream->dropped_events() + entry.stream->dropped_scopes());
                 }
             }
             m_accountedSourceDropped += m_retiredDropped.load(std::memory_order_relaxed);
@@ -1795,6 +2093,10 @@ namespace ce
         }
 
         value.pause_unacked_streams = m_pauseUnacked.load(std::memory_order_relaxed);
+        value.pause_pending_gpu_submissions = m_pausePendingGpu.load(std::memory_order_relaxed);
+        value.pause_failed_gpu_submissions = m_pauseFailedGpu.load(std::memory_order_relaxed);
+        value.pause_open_scopes = m_pauseOpenScopes.load(std::memory_order_relaxed);
+        value.pause_drain_ms = m_pauseDrainMs.load(std::memory_order_relaxed);
         value.capture_complete = (0 == value.pause_unacked_streams);
 
         {

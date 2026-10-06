@@ -464,6 +464,7 @@ struct EnhancedLiveGpuSpanOrigin
     uint32_t submissionId = 0;
     uint16_t renderViewId = 0;
     uint8_t  queueId = 0;
+    uint64_t captureGeneration{ 0 };
 };
 
 struct EnhancedLiveGpuSpanSink
@@ -472,7 +473,13 @@ struct EnhancedLiveGpuSpanSink
                     uint32_t engineFrameId, const EnhancedLiveGpuSpanOrigin& origin) = nullptr;
     void (*on_flush)() = nullptr;
     void (*on_issue)(uint32_t engineFrameId, uint32_t lostPasses,
-                     bool collectFailed, const char* reason) = nullptr;
+                     bool collectFailed, const char* reason, uint64_t captureGeneration) = nullptr;
+
+    // Admission closes atomically with Stop in the sink. The RT retains the
+    // returned generation until it publishes this submission or reports failure.
+    uint64_t (*on_begin_capture)(uint32_t engineFrameId) = nullptr;
+    void (*on_finish_capture)(uint64_t captureGeneration, uint32_t engineFrameId,
+                              bool complete, const char* reason) = nullptr;
 };
 
 /// sink 를 건다. 렌더러가 서기 전에 걸어야 첫 수집부터 흐른다.
