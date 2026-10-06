@@ -121,20 +121,56 @@ namespace editor
     {
         ThemeContractChecks checks{ report };
 
-        // The native drag region must end before transport controls, including
-        // at high DPI and in the compact-menu window widths.
-        for (const float scale : {1.f, 1.25f, 1.5f, 2.25f, 3.f})
-        for (const float width : {320.f, 480.f, 800.f, 1280.f, 1920.f})
+        // Independent pixel expectations cover both scale axes, font rounding,
+        // and a font larger than the minimum. ImGui truncates the reserved row.
+        struct TitleBarExpectation
         {
-            const auto chrome = LayoutEditorTitleBar(width * scale,
-                EditorThemeTokens::TitleBarHeight * scale, scale);
-            checks.expect(chrome.playLeft > 32.f * scale, "title bar", "logo and compact menu fit before Play");
-            checks.expect(chrome.playLeft + chrome.playWidth < chrome.systemButtonsLeft,
-                "title bar", "Play box does not overlap native window controls");
-            checks.number(chrome.systemButtonsLeft + chrome.systemButtonWidth * 3.f, width * scale,
-                "title bar", "window controls remain right aligned");
-            checks.expect(chrome.height - 2.f * chrome.playInset >= 16.f * scale,
-                "title bar", "Play icons fit within the title row");
+            float userScale;
+            float dpiScale;
+            float fontHeight;
+            float safePaddingY;
+            float rowHeight;
+        };
+        constexpr TitleBarExpectation titleRows[] = {
+            { .8f, 1.f, 10.f, 2.f, 36.f },
+            { 1.f, 1.f, 12.f, 3.f, 45.f },
+            { 1.01f, 1.f, 12.f, 3.f, 46.f },
+            { 1.f, 1.25f, 15.f, 3.f, 57.f },
+            { 1.5f, 1.f, 18.f, 4.f, 68.f },
+            { 1.f, 1.5f, 18.f, 4.f, 68.f },
+            { 1.5f, 1.5f, 27.f, 6.f, 102.f },
+            { 1.5f, 2.f, 36.f, 9.f, 135.f },
+            { 1.f, 1.f, 20.f, 3.f, 45.f },
+            { 1.f, 1.f, 64.f, 3.f, 70.f },
+            { 1.f, 1.f, 64.f, 3.25f, 71.f },
+            { 1.f, 1.f, 64.f, -3.f, 64.f },
+        };
+        checks.number(EditorThemeTokens::TitleBarHeight, 45.f, "title bar", "logical minimum is 45");
+        for (const TitleBarExpectation& expected : titleRows)
+        {
+            const float scale = expected.userScale * expected.dpiScale;
+            const float padding = TitleBarFramePaddingY(expected.fontHeight, scale, expected.safePaddingY);
+            const float rowHeight = std::trunc(expected.fontHeight + padding * 2.f);
+            checks.expect(padding >= 0.f, "title bar", "font growth never creates negative padding");
+            checks.expect(padding >= expected.safePaddingY, "title bar", "safe area adds no unreserved offset");
+            checks.number(rowHeight, expected.rowHeight, "title bar", "reserved height rounds the minimum upward");
+            checks.expect(rowHeight >= 45.f * scale, "title bar", "reserved row preserves the scaled minimum");
+            checks.expect(rowHeight >= expected.fontHeight, "title bar", "larger fonts fit inside the row");
+
+            // The native drag region must end before transport controls,
+            // including high DPI and compact-menu window widths.
+            for (const float width : {320.f, 480.f, 800.f, 1280.f, 1920.f})
+            {
+                const auto chrome = LayoutEditorTitleBar(width * scale, rowHeight, scale);
+                checks.number(chrome.height, rowHeight, "title bar", "chrome uses the actual reserved row");
+                checks.expect(chrome.playLeft > 32.f * scale, "title bar", "logo and compact menu fit before Play");
+                checks.expect(chrome.playLeft + chrome.playWidth < chrome.systemButtonsLeft,
+                    "title bar", "Play box does not overlap native window controls");
+                checks.number(chrome.systemButtonsLeft + chrome.systemButtonWidth * 3.f, width * scale,
+                    "title bar", "window controls remain right aligned");
+                checks.expect(chrome.height - 2.f * chrome.playInset >= 16.f * scale,
+                    "title bar", "Play icons fit within the title row");
+            }
         }
 
         // Plan §3.1 values are fixed independently of the product token table.

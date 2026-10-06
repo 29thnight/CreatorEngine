@@ -51,6 +51,10 @@
 #include "EditorClipContract.h"
 #include "EditorNavContract.h"
 #include "EditorStateContract.h"
+#include "EditorModelPlacement.h"
+#include "EditorScriptAuthoring.h"
+#include "RHI/RHIShaderCompiler.h"
+#include "Render/Scene/EnhancedSceneRenderer.h"
 #include <algorithm>
 #include <regex>
 
@@ -248,8 +252,10 @@ void MenuBarWindow::RenderMenuBar()
     // body scale, and the main menu reserves the viewport work area exactly once.
     const float scale = editor::ThemePixels(1.f);
     ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), editor::EditorThemeTokens::TitleBarFontSize);
-    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.f * scale,
-        (editor::EditorThemeTokens::TitleBarHeight - editor::EditorThemeTokens::TitleBarFontSize) * .5f * scale));
+    // Compensate for the active font's rounding while preserving the logical minimum.
+    const float titlePaddingY = editor::TitleBarFramePaddingY(
+        ImGui::GetFontSize(), scale, ImGui::GetStyle().DisplaySafeAreaPadding.y);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.f * scale, titlePaddingY));
     // Popup menus inherit this scope too. A zero vertical gap compresses their
     // selectable rows to the text height, even though the title row looks fine.
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
@@ -263,7 +269,8 @@ void MenuBarWindow::RenderMenuBar()
     ImGui::PushStyleColor(ImGuiCol_MenuBarBg, editor::ThemeColorValue(editor::ThemeColor::Canvas));
     if (ImGui::BeginMainMenuBar())
     {
-        const auto layout = LayoutEditorTitleBar(ImGui::GetWindowWidth(), ImGui::GetFrameHeight(), scale);
+        // Drawing and native caption hit testing share the actual reserved row.
+        const auto layout = LayoutEditorTitleBar(ImGui::GetWindowWidth(), ImGui::GetWindowHeight(), scale);
         const ImVec2 rowMin = ImGui::GetWindowPos();
         const float iconSize = 14.f * scale;
         const ImVec2 iconMin{rowMin.x + 5.f * scale, rowMin.y + (layout.height - iconSize) * .5f};
@@ -347,7 +354,7 @@ void MenuBarWindow::RenderMenuBar()
                         // GUI runs on the presentation thread; scene construction
                         // and activation belong to the scene owner thread.
                         ConsoleCommandSystem::Get().EnqueueStructured(
-                            { "scene.switch", fileName.string() });
+                            { "scene.open_async", fileName.string() });
                     }
                     else
                     {
@@ -579,7 +586,7 @@ void MenuBarWindow::RenderMenuBar()
                 editor::ThemeColor::Warning,
                 editor::ThemeColor::Error,
             };
-            const std::string outputTooltip = "Output Log\nMessages: " + std::to_string(totals.messages) +
+            std::string outputTooltip = "Output Log\nMessages: " + std::to_string(totals.messages) +
                 "  Warnings: " + std::to_string(totals.warnings) + "  Errors: " + std::to_string(totals.errors);
             float countsWidth = 0.f;
             float countWidths[3]{};
@@ -589,11 +596,94 @@ void MenuBarWindow::RenderMenuBar()
                 countsWidth += countWidths[slot];
             }
 
+            // Producers own their state; the UI consumes value snapshots and never
+            // waits on a job or a render fence. Model counts are placement steps,
+            // asset counts are preparation units, and unmeasured phases stay busy.
+            const auto assets = DataSystems->SnapshotAssetPreparationProgress();
+            const auto model = Editor::ModelPlacement::Get().GetProgress();
+            const auto environment = EnhancedSceneRenderer::GetEnvironmentPreparationProgress();
+            if (!environment.error.empty())
+            {
+                outputTooltip += "\n\nEnvironment preparation failed: " + environment.error;
+            }
+            const auto script = EditorScriptAuthoring::GetStatus();
+            const auto shader = RHIShaderCompiler::GetProgress();
+            const float indeterminate = -std::max(.001f, static_cast<float>(ImGui::GetTime()));
+            float progressFraction = indeterminate;
+            std::string progressLabel;
+            std::string progressTooltip;
+            int activeSources = 0;
+            const auto addActivity = [&](const std::string& label, const std::string& detail, float fraction)
+            {
+                if (progressLabel.empty())
+                {
+                    progressLabel = label;
+                    progressFraction = fraction;
+                }
+                if (!progressTooltip.empty())
+                {
+                    progressTooltip += "\n\n";
+                }
+                progressTooltip += label + "\n" + detail;
+                ++activeSources;
+            };
+            // Stable priority avoids cycling labels while several producers work.
+            if (assets.activeRequests != 0)
+            {
+                const auto completed = std::min(assets.completed, assets.total);
+                const std::string count = assets.total != 0
+                    ? " " + std::to_string(completed) + "/" + std::to_string(assets.total) : "";
+                addActivity("Asset preparation" + count,
+                    assets.phase + "\n" + assets.name + "\nActive preparations: " +
+                        std::to_string(assets.activeRequests) +
+                        "\nCounts are CPU preparation items in the current stage.",
+                    assets.total != 0 ? static_cast<float>(completed) / static_cast<float>(assets.total) : indeterminate);
+            }
+            if (model.activeRequests != 0)
+            {
+                const std::string count = model.totalSteps != 0
+                    ? " " + std::to_string(model.completedSteps) + "/" + std::to_string(model.totalSteps) : "";
+                addActivity(model.totalSteps != 0 ? "Model placement" + count : "Loading model",
+                    model.path + "\nPending models: " + std::to_string(model.activeRequests) +
+                        "\nCounts are scene-instantiation steps, not loaded files.",
+                    model.totalSteps != 0 ? static_cast<float>(model.completedSteps) /
+                        static_cast<float>(model.totalSteps) : indeterminate);
+            }
+            if (environment.activeRequests != 0)
+            {
+                addActivity("Loading environment", environment.phase + "\n" + environment.name, indeterminate);
+            }
+            if (script.busy)
+            {
+                // busy also covers waiting for Play to stop before reload/attach.
+                addActivity(script.message.empty() ? "Processing scripts" : script.message,
+                    script.source, indeterminate);
+            }
+            if (shader.active)
+            {
+                addActivity("Shader compile (" + std::to_string(shader.activeRequests) + ")",
+                    shader.phase + "\n" + shader.name + "\n" + shader.entryPoint, indeterminate);
+            }
+            if (SceneManagers->IsSceneLoading() && assets.activeRequests == 0)
+            {
+                // RenderMenuBar is called under the scene-structure lock. This
+                // fallback covers parsing/activation before asset counts exist.
+                addActivity("Loading scene", "Preparing the scene for activation", indeterminate);
+            }
+            if (activeSources > 1)
+            {
+                // Sources can describe overlapping stages of the same request, so
+                // do not invent a combined job count or weighted percentage.
+                progressLabel += " +";
+            }
+            const bool showProgress = !progressLabel.empty();
+            float progressWidth = showProgress ? editor::ThemePixels(220.f) : 0.f;
+
             float outputWidth = ImGui::CalcTextSize(outputLabel.c_str()).x + tabPadding;
             float traceWidth = ImGui::CalcTextSize(kTraceLabel).x + tabPadding;
             float revisionWidth = ImGui::CalcTextSize(kRevisionLabel).x + tabPadding;
             float debugWidth = ImGui::CalcTextSize(EditorIcon::Debug).x + tabPadding;
-            const float fixedWidth = outputWidth + traceWidth + revisionWidth + debugWidth;
+            const float fixedWidth = outputWidth + traceWidth + revisionWidth + debugWidth + progressWidth;
             const float barWidth = std::max(1.f, barRight - barMin.x);
             const bool showCounts = fixedWidth + countsWidth <= barWidth;
             // At narrow widths the log tab's tooltip retains all totals. Shrink and
@@ -603,6 +693,7 @@ void MenuBarWindow::RenderMenuBar()
             traceWidth *= widthScale;
             revisionWidth *= widthScale;
             debugWidth *= widthScale;
+            progressWidth *= widthScale;
 
             ImGui::SetCursorScreenPos(ImVec2(barMin.x, barMin.y + 1.f));
             const bool logOpen = editor::is_window_open(EditorWindowName::kOutputLog);
@@ -619,7 +710,8 @@ void MenuBarWindow::RenderMenuBar()
                 }
             }
             const float countsSlotMinX = ImGui::GetItemRectMax().x;
-            const float debugLeft = std::max(countsSlotMinX, barRight - traceWidth - revisionWidth - debugWidth);
+            const float debugLeft = std::max(countsSlotMinX,
+                barRight - traceWidth - revisionWidth - progressWidth - debugWidth);
             if (showCounts)
             {
                 ImGui::SetCursorScreenPos(ImVec2(debugLeft - countsWidth, barMin.y + 1.f));
@@ -653,7 +745,23 @@ void MenuBarWindow::RenderMenuBar()
             // The golden-image mask remains independent of changing counter digits.
             editor::publish_status_counts_slot(countsSlotMinX, barMin.y, debugLeft, barMin.y + statusHeight);
 
-            ImGui::SameLine(0.f, 0.f);
+            if (showProgress)
+            {
+                const float inset = std::min(editor::ThemePixels(3.f), progressWidth * .2f);
+                ImGui::SetCursorScreenPos(ImVec2(debugLeft + debugWidth + inset, barMin.y + 1.f));
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, editor::ThemePixels(2.f));
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, editor::ThemeColorValue(editor::ThemeColor::Canvas));
+                ImGui::PushStyleColor(ImGuiCol_PlotHistogram, editor::ThemeColorValue(editor::ThemeColor::Primary, .65f));
+                ImGui::ProgressBar(progressFraction, ImVec2(progressWidth - inset * 2.f, tabHeight),
+                    progressLabel.c_str());
+                ImGui::PopStyleColor(2);
+                ImGui::PopStyleVar();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                {
+                    ImGui::SetTooltip("%s", progressTooltip.c_str());
+                }
+            }
+            ImGui::SetCursorScreenPos(ImVec2(barRight - traceWidth - revisionWidth, barMin.y + 1.f));
             const bool profilerOpen = editor::is_window_open(EditorWindowName::kFrameProfiler);
             if (draw_status_tab("##StatusTrace", kTraceLabel, "Trace — Frame Profiler",
                 ImVec2(traceWidth, tabHeight), profilerOpen))
