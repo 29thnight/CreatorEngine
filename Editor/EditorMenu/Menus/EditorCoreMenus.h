@@ -43,6 +43,11 @@ namespace editor::menus
     /// `.meta` 짝이 실제로 있을 때만 활성. 술어는 같은 문맥 타입을 받는다.
     bool has_meta_sidecar(const asset_target& target);
     void copy_meta_path(const asset_target& target);
+    bool is_model_source(const asset_target& target);
+    void enable_model_meshlets(const asset_target& target);
+    void disable_model_meshlets(const asset_target& target);
+    void enable_model_lods(const asset_target& target);
+    void disable_model_lods(const asset_target& target);
 
     // ── Tools 진단 ────────────────────────────────────────────────────────
     //
@@ -84,6 +89,14 @@ namespace editor
                 in_content_asset<&menus::copy_meta_path>("Copy .meta path")
                     .order(20)
                     .enabled(&menus::has_meta_sidecar),
+                in_content_asset<&menus::enable_model_meshlets>("Model import/Enable meshlets and reimport")
+                    .order(30).enabled(&menus::is_model_source),
+                in_content_asset<&menus::disable_model_meshlets>("Model import/Disable meshlets and reimport")
+                    .order(31).enabled(&menus::is_model_source),
+                in_content_asset<&menus::enable_model_lods>("Model import/Generate three LODs and reimport")
+                    .order(32).enabled(&menus::is_model_source),
+                in_content_asset<&menus::disable_model_lods>("Model import/Disable coarse LODs and reimport")
+                    .order(33).enabled(&menus::is_model_source),
                 in_content_asset<&menus::delete_asset>("Delete")
                     .order(90)
                     .confirm("이 파일을 지운다. 되돌릴 수 없다."));

@@ -78,7 +78,11 @@ namespace experiment::cooked
     //   glTF 의 texture.samplerIndex 를 읽은 적이 없어 구 캐시는 wrap/filter 를
     //   전부 기본값으로 담고 있다 — 레이아웃이 아니라 값이 비어 있는 쪽이라
     //   재임포트해야 채워진다.
-    inline constexpr std::uint32_t kFormatVersion = 9u;
+    // 10: optional generation-owned meshlets; v9 indexed payloads remain readable.
+    // 11: optional coarse-LOD chains; v9/v10 remain explicit read formats.
+    inline constexpr std::uint32_t kFormatVersion = 11u;
+    inline constexpr std::uint32_t kMeshletFormatVersion = 10u;
+    inline constexpr std::uint32_t kIndexedOnlyFormatVersion = 9u;
 
     // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
     // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.
@@ -102,9 +106,9 @@ namespace experiment::cooked
     //
     // [Header][SectionTable][Section 0][Section 1]...
     //
-    // 섹션은 8바이트 정렬로 놓는다. 정렬을 어기면 POD 블록을 그대로 읽을 때
+    // v10 섹션은 16바이트 정렬로 놓는다. 정렬을 어기면 POD 블록을 그대로 읽을 때
     // 미정렬 접근이 되고, 그건 아키텍처에 따라 조용히 느려지거나 죽는다.
-    inline constexpr std::uint64_t kSectionAlignment = 8u;
+    inline constexpr std::uint64_t kSectionAlignment = 16u;
 
     enum class SectionKind : std::uint32_t
     {
@@ -124,6 +128,12 @@ namespace experiment::cooked
         ScaleKeys = 13,       // ScaleKey[]        ← 일괄
         Skeleton = 14,      // CookedSkeletonHeader (루트·행렬·존재 여부)
         Animator = 15,      // CookedAnimator
+        MeshletMeshes = 16, // CookedMeshletMesh[]: one per mesh
+        MeshletDescriptors = 17,
+        MeshletVertices = 18,
+        MeshletTriangles = 19,
+        MeshletPrimitives = 20,
+        CoarseLods = 21, // bounded per-mesh POD blocks, then owned contiguous arrays
         Count
     };
 
@@ -178,6 +188,43 @@ namespace experiment::cooked
         std::uint32_t indexBegin{};
         std::uint32_t indexCount{};
         math::aabb bounds{};
+    };
+
+    // Offsets are section-global; descriptor offsets remain mesh-local after decode.
+    // Keeping CookedMesh unchanged permits explicit v9 indexed-only compatibility.
+    struct CookedMeshletMesh final
+    {
+        MeshletBuildSettings settings{};
+        std::array<std::uint8_t, 32> geometryDigest{};
+        std::uint32_t descriptorBegin{};
+        std::uint32_t descriptorCount{};
+        std::uint32_t vertexBegin{};
+        std::uint32_t vertexCount{};
+        std::uint32_t triangleBegin{};
+        std::uint32_t triangleCount{};
+        std::uint32_t primitiveBegin{};
+        std::uint32_t primitiveCount{};
+        MeshletLodRange lod0{};
+    };
+
+    struct CookedLodMesh final
+    {
+        MeshLodBuildSettings settings{};
+        MeshletGeometryDigest geometryDigest{};
+        std::uint32_t levelCount{};
+    };
+
+    struct CookedLodLevel final
+    {
+        float geometricError{};
+        std::uint32_t indexCount{};
+        MeshletBuildSettings meshletSettings{};
+        MeshletGeometryDigest meshletDigest{};
+        std::uint32_t descriptorCount{};
+        std::uint32_t vertexCount{};
+        std::uint32_t triangleCount{};
+        std::uint32_t primitiveCount{};
+        MeshletLodRange lod0{};
     };
 
     struct CookedBone final

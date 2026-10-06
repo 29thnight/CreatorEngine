@@ -2,6 +2,8 @@
 
 #include "Uuid.h"
 #include "VertexLayout.h"
+#include "MeshletData.h"
+#include "MeshLodData.h"
 #include "../Assets/TextureCoordinates.h"
 #include "../Assets/TextureSampler.h"
 
@@ -372,6 +374,10 @@ namespace experiment
 		VertexBuffer vertices{};
 		std::vector<std::uint32_t> indices{};
 		math::aabb bounds{};
+		// Derived from this mesh's finalized indexed geometry; optional for legacy data.
+		MeshletPayload meshlets{};
+		// Optional coarse topology; LOD0 stays in indices/meshlets for all legacy consumers.
+		MeshLodChain coarseLods{};
 	};
 
 	// parent 하나만 hierarchy 정본이다. children/count 중복 저장을 없앴고,

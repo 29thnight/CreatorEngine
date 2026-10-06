@@ -12,6 +12,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -34,6 +35,14 @@ namespace assets
         std::filesystem::path sourcePath{};
         std::filesystem::path identityHeaderPath{};
         std::filesystem::path generationRoot{};
+
+        // Explicit override is persisted in importSettings.buildMeshlets. With no
+        // override, preserve the prior choice; missing settings default to false.
+        // Changing this choice publishes a new generation, never patches an old one.
+        std::optional<bool> buildMeshlets{};
+        // 0 disables coarse LODs; 1..7 requests static simplification levels.
+        // A positive override also enables meshlets for the new generation.
+        std::optional<std::uint32_t> lodLevels{};
 
         // Automatic recovery may rebuild derived files, never replace identity.
         // Nil leaves normal first-import behavior unchanged.
@@ -59,6 +68,7 @@ namespace assets
         std::size_t materialCount{};
         std::size_t embeddedTextureCount{};
         std::vector<ModelAssetAuthoringIssue> issues{};
+        std::vector<ModelAssetAuthoringIssue> warnings{};
         // 단계별 경과(ms, 순서대로) — 진단 전용. 실패 시엔 도달한 단계까지만 남는다.
         ModelAssetPhaseTimeline phases{};
 

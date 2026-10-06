@@ -749,6 +749,11 @@ namespace assets
                     : cookedIssues.front().message);
             return result;
         }
+        for (const experiment::ModelLoadIssue& issue : cookedIssues)
+        {
+            result.warnings.push_back({ ModelAssetGenerationIssueCode::CookedModelRejected,
+                issue.context, issue.message });
+        }
         const std::vector<experiment::ModelLoadIssue> validation =
             experiment::ModelLoader::Validate(draft);
         if (!validation.empty() || draft.metadata.assetId.value != sidecar.assetId)
@@ -866,6 +871,8 @@ namespace assets
             const std::span<const std::byte> vertexBytes = source.vertices.Bytes();
             mesh.vertexBytes.assign(vertexBytes.begin(), vertexBytes.end());
             mesh.indices = std::move(source.indices);
+            mesh.meshlets = std::move(source.meshlets);
+            mesh.coarseLods = std::move(source.coarseLods);
             mesh.bounds = source.bounds;
             if (source.material.IsValid())
                 mesh.materialId = materialRecords[source.material.Value()]->assetId;

@@ -1,4 +1,10 @@
 #include "CookedModelCodec.h"
+#include "../Import/MeshletBuilder.h"
+#include "../Import/MeshLodBuilder.h"
+
+#include <limits>
+#include <new>
+#include <stdexcept>
 
 #include <algorithm>
 #include <cstdio>
@@ -118,6 +124,38 @@ namespace experiment::cooked
                 return value;
             }
 
+            template <typename T>
+            bool Array(std::uint32_t count, std::vector<T>& values)
+            {
+                static_assert(std::is_trivially_copyable_v<T>);
+                if (!ok_ || offset_ > bytes_.size() || count > (bytes_.size() - offset_) / sizeof(T))
+                {
+                    ok_ = false;
+                    return false;
+                }
+                try
+                {
+                    values.resize(count);
+                }
+                catch (const std::bad_alloc&)
+                {
+                    ok_ = false;
+                    return false;
+                }
+                catch (const std::length_error&)
+                {
+                    ok_ = false;
+                    return false;
+                }
+                const std::size_t size = static_cast<std::size_t>(count) * sizeof(T);
+                if (size != 0u)
+                {
+                    std::memcpy(values.data(), bytes_.data() + offset_, size);
+                }
+                offset_ += size;
+                return true;
+            }
+
         private:
             std::span<const std::byte> bytes_{};
             std::size_t offset_{};
@@ -147,7 +185,8 @@ namespace experiment::cooked
                 Reject(issues, what, "섹션이 파일 밖을 가리킨다 — 잘렸거나 손상됐다.");
                 return false;
             }
-            if (entry.bytes != static_cast<std::uint64_t>(entry.elementCount) * sizeof(T))
+            if ((reinterpret_cast<std::uintptr_t>(file.data()) + entry.offset) % alignof(T) != 0u
+                || entry.bytes != static_cast<std::uint64_t>(entry.elementCount) * sizeof(T))
             {
                 Reject(issues, what, "섹션 크기가 원소 수와 맞지 않는다.");
                 return false;
@@ -267,6 +306,11 @@ namespace experiment::cooked
         std::vector<CookedMesh> meshes;
         std::vector<std::byte> vertexBytes;
         std::vector<std::uint32_t> indices;
+        std::vector<CookedMeshletMesh> meshletMeshes;
+        std::vector<MeshletDescriptor> meshletDescriptors;
+        std::vector<std::uint32_t> meshletVertices;
+        std::vector<std::uint8_t> meshletTriangles;
+        std::vector<std::uint32_t> meshletPrimitives;
         VertexAttributeMask vertexAttributeMaskUnion = 0;
         std::uint32_t maxVertexStride = 0;
         meshes.reserve(draft.meshes.size());
@@ -282,6 +326,49 @@ namespace experiment::cooked
         }
         for (const Mesh& mesh : draft.meshes)
         {
+            std::string meshletFailure;
+            if (!importer::ValidateMeshlets(mesh, mesh.meshlets, meshletFailure))
+            {
+                RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh,
+                    "meshlets." + mesh.name, meshletFailure);
+                return result;
+            }
+            const auto fits = [](std::size_t current, std::size_t added)
+            {
+                const auto limit = (std::numeric_limits<std::uint32_t>::max)();
+                return current <= limit && added <= limit - current;
+            };
+            if (!fits(meshletDescriptors.size(), mesh.meshlets.descriptors.size())
+                || !fits(meshletVertices.size(), mesh.meshlets.vertexRemap.size())
+                || !fits(meshletTriangles.size(), mesh.meshlets.triangleIndices.size())
+                || !fits(meshletPrimitives.size(), mesh.meshlets.primitiveRemap.size()))
+            {
+                RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh,
+                    "meshlets." + mesh.name, "Meshlet section exceeds uint32 address range.");
+                return result;
+            }
+            CookedMeshletMesh acceleration{};
+            acceleration.settings = mesh.meshlets.settings;
+            acceleration.geometryDigest = mesh.meshlets.geometryDigest;
+            acceleration.descriptorBegin = static_cast<std::uint32_t>(meshletDescriptors.size());
+            acceleration.descriptorCount = static_cast<std::uint32_t>(mesh.meshlets.descriptors.size());
+            acceleration.vertexBegin = static_cast<std::uint32_t>(meshletVertices.size());
+            acceleration.vertexCount = static_cast<std::uint32_t>(mesh.meshlets.vertexRemap.size());
+            acceleration.triangleBegin = static_cast<std::uint32_t>(meshletTriangles.size());
+            acceleration.triangleCount = static_cast<std::uint32_t>(mesh.meshlets.triangleIndices.size());
+            acceleration.primitiveBegin = static_cast<std::uint32_t>(meshletPrimitives.size());
+            acceleration.primitiveCount = static_cast<std::uint32_t>(mesh.meshlets.primitiveRemap.size());
+            acceleration.lod0 = mesh.meshlets.lod0;
+            meshletMeshes.push_back(acceleration);
+            meshletDescriptors.insert(meshletDescriptors.end(),
+                mesh.meshlets.descriptors.begin(), mesh.meshlets.descriptors.end());
+            meshletVertices.insert(meshletVertices.end(),
+                mesh.meshlets.vertexRemap.begin(), mesh.meshlets.vertexRemap.end());
+            meshletTriangles.insert(meshletTriangles.end(),
+                mesh.meshlets.triangleIndices.begin(), mesh.meshlets.triangleIndices.end());
+            meshletPrimitives.insert(meshletPrimitives.end(),
+                mesh.meshlets.primitiveRemap.begin(), mesh.meshlets.primitiveRemap.end());
+
             CookedMesh cooked{};
             cooked.name = strings.Add(mesh.name);
             cooked.material = mesh.material.Value();
@@ -298,6 +385,45 @@ namespace experiment::cooked
             vertexAttributeMaskUnion |= cooked.vertexAttributeMask;
             maxVertexStride = (std::max)(maxVertexStride, cooked.vertexStride);
             meshes.push_back(cooked);
+        }
+
+        ByteWriter coarseLods;
+        if (draft.meshes.size() > (std::numeric_limits<std::uint32_t>::max)())
+        {
+            RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods", "Too many model meshes.");
+            return result;
+        }
+        coarseLods.Pod(static_cast<std::uint32_t>(draft.meshes.size()));
+        for (const Mesh& mesh : draft.meshes)
+        {
+            std::string failure;
+            if (!importer::ValidateMeshLods(mesh, mesh.coarseLods, failure))
+            {
+                RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods." + mesh.name, failure);
+                return result;
+            }
+            const MeshLodChain& chain = mesh.coarseLods;
+            coarseLods.Pod(CookedLodMesh{chain.settings, chain.geometryDigest,
+                static_cast<std::uint32_t>(chain.levels.size())});
+            for (const MeshLodLevel& level : chain.levels)
+            {
+                const MeshletPayload& payload = level.meshlets;
+                coarseLods.Pod(CookedLodLevel{level.geometricError, static_cast<std::uint32_t>(level.indices.size()),
+                    payload.settings, payload.geometryDigest, static_cast<std::uint32_t>(payload.descriptors.size()),
+                    static_cast<std::uint32_t>(payload.vertexRemap.size()),
+                    static_cast<std::uint32_t>(payload.triangleIndices.size()),
+                    static_cast<std::uint32_t>(payload.primitiveRemap.size()), payload.lod0});
+                coarseLods.PodArray(level.indices);
+                coarseLods.PodArray(payload.descriptors);
+                coarseLods.PodArray(payload.vertexRemap);
+                coarseLods.PodArray(payload.triangleIndices);
+                coarseLods.PodArray(payload.primitiveRemap);
+            }
+        }
+        if (coarseLods.Size() > (std::numeric_limits<std::uint32_t>::max)())
+        {
+            RejectWrite(result.issues, ModelLoadIssueCode::InvalidMesh, "lods", "LOD section exceeds uint32 range.");
+            return result;
         }
 
         // ── 스켈레톤 · 클립 · 키 ────────────────────────────────────────
@@ -489,6 +615,18 @@ namespace experiment::cooked
               scales.data(), scales.size() * sizeof(ScaleKey) },
             { SectionKind::Skeleton, 1u, &skeletonHeader, sizeof(skeletonHeader) },
             { SectionKind::Animator, 1u, &animator, sizeof(animator) },
+            { SectionKind::MeshletMeshes, static_cast<std::uint32_t>(meshletMeshes.size()),
+              meshletMeshes.data(), meshletMeshes.size() * sizeof(CookedMeshletMesh) },
+            { SectionKind::MeshletDescriptors, static_cast<std::uint32_t>(meshletDescriptors.size()),
+              meshletDescriptors.data(), meshletDescriptors.size() * sizeof(MeshletDescriptor) },
+            { SectionKind::MeshletVertices, static_cast<std::uint32_t>(meshletVertices.size()),
+              meshletVertices.data(), meshletVertices.size() * sizeof(std::uint32_t) },
+            { SectionKind::MeshletTriangles, static_cast<std::uint32_t>(meshletTriangles.size()),
+              meshletTriangles.data(), meshletTriangles.size() },
+            { SectionKind::MeshletPrimitives, static_cast<std::uint32_t>(meshletPrimitives.size()),
+              meshletPrimitives.data(), meshletPrimitives.size() * sizeof(std::uint32_t) },
+            { SectionKind::CoarseLods, static_cast<std::uint32_t>(coarseLods.Size()),
+              coarseLods.Bytes().data(), coarseLods.Size() },
         };
 
         const std::uint64_t tableBytes = pending.size() * sizeof(SectionEntry);
@@ -552,7 +690,9 @@ namespace experiment::cooked
             Reject(issues, "header", "매직이 다르다 — 쿠킹 파일이 아니다.");
             return false;
         }
-        if (kFormatVersion != header.formatVersion)
+        if (kFormatVersion != header.formatVersion
+            && kMeshletFormatVersion != header.formatVersion
+            && kIndexedOnlyFormatVersion != header.formatVersion)
         {
             Reject(issues, "header", "포맷 버전 " + std::to_string(header.formatVersion)
                 + " != " + std::to_string(kFormatVersion) + " — 재임포트 필요.");
@@ -600,17 +740,27 @@ namespace experiment::cooked
         //   통과해 버린다 — 이 저장소가 이미 겪은 거짓 통과 양식이다.
         std::vector<const SectionEntry*> byKind(
             static_cast<std::size_t>(SectionKind::Count), nullptr);
+        const auto requiredSections = static_cast<std::uint32_t>(SectionKind::MeshletMeshes);
+        const auto meshletSectionEnd = static_cast<std::uint32_t>(SectionKind::CoarseLods);
+        const auto allowedSections = header.formatVersion == kIndexedOnlyFormatVersion
+            ? requiredSections : header.formatVersion == kMeshletFormatVersion
+            ? meshletSectionEnd : static_cast<std::uint32_t>(SectionKind::Count);
         for (const SectionEntry& entry : table)
         {
-            if (entry.kind >= static_cast<std::uint32_t>(SectionKind::Count))
+            if (entry.kind >= allowedSections)
             {
                 Reject(issues, "sections", "모르는 섹션 종류 "
                     + std::to_string(entry.kind) + " — 상위 버전 파일이다.");
                 return false;
             }
+            if (byKind[entry.kind] != nullptr)
+            {
+                Reject(issues, "sections", "Duplicate section kind.");
+                return false;
+            }
             byKind[entry.kind] = &entry;
         }
-        for (std::uint32_t kind = 0; kind < static_cast<std::uint32_t>(SectionKind::Count);
+        for (std::uint32_t kind = 0; kind < requiredSections;
             ++kind)
         {
             if (!byKind[kind])
@@ -754,6 +904,186 @@ namespace experiment::cooked
         {
             Reject(issues, "header", "정점 mask union/max stride가 mesh 레코드와 다르다.");
             return false;
+        }
+
+        // Optional v10 acceleration is validated separately from indexed geometry.
+        // Generation SHA verification remains the caller's responsibility and is unchanged.
+        if (header.formatVersion >= kMeshletFormatVersion)
+        {
+            std::span<const CookedMeshletMesh> acceleration;
+            std::span<const MeshletDescriptor> descriptors;
+            std::span<const std::uint32_t> vertices;
+            std::span<const std::uint8_t> triangles;
+            std::span<const std::uint32_t> primitives;
+            bool complete = true;
+            for (std::uint32_t kind = requiredSections; kind < meshletSectionEnd; ++kind)
+            {
+                if (byKind[kind] == nullptr)
+                {
+                    complete = false;
+                }
+            }
+            if (!complete)
+            {
+                Reject(issues, "meshlets", "Missing optional meshlet sections; using indexed geometry.");
+            }
+            else if (ViewArray(bytes, section(SectionKind::MeshletMeshes), acceleration, issues, "meshlets.meshes")
+                && ViewArray(bytes, section(SectionKind::MeshletDescriptors), descriptors, issues, "meshlets.descriptors")
+                && ViewArray(bytes, section(SectionKind::MeshletVertices), vertices, issues, "meshlets.vertices")
+                && ViewArray(bytes, section(SectionKind::MeshletTriangles), triangles, issues, "meshlets.triangles")
+                && ViewArray(bytes, section(SectionKind::MeshletPrimitives), primitives, issues, "meshlets.primitives"))
+            {
+                // Each optional stream is a partition, not an arbitrary collection
+                // of aliases. Validate it before allocating per-mesh copies so a
+                // small hostile file cannot amplify into mesh-count times its size.
+                std::uint64_t descriptorEnd = 0, vertexEnd = 0, triangleEnd = 0, primitiveEnd = 0;
+                bool rangesValid = acceleration.size() == decoded.meshes.size();
+                for (const CookedMeshletMesh& source : acceleration)
+                {
+                    if (source.descriptorBegin != descriptorEnd || source.vertexBegin != vertexEnd
+                        || source.triangleBegin != triangleEnd || source.primitiveBegin != primitiveEnd
+                        || !InRange(source.descriptorBegin, source.descriptorCount, descriptors.size())
+                        || !InRange(source.vertexBegin, source.vertexCount, vertices.size())
+                        || !InRange(source.triangleBegin, source.triangleCount, triangles.size())
+                        || !InRange(source.primitiveBegin, source.primitiveCount, primitives.size()))
+                    {
+                        rangesValid = false;
+                        break;
+                    }
+                    descriptorEnd += source.descriptorCount;
+                    vertexEnd += source.vertexCount;
+                    triangleEnd += source.triangleCount;
+                    primitiveEnd += source.primitiveCount;
+                }
+                rangesValid = rangesValid && descriptorEnd == descriptors.size()
+                    && vertexEnd == vertices.size() && triangleEnd == triangles.size()
+                    && primitiveEnd == primitives.size();
+                if (!rangesValid)
+                {
+                    Reject(issues, "meshlets", "Meshlet mesh count or stream partition is invalid; using indexed geometry.");
+                }
+                else
+                {
+                    for (std::size_t i = 0; i < acceleration.size(); ++i)
+                    {
+                        const CookedMeshletMesh& source = acceleration[i];
+                        Mesh& mesh = decoded.meshes[i];
+                        if (!InRange(source.descriptorBegin, source.descriptorCount, descriptors.size())
+                            || !InRange(source.vertexBegin, source.vertexCount, vertices.size())
+                            || !InRange(source.triangleBegin, source.triangleCount, triangles.size())
+                            || !InRange(source.primitiveBegin, source.primitiveCount, primitives.size()))
+                        {
+                            Reject(issues, "meshlets." + mesh.name,
+                                "Meshlet stream range is invalid; using indexed geometry.");
+                            continue;
+                        }
+                        const bool empty = source.descriptorCount == 0u && source.vertexCount == 0u
+                            && source.triangleCount == 0u && source.primitiveCount == 0u;
+                        if (!empty && (source.descriptorCount > mesh.indices.size() / 3u
+                            || source.vertexCount > mesh.indices.size()
+                            || source.triangleCount != mesh.indices.size()
+                            || source.primitiveCount != mesh.indices.size() / 3u))
+                        {
+                            Reject(issues, "meshlets." + mesh.name,
+                                "Meshlet stream counts do not match indexed topology; using indexed geometry.");
+                            continue;
+                        }
+                        MeshletPayload& payload = mesh.meshlets;
+                        payload.settings = source.settings;
+                        payload.geometryDigest = source.geometryDigest;
+                        payload.lod0 = source.lod0;
+                        const auto copyRange = [](auto& out, auto values, std::uint32_t begin, std::uint32_t count)
+                        {
+                            const auto range = values.subspan(begin, count);
+                            out.assign(range.begin(), range.end());
+                        };
+                        copyRange(payload.descriptors, descriptors, source.descriptorBegin, source.descriptorCount);
+                        copyRange(payload.vertexRemap, vertices, source.vertexBegin, source.vertexCount);
+                        copyRange(payload.triangleIndices, triangles, source.triangleBegin, source.triangleCount);
+                        copyRange(payload.primitiveRemap, primitives, source.primitiveBegin, source.primitiveCount);
+                        std::string failure;
+                        if (!importer::ValidateMeshlets(mesh, payload, failure))
+                        {
+                            payload = {};
+                            Reject(issues, "meshlets." + mesh.name,
+                                failure + "; using indexed geometry.");
+                        }
+                    }
+                }
+            }
+        }
+
+        if (header.formatVersion == kFormatVersion)
+        {
+            std::span<const std::byte> lodBytes;
+            bool valid = byKind[static_cast<std::uint32_t>(SectionKind::CoarseLods)] != nullptr;
+            std::string failure = "Missing or malformed optional coarse LOD data";
+            if (valid)
+            {
+                valid = ViewArray(bytes, section(SectionKind::CoarseLods), lodBytes, issues, "lods");
+            }
+            if (valid)
+            {
+                ByteCursor cursor(lodBytes);
+                valid = cursor.Pod<std::uint32_t>() == decoded.meshes.size() && cursor.Ok();
+                for (Mesh& mesh : decoded.meshes)
+                {
+                    if (!valid)
+                    {
+                        break;
+                    }
+                    const auto header = cursor.Pod<CookedLodMesh>();
+                    valid = cursor.Ok() && header.levelCount <= kMeshLodMaxLevels;
+                    if (!valid)
+                    {
+                        break;
+                    }
+                    MeshLodChain& chain = mesh.coarseLods;
+                    chain.settings = header.settings;
+                    chain.geometryDigest = header.geometryDigest;
+                    chain.levels.resize(header.levelCount);
+                    for (MeshLodLevel& level : chain.levels)
+                    {
+                        const auto record = cursor.Pod<CookedLodLevel>();
+                        valid = cursor.Ok() && record.indexCount != 0u && record.indexCount % 3u == 0u
+                            && record.indexCount < mesh.indices.size()
+                            && record.descriptorCount != 0u && record.descriptorCount <= record.indexCount / 3u
+                            && record.vertexCount <= record.indexCount
+                            && record.triangleCount == record.indexCount
+                            && record.primitiveCount == record.indexCount / 3u;
+                        if (!valid)
+                        {
+                            break;
+                        }
+                        level.geometricError = record.geometricError;
+                        level.meshlets.settings = record.meshletSettings;
+                        level.meshlets.geometryDigest = record.meshletDigest;
+                        level.meshlets.lod0 = record.lod0;
+                        valid = cursor.Array(record.indexCount, level.indices)
+                            && cursor.Array(record.descriptorCount, level.meshlets.descriptors)
+                            && cursor.Array(record.vertexCount, level.meshlets.vertexRemap)
+                            && cursor.Array(record.triangleCount, level.meshlets.triangleIndices)
+                            && cursor.Array(record.primitiveCount, level.meshlets.primitiveRemap);
+                        if (!valid)
+                        {
+                            break;
+                        }
+                    }
+                    if (valid)
+                    {
+                        valid = importer::ValidateMeshLods(mesh, chain, failure);
+                    }
+                }
+                valid = valid && cursor.Ok() && cursor.AtEnd();
+            }
+            if (!valid)
+            {
+                for (Mesh& mesh : decoded.meshes)
+                {
+                    mesh.coarseLods = {};
+                }
+                Reject(issues, "lods", failure + "; retaining LOD0 geometry.");
+            }
         }
 
         // ── 스켈레톤 ────────────────────────────────────────────────────

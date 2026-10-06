@@ -106,6 +106,17 @@ namespace experiment::cooked
             return result;
         }
 
+        // Runtime can render valid indexed geometry without optional meshlets, but
+        // cook must not silently ship a known-invalid authored acceleration payload.
+        if (!loaded.warnings.empty())
+        {
+            for (const auto& warning : loaded.warnings)
+            {
+                AddIssue(result, "generation." + warning.context, warning.message);
+            }
+            return result;
+        }
+
         ModelGenerationExportProduct product;
         product.modelAssetId = AssetId{ sidecar.assetId };
         product.generation = sidecar.generation;
