@@ -56,6 +56,7 @@ public:
         std::span<RHIBufferSlice> outSlices,
         std::string& outError);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
+    void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
 
     RHIUploadStats GetStats() const;
@@ -177,6 +178,7 @@ class VulkanDescriptorPoolRecycler
     void Collect(RHICompletionPoint completed);
     bool BeginRecording(VkDevice device, uint64_t recordingId, std::string& outError);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
+    void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
 
     /// 셋 하나를 할당한다. pool 생성/native 할당 실패는 `VK_NULL_HANDLE`.

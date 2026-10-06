@@ -435,6 +435,9 @@
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
+    <ClCompile Include="GpuGeometryVisibility.cpp">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClCompile>
     <ClCompile Include="Render\Passes\Geometry\EnhancedShadowPass.cpp">
       <Filter>Render\Passes\Geometry</Filter>
     </ClCompile>
@@ -911,6 +914,9 @@
     <ClInclude Include="Render\Passes\Geometry\EnhancedGBufferPass.h">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
+    <ClInclude Include="GpuGeometryVisibility.h">
+      <Filter>Render\Passes\Geometry</Filter>
+    </ClInclude>
     <ClInclude Include="Render\Passes\Geometry\EnhancedShadowPass.h">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
@@ -1153,6 +1159,12 @@
     <ClCompile Include="MaterialGraphSceneCompiler.cpp">
       <Filter>Resources</Filter>
     </ClCompile>
+    <ClCompile Include="MaterialGraphSceneRuntimeEffects.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
+    <ClInclude Include="MaterialGraphSceneRuntimeEffects.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
     <ClCompile Include="MaterialGraphShaderMeta.cpp">
       <Filter>Resources</Filter>
     </ClCompile>

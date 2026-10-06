@@ -14,12 +14,22 @@ namespace material_graph
     namespace
     {
         constexpr std::uint32_t kDispatchPixels = 4096;
-        constexpr std::uint64_t kBytesPerPixel = sizeof(IblBakePoint) + sizeof(IblBakeSample);
+        constexpr std::uint64_t kResourceAlignment = 65536;
+        constexpr std::uint64_t kConstantAlignment = 256;
+        constexpr std::uint64_t AlignBytes(std::uint64_t bytes, std::uint64_t alignment)
+        {
+            return (bytes + alignment - 1) / alignment * alignment;
+        }
         struct LookupConstants
         {
             std::uint32_t width, height, count, reuse;
             std::uint32_t environment, first, dispatchCount, precomputed;
             std::uint32_t importance, source, standalone, approximate;
+            std::uint32_t runtimeEvaluation, reserved0, reserved1, reserved2;
+        };
+        struct RuntimeLookupConstants
+        {
+            std::uint32_t enabled, precomputed, source, environment;
         };
         bool Fail(std::string& error, const char* message)
         {
@@ -36,7 +46,8 @@ namespace material_graph
         struct Bundle
         {
             std::uint32_t width{}, height{};
-            std::uint64_t completion{};
+            std::uint64_t completion{}, bytes{};
+            bool runtimeEvaluation{}, capture{};
             std::array<RHITextureHandle, 11> inputs{};
             RHIBufferHandle samples, statistics;
             std::array<RHIResourceState, 11> inputStates{};
@@ -72,42 +83,79 @@ namespace material_graph
             {
                 device.ReleaseBuffer(bundle.statistics);
             }
+            resourceBytes -= bundle.bytes;
         }
 
-        bool Acquire(SceneLookupFrame& frame)
+        bool Acquire(SceneLookupFrame& frame, std::uint64_t budget, std::uint64_t requiredResources,
+                     std::uint64_t requiredExclusive, std::uint64_t requiredUploads, bool& recycled)
         {
             ce::profile_scope profile{ce::marker<"MaterialLookupPoolAcquire">()};
             std::lock_guard lock(mutex);
+            recycled = false;
+            const auto isReusable = [&](const Bundle& bundle) {
+                return bundle.completion <= completed.load(std::memory_order_acquire) &&
+                       bundle.width == frame.width_ && bundle.height == frame.height_ &&
+                       bundle.runtimeEvaluation == frame.runtimeEvaluation_ && bundle.capture == frame.capture_;
+            };
+            auto selected = std::find_if(idle.begin(), idle.end(), isReusable);
+            const bool reuseBundle = selected != idle.end();
+            const auto selectedSamples = reuseBundle ? selected->samples : RHIBufferHandle{};
+            const auto required = requiredUploads + requiredExclusive + (reuseBundle ? 0 : requiredResources);
+            const auto fits = [&] {
+                return required <= budget && resourceBytes <= budget - required &&
+                       uploadBytes <= budget - required - resourceBytes;
+            };
+            // 완료된 유휴 자원만 회수한다. 이전 화면/다른 뷰/제출 대기 자원은
+            // 같은 장부에 남으므로 replacement의 순간 사용량도 한도를 넘지 않는다.
             for (auto it = idle.begin(); it != idle.end();)
             {
-                if (it->completion > completed.load(std::memory_order_acquire))
+                if (it->completion > completed.load(std::memory_order_acquire) ||
+                    (reuseBundle && it->samples == selectedSamples))
                 {
                     ++it;
                     continue;
                 }
-                if (it->width != frame.width_ || it->height != frame.height_)
+                if (!fits() || it->width != frame.width_ || it->height != frame.height_ ||
+                    it->runtimeEvaluation != frame.runtimeEvaluation_ || it->capture != frame.capture_)
                 {
                     Release(*it);
                     it = idle.erase(it);
                     continue;
                 }
-                frame.inputs_ = it->inputs;
-                frame.samples_ = it->samples;
-                frame.statistics_ = it->statistics;
-                frame.inputStates_ = it->inputStates;
-                frame.sampleState_ = it->sampleState;
-                frame.statisticState_ = it->statisticState;
-                idle.erase(it);
-                return true;
+                ++it;
             }
-            ce::profile_instant(idle.empty() ? ce::marker<"MaterialLookupPoolEmpty">()
-                                             : ce::marker<"MaterialLookupPoolFencePending">());
-            return false;
+            if (!fits() || (!uploads.contains(frame.recording_) && uploads.size() >= 128))
+            {
+                ce::profile_instant(ce::marker<"MaterialLookupBudgetDeferred">());
+                return false;
+            }
+            selected = std::find_if(idle.begin(), idle.end(), isReusable);
+            if (selected != idle.end())
+            {
+                frame.inputs_ = selected->inputs;
+                frame.samples_ = selected->samples;
+                frame.statistics_ = selected->statistics;
+                frame.inputStates_ = selected->inputStates;
+                frame.sampleState_ = selected->sampleState;
+                frame.statisticState_ = selected->statisticState;
+                idle.erase(selected);
+                recycled = true;
+            }
+            else
+            {
+                resourceBytes += requiredResources;
+            }
+            frame.resourceBytes_ = requiredResources;
+            frame.exclusiveBytes_ = requiredExclusive;
+            resourceBytes += requiredExclusive;
+            uploads[frame.recording_].bytes += requiredUploads;
+            uploadBytes += requiredUploads;
+            return true;
         }
 
         bool Recycle(const SceneLookupFrame& frame)
         {
-            if (!frame.completion_.IsValid())
+            if (!frame.completion_.IsValid() || !frame.submissionConfirmed_)
             {
                 ce::profile_instant(ce::marker<"MaterialLookupUnsubmittedDiscard">());
                 return false;
@@ -122,24 +170,87 @@ namespace material_graph
                 ce::profile_instant(ce::marker<"MaterialLookupPoolFullDiscard">());
                 return false;
             }
-            idle.push_back({frame.width_, frame.height_, frame.completion_.value, frame.inputs_, frame.samples_,
-                            frame.statistics_, frame.inputStates_, frame.sampleState_, frame.statisticState_});
+            idle.push_back({frame.width_, frame.height_, frame.completion_.value, frame.resourceBytes_,
+                            frame.runtimeEvaluation_, frame.capture_, frame.inputs_, frame.samples_, frame.statistics_,
+                            frame.inputStates_, frame.sampleState_, frame.statisticState_});
             return true;
+        }
+
+        void Released(std::uint64_t bytes)
+        {
+            std::lock_guard lock(mutex);
+            resourceBytes -= bytes;
+        }
+
+        void Submitted(std::uint64_t recording, RHICompletionPoint completion)
+        {
+            std::lock_guard lock(mutex);
+            if (const auto found = uploads.find(recording); found != uploads.end())
+            {
+                if (completion.value <= completed.load(std::memory_order_acquire))
+                {
+                    uploadBytes -= found->second.bytes;
+                    uploads.erase(found);
+                }
+                else
+                {
+                    found->second.completion = completion.value;
+                }
+            }
+        }
+
+        void Aborted(std::uint64_t recording)
+        {
+            std::lock_guard lock(mutex);
+            if (const auto found = uploads.find(recording); found != uploads.end())
+            {
+                uploadBytes -= found->second.bytes;
+                uploads.erase(found);
+            }
+        }
+
+        void Rejected(std::uint64_t recording)
+        {
+            std::lock_guard lock(mutex);
+            if (const auto found = uploads.find(recording); found != uploads.end() && !found->second.completion)
+            {
+                uploadBytes -= found->second.bytes;
+                uploads.erase(found);
+            }
         }
 
         void Completed(std::uint64_t value)
         {
+            std::lock_guard lock(mutex);
             auto prior = completed.load(std::memory_order_relaxed);
             while (prior < value &&
                    !completed.compare_exchange_weak(prior, value, std::memory_order_release, std::memory_order_relaxed))
             {
             }
+            for (auto it = uploads.begin(); it != uploads.end();)
+            {
+                if (it->second.completion && it->second.completion <= value)
+                {
+                    uploadBytes -= it->second.bytes;
+                    it = uploads.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
         }
 
+        struct UploadReservation
+        {
+            std::uint64_t bytes{}, completion{};
+        };
         IRenderDeviceServices& device;
         std::mutex mutex;
         std::atomic<std::uint64_t> completed{};
         std::vector<Bundle> idle;
+        std::map<std::uint64_t, UploadReservation> uploads;
+        std::uint64_t resourceBytes{}, uploadBytes{};
     };
 
     SceneLookupFrame::~SceneLookupFrame()
@@ -165,10 +276,18 @@ namespace material_graph
             {
                 device_->ReleaseBuffer(statistics_);
             }
+            if (resourcePool_)
+            {
+                resourcePool_->Released(resourceBytes_);
+            }
         }
         if (emptyPrevious_.IsValid())
         {
             device_->ReleaseBuffer(emptyPrevious_);
+        }
+        if (resourcePool_)
+        {
+            resourcePool_->Released(exclusiveBytes_);
         }
     }
 
@@ -234,20 +353,26 @@ namespace material_graph
                                    RHITextureHandle prefiltered, std::uint64_t environmentGeneration,
                                    std::uint64_t memoryBudget, std::shared_ptr<const SceneLookupFrame>& result,
                                    std::string& error, std::array<RHITextureHandle, 3> importance,
-                                   RHITextureHandle source, bool standalone, bool approximate)
+                                   RHITextureHandle source, bool standalone, bool approximate, bool capture,
+                                   bool runtimeEvaluation)
     {
         ce::profile_scope profile{ce::marker<"MaterialLookupPrepare">()};
+        ResetPreparationStatus();
         const auto count = std::uint64_t(context.width) * context.height;
         if (!context.resources || !context.rootSignatures || !context.psoManager || !context.frameId || !viewId ||
-            !count || count > UINT32_MAX || count * kBytesPerPixel + sizeof(SceneLookupStats) > memoryBudget ||
+            !count || count > UINT32_MAX ||
             !context.resources->GetCurrentUploadRecordingId() || (environment.IsValid() && !environmentGeneration))
         {
-            return Fail(error, "Scene lookup needs an identified view/environment and sufficient GPU memory budget.");
+            return Fail(error, "Scene lookup needs current services and an identified view/environment.");
+        }
+        if (runtimeEvaluation && !approximate)
+        {
+            return Fail(error, "Scene runtime evaluation requires the explicit split-sum quality policy.");
         }
         std::shared_ptr<const SceneLookupFrame> previous;
         for (const auto& cached : published_)
         {
-            if (!standalone && cached->viewId_ == viewId && cached->sceneEpoch_ == context.sceneEpoch &&
+            if (!runtimeEvaluation && !standalone && cached->viewId_ == viewId && cached->sceneEpoch_ == context.sceneEpoch &&
                 cached->width_ == context.width && cached->height_ == context.height &&
                 cached->environment_ == environment && cached->irradiance_ == irradiance &&
                 cached->prefiltered_ == prefiltered && cached->environmentGeneration_ == environmentGeneration &&
@@ -255,10 +380,6 @@ namespace material_graph
             {
                 previous = cached;
             }
-        }
-        if ((previous ? 2 : 1) * count * kBytesPerPixel + sizeof(SceneLookupStats) > memoryBudget)
-        {
-            return Fail(error, "Scene lookup candidate plus previous owner exceeds its GPU memory budget.");
         }
         if (!Initialize(context, error))
         {
@@ -310,18 +431,11 @@ namespace material_graph
         candidate->descriptors_ = device_->GetDescriptorVersionToken();
         candidate->bake_ = bake_.GetGeneration();
         candidate->clear_ = clear_.GetGeneration();
-        // The upload arena owns this immutable 16 KiB table through submission
-        // completion, exactly like the dispatch constants. No independent pool
-        // or borrowed CPU storage survives recording.
-        candidate->filmSensitivityConstants_ =
-            device_->UploadConstants(kFilmSensitivityConstants.data(), sizeof(kFilmSensitivityConstants));
-        if (!candidate->filmSensitivityConstants_.IsValid())
-        {
-            return Fail(error, "Scene lookup sensitivity table upload failed.");
-        }
         candidate->previous_ = previous;
         candidate->reuse_ = previous != nullptr;
         candidate->standalone_ = standalone;
+        candidate->runtimeEvaluation_ = runtimeEvaluation;
+        candidate->capture_ = !runtimeEvaluation || capture;
         {
             std::lock_guard lock(submissionMutex_);
             if (!resourcePool_)
@@ -330,7 +444,34 @@ namespace material_graph
             }
             candidate->resourcePool_ = resourcePool_;
         }
-        const bool recycled = candidate->resourcePool_->Acquire(*candidate);
+        const auto sampleCount = runtimeEvaluation ? std::uint64_t{1} : count;
+        const auto requiredResources =
+            (candidate->capture_ ? 11 * AlignBytes(count * 16, kResourceAlignment) : 0) +
+            AlignBytes(sampleCount * sizeof(IblBakeSample), kResourceAlignment) +
+            AlignBytes(sizeof(SceneLookupStats), kResourceAlignment);
+        const auto dispatchCount = runtimeEvaluation ? std::uint64_t{1} : (count + kDispatchPixels - 1) / kDispatchPixels;
+        const auto requiredExclusive = (!runtimeEvaluation && !previous)
+                                           ? AlignBytes(sizeof(IblBakeSample), kResourceAlignment)
+                                           : 0;
+        const auto requiredUploads = AlignBytes(sizeof(RuntimeLookupConstants), kConstantAlignment) +
+                                     dispatchCount * AlignBytes(sizeof(LookupConstants), kConstantAlignment) +
+                                     (runtimeEvaluation ? 0 : AlignBytes(sizeof(kFilmSensitivityConstants), kConstantAlignment));
+        bool recycled = false;
+        if (!candidate->resourcePool_->Acquire(*candidate, memoryBudget, requiredResources, requiredExclusive,
+                                              requiredUploads, recycled))
+        {
+            preparationDeferred_ = true;
+            return Fail(error, "Scene lookup admission is waiting for GPU memory retirement.");
+        }
+        if (!runtimeEvaluation)
+        {
+            candidate->filmSensitivityConstants_ =
+                device_->UploadConstants(kFilmSensitivityConstants.data(), sizeof(kFilmSensitivityConstants));
+            if (!candidate->filmSensitivityConstants_.IsValid())
+            {
+                return Fail(error, "Scene lookup sensitivity table upload failed.");
+            }
+        }
         RHIBufferDesc buffer;
         if (!recycled)
         {
@@ -343,12 +484,12 @@ namespace material_graph
             texture.debugName = L"LX.Scene.LookupInput";
             for (auto& input : candidate->inputs_)
             {
-                if (!device_->CreateTexture(texture, input, error))
+                if (candidate->capture_ && !device_->CreateTexture(texture, input, error))
                 {
                     return false;
                 }
             }
-            buffer.bytes = count * sizeof(IblBakeSample);
+            buffer.bytes = sampleCount * sizeof(IblBakeSample);
             buffer.allowUnorderedAccess = true;
             buffer.debugName = L"LX.Scene.LookupSamples";
             if (!device_->CreateBuffer(buffer, candidate->samples_, error))
@@ -362,7 +503,7 @@ namespace material_graph
                 return false;
             }
         }
-        if (!previous)
+        if (!runtimeEvaluation && !previous)
         {
             buffer.bytes = sizeof(IblBakeSample);
             buffer.allowUnorderedAccess = false;
@@ -372,8 +513,22 @@ namespace material_graph
                 return false;
             }
         }
+        const RuntimeLookupConstants runtime{runtimeEvaluation, irradiance.IsValid() && prefiltered.IsValid(),
+                                               source.IsValid(), environment.IsValid()};
+        candidate->runtimeConstants_ = device_->UploadConstants(&runtime, sizeof(runtime));
+        const RHIBindingDesc runtimeInputs[]{
+            RHIBindingDesc::SrvCube(irradiance, irradiance.IsValid() ? device_->DescribeTexture(irradiance).format
+                                                                  : RHIFormat::RGBA16Float, 1).OrNull(),
+            RHIBindingDesc::SrvCube(prefiltered, prefiltered.IsValid() ? device_->DescribeTexture(prefiltered).format
+                                                                    : RHIFormat::RGBA16Float, 6).OrNull(),
+            RHIBindingDesc::Srv2D(source, RHIFormat::RGBA32Float).OrNull()};
+        candidate->runtimeInputs_ = device_->CreateBindings(runtimeInputs);
+        if (!candidate->runtimeConstants_.IsValid() || !candidate->runtimeInputs_.IsValid())
+        {
+            return Fail(error, "Scene runtime lookup constants or bindings are awaiting upload capacity.");
+        }
         const RHIBindingDesc outputs[]{
-            RHIBindingDesc::UavBuffer(candidate->samples_, static_cast<std::uint32_t>(count), sizeof(IblBakeSample)),
+            RHIBindingDesc::UavBuffer(candidate->samples_, static_cast<std::uint32_t>(sampleCount), sizeof(IblBakeSample)),
             RHIBindingDesc::UavBuffer(candidate->statistics_, sizeof(SceneLookupStats) / sizeof(std::uint32_t),
                                       sizeof(std::uint32_t))};
         candidate->outputs_ = device_->CreateBindings(outputs);
@@ -381,6 +536,7 @@ namespace material_graph
         {
             return Fail(error, "Scene lookup output binding failed.");
         }
+        candidate->constants_.reserve(static_cast<std::size_t>(dispatchCount));
         for (std::uint32_t first = 0; first < count; first += kDispatchPixels)
         {
             const LookupConstants constants{
@@ -395,13 +551,19 @@ namespace material_graph
                 hasImportance,
                 source.IsValid(),
                 standalone,
-                approximate};
+                approximate,
+                runtimeEvaluation,
+                0, 0, 0};
             const auto upload = device_->UploadConstants(&constants, sizeof(constants));
             if (!upload.IsValid())
             {
                 return Fail(error, "Scene lookup dispatch constants allocation failed.");
             }
             candidate->constants_.push_back(upload);
+            if (runtimeEvaluation)
+            {
+                break;
+            }
         }
         if (candidate->recording_ != device_->GetCurrentUploadRecordingId() ||
             candidate->descriptors_ != device_->GetDescriptorVersionToken())
@@ -424,6 +586,38 @@ namespace material_graph
         }
     }
 
+    void SceneLookupFrame::DeclareShadingInputs(EnhancedRenderGraph& graph,
+                                               std::vector<EnhancedRenderGraph::RGPassUsage>& uses) const
+    {
+        CheckCurrent(graph);
+        if (!runtimeEvaluation_)
+        {
+            return;
+        }
+        const auto read = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+                              ? RGAccessMode::LegacyState
+                              : RGAccessMode::Read;
+        for (const auto texture : {environment_, irradiance_, prefiltered_, source_})
+        {
+            if (!texture.IsValid())
+            {
+                continue;
+            }
+            auto handle = graph.FindImportedTexture(texture);
+            if (!handle.IsValid())
+            {
+                handle = graph.ImportTexture(texture, RHIResourceState::PixelShaderResource, "LX.Scene.RuntimeIBL");
+            }
+            uses.push_back({handle, RHIResourceState::PixelShaderResource, read});
+        }
+    }
+
+    void SceneLookupFrame::BindRuntime(RHIEncoder& encoder, unsigned firstRootSlot) const
+    {
+        encoder.SetBindings(RHIBindPoint::Graphics, firstRootSlot, runtimeInputs_);
+        encoder.SetConstantBuffer(RHIBindPoint::Graphics, firstRootSlot + 1, runtimeConstants_);
+    }
+
     const std::array<RGHandle, 11>& SceneLookupFrame::DeclareInputs(EnhancedRenderGraph& graph) const
     {
         if (graph_)
@@ -435,8 +629,11 @@ namespace material_graph
         CheckCurrent(graph);
         for (unsigned i = 0; i < inputs_.size(); ++i)
         {
-            graphInputs_[i] =
-                graph.ImportTexture(inputs_[i], inputStates_[i], "LX.Scene.LookupInput", &inputStates_[i]);
+            if (inputs_[i].IsValid())
+            {
+                graphInputs_[i] =
+                    graph.ImportTexture(inputs_[i], inputStates_[i], "LX.Scene.LookupInput", &inputStates_[i]);
+            }
         }
         graphSamples_ = graph.ImportBuffer(samples_, sampleState_, "LX.Scene.LookupSamples", &sampleState_);
         graphStatistics_ =
@@ -454,7 +651,7 @@ namespace material_graph
                                                                      unsigned count) const
     {
         CheckCurrent(graph);
-        if (!count || first >= graphInputs_.size() || count > graphInputs_.size() - first)
+        if (!capture_ || !count || first >= graphInputs_.size() || count > graphInputs_.size() - first)
         {
             throw std::runtime_error("Scene lookup capture range is invalid.");
         }
@@ -476,10 +673,30 @@ namespace material_graph
         const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
         if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
         {
-            graphSamples_ = graph.Write(graphSamples_);
+            if (!runtimeEvaluation_)
+            {
+                graphSamples_ = graph.Write(graphSamples_);
+            }
             graphStatistics_ = graph.Write(graphStatistics_);
         }
         const auto owner = self_.lock();
+        if (runtimeEvaluation_)
+        {
+            // 런타임 sample은 fragment 레지스터에서 계산한다. 이 패스는
+            // offline sample 통계로 오해하지 않도록 mode 표지만 기록한다.
+            graph.AddPass("LX.Scene.RuntimeLookupMetadata",
+                          {{graphStatistics_, RHIResourceState::UnorderedAccess, writeAccess}},
+                          [owner](const auto& execution) {
+                              owner->CheckCurrent(*execution.graph);
+                              auto& encoder = *execution.encoder;
+                              encoder.SetPipeline(RHIBindPoint::Compute, owner->clear_->GetHandle());
+                              encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, owner->constants_.front());
+                              encoder.SetBindings(RHIBindPoint::Compute, 2, owner->outputs_);
+                              owner->stages_.fetch_or(1);
+                              encoder.Dispatch(1, 1, 1);
+                          }, true);
+            return;
+        }
         const auto previous = previous_.lock();
         if (reuse_ && !previous)
         {
@@ -628,7 +845,7 @@ namespace material_graph
         for (const auto texture :
              {environment_, irradiance_, prefiltered_, importance_[0], importance_[1], importance_[2], source_})
         {
-            if (texture.IsValid())
+            if (texture.IsValid() && !runtimeEvaluation_)
             {
                 uses.push_back({graph.FindImportedTexture(texture), RHIResourceState::PixelShaderResource, readAccess});
             }
@@ -652,6 +869,30 @@ namespace material_graph
     {
         CheckCurrent(graph);
         return graphStatistics_;
+    }
+
+    bool SceneLookupCache::TrackAcceptedSubmission(const SceneLookupFrame& frame, RHICompletionPoint completion,
+                                                   std::string& error)
+    {
+        if (frame.device_ != device_ || !completion.IsValid())
+        {
+            return Fail(error, "Scene lookup submission ownership differs from its accepted graph.");
+        }
+        {
+            std::lock_guard lock(submissionMutex_);
+            const auto submitted = submitted_.find(frame.recording_);
+            if (submitted == submitted_.end() || completion.value < submitted->second.value)
+            {
+                return Fail(error, "Scene lookup accepted graph has no matching recording evidence.");
+            }
+            acceptedRecordings_.insert(frame.recording_);
+        }
+        frame.completion_ = completion;
+        if (frame.resourcePool_)
+        {
+            frame.resourcePool_->Submitted(frame.recording_, completion);
+        }
+        return true;
     }
 
     bool SceneLookupCache::PublishSubmitted(const SceneLookupFrame& frame, std::uint64_t frameId,
@@ -682,9 +923,23 @@ namespace material_graph
             ce::profile_instant(ce::marker<"MaterialLookupPublicationOutOfOrder">());
             return Fail(error, "Scene lookup refuses duplicate or older frame publication.");
         }
-        frame.completion_ = completion;
-        if (frame.standalone_)
+        if (!TrackAcceptedSubmission(frame, completion, error))
         {
+            return false;
+        }
+        frame.submissionConfirmed_ = true;
+        if (frame.standalone_ || frame.runtimeEvaluation_)
+        {
+            if (frame.runtimeEvaluation_ && !frame.standalone_)
+            {
+                std::erase_if(published_, [&](const auto& item) { return item->viewId_ == frame.viewId_; });
+            }
+            if (!frame.standalone_)
+            {
+                std::lock_guard lock(submissionMutex_);
+                submitted_.erase(frame.recording_);
+                acceptedRecordings_.erase(frame.recording_);
+            }
             error.clear();
             return true;
         }
@@ -699,6 +954,7 @@ namespace material_graph
         {
             std::lock_guard lock(submissionMutex_);
             submitted_.erase(frame.recording_);
+            acceptedRecordings_.erase(frame.recording_);
         }
         error.clear();
         return true;
@@ -716,6 +972,7 @@ namespace material_graph
             resourcePool_.reset();
         }
         submitted_.clear();
+        acceptedRecordings_.clear();
         bake_ = {};
         clear_ = {};
         device_ = nullptr;
@@ -728,6 +985,7 @@ namespace material_graph
         // Legacy-only frames also notify this listener. Keep recent evidence bounded.
         while (submitted_.size() > 128)
         {
+            acceptedRecordings_.erase(submitted_.begin()->first);
             submitted_.erase(submitted_.begin());
         }
     }
@@ -748,6 +1006,33 @@ namespace material_graph
     void SceneLookupCache::OnUploadAborted(std::uint64_t recordingId)
     {
         std::lock_guard lock(submissionMutex_);
+        if (acceptedRecordings_.contains(recordingId))
+        {
+            return;
+        }
         submitted_.erase(recordingId);
+        if (resourcePool_)
+        {
+            resourcePool_->Aborted(recordingId);
+        }
+    }
+
+    void SceneLookupCache::OnUploadSubmissionRejected(std::uint64_t recordingId, RHICompletionPoint completion)
+    {
+        std::lock_guard lock(submissionMutex_);
+        const auto found = submitted_.find(recordingId);
+        if (acceptedRecordings_.contains(recordingId) ||
+            (found != submitted_.end() && found->second.value != completion.value))
+        {
+            return;
+        }
+        if (found != submitted_.end())
+        {
+            submitted_.erase(found);
+        }
+        if (resourcePool_)
+        {
+            resourcePool_->Rejected(recordingId);
+        }
     }
 } // namespace material_graph

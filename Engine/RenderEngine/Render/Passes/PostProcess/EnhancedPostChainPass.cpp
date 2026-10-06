@@ -199,19 +199,29 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
     // 컴퓨트 한 단계를 선언한다. 다섯 패스가 배선이 같아서(상수 하나 ·
     // SRV 둘 · UAV 하나) 함수로 뺐다 — 같은 배선을 다섯 번 적으면
     // 한 곳만 고치고 나머지를 잊는 부류의 버그가 생긴다.
-    const auto declareStage = [this, &graph, &context](
+    const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto declareStage = [this, &graph, &context, versioned, explicitAccess, readAccess](
         const char* name, RHIPipelineHandle pso,
-        RGHandle srcA, RGHandle srcB, RGHandle dst,
+        RGHandle srcA, RGHandle srcB, RGHandle& dst,
         const PostParams& params, uint32_t dispatchW, uint32_t dispatchH,
         bool accumulate)
     {
+        // 업샘플은 기존 밉에 더한다. 다음 단계에는 덮어쓴 최신 버전을 넘긴다.
+        if (versioned)
+        {
+            dst = accumulate ? graph.Modify(dst) : graph.Write(dst);
+        }
+        const auto outputAccess = explicitAccess
+            ? (accumulate ? RGAccessMode::ReadWrite : RGAccessMode::Write) : RGAccessMode::LegacyState;
         std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-        usages.push_back({ srcA, RHIResourceState::ShaderResource });
+        usages.push_back({ srcA, RHIResourceState::ShaderResource, readAccess });
         if (srcB.IsValid() && srcB.index != srcA.index)
         {
-            usages.push_back({ srcB, RHIResourceState::ShaderResource });
+            usages.push_back({ srcB, RHIResourceState::ShaderResource, readAccess });
         }
-        usages.push_back({ dst, RHIResourceState::UnorderedAccess });
+        usages.push_back({ dst, RHIResourceState::UnorderedAccess, outputAccess });
 
         graph.AddPass(name, usages,
             [this, &context, pso, srcA, srcB, dst, params, dispatchW, dispatchH]
@@ -267,7 +277,6 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
 
                 encoder.Dispatch((dispatchW + 7) / 8, (dispatchH + 7) / 8, 1);
             });
-        (void)accumulate;
     };
 
     // ── 블룸 체인 ──
@@ -384,13 +393,13 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
             hdrDesc.format = kHDRFormat;
             hdrDesc.allowUnorderedAccess = true;
             hdrDesc.name = "PostChain.RefBloomed";
-            const RGHandle bloomed = graph.CreateTexture(hdrDesc);
+            RGHandle bloomed = graph.CreateTexture(hdrDesc);
 
             RGTextureDesc stepDesc = ldrDesc;
             stepDesc.name = "PostChain.RefToned";
-            const RGHandle toned = graph.CreateTexture(stepDesc);
+            RGHandle toned = graph.CreateTexture(stepDesc);
             stepDesc.name = "PostChain.RefVignetted";
-            const RGHandle vignetted = graph.CreateTexture(stepDesc);
+            RGHandle vignetted = graph.CreateTexture(stepDesc);
 
             // ① 블룸 합성 (HDR → HDR)
             PostParams bloomParams = makeParams(bloomW, bloomH, m_width, m_height);

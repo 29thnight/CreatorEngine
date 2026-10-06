@@ -6,6 +6,19 @@
 #include "VulkanBindingTable.h"
 
 #include <algorithm>
+#include <cmath>
+
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(VkDrawIndexedIndirectCommand));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
+    offsetof(VkDrawIndexedIndirectCommand, indexCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
+    offsetof(VkDrawIndexedIndirectCommand, instanceCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
+    offsetof(VkDrawIndexedIndirectCommand, firstIndex));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
+    offsetof(VkDrawIndexedIndirectCommand, vertexOffset));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) ==
+    offsetof(VkDrawIndexedIndirectCommand, firstInstance));
 
 using namespace VulkanApi;
 
@@ -60,6 +73,52 @@ void VulkanEncoder::SetViewportAndScissor(uint32_t width, uint32_t height)
 
     VkRect2D scissor{ { 0, 0 }, { width, height } };
     vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+}
+
+bool VulkanEncoder::SetViewport(float x, float y, uint32_t width, uint32_t height)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || !std::isfinite(x) || !std::isfinite(y) ||
+        width == 0 || height == 0 || width > m_viewportLimits.maxWidth || height > m_viewportLimits.maxHeight)
+    {
+        return false;
+    }
+    const double right = static_cast<double>(x) + width;
+    const double bottom = static_cast<double>(y) + height;
+    if (x < m_viewportLimits.lowerBound || y < m_viewportLimits.lowerBound ||
+        right > m_viewportLimits.upperBound || bottom > m_viewportLimits.upperBound)
+    {
+        return false;
+    }
+
+    // 기존 전체 화면 경로와 같은 Y 반전이다. 음수 오프셋도 논리 좌상단을 뜻한다.
+    const VkViewport viewport{ x, y + static_cast<float>(height),
+        static_cast<float>(width), -static_cast<float>(height), 0.f, 1.f };
+    const double nativeRight = static_cast<double>(viewport.x) + viewport.width;
+    const double nativeTop = static_cast<double>(viewport.y) + viewport.height;
+    if (!std::isfinite(viewport.y) ||
+        static_cast<double>(viewport.width) > m_viewportLimits.maxWidth ||
+        -static_cast<double>(viewport.height) > m_viewportLimits.maxHeight ||
+        nativeRight > m_viewportLimits.upperBound ||
+        viewport.y < m_viewportLimits.lowerBound || viewport.y > m_viewportLimits.upperBound ||
+        nativeTop < m_viewportLimits.lowerBound || nativeTop > m_viewportLimits.upperBound)
+    {
+        return false;
+    }
+    vkCmdSetViewport(m_commandBuffer, 0, 1, &viewport);
+    return true;
+}
+
+bool VulkanEncoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    constexpr uint32_t kMaxScissorCoordinate = INT32_MAX;
+    if (VK_NULL_HANDLE == m_commandBuffer || x > kMaxScissorCoordinate || y > kMaxScissorCoordinate ||
+        width > kMaxScissorCoordinate - x || height > kMaxScissorCoordinate - y)
+    {
+        return false;
+    }
+    const VkRect2D scissor{ { static_cast<int32_t>(x), static_cast<int32_t>(y) }, { width, height } };
+    vkCmdSetScissor(m_commandBuffer, 0, 1, &scissor);
+    return true;
 }
 
 void VulkanEncoder::SetPrimitiveTopology(RHIPrimitiveTopology topology)
@@ -272,6 +331,34 @@ void VulkanEncoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
     FlushDescriptors(RHIBindPoint::Graphics);
     vkCmdDrawIndexed(m_commandBuffer, indexCount, instanceCount, firstIndex,
         baseVertex, firstInstance);
+}
+
+bool VulkanEncoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources ||
+        !m_indirectDrawCapabilities.indexedDraw || nullptr == vkCmdDrawIndexedIndirect ||
+        !m_renderingOpen || 0 != byteOffset % 4)
+    {
+        return false;
+    }
+    const VulkanBufferEntry entry = m_resources->Resolve(arguments);
+    if (!entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+
+    const uint32_t errorsBeforeFlush = m_unimplemented;
+    FlushDescriptors(RHIBindPoint::Graphics);
+    if (errorsBeforeFlush != m_unimplemented)
+    {
+        return false;
+    }
+
+    // multiDrawIndirect는 요구하지 않는다. firstInstance 제약은 생산자가 지킨다.
+    vkCmdDrawIndexedIndirect(m_commandBuffer, entry.buffer, byteOffset, 1,
+        sizeof(RHIDrawIndexedIndirectArguments));
+    return true;
 }
 
 void VulkanEncoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)

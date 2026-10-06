@@ -73,6 +73,7 @@ namespace DX12Translate
         {
         case RHICompareOp::LessEqual: return D3D12_COMPARISON_FUNC_LESS_EQUAL;
         case RHICompareOp::Equal: return D3D12_COMPARISON_FUNC_EQUAL;
+        case RHICompareOp::Always: return D3D12_COMPARISON_FUNC_ALWAYS;
         case RHICompareOp::None:
         default:                      return D3D12_COMPARISON_FUNC_NEVER;
         }
@@ -217,6 +218,7 @@ inline D3D12_COMPARISON_FUNC ToD3D12Depth(RHICompareOp op)
     case RHICompareOp::Less:      return D3D12_COMPARISON_FUNC_LESS;
     case RHICompareOp::LessEqual: return D3D12_COMPARISON_FUNC_LESS_EQUAL;
     case RHICompareOp::Equal: return D3D12_COMPARISON_FUNC_EQUAL;
+    case RHICompareOp::Always: return D3D12_COMPARISON_FUNC_ALWAYS;
     default:                      return D3D12_COMPARISON_FUNC_ALWAYS;
     }
 }

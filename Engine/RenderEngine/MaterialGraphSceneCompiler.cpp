@@ -44,6 +44,11 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
     passes.back().state.blendMode = ShaderBlendMode::Alpha;
     graphics("LXSceneLookup0", "LXSceneVS", "LXSceneLookup0PS");
     graphics("LXSceneLookup1", "LXSceneVS", "LXSceneLookup1PS");
+    if ((program.features & 0x1800u) != 0)
+    {
+        graphics("LXSceneRuntimeEffects0", "LXSceneVS", "LXSceneRuntimeEffects0PS");
+        graphics("LXSceneRuntimeEffects1", "LXSceneVS", "LXSceneRuntimeEffects1PS");
+    }
     if (program.surface) graphics("Shadow", "LXSceneShadowVS", "LXSceneShadowPS", ShaderPassQueue::Shadow, true);
     if ((program.features & 0x1000u) != 0) graphics("Subsurface", "LXSceneVS", "LXSceneSubsurfacePS");
     if ((program.features & 0x0800u) != 0) graphics("Refraction", "LXSceneVS", "LXSceneRefractionPS");
@@ -79,6 +84,11 @@ std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& prog
         if ((program.features & 0x1000u) != 0)
         {
             targets.push_back({backend, "LXSceneSubsurfacePS", "ps_6_0"});
+        }
+        if ((program.features & 0x1800u) != 0)
+        {
+            targets.push_back({backend, "LXSceneRuntimeEffects0PS", "ps_6_0"});
+            targets.push_back({backend, "LXSceneRuntimeEffects1PS", "ps_6_0"});
         }
         if ((program.features & 0x0800u) != 0)
         {
@@ -230,6 +240,8 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
                                                             {"LXSceneShadowPS", &SceneShaderSet::shadow},
                                                             {"LXSceneSubsurfacePS", &SceneShaderSet::subsurface},
                                                             {"LXSceneRefractionPS", &SceneShaderSet::refraction},
+                                                            {"LXSceneRuntimeEffects0PS", &SceneShaderSet::runtimeEffects0},
+                                                            {"LXSceneRuntimeEffects1PS", &SceneShaderSet::runtimeEffects1},
                                                             {"LXSceneVolumeCoefficientCS", &SceneShaderSet::volume}};
         const auto member = std::ranges::find(members, target.entry, &std::pair<std::string_view, Member>::first);
         if (member == std::end(members))

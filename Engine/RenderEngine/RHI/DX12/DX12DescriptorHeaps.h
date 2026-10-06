@@ -125,6 +125,7 @@ public:
     void Collect(RHICompletionPoint completed);
     bool BeginRecording(uint64_t recordingId, std::string& outError);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
+    void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
 
     // 연속 count개를 잘라낸다. 모자라면 무효를 돌려준다 — 조용히 다음 구간을

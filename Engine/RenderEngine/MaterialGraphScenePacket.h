@@ -114,6 +114,7 @@ class SceneMaterialSlot final : private IRHIUploadTransactionListener
     void OnUploadSubmitted(std::uint64_t recordingId, RHICompletionPoint completion) override;
     void OnUploadCompleted(std::uint64_t completed) override;
     void OnUploadAborted(std::uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(std::uint64_t recordingId, RHICompletionPoint reservedCompletion) override;
 
     IRenderDeviceServices* device_{};
     std::uint64_t serial_{};

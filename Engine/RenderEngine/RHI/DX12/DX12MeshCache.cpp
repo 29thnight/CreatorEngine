@@ -484,6 +484,25 @@ void DX12MeshCache::OnUploadCompleted(uint64_t completedValue)
     }
 }
 
+void DX12MeshCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
+{
+    const auto reject = [recordingId, completion](auto& entries)
+    {
+        for (auto& [key, buffers] : entries)
+        {
+            if (buffers.recordingId == recordingId && buffers.completionValue == completion.value &&
+                (buffers.uploadState == RHIUploadTransactionState::Queued ||
+                    buffers.uploadState == RHIUploadTransactionState::Resident))
+            {
+                buffers.uploadState = RHIUploadTransactionState::Recording;
+            }
+        }
+    };
+    reject(m_entries);
+    reject(m_modelEntries);
+    OnUploadAborted(recordingId);
+}
+
 void DX12MeshCache::OnUploadAborted(uint64_t recordingId)
 {
     auto it = m_entries.begin();

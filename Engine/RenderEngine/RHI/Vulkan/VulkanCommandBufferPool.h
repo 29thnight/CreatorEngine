@@ -53,6 +53,9 @@ private:
 
     void RetireEncoder(Slot& slot);
     uint32_t GetCurrentFrameSlot() const override { return m_frameIndex; }
+    uint64_t GetCurrentRecordingId() const override;
+    void RejectPreparedCommands(uint64_t recordingId, RHICompletionPoint completion) override;
+    void AcceptPreparedCommands(RHICompletionPoint completion, const RHISubmissionTicket& ticket) override;
     bool PrepareRecordedCommands(uint32_t frameSlot,
         RHICompletionPoint& outCompletion, std::string& outError) override;
     bool SubmitRecordedCommands(uint32_t frameSlot,

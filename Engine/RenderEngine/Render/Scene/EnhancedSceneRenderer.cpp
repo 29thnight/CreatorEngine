@@ -77,6 +77,8 @@
 #include <condition_variable>
 #include <chrono>
 #include <string_view>
+#include <type_traits>
+#include <exception>
 #include <unordered_map>
 #include <set>
 #include <wrl/wrappers/corewrappers.h>
@@ -94,6 +96,23 @@
 // 명칭 체계가 흐려진다(실제로 그렇게 만들었다가 물렸다).
 namespace EnhancedSceneRenderer
 {
+    using LiveGraphSnapshot = std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>;
+
+    LiveGraphSnapshot CaptureLiveGraphSnapshot(const EnhancedRenderGraph& graph,
+        uint64_t viewId, uint64_t frameId, uint32_t width, uint32_t height)
+    {
+        auto snapshot = std::make_shared<EnhancedRenderGraph::DiagnosticSnapshot>();
+        if (!graph.CaptureDiagnosticSnapshot(*snapshot))
+        {
+            return {};
+        }
+        snapshot->viewId = viewId;
+        snapshot->frameId = frameId;
+        snapshot->width = width;
+        snapshot->height = height;
+        return snapshot;
+    }
+
     // PHASE 14 P2 — 받아 둔 수명 훅. 익명 네임스페이스에 두지 않는다: 유니티
     // 빌드의 격리 단위는 파일이 아니라 blob 이라, 같은 blob 에 든 다른 파일의
     // 같은 이름과 조용히 한 덩어리가 된다. 여기 이름은 링커가 본다.
@@ -284,6 +303,8 @@ namespace
         camera.inverseProjection = math::inverse(camera.projection);
         return camera;
     }
+    using EnhancedSceneRenderer::LiveGraphSnapshot;
+    using EnhancedSceneRenderer::CaptureLiveGraphSnapshot;
     using EnhancedSceneRenderer::RenderPhase;
     using EnhancedSceneRenderer::RenderThreadPhaseScope;
     // I6-C — 신원 키 정본. experiment 핸들의 stableKey가 우선이고, 없으면
@@ -557,6 +578,21 @@ namespace
     // external-memory 직접 공유는 별도 성능 단계다.
     struct VulkanLivePipeline
     {
+        bool shutdownComplete{ false };
+
+        ~VulkanLivePipeline()
+        {
+            if (!shutdownComplete && resources.IsInitialized())
+            {
+                std::string error;
+                if (!Shutdown(error))
+                {
+                    OutputDebugStringA("[Vulkan live] Forced destruction cannot prove GPU idle or device loss; refusing unsafe member destruction.\n");
+                    std::terminate();
+                }
+            }
+        }
+
         static constexpr uint32_t kSlotCount = 3;
         static constexpr uint64_t kDisplayKeyBase = 0x564B4C4956450000ull; // "VKLIVE"
 
@@ -565,6 +601,7 @@ namespace
         uint64_t frameCounter{ 0 };
 
         VulkanDeviceResources resources;
+        std::shared_ptr<VulkanCaptureGpuProfiler> retainedCaptureProfiler;
         VulkanPipelineCache pipelines;
         VulkanMeshCache meshCache;
         VulkanTextureCache textureCache;
@@ -767,21 +804,38 @@ namespace
             return true;
         }
 
-        void Shutdown()
+        bool Shutdown(std::string& outError, EnhancedPbrCapture* capture = nullptr)
         {
+            if (shutdownComplete)
+            {
+                return true;
+            }
             if (resources.IsInitialized())
             {
                 std::string lifecycleError;
-                if (!resources.DrainForLifecycle(
-                        RHILifecycleCommand::BackendShutdown, lifecycleError))
+                bool drained = resources.DrainForLifecycle(
+                    RHILifecycleCommand::BackendShutdown, lifecycleError);
+                if (!drained && GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    drained = resources.DrainForLifecycle(
+                        RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+                }
+                if (!drained)
                 {
                     OutputDebugStringA(("[Vulkan live] backend shutdown drain 실패: " +
                         lifecycleError + "\n").c_str());
-                    std::string abandonError;
-                    resources.DrainForLifecycle(
-                        RHILifecycleCommand::UnrecoverableDeviceError,
-                        abandonError);
+                    outError = "Vulkan pipeline retained: GPU idle or device loss was not established: " + lifecycleError;
+                    return false;
                 }
+            }
+            if (retainedCaptureProfiler)
+            {
+                retainedCaptureProfiler->ReleaseAfterIdle();
+                retainedCaptureProfiler.reset();
+            }
+            if (capture && capture->resourceBackend == EnhancedLiveBackend::Vulkan)
+            {
+                capture->Release(resources);
             }
             for (Slot& slot : slots)
             {
@@ -799,6 +853,8 @@ namespace
             meshCache.Shutdown();
             pipelines.Shutdown();
             resources.Shutdown();
+            shutdownComplete = true;
+            return true;
         }
 
         int FindOrAssignView(const EnhancedLiveViewPacket& requested,
@@ -929,8 +985,25 @@ namespace
             uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
             uint64_t resizeGeneration, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
-            std::string& outError, EnhancedPbrCapture* capture)
+            std::string& outError, EnhancedPbrCapture* capture,
+            LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            preparationDeferred = false;
+            if (retainedCaptureProfiler)
+            {
+                if (!resources.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError))
+                {
+                    return false;
+                }
+                retainedCaptureProfiler->ReleaseAfterIdle();
+                retainedCaptureProfiler.reset();
+                backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&resources);
+                if (GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    outError = "Vulkan capture cleanup observed device loss.";
+                    return false;
+                }
+            }
             Slot* slot = nullptr;
             for (Slot& candidate : slots)
             {
@@ -957,18 +1030,38 @@ namespace
                 const bool& committed;
                 EnhancedPbrCapture* capture;
                 std::string& error;
+                std::shared_ptr<VulkanCaptureGpuProfiler>& profiler;
                 ~FrameGuard()
                 {
                     if (!committed) resources.AbortFrame();
                     if (capture)
                     {
-                        resources.WaitForGpu();
-                        capture->Release(resources);
+                        std::string releaseError;
+                        bool safe = resources.DrainForLifecycle(
+                            RHILifecycleCommand::OfflineReadbackCapture, releaseError);
+                        if (!safe && GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                        {
+                            safe = resources.DrainForLifecycle(
+                                RHILifecycleCommand::UnrecoverableDeviceError, releaseError);
+                        }
+                        if (safe)
+                        {
+                            capture->Release(resources);
+                            if (profiler)
+                            {
+                                profiler->ReleaseAfterIdle();
+                                profiler.reset();
+                            }
+                        }
+                        else
+                        {
+                            capture->Fail("Capture resources retained until GPU idle: " + releaseError);
+                        }
                         if (capture->result.state == EnhancedPbrCaptureState::Recording)
                             capture->Fail(error);
                     }
                 }
-            } frameGuard{ resources, committed, capture, outError };
+            } frameGuard{ resources, committed, capture, outError, retainedCaptureProfiler };
 
             // Keep the diagnostic reset guard alive through recording/submission,
             // just as DX12 does. Resetting at prepare-scope exit changes the SSGI
@@ -999,18 +1092,30 @@ namespace
             }
 
             slot->graph = std::make_shared<EnhancedRenderGraph>(
-                static_cast<IRenderDeviceServices&>(resources));
+                static_cast<IRenderDeviceServices&>(resources),
+                RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
             {
                 RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::SpirV);
                 if (!graphMaterials.PrepareResidency(frameContext, graphInput, outError)) return false;
-                if (graphInput && !graphInput->Draws().empty() &&
-                    !graph.PrepareParallel(commandPool, outError)) return false;
+                if (((graphInput && !graphInput->Draws().empty()) || gbuffer.HasGpuVisibilityCandidates())
+                    && !graph.PrepareParallel(commandPool, outError))
+                {
+                    return false;
+                }
+                if (!gbuffer.PrepareGpuVisibility(frameContext, outError))
+                {
+                    return false;
+                }
                 if (!graphMaterials.Prepare(frameContext, graphInput, ibl.GetCubeMap(),
                         ibl.GetIrradianceMap(), ibl.GetPrefilteredMap(),
-                        shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate},
-                        outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap())) return false;
+                        shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate, .lookupRuntimeEvaluation = true},
+                        outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap()))
+                {
+                    preparationDeferred = graphMaterials.PreparationDeferred();
+                    return false;
+                }
                 if (capture) capture->RecordLatticeInput(graphInput);
             }
             double compileMs = 0.0;
@@ -1048,7 +1153,18 @@ namespace
                 compileMs = compileWatch.ElapsedMs();
             }
 
-            VulkanCaptureGpuProfiler captureProfiler(resources);
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, viewPacket.key.viewId,
+                    sourceFrameId, width, height);
+            }
+
+            // The pipeline retains a query owner if a capture cannot prove idle.
+            // A stack destructor must not free queries still referenced by the GPU.
+            if (capture)
+            {
+                retainedCaptureProfiler = std::make_shared<VulkanCaptureGpuProfiler>(resources);
+            }
             // Graph slots persist across frames; never retain this stack-owned
             // diagnostic profiler when the slot returns to ordinary rendering.
             struct CaptureProfilerReset
@@ -1059,8 +1175,8 @@ namespace
             graph.SetProfiler(nullptr);
             if (capture)
             {
-                if (!captureProfiler.Initialize(outError)) return false;
-                graph.SetProfiler(&captureProfiler);
+                if (!retainedCaptureProfiler->Initialize(outError)) return false;
+                graph.SetProfiler(retainedCaptureProfiler.get());
             }
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
@@ -1082,14 +1198,25 @@ namespace
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (!GetRHISubmissionThread().EnqueueRecordedBatch(&resources,
-                        resources, std::move(batch), batchTicket, outError)) return false;
+                        resources, std::move(batch), batchTicket, outError))
+                {
+                    return false;
+                }
+                // Queue admission already transferred graph ownership. Attach its
+                // completion before a separate immediate tail submission can fail.
+                const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
+                        graphCompletion, outError, batchTicket))
+                {
+                    return false;
+                }
                 lastGraphStats = graph.GetStats();
-                if (!resources.EndFrame(outError)) return false;
+                if (!resources.EndFrame(outError))
+                {
+                    return false;
+                }
             }
             committed = true;
-            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
-            if (!graphMaterials.PublishSubmittedCache(sourceFrameId,
-                    graphCompletion, outError, batchTicket)) return false;
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
@@ -1107,7 +1234,12 @@ namespace
             slot->pending = true;
             if (capture)
             {
-                resources.WaitForGpu();
+                if (!resources.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError)
+                    || GetRHISubmissionThread().GetOwnerStats(&resources).faulted)
+                {
+                    capture->Fail(outError.empty() ? "Vulkan capture cannot read data after device loss." : outError);
+                    return false;
+                }
                 std::string validation;
                 const uint32_t validationCount = resources.DrainDebugMessages(validation);
                 // W8: 패스가 배치를 확정한 뒤라야 알 수 있는 축을 여기서 싣는다.
@@ -1128,9 +1260,14 @@ namespace
                 std::vector<VulkanCaptureGpuProfiler::Timing> nativeTimings;
                 EnhancedLiveGpuSpan captureSpan;
                 std::string timingError;
-                captureProfiler.Collect(nativeTimings, captureSpan.queueSpanMs,
-                    captureSpan.busyMs, timingError);
-                captureSpan.sliceCount = captureProfiler.SliceCount();
+                if (!retainedCaptureProfiler->Collect(nativeTimings, captureSpan.queueSpanMs,
+                        captureSpan.busyMs, timingError))
+                {
+                    outError = timingError;
+                    capture->Fail(outError);
+                    return false;
+                }
+                captureSpan.sliceCount = retainedCaptureProfiler->SliceCount();
                 std::vector<EnhancedLivePassTiming> captureTimings;
                 for (const auto& timing : nativeTimings)
                     captureTimings.push_back({timing.name, timing.milliseconds, timing.milliseconds});
@@ -1144,6 +1281,20 @@ namespace
 
     struct LiveState
     {
+        ~LiveState()
+        {
+            // The submission service intentionally has process lifetime. Drain
+            // while every pass/cache member is still alive, before member teardown.
+            StopRenderThread();
+            const bool dx12Released = TeardownPipeline();
+            const bool vulkanReleased = TeardownVulkanPipeline();
+            if (!dx12Released || !vulkanReleased)
+            {
+                OutputDebugStringA("[EnhancedRenderer] Forced destruction cannot prove GPU idle or device loss; retaining GPU owners is no longer possible.\n");
+                std::terminate();
+            }
+        }
+
         std::unique_ptr<EnhancedPbrCapture> pbrCapture;
 
         EnhancedPbrCapture* BeginPbrCapture(const EnhancedLiveFramePacket& frame,
@@ -1355,7 +1506,6 @@ namespace
         // 새로 올라가므로 다시 넓혀야 한다). 포그를 껐다 켜는 것으로는
         // 리셋하지 않는다 — 이미 넓힌 리소스에 또 배리어를 걸면 before가
         // 실제와 어긋나 검증 레이어가 잡는다.
-        bool                        fogNoiseStateWidened{ false };
 
         // 창이 넣은 켬/끔. 꺼져 있으면 포그 패스를 아예 세우지 않는다.
         bool                        fogEnabled{ false };
@@ -1432,6 +1582,10 @@ namespace
 
         void InvalidateDisplayResultsLocked()
         {
+            {
+                std::lock_guard<std::mutex> lock(debugMutex);
+                graphSnapshots.fill({});
+            }
             for (uint32_t i = 0; i < kEnhancedLiveDisplayTargetCount; ++i)
             {
                 EnhancedLiveDisplayEntrySnapshot& entry = displaySnapshot.targets[i];
@@ -1588,6 +1742,7 @@ namespace
         // Same ordering as graphDraws/SceneDrawInput::sourceIndex. These sealed
         // legacy draws keep the entire model visible during a cold graph compile.
         std::vector<EnhancedDrawItem> graphFallbackDraws;
+        std::vector<bool> graphFallbackShadowEligible;
         std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
@@ -1914,6 +2069,23 @@ namespace
         // 창은 락을 잡아 복사만 한다.
         std::mutex                debugMutex;
         EnhancedLiveDebugSnapshot debugSnapshot;
+        std::array<LiveGraphSnapshot, kEnhancedLiveDisplayTargetCount> graphSnapshots{};
+        std::array<bool, kEnhancedLiveDisplayTargetCount> graphSnapshotRequests{};
+
+        bool ConsumeGraphSnapshotRequest(EnhancedLiveDisplayTarget target)
+        {
+            std::lock_guard<std::mutex> lock(debugMutex);
+            const uint32_t index = DisplayTargetIndex(target);
+            const bool requested = graphSnapshotRequests[index];
+            graphSnapshotRequests[index] = false;
+            return requested;
+        }
+
+        void PublishGraphSnapshot(EnhancedLiveDisplayTarget target, LiveGraphSnapshot snapshot)
+        {
+            std::lock_guard<std::mutex> lock(debugMutex);
+            graphSnapshots[DisplayTargetIndex(target)] = std::move(snapshot);
+        }
 
         // LivePipelineDesc 덤프는 구조가 다시 서거나 active 조건이 바뀔 때만
         // 만든다. 프레임마다 문자열을 조립하지 않고 기존 debug snapshot에
@@ -2049,6 +2221,11 @@ namespace
 
         bool BuildPipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
         {
+            if (pipeline)
+            {
+                outError = "DX12 pipeline is still retained; complete its safe teardown before rebuilding.";
+                return false;
+            }
             const auto traceBuild = [](const char* phase) {
                 const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE");
                 if (value && std::string_view(value) == "1")
@@ -2250,7 +2427,6 @@ namespace
                 }
                 view.ssgi.ReleaseHistory(p.frameContext);
             }
-            std::lock_guard poolLock(p.transientPool.mutex);
             for (auto& [key, entries] : p.transientPool.freeList)
             {
                 (void)key;
@@ -2290,6 +2466,11 @@ namespace
         bool BuildVulkanPipeline(uint32_t newWidth, uint32_t newHeight,
             std::string& outError)
         {
+            if (vulkanPipeline)
+            {
+                outError = "Vulkan pipeline is still retained; complete its safe teardown before rebuilding.";
+                return false;
+            }
             // 락 범위는 DX12 쪽 BuildPipeline과 같은 규약이다 — 무효화만 잡고
             // 구축은 밖에서 한다. 두 백엔드에 같은 규약을 적어 두지 않으면
             // 한쪽만 고쳐진 채로 남는다.
@@ -2306,7 +2487,12 @@ namespace
             if (!vulkanPipeline->Initialize(newWidth, newHeight, cameraSnapshot,
                 draws, forwardDraws, lights, outError))
             {
-                vulkanPipeline->Shutdown();
+                std::string shutdownError;
+                if (!vulkanPipeline->Shutdown(shutdownError))
+                {
+                    outError += "\n" + shutdownError;
+                    return false;
+                }
                 vulkanPipeline.reset();
                 return false;
             }
@@ -2325,42 +2511,56 @@ namespace
             forwardShaderMetaError.clear();
         }
 
-        void TeardownVulkanPipeline()
+        bool TeardownVulkanPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (!vulkanPipeline)
             {
                 ReleaseForwardShaderMetaOwnerIfUnused();
-                return;
+                return true;
             }
             InvalidateDisplayResultsLocked();
-            vulkanPipeline->Shutdown();
+            std::string error;
+            if (!vulkanPipeline->Shutdown(error, pbrCapture.get()))
+            {
+                lastError = error;
+                enabled = false;
+                return false;
+            }
             vulkanPipeline.reset();
             ReleaseForwardShaderMetaOwnerIfUnused();
+            return true;
         }
 
         /// 파이프라인 해체. DX11에 보이는 것은 묘지로 보낸다(수명 규약).
-        void TeardownPipeline()
+        bool TeardownPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (nullptr == pipeline)
             {
                 ReleaseForwardShaderMetaOwnerIfUnused();
-                return;
+                return true;
             }
             InvalidateDisplayResultsLocked();
             LivePipeline& p = *pipeline;
 
             {
                 std::string lifecycleError;
-                if (!dx12.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError))
+                bool drained = dx12.DrainForLifecycle(RHILifecycleCommand::BackendShutdown, lifecycleError);
+                if (!drained && dx12.HasDeviceLossProof())
+                {
+                    drained = dx12.DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+                }
+                if (!drained)
                 {
                     lastError = "DX12 lifecycle drain 실패: " + lifecycleError;
-                    std::string abandonError;
-                    dx12.DrainForLifecycle(
-                        RHILifecycleCommand::UnrecoverableDeviceError,
-                        abandonError);
+                    enabled = false;
+                    return false;
                 }
+            }
+            if (pbrCapture && pbrCapture->resourceBackend == EnhancedLiveBackend::DX12)
+            {
+                pbrCapture->Release(dx12.Resources());
             }
             ReleaseSizeResources(p);
 
@@ -2382,7 +2582,6 @@ namespace
             }
             p.fogBlueNoiseHandle = {};
             fogInputsReady = false;
-            fogNoiseStateWidened = false;   // 새 캐시에는 다시 넓혀야 한다
             fogTeardownPending = false;
             fogRetireFence = 0;
 
@@ -2390,6 +2589,7 @@ namespace
 
             pipeline.reset();
             ReleaseForwardShaderMetaOwnerIfUnused();
+            return true;
         }
 
         /// 포그가 처음 켜질 때 부른다. 프레임이 열려 있어야 한다(업로드 링과
@@ -2443,19 +2643,8 @@ namespace
                     p.fogCloudNeutralHandle, outError)) return false;
             }
 
-            // 블루 노이즈는 캐시가 PIXEL로 끝내 두었다. 그래프가 ShaderResource
-            // (=ALL)로 임포트하므로 여기서 한 번 넓혀 둔다 — ALL은 PIXEL의
-            // 상위집합이라 이 리소스를 픽셀로 읽는 쪽이 생겨도 그대로 맞다.
-            // 두 번 걸면 before가 실제와 어긋나므로 캐시 수명당 한 번만 건다.
-            if (!fogNoiseStateWidened)
-            {
-                const RHITransition widen[] = {
-                    { noiseEntry.handle,
-                      RHIResourceState::PixelShaderResource,
-                      RHIResourceState::ShaderResource } };
-                dx12.Resources().TransitionResources(widen);
-                fogNoiseStateWidened = true;
-            }
+            // The graph imports the cache-owned Pixel state and restores it
+            // after the last consumer. Do not widen a shared asset out of graph.
 
             fogInputsReady = true;
             return true;
@@ -2539,9 +2728,9 @@ namespace
         // 예전에는 그 사실이 RenderOnce 안에 200줄로 흩어져 있었고, 패스를
         // 하나 이으려면 그중 순서를 지켜야 하는 자리 넷을 사람이 찾아 고쳤다.
         //
-        // 노드 순서 = 실행 순서다(3-5 계약을 위층에서 잇는다). 노드를 옮기는
-        // 것이 곧 파이프라인을 바꾸는 것이고, 그것 말고 순서를 정하는 곳은
-        // 없다.
+        // 노드 목록은 저작 슬롯의 버전 배선을 정한다. 실제 실행 순서는
+        // 같은 EnhancedRenderGraph의 명시적 리소스 의존성에서 컴파일한다.
+        // 독립 패스의 안정 tie-break에만 저작 순서를 사용한다.
         //
         // ★ 람다가 `p`(자기 소유자)와 `this`(LiveState 싱글턴)를 캡처한다.
         //   파이프라인을 헐 때 desc도 함께 사라지므로 대롱거리는 참조가
@@ -2702,8 +2891,8 @@ namespace
                 {
                     p.deferred.SetInputs(GatherGBufferOutputs(bb));
                     p.deferred.SetAmbientOcclusion(bb.Get(LiveSlots::kAmbientOcclusion));
-                    p.deferred.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
-                    p.forward.SetShadow(p.shadow.GetShadowMap(), p.shadow.GetShadowData());
+                    p.deferred.SetShadow(bb.Get(LiveSlots::kShadowMap), p.shadow.GetShadowData());
+                    p.forward.SetShadow(bb.Get(LiveSlots::kShadowMap), p.shadow.GetShadowData());
                     p.deferred.Declare(graph, ctx);
                     bb.Set(LiveSlots::kLitColor, p.deferred.GetOutput());
                 };
@@ -3016,10 +3205,22 @@ namespace
                     inputs.color = bb.Get(LiveSlots::kLitColor);
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
                     inputs.shadowMap = bb.Get(LiveSlots::kShadowMap);
-                    inputs.cloudShadow = graph.ImportTexture(p.fogCloudNeutralHandle,
-                        RHIResourceState::ShaderResource, "Fog.CloudNeutral");
-                    inputs.blueNoise = graph.ImportTexture(p.fogBlueNoiseHandle,
-                        RHIResourceState::ShaderResource, "Fog.BlueNoise");
+                    inputs.cloudShadow = graph.FindImportedTexture(p.fogCloudNeutralHandle);
+                    if (!inputs.cloudShadow.IsValid())
+                    {
+                        inputs.cloudShadow = graph.ImportTexture(p.fogCloudNeutralHandle,
+                            RHIResourceState::ShaderResource, "Fog.CloudNeutral");
+                    }
+                    constexpr auto fogNoiseState = std::is_same_v<PipelineT, LivePipeline>
+                        ? RHIResourceState::PixelShaderResource : RHIResourceState::ShaderResource;
+                    inputs.blueNoise = graph.FindImportedTexture(p.fogBlueNoiseHandle);
+                    if (!inputs.blueNoise.IsValid())
+                    {
+                        inputs.blueNoise = graph.ImportTexture(p.fogBlueNoiseHandle,
+                            fogNoiseState, "Fog.BlueNoise");
+                    }
+                    graph.RequireImportedFinalState(inputs.blueNoise, fogNoiseState);
+                    graph.RequireImportedFinalState(inputs.cloudShadow, RHIResourceState::ShaderResource);
                     view.fog.SetInputs(inputs);
                     // 셰이더가 캐스케이드 슬라이스 2를 짚는다 — DX11이 마지막
                     // 캐스케이드 행렬을 넘기는 것과 짝이다.
@@ -3120,12 +3321,19 @@ namespace
 
                     if (binding.sharedTarget.IsValid())
                     {
-                        const RGHandle sharedHandleRG = graph.ImportTexture(
+                        const RGHandle sharedInitial = graph.ImportTexture(
                             binding.sharedTarget, RHIResourceState::CopyDest, "Live.Shared");
+                        const bool explicitAccess = graph.GetSchedulingMode()
+                            != RGSchedulingMode::DeclarationOrder;
+                        const RGHandle sharedHandleRG = graph.GetSchedulingMode()
+                            == RGSchedulingMode::ExplicitVersioned
+                            ? graph.Write(sharedInitial) : sharedInitial;
 
                         graph.AddPass("live_present",
-                            { { finalHandle, RHIResourceState::CopySource },
-                              { sharedHandleRG, RHIResourceState::CopyDest } },
+                            { { finalHandle, RHIResourceState::CopySource,
+                                explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState },
+                              { sharedHandleRG, RHIResourceState::CopyDest,
+                                explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState } },
                             [sharedHandleRG, finalHandle](
                                 const EnhancedRenderGraph::ExecuteContext& executeContext)
                             {
@@ -3140,7 +3348,9 @@ namespace
 
                     const RHIReadback readback = binding.readbackTarget;
                     graph.AddPass("live_present",
-                        { { finalHandle, RHIResourceState::CopySource } },
+                        { { finalHandle, RHIResourceState::CopySource,
+                            graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder
+                                ? RGAccessMode::Read : RGAccessMode::LegacyState } },
                         [readback, finalHandle](
                             const EnhancedRenderGraph::ExecuteContext& executeContext)
                         {
@@ -3421,6 +3631,7 @@ namespace
             drawPool.clear();
             graphDraws.clear();
             graphFallbackDraws.clear();
+            graphFallbackShadowEligible.clear();
             graphViewInput.reset();
             decals.clear();
             spritePool.clear();
@@ -4138,6 +4349,7 @@ namespace
             forwardDraws.clear();
             graphDraws.clear();
             graphFallbackDraws.clear();
+            graphFallbackShadowEligible.clear();
             graphViewInput.reset();
             lights.clear();
             worldSprites.clear();
@@ -4319,24 +4531,59 @@ namespace
             const auto receivers = shadow_math::ReceiverCascades(cameraSnapshot, shadowDirection,
                 shadowPass ? shadowPass->GetShadowDistance() : shadow_math::kDefaultDistance,
                 shadowPass ? shadowPass->GetCascadeBlendBand() : .15f);
+            const bool gpuVisibility = backend == EnhancedLiveBackend::DX12
+                ? dx12.Resources().GetIndirectDrawCapabilities().indexedDraw
+                : (vulkanPipeline && vulkanPipeline->resources.GetIndirectDrawCapabilities().indexedDraw);
             std::vector<size_t> opaqueShadowIndices, graphShadowIndices;
             uint32_t culled = 0;
+            const material_graph::SceneInputBudget sceneInputBudget;
+            uint32_t optionalGpuCandidates = 0;
+            bool hasOptionalGraphCandidates = false;
             for (const PooledDraw& pooled : drawPool)
             {
                 // Select the visible/caster union before the bounded Graph seal.
                 // Unknown or posed bounds remain conservative, never camera-only.
                 const bool visible = !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
                     || math::intersects(frustum, pooled.worldBounds);
-                if (!shadow_math::RelevantToView(visible, shadow_math::WorldBounds(pooled.item),
-                        receivers, shadowDirection, hasShadowLight))
+                const bool relevantToShadow = shadow_math::RelevantToView(visible,
+                    shadow_math::WorldBounds(pooled.item), receivers, shadowDirection, hasShadowLight);
+                // Static candidates reach the GPU even when outside the camera.
+                // Shadow selection remains independent; it must not expand with
+                // the geometry visibility working set.
+                bool gpuMaterialEligible = !pooled.isTransparent;
+                if (pooled.graphMaterialSource)
+                {
+                    const auto& source = *pooled.graphMaterialSource;
+                    gpuMaterialEligible = source.instance && source.instance->generation
+                        && source.instance->generation->cooked.product.program.surface
+                        && (source.instance->generation->cooked.product.program.features & 0x0800u) == 0
+                        && (source.coverage.flags & EnhancedMaterialCoverage::Blended) == 0;
+                }
+                const bool gpuCandidate = gpuVisibility && pooled.item.boneCount == 0 && gpuMaterialEligible;
+                if (!relevantToShadow && !gpuCandidate)
                 {
                     ++culled;
                     continue;
                 }
-                const size_t shadowIndex = shadowDraws.size();
-                if (pooled.graphMaterialSource || !pooled.isTransparent)
+                // Optional offscreen work must not grow CPU staging without a
+                // bound or displace the original visible/caster working set.
+                if (!relevantToShadow)
+                {
+                    if (optionalGpuCandidates >= sceneInputBudget.draws)
+                    {
+                        ++culled;
+                        continue;
+                    }
+                    ++optionalGpuCandidates;
+                    hasOptionalGraphCandidates |= bool(pooled.graphMaterialSource);
+                }
+                size_t shadowIndex = static_cast<size_t>(-1);
+                if (relevantToShadow && (pooled.graphMaterialSource || !pooled.isTransparent))
+                {
+                    shadowIndex = shadowDraws.size();
                     shadowDraws.push_back(pooled.item);
-                if (!pooled.graphMaterialSource && !visible)
+                }
+                if (!pooled.graphMaterialSource && !visible && !gpuCandidate)
                 {
                     ++culled;
                     continue;
@@ -4352,6 +4599,7 @@ namespace
                     fallback.materialGraphInstance.reset();
                     fallback.materialGraphSlot = 0;
                     graphFallbackDraws.push_back(std::move(fallback));
+                    graphFallbackShadowEligible.push_back(relevantToShadow);
                 }
                 else if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
                 else
@@ -4392,9 +4640,19 @@ namespace
                     draws.swap(stagedOpaque); forwardDraws.swap(stagedForward);
                     graphDraws.swap(stagedGraph); graphFallbackDraws.swap(stagedFallback);
                     for (size_t i = 0; i < draws.size(); ++i)
-                        shadowDraws[opaqueShadowIndices[i]] = draws[i];
+                    {
+                        if (opaqueShadowIndices[i] < shadowDraws.size())
+                        {
+                            shadowDraws[opaqueShadowIndices[i]] = draws[i];
+                        }
+                    }
                     for (size_t i = 0; i < graphDraws.size(); ++i)
-                        shadowDraws[graphShadowIndices[i]] = graphDraws[i];
+                    {
+                        if (graphShadowIndices[i] < shadowDraws.size())
+                        {
+                            shadowDraws[graphShadowIndices[i]] = graphDraws[i];
+                        }
+                    }
                     pbrCapture->drawInputBytes = pbrCapture->drawReplay
                         ? pbrCapture->drawReplay->Encode() : selected.Encode();
                     if (pbrCapture->latticeReplayExtension)
@@ -4413,7 +4671,36 @@ namespace
                 inputView.height = frame.height;
                 inputView.camera = cameraSnapshot;
                 std::string inputError;
-                if (!material_graph::SceneViewInput::Seal(inputView, graphDraws, {}, graphViewInput, inputError))
+                bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
+                    sceneInputBudget, graphViewInput, inputError);
+                if (!sealed && hasOptionalGraphCandidates)
+                {
+                    // Aggregate geometry budgets can be tighter than the draw
+                    // limit. Retry the original selection, keeping source-index
+                    // aligned fallback owners and shadow eligibility together.
+                    size_t retained = 0;
+                    for (size_t i = 0; i < graphDraws.size(); ++i)
+                    {
+                        if (!graphFallbackShadowEligible[i])
+                        {
+                            ++lastCulledDraws;
+                            continue;
+                        }
+                        if (retained != i)
+                        {
+                            graphDraws[retained] = std::move(graphDraws[i]);
+                            graphFallbackDraws[retained] = std::move(graphFallbackDraws[i]);
+                            graphFallbackShadowEligible[retained] = graphFallbackShadowEligible[i];
+                        }
+                        ++retained;
+                    }
+                    graphDraws.resize(retained);
+                    graphFallbackDraws.resize(retained);
+                    graphFallbackShadowEligible.resize(retained);
+                    sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
+                        sceneInputBudget, graphViewInput, inputError);
+                }
+                if (!sealed)
                 {
                     lastError = "LX Scene input sealing failed: " + inputError;
                     ++frameFailures;
@@ -4509,13 +4796,20 @@ namespace
                 for (const auto& draw : p.graphInput->Draws())
                     if (draw.sourceIndex < graphSelected.size()) graphSelected[draw.sourceIndex] = true;
             for (std::size_t i = 0; i < graphFallbackDraws.size(); ++i)
+            {
                 if (!graphSelected[i] && graphFallbackDraws[i].materialSnapshot)
                 {
                     draws.push_back(graphFallbackDraws[i]);
-                    shadowDraws.push_back(graphFallbackDraws[i]);
+                    if (i < graphFallbackShadowEligible.size() && graphFallbackShadowEligible[i])
+                    {
+                        shadowDraws.push_back(graphFallbackDraws[i]);
+                    }
                     if (pbrCapture && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
+                    {
                         pbrCapture->RecordPendingLatticeFallback(graphFallbackDraws[i]);
+                    }
                 }
+            }
             if (!p.iblGenerated || skyBoxDirty)
             {
                 // Default CPU data was checked during InitializeLive. Other
@@ -4636,8 +4930,10 @@ namespace
         // 걷어내지 않는다(post_probe가 하던 역할을 실전에서는 이 복사가 맡는다).
         bool RenderOnce(LivePipeline::CameraView& view, int slotIndex,
             uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
-            std::string& outError, EnhancedPbrCapture* capture)
+            std::string& outError, EnhancedPbrCapture* capture,
+            LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
+            preparationDeferred = false;
             LivePipeline& p = *pipeline;
             LivePipeline::DisplaySlot& slot = view.slots[slotIndex];
 
@@ -4670,8 +4966,22 @@ namespace
                     if (!committed) backend.AbortFrame();
                     if (capture)
                     {
-                        backend.WaitForGpu();
-                        capture->Release(backend.Resources());
+                        std::string releaseError;
+                        bool safe = backend.DrainForLifecycle(
+                            RHILifecycleCommand::OfflineReadbackCapture, releaseError);
+                        if (!safe && backend.HasDeviceLossProof())
+                        {
+                            safe = backend.DrainForLifecycle(
+                                RHILifecycleCommand::UnrecoverableDeviceError, releaseError);
+                        }
+                        if (safe)
+                        {
+                            capture->Release(backend.Resources());
+                        }
+                        else
+                        {
+                            capture->Fail("Capture resources retained until GPU idle: " + releaseError);
+                        }
                         if (capture->result.state == EnhancedPbrCaptureState::Recording)
                             capture->Fail(error);
                     }
@@ -4710,18 +5020,30 @@ namespace
             viewSpriteCounts[targetIndex] = lastSpriteCount;
             viewUICounts[targetIndex] = lastUIRectCount;
 
-            slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources());
+            slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
+                RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(dx12.Profiler());
             graph.SetTransientPool(&p.transientPool);
             {
                 RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::Dxil);
                 if (!p.graphMaterials.PrepareResidency(p.frameContext, p.graphInput, outError)) return false;
-                if (p.graphInput && !p.graphInput->Draws().empty() &&
-                    !graph.PrepareParallel(dx12.CommandPool(), outError)) return false;
+                if (((p.graphInput && !p.graphInput->Draws().empty()) || p.gbuffer.HasGpuVisibilityCandidates())
+                    && !graph.PrepareParallel(dx12.CommandPool(), outError))
+                {
+                    return false;
+                }
+                if (!p.gbuffer.PrepareGpuVisibility(p.frameContext, outError))
+                {
+                    return false;
+                }
                 if (!p.graphMaterials.Prepare(p.frameContext, p.graphInput, p.ibl.GetCubeMap(),
                         p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                        p.shadow.GetShadowData(), {}, outError, p.ibl.GetGeneration(),p.ibl.GetImportanceMaps(),p.ibl.GetSourceMap())) return false;
+                        p.shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate, .lookupRuntimeEvaluation = true}, outError, p.ibl.GetGeneration(),p.ibl.GetImportanceMaps(),p.ibl.GetSourceMap()))
+                {
+                    preparationDeferred = p.graphMaterials.PreparationDeferred();
+                    return false;
+                }
                 if (capture) capture->RecordLatticeInput(p.graphInput);
             }
             viewShadowStats[targetIndex] = CaptureShadowStats(p);
@@ -4772,6 +5094,12 @@ namespace
                 compileMs = compileWatch.ElapsedMs();
             }
 
+            if (diagnosticOutput)
+            {
+                *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
+                    sourceFrameId, p.width, p.height);
+            }
+
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
             batchDesc.backendGeneration = dx12.GetBackendGeneration();
@@ -4793,16 +5121,25 @@ namespace
             {
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (!dx12.EnqueueRecordedBatch(std::move(batch), batchTicket,
-                    outError)) return false;
+                    outError))
+                {
+                    return false;
+                }
+                const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
+                if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
+                        graphCompletion, outError, batchTicket))
+                {
+                    return false;
+                }
 
                 dx12.ResolveProfilerFrame(profilerToken);
 
-                if (!dx12.EndFrame(outError)) return false;
+                if (!dx12.EndFrame(outError))
+                {
+                    return false;
+                }
             }
             frameCommitted = true;   // 제출됐다 — 가드가 닫을 것이 없다
-            const auto graphCompletion = batchTicket.GetRecordedBatch()->GetCompletionPoint();
-            if (!p.graphMaterials.PublishSubmittedCache(sourceFrameId,
-                    graphCompletion, outError, batchTicket)) return false;
 
             // 여기서 기다리지 않는다 — 이것이 이 슬라이스의 전부다.
             // EndFrame이 서명한 펜스 값을 슬롯에 적어 두고, TickLive가 다음
@@ -4838,7 +5175,12 @@ namespace
             view.pendingQueue.push_back(slotIndex);
             if (capture)
             {
-                dx12.WaitForGpu();
+                if (!dx12.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, outError)
+                    || dx12.HasDeviceLossProof())
+                {
+                    capture->Fail(outError.empty() ? "DX12 capture cannot read data after device loss." : outError);
+                    return false;
+                }
                 std::string validation;
                 const uint32_t validationCount = dx12.DrainDebugMessages(validation);
                 // W8: Vulkan 경로와 같은 자리에 같은 기록을 남긴다.
@@ -6657,6 +6999,11 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     if (state.pbrCapture && (state.pbrCapture->result.state == EnhancedPbrCaptureState::Pending
         || state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording))
     { outError = "a PBR capture is already pending"; return false; }
+    if (state.pbrCapture && state.pbrCapture->HasResources())
+    {
+        outError = "Previous capture resources are retained until GPU idle or device-loss cleanup.";
+        return false;
+    }
     std::error_code error;
     const std::filesystem::path path(directory);
     if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
@@ -6830,6 +7177,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             state.drawPool.clear();
             state.graphDraws.clear();
             state.graphFallbackDraws.clear();
+            state.graphFallbackShadowEligible.clear();
             state.graphViewInput.reset();
             state.decals.clear();
         }
@@ -6873,7 +7221,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         if (state.vulkanPipeline &&
             (rtWidth != state.vulkanPipeline->width || rtHeight != state.vulkanPipeline->height))
         {
-            state.TeardownVulkanPipeline();
+            if (!state.TeardownVulkanPipeline())
+            {
+                return;
+            }
         }
         if (!state.vulkanPipeline)
         {
@@ -6992,12 +7343,21 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                     p, static_cast<uint32_t>(viewIndex), RHIShaderBinary::SpirV, prepareError);
             };
             bool rendered = false;
+            bool preparationDeferred = false;
+            LiveGraphSnapshot diagnosticSnapshot;
+            const bool captureDiagnostics = state.ConsumeGraphSnapshotRequest(viewPacket.displayTarget);
             {
                 RenderThreadPhaseScope renderView(RenderPhase::view_render);
                 rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
                     frame.frameId, frame.sourceCaptureNanoseconds, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
-                    prepareFrame, error, state.BeginPbrCapture(frame, viewPacket));
+                    prepareFrame, error, state.BeginPbrCapture(frame, viewPacket),
+                    captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
+            }
+            if (captureDiagnostics || !rendered)
+            {
+                state.PublishGraphSnapshot(viewPacket.displayTarget,
+                    rendered ? std::move(diagnosticSnapshot) : LiveGraphSnapshot{});
             }
             if (!rendered)
             {
@@ -7016,7 +7376,16 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 state.lastError = "Vulkan 프레임 실패: " + error;
                 std::printf("[vulkan.live 실패] %s\n", state.lastError.c_str());
                 ++state.frameFailures;
-                ++state.consecutiveFrameFailures;
+                if (!preparationDeferred || !validation.empty() || 0 != unimplemented)
+                {
+                    ++state.consecutiveFrameFailures;
+                }
+                else
+                {
+                    // Keep the last completed display while this feature retries
+                    // bounded admission; budget pressure is not renderer corruption.
+                    state.consecutiveFrameFailures = 0;
+                }
                 if (state.reportedValidation.insert(state.lastError).second)
                     Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
                 if (LiveState::kMaxConsecutiveFrameFailures <= state.consecutiveFrameFailures)
@@ -7352,10 +7721,19 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
         std::string error;
         bool rendered = false;
+        bool preparationDeferred = false;
+        LiveGraphSnapshot diagnosticSnapshot;
+        const bool captureDiagnostics = state.ConsumeGraphSnapshotRequest(viewPacket.displayTarget);
         {
             RenderThreadPhaseScope renderView(RenderPhase::view_render);
             rendered = state.RenderOnce(*view, renderSlot, frame.frameId, frame.sourceCaptureNanoseconds, error,
-                state.BeginPbrCapture(frame, viewPacket));
+                state.BeginPbrCapture(frame, viewPacket),
+                captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
+        }
+        if (captureDiagnostics || !rendered)
+        {
+            state.PublishGraphSnapshot(viewPacket.displayTarget,
+                rendered ? std::move(diagnosticSnapshot) : LiveGraphSnapshot{});
         }
         if (!rendered)
         {
@@ -7374,7 +7752,14 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             // 해 본다 — 링이 되감기므로 대개 그때는 통과한다.
             state.lastError = "프레임 실패: " + error;
             ++state.frameFailures;
-            ++state.consecutiveFrameFailures;
+            if (preparationDeferred)
+            {
+                state.consecutiveFrameFailures = 0;
+            }
+            else
+            {
+                ++state.consecutiveFrameFailures;
+            }
 
             // 같은 문장이 매 프레임 반복되므로 처음 본 것만 찍는다
             // (검증 레이어 메시지와 같은 규약 — 안 그러면 콘솔이 도배돼
@@ -8240,6 +8625,20 @@ EnhancedLiveDebugSnapshot EnhancedSceneRenderer::GetLiveDebugSnapshot()
     return state.debugSnapshot;
 }
 
+std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>
+EnhancedSceneRenderer::GetLiveGraphSnapshot(EnhancedLiveDisplayTarget target)
+{
+    LiveState& state = GetLiveState();
+    const uint32_t index = static_cast<uint32_t>(target);
+    if (index >= kEnhancedLiveDisplayTargetCount)
+    {
+        return {};
+    }
+    std::lock_guard<std::mutex> lock(state.debugMutex);
+    state.graphSnapshotRequests[index] = true;
+    return state.graphSnapshots[index];
+}
+
 EnhancedLiveTuning EnhancedSceneRenderer::GetLiveTuning()
 {
     LiveState& state = GetLiveState();
@@ -8261,8 +8660,13 @@ void EnhancedSceneRenderer::ShutdownLive()
     state.StopRenderThread();
     std::lock_guard<std::mutex> stateLock(state.renderStateMutex);
     state.enabled = false;
-    state.TeardownPipeline();
-    state.TeardownVulkanPipeline();
+    const bool dx12Released = state.TeardownPipeline();
+    const bool vulkanReleased = state.TeardownVulkanPipeline();
+    if (!dx12Released || !vulkanReleased)
+    {
+        // Keep scene/interop owners alive for a later proven-idle recovery.
+        return;
+    }
     state.ResetDisplaySnapshot();
 
     state.dx12.ShutdownInterop();

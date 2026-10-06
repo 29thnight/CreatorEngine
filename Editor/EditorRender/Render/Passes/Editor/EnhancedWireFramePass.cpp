@@ -307,19 +307,31 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         m_depth = m_inputs.depth;
     }
 
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
+        m_depth = ownsDepth ? graph.Write(m_depth) : graph.Modify(m_depth);
+    }
+    const auto colorAccess = explicitAccess
+        ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto depthAccess = explicitAccess
+        ? (ownsDepth ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto output = m_output;
+    const auto depth = m_depth;
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RHIResourceState::RenderTarget });
-    usages.push_back({ m_depth, RHIResourceState::DepthWrite });
+    usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
+    usages.push_back({ depth, RHIResourceState::DepthWrite, depthAccess });
 
     graph.AddPass(GetName(), usages,
-        [this, &context, ownsColor, ownsDepth](
+        [this, &context, ownsColor, ownsDepth, output, depth](
             const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(output) };
             const auto depthDesc = RHIDepthTargetDesc::Depth(
-                executeContext.ResolveHandle(m_depth), kDepthFormat);
+                executeContext.ResolveHandle(depth), kDepthFormat);
             const auto targets = context.resources->CreateRenderTargets(colors, &depthDesc);
             if (!targets.IsValid()) return;
 

@@ -54,6 +54,7 @@ public:
         std::span<RHIBufferSlice> outSlices,
         std::string& outError);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
+    void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
 
     RHIUploadStats GetStats() const;

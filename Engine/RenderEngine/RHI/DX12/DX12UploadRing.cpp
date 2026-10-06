@@ -542,6 +542,23 @@ void DX12UploadSegmentAllocator::OnSubmitted(uint64_t recordingId,
         m_currentRecordingId.store(0, std::memory_order_release);
 }
 
+void DX12UploadSegmentAllocator::RejectSubmission(uint64_t recordingId, RHICompletionPoint completion)
+{
+    std::lock_guard lock(m_mutex);
+    for (const auto& segment : m_segments)
+    {
+        if (segment->state == RHIUploadSegmentState::Pending && segment->recordingId == recordingId &&
+            segment->completionValue == completion.value)
+        {
+            segment->state = RHIUploadSegmentState::Available;
+            segment->cursor.store(0, std::memory_order_relaxed);
+            segment->recordingId = 0;
+            segment->completionValue = 0;
+            segment->lastCollectedEpoch = m_collectEpoch;
+        }
+    }
+}
+
 void DX12UploadSegmentAllocator::AbortRecording(uint64_t recordingId)
 {
     m_fastRegular.store(nullptr, std::memory_order_release);

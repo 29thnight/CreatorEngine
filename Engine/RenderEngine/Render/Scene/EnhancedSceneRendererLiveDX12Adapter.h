@@ -68,6 +68,7 @@ public:
         RHISubmissionTicket& outTicket, std::string& outError);
     void WaitForGpu();
     bool DrainForLifecycle(RHILifecycleCommand command, std::string& outError);
+    bool HasDeviceLossProof() const;
     uint64_t GetCompletedFenceValue() const;
     bool SignalEventOnFenceValue(uint64_t value, void* event) const;
     uint64_t GetLastSignaledFenceValue() const;

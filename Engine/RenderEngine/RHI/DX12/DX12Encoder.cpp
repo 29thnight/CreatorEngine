@@ -2,6 +2,19 @@
 #include "DX12DeviceResources.h"
 
 #include <vector>
+#include <cmath>
+
+static_assert(sizeof(RHIDrawIndexedIndirectArguments) == sizeof(D3D12_DRAW_INDEXED_ARGUMENTS));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, indexCount) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, IndexCountPerInstance));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, instanceCount) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, InstanceCount));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstIndex) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartIndexLocation));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, baseVertex) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, BaseVertexLocation));
+static_assert(offsetof(RHIDrawIndexedIndirectArguments, firstInstance) ==
+    offsetof(D3D12_DRAW_INDEXED_ARGUMENTS, StartInstanceLocation));
 
 namespace
 {
@@ -29,6 +42,39 @@ void DX12Encoder::SetViewportAndScissor(uint32_t width, uint32_t height)
 
     m_commandList->RSSetViewports(1, &viewport);
     m_commandList->RSSetScissorRects(1, &scissor);
+}
+
+bool DX12Encoder::SetViewport(float x, float y, uint32_t width, uint32_t height)
+{
+    if (nullptr == m_commandList || !std::isfinite(x) || !std::isfinite(y) || width == 0 || height == 0)
+    {
+        return false;
+    }
+    const double right = static_cast<double>(x) + width;
+    const double bottom = static_cast<double>(y) + height;
+    if (x < D3D12_VIEWPORT_BOUNDS_MIN || y < D3D12_VIEWPORT_BOUNDS_MIN ||
+        right > D3D12_VIEWPORT_BOUNDS_MAX || bottom > D3D12_VIEWPORT_BOUNDS_MAX)
+    {
+        return false;
+    }
+
+    const D3D12_VIEWPORT viewport{ x, y, static_cast<float>(width), static_cast<float>(height), 0.f, 1.f };
+    m_commandList->RSSetViewports(1, &viewport);
+    return true;
+}
+
+bool DX12Encoder::SetScissor(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
+{
+    constexpr uint32_t kMaxScissorCoordinate = INT32_MAX;
+    if (nullptr == m_commandList || x > kMaxScissorCoordinate || y > kMaxScissorCoordinate ||
+        width > kMaxScissorCoordinate - x || height > kMaxScissorCoordinate - y)
+    {
+        return false;
+    }
+    const D3D12_RECT scissor{ static_cast<LONG>(x), static_cast<LONG>(y),
+        static_cast<LONG>(x + width), static_cast<LONG>(y + height) };
+    m_commandList->RSSetScissorRects(1, &scissor);
+    return true;
 }
 
 void DX12Encoder::SetPipeline(RHIBindPoint bindPoint, RHIPipelineHandle pipeline)
@@ -224,6 +270,25 @@ void DX12Encoder::DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
     if (nullptr == m_commandList || 0 == indexCount || 0 == instanceCount) return;
     m_commandList->DrawIndexedInstanced(indexCount, instanceCount, firstIndex,
         baseVertex, firstInstance);
+}
+
+bool DX12Encoder::DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset)
+{
+    if (nullptr == m_commandList || nullptr == m_resources || 0 != byteOffset % 4)
+    {
+        return false;
+    }
+    ID3D12CommandSignature* const signature = m_resources->GetDrawIndexedIndirectSignature();
+    const DX12BufferEntry entry = m_resources->DescribeBuffer(arguments);
+    if (nullptr == signature || !entry.IsValid() || !entry.allowIndirectArguments ||
+        byteOffset > entry.bytes || sizeof(RHIDrawIndexedIndirectArguments) > entry.bytes - byteOffset)
+    {
+        return false;
+    }
+
+    // 개수 버퍼가 없고 최대 개수도 1이다. CPU 바인딩은 signature가 바꾸지 않는다.
+    m_commandList->ExecuteIndirect(signature, 1, entry.resource, byteOffset, nullptr, 0);
+    return true;
 }
 
 void DX12Encoder::Dispatch(uint32_t x, uint32_t y, uint32_t z)

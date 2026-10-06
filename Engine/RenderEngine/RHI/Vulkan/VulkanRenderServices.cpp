@@ -551,6 +551,24 @@ void VulkanTextureCache::OnUploadCompleted(uint64_t completedValue)
     }
 }
 
+void VulkanTextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
+{
+    if (!m_impl)
+    {
+        return;
+    }
+    for (Impl::Transaction& transaction : m_impl->transactions)
+    {
+        if (transaction.recordingId == recordingId && transaction.completionValue == completion.value &&
+            (transaction.state == RHIUploadTransactionState::Queued ||
+                transaction.state == RHIUploadTransactionState::Resident))
+        {
+            transaction.state = RHIUploadTransactionState::Recording;
+        }
+    }
+    OnUploadAborted(recordingId);
+}
+
 void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
 {
     auto transaction = m_impl->transactions.begin();
@@ -948,6 +966,29 @@ void VulkanMeshCache::OnUploadCompleted(uint64_t completedValue)
     }
 }
 
+void VulkanMeshCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
+{
+    if (!m_impl)
+    {
+        return;
+    }
+    const auto reject = [recordingId, completion](auto& entries)
+    {
+        for (auto& [key, buffers] : entries)
+        {
+            if (buffers.recordingId == recordingId && buffers.completionValue == completion.value &&
+                (buffers.state == RHIUploadTransactionState::Queued ||
+                    buffers.state == RHIUploadTransactionState::Resident))
+            {
+                buffers.state = RHIUploadTransactionState::Recording;
+            }
+        }
+    };
+    reject(m_impl->entries);
+    reject(m_impl->modelEntries);
+    OnUploadAborted(recordingId);
+}
+
 void VulkanMeshCache::OnUploadAborted(uint64_t recordingId)
 {
     if (!m_impl) return;
@@ -1129,13 +1170,18 @@ bool VulkanDeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     outHandle = {};
     if (!IsInitialized()) { outError = "디바이스가 없다"; return false; }
     if (0 == desc.bytes)  { outError = "버퍼 크기가 0이다"; return false; }
+    if (RHIResourceState::IndirectArgument == desc.initialState && !desc.allowIndirectArguments)
+    {
+        outError = "IndirectArgument 상태에는 allowIndirectArguments가 필요하다";
+        return false;
+    }
 
     VkBufferCreateInfo info{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
     info.size = desc.bytes;
 
-    // ★ **용도를 전부 켠다.** `RHIBufferDesc` 는 `allowUnorderedAccess` 하나만
-    //   말하는데 Vulkan 은 생성 시점에 정확한 용도를 요구한다 — DX12 가
-    //   버퍼의 쓰임을 뷰가 정하게 두기 때문에 계약에 그 어휘가 없다.
+    // ★ 기존 일반 버퍼 용도는 넓게 켠다. Vulkan은 생성 시점에 정확한 용도를
+    //   요구하지만 DX12는 버퍼의 쓰임을 뷰가 정하므로 기존 계약도 넓다.
+    //   indirect는 두 백엔드 모두 명시 선언이 있을 때만 허용한다.
     //
     //   넓게 켜면 드라이버가 배치를 최적화할 여지를 잃지만 **틀리지는
     //   않는다**. 좁히려면 계약이 용도를 말해야 하고, 그것은 소비자가
@@ -1146,10 +1192,15 @@ bool VulkanDeviceResources::CreateBuffer(const RHIBufferDesc& desc,
         | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
         | VK_BUFFER_USAGE_TRANSFER_SRC_BIT
         | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    if (desc.allowIndirectArguments)
+    {
+        info.usage |= VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT;
+    }
     info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VulkanBufferEntry entry{};
     entry.bytes = desc.bytes;
+    entry.allowIndirectArguments = desc.allowIndirectArguments;
 
     VkResult made = vkCreateBuffer(m_device, &info, nullptr, &entry.buffer);
     if (VK_SUCCESS != made)
@@ -1648,7 +1699,8 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     AccumulateEncoderDiagnostics();
     m_encoder = std::make_unique<VulkanEncoder>(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTables[m_frameIndex],
-        m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable);
+        m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable,
+        GetIndirectDrawCapabilities(), m_viewportLimits);
     return *m_encoder;
 }
 

@@ -375,4 +375,18 @@ void SceneMaterialSlot::ShutdownAfterIdle()
     serial_ = 0;
     completed_ = 0;
 }
+
+void SceneMaterialSlot::OnUploadSubmissionRejected(std::uint64_t recordingId, RHICompletionPoint completion)
+{
+    const auto found = recordings_.find(recordingId);
+    if (found == recordings_.end() ||
+        (found->second.submissionNotified && found->second.completion != completion.value) ||
+        (found->second.publicationDecided && found->second.submitted && active_ == found->second.submitted))
+    {
+        return;
+    }
+    // 이전 active packet은 유지한다. 큐에 들어가지 않은 정확한 후보의
+    // provisional submitted 표지만 지워 이후 fence가 게시하지 못하게 한다.
+    recordings_.erase(found);
+}
 } // namespace material_graph

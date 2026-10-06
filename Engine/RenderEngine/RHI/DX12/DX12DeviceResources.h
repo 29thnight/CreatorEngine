@@ -130,6 +130,8 @@ public:
     /// 현재 recording의 업로드 예약을 seal한다. 직접 queue 제출은 금지한다.
     bool PrepareParallelSubmission(RHICompletionPoint& outCompletion,
         std::string& outError);
+    void AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket);
+    void RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion);
     bool SubmitCommandLists(std::span<ID3D12CommandList* const> lists,
         RHICompletionPoint completion, std::string& outError);
     // 모든 제출 완료까지 대기(리드백 읽기 전·종료 전).
@@ -140,10 +142,11 @@ public:
         return m_lastLifecycleResult;
     }
 
-    /// 마지막으로 EndFrame이 서명한 펜스 값. 상시 러너의 비동기 표시가
-    /// '이 프레임이 끝났는가'를 논블로킹으로 물을 때 GetCompletedFenceValue와
+    /// 큐 admission이 확인된 마지막 완료 예약. CPU 제출 성공은 ticket이,
+    /// GPU 완료는 GetCompletedFenceValue가 따로 증명한다. 거절된 예약은 제외한다.
+    /// 상시 러너의 비동기 표시가 GetCompletedFenceValue와
     /// 짝으로 쓴다 — 완료 확인이 CPU 대기 없이 되므로 WaitForGpu가 필요 없다.
-    uint64_t GetLastSignaledFenceValue() const override { return m_nextFenceValue - 1; }
+    uint64_t GetLastSignaledFenceValue() const override { return m_lastAdmittedFenceValue; }
     uint64_t GetCompletedFenceValue() const override
     {
         const uint64_t completed = m_fence ? m_fence->GetCompletedValue() : 0;
@@ -416,6 +419,20 @@ public:
 
     ID3D12Resource* Resolve(RHITextureHandle handle) const { return m_resourceTable.Resolve(handle); }
     ID3D12Resource* Resolve(RHIBufferHandle handle) const { return m_resourceTable.Resolve(handle); }
+    DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
+    {
+        return m_resourceTable.DescribeBuffer(handle);
+    }
+
+    RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
+    {
+        const bool available = nullptr != m_drawIndexedIndirectSignature.Get();
+        return { available, available };
+    }
+    ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const
+    {
+        return m_drawIndexedIndirectSignature.Get();
+    }
 
     /// 버퍼의 GPU 주소 (A-4). 인코더의 드로우 루프가 쓴다 — 근거는 표에 있다.
     D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
@@ -495,6 +512,7 @@ private:
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
     ComPtr<ID3D12Device>               m_device;
+    ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
     // 포인터 하나 검사로 끝난다.
@@ -515,6 +533,7 @@ private:
     ComPtr<ID3D12Fence>                m_fence;
     HANDLE                             m_fenceEvent{ nullptr };
     uint64_t                           m_nextFenceValue{ 1 };
+    uint64_t                           m_lastAdmittedFenceValue{ 0 };
     uint32_t                           m_frameIndex{ 0 };
     bool                               m_submissionClient{ false };
     RHILifecycleResult                 m_lastLifecycleResult{};

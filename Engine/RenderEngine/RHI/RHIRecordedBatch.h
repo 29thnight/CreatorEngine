@@ -11,7 +11,7 @@ class IRHIParallelCommandPool;
 class RHISubmissionThread;
 
 /// 기록이 끝났을 때 호출부가 붙이는 backend 중립 식별 정보.
-/// completion은 제출과 signal 뒤에 정해지므로 RHIRecordedBatch에 별도로 채운다.
+/// completion은 admission 전에 예약하며 실제 GPU 완료와 구분한다.
 struct RHIRecordedBatchDesc
 {
     uint64_t frameId{ 0 };
@@ -27,6 +27,8 @@ enum class RHIRecordedBatchState : uint8_t
 {
     Empty,
     Recorded,
+    SubmissionStarted,
+    SubmissionFailed,
     Submitted
 };
 
@@ -75,6 +77,8 @@ public:
         return static_cast<uint32_t>(m_commandOrder.size());
     }
     RHICompletionPoint GetCompletionPoint() const { return m_completion; }
+    uint64_t GetRecordingId() const { return m_recordingId; }
+    bool IsAdmitted() const { return m_admitted; }
     bool HasLifetimeToken() const { return nullptr != m_lifetimeToken; }
     std::shared_ptr<const void> GetLifetimeToken() const { return m_lifetimeToken; }
 
@@ -91,6 +95,8 @@ private:
         m_displayToken = 0;
         m_frameSlot = kInvalidFrameSlot;
         m_completion = {};
+        m_recordingId = 0;
+        m_admitted = false;
         m_lifetimeToken.reset();
         m_state = RHIRecordedBatchState::Empty;
     }
@@ -104,6 +110,8 @@ private:
         m_displayToken = other.m_displayToken;
         m_frameSlot = other.m_frameSlot;
         m_completion = other.m_completion;
+        m_recordingId = other.m_recordingId;
+        m_admitted = other.m_admitted;
         m_lifetimeToken = std::move(other.m_lifetimeToken);
         m_state = other.m_state;
         other.Reset();
@@ -116,6 +124,8 @@ private:
     uint64_t m_displayToken{ 0 };
     uint32_t m_frameSlot{ kInvalidFrameSlot };
     RHICompletionPoint m_completion{};
+    uint64_t m_recordingId{ 0 };
+    bool m_admitted{ false };
     std::shared_ptr<const void> m_lifetimeToken;
     RHIRecordedBatchState m_state{ RHIRecordedBatchState::Empty };
 };

@@ -4,6 +4,7 @@
 #include <Windows.h>
 #include <algorithm>
 #include <cstdio>
+#include <exception>
 #include <cstring>
 
 using namespace VulkanApi;
@@ -428,6 +429,8 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
     m_physicalDevice = best;
     m_adapterName = bestProps.deviceName;
     m_apiVersion = bestProps.apiVersion;
+    m_viewportLimits = { bestProps.limits.maxViewportDimensions[0], bestProps.limits.maxViewportDimensions[1],
+        bestProps.limits.viewportBoundsRange[0], bestProps.limits.viewportBoundsRange[1] };
 
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(best, nullptr, &extensionCount, nullptr);
@@ -456,6 +459,10 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 
 bool VulkanDeviceResources::CreateDevice(std::string& outError)
 {
+    m_indirectDrawCapabilities = {};
+    VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    vkGetPhysicalDeviceFeatures2(m_physicalDevice, &availableFeatures);
+
     const float priority = 1.f;
     VkDeviceQueueCreateInfo queueInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
     queueInfo.queueFamilyIndex = m_queueFamily;
@@ -510,6 +517,8 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     // EnhancedWireFramePass의 RHIFillMode::Wireframe은
     // VkPipelineRasterizationStateCreateInfo::polygonMode=LINE으로 번역된다.
     features2.features.fillModeNonSolid = VK_TRUE;
+    // 선택 기능이 없는 장치도 firstInstance=0인 단건 경로는 사용할 수 있다.
+    features2.features.drawIndirectFirstInstance = availableFeatures.features.drawIndirectFirstInstance;
     features2.pNext = &features11;
 
     VkDeviceCreateInfo deviceInfo{ VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
@@ -527,6 +536,10 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     }
 
     if (!LoadDevice(m_device, outError)) return false;
+
+    m_indirectDrawCapabilities.indexedDraw = nullptr != vkCmdDrawIndexedIndirect;
+    m_indirectDrawCapabilities.nonZeroFirstInstance = m_indirectDrawCapabilities.indexedDraw &&
+        VK_TRUE == features2.features.drawIndirectFirstInstance;
 
     vkGetDeviceQueue(m_device, m_queueFamily, 0, &m_queue);
     return true;
@@ -572,11 +585,19 @@ void VulkanDeviceResources::Shutdown()
             const RHILifecycleCommand command = owner.faulted
                 ? RHILifecycleCommand::UnrecoverableDeviceError
                 : RHILifecycleCommand::BackendShutdown;
-            if (!DrainForLifecycle(command, lifecycleError) &&
-                !lifecycleError.empty())
+            bool drained = DrainForLifecycle(command, lifecycleError);
+            if (!drained && GetRHISubmissionThread().GetOwnerStats(this).faulted)
             {
-                OutputDebugStringA(("[Vulkan] lifecycle shutdown 실패: " +
+                drained = DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+            }
+            if (!drained)
+            {
+                OutputDebugStringA(("[Vulkan] Fatal: forced destruction without verified GPU idle or device loss: " +
                     lifecycleError + "\n").c_str());
+                std::fprintf(stderr, "Fatal Vulkan teardown invariant: GPU idle/device loss unproven: %s\n",
+                    lifecycleError.c_str());
+                std::fflush(stderr);
+                std::terminate();
             }
         }
         else vkDeviceWaitIdle(m_device);
@@ -585,6 +606,13 @@ void VulkanDeviceResources::Shutdown()
             GetRHISubmissionThread().ReleaseClient(this);
             m_submissionClient = false;
         }
+
+        // 이전 native device의 실패 ticket/완료값을 새 프레임 슬롯에 가져가지 않는다.
+        m_frameSubmissionTickets = {};
+        m_frameFenceValues = {};
+        m_hostSubmissionTicket = {};
+        m_hostFenceValue = 0;
+        m_currentRecordingId = 0;
 
         // ★ 표를 디바이스보다 먼저 비운다 (5c-4c). 칸이 vkDestroy 를 들고
         //   있으므로 순서가 뒤집히면 죽은 디바이스로 부른다 — 표가 순서를
@@ -633,11 +661,16 @@ void VulkanDeviceResources::Shutdown()
     m_queueFamily = UINT32_MAX;
     m_memoryBudgetSupported = false;
     m_nullDescriptorSupported = false;
+    m_indirectDrawCapabilities = {};
+    m_viewportLimits = {};
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
     m_pipelineCache = nullptr;
+    m_uploadTransactionListeners.clear();
     m_frameOpen = false;
     m_nextFenceValue = 1;
+    m_lastAdmittedFenceValue = 0;
+    m_frameIndex = 0;
     m_hostSubmissionTicket = {};
     m_hostFenceValue = 0;
 }
@@ -661,6 +694,7 @@ bool VulkanDeviceResources::Resize(uint32_t width, uint32_t height, std::string&
 
 bool VulkanDeviceResources::BeginFrame(std::string& outError)
 {
+    GetRHISubmissionThread().CollectCompletedLifetimes(this);
     if (!IsInitialized()) { outError = "디바이스가 없다"; return false; }
     if (m_frameOpen)      { outError = "프레임이 이미 열려 있다"; return false; }
 
@@ -788,6 +822,11 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     const VkSemaphore presentSemaphore = signalPresent
         ? m_presentSemaphores[m_backBufferIndex] : VK_NULL_HANDLE;
     const uint64_t fenceValue = m_nextFenceValue++;
+    const uint64_t recordingId = m_currentRecordingId;
+    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue]
+    {
+        RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+    });
 
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
@@ -796,13 +835,8 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
             m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    RetireCurrentCommandContext(fenceValue);
     m_currentRecordingId = 0;
     const uint32_t frameSlot = m_frameIndex;
-    m_frameFenceValues[frameSlot] = fenceValue;
-    if (waitForAcquire) m_acquireConsumed = true;
-    m_frameOpen = false;
-    m_frameIndex = (m_frameIndex + 1) % kFrameCount;
 
     RHISubmissionTicket ticket;
     if (!GetRHISubmissionThread().Enqueue(this, "Vulkan EndFrame",
@@ -849,7 +883,17 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
     {
         return false;
     }
+    admission.Accept();
+    RetireCurrentCommandContext(fenceValue);
     m_frameSubmissionTickets[frameSlot] = ticket;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    m_lastAdmittedFenceValue = fenceValue;
+    if (waitForAcquire)
+    {
+        m_acquireConsumed = true;
+    }
+    m_frameOpen = false;
+    m_frameIndex = (m_frameIndex + 1) % kFrameCount;
     if (HasSwapChain())
     {
         m_hostSubmissionTicket = ticket;
@@ -1025,11 +1069,12 @@ void VulkanDeviceResources::AbortFrame()
             submit.pSignalSemaphoreInfos = signals;
             std::string abortSubmissionError;
             RHISubmissionTicket ticket;
+            bool admitted = false;
             bool submitted = false;
             if (VK_SUCCESS == result)
             {
                 RHISubmissionThread& submission = GetRHISubmissionThread();
-                submitted = submission.Enqueue(this, "Vulkan AbortFrame submit",
+                admitted = submission.Enqueue(this, "Vulkan AbortFrame submit",
                     [owner = this, queue = m_queue, submit, command, wait, signals](
                         std::string& error) mutable
                     {
@@ -1052,20 +1097,22 @@ void VulkanDeviceResources::AbortFrame()
                             return false;
                         }
                         return true;
-                    }, ticket, abortSubmissionError) && submission.Wait(ticket, abortSubmissionError);
+                    }, ticket, abortSubmissionError);
+                submitted = admitted && submission.Wait(ticket, abortSubmissionError);
             }
 
-            if (submitted)
+            if (admitted)
             {
                 const uint64_t fenceValue = m_nextFenceValue++;
                 m_frameSubmissionTickets[m_frameIndex] = ticket;
                 m_frameFenceValues[m_frameIndex] = fenceValue;
+                m_lastAdmittedFenceValue = fenceValue;
                 m_hostSubmissionTicket = ticket;
                 m_hostFenceValue = fenceValue;
                 RetireCurrentCommandContext(fenceValue);
                 m_acquireConsumed = true;
                 m_frameIndex = (m_frameIndex + 1) % kFrameCount;
-                if (!PresentAcquiredImage(abortSubmissionError))
+                if (submitted && !PresentAcquiredImage(abortSubmissionError))
                 {
                     OutputDebugStringA(("[Vulkan] AbortFrame present failed: " +
                         abortSubmissionError + "\n").c_str());
@@ -1117,6 +1164,11 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     const VkSemaphore acquireSemaphore = waitForAcquire
         ? m_acquireSemaphores[m_semaphoreIndex] : VK_NULL_HANDLE;
     const uint64_t fenceValue = m_nextFenceValue++;
+    const uint64_t recordingId = m_currentRecordingId;
+    RHIRecordingAdmissionGuard admission([this, recordingId, fenceValue]
+    {
+        RejectNeverEnqueuedRecording(recordingId, RHICompletionPoint{ fenceValue });
+    });
 
     m_uploadAllocator.OnSubmitted(
         m_currentRecordingId, RHICompletionPoint{ fenceValue });
@@ -1125,10 +1177,8 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(
             m_currentRecordingId, RHICompletionPoint{ fenceValue });
-    RetireCurrentCommandContext(fenceValue);
-    if (waitForAcquire) m_acquireConsumed = true;
+    m_currentRecordingId = 0;
     const uint32_t frameSlot = m_frameIndex;
-    m_frameFenceValues[frameSlot] = fenceValue;
 
     RHISubmissionTicket ticket;
     if (!GetRHISubmissionThread().Enqueue(this, "Vulkan immediate flush",
@@ -1170,7 +1220,15 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
     {
         return false;
     }
+    admission.Accept();
+    RetireCurrentCommandContext(fenceValue);
     m_frameSubmissionTickets[frameSlot] = ticket;
+    m_frameFenceValues[frameSlot] = fenceValue;
+    m_lastAdmittedFenceValue = fenceValue;
+    if (waitForAcquire)
+    {
+        m_acquireConsumed = true;
+    }
     if (HasSwapChain())
     {
         m_hostSubmissionTicket = ticket;
@@ -1204,12 +1262,11 @@ bool VulkanDeviceResources::PrepareParallelSubmission(
         return false;
     }
     const RHICompletionPoint completion{ m_nextFenceValue++ };
+    outCompletion = completion;
     m_uploadAllocator.OnSubmitted(m_currentRecordingId, completion);
     m_descriptorRecycler.OnSubmitted(m_currentRecordingId, completion);
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadSubmitted(m_currentRecordingId, completion);
-    m_frameFenceValues[m_frameIndex] = completion.value;
-    outCompletion = completion;
 
     // immediate command context는 Prepare 뒤 열린 빈 buffer 그대로 이어 쓴다.
     // 다만 descriptor version이 바뀌었으므로 encoder의 binding 기억은 버린다.
@@ -1224,6 +1281,27 @@ bool VulkanDeviceResources::PrepareParallelSubmission(
         return false;
     }
     return true;
+}
+
+void VulkanDeviceResources::AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
+{
+    m_frameFenceValues[m_frameIndex] = completion.value;
+    m_frameSubmissionTickets[m_frameIndex] = ticket;
+    m_lastAdmittedFenceValue = completion.value;
+}
+
+void VulkanDeviceResources::RejectNeverEnqueuedRecording(uint64_t recordingId, RHICompletionPoint completion)
+{
+    m_uploadAllocator.RejectSubmission(recordingId, completion);
+    m_descriptorRecycler.RejectSubmission(recordingId, completion);
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadSubmissionRejected(recordingId, completion);
+    }
+    if (m_currentRecordingId == recordingId)
+    {
+        m_currentRecordingId = 0;
+    }
 }
 
 bool VulkanDeviceResources::SubmitParallelCommandBuffers(
@@ -1300,6 +1378,14 @@ void VulkanDeviceResources::WaitForGpu()
 bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
     std::string& outError)
 {
+    const auto releaseCompletedTickets = [this]
+    {
+        GetRHISubmissionThread().CollectCompletedLifetimes(this);
+        m_frameSubmissionTickets = {};
+        m_hostSubmissionTicket = {};
+        m_frameFenceValues = {};
+        m_hostFenceValue = 0;
+    };
     if (!IsInitialized() || !m_submissionClient) return true;
     RHISubmissionThread& submission = GetRHISubmissionThread();
     const RHISubmissionOwnerStats before = submission.GetOwnerStats(this);
@@ -1316,12 +1402,17 @@ bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
         m_lastLifecycleResult.previousGeneration = before.generation - 1u;
         m_lastLifecycleResult.generation = before.generation;
         m_lastLifecycleResult.drained = true;
+        releaseCompletedTickets();
         return true;
     }
     if (RHILifecycleCommand::UnrecoverableDeviceError == command || before.faulted)
     {
-        return submission.AbandonForDeviceError(this,
-            m_lastLifecycleResult, outError);
+        const bool abandoned = submission.AbandonForDeviceError(this, m_lastLifecycleResult, outError);
+        if (abandoned)
+        {
+            releaseCompletedTickets();
+        }
+        return abandoned;
     }
 
     if (!submission.ExecuteLifecycleDrain(this, command,
@@ -1349,6 +1440,7 @@ bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
 
     const uint64_t completed = GetCompletedFenceValue();
     m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
+    releaseCompletedTickets();
     for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
         listener->OnUploadCompleted(completed);
     std::printf("[RHI lifecycle][Vulkan] %s generation %llu->%llu"

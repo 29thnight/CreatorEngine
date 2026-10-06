@@ -1,11 +1,11 @@
 #pragma once
 #include "../../RHI/RHIFormat.h"
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <unordered_map>
 #include <functional>
-#include <mutex>
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
@@ -39,7 +39,7 @@ class IRenderDeviceServices;
 //
 // RG1 ExplicitSingleWriter 모드는 명시적 접근으로 안정적 DAG 정렬을 수행한다.
 // ExplicitVersioned 모드는 RG2 Write/Modify 계보로 RAW/WAR/WAW를 정렬한다.
-// 제품 기본값은 RG5 선언 이관과 RG6 전환까지 기존 선언 순서를 유지한다.
+// 제품은 ExplicitVersioned를 명시한다. 기본 DeclarationOrder는 기존 진단 fixture의 계약을 보존한다.
 // 단일 writer로 순서가 결정되지 않는 입력은 DAG 모드에서 컴파일 오류다.
 //
 // 배리어를 사람이 붙이지 않는 것이 요점이다. DX11은 드라이버가 해 주던 일이라
@@ -111,10 +111,8 @@ public:
         RHITextureHandle handle;
         RHIResourceState state{ RHIResourceState::Common };
     };
-    // 빌리는 쪽은 렌더 스레드(Compile)이고, 반납은 그래프 소멸 때라 마지막
-    // 참조를 쥔 RHISubmissionThread 의 회수에서도 일어난다. 반납의 operator[] 가
-    // 새 키를 넣어 표를 다시 짜는 동안 빌리면 깨진다(재생 시작 때 실측된 충돌).
-    std::mutex mutex;
+    // 대여·반납·비우기는 동일한 producer 스레드가 소유한다. GPU 완료 토큰도 그
+    // 스레드에서 회수해 graph를 파괴하며, 풀 소유자는 모든 토큰을 drain한 뒤 파괴한다.
     std::unordered_map<uint64_t, std::vector<Entry>> freeList;
 };
 
@@ -317,6 +315,10 @@ public:
     RGHandle Write(RGHandle previous);
     RGHandle Modify(RGHandle previous);
 
+    // 캐시처럼 그래프 밖에서 상태를 고정한 소유자에게 마지막 소비 뒤 돌려준다.
+    // 유효성·서로 다른 최종 상태 요구는 Compile에서 진단한다.
+    void RequireImportedFinalState(RGHandle handle, RHIResourceState state);
+
     // 패스 선언. usages는 (핸들, 그 패스가 요구하는 상태) 목록이다.
     //
     // hasSideEffect는 컬링에서 뿌리가 되는 표시다. 화면에 내보내거나 외부가
@@ -332,6 +334,22 @@ public:
 
     RGPassId AddPass(const std::string& name, const std::vector<RGPassUsage>& usages,
         ExecuteCallback execute, bool hasSideEffect = false);
+
+    struct RepeatedPhase
+    {
+        std::string name;
+        std::vector<RGPassUsage> usages;
+    };
+    using RepeatedExecuteCallback =
+        std::function<void(const ExecuteContext&, uint32_t iterationIndex, uint32_t phaseIndex)>;
+    static constexpr uint32_t kMaxRepeatedPhases = 16;
+    static constexpr uint32_t kMaxPassRepetitions = 1024;
+
+    // 외부 버전은 한 번 발행한다. 내부 단계는 그 핸들을 그대로 쓰며,
+    // usage.state는 해당 자원의 첫 단계 상태다. 반복은 같은 인코더에서 직렬 기록한다.
+    RGPassId AddRepeatedPass(const std::string& name, const std::vector<RGPassUsage>& usages,
+        const std::vector<RepeatedPhase>& phases, uint32_t repeatCount,
+        RepeatedExecuteCallback execute, bool hasSideEffect = false, uint32_t recordCost = 0);
 
     /// 여러 커맨드 리스트에 나눠 기록할 수 있는 패스.
     ///
@@ -381,6 +399,7 @@ public:
         uint32_t resource;
         RHIResourceState before, after;
         bool uav;
+        bool afterPass{false};
     };
     struct DiagnosticPass
     {
@@ -391,12 +410,23 @@ public:
         uint32_t recordCost, maxSlices;
         std::vector<DiagnosticUsage> usages;
         std::vector<DiagnosticBarrier> barriers;
+        struct Phase
+        {
+            std::string name;
+            std::vector<DiagnosticUsage> usages;
+            std::vector<DiagnosticBarrier> firstBarriers, repeatBarriers;
+        };
+        uint32_t repeatCount{1};
+        std::vector<Phase> phases;
     };
     struct DiagnosticResource
     {
         std::string name;
         bool imported, buffer, used;
         uint32_t firstUse, lastUse;
+        uint32_t versionCount{0};
+        RHIResourceState initialState{RHIResourceState::Common};
+        RHIResourceState finalState{RHIResourceState::Common};
     };
     struct DiagnosticSnapshot
     {
@@ -409,6 +439,14 @@ public:
         std::vector<VersionEdge> versionEdges;
         std::vector<int32_t> dependencyWaves; // authored pass index; -1 is culled/unavailable
         std::vector<uint16_t> criticalPath;
+        uint64_t generation{0};
+        uint64_t graphEpoch{0};
+        uint64_t dependencyHash{0};
+        RGSchedulingMode scheduling{RGSchedulingMode::DeclarationOrder};
+        RGOrderPolicy orderPolicy{RGOrderPolicy::DependencyOrder};
+        // 뷰 귀속은 게시자가 채운다. 그래프 복사본은 GPU 리소스를 소유하지 않는다.
+        uint64_t viewId{0}, frameId{0};
+        uint32_t width{0}, height{0};
     };
     bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 
@@ -438,6 +476,8 @@ public:
 
 
     bool IsPassCulled(RGPassId pass) const;
+    /// Total planned resource barriers, including repeated phases and final-state
+    /// restoration. Counts emitted barriers, not barrier batches or templates.
     uint32_t GetPassBarrierCount(RGPassId pass) const;
 
     // transient 리소스의 수명(첫 사용 패스 ~ 마지막 사용 패스, 실행 순서 기준).
@@ -462,6 +502,7 @@ private:
 
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
         RHIResourceState state{ RHIResourceState::Common };
+        RHIResourceState initialState{ RHIResourceState::Common };
         RHIResourceState* writeback{ nullptr };   // 프레임 끝 상태를 적어 줄 곳
         bool imported{ false };
         bool used{ false };          // 살아남은 패스가 쓰는가 — 아니면 만들지 않는다
@@ -470,6 +511,14 @@ private:
         std::string name;
         struct Version { uint16_t parent; bool modify; };
         std::vector<Version> versions;
+    };
+
+    struct PhaseBarrierPlan
+    {
+        std::vector<RHITransition> transitions;
+        std::vector<RHIBufferTransition> bufferTransitions;
+        std::vector<RHITextureHandle> uavBarriers;
+        std::vector<RHIBufferHandle> uavBufferBarriers;
     };
 
     struct Pass
@@ -488,26 +537,48 @@ private:
         std::vector<RHIBufferTransition> bufferTransitions;
         std::vector<RHITextureHandle> uavBarriers;
         std::vector<RHIBufferHandle>  uavBufferBarriers;
+        std::vector<RHITransition> finalTransitions;
+        uint32_t repeatCount{1};
+        std::vector<RepeatedPhase> phases;
+        bool repeated{false};
+        RepeatedExecuteCallback repeatedExecute;
+        std::vector<PhaseBarrierPlan> firstPhaseBarriers, repeatPhaseBarriers;
+    };
+
+    struct FinalStateRequirement
+    {
+        RGHandle handle;
+        RHIResourceState state;
     };
 
     void ReleaseResources();
+    bool CheckDeclarationCapacity(std::size_t count, uint16_t limit,
+        const char* kind, const std::string& name);
     bool BuildOrder(std::string& outError);
     void CullPasses();
     /// 〃 (G-1). 이제 `IRenderDeviceServices::CreateTexture` 로 만든다 —
     /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
     bool CreateTransients(std::string& outError);
     void PlanBarriers();
+    bool ValidateFinalStates(std::string& outError) const;
+    bool ValidateRepeatedPasses(std::string& outError) const;
+    void PlanRepeatedBarriers(Pass& pass, std::vector<bool>& previousWrite);
 
     /// 계획한 네 부류를 인코더가 감싼 command target에 한 batch로 기록한다.
     /// 순차·병렬과 DX12·Vulkan이 모두 이 경로를 공유한다(G-2).
     void RecordPassBarriers(RHIEncoder& encoder, const Pass& pass) const;
+    void RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const;
+    void RecordPassBody(const ExecuteContext& context, const Pass& pass,
+        uint32_t slice, uint32_t sliceCount) const;
 
     std::vector<Resource> m_resources;
     RGTransientPool* m_transientPool{ nullptr };
     std::vector<Pass>     m_passes;
+    std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
     IRHIGpuProfiler*      m_profiler{ nullptr };
     bool  m_compiled{ false };
+    std::string m_declarationError;
     RGSchedulingMode m_scheduling{ RGSchedulingMode::DeclarationOrder };
     RGOrderPolicy m_orderPolicy{ RGOrderPolicy::DependencyOrder };
     bool BuildExplicitOrder(std::string& outError);
@@ -522,8 +593,8 @@ private:
 
     uint32_t m_parallelCostThreshold{ kParallelRecordCostThreshold };
     uint64_t m_resourceEpoch{1};
+    uint64_t m_compileGeneration{0};
     IRHIParallelCommandPool* m_preparedPool{nullptr};
     uint64_t m_preparedRecording{0}, m_preparedDescriptors{0};
     bool m_preparedRecordingConsumed{false};
 };
-

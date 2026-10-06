@@ -47,6 +47,8 @@ cbuffer LXSceneConstants : register(b0)
 };
 
 StructuredBuffer<LXSurfacePoint> lx_vertices : register(t0);
+// GPU compaction emits the original draw owners; direct paths bind one owner.
+StructuredBuffer<uint> lx_visibleOwners : register(t138);
 TextureCube<float4> gEnvironment : register(t1);
 Texture2D<uint> lx_owners : register(t2);
 Texture2D<float2> lx_ao : register(t3);
@@ -57,6 +59,42 @@ SamplerComparisonState lx_shadowSampler : register(s1);
 #define lx_volumeShadowSampler lx_shadowSampler
 #include "MaterialGraphForwardVolume.slang"
 StructuredBuffer<PrincipledIblBakeSample> lx_ibl : register(t5);
+TextureCube<float4> lx_runtimeIrradiance : register(t135);
+TextureCube<float4> lx_runtimePrefiltered : register(t136);
+Texture2D<float4> lx_runtimeSource : register(t137);
+cbuffer LXSceneRuntimeLookupConstants : register(b6)
+{
+    uint lx_runtimeLookup, lx_runtimePrecomputed, lx_runtimeHasSource, lx_runtimeEnvironment;
+};
+
+float3 LXSceneRuntimeRadiance(float3 direction)
+{
+    if (lx_runtimeHasSource != 0u)
+    {
+        const float2 uv = float2(atan2(direction.z, direction.x) / (2.0 * PI) + 0.5,
+            -asin(clamp(direction.y, -1.0, 1.0)) / PI + 0.5);
+        uint width, height;
+        lx_runtimeSource.GetDimensions(width, height);
+        const float2 pixel = uv * float2(width, height) - 0.5;
+        const int2 cell = int2(floor(pixel));
+        const float2 weight = frac(pixel);
+        const int x0 = (cell.x + int(width)) % int(width), x1 = (x0 + 1) % int(width);
+        const int y0 = clamp(cell.y, 0, int(height) - 1), y1 = clamp(cell.y + 1, 0, int(height) - 1);
+        return SanitizeEnvironmentRadiance(lerp(
+            lerp(lx_runtimeSource.Load(int3(x0, y0, 0)).rgb, lx_runtimeSource.Load(int3(x1, y0, 0)).rgb, weight.x),
+            lerp(lx_runtimeSource.Load(int3(x0, y1, 0)).rgb, lx_runtimeSource.Load(int3(x1, y1, 0)).rgb, weight.x),
+            weight.y));
+    }
+    return SanitizeEnvironmentRadiance(gEnvironment.SampleLevel(gEnvironmentSampler, direction, 0).rgb);
+}
+
+#define LX_SPLIT_SUM_PRECOMPUTED lx_runtimePrecomputed
+#define LX_SPLIT_SUM_ENVIRONMENT lx_runtimeEnvironment
+#define LX_SPLIT_SUM_IRRADIANCE lx_runtimeIrradiance
+#define LX_SPLIT_SUM_PREFILTERED lx_runtimePrefiltered
+#define LX_SPLIT_SUM_SAMPLER gEnvironmentSampler
+#define LX_SPLIT_SUM_RADIANCE LXSceneRuntimeRadiance
+#include "PrincipledRuntimeIbl.slang"
 StructuredBuffer<float4> lx_forwardLights : register(t128);
 StructuredBuffer<uint> lx_forwardCounts : register(t129);
 StructuredBuffer<uint> lx_forwardIndices : register(t130);
@@ -95,6 +133,46 @@ cbuffer LXSceneDecalConstants : register(b3)
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
 StructuredBuffer<LXSceneSubsurfaceReflection> lx_subsurfaceReflection : register(t6);
 StructuredBuffer<float4> lx_subsurfaceIrradiance : register(t7);
+#include "MaterialGraphRuntimeEffectContract.slang"
+Texture2D<float4> lx_runtimeEffect0 : register(t139);
+Texture2D<float4> lx_runtimeEffect1 : register(t140);
+Texture2D<float4> lx_runtimeEffect2 : register(t141);
+Texture2D<float4> lx_runtimeEffect3 : register(t142);
+Texture2D<float4> lx_runtimeEffect4 : register(t143);
+Texture2D<float4> lx_runtimeEffect5 : register(t144);
+Texture2D<float4> lx_runtimeEffect6 : register(t145);
+Texture2D<float4> lx_runtimeEffect7 : register(t146);
+Texture2D<float4> lx_runtimeEffect8 : register(t147);
+Texture2D<float4> lx_runtimeEffect9 : register(t148);
+Texture2D<float4> lx_runtimeEffect10 : register(t149);
+Texture2D<float4> lx_runtimeEffect11 : register(t150);
+Texture2D<float4> lx_runtimeEffect12 : register(t151);
+Texture2D<float4> lx_runtimeEffect13 : register(t152);
+Texture2D<float4> lx_runtimeBackgroundColor : register(t153);
+Texture2D<float> lx_runtimeBackgroundDepth : register(t154);
+SamplerState lx_runtimeReferenceSampler : register(s2);
+#define gEnvironmentSampler lx_runtimeReferenceSampler
+#include "PrincipledEnvironmentBake.slang"
+#undef gEnvironmentSampler
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+#define LX_SCENE_REFRACTION_VOLUME 1
+#define lx_inverseViewProjection lx_effectInverseViewProjection
+#define lx_steps lx_effectSteps
+#define lx_rays lx_effectRays
+#define lx_reserved lx_effectBackgroundHasMedium
+#define lx_depth lx_runtimeBackgroundDepth
+#define lx_background lx_runtimeBackgroundColor
+#define lx_environment lx_runtimeEnvironment
+#include "MaterialGraphRefractionTransport.slang"
+#undef lx_inverseViewProjection
+#undef lx_steps
+#undef lx_rays
+#undef lx_reserved
+#undef lx_depth
+#undef lx_background
+#undef lx_environment
+#undef LX_SCENE_REFRACTION_VOLUME
+#endif
 #endif
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
 StructuredBuffer<LXSceneRefractionSample> lx_refraction : register(t8);
@@ -108,10 +186,11 @@ struct LXSceneVertex
     float3 tangent : TEXCOORD2;
     float3 bitangent : TEXCOORD3;
     float2 uv : TEXCOORD4;
+    nointerpolation uint owner : TEXCOORD5;
 };
 
 [shader("vertex")]
-LXSceneVertex LXSceneVS(uint index : SV_VertexID)
+LXSceneVertex LXSceneVS(uint index : SV_VertexID, uint instanceId : SV_InstanceID)
 {
     const LXSurfacePoint source = lx_vertices[index];
     LXSceneVertex output;
@@ -121,6 +200,7 @@ LXSceneVertex LXSceneVS(uint index : SV_VertexID)
     output.tangent = source.tangent.xyz;
     output.bitangent = source.bitangent.xyz;
     output.uv = source.uvLod.xy;
+    output.owner = lx_visibleOwners[instanceId];
     return output;
 }
 
@@ -176,6 +256,7 @@ LXSceneVertex LXSceneShadowVS(uint index : SV_VertexID)
     output.tangent = source.tangent.xyz;
     output.bitangent = source.bitangent.xyz;
     output.uv = source.uvLod.xy;
+    output.owner = 0u;
     return output;
 }
 
@@ -243,6 +324,24 @@ PrincipledIblBakePoint LXScenePoint(LXSceneVertex input, bool frontFace)
     if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
         discard;
     return point;
+}
+
+PrincipledIblBakeSample LXSceneReadIbl(LXSceneVertex input, bool frontFace, uint index)
+{
+    if (lx_runtimeLookup == 0u)
+    {
+        return lx_ibl[index];
+    }
+    // capture와 동일한 raw graph 값/접선/양면 처리를 사용한다. 반정밀도
+    // GBuffer를 역변환하거나 화면 크기의 bake point를 유지하지 않는다.
+    const PrincipledIblBakePoint point = LXScenePoint(input, frontFace);
+    if (!IsValidScenePrincipledIblBakePoint(point))
+    {
+        PrincipledIblBakeSample invalid = (PrincipledIblBakeSample)0;
+        invalid.baseAverage.w = -1;
+        return invalid;
+    }
+    return LXSplitSumSample(EvaluateIblBakePoint(point), normalize(point.viewTier.xyz), point.viewTier.w == 1.0);
 }
 
 struct LXSceneLookup0
@@ -374,7 +473,7 @@ LXSceneGBuffer LXSceneGBufferPS(LXSceneVertex input, bool frontFace : SV_IsFront
     output.metalRough = float4(surface.occlusion, surface.roughness, surface.metallic, 1);
     output.normal = float4(surface.normal * 0.5 + 0.5, 1);
     output.emissive = float4(surface.emission, 1);
-    output.owner = lx_drawOwner;
+    output.owner = input.owner;
     return output;
 }
 
@@ -420,10 +519,63 @@ float3 LXSceneShadowDebugColor(uint mode, float3 position, float3 normal, float3
 }
 
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
-SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 view, uint index)
+LXSceneRuntimeEffectSample LXSceneLoadRuntimeSource(uint index)
 {
-    const PrincipledIblBakeSample sample = lx_ibl[index];
-    const LXSceneSubsurfaceReflection reflection = lx_subsurfaceReflection[index];
+    const uint2 pixel = uint2(index % lx_width, index / lx_width);
+    const int3 local = int3(pixel - uint2(lx_effectSourceX, lx_effectSourceY), 0);
+    LXSceneRuntimeEffectSample sample = (LXSceneRuntimeEffectSample)0;
+    sample.sourceArea = lx_runtimeEffect0.Load(local);
+    sample.positionValid = lx_runtimeEffect1.Load(local);
+    sample.normal = lx_runtimeEffect2.Load(local).xyz;
+    sample.owner = lx_owners.Load(int3(pixel, 0));
+    return sample;
+}
+
+LXSceneRuntimeEffectSample LXSceneLoadRuntimeEffect(uint index)
+{
+    const uint2 pixel = uint2(index % lx_width, index / lx_width);
+    const int3 local = int3(pixel - uint2(lx_effectSourceX, lx_effectSourceY), 0);
+    LXSceneRuntimeEffectSample sample = LXSceneLoadRuntimeSource(index);
+    sample.reflection.metalSingleAlbedo = lx_runtimeEffect3.Load(local);
+    sample.reflection.metalAverage = lx_runtimeEffect4.Load(local);
+    sample.reflection.dielectricSingleAlbedo = lx_runtimeEffect5.Load(local);
+    sample.reflection.dielectricAverage = lx_runtimeEffect6.Load(local);
+    sample.reflection.metalEnvironment = lx_runtimeEffect7.Load(local);
+    sample.reflection.dielectricEnvironment = lx_runtimeEffect8.Load(local);
+    sample.refraction.glassSingleAlbedo = lx_runtimeEffect9.Load(local);
+    sample.refraction.glassAverage = lx_runtimeEffect10.Load(local);
+    sample.refraction.glassEnvironment = lx_runtimeEffect11.Load(local);
+    sample.refraction.rawTransmission = lx_runtimeEffect12.Load(local);
+    sample.refraction.radiance = lx_runtimeEffect13.Load(local);
+    return sample;
+}
+
+LXSceneSubsurfaceReflection LXSceneReadReflection(uint index)
+{
+    if (lx_runtimeLookup != 0u)
+    {
+        return LXSceneLoadRuntimeEffect(index).reflection;
+    }
+    return lx_subsurfaceReflection[index];
+}
+
+LXSceneRefractionSample LXSceneReadRefraction(uint index)
+{
+    LXSceneRefractionSample sample = (LXSceneRefractionSample)0;
+#if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
+    if (lx_runtimeLookup != 0u)
+    {
+        return LXSceneLoadRuntimeEffect(index).refraction;
+    }
+    return lx_refraction[index];
+#else
+    return sample;
+#endif
+}
+
+SpecialForwardSurface LXSceneSpecialSurfaceFromSamples(PrincipledSurface material, float3 view,
+    PrincipledIblBakeSample sample, LXSceneSubsurfaceReflection reflection, LXSceneRefractionSample refraction)
+{
     SpecialForwardIntegral integral;
     integral.layers.base = ReadPrincipledIblIntegral(sample.baseSingleAlbedo, sample.baseAverage);
     integral.layers.coat = ReadPrincipledIblIntegral(sample.coatSingleAlbedo, sample.coatAverage);
@@ -432,11 +584,17 @@ SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 v
     integral.glass = PrincipledEmptyIntegral();
     integral.rawTransmission = float3(0);
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
-    const LXSceneRefractionSample refraction = lx_refraction[index];
     integral.glass = ReadPrincipledIblIntegral(refraction.glassSingleAlbedo, refraction.glassAverage);
     integral.rawTransmission = refraction.rawTransmission.rgb;
 #endif
     return BuildSpecialForwardSurface(material, view, integral);
+}
+
+SpecialForwardSurface LXSceneSpecialSurface(PrincipledSurface material, float3 view, uint index,
+    PrincipledIblBakeSample sample)
+{
+    return LXSceneSpecialSurfaceFromSamples(material, view, sample, LXSceneReadReflection(index),
+        LXSceneReadRefraction(index));
 }
 
 float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float2 pixel, float3 position, out float3 irradiance)
@@ -483,6 +641,8 @@ float3 LXSceneSpecialDirect(SpecialForwardSurface surface, float2 pixel, float3 
     return direct;
 }
 
+#include "MaterialGraphRuntimeSpecial.slang"
+
 struct LXSceneSubsurfaceCapture
 {
     float4 fields[7] : SV_Target;
@@ -496,23 +656,24 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     const float area = length(cross(ddx_fine(input.position), ddy_fine(input.position)));
     const PrincipledSurface material = LXSceneMaterial(input, frontFace);
     const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
+    const PrincipledIblBakeSample sample = LXSceneReadIbl(input, frontFace, index);
     if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
     {
         discard;
     }
     LXSceneSubsurfaceCapture output = (LXSceneSubsurfaceCapture)0;
-    if (lx_ibl[index].baseAverage.w < 0 || lx_subsurfaceReflection[index].metalAverage.w != 1.0
+    if (sample.baseAverage.w < 0 || lx_subsurfaceReflection[index].metalAverage.w != 1.0
         || material.subsurfaceWeight <= 0.0)
     {
         return output;
     }
     const float3 view = PrincipledUnitNormal(lx_eye.xyz - input.position, material.normal);
-    const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index);
+    const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index, sample);
     float3 irradiance;
     LXSceneSpecialDirect(surface, input.clip.xy, input.position, irradiance);
     if (lx_hasEnvironment != 0u)
     {
-        irradiance += lx_ibl[index].irradiance.rgb;
+        irradiance += sample.irradiance.rgb;
     }
     const PrincipledSubsurfaceProfile profile = BuildSceneSubsurfaceProfile(material);
     const uint localMask = (profile.local.x ? 1u : 0u) | (profile.local.y ? 2u : 0u)
@@ -527,18 +688,18 @@ LXSceneSubsurfaceCapture LXSceneSubsurfacePS(LXSceneVertex input, bool frontFace
     return output;
 }
 
-float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 position, uint index)
+float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 position, uint index,
+    PrincipledIblBakeSample sample)
 {
-    if (lx_ibl[index].baseAverage.w < 0 || lx_subsurfaceReflection[index].metalAverage.w != 1.0)
+    if (sample.baseAverage.w < 0 || LXSceneReadReflection(index).metalAverage.w != 1.0)
     {
         return float4(1, 0, 1, 1);
     }
     const float3 view = PrincipledUnitNormal(lx_eye.xyz - position, material.normal);
-    const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index);
+    const SpecialForwardSurface surface = LXSceneSpecialSurface(material, view, index, sample);
     float3 source;
     const float3 direct = LXSceneSpecialDirect(surface, pixel, position, source);
-    const PrincipledIblBakeSample sample = lx_ibl[index];
-    const LXSceneSubsurfaceReflection reflection = lx_subsurfaceReflection[index];
+    const LXSceneSubsurfaceReflection reflection = LXSceneReadReflection(index);
     SpecialForwardEnvironment environment = (SpecialForwardEnvironment)0;
     environment.irradiance = sample.irradiance.rgb;
     environment.coatPrefiltered = sample.coatPrefiltered.rgb;
@@ -548,9 +709,16 @@ float4 LXSceneSpecialColor(PrincipledSurface material, float2 pixel, float3 posi
         * surface.integral.dielectric.singleScatter;
     environment.basePrefiltered = (metal * reflection.metalEnvironment.rgb
         + dielectric * reflection.dielectricEnvironment.rgb) / max(metal + dielectric, 1e-20);
-    environment.subsurfaceIrradiance = lx_subsurfaceIrradiance[index].rgb;
+    if (lx_runtimeLookup != 0u)
+    {
+        environment.subsurfaceIrradiance = LXSceneRuntimeSubsurface(material, index);
+    }
+    else
+    {
+        environment.subsurfaceIrradiance = lx_subsurfaceIrradiance[index].rgb;
+    }
 #if (LX_MATERIAL_FEATURE_MASK & 0x0800u) != 0
-    const LXSceneRefractionSample refraction = lx_refraction[index];
+    const LXSceneRefractionSample refraction = LXSceneReadRefraction(index);
     if (refraction.glassAverage.w != 1)
     {
         return float4(1, 0, 1, 1);
@@ -585,6 +753,8 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
 {
     input=LXScenePixelCenter(input);
     PrincipledSurface material = LXSceneMaterial(input, frontFace);
+    const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
+    const PrincipledIblBakeSample sample = LXSceneReadIbl(input, frontFace, index);
     if (lx_blended == 1u && material.alpha <= 0.0) discard;
     // Fine derivatives must be evaluated before the per-pixel owner branch.
     if (lx_blended == 0u && lx_owners.Load(int3(uint2(input.clip.xy), 0)) != lx_drawOwner)
@@ -597,11 +767,9 @@ float4 LXSceneColorPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace) : SV
 #endif
     // Scene SSAO describes the opaque background before refraction. A
     // transmitting surface uses its authored AO instead of that other surface.
-    const uint index = uint(input.clip.y) * lx_width + uint(input.clip.x);
 #if (LX_MATERIAL_FEATURE_MASK & 0x1800u) != 0
-    return LXSceneSpecialColor(material, input.clip.xy, input.position, index);
+    return LXSceneSpecialColor(material, input.clip.xy, input.position, index, sample);
 #else
-    const PrincipledIblBakeSample sample = lx_ibl[index];
     if (sample.baseAverage.w < 0)
         return float4(1, 0, 1, 1);
     PrincipledLayeredIntegral integral;

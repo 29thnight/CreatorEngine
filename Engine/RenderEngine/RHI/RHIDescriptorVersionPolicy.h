@@ -166,6 +166,24 @@ public:
         return true;
     }
 
+    /// 큐 admission 이전에만 호출한다. 다음 active recording에는 손대지 않는다.
+    bool RejectSubmission(uint64_t recordingId, RHICompletionPoint completion)
+    {
+        for (Slot& slot : m_slots)
+        {
+            if (slot.state == RHIDescriptorVersionState::Pending &&
+                slot.recordingId == recordingId && slot.completionValue == completion.value)
+            {
+                slot.state = RHIDescriptorVersionState::Available;
+                slot.recordingId = 0;
+                slot.completionValue = 0;
+                ++m_aborts;
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool AbortRecording(uint64_t recordingId)
     {
         Slot* const slot = FindRecording(recordingId);

@@ -106,6 +106,7 @@ public:
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
     void OnUploadAborted(uint64_t recordingId) override;
+    void OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion) override;
 
     // ── 미사용 기반 은퇴 (자산 상주 관리 ③) ──
     //

@@ -17,10 +17,12 @@
 #include "../../../Mesh.h"
 #include "../../../Texture.h"
 #include "../../../RHI/RHIEncoder.h"
+#include "../../Graph/ShadowCasterBounds.h"
 
 #include <algorithm>
 #include <functional>
 #include <sstream>
+#include <stdexcept>
 
 namespace
 {
@@ -185,12 +187,17 @@ RHIFormat EnhancedGBufferPass::GetRenderTargetFormat(uint32_t index)
 
 bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
+    m_visibilityFrame.reset();
+    m_batches.clear();
+    m_instances.clear();
+    m_instanceBounds.clear();
     m_drawGeometry.clear();
     m_drawTextures.clear();
     m_bonePalettes.clear();
     m_boneOffsets.clear();
     m_lastDrawCount = 0;
     m_lastSkinnedCount = 0;
+    m_lastBatchCount = 0;
     // W8: 장부는 프레임마다 비운다. 비우지 않으면 지난 프레임의 배치가 이번
     // 프레임의 충돌로 보고된다.
     m_sealLedger.Begin(context.frameId, context.sceneEpoch);
@@ -319,13 +326,66 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_lastMaterialCount = static_cast<uint32_t>(m_drawTextures.size());
 
     BuildBatches(context);
-
     return true;
+}
+
+bool EnhancedGBufferPass::HasGpuVisibilityCandidates() const
+{
+    return std::any_of(m_batches.begin(), m_batches.end(), [](const auto& batch) {
+        return batch.gpuEligible;
+    });
+}
+
+bool EnhancedGBufferPass::PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError)
+{
+    std::vector<GpuGeometryVisibility::Candidate> candidates;
+    std::vector<GpuGeometryVisibility::Bin> bins;
+    uint32_t outputOffset = 0;
+    for (auto& batch : m_batches)
+    {
+        if (!batch.gpuEligible)
+        {
+            continue;
+        }
+        batch.visibilityBin = static_cast<uint32_t>(bins.size());
+        batch.visibleIdOffset = outputOffset;
+        const auto& geometry = m_drawGeometry.at(batch.geometryKey);
+        bins.push_back({geometry.indexCount, 0, 0, 0});
+        for (uint32_t local = 0; local < batch.instanceCount; ++local)
+        {
+            candidates.push_back({m_instanceBounds[batch.firstInstance + local], batch.visibilityBin,
+                                  local, outputOffset, 0});
+        }
+        outputOffset += (batch.instanceCount + GpuGeometryVisibility::kOutputAlignment - 1u) /
+                        GpuGeometryVisibility::kOutputAlignment * GpuGeometryVisibility::kOutputAlignment;
+    }
+    return m_visibility.Prepare(context, m_frameViewProjection, candidates, bins, m_visibilityFrame, outError);
+}
+
+bool EnhancedGBufferPass::UsesVisibleInstanceIds(const EnhancedMaterialDrawSnapshot* snapshot,
+                                                uint32_t vertexMask) const
+{
+    std::shared_ptr<const LX::Runtime::GraphicsGeneration> generation;
+    if (snapshot)
+    {
+        generation = LX::Runtime::ResolveGraphicsGeneration(snapshot->pipelineGenerations,
+            snapshot->shaderMetaHandle, snapshot->permutationKey, snapshot->bindingLayout, vertexMask, false);
+    }
+    else if (vertexMask == 0)
+    {
+        generation = m_pipelineRequest.GetGeneration();
+    }
+    else if (const auto found = m_modelPipelineRequests.find(vertexMask); found != m_modelPipelineRequests.end())
+    {
+        generation = found->second.GetGeneration();
+    }
+    return generation && m_visibilityLayouts.contains(generation->pipeline.GetDesc().layout.id);
 }
 
 void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
 {
     m_instances.clear();
+    m_instanceBounds.clear();
     m_batches.clear();
     m_lastBatchCount = 0;
 
@@ -389,14 +449,30 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
             && m_rejectedSnapshots.contains(draw.materialSnapshot.get())) continue;
 
         const MaterialKey key = MakeMaterialKey(draw);
+        const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
+        const uint32_t vertexMask = geometry->second.vertexAttributeMask;
+        const bool usesVisibleIds = UsesVisibleInstanceIds(key.snapshot.get(), vertexMask);
+        const bool skinned = draw.bonePalette && draw.boneCount != 0;
+        const bool gpuEligible = context.resources->GetIndirectDrawCapabilities().indexedDraw &&
+                                 usesVisibleIds && !skinned;
+        const auto bounds = shadow_math::WorldBounds(draw);
+        // Unsupported devices, custom vertex contracts and skinned draws retain
+        // conservative CPU visibility and the direct indexed submission path.
+        if (!gpuEligible && !shadow_math::IntersectsClip(bounds, m_frameViewProjection))
+        {
+            continue;
+        }
 
         if (m_batches.empty()
             || m_batches.back().geometryKey != enhanced_draw::GeometryKey(draw)
-            || m_batches.back().material != key)
+            || m_batches.back().material != key
+            || m_batches.back().gpuEligible != gpuEligible)
         {
             DrawBatch batch{};
             batch.geometryKey = enhanced_draw::GeometryKey(draw);
             batch.material = key;
+            batch.usesVisibleIds = usesVisibleIds;
+            batch.gpuEligible = gpuEligible;
             // I5-D34a: 메시 바인딩의 마스크가 레이아웃 축이다. 배치는 메시별로
             // 갈리므로 마스크가 배치 안에서 섞일 수 없다.
             const auto geometry = m_drawGeometry.find(enhanced_draw::GeometryKey(draw));
@@ -470,6 +546,7 @@ void EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context)
         }
 
         m_instances.push_back(instance);
+        m_instanceBounds.emplace_back(bounds.center.x, bounds.center.y, bounds.center.z, bounds.radius);
         ++m_batches.back().instanceCount;
     }
 
@@ -517,7 +594,7 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     // 들고 있어서다.
     MaterialTextureTable::Schema textureSchema;
     if (!MaterialTextureTable::FromReflection(verified.pixel.reflection, textureSchema, outError)) return false;
-    const RHIPipelineLayoutParam params[] = {
+    std::vector<RHIPipelineLayoutParam> params = {
         RHILayout::Cbv(0, RHIShaderVisibility::Vertex),          // b0 — 프레임 상수
         RHILayout::Srv(4, RHIShaderVisibility::Vertex),          // t4 — 인스턴스 데이터
         RHILayout::SrvTable(static_cast<uint32_t>(textureSchema.size()),
@@ -527,6 +604,18 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
         RHILayout::Cbv(2, RHIShaderVisibility::Pixel),           // b2 — M6 Material property block
         RHILayout::Cbv(3, RHIShaderVisibility::Pixel), // texture coordinates by reflected register
     };
+    // Opt in from the verified vertex contract, never from a filename. Custom
+    // ShaderMeta shaders without the index indirection continue to draw directly.
+    const bool visibleIds = std::any_of(verified.vertex.reflection.resources.begin(),
+        verified.vertex.reflection.resources.end(), [](const auto& resource) {
+            return resource.name == "gVisibleInstanceIds" &&
+                   resource.kind == RHIShaderResourceKind::StructuredBuffer &&
+                   resource.registerIndex == 6 && resource.registerSpace == 0;
+        });
+    if (visibleIds)
+    {
+        params.push_back(RHILayout::Srv(6, RHIShaderVisibility::Vertex));
+    }
 
     RHIPipelineLayoutDesc rootDesc{};
     rootDesc.params = params;
@@ -534,6 +623,10 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
 
     const auto root = context.rootSignatures->GetOrCreate(rootDesc, outError);
     if (!root.IsValid()) return false;
+    if (visibleIds)
+    {
+        m_visibilityLayouts.insert(root.id);
+    }
 
     // 입력 레이아웃. 정점 구조체와 순서가 맞아야 하고, 어긋나면 검증 레이어가
     // 잡아 주지 않는 경우도 있어 화면이 조용히 이상해진다.
@@ -955,6 +1048,11 @@ RHISamplerTable EnhancedGBufferPass::SamplerTableFor(
 
 void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
+    const auto visibility = m_visibilityFrame;
+    if (visibility)
+    {
+        visibility->Declare(graph);
+    }
     const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
     const auto outputAccess = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
         ? RGAccessMode::LegacyState : RGAccessMode::Write;
@@ -1006,6 +1104,10 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
         usages.push_back({ targets[i], RHIResourceState::RenderTarget, outputAccess });
     }
     usages.push_back({ depth, RHIResourceState::DepthWrite, outputAccess });
+    if (visibility)
+    {
+        visibility->AddReadUsages(graph, usages);
+    }
 
     // 소비자가 없을 때만 뿌리로 표시해 살려 둔다(SetKeepAlive).
     // Deferred가 붙으면 그쪽이 읽으므로 표시 없이도 살아남아야 한다.
@@ -1019,7 +1121,7 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
     // 조각 상한은 워커 상한과 맞춘다. 그보다 잘게 쪼개도 같은 워커가 연달아
     // 맡게 되고, 그러면 조각마다 상태를 다시 거는 비용만 늘어난다.
     graph.AddSplitPass(GetName(), usages,
-        [this, &context, targets, depth](const EnhancedRenderGraph::ExecuteContext& executeContext,
+        [this, &context, targets, depth, visibility](const EnhancedRenderGraph::ExecuteContext& executeContext,
             uint32_t slice, uint32_t sliceCount)
         {
             RHIEncoder& encoder = *executeContext.encoder;
@@ -1127,21 +1229,29 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             // 예전에는 배치마다 링에서 잘랐다. dx12.bench11 실측이 그 비용을
             // 정확히 보여 줬다 — Allocate 한 번이 원자 연산 몇 개를 지나며
             // 호출당 ~175ns, 드로우당 할당 3.568ms가 일괄 5.25배(0.679ms)로
-            // 줄었다. 배치들의 인스턴스는 m_instances에 배치 순서로 연속이라
-            // (PrepareFrame의 계약), 조각 구간 전체가 한 번의 memcpy로 올라간다.
-            // 배치마다 갈리는 것은 루트 SRV 주소 하나다.
-            const uint32_t sliceFirstInstance = m_batches[sliceBegin].firstInstance;
-            const DrawBatch& sliceLastBatch = m_batches[sliceEnd - 1];
-            const uint32_t sliceInstanceEnd =
-                sliceLastBatch.firstInstance + sliceLastBatch.instanceCount;
-            if (sliceInstanceEnd <= sliceFirstInstance) return;
-
-            const uint64_t sliceInstanceBytes = sizeof(InstanceData)
-                * static_cast<uint64_t>(sliceInstanceEnd - sliceFirstInstance);
+            // 줄었다. Keep one upload per slice, with each batch's root SRV
+            // beginning at a portable 256-byte storage-buffer offset.
+            std::vector<uint64_t> batchOffsets(sliceEnd - sliceBegin);
+            uint64_t sliceInstanceBytes = 0;
+            uint32_t identityCount = 0;
+            for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
+            {
+                sliceInstanceBytes = (sliceInstanceBytes + 255u) & ~uint64_t{255u};
+                batchOffsets[batchIndex - sliceBegin] = sliceInstanceBytes;
+                sliceInstanceBytes += sizeof(InstanceData) * uint64_t(m_batches[batchIndex].instanceCount);
+                const auto& batch = m_batches[batchIndex];
+                if (batch.usesVisibleIds && (!visibility || batch.visibilityBin == UINT32_MAX))
+                {
+                    identityCount = (std::max)(identityCount, batch.instanceCount);
+                }
+            }
+            if (sliceInstanceBytes == 0)
+            {
+                return;
+            }
             const auto instanceBlock = context.resources->AllocateUpload(
-                RHIUploadRequest{ sliceInstanceBytes, RHIUploadUsage::BufferCopy,
-                    sizeof(InstanceData) });
-            if (!instanceBlock.IsValid())
+                RHIUploadRequest{ sliceInstanceBytes, RHIUploadUsage::BufferCopy, 256 });
+            if (!instanceBlock.IsValid() || !instanceBlock.IsWritable())
             {
                 // W8: 조각 전체가 빠진다. 조용히 돌아가면 그 프레임은 물체
                 // 여럿이 없는 채로 성공으로 보고된다.
@@ -1149,8 +1259,22 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
                     static_cast<std::uint32_t>(sliceEnd - sliceBegin));
                 return;
             }
-            memcpy(instanceBlock.cpuAddress, &m_instances[sliceFirstInstance],
-                static_cast<size_t>(sliceInstanceBytes));
+            for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
+            {
+                const auto& batch = m_batches[batchIndex];
+                std::memcpy(static_cast<std::byte*>(instanceBlock.cpuAddress) + batchOffsets[batchIndex - sliceBegin],
+                            &m_instances[batch.firstInstance], sizeof(InstanceData) * size_t(batch.instanceCount));
+            }
+            RHIBufferSlice identityVisibleIds;
+            if (identityCount != 0)
+            {
+                std::string error;
+                identityVisibleIds = GpuGeometryVisibility::UploadIdentity(context, identityCount, error);
+                if (!identityVisibleIds.IsValid())
+                {
+                    throw std::runtime_error(error);
+                }
+            }
 
             for (size_t batchIndex = sliceBegin; batchIndex < sliceEnd; ++batchIndex)
             {
@@ -1210,9 +1334,15 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
                 encoder.SetRootBuffer(RHIBindPoint::Graphics, 1,
                     instanceBlock.SubRange(
-                        sizeof(InstanceData)
-                            * static_cast<uint64_t>(batch.firstInstance - sliceFirstInstance),
+                        batchOffsets[batchIndex - sliceBegin],
                         sizeof(InstanceData) * batch.instanceCount));
+                const bool indirect = visibility && batch.visibilityBin != UINT32_MAX;
+                if (batch.usesVisibleIds)
+                {
+                    encoder.SetRootBuffer(RHIBindPoint::Graphics, 7,
+                        indirect ? visibility->VisibleIds(batch.visibleIdOffset, batch.instanceCount)
+                                 : identityVisibleIds);
+                }
 
                 const auto textures = m_drawTextures.find(batch.material);
                 if (textures == m_drawTextures.end())
@@ -1232,7 +1362,18 @@ void EnhancedGBufferPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
 
                 encoder.SetVertexBuffer(mesh->second.vertices, mesh->second.vertexStride);
                 encoder.SetIndexBuffer(mesh->second.indices, mesh->second.indexFormat);
-                encoder.DrawIndexed(mesh->second.indexCount, batch.instanceCount);
+                if (indirect)
+                {
+                    if (!encoder.DrawIndexedIndirect(visibility->Arguments(),
+                                                     visibility->ArgsOffset(batch.visibilityBin)))
+                    {
+                        throw std::runtime_error("GBuffer indexed indirect submission failed.");
+                    }
+                }
+                else
+                {
+                    encoder.DrawIndexed(mesh->second.indexCount, batch.instanceCount);
+                }
             }
         },
         // 조각 수는 드로우 수로 정한다.
@@ -1276,6 +1417,10 @@ uint32_t EnhancedGBufferPass::ComputeSliceCount() const
 
 void EnhancedGBufferPass::Shutdown()
 {
+    m_visibilityFrame.reset();
+    m_visibility.ShutdownAfterIdle();
+    m_visibilityLayouts.clear();
+    m_instanceBounds.clear();
     m_drawGeometry.clear();
     m_drawTextures.clear();
     m_bonePalettes.clear();

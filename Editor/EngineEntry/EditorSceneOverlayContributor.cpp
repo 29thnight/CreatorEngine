@@ -94,8 +94,7 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
         {
             return &bundle->wireframe;
         };
-        node.reads = { kGizmoDepthSlot };
-        node.modifies = { LiveSlots::kDisplayLdr };
+        node.modifies = { LiveSlots::kDisplayLdr, kGizmoDepthSlot };
         node.active = []()
         {
             const GizmoRenderer* gizmoRenderer = GizmoRenderer::GetActive();
@@ -118,6 +117,10 @@ void EditorSceneOverlayContributor::Contribute(LivePipelineDesc& pipeline,
             if (bundle->wireframe.GetOutput().IsValid())
             {
                 bb.Set(LiveSlots::kDisplayLdr, bundle->wireframe.GetOutput());
+            }
+            if (bundle->wireframe.GetDepth().IsValid())
+            {
+                bb.Set(kGizmoDepthSlot, bundle->wireframe.GetDepth());
             }
         };
         pipeline.AddNode(std::move(node));

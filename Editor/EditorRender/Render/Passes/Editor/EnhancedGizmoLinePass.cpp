@@ -147,15 +147,23 @@ void EnhancedGizmoLinePass::Declare(EnhancedRenderGraph& graph,
         m_output = m_inputs.color;
     }
 
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_output = ownsColor ? graph.Write(m_output) : graph.Modify(m_output);
+    }
+    const auto colorAccess = explicitAccess
+        ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
+    const auto output = m_output;
     std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-    usages.push_back({ m_output, RHIResourceState::RenderTarget });
+    usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
 
     graph.AddPass(GetName(), usages,
-        [this, &context, ownsColor](const EnhancedRenderGraph::ExecuteContext& executeContext)
+        [this, &context, ownsColor, output](const EnhancedRenderGraph::ExecuteContext& executeContext)
         {
             RHIEncoder& encoder = *executeContext.encoder;
 
-            const RHITextureHandle colors[] = { executeContext.ResolveHandle(m_output) };
+            const RHITextureHandle colors[] = { executeContext.ResolveHandle(output) };
             const auto targets = context.resources->CreateRenderTargets(colors);
             if (!targets.IsValid()) return;
 

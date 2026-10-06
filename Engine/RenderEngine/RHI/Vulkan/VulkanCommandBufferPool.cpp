@@ -157,7 +157,7 @@ RHIEncoder& VulkanCommandBufferPool::AcquireEncoder(uint32_t worker)
         slot.buffer, m_resources->m_pipelineCache, &m_resources->m_resourceTable,
         &m_resources->m_renderTargetTables[m_resources->m_frameIndex], m_device,
         &m_resources->m_descriptorRecycler, &m_resources->m_bindingTable,
-        &m_resources->m_samplerTable);
+        &m_resources->m_samplerTable, m_resources->GetIndirectDrawCapabilities(), m_resources->m_viewportLimits);
     return *slot.encoder;
 }
 
@@ -192,6 +192,27 @@ bool VulkanCommandBufferPool::HasRecorded(uint32_t worker) const
 {
     return !m_slots.empty() && worker < m_workerCount &&
         m_slots[m_frameIndex][worker].opened;
+}
+
+uint64_t VulkanCommandBufferPool::GetCurrentRecordingId() const
+{
+    return m_resources ? m_resources->GetCurrentUploadRecordingId() : 0;
+}
+
+void VulkanCommandBufferPool::RejectPreparedCommands(uint64_t recordingId, RHICompletionPoint completion)
+{
+    if (m_resources)
+    {
+        m_resources->RejectNeverEnqueuedRecording(recordingId, completion);
+    }
+}
+
+void VulkanCommandBufferPool::AcceptPreparedCommands(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
+{
+    if (m_resources)
+    {
+        m_resources->AcceptParallelSubmission(completion, ticket);
+    }
 }
 
 bool VulkanCommandBufferPool::PrepareRecordedCommands(uint32_t frameSlot,
