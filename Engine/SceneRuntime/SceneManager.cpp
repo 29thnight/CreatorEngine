@@ -650,6 +650,8 @@ void SceneManager::Decommissioning()
             delete scene;
         }
 	}
+    // 지운 씬을 목록에 남기면 뒤이은 순회(BindAudioPlayback 등)가 해제된 메모리를 읽는다.
+    m_scenes.clear();
 }
 
 void SceneManager::SetDecommissioning()
