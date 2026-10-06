@@ -93,7 +93,7 @@ namespace ce::profiler_viewer
         struct queued_command
         {
             command kind{};
-            std::uint32_t value = 0;
+            std::uint64_t value = 0;
             std::uint64_t capture_generation = 0;
             std::vector<std::byte> diagnostic;
         };
@@ -141,8 +141,9 @@ namespace ce::profiler_viewer
         std::uint64_t command_revision = 0;
         command last_command = command::stop;
         bool command_accepted = false;
+        dx_capture::control_error command_dx_error = dx_capture::control_error::none;
+        std::uint64_t command_dx_session_id = 0;
         std::string command_message;
-        std::wstring dx_path;
 
         void set_status(bool connected, std::string message, DWORD error = ERROR_SUCCESS, bool failed = true)
         {
@@ -168,9 +169,8 @@ namespace ce::profiler_viewer
             if (packet.kind == message_kind::command)
             {
                 if (!in(request.capture_generation) || !in(request.kind) || !in(request.value) || !in.finished() ||
-                    request.kind < command::record || request.kind > command::stop_dx ||
-                    (request.kind != command::counter_mask && request.value != 0) ||
-                    (request.kind == command::counter_mask && (request.value & ~255u) != 0))
+                    !valid_command_value(request.kind, request.value) ||
+                    (is_dx_command(request.kind) && request.capture_generation != 0))
                 {
                     return false;
                 }
@@ -412,6 +412,9 @@ namespace ce::profiler_viewer
             std::filesystem::path recording_path, last_dx_path;
             std::uint64_t recording_source_id = 0;
             std::uint64_t dx_source_id = 0;
+            std::uint64_t last_status_dx_session_id = 0;
+            auto last_status_dx_state = dx_capture::capture_state::idle;
+            bool last_status_dx_busy = false;
             bool healthy = true;
             bool viewer_closing = false;
             while (healthy && WaitForSingleObject(stop.get(), 0) == WAIT_TIMEOUT &&
@@ -483,7 +486,10 @@ namespace ce::profiler_viewer
                     publication = latest;
                 }
                 if (healthy && (now - status_at >= 100 ||
-                                (publication && publication->snapshot.recording_id != last_status_recording_id)))
+                                (publication && (publication->snapshot.recording_id != last_status_recording_id ||
+                                                 publication->snapshot.dx_status.session_id != last_status_dx_session_id ||
+                                                 publication->snapshot.dx_status.state != last_status_dx_state ||
+                                                 publication->snapshot.dx_status.busy != last_status_dx_busy))))
                 {
                     if (publication && publication->snapshot.target.session_generation == identity.session_generation)
                     {
@@ -496,6 +502,9 @@ namespace ce::profiler_viewer
                         }
                         healthy = send(pipe, message_kind::status, encode_status(current), options.nonce, sent, viewer, stop.get());
                         last_status_recording_id = current.recording_id;
+                        last_status_dx_session_id = current.dx_status.session_id;
+                        last_status_dx_state = current.dx_status.state;
+                        last_status_dx_busy = current.dx_status.busy;
                     }
                     else
                     {
@@ -503,7 +512,7 @@ namespace ce::profiler_viewer
                     }
                     status_at = now;
                 }
-                if (healthy && publication)
+                if (healthy && publication && publication->snapshot.target.session_generation == identity.session_generation)
                 {
                     const auto offer_file = [&](const std::filesystem::path& path, std::filesystem::path& previous,
                                                 security::pinned_image& pin, message_kind kind,
@@ -534,7 +543,8 @@ namespace ce::profiler_viewer
                     {
                         healthy = offer_file(publication->recording_path, recording_path, recording_pin, message_kind::recording_artifact,
                                              publication->snapshot.recording_id, recording_source_id) &&
-                                  offer_file(publication->dx_path, last_dx_path, dx_pin, message_kind::dx_artifact, 0, dx_source_id);
+                                  offer_file(publication->dx_path, last_dx_path, dx_pin, message_kind::dx_artifact,
+                                             publication->snapshot.dx_status.session_id, dx_source_id);
                         artifacts_at = now + 500;
                     }
                     // Diagnostic freshness is independent of a large timeline
@@ -812,8 +822,10 @@ namespace ce::profiler_viewer
                 continue;
             }
             owner.command_accepted = true;
+            owner.command_dx_error = dx_capture::control_error::none;
+            owner.command_dx_session_id = 0;
             owner.command_message = "Target command accepted";
-            if (request.capture_generation != profiler.capture_generation())
+            if (!valid_command_generation(request.kind, request.capture_generation, profiler.capture_generation()))
             {
                 owner.command_accepted = false;
                 owner.command_message = "Stale capture-generation command rejected";
@@ -864,26 +876,20 @@ namespace ce::profiler_viewer
                     owner.command_message = "Stop recording before Clear";
                 }
                 break;
-            case command::counter_mask: profiler.set_counter_mask(request.value); break;
+            case command::counter_mask: profiler.set_counter_mask(static_cast<counter_mask>(request.value)); break;
             case command::start_dx:
+            case command::stop_dx:
             {
-                // A fresh engine-owned path, never a path supplied by the viewer.
-                wchar_t temporary[MAX_PATH]{};
-                const auto length = GetTempPathW(MAX_PATH, temporary);
-                session_nonce nonce{};
-                owner.command_accepted = false;
-                owner.command_message = "Cannot allocate a DX12 capture spool path";
-                if (length && length < MAX_PATH &&
-                    BCryptGenRandom(nullptr, nonce.data(), static_cast<ULONG>(nonce.size()), BCRYPT_USE_SYSTEM_PREFERRED_RNG) >= 0)
-                {
-                    owner.dx_path = std::wstring(temporary) + L"CreatorEngine-DX-" +
-                                    transport::security::nonce_text(nonce) + L".cedx";
-                    owner.command_accepted = dx_capture::deep_capture().start(owner.dx_path, false, false);
-                    owner.command_message = owner.command_accepted ? "DX12 capture start accepted" : "DX12 capture is busy or unavailable";
-                }
+                // CLI and viewer share one admission boundary and spool owner.
+                // An accepted request is queued, not a successful ETW capture.
+                const auto result = request.kind == command::start_dx ?
+                    dx_capture::deep_capture().start_capture() : dx_capture::deep_capture().stop_capture(request.value);
+                owner.command_accepted = result.accepted;
+                owner.command_dx_error = result.error;
+                owner.command_dx_session_id = result.status.session_id;
+                owner.command_message = result.message;
                 break;
             }
-            case command::stop_dx: dx_capture::deep_capture().request_stop(); break;
             }
             owner.last_command = request.kind;
             ++owner.command_revision;
@@ -930,6 +936,8 @@ namespace ce::profiler_viewer
         snapshot.command_revision = owner.command_revision;
         snapshot.last_command = owner.last_command;
         snapshot.command_accepted = owner.command_accepted;
+        snapshot.command_dx_error = owner.command_dx_error;
+        snapshot.command_dx_session_id = owner.command_dx_session_id;
         snapshot.command_message = owner.command_message;
         snapshot.dx_status = dx_capture::deep_capture().status();
 #if CE_DX_TIMING_CAPTURE && !CE_SHIPPING
@@ -940,7 +948,7 @@ namespace ce::profiler_viewer
         {
             publication->recording_path = recording.path;
         }
-        if (!snapshot.dx_status.busy && snapshot.dx_status.recording.record_count > 0 &&
+        if (snapshot.dx_status.session_id != 0 && !snapshot.dx_status.busy && snapshot.dx_status.recording.record_count > 0 &&
             snapshot.dx_status.recording.valid_bytes > 0)
         {
             publication->dx_path = snapshot.dx_status.path;

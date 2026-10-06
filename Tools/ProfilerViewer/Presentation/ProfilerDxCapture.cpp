@@ -174,6 +174,23 @@ namespace editor::profiler_view
 
     namespace
     {
+        const char* capture_state_label(ce::dx_capture::capture_state state)
+        {
+            using ce::dx_capture::capture_state;
+            switch (state)
+            {
+            case capture_state::idle: return "Idle";
+            case capture_state::accepted: return "Accepted; waiting for collector";
+            case capture_state::in_progress: return "Capturing";
+            case capture_state::stopping: return "Stopping / finalizing";
+            case capture_state::finalized: return "Finalized";
+            case capture_state::failed: return "Failed";
+            case capture_state::permission_denied: return "Permission denied";
+            case capture_state::unavailable: return "Unavailable";
+            }
+            return "Unavailable";
+        }
+
         struct dx_operation
         {
             std::atomic_bool done{ false };
@@ -184,6 +201,7 @@ namespace editor::profiler_view
             std::filesystem::path destination;
             bool show = true;
             std::string error = "DX file operation was not accepted by the worker";
+            std::string success_message;
         };
 
         struct dx_admission
@@ -209,8 +227,10 @@ namespace editor::profiler_view
             std::filesystem::path destination;
             bool requested = false;
             std::uint64_t start_command_revision = 0;
+            std::uint64_t seen_command_revision = 0;
+            std::uint64_t requested_session_id = 0;
             bool start_acknowledged = false;
-            bool show_remote = false;
+            bool show_remote = true;
             std::string message;
         };
 
@@ -229,6 +249,7 @@ namespace editor::profiler_view
             operation->destination = destination;
             operation->artifact = std::move(artifact);
             operation->show = show;
+            operation->success_message = destination.empty() ? "Capture opened" : "DX capture exported";
             view.operation = operation;
             view.message.clear();
             try
@@ -261,7 +282,14 @@ namespace editor::profiler_view
                             operation->capture = *loaded;
                             if (!operation->destination.empty() && !operation->canceled.load(std::memory_order_acquire))
                             {
-                                copy_dx_capture_file(operation->artifact->path(), operation->destination, operation->error);
+                                if (!operation->capture->summary().finalized)
+                                {
+                                    operation->error = "DX artifact has no valid finalization; no export was made";
+                                }
+                                else
+                                {
+                                    copy_dx_capture_file(operation->artifact->path(), operation->destination, operation->error);
+                                }
                             }
                         }
                     }
@@ -314,27 +342,23 @@ namespace editor::profiler_view
                 if (operation->capture && operation->show)
                 {
                     view.capture = operation->capture;
-                    view.path = operation->destination.empty() ? operation->path : operation->destination;
+                    view.path = operation->destination.empty() || !operation->error.empty() ? operation->path : operation->destination;
                 }
                 if (operation->error.empty())
                 {
-                    view.message = operation->destination.empty() ? "Capture opened" : "DX capture exported";
+                    view.message = operation->success_message;
                 }
             }
         }
         const auto remote = source().snapshot();
-        if (remote->dx_source && remote->dx_source != view.seen_source && !view.operation)
+        // Only viewer requests advance command_revision. CLI operations instead
+        // advance the shared DX session, so they cannot acknowledge this request.
+        if (remote->command_revision > view.seen_command_revision)
         {
-            view.seen_source = remote->dx_source;
-            const auto destination = view.requested ? view.destination : std::filesystem::path{};
-            const bool show = view.requested && view.show_remote;
-            view.requested = false;
-            view.destination.clear();
-            // A newly attached viewer can inspect the target's last completed DX
-            // capture, but a user's explicit file selection is never overwritten.
-            if (show || !destination.empty() || !view.capture)
+            view.seen_command_revision = remote->command_revision;
+            if (ce::profiler_viewer::is_dx_command(remote->last_command))
             {
-                begin_open(remote->dx_source->path(), remote->dx_source, destination, show || !view.capture);
+                view.message = remote->command_message;
             }
         }
         if (view.requested && !view.start_acknowledged &&
@@ -342,6 +366,7 @@ namespace editor::profiler_view
             remote->last_command == ce::profiler_viewer::command::start_dx)
         {
             view.start_acknowledged = true;
+            view.requested_session_id = remote->command_accepted ? remote->command_dx_session_id : 0;
             if (!remote->command_accepted)
             {
                 view.requested = false;
@@ -349,13 +374,47 @@ namespace editor::profiler_view
                 view.message = remote->command_message.empty() ? "The target rejected DX capture" : remote->command_message;
             }
         }
-        if (view.requested && view.start_acknowledged && !remote->dx_status.busy &&
-            !remote->dx_status.recording.finalized && remote->dx_status.recording.record_count == 0 &&
-            remote->dx_source == view.seen_source)
+        if (remote->dx_source && remote->dx_source != view.seen_source && !view.operation &&
+            (!view.requested || view.start_acknowledged))
+        {
+            view.seen_source = remote->dx_source;
+            const bool requested_source = view.requested && view.requested_session_id != 0 &&
+                                          remote->dx_source_id == view.requested_session_id;
+            const auto destination = requested_source && remote->dx_source_finalized ?
+                view.destination : std::filesystem::path{};
+            if (requested_source)
+            {
+                view.requested = false;
+                view.destination.clear();
+            }
+            // CLI-started captures follow the same immutable source handoff.
+            // Explicit offline selections stay visible. An unrelated or failed
+            // session can never write the destination selected for our Start.
+            if (view.show_remote || !destination.empty())
+            {
+                begin_open(remote->dx_source->path(), remote->dx_source, destination, view.show_remote);
+                if (view.operation && destination.empty())
+                {
+                    view.operation->success_message = remote->dx_source_finalized ?
+                        "Finalized DX artifact opened; no viewer export was made" :
+                        "Incomplete / failed DX artifact opened; no viewer export was made";
+                }
+            }
+            if (requested_source && !remote->dx_source_finalized)
+            {
+                view.message = "DX capture did not finalize successfully; the retained artifact was not exported";
+            }
+        }
+        if (view.requested && view.start_acknowledged &&
+            (remote->dx_status.session_id != view.requested_session_id ||
+             (!remote->dx_status.busy && (remote->dx_status.state != ce::dx_capture::capture_state::finalized ||
+                                        remote->dx_status.recording.record_count == 0))))
         {
             view.requested = false;
             view.destination.clear();
-            view.message = remote->dx_status.message.empty() ? "DX capture completed without an artifact" : remote->dx_status.message;
+            view.message = remote->dx_status.session_id != view.requested_session_id ?
+                "DX session changed before its artifact arrived; no export was made" :
+                "DX capture ended without a finalized artifact; no export was made. " + remote->dx_status.message;
         }
         if (!remote->connected && view.requested)
         {
@@ -372,7 +431,7 @@ namespace editor::profiler_view
         const capture_status& status = remote->dx_status;
         ImGui::TextWrapped("DX12 deep capture uses a headless ETW helper. Record for up to 60 seconds into a new .cedx file.");
         ImGui::TextWrapped("This version only runs an ordinary-privilege helper. Automatic and manual elevation are blocked pending decoder security validation.");
-        ImGui::TextDisabled("If existing ETW permissions are insufficient, deep capture reports unavailable.");
+        ImGui::TextDisabled("If existing ETW permissions are insufficient, deep capture reports permission denied.");
         ImGui::BeginDisabled(!remote->connected || remote->command_pending || !remote->dx_available || status.busy || view.operation || view.requested);
         if (ImGui::Button("Start DX12 Deep Capture"))
         {
@@ -384,10 +443,11 @@ namespace editor::profiler_view
                     view.destination = path;
                     view.requested = true;
                     view.start_acknowledged = false;
+                    view.requested_session_id = 0;
                     view.start_command_revision = remote->command_revision;
                     view.show_remote = true;
                     view.seen_source = remote->dx_source;
-                    view.message = "Waiting for target capture; the viewer will export the completed artifact";
+                    view.message = "Start queued; waiting for target acceptance before exporting this session's finalized artifact";
                 }
                 else
                 {
@@ -404,12 +464,16 @@ namespace editor::profiler_view
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        ImGui::BeginDisabled(!remote->connected || remote->command_pending || !status.busy || status.opening);
+        ImGui::BeginDisabled(!remote->connected || remote->command_pending || !status.busy || status.opening || !status.session_id);
         if (ImGui::Button("Stop Deep Capture"))
         {
-            if (!source().request(ce::profiler_viewer::command::stop_dx))
+            if (!source().request(ce::profiler_viewer::command::stop_dx, status.session_id))
             {
                 view.message = "Stop was not sent: target disconnected or command queue full";
+            }
+            else
+            {
+                view.message = "Stop queued for this DX session; waiting for target acknowledgment";
             }
         }
         ImGui::EndDisabled();
@@ -428,6 +492,12 @@ namespace editor::profiler_view
                     view.capture ? view.capture->summary().record_count : 0);
         if (remote->target.connection.target_pid)
         {
+            ImGui::TextDisabled("DX session %" PRIu64 " | %s", status.session_id, capture_state_label(status.state));
+            if (remote->dx_source)
+            {
+                ImGui::TextDisabled("Retained artifact: session %" PRIu64 " | %s", remote->dx_source_id,
+                    remote->dx_source_finalized ? "finalized source; separate from viewer export" : "incomplete / failed source");
+            }
             ImGui::TextDisabled("Target helper: error %u | transport drops %" PRIu64,
                 status.process.win32_error, status.process.dropped_records);
         }

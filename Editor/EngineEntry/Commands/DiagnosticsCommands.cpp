@@ -150,6 +150,7 @@
 #include <crtdbg.h>
 #include <algorithm>
 #include <atomic>
+#include <charconv>
 #include <cctype>
 #include <limits>
 #include <memory>
@@ -692,11 +693,16 @@ namespace ConsoleCmd
         return operation;
     }
 
-    static void AddRecordingPayload(CommandCore::CommandData& data)
+    static CommandCore::CommandData DeepCapturePayload(const ce::dx_capture::capture_status& deep)
     {
         using namespace CommandCore;
-        const auto deep = ce::dx_capture::deep_capture().status();
         auto deepData = CommandData::Object();
+        const auto path = deep.path.u8string();
+        // Decimal strings retain the full uint64 identity through JSON clients.
+        deepData.Set("sessionId", CommandData::String(std::to_string(deep.session_id)));
+        deepData.Set("state", CommandData::String(ce::dx_capture::describe(deep.state)));
+        deepData.Set("artifactPath", CommandData::String(std::string(path.begin(), path.end())));
+        deepData.Set("artifactFinalized", CommandData::Bool(deep.recording.finalized));
         deepData.Set("busy", CommandData::Bool(deep.busy));
         deepData.Set("opening", CommandData::Bool(deep.opening));
         deepData.Set("helperState", CommandData::String(ce::dx_capture::describe(deep.process.state)));
@@ -708,7 +714,13 @@ namespace ConsoleCmd
         deepData.Set("transportDrops", CommandData::Int(deep.process.dropped_records));
         deepData.Set("unmatchedExecutions", CommandData::Int(deep.recording.unmatched_executions));
         deepData.Set("ambiguousExecutions", CommandData::Int(deep.recording.ambiguous_executions));
-        data.Set("dxDeepCapture", std::move(deepData));
+        return deepData;
+    }
+
+    static void AddRecordingPayload(CommandCore::CommandData& data)
+    {
+        using namespace CommandCore;
+        data.Set("dxDeepCapture", DeepCapturePayload(ce::dx_capture::deep_capture().status()));
         const ce::recording_status status = ce::profiler().recording_status();
         const auto path = ce::profiler().recording_path().u8string();
         auto recording = CommandData::Object();
@@ -1332,6 +1344,61 @@ namespace ConsoleCmd
         return Ok("Entire recording save queued; use profile.save status for completion", ProfileSavePayload());
     }
 
+    static CommandCore::CommandResult DeepCaptureControlResult(const ce::dx_capture::control_result& result)
+    {
+        using namespace CommandCore;
+        using ce::dx_capture::control_error;
+        auto data = DeepCapturePayload(result.status);
+        data.Set("accepted", CommandData::Bool(result.accepted));
+        if (result.accepted)
+        {
+            return Ok(result.message, std::move(data));
+        }
+        if (result.error == control_error::failed)
+        {
+            return Fail("profile.deep.failed", result.message, std::move(data));
+        }
+        const char* code = result.error == control_error::busy ? "profile.deep.busy" :
+            result.error == control_error::session_mismatch ? "profile.deep.session_mismatch" : "profile.deep.unavailable";
+        auto failure = PreconditionFailed(code, result.message);
+        failure.data = std::move(data);
+        return failure;
+    }
+
+    static CommandCore::CommandResult Cmd_profile_deep_start(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1)
+        {
+            return CommandCore::InvalidArguments("profile.deep.start takes no arguments");
+        }
+        return DeepCaptureControlResult(ce::dx_capture::deep_capture().start_capture());
+    }
+
+    static CommandCore::CommandResult Cmd_profile_deep_status(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 1)
+        {
+            return CommandCore::InvalidArguments("profile.deep.status takes no arguments");
+        }
+        return CommandCore::Ok({}, DeepCapturePayload(ce::dx_capture::deep_capture().status()));
+    }
+
+    static CommandCore::CommandResult Cmd_profile_deep_stop(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 2)
+        {
+            return CommandCore::InvalidArguments("profile.deep.stop <session-id>");
+        }
+        const auto& text = ctx.parts[1];
+        std::uint64_t session_id = 0;
+        const auto parsed = std::from_chars(text.data(), text.data() + text.size(), session_id);
+        if (parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() || !session_id)
+        {
+            return CommandCore::InvalidArguments("session-id must be the nonzero decimal ID returned by profile.deep.start/status");
+        }
+        return DeepCaptureControlResult(ce::dx_capture::deep_capture().stop_capture(session_id));
+    }
+
     static CommandCore::CommandResult Cmd_profile_counter_mask(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -1912,6 +1979,9 @@ namespace ConsoleCmd
         reg.Result({ "profile.pause" }, &Cmd_profile_pause);
         reg.Result({ "profile.save" }, &Cmd_profile_save);
         reg.Result({ "profile.counter-mask" }, &Cmd_profile_counter_mask);
+        reg.Result({ "profile.deep.start" }, &Cmd_profile_deep_start);
+        reg.Result({ "profile.deep.status" }, &Cmd_profile_deep_status);
+        reg.Result({ "profile.deep.stop" }, &Cmd_profile_deep_stop);
         reg.Result({ "memory.capture" }, &Cmd_memory_capture);
         reg.Result({ "memory.snapshot" }, &Cmd_memory_snapshot);
         // ★ 별칭이 아니라 **다른 동사**라 descriptor 를 갈랐다(2026-09-06).

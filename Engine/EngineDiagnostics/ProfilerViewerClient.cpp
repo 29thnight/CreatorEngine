@@ -413,8 +413,8 @@ namespace ce::profiler_viewer
                         {
                             std::uint64_t source_id = 0;
                             auto artifact = read_artifact(value.payload, current.target.session_generation, source_id);
-                            healthy = artifact != nullptr && (value.kind == message_kind::recording_artifact ?
-                                      source_id != 0 && source_id == current.recording_id : source_id == 0);
+                            healthy = artifact != nullptr && source_id != 0 && (value.kind == message_kind::recording_artifact ?
+                                      source_id == current.recording_id : source_id == current.dx_status.session_id);
                             if (healthy)
                             {
                                 if (value.kind == message_kind::recording_artifact)
@@ -425,6 +425,10 @@ namespace ce::profiler_viewer
                                 else
                                 {
                                     current.dx_source = std::move(artifact);
+                                    current.dx_source_id = source_id;
+                                    current.dx_source_finalized = !current.dx_status.busy &&
+                                        current.dx_status.state == dx_capture::capture_state::finalized &&
+                                        current.dx_status.recording.finalized;
                                 }
                                 changed = true;
                             }
@@ -536,10 +540,9 @@ namespace ce::profiler_viewer
         return state_->published;
     }
 
-    bool client::request(command kind, std::uint32_t value)
+    bool client::request(command kind, std::uint64_t value)
     {
-        if (kind < command::record || kind > command::stop_dx ||
-            (kind != command::counter_mask && value != 0) || (kind == command::counter_mask && (value & ~255u) != 0))
+        if (!valid_command_value(kind, value))
         {
             return false;
         }
@@ -551,7 +554,7 @@ namespace ce::profiler_viewer
         }
         transport::writer out;
         out(state_->published->target.session_generation);
-        out(state_->published->capture_generation);
+        out(is_dx_command(kind) ? 0 : state_->published->capture_generation);
         out(kind);
         out(value);
         state_->commands.push_back({message_kind::command, std::move(out.bytes)});

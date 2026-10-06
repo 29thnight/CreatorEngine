@@ -132,7 +132,7 @@ namespace ce::profiler_viewer::transport
     template<class Codec, class Status> bool dx_fields(Codec& codec, Status& value)
     {
         auto& recording = value.recording;
-        return codec(value.busy) && codec(value.opening) && codec(value.process.state) &&
+        return codec(value.session_id) && codec(value.state) && codec(value.busy) && codec(value.opening) && codec(value.process.state) &&
             codec(value.process.win32_error) && codec(value.process.dropped_records) &&
             codec(value.process.elevated) && codec(value.message) && codec(recording.valid_bytes) &&
             codec(recording.file_bytes) && codec(recording.dropped_records) && codec(recording.reported_loss_count) &&
@@ -160,6 +160,8 @@ namespace ce::profiler_viewer::transport
         out(value.command_revision);
         out(value.last_command);
         out(value.command_accepted);
+        out(value.command_dx_error);
+        out(value.command_dx_session_id);
         out(value.command_message);
         out(value.skipped_captures);
         out(value.message);
@@ -177,13 +179,20 @@ namespace ce::profiler_viewer::transport
             error > static_cast<std::uint64_t>(capture_file_error::canceled) + 1 ||
             !in(value.counters) || !dx_fields(in, value.dx_status) || !in(value.clear_revision) ||
             !in(value.clear_pending) || !in(value.dx_available) || !in(value.command_revision) ||
-            !in(value.last_command) || !in(value.command_accepted) || !in(value.command_message) || !in(value.skipped_captures) ||
+            !in(value.last_command) || !in(value.command_accepted) || !in(value.command_dx_error) ||
+            !in(value.command_dx_session_id) || !in(value.command_message) || !in(value.skipped_captures) ||
             !in(value.message) || !in.finished() || value.summary.state > recorder_state::starting ||
             value.recording.state > recording_state::failed || (value.counters & ~255u) != 0 ||
+            value.dx_status.state > dx_capture::capture_state::unavailable ||
             value.dx_status.process.state > dx_capture::process_state::failed ||
             value.dx_status.process.elevated || value.dx_status.recording.last_source_status > dx_capture::status_code::disconnected ||
             (value.dx_status.recording.issues & ~1023u) != 0 || value.last_command < command::record ||
-            value.last_command > command::stop_dx)
+            value.last_command > command::stop_dx || value.command_dx_error > dx_capture::control_error::failed ||
+            (value.command_accepted && value.command_dx_error != dx_capture::control_error::none) ||
+            (is_dx_command(value.last_command) &&
+             (value.command_accepted ? value.command_dx_session_id == 0 : value.command_dx_error == dx_capture::control_error::none)) ||
+            (!is_dx_command(value.last_command) &&
+             (value.command_dx_session_id != 0 || value.command_dx_error != dx_capture::control_error::none)))
         {
             return false;
         }
@@ -193,7 +202,7 @@ namespace ce::profiler_viewer::transport
 
     inline std::wstring pipe_name(const connection_options& options)
     {
-        return L"\\\\.\\pipe\\CreatorEngine.ProfilerViewer.v1." + std::to_wstring(options.target_pid) +
+        return L"\\\\.\\pipe\\CreatorEngine.ProfilerViewer.v2." + std::to_wstring(options.target_pid) +
                L"." + security::nonce_text(options.nonce);
     }
 

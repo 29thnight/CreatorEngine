@@ -49,7 +49,11 @@ namespace ce::profiler_viewer
         source_artifact_ptr previous_recording_source;
         std::uint64_t previous_recording_id = 0;
         dx_capture::capture_status dx_status;
+        // Last completed source is retained across subsequent live sessions.
+        // Its identity never implies that it belongs to dx_status.session_id.
         source_artifact_ptr dx_source;
+        std::uint64_t dx_source_id = 0;
+        bool dx_source_finalized = false;
         std::shared_ptr<const std::vector<std::byte>> diagnostics;
         std::uint64_t revision = 0;
         std::uint64_t clear_revision = 0;
@@ -58,6 +62,8 @@ namespace ce::profiler_viewer
         std::uint64_t command_revision = 0;
         command last_command = command::stop;
         bool command_accepted = false;
+        dx_capture::control_error command_dx_error = dx_capture::control_error::none;
+        std::uint64_t command_dx_session_id = 0;
         bool command_pending = false;
         std::string command_message;
         std::uint64_t skipped_captures = 0;
@@ -76,7 +82,8 @@ namespace ce::profiler_viewer
         std::shared_ptr<const client_snapshot> snapshot() const;
         // Enqueues a bounded request stamped with the current target/session.
         // False means disconnected or full; never silently redirect to self.
-        bool request(command kind, std::uint32_t value = 0);
+        // stop_dx requires the observed nonzero DX session ID in value.
+        bool request(command kind, std::uint64_t value = 0);
         bool request_diagnostic(std::span<const std::byte> payload, const target_identity& expected_target);
         bool take_focus_request();
         std::uint32_t take_page_request();

@@ -67,6 +67,7 @@ fixture 를 가진 게이트는 이 기계에서만 돌고 clean checkout 에서
 - `profile.frame gpu` — 캡처 전체에서 GPU 구간이 있는 최근 8프레임을 고른다.
   수집 지연으로 마지막 엔진 프레임 8개에 GPU 레인이 없을 때도 귀속을 검사한다.
 - `profile.counter-mask [process|gpu|network|render|managed|resources on|off]` — 모듈별 수집을 제어한다. 인자가 없으면 현재 마스크를 반환한다. `network`에는 아직 엔진 송수신 계측원이 없다.
+- `profile.deep.start` / `profile.deep.status` / `profile.deep.stop <session-id>` — 별도 DX12 심층 수집기의 시작 요청·상태·비동기 중지를 제어한다. 기존 HTTP `POST /command`와 같은 명령 큐를 사용한다. Start의 `accepted`는 요청 접수이며 실제 수집은 `state=in_progress`로 확인한다. `sessionId`는 전체 uint64를 보존하는 십진 문자열이고, Stop은 그 값을 정확히 요구한다. `artifactPath`는 엔진이 정한 `.cedx` 경로이며 `state=finalized`와 `artifactFinalized`로 마감을 확인한다. `complete=false` 및 손실 수치는 별도로 확인해야 한다. SDK 미포함·권한 거부·수집 실패는 각각 `unavailable`·`permission_denied`·`failed`로 남으며 승격하지 않는다. 이 명령과 신규 소스 fixture는 아직 빌드·실행 검증하지 않았다.
 - `profile.frame`의 `counterDescriptors`는 캡처가 소유한 이름·단위·범주이고, `counterCoverage`는 보존 프레임 전체의 각 카운터 표본 수·마지막 프레임·값이다. 최근 8프레임만 보고 희소 표본의 부재를 단정하지 않는다.
 
 콘솔에 `clear` 는 없다 — 보존분을 버리는 것은 프로파일러 창의 `Clear` 버튼뿐

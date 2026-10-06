@@ -119,3 +119,14 @@ It is **UNEXECUTED**. It does not replace visual parity, complete feature tests 
 adversarial transport acceptance. `WarmupFrames` bounds observation time; unusually
 slow startup needs a longer observation interval. Full matrix and protocol details:
 `docs/design/ProfilerViewerProcess.md`.
+
+## Engine deep-capture commands
+
+The existing authenticated engine CLI/HTTP connection also exposes
+`profile.deep.start`, `profile.deep.status` and `profile.deep.stop <session-id>`.
+Start/status returns the ID as a decimal string and the engine-owned `.cedx`
+artifact path. Start acceptance is separate from collector startup; poll the
+reported state and file-finalized flag. Stop is exact-session and idempotent.
+The viewer uses the same service and IPC v2, with no new buttons or elevation
+options. Existing `profile.record/pause/save` and HTTP routes are unchanged.
+These additional commands and their cross-CLI/viewer behavior are UNEXECUTED.

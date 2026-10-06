@@ -9,7 +9,7 @@
 namespace ce::profiler_viewer
 {
     inline constexpr std::uint32_t protocol_magic = 0x56504543; // CEPV
-    inline constexpr std::uint16_t protocol_version = 1;
+    inline constexpr std::uint16_t protocol_version = 2;
     inline constexpr std::uint32_t maximum_packet_bytes = 64 * 1024;
     inline constexpr std::uint32_t maximum_capture_bytes = 128 * 1024 * 1024;
     inline constexpr std::uint32_t maximum_diagnostic_bytes = 2 * 1024 * 1024;
@@ -44,6 +44,33 @@ namespace ce::profiler_viewer
         start_dx = 5,
         stop_dx = 6
     };
+
+    inline bool is_dx_command(command kind)
+    {
+        return kind == command::start_dx || kind == command::stop_dx;
+    }
+
+    inline bool valid_command_value(command kind, std::uint64_t value)
+    {
+        if (kind < command::record || kind > command::stop_dx)
+        {
+            return false;
+        }
+        if (kind == command::counter_mask)
+        {
+            return (value & ~std::uint64_t{255}) == 0;
+        }
+        return kind == command::stop_dx ? value != 0 : value == 0;
+    }
+
+    // DX has its own exact service session. An unrelated .ceprof Record/Clear
+    // must neither reject its controls nor redirect an old Stop to a new session.
+    inline bool valid_command_generation(command kind, std::uint64_t generation,
+                                         std::uint64_t current_capture_generation)
+    {
+        return is_dx_command(kind) ? generation == 0 :
+            generation != 0 && generation == current_capture_generation;
+    }
 
     enum class message_kind : std::uint16_t
     {
