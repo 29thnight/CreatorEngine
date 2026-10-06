@@ -196,6 +196,12 @@ public:
     virtual void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) = 0;
 
+    /// One RHIDrawIndirectArguments command for the bound vertex graphics pipeline.
+    /// Same alignment, indirect-buffer state, lifetime and producer validation
+    /// contract as DrawIndexedIndirect. False records no command; a prepared GPU
+    /// route must propagate failure rather than silently restore CPU visibility.
+    virtual bool DrawIndirect(RHIBufferHandle, uint64_t = 0) { return false; }
+
     /// 현재 바인딩으로 RHIDrawIndexedIndirectArguments 하나를 실행한다.
     /// 버퍼는 allowIndirectArguments로 생성하고 IndirectArgument 상태로
     /// 전이해야 한다. byteOffset은 4바이트 정렬이며 인자 전체가 범위 안이어야 한다.
@@ -206,6 +212,14 @@ public:
     {
         return false;
     }
+
+    /// Graphics-bind-point mesh pipeline required. Failure records no command.
+    virtual bool DispatchMesh(uint32_t, uint32_t, uint32_t) { return false; }
+
+    /// One 12-byte command. Arguments must be 4-byte aligned, within a buffer
+    /// created for indirect use, and transitioned to IndirectArgument. The GPU
+    /// producer owns dimension/output bounds; no CPU readback is performed.
+    virtual bool DispatchMeshIndirect(RHIBufferHandle, uint64_t = 0) { return false; }
 
     virtual void Dispatch(uint32_t x, uint32_t y, uint32_t z) = 0;
 

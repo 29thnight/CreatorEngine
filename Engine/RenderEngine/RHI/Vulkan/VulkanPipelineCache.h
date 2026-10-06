@@ -5,6 +5,7 @@
 #include "../RHIFormat.h"
 #include "../RHIPipelineLayout.h"
 #include "../RHIPipelineState.h"
+#include "../RHIResourceTypes.h"
 #include "../IRenderPipelineCache.h"
 #include "../RHIGraphicsPipelineRequest.h"
 #include "JobScheduler.h"
@@ -42,6 +43,8 @@
 //   다른 자리에 둘 수 있다는 것이 핸들이 값을 하는 방식이다 — 상위는 표가
 //   어디 있는지 모른다.
 
+enum class VulkanPipelineKind : uint8_t { Graphics, Compute, Mesh };
+
 /// 표 한 칸: 파이프라인과 그것이 구워진 레이아웃.
 struct VulkanPipelineEntry
 {
@@ -55,6 +58,7 @@ struct VulkanPipelineEntry
     /// 이 파이프라인이 구워진 레이아웃의 핸들. 인코더가 **슬롯 번호를
     /// binding 번호로 옮길 때** 되돌아본다 (`ResolveParam`).
     RHIPipelineLayoutHandle layoutHandle;
+    VulkanPipelineKind kind{VulkanPipelineKind::Graphics};
 
     bool IsValid() const { return VK_NULL_HANDLE != pipeline; }
 };
@@ -110,6 +114,7 @@ struct VulkanPipelineLayoutEntry
 
     /// 루트 파라미터 번호 → binding·종류 (5c-4d). 인덱스가 곧 슬롯 번호다.
     std::vector<VulkanLayoutSlot> paramSlots;
+    bool allowInputAssembler{false};
 
     bool IsValid() const { return VK_NULL_HANDLE != layout; }
 };
@@ -124,6 +129,11 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
     VulkanPipelineCache& operator=(const VulkanPipelineCache&) = delete;
 
     void Initialize(VkDevice device);
+    // Called by the device's existing SetPipelineCache connection after initialization.
+    void SetMeshShaderCapabilities(RHIMeshShaderCapabilities capabilities)
+    {
+        m_meshShaderCapabilities = capabilities;
+    }
 
     /// ★ 여기가 수명이 갈리는 자리다. `DX12PSOManager` 는 `ComPtr` 로 들고
     ///   있어서 캐시를 안 비워도 프로세스가 끝나면 COM 이 정리한다. Vulkan 은
@@ -139,6 +149,7 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
 
     // ── IRenderPipelineCache ──
     RHIPipelineHandle GetOrCreate(const RHIGraphicsPipelineDesc& desc, std::string& outError) override;
+    RHIPipelineHandle GetOrCreateMesh(const RHIMeshPipelineDesc& desc, std::string& outError) override;
     // Render owner only. Pending requests own borrowed inputs and never wait here.
     RHIPipelineRequestState RequestGraphics(const RHIGraphicsPipelineDesc& desc, RHIPipelineHandle& result,
                                             std::string& outError) override;
@@ -177,6 +188,11 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
   private:
     static VkPipeline CreateOne(VkDevice device, const RHIGraphicsPipelineDesc& desc, VkPipelineLayout layout,
                                 std::string& outError);
+    static VkPipeline CreateMeshOne(VkDevice device, const RHIMeshPipelineDesc& desc, VkPipelineLayout layout,
+                                    std::string& outError);
+    static VkPipeline CreateRaster(VkDevice device, const RHIGraphicsPipelineDesc& desc, VkPipelineLayout layout,
+                                   VkShaderStageFlagBits geometryStage, const void* geometryCode,
+                                   size_t geometryBytes, std::string& outError);
 
     struct PendingGraphics;
     RHIPipelineRequestState CompleteGraphics(uint64_t hash, PendingGraphics& request, RHIPipelineHandle& result,
@@ -187,10 +203,12 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
     /// 넣어도 된다 — 디스크 캐시가 없어 실행을 넘어 안정할 이유가 없다.
     uint64_t ComputeHash(const RHIGraphicsPipelineDesc& desc) const;
     uint64_t ComputeHash(const RHIComputePipelineDesc& desc) const;
+    uint64_t ComputeHash(const RHIMeshPipelineDesc& desc) const;
     RHIPipelineHandle PublishPipeline(VulkanPipelineEntry entry);
     bool RetirePipeline(RHIPipelineHandle handle, RHICompletionPoint retireAfter);
 
     VkDevice m_device{VK_NULL_HANDLE};
+    RHIMeshShaderCapabilities m_meshShaderCapabilities;
     job_scheduler& m_scheduler;
     // The worker captures only PendingGraphics. Layout/device stay alive until Shutdown joins every job.
     std::unordered_map<uint64_t, std::shared_ptr<PendingGraphics>> m_pendingGraphics;

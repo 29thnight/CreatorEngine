@@ -743,6 +743,7 @@
     <ClInclude Include="Experiment\Import\VertexWelding.h">
       <Filter>Resources\Model\Experiment\Import</Filter>
     </ClInclude>
+    <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
     <ClInclude Include="Experiment\MeshLodData.h">
       <Filter>Resources\Model\Experiment</Filter>
     </ClInclude>

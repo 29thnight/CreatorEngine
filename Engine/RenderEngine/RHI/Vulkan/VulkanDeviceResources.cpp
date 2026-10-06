@@ -442,6 +442,8 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
     }
     m_memoryBudgetSupported = VkHasExtension(extensions,
         VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    m_meshShaderExtensionSupported = VkHasExtension(extensions,
+        VK_EXT_MESH_SHADER_EXTENSION_NAME);
     const bool hasRobustness2 = VkHasExtension(extensions,
         VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
     if (hasRobustness2)
@@ -460,8 +462,32 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 bool VulkanDeviceResources::CreateDevice(std::string& outError)
 {
     m_indirectDrawCapabilities = {};
+    m_meshShaderCapabilities = {};
+    VkPhysicalDeviceMeshShaderFeaturesEXT availableMesh{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
     VkPhysicalDeviceFeatures2 availableFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    if (m_meshShaderExtensionSupported)
+    {
+        availableFeatures.pNext = &availableMesh;
+    }
     vkGetPhysicalDeviceFeatures2(m_physicalDevice, &availableFeatures);
+
+    VkPhysicalDeviceMeshShaderPropertiesEXT meshProperties{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_PROPERTIES_EXT };
+    if (m_meshShaderExtensionSupported && VK_TRUE == availableMesh.meshShader)
+    {
+        VkPhysicalDeviceProperties2 properties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+        properties.pNext = &meshProperties;
+        vkGetPhysicalDeviceProperties2(m_physicalDevice, &properties);
+    }
+    // Publish no partial capability: the mesh-only path needs all dispatch/output limits.
+    const bool enableMesh = m_meshShaderExtensionSupported && VK_TRUE == availableMesh.meshShader &&
+        meshProperties.maxMeshWorkGroupTotalCount && meshProperties.maxMeshWorkGroupCount[0] &&
+        meshProperties.maxMeshWorkGroupCount[1] && meshProperties.maxMeshWorkGroupCount[2] &&
+        meshProperties.maxMeshWorkGroupInvocations && meshProperties.maxMeshWorkGroupSize[0] &&
+        meshProperties.maxMeshWorkGroupSize[1] && meshProperties.maxMeshWorkGroupSize[2] &&
+        meshProperties.maxMeshOutputVertices && meshProperties.maxMeshOutputPrimitives &&
+        meshProperties.maxMeshOutputMemorySize;
 
     const float priority = 1.f;
     VkDeviceQueueCreateInfo queueInfo{ VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO };
@@ -471,9 +497,17 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
 
     std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     if (m_memoryBudgetSupported)
+    {
         deviceExtensions.push_back(VK_EXT_MEMORY_BUDGET_EXTENSION_NAME);
+    }
     if (m_nullDescriptorSupported)
+    {
         deviceExtensions.push_back(VK_EXT_ROBUSTNESS_2_EXTENSION_NAME);
+    }
+    if (enableMesh)
+    {
+        deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+    }
 
     // 세 기능을 명시적으로 켠다. 켜지 않고 쓰면 검증 레이어가 잡아 주지만,
     // 여기서 요구를 적어 두면 드라이버가 못 주는 경우 생성 단계에서 실패한다.
@@ -494,6 +528,15 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     {
         robustness.nullDescriptor = VK_TRUE;
         features13.pNext = &robustness;
+    }
+    VkPhysicalDeviceMeshShaderFeaturesEXT meshFeatures{
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
+    if (enableMesh)
+    {
+        // Task shaders, multiview, primitive shading rate and mesh queries stay disabled.
+        meshFeatures.meshShader = VK_TRUE;
+        meshFeatures.pNext = features13.pNext;
+        features13.pNext = &meshFeatures;
     }
 
     VkPhysicalDeviceVulkan12Features features12{
@@ -535,14 +578,45 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
         return false;
     }
 
-    if (!LoadDevice(m_device, outError)) return false;
+    if (!LoadDevice(m_device, outError))
+    {
+        return false;
+    }
 
     m_indirectDrawCapabilities.indexedDraw = nullptr != vkCmdDrawIndexedIndirect;
-    m_indirectDrawCapabilities.nonZeroFirstInstance = m_indirectDrawCapabilities.indexedDraw &&
+    m_indirectDrawCapabilities.nonIndexedDraw = nullptr != vkCmdDrawIndirect;
+    m_indirectDrawCapabilities.nonZeroFirstInstance =
+        (m_indirectDrawCapabilities.indexedDraw || m_indirectDrawCapabilities.nonIndexedDraw) &&
         VK_TRUE == features2.features.drawIndirectFirstInstance;
+    if (enableMesh && nullptr != vkCmdDrawMeshTasksEXT)
+    {
+        auto& caps = m_meshShaderCapabilities;
+        caps.meshShader = true;
+        caps.meshIndirect = nullptr != vkCmdDrawMeshTasksIndirectEXT;
+        caps.maxGroupCountX = meshProperties.maxMeshWorkGroupCount[0];
+        caps.maxGroupCountY = meshProperties.maxMeshWorkGroupCount[1];
+        caps.maxGroupCountZ = meshProperties.maxMeshWorkGroupCount[2];
+        caps.maxTotalGroupCount = meshProperties.maxMeshWorkGroupTotalCount;
+        caps.maxOutputVertices = meshProperties.maxMeshOutputVertices;
+        caps.maxOutputPrimitives = meshProperties.maxMeshOutputPrimitives;
+        caps.maxThreadsPerGroup = meshProperties.maxMeshWorkGroupInvocations;
+        caps.maxThreadGroupSizeX = meshProperties.maxMeshWorkGroupSize[0];
+        caps.maxThreadGroupSizeY = meshProperties.maxMeshWorkGroupSize[1];
+        caps.maxThreadGroupSizeZ = meshProperties.maxMeshWorkGroupSize[2];
+        caps.maxOutputMemoryBytes = meshProperties.maxMeshOutputMemorySize;
+    }
 
     vkGetDeviceQueue(m_device, m_queueFamily, 0, &m_queue);
     return true;
+}
+
+void VulkanDeviceResources::SetPipelineCache(VulkanPipelineCache* cache)
+{
+    m_pipelineCache = cache;
+    if (cache)
+    {
+        cache->SetMeshShaderCapabilities(m_meshShaderCapabilities);
+    }
 }
 
 bool VulkanDeviceResources::CreateFrameResources(std::string& outError)
@@ -661,7 +735,9 @@ void VulkanDeviceResources::Shutdown()
     m_queueFamily = UINT32_MAX;
     m_memoryBudgetSupported = false;
     m_nullDescriptorSupported = false;
+    m_meshShaderExtensionSupported = false;
     m_indirectDrawCapabilities = {};
+    m_meshShaderCapabilities = {};
     m_viewportLimits = {};
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
@@ -1843,4 +1919,3 @@ uint32_t VulkanDeviceResources::FindMemoryType(uint32_t typeBits,
     }
     return UINT32_MAX;
 }
-

@@ -21,6 +21,7 @@ namespace DX12Translate
         {
         case RHIShaderVisibility::Vertex: return D3D12_SHADER_VISIBILITY_VERTEX;
         case RHIShaderVisibility::Pixel:  return D3D12_SHADER_VISIBILITY_PIXEL;
+        case RHIShaderVisibility::Mesh:   return D3D12_SHADER_VISIBILITY_MESH;
         case RHIShaderVisibility::All:
         default:                          return D3D12_SHADER_VISIBILITY_ALL;
         }

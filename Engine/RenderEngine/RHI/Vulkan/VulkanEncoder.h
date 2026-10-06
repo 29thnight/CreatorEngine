@@ -103,12 +103,14 @@ public:
         const VulkanBindingTable* bindingTables = nullptr,
         const VulkanSamplerTable* samplerTables = nullptr,
         RHIIndirectDrawCapabilities indirectDrawCapabilities = {},
-        VulkanViewportLimits viewportLimits = {})
+        VulkanViewportLimits viewportLimits = {},
+        RHIMeshShaderCapabilities meshShaderCapabilities = {})
         : m_commandBuffer(commandBuffer), m_pipelines(pipelines)
         , m_resources(resources), m_renderTargets(renderTargets)
         , m_device(device), m_descriptors(descriptors)
         , m_bindingTables(bindingTables), m_samplerTables(samplerTables)
-        , m_indirectDrawCapabilities(indirectDrawCapabilities), m_viewportLimits(viewportLimits) {}
+        , m_indirectDrawCapabilities(indirectDrawCapabilities), m_viewportLimits(viewportLimits)
+        , m_meshShaderCapabilities(meshShaderCapabilities) {}
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
@@ -148,7 +150,10 @@ public:
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
     void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
+    bool DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     bool DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
+    bool DispatchMesh(uint32_t x, uint32_t y, uint32_t z) override;
+    bool DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
     /// 불투명 값을 표의 슬롯으로 읽어 백엔드 실물로 푼다 (5c-4c).
@@ -255,7 +260,8 @@ private:
     ///
     /// ★ 바뀐 것이 없으면 아무것도 안 한다 — 이미 걸린 셋이 그대로 산다.
     ///   같은 바인딩으로 여러 번 그리는 흔한 경우에 셋을 다시 자르지 않는다.
-    void FlushDescriptors(RHIBindPoint bindPoint);
+    bool FlushDescriptors(RHIBindPoint bindPoint);
+    bool IsPipelineBound(RHIBindPoint bindPoint, bool mesh = false) const;
 
     /// 현재 셋에 들어갈 디스크립터 하나.
     ///
@@ -297,6 +303,8 @@ private:
     const VulkanSamplerTable*      m_samplerTables{ nullptr };
     RHIIndirectDrawCapabilities m_indirectDrawCapabilities;
     VulkanViewportLimits m_viewportLimits;
+    RHIMeshShaderCapabilities m_meshShaderCapabilities;
+    RHIPipelineHandle m_boundPipeline[2];
 
     std::vector<PendingBinding> m_pending[2];
     bool m_descriptorsDirty[2]{ false, false };
@@ -325,4 +333,3 @@ private:
     uint32_t    m_unimplemented{ 0 };
     const char* m_lastUnimplemented{ nullptr };
 };
-

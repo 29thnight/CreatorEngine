@@ -188,7 +188,10 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 {
     m_width = width;
     m_height = height;
+    m_drawIndirectSignature.Reset();
     m_drawIndexedIndirectSignature.Reset();
+    m_dispatchMeshIndirectSignature.Reset();
+    m_meshShaderCapabilities = {};
     m_lastAdmittedFenceValue = 0;
 
     const ValidationMode validationMode = ReadValidationMode();
@@ -323,6 +326,21 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
             HrToString(indirectResult) + "\n").c_str());
     }
 
+    D3D12_INDIRECT_ARGUMENT_DESC drawArgument{};
+    drawArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+    D3D12_COMMAND_SIGNATURE_DESC drawSignature{};
+    drawSignature.ByteStride = sizeof(RHIDrawIndirectArguments);
+    drawSignature.NumArgumentDescs = 1;
+    drawSignature.pArgumentDescs = &drawArgument;
+    const HRESULT drawIndirectResult = m_device->CreateCommandSignature(
+        &drawSignature, nullptr, IID_PPV_ARGS(&m_drawIndirectSignature));
+    if (FAILED(drawIndirectResult))
+    {
+        m_drawIndirectSignature.Reset();
+        OutputDebugStringA(("[DX12] Nonindexed indirect unavailable: " +
+            HrToString(drawIndirectResult) + "\n").c_str());
+    }
+
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
     hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
@@ -338,6 +356,42 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
         m_allocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList));
     if (FAILED(hr)) { outError = "커맨드 리스트 생성 실패 " + HrToString(hr); return false; }
+    // Mesh support is optional. Feature level alone is not sufficient: require
+    // shader model, hardware tier and the interfaces used by pipeline/dispatch.
+    D3D12_FEATURE_DATA_D3D12_OPTIONS7 meshOptions{};
+    D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{ D3D_SHADER_MODEL_6_5 };
+    ComPtr<ID3D12Device2> meshDevice;
+    ComPtr<ID3D12GraphicsCommandList6> meshCommands;
+    if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7,
+            &meshOptions, sizeof(meshOptions))) &&
+        meshOptions.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1 &&
+        SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL,
+            &shaderModel, sizeof(shaderModel))) && shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5 &&
+        SUCCEEDED(m_device.As(&meshDevice)) && SUCCEEDED(m_commandList.As(&meshCommands)))
+    {
+        // Core mesh shader limits; optional increased-dispatch extensions are
+        // intentionally not required by the first mesh-only route.
+        m_meshShaderCapabilities.meshShader = true;
+        m_meshShaderCapabilities.maxGroupCountX = 65535;
+        m_meshShaderCapabilities.maxGroupCountY = 65535;
+        m_meshShaderCapabilities.maxGroupCountZ = 65535;
+        m_meshShaderCapabilities.maxTotalGroupCount = 4194303;
+        m_meshShaderCapabilities.maxOutputVertices = 256;
+        m_meshShaderCapabilities.maxOutputPrimitives = 256;
+        m_meshShaderCapabilities.maxThreadsPerGroup = 128;
+        m_meshShaderCapabilities.maxThreadGroupSizeX = 128;
+        m_meshShaderCapabilities.maxThreadGroupSizeY = 128;
+        m_meshShaderCapabilities.maxThreadGroupSizeZ = 128;
+        m_meshShaderCapabilities.maxOutputMemoryBytes = 32768;
+        D3D12_INDIRECT_ARGUMENT_DESC meshArgument{};
+        meshArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH_MESH;
+        D3D12_COMMAND_SIGNATURE_DESC meshSignature{};
+        meshSignature.ByteStride = sizeof(RHIDispatchMeshIndirectArguments);
+        meshSignature.NumArgumentDescs = 1;
+        meshSignature.pArgumentDescs = &meshArgument;
+        m_meshShaderCapabilities.meshIndirect = SUCCEEDED(m_device->CreateCommandSignature(
+            &meshSignature, nullptr, IID_PPV_ARGS(&m_dispatchMeshIndirectSignature)));
+    }
     m_commandList->Close(); // BeginFrame이 여는 것이 규약 — 생성 직후는 닫아 둔다
     m_immediateEncoder.reset();
 
@@ -510,7 +564,10 @@ void DX12DeviceResources::Shutdown()
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
     m_commandList.Reset();
+    m_drawIndirectSignature.Reset();
     m_drawIndexedIndirectSignature.Reset();
+    m_dispatchMeshIndirectSignature.Reset();
+    m_meshShaderCapabilities = {};
     for (auto& lists : m_retiredCommandLists) lists.clear();
     m_immediateEncoder.reset();
 
@@ -1741,6 +1798,8 @@ D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
     case RHIResourceState::IndexBuffer:     return D3D12_RESOURCE_STATE_INDEX_BUFFER;
     case RHIResourceState::IndirectArgument:
         return D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT;
+    case RHIResourceState::VertexAndShaderResource:
+        return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
     case RHIResourceState::Common:
     default:                                return D3D12_RESOURCE_STATE_COMMON;
     }

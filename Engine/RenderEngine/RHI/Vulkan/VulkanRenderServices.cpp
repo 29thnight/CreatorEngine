@@ -3,11 +3,13 @@
 #include "VulkanResourceState.h"
 #include "VulkanPersistentHeap.h"
 #include "../RHICompletionRetireQueue.h"
+#include "../RHIModelMeshletUpload.h"
 #include "../../Mesh.h"
 #include "../../Texture.h"
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstring>
 #include <map>
 #include <unordered_map>
@@ -618,11 +620,19 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
 
 struct VulkanMeshCache::Impl
 {
+    struct CoarseLodAllocations
+    {
+        VulkanPersistentHeap::Allocation indices;
+        VulkanPersistentHeap::Allocation meshlets;
+    };
+
     struct Buffers
     {
         RHIMeshBinding binding;
         VulkanPersistentHeap::Allocation vertices;
         VulkanPersistentHeap::Allocation indices;
+        VulkanPersistentHeap::Allocation meshlets;
+        std::array<CoarseLodAllocations, kRHIMaxCoarseMeshLods> coarseLods;
         uint64_t bytes{ 0 };
         uint64_t lastUsedFrame{ 0 };
         uint64_t recordingId{ 0 };
@@ -636,6 +646,11 @@ struct VulkanMeshCache::Impl
         RHIBufferHandle indices;
         VulkanPersistentHeap::Allocation vertexAllocation;
         VulkanPersistentHeap::Allocation indexAllocation;
+        RHIBufferHandle meshlets;
+        VulkanPersistentHeap::Allocation meshletAllocation;
+        std::array<CoarseLodAllocations, kRHIMaxCoarseMeshLods> coarseLods;
+        RHIBufferHandle coarseIndices[kRHIMaxCoarseMeshLods]{};
+        RHIBufferHandle coarseMeshlets[kRHIMaxCoarseMeshLods]{};
     };
 
     VulkanDeviceResources* resources{ nullptr };
@@ -646,13 +661,83 @@ struct VulkanMeshCache::Impl
     uint64_t frameIndex{ 0 };
     Stats stats;
 
+    void ReleaseMeshlets(Buffers& buffers)
+    {
+        if (nullptr == resources)
+        {
+            return;
+        }
+        resources->ReleaseBuffer(buffers.binding.meshlets.data.buffer);
+        persistentHeap.Release(buffers.meshlets);
+        buffers.binding.meshlets = {};
+    }
+
     void Release(Buffers& buffers)
     {
-        if (nullptr == resources) return;
+        if (nullptr == resources)
+        {
+            return;
+        }
         resources->ReleaseBuffer(buffers.binding.vertices.buffer);
         resources->ReleaseBuffer(buffers.binding.indices.buffer);
         persistentHeap.Release(buffers.vertices);
         persistentHeap.Release(buffers.indices);
+        ReleaseMeshlets(buffers);
+        for (uint32_t i = 0; i < kRHIMaxCoarseMeshLods; ++i)
+        {
+            ReleaseCoarseLod(buffers, i);
+        }
+        buffers.binding.coarseLodCount = 0;
+    }
+
+    void ReleaseCoarseLod(Buffers& buffers, uint32_t index)
+    {
+        if (nullptr == resources)
+        {
+            return;
+        }
+        auto& binding = buffers.binding.coarseLods[index];
+        auto& allocation = buffers.coarseLods[index];
+        resources->ReleaseBuffer(binding.indices.buffer);
+        resources->ReleaseBuffer(binding.meshlets.data.buffer);
+        persistentHeap.Release(allocation.indices);
+        persistentHeap.Release(allocation.meshlets);
+        binding = {};
+    }
+
+    void Release(RetiredBuffers& buffers)
+    {
+        if (nullptr == resources)
+        {
+            return;
+        }
+        resources->ReleaseBuffer(buffers.vertices);
+        resources->ReleaseBuffer(buffers.indices);
+        resources->ReleaseBuffer(buffers.meshlets);
+        persistentHeap.Release(buffers.vertexAllocation);
+        persistentHeap.Release(buffers.indexAllocation);
+        persistentHeap.Release(buffers.meshletAllocation);
+        for (uint32_t i = 0; i < kRHIMaxCoarseMeshLods; ++i)
+        {
+            resources->ReleaseBuffer(buffers.coarseIndices[i]);
+            resources->ReleaseBuffer(buffers.coarseMeshlets[i]);
+            persistentHeap.Release(buffers.coarseLods[i].indices);
+            persistentHeap.Release(buffers.coarseLods[i].meshlets);
+        }
+    }
+
+    RetiredBuffers Retire(Buffers& buffers)
+    {
+        RetiredBuffers result{ buffers.binding.vertices.buffer, buffers.binding.indices.buffer,
+            std::move(buffers.vertices), std::move(buffers.indices),
+            buffers.binding.meshlets.data.buffer, std::move(buffers.meshlets) };
+        result.coarseLods = std::move(buffers.coarseLods);
+        for (uint32_t i = 0; i < kRHIMaxCoarseMeshLods; ++i)
+        {
+            result.coarseIndices[i] = buffers.binding.coarseLods[i].indices.buffer;
+            result.coarseMeshlets[i] = buffers.binding.coarseLods[i].meshlets.data.buffer;
+        }
+        return result;
     }
 };
 
@@ -688,17 +773,23 @@ bool VulkanMeshCache::Initialize(VulkanDeviceResources* resources,
 
 void VulkanMeshCache::Shutdown()
 {
-    if (!m_impl || nullptr == m_impl->resources) return;
+    if (!m_impl || nullptr == m_impl->resources)
+    {
+        return;
+    }
 
     m_impl->resources->UnregisterUploadTransactionListener(this);
-    for (auto& pair : m_impl->entries) m_impl->Release(pair.second);
-    for (auto& pair : m_impl->modelEntries) m_impl->Release(pair.second);
+    for (auto& pair : m_impl->entries)
+    {
+        m_impl->Release(pair.second);
+    }
+    for (auto& pair : m_impl->modelEntries)
+    {
+        m_impl->Release(pair.second);
+    }
     m_impl->retireQueue.Drain([&](Impl::RetiredBuffers& retired)
         {
-            m_impl->resources->ReleaseBuffer(retired.vertices);
-            m_impl->resources->ReleaseBuffer(retired.indices);
-            m_impl->persistentHeap.Release(retired.vertexAllocation);
-            m_impl->persistentHeap.Release(retired.indexAllocation);
+            m_impl->Release(retired);
         });
     m_impl->entries.clear();
     m_impl->modelEntries.clear();
@@ -743,6 +834,11 @@ RHIMeshBinding VulkanMeshCache::GetOrUploadModel(
     const RHIModelMeshView& view, std::string& outError)
 {
     RHIMeshBinding empty{};
+    if (view.sourceLodIndex != 0)
+    {
+        outError = "Vulkan model mesh cache requires the base LOD view.";
+        return empty;
+    }
     if (!m_impl || nullptr == m_impl->resources || !view.IsComplete())
     {
         outError = "Vulkan 메시 캐시: ModelAssetGeneration 뷰가 완비되지 않았다";
@@ -750,26 +846,32 @@ RHIMeshBinding VulkanMeshCache::GetOrUploadModel(
     }
     return UploadResolved(0, &view.handle, view.vertexData, view.vertexBytes,
         view.vertexStride, view.vertexAttributeMask, view.indexData,
-        view.indexCount, outError);
+        view.indexCount, outError, &view);
 }
 
 RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
     const assets::ModelMeshHandle* modelKey, const void* vertexData,
     uint64_t vertexBytes, uint32_t vertexStride,
     uint32_t attributeMask, const uint32_t* indexData, uint32_t indexCount,
-    std::string& outError)
+    std::string& outError, const RHIModelMeshView* modelView)
 {
     RHIMeshBinding empty{};
     Impl::Buffers* cached = nullptr;
     if (nullptr != modelKey)
     {
         const auto found = m_impl->modelEntries.find(*modelKey);
-        if (found != m_impl->modelEntries.end()) cached = &found->second;
+        if (found != m_impl->modelEntries.end())
+        {
+            cached = &found->second;
+        }
     }
     else
     {
         const auto found = m_impl->entries.find(HashedGuid{ legacyKey });
-        if (found != m_impl->entries.end()) cached = &found->second;
+        if (found != m_impl->entries.end())
+        {
+            cached = &found->second;
+        }
     }
     if (nullptr != cached)
     {
@@ -784,19 +886,16 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
         return empty;
     }
 
-    const uint64_t indexBytes = static_cast<uint64_t>(indexCount) * sizeof(uint32);
-    const std::array<RHIUploadRequest, 2> requests = {{
-        { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
-        { indexBytes, RHIUploadUsage::IndexData, alignof(uint32) }
-    }};
-    std::array<RHIBufferSlice, 2> staging{};
-    if (!m_impl->resources->ReserveUploadBatch(requests, staging, outError))
+    RHIModelMeshletUpload meshletUpload;
+    std::string meshletError;
+    if (modelView && m_impl->resources->GetMeshShaderCapabilities().meshShader &&
+        !BuildRHIModelMeshletUpload(*modelView, meshletUpload, meshletError))
     {
-        outError = "Vulkan 메시 정점/인덱스 업로드 배치 예약 실패: " + outError;
-        ++m_impl->stats.failures;
-        return empty;
+        ++m_impl->stats.meshletFallbacks;
+        meshletUpload = {};
     }
 
+    const uint64_t indexBytes = static_cast<uint64_t>(indexCount) * sizeof(uint32);
     constexpr VkBufferUsageFlags persistentUsage =
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
@@ -837,6 +936,65 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
         return empty;
     }
 
+    const auto discardMeshlets = [&]
+    {
+        m_impl->ReleaseMeshlets(buffers);
+        meshletUpload = {};
+        ++m_impl->stats.meshletFallbacks;
+    };
+    if (!meshletUpload.bytes.empty())
+    {
+        constexpr VkBufferUsageFlags meshletUsage =
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        if (!m_impl->persistentHeap.CreateBuffer(meshletUpload.bytes.size(), meshletUsage,
+            L"VulkanMesh.Meshlets", buffers.meshlets, meshletError))
+        {
+            discardMeshlets();
+        }
+        else
+        {
+            VulkanBufferEntry meshletEntry{};
+            meshletEntry.buffer = buffers.meshlets.buffer;
+            meshletEntry.bytes = meshletUpload.bytes.size();
+            const auto handle = m_impl->resources->GetResourceTable().AddExternalBuffer(meshletEntry);
+            buffers.binding.meshlets.data = RHIBufferSlice::Whole(handle);
+            if (!handle.IsValid())
+            {
+                discardMeshlets();
+            }
+        }
+    }
+
+    // Secure the indexed buffers first. Optional staging/allocation failures may
+    // drop only meshlets, and every native object exists before any copy is recorded.
+    const std::array<RHIUploadRequest, 3> requests = {{
+        { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
+        { indexBytes, RHIUploadUsage::IndexData, alignof(uint32) },
+        { meshletUpload.bytes.size(), RHIUploadUsage::BufferCopy, 16 }
+    }};
+    std::array<RHIBufferSlice, 3> staging{};
+    bool reserved = false;
+    if (!meshletUpload.bytes.empty())
+    {
+        reserved = m_impl->resources->ReserveUploadBatch(requests, staging, meshletError);
+        // ReserveUploadBatch is atomic: a failed three-slice request can safely
+        // retry the smaller indexed-only request without partially owned staging.
+        if (!reserved)
+        {
+            discardMeshlets();
+        }
+    }
+    if (!reserved && !m_impl->resources->ReserveUploadBatch(
+        std::span<const RHIUploadRequest>(requests.data(), 2),
+        std::span<RHIBufferSlice>(staging.data(), 2), outError))
+    {
+        m_impl->Release(buffers);
+        outError = "Vulkan 메시 정점/인덱스 업로드 배치 예약 실패: " + outError;
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
     const VulkanBufferEntry stagingVertices =
         m_impl->resources->GetResourceTable().Resolve(staging[0].buffer);
     const VulkanBufferEntry stagingIndices =
@@ -846,6 +1004,7 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
     const VulkanBufferEntry destinationIndices =
         m_impl->resources->GetResourceTable().Resolve(indexBuffer);
     const bool validBuffers = staging[0].IsWritable() && staging[1].IsWritable() &&
+        staging[0].size >= vertexBytes && staging[1].size >= indexBytes &&
         stagingVertices.IsValid() && stagingIndices.IsValid() &&
         destinationVertices.IsValid() && destinationIndices.IsValid();
     if (!validBuffers)
@@ -856,18 +1015,201 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
         return empty;
     }
 
+    VulkanBufferEntry stagingMeshlets{}, destinationMeshlets{};
+    if (!meshletUpload.bytes.empty())
+    {
+        stagingMeshlets = m_impl->resources->GetResourceTable().Resolve(staging[2].buffer);
+        destinationMeshlets = m_impl->resources->GetResourceTable().Resolve(buffers.binding.meshlets.data.buffer);
+        if (!staging[2].IsWritable() || staging[2].size < meshletUpload.bytes.size() ||
+            !stagingMeshlets.IsValid() || !destinationMeshlets.IsValid())
+        {
+            discardMeshlets();
+        }
+    }
+    const VkCommandBuffer commandBuffer = m_impl->resources->GetCommandBuffer();
+    const uint64_t recordingId = m_impl->resources->GetCurrentUploadRecordingId();
+    if (commandBuffer == VK_NULL_HANDLE || recordingId == 0)
+    {
+        m_impl->Release(buffers);
+        outError = "Vulkan mesh upload requires an active command buffer and recording transaction.";
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
+    struct CoarseLodUpload
+    {
+        RHIModelMeshView view;
+        uint64_t indexBytes{};
+        RHIModelMeshletUpload meshlets;
+        std::array<RHIBufferSlice, 2> staging;
+        VulkanBufferEntry indexSource, indexDestination, meshletSource, meshletDestination;
+    };
+    std::array<CoarseLodUpload, kRHIMaxCoarseMeshLods> coarseUploads{};
+    uint64_t coarseBytes = 0;
+    const auto* sourceMesh = modelView ? modelView->SourceMesh() : nullptr;
+    if (sourceMesh)
+    {
+        // Preserve LOD0 vertices/indices. Each optional level owns only an index
+        // stream and (on mesh-capable devices) its own generation-validated payload.
+        const uint32_t count = static_cast<uint32_t>((std::min)(sourceMesh->coarseLods.levels.size(),
+            static_cast<size_t>(kRHIMaxCoarseMeshLods)));
+        for (uint32_t i = 0; i < count; ++i)
+        {
+            auto& plan = coarseUploads[i];
+            auto& binding = buffers.binding.coarseLods[i];
+            auto& allocations = buffers.coarseLods[i];
+            const auto& level = sourceMesh->coarseLods.levels[i];
+            std::string lodError;
+            if (!BuildRHIModelMeshLodView(*modelView, i, plan.view) ||
+                !std::isfinite(level.geometricError) || level.geometricError < 0.f)
+            {
+                ++m_impl->stats.coarseLodFallbacks;
+                break;
+            }
+            plan.indexBytes = uint64_t(plan.view.indexCount) * sizeof(uint32_t);
+            constexpr VkBufferUsageFlags indexUsage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+            if (!m_impl->persistentHeap.CreateBuffer(plan.indexBytes, indexUsage,
+                L"VulkanMesh.CoarseIndices", allocations.indices, lodError))
+            {
+                m_impl->ReleaseCoarseLod(buffers, i);
+                ++m_impl->stats.coarseLodFallbacks;
+                break;
+            }
+            VulkanBufferEntry indexEntry{};
+            indexEntry.buffer = allocations.indices.buffer;
+            indexEntry.bytes = plan.indexBytes;
+            binding.indices = RHIBufferSlice::Whole(
+                m_impl->resources->GetResourceTable().AddExternalBuffer(indexEntry));
+            if (!binding.indices.IsValid())
+            {
+                m_impl->ReleaseCoarseLod(buffers, i);
+                ++m_impl->stats.coarseLodFallbacks;
+                break;
+            }
+
+            const auto discardLodMeshlets = [&]
+            {
+                m_impl->resources->ReleaseBuffer(binding.meshlets.data.buffer);
+                m_impl->persistentHeap.Release(allocations.meshlets);
+                binding.meshlets = {};
+                plan.meshlets = {};
+                ++m_impl->stats.meshletFallbacks;
+            };
+            if (m_impl->resources->GetMeshShaderCapabilities().meshShader &&
+                !BuildRHIModelMeshletUpload(plan.view, plan.meshlets, lodError))
+            {
+                discardLodMeshlets();
+            }
+            if (!plan.meshlets.bytes.empty())
+            {
+                constexpr VkBufferUsageFlags meshletUsage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
+                    VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+                if (!m_impl->persistentHeap.CreateBuffer(plan.meshlets.bytes.size(), meshletUsage,
+                    L"VulkanMesh.CoarseMeshlets", allocations.meshlets, lodError))
+                {
+                    discardLodMeshlets();
+                }
+                else
+                {
+                    VulkanBufferEntry meshletEntry{};
+                    meshletEntry.buffer = allocations.meshlets.buffer;
+                    meshletEntry.bytes = plan.meshlets.bytes.size();
+                    binding.meshlets.data = RHIBufferSlice::Whole(
+                        m_impl->resources->GetResourceTable().AddExternalBuffer(meshletEntry));
+                    if (!binding.meshlets.data.IsValid())
+                    {
+                        discardLodMeshlets();
+                    }
+                }
+            }
+
+            const std::array<RHIUploadRequest, 2> lodRequests = {{
+                { plan.indexBytes, RHIUploadUsage::IndexData, alignof(uint32_t) },
+                { plan.meshlets.bytes.size(), RHIUploadUsage::BufferCopy, 16 }
+            }};
+            bool lodReserved = false;
+            if (!plan.meshlets.bytes.empty())
+            {
+                lodReserved = m_impl->resources->ReserveUploadBatch(lodRequests, plan.staging, lodError);
+                if (!lodReserved)
+                {
+                    discardLodMeshlets();
+                }
+            }
+            if (!lodReserved && !m_impl->resources->ReserveUploadBatch(
+                std::span<const RHIUploadRequest>(lodRequests.data(), 1),
+                std::span<RHIBufferSlice>(plan.staging.data(), 1), lodError))
+            {
+                m_impl->ReleaseCoarseLod(buffers, i);
+                ++m_impl->stats.coarseLodFallbacks;
+                break;
+            }
+            plan.indexSource = m_impl->resources->GetResourceTable().Resolve(plan.staging[0].buffer);
+            plan.indexDestination = m_impl->resources->GetResourceTable().Resolve(binding.indices.buffer);
+            if (!plan.staging[0].IsWritable() || plan.staging[0].size < plan.indexBytes ||
+                !plan.indexSource.IsValid() || !plan.indexDestination.IsValid())
+            {
+                m_impl->ReleaseCoarseLod(buffers, i);
+                ++m_impl->stats.coarseLodFallbacks;
+                break;
+            }
+            if (!plan.meshlets.bytes.empty())
+            {
+                plan.meshletSource = m_impl->resources->GetResourceTable().Resolve(plan.staging[1].buffer);
+                plan.meshletDestination = m_impl->resources->GetResourceTable().Resolve(binding.meshlets.data.buffer);
+                if (!plan.staging[1].IsWritable() || plan.staging[1].size < plan.meshlets.bytes.size() ||
+                    !plan.meshletSource.IsValid() || !plan.meshletDestination.IsValid())
+                {
+                    discardLodMeshlets();
+                }
+            }
+            binding.indices.size = plan.indexBytes;
+            binding.indexCount = plan.view.indexCount;
+            binding.geometricError = level.geometricError;
+            if (!plan.meshlets.bytes.empty())
+            {
+                binding.meshlets.data.size = plan.meshlets.bytes.size();
+                binding.meshlets.meshletCount = plan.meshlets.meshletCount;
+                binding.meshlets.profileVersion = plan.meshlets.profileVersion;
+            }
+            ++buffers.binding.coarseLodCount;
+            coarseBytes += plan.indexBytes + plan.meshlets.bytes.size();
+        }
+    }
+
+    // All fallible optional allocation/reservation work precedes every copy.
+    // Dropping a later LOD can therefore never release a buffer already recorded.
+    if (m_impl->resources->GetCurrentUploadRecordingId() != recordingId ||
+        m_impl->resources->GetCommandBuffer() != commandBuffer)
+    {
+        m_impl->Release(buffers);
+        outError = "Vulkan mesh upload recording changed while preparing coarse LODs.";
+        ++m_impl->stats.failures;
+        return empty;
+    }
+
     std::memcpy(staging[0].cpuAddress, vertexData, static_cast<size_t>(vertexBytes));
     std::memcpy(staging[1].cpuAddress, indexData, static_cast<size_t>(indexBytes));
 
     const VkBufferCopy vertexCopy{ staging[0].offset, 0, vertexBytes };
     const VkBufferCopy indexCopy{ staging[1].offset, 0, indexBytes };
-    const VkCommandBuffer commandBuffer = m_impl->resources->GetCommandBuffer();
     vkCmdCopyBuffer(commandBuffer, stagingVertices.buffer,
         destinationVertices.buffer, 1, &vertexCopy);
     vkCmdCopyBuffer(commandBuffer, stagingIndices.buffer,
         destinationIndices.buffer, 1, &indexCopy);
+    if (!meshletUpload.bytes.empty())
+    {
+        std::memcpy(staging[2].cpuAddress, meshletUpload.bytes.data(), meshletUpload.bytes.size());
+        const VkBufferCopy meshletCopy{ staging[2].offset, 0, meshletUpload.bytes.size() };
+        vkCmdCopyBuffer(commandBuffer, stagingMeshlets.buffer, destinationMeshlets.buffer, 1, &meshletCopy);
+        buffers.binding.meshlets.data.size = meshletUpload.bytes.size();
+        buffers.binding.meshlets.meshletCount = meshletUpload.meshletCount;
+        buffers.binding.meshlets.profileVersion = meshletUpload.profileVersion;
+    }
 
-    VkBufferMemoryBarrier2 barriers[2]{};
+    VkBufferMemoryBarrier2 barriers[3 + 2 * kRHIMaxCoarseMeshLods]{};
     for (VkBufferMemoryBarrier2& barrier : barriers)
     {
         barrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER_2;
@@ -879,13 +1221,39 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
         barrier.offset = 0;
         barrier.size = VK_WHOLE_SIZE;
     }
-    barriers[0].dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT;
+    barriers[0].dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barriers[0].dstAccessMask = VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT | VK_ACCESS_2_SHADER_READ_BIT;
     barriers[0].buffer = destinationVertices.buffer;
     barriers[1].dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
     barriers[1].buffer = destinationIndices.buffer;
+    barriers[2].dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+    barriers[2].dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+    barriers[2].buffer = destinationMeshlets.buffer;
+    uint32_t barrierCount = meshletUpload.bytes.empty() ? 2u : 3u;
+    for (uint32_t i = 0; i < buffers.binding.coarseLodCount; ++i)
+    {
+        const auto& plan = coarseUploads[i];
+        std::memcpy(plan.staging[0].cpuAddress, plan.view.indexData, static_cast<size_t>(plan.indexBytes));
+        const VkBufferCopy indexCopy{ plan.staging[0].offset, 0, plan.indexBytes };
+        vkCmdCopyBuffer(commandBuffer, plan.indexSource.buffer, plan.indexDestination.buffer, 1, &indexCopy);
+        auto& indexBarrier = barriers[barrierCount++];
+        indexBarrier.dstStageMask = VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT;
+        indexBarrier.dstAccessMask = VK_ACCESS_2_INDEX_READ_BIT;
+        indexBarrier.buffer = plan.indexDestination.buffer;
+        if (!plan.meshlets.bytes.empty())
+        {
+            std::memcpy(plan.staging[1].cpuAddress, plan.meshlets.bytes.data(), plan.meshlets.bytes.size());
+            const VkBufferCopy meshletCopy{ plan.staging[1].offset, 0, plan.meshlets.bytes.size() };
+            vkCmdCopyBuffer(commandBuffer, plan.meshletSource.buffer, plan.meshletDestination.buffer, 1, &meshletCopy);
+            auto& meshletBarrier = barriers[barrierCount++];
+            meshletBarrier.dstStageMask = VK_PIPELINE_STAGE_2_ALL_COMMANDS_BIT;
+            meshletBarrier.dstAccessMask = VK_ACCESS_2_SHADER_READ_BIT;
+            meshletBarrier.buffer = plan.meshletDestination.buffer;
+        }
+    }
 
     VkDependencyInfo dependency{ VK_STRUCTURE_TYPE_DEPENDENCY_INFO };
-    dependency.bufferMemoryBarrierCount = 2;
+    dependency.bufferMemoryBarrierCount = barrierCount;
     dependency.pBufferMemoryBarriers = barriers;
     vkCmdPipelineBarrier2(commandBuffer, &dependency);
 
@@ -895,13 +1263,28 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
     buffers.binding.indices.size = indexBytes;
     buffers.binding.indexFormat = RHIFormat::R32Uint;
     buffers.binding.indexCount = indexCount;
-    buffers.bytes = vertexBytes + indexBytes;
+    buffers.bytes = vertexBytes + indexBytes + meshletUpload.bytes.size() + coarseBytes;
     buffers.lastUsedFrame = m_impl->frameIndex;
-    buffers.recordingId = m_impl->resources->GetCurrentUploadRecordingId();
+    buffers.recordingId = recordingId;
 
     ++m_impl->stats.uploads;
     // DX12와 대칭 — experiment 여부는 마스크가 말하고, 핸들 경로는 별도 계수.
-    if (nullptr != modelKey) ++m_impl->stats.modelGenerationUploads;
+    if (nullptr != modelKey)
+    {
+        ++m_impl->stats.modelGenerationUploads;
+    }
+    if (buffers.binding.meshlets.IsValid())
+    {
+        ++m_impl->stats.meshletUploads;
+    }
+    m_impl->stats.coarseLodUploads += buffers.binding.coarseLodCount;
+    for (uint32_t i = 0; i < buffers.binding.coarseLodCount; ++i)
+    {
+        if (buffers.binding.coarseLods[i].meshlets.IsValid())
+        {
+            ++m_impl->stats.meshletUploads;
+        }
+    }
     m_impl->stats.bytesUploaded += buffers.bytes;
     ++m_impl->stats.residentCount;
     m_impl->stats.residentBytes += buffers.bytes;
@@ -1068,10 +1451,7 @@ uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue,
         Impl::Buffers& buffers = it->second;
 
         m_impl->retireQueue.Enqueue(RHICompletionPoint{ completionValue },
-            Impl::RetiredBuffers{
-                buffers.binding.vertices.buffer, buffers.binding.indices.buffer,
-                std::move(buffers.vertices), std::move(buffers.indices) },
-            buffers.bytes);
+            m_impl->Retire(buffers), buffers.bytes);
         --m_impl->stats.residentCount;
         m_impl->stats.residentBytes -= buffers.bytes;
         ++m_impl->stats.retired;
@@ -1110,9 +1490,7 @@ uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue,
         if (it == m_impl->modelEntries.end()) continue;
         Impl::Buffers& buffers = it->second;
         m_impl->retireQueue.Enqueue(RHICompletionPoint{ completionValue },
-            Impl::RetiredBuffers{ buffers.binding.vertices.buffer,
-                buffers.binding.indices.buffer, std::move(buffers.vertices),
-                std::move(buffers.indices) }, buffers.bytes);
+            m_impl->Retire(buffers), buffers.bytes);
         --m_impl->stats.residentCount;
         m_impl->stats.residentBytes -= buffers.bytes;
         ++m_impl->stats.retired;
@@ -1136,10 +1514,7 @@ uint64_t VulkanMeshCache::SweepGraveyard(uint64_t completedValue)
     const RHIRetireCollection collected = m_impl->retireQueue.Collect(
         RHICompletionPoint{ completedValue }, [&](Impl::RetiredBuffers& retired)
         {
-            m_impl->resources->ReleaseBuffer(retired.vertices);
-            m_impl->resources->ReleaseBuffer(retired.indices);
-            m_impl->persistentHeap.Release(retired.vertexAllocation);
-            m_impl->persistentHeap.Release(retired.indexAllocation);
+            m_impl->Release(retired);
         });
     m_impl->persistentHeap.TrimEmptySegments(false);
     return collected.bytes;
@@ -1700,7 +2075,7 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     m_encoder = std::make_unique<VulkanEncoder>(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTables[m_frameIndex],
         m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable,
-        GetIndirectDrawCapabilities(), m_viewportLimits);
+        GetIndirectDrawCapabilities(), m_viewportLimits, GetMeshShaderCapabilities());
     return *m_encoder;
 }
 
@@ -2007,4 +2382,3 @@ void VulkanDeviceResources::ReleaseReadback(RHIReadback& readback)
     m_resourceTable.Release(m_device, readback.buffer);
     readback = {};
 }
-

@@ -1,4 +1,5 @@
 #pragma once
+#include <wrl/client.h>
 #include <d3d12.h>   // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
 #include "../RHIEncoder.h"
 
@@ -31,7 +32,7 @@ class DX12Encoder final : public RHIEncoder
 {
 public:
     DX12Encoder(ID3D12GraphicsCommandList* commandList, DX12DeviceResources* resources)
-        : m_commandList(commandList), m_resources(resources) {}
+        : m_resources(resources) { ResetState(commandList); }
 
     void SetViewportAndScissor(uint32_t width, uint32_t height) override;
     bool SetViewport(float x, float y, uint32_t width, uint32_t height) override;
@@ -68,7 +69,11 @@ public:
         uint32_t firstVertex = 0, uint32_t firstInstance = 0) override;
     void DrawIndexed(uint32_t indexCount, uint32_t instanceCount,
         uint32_t firstIndex = 0, int32_t baseVertex = 0, uint32_t firstInstance = 0) override;
+    bool DrawIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
     bool DrawIndexedIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
+
+    bool DispatchMesh(uint32_t x, uint32_t y, uint32_t z) override;
+    bool DispatchMeshIndirect(RHIBufferHandle arguments, uint64_t byteOffset = 0) override;
 
     void Dispatch(uint32_t x, uint32_t y, uint32_t z) override;
 
@@ -106,7 +111,16 @@ public:
     ///   패스 경계를 넘는 기억을 막는 유일한 조건이다.
     void ResetState(ID3D12GraphicsCommandList* commandList)
     {
+        if (m_commandList != commandList)
+        {
+            m_meshCommandList.Reset();
+            if (commandList)
+            {
+                commandList->QueryInterface(IID_PPV_ARGS(&m_meshCommandList));
+            }
+        }
         m_commandList = commandList;
+        m_boundPipeline = {};
         m_boundRootSignature[0] = nullptr;
         m_boundRootSignature[1] = nullptr;
         m_heapsBound = false;
@@ -149,9 +163,12 @@ private:
     ///   (예전에는 패스가 withSamplers로 골라 걸었다. 그 선택이 무엇을
     ///   아꼈는지는 기록이 없고, 재 보면 호출 하나 차이다.)
     void EnsureDescriptorHeaps();
+    bool IsPipelineBound(RHIBindPoint point, bool mesh = false) const;
 
     ID3D12GraphicsCommandList* m_commandList{ nullptr };
     DX12DeviceResources*       m_resources{ nullptr };
+    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_meshCommandList;
+    RHIPipelineHandle m_boundPipeline;
 
     /// [0] = Graphics, [1] = Compute. 둘은 DX12에서 완전히 별개 상태다.
     ID3D12RootSignature*       m_boundRootSignature[2]{ nullptr, nullptr };

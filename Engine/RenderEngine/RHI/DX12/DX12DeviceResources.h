@@ -427,7 +427,20 @@ public:
     RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
     {
         const bool available = nullptr != m_drawIndexedIndirectSignature.Get();
-        return { available, available };
+        return { available, available || nullptr != m_drawIndirectSignature.Get(),
+            nullptr != m_drawIndirectSignature.Get() };
+    }
+    RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override
+    {
+        return m_meshShaderCapabilities;
+    }
+    ID3D12CommandSignature* GetDispatchMeshIndirectSignature() const
+    {
+        return m_dispatchMeshIndirectSignature.Get();
+    }
+    ID3D12CommandSignature* GetDrawIndirectSignature() const
+    {
+        return m_drawIndirectSignature.Get();
     }
     ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const
     {
@@ -451,14 +464,14 @@ public:
     //   모양이다 — 캐시가 만들어 오래 들고, 표는 소비처에 핸들을 주려고 든다.
     //   그 주석이 "이쪽은 과도기가 아니다"라고 적어 둔 부류다.
     RHIPipelineHandle RegisterPipeline(ID3D12PipelineState* pipeline,
-        ID3D12RootSignature* signature)
+        ID3D12RootSignature* signature, bool meshPipeline = false, bool computePipeline = false)
     {
-        return m_resourceTable.AddPipeline(pipeline, signature);
+        return m_resourceTable.AddPipeline(pipeline, signature, meshPipeline, computePipeline);
     }
     RHIPipelineLayoutHandle RegisterPipelineLayout(ID3D12RootSignature* signature,
-        uint64_t stableHash)
+        uint64_t stableHash, bool allowInputAssembler = true)
     {
-        return m_resourceTable.AddPipelineLayout(signature, stableHash);
+        return m_resourceTable.AddPipelineLayout(signature, stableHash, allowInputAssembler);
     }
 
     DX12PipelineEntry Resolve(RHIPipelineHandle handle) const
@@ -512,7 +525,10 @@ private:
     ComPtr<IDXGIFactory6>              m_factory;
     ComPtr<IDXGIAdapter1>              m_adapter;
     ComPtr<ID3D12Device>               m_device;
+    ComPtr<ID3D12CommandSignature>     m_drawIndirectSignature;
     ComPtr<ID3D12CommandSignature>     m_drawIndexedIndirectSignature;
+    ComPtr<ID3D12CommandSignature>     m_dispatchMeshIndirectSignature;
+    RHIMeshShaderCapabilities          m_meshShaderCapabilities;
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
     // 포인터 하나 검사로 끝난다.

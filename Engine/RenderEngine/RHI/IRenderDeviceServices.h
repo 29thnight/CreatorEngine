@@ -276,6 +276,11 @@ public:
         return {};
     }
 
+    virtual RHIMeshShaderCapabilities GetMeshShaderCapabilities() const
+    {
+        return {};
+    }
+
     virtual bool CreateTexture(const RHITextureDesc& desc,
         RHITextureHandle& outHandle, std::string& outError) = 0;
 
@@ -352,6 +357,52 @@ struct RHIModelMeshView
     uint64_t vertexLayoutHash{ 0 };
     const uint32_t* indexData{ nullptr };
     uint32_t indexCount{ 0 };
+
+    // Optional provenance for the generation's SHA-validated derived payload.
+    // Like vertexData, this is borrowed only until upload copies it. A manually
+    // constructed/indexed-only view has no provenance and cannot enable MS.
+    const assets::ModelAssetGeneration* sourceGeneration{ nullptr };
+    uint32_t sourceMeshIndex{ UINT32_MAX };
+    uint32_t sourceLodIndex{ 0 }; // Internal upload view: zero is original geometry.
+
+    [[nodiscard]] const assets::ModelMeshAsset* SourceMesh() const noexcept
+    {
+        if (!sourceGeneration || !handle.IsValid())
+        {
+            return nullptr;
+        }
+        const auto& identity = sourceGeneration->Identity();
+        const auto meshes = sourceGeneration->Meshes();
+        if (identity.modelId != handle.modelId || identity.generation != handle.generation ||
+            sourceMeshIndex >= meshes.size())
+        {
+            return nullptr;
+        }
+        const auto& mesh = meshes[sourceMeshIndex];
+        if (mesh.meshId != handle.meshId || mesh.vertexBytes.data() != vertexData ||
+            mesh.vertexBytes.size() != vertexBytes || mesh.vertexStride != vertexStride ||
+            mesh.vertexAttributeMask != vertexAttributeMask || mesh.vertexLayoutHash != vertexLayoutHash)
+        {
+            return nullptr;
+        }
+        if (sourceLodIndex > mesh.coarseLods.levels.size())
+        {
+            return nullptr;
+        }
+        const auto& indices = sourceLodIndex == 0 ? mesh.indices : mesh.coarseLods.levels[sourceLodIndex - 1].indices;
+        return indices.data() == indexData && indices.size() == indexCount ? &mesh : nullptr;
+    }
+
+    [[nodiscard]] const experiment::MeshletPayload* Meshlets() const noexcept
+    {
+        const auto* mesh = SourceMesh();
+        if (!mesh)
+        {
+            return nullptr;
+        }
+        const auto& payload = sourceLodIndex == 0 ? mesh->meshlets : mesh->coarseLods.levels[sourceLodIndex - 1].meshlets;
+        return payload.HasMeshlets() ? &payload : nullptr;
+    }
 
     [[nodiscard]] bool IsComplete() const noexcept
     {
@@ -430,7 +481,33 @@ struct RHIModelMeshView
     outView.vertexLayoutHash = mesh.vertexLayoutHash;
     outView.indexData = mesh.indices.data();
     outView.indexCount = static_cast<uint32_t>(mesh.indices.size());
+    outView.sourceGeneration = &generation;
+    outView.sourceMeshIndex = meshIndex;
     return outView.IsComplete();
+}
+
+/// Derive a per-LOD upload view from the same immutable, validated generation.
+/// coarseIndex is zero-based (LOD1). This is not a separate mesh cache identity.
+[[nodiscard]] inline bool BuildRHIModelMeshLodView(const RHIModelMeshView& base,
+    uint32_t coarseIndex, RHIModelMeshView& result)
+{
+    result = {};
+    const auto* source = base.SourceMesh();
+    if (!source || base.sourceLodIndex != 0 || coarseIndex >= source->coarseLods.levels.size() ||
+        coarseIndex >= kRHIMaxCoarseMeshLods)
+    {
+        return false;
+    }
+    const auto& indices = source->coarseLods.levels[coarseIndex].indices;
+    if (indices.size() > UINT32_MAX)
+    {
+        return false;
+    }
+    result = base;
+    result.indexData = indices.data();
+    result.indexCount = static_cast<uint32_t>(indices.size());
+    result.sourceLodIndex = coarseIndex + 1;
+    return result.IsComplete();
 }
 
 /// 메시 업로드. 같은 메시를 여러 패스·여러 프레임이 공유한다.

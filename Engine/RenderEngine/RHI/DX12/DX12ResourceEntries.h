@@ -59,6 +59,8 @@ struct DX12PipelineEntry
 {
     ID3D12PipelineState* pipeline{ nullptr };
     ID3D12RootSignature* signature{ nullptr };
+    bool meshPipeline{ false };
+    bool computePipeline{ false };
 
     bool IsValid() const { return nullptr != pipeline; }
 };
@@ -73,6 +75,7 @@ struct DX12PipelineLayoutEntry
 {
     ID3D12RootSignature* signature{ nullptr };
     uint64_t             stableHash{ 0 };
+    bool allowInputAssembler{ true };
 
     bool IsValid() const { return nullptr != signature; }
 };

@@ -79,6 +79,7 @@ public:
 
     // 컴퓨트 PSO. 같은 캐시 2층을 공유한다.
     RHIPipelineHandle GetOrCreateCompute(const RHIComputePipelineDesc& desc, std::string& outError) override;
+    RHIPipelineHandle GetOrCreateMesh(const RHIMeshPipelineDesc& desc, std::string& outError) override;
     bool InvalidatePipeline(RHIPipelineHandle handle,
         RHICompletionPoint retireAfter = {}) override;
     std::uint32_t InvalidatePipelines(RHICompletionPoint retireAfter = {}) override;
@@ -148,7 +149,7 @@ private:
 
     /// 캐시에 넣고 핸들을 발급한다. **락을 쥔 채로** 부른다.
     RHIPipelineHandle Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
-        ID3D12RootSignature* signature, std::string& outError);
+        ID3D12RootSignature* signature, std::string& outError, bool meshPipeline = false, bool computePipeline = false);
     std::uint32_t RetireCachedPipelinesLocked(RHICompletionPoint retireAfter);
 
     class DX12DeviceResources*     m_resources{ nullptr };

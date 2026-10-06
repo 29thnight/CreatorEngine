@@ -711,6 +711,7 @@
     <ClInclude Include="Experiment\MeshletData.h" />
     <ClInclude Include="Experiment\MeshLodData.h" />
     <ClInclude Include="Experiment\Import\MeshLodBuilder.h" />
+    <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
     <ClInclude Include="Experiment\Import\MeshletBuilder.h" />
     <ClInclude Include="Assets\ModelVertexLayout.h" />
     <ClInclude Include="Assets\TextureCoordinates.h" />
