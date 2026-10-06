@@ -385,6 +385,12 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="GpuGeometryOcclusion.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="GpuMeshletVisibility.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Experiment\Import\MeshLodBuilder.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentImport_%(Filename).obj</ObjectFileName>
@@ -711,6 +717,8 @@
     <ClInclude Include="Experiment\MeshletData.h" />
     <ClInclude Include="Experiment\MeshLodData.h" />
     <ClInclude Include="Experiment\Import\MeshLodBuilder.h" />
+    <ClInclude Include="GpuMeshletVisibility.h" />
+    <ClInclude Include="GpuGeometryOcclusion.h" />
     <ClInclude Include="RHI\RHIModelMeshletUpload.h" />
     <ClInclude Include="Experiment\Import\MeshletBuilder.h" />
     <ClInclude Include="Assets\ModelVertexLayout.h" />

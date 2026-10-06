@@ -140,6 +140,14 @@ struct GraphicsCompileIdentity
     std::string vertexProfile, pixelProfile;
     std::uint32_t vertexAttributeMask{};
     bool referencePath{};
+    // Binding shape and semantic opt-in belong to this exact shader generation,
+    // never to a root-layout ID that unrelated shaders can share.
+    bool visibleInstanceIds{};
+    // Optional, strictly reflected GBufferSkinPaletteExtentV1 uniform ABI.
+    // Its root index is retained with this exact accepted generation; it grants
+    // no deformation/culling contract and changes no custom instance bytes.
+    std::uint32_t gbufferSkinPaletteExtentV1Root{UINT32_MAX};
+    ShaderGeometryVisibility geometryVisibility{ShaderGeometryVisibility::Direct};
     RHIShaderPermutation permutation;
     RHIShaderCompileOptions options;
     std::string vertexDependencies, pixelDependencies;

@@ -123,6 +123,20 @@ struct ShaderRenderState
     bool operator==(const ShaderRenderState&) const = default;
 };
 
+// Explicit author promise, checked in addition to reflected binding shape.
+// IndexedInstanceV1 resolves gVisibleInstanceIds[SV_InstanceID] at t6/space0
+// BEFORE all t4 instance and t5 palette reads. firstInstance is always zero.
+// Position may use only the sealed affine world and nonnegative, normalized
+// four-weight linear blend skinning (sum tolerance 1e-5, zero = bind pose).
+// Wind, morph, displacement and other shader-side position changes are excluded;
+// the source sphere expanded by the sealed pose must enclose every emitted vertex.
+// Omitting the contract retains direct submission, even with the same root layout.
+enum class ShaderGeometryVisibility : std::uint8_t
+{
+    Direct,
+    IndexedInstanceV1,
+};
+
 struct ShaderPassDesc
 {
     std::string name;
@@ -131,6 +145,7 @@ struct ShaderPassDesc
     std::optional<ShaderStageEntry> compute;
     ShaderRenderState state;
     ShaderPassQueue queue{ ShaderPassQueue::Opaque };
+    ShaderGeometryVisibility geometryVisibility{ ShaderGeometryVisibility::Direct };
 
     bool IsCompute() const { return compute.has_value(); }
     bool operator==(const ShaderPassDesc&) const = default;

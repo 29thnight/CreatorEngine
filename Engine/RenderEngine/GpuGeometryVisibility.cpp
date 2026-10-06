@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 #include <limits>
 #include <stdexcept>
@@ -19,9 +20,18 @@ namespace
     struct GeometryVisibilityConstants
     {
         math::vector4 planes[6]{};
-        std::uint32_t candidateCount{}, binCount{}, planeMask{}, padding{};
+        std::uint32_t candidateCount{}, binCount{}, planeMask{}, mode{};
+        // Explicit columns avoid depending on Slang's matrix packing convention.
+        math::vector4 projectionColumns[4]{};
+        std::uint32_t width{}, height{}, occlusionLevels{}, projectionValid{};
+        math::vector4 shadowReceiverSphere{}, shadowLightDirection{};
     };
-    static_assert(sizeof(GeometryVisibilityConstants) == 112);
+    static_assert(sizeof(GeometryVisibilityConstants) == 224);
+    static_assert(offsetof(GeometryVisibilityConstants, mode) == 108);
+    static_assert(offsetof(GeometryVisibilityConstants, projectionColumns) == 112);
+    static_assert(offsetof(GeometryVisibilityConstants, width) == 176);
+    static_assert(offsetof(GeometryVisibilityConstants, shadowReceiverSphere) == 192);
+    static_assert(offsetof(GeometryVisibilityConstants, shadowLightDirection) == 208);
 
     bool VisibilityFail(std::string& error, std::string message)
     {
@@ -46,6 +56,13 @@ namespace
                 }
             }
         }
+
+        for (unsigned column = 0; column < 4; ++column)
+        {
+            constants.projectionColumns[column] = {matrix.m[0][column], matrix.m[1][column],
+                                                    matrix.m[2][column], matrix.m[3][column]};
+        }
+        constants.projectionValid = 1;
 
         // p * ViewProjection: clip inequalities are col3 +/- col0/1,
         // col2 >= 0 and col3 - col2 >= 0, for both renderer backends.
@@ -151,9 +168,94 @@ bool GpuGeometryVisibility::Initialize(const EnhancedFrameContext& context, std:
     return true;
 }
 
+bool GpuGeometryVisibility::InitializeOcclusion(const EnhancedFrameContext& context, std::string& error)
+{
+    if (m_occlusionCull.GetGeneration())
+    {
+        return true;
+    }
+    const auto source = RHIShaderSource::Resolve("GeometryVisibility.slang").string();
+    RHIShaderCompileOptions options;
+    options.strictMath = true;
+    RHIShaderPermutation cullPermutation;
+    LX::Runtime::CompiledCompute cull;
+    if (!cullPermutation.Enable("GEOMETRY_VISIBILITY_OCCLUSION", error) ||
+        !LX::Runtime::CompileCompute(source, "GeometryVisibilityCullCS", cullPermutation, options, cull, error))
+    {
+        return false;
+    }
+    const RHIPipelineLayoutParam cullParameters[]{
+        RHILayout::Cbv(0), RHILayout::Srv(0), RHILayout::Srv(1), RHILayout::UavBufferTable(2, 0),
+        RHILayout::SrvTable(kOcclusionLevels, 2)};
+    const auto cullLayout = context.rootSignatures->GetOrCreate({cullParameters, {}}, error);
+    if (!cullLayout.IsValid())
+    {
+        return false;
+    }
+    LX::Runtime::ComputePipeline cullPipeline;
+    RHIComputePipelineDesc description;
+    description.layout = cullLayout;
+    description.csBytecode = cull.stage.bytecode.Data();
+    description.csSize = cull.stage.bytecode.Size();
+    if (!cullPipeline.Create(*context.psoManager, description, std::move(cull.description), error))
+    {
+        return false;
+    }
+    m_occlusionCull = std::move(cullPipeline);
+    return true;
+}
+
+bool GpuGeometryVisibility::PrepareOcclusionPipelines(const EnhancedFrameContext& context, std::string& error)
+{
+    if (!context.resources || !context.rootSignatures || !context.psoManager ||
+        !context.resources->GetCurrentUploadRecordingId() || !GpuGeometryOcclusion::LevelCount(context.width, context.height))
+    {
+        return VisibilityFail(error, "GPU occlusion preflight requires an active supported view.");
+    }
+    return Initialize(context, error) && InitializeOcclusion(context, error);
+}
+
 bool GpuGeometryVisibility::Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                                     std::span<const Candidate> candidates, std::span<const Bin> bins,
-                                    std::shared_ptr<const Frame>& result, std::string& error)
+                                    std::shared_ptr<const Frame>& result, std::string& error,
+                                    bool currentFrameOcclusion)
+{
+    return PrepareInternal(context, viewProjection, candidates, bins, result, error, currentFrameOcclusion, nullptr);
+}
+
+bool GpuGeometryVisibility::PreparePipelines(const EnhancedFrameContext& context, std::string& error)
+{
+    if (!context.resources || (m_device && m_device != context.resources))
+    {
+        return VisibilityFail(error, "GPU visibility preflight requires its current device services.");
+    }
+    const auto capabilities = context.resources->GetIndirectDrawCapabilities();
+    if (!capabilities.indexedDraw && !capabilities.nonIndexedDraw)
+    {
+        error.clear();
+        return true;
+    }
+    if (!context.rootSignatures || !context.psoManager)
+    {
+        return VisibilityFail(error, "GPU visibility preflight requires pipeline services.");
+    }
+    return Initialize(context, error);
+}
+
+bool GpuGeometryVisibility::PrepareShadow(const EnhancedFrameContext& context, const math::vector4& receiverSphere,
+                                         const math::vector4& lightDirection, std::span<const Candidate> candidates,
+                                         std::span<const Bin> bins, std::shared_ptr<const Frame>& result,
+                                         std::string& error)
+{
+    const ShadowCullVolume shadow{receiverSphere, lightDirection};
+    return PrepareInternal(context, math::matrix4x4::identity(), candidates, bins, result, error, false, &shadow);
+}
+
+bool GpuGeometryVisibility::PrepareInternal(const EnhancedFrameContext& context,
+                                          const math::matrix4x4& viewProjection,
+                                          std::span<const Candidate> candidates, std::span<const Bin> bins,
+                                          std::shared_ptr<const Frame>& result, std::string& error,
+                                          bool currentFrameOcclusion, const ShadowCullVolume* shadow)
 {
     result.reset();
     if (!context.resources || (m_device && m_device != context.resources))
@@ -165,7 +267,8 @@ bool GpuGeometryVisibility::Prepare(const EnhancedFrameContext& context, const m
         error.clear();
         return true;
     }
-    if (!context.resources->GetIndirectDrawCapabilities().indexedDraw)
+    const auto capabilities = context.resources->GetIndirectDrawCapabilities();
+    if (!capabilities.indexedDraw && !capabilities.nonIndexedDraw)
     {
         error.clear();
         return true;
@@ -198,6 +301,30 @@ bool GpuGeometryVisibility::Prepare(const EnhancedFrameContext& context, const m
         range.offset = candidate.outputOffset;
         ++range.count;
     }
+    std::vector<std::vector<std::uint8_t>> preservedSources(bins.size());
+    for (std::size_t bin = 0; bin < bins.size(); ++bin)
+    {
+        if (bins[bin].preservedInstanceCount != 0u)
+        {
+            if (ranges[bin].count != bins[bin].preservedInstanceCount)
+            {
+                return VisibilityFail(error, "Preserved GPU bins require one candidate per original instance.");
+            }
+            preservedSources[bin].resize(ranges[bin].count, 0u);
+        }
+    }
+    for (const auto& candidate : candidates)
+    {
+        auto& seen = preservedSources[candidate.bin];
+        if (!seen.empty())
+        {
+            if (candidate.sourceIndex >= seen.size() || seen[candidate.sourceIndex] != 0u)
+            {
+                return VisibilityFail(error, "Preserved GPU bins require unique original instance IDs 0..N-1.");
+            }
+            seen[candidate.sourceIndex] = 1u;
+        }
+    }
     std::erase_if(ranges, [](const auto& range) { return range.count == 0; });
     std::ranges::sort(ranges, {}, &OutputRange::offset);
     std::uint64_t outputEnd = 0;
@@ -214,15 +341,53 @@ bool GpuGeometryVisibility::Prepare(const EnhancedFrameContext& context, const m
     {
         return false;
     }
+    if (currentFrameOcclusion &&
+        (!context.width || !context.height || context.width > (1u << kOcclusionLevels) ||
+         context.height > (1u << kOcclusionLevels)))
+    {
+        return VisibilityFail(error, "GPU occlusion requires a nonempty view within the pyramid extent limit.");
+    }
+    if (currentFrameOcclusion && !InitializeOcclusion(context, error))
+    {
+        return false;
+    }
 
     auto frame = std::shared_ptr<Frame>(new Frame);
     frame->m_device = m_device;
     frame->m_recording = m_device->GetCurrentUploadRecordingId();
+    frame->m_preparedStats.candidateCount = static_cast<std::uint32_t>(candidates.size());
+    for (const auto& bin : bins)
+    {
+        if (bin.preservedInstanceCount != 0u)
+        {
+            ++frame->m_preparedStats.preservedBins;
+        }
+        else
+        {
+            ++frame->m_preparedStats.compactedBins;
+        }
+    }
+    for (const auto& candidate : candidates)
+    {
+        if ((candidate.flags & kConservative) != 0u || !(candidate.sphere.w > 0.f)
+            || !std::isfinite(candidate.sphere.x) || !std::isfinite(candidate.sphere.y)
+            || !std::isfinite(candidate.sphere.z) || !std::isfinite(candidate.sphere.w))
+        {
+            ++frame->m_preparedStats.conservativeCandidates;
+        }
+    }
     frame->m_candidateCount = static_cast<std::uint32_t>(candidates.size());
     frame->m_binCount = static_cast<std::uint32_t>(bins.size());
     frame->m_outputCount = static_cast<std::uint32_t>((std::max)(std::uint64_t{1}, outputEnd));
     frame->m_reset = m_reset.GetGeneration();
     frame->m_cull = m_cull.GetGeneration();
+    if (currentFrameOcclusion)
+    {
+        frame->m_occlusionCull = m_occlusionCull.GetGeneration();
+        frame->m_width = context.width;
+        frame->m_height = context.height;
+        frame->m_occlusionLevelCount = GpuGeometryOcclusion::LevelCount(context.width, context.height);
+    }
 
     RHIBufferDesc description;
     description.bytes = std::uint64_t(frame->m_outputCount) * sizeof(std::uint32_t);
@@ -240,7 +405,18 @@ bool GpuGeometryVisibility::Prepare(const EnhancedFrameContext& context, const m
         return false;
     }
 
-    const auto constants = VisibilityConstants(viewProjection, frame->m_candidateCount, frame->m_binCount);
+    auto constants = VisibilityConstants(viewProjection, frame->m_candidateCount, frame->m_binCount);
+    constants.width = frame->m_width;
+    constants.height = frame->m_height;
+    constants.occlusionLevels = frame->m_occlusionLevelCount;
+    if (shadow)
+    {
+        constants.mode = 1u;
+        constants.planeMask = 0u;
+        constants.projectionValid = 0u;
+        constants.shadowReceiverSphere = shadow->receiverSphere;
+        constants.shadowLightDirection = shadow->lightDirection;
+    }
     const RHIUploadRequest requests[]{
         {(std::max)(std::size_t{1}, candidates.size()) * sizeof(Candidate), RHIUploadUsage::Raw, 256},
         {bins.size_bytes(), RHIUploadUsage::Raw, 256},
@@ -279,6 +455,11 @@ bool GpuGeometryVisibility::Prepare(const EnhancedFrameContext& context, const m
         return VisibilityFail(error, "GPU visibility requires complete bindings in the same upload recording.");
     }
     frame->m_descriptors = m_device->GetDescriptorVersionToken();
+    frame->m_occlusionView = GpuGeometryOcclusion::CaptureView(context, viewProjection);
+    if (currentFrameOcclusion && !m_depthPyramid.Prepare(context, viewProjection, frame->m_preparedPyramid, error))
+    {
+        return false;
+    }
     frame->m_self = frame;
     {
         std::lock_guard lock(m_recordingMutex);
@@ -319,13 +500,14 @@ void GpuGeometryVisibility::Frame::CheckCurrent(const EnhancedRenderGraph* graph
 {
     if (!m_device || m_device->GetCurrentUploadRecordingId() != m_recording ||
         m_device->GetDescriptorVersionToken() != m_descriptors ||
-        (graph && (m_graph != graph || m_graphEpoch != graph->ResourceEpoch())))
+        (graph && (m_graph != graph || m_graphEpoch != graph->ResourceEpoch() ||
+                   &graph->DeviceServices() != m_device)))
     {
         throw std::runtime_error("GPU visibility frame escaped its recording, descriptors or graph epoch.");
     }
 }
 
-void GpuGeometryVisibility::Frame::Dispatch(RHIEncoder& encoder, bool reset) const
+void GpuGeometryVisibility::Frame::Dispatch(RHIEncoder& encoder, bool reset, RHIBindingTable depth) const
 {
     const auto count = reset ? m_binCount : m_candidateCount;
     if (!count)
@@ -334,13 +516,43 @@ void GpuGeometryVisibility::Frame::Dispatch(RHIEncoder& encoder, bool reset) con
     }
     const auto groups = static_cast<std::uint32_t>((std::uint64_t(count) + kVisibilityThreads - 1) /
                                                    kVisibilityThreads);
-    encoder.SetPipeline(RHIBindPoint::Compute, (reset ? m_reset : m_cull)->GetHandle());
+    const auto& pipeline = reset ? m_reset : (depth.IsValid() ? m_occlusionCull : m_cull);
+    encoder.SetPipeline(RHIBindPoint::Compute, pipeline->GetHandle());
     encoder.SetConstantBuffer(RHIBindPoint::Compute, 0, m_constants);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 1, m_candidates);
     encoder.SetRootBuffer(RHIBindPoint::Compute, 2, m_bins);
     encoder.SetBindings(RHIBindPoint::Compute, 3, m_outputs);
+    if (!reset && depth.IsValid())
+    {
+        encoder.SetBindings(RHIBindPoint::Compute, 4, depth);
+    }
     encoder.Dispatch((std::min)(groups, kVisibilityDispatchWidth),
                      (groups + kVisibilityDispatchWidth - 1) / kVisibilityDispatchWidth, 1);
+}
+
+void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& graph, RGHandle occluderDepth) const
+{
+    if (!m_preparedPyramid)
+    {
+        throw std::runtime_error("GPU visibility was not prepared for current-depth occlusion.");
+    }
+    m_preparedPyramid->Declare(graph, occluderDepth);
+    DeclareWithOcclusion(graph, m_preparedPyramid);
+}
+
+void GpuGeometryVisibility::Frame::DeclareWithOcclusion(EnhancedRenderGraph& graph,
+    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid) const
+{
+    CheckCurrent();
+    if (m_graph || !m_occlusionCull || !pyramid ||
+        pyramid->LevelCount() != m_occlusionLevelCount ||
+        graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+    {
+        throw std::runtime_error("GPU visibility requires an undeclared occlusion-capable frame and matching pyramid.");
+    }
+    pyramid->RequireView(m_occlusionView);
+    m_pyramid = std::move(pyramid);
+    Declare(graph);
 }
 
 void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
@@ -395,14 +607,24 @@ void GpuGeometryVisibility::Frame::Declare(EnhancedRenderGraph& graph) const
         m_graphArguments = graph.Modify(m_graphArguments);
         m_graphVisibleIds = graph.Write(m_graphVisibleIds);
     }
-    graph.AddPass("Geometry.Visibility.Cull",
-                  {{m_graphArguments, RHIResourceState::UnorderedAccess,
-                    versioned ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState},
-                   {m_graphVisibleIds, RHIResourceState::UnorderedAccess,
-                    versioned ? RGAccessMode::Write : RGAccessMode::LegacyState}},
+    std::vector<EnhancedRenderGraph::RGPassUsage> usages{
+        {m_graphArguments, RHIResourceState::UnorderedAccess,
+         versioned ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState},
+        {m_graphVisibleIds, RHIResourceState::UnorderedAccess,
+         versioned ? RGAccessMode::Write : RGAccessMode::LegacyState}};
+    if (m_pyramid)
+    {
+        m_pyramid->AddReadUsages(graph, usages);
+    }
+    graph.AddPass(m_pyramid ? "Geometry.Visibility.CullOcclusion" : "Geometry.Visibility.Cull", usages,
                   [owner](const auto& execution) {
                       owner->CheckCurrent(execution.graph);
-                      owner->Dispatch(*execution.encoder, false);
+                      RHIBindingTable depth;
+                      if (owner->m_pyramid)
+                      {
+                          depth = owner->m_pyramid->Bindings(execution);
+                      }
+                      owner->Dispatch(*execution.encoder, false, depth);
                   });
 }
 
@@ -469,6 +691,8 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
     }
     m_reset = {};
     m_cull = {};
+    m_occlusionCull = {};
+    m_depthPyramid.ShutdownAfterIdle();
     m_device = nullptr;
 }
 
