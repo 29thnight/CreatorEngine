@@ -194,6 +194,15 @@ namespace ConsoleCmd
         //   가서야 쓰여서 세 번을 헛짚었다).
         std::printf("[CLI] %s 시작: %s\n", cmd.c_str(), parts[1].c_str());
 
+        if (cmd == "scene.open_async")
+        {
+            SceneManagers->LoadSceneAsyncAndWaitCallback(parts[1]);
+            CommandCore::CommandData data = CommandCore::CommandData::Object();
+            data.Set("path", CommandCore::CommandData::String(parts[1]));
+            data.Set("queued", CommandCore::CommandData::Bool(true));
+            return CommandCore::Ok("Scene preparation queued", std::move(data));
+        }
+
         Scene* scene = SceneManagers->LoadScene(parts[1]);
         std::printf("[CLI] LoadScene 반환: %s\n",
             (nullptr != scene) ? "성공" : "널");
@@ -1594,6 +1603,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
     void RegisterSceneObjectCommands(Registrar& reg)
     {
         reg.Result({ "scene.load", "scene.switch" }, &Cmd_scene_load);
+        reg.Result({ "scene.open_async" }, &Cmd_scene_load);
         reg.Result({ "scene.new" }, &Cmd_scene_new);
         reg.Result({ "scene.ddol" }, &Cmd_scene_ddol);
         reg.Result({ "ai.status" }, &Cmd_ai_status);

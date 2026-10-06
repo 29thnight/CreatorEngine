@@ -3,6 +3,7 @@
 
 #include "DataSystem.h"
 #include "ModelSceneInstantiation.h"
+#include "JobScheduler.h"
 #include "ReflectionUndo.h"
 #include "Scene.h"
 #include "SceneManager.h"
@@ -10,12 +11,13 @@
 #include "EditorWindowNames.h"
 #include "Windows/EditorToolboxWindows.h"
 
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <chrono>
-#include <condition_variable>
-#include <deque>
 #include <mutex>
-#include <thread>
+#include <span>
+#include <utility>
 #include <vector>
 
 namespace Editor
@@ -28,6 +30,8 @@ namespace Editor
         bool gameMode{};
         file::path assetRoot;
         std::weak_ptr<ProjectLayerSettings> project;
+        DataSystem::ModelPreparation modelPreparation;
+        job_handle preparation;
         std::atomic<bool> cancelled{ false };
         std::atomic<bool> ready{ false };
         std::atomic<bool> finished{ false };
@@ -38,6 +42,7 @@ namespace Editor
         std::string error;
         // GT only, including undo cleanup. UI only posts cancellation.
         EntityHandle root;
+        bool modelPublished{ false };
         bool positionApplied{ false };
         std::size_t applyFrames{};
         std::size_t loadingFrames{};
@@ -48,10 +53,10 @@ namespace Editor
     struct ModelPlacement::Impl
     {
         std::mutex mutex;
-        std::condition_variable wake;
-        std::thread worker;
         bool stopping{ true };
-        std::deque<std::shared_ptr<Request>> work;
+        job_handle preparationTail;
+        // Cancelled requests remain here until their scheduler jobs release all captures.
+        std::vector<std::shared_ptr<Request>> preparations;
         std::vector<std::shared_ptr<Request>> incoming;
         std::vector<std::shared_ptr<Request>> cancellations;
         std::vector<std::shared_ptr<Request>> visible;
@@ -96,75 +101,94 @@ namespace Editor
 
         auto& state = *m_impl;
         std::lock_guard lock(state.mutex);
-        if (!state.stopping) return;
-        state.stopping = false;
-        state.worker = std::thread([this]
+        if (!state.stopping)
         {
-            const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-            SetThreadDescription(GetCurrentThread(), L"Model asset preparation");
-            SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
-            auto& state = *m_impl;
-            for (;;)
+            return;
+        }
+        state.stopping = false;
+        state.preparationTail = {};
+    }
+
+    void ModelPlacement::Prepare(const std::shared_ptr<Request>& request)
+    {
+        if (request->cancelled.load(std::memory_order_acquire))
+        {
+            request->ready.store(true, std::memory_order_release);
+            return;
+        }
+        // The shared pool does not promise a COM apartment; balance this job's
+        // initialization without changing a shared worker's name or priority.
+        const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        const auto prepareStart = std::chrono::steady_clock::now();
+        try
+        {
+            if (FAILED(com))
             {
-                std::shared_ptr<Request> request;
+                request->error = "Model image decoder initialization failed";
+            }
+            else
+            {
+                auto generation = DataSystems->ReadPreparedModel(request->modelPreparation, request->error);
+                if (!generation)
                 {
-                    std::unique_lock lock(state.mutex);
-                    state.wake.wait(lock, [&] { return state.stopping || !state.work.empty(); });
-                    if (state.stopping) break;
-                    request = std::move(state.work.front());
-                    state.work.pop_front();
-                }
-                if (request->cancelled.load(std::memory_order_acquire)) continue;
-                const auto prepareStart = std::chrono::steady_clock::now();
-                try
-                {
-                    if (FAILED(com)) request->error = "Model image decoder initialization failed";
-                    else
+                    if (request->error.empty())
                     {
-                        auto generation = DataSystems->LoadModelAssetGenerationByPath(request->path);
-                        if (!generation) request->error = "Model asset load failed: " + request->path;
-                        else if (!request->cancelled.load(std::memory_order_acquire))
-                        {
-                            ModelSceneInstantiation::Options options;
-                            options.createMeshCollider = DataSystems->ReadModelCreateMeshCollider(
-                                FileGuid(generation->Identity().modelId));
-                            if (options.createMeshCollider)
-                            {
-                                const auto assetRoot = request->assetRoot;
-                                const auto expectedProject = request->project;
-                                const auto model = generation->Identity().modelId;
-                                std::vector<Uuid::Uuid16> meshes;
-
-                                for (const auto& mesh : generation->Meshes())
-                                    meshes.push_back(mesh.meshId);
-
-                                options.collisionGeometry = [assetRoot, expectedProject, model, meshes = std::move(meshes)](
-                                    Scene& scene, std::uint32_t meshIndex, const ce::physics::triangle_mesh_source& source)
-                                    -> ce::physics::result<ce::physics::geometry_asset_key> {
-                                    const auto current = expectedProject.lock();
-                                    if (!current || current != SceneManagers->ProjectLayers() || assetRoot != PathFinder::Relative() ||
-                                        SceneManagers->IsPlayCommitted() || meshIndex >= meshes.size())
-                                        return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0,
-                                            "Model collision authoring project changed or Play is active"});
-
-                                    return PublishModelCollisionGeometry(scene, assetRoot, model, meshes[meshIndex], source);
-                                };
-                            }
-
-                            request->prepared = ModelSceneInstantiation::PendingInstance::Prepare(
-                                std::move(generation), options);
-                            if (!request->prepared) request->error = "Model preparation failed: " + request->path;
-                        }
+                        request->error = "Model asset preparation failed: " + request->path;
                     }
                 }
-                catch (const std::exception& error) { request->error = error.what(); }
-                catch (...) { request->error = "Unexpected model preparation failure"; }
-                request->prepareMs = std::chrono::duration<double, std::milli>(
-                    std::chrono::steady_clock::now() - prepareStart).count();
-                request->ready.store(true, std::memory_order_release);
+                else if (!request->cancelled.load(std::memory_order_acquire))
+                {
+                    ModelSceneInstantiation::Options options;
+                    options.createMeshCollider = DataSystems->ReadModelCreateMeshCollider(
+                        FileGuid(generation->Identity().modelId));
+                    if (options.createMeshCollider)
+                    {
+                        const auto assetRoot = request->assetRoot;
+                        const auto expectedProject = request->project;
+                        const auto model = generation->Identity().modelId;
+                        std::vector<Uuid::Uuid16> meshes;
+                        for (const auto& mesh : generation->Meshes())
+                        {
+                            meshes.push_back(mesh.meshId);
+                        }
+                        options.collisionGeometry = [assetRoot, expectedProject, model, meshes = std::move(meshes)](
+                            Scene& scene, std::uint32_t meshIndex, const ce::physics::triangle_mesh_source& source)
+                            -> ce::physics::result<ce::physics::geometry_asset_key>
+                        {
+                            const auto current = expectedProject.lock();
+                            if (!current || current != SceneManagers->ProjectLayers() ||
+                                assetRoot != PathFinder::Relative() || SceneManagers->IsPlayCommitted() ||
+                                meshIndex >= meshes.size())
+                            {
+                                return std::unexpected(ce::physics::error{ce::physics::error_code::wrong_phase, 0,
+                                    "Model collision authoring project changed or Play is active"});
+                            }
+                            return PublishModelCollisionGeometry(scene, assetRoot, model, meshes[meshIndex], source);
+                        };
+                    }
+                    request->prepared = ModelSceneInstantiation::PendingInstance::Prepare(std::move(generation), options);
+                    if (!request->prepared)
+                    {
+                        request->error = "Model preparation failed: " + request->path;
+                    }
+                }
             }
-            if (SUCCEEDED(com)) CoUninitialize();
-        });
+        }
+        catch (const std::exception& error)
+        {
+            request->error = error.what();
+        }
+        catch (...)
+        {
+            request->error = "Unexpected model preparation failure";
+        }
+        if (SUCCEEDED(com))
+        {
+            CoUninitialize();
+        }
+        request->prepareMs = std::chrono::duration<double, std::milli>(
+            std::chrono::steady_clock::now() - prepareStart).count();
+        request->ready.store(true, std::memory_order_release);
     }
 
     void ModelPlacement::Execute(std::uint32_t sceneId, std::string path,
@@ -187,12 +211,49 @@ namespace Editor
         request->project = SceneManagers->ProjectLayers();
         {
             std::lock_guard lock(m_impl->mutex);
-            if (m_impl->stopping) return {};
+            if (m_impl->stopping)
+            {
+                return {};
+            }
             m_impl->incoming.push_back(request);
             m_impl->visible.push_back(request);
-            m_impl->work.push_back(request);
+            m_impl->preparations.push_back(request);
+            try
+            {
+                request->modelPreparation = DataSystems->PrepareModelAssetByPath(request->path);
+                if (!request->modelPreparation)
+                {
+                    request->error = "Cannot queue model asset preparation: " + request->path;
+                    request->ready.store(true, std::memory_order_release);
+                }
+                else
+                {
+                    job_group work;
+                    work.add([request] { Prepare(request); });
+                    std::array<job_handle, 2> dependencies;
+                    std::size_t dependencyCount = 0;
+                    const auto modelWork = DataSystems->ModelPreparationCompletion(request->modelPreparation);
+                    if (modelWork.valid() && !modelWork.is_complete())
+                    {
+                        dependencies[dependencyCount++] = modelWork;
+                    }
+                    // Shared asset preparation deduplicates scene/drop requests.
+                    // Serialize only recipe construction; waiting consumes no worker.
+                    if (m_impl->preparationTail.valid() && !m_impl->preparationTail.is_complete())
+                    {
+                        dependencies[dependencyCount++] = m_impl->preparationTail;
+                    }
+                    request->preparation = ce::get_job_scheduler().submit_after(
+                        std::span<const job_handle>(dependencies.data(), dependencyCount), std::move(work));
+                    m_impl->preparationTail = request->preparation;
+                }
+            }
+            catch (const std::exception& error)
+            {
+                request->error = error.what();
+                request->ready.store(true, std::memory_order_release);
+            }
         }
-        m_impl->wake.notify_one();
         return request;
     }
 
@@ -239,7 +300,15 @@ namespace Editor
                     scene->EndFramePass();
                 }
             }
-            if (!request.finished.exchange(true, std::memory_order_acq_rel)) ++state.cancelled;
+            if (request.ready.load(std::memory_order_acquire))
+            {
+                request.prepared.reset();
+                request.modelPreparation.reset();
+            }
+            if (!request.finished.exchange(true, std::memory_order_acq_rel))
+            {
+                ++state.cancelled;
+            }
         };
         for (const auto& request : cancellations) cleanup(*request);
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(2);
@@ -253,20 +322,53 @@ namespace Editor
             if (request->cancelled.load(std::memory_order_acquire)) { cleanup(*request); continue; }
             if (!request->ready.load(std::memory_order_acquire))
             {
-                ++request->loadingFrames;
-                continue;
+                if (!request->preparation.is_complete())
+                {
+                    ++request->loadingFrames;
+                    continue;
+                }
+                // A scheduler dispatch failure can complete without entering Prepare.
+                // Poll only: the presentation/game loop never waits for unfinished work.
+                if (!request->ready.load(std::memory_order_acquire))
+                {
+                    std::string assetError;
+                    (void)DataSystems->ReadPreparedModel(request->modelPreparation, assetError);
+                    request->error = assetError.empty()
+                        ? "Model preparation job completed without a result" : std::move(assetError);
+                    request->ready.store(true, std::memory_order_release);
+                }
             }
             if (!request->prepared)
             {
                 Debug::PrintLog(spdlog::level::err, request->error);
                 ++state.failed;
+                request->modelPreparation.reset();
                 request->finished.store(true, std::memory_order_release);
                 continue;
             }
             // 전체 요청에 2ms를 배정하고 한 프레임에는 한 인스턴스만 진행한다.
             if (advanced || std::chrono::steady_clock::now() >= deadline) continue;
             advanced = true;
+            if (!request->modelPublished)
+            {
+                std::string error;
+                if (!DataSystems->PublishPreparedModel(request->modelPreparation, error))
+                {
+                    Debug::PrintLog(spdlog::level::err, error);
+                    ++state.failed;
+                    request->prepared.reset();
+                    request->modelPreparation.reset();
+                    request->finished.store(true, std::memory_order_release);
+                    continue;
+                }
+                request->modelPublished = true;
+                request->modelPreparation.reset();
+            }
             request->totalSteps.store(request->prepared->TotalSteps(), std::memory_order_relaxed);
+            if (std::chrono::steady_clock::now() >= deadline)
+            {
+                continue;
+            }
             ModelSceneInstantiation::PendingInstance::Status result;
             const auto applyStart = std::chrono::steady_clock::now();
             try
@@ -311,6 +413,44 @@ namespace Editor
         std::erase_if(state.pending, [](const auto& request) { return request->finished.load(std::memory_order_acquire); });
         std::lock_guard lock(state.mutex);
         std::erase_if(state.visible, [](const auto& request) { return request->finished.load(std::memory_order_acquire); });
+        std::erase_if(state.preparations, [](const auto& request)
+        {
+            if (!request->preparation.is_complete())
+            {
+                return false;
+            }
+            if (request->cancelled.load(std::memory_order_acquire))
+            {
+                // Cancellation may have removed the visible request before its
+                // worker published ready. Do not retain its recipe in undo history.
+                request->prepared.reset();
+                request->modelPreparation.reset();
+            }
+            return true;
+        });
+    }
+
+    ModelPlacement::Progress ModelPlacement::GetProgress() const
+    {
+        Progress progress;
+        std::lock_guard lock(m_impl->mutex);
+        for (const auto& request : m_impl->visible)
+        {
+            if (request->cancelled.load(std::memory_order_acquire) ||
+                request->finished.load(std::memory_order_acquire))
+            {
+                continue;
+            }
+            ++progress.activeRequests;
+            if (progress.activeRequests == 1)
+            {
+                progress.path = request->path;
+                progress.totalSteps = request->totalSteps.load(std::memory_order_relaxed);
+                progress.completedSteps = std::min(progress.totalSteps,
+                    request->completedSteps.load(std::memory_order_relaxed));
+            }
+        }
+        return progress;
     }
 
     // PHASE 21 M4 3단계: 프레임은 셸이 연다. 큐가 비면 창 자체가 존재하지
@@ -344,19 +484,47 @@ namespace Editor
         m_statusBody.reset();
 
         auto& state = *m_impl;
+        std::vector<std::shared_ptr<Request>> preparations;
         {
             std::lock_guard lock(state.mutex);
-            if (state.stopping) return;
+            if (state.stopping)
+            {
+                return;
+            }
             state.stopping = true;
-            for (const auto& request : state.visible) request->cancelled.store(true, std::memory_order_release);
-            state.work.clear();
+            for (const auto& request : state.visible)
+            {
+                request->cancelled.store(true, std::memory_order_release);
+            }
+            preparations = state.preparations;
+            for (const auto& request : preparations)
+            {
+                request->cancelled.store(true, std::memory_order_release);
+            }
         }
-        state.wake.notify_all();
-        if (state.worker.joinable()) state.worker.join();
+        // Lifecycle-only drain, outside the queue lock. Even requests removed from
+        // the visible list must finish before DataSystem and its caches disappear.
+        for (const auto& request : preparations)
+        {
+            try
+            {
+                request->preparation.wait();
+            }
+            catch (const std::exception& error)
+            {
+                Debug::PrintLog(spdlog::level::err, error.what());
+            }
+            catch (...)
+            {
+                Debug::PrintLog(spdlog::level::err, "Model preparation job failed during shutdown");
+            }
+        }
         Tick(); // presentation has stopped; scenes and DataSystem are still alive.
         std::lock_guard lock(state.mutex);
         state.pending.clear();
         state.visible.clear();
+        state.preparations.clear();
+        state.preparationTail = {};
     }
 
     void ModelPlacement::PrintStatus() const

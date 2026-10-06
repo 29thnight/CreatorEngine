@@ -254,6 +254,7 @@ namespace CommandCore
             { "scene.flag", CommandCost::Immediate, "[<dirtytraversal|bonecache> [0|1]]", "씬 진단 플래그를 읽거나 바꾼다(인자 없으면 전부 조회)", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.hierarchycheck", CommandCost::Frames, "", "씬 계층의 불변식을 전수 점검한다(고아·쌍불일치·순회미도달)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "scene.load", CommandCost::Long, "<경로>", "씬을 로드한다(활성 씬은 그대로)", CommandClass::EngineService, CommandLiveness::Live },
+            { "scene.open_async", CommandCost::Immediate, "<path>", "Queue scene CPU preparation and activate at the owner boundary; success means queued, not ready", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.loadjobs", CommandCost::Long, "<fixture-directory> <model-path>", "씬 job 로드·중복·DDOL·종료 회귀(격리 프로세스)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "scene.navigate", CommandCost::Immediate, "<back|forward>", "Navigate entity selection history", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "direction", true },
             { "scene.new", CommandCost::Frames, "[이름]", "빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)", CommandClass::EngineService, CommandLiveness::Live },

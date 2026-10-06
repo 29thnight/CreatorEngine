@@ -232,5 +232,111 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     for (std::size_t index = 1; index < jobs.size(); ++index)
         check(jobs[index].get() == shared, "Concurrent GUID loads observe one owner");
     check(loads == 1, "Concurrent cold load executes one candidate loader");
+
+    // Split preparation is private until the owning publication boundary. A
+    // scene request and a placement request share one same-revision loader.
+    GenerationStore staged;
+    const GenerationLoader originalSnapshot = [first](CookedProgram& product, std::string& failure)
+    {
+        failure.clear();
+        product = first->cooked;
+        return true;
+    };
+    const auto accepted = staged.Load(graphId, originalSnapshot, false, error);
+    check(accepted && staged.Current(graphId) == accepted, "Seed split preparation owner: " + error);
+    const auto replacementRequest = staged.BeginPreparation(graphId, true, error);
+    const auto sharedRequest = staged.BeginPreparation(graphId, false, error);
+    check(replacementRequest && sharedRequest && staged.Current(graphId) == accepted,
+          "Reload ticket preserves Current and allows same-revision callers to join");
+    std::size_t preparedLoads = 0;
+    bool readCurrentDuringPreparation = false;
+    const GenerationLoader replacementSnapshot = [&](CookedProgram& product, std::string& failure)
+    {
+        ++preparedLoads;
+        // This lookup also guards against restoring the global lock around the
+        // loader: Current must remain callable while expensive work is running.
+        readCurrentDuringPreparation = staged.Current(graphId) == accepted;
+        failure.clear();
+        product = next->cooked;
+        return true;
+    };
+    const auto replacementPrepared = GenerationStore::Prepare(replacementRequest, replacementSnapshot, error);
+    const auto sharedPrepared = GenerationStore::Prepare(sharedRequest, replacementSnapshot, error);
+    check(replacementPrepared && sharedPrepared && preparedLoads == 1 && readCurrentDuringPreparation &&
+              staged.Current(graphId) == accepted,
+          "Shared preparation validates once without publishing or locking out Current: " + error);
+    const auto replacementOwner = staged.Publish(*replacementPrepared, error);
+    check(replacementOwner && replacementOwner != accepted &&
+              replacementOwner->generation > accepted->generation && staged.Current(graphId) == replacementOwner,
+          "Owner publication atomically replaces the complete prepared generation: " + error);
+    check(staged.Publish(*sharedPrepared, error) == replacementOwner &&
+              staged.Load(graphId, replacementSnapshot, false, error) == replacementOwner && preparedLoads == 1,
+          "Repeated publication and clean cache hits retain one owner without another loader");
+
+    const auto invalidatedRequest = staged.BeginPreparation(graphId, true, error);
+    staged.InvalidatePreparation(graphId);
+    const auto invalidatedPrepared = GenerationStore::Prepare(invalidatedRequest, originalSnapshot, error);
+    check(invalidatedPrepared && staged.Current(graphId) == replacementOwner,
+          "Invalidated work can finish privately while the accepted owner remains usable");
+    check(!staged.Publish(*invalidatedPrepared, error) && !error.empty() &&
+              staged.Current(graphId) == replacementOwner,
+          "Completion after invalidation cannot publish or replace Current");
+
+    std::size_t failedLoads = 0;
+    const GenerationLoader failedSnapshot = [&](CookedProgram&, std::string& failure)
+    {
+        ++failedLoads;
+        failure = "Deliberate dirty preparation failure.";
+        return false;
+    };
+    check(!staged.Load(graphId, failedSnapshot, false, error) && failedLoads == 1 && !error.empty() &&
+              staged.Current(graphId) == replacementOwner,
+          "A dirty non-reload cannot return a stale cache hit or erase the accepted owner on failure");
+    const auto retryRequest = staged.BeginPreparation(graphId, false, error);
+    const auto sharedRetryRequest = staged.BeginPreparation(graphId, false, error);
+    std::size_t retryLoads = 0;
+    const GenerationLoader retrySnapshot = [&](CookedProgram& product, std::string& failure)
+    {
+        ++retryLoads;
+        return originalSnapshot(product, failure);
+    };
+    const auto retryPrepared = GenerationStore::Prepare(retryRequest, retrySnapshot, error);
+    const auto sharedRetryPrepared = GenerationStore::Prepare(sharedRetryRequest, retrySnapshot, error);
+    check(retryPrepared && sharedRetryPrepared && retryLoads == 1 && staged.Current(graphId) == replacementOwner,
+          "Failed dirty preparation permits a fresh shared retry without early publication: " + error);
+    const auto retryOwner = staged.Publish(*retryPrepared, error);
+    check(retryOwner && retryOwner != replacementOwner && retryOwner->generation > replacementOwner->generation &&
+              staged.Publish(*sharedRetryPrepared, error) == retryOwner,
+          "Successful dirty retry accepts one new owner: " + error);
+    check(staged.Load(graphId, failedSnapshot, false, error) == retryOwner && failedLoads == 1 && error.empty(),
+          "Successful publication clears dirty state and restores the cached-read fast path");
+
+    const auto supersededRequest = staged.BeginPreparation(graphId, true, error);
+    const auto latestRequest = staged.BeginPreparation(graphId, true, error);
+    const auto supersededPrepared = GenerationStore::Prepare(supersededRequest, replacementSnapshot, error);
+    check(supersededPrepared && !staged.Publish(*supersededPrepared, error) && !error.empty() &&
+              staged.Current(graphId) == retryOwner,
+          "A newer request rejects an older completion even before the newer request publishes");
+    const auto latestPrepared = GenerationStore::Prepare(latestRequest, originalSnapshot, error);
+    check(latestPrepared && staged.Publish(*latestPrepared, error) == retryOwner,
+          "An unchanged latest payload keeps the accepted owner and completes its dirty revision");
+
+    const auto removedRequest = staged.BeginPreparation(graphId, true, error);
+    staged.Remove(graphId);
+    const auto removedPrepared = GenerationStore::Prepare(removedRequest, replacementSnapshot, error);
+    check(removedPrepared && !staged.Publish(*removedPrepared, error) && !error.empty() && !staged.Current(graphId),
+          "Completion after Remove cannot revive an entry");
+    const auto afterRemove = staged.Load(graphId, originalSnapshot, false, error);
+    check(afterRemove && afterRemove->generation > retryOwner->generation,
+          "A fresh load after Remove reserves a new generation number: " + error);
+    const auto clearedRequest = staged.BeginPreparation(graphId, true, error);
+    staged.Clear();
+    const auto clearedPrepared = GenerationStore::Prepare(clearedRequest, replacementSnapshot, error);
+    check(clearedPrepared && !staged.Publish(*clearedPrepared, error) && !error.empty() && !staged.Current(graphId),
+          "Completion after Clear cannot revive an entry");
+    const auto afterClear = staged.Load(graphId, originalSnapshot, false, error);
+    check(afterClear && afterClear->generation > afterRemove->generation &&
+              accepted->cooked.metadata == first->cooked.metadata,
+          "Clear preserves retained immutable owners and never reuses a generation number: " + error);
     std::cout << "LX_MATERIAL_RUNTIME_OK checks=" << checks << " concurrentLoads=8\n";
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include "Windows/EditorWindowBody.h"
 #include <memory>
@@ -27,6 +28,17 @@ namespace Editor
         void PrintStatus() const;
         bool IsIdle() const;
 
+        struct Progress
+        {
+            std::size_t activeRequests{};
+            std::size_t completedSteps{};
+            std::size_t totalSteps{};
+            std::string path;
+        };
+        // Counts describe the oldest active model's scene-instantiation steps.
+        // A zero total means preparation has not published a measured denominator.
+        Progress GetProgress() const;
+
     private:
         struct Request;
         struct Impl;
@@ -36,6 +48,7 @@ namespace Editor
         std::shared_ptr<Request> Enqueue(std::uint32_t sceneId, const std::string& path,
             const std::optional<math::vector3>& position, bool gameMode);
         void Cancel(const std::shared_ptr<Request>& request);
+        static void Prepare(const std::shared_ptr<Request>& request);
         std::unique_ptr<Impl> m_impl;
 
         // 진행 창 본문의 수명(PHASE 21 W3). 본문은 `Get()` 으로 다시

@@ -111,6 +111,30 @@ public:
 	AssetBundleLoadResult LoadAssetBundle(const AssetBundle& bundle);
 	// Nonblocking submission; the handle owns all copied asset paths.
 	job_handle LoadAssetBundleAsync(const AssetBundle& bundle);
+    // CPU preparation uses the common scheduler. Poll/publish only at the scene
+    // owner boundary; GPU upload/readiness remains owned by the renderer.
+    struct PreparedRuntimeAsset;
+    using ModelPreparation = std::shared_ptr<PreparedRuntimeAsset>;
+    ModelPreparation PrepareModelAssetByPath(std::string_view path);
+    job_handle ModelPreparationCompletion(const ModelPreparation& preparation) const;
+    assets::ModelAssetGeneration::Shared ReadPreparedModel(
+        const ModelPreparation& preparation, std::string& error) const;
+    bool PublishPreparedModel(const ModelPreparation& preparation, std::string& error);
+    struct SceneAssetPreparation;
+    struct AssetPreparationProgress
+    {
+        std::size_t activeRequests{};
+        std::size_t completed{};
+        std::size_t total{}; // CPU preparation items in this stage; zero during discovery.
+        std::string phase;
+        std::string name;
+    };
+    std::shared_ptr<SceneAssetPreparation> PrepareSceneAssets(
+        const Authoring::ReadNode& root, const AssetBundle& bundle, const file::path& scene);
+    bool PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& preparation,
+        bool wait, bool publish, std::string& error);
+    void CancelSceneAssets(const std::shared_ptr<SceneAssetPreparation>& preparation);
+    [[nodiscard]] AssetPreparationProgress SnapshotAssetPreparationProgress() const;
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
 	[[nodiscard]] size_t SnapshotRetainedAssetCount() const;
@@ -257,16 +281,17 @@ public:
                                                                                   bool reload = false);
     std::shared_ptr<const material_graph::Generation> ResolveMaterialGraphGeneration(FileGuid guid) const;
     file::path GetMaterialGraphSourcePath(FileGuid guid) const;
-    // Scene-open material warm-up (authoring only). Compiles the graphs this scene
-    // loaded last time on worker threads into the on-disk compile cache, so the
-    // entity pass that follows only reads caches. It also starts recording the graphs
-    // loaded until CommitSceneMaterials, which saves them for the next open.
+    // Explicit synchronous warm-up retains verified graph generations, so later
+    // entity loads consume the prepared owners without a second cache decode.
+    // Historical lists are hints here; PrepareSceneAssets discovers current
+    // dependencies for the normal asynchronous editor path.
     void PrewarmSceneMaterials(const file::path& scene);
     void CommitSceneMaterials(const file::path& scene);
     bool ConfigureModelMaterialGraph(Material& material, const assets::ModelAssetGeneration& model,
                                       const assets::ModelMaterialAsset& source, std::string& error);
     bool ConfigureMaterialGraph(Material& material, const material_graph::InstanceDescription& description,
-                                 std::string& error, bool reload = false);
+                                 std::string& error, bool reload = false,
+                                 const assets::ModelAssetGeneration* model = nullptr);
     bool ConfigureMaterialGraphAuthoring(Material& material, const LX::LXMaterialAsset& asset,
                                          const material_graph::InstanceDescription& description, std::string& error);
     std::shared_ptr<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
@@ -336,9 +361,24 @@ public:
 	std::atomic<std::uint64_t> m_generationLoadFailed{ 0 };
 
 private:
+    std::shared_ptr<PreparedRuntimeAsset> PrepareRuntimeAsset(
+        FileGuid guid, const file::path& path, RuntimeAssetType type);
+    bool PublishRuntimeAsset(const std::shared_ptr<PreparedRuntimeAsset>& asset, std::string& error);
+    void DrainAssetPreparations();
+    bool ValidatePreparedMaterialTextures(Material& material, std::string& error);
+    std::vector<assets::ModelAssetGeneration::Shared> SnapshotPreparedModelAssets() const;
+    mutable std::mutex m_assetPreparationMutex;
+    std::map<FileGuid, std::weak_ptr<PreparedRuntimeAsset>> m_assetPreparations;
+    std::vector<std::weak_ptr<SceneAssetPreparation>> m_sceneAssetPreparations;
+    std::vector<std::shared_ptr<PreparedRuntimeAsset>> m_retiredAssetPreparations;
+    std::vector<job_handle> m_assetPreparationLanes;
+    std::size_t m_nextAssetPreparationLane{};
+    std::uint64_t m_assetPreparationEpoch{ 1 };
+    bool m_assetPreparationStopping{};
+    std::size_t m_assetInvalidationDepth{};
 	void LoadAssetCatalog(const file::path& root);
 	[[nodiscard]] assets::ModelAssetGeneration::Shared LoadAndPublishModelAssetGeneration(
-		FileGuid guid, bool allowEditorRecovery = false);
+		FileGuid guid, bool allowEditorRecovery = false, bool publish = true);
 	DataContainer<Texture>& TextureCacheFor(TextureFileType type);
 	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
 		FileGuid guid, bool remove);
