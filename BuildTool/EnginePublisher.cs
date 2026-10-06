@@ -21,7 +21,7 @@ internal static class EnginePublisher
             var installation = (await context.Run(vswhere, ["-latest", "-products", "*", "-requires", "Microsoft.Component.MSBuild", "-property", "installationPath"], echo: false)).Output.Trim();
             var msbuild = Path.Combine(installation, "MSBuild/Current/Bin/amd64/MSBuild.exe");
             // Build individual native hosts; never overwrite the currently running build tool.
-            foreach (var project in new[] { "Editor/CreatorEditor.vcxproj", "Player/Player.vcxproj", "Tools/AssetCooker/AssetCooker.vcxproj", "Tools/AssetPacker/AssetPacker.vcxproj" })
+            foreach (var project in new[] { "Editor/CreatorEditor.vcxproj", "Player/Player.vcxproj", "Tools/AssetCooker/AssetCooker.vcxproj", "Tools/AssetPacker/AssetPacker.vcxproj", "Tools/ProfilerViewer/ProfilerViewer.vcxproj" })
             {
                 var arguments = new List<string> { Path.Combine(repository, project), "/m", "/t:Build", $"/p:Configuration={config}", "/p:Platform=x64", "/nologo", "/verbosity:minimal" };
                 if (shipping && project.StartsWith("Player/")) arguments.Add("/p:EngineShipping=true");
@@ -74,6 +74,40 @@ internal static class EnginePublisher
                 }
                 Copy(recordPath, Paths.Child(binaryTarget, $"Runtime/Manifests/{name}.json")); hosts[name] = abi.DeepClone();
             }
+            // ProfilerViewer is a real standalone application, not an engine
+            // runtime host. Its bounded deployment record contains only its
+            // native import closure and the shared Editor fonts/licenses.
+            var viewerRoot = Path.Combine(binarySource, "Tools/ProfilerViewer");
+            var viewerRecordPath = Path.Combine(viewerRoot, "deployment.json");
+            var viewerRecord = Metadata.Read(viewerRecordPath);
+            var viewerEntries = Metadata.ParseEntries(viewerRecord.Array("entries"));
+            if (viewerRecord.Int("schemaVersion") != 1 || viewerRecord.Text("tool") != "ProfilerViewer" ||
+                viewerRecord.Text("configuration") != config || viewerRecord.Text("version") != version ||
+                Metadata.Digest(viewerEntries) != viewerRecord.Text("digest"))
+            {
+                throw new BuildException("Invalid ProfilerViewer build record. Rebuild Tools/ProfilerViewer/ProfilerViewer.vcxproj.");
+            }
+            Metadata.Verify(binarySource, viewerEntries, context.Cancellation);
+            var viewerPaths = viewerEntries.Select(entry => entry.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var required in new[] { "ProfilerViewer.exe", "Resources/Fonts/Inter-Regular.ttf", "Resources/Fonts/MaterialSymbolsOutlined-Editor.ttf", "Resources/Fonts/LICENSE-Inter.txt", "Resources/Fonts/LICENSE-MaterialSymbols.txt" })
+            {
+                if (!viewerPaths.Contains("Tools/ProfilerViewer/" + required))
+                {
+                    throw new BuildException($"ProfilerViewer deployment record is incomplete: {required}");
+                }
+            }
+            var viewerVersion = FileVersionInfo.GetVersionInfo(Path.Combine(viewerRoot, "ProfilerViewer.exe"));
+            if (viewerVersion.FileVersion != version || viewerVersion.ProductVersion != version)
+            {
+                throw new BuildException("ProfilerViewer version differs from the requested distribution. Rebuild the tool.");
+            }
+            foreach (var entry in viewerEntries)
+            {
+                var file = Paths.Child(binarySource, entry.Path);
+                Paths.AssertChild(file, viewerRoot);
+                Copy(file, Paths.Child(binaryTarget, entry.Path));
+            }
+            Copy(viewerRecordPath, Paths.Child(binaryTarget, "Tools/ProfilerViewer/deployment.json"));
             var api = hosts["Player"]!.Int("scriptApi");
             var expected = Regex.Match(File.ReadAllText(Path.Combine(repository, "ScriptCore/Native.cs")), @"ExpectedVersion\s*=\s*(\d+)");
             if (!expected.Success || int.Parse(expected.Groups[1].Value) != api || hosts.Any(h => h.Value!.Int("scriptApi") != api))

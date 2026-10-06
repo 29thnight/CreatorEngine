@@ -156,12 +156,12 @@
     <ReflgenAttributeHeaders>$(MSBuildThisFileDirectory)Engine\Utility_Framework\ReflgenAttributes.h</ReflgenAttributeHeaders>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Physics' or '$(MSBuildProjectName)' == 'EngineDiagnostics' or '$(MSBuildProjectName)' == 'DxCaptureHelper'">
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Physics' or '$(MSBuildProjectName)' == 'EngineDiagnostics' or '$(MSBuildProjectName)' == 'DxCaptureHelper' or '$(MSBuildProjectName)' == 'ProfilerViewer'">
     <ReflgenRegistration>false</ReflgenRegistration>
     <ReflgenRegistrationHeaders />
     <ReflgenAttributeHeaders />
   </PropertyGroup>
-  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'Physics' and '$(MSBuildProjectName)' != 'EngineDiagnostics' and '$(MSBuildProjectName)' != 'DxCaptureHelper'">
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'Physics' and '$(MSBuildProjectName)' != 'EngineDiagnostics' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer'">
     <!-- [[reflgen::reflect]] 타입을 가진 모듈 — header 를 ClInclude 로 가진 프로젝트가 생성한다. -->
     <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\RenderEngine\RenderEngine.vcxproj" />
     <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\SceneRuntime\SceneRuntime.vcxproj" />
@@ -176,7 +176,7 @@
       <AdditionalIncludeDirectories>$(_EngineVcpkgInstalledDir)$(_EngineVcpkgTriplet)\include\physx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
-  <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and Exists('$(EngineReflgenTargets)')" />
+  <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and Exists('$(EngineReflgenTargets)')" />
 
   <!--
     vcpkg 의 MSBuild 통합은 vcpkg.json·vcpkg-configuration.json 이 바뀔 때만 다시 설치한다 — overlay port 만 바꾸면
@@ -204,7 +204,7 @@
   <Target Name="_EngineRequireReflgen"
           BeforeTargets="ClCompile"
           DependsOnTargets="$(_EngineRequireReflgenAfter)"
-          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(ReflgenTargetsImported)' != 'true' and '$(DesignTimeBuild)' != 'true'">
+          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(ReflgenTargetsImported)' != 'true' and '$(DesignTimeBuild)' != 'true'">
     <Error Condition="Exists('$(EngineReflgenTargets)')"
            Text="reflgen was installed by vcpkg during this build, after its MSBuild targets could be imported. Build again (once per environment)." />
     <Error Condition="!Exists('$(EngineReflgenTargets)')"
@@ -277,6 +277,16 @@
           DestinationFolder="$(EngineResourceOutDir)Fonts\%(RecursiveDir)"
           SkipUnchangedFiles="true" />
   </Target>
+
+  <!-- The Editor launches a separate tool; build it without linking its objects
+       or introducing a reverse Editor dependency into the viewer. -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'CreatorEditor' and '$(EngineShipping)' != 'true' and '$(Platform)' == 'x64'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)Tools\ProfilerViewer\ProfilerViewer.vcxproj">
+      <Project>{43682393-1675-4CBA-96BB-9315169E8421}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
 
   <!-- Development is independent of optimization: Release Player still records
        native source symbols. Preserve other projects' explicit debug policies

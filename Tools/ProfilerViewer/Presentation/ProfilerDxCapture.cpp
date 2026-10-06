@@ -1,11 +1,16 @@
 #include "ProfilerView.h"
-#include "DxCaptureService.h"
+#include "DxCaptureFile.h"
+#include "ProfilerViewerClient.h"
 #include "ImGui.h"
 
 #include <algorithm>
 #include <cinttypes>
 #include <cmath>
 #include <limits>
+#include <atomic>
+#include <exception>
+#include <memory>
+#include <utility>
 
 namespace editor::profiler_view
 {
@@ -167,56 +172,267 @@ namespace editor::profiler_view
         }
     }
 
+    namespace
+    {
+        struct dx_operation
+        {
+            std::atomic_bool done{ false };
+            std::atomic_bool canceled{ false };
+            ce::profiler_viewer::source_artifact_ptr artifact;
+            ce::dx_capture::recording_snapshot_ptr capture;
+            std::filesystem::path path;
+            std::filesystem::path destination;
+            bool show = true;
+            std::string error = "DX file operation was not accepted by the worker";
+        };
+
+        struct dx_admission
+        {
+            explicit dx_admission(std::shared_ptr<dx_operation> operation) : operation(std::move(operation)) {}
+            ~dx_admission()
+            {
+                if (!started.load(std::memory_order_acquire))
+                {
+                    operation->done.store(true, std::memory_order_release);
+                }
+            }
+            std::shared_ptr<dx_operation> operation;
+            std::atomic_bool started{ false };
+        };
+
+        struct dx_view_state
+        {
+            std::shared_ptr<dx_operation> operation;
+            ce::dx_capture::recording_snapshot_ptr capture;
+            ce::profiler_viewer::source_artifact_ptr seen_source;
+            std::filesystem::path path;
+            std::filesystem::path destination;
+            bool requested = false;
+            std::uint64_t start_command_revision = 0;
+            bool start_acknowledged = false;
+            bool show_remote = false;
+            std::string message;
+        };
+
+        dx_view_state view;
+
+        void begin_open(const std::filesystem::path& path,
+                        ce::profiler_viewer::source_artifact_ptr artifact = {},
+                        const std::filesystem::path& destination = {}, bool show = true)
+        {
+            if (view.operation || path.empty())
+            {
+                return;
+            }
+            auto operation = std::make_shared<dx_operation>();
+            operation->path = path;
+            operation->destination = destination;
+            operation->artifact = std::move(artifact);
+            operation->show = show;
+            view.operation = operation;
+            view.message.clear();
+            try
+            {
+                const auto admission = std::make_shared<dx_admission>(operation);
+                dispatch_work([operation, admission]
+                {
+                    admission->started.store(true, std::memory_order_release);
+                    operation->error.clear();
+                    try
+                    {
+                        if (!operation->artifact)
+                        {
+                            const auto artifact = ce::profiler_viewer::open_source_artifact(operation->path);
+                            if (!artifact)
+                            {
+                                operation->error = "Open failed: " + artifact.error();
+                                operation->done.store(true, std::memory_order_release);
+                                return;
+                            }
+                            operation->artifact = *artifact;
+                        }
+                        const auto loaded = ce::dx_capture::read_recording(operation->artifact->path());
+                        if (!loaded)
+                        {
+                            operation->error = std::string("Open failed: ") + ce::dx_capture::describe(loaded.error());
+                        }
+                        else
+                        {
+                            operation->capture = *loaded;
+                            if (!operation->destination.empty() && !operation->canceled.load(std::memory_order_acquire))
+                            {
+                                copy_dx_capture_file(operation->artifact->path(), operation->destination, operation->error);
+                            }
+                        }
+                    }
+                    catch (const std::exception& error)
+                    {
+                        operation->error = error.what();
+                    }
+                    catch (...)
+                    {
+                        operation->error = "Unexpected DX file worker error";
+                    }
+                    operation->done.store(true, std::memory_order_release);
+                });
+            }
+            catch (const std::exception& error)
+            {
+                view.message = error.what();
+                view.operation.reset();
+            }
+        }
+    }
+
+    void open_dx_capture(const std::filesystem::path& path)
+    {
+        if (path.empty() || view.operation)
+        {
+            return;
+        }
+        view.show_remote = false;
+        begin_open(path);
+    }
+
+    void shutdown_dx_capture()
+    {
+        if (view.operation)
+        {
+            view.operation->canceled.store(true, std::memory_order_release);
+        }
+        view = {};
+    }
+
+    void poll_dx_capture()
+    {
+        if (view.operation && view.operation->done.load(std::memory_order_acquire))
+        {
+            const auto operation = std::exchange(view.operation, {});
+            if (!operation->canceled.load(std::memory_order_acquire))
+            {
+                view.message = operation->error;
+                if (operation->capture && operation->show)
+                {
+                    view.capture = operation->capture;
+                    view.path = operation->destination.empty() ? operation->path : operation->destination;
+                }
+                if (operation->error.empty())
+                {
+                    view.message = operation->destination.empty() ? "Capture opened" : "DX capture exported";
+                }
+            }
+        }
+        const auto remote = source().snapshot();
+        if (remote->dx_source && remote->dx_source != view.seen_source && !view.operation)
+        {
+            view.seen_source = remote->dx_source;
+            const auto destination = view.requested ? view.destination : std::filesystem::path{};
+            const bool show = view.requested && view.show_remote;
+            view.requested = false;
+            view.destination.clear();
+            // A newly attached viewer can inspect the target's last completed DX
+            // capture, but a user's explicit file selection is never overwritten.
+            if (show || !destination.empty() || !view.capture)
+            {
+                begin_open(remote->dx_source->path(), remote->dx_source, destination, show || !view.capture);
+            }
+        }
+        if (view.requested && !view.start_acknowledged &&
+            remote->command_revision > view.start_command_revision &&
+            remote->last_command == ce::profiler_viewer::command::start_dx)
+        {
+            view.start_acknowledged = true;
+            if (!remote->command_accepted)
+            {
+                view.requested = false;
+                view.destination.clear();
+                view.message = remote->command_message.empty() ? "The target rejected DX capture" : remote->command_message;
+            }
+        }
+        if (view.requested && view.start_acknowledged && !remote->dx_status.busy &&
+            !remote->dx_status.recording.finalized && remote->dx_status.recording.record_count == 0 &&
+            remote->dx_source == view.seen_source)
+        {
+            view.requested = false;
+            view.destination.clear();
+            view.message = remote->dx_status.message.empty() ? "DX capture completed without an artifact" : remote->dx_status.message;
+        }
+        if (!remote->connected && view.requested)
+        {
+            view.requested = false;
+            view.message = "Target disconnected before a completed DX artifact arrived; no export was made";
+            view.destination.clear();
+        }
+    }
+
     void draw_dx_capture()
     {
         using namespace ce::dx_capture;
-        capture_service& service = deep_capture();
-        const capture_status status = service.status();
+        const auto remote = source().snapshot();
+        const capture_status& status = remote->dx_status;
         ImGui::TextWrapped("DX12 deep capture uses a headless ETW helper. Record for up to 60 seconds into a new .cedx file.");
         ImGui::TextWrapped("This version only runs an ordinary-privilege helper. Automatic and manual elevation are blocked pending decoder security validation.");
-        ImGui::BeginDisabled(status.busy);
         ImGui::TextDisabled("If existing ETW permissions are insufficient, deep capture reports unavailable.");
-#if CE_DX_TIMING_CAPTURE && !CE_SHIPPING
+        ImGui::BeginDisabled(!remote->connected || remote->command_pending || !remote->dx_available || status.busy || view.operation || view.requested);
         if (ImGui::Button("Start DX12 Deep Capture"))
         {
-            auto path = pick_dx_capture_to_save();
+            const auto path = pick_dx_capture_to_save();
             if (!path.empty())
             {
-                if (path.extension().empty())
+                if (source().request(ce::profiler_viewer::command::start_dx))
                 {
-                    path.replace_extension(L".cedx");
+                    view.destination = path;
+                    view.requested = true;
+                    view.start_acknowledged = false;
+                    view.start_command_revision = remote->command_revision;
+                    view.show_remote = true;
+                    view.seen_source = remote->dx_source;
+                    view.message = "Waiting for target capture; the viewer will export the completed artifact";
                 }
-                service.start(path, false);
-            }
-        }
-#else
-        ImGui::TextDisabled("Live capture is disabled in this build (EngineDxDeepCapture). Offline viewing is available.");
-#endif
-        ImGui::SameLine();
-        if (ImGui::Button("Open .cedx"))
-        {
-            const auto path = pick_dx_capture_to_open();
-            if (!path.empty())
-            {
-                service.open(path);
+                else
+                {
+                    view.message = "Start was not sent: target disconnected or command queue full";
+                }
             }
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
-        ImGui::BeginDisabled(!status.busy || status.opening);
+        ImGui::BeginDisabled(static_cast<bool>(view.operation));
+        if (ImGui::Button("Open .cedx"))
+        {
+            open_dx_capture(pick_dx_capture_to_open());
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::BeginDisabled(!remote->connected || remote->command_pending || !status.busy || status.opening);
         if (ImGui::Button("Stop Deep Capture"))
         {
-            service.request_stop();
+            if (!source().request(ce::profiler_viewer::command::stop_dx))
+            {
+                view.message = "Stop was not sent: target disconnected or command queue full";
+            }
         }
         ImGui::EndDisabled();
         ImGui::TextWrapped("%s", status.message.c_str());
-        const auto filename = status.path.filename().u8string();
+        if (!view.message.empty())
+        {
+            ImGui::TextWrapped("%s", view.message.c_str());
+        }
+        if (view.operation)
+        {
+            ImGui::TextDisabled("Opening / exporting DX capture...");
+        }
+        const auto filename = view.path.filename().u8string();
         const std::string path_text(filename.begin(), filename.end());
-        ImGui::Text("File: %s | records %u | helper error %u | transport drops %" PRIu64,
-                    path_text.c_str(), status.recording.record_count, status.process.win32_error,
-                    status.process.dropped_records);
+        ImGui::Text("File: %s | records %u", path_text.c_str(),
+                    view.capture ? view.capture->summary().record_count : 0);
+        if (remote->target.connection.target_pid)
+        {
+            ImGui::TextDisabled("Target helper: error %u | transport drops %" PRIu64,
+                status.process.win32_error, status.process.dropped_records);
+        }
         ImGui::TextDisabled("PIX scope decoding, PSO/residency, CPU context switches and Vulkan are outside this capture mode.");
-        const recording_snapshot_ptr capture = service.snapshot();
+        const recording_snapshot_ptr capture = view.capture;
         if (!capture)
         {
             return;

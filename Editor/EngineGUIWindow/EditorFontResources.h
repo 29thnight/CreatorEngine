@@ -59,7 +59,11 @@ namespace editor::fonts
     /// 한글 폰트 후보. 맑은 고딕이 없는 설치본(언어 기능 제거)이 있다.
     std::span<const char* const> korean_candidates();
 
-    /// 하위 경로가 있는 후보는 EngineResourcePath 기준, 파일 이름만 있으면
+    /// Hosts supply their deployed resource root before loading fonts. This is
+    /// independent of the engine, its project, and the process working directory.
+    void set_resource_root(const std::filesystem::path& root);
+
+    /// 하위 경로가 있는 후보는 host resource root 기준, 파일 이름만 있으면
     /// OS가 알려 준 Windows Fonts 기준이다. 실행 작업 디렉터리에 의존하지 않는다.
     std::filesystem::path expand_font_candidate(const char* candidate);
 

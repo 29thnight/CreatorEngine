@@ -141,6 +141,13 @@ namespace ce
         std::uint64_t  late_events_dropped = 0;
     };
 
+    struct profiler_recording_publication
+    {
+        ce::recording_status status;
+        std::filesystem::path path;
+        std::uint64_t writer_id = 0;
+    };
+
     // 한 프로세스에 동시에 살 수 있는 서비스 수. 라이브 하나 + 검사용 하나면
     // 충분하지만, 상수를 빠듯하게 잡아 두면 나중에 조용히 덮어쓴다.
     inline constexpr std::uint32_t kMaxLiveServices = 4;
@@ -286,8 +293,15 @@ namespace ce
 
         // 얼린 캡처. pause() 뒤에 유효하다.
         capture_session_ptr capture() const;
+        // Snapshot and its collector generation are read under the same lock.
+        // A Clear may advance the current generation before replacing a capture.
+        std::pair<capture_session_ptr, std::uint64_t> capture_publication() const;
+        std::uint64_t capture_generation() const { return m_generation.load(std::memory_order_acquire); }
         ce::recording_status recording_status() const;
         std::filesystem::path recording_path() const;
+        // Writer identity changes only when a new writer is installed. A ring
+        // Clear retains it; state/path/id are sampled under recording_lock_.
+        profiler_recording_publication recording_publication() const;
 
         live_summary summary() const;
 
@@ -487,6 +501,7 @@ namespace ce
         // 파일 쓰기는 별도 worker가 소유한다. 이 잠금은 UI의 짧은 상태/경로 조회만 보호한다.
         mutable std::mutex recording_lock_;
         std::unique_ptr<continuous_capture_writer> recording_writer_;
+        std::uint64_t recording_writer_id_ = 0;
         std::optional<capture_file_error> recording_start_error_;
         std::vector<frame_record> recording_batch_;
         std::size_t recording_batch_bytes_ = 0;
@@ -521,6 +536,7 @@ namespace ce
 
         mutable std::mutex  m_captureLock;
         capture_session_ptr m_capture;
+        std::uint64_t m_captureGeneration = 0;
 
         // 녹화 중 공개. 청한 표식은 아무 스레드나 올리고, 나머지 둘은
         // 수집기만 만진다.

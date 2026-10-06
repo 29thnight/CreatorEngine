@@ -1,6 +1,6 @@
 #include "ProfilerView.h"
 
-#include "MemoryProfilerSnapshot.h"
+#include "ProfilerLiveDiagnostics.h"
 #include "EditorIcons.h"
 #include "ImGui.h"
 
@@ -17,17 +17,19 @@
 
 namespace editor::profiler_view
 {
+	namespace memory_profiler = ce::profiler_viewer::diagnostics;
 	namespace
 	{
 		using memory_profiler::object_entry;
 		using memory_profiler::object_kind;
-		using memory_profiler::snapshot;
+		using snapshot = memory_profiler::memory_snapshot;
 		const char* kind_name(object_kind kind);
 
 		struct memory_view_state
 		{
 			std::vector<std::shared_ptr<const snapshot>> snapshots;
 			std::uint64_t last_seen{};
+			std::uint64_t target_revision{};
 			int selected_a{ -1 };
 			int selected_b{ -1 };
 			char search[128]{};
@@ -43,15 +45,31 @@ namespace editor::profiler_view
 
 		void refresh(memory_view_state& view)
 		{
-			const auto latest = memory_profiler::snapshot_service::instance().latest();
-			if (!latest || latest->serial == view.last_seen) return;
+			const auto target_revision = live_target_revision();
+			if (view.target_revision != target_revision)
+			{
+				view = {};
+				view.target_revision = target_revision;
+			}
+			const auto diagnostics = live_diagnostics();
+			const auto latest = diagnostics ? diagnostics->memory : nullptr;
+			if (!latest || latest->serial == view.last_seen)
+			{
+				return;
+			}
 			view.last_seen = latest->serial;
 			view.snapshots.push_back(latest);
 			if (view.snapshots.size() > 8)
 			{
 				view.snapshots.erase(view.snapshots.begin());
-				if (view.selected_a >= 0) --view.selected_a;
-				if (view.selected_b >= 0) --view.selected_b;
+				if (view.selected_a >= 0)
+				{
+					--view.selected_a;
+				}
+				if (view.selected_b >= 0)
+				{
+					--view.selected_b;
+				}
 			}
 			view.selected_b = view.selected_a;
 			view.selected_a = static_cast<int>(view.snapshots.size()) - 1;
@@ -67,19 +85,33 @@ namespace editor::profiler_view
 		{
 			char preview[64]{};
 			if (const snapshot* current = selected(view, index))
+			{
 				std::snprintf(preview, sizeof(preview), "#%llu · frame %u",
 					static_cast<unsigned long long>(current->serial), current->frame);
-			else std::snprintf(preview, sizeof(preview), "없음");
+			}
+			else
+			{
+				std::snprintf(preview, sizeof(preview), "없음");
+			}
 			ImGui::SetNextItemWidth(220.0f);
-			if (!ImGui::BeginCombo(label, preview)) return;
-			if (allowNone && ImGui::Selectable("비교 안 함", index < 0)) index = -1;
+			if (!ImGui::BeginCombo(label, preview))
+			{
+				return;
+			}
+			if (allowNone && ImGui::Selectable("비교 안 함", index < 0))
+			{
+				index = -1;
+			}
 			for (int i = static_cast<int>(view.snapshots.size()) - 1; i >= 0; --i)
 			{
 				const auto& item = *view.snapshots[i];
 				char option[72]{};
 				std::snprintf(option, sizeof(option), "#%llu · frame %u",
 					static_cast<unsigned long long>(item.serial), item.frame);
-				if (ImGui::Selectable(option, i == index)) index = i;
+				if (ImGui::Selectable(option, i == index))
+				{
+					index = i;
+				}
 			}
 			ImGui::EndCombo();
 		}
@@ -88,12 +120,21 @@ namespace editor::profiler_view
 		{
 			char text[48]{};
 			if (bytes >= 1024ull * 1024ull * 1024ull)
+			{
 				std::snprintf(text, sizeof(text), "%.2f GiB", bytes / 1073741824.0);
+			}
 			else if (bytes >= 1024ull * 1024ull)
+			{
 				std::snprintf(text, sizeof(text), "%.2f MiB", bytes / 1048576.0);
+			}
 			else if (bytes >= 1024ull)
+			{
 				std::snprintf(text, sizeof(text), "%.1f KiB", bytes / 1024.0);
-			else std::snprintf(text, sizeof(text), "%llu B", static_cast<unsigned long long>(bytes));
+			}
+			else
+			{
+				std::snprintf(text, sizeof(text), "%llu B", static_cast<unsigned long long>(bytes));
+			}
 			return text;
 		}
 
@@ -105,17 +146,34 @@ namespace editor::profiler_view
 			ImGui::TableNextColumn();
 			ImGui::TextUnformatted(name);
 			ImGui::TableNextColumn();
-			if (available) ImGui::TextUnformatted(bytes_label(value).c_str());
-			else ImGui::TextDisabled("미계측");
+			if (available)
+			{
+				ImGui::TextUnformatted(bytes_label(value).c_str());
+			}
+			else
+			{
+				ImGui::TextDisabled("미계측");
+			}
 			if (other)
 			{
 				ImGui::TableNextColumn();
-				if (otherAvailable) ImGui::TextUnformatted(bytes_label(otherValue).c_str());
-				else ImGui::TextDisabled("미계측");
+				if (otherAvailable)
+				{
+					ImGui::TextUnformatted(bytes_label(otherValue).c_str());
+				}
+				else
+				{
+					ImGui::TextDisabled("미계측");
+				}
 				ImGui::TableNextColumn();
 				if (available && otherAvailable)
+				{
 					ImGui::Text("%+.2f MiB", (static_cast<double>(value) - otherValue) / 1048576.0);
-				else ImGui::TextDisabled("-");
+				}
+				else
+				{
+					ImGui::TextDisabled("-");
+				}
 			}
 		}
 
@@ -154,22 +212,34 @@ namespace editor::profiler_view
 			ImGui::PushID(id);
 			const ImVec2 at = ImGui::GetCursorScreenPos();
 			const float width = ImGui::GetContentRegionAvail().x;
-			if (width <= 0.0f) { ImGui::PopID(); return; }
+			if (width <= 0.0f)
+			{
+				ImGui::PopID();
+				return;
+			}
 			ImGui::InvisibleButton("##bar", ImVec2(width, kSummaryBarHeight));
 			ImGui::GetWindowDrawList()->AddRectFilled(at, ImVec2(at.x + width, at.y + kSummaryBarHeight),
 				ImGui::GetColorU32(ImGuiCol_FrameBg));
 			float x = at.x;
 			const float mouseX = ImGui::GetMousePos().x;
 			int hoveredPart = -1;
-			if (total > 0) for (std::size_t i = 0; i < parts.size(); ++i)
+			if (total > 0)
 			{
-				const float end = i + 1 == parts.size() ? at.x + width :
-					x + width * static_cast<float>(static_cast<double>(parts[i].bytes) / total);
-				if (end > x)
-					ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(x, at.y),
-						ImVec2((std::max)(x, end - 3.0f), at.y + kSummaryBarHeight), parts[i].color);
-				if (mouseX >= x && mouseX < end) hoveredPart = static_cast<int>(i);
-				x = end;
+				for (std::size_t i = 0; i < parts.size(); ++i)
+				{
+					const float end = i + 1 == parts.size() ? at.x + width :
+						x + width * static_cast<float>(static_cast<double>(parts[i].bytes) / total);
+					if (end > x)
+					{
+						ImGui::GetWindowDrawList()->AddRectFilled(ImVec2(x, at.y),
+							ImVec2((std::max)(x, end - 3.0f), at.y + kSummaryBarHeight), parts[i].color);
+					}
+					if (mouseX >= x && mouseX < end)
+					{
+						hoveredPart = static_cast<int>(i);
+					}
+					x = end;
+				}
 			}
 			ImGui::GetWindowDrawList()->AddRect(at, ImVec2(at.x + width, at.y + kSummaryBarHeight),
 				ImGui::GetColorU32(ImGuiCol_Border));
@@ -215,9 +285,18 @@ namespace editor::profiler_view
 			std::uint64_t budget = 0)
 		{
 			ImGui::TextDisabled("%s", title);
-			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", explanation);
-			if (available) ImGui::TextColored(color, "%s", bytes_label(value).c_str());
-			else ImGui::TextDisabled("미계측");
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("%s", explanation);
+			}
+			if (available)
+			{
+				ImGui::TextColored(color, "%s", bytes_label(value).c_str());
+			}
+			else
+			{
+				ImGui::TextDisabled("미계측");
+			}
 			if (available && budget > 0)
 			{
 				const float fraction = static_cast<float>((std::min)(1.0,
@@ -237,7 +316,10 @@ namespace editor::profiler_view
 						ImGui::TextColored(delta > 0.0 ? ImVec4(0.96f, 0.58f, 0.50f, 1.0f) :
 							ImVec4(0.53f, 0.79f, 0.65f, 1.0f), "A - B %+.2f MiB", delta);
 					}
-					else ImGui::TextDisabled("A - B 미계측");
+					else
+					{
+						ImGui::TextDisabled("A - B 미계측");
+					}
 				}
 				else
 				{
@@ -262,7 +344,10 @@ namespace editor::profiler_view
 
 		bool contains_case_insensitive(const std::string& value, const char* query)
 		{
-			if (!query || !*query) return true;
+			if (!query || !*query)
+			{
+				return true;
+			}
 			return std::search(value.begin(), value.end(), query, query + std::strlen(query),
 				[](char a, char b) { return std::tolower(static_cast<unsigned char>(a)) ==
 					std::tolower(static_cast<unsigned char>(b)); }) != value.end();
@@ -274,7 +359,10 @@ namespace editor::profiler_view
 			{
 				ImGui::TextUnformatted("관리 메모리");
 				ImGui::Separator();
-				if (!a.managed_valid) ImGui::TextDisabled("관리 런타임 값을 수집할 수 없습니다.");
+				if (!a.managed_valid)
+				{
+					ImGui::TextDisabled("관리 런타임 값을 수집할 수 없습니다.");
+				}
 				else
 				{
 					const std::uint64_t fragmented = (std::min)(a.managed_fragmented_bytes, a.managed_heap_bytes);
@@ -283,15 +371,22 @@ namespace editor::profiler_view
 						{ "단편화", fragmented, IM_COL32(231, 199, 85, 255) },
 					}};
 					segmented_bar("ManagedHeap", parts, a.managed_heap_bytes);
-					if (a.managed_heap_bytes == 0) ImGui::TextDisabled("현재 관리 힙이 비어 있습니다.");
+					if (a.managed_heap_bytes == 0)
+					{
+						ImGui::TextDisabled("현재 관리 힙이 비어 있습니다.");
+					}
 					ImGui::TextDisabled("GC 힙 집계입니다. 비단편 힙은 살아 있는 객체 크기와 같지 않습니다.");
 				}
 				if (a.managed_valid)
+				{
 					ImGui::TextDisabled("누적 할당 %s (현재 사용량 아님)",
 						bytes_label(a.managed_total_allocated_bytes).c_str());
+				}
 				if (b && a.managed_valid && b->managed_valid)
+				{
 					ImGui::Text("B 대비 힙 %+.2f MiB",
 						(static_cast<double>(a.managed_heap_bytes) - b->managed_heap_bytes) / 1048576.0);
+				}
 			}
 			end_summary_card();
 		}
@@ -302,22 +397,18 @@ namespace editor::profiler_view
 			{
 				ImGui::TextUnformatted("상위 엔진 객체 범주 · 확인된 CPU 픽셀");
 				ImGui::Separator();
-				std::array<std::uint64_t, 5> counts{};
-				std::array<std::uint64_t, 5> cpuBytes{};
-				for (const object_entry& object : a.objects)
-				{
-					const std::size_t index = static_cast<std::size_t>(object.kind);
-					if (index >= counts.size()) continue;
-					++counts[index];
-					cpuBytes[index] += object.cpu_pixel_bytes;
-				}
+				const auto& counts = a.object_kind_counts;
+				const auto& cpuBytes = a.object_kind_cpu_bytes;
 				const std::array<bar_part, 3> parts{{
 					{ "Texture", cpuBytes[static_cast<std::size_t>(object_kind::texture)], IM_COL32(122, 98, 173, 255) },
 					{ "UI Texture", cpuBytes[static_cast<std::size_t>(object_kind::ui_texture)], IM_COL32(159, 126, 213, 255) },
 					{ "Sprite Sheet", cpuBytes[static_cast<std::size_t>(object_kind::sprite_sheet)], IM_COL32(193, 152, 202, 255) },
 				}};
 				segmented_bar("EngineCpuPixels", parts, a.texture_cpu_pixel_bytes);
-				if (a.texture_cpu_pixel_bytes == 0) ImGui::TextDisabled("보존 중인 CPU 텍스처 픽셀이 없습니다.");
+				if (a.texture_cpu_pixel_bytes == 0)
+				{
+					ImGui::TextDisabled("보존 중인 CPU 텍스처 픽셀이 없습니다.");
+				}
 				ImGui::TextDisabled("모델·재질의 정확한 CPU 크기는 아직 계측하지 않습니다.");
 				ImGui::Separator();
 				if (ImGui::BeginTable("##MemoryObjectCategories", 3,
@@ -332,8 +423,13 @@ namespace editor::profiler_view
 						ImGui::TableNextColumn(); ImGui::Text("%llu", static_cast<unsigned long long>(counts[i]));
 						ImGui::TableNextColumn();
 						if (i >= static_cast<std::size_t>(object_kind::texture))
+						{
 							ImGui::TextUnformatted(bytes_label(cpuBytes[i]).c_str());
-						else ImGui::TextDisabled("미계측");
+						}
+						else
+						{
+							ImGui::TextDisabled("미계측");
+						}
 					}
 					ImGui::EndTable();
 				}
@@ -381,7 +477,10 @@ namespace editor::profiler_view
 				{
 					for (std::size_t i = 0; i < metrics.size(); ++i)
 					{
-						if (i % columns == 0) ImGui::TableNextRow();
+						if (i % columns == 0)
+						{
+							ImGui::TableNextRow();
+						}
 						ImGui::TableNextColumn();
 						const metric& item = metrics[i];
 						metric_tile(item.name, item.explanation, item.value, item.available,
@@ -418,8 +517,9 @@ namespace editor::profiler_view
 			summary_card_gap();
 			draw_overview(a, b);
 			summary_card_gap();
-			ImGui::TextDisabled("자산 캐시 %zu개 · 주소 영역 %zu개 · 수집 %.2f ms",
-				a.objects.size(), a.regions.size(), a.capture_ms);
+			ImGui::TextDisabled("자산 캐시 %llu개 · 주소 영역 %llu개 · 수집 %.2f ms",
+				static_cast<unsigned long long>(a.object_count),
+				static_cast<unsigned long long>(a.region_count), a.capture_ms);
 			if (reader().capture())
 			{
 				summary_card_gap();
@@ -435,34 +535,73 @@ namespace editor::profiler_view
 
 		void draw_objects(const snapshot& a, const snapshot* b, memory_view_state& view)
 		{
+            const auto can_infer_absence = [](const snapshot& value)
+            {
+                return value.object_count == value.objects.size() &&
+                    std::all_of(value.objects.begin(), value.objects.end(),
+                        [](const object_entry& object) { return object.identity_valid; });
+            };
+            const bool complete_a = can_infer_absence(a);
+            const bool complete_b = b && can_infer_absence(*b);
 			ImGui::TextDisabled("CPU 바이트는 캐시에 보관된 텍스처 픽셀만 정확히 셉니다. 모델 업로드량은 GPU 상주량이 아닙니다.");
 			ImGui::InputTextWithHint("##MemoryObjectSearch", "이름 또는 유형 검색", view.search, sizeof(view.search));
-			using object_key = std::pair<object_kind, std::string>;
+			using object_key = memory_profiler::memory_object_key;
 			using compared_object = std::pair<const object_entry*, const object_entry*>;
 			std::map<object_key, compared_object> indexed;
-			for (const object_entry& object : a.objects)
-				indexed[{ object.kind, object.name }].first = &object;
-			if (b) for (const object_entry& object : b->objects)
-				indexed[{ object.kind, object.name }].second = &object;
+			for (std::size_t index = 0; index < a.objects.size(); ++index)
+			{
+				const auto& object = a.objects[index];
+				indexed[memory_profiler::object_comparison_key(object, 1, index)].first = &object;
+			}
+			if (b)
+			{
+				for (std::size_t index = 0; index < b->objects.size(); ++index)
+				{
+					const auto& object = b->objects[index];
+					indexed[memory_profiler::object_comparison_key(object, 2, index)].second = &object;
+				}
+			}
 			std::vector<compared_object> rows;
+			bool identity_unavailable = false;
 			for (const auto& [key, objects] : indexed)
-				if (contains_case_insensitive(key.second, view.search) ||
-					contains_case_insensitive(kind_name(key.first), view.search)) rows.push_back(objects);
+			{
+				const auto* object = objects.first ? objects.first : objects.second;
+				identity_unavailable |= !object->identity_valid;
+				if (contains_case_insensitive(object->name, view.search) ||
+					contains_case_insensitive(kind_name(key.kind), view.search))
+				{
+					rows.push_back(objects);
+				}
+			}
 			const auto bytes = [](const object_entry* object)
 			{ return object ? object->cpu_pixel_bytes : 0ull; };
 			std::sort(rows.begin(), rows.end(), [&](const compared_object& left, const compared_object& right)
 			{
 				const std::uint64_t leftBytes = bytes(left.first) + bytes(left.second);
 				const std::uint64_t rightBytes = bytes(right.first) + bytes(right.second);
-				if (leftBytes != rightBytes) return leftBytes > rightBytes;
+				if (leftBytes != rightBytes)
+				{
+					return leftBytes > rightBytes;
+				}
 				const object_entry* leftObject = left.first ? left.first : left.second;
 				const object_entry* rightObject = right.first ? right.first : right.second;
 				return leftObject->name < rightObject->name;
 			});
 			ImGui::Text("표시 %zu / A %zu%s", rows.size(), a.objects.size(), b ? " · B 비교 포함" : "");
+			if (identity_unavailable)
+			{
+				ImGui::TextWrapped("Some full-name identities are unavailable. Those rows remain separate and have no A/B delta.");
+			}
+            if (b && (!complete_a || !complete_b))
+            {
+                ImGui::TextWrapped("Partial object lists cannot prove an asset is absent. Unmatched rows have no inferred A/B delta.");
+            }
 			if (!ImGui::BeginTable("##MemoryObjects", b ? 6 : 4,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_Resizable |
-				ImGuiTableFlags_ScrollY, ImVec2(0, (std::max)(240.0f, ImGui::GetContentRegionAvail().y)))) return;
+				ImGuiTableFlags_ScrollY, ImVec2(0, (std::max)(240.0f, ImGui::GetContentRegionAvail().y))))
+			{
+				return;
+			}
 			ImGui::TableSetupScrollFreeze(0, 1);
 			ImGui::TableSetupColumn("유형", ImGuiTableColumnFlags_WidthFixed, 100.0f);
 			ImGui::TableSetupColumn("이름");
@@ -476,38 +615,74 @@ namespace editor::profiler_view
 			ImGui::TableHeadersRow();
 			ImGuiListClipper clipper;
 			clipper.Begin(static_cast<int>(rows.size()));
-			while (clipper.Step()) for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+			while (clipper.Step())
 			{
-				const object_entry* current = rows[i].first;
-				const object_entry* previous = rows[i].second;
-				const object_entry& row = *(current ? current : previous);
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn(); ImGui::TextUnformatted(kind_name(row.kind));
-				ImGui::TableNextColumn(); ImGui::TextUnformatted(row.name.c_str());
-				if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", row.name.c_str());
-				ImGui::TableNextColumn();
-				if (!current) ImGui::TextDisabled("A에 없음");
-				else if (current->cpu_size_known)
+				for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
 				{
-					ImGui::TextUnformatted(bytes_label(current->cpu_pixel_bytes).c_str());
-					if (current->shared_alias && ImGui::IsItemHovered())
-						ImGui::SetTooltip("다른 자산과 공유한 픽셀은 다시 합산하지 않았습니다.");
-				}
-				else ImGui::TextDisabled("미계측");
-				ImGui::TableNextColumn();
-				if (current && row.kind == object_kind::model) ImGui::TextUnformatted(bytes_label(current->upload_payload_bytes).c_str());
-				else ImGui::TextDisabled("-");
-				if (b)
-				{
+					const object_entry* current = rows[i].first;
+					const object_entry* previous = rows[i].second;
+					const object_entry& row = *(current ? current : previous);
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn(); ImGui::TextUnformatted(kind_name(row.kind));
+					ImGui::TableNextColumn(); ImGui::TextUnformatted(row.name.c_str());
+					if (ImGui::IsItemHovered())
+					{
+						ImGui::SetTooltip("%s%s", row.name.c_str(), row.identity_valid ? "" :
+							"\nFull-name identity unavailable; this row is not matched across snapshots.");
+					}
 					ImGui::TableNextColumn();
-					if (!previous) ImGui::TextDisabled("B에 없음");
-					else if (previous->cpu_size_known) ImGui::TextUnformatted(bytes_label(previous->cpu_pixel_bytes).c_str());
-					else ImGui::TextDisabled("미계측");
+					if (!current)
+					{
+						ImGui::TextDisabled("%s", row.identity_valid && complete_a ? "A에 없음" : "전송/식별 제한");
+					}
+					else if (current->cpu_size_known)
+					{
+						ImGui::TextUnformatted(bytes_label(current->cpu_pixel_bytes).c_str());
+						if (current->shared_alias && ImGui::IsItemHovered())
+						{
+							ImGui::SetTooltip("다른 자산과 공유한 픽셀은 다시 합산하지 않았습니다.");
+						}
+					}
+					else
+					{
+						ImGui::TextDisabled("미계측");
+					}
 					ImGui::TableNextColumn();
-					if ((!current || current->cpu_size_known) && (!previous || previous->cpu_size_known))
-						ImGui::Text("%+.2f MiB", (static_cast<double>(current ? current->cpu_pixel_bytes : 0ull) -
-							(previous ? previous->cpu_pixel_bytes : 0ull)) / 1048576.0);
-					else ImGui::TextDisabled("미계측");
+					if (current && row.kind == object_kind::model)
+					{
+						ImGui::TextUnformatted(bytes_label(current->upload_payload_bytes).c_str());
+					}
+					else
+					{
+						ImGui::TextDisabled("-");
+					}
+					if (b)
+					{
+						ImGui::TableNextColumn();
+						if (!previous)
+						{
+							ImGui::TextDisabled("%s", row.identity_valid && complete_b ? "B에 없음" : "전송/식별 제한");
+						}
+						else if (previous->cpu_size_known)
+						{
+							ImGui::TextUnformatted(bytes_label(previous->cpu_pixel_bytes).c_str());
+						}
+						else
+						{
+							ImGui::TextDisabled("미계측");
+						}
+						ImGui::TableNextColumn();
+						if (row.identity_valid && (current ? current->cpu_size_known : complete_a) &&
+							(previous ? previous->cpu_size_known : complete_b))
+						{
+							ImGui::Text("%+.2f MiB", (static_cast<double>(current ? current->cpu_pixel_bytes : 0ull) -
+								(previous ? previous->cpu_pixel_bytes : 0ull)) / 1048576.0);
+						}
+						else
+						{
+							ImGui::TextDisabled("미계측");
+						}
+					}
 				}
 			}
 			ImGui::EndTable();
@@ -519,7 +694,11 @@ namespace editor::profiler_view
 			if (ImGui::BeginTable("##AllMemory", b ? 4 : 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
 			{
 				ImGui::TableSetupColumn("영역"); ImGui::TableSetupColumn("A");
-				if (b) { ImGui::TableSetupColumn("B"); ImGui::TableSetupColumn("A - B"); }
+				if (b)
+				{
+					ImGui::TableSetupColumn("B");
+					ImGui::TableSetupColumn("A - B");
+				}
 				ImGui::TableHeadersRow();
 				metric_row("Private commit 영역", a.committed_private_bytes, true, b, b ? b->committed_private_bytes : 0, b != nullptr);
 				metric_row("Image commit 영역", a.committed_image_bytes, true, b, b ? b->committed_image_bytes : 0, b != nullptr);
@@ -551,11 +730,22 @@ namespace editor::profiler_view
 			using region = memory_profiler::virtual_region;
 			std::vector<const region*> largest;
 			for (const region& entry : a.regions)
-				if (entry.committed && entry.bytes > 0) largest.push_back(&entry);
+			{
+				if (entry.committed && entry.bytes > 0)
+				{
+					largest.push_back(&entry);
+				}
+			}
 			std::sort(largest.begin(), largest.end(), [](const region* left, const region* right)
 			{ return left->bytes > right->bytes; });
-			if (largest.size() > 64) largest.resize(64);
-			if (largest.empty()) return;
+			if (largest.size() > 64)
+			{
+				largest.resize(64);
+			}
+			if (largest.empty())
+			{
+				return;
+			}
 			struct tile { const region* source; ImVec2 top_left; ImVec2 bottom_right; };
 			std::vector<tile> tiles;
 			tiles.reserve(largest.size());
@@ -565,18 +755,26 @@ namespace editor::profiler_view
 			const auto pack = [&](const auto& self, std::size_t begin, std::size_t end,
 				float x, float y, float width, float height) -> void
 			{
-				if (begin >= end) return;
+				if (begin >= end)
+				{
+					return;
+				}
 				if (end - begin == 1)
 				{
 					tiles.push_back({ largest[begin], { x, y }, { x + width, y + height } });
 					return;
 				}
 				std::uint64_t total = 0;
-				for (std::size_t i = begin; i < end; ++i) total += largest[i]->bytes;
+				for (std::size_t i = begin; i < end; ++i)
+				{
+					total += largest[i]->bytes;
+				}
 				std::uint64_t first = largest[begin]->bytes;
 				std::size_t middle = begin + 1;
 				for (; middle < end - 1 && first + largest[middle]->bytes <= total / 2; ++middle)
+				{
 					first += largest[middle]->bytes;
+				}
 				const float fraction = static_cast<float>(static_cast<double>(first) / total);
 				if (width >= height)
 				{
@@ -606,38 +804,55 @@ namespace editor::profiler_view
 				ImGui::GetWindowDrawList()->AddRect(entry.top_left, entry.bottom_right,
 					underMouse || view.selected_region_address == entry.source->address ?
 					IM_COL32(255, 255, 255, 255) : IM_COL32(27, 31, 36, 255), 0.0f, 0, 2.0f);
-				if (!underMouse) continue;
+				if (!underMouse)
+				{
+					continue;
+				}
 				ImGui::SetTooltip("0x%llX · %s · %s", static_cast<unsigned long long>(entry.source->address),
 					bytes_label(entry.source->bytes).c_str(), region_type(entry.source->type));
 				if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+				{
 					view.selected_region_address = entry.source->address;
+				}
 			}
 			ImGui::TextDisabled("큰 커밋 영역 64개 · 면적은 바이트에 비례 · 영역을 클릭하면 아래에 상세가 표시됩니다.");
 			if (view.selected_region_address)
 			{
 				const auto found = std::find_if(a.regions.begin(), a.regions.end(), [&](const region& entry)
 				{ return entry.address == view.selected_region_address; });
-				if (found != a.regions.end()) ImGui::Text("선택: 0x%llX · %s · %s · 보호 0x%X",
-					static_cast<unsigned long long>(found->address), bytes_label(found->bytes).c_str(),
-					region_type(found->type), found->protection);
+				if (found != a.regions.end())
+				{
+					ImGui::Text("선택: 0x%llX · %s · %s · 보호 0x%X",
+						static_cast<unsigned long long>(found->address), bytes_label(found->bytes).c_str(),
+						region_type(found->type), found->protection);
+				}
 			}
 		}
 
 		void draw_map(const snapshot& a, memory_view_state& view)
 		{
 			ImGui::TextDisabled("VirtualQuery 주소 영역 · 물리 상주량이나 할당 소유자를 뜻하지 않습니다.");
+			ImGui::TextDisabled("Addresses identify target regions only; the viewer never reads remote memory.");
 			draw_region_tiles(a, view);
 			ImGui::SetNextItemWidth(160.0f);
 			ImGui::Combo("영역 필터", &view.region_filter, "전체\0Commit\0Reserve\0\0");
 			std::vector<const memory_profiler::virtual_region*> rows;
 			for (const auto& region : a.regions)
+			{
 				if (view.region_filter == 0 ||
 					(view.region_filter == 1 && region.committed) ||
-					(view.region_filter == 2 && !region.committed)) rows.push_back(&region);
+					(view.region_filter == 2 && !region.committed))
+				{
+					rows.push_back(&region);
+				}
+			}
 			ImGui::Text("표시 %zu / 전체 %zu 주소 영역", rows.size(), a.regions.size());
 			if (!ImGui::BeginTable("##MemoryRegions", 5,
 				ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY |
-				ImGuiTableFlags_Resizable, ImVec2(0, (std::max)(240.0f, ImGui::GetContentRegionAvail().y)))) return;
+				ImGuiTableFlags_Resizable, ImVec2(0, (std::max)(240.0f, ImGui::GetContentRegionAvail().y))))
+			{
+				return;
+			}
 			ImGui::TableSetupScrollFreeze(0, 1);
 			ImGui::TableSetupColumn("시작 주소");
 			ImGui::TableSetupColumn("크기");
@@ -647,15 +862,18 @@ namespace editor::profiler_view
 			ImGui::TableHeadersRow();
 			ImGuiListClipper clipper;
 			clipper.Begin(static_cast<int>(rows.size()));
-			while (clipper.Step()) for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+			while (clipper.Step())
 			{
-				const auto& region = *rows[i];
-				ImGui::TableNextRow();
-				ImGui::TableNextColumn(); ImGui::Text("0x%llX", static_cast<unsigned long long>(region.address));
-				ImGui::TableNextColumn(); ImGui::TextUnformatted(bytes_label(region.bytes).c_str());
-				ImGui::TableNextColumn(); ImGui::TextUnformatted(region_state(region.committed));
-				ImGui::TableNextColumn(); ImGui::TextUnformatted(region_type(region.type));
-				ImGui::TableNextColumn(); ImGui::Text("0x%X", region.protection);
+				for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; ++i)
+				{
+					const auto& region = *rows[i];
+					ImGui::TableNextRow();
+					ImGui::TableNextColumn(); ImGui::Text("0x%llX", static_cast<unsigned long long>(region.address));
+					ImGui::TableNextColumn(); ImGui::TextUnformatted(bytes_label(region.bytes).c_str());
+					ImGui::TableNextColumn(); ImGui::TextUnformatted(region_state(region.committed));
+					ImGui::TableNextColumn(); ImGui::TextUnformatted(region_type(region.type));
+					ImGui::TableNextColumn(); ImGui::Text("0x%X", region.protection);
+				}
 			}
 			ImGui::EndTable();
 		}
@@ -665,12 +883,26 @@ namespace editor::profiler_view
 	{
 		memory_view_state& view = state();
 		refresh(view);
-		auto& service = memory_profiler::snapshot_service::instance();
+		const auto diagnostics = live_diagnostics();
 		ImGui::TextUnformatted("메모리 프로파일러");
 		ImGui::SameLine();
-		if (service.pending()) ImGui::TextDisabled("스냅샷 수집 중");
-		else if (ImGui::Button(EditorIcon::Label<EditorIcon::Camera, " 스냅샷 촬영">)) service.request();
-		if (ImGui::IsItemHovered()) ImGui::SetTooltip("다음 GameThread 경계에서 자산·GC를 읽고 프로세스 주소 영역을 수집합니다.");
+		if (diagnostics && diagnostics->memory_pending && live_diagnostics_actions_enabled())
+		{
+			ImGui::TextDisabled("스냅샷 수집 중");
+		}
+		else
+		{
+			ImGui::BeginDisabled(!live_diagnostics_actions_enabled());
+			if (ImGui::Button(EditorIcon::Label<EditorIcon::Camera, " 스냅샷 촬영">))
+			{
+				request_memory_snapshot();
+			}
+			ImGui::EndDisabled();
+		}
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::SetTooltip("다음 GameThread 경계에서 자산·GC를 읽고 프로세스 주소 영역을 수집합니다.");
+		}
 		ImGui::SameLine();
 		ImGui::TextUnformatted("A");
 		ImGui::SameLine();
@@ -681,20 +913,55 @@ namespace editor::profiler_view
 		select_snapshot("##MemorySnapshotB", view, view.selected_b, true);
 		const snapshot* a = selected(view, view.selected_a);
 		const snapshot* b = selected(view, view.selected_b);
+		if (const char* status = live_diagnostic_status(); status[0] != '\0')
+		{
+			ImGui::TextDisabled("%s", status);
+		}
 		if (!a)
 		{
 			ImGui::Separator();
 			ImGui::TextDisabled("스냅샷을 촬영하면 요약·객체·전체 메모리·주소 맵과 A/B 비교가 표시됩니다.");
-			if (reader().capture()) draw_telemetry(telemetry_page::memory);
+			if (reader().capture())
+			{
+				draw_telemetry(telemetry_page::memory);
+			}
 			return;
 		}
 		ImGui::Separator();
+		if (a->object_count > a->objects.size() || a->region_count > a->regions.size() || a->strings_truncated)
+		{
+			ImGui::TextWrapped("Bounded live snapshot: %zu / %llu objects, %zu / %llu regions. "
+				"Object lists, address maps and their comparisons may be partial; summary byte totals are complete.%s",
+				a->objects.size(), static_cast<unsigned long long>(a->object_count),
+				a->regions.size(), static_cast<unsigned long long>(a->region_count),
+				a->strings_truncated ? " Some labels were shortened." : "");
+		}
+		if (b && (b->object_count > b->objects.size() || b->region_count > b->regions.size() || b->strings_truncated))
+		{
+			ImGui::TextWrapped("Comparison B also has a bounded object/region list; A/B object differences may be partial.");
+		}
 		if (ImGui::BeginTabBar("##MemoryProfilerSections"))
 		{
-			if (ImGui::BeginTabItem("요약")) { draw_summary(*a, b); ImGui::EndTabItem(); }
-			if (ImGui::BeginTabItem("엔진 객체")) { draw_objects(*a, b, view); ImGui::EndTabItem(); }
-			if (ImGui::BeginTabItem("전체 메모리")) { draw_all_memory(*a, b); ImGui::EndTabItem(); }
-			if (ImGui::BeginTabItem("메모리 맵")) { draw_map(*a, view); ImGui::EndTabItem(); }
+			if (ImGui::BeginTabItem("요약"))
+			{
+				draw_summary(*a, b);
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("엔진 객체"))
+			{
+				draw_objects(*a, b, view);
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("전체 메모리"))
+			{
+				draw_all_memory(*a, b);
+				ImGui::EndTabItem();
+			}
+			if (ImGui::BeginTabItem("메모리 맵"))
+			{
+				draw_map(*a, view);
+				ImGui::EndTabItem();
+			}
 			ImGui::EndTabBar();
 		}
 	}

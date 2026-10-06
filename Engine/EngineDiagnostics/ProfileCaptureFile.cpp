@@ -11,6 +11,8 @@
 #include <fstream>
 #include <string>
 #include <system_error>
+#include <set>
+#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -150,6 +152,16 @@ namespace ce::detail::capture_file_impl
         }
 
         std::size_t remaining() const { return m_bytes.size() - m_at; }
+
+        bool skip(std::size_t bytes)
+        {
+            if (bytes > remaining())
+            {
+                return false;
+            }
+            m_at += bytes;
+            return true;
+        }
 
         // 개수를 믿어도 되는가 — 레코드가 최소 크기로만 채워져도 남은 바이트에
         // 다 들어가는가.
@@ -445,6 +457,7 @@ namespace ce::detail::capture_file_impl
                 return std::unexpected(capture_file_error::malformed);
             }
             frame.counters.reserve(samples);
+            std::set<std::tuple<std::uint16_t, std::uint64_t, std::uint64_t, std::uint64_t>> identities;
             for (std::uint32_t i = 0; i < samples; ++i)
             {
                 std::uint16_t id = 0;
@@ -464,13 +477,9 @@ namespace ce::detail::capture_file_impl
                 {
                     return std::unexpected(capture_file_error::malformed);
                 }
-                for (const auto& existing : frame.counters)
+                if (!identities.emplace(id, sample.cpu.session, sample.cpu.tick, sample.cpu.task).second)
                 {
-                    if (existing.id == sample.id && existing.cpu.session == sample.cpu.session &&
-                        existing.cpu.tick == sample.cpu.tick && existing.cpu.task == sample.cpu.task)
-                    {
-                        return std::unexpected(capture_file_error::malformed);
-                    }
+                    return std::unexpected(capture_file_error::malformed);
                 }
                 frame.counters.push_back(sample);
             }
@@ -590,6 +599,7 @@ namespace ce
         case capture_file_error::checksum_mismatch:   return "파일이 손상됐다 — 체크섬이 맞지 않는다";
         case capture_file_error::resource_limit:     return "캡처 범위가 메모리 한도를 넘는다 — 더 작은 구간을 선택해야 한다";
         case capture_file_error::malformed:           return "파일의 구조가 앞뒤가 맞지 않는다";
+        case capture_file_error::canceled:            return "Capture operation canceled";
         }
         return "알 수 없는 오류";
     }
@@ -627,6 +637,165 @@ namespace ce
             out.put_bytes(chunk.second);
         }
         return out.take();
+    }
+
+    std::expected<std::vector<std::byte>, capture_file_error>
+    encode_capture_bounded(const capture_session& capture, std::size_t max_wire_bytes)
+    {
+        // Fixed cardinalities also bound decoder work (not only wire bytes).
+        constexpr std::size_t maximum = 128 * 1024 * 1024;
+        if (max_wire_bytes == 0 || max_wire_bytes > maximum || capture.frames().size() > 4096 ||
+            capture.markers().size() > 65535 || capture.threads().size() > 65535 ||
+            capture.counter_descriptors().size() > 65535 || capture.total_events() > 2097152)
+        {
+            return std::unexpected(capture_file_error::resource_limit);
+        }
+        std::size_t size = 16 + 6 * 32 + 13 + 4 + 4 + 4 + 12 + 4;
+        const auto add = [&](std::size_t count)
+        {
+            if (size > max_wire_bytes || count > max_wire_bytes - size)
+            {
+                return false;
+            }
+            size += count;
+            return true;
+        };
+        const auto text_fits = [](const std::string& value) { return value.size() <= 1024; };
+        for (const auto& marker : capture.markers())
+        {
+            if (!text_fits(marker.name) || !text_fits(marker.file) ||
+                !add(13 + marker.name.size() + marker.file.size()))
+            {
+                return std::unexpected(capture_file_error::resource_limit);
+            }
+        }
+        for (const auto& thread : capture.threads())
+        {
+            if (!text_fits(thread.name) || !add(17 + thread.name.size()))
+            {
+                return std::unexpected(capture_file_error::resource_limit);
+            }
+        }
+        std::size_t counter_count = 0;
+        for (const auto& frame : capture.frames())
+        {
+            if (frame.counters.size() > 4096 || frame.events.size() > 2097152 ||
+                !add(40 + frame.events.size() * 62 + frame.counters.size() * 34))
+            {
+                return std::unexpected(capture_file_error::resource_limit);
+            }
+            counter_count += frame.counters.size();
+            if (counter_count > 1048576)
+            {
+                return std::unexpected(capture_file_error::resource_limit);
+            }
+        }
+        for (const auto& counter : capture.counter_descriptors())
+        {
+            if (!text_fits(counter.name) || !text_fits(counter.unit) ||
+                !add(14 + counter.name.size() + counter.unit.size()))
+            {
+                return std::unexpected(capture_file_error::resource_limit);
+            }
+        }
+        if (size > max_wire_bytes)
+        {
+            return std::unexpected(capture_file_error::resource_limit);
+        }
+        auto encoded = encode_capture(capture);
+        if (encoded.size() != size)
+        {
+            return std::unexpected(capture_file_error::malformed);
+        }
+        return encoded;
+    }
+
+    std::expected<capture_session_ptr, capture_file_error>
+    decode_capture_bounded(std::span<const std::byte> bytes, std::size_t max_wire_bytes)
+    {
+        using namespace ce::detail::capture_file_impl;
+        if (max_wire_bytes == 0 || max_wire_bytes > 128 * 1024 * 1024 || bytes.size() > max_wire_bytes)
+        {
+            return std::unexpected(capture_file_error::resource_limit);
+        }
+        const auto table = read_chunk_table(bytes);
+        if (!table || !all_chunks_within(*table, bytes.size()))
+        {
+            return std::unexpected(table ? capture_file_error::truncated : table.error());
+        }
+        std::uint32_t seen = 0;
+        std::uint64_t events = 0;
+        std::uint64_t counters = 0;
+        for (const auto& entry : *table)
+        {
+            if (entry.type < 1 || entry.type > 6 || (seen & (1u << entry.type)) != 0)
+            {
+                return std::unexpected(capture_file_error::malformed);
+            }
+            seen |= 1u << entry.type;
+            byte_reader in(bytes.subspan(static_cast<std::size_t>(entry.offset), static_cast<std::size_t>(entry.size)));
+            const auto string_fits = [&]
+            {
+                std::uint32_t size = 0;
+                return in.get(size) && size <= 1024 && in.skip(size);
+            };
+            if (entry.type == 1)
+            {
+                continue;
+            }
+            if (entry.type == 5 && !in.skip(8))
+            {
+                return std::unexpected(capture_file_error::malformed);
+            }
+            std::uint32_t count = 0;
+            if (!in.get(count) || count > ((entry.type == 4 || entry.type == 5) ? 4096u : 65535u))
+            {
+                return std::unexpected(capture_file_error::resource_limit);
+            }
+            for (std::uint32_t index = 0; index < count; ++index)
+            {
+                bool valid = false;
+                if (entry.type == 2)
+                {
+                    valid = in.skip(5) && string_fits() && string_fits();
+                }
+                else if (entry.type == 3)
+                {
+                    valid = in.skip(13) && string_fits();
+                }
+                else if (entry.type == 6)
+                {
+                    valid = in.skip(6) && string_fits() && string_fits();
+                }
+                else
+                {
+                    std::uint32_t items = 0;
+                    const bool frame = entry.type == 4;
+                    valid = in.skip(frame ? 28 : 4) && in.get(items);
+                    if (frame)
+                    {
+                        events += items;
+                        valid = valid && events <= 2097152 && in.skip(static_cast<std::size_t>(items) *
+                                                                 (entry.version >= 2 ? 62 : 38));
+                    }
+                    else
+                    {
+                        counters += items;
+                        valid = valid && items <= 4096 && counters <= 1048576 &&
+                                in.skip(static_cast<std::size_t>(items) * (entry.version >= 2 ? 34 : 10));
+                    }
+                }
+                if (!valid)
+                {
+                    return std::unexpected(capture_file_error::resource_limit);
+                }
+            }
+            if (in.remaining() != 0)
+            {
+                return std::unexpected(capture_file_error::malformed);
+            }
+        }
+        return decode_capture(bytes);
     }
 
     std::expected<capture_session_ptr, capture_file_error>

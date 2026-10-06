@@ -57,6 +57,7 @@
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include <algorithm>
 #include <regex>
+#include <string_view>
 
 constexpr int kMaxLayerSize = 32;
 
@@ -145,6 +146,8 @@ namespace
 MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
     : m_sceneStructureMutex(sceneStructureMutex)
 {
+    editor::initialize_profiler_viewer();
+
     // 한글 폰트는 **선택**이다(PHASE 21 W1). 맑은 고딕은 언어 기능으로
     // 빠질 수 있고, 없으면 `PushFont(nullptr, 0.0f)` 이 "지금 폰트를 그대로"
     // 라서(imgui.h:516) 부르는 자리가 분기하지 않아도 된다.
@@ -238,6 +241,22 @@ MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
 
 void MenuBarWindow::RenderMenuBar()
 {
+    static std::string viewerError;
+    if (auto error = editor::take_profiler_viewer_error(); !error.empty())
+    {
+        viewerError = std::move(error);
+        ImGui::OpenPopup("Trace viewer unavailable");
+    }
+    if (ImGui::BeginPopupModal("Trace viewer unavailable", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        ImGui::TextWrapped("%s", viewerError.c_str());
+        if (ImGui::Button("Close"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+    }
+
     // 선택 문맥은 프레임당 한 번 유도한다. 선언 항목 중 선택 대상 서명을 가진
     // 것들이 이것으로 활성·비활성이 갈린다(서명이 결속을 선언한다 — A.4).
     const std::optional<::editor::entity_target> selection =
@@ -518,10 +537,31 @@ void MenuBarWindow::RenderMenuBar()
                 };
                 for (const auto& toggle : toggles)
                 {
-                    const bool opened = editor::is_window_open(toggle.window);
-                    if (!ImGui::MenuItem(toggle.label, nullptr, opened)) continue;
-                    if (opened) editor::close_window(toggle.window);
-                    else        editor::open_window(toggle.window);
+                    const bool profiler = std::string_view(toggle.window) == EditorWindowName::kFrameProfiler;
+                    const bool opened = profiler ? editor::profiler_viewer_running() : editor::is_window_open(toggle.window);
+                    if (!ImGui::MenuItem(toggle.label, nullptr, opened))
+                    {
+                        continue;
+                    }
+                    if (profiler)
+                    {
+                        if (opened)
+                        {
+                            editor::request_profiler_viewer_close();
+                        }
+                        else
+                        {
+                            editor::request_profiler_viewer();
+                        }
+                    }
+                    else if (opened)
+                    {
+                        editor::close_window(toggle.window);
+                    }
+                    else
+                    {
+                        editor::open_window(toggle.window);
+                    }
                 }
                 ::editor::append_top_menu_items(::editor::top_menu_root::window, selectionPtr);
                 ImGui::EndMenu();
@@ -762,18 +802,11 @@ void MenuBarWindow::RenderMenuBar()
                 }
             }
             ImGui::SetCursorScreenPos(ImVec2(barRight - traceWidth - revisionWidth, barMin.y + 1.f));
-            const bool profilerOpen = editor::is_window_open(EditorWindowName::kFrameProfiler);
+            const bool profilerOpen = editor::profiler_viewer_running();
             if (draw_status_tab("##StatusTrace", kTraceLabel, "Trace — Frame Profiler",
                 ImVec2(traceWidth, tabHeight), profilerOpen))
             {
-                if (profilerOpen)
-                {
-                    editor::close_window(EditorWindowName::kFrameProfiler);
-                }
-                else
-                {
-                    editor::open_window(EditorWindowName::kFrameProfiler);
-                }
+                editor::request_profiler_viewer();
             }
             ImGui::SameLine(0.f, 0.f);
             // Lore is a future provider. This placeholder has no activation path.
@@ -2806,5 +2839,6 @@ void MenuBarWindow::ShowRenderDebugWindow()
 // BringWindowToFocusFront/DisplayFront 둘은 선언의 stacking 으로 갔다.
 void MenuBarWindow::ShowProfilerWindow()
 {
-    DrawProfilerHUD(m_sceneStructureMutex);
+    editor::request_profiler_viewer();
+    editor::close_window(EditorWindowName::kFrameProfiler);
 }

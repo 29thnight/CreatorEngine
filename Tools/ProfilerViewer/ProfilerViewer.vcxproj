@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{43682393-1675-4CBA-96BB-9315169E8421}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>ProfilerViewer</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType Condition="'$(EngineShipping)' != 'true'">Application</ConfigurationType>
+    <ConfigurationType Condition="'$(EngineShipping)' == 'true'">Utility</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)' == 'Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)' != 'Debug'">false</UseDebugLibraries>
+    <EnableUnitySupport>false</EnableUnitySupport>
+    <VcpkgEnabled>true</VcpkgEnabled>
+    <!-- Deployment below resolves exactly the PE import closure, including CRT. -->
+    <VcpkgApplocalDeps>false</VcpkgApplocalDeps>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(MSBuildThisFileDirectory)..\..\EngineOutput.props" />
+  <PropertyGroup>
+    <TargetName>ProfilerViewer</TargetName>
+    <OutDir>$(EngineProfilerViewerOutDir)</OutDir>
+    <LinkIncremental>false</LinkIncremental>
+    <GenerateManifest>true</GenerateManifest>
+    <EmbedManifest>true</EmbedManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ConformanceMode>true</ConformanceMode>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(SolutionDir)Engine\EngineDiagnostics;$(SolutionDir)Editor\ImGuiHelper;$(SolutionDir)Editor\EngineGUIWindow;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;_WIN32_WINNT=0x0A00;WINVER=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;imm32.lib;comdlg32.lib;shell32.lib;ole32.lib;uuid.lib;advapi32.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EnableUAC>true</EnableUAC>
+      <UACExecutionLevel>AsInvoker</UACExecutionLevel>
+      <UACUIAccess>false</UACUIAccess>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <AdditionalOptions>/DEPENDENTLOADFLAG:0xA00 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+    <Manifest><AdditionalManifestFiles>$(ProjectDir)ProfilerViewer.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles></Manifest>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Debug'">
+    <ClCompile><Optimization>Disabled</Optimization><RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary><PreprocessorDefinitions>_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+    <Link><AdditionalDependencies>imguid.lib;%(AdditionalDependencies)</AdditionalDependencies></Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Release'">
+    <ClCompile><Optimization>MaxSpeed</Optimization><FunctionLevelLinking>true</FunctionLevelLinking><RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary><PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+    <Link><AdditionalDependencies>imgui.lib;%(AdditionalDependencies)</AdditionalDependencies><OptimizeReferences>true</OptimizeReferences><EnableCOMDATFolding>true</EnableCOMDATFolding></Link>
+  </ItemDefinitionGroup>
+  <!-- Deliberately no Engine/Editor/Scene/RenderEngine project references. The
+       source list is the bounded file reader + presenter + transport client. -->
+  <ItemGroup Condition="'$(EngineShipping)' != 'true'">
+    <ClCompile Include="ProfilerViewer.cpp" />
+    <ClCompile Include="Presentation\ProfilerWindow.cpp" />
+    <ClCompile Include="Presentation\ProfilerFrameOverview.cpp" />
+    <ClCompile Include="Presentation\ProfilerTimeline.cpp" />
+    <ClCompile Include="Presentation\ProfilerTelemetry.cpp" />
+    <ClCompile Include="Presentation\ProfilerTables.cpp" />
+    <ClCompile Include="Presentation\ProfilerDxCapture.cpp" />
+    <ClCompile Include="Presentation\ProfilerCaptureDialog.cpp" />
+    <ClCompile Include="Presentation\ProfilerMemory.cpp" />
+    <ClCompile Include="Presentation\ProfilerAnimation.cpp" />
+    <ClCompile Include="Presentation\ProfilerLiveDiagnostics.cpp" />
+    <ClCompile Include="Presentation\ProfilerRendering.cpp" />
+    <ClCompile Include="$(SolutionDir)Editor\EngineGUIWindow\EditorTheme.cpp" />
+    <ClCompile Include="$(SolutionDir)Editor\EngineGUIWindow\EditorFontResources.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfileCapture.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfileMarker.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfileThreadStream.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfileCaptureFile.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfileRecording.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfileAggregate.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfileReader.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\DxCaptureFile.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfilerViewerClient.cpp" />
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfilerLiveDiagnostics.cpp">
+      <ObjectFileName>$(IntDir)ProfilerLiveDiagnosticsCodec.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfilerRenderingDiagnostics.cpp" />
+    <ResourceCompile Include="$(SolutionDir)Tools\runtime\EngineVersion.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PreparationWorker.h" />
+    <ClInclude Include="ViewerArguments.h" />
+    <ClInclude Include="Presentation\ProfilerPresenter.h" />
+    <ClInclude Include="Presentation\ProfilerView.h" />
+    <ClInclude Include="Presentation\ProfilerLiveDiagnostics.h" />
+    <Manifest Include="ProfilerViewer.manifest" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="ValidateProfilerViewerConfiguration" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(Platform)' != 'x64'" Text="ProfilerViewer supports Windows x64 only." />
+    <Message Condition="'$(EngineShipping)' == 'true'" Text="ProfilerViewer is excluded from Shipping; no viewer executable is built or deployed." Importance="high" />
+  </Target>
+  <Target Name="DeployProfilerViewer" AfterTargets="Build" Condition="'$(EngineShipping)' != 'true'">
+    <Exec Command="pwsh -NoProfile -File &quot;$(ProjectDir)deploy-viewer.ps1&quot; -Repository &quot;$(SolutionDir).&quot; -BinaryRoot &quot;$(EngineBinaryRoot).&quot; -ViewerPath &quot;$(TargetPath)&quot; -Config &quot;$(Configuration)&quot; -VcpkgDirectory &quot;$(_ZVcpkgCurrentInstalledDir).&quot; -VcToolsDirectory &quot;$(VCToolsInstallDir).&quot; -VcRedistDirectory &quot;$(VCToolsRedistDir).&quot;" />
+  </Target>
+</Project>

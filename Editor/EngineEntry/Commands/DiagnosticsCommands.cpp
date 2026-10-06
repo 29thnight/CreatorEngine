@@ -41,6 +41,7 @@
 #include "EditorSessionState.h"
 #include "EngineBootstrap.h"
 #include "MemoryProfilerSnapshot.h"
+#include "ProfilerViewerProcess.h"
 #include "GameBuilderSystem.h"
 #include "EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
@@ -763,6 +764,16 @@ namespace ConsoleCmd
 
         const ce::live_summary summary = ce::profiler().summary();
         auto data = CommandData::Object();
+
+        const auto viewer = ce::profiler_viewer::viewer_process().status();
+        auto viewerData = CommandData::Object();
+        viewerData.Set("running", CommandData::Bool(viewer.running));
+        viewerData.Set("connected", CommandData::Bool(viewer.connected));
+        viewerData.Set("pid", CommandData::Int(viewer.viewer_pid));
+        viewerData.Set("presentedFrames", CommandData::Int(static_cast<std::int64_t>(viewer.presented_frames)));
+        viewerData.Set("failureRevision", CommandData::Int(static_cast<std::int64_t>(viewer.failure_revision)));
+        viewerData.Set("message", CommandData::String(viewer.message));
+        data.Set("viewer", std::move(viewerData));
 
         // ★ 이름 예산 키(lastFrameNameBytes·peakFrameNameBytes·nameCapacity·
         //   totalDroppedNames)는 **뺐다**. 새 코어는 마커 id 만 흘리므로 프레임마다

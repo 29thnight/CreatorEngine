@@ -12,7 +12,6 @@
 
 #include "ImGui.h"
 #include "ProfileCapture.h"
-#include "ProfileScope.h"
 
 namespace editor::profiler_view
 {
@@ -375,7 +374,6 @@ namespace editor::profiler_view
 			ImGui::TextDisabled("아직 캡처가 없습니다. Record를 켜면 이 페이지에 기록이 나타납니다.");
 			return;
 		}
-		ce::profile_scope telemetry{ ce::marker<"ProfilerTelemetry">() };
 		static gpu_series_cache gpuCache;
 		if (gpuCache.capture.lock().get() != capture)
 		{

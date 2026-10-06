@@ -12,7 +12,6 @@
 #include "EditorIcons.h"
 #include "EditorIconAlignment.h"
 #include "EditorTextFallback.h"
-#include "PathFinder.h"
 
 #include <filesystem>
 #include <string>
@@ -23,6 +22,12 @@ namespace editor::fonts
 {
     namespace
     {
+        std::filesystem::path& resource_root()
+        {
+            static std::filesystem::path value;
+            return value;
+        }
+
         // 하위 경로는 배포된 엔진 자원, 파일 이름은 Windows Fonts의 후보다.
         // Inter가 빠진 배포에서도 시스템 폰트와 ImGui 기본 폰트로 이어진다.
         constexpr const char* kBodyCandidates[] = {
@@ -175,6 +180,11 @@ namespace editor::fonts
         }
     }
 
+    void set_resource_root(const std::filesystem::path& root)
+    {
+        resource_root() = root;
+    }
+
     std::span<const char* const> body_candidates()
     {
         return std::span<const char* const>(kBodyCandidates);
@@ -194,7 +204,7 @@ namespace editor::fonts
         const std::filesystem::path relative{ candidate };
         if (relative.has_parent_path())
         {
-            return PathFinder::EngineResourcePath(candidate);
+            return resource_root().empty() ? std::filesystem::path{} : resource_root() / relative;
         }
         const std::filesystem::path system_fonts = fonts_directory();
         return system_fonts.empty() ? std::filesystem::path{} : system_fonts / relative;

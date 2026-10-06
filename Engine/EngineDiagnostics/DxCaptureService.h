@@ -28,7 +28,7 @@ namespace ce::dx_capture
     {
     public:
         ~capture_service();
-        bool start(const std::filesystem::path& path, bool allow_elevation);
+        bool start(const std::filesystem::path& path, bool allow_elevation, bool analyze_finalized = true);
         bool open(const std::filesystem::path& path);
         void request_stop();
         void shutdown();
@@ -37,7 +37,7 @@ namespace ce::dx_capture
 
     private:
         bool begin_operation(const std::filesystem::path& path, bool opening);
-        void record_to_file(std::filesystem::path path, bool allow_elevation);
+        void record_to_file(std::filesystem::path path, bool allow_elevation, bool analyze_finalized);
         void load_file(const std::filesystem::path& path);
         void finish_operation(std::string message);
 

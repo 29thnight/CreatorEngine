@@ -40,6 +40,7 @@
 #include "UIManager.h"
 #include "ProfileScope.h"
 #include "DxCaptureService.h"
+#include "ProfilerHUD.h"
 #include "ResourceCounterWindow.h"
 #include "MemoryProfilerSnapshot.h"
 #include "ThreadPool.h"
@@ -608,6 +609,7 @@ void Editor::EditorMain::Finalize()
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
+    editor::shutdown_profiler_viewer();
     editor::sound_graph_editing::ShutdownPreview(m_audioPlayback.get());
 	// Asset and scene teardown may release proxies still referenced by a queued
 	// render frame. Drain the consumer before either owner starts shutting down.
@@ -931,6 +933,10 @@ void Editor::EditorMain::OnGui()
         ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
         sceneLock.lock();
     }
+    // Remote controls and bounded immutable scene snapshots share the existing
+    // owner/lifetime boundary, including hidden-UI frames. No viewer I/O or
+    // capture analysis runs here, and no second scene mutex is introduced.
+    editor::pump_profiler_viewer();
     // Acceptance is not installation. Show the new environment only after its
     // render-thread application was recorded; failures preserve overlay state.
     // Keep this before the hidden-UI return so completion is consumed there too.
@@ -953,8 +959,8 @@ void Editor::EditorMain::OnGui()
         ce::profile_scope begin{ ce::marker<"ImGuiBeginFrame">() };
         m_editorRenderer->BeginRender(sceneLock);
     }
-    // 아직 live 패널의 비소유 texture ID를 만들지 않았다. 불변 capture의 긴
-    // timeline 순회를 먼저 끝내야 GT가 이 표시 비용 때문에 기다리지 않는다.
+    // The legacy Frame Profiler window is now only a launch/focus route. Keep
+    // the shell's window-request processing outside the scene lifetime lock.
     sceneLock.unlock();
     {
         ce::profile_scope profiler{ ce::marker<"ImGuiProfilerPanel">() };
@@ -964,7 +970,7 @@ void Editor::EditorMain::OnGui()
         ce::profile_scope wait{ ce::marker<"PresentationSceneLockWait">() };
         sceneLock.lock();
     }
-    // NewFrame과 오래 걸릴 수 있는 프로파일러 표시 뒤에서 판독한다. 카메라를
+    // NewFrame과 창 요청 처리 뒤에서 판독한다. 카메라를
     // 조작하는 PT가 같은 주기로 읽으며, GT InputManager의 초기화와 무관하다.
     if (auto* cameraRig = EditorSessionState::Get().CameraRig())
     {

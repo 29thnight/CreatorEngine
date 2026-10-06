@@ -1014,7 +1014,7 @@ namespace ce::detail::recording_file_impl
     };
 
     std::expected<std::vector<legacy_chunk>, capture_file_error>
-    legacy_table(std::ifstream& input, std::uint64_t size, std::uint32_t count)
+    legacy_table(std::ifstream& input, std::uint64_t size, std::uint32_t count, std::stop_token cancel)
     {
         if (count > 64)
         {
@@ -1072,6 +1072,10 @@ namespace ce::detail::recording_file_impl
             std::uint32_t checksum = 0xFFFFFFFFu;
             while (remaining != 0)
             {
+                if (cancel.stop_requested())
+                {
+                    return std::unexpected(capture_file_error::canceled);
+                }
                 const auto amount = static_cast<std::size_t>((std::min)(remaining, static_cast<std::uint64_t>(scratch.size())));
                 auto bytes = std::span(scratch).first(amount);
                 if (!read_at(input, offset, bytes))
@@ -1290,9 +1294,13 @@ namespace ce::detail::recording_file_impl
 
 namespace ce
 {
-    std::expected<capture_recording_ptr, capture_file_error> open_capture_recording(const std::filesystem::path& path)
+    std::expected<capture_recording_ptr, capture_file_error> open_capture_recording(const std::filesystem::path& path, std::stop_token cancel)
     {
         using namespace detail::recording_file_impl;
+        if (cancel.stop_requested())
+        {
+            return std::unexpected(capture_file_error::canceled);
+        }
         try
         {
             std::ifstream input(path, std::ios::binary | std::ios::ate);
@@ -1322,7 +1330,7 @@ namespace ce
             state->path = path;
             if (version <= kCaptureFileVersion)
             {
-                const auto chunks = legacy_table(input, size, count);
+                const auto chunks = legacy_table(input, size, count, cancel);
                 if (!chunks)
                 {
                     return std::unexpected(chunks.error());
@@ -1358,6 +1366,10 @@ namespace ce
                         state->legacy_frames_end = chunk.offset + chunk.size;
                         for (std::uint32_t index = 0; index < frames; ++index)
                         {
+                            if (cancel.stop_requested())
+                            {
+                                return std::unexpected(capture_file_error::canceled);
+                            }
                             const auto frame = read_legacy_frame(input, offset, state->legacy_frames_end, chunk.version);
                             if (!frame || (!state->bins.empty() && frame->bin.first_engine_frame <= state->bins.back().last_engine_frame))
                             {
@@ -1400,6 +1412,10 @@ namespace ce
                     state->legacy_counter_offsets.resize(state->bins.size());
                     for (std::uint32_t index = 0; index < frames; ++index)
                     {
+                        if (cancel.stop_requested())
+                        {
+                            return std::unexpected(capture_file_error::canceled);
+                        }
                         if (counter_bin < state->bins.size() && state->bins[counter_bin].first_ordinal == index)
                         {
                             state->legacy_counter_offsets[counter_bin++] = offset;
@@ -1454,6 +1470,10 @@ namespace ce
                 state->valid_bytes = offset;
                 while (offset != size)
                 {
+                    if (cancel.stop_requested())
+                    {
+                        return std::unexpected(capture_file_error::canceled);
+                    }
                     if (state->finalized)
                     {
                         return std::unexpected(capture_file_error::malformed);
@@ -1546,9 +1566,14 @@ namespace ce
     }
 
     std::expected<capture_session_ptr, capture_file_error>
-    capture_recording::load_range(std::uint64_t first_ordinal, std::uint32_t count, std::size_t max_bytes) const
+    capture_recording::load_range(std::uint64_t first_ordinal, std::uint32_t count, std::size_t max_bytes,
+                                  std::stop_token cancel) const
     {
         using namespace detail::recording_file_impl;
+        if (cancel.stop_requested())
+        {
+            return std::unexpected(capture_file_error::canceled);
+        }
         const auto& state = *implementation_;
         if (first_ordinal > state.frames || count > state.frames - first_ordinal)
         {
@@ -1580,6 +1605,10 @@ namespace ce
                 }
                 while (ordinal < end_ordinal)
                 {
+                    if (cancel.stop_requested())
+                    {
+                        return std::unexpected(capture_file_error::canceled);
+                    }
                     if (state.legacy_frame_version != 0)
                     {
                         const auto header = read_legacy_frame(input, offset, state.legacy_frames_end, state.legacy_frame_version);
@@ -1718,7 +1747,7 @@ namespace ce
     }
 
     std::expected<void, capture_file_error> save_recording(const capture_recording& recording,
-                                                          const std::filesystem::path& path)
+                                                          const std::filesystem::path& path, std::stop_token cancel)
     {
         using namespace detail::recording_file_impl;
         // 검증된 접두 구간만 복사한다. 아직 열린 녹화에 나중에 붙은 바이트는 포함하지 않는다.
@@ -1761,6 +1790,13 @@ namespace ce
             }
             while (remaining != 0)
             {
+                if (cancel.stop_requested())
+                {
+                    input.close();
+                    output.close();
+                    cleanup();
+                    return std::unexpected(capture_file_error::canceled);
+                }
                 const auto amount = static_cast<std::size_t>((std::min)(remaining, static_cast<std::uint64_t>(scratch.size())));
                 if (!input.read(reinterpret_cast<char*>(scratch.data()), static_cast<std::streamsize>(amount)) ||
                     !write_bytes(output, std::span(scratch).first(amount)))
@@ -1775,7 +1811,12 @@ namespace ce
             output.close();
             input.close();
             // 교체 전에 복사본을 다시 검증해 복사 도중 원본이 손상되었는지 확인한다.
-            const auto copied = open_capture_recording(temporary);
+            const auto copied = open_capture_recording(temporary, cancel);
+            if (cancel.stop_requested())
+            {
+                cleanup();
+                return std::unexpected(capture_file_error::canceled);
+            }
             if (!output || !copied || (*copied)->valid_bytes() != recording.valid_bytes() ||
                 (*copied)->frame_count() != recording.frame_count() || !replace_file(temporary, path))
             {

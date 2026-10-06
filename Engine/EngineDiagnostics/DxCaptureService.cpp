@@ -62,7 +62,7 @@ namespace ce::dx_capture
         return true;
     }
 
-    bool capture_service::start(const std::filesystem::path& path, bool allow_elevation)
+    bool capture_service::start(const std::filesystem::path& path, bool allow_elevation, bool analyze_finalized)
     {
 #if CE_DX_TIMING_CAPTURE && !CE_SHIPPING
         if (!begin_operation(path, false))
@@ -71,9 +71,9 @@ namespace ce::dx_capture
         }
         try
         {
-            worker_ = std::thread([this, path, allow_elevation]
+            worker_ = std::thread([this, path, allow_elevation, analyze_finalized]
             {
-                record_to_file(path, allow_elevation);
+                record_to_file(path, allow_elevation, analyze_finalized);
             });
         }
         catch (const std::exception& error)
@@ -85,6 +85,7 @@ namespace ce::dx_capture
 #else
         (void)path;
         (void)allow_elevation;
+        (void)analyze_finalized;
         std::lock_guard lock(mutex_);
         status_.message = "Live capture was not built. Enable EngineDxDeepCapture for a development x64 build.";
         return false;
@@ -173,7 +174,7 @@ namespace ce::dx_capture
         }
     }
 
-    void capture_service::record_to_file(std::filesystem::path path, bool allow_elevation)
+    void capture_service::record_to_file(std::filesystem::path path, bool allow_elevation, bool analyze_finalized)
     {
 #if CE_DX_TIMING_CAPTURE && !CE_SHIPPING
         process_client client;
@@ -325,8 +326,19 @@ namespace ce::dx_capture
                 {
                     error = std::string("Finalize failed: ") + describe(finalized.error());
                 }
+                {
+                    std::lock_guard lock(mutex_);
+                    status_.recording = writer->status();
+                }
                 writer.reset();
-                load_file(path);
+                if (analyze_finalized)
+                {
+                    load_file(path);
+                }
+                else
+                {
+                    finish_operation(finalized ? "DX12 capture finalized for viewer analysis" : "DX12 finalization failed");
+                }
                 if (!error.empty())
                 {
                     finish_operation(error);
@@ -358,6 +370,7 @@ namespace ce::dx_capture
 #else
         (void)path;
         (void)allow_elevation;
+        (void)analyze_finalized;
 #endif
     }
 }
