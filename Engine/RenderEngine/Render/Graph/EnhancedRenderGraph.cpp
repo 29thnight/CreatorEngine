@@ -1895,10 +1895,45 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     // RunParallel은 모든 콜백이 끝난 뒤 반환/throw하므로 아래에서 안전하게 닫는다.
     try
     {
-        for(activeWave=0;activeWave<waveCount;++activeWave)
+        // 의존이 줄줄이 이어진 그래프는 차례가 거의 패스 수만큼 생긴다(37 패스에
+        // 33 차례). 차례마다 워커를 깨워 합류시키면 그 비용만 프레임당 2 ms 였다
+        // (기록 0.33 → 2.45 ms, 초당 994 → 315장). 워커 하나만 일하는 차례가
+        // 연달아 오면 그 묶음을 Job 하나가 차례 순서대로 기록한다 — 합류 조건과
+        // 리스트 순서 제약이 그대로이고, 기록은 여전히 공용 워커에서만 일어난다.
+        constexpr uint32_t kMaskedWorkers = 32;
+        std::vector<uint32_t> waveWorkerMask(waveCount, 0);
+        for (size_t i = 0; i < unitCount && workers <= kMaskedWorkers; ++i)
         {
-            pool.RunParallel(recordRange, workers);
-            if(failed.load(std::memory_order_relaxed)) break;
+            waveWorkerMask[unitWave[i]] |= 1u << unitWorker[i];
+        }
+        const auto isSingleWorkerWave = [&](uint32_t wave)
+        {
+            const uint32_t mask = waveWorkerMask[wave];
+            return workers <= kMaskedWorkers && 0 == (mask & (mask - 1));
+        };
+        for (uint32_t wave = 0; wave < waveCount && !failed.load(std::memory_order_relaxed);)
+        {
+            if (!isSingleWorkerWave(wave))
+            {
+                activeWave = wave++;
+                pool.RunParallel(recordRange, workers);
+                continue;
+            }
+            const uint32_t runBegin = wave;
+            while (wave < waveCount && isSingleWorkerWave(wave)) ++wave;
+            const uint32_t runEnd = wave;
+            pool.RunParallel([&](uint32_t)
+            {
+                for (uint32_t run = runBegin; run < runEnd && !failed.load(std::memory_order_relaxed); ++run)
+                {
+                    activeWave = run;
+                    const uint32_t mask = waveWorkerMask[run];
+                    for (uint32_t worker = 0; worker < workers; ++worker)
+                    {
+                        if (0 != (mask & (1u << worker))) recordRange(worker);
+                    }
+                }
+            }, 1);
         }
     }
     catch (const std::exception& e)
