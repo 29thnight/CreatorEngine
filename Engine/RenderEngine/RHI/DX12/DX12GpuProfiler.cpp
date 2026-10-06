@@ -200,12 +200,15 @@ uint64_t DX12GpuProfiler::GpuTickToCpuTick(uint64_t gpuTick) const
 }
 
 GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId,
-    uint64_t submissionId, uint64_t renderViewId)
+    uint64_t submissionId, uint64_t renderViewId, uint64_t captureGeneration)
 {
-    if (0 == m_frameCount) return GpuFrameToken{};
-
     GpuFrameToken token;
     token.engineFrameId = engineFrameId;
+    token.captureGeneration = captureGeneration;
+    if (0 == m_frameCount)
+    {
+        return token;
+    }
     token.submissionId = submissionId;
     token.renderViewId = renderViewId;
     token.ringSlot = static_cast<uint32_t>(submissionId % m_frameCount);
@@ -341,7 +344,8 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token,
     }
 
     const GpuFrameToken& held = m_slotTokens[token.ringSlot];
-    if (held.submissionId != token.submissionId)
+    if (held.submissionId != token.submissionId ||
+        (token.captureGeneration != 0 && held.captureGeneration != token.captureGeneration))
     {
         return fail(outError, "GPU 수집 표가 낡았다 — 슬롯 " +
             std::to_string(token.ringSlot) + " 은 제출 " +

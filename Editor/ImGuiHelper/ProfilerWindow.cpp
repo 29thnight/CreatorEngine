@@ -20,6 +20,8 @@
 
 #include <cinttypes>
 #include <algorithm>
+#include <array>
+#include <cmath>
 #include <functional>
 #include <exception>
 #include <utility>
@@ -27,6 +29,8 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "ImGui.h"
 #include "EditorIcons.h"
@@ -104,6 +108,206 @@ namespace editor::profiler_view
         static thread_local char fallback[32];
         std::snprintf(fallback, sizeof(fallback), "marker %u", static_cast<unsigned>(id));
         return fallback;
+    }
+
+    std::optional<ce::profile_tick> capture_stop_tick(const ce::capture_session& capture)
+    {
+        if (capture.frames().empty())
+        {
+            return std::nullopt;
+        }
+        const ce::frame_record& tail = capture.frames().back();
+        for (const ce::profile_counter_sample& sample : tail.counters)
+        {
+            const ce::capture_counter* descriptor = ce::find_counter(capture.counter_descriptors(), sample.id);
+            if (descriptor && descriptor->name == "Capture.StopDrainMilliseconds" &&
+                std::isfinite(sample.value) && sample.value >= 0.0)
+            {
+                return tail.tick_end;
+            }
+        }
+        return std::nullopt;
+    }
+}
+
+namespace editor::profiler_view::capture_integrity
+{
+    struct stop_details
+    {
+        std::weak_ptr<const ce::capture_session> capture_;
+        std::array<std::string, 6> counters_;
+        std::optional<double> admitted_gpu_;
+        std::vector<std::uint16_t> timed_out_threads_;
+        std::vector<const ce::profile_event*> open_scopes_;
+        std::vector<std::string> gpu_errors_;
+        std::size_t other_truncated_ = 0;
+        bool recorded_ = false;
+    };
+
+    const stop_details& details_for(const ce::capture_session_ptr& capture)
+    {
+        static stop_details cached;
+        if (cached.capture_.lock() == capture)
+        {
+            return cached;
+        }
+        cached = {};
+        cached.capture_ = capture;
+        cached.counters_.fill("not recorded");
+        if (!capture || capture->frames().empty())
+        {
+            return cached;
+        }
+
+        // Decode only the immutable final frame, once per capture. Never walk
+        // the retained recording or resolve file IDs through the live registry.
+        constexpr std::array<std::string_view, 6> names = {
+            "Capture.UnackedCpuStreams", "Capture.OpenScopesAtStop", "Capture.PendingGpuSubmissions",
+            "Capture.FailedGpuSubmissions", "Capture.StopDrainMilliseconds", "Capture.AdmittedGpuSubmissions"
+        };
+        const ce::frame_record& tail = capture->frames().back();
+        for (const ce::profile_counter_sample& sample : tail.counters)
+        {
+            const ce::capture_counter* descriptor = ce::find_counter(capture->counter_descriptors(), sample.id);
+            if (!descriptor || !std::isfinite(sample.value) || sample.value < 0.0)
+            {
+                continue;
+            }
+            for (std::size_t index = 0; index < names.size(); ++index)
+            {
+                if (descriptor->name == names[index])
+                {
+                    char value[64];
+                    std::snprintf(value, sizeof(value), index == 4 ? "%.3f ms" : "%.0f", sample.value);
+                    cached.counters_[index] = value;
+                    if (index == 5)
+                    {
+                        cached.admitted_gpu_ = sample.value;
+                    }
+                    cached.recorded_ = true;
+                    break;
+                }
+            }
+        }
+        if (!cached.recorded_)
+        {
+            return cached;
+        }
+
+        const auto stopTick = capture_stop_tick(*capture);
+        for (const ce::profile_event& event : tail.events)
+        {
+            if (ce::has_flag(event.flags, ce::event_flags::instant))
+            {
+                const std::string& name = capture->marker(event.marker).name;
+                if (name == "Capture.Incomplete.CpuProducerTimeout")
+                {
+                    if (std::find(cached.timed_out_threads_.begin(), cached.timed_out_threads_.end(),
+                                  event.thread_slot) == cached.timed_out_threads_.end())
+                    {
+                        cached.timed_out_threads_.push_back(event.thread_slot);
+                    }
+                }
+                else if (name.starts_with("Capture.Incomplete.Gpu: "))
+                {
+                    cached.gpu_errors_.push_back(name.substr(std::string_view("Capture.Incomplete.Gpu: ").size()));
+                }
+                continue;
+            }
+            const bool truncatedEnd = ce::has_flag(event.flags, ce::event_flags::truncated_end);
+            if (stopTick && truncatedEnd && event.tick_end == *stopTick &&
+                !ce::has_flag(event.flags, ce::event_flags::gpu_span))
+            {
+                cached.open_scopes_.push_back(&event);
+            }
+            else if (truncatedEnd || ce::has_flag(event.flags, ce::event_flags::truncated_begin))
+            {
+                ++cached.other_truncated_;
+            }
+        }
+        return cached;
+    }
+
+    void draw_stop_details()
+    {
+        ce::capture_reader& view = reader();
+        const auto capture = view.capture_handle();
+        const auto recording = view.recording();
+        if (recording && recording->frame_count() > 0 &&
+            (!capture || view.recording_first_ordinal() + capture->frame_count() < recording->frame_count()))
+        {
+            ImGui::TextDisabled("Detailed stop diagnostics are in the recording's last frame.");
+            ImGui::SameLine();
+            ImGui::BeginDisabled(view.preparation_pending());
+            if (ImGui::SmallButton("Load stop diagnostics"))
+            {
+                view.request_recording_range(recording->frame_count() - 1, 1);
+            }
+            ImGui::EndDisabled();
+            return;
+        }
+        if (!capture)
+        {
+            return;
+        }
+        const stop_details& details = details_for(capture);
+        if (!details.recorded_)
+        {
+            if (recording || !capture->complete())
+            {
+                ImGui::TextDisabled("Detailed stop diagnostics were not recorded in this window; absence is not completeness.");
+            }
+            return;
+        }
+        ImGui::Text("Stop drain: %s | unacknowledged CPU: %s | open scopes: %s",
+                    details.counters_[4].c_str(), details.counters_[0].c_str(), details.counters_[1].c_str());
+        ImGui::Text("GPU submissions admitted: %s | pending / failed: %s / %s",
+                    details.counters_[5].c_str(), details.counters_[2].c_str(), details.counters_[3].c_str());
+        if (details.admitted_gpu_ && *details.admitted_gpu_ == 0.0)
+        {
+            ImGui::TextDisabled("GPU coverage unobserved: no GPU submissions were admitted during this capture.");
+        }
+        if (!ImGui::TreeNodeEx("Stop integrity details", capture->complete() ? 0 : ImGuiTreeNodeFlags_DefaultOpen))
+        {
+            return;
+        }
+        ImGui::TextDisabled("Capture-owned diagnostics from frame %u", capture->frames().back().engine_frame);
+        for (const std::uint16_t slot : details.timed_out_threads_)
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f), "CPU producer timed out: %s (slot %u)",
+                               thread_name(capture.get(), slot), static_cast<unsigned>(slot));
+        }
+        if (capture->unacked_streams() > details.timed_out_threads_.size())
+        {
+            ImGui::TextDisabled("Some unacknowledged CPU thread identities are unavailable in this capture.");
+        }
+        for (const std::string& error : details.gpu_errors_)
+        {
+            ImGui::TextWrapped("GPU stop issue: %s", error.c_str());
+        }
+        ImGui::Text("Preserved open-at-stop spans: %zu | other truncated spans in final frame: %zu",
+                    details.open_scopes_.size(), details.other_truncated_);
+        ImGui::TextDisabled("Open-at-stop spans have a truncated end; their actual completion was not observed.");
+        if (!details.open_scopes_.empty())
+        {
+            ImGui::BeginChild("##OpenScopesAtStop", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 6.0f), true,
+                              ImGuiWindowFlags_HorizontalScrollbar);
+            ImGuiListClipper clipper;
+            clipper.Begin(static_cast<int>(details.open_scopes_.size()));
+            while (clipper.Step())
+            {
+                for (int index = clipper.DisplayStart; index < clipper.DisplayEnd; ++index)
+                {
+                    const ce::profile_event& event = *details.open_scopes_[static_cast<std::size_t>(index)];
+                    ImGui::Text("%s (slot %u) | %s | depth %u | session %" PRIu64 " / tick %" PRIu64 " / task %" PRIu64,
+                                thread_name(capture.get(), event.thread_slot), static_cast<unsigned>(event.thread_slot),
+                                marker_name(capture.get(), event.marker), static_cast<unsigned>(event.depth),
+                                event.cpu.session, event.cpu.tick, event.cpu.task);
+                }
+            }
+            ImGui::EndChild();
+        }
+        ImGui::TreePop();
     }
 }
 
@@ -496,7 +700,7 @@ namespace
         case ce::recorder_state::starting:  return "Starting";
         case ce::recorder_state::recording: return "Recording";
         case ce::recorder_state::frozen:    return "Frozen";
-        case ce::recorder_state::pausing:   return "Pausing";
+        case ce::recorder_state::pausing:   return "Draining CPU / GPU";
         default:                            return "Stopped";
         }
     }
@@ -601,6 +805,16 @@ namespace
 
         ImGui::SameLine();
         ImGui::Text("%s  |  frame %u", state_label(state), summary.engine_frame);
+        if (state == ce::recorder_state::pausing)
+        {
+            ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.35f, 1.0f),
+                               "Stopping: waiting for %u CPU producers and %" PRIu64 " GPU submissions | %.3f ms elapsed",
+                               summary.pause_unacked_streams, summary.pause_pending_gpu_submissions,
+                               summary.pause_drain_ms);
+            ImGui::Text("Open CPU scopes: pending final count | failed GPU submissions: %" PRIu64,
+                        summary.pause_failed_gpu_submissions);
+            ImGui::TextDisabled("CPU tails and submitted GPU work are still draining. This capture is not finalized yet.");
+        }
         if (hasRecording || state == ce::recorder_state::starting || disk.error)
         {
             const char* diskState = disk.state == ce::recording_state::starting ? "Starting" :
@@ -637,9 +851,9 @@ namespace
                     ImGui::TextWrapped("Recoverable spool: %s", utf8Path.c_str());
                 }
             }
-            if (transitioning)
+            if (transitioning && state != ce::recorder_state::pausing)
             {
-                ImGui::TextDisabled("Waiting for the collector / writer to finish. Record, Clear and Save are disabled.");
+                ImGui::TextDisabled("Waiting for the session writer. Record, Clear and Save are disabled.");
             }
         }
 
@@ -686,11 +900,11 @@ namespace
             shown && !shown->complete())
         {
             ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
-                               "캡처 미완전 - 손실 또는 미응답 스트림이 있다 (미응답 %u)",
+                               "캡처 미완전 - CPU/GPU 수집 미완료 또는 손실 (미응답 CPU %u)",
                                shown->unacked_streams());
             if (ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("미응답 스트림의 꼬리 또는 손실된 이벤트가 캡처에 빠질 수 있다.\n"
+                ImGui::SetTooltip("미응답 CPU 스트림의 꼬리 또는 수집되지 않은 GPU 작업이 빠질 수 있다.\n"
                                   "세션 writer와 파일의 손실 계수를 함께 확인한다.");
             }
         }
@@ -701,6 +915,7 @@ namespace
                                "텔레메트리 표본 손실: %llu",
                                static_cast<unsigned long long>(shown->dropped_counters()));
         }
+        capture_integrity::draw_stop_details();
     }
 
     void draw_summary(const ce::live_summary& summary)
@@ -760,7 +975,21 @@ namespace
         draw_row("Ingested pages", buffer);
 
         std::snprintf(buffer, sizeof(buffer), "%u", summary.pause_unacked_streams);
-        draw_row("Unacked at freeze", buffer);
+        draw_row("Stop: unacknowledged CPU producers", buffer);
+        if (summary.state == ce::recorder_state::pausing)
+        {
+            draw_row("Stop: open CPU scopes", "pending final count");
+        }
+        else
+        {
+            std::snprintf(buffer, sizeof(buffer), "%" PRIu64, summary.pause_open_scopes);
+            draw_row("Stop: open CPU scopes", buffer);
+        }
+        std::snprintf(buffer, sizeof(buffer), "%" PRIu64 " / %" PRIu64,
+                      summary.pause_pending_gpu_submissions, summary.pause_failed_gpu_submissions);
+        draw_row("Stop: pending / failed GPU submissions", buffer);
+        std::snprintf(buffer, sizeof(buffer), "%.3f ms", summary.pause_drain_ms);
+        draw_row("Stop drain duration", buffer);
 
         // 소유 경계. 셋 다 0 이어야 한다.
         std::snprintf(buffer, sizeof(buffer), "%" PRIu64 " / %" PRIu64,

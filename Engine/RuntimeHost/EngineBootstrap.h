@@ -179,6 +179,7 @@ namespace EngineBootstrap
                 gpu.submission = origin.submissionId;
                 gpu.view = origin.renderViewId;
                 gpu.queue = origin.queueId;
+                gpu.generation = origin.captureGeneration;
 
                 ce::profiler().submit_gpu_span(
                     ce::intern_runtime_marker(name, ce::marker_kind::gpu_span),
@@ -186,9 +187,14 @@ namespace EngineBootstrap
             },
             []() { ce::profiler().publish_gpu_spans(); },
             [](std::uint32_t frame, std::uint32_t lostPasses,
-               bool collectFailed, const char* reason)
+               bool collectFailed, const char* reason, std::uint64_t generation)
             {
-                ce::profiler().report_gpu_issue(frame, lostPasses, collectFailed, reason);
+                ce::profiler().report_gpu_issue(frame, lostPasses, collectFailed, reason, generation);
+            },
+            [](std::uint32_t frame) { return ce::profiler().begin_gpu_submission(frame); },
+            [](std::uint64_t generation, std::uint32_t frame, bool complete, const char* reason)
+            {
+                ce::profiler().finish_gpu_submission(generation, frame, complete, reason);
             } });
 
 		if ((config.prepareRuntimeContent ||

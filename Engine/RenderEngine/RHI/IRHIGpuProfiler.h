@@ -32,6 +32,10 @@ struct GpuFrameToken
     uint32_t ringSlot{ kInvalidRingSlot };
     uint8_t  queueId{ 0 };
 
+    // Capture admission belongs to this submission, never the collection frame.
+    // Zero means diagnostic timing only; it must not enter a later capture.
+    uint64_t captureGeneration{ 0 };
+
     bool IsValid() const { return kInvalidRingSlot != ringSlot; }
 };
 

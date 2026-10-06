@@ -39,6 +39,7 @@ namespace editor::profiler_view
             std::weak_ptr<const ce::prepared_capture_window> prepared_;
             std::weak_ptr<const ce::capture_session> capture_;
             std::unordered_map<ce::marker_id, float> marker_widths_;
+            std::optional<ce::profile_tick> stop_tick_;
             ImFont* font_ = nullptr;
             float font_size_ = 0.0f;
             float header_width_ = 0.0f;
@@ -48,6 +49,10 @@ namespace editor::profiler_view
         {
             const auto& capture = prepared->capture_;
             const bool captureChanged = cache.capture_.lock() != capture;
+            if (captureChanged)
+            {
+                cache.stop_tick_ = capture_stop_tick(*capture);
+            }
             // PT에서는 글자 크기만 잰다. 집계·정렬·구간 인덱스는 준비
             // 작업이 하나의 불변 결과로 함께 공개했다.
             if (captureChanged || cache.font_ != ImGui::GetFont() || cache.font_size_ != ImGui::GetFontSize())
@@ -671,7 +676,22 @@ namespace editor::profiler_view
             ImGui::TextUnformatted(marker_name(capture, hoveredInstant->marker));
             ImGui::Text("frame %u  ·  %s", hoveredInstant->frame,
                         thread_name(capture, hoveredInstant->thread_slot));
-            ImGui::TextDisabled("길이가 없는 사건 - 일어난 순간만 있다");
+            const std::string& name = capture->marker(hoveredInstant->marker).name;
+            if (name == "Capture.Incomplete.CpuProducerTimeout")
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
+                                   "CPU producer did not acknowledge stop before the drain deadline.");
+                ImGui::TextDisabled("Its tail may be missing. Preserved open scopes have truncated ends.");
+            }
+            else if (name.starts_with("Capture.Incomplete.Gpu: "))
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
+                                   "GPU collection was incomplete; an empty lane does not mean no GPU work.");
+            }
+            else
+            {
+                ImGui::TextDisabled("길이가 없는 사건 - 일어난 순간만 있다");
+            }
             ImGui::EndTooltip();
         }
         else if (hoveredFrame)
@@ -685,14 +705,15 @@ namespace editor::profiler_view
         {
             const ce::profile_tick length = (hoveredSpan->tick_end > hoveredSpan->tick_begin)
                 ? (hoveredSpan->tick_end - hoveredSpan->tick_begin) : 0;
-            const bool truncated =
-                ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_begin) ||
-                ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_end);
+            const bool truncatedBegin = ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_begin);
+            const bool truncatedEnd = ce::has_flag(hoveredSpan->flags, ce::event_flags::truncated_end);
 
             ImGui::BeginTooltip();
             ImGui::TextUnformatted(marker_name(capture, hoveredSpan->marker));
             ImGui::Text("%.4f ms  ·  frame %u", ticks_to_milliseconds(length),
                         hoveredSpan->frame);
+            ImGui::Text("%s (slot %u)", thread_name(capture, hoveredSpan->thread_slot),
+                        static_cast<unsigned>(hoveredSpan->thread_slot));
 
             if (ce::has_flag(hoveredSpan->flags, ce::event_flags::gpu_span))
             {
@@ -721,9 +742,26 @@ namespace editor::profiler_view
                 }
             }
 
-            if (truncated)
+            if (truncatedBegin)
             {
-                ImGui::TextDisabled("잘린 구간 - 길이가 실제보다 짧다");
+                ImGui::TextDisabled("Truncated start: the scope began before recording observed it.");
+            }
+            if (truncatedEnd)
+            {
+                if (cache.stop_tick_ && hoveredSpan->tick_end == *cache.stop_tick_ &&
+                    !ce::has_flag(hoveredSpan->flags, ce::event_flags::gpu_span))
+                {
+                    ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
+                                       "Open at stop: the preserved tail ends at the capture boundary.");
+                }
+                else
+                {
+                    ImGui::TextDisabled("Truncated end: completion not observed (open at snapshot / stop or thread exit).");
+                }
+            }
+            if (truncatedBegin || truncatedEnd)
+            {
+                ImGui::TextDisabled("Shown duration is partial, not the scope's complete execution time.");
             }
             ImGui::EndTooltip();
         }

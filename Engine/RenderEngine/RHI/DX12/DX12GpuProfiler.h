@@ -129,7 +129,7 @@ public:
     /// ★ 슬롯의 기록(이름·질의 인덱스·사용 표시)만 되감는다. 다른 슬롯은
     ///   건드리지 않는다 — 그것이 인플라이트 제출의 기록을 지키는 유일한 방법이다.
     GpuFrameToken BeginFrame(uint64_t engineFrameId, uint64_t submissionId,
-        uint64_t renderViewId);
+        uint64_t renderViewId, uint64_t captureGeneration = 0);
 
     /// 패스 시작. 돌려준 슬롯을 EndPass에 그대로 넘긴다.
     /// 슬롯이 모자라면 kInvalidSlot을 돌려주고, 그 패스는 측정에서 빠진다.
