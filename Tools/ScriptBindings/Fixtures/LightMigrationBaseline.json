@@ -1,0 +1,33 @@
+{
+  "purpose": "Source-only acceptance baseline for the ABI-v33 to v34 Light migration; not an emitter input or production signature schema",
+  "api_version": 34,
+  "function_slot_count": 187,
+  "light_first_slot": 85,
+  "light_offset": 688,
+  "mesh_exists_offset": 792,
+  "fingerprint_offset": 1504,
+  "table_size": 1512,
+  "relative_slot_names": [
+    "Exists",
+    "GetColor",
+    "SetColor",
+    "GetIntensity",
+    "SetIntensity",
+    "GetRange",
+    "SetRange",
+    "GetSpotAngle",
+    "SetSpotAngle",
+    "GetLightType",
+    "SetLightType",
+    "GetLightStatus",
+    "SetLightStatus"
+  ],
+  "public_properties": [
+    { "name": "Color", "type": "Color4" },
+    { "name": "Intensity", "type": "float" },
+    { "name": "Range", "type": "float" },
+    { "name": "SpotAngle", "type": "float" },
+    { "name": "Type", "type": "LightType" },
+    { "name": "Status", "type": "LightStatus" }
+  ]
+}
