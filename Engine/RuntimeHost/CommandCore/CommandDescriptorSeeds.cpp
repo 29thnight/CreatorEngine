@@ -257,6 +257,7 @@ namespace CommandCore
             { "scene.loadjobs", CommandCost::Long, "<fixture-directory> <model-path>", "씬 job 로드·중복·DDOL·종료 회귀(격리 프로세스)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "scene.navigate", CommandCost::Immediate, "<back|forward>", "Navigate entity selection history", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "direction", true },
             { "scene.new", CommandCost::Frames, "[이름]", "빈 씬을 만들어 활성화한다(기능 테스트 씬 저작용)", CommandClass::EngineService, CommandLiveness::Live },
+            { "scene.open_async", CommandCost::Immediate, "<path>", "Queue scene CPU preparation and activate at the owner boundary; success means queued, not ready", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.populate", CommandCost::Frames, "<개수> [fanout]", "W7 fixture — 제품 경로로 엔티티 N개를 만든다(fanout 0/1이면 평평, 2+면 균형 트리)", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.save", CommandCost::Frames, "<경로>", "활성 씬을 .creator로 저장한다", CommandClass::EngineService, CommandLiveness::Live },
             { "scene.select", CommandCost::Immediate, "<오브젝트 이름>", "오브젝트를 에디터 선택으로 지정한다", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "target", true },

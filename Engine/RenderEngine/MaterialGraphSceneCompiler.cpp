@@ -5,6 +5,7 @@
 #include <atomic>
 #include <fstream>
 #include <tuple>
+#include <Windows.h>
 
 namespace material_graph
 {
@@ -15,6 +16,45 @@ bool Fail(std::string& error, std::string message)
     error = std::move(message);
     return false;
 }
+
+    bool PublishSceneSource(const std::filesystem::path& path, std::string_view source, std::string& error)
+    {
+        const auto matches = [&]()
+        {
+            std::ifstream stream(path, std::ios::binary);
+            const std::string accepted{std::istreambuf_iterator<char>(stream), {}};
+            return stream && accepted == source;
+        };
+        if (matches())
+        {
+            return true;
+        }
+        auto staging = path;
+        staging += ".stage-" + FileGuid::CreateRandomV4().ToString();
+        {
+            std::ofstream stream(staging, std::ios::binary | std::ios::trunc);
+            stream.write(source.data(), static_cast<std::streamsize>(source.size()));
+            stream.close();
+            if (!stream)
+            {
+                std::error_code ignored;
+                std::filesystem::remove(staging, ignored);
+                return Fail(error, "LX Scene shader source write failed.");
+            }
+        }
+        // Same-content tickets can overlap after an explicit invalidation. Never
+        // truncate an input that another compiler may currently be reading.
+        if (!MoveFileExW(staging.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            std::error_code ignored;
+            std::filesystem::remove(staging, ignored);
+            if (!matches())
+            {
+                return Fail(error, "LX Scene shader source publication failed.");
+            }
+        }
+        return true;
+    }
 
 bool TargetLess(const CompileTarget& left, const CompileTarget& right)
 {
@@ -126,13 +166,9 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     }
     std::string hostSource = BuildBoundSource(program) + suffix;
     if (program.volume) hostSource += "\n#include \"MaterialGraphSceneVolumeCoefficients.slang\"\n";
+    if (!PublishSceneSource(sourceFile, hostSource, error))
     {
-        std::ofstream stream(sourceFile, std::ios::binary | std::ios::trunc);
-        stream << hostSource;
-        if (!stream)
-        {
-            return Fail(error, "LX Scene shader source write failed.");
-        }
+        return false;
     }
     RHIShaderPermutation permutation;
     if (!permutation.Enable("LX_MATERIAL_PIXEL_FOOTPRINT", error) ||

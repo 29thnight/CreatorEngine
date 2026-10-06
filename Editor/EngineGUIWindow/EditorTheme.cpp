@@ -2,6 +2,7 @@
 
 #include "ImGui.h"
 
+#include <algorithm>
 #include <array>
 #include <cmath>
 
@@ -50,6 +51,16 @@ namespace editor
     {
         const ImGuiStyle& style = ImGui::GetStyle();
         return logicalPixels * style.FontScaleMain * style.FontScaleDpi;
+    }
+
+    float TitleBarFramePaddingY(float fontHeight, float scale, float safePaddingY) noexcept
+    {
+        // ImGui truncates window sizes, so round the scaled minimum upward and
+        // compensate for the active font's own rounding instead of scaling it twice.
+        // Cover the safe area too, so BeginMainMenuBar adds no unreserved offset.
+        const float paddedFontHeight = fontHeight + 2.f * std::max(0.f, safePaddingY);
+        const float minimumHeight = std::ceil(std::max(EditorThemeTokens::TitleBarHeight * scale, paddedFontHeight));
+        return (minimumHeight - fontHeight) * .5f;
     }
 
     TabStyleScope::TabStyleScope()

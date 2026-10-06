@@ -7,6 +7,7 @@
 #include "AuthoringWriteNode.h"
 
 #include <algorithm>
+#include <atomic>
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -107,70 +108,255 @@ void WriteDouble(Authoring::WriteNode node, double value)
 }
 } // namespace
 
-std::shared_ptr<const Generation> GenerationStore::Load(const experiment::AssetId& id, const GenerationLoader& loader,
-                                                        bool reload, std::string& error)
-{
-    error.clear();
-    if (!ValidTextureId(id) || !loader)
+    struct GenerationPreparationState
     {
-        error = "Material graph generation requires a canonical UUIDv4/UUIDv8 and a loader.";
-        return {};
-    }
-    // Serialize publication with reload/removal. A late candidate cannot revive
-    // a removed entry or overwrite a newer accepted candidate.
-    std::lock_guard lock(mutex_);
-    const auto found = entries_.find(id);
-    if (!reload && found != entries_.end())
-        return found->second.owner;
-    CookedProgram loaded;
-    if (!loader(loaded, error))
-        return {};
-    std::vector<std::uint8_t> payload;
-    if (!WriteCookedProgram(loaded.product, {}, payload, error) ||
-        (loaded.product.materialShader && loaded.product.materialShader->meta.guid.m_guid != id.value) ||
-        loaded.boundSource != BuildBoundSource(loaded.product.program) ||
-        loaded.metadata != LX::WriteMaterialProgramMetadata(loaded.product.program))
+        experiment::AssetId m_assetId;
+        std::uint64_t m_generation{};
+        std::mutex m_mutex;
+        bool m_attempted{};
+        std::atomic<bool> m_failed{};
+        std::shared_ptr<const Generation> m_owner;
+        ck::Sha256Digest m_digest{};
+        std::shared_ptr<const Generation> m_previousOwner;
+        ck::Sha256Digest m_previousDigest{};
+        std::string m_error;
+    };
+
+    PreparedGeneration::PreparedGeneration(std::shared_ptr<GenerationPreparationState> state,
+                                           std::shared_ptr<const Generation> owner, ck::Sha256Digest digest, bool cached)
+        : m_state(std::move(state)), m_owner(std::move(owner)), m_digest(digest), m_cached(cached)
     {
-        if (error.empty())
-            error = "Material generation metadata differs from its verified product.";
-        return {};
     }
-    ck::Sha256Digest digest;
-    if (!ck::ComputeSha256(std::as_bytes(std::span(payload)), digest, error))
-        return {};
-    if (found != entries_.end() && found->second.digest == digest)
-        return found->second.owner;
-    if (serial_ == UINT64_MAX)
+
+    GenerationPreparationRequest GenerationStore::BeginPreparation(const experiment::AssetId& id, bool reload,
+                                                                   std::string& error)
     {
-        error = "Material generation counter is exhausted.";
-        return {};
+        error.clear();
+        if (!ValidTextureId(id))
+        {
+            error = "Material graph generation requires a canonical UUIDv4/UUIDv8.";
+            return {};
+        }
+
+        auto candidate = std::make_shared<GenerationPreparationState>();
+        candidate->m_assetId = id;
+        GenerationPreparationRequest result;
+        // A previous candidate can own a large payload; release it after unlocking.
+        std::shared_ptr<GenerationPreparationState> superseded;
+        {
+            std::lock_guard lock(mutex_);
+            const auto found = entries_.find(id);
+            if (!reload && found != entries_.end() && found->second.owner && !found->second.dirty)
+            {
+                result.m_state = found->second.request;
+                result.m_cachedOwner = found->second.owner;
+                result.m_cachedDigest = found->second.digest;
+                return result;
+            }
+            if (!reload && found != entries_.end() && found->second.request &&
+                !found->second.request->m_failed.load(std::memory_order_acquire))
+            {
+                result.m_state = found->second.request;
+                return result;
+            }
+            if (serial_ == UINT64_MAX)
+            {
+                error = "Material generation counter is exhausted.";
+                return {};
+            }
+            candidate->m_generation = ++serial_;
+            auto& entry = entries_[id];
+            candidate->m_previousOwner = entry.owner;
+            candidate->m_previousDigest = entry.digest;
+            superseded = std::move(entry.request);
+            entry.request = candidate;
+            entry.dirty = true;
+            result.m_state = std::move(candidate);
+        }
+        return result;
     }
-    auto generation = std::make_shared<Generation>();
-    generation->assetId = id;
-    generation->generation = ++serial_;
-    generation->cooked = std::move(loaded);
-    entries_[id] = {generation, digest};
-    return generation;
-}
 
-std::shared_ptr<const Generation> GenerationStore::Current(const experiment::AssetId& id) const
-{
-    std::lock_guard lock(mutex_);
-    const auto found = entries_.find(id);
-    return found == entries_.end() ? nullptr : found->second.owner;
-}
+    std::shared_ptr<const PreparedGeneration> GenerationStore::Prepare(const GenerationPreparationRequest& request,
+                                                                      const GenerationLoader& loader,
+                                                                      std::string& error)
+    {
+        error.clear();
+        if (!request.m_state)
+        {
+            error = "Material generation preparation requires a valid request.";
+            return {};
+        }
+        if (request.m_cachedOwner)
+        {
+            return std::shared_ptr<const PreparedGeneration>(new PreparedGeneration(
+                request.m_state, request.m_cachedOwner, request.m_cachedDigest, true));
+        }
+        if (!loader)
+        {
+            error = "Material graph generation requires a loader.";
+            return {};
+        }
 
-void GenerationStore::Remove(const experiment::AssetId& id)
-{
-    std::lock_guard lock(mutex_);
-    entries_.erase(id);
-}
+        auto& state = *request.m_state;
+        // Only callers sharing this exact cold request can wait here. Different
+        // assets and newer reloads prepare independently of this request/store.
+        std::lock_guard lock(state.m_mutex);
+        if (!state.m_attempted)
+        {
+            state.m_attempted = true;
+            try
+            {
+                auto generation = std::make_shared<Generation>();
+                generation->assetId = state.m_assetId;
+                generation->generation = state.m_generation;
+                auto& loaded = generation->cooked;
+                std::vector<std::uint8_t> payload;
+                if (!loader(loaded, state.m_error))
+                {
+                    if (state.m_error.empty())
+                    {
+                        state.m_error = "Material generation loader failed.";
+                    }
+                }
+                else if (!WriteCookedProgram(loaded.product, {}, payload, state.m_error) ||
+                         (loaded.product.materialShader &&
+                          loaded.product.materialShader->meta.guid.m_guid != state.m_assetId.value) ||
+                         loaded.boundSource != BuildBoundSource(loaded.product.program) ||
+                         loaded.metadata != LX::WriteMaterialProgramMetadata(loaded.product.program))
+                {
+                    if (state.m_error.empty())
+                    {
+                        state.m_error = "Material generation metadata differs from its verified product.";
+                    }
+                }
+                else if (ck::ComputeSha256(std::as_bytes(std::span(payload)), state.m_digest, state.m_error))
+                {
+                    if (state.m_previousOwner && state.m_previousDigest == state.m_digest)
+                    {
+                        state.m_owner = state.m_previousOwner;
+                    }
+                    else
+                    {
+                        state.m_owner = std::move(generation);
+                    }
+                    state.m_error.clear();
+                }
+            }
+            catch (const std::exception& exception)
+            {
+                state.m_error = std::string("Material generation preparation failed: ") + exception.what();
+            }
+            catch (...)
+            {
+                state.m_error = "Material generation preparation failed with an unknown exception.";
+            }
+            state.m_previousOwner.reset();
+            state.m_failed.store(!state.m_owner, std::memory_order_release);
+        }
+        error = state.m_error;
+        if (!state.m_owner)
+        {
+            return {};
+        }
+        return std::shared_ptr<const PreparedGeneration>(
+            new PreparedGeneration(request.m_state, state.m_owner, state.m_digest, false));
+    }
 
-void GenerationStore::Clear()
-{
-    std::lock_guard lock(mutex_);
-    entries_.clear();
-}
+    std::shared_ptr<const Generation> GenerationStore::Publish(const PreparedGeneration& prepared, std::string& error)
+    {
+        error.clear();
+        std::shared_ptr<const Generation> previous;
+        std::shared_ptr<const Generation> result;
+        {
+            std::lock_guard lock(mutex_);
+            const auto found = entries_.find(prepared.m_owner->assetId);
+            if (found == entries_.end() || found->second.request != prepared.m_state)
+            {
+                error = "Material generation preparation was superseded or invalidated before publication.";
+                return {};
+            }
+            auto& entry = found->second;
+            if (prepared.m_cached || (entry.owner && entry.digest == prepared.m_digest))
+            {
+                entry.dirty = false;
+                return entry.owner;
+            }
+            previous = std::move(entry.owner);
+            entry.owner = prepared.m_owner;
+            entry.digest = prepared.m_digest;
+            entry.dirty = false;
+            result = entry.owner;
+        }
+        return result;
+    }
+
+    std::shared_ptr<const Generation> GenerationStore::Load(const experiment::AssetId& id, const GenerationLoader& loader,
+                                                           bool reload, std::string& error)
+    {
+        if (!loader)
+        {
+            error = "Material graph generation requires a loader.";
+            return {};
+        }
+        const auto request = BeginPreparation(id, reload, error);
+        if (!request)
+        {
+            return {};
+        }
+        if (request.m_cachedOwner)
+        {
+            // This is a read of the owner accepted at BeginPreparation, not a
+            // publication. A concurrent reload cannot turn a cache hit into a
+            // failure, and the returned owner keeps the old generation alive.
+            return request.m_cachedOwner;
+        }
+        const auto prepared = Prepare(request, loader, error);
+        if (!prepared)
+        {
+            return {};
+        }
+        return Publish(*prepared, error);
+    }
+
+    std::shared_ptr<const Generation> GenerationStore::Current(const experiment::AssetId& id) const
+    {
+        std::lock_guard lock(mutex_);
+        const auto found = entries_.find(id);
+        return found == entries_.end() ? nullptr : found->second.owner;
+    }
+
+    void GenerationStore::InvalidatePreparation(const experiment::AssetId& id)
+    {
+        std::shared_ptr<GenerationPreparationState> invalidated;
+        {
+            std::lock_guard lock(mutex_);
+            const auto found = entries_.find(id);
+            if (found == entries_.end())
+            {
+                return;
+            }
+            found->second.dirty = true;
+            invalidated = std::move(found->second.request);
+        }
+    }
+
+    void GenerationStore::Remove(const experiment::AssetId& id)
+    {
+        decltype(entries_)::node_type removed;
+        {
+            std::lock_guard lock(mutex_);
+            removed = entries_.extract(id);
+        }
+    }
+
+    void GenerationStore::Clear()
+    {
+        decltype(entries_) removed;
+        {
+            std::lock_guard lock(mutex_);
+            removed.swap(entries_);
+        }
+    }
 
 bool LoadCookedGeneration(const ck::CookedAssetCatalog& catalog, const ck::ArtifactByteSource& bytes,
                           const experiment::AssetId& id, const LX::LXMaterialAsset* source, CookedProgram& result,

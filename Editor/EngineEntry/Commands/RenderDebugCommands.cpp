@@ -308,14 +308,28 @@ namespace ConsoleCmd
             data.Set("background", CommandData::Bool(settings.m_isSkyboxEnabled));
             data.Set("path", CommandData::String(settings.skyboxTextureName));
             data.Set("iblGenerations", CommandData::Int(EnhancedSceneRenderer::GetLiveDisplaySnapshot().iblGenerationCount));
+            const auto preparation = EnhancedSceneRenderer::GetEnvironmentPreparationProgress();
+            data.Set("requestId", CommandData::Int(preparation.requestId));
+            data.Set("activeRequests", CommandData::Int(preparation.activeRequests));
+            data.Set("applied", CommandData::Bool(preparation.applied));
+            data.Set("appliedRequestId", CommandData::Int(preparation.appliedRequestId));
+            data.Set("phase", CommandData::String(preparation.phase));
+            data.Set("error", CommandData::String(preparation.error));
             return Ok({}, std::move(data));
         }
         if (ctx.parts.size()!=2) return InvalidArguments("render.environment <HDR-or-ceibl-path> | status | background on|off");
         std::string error;
         if (!EnhancedSceneRenderer::SetSkyBoxPath(ctx.parts[1],error)) return Fail("render.environment_failed",error);
-        editor::RequestSceneOverlayVisibility(editor::SceneOverlayVisibility::SkyBox, true);
         auto data=CommandData::Object(); data.Set("path",CommandData::String(ctx.parts[1]));
-        return Ok("Environment selection queued; render.live.fence waits for publication",std::move(data));
+        const auto preparation = EnhancedSceneRenderer::GetEnvironmentPreparationProgress();
+        data.Set("requestId", CommandData::Int(preparation.requestId));
+        data.Set("activeRequests", CommandData::Int(preparation.activeRequests));
+        data.Set("applied", CommandData::Bool(preparation.applied));
+        data.Set("appliedRequestId", CommandData::Int(preparation.appliedRequestId));
+        data.Set("phase", CommandData::String(preparation.phase));
+        data.Set("error", CommandData::String(preparation.error));
+        return Ok("Environment preparation accepted; poll render.environment status before requesting a render fence",
+            std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_render_backend(const ConsoleCommandContext& ctx)

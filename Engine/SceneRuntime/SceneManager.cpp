@@ -1066,7 +1066,7 @@ struct SceneManager::PendingSceneLoad
     Authoring::ParsedDocument m_document;
     AssetBundle m_bundle;
     job_handle m_preparation;
-    job_handle m_assets;
+    std::shared_ptr<DataSystem::SceneAssetPreparation> m_assets;
     std::promise<Scene*> m_result;
     size_t m_activationEpoch = 0;
     bool m_autoActivate = false;
@@ -1111,7 +1111,11 @@ std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool aut
         {
             ce::profile_scope parseProfile{ ce::marker<"SceneLoad.Parse">() };
             load->m_document = ParseSceneDocument(load->m_path);
-            const auto bundleNode = load->m_document.Root()["m_requiredLoadAssetsBundle"];
+            auto bundleNode = load->m_document.Root()["m_requiredLoadAssetsBundle"];
+            if (!bundleNode)
+            {
+                bundleNode = load->m_document.Root()["AssetsBundle"];
+            }
             if (bundleNode && !bundleNode.IsNull())
                 for (const auto asset : bundleNode["assets"])
                     if (asset["assetTypeID"] && asset["assetName"])
@@ -1121,7 +1125,8 @@ std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool aut
                         entry.assetName = asset["assetName"].AsString();
                         if (!load->m_bundle.ContainsAsset(entry)) load->m_bundle.AddAsset(entry);
                     }
-            load->m_assets = DataSystems->LoadAssetBundleAsync(load->m_bundle);
+            load->m_assets = DataSystems->PrepareSceneAssets(
+                load->m_document.Root(), load->m_bundle, load->m_path);
         });
     }
     catch (const std::exception& e)
@@ -1180,12 +1185,12 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
         std::unordered_set<size_t> ddolIds;
         for (const auto node : root["DontDestroyOnLoadObjects"])
             if (node["m_instanceID"]) ddolIds.insert(node["m_instanceID"].As<size_t>());
-        DataSystems->PrewarmSceneMaterials(load.m_path);
+        // Required CPU generations were prepared and published by the owner pump.
         for (const auto node : SerializedEntities(root))
             if (!node["m_instanceID"] || !ddolIds.contains(node["m_instanceID"].As<size_t>()))
                 deserialize(node, false);
         for (const auto node : root["DontDestroyOnLoadObjects"]) deserialize(node, true);
-        DataSystems->CommitSceneMaterials(load.m_path);
+
         RemapLoadBatchIndices(scene.get(), batch);
         RemapLoadBatchIndices(ddolScene, ddolBatch);
         for (const auto& entry : batch) ReconnectPrefabInstance(scene.get(), entry.object);
@@ -1227,10 +1232,36 @@ void SceneManager::CompleteSceneLoads(bool wait)
         try { load->m_preparation.wait(); }
         catch (const std::exception& e) { failed = true; Debug::PrintLog(spdlog::level::err, e.what()); }
         catch (...) { failed = true; Debug::PrintLog(spdlog::level::err, "Scene preparation failed"); }
-        if (!wait && !load->m_assets.is_complete()) { ++i; continue; }
-        try { load->m_assets.wait(); }
-        catch (const std::exception& e) { failed = true; Debug::PrintLog(spdlog::level::err, e.what()); }
-        catch (...) { failed = true; Debug::PrintLog(spdlog::level::err, "Scene asset load failed"); }
+        try
+        {
+            std::string error;
+            if (!DataSystems->PollSceneAssets(load->m_assets, wait,
+                !failed && !load->m_cancelled && !m_exitCommand, error))
+            {
+                ++i;
+                continue;
+            }
+            if (!error.empty())
+            {
+                failed = true;
+                if (!load->m_cancelled)
+                {
+                    Debug::PrintLog(spdlog::level::err, error);
+                }
+            }
+        }
+        catch (const std::exception& e)
+        {
+            failed = true;
+            DataSystems->CancelSceneAssets(load->m_assets);
+            Debug::PrintLog(spdlog::level::err, e.what());
+        }
+        catch (...)
+        {
+            failed = true;
+            DataSystems->CancelSceneAssets(load->m_assets);
+            Debug::PrintLog(spdlog::level::err, "Scene asset preparation failed");
+        }
 
         // Remove before callbacks/component construction can enqueue another request.
         m_pendingSceneLoads.erase(m_pendingSceneLoads.begin() + i);

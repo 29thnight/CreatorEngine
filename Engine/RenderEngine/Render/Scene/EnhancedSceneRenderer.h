@@ -838,9 +838,25 @@ namespace EnhancedSceneRenderer
     void SetDisplayPresentationSink(
         std::shared_ptr<IDisplayPresentationSink> sink);
 
-    /// Select a validated HDR/cooked environment and enable its background.
-    /// The next frame installs cached maps or regenerates IBL for the new source.
+    struct EnvironmentPreparationProgress
+    {
+        uint32_t activeRequests{ 0 };
+        uint64_t requestId{ 0 };
+        bool applied{ false }; // Upload commands recorded, not GPU-fence completion.
+        uint64_t appliedRequestId{ 0 }; // Retained across newer queued/failed requests.
+        std::string phase;
+        std::string name;
+        std::string error;
+    };
+
+    /// Queue CPU preparation; true means accepted, not GPU-ready. The latest
+    /// request wins. Validation failures preserve the installed environment.
+    /// Only the render thread installs prepared pixels and changes the selection.
+    /// Startup/rebuild reloads and GPU upload/generation retain their existing path.
     bool SetSkyBoxPath(const std::string& path, std::string& outError);
+    EnvironmentPreparationProgress GetEnvironmentPreparationProgress();
+    /// Invalidates pending publication; an in-flight read/decode drains safely.
+    void CancelEnvironmentPreparation();
 
     /// 켠다. Enhanced-only 런타임에서는 초기화가 이 상태를 유지한다.
     void EnableLive();

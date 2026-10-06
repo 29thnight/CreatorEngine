@@ -89,37 +89,133 @@ namespace
     std::unordered_map<std::string, RHIShaderCompiler::VerifiedShader> g_verifiedCache;
     std::mutex g_progressMutex;
     RHIShaderCompiler::Progress g_progress;
+    class CompileProgress;
+    CompileProgress* g_firstActiveCompile{};
+    CompileProgress* g_lastActiveCompile{};
+    std::uint64_t g_activeCompileCount{};
+
     class CompileProgress final
     {
     public:
-        CompileProgress(const RHIShaderCompileRequest& request, const std::string& error) : error_(error)
+        CompileProgress(const RHIShaderCompileRequest& request, const std::string& error)
+            : m_name(request.name), m_entryPoint(request.entryPoint), m_error(error)
         {
             std::lock_guard guard(g_progressMutex);
-            g_progress.active = true;
-            g_progress.recompiling = false;
-            g_progress.name = std::string(request.name);
-            g_progress.entryPoint = std::string(request.entryPoint);
-            g_progress.phase = "Resolving shader dependencies";
-            g_progress.lastError.clear();
-            ++g_progress.revision;
+            // Request views and intrusive links allocate nothing. Once linked,
+            // optional progress text cannot throw out of this constructor.
+            Append();
+            ++g_activeCompileCount;
+            RefreshSnapshot(*this, true);
         }
-        ~CompileProgress()
+
+        ~CompileProgress() noexcept
         {
             std::lock_guard guard(g_progressMutex);
-            g_progress.active = false;
-            g_progress.lastError = error_;
+            Detach();
+            --g_activeCompileCount;
             ++g_progress.completedRequests;
-            ++g_progress.revision;
+            RefreshSnapshot(*this, false, &m_error);
         }
+
+        CompileProgress(const CompileProgress&) = delete;
+        CompileProgress& operator=(const CompileProgress&) = delete;
+
         void Phase(const char* phase, bool recompiling = false)
         {
             std::lock_guard guard(g_progressMutex);
-            g_progress.phase = phase;
-            g_progress.recompiling |= recompiling;
-            ++g_progress.revision;
+            m_phase = phase;
+            m_recompiling |= recompiling;
+            // Keep a representative stage for each live request so completing
+            // the newest one can immediately reveal another request's stage.
+            Detach();
+            Append();
+            RefreshSnapshot(*this);
         }
+
     private:
-        const std::string& error_;
+        void Append() noexcept
+        {
+            m_previous = g_lastActiveCompile;
+            m_next = nullptr;
+            if (m_previous)
+            {
+                m_previous->m_next = this;
+            }
+            else
+            {
+                g_firstActiveCompile = this;
+            }
+            g_lastActiveCompile = this;
+        }
+
+        void Detach() noexcept
+        {
+            if (m_previous)
+            {
+                m_previous->m_next = m_next;
+            }
+            else
+            {
+                g_firstActiveCompile = m_next;
+            }
+            if (m_next)
+            {
+                m_next->m_previous = m_previous;
+            }
+            else
+            {
+                g_lastActiveCompile = m_previous;
+            }
+            m_previous = nullptr;
+            m_next = nullptr;
+        }
+
+        // All access to the active list and request stages holds g_progressMutex.
+        // Diagnostics are best effort: keep counts truthful even if a text copy
+        // cannot allocate, and never replace or throw over the compiler's error.
+        static void RefreshSnapshot(const CompileProgress& completed, bool clearError = false,
+                                    const std::string* error = nullptr) noexcept
+        {
+            g_progress.activeRequests = g_activeCompileCount;
+            g_progress.active = g_activeCompileCount != 0;
+            g_progress.recompiling = false;
+            for (const auto* request = g_firstActiveCompile; request; request = request->m_next)
+            {
+                g_progress.recompiling |= request->m_recompiling;
+            }
+            ++g_progress.revision;
+            const auto& representative = g_lastActiveCompile ? *g_lastActiveCompile : completed;
+            try
+            {
+                g_progress.name = representative.m_name;
+                g_progress.entryPoint = representative.m_entryPoint;
+                g_progress.phase = representative.m_phase;
+                if (error)
+                {
+                    g_progress.lastError = *error;
+                }
+                else if (clearError)
+                {
+                    g_progress.lastError.clear();
+                }
+            }
+            catch (...)
+            {
+                g_progress.name.clear();
+                g_progress.entryPoint.clear();
+                g_progress.phase.clear();
+                g_progress.lastError.clear();
+            }
+        }
+
+        // The request's text outlives its Process scope, including this tracker.
+        const std::string_view m_name;
+        const std::string_view m_entryPoint;
+        const std::string& m_error;
+        const char* m_phase = "Resolving shader dependencies";
+        bool m_recompiling{};
+        CompileProgress* m_previous{};
+        CompileProgress* m_next{};
     };
     std::atomic<std::uint64_t> g_memoryHits{};
     std::atomic<std::uint64_t> g_diskHits{};
@@ -1399,7 +1495,7 @@ namespace
             const std::filesystem::path& sourcePath, const std::string& sourceText, SlangStage stage,
             const std::vector<std::filesystem::path>& recordedDependencies, std::string_view compilerIdentity,
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection, std::string& outError,
-            std::string* outIdentity, std::vector<std::filesystem::path>* outDependencies)
+            std::string* outIdentity, std::vector<std::filesystem::path>* outDependencies, CompileProgress& progress)
         {
             std::vector<SourceUnit> units;
             units.reserve(recordedDependencies.size() + 1);
@@ -1413,7 +1509,6 @@ namespace
             }
             if (HasShadowCandidate(units, request)) return false;
 
-            CompileProgress progress(request, outError);
             progress.Phase("Checking shader cache");
             const std::string cacheKey = BuildCacheKey(request, units, compilerIdentity);
             if (nullptr == outReflection)
@@ -1437,6 +1532,8 @@ namespace
             std::string& outError, std::string* outIdentity = nullptr,
             std::vector<std::filesystem::path>* outDependencies = nullptr)
         {
+            outError.clear();
+            CompileProgress progress(request, outError);
             if (!EnsureSlang(outError)) return false;
 
             const std::filesystem::path sourcePath = RHIShaderSource::Resolve(request.name);
@@ -1451,13 +1548,14 @@ namespace
             const auto recordedDependencies = ReadDependencyList(dependencyListPath);
             if (recordedDependencies &&
                 ReadCachedWithoutSlang(request, sourcePath, sourceText, stage, *recordedDependencies,
-                    runtime.identity, outBlob, outReflection, outError, outIdentity, outDependencies))
+                    runtime.identity, outBlob, outReflection, outError, outIdentity, outDependencies, progress))
             {
                 return true;
             }
 
             RHIShaderCompiler::ModuleReuseState* const reuse = t_moduleReuse;
             SlotLease ownLease;
+            progress.Phase("Waiting for shader compiler slot");
             if (nullptr == reuse) ownLease = AcquireSlot(runtime, outError);
             else if (nullptr == reuse->lease.Slot()) reuse->lease = AcquireSlot(runtime, outError);
             SlangSlot* const slot = nullptr == reuse ? ownLease.Slot() : reuse->lease.Slot();
@@ -1467,7 +1565,7 @@ namespace
                 return false;
             }
             slang::IGlobalSession& globalSession = *slot->globalSession;
-            CompileProgress progress(request, outError);
+            progress.Phase("Resolving shader dependencies");
 
             std::vector<std::string> ownedArguments;
             ownedArguments.reserve(40);
@@ -1859,4 +1957,3 @@ void RHIShaderCompiler::ClearMemoryCache()
     g_memoryCache.clear();
     g_verifiedCache.clear();
 }
-
