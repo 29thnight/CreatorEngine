@@ -48,6 +48,10 @@
 #include "Windows/EditorStandardWindows.h"
 #include "Windows/EditorToolboxWindows.h"
 #include "Core.Definition.h"
+#include "EditorClipContract.h"
+#include "EditorNavContract.h"
+#include "EditorStateContract.h"
+#include <algorithm>
 #include <regex>
 
 constexpr int kMaxLayerSize = 32;
@@ -57,6 +61,81 @@ namespace
     // 메뉴바 한글 폰트의 기준 크기. 본문 폰트와 같은 값이어야 같은 줄에서
     // 키가 맞는다.
     constexpr float kMenuBarFontSizePixels = ::editor::EditorThemeTokens::BodyFontSize;
+
+    bool draw_status_tab(const char* id, const char* label, const char* tooltip,
+        const ImVec2& size, bool selected = false, bool enabled = true)
+    {
+        ImGuiWindow* const window = ImGui::GetCurrentWindow();
+        if (window->SkipItems)
+        {
+            return false;
+        }
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const ImRect bounds(origin, ImVec2(origin.x + size.x, origin.y + size.y));
+        const ImGuiID itemId = window->GetID(id);
+        ImGui::ItemSize(bounds);
+        if (!ImGui::ItemAdd(bounds, itemId, nullptr, enabled ? ImGuiItemFlags_None : ImGuiItemFlags_Disabled))
+        {
+            return false;
+        }
+        bool hovered = false;
+        bool held = false;
+        const bool pressed = ImGui::ButtonBehavior(bounds, itemId, &hovered, &held);
+        ImGuiContext& context = *ImGui::GetCurrentContext();
+        const bool disabled = (context.LastItemData.ItemFlags & ImGuiItemFlags_Disabled) != 0;
+        constexpr const char* kWidget = "MenuBarWindow.status_tab";
+        ::editor::nav::announce_item(kWidget, itemId, !disabled);
+        ::editor::state::declare("MenuBarWindow.status_tab",
+            ::editor::state::hover | ::editor::state::active | ::editor::state::focus |
+                ::editor::state::nav | ::editor::state::disabled,
+            ::editor::state::mixed | ::editor::state::error,
+            "Status tabs toggle windows or show an unavailable tool; they do not edit mixed or validated values.");
+        ::editor::state::announce(kWidget,
+            (hovered ? ::editor::state::hover : 0u) |
+                (held ? ::editor::state::active : 0u) |
+                (context.NavId == itemId ? ::editor::state::focus : 0u) |
+                (context.NavId == itemId && context.NavCursorVisible ? ::editor::state::nav : 0u) |
+                (disabled ? ::editor::state::disabled : 0u), bounds);
+
+        ImDrawList* const draw = ImGui::GetWindowDrawList();
+        ::editor::clipping::enter_widget(kWidget, draw->_ClipRectStack.Size);
+        draw->PushClipRect(bounds.Min, bounds.Max, true);
+        if (selected || hovered || held)
+        {
+            const auto surface = held ? ::editor::ThemeColor::Selection :
+                (hovered ? ::editor::ThemeColor::PanelRaised : ::editor::ThemeColor::Panel);
+            draw->AddRectFilled(bounds.Min, bounds.Max,
+                ImGui::GetColorU32(::editor::ThemeColorValue(surface)));
+        }
+        if (selected)
+        {
+            draw->AddRectFilled(bounds.Min,
+                ImVec2(bounds.Max.x, bounds.Min.y + ::editor::ThemePixels(2.f)),
+                ImGui::GetColorU32(::editor::ThemeColorValue(::editor::ThemeColor::Primary)));
+        }
+        draw->AddLine(ImVec2(bounds.Max.x - 1.f, bounds.Min.y),
+            ImVec2(bounds.Max.x - 1.f, bounds.Max.y),
+            ImGui::GetColorU32(::editor::ThemeColorValue(::editor::ThemeColor::Border)));
+
+        const ImVec2 textSize = ImGui::CalcTextSize(label);
+        const float padding = ::editor::ThemePixels(::editor::EditorThemeTokens::ControlPaddingX);
+        const float textWidth = std::max(0.f, size.x - padding * 2.f);
+        ::editor::clipping::announce_text(kWidget, textSize.x, textWidth, true, true);
+        const ImVec2 textMin(bounds.Min.x + padding, bounds.Min.y + (size.y - textSize.y) * .5f);
+        const ImVec4 textClip(textMin.x, bounds.Min.y,
+            std::max(textMin.x, bounds.Max.x - padding), bounds.Max.y);
+        draw->AddText(ImGui::GetFont(), ImGui::GetFontSize(), textMin,
+            ImGui::GetColorU32(disabled ? ImGuiCol_TextDisabled : ImGuiCol_Text),
+            label, nullptr, 0.f, &textClip);
+        draw->PopClipRect();
+        ::editor::clipping::leave_widget(kWidget, draw->_ClipRectStack.Size);
+        ::editor::nav::draw_cursor(bounds, itemId, kWidget);
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
+        {
+            ImGui::SetTooltip("%s", tooltip);
+        }
+        return !disabled && pressed;
+    }
 }
 
 MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
@@ -462,100 +541,143 @@ void MenuBarWindow::RenderMenuBar()
     ImGui::PopStyleVar(5);
     ImGui::PopFont();
 
-    if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, height + 1, window_flags)) {
+    // Flat, contiguous status tabs share the bar surface instead of button frames.
+    // Keep the existing viewport reservation and registry-owned window lifetimes.
+    const float statusHeight = height + 1.f;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
+    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, editor::ThemeColorValue(editor::ThemeColor::Chrome));
+    if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, statusHeight, window_flags))
+    {
         if (ImGui::BeginMenuBar())
         {
-            if (ImGui::Button(EditorIcon::Label<EditorIcon::Console, " Output Log ">))
+            const ImVec2 barMin = ImGui::GetWindowPos();
+            const float barRight = barMin.x + ImGui::GetWindowWidth();
+            ImGui::GetWindowDrawList()->AddLine(barMin, ImVec2(barRight, barMin.y),
+                ImGui::GetColorU32(editor::ThemeColorValue(editor::ThemeColor::Border)));
+            const float tabHeight = std::max(1.f, height - 1.f);
+            const float tabPadding = editor::ThemePixels(editor::EditorThemeTokens::ControlPaddingX) * 2.f;
+            const std::string outputLabel = std::string("Output Log  ") + EditorIcon::Console;
+            constexpr const char* kTraceLabel = EditorIcon::Label<EditorIcon::Profiler, " Trace">;
+            constexpr const char* kRevisionLabel = "Revision Control";
+
+            // These are the same store totals shown by Output Log, never a second counter.
+            LogLevelTotals totals;
+            if (Log::IsAlive())
             {
-                if (editor::is_window_open(EditorWindowName::kOutputLog))
-                    editor::close_window(EditorWindowName::kOutputLog);
-                else
-                    editor::open_window(EditorWindowName::kOutputLog);
+                totals = Debug::GetLogLevelTotals();
+            }
+            const std::string countText[3] = {
+                std::string(EditorIcon::Info) + " " + std::to_string(totals.messages),
+                std::string(EditorIcon::Warning) + " " + std::to_string(totals.warnings),
+                std::string(EditorIcon::Error) + " " + std::to_string(totals.errors),
+            };
+            const editor::ThemeColor countColor[3] = {
+                editor::ThemeColor::TextMuted,
+                editor::ThemeColor::Warning,
+                editor::ThemeColor::Error,
+            };
+            const std::string outputTooltip = "Output Log\nMessages: " + std::to_string(totals.messages) +
+                "  Warnings: " + std::to_string(totals.warnings) + "  Errors: " + std::to_string(totals.errors);
+            float countsWidth = 0.f;
+            float countWidths[3]{};
+            for (int slot = 0; slot < 3; ++slot)
+            {
+                countWidths[slot] = ImGui::CalcTextSize(countText[slot].c_str()).x + tabPadding;
+                countsWidth += countWidths[slot];
             }
 
-            ImGui::SameLine();
-            if (ImGui::Button(EditorIcon::Label<EditorIcon::Profiler, " ProfileFrame ">))
+            float outputWidth = ImGui::CalcTextSize(outputLabel.c_str()).x + tabPadding;
+            float traceWidth = ImGui::CalcTextSize(kTraceLabel).x + tabPadding;
+            float revisionWidth = ImGui::CalcTextSize(kRevisionLabel).x + tabPadding;
+            float debugWidth = ImGui::CalcTextSize(EditorIcon::Debug).x + tabPadding;
+            const float fixedWidth = outputWidth + traceWidth + revisionWidth + debugWidth;
+            const float barWidth = std::max(1.f, barRight - barMin.x);
+            const bool showCounts = fixedWidth + countsWidth <= barWidth;
+            // At narrow widths the log tab's tooltip retains all totals. Shrink and
+            // clip the tabs together only after dropping the inline count readout.
+            const float widthScale = std::min(1.f, barWidth / fixedWidth);
+            outputWidth *= widthScale;
+            traceWidth *= widthScale;
+            revisionWidth *= widthScale;
+            debugWidth *= widthScale;
+
+            ImGui::SetCursorScreenPos(ImVec2(barMin.x, barMin.y + 1.f));
+            const bool logOpen = editor::is_window_open(EditorWindowName::kOutputLog);
+            if (draw_status_tab("##StatusOutputLog", outputLabel.c_str(), outputTooltip.c_str(),
+                ImVec2(outputWidth, tabHeight), logOpen))
             {
-                if (editor::is_window_open(EditorWindowName::kFrameProfiler))
-                    editor::close_window(EditorWindowName::kFrameProfiler);
+                if (logOpen)
+                {
+                    editor::close_window(EditorWindowName::kOutputLog);
+                }
                 else
-                    editor::open_window(EditorWindowName::kFrameProfiler);
+                {
+                    editor::open_window(EditorWindowName::kOutputLog);
+                }
             }
             const float countsSlotMinX = ImGui::GetItemRectMax().x;
-
+            const float debugLeft = std::max(countsSlotMinX, barRight - traceWidth - revisionWidth - debugWidth);
+            if (showCounts)
             {
-                // The retired manual Live Code placeholder is removed; automatic detection belongs to CoreCLR.
-                const ImGuiStyle& style = ImGui::GetStyle();
-                const ImVec2 textSize = ImGui::CalcTextSize(EditorIcon::Debug);
-                const ImVec2 buttonSize(textSize.x + style.FramePadding.x * 2.0f,
-                                        textSize.y + style.FramePadding.y * 2.0f);
-
-                // 수준별 누적을 디버그 버튼 **왼쪽**에 붙인다. 로그 창을 열지
-                // 않아도 무엇이 쌓였는지 보이고, 누르면 그 창이 열린다.
-                //
-                // 숫자는 저장소가 센 것을 그대로 읽는다(`GetLogLevelTotals`).
-                // 여기서 따로 세면 로그 창이 보여 주는 값과 두 벌이 되어
-                // 한쪽만 맞는 일이 생긴다.
-                LogLevelTotals totals;
-                if (Log::IsAlive()) totals = Debug::GetLogLevelTotals();
-                const std::string countText[3] = {
-                    std::string(EditorIcon::Info) + " " + std::to_string(totals.messages),
-                    std::string(EditorIcon::Warning) + " " + std::to_string(totals.warnings),
-                    std::string(EditorIcon::Error) + " " + std::to_string(totals.errors),
-                };
-                const ::editor::ThemeColor countColor[3] = {
-                    ::editor::ThemeColor::TextMuted,
-                    ::editor::ThemeColor::Warning,
-                    ::editor::ThemeColor::Error,
-                };
-                float countsWidth = 0.0f;
-                for (const std::string& text : countText)
-                    countsWidth += ImGui::CalcTextSize(text.c_str()).x +
-                                   style.FramePadding.x * 2.0f + style.ItemSpacing.x;
-
-                const float available = ImGui::GetContentRegionAvail().x;
-                const float tail = buttonSize.x + countsWidth;
-                if (available > tail)
-                    ImGui::SetCursorPosX(ImGui::GetCursorPosX() + available - tail);
-                else
-                    ImGui::SameLine();
-
+                ImGui::SetCursorScreenPos(ImVec2(debugLeft - countsWidth, barMin.y + 1.f));
                 for (int slot = 0; slot < 3; ++slot)
                 {
                     ImGui::PushID(slot);
-                    ImGui::PushStyleColor(ImGuiCol_Text, ::editor::ThemeColorValue(countColor[slot]));
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
-                    if (ImGui::Button(countText[slot].c_str()))
+                    ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(countColor[slot]));
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
+                    if (ImGui::Button(countText[slot].c_str(), ImVec2(countWidths[slot], tabHeight)))
+                    {
                         editor::open_window(EditorWindowName::kOutputLog);
+                    }
                     ImGui::PopStyleColor(2);
                     if (ImGui::IsItemHovered())
+                    {
                         ImGui::SetTooltip("%s — 눌러서 Output Log 를 연다",
                             slot == 0 ? "메시지" : (slot == 1 ? "경고" : "오류"));
+                    }
                     ImGui::PopID();
-                    ImGui::SameLine();
+                    ImGui::SameLine(0.f, 0.f);
                 }
-
-                const bool wasDebug = ShouldCollectGizmoColliders();
-                if (wasDebug) {
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-                    ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-                }
-                if (ImGui::Button(EditorIcon::Debug, buttonSize))
-                    SetCollectGizmoColliders(!wasDebug);
-                {
-                    const ImVec2 barPos = ImGui::GetWindowPos();
-                    ::editor::publish_status_counts_slot(countsSlotMinX, barPos.y,
-                        ImGui::GetItemRectMin().x, barPos.y + ImGui::GetWindowSize().y);
-                }
-                if (wasDebug) ImGui::PopStyleColor(3);
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("Collider debug gizmos");
             }
 
+            ImGui::SetCursorScreenPos(ImVec2(debugLeft, barMin.y + 1.f));
+            const bool wasDebug = ShouldCollectGizmoColliders();
+            if (draw_status_tab("##StatusColliderDebug", EditorIcon::Debug, "Collider debug gizmos",
+                ImVec2(debugWidth, tabHeight), wasDebug))
+            {
+                SetCollectGizmoColliders(!wasDebug);
+            }
+            // The golden-image mask remains independent of changing counter digits.
+            editor::publish_status_counts_slot(countsSlotMinX, barMin.y, debugLeft, barMin.y + statusHeight);
+
+            ImGui::SameLine(0.f, 0.f);
+            const bool profilerOpen = editor::is_window_open(EditorWindowName::kFrameProfiler);
+            if (draw_status_tab("##StatusTrace", kTraceLabel, "Trace — Frame Profiler",
+                ImVec2(traceWidth, tabHeight), profilerOpen))
+            {
+                if (profilerOpen)
+                {
+                    editor::close_window(EditorWindowName::kFrameProfiler);
+                }
+                else
+                {
+                    editor::open_window(EditorWindowName::kFrameProfiler);
+                }
+            }
+            ImGui::SameLine(0.f, 0.f);
+            // Lore is a future provider. This placeholder has no activation path.
+            draw_status_tab("##StatusRevisionControl", kRevisionLabel,
+                "Revision Control — Lore integration is not available yet",
+                ImVec2(revisionWidth, tabHeight), false, false);
             ImGui::EndMenuBar();
         }
-        ImGui::End();
     }
+    ImGui::End();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(4);
 
     // PHASE 21 M4 3단계: 여덟 창의 프레임은 셸이 연다. 여기서 그것들을
     // 부르던 여덟 줄이 사라졌다. 아래 둘만 남는데, 창이 **닫혀 있을 때**
