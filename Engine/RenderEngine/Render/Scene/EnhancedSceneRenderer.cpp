@@ -413,6 +413,10 @@ namespace
         stats.shadowDistance = source.shadowDistance;
         stats.slopeScale = source.slopeScale;
         stats.casterCandidates = source.casterCandidates;
+        stats.gpuVisibilityActive = source.gpuVisibilityActive;
+        stats.visibilityCountsExact = source.visibilityCountsExact;
+        stats.gpuSubmittedCandidates = source.gpuSubmittedCandidates;
+        stats.gpuSubmittedBins = source.gpuSubmittedBins;
         for (uint32_t index = 0; index < kShadowCascadeCount; ++index)
         {
             const EnhancedShadowPass::CascadeStats& cascade = source.cascades[index];
@@ -1099,12 +1103,32 @@ namespace
             {
                 RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::SpirV);
                 if (!graphMaterials.PrepareResidency(frameContext, graphInput, outError)) return false;
-                if (((graphInput && !graphInput->Draws().empty()) || gbuffer.HasGpuVisibilityCandidates())
-                    && !graph.PrepareParallel(commandPool, outError))
+                // RecordParallel always consumes this boundary. Establish it
+                // before any recording-owned palette/visibility allocation,
+                // including CPU-only/custom geometry views.
+                if (!graph.PrepareParallel(commandPool, outError))
                 {
                     return false;
                 }
+                if (!animationPalettes.UploadForCurrentRecording(*frameContext.resources))
+                {
+                    outError = "Sealed animation palette upload failed after the upload-prefix boundary.";
+                    return false;
+                }
                 if (!gbuffer.PrepareGpuVisibility(frameContext, outError))
+                {
+                    return false;
+                }
+                if (!shadow.PrepareGpuVisibility(frameContext, outError))
+                {
+                    return false;
+                }
+                if (!forward.PrepareGpuVisibility(frameContext, outError))
+                {
+                    return false;
+                }
+                if (!decal.PrepareGpuVisibility(frameContext, outError)
+                    || !sprite.PrepareGpuVisibility(frameContext, outError))
                 {
                     return false;
                 }
@@ -1743,6 +1767,7 @@ namespace
         // legacy draws keep the entire model visible during a cold graph compile.
         std::vector<EnhancedDrawItem> graphFallbackDraws;
         std::vector<bool> graphFallbackShadowEligible;
+        std::vector<bool> graphFallbackViewRequired;
         std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
@@ -2154,6 +2179,52 @@ namespace
             debugSnapshot.resizeGeneration = resizeGeneration;
             debugSnapshot.drawCount = lastDrawCount;
             debugSnapshot.batchCount = lastBatchCount;
+            const auto* geometryPass = pipeline ? &pipeline->gbuffer
+                : (vulkanPipeline ? &vulkanPipeline->gbuffer : nullptr);
+            debugSnapshot.preparedMeshletBatchCount = geometryPass
+                ? geometryPass->GetLastMeshletBatchCount() : 0u;
+            debugSnapshot.meshletFallback = geometryPass
+                ? geometryPass->GetLastMeshletFallback() : std::string{};
+            debugSnapshot.currentFrameOcclusion = geometryPass && geometryPass->HasCurrentFrameOcclusion();
+            debugSnapshot.occlusionFallback = geometryPass
+                ? geometryPass->GetLastOcclusionFallback() : std::string{};
+            debugSnapshot.skinningFallback = geometryPass
+                ? geometryPass->GetLastSkinningFallback() : std::string{};
+            debugSnapshot.indexedIndirectSupported = false;
+            debugSnapshot.nonIndexedIndirectSupported = false;
+            debugSnapshot.preparedGpuCandidates = 0;
+            debugSnapshot.preparedGpuCompactedBins = 0;
+            debugSnapshot.preparedGpuPreservedBins = 0;
+            debugSnapshot.preparedGpuConservativeCandidates = 0;
+            const auto addVisibility = [&](GpuGeometryVisibility::PreparedStats stats)
+            {
+                debugSnapshot.preparedGpuCandidates += stats.candidateCount;
+                debugSnapshot.preparedGpuCompactedBins += stats.compactedBins;
+                debugSnapshot.preparedGpuPreservedBins += stats.preservedBins;
+                debugSnapshot.preparedGpuConservativeCandidates += stats.conservativeCandidates;
+            };
+            const auto addPipelineVisibility = [&](const auto& source)
+            {
+                if (source.frameContext.resources)
+                {
+                    const auto capabilities = source.frameContext.resources->GetIndirectDrawCapabilities();
+                    debugSnapshot.indexedIndirectSupported = capabilities.indexedDraw;
+                    debugSnapshot.nonIndexedIndirectSupported = capabilities.nonIndexedDraw;
+                }
+                addVisibility(source.gbuffer.GetGpuVisibilityStats());
+                addVisibility(source.forward.GetGpuVisibilityStats());
+                addVisibility(source.decal.GetGpuVisibilityStats());
+                addVisibility(source.sprite.GetGpuVisibilityStats());
+                addVisibility(source.graphMaterials.CameraVisibilityStats());
+            };
+            if (pipeline)
+            {
+                addPipelineVisibility(*pipeline);
+            }
+            else if (vulkanPipeline)
+            {
+                addPipelineVisibility(*vulkanPipeline);
+            }
             debugSnapshot.decalCount = lastDecalCount;
             debugSnapshot.decalBatchCount = lastDecalBatchCount;
             debugSnapshot.spriteCount = lastSpriteCount;
@@ -3632,6 +3703,7 @@ namespace
             graphDraws.clear();
             graphFallbackDraws.clear();
             graphFallbackShadowEligible.clear();
+            graphFallbackViewRequired.clear();
             graphViewInput.reset();
             decals.clear();
             spritePool.clear();
@@ -4350,6 +4422,7 @@ namespace
             graphDraws.clear();
             graphFallbackDraws.clear();
             graphFallbackShadowEligible.clear();
+            graphFallbackViewRequired.clear();
             graphViewInput.reset();
             lights.clear();
             worldSprites.clear();
@@ -4542,32 +4615,54 @@ namespace
             for (const PooledDraw& pooled : drawPool)
             {
                 // Select the visible/caster union before the bounded Graph seal.
-                // Unknown or posed bounds remain conservative, never camera-only.
-                const bool visible = !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
+                // Binding shape does not prove custom vertex position semantics.
+                // Resolve the exact already-sealed generation before CPU rejection,
+                // including on devices without indirect support and before the
+                // optional offscreen candidate budget can discard a custom draw.
+                // Native Forward has no authored deformation/bounds contract.
+                // Transparent is an ordering class, never a position proof.
+                bool knownPositionContract = bool(pooled.graphMaterialSource);
+                if (pooled.item.materialSnapshot)
+                {
+                    const auto& material = *pooled.item.materialSnapshot;
+                    const auto generation = LX::Runtime::ResolveGraphicsGeneration(
+                        material.pipelineGenerations, material.shaderMetaHandle,
+                        material.permutationKey, material.bindingLayout,
+                        pooled.item.modelMeshView.vertexAttributeMask, false);
+                    knownPositionContract = generation && generation->shader.compile.geometryVisibility ==
+                        ShaderGeometryVisibility::IndexedInstanceV1;
+                }
+                const bool conservative = !knownPositionContract || !shadow_math::FinitePose(pooled.item);
+                const bool sourceVisible = conservative || !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
                     || math::intersects(frustum, pooled.worldBounds);
-                const bool relevantToShadow = shadow_math::RelevantToView(visible,
-                    shadow_math::WorldBounds(pooled.item), receivers, shadowDirection, hasShadowLight);
-                // Static candidates reach the GPU even when outside the camera.
+                // Skin weights/current uploaded pose are validated later. Admit
+                // every skinned CAMERA candidate before CPU rejection/budgeting;
+                // a bind-pose/proxy box is not a proof for arbitrary current skin.
+                const bool visible = pooled.item.boneCount != 0 || sourceVisible;
+                // Shadow relevance is independent from camera admission. Weight
+                // normalization is not proven here, so skin geometry cannot use
+                // the convex-hull pose bound as an upstream rejection proof.
+                // Unknown bounds conservatively retain eligible shadow casters.
+                const auto casterBounds = pooled.item.boneCount != 0
+                    ? shadow_math::Sphere{} : shadow_math::WorldBounds(pooled.item);
+                const bool relevantToShadow = shadow_math::RelevantToView(sourceVisible,
+                    casterBounds, receivers, shadowDirection, hasShadowLight);
+                // Static and skinned candidates reach the GPU even outside the camera.
                 // Shadow selection remains independent; it must not expand with
                 // the geometry visibility working set.
-                bool gpuMaterialEligible = !pooled.isTransparent;
-                if (pooled.graphMaterialSource)
-                {
-                    const auto& source = *pooled.graphMaterialSource;
-                    gpuMaterialEligible = source.instance && source.instance->generation
-                        && source.instance->generation->cooked.product.program.surface
-                        && (source.instance->generation->cooked.product.program.features & 0x0800u) == 0
-                        && (source.coverage.flags & EnhancedMaterialCoverage::Blended) == 0;
-                }
-                const bool gpuCandidate = gpuVisibility && pooled.item.boneCount == 0 && gpuMaterialEligible;
-                if (!relevantToShadow && !gpuCandidate)
+                // Material effects and ordering do not choose the submission
+                // mechanism. Native/Graph geometry retains its original command
+                // order while GPU-generated counts gate accepted candidates.
+                // Unknown position semantics above are always conservative.
+                const bool gpuCandidate = gpuVisibility;
+                if (!visible && !relevantToShadow && !gpuCandidate)
                 {
                     ++culled;
                     continue;
                 }
                 // Optional offscreen work must not grow CPU staging without a
                 // bound or displace the original visible/caster working set.
-                if (!relevantToShadow)
+                if (!visible && !relevantToShadow)
                 {
                     if (optionalGpuCandidates >= sceneInputBudget.draws)
                     {
@@ -4600,6 +4695,7 @@ namespace
                     fallback.materialGraphSlot = 0;
                     graphFallbackDraws.push_back(std::move(fallback));
                     graphFallbackShadowEligible.push_back(relevantToShadow);
+                    graphFallbackViewRequired.push_back(visible);
                 }
                 else if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
                 else
@@ -4681,7 +4777,7 @@ namespace
                     size_t retained = 0;
                     for (size_t i = 0; i < graphDraws.size(); ++i)
                     {
-                        if (!graphFallbackShadowEligible[i])
+                        if (!graphFallbackShadowEligible[i] && !graphFallbackViewRequired[i])
                         {
                             ++lastCulledDraws;
                             continue;
@@ -4691,12 +4787,14 @@ namespace
                             graphDraws[retained] = std::move(graphDraws[i]);
                             graphFallbackDraws[retained] = std::move(graphFallbackDraws[i]);
                             graphFallbackShadowEligible[retained] = graphFallbackShadowEligible[i];
+                            graphFallbackViewRequired[retained] = graphFallbackViewRequired[i];
                         }
                         ++retained;
                     }
                     graphDraws.resize(retained);
                     graphFallbackDraws.resize(retained);
                     graphFallbackShadowEligible.resize(retained);
+                    graphFallbackViewRequired.resize(retained);
                     sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
                         sceneInputBudget, graphViewInput, inputError);
                 }
@@ -4914,9 +5012,9 @@ namespace
             p.ui.SetRects(&uiRects);
 
             if (!p.animationPalettes.Prepare(*p.frameContext.resources,
-                    p.frameContext.shadowDraws, p.frameContext.forwardDraws))
+                    p.frameContext.shadowDraws, p.frameContext.forwardDraws, p.frameContext.draws))
             {
-                outError = "공용 애니메이션 팔레트 업로드 실패";
+                outError = "공용 애니메이션 팔레트 업로드 실패 또는 동일 animator key의 pose 불일치";
                 return false;
             }
             return p.desc.PrepareAll(p.frameContext, viewIndex, outError);
@@ -5028,12 +5126,31 @@ namespace
             {
                 RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::Dxil);
                 if (!p.graphMaterials.PrepareResidency(p.frameContext, p.graphInput, outError)) return false;
-                if (((p.graphInput && !p.graphInput->Draws().empty()) || p.gbuffer.HasGpuVisibilityCandidates())
-                    && !graph.PrepareParallel(dx12.CommandPool(), outError))
+                // The later RecordParallel consumes this already-prepared
+                // boundary; it must not retire a palette allocated above it.
+                if (!graph.PrepareParallel(dx12.CommandPool(), outError))
                 {
                     return false;
                 }
+                if (!p.animationPalettes.UploadForCurrentRecording(*p.frameContext.resources))
+                {
+                    outError = "Sealed animation palette upload failed after the upload-prefix boundary.";
+                    return false;
+                }
                 if (!p.gbuffer.PrepareGpuVisibility(p.frameContext, outError))
+                {
+                    return false;
+                }
+                if (!p.shadow.PrepareGpuVisibility(p.frameContext, outError))
+                {
+                    return false;
+                }
+                if (!p.forward.PrepareGpuVisibility(p.frameContext, outError))
+                {
+                    return false;
+                }
+                if (!p.decal.PrepareGpuVisibility(p.frameContext, outError)
+                    || !p.sprite.PrepareGpuVisibility(p.frameContext, outError))
                 {
                     return false;
                 }
@@ -5046,8 +5163,6 @@ namespace
                 }
                 if (capture) capture->RecordLatticeInput(p.graphInput);
             }
-            viewShadowStats[targetIndex] = CaptureShadowStats(p);
-
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
             // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
@@ -5114,6 +5229,7 @@ namespace
                 if (!graph.RecordParallel(dx12.CommandPool(), 4, batchDesc,
                     batch, outError)) return false;
             }
+            viewShadowStats[targetIndex] = CaptureShadowStats(p);
             p.lastNativeRecordMs = recordWatch.ElapsedMs();
             if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
             { outError = "capture graph is not compiled"; return false; }
@@ -7178,6 +7294,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             state.graphDraws.clear();
             state.graphFallbackDraws.clear();
             state.graphFallbackShadowEligible.clear();
+            state.graphFallbackViewRequired.clear();
             state.graphViewInput.reset();
             state.decals.clear();
         }

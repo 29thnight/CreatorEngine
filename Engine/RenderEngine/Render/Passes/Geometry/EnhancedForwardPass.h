@@ -9,6 +9,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 #include <wrl/client.h>
 
@@ -17,6 +18,7 @@
 #include "../../Graph/EnhancedDrawSealLedger.h"
 #include "../../Scene/MaterialTextureTable.h"
 #include "../../../LXMaterialPipeline.h"
+#include "../../../GpuGeometryVisibility.h"
 #include "../../Graph/EnhancedForwardLighting.h"
 namespace material_graph { class SceneHost; }
 
@@ -141,6 +143,9 @@ public:
         std::span<const ShaderMetaHandle> activeHandles,
         RHICompletionPoint retireAfter);
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    // Preflight under the backend shader-output scope after the upload prefix.
+    // Ordered ranges are finalized in Declare after merging Code and Graph.
+    bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
 
@@ -165,6 +170,8 @@ public:
     uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
     uint32_t GetLastMaterialCount() const { return m_lastMaterialCount; }
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
+    // CPU-prepared route accounting, never a GPU-visible/readback count.
+    GpuGeometryVisibility::PreparedStats GetGpuVisibilityStats() const { return m_visibilityStats; }
 
     /// W8 — 이번 프레임 draw의 세대 신원 장부. GBuffer와 같은 뜻이다.
     const EnhancedDrawSealLedger& GetSealLedger() const { return m_sealLedger; }
@@ -273,10 +280,16 @@ private:
     /// 인코더만 받는다. R4-1b에서 함께 받던 커맨드 리스트는 디스크립터 힙
     /// 바인딩 하나에만 쓰였고, R4-1c가 그것을 인코더의 지연 바인딩으로
     /// 옮기면서 마지막 쓰임이 사라졌다.
+    struct OrderedVisibility
+    {
+        std::shared_ptr<const GpuGeometryVisibility::Frame> frame;
+        std::map<std::pair<std::size_t, std::size_t>, std::uint32_t> bins;
+    };
+
     bool RecordShading(class RHIEncoder& encoder,
         const EnhancedFrameContext& context, uint32_t lightCount,
         RHITextureHandle shadowResource, const EnhancedForwardLighting& lighting,
-        std::size_t first, std::size_t end);
+        std::size_t first, std::size_t end, const OrderedVisibility& visibility);
 
     material_graph::SceneHost* m_graphMaterials{};
     Inputs   m_inputs{};
@@ -454,6 +467,8 @@ private:
     };
 
     std::vector<DrawBatch> m_batches;
+    GpuGeometryVisibility m_visibility;
+    GpuGeometryVisibility::PreparedStats m_visibilityStats{};
 
     // 해시맵 대신 정렬 맵. 재질 종류는 프레임당 많아야 수십이고, 배열 키에
     // 해시를 손으로 붙이면 그 해시가 또 검증 대상이 된다(GBuffer와 같은 판단).

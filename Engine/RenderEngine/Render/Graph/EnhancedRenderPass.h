@@ -398,51 +398,131 @@ class AnimationPaletteFrame final
 public:
     bool Prepare(IRenderDeviceServices& resources,
         const std::vector<EnhancedDrawItem>* opaque,
-        const std::vector<EnhancedDrawItem>* forward)
+        const std::vector<EnhancedDrawItem>* forward,
+        const std::vector<EnhancedDrawItem>* geometryCandidates = nullptr)
     {
         m_matrices.clear();
         m_offsets.clear();
         m_upload = {};
-        auto collect = [this](const std::vector<EnhancedDrawItem>* draws)
+        m_uploadDevice = nullptr;
+        m_uploadRecording = 0;
+        std::unordered_map<std::uint64_t, std::uint32_t> paletteCounts;
+        auto collect = [this, &paletteCounts](const std::vector<EnhancedDrawItem>* draws)
         {
-            if (!draws) return;
+            if (!draws)
+            {
+                return true;
+            }
             for (const auto& draw : *draws)
             {
-                if (!draw.bonePalette || !draw.boneCount
-                    || m_offsets.contains(draw.animatorKey)) continue;
+                if (draw.boneCount != 0 && !draw.bonePalette)
+                {
+                    return false;
+                }
+                if (draw.boneCount == 0)
+                {
+                    continue;
+                }
+                if (const auto prior = m_offsets.find(draw.animatorKey); prior != m_offsets.end())
+                {
+                    // One animator key must mean one exact pose for every pass.
+                    // Falling back to direct draws would still fetch the wrong
+                    // shared palette, possibly beyond the first pose's range.
+                    if (paletteCounts.at(draw.animatorKey) != draw.boneCount)
+                    {
+                        return false;
+                    }
+                    for (std::uint32_t bone = 0; bone < draw.boneCount; ++bone)
+                    {
+                        const auto packed = PackedBoneMatrix::From(draw.bonePalette[bone]);
+                        if (std::memcmp(&m_matrices[prior->second + bone], &packed, sizeof(packed)) != 0)
+                        {
+                            return false;
+                        }
+                    }
+                    continue;
+                }
                 if (draw.boneCount > (std::numeric_limits<std::uint32_t>::max)()
                     - m_matrices.size())
+                {
                     throw std::length_error("animation palette upload overflow");
+                }
                 const auto offset = static_cast<std::uint32_t>(m_matrices.size());
                 m_matrices.resize(m_matrices.size() + draw.boneCount);
                 for (std::uint32_t bone = 0; bone < draw.boneCount; ++bone)
+                {
                     m_matrices[offset + bone] = PackedBoneMatrix::From(draw.bonePalette[bone]);
+                }
                 m_offsets.emplace(draw.animatorKey, offset);
+                paletteCounts.emplace(draw.animatorKey, draw.boneCount);
             }
+            return true;
         };
-        collect(opaque);
-        collect(forward);
+        // GPU visibility may admit offscreen skin geometry that is not a shadow
+        // caster. Upload its pose without expanding the independent caster set.
+        if (!collect(opaque) || !collect(forward) || !collect(geometryCandidates))
+        {
+            return false;
+        }
+        return UploadForCurrentRecording(resources);
+    }
+
+    // Parallel preparation submits the upload prefix and begins a new recording.
+    // Re-upload the already sealed pose for that recording; never reread a live
+    // animator/palette pointer or let a completed prefix fence recycle draw input.
+    bool UploadForCurrentRecording(IRenderDeviceServices& resources)
+    {
+        const auto recording = resources.GetCurrentUploadRecordingId();
+        if (!recording)
+        {
+            return false;
+        }
+        if (m_uploadDevice == &resources && m_uploadRecording == recording &&
+            m_upload.IsValid() && m_upload.IsWritable())
+        {
+            return true;
+        }
+        m_upload = {};
+        m_uploadDevice = nullptr;
+        m_uploadRecording = 0;
         const auto bytes = sizeof(PackedBoneMatrix)
             * (m_matrices.empty() ? std::size_t{ 1 } : m_matrices.size());
-        m_upload = resources.AllocateUpload(RHIUploadRequest{
+        const auto uploaded = resources.AllocateUpload(RHIUploadRequest{
             bytes, RHIUploadUsage::BufferCopy, sizeof(PackedBoneMatrix) });
-        if (!m_upload.IsValid()) return false;
+        if (!uploaded.IsValid() || !uploaded.IsWritable() ||
+            recording != resources.GetCurrentUploadRecordingId())
+        {
+            return false;
+        }
         if (m_matrices.empty())
         {
             const auto identity = PackedBoneMatrix::Identity();
-            std::memcpy(m_upload.cpuAddress, &identity, sizeof(identity));
+            std::memcpy(uploaded.cpuAddress, &identity, sizeof(identity));
         }
-        else std::memcpy(m_upload.cpuAddress, m_matrices.data(), bytes);
+        else
+        {
+            std::memcpy(uploaded.cpuAddress, m_matrices.data(), bytes);
+        }
+        m_upload = uploaded;
+        m_uploadDevice = &resources;
+        m_uploadRecording = recording;
         return true;
     }
 
     [[nodiscard]] const auto& Offsets() const noexcept { return m_offsets; }
     [[nodiscard]] RHIBufferSlice Upload() const noexcept { return m_upload; }
+    // Actual sealed matrices, excluding any placeholder or allocation padding.
+    [[nodiscard]] std::uint32_t MatrixCount() const noexcept
+    {
+        return static_cast<std::uint32_t>(m_matrices.size());
+    }
 
 private:
     std::vector<PackedBoneMatrix> m_matrices{};
     std::unordered_map<std::uint64_t, std::uint32_t> m_offsets{};
     RHIBufferSlice m_upload{};
+    IRenderDeviceServices* m_uploadDevice{};
+    std::uint64_t m_uploadRecording{};
 };
 
 // 한 프레임의 렌더 입력과 도구. 패스는 여기 있는 것만 쓴다 —
