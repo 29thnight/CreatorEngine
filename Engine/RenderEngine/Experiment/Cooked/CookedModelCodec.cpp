@@ -690,9 +690,7 @@ namespace experiment::cooked
             Reject(issues, "header", "매직이 다르다 — 쿠킹 파일이 아니다.");
             return false;
         }
-        if (kFormatVersion != header.formatVersion
-            && kMeshletFormatVersion != header.formatVersion
-            && kIndexedOnlyFormatVersion != header.formatVersion)
+        if (kFormatVersion != header.formatVersion)
         {
             Reject(issues, "header", "포맷 버전 " + std::to_string(header.formatVersion)
                 + " != " + std::to_string(kFormatVersion) + " — 재임포트 필요.");
@@ -742,9 +740,7 @@ namespace experiment::cooked
             static_cast<std::size_t>(SectionKind::Count), nullptr);
         const auto requiredSections = static_cast<std::uint32_t>(SectionKind::MeshletMeshes);
         const auto meshletSectionEnd = static_cast<std::uint32_t>(SectionKind::CoarseLods);
-        const auto allowedSections = header.formatVersion == kIndexedOnlyFormatVersion
-            ? requiredSections : header.formatVersion == kMeshletFormatVersion
-            ? meshletSectionEnd : static_cast<std::uint32_t>(SectionKind::Count);
+        const auto allowedSections = static_cast<std::uint32_t>(SectionKind::Count);
         for (const SectionEntry& entry : table)
         {
             if (entry.kind >= allowedSections)
@@ -906,9 +902,8 @@ namespace experiment::cooked
             return false;
         }
 
-        // Optional v10 acceleration is validated separately from indexed geometry.
+        // Optional meshlet acceleration is validated separately from indexed geometry.
         // Generation SHA verification remains the caller's responsibility and is unchanged.
-        if (header.formatVersion >= kMeshletFormatVersion)
         {
             std::span<const CookedMeshletMesh> acceleration;
             std::span<const MeshletDescriptor> descriptors;
@@ -1013,7 +1008,6 @@ namespace experiment::cooked
             }
         }
 
-        if (header.formatVersion == kFormatVersion)
         {
             std::span<const std::byte> lodBytes;
             bool valid = byKind[static_cast<std::uint32_t>(SectionKind::CoarseLods)] != nullptr;

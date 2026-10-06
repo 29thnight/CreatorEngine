@@ -78,11 +78,9 @@ namespace experiment::cooked
     //   glTF 의 texture.samplerIndex 를 읽은 적이 없어 구 캐시는 wrap/filter 를
     //   전부 기본값으로 담고 있다 — 레이아웃이 아니라 값이 비어 있는 쪽이라
     //   재임포트해야 채워진다.
-    // 10: optional generation-owned meshlets; v9 indexed payloads remain readable.
-    // 11: optional coarse-LOD chains; v9/v10 remain explicit read formats.
+    // 10: optional generation-owned meshlets.
+    // 11: optional coarse-LOD chains. 이전 판은 읽지 않는다 — 재임포트한다.
     inline constexpr std::uint32_t kFormatVersion = 11u;
-    inline constexpr std::uint32_t kMeshletFormatVersion = 10u;
-    inline constexpr std::uint32_t kIndexedOnlyFormatVersion = 9u;
 
     // V3부터 헤더는 특정 mesh mask가 아니라 전체 기술표의 지문을 기록한다.
     // 각 mesh의 실제 배치는 CookedMesh의 mask에서 같은 표로 유도한다.
