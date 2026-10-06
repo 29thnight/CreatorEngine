@@ -153,19 +153,7 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle> Camera_GetPrimaryHandle;
 
     // LightComponent. setter는 네이티브에서 컴포넌트 writer를 거쳐 dirty를 발행한다.
-    public delegate* unmanaged<ObjectHandle, int> Light_Exists;
-    public delegate* unmanaged<ObjectHandle, Color4> Light_GetColor;
-    public delegate* unmanaged<ObjectHandle, Color4, void> Light_SetColor;
-    public delegate* unmanaged<ObjectHandle, float> Light_GetIntensity;
-    public delegate* unmanaged<ObjectHandle, float, void> Light_SetIntensity;
-    public delegate* unmanaged<ObjectHandle, float> Light_GetRange;
-    public delegate* unmanaged<ObjectHandle, float, void> Light_SetRange;
-    public delegate* unmanaged<ObjectHandle, float> Light_GetSpotAngle;
-    public delegate* unmanaged<ObjectHandle, float, void> Light_SetSpotAngle;
-    public delegate* unmanaged<ObjectHandle, int> Light_GetLightType;
-    public delegate* unmanaged<ObjectHandle, int, void> Light_SetLightType;
-    public delegate* unmanaged<ObjectHandle, int> Light_GetLightStatus;
-    public delegate* unmanaged<ObjectHandle, int, void> Light_SetLightStatus;
+    public ScriptLightApi Light;
 
     // MeshRenderer + Material (m_Material 42회 — 대부분 셰이더 상수 넣기)
     public delegate* unmanaged<ObjectHandle, int> Mesh_Exists;
@@ -277,13 +265,16 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<uint, int, int, int, int> Audio_Configure;
     public delegate* unmanaged<int, int> Audio_SetReverbPreset;
 
+    // 버전 34: 기존 함수 포인터 다음의 검증 값.
+    public ulong AbiFingerprint;
+
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
-internal static unsafe class Native
+internal static unsafe partial class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 33;
+    public const int ExpectedVersion = 34;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -388,6 +379,10 @@ internal static unsafe class Native
         if (table == null) return false;
         if (table->Version != ExpectedVersion) return false;
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
+        if (table->AbiFingerprint != ScriptBindingsContract.Fingerprint || !ScriptBindingsContract.ValidateLayout())
+        {
+            return false;
+        }
 
         _api = *table;
         _bound = true;
@@ -1135,57 +1130,6 @@ internal static unsafe class Native
 
     public static ObjectHandle CameraGetPrimaryHandle()
         => Entered() && _api.Camera_GetPrimaryHandle != null ? _api.Camera_GetPrimaryHandle() : default;
-
-    public static bool LightExists(ObjectHandle h)
-        => Entered() && _api.Light_Exists != null && _api.Light_Exists(h) != 0;
-
-    public static Color4 LightGetColor(ObjectHandle h)
-        => Entered() && _api.Light_GetColor != null ? _api.Light_GetColor(h) : Color4.White;
-
-    public static void LightSetColor(ObjectHandle h, Color4 color)
-    {
-        if (Entered() && _api.Light_SetColor != null) _api.Light_SetColor(h, color);
-    }
-
-    public static float LightGetIntensity(ObjectHandle h)
-        => Entered() && _api.Light_GetIntensity != null ? _api.Light_GetIntensity(h) : 0f;
-
-    public static void LightSetIntensity(ObjectHandle h, float intensity)
-    {
-        if (Entered() && _api.Light_SetIntensity != null) _api.Light_SetIntensity(h, intensity);
-    }
-
-    public static float LightGetRange(ObjectHandle h)
-        => Entered() && _api.Light_GetRange != null ? _api.Light_GetRange(h) : 0f;
-
-    public static void LightSetRange(ObjectHandle h, float range)
-    {
-        if (Entered() && _api.Light_SetRange != null) _api.Light_SetRange(h, range);
-    }
-
-    public static float LightGetSpotAngle(ObjectHandle h)
-        => Entered() && _api.Light_GetSpotAngle != null ? _api.Light_GetSpotAngle(h) : 0f;
-
-    public static void LightSetSpotAngle(ObjectHandle h, float degrees)
-    {
-        if (Entered() && _api.Light_SetSpotAngle != null) _api.Light_SetSpotAngle(h, degrees);
-    }
-
-    public static int LightGetLightType(ObjectHandle h)
-        => Entered() && _api.Light_GetLightType != null ? _api.Light_GetLightType(h) : 0;
-
-    public static void LightSetLightType(ObjectHandle h, int type)
-    {
-        if (Entered() && _api.Light_SetLightType != null) _api.Light_SetLightType(h, type);
-    }
-
-    public static int LightGetLightStatus(ObjectHandle h)
-        => Entered() && _api.Light_GetLightStatus != null ? _api.Light_GetLightStatus(h) : 0;
-
-    public static void LightSetLightStatus(ObjectHandle h, int status)
-    {
-        if (Entered() && _api.Light_SetLightStatus != null) _api.Light_SetLightStatus(h, status);
-    }
 
     // ── MeshRenderer · Material ──
 

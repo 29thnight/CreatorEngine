@@ -138,7 +138,7 @@
     <_EngineVcpkgTriplet Condition="'$(_EngineVcpkgTriplet)' == '' and '$(Platform)' == 'x64'">x64-windows</_EngineVcpkgTriplet>
     <_EngineVcpkgTriplet Condition="'$(_EngineVcpkgTriplet)' == '' and '$(Platform)' == 'Win32'">x86-windows</_EngineVcpkgTriplet>
     <_EngineVcpkgInstalledDir>$(VcpkgInstalledDir)</_EngineVcpkgInstalledDir>
-    <_EngineVcpkgInstalledDir Condition="'$(_EngineVcpkgInstalledDir)' == ''">$(MSBuildThisFileDirectory)vcpkg_installed\$(_EngineVcpkgTriplet)\</_EngineVcpkgInstalledDir>
+    <_EngineVcpkgInstalledDir Condition="'$(_EngineVcpkgInstalledDir)' == ''">$(MSBuildThisFileDirectory)vcpkg_installed\</_EngineVcpkgInstalledDir>
     <EngineReflgenTargets Condition="'$(EngineReflgenTargets)' == ''">$([MSBuild]::EnsureTrailingSlash('$(_EngineVcpkgInstalledDir)'))$(_EngineVcpkgTriplet)\share\reflgen\msbuild\reflgen.targets</EngineReflgenTargets>
     <ReflgenAttributeScopes>creator</ReflgenAttributeScopes>
     <!-- 런타임 타입 표는 reflgen 서술자다 — 생성된 등록 함수가 엔진 등록소(Meta::Types, ReflgenRuntime.h)를 채운다.
@@ -171,6 +171,32 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and Exists('$(EngineReflgenTargets)')" />
+
+  <!-- ScriptCore와 native 소비자가 같은 구성별 바인딩을 읽는다. 생성은 SceneRuntime만 소유한다. -->
+  <PropertyGroup>
+    <_EngineScriptBindingsPlatform>$(Platform)</_EngineScriptBindingsPlatform>
+    <_EngineScriptBindingsPlatform Condition="'$(_EngineScriptBindingsPlatform)' == '' or '$(_EngineScriptBindingsPlatform)' == 'AnyCPU'">x64</_EngineScriptBindingsPlatform>
+    <EngineScriptBindingsOutputDirectory Condition="'$(EngineScriptBindingsOutputDirectory)' == ''">$(MSBuildThisFileDirectory)Build\Generated\ScriptBindings\$(_EngineScriptBindingsPlatform)-$(EngineConfigKey)\</EngineScriptBindingsOutputDirectory>
+    <EngineScriptBindingsOutputDirectory>$([MSBuild]::EnsureTrailingSlash('$(EngineScriptBindingsOutputDirectory)'))</EngineScriptBindingsOutputDirectory>
+    <EngineScriptBindingsPowerShell Condition="'$(EngineScriptBindingsPowerShell)' == ''">pwsh</EngineScriptBindingsPowerShell>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>$(EngineScriptBindingsOutputDirectory);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <Import Project="$(MSBuildThisFileDirectory)Tools\ScriptBindings\ScriptBindings.targets"
+          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' == 'SceneRuntime'" />
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'CreatorEditor'">
+    <!-- The existing dotnet prebuild is a new process: global MSBuild properties
+         do not propagate unless its command line forwards them. -->
+    <_EngineManagedScriptBuildArguments>-p:Platform=$(Platform) -p:EngineShipping=$(EngineShipping) -p:EngineAsan=$(EngineAsan) &quot;-p:EngineScriptBindingsOutputDirectory=$(EngineScriptBindingsOutputDirectory).&quot; &quot;-p:EngineScriptBindingsPowerShell=$(EngineScriptBindingsPowerShell)&quot;</_EngineManagedScriptBuildArguments>
+    <_EngineManagedScriptBuildArguments Condition="'$(EngineReflgenTargets)' != ''">$(_EngineManagedScriptBuildArguments) &quot;-p:EngineReflgenTargets=$(EngineReflgenTargets)&quot;</_EngineManagedScriptBuildArguments>
+    <_EngineManagedScriptBuildArguments Condition="'$(ReflgenExecutable)' != ''">$(_EngineManagedScriptBuildArguments) &quot;-p:ReflgenExecutable=$(ReflgenExecutable)&quot;</_EngineManagedScriptBuildArguments>
+    <_EngineManagedScriptBuildArguments Condition="'$(EngineScriptBindingsMSBuild)' != ''">$(_EngineManagedScriptBuildArguments) &quot;-p:EngineScriptBindingsMSBuild=$(EngineScriptBindingsMSBuild)&quot;</_EngineManagedScriptBuildArguments>
+    <_EngineManagedScriptBuildArguments Condition="'$(VcpkgInstalledDir)' != ''">$(_EngineManagedScriptBuildArguments) &quot;-p:VcpkgInstalledDir=$([MSBuild]::EnsureTrailingSlash('$(VcpkgInstalledDir)')).&quot;</_EngineManagedScriptBuildArguments>
+    <_EngineManagedScriptBuildArguments Condition="'$(VcpkgTriplet)' != ''">$(_EngineManagedScriptBuildArguments) &quot;-p:VcpkgTriplet=$(VcpkgTriplet)&quot;</_EngineManagedScriptBuildArguments>
+  </PropertyGroup>
 
   <!--
     vcpkg 의 MSBuild 통합은 vcpkg.json·vcpkg-configuration.json 이 바뀔 때만 다시 설치한다 — overlay port 만 바꾸면

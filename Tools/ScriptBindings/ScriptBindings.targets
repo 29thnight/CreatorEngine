@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- Imported only by SceneRuntime, after the pinned reflgen targets. -->
+  <PropertyGroup>
+    <ReflgenDeclarationsJson>$(ReflgenOutputDirectory)SceneRuntime.declarations.json</ReflgenDeclarationsJson>
+    <_EngineScriptBindingsEmitter>$(MSBuildThisFileDirectory)Generate-ScriptBindings.ps1</_EngineScriptBindingsEmitter>
+    <_EngineScriptBindingsTargets>$(MSBuildThisFileFullPath)</_EngineScriptBindingsTargets>
+    <_EngineScriptBindingsNativeSource>$(SolutionDir)Engine\SceneRuntime\ClrHost.cpp</_EngineScriptBindingsNativeSource>
+    <_EngineScriptBindingsManagedSource>$(SolutionDir)ScriptCore\Native.cs</_EngineScriptBindingsManagedSource>
+    <_EngineScriptBindingsStamp>$(EngineScriptBindingsOutputDirectory)ScriptBindings.stamp</_EngineScriptBindingsStamp>
+    <_EngineScriptBindingsLock>$(EngineScriptBindingsOutputDirectory)ScriptBindings.generation.lock</_EngineScriptBindingsLock>
+    <_EngineScriptBindingsLockOwner>$([System.Guid]::NewGuid())</_EngineScriptBindingsLockOwner>
+    <EngineScriptBindingsLockTimeoutSeconds Condition="'$(EngineScriptBindingsLockTimeoutSeconds)' == ''">300</EngineScriptBindingsLockTimeoutSeconds>
+  </PropertyGroup>
+  <ItemGroup>
+    <_EngineScriptBindingOutput Include="$(EngineScriptBindingsOutputDirectory)ScriptLightApi.g.h" />
+    <_EngineScriptBindingOutput Include="$(EngineScriptBindingsOutputDirectory)ScriptLightApi.Thunks.g.inc" />
+    <_EngineScriptBindingOutput Include="$(EngineScriptBindingsOutputDirectory)ScriptLightApi.Fill.g.inc" />
+    <_EngineScriptBindingOutput Include="$(EngineScriptBindingsOutputDirectory)ScriptLightApi.g.cs" />
+    <_EngineScriptBindingOutput Include="$(EngineScriptBindingsOutputDirectory)Native.Light.g.cs" />
+    <_EngineScriptBindingOutput Include="$(EngineScriptBindingsOutputDirectory)LightComponent.g.cs" />
+    <_EngineScriptBindingOutput Include="$(EngineScriptBindingsOutputDirectory)ScriptBindings.contract.json" />
+  </ItemGroup>
+
+  <!-- MSBuild owns this lease, not the game runtime. FileShare.None also excludes
+       the separate VS MSBuild process launched by dotnet build. OnError releases
+       a failed generation; build teardown also disposes registered objects.
+       Yield while waiting so a blocked node cannot starve the current owner. -->
+  <UsingTask TaskName="CreatorEngineScriptBindingsLock"
+             TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <LockPath ParameterType="System.String" Required="true" />
+      <Owner ParameterType="System.String" Required="true" />
+      <Release ParameterType="System.Boolean" Required="true" />
+      <TimeoutSeconds ParameterType="System.Int32" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Diagnostics" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Threading" />
+      <Using Namespace="Microsoft.Build.Framework" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var engine = (IBuildEngine4)BuildEngine;
+        var path = Path.GetFullPath(LockPath);
+        var key = "CreatorEngine.ScriptBindings:" + path.ToUpperInvariant() + ":" + Owner;
+        if (Release)
+        {
+            var owned = engine.UnregisterTaskObject(key, RegisteredTaskObjectLifetime.Build) as IDisposable;
+            if (owned != null)
+            {
+                owned.Dispose();
+            }
+            return true;
+        }
+        FileStream lease = null;
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            var elapsed = Stopwatch.StartNew();
+            var scheduler = (IBuildEngine3)BuildEngine;
+            scheduler.Yield();
+            try
+            {
+                while (lease == null)
+                {
+                    try
+                    {
+                        lease = new FileStream(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+                    }
+                    catch (IOException)
+                    {
+                        if (elapsed.Elapsed.TotalSeconds >= TimeoutSeconds)
+                        {
+                            throw new TimeoutException("Timed out waiting for script binding generation: " + path);
+                        }
+                        Thread.Sleep(100);
+                    }
+                }
+            }
+            finally
+            {
+                scheduler.Reacquire();
+            }
+            engine.RegisterTaskObject(key, lease, RegisteredTaskObjectLifetime.Build, false);
+            lease = null;
+            return true;
+        }
+        catch (Exception error)
+        {
+            Log.LogErrorFromException(error, false);
+            return false;
+        }
+        finally
+        {
+            if (lease != null)
+            {
+                lease.Dispose();
+            }
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="_EngineAcquireScriptBindingsLock"
+          DependsOnTargets="_EngineRequireReflgen;_EngineReflgenUpdatedDuringBuild">
+    <CreatorEngineScriptBindingsLock LockPath="$(_EngineScriptBindingsLock)" Release="false"
+                                    Owner="$(_EngineScriptBindingsLockOwner)"
+                                    TimeoutSeconds="$(EngineScriptBindingsLockTimeoutSeconds)" />
+  </Target>
+  <Target Name="_EngineReleaseScriptBindingsLock">
+    <CreatorEngineScriptBindingsLock LockPath="$(_EngineScriptBindingsLock)" Release="true"
+                                    Owner="$(_EngineScriptBindingsLockOwner)"
+                                    TimeoutSeconds="$(EngineScriptBindingsLockTimeoutSeconds)" />
+  </Target>
+
+  <!-- Keep the four upstream stages in the same order as reflgen commit
+       d04dd64672ff29bc56993e41a3148bd6f939ab76. Acquiring in BeforeTargets of
+       _ReflgenComputeInputs would be too late: its ownership-read dependency
+       has already run. Wrap the public target so that read is protected too.
+       ReflgenGetOwnInjection calls this target, so every native reference also
+       waits for the engine emitter before it receives the injection header. -->
+  <Target Name="ReflgenGenerate"
+          BeforeTargets="ClCompile"
+          Condition="'$(DesignTimeBuild)' != 'true'"
+          DependsOnTargets="_EngineAcquireScriptBindingsLock;_ReflgenComputeInputs;_ReflgenWriteArguments;_ReflgenRun;_ReflgenRegisterOwnedOutputs;_EnginePrepareScriptBindingOutputs;_EngineEmitScriptBindings;_EngineRegisterScriptBindingOutputs;_EngineReleaseScriptBindingsLock">
+    <OnError ExecuteTargets="_EngineReleaseScriptBindingsLock" />
+  </Target>
+
+  <!-- Public generation-only entry point for ScriptCore; never requests Build,
+       ClCompile, or a native ProjectReference. -->
+  <Target Name="EngineGenerateScriptBindings"
+          DependsOnTargets="ReflgenGenerate"
+          Condition="'$(DesignTimeBuild)' != 'true'" />
+
+  <Target Name="_EnginePrepareScriptBindingOutputs">
+    <Error Condition="!Exists('$(ReflgenDeclarationsJson)')"
+           Text="SceneRuntime declaration manifest is missing: $(ReflgenDeclarationsJson). Restore the pinned reflgen overlay and rebuild so its targets are re-imported." />
+    <ItemGroup>
+      <_EngineScriptBindingMissingOutput Include="@(_EngineScriptBindingOutput)" Condition="!Exists('%(Identity)')" />
+    </ItemGroup>
+  </Target>
+  <Target Name="_EngineEmitScriptBindings"
+          Inputs="$(ReflgenDeclarationsJson);$(_EngineScriptBindingsNativeSource);$(_EngineScriptBindingsManagedSource);$(_EngineScriptBindingsEmitter);$(_EngineScriptBindingsTargets)"
+          Outputs="$(_EngineScriptBindingsStamp);@(_EngineScriptBindingMissingOutput)">
+    <Exec Command="&quot;$(EngineScriptBindingsPowerShell)&quot; -NoProfile -File &quot;$(_EngineScriptBindingsEmitter)&quot; -Declarations &quot;$(ReflgenDeclarationsJson)&quot; -NativeSource &quot;$(_EngineScriptBindingsNativeSource)&quot; -ManagedSource &quot;$(_EngineScriptBindingsManagedSource)&quot; -OutputDirectory &quot;$(EngineScriptBindingsOutputDirectory).&quot;"
+          StdOutEncoding="utf-8" StdErrEncoding="utf-8" />
+    <Error Condition="!Exists('%(_EngineScriptBindingOutput.Identity)')"
+           Text="Script binding generation did not produce %(_EngineScriptBindingOutput.Identity)." />
+    <Touch Files="$(_EngineScriptBindingsStamp)" AlwaysCreate="true" />
+  </Target>
+  <Target Name="_EngineRegisterScriptBindingOutputs">
+    <ItemGroup>
+      <!-- SceneRuntime alone owns shared generated sources for Clean. -->
+      <FileWrites Include="@(_EngineScriptBindingOutput);$(_EngineScriptBindingsStamp)" />
+    </ItemGroup>
+  </Target>
+  <Target Name="_EngineCleanScriptBindings" BeforeTargets="Clean">
+    <!-- Generation-only invocations do not run native build's FileWrites-cache
+         persistence. Clean still removes these exact owned files, without
+         globbing/deleting the shared output directory or the lock file. -->
+    <Delete Files="@(_EngineScriptBindingOutput);$(_EngineScriptBindingsStamp)" />
+  </Target>
+</Project>

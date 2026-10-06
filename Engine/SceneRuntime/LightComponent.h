@@ -16,14 +16,32 @@
 // 필요해졌는데, 그 헤더는 Camera·RenderPassData·프록시 계층을 통째로 끌고 온다.
 // ScriptBinder의 어느 헤더도 그것을 include하지 않는 것이 이 저장소의 규약이라
 // 정의를 .cpp로 옮겼다.
-class [[reflgen::reflect]] LightComponent : public meta::identity<LightComponent, Component>
+class [[reflgen::reflect, creator::script_component("Light")]] LightComponent : public meta::identity<LightComponent, Component>
 {
-    public:
 public:
     // CT6-d: 팩토리 분기의 강제 활성 보존
     void OnDeserialized() { SetEnabled(true); }
 
 	LightComponent() = default;
+
+    // 노출의 정본은 이 getter/writer 선언이다. 인스펙터 호출 UI에는 추가하지 않는다.
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Color", 1)]]
+    math::color GetColor() const { return m_color; }
+
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Intensity", 3)]]
+    float GetIntensity() const { return m_intencity; }
+
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Range", 5)]]
+    float GetRange() const { return m_range; }
+
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("SpotAngle", 7)]]
+    float GetSpotAngle() const { return m_spotLightAngle; }
+
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Type", 9)]]
+    LightType GetLightType() const { return m_lightType; }
+
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Status", 11)]]
+    LightStatus GetLightStatus() const { return m_lightStatus; }
 
 	// ── 값 writer는 반드시 dirty를 발행한다 ──
 	//
@@ -35,12 +53,14 @@ public:
 	// 그렇게 쓰고 있어(ReflectionTypedDraw.h는 값을 대입만 하고 dirty를
 	// 모른다) 지금 private으로 내리면 저작 경로가 멈춘다. 그 축은 별도로
 	// 닫아야 하고, 그때까지 새 코드는 이 writer들만 쓴다.
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Type", 10)]]
 	void SetLightType(LightType type)
 	{
 		m_lightType = type;
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 	}
 
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Color", 2)]]
 	void SetColor(const math::color& color)
 	{
 		m_color = color;
@@ -48,12 +68,14 @@ public:
 	}
 
 	// 세기는 EnhancedLight::color.a로 실린다(EnhancedLightPacking.h).
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Intensity", 4)]]
 	void SetIntensity(float intensity)
 	{
 		m_intencity = intensity;
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 	}
 
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Range", 6)]]
 	void SetRange(float range)
 	{
 		m_range = range;
@@ -61,12 +83,14 @@ public:
 	}
 
 	// 도 단위로 받는다 — 패킹이 radians()로 바꿔 싣는다.
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("SpotAngle", 8)]]
 	void SetSpotAngle(float degrees)
 	{
 		m_spotLightAngle = degrees;
 		PublishRenderProxyDirty(ProxyDirty::Payload);
 	}
 
+    [[reflgen::reflect, creator::hide_in_inspector, creator::script_export("Status", 12)]]
 	void SetLightStatus(LightStatus status)
 	{
 		m_lightStatus = status;
