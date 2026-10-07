@@ -271,9 +271,9 @@ void MenuBarWindow::RenderMenuBar()
     // body scale, and the main menu reserves the viewport work area exactly once.
     const float scale = editor::ThemePixels(1.f);
     ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), editor::EditorThemeTokens::TitleBarFontSize);
-    // Compensate for the active font's rounding while preserving the logical minimum.
+    // The minimum is 45 final pixels, not 45 multiplied by user/monitor scale.
     const float titlePaddingY = editor::TitleBarFramePaddingY(
-        ImGui::GetFontSize(), scale, ImGui::GetStyle().DisplaySafeAreaPadding.y);
+        ImGui::GetFontSize(), ImGui::GetStyle().DisplaySafeAreaPadding.y, ImGui::GetIO().DisplayFramebufferScale.y);
     ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(6.f * scale, titlePaddingY));
     // Popup menus inherit this scope too. A zero vertical gap compresses their
     // selectable rows to the text height, even though the title row looks fine.
@@ -937,7 +937,11 @@ void MenuBarWindow::RenderPlayControls(const EditorTitleBarLayout& layout)
                          Editor::PlayState::PlayingEjected == playState ||
                          Editor::PlayState::Exiting == playState;
     const bool paused = SceneManagers->IsGamePaused();
-    ImGui::PushFont(nullptr, editor::EditorThemeTokens::IconFontSize);
+    // A post-scale physical title-row minimum no longer grows as 45 * scale.
+    // Keep the transport glyphs inside the actual control box at large scales.
+    const float iconFontSize = std::min(editor::EditorThemeTokens::IconFontSize,
+        std::max(1.f, (boxMax.y - boxMin.y - 2.f * scale) / scale));
+    ImGui::PushFont(nullptr, iconFontSize);
     ImGui::PushID("TitleBarPlayControls");
     bool playPressed = false, pausePressed = false;
     for (int index = 0; index < 2; ++index)

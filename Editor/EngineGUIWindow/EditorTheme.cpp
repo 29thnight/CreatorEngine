@@ -53,13 +53,15 @@ namespace editor
         return logicalPixels * style.FontScaleMain * style.FontScaleDpi;
     }
 
-    float TitleBarFramePaddingY(float fontHeight, float scale, float safePaddingY) noexcept
+    float TitleBarFramePaddingY(float fontHeight, float safePaddingY, float framebufferScaleY) noexcept
     {
-        // ImGui truncates window sizes, so round the scaled minimum upward and
-        // compensate for the active font's own rounding instead of scaling it twice.
-        // Cover the safe area too, so BeginMainMenuBar adds no unreserved offset.
+        // Win32 client coordinates already are physical pixels in our per-monitor
+        // aware hosts (framebuffer scale 1). Do not multiply this floor by DPI or
+        // user scale again. Larger scaled fonts/safe areas may still grow the row.
+        // ImGui truncates window sizes, so round the reserved coordinate upward.
         const float paddedFontHeight = fontHeight + 2.f * std::max(0.f, safePaddingY);
-        const float minimumHeight = std::ceil(std::max(EditorThemeTokens::TitleBarHeight * scale, paddedFontHeight));
+        const float physicalMinimum = EditorThemeTokens::TitleBarHeight / valid_scale(framebufferScaleY);
+        const float minimumHeight = std::ceil(std::max(physicalMinimum, paddedFontHeight));
         return (minimumHeight - fontHeight) * .5f;
     }
 
