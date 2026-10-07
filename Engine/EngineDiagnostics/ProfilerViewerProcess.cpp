@@ -18,6 +18,67 @@ namespace ce::profiler_viewer
     {
         using namespace transport;
 
+        constexpr DWORD viewer_close_grace_ms = 1500;
+        constexpr DWORD viewer_termination_wait_ms = 500;
+        constexpr DWORD owner_shutdown_wait_ms = 2500;
+
+        security::handle create_viewer_job(DWORD& error)
+        {
+            // Unnamed and non-inheritable: only this Editor holds the lifetime
+            // handle. An Editor crash closes it even if no worker can unwind.
+            security::handle job(CreateJobObjectW(nullptr, nullptr));
+            JOBOBJECT_EXTENDED_LIMIT_INFORMATION limits{};
+            limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+            if (!job || !SetInformationJobObject(job.get(), JobObjectExtendedLimitInformation, &limits, sizeof(limits)))
+            {
+                error = GetLastError();
+                return {};
+            }
+            return job;
+        }
+
+        bool create_owned_viewer(HANDLE job, const std::wstring& executable, std::wstring& command_line,
+                                 std::wstring& environment, PROCESS_INFORMATION& information)
+        {
+            SIZE_T bytes = 0;
+            InitializeProcThreadAttributeList(nullptr, 1, 0, &bytes);
+            if (bytes == 0)
+            {
+                return false;
+            }
+            std::vector<std::byte> storage(bytes);
+            auto* attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
+            if (!InitializeProcThreadAttributeList(attributes, 1, 0, &bytes))
+            {
+                return false;
+            }
+            struct release_attributes
+            {
+                LPPROC_THREAD_ATTRIBUTE_LIST value;
+                ~release_attributes()
+                {
+                    const auto error = GetLastError();
+                    DeleteProcThreadAttributeList(value);
+                    SetLastError(error);
+                }
+            } release{attributes};
+            if (!UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_JOB_LIST,
+                                           &job, sizeof(job), nullptr, nullptr))
+            {
+                return false;
+            }
+            STARTUPINFOEXW startup{};
+            startup.StartupInfo.cb = sizeof(startup);
+            startup.lpAttributeList = attributes;
+            // Atomic job assignment avoids an orphan if the Editor crashes
+            // between CreateProcess and a later AssignProcessToJobObject. Never
+            // fall back to an unowned process or break away from an outer job.
+            return CreateProcessW(executable.c_str(), command_line.data(), nullptr, nullptr, FALSE,
+                                  CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT | CREATE_SUSPENDED,
+                                  environment.data(), security::directory(executable).c_str(),
+                                  &startup.StartupInfo, &information) != FALSE;
+        }
+
         security::handle create_pipe(const connection_options& options)
         {
             std::vector<std::byte> sid;
@@ -67,9 +128,11 @@ namespace ce::profiler_viewer
 
         BOOL CALLBACK focus_window(HWND window, LPARAM process)
         {
+            const auto viewer = reinterpret_cast<HANDLE>(process);
             DWORD owner = 0;
             GetWindowThreadProcessId(window, &owner);
-            if (owner == static_cast<DWORD>(process) && GetWindow(window, GW_OWNER) == nullptr)
+            if (WaitForSingleObject(viewer, 0) == WAIT_TIMEOUT && owner == GetProcessId(viewer) &&
+                GetWindow(window, GW_OWNER) == nullptr)
             {
                 ShowWindowAsync(window, SW_RESTORE);
                 SetForegroundWindow(window);
@@ -80,9 +143,11 @@ namespace ce::profiler_viewer
 
         BOOL CALLBACK close_window(HWND window, LPARAM process)
         {
+            const auto viewer = reinterpret_cast<HANDLE>(process);
             DWORD owner = 0;
             GetWindowThreadProcessId(window, &owner);
-            if (owner == static_cast<DWORD>(process) && GetWindow(window, GW_OWNER) == nullptr)
+            if (WaitForSingleObject(viewer, 0) == WAIT_TIMEOUT && owner == GetProcessId(viewer) &&
+                GetWindow(window, GW_OWNER) == nullptr)
             {
                 PostMessageW(window, WM_CLOSE, 0, 0);
                 return FALSE;
@@ -126,6 +191,9 @@ namespace ce::profiler_viewer
         std::atomic<std::uint32_t> page{0};
         std::uint32_t ui_scale_milli = 1000;
         transport::security::handle stop{CreateEventW(nullptr, TRUE, FALSE, nullptr)};
+        transport::security::handle finished{CreateEventW(nullptr, TRUE, TRUE, nullptr)};
+        DWORD job_error = ERROR_SUCCESS;
+        transport::security::handle job{engine_detail::create_viewer_job(job_error)};
         mutable std::mutex mutex;
         launch_status launch;
         target_identity target;
@@ -201,11 +269,31 @@ namespace ce::profiler_viewer
         {
             using namespace transport;
             using namespace engine_detail;
+            security::handle viewer;
+            bool resumed = false;
             struct completion
             {
                 state& owner;
+                security::handle& viewer;
+                bool& resumed;
                 ~completion()
                 {
+                    if (viewer && WaitForSingleObject(viewer.get(), 0) == WAIT_TIMEOUT)
+                    {
+                        if (resumed && owner.closed.load(std::memory_order_acquire))
+                        {
+                            // WM_CLOSE follows the viewer's normal cancellation,
+                            // settings-save and renderer teardown path. A stuck
+                            // file/driver call must not hold the Editor open.
+                            EnumWindows(close_window, reinterpret_cast<LPARAM>(viewer.get()));
+                            WaitForSingleObject(viewer.get(), viewer_close_grace_ms);
+                        }
+                        if (WaitForSingleObject(viewer.get(), 0) == WAIT_TIMEOUT)
+                        {
+                            TerminateJobObject(owner.job.get(), ERROR_PROCESS_ABORTED);
+                            WaitForSingleObject(viewer.get(), viewer_termination_wait_ms);
+                        }
+                    }
                     std::lock_guard lock(owner.mutex);
                     owner.launch.running = false;
                     owner.launch.connected = false;
@@ -213,9 +301,9 @@ namespace ce::profiler_viewer
                     owner.close_requested.store(false, std::memory_order_release);
                     owner.commands.clear();
                     owner.active.store(false, std::memory_order_release);
+                    SetEvent(owner.finished.get());
                 }
-            } completed{*this};
-            security::handle viewer;
+            } completed{*this, viewer, resumed};
             try
             {
                 bool elevated = false;
@@ -274,53 +362,66 @@ namespace ce::profiler_viewer
                     L" --created " + std::to_wstring(options.target_creation_time) + L" --session " +
                     std::to_wstring(options.windows_session_id) + L" --nonce " + security::nonce_text(options.nonce) +
                     L" --ui-scale-milli " + std::to_wstring(ui_scale_milli);
-                STARTUPINFOW startup{};
-                startup.cb = sizeof(startup);
                 PROCESS_INFORMATION information{};
                 if (environment.empty() || WaitForSingleObject(stop.get(), 0) != WAIT_TIMEOUT ||
-                    !CreateProcessW(executable.c_str(), command_line.data(), nullptr, nullptr, FALSE,
-                                    CREATE_UNICODE_ENVIRONMENT, environment.data(),
-                                    security::directory(executable).c_str(), &startup, &information))
+                    !create_owned_viewer(job.get(), executable, command_line, environment, information))
                 {
-                    set_status(false, "ProfilerViewer.exe could not start", GetLastError());
+                    set_status(false, "ProfilerViewer.exe could not start with Editor-owned lifetime protection", GetLastError());
                     return;
                 }
                 viewer.reset(information.hProcess);
                 security::handle thread(information.hThread);
                 const DWORD viewer_pid = GetProcessId(viewer.get());
                 const auto viewer_created = security::creation_time(viewer.get());
-                AllowSetForegroundWindow(viewer_pid);
                 if (!peer_identity(viewer.get(), viewer_pid, viewer_created, options.windows_session_id) ||
                     !security::equal_path(security::image_path(viewer.get()), executable))
                 {
                     set_status(false, "Viewer process identity rejected", ERROR_ACCESS_DENIED);
+                    return;
+                }
+                // Shutdown can race process creation. The child remains
+                // suspended and job-owned until this final owner check passes.
+                if (closed.load(std::memory_order_acquire) || WaitForSingleObject(stop.get(), 0) != WAIT_TIMEOUT)
+                {
+                    return;
+                }
+                AllowSetForegroundWindow(viewer_pid);
+                if (ResumeThread(thread.get()) == static_cast<DWORD>(-1))
+                {
+                    set_status(false, "ProfilerViewer.exe could not resume", GetLastError());
+                    return;
+                }
+                resumed = true;
+                {
+                    std::lock_guard lock(mutex);
+                    launch.viewer_pid = viewer_pid;
+                }
+                DWORD ignored = 0;
+                const bool accepted = !pending || finish(pipe.get(), connection, connection_timeout_ms,
+                                                        viewer.get(), stop.get(), ignored);
+                pending = false;
+                ULONG peer = 0;
+                if (accepted && GetNamedPipeClientProcessId(pipe.get(), &peer) && peer == viewer_pid &&
+                    peer_identity(viewer.get(), peer, viewer_created, options.windows_session_id))
+                {
+                    serve(pipe.get(), viewer.get(), options, viewer_pid, viewer_created);
                 }
                 else
                 {
-                    {
-                        std::lock_guard lock(mutex);
-                        launch.viewer_pid = viewer_pid;
-                    }
-                    DWORD ignored = 0;
-                    const bool accepted = !pending || finish(pipe.get(), connection, connection_timeout_ms,
-                                                            viewer.get(), stop.get(), ignored);
-                    pending = false;
-                    ULONG peer = 0;
-                    if (accepted && GetNamedPipeClientProcessId(pipe.get(), &peer) && peer == viewer_pid &&
-                        peer_identity(viewer.get(), peer, viewer_created, options.windows_session_id))
-                    {
-                        serve(pipe.get(), viewer.get(), options, viewer_pid, viewer_created);
-                    }
-                    else
-                    {
-                        set_status(false, "Viewer connection was not authenticated", ERROR_ACCESS_DENIED);
-                    }
+                    set_status(false, "Viewer connection was not authenticated", ERROR_ACCESS_DENIED);
                 }
                 pipe.reset();
             }
             catch (...)
             {
                 set_status(false, "Viewer transport failed without affecting engine recording", ERROR_NOT_ENOUGH_MEMORY);
+            }
+            if (viewer && !resumed)
+            {
+                // Identity/path checks can allocate after suspended creation.
+                // An exception there must reach owned cleanup, not preserve a
+                // windowless child which can never connect or handle WM_CLOSE.
+                return;
             }
             // Includes exception paths after launch: never create a second
             // viewer merely because its transport/encoder failed.
@@ -329,11 +430,11 @@ namespace ce::profiler_viewer
             {
                 if (focus.exchange(false, std::memory_order_acq_rel))
                 {
-                    EnumWindows(focus_window, static_cast<LPARAM>(GetProcessId(viewer.get())));
+                    EnumWindows(focus_window, reinterpret_cast<LPARAM>(viewer.get()));
                 }
                 if (close_requested.exchange(false, std::memory_order_acq_rel))
                 {
-                    EnumWindows(close_window, static_cast<LPARAM>(GetProcessId(viewer.get())));
+                    EnumWindows(close_window, reinterpret_cast<LPARAM>(viewer.get()));
                 }
             }
         }
@@ -478,7 +579,7 @@ namespace ce::profiler_viewer
                 if (close_requested.exchange(false, std::memory_order_acq_rel))
                 {
                     viewer_closing = true;
-                    EnumWindows(engine_detail::close_window, static_cast<LPARAM>(GetProcessId(viewer)));
+                    EnumWindows(engine_detail::close_window, reinterpret_cast<LPARAM>(viewer));
                     break;
                 }
                 std::shared_ptr<const engine_detail::publication> publication;
@@ -715,7 +816,8 @@ namespace ce::profiler_viewer
             // A closing viewer can enqueue goodbye immediately before a pending
             // server write sees broken-pipe. Consume only bounded, fully
             // authenticated remaining packets before classifying that close.
-            for (std::uint32_t index = 0; !viewer_closing && index < maximum_pending_commands + 2; ++index)
+            for (std::uint32_t index = 0; !viewer_closing && index < maximum_pending_commands + 2 &&
+                 WaitForSingleObject(stop.get(), 0) == WAIT_TIMEOUT; ++index)
             {
                 bool ready = false;
                 packet closing;
@@ -760,14 +862,17 @@ namespace ce::profiler_viewer
         {
             return true;
         }
-        if (!state_->stop)
+        if (!state_->stop || !state_->finished || !state_->job)
         {
             state_->active.store(false, std::memory_order_release);
+            state_->set_status(false, "Cannot establish Editor-owned profiler viewer lifetime",
+                               state_->job_error != ERROR_SUCCESS ? state_->job_error : ERROR_NOT_ENOUGH_MEMORY);
             return false;
         }
         state_->ui_scale_milli = ui_scale_milli;
         {
             std::lock_guard lock(state_->mutex);
+            ResetEvent(state_->finished.get());
             const auto failures = state_->launch.failure_revision;
             state_->close_requested.store(false, std::memory_order_release);
             state_->launch = {true, false, 0, "Starting profiler viewer"};
@@ -780,10 +885,11 @@ namespace ce::profiler_viewer
         }
         catch (...)
         {
-            state_->active.store(false, std::memory_order_release);
             state_->set_status(false, "Cannot start viewer worker", ERROR_NOT_ENOUGH_MEMORY);
             std::lock_guard lock(state_->mutex);
             state_->launch.running = false;
+            state_->active.store(false, std::memory_order_release);
+            SetEvent(state_->finished.get());
             return false;
         }
         return true;
@@ -978,10 +1084,23 @@ namespace ce::profiler_viewer
 
     void engine_process::shutdown()
     {
-        state_->closed.store(true, std::memory_order_release);
+        if (state_->closed.exchange(true, std::memory_order_acq_rel))
+        {
+            return;
+        }
         if (state_->stop)
         {
             SetEvent(state_->stop.get());
+        }
+        // Normally the transport worker posts WM_CLOSE and observes exit.
+        // A blocked worker cannot extend the owner's shutdown wait indefinitely.
+        if (state_->finished)
+        {
+            WaitForSingleObject(state_->finished.get(), engine_detail::owner_shutdown_wait_ms);
+        }
+        if (state_->job)
+        {
+            TerminateJobObject(state_->job.get(), ERROR_PROCESS_ABORTED);
         }
     }
 
