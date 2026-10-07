@@ -27,9 +27,34 @@ PR #126 (`3cbdeacc`). No dependency was updated, installed or restored.
 Trace opens/focuses one viewer owned by that engine process. Repeated Trace does
 not launch a second instance. Existing profiler-window CLI open/focus/close routes
 are forwarded to the process owner. Explicit close targets only that owned
-viewer; closing a viewer does not stop engine recording. Target exit disables
-controls while retaining the last immutable data for inspection. File-only mode
-has no implicit target and never substitutes viewer-local counters or services.
+viewer; closing a viewer does not stop engine recording. Editor exit closes that
+Editor's viewer, including an owned instance currently inspecting an offline file.
+Transport disconnection alone disables live controls and retains the last
+immutable data while the Editor is still alive. Independently launched file-only
+viewers have no owner/implicit target and never substitute viewer-local counters
+or services.
+
+The launcher holds an unnamed, non-inheritable Windows job with
+`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. `PROC_THREAD_ATTRIBUTE_JOB_LIST` attaches the
+child atomically at creation; a suspended start permits ordinary-token and pinned
+image checks plus a final shutdown check before resume. Incompatible outer jobs or
+ownership-setup failures reject launch rather than falling back to an unowned
+process or requesting breakaway. On Editor crash, kernel job-handle closure
+terminates the owned viewer without relying on IPC, a destructor or PID lookup.
+The job never contains the Editor, independently launched viewers or another
+Editor's viewer.
+
+Normal lifecycle shutdown cancels transport and posts `WM_CLOSE` to the owned
+process's window using the retained process handle, gives normal viewer teardown
+1.5 seconds, then terminates only the private job if necessary. The worker may
+wait another 0.5 seconds to observe forced exit; the owner waits at most 2.5
+seconds for worker completion before enforcing job termination itself. Only this
+lifecycle path waits; ordinary launch/focus and presentation pumping remain
+asynchronous. A process created concurrently with shutdown remains job-owned and
+is not resumed after the final closed/stop check fails. Abrupt termination cannot
+guarantee viewer settings or an in-progress export are saved, and these wait
+bounds do not promise kernel I/O completion deadlines. See the unexecuted
+`Tools/ProfilerViewer/Tests/ViewerLifetimeChecklist.md` acceptance matrix.
 
 ## Ordinary-privilege boundary
 

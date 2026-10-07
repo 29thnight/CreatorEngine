@@ -35,13 +35,17 @@
 #include <vector>
 
 #include "ImGui.h"
+#include <imgui_internal.h>
 #include "EditorIcons.h"
+#include "EditorTheme.h"
 #include "ProfileCaptureFile.h"
 
 namespace editor::profiler_view
 {
     namespace
     {
+        enum class information_panel { session, file, integrity, counters };
+
         struct presenter_state
         {
             ce::preparation_dispatch dispatch;
@@ -49,6 +53,12 @@ namespace editor::profiler_view
             ce::profiler_viewer::client* source = nullptr;
             std::unique_ptr<ce::capture_reader> reader;
             std::uint64_t shown_live_epoch = 0;
+            std::shared_ptr<const ce::profiler_viewer::client_snapshot> frame_source;
+            information_panel information = information_panel::session;
+            bool information_wide = true;
+            bool information_expanded = true;
+            bool information_requested = false;
+            bool information_close_requested = false;
         };
 
         presenter_state state;
@@ -75,6 +85,33 @@ namespace editor::profiler_view
     ce::profiler_viewer::client& source()
     {
         return *state.source;
+    }
+
+    const ce::profiler_viewer::client_snapshot& frame_source()
+    {
+        return *state.frame_source;
+    }
+
+    ImGuiID information_popup_id()
+    {
+        // Menus and the body have different ID stacks. One explicit ID lets
+        // both query actual popup visibility, including Escape/outside dismissal.
+        return ImHashStr("ProfilerViewer.CompactInformation");
+    }
+
+    bool information_visible()
+    {
+        return state.information_wide ? state.information_expanded :
+            !state.information_close_requested && (state.information_requested ||
+                ImGui::IsPopupOpen(information_popup_id(), ImGuiPopupFlags_AnyPopupLevel));
+    }
+
+    void show_information(information_panel panel)
+    {
+        state.information = panel;
+        state.information_expanded = true;
+        state.information_requested = true;
+        state.information_close_requested = false;
     }
 
     void dispatch_work(std::function<void()> work)
@@ -272,7 +309,6 @@ namespace editor::profiler_view::capture_integrity
             (!capture || view.recording_first_ordinal() + capture->frame_count() < recording->frame_count()))
         {
             ImGui::TextDisabled("Detailed stop diagnostics are in the recording's last frame.");
-            ImGui::SameLine();
             ImGui::BeginDisabled(view.preparation_pending());
             if (ImGui::SmallButton("Load stop diagnostics"))
             {
@@ -327,6 +363,7 @@ namespace editor::profiler_view::capture_integrity
         {
             ImGui::BeginChild("##OpenScopesAtStop", ImVec2(0.0f, ImGui::GetTextLineHeightWithSpacing() * 6.0f), true,
                               ImGuiWindowFlags_HorizontalScrollbar);
+            ImGui::PushTextWrapPos(-1.0f);
             ImGuiListClipper clipper;
             clipper.Begin(static_cast<int>(details.open_scopes_.size()));
             while (clipper.Step())
@@ -340,6 +377,7 @@ namespace editor::profiler_view::capture_integrity
                                 event.cpu.session, event.cpu.tick, event.cpu.task);
                 }
             }
+            ImGui::PopTextWrapPos();
             ImGui::EndChild();
         }
         ImGui::TreePop();
@@ -629,7 +667,6 @@ namespace editor::profiler_view::capture_file_view
         {
             ImGui::TextDisabled("%s", file_state().operation->kind == operation_kind::open
                                          ? "Opening recording index..." : "Saving entire recording...");
-            ImGui::SameLine();
             if (ImGui::SmallButton("Cancel file operation"))
             {
                 file_state().operation->canceled.store(true, std::memory_order_release);
@@ -657,6 +694,16 @@ namespace editor::profiler_view::capture_file_view
         }
     }
 
+    void same_line_if_fits(const char* nextLabel, float extraWidth = 0.0f)
+    {
+        const float right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;
+        const float nextWidth = ImGui::CalcTextSize(nextLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f + extraWidth;
+        if (ImGui::GetItemRectMax().x + ImGui::GetStyle().ItemSpacing.x + nextWidth <= right)
+        {
+            ImGui::SameLine();
+        }
+    }
+
     void draw_recording_overview()
     {
         ce::capture_reader& view = reader();
@@ -677,7 +724,7 @@ namespace editor::profiler_view::capture_file_view
         peak = (std::max)(peak, 1.0);
         ImGui::Text("Entire recording | %" PRIu64 " frames | %zu overview bins", total, bins.size());
         const ImVec2 origin = ImGui::GetCursorScreenPos();
-        const ImVec2 size((std::max)(ImGui::GetContentRegionAvail().x, 64.0f),
+        const ImVec2 size((std::max)(ImGui::GetContentRegionAvail().x, 1.0f),
                           ImGui::GetTextLineHeightWithSpacing() * 3.0f);
         ImGui::InvisibleButton("##EntireRecordingOverview", size);
         ImDrawList* draw = ImGui::GetWindowDrawList();
@@ -735,30 +782,30 @@ namespace editor::profiler_view::capture_file_view
             view.request_recording_range(begin, requested);
         }
         int rangeFrames = static_cast<int>(file_state().range_frames);
-        ImGui::SetNextItemWidth(120.0f);
+        ImGui::SetNextItemWidth(ThemePixels(120.0f));
         if (ImGui::InputInt("Frames per window", &rangeFrames, 1, 60))
         {
             file_state().range_frames = static_cast<std::uint32_t>((std::clamp)(rangeFrames, 1, 600));
         }
-        ImGui::SameLine();
+        same_line_if_fits("First");
         if (ImGui::SmallButton("First"))
         {
             view.request_recording_range(0, file_state().range_frames);
         }
-        ImGui::SameLine();
+        same_line_if_fits("Previous");
         if (ImGui::SmallButton("Previous"))
         {
             view.request_recording_range(first > file_state().range_frames ? first - file_state().range_frames : 0,
                                          file_state().range_frames);
         }
-        ImGui::SameLine();
+        same_line_if_fits("Next");
         if (ImGui::SmallButton("Next"))
         {
             const std::uint64_t lastStart = total > file_state().range_frames ? total - file_state().range_frames : 0;
             view.request_recording_range((std::min)(first + file_state().range_frames, lastStart),
                                          file_state().range_frames);
         }
-        ImGui::SameLine();
+        same_line_if_fits("Recent 600");
         if (ImGui::SmallButton("Recent 600"))
         {
             file_state().range_frames = 600;
@@ -792,110 +839,47 @@ namespace
         ImGui::TextUnformatted(value);
     }
 
-    // 툴바. 녹화 제어와 Live Follow.
-    void draw_toolbar(const ce::live_summary& summary)
+    struct control_availability
+    {
+        bool recording;
+        bool transitioning;
+        bool file_busy;
+        bool clearing;
+        bool record_enabled;
+        bool clear_enabled;
+        bool finalized_enabled;
+    };
+
+    control_availability controls()
     {
         using namespace editor::profiler_view;
+        const auto& remote = frame_source();
+        const bool hasRecording = static_cast<bool>(remote.recording_source);
+        control_availability result{};
+        result.recording = remote.summary.state == ce::recorder_state::recording;
+        result.transitioning = remote.summary.state == ce::recorder_state::starting ||
+            remote.summary.state == ce::recorder_state::pausing ||
+            (hasRecording && (remote.recording.state == ce::recording_state::starting ||
+                              remote.recording.state == ce::recording_state::flushing));
+        result.file_busy = capture_file_view::file_busy();
+        result.clearing = capture_file_view::file_state().clear_pending || remote.clear_pending;
+        result.record_enabled = remote.connected && !remote.command_pending && !result.transitioning &&
+            !result.file_busy && !result.clearing;
+        result.clear_enabled = result.record_enabled && !result.recording;
+        result.finalized_enabled = !result.recording && !result.transitioning && !result.file_busy &&
+            !result.clearing && hasRecording && remote.recording.state == ce::recording_state::finalized;
+        return result;
+    }
 
-        const auto remote = source().snapshot();
-        const ce::recorder_state state = remote->summary.state;
-        const ce::recording_status disk = remote->recording;
+    void draw_recording_status()
+    {
+        using namespace editor::profiler_view;
+        const auto* remote = &frame_source();
+        const ce::live_summary& summary = remote->summary;
+        const ce::recorder_state state = summary.state;
+        const ce::recording_status& disk = remote->recording;
         const bool hasRecording = static_cast<bool>(remote->recording_source);
-        const bool recording = state == ce::recorder_state::recording;
-        const bool transitioning = state == ce::recorder_state::starting || state == ce::recorder_state::pausing ||
-            (hasRecording && (disk.state == ce::recording_state::starting || disk.state == ce::recording_state::flushing));
-        const bool fileBusy = capture_file_view::file_busy();
-        const bool clearing = capture_file_view::file_state().clear_pending || remote->clear_pending;
-
-        bool record = recording || state == ce::recorder_state::starting;
-        ImGui::BeginDisabled(!remote->connected || remote->command_pending || transitioning || fileBusy || clearing);
-        if (ImGui::Checkbox("Record", &record))
-        {
-            if (recording)
-            {
-                // 요청만 보낸다. 이 자리에서 생산자·수집기나 디스크 완료를 기다리지 않는다.
-                if (!source().request(ce::profiler_viewer::command::stop))
-                {
-                    capture_file_view::file_state().message = "Stop was not sent: target disconnected or command queue full";
-                }
-            }
-            else
-            {
-                if (!source().request(ce::profiler_viewer::command::record))
-                {
-                    capture_file_view::file_state().message = "Record was not sent: target disconnected or command queue full";
-                }
-            }
-        }
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::SetTooltip("Record starts a new session. Stop flushes the entire session before Save becomes available.");
-        }
-
-        ImGui::SameLine();
-        ImGui::BeginDisabled(!remote->connected || remote->command_pending || recording || transitioning || fileBusy || clearing);
-        if (ImGui::Button(EditorIcon::Label<EditorIcon::Delete, " Clear">))
-        {
-            if (source().request(ce::profiler_viewer::command::clear))
-            {
-                capture_file_view::file_state().clear_pending = true;
-                capture_file_view::file_state().clear_revision = remote->clear_revision;
-                capture_file_view::file_state().clear_command_revision = remote->command_revision;
-                capture_file_view::file_state().message.clear();
-            }
-            else
-            {
-                capture_file_view::file_state().message = "Clear was not sent: target disconnected or command queue full";
-            }
-        }
-        ImGui::EndDisabled();
-
-        ImGui::SameLine();
-        ImGui::BeginDisabled(recording || transitioning || fileBusy || clearing || !hasRecording ||
-                             disk.state != ce::recording_state::finalized);
-        if (ImGui::Button("Save"))
-        {
-            capture_file_view::save_current_recording();
-        }
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::SetTooltip("Save exports the entire current stopped recording, including frames outside this view.");
-        }
-
-        ImGui::SameLine();
-        ImGui::BeginDisabled(recording || transitioning || fileBusy || clearing || !hasRecording ||
-                             disk.state != ce::recording_state::finalized);
-        if (ImGui::Button("View entire session"))
-        {
-            capture_file_view::open_recording_path(remote->recording_source->path(), remote->recording_source);
-        }
-        ImGui::EndDisabled();
-
-        ImGui::SameLine();
-        ImGui::BeginDisabled(fileBusy || clearing);
-        if (ImGui::Button(EditorIcon::Label<EditorIcon::ContentBrowser, " Open">))
-        {
-            capture_file_view::open_capture_file();
-        }
-        ImGui::EndDisabled();
-
-        ImGui::SameLine();
-        ImGui::BeginDisabled(fileBusy || clearing);
-        bool follow = reader().live_follow();
-        if (ImGui::Checkbox(EditorIcon::Label<EditorIcon::Forward, " Live Follow">, &follow))
-        {
-            reader().set_live_follow(follow);
-        }
-        ImGui::EndDisabled();
-        if (ImGui::IsItemHovered())
-        {
-            ImGui::SetTooltip("Live Follow shows the latest live window. Turning it off preserves this view.\n"
-                              "Recording and Save continue to refer to the entire session.");
-        }
-
-        ImGui::SameLine();
+        const bool transitioning = controls().transitioning;
         ImGui::Text("%s  |  frame %u", state_label(state), summary.engine_frame);
         if (state == ce::recorder_state::pausing)
         {
@@ -952,41 +936,47 @@ namespace
                 ImGui::TextDisabled("Waiting for the session writer. Record, Clear and Save are disabled.");
             }
         }
+    }
 
-        ImGui::BeginDisabled(!remote->connected || remote->command_pending || clearing);
-        if (ImGui::TreeNode("Counter modules"))
+    void draw_counter_modules()
+    {
+        using namespace editor::profiler_view;
+        const auto* remote = &frame_source();
+        ImGui::BeginDisabled(!remote->connected || remote->command_pending || controls().clearing);
+        const auto toggle = [&](const char* label, ce::counter_category category)
         {
-            const auto toggle = [&](const char* label, ce::counter_category category)
+            const ce::counter_mask bit = ce::counter_bit(category);
+            bool enabled = (remote->counters & bit) != 0;
+            if (ImGui::Checkbox(label, &enabled))
             {
-                const ce::counter_mask bit = ce::counter_bit(category);
-                bool enabled = (remote->counters & bit) != 0;
-                if (ImGui::Checkbox(label, &enabled))
+                const ce::counter_mask before = remote->counters;
+                if (!source().request(ce::profiler_viewer::command::counter_mask, enabled ? before | bit : before & ~bit))
                 {
-                    const ce::counter_mask before = remote->counters;
-                    if (!source().request(ce::profiler_viewer::command::counter_mask, enabled ? before | bit : before & ~bit))
-                    {
-                        capture_file_view::file_state().message = "Counter module change was not sent";
-                    }
+                    capture_file_view::file_state().message = "Counter module change was not sent";
+                    show_information(information_panel::file);
                 }
-            };
-            toggle("Process CPU/RAM", ce::counter_category::process);
-            ImGui::SameLine(); toggle("GPU VRAM", ce::counter_category::gpu);
-            ImGui::SameLine(); toggle("Render", ce::counter_category::render);
-            ImGui::SameLine(); toggle("Managed GC", ce::counter_category::managed);
-            ImGui::SameLine(); toggle("Resources", ce::counter_category::resources);
-            ImGui::SameLine(); toggle("Physics", ce::counter_category::physics);
-            ImGui::SameLine(); toggle("Audio", ce::counter_category::audio);
-            ImGui::TextDisabled("Resources는 기본 꺼짐 · 켜면 0.5초마다 소유 프레임에서 집계합니다");
-            ImGui::TreePop();
-        }
-
+            }
+        };
+        toggle("Process CPU/RAM", ce::counter_category::process);
+        toggle("GPU VRAM", ce::counter_category::gpu);
+        toggle("Render", ce::counter_category::render);
+        toggle("Managed GC", ce::counter_category::managed);
+        toggle("Resources", ce::counter_category::resources);
+        toggle("Physics", ce::counter_category::physics);
+        toggle("Audio", ce::counter_category::audio);
+        ImGui::TextDisabled("Resources는 기본 꺼짐 · 켜면 0.5초마다 소유 프레임에서 집계합니다");
         ImGui::EndDisabled();
+    }
+
+    void draw_capture_integrity()
+    {
+        using namespace editor::profiler_view;
 
         // ★ 녹화 중 화면은 **한 박자 뒤처진다.** 코어가 정한 간격으로만
         //   스냅샷을 내고, 늦게 오는 GPU 구간은 닫힌 프레임에 나중에 들어간다
         //   (실측 제출→수집 최대 94 ms). 그 사실을 적어 두지 않으면 "최신
         //   프레임에 GPU 막대가 없다" 를 결함으로 읽는다.
-        if (recording)
+        if (frame_source().summary.state == ce::recorder_state::recording)
         {
             ImGui::TextDisabled("녹화 중 - 화면은 마지막 스냅샷이다 (GPU 구간은 몇 프레임 뒤에 채워진다)");
         }
@@ -1112,7 +1102,7 @@ namespace
             std::snprintf(buffer, sizeof(buffer), "%u", summary.gpu_issue_last_frame);
             draw_row("Last GPU issue frame", buffer);
         }
-        const double collectorFrequency = static_cast<double>(editor::profiler_view::source().snapshot()->target.qpc_frequency);
+        const double collectorFrequency = static_cast<double>(editor::profiler_view::frame_source().target.qpc_frequency);
         auto collector_ms = [collectorFrequency](ce::profile_tick ticks)
         {
             return collectorFrequency > 0.0
@@ -1197,8 +1187,11 @@ namespace editor::profiler_view
     void select_rendering_live() { renderingLiveRequested = true; }
 }
 
-void editor::profiler_view::draw()
+void editor::profiler_view::begin_frame()
 {
+    // Resolve responsiveness before menus, not a frame after they are drawn.
+    // draw() reconciles this with the actual bounded body width below.
+    state.information_wide = ImGui::GetMainViewport()->Size.x - navigation_width() >= ThemePixels(900.0f);
     if (source().take_page_request() == 1 || renderingLiveRequested.exchange(false))
     {
         selectedPage = page::renderingLive;
@@ -1206,8 +1199,8 @@ void editor::profiler_view::draw()
 
     // Only the authenticated engine publishes captures. The viewer has no
     // ProfilerService singleton or scene startup of its own.
-    const auto remote = source().snapshot();
-    const ce::live_summary& summary = remote->summary;
+    state.frame_source = source().snapshot();
+    const auto& remote = state.frame_source;
     capture_file_view::poll_file_operation();
     poll_dx_capture();
     reader().poll_preparation();
@@ -1238,47 +1231,237 @@ void editor::profiler_view::draw()
             state.shown_live_epoch = remote->capture_epoch;
         }
     }
+}
 
-    if (!remote->command_message.empty() && !remote->command_accepted)
+namespace
+{
+    void draw_connection_status()
     {
-        ImGui::TextWrapped("%s", remote->command_message.c_str());
-    }
-    if (!remote->message.empty())
-    {
-        ImGui::TextWrapped("%s", remote->message.c_str());
-    }
-    if (remote->target.connection.target_pid)
-    {
-        ImGui::TextDisabled("Target PID %u | session %llu | %s | skipped live windows %llu",
-            remote->target.connection.target_pid,
-            static_cast<unsigned long long>(remote->target.session_generation),
-            remote->connected ? "Connected" : "Disconnected; last received data",
-            static_cast<unsigned long long>(remote->skipped_captures));
-        if (!reader().recording() && state.shown_live_epoch != 0 &&
-            state.shown_live_epoch != remote->capture_generation)
+        using namespace editor::profiler_view;
+        const auto* remote = &frame_source();
+        if (!remote->command_message.empty() && !remote->command_accepted)
         {
-            ImGui::TextDisabled("Showing capture epoch %llu; target is now epoch %llu",
-                static_cast<unsigned long long>(state.shown_live_epoch),
-                static_cast<unsigned long long>(remote->capture_generation));
+            ImGui::TextWrapped("%s", remote->command_message.c_str());
+        }
+        if (!remote->message.empty())
+        {
+            ImGui::TextWrapped("%s", remote->message.c_str());
+        }
+        if (remote->target.connection.target_pid)
+        {
+            ImGui::TextDisabled("Target PID %u | session %llu | %s | skipped live windows %llu",
+                remote->target.connection.target_pid,
+                static_cast<unsigned long long>(remote->target.session_generation),
+                remote->connected ? "Connected" : "Disconnected; last received data",
+                static_cast<unsigned long long>(remote->skipped_captures));
+            if (!reader().recording() && state.shown_live_epoch != 0 &&
+                state.shown_live_epoch != remote->capture_generation)
+            {
+                ImGui::TextDisabled("Showing capture epoch %llu; target is now epoch %llu",
+                    static_cast<unsigned long long>(state.shown_live_epoch),
+                    static_cast<unsigned long long>(remote->capture_generation));
+            }
+        }
+        else
+        {
+            ImGui::TextDisabled("Offline viewer - open a recording from File");
         }
     }
+}
 
-    draw_toolbar(summary);
-    capture_file_view::draw_file_line();
-    if (selectedPage != page::renderingLive)
+float editor::profiler_view::navigation_width()
+{
+    return ThemePixels(48.0f);
+}
+
+float editor::profiler_view::draw_menus(bool compact)
+{
+    const auto& remote = frame_source();
+    const control_availability available = controls();
+    const auto fileMenu = [&]
     {
-        ImGui::BeginDisabled(capture_file_view::file_busy() || capture_file_view::file_state().clear_pending);
-        capture_file_view::draw_recording_overview();
-        ImGui::EndDisabled();
-    }
-    ImGui::Separator();
-    // The left rail keeps every profiler view in one predictable location.
-    // The selectedPage frame range belongs to the reader, not to an individual page.
+        if (ImGui::BeginMenu("File"))
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                                ImVec2(ThemePixels(EditorThemeTokens::ControlPaddingX), ThemePixels(2.0f)));
+            if (ImGui::MenuItem(EditorIcon::Label<EditorIcon::ContentBrowser, " Open...">, nullptr, false,
+                                !available.file_busy && !available.clearing))
+            {
+                capture_file_view::open_capture_file();
+                show_information(information_panel::file);
+            }
+            if (ImGui::MenuItem(EditorIcon::Label<EditorIcon::Save, " Save entire recording...">,
+                                nullptr, false, available.finalized_enabled))
+            {
+                capture_file_view::save_current_recording();
+                show_information(information_panel::file);
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::SetTooltip("Exports the entire stopped recording, including frames outside this view.\n"
+                                  "Available after the session writer has finalized.");
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(EditorIcon::Label<EditorIcon::Delete, " Clear live capture">,
+                                nullptr, false, available.clear_enabled))
+            {
+                if (source().request(ce::profiler_viewer::command::clear))
+                {
+                    capture_file_view::file_state().clear_pending = true;
+                    capture_file_view::file_state().clear_revision = remote.clear_revision;
+                    capture_file_view::file_state().clear_command_revision = remote.command_revision;
+                    capture_file_view::file_state().message.clear();
+                }
+                else
+                {
+                    capture_file_view::file_state().message = "Clear was not sent: target disconnected or command queue full";
+                }
+                show_information(information_panel::file);
+            }
+            ImGui::PopStyleVar();
+            ImGui::EndMenu();
+        }
+    };
+    const auto viewMenu = [&]
+    {
+        if (ImGui::BeginMenu("View"))
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                                ImVec2(ThemePixels(EditorThemeTokens::ControlPaddingX), ThemePixels(2.0f)));
+            bool follow = reader().live_follow();
+            if (ImGui::MenuItem(EditorIcon::Label<EditorIcon::Forward, " Live Follow">, nullptr, &follow,
+                                !available.file_busy && !available.clearing))
+            {
+                reader().set_live_follow(follow);
+            }
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            {
+                ImGui::SetTooltip("Shows the latest live window. Turning it off preserves this view.\n"
+                                  "Recording and Save continue to refer to the entire session.");
+            }
+            if (ImGui::MenuItem("View entire session", nullptr, false, available.finalized_enabled))
+            {
+                capture_file_view::open_recording_path(remote.recording_source->path(), remote.recording_source);
+                show_information(information_panel::file);
+            }
+            ImGui::Separator();
+            bool informationVisible = information_visible();
+            if (ImGui::MenuItem("Information sidebar", nullptr, &informationVisible))
+            {
+                if (state.information_wide)
+                {
+                    state.information_expanded = informationVisible;
+                }
+                else if (informationVisible)
+                {
+                    state.information_requested = true;
+                    state.information_close_requested = false;
+                }
+                else
+                {
+                    state.information_requested = false;
+                    state.information_close_requested = true;
+                }
+            }
+            ImGui::PopStyleVar();
+            ImGui::EndMenu();
+        }
+    };
 
-    static bool timelineFlame = false;
-    const float railWidth = ImGui::GetTextLineHeightWithSpacing() + 20.0f;
-    ImGui::BeginChild("##ProfilerNavigation", ImVec2(railWidth, 0.0f), false,
+    // The host's title row has no padding. Menus keep the shared compact menu
+    // spacing, including their popups, rather than inheriting the full row height.
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,
+                        ImVec2(ThemePixels(EditorThemeTokens::MenuPaddingX), ThemePixels(EditorThemeTokens::MenuPaddingY)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                        ImVec2(ThemePixels(EditorThemeTokens::MenuGapX), ThemePixels(EditorThemeTokens::MenuGapY)));
+    if (compact)
+    {
+        if (ImGui::BeginMenu("Menu"))
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+                                ImVec2(ThemePixels(EditorThemeTokens::ControlPaddingX), ThemePixels(2.0f)));
+            fileMenu();
+            viewMenu();
+            ImGui::PopStyleVar();
+            ImGui::EndMenu();
+        }
+    }
+    else
+    {
+        fileMenu();
+        viewMenu();
+    }
+    ImGui::PopStyleVar(2);
+    return ImGui::GetCursorScreenPos().x;
+}
+
+void editor::profiler_view::draw_record_control(const ImVec2& size)
+{
+    const auto& remote = frame_source();
+    const control_availability available = controls();
+    const bool active = available.recording;
+    const bool pending = remote.command_pending || available.transitioning;
+    const float scale = (std::max)(ThemePixels(1.0f), 0.01f);
+    const float glyphSize = (std::min)(EditorThemeTokens::IconFontSize,
+        (std::max)(1.0f, size.y - ThemePixels(6.0f)) / scale);
+    ImGui::PushFont(nullptr, glyphSize);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0.0f, 0.0f));
+    ImGui::PushStyleColor(ImGuiCol_Button, ThemeColorValue(active ? ThemeColor::PanelRaised : ThemeColor::Chrome));
+    ImGui::PushStyleColor(ImGuiCol_Text,
+        ThemeColorValue(pending ? ThemeColor::Warning : active ? ThemeColor::Error : ThemeColor::Text));
+    ImGui::BeginDisabled(!available.record_enabled);
+    const char* icon = pending ? EditorIcon::Label<EditorIcon::Timing, "###ProfilerRecord"> :
+        active ? EditorIcon::Label<EditorIcon::Stop, "###ProfilerRecord"> :
+                 EditorIcon::Label<EditorIcon::Play, "###ProfilerRecord">;
+    if (ImGui::Button(icon, size))
+    {
+        // Only enqueue the existing command. Stop never waits for producers,
+        // GPU work or disk completion on the UI thread.
+        if (!source().request(available.recording ? ce::profiler_viewer::command::stop :
+                                                   ce::profiler_viewer::command::record))
+        {
+            capture_file_view::file_state().message = available.recording
+                ? "Stop was not sent: target disconnected or command queue full"
+                : "Record was not sent: target disconnected or command queue full";
+            show_information(information_panel::file);
+        }
+        else
+        {
+            state.information = information_panel::session;
+        }
+    }
+    ImGui::EndDisabled();
+    const bool hovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled);
+    ImGui::PopStyleColor(2);
+    ImGui::PopStyleVar();
+    ImGui::PopFont();
+    if (hovered)
+    {
+        ImGui::BeginTooltip();
+        ImGui::TextUnformatted(pending ? "Recording control pending" : active ? "Stop recording" : "Start recording");
+        ImGui::Text("Target state: %s", state_label(remote.summary.state));
+        ImGui::TextUnformatted("Record starts a new session. Stop flushes the entire session before Save becomes available.");
+        if (!available.record_enabled)
+        {
+            ImGui::TextDisabled("%s", !remote.connected ? "Target disconnected" :
+                remote.command_pending ? "Waiting for the target to acknowledge the control request" :
+                available.transitioning ? "Waiting for CPU/GPU drain or the session writer" :
+                available.file_busy ? "A file operation is in progress" : "Clearing live capture");
+        }
+        ImGui::EndTooltip();
+    }
+}
+
+void editor::profiler_view::draw_navigation()
+{
+    // This child starts at the host's upper-left corner and scrolls independently
+    // when a small window or large accessibility scale cannot fit every page.
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ThemeColorValue(ThemeColor::Chrome));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ThemePixels(4.0f), ThemePixels(4.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, ThemePixels(4.0f)));
+    ImGui::BeginChild("##ProfilerNavigation", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding,
                       ImGuiWindowFlags_NoScrollbar);
+    const float buttonWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x);
     const auto nav = [&](page target, const char* icon, const char* title, const char* description)
     {
         ImGui::PushID(static_cast<int>(target));
@@ -1288,7 +1471,7 @@ void editor::profiler_view::draw()
         {
             ImGui::PushStyleColor(ImGuiCol_Button, activeColor);
         }
-        if (ImGui::Button(icon, ImVec2(railWidth - 12.0f, railWidth - 12.0f)))
+        if (ImGui::Button(icon, ImVec2(buttonWidth, ThemePixels(36.0f))))
         {
             selectedPage = target;
         }
@@ -1314,7 +1497,7 @@ void editor::profiler_view::draw()
     nav(page::dxCapture, EditorIcon::Timing, "DX12 Deep Capture", "별도 ETW 수집 프로세스와 제출→실행 기록");
     nav(page::renderingLive, EditorIcon::Scene, "Rendering - Live", "Live renderer diagnostics without Record");
     nav(page::physics, EditorIcon::Timing, "Physics", "씬별 물리 틱 카운터와 손실 진단");
-    nav(page::audio, EditorIcon::Timing, "Audio", "논리 재생·보이스·오디오 callback 진단");
+    nav(page::audio, EditorIcon::Audio, "Audio", "논리 재생·보이스·오디오 callback 진단");
     nav(page::network, EditorIcon::World, "네트워크", "엔진 송수신량");
     nav(page::animation, EditorIcon::AvatarMask, "Animation", "실시간 CPU 예산과 태스크 실행 기록");
     ImGui::Separator();
@@ -1323,140 +1506,393 @@ void editor::profiler_view::draw()
     nav(page::threads, EditorIcon::Grid, "Threads", "스레드별 구간 요약");
     nav(page::collector, EditorIcon::Settings, "Collector", "수집 상태와 손실 계상");
     ImGui::EndChild();
-    ImGui::SameLine(0.0f, 0.0f);
-    ImGui::BeginChild("##ProfilerPage", ImVec2(0.0f, 0.0f), false);
-    const char* pageTitle = selectedPage == page::frames ? "프레임 그래프" :
-        selectedPage == page::timeline ? "타임라인" :
-        selectedPage == page::cpu ? "CPU" :
-        selectedPage == page::memory ? "메모리" :
-        selectedPage == page::gpu ? "GPU" :
-        selectedPage == page::dxCapture ? "DX12 Deep Capture" :
-        selectedPage == page::network ? "네트워크" :
-        selectedPage == page::animation ? "Animation Budget" :
-        selectedPage == page::renderingLive ? "Rendering - Live" :
-        selectedPage == page::hierarchy ? "Hierarchy" :
-        selectedPage == page::flat ? "Flat" :
-        selectedPage == page::threads ? "Threads" : "Collector";
-    ImGui::TextUnformatted(pageTitle);
-    ImGui::Separator();
-    ImGui::BeginDisabled(capture_file_view::file_busy() || capture_file_view::file_state().clear_pending);
-    switch (selectedPage)
+    ImGui::PopStyleVar(2);
+    ImGui::PopStyleColor();
+}
+
+namespace
+{
+    void draw_selected_page()
     {
-    case page::frames:
-        draw_frame_overview();
+        using namespace editor::profiler_view;
+        const ce::live_summary& summary = frame_source().summary;
+        static bool timelineFlame = false;
+        const char* pageTitle = selectedPage == page::frames ? "프레임 그래프" :
+            selectedPage == page::timeline ? "타임라인" :
+            selectedPage == page::cpu ? "CPU" :
+            selectedPage == page::memory ? "메모리" :
+            selectedPage == page::gpu ? "GPU" :
+            selectedPage == page::dxCapture ? "DX12 Deep Capture" :
+            selectedPage == page::physics ? "Physics" :
+            selectedPage == page::audio ? "Audio" :
+            selectedPage == page::network ? "네트워크" :
+            selectedPage == page::animation ? "Animation Budget" :
+            selectedPage == page::renderingLive ? "Rendering - Live" :
+            selectedPage == page::hierarchy ? "Hierarchy" :
+            selectedPage == page::flat ? "Flat" :
+            selectedPage == page::threads ? "Threads" : "Collector";
+        ImGui::TextUnformatted(pageTitle);
         ImGui::Separator();
-        draw_telemetry_dashboard();
-        break;
-    case page::timeline:
-        draw_frame_overview();
-        if (reader().has_capture())
+        ImGui::BeginDisabled(capture_file_view::file_busy() || capture_file_view::file_state().clear_pending);
+        if (selectedPage != page::renderingLive)
         {
-            draw_selection_summary();
+            capture_file_view::draw_recording_overview();
+        }
+        switch (selectedPage)
+        {
+        case page::frames:
+            draw_frame_overview();
             ImGui::Separator();
-            if (ImGui::RadioButton("시간순 레인", !timelineFlame))
+            draw_telemetry_dashboard();
+            break;
+        case page::timeline:
+            draw_frame_overview();
+            if (reader().has_capture())
             {
-                timelineFlame = false;
+                draw_selection_summary();
+                ImGui::Separator();
+                if (ImGui::RadioButton("시간순 레인", !timelineFlame))
+                {
+                    timelineFlame = false;
+                }
+                capture_file_view::same_line_if_fits("CPU 호출 계층", ImGui::GetFrameHeight());
+                if (ImGui::RadioButton("CPU 호출 계층", timelineFlame))
+                {
+                    timelineFlame = true;
+                }
+                ImGui::Separator();
+                if (timelineFlame)
+                {
+                    draw_flame_graph();
+                }
+                else
+                {
+                    draw_timeline();
+                }
             }
-            ImGui::SameLine();
-            if (ImGui::RadioButton("CPU 호출 계층", timelineFlame))
+            break;
+        case page::cpu:
+            draw_telemetry(telemetry_page::cpu);
+            if (reader().has_capture())
             {
-                timelineFlame = true;
-            }
-            ImGui::Separator();
-            if (timelineFlame)
-            {
+                ImGui::Separator();
                 draw_flame_graph();
             }
-            else
-            {
-                draw_timeline();
-            }
-        }
-        break;
-    case page::cpu:
-        draw_telemetry(telemetry_page::cpu);
-        if (reader().has_capture())
+            break;
+        case page::memory: draw_memory_profiler(); break;
+        case page::gpu: draw_telemetry(telemetry_page::gpu); break;
+        case page::dxCapture: draw_dx_capture(); break;
+        case page::network: draw_telemetry(telemetry_page::network); break;
+        case page::physics: draw_physics_telemetry(); break;
+        case page::audio: draw_audio_telemetry(); break;
+        case page::animation:
         {
-            ImGui::Separator();
-            draw_flame_graph();
+            draw_animation_budget();
+            break;
         }
-        break;
-    case page::memory: draw_memory_profiler(); break;
-    case page::gpu: draw_telemetry(telemetry_page::gpu); break;
-    case page::dxCapture: draw_dx_capture(); break;
-    case page::network: draw_telemetry(telemetry_page::network); break;
-    case page::physics: draw_physics_telemetry(); break;
-    case page::audio: draw_audio_telemetry(); break;
-    case page::animation:
-    {
-        draw_animation_budget();
-        break;
-    }
-    case page::renderingLive:
-    {
-        draw_rendering_live();
-        break;
-    }
-    case page::hierarchy:
-    case page::flat:
-        if (reader().has_capture())
+        case page::renderingLive:
         {
-            if (!draw_selection_summary())
+            draw_rendering_live();
+            break;
+        }
+        case page::hierarchy:
+        case page::flat:
+            if (reader().has_capture())
             {
-                break;
-            }
-            ImGui::Separator();
-            if (selectedPage == page::hierarchy)
-            {
-                draw_hierarchy_table();
+                if (!draw_selection_summary())
+                {
+                    break;
+                }
+                ImGui::Separator();
+                if (selectedPage == page::hierarchy)
+                {
+                    draw_hierarchy_table();
+                }
+                else
+                {
+                    draw_flat_table();
+                }
             }
             else
             {
-                draw_flat_table();
+                ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
             }
-        }
-        else
-        {
-            ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
-        }
-        break;
-    case page::threads:
-        if (reader().has_capture())
-        {
-            if (draw_selection_summary())
+            break;
+        case page::threads:
+            if (reader().has_capture())
             {
-                draw_thread_table();
+                if (draw_selection_summary())
+                {
+                    draw_thread_table();
+                }
+            }
+            else
+            {
+                ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
+            }
+            break;
+        case page::collector:
+            draw_summary(summary);
+            if (!summary.gpu_issue_last_error.empty())
+            {
+                ImGui::TextWrapped("Last GPU issue: %s", summary.gpu_issue_last_error.c_str());
+            }
+            if (summary.dropped_events > 0 || summary.dropped_counters > 0 || summary.unbalanced_scopes > 0
+                || summary.late_events_dropped > 0 || summary.stale_chunks_dropped > 0
+                || summary.foreign_stream_touches > 0 || summary.abandoned_streams > 0
+                || summary.collector_dropped_frames > 0 || summary.malformed_pages > 0
+                || summary.gpu_query_overflow_passes > 0 || summary.gpu_collect_failures > 0)
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
+                                   "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");
+            }
+            if (!summary.capture_complete)
+            {
+                ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
+                                   "캡처 미확정 - 미응답 스트림 %u", summary.capture_unacked_streams);
+            }
+            break;
+        }
+        ImGui::EndDisabled();
+    }
+}
+
+namespace
+{
+    bool capture_needs_attention()
+    {
+        const ce::capture_session* shown = editor::profiler_view::reader().capture();
+        return shown && (!shown->complete() || shown->dropped_counters() > 0);
+    }
+
+    const char* information_title(editor::profiler_view::information_panel panel)
+    {
+        using editor::profiler_view::information_panel;
+        switch (panel)
+        {
+        case information_panel::session: return "Session";
+        case information_panel::file: return "Recording file";
+        case information_panel::integrity: return "Capture integrity";
+        case information_panel::counters: return "Counter modules";
+        }
+        return "Information";
+    }
+
+    void draw_information_content()
+    {
+        using namespace editor::profiler_view;
+        ImGui::PushTextWrapPos(0.0f);
+        switch (state.information)
+        {
+        case information_panel::session:
+            if (ImGui::CollapsingHeader("Connection", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                draw_connection_status();
+                ImGui::TextDisabled("%s", reader().live_follow() ? "Live Follow enabled" : "Current view held");
+            }
+            if (ImGui::CollapsingHeader("Session writer", ImGuiTreeNodeFlags_DefaultOpen))
+            {
+                draw_recording_status();
+            }
+            break;
+        case information_panel::file:
+            if (!reader().recording() && !capture_file_view::file_busy())
+            {
+                ImGui::TextDisabled("Open a .ceprof recording from File, or use View > View entire session after stopping.");
+            }
+            capture_file_view::draw_file_line();
+            break;
+        case information_panel::integrity:
+            ImGui::TextDisabled("Diagnostics belong to the displayed capture.");
+            if (!reader().has_capture())
+            {
+                ImGui::TextDisabled("No capture is selected.");
+            }
+            else if (!capture_needs_attention())
+            {
+                ImGui::TextUnformatted("No incompleteness flag or telemetry sample loss in this capture window.");
+            }
+            draw_capture_integrity();
+            break;
+        case information_panel::counters:
+            draw_counter_modules();
+            break;
+        }
+        ImGui::PopTextWrapPos();
+    }
+
+    void draw_information_panel(bool popup)
+    {
+        using namespace editor::profiler_view;
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, editor::ThemeColorValue(editor::ThemeColor::Panel));
+        ImGui::BeginChild("##ProfilerInformation", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        const float closeSize = ImGui::GetFrameHeight();
+        const float titleWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x - closeSize - ImGui::GetStyle().ItemSpacing.x);
+        ImGui::BeginChild("##InformationTitle", ImVec2(titleWidth, closeSize), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted(information_title(state.information));
+        ImGui::EndChild();
+        ImGui::SameLine();
+        if (ImGui::Button(EditorIcon::Label<EditorIcon::Close, "##CloseInformation">, ImVec2(closeSize, closeSize)))
+        {
+            if (popup)
+            {
+                ImGui::CloseCurrentPopup();
+            }
+            else
+            {
+                state.information_expanded = false;
             }
         }
-        else
+        if (ImGui::IsItemHovered())
         {
-            ImGui::TextDisabled("아직 캡처가 없다 - Record 를 켤 것");
+            ImGui::SetTooltip("Close information sidebar");
         }
-        break;
-    case page::collector:
-        draw_summary(summary);
-        if (!summary.gpu_issue_last_error.empty())
-        {
-            ImGui::TextWrapped("Last GPU issue: %s", summary.gpu_issue_last_error.c_str());
-        }
-        if (summary.dropped_events > 0 || summary.dropped_counters > 0 || summary.unbalanced_scopes > 0
-            || summary.late_events_dropped > 0 || summary.stale_chunks_dropped > 0
-            || summary.foreign_stream_touches > 0 || summary.abandoned_streams > 0
-            || summary.collector_dropped_frames > 0 || summary.malformed_pages > 0
-            || summary.gpu_query_overflow_passes > 0 || summary.gpu_collect_failures > 0)
-        {
-            ImGui::TextColored(ImVec4(1.0f, 0.5f, 0.3f, 1.0f),
-                               "수집에 구멍이 있다 - 이 캡처의 합계를 그대로 믿지 말 것");
-        }
-        if (!summary.capture_complete)
-        {
-            ImGui::TextColored(ImVec4(1.0f, 0.65f, 0.25f, 1.0f),
-                               "캡처 미확정 - 미응답 스트림 %u", summary.capture_unacked_streams);
-        }
-        break;
+        ImGui::Separator();
+        // Each section retains its own scroll position; its title and the right
+        // icon strip stay fixed even for a very long list of stop diagnostics.
+        ImGui::PushID(static_cast<int>(state.information));
+        ImGui::BeginChild("##InformationScroll", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None);
+        draw_information_content();
+        ImGui::EndChild();
+        ImGui::PopID();
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
     }
-    ImGui::EndDisabled();
+
+    void draw_information_icons(bool wide)
+    {
+        using namespace editor::profiler_view;
+        const auto& remote = frame_source();
+        const auto& disk = remote.recording;
+        const auto recording = reader().recording();
+        const bool sessionAttention = (!remote.connected && remote.target.connection.target_pid != 0) ||
+            (!remote.command_message.empty() && !remote.command_accepted) ||
+            disk.error || disk.dropped_frames || disk.dropped_events || disk.dropped_counters ||
+            disk.source_dropped_counters || disk.source_losses.dropped_events ||
+            disk.source_losses.dropped_frame_boundaries || disk.source_losses.late_events || disk.source_losses.late_gpu_spans;
+        const bool fileAttention = capture_file_view::file_busy() || !capture_file_view::file_state().message.empty() ||
+            capture_file_view::file_state().clear_pending || reader().preparation_pending() || reader().preparation_failed() ||
+            (recording && (!recording->complete() || recording->recovered()));
+        const auto button = [&](information_panel panel, const char* icon, const char* description, bool attention)
+        {
+            ImGui::PushID(static_cast<int>(panel));
+            const bool selected = state.information == panel && information_visible();
+            ImGui::PushStyleColor(ImGuiCol_Button,
+                editor::ThemeColorValue(selected ? editor::ThemeColor::Selection : editor::ThemeColor::Chrome));
+            ImGui::PushStyleColor(ImGuiCol_Text,
+                editor::ThemeColorValue(attention ? editor::ThemeColor::Warning : editor::ThemeColor::Text));
+            if (ImGui::Button(icon, ImVec2((std::max)(1.0f, ImGui::GetContentRegionAvail().x), editor::ThemePixels(32.0f))))
+            {
+                if (wide && selected)
+                {
+                    state.information_expanded = false;
+                }
+                else
+                {
+                    show_information(panel);
+                }
+            }
+            ImGui::PopStyleColor(2);
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::TextUnformatted(information_title(panel));
+                ImGui::TextDisabled("%s", description);
+                if (attention)
+                {
+                    ImGui::TextUnformatted("Status or diagnostics available");
+                }
+                ImGui::EndTooltip();
+            }
+            ImGui::PopID();
+        };
+        button(information_panel::session, EditorIcon::Info, "Connection, control status and session writer", sessionAttention);
+        button(information_panel::file, EditorIcon::Save, "Recording metadata, file progress and cancellation", fileAttention);
+        button(information_panel::integrity, EditorIcon::Shield, "Capture completeness and stop integrity details", capture_needs_attention());
+        button(information_panel::counters, EditorIcon::Inspector, "Enable or disable counter modules", false);
+    }
+}
+
+void editor::profiler_view::draw()
+{
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const ImVec2 available((std::max)(1.0f, ImGui::GetContentRegionAvail().x),
+                          (std::max)(1.0f, ImGui::GetContentRegionAvail().y));
+    const float iconWidth = (std::min)(ThemePixels(40.0f), available.x * 0.25f);
+    const bool wide = available.x >= ThemePixels(900.0f);
+    state.information_wide = wide;
+    const float informationWidth = wide && state.information_expanded
+        ? (std::clamp)(available.x * 0.30f, ThemePixels(280.0f), ThemePixels(400.0f)) : 0.0f;
+    const float pageWidth = (std::max)(1.0f, available.x - informationWidth - iconWidth);
+
+    // Host chrome intentionally has zero padding/spacing. Restore shared body
+    // metrics locally; page scrolling can never move the titlebar or either rail.
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ThemePixels(10.0f), ThemePixels(8.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                        ImVec2(ThemePixels(EditorThemeTokens::ItemGapX), ThemePixels(EditorThemeTokens::ItemGapY)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, ThemePixels(1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ThemeColorValue(ThemeColor::Canvas));
+    ImGui::BeginChild("##ProfilerPage", ImVec2(pageWidth, available.y), ImGuiChildFlags_AlwaysUseWindowPadding,
+                      ImGuiWindowFlags_HorizontalScrollbar);
+    draw_selected_page();
     ImGui::EndChild();
+    ImGui::PopStyleColor();
+
+    if (informationWidth > 0.0f)
+    {
+        ImGui::SetCursorScreenPos(ImVec2(origin.x + pageWidth, origin.y));
+        ImGui::BeginChild("##InformationBounds", ImVec2(informationWidth, available.y), ImGuiChildFlags_None,
+                          ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+        draw_information_panel(false);
+        ImGui::EndChild();
+    }
+
+    ImGui::SetCursorScreenPos(ImVec2(origin.x + available.x - iconWidth, origin.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ThemePixels(3.0f), ThemePixels(4.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, ThemePixels(4.0f)));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ThemeColorValue(ThemeColor::Chrome));
+    ImGui::BeginChild("##InformationIcons", ImVec2(iconWidth, available.y), ImGuiChildFlags_AlwaysUseWindowPadding,
+                      ImGuiWindowFlags_NoScrollbar);
+    draw_information_icons(wide);
+    ImGui::EndChild();
+    ImGui::PopStyleColor();
+    ImGui::PopStyleVar(2);
+
+    if (state.information_requested)
+    {
+        if (!wide)
+        {
+            ImGui::OpenPopup(information_popup_id());
+        }
+        state.information_requested = false;
+    }
+    // At narrow widths a dismissible inspector overlays the page instead of
+    // squeezing its chart to zero. Its bounds remain inside the body viewport.
+    const float popupWidth = (std::max)(1.0f, (std::min)(ThemePixels(400.0f), available.x - iconWidth));
+    ImGui::SetNextWindowPos(ImVec2(origin.x + available.x - iconWidth - popupWidth, origin.y));
+    ImGui::SetNextWindowSize(ImVec2(popupWidth, available.y));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    if (ImGui::BeginPopupEx(information_popup_id(), ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize |
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+    {
+        if (wide || state.information_close_requested)
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        else
+        {
+            ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ThemePixels(10.0f), ThemePixels(8.0f)));
+            draw_information_panel(true);
+            ImGui::PopStyleVar();
+        }
+        ImGui::EndPopup();
+    }
+    state.information_close_requested = false;
+    ImGui::PopStyleVar();
+    ImGui::PopStyleVar(3);
 }
 
 void editor::profiler_view::open_path(const std::filesystem::path& path)
@@ -1488,6 +1924,7 @@ void editor::profiler_view::shutdown()
     shutdown_dx_capture();
     shutdown_live_diagnostics();
     state.reader.reset();
+    state.frame_source.reset();
     state.dispatch = {};
     state.diagnostics_dispatch = {};
     state.source = nullptr;

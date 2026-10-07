@@ -31,7 +31,8 @@ namespace ce::profiler_viewer
 
         // Starts the pinned ../Tools/ProfilerViewer/ProfilerViewer.exe relative
         // to the Editor directory, or requests focus
-        // of this engine's existing viewer. Never elevates and never waits on it.
+        // of this engine's existing viewer. Never elevates; launch/focus never
+        // waits on it. The Editor owns the child even if its transport breaks.
         bool open_or_focus(std::uint32_t page = 0, std::uint32_t ui_scale_milli = 1000);
         void request_close();
         // Call from the engine UI owner with its usual scene-lifetime protection.
@@ -39,6 +40,8 @@ namespace ce::profiler_viewer
         // to the transport worker; no IPC, encoding, file scan or indexing here.
         void pump();
         launch_status status() const;
+        // Graceful owned-viewer close, then bounded job-scoped cleanup. Only
+        // lifecycle shutdown may wait; independently launched viewers are untouched.
         void shutdown();
 
         // Optional versioned scene diagnostics. The publisher freezes a bounded
