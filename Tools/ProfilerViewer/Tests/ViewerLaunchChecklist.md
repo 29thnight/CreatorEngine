@@ -15,7 +15,7 @@ benchmark or installer was run for this revision. The companion
   named/reloaded workspaces and preset application skip that visibility state
 - Rendering & Debug no longer supplies a profiler open/dock override. A saved
   legacy ImGui section can be read without drawing or launching an empty panel
-- Trace, Window > Frame Profiler, explicit Rendering - Live controls and CLI
+- Profiler, Window > Frame Profiler, explicit Rendering - Live controls and CLI
   `editor.window ###Editor.FrameProfiler open|focus|rendering-live` retain their
   existing request paths. Closing uses the existing process close request
 - Recording, transport identity, private job ownership, launch admission and
@@ -33,9 +33,9 @@ benchmark or installer was run for this revision. The companion
    Rendering & Debug, reset and save/reload each layout: none launches a viewer.
    Repeating these actions while a viewer is already open neither closes nor
    duplicates it; layout changes are not viewer lifetime commands
-4. Click Trace: exactly one ordinary-token owned viewer opens. Repeated Trace
+4. Click Profiler: exactly one ordinary-token owned viewer opens. Repeated Profiler
    focuses the same process. Close the viewer, continue recording, then click
-   Trace again: one fresh viewer opens; the old layout cannot reopen it by itself
+   Profiler again: one fresh viewer opens; the old layout cannot reopen it by itself
 5. Window > Frame Profiler opens/closes the viewer and reflects process status.
    Rendering - Live explicit buttons and menu items open/focus that page. Every
    case still works after workspace reload or preset application

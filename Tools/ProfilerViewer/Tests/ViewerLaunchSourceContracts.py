@@ -53,7 +53,7 @@ class ViewerLaunchSourceContracts(unittest.TestCase):
 
     def test_only_explicit_launch_call_sites_remain(self):
         expected = {
-            "Editor/EngineGUIWindow/MenuBarWindow.cpp": 2,  # Window menu, Trace
+            "Editor/EngineGUIWindow/MenuBarWindow.cpp": 2,  # Window menu, Profiler (stable StatusTrace ID)
             "Editor/EngineGUIWindow/EnhancedRenderDebugWindow.cpp": 1,  # explicit Rendering - Live
             "Editor/EngineEntry/Commands/CoreCommands.cpp": 1,  # CLI open/focus
             "Editor/ImGuiHelper/ProfilerLauncher.cpp": 1,  # request function definition

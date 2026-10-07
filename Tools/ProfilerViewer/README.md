@@ -62,7 +62,7 @@ deployment rather than silently expanding the viewer runtime.
 
 ## Launch and settings
 
-The Editor starts/focuses the viewer only for explicit Trace, Window > Frame
+The Editor starts/focuses the viewer only for explicit Profiler, Window > Frame
 Profiler, Rendering - Live or `editor.window` open/focus requests. Startup,
 workspace restoration/reload and layout presets do not open a viewer, including
 old workspaces with the embedded FrameProfiler open bit set. That legacy ID
@@ -70,6 +70,14 @@ remains for compatibility, without a bound draw body or persisted open state.
 The old body-to-launch bridge is removed; engine recording remains independent.
 Source guards and the unexecuted Windows matrix are in
 `Tests/ViewerLaunchSourceContracts.py` and `Tests/ViewerLaunchChecklist.md`.
+
+The Editor's bottom-bar label is now **Profiler** (formerly Trace); its existing
+`##StatusTrace` ID and CLI commands remain stable. The accompanying flat status
+bar contains Content Browser, Output Log with inline severity counts, an editable
+but disconnected Cmd field, active progress, Profiler, inactive Revision Control
+and the existing collider-debug toggle at the far right. Cmd does not execute
+commands, including on Enter. Static/reference scope and pending Windows
+acceptance are in `Tests/EditorStatusBarChecklist.md`.
 
 The executable embeds its dedicated multi-resolution icon and matching rail
 PNG, derived from the existing engine artwork with a bottom-right magnifier.
