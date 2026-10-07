@@ -1,5 +1,6 @@
 #include "PreparationWorker.h"
 #include "ViewerArguments.h"
+#include "ViewerWindowChrome.h"
 #include "Presentation/ProfilerPresenter.h"
 #include "ProfilerViewerClient.h"
 #include "EditorFontResources.h"
@@ -244,6 +245,8 @@ namespace ce::profiler_viewer
                 {
                     throw std::runtime_error("Cannot create the ProfilerViewer window.");
                 }
+                SetWindowPos(window_, nullptr, 0, 0, 0, 0,
+                    SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
                 create_device();
                 IMGUI_CHECKVERSION();
                 ImGui::CreateContext();
@@ -360,17 +363,7 @@ namespace ce::profiler_viewer
                     ImGui_ImplWin32_NewFrame();
                     ImGui::NewFrame();
                     handle_scale_shortcuts();
-                    const auto* viewport = ImGui::GetMainViewport();
-                    ImGui::SetNextWindowPos(viewport->WorkPos);
-                    ImGui::SetNextWindowSize(viewport->WorkSize);
-                    ImGui::SetNextWindowViewport(viewport->ID);
-                    constexpr auto flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
-                        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings;
-                    if (ImGui::Begin("Frame Profiler", nullptr, flags))
-                    {
-                        editor::profiler_view::draw();
-                    }
-                    ImGui::End();
+                    draw_shell();
                     ImGui::Render();
                     const auto color = editor::ThemeColorValue(editor::ThemeColor::Canvas);
                     const float clear[]{ color.x, color.y, color.z, color.w };
@@ -390,9 +383,102 @@ namespace ce::profiler_viewer
             }
 
         private:
+            void draw_shell()
+            {
+                editor::profiler_view::begin_frame();
+                const auto* viewport = ImGui::GetMainViewport();
+                ImGui::SetNextWindowPos(viewport->Pos);
+                ImGui::SetNextWindowSize(viewport->Size);
+                ImGui::SetNextWindowViewport(viewport->ID);
+                constexpr auto fixed = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove |
+                    ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
+                    ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 0.f, 0.f });
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.f);
+                ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.f);
+                ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.f);
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 0.f, 0.f });
+                if (ImGui::Begin("Frame Profiler", nullptr, fixed))
+                {
+                    const ImVec2 origin = ImGui::GetWindowPos();
+                    const ImVec2 size = ImGui::GetWindowSize();
+                    const float rail = std::min(editor::profiler_view::navigation_width(), size.x);
+                    ImGui::SetCursorScreenPos(origin);
+                    ImGui::PushStyleColor(ImGuiCol_ChildBg, editor::ThemeColorValue(editor::ThemeColor::Chrome));
+                    if (ImGui::BeginChild("##ProfilerNavigation", { rail, size.y }, ImGuiChildFlags_None, fixed))
+                    {
+                        editor::profiler_view::draw_navigation();
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleColor();
+
+                    ImGui::PushFont(nullptr, editor::EditorThemeTokens::TitleBarFontSize);
+                    const float padding = editor::TitleBarFramePaddingY(ImGui::GetFontSize(),
+                        ImGui::GetStyle().DisplaySafeAreaPadding.y, ImGui::GetIO().DisplayFramebufferScale.y);
+                    const float title_height = ImGui::GetFontSize() + padding * 2.f;
+                    const float width = std::max(1.f, size.x - rail);
+                    // Preserve the Editor control proportions, but avoid losing
+                    // system buttons in a very narrow/high-user-scale window.
+                    const float scale = editor::ThemePixels(1.f);
+                    const float controls_scale = std::min(scale, width / 280.f);
+                    const auto layout = LayoutEditorTitleBar(width, title_height, controls_scale);
+                    const ImVec2 title_origin{ origin.x + rail, origin.y };
+                    ImGui::SetCursorScreenPos(title_origin);
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { editor::ThemePixels(6.f), padding });
+                    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing,
+                        { editor::ThemePixels(editor::EditorThemeTokens::MenuGapX),
+                          editor::ThemePixels(editor::EditorThemeTokens::MenuGapY) });
+                    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, editor::ThemeColorValue(editor::ThemeColor::Canvas));
+                    if (ImGui::BeginChild("##ProfilerTitleBar", { width, title_height }, ImGuiChildFlags_None,
+                        fixed | ImGuiWindowFlags_MenuBar))
+                    {
+                        if (ImGui::BeginMenuBar())
+                        {
+                            const float menu_width = ImGui::CalcTextSize("File").x + ImGui::CalcTextSize("View").x +
+                                ImGui::GetStyle().ItemSpacing.x * 4.f;
+                            const bool compact = menu_width + editor::ThemePixels(16.f) > layout.playLeft;
+                            const float menu_end = editor::profiler_view::draw_menus(compact);
+                            const ImVec2 label_size = ImGui::CalcTextSize("Frame Profiler");
+                            const float label_x = title_origin.x + (width - label_size.x) * .5f;
+                            if (label_x > menu_end && label_x + label_size.x < title_origin.x + layout.playLeft)
+                            {
+                                ImGui::GetWindowDrawList()->AddText(
+                                    { label_x, title_origin.y + (title_height - label_size.y) * .5f },
+                                    ImGui::GetColorU32(ImGuiCol_TextDisabled), "Frame Profiler");
+                            }
+                            ImGui::SetCursorScreenPos({ title_origin.x + layout.playLeft, title_origin.y + layout.playInset });
+                            editor::profiler_view::draw_record_control(
+                                { layout.playWidth, title_height - layout.playInset * 2.f });
+                            chrome_.draw_system_buttons(window_, layout, title_origin);
+                            // Win32 backend uses client pixels and no secondary
+                            // viewports. The exact rendered row drives hit tests.
+                            chrome_.publish_caption(title_height, menu_end - viewport->Pos.x,
+                                title_origin.x + layout.playLeft - viewport->Pos.x);
+                            ImGui::EndMenuBar();
+                        }
+                    }
+                    ImGui::EndChild();
+                    ImGui::PopStyleColor();
+                    ImGui::PopStyleVar(2);
+                    ImGui::PopFont();
+
+                    ImGui::SetCursorScreenPos({ origin.x + rail, origin.y + title_height });
+                    if (ImGui::BeginChild("##ProfilerWorkspace", { width, std::max(1.f, size.y - title_height) },
+                        ImGuiChildFlags_None, fixed))
+                    {
+                        editor::profiler_view::draw();
+                    }
+                    ImGui::EndChild();
+                }
+                ImGui::End();
+                ImGui::PopStyleVar(6);
+            }
+
             void apply_scale()
             {
                 editor::ApplyEditorTheme(ImGui::GetStyle(), settings_.scale_milli / 1000.0f, dpi_scale_);
+                chrome_.invalidate();
                 scale_dirty_ = false;
             }
 
@@ -473,6 +559,13 @@ namespace ce::profiler_viewer
                     self = static_cast<application*>(reinterpret_cast<CREATESTRUCTW*>(lparam)->lpCreateParams);
                     SetWindowLongPtrW(window, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(self));
                 }
+                if (self)
+                {
+                    if (const auto handled = self->chrome_.handle_message(window, message, wparam, lparam))
+                    {
+                        return *handled;
+                    }
+                }
                 if (ImGui::GetCurrentContext() && ImGui_ImplWin32_WndProcHandler(window, message, wparam, lparam))
                 {
                     return 1;
@@ -481,6 +574,14 @@ namespace ce::profiler_viewer
                 {
                     switch (message)
                     {
+                    case WM_GETMINMAXINFO:
+                    {
+                        const UINT dpi = GetDpiForWindow(window);
+                        auto* limits = reinterpret_cast<MINMAXINFO*>(lparam);
+                        limits->ptMinTrackSize.x = MulDiv(600, static_cast<int>(dpi), 96);
+                        limits->ptMinTrackSize.y = MulDiv(400, static_cast<int>(dpi), 96);
+                        return 0;
+                    }
                     case WM_SIZE:
                         self->minimized_ = wparam == SIZE_MINIMIZED;
                         if (!self->minimized_)
@@ -539,6 +640,7 @@ namespace ce::profiler_viewer
             UINT resize_width_ = 0;
             UINT resize_height_ = 0;
             window_settings settings_;
+            window_chrome chrome_;
             std::filesystem::path settings_root_;
             std::string ini_path_;
             ComPtr<ID3D11Device> device_;

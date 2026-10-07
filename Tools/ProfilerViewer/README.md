@@ -8,15 +8,37 @@ installed or restored while implementing this change.
 Win32 window, D3D11 device/context/swapchain, ImGui context and backend lifetimes
 belong to the viewer. Hardware D3D11 failure can fall back to WARP. No engine,
 scene, RHI, scripting runtime, Editor singleton or in-process analysis host is
-initialized. Its frame presentation is the moved profiler UI, with the same
-tabs, content, toolbar, Editor theme, Inter text, Material Symbols and fallback
-alignment. This is not a second copy of the theme or profiler renderer.
+initialized. Its presentation reuses the existing profiler pages, Editor theme,
+Inter text, Material Symbols and fallback alignment. Its shell now places the
+navigation rail at the top-left edge for the full window height, an ImGui title
+row to its right, and independent page/information scroll regions below that
+row. This is not a second copy of the theme or profiler renderer.
 
 The project uses the repository's pinned ImGui package and its existing
 `win32-binding`, `dx11-binding`, `docking-experimental`, `wchar32` and `freetype`
 features. No newer or separately vendored ImGui version is introduced.
 
 ## Layout and build ownership
+
+The Win32 caption is replaced by ImGui chrome while retaining the standard
+resizable window style, native drag/double-click behavior, minimize/maximize/
+restore/close and system menu (caption right-click or Alt+Space). Menu/action
+rectangles remain client input. The shared Editor title-row calculation applies
+a 45px physical floor **after** user/DPI scaling; already larger fonts/safe
+padding can grow it. The fixed shell has no outer scrollbar.
+
+- Title row: File (Open, Save entire recording, Clear), View (Live Follow,
+  entire session, information sidebar), state-driven Record/Stop/pending icon
+  and window buttons. Disabled actions retain their original admission rules
+- Left rail: all existing analysis/live pages, with its own scrolling when
+  needed. Header and diagnostics never consume space above it
+- Right information sections: connection/session writer, file metadata/progress/
+  cancellation, capture/stop integrity, and counter modules. At narrow widths
+  the right icon strip opens a dismissible bounded inspector over the page
+
+Screenshot interpretation and pending visual/interaction acceptance are in
+`Tests/ViewerChromeChecklist.md`. These are source changes, not runtime-verified
+pixel measurements or a claim that visual parity has passed.
 
 - Application: `Bin/<platform>-<configuration>/Tools/ProfilerViewer/ProfilerViewer.exe`
 - Application-local import closure: beside `ProfilerViewer.exe`
@@ -51,6 +73,17 @@ The client validates the peer before any
 live control can be sent. A missing helper or failed connection is an error,
 never a reason to fall back to an embedded viewer or request elevation.
 
+An Editor-launched viewer belongs to that Editor's private Windows job for its
+whole lifetime, even after opening an offline capture or losing its IPC connection.
+Normal Editor shutdown requests the viewer's usual close path, allows a 1.5-second
+grace period, and terminates the owned job if teardown is stuck. The Editor waits
+at most 2.5 seconds for its transport worker before also enforcing that cleanup.
+Editor exit/crash closes the non-inherited kill-on-close job handle. Job assignment
+is atomic with process creation; failure to establish ownership rejects launch.
+Standalone no-argument and `--open` viewers are never added to this job and remain
+independent. A transport disconnect while the Editor is alive does not close its
+viewer. This does not change or validate the separate ETW helper's crash cleanup.
+
 Only `%LOCALAPPDATA%/CreatorEngine/ProfilerViewer/imgui.ini` and `window.ini` are
 used for UI persistence. A missing/unwritable settings directory disables
 persistence. Normal placement is clamped to an existing monitor's work area;
@@ -71,14 +104,18 @@ runtime validation.
 1. Build Debug and Release x64 using the repository's supported VS/vcpkg setup;
    confirm no SceneRuntime, RenderEngine, Editor, ProfileService or
    DxCaptureProcess implementation enters the viewer link closure
-2. Compare the old profiler and separate viewer at identical window/content
-   size and user/DPI scale: palette, fonts, icon baselines, left navigation,
-   Frame Overview, timeline/flame graph, selected frame and every live page
+2. Compare the revised shell against the supplied reference layout at identical
+   window/content size and user/DPI scale: full-height rail, custom title row,
+   menu/record placement, inspector sections, palette, fonts and icon baselines.
+   Verify Frame Overview, timeline/flame graph and every live page retain content
 3. Exercise no-argument offline startup, `.ceprof` v1/v2/v3 and `.cedx` Open,
    repeated Open while preparing, cancel, malformed/truncated/oversize captures,
    Save, and closing during analysis; the analysis queue stays bounded
 4. Exercise valid live launch, focus-existing, target exit, wrong nonce/PID/
-   creation time/session, malformed packets and reconnect after disconnection
+   creation time/session and malformed packets. A transport-only disconnect
+   retains the window; Editor exit closes it. Cover launch/shutdown races,
+   multiple Editors and independent offline viewers with
+   `Tests/ViewerLifetimeChecklist.md`
 5. Rename/remove the deployed helper and its runtime/font files separately:
    Editor launch reports missing-helper failure; missing text/icon fonts use the
    shared fallback path; no engine window or elevated prompt appears
@@ -93,8 +130,10 @@ runtime validation.
    Presenter publication cancels first, client disconnects, queued analysis is
    discarded outside each queue lock, and only each running operation finishes
    cooperatively before renderer/platform/context tear down, D3D releases and
-   the native window closes. File-system calls can still block at the OS level;
-   this is not a hard I/O shutdown deadline guarantee
+   the native window closes. On Editor shutdown a stuck owned viewer receives
+   job-scoped forced termination after its grace period. Standalone viewer close
+   remains cooperative; file-system calls can still block at the OS level and
+   no hard I/O completion deadline is claimed
 9. Relaunch with a disconnected monitor, invalid window rectangle, saved
    maximized state and unwritable settings location. Window remains reachable;
    Editor workspace/settings files are unchanged
