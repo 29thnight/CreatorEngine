@@ -5,6 +5,7 @@
 #include "ProfileReader.h"
 
 struct ImVec2;
+struct ImTextureRef;
 
 namespace ce::profiler_viewer
 {
@@ -24,7 +25,7 @@ namespace editor::profiler_view
     // titlebar and body bounds; none of these surfaces scroll the host window.
     void begin_frame();
     float navigation_width();
-    void draw_navigation();
+    void draw_navigation(const ImTextureRef& brand_icon);
     // Called inside the host's menu bar. Returns the absolute right menu edge.
     float draw_menus(bool compact);
     void draw_record_control(const ImVec2& size);

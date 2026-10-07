@@ -46,7 +46,7 @@
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
-      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;imm32.lib;comdlg32.lib;shell32.lib;ole32.lib;uuid.lib;advapi32.lib;bcrypt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>d3d11.lib;dxgi.lib;d3dcompiler.lib;dwmapi.lib;imm32.lib;comdlg32.lib;shell32.lib;ole32.lib;uuid.lib;advapi32.lib;bcrypt.lib;windowscodecs.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>true</EnableUAC>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
@@ -96,15 +96,19 @@
     </ClCompile>
     <ClCompile Include="$(SolutionDir)Engine\EngineDiagnostics\ProfilerRenderingDiagnostics.cpp" />
     <ResourceCompile Include="$(SolutionDir)Tools\runtime\EngineVersion.rc" />
+    <ResourceCompile Include="ProfilerViewer.rc" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="PreparationWorker.h" />
     <ClInclude Include="ViewerArguments.h" />
     <ClInclude Include="ViewerWindowChrome.h" />
+    <ClInclude Include="ProfilerViewerResources.h" />
     <ClInclude Include="Presentation\ProfilerPresenter.h" />
     <ClInclude Include="Presentation\ProfilerView.h" />
     <ClInclude Include="Presentation\ProfilerLiveDiagnostics.h" />
     <Manifest Include="ProfilerViewer.manifest" />
+    <Image Include="ProfilerViewer.ico" />
+    <Image Include="$(SolutionDir)Resources\Editor\Icons\Profiler.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <Target Name="ValidateProfilerViewerConfiguration" BeforeTargets="PrepareForBuild">

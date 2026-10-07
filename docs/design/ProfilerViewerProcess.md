@@ -24,7 +24,7 @@ PR #126 (`3cbdeacc`). No dependency was updated, installed or restored.
   Font root is injected explicitly; the Editor retains its previous resource
   root. Viewer startup inherits user scale and applies monitor DPI separately
 
-Trace opens/focuses one viewer owned by that engine process. Repeated Trace does
+Profiler opens/focuses one viewer owned by that engine process. Repeated Profiler does
 not launch a second instance. Existing profiler-window CLI open/focus/close routes
 are forwarded to the process owner. Explicit close targets only that owned
 viewer; closing a viewer does not stop engine recording. Editor exit closes that

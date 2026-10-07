@@ -56,6 +56,7 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include <algorithm>
+#include <cstdint>
 #include <regex>
 #include <string_view>
 
@@ -67,8 +68,17 @@ namespace
     // 키가 맞는다.
     constexpr float kMenuBarFontSizePixels = ::editor::EditorThemeTokens::BodyFontSize;
 
+    // Bottom-bar reference: compact charcoal chrome, dark dividers and an inset
+    // command field. Keep this palette local so other editor panels are unchanged.
+    constexpr ImU32 kStatusChrome = IM_COL32(36, 36, 36, 255);
+    constexpr ImU32 kStatusDivider = IM_COL32(21, 21, 21, 255);
+    constexpr ImU32 kStatusField = IM_COL32(15, 15, 15, 255);
+    constexpr ImU32 kStatusFieldBorder = IM_COL32(46, 46, 46, 255);
+    constexpr ImU32 kStatusText = IM_COL32(192, 192, 192, 255);
+    constexpr ImU32 kStatusMuted = IM_COL32(140, 140, 140, 255);
+
     bool draw_status_tab(const char* id, const char* label, const char* tooltip,
-        const ImVec2& size, bool selected = false, bool enabled = true)
+        const ImVec2& size, bool selected = false, bool enabled = true, bool trailingSeparator = true)
     {
         ImGuiWindow* const window = ImGui::GetCurrentWindow();
         if (window->SkipItems)
@@ -107,23 +117,21 @@ namespace
         draw->PushClipRect(bounds.Min, bounds.Max, true);
         if (selected || hovered || held)
         {
-            const auto surface = held ? ::editor::ThemeColor::Selection :
-                (hovered ? ::editor::ThemeColor::PanelRaised : ::editor::ThemeColor::Panel);
+            const ImU32 surface = held ? IM_COL32(58, 58, 58, 255) :
+                (hovered ? IM_COL32(49, 49, 49, 255) : IM_COL32(43, 43, 43, 255));
             draw->AddRectFilled(bounds.Min, bounds.Max,
-                ImGui::GetColorU32(::editor::ThemeColorValue(surface)));
+                ImGui::GetColorU32(surface));
         }
-        if (selected)
+        if (trailingSeparator)
         {
-            draw->AddRectFilled(bounds.Min,
-                ImVec2(bounds.Max.x, bounds.Min.y + ::editor::ThemePixels(2.f)),
-                ImGui::GetColorU32(::editor::ThemeColorValue(::editor::ThemeColor::Primary)));
+            const float dividerWidth = ::editor::ThemePixels(1.f);
+            draw->AddRectFilled(ImVec2(bounds.Max.x - dividerWidth, bounds.Min.y),
+                bounds.Max, ImGui::GetColorU32(kStatusDivider));
         }
-        draw->AddLine(ImVec2(bounds.Max.x - 1.f, bounds.Min.y),
-            ImVec2(bounds.Max.x - 1.f, bounds.Max.y),
-            ImGui::GetColorU32(::editor::ThemeColorValue(::editor::ThemeColor::Border)));
 
         const ImVec2 textSize = ImGui::CalcTextSize(label);
-        const float padding = ::editor::ThemePixels(::editor::EditorThemeTokens::ControlPaddingX);
+        const float padding = std::min(size.x * .2f,
+            ::editor::ThemePixels(6.f));
         const float textWidth = std::max(0.f, size.x - padding * 2.f);
         ::editor::clipping::announce_text(kWidget, textSize.x, textWidth, true, true);
         const ImVec2 textMin(bounds.Min.x + padding, bounds.Min.y + (size.y - textSize.y) * .5f);
@@ -135,7 +143,7 @@ namespace
         draw->PopClipRect();
         ::editor::clipping::leave_widget(kWidget, draw->_ClipRectStack.Size);
         ::editor::nav::draw_cursor(bounds, itemId, kWidget);
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
+        if (tooltip && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_AllowWhenDisabled))
         {
             ImGui::SetTooltip("%s", tooltip);
         }
@@ -167,8 +175,9 @@ MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
     }));
 
 
-    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kFrameProfiler,
-        [this]() { ShowProfilerWindow(); }));
+    // A restored panel is layout state, never a request to start another process.
+    // FrameProfiler keeps its legacy ID, but no longer has an embedded draw body.
+    // Profiler, the Window menu and editor.window enqueue explicit viewer requests.
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kOutputLog,
         [this]() { m_outputLog.Draw(); }));
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kAbout,
@@ -245,9 +254,9 @@ void MenuBarWindow::RenderMenuBar()
     if (auto error = editor::take_profiler_viewer_error(); !error.empty())
     {
         viewerError = std::move(error);
-        ImGui::OpenPopup("Trace viewer unavailable");
+        ImGui::OpenPopup("Profiler viewer unavailable###ProfilerViewerUnavailable");
     }
-    if (ImGui::BeginPopupModal("Trace viewer unavailable", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    if (ImGui::BeginPopupModal("Profiler viewer unavailable###ProfilerViewerUnavailable", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
         ImGui::TextWrapped("%s", viewerError.c_str());
         if (ImGui::Button("Close"))
@@ -265,7 +274,6 @@ void MenuBarWindow::RenderMenuBar()
 
     ImGuiViewportP* viewport = (ImGuiViewportP*)(void*)ImGui::GetMainViewport();
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar;
-    float height = ImGui::GetFrameHeight();
 
     // Only the app chrome uses the compact font. The docked panels retain their
     // body scale, and the main menu reserves the viewport work area exactly once.
@@ -590,25 +598,34 @@ void MenuBarWindow::RenderMenuBar()
 
     // Flat, contiguous status tabs share the bar surface instead of button frames.
     // Keep the existing viewport reservation and registry-owned window lifetimes.
-    const float statusHeight = height + 1.f;
+    ImGui::PushFont(EditorAssetPresentation::Get().GetSmallFont(), editor::EditorThemeTokens::SmallFontSize);
+    const float statusHeight = editor::ThemePixels(27.f);
+    const float statusTopInset = editor::ThemePixels(3.f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.f, 0.f));
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.f, 0.f));
     ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.f);
-    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, editor::ThemeColorValue(editor::ThemeColor::Chrome));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(editor::ThemePixels(6.f),
+        std::max(0.f, (statusHeight - ImGui::GetFontSize()) * .5f)));
+    ImGui::PushStyleColor(ImGuiCol_MenuBarBg, kStatusChrome);
+    ImGui::PushStyleColor(ImGuiCol_Text, kStatusText);
+    ImGui::PushStyleColor(ImGuiCol_TextDisabled, kStatusMuted);
     if (ImGui::BeginViewportSideBar("##MainStatusBar", viewport, ImGuiDir_Down, statusHeight, window_flags))
     {
         if (ImGui::BeginMenuBar())
         {
             const ImVec2 barMin = ImGui::GetWindowPos();
             const float barRight = barMin.x + ImGui::GetWindowWidth();
-            ImGui::GetWindowDrawList()->AddLine(barMin, ImVec2(barRight, barMin.y),
-                ImGui::GetColorU32(editor::ThemeColorValue(editor::ThemeColor::Border)));
-            const float tabHeight = std::max(1.f, height - 1.f);
-            const float tabPadding = editor::ThemePixels(editor::EditorThemeTokens::ControlPaddingX) * 2.f;
-            const std::string outputLabel = std::string("Output Log  ") + EditorIcon::Console;
-            constexpr const char* kTraceLabel = EditorIcon::Label<EditorIcon::Profiler, " Trace">;
+            ImGui::GetWindowDrawList()->AddRectFilled(barMin,
+                ImVec2(barRight, barMin.y + statusTopInset), ImGui::GetColorU32(kStatusDivider));
+            const float tabY = barMin.y + statusTopInset;
+            const float tabHeight = std::max(1.f, statusHeight - statusTopInset);
+            const float tabPadding = editor::ThemePixels(6.f) * 2.f;
+            constexpr const char* kContentLabel = EditorWindowName::kContentBrowserLabel;
+            constexpr const char* kOutputLabel = EditorIcon::Label<EditorIcon::Console, " Output Log">;
+            constexpr const char* kProfilerLabel = EditorIcon::Label<EditorIcon::Profiler, " Profiler">;
             constexpr const char* kRevisionLabel = "Revision Control";
+            const std::string commandLabel = std::string(EditorIcon::Console) + " Cmd " + EditorIcon::Expand;
 
             // These are the same store totals shown by Output Log, never a second counter.
             LogLevelTotals totals;
@@ -616,11 +633,9 @@ void MenuBarWindow::RenderMenuBar()
             {
                 totals = Debug::GetLogLevelTotals();
             }
-            const std::string countText[3] = {
-                std::string(EditorIcon::Info) + " " + std::to_string(totals.messages),
-                std::string(EditorIcon::Warning) + " " + std::to_string(totals.warnings),
-                std::string(EditorIcon::Error) + " " + std::to_string(totals.errors),
-            };
+            const std::uint64_t countValues[3] = { totals.messages, totals.warnings, totals.errors };
+            const char* const countIcons[3] = { EditorIcon::Info, EditorIcon::Warning, EditorIcon::Error };
+            std::string countText[3];
             const editor::ThemeColor countColor[3] = {
                 editor::ThemeColor::TextMuted,
                 editor::ThemeColor::Warning,
@@ -630,9 +645,20 @@ void MenuBarWindow::RenderMenuBar()
                 "  Warnings: " + std::to_string(totals.warnings) + "  Errors: " + std::to_string(totals.errors);
             float countsWidth = 0.f;
             float countWidths[3]{};
+            float widestDigit = 0.f;
+            for (char digit = '0'; digit <= '9'; ++digit)
+            {
+                const char text[2] = { digit, '\0' };
+                widestDigit = std::max(widestDigit, ImGui::CalcTextSize(text).x);
+            }
             for (int slot = 0; slot < 3; ++slot)
             {
-                countWidths[slot] = ImGui::CalcTextSize(countText[slot].c_str()).x + tabPadding;
+                // Bounded display and constant digit budgets prevent changing
+                // totals from resizing any controls, including compact/DPI modes.
+                const std::string prefix = std::string(countIcons[slot]) + " ";
+                countText[slot] = prefix + (countValues[slot] > 999 ? "999+" : std::to_string(countValues[slot]));
+                countWidths[slot] = ImGui::CalcTextSize(prefix.c_str()).x + widestDigit * 3.f +
+                    ImGui::CalcTextSize("+").x + tabPadding;
                 countsWidth += countWidths[slot];
             }
 
@@ -719,26 +745,58 @@ void MenuBarWindow::RenderMenuBar()
             const bool showProgress = !progressLabel.empty();
             float progressWidth = showProgress ? editor::ThemePixels(220.f) : 0.f;
 
-            float outputWidth = ImGui::CalcTextSize(outputLabel.c_str()).x + tabPadding;
-            float traceWidth = ImGui::CalcTextSize(kTraceLabel).x + tabPadding;
+            float contentWidth = ImGui::CalcTextSize(kContentLabel).x + tabPadding;
+            float outputLabelWidth = ImGui::CalcTextSize(kOutputLabel).x + tabPadding;
+            float commandLabelWidth = ImGui::CalcTextSize(commandLabel.c_str()).x + tabPadding;
+            float profilerWidth = ImGui::CalcTextSize(kProfilerLabel).x + tabPadding;
             float revisionWidth = ImGui::CalcTextSize(kRevisionLabel).x + tabPadding;
             float debugWidth = ImGui::CalcTextSize(EditorIcon::Debug).x + tabPadding;
-            const float fixedWidth = outputWidth + traceWidth + revisionWidth + debugWidth + progressWidth;
+            const float commandMinWidth = commandLabelWidth + editor::ThemePixels(110.f);
+            const float fixedWidth = contentWidth + outputLabelWidth + countsWidth + commandMinWidth +
+                profilerWidth + revisionWidth + debugWidth + progressWidth;
             const float barWidth = std::max(1.f, barRight - barMin.x);
-            const bool showCounts = fixedWidth + countsWidth <= barWidth;
-            // At narrow widths the log tab's tooltip retains all totals. Shrink and
-            // clip the tabs together only after dropping the inline count readout.
+            // Keep all three severity segments inside Output Log at every width.
+            // Font-measured widths include a stable count budget and current DPI. Only
+            // genuinely narrow bars clip the segments; their tooltips retain totals.
             const float widthScale = std::min(1.f, barWidth / fixedWidth);
-            outputWidth *= widthScale;
-            traceWidth *= widthScale;
+            contentWidth *= widthScale;
+            outputLabelWidth *= widthScale;
+            commandLabelWidth *= widthScale;
+            countsWidth = 0.f;
+            for (float& countWidth : countWidths)
+            {
+                countWidth *= widthScale;
+                countsWidth += countWidth;
+            }
+            profilerWidth *= widthScale;
             revisionWidth *= widthScale;
             debugWidth *= widthScale;
             progressWidth *= widthScale;
+            const float outputWidth = outputLabelWidth + countsWidth;
+            const float outputLeft = barMin.x + contentWidth;
+            const float debugLeft = barRight - debugWidth;
+            const float revisionLeft = debugLeft - revisionWidth;
+            const float profilerLeft = revisionLeft - profilerWidth;
+            const float progressLeft = profilerLeft - progressWidth;
+            const float commandLeft = outputLeft + outputWidth;
+            const float commandWidth = std::max(0.f, progressLeft - commandLeft);
 
-            ImGui::SetCursorScreenPos(ImVec2(barMin.x, barMin.y + 1.f));
+            ImGui::SetCursorScreenPos(ImVec2(barMin.x, tabY));
+            if (draw_status_tab("##StatusContentBrowser", kContentLabel, "Open or focus Content Browser",
+                ImVec2(contentWidth, tabHeight), editor::is_window_open(EditorWindowName::kContentBrowser)))
+            {
+                // The existing focus request also opens closed panels and selects
+                // the docked tab when Content Browser is behind another window.
+                editor::queue_window_request(EditorWindowName::kContentBrowser, editor::window_request::focus);
+            }
+
+            ImGui::SetCursorScreenPos(ImVec2(outputLeft, tabY));
+            ImGui::BeginGroup();
             const bool logOpen = editor::is_window_open(EditorWindowName::kOutputLog);
-            if (draw_status_tab("##StatusOutputLog", outputLabel.c_str(), outputTooltip.c_str(),
-                ImVec2(outputWidth, tabHeight), logOpen))
+            // No internal dividers: the label and colored counts form one tab.
+            // Their disjoint hit rectangles retain label-toggle / count-open behavior.
+            if (draw_status_tab("##StatusOutputLog", kOutputLabel, outputTooltip.c_str(),
+                ImVec2(outputLabelWidth, tabHeight), logOpen, true, false))
             {
                 if (logOpen)
                 {
@@ -749,51 +807,86 @@ void MenuBarWindow::RenderMenuBar()
                     editor::open_window(EditorWindowName::kOutputLog);
                 }
             }
-            const float countsSlotMinX = ImGui::GetItemRectMax().x;
-            const float debugLeft = std::max(countsSlotMinX,
-                barRight - traceWidth - revisionWidth - progressWidth - debugWidth);
-            if (showCounts)
+            const float countsSlotMinX = outputLeft + outputLabelWidth;
+            float countLeft = countsSlotMinX;
+            ImGui::PushID("StatusOutputLogCounts");
+            for (int slot = 0; slot < 3; ++slot)
             {
-                ImGui::SetCursorScreenPos(ImVec2(debugLeft - countsWidth, barMin.y + 1.f));
-                for (int slot = 0; slot < 3; ++slot)
+                ImGui::SetCursorScreenPos(ImVec2(countLeft, tabY));
+                ImGui::PushID(slot);
+                ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(countColor[slot]));
+                if (draw_status_tab("##Count", countText[slot].c_str(), nullptr,
+                    ImVec2(countWidths[slot], tabHeight), logOpen, true, slot == 2))
                 {
-                    ImGui::PushID(slot);
-                    ImGui::PushStyleColor(ImGuiCol_Text, editor::ThemeColorValue(countColor[slot]));
-                    ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.f, 0.f, 0.f, 0.f));
-                    if (ImGui::Button(countText[slot].c_str(), ImVec2(countWidths[slot], tabHeight)))
-                    {
-                        editor::open_window(EditorWindowName::kOutputLog);
-                    }
-                    ImGui::PopStyleColor(2);
-                    if (ImGui::IsItemHovered())
-                    {
-                        ImGui::SetTooltip("%s — 눌러서 Output Log 를 연다",
-                            slot == 0 ? "메시지" : (slot == 1 ? "경고" : "오류"));
-                    }
-                    ImGui::PopID();
-                    ImGui::SameLine(0.f, 0.f);
+                    editor::open_window(EditorWindowName::kOutputLog);
                 }
+                ImGui::PopStyleColor();
+                if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                {
+                    ImGui::SetTooltip("%s\n\nClick to open Output Log.", outputTooltip.c_str());
+                }
+                ImGui::PopID();
+                countLeft += countWidths[slot];
             }
+            ImGui::PopID();
+            ImGui::EndGroup();
 
-            ImGui::SetCursorScreenPos(ImVec2(debugLeft, barMin.y + 1.f));
-            const bool wasDebug = ShouldCollectGizmoColliders();
-            if (draw_status_tab("##StatusColliderDebug", EditorIcon::Debug, "Collider debug gizmos",
-                ImVec2(debugWidth, tabHeight), wasDebug))
+            // UI only: editing this buffer (including Enter) never dispatches a
+            // console command. Execution, history and completion are not connected.
+            if (commandWidth >= 1.f)
             {
-                SetCollectGizmoColliders(!wasDebug);
+                static char commandText[512]{};
+                constexpr const char* kCommandTooltip =
+                    "Cmd UI only. Command execution is not connected; Enter does not run commands.";
+                ImGui::SetCursorScreenPos(ImVec2(commandLeft, tabY));
+                draw_status_tab("##StatusCommandLabel", commandLabel.c_str(), kCommandTooltip,
+                    ImVec2(commandLabelWidth, tabHeight), false, false, false);
+                const float inset = std::min(editor::ThemePixels(4.f), tabHeight * .2f);
+                const float fieldWidth = std::min(editor::ThemePixels(240.f),
+                    std::max(0.f, commandWidth - commandLabelWidth - editor::ThemePixels(6.f) * widthScale));
+                if (fieldWidth >= 1.f)
+                {
+                    ImGui::SetCursorScreenPos(ImVec2(commandLeft + commandLabelWidth, tabY + inset));
+                    ImGui::SetNextItemWidth(fieldWidth);
+                    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(
+                        std::min(editor::ThemePixels(6.f), fieldWidth * .2f),
+                        std::max(0.f, (tabHeight - inset * 2.f - ImGui::GetFontSize()) * .5f)));
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, editor::ThemePixels(1.f));
+                    ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, editor::ThemePixels(2.f));
+                    ImGui::PushStyleColor(ImGuiCol_FrameBg, kStatusField);
+                    ImGui::PushStyleColor(ImGuiCol_Border, kStatusFieldBorder);
+                    ImGui::PushStyleColor(ImGuiCol_TextDisabled, kStatusMuted);
+                    ImGui::InputTextWithHint("##StatusCommand", "Enter command (not connected)",
+                        commandText, sizeof(commandText));
+                    ImGui::PopStyleColor(3);
+                    ImGui::PopStyleVar(3);
+                    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
+                    {
+                        ImGui::SetTooltip("%s", kCommandTooltip);
+                    }
+                }
+                const float commandEnd = std::min(progressLeft, commandLeft + commandLabelWidth +
+                    fieldWidth + editor::ThemePixels(6.f) * widthScale);
+                ImGui::GetWindowDrawList()->AddRectFilled(
+                    ImVec2(std::max(commandLeft, commandEnd - editor::ThemePixels(1.f)), tabY),
+                    ImVec2(commandEnd, tabY + tabHeight), ImGui::GetColorU32(kStatusDivider));
             }
-            // The golden-image mask remains independent of changing counter digits.
-            editor::publish_status_counts_slot(countsSlotMinX, barMin.y, debugLeft, barMin.y + statusHeight);
+            // Mask the counts and editable/flexible Cmd area; count digit changes
+            // cannot shift unmasked controls at normal or compact widths.
+            editor::publish_status_counts_slot(countsSlotMinX, barMin.y, progressLeft, barMin.y + statusHeight);
 
             if (showProgress)
             {
                 const float inset = std::min(editor::ThemePixels(3.f), progressWidth * .2f);
-                ImGui::SetCursorScreenPos(ImVec2(debugLeft + debugWidth + inset, barMin.y + 1.f));
-                ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, editor::ThemePixels(2.f));
-                ImGui::PushStyleColor(ImGuiCol_FrameBg, editor::ThemeColorValue(editor::ThemeColor::Canvas));
+                const float lineHeight = std::min(editor::ThemePixels(3.f), tabHeight * .2f);
+                ImGui::SetCursorScreenPos(ImVec2(progressLeft, tabY));
+                draw_status_tab("##StatusProgress", progressLabel.c_str(), progressTooltip.c_str(),
+                    ImVec2(progressWidth, tabHeight), false, false);
+                ImGui::SetCursorScreenPos(ImVec2(progressLeft + inset, tabY + tabHeight - lineHeight));
+                ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.f);
+                ImGui::PushStyleColor(ImGuiCol_FrameBg, kStatusDivider);
                 ImGui::PushStyleColor(ImGuiCol_PlotHistogram, editor::ThemeColorValue(editor::ThemeColor::Primary, .65f));
-                ImGui::ProgressBar(progressFraction, ImVec2(progressWidth - inset * 2.f, tabHeight),
-                    progressLabel.c_str());
+                ImGui::ProgressBar(progressFraction, ImVec2(progressWidth - inset * 2.f, lineHeight), "");
                 ImGui::PopStyleColor(2);
                 ImGui::PopStyleVar();
                 if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
@@ -801,10 +894,10 @@ void MenuBarWindow::RenderMenuBar()
                     ImGui::SetTooltip("%s", progressTooltip.c_str());
                 }
             }
-            ImGui::SetCursorScreenPos(ImVec2(barRight - traceWidth - revisionWidth, barMin.y + 1.f));
+            ImGui::SetCursorScreenPos(ImVec2(profilerLeft, tabY));
             const bool profilerOpen = editor::profiler_viewer_running();
-            if (draw_status_tab("##StatusTrace", kTraceLabel, "Trace — Frame Profiler",
-                ImVec2(traceWidth, tabHeight), profilerOpen))
+            if (draw_status_tab("##StatusTrace", kProfilerLabel, "Profiler — Frame Profiler",
+                ImVec2(profilerWidth, tabHeight), profilerOpen))
             {
                 editor::request_profiler_viewer();
             }
@@ -813,12 +906,20 @@ void MenuBarWindow::RenderMenuBar()
             draw_status_tab("##StatusRevisionControl", kRevisionLabel,
                 "Revision Control — Lore integration is not available yet",
                 ImVec2(revisionWidth, tabHeight), false, false);
+            ImGui::SetCursorScreenPos(ImVec2(debugLeft, tabY));
+            const bool wasDebug = ShouldCollectGizmoColliders();
+            if (draw_status_tab("##StatusColliderDebug", EditorIcon::Debug, "Collider debug gizmos",
+                ImVec2(debugWidth, tabHeight), wasDebug))
+            {
+                SetCollectGizmoColliders(!wasDebug);
+            }
             ImGui::EndMenuBar();
         }
     }
     ImGui::End();
-    ImGui::PopStyleColor();
-    ImGui::PopStyleVar(4);
+    ImGui::PopStyleColor(3);
+    ImGui::PopStyleVar(5);
+    ImGui::PopFont();
 
     // PHASE 21 M4 3단계: 여덟 창의 프레임은 셸이 연다. 여기서 그것들을
     // 부르던 여덟 줄이 사라졌다. 아래 둘만 남는데, 창이 **닫혀 있을 때**
@@ -2836,13 +2937,4 @@ void MenuBarWindow::ShowRenderDebugWindow()
     ImGui::TextWrapped("Frame capture and event/resource inspection are not available yet.");
     ImGui::TextWrapped("Current live pass timings and validation are available without recording.");
     if (ImGui::Button("Open Rendering - Live")) editor::OpenRenderLiveDiagnostics();
-}
-
-// PHASE 21 M4 3단계: 프레임 루프 안에 인라인으로 있던 본문이다. 셸이 프레임을
-// 소유하려면 본문이 부를 수 있는 것이어야 해서 메서드로 냈다. 맨 앞의
-// BringWindowToFocusFront/DisplayFront 둘은 선언의 stacking 으로 갔다.
-void MenuBarWindow::ShowProfilerWindow()
-{
-    editor::request_profiler_viewer();
-    editor::close_window(EditorWindowName::kFrameProfiler);
 }

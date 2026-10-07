@@ -20,6 +20,10 @@ product's artwork or colors.
 
 - The fixed outer shell has zero padding, rounding and scrolling. The left rail
   occupies the whole client height; the titlebar starts after its right edge
+- The dedicated engine-plus-magnifier icon is fixed at the rail's very top.
+  The pages below it use a 40px rail, 26px button heights and 2px gaps, retaining
+  the shared 16px glyphs and full tooltips. Only the page list scrolls; icon
+  resources and explicit launch acceptance are in `ViewerLaunchChecklist.md`
 - Header menus, record control, native buttons and drag geometry use one actual
   row. `TitleBarFramePaddingY` reserves at least 45 final framebuffer pixels
   without multiplying that floor by user scale or OS DPI again

@@ -1271,7 +1271,7 @@ namespace
 
 float editor::profiler_view::navigation_width()
 {
-    return ThemePixels(48.0f);
+    return ThemePixels(40.0f);
 }
 
 float editor::profiler_view::draw_menus(bool compact)
@@ -1452,14 +1452,31 @@ void editor::profiler_view::draw_record_control(const ImVec2& size)
     }
 }
 
-void editor::profiler_view::draw_navigation()
+void editor::profiler_view::draw_navigation(const ImTextureRef& brand_icon)
 {
-    // This child starts at the host's upper-left corner and scrolls independently
-    // when a small window or large accessibility scale cannot fit every page.
+    // Brand stays at the very top even when the pages below need to scroll.
+    // The same embedded artwork supplies the native window/taskbar icon.
+    const ImVec2 origin = ImGui::GetCursorScreenPos();
+    const float width = ImGui::GetContentRegionAvail().x;
+    const float extent = (std::max)(1.0f, (std::min)(ThemePixels(32.0f), width - ThemePixels(8.0f)));
+    const ImVec2 topLeft{ origin.x + (width - extent) * .5f, origin.y + ThemePixels(4.0f) };
+    ImGui::GetWindowDrawList()->AddImage(brand_icon, topLeft,
+        ImVec2(topLeft.x + extent, topLeft.y + extent));
+    ImGui::Dummy(ImVec2(width, extent + ThemePixels(8.0f)));
+    if (ImGui::IsItemHovered())
+    {
+        ImGui::SetTooltip("CreatorEngine Profiler");
+    }
+
+    // Fifteen 26px rows with 2px gaps replace the former 36px + 4px rows.
+    // Keep the 16px shared icon/text face and full-size tooltips. Small windows
+    // and large accessibility scales still get independent wheel/key scrolling.
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ThemeColorValue(ThemeColor::Chrome));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ThemePixels(4.0f), ThemePixels(4.0f)));
-    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, ThemePixels(4.0f)));
-    ImGui::BeginChild("##ProfilerNavigation", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding,
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, ThemePixels(2.0f)));
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ThemePixels(2.0f), ThemePixels(2.0f)));
+    ImGui::Separator();
+    ImGui::BeginChild("##ProfilerNavigationPages", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding,
                       ImGuiWindowFlags_NoScrollbar);
     const float buttonWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x);
     const auto nav = [&](page target, const char* icon, const char* title, const char* description)
@@ -1471,7 +1488,7 @@ void editor::profiler_view::draw_navigation()
         {
             ImGui::PushStyleColor(ImGuiCol_Button, activeColor);
         }
-        if (ImGui::Button(icon, ImVec2(buttonWidth, ThemePixels(36.0f))))
+        if (ImGui::Button(icon, ImVec2(buttonWidth, ThemePixels(26.0f))))
         {
             selectedPage = target;
         }
@@ -1506,7 +1523,7 @@ void editor::profiler_view::draw_navigation()
     nav(page::threads, EditorIcon::Grid, "Threads", "스레드별 구간 요약");
     nav(page::collector, EditorIcon::Settings, "Collector", "수집 상태와 손실 계상");
     ImGui::EndChild();
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
     ImGui::PopStyleColor();
 }
 

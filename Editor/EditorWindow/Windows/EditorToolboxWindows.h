@@ -85,13 +85,13 @@ struct editor_diagnostic_windows
     {
         using namespace editor;
         return window_set(
-            // 프레임 프로파일러만 앞으로 끌어올린다. 본문 첫 줄이
-            // BringWindowToFocusFront + BringWindowToDisplayFront 를 부르던 것이
-            // 표시 순서 선언으로 왔다.
+            // Keep the legacy ID for CLI/workspace compatibility, without a
+            // bound embedded body. Restoring a workspace must not open a process.
             panel<&windows::draw_frame_profiler>(
                 EditorWindowName::kFrameProfiler, EditorWindowName::kFrameProfilerLabel)
                 .stacking(window_stacking::focus_front)
                 .open_by_default(false)
+                .persist_open(false)
                 .available(&windows::has_frame_profiler),
 
             // 첫 크기를 싣지 않으면 ImGui 가 **내용에 맞춰** 접는다. 로그 창은

@@ -59,6 +59,14 @@ namespace editor
             return false;
         }
 
+        bool is_external_window_alias(std::string_view stable_id)
+        {
+            // A retained command/legacy-workspace ID, not an embedded panel.
+            // Its explicit menu/CLI actions launch the separate viewer; adding
+            // a draw binding would reintroduce layout-triggered process launch.
+            return stable_id == EditorWindowName::kFrameProfiler;
+        }
+
         bool contains(const std::vector<std::string_view>& names, std::string_view one)
         {
             return names.end() != std::find(names.begin(), names.end(), one);
@@ -90,7 +98,8 @@ namespace editor
         seen.reserve(entries.size());
         for (const window_entry& entry : entries)
         {
-            if (!draws_without_store(entry.stable_id) && !contains(bodies, entry.stable_id))
+            if (!draws_without_store(entry.stable_id) && !is_external_window_alias(entry.stable_id) &&
+                !contains(bodies, entry.stable_id))
             {
                 audit.bodyless_windows.push_back(entry.stable_id);
             }

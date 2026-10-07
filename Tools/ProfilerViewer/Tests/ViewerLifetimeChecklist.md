@@ -33,19 +33,19 @@ are added.
 2. Repeat with the owned viewer focused, minimized, occluded, on each live tab,
    and displaying an offline file. Normal teardown saves settings when it
    finishes within the grace period; closing the viewer alone preserves engine
-   recording and permits a fresh Trace launch
+   recording and permits a fresh Profiler launch
 3. Terminate/crash one Editor after viewer startup, during process creation,
    before resume and during handshake. The job must leave no orphan or suspended
    viewer, and must not affect another Editor or standalone viewer
 4. Disconnect/break the pipe while the Editor remains alive. Last immutable data
-   remains visible and live actions are disabled. Repeated Trace focuses the
+   remains visible and live actions are disabled. Repeated Profiler focuses the
    same owned viewer. Subsequent Editor close/crash still closes it
 5. Close the Editor while a large file is opening/indexing, a range is preparing,
    export is pending, native UI is stuck, or a mocked worker is blocked. Verify
    normal cancellation is attempted, only owned processes receive forced cleanup,
    and the Editor does not wait indefinitely for the viewer/transport. Do not
    treat a forced close as successful export or completed settings persistence
-6. Race Trace/open with shutdown and repeat open/close/relaunch. Include shutdown
+6. Race Profiler/open with shutdown and repeat open/close/relaunch. Include shutdown
    before worker startup, during job setup, after process creation, immediately
    before/after resume, and while completing the prior viewer. No new child may
    escape ownership; a stop observed before resume leaves it suspended until
@@ -54,7 +54,7 @@ are added.
    identity validation (including allocation exceptions after suspended creation)
    and ResumeThread failures. Show the launch error without an unowned viewer,
    leaked suspended child, inherited job handle, or UAC prompt. Also force worker
-   thread-creation failure while another Trace request arrives; failure cleanup
+   thread-creation failure while another Profiler request arrives; failure cleanup
    must not overwrite the next launch's status or completion event
 8. Run the Editor in a compatible enclosing job and a restrictive incompatible
    enclosing job. Verify nested ownership succeeds when allowed; otherwise launch

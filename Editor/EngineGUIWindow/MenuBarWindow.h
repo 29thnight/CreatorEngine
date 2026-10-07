@@ -15,8 +15,6 @@ public:
 	~MenuBarWindow() = default;
 	void RenderMenuBar();
 	void ShowAboutWindow();
-	/// 프레임 루프 안에 인라인으로 있던 본문. 셸이 창 본문으로 부른다.
-	void ShowProfilerWindow();
 	/// 아래 둘은 셸이 본문으로 부르고, Show* 짝은 창이 닫혀 있을 때만
 	/// 도는 정리 경로다. 함수 지역 static을 나눠 쓰므로 몸통은 하나로 둔다.
 	void DrawBehaviorTreeWindow();
