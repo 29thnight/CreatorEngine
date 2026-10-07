@@ -43,15 +43,13 @@ namespace editor
 
         // ── ④ Rendering & Debug — 아래를 관측으로 채운다 ───────────────────
         //
-        // 넷 다 선언에서는 `floating` 이다. 렌더링을 들여다보는 동안에는 떠
+        // 셋 다 선언에서는 `floating` 이다. 렌더링을 들여다보는 동안에는 떠
         // 있는 창을 옮겨 놓는 일부터 하게 되므로, 이 preset 이 아래 탭으로
-        // 모아 열어 준다.
+        // 모아 열어 준다. 별도 ProfilerViewer는 명시적 열기 요청으로만 연다.
         constexpr std::array kRenderingDebug{
             layout_override{ EditorWindowName::kRenderPass, dock_slot::bottom,
                              preset_visibility::opened },
             layout_override{ EditorWindowName::kRenderPassDebug, dock_slot::bottom,
-                             preset_visibility::opened },
-            layout_override{ EditorWindowName::kFrameProfiler, dock_slot::bottom,
                              preset_visibility::opened },
             layout_override{ EditorWindowName::kOutputLog, dock_slot::bottom,
                              preset_visibility::opened },

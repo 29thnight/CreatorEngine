@@ -167,8 +167,9 @@ MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
     }));
 
 
-    m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kFrameProfiler,
-        [this]() { ShowProfilerWindow(); }));
+    // A restored panel is layout state, never a request to start another process.
+    // FrameProfiler keeps its legacy ID, but no longer has an embedded draw body.
+    // Trace, the Window menu and editor.window enqueue explicit viewer requests.
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kOutputLog,
         [this]() { m_outputLog.Draw(); }));
     m_windowBodies.push_back(editor::windows::bind_window_body(EditorWindowName::kAbout,
@@ -2836,13 +2837,4 @@ void MenuBarWindow::ShowRenderDebugWindow()
     ImGui::TextWrapped("Frame capture and event/resource inspection are not available yet.");
     ImGui::TextWrapped("Current live pass timings and validation are available without recording.");
     if (ImGui::Button("Open Rendering - Live")) editor::OpenRenderLiveDiagnostics();
-}
-
-// PHASE 21 M4 3단계: 프레임 루프 안에 인라인으로 있던 본문이다. 셸이 프레임을
-// 소유하려면 본문이 부를 수 있는 것이어야 해서 메서드로 냈다. 맨 앞의
-// BringWindowToFocusFront/DisplayFront 둘은 선언의 stacking 으로 갔다.
-void MenuBarWindow::ShowProfilerWindow()
-{
-    editor::request_profiler_viewer();
-    editor::close_window(EditorWindowName::kFrameProfiler);
 }
