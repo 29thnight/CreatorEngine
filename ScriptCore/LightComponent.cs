@@ -37,50 +37,7 @@ public enum LightStatus
 /// 이 래퍼의 setter는 네이티브에서 <c>LightComponent</c>의 writer를 부르고,
 /// 그 writer가 <c>PublishRenderProxyDirty</c>를 함께 발행한다.
 /// </summary>
-public sealed class LightComponent : NativeComponent
+public sealed partial class LightComponent : NativeComponent
 {
-    /// <summary>광원의 색. 알파는 세기와 별개로 패킹에서 덮어써진다.</summary>
-    public Color4 Color
-    {
-        get => Native.LightGetColor(OwnerHandle);
-        set => Native.LightSetColor(OwnerHandle, value);
-    }
-
-    /// <summary>세기. 패킹에서 <c>EnhancedLight.color.a</c>로 실린다.</summary>
-    public float Intensity
-    {
-        get => Native.LightGetIntensity(OwnerHandle);
-        set => Native.LightSetIntensity(OwnerHandle, value);
-    }
-
-    /// <summary>사거리. 방향광에는 의미가 없다.</summary>
-    public float Range
-    {
-        get => Native.LightGetRange(OwnerHandle);
-        set => Native.LightSetRange(OwnerHandle, value);
-    }
-
-    /// <summary>스포트라이트의 원뿔 각도(도). 패킹이 라디안으로 바꿔 싣는다.</summary>
-    public float SpotAngle
-    {
-        get => Native.LightGetSpotAngle(OwnerHandle);
-        set => Native.LightSetSpotAngle(OwnerHandle, value);
-    }
-
-    /// <summary>
-    /// 광원의 종류. 범위를 벗어난 값은 네이티브가 조용히 무시한다 —
-    /// 잘못된 캐스트가 광원을 정의되지 않은 상태로 만들지 않게 한다.
-    /// </summary>
-    public LightType Type
-    {
-        get => (LightType)Native.LightGetLightType(OwnerHandle);
-        set => Native.LightSetLightType(OwnerHandle, (int)value);
-    }
-
-    /// <summary>렌더 쪽 상태. 범위를 벗어난 값은 무시된다.</summary>
-    public LightStatus Status
-    {
-        get => (LightStatus)Native.LightGetLightStatus(OwnerHandle);
-        set => Native.LightSetLightStatus(OwnerHandle, (int)value);
-    }
+    // 속성과 Native 호출은 LightComponent.h 의 명시적 선언에서 생성된다.
 }

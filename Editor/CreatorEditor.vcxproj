@@ -141,8 +141,8 @@
     </Link>
     <PreBuildEvent>
       <Command>echo [ScriptCore] 관리 어셈블리 빌드
-dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
-dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
+dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet $(_EngineManagedScriptBuildArguments)
+dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet $(_EngineManagedScriptBuildArguments)</Command>
     </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -173,8 +173,8 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
     </Link>
     <PreBuildEvent>
       <Command>echo [ScriptCore] 관리 어셈블리 빌드
-dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet
-dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet</Command>
+dotnet build "$(SolutionDir)ScriptCore\ScriptCore.csproj" -c $(Configuration) --nologo -v quiet $(_EngineManagedScriptBuildArguments)
+dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) --nologo -v quiet $(_EngineManagedScriptBuildArguments)</Command>
     </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemGroup>

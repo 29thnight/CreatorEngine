@@ -29,4 +29,26 @@
                       ReferenceOutputAssembly="false" />
   </ItemGroup>
 
+  <!-- SDK MSBuild cannot evaluate C++ projects. The launcher uses VS x64 MSBuild,
+       asking only for generation, never Build/ClCompile or project references. -->
+  <Target Name="GenerateEngineScriptBindings"
+          BeforeTargets="BeforeCompile">
+    <PropertyGroup>
+      <!-- Do not end a quoted Windows native argument with a backslash. -->
+      <_EngineScriptBindingsVcpkgDirectory Condition="'$(VcpkgInstalledDir)' != ''">$([MSBuild]::EnsureTrailingSlash('$(VcpkgInstalledDir)')).</_EngineScriptBindingsVcpkgDirectory>
+      <_EngineScriptBindingsReflgenDirectory Condition="'$(ReflgenOutputDirectory)' != ''">$([MSBuild]::EnsureTrailingSlash('$(ReflgenOutputDirectory)')).</_EngineScriptBindingsReflgenDirectory>
+    </PropertyGroup>
+    <Exec Command="&quot;$(EngineScriptBindingsPowerShell)&quot; -NoProfile -File &quot;$(MSBuildThisFileDirectory)..\Tools\ScriptBindings\Invoke-ScriptBindingGeneration.ps1&quot; -Configuration &quot;$(Configuration)&quot; -Platform &quot;$(EnginePlatform)&quot; -EngineShipping &quot;$(EngineShipping)&quot; -EngineAsan &quot;$(EngineAsan)&quot; -OutputDirectory &quot;$(EngineScriptBindingsOutputDirectory).&quot; -MSBuild &quot;$(EngineScriptBindingsMSBuild)&quot; -ReflgenTargets &quot;$(EngineReflgenTargets)&quot; -ReflgenExecutable &quot;$(ReflgenExecutable)&quot; -ReflgenOutputDirectory &quot;$(_EngineScriptBindingsReflgenDirectory)&quot; -PowerShellExecutable &quot;$(EngineScriptBindingsPowerShell)&quot; -VcpkgInstalledDirectory &quot;$(_EngineScriptBindingsVcpkgDirectory)&quot; -VcpkgTriplet &quot;$(VcpkgTriplet)&quot;"
+          StdOutEncoding="utf-8" StdErrEncoding="utf-8"
+          Condition="'$(DesignTimeBuild)' != 'true'" />
+    <ItemGroup>
+      <Compile Include="$(EngineScriptBindingsOutputDirectory)ScriptLightApi.g.cs"
+               Condition="'$(DesignTimeBuild)' != 'true' or Exists('$(EngineScriptBindingsOutputDirectory)ScriptLightApi.g.cs')" />
+      <Compile Include="$(EngineScriptBindingsOutputDirectory)Native.Light.g.cs"
+               Condition="'$(DesignTimeBuild)' != 'true' or Exists('$(EngineScriptBindingsOutputDirectory)Native.Light.g.cs')" />
+      <Compile Include="$(EngineScriptBindingsOutputDirectory)LightComponent.g.cs"
+               Condition="'$(DesignTimeBuild)' != 'true' or Exists('$(EngineScriptBindingsOutputDirectory)LightComponent.g.cs')" />
+    </ItemGroup>
+  </Target>
+
 </Project>

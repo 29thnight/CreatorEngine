@@ -40,4 +40,22 @@ namespace creator
     struct hide_in_inspector
     {
     };
+
+    // 엔진 바인딩 생성기의 명시적 opt-in. reflection/private 접근 허용과는 별개다.
+    // 이름은 기존 API 표의 도메인 접두사이고, 각 메서드도 script_export 를 가져야 한다.
+    struct script_component
+    {
+        reflgen::static_string prefix;
+
+        constexpr explicit script_component(std::string_view value) noexcept : prefix(value) {}
+    };
+
+    struct script_export
+    {
+        reflgen::static_string property;
+        int slot;
+
+        // slot 0 은 존재 질의다. 나머지 순번은 ABI 이므로 선언의 이동으로 바뀌지 않는다.
+        constexpr script_export(std::string_view name, int abiSlot) noexcept : property(name), slot(abiSlot) {}
+    };
 }

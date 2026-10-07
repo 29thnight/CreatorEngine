@@ -1,6 +1,6 @@
 # 엔진 리플렉션 — reflgen
 
-작성: 2026-09-30 · 근거: `reflgen-adoption` 브랜치(f58d9fc0) · reflgen 1.0.0(`ports/reflgen` 이 `v1.0.0` 태그를 가리킨다)
+작성: 2026-09-30 · 갱신: 2026-10-06 · reflgen 1.0.0 + 병합 커밋 `d04dd646`(`ports/reflgen`, port-version 1)
 이 문서는 엔진 리플렉션의 **현재 설계 정본**이다. 옛 체계(`reflect()` 레시피·`meta::schema`·`Meta::Type`)를
 말하는 문서를 읽을 때는 §9의 대응표를 본다.
 
@@ -68,6 +68,7 @@ private:
 | `creator::debug_only` · `creator::wide` | 인스펙터 — 디버그 모드에서만 그린다 · 줄을 넓힌다 |
 | `creator::read_only_in_inspector` · `creator::hide_in_inspector` | 인스펙터 메서드 UI — 인자 없는 메서드를 매 프레임 불러 결과만 보인다 · 그리지 않는다 |
 | `creator::units("m")` | 저작 표기만 받는다(읽는 곳 없음) |
+| `creator::script_component("Light")` · `creator::script_export("속성", 슬롯)` | 엔진 스크립트 바인딩 생성기의 명시적 opt-in. Light 도메인만 이관하며 public 메서드 서명을 manifest에서 읽는다 |
 
 엔진 속성은 `Engine/Utility_Framework/ReflgenAttributes.h` 의 독립 타입이다(`creator` 이름공간 =
 `ReflgenAttributeScopes`). 문자열 인자는 `reflgen::static_string` 으로 받는다 — 구조적 타입이라 C++26 주석
@@ -121,6 +122,14 @@ reflgen은 vcpkg 매니페스트(`vcpkg.json`)의 overlay port(`ports/reflgen`)�
 
 reflgen을 고치면서 엔진에 바로 걸어 볼 때는 `EngineReflgenTargets` 를 reflgen 저장소의 `msbuild\reflgen.targets`
 로, `ReflgenExecutable` 을 빌드한 생성기로 준다.
+
+### 2.2 스크립트 바인딩 생성
+
+SceneRuntime은 typed declaration manifest를 함께 출력한다. 엔진 소유 emitter가
+Light의 13개 슬롯·native thunk·C# 내부 도우미와 공개 프로퍼티를 생성한다.
+일반 reflection 표시나 private friend 접근을 export 허가로 해석하지 않는다.
+나머지 174개 슬롯은 수동이며, ABI 34의 배치·fingerprint와 실행 의미/미검증 범위는
+[스크립트 바인딩 생성](ScriptBindingGeneration.md)에 정리한다.
 
 ## 3. 런타임 — 등록소와 창구
 

@@ -37,6 +37,10 @@
 
 #include <windows.h>
 #include <cstring>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <type_traits>
 
 // nethost.lib는 get_hostfxr_path 하나만 제공하는 얇은 import 라이브러리다.
 // 헤더·lib·DLL은 ThirdParty\DotNetHost\에 고정한 사본이고, 경로는 EngineOutput.props의
@@ -102,6 +106,8 @@ namespace
     };
     static_assert(sizeof(AudioAssetId) == 16u);
     static_assert(sizeof(AudioPlaySettings) == 60u);
+
+    #include "ScriptLightApi.g.h"
 
 	struct ScriptApiTable
 	{
@@ -246,19 +252,7 @@ namespace
 		//
 		// setter는 전부 LightComponent의 writer를 거친다 — 필드에 직접 대입하면
 		// dirty가 서지 않아 LightRenderProxy가 낡은 채 남는다(LightComponent.h 주석).
-		int    (__stdcall* Light_Exists)(ScriptObjectHandle handle);
-		Float4 (__stdcall* Light_GetColor)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetColor)(ScriptObjectHandle handle, Float4 color);
-		float  (__stdcall* Light_GetIntensity)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetIntensity)(ScriptObjectHandle handle, float intensity);
-		float  (__stdcall* Light_GetRange)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetRange)(ScriptObjectHandle handle, float range);
-		float  (__stdcall* Light_GetSpotAngle)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetSpotAngle)(ScriptObjectHandle handle, float degrees);
-		int    (__stdcall* Light_GetLightType)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetLightType)(ScriptObjectHandle handle, int type);
-		int    (__stdcall* Light_GetLightStatus)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetLightStatus)(ScriptObjectHandle handle, int status);
+        ScriptLightApi Light;
 
 		// MeshRenderer + Material. 스크립트가 만지는 것은 사실상 셋뿐이다 —
 		// 재질 사본 만들기(6회) · 셰이더 상수 넣기(24회) · 베이스 색 알파.
@@ -379,7 +373,22 @@ namespace
         int (__stdcall* Audio_Configure)(std::uint32_t id, int cap, int policy, int group);
         int (__stdcall* Audio_SetReverbPreset)(int preset);
 
+
+        // 버전 34: 기존 187 함수 포인터 뒤에만 붙여 기존 슬롯 offset 을 보존한다.
+        std::uint64_t abiFingerprint;
 	};
+
+    // 기존 평면 표의 경계: Light 85..97, 다음 Mesh 98, 전체 187 슬롯.
+    static_assert(sizeof(void*) == 8);
+    static_assert(std::is_standard_layout_v<ScriptApiTable>);
+    static_assert(alignof(ScriptApiTable) == 8);
+    static_assert(offsetof(ScriptApiTable, PrintLog) == 8);
+    static_assert(offsetof(ScriptApiTable, Camera_GetPrimaryHandle) == 8 + 84 * 8);
+    static_assert(offsetof(ScriptApiTable, Light) == 8 + 85 * 8);
+    static_assert(offsetof(ScriptApiTable, Mesh_Exists) == 8 + 98 * 8);
+    static_assert(offsetof(ScriptApiTable, abiFingerprint) == 8 + 187 * 8);
+    static_assert(sizeof(ScriptApiTable) == 8 + 187 * 8 + 8);
+
 
 	ScriptApiTable g_apiTable{};
 
@@ -1648,101 +1657,28 @@ namespace
 	// LightRenderProxy가 낡은 채 남아 화면이 그대로다 — 되읽으면 새 값이 나와
 	// 스크립트 쪽에서는 성공한 것처럼 보인다.
 
-	LightComponent* ResolveLight(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object) ? object->GetComponent<LightComponent>() : nullptr;
-	}
+    // 생성된 thunk 도 매 호출마다 동일한 레지스트리/컴포넌트 조회를 거친다.
+    // 객체 주소를 관리 코드에 보관하거나 세대 확인을 우회하지 않는다.
+    template<class TComponent>
+    TComponent* ResolveScriptComponent(ScriptObjectHandle handle)
+    {
+        Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
+        return object != nullptr ? object->GetComponent<TComponent>() : nullptr;
+    }
 
-	int __stdcall Api_Light_Exists(ScriptObjectHandle handle)
-	{
-		return (nullptr != ResolveLight(handle)) ? 1 : 0;
-	}
+    void ReportScriptBindingException(const char* api) noexcept
+    {
+        try
+        {
+            Debug::PrintLog(spdlog::level::err, std::string("[CLR] native script binding threw: ") + api);
+        }
+        catch (...)
+        {
+            // 로깅 실패까지 C ABI 밖으로 새지 않게 한다.
+        }
+    }
 
-	Float4 __stdcall Api_Light_GetColor(ScriptObjectHandle handle)
-	{
-		LightComponent* light = ResolveLight(handle);
-		if (nullptr == light) return { 1.f, 1.f, 1.f, 1.f };
-
-		const math::color& c = light->m_color;
-		return { c.r, c.g, c.b, c.a };
-	}
-
-	void __stdcall Api_Light_SetColor(ScriptObjectHandle handle, Float4 color)
-	{
-		LightComponent* light = ResolveLight(handle);
-		if (nullptr == light) return;
-
-		light->SetColor(math::color{ color.x, color.y, color.z, color.w });
-	}
-
-	float __stdcall Api_Light_GetIntensity(ScriptObjectHandle handle)
-	{
-		LightComponent* light = ResolveLight(handle);
-		return (nullptr != light) ? light->m_intencity : 0.f;
-	}
-
-	void __stdcall Api_Light_SetIntensity(ScriptObjectHandle handle, float intensity)
-	{
-		LightComponent* light = ResolveLight(handle);
-		if (nullptr != light) light->SetIntensity(intensity);
-	}
-
-	float __stdcall Api_Light_GetRange(ScriptObjectHandle handle)
-	{
-		LightComponent* light = ResolveLight(handle);
-		return (nullptr != light) ? light->m_range : 0.f;
-	}
-
-	void __stdcall Api_Light_SetRange(ScriptObjectHandle handle, float range)
-	{
-		LightComponent* light = ResolveLight(handle);
-		if (nullptr != light) light->SetRange(range);
-	}
-
-	float __stdcall Api_Light_GetSpotAngle(ScriptObjectHandle handle)
-	{
-		LightComponent* light = ResolveLight(handle);
-		return (nullptr != light) ? light->m_spotLightAngle : 0.f;
-	}
-
-	void __stdcall Api_Light_SetSpotAngle(ScriptObjectHandle handle, float degrees)
-	{
-		LightComponent* light = ResolveLight(handle);
-		if (nullptr != light) light->SetSpotAngle(degrees);
-	}
-
-	// 열거는 int로 건넌다. LightType/LightStatus는 uint16_t라 값 범위는 넉넉하고,
-	// 미러 대조는 check-api-table이 아니라 관리 측 enum 정의가 진다.
-	int __stdcall Api_Light_GetLightType(ScriptObjectHandle handle)
-	{
-		LightComponent* light = ResolveLight(handle);
-		return (nullptr != light) ? static_cast<int>(light->m_lightType) : 0;
-	}
-
-	void __stdcall Api_Light_SetLightType(ScriptObjectHandle handle, int type)
-	{
-		LightComponent* light = ResolveLight(handle);
-		if (nullptr == light) return;
-		if (type < DirectionalLight || type > SpotLight) return;
-
-		light->SetLightType(static_cast<LightType>(type));
-	}
-
-	int __stdcall Api_Light_GetLightStatus(ScriptObjectHandle handle)
-	{
-		LightComponent* light = ResolveLight(handle);
-		return (nullptr != light) ? static_cast<int>(light->m_lightStatus) : 0;
-	}
-
-	void __stdcall Api_Light_SetLightStatus(ScriptObjectHandle handle, int status)
-	{
-		LightComponent* light = ResolveLight(handle);
-		if (nullptr == light) return;
-		if (status < Disabled || status > StaticShadows) return;
-
-		light->SetLightStatus(static_cast<LightStatus>(status));
-	}
+    #include "ScriptLightApi.Thunks.g.inc"
 
 	// ── MeshRenderer · Material ──
 	//
@@ -2645,6 +2581,7 @@ namespace
         g_physicsApiOwner = std::this_thread::get_id();
 		g_apiTable.version    = kApiVersion;
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
+        g_apiTable.abiFingerprint = CreatorScriptBindingsFingerprint;
 
 		g_apiTable.PrintLog                    = &Api_PrintLog;
 		g_apiTable.Entity_FindByName       = &Api_Entity_FindByName;
@@ -2755,19 +2692,7 @@ namespace
 		g_apiTable.Camera_SetPrimary           = &Api_Camera_SetPrimary;
 		g_apiTable.Camera_GetPrimaryHandle     = &Api_Camera_GetPrimaryHandle;
 
-		g_apiTable.Light_Exists                = &Api_Light_Exists;
-		g_apiTable.Light_GetColor              = &Api_Light_GetColor;
-		g_apiTable.Light_SetColor              = &Api_Light_SetColor;
-		g_apiTable.Light_GetIntensity          = &Api_Light_GetIntensity;
-		g_apiTable.Light_SetIntensity          = &Api_Light_SetIntensity;
-		g_apiTable.Light_GetRange              = &Api_Light_GetRange;
-		g_apiTable.Light_SetRange              = &Api_Light_SetRange;
-		g_apiTable.Light_GetSpotAngle          = &Api_Light_GetSpotAngle;
-		g_apiTable.Light_SetSpotAngle          = &Api_Light_SetSpotAngle;
-		g_apiTable.Light_GetLightType          = &Api_Light_GetLightType;
-		g_apiTable.Light_SetLightType          = &Api_Light_SetLightType;
-		g_apiTable.Light_GetLightStatus        = &Api_Light_GetLightStatus;
-		g_apiTable.Light_SetLightStatus        = &Api_Light_SetLightStatus;
+        #include "ScriptLightApi.Fill.g.inc"
 
 		g_apiTable.Mesh_Exists                 = &Api_Mesh_Exists;
 		g_apiTable.Mesh_InstantiateMaterial    = &Api_Mesh_InstantiateMaterial;
