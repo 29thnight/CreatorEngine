@@ -1,6 +1,7 @@
 #include "PreparationWorker.h"
 #include "ViewerArguments.h"
 #include "ViewerWindowChrome.h"
+#include "ProfilerViewerResources.h"
 #include "Presentation/ProfilerPresenter.h"
 #include "ProfilerViewerClient.h"
 #include "EditorFontResources.h"
@@ -11,6 +12,7 @@
 #include <shellapi.h>
 #include <shlobj.h>
 #include <wrl/client.h>
+#include <wincodec.h>
 
 #include <imgui.h>
 #include <imgui_impl_dx11.h>
@@ -192,6 +194,7 @@ namespace ce::profiler_viewer
                     ImGui::DestroyContext();
                 }
                 target_.Reset();
+                brand_texture_.Reset();
                 if (context_)
                 {
                     context_->ClearState();
@@ -212,6 +215,10 @@ namespace ce::profiler_viewer
                 {
                     UnregisterClassW(window_class, instance_);
                 }
+                if (window_big_icon_) DestroyIcon(window_big_icon_);
+                if (window_small_icon_) DestroyIcon(window_small_icon_);
+                if (class_big_icon_) DestroyIcon(class_big_icon_);
+                if (class_small_icon_) DestroyIcon(class_small_icon_);
             }
 
             void initialize(const viewer_arguments& arguments)
@@ -230,7 +237,8 @@ namespace ce::profiler_viewer
                 type.lpfnWndProc = window_proc;
                 type.hInstance = instance_;
                 type.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-                type.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+                type.hIcon = class_big_icon_ = load_icon(GetSystemMetrics(SM_CXICON));
+                type.hIconSm = class_small_icon_ = load_icon(GetSystemMetrics(SM_CXSMICON));
                 type.lpszClassName = window_class;
                 if (!RegisterClassExW(&type))
                 {
@@ -245,9 +253,11 @@ namespace ce::profiler_viewer
                 {
                     throw std::runtime_error("Cannot create the ProfilerViewer window.");
                 }
+                update_native_icons(window_, GetDpiForWindow(window_));
                 SetWindowPos(window_, nullptr, 0, 0, 0, 0,
                     SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
                 create_device();
+                create_brand_texture();
                 IMGUI_CHECKVERSION();
                 ImGui::CreateContext();
                 imgui_initialized_ = true;
@@ -408,7 +418,8 @@ namespace ce::profiler_viewer
                     ImGui::PushStyleColor(ImGuiCol_ChildBg, editor::ThemeColorValue(editor::ThemeColor::Chrome));
                     if (ImGui::BeginChild("##ProfilerNavigation", { rail, size.y }, ImGuiChildFlags_None, fixed))
                     {
-                        editor::profiler_view::draw_navigation();
+                        editor::profiler_view::draw_navigation(
+                            ImTextureRef(reinterpret_cast<ImTextureID>(brand_texture_.Get())));
                     }
                     ImGui::EndChild();
                     ImGui::PopStyleColor();
@@ -514,6 +525,96 @@ namespace ce::profiler_viewer
                 MsgWaitForMultipleObjectsEx(0, nullptr, 100, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
             }
 
+            HICON load_icon(int extent) const
+            {
+                // Own each size separately: LR_SHARED caches the first size
+                // under the resource ID and can return it for every later size.
+                // Keep class handles alive until window destruction/unregister.
+                const auto icon = static_cast<HICON>(LoadImageW(instance_,
+                    MAKEINTRESOURCEW(IDI_PROFILER_VIEWER), IMAGE_ICON,
+                    extent, extent, 0));
+                if (!icon)
+                {
+                    throw std::runtime_error("Cannot load the embedded ProfilerViewer icon.");
+                }
+                return icon;
+            }
+
+            void create_brand_texture()
+            {
+                // Decode only our embedded PNG with the Windows PNG decoder.
+                // No relative working-directory lookup or engine asset service.
+                const HRSRC resource = FindResourceW(instance_,
+                    MAKEINTRESOURCEW(IDR_PROFILER_BRAND_PNG), RT_RCDATA);
+                const DWORD size = resource ? SizeofResource(instance_, resource) : 0;
+                const HGLOBAL loaded = resource ? LoadResource(instance_, resource) : nullptr;
+                const auto bytes = loaded ? static_cast<BYTE*>(LockResource(loaded)) : nullptr;
+                if (!bytes || size == 0)
+                {
+                    throw std::runtime_error("Cannot load the embedded ProfilerViewer artwork.");
+                }
+                ComPtr<IWICImagingFactory> factory;
+                check(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
+                    IID_PPV_ARGS(factory.GetAddressOf())), "Profiler icon imaging factory");
+                ComPtr<IWICStream> stream;
+                check(factory->CreateStream(stream.GetAddressOf()), "Profiler icon stream");
+                check(stream->InitializeFromMemory(bytes, size), "Profiler icon resource stream");
+                ComPtr<IWICBitmapDecoder> decoder;
+                check(factory->CreateDecoder(GUID_ContainerFormatPng, &GUID_VendorMicrosoft,
+                    decoder.GetAddressOf()), "Profiler icon PNG decoder");
+                check(decoder->Initialize(stream.Get(), WICDecodeMetadataCacheOnLoad), "Profiler icon PNG decode");
+                ComPtr<IWICBitmapFrameDecode> frame;
+                check(decoder->GetFrame(0, frame.GetAddressOf()), "Profiler icon frame");
+                UINT width = 0, height = 0;
+                check(frame->GetSize(&width, &height), "Profiler icon dimensions");
+                if (width == 0 || height == 0 || width > 2048 || height > 2048)
+                {
+                    throw std::runtime_error("Embedded ProfilerViewer artwork has invalid dimensions.");
+                }
+                ComPtr<IWICFormatConverter> rgba;
+                check(factory->CreateFormatConverter(rgba.GetAddressOf()), "Profiler icon format converter");
+                check(rgba->Initialize(frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone,
+                    nullptr, 0.0, WICBitmapPaletteTypeCustom), "Profiler icon RGBA conversion");
+                const UINT stride = width * 4;
+                std::vector<BYTE> pixels(static_cast<std::size_t>(stride) * height);
+                check(rgba->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.size()), pixels.data()),
+                    "Profiler icon pixels");
+                D3D11_TEXTURE2D_DESC description{};
+                description.Width = width;
+                description.Height = height;
+                description.MipLevels = 1;
+                description.ArraySize = 1;
+                description.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+                description.SampleDesc.Count = 1;
+                description.Usage = D3D11_USAGE_IMMUTABLE;
+                description.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+                const D3D11_SUBRESOURCE_DATA initial{ pixels.data(), stride, 0 };
+                ComPtr<ID3D11Texture2D> texture;
+                check(device_->CreateTexture2D(&description, &initial, texture.GetAddressOf()),
+                    "Profiler icon texture");
+                check(device_->CreateShaderResourceView(texture.Get(), nullptr, brand_texture_.GetAddressOf()),
+                    "Profiler icon texture view");
+            }
+
+            void update_native_icons(HWND window, UINT dpi) noexcept
+            {
+                // Pick a matching ICO frame after a mixed-DPI monitor move.
+                // On a resource-load failure keep the already registered icon.
+                const auto apply = [&](WPARAM kind, int metric, HICON& owned)
+                {
+                    const int extent = GetSystemMetricsForDpi(metric, dpi);
+                    if (const auto icon = static_cast<HICON>(LoadImageW(instance_,
+                        MAKEINTRESOURCEW(IDI_PROFILER_VIEWER), IMAGE_ICON, extent, extent, 0)))
+                    {
+                        SendMessageW(window, WM_SETICON, kind, reinterpret_cast<LPARAM>(icon));
+                        if (owned) DestroyIcon(owned);
+                        owned = icon;
+                    }
+                };
+                apply(ICON_BIG, SM_CXICON, window_big_icon_);
+                apply(ICON_SMALL, SM_CXSMICON, window_small_icon_);
+            }
+
             void create_device()
             {
                 DXGI_SWAP_CHAIN_DESC description{};
@@ -600,6 +701,7 @@ namespace ce::profiler_viewer
                     case WM_DPICHANGED:
                     {
                         self->dpi_scale_ = static_cast<float>(HIWORD(wparam)) / 96.0f;
+                        self->update_native_icons(window, HIWORD(wparam));
                         self->scale_dirty_ = true;
                         const auto* rectangle = reinterpret_cast<const RECT*>(lparam);
                         SetWindowPos(window, nullptr, rectangle->left, rectangle->top,
@@ -626,6 +728,10 @@ namespace ce::profiler_viewer
 
             HINSTANCE instance_ = nullptr;
             HWND window_ = nullptr;
+            HICON class_big_icon_ = nullptr;
+            HICON class_small_icon_ = nullptr;
+            HICON window_big_icon_ = nullptr;
+            HICON window_small_icon_ = nullptr;
             bool registered_ = false;
             bool imgui_initialized_ = false;
             bool platform_initialized_ = false;
@@ -647,6 +753,7 @@ namespace ce::profiler_viewer
             ComPtr<ID3D11DeviceContext> context_;
             ComPtr<IDXGISwapChain> swapchain_;
             ComPtr<ID3D11RenderTargetView> target_;
+            ComPtr<ID3D11ShaderResourceView> brand_texture_;
             preparation_worker worker_;
             preparation_worker diagnostics_worker_;
             client source_;

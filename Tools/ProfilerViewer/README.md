@@ -30,8 +30,11 @@ padding can grow it. The fixed shell has no outer scrollbar.
 - Title row: File (Open, Save entire recording, Clear), View (Live Follow,
   entire session, information sidebar), state-driven Record/Stop/pending icon
   and window buttons. Disabled actions retain their original admission rules
-- Left rail: all existing analysis/live pages, with its own scrolling when
-  needed. Header and diagnostics never consume space above it
+- Left rail: dedicated engine-plus-magnifier icon fixed at the very top; all
+  fifteen existing analysis/live pages below it, with independent scrolling
+  when needed. The rail is 40 logical px wide, with 26px rows/2px gaps instead
+  of 48px and 36px rows/4px gaps; shared 16px glyphs and full tooltips remain
+  readable. Header and diagnostics never consume space above the rail
 - Right information sections: connection/session writer, file metadata/progress/
   cancellation, capture/stop integrity, and counter modules. At narrow widths
   the right icon strip opens a dismissible bounded inspector over the page
@@ -58,6 +61,22 @@ PhysX, shader compiler, scripting host and Editor-only DLL dependencies fail
 deployment rather than silently expanding the viewer runtime.
 
 ## Launch and settings
+
+The Editor starts/focuses the viewer only for explicit Trace, Window > Frame
+Profiler, Rendering - Live or `editor.window` open/focus requests. Startup,
+workspace restoration/reload and layout presets do not open a viewer, including
+old workspaces with the embedded FrameProfiler open bit set. That legacy ID
+remains for compatibility, without a bound draw body or persisted open state.
+The old body-to-launch bridge is removed; engine recording remains independent.
+Source guards and the unexecuted Windows matrix are in
+`Tests/ViewerLaunchSourceContracts.py` and `Tests/ViewerLaunchChecklist.md`.
+
+The executable embeds its dedicated multi-resolution icon and matching rail
+PNG, derived from the existing engine artwork with a bottom-right magnifier.
+Explorer/window/taskbar and rail branding share that source; no loose image
+sidecar or engine asset loader is required. Windows WIC decodes the embedded
+PNG into a viewer-owned D3D11 texture. Icon artwork/provenance lives in
+`Resources/Editor/Branding/ProfilerIcon.md` at the repository root.
 
 Launch with no arguments for an empty viewer or `--open <path.ceprof|path.cedx>`
 for offline capture analysis. A capture is opened/indexed by the viewer worker;
