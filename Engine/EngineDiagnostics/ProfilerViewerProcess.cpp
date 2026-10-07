@@ -219,13 +219,14 @@ namespace ce::profiler_viewer
             try
             {
                 bool elevated = false;
+                DWORD windows_session = 0;
                 const auto engine_path = security::image_path(GetCurrentProcess());
                 connection_options options;
                 options.target_pid = GetCurrentProcessId();
                 options.target_creation_time = security::creation_time(GetCurrentProcess());
                 if (!security::query_elevation(GetCurrentProcess(), elevated) || elevated ||
-                    !options.target_creation_time || !ProcessIdToSessionId(options.target_pid, &options.windows_session_id) ||
-                    options.windows_session_id == 0 || !security::editor_image(engine_path))
+                    !options.target_creation_time || !ProcessIdToSessionId(options.target_pid, &windows_session) ||
+                    (options.windows_session_id = windows_session) == 0 || !security::editor_image(engine_path))
                 {
                     set_status(false, "Viewer launch requires a verified ordinary-privilege Editor", ERROR_ACCESS_DENIED);
                     return;

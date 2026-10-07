@@ -1077,12 +1077,12 @@ namespace ce::detail::recording_file_impl
                     return std::unexpected(capture_file_error::canceled);
                 }
                 const auto amount = static_cast<std::size_t>((std::min)(remaining, static_cast<std::uint64_t>(scratch.size())));
-                auto bytes = std::span(scratch).first(amount);
-                if (!read_at(input, offset, bytes))
+                auto window = std::span(scratch).first(amount);
+                if (!read_at(input, offset, window))
                 {
                     return std::unexpected(capture_file_error::open_failed);
                 }
-                checksum = update_crc(checksum, bytes);
+                checksum = update_crc(checksum, window);
                 remaining -= amount;
                 offset += amount;
             }
