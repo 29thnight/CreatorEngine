@@ -9,17 +9,48 @@
 #include <chrono>
 #include <crtdbg.h>
 #include <mutex>
+#include <limits>
 #include <unordered_set>
 #include <utility>
 
 #include <Windows.h>
 #include <Psapi.h>
+#include <bcrypt.h>
+
+#pragma comment(lib, "bcrypt.lib")
 
 namespace editor::memory_profiler
 {
 	namespace
 	{
 		constexpr std::uint64_t kMegabyte = 1024ull * 1024ull;
+
+		void capture_object_identities(snapshot& out)
+		{
+			BCRYPT_ALG_HANDLE algorithm{};
+			if (BCryptOpenAlgorithmProvider(&algorithm, BCRYPT_SHA256_ALGORITHM, nullptr, 0) < 0)
+			{
+				return; // Default invalid identities stay distinct in the viewer.
+			}
+			for (auto& object : out.objects)
+			{
+				if (object.name.size() > (std::numeric_limits<ULONG>::max)())
+				{
+					continue;
+				}
+				// Hash the complete original UTF-8 name on the capture owner, before
+				// any transport label clipping. Object kind is a separate key field.
+				object.identity_valid = BCryptHash(algorithm, nullptr, 0,
+					reinterpret_cast<PUCHAR>(object.name.data()),
+					static_cast<ULONG>(object.name.size()), object.full_name_sha256.data(),
+					static_cast<ULONG>(object.full_name_sha256.size())) >= 0;
+				if (!object.identity_valid)
+				{
+					object.full_name_sha256.fill(0);
+				}
+			}
+			BCryptCloseAlgorithmProvider(algorithm, 0);
+		}
 
 		void capture_assets(snapshot& out)
 		{
@@ -164,7 +195,19 @@ namespace editor::memory_profiler
 			result->vram_used_bytes = usedMB * kMegabyte;
 			result->vram_budget_bytes = budgetMB * kMegabyte;
 			capture_assets(*result);
+			capture_object_identities(*result);
 			capture_regions(*result);
+			result->object_count = result->objects.size();
+			result->region_count = result->regions.size();
+			for (const auto& object : result->objects)
+			{
+				const auto kind = static_cast<std::size_t>(object.kind);
+				if (kind < result->object_kind_counts.size())
+				{
+					++result->object_kind_counts[kind];
+					result->object_kind_cpu_bytes[kind] += object.cpu_pixel_bytes;
+				}
+			}
 			result->capture_ms = std::chrono::duration<double, std::milli>(
 				std::chrono::steady_clock::now() - started).count();
 			return result;

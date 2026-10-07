@@ -1253,6 +1253,9 @@ namespace
             batchDesc.backendGeneration = backendGeneration;
             batchDesc.displayToken = kDisplayKeyBase + viewIndex + 1u;
             batchDesc.lifetimeToken = slot->graph;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+            batchDesc.captureContext = { sourceFrameId, 0, viewPacket.key.viewId, false };
+#endif
             RHIRecordedBatch batch;
             RHISubmissionTicket batchTicket;
             LiveStopwatch recordWatch;
@@ -5637,6 +5640,12 @@ namespace
             batchDesc.backendGeneration = dx12.GetBackendGeneration();
             batchDesc.displayToken = slot.interopToken;
             batchDesc.lifetimeToken = slot.graph;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+            batchDesc.captureContext = profilerToken.IsValid()
+                ? ce::dx_capture::submission_context{ profilerToken.engineFrameId,
+                    profilerToken.submissionId, profilerToken.renderViewId, true }
+                : ce::dx_capture::submission_context{ sourceFrameId, 0, view.key.viewId, false };
+#endif
             RHIRecordedBatch batch;
             RHISubmissionTicket batchTicket;
             LiveStopwatch recordWatch;

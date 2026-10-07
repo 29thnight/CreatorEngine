@@ -125,6 +125,9 @@ public:
         batch.m_frameId = desc.frameId;
         batch.m_backendGeneration = desc.backendGeneration;
         batch.m_displayToken = desc.displayToken;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+        batch.m_captureContext = desc.captureContext;
+#endif
         batch.m_frameSlot = GetCurrentFrameSlot();
         batch.m_lifetimeToken = desc.lifetimeToken;
         batch.m_state = RHIRecordedBatchState::Recorded;

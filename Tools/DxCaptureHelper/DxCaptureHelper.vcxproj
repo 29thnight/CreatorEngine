@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{8D7266B8-9752-4AAF-A2B7-C74F3124F2F8}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>DxCaptureHelper</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <VcpkgEnabled>false</VcpkgEnabled>
+    <VcpkgEnableManifest>false</VcpkgEnableManifest>
+    <VcpkgApplocalDeps>false</VcpkgApplocalDeps>
+    <EnableUnitySupport>false</EnableUnitySupport>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <Import Project="$(MSBuildThisFileDirectory)..\..\EngineOutput.props" />
+  <PropertyGroup>
+    <TargetName>CreatorDxCaptureHelper</TargetName>
+    <OutDir>$(EngineEditorOutDir)DxCaptureHelper\</OutDir>
+    <IntDir>$(SolutionDir)Build\Obj\DxCaptureHelper\$(Platform)-$(EngineConfigKey)\</IntDir>
+    <LinkIncremental>false</LinkIncremental>
+    <DxTimingCaptureRoot>$(MSBuildThisFileDirectory)..\..\ThirdParty\DxTimingCaptureLibrary\</DxTimingCaptureRoot>
+    <GenerateManifest>true</GenerateManifest>
+    <EmbedManifest>true</EmbedManifest>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalOptions>/utf-8 /Zc:__cplusplus %(AdditionalOptions)</AdditionalOptions>
+      <WarningLevel>Level4</WarningLevel>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <!-- helper가 사용자 디렉터리의 CRT DLL을 로드하지 않도록 Debug도 /MT다. -->
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;_WINDOWS;UNICODE;_UNICODE;WIN32_LEAN_AND_MEAN;NOMINMAX;_WIN32_WINNT=0x0A00;WINVER=0x0A00;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- Agility 헤더가 OS SDK보다 앞서야 marker ABI가 고정된 core와 일치한다. -->
+      <AdditionalIncludeDirectories>$(DxTimingCaptureSdkInclude);$(DxTimingCaptureRoot)include;$(DxTimingCaptureRoot)third_party\dxgk;$(DxTimingCaptureRoot)third_party\directstorage;$(DxTimingCaptureRoot)third_party\PixEventDecoder\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <AdditionalDependencies>d3d12.lib;dxgi.lib;onecore.lib;uuid.lib;tdh.lib;advapi32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(IntDir)$(TargetName).pdb</ProgramDatabaseFile>
+      <!-- 이 slice는 일반 토큰 전용이다. manifest 자체가 상승을 요청하지 않는다. -->
+      <EnableUAC>true</EnableUAC>
+      <UACExecutionLevel>AsInvoker</UACExecutionLevel>
+      <UACUIAccess>false</UACUIAccess>
+      <DataExecutionPrevention>true</DataExecutionPrevention>
+      <RandomizedBaseAddress>true</RandomizedBaseAddress>
+      <AdditionalOptions>/DEPENDENTLOADFLAG:0x800 %(AdditionalOptions)</AdditionalOptions>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Debug'">
+    <ClCompile><Optimization>Disabled</Optimization></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)' == 'Release'">
+    <ClCompile><Optimization>MaxSpeed</Optimization><PreprocessorDefinitions>NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="DxCaptureHelper.cpp" />
+    <ClCompile Include="DxCaptureTransport.cpp" />
+    <ClCompile Include="DxTimingCollector.cpp" />
+    <ClCompile Include="$(DxTimingCaptureRoot)lib\AllocationTracker.cpp" />
+    <ClCompile Include="$(DxTimingCaptureRoot)lib\D3D12ObjectProcessor.cpp" />
+    <ClCompile Include="$(DxTimingCaptureRoot)lib\DxTimingCaptureEventHandler.cpp" />
+    <ClCompile Include="$(DxTimingCaptureRoot)lib\PixEventDecoderStub.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DxCaptureTransport.h" />
+    <ClInclude Include="DxTimingCollector.h" />
+    <ClInclude Include="..\..\Engine\EngineDiagnostics\DxCaptureProtocol.h" />
+    <ClInclude Include="..\..\Engine\EngineDiagnostics\DxCaptureSecurity.h" />
+    <ClInclude Include="$(DxTimingCaptureRoot)include\DxTimingCaptureLibrary\*.h" />
+    <ClInclude Include="$(DxTimingCaptureRoot)lib\*.h" />
+    <ClInclude Include="$(DxTimingCaptureRoot)third_party\dxgk\*.h" />
+    <ClInclude Include="$(DxTimingCaptureRoot)third_party\directstorage\*.h" />
+    <ClInclude Include="$(DxTimingCaptureRoot)third_party\PixEventDecoder\include\*.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <!-- 다운로드·NuGet restore·SDK 설치는 이 선택적 프로젝트의 작업이 아니다. -->
+  <Target Name="ValidateDxCapturePrerequisites" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(EngineDxDeepCapture)' != 'true'" Text="DxCaptureHelper is optional. Explicitly set EngineDxDeepCapture=true." />
+    <Error Condition="'$(EngineShipping)' == 'true'" Text="DxCaptureHelper cannot be built into Shipping." />
+    <Error Condition="'$(Platform)' != 'x64'" Text="DxCaptureHelper supports Windows x64 only." />
+    <Error Condition="'$(DxTimingCaptureSdkInclude)' == ''" Text="Set DxTimingCaptureSdkInclude to an existing Microsoft.Direct3D.D3D12 1.619.5 build/native/include directory. No SDK is automatically restored." />
+    <Error Condition="!Exists('$(DxTimingCaptureSdkInclude)\D3D12Events.h') or !Exists('$(DxTimingCaptureSdkInclude)\d3d12.h')" Text="The explicitly selected Agility SDK include directory is incomplete." />
+    <PropertyGroup>
+      <_DxTimingCaptureNuspec>$(DxTimingCaptureSdkInclude)\..\..\..\Microsoft.Direct3D.D3D12.nuspec</_DxTimingCaptureNuspec>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_DxTimingCaptureNuspec)')" Text="The selected SDK must retain its Microsoft.Direct3D.D3D12.nuspec so version 1.619.5 can be verified." />
+    <XmlPeek XmlInputPath="$(_DxTimingCaptureNuspec)" Query="/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='version']/text()">
+      <Output TaskParameter="Result" ItemName="_DxTimingCaptureSdkVersion" />
+    </XmlPeek>
+    <Error Condition="'@(_DxTimingCaptureSdkVersion)' != '1.619.5'" Text="DxCaptureHelper requires Microsoft.Direct3D.D3D12 exactly 1.619.5; the selected package reports @(_DxTimingCaptureSdkVersion)." />
+  </Target>
+</Project>

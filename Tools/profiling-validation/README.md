@@ -28,7 +28,7 @@ pwsh -NoProfile -File .\Tools\profiling-validation\Invoke-ProfilingValidation.ps
 |---|---|---|
 | `Stats` (기본) | 기본 씬 · `profile.record` · 예열 | 보존 프레임 · 이벤트 · 등록 마커가 0 이 아닌지, 불균형 스코프 0, 청크 풀 미고갈, `[GameThread]`·`[RenderThread]`·`[PresentationThread]` 가 **등록만 되고 안 찍는 상태가 아닌지**, `[Worker 1]` 등록 |
 | `Workers` | fixture 씬으로 갈아 끼워 애니메이션 잡 | 워커 레인 등록, **이벤트를 찍은 워커가 넷 이상**, 그 이벤트에 `AnimationJob` 이 있는지, 씬 교체의 `SceneActivated` 가 길이 없는 사건으로 남았는지 |
-| `Window` | 프로파일러 창을 열고 돌린 뒤 닫는다 | `ProfilerWindow`·`ProfilerTimeline` **마커가 캡처에 나타나는지**(창이 자기 창을 증언한다), 창이 프레젠테이션 스레드에 붙는지, **창을 닫아도 녹화가 계속되는지** |
+| `Window` | 별도 프로파일러 뷰어를 열고 닫고 다시 연다 | 인증된 PID·Present 계수, 명시적 Close, 엔진 녹화 지속, 엔진 캡처에 viewer UI 마커가 없는지. 새 프로세스 축은 아직 실행하지 않았다 |
 | `Gpu` | Scene 모드 → Game 모드 → Scene+Game Preview → 창 리사이즈 | 같은 엔진 프레임의 두 뷰가 서로 다른 submission에 귀속 · 최대 2-inflight와 펜스 대기 · 리사이즈 전후 두 뷰 완료 세대 · 질의 초과/수집 실패 0과 Collector 진단 배선 · raw 조각/clock/레인/트랙 순서 · Debug Layer/DRED 활성 및 오류 0 · 종료 소유 0 |
 | `GpuLoss` | Debug에서 GPU 질의 슬롯을 16개로 제한 | 렌더러의 query overflow가 0보다 크고, 녹화 Collector에 누락 건수·프레임·이유가 남으며 collect 실패와 구분되는지 |
 | `Providers` | Resource 모듈을 끄고 켠 뒤 Play 중 GC를 강제한다 | 꺼진 모듈의 표본 부재, 켜진 모듈의 owner 표본·비용, 증가한 Gen2 수치와 ScriptCore 마커의 동일 프레임 귀속, 두 캡처 모두 counter 누락 0 |
@@ -67,6 +67,7 @@ fixture 를 가진 게이트는 이 기계에서만 돌고 clean checkout 에서
 - `profile.frame gpu` — 캡처 전체에서 GPU 구간이 있는 최근 8프레임을 고른다.
   수집 지연으로 마지막 엔진 프레임 8개에 GPU 레인이 없을 때도 귀속을 검사한다.
 - `profile.counter-mask [process|gpu|network|render|managed|resources on|off]` — 모듈별 수집을 제어한다. 인자가 없으면 현재 마스크를 반환한다. `network`에는 아직 엔진 송수신 계측원이 없다.
+- `profile.deep.start` / `profile.deep.status` / `profile.deep.stop <session-id>` — 별도 DX12 심층 수집기의 시작 요청·상태·비동기 중지를 제어한다. 기존 HTTP `POST /command`와 같은 명령 큐를 사용한다. Start의 `accepted`는 요청 접수이며 실제 수집은 `state=in_progress`로 확인한다. `sessionId`는 전체 uint64를 보존하는 십진 문자열이고, Stop은 그 값을 정확히 요구한다. `artifactPath`는 엔진이 정한 `.cedx` 경로이며 `state=finalized`와 `artifactFinalized`로 마감을 확인한다. `complete=false` 및 손실 수치는 별도로 확인해야 한다. SDK 미포함·권한 거부·수집 실패는 각각 `unavailable`·`permission_denied`·`failed`로 남으며 승격하지 않는다. 이 명령과 신규 소스 fixture는 아직 빌드·실행 검증하지 않았다.
 - `profile.frame`의 `counterDescriptors`는 캡처가 소유한 이름·단위·범주이고, `counterCoverage`는 보존 프레임 전체의 각 카운터 표본 수·마지막 프레임·값이다. 최근 8프레임만 보고 희소 표본의 부재를 단정하지 않는다.
 
 콘솔에 `clear` 는 없다 — 보존분을 버리는 것은 프로파일러 창의 `Clear` 버튼뿐

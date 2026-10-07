@@ -218,6 +218,9 @@ namespace CommandCore
             { "prefab.status", CommandCost::Immediate, "", "프리팹 등록·캐시 상태를 낸다", CommandClass::EngineService, CommandLiveness::Live },
             { "prefab.update", CommandCost::Frames, "<소스 오브젝트> <프리팹 이름>", "기존 프리팹을 소스 오브젝트로 갱신한다", CommandClass::EngineService, CommandLiveness::Live },
             { "profile.counter-mask", CommandCost::Immediate, "[process|gpu|network|render|managed|resources on|off]", "프로파일러 counter 제공자 마스크를 조회·설정한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
+            { "profile.deep.start", CommandCost::Immediate, "", "Queue ordinary-privilege DX12 capture to an engine-owned spool; admission is not collector startup", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "profile.deep.status", CommandCost::Immediate, "", "Read deep capture session, collector state and artifact finalization without waiting", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "profile.deep.stop", CommandCost::Immediate, "<session-id>", "Request asynchronous deep capture stop for the exact session; repeated stops are idempotent", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "sessionId" },
             { "profile.frame", CommandCost::Immediate, "", "보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "profile.pause", CommandCost::Immediate, "", "Request Stop and flush the entire recording asynchronously", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both, "()" },
             { "profile.record", CommandCost::Immediate, "", "Start a new continuous recording session in a recoverable temporary spool", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Both, "()" },
@@ -328,6 +331,11 @@ namespace CommandCore
                        [](const DescriptorSeed& a, const DescriptorSeed& b)
                        { return std::string_view(a.name) < std::string_view(b.name); }),
         "CommandDescriptorSeeds: kSeeds must stay sorted by name (binary search)");
+    static_assert(
+        std::adjacent_find(std::begin(kSeeds), std::end(kSeeds),
+                          [](const DescriptorSeed& a, const DescriptorSeed& b)
+                          { return std::string_view(a.name) == std::string_view(b.name); }) == std::end(kSeeds),
+        "CommandDescriptorSeeds: kSeeds must not contain duplicate names");
 
     const DescriptorSeed* FindDescriptorSeed(std::string_view canonical)
     {

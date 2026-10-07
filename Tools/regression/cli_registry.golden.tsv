@@ -1,6 +1,6 @@
 # lc3-commands v1
-# commands	135
-# names	144
+# commands	138
+# names	147
 # problems	0
 canonical	aliases	cost	roles	class	liveness	user_code	result_bearing	usage	summary
 ai.status	-	immediate	editor	engine_service	live	no	yes	[오브젝트]	AI 레지스트리 등록 수를 낸다(오브젝트를 주면 그 하나)
@@ -88,6 +88,9 @@ prefab.objectguid	-	immediate	editor	engine_service	live	no	yes	<오브젝트 �
 prefab.overrides	-	immediate	editor	engine_service	live	no	yes	<오브젝트>	프리팹 인스턴스에 기록된 오버라이드를 나열한다
 prefab.status	-	immediate	editor	engine_service	live	no	yes	-	프리팹 등록·캐시 상태를 낸다
 prefab.update	-	frames	editor	engine_service	live	no	yes	<소스 오브젝트> <프리팹 이름>	기존 프리팹을 소스 오브젝트로 갱신한다
+profile.deep.start	-	immediate	editor	engine_service	live	no	yes	-	Queue ordinary-privilege DX12 capture to an engine-owned spool; admission is not collector startup
+profile.deep.status	-	immediate	editor	engine_service	live	no	yes	-	Read deep capture session, collector state and artifact finalization without waiting
+profile.deep.stop	-	immediate	editor	engine_service	live	no	yes	<session-id>	Request asynchronous deep capture stop for the exact session; repeated stops are idempotent
 profile.frame	-	immediate	editor	engine_service	live	no	yes	-	보존된 프레임의 CPU 이벤트를 이름·깊이·ms 로 낸다(PHASE 14 임시)
 profile.pause	-	immediate	editor	engine_service	live	no	yes	-	녹화를 멈춰 그때까지를 얼린다(창이 그것을 집는다)
 profile.record	-	immediate	editor	engine_service	live	no	yes	-	얼린 캡처를 남긴 채 기록만 다시 연다

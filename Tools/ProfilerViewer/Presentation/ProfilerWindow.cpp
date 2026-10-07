@@ -14,9 +14,10 @@
 //   Profiler 창 focus 일 때만 받는다" 고 적은 것은 옛 코어 얘기이고, 지금
 //   에디터에는 그런 단축키가 없다. 여기서 새로 만들지 않는 것이 그 조건을
 //   지키는 가장 싼 방법이다.
-#include "ProfilerHUD.h"
+#include "ProfilerPresenter.h"
 #include "ProfilerView.h"
-#include "EnhancedRenderDebugWindow.h"
+#include "ProfilerViewerClient.h"
+#include "ProfilerLiveDiagnostics.h"
 
 #include <cinttypes>
 #include <algorithm>
@@ -29,27 +30,61 @@
 #include <cstdio>
 #include <memory>
 #include <string>
+#include <stdexcept>
 #include <string_view>
 #include <vector>
 
 #include "ImGui.h"
 #include "EditorIcons.h"
 #include "ProfileCaptureFile.h"
-#include "ProfileScope.h"
-#include "JobScheduler.h"
 
 namespace editor::profiler_view
 {
-    // 창이 소유하는 reader. 함수 지역 static 이라 창을 닫아도 살아 있다 —
-    // 녹화 상태는 서비스가, 선택은 이 reader 가 들고 있으므로 창을 여닫아도
-    // 둘 다 유지된다(완료조건).
+    namespace
+    {
+        struct presenter_state
+        {
+            ce::preparation_dispatch dispatch;
+            ce::preparation_dispatch diagnostics_dispatch;
+            ce::profiler_viewer::client* source = nullptr;
+            std::unique_ptr<ce::capture_reader> reader;
+            std::uint64_t shown_live_epoch = 0;
+        };
+
+        presenter_state state;
+    }
+
+    void initialize(ce::preparation_dispatch dispatch, ce::profiler_viewer::client& source,
+                    ce::preparation_dispatch diagnostics_dispatch)
+    {
+        if (!dispatch || !diagnostics_dispatch || state.reader)
+        {
+            throw std::logic_error("Profiler presenter requires initialized asynchronous host executors");
+        }
+        state.dispatch = std::move(dispatch);
+        state.diagnostics_dispatch = std::move(diagnostics_dispatch);
+        state.source = &source;
+        state.reader = std::make_unique<ce::capture_reader>(state.dispatch);
+    }
+
     ce::capture_reader& reader()
     {
-        static ce::capture_reader instance{ [](std::function<void()> work)
-        {
-            (void)ce::get_job_scheduler().submit(std::move(work));
-        } };
-        return instance;
+        return *state.reader;
+    }
+
+    ce::profiler_viewer::client& source()
+    {
+        return *state.source;
+    }
+
+    void dispatch_work(std::function<void()> work)
+    {
+        state.dispatch(std::move(work));
+    }
+
+    void dispatch_diagnostics(std::function<void()> work)
+    {
+        state.diagnostics_dispatch(std::move(work));
     }
 
     double ticks_to_milliseconds(ce::profile_tick ticks)
@@ -326,6 +361,9 @@ namespace editor::profiler_view::capture_file_view
         operation_kind kind = operation_kind::open;
         std::filesystem::path path;
         ce::capture_recording_ptr recording;
+        ce::profiler_viewer::source_artifact_ptr artifact;
+        std::atomic_bool canceled{ false };
+        std::stop_source cancellation;
         std::string error = "File operation was not accepted by the worker scheduler";
     };
 
@@ -351,7 +389,15 @@ namespace editor::profiler_view::capture_file_view
         std::shared_ptr<file_operation> operation;
         std::string message;
         std::uint32_t range_frames = ce::kDefaultRetainedFrames;
-        std::uint64_t clear_ticket = 0;
+        bool clear_pending = false;
+        std::uint64_t clear_revision = 0;
+        std::uint64_t clear_command_revision = 0;
+    };
+
+    struct pinned_recording
+    {
+        ce::capture_recording_ptr recording;
+        ce::profiler_viewer::source_artifact_ptr artifact;
     };
 
     file_view_state& file_state()
@@ -380,6 +426,10 @@ namespace editor::profiler_view::capture_file_view
             return;
         }
         state.operation.reset();
+        if (operation->canceled.load(std::memory_order_acquire))
+        {
+            return;
+        }
         if (!operation->error.empty())
         {
             state.message = operation->error;
@@ -387,7 +437,12 @@ namespace editor::profiler_view::capture_file_view
         }
         if (operation->kind == operation_kind::open)
         {
-            reader().open_file(operation->recording);
+            // Aliasing ownership keeps the source pin alive for the reader and
+            // every accepted range job, then releases it when the file is no
+            // longer used. Switching back to Live need not lock an old file.
+            const auto owner = std::make_shared<pinned_recording>(
+                pinned_recording{ operation->recording, operation->artifact });
+            reader().open_file(ce::capture_recording_ptr(owner, owner->recording.get()));
             state.message.clear();
         }
         else
@@ -402,9 +457,10 @@ namespace editor::profiler_view::capture_file_view
 
     void save_current_recording()
     {
-        ce::profiler_service& service = ce::profiler();
-        const std::filesystem::path source = service.recording_path();
-        if (source.empty() || service.recording_status().state != ce::recording_state::finalized || file_busy())
+        const auto remote = source().snapshot();
+        const auto artifact = remote->recording_source;
+        const std::filesystem::path path = artifact ? artifact->path() : std::filesystem::path{};
+        if (path.empty() || remote->recording.state != ce::recording_state::finalized || file_busy())
         {
             return;
         }
@@ -416,18 +472,19 @@ namespace editor::profiler_view::capture_file_view
         auto operation = std::make_shared<file_operation>();
         operation->kind = operation_kind::save;
         operation->path = destination;
+        operation->artifact = artifact;
         file_state().operation = operation;
         file_state().message.clear();
         try
         {
             const auto admission = std::make_shared<file_admission>(operation);
-            (void)ce::get_job_scheduler().submit([operation, source, admission]
+            dispatch_work([operation, path, admission]
             {
                 admission->started.store(true, std::memory_order_release);
                 operation->error.clear();
                 try
                 {
-                    const auto recording = ce::open_capture_recording(source);
+                    const auto recording = ce::open_capture_recording(path, operation->cancellation.get_token());
                     if (!recording)
                     {
                         operation->error = std::string("Save failed: ") + ce::describe(recording.error());
@@ -439,7 +496,7 @@ namespace editor::profiler_view::capture_file_view
                     else
                     {
                         operation->recording = *recording;
-                        if (const auto saved = ce::save_recording(**recording, operation->path); !saved)
+                        if (const auto saved = ce::save_recording(**recording, operation->path, operation->cancellation.get_token()); !saved)
                         {
                             operation->error = std::string("Save failed: ") + ce::describe(saved.error());
                         }
@@ -463,7 +520,8 @@ namespace editor::profiler_view::capture_file_view
         }
     }
 
-    void open_recording_path(const std::filesystem::path& path)
+    void open_recording_path(const std::filesystem::path& path,
+                             ce::profiler_viewer::source_artifact_ptr artifact = {})
     {
         if (file_busy())
         {
@@ -475,18 +533,30 @@ namespace editor::profiler_view::capture_file_view
         }
         auto operation = std::make_shared<file_operation>();
         operation->path = path;
+        operation->artifact = std::move(artifact);
         file_state().operation = operation;
         file_state().message.clear();
         try
         {
             const auto admission = std::make_shared<file_admission>(operation);
-            (void)ce::get_job_scheduler().submit([operation, admission]
+            dispatch_work([operation, admission]
             {
                 admission->started.store(true, std::memory_order_release);
                 operation->error.clear();
                 try
                 {
-                    const auto loaded = ce::open_capture_recording(operation->path);
+                    if (!operation->artifact)
+                    {
+                        auto artifact = ce::profiler_viewer::open_source_artifact(operation->path);
+                        if (!artifact)
+                        {
+                            operation->error = "Open failed: " + artifact.error();
+                            operation->done.store(true, std::memory_order_release);
+                            return;
+                        }
+                        operation->artifact = *artifact;
+                    }
+                    const auto loaded = ce::open_capture_recording(operation->artifact->path(), operation->cancellation.get_token());
                     if (loaded)
                     {
                         operation->recording = *loaded;
@@ -559,12 +629,20 @@ namespace editor::profiler_view::capture_file_view
         {
             ImGui::TextDisabled("%s", file_state().operation->kind == operation_kind::open
                                          ? "Opening recording index..." : "Saving entire recording...");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Cancel file operation"))
+            {
+                file_state().operation->canceled.store(true, std::memory_order_release);
+                file_state().operation->cancellation.request_stop();
+                file_state().operation.reset();
+                file_state().message = "Cancellation requested; in-flight I/O finishes at a safe boundary";
+            }
         }
         if (!file_state().message.empty())
         {
             ImGui::TextUnformatted(file_state().message.c_str());
         }
-        if (file_state().clear_ticket)
+        if (file_state().clear_pending)
         {
             ImGui::TextDisabled("Clearing live capture...");
         }
@@ -719,28 +797,34 @@ namespace
     {
         using namespace editor::profiler_view;
 
-        ce::profiler_service& service = ce::profiler();
-        const ce::recorder_state state = service.state();
-        const ce::recording_status disk = service.recording_status();
-        const bool hasRecording = !service.recording_path().empty();
+        const auto remote = source().snapshot();
+        const ce::recorder_state state = remote->summary.state;
+        const ce::recording_status disk = remote->recording;
+        const bool hasRecording = static_cast<bool>(remote->recording_source);
         const bool recording = state == ce::recorder_state::recording;
         const bool transitioning = state == ce::recorder_state::starting || state == ce::recorder_state::pausing ||
             (hasRecording && (disk.state == ce::recording_state::starting || disk.state == ce::recording_state::flushing));
         const bool fileBusy = capture_file_view::file_busy();
-        const bool clearing = capture_file_view::file_state().clear_ticket != 0;
+        const bool clearing = capture_file_view::file_state().clear_pending || remote->clear_pending;
 
         bool record = recording || state == ce::recorder_state::starting;
-        ImGui::BeginDisabled(transitioning || fileBusy || clearing);
+        ImGui::BeginDisabled(!remote->connected || remote->command_pending || transitioning || fileBusy || clearing);
         if (ImGui::Checkbox("Record", &record))
         {
             if (recording)
             {
                 // 요청만 보낸다. 이 자리에서 생산자·수집기나 디스크 완료를 기다리지 않는다.
-                service.pause();
+                if (!source().request(ce::profiler_viewer::command::stop))
+                {
+                    capture_file_view::file_state().message = "Stop was not sent: target disconnected or command queue full";
+                }
             }
             else
             {
-                service.record(summary.engine_frame);
+                if (!source().request(ce::profiler_viewer::command::record))
+                {
+                    capture_file_view::file_state().message = "Record was not sent: target disconnected or command queue full";
+                }
             }
         }
         ImGui::EndDisabled();
@@ -750,12 +834,20 @@ namespace
         }
 
         ImGui::SameLine();
-        ImGui::BeginDisabled(recording || transitioning || fileBusy || clearing);
+        ImGui::BeginDisabled(!remote->connected || remote->command_pending || recording || transitioning || fileBusy || clearing);
         if (ImGui::Button(EditorIcon::Label<EditorIcon::Delete, " Clear">))
         {
-            capture_file_view::file_state().clear_ticket = service.clear();
-            reader().reset();
-            capture_file_view::file_state().message.clear();
+            if (source().request(ce::profiler_viewer::command::clear))
+            {
+                capture_file_view::file_state().clear_pending = true;
+                capture_file_view::file_state().clear_revision = remote->clear_revision;
+                capture_file_view::file_state().clear_command_revision = remote->command_revision;
+                capture_file_view::file_state().message.clear();
+            }
+            else
+            {
+                capture_file_view::file_state().message = "Clear was not sent: target disconnected or command queue full";
+            }
         }
         ImGui::EndDisabled();
 
@@ -777,7 +869,7 @@ namespace
                              disk.state != ce::recording_state::finalized);
         if (ImGui::Button("View entire session"))
         {
-            capture_file_view::open_recording_path(service.recording_path());
+            capture_file_view::open_recording_path(remote->recording_source->path(), remote->recording_source);
         }
         ImGui::EndDisabled();
 
@@ -815,6 +907,10 @@ namespace
                         summary.pause_failed_gpu_submissions);
             ImGui::TextDisabled("CPU tails and submitted GPU work are still draining. This capture is not finalized yet.");
         }
+        else if (remote->command_pending)
+        {
+            ImGui::TextDisabled("Waiting for the target to acknowledge the control request...");
+        }
         if (hasRecording || state == ce::recorder_state::starting || disk.error)
         {
             const char* diskState = disk.state == ce::recording_state::starting ? "Starting" :
@@ -846,7 +942,7 @@ namespace
                 ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "Writer error: %s", ce::describe(*disk.error));
                 if (hasRecording)
                 {
-                    const auto path = service.recording_path().u8string();
+                    const auto path = remote->recording_source->path().u8string();
                     const std::string utf8Path(path.begin(), path.end());
                     ImGui::TextWrapped("Recoverable spool: %s", utf8Path.c_str());
                 }
@@ -857,16 +953,20 @@ namespace
             }
         }
 
+        ImGui::BeginDisabled(!remote->connected || remote->command_pending || clearing);
         if (ImGui::TreeNode("Counter modules"))
         {
             const auto toggle = [&](const char* label, ce::counter_category category)
             {
                 const ce::counter_mask bit = ce::counter_bit(category);
-                bool enabled = (service.get_counter_mask() & bit) != 0;
+                bool enabled = (remote->counters & bit) != 0;
                 if (ImGui::Checkbox(label, &enabled))
                 {
-                    const ce::counter_mask before = service.get_counter_mask();
-                    service.set_counter_mask(enabled ? before | bit : before & ~bit);
+                    const ce::counter_mask before = remote->counters;
+                    if (!source().request(ce::profiler_viewer::command::counter_mask, enabled ? before | bit : before & ~bit))
+                    {
+                        capture_file_view::file_state().message = "Counter module change was not sent";
+                    }
                 }
             };
             toggle("Process CPU/RAM", ce::counter_category::process);
@@ -879,6 +979,8 @@ namespace
             ImGui::TextDisabled("Resources는 기본 꺼짐 · 켜면 0.5초마다 소유 프레임에서 집계합니다");
             ImGui::TreePop();
         }
+
+        ImGui::EndDisabled();
 
         // ★ 녹화 중 화면은 **한 박자 뒤처진다.** 코어가 정한 간격으로만
         //   스냅샷을 내고, 늦게 오는 GPU 구간은 닫힌 프레임에 나중에 들어간다
@@ -1010,7 +1112,7 @@ namespace
             std::snprintf(buffer, sizeof(buffer), "%u", summary.gpu_issue_last_frame);
             draw_row("Last GPU issue frame", buffer);
         }
-        const double collectorFrequency = static_cast<double>(ce::profiler_service::ticks_per_second());
+        const double collectorFrequency = static_cast<double>(editor::profiler_view::source().snapshot()->target.qpc_frequency);
         auto collector_ms = [collectorFrequency](ce::profile_tick ticks)
         {
             return collectorFrequency > 0.0
@@ -1089,67 +1191,83 @@ namespace
 
 namespace editor::profiler_view
 {
-    enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive, physics, audio };
+    enum class page { frames, timeline, cpu, memory, gpu, network, animation, hierarchy, flat, threads, collector, renderingLive, physics, audio, dxCapture };
     page selectedPage = page::timeline;
     std::atomic_bool renderingLiveRequested{false};
     void select_rendering_live() { renderingLiveRequested = true; }
 }
 
-void DrawProfilerHUD(std::mutex& sceneStructureMutex)
+void editor::profiler_view::draw()
 {
-    using namespace editor::profiler_view;
-    if (renderingLiveRequested.exchange(false))
+    if (source().take_page_request() == 1 || renderingLiveRequested.exchange(false))
     {
         selectedPage = page::renderingLive;
     }
 
-    // ★ 창이 **그려졌다** 는 증거를 프로파일러 자신이 낸다. 창이 열린 것과
-    //   본문이 도는 것은 다르다 — 도크 탭으로 겹친 창은 선택돼야 본문이
-    //   돌고, 그러지 않으면 `editor.window ... open` 이 성공해도 여기까지
-    //   오지 않는다. 이 마커가 캡처에 나타나는지로 게이트가 판정한다.
-    //
-    //   자기 UI 비용을 자기가 재는 것은 §7 이 말하는 profiler overhead 이기도
-    //   하다. 창이 열려 있으면 녹화 중에도 최신 immutable 스냅샷을 그린다.
-    ce::profile_scope _profile{ ce::marker<"ProfilerWindow">() };
-
-    ce::profiler_service& service = ce::profiler();
-
-    // ★ 녹화 중에도 프레임을 보여 준다(§6.4 개정). 창이 떠 있는 동안만
-    //   청하므로, 창을 닫으면 코어는 스냅샷을 한 번도 만들지 않는다.
-    //   간격은 코어가 정한다 — 화면이 부르는 대로 다 내주면 링을 통째로
-    //   복사하는 비용이 재려는 대상을 흔든다.
-    if (selectedPage != page::renderingLive && !capture_file_view::file_state().clear_ticket)
-    {
-        service.request_live_capture();
-    }
-
-    const ce::live_summary summary = service.summary();
-
-    // 공개된 불변 캡처를 따라간다. 조회 때문에 진행 중인 녹화를 멈추지 않는다.
-    //
-    // ★ 언제 갈아타는가 는 이 줄이 아니라 reader 가 정한다. 그래야 그 규칙을
-    //   화면 없이 재고 변이로 물 수 있다 — 여기 조건문을 두면 재는 수단이 눈뿐이다.
+    // Only the authenticated engine publishes captures. The viewer has no
+    // ProfilerService singleton or scene startup of its own.
+    const auto remote = source().snapshot();
+    const ce::live_summary& summary = remote->summary;
     capture_file_view::poll_file_operation();
+    poll_dx_capture();
     reader().poll_preparation();
-    const ce::capture_session_ptr latest = service.capture();
-    if (capture_file_view::file_state().clear_ticket)
+    if (capture_file_view::file_state().clear_pending)
     {
-        if (service.control_applied(capture_file_view::file_state().clear_ticket))
+        if (!remote->connected)
         {
-            capture_file_view::file_state().clear_ticket = 0;
+            capture_file_view::file_state().clear_pending = false;
+            capture_file_view::file_state().message = "Disconnected before Clear completion was observed";
+        }
+        else if (remote->command_revision > capture_file_view::file_state().clear_command_revision &&
+            remote->last_command == ce::profiler_viewer::command::clear && !remote->command_accepted)
+        {
+            capture_file_view::file_state().clear_pending = false;
+            capture_file_view::file_state().message = remote->command_message;
+        }
+        else if (remote->clear_revision != capture_file_view::file_state().clear_revision)
+        {
+            capture_file_view::file_state().clear_pending = false;
             reader().reset();
+            state.shown_live_epoch = 0;
         }
     }
     else if (selectedPage != page::renderingLive)
     {
-        reader().sync(latest);
+        if (reader().sync(remote->capture))
+        {
+            state.shown_live_epoch = remote->capture_epoch;
+        }
+    }
+
+    if (!remote->command_message.empty() && !remote->command_accepted)
+    {
+        ImGui::TextWrapped("%s", remote->command_message.c_str());
+    }
+    if (!remote->message.empty())
+    {
+        ImGui::TextWrapped("%s", remote->message.c_str());
+    }
+    if (remote->target.connection.target_pid)
+    {
+        ImGui::TextDisabled("Target PID %u | session %llu | %s | skipped live windows %llu",
+            remote->target.connection.target_pid,
+            static_cast<unsigned long long>(remote->target.session_generation),
+            remote->connected ? "Connected" : "Disconnected; last received data",
+            static_cast<unsigned long long>(remote->skipped_captures));
+        if (!reader().recording() && state.shown_live_epoch != 0 &&
+            state.shown_live_epoch != remote->capture_generation)
+        {
+            ImGui::TextDisabled("Showing capture epoch %llu; target is now epoch %llu",
+                static_cast<unsigned long long>(state.shown_live_epoch),
+                static_cast<unsigned long long>(remote->capture_generation));
+        }
     }
 
     draw_toolbar(summary);
     capture_file_view::draw_file_line();
     if (selectedPage != page::renderingLive)
     {
-        ImGui::BeginDisabled(capture_file_view::file_busy() || capture_file_view::file_state().clear_ticket != 0);
+        ImGui::BeginDisabled(capture_file_view::file_busy() || capture_file_view::file_state().clear_pending);
         capture_file_view::draw_recording_overview();
         ImGui::EndDisabled();
     }
@@ -1193,6 +1311,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
     nav(page::cpu, EditorIcon::Timing, "CPU", "프로세스 사용률과 CPU Self 상위 마커");
     nav(page::memory, EditorIcon::Runtime, "메모리", "프로세스 RAM 작업 집합");
     nav(page::gpu, EditorIcon::Game, "GPU", "Graphics 구간 시간과 VRAM");
+    nav(page::dxCapture, EditorIcon::Timing, "DX12 Deep Capture", "별도 ETW 수집 프로세스와 제출→실행 기록");
     nav(page::renderingLive, EditorIcon::Scene, "Rendering - Live", "Live renderer diagnostics without Record");
     nav(page::physics, EditorIcon::Timing, "Physics", "씬별 물리 틱 카운터와 손실 진단");
     nav(page::audio, EditorIcon::Timing, "Audio", "논리 재생·보이스·오디오 callback 진단");
@@ -1211,6 +1330,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
         selectedPage == page::cpu ? "CPU" :
         selectedPage == page::memory ? "메모리" :
         selectedPage == page::gpu ? "GPU" :
+        selectedPage == page::dxCapture ? "DX12 Deep Capture" :
         selectedPage == page::network ? "네트워크" :
         selectedPage == page::animation ? "Animation Budget" :
         selectedPage == page::renderingLive ? "Rendering - Live" :
@@ -1219,7 +1339,7 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
         selectedPage == page::threads ? "Threads" : "Collector";
     ImGui::TextUnformatted(pageTitle);
     ImGui::Separator();
-    ImGui::BeginDisabled(capture_file_view::file_busy() || capture_file_view::file_state().clear_ticket != 0);
+    ImGui::BeginDisabled(capture_file_view::file_busy() || capture_file_view::file_state().clear_pending);
     switch (selectedPage)
     {
     case page::frames:
@@ -1263,19 +1383,18 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
         break;
     case page::memory: draw_memory_profiler(); break;
     case page::gpu: draw_telemetry(telemetry_page::gpu); break;
+    case page::dxCapture: draw_dx_capture(); break;
     case page::network: draw_telemetry(telemetry_page::network); break;
     case page::physics: draw_physics_telemetry(); break;
     case page::audio: draw_audio_telemetry(); break;
     case page::animation:
     {
-        std::lock_guard<std::mutex> sceneLock(sceneStructureMutex);
         draw_animation_budget();
         break;
     }
     case page::renderingLive:
     {
-        std::lock_guard<std::mutex> sceneLock(sceneStructureMutex);
-        editor::DrawRenderLiveDiagnostics();
+        draw_rendering_live();
         break;
     }
     case page::hierarchy:
@@ -1338,4 +1457,38 @@ void DrawProfilerHUD(std::mutex& sceneStructureMutex)
     }
     ImGui::EndDisabled();
     ImGui::EndChild();
+}
+
+void editor::profiler_view::open_path(const std::filesystem::path& path)
+{
+    auto extension = path.extension().wstring();
+    std::transform(extension.begin(), extension.end(), extension.begin(), [](wchar_t c)
+    {
+        return c >= L'A' && c <= L'Z' ? static_cast<wchar_t>(c + L'a' - L'A') : c;
+    });
+    if (extension == L".cedx")
+    {
+        selectedPage = page::dxCapture;
+        open_dx_capture(path);
+    }
+    else
+    {
+        capture_file_view::open_recording_path(path);
+    }
+}
+
+void editor::profiler_view::shutdown()
+{
+    if (capture_file_view::file_state().operation)
+    {
+        capture_file_view::file_state().operation->canceled.store(true, std::memory_order_release);
+        capture_file_view::file_state().operation->cancellation.request_stop();
+        capture_file_view::file_state().operation.reset();
+    }
+    shutdown_dx_capture();
+    shutdown_live_diagnostics();
+    state.reader.reset();
+    state.dispatch = {};
+    state.diagnostics_dispatch = {};
+    state.source = nullptr;
 }

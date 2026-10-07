@@ -29,6 +29,7 @@
 #include <span>
 #include <memory>
 #include <optional>
+#include <stop_token>
 #include <vector>
 
 #include "ProfileCapture.h"
@@ -54,6 +55,7 @@ namespace ce
         checksum_mismatch,    // 청크의 CRC 가 안 맞는다 — 손상
         resource_limit,       // 해석할 구간이 지정한 메모리 한도를 넘는다
         malformed,            // 크기·개수·순서가 앞뒤가 안 맞는다
+        canceled,             // Viewer canceled at a record/chunk boundary; source is unchanged
     };
 
     // 사람이 읽을 한 줄. 오류 창과 로그가 쓴다.
@@ -68,6 +70,13 @@ namespace ce
 
     std::expected<capture_session_ptr, capture_file_error>
     decode_capture(std::span<const std::byte> bytes);
+
+    // IPC entry points preflight allocation/count/work limits before calling the
+    // unchanged v2 codec. No partial snapshot is presented as a complete one.
+    std::expected<std::vector<std::byte>, capture_file_error>
+    encode_capture_bounded(const capture_session& capture, std::size_t max_wire_bytes);
+    std::expected<capture_session_ptr, capture_file_error>
+    decode_capture_bounded(std::span<const std::byte> bytes, std::size_t max_wire_bytes);
 
     // ── 파일 ───────────────────────────────────────────────────────────────
     //
@@ -190,14 +199,14 @@ namespace ce
         // 이벤트·카운터·프레임 소유 메모리에 한도를 둔다. 레코드 입력 버퍼는 최대 32MiB다.
         std::expected<capture_session_ptr, capture_file_error>
         load_range(std::uint64_t first_ordinal, std::uint32_t count,
-                   std::size_t max_bytes = kDefaultMemoryBudget) const;
+                   std::size_t max_bytes = kDefaultMemoryBudget, std::stop_token cancel = {}) const;
 
     private:
         struct implementation;
         explicit capture_recording(std::shared_ptr<implementation> implementation);
         std::shared_ptr<implementation> implementation_;
         friend std::expected<std::shared_ptr<const capture_recording>, capture_file_error>
-        open_capture_recording(const std::filesystem::path& path);
+        open_capture_recording(const std::filesystem::path& path, std::stop_token cancel);
     };
 
     using capture_recording_ptr = std::shared_ptr<const capture_recording>;
@@ -205,9 +214,10 @@ namespace ce
     // 제한된 작업 메모리와 최대 2048개 개요 구간으로 읽는다. 잘린 마지막 레코드는
     // 복구하고, 완성된 레코드의 구조·CRC 오류는 거절한다. v1/v2의 이벤트 값은 구간을 읽을 때 검증한다.
     std::expected<capture_recording_ptr, capture_file_error>
-    open_capture_recording(const std::filesystem::path& path);
+    open_capture_recording(const std::filesystem::path& path, std::stop_token cancel = {});
 
     // 검증한 접두 구간만 같은 디렉터리의 임시 파일을 거쳐 복사한다. 원본은 복구용으로 남긴다.
     std::expected<void, capture_file_error>
-    save_recording(const capture_recording& recording, const std::filesystem::path& path);
+    save_recording(const capture_recording& recording, const std::filesystem::path& path,
+                   std::stop_token cancel = {});
 }

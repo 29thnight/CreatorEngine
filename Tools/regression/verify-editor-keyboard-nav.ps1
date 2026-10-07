@@ -127,7 +127,6 @@ $contracted = @(
 # 면제 — 계약을 요구하지 않는 자리. **이름으로** 적고 수를 찍는다. 면제가
 # 대상을 통째로 비우면 이 게이트는 아무것도 안 보는 것이다.
 $exempt = @{
-    'ProfilerWindow.cpp' = 'PHASE 14 프로파일러의 타임라인. W2 의 custom draw family 가 아니며 계획서 §7.1 의 허용 목록 밖이다'
 }
 
 $expected = @(($contracted + $exempt.Keys) | Sort-Object)

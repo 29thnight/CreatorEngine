@@ -28,6 +28,7 @@ namespace ce::detail::profile_reader_impl
         std::uint32_t count_ = 0;
         std::uint64_t id_ = 0;
         std::uint64_t epoch_ = 0;
+        std::stop_source cancellation_;
     };
 
     struct prepared_selection
@@ -41,6 +42,7 @@ namespace ce::detail::profile_reader_impl
         std::mutex mutex_;
         bool canceled_ = false;
         bool running_ = false;
+        bool prefer_selection_ = false;
         bool range_failed_ = false;
         bool window_failed_ = false;
         bool selection_failed_ = false;
@@ -171,8 +173,9 @@ namespace ce::detail::profile_reader_impl
 
     void run_preparation(const std::shared_ptr<preparation_state>& state)
     {
-        bool preferSelection = false;
-        for (;;)
+        // One bounded request per executor turn. A continuing live stream must
+        // not monopolize the viewer worker ahead of Open/DX/diagnostic decoding.
+        for (unsigned handled = 0; handled < 1; ++handled)
         {
             preparation_request request;
             {
@@ -188,17 +191,17 @@ namespace ce::detail::profile_reader_impl
                     request = *state->range_request_;
                     state->range_pending_ = false;
                 }
-                else if (state->window_pending_ && (!state->selection_pending_ || !preferSelection))
+                else if (state->window_pending_ && (!state->selection_pending_ || !state->prefer_selection_))
                 {
                     request = *state->window_request_;
                     state->window_pending_ = false;
-                    preferSelection = true;
+                    state->prefer_selection_ = true;
                 }
                 else
                 {
                     request = *state->selection_request_;
                     state->selection_pending_ = false;
-                    preferSelection = false;
+                    state->prefer_selection_ = false;
                 }
             }
             capture_session_ptr range;
@@ -210,7 +213,7 @@ namespace ce::detail::profile_reader_impl
                 if (request.kind_ == request_kind::range)
                 {
                     const auto loaded = request.recording_->load_range(
-                        request.first_ordinal_, request.count_, 128u * 1024u * 1024u);
+                        request.first_ordinal_, request.count_, 128u * 1024u * 1024u, request.cancellation_.get_token());
                     if (loaded)
                     {
                         range = *loaded;
@@ -242,7 +245,8 @@ namespace ce::detail::profile_reader_impl
                 std::lock_guard lock(state->mutex_);
                 if (!current_request(*state, request))
                 {
-                    continue;
+                    state->running_ = false;
+                    return;
                 }
                 if (request.kind_ == request_kind::range)
                 {
@@ -273,6 +277,7 @@ namespace ce::detail::profile_reader_impl
                         state->selection_ready_.swap(selection);
                     }
                 }
+                state->running_ = false;
             }
         }
     }
@@ -327,10 +332,18 @@ namespace ce::detail::profile_reader_impl
         try
         {
             const auto admission = std::make_shared<preparation_admission>(state);
-            dispatch([admission]
+            dispatch([admission, dispatch]
             {
                 admission->started_.store(true, std::memory_order_release);
-                run_preparation(admission->state_);
+                try
+                {
+                    run_preparation(admission->state_);
+                    start_preparation(admission->state_, dispatch);
+                }
+                catch (...)
+                {
+                    fail_admission(admission->state_);
+                }
             });
         }
         catch (...)
@@ -360,6 +373,10 @@ namespace ce
         {
             std::lock_guard lock(m_preparation->mutex_);
             m_preparation->canceled_ = true;
+            if (m_preparation->range_request_)
+            {
+                m_preparation->range_request_->cancellation_.request_stop();
+            }
         }
         // UI는 future/join/wait를 하지 않는다. 실행기는 종료 시 승인한 작업을
         // 배출하고, 그때까지 공유 소유권이 입력 자료의 수명을 보장한다.
@@ -380,6 +397,10 @@ namespace ce
             // 취소 중인 작업과 새 작업이 동시에 실행될 수 있다.
             std::lock_guard lock(m_preparation->mutex_);
             ++m_preparation->epoch_;
+            if (m_preparation->range_request_)
+            {
+                m_preparation->range_request_->cancellation_.request_stop();
+            }
             rangeRequest.swap(m_preparation->range_request_);
             windowRequest.swap(m_preparation->window_request_);
             selectionRequest.swap(m_preparation->selection_request_);
@@ -498,11 +519,15 @@ namespace ce
         std::optional<preparation_request> retired;
         {
             std::lock_guard lock(m_preparation->mutex_);
-            const auto& previous = m_preparation->range_request_;
+            auto& previous = m_preparation->range_request_;
             if (previous && previous->recording_ == m_recording && previous->first_ordinal_ == first_ordinal &&
                 previous->count_ == count && !m_preparation->range_failed_)
             {
                 return;
+            }
+            if (previous)
+            {
+                previous->cancellation_.request_stop();
             }
             preparation_request request;
             request.kind_ = request_kind::range;

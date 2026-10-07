@@ -1,4 +1,5 @@
 #include "../../../EngineDiagnostics/ProfileScope.h"
+#include "../../../EngineDiagnostics/DxCaptureSubmission.h"
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <vector>
@@ -829,7 +830,11 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
                 return false;
             }
             ID3D12CommandList* lists[] = { submittedList.Get() };
-            queue->ExecuteCommandLists(1, lists);
+            {
+                // Immediate work has no proven frame/query token association.
+                const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                queue->ExecuteCommandLists(1, lists);
+            }
             const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
             if (FAILED(signalResult))
             {
@@ -938,7 +943,11 @@ bool DX12DeviceResources::SubmitCommandLists(
         return false;
     }
     if (!lists.empty())
+    {
+        const ce::dx_capture::submission_scope capture(m_queue.Get(), static_cast<std::uint32_t>(lists.size()),
+            ce::dx_capture::current_submission_context());
         m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
+    }
     const HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
     if (FAILED(hr))
     {
@@ -1006,7 +1015,11 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
                 return false;
             }
             ID3D12CommandList* lists[] = { submittedList.Get() };
-            queue->ExecuteCommandLists(1, lists);
+            {
+                // Immediate tails must not inherit another recorded batch's IDs.
+                const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                queue->ExecuteCommandLists(1, lists);
+            }
             const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
             if (FAILED(signalResult))
             {

@@ -169,7 +169,6 @@
     <ClInclude Include="ImGuiHelper\NodeEditor.h" />
     <ClInclude Include="ImGuiHelper\PinHelper.h" />
     <ClInclude Include="ImGuiHelper\ProfilerHUD.h" />
-    <ClInclude Include="ImGuiHelper\ProfilerView.h" />
     <ClInclude Include="ImGuiHelper\EditorInspectorPanel.h" />
     <ClInclude Include="ImGuiHelper\EditorPropertyRow.h" />
     <ClInclude Include="ImGuiHelper\EditorAxisField3.h" />
@@ -348,16 +347,11 @@
     <ClCompile Include="ImGuiHelper\EditorNavContract.cpp" />
     <ClCompile Include="ImGuiHelper\EditorStateContract.cpp" />
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp" />
-    <ClCompile Include="ImGuiHelper\ProfilerCaptureDialog.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
-    <ClCompile Include="ImGuiHelper\ProfilerFrameOverview.cpp" />
-    <ClCompile Include="ImGuiHelper\ProfilerTelemetry.cpp" />
-    <ClCompile Include="ImGuiHelper\ProfilerMemory.cpp" />
-    <ClCompile Include="ImGuiHelper\ProfilerAnimation.cpp" />
-    <ClCompile Include="ImGuiHelper\ProfilerTables.cpp" />
-    <ClCompile Include="ImGuiHelper\ProfilerTimeline.cpp" />
-    <ClCompile Include="ImGuiHelper\ProfilerWindow.cpp" />
+    <ClCompile Include="ImGuiHelper\ProfilerLauncher.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="EngineGUIWindow\ProfilerRenderingBridge.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClInclude Include="EngineGUIWindow\ProfilerRenderingBridge.h" />
+    <ClCompile Include="EngineGUIWindow\ProfilerLiveDiagnosticsBridge.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClInclude Include="EngineGUIWindow\ProfilerLiveDiagnosticsBridge.h" />
     <ClCompile Include="ImGuiHelper\widgets.cpp" />
   </ItemGroup>
   <ItemGroup>

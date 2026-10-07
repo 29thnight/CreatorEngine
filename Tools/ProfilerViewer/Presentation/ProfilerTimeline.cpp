@@ -24,7 +24,6 @@
 #include <imgui_internal.h>
 
 #include "ProfileMarker.h"
-#include "ProfileScope.h"
 
 namespace editor::profiler_view
 {
@@ -187,7 +186,6 @@ namespace editor::profiler_view
     {
         // 타임라인이 **그려졌다** 는 증거. 탭은 선택돼야 본문이 돌므로,
         // 창이 열린 것만으로는 여기까지 온다고 말할 수 없다.
-        ce::profile_scope _profile{ ce::marker<"ProfilerTimeline">() };
 
         ce::capture_reader& view = reader();
         if (!view.has_capture())

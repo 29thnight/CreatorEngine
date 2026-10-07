@@ -1,5 +1,6 @@
 #pragma once
 #include "RHIResourceTypes.h"
+#include "../../EngineDiagnostics/DxCaptureSubmission.h"
 
 #include <cstdint>
 #include <limits>
@@ -17,6 +18,11 @@ struct RHIRecordedBatchDesc
     uint64_t frameId{ 0 };
     uint64_t backendGeneration{ 0 };
     uint64_t displayToken{ 0 };
+
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+    // Frozen at recording time; never infer query identity on the RHI thread.
+    ce::dx_capture::submission_context captureContext{};
+#endif
 
     // 그래프 transient처럼 GPU completion까지 붙잡아야 하는 소유자를 한 덩어리로
     // 넘기는 자리다. 3-15B의 retire queue가 batch와 함께 보관한다.
@@ -71,6 +77,9 @@ public:
     uint64_t GetFrameId() const { return m_frameId; }
     uint64_t GetBackendGeneration() const { return m_backendGeneration; }
     uint64_t GetDisplayToken() const { return m_displayToken; }
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+    ce::dx_capture::submission_context GetCaptureContext() const { return m_captureContext; }
+#endif
     uint32_t GetFrameSlot() const { return m_frameSlot; }
     uint32_t GetCommandCount() const
     {
@@ -93,6 +102,9 @@ private:
         m_frameId = 0;
         m_backendGeneration = 0;
         m_displayToken = 0;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+        m_captureContext = {};
+#endif
         m_frameSlot = kInvalidFrameSlot;
         m_completion = {};
         m_recordingId = 0;
@@ -108,6 +120,9 @@ private:
         m_frameId = other.m_frameId;
         m_backendGeneration = other.m_backendGeneration;
         m_displayToken = other.m_displayToken;
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+        m_captureContext = other.m_captureContext;
+#endif
         m_frameSlot = other.m_frameSlot;
         m_completion = other.m_completion;
         m_recordingId = other.m_recordingId;
@@ -122,6 +137,9 @@ private:
     uint64_t m_frameId{ 0 };
     uint64_t m_backendGeneration{ 0 };
     uint64_t m_displayToken{ 0 };
+#if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
+    ce::dx_capture::submission_context m_captureContext{};
+#endif
     uint32_t m_frameSlot{ kInvalidFrameSlot };
     RHICompletionPoint m_completion{};
     uint64_t m_recordingId{ 0 };

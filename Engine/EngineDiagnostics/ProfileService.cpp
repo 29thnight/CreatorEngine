@@ -250,6 +250,7 @@ namespace ce
         {
             std::lock_guard<std::mutex> guard(m_captureLock);
             m_capture.reset();
+            m_captureGeneration = m_generation.load(std::memory_order_acquire);
         }
         m_ring.clear();
         publish_ring_stats();
@@ -1373,6 +1374,7 @@ namespace ce
             if (started)
             {
                 recording_writer_ = std::move(*started);
+                ++recording_writer_id_;
             }
             else
             {
@@ -1698,6 +1700,7 @@ namespace ce
         {
             std::lock_guard<std::mutex> guard(m_captureLock);
             m_capture = std::move(frozen);
+            m_captureGeneration = m_generation.load(std::memory_order_acquire);
         }
         m_collectorTiming.snapshot_ticks += now() - snapshotStart;
         ++m_collectorTiming.snapshots_built;
@@ -1815,6 +1818,7 @@ namespace ce
         {
             std::lock_guard<std::mutex> guard(m_captureLock);
             m_capture = std::move(live);
+            m_captureGeneration = m_generation.load(std::memory_order_acquire);
         }
         m_collectorTiming.snapshot_ticks += now() - snapshotStart;
         ++m_collectorTiming.snapshots_built;
@@ -1898,6 +1902,7 @@ namespace ce
 
         std::lock_guard<std::mutex> guard(m_captureLock);
         m_capture.reset();
+        m_captureGeneration = m_generation.load(std::memory_order_acquire);
     }
 
     void profiler_service::collect_recording_frames()
@@ -1993,10 +1998,34 @@ namespace ce
         return recording_writer_ ? recording_writer_->path() : std::filesystem::path{};
     }
 
+    profiler_recording_publication profiler_service::recording_publication() const
+    {
+        std::lock_guard<std::mutex> guard(recording_lock_);
+        profiler_recording_publication result;
+        if (recording_writer_)
+        {
+            result.status = recording_writer_->status();
+            result.path = recording_writer_->path();
+            result.writer_id = recording_writer_id_;
+        }
+        else
+        {
+            result.status.state = recording_state::failed;
+            result.status.error = recording_start_error_;
+        }
+        return result;
+    }
+
     capture_session_ptr profiler_service::capture() const
     {
         std::lock_guard<std::mutex> guard(m_captureLock);
         return m_capture;
+    }
+
+    std::pair<capture_session_ptr, std::uint64_t> profiler_service::capture_publication() const
+    {
+        std::lock_guard<std::mutex> guard(m_captureLock);
+        return {m_capture, m_captureGeneration};
     }
 
     void profiler_service::publish_ring_stats()

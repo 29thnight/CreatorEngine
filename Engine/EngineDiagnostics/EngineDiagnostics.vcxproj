@@ -19,6 +19,18 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ProfilerViewerProtocol.h" />
+    <ClInclude Include="ProfilerViewerProcess.h" />
+    <ClInclude Include="ProfilerViewerClient.h" />
+    <ClInclude Include="ProfilerViewerTransport.h" />
+    <ClInclude Include="ProfilerLiveDiagnostics.h" />
+    <ClInclude Include="ProfilerRenderingDiagnostics.h" />
+    <ClInclude Include="DxCaptureProtocol.h" />
+    <ClInclude Include="DxCaptureProcess.h" />
+    <ClInclude Include="DxCaptureSecurity.h" />
+    <ClInclude Include="DxCaptureFile.h" />
+    <ClInclude Include="DxCaptureService.h" />
+    <ClInclude Include="DxCaptureSubmission.h" />
     <ClInclude Include="ProfileAggregate.h" />
     <ClInclude Include="ProfileCapture.h" />
     <ClInclude Include="ProfileCaptureFile.h" />
@@ -30,6 +42,13 @@
     <ClInclude Include="ProfileThreadStream.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ProfilerViewerProcess.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="ProfilerLiveDiagnostics.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="ProfilerRenderingDiagnostics.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="DxCaptureFile.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="DxCaptureProcess.cpp" Condition="'$(EngineDxDeepCapture)' == 'true' and '$(EngineShipping)' != 'true' and '$(Platform)' == 'x64'"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="DxCaptureService.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="DxCaptureSubmission.cpp" Condition="'$(EngineDxDeepCapture)' == 'true' and '$(EngineShipping)' != 'true' and '$(Platform)' == 'x64'"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="ProfileAggregate.cpp" />
     <ClCompile Include="ProfileCapture.cpp" />
     <ClCompile Include="ProfileCaptureFile.cpp" />

@@ -1,8 +1,6 @@
 #include "ProfilerView.h"
 
-#include "AnimationDiagnostics.h"
-#include "AnimationScheduler.h"
-#include "SceneManager.h"
+#include "ProfilerLiveDiagnostics.h"
 #include "ImGui.h"
 
 #include <algorithm>
@@ -11,6 +9,7 @@
 
 namespace editor::profiler_view
 {
+    namespace animation = ce::profiler_viewer::diagnostics;
     namespace
     {
         const char* task_name(animation::task_kind kind)
@@ -35,18 +34,37 @@ namespace editor::profiler_view
 
         void draw_task_index(std::uint32_t index)
         {
-            if (index == animation::invalid_task) ImGui::TextDisabled("-");
-            else ImGui::Text("%u", index);
+            if (index == animation::invalid_task)
+            {
+                ImGui::TextDisabled("-");
+            }
+            else
+            {
+                ImGui::Text("%u", index);
+            }
         }
     }
 
     void draw_animation_budget()
     {
         static std::uint64_t selectedAnimatorId{};
-        AnimationScheduler& scheduler = SceneManagers->GetAnimationScheduler();
-        scheduler.RequestHudCapture(selectedAnimatorId);
-        const auto snapshot = scheduler.GetHudSnapshot();
+        static std::uint64_t targetRevision{};
+        static std::uint32_t sceneId{};
+        const auto diagnostics = live_diagnostics();
+        const auto revision = live_target_revision();
+        if (revision != targetRevision || (diagnostics && diagnostics->scene_id != sceneId))
+        {
+            selectedAnimatorId = 0;
+            targetRevision = revision;
+            sceneId = diagnostics ? diagnostics->scene_id : 0;
+        }
+        request_animation_snapshot(selectedAnimatorId);
+        const auto snapshot = diagnostics ? diagnostics->animation : nullptr;
         ImGui::TextDisabled("Live scene data; independent of the selected .ceprof capture.");
+        if (const char* status = live_diagnostic_status(); status[0] != '\0')
+        {
+            ImGui::TextDisabled("%s", status);
+        }
         if (!snapshot)
         {
             ImGui::TextDisabled("Waiting for an animation frame.");
@@ -59,23 +77,37 @@ namespace editor::profiler_view
             static_cast<unsigned long long>(snapshot->evaluated),
             static_cast<unsigned long long>(snapshot->degraded));
         const bool overBudget = snapshot->measuredUs > snapshot->budgetUs;
-        if (overBudget) ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, .45f, .3f, 1.f));
+        if (overBudget)
+        {
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(1.f, .45f, .3f, 1.f));
+        }
         ImGui::Text("Pose CPU %.3f ms measured / %.3f ms budget   (predicted %.3f ms)",
             snapshot->measuredUs / 1000., snapshot->budgetUs / 1000.,
             snapshot->predictedUs / 1000.);
-        if (overBudget) ImGui::PopStyleColor();
+        if (overBudget)
+        {
+            ImGui::PopStyleColor();
+        }
         const float budgetFraction = snapshot->budgetUs > 0.
             ? static_cast<float>((std::min)(snapshot->measuredUs / snapshot->budgetUs, 1.))
             : 0.f;
         ImGui::ProgressBar(budgetFraction, ImVec2(-1.f, 0.f));
+        if (snapshot->animator_count > snapshot->animators.size() ||
+            snapshot->task_count > snapshot->tasks.size() || snapshot->strings_truncated)
+        {
+            ImGui::TextWrapped("Bounded live snapshot: %zu / %llu animators, %zu / %llu tasks.%s",
+                snapshot->animators.size(), static_cast<unsigned long long>(snapshot->animator_count),
+                snapshot->tasks.size(), static_cast<unsigned long long>(snapshot->task_count),
+                snapshot->strings_truncated ? " Some labels were shortened." : "");
+        }
 
         if (ImGui::CollapsingHeader("Quality stages", ImGuiTreeNodeFlags_DefaultOpen))
         {
             for (std::size_t stage = 0; stage < snapshot->stages.size(); ++stage)
             {
-                const float fraction = snapshot->animators.empty() ? 0.f
+                const float fraction = snapshot->animator_count == 0 ? 0.f
                     : static_cast<float>(snapshot->stages[stage])
-                        / static_cast<float>(snapshot->animators.size());
+                        / static_cast<float>(snapshot->animator_count);
                 ImGui::Text("L%zu  %llu", stage,
                     static_cast<unsigned long long>(snapshot->stages[stage]));
                 ImGui::SameLine(100.f);
@@ -113,7 +145,7 @@ namespace editor::profiler_view
                     ImGuiSelectableFlags_SpanAllColumns))
                 {
                     selectedAnimatorId = actor.id;
-                    scheduler.RequestHudCapture(selectedAnimatorId);
+                    request_animation_snapshot(selectedAnimatorId, true);
                 }
                 ImGui::TableSetColumnIndex(1);
                 ImGui::Text("L%d", static_cast<int>(actor.stage));
@@ -137,14 +169,16 @@ namespace editor::profiler_view
             ImGui::TextDisabled("Select an active Animator to inspect its tasks.");
             return;
         }
-        ImGui::Text("Animator #%llu   Pose buffers: instance %zu, worker %zu",
+        ImGui::Text("Animator #%llu   Pose buffers: instance %llu, worker %llu",
             static_cast<unsigned long long>(snapshot->selectedAnimatorId),
-            snapshot->instancePoseBuffers, snapshot->workerPoseBuffers);
+            static_cast<unsigned long long>(snapshot->instancePoseBuffers),
+            static_cast<unsigned long long>(snapshot->workerPoseBuffers));
         if (ImGui::TreeNode("Pose storage diagnostics"))
         {
-            ImGui::Text("Worker pool: %p", reinterpret_cast<const void*>(snapshot->workerPosePool));
-            ImGui::Text("Worker storage: %p", reinterpret_cast<const void*>(snapshot->workerCurrentStorage));
-            ImGui::Text("Instance pose: %p", reinterpret_cast<const void*>(snapshot->instancePoseStorage));
+            ImGui::TextDisabled("Target address labels only; no remote memory access.");
+            ImGui::Text("Worker pool: 0x%llX", static_cast<unsigned long long>(snapshot->workerPosePool));
+            ImGui::Text("Worker storage: 0x%llX", static_cast<unsigned long long>(snapshot->workerCurrentStorage));
+            ImGui::Text("Instance pose: 0x%llX", static_cast<unsigned long long>(snapshot->instancePoseStorage));
             ImGui::TreePop();
         }
         ImGui::TextDisabled("Execution order is recorded by the executor; skipped tasks have no order.");
@@ -178,14 +212,25 @@ namespace editor::profiler_view
                 ImGui::SameLine(0.f, 2.f);
                 draw_task_index(task.dependencyB);
                 ImGui::TableSetColumnIndex(3);
-                if (task.clipIndex >= 0) ImGui::Text("%d", task.clipIndex);
-                else ImGui::TextDisabled("-");
+                if (task.clipIndex >= 0)
+                {
+                    ImGui::Text("%d", task.clipIndex);
+                }
+                else
+                {
+                    ImGui::TextDisabled("-");
+                }
                 ImGui::TableSetColumnIndex(4);
                 ImGui::TextUnformatted(task.reachable ? "Yes" : "No");
                 ImGui::TableSetColumnIndex(5);
                 if (task.executionOrder != animation::invalid_task)
+                {
                     ImGui::Text("#%u", task.executionOrder);
-                else ImGui::TextDisabled("Skipped");
+                }
+                else
+                {
+                    ImGui::TextDisabled("Skipped");
+                }
                 ImGui::TableSetColumnIndex(6);
                 ImGui::TextUnformatted(task.bufferOwner.c_str());
             }

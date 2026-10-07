@@ -21,6 +21,7 @@
 // include 는 이 TU 가 직접 소유한다(유니티에서 빠져 있다).
 
 #include "CommandRegistrar.h"
+#include "ProfilerHUD.h"
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
 #include "EditorPanelCost.h"
@@ -834,6 +835,25 @@ namespace ConsoleCmd
         else if ("close" == args[2]) request = ::editor::window_request::close;
         else if ("focus" == args[2]) request = ::editor::window_request::focus;
         else return InvalidArguments("editor.window <stable-id> <open|close|focus>");
+
+        if (args[1] == EditorWindowName::kFrameProfiler)
+        {
+            if (request == ::editor::window_request::close)
+            {
+                ::editor::request_profiler_viewer_close();
+            }
+            else
+            {
+                ::editor::request_profiler_viewer();
+            }
+            auto result = CommandData::Object();
+            result.Set("stableId", CommandData::String(args[1]));
+            result.Set("request", CommandData::String(args[2]));
+            result.Set("declared", CommandData::Bool(true));
+            result.Set("queued", CommandData::Bool(true));
+            result.Set("separateProcess", CommandData::Bool(true));
+            return Ok("Profiler viewer request queued for the presentation owner", std::move(result));
+        }
 
         auto data = CommandData::Object();
         data.Set("stableId", CommandData::String(args[1]));

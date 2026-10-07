@@ -4,8 +4,6 @@
 
 namespace editor
 {
-	void DrawRenderRuntime(const EnhancedLiveDebugSnapshot& snapshot);
-	void DrawRenderLiveDiagnostics();
 	void OpenRenderLiveDiagnostics();
 }
 
@@ -25,8 +23,6 @@ private:
     double m_graphLastRefresh{-1.0};
     ImGuiTextFilter m_graphFilter;
     std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot> m_graphSnapshot;
-
-	bool m_sortByDuration{ false };
 
 	// 편집 중인 파라미터. 매 프레임 라이브 값으로 덮지 않는 이유는 적용이
 	// 한 프레임 늦기 때문이다 — 덮으면 슬라이더를 끄는 동안 값이 계속

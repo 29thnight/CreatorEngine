@@ -62,6 +62,7 @@
     <EngineEditorOutDir>$(EngineBinaryRoot)Editor\</EngineEditorOutDir>
     <EnginePlayerOutDir>$(EngineBinaryRoot)Player\</EnginePlayerOutDir>
     <EngineToolOutDir>$(EngineBinaryRoot)Tools\$(MSBuildProjectName)\</EngineToolOutDir>
+    <EngineProfilerViewerOutDir>$(EngineBinaryRoot)Tools\ProfilerViewer\</EngineProfilerViewerOutDir>
     <EngineManagedOutDir>$(EngineBinaryRoot)Managed\</EngineManagedOutDir>
     <EngineResourceOutDir>$(EngineBinaryRoot)Resources\</EngineResourceOutDir>
 

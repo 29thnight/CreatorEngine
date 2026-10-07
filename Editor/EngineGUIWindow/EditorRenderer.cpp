@@ -90,6 +90,7 @@ EditorRenderer::~EditorRenderer()
 
 void EditorRenderer::AddEditorFonts()
 {
+    ::editor::fonts::set_resource_root(PathFinder::EngineResourcePath());
     // 폰트 자원은 `editor::fonts` 한 자리가 든다(PHASE 21 W1). 경로를 손으로
     // 적던 넷을 거기로 모았고, 파일이 없을 때 죽던 자리도 거기서 막는다.
     // 왜 죽었는지는 `EditorFontResources.h` 머리에 실측과 함께 적었다 —

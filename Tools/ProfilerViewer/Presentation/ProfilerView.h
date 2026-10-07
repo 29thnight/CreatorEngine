@@ -1,7 +1,7 @@
 #pragma once
 // PHASE 14 P3 — 프로파일러 창의 내부 표면.
 //
-// 공개 표면은 ProfilerHUD.h 의 DrawProfilerHUD() 하나뿐이다. 이 헤더는 창을
+// 공개 표면은 ProfilerPresenter.h 의 호스트 수명 계약이다. 이 헤더는 창을
 // 이루는 조각들(툴바·Frame Overview·표)이 서로를 부르기 위한 것이고, 창 밖에서
 // 쓰라고 만든 것이 아니다.
 //
@@ -10,12 +10,21 @@
 //   이 층은 이미 접힌 것을 그리기만 한다.
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 
 #include "ProfileReader.h"
 
+namespace ce::profiler_viewer
+{
+    class client;
+}
+
 namespace editor::profiler_view
 {
+    ce::profiler_viewer::client& source();
+    void dispatch_work(std::function<void()> work);
+    void dispatch_diagnostics(std::function<void()> work);
 	// 창이 소유하는 reader. 창을 닫아도 살아 있다 — 녹화는 서비스가 들고
 	// 있고 선택은 이 reader 가 들고 있으므로, 창을 여닫아도 둘 다 유지된다.
 	ce::capture_reader& reader();
@@ -43,6 +52,16 @@ namespace editor::profiler_view
 	//   std::min/std::max 를 깨뜨리지 않게.
 	std::filesystem::path pick_capture_to_open();
 	std::filesystem::path pick_capture_to_save();
+    std::filesystem::path pick_dx_capture_to_open();
+    std::filesystem::path pick_dx_capture_to_save();
+    void draw_dx_capture();
+    void poll_dx_capture();
+    void open_dx_capture(const std::filesystem::path& path);
+    void shutdown_dx_capture();
+    void draw_rendering_live();
+    bool copy_dx_capture_file(const std::filesystem::path& source,
+                              const std::filesystem::path& destination,
+                              std::string& error);
 
 	// 프레임 그래프. 클릭으로 한 프레임, 끌어서 범위를 고른다.
 	void draw_frame_overview();

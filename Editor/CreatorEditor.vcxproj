@@ -201,6 +201,11 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.csproj" -c $(Configuration) 
     <ProjectReference Include="Editor.vcxproj">
       <Project>{7e4d1c58-2a9b-4f36-8d07-c3b5a6e92f41}</Project>
     </ProjectReference>
+    <ProjectReference Include="..\Tools\DxCaptureHelper\DxCaptureHelper.vcxproj" Condition="'$(EngineDxDeepCapture)' == 'true' and '$(EngineShipping)' != 'true' and '$(Platform)' == 'x64'">
+      <Project>{8D7266B8-9752-4AAF-A2B7-C74F3124F2F8}</Project>
+      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
     <ProjectReference Include="HostImGuiPresentation\HostImGuiPresentation.vcxproj">
       <Project>{d4c2a7f1-8e6b-4b3d-9f21-5a0c47e6b8d2}</Project>
     </ProjectReference>

@@ -117,7 +117,6 @@ $contracted = @(
 )
 # 면제 — 이름으로 적고 이유를 남긴다.
 $exempt = @{
-    'ProfilerWindow.cpp'  = 'PHASE 14 프로파일러의 타임라인. 자기 클립 안에서만 그리고 W2 의 custom draw family 가 아니다'
     'HierarchyWindow.cpp' = '평탄 목록의 행. W7-3 의 clipper 와 자기 PushClipRect 로 이미 잘리고, 이름 전체는 행 자체가 보여 준다'
     'ContentsBrowserWindow.cpp' = 'W7-1 스냅샷의 타일·트리. 자기 PushClipRect 안에서만 그린다'
     'InspectorWindow.cpp' = '패널 바깥의 머리글. custom draw family 가 아니라 창 본문이다'
