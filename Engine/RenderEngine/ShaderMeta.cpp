@@ -1,6 +1,7 @@
 #include "ShaderMeta.h"
 
 #include "AuthoringParsedDocument.h"
+#include "AuthoringCookedDocument.h"
 #include "Sha256.h"
 
 #include <algorithm>
@@ -620,7 +621,8 @@ bool ShaderMetaLoader::LoadFile(const std::filesystem::path& path,
 
 bool ShaderMetaLoader::LoadFile(const std::filesystem::path& documentPath,
     const std::filesystem::path& sourceOriginPath, const FileGuid& guid,
-    ShaderMeta& outMeta, std::string& outError)
+    ShaderMeta& outMeta, std::string& outError,
+    std::array<std::uint8_t, 32>* outDocumentDigest)
 {
     if (".shadermeta" != documentPath.extension().string())
         return Fail(documentPath.string(), "확장자가 .shadermeta가 아니다", outError);
@@ -639,7 +641,27 @@ bool ShaderMetaLoader::LoadFile(const std::filesystem::path& documentPath,
         Authoring::ParsedDocument::ParseFile(documentPath.string(), documentError);
     if (!document)
         return Fail(documentPath.string(), "문서 해석 실패: " + documentError, outError);
-    return ParseDocument(document.Root(), sourceOriginPath, guid, outMeta, outError);
+    ShaderMeta candidate;
+    if (!ParseDocument(document.Root(), sourceOriginPath, guid, candidate, outError))
+    {
+        return false;
+    }
+    if (outDocumentDigest)
+    {
+        std::vector<std::byte> canonical;
+        if (!Authoring::EncodeCookedDocument(document.Root(), canonical, outError))
+        {
+            return false;
+        }
+        Hash::Sha256 hash;
+        const auto origin = candidate.originPath.generic_u8string();
+        const auto documentDigest = Hash::Sha256::Compute(canonical.data(), canonical.size());
+        hash.Update(documentDigest.data(), documentDigest.size());
+        hash.Update(origin.data(), origin.size());
+        *outDocumentDigest = hash.Finish();
+    }
+    outMeta = std::move(candidate);
+    return true;
 }
 
 bool ShaderMetaLoader::Parse(std::string_view text,

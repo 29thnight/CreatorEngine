@@ -188,7 +188,7 @@ namespace
 bool EnhancedGBufferPass::MaterialKey::operator==(const MaterialKey& other) const
 {
     if (coordinates != other.coordinates || sampler != other.sampler
-        || textures != other.textures
+        || textureIds != other.textureIds
         || static_cast<bool>(snapshot) != static_cast<bool>(other.snapshot))
     {
         return false;
@@ -223,8 +223,7 @@ bool EnhancedGBufferPass::MaterialKey::operator<(const MaterialKey& other) const
     }
     if (coordinates != other.coordinates) return coordinates < other.coordinates;
     if (sampler != other.sampler) return sampler < other.sampler;
-    return std::lexicographical_compare(textures.begin(), textures.end(),
-        other.textures.begin(), other.textures.end(), std::less<Texture*>{});
+    return textureIds < other.textureIds;
 }
 
 EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
@@ -241,6 +240,11 @@ EnhancedGBufferPass::MaterialKey EnhancedGBufferPass::MakeMaterialKey(
     else
     {
         key.textures = MaterialTextureTable::LegacyOwners(m_legacyTextureSchema, draw);
+    }
+    key.textureIds.reserve(key.textures.size());
+    for (const Texture* texture : key.textures)
+    {
+        key.textureIds.push_back(TextureFramePins::Identity(texture));
     }
     return key;
 }

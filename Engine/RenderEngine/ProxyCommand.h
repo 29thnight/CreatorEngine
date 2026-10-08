@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "AnimationPaletteArena.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
@@ -61,12 +62,12 @@ public:
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::vector3 worldPosition{};
 		math::aabb worldBounds{};
-		std::shared_ptr<Material> material{};
+		own::shared_owner<const Material> material{};
         std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
 		// I5-D5c3 — 저작 정본의 값 스냅샷과 그 세대. 프록시의 authored는 값이라
 		// legacy(shared_ptr 공유)와 달리 편집이 저절로 보이지 않는다 — 갱신
 		// 커맨드가 세대 변화를 보고 새 스냅샷을 나른다.
-		std::shared_ptr<const experiment::Material> authoredMaterial{};
+		own::shared_owner<const experiment::Material> authoredMaterial{};
 		std::uint64_t authoredRevision{ 0 };
 		std::uint32_t paletteOffset{ 0 };
 		std::uint32_t boneCount{ 0 };
@@ -103,9 +104,9 @@ public:
 	struct DecalUpdate
 	{
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
-		std::shared_ptr<Texture> diffuse{};
-		std::shared_ptr<Texture> normal{};
-		std::shared_ptr<Texture> orm{};
+		own::shared_owner<const Texture> diffuse{};
+		own::shared_owner<const Texture> normal{};
+		own::shared_owner<const Texture> orm{};
 		uint32 sliceX{ 1 };
 		uint32 sliceY{ 1 };
 		int sliceNumber{ 0 };
@@ -115,7 +116,7 @@ public:
 	{
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::vector3 worldPosition{};
-		std::shared_ptr<Texture> texture{};
+		own::shared_owner<const Texture> texture{};
 		math::vector3 billboardAxis{ 0.f, 1.f, 0.f };
 		BillboardType billboardType{ BillboardType::None };
 		bool isStatic{ false };

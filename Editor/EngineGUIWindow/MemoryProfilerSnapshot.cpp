@@ -68,26 +68,26 @@ namespace editor::memory_profiler
 				out.objects.push_back(std::move(object));
 			}
 
-			{
-				std::lock_guard lock(data->m_materialMutex);
-				for (const auto& [name, material] : data->Materials)
-					if (material) out.objects.push_back({ object_kind::material, name });
-			}
+            for (const auto& [name, material] : data->SnapshotMaterials())
+            {
+                if (material)
+                {
+                    out.objects.push_back({ object_kind::material, name });
+                }
+            }
 
-			using texture_pair = std::pair<std::string, std::shared_ptr<Texture>>;
-			std::vector<std::pair<object_kind, texture_pair>> textures;
-			{
-				std::lock_guard lock(data->m_textureMutex);
-				textures.reserve(data->Textures.size() + data->UITextures.size() + data->SpriteSheets.size());
-				const auto copy = [&](const auto& cache, object_kind kind)
-				{
-					for (const auto& [name, texture] : cache)
-						textures.emplace_back(kind, texture_pair{ name, texture });
-				};
-				copy(data->Textures, object_kind::texture);
-				copy(data->UITextures, object_kind::ui_texture);
-				copy(data->SpriteSheets, object_kind::sprite_sheet);
-			}
+            using texture_pair = std::pair<std::string, own::shared_owner<const Texture>>;
+            std::vector<std::pair<object_kind, texture_pair>> textures;
+            const auto copy = [&](DataSystem::TextureFileType type, object_kind kind)
+            {
+                for (auto& [name, texture] : data->SnapshotTextures(type))
+                {
+                    textures.emplace_back(kind, texture_pair{ std::move(name), std::move(texture) });
+                }
+            };
+            copy(DataSystem::TextureFileType::Texture, object_kind::texture);
+            copy(DataSystem::TextureFileType::UITexture, object_kind::ui_texture);
+            copy(DataSystem::TextureFileType::SpriteSheet, object_kind::sprite_sheet);
 			std::sort(textures.begin(), textures.end(), [](const auto& left, const auto& right)
 			{
 				return left.second.first != right.second.first

@@ -9,7 +9,7 @@ namespace EditorImGuiTexture
         return GetImGuiHost().IsActive();
     }
 
-    uint64_t From(Texture* texture)
+    uint64_t From(const Texture* texture)
     {
         IImGuiHost& host = GetImGuiHost();
         if (host.IsActive())
@@ -30,7 +30,7 @@ namespace EditorImGuiTexture
         return 0;
     }
 
-    void Prime(Texture* texture)
+    void Prime(const Texture* texture)
     {
         if (nullptr == texture) return;
         IImGuiHost& host = GetImGuiHost();
@@ -39,7 +39,7 @@ namespace EditorImGuiTexture
         if (host.IsActive()) (void)host.RegisterTexture(texture);
     }
 
-    bool IsReady(Texture* texture)
+    bool IsReady(const Texture* texture)
     {
         if (nullptr == texture) return false;
         IImGuiHost& host = GetImGuiHost();
@@ -57,5 +57,5 @@ namespace EditorImGuiTexture
     //   복사해 두던 물건), DX11 백엔드 자체도 D4에서 사라졌다. 남은 쪽 가지는
     //   빈 그림을 돌려주는 것뿐이라 부를 이유도 없다.
     //
-    //   RHI 텍스처를 ImGui에 넘기는 길은 From(Texture*) 하나로 모였다.
+    //   RHI 텍스처를 ImGui에 넘기는 길은 From(const Texture*) 하나로 모였다.
 }

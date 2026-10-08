@@ -118,7 +118,7 @@ public:
 
     /// 텍스처를 올리고 핸들을 돌려준다. 이미 올라가 있으면 그대로 준다.
     /// 프레임이 열려 있어야 한다(BeginFrame과 EndFrame 사이).
-    Entry GetOrUpload(Texture* texture, std::string& outError) override;
+    Entry GetOrUpload(const Texture* texture, std::string& outError) override;
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;
@@ -207,7 +207,7 @@ private:
 
     // ── 키가 주소가 아니라 자산 신원이다 (자산 상주 관리 ①) ──
     //
-    // 예전에는 Texture*였다. 자산 수명이 shared_ptr 공동 소유라 언제 어느
+    // 예전에는 const Texture*였다. 자산 수명이 shared_ptr 공동 소유라 언제 어느
     // 스레드에서 죽는지 정해져 있지 않고, 죽은 뒤 같은 주소에 새 자산이
     // 올라오면 이 맵이 이전 것의 GPU 리소스를 돌려줬다 — 검증 레이어는
     // 조용하고 화면에만 '가끔 다른 텍스처'로 나타나는 부류다.

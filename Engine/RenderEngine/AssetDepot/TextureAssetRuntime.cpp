@@ -421,12 +421,13 @@ void DataSystem::RunTextureAssetWork(own::shared_owner<AssetDepot::TextureAssetW
 
         // All source access and image decoding occur only in this tracked worker.
         // Read/hash exact captured locator bytes; never re-resolve the latest path.
-        const auto& resolved = work->resolved;
+        auto& resolved = origin->resolved;
         std::string failure;
         std::uint64_t byteSize{};
         constexpr std::uint64_t maxSourceImageBytes = 512ull * 1024ull * 1024ull;
         AssetRequestError error = AssetRequestError::None;
-        if (!resolved.byteSource || !resolved.byteSource->Size(resolved.blob.artifactPath, byteSize, failure))
+        if (!texture_cooked::CaptureArtifactSource(resolved.byteSource, resolved.blob.artifactPath, failure)
+            || !resolved.byteSource->Size(resolved.blob.artifactPath, byteSize, failure))
         {
             error = AssetRequestError::ReadFailed;
         }

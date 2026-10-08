@@ -54,6 +54,7 @@
 #include "CameraComponent.h"
 #include "Render/Core/EnhancedLightPacking.h"
 #include "Texture.h"
+#include "TextureFramePins.h"
 #include "PrimitiveRenderProxy.h"
 #include "BoneRegion.h" // kMaxBones
 #include "DataSystem.h"
@@ -1168,7 +1169,10 @@ passes:
             return false;
         }
         auto bindings = std::make_shared<RenderBindings>();
-        bindings->instance = instance;
+        auto instancePins = own::make_shared<InstanceFramePins>();
+        bindings->instancePinIndex = instancePins->Retain(instance);
+        bindings->instance = instancePins->Borrow(bindings->instancePinIndex);
+        bindings->instancePins = std::move(instancePins);
         const auto constants = resources.UploadConstants(normal.data(), sizeof(normal));
         const SceneVolumeBinding binding{bindings, coefficientFixture.GetGeneration(), constants};
         const std::array<SceneVolumeBinding, 2> coefficientBindings{binding, binding};
@@ -4177,7 +4181,7 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     }
     const auto generation = own::make_shared<const material_graph::Generation>(std::move(generationValue));
     const uint32_t pixel=0xff4080c0;
-    auto texture=std::shared_ptr<Texture>(Texture::CreateFromPixels(1,1,"base0-lattice-owner",RHIFormat::RGBA8Unorm,&pixel));
+    auto texture=Texture::CreateFromPixels(1,1,"base0-lattice-owner",RHIFormat::RGBA8Unorm,&pixel);
     material_graph::InstanceDescription description; description.graphId=generation->assetId;
     own::shared_owner<const material_graph::Instance> source;
     if(!texture || !material_graph::BuildInstance(generation,description,[&](const auto&,auto,std::string&){return texture;},source,error)) return false;
@@ -4223,7 +4227,11 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     if(!accepted.Apply(graph,error) || material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, source)
         || !material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, graph[1].materialGraphInstance)
         || !material_graph_test::SamePinnedObject(graph[0].materialGraphInstance->generation, generation)
-        || graph[0].materialGraphInstance->textures[0].owner!=texture) return false;
+        || !graph[0].materialGraphInstance->textures[0].owner
+        || graph[0].materialGraphInstance->textures[0].owner->m_assetId != texture->m_assetId)
+    {
+        return false;
+    }
     float replayed{}; std::memcpy(&replayed,graph[0].materialGraphInstance->uniforms.data(),sizeof(replayed));
     if(replayed!=.25f || source->uniforms==graph[0].materialGraphInstance->uniforms) return false;
     error.clear(); return true;
@@ -5191,6 +5199,9 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
     // 큐 하나를 드로우 목록으로 옮긴다. deferred와 forward가 같은 복사
     // 규칙을 쓰므로 함수로 뽑았다 — 두 곳에 같은 코드를 두면 한쪽만 고치고
     // 다른 쪽을 잊는 부류의 버그가 생긴다.
+    // This isolated legacy draw fixture has no sealed material packet. Its
+    // owner table pins every texture alias until all render probes finish.
+    auto sceneTexturePins = own::make_shared<TextureFramePins>();
     const auto copyQueue = [&](const auto& queue,
         std::vector<EnhancedDrawItem>& deferred,
         std::vector<EnhancedDrawItem>& forward)
@@ -5280,12 +5291,16 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
 
             // 재질도 Material* 자체가 아니라 필요한 것만 복사한다.
             bool isTransparent = false;
-            if (auto* material = proxy->m_Material.get())
+            if (const auto* material = proxy->m_Material ? &*proxy->m_Material.borrow() : nullptr)
             {
-		item.baseColor = material->GetBaseColorMapShared().get();
-		item.normalMap = material->GetNormalMapShared().get();
-		item.occRoughMetal = material->GetOccRoughMetalMapShared().get();
-		item.emissive = material->GetEmissiveMapShared().get();
+                const auto pinTexture = [&](const own::shared_owner<const Texture>& owner)
+                {
+                    return sceneTexturePins->Borrow(sceneTexturePins->Retain(owner));
+                };
+                item.baseColor = pinTexture(material->GetBaseColorMapShared());
+                item.normalMap = pinTexture(material->GetNormalMapShared());
+                item.occRoughMetal = pinTexture(material->GetOccRoughMetalMapShared());
+                item.emissive = pinTexture(material->GetEmissiveMapShared());
 
                 item.baseColorFactor = material->m_materialInfo.m_baseColor;
                 item.metallic = material->m_materialInfo.m_metallic;
@@ -5360,7 +5375,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             + " · 큐 " + std::to_string(flat.size()) + "\n";
 
         uiSkipped = EnhancedUIPass::BuildRectsFromQueue(
-            flat.data(), flat.size(), uiRects);
+            flat.data(), flat.size(), uiRects, &*sceneTexturePins.borrow());
     }
 
     if (report) { report->drawCandidates = draws.size(); report->lights = lights.size(); }
@@ -5472,7 +5487,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         outLog += "[2/4] UI 초기화 실패: " + error + "\n";
         return false;
     }
-    uiPass.SetRects(&uiRects);
+    uiPass.SetRects(&uiRects, sceneTexturePins);
 
     EnhancedPostChainPass postChain;
     if (!postChain.Initialize(frameContext, error))
@@ -6264,9 +6279,9 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         //   가려 09-17 까지 아무도 이 줄에 닿지 못했다.
         const uint8_t keyPixelA[4] = { 255, 0, 0, 255 };
         const uint8_t keyPixelB[4] = { 0, 0, 255, 255 };
-        auto* keyTextureA = Texture::CreateFromPixels(1, 1, "sceneKeyA",
+        auto keyTextureA = Texture::CreateFromPixels(1, 1, "sceneKeyA",
             RHIFormat::RGBA8Unorm, keyPixelA);
-        auto* keyTextureB = Texture::CreateFromPixels(1, 1, "sceneKeyB",
+        auto keyTextureB = Texture::CreateFromPixels(1, 1, "sceneKeyB",
             RHIFormat::RGBA8Unorm, keyPixelB);
 
         if (nullptr != keyTextureA && nullptr != keyTextureB)
@@ -6274,11 +6289,11 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             std::vector<EnhancedDrawItem> sameMeshDraws;
 
             EnhancedDrawItem first = draws.front();
-            first.baseColor = keyTextureA;
+            first.baseColor = (keyTextureA ? &*keyTextureA.borrow() : nullptr);
             sameMeshDraws.push_back(first);
 
             EnhancedDrawItem variant = draws.front();   // 메시는 같다
-            variant.baseColor = keyTextureB;            // 재질만 다르다
+            variant.baseColor = (keyTextureB ? &*keyTextureB.borrow() : nullptr);            // 재질만 다르다
             sameMeshDraws.push_back(variant);
 
             frameContext.draws = &sameMeshDraws;
@@ -6307,8 +6322,8 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             frameContext.draws = &draws;
         }
 
-        Memory::SafeDelete(keyTextureA);
-        Memory::SafeDelete(keyTextureB);
+        keyTextureA.reset();
+        keyTextureB.reset();
     }
 
     step("[4/4] 정반사");
@@ -6480,15 +6495,18 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         // 4x4 텍스처를 여러 개 만들어 복제마다 돌려 쓴다. 픽셀 내용은 상관없다
         // — 재질 키가 포인터라 객체가 다르기만 하면 배치가 갈린다.
         constexpr uint32_t kMaterialVariants = 64;
-        std::vector<Texture*> variantTextures;
+        std::vector<own::shared_owner<const Texture>> variantTextures;
         variantTextures.reserve(kMaterialVariants);
         for (uint32_t index = 0; index < kMaterialVariants; ++index)
         {
             // 신원만 필요하지만 CPU 픽셀은 있어야 한다(위 재질 키잉 주석 참조).
             const uint8_t pixel[4] = { static_cast<uint8_t>(index * 4u), 128, 128, 255 };
-            auto* texture = Texture::CreateFromPixels(1, 1,
+            auto texture = Texture::CreateFromPixels(1, 1,
                 "sceneVariant" + std::to_string(index), RHIFormat::RGBA8Unorm, pixel);
-            if (nullptr != texture) variantTextures.push_back(texture);
+            if (texture)
+            {
+                variantTextures.push_back(std::move(texture));
+            }
         }
 
         // 재질을 가르지 않은 경우와 가른 경우를 나란히 잰다. 하나만 재면
@@ -6523,7 +6541,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
 
                     if (mode.varyMaterial)
                     {
-                        clone.baseColor = variantTextures[copy % variantTextures.size()];
+                        clone.baseColor = (variantTextures[copy % variantTextures.size()] ? &*variantTextures[copy % variantTextures.size()].borrow() : nullptr);
                     }
 
                     scaled.push_back(clone);
@@ -6620,7 +6638,6 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
         }
         }
 
-        for (auto* texture : variantTextures) Memory::SafeDelete(texture);
         variantTextures.clear();
 
         frameContext.draws = &draws;

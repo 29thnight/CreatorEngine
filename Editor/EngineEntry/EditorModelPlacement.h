@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Ownership.h"
 #include <cstddef>
 #include <cstdint>
 #include "Windows/EditorWindowBody.h"
@@ -45,10 +46,10 @@ namespace Editor
         class Command;
         ModelPlacement();
         ~ModelPlacement();
-        std::shared_ptr<Request> Enqueue(std::uint32_t sceneId, const std::string& path,
+        own::shared_owner<Request> Enqueue(std::uint32_t sceneId, const std::string& path,
             const std::optional<math::vector3>& position, bool gameMode);
-        void Cancel(const std::shared_ptr<Request>& request);
-        static void Prepare(const std::shared_ptr<Request>& request);
+        void Cancel(const own::shared_owner<Request>& request);
+        static void Prepare(const own::shared_owner<Request>& request);
         std::unique_ptr<Impl> m_impl;
 
         // 진행 창 본문의 수명(PHASE 21 W3). 본문은 `Get()` 으로 다시

@@ -47,13 +47,24 @@ namespace material_graph
                                std::span<const RHIStaticSamplerDesc> hostSamplers, bool inputAssembler,
                                ScenePassLayout& result, std::string& error, std::uint32_t iblRegister = 0);
 
+    // Recorded evaluation borrows its exact instance from the packet's table.
+    // The producer-facing SceneSurfaceEvaluation remains an owning input value.
+    struct SceneSurfaceSnapshot
+    {
+        own::local_view<const Instance> instance;
+        std::uint64_t sceneEpoch{}, viewRevision{}, geometryRevision{};
+        std::vector<IblBakePoint> points;
+        std::shared_ptr<const SurfaceBatch> gpu;
+    };
+
     struct SceneMaterialPacket
     {
         std::uint64_t serial{};
         Selection selection;
         SceneCoverage queue{};
         EnhancedMaterialCoverage coverage;
-        SceneSurfaceEvaluation evaluation;
+        own::shared_owner<InstanceFramePins> instancePins;
+        SceneSurfaceSnapshot evaluation;
         IblEnvironment environment;
         std::shared_ptr<const RenderBindings> bindings;
         std::shared_ptr<const LX::Runtime::GraphicsPipeline> pipeline;
@@ -103,6 +114,7 @@ namespace material_graph
       private:
         struct Recording
         {
+            own::shared_owner<InstanceFramePins> instancePins;
             std::vector<std::shared_ptr<const SceneMaterialPacket>> owners;
             std::shared_ptr<const SceneMaterialPacket> accepted;
             std::shared_ptr<const SceneMaterialPacket> submitted;

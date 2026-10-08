@@ -12,6 +12,7 @@
 #include "KeyFrameEvent.h" // I5-D4e-2: 클립 오버라이드 소유
 #include "../RenderEngine/LocalPose.h"
 #include "../RenderEngine/ClipSamplingCursor.h"
+#include "../RenderEngine/AssetDepot/AssetRequest.h"
 #include <array>
 #include <mathematics/matrix4x4.hpp>
 #include <optional>
@@ -69,15 +70,39 @@ namespace assets // PHASE 3.75 MBC8: typed 재생 정본(shared_owner 보관용)
     struct ModelSkeletonAsset;
     struct ModelAnimationAsset;
     struct ModelAnimationTrack;
+    struct ModelAnimationDescriptor;
+    struct ModelSkeletonPayload;
+    struct ModelAnimationPayload;
 }
 
-// PHASE 3.75 MBC8/MBC9 — Animator 창구의 데이터 출처(진단·게이트 관측 축).
-// MBC9에서 Experiment·Legacy 축이 은퇴해 Generation 하나만 남았다. 열거형은
-// 관측 토큰 호환을 위해 유지한다.
+// One frame's exact immutable owners. Sparse clip indices refer to the descriptor's
+// summary order; unselected siblings never become resident through this view.
+struct AnimatorAnimationClipPin final
+{
+    int clipIndex{ -1 };
+    own::shared_owner<const assets::ModelAnimationPayload> payload{};
+};
+
+struct AnimatorAnimationBinding final
+{
+    own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};
+    own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};
+    std::vector<AnimatorAnimationClipPin> clips{};
+    // CEMCv11 compatibility only. A v3 binding never owns this aggregate.
+    own::shared_owner<const assets::ModelAssetGeneration> legacyGeneration{};
+    std::uint64_t skeletonSerial{};
+    bool ready{};
+
+    [[nodiscard]] const assets::ModelSkeletonAsset* Skeleton() const noexcept;
+};
+
+// Diagnostics distinguish independent v3 payloads from the transitional
+// CEMCv11 aggregate. Existing Generation's numeric token is preserved.
 enum class AnimatorDataPath : std::uint8_t
 {
     None,
     Generation,
+    Granular,
 };
 
 // K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
@@ -196,13 +221,15 @@ public:
     // generation is bound. New masks are authored directly as bone weights.
     bool ConvertLegacyAvatarMask(AvatarMask& mask);
 
-    // PHASE 3.75 MBC8 — typed 정본 창구. m_Motion(ModelId)으로 붙든 immutable
-    // generation의 skeleton·clip. 스위치와 무관하며, 있으면 모든 창구·틱이 이것을
-    // 우선한다. null이면 experiment → legacy 폴백(MBC9까지의 전환기).
+    // v3 skeleton and selected resident clips, or the CEMCv11 fallback.
+    // Clip enumeration reads metadata; TypedClip never loads a missing sibling.
     [[nodiscard]] const assets::ModelSkeletonAsset* TypedSkeleton() const noexcept;
     [[nodiscard]] std::size_t TypedClipCount() const noexcept;
     [[nodiscard]] const assets::ModelAnimationAsset* TypedClip(int clipIndex) const noexcept;
     [[nodiscard]] AnimatorDataPath GetSkeletonPath() const noexcept;
+    [[nodiscard]] const assets::ModelAnimationDescriptor* TypedDescriptor() const noexcept;
+    // Owner-thread polling/submission only, before either animation worker batch.
+    [[nodiscard]] AnimatorAnimationBinding CaptureAnimationBinding();
 
     bool HasSocket() { return !socketvec.empty(); };
     void ClearControllersAndParams();
@@ -281,15 +308,66 @@ private:
     AnimInstanceHandle m_instance{};
 
 public:
-    // PHASE 3.75 MBC8/MBC9 — typed 재생 정본. m_Motion(ModelId)으로
-    // EnsureAnimationBinding이 채운다. 비직렬화 — 영속 신원은 m_Motion이 진다.
+    // Explicitly transitional CEMCv11 fallback. v3 uses independent payload pins.
     [[reflgen::ignore]]
     own::shared_owner<const assets::ModelAssetGeneration> m_modelGeneration{};
 
-    // Evaluation buffers, playback time and cursors live in the instance.
+    // Polls v3 preparation without waiting; only the explicit CEMCv11 fallback
+    // retains the transitional aggregate load. Buffers belong to the instance.
     void EnsureAnimationBinding();
     void BindModelGeneration(own::shared_owner<const assets::ModelAssetGeneration> generation);
+    // Render bridge guard for the transitional CEMCv11 geometry consumer. No I/O
+    // or new aggregate pin: compare the already-owned geometry skin contract.
+    [[nodiscard]] bool IsSkinBindingCompatible(const assets::ModelAssetGeneration& geometry) const noexcept;
 
+private:
+    struct RequestedAnimationClip final
+    {
+        int clipIndex{ -1 };
+        own::shared_owner<const assets::ModelAnimationPayload> payload{};
+        AssetDepot::AssetRequest<assets::ModelAnimationPayload> request{};
+        bool requested{};
+    };
+
+    struct DeferredAvatarMask final
+    {
+        struct Bone final
+        {
+            std::string name{};
+            bool enabled{ true };
+            float weight{ 1.f };
+        };
+        std::weak_ptr<AnimationController> controller{};
+        std::vector<Bone> bones{};
+    };
+
+    [[reflgen::ignore]]
+    FileGuid m_animationBindingMotion{};
+    [[reflgen::ignore]]
+    bool m_animationBindingInitialized{};
+    [[reflgen::ignore]]
+    bool m_granularAnimationBinding{};
+    [[reflgen::ignore]]
+    own::shared_owner<const assets::ModelAnimationDescriptor> m_animationDescriptor{};
+    [[reflgen::ignore]]
+    own::shared_owner<const assets::ModelSkeletonPayload> m_skeletonPayload{};
+    [[reflgen::ignore]]
+    AssetDepot::AssetRequest<assets::ModelAnimationDescriptor> m_descriptorRequest{};
+    [[reflgen::ignore]]
+    AssetDepot::AssetRequest<assets::ModelSkeletonPayload> m_skeletonRequest{};
+    [[reflgen::ignore]]
+    bool m_skeletonRequested{};
+    [[reflgen::ignore]]
+    std::uint64_t m_poseSkeletonSerial{};
+    [[reflgen::ignore]]
+    std::vector<RequestedAnimationClip> m_requestedClips{};
+    [[reflgen::ignore]]
+    std::vector<DeferredAvatarMask> m_deferredAvatarMasks{};
+
+    void ResetAnimationPose();
+    void RestoreDeferredAvatarMasks();
+
+public:
     // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.
     [[reflgen::ignore]]

@@ -1,5 +1,7 @@
 #include "Tasks/WorkerPoolSelfTest.h"
 #include "DataSystem.h"
+#include "AssetDepot/LegacyResourceCache.h"
+#include <map>
 #include "JobScheduler.h"
 #include "FoliageComponent.h"
 #include <atomic>
@@ -17,6 +19,59 @@ namespace RenderTest
         if (!ce::get_job_scheduler().is_running()) { log = "Job scheduler is not running"; return false; }
         try
         {
+            // Source-only regression coverage for bounded cache ownership. A
+            // logical eviction releases retention, never another consumer's pin.
+            std::map<std::string, asset_cache_detail::Entry<int>> cache;
+            auto first = asset_cache_detail::Publish(cache, std::string("first"),
+                own::make_shared<const int>(1), sizeof(int), sizeof(int), 1u);
+            const own::weak_owner<const int> firstLifetime(first);
+            auto second = asset_cache_detail::Publish(cache, std::string("second"),
+                own::make_shared<const int>(2), sizeof(int), sizeof(int), 1u);
+            if (cache.at("first").retained || firstLifetime.expired())
+            {
+                throw std::runtime_error("Cache budget eviction lost a live consumer or retained too much");
+            }
+            auto oldGeneration = asset_cache_detail::Acquire(cache.at("first"));
+            cache.erase("first");
+            auto replacement = asset_cache_detail::Publish(cache, std::string("first"),
+                own::make_shared<const int>(3), sizeof(int), sizeof(int), 1u);
+            if (!oldGeneration || *oldGeneration != 1 || *replacement != 3)
+            {
+                throw std::runtime_error("Cache replacement changed an already pinned generation");
+            }
+            first.reset();
+            oldGeneration.reset();
+            if (!firstLifetime.expired())
+            {
+                throw std::runtime_error("Old generation survived its final consumer without a cache root");
+            }
+            asset_cache_detail::Trim(cache, 0u, 0u);
+            if (cache.at("first").retained || !replacement || *replacement != 3)
+            {
+                throw std::runtime_error("Zero cache budget destroyed a consumer pin");
+            }
+
+            replacement.reset();
+            second.reset();
+            asset_cache_detail::Trim(cache, 0u, 0u);
+            if (!cache.empty())
+            {
+                throw std::runtime_error("Expired weak cache entries survived pruning");
+            }
+            auto revisionOne = asset_cache_detail::Publish(cache, std::string("revision"),
+                own::make_shared<const int>(10), sizeof(int), sizeof(int), 1u, 1u);
+            if (asset_cache_detail::Acquire(cache.at("revision"), 2u))
+            {
+                throw std::runtime_error("A current lookup returned a prior resolver revision");
+            }
+            auto revisionTwo = asset_cache_detail::Publish(cache, std::string("revision"),
+                own::make_shared<const int>(20), sizeof(int), sizeof(int), 1u, 2u);
+            const auto currentRevision = asset_cache_detail::Acquire(cache.at("revision"), 2u);
+            if (*revisionOne != 10 || !currentRevision || *currentRevision != 20 || *revisionTwo != 20)
+            {
+                throw std::runtime_error("Resolver replacement changed an old pin or reused stale cache state");
+            }
+
             // Use the real bundle path alongside an external producer (the same
             // submission shape as Presentation's thumbnail reader).
             std::atomic<unsigned> reads{0}, inlineReads{0};
@@ -45,7 +100,23 @@ namespace RenderTest
             for (int i = 0; i < 32; ++i)
                 bundle.AddAsset(AssetEntry(ManagedAssetType::Model, file::path(modelPath)));
             const auto loaded = DataSystems->LoadAssetBundle(bundle);
-            const bool bundleBarrier = loaded.submitted == 32 && loaded.completed == 32;
+            const bool bundleBarrier = loaded.submitted == 32 && loaded.completed == 32
+                && loaded.status == AssetDepot::AssetRequestStatus::Ready
+                && loaded.models.size() == 32;
+            auto asyncBundle = DataSystems->LoadAssetBundleAsync(bundle);
+            const own::weak_owner<DataSystem::AssetBundlePreparation> asyncLifetime(asyncBundle);
+            asyncBundle->Completion().wait();
+            const auto asyncResult = asyncBundle->Snapshot();
+            if (asyncResult.status != AssetDepot::AssetRequestStatus::Ready
+                || asyncResult.completed != 32 || asyncResult.models.size() != 32)
+            {
+                throw std::runtime_error("Async bundle failed to hand off actual generation owners");
+            }
+            asyncBundle.reset();
+            if (!asyncLifetime.expired())
+            {
+                throw std::runtime_error("Completed bundle request leaked through a strong registry");
+            }
             producer.join();
             external.wait();
             if (!bundleBarrier) throw std::runtime_error("Bundle returned before all 32 loader callbacks completed");

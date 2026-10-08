@@ -57,6 +57,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
     auto published = own::make_shared<const cooked::CookedAssetCatalog>(std::move(candidate));
     own::shared_owner<const cooked::CookedAssetCatalog> retired;
     AssetDepot::TextureAssetEntries retiredTextures;
+    AssetDepot::ModelAssetRetiredEntries retiredModels;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
@@ -70,6 +71,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
         m_cookedCatalog = std::move(published);
         m_assetDepotRevision = revision + 1u;
         retiredTextures = InvalidateTextureAssetsLocked();
+        retiredModels = InvalidateModelAssetsLocked();
     }
     return mountId;
 }
@@ -107,6 +109,7 @@ bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
     auto published = own::make_shared<const cooked::CookedAssetCatalog>(std::move(candidate));
     own::shared_owner<const cooked::CookedAssetCatalog> retired;
     AssetDepot::TextureAssetEntries retiredTextures;
+    AssetDepot::ModelAssetRetiredEntries retiredModels;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
@@ -120,6 +123,7 @@ bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
         m_cookedCatalog = std::move(published);
         m_assetDepotRevision = revision + 1u;
         retiredTextures = InvalidateTextureAssetsLocked();
+        retiredModels = InvalidateModelAssetsLocked();
     }
     // Existing snapshots and resolved generation owners keep the exact backing.
     // No storage deletion or GPU retirement is implied by logical unmount.

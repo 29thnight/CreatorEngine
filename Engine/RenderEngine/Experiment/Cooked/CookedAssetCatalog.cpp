@@ -73,10 +73,21 @@ namespace experiment::cooked
     {
         out.clear();
         const auto* entry = Find(assetId);
-        std::uint64_t size = 0;
         if (!entry || entry->kind != CookedAssetKind::CollisionGeometry || entry->formatVersion != 1 ||
-            !IsCollisionGeometryArtifactVirtualPath(entry->artifactPath) ||
-            !bytes.Size(entry->artifactPath, size, failure) || size != entry->byteSize || size < 68 || size > 256 * 1024 * 1024)
+            !IsCollisionGeometryArtifactVirtualPath(entry->artifactPath))
+        {
+            failure = "Collision geometry artifact missing or incompatible";
+            return false;
+        }
+        own::shared_owner<const ArtifactByteSource> exactBytes;
+        if (!bytes.CaptureArtifact(entry->artifactPath, exactBytes, failure))
+        {
+            return false;
+        }
+        const auto& source = exactBytes ? *exactBytes : bytes;
+        std::uint64_t size = 0;
+        if (!source.Size(entry->artifactPath, size, failure)
+            || size != entry->byteSize || size < 68 || size > 256 * 1024 * 1024)
         {
             failure = "Collision geometry artifact missing or incompatible";
             return false;
@@ -84,7 +95,10 @@ namespace experiment::cooked
         try
         {
             std::vector<std::byte> prepared(static_cast<std::size_t>(size));
-            if (!bytes.ReadAt(entry->artifactPath, 0, prepared, failure)) return false;
+            if (!source.ReadAt(entry->artifactPath, 0, prepared, failure))
+            {
+                return false;
+            }
 
             Sha256Digest digest;
             if (!ComputeSha256(prepared, digest, failure) || digest != entry->contentSha256)

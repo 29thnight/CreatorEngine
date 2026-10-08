@@ -1308,7 +1308,7 @@ namespace
             // 최신 요청이 아니라 실제 패스가 소비한 카메라를 완료 슬롯에 붙인다.
             slot->camera = *frameContext.camera;
             slot->previewComplete = graphInput && !graphInput->Draws().empty() &&
-                (!viewPacket.materialPreview || graphInput->Draws()[0].material == viewPacket.materialPreview->instance);
+                (!viewPacket.materialPreview || graphInput->Draws()[0].material->representationId == viewPacket.materialPreview->instance->representationId);
             slot->pending = true;
             if (capture)
             {
@@ -1372,7 +1372,7 @@ namespace
     {
         EnvironmentPreparationRequest request;
         std::optional<assets::CookedEnvironment> cooked;
-        std::shared_ptr<Texture> equirect;
+        own::shared_owner<const Texture> equirect;
         std::optional<assets::EnvironmentIdentity> identity;
         file::path cachePath;
     };
@@ -1811,7 +1811,7 @@ namespace
         // Cooked data is loaded before decode/generation. A raw HDR cache miss
         // generates the four maps once and publishes their pixels asynchronously.
         std::string                 skyBoxPath;
-        std::shared_ptr<Texture> skyEquirect;
+        own::shared_owner<const Texture> skyEquirect;
         std::optional<assets::CookedEnvironment> skyCooked;
         std::optional<assets::EnvironmentIdentity> skyCookIdentity;
         std::filesystem::path skyCookCachePath;
@@ -1893,7 +1893,7 @@ namespace
         //   PIXEL 전용 값이 없어 ShaderResource가 곧 ALL인데, textureCache는
         //   업로드를 PIXEL로 끝내므로 그대로 임포트하면 배리어의 before가
         //   실제와 어긋난다(검증 레이어가 잡는다).
-        std::unique_ptr<Texture> fogBlueNoise;
+        own::shared_owner<const Texture> fogBlueNoise;
 
         // ★ 핸들을 옆에 든다(V3). 예전에는 프레임마다 ImportTexture 의 포인터
         //   오버로드를 타서 표에 등록하고 그래프가 죽을 때 놓기를 반복했다 —
@@ -2098,18 +2098,9 @@ namespace
             // Borrowed mesh bytes are covered by the frame's single model pin
             // table. Copies of this draw carry only the stable table index.
             std::size_t modelPinIndex{ (std::numeric_limits<std::size_t>::max)() };
-            // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
-            // The identified graph source is retained with its model generation.
-            // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
-            std::shared_ptr<const Material> materialSource{};
-            std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
-            // I5-D5c2-2 — 재질 저작 정본의 값 스냅샷. 있으면 sealing이
-            // properties·keywords·blendMode를 이것으로 덮는다(부속은 legacy).
-            std::shared_ptr<const experiment::Material> authoredMaterialSource{};
-            // W8 — 그 값 스냅샷을 만든 MaterialInstance의 Revision. 프록시까지만
-            // 오고 렌더 스냅샷에는 없어서, 인스턴스 편집이 화면에 닿았는지를
-            // 밖에서 물을 수 없었다. seal 신원의 일부로 운반한다.
-            std::uint64_t        authoredRevision{};
+            // Source identity/coverage is copied once. The immutable instance
+            // itself is retained by the frame pin table, never per draw.
+            bool hasGraphMaterialSource{};
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
             bool                 isTransparent{ false };
@@ -2120,12 +2111,14 @@ namespace
         struct PooledSprite
         {
             math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
-            std::shared_ptr<Texture> texture;
+            std::size_t texturePinIndex{ TextureFramePins::InvalidIndex };
             BillboardType billboardType{ BillboardType::None };
             math::vector3 billboardAxis{ 0.f, 1.f, 0.f };
             int orderInLayer{ 0 };
             bool enableDepth{ false };
         };
+        own::shared_owner<TextureFramePins> textureFramePins;
+        own::shared_owner<material_graph::InstanceFramePins> graphFramePins;
         std::vector<PooledSprite> spritePool;
         RenderScene::UIProxySnapshot uiProxySnapshot;
         std::vector<UIRenderProxy*> uiProxyPointers;
@@ -2877,7 +2870,7 @@ namespace
             }
 
             const RHITextureEntry noiseEntry =
-                dx12.TextureCache().GetOrUpload(fogBlueNoise.get(), outError);
+                dx12.TextureCache().GetOrUpload((fogBlueNoise ? &*fogBlueNoise.borrow() : nullptr), outError);
             if (!noiseEntry.IsValid())
             {
                 outError = "블루 노이즈 운반 실패" +
@@ -2931,7 +2924,7 @@ namespace
 
             std::string noiseError;
             const RHITextureEntry noise =
-                p.textureCache.GetOrUpload(fogBlueNoise.get(), noiseError);
+                p.textureCache.GetOrUpload((fogBlueNoise ? &*fogBlueNoise.borrow() : nullptr), noiseError);
             if (!noise.IsValid())
             {
                 outError = "Vulkan 블루 노이즈 운반 실패" +
@@ -3084,7 +3077,7 @@ namespace
                 node.prepare = [this, &p](const EnhancedFrameContext& ctx,
                     std::string& err, uint32_t) -> bool
                 {
-                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals);
+                    p.decal.SetDecals(materialPreviewView ? previewDecals : decals, textureFramePins);
                     return p.decal.PrepareFrame(ctx, err);
                 };
                 node.reads = { LiveSlots::kGBufferDepth };
@@ -3819,7 +3812,7 @@ namespace
 
         static bool AppendImageToPlane(const UIRenderProxy::ImageData& image,
             const CanvasPlane& plane, bool enableDepth,
-            std::vector<EnhancedSpritePass::Item>& output)
+            std::vector<EnhancedSpritePass::Item>& output, TextureFramePins& texturePins)
         {
             if (!plane.valid) return false;
 
@@ -3853,7 +3846,8 @@ namespace
             item.world = MakeSpriteMatrix(right, down, center);
             item.uv = uv;
             item.color = image.color;
-            item.texture = image.texture.get();
+            item.texturePinIndex = texturePins.Retain(image.texture);
+            item.texture = texturePins.Borrow(item.texturePinIndex);
             item.canvasOrder = image.canvasOrder;
             item.layerOrder = image.layerOrder;
             item.enableDepth = enableDepth;
@@ -3891,6 +3885,14 @@ namespace
             add(plane.center + plane.right * 0.5f, rightUnit * thickness, plane.down);
         }
 
+        void PinGraphInstance(EnhancedDrawItem& draw,
+            const own::shared_owner<const material_graph::Instance>& instance)
+        {
+            draw.materialGraphPinIndex = graphFramePins->Retain(instance);
+            draw.materialGraphView = graphFramePins->Borrow(draw.materialGraphPinIndex);
+            draw.materialGraphInstance.reset();
+        }
+
         void BuildDrawPool()
         {
             drawPool.clear();
@@ -3903,6 +3905,10 @@ namespace
             graphViewInput.reset();
             decals.clear();
             spritePool.clear();
+            worldSprites.clear();
+            uiRects.clear();
+            textureFramePins = own::make_shared<TextureFramePins>();
+            graphFramePins = own::make_shared<material_graph::InstanceFramePins>();
             uiProxySnapshot.clear();
             uiProxyPointers.clear();
             modelFramePins.reset();
@@ -3968,9 +3974,12 @@ namespace
 
                 EnhancedDecalPass::Item item{};
                 item.worldMatrix = proxy->m_worldMatrix;
-                item.diffuse = proxy->m_diffuseTexture.get();
-                item.normal = proxy->m_normalTexture.get();
-                item.occRoughMetal = proxy->m_occluroughmetalTexture.get();
+                item.texturePinIndices = {textureFramePins->Retain(proxy->m_diffuseTexture),
+                    textureFramePins->Retain(proxy->m_normalTexture),
+                    textureFramePins->Retain(proxy->m_occluroughmetalTexture)};
+                item.diffuse = textureFramePins->Borrow(item.texturePinIndices[0]);
+                item.normal = textureFramePins->Borrow(item.texturePinIndices[1]);
+                item.occRoughMetal = textureFramePins->Borrow(item.texturePinIndices[2]);
                 item.sliceX = proxy->m_sliceX;
                 item.sliceY = proxy->m_sliceY;
                 item.sliceNum = proxy->m_sliceNum;
@@ -4033,21 +4042,16 @@ namespace
 
                 if (proxy->m_graphMaterialSource)
                 {
-                    pooled.graphMaterialSource = proxy->m_graphMaterialSource;
-                    pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
-                    pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
-                    pooled.item.coverage = pooled.graphMaterialSource->coverage;
-                    pooled.materialSource = proxy->m_Material;
-                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
-                    pooled.authoredRevision = proxy->m_authoredRevision;
+                    const auto& source = *proxy->m_graphMaterialSource;
+                    pooled.hasGraphMaterialSource = true;
+                    PinGraphInstance(pooled.item, source.instance);
+                    pooled.item.materialGraphSlot = source.materialSlot;
+                    pooled.item.coverage = source.coverage;
                     pooled.isTransparent =
                         (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
                 }
-                else if (const auto* material = proxy->m_Material.get())
+                else if (const auto* material = (proxy->m_Material ? &*proxy->m_Material.borrow() : nullptr))
                 {
-                    pooled.materialSource = proxy->m_Material;
-                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
-                    pooled.authoredRevision = proxy->m_authoredRevision;
                     pooled.isTransparent =
                         (MaterialRenderingMode::Transparent == material->m_renderingMode);
                 }
@@ -4092,23 +4096,17 @@ namespace
 
                     if (source.graphMaterialSource)
                     {
-                        pooled.graphMaterialSource = std::move(source.graphMaterialSource);
-                        pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
-                        pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
-                        pooled.item.coverage = pooled.graphMaterialSource->coverage;
-                        pooled.materialSource = std::move(source.material);
-                        pooled.authoredMaterialSource = std::move(source.authoredMaterial);
+                        const auto& material = *source.graphMaterialSource;
+                        pooled.hasGraphMaterialSource = true;
+                        PinGraphInstance(pooled.item, material.instance);
+                        pooled.item.materialGraphSlot = material.materialSlot;
+                        pooled.item.coverage = material.coverage;
                         pooled.isTransparent =
                             (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
                     }
                     else if (source.material)
                     {
-                        pooled.materialSource = std::move(source.material);
-                        // I5-D5c4 — Foliage도 저작 정본을 나른다(poolMesh와 같은
-                        // 규약). sealing 직행·texture 해석에 그대로 합류한다.
-                        pooled.authoredMaterialSource =
-                            std::move(source.authoredMaterial);
-                        const Material* material = pooled.materialSource.get();
+                        const Material* material = &*source.material.borrow();
                         pooled.isTransparent =
                             MaterialRenderingMode::Transparent == material->m_renderingMode;
                     }
@@ -4133,7 +4131,7 @@ namespace
                 if (!proxy->m_isEnabled || nullptr == proxy->m_spriteTexture) return;
                 PooledSprite pooled{};
                 pooled.worldMatrix = proxy->m_worldMatrix;
-                pooled.texture = proxy->m_spriteTexture;
+                pooled.texturePinIndex = textureFramePins->Retain(proxy->m_spriteTexture);
                 pooled.billboardType = proxy->m_billboardType;
                 pooled.billboardAxis = proxy->m_billboardAxis;
                 pooled.orderInLayer = proxy->m_orderInLayer;
@@ -4227,7 +4225,7 @@ namespace
                 draw.worldMatrix = math::matrix4x4::identity();
                 draw.boundRadius = 1.f;
                 draw.coverage = source->coverage;
-                draw.materialGraphInstance = source->instance;
+                PinGraphInstance(draw, source->instance);
                 draw.materialGraphSlot = source->materialSlot ? source->materialSlot : 1;
                 material_graph::SceneInputView inputView;
                 inputView.frameId = frame.frameId;
@@ -4250,11 +4248,11 @@ namespace
                     tile.worldMatrix = math::matrix4x4::identity();
                     tile.boundRadius = 8.f;
                     tile.coverage = ground->coverage;
-                    tile.materialGraphInstance = ground->instance;
+                    PinGraphInstance(tile, ground->instance);
                     tile.materialGraphSlot = ground->materialSlot;
                     previewDraws.push_back(std::move(tile));
                 }
-                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error))
+                if (!material_graph::SceneViewInput::Seal(inputView, previewDraws, {}, graphViewInput, error, {}, graphFramePins))
                 {
                     lastError = "Material preview: " + error;
                     return false;
@@ -4309,7 +4307,8 @@ namespace
 
                 EnhancedSpritePass::Item item{};
                 item.world = MakeSpriteMatrix(right, down, center);
-                item.texture = sprite.texture.get();
+                item.texturePinIndex = sprite.texturePinIndex;
+                item.texture = textureFramePins->Borrow(item.texturePinIndex);
                 item.layerOrder = sprite.orderInLayer;
                 item.enableDepth = sprite.enableDepth;
                 worldSprites.push_back(item);
@@ -4332,7 +4331,8 @@ namespace
             {
                 EnhancedUIPass::BuildRectsFromQueue(uiProxyPointers.data(),
                     uiProxyPointers.size(), uiRects,
-                    static_cast<float>(frame.width), static_cast<float>(frame.height));
+                    static_cast<float>(frame.width), static_cast<float>(frame.height),
+                    &*textureFramePins.borrow());
             }
 
             // Scene View에서는 Overlay도 Canvas Transform 평면으로 미리 본다.
@@ -4351,7 +4351,7 @@ namespace
 
                 const CanvasPlane plane = ResolveCanvasPlane(*image, gameCamera);
                 const bool depth = CanvasRenderMode::WorldSpace == image->renderMode;
-                AppendImageToPlane(*image, plane, depth, worldSprites);
+                AppendImageToPlane(*image, plane, depth, worldSprites, *textureFramePins);
 
                 if (HasViewFlag(viewPacket.viewFlags,
                     EnhancedLiveViewFlags::CanvasPreview))
@@ -4410,7 +4410,7 @@ namespace
                 // optional offscreen candidate budget can discard a custom draw.
                 // Native Forward has no authored deformation/bounds contract.
                 // Transparent is an ordering class, never a position proof.
-                bool knownPositionContract = bool(pooled.graphMaterialSource);
+                bool knownPositionContract = bool(pooled.hasGraphMaterialSource);
                 if (pooled.item.materialSnapshot)
                 {
                     const auto& material = *pooled.item.materialSnapshot;
@@ -4428,7 +4428,7 @@ namespace
                 // every skinned CAMERA candidate before CPU rejection/budgeting;
                 // a bind-pose/proxy box is not a proof for arbitrary current skin.
                 const bool visible = pooled.item.boneCount != 0 || sourceVisible;
-                if (!pooled.graphMaterialSource || !pooled.item.materialGraphInstance)
+                if (!pooled.hasGraphMaterialSource || !pooled.item.GraphInstance())
                 {
                     lastError = "Live scene draw requires a prepared material graph source.";
                     ++frameFailures;
@@ -4465,10 +4465,10 @@ namespace
                         continue;
                     }
                     ++optionalGpuCandidates;
-                    hasOptionalGraphCandidates |= bool(pooled.graphMaterialSource);
+                    hasOptionalGraphCandidates |= bool(pooled.hasGraphMaterialSource);
                 }
                 size_t shadowIndex = static_cast<size_t>(-1);
-                if (relevantToShadow && (pooled.graphMaterialSource || !pooled.isTransparent))
+                if (relevantToShadow && (pooled.hasGraphMaterialSource || !pooled.isTransparent))
                 {
                     shadowIndex = shadowDraws.size();
                     shadowDraws.push_back(pooled.item);
@@ -4544,8 +4544,24 @@ namespace
                 inputView.height = frame.height;
                 inputView.camera = cameraSnapshot;
                 std::string inputError;
+                // Replay may return new producer owners. Publish each exact
+                // representation once, then leave only frame-table borrows.
+                for (auto& draw : graphDraws)
+                {
+                    if (draw.materialGraphInstance)
+                    {
+                        PinGraphInstance(draw, draw.materialGraphInstance);
+                    }
+                }
+                for (auto& draw : shadowDraws)
+                {
+                    if (draw.materialGraphInstance)
+                    {
+                        PinGraphInstance(draw, draw.materialGraphInstance);
+                    }
+                }
                 bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                    sceneInputBudget, graphViewInput, inputError, modelFramePins);
+                    sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins);
                 if (!sealed && hasOptionalGraphCandidates)
                 {
                     // Aggregate geometry budgets can be tighter than the draw
@@ -4571,7 +4587,7 @@ namespace
                     graphShadowEligible.resize(retained);
                     graphViewRequired.resize(retained);
                     sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                        sceneInputBudget, graphViewInput, inputError, modelFramePins);
+                        sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins);
                 }
                 if (!sealed)
                 {
@@ -4734,7 +4750,7 @@ namespace
 
                         std::string skyUploadError;
                         const RHITextureEntry skyEntry = p.frameContext.textureCache->GetOrUpload(
-                            skyEquirect.get(), skyUploadError);
+                            (skyEquirect ? &*skyEquirect.borrow() : nullptr), skyUploadError);
                         if (!skyEntry.IsValid() || skyEntry.isCube)
                         {
                             outError = "equirect HDR 운반 실패";
@@ -4781,8 +4797,8 @@ namespace
 
             // 기즈모 데이터(gizmoData)의 프레임별 feed는 기여 노드의 prepare가
             // 한다 — RenderFeatureContext가 안정 주소를 넘겼다(E4-2).
-            p.sprite.SetItems(&worldSprites);
-            p.ui.SetRects(&uiRects);
+            p.sprite.SetItems(&worldSprites, textureFramePins);
+            p.ui.SetRects(&uiRects, textureFramePins);
 
             if (!p.animationPalettes.Prepare(*p.frameContext.resources,
                     p.frameContext.shadowDraws, p.frameContext.forwardDraws, p.frameContext.draws))
@@ -5058,7 +5074,7 @@ namespace
             slot.camera = *p.frameContext.camera;
             slot.previewComplete = p.graphInput && !p.graphInput->Draws().empty() &&
                 (!materialPreviewView || (graphViewInput && !graphViewInput->Draws().empty() &&
-                    p.graphInput->Draws()[0].material == graphViewInput->Draws()[0].material));
+                    p.graphInput->Draws()[0].material->representationId == graphViewInput->Draws()[0].material->representationId));
             slot.key = view.key;
             finish_gpu_capture(slot.profilerToken, false,
                 "DX12 display slot reused before GPU query collection");
@@ -6752,10 +6768,10 @@ void EnhancedSceneRenderer::WaitForLiveGpu()
 }
 
 EnhancedRequiredAssetPacket EnhancedSceneRenderer::BuildRequiredAssetPacket(
-    std::span<const std::shared_ptr<Material>> materials)
+    std::span<const own::shared_owner<const Material>> materials)
 {
     EnhancedRequiredAssetPacket packet{};
-    for (const std::shared_ptr<Material>& material : materials)
+    for (const own::shared_owner<const Material>& material : materials)
     {
         if (!material) continue;
         const EnhancedShaderMetaDomain domain =

@@ -79,7 +79,7 @@ namespace experiment
         ResolvedMaterial& outResolved, std::string& outError)
     {
         outResolved = {};
-        if (!services.loadShaderMetaHandle || !services.resolveShaderMeta
+        if (!services.loadShaderMetaOwner
             || !services.loadTexture || !services.resolveSourcePath)
         {
             outError = "MaterialResolveServices가 불완전하다";
@@ -95,15 +95,14 @@ namespace experiment
         }
         const FileGuid shaderGuid = ToFileGuid(material.shaderAssetId);
         std::string loadError;
-        const ShaderMetaHandle handle =
-            services.loadShaderMetaHandle(shaderGuid, loadError);
+        ShaderMetaHandle handle;
+        const auto meta = services.loadShaderMetaOwner(shaderGuid, handle, loadError);
         if (!handle.IsValid())
         {
             outError = "ShaderMeta handle 해석 실패: "
                 + (loadError.empty() ? shaderGuid.ToString() : loadError);
             return false;
         }
-        std::shared_ptr<const ShaderMeta> meta = services.resolveShaderMeta(handle);
         if (!meta)
         {
             outError = "ShaderMeta generation resolve 실패 — handle이 낡았다: "
@@ -140,7 +139,7 @@ namespace experiment
             // 로드가 이름 폴백으로 떨어진 결함). closure에 없으면 예전 그대로.
             if (services.resolveEmbeddedTexture)
             {
-                if (std::shared_ptr<Texture> owner =
+                if (own::shared_owner<const Texture> owner =
                     services.resolveEmbeddedTexture(reference->assetId))
                 {
                     ++notes.generationTextures;
@@ -168,7 +167,7 @@ namespace experiment
 
             const bool compress = reference->colorSpace == TextureColorSpace::Srgb
                 && property.name == standard_material::property::BaseColorMap;
-            std::shared_ptr<Texture> owner = services.loadTexture(
+            own::shared_owner<const Texture> owner = services.loadTexture(
                 path, compress, reference->colorSpace);
             if (!owner)
             {

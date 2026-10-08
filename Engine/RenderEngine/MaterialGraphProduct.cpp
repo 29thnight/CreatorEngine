@@ -1,4 +1,5 @@
 #include "MaterialGraphProduct.h"
+#include "Texture.h"
 #include "MaterialGraphShaderMeta.h"
 
 #include <algorithm>
@@ -895,6 +896,7 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
     if (textures.size() != layout.textures.size())
         return Fail(diagnostics, "product.texture", "Texture owner count differs from material resource table.");
     std::set<std::uint32_t> textureSlots;
+    std::set<std::uint64_t> texturePins;
     for (const auto& binding : textures)
         if (!textureSlots.insert(binding.slot).second)
             return Fail(diagnostics, "product.texture", "Duplicate material texture owner slot.");
@@ -915,7 +917,10 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
             candidate.textures.push_back(RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
         candidate.textures[resource.slot] =
             RHIBindingDesc::Srv2D(found->texture.handle, found->texture.format, 0, found->texture.mipLevels);
-        candidate.owners.push_back(found->owner);
+        if (texturePins.insert(static_cast<std::uint64_t>(found->owner->m_assetId)).second)
+        {
+            candidate.owners.push_back(found->owner);
+        }
     }
     for (const auto& resource : layout.samplers)
     {
@@ -1152,7 +1157,7 @@ bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget
         GeneratedMaterialShader shader;
         if (contract.empty() || !RestoreMaterialShaderMeta(product, FileGuid{graphGuid}, document, source, shader, error,
                 {reinterpret_cast<const std::byte*>(contract.data()), contract.size()})) return false;
-        product.materialShader = std::make_shared<GeneratedMaterialShader>(std::move(shader));
+        product.materialShader = own::make_shared<const GeneratedMaterialShader>(std::move(shader));
     }
     result = std::move(candidate);
     error.clear();

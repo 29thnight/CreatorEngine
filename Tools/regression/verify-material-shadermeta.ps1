@@ -24,6 +24,7 @@ if ($CookFixtureRoot) {
 $sources = @('Tools/regression/material_shadermeta_probe.cpp',
     'Engine/RenderEngine/MaterialGraphRuntime.cpp',
     'Engine/RenderEngine/LXMaterialRuntime.cpp',
+    'Engine/Utility_Framework/TypeTrait.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedMaterialProgram.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.cpp',
     'Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.cpp',

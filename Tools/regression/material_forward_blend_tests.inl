@@ -1,7 +1,7 @@
 // Pixel-level alpha composition across the real Code and cooked Graph consumers.
 void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                      ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
-                     std::array<own::shared_owner<const Instance>, 2> instances, std::shared_ptr<Texture> cube)
+                     std::array<own::shared_owner<const Instance>, 2> instances, own::shared_owner<const Texture> cube)
 {
     std::string error;
     for (unsigned tier = 0; tier < 2; ++tier)
@@ -141,7 +141,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(device.BeginFrame(error), "Mixed begin " + error);
         textures.BeginFrame(context.frameId);
         meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
-        const auto environment = textures.GetOrUpload(cube.get(), error);
+        const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error);
         Check(environment.IsValid(), "Alpha environment upload");
         Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
                   host.PrepareResidency(context, input, error), "Mixed preparation " + error);

@@ -1101,20 +1101,40 @@ namespace EditorObjectOperations
         return object ? Describe(object->GetScene()->HandleOf(object->m_index)) : Fail("prefab.instantiate_failed", "Cannot instantiate prefab");
     }
 
-    CommandCore::CommandResult MaterialMode(const std::vector<std::shared_ptr<Material>>& materials, MaterialRenderingMode mode)
+    CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode)
     {
         using namespace CommandCore;
         if (mode != MaterialRenderingMode::Opaque && mode != MaterialRenderingMode::Transparent)
             return InvalidArguments("Material mode must be opaque or transparent");
-        std::vector<std::pair<std::shared_ptr<Material>, MaterialRenderingMode>> changes;
-        std::unordered_set<Material*> seen;
+        std::vector<std::pair<own::shared_owner<Material>, MaterialRenderingMode>> changes;
+        std::unordered_set<std::size_t> seen;
         for (const auto& material : materials)
-            if (material && seen.insert(material.get()).second && material->m_renderingMode != mode)
+        {
+            if (material && seen.insert(material->m_materialGuid.m_ID_Data).second && material->m_renderingMode != mode)
+            {
                 changes.emplace_back(material, material->m_renderingMode);
-        if (seen.empty()) return PreconditionFailed("material.not_found", "No material in target hierarchy");
-        if (!changes.empty()) Meta::MakeCustomChangeCommand(
-            [changes] { for (const auto& [material, before] : changes) material->m_renderingMode = before; },
-            [changes, mode] { for (const auto& [material, before] : changes) material->m_renderingMode = mode; });
+            }
+        }
+        if (seen.empty())
+        {
+            return PreconditionFailed("material.not_found", "No material in target hierarchy");
+        }
+        if (!changes.empty())
+        {
+            Meta::MakeCustomChangeCommand(
+                [changes] {
+                    for (const auto& [material, before] : changes)
+                    {
+                        material->m_renderingMode = before;
+                    }
+                },
+                [changes, mode] {
+                    for (const auto& [material, before] : changes)
+                    {
+                        material->m_renderingMode = mode;
+                    }
+                });
+        }
         auto data = CommandData::Object();
         data.Set("materials", CommandData::Int(seen.size()));
         data.Set("changed", CommandData::Int(changes.size()));
@@ -1127,7 +1147,7 @@ namespace EditorObjectOperations
         auto* object = Resolve(target);
         if (!object) return CommandCore::PreconditionFailed("object.stale", "Object no longer exists");
         if (IsEditLocked(object, true)) return CommandCore::PreconditionFailed("object.locked", "Unlock the entity hierarchy before editing");
-        std::vector<std::shared_ptr<Material>> materials;
+        std::vector<own::shared_owner<Material>> materials;
         std::function<void(Entity*)> collect = [&](Entity* node) {
             if (!node || node->IsDestroyMark()) return;
             for (const auto& component : node->m_components)
@@ -1187,7 +1207,7 @@ namespace EditorObjectOperations
                                       "Mesh renderer has no authored base — override는 저작 정본이 있어야 얹힌다");
 
         const auto previous = renderer->m_Material;
-        const auto edited = graphMaterial ? std::make_shared<Material>(*previous) : previous;
+        const auto edited = graphMaterial ? own::make_shared<Material>(*previous) : previous;
 
         if (1 == values.size())
         {
@@ -1221,7 +1241,7 @@ namespace EditorObjectOperations
         if (graphMaterial)
         {
             const auto apply = [handle = renderer->GetOwner()->GetScene()->HandleOf(renderer->GetOwner()->m_index),
-                                component = renderer->GetInstanceID()](const std::shared_ptr<Material>& material) {
+                                component = renderer->GetInstanceID()](const own::shared_owner<Material>& material) {
                 auto* scene = SceneManagers->GetActiveScene();
                 auto* entity = scene ? scene->Resolve(handle) : nullptr;
                 auto* renderer = entity ? entity->GetComponent<MeshRenderer>() : nullptr;
@@ -1270,12 +1290,17 @@ namespace EditorObjectOperations
             data.Set("meshId", D::String(FileGuid(meshHandle.meshId).ToString()));
         }
 
-        // ★ fixture 의 전제("주소가 실제로 공유됐다")를 값으로 돌려준다. 모델
+        // ★ fixture 의 전제("재질 세대가 실제로 공유됐다")를 값으로 돌려준다. 모델
         //   인스턴스화가 언젠가 사본을 주도록 바뀌면 이 수가 1 이 되고, 게이트는
         //   조용히 아무것도 재지 않는 대신 그 자리에서 붉어진다.
         int sharedWith = 0;
         for (const MeshRenderer* other : renderers)
-            if (other->m_Material.get() == renderer->m_Material.get()) ++sharedWith;
+        {
+            if (other->m_Material && other->m_Material->m_materialGuid == renderer->m_Material->m_materialGuid)
+            {
+                ++sharedWith;
+            }
+        }
         data.Set("sharedMaterialRenderers", D::Int(sharedWith));
         data.Set("changed", D::Bool(true));
         return Ok("material override applied", std::move(data));

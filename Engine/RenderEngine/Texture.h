@@ -67,10 +67,10 @@ public:
 	Texture() = default;
 	Texture(const Texture&) = delete;
 	Texture(Texture&& texture) noexcept;
-	~Texture();
+	~Texture() = default;
 
 	/// CPU 픽셀에서 바로 만든다. 자가 검증이 작은 더미 텍스처를 세울 때 쓴다.
-	static Texture* CreateFromPixels(
+	static own::shared_owner<const Texture> CreateFromPixels(
 		_In_ uint32 width,
 		_In_ uint32 height,
 		_In_ std::string_view name,
@@ -79,27 +79,27 @@ public:
 		_In_opt_ size_t rowPitch = 0
 	);
 
-	static Texture* LoadFormPath(_In_ const file::path& path, bool isCompress = false);
+	static own::shared_owner<const Texture> LoadFormPath(_In_ const file::path& path, bool isCompress = false);
 
     // Shares encoded CPU pixels, but owns a distinct GPU cache identity when
     // the sampling format changes. Never mutates a texture used by another role.
-    static std::shared_ptr<Texture> WithColorSpace(
-        const std::shared_ptr<Texture>& source, bool srgb);
+    static own::shared_owner<const Texture> WithColorSpace(
+        const own::shared_owner<const Texture>& source, bool srgb);
 
     // Call after choosing the material color space. Retains authored chains and
     // 1x1 owners; otherwise generates a full chain with linear-light RGB filtering
     // for sRGB formats and independent linear alpha. Preserves mip 0 exactly.
-    static std::shared_ptr<Texture> WithMipChain(
-        const std::shared_ptr<Texture>& source, std::string& outFailure);
+    static own::shared_owner<const Texture> WithMipChain(
+        const own::shared_owner<const Texture>& source, std::string& outFailure);
 
-	static std::shared_ptr<Texture> LoadSharedFromPath(
-		const file::path& path, bool isCompress = false);
+	static own::shared_owner<const Texture> LoadSharedFromPath(
+		const file::path& path, bool isCompress = false, std::string_view assetPath = {});
 
 	// I2-E 후속 — 컨테이너 안에 묻힌 이미지(glb 임베디드 등)를 디스크에 뽑지
 	// 않고 바이트에서 바로 만든다. 포맷은 매직으로 가른다(DDS·HDR, 나머지는
 	// WIC → 실패 시 TGA). 실패는 nullptr — 예외를 밖으로 내지 않는다.
 	// LoadSharedFromPath 와 같은 결과물(압축 정책 포함)을 만든다.
-	static std::shared_ptr<Texture> LoadSharedFromMemory(
+	static own::shared_owner<const Texture> LoadSharedFromMemory(
 		std::span<const std::byte> bytes, bool isCompress = false);
 
     [[nodiscard]] own::shared_owner<const AssetDepot::TextureAssetOrigin> GetAssetOrigin() const;
@@ -110,7 +110,7 @@ public:
 	// 디코드해 둔 RGBA8 픽셀이라 파일 로더를 다시 태울 이유가 없다 — 여기서
 	// 두 번째 디코드가 생기면 generation의 SHA-256 검증이 뜻을 잃는다. 이미지가
 	// 비었으면 nullptr.
-	static std::shared_ptr<Texture> CreateSharedFromImage(
+	static own::shared_owner<const Texture> CreateSharedFromImage(
 		std::string_view name, TextureImage image);
 
 	// ── 디코드 전용 창구 (축 A) ──
@@ -125,7 +125,7 @@ public:
 	static bool DecodeToRgba8(std::span<const std::byte> bytes,
 		TextureImage& outImage, std::string& outFailure);
 
-	static std::unique_ptr<Texture> LoadManagedFromPath(
+	static own::shared_owner<const Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);
 
 	// ── 업로드용 CPU 픽셀 (PHASE 3-1 재정의, T1 · 축 A) ──

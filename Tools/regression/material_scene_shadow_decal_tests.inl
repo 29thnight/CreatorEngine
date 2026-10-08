@@ -239,7 +239,7 @@ void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
 
 void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                    const std::shared_ptr<Texture>& image)
+                    const own::shared_owner<const Texture>& image)
 {
     CheckCsmContracts(device);
     RunCsmLegacyBatches(device, roots, pipelines, textures);

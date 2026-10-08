@@ -286,7 +286,7 @@ void draw_character_movement(CharacterMovementComponent& character, editor::widg
 
 struct ComponentMenuVisual
 {
-    Texture* image{};
+    const Texture* image{};
     const char* fallback{};
 };
 
@@ -1408,7 +1408,7 @@ static bool NameButton(const std::string& name, const char* id, float width)
 
 // 자산 칸: 이름을 보여 주는 버튼 하나. 버튼이 끌어 놓기 대상이다. 텍스처가 있으면
 // 앞에 줄 높이의 미리보기를 붙인다. 놓인 자산 경로를 돌려준다(없으면 빈 경로).
-static file::path DrawAssetSlot(const char* id, Texture* texture, const char* emptyText,
+static file::path DrawAssetSlot(const char* id, const Texture* texture, const char* emptyText,
 	const char* payloadType, float width)
 {
 	ImGui::PushID(id);
@@ -1668,7 +1668,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	}
 
 	// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
-	const auto slot = [&](const char* label, Texture* texture, const char* context)
+	const auto slot = [&](const char* label, const Texture* texture, const char* context)
 	{
 		const file::path dropped = DrawAssetSlot(label, texture, "None", "Texture", sheet.line(label));
 		return !dropped.empty() && editor::asset_drag::lives_in(dropped, "Textures", context)
@@ -1784,7 +1784,8 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 {
 	{
 		const editor::widgets::property_sheet sheet(m_layout, { "Sprite" });
-		const file::path dropped = DrawAssetSlot("Sprite", spriteRenderer->GetSprite().get(), "None (drag texture)",
+		const auto& sprite = spriteRenderer->GetSprite();
+		const file::path dropped = DrawAssetSlot("Sprite", sprite ? &*sprite.borrow() : nullptr, "None (drag texture)",
 			"Texture", sheet.line("Sprite"));
 		if (!dropped.empty())
 		{

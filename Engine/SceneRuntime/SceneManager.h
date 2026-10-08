@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "Ownership.h"
 #include "Object.h"
 #include "AssetBundle.h"
 #include "ReflectionYml.h"
@@ -156,7 +157,7 @@ public:
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
     // GT frame sealing용. 활성 Scene의 mesh/foliage가 실제 소유한 Material을
     // cache 소속 여부와 무관하게 owner snapshot으로 돌려준다.
-    std::vector<std::shared_ptr<Material>> CaptureRequiredRenderMaterials() const;
+    std::vector<own::shared_owner<const Material>> CaptureRequiredRenderMaterials() const;
 
 	void RequestRenderProfileApply();
 	bool IsRenderProfileApplyPending() const { return m_renderProfileApplyPending; }

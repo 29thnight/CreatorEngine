@@ -40,9 +40,17 @@ namespace ModelSceneInstantiation
     // 경계에서만 호출한다. 한 작업은 한 인스턴스의 재질과 생성 상태를 소유한다.
     class PendingInstance final
     {
+        struct Impl;
+
     public:
+        class ConstructionKey final
+        {
+            friend class PendingInstance;
+            ConstructionKey() = default;
+        };
+        explicit PendingInstance(ConstructionKey, own::unique_owner<Impl> impl);
         enum class Status { Building, Complete, Failed };
-        static std::unique_ptr<PendingInstance> Prepare(
+        static own::unique_owner<PendingInstance> Prepare(
             own::shared_owner<const assets::ModelAssetGeneration> generation,
             const Options& options);
         ~PendingInstance();
@@ -55,9 +63,7 @@ namespace ModelSceneInstantiation
         std::size_t TotalSteps() const;
 
     private:
-        struct Impl;
-        explicit PendingInstance(std::unique_ptr<Impl> impl);
-        std::unique_ptr<Impl> m_impl;
+        own::unique_owner<Impl> m_impl;
     };
 
     // 성공하면 루트 엔티티. 관측은 ModelConsumptionDiagnostics 계수(읽기 전용)로만

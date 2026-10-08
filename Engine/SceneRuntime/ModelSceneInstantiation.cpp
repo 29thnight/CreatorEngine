@@ -39,8 +39,8 @@ namespace ModelSceneInstantiation
         assets::ModelAssetGeneration::Shared generation;
         Options options;
         std::vector<ObjectRecipe> objects;
-        std::vector<std::shared_ptr<Material>> materials;
-        std::vector<std::shared_ptr<const experiment::Material>> authored;
+        std::vector<own::shared_owner<Material>> materials;
+        std::vector<own::shared_owner<const experiment::Material>> authored;
         std::vector<std::uint32_t> meshMaterials;
         std::vector<EntityHandle> handles;
         std::vector<std::size_t> renderers;
@@ -54,13 +54,13 @@ namespace ModelSceneInstantiation
         Status status{ Status::Building };
     };
 
-    PendingInstance::PendingInstance(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
+    PendingInstance::PendingInstance(ConstructionKey, own::unique_owner<Impl> impl) : m_impl(std::move(impl)) {}
     PendingInstance::~PendingInstance() = default;
 
-    std::unique_ptr<PendingInstance> PendingInstance::Prepare(
+    own::unique_owner<PendingInstance> PendingInstance::Prepare(
         assets::ModelAssetGeneration::Shared generation, const Options& options)
     {
-        const auto reject = []() -> std::unique_ptr<PendingInstance>
+        const auto reject = []() -> own::unique_owner<PendingInstance>
         {
             ModelConsumptionDiagnostics::NoteInstantiateRejected();
             return {};
@@ -75,7 +75,7 @@ namespace ModelSceneInstantiation
         if (options.createMeshCollider && !options.collisionGeometry)
             return reject();
 
-        auto impl = std::make_unique<Impl>();
+        auto impl = own::make_unique<Impl>();
         impl->generation = std::move(generation);
         impl->options = options;
         const auto* skeleton = impl->generation->Skeleton();
@@ -190,9 +190,9 @@ namespace ModelSceneInstantiation
         {
             const auto index = impl->meshMaterials[impl->objects[objectIndex].mesh];
             if (index >= materials.size() || impl->materials[index]) continue;
-            auto converted = std::make_shared<experiment::Material>();
+            auto converted = own::make_shared<experiment::Material>();
             ExperimentMaterialMigration::ConvertModelMaterialAsset(materials[index], *impl->generation, *converted);
-            auto material = std::make_shared<Material>();
+            auto material = own::make_shared<Material>();
             std::string error;
             if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(*converted, nullptr, *material, error))
                 return reject();
@@ -206,7 +206,7 @@ namespace ModelSceneInstantiation
             impl->materials[index] = std::move(material);
         }
         impl->handles.resize(impl->objects.size());
-        return std::unique_ptr<PendingInstance>(new PendingInstance(std::move(impl)));
+        return own::make_unique<PendingInstance>(ConstructionKey{}, std::move(impl));
     }
 
     PendingInstance::Status PendingInstance::Advance(Scene& scene, std::size_t maxSteps,

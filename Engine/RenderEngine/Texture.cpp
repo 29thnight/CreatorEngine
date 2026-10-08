@@ -333,8 +333,8 @@ TextureImageView Texture::GetImageView() const
 		static_cast<uint32_t>(codec.subresources.size()));
 }
 
-std::shared_ptr<Texture> Texture::WithColorSpace(
-    const std::shared_ptr<Texture>& source, bool srgb)
+own::shared_owner<const Texture> Texture::WithColorSpace(
+    const own::shared_owner<const Texture>& source, bool srgb)
 {
     if (!source || source->GetImageView().IsEmpty()) return nullptr;
     const auto format = source->GetImageView().Format();
@@ -354,8 +354,15 @@ std::shared_ptr<Texture> Texture::WithColorSpace(
     default: if (srgb) return nullptr; break;
     }
     if (target == format) return source;
-    auto texture = std::make_shared<Texture>();
+    auto texture = own::make_shared<Texture>();
     texture->m_codecImage = source->m_codecImage;
+    if (source->m_assetOrigin)
+    {
+        auto origin = *source->m_assetOrigin;
+        origin.variant.colorSpace = srgb ? AssetDepot::TextureAssetColorSpace::Srgb
+            : AssetDepot::TextureAssetColorSpace::Linear;
+        texture->m_assetOrigin = own::make_shared<const AssetDepot::TextureAssetOrigin>(std::move(origin));
+    }
     texture->m_samplingFormat = target;
     texture->m_textureType = source->m_textureType;
     texture->m_name = source->m_name;
@@ -363,16 +370,16 @@ std::shared_ptr<Texture> Texture::WithColorSpace(
     texture->m_assetPath = source->m_assetPath;
     texture->m_size = source->m_size;
     texture->m_isTextureAlpha = source->m_isTextureAlpha;
-    return texture;
+    return std::move(texture);
 }
 
 //static functions
-std::shared_ptr<Texture> Texture::WithMipChain(
-    const std::shared_ptr<Texture>& source, std::string& outFailure)
+own::shared_owner<const Texture> Texture::WithMipChain(
+    const own::shared_owner<const Texture>& source, std::string& outFailure)
 {
     ce::profile_scope profile{ ce::marker<"Texture.MipChain">() };
     outFailure.clear();
-    const auto fail = [&](std::string_view message) -> std::shared_ptr<Texture> {
+    const auto fail = [&](std::string_view message) -> own::shared_owner<const Texture> {
         outFailure = message; return nullptr;
     };
     if (!source || source->GetImageView().IsEmpty()) return fail("Mip source is empty");
@@ -447,16 +454,17 @@ std::shared_ptr<Texture> Texture::WithMipChain(
     }
     auto codec = TextureMakeCodecImage(std::move(chain));
     if (!codec) return fail("Generated mip chain is invalid");
-    auto texture = std::make_shared<Texture>();
+    auto texture = own::make_shared<Texture>();
     texture->m_codecImage = std::move(codec);
+    texture->m_assetOrigin = source->m_assetOrigin;
     texture->m_textureType = source->m_textureType;
     texture->m_name = source->m_name; texture->m_extension = source->m_extension;
     texture->m_assetPath = source->m_assetPath;
     texture->m_size = source->m_size; texture->m_isTextureAlpha = source->m_isTextureAlpha;
-    return texture;
+    return std::move(texture);
 }
 
-Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
+own::shared_owner<const Texture> Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	_In_ std::string_view name, _In_ RHIFormat textureFormat,
 	_In_reads_bytes_(rowPitch* height) const void* pixels, _In_opt_ size_t rowPitch)
 {
@@ -485,7 +493,7 @@ Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 		static_cast<const std::byte*>(pixels), sourcePitch,
 		RHIFormatRowCount(textureFormat, height), destination->rowPitch);
 
-	Texture* texture = new Texture();
+	auto texture = own::make_shared<Texture>();
 	texture->m_name = std::string(name);
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { float(width), float(height) };
@@ -494,14 +502,13 @@ Texture* Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
 	texture->m_codecImage = TextureMakeCodecImage(std::move(image));
 	if (!texture->m_codecImage)
 	{
-		delete texture;
 		return nullptr;
 	}
 
-	return texture;
+	return std::move(texture);
 }
 
-std::shared_ptr<Texture> Texture::CreateSharedFromImage(
+own::shared_owner<const Texture> Texture::CreateSharedFromImage(
 	std::string_view name, TextureImage image)
 {
 	if (!image.IsValid()) return nullptr;
@@ -515,7 +522,7 @@ std::shared_ptr<Texture> Texture::CreateSharedFromImage(
 	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::shared_ptr<Texture>(new Texture());
+	auto texture = own::make_shared<Texture>();
 	texture->m_name = std::string(name);
 	texture->m_textureType = isCube
 		? TextureType::TextureCube
@@ -528,10 +535,10 @@ std::shared_ptr<Texture> Texture::CreateSharedFromImage(
 	texture->m_isTextureAlpha = (4 == RHIFormatChannels(format))
 		|| RHIFormatIsBlockCompressed(format);
 	texture->m_codecImage = std::move(codecImage);
-	return texture;
+	return std::move(texture);
 }
 
-Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
+own::shared_owner<const Texture> Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
@@ -641,7 +648,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-    Texture* texture = new Texture();
+    auto texture = own::make_shared<Texture>();
 	// ★ 여기 있던 DX11 SRV 생성을 걷었다 (T6, 2026-08-08).
 	//
 	//   이 로더가 만들던 것은 둘이었다 - CPU 픽셀(m_cpuPixels)과 DX11
@@ -656,10 +663,10 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
 	texture->m_codecImage = std::move(codecImage);
 
-	return texture;
+	return std::move(texture);
 }
 
-std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress)
+own::shared_owner<const Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress, std::string_view assetPath)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
@@ -769,7 +776,10 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::make_shared<Texture>();
+	auto texture = own::make_shared<Texture>();
+    texture->m_name = path.stem().string();
+    texture->m_extension = path.extension().string();
+    texture->m_assetPath = assetPath.empty() ? path.lexically_normal().generic_string() : std::string(assetPath);
 
 	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
 
@@ -780,11 +790,11 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
 	texture->m_codecImage = std::move(codecImage);
 
-	return texture;
+	return std::move(texture);
 }
 
 
-std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
+own::shared_owner<const Texture> Texture::LoadSharedFromMemory(
 	std::span<const std::byte> bytes, bool isCompress)
 {
 	ScratchImage image{};
@@ -820,12 +830,12 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::make_shared<Texture>();
+	auto texture = own::make_shared<Texture>();
 	texture->m_textureType = TextureType::ImageTexture;
 	texture->m_size = { imageWidth, imageHeight };
 	texture->m_isTextureAlpha = hasAlpha;
 	texture->m_codecImage = std::move(codecImage);
-	return texture;
+	return std::move(texture);
 }
 
 own::shared_owner<const Texture> Texture::LoadOwnedFromMemory(
@@ -955,7 +965,7 @@ std::size_t Texture::DecodedByteSize() const noexcept
     return result;
 }
 
-std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
+own::shared_owner<const Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
 {
 	file::path matPath = PathFinder::RelativeToMaterial(path.string());
 	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
@@ -1064,7 +1074,7 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
-	auto texture = std::make_unique<Texture>();
+	auto texture = own::make_shared<Texture>();
 
 	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
 
@@ -1075,7 +1085,7 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
 	texture->m_codecImage = std::move(codecImage);
 
-	return texture;
+	return std::move(texture);
 }
 
 // ── cook 경로의 디코드 창구 (축 A) ──────────────────────────────────────
@@ -1185,7 +1195,6 @@ Texture::Texture(Texture&& texture) noexcept
 	texture.m_isTextureAlpha = false;
 }
 
-Texture::~Texture() = default;
 
 math::vector2 Texture::GetImageSize() const
 {

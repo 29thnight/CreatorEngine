@@ -47,7 +47,7 @@ function BodyOf([string]$signature) {
     $next = $dataSystem.IndexOf("`n}", $start)
     $dataSystem.Substring($start, $next - $start)
 }
-Assert ((BodyOf 'std::shared_ptr<Texture> DataSystem::LoadSharedTexture(') -match 'TextureCacheKey\(assetPath\)') 'LoadSharedTexture 가 TextureCacheKey 로 키를 만들지 않는다'
+Assert ((BodyOf 'own::shared_owner<const Texture> DataSystem::LoadSharedTexture(') -match 'TextureCacheKey\(assetPath\)') 'LoadSharedTexture 가 TextureCacheKey 로 키를 만들지 않는다'
 Assert ((BodyOf 'void DataSystem::RetireCachedAsset(') -match 'TextureCacheKey\(path\)') 'RetireCachedAsset 이 TextureCacheKey 로 떼지 않는다'
 $retain = BodyOf 'void DataSystem::RetainAssets('
 Assert (([regex]::Matches($retain, 'TextureCacheKey\(ResolveRuntimeAssetPath\(')).Count -eq 3) 'RetainAssets 가 텍스처 세 용도의 키를 적재와 같은 해석으로 만들지 않는다 — 언로드가 번들 텍스처를 지운다'

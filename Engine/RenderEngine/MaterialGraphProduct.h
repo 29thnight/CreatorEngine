@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 
 #include "../../Lattice/Material/LXMaterialCompiler.h"
 #include "LXMaterialPipeline.h"
@@ -7,6 +8,8 @@
 
 #include <memory>
 #include <span>
+
+class Texture;
 
 namespace material_graph
 {
@@ -109,7 +112,7 @@ struct VerifiedProduct
     std::vector<LX::LXMaterialShaderArtifact> shaders;
     std::vector<CompileTarget> targets;
     // Meta, source, common binding layout and bytecode share this generation.
-    std::shared_ptr<const GeneratedMaterialShader> materialShader;
+    own::shared_owner<const GeneratedMaterialShader> materialShader;
     // Sorted union of the files every target compile read (root source excluded).
     // In memory only: the cooked product format does not carry it.
     std::vector<std::filesystem::path> dependencies;
@@ -142,8 +145,8 @@ struct TextureBinding
 {
     std::uint32_t slot{};
     RHITextureEntry texture;
-    // The owner must keep both the CPU generation and its RHI registration live.
-    std::shared_ptr<const void> owner;
+    // CPU representation pin; the texture cache separately retires native storage.
+    own::shared_owner<const Texture> owner;
     bool linearStorage = false;
 };
 
@@ -152,7 +155,8 @@ struct ResourcePacket
     std::vector<std::uint8_t> uniforms;
     std::vector<RHIBindingDesc> textures;
     std::vector<RHISamplerDesc> samplers;
-    std::vector<std::shared_ptr<const void>> owners;
+    // One pin per Texture representation, deduplicated by m_assetId.
+    std::vector<own::shared_owner<const Texture>> owners;
 };
 
 // CPU instance packing uses the same reflected layout as the render packet.

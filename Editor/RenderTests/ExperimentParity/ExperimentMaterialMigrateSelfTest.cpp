@@ -454,9 +454,9 @@ namespace RenderTest
 
             // legacy 노드에서는 typed가 채운 인스턴스를 보존해야 한다.
             MeshRenderer legacyRenderer;
-            legacyRenderer.m_Material = std::make_shared<Material>();
+            legacyRenderer.m_Material = own::make_shared<Material>();
             legacyRenderer.m_Material->m_name = "TypedFilled";
-            const std::shared_ptr<Material> before = legacyRenderer.m_Material;
+            const own::shared_owner<Material> before = legacyRenderer.m_Material;
             Authoring::ParsedDocument legacyDocument =
                 Authoring::ParsedDocument::ParseText(
                     "m_Material:\n  m_name: TypedFilled\n", parseError);
@@ -464,7 +464,8 @@ namespace RenderTest
             if (legacyDocument)
                 legacyRenderer.OnDeserialized(
                     Authoring::NodeViewAccess::Make(legacyNode));
-            check.Check(legacyRenderer.m_Material == before
+            check.Check(legacyRenderer.m_Material && before
+                && legacyRenderer.m_Material->m_materialGuid == before->m_materialGuid
                 && legacyRenderer.m_Material->m_name == "TypedFilled",
                 "legacy 노드는 typed 인스턴스를 보존한다");
         }
@@ -567,17 +568,15 @@ namespace RenderTest
             {
                 experiment::Material authoredForEmbed;
                 std::string error;
-                const ShaderMetaHandle handle =
-                    DataSystems->LoadShaderMetaHandle(fixtureGuid, error);
-                const std::shared_ptr<const ShaderMeta> fixtureMeta =
-                    DataSystems->ResolveShaderMeta(handle);
-                auto owned = std::make_shared<Material>();
+                ShaderMetaHandle handle;
+                const auto fixtureMeta = DataSystems->LoadShaderMetaOwner(fixtureGuid, handle, error);
+                auto owned = own::make_shared<Material>();
                 if (fixtureMeta
                     && experiment::DeserializeMaterialAuthoring(
                         authoredNode,
                         authoredForEmbed, error)
                     && ExperimentMaterialMigration::ConvertToLegacyMaterial(
-                        authoredForEmbed, fixtureMeta.get(), *owned, error))
+                        authoredForEmbed, &*fixtureMeta.borrow(), *owned, error))
                 {
                     DataSystems->FinalizeMaterialRuntime(*owned);
                     writerRenderer.m_Material = std::move(owned);
@@ -678,14 +677,14 @@ namespace RenderTest
 
         // ── S2c-2a: base 참조+diff — 자산 링크가 저장을 살아넘는다 ────────
         {
-            const std::shared_ptr<Material> base =
+            const own::shared_owner<const Material> base =
                 DataSystems->LoadMaterialShared("ForwardWater");
             check.Check(nullptr != base && FileGuid{} != base->m_fileGuid,
                 "base 재질 자산 로드");
             if (base)
             {
                 MeshRenderer linked;
-                linked.m_Material = std::make_shared<Material>(*base);
+                linked.m_Material = own::make_shared<Material>(*base);
                 linked.m_materialBaseGuid = base->m_fileGuid;
                 experiment::MaterialProperty edit;
                 edit.name = "roughness";
@@ -758,7 +757,7 @@ namespace RenderTest
                     "참조 표기 재저장 고정점");
 
                 MeshRenderer clean;
-                clean.m_Material = std::make_shared<Material>(*base);
+                clean.m_Material = own::make_shared<Material>(*base);
                 clean.m_materialBaseGuid = base->m_fileGuid;
                 Authoring::WriteDocument cleanDocument =
                     Meta::SerializeDocument(&clean);

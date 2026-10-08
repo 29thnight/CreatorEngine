@@ -38,7 +38,7 @@ void Near(float actual, double expected, const std::string& label, double tolera
 
 using namespace MaterialProbe::IblReference;
 
-std::shared_ptr<Texture> Cube(const Environment& environment)
+own::shared_owner<const Texture> Cube(const Environment& environment)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 4, 4, 6, 1, true);
     for (unsigned face = 0; face < 6; ++face)
@@ -186,7 +186,7 @@ void Run(const std::filesystem::path& root)
         Check(device.BeginFrame(error), "Begin recording: " + error);
         textures.BeginFrame(frame);
         auto& encoder = device.GetImmediateEncoder();
-        IblEnvironment environment{textures.GetOrUpload(texture.get(), error), frame + 1, texture};
+        IblEnvironment environment{textures.GetOrUpload((texture ? &*texture.borrow() : nullptr), error), frame + 1, texture};
         const RHITransition source{environment.cube.handle, RHIResourceState::PixelShaderResource,
                                    RHIResourceState::ShaderResource};
         encoder.ResourceBarriers({{&source, 1}});

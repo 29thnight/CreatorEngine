@@ -119,7 +119,7 @@ Vector SceneTransmissionIntegral(const MaterialProbe::Reference::Material& glass
 
 void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                         ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                        std::shared_ptr<Texture> image, std::shared_ptr<Texture> cube,
+                        own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
                         const own::shared_owner<const Instance>& background)
 {
     const std::array products{RefractionProduct(root, false), RefractionProduct(root, true),
@@ -256,7 +256,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(device.BeginFrame(error), "Refraction frame begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload(cube.get(), error).handle;
+            const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error).handle;
             Check(host.PrepareResidency(context, input, error), "Refraction residency " + error);
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) && forward.PrepareFrame(context, error),
                   "Refraction Scene prepare " + error);

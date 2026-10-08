@@ -156,6 +156,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="ShaderMetadataRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="Assets\ModelSourcePreparation.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
@@ -168,8 +171,18 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
-    <ClCompile Include="AssetDepot\AssetDepot.cpp" />
-    <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp" />
+    <ClCompile Include="AssetDepot\ModelAssetRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\AssetDepot.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
@@ -572,6 +585,14 @@
     <ClInclude Include="Assets\ModelSourcePreparation.h" />
     <ClInclude Include="Experiment\Cooked\CookedModelSubAssetCodec.h" />
     <ClInclude Include="Experiment\Cooked\ModelAssetSetProducer.h" />
+    <ClInclude Include="Assets\ModelSkeletonPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationDescriptor.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCache.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCharges.h" />
+    <ClInclude Include="TextureFramePins.h" />
+    <ClInclude Include="MaterialGraphInstancePins.h" />
+    <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
     <ClInclude Include="AssetDepot\AssetLink.h" />
     <ClInclude Include="AssetDepot\AssetRequest.h" />
     <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />

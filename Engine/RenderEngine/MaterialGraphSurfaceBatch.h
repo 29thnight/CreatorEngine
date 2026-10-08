@@ -70,7 +70,14 @@ namespace material_graph
         std::uint32_t Count() const { return count_; }
         const IRenderDeviceServices* Device() const { return device_; }
         const SurfaceView& View() const { return view_; }
-        const own::shared_owner<const Instance>& Material() const { return bindings_->instance; }
+        own::shared_owner<const Instance> Material() const
+        {
+            return bindings_->instancePins->Owner(bindings_->instancePinIndex);
+        }
+        const own::shared_owner<InstanceFramePins>& MaterialPins() const
+        {
+            return bindings_->instancePins;
+        }
         std::uint64_t RecordingId() const { return recordingId_; }
         bool IsValidated() const { return validated_; }
         bool IsReadyForBake() const { return recordedStages_.load() == 3 && (!mesh_ || mesh_->IsReadyForEvaluation()); }

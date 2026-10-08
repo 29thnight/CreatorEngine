@@ -414,13 +414,14 @@ private:
     // 두 번 그릴 때 두 번째가 첫 번째의 텍스처로 그려지지 않는다.
     struct MaterialKey
     {
-        std::vector<Texture*> textures{};
+        std::vector<const Texture*> textures{};
+        std::vector<std::uint64_t> textureIds{};
         std::vector<assets::TextureCoordinates> coordinates{}; // reflected register order
         // W7 — 배치가 샘플러로도 갈려야 draw 마다 자기 것을 걸 수 있다.
         assets::TextureSampler sampler{};
         std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> snapshot{};
 
-        Texture* operator[](std::size_t i) const { return textures[i]; }
+        const Texture* operator[](std::size_t i) const { return textures[i]; }
         bool operator==(const MaterialKey& other) const;
         bool operator<(const MaterialKey& other) const;
     };

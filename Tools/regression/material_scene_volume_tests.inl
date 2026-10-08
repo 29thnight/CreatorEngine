@@ -217,7 +217,7 @@ VolumeGeometry VolumeBoxes(std::span<const std::array<float, 2>> depths, std::ui
 
 void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                    const std::shared_ptr<Texture>& image, const std::shared_ptr<Texture>& cube,
+                    const own::shared_owner<const Texture>& image, const own::shared_owner<const Texture>& cube,
                     const own::shared_owner<const Instance>& background)
 {
     const std::array products{VolumeProduct(root, false), VolumeProduct(root, true)};
@@ -382,7 +382,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
             const auto environment =
-                fixture != 6 && fixture != 10 ? textures.GetOrUpload(cube.get(), error).handle : RHITextureHandle{};
+                fixture != 6 && fixture != 10 ? textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error).handle : RHITextureHandle{};
             Check(host.PrepareResidency(context, input, error), "Volume residency " + error);
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
                   "Volume Scene prepare " + error);

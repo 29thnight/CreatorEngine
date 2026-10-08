@@ -1,3 +1,4 @@
+#include "Texture.h"
 #include "MaterialGraphIblBake.h"
 #include "MaterialGraphSurfaceBatch.h"
 
@@ -56,7 +57,8 @@ bool IblBakeResult::Matches(const IRenderDeviceServices& device, const IblEnviro
     const auto& a = environment_.cube;
     const auto& b = environment.cube;
     return device_ == &device && environment_.generation == environment.generation &&
-           environment_.owner == environment.owner && a.handle == b.handle && a.format == b.format &&
+           environment_.owner && environment.owner &&
+           environment_.owner->m_assetId == environment.owner->m_assetId && a.handle == b.handle && a.format == b.format &&
            a.width == b.width && a.height == b.height && a.mipLevels == b.mipLevels && a.arraySize == b.arraySize &&
            a.isCube == b.isCube && !gpuPoints_ && points_.size() == points.size() &&
            std::memcmp(points_.data(), points.data(), points.size_bytes()) == 0;
@@ -68,7 +70,8 @@ bool IblBakeResult::MatchesGpu(const IRenderDeviceServices& device, const IblEnv
     const auto& a = environment_.cube;
     const auto& b = environment.cube;
     return device_ == &device && gpuPoints_.get() == &points && environment_.generation == environment.generation &&
-           environment_.owner == environment.owner && a.handle == b.handle && a.format == b.format &&
+           environment_.owner && environment.owner &&
+           environment_.owner->m_assetId == environment.owner->m_assetId && a.handle == b.handle && a.format == b.format &&
            a.width == b.width && a.height == b.height && a.mipLevels == b.mipLevels && a.arraySize == b.arraySize &&
            a.isCube == b.isCube;
 }

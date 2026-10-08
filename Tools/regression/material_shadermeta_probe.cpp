@@ -1,3 +1,4 @@
+#include "../../Engine/RenderEngine/Texture.h"
 #include "material_owner_checks.h"
 #include "../../Engine/RenderEngine/MaterialGraphShaderMeta.h"
 #include "../../Engine/RenderEngine/MaterialGraphSceneCompiler.h"
@@ -142,11 +143,11 @@ RWStructuredBuffer<float4> result : register(u0);
     generationValue.generation = 1;
     generationValue.cooked.product.program = program;
     generationValue.cooked.product.layout = legacy;
-    generationValue.cooked.product.materialShader = std::make_shared<GeneratedMaterialShader>(accepted);
+    generationValue.cooked.product.materialShader = own::make_shared<const GeneratedMaterialShader>(accepted);
     const auto owning = own::make_shared<const Generation>(std::move(generationValue));
-    const auto lifetime = std::make_shared<int>(1);
+    const auto lifetime = own::make_shared<const Texture>();
     const TextureLoader loader = [&lifetime](const experiment::AssetId&, LXColorSpace, std::string&) {
-        return std::shared_ptr<Texture>(lifetime, reinterpret_cast<Texture*>(lifetime.get()));
+        return lifetime;
     };
     InstanceDescription instanceDescription{owning->assetId, {}, {}};
     own::shared_owner<const Instance> instance;
@@ -300,19 +301,20 @@ RWStructuredBuffer<float4> result : register(u0);
         retainedShader, error, alteredContractBytes) && retainedShader.meta == retained->meta,
         "Cooked typed defaults cannot disagree with verified program or replace accepted output");
     auto broken = product;
-    auto brokenShader = std::make_shared<GeneratedMaterialShader>(*broken.materialShader);
-    brokenShader->source += "\n// mismatched source\n";
-    broken.materialShader = brokenShader;
+    auto brokenShader = *broken.materialShader;
+    brokenShader.source += "\n// mismatched source\n";
+    broken.materialShader = own::make_shared<const GeneratedMaterialShader>(brokenShader);
     const auto acceptedPayload = payload;
     Check(!WriteCookedProgram(broken, {}, payload, error) && payload == acceptedPayload,
         "Mismatched generated pair cannot replace accepted cook bytes");
-    brokenShader->source = product.materialShader->source;
-    brokenShader->layout.properties[0].byteOffset += 4;
+    brokenShader.source = product.materialShader->source;
+    brokenShader.layout.properties[0].byteOffset += 4;
+    broken.materialShader = own::make_shared<const GeneratedMaterialShader>(std::move(brokenShader));
     Check(!WriteCookedProgram(broken, {}, payload, error) && payload == acceptedPayload,
         "Altered common binding cannot replace accepted cook bytes");
     auto corrupt = acceptedPayload;
     corrupt[corrupt.size() / 2] ^= 1;
-    Check(!ReadCookedProgram(corrupt, {}, restoredProduct, error) && restoredProduct.product.materialShader == retained,
+    Check(!ReadCookedProgram(corrupt, {}, restoredProduct, error) && material_graph_test::SamePinnedObject(restoredProduct.product.materialShader, retained),
         "Corrupt cooked generation preserves prior schema owner");
 
     // The editor compiles only its renderer's backend. That product must survive the

@@ -159,7 +159,7 @@ bool SceneMaterialSlot::Prepare(IRenderTextureCache& textures, IRenderPipelineCa
     }
     if (evaluation.gpu &&
         (evaluation.gpu->Device() != device_ || !evaluation.gpu->Count() ||
-         evaluation.gpu->Count() > IblBaker::MaxPoints || evaluation.gpu->Material() != evaluation.instance ||
+         evaluation.gpu->Count() > IblBaker::MaxPoints || evaluation.gpu->Material()->representationId != evaluation.instance->representationId ||
          evaluation.gpu->View().sceneEpoch != evaluation.sceneEpoch ||
          evaluation.gpu->View().viewRevision != evaluation.viewRevision ||
          evaluation.gpu->View().geometryRevision != evaluation.geometryRevision ||
@@ -219,7 +219,23 @@ bool SceneMaterialSlot::Prepare(IRenderTextureCache& textures, IRenderPipelineCa
     }
     candidate->serial = ++serial_;
     candidate->coverage = coverage;
-    candidate->evaluation = evaluation;
+    if (evaluation.gpu)
+    {
+        candidate->instancePins = evaluation.gpu->MaterialPins();
+    }
+    else
+    {
+        auto& recordingPins = recordings_[recordingId].instancePins;
+        if (!recordingPins)
+        {
+            recordingPins = own::make_shared<InstanceFramePins>();
+        }
+        recordingPins->Retain(evaluation.instance);
+        candidate->instancePins = recordingPins;
+    }
+    const auto instanceView = candidate->instancePins->Borrow(candidate->instancePins->Find(*evaluation.instance));
+    candidate->evaluation = {instanceView, evaluation.sceneEpoch, evaluation.viewRevision,
+        evaluation.geometryRevision, evaluation.points, evaluation.gpu};
     candidate->environment = environment;
     candidate->pipeline = std::move(request);
     candidate->iblSlot = layout.iblSlot;
@@ -228,7 +244,8 @@ bool SceneMaterialSlot::Prepare(IRenderTextureCache& textures, IRenderPipelineCa
     // texture upload can submit a recording segment before returning a failure.
     recordings_[recordingId].owners.push_back(candidate);
     const bool prepared =
-        bindings.Prepare(*device_, textures, evaluation.instance, layout.material, candidate->bindings, error);
+        bindings.Prepare(*device_, textures, evaluation.instance, layout.material, candidate->bindings, error,
+            candidate->instancePins);
     const auto current = device_->GetCurrentUploadRecordingId();
     if (current != 0 && current != recordingId)
     {

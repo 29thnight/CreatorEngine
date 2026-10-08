@@ -38,7 +38,7 @@ class IRenderTextureCache
 public:
     virtual ~IRenderTextureCache() = default;
 
-    virtual RHITextureEntry GetOrUpload(Texture* texture, std::string& outError) = 0;
+    virtual RHITextureEntry GetOrUpload(const Texture* texture, std::string& outError) = 0;
     virtual RHITextureEntry GetBlackTexture(std::string& outError) = 0;
     virtual RHITextureEntry GetOrmNeutralTexture(std::string& outError) = 0;
 

@@ -271,7 +271,7 @@ struct Session
         }
         const auto before = renderer->m_Material;
         const auto previousBase = renderer->m_materialBaseGuid;
-        auto candidate = before ? std::make_shared<Material>(*before) : std::make_shared<Material>();
+        auto candidate = before ? own::make_shared<Material>(*before) : own::make_shared<Material>();
         material_graph::InstanceDescription description;
         if (before && before->HasMaterialGraph() &&
             before->GetMaterialGraphInstance()->description.graphId.value == guid.m_guid)
@@ -285,7 +285,7 @@ struct Session
             message = "Apply failed. Scene and preview keep the last accepted material. " + message;
             return false;
         }
-        const auto apply = [handle = target, identity = component](const std::shared_ptr<Material>& material,
+        const auto apply = [handle = target, identity = component](const own::shared_owner<Material>& material,
                                                                    FileGuid base) {
             auto* scene = SceneManagers->GetActiveScene();
             auto* object = scene ? scene->Resolve(handle) : nullptr;

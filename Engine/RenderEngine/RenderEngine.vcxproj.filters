@@ -240,9 +240,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ShaderMetadataRuntime.cpp" />
     <ClCompile Include="Assets\ModelSourcePreparation.cpp" />
     <ClCompile Include="Experiment\Cooked\CookedModelSubAssetCodec.cpp" />
     <ClCompile Include="Experiment\Cooked\ModelAssetSetProducer.cpp" />
+    <ClCompile Include="AssetDepot\ModelAssetRuntime.cpp" />
     <ClCompile Include="AssetDepot\AssetDepot.cpp" />
     <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp" />
     <ClCompile Include="AssetAuthoringPort.cpp">
@@ -594,6 +596,14 @@
     <ClInclude Include="Assets\ModelSourcePreparation.h" />
     <ClInclude Include="Experiment\Cooked\CookedModelSubAssetCodec.h" />
     <ClInclude Include="Experiment\Cooked\ModelAssetSetProducer.h" />
+    <ClInclude Include="Assets\ModelSkeletonPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationPayload.h" />
+    <ClInclude Include="Assets\ModelAnimationDescriptor.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCache.h" />
+    <ClInclude Include="AssetDepot\LegacyResourceCharges.h" />
+    <ClInclude Include="TextureFramePins.h" />
+    <ClInclude Include="MaterialGraphInstancePins.h" />
+    <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
     <ClInclude Include="AssetDepot\AssetLink.h" />
     <ClInclude Include="AssetDepot\AssetRequest.h" />
     <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />

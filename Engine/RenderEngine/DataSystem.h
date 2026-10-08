@@ -13,6 +13,9 @@
 #include "MaterialGraphRuntime.h"
 #include "../Utility_Framework/Ownership.h"
 #include "AssetDepot/TextureAssetRuntime.h"
+#include "AssetDepot/LegacyResourceCache.h"
+#include "AssetDepot/ModelAssetRuntime.h"
+#include <array>
 #include <atomic>
 #include <cstddef>
 #include <iosfwd>
@@ -25,12 +28,20 @@
 #include <vector>
 
 template <typename T>
-using DataContainer = std::unordered_map<std::string, std::shared_ptr<T>>;
+using DataContainer = std::unordered_map<std::string, asset_cache_detail::Entry<T>>;
+
+class Material;
 
 struct AssetBundleLoadResult
 {
     std::size_t submitted{};
     std::size_t completed{};
+    AssetDepot::AssetRequestStatus status{ AssetDepot::AssetRequestStatus::Pending };
+    AssetDepot::AssetRequestError error{ AssetDepot::AssetRequestError::None };
+    std::string message;
+    std::vector<assets::ModelAssetGeneration::Shared> models;
+    std::vector<own::shared_owner<const Material>> materials;
+    std::vector<own::shared_owner<const Texture>> textures;
 };
 
 // Main system for storing runtime data
@@ -104,34 +115,63 @@ private:
 	DataSystem() = default;
 	~DataSystem();
 public:
-	// C4 이후 Model/Material의 장기 소비자는 shared_ptr를 보유한다. Texture 계열은
-	// TerrainLayer와 legacy Material raw 별칭이 남아 있어 별도 이행 전까지 이전
-	// cache generation을 runtime 종료까지 보존한다.
-	static constexpr bool RequiresLegacyRetiredGeneration(
-		RuntimeAssetType assetType) noexcept
-	{
-		return assetType == RuntimeAssetType::Texture
-			|| assetType == RuntimeAssetType::UITexture
-			|| assetType == RuntimeAssetType::SpriteSheet;
-	}
+    // Compatibility probe for older diagnostics. All durable Texture aliases
+    // now travel with typed scene/proxy/frame owners; no retirement root is needed.
+    static constexpr bool RequiresLegacyRetiredGeneration(RuntimeAssetType) noexcept
+    {
+        return false;
+    }
 
-    // Typed CPU acquisition. Only Texture has an implemented v3 runtime decoder.
+    // Typed CPU acquisition. Current links never resurrect an old generation.
     // Misses are I/O-free; callers request work explicitly and poll its state.
     template<class T>
     [[nodiscard]] own::shared_owner<const T> TryAcquire(AssetDepot::AssetLink<T> link,
         const AssetDepot::TextureAssetVariant& variant = {})
     {
-        static_assert(std::is_same_v<T, Texture>, "AssetDepot runtime acquisition currently supports Texture only.");
-        return TryAcquireTexture(link, variant);
+        if constexpr (std::is_same_v<T, Texture>)
+        {
+            return TryAcquireTexture(link, variant);
+        }
+        else
+        {
+            static_assert(std::is_same_v<T, assets::ModelAnimationDescriptor>
+                || std::is_same_v<T, assets::ModelSkeletonPayload>
+                || std::is_same_v<T, assets::ModelAnimationPayload>, "Unsupported AssetDepot type.");
+            return TryAcquireCurrentModelAsset(link);
+        }
     }
 
     template<class T>
     [[nodiscard]] AssetDepot::AssetRequest<T> RequestAsync(AssetDepot::AssetLink<T> link,
         const AssetDepot::TextureAssetVariant& variant = {})
     {
-        static_assert(std::is_same_v<T, Texture>, "AssetDepot runtime acquisition currently supports Texture only.");
-        return RequestTextureAsync(link, variant);
+        if constexpr (std::is_same_v<T, Texture>)
+        {
+            return RequestTextureAsync(link, variant);
+        }
+        else
+        {
+            static_assert(std::is_same_v<T, assets::ModelAnimationDescriptor>
+                || std::is_same_v<T, assets::ModelSkeletonPayload>
+                || std::is_same_v<T, assets::ModelAnimationPayload>, "Unsupported AssetDepot type.");
+            return RequestCurrentModelAssetAsync(link);
+        }
     }
+
+    // Exact payload access requires an already-owned descriptor. These overloads
+    // never resolve a child against the latest catalog and survive logical unmount.
+    [[nodiscard]] AssetDepot::AssetRequest<assets::ModelSkeletonPayload> RequestSkeletonAsync(
+        own::shared_owner<const assets::ModelAnimationDescriptor> descriptor);
+    [[nodiscard]] AssetDepot::AssetRequest<assets::ModelAnimationPayload> RequestAnimationAsync(
+        own::shared_owner<const assets::ModelAnimationDescriptor> descriptor, std::size_t clipIndex);
+    [[nodiscard]] own::shared_owner<const assets::ModelSkeletonPayload> TryAcquireSkeleton(
+        const own::shared_owner<const assets::ModelAnimationDescriptor>& descriptor);
+    [[nodiscard]] own::shared_owner<const assets::ModelAnimationPayload> TryAcquireAnimation(
+        const own::shared_owner<const assets::ModelAnimationDescriptor>& descriptor, std::size_t clipIndex);
+    [[nodiscard]] bool HasModelAnimationDescriptor(
+        AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link) const;
+    void SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips);
+    [[nodiscard]] AssetDepot::ModelAssetCacheSnapshot SnapshotModelAssetCache() const;
 
     void SetTextureAssetCacheBudget(std::size_t bytes);
     [[nodiscard]] AssetDepot::TextureAssetCacheSnapshot SnapshotTextureAssetCache() const;
@@ -142,13 +182,27 @@ public:
     void Finalize();
 	// Asset bundle operations
 	AssetBundleLoadResult LoadAssetBundle(const AssetBundle& bundle);
-	// Nonblocking submission; copied paths and request state remain owned until
-    // completion. Finalize also drains the work if the caller drops the handle.
-	job_handle LoadAssetBundleAsync(const AssetBundle& bundle);
+    class AssetBundlePreparation final
+    {
+    public:
+        [[nodiscard]] AssetBundleLoadResult Snapshot() const;
+        [[nodiscard]] job_handle Completion() const;
+        void Cancel();
+    private:
+        friend class DataSystem;
+        mutable std::mutex mutex;
+        std::uint64_t epoch{};
+        std::atomic<bool> cancelled{};
+        AssetBundleLoadResult result;
+        job_handle work;
+    };
+    // Nonblocking submission returns the actual result owner. Jobs and shutdown
+    // drain snapshots retain it independently; the lookup registry is weak.
+    own::shared_owner<AssetBundlePreparation> LoadAssetBundleAsync(const AssetBundle& bundle);
     // CPU preparation uses the common scheduler. Poll/publish only at the scene
     // owner boundary; GPU upload/readiness remains owned by the renderer.
     struct PreparedRuntimeAsset;
-    using ModelPreparation = std::shared_ptr<PreparedRuntimeAsset>;
+    using ModelPreparation = own::shared_owner<PreparedRuntimeAsset>;
     ModelPreparation PrepareModelAssetByPath(std::string_view path);
     job_handle ModelPreparationCompletion(const ModelPreparation& preparation) const;
     assets::ModelAssetGeneration::Shared ReadPreparedModel(
@@ -163,11 +217,11 @@ public:
         std::string phase;
         std::string name;
     };
-    std::shared_ptr<SceneAssetPreparation> PrepareSceneAssets(
+    own::shared_owner<SceneAssetPreparation> PrepareSceneAssets(
         const Authoring::ReadNode& root, const AssetBundle& bundle, const file::path& scene);
-    bool PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& preparation,
+    bool PollSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation,
         bool wait, bool publish, std::string& error);
-    void CancelSceneAssets(const std::shared_ptr<SceneAssetPreparation>& preparation);
+    void CancelSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation);
     [[nodiscard]] AssetPreparationProgress SnapshotAssetPreparationProgress() const;
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
@@ -217,7 +271,7 @@ public:
 		std::uint64_t retired{};
 		std::uint64_t rejected{};
 	};
-	[[nodiscard]] std::shared_ptr<Texture> ResolveModelGenerationTexture(
+	[[nodiscard]] own::shared_owner<const Texture> ResolveModelGenerationTexture(
 		const assets::ModelAssetGeneration& generation,
 		const Uuid::Uuid16& textureId);
 	[[nodiscard]] ModelGenerationTextureCacheSnapshot
@@ -289,19 +343,19 @@ public:
 	[[nodiscard]] std::size_t CookedCatalogStaleCount() const;
 
 	//Resource Texture
-	Texture* LoadTextureGUID(FileGuid guid);
-	Texture* LoadTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
-	// 캐시 키는 확장자까지 포함한 Assets 기준 상대 경로다(밖이면 절대 경로). 폴더를 가진
-	// 상대 경로는 Assets 기준으로, 이름만 온 요청은 용도 폴더에서 찾는다. 돌려준
-	// Texture 의 m_assetPath 가 그 키이고, 저장하면 같은 파일로 돌아온다.
-	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
-	std::vector<std::pair<std::string, std::shared_ptr<Texture>>> SnapshotTextures();
+	own::shared_owner<const Texture> LoadTextureGUID(FileGuid guid);
+	own::shared_owner<const Texture> LoadTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
+    // Source identity is the Assets-relative path including extension (absolute
+    // outside Assets). The cache also separates role/compression/color space;
+    // Texture::m_assetPath stays the source path suitable for serialization.
+	own::shared_owner<const Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
+	std::vector<std::pair<std::string, own::shared_owner<const Texture>>> SnapshotTextures(TextureFileType type = TextureFileType::Texture);
 	//Resource Material
-	void InsertMaterial(std::shared_ptr<Material> material);
-	std::shared_ptr<Material> FindCachedMaterial(std::string_view name);
-	std::vector<std::pair<std::string, std::shared_ptr<Material>>> SnapshotMaterials();
-	std::shared_ptr<Material> RegisterImportedMaterial(
-		std::shared_ptr<Material> material, std::string_view baseName);
+	void InsertMaterial(own::shared_owner<const Material> material);
+	own::shared_owner<const Material> FindCachedMaterial(std::string_view name);
+	std::vector<std::pair<std::string, own::shared_owner<const Material>>> SnapshotMaterials();
+	own::shared_owner<const Material> RegisterImportedMaterial(
+		own::shared_owner<const Material> material, std::string_view baseName);
 	// M5-B1: standalone Material YAML의 단일 codec. scene embedded material은
 	// typed reflection이 값을 복원한 뒤 같은 runtime finalize 규약을 공유한다.
 	bool SerializeMaterialPayload(Material& material,
@@ -316,7 +370,7 @@ public:
 		const Authoring::NodeView& node, experiment::Material* outAuthored);
 	// I5-D5c1 — base 재질 자산의 저작 원본. 씬의 ref 표기가 base를 legacy로만
 	// 로드해 왔다(LoadMaterialShared). 실패·legacy 표기 자산은 nullptr다.
-	std::shared_ptr<const experiment::Material> LoadAuthoredMaterialShared(
+	own::shared_owner<const experiment::Material> LoadAuthoredMaterialShared(
 		FileGuid assetGuid);
 	// Model cache는 이 versioned envelope 안에 위 YAML payload를 넣는다. 기존
 	// 무버전 binary record 판별은 probe 뒤 ModelLoader의 read-only 호환 경로가 맡는다.
@@ -324,19 +378,23 @@ public:
 	bool SerializeMaterialBinaryPayload(Material& material, std::ostream& output) const;
 	bool DeserializeMaterialBinaryPayload(Material& material, std::istream& input);
 	void FinalizeMaterialRuntime(Material& material);
-	Material* LoadMaterial(std::string_view name);
+	own::shared_owner<const Material> LoadMaterial(std::string_view name);
 	// 소유권을 공유하는 조회. 컴포넌트처럼 참조를 보관하는 쪽은 이것을 써야
 	// 캐시에서 제거되어도 사용 중인 머티리얼이 파괴되지 않는다.
-	std::shared_ptr<Material> LoadMaterialShared(std::string_view name);
-	std::shared_ptr<Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
+	own::shared_owner<const Material> LoadMaterialShared(std::string_view name);
+	own::shared_owner<const Texture> LoadSharedMaterialTexture(std::string_view filePath, bool isCompress,
         std::optional<bool> srgb = std::nullopt);
-	Material* CreateMaterial();
+	own::shared_owner<Material> CreateMaterial();
 	// Asset Metadata
 	FileGuid GetFileGuid(const file::path& filepath) const;
-	// catalog GUID를 정본으로 DataSystem 소유 cache slot을 얻는다. resolve가 반환한
-	// shared snapshot은 호출자가 보유하는 동안 안전하지만 reload 뒤 옛 handle은
-	// resolve되지 않는다. 값 복사 API는 기존 호출 호환 경계다.
-	ShaderMetaHandle LoadShaderMetaHandle(FileGuid guid, std::string& outError);
+    // Transitional synchronous engine-internal handoff: the immutable owner and
+    // numeric identity are acquired together. The handle itself never pins data.
+    own::shared_owner<const ShaderMeta> LoadShaderMetaOwner(FileGuid guid,
+        ShaderMetaHandle& outHandle, std::string& outError);
+    // CPU cache retention only; zero still permits owner-returning loads.
+    void SetShaderMetaRetainedBudgetBytes(std::size_t bytes);
+    std::size_t ShaderMetaRetainedBytes() const;
+    std::size_t ShaderMetaRetainedBudgetBytes() const;
 
     own::shared_owner<const material_graph::Generation> LoadMaterialGraphGeneration(FileGuid guid, std::string& error,
                                                                                   bool reload = false);
@@ -358,7 +416,7 @@ public:
                                  const assets::ModelAssetGeneration* model = nullptr);
     bool ConfigureMaterialGraphAuthoring(Material& material, const LX::LXMaterialAsset& asset,
                                          const material_graph::InstanceDescription& description, std::string& error);
-    std::shared_ptr<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
+    own::shared_owner<const ShaderMeta> ResolveShaderMeta(ShaderMetaHandle handle) const;
 	bool LoadShaderMetaGUID(FileGuid guid, ShaderMeta& outMeta,
 		std::string& outError);
 
@@ -376,13 +434,20 @@ public:
 	FileGuid GetStemToGuid(const std::string& stem) const;
 	file::path GetFilePath(FileGuid fileguid) const;
 
+private:
+    // Transitional synchronous caches: lookup and retained CPU budget share each entry.
+    static constexpr std::size_t kLegacyTextureBudgetBytes = 256u * 1024u * 1024u;
+    static constexpr std::size_t kLegacyMaterialBudgetBytes = 64u * 1024u * 1024u;
+    static constexpr std::size_t kLegacyCacheBudgetEntries = 512u;
 	DataContainer<Material>		Materials;
 	DataContainer<Texture>		Textures;
 	DataContainer<Texture>		UITextures;
 	DataContainer<Texture>		SpriteSheets;
 	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
 
+public:
 	std::string m_trasfarShader{};
+private:
 
 	// 캐시별 보호 규약(모델 generation cache는 자체 동기화 — ModelAssetGenerationCache).
 	//   m_materialMutex : Materials
@@ -401,7 +466,7 @@ public:
 	// 않으므로 m_materialMutex와 겹칠 이유가 없다.
 	std::mutex m_authoredMaterialMutex;
 	std::unordered_map<FileGuid,
-		std::shared_ptr<const experiment::Material>> m_authoredMaterials;
+		asset_cache_detail::Entry<experiment::Material>> m_authoredMaterials;
 
 	// MBC5 정본 cache. {ModelId,generation}을 주소 키로 쓰고 current generation
 	// 교체/retire를 aggregate 전체에 원자 적용한다.
@@ -409,7 +474,7 @@ public:
 	// MBC7 — generation embedded texture owner. 값은 generation 픽셀에서 만든
 	// Texture고, 소유자 색인은 retire가 generation 단위로 걷기 위한 역참조다.
 	mutable std::mutex m_modelGenerationTextureMutex;
-	std::map<assets::ModelTextureHandle, std::shared_ptr<Texture>>
+	std::map<assets::ModelTextureHandle, asset_cache_detail::Entry<Texture>>
 		m_modelGenerationTextures;
 	std::map<assets::ModelAssetGenerationHandle,
 		std::vector<assets::ModelTextureHandle>> m_modelGenerationTextureOwners;
@@ -442,22 +507,54 @@ private:
     [[nodiscard]] AssetDepot::TextureAssetEntries InvalidateTextureAssetsLocked();
     AssetDepot::TextureAssetRuntimeState m_textureAssets{};
 
-    struct AssetBundlePreparation;
-    std::shared_ptr<AssetBundlePreparation> SubmitAssetBundle(const AssetBundle& bundle);
+    template<class T>
+    AssetDepot::ModelAssetCache<T>& ModelAssetCacheLocked();
+    template<class T>
+    own::shared_owner<const T> TryAcquireCurrentModelAsset(AssetDepot::AssetLink<T> link);
+    template<class T>
+    AssetDepot::AssetRequest<T> RequestCurrentModelAssetAsync(AssetDepot::AssetLink<T> link);
+    template<class T>
+    AssetDepot::AssetRequest<T> RequestResolvedModelAssetAsync(
+        experiment::cooked::ResolvedAssetEntry resolved,
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog,
+        bool exactGeneration, std::uint64_t epoch,
+        experiment::cooked::ResolvedAssetEntry skeleton = {});
+    template<class T>
+    own::shared_owner<AssetDepot::ModelAssetWork<T>> StartModelAssetWorkLocked(
+        const experiment::cooked::ResolvedAssetEntry& resolved,
+        const own::shared_owner<const experiment::cooked::CookedAssetCatalog>& catalog,
+        bool exactGeneration, std::uint64_t epoch,
+        const experiment::cooked::ResolvedAssetEntry& skeleton);
+    template<class T>
+    void RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<T>> work);
+    template<class T>
+    void CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot::ModelAssetWork<T>>& work,
+        AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
+        std::string message = {}, own::shared_owner<const T> asset = {});
+    template<class T>
+    own::shared_owner<const T> TryAcquireResolvedModelAssetLocked(
+        const experiment::cooked::ResolvedAssetEntry& resolved, bool exactGeneration);
+    void TrimModelAssetsLocked();
+    [[nodiscard]] AssetDepot::ModelAssetRetiredEntries InvalidateModelAssetsLocked();
+    AssetDepot::ModelAssetRuntimeState m_modelAssets{};
+
+    own::shared_owner<AssetBundlePreparation> SubmitAssetBundle(const AssetBundle& bundle);
     // Caller holds m_assetPreparationMutex through registration and submission.
+    // exactGeneration is only for an already-pinned artifact/dependency closure;
+    // it bypasses current-lookup invalidation, never lifecycle shutdown.
     job_handle SubmitAssetWorkLocked(job_group work,
-        std::span<const job_handle> dependencies = {});
-    std::shared_ptr<PreparedRuntimeAsset> PrepareRuntimeAsset(
+        std::span<const job_handle> dependencies = {}, bool exactGeneration = false);
+    own::shared_owner<PreparedRuntimeAsset> PrepareRuntimeAsset(
         FileGuid guid, const file::path& path, RuntimeAssetType type);
-    bool PublishRuntimeAsset(const std::shared_ptr<PreparedRuntimeAsset>& asset, std::string& error);
+    bool PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsset>& asset, std::string& error);
     void DrainAssetPreparations();
     bool ValidatePreparedMaterialTextures(Material& material, std::string& error);
     std::vector<assets::ModelAssetGeneration::Shared> SnapshotPreparedModelAssets() const;
     mutable std::mutex m_assetPreparationMutex;
-    std::map<FileGuid, std::weak_ptr<PreparedRuntimeAsset>> m_assetPreparations;
-    std::vector<std::weak_ptr<SceneAssetPreparation>> m_sceneAssetPreparations;
-    std::vector<std::shared_ptr<PreparedRuntimeAsset>> m_retiredAssetPreparations;
-    std::vector<std::shared_ptr<AssetBundlePreparation>> m_assetBundlePreparations;
+    std::map<FileGuid, own::weak_owner<PreparedRuntimeAsset>> m_assetPreparations;
+    std::vector<own::weak_owner<SceneAssetPreparation>> m_sceneAssetPreparations;
+    std::vector<own::shared_owner<PreparedRuntimeAsset>> m_retiredAssetPreparations;
+    std::vector<own::weak_owner<AssetBundlePreparation>> m_assetBundlePreparations;
     // Completion owns callback/capture teardown, even after a weak request expires.
     std::vector<job_handle> m_assetWork;
     std::vector<job_handle> m_assetPreparationLanes;
@@ -488,23 +585,39 @@ private:
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
+    // Both service root handles use m_cookedCatalogMutex. Writers additionally
+    // hold admission first; readers copy a root and release before registry work.
+    [[nodiscard]] own::shared_owner<AssetMetaRegistry> SnapshotAssetMetaRegistry() const;
 	own::shared_owner<AssetMetaRegistry> m_assetMetaRegistry{};
-	// Texture 계열의 legacy raw 별칭만을 위한 한시적 보존 목록. Model/Material은
-	// cache 분리 뒤 실제 shared consumer가 없으면 즉시 파괴된다.
-	std::mutex m_retiredTextureMutex;
-	std::vector<std::shared_ptr<Texture>> m_retiredTextureGenerations;
-
-	struct ShaderMetaCacheSlot
-	{
-		FileGuid guid{};
-		std::uint32_t generation{ 1 };
-		bool occupied{};
-		std::shared_ptr<const ShaderMeta> value{};
-	};
-	mutable std::mutex m_shaderMetaMutex;
-	std::unordered_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
-	std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;
-	std::vector<std::uint32_t> m_shaderMetaFreeSlots;
+    struct ShaderMetaCacheSlot
+    {
+        FileGuid guid{};
+        std::uint32_t generation{};
+        std::uint64_t resolverRevision{};
+        bool occupied{};
+        own::weak_owner<const ShaderMeta> current;
+        own::shared_owner<const ShaderMeta> retained;
+        std::array<std::uint8_t, 32> documentDigest{};
+        bool hasDocumentDigest{};
+        mutable std::uint64_t lastUse{};
+        std::size_t retainedBytes{};
+    };
+    void RetainShaderMetaLocked(ShaderMetaCacheSlot& slot,
+        const own::shared_owner<const ShaderMeta>& owner, std::size_t charge,
+        std::vector<own::shared_owner<const ShaderMeta>>& released);
+    void TrimShaderMetaRetainedLocked(std::size_t targetBytes,
+        std::vector<own::shared_owner<const ShaderMeta>>& released);
+    std::uint64_t NextShaderMetaUseLocked() const noexcept;
+    void ClearShaderMetaCache();
+    mutable std::mutex m_shaderMetaMutex;
+    std::unordered_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
+    std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;
+    std::vector<std::uint32_t> m_shaderMetaFreeSlots;
+    std::size_t m_shaderMetaRetainedBudgetBytes = 16u * 1024u * 1024u;
+    std::size_t m_shaderMetaRetainedBytes{};
+    mutable std::uint64_t m_shaderMetaUseSerial{};
+    // Monotonic across Finalize; exhaustion fails closed instead of wrapping.
+    std::uint64_t m_shaderMetaGenerationSerial{};
     material_graph::GenerationStore m_materialGraphGenerations;
     bool LoadMaterialGraphProgram(FileGuid guid, const file::path& sourcePath, material_graph::CookedProgram& result,
                                   std::string& failure) const;

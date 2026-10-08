@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "EnhancedDrawReplayInput.h"
 #include "../../MaterialGraphRuntime.h"
 #include "../../Texture.h"
@@ -197,7 +198,7 @@ struct EnhancedLatticeReplayInput
             EnhancedLatticeReplayInput candidate;
             for(const auto& item:graph)
             {
-                const auto& instance=item.materialGraphInstance;
+                const auto instance=item.GraphInstance();
                 if(!item.modelMeshView.IsComplete() || !instance || !instance->generation || !instance->generation->generation
                     || instance->description.graphId!=instance->generation->assetId || !item.coverage.IsValid()
                     || (item.coverage.flags&EnhancedMaterialCoverage::Blended))
@@ -242,12 +243,12 @@ struct EnhancedLatticeReplayInput
         std::map<uint64_t,size_t> sharedSlots;
         for(size_t i=0;i<draws.size();++i)
         {
-            const auto& saved=draws[i]; const auto& live=current.draws[i]; const auto& source=graph[i].materialGraphInstance;
+            const auto& saved=draws[i]; const auto& live=current.draws[i]; const auto source=graph[i].GraphInstance();
             if(saved.geometryIds!=live.geometryIds || saved.description.graphId!=live.description.graphId
                 || saved.program!=live.program || saved.textures!=live.textures)
             { error="Lattice replay geometry/program/texture closure mismatch"; return false; }
             // Retain exact current texture owners. No DataSystem/authoring lookup.
-            const auto loader=[&](const experiment::AssetId& id,LX::LXColorSpace colorSpace,std::string& why) -> std::shared_ptr<Texture> {
+            const auto loader=[&](const experiment::AssetId& id,LX::LXColorSpace colorSpace,std::string& why) -> own::shared_owner<const Texture> {
                 for(const auto& t:source->textures) if(t.assetId==id && t.colorSpace==colorSpace) return t.owner;
                 why="Lattice replay texture override escaped current closure"; return {};
             };

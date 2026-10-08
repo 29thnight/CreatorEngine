@@ -1,4 +1,6 @@
 #pragma once
+#include "Ownership.h"
+#include "../../TextureFramePins.h"
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -45,7 +47,7 @@ namespace material_graph
     struct Instance;
 }
 
-// M6-P1b2a: Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
+// M6-P1b2a: const Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
 // ShaderMeta reflection이 해석한 논리 property/GUID/register와 CPU generation owner를
 // 한 레코드로 밀봉한다. 실제 backend binding은 register를 검증한 뒤 owner의 view를 쓴다.
 struct EnhancedMaterialTextureBinding
@@ -54,7 +56,7 @@ struct EnhancedMaterialTextureBinding
     FileGuid textureGuid{};
     std::uint32_t registerIndex{};
     std::uint32_t registerSpace{};
-    std::shared_ptr<Texture> textureOwner{};
+    own::shared_owner<const Texture> textureOwner{};
     assets::TextureCoordinates coordinates{};
     // W7 — coordinates 와 같은 출처(저작 TextureReference)에서 온다. 이 값이
     // 여기 없던 동안 패스는 Initialize 에서 만든 샘플러 하나를 모든 재질에
@@ -250,10 +252,10 @@ struct EnhancedDrawItem
 
     // 재질에서 뽑아 온 것. Material* 자체를 들지 않는 이유는 메시와 같다 —
     // 렌더가 게임 자료구조를 들고 다니면 수명과 스레드 규약이 다시 얽힌다.
-    Texture*       baseColor{ nullptr };
-    Texture*       normalMap{ nullptr };
-    Texture*       occRoughMetal{ nullptr };
-    Texture*       emissive{ nullptr };
+    const Texture*       baseColor{ nullptr };
+    const Texture*       normalMap{ nullptr };
+    const Texture*       occRoughMetal{ nullptr };
+    const Texture*       emissive{ nullptr };
 
     math::color    baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
     float          metallic{ 0.f };
@@ -271,9 +273,15 @@ struct EnhancedDrawItem
     std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>
         forwardMaterialSnapshot{};
 
-    // Scene input sealing retains the exact typed LX generation/instance.
-    // A graph draw is selected separately from the ShaderMeta queues.
+    // Fixture/producer transfer slot. Product frame records empty this owner
+    // into a deduplicated InstanceFramePins table before copying draw records.
     own::shared_owner<const material_graph::Instance> materialGraphInstance{};
+    own::local_view<const material_graph::Instance> materialGraphView;
+    std::size_t materialGraphPinIndex{ (std::numeric_limits<std::size_t>::max)() };
+    own::local_view<const material_graph::Instance> GraphInstance() const
+    {
+        return materialGraphInstance ? materialGraphInstance.borrow() : materialGraphView;
+    }
     // Runtime Material identity, stable across instance/generation replacement.
     std::uint64_t materialGraphSlot{};
 

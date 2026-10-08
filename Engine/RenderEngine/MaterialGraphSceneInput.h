@@ -1,6 +1,7 @@
 #pragma once
 
 #include "FrameCameraSnapshot.h"
+#include "MaterialGraphInstancePins.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "MaterialGraphMeshSurface.h"
 #include "MaterialGraphScenePacket.h"
@@ -51,7 +52,8 @@ namespace material_graph
         assets::ModelAssetGenerationHandle model;
         std::size_t modelPinIndex = SIZE_MAX;
         std::uint64_t materialSlot{}, selectionRevision{};
-        own::shared_owner<const Instance> material;
+        own::local_view<const Instance> material;
+        std::size_t materialPinIndex{ InstanceFramePins::InvalidIndex };
         EnhancedMaterialCoverage coverage;
         SceneCoverage queue{};
         float viewDepth{};
@@ -61,7 +63,8 @@ namespace material_graph
     };
 
     // One selected Scene view. No proxy, Material, Camera, mutable mesh bytes or
-    // palette pointers survive sealing. Every draw retains its exact graph instance.
+    // palette pointers survive sealing. One frame table retains each exact graph
+    // instance; draw records contain only its table index and anchored borrow.
     // A fresh revision identifies the entire view's current geometry, not just a
     // model generation; changing world/pose/camera cannot reuse another view's batch.
     class SceneViewInput
@@ -69,12 +72,18 @@ namespace material_graph
       public:
         static bool Seal(const SceneInputView& view, std::span<const EnhancedDrawItem> draws,
                          const SceneInputBudget& budget, std::shared_ptr<const SceneViewInput>& result, std::string& error,
-                         own::shared_owner<const assets::ModelAssetGenerationPins> modelPins = {});
+                         own::shared_owner<const assets::ModelAssetGenerationPins> modelPins = {},
+                         own::shared_owner<InstanceFramePins> materialPins = {});
         const SceneInputView& View() const { return view_; }
         const SurfaceView& Surface() const { return surface_; }
         const math::matrix4x4& ViewProjection() const { return viewProjection_; }
         std::span<const SceneDrawInput> Draws() const { return draws_; }
         const SceneInputCost& Cost() const { return cost_; }
+        own::shared_owner<const Instance> MaterialOwner(const SceneDrawInput& draw) const
+        {
+            return materialPins_->Owner(draw.materialPinIndex);
+        }
+        const own::shared_owner<InstanceFramePins>& MaterialPins() const { return materialPins_; }
 
       private:
         friend class SceneHost;
@@ -85,5 +94,6 @@ namespace material_graph
         std::vector<SceneDrawInput> draws_;
         SceneInputCost cost_;
         own::shared_owner<const assets::ModelAssetGenerationPins> modelPins_;
+        own::shared_owner<InstanceFramePins> materialPins_;
     };
 } // namespace material_graph

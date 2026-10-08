@@ -13,21 +13,17 @@ namespace experiment
         if (nullptr != generation)
         {
             services.resolveEmbeddedTexture =
-                [generation](const AssetId& id) -> std::shared_ptr<Texture>
+                [generation](const AssetId& id) -> own::shared_owner<const Texture>
                 {
                     if (nullptr == generation->FindTexture(id.value)) return nullptr;
                     return DataSystems->ResolveModelGenerationTexture(
                         *generation, id.value);
                 };
         }
-        services.loadShaderMetaHandle =
-            [](const FileGuid& guid, std::string& outError)
+        services.loadShaderMetaOwner =
+            [](const FileGuid& guid, ShaderMetaHandle& handle, std::string& outError)
             {
-                return DataSystems->LoadShaderMetaHandle(guid, outError);
-            };
-        services.resolveShaderMeta = [](const ShaderMetaHandle& handle)
-            {
-                return DataSystems->ResolveShaderMeta(handle);
+                return DataSystems->LoadShaderMetaOwner(guid, handle, outError);
             };
         services.loadTexture =
             [](const std::filesystem::path& path, bool compress, TextureColorSpace colorSpace)

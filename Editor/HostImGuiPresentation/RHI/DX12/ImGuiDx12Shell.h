@@ -89,11 +89,11 @@ public:
     /// 경로)되고 셸 SRV 힙에 슬롯을 받는다. 열린 ImGui 프레임에서 즉시
     /// 기록하며, 프레임 밖 호출은 null SRV 슬롯만 예약한다. 실제 표시 프레임은
     /// 매번 다시 호출해 last-used를 갱신해야 한다.
-    uint64_t RegisterTexture(Texture* texture);
+    uint64_t RegisterTexture(const Texture* texture);
 
     /// 그 텍스처의 SRV가 실제로 기록됐는가. 위 주석의 "프레임 밖 호출은 null
     /// SRV 슬롯만 예약한다" 를 밖에서 구분할 수 있게 하는 창구다(W7 썸네일).
-    bool IsTextureReady(Texture* texture) const;
+    bool IsTextureReady(const Texture* texture) const;
 
     /// 라이브 러너의 공유 텍스처(NT 핸들)를 열어 ImTextureID로. 핸들별 캐시.
     uint64_t OpenSharedTexture(void* sharedHandle,

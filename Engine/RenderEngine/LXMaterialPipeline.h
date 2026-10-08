@@ -18,7 +18,7 @@ struct ComputeCompileIdentity
 struct ComputeShaderDescription
 {
     // Renderer helpers have no material schema; generated material compute does.
-    std::shared_ptr<const ShaderGeneration> shader;
+    own::shared_owner<const ShaderGeneration> shader;
     RHIShaderPermutationKey materialPermutationKey{};
     ComputeCompileIdentity compile;
 };
@@ -189,7 +189,7 @@ inline bool CompileGraphics(std::string_view source, std::string_view vertex, st
 
 struct GraphicsShaderDescription
 {
-    std::shared_ptr<const ShaderGeneration> shader;
+    own::shared_owner<const ShaderGeneration> shader;
     RHIShaderPermutationKey materialPermutationKey{};
     GraphicsCompileIdentity compile;
 };

@@ -122,7 +122,7 @@ CommandResult MaterialGraph(const ConsoleCommandContext& context)
         return PreconditionFailed("material.inline_required", "Graph editing requires an inline material instance");
     }
     const auto before = renderer->m_Material;
-    auto candidate = std::make_shared<Material>(*before);
+    auto candidate = own::make_shared<Material>(*before);
     std::string error;
     if (parts[2] == "bind" && parts.size() == 4)
     {
@@ -209,7 +209,7 @@ CommandResult MaterialGraph(const ConsoleCommandContext& context)
     {
         return InvalidArguments("material.graph <object> [bind <graph-guid>|set <parameter-id> <value...>|reload]");
     }
-    const auto apply = [target](const std::shared_ptr<Material>& material) {
+    const auto apply = [target](const own::shared_owner<Material>& material) {
         auto* active = SceneManagers->GetActiveScene();
         auto* object = active ? active->Resolve(target) : nullptr;
         if (auto* component = object ? object->GetComponent<MeshRenderer>() : nullptr)

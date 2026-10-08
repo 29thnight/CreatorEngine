@@ -30,7 +30,7 @@ struct EnhancedGizmoIcon
 {
     math::vector3  position{};
     float          size{ 1.f };
-    Texture*       texture{ nullptr };
+    const Texture*       texture{ nullptr };
 };
 
 /// 라인 정점. DX11 쪽 LineVertex와 같은 배치(POSITION float3 + COLOR float4).

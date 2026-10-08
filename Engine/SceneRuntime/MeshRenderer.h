@@ -47,7 +47,7 @@ public:
    }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
-	void SetMaterial(std::shared_ptr<Material> material)
+	void SetMaterial(own::shared_owner<Material> material)
 	{
 		m_Material = std::move(material);
 		PublishRenderProxyDirty(ProxyDirty::Material);
@@ -95,7 +95,7 @@ public:
     // 빼면 프리팹 재질 오버라이드가 조용히 소실된다. base 참조(ref) 표기의
     // 읽기/쓰기는 훅이 전담한다(typed는 ref 노드에서 기본값 재질을 만들고
     // postLoad가 교체).
-    std::shared_ptr<Material> m_Material{};
+    own::shared_owner<Material> m_Material{};
     LightMapping m_LightMapping;
     uint32 m_bitflag{ 0 };
 
@@ -147,12 +147,12 @@ public:
     // 게이트다(M1 패리티와 같은 축). unique_ptr인 이유: MaterialInstance가
     // 전방선언 타입이라 값 멤버로 둘 수 없다.
     [[reflgen::ignore]]
-    std::unique_ptr<experiment::MaterialInstance> m_materialInstance{};
+    own::unique_owner<experiment::MaterialInstance> m_materialInstance{};
 
     void SetExperimentMaterialBase(
-        std::shared_ptr<const experiment::Material> base);
+        own::shared_owner<const experiment::Material> base);
     [[nodiscard]] experiment::MaterialInstance* GetMaterialInstance() const
     {
-        return m_materialInstance.get();
+        return (m_materialInstance ? &*m_materialInstance.borrow() : nullptr);
     }
 };

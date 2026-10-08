@@ -99,7 +99,7 @@ namespace LX::Runtime
     }
 
     bool CreateCodeShader(const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
-                          ShaderMetaHandle handle, std::shared_ptr<const ShaderGeneration>& result,
+                          ShaderMetaHandle handle, own::shared_owner<const ShaderGeneration>& result,
                           std::string& error)
     {
         if (meta.generatedMaterial)
@@ -109,7 +109,7 @@ namespace LX::Runtime
         // Weak entries reuse contract owners across frame seals and permutations;
         // cache retirement cannot destroy an instance's accepted shader generation.
         static std::mutex cacheMutex;
-        static std::map<std::uint32_t, std::vector<std::weak_ptr<const ShaderGeneration>>> cache;
+        static std::map<std::uint32_t, std::vector<own::weak_owner<const ShaderGeneration>>> cache;
         if (handle.IsValid())
         {
             std::lock_guard lock(cacheMutex);
@@ -129,25 +129,26 @@ namespace LX::Runtime
                 }
             }
         }
-        auto candidate = std::make_shared<ShaderGeneration>();
-        candidate->meta = meta;
-        candidate->layout = layout;
-        candidate->codeHandle = handle;
-        if (!ValidateShader(*candidate, error))
+        ShaderGeneration candidate;
+        candidate.meta = meta;
+        candidate.layout = layout;
+        candidate.codeHandle = handle;
+        if (!ValidateShader(candidate, error))
         {
             return false;
         }
+        auto published = own::make_shared<const ShaderGeneration>(std::move(candidate));
         if (handle.IsValid())
         {
             std::lock_guard lock(cacheMutex);
-            cache[handle.slot].push_back(candidate);
+            cache[handle.slot].push_back(published);
         }
-        result = std::move(candidate);
+        result = std::move(published);
         error.clear();
         return true;
     }
 
-    bool BuildInstance(std::shared_ptr<const ShaderGeneration> shader,
+    bool BuildInstance(own::shared_owner<const ShaderGeneration> shader,
                        std::span<const MaterialPropertyValue> values,
                        std::span<const std::uint16_t> keywords,
                        std::span<const MaterialTextureOwner> textures,
@@ -263,7 +264,7 @@ namespace LX::Runtime
         return true;
     }
 
-    bool SetTextureOwner(const Instance& instance, std::string_view name, std::shared_ptr<Texture> owner,
+    bool SetTextureOwner(const Instance& instance, std::string_view name, own::shared_owner<const Texture> owner,
                          own::shared_owner<const Instance>& result, std::string& error)
     {
         const auto* binding = instance.shader ? MaterialPropertyPacker::FindBinding(instance.shader->layout, name) : nullptr;

@@ -372,7 +372,7 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     std::string error;
 
     const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
-    std::unique_ptr<Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
+    own::shared_owner<const Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
     if (!cameraIcon || cameraIcon->GetImageView().IsEmpty())
     {
         outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
@@ -458,12 +458,12 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     //
     // ★ 포맷을 먼저 단정하는 이유: 로더가 압축을 안 했거나 dds가 다른 포맷이면
     //   아래 업로드 단정은 비압축 자산을 올려 놓고 초록을 내는 눈먼 검사가 된다.
-    std::shared_ptr<Texture> compressedIcon =
+    own::shared_owner<const Texture> compressedIcon =
         Texture::LoadSharedFromPath(cameraIconPath, /*isCompress*/ true);
-    std::shared_ptr<Texture> blockNoise = Texture::LoadSharedFromPath(
+    own::shared_owner<const Texture> blockNoise = Texture::LoadSharedFromPath(
         PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
     const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
-    std::shared_ptr<Texture> bgraTexture(Texture::CreateFromPixels(
+    own::shared_owner<const Texture> bgraTexture(Texture::CreateFromPixels(
         1, 1, "vk_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
 
     if (!compressedIcon ||
@@ -486,7 +486,7 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     std::vector<EnhancedGizmoIconPass::Icon> icons(1);
     icons[0].position = { 0.f, 0.f, 0.f };
     icons[0].size = 2.f;
-    icons[0].texture = cameraIcon.get();
+    icons[0].texture = (cameraIcon ? &*cameraIcon.borrow() : nullptr);
     gizmo.SetIcons(&icons);
 
     if (!resources.BeginFrame(error))
@@ -501,11 +501,11 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     //   RGBA8Unorm 이라 BC1_SRGB · BC3 · BGRA8 어느 것과도 다르다.
     std::string codecError;
     const RHITextureEntry compressedEntry =
-        textureCache.GetOrUpload(compressedIcon.get(), codecError);
+        textureCache.GetOrUpload((compressedIcon ? &*compressedIcon.borrow() : nullptr), codecError);
     const RHITextureEntry noiseEntry =
-        textureCache.GetOrUpload(blockNoise.get(), codecError);
+        textureCache.GetOrUpload((blockNoise ? &*blockNoise.borrow() : nullptr), codecError);
     const RHITextureEntry bgraEntry =
-        textureCache.GetOrUpload(bgraTexture.get(), codecError);
+        textureCache.GetOrUpload((bgraTexture ? &*bgraTexture.borrow() : nullptr), codecError);
     if (!compressedEntry.IsValid() || !noiseEntry.IsValid() || !bgraEntry.IsValid() ||
         RHIFormat::BC1UnormSrgb != compressedEntry.format ||
         RHIFormat::BC3Unorm != noiseEntry.format ||

@@ -141,9 +141,9 @@ namespace RenderTest
                 ++tally.embeddedProps;
                 if (isRobot) ++tally.robotEmbedded;
 
-                const std::shared_ptr<Texture> owner =
+                const own::shared_owner<const Texture> owner =
                     renderer.m_Material->GetTextureMapShared(value.m_name);
-                const std::shared_ptr<Texture> expected =
+                const own::shared_owner<const Texture> expected =
                     DataSystems->ResolveModelGenerationTexture(*generation,
                         value.m_textureGuid.m_guid);
                 if (!owner)
@@ -151,7 +151,7 @@ namespace RenderTest
                     ++tally.missingTextures;
                     tally.Note("missing " + entityName + "." + value.m_name);
                 }
-                else if (owner == expected)
+                else if (expected && owner->m_assetId == expected->m_assetId)
                 {
                     ++tally.generationTextures;
                 }
@@ -258,7 +258,7 @@ namespace RenderTest
             return false;
         }
 
-        std::map<Uuid::Uuid16, std::shared_ptr<Texture>> ownersBefore;
+        std::map<Uuid::Uuid16, own::shared_owner<const Texture>> ownersBefore;
         for (const assets::ModelTextureAsset& texture : before->Textures())
         {
             ownersBefore[texture.textureId] =
@@ -284,12 +284,15 @@ namespace RenderTest
         {
             for (const assets::ModelTextureAsset& texture : after->Textures())
             {
-                const std::shared_ptr<Texture> owner =
+                const own::shared_owner<const Texture> owner =
                     DataSystems->ResolveModelGenerationTexture(*after, texture.textureId);
                 const auto previous = ownersBefore.find(texture.textureId);
                 if (!owner) ++missingAfter;
                 else if (previous != ownersBefore.end() && previous->second
-                    && previous->second == owner) ++reused;
+                    && previous->second->m_assetId == owner->m_assetId)
+                {
+                    ++reused;
+                }
                 else ++created;
             }
         }

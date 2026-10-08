@@ -4,6 +4,8 @@
 #include "ShaderMetaReflection.h"
 #include "LXMaterialRuntime.h"
 
+#include <type_traits>
+
 namespace material_graph
 {
 struct VerifiedProduct;
@@ -12,6 +14,13 @@ struct GeneratedMaterialShader : LX::Runtime::ShaderGeneration
     // Retain the validated binary tree for generation validation and recooking.
     std::vector<std::byte> cookedContract;
 };
+
+    // Public converting owners retain the derived allocation without raw adoption
+    // or a std pointer cast. Embedded metadata/layout remain aggregate borrows.
+    static_assert(std::is_constructible_v<own::shared_owner<const LX::Runtime::ShaderGeneration>,
+        own::shared_owner<const GeneratedMaterialShader>>);
+    static_assert(!std::is_constructible_v<own::shared_owner<const LX::Runtime::ShaderGeneration>,
+        const LX::Runtime::ShaderGeneration*>);
 
 // Rebuild the common binding contract from the validated product layout and
 // canonical generated pair, with no filesystem or compiler dependency.

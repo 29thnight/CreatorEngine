@@ -116,7 +116,7 @@ namespace experiment
         std::span<const MaterialTextureOwner> textures,
         own::shared_owner<const LX::Runtime::Instance>& outInstance, std::string& outError)
     {
-        std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
+        own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
         if (!LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError)) return false;
         std::vector<::MaterialPropertyValue> values;
         for (const ShaderPropertyDesc& desc : meta.properties)

@@ -353,15 +353,25 @@ namespace wave
                 std::uint64_t size{};
                 const auto expectedPath = entry.kind == ck::CookedAssetKind::SoundGraph
                     ? ck::MakeDerivedSoundGraphArtifactPath(entry.assetId) : ck::MakeDerivedSoundPresetArtifactPath(entry.assetId);
-                if (entry.formatVersion != ck::kSoundAssetArtifactVersion || entry.artifactPath != expectedPath
-                    || !bytes->Size(entry.artifactPath, size, error) || size != entry.byteSize || size > 4u * 1024u * 1024u)
+                if (entry.formatVersion != ck::kSoundAssetArtifactVersion || entry.artifactPath != expectedPath)
+                {
+                    error = "Cooked sound asset metadata/size mismatch: " + id.Text();
+                    return false;
+                }
+                own::shared_owner<const ck::ArtifactByteSource> exactBytes;
+                if (!bytes->CaptureArtifact(entry.artifactPath, exactBytes, error))
+                {
+                    return false;
+                }
+                const auto& source = exactBytes ? *exactBytes : *bytes;
+                if (!source.Size(entry.artifactPath, size, error) || size != entry.byteSize || size > 4u * 1024u * 1024u)
                 {
                     error = "Cooked sound asset metadata/size mismatch: " + id.Text();
                     return false;
                 }
                 std::vector<std::byte> payload(static_cast<std::size_t>(size));
                 ck::Sha256Digest digest;
-                if (!bytes->ReadAt(entry.artifactPath, 0u, payload, error)
+                if (!source.ReadAt(entry.artifactPath, 0u, payload, error)
                     || !ck::ComputeSha256(payload, digest, error) || digest != entry.contentSha256)
                 {
                     error = "Cooked sound asset read/hash mismatch: " + id.Text();

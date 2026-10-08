@@ -56,6 +56,19 @@ namespace
         return sceneNode["m_SceneObjects"];
     }
 
+    void RequireReadySceneBundle(const AssetBundleLoadResult& result)
+    {
+        if (result.status != AssetDepot::AssetRequestStatus::Ready
+            || result.error != AssetDepot::AssetRequestError::None
+            || result.completed != result.submitted)
+        {
+            throw std::runtime_error("Scene asset bundle preparation failed (status "
+                + std::to_string(static_cast<unsigned>(result.status)) + ", completed "
+                + std::to_string(result.completed) + "/" + std::to_string(result.submitted)
+                + "): " + result.message);
+        }
+    }
+
     Authoring::ParsedDocument ParseSceneDocument(const std::string& path)
     {
 		const file::path sourcePath(path);
@@ -820,46 +833,45 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         }
 		file::path sceneName = name.data();
         resourceTrimEvent.Broadcast();
-		m_activeScene = Scene::LoadScene(sceneName.stem().string());
-
+        AssetBundle requiredBundle;
+        // Keep the actual generation pins through deserialization, prefab
+        // remapping, activation and Reset, even if cache retention is bounded.
+        AssetBundleLoadResult bundleAssets;
         if (const Authoring::ReadNode assetsBundleNode =
             sceneNode["m_requiredLoadAssetsBundle"])
         {
-            try
+            if (assetsBundleNode.IsNull())
             {
-                if (assetsBundleNode.IsNull())
+                Debug::PrintLog(spdlog::level::err, "AssetsBundle node is null.");
+            }
+            else
+            {
+                Meta::Deserialize(&requiredBundle, assetsBundleNode);
+                if (const Authoring::ReadNode assets = assetsBundleNode["assets"])
                 {
-                    Debug::PrintLog(spdlog::level::err, "AssetsBundle node is null.");
-                }
-                else
-                {
-                    auto* assetBundle = &m_activeScene.load()->m_requiredLoadAssetsBundle;
-                    Meta::Deserialize(assetBundle, assetsBundleNode);
-                    //DataSystems->LoadAssetBundle(*assetBundle);
-                    if (const Authoring::ReadNode assets = assetsBundleNode["assets"])
+                    for (const Authoring::ReadNode asset : assets)
                     {
-                        for (const Authoring::ReadNode asset : assets)
+                        if (asset["assetTypeID"] && asset["assetName"])
                         {
-                            if(asset["assetTypeID"] && asset["assetName"])
+                            AssetEntry entry{};
+                            entry.assetTypeID = asset["assetTypeID"].As<int>();
+                            entry.assetName = asset["assetName"].AsString();
+                            if (!requiredBundle.ContainsAsset(entry))
                             {
-                                AssetEntry entry{};
-                                entry.assetTypeID = asset["assetTypeID"].As<int>();
-                                entry.assetName = asset["assetName"].AsString();
-                                if (!assetBundle->ContainsAsset(entry))
-                                {
-                                    assetBundle->AddAsset(entry);
-                                }
+                                requiredBundle.AddAsset(entry);
                             }
                         }
-                        ce::profile_scope bundleProfile{ ce::marker<"SceneLoad.AssetBundle">() };
-                        DataSystems->LoadAssetBundle(*assetBundle);
                     }
                 }
-            }
-            catch (...)
-            {
+                ce::profile_scope bundleProfile{ ce::marker<"SceneLoad.AssetBundle">() };
+                bundleAssets = DataSystems->LoadAssetBundle(requiredBundle);
+                RequireReadySceneBundle(bundleAssets);
             }
         }
+        // Preparation exceptions and non-ready outcomes reach the existing
+        // scene-load failure handler before a new Scene or its entities exist.
+        m_activeScene = Scene::LoadScene(sceneName.stem().string());
+        m_activeScene.load()->m_requiredLoadAssetsBundle = std::move(requiredBundle);
 
         DataSystems->ClearRetainedAssets();
         DataSystems->RetainAssets(m_dontDestroyOnLoadAssetsBundle);
@@ -967,8 +979,9 @@ Scene* SceneManager::LoadScene(std::string_view name)
         }
         const Authoring::ReadNode sceneNode = sceneDocument.Root();
         file::path sceneName = name.data();
-        scene = Scene::LoadScene(sceneName.stem().string());
-
+        AssetBundle requiredBundle;
+        // Pins outlive both entity construction loops and scene publication.
+        AssetBundleLoadResult bundleAssets;
         if (const Authoring::ReadNode assetsBundleNode = sceneNode["AssetsBundle"])
         {
             if (assetsBundleNode.IsNull())
@@ -978,10 +991,13 @@ Scene* SceneManager::LoadScene(std::string_view name)
             else
             {
                 ce::profile_scope bundleProfile{ ce::marker<"SceneLoad.AssetBundle">() };
-                Meta::Deserialize(&scene->m_requiredLoadAssetsBundle, assetsBundleNode);
-                DataSystems->LoadAssetBundle(scene->m_requiredLoadAssetsBundle);
+                Meta::Deserialize(&requiredBundle, assetsBundleNode);
+                bundleAssets = DataSystems->LoadAssetBundle(requiredBundle);
+                RequireReadySceneBundle(bundleAssets);
             }
         }
+        scene = Scene::LoadScene(sceneName.stem().string());
+        scene->m_requiredLoadAssetsBundle = std::move(requiredBundle);
 
         // ★ 두 루프가 서로 다른 씬을 타깃으로 한다 — m_Entities는 방금 만든
         // `scene`으로, DontDestroyOnLoadObjects는 (아직 활성화 전인) m_activeScene으로
@@ -1066,7 +1082,7 @@ struct SceneManager::PendingSceneLoad
     Authoring::ParsedDocument m_document;
     AssetBundle m_bundle;
     job_handle m_preparation;
-    std::shared_ptr<DataSystem::SceneAssetPreparation> m_assets;
+    own::shared_owner<DataSystem::SceneAssetPreparation> m_assets;
     std::promise<Scene*> m_result;
     size_t m_activationEpoch = 0;
     bool m_autoActivate = false;
@@ -1501,17 +1517,20 @@ std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 	return { renderers.begin(), renderers.end() };
 }
 
-std::vector<std::shared_ptr<Material>>
+std::vector<own::shared_owner<const Material>>
 SceneManager::CaptureRequiredRenderMaterials() const
 {
-    std::vector<std::shared_ptr<Material>> materials;
-    std::unordered_set<const Material*> seen;
+    std::vector<own::shared_owner<const Material>> materials;
+    std::unordered_set<std::uint64_t> seen;
     Scene* scene = m_activeScene.load();
     if (nullptr == scene) return materials;
 
-    const auto add = [&materials, &seen](const std::shared_ptr<Material>& material)
+    const auto add = [&materials, &seen](const own::shared_owner<const Material>& material)
     {
-        if (!material || !seen.insert(material.get()).second) return;
+        if (!material || !seen.insert(static_cast<std::uint64_t>(material->m_materialGuid)).second)
+        {
+            return;
+        }
         materials.push_back(material);
     };
 

@@ -55,8 +55,14 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
             Animator* animator = animatorOwner->GetComponent<Animator>();
             if (animator && animator->IsEnabled())
             {
-                m_isAnimationEnabled = true;
-                m_animatorGuid = animator->GetInstanceID();
+                // Independent v3 clips may only animate transitional geometry
+                // after its ordered bones and complete bind transforms match.
+                m_isAnimationEnabled = component->m_modelGeneration
+                    && animator->IsSkinBindingCompatible(*component->m_modelGeneration);
+                if (m_isAnimationEnabled)
+                {
+                    m_animatorGuid = animator->GetInstanceID();
+                }
                 break;
             }
         }
@@ -76,7 +82,7 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
     // 않는다 — 인스턴스 override 편집이 그리는 중에 값을 바꾸면 안 된다.
     if (experiment::MaterialInstance* instance = component->GetMaterialInstance())
     {
-        auto effective = std::make_shared<experiment::Material>();
+        auto effective = own::make_shared<experiment::Material>();
         std::string error;
         if (instance->BuildEffectiveMaterial(*effective, error))
         {

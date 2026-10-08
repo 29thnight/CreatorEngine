@@ -1,6 +1,7 @@
 #pragma once
 
 #include "MaterialGraphRuntime.h"
+#include "MaterialGraphInstancePins.h"
 #include "RHI/IRenderDeviceServices.h"
 #include "RHI/IRenderTextureCache.h"
 #include "RHI/RHIEncoder.h"
@@ -28,7 +29,9 @@ namespace material_graph
 
     struct RenderBindings
     {
-        own::shared_owner<const Instance> instance;
+        own::shared_owner<InstanceFramePins> instancePins;
+        std::size_t instancePinIndex{ InstanceFramePins::InvalidIndex };
+        own::local_view<const Instance> instance;
         PassLayout layout;
         ResourcePacket resources;
         RHIBufferSlice uniforms;
@@ -47,7 +50,8 @@ namespace material_graph
     {
       public:
         bool Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures, own::shared_owner<const Instance> instance,
-                     const PassLayout& layout, std::shared_ptr<const RenderBindings>& result, std::string& error);
+                     const PassLayout& layout, std::shared_ptr<const RenderBindings>& result, std::string& error,
+                     own::shared_owner<InstanceFramePins> instancePins = {});
 
         // Call after SetPipeline with this packet's layout, before a draw/dispatch.
         // Frame upload/descriptor handles cannot be reused in another recording.

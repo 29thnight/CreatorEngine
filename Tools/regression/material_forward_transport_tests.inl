@@ -85,7 +85,7 @@ own::shared_owner<const Generation> ForwardTransportProduct(const std::filesyste
 
 void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                          ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
-                         std::shared_ptr<Texture> image, std::shared_ptr<Texture> cube,
+                         own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube,
                          bool versionedAcceptance = false)
 {
     std::string error;
@@ -299,7 +299,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             Check(device.BeginFrame(error), "Transport begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = textures.GetOrUpload(cube.get(), error);
+            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error);
             Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
                       host.PrepareResidency(context, input, error),
                   "Transport preparation");

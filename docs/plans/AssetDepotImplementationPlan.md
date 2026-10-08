@@ -27,28 +27,64 @@ design. A foundation slice is not completion of the runtime migration.
 
 - The pinned ownership dependency, CEMF v3 link/manifest schema, immutable catalog
   transactions and generic loose/pak range sources are present.
-- `build-asset-set` produces source-recooked TextureSourceImage artifacts only. It
-  includes both hard/loadable edges, verifies immutable CAS reuse and publishes a
-  new output directory transactionally. The OS owns the cache lock so forced
-  cancellation does not permanently block later builds. Incomplete work directories
-  are never reused as published output.
-- DataSystem exposes `MountAssetSet`, `UnmountAssetSet`, `ListRootLinks<T>`,
-  `RequestAsync<Texture>` and I/O-free `TryAcquire<Texture>`. Texture requests have
-  independent cancellation, exact backing/dependency pins, stale publication gates,
-  and a default 64 MiB conservative retained-graph charge budget.
+- `build-asset-set` source-recooks TextureSourceImage and selected Model descriptor,
+  Skeleton and AnimationClip artifacts. Import roots and external buffer inputs are
+  captured immutably and hashed. Selected child build identities do not depend on
+  unrelated siblings. Verified CAS reuse and transactional unique output directories
+  remain independent of Player compilation. The OS owns the cache lock; interrupted
+  candidates are never accepted as published output.
+- DataSystem exposes `MountAssetSet`, `UnmountAssetSet`, `ListRootLinks<T>`, typed
+  `RequestAsync<T>` and I/O-free `TryAcquire<T>` for Texture and granular animation
+  descriptors/skeletons/clips. Requests have independent cancellation, resolver-bound
+  keys, stale publication gates and bounded weak-current/retained caches.
+- A model descriptor reads no skeleton/clip files. It captures ordered child identity
+  and locator metadata, including absent Loadable children. Only a selected child
+  worker opens and verifies its payload; absent captured children fail without resolving
+  a newer mount. Acquired origins retain exact per-artifact backing, not every file in
+  the mount. Current unique immutable outputs have no physical garbage collector;
+  a future collector requires an artifact-store/root lease. External file replacement
+  or removal can therefore cause an I/O or integrity failure before first acquisition.
+- Animator owns only selected/current/transition/layer clips and their skeletons
+  through scheduled evaluation. Legacy geometry uses an explicit full skin-binding
+  compatibility gate before accepting a granular palette. This is not yet standalone
+  granular mesh rendering.
 - All accepted DataSystem preparation/bundle/prewarm jobs share one shutdown barrier.
-  Scheduler terminal observers also finish requests whose dependent body never runs.
-- Model generations and graph/LX instances use actual own owners through their
-  consumers. Model cache retention defaults to 256 MiB; graph retention to 128 MiB.
-  These are explicit cache-pin budgets, not estimates of allocator/GPU bytes freed.
-  Model pins are deduplicated per sealed scene input; draw records keep indices.
-- Runtime material clones no longer silently publish themselves into Materials.
+  Scheduler terminal observers finish requests whose dependent body never runs.
+  Bundle and scene preparation results carry real resource owners through consumption.
+- Model, Material, Texture, ShaderMeta and graph/LX consumers use actual own owners.
+  Cache entries combine weak current lookup with explicit bounded strong retention.
+  Mutable material instances remain separate from immutable published templates;
+  publication severs mutable aliases and clones do not silently register themselves.
+- Components, editor previews and accepted rendering inputs retain their own resources.
+  Model, texture and graph-instance frame tables deduplicate exact stable identities;
+  draw records carry indices/anchored borrows. Native GPU completion, abort and
+  completion-zero quarantine paths remain responsible for physical retirement.
+- The managed Texture adapter uses generation-checked native owner tokens, independent
+  request/result handles, deterministic Dispose and POD-only deferred finalizer release.
+  Explicit static type registration and AssetLink authoring serialization support
+  NativeAOT without reflecting over native owners.
+- Reflection/authoring serializers understand own shared/exclusive owners. Deserialization
+  builds a candidate before replacement; immutable reflected payloads are copied for
+  legacy mutable serialization hooks and shown read-only in the editor. Nested
+  exclusive reflected fields are rejected safely; immutable polymorphic Component
+  lists require a dedicated const-safe serializer. Resource copy contracts still
+  govern unreflected state and isolation of shared mutable children.
 
-The Texture descriptor still pins its CodecImage; models still use whole-model
-aggregate storage. Granular mesh/skeleton/clip/image artifacts, independently evictable
-bulk, cross-ID blob decode sharing, typed model acquisition and the remaining
-Material/Texture/ShaderMeta/UI/Terrain ownership migration are not complete. Managed
-asset handles and independent Player/content cutover are separate slices in progress.
+## Remaining integration and support boundaries
+
+- Standalone mesh artifacts, node/mesh descriptor metadata and MeshRenderer/RHI typed
+  geometry acquisition remain to be implemented. CEMCv11 whole-model geometry is a
+  transitional adapter, not the finished fine-grained model format.
+- Texture descriptors still retain CodecImage and embedded-image bulk. Independently
+  evictable image payloads, exact rehydration and cross-ID blob decode sharing remain.
+- Some legacy Material/Texture/ShaderMeta APIs are synchronous transitional loaders;
+  full typed asynchronous acquisition and independent cooked producers for every
+  supported resource kind are not complete.
+- Source-free Player/content cutover, managed support beyond Texture, and removal of
+  superseded compatibility paths remain separate implementation slices.
+- Cache budgets describe retained cache pins, not allocator or GPU memory immediately
+  freed. Existing consumers, in-flight jobs and accepted frames intentionally outlive
+  eviction and logical unmount.
 
 ## Invariants
 

@@ -57,6 +57,73 @@ namespace
         bool operator==(const ProbeNested&) const = default;
     };
 
+    struct ProbeOwnedRecord
+    {
+        ProbeOwnedRecord() = default;
+        explicit ProbeOwnedRecord(int initial) : value(initial) {}
+        static consteval auto reflect()
+        {
+            using Self = ProbeOwnedRecord;
+            return reflgen::schema<Self>(reflgen::field<&Self::value>,
+                reflgen::field<&Self::beforeWrites>);
+        }
+        void OnBeforeSerialize() { ++beforeWrites; }
+        int value{};
+        int beforeWrites{};
+    };
+
+    struct ProbeRecursiveValue
+    {
+        static consteval auto reflect()
+        {
+            using Self = ProbeRecursiveValue;
+            return reflgen::schema<Self>(reflgen::field<&Self::children>);
+        }
+        std::vector<ProbeRecursiveValue> children;
+    };
+    static_assert(Meta::Typed::CanSnapshotImmutable<ProbeRecursiveValue>());
+
+    struct ProbeExclusiveNested
+    {
+        static consteval auto reflect()
+        {
+            using Self = ProbeExclusiveNested;
+            return reflgen::schema<Self>(reflgen::field<&Self::items>);
+        }
+        std::vector<own::unique_owner<ProbeOwnedRecord>> items;
+    };
+
+    static_assert(!Meta::Typed::CanSnapshotImmutable<ProbeExclusiveNested>());
+    static_assert(!Meta::Typed::CanSnapshotImmutable<
+        std::vector<ProbeExclusiveNested>>());
+    static_assert(!Meta::Typed::CanSnapshotImmutable<
+        std::map<int, ProbeExclusiveNested>>());
+    static_assert(Meta::Typed::CanSnapshotImmutable<ProbeOwnedRecord>());
+
+    struct ProbeOwners
+    {
+        static consteval auto reflect()
+        {
+            using Self = ProbeOwners;
+            return reflgen::schema<Self>(reflgen::field<&Self::shared>,
+                reflgen::field<&Self::frozen>, reflgen::field<&Self::unique>,
+                reflgen::field<&Self::frozenUnique>);
+        }
+        own::shared_owner<ProbeOwnedRecord> shared;
+        own::shared_owner<const ProbeOwnedRecord> frozen;
+        own::unique_owner<ProbeOwnedRecord> unique;
+        own::unique_owner<const ProbeOwnedRecord> frozenUnique;
+    };
+
+    static_assert(Meta::Typed::PointerLike<own::shared_owner<ProbeOwnedRecord>>);
+    static_assert(Meta::Typed::PointerLike<own::unique_owner<ProbeOwnedRecord>>);
+    static_assert(!Meta::Typed::PointerLike<own::weak_owner<ProbeOwnedRecord>>);
+    static_assert(!IsCopyableForProperty<std::vector<own::unique_owner<ProbeOwnedRecord>>>());
+    static_assert(std::is_same_v<Meta::Typed::PointeeT<own::shared_owner<const ProbeOwnedRecord>>,
+        ProbeOwnedRecord>);
+    static_assert(std::is_same_v<decltype(Meta::Typed::RawPtrOf(
+        std::declval<own::shared_owner<const ProbeOwnedRecord>&>())), const ProbeOwnedRecord*>);
+
     struct ProbeFixture
     {
         static consteval auto reflect()
@@ -155,6 +222,62 @@ namespace
         std::printf("axis %-20s %s\n", axis, ok ? "ok" : "MISMATCH");
     }
 
+    // Source-only ownership/constness cases; this probe was not executed as
+    // part of the AssetDepot implementation session.
+    void CheckOwnerRoundtrip()
+    {
+        const auto noncopyable = own::make_shared<const ProbeExclusiveNested>();
+        Authoring::WriteDocument rejectedDocument;
+        Authoring::ReflgenWriter rejectedWriter(rejectedDocument.Root());
+        bool noncopyableRejected = false;
+        try
+        {
+            reflgen::serialize(rejectedWriter, noncopyable);
+        }
+        catch (const reflgen::serialization_error&)
+        {
+            noncopyableRejected = true;
+        }
+        Check("owner-nested-exclusive-rejected", noncopyableRejected);
+
+        ProbeOwners source;
+        source.shared = own::make_shared<ProbeOwnedRecord>(11);
+        source.frozen = own::make_shared<const ProbeOwnedRecord>(22);
+        source.unique = own::make_unique<ProbeOwnedRecord>(33);
+        source.frozenUnique = own::make_unique<const ProbeOwnedRecord>(44);
+        Authoring::WriteDocument document;
+        Meta::Typed::SerializeObjectInto(source, document.Root());
+        Check("owner-mutable-hook", source.shared->beforeWrites == 1 && source.unique->beforeWrites == 1);
+        Check("owner-const-not-mutated", source.frozen->beforeWrites == 0
+            && source.frozenUnique->beforeWrites == 0);
+        std::string failure;
+        const auto parsed = Authoring::ParsedDocument::ParseText(document.Dump(), failure);
+        Check("owner-output-parses", static_cast<bool>(parsed));
+        if (!parsed)
+        {
+            return;
+        }
+        ProbeOwners loaded;
+        Meta::Typed::DeserializeObjectFrom(loaded, parsed.Root());
+        Check("owner-shared-roundtrip", loaded.shared && loaded.shared->value == 11);
+        Check("owner-const-roundtrip", loaded.frozen && loaded.frozen->value == 22);
+        Check("owner-unique-roundtrip", loaded.unique && loaded.unique->value == 33);
+        Check("owner-const-unique-roundtrip", loaded.frozenUnique && loaded.frozenUnique->value == 44);
+        auto previous = loaded.shared;
+        const auto invalid = Authoring::ParsedDocument::ParseText("shared: {value: not-an-int}\n", failure);
+        bool rejected = false;
+        try
+        {
+            Meta::Typed::DeserializeObjectFrom(loaded, invalid.Root());
+        }
+        catch (const std::exception&)
+        {
+            rejected = true;
+        }
+        Check("owner-failed-read-transactional", rejected && loaded.shared && previous
+            && &*loaded.shared.borrow() == &*previous.borrow() && loaded.shared->value == 11);
+    }
+
     // 텍스트에 정확히 이 줄이 있는가. 형상 단정은 줄 단위로 건다 — 부분 문자열
     // 매치는 다른 필드의 값에 우연히 걸린다(이 저장소가 이미 겪은 오판 양식).
     bool HasLine(const std::string& text, const std::string& needle)
@@ -189,6 +312,8 @@ int main(int argc, char** argv)
     {
         if (0 == std::strcmp(argv[i], "--dump")) { dump = true; }
     }
+
+    CheckOwnerRoundtrip();
 
     const ProbeFixture authored = MakeAuthored();
 

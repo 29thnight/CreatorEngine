@@ -11,6 +11,9 @@ struct ShaderMeta;
 namespace assets
 {
     class ModelAssetGeneration;
+    struct ModelAnimationDescriptor;
+    struct ModelSkeletonPayload;
+    struct ModelAnimationPayload;
 }
 namespace experiment
 {
@@ -52,6 +55,24 @@ namespace AssetDepot
     struct AssetTypeTraits<assets::ModelAssetGeneration>
     {
         static constexpr auto kKind = experiment::cooked::CookedAssetKind::Model;
+    };
+
+    template<>
+    struct AssetTypeTraits<assets::ModelAnimationDescriptor>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::Model;
+    };
+
+    template<>
+    struct AssetTypeTraits<assets::ModelSkeletonPayload>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::Skeleton;
+    };
+
+    template<>
+    struct AssetTypeTraits<assets::ModelAnimationPayload>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::AnimationClip;
     };
 
     // Persist only the asset/subasset IDs plus the expected kind at the wire

@@ -452,7 +452,7 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image,
     return true;
 }
 
-DX12TextureCache::Entry DX12TextureCache::GetOrUpload(Texture* texture, std::string& outError)
+DX12TextureCache::Entry DX12TextureCache::GetOrUpload(const Texture* texture, std::string& outError)
 {
     if (nullptr == m_resources) return Entry{};
 

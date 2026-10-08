@@ -82,7 +82,8 @@ namespace material_graph
     bool SceneViewInput::Seal(const SceneInputView& view, std::span<const EnhancedDrawItem> draws,
                               const SceneInputBudget& budget, std::shared_ptr<const SceneViewInput>& result,
                               std::string& error,
-                              own::shared_owner<const assets::ModelAssetGenerationPins> modelPins)
+                              own::shared_owner<const assets::ModelAssetGenerationPins> modelPins,
+                              own::shared_owner<InstanceFramePins> materialPins)
     {
         ce::profile_scope profile{ce::marker<"MaterialSceneInputSeal">()};
         const auto& camera = view.camera;
@@ -98,6 +99,9 @@ namespace material_graph
         }
         auto candidate = std::shared_ptr<SceneViewInput>(new SceneViewInput);
         candidate->modelPins_ = std::move(modelPins);
+        auto collectedPins = materialPins ? own::shared_owner<InstanceFramePins>{}
+            : own::make_shared<InstanceFramePins>();
+        candidate->materialPins_ = materialPins ? std::move(materialPins) : collectedPins;
         candidate->view_ = view;
         candidate->viewProjection_ = camera.view * camera.projection;
         if (!Finite(std::bit_cast<std::array<float, 16>>(candidate->viewProjection_)))
@@ -119,7 +123,7 @@ namespace material_graph
         for (std::size_t sourceIndex = 0; sourceIndex < draws.size(); ++sourceIndex)
         {
             const auto& draw = draws[sourceIndex];
-            const auto& instance = draw.materialGraphInstance;
+            const auto instance = draw.GraphInstance();
             if (!draw.geometryKey || !instance || !instance->generation || !instance->generation->generation ||
                 instance->generation->assetId != instance->description.graphId || draw.materialSnapshot ||
                 draw.forwardMaterialSnapshot)
@@ -151,7 +155,14 @@ namespace material_graph
                 input.modelPinIndex = static_cast<std::size_t>(pin - pins.begin());
             }
             input.materialSlot = draw.materialGraphSlot;
-            input.material = instance;
+            input.materialPinIndex = collectedPins
+                ? collectedPins->Retain(draw.materialGraphInstance)
+                : candidate->materialPins_->Find(*instance);
+            input.material = candidate->materialPins_->Borrow(input.materialPinIndex);
+            if (!input.material || InstanceFramePins::Identity(*input.material) != InstanceFramePins::Identity(*instance))
+            {
+                return Fail(error, "Scene graph draw has no exact instance in its frame pin table.");
+            }
             input.coverage = draw.coverage;
             if (!ClassifySceneCoverage(input.coverage, input.queue, error))
             {

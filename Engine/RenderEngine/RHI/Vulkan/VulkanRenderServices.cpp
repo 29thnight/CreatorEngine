@@ -371,7 +371,7 @@ void VulkanTextureCache::Shutdown()
     m_impl->resources = nullptr;
 }
 
-RHITextureEntry VulkanTextureCache::GetOrUpload(Texture* texture, std::string& outError)
+RHITextureEntry VulkanTextureCache::GetOrUpload(const Texture* texture, std::string& outError)
 {
     if (nullptr == texture)
     {

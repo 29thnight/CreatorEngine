@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 
 #include "../../Experiment/MaterialResolver.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -27,7 +28,7 @@ namespace ExperimentMaterialSealing
     struct SealTextureOwner final
     {
         std::string propertyName{};
-        std::shared_ptr<Texture> owner{};
+        own::shared_owner<const Texture> owner{};
     };
 
     struct SealSource final

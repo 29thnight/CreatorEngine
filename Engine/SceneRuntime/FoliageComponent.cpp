@@ -188,7 +188,7 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
         experiment::Material converted;
         ExperimentMaterialMigration::ConvertModelMaterialAsset(
             materials[index], *generation, converted);
-        auto material = std::make_shared<Material>();
+        auto material = own::make_shared<Material>();
         std::string error;
         if (ExperimentMaterialMigration::ConvertToLegacyMaterial(
             converted, nullptr, *material, error))
@@ -198,7 +198,7 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
             type.m_material = std::move(material);
             if (!materials[index].shaderAssetId.IsNil())
             {
-                auto authored = std::make_shared<experiment::Material>(std::move(converted));
+                auto authored = own::make_shared<experiment::Material>(std::move(converted));
                 type.m_authoredMaterial = std::move(authored);
             }
         }

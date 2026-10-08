@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "LayerTypes.h"
 #include "CommandCore/CommandResult.h"
 #include "EntityHandle.h"
@@ -77,7 +78,7 @@ namespace EditorObjectOperations
     CommandCore::CommandResult NavigateSelection(Scene* scene, int direction);
     CommandCore::CommandResult InstantiatePrefab(const std::string& prefab, const std::string& name);
     CommandCore::CommandResult InstantiatePrefab(Prefab* prefab, const std::string& name);
-    CommandCore::CommandResult MaterialMode(const std::vector<std::shared_ptr<Material>>& materials, MaterialRenderingMode mode);
+    CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode);
     CommandCore::CommandResult MaterialMode(EntityHandle target, MaterialRenderingMode mode);
 
     // PBR-W8 — 렌더러별 MaterialInstance override 를 헤드리스로 얹는다.

@@ -184,9 +184,12 @@ namespace ShaderMetaLoader
     // Cooked D5 document는 GUID-addressed Derived 경로에 있지만 `source`는 여전히
     // authoring .shadermeta 기준 상대 HLSL이다(B3 전 계약). documentPath에서
     // payload를 읽되 sourceOriginPath를 상대 경로 기준과 runtime origin으로 쓴다.
+    // Optional digest covers this parsed document and its normalized source origin;
+    // cache rehydration uses it to reject changed input without reusing an old identity.
     bool LoadFile(const std::filesystem::path& documentPath,
         const std::filesystem::path& sourceOriginPath, const FileGuid& guid,
-        ShaderMeta& outMeta, std::string& outError);
+        ShaderMeta& outMeta, std::string& outError,
+        std::array<std::uint8_t, 32>* outDocumentDigest = nullptr);
 
     // Editor importer와 자가 검증이 디스크 게시 전에 같은 검증기를 쓸 수 있는 경계.
     // originPath는 source 상대 경로의 기준이며 .shadermeta 파일명을 포함한다.

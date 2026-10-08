@@ -1,6 +1,7 @@
 #include "EnhancedGizmoIconPass.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
+#include "Texture.h"
 
 #include <cstring>
 #include <algorithm>
@@ -149,7 +150,8 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
             icon.position.x, icon.position.y, icon.position.z, icon.size);
         m_instances.push_back(instance);
 
-        if (!m_batches.empty() && m_batches.back().texture == icon.texture)
+        const std::size_t textureId = icon.texture ? icon.texture->m_assetId.m_ID_Data : 0;
+        if (!m_batches.empty() && m_batches.back().textureId == textureId)
         {
             ++m_batches.back().count;
         }
@@ -158,7 +160,7 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
-            batch.texture = icon.texture;
+            batch.textureId = textureId;
             m_batches.push_back(batch);
         }
     }
@@ -175,7 +177,7 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
         for (Batch& batch : m_batches)
         {
             std::string uploadError;
-            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, uploadError);
+            batch.uploaded = context.textureCache->GetOrUpload((*m_icons)[batch.first].texture, uploadError);
             if (!batch.uploaded.IsValid() && !uploadError.empty())
             {
                 outError = "기즈모 아이콘 텍스처 업로드 실패: " + uploadError;

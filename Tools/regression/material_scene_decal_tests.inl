@@ -1,5 +1,5 @@
 // Included after the shared Shadow/Decal product and native submission helpers.
-std::shared_ptr<Texture> DecalImage(std::array<float, 4> value)
+own::shared_owner<const Texture> DecalImage(std::array<float, 4> value)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 1, 1, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), value.data(), sizeof(value));
@@ -7,8 +7,8 @@ std::shared_ptr<Texture> DecalImage(std::array<float, 4> value)
 }
 
 void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines, ProbeTextures& textures,
-                   ProbePool& pool, const std::filesystem::path& root, const std::shared_ptr<Texture>& image,
-                   const std::shared_ptr<Texture>& cube, bool versionedAcceptance = false)
+                   ProbePool& pool, const std::filesystem::path& root, const own::shared_owner<const Texture>& image,
+                   const own::shared_owner<const Texture>& cube, bool versionedAcceptance = false)
 {
     const std::array products{ShadowDecalProduct(root, false), ShadowDecalProduct(root, true)};
     GenerationStore store;
@@ -95,17 +95,17 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     Check(device.BeginFrame(error), "Decal begin");
                     textures.BeginFrame(context.frameId);
                     meshes.BeginFrame(context.frameId);
-                    const auto environment = textures.GetOrUpload(cube.get(), error).handle;
+                    const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error).handle;
                     Check(environment.IsValid() && host.PrepareResidency(context, input, error),
                           "Decal residency " + error);
                     EnhancedDecalPass::Item item;
                     item.worldMatrix = math::matrix4x4::identity();
                     item.worldMatrix.m[3][2] = .5f;
-                    item.diffuse = fixture == 1 || fixture == 3 ? diffuse.get()
-                                   : fixture == 5               ? transparent.get()
+                    item.diffuse = fixture == 1 || fixture == 3 ? (diffuse ? &*diffuse.borrow() : nullptr)
+                                   : fixture == 5               ? (transparent ? &*transparent.borrow() : nullptr)
                                                                 : nullptr;
-                    item.occRoughMetal = fixture == 2 || fixture == 3 || fixture == 6 ? orm.get() : nullptr;
-                    item.normal = fixture == 4 ? normal.get() : nullptr;
+                    item.occRoughMetal = fixture == 2 || fixture == 3 || fixture == 6 ? (orm ? &*orm.borrow() : nullptr) : nullptr;
+                    item.normal = fixture == 4 ? (normal ? &*normal.borrow() : nullptr) : nullptr;
                     decal.SetDecals(fixture >= 1 && fixture <= 6 ? std::vector{item}
                                                                  : std::vector<EnhancedDecalPass::Item>{});
                     Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) &&

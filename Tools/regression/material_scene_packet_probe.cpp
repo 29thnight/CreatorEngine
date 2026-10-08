@@ -124,7 +124,7 @@ float4 PSMain(float4 position : SV_Position, bool frontFace : SV_IsFrontFace) : 
     return product;
 }
 
-std::shared_ptr<Texture> TextureFixture(bool cube)
+own::shared_owner<const Texture> TextureFixture(bool cube)
 {
     auto image =
         TextureImage::Allocate(cube ? RHIFormat::RGBA32Float : RHIFormat::RGBA8UnormSrgb, 1, 1, cube ? 6 : 1, 1, cube);
@@ -284,8 +284,8 @@ void Run(const std::filesystem::path& root)
     IblEnvironment environment;
     Check(device.BeginFrame(error), "Warm upload BeginFrame");
     textures.BeginFrame(0);
-    const auto imageEntry = textures.GetOrUpload(texture.get(), error);
-    environment = {textures.GetOrUpload(environmentTexture.get(), error), 1, environmentTexture};
+    const auto imageEntry = textures.GetOrUpload((texture ? &*texture.borrow() : nullptr), error);
+    environment = {textures.GetOrUpload((environmentTexture ? &*environmentTexture.borrow() : nullptr), error), 1, environmentTexture};
     Check(imageEntry.IsValid() && environment.cube.IsValid(), "Native owning textures");
     const RHITransition envTransition{environment.cube.handle, RHIResourceState::PixelShaderResource,
                                       RHIResourceState::ShaderResource};

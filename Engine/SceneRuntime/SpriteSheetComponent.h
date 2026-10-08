@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
@@ -38,7 +39,7 @@ public:
 	ImageInfo				 uiinfo{};
 
 	[[reflgen::ignore]]
-	std::shared_ptr<Texture> m_spriteSheetTexture{};
+	own::shared_owner<const Texture> m_spriteSheetTexture{};
 
 	std::string				 m_spriteSheetPath{};
 	float                    m_frameDuration{ 0.1f };

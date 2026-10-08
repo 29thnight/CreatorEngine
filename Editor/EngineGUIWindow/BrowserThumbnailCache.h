@@ -167,7 +167,7 @@ namespace editor
     /// `visible` 은 지금 화면에 보이는 타일인가다 — 계약의 "가시 타일 우선
     /// 요청". clipping 이 건너뛴 행은 묻지 않으므로 사실상 전부 참이지만,
     /// 목록이 그것을 보장하지 않으므로 인자로 받는다.
-    Texture* thumbnail_acquire(const thumbnail_key& key,
+    const Texture* thumbnail_acquire(const thumbnail_key& key,
                                const thumbnail_fs::path& source,
                                bool visible);
 

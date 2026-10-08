@@ -1882,7 +1882,7 @@ namespace
 	Material* ResolveMaterial(ScriptObjectHandle handle)
 	{
 		MeshRenderer* mesh = ResolveMesh(handle);
-		return (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
+		return (nullptr != mesh) ? (mesh->m_Material ? &*mesh->m_Material.borrow() : nullptr) : nullptr;
 	}
 
 	int __stdcall Api_Mesh_Exists(ScriptObjectHandle handle)
@@ -1935,7 +1935,7 @@ namespace
 		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
-		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
+		Material* material = (nullptr != mesh) ? (mesh->m_Material ? &*mesh->m_Material.borrow() : nullptr) : nullptr;
 		if (nullptr == material) return 0;
 
 		// I5-D5c3 — 저작 정본이 있으면 인스턴스도 함께 간다(c2-2 이후 sealing이
@@ -1949,7 +1949,7 @@ namespace
 		if (nullptr == name) return 0;
 
 		MeshRenderer* mesh = ResolveMesh(handle);
-		Material* material = (nullptr != mesh) ? mesh->m_Material.get() : nullptr;
+		Material* material = (nullptr != mesh) ? (mesh->m_Material ? &*mesh->m_Material.borrow() : nullptr) : nullptr;
 		if (nullptr == material) return 0;
 
 		return MaterialScriptBinding::SetInt(*material, name, value,

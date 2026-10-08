@@ -88,14 +88,14 @@ namespace experiment::cooked
         [[nodiscard]] bool ReadPayload(std::uint64_t offset,
             std::span<std::byte> out, std::string& failure) const
         {
-            if (!bytes_ || offset > metadata_.payloadBytes
+            if ((!exactBytes_ && !bytes_) || offset > metadata_.payloadBytes
                 || out.size() > metadata_.payloadBytes - offset)
             {
                 failure = "audio payload read exceeds bounded range";
                 return false;
             }
-            return bytes_->ReadAt(path_, metadata_.payloadOffset + offset,
-                out, failure);
+            const auto& source = exactBytes_ ? *exactBytes_ : *bytes_;
+            return source.ReadAt(path_, metadata_.payloadOffset + offset, out, failure);
         }
 
         friend bool OpenCookedAudioClipEntry(const CookedAssetManifestEntry&,
@@ -104,7 +104,10 @@ namespace experiment::cooked
 
     private:
         AssetId id_{};
+        // Keep the legacy std owner only for already-immutable sources. Loose
+        // clips retain exactly one narrowed own source, never the entire mount.
         std::shared_ptr<const ArtifactByteSource> bytes_{};
+        own::shared_owner<const ArtifactByteSource> exactBytes_{};
         std::string path_{};
         CookedAudioClipHeader metadata_{};
     };
@@ -112,8 +115,9 @@ namespace experiment::cooked
     // Opening streams through the artifact once to verify both the CEMF
     // digest and CEAC payload digest. Later reads remain bounded by CEAC.
     // The caller must keep the mounted bytes immutable for the clip lifetime.
-    // Windows loose mounts pin a read handle denying writes; other byte sources
-    // retain their own immutability contract.
+    // Each loose clip pins its exact opened file, independently of sibling
+    // clips or the mount. Windows also denies writes; POSIX in-place mutations
+    // remain a caller immutability violation. Pak/memory retain their contract.
     [[nodiscard]] inline bool OpenCookedAudioClipEntry(
         const CookedAssetManifestEntry& entry,
         std::shared_ptr<const ArtifactByteSource> bytes,
@@ -127,15 +131,27 @@ namespace experiment::cooked
             failure = "manifest entry is not a supported audio clip";
             return false;
         }
+        own::shared_owner<const ArtifactByteSource> exactBytes;
+        if (!bytes->CaptureArtifact(entry.artifactPath, exactBytes, failure))
+        {
+            return false;
+        }
+        const auto& source = exactBytes ? *exactBytes : *bytes;
         std::uint64_t fileSize = 0u;
-        if (!bytes->Size(entry.artifactPath, fileSize, failure)) return false;
+        if (!source.Size(entry.artifactPath, fileSize, failure))
+        {
+            return false;
+        }
         if (fileSize != entry.byteSize || fileSize < kAudioClipHeaderBytes)
         {
             failure = "audio artifact size differs from manifest";
             return false;
         }
         std::array<std::byte, kAudioClipHeaderBytes> headerBytes{};
-        if (!bytes->ReadAt(entry.artifactPath, 0u, headerBytes, failure)) return false;
+        if (!source.ReadAt(entry.artifactPath, 0u, headerBytes, failure))
+        {
+            return false;
+        }
         CookedAudioClipHeader metadata{};
         if (!ReadAudioClipHeader(headerBytes, fileSize, metadata))
         {
@@ -152,7 +168,7 @@ namespace experiment::cooked
         {
             const std::size_t count = static_cast<std::size_t>(
                 std::min<std::uint64_t>(block.size(), metadata.payloadBytes - position));
-            if (!bytes->ReadAt(entry.artifactPath,
+            if (!source.ReadAt(entry.artifactPath,
                 metadata.payloadOffset + position,
                 std::span(block.data(), count), failure)) return false;
             artifactHash.Update(block.data(), count);
@@ -168,7 +184,11 @@ namespace experiment::cooked
 
         CookedAudioClipSource candidate;
         candidate.id_ = entry.assetId;
-        candidate.bytes_ = std::move(bytes);
+        candidate.exactBytes_ = std::move(exactBytes);
+        if (!candidate.exactBytes_)
+        {
+            candidate.bytes_ = std::move(bytes);
+        }
         candidate.path_ = entry.artifactPath;
         candidate.metadata_ = metadata;
         out = std::move(candidate);

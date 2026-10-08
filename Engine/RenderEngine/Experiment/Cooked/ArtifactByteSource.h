@@ -1,38 +1,87 @@
 #pragma once
 
+#include "../../../Utility_Framework/Ownership.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <limits>
-#include <memory>
 #include <span>
 #include <string>
 #include <string_view>
 #include <utility>
-#if defined(_WIN32)
 #include <cstdio>
-#include <io.h>
-#include <share.h>
 #include <mutex>
 #include <unordered_map>
+#include <sys/stat.h>
+#if defined(_WIN32)
+#include <io.h>
+#include <share.h>
+#else
+#include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
 #endif
 
 namespace experiment::cooked
 {
     // Paths are normalized virtual paths under Derived/. Implementations may
     // address a loose cooked tree or an entry inside a mounted pak. Holding the
-    // source owner retains its backing; calling Size/ReadAt remains explicit I/O.
+    // source owner retains its backing; calling CaptureArtifact/Size/ReadAt is
+    // explicit I/O and must not occur during metadata-only mount/root lookup.
     class ArtifactByteSource
     {
     public:
         virtual ~ArtifactByteSource() = default;
+
+        // Capture before a multi-call read or before publishing a durable exact
+        // locator. A nonempty result narrows ownership to this artifact. Success
+        // with an empty result means this source already retains immutable
+        // backing (for example a pak or memory image): retain the caller's
+        // existing source owner instead. This default is not valid for mutable
+        // pathname-only sources. Failure must never fall back to the original.
+        // Capture alone reads no payload. It does not validate a typed digest.
+        // Pass a separate output; use CaptureArtifactSource below when replacing
+        // an existing engine owner so the empty-result fallback stays owned.
+        [[nodiscard]] virtual bool CaptureArtifact(std::string_view,
+            own::shared_owner<const ArtifactByteSource>& narrowed,
+            std::string& failure) const
+        {
+            failure.clear();
+            narrowed.reset();
+            return true;
+        }
         [[nodiscard]] virtual bool Size(std::string_view path,
             std::uint64_t& out, std::string& failure) const = 0;
         [[nodiscard]] virtual bool ReadAt(std::string_view path,
             std::uint64_t offset, std::span<std::byte> out,
             std::string& failure) const = 0;
     };
+
+    // Keep the default immutable-source fallback in one place for durable
+    // engine-owned locators. The replacement is complete before the root source
+    // owner is dropped, and failed capture leaves that existing owner intact.
+    [[nodiscard]] inline bool CaptureArtifactSource(
+        own::shared_owner<const ArtifactByteSource>& source,
+        std::string_view path, std::string& failure)
+    {
+        if (!source)
+        {
+            failure = "cooked artifact source owner is absent";
+            return false;
+        }
+        own::shared_owner<const ArtifactByteSource> narrowed;
+        if (!source->CaptureArtifact(path, narrowed, failure))
+        {
+            return false;
+        }
+        if (narrowed)
+        {
+            source = std::move(narrowed);
+        }
+        return true;
+    }
 
     // Generic byte sources validate location, not a particular codec suffix.
     // Typed readers still validate kind/schema and the artifact's own format.
@@ -120,56 +169,56 @@ namespace experiment::cooked
 
     class LooseArtifactByteSource final : public ArtifactByteSource
     {
-    public:
-        explicit LooseArtifactByteSource(std::filesystem::path root)
-            : root_(std::move(root)) {}
+    private:
+        struct PinnedFile
+        {
+            std::FILE* file{};
+            std::mutex mutex;
 
-        [[nodiscard]] bool Size(std::string_view path,
-            std::uint64_t& out, std::string& failure) const override
+            ~PinnedFile()
+            {
+                if (file)
+                {
+                    std::fclose(file);
+                }
+            }
+        };
+
+        // The caller holds this file's mutex. Size and type refer to the opened
+        // descriptor, never a pathname that may have been replaced meanwhile.
+        [[nodiscard]] static bool FileSizeLocked(const PinnedFile& pinned,
+            std::uint64_t& out, std::string& failure)
         {
 #if defined(_WIN32)
-            const auto pinned = Pin(path, failure);
-            if (!pinned)
-            {
-                return false;
-            }
-            std::lock_guard lock(pinned->mutex);
-            const auto size = _filelengthi64(_fileno(pinned->file));
-            if (size < 0)
-            {
-                failure = "pinned cooked artifact size cannot be read";
-                return false;
-            }
-            out = static_cast<std::uint64_t>(size);
-            return true;
+            struct _stat64 information{};
+            if (::_fstat64(::_fileno(pinned.file), &information) != 0
+                || (information.st_mode & _S_IFMT) != _S_IFREG || information.st_size < 0)
 #else
-            std::filesystem::path file;
-            if (!Resolve(path, file, failure))
-            {
-                return false;
-            }
-            std::error_code error;
-            if (!std::filesystem::is_regular_file(file, error) || error)
-            {
-                failure = "cooked artifact file is missing";
-                return false;
-            }
-            out = std::filesystem::file_size(file, error);
-            if (error)
-            {
-                failure = "cooked artifact size cannot be read";
-                return false;
-            }
-            return true;
+            struct stat information{};
+            if (::fstat(::fileno(pinned.file), &information) != 0
+                || !S_ISREG(information.st_mode) || information.st_size < 0)
 #endif
+            {
+                failure = "pinned cooked artifact is not a readable regular file";
+                return false;
+            }
+            out = static_cast<std::uint64_t>(information.st_size);
+            return true;
         }
 
-        [[nodiscard]] bool ReadAt(std::string_view path,
-            std::uint64_t offset, std::span<std::byte> out,
-            std::string& failure) const override
+        [[nodiscard]] static bool FileSize(const own::shared_owner<PinnedFile>& pinned,
+            std::uint64_t& out, std::string& failure)
         {
-            std::uint64_t size = 0u;
-            if (!Size(path, size, failure))
+            std::lock_guard lock(pinned->mutex);
+            return FileSizeLocked(*pinned, out, failure);
+        }
+
+        [[nodiscard]] static bool ReadFile(const own::shared_owner<PinnedFile>& pinned,
+            std::uint64_t offset, std::span<std::byte> out, std::string& failure)
+        {
+            std::lock_guard lock(pinned->mutex);
+            std::uint64_t size{};
+            if (!FileSizeLocked(*pinned, size, failure))
             {
                 return false;
             }
@@ -187,76 +236,176 @@ namespace experiment::cooked
                 return true;
             }
 #if defined(_WIN32)
-            const auto pinned = Pin(path, failure);
-            if (!pinned)
-            {
-                return false;
-            }
-            std::lock_guard lock(pinned->mutex);
-            if (_fseeki64(pinned->file, static_cast<__int64>(offset), SEEK_SET) != 0 ||
-                std::fread(out.data(), 1, out.size(), pinned->file) != out.size())
+            const bool positioned = _fseeki64(pinned->file, static_cast<__int64>(offset), SEEK_SET) == 0;
+#else
+            const bool positioned = offset <= static_cast<std::uint64_t>((std::numeric_limits<off_t>::max)())
+                && ::fseeko(pinned->file, static_cast<off_t>(offset), SEEK_SET) == 0;
+#endif
+            if (!positioned || std::fread(out.data(), 1u, out.size(), pinned->file) != out.size())
             {
                 failure = "pinned cooked artifact range cannot be read";
                 return false;
             }
             return true;
-#else
-            std::filesystem::path file;
-            if (!Resolve(path, file, failure))
+        }
+
+        // An exact locator owns only its physical file, not the mount source or
+        // sibling files. Recapture keeps this already-narrow source owner;
+        // no path lookup is ever performed again.
+        class SingleArtifactSource final : public ArtifactByteSource
+        {
+        public:
+            SingleArtifactSource(std::string path, own::shared_owner<PinnedFile> file)
+                : path_(std::move(path)), file_(std::move(file)) {}
+
+            [[nodiscard]] bool CaptureArtifact(std::string_view path,
+                own::shared_owner<const ArtifactByteSource>& narrowed,
+                std::string& failure) const override
             {
+                if (!Matches(path, failure))
+                {
+                    narrowed.reset();
+                    return false;
+                }
+                failure.clear();
+                narrowed.reset();
+                return true;
+            }
+
+            [[nodiscard]] bool Size(std::string_view path, std::uint64_t& out,
+                std::string& failure) const override
+            {
+                return Matches(path, failure) && FileSize(file_, out, failure);
+            }
+
+            [[nodiscard]] bool ReadAt(std::string_view path, std::uint64_t offset,
+                std::span<std::byte> out, std::string& failure) const override
+            {
+                return Matches(path, failure) && ReadFile(file_, offset, out, failure);
+            }
+
+        private:
+            [[nodiscard]] bool Matches(std::string_view path, std::string& failure) const
+            {
+                if (path != path_)
+                {
+                    failure = "exact cooked source does not contain this artifact";
+                    return false;
+                }
+                return true;
+            }
+
+            std::string path_;
+            own::shared_owner<PinnedFile> file_;
+        };
+
+    public:
+        // Replaced manifests must use immutable CAS paths or a fresh source
+        // snapshot. A live path pin in this snapshot keeps its old file identity.
+        explicit LooseArtifactByteSource(std::filesystem::path root)
+            : root_(std::move(root)) {}
+
+        [[nodiscard]] bool CaptureArtifact(std::string_view path,
+            own::shared_owner<const ArtifactByteSource>& narrowed,
+            std::string& failure) const override
+        {
+            auto pinned = Pin(path, failure);
+            if (!pinned)
+            {
+                narrowed.reset();
                 return false;
             }
-            std::ifstream input(file, std::ios::binary);
-            input.seekg(static_cast<std::streamoff>(offset));
-            input.read(reinterpret_cast<char*>(out.data()),
-                static_cast<std::streamsize>(out.size()));
-            if (!input || input.gcount() != static_cast<std::streamsize>(out.size()))
-            {
-                failure = "cooked artifact range cannot be read";
-                return false;
-            }
+            auto candidate = own::make_shared<SingleArtifactSource>(std::string(path), std::move(pinned));
+            failure.clear();
+            narrowed = std::move(candidate);
             return true;
-#endif
+        }
+
+        // Direct calls are safe one-shot reads, not durable file-identity pins.
+        // A caller spanning multiple reads must retain CaptureArtifact's owner.
+        [[nodiscard]] bool Size(std::string_view path,
+            std::uint64_t& out, std::string& failure) const override
+        {
+            const auto pinned = Pin(path, failure);
+            return pinned && FileSize(pinned, out, failure);
+        }
+
+        [[nodiscard]] bool ReadAt(std::string_view path,
+            std::uint64_t offset, std::span<std::byte> out,
+            std::string& failure) const override
+        {
+            const auto pinned = Pin(path, failure);
+            return pinned && ReadFile(pinned, offset, out, failure);
         }
 
     private:
-#if defined(_WIN32)
-        struct PinnedFile
-        {
-            std::FILE* file{};
-            std::mutex mutex;
-
-            ~PinnedFile()
-            {
-                if (file)
-                {
-                    std::fclose(file);
-                }
-            }
-        };
-
-        // An opened artifact retains this byte source. Denying writers pins its
-        // validated file identity/bytes until the final source owner is released.
+        // Windows denies writes; POSIX retains the opened inode across
+        // rename/unlink. In-place external edits remain a caller immutability
+        // violation and are rejected when a typed reader rechecks its digest.
         // Mount/root enumeration never calls Pin or opens artifact files.
-        [[nodiscard]] std::shared_ptr<PinnedFile> Pin(std::string_view path,
+        [[nodiscard]] own::shared_owner<PinnedFile> Pin(std::string_view path,
             std::string& failure) const
         {
             std::lock_guard lock(filesMutex_);
+            // Weak lookup must not accumulate a control block/path for every
+            // artifact ever touched. Amortized pruning retains at most one
+            // small interval of expired records between new captures.
+            if (++pinsSincePrune_ == 64u)
+            {
+                std::erase_if(files_, [](const auto& item) { return item.second.expired(); });
+                pinsSincePrune_ = 0u;
+            }
             const std::string key(path);
             if (const auto existing = files_.find(key); existing != files_.end())
             {
-                return existing->second;
+                if (auto pinned = existing->second.lock())
+                {
+                    return pinned;
+                }
+                files_.erase(existing);
             }
             std::filesystem::path resolved;
             if (!Resolve(path, resolved, failure))
             {
                 return {};
             }
-            auto pinned = std::make_shared<PinnedFile>();
+            auto pinned = own::make_shared<PinnedFile>();
+#if defined(_WIN32)
             pinned->file = _wfsopen(resolved.c_str(), L"rb", _SH_DENYWR);
+#else
+            // Reject a hostile FIFO/device without blocking before its type can
+            // be checked. Validate the opened descriptor, not a pathname stat.
+            int flags = O_RDONLY | O_CLOEXEC | O_NONBLOCK;
+#if defined(O_NOFOLLOW)
+            flags |= O_NOFOLLOW;
+#endif
+            const int descriptor = ::open(resolved.c_str(), flags);
+            if (descriptor < 0)
+            {
+                failure = "cooked artifact backing cannot be opened";
+                return {};
+            }
+            struct stat information{};
+            if (::fstat(descriptor, &information) != 0 || !S_ISREG(information.st_mode))
+            {
+                ::close(descriptor);
+                failure = "cooked artifact backing is not a regular file";
+                return {};
+            }
+            pinned->file = ::fdopen(descriptor, "rb");
             if (!pinned->file)
             {
-                failure = "cooked artifact cannot be pinned against writes";
+                ::close(descriptor);
+            }
+#endif
+            if (!pinned->file)
+            {
+                failure = "cooked artifact backing cannot be opened and pinned";
+                return {};
+            }
+            std::uint64_t ignoredSize{};
+            if (!FileSize(pinned, ignoredSize, failure))
+            {
                 return {};
             }
             files_.emplace(key, pinned);
@@ -264,8 +413,8 @@ namespace experiment::cooked
         }
 
         mutable std::mutex filesMutex_;
-        mutable std::unordered_map<std::string, std::shared_ptr<PinnedFile>> files_;
-#endif
+        mutable std::unordered_map<std::string, own::weak_owner<PinnedFile>> files_;
+        mutable std::size_t pinsSincePrune_{};
         [[nodiscard]] bool Resolve(std::string_view virtualPath,
             std::filesystem::path& out, std::string& failure) const
         {

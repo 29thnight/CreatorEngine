@@ -291,7 +291,7 @@ namespace ExperimentMaterialSealing
         bool prepared;
         if (source.hasCodeValues)
         {
-            std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
+            own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
             std::vector<std::uint16_t> keywords;
             prepared = LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError) &&
                 experiment::NormalizeMaterialKeywordSelections(source.material, meta.keywords, keywords, outError) &&

@@ -61,7 +61,7 @@ bool ImageComponent::isThisTextureExist(std::string_view path) const
 	return false;
 }
 
-void ImageComponent::Load(const std::shared_ptr<Texture>& ptr)
+void ImageComponent::Load(const own::shared_owner<const Texture>& ptr)
 {
 	if (nullptr == ptr)
 		return;
@@ -75,7 +75,7 @@ void ImageComponent::Load(const std::shared_ptr<Texture>& ptr)
 	}
 }
 
-void ImageComponent::DeserializeTexture(const std::shared_ptr<Texture>& ptr)
+void ImageComponent::DeserializeTexture(const own::shared_owner<const Texture>& ptr)
 {
 	if (nullptr == ptr)
 		return;

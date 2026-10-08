@@ -64,7 +64,7 @@ namespace
     void ApplyGraphParameter(MeshRenderer& renderer, LX::Id id, LX::LXSocketValue value)
     {
         const auto previous = renderer.m_Material;
-        auto candidate = std::make_shared<Material>(*previous);
+        auto candidate = own::make_shared<Material>(*previous);
         std::string error;
         if (!candidate->TrySetMaterialGraphParameter(id, std::move(value), error))
         {
@@ -73,7 +73,7 @@ namespace
         }
         const auto apply = [scene = renderer.GetOwner()->GetScene(),
                             handle = renderer.GetOwner()->GetScene()->HandleOf(renderer.GetOwner()->m_index),
-                            component = renderer.GetInstanceID()](const std::shared_ptr<Material>& material) {
+                            component = renderer.GetInstanceID()](const own::shared_owner<Material>& material) {
             if (SceneManagers->GetActiveScene() != scene)
                 return;
             auto* object = scene->Resolve(handle);
@@ -84,14 +84,14 @@ namespace
         Meta::MakeCustomChangeCommand([apply, previous] { apply(previous); }, [apply, candidate] { apply(candidate); });
     }
 
-    void AssignMaterialAsset(MeshRenderer& renderer, const std::shared_ptr<Material>& asset)
+    void AssignMaterialAsset(MeshRenderer& renderer, const own::shared_owner<const Material>& asset)
     {
         const auto previous = renderer.m_Material;
         const auto previousBase = renderer.m_materialBaseGuid;
-        auto candidate = std::make_shared<Material>(*asset);
+        auto candidate = own::make_shared<Material>(*asset);
         const auto apply = [scene = renderer.GetOwner()->GetScene(),
                             handle = renderer.GetOwner()->GetScene()->HandleOf(renderer.GetOwner()->m_index),
-                            component = renderer.GetInstanceID()](const std::shared_ptr<Material>& material, FileGuid base) {
+                            component = renderer.GetInstanceID()](const own::shared_owner<Material>& material, FileGuid base) {
             if (SceneManagers->GetActiveScene() != scene) return;
             auto* object = scene->Resolve(handle);
             auto* target = object ? object->GetComponent<MeshRenderer>() : nullptr;
@@ -179,10 +179,10 @@ namespace
                     error = "That name already exists. Choose another name.";
                 else
                 {
-                    auto material = std::make_shared<Material>(*renderer.m_Material);
+                    auto material = own::make_shared<Material>(*renderer.m_Material);
                     material->m_name = name;
                     material->m_fileGuid = FileGuid::CreateRandomV4();
-                    if (EditorAssetDatabase::Get().SaveMaterial(material.get()))
+                    if (EditorAssetDatabase::Get().SaveMaterial(&*material.borrow()))
                     {
                         DataSystems->InsertMaterial(material);
                         AssignMaterialAsset(renderer, material);
@@ -333,7 +333,7 @@ namespace
             if (nullptr != meshRenderer->m_Material)
             {
                 auto& mat_info = meshRenderer->m_Material->m_materialInfo;
-                auto mat = meshRenderer->m_Material.get();
+                auto mat = (meshRenderer->m_Material ? &*meshRenderer->m_Material.borrow() : nullptr);
                 TextureDropTarget(mat, meshRenderer->GetMaterialInstance());
 
                 // I5-M5 S4 — 편집 정본은 이름 기반 논리 값이다. m_materialInfo는
@@ -394,7 +394,7 @@ namespace
         // 전용 위젯이 담당하므로 건너뛴다.
         if (!latticeMaterial && ImGui::CollapsingHeader("Shader Properties", ImGuiTreeNodeFlags_DefaultOpen))
         {
-            Material* mat = meshRenderer->m_Material.get();
+            Material* mat = (meshRenderer->m_Material ? &*meshRenderer->m_Material.borrow() : nullptr);
             if (nullptr == mat)
             {
                 ImGui::TextUnformatted("No Material assigned.");
@@ -406,8 +406,8 @@ namespace
             else
             {
                 std::string metaError;
-                const ShaderMetaHandle metaHandle = DataSystems->LoadShaderMetaHandle(mat->m_shaderMetaGuid, metaError);
-                const auto meta = DataSystems->ResolveShaderMeta(metaHandle);
+                ShaderMetaHandle metaHandle;
+                const auto meta = DataSystems->LoadShaderMetaOwner(mat->m_shaderMetaGuid, metaHandle, metaError);
                 if (!meta)
                 {
                     ImGui::TextWrapped("ShaderMeta 로드 실패: %s", metaError.c_str());
@@ -550,8 +550,8 @@ namespace
 	// 한 줄이다: 라벨, 미리보기(있을 때), 이름 버튼(끌어 놓기 대상), 지우기 버튼.
 	void DrawMaterialTextureSlot(const editor::widgets::property_sheet& sheet, Material& mat,
 		const char* label, std::string_view propertyName, std::string& legacyNameField,
-		const std::shared_ptr<Texture>& current, bool compress,
-		const std::function<void(std::shared_ptr<Texture>)>& apply,
+		const own::shared_owner<const Texture>& current, bool compress,
+		const std::function<void(own::shared_owner<const Texture>)>& apply,
 		experiment::MaterialInstance* instance) // I5-D5c3
 	{
 		ImGui::PushID(propertyName.data(),
@@ -562,7 +562,7 @@ namespace
 		float width = current ? sheet.line_before_buttons(label, 2) : sheet.line(label);
 		if (current)
 		{
-			ImGui::Image((ImTextureID)EditorImGuiTexture::From(current.get()),
+			ImGui::Image((ImTextureID)EditorImGuiTexture::From(current),
 				ImVec2(square, square));
 			ImGui::SameLine(0.f, gap);
 		}
@@ -627,21 +627,21 @@ void TextureDropTarget(Material* mat,
 	DrawMaterialTextureSlot(sheet, *mat, "Base Map",
 		standard_material::property::BaseColorMap, mat->m_baseColorTexName,
 		mat->GetBaseColorMapShared(), true,
-		[mat](std::shared_ptr<Texture> texture)
+		[mat](own::shared_owner<const Texture> texture)
 		{
 			mat->UseBaseColorMap(std::move(texture));
 		}, instance);
 	DrawMaterialTextureSlot(sheet, *mat, "Normal Map",
 		standard_material::property::NormalMap, mat->m_normalTexName,
 		mat->GetNormalMapShared(), false,
-		[mat](std::shared_ptr<Texture> texture)
+		[mat](own::shared_owner<const Texture> texture)
 		{
 			mat->UseNormalMap(std::move(texture));
 		}, instance);
 	DrawMaterialTextureSlot(sheet, *mat, "ORM Map",
 		standard_material::property::OrmMap, mat->m_ORM_TexName,
 		mat->GetOccRoughMetalMapShared(), false,
-		[mat](std::shared_ptr<Texture> texture)
+		[mat](own::shared_owner<const Texture> texture)
 		{
 			mat->UseOccRoughMetalMap(std::move(texture));
 		}, instance);

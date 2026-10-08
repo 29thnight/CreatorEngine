@@ -114,7 +114,8 @@ namespace material_graph
 
     bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures,
                                      own::shared_owner<const Instance> instance, const PassLayout& layout,
-                                     std::shared_ptr<const RenderBindings>& result, std::string& error)
+                                     std::shared_ptr<const RenderBindings>& result, std::string& error,
+                                     own::shared_owner<InstanceFramePins> instancePins)
     {
         ce::profile_scope profile{ce::marker<"MaterialBindingsPrepare">()};
         error.clear();
@@ -128,7 +129,19 @@ namespace material_graph
             return Fail(error, "Material render binding requires an active frame recording.");
 
         auto candidate = std::make_shared<RenderBindings>();
-        candidate->instance = std::move(instance);
+        if (!instancePins)
+        {
+            auto pins = own::make_shared<InstanceFramePins>();
+            pins->Retain(instance);
+            instancePins = std::move(pins);
+        }
+        candidate->instancePinIndex = instancePins->Find(*instance);
+        candidate->instance = instancePins->Borrow(candidate->instancePinIndex);
+        if (!candidate->instance)
+        {
+            return Fail(error, "Material bindings require the exact instance in the frame pin table.");
+        }
+        candidate->instancePins = std::move(instancePins);
         candidate->layout = layout;
         candidate->device = &device;
         candidate->recordingId = recording;
@@ -138,7 +151,7 @@ namespace material_graph
             if (!texture.owner)
                 return Fail(error, "Material render texture has no CPU generation owner.");
             const auto failures = textures.GetUploadFailureCount();
-            const auto entry = textures.GetOrUpload(texture.owner.get(), error);
+            const auto entry = textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error);
             if (!entry.IsValid() || !error.empty() || textures.GetUploadFailureCount() != failures)
                 return Fail(error,
                             error.empty() ? "LX material texture upload failed; neutral substitution rejected." : error);
@@ -153,6 +166,10 @@ namespace material_graph
             return Fail(error, diagnostics.empty() ? "Material instance differs from its reflected uniform layout."
                                                    : diagnostics.front().message);
 
+        // The exact immutable instance already owns every texture dependency.
+        // A binding packet borrows that closure through its frame table rather
+        // than duplicating texture strong references for every draw/pass.
+        candidate->resources.owners.clear();
         if (layout.samplerSlot)
         {
             std::vector<std::string> key(candidate->resources.samplers.size(), "nearest-clamp");

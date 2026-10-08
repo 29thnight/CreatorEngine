@@ -440,7 +440,7 @@ uint32_t Core::App::PublishRenderFrame()
 	::editor::windows::note_view_submission(
 		!editorDemanded && nullptr != editorCamera,
 		!gameDemanded && nullptr != gameCamera);
-	const std::vector<std::shared_ptr<Material>> requiredMaterials =
+	const std::vector<own::shared_owner<const Material>> requiredMaterials =
 		SceneManagers->CaptureRequiredRenderMaterials();
 	const EnhancedRequiredAssetPacket requiredAssets =
 		EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);

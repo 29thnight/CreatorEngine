@@ -161,7 +161,7 @@ namespace material_graph
         experiment::AssetId assetId;
         LX::LXColorSpace colorSpace{};
         // Texture CPU owners migrate in their own slice; retain this exact owner.
-        std::shared_ptr<Texture> owner;
+        own::shared_owner<const Texture> owner;
     };
 
     struct Instance : LX::Runtime::Instance
@@ -172,7 +172,7 @@ namespace material_graph
     };
 
     using TextureLoader =
-        std::function<std::shared_ptr<Texture>(const experiment::AssetId&, LX::LXColorSpace, std::string&)>;
+        std::function<own::shared_owner<const Texture>(const experiment::AssetId&, LX::LXColorSpace, std::string&)>;
     bool BuildInstance(own::shared_owner<const Generation> generation, const InstanceDescription& description,
                        const TextureLoader& loadTexture, own::shared_owner<const Instance>& result, std::string& error);
 

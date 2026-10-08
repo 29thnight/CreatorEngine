@@ -220,7 +220,8 @@ private:
     // 다르면 b2/PSO 상태가 다르므로 한 draw로 합치지 않는다.
     struct MaterialKey
     {
-        std::vector<Texture*> textures{};
+        std::vector<const Texture*> textures{};
+        std::vector<std::uint64_t> textureIds{};
         std::vector<assets::TextureCoordinates> coordinates{};
         // W7 — 배치가 샘플러로도 갈려야 draw 마다 자기 것을 걸 수 있다.
         assets::TextureSampler sampler{};

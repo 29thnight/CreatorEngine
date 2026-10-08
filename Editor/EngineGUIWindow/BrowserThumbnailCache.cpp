@@ -52,7 +52,7 @@ namespace
         std::uint64_t generation{ 0 };
         std::uint64_t lastUsedFrame{ 0 };
         std::uint64_t bytes{ 0 };
-        std::shared_ptr<Texture> texture;
+        own::shared_owner<const Texture> texture;
         thumbnail_fs::path source;
         bool dispatched{ false };
         bool visible{ false };
@@ -319,10 +319,10 @@ namespace
             ++self.live.decoded;
 
             // Texture 는 **여기서** 선다 — Presentation 스레드다.
-            std::shared_ptr<Texture> texture(Texture::CreateFromPixels(
+            auto texture = Texture::CreateFromPixels(
                 done.width, done.height, "BrowserThumbnail",
                 RHIFormat::RGBA8Unorm, done.rgba.data(),
-                std::size_t(done.width) * 4u));
+                std::size_t(done.width) * 4u);
             if (!texture)
             {
                 item.state = thumbnail_state::failed;
@@ -343,7 +343,7 @@ namespace
         for (auto& [key, item] : self.entries)
         {
             if (thumbnail_state::awaiting_upload != item.state) continue;
-            if (EditorImGuiTexture::IsReady(item.texture.get()))
+            if (EditorImGuiTexture::IsReady(item.texture))
             {
                 item.state = thumbnail_state::ready;
                 ++self.live.published;
@@ -351,7 +351,7 @@ namespace
             }
             // 아직이다 — 그리지 않고 등록만 해서 업로드를 **일으킨다.**
             // 이것이 없으면 아무도 등록하지 않아 영원히 안 올라간다.
-            EditorImGuiTexture::Prime(item.texture.get());
+            EditorImGuiTexture::Prime(item.texture ? &*item.texture.borrow() : nullptr);
         }
 
         // ── ③ 대기 중인 요청을 조금씩 넘긴다 ────────────────────────────
@@ -428,7 +428,7 @@ namespace
         for (auto& [key, item] : self.entries) item.visible = false;
     }
 
-    Texture* thumbnail_acquire(const thumbnail_key& key,
+    const Texture* thumbnail_acquire(const thumbnail_key& key,
                                const thumbnail_fs::path& source,
                                bool visible)
     {
@@ -474,7 +474,7 @@ namespace
         if (thumbnail_state::ready == item.state && item.texture)
         {
             ++self.live.servedThumbnails;
-            return item.texture.get();
+            return &*item.texture.borrow();
         }
         ++self.live.servedIcons;
         return nullptr;

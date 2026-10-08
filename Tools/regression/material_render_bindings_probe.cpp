@@ -258,7 +258,7 @@ void Run(const std::filesystem::path& root)
         if (frame == 0)
         {
             Instance missingPixelsValue(*instance);
-            missingPixelsValue.textures.front().owner = std::make_shared<Texture>();
+            missingPixelsValue.textures.front().owner = own::make_shared<const Texture>();
             const auto missingPixels = own::make_shared<const Instance>(std::move(missingPixelsValue));
             Check(!bindings.Prepare(device, textures, missingPixels, layout, packet, error) && packet == accepted &&
                       textures.GetUploadFailureCount() == 1,
@@ -269,7 +269,7 @@ void Run(const std::filesystem::path& root)
         description.rtvFormats[0] = targetDescription.format;
         std::vector<TextureBinding> uploaded;
         for (const auto& owner : instance->textures)
-            uploaded.push_back({owner.slot, textures.GetOrUpload(owner.owner.get(), error), owner.owner});
+            uploaded.push_back({owner.slot, textures.GetOrUpload((owner.owner ? &*owner.owner.borrow() : nullptr), error), owner.owner});
         std::vector<LXMaterialDiagnostic> diagnostics;
         Check(pipeline.Publish(pipelines, product, RHIShaderBinary::Dxil, {.coreForward = true}, {},
                                instance->description.parameters, uploaded, description, {}, diagnostics),

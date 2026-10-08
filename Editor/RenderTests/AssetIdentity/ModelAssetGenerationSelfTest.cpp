@@ -1,4 +1,5 @@
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"
+#include "Texture.h"
 
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelSidecarV2.h"
@@ -188,7 +189,7 @@ namespace RenderTest
                 if (!before) { check.Check(false, "runtime failure probe lost setup generation"); return; }
                 check.Check(instance.BindModelGeneration(before, 0), "existing instance bound");
                 const auto instanceHandle = instance.GetModelMeshHandle();
-                std::vector<std::shared_ptr<Texture>> owners;
+                std::vector<own::shared_owner<const Texture>> owners;
                 for (const auto& texture : before->Textures())
                     owners.push_back(DataSystems->ResolveModelGenerationTexture(*before, texture.textureId));
                 check.Check(std::ranges::all_of(owners, [](const auto& owner) { return !!owner; }),
@@ -210,8 +211,12 @@ namespace RenderTest
                     && cacheAfter.replacements == cacheBefore.replacements;
                 bool texturesHeld = DataSystems->SnapshotModelGenerationTextures().retired == texturesBefore.retired;
                 for (std::size_t i = 0; i < owners.size(); ++i)
-                    texturesHeld &= owners[i] == DataSystems->ResolveModelGenerationTexture(
+                {
+                    const auto current = DataSystems->ResolveModelGenerationTexture(
                         *before, before->Textures()[i].textureId);
+                    texturesHeld &= owners[i] && current
+                        && owners[i]->m_assetId == current->m_assetId;
+                }
                 RHIModelMeshView view;
                 const bool instanceHeld = SameGeneration(instance.m_modelGeneration, before)
                     && instance.GetModelMeshHandle() == instanceHandle
@@ -238,7 +243,7 @@ namespace RenderTest
             const auto before = DataSystems->LoadModelAssetGeneration(guid);
             if (!before) { check.Check(false, "runtime recovery setup"); return; }
             instance.BindModelGeneration(before, 0);
-            std::vector<std::shared_ptr<Texture>> oldOwners;
+            std::vector<own::shared_owner<const Texture>> oldOwners;
             for (const auto& texture : before->Textures())
                 oldOwners.push_back(DataSystems->ResolveModelGenerationTexture(*before, texture.textureId));
             const auto cacheBefore = DataSystems->SnapshotModelAssetGenerations();
@@ -251,7 +256,11 @@ namespace RenderTest
                 for (std::size_t i = 0; i < after->Textures().size(); ++i)
                 {
                     const auto owner = DataSystems->ResolveModelGenerationTexture(*after, after->Textures()[i].textureId);
-                    newOwners &= owner && std::ranges::find(oldOwners, owner) == oldOwners.end();
+                    newOwners &= owner && std::ranges::none_of(oldOwners,
+                        [&owner](const auto& previous)
+                        {
+                            return previous && previous->m_assetId == owner->m_assetId;
+                        });
                 }
             MeshRenderer fresh;
             RHIModelMeshView oldView;

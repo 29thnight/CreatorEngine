@@ -1,5 +1,6 @@
 #pragma once
 #include <cstdint>
+#include "Ownership.h"
 
 class Texture;
 
@@ -19,14 +20,12 @@ namespace EditorImGuiTexture
     /// API의 ImTextureID를 돌려준다. Host가 꺼져 있으면 0이다.
     ///
     /// FromRawDx11Srv가 여기 있었다 — 호출자 0으로 걷었다(E). .cpp 주석 참고.
-    uint64_t From(Texture* texture);
+    uint64_t From(const Texture* texture);
 
-    /// 스마트 포인터(shared_ptr·std::unique_ptr 등)도 그대로 받는다 —
-    /// 호출부 21곳의 소유 형태가 제각각이라 여기서 흡수한다.
-    template <typename TPtr>
-    uint64_t From(const TPtr& pointer)
+    /// The caller retains the immutable texture owner during host registration.
+    inline uint64_t From(const own::shared_owner<const Texture>& pointer)
     {
-        return From(pointer ? &*pointer : nullptr);
+        return From(pointer ? &*pointer.borrow() : nullptr);
     }
 
     // ── 비동기 썸네일이 쓰는 둘 (PHASE 21 W7) ──
@@ -42,14 +41,13 @@ namespace EditorImGuiTexture
     /// 때까지 유형 아이콘만 그리는 타일은 썸네일 텍스처를 한 번도 등록하지
     /// 않으므로, 이 창구가 없으면 **영원히 안 올라간다** — 준비를 기다리는
     /// 쪽이 준비를 막는 교착이다.
-    void Prime(Texture* texture);
+    void Prime(const Texture* texture);
 
     /// 픽셀이 실제로 GPU 에 올라갔는가. 부수 효과가 없다.
-    bool IsReady(Texture* texture);
+    bool IsReady(const Texture* texture);
 
-    template <typename TPtr>
-    bool IsReady(const TPtr& pointer)
+    inline bool IsReady(const own::shared_owner<const Texture>& pointer)
     {
-        return IsReady(pointer ? &*pointer : nullptr);
+        return IsReady(pointer ? &*pointer.borrow() : nullptr);
     }
 }

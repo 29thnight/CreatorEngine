@@ -81,7 +81,7 @@ namespace material_graph
     bool SurfaceBatch::Matches(const Instance& instance, const SurfaceView& view,
                                std::span<const SurfacePoint> points) const
     {
-        return !mesh_ && std::addressof(*bindings_->instance) == &instance && view_.eye == view.eye &&
+        return !mesh_ && bindings_->instance->representationId == instance.representationId && view_.eye == view.eye &&
                view_.sceneEpoch == view.sceneEpoch && view_.viewRevision == view.viewRevision &&
                view_.geometryRevision == view.geometryRevision && points_.size() == points.size() &&
                std::memcmp(points_.data(), points.data(), points.size_bytes()) == 0;
@@ -94,7 +94,7 @@ namespace material_graph
 
     bool SurfaceBatch::Matches(const Instance& instance, const SurfaceGeometrySource& mesh) const
     {
-        return mesh_ && std::addressof(*bindings_->instance) == &instance && mesh_.get() == &mesh;
+        return mesh_ && bindings_->instance->representationId == instance.representationId && mesh_.get() == &mesh;
     }
 
     bool SurfaceBatch::ValidateReadback(std::span<const IblBakePoint> points, std::string& error) const

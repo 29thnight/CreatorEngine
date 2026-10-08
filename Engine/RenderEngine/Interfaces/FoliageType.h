@@ -19,7 +19,7 @@ struct [[reflgen::reflect]] FoliageType
 {
    public:
     [[reflgen::ignore]]
-    std::shared_ptr<Material> m_material{};
+    own::shared_owner<const Material> m_material{};
 
     [[reflgen::ignore]]
     std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource;
@@ -29,7 +29,7 @@ struct [[reflgen::reflect]] FoliageType
     // 재질에서 온다(메시가 가리키는 MaterialId) — MeshRenderer처럼 씬 diff를 얹을
     // 표면이 없어 인스턴스가 아니라 base 값 그대로다.
     [[reflgen::ignore]]
-    std::shared_ptr<const experiment::Material> m_authoredMaterial{};
+    own::shared_owner<const experiment::Material> m_authoredMaterial{};
 
     // PHASE 3.75 MBC8 — typed 정본(MeshRenderer m_modelGeneration 패턴). 비직렬화
     // 런타임 필드. FoliageComponent::BindExperimentMesh가 m_modelName → ModelId →

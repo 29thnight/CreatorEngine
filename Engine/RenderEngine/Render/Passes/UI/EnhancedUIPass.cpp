@@ -65,7 +65,7 @@ namespace
 // 하나가 틀려도 알 수 없다.
 uint32_t EnhancedUIPass::BuildRectsFromQueue(
     UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects,
-    float screenWidth, float screenHeight)
+    float screenWidth, float screenHeight, TextureFramePins* texturePins)
 {
     outRects.clear();
     outRects.reserve(count);
@@ -143,7 +143,9 @@ uint32_t EnhancedUIPass::BuildRectsFromQueue(
         rect.rotation = image->rotation;
         rect.canvasOrder = image->canvasOrder;
         rect.layerOrder = image->layerOrder;
-        rect.texture = image->texture.get();
+        rect.texturePinIndex = texturePins ? texturePins->Retain(image->texture)
+            : TextureFramePins::InvalidIndex;
+        rect.texture = (image->texture ? &*image->texture.borrow() : nullptr);
 
         outRects.push_back(rect);
     }
@@ -273,7 +275,7 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
         m_instances.push_back(instance);
 
         // 앞 배치와 텍스처가 같으면 이어 붙인다.
-        if (!m_batches.empty() && m_batches.back().texture == rect.texture)
+        if (!m_batches.empty() && m_batches.back().textureId == TextureFramePins::Identity(rect.texture))
         {
             ++m_batches.back().count;
         }
@@ -282,7 +284,9 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
+            batch.texturePinIndex = rect.texturePinIndex;
             batch.texture = rect.texture;
+            batch.textureId = TextureFramePins::Identity(rect.texture);
             m_batches.push_back(batch);
         }
     }
@@ -453,6 +457,7 @@ void EnhancedUIPass::Shutdown()
 {
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     m_lastRectCount = 0;
     m_lastBatchCount = 0;
     m_width = 0;

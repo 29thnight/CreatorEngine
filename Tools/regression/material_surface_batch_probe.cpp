@@ -135,7 +135,7 @@ constexpr std::array<Texel, 8> kTexels{{{64, 128, 192, 0},
                                         {192, 192, 128, 0}}};
 constexpr std::array<Texel, 2> kMip{{{96, 160, 224, 96}, {224, 96, 160, 160}}};
 
-std::shared_ptr<Texture> Image()
+own::shared_owner<const Texture> Image()
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
@@ -143,7 +143,7 @@ std::shared_ptr<Texture> Image()
     return Texture::CreateSharedFromImage("LX.Spatial.Image", std::move(image));
 }
 
-std::shared_ptr<Texture> Cube(const Environment& environment)
+own::shared_owner<const Texture> Cube(const Environment& environment)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 6, 1, true);
     for (unsigned face = 0; face < 6; ++face)
@@ -378,12 +378,12 @@ void Run(const std::filesystem::path& root)
             std::vector<RHITransition> transitions;
             if (frame == 0)
             {
-                const auto entry = textures.GetOrUpload(image.get(), error);
+                const auto entry = textures.GetOrUpload((image ? &*image.borrow() : nullptr), error);
                 transitions.push_back(
                     {entry.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource});
             }
             const unsigned envIndex = frame >= 5 ? 1 : 0;
-            const IblEnvironment environment{textures.GetOrUpload(environments[envIndex].get(), error), envIndex + 1,
+            const IblEnvironment environment{textures.GetOrUpload((environments[envIndex] ? &*environments[envIndex].borrow() : nullptr), error), envIndex + 1,
                                              environments[envIndex]};
             if (frame == 0 || frame == 5)
             {
@@ -579,7 +579,7 @@ void Run(const std::filesystem::path& root)
         device.AbortFrame();
         Check(device.BeginFrame(error), "Begin after evaluation abort");
         textures.BeginFrame(9);
-        const IblEnvironment environment{textures.GetOrUpload(environments[1].get(), error), 2, environments[1]};
+        const IblEnvironment environment{textures.GetOrUpload((environments[1] ? &*environments[1].borrow() : nullptr), error), 2, environments[1]};
         auto acceptedBake = baked;
         Check(!baker.RecordGpu(device, environment, aborted, baked, error) && baked == acceptedBake,
               "Cancelled/unvalidated GPU batch cannot cross recordings");

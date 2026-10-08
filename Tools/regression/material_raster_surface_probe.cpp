@@ -309,7 +309,7 @@ constexpr std::array<Texel, 8> kTexels{{{64, 128, 192, 0},
                                         {192, 192, 128, 0}}};
 constexpr std::array<Texel, 2> kMip{{{96, 160, 224, 96}, {224, 96, 160, 160}}};
 
-std::shared_ptr<Texture> Image()
+own::shared_owner<const Texture> Image()
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 4, 2, 1, 2, false);
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), kTexels.data(), sizeof(kTexels));
@@ -337,7 +337,7 @@ Texel FootprintTexel(bool second, unsigned mip, unsigned x, unsigned y, unsigned
             std::uint8_t(135 + 8 * mip + u(30)), std::uint8_t(55 + 8 * mip + u(32) + v(20))};
 }
 
-std::shared_ptr<Texture> FootprintImage(bool second, bool resized = false)
+own::shared_owner<const Texture> FootprintImage(bool second, bool resized = false)
 {
     const auto extent = ImageExtent(second, resized);
     auto image = TextureImage::Allocate(second ? RHIFormat::RGBA8Unorm : RHIFormat::RGBA8UnormSrgb, extent.width,
@@ -407,7 +407,7 @@ std::array<float, 4> ReferenceImage(bool second, bool resized, double u, double 
     return result;
 }
 
-std::shared_ptr<Texture> Cube(const Environment& environment)
+own::shared_owner<const Texture> Cube(const Environment& environment)
 {
     auto image = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 6, 1, true);
     for (unsigned face = 0; face < 6; ++face)
@@ -665,7 +665,7 @@ void CheckReferenceDeclarations(const EnhancedRenderGraph& graph)
 void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                    MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings, RasterSurfaceCollector& collector,
                    SurfaceEvaluator& evaluator, IblBaker& baker, own::shared_owner<const Instance> instance,
-                   std::shared_ptr<Texture> cube, const RasterSurfaceRequest& request,
+                   own::shared_owner<const Texture> cube, const RasterSurfaceRequest& request,
                    std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources,
                    std::span<const SurfacePoint> expectedGeometry, std::span<const IblBakePoint> expectedSurface,
                    std::span<const IblBakeSample> expectedBake, unsigned workers,
@@ -696,10 +696,10 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     textures.BeginFrame(100 + graphFrames);
     // Touch/upload before the prefix. Current-pose mesh packets, rather than
     // previously submitted geometry buffers, are prepared after this boundary.
-    const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
     for (const auto& texture : instance->textures)
     {
-        Check(textures.GetOrUpload(texture.owner.get(), error).IsValid(), "Touch graph material texture");
+        Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error).IsValid(), "Touch graph material texture");
     }
     if (workers)
     {
@@ -905,6 +905,14 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     std::shared_ptr<const SceneViewInput> accepted;
     std::string error;
     Check(SceneViewInput::Seal(view, {&draw, 1}, {}, accepted, error), "Scene input seal " + error);
+    {
+        const std::array repeated{draw, draw};
+        std::shared_ptr<const SceneViewInput> sharedInput;
+        Check(SceneViewInput::Seal(view, repeated, {}, sharedInput, error) &&
+            sharedInput->MaterialPins()->Size() == 1 &&
+            sharedInput->Draws()[0].materialPinIndex == sharedInput->Draws()[1].materialPinIndex,
+            "Repeated Scene draws share one immutable instance pin and store only indices/views");
+    }
     Check(accepted->Draws().size() == 1 && material_graph_test::SamePinnedObject(accepted->Draws()[0].material, instances[0]) &&
               accepted->View().frameId == 10 && accepted->View().sceneEpoch == 2,
           "Scene frame retains its exact typed instance and identity");
@@ -1103,7 +1111,7 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
                          MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings,
                          RasterSurfaceCollector& collector, std::array<SurfaceEvaluator, 2>& evaluators,
                          IblBaker& baker, const std::array<own::shared_owner<const Instance>, 2>& instances,
-                         std::shared_ptr<Texture> cube, const Environment& colors, const SheenTable& table,
+                         own::shared_owner<const Texture> cube, const Environment& colors, const SheenTable& table,
                          unsigned fixture, bool reverseOrder, unsigned workers,
                          RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
                          RGOrderPolicy order = RGOrderPolicy::DependencyOrder)
@@ -1247,12 +1255,12 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     Drain drain{device};
     Check(device.BeginFrame(error), "Shared graph begin");
     textures.BeginFrame(300 + sharedDepthFrames);
-    const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
     for (const auto& instance : instances)
     {
         for (const auto& texture : instance->textures)
         {
-            Check(textures.GetOrUpload(texture.owner.get(), error).IsValid(), "Shared texture residency");
+            Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error).IsValid(), "Shared texture residency");
         }
     }
     if (workers)
@@ -1528,7 +1536,7 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
 
 void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                           RenderBindingCache& bindings, RasterSurfaceCollector& collector, SurfaceEvaluator& evaluator,
-                          IblBaker& baker, own::shared_owner<const Instance> instance, std::shared_ptr<Texture> cube,
+                          IblBaker& baker, own::shared_owner<const Instance> instance, own::shared_owner<const Texture> cube,
                           const RasterSurfaceRequest& request,
                           std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources)
 {
@@ -1543,7 +1551,7 @@ void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeT
         Drain drain{device};
         Check(device.BeginFrame(error), "Failure graph begin");
         textures.BeginFrame(200 + failure);
-        const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
         pool.BeginFrame(failure);
         if (failure != 3)
         {
@@ -1759,7 +1767,7 @@ own::shared_owner<const Instance> SceneReload(const own::shared_owner<const Inst
                   const auto found = std::ranges::find_if(original->textures, [&](const auto& texture) {
                       return texture.assetId == id && texture.colorSpace == space;
                   });
-                  return found == original->textures.end() ? std::shared_ptr<Texture>{} : found->owner;
+                  return found == original->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
               },
               result, error),
           "Reload immutable instance " + error);
@@ -1804,7 +1812,7 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
 
 void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                          ProbeTextures& textures, ProbePool& pool,
-                         const std::array<own::shared_owner<const Instance>, 2>& instances, std::shared_ptr<Texture> cube,
+                         const std::array<own::shared_owner<const Instance>, 2>& instances, own::shared_owner<const Texture> cube,
                          const Environment& environmentColors, const SheenTable& table, unsigned expanded = 0)
 {
     std::string error;
@@ -1932,7 +1940,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         const auto found = std::ranges::find_if(instances[0]->textures, [&](const auto& texture) {
             return texture.assetId == id && texture.colorSpace == space;
         });
-        return found == instances[0]->textures.end() ? std::shared_ptr<Texture>{} : found->owner;
+        return found == instances[0]->textures.end() ? own::shared_owner<const Texture>{} : found->owner;
     };
     auto maskedDescription = instances[0]->description;
     maskedDescription.parameters.push_back({902, 0.0});
@@ -2154,7 +2162,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(device.BeginFrame(error), "Scene composition begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
-            const auto environment = textures.GetOrUpload(cube.get(), error);
+            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error);
             Check(environment.IsValid(), "Scene reference environment");
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
                   "Actual Scene pass preparation " + error);
@@ -2937,13 +2945,13 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     }
     {
         const auto before = textures.GetCachedCount();
-        std::array<std::shared_ptr<Texture>, 3> abortedImages{Image(), Image(), Image()};
+        std::array<own::shared_owner<const Texture>, 3> abortedImages{Image(), Image(), Image()};
         std::array<RHITextureHandle, 3> handles;
         Check(device.BeginFrame(error), "Texture abort regression begin");
         textures.BeginFrame(800);
         for (unsigned i = 0; i < handles.size(); ++i)
         {
-            const auto uploaded = textures.GetOrUpload(abortedImages[i].get(), error);
+            const auto uploaded = textures.GetOrUpload((abortedImages[i] ? &*abortedImages[i].borrow() : nullptr), error);
             Check(uploaded.IsValid(), "Fresh texture upload before abort");
             handles[i] = uploaded.handle;
         }
@@ -2955,7 +2963,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         Check(device.BeginFrame(error), "Texture retry regression begin");
         textures.BeginFrame(801);
         for (const auto& owner : abortedImages)
-            Check(textures.GetOrUpload(owner.get(), error).IsValid(), "Aborted texture retries on fresh recording");
+            Check(textures.GetOrUpload((owner ? &*owner.borrow() : nullptr), error).IsValid(), "Aborted texture retries on fresh recording");
         Check(device.EndFrame(error), "Texture retry submit");
         Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Texture retry drain");
         device.WaitForGpu();
@@ -3070,11 +3078,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         std::shared_ptr<const RenderBindings> materialBindings;
         Check(bindings.Prepare(device, textures, instances[tier], evaluators[tier].Layout(), materialBindings, error),
               "Raster material bindings " + error);
-        const IblEnvironment environment{textures.GetOrUpload(cube.get(), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
         auto& encoder = device.GetImmediateEncoder();
         if (frame == 0)
         {
-            const auto texture = textures.GetOrUpload(image.get(), error);
+            const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), error);
             const RHITransition transitions[]{
                 {texture.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource},
                 {environment.cube.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource}};

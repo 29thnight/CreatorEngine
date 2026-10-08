@@ -43,25 +43,25 @@ namespace RenderTest
         }
 
         // 축 3개 — SHADOW의 "high"가 QUALITY와 겹쳐 모호 케이스를 데이터로 갖는다.
-        [[nodiscard]] std::shared_ptr<const ShaderMeta> MakeSyntheticMeta(
+        [[nodiscard]] own::shared_owner<const ShaderMeta> MakeSyntheticMeta(
             const FileGuid& guid)
         {
-            auto meta = std::make_shared<ShaderMeta>();
-            meta->guid = guid;
-            meta->name = "ResolveProbe";
-            meta->keywords = {
+            ShaderMeta meta;
+            meta.guid = guid;
+            meta.name = "ResolveProbe";
+            meta.keywords = {
                 { "QUALITY", { "low", "high" } },
                 { "FOG", { "off", "on" } },
                 { "SHADOW", { "off", "high" } },
             };
-            return meta;
+            return own::make_shared<const ShaderMeta>(std::move(meta));
         }
 
         struct FakeServices final
         {
             experiment::MaterialResolveServices services{};
             ShaderMetaHandle handle{ 7, 3 };
-            std::shared_ptr<const ShaderMeta> meta{};
+            own::shared_owner<const ShaderMeta> meta{};
             FileGuid lastShaderGuid{};
 
             std::size_t shaderLoads{};
@@ -78,15 +78,12 @@ namespace RenderTest
             void Wire(const FileGuid& shaderGuid)
             {
                 meta = MakeSyntheticMeta(shaderGuid);
-                services.loadShaderMetaHandle =
-                    [this](const FileGuid& guid, std::string&)
+                services.loadShaderMetaOwner =
+                    [this](const FileGuid& guid, ShaderMetaHandle& outHandle, std::string&)
                     {
                         ++shaderLoads;
                         lastShaderGuid = guid;
-                        return handle;
-                    };
-                services.resolveShaderMeta = [this](const ShaderMetaHandle&)
-                    {
+                        outHandle = handle;
                         return meta;
                     };
                 services.resolveCookedArtifactPath =
@@ -111,13 +108,13 @@ namespace RenderTest
                     };
                 services.loadTexture =
                     [this](const std::filesystem::path& path, bool compress, experiment::TextureColorSpace colorSpace)
-                        -> std::shared_ptr<Texture>
+                        -> own::shared_owner<const Texture>
                     {
                         loadedPaths.push_back(path);
                         loadedCompress.push_back(compress);
                         loadedColorSpaces.push_back(colorSpace);
                         if (textureLoadFails) return nullptr;
-                        return std::make_shared<Texture>();
+                        return own::make_shared<const Texture>();
                     };
             }
         };
@@ -184,7 +181,8 @@ namespace RenderTest
                 check.Check(resolved.assetId == materialId, "assetId 보존");
                 check.Check(resolved.shaderMetaHandle == fake.handle,
                     "shaderMetaHandle");
-                check.Check(resolved.shaderMeta == fake.meta, "meta generation");
+                check.Check(resolved.shaderMeta && fake.meta &&
+                    &*resolved.shaderMeta.borrow() == &*fake.meta.borrow(), "meta generation");
                 check.Check(fake.lastShaderGuid == shaderGuid,
                     "shader GUID로 handle을 물어야 한다");
                 check.Check(resolved.keywordSelections
@@ -398,8 +396,7 @@ namespace RenderTest
 
         const experiment::MaterialResolveServices services =
             experiment::MakeDataSystemMaterialResolveServices(nullptr);
-        check.Check(static_cast<bool>(services.loadShaderMetaHandle)
-            && static_cast<bool>(services.resolveShaderMeta)
+        check.Check(static_cast<bool>(services.loadShaderMetaOwner)
             && static_cast<bool>(services.loadTexture)
             && static_cast<bool>(services.resolveSourcePath),
             "제품 바인딩이 서비스 전부를 채워야 한다");
@@ -463,7 +460,8 @@ namespace RenderTest
                 check.Check(linear->m_assetId != srgb->m_assetId
                     && std::memcmp(linear->GetImageView().At(0)->pixels, srgb->GetImageView().At(0)->pixels, 4) == 0,
                     "W6 roles have separate GPU identities and identical encoded bytes");
-                check.Check(srgb == services.loadTexture(first, false, experiment::TextureColorSpace::Srgb)
+                const auto cachedSrgb = services.loadTexture(first, false, experiment::TextureColorSpace::Srgb);
+                check.Check(cachedSrgb && srgb->m_assetId == cachedSrgb->m_assetId
                     && srgb->m_assetId != other->m_assetId
                     && std::memcmp(srgb->GetImageView().At(0)->pixels, other->GetImageView().At(0)->pixels, 4) != 0,
                     "W6 cache reuses exact path/role and separates same filenames");

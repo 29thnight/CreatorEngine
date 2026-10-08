@@ -75,7 +75,7 @@ public:
 	// 그대로 파괴됐다(12.2 보충 분석). 호출자가 소유권을 함께 받도록 강제해
 	// 그 상황 자체를 없앤다.
 	// 런타임 클론은 자산 캐시에 게시하지 않는다. 이름과 수명은 호출자의 몫이다.
-	static std::shared_ptr<Material> InstantiateShared(const Material* origin, std::string_view newName = {});
+	static own::shared_owner<Material> InstantiateShared(const Material* origin, std::string_view newName = {});
 
 //initialize material chainable functions
 public:
@@ -87,25 +87,25 @@ public:
 public:
 	// Material이 Texture generation을 직접 소유한다. 호출자는 raw alias를 저장하지
 	// 않고 아래 shared getter에서 필요한 순간 view만 얻는다.
-	Material& UseBaseColorMap(std::shared_ptr<Texture> texture);
-	Material& UseNormalMap(std::shared_ptr<Texture> texture);
-	Material& UseOccRoughMetalMap(std::shared_ptr<Texture> texture);
-	Material& UseAOMap(std::shared_ptr<Texture> texture);
-	Material& UseEmissiveMap(std::shared_ptr<Texture> texture);
-	Material& UseTextureMap(std::string_view property, std::shared_ptr<Texture> texture);
+	Material& UseBaseColorMap(own::shared_owner<const Texture> texture);
+	Material& UseNormalMap(own::shared_owner<const Texture> texture);
+	Material& UseOccRoughMetalMap(own::shared_owner<const Texture> texture);
+	Material& UseAOMap(own::shared_owner<const Texture> texture);
+	Material& UseEmissiveMap(own::shared_owner<const Texture> texture);
+	Material& UseTextureMap(std::string_view property, own::shared_owner<const Texture> texture);
 
-	const std::shared_ptr<Texture>& GetTextureMapShared(
+	const own::shared_owner<const Texture>& GetTextureMapShared(
 		std::string_view property) const noexcept;
 	std::span<const MaterialTextureOwner> GetTextureOwners() const noexcept
 	{
         if (const auto* instance = RuntimeInstance()) return instance->textureOwners;
         return m_textureOwners;
 	}
-	const std::shared_ptr<Texture>& GetBaseColorMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetNormalMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetOccRoughMetalMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetAOMapShared() const noexcept;
-	const std::shared_ptr<Texture>& GetEmissiveMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetBaseColorMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetNormalMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetOccRoughMetalMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetAOMapShared() const noexcept;
+	const own::shared_owner<const Texture>& GetEmissiveMapShared() const noexcept;
 
 	Material& ConvertToLinearSpace(bool32 convert);
 	Material& SetWindVector(const math::vector4& windVector);

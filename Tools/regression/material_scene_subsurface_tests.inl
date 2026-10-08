@@ -113,7 +113,7 @@ double SssDensity(const SceneSssProfile& profile, double distance, unsigned chan
 
 void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                         ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
-                        std::shared_ptr<Texture> image, std::shared_ptr<Texture> cube, const SheenTable& table)
+                        own::shared_owner<const Texture> image, own::shared_owner<const Texture> cube, const SheenTable& table)
 {
     const auto product = SubsurfaceProduct(root);
     std::string error;
@@ -222,7 +222,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(device.BeginFrame(error), "SSS begin frame");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload(cube.get(), error).handle;
+            const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error).handle;
             Check(host.PrepareResidency(context, input, error), "SSS residency " + error);
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
                   "SSS actual Scene pass preparation " + error);

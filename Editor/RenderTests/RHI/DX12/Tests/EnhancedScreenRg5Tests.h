@@ -36,7 +36,7 @@ namespace
         ssr.SetTuning(ssrTuning);
         ssr.SetTime(0.25f);
         const uint32_t white = 0xffffffff;
-        std::unique_ptr<Texture> texture(
+        own::shared_owner<const Texture> texture(
             Texture::CreateFromPixels(1, 1, "RG5.Screen.White", RHIFormat::RGBA8Unorm, &white));
         if (!texture)
         {
@@ -136,7 +136,7 @@ namespace
                 if (variant != 0)
                 {
                     items.resize(1);
-                    items[0].texture = texture.get();
+                    items[0].texture = (texture ? &*texture.borrow() : nullptr);
                     items[0].color = {0.25f, 0.5f, 0.75f, 1.f};
                 }
                 sprite.SetItems(&items);

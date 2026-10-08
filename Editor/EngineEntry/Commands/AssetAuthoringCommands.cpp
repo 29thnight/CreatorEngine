@@ -1577,7 +1577,7 @@ namespace ConsoleCmd
 
             // ⑤ 지금의 런타임 로드 경로 전체(디코드 + 중립 이미지 감싸기).
             t0 = chrono::steady_clock::now();
-            std::shared_ptr<Texture> texture = Texture::LoadSharedFromPath(path);
+            own::shared_owner<const Texture> texture = Texture::LoadSharedFromPath(path);
             t1 = chrono::steady_clock::now();
             if (texture) legacyMs += chrono::duration<double, std::milli>(t1 - t0).count();
         }
@@ -1811,12 +1811,10 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_assets_texture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const auto describe = [](const std::shared_ptr<Texture>& texture)
+        const auto describe = [](const own::shared_owner<const Texture>& texture)
         {
             auto item = CommandData::Object();
-            char instance[32]{};
-            std::snprintf(instance, sizeof(instance), "%p", static_cast<void*>(texture.get()));
-            item.Set("instance", CommandData::String(instance));
+            item.Set("instance", CommandData::String(std::to_string(texture->m_assetId.m_ID_Data)));
             item.Set("name", CommandData::String(texture->m_name));
             item.Set("extension", CommandData::String(texture->m_extension));
             const math::vector2 size = texture->GetImageSize();
@@ -1835,7 +1833,7 @@ namespace ConsoleCmd
             else if (kind == "ui") type = Type::UITexture;
             else if (kind == "spritesheet") type = Type::SpriteSheet;
             else return InvalidArguments("assets.texture load <texture|ui|spritesheet> <경로>");
-            const std::shared_ptr<Texture> loaded = DataSystems->LoadSharedTexture(ctx.parts[3], type);
+            const own::shared_owner<const Texture> loaded = DataSystems->LoadSharedTexture(ctx.parts[3], type);
             if (!loaded) return Fail("texture.load_failed", "Texture load failed: " + ctx.parts[3]);
             data.Set("loaded", describe(loaded));
         }
@@ -1844,7 +1842,7 @@ namespace ConsoleCmd
             return InvalidArguments("assets.texture [load <texture|ui|spritesheet> <경로>]");
         }
 
-        const auto list = [&describe](DataContainer<Texture>& cache)
+        const auto list = [&describe](const auto& cache)
         {
             auto entries = CommandData::Array();
             for (const auto& [key, texture] : cache)
@@ -1856,12 +1854,10 @@ namespace ConsoleCmd
             }
             return entries;
         };
-        {
-            std::lock_guard<std::mutex> guard(DataSystems->m_textureMutex);
-            data.Set("textures", list(DataSystems->Textures));
-            data.Set("uiTextures", list(DataSystems->UITextures));
-            data.Set("spriteSheets", list(DataSystems->SpriteSheets));
-        }
+        using Type = DataSystem::TextureFileType;
+        data.Set("textures", list(DataSystems->SnapshotTextures(Type::Texture)));
+        data.Set("uiTextures", list(DataSystems->SnapshotTextures(Type::UITexture)));
+        data.Set("spriteSheets", list(DataSystems->SnapshotTextures(Type::SpriteSheet)));
         return Ok({}, std::move(data));
     }
 

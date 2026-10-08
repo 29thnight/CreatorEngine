@@ -13,6 +13,9 @@
 #include <string>
 #include <utility>
 #include <vector>
+#if !defined(_WIN32)
+#include <sys/stat.h>
+#endif
 
 namespace
 {
@@ -20,6 +23,7 @@ namespace
 
     struct SourceCounters final
     {
+        unsigned captureCalls{};
         unsigned sizeCalls{};
         unsigned readCalls{};
         unsigned destructions{};
@@ -34,6 +38,14 @@ namespace
         }
 
         ~CountingByteSource() override { ++m_counters->destructions; }
+
+        [[nodiscard]] bool CaptureArtifact(std::string_view path,
+            own::shared_owner<const Cooked::ArtifactByteSource>& narrowed,
+            std::string& failure) const override
+        {
+            ++m_counters->captureCalls;
+            return ArtifactByteSource::CaptureArtifact(path, narrowed, failure);
+        }
 
         [[nodiscard]] bool Size(std::string_view, std::uint64_t& out, std::string& failure) const override
         {
@@ -245,7 +257,7 @@ namespace
         Require(Closure(original, a).size() == 2u, "logical removal invalidated an older closure");
         Require(!removedB.WithMountedAssetSet(MakeManifest(105u, lazy, 88u), source, { 50u }, 5u,
             Options(), unchanged, issues), "new mount skipped strict validation of the current union");
-        Require(counters->sizeCalls == 0u && counters->readCalls == 0u, "mount/list/closure read artifact bulk");
+        Require(counters->captureCalls == 0u && counters->sizeCalls == 0u && counters->readCalls == 0u, "mount/list/closure read artifact bulk");
     }
 
     void VerifyMergedOverrideAndValueIndices()
@@ -291,7 +303,49 @@ namespace
         Cooked::CookedAssetCatalog moved = std::move(copied);
         Require(moved.Find(asset, resolved) == Cooked::AssetLookupStatus::Found
             && resolved.blob.contentSha256[0] == 1u, "copy/move/reallocation invalidated a mounted entry");
-        Require(counters->sizeCalls == 0u && counters->readCalls == 0u, "index rebuild performed bulk I/O");
+        Require(counters->captureCalls == 0u && counters->sizeCalls == 0u && counters->readCalls == 0u, "index rebuild performed bulk I/O");
+    }
+
+    void VerifyAbsentModelLoadableRemainsMetadataOnly()
+    {
+        const auto counters = own::make_shared<SourceCounters>();
+        const own::shared_owner<const Cooked::ArtifactByteSource> source =
+            own::make_shared<CountingByteSource>(counters);
+        const auto model = Link(301u, Cooked::CookedAssetKind::Model);
+        const auto skeleton = Link(302u, Cooked::CookedAssetKind::Skeleton);
+        const auto present = Link(303u, Cooked::CookedAssetKind::AnimationClip);
+        const auto absent = Link(304u, Cooked::CookedAssetKind::AnimationClip);
+        const Cooked::CookedAssetCatalog empty;
+        const auto withSkeleton = Mount(empty, MakeManifest(601u, skeleton, 21u), source, 1u, 1u);
+        const auto withClip = Mount(withSkeleton, MakeManifest(602u, present, 22u,
+            { { skeleton, Cooked::AssetDependencyKind::Hard, Cooked::AssetDependencyScope::External } }),
+            source, 2u, 2u);
+        auto descriptorManifest = MakeManifest(603u, model, 23u,
+            { { skeleton, Cooked::AssetDependencyKind::Loadable, Cooked::AssetDependencyScope::External },
+                { present, Cooked::AssetDependencyKind::Loadable, Cooked::AssetDependencyScope::External },
+                { absent, Cooked::AssetDependencyKind::Loadable, Cooked::AssetDependencyScope::External } });
+        descriptorManifest.blobs[0].representation = 2u; // Model descriptor, not the legacy full model.
+        const auto mounted = Mount(withClip, descriptorManifest, source, 3u, 3u);
+        Require(mounted.ListRoots({ 3u }, model.kind) == std::vector{ model }
+            && Closure(mounted, model).size() == 1u,
+            "absent optional clip prevented model root enumeration or entered its hard closure");
+        Cooked::ResolvedAssetEntry child;
+        Require(mounted.Find(present, child) == Cooked::AssetLookupStatus::Found && child.byteSource,
+            "present model Loadable lost its snapshot metadata/source owner");
+        Require(mounted.Find(absent, child) == Cooked::AssetLookupStatus::NotMounted && !child.byteSource,
+            "missing model Loadable was not reported as metadata absence");
+        const auto removedSkeleton = Unmount(mounted, 1u, 4u);
+        Require(Closure(removedSkeleton, model).size() == 1u,
+            "missing optional child's hard skeleton blocked the model metadata root");
+        Require(removedSkeleton.Find(present, child) == Cooked::AssetLookupStatus::Found,
+            "logical skeleton removal erased an independently mounted clip's metadata");
+        std::vector<Cooked::ResolvedAssetEntry> selectedClosure;
+        Cooked::AssetCatalogLookupIssue issue;
+        Require(removedSkeleton.CollectHardClosure(present, selectedClosure, issue)
+            == Cooked::AssetLookupStatus::NotMounted && selectedClosure.empty(),
+            "selected clip bypassed its absent hard skeleton dependency");
+        Require(counters->captureCalls == 0u && counters->sizeCalls == 0u && counters->readCalls == 0u,
+            "unselected model Loadable metadata enumeration captured or read child files");
     }
 
     void VerifyGenericArtifactPathsAndLooseRanges()
@@ -337,19 +391,120 @@ namespace
             output.write(bytes, sizeof(bytes));
             Require(output.good(), "loose source fixture was not written");
         }
+        const std::string siblingPath = "Derived/AssetBlobs/compat/sibling.png";
+        const auto siblingFile = scratch.path / siblingPath;
+        std::filesystem::copy_file(file, siblingFile);
         // Declared after scratch, so all OS handles close before cleanup.
-        const Cooked::LooseArtifactByteSource source(scratch.path);
+        own::shared_owner<const Cooked::ArtifactByteSource> source =
+            own::make_shared<Cooked::LooseArtifactByteSource>(scratch.path);
+        own::weak_owner<const Cooked::ArtifactByteSource> weakMount(source);
         std::uint64_t size{};
         std::string failure;
-        Require(source.Size(virtualPath, size, failure) && size == 4u, "generic loose source size failed");
+        Require(source->Size(virtualPath, size, failure) && size == 4u, "generic loose source size failed");
         std::byte range[2]{};
-        Require(source.ReadAt(virtualPath, 1u, range, failure)
+        Require(source->ReadAt(virtualPath, 1u, range, failure)
             && range[0] == std::byte{ 0x22 } && range[1] == std::byte{ 0x33 }, "generic loose range read failed");
-        Require(!source.ReadAt(virtualPath, 3u, range, failure), "loose source allowed an out-of-bounds read");
-        Require(!source.Size("Derived/../outside.png", size, failure), "loose source allowed traversal");
+        Require(!source->ReadAt(virtualPath, 3u, range, failure), "loose source allowed an out-of-bounds read");
+        Require(!source->Size("Derived/../outside.png", size, failure), "loose source allowed traversal");
+        own::shared_owner<const Cooked::ArtifactByteSource> exact;
+        own::shared_owner<const Cooked::ArtifactByteSource> recaptured;
+        own::shared_owner<const Cooked::ArtifactByteSource> sibling;
+        Require(source->CaptureArtifact(virtualPath, exact, failure) && exact,
+            "loose source did not return an exact artifact owner");
+        Require(source->CaptureArtifact(virtualPath, recaptured, failure) && recaptured,
+            "same artifact could not be independently captured");
+        Require(source->CaptureArtifact(siblingPath, sibling, failure) && sibling,
+            "sibling artifact could not be independently captured");
+        Require(Cooked::CaptureArtifactSource(exact, virtualPath, failure) && exact,
+            "recapturing a narrowed source lost its owner");
+        Require(!Cooked::CaptureArtifactSource(exact, siblingPath, failure) && exact,
+            "exact source allowed capture of a different artifact or lost its existing owner");
+        Require(!exact->Size(siblingPath, size, failure)
+            && !exact->ReadAt(siblingPath, 0u, range, failure), "exact source read a sibling artifact");
+#if defined(__linux__)
+        struct stat originalInformation{};
+        struct stat siblingInformation{};
+        Require(::stat(file.c_str(), &originalInformation) == 0
+            && ::stat(siblingFile.c_str(), &siblingInformation) == 0, "file identity fixture stat failed");
+        const auto openReferences = [](const struct stat& identity)
+        {
+            std::size_t count{};
+            for (const auto& entry : std::filesystem::directory_iterator("/proc/self/fd"))
+            {
+                struct stat opened{};
+                if (::stat(entry.path().c_str(), &opened) == 0
+                    && opened.st_dev == identity.st_dev && opened.st_ino == identity.st_ino)
+                {
+                    ++count;
+                }
+            }
+            return count;
+        };
+        Require(openReferences(originalInformation) == 1u && openReferences(siblingInformation) == 1u,
+            "recapture opened duplicate native handles or lost an independent file");
+#endif
 #if defined(_WIN32)
-        std::fstream writer(file, std::ios::binary | std::ios::in | std::ios::out);
-        Require(!writer.is_open(), "generic loose source lost its deny-writer file pin");
+        {
+            std::fstream writer(file, std::ios::binary | std::ios::in | std::ios::out);
+            Require(!writer.is_open(), "captured loose source lost its deny-writer file pin");
+        }
+#else
+        const auto retiredFile = file.string() + ".retired";
+        std::filesystem::rename(file, retiredFile);
+        {
+            std::ofstream replacement(file, std::ios::binary);
+            const char bytes[] = { 0x55, 0x66, 0x77, 0x00 };
+            replacement.write(bytes, sizeof(bytes));
+            Require(replacement.good(), "replacement path fixture was not written");
+        }
+        Require(exact->ReadAt(virtualPath, 1u, range, failure)
+            && range[0] == std::byte{ 0x22 } && range[1] == std::byte{ 0x33 },
+            "exact source reopened the replacement path instead of its pinned file");
+        std::filesystem::remove(retiredFile);
+        Require(recaptured->ReadAt(virtualPath, 1u, range, failure)
+            && range[0] == std::byte{ 0x22 } && range[1] == std::byte{ 0x33 },
+            "POSIX source lost its pinned inode after unlink");
+        const auto pipePath = scratch.path / "Derived/not-an-artifact.pipe";
+        Require(::mkfifo(pipePath.c_str(), 0600) == 0, "FIFO rejection fixture was not created");
+        Require(!source->Size("Derived/not-an-artifact.pipe", size, failure),
+            "loose source accepted a FIFO as an artifact");
+        own::shared_owner<const Cooked::ArtifactByteSource> invalid;
+        Require(!source->CaptureArtifact("Derived/not-an-artifact.pipe", invalid, failure) && !invalid,
+            "loose capture accepted a FIFO as an artifact");
+#endif
+        exact.reset();
+        Require(recaptured->ReadAt(virtualPath, 1u, range, failure)
+            && range[0] == std::byte{ 0x22 } && range[1] == std::byte{ 0x33 },
+            "dropping one artifact owner invalidated another owner of that same file");
+        recaptured.reset();
+#if defined(__linux__)
+        Require(openReferences(originalInformation) == 0u && openReferences(siblingInformation) == 1u,
+            "final artifact owner did not release exactly its native handle while sibling/mount survived");
+#endif
+#if defined(_WIN32)
+        {
+            std::fstream writer(file, std::ios::binary | std::ios::in | std::ios::out);
+            std::fstream siblingWriter(siblingFile, std::ios::binary | std::ios::in | std::ios::out);
+            Require(writer.is_open() && !siblingWriter.is_open(),
+                "last artifact owner did not release exactly its file while sibling/mount survived");
+        }
+#else
+        Require(source->ReadAt(virtualPath, 1u, range, failure)
+            && range[0] == std::byte{ 0x66 } && range[1] == std::byte{ 0x77 },
+            "expired weak lookup reused the retired file instead of a fresh current-path capture");
+#endif
+        source.reset();
+        Require(weakMount.expired(), "single-artifact owner unexpectedly retained the entire mount source");
+        Require(sibling->ReadAt(siblingPath, 1u, range, failure)
+            && range[0] == std::byte{ 0x22 } && range[1] == std::byte{ 0x33 },
+            "independent sibling did not survive mount and other artifact release");
+        sibling.reset();
+#if defined(__linux__)
+        Require(openReferences(siblingInformation) == 0u, "last sibling owner did not close its native handle");
+#endif
+#if defined(_WIN32)
+        std::fstream siblingWriter(siblingFile, std::ios::binary | std::ios::in | std::ios::out);
+        Require(siblingWriter.is_open(), "last sibling owner did not release its deny-writer handle");
 #endif
     }
 
@@ -363,6 +518,9 @@ namespace
             Cooked::CookedAssetCatalog empty;
             auto mounted = Mount(empty, MakeManifest(501u, asset, 1u), source, 1u, 1u);
             Require(mounted.Find(asset, exact) == Cooked::AssetLookupStatus::Found, "exact source was not resolved");
+            std::string failure;
+            Require(Cooked::CaptureArtifactSource(exact.byteSource, exact.blob.artifactPath, failure)
+                && exact.byteSource, "immutable source capture fallback lost its existing owner");
             const auto removed = Unmount(mounted, 1u, 2u);
             source.reset();
             mounted = {};
@@ -385,6 +543,7 @@ int main()
         VerifyTransactionsAndClosures();
         VerifyMergedOverrideAndValueIndices();
         VerifySourceOwnerSurvivesLogicalRemoval();
+        VerifyAbsentModelLoadableRemainsMetadataOnly();
         VerifyGenericArtifactPathsAndLooseRanges();
         std::cout << "ASSET_SET_CATALOG_OK\n";
         return 0;

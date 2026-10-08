@@ -38,10 +38,10 @@ namespace
 
     struct CodecAssets
     {
-        std::shared_ptr<Texture> plain;       // RGBA8 또는 BGRA8 — 실제 PNG
-        std::shared_ptr<Texture> compressed;  // BC1_UNORM_SRGB — baseColor 압축 경로
-        std::shared_ptr<Texture> blockNoise;  // BC3_UNORM — blueNoise.dds
-        std::shared_ptr<Texture> bgra;        // BGRA8_UNORM — 합성
+        own::shared_owner<const Texture> plain;       // RGBA8 또는 BGRA8 — 실제 PNG
+        own::shared_owner<const Texture> compressed;  // BC1_UNORM_SRGB — baseColor 압축 경로
+        own::shared_owner<const Texture> blockNoise;  // BC3_UNORM — blueNoise.dds
+        own::shared_owner<const Texture> bgra;        // BGRA8_UNORM — 합성
 
         bool IsValid() const
         {
@@ -61,8 +61,8 @@ namespace
             PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
 
         const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
-        out.bgra.reset(Texture::CreateFromPixels(
-            1, 1, "codec_ab_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
+        out.bgra = Texture::CreateFromPixels(
+            1, 1, "codec_ab_bgra", RHIFormat::BGRA8Unorm, bgraPixel);
 
         if (!out.IsValid())
         {
@@ -101,10 +101,10 @@ namespace
     template <typename CacheT>
     bool UploadAll(CacheT& cache, const CodecAssets& assets, std::string& outError)
     {
-        Texture* const order[] = {
-            assets.plain.get(), assets.compressed.get(),
-            assets.blockNoise.get(), assets.bgra.get() };
-        for (Texture* texture : order)
+        const Texture* const order[] = {
+            (assets.plain ? &*assets.plain.borrow() : nullptr), (assets.compressed ? &*assets.compressed.borrow() : nullptr),
+            (assets.blockNoise ? &*assets.blockNoise.borrow() : nullptr), (assets.bgra ? &*assets.bgra.borrow() : nullptr) };
+        for (const Texture* texture : order)
         {
             std::string error;
             const auto entry = cache.GetOrUpload(texture, error);

@@ -585,7 +585,7 @@ bool EnhancedIBLGenerator::TouchCooked(const EnhancedFrameContext& context, std:
     for (size_t index=0; index<m_cookedTextures.size(); ++index)
     {
         if (!m_cookedTextures[index]) continue;
-        const auto entry = context.textureCache->GetOrUpload(m_cookedTextures[index].get(),error);
+        const auto entry = context.textureCache->GetOrUpload((m_cookedTextures[index] ? &*m_cookedTextures[index].borrow() : nullptr),error);
         const auto image = m_cookedTextures[index]->GetImageView();
         if (!error.empty() || !entry.IsValid() || entry.width!=image.Width() || entry.height!=image.Height() ||
             entry.mipLevels!=image.MipLevels() || entry.format!=image.Format() || entry.isCube!=image.IsCube())

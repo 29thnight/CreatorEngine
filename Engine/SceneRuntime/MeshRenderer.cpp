@@ -38,7 +38,7 @@ namespace
 	// 세므로 주석에 그 함수 이름을 적는 것만으로도 계수가 는다).
 	// outInstance는 선택이다(nullptr이면 legacy만).
 	[[nodiscard]] bool DecodeMaterialReferenceNode(
-		const Authoring::ReadNode materialNode, std::shared_ptr<Material>& outMaterial,
+		const Authoring::ReadNode materialNode, own::shared_owner<Material>& outMaterial,
 		FileGuid& outBaseGuid, std::string& outError,
 		experiment::MaterialInstance* outInstance = nullptr)
 	{
@@ -60,7 +60,7 @@ namespace
 			outError = "base 자산 경로 미해석: " + ref.AsString();
 			return false;
 		}
-		const std::shared_ptr<Material> base =
+		const own::shared_owner<const Material> base =
 			DataSystems->LoadMaterialShared(basePath.stem().string());
 		if (!base)
 		{
@@ -68,7 +68,7 @@ namespace
 			return false;
 		}
 
-		auto owned = std::make_shared<Material>(*base);
+		auto owned = own::make_shared<Material>(*base);
 		if (const Authoring::ReadNode blend = materialNode["blendMode"];
 			blend && blend.IsScalar())
 		{
@@ -143,7 +143,7 @@ namespace
 			outError = "base 자산 경로 미해석";
 			return false;
 		}
-		const std::shared_ptr<Material> base =
+		const own::shared_owner<const Material> base =
 			DataSystems->LoadMaterialShared(basePath.stem().string());
 		if (!base)
 		{
@@ -151,10 +151,9 @@ namespace
 			return false;
 		}
 		std::string metaError;
-		const ShaderMetaHandle handle = DataSystems->LoadShaderMetaHandle(
-			current.m_shaderMetaGuid, metaError);
-		const std::shared_ptr<const ShaderMeta> meta =
-			DataSystems->ResolveShaderMeta(handle);
+		ShaderMetaHandle handle;
+		const auto meta = DataSystems->LoadShaderMetaOwner(
+			current.m_shaderMetaGuid, handle, metaError);
 		if (!meta)
 		{
 			outError = "diff 타이핑용 ShaderMeta 미해석: " + metaError;
@@ -337,7 +336,7 @@ void MeshRenderer::OnUninitializing()
 // I5-D5c1 — 재질 병행 표현의 base 설치. base가 없으면 인스턴스도 없다
 // (빈 인스턴스를 들고 있으면 "저작 원본이 있다"는 거짓 신호가 된다).
 void MeshRenderer::SetExperimentMaterialBase(
-    std::shared_ptr<const experiment::Material> base)
+    own::shared_owner<const experiment::Material> base)
 {
     if (!base)
     {
@@ -345,7 +344,7 @@ void MeshRenderer::SetExperimentMaterialBase(
         return;
     }
     m_materialInstance =
-        std::make_unique<experiment::MaterialInstance>(std::move(base));
+        own::make_unique<experiment::MaterialInstance>(std::move(base));
 }
 
 math::aabb MeshRenderer::GetBoundingBox() const
@@ -390,7 +389,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	{
 		// I5-M5 S2c-2a — base 참조 표기. typed 역직렬화는 ref 노드에서 기본값
 		// 재질을 만들었을 뿐이다 — base 소유 사본+override로 교체한다.
-		std::shared_ptr<Material> resolved;
+		own::shared_owner<Material> resolved;
 		FileGuid baseGuid;
 		std::string error;
 		// I5-D5c1 — base 저작 원본을 먼저 세운다. 그래야 아래 한 번의 파싱이
@@ -419,7 +418,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
     else if (const Authoring::ReadNode materialNode = node["m_Material"];
              materialNode && materialNode.IsMap() && materialNode["lattice_material"])
     {
-        auto decoded = std::make_shared<Material>();
+        auto decoded = own::make_shared<Material>();
         if (DataSystems->DeserializeMaterialPayload(*decoded, Authoring::NodeViewAccess::Make(materialNode)))
         {
             m_Material = std::move(decoded);
@@ -434,10 +433,10 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
     else if (const Authoring::ReadNode materialNode = node["m_Material"];
              materialNode && materialNode.IsMap() && materialNode["schema"] && materialNode["shaderAssetId"])
     {
-        auto decoded = std::make_shared<Material>();
-        auto authored = std::make_shared<experiment::Material>();
+        auto decoded = own::make_shared<Material>();
+        auto authored = own::make_shared<experiment::Material>();
 		if (DataSystems->DeserializeMaterialPayload(*decoded,
-			Authoring::NodeViewAccess::Make(materialNode), authored.get()))
+			Authoring::NodeViewAccess::Make(materialNode), (authored ? &*authored.borrow() : nullptr)))
 		{
 			// FinalizeMaterialRuntime은 이중화 경로 안에서 이미 수행됐다.
 			m_Material = std::move(decoded);
@@ -583,7 +582,7 @@ bool MeshRenderer::BindModelGeneration(
     {
         const auto* source = generation->FindMaterial(generation->Meshes()[meshIndex].materialId);
         std::string error;
-        auto candidate = std::make_shared<Material>(*m_Material);
+        auto candidate = own::make_shared<Material>(*m_Material);
         if (source && !DataSystems->ConfigureModelMaterialGraph(*candidate, *generation, *source, error))
         {
             Debug::PrintLog(spdlog::level::err, "MeshRenderer model graph conversion failed: " + error);

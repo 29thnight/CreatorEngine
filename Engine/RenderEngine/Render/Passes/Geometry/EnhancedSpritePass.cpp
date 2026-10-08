@@ -149,7 +149,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         const auto sphere = shadow_math::WorldBounds(bounds);
         m_visibilitySpheres.push_back({sphere.center.x, sphere.center.y, sphere.center.z, sphere.radius});
 
-        if (!m_batches.empty() && m_batches.back().texture == item.texture &&
+        if (!m_batches.empty() && m_batches.back().textureId == TextureFramePins::Identity(item.texture) &&
             m_batches.back().enableDepth == item.enableDepth)
         {
             ++m_batches.back().count;
@@ -159,7 +159,9 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
+            batch.texturePinIndex = item.texturePinIndex;
             batch.texture = item.texture;
+            batch.textureId = TextureFramePins::Identity(item.texture);
             batch.enableDepth = item.enableDepth;
             m_batches.push_back(batch);
         }
@@ -424,6 +426,7 @@ void EnhancedSpritePass::Shutdown()
     m_visibilitySpheres.clear();
     m_instances.clear();
     m_batches.clear();
+    m_texturePins.reset();
     m_width = 0;
     m_height = 0;
     m_lastItemCount = 0;

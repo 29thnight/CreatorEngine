@@ -74,7 +74,7 @@ namespace
         std::array<RHIShaderPermutationKey, 4> permutations;
         std::vector<uint16_t> keywords{0};
         std::array<std::filesystem::path, 2> files;
-        std::array<std::shared_ptr<Texture>, 4> textures;
+        std::array<own::shared_owner<const Texture>, 4> textures;
         ~PbrAoFixture()
         {
             for (const auto& path : files) if (!path.empty())
@@ -151,8 +151,8 @@ namespace
                 {255, 255, 255, 255}, {0, 255, 255, 255}, {64, 0, 255, 255}, {0, 0, 0, 255}};
             for (uint32_t i = 0; i < textures.size(); ++i)
             {
-                textures[i].reset(Texture::CreateFromPixels(1, 1, "PbrAo." + std::to_string(i),
-                    RHIFormat::RGBA8Unorm, pixels[i], 4));
+                textures[i] = Texture::CreateFromPixels(1, 1, "PbrAo." + std::to_string(i),
+                    RHIFormat::RGBA8Unorm, pixels[i], 4);
                 if (!textures[i]) { error = "AO texture creation failed"; return false; }
             }
             return true;
@@ -206,8 +206,8 @@ namespace
                 if (!seal(*gb, first) || !seal(*fw, first + 1)) return false;
                 draws[band].materialSnapshot = gb; draws[band].forwardMaterialSnapshot = fw;
                 // Legacy aliases must not override the owning material.
-                draws[band].occRoughMetal = textures[3].get();
-                draws[band].emissive = textures[3].get();
+                draws[band].occRoughMetal = (textures[3] ? &*textures[3].borrow() : nullptr);
+                draws[band].emissive = (textures[3] ? &*textures[3].borrow() : nullptr);
                 draws[band].baseColorFactor = math::color(0, 0, 0, 1);
             }
             return true;
@@ -215,30 +215,31 @@ namespace
     };
     struct PbrEmissionFixture
     {
-        std::array<std::shared_ptr<Texture>, 5> textures;
+        std::array<own::shared_owner<const Texture>, 5> textures;
         bool Initialize(std::string& error)
         {
             const uint8_t gray[] = {128, 64, 192, 255};
-            textures[0].reset(Texture::CreateFromPixels(1, 1, "Emission.encoded",
-                RHIFormat::RGBA8Unorm, gray, 4));
+            textures[0] = Texture::CreateFromPixels(1, 1, "Emission.encoded",
+                RHIFormat::RGBA8Unorm, gray, 4);
             textures[1] = Texture::WithColorSpace(textures[0], true);
             textures[2] = Texture::WithColorSpace(textures[1], false);
             const uint8_t black[] = {0, 0, 0, 255};
-            textures[3].reset(Texture::CreateFromPixels(1, 1, "Emission.black",
-                RHIFormat::RGBA8Unorm, black, 4));
+            textures[3] = Texture::CreateFromPixels(1, 1, "Emission.black",
+                RHIFormat::RGBA8Unorm, black, 4);
             const uint8_t redBlock[16] = {255, 255, 0, 0, 0, 0, 0, 0, 0, 248, 0, 248, 0, 0, 0, 0};
-            auto bc3 = std::shared_ptr<Texture>(Texture::CreateFromPixels(4, 4, "Emission.BC3",
-                RHIFormat::BC3Unorm, redBlock, 16));
+            auto bc3 = Texture::CreateFromPixels(4, 4, "Emission.BC3",
+                RHIFormat::BC3Unorm, redBlock, 16);
             textures[4] = Texture::WithColorSpace(bc3, true);
             if (!textures[4] || textures[4]->GetImageView().Format() != RHIFormat::BC3UnormSrgb)
             { error = "Emission BC3 sRGB format failed"; return false; }
+            const auto repeatedSrgb = Texture::WithColorSpace(textures[1], true);
             if (!textures[0] || !textures[1] || !textures[2] || !textures[3]
                 || textures[0]->m_assetId == textures[1]->m_assetId
                 || textures[0]->GetImageView().Format() != RHIFormat::RGBA8Unorm
                 || textures[1]->GetImageView().Format() != RHIFormat::RGBA8UnormSrgb
                 || textures[2]->GetImageView().Format() != RHIFormat::RGBA8Unorm
                 || textures[0]->GetImageView().At(0)->pixels != textures[1]->GetImageView().At(0)->pixels
-                || Texture::WithColorSpace(textures[1], true) != textures[1])
+                || !repeatedSrgb || repeatedSrgb->m_assetId != textures[1]->m_assetId)
             { error = "Emission color-space owner isolation failed"; return false; }
             return true;
         }
@@ -301,7 +302,7 @@ namespace
         std::array<std::vector<std::byte>, kCases> vertices;
         const std::array<uint32_t, 6> indices{0, 1, 2, 0, 2, 3};
         std::array<math::matrix4x4, 2> bones;
-        std::shared_ptr<Texture> normalMap;
+        own::shared_owner<const Texture> normalMap;
         math::vector3 expected;
 
         bool Initialize(std::string& error)
@@ -310,8 +311,8 @@ namespace
             bones[0] = bones[1] = math::matrix4x4::identity();
             bones[0](2, 2) = -1.f; bones[1](2, 2) = -3.f;
             const float texel[] = {.65f, .7f, (std::sqrt(.75f) + 1.f) * .5f, 1.f};
-            normalMap.reset(Texture::CreateFromPixels(1, 1, "Pbr.Transform.Normal",
-                RHIFormat::RGBA32Float, texel, sizeof(texel)));
+            normalMap = Texture::CreateFromPixels(1, 1, "Pbr.Transform.Normal",
+                RHIFormat::RGBA32Float, texel, sizeof(texel));
             if (!normalMap) { error = "Transform normal texture creation failed"; return false; }
             for (uint32_t index = 0; index < kCases; ++index)
             {
@@ -348,7 +349,7 @@ namespace
             draw.worldMatrix(3, 2) = .5f;
             draw.bonePalette = skin ? bones.data() : nullptr;
             draw.boneCount = skin ? 2 : 0; draw.animatorKey = skin ? 907 : 0;
-            draw.useNormalMap = variant != 0; draw.normalMap = normalMap.get();
+            draw.useNormalMap = variant != 0; draw.normalMap = (normalMap ? &*normalMap.borrow() : nullptr);
             draw.metallic = .25f; draw.roughness = .7f;
             draw.geometryKey = 0x57370000ull + index;
             auto& view = draw.modelMeshView;
@@ -458,7 +459,7 @@ namespace
         std::array<experiment::VertexBuffer, 4> vertices;
         const std::array<uint32_t, 6> indices{0, 1, 2, 0, 2, 3};
         std::array<float, 64> pixels{};
-        std::shared_ptr<Texture> texture;
+        own::shared_owner<const Texture> texture;
         math::matrix4x4 bone = math::matrix4x4::identity();
         bool Initialize(std::string& error)
         {
@@ -469,7 +470,7 @@ namespace
                     .625f + (x + y) * .03125f, 1.f};
                 std::copy_n(texel, 4, pixels.data() + (y * 4 + x) * 4);
             }
-            texture.reset(Texture::CreateFromPixels(4, 4, "Pbr.UV", RHIFormat::RGBA32Float, pixels.data(), 64));
+            texture = Texture::CreateFromPixels(4, 4, "Pbr.UV", RHIFormat::RGBA32Float, pixels.data(), 64);
             if (!texture) { error = "UV texture creation failed"; return false; }
             for (uint32_t mask = 0; mask < 4; ++mask)
             {
@@ -580,7 +581,7 @@ namespace
     struct PbrMipFixture
     {
         static constexpr uint32_t kCases = 15; // five authored LODs + ten generated formats
-        std::array<std::shared_ptr<Texture>, 11> textures;
+        std::array<own::shared_owner<const Texture>, 11> textures;
         experiment::VertexBuffer vertices;
         const std::array<uint32_t, 6> indices{0, 1, 2, 0, 2, 3};
         static constexpr RHIFormat formats[] = {RHIFormat::RGBA8Unorm, RHIFormat::RGBA8UnormSrgb,
@@ -598,7 +599,8 @@ namespace
                 { dst[p*4] = .125f * (mip+1); dst[p*4+1] = .25f; dst[p*4+2] = .5f; dst[p*4+3] = 1; }
             }
             textures[0] = Texture::CreateSharedFromImage("Mip.authored", std::move(authored));
-            if (Texture::WithMipChain(textures[0], error) != textures[0])
+            const auto authoredMips = Texture::WithMipChain(textures[0], error);
+            if (!authoredMips || !textures[0] || authoredMips->m_assetId != textures[0]->m_assetId)
             { error = "Authored mip owner replaced"; return false; }
             for (uint32_t f = 0; f < std::size(formats); ++f)
             {
@@ -637,10 +639,11 @@ namespace
                 textures[f+1] = Texture::WithMipChain(source, error);
                 if (!textures[f+1]) return false;
                 const auto before = source->GetImageView(), after = textures[f+1]->GetImageView();
+                const auto repeatedMips = Texture::WithMipChain(textures[f+1], error);
                 if (before.MipLevels() != 1 || after.MipLevels() != 6 || after.Format() != formats[f]
                     || textures[f+1]->m_assetId == source->m_assetId
                     || std::memcmp(before.At(0)->pixels, after.At(0)->pixels, before.At(0)->slicePitch)
-                    || Texture::WithMipChain(textures[f+1], error) != textures[f+1])
+                    || !repeatedMips || repeatedMips->m_assetId != textures[f+1]->m_assetId)
                 { error = "Mip base/format/owner preservation failed"; return false; }
                 const auto* last = after.Find(5, 0);
                 if (f < 4)
@@ -1177,7 +1180,7 @@ namespace
             if (shape.mips>1) levels=shape.mips;
             if (view.MipLevels()!=levels || view.ArraySize()!=shape.items || view.IsCube()!=shape.cube
                 || view.SubresourceCount()!=levels*shape.items
-                || ((shape.mips>1 || levels==1) && result!=source))
+                || ((shape.mips>1 || levels==1) && result->m_assetId != source->m_assetId))
             { error="NPOT/array/cube/partial mip shape failed"; return false; }
             for (uint32_t item=0; item<shape.items; ++item)
             {
@@ -1189,8 +1192,8 @@ namespace
         }
         if (Texture::WithMipChain({},error) || error.empty()) return false;
         const uint32_t unsupportedPixels[4]{};
-        auto unsupported=std::shared_ptr<Texture>(Texture::CreateFromPixels(2,2,"Mip.invalid",
-            RHIFormat::R32Uint,unsupportedPixels,8));
+        auto unsupported=Texture::CreateFromPixels(2,2,"Mip.invalid",
+            RHIFormat::R32Uint,unsupportedPixels,8);
         if (!unsupported || Texture::WithMipChain(unsupported,error) || error.empty()) return false;
         error.clear();
 
@@ -1210,7 +1213,7 @@ namespace
             const uint8_t pixel[]={uint8_t((x+y)%2 ? 255 : 0),64,uint8_t((x+y)%2 ? 255 : 0),255};
             std::memcpy(tga.data()+18+(y*8+x)*4,pixel,4);
         }
-        std::shared_ptr<Texture> previous;
+        own::shared_owner<const Texture> previous;
         for (const auto folder : {"source","Derived"})
         {
             const auto path=files.root/folder/"same.tga";
@@ -1220,9 +1223,13 @@ namespace
             if (!out) { error="Mip fixture write failed"; return false; }
             auto color=DataSystems->LoadSharedMaterialTexture(path.string(),false,true);
             auto data=DataSystems->LoadSharedMaterialTexture(path.string(),false,false);
-            if (!color || !data || color==data || color==previous
-                || color!=DataSystems->LoadSharedMaterialTexture(path.string(),false,true)
-                || data!=DataSystems->LoadSharedMaterialTexture(path.string(),false,false))
+            const auto cachedColor = DataSystems->LoadSharedMaterialTexture(path.string(),false,true);
+            const auto cachedData = DataSystems->LoadSharedMaterialTexture(path.string(),false,false);
+            if (!color || !data || !cachedColor || !cachedData
+                || color->m_assetId == data->m_assetId
+                || (previous && color->m_assetId == previous->m_assetId)
+                || color->m_assetId != cachedColor->m_assetId
+                || data->m_assetId != cachedData->m_assetId)
             { error="Material mip cache reuse/isolation failed"; return false; }
             const auto c=color->GetImageView(), d=data->GetImageView();
             if (c.MipLevels()!=4 || d.MipLevels()!=4 || c.Format()!=RHIFormat::RGBA8UnormSrgb
@@ -1321,12 +1328,12 @@ namespace
         pixels.fill(255);
         for (uint32_t y = 0; y < 8; ++y)
             for (uint32_t x = 0; x < 4; ++x) pixels[(y * 8 + x) * 4 + 3] = 0;
-        std::shared_ptr<Texture> holes(Texture::CreateFromPixels(8, 8, "PbrCoverage.Holes",
+        own::shared_owner<const Texture> holes(Texture::CreateFromPixels(8, 8, "PbrCoverage.Holes",
             RHIFormat::RGBA8Unorm, pixels.data(), 8 * 4));
         auto minifiedHoles = Texture::WithMipChain(holes, error);
         if (!minifiedHoles || minifiedHoles->GetImageView().MipLevels()!=4) return false;
         const uint8_t whitePixel[] = {255, 255, 255, 255};
-        std::shared_ptr<Texture> white(Texture::CreateFromPixels(1, 1, "PbrCoverage.Emission",
+        own::shared_owner<const Texture> white(Texture::CreateFromPixels(1, 1, "PbrCoverage.Emission",
             RHIFormat::RGBA8Unorm, whitePixel, 4));
         if (!holes || !white) { error = "Coverage fixture textures missing"; return false; }
         FrameCameraSnapshot camera{};
@@ -1400,8 +1407,8 @@ namespace
             draw.worldMatrix = math::matrix4x4::identity();
             draw.baseColorFactor = math::color(1, 1, 1, test.alpha);
             draw.coverage = {test.flags, test.cutoff, test.alpha};
-            draw.baseColor = test.holes ? (test.minified ? minifiedHoles : holes).get() : nullptr;
-            draw.emissive = white.get();
+            draw.baseColor = test.holes ? (test.minified ? &*minifiedHoles.borrow() : &*holes.borrow()) : nullptr;
+            draw.emissive = (white ? &*white.borrow() : nullptr);
             draw.bonePalette = skin ? &bone : nullptr;
             draw.animatorKey = skin ? 123 : 0; draw.boneCount = skin;
             draw.materialSnapshot.reset(); draw.forwardMaterialSnapshot.reset();

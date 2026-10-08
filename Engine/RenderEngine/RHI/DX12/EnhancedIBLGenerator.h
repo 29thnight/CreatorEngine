@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "../RHIFormat.h"
 #include <cstdint>
 #include <array>
@@ -107,7 +108,7 @@ public:
 
 private:
     struct CookedCaptureSlice { RHIReadback readback; uint32_t image{}, mip{}; };
-    std::array<std::shared_ptr<class Texture>, 8> m_cookedTextures;
+    std::array<own::shared_owner<const Texture>, 8> m_cookedTextures;
     struct CookedCapture
     {
         std::vector<CookedCaptureSlice> slices;

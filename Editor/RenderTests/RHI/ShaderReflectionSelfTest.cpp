@@ -20,6 +20,13 @@
 
 namespace
 {
+    bool SameShaderMetaOwner(const own::shared_owner<const ShaderMeta>& left,
+        const own::shared_owner<const ShaderMeta>& right)
+    {
+        // Parameters pin even a temporary Resolve result through the comparison.
+        return left && right ? &*left.borrow() == &*right.borrow() : !left && !right;
+    }
+
     struct ReflectionStageRequest
     {
         std::string entry;
@@ -76,16 +83,13 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         "SelfTest/ShaderMetaFixture.shadermeta");
     const FileGuid guid = DataSystems->GetFileGuid(metaPath);
     std::string error;
-    const ShaderMetaHandle metaHandle = DataSystems->LoadShaderMetaHandle(guid, error);
-    const std::shared_ptr<const ShaderMeta> metaSnapshot =
-        DataSystems->ResolveShaderMeta(metaHandle);
-    const ShaderMetaHandle cachedMetaHandle =
-        DataSystems->LoadShaderMetaHandle(guid, error);
-    const std::shared_ptr<const ShaderMeta> cachedMetaSnapshot =
-        DataSystems->ResolveShaderMeta(cachedMetaHandle);
+    ShaderMetaHandle metaHandle;
+    const auto metaSnapshot = DataSystems->LoadShaderMetaOwner(guid, metaHandle, error);
+    ShaderMetaHandle cachedMetaHandle;
+    const auto cachedMetaSnapshot = DataSystems->LoadShaderMetaOwner(guid, cachedMetaHandle, error);
     if (FileGuid{} == guid || !metaHandle.IsValid() || !metaSnapshot
         || cachedMetaHandle != metaHandle
-        || cachedMetaSnapshot.get() != metaSnapshot.get())
+        || !SameShaderMetaOwner(cachedMetaSnapshot, metaSnapshot))
     {
         outLog += "[shader reflection] ShaderMeta load 실패: " + error + "\n";
         return false;
@@ -394,16 +398,23 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
 		&& legacyTextures.GetTextureMapShared("baseMap")
 		&& 6u == legacyTextures.GetTextureOwners().size()
 		&& legacyTextureCopy.GetBaseColorMapShared()
-			== legacyTextures.GetBaseColorMapShared()
+		&& legacyTextureCopy.GetBaseColorMapShared()->m_assetId
+			== legacyTextures.GetBaseColorMapShared()->m_assetId
 		&& legacyTextureCopy.GetNormalMapShared()
-			== legacyTextures.GetNormalMapShared()
+		&& legacyTextureCopy.GetNormalMapShared()->m_assetId
+			== legacyTextures.GetNormalMapShared()->m_assetId
 		&& legacyTextureCopy.GetOccRoughMetalMapShared()
-			== legacyTextures.GetOccRoughMetalMapShared()
-		&& legacyTextureCopy.GetAOMapShared() == legacyTextures.GetAOMapShared()
+		&& legacyTextureCopy.GetOccRoughMetalMapShared()->m_assetId
+			== legacyTextures.GetOccRoughMetalMapShared()->m_assetId
+		&& legacyTextureCopy.GetAOMapShared()
+		&& legacyTextureCopy.GetAOMapShared()->m_assetId
+			== legacyTextures.GetAOMapShared()->m_assetId
 		&& legacyTextureCopy.GetEmissiveMapShared()
-			== legacyTextures.GetEmissiveMapShared()
+		&& legacyTextureCopy.GetEmissiveMapShared()->m_assetId
+			== legacyTextures.GetEmissiveMapShared()->m_assetId
 		&& legacyTextureCopy.GetTextureMapShared("baseMap")
-			== legacyTextures.GetTextureMapShared("baseMap")
+		&& legacyTextureCopy.GetTextureMapShared("baseMap")->m_assetId
+			== legacyTextures.GetTextureMapShared("baseMap")->m_assetId
 		&& 6u == legacyTextureCopy.GetTextureOwners().size();
 
     if (!legacyBufferRestored || !restoredValues
@@ -451,6 +462,21 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         return false;
     }
 
+    // Eviction must not revoke a consumer pin,
+    // and a cold reload must transfer its owner even with retention disabled.
+    struct RestoreShaderBudget
+    {
+        std::size_t bytes;
+        ~RestoreShaderBudget() { DataSystems->SetShaderMetaRetainedBudgetBytes(bytes); }
+    } restoreShaderBudget{ DataSystems->ShaderMetaRetainedBudgetBytes() };
+    DataSystems->SetShaderMetaRetainedBudgetBytes(0);
+    if (DataSystems->ShaderMetaRetainedBytes() != 0 ||
+        !SameShaderMetaOwner(DataSystems->ResolveShaderMeta(metaHandle), metaSnapshot))
+    {
+        outLog += "[shader reflection] ShaderMeta eviction revoked a consumer pin\n";
+        return false;
+    }
+
     // M5-C3a: watcher thread의 게시만으로는 cache를 바꾸지 않는다. 같은 저장의
     // 중복 Modified는 하나로 합쳐지고 GT 프레임 경계 drain 뒤에만 generation을
     // 올려 이전 handle resolve를 거부해야 한다.
@@ -460,18 +486,14 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
     DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
         RuntimeAssetType::ShaderMeta, guid, metaPath });
     const bool queuedHandleStillValid =
-        DataSystems->ResolveShaderMeta(metaHandle).get() == metaSnapshot.get();
+        SameShaderMetaOwner(DataSystems->ResolveShaderMeta(metaHandle), metaSnapshot);
     const std::size_t drainedAssetChanges = DataSystems->DrainQueuedAssetChanges();
     const bool staleHandleRejected =
         !DataSystems->ResolveShaderMeta(metaHandle) && metaSnapshot;
-    const ShaderMetaHandle reloadedHandle =
-        DataSystems->LoadShaderMetaHandle(guid, error);
-    const std::shared_ptr<const ShaderMeta> reloadedMeta =
-        DataSystems->ResolveShaderMeta(reloadedHandle);
-    const ShaderMetaHandle reloadedCachedHandle =
-        DataSystems->LoadShaderMetaHandle(guid, error);
-    const std::shared_ptr<const ShaderMeta> reloadedCachedMeta =
-        DataSystems->ResolveShaderMeta(reloadedCachedHandle);
+    ShaderMetaHandle reloadedHandle;
+    const auto reloadedMeta = DataSystems->LoadShaderMetaOwner(guid, reloadedHandle, error);
+    ShaderMetaHandle reloadedCachedHandle;
+    const auto reloadedCachedMeta = DataSystems->LoadShaderMetaOwner(guid, reloadedCachedHandle, error);
     Material reloadedMaterial;
     const bool reconfigured = reloadedMeta
         && reloadedMaterial.ConfigureShaderProperties(
@@ -483,7 +505,8 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         && reloadedHandle.slot == metaHandle.slot
         && reloadedHandle.generation != metaHandle.generation
         && reloadedCachedHandle == reloadedHandle
-        && reloadedCachedMeta.get() == reloadedMeta.get()
+        && SameShaderMetaOwner(reloadedCachedMeta, reloadedMeta)
+        && DataSystems->ShaderMetaRetainedBytes() == 0
         && reconfigured
         && reloadedMaterial.GetShaderMetaHandle() == reloadedHandle;
     if (!generationAdvanced)
@@ -497,9 +520,9 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
     // cache generation이 바뀐 뒤 UAF가 없다. 메시는 typed generation이 소유하므로
     // 이 프로브는 재질 축만 잰다 — 원 소유자와 복사본이 사라지는 각 경계에서
     // 소유가 유지·해제되는지 단정한다.
-    std::weak_ptr<Material> foliageMaterialLifetime;
+    own::weak_owner<Material> foliageMaterialLifetime;
     {
-        auto material = std::make_shared<Material>();
+        auto material = own::make_shared<Material>();
         foliageMaterialLifetime = material;
 
     stage = "foliage ownership and serialization";
@@ -541,12 +564,14 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         return false;
     }
 
+    // Owning consumers and frame pin tables retain displaced generations;
+    // no resource type relies on a global legacy retired-generation list.
     const bool retiredPolicyClosed =
         !DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::Model)
         && !DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::Material)
-        && DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::Texture)
-        && DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::UITexture)
-        && DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::SpriteSheet);
+        && !DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::Texture)
+        && !DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::UITexture)
+        && !DataSystem::RequiresLegacyRetiredGeneration(RuntimeAssetType::SpriteSheet);
     if (!retiredPolicyClosed)
     {
         outLog += "[shader reflection] C4 retired generation 축소 정책 불일치\n";
@@ -557,14 +582,19 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
     // 생존하고, 마지막 실제 consumer가 사라지면 전역 retired 목록 없이 파괴된다.
     stage = "material cache lifetime";
     constexpr std::string_view lifetimeProbeName = "M5_C4_FoliageMaterialProbe";
-    auto cacheMaterial = std::make_shared<Material>();
+    auto cacheMaterial = own::make_shared<Material>();
     cacheMaterial->m_name = lifetimeProbeName;
-    std::weak_ptr<Material> cacheMaterialLifetime = cacheMaterial;
-    FoliageType cacheConsumer("C4CacheProbe", true);
-    cacheConsumer.m_material = cacheMaterial;
     DataSystems->InsertMaterial(cacheMaterial);
-    const bool inserted = DataSystems->FindCachedMaterial(lifetimeProbeName).get()
-        == cacheMaterial.get();
+    auto cachedMaterial = DataSystems->FindCachedMaterial(lifetimeProbeName);
+    const bool inserted = cachedMaterial
+        && cachedMaterial->m_materialGuid != cacheMaterial->m_materialGuid
+        && cachedMaterial->m_name == lifetimeProbeName;
+    cacheMaterial->m_name = "EditedAfterPublication";
+    const bool frozenPublication = cachedMaterial && cachedMaterial->m_name == lifetimeProbeName;
+    const own::weak_owner<const Material> cacheMaterialLifetime = cachedMaterial;
+    FoliageType cacheConsumer("C4CacheProbe", true);
+    cacheConsumer.m_material = cachedMaterial;
+    cachedMaterial.reset();
     cacheMaterial.reset();
     DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
         RuntimeAssetType::Material, {}, std::filesystem::path(lifetimeProbeName)
@@ -574,7 +604,7 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
     const bool consumerPreserved = !cacheMaterialLifetime.expired();
     cacheConsumer = {};
     const bool releasedWithLastConsumer = cacheMaterialLifetime.expired();
-    if (!inserted || retiredDrainCount != 1 || !detached || !consumerPreserved
+    if (!inserted || !frozenPublication || retiredDrainCount != 1 || !detached || !consumerPreserved
         || !releasedWithLastConsumer)
     {
         outLog += "[shader reflection] C4 Material cache/shared consumer 수명 계약 불일치\n";

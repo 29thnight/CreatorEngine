@@ -117,14 +117,14 @@ namespace MaterialTextureTable
     }
 
     template <typename Snapshot>
-    std::vector<Texture*> Owners(const Snapshot& snapshot)
+    std::vector<const Texture*> Owners(const Snapshot& snapshot)
     {
         Schema schema;
         std::string error;
         if (!FromLayout(snapshot.bindingLayout, schema, error)) return {};
-        std::vector<Texture*> owners(schema.size());
+        std::vector<const Texture*> owners(schema.size());
         for (const auto& texture : snapshot.textureBindings)
-            owners[texture.registerIndex - FirstRegister] = texture.textureOwner.get();
+            owners[texture.registerIndex - FirstRegister] = (texture.textureOwner ? &*texture.textureOwner.borrow() : nullptr);
         return owners; // Callers validate the complete snapshot before indexing.
     }
 
@@ -190,9 +190,9 @@ namespace MaterialTextureTable
         return resources.UploadConstants(table.data(), sizeof(table));
     }
 
-    inline std::vector<Texture*> LegacyOwners(const Schema& schema, const EnhancedDrawItem& draw)
+    inline std::vector<const Texture*> LegacyOwners(const Schema& schema, const EnhancedDrawItem& draw)
     {
-        std::vector<Texture*> owners(schema.size());
+        std::vector<const Texture*> owners(schema.size());
         for (size_t i = 0; i < schema.size(); ++i)
         {
             using namespace standard_material::property;
@@ -205,7 +205,7 @@ namespace MaterialTextureTable
     }
 
     inline bool Upload(IRenderTextureCache& cache, const Schema& schema,
-        const std::vector<Texture*>& owners, Views& views, std::string& error, bool legacy)
+        const std::vector<const Texture*>& owners, Views& views, std::string& error, bool legacy)
     {
         if (schema.size() != owners.size())
         {

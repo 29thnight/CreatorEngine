@@ -91,7 +91,7 @@ namespace
             cloud.cloudMapSize[0] = cloud.cloudMapSize[1] = 4.f;
             fog.SetCloudShadow(cloud);
             const uint32_t white = 0xffffffff;
-            std::unique_ptr<Texture> texture(Texture::CreateFromPixels(1, 1, "RG5.Final.White", RHIFormat::RGBA8Unorm, &white));
+            own::shared_owner<const Texture> texture(Texture::CreateFromPixels(1, 1, "RG5.Final.White", RHIFormat::RGBA8Unorm, &white));
             require(texture != nullptr, "Final fixture texture");
             std::vector<Vertex> vertices(4);
             vertices[0].position = {-1.f, 0.f, 2.f};
@@ -108,14 +108,14 @@ namespace
             rects[0].right = 24.f;
             rects[0].bottom = 24.f;
             rects[0].color = {1.f, 0.f, 0.f, 0.5f};
-            rects[0].texture = texture.get();
+            rects[0].texture = (texture ? &*texture.borrow() : nullptr);
             rects[1] = rects[0];
             rects[1].left = 28.f;
             rects[1].right = 48.f;
             std::vector<EnhancedGizmoIconPass::Icon> icons(2);
             icons[0].position = {0.f, 1.f, 3.f};
             icons[0].size = 0.7f;
-            icons[0].texture = texture.get();
+            icons[0].texture = (texture ? &*texture.borrow() : nullptr);
             icons[1] = icons[0];
             icons[1].position.x = 1.f;
             const std::vector<EnhancedDrawItem> emptyDraws;

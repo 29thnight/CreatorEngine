@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "Core.Minimal.h"
 #include <vector>
 #include <mutex>
@@ -47,7 +48,7 @@ struct ScriptObjectHandle
 	bool IsValid() const { return generation != 0; }
 };
 
-// Flat AssetDepot ABI values. No C++ owner, string, job or Texture* crosses CLR.
+// Flat AssetDepot ABI values. No C++ owner, string, job or const Texture* crosses CLR.
 struct ScriptAssetId
 {
     std::uint64_t first{};

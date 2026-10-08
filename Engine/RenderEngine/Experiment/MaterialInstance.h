@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ModelData.h"
+#include "../../Utility_Framework/Ownership.h"
 
 #include <cstdint>
 #include <memory>
@@ -33,12 +34,12 @@ namespace experiment
     {
     public:
         MaterialInstance() = default;
-        explicit MaterialInstance(std::shared_ptr<const Material> base)
+        explicit MaterialInstance(own::shared_owner<const Material> base)
             : base_(std::move(base))
         {
         }
 
-        [[nodiscard]] const std::shared_ptr<const Material>& Base() const noexcept
+        [[nodiscard]] const own::shared_owner<const Material>& Base() const noexcept
         {
             return base_;
         }
@@ -77,7 +78,7 @@ namespace experiment
             std::string& outError) const;
 
     private:
-        std::shared_ptr<const Material> base_{};
+        own::shared_owner<const Material> base_{};
         std::vector<MaterialProperty> propertyOverrides_{};
         std::vector<std::string> keywordOverrides_{};
         std::uint64_t revision_{};

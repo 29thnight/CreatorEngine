@@ -1,4 +1,5 @@
 #include "Material.h"
+#include "material_owner_checks.h"
 #include "MaterialPropertyPacker.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Scene/ExperimentMaterialSealing.h"
@@ -151,7 +152,7 @@ RWStructuredBuffer<float4> result : register(u0, space0);
           SameRuntimeInstance(material.GetLXMaterialInstance(), accepted), "Private/type/keyword errors preserve the snapshot");
     Material clone(material);
     check(clone.ConfigureShaderProperties(meta, layout, error, handle) &&
-          clone.GetLXMaterialInstance()->shader == accepted->shader &&
+          material_graph_test::SamePinnedObject(clone.GetLXMaterialInstance()->shader, accepted->shader) &&
           clone.TrySetFloat("CodeValues.amount", .8f) && SameRuntimeInstance(material.GetLXMaterialInstance(), accepted),
           "Code clone shares the shader contract and edits an independent instance");
     auto badLayout = layout;
@@ -161,7 +162,7 @@ RWStructuredBuffer<float4> result : register(u0, space0);
     auto changedMeta = meta;
     changedMeta.name += " reloaded";
     check(clone.ConfigureShaderProperties(changedMeta, layout, error, {333, 2}) &&
-          clone.GetLXMaterialInstance()->shader != accepted->shader && accepted->shader->meta.name == meta.name,
+          !material_graph_test::SamePinnedObject(clone.GetLXMaterialInstance()->shader, accepted->shader) && accepted->shader->meta.name == meta.name,
           "Reload installs a distinct immutable shader owner");
 
     ExperimentMaterialSealing::SealSource sealSource;
@@ -171,7 +172,7 @@ RWStructuredBuffer<float4> result : register(u0, space0);
     std::vector<EnhancedMaterialTextureBinding> bindings;
     own::shared_owner<const LX::Runtime::Instance> sealed;
     check(ExperimentMaterialSealing::SealCore(sealSource, meta, layout, sealedBytes, bindings, error, &sealed, handle) &&
-          sealed && sealed->shader == accepted->shader && sealedBytes == accepted->uniforms &&
+          sealed && material_graph_test::SamePinnedObject(sealed->shader, accepted->shader) && sealedBytes == accepted->uniforms &&
           sealed->keywordSelections == accepted->keywordSelections, "Frame sealing consumes the same generic LX contract");
     EnhancedMaterialDrawSnapshot gbuffer;
     gbuffer.shaderMetaHandle = handle;

@@ -13,6 +13,8 @@ namespace experiment::cooked
     // Retains its historical name for callers, but addresses any normalized
     // cooked artifact (including AssetSet CAS paths) in the immutable archive.
     // The pak owns its index and is kept alive by every opened byte source.
+    // Default CaptureArtifact retains this immutable source: the archive is
+    // the physical backing file, so entry capture need not create a new owner.
     // Pak::Archive::readRange decompresses only intersecting chunks.
     class PakAudioClipByteSource final : public ArtifactByteSource
     {

@@ -1,3 +1,5 @@
+#include "../../Engine/RenderEngine/MaterialGraphInstancePins.h"
+#include "../../Engine/RenderEngine/Texture.h"
 #include "material_owner_checks.h"
 #include "material_runtime_tests.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
@@ -64,19 +66,37 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
               pakGeneration->cooked.product.program.semanticKey == first->cooked.product.program.semanticKey,
           "PAK generation loads by GUID without source parsing or runtime compiler");
 
-    // This token tests CPU owner retention only. It is never dereferenced as a
-    // Texture and cannot be used as an RHI resource. The product probe separately
-    // checks real D3D12 resources, PSOs and GPU readback.
-    auto lifetime = std::make_shared<int>(1);
-    std::weak_ptr<int> weakTexture = lifetime;
+    // A real empty CPU descriptor tests owner retention. Pixel upload and GPU
+    // lifetime checks remain in the rendering probes.
+    auto lifetime = own::make_shared<const Texture>();
+    own::weak_owner<const Texture> weakTexture = lifetime;
     const TextureLoader textureLoader = [&lifetime](const experiment::AssetId&, LX::LXColorSpace, std::string&) {
-        return std::shared_ptr<Texture>(lifetime, reinterpret_cast<Texture*>(lifetime.get()));
+        return lifetime;
     };
     InstanceDescription description{
         graphId, {{900, .12345678901234567}, {901, std::array<double, 4>{.2, .3, .4, 1.}}}, {}};
     own::shared_owner<const Instance> instance;
     check(BuildInstance(first, description, textureLoader, instance, error), "Pack graph instance: " + error);
     auto acceptedInstance = instance;
+    {
+        auto pins = own::make_shared<InstanceFramePins>();
+        auto firstRepresentation = own::make_shared<const Instance>(*instance);
+        auto secondRepresentation = own::make_shared<const Instance>(*instance);
+        const auto firstId = firstRepresentation->representationId;
+        const auto firstIndex = pins->Retain(firstRepresentation);
+        check(firstIndex == pins->Retain(firstRepresentation) && pins->Size() == 1,
+            "Frame pins deduplicate the exact immutable instance representation");
+        check(firstId != secondRepresentation->representationId &&
+            firstIndex != pins->Retain(secondRepresentation) && pins->Size() == 2,
+            "Value copies have distinct representation identities within one graph generation");
+        const own::weak_owner<const Instance> weak = firstRepresentation;
+        const auto borrowed = pins->Borrow(firstIndex);
+        firstRepresentation.reset();
+        check(!weak.expired() && borrowed->representationId == firstId,
+            "Frame table protects draw borrows after producer owner release");
+        pins.reset();
+        check(weak.expired(), "Final frame table release ends its exact instance pin");
+    }
     check(instance->textures.size() == 1 && instance->textures[0].owner && !instance->uniforms.empty(),
           "CPU snapshot owns texture generation and reflected uniform values");
     auto other = description;
@@ -119,7 +139,7 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
           "Public texture override changes one instance without changing the shared graph/default");
     const TextureLoader missingTexture = [](const experiment::AssetId&, LX::LXColorSpace, std::string& failure) {
         failure = "Missing replacement texture";
-        return std::shared_ptr<Texture>{};
+        return own::shared_owner<const Texture>{};
     };
     const auto priorTextureInstance = textureInstance;
     check(!BuildInstance(first, textureDescription, missingTexture, textureInstance, error) &&

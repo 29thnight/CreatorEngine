@@ -603,7 +603,7 @@ void ImGuiDx12Shell::Resize(uint32_t width, uint32_t height)
     }
 }
 
-uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
+uint64_t ImGuiDx12Shell::RegisterTexture(const Texture* texture)
 {
     Impl& impl = *m_impl;
     if (!impl.active) return 0;
@@ -629,7 +629,7 @@ uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
     slot.lastUsedFrame = impl.frameIndex;
 
     // 프레임 밖에서 온 등록은 안정 슬롯만 예약한다. 다음 표시 프레임의 같은
-    // 호출이 실제 업로드를 수행하므로 Texture*를 대기열에 보관하지 않는다.
+    // 호출이 실제 업로드를 수행하므로 const Texture*를 대기열에 보관하지 않는다.
     if (impl.frameOpen)
     {
         std::string uploadError;
@@ -655,7 +655,7 @@ uint64_t ImGuiDx12Shell::RegisterTexture(Texture* texture)
     return slot.textureId;
 }
 
-bool ImGuiDx12Shell::IsTextureReady(Texture* texture) const
+bool ImGuiDx12Shell::IsTextureReady(const Texture* texture) const
 {
     const Impl& impl = *m_impl;
     if (!impl.active || nullptr == texture) return false;

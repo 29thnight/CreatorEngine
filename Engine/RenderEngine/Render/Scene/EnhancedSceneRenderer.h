@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include <algorithm>
@@ -11,6 +12,7 @@
 
 #include "../../FrameCameraSnapshot.h"
 #include "../../ShaderMetaHandle.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/TypeTrait.h"
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
@@ -119,7 +121,7 @@ struct EnhancedShaderMetaFrameSnapshot
 {
     FileGuid guid{};
     ShaderMetaHandle handle{};
-    std::shared_ptr<const ShaderMeta> value;
+    own::shared_owner<const ShaderMeta> value;
     std::string error;
 
     bool IsValid() const
@@ -900,7 +902,7 @@ namespace EnhancedSceneRenderer
     /// 논리 대상으로 결과를 발행한다(MultiCameraRenderPlan.md).
     inline constexpr uint32_t kMaxLiveCameraViews = kEnhancedMaxLiveCameraViews;
     EnhancedRequiredAssetPacket BuildRequiredAssetPacket(
-        std::span<const std::shared_ptr<Material>> materials);
+        std::span<const own::shared_owner<const Material>> materials);
 
     EnhancedLiveFramePacket BuildLiveFramePacket(float deltaSeconds,
         const EnhancedLiveViewRequest* views, uint32_t viewCount,
