@@ -992,11 +992,179 @@ bool DataSystem::ReadPreparedModelScene(const ModelPreparation& preparation,
     return true;
 }
 
-DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_view path)
+AssetDepot::AssetRequest<Material> DataSystem::RequestAsync(
+    const own::shared_owner<const assets::ModelAnimationDescriptor>& descriptor,
+    AssetDepot::AssetLink<Material> material)
+{
+    using Status = AssetDepot::AssetRequestStatus;
+    using Error = AssetDepot::AssetRequestError;
+    namespace cooked = experiment::cooked;
+    const auto failed = [this](Status status, Error error, std::string message)
+    {
+        auto state = own::make_shared<AssetDepot::AssetRequestState<Material>>(m_assetRequestCounters);
+        std::lock_guard stateLock(state->mutex);
+        state->SetTerminalLocked(status);
+        state->error = error;
+        state->message = std::move(message);
+        return AssetDepot::AssetRequest<Material>(std::move(state));
+    };
+    if (!descriptor || !material.IsValid() || material.identity.subassetId.IsValid()
+        || std::ranges::none_of(descriptor->origin.entry.dependencies, [&](const auto& edge)
+        {
+            return edge.kind == cooked::AssetDependencyKind::Loadable
+                && edge.target == material.ToReference();
+        }))
+    {
+        return failed(Status::Failed, Error::InvalidLink,
+            "Selected material is not a declared model Loadable link.");
+    }
+    own::shared_owner<const cooked::CookedAssetCatalog> catalog;
+    std::uint64_t epoch{};
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        if (m_assetPreparationStopping)
+        {
+            return failed(Status::Cancelled, Error::ShuttingDown, "Material admission is shutting down.");
+        }
+        if (m_assetInvalidationDepth != 0u || descriptor->origin.resolverRevision != m_assetDepotRevision)
+        {
+            return failed(Status::Stale, Error::RevisionChanged,
+                "The selected model/material closure was superseded; rebind explicitly.");
+        }
+        cooked::ResolvedAssetEntry current;
+        catalog = m_cookedCatalog;
+        if (!catalog || catalog->Find(descriptor->origin.entry.asset, current) != cooked::AssetLookupStatus::Found)
+        {
+            return failed(Status::Failed, Error::NotMounted, "The model for the unresolved material is not mounted.");
+        }
+        if (current.resolverRevision != descriptor->origin.resolverRevision
+            || current.blob != descriptor->origin.blob)
+        {
+            return failed(Status::Stale, Error::RevisionChanged,
+                "The selected model/material closure was superseded; rebind explicitly.");
+        }
+        epoch = m_assetPreparationEpoch;
+    }
+    // Admission and commit already recheck this snapshot/epoch in the shared
+    // material pipeline. A remount in this handoff cannot silently follow latest.
+    return RequestMaterialPipelineAssetFromSnapshot(material, std::move(catalog), epoch);
+}
+
+AssetDepot::AssetRequest<Material> DataSystem::RequestLegacyModelMaterialAsync(
+    own::shared_owner<const assets::ModelAssetGeneration> generation, FileGuid materialId)
+{
+    using Status = AssetDepot::AssetRequestStatus;
+    using Error = AssetDepot::AssetRequestError;
+    auto state = own::make_shared<AssetDepot::AssetRequestState<Material>>(m_assetRequestCounters);
+    AssetDepot::AssetRequest<Material> request(state);
+    const auto complete = [state](Status status, Error error, std::string message,
+        const own::shared_owner<const Material>& material = {})
+    {
+        std::lock_guard lock(state->mutex);
+        if (state->status == Status::Pending)
+        {
+            state->SetTerminalLocked(status);
+            state->error = error;
+            state->message = std::move(message);
+            state->asset = material;
+        }
+    };
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u)
+    {
+        complete(m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+            m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged, {});
+        return request;
+    }
+    if (!PathFinder::IsAssetAuthoringEnabled() || !generation || !generation->FindMaterial(materialId.m_guid))
+    {
+        complete(Status::Failed, Error::InvalidLink, "Legacy foliage material requires an existing authoring model.");
+        return request;
+    }
+    {
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        experiment::cooked::ResolvedAssetEntry mounted;
+        const AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link{
+            { experiment::AssetId{ generation->Identity().modelId }, {} } };
+        if (m_cookedCatalog && m_cookedCatalog->Find(link.ToReference(), mounted)
+            != experiment::cooked::AssetLookupStatus::NotMounted)
+        {
+            complete(Status::Stale, Error::RevisionChanged, "Mounted models cannot fall back to legacy material conversion.");
+            return request;
+        }
+    }
+    const auto epoch = m_assetPreparationEpoch;
+    const auto revision = m_assetDepotRevision;
+    try
+    {
+        job_group jobs;
+        jobs.add([this, state, complete, generation = std::move(generation), materialId, epoch, revision]()
+        {
+            {
+                std::lock_guard admissionLock(m_assetPreparationMutex);
+                if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u
+                    || epoch != m_assetPreparationEpoch || revision != m_assetDepotRevision)
+                {
+                    complete(m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+                        m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged, {});
+                    return;
+                }
+            }
+            {
+                std::lock_guard stateLock(state->mutex);
+                if (state->status != Status::Pending)
+                {
+                    return;
+                }
+            }
+            const AssetDecoderApartment apartment;
+            const auto* source = generation->FindMaterial(materialId.m_guid);
+            experiment::Material converted;
+            ExperimentMaterialMigration::ConvertModelMaterialAsset(*source, *generation, converted);
+            auto material = own::make_shared<Material>();
+            std::string error;
+            const bool ready = ExperimentMaterialMigration::ConvertToLegacyMaterial(
+                converted, nullptr, *material, error)
+                && ConfigureModelMaterialGraph(*material, *generation, *source, error);
+            std::lock_guard completionLock(m_assetPreparationMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u
+                || epoch != m_assetPreparationEpoch || revision != m_assetDepotRevision)
+            {
+                complete(m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+                    m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged, {});
+            }
+            else if (!ready || !material->HasMaterialGraph())
+            {
+                complete(Status::Failed, Error::DecodeFailed, std::move(error));
+            }
+            else
+            {
+                complete(Status::Ready, Error::None, {}, material);
+            }
+        });
+        jobs.on_complete([complete](std::exception_ptr failure)
+        {
+            complete(Status::Failed, failure ? Error::SubmissionFailed : Error::DecodeFailed, {});
+        });
+        state->completion = SubmitAssetWorkLocked(std::move(jobs));
+    }
+    catch (...)
+    {
+        complete(Status::Failed, Error::SubmissionFailed, {});
+    }
+    return request;
+}
+
+DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_view path, bool allowMounted)
 {
     Uuid::Uuid16 explicitIdentity;
     if (assets::TryParseCanonicalUuidV8(path, explicitIdentity))
     {
+        if (!allowMounted)
+        {
+            return {};
+        }
         return PrepareModelAsset(AssetDepot::AssetLink<assets::ModelAnimationDescriptor>{
             { experiment::AssetId{ explicitIdentity }, {} } });
     }
@@ -1022,6 +1190,24 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_vie
     {
         return {};
     }
+    if (!allowMounted)
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        experiment::cooked::ResolvedAssetEntry resolved;
+        const AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link{
+            { experiment::AssetId{ guid.m_guid }, {} } };
+        if (!PathFinder::IsAssetAuthoringEnabled() || m_assetPreparationStopping
+            || m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch
+            || resolverRevision != m_assetDepotRevision
+            || (m_cookedCatalog && m_cookedCatalog->Find(link.ToReference(), resolved)
+                != experiment::cooked::AssetLookupStatus::NotMounted))
+        {
+            return {};
+        }
+    }
+    // PrepareRuntimeAsset checks the captured epoch/revision before dispatch,
+    // so a mount in this handoff cannot turn fallback into an eager v3 load.
     return PrepareRuntimeAsset(guid, source, RuntimeAssetType::Model, epoch, resolverRevision);
 }
 

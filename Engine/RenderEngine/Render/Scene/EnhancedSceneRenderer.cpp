@@ -4060,15 +4060,9 @@ namespace
             pending = false;
             error.clear();
             geometryFramePins.entries.clear();
-            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
-            for (const auto& primitive : proxies)
+            const auto admit = [&](const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor,
+                bool cpuConsumer)
             {
-                const auto* proxy = primitive ? primitive->As<MeshRenderProxy>() : nullptr;
-                if (!proxy || !proxy->m_isEnabled || !proxy->m_meshDescriptor)
-                {
-                    continue;
-                }
-                const auto& descriptor = proxy->m_meshDescriptor;
                 const auto handle = assets::MakeModelMeshHandle(*descriptor);
                 if (!handle.IsValid())
                 {
@@ -4078,13 +4072,10 @@ namespace
                 const bool resident = backend == EnhancedLiveBackend::DX12
                     ? pipeline && dx12.MeshCache().FindModel(handle).IsValid()
                     : vulkanPipeline && vulkanPipeline->meshCache.FindModel(handle).IsValid();
-                // Graph sealing copies/deforms source vertices. Resident GPU
-                // geometry cannot satisfy that independent CPU consumer.
-                const bool cpuConsumer = static_cast<bool>(proxy->m_graphMaterialSource)
-                    || proxy->m_isAnimationEnabled;
+                // Graph sealing is a distinct CPU user, even with a resident GPU buffer.
                 if (resident && !cpuConsumer)
                 {
-                    continue;
+                    return true;
                 }
                 auto& demand = geometryDemands[handle];
                 demand.seenFrame = frameId;
@@ -4111,7 +4102,7 @@ namespace
                     if (result.status == AssetDepot::AssetRequestStatus::Pending)
                     {
                         pending = true;
-                        continue;
+                        return true;
                     }
                     if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
                     {
@@ -4124,6 +4115,37 @@ namespace
                 {
                     error = "Prepared mesh geometry does not match its exact descriptor.";
                     return false;
+                }
+                return true;
+            };
+            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& primitive : proxies)
+            {
+                if (!primitive || !primitive->m_isEnabled)
+                {
+                    continue;
+                }
+                if (const auto* mesh = primitive->As<MeshRenderProxy>(); mesh && mesh->m_meshDescriptor)
+                {
+                    if (!admit(mesh->m_meshDescriptor, mesh->m_graphMaterialSource || mesh->m_isAnimationEnabled))
+                    {
+                        return false;
+                    }
+                }
+                else if (const auto* foliage = primitive->As<FoliageRenderProxy>(); foliage && !foliage->m_isCulled)
+                {
+                    // One demand per actual selected type, never a model root
+                    // closure or an unrelated mesh/material in the descriptor.
+                    for (std::size_t index = 0u; index < foliage->m_foliageTypes.size(); ++index)
+                    {
+                        const auto& type = foliage->m_foliageTypes[index];
+                        const auto instances = foliage->instanceMap.find(static_cast<uint32>(index));
+                        if (type.m_meshDescriptor && instances != foliage->instanceMap.end() && !instances->second.empty()
+                            && !admit(type.m_meshDescriptor, static_cast<bool>(type.m_graphMaterialSource)))
+                        {
+                            return false;
+                        }
+                    }
                 }
             }
             for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
@@ -4202,10 +4224,25 @@ namespace
             const auto proxies = renderScene->GetPrimitiveProxySnapshot();
             for (const auto& primitive : proxies)
             {
-                const auto* proxy = primitive ? primitive->As<MeshRenderProxy>() : nullptr;
-                if (proxy && proxy->m_isEnabled && proxy->m_meshDescriptor)
+                if (!primitive || !primitive->m_isEnabled)
                 {
-                    activeMeshes.insert(assets::MakeModelMeshHandle(*proxy->m_meshDescriptor));
+                    continue;
+                }
+                if (const auto* mesh = primitive->As<MeshRenderProxy>(); mesh && mesh->m_meshDescriptor)
+                {
+                    activeMeshes.insert(assets::MakeModelMeshHandle(*mesh->m_meshDescriptor));
+                }
+                else if (const auto* foliage = primitive->As<FoliageRenderProxy>(); foliage && !foliage->m_isCulled)
+                {
+                    for (std::size_t index = 0u; index < foliage->m_foliageTypes.size(); ++index)
+                    {
+                        const auto& type = foliage->m_foliageTypes[index];
+                        const auto instances = foliage->instanceMap.find(static_cast<uint32>(index));
+                        if (type.m_meshDescriptor && instances != foliage->instanceMap.end() && !instances->second.empty())
+                        {
+                            activeMeshes.insert(assets::MakeModelMeshHandle(*type.m_meshDescriptor));
+                        }
+                    }
                 }
             }
             for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
@@ -4449,62 +4486,69 @@ namespace
                 drawPool.push_back(pooled);
             };
 
-            const auto poolFoliage = [this, &pinModel, &modelPins](const FoliageRenderProxy* proxy)
+            const auto poolFoliage = [this, &pinModel, &pinMesh, &modelPins](const FoliageRenderProxy* proxy)
             {
                 if (!proxy->m_isEnabled || proxy->m_isCulled) return;
 
-                for (FoliageRenderProxy::DrawSource source :
-                    proxy->CaptureDrawSources())
+                // CaptureDrawSources returns only instance values and type
+                // indices. Owners stay on the live proxy, then in frame tables.
+                for (const auto& source : proxy->CaptureDrawSources())
                 {
-                    if (source.graphMaterialSource)
-                    {
-                        RetainGraphImages(source.graphMaterialSource->instance);
-                    }
-                    // PHASE 3.75 MBC8 — poolMesh와 같은 typed 축이 첫째다.
-                    if (!source.modelGeneration)
-                    {
-                        continue;
-                    }
-                    const auto modelPinIndex = pinModel(source.modelGeneration);
-                    if (modelPinIndex == (std::numeric_limits<std::size_t>::max)())
-                    {
-                        continue;
-                    }
-                    const auto& modelGeneration = modelPins.generations[modelPinIndex];
-                    RHIModelMeshView modelView{};
-                    if (!BuildRHIModelMeshView(*modelGeneration,
-                            source.modelMeshIndex, modelView))
-                    {
-                        continue;
-                    }
-
+                    const auto& type = proxy->m_foliageTypes[source.foliageTypeID];
                     PooledDraw pooled{};
+                    RHIModelMeshView modelView{};
+                    math::aabb bounds{};
+                    if (type.m_meshDescriptor)
+                    {
+                        const auto pinIndex = pinMesh(type.m_meshDescriptor);
+                        const auto& descriptor = modelPins.meshes[pinIndex];
+                        const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                        const auto payload = std::ranges::find_if(geometryFramePins.entries,
+                            [&](const auto& entry) { return entry.handle == handle; });
+                        const bool valid = payload != geometryFramePins.entries.end()
+                            ? payload->payload && BuildRHIModelMeshView(*descriptor, *payload->payload, modelView)
+                            : BuildRHIModelMeshView(*descriptor, modelView);
+                        if (!valid)
+                        {
+                            continue;
+                        }
+                        pooled.modelPinIndex = pinIndex;
+                        bounds = descriptor->bounds;
+                    }
+                    else
+                    {
+                        if (!type.m_modelGeneration)
+                        {
+                            continue;
+                        }
+                        const auto pinIndex = pinModel(type.m_modelGeneration);
+                        if (pinIndex == (std::numeric_limits<std::size_t>::max)())
+                        {
+                            continue;
+                        }
+                        const auto& generation = modelPins.generations[pinIndex];
+                        if (!BuildRHIModelMeshView(*generation, type.m_modelMeshIndex, modelView))
+                        {
+                            continue;
+                        }
+                        pooled.modelPinIndex = pinIndex;
+                        bounds = generation->Meshes()[type.m_modelMeshIndex].bounds;
+                    }
                     pooled.item.worldMatrix = source.worldMatrix;
                     pooled.worldBounds = source.worldBounds;
                     pooled.hasBounds = !source.worldBounds.is_empty();
-                    pooled.item.modelMeshView = modelView;
-                    pooled.modelPinIndex = modelPinIndex;
-
-                    if (source.graphMaterialSource)
+                    pooled.item.modelMeshView = std::move(modelView);
+                    if (type.m_graphMaterialSource)
                     {
-                        const auto& material = *source.graphMaterialSource;
+                        const auto& material = *type.m_graphMaterialSource;
                         pooled.hasGraphMaterialSource = true;
                         PinGraphInstance(pooled.item, material.instance);
                         pooled.item.materialGraphSlot = material.materialSlot;
                         pooled.item.coverage = material.coverage;
                     }
-
-                    // I6-C — poolMesh와 같은 규약: 신원 키와 반경을 값으로
-                    //   싣는다(패스가 Mesh를 역참조하지 않게).
                     pooled.item.geometryKey = MakeGeometryKey(pooled.item);
-                    {
-                        const math::aabb& bounds = modelGeneration
-                            ->Meshes()[source.modelMeshIndex].bounds;
-                        pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
-                    pooled.item.boundRadius = bounds.is_empty()
-                            ? 0.f : math::length(bounds.extents);
-                    }
-
+                    pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
+                    pooled.item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
                     drawPool.push_back(std::move(pooled));
                 }
             };

@@ -2723,7 +2723,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     Material waterMaterial(*waterAsset);
     Material windMaterial(*windAsset);
 
-    // P2d-a: 실제 FoliageRenderProxy가 타입별 인스턴스를 owning draw source로
+    // P2d-a: 실제 FoliageRenderProxy가 타입별 인스턴스를 type-index draw source로
     // 펼친다. m_isCulled는 한 카메라의 파생값이므로 여기서 버리지 않고,
     // worldBounds를 제품 CaptureFromView의 카메라별 절두체 판정으로 넘긴다.
     bool foliageDrawSourceValid = false;
@@ -2744,9 +2744,7 @@ bool RunVulkanForwardTest(std::string& outLog)
 
         FoliageRenderProxy foliage;
         {
-            // 지역 사본이 재질을 붙들면 아래 "마지막 owner 해제" 단정이 거짓으로 붉는다.
-            // FoliageType은 사용자 선언 소멸자 때문에 move가 복사로 떨어지므로 블록으로
-            // 수명을 끊는다(MBC9 실측: ownerNotReleased).
+            // Keep the authoring temporary outside the lifetime assertion below.
             FoliageType windType("P2dWind", true);
             windType.m_material = foliageMaterialOwner;
             windType.m_modelGeneration = foliageGeneration;
@@ -2777,14 +2775,20 @@ bool RunVulkanForwardTest(std::string& outLog)
         for (std::size_t index = 0; index < sources.size(); ++index)
         {
             const FoliageRenderProxy::DrawSource& source = sources[index];
-            if (!source.modelGeneration || !foliageGeneration
-                || source.modelGeneration->Handle() != foliageGeneration->Handle())
+            if (source.foliageTypeID >= foliage.m_foliageTypes.size())
+            {
+                foliageWhy += " typeIndex";
+                continue;
+            }
+            const auto& type = foliage.m_foliageTypes[source.foliageTypeID];
+            if (!type.m_modelGeneration || !foliageGeneration
+                || type.m_modelGeneration->Handle() != foliageGeneration->Handle())
             {
                 foliageWhy += " generation";
             }
-            if (0u != source.modelMeshIndex) foliageWhy += " meshIndex";
-            if (!source.material || !foliageMaterialOwner
-                || source.material->m_materialGuid != foliageMaterialOwner->m_materialGuid)
+            if (0u != type.m_modelMeshIndex) foliageWhy += " meshIndex";
+            if (!type.m_material || !foliageMaterialOwner
+                || type.m_material->m_materialGuid != foliageMaterialOwner->m_materialGuid)
             {
                 foliageWhy += " material";
             }
@@ -2799,19 +2803,22 @@ bool RunVulkanForwardTest(std::string& outLog)
         }
         foliageDrawSourceValid = foliageWhy.empty();
 
-        // 프록시 원본을 놓아도 frame draw source가 owner를 유지하고, source를
-        // 놓은 뒤에는 반환되는지까지 같이 고정한다.
+        // A retained proxy snapshot pins each type once. Instance records carry
+        // no hidden Material/model owners; releasing the snapshot releases them
+        // even while those value-only draw records remain alive.
+        auto retainedTypes = foliage.m_foliageTypes;
         foliage.m_foliageTypes.clear();
         foliageMaterialOwner.reset();
         if (foliageMaterialLifetime.expired()) foliageWhy += " ownerLostEarly";
-        sources.clear();
+        retainedTypes.clear();
         if (!foliageMaterialLifetime.expired()) foliageWhy += " ownerNotReleased";
+        sources.clear();
         foliageDrawSourceValid = foliageWhy.empty();
         foliageFailureWhy = foliageWhy;
     }
     if (!foliageDrawSourceValid)
     {
-        outLog += "[1/4] FoliageRenderProxy owning draw source/culling 경계 실패:"
+        outLog += "[1/4] FoliageRenderProxy indexed draw source/culling 경계 실패:"
             + foliageFailureWhy + "\n";
         return false;
     }

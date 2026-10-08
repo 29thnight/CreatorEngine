@@ -164,8 +164,10 @@ design. A foundation slice is not completion of the runtime migration.
   independent Lattice materials/embedded textures and exact collider preparation.
   Saved-scene material references/inline overrides and authored/Code views now restore
   from the captured mounted closure, preserving explicit color/mip recipes and numeric
-  keyword axis choices. Other legacy aggregate consumers, including Foliage, are still
-  undergoing cutover. Upstream live rendering remains graph-only; carried Code programs
+  keyword axis choices. Foliage persists selected model/mesh/material identities,
+  prepares them asynchronously and retains descriptor/material owners through its
+  proxy/frame handoff. Unmounted authoring fallback is explicit and tracked; mounted
+  failure/staleness does not trigger fallback or automatic rebind. Upstream live rendering remains graph-only; carried Code programs
   serve existing explicit Code-capable passes, not an invented live rendering route.
   Automatic set activation is connected to the existing package bootstrap, which still
   requires the legacy scene/audio/source-identity closure; a v3-only package is pending. CEMCv11 remains a transitional adapter for other legacy consumers.

@@ -41,6 +41,15 @@ void FoliageSystem::Update(float tick)
     // UpdateFoliageCullingData"였다 — renderScene 없음/camera 없음 둘 다
     // 조기 반환 조건이었으므로, 순서를 바꿔도(레지시 카메라를 renderScene 뒤에
     // 얻어도) 관측 가능한 동작은 같다.
+    // Preparation is independent of camera/render visibility. Poll only CPU
+    // request state; accepted workers own every source/result capture.
+    for (FoliageComponent* foliage : m_foliages)
+    {
+        if (foliage && foliage->GetOwner() && !foliage->GetOwner()->IsDestroyMark())
+        {
+            foliage->PollAssetBindings();
+        }
+    }
     auto renderScene = SceneManagers->GetRenderScene();
     if (nullptr == renderScene) return;
 

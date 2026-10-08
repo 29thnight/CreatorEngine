@@ -204,6 +204,15 @@ public:
         own::shared_owner<const assets::ModelAnimationDescriptor> descriptor, std::size_t meshIndex);
     [[nodiscard]] own::shared_owner<const assets::ModelMeshDescriptor> TryAcquire(
         const own::shared_owner<const assets::ModelAnimationDescriptor>& descriptor, std::size_t meshIndex);
+    // An unresolved material is a new lookup, admitted only while the model's
+    // resolver revision remains current. It must never mix newer dependencies.
+    [[nodiscard]] AssetDepot::AssetRequest<Material> RequestAsync(
+        const own::shared_owner<const assets::ModelAnimationDescriptor>& descriptor,
+        AssetDepot::AssetLink<Material> material);
+    // Explicit old authoring workflow; conversion/image copies run in tracked
+    // asset work, not on the UI/scene thread. Never used for mounted v3 records.
+    [[nodiscard]] AssetDepot::AssetRequest<Material> RequestLegacyModelMaterialAsync(
+        own::shared_owner<const assets::ModelAssetGeneration> generation, FileGuid materialId);
     [[nodiscard]] bool HasModelMeshDescriptor(AssetDepot::AssetLink<assets::ModelMeshDescriptor> link) const;
     void SetModelGeometryCacheBudgets(std::size_t descriptors, std::size_t geometry);
 
@@ -290,7 +299,9 @@ public:
     // owner boundary; GPU upload/readiness remains owned by the renderer.
     struct PreparedRuntimeAsset;
     using ModelPreparation = own::shared_owner<PreparedRuntimeAsset>;
-    ModelPreparation PrepareModelAssetByPath(std::string_view path);
+    // Set allowMounted=false only for an explicit unmounted authoring fallback.
+    // Admission rejects a mounted winner before any full scene preparation.
+    ModelPreparation PrepareModelAssetByPath(std::string_view path, bool allowMounted = true);
     // Full model scene preparation is explicit. Root enumeration/acquisition
     // remains metadata-only and individual mesh/clip requests stay independent.
     // Collider demand is fixed per ticket; construction uses its effective choice.

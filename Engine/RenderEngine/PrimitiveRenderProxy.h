@@ -200,15 +200,8 @@ public:
 
 	struct DrawSource
 	{
-		own::shared_owner<const Material> material{};
-        std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
-		// I5-D5c4 — 재질 저작 정본(FoliageType 병행 필드의 사본). drawPool이
-		// pooled.authoredMaterialSource로 옮겨 sealing 직행에 합류시킨다.
-		own::shared_owner<const experiment::Material> authoredMaterial{};
-		// PHASE 3.75 MBC8/MBC9 — typed 정본(FoliageType 필드의 사본). drawPool이
-		// 이것으로 RHIModelMeshView를 만들어 싣는다 — 유일한 지오메트리 출처다.
-		own::shared_owner<const assets::ModelAssetGeneration> modelGeneration{};
-		uint32 modelMeshIndex{ 0 };
+        // The proxy owns each selected type once. Draw records contain only
+        // values/indices; the renderer adds one exact generation to frame pins.
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::aabb worldBounds{};
 		uint32 foliageTypeID{};

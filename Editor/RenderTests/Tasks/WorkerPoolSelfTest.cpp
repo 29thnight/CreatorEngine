@@ -127,10 +127,24 @@ namespace RenderTest
             FoliageComponent foliage;
             FoliageType type;
             type.m_modelName = generation->Name();
+            type.m_modelGuid = FileGuid(generation->Identity().modelId);
+            type.m_allowLegacySource = true;
             foliage.AddFoliageType(type);
-            if (!foliage.GetFoliageTypes().front().m_modelGeneration)
-                throw std::runtime_error("Foliage model generation not bound");
-            // Start culled: every real range callback must update its own entry.
+            // Only this explicit regression harness may wait. Product binding
+            // polls on the foliage tick without blocking or decoding on the UI.
+            const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+            while (foliage.GetAssetBindingStatus(0u) == AssetDepot::AssetRequestStatus::Pending
+                && std::chrono::steady_clock::now() < deadline)
+            {
+                foliage.PollAssetBindings();
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+            if (foliage.GetAssetBindingStatus(0u) != AssetDepot::AssetRequestStatus::Ready
+                || !foliage.GetFoliageTypes().front().m_modelGeneration)
+            {
+                throw std::runtime_error("Asynchronous legacy foliage generation/material did not become ready");
+            }
+            // Bounds-only culling updates all instances without queued raw captures.
             for (int i = 0; i < 73; ++i)
             {
                 FoliageInstance instance;
@@ -140,7 +154,7 @@ namespace RenderTest
             }
             foliage.UpdateFoliageCullingData(std::nullopt);
             for (const auto& instance : foliage.GetFoliageInstances())
-                if (instance.m_isCulled) throw std::runtime_error("Foliage range barrier missed an entry");
+                if (instance.m_isCulled) throw std::runtime_error("Foliage culling missed an entry");
             log = "WORKER_PRODUCT_OK bundleSubmitted=32 bundleCompleted=32 externalReads=64 inlineReads=0 model="
                 + generation->Name() + " foliageCompleted=73";
             return true;

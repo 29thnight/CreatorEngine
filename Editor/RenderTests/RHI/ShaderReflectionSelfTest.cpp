@@ -528,6 +528,10 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
     stage = "foliage ownership and serialization";
         FoliageType foliage("C4LifetimeProbe", true);
         foliage.m_material = material;
+        foliage.m_modelGuid = FileGuid("e1000000-0000-4000-8000-000000000001");
+        foliage.m_meshAssetId = FileGuid("e1000000-0000-8000-8000-000000000002");
+        foliage.m_materialAssetId = FileGuid("e1000000-0000-8000-8000-000000000003");
+        foliage.m_allowLegacySource = false;
         material.reset();
         if (foliageMaterialLifetime.expired())
         {
@@ -544,7 +548,12 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         if (restoredFoliage.m_modelName != foliage.m_modelName
             || restoredFoliage.m_castShadow != foliage.m_castShadow
             || restoredFoliage.m_isShadowRecive != foliage.m_isShadowRecive
-            || restoredFoliage.m_material || restoredFoliage.m_modelGeneration)
+            || restoredFoliage.ModelLink() != foliage.ModelLink()
+            || restoredFoliage.MeshLink() != foliage.MeshLink()
+            || restoredFoliage.MaterialLink() != foliage.MaterialLink()
+            || restoredFoliage.m_allowLegacySource != foliage.m_allowLegacySource
+            || restoredFoliage.m_material || restoredFoliage.m_modelGeneration
+            || restoredFoliage.m_modelDescriptor || restoredFoliage.m_meshDescriptor)
         {
             outLog += "[shader reflection] FoliageType asset/runtime owner 분리 실패\n";
             return false;
