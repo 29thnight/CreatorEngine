@@ -3259,6 +3259,13 @@ golden 이 닫을 자리다.
 
 ### W7 — Hierarchy/Browser clipping과 presentation cache (P1, 3일)
 
+- **2026-10-08 순서 복원 보정:** Hierarchy 루트 표시를 재사용 슬롯 순서 대신
+  `HierarchyStore`의 자식 순서로 구성한다. 행 위/아래 드롭으로 형제 앞/뒤 배치,
+  가운데 드롭으로 기존 자식 이동을 제공하며 순서 변경은 Undo/Redo 한 건으로 처리한다.
+  VS 2026 Debug/Release 빌드와 Editor의 21개 순서 검사·Play/Stop 2회가 통과했다.
+  기존 Play 진입 시 편집 Undo 이력 초기화 정책은 유지한다. 실제 포인터 드롭 사용감은
+  미검증이며 W7 전체 성능 수용을 뜻하지 않는다.
+  근거: [HierarchyOrder20261008.md](../analysis/HierarchyOrder20261008.md).
 - 1k/10k/50k hierarchy와 asset fixture를 만든다.
 - **flatten presentation cache를 먼저 만들고**, 그 위에 visible-row clipping을 얹는다(§8.3의
   순서 제약). 재귀 `TreeNodeEx` 위에 clipper를 바로 끼울 자리는 없다.

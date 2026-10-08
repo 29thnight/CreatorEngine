@@ -1,4 +1,5 @@
 #include "../EditorDiagnostics.h"
+#include "../../EngineGUIWindow/HierarchyFlatten.h"
 #include "SoundGraphEditor.h"
 // LC6 (PHASE 14.5) — SceneObject 도메인 명령.
 //
@@ -686,6 +687,68 @@ namespace ConsoleCmd
         if (ctx.parts[2] == "-") parent = SceneManagers->GetActiveScene()->HandleOf(0);
         else { auto result = EditorObjectOperations::ResolveTarget(ctx.parts[2], parent); if (!result.IsSuccess()) return result; }
         return EditorObjectOperations::Parent(target, parent);
+    }
+
+    static CommandCore::CommandResult Cmd_object_order(const ConsoleCommandContext& ctx)
+    {
+        if (ctx.parts.size() != 4 || (ctx.parts[3] != "before" && ctx.parts[3] != "after"))
+        {
+            return CommandCore::InvalidArguments("object.order <target> <sibling> <before|after>");
+        }
+        EntityHandle target, sibling;
+        auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        result = EditorObjectOperations::ResolveTarget(ctx.parts[2], sibling);
+        if (!result.IsSuccess())
+        {
+            return result;
+        }
+        return EditorObjectOperations::MoveRelative(target, sibling, ctx.parts[3] == "after");
+    }
+
+    static CommandCore::CommandResult Cmd_scene_order(const ConsoleCommandContext& ctx)
+    {
+        using D = CommandCore::CommandData;
+        Scene* scene = SceneManagers->GetActiveScene();
+        if (!scene || ctx.parts.size() != 2)
+        {
+            return CommandCore::InvalidArguments("scene.order <parent|->");
+        }
+        EntityHandle parent = scene->HandleOf(0);
+        if (ctx.parts[1] != "-")
+        {
+            auto result = EditorObjectOperations::ResolveTarget(ctx.parts[1], parent);
+            if (!result.IsSuccess())
+            {
+                return result;
+            }
+        }
+        auto names = D::Array();
+        for (auto index : scene->Resolve(parent)->GetChildrenIndices())
+        {
+            if (auto* child = scene->TryGetEntity(index))
+            {
+                names.Append(D::String(child->m_name.ToString()));
+            }
+        }
+        auto visible = D::Array();
+        editor::HierarchyFlatView flat;
+        ImGuiTextFilter filter;
+        const editor::hierarchy_flat_key key{scene->GetHierarchyStore().Revision(), scene->m_Entities.size()};
+        for (const auto& row : flat.Rows(scene, key, filter))
+        {
+            if (row.kind == editor::hierarchy_row_kind::entity && row.depth == 1)
+            {
+                visible.Append(D::String(scene->TryGetEntity(row.index)->m_name.ToString()));
+            }
+        }
+        auto data = D::Object();
+        data.Set("children", std::move(names));
+        data.Set("visibleRoots", std::move(visible));
+        return CommandCore::Ok("scene.order", std::move(data));
     }
 
     // H2 root-reference 회귀용. m_rootIndex는 일반 parent와 별개의 same-scene
@@ -1694,6 +1757,8 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "scene.navigate" }, &Cmd_scene_navigate);
         reg.Result({ "object.transform" }, &Cmd_object_transform);
         reg.Result({ "object.parent" }, &Cmd_object_parent);
+        reg.Result({ "object.order" }, &Cmd_object_order);
+        reg.Result({ "scene.order" }, &Cmd_scene_order);
         reg.Result({ "object.rootref" }, &Cmd_object_rootref);
         reg.Result({ "object.duplicate" }, &Cmd_object_duplicate);
         reg.Result({ "scene.hierarchycheck" }, &Cmd_scene_hierarchycheck);

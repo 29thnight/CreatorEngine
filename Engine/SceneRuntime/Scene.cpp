@@ -1017,6 +1017,34 @@ ReparentResult Scene::Reparent(EntityHandle childHandle, EntityHandle newParentH
 	return ReparentResult::Success;
 }
 
+bool Scene::ReorderChildren(EntityHandle parent, std::span<const EntityHandle> children)
+{
+    Entity* owner = Resolve(parent);
+    if (!owner || owner->GetChildrenIndices().size() != children.size())
+    {
+        return false;
+    }
+    const auto& current = owner->GetChildrenIndices();
+    std::unordered_set<Entity::Index> remaining(current.begin(), current.end());
+    std::vector<Entity::Index> order;
+    order.reserve(children.size());
+    for (const auto handle : children)
+    {
+        if (!Resolve(handle) || !remaining.erase(handle.index))
+        {
+            return false;
+        }
+        order.push_back(handle.index);
+    }
+    if (order != current)
+    {
+        m_hierarchyStore.SetChildren(parent.index, std::move(order));
+        PublishTopologyMutation();
+        MarkUILayoutDirty();
+    }
+    return true;
+}
+
 HierarchyIntegrityMetrics Scene::GetHierarchyIntegrityMetrics() const
 {
 	HierarchyIntegrityMetrics metrics{};

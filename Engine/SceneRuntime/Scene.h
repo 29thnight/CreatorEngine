@@ -332,6 +332,7 @@ public:
     // tombstone) 무효 핸들을 돌려준다.
     EntityHandle HandleOf(Entity::Index index) const;
 	ReparentResult Reparent(EntityHandle child, EntityHandle newParent);
+	bool ReorderChildren(EntityHandle parent, std::span<const EntityHandle> children);
 	uint64_t GetTopologyVersion() const
 	{
 		return m_topologyVersion.load(std::memory_order_acquire);

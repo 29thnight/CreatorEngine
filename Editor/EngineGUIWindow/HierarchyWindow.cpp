@@ -253,18 +253,37 @@ void HierarchyWindow::DrawSceneObjectRow(Entity* obj, const editor::hierarchy_fl
 
 	if (!EditorObjectOperations::IsEditLocked(obj) && ImGui::BeginDragDropTarget())
 	{
-		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT"))
+		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SCENE_OBJECT", ImGuiDragDropFlags_AcceptBeforeDelivery))
 		{
+			const ImVec2 itemMin = ImGui::GetItemRectMin();
+			const ImVec2 itemMax = ImGui::GetItemRectMax();
+			const float edge = (itemMax.y - itemMin.y) * 0.25f;
+			const float mouseY = ImGui::GetMousePos().y;
+			const bool before = row.index != 0 && mouseY < itemMin.y + edge;
+			const bool after = row.index != 0 && mouseY > itemMax.y - edge;
+			if (before || after)
+			{
+				const float y = before ? itemMin.y : itemMax.y;
+				ImGui::GetWindowDrawList()->AddLine({itemMin.x, y}, {itemMax.x, y},
+					ImGui::GetColorU32(ImGuiCol_DragDropTarget), 2.0f);
+			}
 			Entity::Index draggedIndex = *(Entity::Index*)payload->Data;
 			// 부모 변경 로직
-			if (draggedIndex != obj->m_index) // 자기 자신에 드롭하는 것 방지
+			if (payload->IsDelivery() && draggedIndex != obj->m_index)
 			{
 				const auto& draggedObj = scene->GetEntity(draggedIndex);
 				// E1 후속 배선: 위 드롭 타겟(씬 루트)과 동일한 사유 — 페이로드 인덱스가
 				// 이미 파괴된 슬롯을 가리키면 draggedObj/oldParent가 nullptr일 수 있다.
 				if (draggedObj)
 				{
-					EditorObjectOperations::Parent(scene->HandleOf(draggedObj->m_index), scene->HandleOf(obj->m_index));
+					if (before || after)
+					{
+						EditorObjectOperations::MoveRelative(scene->HandleOf(draggedObj->m_index), scene->HandleOf(obj->m_index), after);
+					}
+					else
+					{
+						EditorObjectOperations::Parent(scene->HandleOf(draggedObj->m_index), scene->HandleOf(obj->m_index));
+					}
 				}
 			}
 		}

@@ -54,6 +54,7 @@ namespace EditorObjectOperations
     CommandCore::CommandResult Delete(EntityHandle target);
     CommandCore::CommandResult Duplicate(EntityHandle target, const std::string& name = {});
     CommandCore::CommandResult Parent(EntityHandle target, EntityHandle parent);
+    CommandCore::CommandResult MoveRelative(EntityHandle target, EntityHandle sibling, bool after);
     CommandCore::CommandResult Transform(EntityHandle target, math::vector3 position, math::quaternion rotation, math::vector3 scale);
     // A GUI drag keeps handles and owned values, never component pointers. One
     // commit groups all affected objects into a single Undo entry.

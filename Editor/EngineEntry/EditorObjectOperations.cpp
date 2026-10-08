@@ -483,53 +483,203 @@ namespace EditorObjectOperations
         return Describe(scene->HandleOf(created->GetCreatedIndex()));
     }
 
-    CommandCore::CommandResult Parent(EntityHandle target, EntityHandle parent)
+    static CommandCore::CommandResult ParentAt(EntityHandle target, EntityHandle parent, Entity* anchor = nullptr, bool insertAfter = false)
     {
         using namespace CommandCore;
         Entity* object = Resolve(target);
         Entity* destination = Resolve(parent);
-        if (!object || !destination || target.sceneId != parent.sceneId) return PreconditionFailed("object.stale", "Both objects must belong to the same scene");
+        if (!object || !destination || target.sceneId != parent.sceneId)
+        {
+            return PreconditionFailed("object.stale", "Both objects must belong to the same scene");
+        }
         if (IsEditLocked(object, true) || IsEditLocked(destination))
+        {
             return PreconditionFailed("object.locked", "Unlock the entity hierarchy before reparenting");
-        if (!target.index) return InvalidArguments("Cannot reparent the scene root");
+        }
+        if (!target.index)
+        {
+            return InvalidArguments("Cannot reparent the scene root");
+        }
         for (Entity* ancestor = destination; ancestor; ancestor = ancestor->GetScene()->TryGetEntity(ancestor->GetParentIndex()))
         {
-            if (ancestor == object) return InvalidArguments("Parent would create a cycle", "object.parent.cycle");
-            if (!ancestor->m_index) break;
+            if (ancestor == object)
+            {
+                return InvalidArguments("Parent would create a cycle", "object.parent.cycle");
+            }
+            if (!ancestor->m_index)
+            {
+                break;
+            }
         }
-        const bool changed = object->GetParentIndex() != parent.index;
+        const auto oldParentIndex = Entity::IsValidIndex(object->GetParentIndex()) ? object->GetParentIndex() : 0;
+        const bool parentChanged = oldParentIndex != parent.index;
+        auto desiredOrder = destination->GetChildrenIndices();
+        if (anchor)
+        {
+            std::erase(desiredOrder, target.index);
+            auto position = std::ranges::find(desiredOrder, anchor->m_index);
+            if (position == desiredOrder.end())
+            {
+                return PreconditionFailed("object.order.stale", "Sibling no longer belongs to the destination");
+            }
+            if (insertAfter)
+            {
+                ++position;
+            }
+            desiredOrder.insert(position, target.index);
+        }
+        const bool reorder = anchor != nullptr;
+        const bool changed = parentChanged || (reorder && desiredOrder != destination->GetChildrenIndices());
         if (changed)
         {
-            Meta::EntityReference reference(object), before(object->GetScene()->TryGetEntity(object->GetParentIndex())), after(destination);
+            Meta::EntityReference reference(object), before(object->GetScene()->TryGetEntity(oldParentIndex)), after(destination);
+            const auto captureOrder = [](Entity* parentObject)
+            {
+                std::vector<Meta::EntityReference> order;
+                if (parentObject)
+                {
+                    for (auto index : parentObject->GetChildrenIndices())
+                    {
+                        if (auto* child = parentObject->GetScene()->TryGetEntity(index))
+                        {
+                            order.emplace_back(child);
+                        }
+                    }
+                }
+                return order;
+            };
+            const auto restoreOrder = [](Meta::EntityReference parentReference, const std::vector<Meta::EntityReference>& order)
+            {
+                auto* parentObject = parentReference.Resolve();
+                if (!parentObject)
+                {
+                    return;
+                }
+                auto remaining = parentObject->GetChildrenIndices();
+                std::vector<Entity::Index> restored;
+                for (const auto& reference : order)
+                {
+                    if (auto* child = reference.Resolve())
+                    {
+                        if (std::erase(remaining, child->m_index))
+                        {
+                            restored.push_back(child->m_index);
+                        }
+                    }
+                }
+                restored.insert(restored.end(), remaining.begin(), remaining.end());
+                std::vector<EntityHandle> handles;
+                for (auto index : restored)
+                {
+                    handles.push_back(parentObject->GetScene()->HandleOf(index));
+                }
+                if (!parentObject->GetScene()->ReorderChildren(parentObject->GetScene()->HandleOf(parentObject->m_index), handles))
+                {
+                    throw std::runtime_error("Cannot restore sibling order");
+                }
+                parentObject->GetScene()->MarkUILayoutDirty();
+            };
+            const auto oldOrder = captureOrder(before.Resolve());
+            const auto destinationOrder = captureOrder(destination);
+            auto newOldOrder = std::make_shared<std::vector<Meta::EntityReference>>();
+            auto newDestinationOrder = std::make_shared<std::vector<Meta::EntityReference>>();
+            auto orderCaptured = std::make_shared<bool>(false);
             auto beforeRect = std::make_shared<Authoring::WriteDocument>();
             auto afterRect = std::make_shared<Authoring::WriteDocument>();
             auto capturedAfter = std::make_shared<bool>(false);
             if (auto* rect = object->GetComponent<RectTransformComponent>())
+            {
                 *beforeRect = Meta::SerializeDocument(rect);
-            const auto apply = [reference, capturedAfter](Meta::EntityReference destination, const std::shared_ptr<Authoring::WriteDocument>& rectState, bool first)
+            }
+            const auto apply = [reference, capturedAfter, parentChanged](Meta::EntityReference destination, const std::shared_ptr<Authoring::WriteDocument>& rectState, bool first)
             {
                 auto* object = reference.Resolve(); auto* parent = destination.Resolve();
-                if (!object) return;
+                if (!object)
+                {
+                    return;
+                }
                 Scene* scene = object->GetScene();
                 const auto result = scene->Reparent(scene->HandleOf(object->m_index), scene->HandleOf(parent ? parent->m_index : 0));
-                if (result != ReparentResult::Success) throw std::runtime_error("Cannot reparent object");
-                if (auto* rect = object->GetComponent<RectTransformComponent>())
+                if (result != ReparentResult::Success && result != ReparentResult::NoChange)
+                {
+                    throw std::runtime_error("Cannot reparent object");
+                }
+                if (auto* rect = object->GetComponent<RectTransformComponent>(); rect && parentChanged)
                 {
                     if (first && !*capturedAfter)
                     {
                         rect->SetParentKeepWorldPosition(parent);
                         *rectState = Meta::SerializeDocument(rect); *capturedAfter = true;
                     }
-                    else Meta::Deserialize(rect, rectState->Root().Read());
+                    else
+                    {
+                        Meta::Deserialize(rect, rectState->Root().Read());
+                    }
                     scene->MarkUILayoutDirty();
                 }
             };
-            Meta::MakeCustomChangeCommand([=] { apply(before, beforeRect, false); }, [=] { apply(after, afterRect, true); });
+            Meta::MakeCustomChangeCommand([=]
+            {
+                apply(before, beforeRect, false);
+                restoreOrder(before, oldOrder);
+                restoreOrder(after, destinationOrder);
+            }, [=]
+            {
+                apply(after, afterRect, true);
+                if (!*orderCaptured)
+                {
+                    if (reorder)
+                    {
+                        if (auto* destinationObject = after.Resolve())
+                        {
+                            std::vector<EntityHandle> handles;
+                            for (auto index : desiredOrder)
+                            {
+                                handles.push_back(destinationObject->GetScene()->HandleOf(index));
+                            }
+                            if (!destinationObject->GetScene()->ReorderChildren(destinationObject->GetScene()->HandleOf(destinationObject->m_index), handles))
+                            {
+                                throw std::runtime_error("Cannot change sibling order");
+                            }
+                            destinationObject->GetScene()->MarkUILayoutDirty();
+                        }
+                    }
+                    *newOldOrder = captureOrder(before.Resolve());
+                    *newDestinationOrder = captureOrder(after.Resolve());
+                    *orderCaptured = true;
+                }
+                else
+                {
+                    restoreOrder(before, *newOldOrder);
+                    restoreOrder(after, *newDestinationOrder);
+                }
+            });
         }
         auto data = Snapshot(target, *object); data.Set("changed", CommandData::Bool(changed));
         return Ok("object.parent", std::move(data));
     }
 
+    CommandCore::CommandResult Parent(EntityHandle target, EntityHandle parent)
+    {
+        return ParentAt(target, parent);
+    }
+
+    CommandCore::CommandResult MoveRelative(EntityHandle target, EntityHandle sibling, bool after)
+    {
+        Entity* object = Resolve(target);
+        Entity* anchor = Resolve(sibling);
+        if (!object || !anchor || target.sceneId != sibling.sceneId || object == anchor || sibling.index == 0)
+        {
+            return CommandCore::InvalidArguments("Move requires two distinct entities in the same scene");
+        }
+        if (IsEditLocked(anchor))
+        {
+            return CommandCore::PreconditionFailed("object.locked", "Unlock the destination sibling before moving");
+        }
+        Scene* scene = anchor->GetScene();
+        const auto parentIndex = anchor->GetParentIndex();
+        return ParentAt(target, scene->HandleOf(Entity::IsValidIndex(parentIndex) ? parentIndex : 0), anchor, after);
+    }
     CommandCore::CommandResult Transform(EntityHandle target, math::vector3 position, math::quaternion rotation, math::vector3 scale)
     {
         using namespace CommandCore;
