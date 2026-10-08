@@ -3687,7 +3687,10 @@ job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
 	for (const auto& entry : bundle.assets)
 	{
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
-		file::path name = entry.assetName;
+        // Font references remain UTF-8 until resolve_font_path performs its
+        // explicit u8string conversion; even an unused ANSI path can throw here.
+        const file::path name = type == ManagedAssetType::SpriteFont
+            ? file::path{} : file::path(entry.assetName);
         const std::string fontReference = entry.assetName; // Preserve authored UTF-8 font paths.
 
 		jobs.add([&data, type, name, fontReference, completed]
