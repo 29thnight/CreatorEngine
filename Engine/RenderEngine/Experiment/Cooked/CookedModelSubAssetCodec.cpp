@@ -805,6 +805,10 @@ namespace experiment::cooked
             {
                 expected.insert({ { mesh.meshAssetId, {} }, CookedAssetKind::Mesh });
             }
+            for (const auto& material : descriptor.materials)
+            {
+                expected.insert({ { material.materialAssetId, {} }, CookedAssetKind::Material });
+            }
             Require(dependencies.size() == expected.size(), "Model descriptor loadable edge count mismatch");
             for (const auto& edge : dependencies)
             {

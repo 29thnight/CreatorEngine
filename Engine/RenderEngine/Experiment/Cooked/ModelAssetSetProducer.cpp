@@ -1,6 +1,9 @@
 #include "ModelAssetSetProducer.h"
 #include "CookSupport.h"
+#include "MaterialAssetSetCodec.h"
+#include "TextureCookProducer.h"
 #include "../../Assets/ModelSourcePreparation.h"
+#include "../../Assets/ModelMaterialGraph.h"
 #include "../Import/SceneToModelDraft.h"
 #include "../Import/MeshletBuilder.h"
 #include "../Import/MeshLodBuilder.h"
@@ -208,6 +211,8 @@ namespace experiment::cooked
             RequireSource(assets::ReconcileAuthoredModelBindings(*imported.scene, sidecar, assignments, failure), failure);
             std::map<AssetId, std::size_t> clipIndices;
             std::map<AssetId, std::size_t> meshIndices;
+            std::map<AssetId, std::size_t> materialIndices;
+            std::map<AssetId, std::size_t> textureIndices;
             std::vector<AssetId> meshIds(imported.scene->meshes.size());
             std::vector<AssetId> materialIds(imported.scene->materials.size());
             AssetId skeletonId{};
@@ -235,6 +240,15 @@ namespace experiment::cooked
                     RequireSource(binding.index < materialIds.size() && !materialIds[binding.index].IsValid(),
                         "Invalid authored material binding");
                     materialIds[binding.index] = AssetId{ record->assetId };
+                    materialIndices.emplace(materialIds[binding.index], binding.index);
+                }
+                else if (binding.kind == assets::SubAssetKind::Texture)
+                {
+                    RequireSource(binding.index < imported.scene->textures.size() &&
+                        imported.scene->textures[binding.index].IsEmbedded(),
+                        "Authored model texture binding must select encoded embedded image bytes");
+                    RequireSource(textureIndices.emplace(AssetId{ record->assetId }, binding.index).second,
+                        "Duplicate authored embedded texture identity");
                 }
                 else if (binding.kind == assets::SubAssetKind::Skeleton)
                 {
@@ -258,6 +272,14 @@ namespace experiment::cooked
                 case CookedAssetKind::Mesh:
                     RequireSource(meshIndices.contains(selection.key.assetId),
                         "Selected mesh UUIDv8 is absent from this authored model");
+                    break;
+                case CookedAssetKind::Material:
+                    RequireSource(materialIndices.contains(selection.key.assetId),
+                        "Selected Material UUIDv8 is absent from this authored model");
+                    break;
+                case CookedAssetKind::Texture:
+                    RequireSource(textureIndices.contains(selection.key.assetId),
+                        "Selected embedded Texture UUIDv8 is absent from this authored model");
                     break;
                 case CookedAssetKind::Skeleton:
                     RequireSource(skeletonId.IsValid() && selection.key.assetId == skeletonId,
@@ -306,7 +328,38 @@ namespace experiment::cooked
             {
                 ModelAssetSetProduct product;
                 product.asset = selection;
-                if (selection.kind == CookedAssetKind::Skeleton)
+                if (selection.kind == CookedAssetKind::Texture)
+                {
+                    auto& texture = imported.scene->textures.at(textureIndices.at(selection.key.assetId));
+                    const auto extension = SniffTextureExtension(texture.embeddedBytes);
+                    RequireSource(!extension.empty() && IsSupportedTextureExtension(extension),
+                        "Selected embedded texture has an unsupported encoded image format");
+                    product.representation = 1u;
+                    product.schemaVersion = kTextureArtifactVersion;
+                    product.extension = extension;
+                    product.artifactBytes = std::move(texture.embeddedBytes);
+                }
+                else if (selection.kind == CookedAssetKind::Material)
+                {
+                    const auto index = materialIndices.at(selection.key.assetId);
+                    const auto& material = imported.scene->materials.at(index);
+                    material_graph::InstanceDocument document;
+                    document.materialId = selection.key.assetId;
+                    document.name = material.name.empty() ? "material_" + std::to_string(index) : material.name;
+                    document.doubleSided = material.doubleSided;
+                    document.blendMode = material.alphaMode == im::AlphaMode::Blend ? "transparent" :
+                        material.alphaMode == im::AlphaMode::Mask ? "masked" : "opaque";
+                    // The existing authored graph is a separate source recipe.
+                    // Never regenerate it from imported PBR defaults or repair a
+                    // missing graph by silently overwriting the user's edits.
+                    document.description.graphId = AssetId{ assets::ModelMaterialGraphId(selection.key.assetId.value) };
+                    product.representation = kMaterialDocumentRepresentation;
+                    product.schemaVersion = kMaterialArtifactVersion;
+                    product.extension = ".asset";
+                    RequireSource(EncodeMaterialAssetSetDocument(document, product.artifactBytes,
+                        product.dependencies, failure), failure);
+                }
+                else if (selection.kind == CookedAssetKind::Skeleton)
                 {
                     product.representation = kSkeletonRepresentation;
                     product.schemaVersion = kSkeletonArtifactVersion;
@@ -422,6 +475,8 @@ namespace experiment::cooked
                         const auto blendMode = material.alphaMode == im::AlphaMode::Blend ? MaterialBlendMode::Transparent :
                             material.alphaMode == im::AlphaMode::Mask ? MaterialBlendMode::Masked : MaterialBlendMode::Opaque;
                         descriptor.materials.push_back({ materialIds.at(index), material.name, blendMode });
+                        product.dependencies.push_back(SourceEdge(materialIds.at(index), CookedAssetKind::Material,
+                            AssetDependencyKind::Loadable));
                     }
                     RequireSource(ValidateModelDescriptorDependencies(descriptor, product.dependencies, failure), failure);
                     product.representation = kModelDescriptorRepresentation;

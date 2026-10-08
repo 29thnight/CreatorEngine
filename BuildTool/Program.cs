@@ -22,7 +22,7 @@ internal static class Program
                         "    [--asset-list FILE: exact paths relative to Assets, one per line; Project mode only]\n" +
                         "    [--shipping] [--build-native] [--skip-verify] [--smoke-offscreen] [--smoke-frames 120] [--smoke-promotions 2] [--smoke-timeout-sec 180]\n" +
                         "  build-asset-set --engine-distribution PATH --project PATH --asset-set FILE --output NEW_PATH\n" +
-                        "    [--artifact-cache PATH] (source-authored Texture AssetSet; independent of Player)\n" +
+                        "    [--artifact-cache PATH] (source-authored typed AssetSet; independent of Player)\n" +
                         "  verify-engine | select-engine --engine-distribution PATH [--project PATH]\n" +
                         "  open-project --engine-distribution PATH --development-project PATH [--select-engine]\n" +
                         "  Common: --log-path FILE --json (JSON Lines), Ctrl+C cancels the process tree.\n" +

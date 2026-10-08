@@ -10,6 +10,8 @@
 #include "Experiment/Cooked/ModelAssetSetProducer.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "Experiment/Cooked/CookedShaderMeta.h"
+#include "Experiment/Cooked/MaterialAssetSetProducer.h"
+#include "Assets/AssetIdentityProfile.h"
 #include "Texture.h"
 
 #include <algorithm>
@@ -41,8 +43,10 @@ namespace AssetCooking
         constexpr std::size_t kMaxEdges = 262144u;
         // Bump for producer/decoder behavior or normalization changes.
         constexpr std::string_view kTextureImporterVersion = "texture-source-image-v1";
-        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v2";
+        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v3";
         constexpr std::string_view kShaderMetaImporterVersion = "shadermeta-source-document-v1";
+        constexpr std::string_view kMaterialImporterVersion = "lattice-material-source-document-v1";
+        constexpr std::string_view kMaterialProgramImporterVersion = "lattice-source-verified-program-v1";
         constexpr std::string_view kBuildVersion = "asset-set-build-v3";
         constexpr std::uint32_t kTextureSourceImage = 1u;
 
@@ -50,6 +54,7 @@ namespace AssetCooking
         {
             ck::TypedAssetReference asset{};
             std::string source{};
+            std::string verifiedProgram{};
             std::vector<ck::AssetDependency> dependencies{};
         };
 
@@ -136,9 +141,18 @@ namespace AssetCooking
         {
             const auto name = Text(node, "kind");
             ck::CookedAssetKind kind{};
-            if (name == "Texture")
+            if (name == "Texture" || name == "Material" || name == "MaterialProgram")
             {
-                return { { Id(node, "assetId"), {} }, ck::CookedAssetKind::Texture };
+                experiment::AssetId id;
+                const auto text = Text(node, "assetId");
+                if (!experiment::TryParseCanonicalAssetId(text, id) &&
+                    !assets::TryParseCanonicalUuidV8(text, id.value))
+                {
+                    Fail(name + ": assetId must be a canonical UUIDv4 or already-authored UUIDv8");
+                }
+                kind = name == "Texture" ? ck::CookedAssetKind::Texture :
+                    name == "Material" ? ck::CookedAssetKind::Material : ck::CookedAssetKind::MaterialProgram;
+                return { { id, {} }, kind };
             }
             if (name == "ShaderMeta")
             {
@@ -163,7 +177,7 @@ namespace AssetCooking
             else
             {
                 Fail("Unsupported AssetSet source kind: " + name +
-                    "; supported: Texture, ShaderMeta, Model, Mesh, Skeleton, AnimationClip");
+                    "; supported: Texture, ShaderMeta, Material, MaterialProgram, Model, Mesh, Skeleton, AnimationClip");
             }
             const auto text = Text(node, "assetId");
             Uuid::Uuid16 parsed{};
@@ -327,7 +341,7 @@ namespace AssetCooking
             std::size_t edgeCount{};
             for (const auto node : sources)
             {
-                RequireMap(node, { "assetId", "kind", "source", "dependencies" }, "asset source");
+                RequireMap(node, { "assetId", "kind", "source", "verifiedProgram", "dependencies" }, "asset source");
                 AssetSource source;
                 source.asset = Reference(node);
                 source.source = Text(node, "source");
@@ -335,20 +349,32 @@ namespace AssetCooking
                 {
                     Fail("Asset source must be normalized relative to Assets: " + source.source);
                 }
+                if (source.asset.kind == ck::CookedAssetKind::MaterialProgram)
+                {
+                    source.verifiedProgram = Text(node, "verifiedProgram");
+                    if (!RelativePath(source.verifiedProgram))
+                    {
+                        Fail("verifiedProgram must be normalized relative to Assets: " + source.source);
+                    }
+                }
+                else if (node["verifiedProgram"])
+                {
+                    Fail("verifiedProgram is only valid for MaterialProgram sources: " + source.source);
+                }
                 const auto dependencies = node["dependencies"];
                 if (!dependencies.IsSequence())
                 {
                     Fail("Every source must explicitly declare dependencies, including [] for leaves: " +
                         source.source);
                 }
-                std::set<ck::AssetDependency> distinctDependencies;
+                std::set<ck::AssetIdentity> distinctDependencies;
                 for (const auto edge : dependencies)
                 {
                     if (++edgeCount > kMaxEdges)
                     {
                         Fail("AssetSet source exceeds 262144 dependency edges");
                     }
-                    RequireMap(edge, { "assetId", "kind", "dependency" }, "dependency");
+                    RequireMap(edge, { "assetId", "kind", "dependency", "scope" }, "dependency");
                     ck::AssetDependency dependency;
                     dependency.target = Reference(edge);
                     const auto kind = Text(edge, "dependency");
@@ -358,8 +384,14 @@ namespace AssetCooking
                     }
                     dependency.kind = kind == "Hard"
                         ? ck::AssetDependencyKind::Hard : ck::AssetDependencyKind::Loadable;
-                    dependency.scope = ck::AssetDependencyScope::Internal;
-                    if (!distinctDependencies.insert(dependency).second)
+                    const auto scope = edge["scope"] ? Text(edge, "scope") : "Internal";
+                    if (scope != "Internal" && scope != "External")
+                    {
+                        Fail("Dependency scope must be Internal or External: " + source.source);
+                    }
+                    dependency.scope = scope == "Internal"
+                        ? ck::AssetDependencyScope::Internal : ck::AssetDependencyScope::External;
+                    if (!distinctDependencies.insert(dependency.target.key).second)
                     {
                         Fail("Duplicate dependency from " + source.source + " to " + Label(dependency.target.key));
                     }
@@ -391,8 +423,13 @@ namespace AssetCooking
                 {
                     for (const auto& edge : found->second.dependencies)
                     {
-                        // Build includes both; runtime eager loading follows only Hard.
-                        pending.push_back(edge.target);
+                        // Both relations enter this build only for Internal
+                        // scope. External keeps its explicit typed declaration
+                        // for atomic mount-union/runtime validation.
+                        if (edge.scope == ck::AssetDependencyScope::Internal)
+                        {
+                            pending.push_back(edge.target);
+                        }
                     }
                 }
             }
@@ -440,7 +477,8 @@ namespace AssetCooking
                     if (frame.next < edges.size())
                     {
                         const auto edge = edges[frame.next++];
-                        if (edge.kind != ck::AssetDependencyKind::Hard)
+                        if (edge.kind != ck::AssetDependencyKind::Hard ||
+                            edge.scope != ck::AssetDependencyScope::Internal)
                         {
                             continue;
                         }
@@ -468,7 +506,8 @@ namespace AssetCooking
                         } while (component.back() != key);
                         const bool selfCycle = std::ranges::any_of(edges, [&](const auto& edge)
                         {
-                            return edge.kind == ck::AssetDependencyKind::Hard && edge.target.key == key;
+                            return edge.kind == ck::AssetDependencyKind::Hard &&
+                                edge.scope == ck::AssetDependencyScope::Internal && edge.target.key == key;
                         });
                         if (component.size() > 1u || selfCycle)
                         {
@@ -481,6 +520,7 @@ namespace AssetCooking
                                 for (const auto& edge : source.dependencies)
                                 {
                                     if (edge.kind == ck::AssetDependencyKind::Hard &&
+                                        edge.scope == ck::AssetDependencyScope::Internal &&
                                         std::ranges::binary_search(component, edge.target.key))
                                     {
                                         diagnostic += " -> " + definition.sources.at(edge.target.key).source;
@@ -515,7 +555,7 @@ namespace AssetCooking
         }
 
         void ValidatePayload(std::span<const std::byte> bytes, const ck::TypedAssetReference& asset,
-            const std::string& extension)
+            std::span<const ck::AssetDependency> dependencies, const std::string& extension)
         {
             std::string failure;
             bool valid{};
@@ -529,6 +569,20 @@ namespace AssetCooking
                 ShaderMeta value;
                 valid = extension == ".shadermeta" &&
                     ck::ReadShaderMetaArtifact(bytes, asset.key.assetId, value, failure);
+                break;
+            }
+            case ck::CookedAssetKind::Material:
+            {
+                material_graph::InstanceDocument value;
+                valid = extension == ".asset" &&
+                    ck::ReadMaterialAssetSetDocument(bytes, asset, dependencies, value, failure);
+                break;
+            }
+            case ck::CookedAssetKind::MaterialProgram:
+            {
+                material_graph::CookedProgram value;
+                valid = extension == ".lxmaterial" &&
+                    ck::ReadMaterialProgramAssetSetArtifact(bytes, asset, dependencies, {}, value, failure);
                 break;
             }
             case ck::CookedAssetKind::Model:
@@ -571,14 +625,15 @@ namespace AssetCooking
         }
 
         void VerifyBytes(const std::filesystem::path& path, std::uint64_t size,
-            const std::string& digest, const ck::TypedAssetReference& asset, const std::string& extension)
+            const std::string& digest, const ck::TypedAssetReference& asset,
+            std::span<const ck::AssetDependency> dependencies, const std::string& extension)
         {
             const auto bytes = Read(path);
             if (bytes.size() != size || Hash(bytes) != digest)
             {
                 Fail("Immutable AssetSet blob hash/size mismatch: " + path.string());
             }
-            ValidatePayload(bytes, asset, extension);
+            ValidatePayload(bytes, asset, dependencies, extension);
         }
 
         void WriteNew(const std::filesystem::path& path, std::span<const std::byte> bytes)
@@ -682,6 +737,28 @@ namespace AssetCooking
             std::uint32_t schema{};
         };
 
+        bool MatchesRecipeDependencies(std::span<const ck::AssetDependency> authored,
+            std::span<const ck::AssetDependency> produced)
+        {
+            // The producer determines semantic references and eager/lazy intent.
+            // The definition chooses which set supplies each exact typed target.
+            // Both lists are canonical, sorted and unique by logical identity.
+            return authored.size() == produced.size() &&
+                std::equal(authored.begin(), authored.end(), produced.begin(),
+                    [](const auto& declared, const auto& required)
+                    {
+                        return declared.target == required.target && declared.kind == required.kind;
+                    });
+        }
+
+        bool IsExternalDependency(const AssetSource& source, const ck::TypedAssetReference& target)
+        {
+            return std::ranges::any_of(source.dependencies, [&](const auto& edge)
+            {
+                return edge.target == target && edge.scope == ck::AssetDependencyScope::External;
+            });
+        }
+
         PreparedArtifact PrepareShaderMeta(const AssetSource& authored,
             const std::filesystem::path& assetRoot)
         {
@@ -781,6 +858,67 @@ namespace AssetCooking
             return value;
         }
 
+        PreparedArtifact PrepareMaterial(const AssetSource& authored,
+            const std::filesystem::path& assetRoot)
+        {
+            const bool program = authored.asset.kind == ck::CookedAssetKind::MaterialProgram;
+            const auto source = Canonical(assetRoot / std::filesystem::u8path(authored.source));
+            if (!ck::IsContainedPath(assetRoot, source) ||
+                source.extension() != (program ? ".shadergraph" : ".asset"))
+            {
+                Fail("Material source has an unsupported extension or escapes Assets: " + authored.source);
+            }
+            auto metaPath = source;
+            metaPath += ".meta";
+            const auto sourceInput = Read(source, ck::kMaterialGraphSourceMaxBytes);
+            const auto metaInput = Read(metaPath, ck::kMaterialAssetSetMetaMaxBytes);
+            std::filesystem::path verifiedPath;
+            std::vector<std::byte> verifiedInput;
+            ck::MaterialAssetSetCookResult cooked;
+            if (program)
+            {
+                verifiedPath = Canonical(assetRoot / std::filesystem::u8path(authored.verifiedProgram));
+                if (!ck::IsContainedPath(assetRoot, verifiedPath))
+                {
+                    Fail("Verified program escapes Assets: " + authored.verifiedProgram);
+                }
+                verifiedInput = Read(verifiedPath, ck::kMaterialProgramAssetSetMaxBytes);
+                cooked = ck::BuildMaterialProgramAssetSetProduct({ authored.asset.key.assetId,
+                    sourceInput, metaInput, verifiedInput, {} });
+            }
+            else
+            {
+                cooked = ck::BuildMaterialAssetSetProduct({ authored.asset.key.assetId, sourceInput, metaInput });
+            }
+            if (!cooked.Succeeded())
+            {
+                Fail("Material source cook failed: " + authored.source + ": " + cooked.failure);
+            }
+            auto& product = *cooked.product;
+            if (product.asset != authored.asset || !MatchesRecipeDependencies(authored.dependencies, product.dependencies))
+            {
+                Fail("Declared typed material dependencies differ from current authoring source: " + authored.source);
+            }
+            if (Read(source, ck::kMaterialGraphSourceMaxBytes) != sourceInput ||
+                Read(metaPath, ck::kMaterialAssetSetMetaMaxBytes) != metaInput ||
+                (program && Read(verifiedPath, ck::kMaterialProgramAssetSetMaxBytes) != verifiedInput))
+            {
+                Fail("Material source/meta/verified program changed during source cook: " + authored.source);
+            }
+            PreparedArtifact value;
+            value.bytes = std::move(product.artifactBytes);
+            value.extension = product.extension;
+            // Hash path tokens separately so source-authored newlines cannot
+            // make two role/path inventories ambiguous.
+            value.inputDigest = Hash("sourcePath=" + Hash(authored.source) + "\nverifiedPath=" +
+                Hash(authored.verifiedProgram) + "\ninputs=" +
+                Hash(std::as_bytes(std::span(cooked.sourceInputsSha256))) + "\n");
+            value.importer = program ? kMaterialProgramImporterVersion : kMaterialImporterVersion;
+            value.representation = product.representation;
+            value.schema = product.schemaVersion;
+            return value;
+        }
+
         std::map<ck::AssetIdentity, PreparedArtifact> PrepareSources(const AssetSet& definition,
             const std::set<ck::AssetIdentity>& included, const std::filesystem::path& assetRoot)
         {
@@ -794,7 +932,15 @@ namespace AssetCooking
                     result.emplace(identity, PrepareShaderMeta(authored, assetRoot));
                     continue;
                 }
-                if (authored.asset.kind != ck::CookedAssetKind::Texture)
+                if (authored.asset.kind == ck::CookedAssetKind::MaterialProgram ||
+                    (authored.asset.kind == ck::CookedAssetKind::Material &&
+                        experiment::IsAssetIdV4(authored.asset.key.assetId)))
+                {
+                    result.emplace(identity, PrepareMaterial(authored, assetRoot));
+                    continue;
+                }
+                if (authored.asset.kind != ck::CookedAssetKind::Texture ||
+                    assets::IsUuidV8(authored.asset.key.assetId.value))
                 {
                     modelSelections[authored.source].push_back(authored.asset);
                     continue;
@@ -852,12 +998,13 @@ namespace AssetCooking
                 for (auto& product : cooked.products)
                 {
                     const auto& authored = definition.sources.at(product.asset.key);
-                    if (authored.asset != product.asset || authored.dependencies != product.dependencies)
+                    if (authored.asset != product.asset || !MatchesRecipeDependencies(authored.dependencies, product.dependencies))
                     {
                         Fail("Authored typed dependencies differ from source: " + relativeSource + " [" +
                             Label(product.asset.key) + "]; skeleton requires [], clip requires exactly Hard skeleton, "
                             "static Mesh requires [], skinned Mesh requires exactly Hard skeleton; "
-                            "Model requires exactly Loadable skeleton, all authored clips and meshes");
+                            "Material requires its authored Hard MaterialProgram; embedded Texture requires []; "
+                            "Model requires exactly Loadable skeleton, all authored clips, meshes and materials");
                     }
                     PreparedArtifact value;
                     value.bytes = std::move(product.artifactBytes);
@@ -871,6 +1018,9 @@ namespace AssetCooking
             }
             // producer 내부 값만 비교하면 복사된 UUID 뒤의 다른 skeleton을 놓친다.
             // 실제 선택 artifact끼리 연결을 검증한다.
+            // External children deliberately have no local bytes. Their typed
+            // references remain in the manifest; captured-union resolution and
+            // runtime binding validate those children without authoring fallback.
             for (const auto& identity : included)
             {
                 const auto& authored = definition.sources.at(identity);
@@ -884,6 +1034,10 @@ namespace AssetCooking
                         Fail("Prepared clip validation failed: " + failure);
                     }
                     const ck::AssetIdentity skeletonKey{ clip.skeletonAssetId, {} };
+                    if (IsExternalDependency(authored, { skeletonKey, ck::CookedAssetKind::Skeleton }))
+                    {
+                        continue;
+                    }
                     const auto found = result.find(skeletonKey);
                     if (found == result.end() || definition.sources.at(skeletonKey).asset.kind != ck::CookedAssetKind::Skeleton ||
                         !ck::ReadSkeletonArtifact(found->second.bytes, skeleton, failure) ||
@@ -914,6 +1068,10 @@ namespace AssetCooking
                         Fail("Skinned geometry requires exactly one typed Hard skeleton edge: " + authored.source);
                     }
                     const auto key = authored.dependencies[0].target.key;
+                    if (authored.dependencies[0].scope == ck::AssetDependencyScope::External)
+                    {
+                        continue;
+                    }
                     const auto found = result.find(key);
                     ck::SkeletonArtifact skeleton;
                     if (found == result.end() || definition.sources.at(key).asset.kind != ck::CookedAssetKind::Skeleton ||
@@ -935,6 +1093,10 @@ namespace AssetCooking
                     for (const auto& summary : descriptor.meshes)
                     {
                         const ck::AssetIdentity key{ summary.meshAssetId, {} };
+                        if (IsExternalDependency(authored, { key, ck::CookedAssetKind::Mesh }))
+                        {
+                            continue;
+                        }
                         const auto found = result.find(key);
                         ck::ModelGeometryArtifact geometry;
                         if (found == result.end() || definition.sources.at(key).asset.kind != ck::CookedAssetKind::Mesh ||
@@ -949,6 +1111,31 @@ namespace AssetCooking
                         {
                             Fail("Selected model and mesh disagree on logical skeleton identity: " + authored.source);
                         }
+                    }
+                }
+                else if (authored.asset.kind == ck::CookedAssetKind::Material)
+                {
+                    material_graph::InstanceDocument document;
+                    if (!ck::ReadMaterialAssetSetDocument(result.at(identity).bytes, authored.asset,
+                        authored.dependencies, document, failure))
+                    {
+                        Fail("Selected Material document failed source-free validation: " + failure);
+                    }
+                    const ck::AssetIdentity programIdentity{ document.description.graphId, {} };
+                    if (IsExternalDependency(authored, { programIdentity, ck::CookedAssetKind::MaterialProgram }))
+                    {
+                        continue;
+                    }
+                    const auto programSource = definition.sources.find(programIdentity);
+                    const auto programArtifact = result.find(programIdentity);
+                    material_graph::CookedProgram program;
+                    if (programSource == definition.sources.end() || programArtifact == result.end() ||
+                        programSource->second.asset.kind != ck::CookedAssetKind::MaterialProgram ||
+                        !ck::ReadMaterialProgramAssetSetArtifact(programArtifact->second.bytes,
+                            programSource->second.asset, programSource->second.dependencies, {}, program, failure) ||
+                        !ck::ValidateMaterialAssetSetBinding(document, program.product, failure))
+                    {
+                        Fail("Selected Material/MaterialProgram binding failed: " + authored.source + ": " + failure);
                     }
                 }
             }
@@ -1034,7 +1221,8 @@ namespace AssetCooking
                 // sidecar generation edit does not invalidate unchanged clip work.
                 const auto importKey = Hash("source-import-v1\nimporter=" + product.importer +
                     "\ntool=" + request.toolFingerprint + "\ninputs=" + product.inputDigest + "\n");
-                const auto artifactInput = authored.asset.kind == ck::CookedAssetKind::Texture
+                const auto artifactInput = authored.asset.kind == ck::CookedAssetKind::Texture &&
+                    experiment::IsAssetIdV4(authored.asset.key.assetId)
                     ? product.inputDigest : digest;
                 const auto buildKey = Hash(std::string(kBuildVersion) + "\nimporter=" + product.importer +
                     "\ntool=" + request.toolFingerprint + "\n" + compatibility +
@@ -1056,16 +1244,16 @@ namespace AssetCooking
                 const bool cached = std::filesystem::exists(cachedBlob);
                 if (cached)
                 {
-                    VerifyBytes(cachedBlob, product.bytes.size(), digest, authored.asset, product.extension);
+                    VerifyBytes(cachedBlob, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension);
                 }
                 else
                 {
-                    ValidatePayload(product.bytes, authored.asset, product.extension);
+                    ValidatePayload(product.bytes, authored.asset, authored.dependencies, product.extension);
                     // Cache-local temporary storage keeps rename on the same
                     // volume, even when the requested output uses another drive.
                     const auto cacheTemporary = cacheWork / "payload.tmp";
                     WriteNew(cacheTemporary, product.bytes);
-                    VerifyBytes(cacheTemporary, product.bytes.size(), digest, authored.asset, product.extension);
+                    VerifyBytes(cacheTemporary, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension);
                     std::filesystem::create_directories(cachedBlob.parent_path());
                     NoReparse(cachedBlob);
                     std::filesystem::rename(cacheTemporary, cachedBlob);
@@ -1099,7 +1287,7 @@ namespace AssetCooking
                     std::filesystem::create_directories(outputBlob.parent_path());
                     // Output owns independent immutable files, so cache GC cannot break a release.
                     std::filesystem::copy_file(cachedBlob, outputBlob);
-                    VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset, product.extension);
+                    VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension);
                     if (cached)
                     {
                         ++result.reusedBlobs;

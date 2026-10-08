@@ -1,6 +1,8 @@
 #include "MaterialAssetRuntime.h"
 #include "../DataSystem.h"
 #include "../Experiment/Cooked/CookedShaderMeta.h"
+#include "../Experiment/Cooked/MaterialAssetSetCodec.h"
+#include "LegacyResourceCharges.h"
 
 #include <algorithm>
 #include <cassert>
@@ -581,9 +583,327 @@ void DataSystem::CompleteShaderMetaAssetWorkLocked(
     TrimShaderMetaCache(m_materialAssets, work->retiredAssets);
 }
 
+namespace
+{
+    thread_local std::uint64_t MaterialPipelineSubmittingRequestId{};
+
+    class MaterialPipelineSubmissionScope final
+    {
+    public:
+        explicit MaterialPipelineSubmissionScope(std::uint64_t requestId)
+            : m_previous(std::exchange(MaterialPipelineSubmittingRequestId, requestId))
+        {
+        }
+        ~MaterialPipelineSubmissionScope()
+        {
+            MaterialPipelineSubmittingRequestId = m_previous;
+        }
+        MaterialPipelineSubmissionScope(const MaterialPipelineSubmissionScope&) = delete;
+        MaterialPipelineSubmissionScope& operator=(const MaterialPipelineSubmissionScope&) = delete;
+
+    private:
+        std::uint64_t m_previous{};
+    };
+
+    template<class T>
+    void NotifyMaterialPipelineConsumer(const own::shared_owner<AssetDepot::AssetRequestState<T>>& consumer,
+        Status status, Error error, const std::string& message, const own::shared_owner<const T>& asset = {})
+    {
+        std::lock_guard lock(consumer->mutex);
+        if (consumer->status != Status::Pending)
+        {
+            return;
+        }
+        consumer->status = status;
+        consumer->error = error;
+        consumer->asset = asset;
+        try
+        {
+            consumer->message = message;
+        }
+        catch (...)
+        {
+            consumer->message.clear();
+        }
+    }
+
+    AssetDepot::MaterialPipelineAssetKey MaterialPipelineKey(const material_cooked::ResolvedAssetEntry& resolved)
+    {
+        return { resolved.entry.asset, resolved.blob, resolved.resolverRevision };
+    }
+
+    template<class T>
+    bool SupportedMaterialPipelineRepresentation(const material_cooked::ResolvedAssetEntry& resolved)
+    {
+        const auto kind = AssetDepot::AssetLink<T>::kKind;
+        if (resolved.entry.asset.kind != kind || resolved.blob.kind != kind || !resolved.byteSource
+            || resolved.entry.asset.key.subassetId.IsValid())
+        {
+            return false;
+        }
+        if constexpr (std::is_same_v<T, material_graph::Generation>)
+        {
+            return resolved.blob.representation == material_cooked::kMaterialProgramRepresentation
+                && resolved.blob.schemaVersion == material_cooked::kMaterialProgramArtifactVersion;
+        }
+        else
+        {
+            static_assert(std::is_same_v<T, Material>);
+            return resolved.blob.representation == material_cooked::kMaterialDocumentRepresentation
+                && resolved.blob.schemaVersion == material_cooked::kMaterialArtifactVersion;
+        }
+    }
+
+    template<class T>
+    bool MatchesMaterialPipelineAsset(const T& asset, const AssetDepot::MaterialPipelineAssetKey& key)
+    {
+        const auto& origin = [&]() -> const auto&
+        {
+            if constexpr (std::is_same_v<T, material_graph::Generation>)
+            {
+                return asset.assetOrigin;
+            }
+            else
+            {
+                return asset.GetAssetOrigin();
+            }
+        }();
+        return origin && origin->resolved.entry.asset == key.asset
+            && origin->resolved.blob == key.blob && origin->resolved.resolverRevision == key.resolverRevision;
+    }
+
+    void ChargeMaterialOrigin(asset_cache_detail::Charge& charge, const material_cooked::ResolvedAssetEntry& resolved)
+    {
+        charge.Vector(resolved.entry.dependencies);
+        charge.String(resolved.blob.targetPlatform);
+        charge.String(resolved.blob.targetAbi);
+        charge.String(resolved.blob.artifactPath);
+    }
+
+    template<class T>
+    std::size_t MaterialPipelineChargeBytes(const T& asset)
+    {
+        asset_cache_detail::Charge charge;
+        if constexpr (std::is_same_v<T, material_graph::Generation>)
+        {
+            charge.Add(asset.RetainedPayloadBytes());
+        }
+        else
+        {
+            charge.Add(asset_cache_detail::LegacyMaterialRetainedBytes(asset));
+            if (asset.GetAssetOrigin())
+            {
+                charge.Add(sizeof(AssetDepot::MaterialDocumentAssetOrigin));
+                ChargeMaterialOrigin(charge, asset.GetAssetOrigin()->resolved);
+            }
+            // The legacy helper includes the canonical Generation charge and
+            // active instance Texture owners, so do not count defaults again.
+        }
+        return charge.Bytes();
+    }
+
+    template<class T>
+    std::uint64_t NextMaterialPipelineUse(AssetDepot::MaterialPipelineAssetCache<T>& cache)
+    {
+        if (cache.clock == (std::numeric_limits<std::uint64_t>::max)())
+        {
+            for (auto& [key, entry] : cache.entries)
+            {
+                entry.lastUse = 0u;
+            }
+            cache.clock = 0u;
+        }
+        return ++cache.clock;
+    }
+
+    template<class T>
+    void PruneMaterialPipelineCache(AssetDepot::MaterialPipelineAssetCache<T>& cache)
+    {
+        std::erase_if(cache.entries, [](const auto& item)
+        {
+            return !item.second.retained && !item.second.inFlight && item.second.live.expired();
+        });
+    }
+
+    template<class T>
+    void TrimMaterialPipelineCache(AssetDepot::MaterialPipelineAssetCache<T>& cache,
+        std::vector<own::shared_owner<const T>>& retired)
+    {
+        while (cache.retainedChargeBytes > cache.budgetBytes)
+        {
+            auto oldest = cache.entries.end();
+            for (auto item = cache.entries.begin(); item != cache.entries.end(); ++item)
+            {
+                if (item->second.retained && (oldest == cache.entries.end()
+                    || item->second.lastUse < oldest->second.lastUse))
+                {
+                    oldest = item;
+                }
+            }
+            if (oldest == cache.entries.end())
+            {
+                break;
+            }
+            assert(retired.size() < retired.capacity());
+            cache.retainedChargeBytes -= oldest->second.retainedCharge;
+            oldest->second.retainedCharge = 0u;
+            retired.push_back(std::move(oldest->second.retained));
+            ++cache.logicalEvictions;
+        }
+        PruneMaterialPipelineCache(cache);
+    }
+
+    template<class T>
+    void StageMaterialPipelineConsumers(const AssetDepot::MaterialPipelineAssetCache<T>& cache,
+        std::vector<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers)
+    {
+        assert(consumers.empty());
+        std::size_t count{};
+        for (const auto& [key, entry] : cache.entries)
+        {
+            if (entry.inFlight && entry.inFlight->status == Status::Pending)
+            {
+                if (entry.inFlight->consumers.size() > consumers.max_size() - count)
+                {
+                    throw std::length_error("Material retirement consumer capacity exceeded.");
+                }
+                count += entry.inFlight->consumers.size();
+            }
+        }
+        consumers.reserve(count);
+        for (const auto& [key, entry] : cache.entries)
+        {
+            if (entry.inFlight && entry.inFlight->status == Status::Pending)
+            {
+                for (const auto& weak : entry.inFlight->consumers)
+                {
+                    if (auto consumer = weak.lock())
+                    {
+                        consumers.push_back(std::move(consumer));
+                    }
+                }
+            }
+        }
+    }
+
+    template<class T>
+    void InvalidateMaterialPipelineCache(AssetDepot::MaterialPipelineAssetCache<T>& cache,
+        AssetDepot::MaterialPipelineAssetEntries<T>& retired,
+        const std::vector<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers,
+        Status status, Error error) noexcept
+    {
+        assert(retired.empty());
+        static_assert(noexcept(retired.swap(cache.entries)));
+        retired.swap(cache.entries);
+        cache.retainedChargeBytes = 0u;
+        for (auto& [key, entry] : retired)
+        {
+            if (entry.retained)
+            {
+                ++cache.logicalEvictions;
+            }
+            if (entry.inFlight && entry.inFlight->status == Status::Pending)
+            {
+                entry.inFlight->status = status;
+                entry.inFlight->error = error;
+                entry.inFlight->message.clear();
+            }
+        }
+        for (const auto& consumer : consumers)
+        {
+            NotifyMaterialPipelineConsumer(consumer, status, error, {});
+        }
+    }
+
+    template<class T>
+    Error ReadMaterialPipelineBytes(material_cooked::ResolvedAssetEntry& resolved,
+        std::vector<std::byte>& bytes, std::string& failure)
+    {
+        constexpr auto maximum = std::is_same_v<T, material_graph::Generation>
+            ? material_cooked::kMaterialProgramAssetSetMaxBytes : material_cooked::kMaterialDocumentMaxBytes;
+        if (resolved.blob.byteSize == 0u || resolved.blob.byteSize > maximum)
+        {
+            failure = "Material artifact size exceeds its bounded representation.";
+            return Error::IntegrityFailed;
+        }
+        std::uint64_t size{};
+        if (!material_cooked::CaptureArtifactSource(resolved.byteSource, resolved.blob.artifactPath, failure)
+            || !resolved.byteSource->Size(resolved.blob.artifactPath, size, failure))
+        {
+            return Error::ReadFailed;
+        }
+        if (size != resolved.blob.byteSize)
+        {
+            failure = "Material artifact size differs from its exact manifest record.";
+            return Error::IntegrityFailed;
+        }
+        bytes.resize(static_cast<std::size_t>(size));
+        if (!resolved.byteSource->ReadAt(resolved.blob.artifactPath, 0u, bytes, failure))
+        {
+            return Error::ReadFailed;
+        }
+        material_cooked::Sha256Digest digest{};
+        if (!material_cooked::ComputeSha256(bytes, digest, failure) || digest != resolved.blob.contentSha256)
+        {
+            failure = "Material artifact SHA-256 differs from its exact captured record.";
+            return Error::IntegrityFailed;
+        }
+        return Error::None;
+    }
+
+    own::shared_owner<const Texture> SelectMaterialTexture(
+        const experiment::AssetId& id, LX::LXColorSpace colorSpace,
+        std::span<const AssetDepot::MaterialAssetTexturePin> sources,
+        std::vector<AssetDepot::MaterialAssetTexturePin>& selected, std::string& failure)
+    {
+        if (colorSpace != LX::LXColorSpace::Data && colorSpace != LX::LXColorSpace::Linear
+            && colorSpace != LX::LXColorSpace::SRGB)
+        {
+            failure = "Material resource has an unknown texture color space.";
+            return {};
+        }
+        const auto previous = std::ranges::find_if(selected, [&](const auto& pin)
+        {
+            return pin.assetId == id && pin.colorSpace == colorSpace;
+        });
+        if (previous != selected.end())
+        {
+            return previous->owner;
+        }
+        const auto source = std::ranges::find(sources, id, &AssetDepot::MaterialAssetTexturePin::assetId);
+        if (source == sources.end() || !source->owner)
+        {
+            failure = "Material texture was not resolved in the captured hard dependency closure.";
+            return {};
+        }
+        // Fixed-DAG Source acquisition precedes the parent's token. This clones
+        // only a sampling description; it performs no I/O, decode or mip work.
+        auto owner = Texture::WithColorSpace(source->owner, colorSpace == LX::LXColorSpace::SRGB);
+        if (!owner)
+        {
+            failure = "Material texture cannot represent the requested color space.";
+            return {};
+        }
+        // Preserve graph sampling policy: Data and Linear filter as linear,
+        // SRGB filters in its transfer function. Reproducible AssetDepot images
+        // only transform their exact descriptor recipe here; rehydration does
+        // the mip work later in the image worker, never inline source loading.
+        owner = Texture::WithMipChain(owner, failure);
+        if (!owner)
+        {
+            return {};
+        }
+        selected.push_back({ id, colorSpace, owner });
+        return owner;
+    }
+}
+
 void DataSystem::StageMaterialAssetRetirementLocked(AssetDepot::MaterialAssetRetiredEntries& retired)
 {
     assert(retired.shaderMetadata.empty() && retired.shaderMetaConsumers.empty());
+    assert(retired.programs.empty() && retired.materials.empty());
+    StageMaterialPipelineConsumers(m_materialAssets.programs, retired.programConsumers);
+    StageMaterialPipelineConsumers(m_materialAssets.materials, retired.materialConsumers);
     std::size_t count{};
     for (const auto& [key, entry] : m_materialAssets.shaderMetadata)
     {
@@ -620,6 +940,10 @@ void DataSystem::InvalidateMaterialAssetsLocked(AssetDepot::MaterialAssetRetired
     m_materialAssets.shaderMetaRetainedChargeBytes = 0u;
     const auto status = m_assetPreparationStopping ? Status::Cancelled : Status::Stale;
     const auto error = m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged;
+    InvalidateMaterialPipelineCache(m_materialAssets.programs, retired.programs,
+        retired.programConsumers, status, error);
+    InvalidateMaterialPipelineCache(m_materialAssets.materials, retired.materials,
+        retired.materialConsumers, status, error);
     for (auto& [key, entry] : retired.shaderMetadata)
     {
         if (entry.retained)
@@ -666,3 +990,621 @@ AssetDepot::ShaderMetaAssetCacheSnapshot DataSystem::SnapshotShaderMetaAssetCach
     }
     return snapshot;
 }
+
+template<class T>
+AssetDepot::MaterialPipelineAssetCache<T>& DataSystem::MaterialPipelineAssetCacheLocked()
+{
+    if constexpr (std::is_same_v<T, material_graph::Generation>)
+    {
+        return m_materialAssets.programs;
+    }
+    else
+    {
+        static_assert(std::is_same_v<T, Material>);
+        return m_materialAssets.materials;
+    }
+}
+
+template<class T>
+own::shared_owner<const T> DataSystem::TryAcquireCurrentMaterialPipelineAsset(AssetDepot::AssetLink<T> link)
+{
+    if (!link.IsValid() || link.identity.subassetId.IsValid())
+    {
+        return {};
+    }
+    material_cooked::ResolvedAssetEntry resolved;
+    own::shared_owner<const T> resident;
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u)
+    {
+        return {};
+    }
+    {
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        if (!m_cookedCatalog || m_cookedCatalog->Find(link.ToReference(), resolved)
+            != material_cooked::AssetLookupStatus::Found)
+        {
+            return {};
+        }
+    }
+    auto& cache = MaterialPipelineAssetCacheLocked<T>();
+    const auto key = MaterialPipelineKey(resolved);
+    const auto found = cache.entries.find(key);
+    if (found == cache.entries.end())
+    {
+        return {};
+    }
+    resident = found->second.retained ? found->second.retained : found->second.live.lock();
+    if (!resident || !MatchesMaterialPipelineAsset(*resident, key))
+    {
+        return {};
+    }
+    found->second.lastUse = NextMaterialPipelineUse(cache);
+    return resident;
+}
+
+template<class T>
+AssetDepot::AssetRequest<T> DataSystem::RequestCurrentMaterialPipelineAssetAsync(AssetDepot::AssetLink<T> link)
+{
+    own::shared_owner<const material_cooked::CookedAssetCatalog> catalog;
+    std::uint64_t epoch{};
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        catalog = m_cookedCatalog;
+        epoch = m_assetPreparationEpoch;
+    }
+    return RequestMaterialPipelineAssetFromSnapshot(link, std::move(catalog), epoch);
+}
+
+template<class T>
+AssetDepot::AssetRequest<T> DataSystem::RequestMaterialPipelineAssetFromSnapshot(AssetDepot::AssetLink<T> link,
+    own::shared_owner<const material_cooked::CookedAssetCatalog> catalog, std::uint64_t epoch)
+{
+    auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>();
+    AssetDepot::AssetRequest<T> request(consumer);
+    const auto fail = [&](Status status, Error error, const std::string& message = {})
+    {
+        NotifyMaterialPipelineConsumer(consumer, status, error, message);
+        return request;
+    };
+    if (!link.IsValid())
+    {
+        return fail(Status::Failed, Error::InvalidLink, "Invalid material pipeline link.");
+    }
+    if (link.identity.subassetId.IsValid())
+    {
+        return fail(Status::Failed, Error::UnsupportedRepresentation,
+            "Material pipeline artifacts require a global identity without a subasset ID.");
+    }
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch)
+        {
+            return fail(m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+                m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged);
+        }
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        if (catalog && (!m_cookedCatalog || m_cookedCatalog->ResolverRevision() != catalog->ResolverRevision()))
+        {
+            return fail(Status::Stale, Error::RevisionChanged);
+        }
+    }
+    if (!catalog)
+    {
+        return fail(Status::Failed, Error::NotMounted, "No material pipeline catalog is mounted.");
+    }
+    std::vector<material_cooked::ResolvedAssetEntry> closure;
+    material_cooked::AssetCatalogLookupIssue issue;
+    const auto lookup = catalog->CollectHardClosure(link.ToReference(), closure, issue);
+    if (lookup != material_cooked::AssetLookupStatus::Found)
+    {
+        const auto error = lookup == material_cooked::AssetLookupStatus::HardDependencyCycle
+            ? Error::HardDependencyCycle : lookup == material_cooked::AssetLookupStatus::TypeMismatch
+            ? Error::TypeMismatch : Error::NotMounted;
+        return fail(Status::Failed, error, issue.message);
+    }
+    if (closure.empty() || !SupportedMaterialPipelineRepresentation<T>(closure.back()))
+    {
+        return fail(Status::Failed, Error::UnsupportedRepresentation,
+            "Unsupported MaterialProgram or Lattice Material document representation.");
+    }
+    auto resolved = std::move(closure.back());
+    const auto key = MaterialPipelineKey(resolved);
+    // All resource-owning locals outlive either admission lock, including an
+    // inline scheduler terminal observer and a lost duplicate-admission race.
+    own::shared_owner<AssetDepot::MaterialPipelineAssetWork<T>> work;
+    own::shared_owner<const T> resident;
+    std::vector<AssetDepot::MaterialAssetTextureRequest> textures;
+    AssetDepot::AssetRequest<material_graph::Generation> program;
+    std::vector<job_handle> dependencies;
+    const auto joinOrAcquire = [&]()
+    {
+        auto& cache = MaterialPipelineAssetCacheLocked<T>();
+        const auto found = cache.entries.find(key);
+        if (found == cache.entries.end())
+        {
+            return false;
+        }
+        found->second.lastUse = NextMaterialPipelineUse(cache);
+        if (found->second.inFlight)
+        {
+            work = found->second.inFlight;
+            work->consumers.emplace_back(consumer);
+            consumer->completion = work->completion;
+            return true;
+        }
+        resident = found->second.retained ? found->second.retained : found->second.live.lock();
+        if (resident)
+        {
+            if (!MatchesMaterialPipelineAsset(*resident, key))
+            {
+                NotifyMaterialPipelineConsumer(consumer, Status::Failed, Error::IntegrityFailed,
+                    "Resident material does not match its exact generation key.");
+            }
+            else
+            {
+                NotifyMaterialPipelineConsumer(consumer, Status::Ready, Error::None, {}, resident);
+            }
+            return true;
+        }
+        return false;
+    };
+    try
+    {
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            std::lock_guard catalogLock(m_cookedCatalogMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch
+                || !m_cookedCatalog || m_cookedCatalog->ResolverRevision() != resolved.resolverRevision)
+            {
+                return fail(m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+                    m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged);
+            }
+            if (joinOrAcquire())
+            {
+                return request;
+            }
+        }
+        // Build a fixed dependency DAG from typed metadata. Texture color-space
+        // projections occur after decode and require no additional jobs or I/O.
+        // Therefore the token returned below covers the entire hard closure.
+        constexpr std::size_t maximumDependencies = std::is_same_v<T, material_graph::Generation> ? 128u : 65u;
+        if (resolved.entry.dependencies.size() > maximumDependencies)
+        {
+            return fail(Status::Failed, Error::DependencyFailed, "Material dependency count exceeds its budget.");
+        }
+        [[maybe_unused]] material_cooked::TypedAssetReference programReference;
+        [[maybe_unused]] std::size_t programCount{};
+        for (const auto& dependency : resolved.entry.dependencies)
+        {
+            if (dependency.kind != material_cooked::AssetDependencyKind::Hard
+                || dependency.target.key.subassetId.IsValid())
+            {
+                return fail(Status::Failed, Error::DependencyFailed,
+                    "Material pipeline entries require explicitly typed root Hard dependencies.");
+            }
+            if (dependency.target.kind == material_cooked::CookedAssetKind::Texture)
+            {
+                continue;
+            }
+            if constexpr (std::is_same_v<T, Material>)
+            {
+                if (dependency.target.kind == material_cooked::CookedAssetKind::MaterialProgram)
+                {
+                    programReference = dependency.target;
+                    ++programCount;
+                    continue;
+                }
+            }
+            return fail(Status::Failed, Error::DependencyFailed, "Unsupported material hard dependency type.");
+        }
+        if constexpr (std::is_same_v<T, Material>)
+        {
+            if (programCount != 1u)
+            {
+                return fail(Status::Failed, Error::DependencyFailed, "Lattice Material requires one MaterialProgram.");
+            }
+            program = RequestMaterialPipelineAssetFromSnapshot(
+                AssetDepot::AssetLink<material_graph::Generation>{ programReference.key }, catalog, epoch);
+            const auto completion = program.Completion();
+            if (completion.valid())
+            {
+                dependencies.push_back(completion);
+            }
+        }
+        textures.reserve(resolved.entry.dependencies.size());
+        for (const auto& dependency : resolved.entry.dependencies)
+        {
+            if (dependency.target.kind == material_cooked::CookedAssetKind::Texture)
+            {
+                auto texture = RequestTextureAsyncFromSnapshot(
+                    AssetDepot::AssetLink<Texture>{ dependency.target.key }, {}, catalog, epoch);
+                const auto completion = texture.Completion();
+                if (completion.valid())
+                {
+                    dependencies.push_back(completion);
+                }
+                textures.push_back({ dependency.target.key.assetId, std::move(texture) });
+            }
+        }
+        std::lock_guard lock(m_assetPreparationMutex);
+        {
+            std::lock_guard catalogLock(m_cookedCatalogMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch
+                || !m_cookedCatalog || m_cookedCatalog->ResolverRevision() != resolved.resolverRevision)
+            {
+                return fail(m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+                    m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged);
+            }
+        }
+        if (joinOrAcquire())
+        {
+            return request;
+        }
+        if (m_materialAssets.nextRequestId == (std::numeric_limits<std::uint64_t>::max)())
+        {
+            return fail(Status::Failed, Error::SubmissionFailed, "Material request identity space exhausted.");
+        }
+        work = own::make_shared<AssetDepot::MaterialPipelineAssetWork<T>>();
+        work->key = key;
+        work->resolved = std::move(resolved);
+        work->catalog = catalog;
+        work->textures = std::move(textures);
+        work->program = std::move(program);
+        work->epoch = epoch;
+        work->requestId = m_materialAssets.nextRequestId++;
+        if constexpr (std::is_same_v<T, material_graph::Generation>)
+        {
+            work->programGeneration = m_materialGraphGenerations.ReserveGeneration();
+            if (work->programGeneration == 0u)
+            {
+                return fail(Status::Failed, Error::SubmissionFailed, "Material generation identity space exhausted.");
+            }
+        }
+        work->consumers.emplace_back(consumer);
+        auto& cache = MaterialPipelineAssetCacheLocked<T>();
+        PruneMaterialPipelineCache(cache);
+        auto& entry = cache.entries[key];
+        entry.lastUse = NextMaterialPipelineUse(cache);
+        entry.inFlight = work;
+        MaterialPipelineSubmissionScope submitting(work->requestId);
+        try
+        {
+            job_group jobs;
+            jobs.add([this, work]() { RunMaterialPipelineAssetWork(work); });
+            jobs.on_complete([this, work](std::exception_ptr failure)
+            {
+                const auto finish = [&]()
+                {
+                    CompleteMaterialPipelineAssetWorkLocked(work, Status::Failed,
+                        failure ? Error::SubmissionFailed : Error::DecodeFailed);
+                };
+                if (MaterialPipelineSubmittingRequestId == work->requestId)
+                {
+                    finish();
+                }
+                else
+                {
+                    std::lock_guard completionLock(m_assetPreparationMutex);
+                    finish();
+                }
+            });
+            work->completion = SubmitAssetWorkLocked(std::move(jobs), dependencies);
+        }
+        catch (...)
+        {
+            CompleteMaterialPipelineAssetWorkLocked(work, Status::Failed, Error::SubmissionFailed);
+        }
+        consumer->completion = work->completion;
+    }
+    catch (...)
+    {
+        return fail(Status::Failed, Error::SubmissionFailed);
+    }
+    return request;
+}
+
+template<class T>
+void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::MaterialPipelineAssetWork<T>> work)
+{
+    try
+    {
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            if (work->status != Status::Pending)
+            {
+                return;
+            }
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || work->epoch != m_assetPreparationEpoch)
+            {
+                CompleteMaterialPipelineAssetWorkLocked(work,
+                    m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+                    m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged);
+                return;
+            }
+        }
+        std::string failure;
+        Error error = Error::None;
+        std::vector<AssetDepot::MaterialAssetTexturePin> sources;
+        sources.reserve(work->textures.size());
+        for (const auto& texture : work->textures)
+        {
+            const auto result = texture.request.Snapshot();
+            const auto origin = result.asset ? result.asset->GetAssetOrigin()
+                : own::shared_owner<const AssetDepot::TextureAssetOrigin>{};
+            if (result.status != Status::Ready || !origin
+                || origin->resolved.resolverRevision != work->key.resolverRevision
+                || origin->resolved.entry.asset.key.assetId != texture.assetId)
+            {
+                error = Error::DependencyFailed;
+                failure = "Material Texture hard dependency did not produce its captured generation.";
+                break;
+            }
+            sources.push_back({ texture.assetId, LX::LXColorSpace::Data, result.asset });
+        }
+        own::shared_owner<const material_graph::Generation> program;
+        if constexpr (std::is_same_v<T, Material>)
+        {
+            const auto result = work->program.Snapshot();
+            program = result.asset;
+            if (result.status != Status::Ready || !program || !program->assetOrigin
+                || program->assetOrigin->resolved.resolverRevision != work->key.resolverRevision)
+            {
+                error = Error::DependencyFailed;
+                failure = "MaterialProgram hard dependency did not produce its captured generation.";
+            }
+        }
+        auto resolved = work->resolved;
+        std::vector<std::byte> bytes;
+        own::shared_owner<const T> candidate;
+        if (error == Error::None)
+        {
+            error = ReadMaterialPipelineBytes<T>(resolved, bytes, failure);
+        }
+        if (error == Error::None)
+        {
+            if constexpr (std::is_same_v<T, material_graph::Generation>)
+            {
+                auto decoded = own::make_shared<material_graph::Generation>();
+                if (!material_cooked::ReadMaterialProgramAssetSetArtifact(bytes, resolved.entry.asset,
+                    resolved.entry.dependencies, {}, decoded->cooked, failure))
+                {
+                    error = Error::DecodeFailed;
+                }
+                else
+                {
+                    auto origin = own::make_shared<AssetDepot::MaterialProgramAssetOrigin>();
+                    origin->resolved = std::move(resolved);
+                    for (const auto& resource : decoded->cooked.product.program.resources)
+                    {
+                        if (resource.kind != LX::LXMaterialResourceKind::Texture)
+                        {
+                            continue;
+                        }
+                        experiment::AssetId id;
+                        if ((!experiment::TryParseCanonicalAssetId(resource.reference, id)
+                            && !assets::TryParseCanonicalUuidV8(resource.reference, id.value))
+                            || !SelectMaterialTexture(id, resource.colorSpace, sources,
+                                origin->defaultTextures, failure))
+                        {
+                            error = Error::DependencyFailed;
+                            break;
+                        }
+                    }
+                    if (error == Error::None)
+                    {
+                        asset_cache_detail::Charge textureCharge;
+                        for (const auto& texture : origin->defaultTextures)
+                        {
+                            textureCharge.Add(asset_cache_detail::LegacyTextureRetainedBytes(*texture.owner));
+                        }
+                        origin->defaultTextureChargeBytes = textureCharge.Bytes();
+                        decoded->assetId = work->key.asset.key.assetId;
+                        decoded->generation = work->programGeneration;
+                        decoded->assetOrigin = std::move(origin);
+                        candidate = std::move(decoded);
+                    }
+                }
+            }
+            else
+            {
+                material_graph::InstanceDocument document;
+                if (!material_cooked::ReadMaterialAssetSetDocument(bytes, resolved.entry.asset,
+                    resolved.entry.dependencies, document, failure)
+                    || !material_cooked::ValidateMaterialAssetSetBinding(document, program->cooked.product, failure))
+                {
+                    error = Error::DecodeFailed;
+                }
+                else
+                {
+                    std::vector<AssetDepot::MaterialAssetTexturePin> selected;
+                    const auto loadTexture = [&](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
+                        std::string& textureFailure) -> own::shared_owner<const Texture>
+                    {
+                        if (std::ranges::any_of(sources, [&](const auto& pin) { return pin.assetId == id; }))
+                        {
+                            return SelectMaterialTexture(id, colorSpace, sources, selected, textureFailure);
+                        }
+                        const auto& defaults = program->assetOrigin->defaultTextures;
+                        const auto found = std::ranges::find_if(defaults, [&](const auto& pin)
+                        {
+                            return pin.assetId == id && pin.colorSpace == colorSpace;
+                        });
+                        if (found == defaults.end())
+                        {
+                            textureFailure = "Material default texture is absent from its exact Program generation.";
+                            return {};
+                        }
+                        return found->owner;
+                    };
+                    own::shared_owner<const material_graph::Instance> instance;
+                    if (!material_graph::BuildInstance(program, document.description, loadTexture, instance, failure))
+                    {
+                        error = Error::DependencyFailed;
+                    }
+                    else
+                    {
+                        auto origin = own::make_shared<AssetDepot::MaterialDocumentAssetOrigin>();
+                        origin->resolved = std::move(resolved);
+                        auto material = own::make_shared<Material>();
+                        material->m_name = std::move(document.name);
+                        material->m_fileGuid = FileGuid{ document.materialId.value };
+                        // The graph identity belongs to its owning instance;
+                        // the legacy authored ShaderMeta slot stays unused.
+                        material->m_shaderMetaGuid = {};
+                        material->m_doubleSided = document.doubleSided;
+                        if (document.blendMode == "transparent")
+                        {
+                            material->m_renderingMode = MaterialRenderingMode::Transparent;
+                        }
+                        else if (document.blendMode == "masked")
+                        {
+                            material->m_renderingMode = MaterialRenderingMode::Masked;
+                        }
+                        material->m_materialGraphInstance = std::move(instance);
+                        material->m_assetOrigin = std::move(origin);
+                        candidate = std::move(material);
+                    }
+                }
+            }
+        }
+        std::lock_guard lock(m_assetPreparationMutex);
+        CompleteMaterialPipelineAssetWorkLocked(work, error == Error::None ? Status::Ready : Status::Failed,
+            error, std::move(failure), candidate);
+    }
+    catch (...)
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        CompleteMaterialPipelineAssetWorkLocked(work, Status::Failed, Error::DecodeFailed);
+    }
+}
+
+template<class T>
+void DataSystem::CompleteMaterialPipelineAssetWorkLocked(
+    const own::shared_owner<AssetDepot::MaterialPipelineAssetWork<T>>& work,
+    Status status, Error error, std::string message, const own::shared_owner<const T>& candidate)
+{
+    if (work->status != Status::Pending)
+    {
+        return;
+    }
+    auto& cache = MaterialPipelineAssetCacheLocked<T>();
+    const auto found = cache.entries.find(work->key);
+    bool current{};
+    {
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        current = m_cookedCatalog && m_cookedCatalog->ResolverRevision() == work->key.resolverRevision;
+    }
+    if (m_assetPreparationStopping)
+    {
+        status = Status::Cancelled;
+        error = Error::ShuttingDown;
+        message.clear();
+    }
+    else if (!current || m_assetInvalidationDepth != 0u || m_assetPreparationEpoch != work->epoch
+        || found == cache.entries.end() || !found->second.inFlight
+        || found->second.inFlight->requestId != work->requestId)
+    {
+        status = Status::Stale;
+        error = Error::RevisionChanged;
+        message.clear();
+    }
+    if (status == Status::Ready && (!candidate || !MatchesMaterialPipelineAsset(*candidate, work->key)))
+    {
+        status = Status::Failed;
+        error = Error::DecodeFailed;
+    }
+    const auto asset = status == Status::Ready ? candidate : own::shared_owner<const T>{};
+    const auto charge = asset ? MaterialPipelineChargeBytes(*asset) : 0u;
+    bool retainCandidate = asset && charge <= cache.budgetBytes
+        && charge <= (std::numeric_limits<std::size_t>::max)() - cache.retainedChargeBytes;
+    if (retainCandidate && cache.retainedChargeBytes > cache.budgetBytes - charge)
+    {
+        try
+        {
+            work->retiredAssets.reserve(cache.entries.size());
+        }
+        catch (...)
+        {
+            retainCandidate = false;
+        }
+    }
+    work->status = status;
+    work->error = error;
+    work->message = std::move(message);
+    work->asset = asset;
+    if (found != cache.entries.end() && found->second.inFlight
+        && found->second.inFlight->requestId == work->requestId)
+    {
+        auto& entry = found->second;
+        entry.inFlight.reset();
+        if (asset)
+        {
+            entry.live = asset;
+            entry.lastUse = NextMaterialPipelineUse(cache);
+            if (retainCandidate)
+            {
+                assert(!entry.retained && entry.retainedCharge == 0u);
+                entry.retained = asset;
+                entry.retainedCharge = charge;
+                cache.retainedChargeBytes += charge;
+            }
+        }
+    }
+    for (const auto& weak : work->consumers)
+    {
+        if (const auto consumer = weak.lock())
+        {
+            NotifyMaterialPipelineConsumer(consumer, status, error, work->message, asset);
+        }
+    }
+    work->consumers.clear();
+    TrimMaterialPipelineCache(cache, work->retiredAssets);
+}
+
+void DataSystem::SetMaterialAssetCacheBudgets(std::size_t programs, std::size_t materials)
+{
+    std::vector<own::shared_owner<const material_graph::Generation>> retiredPrograms;
+    std::vector<own::shared_owner<const Material>> retiredMaterials;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        retiredPrograms.reserve(m_materialAssets.programs.entries.size());
+        retiredMaterials.reserve(m_materialAssets.materials.entries.size());
+        m_materialAssets.programs.budgetBytes = programs;
+        m_materialAssets.materials.budgetBytes = materials;
+        TrimMaterialPipelineCache(m_materialAssets.programs, retiredPrograms);
+        TrimMaterialPipelineCache(m_materialAssets.materials, retiredMaterials);
+    }
+}
+
+AssetDepot::MaterialAssetCacheSnapshot DataSystem::SnapshotMaterialAssetCache() const
+{
+    std::lock_guard lock(m_assetPreparationMutex);
+    AssetDepot::MaterialAssetCacheSnapshot snapshot;
+    const auto append = [](const auto& cache, auto& statistics)
+    {
+        statistics.entries = cache.entries.size();
+        statistics.retainedChargeBytes = cache.retainedChargeBytes;
+        statistics.budgetBytes = cache.budgetBytes;
+        statistics.logicalEvictions = cache.logicalEvictions;
+        for (const auto& [key, entry] : cache.entries)
+        {
+            statistics.retainedEntries += entry.retained ? 1u : 0u;
+            statistics.liveEntries += entry.live.expired() ? 0u : 1u;
+            statistics.inFlight += entry.inFlight ? 1u : 0u;
+        }
+    };
+    append(m_materialAssets.programs, snapshot.programs);
+    append(m_materialAssets.materials, snapshot.materials);
+    return snapshot;
+}
+
+template own::shared_owner<const material_graph::Generation> DataSystem::TryAcquireCurrentMaterialPipelineAsset(
+    AssetDepot::AssetLink<material_graph::Generation>);
+template own::shared_owner<const Material> DataSystem::TryAcquireCurrentMaterialPipelineAsset(
+    AssetDepot::AssetLink<Material>);
+template AssetDepot::AssetRequest<material_graph::Generation> DataSystem::RequestCurrentMaterialPipelineAssetAsync(
+    AssetDepot::AssetLink<material_graph::Generation>);
+template AssetDepot::AssetRequest<Material> DataSystem::RequestCurrentMaterialPipelineAssetAsync(
+    AssetDepot::AssetLink<Material>);

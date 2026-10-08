@@ -292,6 +292,8 @@ namespace
             descriptor.skeletonAssetId = skinned ? V8(21u) : experiment::AssetId{};
             descriptor.meshes.push_back(summary);
             descriptor.nodes.push_back({ "Root", {}, math::matrix4x4::identity(), { summary.meshAssetId } });
+            descriptor.materials.push_back({ V8(98u), "Surface", experiment::MaterialBlendMode::Opaque });
+            descriptor.meshes[0].materialAssetId = V8(98u);
             std::vector<ck::AssetDependency> edges{
                 { { { summary.meshAssetId, {} }, ck::CookedAssetKind::Mesh }, ck::AssetDependencyKind::Loadable,
                     ck::AssetDependencyScope::External } };
@@ -300,6 +302,10 @@ namespace
                 edges.push_back({ { { descriptor.skeletonAssetId, {} }, ck::CookedAssetKind::Skeleton },
                     ck::AssetDependencyKind::Loadable, ck::AssetDependencyScope::Internal });
             }
+            Require(!ck::ValidateModelDescriptorDependencies(descriptor, edges, failure),
+                "model material summary without a typed Loadable edge accepted");
+            edges.push_back({ { { V8(98u), {} }, ck::CookedAssetKind::Material },
+                ck::AssetDependencyKind::Loadable, ck::AssetDependencyScope::Internal });
             Require(ck::ValidateModelDescriptorDependencies(descriptor, edges, failure), "valid lazy descriptor edges rejected");
             Require(ck::WriteModelDescriptorArtifact(descriptor, renamed, failure), "geometry descriptor encode");
             ck::ModelDescriptorArtifact restored;
@@ -307,6 +313,8 @@ namespace
                 restored.nodes[0].meshAssetIds[0] == summary.meshAssetId, "geometry descriptor roundtrip");
             renamed[4] = std::byte{ 1u };
             Require(!ck::ReadModelDescriptorArtifact(renamed, restored, failure), "descriptor v1 accepted without recook");
+            renamed[4] = std::byte{ 2u };
+            Require(!ck::ReadModelDescriptorArtifact(renamed, restored, failure), "descriptor v2 accepted without material-edge recook");
             edges[0].kind = ck::AssetDependencyKind::Hard;
             Require(!ck::ValidateModelDescriptorDependencies(descriptor, edges, failure), "eager geometry descriptor edge accepted");
             descriptor.nodes[0].meshAssetIds[0] = V8(99u);

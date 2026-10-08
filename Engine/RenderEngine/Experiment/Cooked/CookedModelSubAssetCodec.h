@@ -11,7 +11,8 @@ namespace experiment::cooked
     inline constexpr std::uint32_t kModelGeometryArtifactVersion = 1u;
     inline constexpr std::uint32_t kSkeletonRepresentation = 1u;
     inline constexpr std::uint32_t kAnimationClipRepresentation = 1u;
-    inline constexpr std::uint32_t kModelDescriptorVersion = 2u;
+    // Version 3 declares independent Material records as Loadable dependencies.
+    inline constexpr std::uint32_t kModelDescriptorVersion = 3u;
     inline constexpr std::uint32_t kSkeletonArtifactVersion = 1u;
     inline constexpr std::uint32_t kAnimationClipArtifactVersion = 1u;
     inline constexpr std::size_t kModelSubAssetMaxBytes = 256u * 1024u * 1024u;
@@ -75,7 +76,7 @@ namespace experiment::cooked
     struct ModelMaterialSummary final
     {
         // 연결용 설명 정보다. 준비된 material을 소유하거나 source-free 생산을 뜻하지 않는다.
-        // Material/embedded texture producer는 별도의 계약으로 연결해야 한다.
+        // Material is an independent Loadable record; the descriptor pins no bulk.
         AssetId materialAssetId{};
         std::string name{};
         MaterialBlendMode blendMode{ MaterialBlendMode::Opaque };

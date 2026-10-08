@@ -121,18 +121,14 @@ namespace asset_cache_detail
     inline std::size_t LegacyTextureRetainedBytes(const Texture& texture) noexcept
     {
         Charge charge;
-        charge.Add(sizeof(Texture));
+        charge.Add(texture.DescriptorByteSize());
         charge.Add(Texture::ImageRetainedCharge(texture.NonRehydratableImage()));
-        charge.String(texture.m_name);
-        charge.String(texture.m_extension);
-        charge.String(texture.m_assetPath);
         const auto origin = texture.GetAssetOrigin();
         if (origin)
         {
-            charge.Add(sizeof(AssetDepot::TextureAssetOrigin));
+            // DescriptorByteSize owns all origin metadata; hard payload owners
+            // are separately charged conservatively even if caches share them.
             charge.Add(origin->hardDependencyChargeBytes);
-            charge.Vector(origin->hardDependencies);
-            charge.Vector(origin->loadableDependencies);
         }
         return charge.Bytes();
     }

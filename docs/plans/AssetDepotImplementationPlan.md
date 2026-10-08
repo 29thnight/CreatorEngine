@@ -32,8 +32,9 @@ design. A foundation slice is not completion of the runtime migration.
 
 - The pinned ownership dependency, CEMF v3 link/manifest schema, immutable catalog
   transactions and generic loose/pak range sources are present.
-- `build-asset-set` source-recooks TextureSourceImage and selected Model descriptor,
-  Mesh, Skeleton and AnimationClip artifacts. Import roots and external buffer inputs are
+- `build-asset-set` source-recooks TextureSourceImage, authored ShaderMeta, Lattice
+  Material and verified MaterialProgram documents, plus selected Model descriptor,
+  Mesh, Skeleton, AnimationClip, model Material and embedded Texture artifacts. Import roots and external buffer inputs are
   captured immutably and hashed. Selected child build identities do not depend on
   unrelated siblings. Verified CAS reuse and transactional unique output directories
   remain independent of Player compilation. The OS owns the cache lock; interrupted
@@ -43,7 +44,7 @@ design. A foundation slice is not completion of the runtime migration.
   descriptors/skeletons/clips, plus small Mesh descriptors and exact geometry payloads.
   Requests have independent cancellation, resolver-bound
   keys, stale publication gates and bounded weak-current/retained caches.
-- A schema2 model descriptor reads no mesh/skeleton/clip files. It captures ordered child identity
+- A schema3 model descriptor reads no mesh/skeleton/clip files. It captures ordered child identity
   and locator metadata, including absent Loadable children. Only a selected child
   worker opens and verifies its payload; absent captured children fail without resolving
   a newer mount. Acquired origins retain exact per-artifact backing, not every file in
@@ -53,8 +54,9 @@ design. A foundation slice is not completion of the runtime migration.
   failure and is never treated as permission to resolve a newer generation.
 - Independent CEGE mesh artifacts omit logical identity/name/material fields. Their
   bounded codec validates the packed rendering contract and full skin binding; optional
-  invalid meshlet/LOD data falls back to indexed geometry. Schema1 model descriptors
-  require recook into schema2, which adds ordered mesh/node/material summaries.
+  invalid meshlet/LOD data falls back to indexed geometry. Earlier model descriptor
+  schemas require recook into schema3, which adds explicit Loadable Material edges
+  beside ordered mesh/node/material summaries.
 - MeshRenderer recognizes mounted typed meshes before legacy paths. Components,
   proxies and durable frame tables retain small descriptors; a separate 128 MiB raw
   geometry cache shares compatible reads/decodes across logical IDs. Each descriptor
@@ -94,6 +96,15 @@ design. A foundation slice is not completion of the runtime migration.
   Model, texture and graph-instance frame tables deduplicate exact stable identities;
   draw records carry indices/anchored borrows. Native GPU completion, abort and
   completion-zero quarantine paths remain responsible for physical retirement.
+- Source definitions may declare Internal or External placement explicitly (omitted
+  scope remains Internal). External references retain exact type and Hard/Loadable
+  semantics without importing the other set; the mounted union validates their graph.
+- Typed `RequestAsync<material_graph::Generation>` and `RequestAsync<Material>` load
+  verified CPU programs and Lattice runtime templates through a fixed same-snapshot
+  Texture → Program → Material job DAG. Separate concrete stores prevent manifest-kind
+  aliasing. Default/override texture recipes retain color-space and full-mip policy;
+  their real descriptor/hard-closure charges count toward bounded retention. Authored
+  `experiment::Material` is not falsely advertised as the same concrete runtime type.
 - Packages can attach independently built immutable AssetSets via an explicit
   directory list and host ABI token. Receipts/CAS bytes are reverified after copy;
   native preflight checks the complete typed union. Startup publishes all configured
@@ -119,7 +130,9 @@ design. A foundation slice is not completion of the runtime migration.
 
 - Granular rendering is available after explicit `MountAssetSet` activation and with
   an explicitly prepared material. General source-free authored-model instantiation,
-  material production/binding and embedded textures are not yet fully cut over.
+  general material binding/instantiation and legacy aggregate embedded texture
+  consumers are not yet fully cut over. Independent producers and typed Lattice
+  runtime requests exist; source-free hierarchy/consumer handoff is the next slice.
   Automatic set activation is connected to the existing package bootstrap, which still
   requires the legacy scene/audio/source-identity closure; a v3-only package is pending. CEMCv11 remains a transitional adapter for other legacy consumers.
 - Legacy source/generated Texture adapters explicitly retain non-rehydratable images.

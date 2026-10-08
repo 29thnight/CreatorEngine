@@ -134,7 +134,9 @@ public:
         return false;
     }
 
-    // Typed CPU acquisition. Current links never resurrect an old generation.
+    // Typed CPU acquisition. ::Material is the Lattice document runtime view;
+    // experiment::Material authoring values have no acquisition dispatch here.
+    // Current links never resurrect an old generation.
     // Misses are I/O-free; callers request work explicitly and poll its state.
     template<class T>
         requires (!std::is_same_v<T, Texture::CodecImage>)
@@ -148,6 +150,10 @@ public:
         else if constexpr (std::is_same_v<T, ShaderMeta>)
         {
             return TryAcquireShaderMeta(link);
+        }
+        else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>)
+        {
+            return TryAcquireCurrentMaterialPipelineAsset(link);
         }
         else
         {
@@ -171,6 +177,10 @@ public:
         else if constexpr (std::is_same_v<T, ShaderMeta>)
         {
             return RequestShaderMetaAsync(link);
+        }
+        else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>)
+        {
+            return RequestCurrentMaterialPipelineAssetAsync(link);
         }
         else
         {
@@ -234,6 +244,8 @@ public:
     // imply a prepared shader program, pipeline state or GPU upload.
     void SetShaderMetaAssetCacheBudget(std::size_t bytes);
     [[nodiscard]] AssetDepot::ShaderMetaAssetCacheSnapshot SnapshotShaderMetaAssetCache() const;
+    void SetMaterialAssetCacheBudgets(std::size_t programs, std::size_t materials);
+    [[nodiscard]] AssetDepot::MaterialAssetCacheSnapshot SnapshotMaterialAssetCache() const;
 
 	void Initialize();
     // Lifecycle owner only: stop admission and drain every accepted asset job
@@ -635,6 +647,23 @@ private:
     void StageMaterialAssetRetirementLocked(AssetDepot::MaterialAssetRetiredEntries& retired);
     void InvalidateMaterialAssetsLocked(AssetDepot::MaterialAssetRetiredEntries& retired) noexcept;
     AssetDepot::MaterialAssetRuntimeState m_materialAssets{};
+
+    template<class T>
+    AssetDepot::MaterialPipelineAssetCache<T>& MaterialPipelineAssetCacheLocked();
+    template<class T>
+    own::shared_owner<const T> TryAcquireCurrentMaterialPipelineAsset(AssetDepot::AssetLink<T> link);
+    template<class T>
+    AssetDepot::AssetRequest<T> RequestCurrentMaterialPipelineAssetAsync(AssetDepot::AssetLink<T> link);
+    template<class T>
+    AssetDepot::AssetRequest<T> RequestMaterialPipelineAssetFromSnapshot(AssetDepot::AssetLink<T> link,
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch);
+    template<class T>
+    void RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::MaterialPipelineAssetWork<T>> work);
+    template<class T>
+    void CompleteMaterialPipelineAssetWorkLocked(
+        const own::shared_owner<AssetDepot::MaterialPipelineAssetWork<T>>& work,
+        AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
+        std::string message = {}, const own::shared_owner<const T>& candidate = {});
 
     own::shared_owner<AssetBundlePreparation> SubmitAssetBundle(const AssetBundle& bundle);
     // Caller holds m_assetPreparationMutex through registration and submission.

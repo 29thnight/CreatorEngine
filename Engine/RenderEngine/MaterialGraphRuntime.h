@@ -11,6 +11,10 @@
 #include <mutex>
 
 class Texture;
+namespace AssetDepot
+{
+    struct MaterialProgramAssetOrigin;
+}
 namespace Authoring
 {
     class ReadNode;
@@ -29,8 +33,12 @@ namespace material_graph
         experiment::AssetId assetId;
         std::uint64_t generation{};
         CookedProgram cooked;
+        // AssetDepot pins the exact artifact and resolved default Texture
+        // representations. Legacy source generations leave this empty.
+        own::shared_owner<const AssetDepot::MaterialProgramAssetOrigin> assetOrigin{};
 
-        // Conservative CPU capacity charge, including the reachable generated shader.
+        // Conservative CPU capacity charge, including the reachable generated
+        // shader and exact AssetDepot origin/default Texture descriptor closure.
         // This excludes allocator/control-block overhead and is not reclaimed bytes.
         std::size_t RetainedPayloadBytes() const noexcept;
     };
@@ -142,6 +150,9 @@ namespace material_graph
         void SetRetainedBudgetBytes(std::size_t bytes);
         std::size_t RetainedBytes() const;
         std::size_t RetainedBudgetBytes() const;
+        // Reserve in the same never-reset identity space as legacy preparation.
+        // Zero means exhausted. Caller may already hold asset admission.
+        [[nodiscard]] std::uint64_t ReserveGeneration();
 
     private:
         void RetainLocked(Entry& entry, const own::shared_owner<const Generation>& owner,

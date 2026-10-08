@@ -277,3 +277,15 @@ content and CEMF v2 source-identity boot remain. It does not claim a v3-only pac
 or eliminate the legacy package cook. Runtime async startup separately prepares cold
 mesh/image/material work before scene activation. Copied/extracted store roots are
 unenrolled and noncollectible until freshly published under the storage lease protocol.
+
+AssetSet source dependencies may also specify `scope: External`; omitted scope means
+`Internal`. External targets are not included or imported by this build and need not
+have a source record here. Exact type and Hard/Loadable declarations still match each
+producer recipe. Internal missing targets/cycles remain errors; the final mounted
+union validates external missing/type/hard-cycle and cross-artifact binding rules.
+
+Lattice Material sources use `.asset`; MaterialProgram sources name both their current
+`.lxmaterial` graph and an explicit `verifiedProgram` input. The producer checks source
+and carried backend agreement; it does not silently use a previous package or compile
+shaders during runtime. Model descriptor schema3 adds Loadable Material references;
+selected model materials and embedded textures produce independent artifacts.

@@ -21,6 +21,10 @@ namespace experiment
 {
     struct Material;
 }
+namespace material_graph
+{
+    struct Generation;
+}
 
 namespace AssetDepot
 {
@@ -44,6 +48,8 @@ namespace AssetDepot
     template<>
     struct AssetTypeTraits<experiment::Material>
     {
+        // Authoring reference type only. It is not the Lattice ::Material
+        // runtime view; DataSystem does not advertise an acquire overload.
         static constexpr auto kKind = experiment::cooked::CookedAssetKind::Material;
     };
 
@@ -51,6 +57,12 @@ namespace AssetDepot
     struct AssetTypeTraits<ShaderMeta>
     {
         static constexpr auto kKind = experiment::cooked::CookedAssetKind::ShaderMeta;
+    };
+
+    template<>
+    struct AssetTypeTraits<material_graph::Generation>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::MaterialProgram;
     };
 
     template<>

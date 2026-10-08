@@ -3,6 +3,7 @@
 #include "MaterialPropertyPacker.h"
 #include "Assets/AssetIdentityProfile.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
+#include "AssetDepot/MaterialAssetRuntime.h"
 #include "AuthoringReadNode.h"
 #include "AuthoringWriteNode.h"
 
@@ -298,6 +299,16 @@ namespace material_graph
                     charge.AddString(field.name);
                 }
             }
+        }
+        if (assetOrigin)
+        {
+            charge.Add(sizeof(AssetDepot::MaterialProgramAssetOrigin));
+            charge.AddVector(assetOrigin->resolved.entry.dependencies);
+            charge.AddString(assetOrigin->resolved.blob.targetPlatform);
+            charge.AddString(assetOrigin->resolved.blob.targetAbi);
+            charge.AddString(assetOrigin->resolved.blob.artifactPath);
+            charge.AddVector(assetOrigin->defaultTextures);
+            charge.Add(assetOrigin->defaultTextureChargeBytes);
         }
         return charge.Bytes();
     }
@@ -692,6 +703,16 @@ namespace material_graph
         result = std::move(candidate);
         error.clear();
         return true;
+    }
+
+    std::uint64_t GenerationStore::ReserveGeneration()
+    {
+        std::lock_guard lock(mutex_);
+        if (serial_ == UINT64_MAX)
+        {
+            return 0u;
+        }
+        return ++serial_;
     }
 
     bool BuildInstance(own::shared_owner<const Generation> generation, const InstanceDescription& description,

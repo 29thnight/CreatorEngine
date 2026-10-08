@@ -47,7 +47,7 @@ Material::Material(const Material& material)
       m_renderingMode(material.m_renderingMode), m_doubleSided(material.m_doubleSided),
       m_cbufferValues(material.m_cbufferValues), m_runtimeInstance(material.m_runtimeInstance),
       m_shaderMetaHandle(material.m_shaderMetaHandle), m_textureOwners(material.m_textureOwners),
-      m_materialGraphInstance(material.m_materialGraphInstance)
+      m_materialGraphInstance(material.m_materialGraphInstance), m_assetOrigin(material.m_assetOrigin)
 {
 }
 
@@ -73,6 +73,7 @@ Material::Material(Material&& material) noexcept
     m_runtimeInstance = std::move(material.m_runtimeInstance);
     m_cbufferValues = std::move(material.m_cbufferValues);
     m_materialGraphInstance = std::move(material.m_materialGraphInstance);
+    m_assetOrigin = std::move(material.m_assetOrigin);
 }
 
 Material::~Material()

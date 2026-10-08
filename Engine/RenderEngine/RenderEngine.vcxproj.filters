@@ -243,6 +243,8 @@
     <ClCompile Include="ShaderMetadataRuntime.cpp" />
     <ClCompile Include="Assets\ModelSourcePreparation.cpp" />
     <ClCompile Include="Experiment\Cooked\CookedModelSubAssetCodec.cpp" />
+    <ClCompile Include="Experiment\Cooked\MaterialAssetSetCodec.cpp" />
+    <ClCompile Include="Experiment\Cooked\MaterialAssetSetProducer.cpp" />
     <ClCompile Include="Experiment\Cooked\CookedShaderMeta.cpp" />
     <ClCompile Include="AssetDepot\MaterialAssetRuntime.cpp" />
     <ClCompile Include="Experiment\Cooked\ModelAssetSetProducer.cpp" />
@@ -598,6 +600,8 @@
   <ItemGroup>
     <ClInclude Include="Assets\ModelSourcePreparation.h" />
     <ClInclude Include="Experiment\Cooked\CookedModelSubAssetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\MaterialAssetSetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\MaterialAssetSetProducer.h" />
     <ClInclude Include="Experiment\Cooked\CookedShaderMeta.h" />
     <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />
     <ClInclude Include="Experiment\Cooked\ModelAssetSetProducer.h" />

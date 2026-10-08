@@ -23,6 +23,10 @@
 struct ShaderMeta;
 struct ShaderMetaBindingLayout;
 struct ShaderMetaPropertyBinding;
+namespace AssetDepot
+{
+    struct MaterialDocumentAssetOrigin;
+}
 
 enum class MaterialRenderingMode
 {
@@ -52,6 +56,10 @@ public:
         return m_materialGraphInstance;
     }
     bool HasMaterialGraph() const { return !!m_materialGraphInstance; }
+    const own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin>& GetAssetOrigin() const noexcept
+    {
+        return m_assetOrigin;
+    }
     own::shared_owner<const LX::Runtime::Instance> GetLXMaterialInstance() const
     {
         if (m_materialGraphInstance)
@@ -233,4 +241,7 @@ private:
 
     [[reflgen::ignore]]
     own::shared_owner<const material_graph::Instance> m_materialGraphInstance;
+
+    [[reflgen::ignore]]
+    own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin> m_assetOrigin{};
 };
