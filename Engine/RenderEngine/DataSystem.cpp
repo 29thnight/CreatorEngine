@@ -3688,8 +3688,9 @@ job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
 	{
 		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
 		file::path name = entry.assetName;
+        const std::string fontReference = entry.assetName; // Preserve authored UTF-8 font paths.
 
-		jobs.add([&data, type, name, completed]
+		jobs.add([&data, type, name, fontReference, completed]
 		{
 			ce::profile_scope profile{ ce::marker<"Asset.BundleJob">() };
 			switch (type)
@@ -3706,7 +3707,7 @@ job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
 			case ManagedAssetType::SpriteFont:
             {
                 std::string error;
-                if (!data.LoadFontShared(name.string(), error) || !error.empty())
+                if (!data.LoadFontShared(fontReference, error) || !error.empty())
                 {
                     Debug::PrintLog(spdlog::level::warn, "SDF font bundle load: " + error);
                 }

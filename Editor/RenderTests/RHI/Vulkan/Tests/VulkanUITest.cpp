@@ -9,12 +9,16 @@
 #include "RHI/DX12/DX12TextureCache.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "Render/Passes/UI/EnhancedUIPass.h"
+#include "Render/Passes/Geometry/EnhancedSpritePass.h"
+#include "FontAsset.h"
 #include "Texture.h"
 
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdio>
+#include <memory>
+#include <limits>
 #include <string>
 #include <vector>
 
@@ -31,8 +35,10 @@ namespace
     {
         Texture* redTexture{ nullptr };
         Texture* blueTexture{ nullptr };
+        std::shared_ptr<Texture> distanceTexture;
         std::vector<EnhancedUIPass::Rect> baseRects;
         std::vector<EnhancedUIPass::Rect> texturedRects;
+        std::vector<EnhancedUIPass::Rect> distanceRects;
 
         UiRhiFixture()
         {
@@ -42,6 +48,19 @@ namespace
                 RHIFormat::RGBA8Unorm, red);
             blueTexture = Texture::CreateFromPixels(1, 1, "rhi_ui_blue",
                 RHIFormat::RGBA8Unorm, blue);
+            // Exact outside / contour / inside plateaus make coverage and the
+            // straight-alpha blend test independent of font files and rasterizers.
+            constexpr std::array<uint8_t, 8> distances{ 0, 0, 128, 128, 255, 255, 0, 0 };
+            std::array<uint8_t, 32> distancePixels{};
+            for (size_t pixel = 0; pixel < distances.size(); ++pixel)
+            {
+                for (size_t channel = 0; channel < 4; ++channel)
+                {
+                    distancePixels[pixel * 4 + channel] = distances[pixel];
+                }
+            }
+            distanceTexture.reset(Texture::CreateFromPixels(8, 1, "rhi_ui_distance",
+                RHIFormat::RGBA8Unorm, distancePixels.data()));
 
             EnhancedUIPass::Rect redRect{};
             redRect.left = 10.f;
@@ -93,6 +112,29 @@ namespace
                 rect.texture = (0 == (i & 1u)) ? redTexture : blueTexture;
                 texturedRects.push_back(rect);
             }
+
+            EnhancedUIPass::Rect distanceBackground{};
+            distanceBackground.left = 16.f;
+            distanceBackground.top = 16.f;
+            distanceBackground.right = 144.f;
+            distanceBackground.bottom = 80.f;
+            distanceBackground.color = { 0.f, 1.f, 0.f, 1.f };
+            distanceRects.push_back(distanceBackground);
+
+            EnhancedUIPass::Rect distanceRect = distanceBackground;
+            distanceRect.color = { 1.f, 0.f, 0.f, 0.5f };
+            distanceRect.textureOwner = distanceTexture;
+            distanceRect.signedDistance = true;
+            distanceRects.push_back(distanceRect);
+
+            // Same atlas, adjacent instance, different mode. It must stay an
+            // ordinary tinted image even though batching keeps both in one draw.
+            EnhancedUIPass::Rect imageRect = distanceRect;
+            imageRect.top = 112.f;
+            imageRect.bottom = 176.f;
+            imageRect.color = { 0.f, 0.f, 1.f, 1.f };
+            imageRect.signedDistance = false;
+            distanceRects.push_back(imageRect);
         }
 
         ~UiRhiFixture()
@@ -103,7 +145,7 @@ namespace
 
         bool IsValid() const
         {
-            return nullptr != redTexture && nullptr != blueTexture;
+            return nullptr != redTexture && nullptr != blueTexture && nullptr != distanceTexture;
         }
     };
 
@@ -119,6 +161,7 @@ namespace
     {
         UiRhiFrame base;
         UiRhiFrame textured;
+        UiRhiFrame distance;
 
         float redOnly{ 0.f };
         float overlapR{ 0.f };
@@ -129,6 +172,13 @@ namespace
         float outsideA{ 0.f };
         float textureRed{ 0.f };
         float textureBlue{ 0.f };
+        float distanceOutsideR{ 0.f };
+        float distanceOutsideG{ 0.f };
+        float distanceContourR{ 0.f };
+        float distanceContourG{ 0.f };
+        float distanceInsideR{ 0.f };
+        float distanceInsideG{ 0.f };
+        float distanceImageB{ 0.f };
 
         uint32_t textureUploads{ 0 };
         uint32_t textureHits{ 0 };
@@ -207,6 +257,10 @@ namespace
 
         if (!render(fixture.baseRects, outCapture.base)) return fail(outError);
         if (!render(fixture.texturedRects, outCapture.textured)) return fail(outError);
+        if (!render(fixture.distanceRects, outCapture.distance))
+        {
+            return fail(outError);
+        }
 
         outCapture.redOnly = outCapture.base.image.At(20, 20, 0);
         outCapture.overlapR = outCapture.base.image.At(50, 50, 0);
@@ -217,6 +271,13 @@ namespace
         outCapture.outsideA = outCapture.base.image.At(120, 200, 3);
         outCapture.textureRed = outCapture.textured.image.At(30, 175, 0);
         outCapture.textureBlue = outCapture.textured.image.At(85, 175, 2);
+        outCapture.distanceOutsideR = outCapture.distance.image.At(24, 48, 0);
+        outCapture.distanceOutsideG = outCapture.distance.image.At(24, 48, 1);
+        outCapture.distanceContourR = outCapture.distance.image.At(56, 48, 0);
+        outCapture.distanceContourG = outCapture.distance.image.At(56, 48, 1);
+        outCapture.distanceInsideR = outCapture.distance.image.At(88, 48, 0);
+        outCapture.distanceInsideG = outCapture.distance.image.At(88, 48, 1);
+        outCapture.distanceImageB = outCapture.distance.image.At(56, 144, 2);
 
         const auto stats = textures.GetStats();
         outCapture.textureUploads = stats.uploads;
@@ -237,9 +298,10 @@ namespace
                 0 == frame.graph.passesCulled &&
                 1 == frame.graph.transientCreated;
         };
-        return graphOk(capture.base) && graphOk(capture.textured) &&
+        return graphOk(capture.base) && graphOk(capture.textured) && graphOk(capture.distance) &&
             4 == capture.base.rects && 1 == capture.base.batches &&
             4 == capture.textured.rects && 4 == capture.textured.batches &&
+            3 == capture.distance.rects && 2 == capture.distance.batches &&
             capture.redOnly > 0.9f &&
             capture.overlapR < 0.1f && capture.overlapB > 0.9f &&
             capture.greenOnly > 0.9f &&
@@ -247,8 +309,146 @@ namespace
             capture.blendG > 0.2f && capture.blendG < 0.8f &&
             capture.outsideA < 0.01f &&
             capture.textureRed > 0.9f && capture.textureBlue > 0.9f &&
-            2 == capture.textureUploads && capture.textureHits >= 2 &&
-            0 == capture.textureFailures && 2 == capture.fromCpuPixels;
+            capture.distanceOutsideR < 0.01f && capture.distanceOutsideG > 0.99f &&
+            std::fabs(capture.distanceContourR - 0.25f) < 0.02f &&
+            std::fabs(capture.distanceContourG - 0.75f) < 0.02f &&
+            std::fabs(capture.distanceInsideR - 0.5f) < 0.02f &&
+            std::fabs(capture.distanceInsideG - 0.5f) < 0.02f &&
+            std::fabs(capture.distanceImageB - (128.f / 255.f) * (128.f / 255.f)) < 0.02f &&
+            3 == capture.textureUploads && capture.textureHits >= 2 &&
+            0 == capture.textureFailures && 3 == capture.fromCpuPixels;
+    }
+
+    bool UiRhiTextureLifetime(std::string& outError)
+    {
+        EnhancedUIPass ui;
+        EnhancedFrameContext context{};
+        std::vector<EnhancedUIPass::Rect> rects(1);
+        rects.front().textureOwner = std::make_shared<Texture>();
+        const std::weak_ptr<Texture> weakTexture = rects.front().textureOwner;
+        ui.SetRects(&rects);
+        // CPU-only: no texture cache, device or fake upload is involved.
+        if (!ui.PrepareFrame(context, outError))
+        {
+            return false;
+        }
+        rects.clear();
+        if (weakTexture.expired())
+        {
+            outError = "UI batch did not retain the source texture owner";
+            return false;
+        }
+        ui.Shutdown();
+        if (!weakTexture.expired())
+        {
+            outError = "UI shutdown did not release the source texture owner";
+            return false;
+        }
+        return true;
+    }
+
+    bool UiRhiTextRects(std::string& outError)
+    {
+        auto layout = std::make_shared<TextLayout>();
+        layout->width = 100.f;
+        layout->height = 40.f;
+        TextGlyph glyph{};
+        glyph.left = 10.f;
+        glyph.top = 4.f;
+        glyph.right = 30.f;
+        glyph.bottom = 24.f;
+        glyph.uvLeft = 0.1f;
+        glyph.uvTop = 0.2f;
+        glyph.uvRight = 0.3f;
+        glyph.uvBottom = 0.6f;
+        glyph.texture = std::make_shared<Texture>();
+        layout->glyphs.push_back(glyph);
+        glyph.left = 50.f;
+        glyph.right = 80.f;
+        layout->glyphs.push_back(glyph);
+
+        UIRenderProxy::TextData text{};
+        text.layout = layout;
+        text.position = { 200.f, 100.f };
+        text.canvasOrder = 7;
+        text.layerOrder = 3;
+        std::vector<EnhancedUIPass::Rect> rects(1);
+        if (!EnhancedUIPass::AppendTextRects(text, rects, 20.f, 30.f) || rects.size() != 3 ||
+            rects[1].left != 180.f || rects[1].top != 114.f ||
+            rects[1].right != 200.f || rects[1].bottom != 134.f ||
+            rects[2].left != 220.f || rects[1].canvasOrder != 7 ||
+            rects[1].layerOrder != 3 || !rects[1].signedDistance ||
+            rects[1].textureOwner != glyph.texture)
+        {
+            outError = "Text rectangles lost center anchor, glyph order, append semantics or ownership";
+            return false;
+        }
+        rects.clear();
+        text.alignment = TextAlignment::Left;
+        if (!EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 2 || rects[0].left != 210.f)
+        {
+            outError = "Text left anchor is incorrect";
+            return false;
+        }
+        rects.clear();
+        text.alignment = TextAlignment::Right;
+        if (!EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 2 || rects[0].left != 110.f)
+        {
+            outError = "Text right anchor is incorrect";
+            return false;
+        }
+        rects.clear();
+        text.filpEffect = static_cast<UIEffects>(3);
+        if (!EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 2 ||
+            rects[0].left != 170.f || rects[0].top != 96.f ||
+            rects[0].right != 190.f || rects[0].bottom != 116.f ||
+            rects[0].uvLeft != 0.3f || rects[0].uvRight != 0.1f ||
+            rects[0].uvTop != 0.6f || rects[0].uvBottom != 0.2f)
+        {
+            outError = "Text flip did not mirror both block geometry and glyph UVs";
+            return false;
+        }
+        rects.clear();
+        text.position.x = (std::numeric_limits<float>::quiet_NaN)();
+        if (EnhancedUIPass::AppendTextRects(text, rects) || !rects.empty())
+        {
+            outError = "Text accepted a nonfinite anchor";
+            return false;
+        }
+        text.position.x = 200.f;
+        layout->glyphs.front().uvLeft = (std::numeric_limits<float>::infinity)();
+        if (EnhancedUIPass::AppendTextRects(text, rects) || rects.size() != 1)
+        {
+            outError = "Text accepted nonfinite UVs or discarded valid adjacent glyphs";
+            return false;
+        }
+
+        // Planar text uses the same owner and signed-distance fields, including
+        // when the source list is rebuilt before graph recording.
+        EnhancedSpritePass sprite;
+        EnhancedFrameContext context{};
+        std::vector<EnhancedSpritePass::Item> items(1);
+        items.front().textureOwner = std::make_shared<Texture>();
+        items.front().signedDistance = true;
+        const std::weak_ptr<Texture> weakTexture = items.front().textureOwner;
+        sprite.SetItems(&items);
+        if (!sprite.PrepareFrame(context, outError))
+        {
+            return false;
+        }
+        items.clear();
+        if (weakTexture.expired() || sprite.GetLastItemCount() != 1 || sprite.GetLastBatchCount() != 1)
+        {
+            outError = "Planar text did not preserve batch ownership";
+            return false;
+        }
+        sprite.Shutdown();
+        if (!weakTexture.expired())
+        {
+            outError = "Planar text shutdown did not release batch ownership";
+            return false;
+        }
+        return true;
     }
 
     struct UiRhiComparison
@@ -290,7 +490,7 @@ namespace
 
 bool RunVulkanUITest(std::string& outLog)
 {
-    outLog += "── UI 공용 패스 — DX12/Vulkan order·blend·texture batch 대조 ──\n";
+    outLog += "── UI 공용 패스 — DX12/Vulkan order·blend·texture·SDF 대조 ──\n";
     UiRhiFixture fixture;
     if (!fixture.IsValid())
     {
@@ -301,6 +501,11 @@ bool RunVulkanUITest(std::string& outLog)
     UiRhiCapture dx12Capture{};
     UiRhiCapture vkCapture{};
     std::string error;
+    if (!UiRhiTextureLifetime(error) || !UiRhiTextRects(error))
+    {
+        outLog += "UI text/lifetime check failed: " + error + "\n";
+        return false;
+    }
     {
         DX12DeviceResources resources;
         DX12PSOManager pipelines;
@@ -407,12 +612,14 @@ bool RunVulkanUITest(std::string& outLog)
         vkCapture.base.image, comparison);
     CompareUiRhiImage(dx12Capture.textured.image,
         vkCapture.textured.image, comparison);
+    CompareUiRhiImage(dx12Capture.distance.image,
+        vkCapture.distance.image, comparison);
     const double meanDelta = (0 == comparison.samples) ? 0.0 :
         comparison.sumDelta / static_cast<double>(comparison.samples);
 
     char compareLine[320]{};
     std::snprintf(compareLine, sizeof(compareLine),
-        "[3/6] base/textured 전체 RGBA %llu표본 — 최대 %.6f · 평균 %.8f · "
+        "[3/6] base/textured/SDF 전체 RGBA %llu표본 — 최대 %.6f · 평균 %.8f · "
         "0.003 초과 %llu\n",
         static_cast<unsigned long long>(comparison.samples),
         comparison.maxDelta, meanDelta,
@@ -436,6 +643,13 @@ bool RunVulkanUITest(std::string& outLog)
         std::fabs(dx12Capture.outsideA - vkCapture.outsideA),
         std::fabs(dx12Capture.textureRed - vkCapture.textureRed),
         std::fabs(dx12Capture.textureBlue - vkCapture.textureBlue),
+        std::fabs(dx12Capture.distanceOutsideR - vkCapture.distanceOutsideR),
+        std::fabs(dx12Capture.distanceOutsideG - vkCapture.distanceOutsideG),
+        std::fabs(dx12Capture.distanceContourR - vkCapture.distanceContourR),
+        std::fabs(dx12Capture.distanceContourG - vkCapture.distanceContourG),
+        std::fabs(dx12Capture.distanceInsideR - vkCapture.distanceInsideR),
+        std::fabs(dx12Capture.distanceInsideG - vkCapture.distanceInsideG),
+        std::fabs(dx12Capture.distanceImageB - vkCapture.distanceImageB),
     });
     char predicateLine[288]{};
     std::snprintf(predicateLine, sizeof(predicateLine),
@@ -444,6 +658,15 @@ bool RunVulkanUITest(std::string& outLog)
         predicateDelta, vkCapture.textureUploads,
         vkCapture.textureHits, vkCapture.textureFailures);
     outLog += predicateLine;
+    char distanceLine[384]{};
+    std::snprintf(distanceLine, sizeof(distanceLine),
+        "      SDF contour R/G DX12 %.3f/%.3f Vulkan %.3f/%.3f · "
+        "inside R/G %.3f/%.3f · image B %.3f · rect/batch %u/%u\n",
+        dx12Capture.distanceContourR, dx12Capture.distanceContourG,
+        vkCapture.distanceContourR, vkCapture.distanceContourG,
+        vkCapture.distanceInsideR, vkCapture.distanceInsideG,
+        vkCapture.distanceImageB, vkCapture.distance.rects, vkCapture.distance.batches);
+    outLog += distanceLine;
     if (predicateDelta > 0.003f) passed = false;
 
     outLog += "[5/6] PrepareFrame texture lifetime·root t0·sampled t1·static s0 · 미구현 " +

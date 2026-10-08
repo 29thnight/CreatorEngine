@@ -860,6 +860,13 @@ Canvas order → hierarchy sibling order → component/local order → stable ti
 
 ### 트랙 T — 텍스트 렌더 *(신설 · §0.4 · **9-15 개정에서 U1 앞으로 승격**)*
 
+> **2026-10-08 소스 연결 체크포인트**: `FontAsset`/UTF-8 배치/한글 fallback,
+> Text 프록시→Overlay·Scene View·Camera/World Canvas SDF 경로, 폰트 배포와
+> `ui.drawitems` 진단을 구현했다. 아래 런타임 완료 체크박스는 아직 채우지 않는다.
+> 빌드·셰이더 컴파일·테스트·화면 검증은 미실행이며, atlas의 사전 쿠킹 형식 대신
+> 원본 TTF/OTF를 배포해 첫 사용 시 SDF를 생성한다.
+> 구현 계약·상한·남은 수용: [SdfTextRendering](../design/SdfTextRendering.md).
+
 **선행**: U0-a(`ui.drawitems`) · U0-c(래칫). **후행**: U1 이후 전부.
 
 **왜 U1 앞으로 올리는가 (9-15)**
