@@ -1,4 +1,5 @@
 #include "Texture.h"
+#include "AssetDepot/TextureAssetRuntime.h"
 #include "PathFinder.h"
 #include "Core.Memory.hpp"
 // Win32::ThrowIfFailed가 여기 있다. 유니티 빌드에서는 같은 블롭의 앞선
@@ -6,7 +7,9 @@
 #include "DirectXHelper.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <optional>
+#include <limits>
 #include <DirectXTex.h>
+#include <objbase.h>
 
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 이 using을 공급했다.
 // ASan 구성은 블롭을 끄므로 직접 받는다(PHASE 9-9).
@@ -189,34 +192,51 @@ namespace
 	}
 
 	/// 디코드 결과를 Texture 가 들 형태로 감싼다. 픽셀 복사 0.
-	std::shared_ptr<Texture::CodecImage> TextureMakeCodecImage(ScratchImage&& image)
+	own::shared_owner<const Texture::CodecImage> TextureMakeCodecImage(ScratchImage&& image)
 	{
-		if (!TextureIsUploadableShape(image.GetMetadata())) return nullptr;
+		if (!TextureIsUploadableShape(image.GetMetadata()))
+		{
+			return {};
+		}
 
-		auto codec = std::make_shared<Texture::CodecImage>();
+		auto codec = own::make_shared<Texture::CodecImage>();
 		const RHIFormat known = TextureDecodedFormatToRHI(image.GetMetadata().format);
 		if (RHIFormat::Unknown != known)
 		{
-			if (!TextureAdoptScratch(*codec, std::move(image), known)) return nullptr;
-			return codec;
+			if (!TextureAdoptScratch(*codec, std::move(image), known))
+			{
+				return {};
+			}
+			return std::move(codec);
 		}
 
 		ScratchImage lowered;
-		if (!TextureLowerToRgba8(image, lowered)) return nullptr;
+		if (!TextureLowerToRgba8(image, lowered))
+		{
+			return {};
+		}
 		const RHIFormat loweredFormat =
 			TextureDecodedFormatToRHI(lowered.GetMetadata().format);
-		if (RHIFormat::Unknown == loweredFormat) return nullptr;
+		if (RHIFormat::Unknown == loweredFormat)
+		{
+			return {};
+		}
 		if (!TextureAdoptScratch(*codec, std::move(lowered), loweredFormat))
-			return nullptr;
-		return codec;
+		{
+			return {};
+		}
+		return std::move(codec);
 	}
 
 	/// 이미 중립인 이미지를 Texture 가 들 형태로 감싼다.
-	std::shared_ptr<Texture::CodecImage> TextureMakeCodecImage(TextureImage&& image)
+	own::shared_owner<const Texture::CodecImage> TextureMakeCodecImage(TextureImage&& image)
 	{
-		auto codec = std::make_shared<Texture::CodecImage>();
-		if (!TextureAdoptImage(*codec, std::move(image))) return nullptr;
-		return codec;
+		auto codec = own::make_shared<Texture::CodecImage>();
+		if (!TextureAdoptImage(*codec, std::move(image)))
+		{
+			return {};
+		}
+		return std::move(codec);
 	}
 
 	/// 디코드 결과를 소유 컨테이너로 **복사한다**. cook 경로 전용이다 —
@@ -492,7 +512,7 @@ std::shared_ptr<Texture> Texture::CreateSharedFromImage(
 	const float height = float(image.Height());
 	const RHIFormat format = image.Format();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
 	auto texture = std::shared_ptr<Texture>(new Texture());
@@ -618,7 +638,7 @@ Texture* Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
     Texture* texture = new Texture();
@@ -746,7 +766,7 @@ std::shared_ptr<Texture> Texture::LoadSharedFromPath(const file::path& path, boo
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
 	auto texture = std::make_shared<Texture>();
@@ -797,7 +817,7 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
 	auto texture = std::make_shared<Texture>();
@@ -806,6 +826,133 @@ std::shared_ptr<Texture> Texture::LoadSharedFromMemory(
 	texture->m_isTextureAlpha = hasAlpha;
 	texture->m_codecImage = std::move(codecImage);
 	return texture;
+}
+
+own::shared_owner<const Texture> Texture::LoadOwnedFromMemory(
+    std::span<const std::byte> bytes, const AssetDepot::TextureAssetVariant& variant,
+    own::shared_owner<const AssetDepot::TextureAssetOrigin> origin, std::string& failure)
+{
+    failure.clear();
+    struct DecoderApartment final
+    {
+        HRESULT result{ CoInitializeEx(nullptr, COINIT_MULTITHREADED) };
+        ~DecoderApartment()
+        {
+            if (SUCCEEDED(result))
+            {
+                CoUninitialize();
+            }
+        }
+    } apartment;
+    if (FAILED(apartment.result) && apartment.result != RPC_E_CHANGED_MODE)
+    {
+        failure = "Texture decoder COM initialization failed.";
+        return {};
+    }
+    ScratchImage image{};
+    TexMetadata metadata{};
+    bool alreadyFinal = false;
+    if (!TextureDecodeImageBytes(bytes, metadata, image, alreadyFinal))
+    {
+        failure = "Texture source-image decoding failed.";
+        return {};
+    }
+    if (!TextureIsUploadableShape(metadata))
+    {
+        failure = "Texture source-image shape is unsupported.";
+        return {};
+    }
+    if (variant.compress && !alreadyFinal && !IsCompressed(metadata.format))
+    {
+        ScratchImage compressed{};
+        const bool srgb = variant.colorSpace == AssetDepot::TextureAssetColorSpace::Srgb
+            || (variant.colorSpace == AssetDepot::TextureAssetColorSpace::Source && IsSRGB(metadata.format));
+        const auto format = srgb ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
+        const auto flags = srgb
+            ? TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM
+            : TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM;
+        if (FAILED(DirectX::Compress(image.GetImages(), image.GetImageCount(), metadata,
+            format, flags, 0.5f, compressed)))
+        {
+            failure = "Texture compression failed.";
+            return {};
+        }
+        metadata = compressed.GetMetadata();
+        image = std::move(compressed);
+    }
+    const bool hasAlpha = !image.IsAlphaAllOpaque();
+    auto codec = TextureMakeCodecImage(std::move(image));
+    if (!codec)
+    {
+        failure = "Texture decoded pixels are invalid.";
+        return {};
+    }
+    RHIFormat samplingFormat = codec->format;
+    if (variant.colorSpace != AssetDepot::TextureAssetColorSpace::Source)
+    {
+        const bool srgb = variant.colorSpace == AssetDepot::TextureAssetColorSpace::Srgb;
+        switch (samplingFormat)
+        {
+        case RHIFormat::RGBA8Unorm: case RHIFormat::RGBA8UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::RGBA8UnormSrgb : RHIFormat::RGBA8Unorm;
+            break;
+        case RHIFormat::BGRA8Unorm: case RHIFormat::BGRA8UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::BGRA8UnormSrgb : RHIFormat::BGRA8Unorm;
+            break;
+        case RHIFormat::BC1Unorm: case RHIFormat::BC1UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::BC1UnormSrgb : RHIFormat::BC1Unorm;
+            break;
+        case RHIFormat::BC3Unorm: case RHIFormat::BC3UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::BC3UnormSrgb : RHIFormat::BC3Unorm;
+            break;
+        case RHIFormat::RGBA16Float: case RHIFormat::RGBA32Float:
+            if (srgb)
+            {
+                failure = "Floating-point texture cannot use an sRGB sampling representation.";
+                return {};
+            }
+            break;
+        default:
+            failure = "Texture sampling representation is unsupported.";
+            return {};
+        }
+    }
+    auto texture = own::make_shared<Texture>();
+    texture->m_textureType = codec->isCube ? TextureType::TextureCube
+        : (codec->arraySize > 1u ? TextureType::TextureArray : TextureType::ImageTexture);
+    texture->m_size = { float(codec->width), float(codec->height) };
+    texture->m_samplingFormat = samplingFormat;
+    texture->m_isTextureAlpha = hasAlpha;
+    texture->m_codecImage = std::move(codec);
+    texture->m_assetOrigin = std::move(origin);
+    return std::move(texture);
+}
+
+own::shared_owner<const AssetDepot::TextureAssetOrigin> Texture::GetAssetOrigin() const
+{
+    return m_assetOrigin;
+}
+
+std::size_t Texture::DecodedByteSize() const noexcept
+{
+    if (!m_codecImage)
+    {
+        return 0u;
+    }
+    if (m_codecImage->scratch.GetPixelsSize() != 0u)
+    {
+        return m_codecImage->scratch.GetPixelsSize();
+    }
+    std::size_t result = 0u;
+    for (const auto& subresource : m_codecImage->subresources)
+    {
+        if (subresource.slicePitch > (std::numeric_limits<std::size_t>::max)() - result)
+        {
+            return (std::numeric_limits<std::size_t>::max)();
+        }
+        result += subresource.slicePitch;
+    }
+    return result;
 }
 
 std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
@@ -914,7 +1061,7 @@ std::unique_ptr<Texture> Texture::LoadManagedFromPath(const file::path& path, bo
 		return !image.IsAlphaAllOpaque();
 	}();
 
-	std::shared_ptr<CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
 	if (!codecImage) return nullptr;
 
 	auto texture = std::make_unique<Texture>();
@@ -1023,11 +1170,13 @@ bool Texture::DecodeToRgba8(std::span<const std::byte> bytes,
 Texture::Texture(Texture&& texture) noexcept
 {
 	m_codecImage = std::move(texture.m_codecImage);
+    m_assetOrigin = std::move(texture.m_assetOrigin);
     m_samplingFormat = texture.m_samplingFormat;
 	m_assetId = texture.m_assetId;
 	m_textureType = texture.m_textureType;
 	m_name = std::move(texture.m_name);
 	m_extension = std::move(texture.m_extension);
+    m_assetPath = std::move(texture.m_assetPath);
 	m_size = texture.m_size;
 	m_isTextureAlpha = texture.m_isTextureAlpha;
 

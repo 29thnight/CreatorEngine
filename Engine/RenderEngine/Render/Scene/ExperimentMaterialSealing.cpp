@@ -190,11 +190,11 @@ namespace ExperimentMaterialSealing
         // c3-2가 "catalog가 서면 이 자리가 그대로 cooked 우선이 된다"고 적어
         // 둔 그 자리다. 미게시(저작 트리)에서는 nullptr이라 예전처럼 source.
         //
-        // shared_ptr을 이 스코프에서 붙잡는다 — services는 raw 포인터를 나르고,
+        // catalog owner를 이 스코프에서 붙잡는다 — services는 raw 포인터를 나르고,
         // 마운트가 렌더 중에 표를 갈아 끼울 수 있다.
         const auto catalog = DataSystems->GetCookedCatalog();
         const experiment::MaterialResolveServices services =
-            experiment::MakeDataSystemMaterialResolveServices(catalog.get(),
+            experiment::MakeDataSystemMaterialResolveServices(catalog ? &*catalog.borrow() : nullptr,
                 generation);
         experiment::ResolvedMaterial resolved;
         if (!experiment::ResolveMaterial(source.material, services, resolved,

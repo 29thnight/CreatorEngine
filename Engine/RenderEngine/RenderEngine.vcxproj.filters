@@ -240,6 +240,8 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AssetDepot\AssetDepot.cpp" />
+    <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp" />
     <ClCompile Include="AssetAuthoringPort.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
@@ -586,6 +588,11 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AssetDepot\AssetLink.h" />
+    <ClInclude Include="AssetDepot\AssetRequest.h" />
+    <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\AssetMountId.h" />
+    <ClInclude Include="Experiment\Cooked\ArtifactByteSource.h" />
     <ClInclude Include="AssetBundle.h">
       <Filter>Resources\AssetBundle</Filter>
     </ClInclude>

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -156,6 +156,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="AssetDepot\AssetDepot.cpp" />
+    <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
@@ -555,6 +557,11 @@
     <ClCompile Include="UIRenderProxy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AssetDepot\AssetLink.h" />
+    <ClInclude Include="AssetDepot\AssetRequest.h" />
+    <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\AssetMountId.h" />
+    <ClInclude Include="Experiment\Cooked\ArtifactByteSource.h" />
     <ClInclude Include="Interfaces\LightProperty.h" />
     <ClInclude Include="Interfaces\Navigation.h" />
     <ClInclude Include="Interfaces\RenderBackend.h" />

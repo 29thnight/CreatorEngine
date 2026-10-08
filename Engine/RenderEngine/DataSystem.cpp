@@ -268,6 +268,7 @@ struct DataSystem::PreparedRuntimeAsset
     file::path projectRoot;
     RuntimeAssetType type{};
     std::uint64_t epoch{};
+    std::atomic<bool> cancelled{};
     job_handle work;
     assets::ModelAssetGeneration::Shared model;
     std::shared_ptr<const material_graph::PreparedGeneration> graph;
@@ -279,6 +280,7 @@ struct DataSystem::SceneAssetPreparation
 {
     file::path projectRoot;
     std::string name;
+    std::uint64_t epoch{};
     std::atomic<bool> cancelled{}, finished{};
     std::atomic<unsigned> phase{}; // Discovery, models, graphs, resources, ready.
     std::atomic<std::size_t> completed{}, total{};
@@ -289,6 +291,37 @@ struct DataSystem::SceneAssetPreparation
     job_handle resourceWork;
     std::string error;
 };
+
+struct DataSystem::AssetBundlePreparation
+{
+    std::uint64_t epoch{};
+    std::atomic<bool> cancelled{};
+    std::atomic<std::size_t> completed{};
+    job_handle work;
+};
+
+job_handle DataSystem::SubmitAssetWorkLocked(job_group work,
+    std::span<const job_handle> dependencies)
+{
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+    {
+        throw std::runtime_error("Asset work is shutting down or invalidated.");
+    }
+    std::erase_if(m_assetWork, [](const auto& handle) { return handle.is_complete(); });
+    // Allocate tracking storage first: no accepted DataSystem capture may be
+    // orphaned by an allocation failure after scheduler submission.
+    m_assetWork.emplace_back();
+    try
+    {
+        m_assetWork.back() = ce::get_job_scheduler().submit_after(dependencies, std::move(work));
+    }
+    catch (...)
+    {
+        m_assetWork.pop_back();
+        throw;
+    }
+    return m_assetWork.back();
+}
 
 std::shared_ptr<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAsset(
     FileGuid guid, const file::path& path, RuntimeAssetType type)
@@ -331,6 +364,15 @@ std::shared_ptr<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAsse
     {
         try
         {
+            {
+                std::lock_guard lock(m_assetPreparationMutex);
+                if (asset->cancelled.load(std::memory_order_acquire) ||
+                    m_assetPreparationStopping || asset->epoch != m_assetPreparationEpoch)
+                {
+                    asset->error = "Asset preparation was cancelled or invalidated.";
+                    return;
+                }
+            }
             const AssetDecoderApartment apartment;
             if (asset->type == RuntimeAssetType::MaterialGraph)
             {
@@ -350,7 +392,7 @@ std::shared_ptr<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAsse
                 }
                 else
                 {
-                    asset->model = LoadAndPublishModelAssetGeneration(asset->guid, true, false);
+                    asset->model = LoadAndPublishModelAssetGeneration(asset->guid, true, false, asset->epoch);
                 }
                 if (!asset->model)
                 {
@@ -369,8 +411,8 @@ std::shared_ptr<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAsse
     });
     const std::array dependencies{lane};
     asset->work = lane.valid()
-        ? ce::get_job_scheduler().submit_after(dependencies, std::move(work))
-        : ce::get_job_scheduler().submit(std::move(work));
+        ? SubmitAssetWorkLocked(std::move(work), dependencies)
+        : SubmitAssetWorkLocked(std::move(work));
     lane = asset->work;
     m_assetPreparations.emplace(guid, asset);
     return asset;
@@ -382,7 +424,8 @@ bool DataSystem::PublishRuntimeAsset(const std::shared_ptr<PreparedRuntimeAsset>
     // changes erase their request before a stale completion can publish.
     std::lock_guard lock(m_assetPreparationMutex);
     const auto found = m_assetPreparations.find(asset->guid);
-    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || asset->epoch != m_assetPreparationEpoch ||
+    if (asset->cancelled.load(std::memory_order_acquire) ||
+        m_assetPreparationStopping || m_assetInvalidationDepth != 0 || asset->epoch != m_assetPreparationEpoch ||
         asset->projectRoot != PathFinder::Relative() ||
         found == m_assetPreparations.end() || found->second.lock() != asset)
     {
@@ -448,7 +491,8 @@ assets::ModelAssetGeneration::Shared DataSystem::ReadPreparedModel(
 {
     error.clear();
     std::lock_guard lock(m_assetPreparationMutex);
-    if (!preparation || preparation->epoch != m_assetPreparationEpoch ||
+    if (!preparation || m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
+        preparation->cancelled.load(std::memory_order_acquire) || preparation->epoch != m_assetPreparationEpoch ||
         preparation->projectRoot != PathFinder::Relative() || !preparation->work.is_complete())
     {
         error = "Model preparation is incomplete or invalidated.";
@@ -477,6 +521,11 @@ std::shared_ptr<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAsset
     preparation->resources = bundle;
     {
         std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+        {
+            throw std::runtime_error("Scene asset preparation is shutting down or invalidated.");
+        }
+        preparation->epoch = m_assetPreparationEpoch;
         std::erase_if(m_sceneAssetPreparations, [](const auto& weak) { return weak.expired(); });
         m_sceneAssetPreparations.emplace_back(preparation);
     }
@@ -677,9 +726,14 @@ bool DataSystem::PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& p
     {
         return true;
     }
-    if (!publish || preparation->projectRoot != PathFinder::Relative())
     {
-        preparation->cancelled.store(true, std::memory_order_release);
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (!publish || m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
+            preparation->epoch != m_assetPreparationEpoch ||
+            preparation->projectRoot != PathFinder::Relative())
+        {
+            preparation->cancelled.store(true, std::memory_order_release);
+        }
     }
     const auto finish = [&](std::string message)
     {
@@ -762,11 +816,20 @@ bool DataSystem::PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& p
                 error.clear();
             }
         }
+        // Registration and handle assignment share the shutdown admission lock.
+        // Drain must see this job, or reject it before the scheduler accepts it.
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (preparation->cancelled.load(std::memory_order_acquire) ||
+            m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
+            preparation->epoch != m_assetPreparationEpoch)
+        {
+            return finish("Scene asset preparation was cancelled or invalidated.");
+        }
         preparation->completed.store(0, std::memory_order_relaxed);
         preparation->total.store(preparation->resources.assets.size() + preparation->graphs.size() +
             preparation->materialDocuments.size(), std::memory_order_relaxed);
-        preparation->phase.store(3, std::memory_order_release);
-        preparation->resourceWork = ce::get_job_scheduler().submit([this, preparation]
+        job_group work;
+        work.add([this, preparation]
         {
             const AssetDecoderApartment apartment;
             // Only CPU texture owners/material instances. RHI upload/fences and
@@ -889,6 +952,8 @@ bool DataSystem::PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& p
                 ++preparation->completed;
             }
         });
+        preparation->resourceWork = SubmitAssetWorkLocked(std::move(work));
+        preparation->phase.store(3, std::memory_order_release);
     }
     if (!wait && !preparation->resourceWork.is_complete())
     {
@@ -978,8 +1043,16 @@ DataSystem::AssetPreparationProgress DataSystem::SnapshotAssetPreparationProgres
 
 void DataSystem::DrainAssetPreparations()
 {
+    if (thread_pool::is_worker_thread())
+    {
+        // job_handle::wait rejects incomplete worker waits. Never mistake that
+        // rejection for a completed job and tear down its captured service.
+        throw std::logic_error("DataSystem shutdown requires the lifecycle owner thread.");
+    }
     std::vector<std::shared_ptr<PreparedRuntimeAsset>> assets;
     std::vector<std::shared_ptr<SceneAssetPreparation>> scenes;
+    std::vector<std::shared_ptr<AssetBundlePreparation>> bundles;
+    std::vector<job_handle> work;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         m_assetPreparationStopping = true;
@@ -992,6 +1065,10 @@ void DataSystem::DrainAssetPreparations()
                 assets.push_back(std::move(asset));
             }
         }
+        for (const auto& asset : assets)
+        {
+            asset->cancelled.store(true, std::memory_order_release);
+        }
         for (const auto& weak : m_sceneAssetPreparations)
         {
             if (auto scene = weak.lock())
@@ -1000,14 +1077,25 @@ void DataSystem::DrainAssetPreparations()
                 scenes.push_back(std::move(scene));
             }
         }
+        bundles.swap(m_assetBundlePreparations);
+        for (const auto& bundle : bundles)
+        {
+            bundle->cancelled.store(true, std::memory_order_release);
+        }
+        work.swap(m_assetWork);
     }
-    for (const auto& asset : assets)
+    // Waiting also releases the scheduler callbacks/captures. Request owners
+    // stay strong until every accepted preparation, prewarm and bundle ends.
+    for (const auto& handle : work)
     {
-        try { asset->work.wait(); } catch (...) {}
-    }
-    for (const auto& scene : scenes)
-    {
-        try { scene->resourceWork.wait(); } catch (...) {}
+        try
+        {
+            handle.wait();
+        }
+        catch (...)
+        {
+            // A task failure is terminal; its caller's handle still reports it.
+        }
     }
     std::lock_guard lock(m_assetPreparationMutex);
     m_assetPreparations.clear();
@@ -1028,7 +1116,7 @@ void DataSystem::Initialize()
         std::lock_guard lock(m_assetPreparationMutex);
         m_assetPreparationStopping = false;
     }
-	m_assetMetaRegistry = std::make_shared<AssetMetaRegistry>();
+	m_assetMetaRegistry = own::make_shared<AssetMetaRegistry>();
 	const bool authoring = PathFinder::IsAssetAuthoringEnabled();
 	if (authoring)
 	{
@@ -1109,6 +1197,24 @@ void DataSystem::Finalize()
 		std::lock_guard lock(m_pendingAssetChangeMutex);
 		m_pendingAssetChanges.clear();
 	}
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> retiredCatalog;
+    AssetDepot::TextureAssetEntries retiredTextures;
+    {
+        std::lock_guard preparationLock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        retiredCatalog = std::move(m_cookedCatalog);
+        retiredTextures = InvalidateTextureAssetsLocked();
+        m_cookedStaleAssets.clear();
+        if (m_assetDepotRevision != (std::numeric_limits<std::uint64_t>::max)())
+        {
+            ++m_assetDepotRevision;
+        }
+    }
+    {
+        std::lock_guard lock(m_sceneMaterialMutex);
+        m_recordingSceneMaterials = false;
+        m_sceneMaterials.clear();
+    }
 
 	m_assetMetaRegistry.reset();
 }
@@ -1202,8 +1308,17 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(FileGu
 }
 
 assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGeneration(
-	FileGuid guid, bool allowEditorRecovery, bool publish)
+	FileGuid guid, bool allowEditorRecovery, bool publish, std::optional<std::uint64_t> expectedEpoch)
 {
+    std::uint64_t loadEpoch;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || (expectedEpoch && *expectedEpoch != m_assetPreparationEpoch))
+        {
+            return {};
+        }
+        loadEpoch = m_assetPreparationEpoch;
+    }
 	ce::profile_scope profile{ ce::marker<"Asset.ModelGeneration">() };
 	// MBC11 — cooked catalog가 마운트돼 있고 이 모델의 generation 레코드가 신선하면
 	// 그 레코드(Derived/Models/xx/<id>/<gen>/generation.asset)를 읽는다. Player는 이
@@ -1245,7 +1360,9 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 		// before applying a reload; the repair itself never calls this loader.
 		if (allowEditorRecovery && !fromCatalog && PathFinder::IsAssetAuthoringEnabled()
 			&& AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
-			return LoadAndPublishModelAssetGeneration(guid, false, publish);
+        {
+            return LoadAndPublishModelAssetGeneration(guid, false, publish, loadEpoch);
+        }
 		const std::string detail = loaded.issues.empty()
 			? "알 수 없는 generation load 실패"
 			: loaded.issues.front().context + ": "
@@ -1266,7 +1383,9 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
         !assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *loaded.generation))
     {
         if (allowEditorRecovery && AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
-            return LoadAndPublishModelAssetGeneration(guid, false, publish);
+        {
+            return LoadAndPublishModelAssetGeneration(guid, false, publish, loadEpoch);
+        }
         Debug::PrintLog(spdlog::level::err,
                         "Model material graphs are missing; retain geometry and create editable default graphs.");
     }
@@ -1277,6 +1396,11 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
     }
     const std::string sourcePathString = sourceLabel;
 
+    std::lock_guard preparationLock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
+    {
+        return {};
+    }
     assets::ModelAssetPublishResult published =
 		m_modelAssetGenerations.Publish(std::move(loaded.generation));
 	if (!published.Succeeded())
@@ -1289,8 +1413,10 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 	}
 	// MBC7 — 교체된 generation의 embedded texture owner는 새 generation과
 	// 섞이지 않는다(§6.2 "이전 texture generation 재사용 금지").
-	if (published.retired)
-		RetireModelGenerationTextures(published.retired->Handle());
+    if (published.retired)
+    {
+        RetireModelGenerationTextures(published.retired->Handle());
+    }
 	return published.current;
 }
 
@@ -1949,6 +2075,22 @@ std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphG
 {
     ce::profile_scope profile{ ce::marker<"Material.GraphGeneration">() };
     const experiment::AssetId id{guid.m_guid};
+    std::uint64_t loadEpoch;
+    material_graph::GenerationPreparationRequest request;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping)
+        {
+            error = "Material graph loading is shutting down.";
+            return {};
+        }
+        loadEpoch = m_assetPreparationEpoch;
+        request = m_materialGraphGenerations.BeginPreparation(id, reload, error);
+    }
+    if (!request)
+    {
+        return {};
+    }
     // 이미 세대가 있는 그래프도 남긴다. 그래야 다음 열기에 세대가 비어 있을 때 선적재된다.
     // 경로 해석은 다른 잠금을 잡으므로 기록 잠금 밖에서 한다.
     bool recording = false;
@@ -1964,14 +2106,25 @@ std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphG
             if (m_recordingSceneMaterials) m_sceneMaterials.emplace_back(guid, std::move(sourcePath));
         }
     }
-    return m_materialGraphGenerations.Load(
-        id,
+    const auto prepared = material_graph::GenerationStore::Prepare(
+        request,
         [this, guid](material_graph::CookedProgram& result, std::string& failure) {
             const file::path sourcePath =
                 PathFinder::IsAssetAuthoringEnabled() ? GetMaterialGraphSourcePath(guid) : file::path{};
             return LoadMaterialGraphProgram(guid, sourcePath, result, failure);
         },
-        reload, error);
+        error);
+    if (!prepared)
+    {
+        return {};
+    }
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
+    {
+        error = "Material graph loading was cancelled or invalidated.";
+        return {};
+    }
+    return m_materialGraphGenerations.Publish(*prepared, error);
 }
 
 bool DataSystem::LoadMaterialGraphProgram(FileGuid guid, const file::path& sourcePath,
@@ -2045,8 +2198,22 @@ constexpr std::size_t kMaxSceneMaterials = 4096;
 
 void DataSystem::PrewarmSceneMaterials(const file::path& scene)
 {
-    if (!PathFinder::IsAssetAuthoringEnabled()) return;
+    if (thread_pool::is_worker_thread())
     {
+        throw std::logic_error("Scene material prewarm requires the scene owner thread.");
+    }
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        return;
+    }
+    std::uint64_t loadEpoch;
+    {
+        std::lock_guard preparationLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+        {
+            return;
+        }
+        loadEpoch = m_assetPreparationEpoch;
         std::lock_guard lock(m_sceneMaterialMutex);
         m_recordingSceneMaterials = true;
         m_sceneMaterials.clear();
@@ -2079,11 +2246,27 @@ void DataSystem::PrewarmSceneMaterials(const file::path& scene)
             std::string failure;
             try
             {
-                if (!m_materialGraphGenerations.Load(experiment::AssetId{graphs[index].first.m_guid},
+                material_graph::GenerationPreparationRequest request;
+                {
+                    std::lock_guard lock(m_assetPreparationMutex);
+                    if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
+                    {
+                        return;
+                    }
+                    request = m_materialGraphGenerations.BeginPreparation(
+                        experiment::AssetId{graphs[index].first.m_guid}, false, failure);
+                }
+                const auto prepared = material_graph::GenerationStore::Prepare(request,
                     [&](material_graph::CookedProgram& result, std::string& error)
                     {
                         return LoadMaterialGraphProgram(graphs[index].first, graphs[index].second, result, error);
-                    }, false, failure))
+                    }, failure);
+                std::lock_guard lock(m_assetPreparationMutex);
+                if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
+                {
+                    return;
+                }
+                if (!prepared || !m_materialGraphGenerations.Publish(*prepared, failure))
                 {
                     ++failures;
                 }
@@ -2096,14 +2279,17 @@ void DataSystem::PrewarmSceneMaterials(const file::path& scene)
     };
     // 컴파일 칸 수만큼만 작업 스레드를 쓴다. 더 띄우면 칸을 기다리며 작업 스레드를 붙든다.
     const std::size_t workers = std::min(graphs.size(), RHIShaderCompiler::MaxParallelCompiles());
-    if (thread_pool::is_worker_thread())
+    job_group jobs;
+    for (std::size_t index = 0; index < workers; ++index)
     {
-        work(); // 작업 스레드는 다른 작업을 기다릴 수 없다.
+        jobs.add([&work] { work(); });
     }
-    else
+    job_handle completion;
     {
-        ce::get_job_scheduler().submit_indexed(workers, [&](std::size_t) { work(); }).wait();
+        std::lock_guard lock(m_assetPreparationMutex);
+        completion = SubmitAssetWorkLocked(std::move(jobs));
     }
+    completion.wait();
     if (failures)
     {
         // 실패한 그래프는 엔티티 적재가 다시 시도하고 그 오류를 보고한다.
@@ -2261,6 +2447,14 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
 
 bool DataSystem::ConfigureEditableDefaultMaterialGraph(Material& material, std::string_view cause, std::string& error)
 {
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping)
+        {
+            error = "Material graph recovery is shutting down.";
+            return false;
+        }
+    }
     if (!PathFinder::IsAssetAuthoringEnabled())
     {
         error = std::string(cause);
@@ -2311,12 +2505,38 @@ bool DataSystem::ConfigureMaterialGraphAuthoring(Material& material, const LX::L
         error = "Material graph authoring requires an Editor project.";
         return false;
     }
-    auto generation = m_materialGraphGenerations.Load(
-        description.graphId,
+    std::uint64_t loadEpoch;
+    material_graph::GenerationPreparationRequest request;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping)
+        {
+            error = "Material graph authoring is shutting down.";
+            return false;
+        }
+        loadEpoch = m_assetPreparationEpoch;
+        request = m_materialGraphGenerations.BeginPreparation(description.graphId, true, error);
+    }
+    const auto prepared = material_graph::GenerationStore::Prepare(
+        request,
         [&](material_graph::CookedProgram& result, std::string& failure) {
             return CompileAuthoringMaterial(asset, FileGuid(description.graphId.value), result, failure);
         },
-        true, error);
+        error);
+    if (!prepared)
+    {
+        return false;
+    }
+    std::shared_ptr<const material_graph::Generation> generation;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
+        {
+            error = "Material graph authoring was cancelled or invalidated.";
+            return false;
+        }
+        generation = m_materialGraphGenerations.Publish(*prepared, error);
+    }
     return generation && ConfigureMaterialGraph(material, description, error);
 }
 
@@ -3215,6 +3435,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
             }
         }
     } invalidation;
+    AssetDepot::TextureAssetEntries retiredTextures;
     if (change.kind != RuntimeAssetChangeKind::CatalogUpsert)
     {
         // The current document closure may reference a changed model's generated
@@ -3225,6 +3446,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         invalidation.mutex = &m_assetPreparationMutex;
         invalidation.depth = &m_assetInvalidationDepth;
         ++m_assetPreparationEpoch;
+        retiredTextures = InvalidateTextureAssetsLocked();
         std::erase_if(m_retiredAssetPreparations, [](const auto& asset)
         {
             return asset->work.is_complete();
@@ -3233,6 +3455,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         {
             if (const auto asset = weak.lock())
             {
+                asset->cancelled.store(true, std::memory_order_release);
                 if (asset->type == RuntimeAssetType::MaterialGraph)
                 {
                     m_materialGraphGenerations.InvalidatePreparation(experiment::AssetId{guid.m_guid});
@@ -3244,6 +3467,10 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
             }
         }
         m_assetPreparations.clear();
+        for (const auto& bundle : m_assetBundlePreparations)
+        {
+            bundle->cancelled.store(true, std::memory_order_release);
+        }
         for (const auto& weak : m_sceneAssetPreparations)
         {
             if (const auto preparation = weak.lock())
@@ -3364,10 +3591,16 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 	const auto detachForType = [this, &detach](RuntimeAssetType type,
 		auto& cache, std::mutex& cacheMutex)
 	{
-		auto generation = detach(cache, cacheMutex);
-		if (!generation || !RequiresLegacyRetiredGeneration(type)) return;
-		std::lock_guard lock(m_retiredTextureMutex);
-		m_retiredTextureGenerations.emplace_back(std::move(generation));
+        auto generation = detach(cache, cacheMutex);
+        if constexpr (std::is_same_v<decltype(generation), std::shared_ptr<Texture>>)
+        {
+            if (!generation || !RequiresLegacyRetiredGeneration(type))
+            {
+                return;
+            }
+            std::lock_guard lock(m_retiredTextureMutex);
+            m_retiredTextureGenerations.emplace_back(std::move(generation));
+        }
 	};
 
 	switch (assetType)
@@ -3378,11 +3611,10 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 		if (FileGuid{} != guid)
 		{
 			// MBC7 — generation과 그 embedded texture owner는 한 단위로 은퇴한다.
-			if (const assets::ModelAssetGeneration::Shared retired =
-				m_modelAssetGenerations.Retire(guid.m_guid))
-			{
-				RetireModelGenerationTextures(retired->Handle());
-			}
+            if (const auto retired = m_modelAssetGenerations.Retire(guid.m_guid))
+            {
+                RetireModelGenerationTextures(retired->Handle());
+            }
 		}
 		break;
 	case RuntimeAssetType::Material:
@@ -3458,58 +3690,86 @@ file::path DataSystem::GetFilePath(FileGuid fileguid) const
 	return m_assetMetaRegistry ? m_assetMetaRegistry->GetPath(fileguid) : file::path{};
 }
 
-namespace
+std::shared_ptr<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBundle(const AssetBundle& bundle)
 {
-job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
-    std::shared_ptr<std::atomic<std::size_t>> completed = {})
-{
-	job_group jobs;
-	for (const auto& entry : bundle.assets)
-	{
-		auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
-		file::path name = entry.assetName;
-
-		jobs.add([&data, type, name, completed]
-		{
-			ce::profile_scope profile{ ce::marker<"Asset.BundleJob">() };
-			switch (type)
-			{
-			case ManagedAssetType::Model:
-				(void)data.LoadModelAssetGenerationByPath(name.string());
-				break;
-			case ManagedAssetType::Material:
-				data.LoadMaterial(name.string());
-				break;
-			case ManagedAssetType::Texture:
-				data.LoadTexture(name.string());
-				break;
-			case ManagedAssetType::SpriteFont:
-				// 폰트 로딩은 D4에서 은퇴했다(DX11 SpriteFont). 번들에 옛
-				// 항목이 남아 있어도 조용히 건너뛴다 - SDF 계통이 서면
-				// 그때 새 타입으로 받는다.
-				break;
-			default:
-				break;
-			}
-			if (completed) completed->fetch_add(1, std::memory_order_release);
-		});
-	}
-
-    return jobs;
-}
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+    {
+        throw std::runtime_error("Asset bundle loading is shutting down or invalidated.");
+    }
+    std::erase_if(m_assetBundlePreparations, [](const auto& request) { return request->work.is_complete(); });
+    auto request = std::make_shared<AssetBundlePreparation>();
+    request->epoch = m_assetPreparationEpoch;
+    job_group jobs;
+    for (const auto& entry : bundle.assets)
+    {
+        const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
+        const file::path name = entry.assetName;
+        jobs.add([this, request, type, name]
+        {
+            ce::profile_scope profile{ ce::marker<"Asset.BundleJob">() };
+            {
+                std::lock_guard lock(m_assetPreparationMutex);
+                if (request->cancelled.load(std::memory_order_acquire) ||
+                    m_assetPreparationStopping || request->epoch != m_assetPreparationEpoch)
+                {
+                    throw std::runtime_error("Asset bundle loading was cancelled or invalidated.");
+                }
+            }
+            switch (type)
+            {
+            case ManagedAssetType::Model:
+                (void)LoadModelAssetGenerationByPath(name.string());
+                break;
+            case ManagedAssetType::Material:
+                LoadMaterial(name.string());
+                break;
+            case ManagedAssetType::Texture:
+                LoadTexture(name.string());
+                break;
+            case ManagedAssetType::SpriteFont:
+                // Font loading retired with DX11 SpriteFont; old entries are ignored.
+                break;
+            default:
+                break;
+            }
+            {
+                std::lock_guard lock(m_assetPreparationMutex);
+                if (request->cancelled.load(std::memory_order_acquire) ||
+                    m_assetPreparationStopping || request->epoch != m_assetPreparationEpoch)
+                {
+                    throw std::runtime_error("Asset bundle loading was cancelled or invalidated.");
+                }
+                request->completed.fetch_add(1, std::memory_order_release);
+            }
+        });
+    }
+    // Keep the request root as well as the handle. The caller may discard its
+    // async token immediately; shutdown still cancels and joins this batch.
+    m_assetBundlePreparations.push_back(request);
+    try
+    {
+        request->work = SubmitAssetWorkLocked(std::move(jobs));
+    }
+    catch (...)
+    {
+        m_assetBundlePreparations.pop_back();
+        throw;
+    }
+    return request;
 }
 
 AssetBundleLoadResult DataSystem::LoadAssetBundle(const AssetBundle& bundle)
 {
-    auto completed = std::make_shared<std::atomic<std::size_t>>(0);
     ce::profile_scope profile{ ce::marker<"Asset.BundleWait">() };
-    ce::get_job_scheduler().submit(MakeAssetBundleJobs(*this, bundle, completed)).wait();
-    return {bundle.assets.size(), completed->load(std::memory_order_acquire)};
+    const auto request = SubmitAssetBundle(bundle);
+    request->work.wait();
+    return {bundle.assets.size(), request->completed.load(std::memory_order_acquire)};
 }
 
 job_handle DataSystem::LoadAssetBundleAsync(const AssetBundle& bundle)
 {
-    return ce::get_job_scheduler().submit(MakeAssetBundleJobs(*this, bundle));
+    return SubmitAssetBundle(bundle)->work;
 }
 
 void DataSystem::RetainAssets(const AssetBundle& bundle)
@@ -3610,6 +3870,29 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 	std::string& outError)
 {
 	outError.clear();
+    std::uint64_t expectedRevision{};
+    std::uint64_t expectedEpoch{};
+    {
+        std::lock_guard preparationLock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u)
+        {
+            outError = "Catalog admission is stopped or invalidating.";
+            return false;
+        }
+        if (m_cookedCatalog && m_cookedCatalog->MountCount() != 0u)
+        {
+            outError = "Unmount active AssetSets before replacing the legacy catalog.";
+            return false;
+        }
+        if (m_assetDepotRevision == (std::numeric_limits<std::uint64_t>::max)())
+        {
+            outError = "Catalog resolver revision space exhausted.";
+            return false;
+        }
+        expectedRevision = m_assetDepotRevision;
+        expectedEpoch = m_assetPreparationEpoch;
+    }
 	const file::path manifestPath =
 		derivedRoot / "Derived" / "asset-manifest.cemf";
 	std::error_code errorCode;
@@ -3617,9 +3900,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 	{
 		// 미게시는 실패가 아니다 — 에디터 작업 트리에는 Derived가 없다.
 		// 조용히 두면 resolver·모델 로드가 예전처럼 source로 간다.
-		std::lock_guard lock(m_cookedCatalogMutex);
-		m_cookedCatalog.reset();
-		m_cookedStaleAssets.clear();
+        // Failed or absent candidates preserve the currently published catalog.
 		return false;
 	}
 
@@ -3648,7 +3929,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 
 	std::vector<experiment::cooked::AssetManifestIssue> issues;
 	// Load는 실패하면 **빈 catalog**를 준다(부분 표를 내놓지 않는 계약).
-	auto catalog = std::make_shared<experiment::cooked::CookedAssetCatalog>(
+	auto catalog = own::make_shared<const experiment::cooked::CookedAssetCatalog>(
 		experiment::cooked::CookedAssetCatalog::Load(bytes, derivedRoot, issues));
 	if (catalog->IsEmpty())
 	{
@@ -3657,9 +3938,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 		{
 			outError += " | " + issue.context + ": " + issue.message;
 		}
-		std::lock_guard lock(m_cookedCatalogMutex);
-		m_cookedCatalog.reset();
-		m_cookedStaleAssets.clear();
+        // Failed or absent candidates preserve the currently published catalog.
 		return false;
 	}
 
@@ -3667,8 +3946,8 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 	// AssetMetaRegistry 전체를 새로 만든 뒤 한 번에 교체한다. Editor는 watcher가
 	// 갱신하는 source registry가 정본이므로 optional cooked mount가 건드리지 않는다.
 	const bool authoring = PathFinder::IsAssetAuthoringEnabled();
-	std::shared_ptr<AssetMetaRegistry> registryForFreshness = m_assetMetaRegistry;
-	std::shared_ptr<AssetMetaRegistry> packagedRegistry;
+	own::shared_owner<AssetMetaRegistry> registryForFreshness = m_assetMetaRegistry;
+	own::shared_owner<AssetMetaRegistry> packagedRegistry;
 	if (!authoring)
 	{
 		if (catalog->SourceAssetCount() == 0u)
@@ -3677,7 +3956,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 			return false;
 		}
 
-		packagedRegistry = std::make_shared<AssetMetaRegistry>();
+		packagedRegistry = own::make_shared<AssetMetaRegistry>();
 		for (const experiment::cooked::AssetSourceManifestEntry& source
 			: catalog->SourceAssets())
 		{
@@ -3749,12 +4028,27 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 	const std::size_t entryCount = catalog->Size();
 	const std::size_t sourceAssetCount = catalog->SourceAssetCount();
 	const std::size_t staleCount = stale.size();
-	{
-		std::lock_guard lock(m_cookedCatalogMutex);
-		m_cookedCatalog = std::move(catalog);
-		m_cookedStaleAssets = std::move(stale);
-	}
-	if (packagedRegistry) m_assetMetaRegistry = std::move(packagedRegistry);
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> retiredCatalog;
+    AssetDepot::TextureAssetEntries retiredTextures;
+    {
+        std::lock_guard preparationLock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u
+            || m_assetPreparationEpoch != expectedEpoch || m_assetDepotRevision != expectedRevision)
+        {
+            outError = "Catalog changed before publication; legacy mount is stale.";
+            return false;
+        }
+        retiredCatalog = std::move(m_cookedCatalog);
+        retiredTextures = InvalidateTextureAssetsLocked();
+        m_cookedCatalog = std::move(catalog);
+        m_cookedStaleAssets = std::move(stale);
+        ++m_assetDepotRevision;
+        if (packagedRegistry)
+        {
+            m_assetMetaRegistry = std::move(packagedRegistry);
+        }
+    }
     // A new cook transaction must be observable to subsequent GUID loads.
     // Existing Material snapshots continue to own their accepted generation.
     m_materialGraphGenerations.Clear();
@@ -3763,7 +4057,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 	return true;
 }
 
-std::shared_ptr<const experiment::cooked::CookedAssetCatalog>
+own::shared_owner<const experiment::cooked::CookedAssetCatalog>
 DataSystem::GetCookedCatalog() const
 {
 	std::lock_guard lock(m_cookedCatalogMutex);

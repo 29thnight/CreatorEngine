@@ -60,11 +60,13 @@ struct completion_state : std::enable_shared_from_this<completion_state>
     std::function<void(std::size_t)> indexed_task_;
     std::size_t indexed_count_{};
     std::vector<std::function<void(std::exception_ptr)>> continuations_;
+    std::function<void(std::exception_ptr)> terminal_observer_;
 
     void finish(std::exception_ptr error) noexcept
     {
         std::vector<std::function<void()>> discarded;
         std::function<void(std::size_t)> discarded_indexed;
+        std::function<void(std::exception_ptr)> terminal_observer;
         {
             std::lock_guard lock(mutex_);
             if (complete_ || completing_)
@@ -72,9 +74,25 @@ struct completion_state : std::enable_shared_from_this<completion_state>
             completing_ = true;
             discarded = std::move(tasks_);
             discarded_indexed = std::move(indexed_task_);
+            terminal_observer = std::move(terminal_observer_);
         }
         discarded.clear();
         discarded_indexed = {};
+        if (terminal_observer)
+        {
+            try
+            {
+                terminal_observer(error);
+            }
+            catch (...)
+            {
+                if (!error)
+                {
+                    error = std::current_exception();
+                }
+            }
+            terminal_observer = {};
+        }
         std::vector<std::function<void(std::exception_ptr)>> ready;
         {
             std::lock_guard lock(mutex_);
@@ -202,6 +220,7 @@ job_handle job_scheduler::submit_after(std::span<const job_handle> dependencies,
     auto job = std::make_shared<job_detail::completion_state>();
     job->owner_ = state_;
     job->tasks_ = std::move(group.tasks_);
+    job->terminal_observer_ = std::move(group.terminal_observer_);
     job->remaining_ = dependencies.size() + 1; // Registration barrier.
     {
         std::lock_guard lock(state_->mutex_);

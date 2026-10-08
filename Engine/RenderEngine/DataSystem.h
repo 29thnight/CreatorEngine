@@ -7,8 +7,12 @@
 #include "AssetBundle.h"
 #include "JobScheduler.h"
 #include "ShaderMetaHandle.h"
+#include "AssetDepot/AssetLink.h"
+#include "AssetDepot/AssetMountId.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "MaterialGraphRuntime.h"
+#include "../Utility_Framework/Ownership.h"
+#include "AssetDepot/TextureAssetRuntime.h"
 #include <atomic>
 #include <cstddef>
 #include <iosfwd>
@@ -16,6 +20,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <span>
 #include <unordered_set>
 #include <vector>
 
@@ -35,7 +40,12 @@ class Material;
 struct ShaderMeta;
 namespace Authoring { class WriteNode; }
 namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
-namespace experiment::cooked { class CookedAssetCatalog; } // I7-C1
+namespace experiment::cooked
+{
+    class CookedAssetCatalog;
+    class ArtifactByteSource;
+    struct AssetSetMountOptions;
+} // I7-C1
 namespace experiment { struct AssetId; } // I7-C2
 
 enum class RuntimeAssetType
@@ -105,11 +115,35 @@ public:
 			|| assetType == RuntimeAssetType::SpriteSheet;
 	}
 
+    // Typed CPU acquisition. Only Texture has an implemented v3 runtime decoder.
+    // Misses are I/O-free; callers request work explicitly and poll its state.
+    template<class T>
+    [[nodiscard]] own::shared_owner<const T> TryAcquire(AssetDepot::AssetLink<T> link,
+        const AssetDepot::TextureAssetVariant& variant = {})
+    {
+        static_assert(std::is_same_v<T, Texture>, "AssetDepot runtime acquisition currently supports Texture only.");
+        return TryAcquireTexture(link, variant);
+    }
+
+    template<class T>
+    [[nodiscard]] AssetDepot::AssetRequest<T> RequestAsync(AssetDepot::AssetLink<T> link,
+        const AssetDepot::TextureAssetVariant& variant = {})
+    {
+        static_assert(std::is_same_v<T, Texture>, "AssetDepot runtime acquisition currently supports Texture only.");
+        return RequestTextureAsync(link, variant);
+    }
+
+    void SetTextureAssetCacheBudget(std::size_t bytes);
+    [[nodiscard]] AssetDepot::TextureAssetCacheSnapshot SnapshotTextureAssetCache() const;
+
 	void Initialize();
+    // Lifecycle owner only: stop admission and drain every accepted asset job
+    // before clearing CPU caches. Existing renderer completion/retire rules apply.
     void Finalize();
 	// Asset bundle operations
 	AssetBundleLoadResult LoadAssetBundle(const AssetBundle& bundle);
-	// Nonblocking submission; the handle owns all copied asset paths.
+	// Nonblocking submission; copied paths and request state remain owned until
+    // completion. Finalize also drains the work if the caller drops the handle.
 	job_handle LoadAssetBundleAsync(const AssetBundle& bundle);
     // CPU preparation uses the common scheduler. Poll/publish only at the scene
     // owner boundary; GPU upload/readiness remains owned by the renderer.
@@ -204,9 +238,36 @@ public:
 	// (에디터 작업 트리에는 Derived가 없다 — 마운트 실패가 아니라 미게시다).
 	// 이것이 M2 resolver의 cooked 우선 해석과 모델 cookedPath의 유일한 출처다.
 	bool MountCookedCatalog(const file::path& derivedRoot, std::string& outError);
-	// 수명 안전: 호출자가 shared_ptr을 잡은 동안만 raw 포인터를 쓴다
+
+    // AssetDepot metadata transactions. v2 packages remain on MountCookedCatalog;
+    // a new AssetSet must be explicitly cooked as CEMF v3.
+    [[nodiscard]] AssetDepot::AssetMountId MountAssetSet(
+        std::span<const std::byte> manifestBytes,
+        own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource,
+        const experiment::cooked::AssetSetMountOptions& options,
+        std::vector<experiment::cooked::AssetManifestIssue>& outIssues);
+    [[nodiscard]] bool UnmountAssetSet(AssetDepot::AssetMountId mountId,
+        std::vector<experiment::cooked::AssetManifestIssue>& outIssues);
+
+    template<class T>
+    [[nodiscard]] std::vector<AssetDepot::AssetLink<T>> ListRootLinks(
+        AssetDepot::AssetMountId mountId) const
+    {
+        std::vector<AssetDepot::AssetLink<T>> result;
+        for (const auto& reference : ListAssetSetRoots(mountId, AssetDepot::AssetLink<T>::kKind))
+        {
+            AssetDepot::AssetLink<T> link;
+            if (AssetDepot::AssetLink<T>::FromReference(reference, link))
+            {
+                result.push_back(link);
+            }
+        }
+        return result;
+    }
+
+	// 수명 안전: 호출자가 strong owner를 잡은 동안만 raw 포인터를 쓴다
 	// (마운트가 렌더 중에 표를 갈아 끼워도 진행 중인 해석이 살아 있어야 한다).
-	[[nodiscard]] std::shared_ptr<const experiment::cooked::CookedAssetCatalog>
+	[[nodiscard]] own::shared_owner<const experiment::cooked::CookedAssetCatalog>
 		GetCookedCatalog() const;
 	[[nodiscard]] std::size_t CookedCatalogEntryCount() const;
 	[[nodiscard]] std::size_t CookedCatalogSourceAssetCount() const;
@@ -283,6 +344,7 @@ public:
     file::path GetMaterialGraphSourcePath(FileGuid guid) const;
     // Explicit synchronous warm-up retains verified graph generations, so later
     // entity loads consume the prepared owners without a second cache decode.
+    // Synchronous scene-owner entry point; pool workers cannot call or wait here.
     // Historical lists are hints here; PrepareSceneAssets discovers current
     // dependencies for the normal asynchronous editor path.
     void PrewarmSceneMaterials(const file::path& scene);
@@ -353,8 +415,13 @@ public:
 		std::vector<assets::ModelTextureHandle>> m_modelGenerationTextureOwners;
 	mutable ModelGenerationTextureCacheSnapshot m_modelGenerationTextureStats;
 	// I7-C1 — cooked catalog. immutable 표라 교체는 포인터 하나 바꾸기다.
-	std::shared_ptr<const experiment::cooked::CookedAssetCatalog> m_cookedCatalog;
+	own::shared_owner<const experiment::cooked::CookedAssetCatalog> m_cookedCatalog;
 	mutable std::mutex m_cookedCatalogMutex;
+    // Guarded with m_cookedCatalogMutex; never reset/reused on reinitialize.
+    std::uint64_t m_assetDepotRevision{};
+    std::uint64_t m_nextAssetMountId{ 1u };
+    [[nodiscard]] std::vector<experiment::cooked::TypedAssetReference> ListAssetSetRoots(
+        AssetDepot::AssetMountId mountId, experiment::cooked::CookedAssetKind kind) const;
 	// I7-C2 — 마운트 때 한 번 판정한 stale 집합. 해석마다 stat을 두 번 하면
 	// sealing이 매 프레임 그 값을 문다.
 	std::unordered_set<FileGuid> m_cookedStaleAssets;
@@ -363,6 +430,23 @@ public:
 	std::atomic<std::uint64_t> m_generationLoadFailed{ 0 };
 
 private:
+    [[nodiscard]] own::shared_owner<const Texture> TryAcquireTexture(
+        AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant);
+    [[nodiscard]] AssetDepot::AssetRequest<Texture> RequestTextureAsync(
+        AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant);
+    void RunTextureAssetWork(own::shared_owner<AssetDepot::TextureAssetWork> work);
+    void CompleteTextureAssetWorkLocked(const own::shared_owner<AssetDepot::TextureAssetWork>& work,
+        AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
+        std::string message = {}, own::shared_owner<const Texture> texture = {});
+    void TrimTextureAssetsLocked();
+    [[nodiscard]] AssetDepot::TextureAssetEntries InvalidateTextureAssetsLocked();
+    AssetDepot::TextureAssetRuntimeState m_textureAssets{};
+
+    struct AssetBundlePreparation;
+    std::shared_ptr<AssetBundlePreparation> SubmitAssetBundle(const AssetBundle& bundle);
+    // Caller holds m_assetPreparationMutex through registration and submission.
+    job_handle SubmitAssetWorkLocked(job_group work,
+        std::span<const job_handle> dependencies = {});
     std::shared_ptr<PreparedRuntimeAsset> PrepareRuntimeAsset(
         FileGuid guid, const file::path& path, RuntimeAssetType type);
     bool PublishRuntimeAsset(const std::shared_ptr<PreparedRuntimeAsset>& asset, std::string& error);
@@ -373,6 +457,9 @@ private:
     std::map<FileGuid, std::weak_ptr<PreparedRuntimeAsset>> m_assetPreparations;
     std::vector<std::weak_ptr<SceneAssetPreparation>> m_sceneAssetPreparations;
     std::vector<std::shared_ptr<PreparedRuntimeAsset>> m_retiredAssetPreparations;
+    std::vector<std::shared_ptr<AssetBundlePreparation>> m_assetBundlePreparations;
+    // Completion owns callback/capture teardown, even after a weak request expires.
+    std::vector<job_handle> m_assetWork;
     std::vector<job_handle> m_assetPreparationLanes;
     std::size_t m_nextAssetPreparationLane{};
     std::uint64_t m_assetPreparationEpoch{ 1 };
@@ -380,7 +467,8 @@ private:
     std::size_t m_assetInvalidationDepth{};
 	void LoadAssetCatalog(const file::path& root);
 	[[nodiscard]] assets::ModelAssetGeneration::Shared LoadAndPublishModelAssetGeneration(
-		FileGuid guid, bool allowEditorRecovery = false, bool publish = true);
+		FileGuid guid, bool allowEditorRecovery = false, bool publish = true,
+        std::optional<std::uint64_t> expectedEpoch = {});
 	DataContainer<Texture>& TextureCacheFor(TextureFileType type);
 	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
 		FileGuid guid, bool remove);
@@ -400,11 +488,11 @@ private:
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
 	file::path m_dragDropPath{};
-	std::shared_ptr<AssetMetaRegistry> m_assetMetaRegistry{};
+	own::shared_owner<AssetMetaRegistry> m_assetMetaRegistry{};
 	// Texture 계열의 legacy raw 별칭만을 위한 한시적 보존 목록. Model/Material은
 	// cache 분리 뒤 실제 shared consumer가 없으면 즉시 파괴된다.
 	std::mutex m_retiredTextureMutex;
-	std::vector<std::shared_ptr<void>> m_retiredTextureGenerations;
+	std::vector<std::shared_ptr<Texture>> m_retiredTextureGenerations;
 
 	struct ShaderMetaCacheSlot
 	{

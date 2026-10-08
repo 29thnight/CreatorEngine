@@ -16,6 +16,7 @@
 //   지금 CPU 픽셀은 백엔드 중립 타입이 든다. 디코더와 BC 압축기는 여전히
 //   DirectXTex 이지만 Texture.cpp 안에만 있다.
 #include "TextureImage.h"
+#include "../Utility_Framework/Ownership.h"
 #include <mathematics/vector2.hpp>
 #include <cstddef>
 #include <memory>
@@ -43,6 +44,12 @@
 //   텍스처 캐시(DX12·Vulkan)가 그것을 신원(m_assetId)으로 캐싱해 GPU에
 //   올린다.
 //-----------------------------------------------------------------------------
+
+namespace AssetDepot
+{
+    struct TextureAssetVariant;
+    struct TextureAssetOrigin;
+}
 
 enum class TextureType
 {
@@ -95,6 +102,9 @@ public:
 	static std::shared_ptr<Texture> LoadSharedFromMemory(
 		std::span<const std::byte> bytes, bool isCompress = false);
 
+    [[nodiscard]] own::shared_owner<const AssetDepot::TextureAssetOrigin> GetAssetOrigin() const;
+    [[nodiscard]] std::size_t DecodedByteSize() const noexcept;
+
 	// PHASE 3.75 MBC7 — 이미 디코드된 이미지(mip·array 포함)를 그대로 CPU 픽셀로
 	// 삼는다. ModelAssetGeneration의 embedded texture는 generation load가 검증·
 	// 디코드해 둔 RGBA8 픽셀이라 파일 로더를 다시 태울 이유가 없다 — 여기서
@@ -140,8 +150,8 @@ public:
 	//   진짜 안 쓰이므로 CPU 사본을 계속 드는 것이 아깝다. 지금은 그대로
 	//   두고 관측만 한다 — 은퇴 시점에 함께 놓는 것은 별도 판단이다.
 	//
-	// shared_ptr인 이유: Texture가 이동되는 경로가 있어 소유권을 하나로
-	// 묶어야 하고, unique_ptr이면 그 경로들이 깨진다.
+	// Immutable shared ownership preserves codec storage through Texture moves.
+	// The initial AssetDepot slice still pins this bulk for the descriptor lifetime.
 	//
 	// ★ 불투명 타입인 이유(축 A). 코덱이 낸 픽셀을 **그 자리에 그대로 둔다**.
 	//   컨테이너로 옮기면 로드마다 전량 복사가 한 번 붙는데, 4K HDR equirect
@@ -152,7 +162,7 @@ public:
 	//   DirectX:: 이름조차 알지 않는다. 디코더를 갈아 끼우는 날 바뀌는 것은
 	//   그 struct 의 정의 하나뿐이고 이 선언은 그대로다.
 	struct CodecImage;
-	std::shared_ptr<CodecImage> m_codecImage;
+	own::shared_owner<const CodecImage> m_codecImage;
 
 	/// GPU 업로드용 뷰. 소유권을 넘기지 않는다 — 은퇴 후 재업로드가 같은
 	/// 픽셀을 다시 읽어야 한다.
@@ -203,6 +213,12 @@ public:
 
 private:
 	friend class DataSystem;
+    // AssetDepot worker-only construction from already verified exact bytes.
+    // No raw adoption, unique promotion or mutable aliases survive publication.
+    [[nodiscard]] static own::shared_owner<const Texture> LoadOwnedFromMemory(
+        std::span<const std::byte> bytes, const AssetDepot::TextureAssetVariant& variant,
+        own::shared_owner<const AssetDepot::TextureAssetOrigin> origin, std::string& failure);
+    own::shared_owner<const AssetDepot::TextureAssetOrigin> m_assetOrigin{};
 
 	RHIFormat m_samplingFormat{ RHIFormat::Unknown };
 	math::vector2 m_size{};
