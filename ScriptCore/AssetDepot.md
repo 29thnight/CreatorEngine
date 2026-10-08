@@ -1,8 +1,30 @@
-# AssetDepot managed Texture slice
+# AssetDepot managed CPU bindings
 
-The managed API supports `Texture` only. A link is stable identity data; a request
-and an acquired handle hold native CPU owners. Nothing serializes a pointer,
-resident slot or ownership object. Mount publication remains native-host work.
+A link is stable identity data; a request and an acquired handle hold native CPU
+owners. Nothing serializes a pointer, resident slot or ownership object. Mount
+publication remains native-host work. The static supported types are:
+
+| Managed marker | Manifest kind | Actual native CPU owner |
+| --- | ---: | --- |
+| `Texture` | 3 | `own::shared_owner<const Texture>` |
+| `Model` | 1 | `own::shared_owner<const assets::ModelAnimationDescriptor>` |
+| `Mesh` | 12 | `own::shared_owner<const assets::ModelMeshDescriptor>` |
+| `Skeleton` | 13 | `own::shared_owner<const assets::ModelSkeletonPayload>` |
+| `AnimationClip` | 14 | `own::shared_owner<const assets::ModelAnimationPayload>` |
+| `ShaderMeta` | 4 | `own::shared_owner<const ShaderMeta>` |
+| `MaterialProgram` | 8 | `own::shared_owner<const material_graph::Generation>` |
+| `Material` | 2 | `own::shared_owner<const ::Material>` |
+
+`Model` and `Mesh` are small descriptors, not whole-model/geometry bulk owners.
+Skeleton and clip requests acquire the selected payload; they do not load sibling
+clips. ShaderMeta is authored metadata with a UUIDv4 root (no subasset).
+MaterialProgram and Material use UUIDv4/v8 root identities (no subasset).
+MaterialProgram is a verified CPU program,
+not a compiled GPU pipeline. Material is the Lattice instance-document runtime
+view; it is not `experiment::Material` or a legacy reflected material. Unsupported
+representations report a failed request rather than silently choosing another
+resource shape. Other catalog kinds are not runtime bindings merely because they
+have a manifest enum value.
 
 ```csharp
 [SerializeField]
@@ -36,7 +58,9 @@ void PollLoad()
 ```
 
 - `TryAcquire<T>` is an I/O-free resident lookup; a miss returns `false`
-- `ListRootLinks<Texture>(mount)` returns identities without loading roots
+- `TextureAssetVariant` is accepted only for Texture; non-default options for any
+  other marker fail explicitly on both managed and native boundaries
+- `ListRootLinks<T>(mount)` returns identities without loading roots for each registered marker
 - `Snapshot()` copies CPU state/error/message and whether the underlying work has
   drained. `Cancelled` can be visible while `IsWorkComplete` is still false
 - `TryAcquireResult` returns a fresh independently disposable owner each time it
@@ -59,19 +83,57 @@ void PollLoad()
   and retirement remain governed by the existing renderer
 
 The serialized link format is
-`1:3:<canonical UUIDv4/v8 asset ID>:<canonical subasset UUID or nil>`.
-The first number is the link format version; `3` is the Texture kind. A default
+`1:<expected manifest kind>:<canonical UUIDv4/v8 asset ID>:<canonical subasset UUID or nil>`.
+The first number is the link format version; kinds are listed above (Texture is 3). A default
 link roundtrips as nil/nil. A non-nil subasset requires a non-nil asset. Malformed
 or mismatched-kind input preserves the previous field value. Editor commands
 report an input error; the inspector validates when Enter is pressed.
 
-The source generator emits direct `AssetLink<Texture>.TryParse` and `ToString`
-calls in the existing static field dispatch. This keeps lazy-link serialization
-and its closed supported type visible to NativeAOT, without reflective type lookup
-or treating a link as a resident pin. Other managed runtime kinds, Texture bulk
-rehydration, GPU access, and managed mount authoring are not implemented here.
+The source generator emits direct `AssetLink<T>.TryParse` and `ToString` calls
+for the field's exact closed registered type, including aliases such as
+`using MeshLink = CreatorEngine.AssetLink<CreatorEngine.Mesh>`. This keeps lazy-link
+serialization visible to NativeAOT without reflection or treating a link as a pin.
+The inspector/native serialized-field boundary accepts two-digit kinds and still
+uses the generated typed parser to preserve the previous value on malformed input.
 
-The API table was appended and its native/managed version is 34. Source inspection
-is not a successful runtime or NativeAOT verification: build, managed ABI smoke,
-GC/finalizer, reload, concurrent cancellation and shutdown/reinitialize execution
-remain required before claiming those acceptance checks passed.
+Opaque token type IDs are separate from manifest kinds. Texture keeps its existing
+v34 token ID (3); the additional concrete runtime views use `0x00010001` through
+`0x00010007` in the table order after Texture. The request-role bit is `0x80000000`.
+Native slots hold a closed variant of the actual typed owner or consumer request.
+Every lookup checks index, nonzero generation, role/concrete type and the actual
+variant alternative. `experiment::Material`, `ModelAssetGeneration` and geometry
+bulk have no registration despite sharing kinds with supported views. Managed
+handle/request construction also validates the exact expected token type and role.
+
+Typed request results pin their exact immutable generation across logical unmount
+or replacement. New `TryAcquire`/`RequestAsync` calls still consult the current
+resolver. Link parsing and root enumeration never imply residency or hard-closure
+loading. There are no new non-Texture descriptor-copy/bulk APIs in this ABI slice;
+Texture bulk rehydration, managed GPU access and mount authoring remain native work.
+
+The existing API table layout and native/managed version remain 34. No entry,
+POD layout or Texture token meaning changed; only the closed dispatch set expanded.
+The Program/Material branches require the native material-pipeline runtime slice
+(`DataSystem` concrete dispatch and `AssetTypeTraits<material_graph::Generation>`)
+to be integrated alongside this boundary change.
+
+## Unrun acceptance fixtures
+
+- `Tools/regression/asset_depot_managed_kind_probe.cpp` is an opt-in dedicated-host
+  fixture using the real native registry and DataSystem, not a mock owner. A host
+  supplies a source-free v3 mount with all eight roots, calls `Driver::Begin`, ticks
+  `Poll` without blocking the GT, then `VerifySessionRestart`. It covers concrete
+  type proof, high-bit kind rejection, texture-option rejection, separate consumers,
+  independent result owners, wrong-type/role releases, stale tokens and CLR restart
+- `Tools/regression/asset_depot_managed_kind_fixture.cs` is an opt-in source-generator
+  and managed host fixture. `VerifyStableSerialization` needs no native host and
+  verifies all eight lazy closed types, alias registration, nil links, invalid text
+  preserving fields, unknown types and non-texture options. `VerifyWarmHostBindings`
+  requires all fixture roots already resident and exercises direct NativeAOT-visible
+  request/result code with independently disposed owners
+- Neither fixture is auto-included in game/runtime targets. No build, test, binary,
+  shader or NativeAOT execution was performed. Source inspection is not runtime
+  verification. Future authorized runs must also cover allocator-failure injection,
+  off-thread Dispose and finalizer queue OOM, forced generation wrap/slot retirement,
+  unmount/reload while owners survive, finalizer delivery after restart and renderer
+  retirement. Do not claim those acceptance gates have passed from these sources

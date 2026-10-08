@@ -427,7 +427,7 @@ internal static unsafe class Native
         }
         if (result == AssetBindingResult.UnsupportedType)
         {
-            throw new NotSupportedException("AssetDepot currently supports Texture only.");
+            throw new NotSupportedException("This concrete type has no AssetDepot runtime binding.");
         }
         throw new InvalidOperationException($"AssetDepot binding failed: {result}.");
     }

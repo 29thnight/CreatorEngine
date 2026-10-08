@@ -254,7 +254,7 @@ namespace ConsoleCmd
             case ClrHost::ScriptFieldType::Float: type = "float"; value = CommandData::Double(clr.GetFieldFloat(id, i)); break;
             case ClrHost::ScriptFieldType::Int32: type = "int"; value = CommandData::Int(clr.GetFieldInt32(id, i)); break;
             case ClrHost::ScriptFieldType::Bool: type = "bool"; value = CommandData::Bool(clr.GetFieldBool(id, i)); break;
-            case ClrHost::ScriptFieldType::AssetLink: type = "asset-link<Texture>"; value = CommandData::String(clr.GetFieldString(id, i)); break;
+            case ClrHost::ScriptFieldType::AssetLink: type = "asset-link"; value = CommandData::String(clr.GetFieldString(id, i)); break;
             case ClrHost::ScriptFieldType::String: type = "string"; value = CommandData::String(clr.GetFieldString(id, i)); break;
             case ClrHost::ScriptFieldType::Float2:
             { type = "float2"; const auto v = clr.GetFieldFloat2(id, i); value = CommandData::Array(); value.Append(CommandData::Double(v.x)); value.Append(CommandData::Double(v.y)); break; }
@@ -322,7 +322,7 @@ namespace ConsoleCmd
         case ClrHost::ScriptFieldType::AssetLink:
             if (!clr.SetFieldAssetLink(id, index, rawValue))
             {
-                return InvalidArguments("Expected 1:3:<canonical UUIDv4/v8 asset>:<subasset UUID or nil>; nil/nil clears the link");
+                return InvalidArguments("Expected 1:<this field's kind>:<canonical UUIDv4/v8 asset>:<subasset UUID or nil>; version and kind must match; nil/nil clears the link");
             }
             break;
         case ClrHost::ScriptFieldType::String:

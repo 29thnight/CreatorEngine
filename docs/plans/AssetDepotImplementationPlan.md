@@ -115,10 +115,13 @@ design. A foundation slice is not completion of the runtime migration.
   the immutable result retains only its exact artifact source. This is metadata
   readiness, not HLSL compilation or GPU program/PSO readiness. Material dependency
   continuations can request Texture against the same admitted resolver snapshot.
-- The managed Texture adapter uses generation-checked native owner tokens, independent
-  request/result handles, deterministic Dispose and POD-only deferred finalizer release.
-  Explicit static type registration and AssetLink authoring serialization support
-  NativeAOT without reflecting over native owners.
+- Managed bindings cover Texture, Model/Mesh descriptors, Skeleton, AnimationClip,
+  ShaderMeta, MaterialProgram and the Lattice Material runtime view. Closed native
+  alternatives hold actual typed owners/requests; concrete token type proofs are
+  distinct from manifest kinds. Generation/session tombstones, deterministic Dispose
+  and POD-only deferred finalizer release remain. Static closed-type registration and
+  AssetLink authoring serialization include aliases/two-digit kinds for NativeAOT;
+  the v34 function table/POD ABI is unchanged.
 - Reflection/authoring serializers understand own shared/exclusive owners. Deserialization
   builds a candidate before replacement; immutable reflected payloads are copied for
   legacy mutable serialization hooks and shown read-only in the editor. Nested
@@ -157,8 +160,9 @@ design. A foundation slice is not completion of the runtime migration.
 - Some legacy Material/Texture/ShaderMeta APIs are synchronous transitional loaders;
   full typed asynchronous acquisition and independent cooked producers for every
   supported resource kind are not complete.
-- Source-free Player/content cutover, managed support beyond Texture, and removal of
-  superseded compatibility paths remain separate implementation slices.
+- General source-free Player/content cutover and removal of superseded compatibility
+  paths remain separate implementation slices. Managed/NativeAOT execution and all
+  source-free runtime acceptance gates remain unrun, including the expanded kinds.
 - Cache budgets describe retained cache pins, not allocator or GPU memory immediately
   freed. Existing consumers, in-flight jobs and accepted frames intentionally outlive
   eviction and logical unmount.

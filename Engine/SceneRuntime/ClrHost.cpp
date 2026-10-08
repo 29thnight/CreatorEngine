@@ -3777,11 +3777,12 @@ void ClrHost::SetFieldString(int instanceId, int index, const std::string& value
 
 bool ClrHost::SetFieldAssetLink(int instanceId, int index, const std::string& value)
 {
-    // v1 Texture wire format: "1:3:" + UUID + ":" + UUID. Nil/nil is
-    // the canonical empty link; arbitrary strings never become asset links.
+    // v1 wire format: "1:<kind>:" + UUID + ":" + UUID. The uint32 kind
+    // has 1..10 decimal digits; typed managed parsing validates its exact value.
+    // Nil/nil is the canonical empty link; no runtime token is serialized.
     if (!m_ready || m_fnSetFieldString == nullptr || m_fnGetFieldString == nullptr
         || GetFieldType(instanceId, index) != ScriptFieldType::AssetLink
-        || value.size() != 77u || value.find('\0') != std::string::npos)
+        || value.size() < 77u || value.size() > 86u || value.find('\0') != std::string::npos)
     {
         return false;
     }

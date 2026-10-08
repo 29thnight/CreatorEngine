@@ -4,11 +4,29 @@
 #include <vector>
 #include <mutex>
 #include <thread>
+#include <variant>
+#include "../RenderEngine/AssetDepot/AssetLink.h"
 #include "../RenderEngine/AssetDepot/AssetRequest.h"
 
 class Entity;
 class Texture;
 class DataSystem;
+namespace material_graph { struct Generation; }
+
+// Closed concrete-type registration for this ABI adapter, not manifest kinds.
+// Several native types share a manifest kind (for example ::Material and
+// experiment::Material); a kind alone never proves which C++ owner a slot holds.
+// Zero is deliberately unregistered. Preserve Texture's existing v34 token ID.
+template<class T> inline constexpr std::uint32_t kScriptAssetConcreteType = 0u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<Texture> = 3u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelAnimationDescriptor> = 0x00010001u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelMeshDescriptor> = 0x00010002u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelSkeletonPayload> = 0x00010003u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::ModelAnimationPayload> = 0x00010004u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<ShaderMeta> = 0x00010005u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<material_graph::Generation> = 0x00010006u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<::Material> = 0x00010007u;
+inline constexpr std::uint32_t kScriptAssetRequestBit = 0x80000000u;
 
 // 관리 코드에 넘기는 객체 핸들.
 //
@@ -48,7 +66,7 @@ struct ScriptObjectHandle
 	bool IsValid() const { return generation != 0; }
 };
 
-// Flat AssetDepot ABI values. No C++ owner, string, job or const Texture* crosses CLR.
+// Flat AssetDepot ABI values. No C++ owner, string, job or resource pointer crosses CLR.
 struct ScriptAssetId
 {
     std::uint64_t first{};
@@ -67,7 +85,8 @@ struct ScriptAssetToken
 {
     std::uint32_t index{};
     std::uint32_t generation{};
-    // The high bit distinguishes requests from owned results of the same kind.
+    // Concrete native type proof, independent of ScriptAssetLink::kind. The high
+    // bit distinguishes consumer requests from strong owners of that exact type.
     std::uint32_t type{};
 };
 
@@ -159,18 +178,42 @@ public:
         ScriptAssetLink* links, int capacity, int& count);
 
 private:
+    // These are the actual native owners/consumer requests, never void owners,
+    // adopted pointers, a second AssetPtr wrapper or a polymorphic asset object.
+    using AssetStorage = std::variant<std::monostate,
+        own::shared_owner<const Texture>,
+        own::shared_owner<const assets::ModelAnimationDescriptor>,
+        own::shared_owner<const assets::ModelMeshDescriptor>,
+        own::shared_owner<const assets::ModelSkeletonPayload>,
+        own::shared_owner<const assets::ModelAnimationPayload>,
+        own::shared_owner<const ShaderMeta>,
+        own::shared_owner<const material_graph::Generation>,
+        own::shared_owner<const ::Material>,
+        AssetDepot::AssetRequest<Texture>,
+        AssetDepot::AssetRequest<assets::ModelAnimationDescriptor>,
+        AssetDepot::AssetRequest<assets::ModelMeshDescriptor>,
+        AssetDepot::AssetRequest<assets::ModelSkeletonPayload>,
+        AssetDepot::AssetRequest<assets::ModelAnimationPayload>,
+        AssetDepot::AssetRequest<ShaderMeta>,
+        AssetDepot::AssetRequest<material_graph::Generation>,
+        AssetDepot::AssetRequest<::Material>>;
+
     struct AssetSlot
     {
         std::uint32_t generation{ 1u };
         std::uint32_t type{};
-        own::shared_owner<const Texture> texture{};
-        AssetDepot::AssetRequest<Texture> request{};
+        AssetStorage value{};
     };
 
     [[nodiscard]] ScriptAssetResult CheckAssetSessionLocked() const;
     [[nodiscard]] AssetSlot* FindAssetLocked(ScriptAssetToken token);
-    [[nodiscard]] ScriptAssetToken InsertAssetLocked(own::shared_owner<const Texture> texture,
-        AssetDepot::AssetRequest<Texture> request, bool isRequest);
+    [[nodiscard]] ScriptAssetToken InsertAssetLocked(AssetStorage value);
+    template<class T>
+    ScriptAssetResult RequestTypedAssetLocked(const ScriptAssetLink& link,
+        const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token);
+    template<class T>
+    ScriptAssetResult ListTypedAssetRootsLocked(std::uint64_t mount,
+        ScriptAssetLink* links, int capacity, int& count);
     void ReleaseAssetLocked(AssetSlot& slot);
     std::mutex m_assetMutex;
     std::vector<AssetSlot> m_assetSlots;

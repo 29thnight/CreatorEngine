@@ -859,12 +859,12 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
                 }
                 else
                 {
-                    Debug::PrintLog(spdlog::level::warn, "[ScriptCore] Invalid AssetLink; expected 1:3:<asset UUID>:<subasset UUID>.");
+                    Debug::PrintLog(spdlog::level::warn, "[ScriptCore] Invalid AssetLink version, kind or UUID; expected 1:<this field's kind>:<canonical asset UUID>:<subasset UUID or nil>.");
                 }
             }
             if (ImGui::IsItemHovered())
             {
-                ImGui::SetTooltip("Texture link: 1:3:<asset UUID>:<subasset UUID>. Press Enter to apply. Nil/nil clears the link.");
+                ImGui::SetTooltip("Typed link: 1:<expected kind>:<canonical asset UUID>:<subasset UUID or nil>. Preserve this field's kind. Press Enter to apply. Nil/nil clears the link.");
             }
             break;
         }

@@ -89,7 +89,8 @@ public sealed class ScriptGenerator : IIncrementalGenerator
             if (kind == FieldKind.Unsupported)
                 continue;   // 지원하지 않는 타입은 조용히 건너뛴다(진단은 아래 Emit에서)
 
-            fields.Add(new FieldInfo(field.Name, kind, GetDisplayName(field)));
+            fields.Add(new FieldInfo(field.Name, kind, GetDisplayName(field),
+                field.Type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)));
         }
 
         // 이름으로 부르는 콜백(애니메이션 키프레임 이벤트·입력 액션)의 디스패치 표.
@@ -180,6 +181,13 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         "string?"                  => FieldKind.String,
         "CreatorEngine.Entity" => FieldKind.Object,
         "CreatorEngine.AssetLink<CreatorEngine.Texture>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Model>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Mesh>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Skeleton>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.AnimationClip>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.ShaderMeta>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.MaterialProgram>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.Material>" => FieldKind.AssetLink,
         _                          => FieldKind.Unsupported,
     };
 
@@ -314,7 +322,7 @@ public sealed class ScriptGenerator : IIncrementalGenerator
             if (info.Fields[index].Kind == FieldKind.AssetLink)
             {
                 // Direct closed-generic calls keep the lazy link serializer and
-                // supported Texture marker visible to the NativeAOT linker.
+                // exact supported marker visible to the NativeAOT linker.
                 sb.AppendLine($"        {index} => {name}.ToString(),");
             }
             else
@@ -336,7 +344,7 @@ public sealed class ScriptGenerator : IIncrementalGenerator
             {
                 sb.AppendLine($"            case {index}:");
                 sb.AppendLine("            {");
-                sb.AppendLine("                if (global::CreatorEngine.AssetLink<global::CreatorEngine.Texture>.TryParse(value, out var link))");
+                sb.AppendLine($"                if ({info.Fields[index].TypeName}.TryParse(value, out var link))");
                 sb.AppendLine("                {");
                 sb.AppendLine($"                    {name} = link;");
                 sb.AppendLine("                }");
@@ -448,7 +456,7 @@ public sealed class ScriptGenerator : IIncrementalGenerator
     // 값은 CreatorEngine.FieldType과 이름이 같아야 한다(생성 코드가 그대로 찍는다).
     private enum FieldKind { Unsupported, Float, Int32, Bool, Float3, String, Object, Float2, AssetLink }
 
-    private sealed record FieldInfo(string Name, FieldKind Kind, string? DisplayName);
+    private sealed record FieldInfo(string Name, FieldKind Kind, string? DisplayName, string TypeName);
 
     private enum BTNodeKind { None, Action, Condition, ConditionDecorator }
 

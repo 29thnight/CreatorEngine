@@ -2,6 +2,13 @@
 #include "Entity.h"
 #include "../RenderEngine/DataSystem.h"
 #include "../RenderEngine/Texture.h"
+#include "../RenderEngine/Material.h"
+#include "../RenderEngine/ShaderMeta.h"
+#include "../RenderEngine/MaterialGraphRuntime.h"
+#include "../RenderEngine/Assets/ModelAnimationDescriptor.h"
+#include "../RenderEngine/Assets/ModelAnimationPayload.h"
+#include "../RenderEngine/Assets/ModelMeshDescriptor.h"
+#include "../RenderEngine/Assets/ModelSkeletonPayload.h"
 #include <algorithm>
 #include <cstring>
 #include <limits>
@@ -174,9 +181,42 @@ size_t ScriptObjectRegistry::LiveCount() const
 
 namespace
 {
-    constexpr std::uint32_t kTextureAssetType =
-        static_cast<std::uint32_t>(experiment::cooked::CookedAssetKind::Texture);
-    constexpr std::uint32_t kTextureRequestType = 0x80000000u | kTextureAssetType;
+    constexpr std::uint32_t StoredAssetType(const std::monostate&) noexcept { return 0u; }
+
+    template<class T>
+    constexpr std::uint32_t StoredAssetType(const own::shared_owner<const T>&) noexcept
+    {
+        static_assert(kScriptAssetConcreteType<T> != 0u);
+        return kScriptAssetConcreteType<T>;
+    }
+
+    template<class T>
+    constexpr std::uint32_t StoredAssetType(const AssetDepot::AssetRequest<T>&) noexcept
+    {
+        static_assert(kScriptAssetConcreteType<T> != 0u);
+        return kScriptAssetConcreteType<T> | kScriptAssetRequestBit;
+    }
+
+    // The manifest kind chooses one explicitly registered public runtime view.
+    // Do not derive a C++ owner type from AssetTypeTraits alone: Model aggregate,
+    // geometry bulk and experiment::Material deliberately are not registered.
+    template<class F>
+    ScriptAssetResult DispatchScriptAssetKind(std::uint32_t kind, F&& invoke)
+    {
+        using Kind = experiment::cooked::CookedAssetKind;
+        switch (kind) // Keep uint32 width: malformed high bits must not truncate.
+        {
+        case static_cast<std::uint32_t>(Kind::Texture): return invoke.template operator()<Texture>();
+        case static_cast<std::uint32_t>(Kind::Model): return invoke.template operator()<assets::ModelAnimationDescriptor>();
+        case static_cast<std::uint32_t>(Kind::Mesh): return invoke.template operator()<assets::ModelMeshDescriptor>();
+        case static_cast<std::uint32_t>(Kind::Skeleton): return invoke.template operator()<assets::ModelSkeletonPayload>();
+        case static_cast<std::uint32_t>(Kind::AnimationClip): return invoke.template operator()<assets::ModelAnimationPayload>();
+        case static_cast<std::uint32_t>(Kind::ShaderMeta): return invoke.template operator()<ShaderMeta>();
+        case static_cast<std::uint32_t>(Kind::MaterialProgram): return invoke.template operator()<material_graph::Generation>();
+        case static_cast<std::uint32_t>(Kind::Material): return invoke.template operator()<::Material>();
+        default: return ScriptAssetResult::UnsupportedType;
+        }
+    }
 
     experiment::AssetId DecodeScriptAssetId(ScriptAssetId value)
     {
@@ -243,18 +283,29 @@ ScriptAssetResult ScriptObjectRegistry::CheckAssetSessionLocked() const
 
 ScriptObjectRegistry::AssetSlot* ScriptObjectRegistry::FindAssetLocked(ScriptAssetToken token)
 {
-    if (token.generation == 0u || token.index >= m_assetSlots.size()
-        || (token.type != kTextureAssetType && token.type != kTextureRequestType))
+    if (token.generation == 0u || token.type == 0u || token.index >= m_assetSlots.size())
     {
         return nullptr;
     }
     auto& slot = m_assetSlots[token.index];
-    return slot.generation == token.generation && slot.type == token.type ? &slot : nullptr;
+    // Validate both the token and the actual variant alternative, not a kind
+    // number shared by unrelated native types. Tombstones cannot pass this test.
+    return slot.generation == token.generation && slot.type == token.type
+        && std::visit([](const auto& value) { return StoredAssetType(value); }, slot.value) == token.type
+        ? &slot : nullptr;
 }
 
-ScriptAssetToken ScriptObjectRegistry::InsertAssetLocked(own::shared_owner<const Texture> texture,
-    AssetDepot::AssetRequest<Texture> request, bool isRequest)
+ScriptAssetToken ScriptObjectRegistry::InsertAssetLocked(AssetStorage value)
 {
+    // Allocation happens only when growing the slot vector. Once it succeeds,
+    // installing the typed owner/request cannot leave a partially published slot.
+    static_assert(std::is_nothrow_move_constructible_v<AssetStorage>);
+    static_assert(std::is_nothrow_move_assignable_v<AssetStorage>);
+    const auto type = std::visit([](const auto& stored) { return StoredAssetType(stored); }, value);
+    if (type == 0u)
+    {
+        throw std::invalid_argument("Cannot publish an empty managed asset slot.");
+    }
     std::size_t index = 0u;
     for (; index < m_assetSlots.size(); ++index)
     {
@@ -272,20 +323,69 @@ ScriptAssetToken ScriptObjectRegistry::InsertAssetLocked(own::shared_owner<const
         m_assetSlots.emplace_back();
     }
     auto& slot = m_assetSlots[index];
-    slot.texture = std::move(texture);
-    slot.request = std::move(request);
-    slot.type = isRequest ? kTextureRequestType : kTextureAssetType;
+    slot.value = std::move(value);
+    slot.type = type;
     return { static_cast<std::uint32_t>(index), slot.generation, slot.type };
 }
 
 void ScriptObjectRegistry::ReleaseAssetLocked(AssetSlot& slot)
 {
-    slot.request.Cancel();
-    slot.request = {};
-    slot.texture.reset();
+    std::visit([](const auto& value)
+    {
+        if constexpr (requires { value.Cancel(); })
+        {
+            value.Cancel();
+        }
+    }, slot.value);
+    slot.value = std::monostate{};
     slot.type = 0u;
     // On wrap retire this slot permanently instead of reviving an ancient token.
     ++slot.generation;
+}
+
+template<class T>
+ScriptAssetResult ScriptObjectRegistry::RequestTypedAssetLocked(const ScriptAssetLink& link,
+    const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token)
+{
+    static_assert(kScriptAssetConcreteType<T> != 0u);
+    AssetDepot::AssetLink<T> typed{
+        { DecodeScriptAssetId(link.asset), DecodeScriptAssetId(link.subasset) } };
+    if (link.reserved != 0u || !typed.IsValid()
+        || link.kind != static_cast<std::uint32_t>(AssetDepot::AssetLink<T>::kKind))
+    {
+        return ScriptAssetResult::InvalidLink;
+    }
+    if (variant.colorSpace > static_cast<std::uint32_t>(AssetDepot::TextureAssetColorSpace::Srgb)
+        || variant.compress > 1u)
+    {
+        return ScriptAssetResult::InvalidArgument;
+    }
+    if constexpr (!std::is_same_v<T, Texture>)
+    {
+        // No texture option may be silently ignored for another concrete type.
+        if (variant.colorSpace != 0u || variant.compress != 0u || variant.role != 0u)
+        {
+            return ScriptAssetResult::InvalidArgument;
+        }
+    }
+    const AssetDepot::TextureAssetVariant options{
+        static_cast<AssetDepot::TextureAssetColorSpace>(variant.colorSpace), variant.compress != 0u, variant.role };
+    if (residentOnly)
+    {
+        auto owner = m_assetDataSystem->TryAcquire<T>(typed, options);
+        if (!owner)
+        {
+            return ScriptAssetResult::NotResident;
+        }
+        token = InsertAssetLocked(AssetStorage{ std::move(owner) });
+    }
+    else
+    {
+        // Each call obtains its own consumer state. Only native generation work
+        // is joined; cancelling this slot cannot cancel another consumer's slot.
+        token = InsertAssetLocked(AssetStorage{ m_assetDataSystem->RequestAsync<T>(typed, options) });
+    }
+    return ScriptAssetResult::Success;
 }
 
 ScriptAssetResult ScriptObjectRegistry::RequestAsset(const ScriptAssetLink& link,
@@ -298,37 +398,10 @@ ScriptAssetResult ScriptObjectRegistry::RequestAsset(const ScriptAssetLink& link
     {
         return available;
     }
-    if (link.kind != kTextureAssetType)
+    return DispatchScriptAssetKind(link.kind, [&]<class T>()
     {
-        return ScriptAssetResult::UnsupportedType;
-    }
-    AssetDepot::AssetLink<Texture> typed{
-        { DecodeScriptAssetId(link.asset), DecodeScriptAssetId(link.subasset) } };
-    if (link.reserved != 0u || !typed.IsValid())
-    {
-        return ScriptAssetResult::InvalidLink;
-    }
-    if (variant.colorSpace > static_cast<std::uint32_t>(AssetDepot::TextureAssetColorSpace::Srgb)
-        || variant.compress > 1u)
-    {
-        return ScriptAssetResult::InvalidArgument;
-    }
-    const AssetDepot::TextureAssetVariant options{
-        static_cast<AssetDepot::TextureAssetColorSpace>(variant.colorSpace), variant.compress != 0u, variant.role };
-    if (residentOnly)
-    {
-        auto texture = m_assetDataSystem->TryAcquire<Texture>(typed, options);
-        if (!texture)
-        {
-            return ScriptAssetResult::NotResident;
-        }
-        token = InsertAssetLocked(std::move(texture), {}, false);
-    }
-    else
-    {
-        token = InsertAssetLocked({}, m_assetDataSystem->RequestAsync<Texture>(typed, options), true);
-    }
-    return ScriptAssetResult::Success;
+        return RequestTypedAssetLocked<T>(link, variant, residentOnly, token);
+    });
 }
 
 ScriptAssetResult ScriptObjectRegistry::SnapshotAssetRequest(ScriptAssetToken token,
@@ -341,24 +414,34 @@ ScriptAssetResult ScriptObjectRegistry::SnapshotAssetRequest(ScriptAssetToken to
     }
     std::lock_guard lock(m_assetMutex);
     auto* slot = FindAssetLocked(token);
-    if (slot == nullptr || token.type != kTextureRequestType)
+    if (slot == nullptr || (token.type & kScriptAssetRequestBit) == 0u)
     {
         return ScriptAssetResult::InvalidToken;
     }
-    const auto result = slot->request.Snapshot();
-    const auto completion = slot->request.Completion();
-    snapshot.status = static_cast<std::int32_t>(result.status);
-    snapshot.error = static_cast<std::int32_t>(result.error);
-    snapshot.workComplete = !completion.valid() || completion.is_complete() ? 1 : 0;
-    snapshot.messageBytes = static_cast<std::int32_t>(std::min<std::size_t>(
-        result.message.size(), static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())));
-    if (capacity > 0)
+    return std::visit([&](const auto& value)
     {
-        const auto count = std::min<std::size_t>(result.message.size(), static_cast<std::size_t>(capacity - 1));
-        std::memcpy(message, result.message.data(), count);
-        message[count] = '\0';
-    }
-    return ScriptAssetResult::Success;
+        if constexpr (requires { value.Snapshot(); })
+        {
+            const auto result = value.Snapshot();
+            const auto completion = value.Completion();
+            snapshot.status = static_cast<std::int32_t>(result.status);
+            snapshot.error = static_cast<std::int32_t>(result.error);
+            snapshot.workComplete = !completion.valid() || completion.is_complete() ? 1 : 0;
+            snapshot.messageBytes = static_cast<std::int32_t>(std::min<std::size_t>(
+                result.message.size(), static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())));
+            if (capacity > 0)
+            {
+                const auto count = std::min<std::size_t>(result.message.size(), static_cast<std::size_t>(capacity - 1));
+                std::memcpy(message, result.message.data(), count);
+                message[count] = '\0';
+            }
+            return ScriptAssetResult::Success;
+        }
+        else
+        {
+            return ScriptAssetResult::InvalidToken;
+        }
+    }, slot->value);
 }
 
 ScriptAssetResult ScriptObjectRegistry::AcquireAssetResult(ScriptAssetToken request, ScriptAssetToken& owner)
@@ -366,16 +449,29 @@ ScriptAssetResult ScriptObjectRegistry::AcquireAssetResult(ScriptAssetToken requ
     owner = {};
     std::lock_guard lock(m_assetMutex);
     auto* slot = FindAssetLocked(request);
-    if (slot == nullptr || request.type != kTextureRequestType)
+    if (slot == nullptr || (request.type & kScriptAssetRequestBit) == 0u)
     {
         return ScriptAssetResult::InvalidToken;
     }
-    const auto result = slot->request.Snapshot();
-    if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+    // Finish the visit and copy the actual result owner before growing the slot
+    // vector: growth can invalidate slot and every reference into its variant.
+    AssetStorage acquired = std::visit([](const auto& value) -> AssetStorage
+    {
+        if constexpr (requires { value.Snapshot(); })
+        {
+            auto result = value.Snapshot();
+            if (result.status == AssetDepot::AssetRequestStatus::Ready && result.asset)
+            {
+                return AssetStorage{ std::move(result.asset) };
+            }
+        }
+        return {};
+    }, slot->value);
+    if (std::holds_alternative<std::monostate>(acquired))
     {
         return ScriptAssetResult::NotResident;
     }
-    owner = InsertAssetLocked(result.asset, {}, false);
+    owner = InsertAssetLocked(std::move(acquired));
     return ScriptAssetResult::Success;
 }
 
@@ -383,11 +479,17 @@ ScriptAssetResult ScriptObjectRegistry::CancelAssetRequest(ScriptAssetToken requ
 {
     std::lock_guard lock(m_assetMutex);
     auto* slot = FindAssetLocked(request);
-    if (slot == nullptr || request.type != kTextureRequestType)
+    if (slot == nullptr || (request.type & kScriptAssetRequestBit) == 0u)
     {
         return ScriptAssetResult::InvalidToken;
     }
-    slot->request.Cancel();
+    std::visit([](const auto& value)
+    {
+        if constexpr (requires { value.Cancel(); })
+        {
+            value.Cancel();
+        }
+    }, slot->value);
     return ScriptAssetResult::Success;
 }
 
@@ -410,11 +512,16 @@ ScriptAssetResult ScriptObjectRegistry::ReadTexture(ScriptAssetToken token, Scri
     descriptor = {};
     std::lock_guard lock(m_assetMutex);
     auto* slot = FindAssetLocked(token);
-    if (slot == nullptr || token.type != kTextureAssetType || !slot->texture)
+    if (slot == nullptr || token.type != kScriptAssetConcreteType<Texture>)
     {
         return ScriptAssetResult::InvalidToken;
     }
-    const auto image = slot->texture->GetImageDescription();
+    const auto& texture = std::get<own::shared_owner<const Texture>>(slot->value);
+    if (!texture)
+    {
+        return ScriptAssetResult::InvalidToken;
+    }
+    const auto image = texture->GetImageDescription();
     descriptor = { image.Width(), image.Height(), image.MipLevels(), image.ArraySize(), image.IsCube() ? 1u : 0u };
     return ScriptAssetResult::Success;
 }
@@ -433,11 +540,18 @@ ScriptAssetResult ScriptObjectRegistry::ListAssetRoots(std::uint64_t mount, std:
     {
         return available;
     }
-    if (kind != kTextureAssetType)
+    return DispatchScriptAssetKind(kind, [&]<class T>()
     {
-        return ScriptAssetResult::UnsupportedType;
-    }
-    const auto roots = m_assetDataSystem->ListRootLinks<Texture>({ mount });
+        return ListTypedAssetRootsLocked<T>(mount, links, capacity, count);
+    });
+}
+
+template<class T>
+ScriptAssetResult ScriptObjectRegistry::ListTypedAssetRootsLocked(std::uint64_t mount,
+    ScriptAssetLink* links, int capacity, int& count)
+{
+    static_assert(kScriptAssetConcreteType<T> != 0u);
+    const auto roots = m_assetDataSystem->ListRootLinks<T>({ mount });
     if (roots.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
     {
         return ScriptAssetResult::InternalError;
@@ -446,7 +560,8 @@ ScriptAssetResult ScriptObjectRegistry::ListAssetRoots(std::uint64_t mount, std:
     for (int index = 0; index < std::min(count, capacity); ++index)
     {
         links[index] = { EncodeScriptAssetId(roots[index].identity.assetId),
-            EncodeScriptAssetId(roots[index].identity.subassetId), kTextureAssetType, 0u };
+            EncodeScriptAssetId(roots[index].identity.subassetId),
+            static_cast<std::uint32_t>(AssetDepot::AssetLink<T>::kKind), 0u };
     }
     return ScriptAssetResult::Success;
 }

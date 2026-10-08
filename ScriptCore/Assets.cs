@@ -71,29 +71,59 @@ namespace CreatorEngine
         public static bool operator !=(AssetId left, AssetId right) => !left.Equals(right);
     }
 
-    // Only Texture has a runtime binding in this slice. This type is a static
-    // compile-time marker, never a managed wrapper around a naked Texture*.
-    public sealed class Texture
-    {
-        private Texture() { }
-    }
+    // Closed compile-time markers. These are never managed resource instances
+    // or wrappers around native pointers; AssetHandle<T> owns the native token.
+    public sealed class Texture { private Texture() { } }
+    public sealed class Model { private Model() { } }
+    public sealed class Mesh { private Mesh() { } }
+    public sealed class Skeleton { private Skeleton() { } }
+    public sealed class AnimationClip { private AnimationClip() { } }
+    public sealed class ShaderMeta { private ShaderMeta() { } }
+    public sealed class MaterialProgram { private MaterialProgram() { } }
+    public sealed class Material { private Material() { } }
 
+    // Stable manifest kinds, persisted by AssetLink<T>. Not residency/type tokens.
     public enum AssetKind : uint
     {
+        Model = 1,
+        Material = 2,
         Texture = 3,
+        ShaderMeta = 4,
+        MaterialProgram = 8,
+        Mesh = 12,
+        Skeleton = 13,
+        AnimationClip = 14,
     }
 
     internal static class AssetType<T>
     {
-        internal static AssetKind Kind
+        // Static, closed registration is visible to NativeAOT. No type-name
+        // reflection, MakeGenericType, native RTTI or arbitrary kind casts.
+        // Native token IDs prove the concrete stored C++ type independently of
+        // its manifest kind. Keep in sync with kScriptAssetConcreteType<T>.
+        private static (AssetKind Kind, uint TokenType) Registration => Register();
+        internal static AssetKind Kind => Registration.Kind;
+        internal static uint TokenType => Registration.TokenType;
+
+        private static (AssetKind, uint) Register()
         {
-            get
+            if (typeof(T) == typeof(Texture)) return (AssetKind.Texture, 3u);
+            if (typeof(T) == typeof(Model)) return (AssetKind.Model, 0x00010001u);
+            if (typeof(T) == typeof(Mesh)) return (AssetKind.Mesh, 0x00010002u);
+            if (typeof(T) == typeof(Skeleton)) return (AssetKind.Skeleton, 0x00010003u);
+            if (typeof(T) == typeof(AnimationClip)) return (AssetKind.AnimationClip, 0x00010004u);
+            if (typeof(T) == typeof(ShaderMeta)) return (AssetKind.ShaderMeta, 0x00010005u);
+            if (typeof(T) == typeof(MaterialProgram)) return (AssetKind.MaterialProgram, 0x00010006u);
+            if (typeof(T) == typeof(Material)) return (AssetKind.Material, 0x00010007u);
+            throw new NotSupportedException("This concrete type has no AssetDepot runtime binding.");
+        }
+
+        internal static void ValidateToken(AssetToken token, bool request)
+        {
+            uint expected = TokenType | (request ? 0x80000000u : 0u);
+            if (token.Generation == 0u || token.Type != expected)
             {
-                if (typeof(T) != typeof(Texture))
-                {
-                    throw new NotSupportedException("AssetDepot currently supports Texture only.");
-                }
-                return AssetKind.Texture;
+                throw new InvalidOperationException("Native asset token concrete type/role mismatch.");
             }
         }
     }
@@ -206,6 +236,7 @@ namespace CreatorEngine
         {
             try
             {
+                AssetType<T>.ValidateToken(token, request: false);
                 return new AssetHandle<T>(token);
             }
             catch
@@ -280,6 +311,7 @@ namespace CreatorEngine
         {
             try
             {
+                AssetType<T>.ValidateToken(token, request: true);
                 return new AssetRequest<T>(token);
             }
             catch
@@ -352,16 +384,18 @@ namespace CreatorEngine
         }
     }
 
-    /// <summary>Texture-only AssetDepot bindings. Mount publication stays with the native host.</summary>
+    /// <summary>Typed CPU AssetDepot bindings. Mount publication stays with the native host.</summary>
     public static class AssetDepot
     {
         public static AssetRequest<T> RequestAsync<T>(AssetLink<T> link, TextureAssetVariant variant = default)
         {
+            ValidateVariant<T>(variant);
             return AssetRequest<T>.FromToken(Native.AssetRequest(link.ToABI(), variant, residentOnly: false));
         }
 
         public static bool TryAcquire<T>(AssetLink<T> link, out AssetHandle<T>? asset, TextureAssetVariant variant = default)
         {
+            ValidateVariant<T>(variant);
             AssetToken token = Native.AssetRequest(link.ToABI(), variant, residentOnly: true);
             if (token.Generation == 0)
             {
@@ -370,6 +404,14 @@ namespace CreatorEngine
             }
             asset = AssetHandle<T>.FromToken(token);
             return true;
+        }
+
+        private static void ValidateVariant<T>(TextureAssetVariant variant)
+        {
+            if (AssetType<T>.Kind != AssetKind.Texture && variant != default)
+            {
+                throw new ArgumentException("Texture variants apply only to Texture links.", nameof(variant));
+            }
         }
 
         public static AssetLink<T>[] ListRootLinks<T>(AssetMountId mount)
