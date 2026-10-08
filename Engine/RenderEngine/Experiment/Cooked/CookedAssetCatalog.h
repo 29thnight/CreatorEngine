@@ -1,9 +1,13 @@
 #pragma once
 
+#include "ArtifactByteSource.h"
 #include "CookedAssetManifest.h"
+#include "../../AssetDepot/AssetMountId.h"
+#include "../../../Utility_Framework/Ownership.h"
 
 #include <cstddef>
 #include <filesystem>
+#include <map>
 #include <memory>
 #include <span>
 #include <string>
@@ -17,8 +21,48 @@ namespace material_graph
 
 namespace experiment::cooked
 {
-    class ArtifactByteSource;
     class CookedAudioClipSource;
+    enum class AssetLookupStatus : std::uint8_t
+    {
+        Found,
+        NotMounted,
+        TypeMismatch,
+        HardDependencyCycle,
+    };
+
+    struct AssetCatalogLookupIssue final
+    {
+        AssetLookupStatus status{ AssetLookupStatus::Found };
+        TypedAssetReference asset{};
+        // Root through the failing edge, including the repeated target on a cycle.
+        std::vector<TypedAssetReference> dependencyPath{};
+        std::string message{};
+    };
+
+    struct ResolvedAssetEntry final
+    {
+        AssetDepot::AssetMountId mountId{};
+        AssetId assetSetId{};
+        std::uint64_t manifestRevision{};
+        std::uint64_t resolverRevision{};
+        AssetSetEntry entry{};
+        AssetBlobRecord blob{};
+        // Exact locator metadata above and this source travel together. No raw
+        // pointer borrows an entry or a source from a movable catalog vector.
+        own::shared_owner<const ArtifactByteSource> byteSource{};
+    };
+
+    struct AssetSetMountOptions final
+    {
+        // Supplied by the host, never copied from an untrusted manifest as an
+        // implicit compatibility decision. Both must be nonempty and exact.
+        std::string expectedTargetPlatform{};
+        std::string expectedTargetAbi{};
+        // The default rejects every conflicting definition. An override names
+        // each exact identity intentionally replaced by this transaction.
+        std::vector<AssetIdentity> overrideIdentities{};
+    };
+
     // CEMF 하나를 읽어 **GUID 로 묻는** 런타임 경계.
     //
     // ★ 이것이 대체하려는 것은 `DataSystem::LoadAssetCatalog` 다. 지금은 부팅
@@ -114,7 +158,71 @@ namespace experiment::cooked
         [[nodiscard]] bool CollectClosure(const AssetId& root,
             std::vector<AssetId>& outOrdered, std::string& outFailure) const;
 
+        // v3 mount-set operations are immutable candidate builders. Failure
+        // leaves outCatalog unchanged; the caller atomically publishes success.
+        // These operations and root listing perform no payload reads/decodes.
+        // Legacy Load/Find/Entries retain their CEMF v2 meaning above.
+        [[nodiscard]] bool WithMountedAssetSet(const AssetSetManifest& manifest,
+            own::shared_owner<const ArtifactByteSource> byteSource,
+            AssetDepot::AssetMountId mountId, std::uint64_t nextResolverRevision,
+            const AssetSetMountOptions& options, CookedAssetCatalog& outCatalog,
+            std::vector<AssetManifestIssue>& outIssues) const;
+
+        // Logical removal always advances the resolver. It may leave another
+        // mount's external hard edge unresolved: its next acquisition reports
+        // NotMounted. Old snapshots/results retain their exact source owners.
+        [[nodiscard]] bool WithoutMountedAssetSet(AssetDepot::AssetMountId mountId,
+            std::uint64_t nextResolverRevision, CookedAssetCatalog& outCatalog,
+            std::vector<AssetManifestIssue>& outIssues) const;
+
+        [[nodiscard]] std::uint64_t ResolverRevision() const noexcept { return m_resolverRevision; }
+        [[nodiscard]] std::size_t MountCount() const noexcept { return m_mounts.size(); }
+        [[nodiscard]] std::size_t MountedAssetCount() const noexcept { return m_mountedEntries.size(); }
+        [[nodiscard]] bool IsMounted(AssetDepot::AssetMountId mountId) const noexcept;
+
+        [[nodiscard]] AssetLookupStatus Find(const TypedAssetReference& asset,
+            ResolvedAssetEntry& out) const;
+        [[nodiscard]] std::vector<TypedAssetReference> ListRoots(
+            AssetDepot::AssetMountId mountId, CookedAssetKind kind) const;
+
+        // Dependency-first, root last, using only this resolver snapshot. Hard
+        // cycles and missing/wrong-type targets fail with the full lookup path;
+        // loadable edges do not contribute bulk or block this hard closure.
+        // Failure clears outOrdered instead of exposing a partial generation.
+        [[nodiscard]] AssetLookupStatus CollectHardClosure(const TypedAssetReference& root,
+            std::vector<ResolvedAssetEntry>& outOrdered, AssetCatalogLookupIssue& outIssue) const;
+
     private:
+        struct MountedAssetSet final
+        {
+            AssetDepot::AssetMountId mountId{};
+            AssetSetManifest manifest{};
+            own::shared_owner<const ArtifactByteSource> byteSource{};
+            // Identical declarations inherit the selected definition's rank.
+            // Only an explicitly named conflict receives a higher rank, so
+            // removal/rebuild never invents a last-mounted-wins policy.
+            std::vector<std::uint64_t> definitionRevisions{};
+        };
+
+        struct MountedEntryLocation final
+        {
+            std::size_t mountIndex{};
+            std::size_t entryIndex{};
+        };
+
+        void RebuildMountedIndex();
+        [[nodiscard]] ResolvedAssetEntry ResolveMountedEntry(const MountedEntryLocation& location) const;
+        [[nodiscard]] bool ValidateMountedHardGraph(AssetCatalogLookupIssue& outIssue) const;
+        [[nodiscard]] AssetLookupStatus TraverseHardClosure(const TypedAssetReference& root,
+            std::map<AssetIdentity, std::uint8_t>& states, std::vector<ResolvedAssetEntry>* outOrdered,
+            AssetCatalogLookupIssue& outIssue) const;
+
+        std::vector<MountedAssetSet> m_mounts{};
+        std::map<AssetIdentity, MountedEntryLocation> m_mountedEntries{};
+        std::uint64_t m_resolverRevision{};
+        std::string m_targetPlatform{};
+        std::string m_targetAbi{};
+
         CookedAssetManifest manifest_{};
         std::vector<CookedAssetManifestEntry> entries_{};
         std::filesystem::path derivedRoot_{};
