@@ -168,6 +168,21 @@ own::shared_owner<const Texture> DataSystem::TryAcquireTexture(
 AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsync(
     AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant)
 {
+    own::shared_owner<const texture_cooked::CookedAssetCatalog> catalog;
+    std::uint64_t epoch{};
+    {
+        std::lock_guard preparationLock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        catalog = m_cookedCatalog;
+        epoch = m_assetPreparationEpoch;
+    }
+    return RequestTextureAsyncFromSnapshot(link, variant, std::move(catalog), epoch);
+}
+
+AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsyncFromSnapshot(
+    AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant,
+    own::shared_owner<const texture_cooked::CookedAssetCatalog> catalog, std::uint64_t epoch)
+{
     using namespace AssetDepot;
     auto consumer = own::make_shared<AssetRequestState<Texture>>();
     AssetRequest<Texture> request(consumer);
@@ -193,8 +208,6 @@ AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsync(
         return fail(AssetRequestStatus::Failed, AssetRequestError::UnsupportedRepresentation,
             "Unknown texture color-space variant.");
     }
-    own::shared_owner<const texture_cooked::CookedAssetCatalog> catalog;
-    std::uint64_t epoch{};
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         if (m_assetPreparationStopping)
@@ -208,8 +221,12 @@ AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsync(
                 "Asset invalidation is in progress.");
         }
         std::lock_guard catalogLock(m_cookedCatalogMutex);
-        catalog = m_cookedCatalog;
-        epoch = m_assetPreparationEpoch;
+        if (epoch != m_assetPreparationEpoch || (catalog && (!m_cookedCatalog
+            || catalog->ResolverRevision() != m_cookedCatalog->ResolverRevision())))
+        {
+            return fail(AssetRequestStatus::Stale, AssetRequestError::RevisionChanged,
+                "Captured texture resolver changed; request was not rebound.");
+        }
     }
     if (!catalog)
     {

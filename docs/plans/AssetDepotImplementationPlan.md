@@ -93,6 +93,11 @@ design. A foundation slice is not completion of the runtime migration.
   Model, texture and graph-instance frame tables deduplicate exact stable identities;
   draw records carry indices/anchored borrows. Native GPU completion, abort and
   completion-zero quarantine paths remain responsible for physical retirement.
+- Authored ShaderMeta has a v3 fresh-source CEDO producer and typed asynchronous
+  source-free descriptor loader. Captured source/sidecar bytes must match the product;
+  the immutable result retains only its exact artifact source. This is metadata
+  readiness, not HLSL compilation or GPU program/PSO readiness. Material dependency
+  continuations can request Texture against the same admitted resolver snapshot.
 - The managed Texture adapter uses generation-checked native owner tokens, independent
   request/result handles, deterministic Dispose and POD-only deferred finalizer release.
   Explicit static type registration and AssetLink authoring serialization support

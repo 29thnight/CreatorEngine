@@ -681,7 +681,8 @@ bool ShaderMetaLoader::Parse(std::string_view text,
 
 static bool ParseShaderMetaDocument(const Authoring::ReadNode& root,
     const std::filesystem::path& originPath, const FileGuid& guid,
-    ShaderMeta& outMeta, std::string& outError, std::optional<std::string_view> sourceBytes)
+    ShaderMeta& outMeta, std::string& outError, std::optional<std::string_view> sourceBytes,
+    bool cookedMetadata = false)
 {
     try
     {
@@ -718,8 +719,17 @@ static bool ParseShaderMetaDocument(const Authoring::ReadNode& root,
         meta.source = authoredSource.lexically_normal();
         const std::filesystem::path resolved = meta.ResolveSource(originPath);
         std::error_code sourceError;
-        if (!sourceBytes && (!std::filesystem::is_regular_file(resolved, sourceError) || sourceError))
+        if (!cookedMetadata && !sourceBytes &&
+            (!std::filesystem::is_regular_file(resolved, sourceError) || sourceError))
+        {
             return Fail(originPath.string(), "source 파일이 없다: " + resolved.string(), outError);
+        }
+
+        if (cookedMetadata && root["generatedMaterial"])
+        {
+            return Fail(originPath.string(),
+                "generated metadata requires its verified cooked material program", outError);
+        }
 
         if (!ParseProperties(root["properties"], meta.properties, outError)
             || !ParseKeywords(root["keywords"], meta.keywords, outError)
@@ -750,6 +760,22 @@ bool ShaderMetaLoader::ParseDocument(const Authoring::ReadNode& root,
     ShaderMeta& outMeta, std::string& outError)
 {
     return ParseShaderMetaDocument(root, originPath, guid, outMeta, outError, {});
+}
+
+bool ShaderMetaLoader::ParseCookedMetadata(std::span<const std::byte> bytes,
+    const FileGuid& guid, ShaderMeta& outMeta, std::string& outError)
+{
+    if (bytes.empty() || bytes.size() > kMaxMetaBytes)
+    {
+        return Fail("cooked shader metadata", "metadata is empty or exceeds 1 MiB", outError);
+    }
+    const auto document = Authoring::ParsedDocument::ParseCooked(bytes, outError);
+    if (!document)
+    {
+        return false;
+    }
+    // No physical source origin is invented for an immutable content blob.
+    return ParseShaderMetaDocument(document.Root(), {}, guid, outMeta, outError, {}, true);
 }
 
 bool ShaderMetaLoader::ParseGenerated(std::string_view text, std::string_view source,

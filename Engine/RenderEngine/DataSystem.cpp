@@ -1644,6 +1644,7 @@ void DataSystem::Finalize()
     own::shared_owner<AssetMetaRegistry> retiredRegistry;
     AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
+    AssetDepot::MaterialAssetRetiredEntries retiredMaterials;
     LegacyCacheRetirement retiredLegacy;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
@@ -1651,10 +1652,12 @@ void DataSystem::Finalize()
         StageLegacyCacheRetirementLocked(retiredLegacy);
         StageTextureAssetRetirementLocked(retiredTextures);
         StageModelAssetRetirementLocked(retiredModels);
+        StageMaterialAssetRetirementLocked(retiredMaterials);
         retiredCatalog = std::move(m_cookedCatalog);
         retiredRegistry = std::move(m_assetMetaRegistry);
         InvalidateTextureAssetsLocked(retiredTextures);
         InvalidateModelAssetsLocked(retiredModels);
+        InvalidateMaterialAssetsLocked(retiredMaterials);
         DetachLegacyCachesLocked(retiredLegacy);
         m_cookedStaleAssets.clear();
         if (m_assetDepotRevision != (std::numeric_limits<std::uint64_t>::max)())
@@ -4121,6 +4124,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
     } invalidation;
     AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
+    AssetDepot::MaterialAssetRetiredEntries retiredMaterials;
     own::shared_owner<AssetMetaRegistry> registry;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
@@ -4142,9 +4146,11 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         std::lock_guard lock(m_assetPreparationMutex);
         StageTextureAssetRetirementLocked(retiredTextures);
         StageModelAssetRetirementLocked(retiredModels);
+        StageMaterialAssetRetirementLocked(retiredMaterials);
         ++m_assetPreparationEpoch;
         InvalidateTextureAssetsLocked(retiredTextures);
         InvalidateModelAssetsLocked(retiredModels);
+        InvalidateMaterialAssetsLocked(retiredMaterials);
         std::erase_if(m_retiredAssetPreparations, [](const auto& asset)
         {
             return asset->work.is_complete();
@@ -4962,6 +4968,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
     own::shared_owner<AssetMetaRegistry> retiredRegistry;
     AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
+    AssetDepot::MaterialAssetRetiredEntries retiredMaterials;
     LegacyCacheRetirement retiredLegacy;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
@@ -4975,9 +4982,11 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
         StageLegacyCacheRetirementLocked(retiredLegacy);
         StageTextureAssetRetirementLocked(retiredTextures);
         StageModelAssetRetirementLocked(retiredModels);
+        StageMaterialAssetRetirementLocked(retiredMaterials);
         retiredCatalog = std::move(m_cookedCatalog);
         InvalidateTextureAssetsLocked(retiredTextures);
         InvalidateModelAssetsLocked(retiredModels);
+        InvalidateMaterialAssetsLocked(retiredMaterials);
         m_cookedCatalog = std::move(catalog);
         m_cookedStaleAssets = std::move(stale);
         ++m_assetDepotRevision;

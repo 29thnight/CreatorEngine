@@ -171,6 +171,14 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedShaderMeta.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="AssetDepot\MaterialAssetRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="AssetDepot\ModelAssetRuntime.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
@@ -591,6 +599,8 @@
     <ClInclude Include="AssetDepot\LegacyResourceCharges.h" />
     <ClInclude Include="TextureFramePins.h" />
     <ClInclude Include="MaterialGraphInstancePins.h" />
+    <ClInclude Include="Experiment\Cooked\CookedShaderMeta.h" />
+    <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />
     <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
     <ClInclude Include="AssetDepot\AssetLink.h" />
     <ClInclude Include="AssetDepot\AssetRequest.h" />

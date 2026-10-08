@@ -16,6 +16,7 @@
 #include "AssetDepot/TextureAssetRuntime.h"
 #include "AssetDepot/LegacyResourceCache.h"
 #include "AssetDepot/ModelAssetRuntime.h"
+#include "AssetDepot/MaterialAssetRuntime.h"
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -144,6 +145,10 @@ public:
         {
             return TryAcquireTexture(link, variant);
         }
+        else if constexpr (std::is_same_v<T, ShaderMeta>)
+        {
+            return TryAcquireShaderMeta(link);
+        }
         else
         {
             static_assert(std::is_same_v<T, assets::ModelAnimationDescriptor>
@@ -162,6 +167,10 @@ public:
         if constexpr (std::is_same_v<T, Texture>)
         {
             return RequestTextureAsync(link, variant);
+        }
+        else if constexpr (std::is_same_v<T, ShaderMeta>)
+        {
+            return RequestShaderMetaAsync(link);
         }
         else
         {
@@ -220,6 +229,11 @@ public:
 
     void SetTextureAssetCacheBudget(std::size_t bytes);
     [[nodiscard]] AssetDepot::TextureAssetCacheSnapshot SnapshotTextureAssetCache() const;
+
+    // Authored cooked descriptors only. CPU Ready does not compile source or
+    // imply a prepared shader program, pipeline state or GPU upload.
+    void SetShaderMetaAssetCacheBudget(std::size_t bytes);
+    [[nodiscard]] AssetDepot::ShaderMetaAssetCacheSnapshot SnapshotShaderMetaAssetCache() const;
 
 	void Initialize();
     // Lifecycle owner only: stop admission and drain every accepted asset job
@@ -548,6 +562,11 @@ private:
         AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant);
     [[nodiscard]] AssetDepot::AssetRequest<Texture> RequestTextureAsync(
         AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant);
+    // Dependency continuations use the parent's admitted resolver, never a
+    // fresh public lookup which could silently bind a newer override.
+    [[nodiscard]] AssetDepot::AssetRequest<Texture> RequestTextureAsyncFromSnapshot(
+        AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant,
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch);
     void RunTextureAssetWork(own::shared_owner<AssetDepot::TextureAssetWork> work);
     void CompleteTextureAssetWorkLocked(const own::shared_owner<AssetDepot::TextureAssetWork>& work,
         AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
@@ -601,6 +620,18 @@ private:
     void StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEntries& retired);
     void InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntries& retired) noexcept;
     AssetDepot::ModelAssetRuntimeState m_modelAssets{};
+
+    [[nodiscard]] own::shared_owner<const ShaderMeta> TryAcquireShaderMeta(
+        AssetDepot::AssetLink<ShaderMeta> link);
+    [[nodiscard]] AssetDepot::AssetRequest<ShaderMeta> RequestShaderMetaAsync(
+        AssetDepot::AssetLink<ShaderMeta> link);
+    void RunShaderMetaAssetWork(own::shared_owner<AssetDepot::ShaderMetaAssetWork> work);
+    void CompleteShaderMetaAssetWorkLocked(const own::shared_owner<AssetDepot::ShaderMetaAssetWork>& work,
+        AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
+        std::string message = {}, const own::shared_owner<const ShaderMeta>& candidate = {});
+    void StageMaterialAssetRetirementLocked(AssetDepot::MaterialAssetRetiredEntries& retired);
+    void InvalidateMaterialAssetsLocked(AssetDepot::MaterialAssetRetiredEntries& retired) noexcept;
+    AssetDepot::MaterialAssetRuntimeState m_materialAssets{};
 
     own::shared_owner<AssetBundlePreparation> SubmitAssetBundle(const AssetBundle& bundle);
     // Caller holds m_assetPreparationMutex through registration and submission.

@@ -1,10 +1,14 @@
 #include "AssetSetBuild.h"
 
 #include "AuthoringParsedDocument.h"
+#include "AuthoringCookedDocument.h"
+#include "Experiment/Cooked/ModelCookIdentity.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookSupport.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 #include "Experiment/Cooked/ModelAssetSetProducer.h"
+#include "Experiment/Cooked/ShaderMetaCookProducer.h"
+#include "Experiment/Cooked/CookedShaderMeta.h"
 #include "Texture.h"
 
 #include <algorithm>
@@ -37,6 +41,7 @@ namespace AssetCooking
         // Bump for producer/decoder behavior or normalization changes.
         constexpr std::string_view kTextureImporterVersion = "texture-source-image-v1";
         constexpr std::string_view kModelImporterVersion = "model-source-subassets-v2";
+        constexpr std::string_view kShaderMetaImporterVersion = "shadermeta-source-document-v1";
         constexpr std::string_view kBuildVersion = "asset-set-build-v3";
         constexpr std::uint32_t kTextureSourceImage = 1u;
 
@@ -134,6 +139,10 @@ namespace AssetCooking
             {
                 return { { Id(node, "assetId"), {} }, ck::CookedAssetKind::Texture };
             }
+            if (name == "ShaderMeta")
+            {
+                return { { Id(node, "assetId"), {} }, ck::CookedAssetKind::ShaderMeta };
+            }
             if (name == "Model")
             {
                 kind = ck::CookedAssetKind::Model;
@@ -152,7 +161,8 @@ namespace AssetCooking
             }
             else
             {
-                Fail("Unsupported AssetSet source kind: " + name + "; supported: Texture, Model, Mesh, Skeleton, AnimationClip");
+                Fail("Unsupported AssetSet source kind: " + name +
+                    "; supported: Texture, ShaderMeta, Model, Mesh, Skeleton, AnimationClip");
             }
             const auto text = Text(node, "assetId");
             Uuid::Uuid16 parsed{};
@@ -503,16 +513,23 @@ namespace AssetCooking
             }
         }
 
-        void ValidatePayload(std::span<const std::byte> bytes, ck::CookedAssetKind kind,
+        void ValidatePayload(std::span<const std::byte> bytes, const ck::TypedAssetReference& asset,
             const std::string& extension)
         {
             std::string failure;
             bool valid{};
-            switch (kind)
+            switch (asset.kind)
             {
             case ck::CookedAssetKind::Texture:
                 ValidateTexture(bytes, extension);
                 return;
+            case ck::CookedAssetKind::ShaderMeta:
+            {
+                ShaderMeta value;
+                valid = extension == ".shadermeta" &&
+                    ck::ReadShaderMetaArtifact(bytes, asset.key.assetId, value, failure);
+                break;
+            }
             case ck::CookedAssetKind::Model:
             {
                 ck::ModelDescriptorArtifact value;
@@ -553,14 +570,14 @@ namespace AssetCooking
         }
 
         void VerifyBytes(const std::filesystem::path& path, std::uint64_t size,
-            const std::string& digest, ck::CookedAssetKind kind, const std::string& extension)
+            const std::string& digest, const ck::TypedAssetReference& asset, const std::string& extension)
         {
             const auto bytes = Read(path);
             if (bytes.size() != size || Hash(bytes) != digest)
             {
                 Fail("Immutable AssetSet blob hash/size mismatch: " + path.string());
             }
-            ValidatePayload(bytes, kind, extension);
+            ValidatePayload(bytes, asset, extension);
         }
 
         void WriteNew(const std::filesystem::path& path, std::span<const std::byte> bytes)
@@ -664,6 +681,105 @@ namespace AssetCooking
             std::uint32_t schema{};
         };
 
+        PreparedArtifact PrepareShaderMeta(const AssetSource& authored,
+            const std::filesystem::path& assetRoot)
+        {
+            if (!authored.dependencies.empty())
+            {
+                Fail("Authored ShaderMeta descriptors require dependencies: []; generated graph metadata "
+                    "belongs to its verified MaterialProgram: " + authored.source);
+            }
+            const auto source = Canonical(assetRoot / std::filesystem::u8path(authored.source));
+            if (!ck::IsContainedPath(assetRoot, source))
+            {
+                Fail("Shader metadata source escapes asset root: " + authored.source);
+            }
+            auto metaPath = source;
+            metaPath += ".meta";
+            const auto sourceInput = Read(source, ck::kShaderMetaDocumentMaxBytes);
+            const auto metaInput = Read(metaPath, kMaxDefinitionBytes);
+            ShaderMeta sourceMetadata;
+            std::string failure;
+            if (!ShaderMetaLoader::Parse(
+                { reinterpret_cast<const char*>(sourceInput.data()), sourceInput.size() }, source,
+                FileGuid{ authored.asset.key.assetId.value }, sourceMetadata, failure))
+            {
+                Fail("Shader metadata authoring validation failed: " + authored.source + ": " + failure);
+            }
+            if (sourceMetadata.generatedMaterial)
+            {
+                Fail("Generated ShaderMeta must be cooked as part of its verified MaterialProgram: " +
+                    authored.source);
+            }
+            // These inputs are validated by the canonical authoring producer.
+            // Snapshot them for a coherent source import key; HLSL is not a new
+            // runtime dependency and is never opened by descriptor acquisition.
+            const auto shaderSource = Canonical(sourceMetadata.ResolveSource(source));
+            if (!ck::IsContainedPath(assetRoot, shaderSource))
+            {
+                Fail("Shader source escapes asset root: " + authored.source);
+            }
+            auto shaderMetaPath = shaderSource;
+            shaderMetaPath += ".meta";
+            const auto shaderInput = Read(shaderSource, 16u * 1024u * 1024u);
+            const auto shaderMetaInput = Read(shaderMetaPath, kMaxDefinitionBytes);
+            auto cooked = ck::BuildShaderMetaCookProduct({ source, assetRoot });
+            if (!cooked.Succeeded())
+            {
+                failure = "Shader metadata source cook failed: " + authored.source;
+                for (const auto& issue : cooked.issues)
+                {
+                    failure += "\n  " + issue.context + ": " + issue.message;
+                }
+                Fail(failure);
+            }
+            auto& product = *cooked.product;
+            // Bind the emitted CEDO and both identities to the captured bytes,
+            // not merely before/after file observations (which can miss A-B-A).
+            const auto capturedDocument = Authoring::ParsedDocument::ParseText(
+                { reinterpret_cast<const char*>(sourceInput.data()), sourceInput.size() }, failure);
+            std::vector<std::byte> capturedArtifact;
+            std::vector<ck::ModelIdentityIssue> identityIssues;
+            experiment::AssetId capturedId;
+            experiment::AssetId capturedShaderId;
+            if (!capturedDocument ||
+                !Authoring::EncodeCookedDocument(capturedDocument.Root(), capturedArtifact, failure) ||
+                !ck::ReadAssetIdFromMeta(
+                    { reinterpret_cast<const char*>(metaInput.data()), metaInput.size() }, capturedId, identityIssues) ||
+                !ck::ReadAssetIdFromMeta(
+                    { reinterpret_cast<const char*>(shaderMetaInput.data()), shaderMetaInput.size() },
+                    capturedShaderId, identityIssues) ||
+                capturedId != authored.asset.key.assetId || capturedShaderId != product.sourceShaderAssetId ||
+                capturedArtifact != product.artifactBytes)
+            {
+                Fail("Shader metadata product differs from its captured source/sidecar bytes: " + authored.source);
+            }
+            if (product.shaderMetaAssetId != authored.asset.key.assetId ||
+                Read(source, ck::kShaderMetaDocumentMaxBytes) != sourceInput ||
+                Read(metaPath, kMaxDefinitionBytes) != metaInput ||
+                Read(shaderSource, 16u * 1024u * 1024u) != shaderInput ||
+                Read(shaderMetaPath, kMaxDefinitionBytes) != shaderMetaInput)
+            {
+                Fail("Shader metadata inputs changed during cook or definition differs from sidecar: " +
+                    authored.source);
+            }
+            ShaderMeta readback;
+            if (!ck::ReadShaderMetaArtifact(product.artifactBytes, authored.asset.key.assetId,
+                readback, failure))
+            {
+                Fail("Source-free shader metadata readback failed: " + failure);
+            }
+            PreparedArtifact value;
+            value.bytes = std::move(product.artifactBytes);
+            value.extension = ".shadermeta";
+            value.inputDigest = Hash("source=" + Hash(sourceInput) + "\nmeta=" + Hash(metaInput) +
+                "\nshader=" + Hash(shaderInput) + "\nshaderMeta=" + Hash(shaderMetaInput) + "\n");
+            value.importer = kShaderMetaImporterVersion;
+            value.representation = ck::kShaderMetaDocumentRepresentation;
+            value.schema = ck::kShaderMetaDocumentVersion;
+            return value;
+        }
+
         std::map<ck::AssetIdentity, PreparedArtifact> PrepareSources(const AssetSet& definition,
             const std::set<ck::AssetIdentity>& included, const std::filesystem::path& assetRoot)
         {
@@ -672,6 +788,11 @@ namespace AssetCooking
             for (const auto& identity : included)
             {
                 const auto& authored = definition.sources.at(identity);
+                if (authored.asset.kind == ck::CookedAssetKind::ShaderMeta)
+                {
+                    result.emplace(identity, PrepareShaderMeta(authored, assetRoot));
+                    continue;
+                }
                 if (authored.asset.kind != ck::CookedAssetKind::Texture)
                 {
                     modelSelections[authored.source].push_back(authored.asset);
@@ -928,16 +1049,16 @@ namespace AssetCooking
                 const bool cached = std::filesystem::exists(cachedBlob);
                 if (cached)
                 {
-                    VerifyBytes(cachedBlob, product.bytes.size(), digest, authored.asset.kind, product.extension);
+                    VerifyBytes(cachedBlob, product.bytes.size(), digest, authored.asset, product.extension);
                 }
                 else
                 {
-                    ValidatePayload(product.bytes, authored.asset.kind, product.extension);
+                    ValidatePayload(product.bytes, authored.asset, product.extension);
                     // Cache-local temporary storage keeps rename on the same
                     // volume, even when the requested output uses another drive.
                     const auto cacheTemporary = cacheWork / "payload.tmp";
                     WriteNew(cacheTemporary, product.bytes);
-                    VerifyBytes(cacheTemporary, product.bytes.size(), digest, authored.asset.kind, product.extension);
+                    VerifyBytes(cacheTemporary, product.bytes.size(), digest, authored.asset, product.extension);
                     std::filesystem::create_directories(cachedBlob.parent_path());
                     NoReparse(cachedBlob);
                     std::filesystem::rename(cacheTemporary, cachedBlob);
@@ -971,7 +1092,7 @@ namespace AssetCooking
                     std::filesystem::create_directories(outputBlob.parent_path());
                     // Output owns independent immutable files, so cache GC cannot break a release.
                     std::filesystem::copy_file(cachedBlob, outputBlob);
-                    VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset.kind, product.extension);
+                    VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset, product.extension);
                     if (cached)
                     {
                         ++result.reusedBlobs;

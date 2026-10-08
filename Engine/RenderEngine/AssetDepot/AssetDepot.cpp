@@ -58,6 +58,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
     own::shared_owner<const cooked::CookedAssetCatalog> retired;
     AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
+    AssetDepot::MaterialAssetRetiredEntries retiredMaterials;
     LegacyCacheRetirement retiredLegacy;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
@@ -71,12 +72,14 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
         StageLegacyCacheRetirementLocked(retiredLegacy);
         StageTextureAssetRetirementLocked(retiredTextures);
         StageModelAssetRetirementLocked(retiredModels);
+        StageMaterialAssetRetirementLocked(retiredMaterials);
         retired = std::move(m_cookedCatalog);
         m_cookedCatalog = std::move(published);
         m_assetDepotRevision = revision + 1u;
         DetachLegacyCachesLocked(retiredLegacy);
         InvalidateTextureAssetsLocked(retiredTextures);
         InvalidateModelAssetsLocked(retiredModels);
+        InvalidateMaterialAssetsLocked(retiredMaterials);
     }
     return mountId;
 }
@@ -115,6 +118,7 @@ bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
     own::shared_owner<const cooked::CookedAssetCatalog> retired;
     AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
+    AssetDepot::MaterialAssetRetiredEntries retiredMaterials;
     LegacyCacheRetirement retiredLegacy;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
@@ -128,12 +132,14 @@ bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
         StageLegacyCacheRetirementLocked(retiredLegacy);
         StageTextureAssetRetirementLocked(retiredTextures);
         StageModelAssetRetirementLocked(retiredModels);
+        StageMaterialAssetRetirementLocked(retiredMaterials);
         retired = std::move(m_cookedCatalog);
         m_cookedCatalog = std::move(published);
         m_assetDepotRevision = revision + 1u;
         DetachLegacyCachesLocked(retiredLegacy);
         InvalidateTextureAssetsLocked(retiredTextures);
         InvalidateModelAssetsLocked(retiredModels);
+        InvalidateMaterialAssetsLocked(retiredMaterials);
     }
     // Existing snapshots and resolved generation owners keep the exact backing.
     // No storage deletion or GPU retirement is implied by logical unmount.

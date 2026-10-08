@@ -2,6 +2,7 @@
 
 #include "RHI/RHIPipelineState.h"
 #include "TypeTrait.h"
+#include "Ownership.h"
 
 #include <array>
 #include <cstddef>
@@ -17,6 +18,11 @@
 namespace Authoring
 {
     class ReadNode;
+}
+
+namespace AssetDepot
+{
+    struct ShaderMetaAssetOrigin;
 }
 
 enum class ShaderPropertyType : std::uint8_t
@@ -168,7 +174,17 @@ struct ShaderMeta
     std::vector<ShaderPassDesc> passes;
     // Present only on derived Graph outputs. Graph/Blackboard owns authoring.
     std::optional<ShaderGeneratedMaterial> generatedMaterial;
-    bool operator==(const ShaderMeta&) const = default;
+    // Exact immutable artifact source pin. It holds no bulk image or GPU data.
+    own::shared_owner<const AssetDepot::ShaderMetaAssetOrigin> assetOrigin{};
+
+    bool operator==(const ShaderMeta& other) const
+    {
+        // Ownership handles have no value equality. Preserve metadata comparison
+        // semantics without turning a runtime backing pin into resource identity.
+        return guid == other.guid && schemaVersion == other.schemaVersion && name == other.name &&
+            source == other.source && originPath == other.originPath && properties == other.properties &&
+            keywords == other.keywords && passes == other.passes && generatedMaterial == other.generatedMaterial;
+    }
 
     std::filesystem::path ResolveSource(
         const std::filesystem::path& metaPath) const;
@@ -201,6 +217,12 @@ namespace ShaderMetaLoader
     bool ParseDocument(const Authoring::ReadNode& root,
         const std::filesystem::path& originPath, const FileGuid& guid,
         ShaderMeta& outMeta, std::string& outError);
+
+    // Source-free CPU metadata decode. The source token is schema-validated but
+    // never opened, compiled or treated as a ready GPU program. Generated graph
+    // metadata must use ParseGeneratedCooked with its verified source instead.
+    bool ParseCookedMetadata(std::span<const std::byte> bytes,
+        const FileGuid& guid, ShaderMeta& outMeta, std::string& outError);
 
     // A verified cooked generation supplies the exact source bytes. Reuses the
     // authoring schema and source digest checks without reading source files.
