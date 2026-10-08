@@ -304,7 +304,8 @@ namespace assets
             owner = Texture::WithColorSpace(owner, colorSpace == ModelTextureColorSpace::Srgb);
             owner = Texture::WithMipChain(owner, failure);
             if (!owner) return false;
-            const auto image = owner->GetImageView();
+            const auto imagePayload = owner->NonRehydratableImage();
+            const auto image = owner->GetImageView(imagePayload);
 
             out.colorSpace = colorSpace;
             out.format = colorSpace == ModelTextureColorSpace::Srgb

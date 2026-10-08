@@ -118,7 +118,9 @@ public:
 
     /// 텍스처를 올리고 핸들을 돌려준다. 이미 올라가 있으면 그대로 준다.
     /// 프레임이 열려 있어야 한다(BeginFrame과 EndFrame 사이).
-    Entry GetOrUpload(const Texture* texture, std::string& outError) override;
+    bool IsResident(const Texture* texture) const override;
+    Entry GetOrUpload(const Texture* texture,
+        const own::shared_owner<const Texture::CodecImage>& image, std::string& outError) override;
     void OnUploadSubmitted(uint64_t recordingId,
         RHICompletionPoint completion) override;
     void OnUploadCompleted(uint64_t completedValue) override;

@@ -95,7 +95,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     Check(device.BeginFrame(error), "Decal begin");
                     textures.BeginFrame(context.frameId);
                     meshes.BeginFrame(context.frameId);
-                    const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error).handle;
+                    const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
                     Check(environment.IsValid() && host.PrepareResidency(context, input, error),
                           "Decal residency " + error);
                     EnhancedDecalPass::Item item;

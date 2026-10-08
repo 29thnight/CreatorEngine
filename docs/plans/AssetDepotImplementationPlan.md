@@ -63,6 +63,18 @@ design. A foundation slice is not completion of the runtime migration.
   GPU-resident raster paths need no CPU payload. The live graph path does read/copy
   geometry on CPU, so it explicitly retains transient payload owners until all selected
   views finish. Existing graph-derived CPU copies have their own bounded ownership.
+- Mounted Texture descriptors retain metadata, an exact image recipe and backing,
+  not decoded pixels. Independent CodecImage requests share compatible verified reads
+  and decodes; descriptor and image caches have separate weak lookup/retained budgets.
+  Sampling-only labels share bytes, while compression/filtering/mip recipes distinguish
+  different decoded results. The source-image representation still decodes on first
+  descriptor acquisition to derive its metadata; this is not a metadata-only file format.
+- DX12/Vulkan uploads, material graph bindings, sprites/UI/decals, gizmos, environment
+  work and editor previews now use explicit image owners. CPU admission precedes native
+  recording; deferred views retain exact results across mesh/image/program misses and
+  credit limits. No-demand frames cancel their subscribers; accepted native resources
+  keep the existing GPU retirement path. Scene and bundle results carry zero-budget
+  image handoffs through construction and current camera admission.
 - Animator owns only selected/current/transition/layer clips and skeletons through
   scheduled evaluation. Both granular and transitional legacy geometry require the
   full compatible skin-binding contract before accepting its current palette.
@@ -98,9 +110,19 @@ design. A foundation slice is not completion of the runtime migration.
   an explicitly prepared material. General source-free authored-model instantiation,
   material production/binding, embedded textures and automatic Player bootstrap are
   not yet cut over. CEMCv11 remains a transitional adapter for other legacy consumers.
-- Texture descriptors still retain CodecImage and embedded-image bulk. Independently
-  evictable image payloads, exact image rehydration and compatible image decode sharing
-  remain. Mesh sharing does not imply those image/legacy paths are complete.
+- Legacy source/generated Texture adapters explicitly retain non-rehydratable images.
+  In particular, legacy material property/name loads and embedded ModelTextureAsset
+  pixel/subresource storage are not yet fully cut over to standalone image recipes.
+  Mounted typed graph/UI/sprite/generic paths use the independent image store.
+- Synchronous scene entry points reject a composite Pending bundle rather than waiting
+  for image payload jobs on the caller. Cold mounted-content activation must use the
+  asynchronous scene preparation path; Player startup and command callers still need
+  that activation cutover. No synchronous readiness guarantee is claimed for that bridge.
+- BuildAssetSet currently imports/converts before verified CAS reuse. Skipping unchanged
+  CPU imports still needs complete source/external/settings/tool/version receipt keys
+  and validation of every referenced schema/blob; blob reuse alone is not that optimization.
+- Artifact-store root leases and explicit safe deletion/repack eligibility are pending.
+  Logical unmount and cache eviction never themselves delete immutable output files.
 - Some legacy Material/Texture/ShaderMeta APIs are synchronous transitional loaders;
   full typed asynchronous acquisition and independent cooked producers for every
   supported resource kind are not complete.

@@ -3,6 +3,7 @@
 #include "EnhancedDrawReplayInput.h"
 #include "../../MaterialGraphRuntime.h"
 #include "../../Texture.h"
+#include "../../TextureFramePins.h"
 #include <map>
 #include <set>
 
@@ -100,9 +101,10 @@ struct EnhancedLatticeReplayInput
         for(const auto& s:product.shaders) { w.Text(s.backend); w.Text(s.entryPoint); w.Number(s.bytecode.size(),8); w.Block(s.bytecode); }
         return EnhancedCameraReplayInput::Checksum(w.bytes);
     }
-    static uint64_t TextureDigest(const Texture& texture)
+    static uint64_t TextureDigest(const Texture& texture,
+        const own::shared_owner<const Texture::CodecImage>& image)
     {
-        const auto view=texture.GetImageView();
+        const auto view=texture.GetImageView(image);
         if(view.IsEmpty()) throw std::runtime_error("Lattice replay texture lacks CPU content owner");
         uint64_t hash=14695981039346656037ull;
         const auto mix=[&](std::span<const uint8_t> bytes) { for(auto b:bytes) { hash^=b; hash*=1099511628211ull; } };
@@ -190,7 +192,8 @@ struct EnhancedLatticeReplayInput
         if(!stream.read(reinterpret_cast<char*>(bytes.data()),bytes.size()) || stream.peek()!=EOF) { error="Lattice replay read failed"; return false; }
         return Decode(bytes,output,error);
     }
-    static bool Seal(std::span<const EnhancedDrawItem> graph, EnhancedLatticeReplayInput& output, std::string& error)
+    static bool Seal(std::span<const EnhancedDrawItem> graph, EnhancedLatticeReplayInput& output, std::string& error,
+        const TextureFramePins* imagePins = nullptr)
     {
         try
         {
@@ -222,7 +225,9 @@ struct EnhancedLatticeReplayInput
                 for(const auto& t:instance->textures)
                 {
                     if(!t.owner) throw std::runtime_error("Lattice replay texture owner missing");
-                    d.textures.push_back({t.slot,static_cast<uint32_t>(t.colorSpace),t.assetId,TextureDigest(*t.owner)});
+                    const auto image = imagePins ? imagePins->Image(&*t.owner) : t.owner->NonRehydratableImage();
+                    d.textures.push_back({t.slot, static_cast<uint32_t>(t.colorSpace), t.assetId,
+                        TextureDigest(*t.owner, image)});
                 }
                 std::ranges::sort(d.textures,{},&TextureIdentity::slot);
                 candidate.draws.push_back(std::move(d));
@@ -234,10 +239,14 @@ struct EnhancedLatticeReplayInput
         }
         catch(const std::exception& e) { error=e.what(); return false; }
     }
-    bool Apply(std::span<EnhancedDrawItem> graph, std::string& error) const
+    bool Apply(std::span<EnhancedDrawItem> graph, std::string& error,
+        const TextureFramePins* imagePins = nullptr) const
     {
         EnhancedLatticeReplayInput current;
-        if(!Seal(graph,current,error)) return false;
+        if (!Seal(graph, current, error, imagePins))
+        {
+            return false;
+        }
         if(draws.size()!=graph.size()) { error="Lattice replay selected draw count mismatch"; return false; }
         std::vector<own::shared_owner<const material_graph::Instance>> instances;
         std::map<uint64_t,size_t> sharedSlots;
@@ -255,9 +264,26 @@ struct EnhancedLatticeReplayInput
             own::shared_owner<const material_graph::Instance> instance;
             if(!material_graph::BuildInstance(source->generation,saved.description,loader,instance,error)) return false;
             if(instance->textures.size()!=saved.textures.size()) { error="Lattice replay rebuilt texture count mismatch"; return false; }
-            for(const auto& t:instance->textures)
-                if(!t.owner || std::ranges::none_of(saved.textures,[&](const auto& s){return s.slot==t.slot && s.assetId==t.assetId && s.colorSpace==static_cast<uint32_t>(t.colorSpace) && s.content==TextureDigest(*t.owner);}))
-                { error="Lattice replay rebuilt texture binding mismatch"; return false; }
+            for (const auto& t : instance->textures)
+            {
+                if (!t.owner)
+                {
+                    error = "Lattice replay rebuilt texture owner missing";
+                    return false;
+                }
+                const auto image = imagePins ? imagePins->Image(&*t.owner) : t.owner->NonRehydratableImage();
+                const auto digest = TextureDigest(*t.owner, image);
+                if (std::ranges::none_of(saved.textures, [&](const auto& identity)
+                    {
+                        return identity.slot == t.slot && identity.assetId == t.assetId
+                            && identity.colorSpace == static_cast<uint32_t>(t.colorSpace)
+                            && identity.content == digest;
+                    }))
+                {
+                    error = "Lattice replay rebuilt texture binding mismatch";
+                    return false;
+                }
+            }
             const auto [slot,inserted]=sharedSlots.emplace(graph[i].materialGraphSlot,i);
             if(!inserted)
             {

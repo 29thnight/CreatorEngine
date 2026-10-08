@@ -2,6 +2,7 @@
 
 #include "MaterialGraphRuntime.h"
 #include "MaterialGraphInstancePins.h"
+#include "TextureFramePins.h"
 #include "RHI/IRenderDeviceServices.h"
 #include "RHI/IRenderTextureCache.h"
 #include "RHI/RHIEncoder.h"
@@ -52,7 +53,8 @@ namespace material_graph
       public:
         bool Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures, own::shared_owner<const Instance> instance,
                      const PassLayout& layout, std::shared_ptr<const RenderBindings>& result, std::string& error,
-                     own::shared_owner<InstanceFramePins> instancePins = {});
+                     own::shared_owner<InstanceFramePins> instancePins = {},
+                     const TextureFramePins* imagePins = nullptr);
 
         // Call after SetPipeline with this packet's layout, before a draw/dispatch.
         // Frame upload/descriptor handles cannot be reused in another recording.

@@ -113,7 +113,7 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     // CameraIcon 연결이 다시 nullptr로 퇴행하거나 WIC 알파가 사라져도 통과한다.
     const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
     own::shared_owner<const Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
-    if (!cameraIcon || cameraIcon->GetImageView().IsEmpty())
+    if (!cameraIcon || cameraIcon->GetImageDescription().IsEmpty())
     {
         outLog += "[1/4] CameraGizmo.png 로드 실패: " + cameraIconPath.string() + "\n";
         return false;
@@ -122,7 +122,8 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     // 알파 판정은 Texture 가 로드 때 재어 둔 값을 본다. 예전에는 여기서
     // ScratchImage::IsAlphaAllOpaque 를 직접 불렀는데, 그 물음의 답은
     // m_isTextureAlpha 에 이미 들어 있다(로더가 같은 함수로 잰다).
-    const TextureImageView cameraPixels = cameraIcon->GetImageView();
+    const auto imagePayload_cameraIcon = cameraIcon->NonRehydratableImage();
+    const TextureImageView cameraPixels = cameraIcon->GetImageView(imagePayload_cameraIcon);
     if (128 != cameraPixels.Width() || 128 != cameraPixels.Height() ||
         !cameraIcon->IsTextureAlpha())
     {
@@ -505,11 +506,11 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
             1, 1, "dx12_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));
 
         if (!compressedIcon ||
-            RHIFormat::BC1UnormSrgb != compressedIcon->GetImageView().Format() ||
+            RHIFormat::BC1UnormSrgb != compressedIcon->GetImageDescription().Format() ||
             !blockNoise ||
-            RHIFormat::BC3Unorm != blockNoise->GetImageView().Format() ||
+            RHIFormat::BC3Unorm != blockNoise->GetImageDescription().Format() ||
             !bgraTexture ||
-            RHIFormat::BGRA8Unorm != bgraTexture->GetImageView().Format())
+            RHIFormat::BGRA8Unorm != bgraTexture->GetImageDescription().Format())
         {
             passed = false;
             outLog += "[4/4] 코덱 자산 셋(BC1_SRGB·BC3·BGRA8)을 준비하지 못했다\n";
@@ -525,11 +526,11 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
             // 그것도 유효한 handle 이다. 판별하는 것은 format 이다.
             std::string codecError;
             const DX12TextureCache::Entry compressedEntry =
-                textureCache.GetOrUpload((compressedIcon ? &*compressedIcon.borrow() : nullptr), codecError);
+                textureCache.GetOrUpload((compressedIcon ? &*compressedIcon.borrow() : nullptr), compressedIcon ? compressedIcon->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
             const DX12TextureCache::Entry noiseEntry =
-                textureCache.GetOrUpload((blockNoise ? &*blockNoise.borrow() : nullptr), codecError);
+                textureCache.GetOrUpload((blockNoise ? &*blockNoise.borrow() : nullptr), blockNoise ? blockNoise->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
             const DX12TextureCache::Entry bgraEntry =
-                textureCache.GetOrUpload((bgraTexture ? &*bgraTexture.borrow() : nullptr), codecError);
+                textureCache.GetOrUpload((bgraTexture ? &*bgraTexture.borrow() : nullptr), bgraTexture ? bgraTexture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, codecError);
             const bool codecOk = compressedEntry.IsValid() && noiseEntry.IsValid() &&
                 bgraEntry.IsValid() &&
                 RHIFormat::BC1UnormSrgb == compressedEntry.format &&

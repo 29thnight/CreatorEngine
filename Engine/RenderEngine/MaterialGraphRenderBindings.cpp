@@ -135,7 +135,7 @@ namespace material_graph
     bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures,
                                      own::shared_owner<const Instance> instance, const PassLayout& layout,
                                      std::shared_ptr<const RenderBindings>& result, std::string& error,
-                                     own::shared_owner<InstanceFramePins> instancePins)
+                                     own::shared_owner<InstanceFramePins> instancePins, const TextureFramePins* imagePins)
     {
         ce::profile_scope profile{ce::marker<"MaterialBindingsPrepare">()};
         error.clear();
@@ -203,7 +203,9 @@ namespace material_graph
                 return Fail(error, "Material render texture has no CPU generation owner.");
             }
             const auto failures = textures.GetUploadFailureCount();
-            const auto entry = textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error);
+            const auto* descriptor = &*texture.owner;
+            const auto image = imagePins ? imagePins->Image(descriptor) : descriptor->NonRehydratableImage();
+            const auto entry = textures.GetOrUpload(descriptor, image, error);
             if (!entry.IsValid() || !error.empty() || textures.GetUploadFailureCount() != failures)
             {
                 return Fail(error,

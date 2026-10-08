@@ -708,33 +708,94 @@ void EnhancedIBLGenerator::OnUploadAborted(uint64_t recording)
     }
 }
 
-bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
-    assets::CookedEnvironment value, std::string& error)
+own::shared_owner<const EnhancedIBLGenerator::PreparedCookedEnvironment>
+EnhancedIBLGenerator::PrepareCooked(assets::CookedEnvironment value, std::string& error)
 {
-    ce::profile_scope profile{ ce::marker<"Environment.InstallCooked">() };
-    if (!m_resources || m_resources != context.resources || !context.textureCache || m_generation == UINT64_MAX)
-    { error = "Cooked environment context is invalid"; return false; }
-    if (!BeginReplacement(error)) return false;
-    RHIRecordingAdmissionGuard replacement([this] { RollbackReplacement(); });
-    ReleaseTargets();
-    m_cubeSize = value.cubeSize; m_brdfSize = value.brdfSize;
-    if (!value.importance[0].IsValid() && !assets::BuildEnvironmentImportance(value,error)) return false;
-    for (size_t index=0; index<4; ++index)
+    error.clear();
+    if (!value.importance[0].IsValid() && !assets::BuildEnvironmentImportance(value, error))
     {
-        m_cookedTextures[index] = Texture::CreateSharedFromImage("CookedEnvironment",std::move(value.images[index]));
-        if (!m_cookedTextures[index]) { error = "Cooked environment image is invalid"; return false; }
+        return {};
     }
-    for(size_t index=0;index<3;++index)
+    PreparedCookedEnvironment prepared;
+    prepared.identity = value.identity;
+    prepared.cubeSize = value.cubeSize;
+    prepared.brdfSize = value.brdfSize;
+    for (size_t index = 0; index < 4; ++index)
     {
-        m_cookedTextures[index+4]=Texture::CreateSharedFromImage("CookedEnvironmentImportance",std::move(value.importance[index]));
-        if (!m_cookedTextures[index+4]) {error="Cooked importance image is invalid";return false;}
+        prepared.textures[index] = Texture::CreateSharedFromImage(
+            "CookedEnvironment", std::move(value.images[index]));
+        if (!prepared.textures[index])
+        {
+            error = "Cooked environment image is invalid";
+            return {};
+        }
+    }
+    for (size_t index = 0; index < 3; ++index)
+    {
+        prepared.textures[index + 4] = Texture::CreateSharedFromImage(
+            "CookedEnvironmentImportance", std::move(value.importance[index]));
+        if (!prepared.textures[index + 4])
+        {
+            error = "Cooked importance image is invalid";
+            return {};
+        }
     }
     if (value.source.IsValid())
     {
-        m_cookedTextures[7]=Texture::CreateSharedFromImage("CookedEnvironmentSource",std::move(value.source));
-        if (!m_cookedTextures[7]) {error="Cooked source image is invalid";return false;}
+        prepared.textures[7] = Texture::CreateSharedFromImage("CookedEnvironmentSource", std::move(value.source));
+        if (!prepared.textures[7])
+        {
+            error = "Cooked source image is invalid";
+            return {};
+        }
     }
-    if (!TouchCooked(context,error)) return false;
+    return own::make_shared<const PreparedCookedEnvironment>(std::move(prepared));
+}
+
+bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
+    assets::CookedEnvironment value, std::string& error)
+{
+    const auto prepared = PrepareCooked(std::move(value), error);
+    return prepared && InstallCooked(context, *prepared, error);
+}
+
+bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
+    const PreparedCookedEnvironment& source, std::string& error)
+{
+    ce::profile_scope profile{ ce::marker<"Environment.InstallCooked">() };
+    if (!m_resources || m_resources != context.resources || !context.textureCache || m_generation == UINT64_MAX)
+    {
+        error = "Cooked environment context is invalid";
+        return false;
+    }
+    if (source.cubeSize == 0 || source.brdfSize == 0)
+    {
+        error = "Prepared cooked environment dimensions are invalid";
+        return false;
+    }
+    for (size_t index = 0; index < 7; ++index)
+    {
+        if (!source.textures[index] || source.textures[index]->GetImageDescription().IsEmpty())
+        {
+            error = "Prepared cooked environment image is missing";
+            return false;
+        }
+    }
+    if (!BeginReplacement(error))
+    {
+        return false;
+    }
+    RHIRecordingAdmissionGuard replacement([this] { RollbackReplacement(); });
+    ReleaseTargets();
+    m_cubeSize = source.cubeSize;
+    m_brdfSize = source.brdfSize;
+    // Only owner handles are copied. A failed partial upload rolls these targets
+    // back without consuming the caller's exact source or copying image bytes.
+    m_cookedTextures = source.textures;
+    if (!TouchCooked(context, error))
+    {
+        return false;
+    }
     replacement.Accept();
     return true;
 }
@@ -749,8 +810,9 @@ bool EnhancedIBLGenerator::TouchCooked(const EnhancedFrameContext& context, std:
     for (size_t index=0; index<m_cookedTextures.size(); ++index)
     {
         if (!m_cookedTextures[index]) continue;
-        const auto entry = context.textureCache->GetOrUpload((m_cookedTextures[index] ? &*m_cookedTextures[index].borrow() : nullptr),error);
-        const auto image = m_cookedTextures[index]->GetImageView();
+        const auto payload = m_cookedTextures[index]->NonRehydratableImage();
+        const auto entry = context.textureCache->GetOrUpload(&*m_cookedTextures[index], payload, error);
+        const auto image = m_cookedTextures[index]->GetImageDescription();
         if (!error.empty() || !entry.IsValid() || entry.width!=image.Width() || entry.height!=image.Height() ||
             entry.mipLevels!=image.MipLevels() || entry.format!=image.Format() || entry.isCube!=image.IsCube())
         { error = "Cooked environment upload failed: " + error; return false; }

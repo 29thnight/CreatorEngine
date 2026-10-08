@@ -528,7 +528,9 @@ public:
     bool Initialize(VulkanDeviceResources* resources, std::string& outError);
     void Shutdown();
 
-    RHITextureEntry GetOrUpload(const Texture* texture, std::string& outError) override;
+    bool IsResident(const Texture* texture) const override;
+    RHITextureEntry GetOrUpload(const Texture* texture,
+        const own::shared_owner<const Texture::CodecImage>& image, std::string& outError) override;
     RHITextureEntry GetBlackTexture(std::string& outError) override;
     RHITextureEntry GetOrmNeutralTexture(std::string& outError) override;
     uint32_t GetUploadFailureCount() const override;

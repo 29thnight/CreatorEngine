@@ -230,15 +230,15 @@ namespace
             auto bc3 = Texture::CreateFromPixels(4, 4, "Emission.BC3",
                 RHIFormat::BC3Unorm, redBlock, 16);
             textures[4] = Texture::WithColorSpace(bc3, true);
-            if (!textures[4] || textures[4]->GetImageView().Format() != RHIFormat::BC3UnormSrgb)
+            if (!textures[4] || textures[4]->GetImageDescription().Format() != RHIFormat::BC3UnormSrgb)
             { error = "Emission BC3 sRGB format failed"; return false; }
             const auto repeatedSrgb = Texture::WithColorSpace(textures[1], true);
             if (!textures[0] || !textures[1] || !textures[2] || !textures[3]
                 || textures[0]->m_assetId == textures[1]->m_assetId
-                || textures[0]->GetImageView().Format() != RHIFormat::RGBA8Unorm
-                || textures[1]->GetImageView().Format() != RHIFormat::RGBA8UnormSrgb
-                || textures[2]->GetImageView().Format() != RHIFormat::RGBA8Unorm
-                || textures[0]->GetImageView().At(0)->pixels != textures[1]->GetImageView().At(0)->pixels
+                || textures[0]->GetImageDescription().Format() != RHIFormat::RGBA8Unorm
+                || textures[1]->GetImageDescription().Format() != RHIFormat::RGBA8UnormSrgb
+                || textures[2]->GetImageDescription().Format() != RHIFormat::RGBA8Unorm
+                || textures[0]->GetImageView(textures[0]->NonRehydratableImage()).At(0)->pixels != textures[1]->GetImageView(textures[1]->NonRehydratableImage()).At(0)->pixels
                 || !repeatedSrgb || repeatedSrgb->m_assetId != textures[1]->m_assetId)
             { error = "Emission color-space owner isolation failed"; return false; }
             return true;
@@ -638,7 +638,9 @@ namespace
                 auto source = Texture::CreateSharedFromImage("Mip.generated", std::move(image));
                 textures[f+1] = Texture::WithMipChain(source, error);
                 if (!textures[f+1]) return false;
-                const auto before = source->GetImageView(), after = textures[f+1]->GetImageView();
+                const auto imagePayload_source = source->NonRehydratableImage();
+                const auto imagePayload_textures_f_1_ = textures[f+1]->NonRehydratableImage();
+                const auto before = source->GetImageView(imagePayload_source), after = textures[f+1]->GetImageView(imagePayload_textures_f_1_);
                 const auto repeatedMips = Texture::WithMipChain(textures[f+1], error);
                 if (before.MipLevels() != 1 || after.MipLevels() != 6 || after.Format() != formats[f]
                     || textures[f+1]->m_assetId == source->m_assetId
@@ -1174,7 +1176,8 @@ namespace
             auto source=Texture::CreateSharedFromImage("Mip.shape",std::move(image));
             auto result=Texture::WithMipChain(source,error);
             if (!result) return false;
-            const auto view=result->GetImageView();
+            const auto imagePayload_result = result->NonRehydratableImage();
+            const auto view=result->GetImageView(imagePayload_result);
             uint32_t levels=1;
             for (uint32_t size=(std::max)(shape.w,shape.h); size>1; size>>=1) ++levels;
             if (shape.mips>1) levels=shape.mips;
@@ -1231,7 +1234,9 @@ namespace
                 || color->m_assetId != cachedColor->m_assetId
                 || data->m_assetId != cachedData->m_assetId)
             { error="Material mip cache reuse/isolation failed"; return false; }
-            const auto c=color->GetImageView(), d=data->GetImageView();
+            const auto imagePayload_color = color->NonRehydratableImage();
+            const auto imagePayload_data = data->NonRehydratableImage();
+            const auto c=color->GetImageView(imagePayload_color), d=data->GetImageView(imagePayload_data);
             if (c.MipLevels()!=4 || d.MipLevels()!=4 || c.Format()!=RHIFormat::RGBA8UnormSrgb
                 || d.Format()!=RHIFormat::RGBA8Unorm
                 || std::abs(int(uint8_t(c.Find(3,0)->pixels[0]))-188)>1
@@ -1331,7 +1336,10 @@ namespace
         own::shared_owner<const Texture> holes(Texture::CreateFromPixels(8, 8, "PbrCoverage.Holes",
             RHIFormat::RGBA8Unorm, pixels.data(), 8 * 4));
         auto minifiedHoles = Texture::WithMipChain(holes, error);
-        if (!minifiedHoles || minifiedHoles->GetImageView().MipLevels()!=4) return false;
+        if (!minifiedHoles || minifiedHoles->GetImageDescription().MipLevels() != 4)
+        {
+            return false;
+        }
         const uint8_t whitePixel[] = {255, 255, 255, 255};
         own::shared_owner<const Texture> white(Texture::CreateFromPixels(1, 1, "PbrCoverage.Emission",
             RHIFormat::RGBA8Unorm, whitePixel, 4));

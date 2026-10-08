@@ -1285,7 +1285,14 @@ void SceneManager::CompleteSceneLoads(bool wait)
         Scene* scene = nullptr;
         if (!failed && !load->m_cancelled && !m_exitCommand)
         {
-            try { scene = BuildPreparedScene(*load); }
+            try
+            {
+                scene = BuildPreparedScene(*load);
+                if (scene)
+                {
+                    scene->SetPreparedTextureImagePins(DataSystems->SceneTextureImagePins(load->m_assets));
+                }
+            }
             catch (const std::exception& e) { Debug::PrintLog(spdlog::level::err, e.what()); }
             catch (...) { Debug::PrintLog(spdlog::level::err, "Scene construction failed"); }
         }

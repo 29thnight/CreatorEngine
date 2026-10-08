@@ -20,6 +20,7 @@
 class RenderScene;
 class Scene;
 class Material;
+class TextureFramePins;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
@@ -212,6 +213,9 @@ struct EnhancedLiveFramePacket
     // M6-P2d-d: Host가 실제 Scene material에서 수집해 넘긴 추가 의존성.
     // 아래 ShaderMeta owner 배열은 이 선언과 primary/cache 입력을 resolve한 결과다.
     EnhancedRequiredAssetPacket requiredAssets;
+    // One-shot scene preparation result. The queue and RT preserve this owner
+    // until the first relevant staging copy, including coalesced/pending frames.
+    own::shared_owner<TextureFramePins> preparedTextureImages;
     // 첫 항목은 제품 GBuffer primary meta다. 뒤에는 GT가 DataSystem의 material
     // generation 집합에서 함께 밀봉한 material별 meta가 GUID 순서로 붙는다.
     std::vector<EnhancedShaderMetaFrameSnapshot> gbufferShaderMetas;

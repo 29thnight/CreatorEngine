@@ -10,7 +10,8 @@
 #include <unordered_map>
 #include <vector>
 
-// A recording's CPU texture representations, pinned once per stable runtime ID.
+// A recording's small texture descriptions and explicitly prepared image payloads.
+// Each kind is pinned once per stable runtime ID; descriptions do not imply pixels.
 // Mutable append-only recording bookkeeping, shared across views and accepted
 // packets. All access is synchronized; published slots are never replaced/erased.
 // This table is not an immutable asset generation.
@@ -61,6 +62,63 @@ public:
         return &*textures_[index].borrow();
     }
 
+    std::vector<own::shared_owner<const Texture>> Owners() const
+    {
+        std::lock_guard lock(mutex_);
+        return textures_;
+    }
+
+    void RetainImage(const own::shared_owner<const Texture>& texture,
+        const own::shared_owner<const Texture::CodecImage>& image)
+    {
+        if (!texture || !image)
+        {
+            return;
+        }
+        Retain(texture);
+        std::lock_guard lock(mutex_);
+        // Exact descriptor identity fixes the image key. Never replace a live
+        // payload (or destroy its last owner) while holding the table lock.
+        images_.try_emplace(Identity(&*texture), image);
+    }
+
+    own::shared_owner<const Texture::CodecImage> Image(const Texture* texture) const
+    {
+        if (!texture)
+        {
+            return {};
+        }
+        std::lock_guard lock(mutex_);
+        const auto found = images_.find(Identity(texture));
+        if (found != images_.end())
+        {
+            return found->second;
+        }
+        // Generated/legacy images explicitly retain their only source. This is
+        // resident-only and never asks the descriptor to decode or reopen a file.
+        return texture->NonRehydratableImage();
+    }
+
+    void ReleaseImages() noexcept
+    {
+        // A default node handle owns no allocated bucket array. This path also
+        // runs from abort guards, where allocating an empty map could terminate
+        // exception unwinding on the target STL.
+        for (;;)
+        {
+            decltype(images_)::node_type retired;
+            {
+                std::lock_guard lock(mutex_);
+                if (images_.empty())
+                {
+                    return;
+                }
+                retired = images_.extract(images_.begin());
+            }
+            // The final image owner, if any, dies after the table lock.
+        }
+    }
+
     std::size_t Size() const
     {
         std::lock_guard lock(mutex_);
@@ -71,4 +129,5 @@ private:
     mutable std::mutex mutex_;
     std::vector<own::shared_owner<const Texture>> textures_;
     std::unordered_map<std::uint64_t, std::size_t> indices_;
+    std::unordered_map<std::uint64_t, own::shared_owner<const Texture::CodecImage>> images_;
 };

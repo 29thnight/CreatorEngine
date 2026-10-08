@@ -205,7 +205,8 @@ namespace MaterialTextureTable
     }
 
     inline bool Upload(IRenderTextureCache& cache, const Schema& schema,
-        const std::vector<const Texture*>& owners, Views& views, std::string& error, bool legacy)
+        const std::vector<const Texture*>& owners, Views& views, std::string& error, bool legacy,
+        const TextureFramePins* imagePins = nullptr)
     {
         if (schema.size() != owners.size())
         {
@@ -227,7 +228,11 @@ namespace MaterialTextureTable
             else if (!owners[i] && schema[i] == standard_material::property::OrmMap)
                 uploaded = cache.GetOrmNeutralTexture(error);
             else
-                uploaded = cache.GetOrUpload(owners[i], error); // Missing AO and owned emission use neutral white.
+            {
+                const auto image = imagePins ? imagePins->Image(owners[i])
+                    : (owners[i] ? owners[i]->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{});
+                uploaded = cache.GetOrUpload(owners[i], image, error); // Missing AO and owned emission use neutral white.
+            }
             if (!error.empty() || !uploaded.IsValid()) return false;
             views.push_back(RHIBindingDesc::Srv2D(uploaded.handle, uploaded.format, 0, uploaded.mipLevels));
         }

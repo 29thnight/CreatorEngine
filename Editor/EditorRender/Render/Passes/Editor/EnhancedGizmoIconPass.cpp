@@ -168,7 +168,7 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
         for (Batch& batch : m_batches)
         {
             std::string uploadError;
-            batch.uploaded = context.textureCache->GetOrUpload((*m_icons)[batch.first].texture, uploadError);
+            batch.uploaded = context.textureCache->GetOrUpload((*m_icons)[batch.first].texture, context.TextureImage((*m_icons)[batch.first].texture), uploadError);
             if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "기즈모 아이콘 텍스처 업로드 실패: " + uploadError;

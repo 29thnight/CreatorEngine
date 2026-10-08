@@ -1,8 +1,6 @@
 #pragma once
 #include <cstdint>
-#include "Ownership.h"
-
-class Texture;
+#include "Texture.h"
 
 // 에디터 UI가 ImGui::Image에 넘길 ImTextureID의 백엔드 중립 변환기
 // (DX12 GPU descriptor handle / Vulkan descriptor set을 공통 Host 뒤로 숨긴다).
@@ -19,14 +17,18 @@ namespace EditorImGuiTexture
     /// Texture 객체 표시. 선택된 ImGui RHI backend가 내용을 업로드하고 해당
     /// API의 ImTextureID를 돌려준다. Host가 꺼져 있으면 0이다.
     ///
-    /// FromRawDx11Srv가 여기 있었다 — 호출자 0으로 걷었다(E). .cpp 주석 참고.
+    // Borrowed descriptors support GPU hits and explicit non-rehydratable images.
+    // Reproducible textures must use the owning overload for exact async requests.
     uint64_t From(const Texture* texture);
 
-    /// The caller retains the immutable texture owner during host registration.
-    inline uint64_t From(const own::shared_owner<const Texture>& pointer)
-    {
-        return From(pointer ? &*pointer.borrow() : nullptr);
-    }
+    /// Exact image preparation is nonblocking. Pending requests and ready image
+    /// owners survive UI frames until RegisterTexture has copied their pixels.
+    uint64_t From(const own::shared_owner<const Texture>& texture);
+
+    /// Presentation-thread demand boundaries, independent of any visible panel.
+    void BeginFrame();
+    void EndFrame();
+    void Shutdown();
 
     // ── 비동기 썸네일이 쓰는 둘 (PHASE 21 W7) ──
     //
@@ -42,6 +44,10 @@ namespace EditorImGuiTexture
     /// 않으므로, 이 창구가 없으면 **영원히 안 올라간다** — 준비를 기다리는
     /// 쪽이 준비를 막는 교착이다.
     void Prime(const Texture* texture);
+
+    /// Worker-prepared payload stays owned by the caller until IsReady succeeds.
+    void Prime(const own::shared_owner<const Texture>& texture,
+        const own::shared_owner<const Texture::CodecImage>& image);
 
     /// 픽셀이 실제로 GPU 에 올라갔는가. 부수 효과가 없다.
     bool IsReady(const Texture* texture);

@@ -186,7 +186,7 @@ void Run(const std::filesystem::path& root)
         Check(device.BeginFrame(error), "Begin recording: " + error);
         textures.BeginFrame(frame);
         auto& encoder = device.GetImmediateEncoder();
-        IblEnvironment environment{textures.GetOrUpload((texture ? &*texture.borrow() : nullptr), error), frame + 1, texture};
+        IblEnvironment environment{textures.GetOrUpload((texture ? &*texture.borrow() : nullptr), texture ? texture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), frame + 1, texture};
         const RHITransition source{environment.cube.handle, RHIResourceState::PixelShaderResource,
                                    RHIResourceState::ShaderResource};
         encoder.ResourceBarriers({{&source, 1}});

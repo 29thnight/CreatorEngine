@@ -320,7 +320,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         RHITextureHandle irradianceHandle, prefilteredHandle;
         if (furnace)
         {
-            const auto uploaded = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error);
+            const auto uploaded = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             CheckWith(uploaded.IsValid(), "Matched furnace cube ", error);
             environmentHandle = uploaded.handle;
         }

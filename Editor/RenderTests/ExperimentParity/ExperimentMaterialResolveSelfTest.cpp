@@ -451,19 +451,19 @@ namespace RenderTest
             check.Check(loaded, "W6 external texture loader accepts both color roles");
             if (loaded)
             {
-                check.Check(linear->GetImageView().Format() == RHIFormat::RGBA8Unorm
-                    || linear->GetImageView().Format() == RHIFormat::BGRA8Unorm,
+                check.Check(linear->GetImageDescription().Format() == RHIFormat::RGBA8Unorm
+                    || linear->GetImageDescription().Format() == RHIFormat::BGRA8Unorm,
                     "W6 external data texture remains linear");
-                check.Check(srgb->GetImageView().Format() == RHIFormat::RGBA8UnormSrgb
-                    || srgb->GetImageView().Format() == RHIFormat::BGRA8UnormSrgb,
+                check.Check(srgb->GetImageDescription().Format() == RHIFormat::RGBA8UnormSrgb
+                    || srgb->GetImageDescription().Format() == RHIFormat::BGRA8UnormSrgb,
                     "W6 external emission texture uses sRGB sampling");
                 check.Check(linear->m_assetId != srgb->m_assetId
-                    && std::memcmp(linear->GetImageView().At(0)->pixels, srgb->GetImageView().At(0)->pixels, 4) == 0,
+                    && std::memcmp(linear->GetImageView(linear->NonRehydratableImage()).At(0)->pixels, srgb->GetImageView(srgb->NonRehydratableImage()).At(0)->pixels, 4) == 0,
                     "W6 roles have separate GPU identities and identical encoded bytes");
                 const auto cachedSrgb = services.loadTexture(first, false, experiment::TextureColorSpace::Srgb);
                 check.Check(cachedSrgb && srgb->m_assetId == cachedSrgb->m_assetId
                     && srgb->m_assetId != other->m_assetId
-                    && std::memcmp(srgb->GetImageView().At(0)->pixels, other->GetImageView().At(0)->pixels, 4) != 0,
+                    && std::memcmp(srgb->GetImageView(srgb->NonRehydratableImage()).At(0)->pixels, other->GetImageView(other->NonRehydratableImage()).At(0)->pixels, 4) != 0,
                     "W6 cache reuses exact path/role and separates same filenames");
             }
             std::error_code ignored;

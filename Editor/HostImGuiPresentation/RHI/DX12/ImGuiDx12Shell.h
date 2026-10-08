@@ -4,12 +4,12 @@
 #endif
 
 #include "RHI/RHIDisplayFrame.h"
+#include "Texture.h"
 #include <functional>
 #include <memory>
 #include <cstdint>
 #include <string>
 
-class Texture;
 
 // 사용자 텍스처 descriptor는 마지막 표시 이후 충분히 오래 사용되지 않을 때
 // 은퇴시킨다. 실제 descriptor 재사용은 추가로 GPU 완료점을 기다린다.
@@ -89,7 +89,8 @@ public:
     /// 경로)되고 셸 SRV 힙에 슬롯을 받는다. 열린 ImGui 프레임에서 즉시
     /// 기록하며, 프레임 밖 호출은 null SRV 슬롯만 예약한다. 실제 표시 프레임은
     /// 매번 다시 호출해 last-used를 갱신해야 한다.
-    uint64_t RegisterTexture(const Texture* texture);
+    uint64_t RegisterTexture(const Texture* texture,
+        const own::shared_owner<const Texture::CodecImage>& image);
 
     /// 그 텍스처의 SRV가 실제로 기록됐는가. 위 주석의 "프레임 밖 호출은 null
     /// SRV 슬롯만 예약한다" 를 밖에서 구분할 수 있게 하는 창구다(W7 썸네일).

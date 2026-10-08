@@ -174,7 +174,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         for (Batch &batch : m_batches)
         {
             std::string uploadError;
-            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, uploadError);
+            batch.uploaded = context.textureCache->GetOrUpload(batch.texture, context.TextureImage(batch.texture), uploadError);
             if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "스프라이트 텍스처 업로드 실패: " + uploadError;

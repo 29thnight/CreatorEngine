@@ -1467,7 +1467,11 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
                     key.snapshot->bindingLayout, schema, outError)) return false;
             MaterialTextures textures;
             if (!MaterialTextureTable::Upload(*context.textureCache, schema,
-                    key.textures, textures.views, outError, !key.snapshot)) return false;
+                    key.textures, textures.views, outError, !key.snapshot,
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
+            {
+                return false;
+            }
             m_materialTextures.emplace(key, std::move(textures));
         }
     }

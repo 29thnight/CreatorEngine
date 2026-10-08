@@ -1,5 +1,6 @@
 #pragma once
 #include "RHIResourceTypes.h"
+#include "../Texture.h"
 
 #include <array>
 #include <cstdint>
@@ -38,13 +39,19 @@ class IRenderTextureCache
 public:
     virtual ~IRenderTextureCache() = default;
 
-    virtual RHITextureEntry GetOrUpload(const Texture* texture, std::string& outError) = 0;
+    // GPU hits need no CPU payload. A miss without a prepared owner returns
+    // preparationNeeded, never a white fallback, scheduling, file I/O or decode.
+    // The supplied owner spans the synchronous staging row copies only.
+    [[nodiscard]] virtual bool IsResident(const Texture* texture) const = 0;
+    virtual RHITextureEntry GetOrUpload(const Texture* texture,
+        const own::shared_owner<const Texture::CodecImage>& image, std::string& outError) = 0;
     virtual RHITextureEntry GetBlackTexture(std::string& outError) = 0;
     virtual RHITextureEntry GetOrmNeutralTexture(std::string& outError) = 0;
 
     /// W9 — 업로드 실패로 중립 텍스처를 대신 내준 횟수.
     ///
-    /// ★ 이 캐시는 CPU 픽셀이 없거나 업로드가 실패하면 **흰색**을 돌려준다.
+    /// Missing preparation returns an invalid preparationNeeded entry. Only an
+    /// invalid prepared payload or actual upload failure may return neutral white.
     ///   그 자체는 옳다(그리기는 계속되어야 한다). 문제는 그것이 조용하다는
     ///   것이다 — 재질이 흰색으로 보이는 프레임과 정말 흰 재질을 밖에서
     ///   구분할 수 없었다. 계획의 "silent neutral substitution 0"이 이 축이다.

@@ -281,7 +281,7 @@ void Run(const std::filesystem::path& root)
         description.rtvFormats[0] = targetDescription.format;
         std::vector<TextureBinding> uploaded;
         for (const auto& owner : instance->textures)
-            uploaded.push_back({owner.slot, textures.GetOrUpload((owner.owner ? &*owner.owner.borrow() : nullptr), error), owner.owner});
+            uploaded.push_back({owner.slot, textures.GetOrUpload((owner.owner ? &*owner.owner.borrow() : nullptr), owner.owner ? owner.owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), owner.owner});
         std::vector<LXMaterialDiagnostic> diagnostics;
         Check(pipeline.Publish(pipelines, product, RHIShaderBinary::Dxil, {.coreForward = true}, {},
                                instance->description.parameters, uploaded, description, {}, diagnostics),

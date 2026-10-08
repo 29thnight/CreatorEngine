@@ -378,12 +378,12 @@ void Run(const std::filesystem::path& root)
             std::vector<RHITransition> transitions;
             if (frame == 0)
             {
-                const auto entry = textures.GetOrUpload((image ? &*image.borrow() : nullptr), error);
+                const auto entry = textures.GetOrUpload((image ? &*image.borrow() : nullptr), image ? image->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
                 transitions.push_back(
                     {entry.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource});
             }
             const unsigned envIndex = frame >= 5 ? 1 : 0;
-            const IblEnvironment environment{textures.GetOrUpload((environments[envIndex] ? &*environments[envIndex].borrow() : nullptr), error), envIndex + 1,
+            const IblEnvironment environment{textures.GetOrUpload((environments[envIndex] ? &*environments[envIndex].borrow() : nullptr), environments[envIndex] ? environments[envIndex]->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), envIndex + 1,
                                              environments[envIndex]};
             if (frame == 0 || frame == 5)
             {
@@ -579,7 +579,7 @@ void Run(const std::filesystem::path& root)
         device.AbortFrame();
         Check(device.BeginFrame(error), "Begin after evaluation abort");
         textures.BeginFrame(9);
-        const IblEnvironment environment{textures.GetOrUpload((environments[1] ? &*environments[1].borrow() : nullptr), error), 2, environments[1]};
+        const IblEnvironment environment{textures.GetOrUpload((environments[1] ? &*environments[1].borrow() : nullptr), environments[1] ? environments[1]->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 2, environments[1]};
         auto acceptedBake = baked;
         Check(!baker.RecordGpu(device, environment, aborted, baked, error) && baked == acceptedBake,
               "Cancelled/unvalidated GPU batch cannot cross recordings");

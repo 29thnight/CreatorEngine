@@ -230,7 +230,7 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         }
 
         std::string textureError;
-        const auto entry = context.textureCache->GetOrUpload(texture, textureError);
+        const auto entry = context.textureCache->GetOrUpload(texture, context.TextureImage(texture), textureError);
         if (!entry.IsValid() || !textureError.empty())
         {
             return false;

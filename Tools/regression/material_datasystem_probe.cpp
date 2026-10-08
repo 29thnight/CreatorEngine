@@ -75,9 +75,9 @@ int main(int argc, char** argv)
         check(data->ConfigureMaterialGraph(material, description, error), "Actual instance/Texture load: " + error);
         const auto original = material.GetMaterialGraphInstance();
         check(original && SameGraphOwner(original->generation, generation) && original->textures.size() == 1 &&
-                  original->textures[0].owner && original->textures[0].owner->GetImageView().Width() == 1,
+                  original->textures[0].owner && original->textures[0].owner->GetImageDescription().Width() == 1,
               "Actual decoded texture is owned by the graph instance");
-        const auto format = original->textures[0].owner->GetImageView().Format();
+        const auto format = original->textures[0].owner->GetImageDescription().Format();
         check(format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb,
               "Actual CPU texture storage preserves graph SRGB intent");
         const auto* generated = material.GetGeneratedShaderMeta();
@@ -185,7 +185,7 @@ int main(int argc, char** argv)
                   !data->ResolveMaterialGraphGeneration(graph) && SameGraphOwner(accepted->generation, generation),
               "Actual removal retires GUID lookup while retained instances own the program");
         data->Finalize();
-        check(accepted->textures[0].owner && accepted->textures[0].owner->GetImageView().Width() == 1,
+        check(accepted->textures[0].owner && accepted->textures[0].owner->GetImageDescription().Width() == 1,
               "DataSystem finalization does not destroy externally owned instance textures");
         std::cout << "LX_MATERIAL_DATASYSTEM_OK checks=" << checks << "\n";
         return 0;

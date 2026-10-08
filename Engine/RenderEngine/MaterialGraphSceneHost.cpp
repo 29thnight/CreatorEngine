@@ -1090,7 +1090,8 @@ namespace material_graph
             for (const auto& texture : draw.material->textures)
             {
                 const auto failures = context.textureCache->GetUploadFailureCount();
-                const auto entry = context.textureCache->GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error);
+                const auto entry = context.textureCache->GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr),
+                    context.TextureImage(texture.owner ? &*texture.owner : nullptr), error);
                 if (!entry.IsValid() || !error.empty() || context.textureCache->GetUploadFailureCount() != failures)
                 {
                     return Fail(error, error.empty() ? "LX Scene texture residency upload failed." : error);
@@ -1249,7 +1250,8 @@ namespace material_graph
             std::shared_ptr<const RenderBindings> bindings;
             if (!PrepareProgram(context, *draw.material, program, error) ||
                 !bindings_.Prepare(*device_, *context.textureCache, candidate->input->MaterialOwner(draw),
-                    program->layout, bindings, error, candidate->input->MaterialPins()))
+                    program->layout, bindings, error, candidate->input->MaterialPins(),
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
             {
                 return false;
             }
@@ -1258,7 +1260,8 @@ namespace material_graph
                 SceneVolumeBinding volume;
                 volume.pipeline = program->volume.GetGeneration();
                 if (!bindings_.Prepare(*device_, *context.textureCache, candidate->input->MaterialOwner(draw),
-                    program->volumeLayout, volume.material, error, candidate->input->MaterialPins()))
+                    program->volumeLayout, volume.material, error, candidate->input->MaterialPins(),
+                    context.textureFramePins ? &*context.textureFramePins : nullptr))
                 {
                     return false;
                 }

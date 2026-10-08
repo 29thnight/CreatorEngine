@@ -122,7 +122,7 @@ namespace asset_cache_detail
     {
         Charge charge;
         charge.Add(sizeof(Texture));
-        charge.Add(texture.DecodedByteSize());
+        charge.Add(Texture::ImageRetainedCharge(texture.NonRehydratableImage()));
         charge.String(texture.m_name);
         charge.String(texture.m_extension);
         charge.String(texture.m_assetPath);

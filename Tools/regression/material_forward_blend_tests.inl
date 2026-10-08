@@ -141,7 +141,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(device.BeginFrame(error), "Mixed begin " + error);
         textures.BeginFrame(context.frameId);
         meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
-        const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error);
+        const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
         Check(environment.IsValid(), "Alpha environment upload");
         Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
                   host.PrepareResidency(context, input, error), "Mixed preparation " + error);

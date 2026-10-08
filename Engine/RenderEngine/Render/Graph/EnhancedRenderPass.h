@@ -552,6 +552,13 @@ struct EnhancedFrameContext
     IRenderRootSignatureCache* rootSignatures{ nullptr };
     IRenderMeshCache*          meshCache{ nullptr };
     IRenderTextureCache*       textureCache{ nullptr };
+    own::shared_owner<TextureFramePins> textureFramePins;
+
+    own::shared_owner<const Texture::CodecImage> TextureImage(const Texture* texture) const
+    {
+        return textureFramePins ? textureFramePins->Image(texture)
+            : (texture ? texture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{});
+    }
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };

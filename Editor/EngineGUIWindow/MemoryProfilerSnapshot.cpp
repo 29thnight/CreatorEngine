@@ -54,7 +54,7 @@ namespace editor::memory_profiler
 
 		void capture_assets(snapshot& out)
 		{
-			DataSystem* data = DataSystem::GetInstance();
+			DataSystem* data = DataSystem::GetIfAlive();
 			if (!data) return;
 			for (const auto& generation : data->SnapshotCurrentModelAssetGenerations())
 			{
@@ -94,29 +94,50 @@ namespace editor::memory_profiler
 					? left.second.first < right.second.first
 					: left.first < right.first;
 			});
-			std::unordered_set<const std::byte*> seenPixels;
-			for (const auto& [kind, entry] : textures)
-			{
-				if (!entry.second) continue;
-				object_entry object;
-				object.kind = kind;
-				object.name = entry.first;
-				const TextureImageView image = entry.second->GetImageView();
-				object.cpu_size_known = !image.IsEmpty();
-				if (object.cpu_size_known)
-				{
-					for (std::uint32_t mipIndex = 0; mipIndex < image.SubresourceCount(); ++mipIndex)
-					{
-						const TextureSubimage* mip = image.At(mipIndex);
-						if (!mip || !mip->pixels) continue;
-						if (seenPixels.insert(mip->pixels).second)
-							object.cpu_pixel_bytes += mip->slicePitch;
-						else object.shared_alias = true;
-					}
-					out.texture_cpu_pixel_bytes += object.cpu_pixel_bytes;
-				}
-				out.objects.push_back(std::move(object));
-			}
+            // Keep every sampled payload alive until pointer deduplication is
+            // complete. A descriptor by itself proves no CPU pixel residency.
+            std::vector<own::shared_owner<const Texture::CodecImage>> imagePins;
+            imagePins.reserve(textures.size());
+            std::unordered_set<const std::byte*> seenPixels;
+            for (const auto& [kind, entry] : textures)
+            {
+                if (!entry.second)
+                {
+                    continue;
+                }
+                object_entry object;
+                object.kind = kind;
+                object.name = entry.first;
+                auto image = data->TryAcquire<Texture::CodecImage>(entry.second);
+                object.cpu_size_known = static_cast<bool>(image)
+                    || entry.second->GetImageDescription().IsEmpty();
+                if (image)
+                {
+                    imagePins.push_back(std::move(image));
+                    const TextureImageView view = entry.second->GetImageView(imagePins.back());
+                    for (std::uint32_t mipIndex = 0; mipIndex < view.SubresourceCount(); ++mipIndex)
+                    {
+                        const TextureSubimage* mip = view.At(mipIndex);
+                        if (!mip || !mip->pixels)
+                        {
+                            continue;
+                        }
+                        if (seenPixels.insert(mip->pixels).second)
+                        {
+                            object.cpu_pixel_bytes += mip->slicePitch;
+                        }
+                        else
+                        {
+                            object.shared_alias = true;
+                        }
+                    }
+                }
+                out.objects.push_back(std::move(object));
+            }
+            // Includes exact old generations, worker result pins and generated
+            // images outside the legacy name tables. Logical eviction is not a
+            // byte-free event; the lifetime counters exclude descriptor metadata.
+            out.texture_cpu_pixel_bytes = data->SnapshotTextureImageCache().liveBytes;
 		}
 
 		void capture_regions(snapshot& out)

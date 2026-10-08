@@ -33,6 +33,7 @@
 #include "EditorPlatform.h"
 #include "EditorAssetDatabase.h"
 #include "EditorAssetPresentation.h"
+#include "EditorImGuiTexture.h"
 #include "RegisterEditorWindowManual.h"
 #include "RegisterEditorMenuManual.h"
 #include "EditorModelPlacement.h"
@@ -644,6 +645,7 @@ void Editor::EditorMain::Finalize()
 	// 표시 소비자를 먼저 세운다. GT는 이미 메인 루프를 빠져나와 새 frame을
 	// 발행하지 않고, condition variable이 배리어 없이 대기 중인 스레드를 깨운다.
 	StopPresentationThread();
+	EditorImGuiTexture::Shutdown();
 	std::printf("[SHUTDOWN] PresentationThread join 반환\n");
     editor::shutdown_profiler_viewer();
     editor::sound_graph_editing::ShutdownPreview(m_audioPlayback.get());
@@ -998,6 +1000,9 @@ void Editor::EditorMain::OnGui()
     }
     if (EditorSessionState::Get().IsGameViewHidden())
     {
+        // Hidden UI never reaches EditorRenderer's demand sweep. Drop only CPU
+        // preview subscribers here; native ImGui/GPU retirement is unchanged.
+        EditorImGuiTexture::Shutdown();
         if (auto* cameraRig = EditorSessionState::Get().CameraRig())
         {
             cameraRig->BeginPresentationFrame(false);

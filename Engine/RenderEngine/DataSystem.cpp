@@ -252,6 +252,24 @@ namespace
 		return {};
 	}
 
+    FileGuid RegisteredTextureGuid(DataSystem& data, std::string_view name,
+        DataSystem::TextureFileType type)
+    {
+        const file::path requested(name);
+        const std::array candidates{ requested,
+            requested.is_relative() ? PathFinder::Relative() / requested : requested,
+            PathFinder::Relative(std::string(TextureFallbackDirectory(type))) / requested.filename() };
+        for (const auto& candidate : candidates)
+        {
+            const auto guid = data.GetFileGuid(candidate);
+            if (guid != FileGuid{})
+            {
+                return guid;
+            }
+        }
+        return {};
+    }
+
 	bool RegisterAssetMeta(AssetMetaRegistry& registry, const FileGuid& guid,
 		const file::path& path)
 	{
@@ -320,14 +338,54 @@ struct DataSystem::SceneAssetPreparation
     std::vector<own::shared_owner<const Material>> materialPins;
     std::vector<own::shared_owner<const experiment::Material>> authoredMaterialPins;
     std::vector<own::shared_owner<const Texture>> texturePins;
+    own::shared_owner<TextureFramePins> textureImages{ own::make_shared<TextureFramePins>() };
+    std::vector<PreparedTextureImageRequest> imageRequests;
+    std::map<std::pair<AssetDepot::AssetLink<Texture>, AssetDepot::TextureAssetVariant>,
+        AssetDepot::AssetRequest<Texture>> descriptorRequests;
+    std::vector<material_graph::InstanceDescription> graphImageDescriptions;
     job_handle resourceWork;
     std::string error;
 };
 
 AssetBundleLoadResult DataSystem::AssetBundlePreparation::Snapshot() const
 {
-    std::lock_guard lock(mutex);
-    return result;
+    AssetBundleLoadResult snapshot;
+    {
+        std::lock_guard lock(mutex);
+        snapshot = result;
+    }
+    snapshot.PollImages();
+    return snapshot;
+}
+
+bool AssetBundleLoadResult::PollImages()
+{
+    if (status != AssetDepot::AssetRequestStatus::Ready && status != AssetDepot::AssetRequestStatus::Pending)
+    {
+        return true;
+    }
+    bool pending = completed != submitted;
+    for (const auto& imageRequest : imageRequests)
+    {
+        const auto image = imageRequest.request.Snapshot();
+        if (image.status == AssetDepot::AssetRequestStatus::Pending)
+        {
+            pending = true;
+        }
+        else if (image.status == AssetDepot::AssetRequestStatus::Ready && image.asset)
+        {
+            textureImages->RetainImage(imageRequest.descriptor, image.asset);
+        }
+        else
+        {
+            status = image.status;
+            error = image.error;
+            message = image.message;
+            return true;
+        }
+    }
+    status = pending ? AssetDepot::AssetRequestStatus::Pending : AssetDepot::AssetRequestStatus::Ready;
+    return !pending;
 }
 
 job_handle DataSystem::AssetBundlePreparation::Completion() const
@@ -338,11 +396,46 @@ job_handle DataSystem::AssetBundlePreparation::Completion() const
 
 void DataSystem::AssetBundlePreparation::Cancel()
 {
-    std::lock_guard lock(mutex);
-    if (result.status == AssetDepot::AssetRequestStatus::Pending)
+    std::vector<PreparedTextureImageRequest> retiredRequests;
+    std::vector<AssetDepot::AssetRequest<Texture>> retiredDescriptors;
+    own::shared_owner<TextureFramePins> retiredImages;
+    std::vector<assets::ModelAssetGeneration::Shared> retiredModels;
+    std::vector<own::shared_owner<const Material>> retiredMaterials;
+    std::vector<own::shared_owner<const Texture>> retiredTextures;
     {
-        cancelled.store(true, std::memory_order_release);
+        std::lock_guard lock(mutex);
+        bool pending = result.status == AssetDepot::AssetRequestStatus::Pending;
+        if (result.status == AssetDepot::AssetRequestStatus::Ready)
+        {
+            for (const auto& image : result.imageRequests)
+            {
+                pending = pending || image.request.Snapshot().status == AssetDepot::AssetRequestStatus::Pending;
+            }
+        }
+        if (pending)
+        {
+            cancelled.store(true, std::memory_order_release);
+            result.status = AssetDepot::AssetRequestStatus::Cancelled;
+            result.error = AssetDepot::AssetRequestError::None;
+            result.message.clear();
+            for (const auto& image : result.imageRequests)
+            {
+                image.request.Cancel();
+            }
+            for (const auto& descriptor : descriptorRequests)
+            {
+                descriptor.Cancel();
+            }
+            retiredDescriptors.swap(descriptorRequests);
+            retiredRequests.swap(result.imageRequests);
+            retiredImages = std::move(result.textureImages);
+            retiredModels.swap(result.models);
+            retiredMaterials.swap(result.materials);
+            retiredTextures.swap(result.textures);
+        }
     }
+    // Subscriber/result pins release outside the bundle lock. Shared decode jobs
+    // keep their own service drain registration and other subscribers untouched.
 }
 
 job_handle DataSystem::SubmitAssetWorkLocked(job_group work,
@@ -646,6 +739,17 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             }
             return;
         }
+        const AssetDepot::AssetLink<Texture> imageLink{ { experiment::AssetId{ guid.m_guid }, {} } };
+        const auto catalog = GetCookedCatalog();
+        experiment::cooked::ResolvedAssetEntry imageEntry;
+        if (catalog && catalog->Find(imageLink.ToReference(), imageEntry)
+            == experiment::cooked::AssetLookupStatus::Found)
+        {
+            const AssetDepot::TextureAssetVariant variant;
+            preparation->descriptorRequests.try_emplace(std::pair{ imageLink, variant },
+                RequestAsync<Texture>(imageLink, variant));
+            return;
+        }
         const auto path = GetFilePath(guid);
         if (path.empty())
         {
@@ -782,6 +886,12 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                         if (Uuid::TryParse(entry.value.AsString(), guid.m_guid) && guid != FileGuid{})
                         {
                             preparation->graphPaths.emplace(guid, GetFilePath(guid));
+                            material_graph::InstanceDocument instance;
+                            std::string instanceError;
+                            if (material_graph::ReadInstanceDocument(node, instance, instanceError))
+                            {
+                                preparation->graphImageDescriptions.push_back(std::move(instance.description));
+                            }
                         }
                     }
                     walk(entry.value, depth + 1);
@@ -835,6 +945,17 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             throw std::runtime_error("Asset dependency document could not be read: " + path.string() + " " + error);
         }
         walk(document.Root(), 0);
+    }
+    for (const auto& resource : preparation->resources.assets)
+    {
+        const auto type = static_cast<ManagedAssetType>(resource.assetTypeID);
+        if (type == ManagedAssetType::Texture || type == ManagedAssetType::UITexture
+            || type == ManagedAssetType::SpriteSheet)
+        {
+            const auto textureType = type == ManagedAssetType::UITexture ? TextureFileType::UITexture
+                : (type == ManagedAssetType::SpriteSheet ? TextureFileType::SpriteSheet : TextureFileType::Texture);
+            discover(RegisteredTextureGuid(*this, resource.assetName, textureType));
+        }
     }
     for (const auto& [guid, path] : models)
     {
@@ -973,6 +1094,96 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 Debug::PrintLog(spdlog::level::warn, "Scene graph will use an editable default material: " + error);
                 error.clear();
             }
+        }
+        const auto catalog = GetCookedCatalog();
+        for (const auto& graph : preparation->graphs)
+        {
+            const auto generation = m_materialGraphGenerations.Current(experiment::AssetId{ graph->guid.m_guid });
+            if (!generation || !catalog)
+            {
+                continue;
+            }
+            for (const auto& binding : generation->cooked.product.layout.textures)
+            {
+                experiment::AssetId id;
+                if (!experiment::TryParseCanonicalAssetId(binding.reference, id))
+                {
+                    continue;
+                }
+                const AssetDepot::AssetLink<Texture> link{ { id, {} } };
+                experiment::cooked::ResolvedAssetEntry resolved;
+                if (catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::Found)
+                {
+                    continue;
+                }
+                AssetDepot::TextureAssetVariant variant;
+                variant.colorSpace = binding.colorSpace == LX::LXColorSpace::SRGB
+                    ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
+                variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
+                const auto key = std::pair{ link, variant };
+                if (!preparation->descriptorRequests.contains(key))
+                {
+                    preparation->descriptorRequests.emplace(key, RequestAsync<Texture>(link, variant));
+                }
+            }
+        }
+        for (const auto& description : preparation->graphImageDescriptions)
+        {
+            const auto generation = m_materialGraphGenerations.Current(description.graphId);
+            if (!generation || !catalog)
+            {
+                continue;
+            }
+            for (const auto& override : description.textures)
+            {
+                const auto binding = std::ranges::find(generation->cooked.product.layout.textures,
+                    override.parameter, &LX::LXMaterialResource::parameter);
+                if (binding == generation->cooked.product.layout.textures.end())
+                {
+                    continue;
+                }
+                const AssetDepot::AssetLink<Texture> link{ { override.assetId, {} } };
+                experiment::cooked::ResolvedAssetEntry resolved;
+                if (catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::Found)
+                {
+                    continue;
+                }
+                AssetDepot::TextureAssetVariant variant;
+                variant.colorSpace = binding->colorSpace == LX::LXColorSpace::SRGB
+                    ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
+                variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
+                const auto key = std::pair{ link, variant };
+                if (!preparation->descriptorRequests.contains(key))
+                {
+                    preparation->descriptorRequests.emplace(key, RequestAsync<Texture>(link, variant));
+                }
+            }
+        }
+        preparation->phase.store(5, std::memory_order_release);
+    }
+    if (preparation->phase.load(std::memory_order_acquire) == 5)
+    {
+        if (preparation->cancelled.load(std::memory_order_acquire))
+        {
+            return finish("Scene asset preparation was cancelled.");
+        }
+        bool descriptorsPending = false;
+        for (const auto& [key, request] : preparation->descriptorRequests)
+        {
+            const auto descriptor = request.Snapshot();
+            if (descriptor.status == AssetDepot::AssetRequestStatus::Pending)
+            {
+                descriptorsPending = true;
+            }
+            else if (descriptor.status != AssetDepot::AssetRequestStatus::Ready || !descriptor.asset)
+            {
+                return finish(descriptor.message.empty() ? "Scene texture descriptor preparation failed."
+                    : descriptor.message);
+            }
+        }
+        if (descriptorsPending)
+        {
+            return false;
         }
         // Registration and handle assignment share the shutdown admission lock.
         // Drain must see this job, or reject it before the scheduler accepts it.
@@ -1140,6 +1351,29 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 }
                 ++preparation->completed;
             }
+            for (const auto& texture : preparation->texturePins)
+            {
+                preparation->textureImages->Retain(texture);
+            }
+            for (const auto& material : preparation->materialPins)
+            {
+                for (const auto& binding : material->GetTextureOwners())
+                {
+                    preparation->textureImages->Retain(binding.textureOwner);
+                }
+                if (const auto graph = material->GetMaterialGraphInstance())
+                {
+                    for (const auto& binding : graph->textures)
+                    {
+                        preparation->textureImages->Retain(binding.owner);
+                    }
+                }
+            }
+            for (const auto& descriptor : preparation->textureImages->Owners())
+            {
+                preparation->imageRequests.push_back({ descriptor,
+                    RequestAsync<Texture::CodecImage>(descriptor) });
+            }
         });
         preparation->resourceWork = SubmitAssetWorkLocked(std::move(work));
         preparation->phase.store(3, std::memory_order_release);
@@ -1156,9 +1390,33 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     {
         return finish(failure.what());
     }
+    if (preparation->cancelled.load(std::memory_order_acquire))
+    {
+        return finish("Scene asset preparation was cancelled.");
+    }
+    bool imagesPending = false;
+    for (const auto& imageRequest : preparation->imageRequests)
+    {
+        const auto image = imageRequest.request.Snapshot();
+        if (image.status == AssetDepot::AssetRequestStatus::Pending)
+        {
+            imagesPending = true;
+        }
+        else if (image.status != AssetDepot::AssetRequestStatus::Ready || !image.asset)
+        {
+            return finish(image.message.empty() ? "Scene image preparation failed." : image.message);
+        }
+        else
+        {
+            preparation->textureImages->RetainImage(imageRequest.descriptor, image.asset);
+        }
+    }
+    if (imagesPending)
+    {
+        return false; // Never wait for an incomplete image job on the scene owner.
+    }
     preparation->phase.store(4, std::memory_order_release);
-    return finish(preparation->cancelled.load(std::memory_order_acquire)
-        ? "Scene asset preparation was cancelled." : std::string{});
+    return finish({});
 }
 
 bool DataSystem::ValidatePreparedMaterialTextures(Material& material, std::string& error)
@@ -1202,6 +1460,17 @@ void DataSystem::CancelSceneAssets(const own::shared_owner<SceneAssetPreparation
     {
         preparation->cancelled.store(true, std::memory_order_release);
     }
+}
+
+own::shared_owner<TextureFramePins> DataSystem::SceneTextureImagePins(
+    const own::shared_owner<SceneAssetPreparation>& preparation) const
+{
+    if (!preparation || !preparation->finished.load(std::memory_order_acquire)
+        || preparation->cancelled.load(std::memory_order_acquire) || !preparation->error.empty())
+    {
+        return {};
+    }
+    return preparation->textureImages;
 }
 
 DataSystem::AssetPreparationProgress DataSystem::SnapshotAssetPreparationProgress() const
@@ -2990,6 +3259,29 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
         FileGuid textureGuid;
         textureGuid.m_guid = id.value;
         const auto catalog = GetCookedCatalog();
+        const AssetDepot::AssetLink<Texture> imageLink{ { id, {} } };
+        experiment::cooked::ResolvedAssetEntry resolvedImage;
+        if (catalog && catalog->Find(imageLink.ToReference(), resolvedImage)
+            == experiment::cooked::AssetLookupStatus::Found)
+        {
+            AssetDepot::TextureAssetVariant variant;
+            variant.colorSpace = colorSpace == LX::LXColorSpace::SRGB
+                ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
+            variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
+            auto owner = TryAcquire<Texture>(imageLink, variant);
+            const auto currentCatalog = GetCookedCatalog();
+            if (!currentCatalog || currentCatalog->ResolverRevision() != catalog->ResolverRevision())
+            {
+                failure = "Mounted graph texture resolver changed during acquisition.";
+                return {};
+            }
+            if (!owner)
+            {
+                failure = "Mounted graph texture requires asynchronous descriptor preparation: "
+                    + textureGuid.ToString();
+            }
+            return owner;
+        }
         const auto* entry = catalog ? catalog->Find(id) : nullptr;
         if ((entry && entry->kind != experiment::cooked::CookedAssetKind::Texture) ||
             (!entry && !PathFinder::IsAssetAuthoringEnabled()))
@@ -3487,6 +3779,14 @@ own::shared_owner<const Material> DataSystem::LoadMaterialShared(std::string_vie
 
 own::shared_owner<const Texture> DataSystem::LoadTextureGUID(FileGuid guid)
 {
+    const AssetDepot::AssetLink<Texture> imageLink{ { experiment::AssetId{ guid.m_guid }, {} } };
+    const auto catalog = GetCookedCatalog();
+    experiment::cooked::ResolvedAssetEntry resolvedImage;
+    if (catalog && catalog->Find(imageLink.ToReference(), resolvedImage)
+        == experiment::cooked::AssetLookupStatus::Found)
+    {
+        return TryAcquire<Texture>(imageLink);
+    }
     std::uint64_t loadEpoch{};
     std::uint64_t resolverRevision{};
     {
@@ -3549,7 +3849,25 @@ own::shared_owner<const Texture> DataSystem::LoadSharedTexture(std::string_view 
         resolverRevision = m_assetDepotRevision;
     }
 
-	const file::path assetPath = ResolveRuntimeAssetPath(filePath, TextureFallbackDirectory(type));
+    const auto guid = RegisteredTextureGuid(*this, filePath, type);
+    const AssetDepot::AssetLink<Texture> imageLink{ { experiment::AssetId{ guid.m_guid }, {} } };
+    const auto catalog = GetCookedCatalog();
+    experiment::cooked::ResolvedAssetEntry imageEntry;
+    if (catalog && catalog->Find(imageLink.ToReference(), imageEntry)
+        == experiment::cooked::AssetLookupStatus::Found)
+    {
+        // No synchronous fallback to a newer loose path for a mounted typed ID.
+        auto owner = TryAcquire<Texture>(imageLink);
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0
+            || loadEpoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
+        {
+            return {};
+        }
+        return owner;
+    }
+    // Only the explicitly transitional loose-source path performs pathname I/O.
+    const file::path assetPath = ResolveRuntimeAssetPath(filePath, TextureFallbackDirectory(type));
     const std::string sourceKey = TextureCacheKey(assetPath);
     const std::string key = TextureRoleCacheKey(sourceKey, type);
 	DataContainer<Texture>& cache = TextureCacheFor(type);
@@ -4082,16 +4400,102 @@ file::path DataSystem::GetFilePath(FileGuid fileguid) const
 own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBundle(const AssetBundle& bundle)
 {
     auto request = own::make_shared<AssetBundlePreparation>();
+    struct RetiredBundleResults final
+    {
+        bool detached{};
+        std::vector<assets::ModelAssetGeneration::Shared> models;
+        std::vector<own::shared_owner<const Material>> materials;
+        std::vector<own::shared_owner<const Texture>> textures;
+        std::vector<PreparedTextureImageRequest> imageRequests;
+        std::vector<AssetDepot::AssetRequest<Texture>> descriptorRequests;
+        own::shared_owner<TextureFramePins> images;
+    };
+    // This local outlives the admission guard even if scheduler failure invokes
+    // the observer inline. Asynchronous observers hold their own stage copy.
+    const auto retired = own::make_shared<RetiredBundleResults>();
+    const auto detachResults = [request, retired]()
+    {
+        // Caller holds result mutex (or has exclusive pre-publication access).
+        if (retired->detached)
+        {
+            return;
+        }
+        for (const auto& image : request->result.imageRequests)
+        {
+            image.request.Cancel();
+        }
+        for (const auto& descriptor : request->descriptorRequests)
+        {
+            descriptor.Cancel();
+        }
+        retired->models.swap(request->result.models);
+        retired->materials.swap(request->result.materials);
+        retired->textures.swap(request->result.textures);
+        retired->imageRequests.swap(request->result.imageRequests);
+        retired->descriptorRequests.swap(request->descriptorRequests);
+        retired->images = std::move(request->result.textureImages);
+        retired->detached = true;
+    };
     request->result.submitted = bundle.assets.size();
+    request->result.textureImages = own::make_shared<TextureFramePins>();
+    // Resolve registered path identities without filesystem probes. Mounted
+    // typed images become scheduler dependencies, never worker-to-worker waits.
+    std::vector<job_handle> descriptorDependencies;
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> imageCatalog;
+    {
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u)
+        {
+            request->result.status = AssetDepot::AssetRequestStatus::Cancelled;
+            request->result.error = AssetDepot::AssetRequestError::ShuttingDown;
+            detachResults();
+            return request;
+        }
+        request->epoch = m_assetPreparationEpoch;
+        request->resolverRevision = m_assetDepotRevision;
+        imageCatalog = GetCookedCatalog();
+    }
+    for (const auto& entry : bundle.assets)
+    {
+        const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
+        if (type != ManagedAssetType::Texture && type != ManagedAssetType::UITexture
+            && type != ManagedAssetType::SpriteSheet)
+        {
+            continue;
+        }
+        const auto textureType = type == ManagedAssetType::UITexture ? TextureFileType::UITexture
+            : (type == ManagedAssetType::SpriteSheet ? TextureFileType::SpriteSheet : TextureFileType::Texture);
+        const auto guid = RegisteredTextureGuid(*this, entry.assetName, textureType);
+        const AssetDepot::AssetLink<Texture> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+        experiment::cooked::ResolvedAssetEntry resolved;
+        if (!imageCatalog || imageCatalog->Find(link.ToReference(), resolved)
+            != experiment::cooked::AssetLookupStatus::Found)
+        {
+            continue;
+        }
+        auto descriptor = RequestAsync<Texture>(link);
+        if (const auto completion = descriptor.Completion(); completion.valid())
+        {
+            descriptorDependencies.push_back(completion);
+        }
+        request->descriptorRequests.push_back(std::move(descriptor));
+    }
     std::lock_guard lock(m_assetPreparationMutex);
     if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
     {
         request->result.status = AssetDepot::AssetRequestStatus::Cancelled;
         request->result.error = AssetDepot::AssetRequestError::ShuttingDown;
+        detachResults();
+        return request;
+    }
+    if (request->epoch != m_assetPreparationEpoch || request->resolverRevision != m_assetDepotRevision)
+    {
+        request->result.status = AssetDepot::AssetRequestStatus::Stale;
+        request->result.error = AssetDepot::AssetRequestError::RevisionChanged;
+        detachResults();
         return request;
     }
     std::erase_if(m_assetBundlePreparations, [](const auto& request) { return request.expired(); });
-    request->epoch = m_assetPreparationEpoch;
     job_group jobs;
     for (const auto& entry : bundle.assets)
     {
@@ -4103,10 +4507,30 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             {
                 std::lock_guard lock(m_assetPreparationMutex);
                 if (request->cancelled.load(std::memory_order_acquire) ||
-                    m_assetPreparationStopping || request->epoch != m_assetPreparationEpoch)
+                    m_assetPreparationStopping || request->epoch != m_assetPreparationEpoch
+                    || request->resolverRevision != m_assetDepotRevision)
                 {
                     request->cancelled.store(true, std::memory_order_release);
                     throw std::runtime_error("Asset bundle loading was cancelled or invalidated.");
+                }
+            }
+            {
+                std::lock_guard resultLock(request->mutex);
+                if (request->cancelled.load(std::memory_order_acquire))
+                {
+                    throw std::runtime_error("Bundle texture preparation was cancelled.");
+                }
+                for (const auto& descriptorRequest : request->descriptorRequests)
+                {
+                    const auto descriptor = descriptorRequest.Snapshot();
+                    if (descriptor.status != AssetDepot::AssetRequestStatus::Ready || !descriptor.asset)
+                    {
+                        request->result.status = descriptor.status == AssetDepot::AssetRequestStatus::Pending
+                            ? AssetDepot::AssetRequestStatus::Failed : descriptor.status;
+                        request->result.error = descriptor.error;
+                        request->result.message = descriptor.message;
+                        throw std::runtime_error("Bundle texture descriptor dependency was not Ready.");
+                    }
                 }
             }
             assets::ModelAssetGeneration::Shared model;
@@ -4145,14 +4569,42 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             default:
                 break;
             }
+            std::vector<PreparedTextureImageRequest> images;
+            const auto prepareImage = [&](const own::shared_owner<const Texture>& descriptor)
+            {
+                if (descriptor)
+                {
+                    images.push_back({ descriptor, RequestAsync<Texture::CodecImage>(descriptor) });
+                }
+            };
+            prepareImage(texture);
+            if (material)
+            {
+                for (const auto& binding : material->GetTextureOwners())
+                {
+                    prepareImage(binding.textureOwner);
+                }
+                if (const auto graph = material->GetMaterialGraphInstance())
+                {
+                    for (const auto& binding : graph->textures)
+                    {
+                        prepareImage(binding.owner);
+                    }
+                }
+            }
             std::lock_guard preparationLock(m_assetPreparationMutex);
             if (request->cancelled.load(std::memory_order_acquire) ||
-                m_assetPreparationStopping || request->epoch != m_assetPreparationEpoch)
+                m_assetPreparationStopping || request->epoch != m_assetPreparationEpoch
+                    || request->resolverRevision != m_assetDepotRevision)
             {
                 request->cancelled.store(true, std::memory_order_release);
                 throw std::runtime_error("Asset bundle loading was cancelled or invalidated.");
             }
             std::lock_guard resultLock(request->mutex);
+            if (request->cancelled.load(std::memory_order_acquire))
+            {
+                throw std::runtime_error("Asset bundle image preparation was cancelled.");
+            }
             if (model)
             {
                 request->result.models.push_back(std::move(model));
@@ -4165,13 +4617,17 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             {
                 request->result.textures.push_back(std::move(texture));
             }
+            for (auto& image : images)
+            {
+                request->result.imageRequests.push_back(std::move(image));
+            }
             ++request->result.completed;
         });
     }
     // This observer also runs if dispatch/dependencies fail before a task body.
     // It uses only request synchronization, so inline submission failure cannot
     // recursively take the already-held DataSystem admission mutex.
-    jobs.on_complete([request](std::exception_ptr error)
+    jobs.on_complete([request, detachResults](std::exception_ptr error)
     {
         std::lock_guard resultLock(request->mutex);
         if (request->cancelled.load(std::memory_order_acquire))
@@ -4179,10 +4635,17 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             request->result.status = AssetDepot::AssetRequestStatus::Cancelled;
             request->result.error = AssetDepot::AssetRequestError::None;
         }
+        else if (error && request->result.status != AssetDepot::AssetRequestStatus::Pending)
+        {
+            // A typed prerequisite already supplied its exact terminal result.
+        }
         else if (error)
         {
             request->result.status = AssetDepot::AssetRequestStatus::Failed;
             request->result.error = AssetDepot::AssetRequestError::ReadFailed;
+            // Diagnostics may allocate; resource detachment must already be
+            // complete even if the scheduler catches an observer exception.
+            detachResults();
             try
             {
                 std::rethrow_exception(error);
@@ -4202,15 +4665,13 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
         }
         if (request->result.status != AssetDepot::AssetRequestStatus::Ready)
         {
-            request->result.models.clear();
-            request->result.materials.clear();
-            request->result.textures.clear();
+            detachResults();
         }
     });
     m_assetBundlePreparations.emplace_back(request);
     try
     {
-        auto completion = SubmitAssetWorkLocked(std::move(jobs));
+        auto completion = SubmitAssetWorkLocked(std::move(jobs), descriptorDependencies);
         std::lock_guard resultLock(request->mutex);
         request->work = std::move(completion);
     }
@@ -4219,9 +4680,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
         std::lock_guard resultLock(request->mutex);
         request->result.status = AssetDepot::AssetRequestStatus::Failed;
         request->result.error = AssetDepot::AssetRequestError::SubmissionFailed;
-        request->result.models.clear();
-        request->result.materials.clear();
-        request->result.textures.clear();
+        detachResults();
     }
     return request;
 }

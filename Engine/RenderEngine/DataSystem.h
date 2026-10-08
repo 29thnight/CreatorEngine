@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Texture.h"
+#include "TextureFramePins.h"
 #include "AuthoringNodeView.h" // D3-a-5b
 #include "AssetMetaRegistry.h"
 #include "ClassProperty.h"
@@ -32,6 +33,12 @@ using DataContainer = std::unordered_map<std::string, asset_cache_detail::Entry<
 
 class Material;
 
+struct PreparedTextureImageRequest final
+{
+    own::shared_owner<const Texture> descriptor;
+    AssetDepot::AssetRequest<Texture::CodecImage> request;
+};
+
 struct AssetBundleLoadResult
 {
     std::size_t submitted{};
@@ -42,6 +49,10 @@ struct AssetBundleLoadResult
     std::vector<assets::ModelAssetGeneration::Shared> models;
     std::vector<own::shared_owner<const Material>> materials;
     std::vector<own::shared_owner<const Texture>> textures;
+    own::shared_owner<TextureFramePins> textureImages;
+    std::vector<PreparedTextureImageRequest> imageRequests;
+    // Nonblocking, including for direct LoadAssetBundle result owners.
+    bool PollImages();
 };
 
 // Main system for storing runtime data
@@ -125,6 +136,7 @@ public:
     // Typed CPU acquisition. Current links never resurrect an old generation.
     // Misses are I/O-free; callers request work explicitly and poll its state.
     template<class T>
+        requires (!std::is_same_v<T, Texture::CodecImage>)
     [[nodiscard]] own::shared_owner<const T> TryAcquire(AssetDepot::AssetLink<T> link,
         const AssetDepot::TextureAssetVariant& variant = {})
     {
@@ -143,6 +155,7 @@ public:
     }
 
     template<class T>
+        requires (!std::is_same_v<T, Texture::CodecImage>)
     [[nodiscard]] AssetDepot::AssetRequest<T> RequestAsync(AssetDepot::AssetLink<T> link,
         const AssetDepot::TextureAssetVariant& variant = {})
     {
@@ -186,6 +199,25 @@ public:
     void SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips);
     [[nodiscard]] AssetDepot::ModelAssetCacheSnapshot SnapshotModelAssetCache() const;
 
+    template<class T>
+        requires std::is_same_v<T, Texture::CodecImage>
+    [[nodiscard]] own::shared_owner<const T> TryAcquire(
+        const own::shared_owner<const Texture>& descriptor)
+    {
+        static_assert(std::is_same_v<T, Texture::CodecImage>, "Unsupported texture payload type.");
+        return TryAcquireTextureImage(descriptor);
+    }
+    template<class T>
+        requires std::is_same_v<T, Texture::CodecImage>
+    [[nodiscard]] AssetDepot::AssetRequest<T> RequestAsync(
+        const own::shared_owner<const Texture>& descriptor)
+    {
+        static_assert(std::is_same_v<T, Texture::CodecImage>, "Unsupported texture payload type.");
+        return RequestTextureImageAsync(descriptor);
+    }
+    void SetTextureImageCacheBudget(std::size_t bytes);
+    [[nodiscard]] AssetDepot::TextureImageCacheSnapshot SnapshotTextureImageCache() const;
+
     void SetTextureAssetCacheBudget(std::size_t bytes);
     [[nodiscard]] AssetDepot::TextureAssetCacheSnapshot SnapshotTextureAssetCache() const;
 
@@ -205,8 +237,10 @@ public:
         friend class DataSystem;
         mutable std::mutex mutex;
         std::uint64_t epoch{};
+        std::uint64_t resolverRevision{};
         std::atomic<bool> cancelled{};
         AssetBundleLoadResult result;
+        std::vector<AssetDepot::AssetRequest<Texture>> descriptorRequests;
         job_handle work;
     };
     // Nonblocking submission returns the actual result owner. Jobs and shutdown
@@ -235,6 +269,8 @@ public:
     bool PollSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation,
         bool wait, bool publish, std::string& error);
     void CancelSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation);
+    [[nodiscard]] own::shared_owner<TextureFramePins> SceneTextureImagePins(
+        const own::shared_owner<SceneAssetPreparation>& preparation) const;
     [[nodiscard]] AssetPreparationProgress SnapshotAssetPreparationProgress() const;
 	void RetainAssets(const AssetBundle& bundle);
 	void ClearRetainedAssets();
@@ -516,7 +552,20 @@ private:
     void CompleteTextureAssetWorkLocked(const own::shared_owner<AssetDepot::TextureAssetWork>& work,
         AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
         std::string message = {}, own::shared_owner<const Texture> texture = {});
-    void TrimTextureAssetsLocked();
+    [[nodiscard]] own::shared_owner<const Texture::CodecImage> TryAcquireTextureImage(
+        const own::shared_owner<const Texture>& descriptor);
+    [[nodiscard]] AssetDepot::AssetRequest<Texture::CodecImage> RequestTextureImageAsync(
+        const own::shared_owner<const Texture>& descriptor);
+    [[nodiscard]] own::shared_owner<AssetDepot::TextureImageWork> StartTextureImageWorkLocked(
+        const AssetDepot::TextureImageKey& key,
+        const experiment::cooked::ResolvedAssetEntry& resolved,
+        own::shared_owner<const AssetDepot::TextureImageSource> source = {});
+    void RunTextureImageWork(own::shared_owner<AssetDepot::TextureImageWork> work);
+    void CompleteTextureImageWorkLocked(const own::shared_owner<AssetDepot::TextureImageWork>& work,
+        AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
+        std::string message = {}, own::shared_owner<const Texture::CodecImage> image = {},
+        own::shared_owner<const AssetDepot::TextureImageSource> source = {});
+    void TrimTextureAssetsLocked(AssetDepot::TextureAssetRetiredEntries& retired);
     void StageTextureAssetRetirementLocked(AssetDepot::TextureAssetRetiredEntries& retired);
     void InvalidateTextureAssetsLocked(AssetDepot::TextureAssetRetiredEntries& retired) noexcept;
     AssetDepot::TextureAssetRuntimeState m_textureAssets{};

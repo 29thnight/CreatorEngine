@@ -299,7 +299,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             Check(device.BeginFrame(error), "Transport begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error);
+            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             Check(gbuffer.PrepareFrame(context, error) && forward.PrepareFrame(context, error) &&
                       host.PrepareResidency(context, input, error),
                   "Transport preparation");

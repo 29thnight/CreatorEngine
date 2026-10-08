@@ -677,7 +677,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             }
             texture = (found->textureOwner ? &*found->textureOwner.borrow() : nullptr);
         }
-        m_alphaTextures[i] = context.textureCache->GetOrUpload(texture, outError);
+        m_alphaTextures[i] = context.textureCache->GetOrUpload(texture, context.TextureImage(texture), outError);
         if (!m_alphaTextures[i].IsValid())
         {
             return false;

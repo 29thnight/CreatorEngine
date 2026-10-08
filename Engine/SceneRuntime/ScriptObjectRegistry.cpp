@@ -414,7 +414,7 @@ ScriptAssetResult ScriptObjectRegistry::ReadTexture(ScriptAssetToken token, Scri
     {
         return ScriptAssetResult::InvalidToken;
     }
-    const auto image = slot->texture->GetImageView();
+    const auto image = slot->texture->GetImageDescription();
     descriptor = { image.Width(), image.Height(), image.MipLevels(), image.ArraySize(), image.IsCube() ? 1u : 0u };
     return ScriptAssetResult::Success;
 }

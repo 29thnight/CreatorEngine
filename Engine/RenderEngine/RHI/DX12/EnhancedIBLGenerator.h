@@ -95,6 +95,19 @@ public:
         RHITextureHandle equirect, RHIFormat equirectFormat,
         uint32_t cubeSize, uint32_t brdfSize, std::string& outError);
 
+    struct PreparedCookedEnvironment
+    {
+        std::array<own::shared_owner<const Texture>, 8> textures;
+        assets::EnvironmentIdentity identity;
+        uint32_t cubeSize{};
+        uint32_t brdfSize{};
+    };
+    // CPU preparation moves image storage into immutable generated descriptions.
+    // The resulting exact source can survive any number of rejected recordings.
+    static own::shared_owner<const PreparedCookedEnvironment> PrepareCooked(
+        assets::CookedEnvironment value, std::string& error);
+    bool InstallCooked(const EnhancedFrameContext& context,
+        const PreparedCookedEnvironment& source, std::string& error);
     bool InstallCooked(const EnhancedFrameContext& context, assets::CookedEnvironment value, std::string& error);
     bool TouchCooked(const EnhancedFrameContext& context, std::string& error);
     // Record copies in the current upload frame; publish only after its fence.

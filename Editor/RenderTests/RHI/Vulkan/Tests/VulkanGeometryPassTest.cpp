@@ -505,7 +505,7 @@ namespace
         open = true;
         if (beginCaches) beginCaches();
         const std::array<RHITextureEntry, 3> entries{
-            cache.GetOrUpload(nullptr, outError),
+            cache.GetOrUpload(nullptr, {}, outError),
             cache.GetOrmNeutralTexture(outError), cache.GetBlackTexture(outError) };
         EnhancedRenderGraph graph(static_cast<IRenderDeviceServices&>(resources));
         for (uint32_t i = 0; i < entries.size(); ++i)

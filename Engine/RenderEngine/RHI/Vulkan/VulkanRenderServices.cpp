@@ -368,7 +368,24 @@ void VulkanTextureCache::Shutdown()
     m_impl->resources = nullptr;
 }
 
-RHITextureEntry VulkanTextureCache::GetOrUpload(const Texture* texture, std::string& outError)
+bool VulkanTextureCache::IsResident(const Texture* texture) const
+{
+    if (!texture)
+    {
+        return true;
+    }
+    const auto resident = m_impl->entries.find(texture->m_assetId);
+    if (resident == m_impl->entries.end())
+    {
+        return false;
+    }
+    const auto transaction = m_impl->transactions.find(resident->second.entry.handle.id);
+    return transaction == m_impl->transactions.end()
+        || transaction->second.state != RHIUploadTransactionState::Quarantined;
+}
+
+RHITextureEntry VulkanTextureCache::GetOrUpload(const Texture* texture,
+    const own::shared_owner<const Texture::CodecImage>& image, std::string& outError)
 {
     if (nullptr == texture)
     {
@@ -381,12 +398,23 @@ RHITextureEntry VulkanTextureCache::GetOrUpload(const Texture* texture, std::str
     const auto found = m_impl->entries.find(texture->m_assetId);
     if (m_impl->entries.end() != found)
     {
+        if (!IsResident(texture))
+        {
+            outError = "Vulkan texture upload has no verified completion; native allocation is quarantined.";
+            return {};
+        }
         ++m_impl->stats.hits;
         found->second.lastUsedFrame = m_impl->frameIndex;
         return found->second.entry;
     }
 
-    const TextureImageView pixels = texture->GetImageView();
+    if (!image)
+    {
+        RHITextureEntry pending;
+        pending.preparationNeeded = true;
+        return pending;
+    }
+    const TextureImageView pixels = texture->GetImageView(image);
     if (pixels.IsEmpty())
     {
         ++m_impl->stats.failures;

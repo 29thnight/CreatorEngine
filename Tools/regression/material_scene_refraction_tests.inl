@@ -256,7 +256,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(device.BeginFrame(error), "Refraction frame begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(context.frameId);
-            const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error).handle;
+            const auto environment = fixture == 4 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "Refraction residency " + error);
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error) && forward.PrepareFrame(context, error),
                   "Refraction Scene prepare " + error);

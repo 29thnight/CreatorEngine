@@ -749,10 +749,10 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     textures.BeginFrame(100 + graphFrames);
     // Touch/upload before the prefix. Current-pose mesh packets, rather than
     // previously submitted geometry buffers, are prepared after this boundary.
-    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     for (const auto& texture : instance->textures)
     {
-        Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error).IsValid(), "Touch graph material texture");
+        Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), texture.owner ? texture.owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).IsValid(), "Touch graph material texture");
     }
     if (workers)
     {
@@ -1308,12 +1308,12 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     Drain drain{device};
     Check(device.BeginFrame(error), "Shared graph begin");
     textures.BeginFrame(300 + sharedDepthFrames);
-    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     for (const auto& instance : instances)
     {
         for (const auto& texture : instance->textures)
         {
-            Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error).IsValid(), "Shared texture residency");
+            Check(textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), texture.owner ? texture.owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).IsValid(), "Shared texture residency");
         }
     }
     if (workers)
@@ -1604,7 +1604,7 @@ void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeT
         Drain drain{device};
         Check(device.BeginFrame(error), "Failure graph begin");
         textures.BeginFrame(200 + failure);
-        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
         pool.BeginFrame(failure);
         if (failure != 3)
         {
@@ -2215,7 +2215,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             Check(device.BeginFrame(error), "Scene composition begin");
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(static_cast<std::uint32_t>(context.frameId));
-            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error);
+            const auto environment = textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             Check(environment.IsValid(), "Scene reference environment");
             Check(gbuffer.PrepareFrame(context, error) && deferred.PrepareFrame(context, error),
                   "Actual Scene pass preparation " + error);
@@ -3305,7 +3305,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         textures.BeginFrame(800);
         for (unsigned i = 0; i < handles.size(); ++i)
         {
-            const auto uploaded = textures.GetOrUpload((abortedImages[i] ? &*abortedImages[i].borrow() : nullptr), error);
+            const auto uploaded = textures.GetOrUpload((abortedImages[i] ? &*abortedImages[i].borrow() : nullptr), abortedImages[i] ? abortedImages[i]->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             Check(uploaded.IsValid(), "Fresh texture upload before abort");
             handles[i] = uploaded.handle;
         }
@@ -3317,7 +3317,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         Check(device.BeginFrame(error), "Texture retry regression begin");
         textures.BeginFrame(801);
         for (const auto& owner : abortedImages)
-            Check(textures.GetOrUpload((owner ? &*owner.borrow() : nullptr), error).IsValid(), "Aborted texture retries on fresh recording");
+            Check(textures.GetOrUpload((owner ? &*owner.borrow() : nullptr), owner ? owner->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).IsValid(), "Aborted texture retries on fresh recording");
         Check(device.EndFrame(error), "Texture retry submit");
         Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Texture retry drain");
         device.WaitForGpu();
@@ -3432,11 +3432,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         std::shared_ptr<const RenderBindings> materialBindings;
         Check(bindings.Prepare(device, textures, instances[tier], evaluators[tier].Layout(), materialBindings, error),
               "Raster material bindings " + error);
-        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
         auto& encoder = device.GetImmediateEncoder();
         if (frame == 0)
         {
-            const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), error);
+            const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), image ? image->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
             const RHITransition transitions[]{
                 {texture.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource},
                 {environment.cube.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource}};

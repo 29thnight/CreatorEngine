@@ -284,8 +284,8 @@ void Run(const std::filesystem::path& root)
     IblEnvironment environment;
     Check(device.BeginFrame(error), "Warm upload BeginFrame");
     textures.BeginFrame(0);
-    const auto imageEntry = textures.GetOrUpload((texture ? &*texture.borrow() : nullptr), error);
-    environment = {textures.GetOrUpload((environmentTexture ? &*environmentTexture.borrow() : nullptr), error), 1, environmentTexture};
+    const auto imageEntry = textures.GetOrUpload((texture ? &*texture.borrow() : nullptr), texture ? texture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
+    environment = {textures.GetOrUpload((environmentTexture ? &*environmentTexture.borrow() : nullptr), environmentTexture ? environmentTexture->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, environmentTexture};
     Check(imageEntry.IsValid() && environment.cube.IsValid(), "Native owning textures");
     const RHITransition envTransition{environment.cube.handle, RHIResourceState::PixelShaderResource,
                                       RHIResourceState::ShaderResource};

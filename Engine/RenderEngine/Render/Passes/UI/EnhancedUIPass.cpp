@@ -305,7 +305,7 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
             std::string uploadError;
             // nullptr은 캐시의 1x1 흰색으로 해석된다 — 단색 사각형 계약.
             batch.uploaded =
-                context.textureCache->GetOrUpload(batch.texture, uploadError);
+                context.textureCache->GetOrUpload(batch.texture, context.TextureImage(batch.texture), uploadError);
             if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "UI 텍스처 업로드 실패: " + uploadError;

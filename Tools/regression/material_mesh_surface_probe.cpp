@@ -909,7 +909,7 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     textures.BeginFrame(++frames);
     std::shared_ptr<const RenderBindings> materialBindings;
     Check(bindings.Prepare(device, textures, instance, evaluator.Layout(), materialBindings, error), "Sample bindings");
-    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
+    const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     std::shared_ptr<const MeshSurfaceBatch> vertices, sampled;
     std::shared_ptr<const SurfaceBatch> surface;
     std::shared_ptr<const IblBakeResult> bake;
@@ -1290,11 +1290,11 @@ void Run(const std::filesystem::path& root)
                 Check(bindings.Prepare(device, textures, instances[tier], evaluators[tier].Layout(), materialBindings,
                                        error),
                       "Material bind prepare");
-                const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
+                const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
                 auto& encoder = device.GetImmediateEncoder();
                 if (frames == 0)
                 {
-                    const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), error);
+                    const auto texture = textures.GetOrUpload((image ? &*image.borrow() : nullptr), image ? image->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error);
                     const RHITransition transitions[]{
                         {texture.handle, RHIResourceState::PixelShaderResource, RHIResourceState::ShaderResource},
                         {environment.cube.handle, RHIResourceState::PixelShaderResource,
@@ -1519,7 +1519,7 @@ void Run(const std::filesystem::path& root)
               "Record invalid frame graph candidate");
         SceneSurfaceEvaluation invalidEvaluation;
         Check(BuildSceneSurfaceEvaluation(rejected, invalidEvaluation, error), "Invalid GPU candidate ownership");
-        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), error), 1, cube};
+        const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
         EnhancedMaterialCoverage coverage;
         coverage.flags = EnhancedMaterialCoverage::Enabled | EnhancedMaterialCoverage::DoubleSided;
         RHIGraphicsPipelineDesc invalidPipeline;
