@@ -156,6 +156,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Assets\ModelSourcePreparation.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)Assets_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedModelSubAssetCodec.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="Experiment\Cooked\ModelAssetSetProducer.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="AssetDepot\AssetDepot.cpp" />
     <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp" />
     <ClCompile Include="MeshOptimizer.cpp" />
@@ -557,6 +569,9 @@
     <ClCompile Include="UIRenderProxy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Assets\ModelSourcePreparation.h" />
+    <ClInclude Include="Experiment\Cooked\CookedModelSubAssetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\ModelAssetSetProducer.h" />
     <ClInclude Include="AssetDepot\AssetLink.h" />
     <ClInclude Include="AssetDepot\AssetRequest.h" />
     <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />

@@ -96,6 +96,18 @@ namespace experiment::importer
     [[nodiscard]] ConversionResult ConvertToModelDraft(
         const ImportedScene& scene, const ConversionOptions& options);
 
+    struct SkeletonConversionResult final
+    {
+        std::optional<Skeleton> skeleton{};
+        std::vector<ImportNote> notes{};
+    };
+
+    // Converts only the selected clips (in ascending source-index order).
+    // Empty selection emits bind data only; no meshes/materials are converted.
+    [[nodiscard]] SkeletonConversionResult ConvertToSkeleton(
+        const ImportedScene& scene, const ConversionOptions& options,
+        std::span<const std::size_t> clipIndices);
+
     // TRS → 행 우선 4x4. 합성 순서는 S * R * T(행 벡터 규약)로, legacy
     // calculAni 및 global = local * parent 누적과 같은 의미다.
     [[nodiscard]] math::matrix4x4 ComposeTrs(const TrsTransform& transform) noexcept;

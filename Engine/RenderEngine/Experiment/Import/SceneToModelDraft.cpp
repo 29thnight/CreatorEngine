@@ -693,13 +693,18 @@ namespace experiment::importer
         }
 
         void BuildAnimations(const ImportedScene& scene, const SkeletonPlan& plan,
-            const ConversionOptions& options, ImportNoteSink& notes, Skeleton& out)
+            const ConversionOptions& options, ImportNoteSink& notes, Skeleton& out,
+            std::span<const std::size_t> selected = {}, bool selectAll = true)
         {
             const double tps = options.ticksPerSecond;
-            out.clips.reserve(scene.clips.size());
+            out.clips.reserve(selectAll ? scene.clips.size() : selected.size());
 
             for (std::size_t clipIndex = 0; clipIndex < scene.clips.size(); ++clipIndex)
             {
+                if (!selectAll && !std::ranges::binary_search(selected, clipIndex))
+                {
+                    continue;
+                }
                 const ImportedClip& source = scene.clips[clipIndex];
                 const std::string context = "clips[" + std::to_string(clipIndex) + "]";
 
@@ -786,6 +791,46 @@ namespace experiment::importer
             s.y * r10, s.y * r11, s.y * r12, 0.0f,
             s.z * r20, s.z * r21, s.z * r22, 0.0f,
             t.x,       t.y,       t.z,       1.0f };
+    }
+
+    SkeletonConversionResult ConvertToSkeleton(const ImportedScene& scene,
+        const ConversionOptions& options, std::span<const std::size_t> clipIndices)
+    {
+        SkeletonConversionResult result;
+        ImportNoteSink notes;
+        if (scene.nodes.empty() || !std::ranges::is_sorted(clipIndices) ||
+            std::adjacent_find(clipIndices.begin(), clipIndices.end()) != clipIndices.end() ||
+            (!clipIndices.empty() && clipIndices.back() >= scene.clips.size()))
+        {
+            notes.Error(ImportNoteCode::InvalidAnimation, "selection", "Invalid selected clip indices or empty node graph");
+            result.notes = notes.Release();
+            return result;
+        }
+        const auto plan = PlanSkeleton(scene, notes);
+        if (!plan.present)
+        {
+            notes.Error(ImportNoteCode::InvalidSkin, "skeleton", "Source has no representable skeleton");
+            result.notes = notes.Release();
+            return result;
+        }
+        // An unnamed sole hierarchy root has an unambiguous root role; unnamed
+        // descendants cannot establish stable bone-index semantics.
+        for (const auto index : plan.boneToNode)
+        {
+            if (scene.nodes[index].name.empty() && scene.nodes[index].parent.IsValid())
+            {
+                notes.Error(ImportNoteCode::InvalidSkin, "skeleton", "Name all source bones before granular animation cooking");
+            }
+        }
+        Skeleton skeleton;
+        BuildSkeleton(scene, plan, notes, skeleton);
+        BuildAnimations(scene, plan, options, notes, skeleton, clipIndices, false);
+        if (!notes.HasErrors())
+        {
+            result.skeleton = std::move(skeleton);
+        }
+        result.notes = notes.Release();
+        return result;
     }
 
     ConversionResult ConvertToModelDraft(

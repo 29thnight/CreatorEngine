@@ -71,6 +71,87 @@ namespace experiment::importer
                 objectType, objectIndex, value);
         }
 
+        [[nodiscard]] bool ReadCapturedGltfSource(
+            const ImportRequest& request, const fastgltf::sources::URI& source,
+            std::filesystem::path& resolvedPath, ImportSourceBytes& bytes,
+            ImportNoteSink& notes)
+        {
+            const fastgltf::URI& uri = source.uri;
+            if (!uri.valid() || !uri.isLocalPath() || !uri.scheme().empty()
+                || !uri.host().empty() || !uri.query().empty()
+                || !uri.fragment().empty()
+                || uri.path().find('\0') != std::string_view::npos)
+            {
+                notes.Error(ImportNoteCode::InvalidSceneStructure, "source dependency",
+                    "Captured glTF imports require a local relative URI.");
+                return false;
+            }
+
+            const std::filesystem::path relative = uri.fspath();
+            if (relative.empty() || relative.has_root_name()
+                || relative.has_root_directory())
+            {
+                notes.Error(ImportNoteCode::InvalidSceneStructure, "source dependency",
+                    "Captured glTF dependency URI must be relative.");
+                return false;
+            }
+
+            resolvedPath = (request.sourcePath.parent_path() / relative).lexically_normal();
+            std::string failure;
+            try
+            {
+                if (request.readSourceDependency(resolvedPath, bytes, failure) && bytes)
+                {
+                    return true;
+                }
+            }
+            catch (...)
+            {
+                failure = "The source snapshot reader threw an exception.";
+            }
+            notes.Error(ImportNoteCode::InvalidSceneStructure, "source dependency",
+                "Cannot capture glTF dependency: " + resolvedPath.generic_string()
+                + (failure.empty() ? std::string{} : ": " + failure));
+            return false;
+        }
+
+        [[nodiscard]] bool BindCapturedGltfBuffers(fastgltf::Asset& asset,
+            const ImportRequest& request, ImportNoteSink& notes)
+        {
+            for (fastgltf::Buffer& buffer : asset.buffers)
+            {
+                const auto* source = std::get_if<fastgltf::sources::URI>(&buffer.data);
+                if (source == nullptr)
+                {
+                    continue;
+                }
+
+                std::filesystem::path resolvedPath;
+                ImportSourceBytes bytes;
+                if (!ReadCapturedGltfSource(request, *source, resolvedPath, bytes, notes))
+                {
+                    return false;
+                }
+                if (source->fileByteOffset > bytes->size()
+                    || buffer.byteLength > bytes->size() - source->fileByteOffset)
+                {
+                    notes.Error(ImportNoteCode::InvalidSceneStructure, "buffers",
+                        "Captured glTF buffer is shorter than its declared byte range.");
+                    return false;
+                }
+
+                fastgltf::StaticVector<std::byte> captured(buffer.byteLength);
+                if (buffer.byteLength != 0)
+                {
+                    std::memcpy(captured.data(), bytes->data() + source->fileByteOffset,
+                        buffer.byteLength);
+                }
+                buffer.data = fastgltf::sources::Array{
+                    std::move(captured), source->mimeType };
+            }
+            return true;
+        }
+
         // ── 공간 좌표 규약 변환 (MakeLeftHanded + FlipWindingOrder) ──────
         [[nodiscard]] math::vector3 ToEngine(const fastgltf::math::fvec3& v) noexcept
         {
@@ -461,7 +542,8 @@ namespace experiment::importer
             const fastgltf::Asset& asset, const fastgltf::TextureInfo& info,
             TextureColorSpace colorSpace, const std::filesystem::path& baseDirectory,
             ImportedScene& scene, std::unordered_map<std::size_t, std::uint32_t>& cache,
-            const GltfPersistentIds& persistentIds, ImportNoteSink& notes)
+            const GltfPersistentIds& persistentIds, const ImportRequest& request,
+            bool& dependencyFailed, ImportNoteSink& notes)
         {
             if (info.textureIndex >= asset.textures.size()) return {};
             const fastgltf::Texture& texture = asset.textures[info.textureIndex];
@@ -489,8 +571,19 @@ namespace experiment::importer
             std::visit(fastgltf::visitor{
                 [&](const fastgltf::sources::URI& uri)
                 {
-                    out.sourcePath = baseDirectory /
-                        std::filesystem::path(std::string(uri.uri.path()));
+                    if (request.readSourceDependency)
+                    {
+                        if (!ReadCapturedGltfSource(request, uri, out.sourcePath,
+                            out.capturedSourceBytes, notes))
+                        {
+                            dependencyFailed = true;
+                        }
+                    }
+                    else
+                    {
+                        out.sourcePath = baseDirectory /
+                            std::filesystem::path(std::string(uri.uri.path()));
+                    }
                 },
                 [&](const fastgltf::sources::Array& array)
                 {
@@ -550,7 +643,20 @@ namespace experiment::importer
         ImportResult result;
         ImportNoteSink notes;
 
-        auto data = fastgltf::GltfDataBuffer::FromPath(request.sourcePath);
+        const bool capturedSource = static_cast<bool>(request.sourceBytes);
+        if (capturedSource != static_cast<bool>(request.readSourceDependency)
+            || (capturedSource && !request.sourcePath.is_absolute()))
+        {
+            notes.Error(ImportNoteCode::InvalidSceneStructure, "file",
+                "Captured imports require root bytes, a dependency reader, and an absolute source path.");
+            result.notes = notes.Release();
+            return result;
+        }
+
+        auto data = capturedSource
+            ? fastgltf::GltfDataBuffer::FromBytes(
+                request.sourceBytes->data(), request.sourceBytes->size())
+            : fastgltf::GltfDataBuffer::FromPath(request.sourcePath);
         if (data.error() != fastgltf::Error::None)
         {
             notes.Error(ImportNoteCode::InvalidSceneStructure, "file",
@@ -561,11 +667,14 @@ namespace experiment::importer
         }
 
         // DecomposeNodeMatrices: 노드 변환을 전부 TRS 로 받는다(IR 정본 형태).
-        // LoadExternalBuffers/Images: .bin·이미지 파일을 지금 읽어 둔다.
+        // Captured mode never lets fastgltf reopen external source paths.
         // GenerateMeshIndices: 인덱스 없는 primitive 에 인덱스를 만든다.
-        constexpr auto options = fastgltf::Options::DecomposeNodeMatrices
-            | fastgltf::Options::LoadExternalBuffers
+        auto options = fastgltf::Options::DecomposeNodeMatrices
             | fastgltf::Options::GenerateMeshIndices;
+        if (!capturedSource)
+        {
+            options = options | fastgltf::Options::LoadExternalBuffers;
+        }
 
         fastgltf::Parser parser(fastgltf::Extensions::KHR_texture_transform
             | fastgltf::Extensions::KHR_materials_emissive_strength);
@@ -583,7 +692,12 @@ namespace experiment::importer
             result.notes = notes.Release();
             return result;
         }
-        const fastgltf::Asset& asset = loaded.get();
+        fastgltf::Asset& asset = loaded.get();
+        if (capturedSource && !BindCapturedGltfBuffers(asset, request, notes))
+        {
+            result.notes = notes.Release();
+            return result;
+        }
 
         ImportedScene scene;
         scene.metadata.sourcePath = request.sourcePath;
@@ -786,6 +900,7 @@ namespace experiment::importer
 
         // ── 머테리얼 ────────────────────────────────────────────────────
         std::unordered_map<std::size_t, std::uint32_t> textureCache;
+        bool textureDependencyFailed = false;
         scene.materials.reserve(asset.materials.size());
         for (std::size_t materialIndex = 0;
             materialIndex < asset.materials.size(); ++materialIndex)
@@ -822,7 +937,8 @@ namespace experiment::importer
             {
                 TextureSlot out;
                 out.texture = ResolveTexture(asset, info, colorSpace,
-                    baseDirectory, scene, textureCache, persistentIds, notes);
+                    baseDirectory, scene, textureCache, persistentIds, request,
+                    textureDependencyFailed, notes);
                 const auto uvSet = info.transform
                     ? info.transform->texCoordIndex.value_or(info.texCoordIndex) : info.texCoordIndex;
                 // Preserve unsupported sets as invalid instead of narrowing to UV0/UV1.
@@ -867,6 +983,11 @@ namespace experiment::importer
                     slot(*source.emissiveTexture, TextureColorSpace::Srgb);
             }
             scene.materials.push_back(std::move(material));
+        }
+        if (textureDependencyFailed)
+        {
+            result.notes = notes.Release();
+            return result;
         }
 
         // ── skin ────────────────────────────────────────────────────────

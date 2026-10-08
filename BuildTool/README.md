@@ -144,13 +144,17 @@ listener automatically. Existing loopback binding, token authentication and user
 policy are unchanged. Shipping compile-excludes the registry, CLI execution, profiler
 command handlers and HTTP implementation, and rejects local developer switches.
 
-## Independent source AssetSets (first supported cook slice)
+## Independent source AssetSets
 
 `CreatorBuildTool build-asset-set --engine-distribution C:\Engine\Distribution --project C:\Game --asset-set C:\Game\Content\textures.assetset.yml --output C:\Game\Build\Textures-r1`
 
 This command invokes the verified distribution's AssetCooker independently. It does not build Player, native code, shaders, or managed game scripts. Existing `package-game` retains its legacy CEMF v2 path; it does not silently combine v3 AssetSets with an old package. The distribution must contain the new AssetCooker command.
 
-The first source cook supports whole-asset Texture IDs and source-image artifacts (`.png`, `.jpg`, `.hdr`, `.dds`). It requires source files and matching canonical UUIDv4 `.meta` sidecars on every invocation, including cache reuse. It uses the existing texture producer and actually decodes each newly cooked/reused payload for format validation. Model/mesh/clip/material/scene/audio kinds, stable subasset declarations, external edges, transcoding, and mip-generation settings fail explicitly. Runtime support is a separate per-kind contract; a successful cook alone does not establish full engine/runtime integration.
+Supported kinds are Texture (canonical UUIDv4), and source-authored Model animation descriptors, Skeleton and AnimationClip (canonical UUIDv8 from the schema-v2 model sidecar). Each declaration uses that independently addressable identity as `assetId`; a nested `subassetId` YAML field is not supported. Texture output is a source image (`.png`, `.jpg`, `.hdr`, `.dds`); the other kinds use independent bounded descriptor (`.cemd`), skeleton (`.cesl`) and clip (`.cean`) formats. Mesh/material/scene/audio kinds, external manifest edges, transcoding and mip-generation settings still fail explicitly. Runtime support is a separate per-kind contract; a successful cook alone does not establish full animated geometry/render integration.
+
+Every invocation reads authoring source and canonical identity data, including cache reuse. Model import uses immutable captured root and external dependency bytes (including glTF buffers/images and FBX side inputs); each consumed file contributes to the source-import fingerprint. Source sidecars and the identity epoch are validated without issuing IDs or advancing canonical generation state. Old `generation.asset`, `model.cemc` and CEMF v2 packages are never the source of a v3 recook. A missing or changed stable identity requires the authoring workflow to reconcile it first.
+
+Skeleton/clip selections share one source import. A clip includes exactly one hard skeleton edge; its ordered bone-layout digest prevents changed bone indices from being silently rebound. Model animation descriptors list skeleton and clips as loadable references. The definition must declare those exact typed edges, rather than importing old untyped dependencies. Selecting only a clip root includes that clip and its skeleton; unrelated sibling artifacts are not emitted. This source import can inspect the entire authoring model, but runtime readers consume independent selected artifacts, not the monolithic CEMC.
 
 A source definition is strict YAML. Unknown or duplicate fields fail. Every source declares its typed dependencies explicitly, even when empty. Roots and both Hard/Loadable edge kinds form the included closure; only hard ownership SCCs are rejected. A loadable-only cycle is allowed. These edges are authored v3 source declarations; legacy CEMF v2 dependency lists are never reinterpreted or converted.
 
@@ -188,12 +192,41 @@ assets:
     dependencies: []
 ```
 
+A selected clip definition can name the already-authored skeleton and clip from one source. Replace these sample UUIDv8 values with the canonical sidecar IDs:
+
+```yaml
+schemaVersion: 1
+assetSetId: 11111111-1111-4111-8111-111111111111
+revision: 1
+inclusion: HardAndLoadable
+target:
+  platform: win-x64
+  abi: creator-animation-v1
+settings:
+  textureEncoding: Source
+roots:
+  - assetId: 22222222-2222-8222-8222-222222222222
+    kind: AnimationClip
+assets:
+  - assetId: 22222222-2222-8222-8222-222222222222
+    kind: AnimationClip
+    source: Models/Character.glb
+    dependencies:
+      - assetId: 33333333-3333-8333-8333-333333333333
+        kind: Skeleton
+        dependency: Hard
+  - assetId: 33333333-3333-8333-8333-333333333333
+    kind: Skeleton
+    source: Models/Character.glb
+    dependencies: []
+```
+
 `target.abi` is an explicit compatibility token which the mount caller must agree with. The sample token is illustrative, not a claim that every existing Player accepts this ABI. Encoded texture representation is `TextureSourceImage = 1`, with schema `kTextureArtifactVersion = 1`. Source container extension and decoder signature must agree.
 
 Outputs are new immutable directories containing `Derived/asset-set-manifest.cemf`, `Derived/AssetBlobs/<compatibility-sha256>/<content-sha256>.<extension>`, `build-keys.txt`, and `build-report.txt`. Native manifest serialization/readback and payload hash/size/format validation complete before the candidate is renamed to the requested output. BuildTool verifies the completion hashes and source-free file boundary. Existing output paths are rejected; no current-release pointer is changed. No Player/source files are copied into the result.
 
 The default CAS is `<project>/Library/AssetSetArtifacts`; override with `--artifact-cache PATH`. Source root, output, cache, and the verified engine distribution must not overlap as enforced by the command. Same compatible encoded bytes use one blob record and file per output. Outputs copy verified CAS blobs so cache cleanup cannot remove a published output's backing. The cache never overwrites existing blobs or build-key records; corruption fails rather than quietly repairing an immutable address. Builds sharing the same cache acquire a Windows exclusive file handle on `.asset-set-build.guard`. The file may remain, but only the live handle owns exclusion; forced cancellation, timeout, or process death releases it automatically. A leftover prototype `.asset-set-build.lock` directory is ignored and is not automatically deleted. Normal failures clean only the current invocation's private work directories. Forced termination can leave uniquely named `.asset-set-work-<nonce>.incomplete` cache work directories or `.asset-set-<nonce>.candidate` output siblings. Later builds neither enumerate these as reusable results nor resume or delete them. Only exact final hash-addressed blob/build-key paths are eligible for verified reuse. The requested immutable output path is published by the final rename and is never automatically deleted, including when cancellation races with publication.
 
-Build keys include source SHA256, sidecar SHA256, importer/build version pins, verified toolchain payload digest, build-tool implementation digest, normalized settings, container extension, representation/schema and target platform/ABI. Roots, revision, and dependency hashes do not perturb texture payload keys because source-image bytes contain no dependency hashes. Their typed declarations still update the new manifest. This first pass-through producer rereads source and metadata on every invocation; incremental reuse avoids rewriting an existing CAS payload and regenerates no shader/model output.
+Build keys include source SHA256, sidecar SHA256, importer/build version pins, verified toolchain payload digest, build-tool implementation digest, normalized settings, container extension, representation/schema and target platform/ABI. Roots, revision, and dependency hashes do not perturb texture payload keys because source-image bytes contain no dependency hashes. Their typed declarations still update the new manifest. Texture passthrough rereads source and metadata on every invocation. Granular model builds separately record a source-import key and a selected typed artifact build key; unrelated sibling or sidecar-generation changes do not perturb unchanged clip artifact records. Incremental storage reuse avoids rewriting an existing compatible CAS payload; it does not imply that all source/import/validation work was skipped.
 
 Source/static implementation only until explicitly validated on Windows: no build, executable test, or source-free runtime result is implied by the presence of this command.

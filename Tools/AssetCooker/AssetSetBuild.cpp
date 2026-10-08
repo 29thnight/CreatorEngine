@@ -4,6 +4,7 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookSupport.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
+#include "Experiment/Cooked/ModelAssetSetProducer.h"
 #include "Texture.h"
 
 #include <algorithm>
@@ -33,8 +34,9 @@ namespace AssetCooking
         constexpr std::size_t kMaxAssets = 65536u;
         constexpr std::size_t kMaxEdges = 262144u;
         // Bump for producer/decoder behavior or normalization changes.
-        constexpr std::string_view kImporterVersion = "texture-source-image-v1";
-        constexpr std::string_view kBuildVersion = "asset-set-build-v1";
+        constexpr std::string_view kTextureImporterVersion = "texture-source-image-v1";
+        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v1";
+        constexpr std::string_view kBuildVersion = "asset-set-build-v2";
         constexpr std::uint32_t kTextureSourceImage = 1u;
 
         struct AssetSource final
@@ -125,11 +127,36 @@ namespace AssetCooking
 
         ck::TypedAssetReference Reference(Authoring::ReadNode node)
         {
-            if (Text(node, "kind") != "Texture")
+            const auto name = Text(node, "kind");
+            ck::CookedAssetKind kind{};
+            if (name == "Texture")
             {
-                Fail("Unsupported AssetSet source kind: " + Text(node, "kind") + "; supported: Texture");
+                return { { Id(node, "assetId"), {} }, ck::CookedAssetKind::Texture };
             }
-            return { { Id(node, "assetId"), {} }, ck::CookedAssetKind::Texture };
+            if (name == "Model")
+            {
+                kind = ck::CookedAssetKind::Model;
+            }
+            else if (name == "Skeleton")
+            {
+                kind = ck::CookedAssetKind::Skeleton;
+            }
+            else if (name == "AnimationClip")
+            {
+                kind = ck::CookedAssetKind::AnimationClip;
+            }
+            else
+            {
+                Fail("Unsupported AssetSet source kind: " + name + "; supported: Texture, Model, Skeleton, AnimationClip");
+            }
+            const auto text = Text(node, "assetId");
+            Uuid::Uuid16 parsed{};
+            if (!Uuid::TryParse(text, parsed) || Uuid::ToString(parsed) != text ||
+                (parsed.data[6] & 0xf0u) != 0x80u || (parsed.data[8] & 0xc0u) != 0x80u)
+            {
+                Fail(name + ": assetId must be an already-authored canonical UUIDv8");
+            }
+            return { { experiment::AssetId{ parsed }, {} }, kind };
         }
 
         bool RelativePath(std::string_view text)
@@ -256,7 +283,7 @@ namespace AssetCooking
             result.targetAbi = Text(target, "abi");
             if (result.targetPlatform != "win-x64" || !Token(result.targetAbi))
             {
-                Fail("AssetSet Texture target requires win-x64 and an explicit compatible ABI token");
+                Fail("AssetSet target requires win-x64 and an explicit compatible ABI token");
             }
             RequireMap(root["settings"], { "textureEncoding" }, "settings");
             if (Text(root["settings"], "textureEncoding") != "Source")
@@ -471,15 +498,52 @@ namespace AssetCooking
             }
         }
 
+        void ValidatePayload(std::span<const std::byte> bytes, ck::CookedAssetKind kind,
+            const std::string& extension)
+        {
+            std::string failure;
+            bool valid{};
+            switch (kind)
+            {
+            case ck::CookedAssetKind::Texture:
+                ValidateTexture(bytes, extension);
+                return;
+            case ck::CookedAssetKind::Model:
+            {
+                ck::ModelDescriptorArtifact value;
+                valid = ck::ReadModelDescriptorArtifact(bytes, value, failure);
+                break;
+            }
+            case ck::CookedAssetKind::Skeleton:
+            {
+                ck::SkeletonArtifact value;
+                valid = ck::ReadSkeletonArtifact(bytes, value, failure);
+                break;
+            }
+            case ck::CookedAssetKind::AnimationClip:
+            {
+                ck::AnimationClipArtifact value;
+                valid = ck::ReadAnimationClipArtifact(bytes, value, failure);
+                break;
+            }
+            default:
+                Fail("No exact AssetSet payload codec registered for source kind");
+            }
+            if (!valid)
+            {
+                Fail("Typed AssetSet payload validation failed: " + failure);
+            }
+        }
+
         void VerifyBytes(const std::filesystem::path& path, std::uint64_t size,
-            const std::string& digest, const std::string& extension)
+            const std::string& digest, ck::CookedAssetKind kind, const std::string& extension)
         {
             const auto bytes = Read(path);
             if (bytes.size() != size || Hash(bytes) != digest)
             {
                 Fail("Immutable AssetSet blob hash/size mismatch: " + path.string());
             }
-            ValidateTexture(bytes, extension);
+            ValidatePayload(bytes, kind, extension);
         }
 
         void WriteNew(const std::filesystem::path& path, std::span<const std::byte> bytes)
@@ -565,12 +629,131 @@ namespace AssetCooking
             HANDLE m_handle{ INVALID_HANDLE_VALUE };
         };
 
-        std::string Compatibility(const AssetSet& definition)
+        std::string Compatibility(const AssetSet& definition, ck::CookedAssetKind kind,
+            std::uint32_t representation, std::uint32_t schema)
         {
-            return "kind=Texture\nrepresentation=" + std::to_string(kTextureSourceImage) +
-                "\nschema=" + std::to_string(ck::kTextureArtifactVersion) +
+            return "kind=" + std::to_string(static_cast<unsigned>(kind)) +
+                "\nrepresentation=" + std::to_string(representation) + "\nschema=" + std::to_string(schema) +
                 "\nplatform=" + definition.targetPlatform + "\nabi=" + definition.targetAbi + "\n";
         }
+
+        struct PreparedArtifact final
+        {
+            std::vector<std::byte> bytes{};
+            std::string extension{};
+            std::string inputDigest{};
+            std::string importer{};
+            std::uint32_t representation{};
+            std::uint32_t schema{};
+        };
+
+        std::map<ck::AssetIdentity, PreparedArtifact> PrepareSources(const AssetSet& definition,
+            const std::set<ck::AssetIdentity>& included, const std::filesystem::path& assetRoot)
+        {
+            std::map<ck::AssetIdentity, PreparedArtifact> result;
+            std::map<std::string, std::vector<ck::TypedAssetReference>> modelSelections;
+            for (const auto& identity : included)
+            {
+                const auto& authored = definition.sources.at(identity);
+                if (authored.asset.kind != ck::CookedAssetKind::Texture)
+                {
+                    modelSelections[authored.source].push_back(authored.asset);
+                    continue;
+                }
+                const auto source = Canonical(assetRoot / std::filesystem::u8path(authored.source));
+                if (!ck::IsContainedPath(assetRoot, source))
+                {
+                    Fail("Source escapes asset root: " + authored.source);
+                }
+                const auto sourceInput = Read(source);
+                auto metaPath = source;
+                metaPath += ".meta";
+                const auto metaInput = Read(metaPath, kMaxDefinitionBytes);
+                auto cooked = ck::BuildTextureCookProduct({ source, assetRoot });
+                if (!cooked.Succeeded())
+                {
+                    std::string failure = "Texture source cook failed: " + authored.source;
+                    for (const auto& issue : cooked.issues)
+                    {
+                        failure += "\n  " + issue.context + ": " + issue.message;
+                    }
+                    Fail(failure);
+                }
+                auto& product = *cooked.product;
+                if (product.textureAssetId != identity.assetId || product.artifactBytes != sourceInput ||
+                    Read(metaPath, kMaxDefinitionBytes) != metaInput || Read(source) != sourceInput)
+                {
+                    Fail("Source/meta changed during cook or definition assetId differs from sidecar: " + authored.source);
+                }
+                PreparedArtifact value;
+                value.bytes = std::move(product.artifactBytes);
+                value.extension = product.sourceExtension;
+                value.inputDigest = Hash("source=" + Hash(sourceInput) + "\nmeta=" + Hash(metaInput) + "\n");
+                value.importer = kTextureImporterVersion;
+                value.representation = kTextureSourceImage;
+                value.schema = ck::kTextureArtifactVersion;
+                result.emplace(identity, std::move(value));
+            }
+            for (const auto& [relativeSource, selections] : modelSelections)
+            {
+                ck::ModelAssetSetCookRequest request;
+                request.assetRoot = assetRoot;
+                request.sourcePath = Canonical(assetRoot / std::filesystem::u8path(relativeSource));
+                request.identityHeaderPath = assetRoot.parent_path() / "ProjectSetting" / "AssetIdentity.asset";
+                request.selected = selections;
+                auto cooked = ck::BuildModelAssetSetProducts(request);
+                if (!cooked.Succeeded())
+                {
+                    Fail("Model source cook failed: " + relativeSource + ": " + cooked.failure);
+                }
+                for (auto& product : cooked.products)
+                {
+                    const auto& authored = definition.sources.at(product.asset.key);
+                    if (authored.asset != product.asset || authored.dependencies != product.dependencies)
+                    {
+                        Fail("Authored typed dependencies differ from source: " + relativeSource + " [" +
+                            Label(product.asset.key) + "]; skeleton requires [], clip requires exactly Hard skeleton, "
+                            "Model requires exactly Loadable skeleton and all authored clips");
+                    }
+                    PreparedArtifact value;
+                    value.bytes = std::move(product.artifactBytes);
+                    value.extension = product.extension;
+                    value.inputDigest = Hash(std::as_bytes(std::span(cooked.sourceInputsSha256)));
+                    value.importer = kModelImporterVersion;
+                    value.representation = product.representation;
+                    value.schema = product.schemaVersion;
+                    result.emplace(product.asset.key, std::move(value));
+                }
+            }
+            // Bind against the actual selected skeleton artifact, not merely
+            // the producer-local skeleton. Two source paths may not smuggle
+            // incompatible bytes behind a copied authored identity.
+            for (const auto& identity : included)
+            {
+                const auto& authored = definition.sources.at(identity);
+                if (authored.asset.kind != ck::CookedAssetKind::AnimationClip)
+                {
+                    continue;
+                }
+                ck::AnimationClipArtifact clip;
+                ck::SkeletonArtifact skeleton;
+                std::string failure;
+                if (!ck::ReadAnimationClipArtifact(result.at(identity).bytes, clip, failure))
+                {
+                    Fail("Prepared clip validation failed: " + failure);
+                }
+                const ck::AssetIdentity skeletonKey{ clip.skeletonAssetId, {} };
+                const auto found = result.find(skeletonKey);
+                if (found == result.end() || definition.sources.at(skeletonKey).asset.kind != ck::CookedAssetKind::Skeleton ||
+                    !ck::ReadSkeletonArtifact(found->second.bytes, skeleton, failure) ||
+                    !ck::ValidateAnimationClipBinding(clip, skeleton, failure))
+                {
+                    Fail("Selected clip/skeleton layout binding failed: " + authored.source + ": " + failure);
+                }
+            }
+            return result;
+        }
+
     }
 
     AssetSetBuildResult BuildAssetSet(const AssetSetBuildRequest& request)
@@ -601,6 +784,7 @@ namespace AssetCooking
             const auto definition = ParseDefinition(definitionPath);
             const auto included = IncludeClosure(definition);
             RejectHardCycles(definition, included);
+            const auto prepared = PrepareSources(definition, included, assetRoot);
             std::filesystem::create_directories(cache);
             // The former prototype directory lock is deliberately not consulted
             // or deleted. A leftover directory cannot own this OS-scoped guard.
@@ -630,49 +814,28 @@ namespace AssetCooking
             manifest.targetAbi = definition.targetAbi;
             manifest.roots = definition.roots;
             std::map<std::string, std::uint32_t> blobIndices;
-            std::string buildRecords = "asset-set-build-v1\n";
+            std::string buildRecords = std::string(kBuildVersion) + "\n";
             for (const auto& identity : included)
             {
                 const auto& authored = definition.sources.at(identity);
-                const auto source = Canonical(assetRoot / std::filesystem::u8path(authored.source));
-                if (!ck::IsContainedPath(assetRoot, source))
-                {
-                    Fail("Source escapes asset root: " + authored.source);
-                }
-                // Source and sidecar are mandatory even on a cache hit. Never read v2 dependencies.
-                const auto sourceInput = Read(source);
-                auto metaPath = source;
-                metaPath += ".meta";
-                const auto metaInput = Read(metaPath, kMaxDefinitionBytes);
-                auto cooked = ck::BuildTextureCookProduct({ source, assetRoot });
-                if (!cooked.Succeeded())
-                {
-                    std::string failure = "Texture source cook failed: " + authored.source;
-                    for (const auto& issue : cooked.issues)
-                    {
-                        failure += "\n  " + issue.context + ": " + issue.message;
-                    }
-                    Fail(failure);
-                }
-                const auto& product = *cooked.product;
-                if (product.textureAssetId != identity.assetId || product.artifactBytes != sourceInput ||
-                    Read(metaPath, kMaxDefinitionBytes) != metaInput)
-                {
-                    Fail("Source/meta changed during cook or definition assetId differs from sidecar: " +
-                        authored.source);
-                }
-                const auto digest = Hash(product.artifactBytes);
-                const auto compatibility = Compatibility(definition);
-                // Texture payload embeds no child content. Typed edges and root selection affect
-                // the manifest, not this key; changing a dependency does not recook parent bytes.
-                const auto buildKey = Hash(std::string(kBuildVersion) + "\nimporter=" + std::string(kImporterVersion) +
+                const auto& product = prepared.at(identity);
+                const auto digest = Hash(product.bytes);
+                const auto compatibility = Compatibility(definition, authored.asset.kind,
+                    product.representation, product.schema);
+                // Full captured inputs identify the import transaction. Per-artifact
+                // keys use only normalized selected output, so another clip or a
+                // sidecar generation edit does not invalidate unchanged clip work.
+                const auto importKey = Hash("source-import-v1\nimporter=" + product.importer +
+                    "\ntool=" + request.toolFingerprint + "\ninputs=" + product.inputDigest + "\n");
+                const auto artifactInput = authored.asset.kind == ck::CookedAssetKind::Texture
+                    ? product.inputDigest : digest;
+                const auto buildKey = Hash(std::string(kBuildVersion) + "\nimporter=" + product.importer +
                     "\ntool=" + request.toolFingerprint + "\n" + compatibility +
-                    "textureEncoding=Source\nextension=" + product.sourceExtension +
-                    "\nsource=" + Hash(sourceInput) + "\nmeta=" + Hash(metaInput) + "\n");
-                const auto relative = "Derived/AssetBlobs/" + Hash(compatibility) + "/" +
-                    digest + product.sourceExtension;
+                    "textureEncoding=Source\nextension=" + product.extension +
+                    "\nselectedInput=" + artifactInput + "\nselection=" + Label(identity) + "\n");
+                const auto relative = "Derived/AssetBlobs/" + Hash(compatibility) + "/" + digest + product.extension;
                 const auto record = "buildKey=" + buildKey + "\ncontentSha256=" + digest +
-                    "\nbyteSize=" + std::to_string(product.artifactBytes.size()) + "\nartifactPath=" + relative + "\n";
+                    "\nbyteSize=" + std::to_string(product.bytes.size()) + "\nartifactPath=" + relative + "\n";
                 const auto recordPath = cache / "BuildKeys" / (buildKey + ".txt");
                 if (std::filesystem::exists(recordPath))
                 {
@@ -686,16 +849,16 @@ namespace AssetCooking
                 const bool cached = std::filesystem::exists(cachedBlob);
                 if (cached)
                 {
-                    VerifyBytes(cachedBlob, product.artifactBytes.size(), digest, product.sourceExtension);
+                    VerifyBytes(cachedBlob, product.bytes.size(), digest, authored.asset.kind, product.extension);
                 }
                 else
                 {
-                    ValidateTexture(product.artifactBytes, product.sourceExtension);
+                    ValidatePayload(product.bytes, authored.asset.kind, product.extension);
                     // Cache-local temporary storage keeps rename on the same
                     // volume, even when the requested output uses another drive.
                     const auto cacheTemporary = cacheWork / "payload.tmp";
-                    WriteNew(cacheTemporary, product.artifactBytes);
-                    VerifyBytes(cacheTemporary, product.artifactBytes.size(), digest, product.sourceExtension);
+                    WriteNew(cacheTemporary, product.bytes);
+                    VerifyBytes(cacheTemporary, product.bytes.size(), digest, authored.asset.kind, product.extension);
                     std::filesystem::create_directories(cachedBlob.parent_path());
                     NoReparse(cachedBlob);
                     std::filesystem::rename(cacheTemporary, cachedBlob);
@@ -712,11 +875,15 @@ namespace AssetCooking
                 if (inserted)
                 {
                     ck::AssetBlobRecord blobRecord;
-                    blobRecord.contentSha256 = product.manifestEntry.contentSha256;
-                    blobRecord.byteSize = product.artifactBytes.size();
-                    blobRecord.kind = ck::CookedAssetKind::Texture;
-                    blobRecord.representation = kTextureSourceImage;
-                    blobRecord.schemaVersion = ck::kTextureArtifactVersion;
+                    std::string hashFailure;
+                    if (!ck::ComputeSha256(product.bytes, blobRecord.contentSha256, hashFailure))
+                    {
+                        Fail("Cannot hash AssetSet payload: " + hashFailure);
+                    }
+                    blobRecord.byteSize = product.bytes.size();
+                    blobRecord.kind = authored.asset.kind;
+                    blobRecord.representation = product.representation;
+                    blobRecord.schemaVersion = product.schema;
                     blobRecord.targetPlatform = definition.targetPlatform;
                     blobRecord.targetAbi = definition.targetAbi;
                     blobRecord.artifactPath = relative;
@@ -725,14 +892,14 @@ namespace AssetCooking
                     std::filesystem::create_directories(outputBlob.parent_path());
                     // Output owns independent immutable files, so cache GC cannot break a release.
                     std::filesystem::copy_file(cachedBlob, outputBlob);
-                    VerifyBytes(outputBlob, product.artifactBytes.size(), digest, product.sourceExtension);
+                    VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset.kind, product.extension);
                     if (cached)
                     {
                         ++result.reusedBlobs;
                     }
                 }
                 manifest.entries.push_back({ authored.asset, blob->second, authored.dependencies });
-                buildRecords += Label(identity) + " " + buildKey + "\n";
+                buildRecords += Label(identity) + " " + buildKey + " sourceImportKey=" + importKey + "\n";
             }
             const auto written = ck::WriteAssetSetManifest(manifest);
             if (!written.Succeeded())
