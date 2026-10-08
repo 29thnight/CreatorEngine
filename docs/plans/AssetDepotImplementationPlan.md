@@ -122,11 +122,17 @@ design. A foundation slice is not completion of the runtime migration.
   retain metadata, reflection/layout, executable stages and exact dependency owners;
   restored CPU programs never trigger source compilation. Supplied compiler bundles
   remain an explicit trusted build input, not an authenticated executable format.
-- Packages can attach independently built immutable AssetSets via an explicit
-  directory list and host ABI token. Receipts/CAS bytes are reverified after copy;
-  native preflight checks the complete typed union. Startup publishes all configured
-  sets atomically before consumers run, including acyclic asset graphs whose set-level
-  dependency ordering has a cycle. Runtime activation reads no root payloads.
+- Packages attach independently built immutable AssetSets using an explicit directory
+  list. Receipts/CAS bytes are reverified after leased copy; native preflight checks
+  the complete typed union. PrebuiltAssetSets mode combines those sets with a separately
+  built immutable document bootstrap and prebuilt scripts, without project asset staging,
+  model generations, legacy asset cooking or managed compilation. CEBR1 binds typed
+  document references and exact document/manifest/set hashes; existing v2 document/audio
+  semantics stay intact. Preserved Foliage documents get bounded typed-union preflight.
+  A compiled content ABI, recorded by actual native hosts and verified distribution
+  metadata, controls activation; the supplied token cannot assert its own compatibility.
+  Startup publishes configured sets atomically, including acyclic asset graphs with
+  cyclic set-level ordering. Runtime activation reads no root payloads.
 - Authored ShaderMeta has a v3 fresh-source CEDO producer and typed asynchronous
   source-free descriptor loader. Captured source/sidecar bytes must match the product;
   the immutable result retains only its exact artifact source. This is metadata
@@ -169,8 +175,9 @@ design. A foundation slice is not completion of the runtime migration.
   proxy/frame handoff. Unmounted authoring fallback is explicit and tracked; mounted
   failure/staleness does not trigger fallback or automatic rebind. Upstream live rendering remains graph-only; carried Code programs
   serve existing explicit Code-capable passes, not an invented live rendering route.
-  Automatic set activation is connected to the existing package bootstrap, which still
-  requires the legacy scene/audio/source-identity closure; a v3-only package is pending. CEMCv11 remains a transitional adapter for other legacy consumers.
+  Source-free packaging retains the explicit legacy-document bootstrap for Scene,
+  Prefab and audio identity, rather than inventing new typed payload loaders for them.
+  CEMCv11 remains an explicit source/editor adapter for unmounted legacy content.
 - Legacy source/generated Texture adapters explicitly retain non-rehydratable images.
   In particular, legacy material property/name loads and embedded ModelTextureAsset
   pixel/subresource storage are not yet fully cut over to standalone image recipes.
@@ -199,9 +206,9 @@ design. A foundation slice is not completion of the runtime migration.
   physical decode while each logical wrapper retains its exact origin and hard closure.
   Independent raw animation budgets and logical wrapper budgets are both explicit;
   setting one cache budget to zero does not erase another cache's retained owner.
-- General source-free Player/content cutover and removal of superseded compatibility
-  paths remain separate implementation slices. Managed/NativeAOT execution and all
-  source-free runtime acceptance gates remain unrun, including the expanded kinds.
+- Managed/NativeAOT execution and all source-free Player/runtime acceptance gates
+  remain unrun, including expanded kinds, package copying, failure injection and
+  GPU submission. Source-level completion does not establish runtime validation.
 - Cache budgets describe retained cache pins, not allocator or GPU memory immediately
   freed. Existing consumers, in-flight jobs and accepted frames intentionally outlive
   eviction and logical unmount.

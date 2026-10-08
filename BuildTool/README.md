@@ -262,7 +262,8 @@ Source/static implementation only until explicitly validated on Windows: no buil
 `package-game --asset-set-list <directories.txt> --asset-set-abi <host-token>` attaches
 1–64 already-built immutable AssetSet outputs. Each nonempty UTF-8 list line is a
 source output directory (relative entries resolve beside the list file). The ABI is
-an explicit host choice; it is never inferred from an untrusted incoming manifest.
+an optional assertion of the verified installed host content ABI; it cannot select
+or self-assert compatibility. Omit it to use the installed Player/AssetCooker identity.
 
 The packager verifies receipts and every CAS byte hash before and after copying.
 Its native `--copy-asset-set` step holds a shared source-store lease for enrolled
@@ -276,9 +277,10 @@ existing final package transaction can publish. The Player mounts the whole grou
 atomically during DataSystem initialization; it reads policy/manifests, not root
 payloads. A cyclic set-level ordering is legal if the actual hard asset graph is a DAG.
 
-This is currently an overlay on the existing package closure: legacy scene/audio
-content and CEMF v2 source-identity boot remain. It does not claim a v3-only package
-or eliminate the legacy package cook. Runtime async startup separately prepares cold
+The default Legacy content mode overlays the existing package closure. The explicit
+PrebuiltAssetSets mode instead consumes an independently built document bootstrap
+and skips project source staging and the legacy package cook. Scene/audio identity
+boot remains the existing CEMF v2 document bridge; this does not claim new v3 loaders. Runtime async startup separately prepares cold
 mesh/image/material work before scene activation. Copied/extracted store roots are
 unenrolled and noncollectible until freshly published under the storage lease protocol.
 
@@ -293,3 +295,19 @@ Lattice Material sources use `.asset`; MaterialProgram sources name both their c
 and carried backend agreement; it does not silently use a previous package or compile
 shaders during runtime. Model descriptor schema3 adds Loadable Material references;
 selected model materials and embedded textures produce independent artifacts.
+
+### Source-free package composition
+
+Use `build-runtime-bootstrap` to prepare the existing scene/prefab/audio/settings
+documents independently, then `package-game --content-mode PrebuiltAssetSets
+--bootstrap-root <output> --asset-set-list <directories.txt>
+--game-scripts-assembly <prebuilt.dll>`. This path does not stage model/texture/material
+sources or run generations, legacy cook, CEDO compile, shaders, managed compilation
+or native builds. It verifies/copies a prebuilt script assembly and installed Player.
+Startup/backend settings are frozen in the bootstrap. The exact bootstrap/AssetSet
+group and installed content ABI are validated before the existing package transaction.
+
+See [SourceFreeAssetSetPackaging](../docs/design/SourceFreeAssetSetPackaging.md) for
+commands, strict boundaries, the CEBR1 typed document-reference receipt, independent
+ABI provenance, and unrun verification fixtures. Scene/Prefab/Audio/Font typed loaders
+remain future extensions. No runtime validation is implied by these source changes.

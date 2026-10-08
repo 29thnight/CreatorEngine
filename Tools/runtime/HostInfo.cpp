@@ -2,6 +2,7 @@
 #include "../../Engine/Utility_Framework/ScriptApiVersion.h"
 #include "../../Engine/Utility_Framework/EngineVersion.h"
 #include "../../Engine/Utility_Framework/EngineDistributionIdentity.h"
+#include "../../Engine/Utility_Framework/ContentAbi.h"
 #include <vector>
 
 extern "C" __declspec(dllexport) const CreatorHostInfoV1* __cdecl CreatorHostGetInfoV1()
@@ -17,6 +18,14 @@ extern "C" __declspec(dllexport) const CreatorHostInfoV1* __cdecl CreatorHostGet
         CE_SHIPPING, CreatorScriptApiVersion, sizeof(void*) * 8,
         CreatorEngineVersion::LocalDevelopment ? 1u : 0u,
         CreatorEngineVersion::ProductName, CreatorEngineVersion::FeatureRelease, CreatorEngineVersion::Build
+    };
+    return &info;
+}
+
+extern "C" __declspec(dllexport) const CreatorHostContentInfoV1* __cdecl CreatorHostGetContentInfoV1()
+{
+    static constexpr CreatorHostContentInfoV1 info{
+        sizeof(CreatorHostContentInfoV1), CreatorContentAbi::Version, CreatorContentAbi::Token
     };
     return &info;
 }

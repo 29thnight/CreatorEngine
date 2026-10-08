@@ -195,6 +195,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="AssetDepot\RuntimeBootstrap.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="AssetDepot\AssetSetActivation.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)AssetDepot_%(Filename).obj</ObjectFileName>
@@ -623,6 +624,7 @@
     <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />
     <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
     <ClInclude Include="AssetDepot\AssetSetActivation.h" />
+    <ClInclude Include="AssetDepot\RuntimeBootstrap.h" />
     <ClInclude Include="AssetDepot\AssetLink.h" />
     <ClInclude Include="AssetDepot\AssetRequest.h" />
     <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />

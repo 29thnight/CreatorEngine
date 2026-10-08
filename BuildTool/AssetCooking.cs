@@ -50,7 +50,7 @@ internal static class AssetCooking
         }
         return new(models.Length, copied, authored);
     }
-    public static CookResult Validate(string output, int expected)
+    public static CookResult Validate(string output, int expected, bool bootstrap = false)
     {
         const string guid = "([0-9a-f]{8}-[0-9a-f]{4}-[48][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
         var rules = new Dictionary<string, string> { ["Models"] = "", ["Textures"] = "png|hdr|dds|jpg", ["ShaderMeta"] = "shadermeta", ["Materials"] = "asset", ["MaterialPrograms"] = "lxmaterial", ["Scenes"] = "creator", ["Prefabs"] = "prefab", ["CollisionGeometry"] = "cepg", ["Audio"] = "ceac", ["SoundGraphs"] = "cesg", ["SoundPresets"] = "cesp" };
@@ -60,6 +60,7 @@ internal static class AssetCooking
         var artifacts = 0; var companions = 0; var bytes = 0L;
         foreach (var file in files.Where(f => !Paths.Comparer.Equals(f, manifest)))
         {
+            if (bootstrap && Paths.Relative(derived, file) == "bootstrap-asset-references.cebr") continue;
             bytes += new FileInfo(file).Length;
             var relative = Paths.Relative(derived, file); var folder = relative.Split('/')[0];
             if (!rules.TryGetValue(folder, out var extensions)) throw new BuildException($"Unexpected Derived folder: {relative}");
@@ -77,15 +78,19 @@ internal static class AssetCooking
         if (artifacts != expected || companions != 2 * generations) throw new BuildException($"Cook artifact/companion count mismatch: {artifacts}/{expected}, companions={companions}, models={generations}");
         return new(artifacts, companions, bytes, new FileInfo(manifest).Length, Metadata.Hash(manifest), files.Length, byFolder);
     }
-    public static async Task<CookResult> Cook(BuildContext context, string cooker, string assets, string output, string generations)
+    public static async Task<CookResult> Cook(BuildContext context, string cooker, string assets, string output, string generations, string bootstrapAssetSets = "")
     {
         if (Directory.Exists(output)) throw new BuildException("Cook output must be a new directory.");
         var models = Models(assets); var all = Paths.Files(assets).Order(StringComparer.Ordinal).ToArray();
         var stale = all.Where(p => Path.GetExtension(p).Equals(".asset", StringComparison.OrdinalIgnoreCase) && Paths.Relative(assets, p).StartsWith("Models/", StringComparison.OrdinalIgnoreCase)).ToHashSet(Paths.Comparer);
-        var arguments = new List<string> { "--asset-root", assets, "--output", output, "--generation-root", generations };
+        var bootstrap = bootstrapAssetSets.Length != 0;
+        var arguments = new List<string> { "--asset-root", assets, "--output", output };
+        if (bootstrap) arguments.AddRange(["--build-runtime-bootstrap", "--runtime-root", bootstrapAssetSets]);
+        else arguments.AddRange(["--generation-root", generations]);
         var counts = new Dictionary<string, int>();
         foreach (var (option, extensions) in new (string, string[])[] { ("--model", [".fbx", ".glb", ".gltf"]), ("--texture", [".png", ".hdr", ".dds"]), ("--shadermeta", [".shadermeta"]), ("--shadergraph", [".shadergraph"]), ("--material", [".asset"]), ("--scene", [".creator", ".prefab"]) })
         {
+            if (bootstrap && option != "--scene") continue;
             var sources = all.Where(p => extensions.Contains(Path.GetExtension(p).ToLowerInvariant()) && !stale.Contains(p)).ToArray(); counts[option] = sources.Length;
             foreach (var source in sources) { arguments.Add(option); arguments.Add(source); }
         }
@@ -101,7 +106,7 @@ internal static class AssetCooking
         finally { File.Delete(argumentsFile); }
         var summary = Regex.Match(log.Output, @"(?m)^asset-cooker models=[^\r\n]*");
         int Metric(string name) { var match = Regex.Match(summary.Value, name + @"=(\d+)"); return match.Success ? int.Parse(match.Groups[1].Value) : throw new BuildException($"Cook summary missing {name}."); }
-        var result = Validate(output, Metric("artifactPaths"));
+        var result = Validate(output, Metric("artifactPaths"), bootstrap);
         result.ModelCount = models.Length; result.SourceCounts = counts; result.LegacyModelCookCaches = stale.Count; result.LegacyTextureNameRefs = Metric("legacyTextureNameRefs");
         return result;
     }

@@ -1,6 +1,7 @@
 // Unrun source fixture for the RenderEngine-linked metadata activation boundary.
 // It performs no shader compilation, texture decode or GPU submission.
 #include "../../Engine/RenderEngine/AssetDepot/AssetSetActivation.h"
+#include "../../Engine/Utility_Framework/ContentAbi.h"
 
 #include <chrono>
 #include <filesystem>
@@ -69,7 +70,7 @@ namespace
         manifest.assetSetId = Id(1u);
         manifest.revision = 1u;
         manifest.targetPlatform = "win-x64";
-        manifest.targetAbi = "activation-probe-v1";
+        manifest.targetAbi = CreatorContentAbi::Token;
         cooked::AssetBlobRecord blob;
         Require(cooked::ComputeSha256(payload, blob.contentSha256, failure), "Blob hash failed");
         blob.byteSize = payload.size();
@@ -101,14 +102,24 @@ namespace
         Write(setRoot / "Derived/asset-set-manifest.cemf", encoded.bytes);
         Write(setRoot / blob.artifactPath, payload);
         const auto policy = root / "Derived/asset-set-activation.ceas";
-        const auto good = "CEAS1\nwin-x64\nactivation-probe-v1\n" + manifestHash + "\n";
+        const auto good = std::string("CEAS1\nwin-x64\n") + CreatorContentAbi::Token + "\n" + manifestHash + "\n";
         Text(policy, good);
         Require(AssetDepot::ReadConfiguredAssetSets(root, inputs, failure) && inputs.size() == 1u
             && inputs.front().manifest.assetSetId == manifest.assetSetId, "Configured set was not captured");
         Require(AssetDepot::ValidateConfiguredAssetSets(root, failure), "Valid activation metadata failed");
         Text(policy, "CEAS1\nwin-x64\nwrong-host-abi\n" + manifestHash + "\n");
         Require(!AssetDepot::ValidateConfiguredAssetSets(root, failure), "Host ABI mismatch was accepted");
-        Text(policy, "CEAS1\nwin-x64\nactivation-probe-v1\n../outside\n");
+        // Both policy and manifest claiming the same wrong ABI must still fail.
+        auto selfAsserted = manifest;
+        selfAsserted.targetAbi = "wrong-host-abi";
+        selfAsserted.blobs.front().targetAbi = selfAsserted.targetAbi;
+        const auto wrongBytes = cooked::WriteAssetSetManifest(selfAsserted);
+        Require(wrongBytes.Succeeded(), "Wrong-ABI fixture could not be serialized");
+        const auto wrongHash = Hash(wrongBytes.bytes);
+        Write(root / "AssetSets" / wrongHash / "Derived/asset-set-manifest.cemf", wrongBytes.bytes);
+        Text(policy, "CEAS1\nwin-x64\nwrong-host-abi\n" + wrongHash + "\n");
+        Require(!AssetDepot::ReadConfiguredAssetSets(root, inputs, failure), "Self-asserted host content ABI accepted");
+        Text(policy, std::string("CEAS1\nwin-x64\n") + CreatorContentAbi::Token + "\n../outside\n");
         Require(!AssetDepot::ReadConfiguredAssetSets(root, inputs, failure) && inputs.size() == 1u,
             "Traversal was accepted or failure destroyed the prior parse result");
         Text(policy, good + manifestHash + "\n");

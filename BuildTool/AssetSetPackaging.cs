@@ -8,7 +8,7 @@ namespace CreatorBuildTool
         // Attach independently built immutable outputs. No model import, texture
         // decode, managed compilation or native Player build occurs in this step.
         internal static async Task<string[]> CopyConfiguredSets(BuildContext context, string runtimeAssets,
-            Func<string, string, Task> copyWithSourceLease)
+            Func<string, string, Task> copyWithSourceLease, string installedContentAbi)
         {
             var list = context.Options.Get("asset-set-list");
             var abi = context.Options.Get("asset-set-abi");
@@ -20,10 +20,12 @@ namespace CreatorBuildTool
                 }
                 return [];
             }
-            if (!Regex.IsMatch(abi, "^[A-Za-z0-9_.-]{1,128}$"))
+            if (!Regex.IsMatch(installedContentAbi, "^[A-Za-z0-9_.-]{1,128}$")
+                || (abi.Length != 0 && abi != installedContentAbi))
             {
-                throw new BuildException("Prebuilt AssetSets require an explicit --asset-set-abi host compatibility token.");
+                throw new BuildException("Requested AssetSet ABI differs from the verified installed host content ABI.");
             }
+            abi = installedContentAbi;
             list = Paths.Normal(list);
             var listParent = Paths.Canonical(Path.GetDirectoryName(list)!, true);
             list = Paths.Child(listParent, Path.GetFileName(list));

@@ -58,13 +58,13 @@ try
             Paths.CopyTree(source, destination);
             return Task.CompletedTask;
         }
-        var hashes = await AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets, CopyFixture);
+        var hashes = await AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets, CopyFixture, "fixture-v1");
         Check(hashes.SequenceEqual(new[] { Metadata.Hash(setManifest) }), "Package changed the immutable manifest identity");
         var activationText = File.ReadAllText(Paths.Child(packagedAssets, "Derived/asset-set-activation.ceas"));
         Check(activationText == "CEAS1\nwin-x64\nfixture-v1\n" + hashes[0] + "\n", "Activation policy was not canonical");
         Check(Metadata.Hash(Paths.Child(packagedAssets, "AssetSets/" + hashes[0] + "/Derived/asset-set-manifest.cemf"))
             == hashes[0], "Copied manifest is not the validated content");
-        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets, CopyFixture), "Existing package activation was replaced");
+        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets, CopyFixture, "fixture-v1"), "Existing package activation was replaced");
         var interruptedDestination = Path.Combine(root, "interrupted-set-package/Assets");
         await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, interruptedDestination,
             (source, destination) =>
@@ -72,7 +72,7 @@ try
                 Directory.CreateDirectory(destination);
                 File.WriteAllText(Path.Combine(destination, "partial"), "incomplete");
                 return Task.FromException(new IOException("Injected copy interruption"));
-            }), "Interrupted copy was accepted");
+            }, "fixture-v1"), "Interrupted copy was accepted");
         Check(!File.Exists(Paths.Child(interruptedDestination, "Derived/asset-set-activation.ceas")),
             "Interrupted copy published activation policy");
         var corruptDestination = Path.Combine(root, "corrupt-set-package/Assets");
@@ -81,13 +81,31 @@ try
             {
                 await CopyFixture(source, destination);
                 File.WriteAllBytes(Paths.Child(destination, Paths.Relative(source, setBlob)), [99]);
-            }), "Corruption during copying was accepted");
+            }, "fixture-v1"), "Corruption during copying was accepted");
         Check(!File.Exists(Paths.Child(corruptDestination, "Derived/asset-set-activation.ceas")),
             "Post-copy validation failure published activation policy");
         File.WriteAllBytes(setBlob, [99]);
-        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, Path.Combine(root, "damaged-set-package/Assets"), CopyFixture),
+        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, Path.Combine(root, "damaged-set-package/Assets"), CopyFixture, "fixture-v1"),
             "Damaged source CAS blob was packaged");
     }
+
+    // Unrun source fixtures: content mode rejects accidental cook/override paths.
+    Check(RuntimeBootstrap.ContentMode(new Options(["package-game"])) == "Legacy", "Legacy default changed");
+    var prebuiltOptions = new[] { "package-game", "--content-mode", "PrebuiltAssetSets", "--bootstrap-root", "bootstrap",
+        "--asset-set-list", "sets.txt", "--game-scripts-assembly", "GameScripts.dll" };
+    Check(RuntimeBootstrap.ContentMode(new Options(prebuiltOptions)) == "PrebuiltAssetSets", "Prebuilt content mode rejected");
+    foreach (var forbidden in new[] { new[] { "--input-mode", "Tracked" }, new[] { "--startup-scene", "Other.creator" },
+        new[] { "--render-backend", "vulkan" }, new[] { "--asset-list", "sources.txt" }, new[] { "--build-native" } })
+        Reject(() => RuntimeBootstrap.ContentMode(new Options(prebuiltOptions.Concat(forbidden).ToArray())), "Prebuilt content accepted a source/override option");
+    Reject(() => RuntimeBootstrap.ContentMode(new Options(["package-game", "--content-mode", "PrebuiltAssetSets"])), "Incomplete prebuilt mode accepted");
+    Reject(() => RuntimeBootstrap.ContentMode(new Options(["package-game", "--bootstrap-root", "bootstrap"])), "Legacy mode accepted bootstrap");
+    foreach (var path in new[] { "Assets/Models/model.glb", "Assets/Textures/image.png", "Assets/Materials/cloth.asset",
+        "Assets/Materials/cloth.shadergraph", "Assets/Audio/raw.wav", "Assets/Scenes/Start.creator.meta", "Assets/Derived/Models/model.cemc",
+        "Assets/AssetSets/extra/Derived/asset-set-manifest.cemf" })
+        Reject(() => RuntimeBootstrap.ValidateBoundary([new(path, 1, new string('0', 64))]), "Bootstrap source boundary accepted " + path);
+    RuntimeBootstrap.ValidateBoundary([new("Assets/Scenes/Start.creator", 1, new string('0', 64)),
+        new("ProjectSetting/Layers.celayers", 1, new string('0', 64)),
+        new("Assets/Derived/bootstrap-asset-references.cebr", 1, new string('0', 64))]); ++checks;
 
     var textureCook = Path.Combine(root, "texture-cook");
     var textureDerived = Path.Combine(textureCook, "Derived");
@@ -142,12 +160,54 @@ try
     File.WriteAllText(Path.Combine(engineRoot, "payload.txt"), "tampered payload"); Reject(() => EngineDistribution.Load(engineRoot, context), "Modified payload accepted");
     File.WriteAllText(Path.Combine(engineRoot, "payload.txt"), "original payload");
     Reject(() => Metadata.Digest([files[0], files[0] with { Path = files[0].Path.ToUpperInvariant() }]), "Case-duplicate payload accepted");
+    // Unrun source fixture: prebuilt-copy checks pinned source and receipt bytes,
+    // never recompiles, and never generates a receipt for unapproved replacement bytes.
+    var prebuiltRoot = Path.Combine(root, "prebuilt-copy"); Directory.CreateDirectory(prebuiltRoot);
+    var prebuiltSource = Path.Combine(prebuiltRoot, "GameScripts.dll");
+    File.WriteAllBytes(prebuiltSource, [1, 2, 3, 4]);
+    var approvedAssemblyHash = Metadata.Hash(prebuiltSource);
+    var prebuiltReceipt = prebuiltSource + ".engine.json";
+    Metadata.Write(prebuiltReceipt, new { schemaVersion = 1, engineBuildId = manifest.Text("buildId"),
+        scriptApi = manifest.Int("scriptApi"), sha256 = approvedAssemblyHash });
+    var approvedReceiptBytes = File.ReadAllBytes(prebuiltReceipt);
+    var copiedAssembly = Path.Combine(prebuiltRoot, "Copied.dll");
+    Check(GameCompiler.CopyPrebuiltAssembly(engine, prebuiltSource, copiedAssembly) == approvedAssemblyHash
+        && Metadata.Hash(copiedAssembly) == approvedAssemblyHash, "Prebuilt copy did not preserve the captured expected hash");
+    var rejectedAssembly = Path.Combine(prebuiltRoot, "Rejected.dll");
+    using (var writer = new FileStream(prebuiltSource, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+        Reject(() => GameCompiler.CopyPrebuiltAssembly(engine, prebuiltSource, rejectedAssembly), "Prebuilt source was copied with an outstanding writable handle");
+    using (var writer = new FileStream(prebuiltReceipt, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite))
+        Reject(() => GameCompiler.CopyPrebuiltAssembly(engine, prebuiltSource, rejectedAssembly), "Prebuilt receipt was accepted with an outstanding writable handle");
+    File.WriteAllBytes(prebuiltSource, [5, 6, 7, 8]);
+    Reject(() => GameCompiler.CopyPrebuiltAssembly(engine, prebuiltSource, rejectedAssembly), "Replacement assembly bytes were blessed by a fresh receipt");
+    Check(!File.Exists(rejectedAssembly) && Metadata.Hash(copiedAssembly) == approvedAssemblyHash, "Rejected prebuilt copy altered published output");
+    File.WriteAllBytes(prebuiltSource, [1, 2, 3, 4]);
+    File.WriteAllBytes(prebuiltReceipt, new byte[16385]);
+    Reject(() => GameCompiler.CopyPrebuiltAssembly(engine, prebuiltSource, rejectedAssembly), "Oversized prebuilt receipt accepted");
+    File.WriteAllBytes(prebuiltReceipt, approvedReceiptBytes);
+
     var project = Path.Combine(root, "game 한글 & spaces"); Directory.CreateDirectory(Path.Combine(project, "ProjectSetting")); Directory.CreateDirectory(Path.Combine(project, "Assets/Script"));
     File.WriteAllText(Path.Combine(project, "Assets/Script/Example.cs"), "public class Example {}");
     File.WriteAllText(Path.Combine(project, "Assets/Script/Example.cs.meta"), "guid: 11111111-1111-4111-8111-111111111111");
     File.WriteAllText(Path.Combine(project, "Assets/Shader.hlsl"), "shader");
     File.WriteAllText(Path.Combine(project, "Assets/Shader.hlsl.meta"), "guid: 22222222-2222-4222-8222-222222222222");
     File.Copy(Path.Combine(Directory.GetCurrentDirectory(), "Dynamic_CPP", ProjectLayerAsset.RelativePath), Paths.Child(project, ProjectLayerAsset.RelativePath));
+    Reject(() => engine.RequireContentAbi(context), "Legacy distribution silently asserted content ABI support");
+    foreach (var relative in new[] { "Scenes/Bootstrap.creator", "Scenes/Bootstrap.creator.meta", "Prefabs/Item.prefab", "Prefabs/Item.prefab.meta",
+        "Models/Robot.glb", "Models/Robot.glb.meta", "Textures/cloth.png", "Materials/cloth.asset", "Materials/cloth.shadergraph",
+        "Audio/voice.wav", "Audio/voice.wav.meta", "Shaders/DefaultPassShader/WorldSprite.slang" })
+    {
+        var file = Paths.Child(project, "Assets/" + relative); Directory.CreateDirectory(Path.GetDirectoryName(file)!); File.WriteAllText(file, "fixture");
+    }
+    var bootstrapInput = Path.Combine(root, "bootstrap-input");
+    _ = PackageInputs.CopyBootstrapProject(project, bootstrapInput, CancellationToken.None);
+    foreach (var retained in new[] { "Scenes/Bootstrap.creator", "Scenes/Bootstrap.creator.meta", "Prefabs/Item.prefab", "Audio/voice.wav", "Shaders/DefaultPassShader/WorldSprite.slang" })
+        Check(File.Exists(Paths.Child(bootstrapInput, "Assets/" + retained)), "Bootstrap omitted document input " + retained);
+    foreach (var omitted in new[] { "Models/Robot.glb", "Models/Robot.glb.meta", "Textures/cloth.png", "Materials/cloth.asset", "Materials/cloth.shadergraph", "Script/Example.cs" })
+        Check(!File.Exists(Paths.Child(bootstrapInput, "Assets/" + omitted)), "Bootstrap staged an asset importer input " + omitted);
+    Reject(() => PackageInputs.CopyBootstrapProject(project, Path.Combine(root, "bad-bootstrap"), CancellationToken.None,
+        new HashSet<string>(["Models/Robot.glb"], Paths.Comparer)), "Explicit bootstrap model source was silently included");
+
     var cookInput = Path.Combine(root, "cook-input"); PackageInputs.CopyProject(project, cookInput, CancellationToken.None);
     var geometrySource = Paths.Child(cookInput, "Assets/Geometry/shape.cegeometry");
     var geometryHistory = Paths.Child(cookInput, "Assets/Derived/CollisionGeometry/id/1.cegeometry");

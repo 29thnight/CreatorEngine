@@ -14,7 +14,8 @@ namespace AssetDepot
     // operations for startup/package validation, never TryAcquire or frame work.
     // An absent policy is successful with no inputs. Failures preserve outInputs.
     [[nodiscard]] bool ReadConfiguredAssetSets(const std::filesystem::path& assetRoot,
-        std::vector<experiment::cooked::AssetSetMountInput>& outInputs, std::string& failure);
+        std::vector<experiment::cooked::AssetSetMountInput>& outInputs, std::string& failure,
+        std::vector<std::string>* outHashes = nullptr);
     [[nodiscard]] bool ValidateConfiguredAssetSets(const std::filesystem::path& assetRoot,
         std::string& failure);
 }

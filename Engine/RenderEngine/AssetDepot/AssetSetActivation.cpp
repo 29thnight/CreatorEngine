@@ -1,5 +1,7 @@
 #include "../DataSystem.h"
 #include "AssetSetActivation.h"
+#include "RuntimeBootstrap.h"
+#include "../../Utility_Framework/ContentAbi.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
 
 #include <algorithm>
@@ -61,7 +63,8 @@ namespace
 namespace AssetDepot
 {
     bool ReadConfiguredAssetSets(const std::filesystem::path& assetRoot,
-        std::vector<cooked::AssetSetMountInput>& outInputs, std::string& failure)
+        std::vector<cooked::AssetSetMountInput>& outInputs, std::string& failure,
+        std::vector<std::string>* outHashes)
     {
         failure.clear();
         try
@@ -75,6 +78,7 @@ namespace AssetDepot
                     throw std::runtime_error("Cannot inspect AssetSet activation list: " + error.message());
                 }
                 outInputs.clear();
+                if (outHashes) outHashes->clear();
                 return true; // Existing packages do not opt into automatic v3 activation.
             }
             const auto bytes = ReadActivationArtifact(
@@ -95,11 +99,9 @@ namespace AssetDepot
                 throw std::runtime_error("Unsupported AssetSet activation format/platform.");
             }
             const auto abi = line();
-            if (abi.empty() || abi.size() > 128u || !std::ranges::all_of(abi, [](unsigned char value)
-                { return (value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z')
-                    || (value >= '0' && value <= '9') || value == '-' || value == '_' || value == '.'; }))
+            if (abi != CreatorContentAbi::Token)
             {
-                throw std::runtime_error("AssetSet activation requires an explicit host ABI token.");
+                throw std::runtime_error("AssetSet activation differs from the installed host content ABI.");
             }
             std::vector<cooked::AssetSetMountInput> inputs;
             std::set<std::string> seen;
@@ -135,7 +137,7 @@ namespace AssetDepot
                     throw std::runtime_error(detail);
                 }
                 input.options.expectedTargetPlatform = "win-x64";
-                input.options.expectedTargetAbi = abi;
+                input.options.expectedTargetAbi = CreatorContentAbi::Token;
                 inputs.push_back(std::move(input));
             }
             if (inputs.empty())
@@ -143,6 +145,7 @@ namespace AssetDepot
                 throw std::runtime_error("AssetSet activation list is empty.");
             }
 
+            if (outHashes) outHashes->assign(seen.begin(), seen.end());
             outInputs = std::move(inputs);
             return true;
         }
@@ -156,13 +159,14 @@ namespace AssetDepot
     bool ValidateConfiguredAssetSets(const std::filesystem::path& assetRoot, std::string& failure)
     {
         std::vector<cooked::AssetSetMountInput> inputs;
-        if (!ReadConfiguredAssetSets(assetRoot, inputs, failure))
+        std::vector<std::string> hashes;
+        if (!ReadConfiguredAssetSets(assetRoot, inputs, failure, &hashes))
         {
             return false;
         }
         if (inputs.empty())
         {
-            return true;
+            return ValidateRuntimeBootstrap(assetRoot, hashes, cooked::CookedAssetCatalog{}, failure);
         }
         std::uint64_t mount{};
         for (auto& input : inputs)
@@ -196,7 +200,7 @@ namespace AssetDepot
             }
             return false;
         }
-        return true;
+        return ValidateRuntimeBootstrap(assetRoot, hashes, candidate, failure);
     }
 }
 
@@ -206,13 +210,14 @@ bool DataSystem::MountConfiguredAssetSets(const file::path& assetRoot, std::stri
     try
     {
         std::vector<cooked::AssetSetMountInput> inputs;
-        if (!AssetDepot::ReadConfiguredAssetSets(assetRoot, inputs, failure))
+        std::vector<std::string> hashes;
+        if (!AssetDepot::ReadConfiguredAssetSets(assetRoot, inputs, failure, &hashes))
         {
             return false;
         }
         if (inputs.empty())
         {
-            return true;
+            return AssetDepot::ValidateRuntimeBootstrap(assetRoot, hashes, cooked::CookedAssetCatalog{}, failure);
         }
         own::shared_owner<const cooked::CookedAssetCatalog> snapshot;
         std::uint64_t revision{};
@@ -245,6 +250,10 @@ bool DataSystem::MountConfiguredAssetSets(const file::path& assetRoot, std::stri
             {
                 failure += " | " + issue.context + ": " + issue.message;
             }
+            return false;
+        }
+        if (!AssetDepot::ValidateRuntimeBootstrap(assetRoot, hashes, candidate, failure))
+        {
             return false;
         }
         auto published = own::make_shared<const cooked::CookedAssetCatalog>(std::move(candidate));

@@ -77,6 +77,12 @@ internal static class EnginePublisher
                 }
                 Copy(recordPath, Paths.Child(binaryTarget, $"Runtime/Manifests/{name}.json")); hosts[name] = abi.DeepClone();
             }
+            var content = ContentCompatibility.Read(hosts["Player"]!, "Player native build record");
+            foreach (var host in hosts)
+            {
+                if (ContentCompatibility.Read(host.Value!, $"{host.Key} native build record") != content)
+                    throw new BuildException($"Native content ABIs differ: {host.Key}. Rebuild all four engine hosts before publishing.");
+            }
             // ProfilerViewer is a real standalone application, not an engine
             // runtime host. Its bounded deployment record contains only its
             // native import closure and the shared Editor fonts/licenses.
@@ -171,6 +177,7 @@ internal static class EnginePublisher
             var manifest = (JsonObject)metadata.DeepClone();
             var payload = Metadata.Object(new { buildId, payloadDigest = digest, platform = "win-x64", configuration = config, shipping,
                 binaryRoot = $"Bin/x64-{config}", scriptApi = api, hostAbi = 1, supportedScriptApis = new[] { api },
+                contentAbiVersion = content.Version, contentAbi = content.Token,
                 source = new { revision, dirty, kind = "build-workspace-observation" },
                 toolchain = new { dotnetRuntime = Path.GetFileName(runtime), compilerSdk = Path.GetFileName(sdk), referencePack = Path.GetFileName(references) },
                 hosts, files = entriesAll, buildTool = $"Bin/x64-{config}/Tools/CreatorBuildTool/CreatorBuildTool.exe" });

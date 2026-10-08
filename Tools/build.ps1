@@ -6,6 +6,8 @@ param(
     [string]$Project = '',
     [ValidateSet('Project','Workspace','Tracked')][string]$InputMode = 'Project',
     [string]$RenderBackend = '', [string]$StartupScene = '',
+    [ValidateSet('Legacy','PrebuiltAssetSets')][string]$ContentMode = 'Legacy',
+    [string]$BootstrapRoot = '', [string]$AssetSetList = '', [string]$AssetSetAbi = '',
     [switch]$BuildNative, [switch]$SkipVerify,
     [string]$EngineDistribution = '', [string]$GameScriptsAssembly = '',
     # EngineShipping controls diagnostics independently of -Config Debug/Release.

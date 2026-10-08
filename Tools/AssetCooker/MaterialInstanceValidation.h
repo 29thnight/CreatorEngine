@@ -2,6 +2,7 @@
 
 #include "MaterialGraphRuntime.h"
 #include "AuthoringReadNode.h"
+#include "Experiment/Cooked/CookedAssetCatalog.h"
 
 #include <algorithm>
 #include <map>
@@ -11,7 +12,8 @@ namespace material_cook
 using Programs = std::map<experiment::AssetId, material_graph::VerifiedProduct>;
 
 inline bool ValidateInstances(const Authoring::ReadNode& node, const Programs& programs,
-                              const experiment::cooked::CookedAssetManifest& manifest, std::string& error)
+                              const experiment::cooked::CookedAssetManifest& manifest, std::string& error,
+                              const experiment::cooked::CookedAssetCatalog* external = nullptr)
 {
     if (node.IsMap() && node["lattice_material"])
     {
@@ -41,7 +43,12 @@ inline bool ValidateInstances(const Authoring::ReadNode& node, const Programs& p
             const auto& program = graph->second.program;
             const auto parameter =
                 std::ranges::find(program.parameters, texture.parameter, &LX::LXMaterialParameter::id);
-            if (artifact == manifest.entries.end() || artifact->kind != experiment::cooked::CookedAssetKind::Texture ||
+            experiment::cooked::ResolvedAssetEntry resolved;
+            const bool textureFound = artifact != manifest.entries.end()
+                ? artifact->kind == experiment::cooked::CookedAssetKind::Texture
+                : external && external->Find({{texture.assetId, {}}, experiment::cooked::CookedAssetKind::Texture}, resolved)
+                    == experiment::cooked::AssetLookupStatus::Found;
+            if (!textureFound ||
                 parameter == program.parameters.end() || !parameter->exposed ||
                 parameter->type != LX::PinType::Texture ||
                 std::ranges::none_of(graph->second.layout.textures,
@@ -57,7 +64,7 @@ inline bool ValidateInstances(const Authoring::ReadNode& node, const Programs& p
     {
         for (const auto entry : node.Map())
         {
-            if (!ValidateInstances(entry.value, programs, manifest, error))
+            if (!ValidateInstances(entry.value, programs, manifest, error, external))
             {
                 return false;
             }
@@ -67,7 +74,7 @@ inline bool ValidateInstances(const Authoring::ReadNode& node, const Programs& p
     {
         for (const auto entry : node)
         {
-            if (!ValidateInstances(entry, programs, manifest, error))
+            if (!ValidateInstances(entry, programs, manifest, error, external))
             {
                 return false;
             }
