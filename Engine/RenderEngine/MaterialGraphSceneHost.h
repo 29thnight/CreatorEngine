@@ -75,13 +75,13 @@ namespace material_graph
         }
         // Select only exact requested graph instances and coverage for the current
         // view. Pending requests defer the whole frame; failed requests reject it.
-        bool SelectReadyInput(const EnhancedFrameContext& context, std::shared_ptr<const SceneViewInput> requested,
-                              std::shared_ptr<const SceneViewInput>& result, std::string& error);
+        bool SelectReadyInput(const EnhancedFrameContext& context, own::shared_owner<const SceneViewInput> requested,
+                              own::shared_owner<const SceneViewInput>& result, std::string& error);
         // Texture copy commands must precede the native parallel prefix. Uniforms
         // and geometry are prepared afterward in its fresh upload recording.
-        bool PrepareResidency(const EnhancedFrameContext& context, const std::shared_ptr<const SceneViewInput>& input,
+        bool PrepareResidency(const EnhancedFrameContext& context, const own::shared_owner<const SceneViewInput>& input,
                               std::string& error) const;
-        bool Prepare(const EnhancedFrameContext& context, std::shared_ptr<const SceneViewInput> input,
+        bool Prepare(const EnhancedFrameContext& context, own::shared_owner<const SceneViewInput> input,
                      RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                      const EnhancedShadowData& shadow, const SceneHostBudget& budget, std::string& error,
                      std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance = {},
@@ -138,14 +138,14 @@ namespace material_graph
         using SlotKey = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t>;
         struct Recording
         {
-            std::vector<std::shared_ptr<const Frame>> owners;
-            std::shared_ptr<const Frame> publication;
+            std::vector<own::shared_owner<const Frame>> owners;
+            own::shared_owner<const Frame> publication;
             RHISubmissionTicket ticket;
             std::uint64_t completion{};
             bool submitted{}, accepted{}, decided{};
         };
         bool PrepareProgram(const EnhancedFrameContext& context, const Instance& instance,
-                            std::shared_ptr<const Program>& result, std::string& error);
+                            own::shared_owner<const Program>& result, std::string& error);
         void PruneFailedPreparations(const own::shared_owner<const Generation>& requested = {});
         IRenderDeviceServices* device_{};
         MeshSurfaceEvaluator geometry_;
@@ -156,18 +156,18 @@ namespace material_graph
         SceneSubsurfaceResources subsurface_;
         SceneRefractionResources refraction_;
         SceneVolumeResources volume_;
-        std::vector<std::shared_ptr<const Program>> programs_;
-        std::shared_ptr<const Frame> frame_;
+        std::vector<own::shared_owner<const Program>> programs_;
+        own::shared_owner<const Frame> frame_;
         job_scheduler& scheduler_;
         IRenderDeviceServices* programDevice_{};
-        std::vector<std::shared_ptr<Preparation>> preparations_;
-        std::map<SlotKey, std::shared_ptr<Slot>> slots_;
+        std::vector<own::unique_owner<Preparation>> preparations_;
+        std::map<SlotKey, own::unique_owner<Slot>> slots_;
         bool selectionDeferred_{};
         std::map<std::uint64_t, Recording> recordings_;
         mutable std::mutex recordingMutex_;
         std::uint64_t completed_{}, selectionSerial_{};
         SceneProgramStats stats_;
-        bool CommitSubmittedFrame(const std::shared_ptr<const Frame>& frame, RHICompletionPoint completion,
+        bool CommitSubmittedFrame(const own::shared_owner<const Frame>& frame, RHICompletionPoint completion,
                                   std::string& error);
         void PollSubmittedFrames();
         void DeclareGeometry(EnhancedRenderGraph& graph) const;

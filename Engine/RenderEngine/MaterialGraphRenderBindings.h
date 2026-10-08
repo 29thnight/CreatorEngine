@@ -52,7 +52,7 @@ namespace material_graph
     {
       public:
         bool Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures, own::shared_owner<const Instance> instance,
-                     const PassLayout& layout, std::shared_ptr<const RenderBindings>& result, std::string& error,
+                     const PassLayout& layout, own::shared_owner<const RenderBindings>& result, std::string& error,
                      own::shared_owner<InstanceFramePins> instancePins = {},
                      const TextureFramePins* imagePins = nullptr);
 
@@ -76,7 +76,7 @@ namespace material_graph
       private:
         IRenderDeviceServices* device_{};
         std::map<std::vector<std::string>, RHISamplerTable> samplers_;
-        std::map<InstanceFramePins::Key, std::vector<std::weak_ptr<const RenderBindings>>> prepared_;
+        std::map<InstanceFramePins::Key, std::vector<own::weak_owner<const RenderBindings>>> prepared_;
         std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
     };
 } // namespace material_graph

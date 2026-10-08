@@ -157,6 +157,13 @@ design. A foundation slice is not completion of the runtime migration.
   observed input-vector staging, decoded worker results, unique live payloads and
   retained cache charge. SDK-internal scratch/allocator overhead is not measured;
   overlapping pin/result categories must not be added as physical memory usage.
+- Scene material sources/views/bindings and accepted CPU Program/Frame records now
+  use actual own owners. Preparation/Slot state is exclusive; accepted scheduler work
+  has its own strong captures. Private immutable view construction uses a passkey.
+  Prepared binding reuse still checks exact pinned instance, recording and descriptor
+  version. Recording/ticket owners are detached before destruction outside the recording
+  mutex. Accepted work survives later publication/abort failure; completion zero stays
+  quarantined until the existing confirmed-idle teardown.
 - Reflection/authoring serializers understand own shared/exclusive owners. Deserialization
   builds a candidate before replacement; immutable reflected payloads are copied for
   legacy mutable serialization hooks and shown read-only in the editor. Nested
@@ -164,7 +171,7 @@ design. A foundation slice is not completion of the runtime migration.
   lists require a dedicated const-safe serializer. Resource copy contracts still
   govern unreflected state and isolation of shared mutable children.
 
-## Remaining integration and support boundaries
+## Support and verification boundaries
 
 - Granular rendering and source-free mounted-model placement use the typed hierarchy,
   independent Lattice materials/embedded textures and exact collider preparation.
@@ -178,10 +185,11 @@ design. A foundation slice is not completion of the runtime migration.
   Source-free packaging retains the explicit legacy-document bootstrap for Scene,
   Prefab and audio identity, rather than inventing new typed payload loaders for them.
   CEMCv11 remains an explicit source/editor adapter for unmounted legacy content.
-- Legacy source/generated Texture adapters explicitly retain non-rehydratable images.
-  In particular, legacy material property/name loads and embedded ModelTextureAsset
-  pixel/subresource storage are not yet fully cut over to standalone image recipes.
-  Mounted typed graph/UI/sprite/generic paths use the independent image store.
+- Unmounted source/editor and generated Texture adapters explicitly retain
+  non-rehydratable images. Legacy property/name loading and aggregate embedded
+  ModelTextureAsset storage keep that declared adapter contract. Mounted typed
+  model/material/graph/UI/sprite/Foliage paths use standalone image recipes and the
+  independently budgeted image store; source adapters are not a mounted fallback.
 - Synchronous scene entry points reject a composite Pending bundle rather than waiting
   for image payload jobs on the caller. Cold mounted-content activation must use the
   asynchronous scene preparation path. Player startup now polls that path, commits

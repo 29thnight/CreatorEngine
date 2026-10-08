@@ -236,7 +236,7 @@ struct EnhancedPbrCapture
         root["sealLedger"]["recorded"] << false;
     }
 
-    void RecordLatticeInput(const std::shared_ptr<const material_graph::SceneViewInput>& input)
+    void RecordLatticeInput(const own::shared_owner<const material_graph::SceneViewInput>& input)
     {
         if (!input)
         {

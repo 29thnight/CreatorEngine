@@ -311,7 +311,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             lights.push_back(light);
         }
         SceneInputView view{context.frameId, context.sceneEpoch, 1, 1, 64, 64, camera};
-        std::shared_ptr<const SceneViewInput> input;
+        own::shared_owner<const SceneViewInput> input;
         CheckWith(SceneViewInput::Seal(view, {&geometry.draw, 1}, {}, input, error), "Matched Scene seal ", error);
         CheckWith(device.BeginFrame(error), "Matched begin ", error);
         textures.BeginFrame(context.frameId);

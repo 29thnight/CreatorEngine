@@ -134,7 +134,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         const std::vector<EnhancedDrawItem> empty;
         context.draws = &empty;
         SceneInputView view{context.frameId, context.sceneEpoch, 99, 1, 16, 16, camera};
-        std::shared_ptr<const SceneViewInput> input;
+        own::shared_owner<const SceneViewInput> input;
         Check(SceneViewInput::Seal(view, graphDraws, {}, input, error) &&
                   host.SelectReadyInput(context, input, input, error), "Mixed sealed input " + error);
         Check(input->Draws().size() == graphDraws.size(), "No ready alpha graph omitted");

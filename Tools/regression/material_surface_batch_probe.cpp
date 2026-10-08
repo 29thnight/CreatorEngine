@@ -315,7 +315,7 @@ void Run(const std::filesystem::path& root)
     std::shared_ptr<const SurfaceBatch> lastGoodBatch;
     std::shared_ptr<const IblBakeResult> lastGoodBake;
     own::shared_owner<const Instance> previousInstance;
-    std::shared_ptr<const RenderBindings> staleBindings;
+    own::shared_owner<const RenderBindings> staleBindings;
     auto points = Points();
     SurfaceView view{{0, 0, 2, 0}, 1, 1, 1};
     auto targetState = RHIResourceState::Common;
@@ -369,7 +369,7 @@ void Run(const std::filesystem::path& root)
             }
             Check(device.BeginFrame(error), "Begin spatial frame");
             textures.BeginFrame(frame);
-            std::shared_ptr<const RenderBindings> computeBindings, drawBindings;
+            own::shared_owner<const RenderBindings> computeBindings, drawBindings;
             Check(bindings.Prepare(device, textures, instance, evaluators[tier].Layout(), computeBindings, error),
                   "Compute bindings: " + error);
             Check(bindings.Prepare(device, textures, instance, graphicsLayouts[tier], drawBindings, error),
@@ -569,7 +569,7 @@ void Run(const std::filesystem::path& root)
         Check(!evaluators[0].Record(device, staleBindings, view, points, batch, error),
               "No evaluation outside a recording");
         Check(!baker.RecordGpu(device, {}, batch, baked, error), "No GPU bake outside a recording");
-        std::shared_ptr<const RenderBindings> abortBindings;
+        own::shared_owner<const RenderBindings> abortBindings;
         Check(device.BeginFrame(error), "Begin aborted evaluation");
         textures.BeginFrame(8);
         Check(bindings.Prepare(device, textures, previousInstance, evaluators[1].Layout(), abortBindings, error),

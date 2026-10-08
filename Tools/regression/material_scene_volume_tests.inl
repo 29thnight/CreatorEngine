@@ -374,7 +374,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             {
                 sealBudget.mesh.maxChunkPoints = 3;
             }
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             const bool sealed = SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera},
                                                      draws, sealBudget, input, error);
             Check(sealed, "Volume seal " + error);
@@ -441,7 +441,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 auto open = volume.draw;
                 open.modelMeshView.indexCount -= 3;
                 open.geometryKey += 100;
-                std::shared_ptr<const SceneViewInput> invalid;
+                own::shared_owner<const SceneViewInput> invalid;
                 Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 93, 1, 16, 16, camera}, {&open, 1}, {},
                                            invalid, error),
                       "Open boundary input remains structurally valid");

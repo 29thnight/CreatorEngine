@@ -67,7 +67,7 @@ public:
         own::shared_owner<const assets::ModelMeshDescriptor> meshDescriptor{};
         std::uint32_t modelMeshIndex{};
         bool skinned{};
-        std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
+        own::shared_owner<const material_graph::SceneMaterialSource> graphMaterialSource;
 		// I5-D5c3 — 저작 정본의 값 스냅샷과 그 세대. 프록시의 authored는 값이라
 		// legacy(shared_ptr 공유)와 달리 편집이 저절로 보이지 않는다 — 갱신
 		// 커맨드가 세대 변화를 보고 새 스냅샷을 나른다.

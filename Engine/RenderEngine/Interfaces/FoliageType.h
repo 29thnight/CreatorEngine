@@ -58,7 +58,7 @@ public:
     [[reflgen::ignore]]
     own::shared_owner<const Material> m_material{};
     [[reflgen::ignore]]
-    std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource{};
+    own::shared_owner<const material_graph::SceneMaterialSource> m_graphMaterialSource{};
     [[reflgen::ignore]]
     own::shared_owner<const experiment::Material> m_authoredMaterial{};
 

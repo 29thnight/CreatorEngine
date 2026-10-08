@@ -217,7 +217,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             context.lights = &lights;
             const std::array draws{a.draw, b.draw};
             SceneInputView view{context.frameId, context.sceneEpoch, 91, 1, 24, 24, camera};
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             Check(SceneViewInput::Seal(view, draws, {}, input, error), "SSS Scene seal " + error);
             Check(device.BeginFrame(error), "SSS begin frame");
             textures.BeginFrame(context.frameId);

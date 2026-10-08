@@ -109,7 +109,7 @@ namespace material_graph
         std::vector<SurfacePoint> points_;
         std::shared_ptr<const SurfaceGeometrySource> mesh_;
         std::uint32_t count_{};
-        std::shared_ptr<const RenderBindings> bindings_;
+        own::shared_owner<const RenderBindings> bindings_;
         std::uint64_t recordingId_{};
         std::uint64_t descriptorVersion_{};
         std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
@@ -136,25 +136,25 @@ namespace material_graph
         // Immediate recording only, after material textures are ShaderResource.
         // All allocations/bind validation precede dispatch. Keep returned owner
         // through submission completion/abort and release it before device shutdown.
-        bool Record(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings, const SurfaceView& view,
+        bool Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings, const SurfaceView& view,
                     std::span<const SurfacePoint> points, std::shared_ptr<const SurfaceBatch>& result, std::string& error);
         // GPU skin/world frame -> graph -> IBL, without a CPU readback between stages.
         // Across recordings the source must have passed completed readback validation.
-        bool RecordGpu(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+        bool RecordGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                        std::shared_ptr<const SurfaceGeometrySource> mesh, std::shared_ptr<const SurfaceBatch>& result,
                        std::string& error);
         // Allocate without recording, including an unrecorded prepared raster
         // source. PrepareParallel must precede this when using worker recording.
-        bool PrepareGpu(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+        bool PrepareGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                         std::shared_ptr<const SurfaceGeometrySource> source, std::shared_ptr<const SurfaceBatch>& result,
                         std::string& error);
 
       private:
-        bool RecordInputs(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+        bool RecordInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                           const SurfaceView& view, std::span<const SurfacePoint> points,
                           std::shared_ptr<const SurfaceGeometrySource> mesh, std::shared_ptr<const SurfaceBatch>& result,
                           std::string& error);
-        bool PrepareInputs(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+        bool PrepareInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                            const SurfaceView& view, std::span<const SurfacePoint> points,
                            std::shared_ptr<const SurfaceGeometrySource> source, std::shared_ptr<const SurfaceBatch>& result,
                            std::string& error);

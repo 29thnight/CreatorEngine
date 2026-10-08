@@ -1313,7 +1313,7 @@ passes:
         SceneInputView view{1, 1, 1, 1, 4, 4};
         view.camera.view = math::matrix4x4::identity();
         view.camera.projection = math::matrix4x4::identity();
-        std::shared_ptr<const SceneViewInput> input;
+        own::shared_owner<const SceneViewInput> input;
         if (!SceneViewInput::Seal(view, draws, {}, input, error))
         {
             return false;
@@ -1338,7 +1338,7 @@ passes:
         {
             return false;
         }
-        auto bindings = std::make_shared<RenderBindings>();
+        auto bindings = own::make_shared<RenderBindings>();
         auto instancePins = own::make_shared<InstanceFramePins>();
         bindings->instancePinIndex = instancePins->Retain(instance);
         bindings->instance = instancePins->Borrow(bindings->instancePinIndex);

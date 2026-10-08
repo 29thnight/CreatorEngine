@@ -907,7 +907,7 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     Check(device.CreateBufferReadback(kSamples * sizeof(IblBakeSample), readbacks[3], error), "Sample bake readback");
     Check(device.BeginFrame(error), "Sample begin");
     textures.BeginFrame(++frames);
-    std::shared_ptr<const RenderBindings> materialBindings;
+    own::shared_owner<const RenderBindings> materialBindings;
     Check(bindings.Prepare(device, textures, instance, evaluator.Layout(), materialBindings, error), "Sample bindings");
     const IblEnvironment environment{textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error), 1, cube};
     std::shared_ptr<const MeshSurfaceBatch> vertices, sampled;
@@ -1286,7 +1286,7 @@ void Run(const std::filesystem::path& root)
                 }
                 Check(device.BeginFrame(error), "Begin");
                 textures.BeginFrame(frames);
-                std::shared_ptr<const RenderBindings> materialBindings;
+                own::shared_owner<const RenderBindings> materialBindings;
                 Check(bindings.Prepare(device, textures, instances[tier], evaluators[tier].Layout(), materialBindings,
                                        error),
                       "Material bind prepare");
@@ -1492,7 +1492,7 @@ void Run(const std::filesystem::path& root)
         device.AbortFrame();
         Check(device.BeginFrame(error), "Mesh abort reuse begin");
         textures.BeginFrame(++frames);
-        std::shared_ptr<const RenderBindings> materialBindings;
+        own::shared_owner<const RenderBindings> materialBindings;
         Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
               "Abort material bindings");
         std::shared_ptr<const SurfaceBatch> rejected;

@@ -88,7 +88,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                               [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; },
                               geometry.draw.materialGraphInstance, error),
                           "Decal instance " + error);
-                    std::shared_ptr<const SceneViewInput> input;
+                    own::shared_owner<const SceneViewInput> input;
                     Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 97 + tier, 1, 16, 16, camera},
                                                {&geometry.draw, 1}, {}, input, error),
                           "Decal seal " + error);

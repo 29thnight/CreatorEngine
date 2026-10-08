@@ -123,7 +123,7 @@ public:
 	// 컴포넌트에서 스냅샷할 때 shared_ptr을 그대로 복사하므로,
 	// 원본이 파괴되거나 언로드되어도 이 프록시가 그리는 중에는 안전하다.
 	own::shared_owner<const Material>		m_Material{};
-    std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource;
+    own::shared_owner<const material_graph::SceneMaterialSource> m_graphMaterialSource;
 	// PHASE 3.75 MBC7/MBC9 — typed 정본이 유일한 지오메트리 출처다. 컴포넌트가
 	// 붙든 immutable generation과 메시 인덱스의 사본. drawPool이 이것으로
 	// RHIModelMeshView를 만들어 패스에 싣고, shared_owner가 뷰가 가리키는 정점·인덱스

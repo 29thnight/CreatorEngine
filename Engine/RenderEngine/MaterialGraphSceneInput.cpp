@@ -27,7 +27,7 @@ namespace material_graph
         }
     } // namespace
 
-    std::shared_ptr<const SceneMaterialSource> SceneMaterialSource::Capture(const Material& material)
+    own::shared_owner<const SceneMaterialSource> SceneMaterialSource::Capture(const Material& material)
     {
         SceneCoverage queue;
         switch (material.m_renderingMode)
@@ -49,7 +49,7 @@ namespace material_graph
                        static_cast<std::uint64_t>(material.m_materialGuid));
     }
 
-    std::shared_ptr<const SceneMaterialSource> SceneMaterialSource::Capture(own::shared_owner<const Instance> instance,
+    own::shared_owner<const SceneMaterialSource> SceneMaterialSource::Capture(own::shared_owner<const Instance> instance,
                                                                             SceneCoverage queue, bool doubleSided,
                                                                             std::uint64_t materialSlot)
     {
@@ -57,7 +57,7 @@ namespace material_graph
         {
             return {};
         }
-        auto source = std::make_shared<SceneMaterialSource>();
+        auto source = own::make_shared<SceneMaterialSource>();
         source->instance = std::move(instance);
         source->materialSlot = materialSlot;
         source->coverage.flags = EnhancedMaterialCoverage::Enabled;
@@ -82,7 +82,7 @@ namespace material_graph
     }
 
     bool SceneViewInput::Seal(const SceneInputView& view, std::span<const EnhancedDrawItem> draws,
-                              const SceneInputBudget& budget, std::shared_ptr<const SceneViewInput>& result,
+                              const SceneInputBudget& budget, own::shared_owner<const SceneViewInput>& result,
                               std::string& error,
                               own::shared_owner<const assets::ModelAssetGenerationPins> modelPins,
                               own::shared_owner<InstanceFramePins> materialPins,
@@ -104,7 +104,7 @@ namespace material_graph
         {
             return false;
         }
-        auto candidate = std::shared_ptr<SceneViewInput>(new SceneViewInput);
+        auto candidate = own::make_shared<SceneViewInput>(ConstructionKey{});
         candidate->modelPins_ = std::move(modelPins);
         auto collectedPins = materialPins ? own::shared_owner<InstanceFramePins>{}
             : own::make_shared<InstanceFramePins>();

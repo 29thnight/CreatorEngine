@@ -249,7 +249,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             }
             context.draws = &oldDraws;
             const std::array draws{glass.draw, backdrop.draw};
-            std::shared_ptr<const SceneViewInput> input;
+            own::shared_owner<const SceneViewInput> input;
             Check(SceneViewInput::Seal({context.frameId, context.sceneEpoch, 92, 1, 24, 24, camera}, draws, {}, input,
                                        error),
                   "Refraction Scene seal " + error);

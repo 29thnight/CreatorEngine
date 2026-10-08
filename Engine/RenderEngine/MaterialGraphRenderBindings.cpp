@@ -134,7 +134,7 @@ namespace material_graph
 
     bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures,
                                      own::shared_owner<const Instance> instance, const PassLayout& layout,
-                                     std::shared_ptr<const RenderBindings>& result, std::string& error,
+                                     own::shared_owner<const RenderBindings>& result, std::string& error,
                                      own::shared_owner<InstanceFramePins> instancePins, const TextureFramePins* imagePins)
     {
         ce::profile_scope profile{ce::marker<"MaterialBindingsPrepare">()};
@@ -178,7 +178,7 @@ namespace material_graph
         }
         error.clear();
 
-        auto candidate = std::make_shared<RenderBindings>();
+        auto candidate = own::make_shared<RenderBindings>();
         if (!instancePins)
         {
             auto pins = own::make_shared<InstanceFramePins>();

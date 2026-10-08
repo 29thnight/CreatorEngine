@@ -67,7 +67,7 @@ struct Session
     bool confirmReload = false;
     bool previewPinned = false;
     std::chrono::steady_clock::time_point previewVisible{};
-    std::shared_ptr<const material_graph::SceneMaterialSource> previewSource;
+    own::shared_owner<const material_graph::SceneMaterialSource> previewSource;
     std::uint64_t previewRevision = 0;
 
     Session(EntityHandle object, const MeshRenderer& renderer, FileGuid identity, std::filesystem::path source,
@@ -388,7 +388,7 @@ std::mutex sessionMutex;
 std::vector<std::unique_ptr<Session>> sessions;
 Session* active = nullptr;
 std::uint64_t previewSerial = 0;
-std::shared_ptr<const material_graph::SceneMaterialSource> inspectorPreview;
+own::shared_owner<const material_graph::SceneMaterialSource> inspectorPreview;
 std::uint64_t inspectorPreviewRevision{};
 std::chrono::steady_clock::time_point inspectorPreviewVisible{};
 std::uint32_t observedSceneId{};
@@ -433,7 +433,7 @@ void ReconcileSceneLocked()
     });
 }
 
-std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> previewFloor;
+std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> previewFloor;
 std::string previewFloorError;
 
 bool PreparePreviewFloor()
@@ -473,7 +473,8 @@ void RefreshPreview(Session& session)
     auto source = renderer && renderer->m_Material
                       ? material_graph::SceneMaterialSource::Capture(*renderer->m_Material) : nullptr;
     if (!source || !source->instance) { session.previewSource.reset(); return; }
-    if (!session.previewSource || session.previewSource->instance != source->instance ||
+    if (!session.previewSource || !session.previewSource->instance ||
+        std::addressof(*session.previewSource->instance) != std::addressof(*source->instance) ||
         session.previewSource->coverage.flags != source->coverage.flags)
     {
         session.previewSource = std::move(source);
@@ -946,7 +947,8 @@ void DrawInspectorPreview(MeshRenderer& renderer)
         ImGui::TextDisabled("Apply a Surface graph to preview this material.");
         return;
     }
-    if (!inspectorPreview || inspectorPreview->instance != source->instance ||
+    if (!inspectorPreview || !inspectorPreview->instance ||
+        std::addressof(*inspectorPreview->instance) != std::addressof(*source->instance) ||
         inspectorPreview->coverage.flags != source->coverage.flags)
     {
         inspectorPreview = std::move(source);

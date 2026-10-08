@@ -193,14 +193,14 @@ namespace material_graph
         return true;
     }
 
-    bool SurfaceEvaluator::Record(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+    bool SurfaceEvaluator::Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                                   const SurfaceView& view, std::span<const SurfacePoint> points,
                                   std::shared_ptr<const SurfaceBatch>& result, std::string& error)
     {
         return RecordInputs(device, std::move(bindings), view, points, {}, result, error);
     }
 
-    bool SurfaceEvaluator::RecordGpu(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+    bool SurfaceEvaluator::RecordGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                                      std::shared_ptr<const SurfaceGeometrySource> mesh,
                                      std::shared_ptr<const SurfaceBatch>& result, std::string& error)
     {
@@ -215,7 +215,7 @@ namespace material_graph
         return RecordInputs(device, std::move(bindings), view, {}, std::move(mesh), result, error);
     }
 
-    bool SurfaceEvaluator::RecordInputs(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+    bool SurfaceEvaluator::RecordInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                                         const SurfaceView& view, std::span<const SurfacePoint> points,
                                         std::shared_ptr<const SurfaceGeometrySource> mesh,
                                         std::shared_ptr<const SurfaceBatch>& result, std::string& error)
@@ -240,7 +240,7 @@ namespace material_graph
         return true;
     }
 
-    bool SurfaceEvaluator::PrepareGpu(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+    bool SurfaceEvaluator::PrepareGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                                       std::shared_ptr<const SurfaceGeometrySource> source,
                                       std::shared_ptr<const SurfaceBatch>& result, std::string& error)
     {
@@ -254,7 +254,7 @@ namespace material_graph
         return PrepareInputs(device, std::move(bindings), view, {}, std::move(source), result, error);
     }
 
-    bool SurfaceEvaluator::PrepareInputs(IRenderDeviceServices& device, std::shared_ptr<const RenderBindings> bindings,
+    bool SurfaceEvaluator::PrepareInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                                          const SurfaceView& view, std::span<const SurfacePoint> points,
                                          std::shared_ptr<const SurfaceGeometrySource> mesh,
                                          std::shared_ptr<const SurfaceBatch>& result, std::string& error)

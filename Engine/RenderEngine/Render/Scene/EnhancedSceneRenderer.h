@@ -99,8 +99,8 @@ struct EnhancedLiveViewPacket
     std::shared_ptr<const EnhancedGizmoSceneData> gizmos;
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
@@ -111,8 +111,8 @@ struct EnhancedLiveViewRequest
     FrameCameraSnapshot camera{};
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
-    std::shared_ptr<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<std::shared_ptr<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
+    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
 };
 
 /// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.

@@ -18,8 +18,8 @@ namespace material_graph
 
         // Producer-side capture. RenderThread reads this immutable source, not the
         // mutable Material object. Null means the producer selected a legacy source.
-        static std::shared_ptr<const SceneMaterialSource> Capture(const Material& material);
-        static std::shared_ptr<const SceneMaterialSource> Capture(own::shared_owner<const Instance> instance,
+        static own::shared_owner<const SceneMaterialSource> Capture(const Material& material);
+        static own::shared_owner<const SceneMaterialSource> Capture(own::shared_owner<const Instance> instance,
                                                                   SceneCoverage queue, bool doubleSided,
                                                                   std::uint64_t materialSlot = 0);
     };
@@ -71,8 +71,20 @@ namespace material_graph
     class SceneViewInput
     {
       public:
+        class ConstructionKey
+        {
+            friend class SceneViewInput;
+            friend class SceneHost;
+            ConstructionKey() = default;
+        };
+        // Public factories may construct only with a key issued by Seal/SceneHost.
+        explicit SceneViewInput(ConstructionKey) {}
+        SceneViewInput(ConstructionKey, const SceneViewInput& source)
+            : view_(source.view_), surface_(source.surface_), viewProjection_(source.viewProjection_),
+              draws_(source.draws_), cost_(source.cost_), modelPins_(source.modelPins_),
+              materialPins_(source.materialPins_) {}
         static bool Seal(const SceneInputView& view, std::span<const EnhancedDrawItem> draws,
-                         const SceneInputBudget& budget, std::shared_ptr<const SceneViewInput>& result, std::string& error,
+                         const SceneInputBudget& budget, own::shared_owner<const SceneViewInput>& result, std::string& error,
                          own::shared_owner<const assets::ModelAssetGenerationPins> modelPins = {},
                          own::shared_owner<InstanceFramePins> materialPins = {},
                          const assets::ModelGeometryPreparationPins* geometryPins = nullptr);
@@ -89,7 +101,6 @@ namespace material_graph
 
       private:
         friend class SceneHost;
-        SceneViewInput() = default;
         SceneInputView view_;
         SurfaceView surface_;
         math::matrix4x4 viewProjection_;

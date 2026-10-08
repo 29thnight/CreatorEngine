@@ -57,7 +57,7 @@ namespace material_graph
         std::size_t instancePinIndex{ InstanceFramePins::InvalidIndex };
         SceneSurfaceSnapshot evaluation;
         IblEnvironment environment;
-        std::shared_ptr<const RenderBindings> bindings;
+        own::shared_owner<const RenderBindings> bindings;
         std::shared_ptr<const LX::Runtime::GraphicsPipeline> pipeline;
         std::shared_ptr<const IblBakeResult> ibl;
         std::uint32_t iblSlot{};

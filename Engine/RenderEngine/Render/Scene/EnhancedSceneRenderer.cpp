@@ -493,7 +493,7 @@ namespace
         //   카메라가 둘이어도 한 인스턴스로 충분하다.
         EnhancedGBufferPass   gbuffer;
         material_graph::SceneHost graphMaterials;
-        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedShadowPass    shadow;
         EnhancedDecalPass     decal;
         EnhancedDeferredPass  deferred;
@@ -710,7 +710,7 @@ namespace
         EnhancedShadowPass shadow;
         EnhancedGBufferPass gbuffer;
         material_graph::SceneHost graphMaterials;
-        std::shared_ptr<const material_graph::SceneViewInput> graphInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphInput;
         EnhancedDecalPass decal;
         EnhancedSSAOPass ssao;
         EnhancedDeferredPass deferred;
@@ -2310,7 +2310,7 @@ namespace
         // remains aligned when optional graph candidates are removed.
         std::vector<bool> graphShadowEligible;
         std::vector<bool> graphViewRequired;
-        std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
+        own::shared_owner<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
         // 몇 개를 봤고 패스 한도에 몇 개가 걸리는지"를 답하는 데 쓴다 —

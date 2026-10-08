@@ -546,7 +546,7 @@ struct EnhancedFrameContext
 {
     uint32_t viewFlags{};
     bool forwardLightingConsumer{true}; // Isolated cull/readback fixtures remain explicit consumers.
-    std::shared_ptr<const material_graph::SceneViewInput> graphSceneInput;
+    own::shared_owner<const material_graph::SceneViewInput> graphSceneInput;
     IRenderDeviceServices*     resources{ nullptr };
     IRenderPipelineCache*      psoManager{ nullptr };
     IRenderRootSignatureCache* rootSignatures{ nullptr };
