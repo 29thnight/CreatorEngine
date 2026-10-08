@@ -1,5 +1,7 @@
 #include "AssetSetBuild.h"
 #include "AssetDepot/AssetSetActivation.h"
+#include "ArtifactStoreGuard.h"
+#include <cwctype>
 #include "SoundAssetCookProducer.h"
 #include "CollisionGeometryCookProducer.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
@@ -63,6 +65,7 @@ namespace
             CompileRuntimeDocuments,
             BuildAssetSet,
             ValidateAssetSets,
+            CopyAssetSet,
         };
 
         Mode mode{ Mode::Cook };
@@ -103,6 +106,7 @@ namespace
                "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
                "--runtime-root <package-input-root>\n"
+            << "       AssetCooker --copy-asset-set --asset-root <immutable output> --output <new staging directory>\n"
             << "       AssetCooker --validate-asset-set-activation --asset-root <runtime Assets>\n"
             << "       AssetCooker --build-asset-set --asset-root <Assets> --asset-set <source.yml> "
                "--output <new-dir> --artifact-cache <cache-dir> --tool-fingerprint <sha256>\n"
@@ -163,6 +167,16 @@ namespace
             {
                 PrintUsage();
                 return false;
+            }
+            if (option == L"--copy-asset-set")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::CopyAssetSet;
+                continue;
             }
             if (option == L"--validate-asset-set-activation")
             {
@@ -378,9 +392,10 @@ namespace
             }
         }
 
-        if (out.mode == Arguments::Mode::ValidateAssetSets)
+        if (out.mode == Arguments::Mode::ValidateAssetSets || out.mode == Arguments::Mode::CopyAssetSet)
         {
-            if (out.assetRoot.empty() || !out.outputRoot.empty() || !out.assetSetDefinition.empty()
+            const bool copy = out.mode == Arguments::Mode::CopyAssetSet;
+            if (out.assetRoot.empty() || (copy ? out.outputRoot.empty() : !out.outputRoot.empty()) || !out.assetSetDefinition.empty()
                 || !out.artifactCache.empty() || !out.toolFingerprint.empty() || !out.runtimeRoot.empty()
                 || !out.generationRoot.empty() || !out.models.empty() || !out.textures.empty()
                 || !out.shaderMetas.empty() || !out.shaderGraphs.empty() || !out.materials.empty()
@@ -388,7 +403,7 @@ namespace
                 || !out.identityEpoch.empty() || out.buildMeshlets.has_value() || out.lodLevels.has_value()
                 || out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
             {
-                failure = "validate-asset-set-activation accepts only --asset-root <runtime Assets>.";
+                failure = "AssetSet validation accepts --asset-root; copying additionally requires --output <new staging directory>.";
                 return false;
             }
             return true;
@@ -2152,6 +2167,97 @@ namespace
         }
         return 0;
     }
+    int CopyAssetSetForPackage(const Arguments& arguments)
+    {
+        try
+        {
+            std::string failure;
+            AssetDepot::ArtifactStoreGuard sourceGuard;
+            const auto sourceAccess = AssetDepot::ArtifactStoreGuard::OpenShared(
+                arguments.assetRoot, sourceGuard, failure);
+            if (sourceAccess != AssetDepot::ArtifactStoreAccess::Acquired
+                && sourceAccess != AssetDepot::ArtifactStoreAccess::Unmanaged)
+            {
+                throw std::runtime_error("Cannot lease AssetSet copy source: " + failure);
+            }
+            const auto source = sourceGuard.BackingPath();
+            const auto requested = std::filesystem::absolute(arguments.outputRoot).lexically_normal();
+            if (requested.filename().empty() || !std::filesystem::is_directory(source))
+            {
+                throw std::runtime_error("AssetSet copy requires a directory and a new named output.");
+            }
+            // The host must supply its private, unpublished staging tree.
+            // An unmanaged immediate parent alone does not prove that policy;
+            // GamePackager creates/owns the whole candidate and checks disjointness.
+            AssetDepot::ArtifactStoreGuard parentGuard;
+            if (AssetDepot::ArtifactStoreGuard::OpenShared(requested.parent_path(), parentGuard, failure)
+                != AssetDepot::ArtifactStoreAccess::Unmanaged)
+            {
+                throw std::runtime_error("AssetSet copy destination must be an unpublished unmanaged staging parent: " + failure);
+            }
+            const auto destination = parentGuard.BackingPath() / requested.filename();
+            const auto folded = [](const std::filesystem::path& path)
+            {
+                auto value = path.native();
+                for (auto& character : value)
+                {
+                    character = static_cast<wchar_t>(std::towlower(character));
+                    if (character == L'/')
+                    {
+                        character = L'\\';
+                    }
+                }
+                return value;
+            };
+            const auto sourceName = folded(source);
+            const auto destinationName = folded(destination);
+            if (destinationName == sourceName || destinationName.starts_with(sourceName + L"\\")
+                || sourceName.starts_with(destinationName + L"\\")
+                || std::filesystem::exists(destination)
+                || !std::filesystem::create_directory(destination))
+            {
+                throw std::runtime_error("AssetSet copy output exists or overlaps its immutable source.");
+            }
+            std::size_t copied{};
+            for (const auto& entry : std::filesystem::recursive_directory_iterator(source))
+            {
+                const auto attributes = GetFileAttributesW(entry.path().c_str());
+                if (attributes == INVALID_FILE_ATTRIBUTES || (attributes & FILE_ATTRIBUTE_REPARSE_POINT) != 0u)
+                {
+                    throw std::runtime_error("AssetSet copy encountered an inaccessible or reparse entry.");
+                }
+                const auto relative = entry.path().lexically_relative(source);
+                const auto target = destination / relative;
+                if (entry.is_directory())
+                {
+                    std::filesystem::create_directory(target);
+                }
+                else if (entry.is_regular_file())
+                {
+                    std::filesystem::copy_file(entry.path(), target);
+                    ++copied;
+                }
+                else
+                {
+                    throw std::runtime_error("AssetSet copy supports only regular files/directories.");
+                }
+            }
+            if (!sourceGuard.ValidateBacking(failure) || !parentGuard.ValidateBacking(failure))
+            {
+                throw std::runtime_error("AssetSet copy backing changed: " + failure);
+            }
+            // No enrollment/guard is copied into portable package content. The
+            // caller validates every receipt/CAS byte in its unpublished stage.
+            std::cout << "asset-cooker asset-set copied files=" << copied << '\n';
+            return 0;
+        }
+        catch (const std::exception& exception)
+        {
+            std::cerr << "asset-cooker error: " << exception.what() << '\n';
+            return 9;
+        }
+    }
+
 }
 
 int wmain(int argc, wchar_t** argv)
@@ -2182,6 +2288,10 @@ int wmain(int argc, wchar_t** argv)
         std::cerr << "asset-cooker error: " << failure << '\n';
         PrintUsage();
         return 2;
+    }
+    if (arguments.mode == Arguments::Mode::CopyAssetSet)
+    {
+        return CopyAssetSetForPackage(arguments);
     }
     if (arguments.mode == Arguments::Mode::ValidateAssetSets)
     {

@@ -52,15 +52,40 @@ try
     using (var setContext = new BuildContext(new Options(["package-game", "--asset-set-list", setList,
         "--asset-set-abi", "fixture-v1"]), CancellationToken.None))
     {
-        var hashes = AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets);
+        // Unit seam only: production invokes the native source-lease copy mode.
+        Task CopyFixture(string source, string destination)
+        {
+            Paths.CopyTree(source, destination);
+            return Task.CompletedTask;
+        }
+        var hashes = await AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets, CopyFixture);
         Check(hashes.SequenceEqual(new[] { Metadata.Hash(setManifest) }), "Package changed the immutable manifest identity");
         var activationText = File.ReadAllText(Paths.Child(packagedAssets, "Derived/asset-set-activation.ceas"));
         Check(activationText == "CEAS1\nwin-x64\nfixture-v1\n" + hashes[0] + "\n", "Activation policy was not canonical");
         Check(Metadata.Hash(Paths.Child(packagedAssets, "AssetSets/" + hashes[0] + "/Derived/asset-set-manifest.cemf"))
             == hashes[0], "Copied manifest is not the validated content");
-        Reject(() => AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets), "Existing package activation was replaced");
+        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets, CopyFixture), "Existing package activation was replaced");
+        var interruptedDestination = Path.Combine(root, "interrupted-set-package/Assets");
+        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, interruptedDestination,
+            (source, destination) =>
+            {
+                Directory.CreateDirectory(destination);
+                File.WriteAllText(Path.Combine(destination, "partial"), "incomplete");
+                return Task.FromException(new IOException("Injected copy interruption"));
+            }), "Interrupted copy was accepted");
+        Check(!File.Exists(Paths.Child(interruptedDestination, "Derived/asset-set-activation.ceas")),
+            "Interrupted copy published activation policy");
+        var corruptDestination = Path.Combine(root, "corrupt-set-package/Assets");
+        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, corruptDestination,
+            async (source, destination) =>
+            {
+                await CopyFixture(source, destination);
+                File.WriteAllBytes(Paths.Child(destination, Paths.Relative(source, setBlob)), [99]);
+            }), "Corruption during copying was accepted");
+        Check(!File.Exists(Paths.Child(corruptDestination, "Derived/asset-set-activation.ceas")),
+            "Post-copy validation failure published activation policy");
         File.WriteAllBytes(setBlob, [99]);
-        Reject(() => AssetSetPackaging.CopyConfiguredSets(setContext, Path.Combine(root, "damaged-set-package/Assets")),
+        await RejectAsync(() => AssetSetPackaging.CopyConfiguredSets(setContext, Path.Combine(root, "damaged-set-package/Assets"), CopyFixture),
             "Damaged source CAS blob was packaged");
     }
 

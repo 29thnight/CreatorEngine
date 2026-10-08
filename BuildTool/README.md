@@ -264,8 +264,12 @@ Source/static implementation only until explicitly validated on Windows: no buil
 source output directory (relative entries resolve beside the list file). The ABI is
 an explicit host choice; it is never inferred from an untrusted incoming manifest.
 
-The packager verifies receipts and every CAS byte hash before and after copying,
-records exact manifest identities under `Assets/AssetSets/<sha256>`, and emits a
+The packager verifies receipts and every CAS byte hash before and after copying.
+Its native `--copy-asset-set` step holds a shared source-store lease for enrolled
+sources throughout traversal and identity revalidation; unmanaged sources remain
+noncollectible. Cancellation/process exit releases the acquired OS lease.
+The output is always a new directory in the host-owned private package candidate,
+never a mutation of a managed release. It records exact manifest identities under `Assets/AssetSets/<sha256>`, and emits a
 bounded `Assets/Derived/asset-set-activation.ceas` policy. Native preflight validates
 schema, ABI, duplicate definitions and the complete cross-set hard graph before the
 existing final package transaction can publish. The Player mounts the whole group

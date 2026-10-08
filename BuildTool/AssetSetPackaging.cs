@@ -7,7 +7,8 @@ namespace CreatorBuildTool
     {
         // Attach independently built immutable outputs. No model import, texture
         // decode, managed compilation or native Player build occurs in this step.
-        internal static string[] CopyConfiguredSets(BuildContext context, string runtimeAssets)
+        internal static async Task<string[]> CopyConfiguredSets(BuildContext context, string runtimeAssets,
+            Func<string, string, Task> copyWithSourceLease)
         {
             var list = context.Options.Get("asset-set-list");
             var abi = context.Options.Get("asset-set-abi");
@@ -67,7 +68,9 @@ namespace CreatorBuildTool
                 // A guard is a sibling OS identity record, not portable content.
                 // Only this output directory is copied. Extracted package roots
                 // are explicitly unmanaged/noncollectible until freshly enrolled.
-                Paths.CopyTree(root, destination, context.Cancellation);
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                await copyWithSourceLease(root, destination);
+                context.Cancellation.ThrowIfCancellationRequested();
                 _ = AssetSetBuilding.ValidateOutput(destination);
                 if (Metadata.Hash(Paths.Child(destination, "Derived/asset-set-manifest.cemf")) != hash)
                 {

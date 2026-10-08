@@ -116,7 +116,11 @@ internal static class GamePackager
             PackageInputs.RemoveAudioSources(merged);
             var mergedCook = AssetCooking.Validate(Path.Combine(merged, "Assets"), cook.ArtifactCount);
             if (mergedCook.ManifestSha256 != cook.ManifestSha256 || mergedCook.ArtifactBytes != cook.ArtifactBytes) throw new BuildException("Merged cook output changed.");
-            var assetSetManifests = AssetSetPackaging.CopyConfiguredSets(context, Path.Combine(merged, "Assets"));
+            var assetSetManifests = await AssetSetPackaging.CopyConfiguredSets(context, Path.Combine(merged, "Assets"),
+                async (source, destination) =>
+                {
+                    await context.Run(cooker, ["--copy-asset-set", "--asset-root", source, "--output", destination], engine.Root);
+                });
             if (assetSetManifests.Length != 0)
             {
                 await context.Run(cooker, ["--validate-asset-set-activation", "--asset-root", Path.Combine(merged, "Assets")], engine.Root);
