@@ -116,8 +116,10 @@ design. A foundation slice is not completion of the runtime migration.
   Mounted typed graph/UI/sprite/generic paths use the independent image store.
 - Synchronous scene entry points reject a composite Pending bundle rather than waiting
   for image payload jobs on the caller. Cold mounted-content activation must use the
-  asynchronous scene preparation path; Player startup and command callers still need
-  that activation cutover. No synchronous readiness guarantee is claimed for that bridge.
+  asynchronous scene preparation path. Player startup now polls that path, commits
+  activation/play before opening its command service, and excludes preparation time
+  from its first simulation delta. Legacy synchronous command callers still need
+  cutover; no synchronous readiness guarantee is claimed for that bridge.
 - BuildAssetSet currently imports/converts before verified CAS reuse. Skipping unchanged
   CPU imports still needs complete source/external/settings/tool/version receipt keys
   and validation of every referenced schema/blob; blob reuse alone is not that optimization.
