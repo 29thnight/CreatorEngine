@@ -31,6 +31,7 @@
 // -----------------------------------------------------------------------------
 
 #pragma once
+#include "ArtifactStoreGuard.h"
 #include <cstdint>
 #include <algorithm>
 #include <limits>
@@ -402,6 +403,9 @@ namespace Pak {
     struct OpenOptions { std::optional<std::array<u8, 32>> key; };
 
     class Archive {
+        // Declared first, released after every file/index reader has gone away.
+        // This also protects archives retained independently of a byte source.
+        AssetDepot::ArtifactStoreGuard m_storeGuard;
         std::filesystem::path m_path; Header m_hdr{}; IndexHeader m_ih{}; std::vector<Entry> m_entries; std::unordered_map<u64, size_t> m_hashToIndex; std::optional<std::array<u8, 32>> m_key;
         // Index and payload reads must refer to the same mounted file. Deny
         // writers while this archive is alive; the lock protects FILE's cursor
@@ -410,9 +414,21 @@ namespace Pak {
         mutable std::mutex m_readMutex;
     public:
         explicit Archive(std::filesystem::path pak, OpenOptions opt = {}) : m_path(std::move(pak)), m_key(std::move(opt.key)) {
+            std::string guardFailure;
+            const auto guardAccess = AssetDepot::ArtifactStoreGuard::OpenShared(m_path, m_storeGuard, guardFailure);
+            if (guardAccess != AssetDepot::ArtifactStoreAccess::Acquired
+                && guardAccess != AssetDepot::ArtifactStoreAccess::Unmanaged)
+            {
+                fail(guardFailure);
+            }
+            m_path = m_storeGuard.BackingPath();
             std::FILE* raw = _wfsopen(m_path.wstring().c_str(), L"rb", _SH_DENYWR);
             ensure(raw != nullptr, "open pak");
             m_file.reset(raw);
+            if (!m_storeGuard.ValidateOpenedFile(raw, guardFailure))
+            {
+                fail(guardFailure);
+            }
             std::FILE* fp = m_file.get();
             auto read = [&](void* p, size_t n) { if (std::fread(p, 1, n, fp) != n) fail("read pak"); };
             auto seek = [&](u64 ofs) { _fseeki64(fp, ofs, SEEK_SET); };

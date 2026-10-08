@@ -1,4 +1,5 @@
 #include "AssetSetBuild.h"
+#include "../../Engine/Utility_Framework/ArtifactStoreGuard.h"
 
 #include "AuthoringParsedDocument.h"
 #include "AuthoringCookedDocument.h"
@@ -990,6 +991,12 @@ namespace AssetCooking
             // or deleted. A leftover directory cannot own this OS-scoped guard.
             const AssetSetCacheLock cacheLock{ cache / ".asset-set-build.guard" };
             std::filesystem::create_directories(output.parent_path());
+            AssetDepot::ArtifactStoreGuard publicationGuard;
+            std::string guardFailure;
+            if (!AssetDepot::ArtifactStoreGuard::BeginPublication(output, publicationGuard, guardFailure))
+            {
+                Fail("Cannot reserve immutable AssetSet backing: " + guardFailure);
+            }
             const auto nonce = std::to_string(GetCurrentProcessId()) + "." +
                 std::to_string(std::chrono::steady_clock::now().time_since_epoch().count());
             // Killed processes may leave these unique work directories. They are
@@ -1129,6 +1136,10 @@ namespace AssetCooking
             // No mutable release pointer and no replacement: caller receives this exact revision.
             std::filesystem::rename(candidate, output);
             candidateScope.path.clear();
+            if (!publicationGuard.CommitPublication(guardFailure))
+            {
+                Fail("Published AssetSet has no valid storage lease enrollment: " + guardFailure);
+            }
             result.assets = manifest.entries.size();
             result.blobs = manifest.blobs.size();
             result.succeeded = true;

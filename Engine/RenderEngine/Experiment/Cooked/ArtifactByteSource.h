@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../../../Utility_Framework/Ownership.h"
+#include "../../../Utility_Framework/ArtifactStoreGuard.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -10,6 +11,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <stdexcept>
 #include <utility>
 #include <cstdio>
 #include <mutex>
@@ -249,14 +251,17 @@ namespace experiment::cooked
             return true;
         }
 
-        // An exact locator owns only its physical file, not the mount source or
-        // sibling files. Recapture keeps this already-narrow source owner;
+        // An exact locator owns its selected file plus the release's small OS
+        // guard, never the mount source or sibling file descriptors. The guard
+        // prevents cooperating physical GC/repack after logical unmount.
+        // Recapture keeps this already-narrow source owner;
         // no path lookup is ever performed again.
         class SingleArtifactSource final : public ArtifactByteSource
         {
         public:
-            SingleArtifactSource(std::string path, own::shared_owner<PinnedFile> file)
-                : path_(std::move(path)), file_(std::move(file)) {}
+            SingleArtifactSource(std::string path, own::shared_owner<PinnedFile> file,
+                own::shared_owner<const AssetDepot::ArtifactStoreGuard> storeGuard)
+                : path_(std::move(path)), storeGuard_(std::move(storeGuard)), file_(std::move(file)) {}
 
             [[nodiscard]] bool CaptureArtifact(std::string_view path,
                 own::shared_owner<const ArtifactByteSource>& narrowed,
@@ -296,14 +301,30 @@ namespace experiment::cooked
             }
 
             std::string path_;
+            own::shared_owner<const AssetDepot::ArtifactStoreGuard> storeGuard_;
             own::shared_owner<PinnedFile> file_;
         };
 
     public:
         // Replaced manifests must use immutable CAS paths or a fresh source
         // snapshot. A live path pin in this snapshot keeps its old file identity.
+        // Only metadata I/O occurs here. Construct on mount/worker paths, never
+        // on TryAcquire or RT upload. A single guard covers even unselected lazy
+        // children, without opening any artifact file. Legacy roots lacking
+        // enrollment remain readable but cannot receive a collection permit.
         explicit LooseArtifactByteSource(std::filesystem::path root)
-            : root_(std::move(root)) {}
+        {
+            auto guard = own::make_shared<AssetDepot::ArtifactStoreGuard>();
+            std::string failure;
+            const auto access = AssetDepot::ArtifactStoreGuard::OpenShared(root, *guard, failure);
+            if (access != AssetDepot::ArtifactStoreAccess::Acquired
+                && access != AssetDepot::ArtifactStoreAccess::Unmanaged)
+            {
+                throw std::runtime_error(failure);
+            }
+            root_ = guard->BackingPath();
+            storeGuard_ = std::move(guard);
+        }
 
         [[nodiscard]] bool CaptureArtifact(std::string_view path,
             own::shared_owner<const ArtifactByteSource>& narrowed,
@@ -315,7 +336,7 @@ namespace experiment::cooked
                 narrowed.reset();
                 return false;
             }
-            auto candidate = own::make_shared<SingleArtifactSource>(std::string(path), std::move(pinned));
+            auto candidate = own::make_shared<SingleArtifactSource>(std::string(path), std::move(pinned), storeGuard_);
             failure.clear();
             narrowed = std::move(candidate);
             return true;
@@ -347,6 +368,10 @@ namespace experiment::cooked
             std::string& failure) const
         {
             std::lock_guard lock(filesMutex_);
+            if (!storeGuard_->ValidateBacking(failure))
+            {
+                return {};
+            }
             // Weak lookup must not accumulate a control block/path for every
             // artifact ever touched. Amortized pruning retains at most one
             // small interval of expired records between new captures.
@@ -460,6 +485,7 @@ namespace experiment::cooked
         }
 
         std::filesystem::path root_{};
+        own::shared_owner<const AssetDepot::ArtifactStoreGuard> storeGuard_{};
     };
 
 }

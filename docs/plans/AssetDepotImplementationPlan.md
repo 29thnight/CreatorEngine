@@ -47,9 +47,10 @@ design. A foundation slice is not completion of the runtime migration.
   and locator metadata, including absent Loadable children. Only a selected child
   worker opens and verifies its payload; absent captured children fail without resolving
   a newer mount. Acquired origins retain exact per-artifact backing, not every file in
-  the mount. Current unique immutable outputs have no physical garbage collector;
-  a future collector requires an artifact-store/root lease. External file replacement
-  or removal can therefore cause an I/O or integrity failure before first acquisition.
+  the mount. Managed immutable output roots now carry cooperative OS store guards,
+  including unselected lazy backing. Existing/extracted unenrolled roots remain
+  readable but noncollectible; external replacement can still report an integrity/I/O
+  failure and is never treated as permission to resolve a newer generation.
 - Independent CEGE mesh artifacts omit logical identity/name/material fields. Their
   bounded codec validates the packed rendering contract and full skin binding; optional
   invalid meshlet/LOD data falls back to indexed geometry. Schema1 model descriptors
@@ -128,8 +129,12 @@ design. A foundation slice is not completion of the runtime migration.
 - BuildAssetSet currently imports/converts before verified CAS reuse. Skipping unchanged
   CPU imports still needs complete source/external/settings/tool/version receipt keys
   and validation of every referenced schema/blob; blob reuse alone is not that optimization.
-- Artifact-store root leases and explicit safe deletion/repack eligibility are pending.
-  Logical unmount and cache eviction never themselves delete immutable output files.
+- Shared store guards protect mounted/retired roots, narrowed artifacts and pak
+  archives. A held exclusive capability plus exact backing-incarnation revalidation
+  is required for cooperative deletion/repack eligibility. No collector or destructive
+  operation runs automatically; logical unmount/eviction never delete storage.
+  Newly copied outputs need fresh prepublication enrollment; extracted unenrolled
+  package content remains explicitly noncollectible.
 - Some legacy Material/Texture/ShaderMeta APIs are synchronous transitional loaders;
   full typed asynchronous acquisition and independent cooked producers for every
   supported resource kind are not complete.

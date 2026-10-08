@@ -118,6 +118,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="ArtifactStoreGuard.h" />
     <ClInclude Include="Ownership.h" />
     <ClInclude Include="BaseTypeDef.h">
       <Filter>Core.definition\Type</Filter>
