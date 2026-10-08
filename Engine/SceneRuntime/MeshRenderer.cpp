@@ -12,6 +12,7 @@
 #include "Experiment/MaterialAuthoringCodec.h" // S2c-2a: override 값 표기 정본
 #include "ExperimentMaterialMigration.h" // S2c-2a: diff 타이핑·override 적용
 #include "Experiment/MaterialInstance.h" // I5-D5c1: 재질 병행 표현
+#include "Assets/ModelMeshDescriptor.h"
 #include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC7: typed 정본
 #include <mathematics/transform.hpp>
 
@@ -276,10 +277,12 @@ MeshRenderer::MeshRenderer()
 
 MeshRenderer::~MeshRenderer()
 {
+    m_meshRequest.Cancel();
 }
 
 void MeshRenderer::OnInitialized()
 {
+    EnsureMeshBinding();
     auto scene = GetOwner()->m_ownerScene;
     auto renderScene = SceneManagers->GetRenderScene();
     if (scene)
@@ -354,6 +357,10 @@ math::aabb MeshRenderer::GetBoundingBox() const
 
 math::aabb MeshRenderer::GetBoundingBox(const math::matrix4x4& world) const
 {
+    if (m_meshDescriptor)
+    {
+        return math::transform(m_meshDescriptor->bounds, world);
+    }
     // typed 정본의 바운드(immutable aggregate가 소유). MBC9: legacy Mesh 바운드 폴백은
     // 은퇴했다 — generation이 없으면 빈 상자다.
     if (m_modelGeneration
@@ -371,7 +378,13 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
     // Graph textures may be embedded in this model. Publish the immutable
     // model owner before resolving an inline graph instance's texture GUIDs.
-    if (m_modelGuid != FileGuid{}) DataSystems->LoadModelAssetGeneration(m_modelGuid);
+    const AssetDepot::AssetLink<assets::ModelMeshDescriptor> meshLink{
+        { experiment::AssetId{ m_meshAssetId.m_guid }, {} } };
+    m_granularMeshBinding = meshLink.IsValid() && DataSystems->HasModelMeshDescriptor(meshLink);
+    if (!m_granularMeshBinding && m_modelGuid != FileGuid{})
+    {
+        DataSystems->LoadModelAssetGeneration(m_modelGuid);
+    }
     // 재질 해석 → 모델 묶기 단계를 캡처에 가른다.
     std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"MeshRenderer.Material">() };
 	// typed 역직렬화가 m_Material의 소유 인스턴스를 이미 만들었다. 예전 경로는
@@ -475,6 +488,13 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	}
 	step.reset();
 	step.emplace(ce::marker<"MeshRenderer.BindModel">());
+    if (m_granularMeshBinding)
+    {
+        // A mounted v3 candidate, including a failed/unsupported one, never
+        // falls through to source-path or CEMCv11 loading.
+        EnsureMeshBinding();
+        return;
+    }
 	const assets::ModelAssetGeneration::Shared generation =
 		DataSystems->LoadModelAssetGeneration(m_modelGuid);
 
@@ -594,6 +614,11 @@ bool MeshRenderer::BindModelGeneration(
             SetExperimentMaterialBase(nullptr);
         }
     }
+    m_meshRequest.Cancel();
+    m_meshRequest = {};
+    m_meshDescriptor.reset();
+    m_granularMeshBinding = false;
+    m_meshRequested = false;
 	m_modelGeneration = std::move(generation);
 	m_modelMeshIndex = meshIndex;
 	m_meshAssetId = FileGuid(m_modelGeneration->Meshes()[meshIndex].meshId);
@@ -610,6 +635,10 @@ bool MeshRenderer::BindModelGeneration(
 
 assets::ModelMeshHandle MeshRenderer::GetModelMeshHandle() const
 {
+    if (m_meshDescriptor)
+    {
+        return assets::MakeModelMeshHandle(*m_meshDescriptor);
+    }
 	if (!m_modelGeneration
 		|| m_modelMeshIndex >= m_modelGeneration->Meshes().size())
 	{
@@ -620,3 +649,89 @@ assets::ModelMeshHandle MeshRenderer::GetModelMeshHandle() const
 		m_modelGeneration->Identity().generation };
 }
 
+bool MeshRenderer::BindMeshDescriptor(
+    own::shared_owner<const assets::ModelMeshDescriptor> descriptor)
+{
+    if (!descriptor || !assets::MakeModelMeshHandle(*descriptor).IsValid()
+        || !assets::IsSupportedModelVertexLayout(descriptor->vertexAttributeMask)
+        || descriptor->vertexStride == 0u
+        || descriptor->skinned != assets::Has(descriptor->vertexAttributeMask, assets::VertexAttribute::BoneIndices)
+        || descriptor->vertexStride != assets::StrideOf(descriptor->vertexAttributeMask)
+        || descriptor->vertexLayoutHash != assets::VertexLayoutHash(descriptor->vertexAttributeMask)
+        || descriptor->vertexCount == 0u || descriptor->indexCount == 0u
+        || (descriptor->skinned && (!descriptor->skeleton
+            || descriptor->requiredBoneCount != descriptor->skeleton->skeleton.bones.size()
+            || descriptor->requiredSkinBindingSha256 != descriptor->skeleton->skinBindingSha256)))
+    {
+        return false;
+    }
+    m_meshRequest.Cancel();
+    m_meshRequest = {};
+    m_meshRequested = false;
+    m_meshFailureReported = false;
+    m_meshDescriptor = std::move(descriptor);
+    m_modelGeneration.reset();
+    m_modelMeshIndex = 0u;
+    m_meshAssetId = FileGuid(m_meshDescriptor->meshId);
+    m_isSkinnedMesh = m_meshDescriptor->skinned;
+    m_granularMeshBinding = true;
+    m_isNeedUpdateCulling = true;
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+    return true;
+}
+
+void MeshRenderer::EnsureMeshBinding()
+{
+    const AssetDepot::AssetLink<assets::ModelMeshDescriptor> link{
+        { experiment::AssetId{ m_meshAssetId.m_guid }, {} } };
+    if (!link.IsValid())
+    {
+        return;
+    }
+    if (m_requestedMeshId != m_meshAssetId)
+    {
+        m_meshRequest.Cancel();
+        m_meshRequest = {};
+        m_requestedMeshId = m_meshAssetId;
+        m_meshRequested = false;
+        m_meshFailureReported = false;
+        m_granularMeshBinding = DataSystems->HasModelMeshDescriptor(link);
+    }
+    if (!m_granularMeshBinding || (m_meshDescriptor && m_meshDescriptor->meshId == m_meshAssetId.m_guid))
+    {
+        return;
+    }
+    if (!m_meshRequested)
+    {
+        if (auto descriptor = DataSystems->TryAcquire(link))
+        {
+            if (BindMeshDescriptor(std::move(descriptor)))
+            {
+                return;
+            }
+        }
+        m_meshRequest = DataSystems->RequestAsync(link);
+        m_meshRequested = true;
+    }
+    const auto result = m_meshRequest.Snapshot();
+    if (result.status == AssetDepot::AssetRequestStatus::Pending)
+    {
+        return;
+    }
+    if (result.status == AssetDepot::AssetRequestStatus::Ready && BindMeshDescriptor(result.asset))
+    {
+        m_meshRequest = {};
+        m_meshRequested = false;
+        return;
+    }
+    // Failed, Cancelled and Stale are terminal for this requested link. Keep
+    // the result visible until an explicit bind or mesh-ID transition; silently
+    // issuing a new current-link request here would implement FollowLatest.
+    if (!m_meshFailureReported)
+    {
+        Debug::PrintLog(spdlog::level::err, "MeshRenderer v3 mesh binding failed: "
+            + m_meshAssetId.ToString() + " " + result.message);
+        m_meshFailureReported = true;
+    }
+    // Retain any previous valid descriptor/material while the replacement fails.
+}

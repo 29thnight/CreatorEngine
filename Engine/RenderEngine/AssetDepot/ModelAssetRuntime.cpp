@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cmath>
 #include <stdexcept>
 #include <exception>
 #include <limits>
@@ -40,9 +41,26 @@ namespace
         return AddModelCharge(charge, origin.blob.artifactPath.capacity());
     }
 
+    assets::ModelGeometryKey GeometryKey(const model_cooked::ResolvedAssetEntry& resolved)
+    {
+        const auto& blob = resolved.blob;
+        return { blob.contentSha256, blob.byteSize, blob.kind, blob.representation,
+            blob.schemaVersion, blob.targetPlatform, blob.targetAbi, 1u };
+    }
+
+    template<class T>
     AssetDepot::ModelAssetKey ModelKey(const model_cooked::ResolvedAssetEntry& resolved, bool exact)
     {
-        return { resolved.entry.asset, resolved.blob, resolved.resolverRevision, exact };
+        if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
+        {
+            auto blob = resolved.blob;
+            blob.artifactPath.clear();
+            return { { {}, model_cooked::CookedAssetKind::Mesh }, std::move(blob), 0u, true, 1u };
+        }
+        else
+        {
+            return { resolved.entry.asset, resolved.blob, resolved.resolverRevision, exact, 0u };
+        }
     }
 
     template<class T>
@@ -79,6 +97,9 @@ namespace
         case CookedAssetKind::Model:
             return resolved.blob.representation == kModelDescriptorRepresentation
                 && resolved.blob.schemaVersion == kModelDescriptorVersion;
+        case CookedAssetKind::Mesh:
+            return resolved.blob.representation == kModelGeometryRepresentation
+                && resolved.blob.schemaVersion == kModelGeometryArtifactVersion;
         case CookedAssetKind::Skeleton:
             return resolved.blob.representation == kSkeletonRepresentation
                 && resolved.blob.schemaVersion == kSkeletonArtifactVersion;
@@ -205,6 +226,10 @@ namespace
         auto result = own::make_shared<assets::ModelSkeletonPayload>();
         result->origin = resolved;
         result->boneLayoutSha256 = decoded.boneLayoutSha256;
+        if (!model_cooked::ComputeSkinBindingDigest(decoded.skeleton, result->skinBindingSha256, failure))
+        {
+            return {};
+        }
         auto& target = result->skeleton;
         target.skeletonId = resolved.entry.asset.key.assetId.value;
         target.rootBone = decoded.skeleton.rootBone.Value();
@@ -290,12 +315,186 @@ namespace
         return result;
     }
 
+    std::size_t MeshletDynamicCharge(const experiment::MeshletPayload& meshlets) noexcept
+    {
+        auto charge = meshlets.descriptors.capacity() * sizeof(experiment::MeshletDescriptor);
+        charge = AddModelCharge(charge, meshlets.vertexRemap.capacity() * sizeof(std::uint32_t));
+        charge = AddModelCharge(charge, meshlets.triangleIndices.capacity());
+        return AddModelCharge(charge, meshlets.primitiveRemap.capacity() * sizeof(std::uint32_t));
+    }
+
+    math::vector4 MeshletLocalBounds(const experiment::MeshletPayload& payload)
+    {
+        if (payload.descriptors.empty())
+        {
+            return {};
+        }
+        std::array<double, 3> minimum{}, maximum{};
+        for (size_t axis = 0; axis < 3; ++axis)
+        {
+            minimum[axis] = std::numeric_limits<double>::infinity();
+            maximum[axis] = -std::numeric_limits<double>::infinity();
+        }
+        for (const auto& descriptor : payload.descriptors)
+        {
+            for (size_t axis = 0; axis < 3; ++axis)
+            {
+                const double center = descriptor.sphereCenter[axis];
+                minimum[axis] = (std::min)(minimum[axis], center - descriptor.sphereRadius);
+                maximum[axis] = (std::max)(maximum[axis], center + descriptor.sphereRadius);
+            }
+        }
+        std::array<float, 3> center{};
+        for (size_t axis = 0; axis < 3; ++axis)
+        {
+            const double midpoint = (minimum[axis] + maximum[axis]) * 0.5;
+            if (!std::isfinite(midpoint) || std::abs(midpoint) > (std::numeric_limits<float>::max)())
+            {
+                return {};
+            }
+            center[axis] = static_cast<float>(midpoint);
+        }
+        double radius = 0.0;
+        for (const auto& descriptor : payload.descriptors)
+        {
+            const double x = static_cast<double>(center[0]) - descriptor.sphereCenter[0];
+            const double y = static_cast<double>(center[1]) - descriptor.sphereCenter[1];
+            const double z = static_cast<double>(center[2]) - descriptor.sphereCenter[2];
+            radius = (std::max)(radius, std::sqrt(x * x + y * y + z * z) + descriptor.sphereRadius);
+        }
+        if (!std::isfinite(radius) || radius > (std::numeric_limits<float>::max)())
+        {
+            return {};
+        }
+        const float outward = radius > 0.0
+            ? std::nextafter(static_cast<float>(radius), std::numeric_limits<float>::infinity()) : 0.0f;
+        // Unknown bounds force LOD0; they never permit additional simplification.
+        return std::isfinite(outward) ? math::vector4{center[0], center[1], center[2], outward} : math::vector4{};
+    }
+
+    assets::ModelMeshletSummary MeshletSummary(const experiment::MeshletPayload& meshlets);
+
+    own::shared_owner<const assets::ModelGeometryPayload> DecodeModelGeometry(
+        const model_cooked::ResolvedAssetEntry& resolved, std::span<const std::byte> bytes,
+        std::string& failure)
+    {
+        model_cooked::ModelGeometryArtifact decoded;
+        if (!model_cooked::ReadModelGeometryArtifact(bytes, decoded, failure))
+        {
+            return {};
+        }
+        auto result = own::make_shared<assets::ModelGeometryPayload>();
+        result->key = GeometryKey(resolved);
+        result->artifactPath = resolved.blob.artifactPath;
+        result->byteSource = resolved.byteSource;
+        result->requiredBoneCount = decoded.requiredBoneCount;
+        result->requiredSkinBindingSha256 = decoded.requiredSkinBindingSha256;
+        auto& mesh = result->mesh;
+        mesh.vertexAttributeMask = decoded.mesh.vertices.AttributeMask();
+        mesh.vertexStride = decoded.mesh.vertices.Stride();
+        mesh.vertexLayoutHash = assets::VertexLayoutHash(mesh.vertexAttributeMask);
+        const auto vertices = decoded.mesh.vertices.Bytes();
+        mesh.vertexBytes.assign(vertices.begin(), vertices.end());
+        mesh.indices = std::move(decoded.mesh.indices);
+        mesh.bounds = decoded.mesh.bounds;
+        mesh.meshlets = std::move(decoded.mesh.meshlets);
+        mesh.coarseLods = std::move(decoded.mesh.coarseLods);
+        result->meshletSummary = MeshletSummary(mesh.meshlets);
+        for (std::size_t index = 0u; index < mesh.coarseLods.levels.size(); ++index)
+        {
+            const auto& lod = mesh.coarseLods.levels[index];
+            result->lodSummaries[index] = { lod.geometricError,
+                static_cast<std::uint32_t>(lod.indices.size()), MeshletSummary(lod.meshlets) };
+        }
+        auto charge = AddModelCharge(sizeof(assets::ModelGeometryPayload), mesh.vertexBytes.capacity());
+        charge = AddModelCharge(charge, result->artifactPath.capacity());
+        charge = AddModelCharge(charge, result->key.targetPlatform.capacity());
+        charge = AddModelCharge(charge, result->key.targetAbi.capacity());
+        charge = AddModelCharge(charge, mesh.indices.capacity() * sizeof(std::uint32_t));
+        charge = AddModelCharge(charge, MeshletDynamicCharge(mesh.meshlets));
+        charge = AddModelCharge(charge, mesh.coarseLods.levels.capacity() * sizeof(experiment::MeshLodLevel));
+        for (const auto& lod : mesh.coarseLods.levels)
+        {
+            charge = AddModelCharge(charge, lod.indices.capacity() * sizeof(std::uint32_t));
+            charge = AddModelCharge(charge, MeshletDynamicCharge(lod.meshlets));
+        }
+        result->decodedBytes = charge;
+        return result;
+    }
+
+    assets::ModelMeshletSummary MeshletSummary(const experiment::MeshletPayload& meshlets)
+    {
+        return { meshlets.settings, meshlets.geometryDigest,
+            static_cast<std::uint32_t>(meshlets.descriptors.size()),
+            static_cast<std::uint32_t>(meshlets.vertexRemap.size()),
+            static_cast<std::uint32_t>(meshlets.triangleIndices.size()),
+            static_cast<std::uint32_t>(meshlets.primitiveRemap.size()), meshlets.lod0, MeshletLocalBounds(meshlets) };
+    }
+
+    own::shared_owner<const assets::ModelMeshDescriptor> DescribeModelGeometry(
+        model_cooked::ResolvedAssetEntry resolved,
+        const assets::ModelGeometryPayload& geometry,
+        own::shared_owner<const assets::ModelSkeletonPayload> skeleton,
+        Error& error, std::string& failure)
+    {
+        if (!geometry.byteSource || geometry.key != GeometryKey(resolved))
+        {
+            error = Error::IntegrityFailed;
+            failure = "Mesh descriptor and compatible raw decode identities differ.";
+            return {};
+        }
+        // Logical identity/closure stay on this descriptor. Canonical content
+        // backing is copied as a matched locator/source pair, already captured
+        // and SHA-verified by the joined raw read. Never mix source A with path B.
+        // This joins reads as well as decode for same- or cross-source aliases.
+        resolved.blob.artifactPath = geometry.artifactPath;
+        resolved.byteSource = geometry.byteSource;
+        const bool skinned = assets::Has(geometry.mesh.vertexAttributeMask, assets::VertexAttribute::BoneIndices);
+        if ((!skinned && (!HasNoHardDependencies(resolved) || skeleton))
+            || (skinned && (!skeleton || !ValidateClipDependency(resolved, skeleton->origin)
+                || geometry.requiredBoneCount != skeleton->skeleton.bones.size()
+                || geometry.requiredSkinBindingSha256 != skeleton->skinBindingSha256)))
+        {
+            error = Error::DependencyFailed;
+            failure = "Mesh hard dependency does not match its exact full skin binding.";
+            return {};
+        }
+        auto result = own::make_shared<assets::ModelMeshDescriptor>();
+        result->origin = std::move(resolved);
+        result->geometryKey = geometry.key;
+        result->meshId = result->origin.entry.asset.key.assetId.value;
+        const auto& mesh = geometry.mesh;
+        result->vertexAttributeMask = mesh.vertexAttributeMask;
+        result->vertexStride = mesh.vertexStride;
+        result->vertexLayoutHash = mesh.vertexLayoutHash;
+        result->vertexCount = static_cast<std::uint32_t>(mesh.vertexBytes.size() / mesh.vertexStride);
+        result->indexCount = static_cast<std::uint32_t>(mesh.indices.size());
+        result->bounds = mesh.bounds;
+        result->skinned = skinned;
+        result->requiredBoneCount = geometry.requiredBoneCount;
+        result->requiredSkinBindingSha256 = geometry.requiredSkinBindingSha256;
+        result->skeleton = std::move(skeleton);
+        result->meshlets = geometry.meshletSummary;
+        result->lodSettings = mesh.coarseLods.settings;
+        result->lodGeometryDigest = mesh.coarseLods.geometryDigest;
+        result->coarseLodCount = static_cast<std::uint32_t>(mesh.coarseLods.levels.size());
+        for (std::size_t index = 0u; index < mesh.coarseLods.levels.size(); ++index)
+        {
+            result->coarseLods[index] = geometry.lodSummaries[index];
+        }
+        auto charge = AddModelCharge(sizeof(assets::ModelMeshDescriptor), ModelOriginDynamicCharge(result->origin));
+        charge = AddModelCharge(charge, result->geometryKey.targetPlatform.capacity());
+        result->metadataBytes = AddModelCharge(charge, result->geometryKey.targetAbi.capacity());
+        return result;
+    }
+
     own::shared_owner<const assets::ModelAnimationDescriptor> DecodeModelDescriptor(
         const model_cooked::ResolvedAssetEntry& resolved, std::span<const std::byte> bytes,
         own::shared_owner<const model_cooked::CookedAssetCatalog> catalog, std::string& failure)
     {
         auto result = own::make_shared<assets::ModelAnimationDescriptor>();
-        if (!catalog || !model_cooked::ReadModelDescriptorArtifact(bytes, result->summary, failure))
+        if (!catalog || !model_cooked::ReadModelDescriptorArtifact(bytes, result->summary, failure)
+            || !model_cooked::ValidateModelDescriptorDependencies(result->summary, resolved.entry.dependencies, failure))
         {
             return {};
         }
@@ -305,37 +504,13 @@ namespace
             return {};
         }
         result->origin = resolved;
-        result->metadataBytes = AddModelCharge(sizeof(assets::ModelAnimationDescriptor),
-            ModelOriginDynamicCharge(result->origin));
-        result->metadataBytes = AddModelCharge(result->metadataBytes, result->summary.name.capacity());
-        result->metadataBytes = AddModelCharge(result->metadataBytes,
-            result->summary.clips.capacity() * sizeof(model_cooked::ModelClipSummary));
-        for (const auto& clip : result->summary.clips)
-        {
-            result->metadataBytes = AddModelCharge(result->metadataBytes, clip.name.capacity());
-        }
-        if (!result->summary.skeletonAssetId.IsValid())
-        {
-            // Static model metadata can enumerate zero clips without fabricating
-            // a skeleton payload. An explicit skeleton request then fails closed.
-            return result;
-        }
         const model_cooked::TypedAssetReference skeletonReference{
             { result->summary.skeletonAssetId, {} }, model_cooked::CookedAssetKind::Skeleton };
-        const auto hasLoadable = [&](const auto& reference)
+        if (result->summary.skeletonAssetId.IsValid()
+            && (!ResolveModelLoadable(*catalog, skeletonReference, result->skeleton, failure)
+                || (result->skeleton.byteSource && !HasNoHardDependencies(result->skeleton))))
         {
-            return std::any_of(resolved.entry.dependencies.begin(), resolved.entry.dependencies.end(),
-                [&](const auto& dependency)
-                {
-                    return dependency.kind == model_cooked::AssetDependencyKind::Loadable
-                        && dependency.target == reference;
-                });
-        };
-        if (!hasLoadable(skeletonReference)
-            || !ResolveModelLoadable(*catalog, skeletonReference, result->skeleton, failure)
-            || (result->skeleton.byteSource && !HasNoHardDependencies(result->skeleton)))
-        {
-            failure = "Model descriptor skeleton metadata is incompatible or not a declared loadable dependency.";
+            failure = "Model descriptor skeleton metadata is incompatible.";
             return {};
         }
         result->clips.reserve(result->summary.clips.size());
@@ -344,8 +519,7 @@ namespace
             model_cooked::ResolvedAssetEntry child;
             const model_cooked::TypedAssetReference reference{
                 { clip.clipAssetId, {} }, model_cooked::CookedAssetKind::AnimationClip };
-            if (!hasLoadable(reference)
-                || !ResolveModelLoadable(*catalog, reference, child, failure)
+            if (!ResolveModelLoadable(*catalog, reference, child, failure)
                 || (child.byteSource && !HasClipSkeletonDependency(child, skeletonReference)))
             {
                 failure = "Model descriptor clip metadata has an invalid declared skeleton dependency.";
@@ -353,18 +527,71 @@ namespace
             }
             result->clips.push_back(std::move(child));
         }
-        result->metadataBytes = AddModelCharge(result->metadataBytes,
-            result->clips.capacity() * sizeof(model_cooked::ResolvedAssetEntry));
-        result->metadataBytes = AddModelCharge(result->metadataBytes, ModelOriginDynamicCharge(result->skeleton));
+        result->meshes.reserve(result->summary.meshes.size());
+        for (const auto& mesh : result->summary.meshes)
+        {
+            model_cooked::ResolvedAssetEntry child;
+            const model_cooked::TypedAssetReference reference{
+                { mesh.meshAssetId, {} }, model_cooked::CookedAssetKind::Mesh };
+            if (!ResolveModelLoadable(*catalog, reference, child, failure)
+                || (child.byteSource && (mesh.skinned
+                    ? !HasClipSkeletonDependency(child, skeletonReference) : !HasNoHardDependencies(child))))
+            {
+                failure = "Model descriptor mesh metadata has an invalid declared skeleton dependency.";
+                return {};
+            }
+            result->meshes.push_back(std::move(child));
+        }
+        auto charge = AddModelCharge(sizeof(assets::ModelAnimationDescriptor), ModelOriginDynamicCharge(result->origin));
+        charge = AddModelCharge(charge, result->summary.name.capacity());
+        charge = AddModelCharge(charge, result->summary.clips.capacity() * sizeof(model_cooked::ModelClipSummary));
+        charge = AddModelCharge(charge, result->summary.meshes.capacity() * sizeof(model_cooked::ModelMeshSummary));
+        charge = AddModelCharge(charge, result->summary.nodes.capacity() * sizeof(model_cooked::ModelNodeSummary));
+        charge = AddModelCharge(charge, result->summary.materials.capacity() * sizeof(model_cooked::ModelMaterialSummary));
+        for (const auto& clip : result->summary.clips)
+        {
+            charge = AddModelCharge(charge, clip.name.capacity());
+        }
+        for (const auto& mesh : result->summary.meshes)
+        {
+            charge = AddModelCharge(charge, mesh.name.capacity());
+        }
+        for (const auto& node : result->summary.nodes)
+        {
+            charge = AddModelCharge(charge, node.name.capacity());
+            charge = AddModelCharge(charge, node.meshAssetIds.capacity() * sizeof(experiment::AssetId));
+        }
+        for (const auto& material : result->summary.materials)
+        {
+            charge = AddModelCharge(charge, material.name.capacity());
+        }
+        charge = AddModelCharge(charge, result->clips.capacity() * sizeof(model_cooked::ResolvedAssetEntry));
+        charge = AddModelCharge(charge, result->meshes.capacity() * sizeof(model_cooked::ResolvedAssetEntry));
+        charge = AddModelCharge(charge, ModelOriginDynamicCharge(result->skeleton));
         for (const auto& clip : result->clips)
         {
-            result->metadataBytes = AddModelCharge(result->metadataBytes, ModelOriginDynamicCharge(clip));
+            charge = AddModelCharge(charge, ModelOriginDynamicCharge(clip));
         }
+        for (const auto& mesh : result->meshes)
+        {
+            charge = AddModelCharge(charge, ModelOriginDynamicCharge(mesh));
+        }
+        result->metadataBytes = charge;
         return result;
     }
 
+    bool MatchesModelMeshSummary(const assets::ModelMeshDescriptor& mesh,
+        const model_cooked::ModelMeshSummary& summary) noexcept
+    {
+        return mesh.meshId == summary.meshAssetId.value && mesh.bounds == summary.bounds
+            && mesh.vertexAttributeMask == summary.attributes && mesh.vertexStride == summary.stride
+            && mesh.vertexCount == summary.vertexCount && mesh.indexCount == summary.indexCount
+            && mesh.skinned == summary.skinned;
+    }
+
     template<class T>
-    void TrimModelCache(AssetDepot::ModelAssetCache<T>& cache)
+    void TrimModelCache(AssetDepot::ModelAssetCache<T>& cache,
+        std::vector<own::shared_owner<const T>>* retired = nullptr)
     {
         while (cache.retainedBytes > cache.budgetBytes)
         {
@@ -383,7 +610,16 @@ namespace
             }
             cache.retainedBytes -= oldest->second.retainedCharge;
             oldest->second.retainedCharge = 0u;
-            oldest->second.retained.reset();
+            if (retired)
+            {
+                // Caller stages capacity before changing publication/budget.
+                assert(retired->size() < retired->capacity());
+                retired->push_back(std::move(oldest->second.retained));
+            }
+            else
+            {
+                oldest->second.retained.reset();
+            }
             ++cache.logicalEvictions;
         }
         std::erase_if(cache.entries, [](const auto& item)
@@ -404,9 +640,18 @@ AssetDepot::ModelAssetCache<T>& DataSystem::ModelAssetCacheLocked()
     {
         return m_modelAssets.skeletons;
     }
-    else
+    else if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
     {
         return m_modelAssets.animations;
+    }
+    else if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
+    {
+        return m_modelAssets.meshes;
+    }
+    else
+    {
+        static_assert(std::is_same_v<T, assets::ModelGeometryPayload>);
+        return m_modelAssets.geometry;
     }
 }
 
@@ -419,7 +664,7 @@ own::shared_owner<const T> DataSystem::TryAcquireResolvedModelAssetLocked(
         return {};
     }
     auto& cache = ModelAssetCacheLocked<T>();
-    const auto found = cache.entries.find(ModelKey(resolved, exactGeneration));
+    const auto found = cache.entries.find(ModelKey<T>(resolved, exactGeneration));
     if (found == cache.entries.end())
     {
         return {};
@@ -507,6 +752,18 @@ AssetDepot::AssetRequest<T> DataSystem::RequestCurrentModelAssetAsync(AssetDepot
         }
         skeleton = closure.front();
     }
+    else if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
+    {
+        if (closure.size() == 2u && ValidateClipDependency(closure.back(), closure.front()))
+        {
+            skeleton = closure.front();
+        }
+        else if (closure.size() != 1u || !HasNoHardDependencies(closure.back()))
+        {
+            return fail(Status::Failed, Error::DependencyFailed,
+                "Mesh requires either no hard dependency or one supported skeleton.");
+        }
+    }
     else if (closure.size() != 1u)
     {
         return fail(Status::Failed, Error::DependencyFailed, "Descriptor/skeleton has an unsupported hard dependency.");
@@ -556,7 +813,8 @@ AssetDepot::AssetRequest<T> DataSystem::RequestResolvedModelAssetAsync(
             return fail(Status::Stale, Error::RevisionChanged);
         }
     }
-    if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
+    if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>
+        || std::is_same_v<T, assets::ModelMeshDescriptor>)
     {
         if (exactGeneration && !skeleton.byteSource
             && skeleton.entry.asset.kind == model_cooked::CookedAssetKind::Skeleton
@@ -564,7 +822,8 @@ AssetDepot::AssetRequest<T> DataSystem::RequestResolvedModelAssetAsync(
         {
             return fail(Status::Failed, Error::NotMounted);
         }
-        if (!ValidateClipDependency(resolved, skeleton))
+        if ((!HasNoHardDependencies(resolved) && !ValidateClipDependency(resolved, skeleton))
+            || (std::is_same_v<T, assets::ModelAnimationPayload> && !skeleton.byteSource))
         {
             return fail(Status::Failed, Error::DependencyFailed);
         }
@@ -597,7 +856,7 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
     bool exactGeneration, std::uint64_t epoch, const model_cooked::ResolvedAssetEntry& skeleton)
 {
     auto& cache = ModelAssetCacheLocked<T>();
-    const auto key = ModelKey(resolved, exactGeneration);
+    const auto key = ModelKey<T>(resolved, exactGeneration);
     const auto previous = cache.entries.find(key);
     if (previous != cache.entries.end() && previous->second.inFlight)
     {
@@ -627,13 +886,28 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
     }
     work->requestId = m_modelAssets.nextRequestId++;
     std::vector<job_handle> dependencies;
-    if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
+    if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>
+        || std::is_same_v<T, assets::ModelMeshDescriptor>)
     {
-        work->dependencies.skeletonWork = StartModelAssetWorkLocked<assets::ModelSkeletonPayload>(
-            skeleton, catalog, exactGeneration, epoch, {});
-        if (work->dependencies.skeletonWork->completion.valid())
+        if (skeleton.byteSource)
         {
-            dependencies.push_back(work->dependencies.skeletonWork->completion);
+            work->dependencies.skeletonWork = StartModelAssetWorkLocked<assets::ModelSkeletonPayload>(
+                skeleton, catalog, exactGeneration, epoch, {});
+            if (work->dependencies.skeletonWork->completion.valid())
+            {
+                dependencies.push_back(work->dependencies.skeletonWork->completion);
+            }
+        }
+    }
+    if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
+    {
+        // Accepted compatible raw work survives current-link invalidation. Each
+        // bound descriptor still revalidates its own revision before publishing.
+        work->dependencies.geometryWork = StartModelAssetWorkLocked<assets::ModelGeometryPayload>(
+            resolved, {}, true, epoch, {});
+        if (work->dependencies.geometryWork->completion.valid())
+        {
+            dependencies.push_back(work->dependencies.geometryWork->completion);
         }
     }
     // A dependency's inline terminal callback can trim expired parent entries.
@@ -681,6 +955,7 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
     try
     {
         own::shared_owner<const assets::ModelSkeletonPayload> skeleton;
+        own::shared_owner<const assets::ModelGeometryPayload> geometry;
         {
             std::lock_guard lock(m_assetPreparationMutex);
             if (work->status != Status::Pending)
@@ -691,47 +966,83 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
                 || (!work->key.exactGeneration && (m_assetInvalidationDepth != 0u
                     || work->epoch != m_assetPreparationEpoch)))
             {
-                CompleteModelAssetWorkLocked(work, Status::Cancelled, Error::ShuttingDown);
+                CompleteModelAssetWorkLocked(work,
+                    m_assetPreparationStopping ? Status::Cancelled : Status::Stale,
+                    m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged);
                 return;
             }
-            if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
+            if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>
+                || std::is_same_v<T, assets::ModelMeshDescriptor>)
             {
                 const auto& dependency = work->dependencies.skeletonWork;
-                if (!dependency || dependency->status != Status::Ready || !dependency->asset)
+                if (dependency)
+                {
+                    if (dependency->status != Status::Ready || !dependency->asset)
+                    {
+                        CompleteModelAssetWorkLocked(work, Status::Failed, Error::DependencyFailed);
+                        return;
+                    }
+                    skeleton = dependency->asset;
+                }
+                else if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
                 {
                     CompleteModelAssetWorkLocked(work, Status::Failed, Error::DependencyFailed);
                     return;
                 }
-                skeleton = dependency->asset;
+            }
+            if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
+            {
+                const auto& dependency = work->dependencies.geometryWork;
+                if (!dependency || dependency->status != Status::Ready || !dependency->asset)
+                {
+                    CompleteModelAssetWorkLocked(work, Status::Failed,
+                        dependency ? dependency->error : Error::DependencyFailed,
+                        dependency ? dependency->message : std::string{});
+                    return;
+                }
+                geometry = dependency->asset;
             }
         }
-        std::vector<std::byte> bytes;
         std::string failure;
-        auto resolved = work->resolved;
-        Error error = ReadModelBytes(resolved, bytes, failure);
+        Error error = Error::None;
         own::shared_owner<const T> candidate;
-        if (error == Error::None)
+        if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
         {
-            if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>)
+            candidate = DescribeModelGeometry(work->resolved, *geometry, std::move(skeleton), error, failure);
+        }
+        else
+        {
+            std::vector<std::byte> bytes;
+            auto resolved = work->resolved;
+            error = ReadModelBytes(resolved, bytes, failure);
+            if (error == Error::None)
             {
-                candidate = DecodeModelSkeleton(resolved, bytes, failure);
+                if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>)
+                {
+                    candidate = DecodeModelSkeleton(resolved, bytes, failure);
+                }
+                else if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
+                {
+                    candidate = DecodeModelAnimation(resolved, bytes, std::move(skeleton), failure);
+                }
+                else if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
+                {
+                    candidate = DecodeModelGeometry(resolved, bytes, failure);
+                }
+                else
+                {
+                    candidate = DecodeModelDescriptor(resolved, bytes, work->catalog, failure);
+                }
             }
-            else if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
-            {
-                candidate = DecodeModelAnimation(resolved, bytes, std::move(skeleton), failure);
-            }
-            else
-            {
-                candidate = DecodeModelDescriptor(resolved, bytes, work->catalog, failure);
-            }
-            if (!candidate)
-            {
-                error = Error::DecodeFailed;
-            }
+        }
+        if (error == Error::None && !candidate)
+        {
+            error = Error::DecodeFailed;
         }
         std::lock_guard lock(m_assetPreparationMutex);
         CompleteModelAssetWorkLocked(work, error == Error::None ? Status::Ready : Status::Failed,
-            error, std::move(failure), std::move(candidate));
+            error, std::move(failure), candidate);
+        // candidate keeps rejected/stale bulk alive until this lock is gone.
     }
     catch (...)
     {
@@ -779,6 +1090,25 @@ void DataSystem::CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot
         status = Status::Failed;
         error = Error::DecodeFailed;
     }
+    bool retainCandidate = true;
+    if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>
+        || std::is_same_v<T, assets::ModelGeometryPayload>)
+    {
+        try
+        {
+            // Every allocation precedes work/cache publication. If retirement
+            // staging cannot allocate, deliver an unretained ready result instead.
+            const auto charge = asset ? asset->ByteSize() : 0u;
+            if (charge <= cache.budgetBytes && cache.retainedBytes > cache.budgetBytes - charge)
+            {
+                work->retiredAssets.reserve(cache.entries.size());
+            }
+        }
+        catch (...)
+        {
+            retainCandidate = false;
+        }
+    }
     work->status = status;
     work->error = error;
     work->message = std::move(message);
@@ -793,7 +1123,7 @@ void DataSystem::CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot
             entry.live = asset;
             entry.lastUse = ++m_modelAssets.clock;
             const auto charge = asset->ByteSize();
-            if (charge <= cache.budgetBytes
+            if (retainCandidate && charge <= cache.budgetBytes
                 && charge <= (std::numeric_limits<std::size_t>::max)() - cache.retainedBytes)
             {
                 cache.retainedBytes -= entry.retainedCharge;
@@ -811,7 +1141,158 @@ void DataSystem::CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot
         }
     }
     work->consumers.clear();
+    if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>
+        || std::is_same_v<T, assets::ModelGeometryPayload>)
+    {
+        if (retainCandidate)
+        {
+            TrimModelCache(cache, &work->retiredAssets);
+        }
+    }
     TrimModelAssetsLocked();
+}
+
+AssetDepot::AssetRequest<assets::ModelGeometryPayload> DataSystem::RequestAsync(
+    own::shared_owner<const assets::ModelMeshDescriptor> descriptor)
+{
+    if (!descriptor || descriptor->geometryKey != GeometryKey(descriptor->origin)
+        || (descriptor->skinned && (!descriptor->skeleton
+            || descriptor->requiredBoneCount != descriptor->skeleton->skeleton.bones.size()
+            || descriptor->requiredSkinBindingSha256 != descriptor->skeleton->skinBindingSha256)))
+    {
+        auto consumer = own::make_shared<AssetDepot::AssetRequestState<assets::ModelGeometryPayload>>();
+        NotifyModelConsumer(consumer, Status::Failed, Error::InvalidLink, "Invalid exact mesh descriptor.");
+        return AssetDepot::AssetRequest<assets::ModelGeometryPayload>(std::move(consumer));
+    }
+    return RequestResolvedModelAssetAsync<assets::ModelGeometryPayload>(descriptor->origin, {}, true, 0u);
+}
+
+own::shared_owner<const assets::ModelGeometryPayload> DataSystem::TryAcquire(
+    const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor)
+{
+    own::shared_owner<const assets::ModelGeometryPayload> result;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (!descriptor || m_assetPreparationStopping)
+        {
+            return {};
+        }
+        result = TryAcquireResolvedModelAssetLocked<assets::ModelGeometryPayload>(descriptor->origin, true);
+    }
+    return result && result->Matches(*descriptor) ? result : own::shared_owner<const assets::ModelGeometryPayload>{};
+}
+
+AssetDepot::AssetRequest<assets::ModelMeshDescriptor> DataSystem::RequestAsync(
+    own::shared_owner<const assets::ModelAnimationDescriptor> descriptor, std::size_t meshIndex)
+{
+    auto consumer = own::make_shared<AssetDepot::AssetRequestState<assets::ModelMeshDescriptor>>();
+    AssetDepot::AssetRequest<assets::ModelMeshDescriptor> request(consumer);
+    if (!descriptor || meshIndex >= descriptor->meshes.size() || meshIndex >= descriptor->summary.meshes.size())
+    {
+        NotifyModelConsumer(consumer, Status::Failed, Error::InvalidLink, "Invalid selected mesh descriptor.");
+        return request;
+    }
+    const auto& summary = descriptor->summary.meshes[meshIndex];
+    auto selected = RequestResolvedModelAssetAsync<assets::ModelMeshDescriptor>(descriptor->meshes[meshIndex],
+        {}, true, 0u, summary.skinned ? descriptor->skeleton : model_cooked::ResolvedAssetEntry{});
+    // The selected child validates only after its exact decode dependency. Keep
+    // both the child result and the root summary in this nonblocking continuation.
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping)
+    {
+        NotifyModelConsumer(consumer, Status::Cancelled, Error::ShuttingDown, {});
+        return request;
+    }
+    try
+    {
+        job_group jobs;
+        jobs.add([this, consumer, descriptor = std::move(descriptor), meshIndex, selected]()
+        {
+            auto result = selected.Snapshot();
+            if (result.status == Status::Ready && result.asset)
+            {
+                const auto& expected = descriptor->summary.meshes[meshIndex];
+                if (!MatchesModelMeshSummary(*result.asset, expected))
+                {
+                    NotifyModelConsumer(consumer, Status::Failed, Error::IntegrityFailed,
+                        "Selected mesh does not match the model descriptor summary.");
+                    return;
+                }
+                // Material/name selection remains in the model's summary. Return
+                // the same cached mesh generation so its weak live entry also
+                // survives zero-budget handoff; do not create a second wrapper.
+            }
+            std::lock_guard completionLock(m_assetPreparationMutex);
+            NotifyModelConsumer(consumer,
+                m_assetPreparationStopping ? Status::Cancelled : result.status,
+                m_assetPreparationStopping ? Error::ShuttingDown : result.error,
+                result.message, m_assetPreparationStopping ? own::shared_owner<const assets::ModelMeshDescriptor>{}
+                    : result.asset);
+        });
+        jobs.on_complete([consumer](std::exception_ptr failure)
+        {
+            NotifyModelConsumer(consumer, Status::Failed,
+                failure ? Error::SubmissionFailed : Error::DecodeFailed, {});
+        });
+        const auto completion = selected.Completion();
+        consumer->completion = SubmitAssetWorkLocked(std::move(jobs),
+            completion.valid() ? std::span<const job_handle>(&completion, 1u) : std::span<const job_handle>{}, true);
+    }
+    catch (...)
+    {
+        NotifyModelConsumer(consumer, Status::Failed, Error::SubmissionFailed, {});
+    }
+    return request;
+}
+
+own::shared_owner<const assets::ModelMeshDescriptor> DataSystem::TryAcquire(
+    const own::shared_owner<const assets::ModelAnimationDescriptor>& descriptor, std::size_t meshIndex)
+{
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (!descriptor || meshIndex >= descriptor->meshes.size()
+        || meshIndex >= descriptor->summary.meshes.size() || m_assetPreparationStopping)
+    {
+        return {};
+    }
+    auto result = TryAcquireResolvedModelAssetLocked<assets::ModelMeshDescriptor>(descriptor->meshes[meshIndex], true);
+    return result && MatchesModelMeshSummary(*result, descriptor->summary.meshes[meshIndex])
+        ? result : own::shared_owner<const assets::ModelMeshDescriptor>{};
+}
+
+bool DataSystem::HasModelMeshDescriptor(AssetDepot::AssetLink<assets::ModelMeshDescriptor> link) const
+{
+    if (!link.IsValid())
+    {
+        return false;
+    }
+    std::lock_guard lock(m_assetPreparationMutex);
+    std::lock_guard catalogLock(m_cookedCatalogMutex);
+    model_cooked::ResolvedAssetEntry resolved;
+    if (!m_cookedCatalog)
+    {
+        return false;
+    }
+    const auto status = m_cookedCatalog->Find(link.ToReference(), resolved);
+    // A mounted winner of the wrong kind is still an explicit v3 error, not
+    // permission to load the legacy source model at the same serialized ID.
+    return status == model_cooked::AssetLookupStatus::Found
+        || status == model_cooked::AssetLookupStatus::TypeMismatch;
+}
+
+void DataSystem::SetModelGeometryCacheBudgets(std::size_t descriptors, std::size_t geometry)
+{
+    std::vector<own::shared_owner<const assets::ModelMeshDescriptor>> retiredMeshes;
+    std::vector<own::shared_owner<const assets::ModelGeometryPayload>> retiredGeometry;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        retiredMeshes.reserve(m_modelAssets.meshes.entries.size());
+        retiredGeometry.reserve(m_modelAssets.geometry.entries.size());
+        m_modelAssets.meshes.budgetBytes = descriptors;
+        m_modelAssets.geometry.budgetBytes = geometry;
+        TrimModelCache(m_modelAssets.meshes, &retiredMeshes);
+        TrimModelCache(m_modelAssets.geometry, &retiredGeometry);
+    }
+    // Potentially large arrays and exact backing are destroyed after the lock.
 }
 
 AssetDepot::AssetRequest<assets::ModelSkeletonPayload> DataSystem::RequestSkeletonAsync(
@@ -870,11 +1351,14 @@ void DataSystem::TrimModelAssetsLocked()
     TrimModelCache(m_modelAssets.descriptors);
     TrimModelCache(m_modelAssets.skeletons);
     TrimModelCache(m_modelAssets.animations);
+    // Mesh/geometry retention is trimmed by its publishing work or the budget
+    // setter, both with staged owners disposed outside this lock.
 }
 
 void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEntries& retired)
 {
-    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty());
+    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty()
+        && retired.meshes.empty() && retired.geometry.empty());
     const auto stage = [&](const auto& cache, auto& consumers)
     {
         assert(consumers.empty());
@@ -910,11 +1394,14 @@ void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEn
     stage(m_modelAssets.descriptors, retired.descriptorConsumers);
     stage(m_modelAssets.skeletons, retired.skeletonConsumers);
     stage(m_modelAssets.animations, retired.animationConsumers);
+    stage(m_modelAssets.meshes, retired.meshConsumers);
+    stage(m_modelAssets.geometry, retired.geometryConsumers);
 }
 
 void DataSystem::InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntries& retired) noexcept
 {
-    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty());
+    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty()
+        && retired.meshes.empty() && retired.geometry.empty());
     const auto status = m_assetPreparationStopping ? Status::Cancelled : Status::Stale;
     const auto error = m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged;
     const auto invalidate = [&](auto& cache, auto& detached, const auto& consumers)
@@ -956,6 +1443,8 @@ void DataSystem::InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntrie
     invalidate(m_modelAssets.descriptors, retired.descriptors, retired.descriptorConsumers);
     invalidate(m_modelAssets.skeletons, retired.skeletons, retired.skeletonConsumers);
     invalidate(m_modelAssets.animations, retired.animations, retired.animationConsumers);
+    invalidate(m_modelAssets.meshes, retired.meshes, retired.meshConsumers);
+    invalidate(m_modelAssets.geometry, retired.geometry, retired.geometryConsumers);
 }
 
 void DataSystem::SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips)
@@ -987,14 +1476,40 @@ AssetDepot::ModelAssetCacheSnapshot DataSystem::SnapshotModelAssetCache() const
     append(m_modelAssets.descriptors);
     append(m_modelAssets.skeletons);
     append(m_modelAssets.animations);
+    append(m_modelAssets.meshes);
+    append(m_modelAssets.geometry);
+    result.meshDescriptorRetainedBytes = m_modelAssets.meshes.retainedBytes;
+    result.geometryRetainedBytes = m_modelAssets.geometry.retainedBytes;
+    result.geometryBudgetBytes = m_modelAssets.geometry.budgetBytes;
+    for (const auto& [key, entry] : m_modelAssets.meshes.entries)
+    {
+        if (const auto owner = entry.live.lock())
+        {
+            result.meshDescriptorLiveBytes = AddModelCharge(result.meshDescriptorLiveBytes, owner->metadataBytes);
+            if (owner->skeleton)
+            {
+                result.skeletonDependencyBytes = AddModelCharge(result.skeletonDependencyBytes,
+                    owner->skeleton->ByteSize());
+            }
+        }
+    }
+    for (const auto& [key, entry] : m_modelAssets.geometry.entries)
+    {
+        if (const auto owner = entry.live.lock())
+        {
+            result.geometryLiveBytes = AddModelCharge(result.geometryLiveBytes, owner->ByteSize());
+        }
+        result.geometryInFlight += entry.inFlight ? 1u : 0u;
+    }
     return result;
 }
 
-// Public template dispatch is instantiated only for the three concrete types.
+// Current-link dispatch returns logical descriptors, never raw geometry.
 #define INSTANTIATE_MODEL_ASSET(Type) \
     template own::shared_owner<const Type> DataSystem::TryAcquireCurrentModelAsset(AssetDepot::AssetLink<Type>); \
     template AssetDepot::AssetRequest<Type> DataSystem::RequestCurrentModelAssetAsync(AssetDepot::AssetLink<Type>);
 INSTANTIATE_MODEL_ASSET(assets::ModelAnimationDescriptor)
 INSTANTIATE_MODEL_ASSET(assets::ModelSkeletonPayload)
 INSTANTIATE_MODEL_ASSET(assets::ModelAnimationPayload)
+INSTANTIATE_MODEL_ASSET(assets::ModelMeshDescriptor)
 #undef INSTANTIATE_MODEL_ASSET

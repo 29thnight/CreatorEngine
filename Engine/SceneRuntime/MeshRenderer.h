@@ -5,10 +5,11 @@
 #include "Component.h"
 #include "Entity.h"
 #include "LightMapping.h"
+#include "AssetDepot/AssetRequest.h"
 #include <mathematics/bounds.hpp>
 
 namespace experiment { struct Material; class MaterialInstance; } // I5-D5c1
-namespace assets { class ModelAssetGeneration; struct ModelMeshHandle; } // PHASE 3.75 MBC7
+namespace assets { class ModelAssetGeneration; struct ModelMeshHandle; struct ModelMeshDescriptor; } // PHASE 3.75 MBC7
 
 class Material;
 class Animator;
@@ -65,7 +66,7 @@ public:
     // MBC9: typed generation이 유일한 정본이다.
     [[nodiscard]] bool HasRenderableMesh() const noexcept
     {
-        return static_cast<bool>(m_modelGeneration);
+        return static_cast<bool>(m_meshDescriptor) || static_cast<bool>(m_modelGeneration);
     }
 
     // PHASE 3.75 MBC7 — typed 정본 창구. generation과 그 안의 메시 인덱스를 붙들고
@@ -80,6 +81,9 @@ public:
         own::shared_owner<const assets::ModelAssetGeneration> generation,
         std::uint32_t meshIndex);
     [[nodiscard]] assets::ModelMeshHandle GetModelMeshHandle() const;
+    bool BindMeshDescriptor(own::shared_owner<const assets::ModelMeshDescriptor> descriptor);
+    // Owner-thread resident lookup/request polling only. Never waits or decodes.
+    void EnsureMeshBinding();
 
 public:
     // 에셋을 공동 소유한다.
@@ -137,6 +141,22 @@ public:
     [[reflgen::ignore]]
     std::uint32_t m_modelMeshIndex{ 0 };
 
+    [[reflgen::ignore]]
+    own::shared_owner<const assets::ModelMeshDescriptor> m_meshDescriptor{};
+
+private:
+    [[reflgen::ignore]]
+    AssetDepot::AssetRequest<assets::ModelMeshDescriptor> m_meshRequest{};
+    [[reflgen::ignore]]
+    FileGuid m_requestedMeshId{};
+    [[reflgen::ignore]]
+    bool m_granularMeshBinding{};
+    [[reflgen::ignore]]
+    bool m_meshRequested{};
+    [[reflgen::ignore]]
+    bool m_meshFailureReported{};
+
+public:
     // I5-D5c1 — 재질의 experiment 병행 표현(base 저작 원본 + 인스턴스
     // override). 저작 경계가 채운다: 새 정본 문서는 자기 authored 원본을,
     // ref 표기는 base 자산의 authored를 base로 삼고 씬의 diff를 override로

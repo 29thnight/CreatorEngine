@@ -1419,6 +1419,10 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     m_drawGeometry.clear();
     if (nullptr != context.meshCache && nullptr != context.forwardDraws)
     {
+        if (!enhanced_draw::ValidateGeometryIdentities(*context.forwardDraws, outError))
+        {
+            return false;
+        }
         for (const EnhancedDrawItem& draw : *context.forwardDraws)
         {
             if (0 == enhanced_draw::GeometryKey(draw)
@@ -1426,7 +1430,7 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
 
             std::string uploadError;
             // I5-D4b: GBuffer와 같은 분기 — 핸들 경로 우선.
-            const RHIMeshBinding entry = draw.modelMeshView.IsComplete()
+            const RHIMeshBinding entry = draw.modelMeshView.handle.IsValid()
                 ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
                 : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())

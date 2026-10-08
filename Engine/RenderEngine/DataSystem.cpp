@@ -310,6 +310,8 @@ struct DataSystem::SceneAssetPreparation
     std::atomic<unsigned> phase{}; // Discovery, models, graphs, resources, ready.
     std::atomic<std::size_t> completed{}, total{};
     std::vector<own::shared_owner<PreparedRuntimeAsset>> models, graphs;
+    std::vector<AssetDepot::AssetRequest<assets::ModelMeshDescriptor>> meshRequests;
+    std::vector<own::shared_owner<const assets::ModelMeshDescriptor>> meshPins;
     std::map<FileGuid, file::path> graphPaths;
     std::vector<std::vector<std::byte>> materialDocuments;
     AssetBundle resources;
@@ -608,17 +610,41 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
     // Follow current scene/material/prefab references, including the first open.
     // Historical ScenePreload lists are not a correctness dependency.
     std::map<FileGuid, file::path> models;
-    std::unordered_set<FileGuid> seen;
+    std::unordered_set<FileGuid> seen, requestedMeshes;
     std::vector<std::pair<FileGuid, file::path>> documents;
-    const auto discover = [&](FileGuid guid)
+    const auto discover = [&](FileGuid guid, bool meshReference = false)
     {
-        if (guid == FileGuid{} || !seen.insert(guid).second)
+        if (guid == FileGuid{} || (!seen.insert(guid).second && !meshReference))
         {
             return;
         }
         if (seen.size() > 65536)
         {
             throw std::runtime_error("Scene asset dependency limit exceeded.");
+        }
+        const AssetDepot::AssetLink<assets::ModelMeshDescriptor> meshLink{
+            { experiment::AssetId{ guid.m_guid }, {} } };
+        auto meshStatus = experiment::cooked::AssetLookupStatus::NotMounted;
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            std::lock_guard catalogLock(m_cookedCatalogMutex);
+            experiment::cooked::ResolvedAssetEntry resolved;
+            if (m_cookedCatalog)
+            {
+                meshStatus = m_cookedCatalog->Find(meshLink.ToReference(), resolved);
+            }
+        }
+        if (meshStatus == experiment::cooked::AssetLookupStatus::Found
+            || (meshReference && meshStatus == experiment::cooked::AssetLookupStatus::TypeMismatch))
+        {
+            // Explicit Mesh references fail closed on a wrong-kind v3 winner.
+            // Other GUID scalars can legitimately identify mounted materials,
+            // textures or models and must not be reinterpreted as Mesh requests.
+            if (requestedMeshes.insert(guid).second)
+            {
+                preparation->meshRequests.push_back(RequestAsync(meshLink));
+            }
+            return;
         }
         const auto path = GetFilePath(guid);
         if (path.empty())
@@ -667,6 +693,21 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         }
         if (node.IsMap())
         {
+            bool granularMesh{};
+            const auto meshNode = node["m_meshAssetId"];
+            if (meshNode && meshNode.IsScalar())
+            {
+                FileGuid meshId;
+                if (Uuid::TryParse(meshNode.AsString(), meshId.m_guid))
+                {
+                    granularMesh = HasModelMeshDescriptor(AssetDepot::AssetLink<assets::ModelMeshDescriptor>{
+                        { experiment::AssetId{ meshId.m_guid }, {} } });
+                    if (granularMesh)
+                    {
+                        discover(meshId, true);
+                    }
+                }
+            }
             if (const auto material = node["m_Material"]; material && material.IsMap())
             {
                 std::vector<std::byte> bytes;
@@ -680,6 +721,10 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             for (const auto entry : node.Map())
             {
                 const auto key = entry.key.Scalar();
+                if (granularMesh && (key == "m_modelGuid" || key == "m_modelName"))
+                {
+                    continue;
+                }
                 if (key == "m_valueYaml" && entry.value.IsScalar() && !entry.value.Scalar().empty())
                 {
                     std::string error;
@@ -795,7 +840,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
     {
         preparation->models.push_back(PrepareRuntimeAsset(guid, path, RuntimeAssetType::Model));
     }
-    preparation->total.store(preparation->models.size(), std::memory_order_relaxed);
+    preparation->total.store(preparation->models.size() + preparation->meshRequests.size(), std::memory_order_relaxed);
     preparation->phase.store(1, std::memory_order_release);
     return preparation;
 }
@@ -846,9 +891,40 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     }
     if (preparation->phase.load(std::memory_order_acquire) == 1)
     {
+        if (preparation->cancelled.load(std::memory_order_acquire))
+        {
+            for (const auto& mesh : preparation->meshRequests)
+            {
+                mesh.Cancel();
+            }
+            // A canceled scene owns no publication obligation. Shared typed
+            // workers remain registered in the common shutdown drain, while
+            // this ticket/promise can terminate without waiting for their I/O.
+            return finish("Scene asset preparation was cancelled.");
+        }
         if (!ready(preparation->models))
         {
             return false;
+        }
+        // Mesh requests never introduce an incomplete GT/RT wait, including the
+        // legacy wait=true entry point. The owner boundary polls and retries.
+        for (const auto& mesh : preparation->meshRequests)
+        {
+            const auto result = mesh.Snapshot();
+            if (result.status == AssetDepot::AssetRequestStatus::Pending)
+            {
+                return false;
+            }
+            if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+            {
+                return finish(result.message.empty()
+                    ? "Mounted Mesh descriptor preparation failed." : result.message);
+            }
+        }
+        preparation->meshPins.reserve(preparation->meshRequests.size());
+        for (const auto& mesh : preparation->meshRequests)
+        {
+            preparation->meshPins.push_back(mesh.Snapshot().asset);
         }
         if (preparation->cancelled.load(std::memory_order_acquire))
         {

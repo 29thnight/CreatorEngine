@@ -1,4 +1,5 @@
 #include "ModelAssetGeneration.h"
+#include "ModelMeshDescriptor.h"
 #include "ModelAnimationSampler.h"
 
 #include <chrono>
@@ -26,6 +27,20 @@
 
 namespace assets
 {
+    ModelMeshHandle MakeModelMeshHandle(const ModelMeshDescriptor& descriptor)
+    {
+        ModelMeshHandle result{};
+        result.domain = ModelMeshDomain::Granular;
+        result.meshId = descriptor.meshId;
+        result.asset = descriptor.origin.entry.asset;
+        result.blob = descriptor.origin.blob;
+        result.resolverRevision = descriptor.origin.resolverRevision;
+        result.mountId = descriptor.origin.mountId.value;
+        result.assetSetId = descriptor.origin.assetSetId;
+        result.manifestRevision = descriptor.origin.manifestRevision;
+        return result;
+    }
+
     namespace
     {
         namespace ck = experiment::cooked;
@@ -1437,6 +1452,11 @@ namespace assets
     const ModelMeshAsset* ModelAssetGenerationCache::ResolveMesh(
         ModelMeshHandle handle, ModelAssetGeneration::Shared& outOwner) const
     {
+        if (handle.domain != ModelMeshDomain::LegacyAggregate)
+        {
+            outOwner.reset();
+            return nullptr;
+        }
         outOwner = Resolve({ handle.modelId, handle.generation });
         return outOwner ? outOwner->FindMesh(handle.meshId) : nullptr;
     }

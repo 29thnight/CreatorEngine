@@ -44,7 +44,7 @@ struct SceneMaterialSource;
 class Mesh;
 class MeshRenderer;
 namespace experiment { struct Material; } // I5-D5c2-2 저작 정본 스냅샷
-namespace assets { class ModelAssetGeneration; } // PHASE 3.75 MBC7 typed 정본
+namespace assets { class ModelAssetGeneration; struct ModelMeshDescriptor; } // PHASE 3.75 MBC7 typed 정본
 class TerrainMesh;
 class TerrainMaterial;
 class TerrainComponent;
@@ -129,6 +129,7 @@ public:
 	// RHIModelMeshView를 만들어 패스에 싣고, shared_owner가 뷰가 가리키는 정점·인덱스
 	// 저장소의 수명을 이 프레임 동안 잡아 준다. null이면 그릴 것이 없다.
 	own::shared_owner<const assets::ModelAssetGeneration>	m_modelGeneration{};
+    own::shared_owner<const assets::ModelMeshDescriptor> m_meshDescriptor{};
 	uint32							m_modelMeshIndex{ 0 };
 	// I5-D5c2-2 — 재질 저작 정본의 **값 스냅샷**(base+override 합성 결과).
 	// MeshRenderer의 MaterialInstance에서 프록시 생성 시 한 번 만든다 —

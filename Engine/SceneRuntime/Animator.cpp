@@ -16,6 +16,7 @@
 #include "../RenderEngine/Assets/ModelAssetGeneration.h" // Transitional CEMCv11
 #include "../RenderEngine/Assets/ModelAnimationDescriptor.h"
 #include "../RenderEngine/Assets/ModelAnimationPayload.h"
+#include "../RenderEngine/Assets/ModelMeshDescriptor.h"
 #include <algorithm>
 #include <cassert>
 #include <iterator>
@@ -594,6 +595,38 @@ bool Animator::IsSkinBindingCompatible(const assets::ModelAssetGeneration& geome
     // Geometry joint indices address this exact ordered table. Matching only
     // bone count or the clip's v3 layout digest would not prove skin compatibility.
     // Both descriptions remain borrowed under their callers' existing owners.
+    return true;
+}
+
+bool Animator::IsSkinBindingCompatible(const assets::ModelMeshDescriptor& geometry) const noexcept
+{
+    const auto* selected = TypedSkeleton();
+    if (!geometry.skinned || !geometry.skeleton || !selected
+        || m_poseSkeletonSerial == 0u || m_poseSkeletonSerial != GetSkeletonSerial()
+        || geometry.requiredBoneCount != geometry.skeleton->skeleton.bones.size()
+        || geometry.requiredSkinBindingSha256 != geometry.skeleton->skinBindingSha256
+        || (m_skeletonPayload
+            && m_skeletonPayload->skinBindingSha256 != geometry.requiredSkinBindingSha256))
+    {
+        return false;
+    }
+    const auto& bound = geometry.skeleton->skeleton;
+    if (selected->bones.size() != bound.bones.size() || selected->rootBone != bound.rootBone
+        || selected->rootTransform != bound.rootTransform
+        || selected->globalInverseTransform != bound.globalInverseTransform)
+    {
+        return false;
+    }
+    for (std::size_t index = 0; index < bound.bones.size(); ++index)
+    {
+        const auto& poseBone = selected->bones[index];
+        const auto& geometryBone = bound.bones[index];
+        if (poseBone.name != geometryBone.name || poseBone.parent != geometryBone.parent
+            || poseBone.inverseBindMatrix != geometryBone.inverseBindMatrix)
+        {
+            return false;
+        }
+    }
     return true;
 }
 

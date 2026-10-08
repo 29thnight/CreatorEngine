@@ -50,6 +50,7 @@ namespace material_graph
         std::size_t sourceIndex{};
         std::size_t geometryKey{};
         assets::ModelAssetGenerationHandle model;
+        assets::ModelMeshHandle mesh;
         std::size_t modelPinIndex = SIZE_MAX;
         std::uint64_t materialSlot{}, selectionRevision{};
         own::local_view<const Instance> material;
@@ -73,7 +74,8 @@ namespace material_graph
         static bool Seal(const SceneInputView& view, std::span<const EnhancedDrawItem> draws,
                          const SceneInputBudget& budget, std::shared_ptr<const SceneViewInput>& result, std::string& error,
                          own::shared_owner<const assets::ModelAssetGenerationPins> modelPins = {},
-                         own::shared_owner<InstanceFramePins> materialPins = {});
+                         own::shared_owner<InstanceFramePins> materialPins = {},
+                         const assets::ModelGeometryPreparationPins* geometryPins = nullptr);
         const SceneInputView& View() const { return view_; }
         const SurfaceView& Surface() const { return surface_; }
         const math::matrix4x4& ViewProjection() const { return viewProjection_; }

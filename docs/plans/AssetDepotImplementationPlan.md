@@ -33,26 +33,43 @@ design. A foundation slice is not completion of the runtime migration.
 - The pinned ownership dependency, CEMF v3 link/manifest schema, immutable catalog
   transactions and generic loose/pak range sources are present.
 - `build-asset-set` source-recooks TextureSourceImage and selected Model descriptor,
-  Skeleton and AnimationClip artifacts. Import roots and external buffer inputs are
+  Mesh, Skeleton and AnimationClip artifacts. Import roots and external buffer inputs are
   captured immutably and hashed. Selected child build identities do not depend on
   unrelated siblings. Verified CAS reuse and transactional unique output directories
   remain independent of Player compilation. The OS owns the cache lock; interrupted
   candidates are never accepted as published output.
 - DataSystem exposes `MountAssetSet`, `UnmountAssetSet`, `ListRootLinks<T>`, typed
   `RequestAsync<T>` and I/O-free `TryAcquire<T>` for Texture and granular animation
-  descriptors/skeletons/clips. Requests have independent cancellation, resolver-bound
+  descriptors/skeletons/clips, plus small Mesh descriptors and exact geometry payloads.
+  Requests have independent cancellation, resolver-bound
   keys, stale publication gates and bounded weak-current/retained caches.
-- A model descriptor reads no skeleton/clip files. It captures ordered child identity
+- A schema2 model descriptor reads no mesh/skeleton/clip files. It captures ordered child identity
   and locator metadata, including absent Loadable children. Only a selected child
   worker opens and verifies its payload; absent captured children fail without resolving
   a newer mount. Acquired origins retain exact per-artifact backing, not every file in
   the mount. Current unique immutable outputs have no physical garbage collector;
   a future collector requires an artifact-store/root lease. External file replacement
   or removal can therefore cause an I/O or integrity failure before first acquisition.
-- Animator owns only selected/current/transition/layer clips and their skeletons
-  through scheduled evaluation. Legacy geometry uses an explicit full skin-binding
-  compatibility gate before accepting a granular palette. This is not yet standalone
-  granular mesh rendering.
+- Independent CEGE mesh artifacts omit logical identity/name/material fields. Their
+  bounded codec validates the packed rendering contract and full skin binding; optional
+  invalid meshlet/LOD data falls back to indexed geometry. Schema1 model descriptors
+  require recook into schema2, which adds ordered mesh/node/material summaries.
+- MeshRenderer recognizes mounted typed meshes before legacy paths. Components,
+  proxies and durable frame tables retain small descriptors; a separate 128 MiB raw
+  geometry cache shares compatible reads/decodes across logical IDs. Each descriptor
+  preserves its own logical closure and a matching verified backing source/locator.
+  Descriptor retention defaults to 8 MiB and conservatively includes skeleton pins.
+- Pending geometry requests survive frame handoff; unused/hidden demands are pruned.
+  GPU-resident raster paths need no CPU payload. The live graph path does read/copy
+  geometry on CPU, so it explicitly retains transient payload owners until all selected
+  views finish. Existing graph-derived CPU copies have their own bounded ownership.
+- Animator owns only selected/current/transition/layer clips and skeletons through
+  scheduled evaluation. Both granular and transitional legacy geometry require the
+  full compatible skin-binding contract before accepting its current palette.
+- Scene preparation pins selected mesh descriptors through construction. The public
+  completion pump is nonblocking `PollSceneLoads`; canceled tickets finish without
+  waiting for shared mesh jobs, which still participate in service shutdown drain.
+  Terminal Stale does not implicitly retry the latest mount.
 - All accepted DataSystem preparation/bundle/prewarm jobs share one shutdown barrier.
   Scheduler terminal observers finish requests whose dependent body never runs.
   Bundle and scene preparation results carry real resource owners through consumption.
@@ -77,11 +94,13 @@ design. A foundation slice is not completion of the runtime migration.
 
 ## Remaining integration and support boundaries
 
-- Standalone mesh artifacts, node/mesh descriptor metadata and MeshRenderer/RHI typed
-  geometry acquisition remain to be implemented. CEMCv11 whole-model geometry is a
-  transitional adapter, not the finished fine-grained model format.
+- Granular rendering is available after explicit `MountAssetSet` activation and with
+  an explicitly prepared material. General source-free authored-model instantiation,
+  material production/binding, embedded textures and automatic Player bootstrap are
+  not yet cut over. CEMCv11 remains a transitional adapter for other legacy consumers.
 - Texture descriptors still retain CodecImage and embedded-image bulk. Independently
-  evictable image payloads, exact rehydration and cross-ID blob decode sharing remain.
+  evictable image payloads, exact image rehydration and compatible image decode sharing
+  remain. Mesh sharing does not imply those image/legacy paths are complete.
 - Some legacy Material/Texture/ShaderMeta APIs are synchronous transitional loaders;
   full typed asynchronous acquisition and independent cooked producers for every
   supported resource kind are not complete.

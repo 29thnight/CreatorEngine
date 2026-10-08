@@ -1,6 +1,8 @@
 #include "MaterialGraphSceneInput.h"
 #include "Render/Graph/ShadowCasterBounds.h"
+#include "Render/Graph/EnhancedDrawIdentity.h"
 #include "Material.h"
+#include "Assets/ModelGeometryPayload.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 
 #include <algorithm>
@@ -83,7 +85,8 @@ namespace material_graph
                               const SceneInputBudget& budget, std::shared_ptr<const SceneViewInput>& result,
                               std::string& error,
                               own::shared_owner<const assets::ModelAssetGenerationPins> modelPins,
-                              own::shared_owner<InstanceFramePins> materialPins)
+                              own::shared_owner<InstanceFramePins> materialPins,
+                              const assets::ModelGeometryPreparationPins* geometryPins)
     {
         ce::profile_scope profile{ce::marker<"MaterialSceneInputSeal">()};
         const auto& camera = view.camera;
@@ -96,6 +99,10 @@ namespace material_graph
         {
             return Fail(error,
                         "Scene graph input needs an identified frame/view, invertible finite camera and draw budget.");
+        }
+        if (!enhanced_draw::ValidateGeometryIdentities(draws, error))
+        {
+            return false;
         }
         auto candidate = std::shared_ptr<SceneViewInput>(new SceneViewInput);
         candidate->modelPins_ = std::move(modelPins);
@@ -140,19 +147,46 @@ namespace material_graph
             input.geometryKey = draw.geometryKey;
             input.viewDepth = math::dot(draw.worldMatrix.translation() - view.camera.eyePosition, view.camera.forward);
             if (!std::isfinite(input.viewDepth)) return Fail(error, "Scene draw has a non-finite sorting depth.");
-            input.model = {geometry.handle.modelId, geometry.handle.generation};
-            if (candidate->modelPins_)
+            input.mesh = geometry.handle;
+            if (geometry.handle.domain == assets::ModelMeshDomain::Granular)
             {
-                const auto& pins = candidate->modelPins_->generations;
+                if (!candidate->modelPins_ || !geometryPins)
+                {
+                    return Fail(error, "Scene graph granular geometry needs descriptor and CPU-use pin tables.");
+                }
+                const auto& pins = candidate->modelPins_->meshes;
                 const auto pin = std::ranges::find_if(pins, [&](const auto& owner)
                 {
-                    return owner && owner->Handle() == input.model;
+                    return owner && assets::MakeModelMeshHandle(*owner) == input.mesh;
                 });
-                if (pin == pins.end())
+                const auto payload = std::ranges::find_if(geometryPins->entries, [&](const auto& entry)
                 {
-                    return Fail(error, "Scene graph geometry has no exact model generation in its frame pin table.");
+                    return entry.handle == input.mesh;
+                });
+                if (pin == pins.end() || payload == geometryPins->entries.end() || !payload->payload
+                    || &**pin != geometry.sourceDescriptor || &*payload->payload != geometry.sourcePayload
+                    || !payload->payload->Matches(**pin) || geometry.SourceMesh() != &payload->payload->mesh)
+                {
+                    return Fail(error, "Scene graph geometry has no exact descriptor/payload provenance in its pin tables.");
                 }
                 input.modelPinIndex = static_cast<std::size_t>(pin - pins.begin());
+            }
+            else
+            {
+                input.model = {geometry.handle.modelId, geometry.handle.generation};
+                if (candidate->modelPins_)
+                {
+                    const auto& pins = candidate->modelPins_->generations;
+                    const auto pin = std::ranges::find_if(pins, [&](const auto& owner)
+                    {
+                        return owner && owner->Handle() == input.model;
+                    });
+                    if (pin == pins.end())
+                    {
+                        return Fail(error, "Scene graph geometry has no exact model generation in its frame pin table.");
+                    }
+                    input.modelPinIndex = static_cast<std::size_t>(pin - pins.begin());
+                }
             }
             input.materialSlot = draw.materialGraphSlot;
             input.materialPinIndex = collectedPins

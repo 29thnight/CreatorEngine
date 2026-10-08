@@ -596,6 +596,7 @@ public:
     void Shutdown();
 
     RHIMeshBinding GetOrUpload(Mesh* mesh, std::string& outError) override;
+    RHIMeshBinding FindModel(const assets::ModelMeshHandle& handle) const override;
     RHIMeshBinding GetOrUploadModel(
         const RHIModelMeshView& view, std::string& outError) override;
     uint32_t GetModelGenerationUploadCount() const override;

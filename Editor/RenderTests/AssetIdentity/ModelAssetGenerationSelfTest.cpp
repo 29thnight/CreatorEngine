@@ -2,10 +2,13 @@
 #include "Texture.h"
 
 #include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelGeometryPayload.h"
 #include "Assets/ModelSidecarV2.h"
 #include "DataSystem.h"
 #include "MeshRenderer.h"
 #include "RHI/IRenderDeviceServices.h"
+#include "Render/Graph/EnhancedDrawIdentity.h"
+#include "Render/Scene/EnhancedDrawReplayInput.h"
 
 #include <algorithm>
 #include <chrono>
@@ -50,6 +53,119 @@ namespace RenderTest
                 log += "    [실패] " + label + "\n";
             }
         };
+
+        class MetadataOnlyMeshSource final : public experiment::cooked::ArtifactByteSource
+        {
+        public:
+            mutable std::uint32_t reads{};
+            bool Size(std::string_view, std::uint64_t&, std::string&) const override
+            {
+                ++reads;
+                return false;
+            }
+            bool ReadAt(std::string_view, std::uint64_t, std::span<std::byte>, std::string&) const override
+            {
+                ++reads;
+                return false;
+            }
+        };
+
+        void CheckGranularMeshViews(GenerationChecker& check)
+        {
+            auto source = own::make_shared<MetadataOnlyMeshSource>();
+            auto descriptor = own::make_shared<assets::ModelMeshDescriptor>();
+            Uuid::TryParse("00000001-0000-8000-8000-000000000001", descriptor->meshId);
+            descriptor->origin.entry.asset = {
+                { experiment::AssetId{ descriptor->meshId }, {} },
+                experiment::cooked::CookedAssetKind::Mesh };
+            descriptor->origin.mountId.value = 1u;
+            descriptor->origin.assetSetId = experiment::AssetId{ descriptor->meshId };
+            descriptor->origin.manifestRevision = 1u;
+            descriptor->origin.resolverRevision = 7u;
+            descriptor->origin.byteSource = source;
+            auto& blob = descriptor->origin.blob;
+            blob.contentSha256[0] = 17u;
+            blob.byteSize = 123u;
+            blob.kind = experiment::cooked::CookedAssetKind::Mesh;
+            blob.representation = experiment::cooked::kModelGeometryRepresentation;
+            blob.schemaVersion = experiment::cooked::kModelGeometryArtifactVersion;
+            blob.targetPlatform = "test-platform";
+            blob.targetAbi = "test-abi";
+            blob.artifactPath = "Derived/mesh-contract.bin";
+            descriptor->geometryKey = { blob.contentSha256, blob.byteSize, blob.kind,
+                blob.representation, blob.schemaVersion, blob.targetPlatform, blob.targetAbi, 1u };
+            descriptor->vertexAttributeMask = assets::kCoreVertexAttributes;
+            descriptor->vertexStride = assets::StrideOf(descriptor->vertexAttributeMask);
+            descriptor->vertexLayoutHash = assets::VertexLayoutHash(descriptor->vertexAttributeMask);
+            descriptor->vertexCount = 3u;
+            descriptor->indexCount = 3u;
+            auto payload = own::make_shared<assets::ModelGeometryPayload>();
+            payload->key = descriptor->geometryKey;
+            payload->mesh.vertexAttributeMask = descriptor->vertexAttributeMask;
+            payload->mesh.vertexStride = descriptor->vertexStride;
+            payload->mesh.vertexLayoutHash = descriptor->vertexLayoutHash;
+            payload->mesh.vertexBytes.resize(std::size_t(descriptor->vertexStride) * descriptor->vertexCount);
+            payload->mesh.indices = { 0u, 1u, 2u };
+            RHIModelMeshView view;
+            check.Check(BuildRHIModelMeshView(*descriptor, view) && view.IsMetadataComplete()
+                && !view.IsComplete() && !view.SourceMesh() && view.handle.modelId.IsNil(),
+                "granular metadata view needs neither parent model ID nor CPU geometry");
+            check.Check(BuildRHIModelMeshView(*descriptor, *payload, view) && view.IsComplete()
+                && view.SourceMesh() == &payload->mesh,
+                "granular source view validates exact pinned payload storage");
+            EnhancedDrawItem replayDraw{};
+            replayDraw.worldMatrix = math::matrix4x4::identity();
+            replayDraw.modelMeshView = view;
+            std::array replayDraws{ replayDraw };
+            EnhancedDrawReplayInput replay;
+            EnhancedDrawReplayInput decodedReplay;
+            std::string replayError;
+            check.Check(EnhancedDrawReplayInput::Seal({}, {}, replayDraws, replay, replayError)
+                && EnhancedDrawReplayInput::Decode(replay.Encode(), decodedReplay, replayError)
+                && decodedReplay.draws.size() == 1u
+                && decodedReplay.draws.front().domain == assets::ModelMeshDomain::Granular
+                && decodedReplay.draws.front().assetIds == EnhancedDrawReplayInput::Identity(view),
+                "granular replay keeps explicit domain and permits no parent/subasset ID");
+            replayDraw.modelMeshView = {};
+            replayDraws.front().modelMeshView = {};
+            auto forged = view;
+            forged.vertexData = static_cast<const std::byte*>(view.vertexData) + 1u;
+            check.Check(!forged.SourceMesh() && !forged.IsComplete(),
+                "granular source rejects a forged pointer even with matching identity");
+            auto other = own::make_shared<assets::ModelMeshDescriptor>(*descriptor);
+            Uuid::TryParse("00000002-0000-8000-8000-000000000002", other->meshId);
+            other->origin.entry.asset.key.assetId = experiment::AssetId{ other->meshId };
+            const auto firstKey = assets::MakeModelMeshHandle(*descriptor);
+            const auto secondKey = assets::MakeModelMeshHandle(*other);
+            check.Check(payload->Matches(*other) && firstKey != secondKey
+                && HashModelMeshHandle(firstKey) != HashModelMeshHandle(secondKey),
+                "compatible raw decode sharing keeps logical mesh GPU identities distinct");
+            std::array<EnhancedDrawItem, 2> collidingDraws{};
+            collidingDraws[0].geometryKey = 1u;
+            collidingDraws[1].geometryKey = 1u;
+            collidingDraws[0].modelMeshView.handle = firstKey;
+            collidingDraws[1].modelMeshView.handle = secondKey;
+            std::string collisionError;
+            check.Check(!enhanced_draw::ValidateGeometryIdentities(collidingDraws, collisionError),
+                "pass batching compares full identities even when compact hashes collide");
+            auto revised = firstKey;
+            ++revised.resolverRevision;
+            check.Check(revised != firstKey && HashModelMeshHandle(revised) != HashModelMeshHandle(firstKey),
+                "GPU identity includes resolver revision independently of authoring generation");
+            revised = firstKey;
+            revised.blob.targetAbi += "-other";
+            check.Check(revised != firstKey && HashModelMeshHandle(revised) != HashModelMeshHandle(firstKey),
+                "GPU identity includes full artifact ABI");
+            assets::ModelAssetGenerationPins frame;
+            frame.meshes.push_back(descriptor);
+            own::weak_owner<const assets::ModelGeometryPayload> weakPayload = payload;
+            check.Check(BuildRHIModelMeshView(*descriptor, view), "rebuild metadata view before releasing CPU pin");
+            forged = {};
+            payload.reset();
+            check.Check(!weakPayload.lock() && frame.meshes.front()
+                && view.IsMetadataComplete() && !view.IsComplete() && source->reads == 0u,
+                "durable descriptor/frame pins allow CPU geometry eviction without I/O");
+        }
 
         struct TemporaryTree final
         {
@@ -299,6 +415,7 @@ namespace RenderTest
     {
         if (report) *report = {};
         GenerationChecker check{ outLog };
+        CheckGranularMeshViews(check);
         outLog += "[assets.generation] MBC5 immutable aggregate·atomic cache 검사\n";
 
         // PBR-W8 — 게이트가 읽는 수. 세 return 지점이 모두 채운다(이른 반환에서

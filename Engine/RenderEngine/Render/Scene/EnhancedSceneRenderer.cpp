@@ -40,6 +40,7 @@
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
 #include "../../DataSystem.h"
+#include "../../Assets/ModelGeometryPayload.h"
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h"
 
@@ -1077,6 +1078,7 @@ namespace
             uint64_t sourceFrameId, uint64_t sourceCaptureNanoseconds,
             uint64_t resizeGeneration, uint64_t backendGeneration,
             const std::function<bool(std::string&)>& prepareFrame,
+            const assets::ModelAssetGenerationPins* selectedMeshPins,
             std::string& outError, EnhancedPbrCapture* capture,
             LiveGraphSnapshot* diagnosticOutput, bool& preparationDeferred)
         {
@@ -1187,6 +1189,22 @@ namespace
                 commandPool.BeginFrame(commandPoolFrame);
                 textureCache.BeginFrame(frameIndex);
                 meshCache.BeginFrame(frameIndex);
+                if (selectedMeshPins)
+                {
+                    // Keep the admitted descriptor-only working set recent
+                    // until this recording consumes it. Existing retirement
+                    // policy already protects current-frame resident uses.
+                    for (const auto& descriptor : selectedMeshPins->meshes)
+                    {
+                        RHIModelMeshView metadata;
+                        if (descriptor && BuildRHIModelMeshView(*descriptor, metadata)
+                            && meshCache.FindModel(metadata.handle).IsValid())
+                        {
+                            std::string ignored;
+                            (void)meshCache.GetOrUploadModel(metadata, ignored);
+                        }
+                    }
+                }
                 const RHIDeviceMemoryPressureInfo pressureInfo = resources
                     .GetPersistentMemoryBudgetCoordinator().GetMemoryPressureInfo();
                 RHIAssetEvictionPass evictionPass = BeginRHIAssetEvictionPass(
@@ -2124,6 +2142,16 @@ namespace
         };
         std::vector<PooledDraw>       drawPool;
         own::shared_owner<const assets::ModelAssetGenerationPins> modelFramePins{};
+        assets::ModelGeometryPreparationPins geometryFramePins{};
+        struct GeometryDemand final
+        {
+            own::shared_owner<const assets::ModelMeshDescriptor> descriptor{};
+            AssetDepot::AssetRequest<assets::ModelGeometryPayload> request{};
+            own::shared_owner<const assets::ModelGeometryPayload> ready{};
+            bool requested{};
+            std::uint64_t seenFrame{};
+        };
+        std::map<assets::ModelMeshHandle, GeometryDemand> geometryDemands{};
 
         struct PooledSprite
         {
@@ -3914,6 +3942,176 @@ namespace
             draw.materialGraphInstance.reset();
         }
 
+        // Runs before either backend begins an upload recording. Exact requests
+        // survive Pending across packets; cache-zero ready results are handed to
+        // the CPU-use table before the request owner is released.
+        bool PrepareGeometry(std::uint64_t frameId, bool& pending, std::string& error)
+        {
+            pending = false;
+            error.clear();
+            geometryFramePins.entries.clear();
+            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& primitive : proxies)
+            {
+                const auto* proxy = primitive ? primitive->As<MeshRenderProxy>() : nullptr;
+                if (!proxy || !proxy->m_isEnabled || !proxy->m_meshDescriptor)
+                {
+                    continue;
+                }
+                const auto& descriptor = proxy->m_meshDescriptor;
+                const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                if (!handle.IsValid())
+                {
+                    error = "Invalid granular mesh descriptor identity.";
+                    return false;
+                }
+                const bool resident = backend == EnhancedLiveBackend::DX12
+                    ? pipeline && dx12.MeshCache().FindModel(handle).IsValid()
+                    : vulkanPipeline && vulkanPipeline->meshCache.FindModel(handle).IsValid();
+                // Graph sealing copies/deforms source vertices. Resident GPU
+                // geometry cannot satisfy that independent CPU consumer.
+                const bool cpuConsumer = static_cast<bool>(proxy->m_graphMaterialSource)
+                    || proxy->m_isAnimationEnabled;
+                if (resident && !cpuConsumer)
+                {
+                    continue;
+                }
+                auto& demand = geometryDemands[handle];
+                demand.seenFrame = frameId;
+                if (!demand.descriptor)
+                {
+                    demand.descriptor = descriptor;
+                }
+                if (!demand.ready)
+                {
+                    demand.ready = DataSystems->TryAcquire(demand.descriptor);
+                }
+                if (!demand.ready)
+                {
+                    if (!demand.requested)
+                    {
+                        demand.request = DataSystems->RequestAsync(demand.descriptor);
+                        demand.requested = true;
+                    }
+                    const auto result = demand.request.Snapshot();
+                    if (result.status == AssetDepot::AssetRequestStatus::Pending)
+                    {
+                        pending = true;
+                        continue;
+                    }
+                    if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+                    {
+                        error = "Exact mesh geometry preparation failed: " + result.message;
+                        return false;
+                    }
+                    demand.ready = result.asset;
+                }
+                if (!demand.ready->Matches(*demand.descriptor))
+                {
+                    error = "Prepared mesh geometry does not match its exact descriptor.";
+                    return false;
+                }
+            }
+            for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
+            {
+                if (position->second.seenFrame != frameId)
+                {
+                    position->second.request.Cancel();
+                    position = geometryDemands.erase(position);
+                }
+                else
+                {
+                    ++position;
+                }
+            }
+            if (pending)
+            {
+                return false;
+            }
+            geometryFramePins.entries.reserve(geometryDemands.size());
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                geometryFramePins.entries.push_back({ handle, std::move(demand.ready) });
+                demand.request = {};
+                demand.requested = false;
+            }
+            return true;
+        }
+
+        void CancelGeometryDemands()
+        {
+            for (auto& [handle, demand] : geometryDemands)
+            {
+                demand.request.Cancel();
+            }
+            geometryDemands.clear();
+        }
+
+        void ReconcileGeometryDemands(bool hasSceneGeometryView)
+        {
+            if (geometryDemands.empty())
+            {
+                return;
+            }
+            if (!hasSceneGeometryView || !runtimeInitialized || !renderScene)
+            {
+                CancelGeometryDemands();
+                return;
+            }
+            // Reconcile after proxy deltas even when pixel work will be skipped.
+            // A ready request owns its CPU result independently of cache budgets.
+            // Keep relevant requests across active Pending frames, but never let
+            // a removed/disabled/rebound proxy leave that result pinned forever.
+            std::set<assets::ModelMeshHandle> activeMeshes;
+            const auto proxies = renderScene->GetPrimitiveProxySnapshot();
+            for (const auto& primitive : proxies)
+            {
+                const auto* proxy = primitive ? primitive->As<MeshRenderProxy>() : nullptr;
+                if (proxy && proxy->m_isEnabled && proxy->m_meshDescriptor)
+                {
+                    activeMeshes.insert(assets::MakeModelMeshHandle(*proxy->m_meshDescriptor));
+                }
+            }
+            for (auto position = geometryDemands.begin(); position != geometryDemands.end();)
+            {
+                if (!activeMeshes.contains(position->first))
+                {
+                    position->second.request.Cancel();
+                    position = geometryDemands.erase(position);
+                }
+                else
+                {
+                    ++position;
+                }
+            }
+        }
+
+        void ReleaseGeometrySources()
+        {
+            const auto release = [](EnhancedDrawItem& draw)
+            {
+                if (draw.modelMeshView.sourceDescriptor)
+                {
+                    draw.modelMeshView.sourcePayload = nullptr;
+                    draw.modelMeshView.vertexData = nullptr;
+                    draw.modelMeshView.indexData = nullptr;
+                }
+            };
+            for (auto& draw : drawPool)
+            {
+                release(draw.item);
+            }
+            for (auto& draw : shadowDraws)
+            {
+                release(draw);
+            }
+            for (auto& draw : graphDraws)
+            {
+                release(draw);
+            }
+            geometryFramePins.entries.clear();
+        }
+
         void BuildDrawPool()
         {
             drawPool.clear();
@@ -3939,6 +4137,7 @@ namespace
 
             assets::ModelAssetGenerationPins modelPins;
             std::map<assets::ModelAssetGenerationHandle, std::size_t> modelPinIndices;
+            std::map<assets::ModelMeshHandle, std::size_t> meshPinIndices;
             struct BuildGuard final
             {
                 std::vector<PooledDraw>& draws;
@@ -3980,6 +4179,18 @@ namespace
                 return position->second;
             };
 
+            const auto pinMesh = [&modelPins, &meshPinIndices](
+                const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor)
+            {
+                const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                const auto [position, inserted] = meshPinIndices.emplace(handle, modelPins.meshes.size());
+                if (inserted)
+                {
+                    modelPins.meshes.push_back(descriptor);
+                }
+                return position->second;
+            };
+
             const auto poolDecal = [this](const DecalRenderProxy* proxy)
             {
                 // 셋 다 없으면 그릴 것이 없다 — DX11 RenderPassData의
@@ -4005,47 +4216,56 @@ namespace
                 decals.push_back(item);
             };
 
-            const auto poolMesh = [this, &pinModel, &modelPins](const MeshRenderProxy* proxy)
+            const auto poolMesh = [this, &pinModel, &pinMesh, &modelPins](const MeshRenderProxy* proxy)
             {
                 // Visibility is published by Scene even when the Animator is disabled.
                 // Exclude the mesh before building draws for any render pass.
                 if (!proxy->m_isEnabled) return;
 
-                // PHASE 3.75 MBC7 — typed generation 뷰가 정본이다. generation
-                // descriptor와 immutable 저장소를 대조해 뷰를 짓고(BuildRHIModelMeshView),
-                // 실패·부재면 experiment 핸들 → legacy Mesh 순으로 내려간다(MBC9 은퇴).
-                if (!proxy->m_modelGeneration)
-                {
-                    return;
-                }
-                const auto modelPinIndex = pinModel(proxy->m_modelGeneration);
-                if (modelPinIndex == (std::numeric_limits<std::size_t>::max)())
-                {
-                    return;
-                }
-                // A retired/reloaded identity can have distinct allocations.
-                // Build every raw view from the canonical table owner itself.
-                const auto& modelGeneration = modelPins.generations[modelPinIndex];
-                RHIModelMeshView modelView{};
-                if (!BuildRHIModelMeshView(*modelGeneration,
-                        proxy->m_modelMeshIndex, modelView))
-                {
-                    return;
-                }
-
                 PooledDraw pooled{};
-                pooled.item.worldMatrix = proxy->m_worldMatrix;
-                pooled.item.modelMeshView = modelView;
-                pooled.modelPinIndex = modelPinIndex;
-                // I6-C — 신원 키와 반경을 값으로 싣는다.
-                pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                RHIModelMeshView modelView{};
+                math::aabb bounds{};
+                if (proxy->m_meshDescriptor)
                 {
-                    const math::aabb& bounds = modelGeneration
-                        ->Meshes()[proxy->m_modelMeshIndex].bounds;
-                    pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
-                    pooled.item.boundRadius = bounds.is_empty()
-                        ? 0.f : math::length(bounds.extents);
+                    const auto pinIndex = pinMesh(proxy->m_meshDescriptor);
+                    const auto& descriptor = modelPins.meshes[pinIndex];
+                    const auto handle = assets::MakeModelMeshHandle(*descriptor);
+                    const auto payload = std::ranges::find_if(geometryFramePins.entries,
+                        [&](const auto& entry) { return entry.handle == handle; });
+                    const bool valid = payload != geometryFramePins.entries.end()
+                        ? payload->payload && BuildRHIModelMeshView(*descriptor, *payload->payload, modelView)
+                        : BuildRHIModelMeshView(*descriptor, modelView);
+                    if (!valid)
+                    {
+                        return;
+                    }
+                    pooled.modelPinIndex = pinIndex;
+                    bounds = descriptor->bounds;
                 }
+                else
+                {
+                    if (!proxy->m_modelGeneration)
+                    {
+                        return;
+                    }
+                    const auto pinIndex = pinModel(proxy->m_modelGeneration);
+                    if (pinIndex == (std::numeric_limits<std::size_t>::max)())
+                    {
+                        return;
+                    }
+                    const auto& generation = modelPins.generations[pinIndex];
+                    if (!BuildRHIModelMeshView(*generation, proxy->m_modelMeshIndex, modelView))
+                    {
+                        return;
+                    }
+                    pooled.modelPinIndex = pinIndex;
+                    bounds = generation->Meshes()[proxy->m_modelMeshIndex].bounds;
+                }
+                pooled.item.worldMatrix = proxy->m_worldMatrix;
+                pooled.item.modelMeshView = std::move(modelView);
+                pooled.item.geometryKey = MakeGeometryKey(pooled.item);
+                pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
+                pooled.item.boundRadius = bounds.is_empty() ? 0.f : math::length(bounds.extents);
 
                 const math::matrix4x4* palette = proxy->m_paletteArena
                     ? proxy->m_paletteArena->resolve(proxy->m_paletteOffset,
@@ -4552,7 +4772,7 @@ namespace
                     }
                 }
                 bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                    sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins);
+                    sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
                 if (!sealed && hasOptionalGraphCandidates)
                 {
                     // Aggregate geometry budgets can be tighter than the draw
@@ -4578,7 +4798,7 @@ namespace
                     graphShadowEligible.resize(retained);
                     graphViewRequired.resize(retained);
                     sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                        sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins);
+                        sceneInputBudget, graphViewInput, inputError, modelFramePins, graphFramePins, &geometryFramePins);
                 }
                 if (!sealed)
                 {
@@ -6345,6 +6565,12 @@ namespace
             ++renderShutdownDrains;
         }
 
+        {
+            std::lock_guard<std::mutex> lock(renderStateMutex);
+            ReleaseGeometrySources();
+            CancelGeometryDemands();
+        }
+
         const uint64_t discarded = ProxyCommandQueue->DiscardPendingForShutdown();
         {
             std::lock_guard<std::mutex> lock(renderQueueMutex);
@@ -7035,6 +7261,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
 
     if (!state.enabled)
     {
+        state.ReleaseGeometrySources();
+        state.CancelGeometryDemands();
         ProxyCommandQueue->DeferBatch(std::move(state.activeDeltaBatch));
         return;
     }
@@ -7088,23 +7316,70 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             // Accepted frames own independent copies of their pin tables.
             // Drop only obsolete current-input roots after every borrow above.
             state.modelFramePins.reset();
+            state.geometryFramePins.entries.clear();
+            state.CancelGeometryDemands();
             state.graphFramePins.reset();
             state.textureFramePins.reset();
         }
     }
 
     traceProgress("proxy.end");
+    bool hasSceneGeometryView = false;
+    if (!sceneLoading && !state.activeFrameDrainOnly && frame.width != 0u && frame.height != 0u)
+    {
+        for (uint32_t index = 0u; index < cameraCount; ++index)
+        {
+            const auto& view = frame.views[index];
+            if (view.key.IsValid() && view.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview
+                && (!state.controlledCaptureFrame || view.displayTarget == state.pbrCapture->target))
+            {
+                hasSceneGeometryView = true;
+                break;
+            }
+        }
+    }
+    // This precedes every idle/drain/age/size exit below. Preview-only views use
+    // their own geometry and do not justify retaining scene payload requests.
+    state.ReconcileGeometryDemands(hasSceneGeometryView);
     traceProgress("collect.begin");
     state.CollectCompletedDisplays();
     if (state.activeFrameDrainOnly || state.ShouldSkipScenePixels(frame))
     {
         return;
     }
-    if (state.runtimeInitialized && state.renderScene && !sceneLoading)
+    struct GeometrySourceGuard final
     {
+        LiveState& state;
+        ~GeometrySourceGuard() { state.ReleaseGeometrySources(); }
+    } geometrySourceGuard{ state };
+    const auto prepareSceneGeometry = [&]()
+    {
+        if (!state.runtimeInitialized || !state.renderScene || !hasSceneGeometryView)
+        {
+            return true;
+        }
         RenderThreadPhaseScope proxy(RenderPhase::proxy_sync);
+        bool preparationDeferred = false;
+        std::string geometryError;
+        if (!state.PrepareGeometry(frame.frameId, preparationDeferred, geometryError))
+        {
+            // No BeginFrame/recording has started. Keep the completed display
+            // and exact request owners until a future packet admits all bytes.
+            ++state.framesIdle;
+            if (!preparationDeferred)
+            {
+                state.CancelGeometryDemands();
+            }
+            if (!preparationDeferred && state.lastError != geometryError)
+            {
+                state.lastError = std::move(geometryError);
+                Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] " + state.lastError);
+            }
+            return false;
+        }
         state.BuildDrawPool();
-    }
+        return true;
+    };
 
     // ── Vulkan editor TickLive 공통 scene graph 경로 ──
     //
@@ -7148,6 +7423,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
         }
 
+        if (!prepareSceneGeometry())
+        {
+            return;
+        }
         VulkanLivePipeline& p = *state.vulkanPipeline;
         p.frameContext.frameId = frame.frameId;
         p.frameContext.sceneEpoch = frame.sceneEpoch;
@@ -7217,7 +7496,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                 rendered = p.Render(static_cast<uint32_t>(viewIndex), viewPacket,
                     frame.frameId, frame.sourceCaptureNanoseconds, frame.resizeGeneration,
                     GetRHISubmissionThread().GetOwnerGeneration(&p.resources),
-                    prepareFrame, error, state.BeginPbrCapture(frame, viewPacket),
+                    prepareFrame, state.modelFramePins ? &*state.modelFramePins : nullptr,
+                    error, state.BeginPbrCapture(frame, viewPacket),
                     captureDiagnostics ? &diagnosticSnapshot : nullptr, preparationDeferred);
             }
             if (captureDiagnostics || !rendered)
@@ -7369,6 +7649,10 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
     }
 
     traceProgress("pipeline.end");
+    if (!prepareSceneGeometry())
+    {
+        return;
+    }
     LivePipeline& p = *state.pipeline;
     {
         traceProgress("seal.begin");

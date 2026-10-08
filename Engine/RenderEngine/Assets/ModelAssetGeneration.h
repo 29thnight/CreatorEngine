@@ -14,6 +14,7 @@
 #include "../RHI/RHIFormat.h"
 #include "../Experiment/MeshletData.h"
 #include "../Experiment/MeshLodData.h"
+#include "../Experiment/Cooked/CookedAssetManifest.h"
 
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
@@ -52,19 +53,49 @@ namespace assets
             const ModelAssetGenerationHandle&) noexcept = default;
     };
 
+    struct ModelMeshDescriptor;
+    struct ModelGeometryPayload;
+
+    enum class ModelMeshDomain : std::uint8_t
+    {
+        LegacyAggregate,
+        Granular,
+    };
+
     struct ModelMeshHandle final
     {
+        // Keep the legacy aggregate initializer/source adapter stable.
         Uuid::Uuid16 modelId{};
         Uuid::Uuid16 meshId{};
         std::uint64_t generation{};
+        ModelMeshDomain domain{ ModelMeshDomain::LegacyAggregate };
+        experiment::cooked::TypedAssetReference asset{};
+        experiment::cooked::AssetBlobRecord blob{};
+        std::uint64_t resolverRevision{};
+        std::uint64_t mountId{};
+        experiment::AssetId assetSetId{};
+        std::uint64_t manifestRevision{};
 
         [[nodiscard]] bool IsValid() const noexcept
         {
-            return IsUuidV8(modelId) && IsUuidV8(meshId) && generation != 0u;
+            if (domain == ModelMeshDomain::Granular)
+            {
+                return IsUuidV8(meshId) && asset.key.assetId.value == meshId
+                    && asset.kind == experiment::cooked::CookedAssetKind::Mesh
+                    && blob.kind == experiment::cooked::CookedAssetKind::Mesh
+                    && blob.byteSize != 0u && blob.representation != 0u
+                    && blob.schemaVersion != 0u && resolverRevision != 0u
+                    && mountId != 0u && assetSetId.IsValid() && manifestRevision != 0u;
+            }
+            return domain == ModelMeshDomain::LegacyAggregate
+                && IsUuidV8(modelId) && IsUuidV8(meshId) && generation != 0u;
         }
         friend auto operator<=>(const ModelMeshHandle&,
             const ModelMeshHandle&) noexcept = default;
     };
+
+    // Small descriptor identity only; no parent model or CPU geometry is needed.
+    [[nodiscard]] ModelMeshHandle MakeModelMeshHandle(const ModelMeshDescriptor& descriptor);
 
     struct ModelTextureHandle final
     {
@@ -397,6 +428,20 @@ namespace assets
     struct ModelAssetGenerationPins final
     {
         std::vector<ModelAssetGeneration::Shared> generations{};
+        std::vector<own::shared_owner<const ModelMeshDescriptor>> meshes{};
+    };
+
+    // Scoped CPU-use/upload handoff, separate from durable descriptor frame pins.
+    // Release after the last source read or synchronous native staging copy.
+    struct ModelGeometryPreparationPin final
+    {
+        ModelMeshHandle handle{};
+        own::shared_owner<const ModelGeometryPayload> payload{};
+    };
+
+    struct ModelGeometryPreparationPins final
+    {
+        std::vector<ModelGeometryPreparationPin> entries{};
     };
 
     struct ModelAssetGenerationLoadResult final

@@ -845,46 +845,18 @@ namespace assets
             return result;
         }
 
-        bool buildMeshlets = false;
-        std::uint32_t lodLevels = 0;
+        ModelGeometryImportSettings geometrySettings;
         if (hadSidecar)
         {
             std::string settingsError;
-            const auto document = Authoring::ParsedDocument::ParseText(originalSidecar, settingsError);
-            const auto settings = document ? document.Root()["importSettings"] : Authoring::ReadNode{};
-            if (settings && !settings.IsMap())
+            if (!ReadModelGeometryImportSettings(originalSidecar, geometrySettings, settingsError))
             {
-                Mbc3AddIssue(result, "importSettings", "Expected an import settings map.");
+                Mbc3AddIssue(result, "importSettings", std::move(settingsError));
                 return result;
             }
-            const auto enabled = settings ? settings["buildMeshlets"] : Authoring::ReadNode{};
-            if (enabled)
-            {
-                const std::string value = enabled.IsScalar() ? enabled.AsString() : std::string{};
-                if (value != "true" && value != "false")
-                {
-                    Mbc3AddIssue(result, "importSettings.buildMeshlets", "Expected true or false.");
-                    return result;
-                }
-                buildMeshlets = value == "true";
-            }
         }
-        if (hadSidecar)
-        {
-            std::string settingsError;
-            const auto document = Authoring::ParsedDocument::ParseText(originalSidecar, settingsError);
-            const auto levels = document ? document.Root()["importSettings"]["lodLevels"] : Authoring::ReadNode{};
-            if (levels)
-            {
-                const std::string value = levels.IsScalar() ? levels.AsString() : std::string{};
-                if (value.size() != 1u || value[0] < '0' || value[0] > '7')
-                {
-                    Mbc3AddIssue(result, "importSettings.lodLevels", "Expected an integer from 0 to 7.");
-                    return result;
-                }
-                lodLevels = static_cast<std::uint32_t>(value[0] - '0');
-            }
-        }
+        bool buildMeshlets = geometrySettings.buildMeshlets;
+        std::uint32_t lodLevels = geometrySettings.lodLevels;
         if (request.buildMeshlets.has_value())
         {
             buildMeshlets = *request.buildMeshlets;

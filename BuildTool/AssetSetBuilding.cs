@@ -44,7 +44,7 @@ namespace CreatorBuildTool
             // Includes every verified native importer/decoder dependency and this orchestration
             // implementation. Publication GUIDs and local absolute paths are not build-key inputs.
             var toolFingerprint = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(
-                "CreatorBuildTool.BuildAssetSet.v1\n" + engine.Manifest.Text("payloadDigest") + "\n" +
+                "CreatorBuildTool.BuildAssetSet.v2\n" + engine.Manifest.Text("payloadDigest") + "\n" +
                 Metadata.Hash(typeof(AssetSetBuilding).Assembly.Location) + "\n")));
             context.Log($"Building source AssetSet: {definition}", "stage");
             await context.Run(cooker,
@@ -111,7 +111,7 @@ namespace CreatorBuildTool
                     continue;
                 }
                 var match = Regex.Match(relative,
-                    @"^Derived/AssetBlobs/[0-9a-f]{64}/([0-9a-f]{64})\.(png|jpg|hdr|dds|cemd|cesl|cean)$");
+                    @"^Derived/AssetBlobs/[0-9a-f]{64}/([0-9a-f]{64})\.(png|jpg|hdr|dds|cemd|cesl|cean|cege)$");
                 if (!match.Success || new FileInfo(path).Length <= 0 || Metadata.Hash(path) != match.Groups[1].Value)
                 {
                     throw new BuildException($"Unexpected or damaged AssetSet blob: {relative}");

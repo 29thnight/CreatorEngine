@@ -2,6 +2,8 @@
 #include "CookSupport.h"
 #include "../../Assets/ModelSourcePreparation.h"
 #include "../Import/SceneToModelDraft.h"
+#include "../Import/MeshletBuilder.h"
+#include "../Import/MeshLodBuilder.h"
 
 #include <algorithm>
 #include <map>
@@ -146,7 +148,7 @@ namespace experiment::cooked
         ModelAssetSetCookResult result;
         try
         {
-            RequireSource(!request.selected.empty() && request.selected.size() <= kModelSubAssetMaxClips + 2u,
+            RequireSource(!request.selected.empty() && request.selected.size() <= 65536u,
                 "Model source cook requires a bounded, explicit nonempty selection");
             SourceSnapshot snapshot;
             snapshot.root = SourceCanonical(request.assetRoot);
@@ -174,11 +176,18 @@ namespace experiment::cooked
                 assets::ValidateModelSidecarV2Closure(sidecar, header, sidecarIssues),
                 "Missing/invalid canonical model sidecar; run model authoring reconciliation before BuildAssetSet");
 
+            std::string failure;
+            assets::ModelGeometryImportSettings geometrySettings;
+            RequireSource(assets::ReadModelGeometryImportSettings(SourceText(meta), geometrySettings, failure), failure);
+            RequireSource(geometrySettings.buildMeshlets || geometrySettings.lodLevels == 0u,
+                "Persisted coarse LODs require buildMeshlets=true; reconcile authoring settings");
             auto importer = assets::CreateModelSourceImporter(source);
             RequireSource(importer != nullptr, "Unsupported model source extension: " + source.extension().string());
             im::ImportRequest importRequest;
             importRequest.sourcePath = source;
             importRequest.sourceBytes = input;
+            importRequest.options.buildMeshlets = geometrySettings.buildMeshlets;
+            importRequest.options.lodLevels = geometrySettings.lodLevels;
             importRequest.readSourceDependency = [&](const std::filesystem::path& path,
                 im::ImportSourceBytes& out, std::string& failure)
             {
@@ -196,9 +205,11 @@ namespace experiment::cooked
             auto imported = importer->Import(importRequest);
             RequireSource(imported.Succeeded(), imported.notes.empty() ? "Model source import failed" : imported.notes.front().message);
             std::vector<assets::StableKeyAssignment> assignments;
-            std::string failure;
             RequireSource(assets::ReconcileAuthoredModelBindings(*imported.scene, sidecar, assignments, failure), failure);
             std::map<AssetId, std::size_t> clipIndices;
+            std::map<AssetId, std::size_t> meshIndices;
+            std::vector<AssetId> meshIds(imported.scene->meshes.size());
+            std::vector<AssetId> materialIds(imported.scene->materials.size());
             AssetId skeletonId{};
             for (const auto& binding : assignments)
             {
@@ -211,9 +222,23 @@ namespace experiment::cooked
                 {
                     clipIndices.emplace(AssetId{ record->assetId }, binding.index);
                 }
+                else if (binding.kind == assets::SubAssetKind::Mesh)
+                {
+                    const AssetId id{ record->assetId };
+                    RequireSource(binding.index < meshIds.size() && !meshIds[binding.index].IsValid(),
+                        "Invalid authored mesh binding");
+                    meshIds[binding.index] = id;
+                    meshIndices.emplace(id, binding.index);
+                }
+                else if (binding.kind == assets::SubAssetKind::Material)
+                {
+                    RequireSource(binding.index < materialIds.size() && !materialIds[binding.index].IsValid(),
+                        "Invalid authored material binding");
+                    materialIds[binding.index] = AssetId{ record->assetId };
+                }
                 else if (binding.kind == assets::SubAssetKind::Skeleton)
                 {
-                    RequireSource(!skeletonId.IsValid(), "Granular animation cooking requires the authored single-skeleton conversion policy");
+                    RequireSource(!skeletonId.IsValid(), "Granular model cooking requires the authored single-skeleton conversion policy");
                     skeletonId = AssetId{ record->assetId };
                 }
             }
@@ -229,6 +254,10 @@ namespace experiment::cooked
                 {
                 case CookedAssetKind::Model:
                     RequireSource(selection.key.assetId == modelId, "Model source selection differs from canonical sidecar UUIDv8");
+                    break;
+                case CookedAssetKind::Mesh:
+                    RequireSource(meshIndices.contains(selection.key.assetId),
+                        "Selected mesh UUIDv8 is absent from this authored model");
                     break;
                 case CookedAssetKind::Skeleton:
                     RequireSource(skeletonId.IsValid() && selection.key.assetId == skeletonId,
@@ -250,17 +279,28 @@ namespace experiment::cooked
             conversion.modelAssetId = modelId;
             conversion.modelName = source.stem().string();
             SkeletonArtifact skeleton;
-            if (skeletonId.IsValid())
+            std::vector<AnimationClip> clips;
+            const auto prepareSkeleton = [&]
             {
+                if (!skeleton.skeleton.bones.empty())
+                {
+                    return;
+                }
+                RequireSource(skeletonId.IsValid(), "Selected skinned geometry/animation requires an authored skeleton");
                 auto converted = im::ConvertToSkeleton(*imported.scene, conversion, selectedClips);
                 RequireSource(converted.skeleton.has_value(), converted.notes.empty()
                     ? "Source skeleton conversion failed" : converted.notes.back().message);
                 skeleton.skeleton = std::move(*converted.skeleton);
                 RequireSource(ComputeBoneLayoutDigest(skeleton.skeleton, skeleton.boneLayoutSha256, failure), failure);
-            }
+                clips = std::move(skeleton.skeleton.clips);
+                skeleton.skeleton.clips.clear();
+            };
             RequireSource(skeletonId.IsValid() || clipIndices.empty(), "Authored clips require an authored skeleton");
-            std::vector<AnimationClip> clips = std::move(skeleton.skeleton.clips);
-            skeleton.skeleton.clips.clear();
+            if (!selectedClips.empty() || std::ranges::any_of(request.selected, [](const auto& selection)
+                { return selection.kind == CookedAssetKind::Skeleton; }))
+            {
+                prepareSkeleton();
+            }
 
             for (const auto& selection : request.selected)
             {
@@ -272,6 +312,44 @@ namespace experiment::cooked
                     product.schemaVersion = kSkeletonArtifactVersion;
                     product.extension = ".cesl";
                     RequireSource(WriteSkeletonArtifact(skeleton, product.artifactBytes, failure), failure);
+                }
+                else if (selection.kind == CookedAssetKind::Mesh)
+                {
+                    auto converted = im::ConvertToMesh(*imported.scene, meshIndices.at(selection.key.assetId));
+                    RequireSource(converted.mesh.has_value(), converted.notes.empty()
+                        ? "Selected source mesh conversion failed" : converted.notes.back().message);
+                    ModelGeometryArtifact geometry;
+                    geometry.mesh = std::move(*converted.mesh);
+                    for (const auto& note : converted.notes)
+                    {
+                        result.warnings.push_back(note.message);
+                    }
+                    if (Has(geometry.mesh.vertices.AttributeMask(), VertexAttribute::BoneIndices))
+                    {
+                        prepareSkeleton();
+                        geometry.requiredBoneCount = static_cast<std::uint32_t>(skeleton.skeleton.bones.size());
+                        RequireSource(ComputeSkinBindingDigest(skeleton.skeleton,
+                            geometry.requiredSkinBindingSha256, failure), failure);
+                        RequireSource(ValidateModelGeometryBinding(geometry, skeleton, failure), failure);
+                        product.dependencies.push_back(SourceEdge(skeletonId, CookedAssetKind::Skeleton, AssetDependencyKind::Hard));
+                    }
+                    if (geometrySettings.buildMeshlets)
+                    {
+                        RequireSource(im::BuildMeshlets(geometry.mesh, geometry.mesh.meshlets, failure), failure);
+                    }
+                    MeshLodBuildSettings lodSettings;
+                    lodSettings.levelCount = geometrySettings.lodLevels;
+                    std::string lodDiagnostic;
+                    RequireSource(im::BuildMeshLods(geometry.mesh, geometry.mesh.coarseLods, lodDiagnostic, lodSettings),
+                        lodDiagnostic);
+                    if (geometrySettings.lodLevels != 0u && !lodDiagnostic.empty())
+                    {
+                        result.warnings.push_back(geometry.mesh.name + ": " + lodDiagnostic);
+                    }
+                    product.representation = kModelGeometryRepresentation;
+                    product.schemaVersion = kModelGeometryArtifactVersion;
+                    product.extension = ".cege";
+                    RequireSource(WriteModelGeometryArtifact(geometry, product.artifactBytes, failure), failure);
                 }
                 else if (selection.kind == CookedAssetKind::AnimationClip)
                 {
@@ -314,6 +392,38 @@ namespace experiment::cooked
                             clip.durationSeconds * conversion.ticksPerSecond, conversion.ticksPerSecond, true });
                         product.dependencies.push_back(SourceEdge(id, CookedAssetKind::AnimationClip, AssetDependencyKind::Loadable));
                     }
+                    auto metadata = im::ConvertToModelMetadata(*imported.scene, conversion);
+                    RequireSource(metadata.succeeded, metadata.notes.empty()
+                        ? "Source model metadata conversion failed" : metadata.notes.back().message);
+                    for (std::size_t index = 0; index < metadata.meshes.size(); ++index)
+                    {
+                        const auto& mesh = metadata.meshes[index];
+                        const auto materialId = mesh.material.IsValid() ? materialIds.at(mesh.material.Value()) : AssetId{};
+                        descriptor.meshes.push_back({ meshIds.at(index), materialId, mesh.name, mesh.bounds,
+                            mesh.attributes, mesh.stride, mesh.vertexCount, mesh.indexCount, mesh.skinned });
+                        product.dependencies.push_back(SourceEdge(meshIds.at(index), CookedAssetKind::Mesh,
+                            AssetDependencyKind::Loadable));
+                    }
+                    for (const auto& node : metadata.nodes)
+                    {
+                        ModelNodeSummary summary;
+                        summary.name = node.name;
+                        summary.parent = node.parent;
+                        summary.localTransform = node.localTransform;
+                        for (const auto index : node.meshes)
+                        {
+                            summary.meshAssetIds.push_back(meshIds.at(index.Value()));
+                        }
+                        descriptor.nodes.push_back(std::move(summary));
+                    }
+                    for (std::size_t index = 0; index < imported.scene->materials.size(); ++index)
+                    {
+                        const auto& material = imported.scene->materials[index];
+                        const auto blendMode = material.alphaMode == im::AlphaMode::Blend ? MaterialBlendMode::Transparent :
+                            material.alphaMode == im::AlphaMode::Mask ? MaterialBlendMode::Masked : MaterialBlendMode::Opaque;
+                        descriptor.materials.push_back({ materialIds.at(index), material.name, blendMode });
+                    }
+                    RequireSource(ValidateModelDescriptorDependencies(descriptor, product.dependencies, failure), failure);
                     product.representation = kModelDescriptorRepresentation;
                     product.schemaVersion = kModelDescriptorVersion;
                     product.extension = ".cemd";

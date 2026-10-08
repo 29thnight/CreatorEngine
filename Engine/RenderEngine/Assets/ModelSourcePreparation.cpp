@@ -1,4 +1,5 @@
 #include "ModelSourcePreparation.h"
+#include "AuthoringParsedDocument.h"
 #include "../Experiment/Import/FbxImporter.h"
 #include "../Experiment/Import/GltfImporter.h"
 
@@ -8,6 +9,48 @@
 
 namespace assets
 {
+    bool ReadModelGeometryImportSettings(std::string_view sidecarText,
+        ModelGeometryImportSettings& out, std::string& failure)
+    {
+        const auto document = Authoring::ParsedDocument::ParseText(std::string(sidecarText), failure);
+        if (!document)
+        {
+            return false;
+        }
+        ModelGeometryImportSettings value;
+        const auto settings = document.Root()["importSettings"];
+        if (settings && !settings.IsMap())
+        {
+            failure = "importSettings: expected a map";
+            return false;
+        }
+        const auto enabled = settings ? settings["buildMeshlets"] : Authoring::ReadNode{};
+        if (enabled)
+        {
+            const auto text = enabled.IsScalar() ? enabled.AsString() : std::string{};
+            if (text != "true" && text != "false")
+            {
+                failure = "importSettings.buildMeshlets: expected true or false";
+                return false;
+            }
+            value.buildMeshlets = text == "true";
+        }
+        const auto levels = settings ? settings["lodLevels"] : Authoring::ReadNode{};
+        if (levels)
+        {
+            const auto text = levels.IsScalar() ? levels.AsString() : std::string{};
+            if (text.size() != 1u || text[0] < '0' || text[0] > '7')
+            {
+                failure = "importSettings.lodLevels: expected an integer from 0 to 7";
+                return false;
+            }
+            value.lodLevels = static_cast<std::uint32_t>(text[0] - '0');
+        }
+        out = value;
+        failure.clear();
+        return true;
+    }
+
     own::unique_owner<experiment::importer::IAssetImporter> CreateModelSourceImporter(
         const std::filesystem::path& source)
     {

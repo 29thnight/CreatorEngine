@@ -73,6 +73,7 @@ namespace assets // PHASE 3.75 MBC8: typed 재생 정본(shared_owner 보관용)
     struct ModelAnimationDescriptor;
     struct ModelSkeletonPayload;
     struct ModelAnimationPayload;
+    struct ModelMeshDescriptor;
 }
 
 // One frame's exact immutable owners. Sparse clip indices refer to the descriptor's
@@ -319,6 +320,7 @@ public:
     // Render bridge guard for the transitional CEMCv11 geometry consumer. No I/O
     // or new aggregate pin: compare the already-owned geometry skin contract.
     [[nodiscard]] bool IsSkinBindingCompatible(const assets::ModelAssetGeneration& geometry) const noexcept;
+    [[nodiscard]] bool IsSkinBindingCompatible(const assets::ModelMeshDescriptor& geometry) const noexcept;
 
 private:
     struct RequestedAnimationClip final

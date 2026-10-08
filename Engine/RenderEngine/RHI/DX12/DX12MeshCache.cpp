@@ -319,14 +319,39 @@ DX12MeshCache::Entry DX12MeshCache::GetOrUpload(Mesh* mesh, std::string& outErro
         static_cast<uint32_t>(indices.size()), outError);
 }
 
+DX12MeshCache::Entry DX12MeshCache::FindModel(const assets::ModelMeshHandle& handle) const
+{
+    if (!m_resources || !handle.IsValid())
+    {
+        return {};
+    }
+    const auto found = m_modelEntries.find(handle);
+    return found != m_modelEntries.end() &&
+        found->second.uploadState == RHIUploadTransactionState::Resident
+        ? found->second.entry : Entry{};
+}
+
 DX12MeshCache::Entry DX12MeshCache::GetOrUploadModel(
     const RHIModelMeshView& view, std::string& outError)
 {
-    Entry empty{};
-    if (nullptr == m_resources || !view.IsComplete() || view.sourceLodIndex != 0)
+    if (!m_resources || !view.IsMetadataComplete() || view.sourceLodIndex != 0)
     {
-        outError = "메시 캐시: ModelAssetGeneration 뷰가 완비되지 않았다";
-        return empty;
+        outError = "Mesh cache requires valid base-LOD model metadata.";
+        return {};
+    }
+    // The immutable descriptor is enough to reuse GPU bytes after CPU eviction.
+    const auto found = m_modelEntries.find(view.handle);
+    if (found != m_modelEntries.end())
+    {
+        ++m_stats.hits;
+        found->second.lastUsedFrame = m_frameIndex;
+        outError.clear();
+        return found->second.entry;
+    }
+    if (!view.IsComplete())
+    {
+        outError = "Mesh geometry preparation is required before upload: no compatible CPU payload is pinned.";
+        return {};
     }
     return UploadResolved({}, &view.handle, view.vertexData, view.vertexBytes,
         view.vertexStride, view.vertexAttributeMask, view.indexData,

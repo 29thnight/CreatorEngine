@@ -684,6 +684,10 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
         }
     }
 
+    if (!enhanced_draw::ValidateGeometryIdentities(*frameDraws, outError))
+    {
+        return false;
+    }
     // Reuse the same LOD0 cache entry as the other geometry passes.
     for (const auto& draw : *frameDraws)
     {
@@ -693,7 +697,7 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
             continue;
         }
         std::string uploadError;
-        const auto entry = draw.modelMeshView.IsComplete()
+        const auto entry = draw.modelMeshView.handle.IsValid()
             ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
             : context.meshCache->GetOrUpload(draw.mesh, uploadError);
         if (!entry.IsValid())

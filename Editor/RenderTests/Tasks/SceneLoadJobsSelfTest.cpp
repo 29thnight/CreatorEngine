@@ -11,6 +11,7 @@
 #include <filesystem>
 #include <mutex>
 #include <stdexcept>
+#include <thread>
 #include <vector>
 
 namespace
@@ -126,12 +127,20 @@ namespace RenderTest
                     "Result completed before owner-thread construction");
                 Check(SceneManagers->GetScenes().size() == before, "Worker changed scene ownership");
             }
-            SceneManagers->WaitForSceneLoad();
+            // Explicit test-harness pumping, not a runtime blocking asset API.
+            // The production frame boundary keeps polling without waiting.
+            const auto sceneDeadline = std::chrono::steady_clock::now() + std::chrono::minutes(2);
+            while (!SceneManagers->PollSceneLoads())
+            {
+                Check(std::chrono::steady_clock::now() < sceneDeadline,
+                    "Asynchronous scene completion exceeded the fixture deadline");
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
             Scene* prepared = loaded.get();
             Check(prepared && Find(prepared, "SceneJobsChild"), "Prepared entity missing");
             Check(Find(prepared, "SceneJobsChild")->GetComponent<Transform>() != nullptr, "Component load missing");
             Check(missing.get() == nullptr, "Missing document did not resolve to nullptr");
-            Check(SceneManagers->GetActiveScene() == original, "Wait activated outside frame boundary");
+            Check(SceneManagers->GetActiveScene() == original, "Poll activated outside frame boundary");
             Check(SceneManagers->GetScenes().size() == before + 3,
                 "Abandoned result ownership or replaced callback count mismatch");
             Check(prepared->m_requiredLoadAssetsBundle.assets.size() == 1, "Asset bundle not preserved");

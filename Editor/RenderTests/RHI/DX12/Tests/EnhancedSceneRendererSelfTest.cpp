@@ -4248,7 +4248,7 @@ static bool ValidateBase0CameraReplay(std::string& error)
 
 static bool ValidateBase0DrawReplay(std::string& error)
 {
-    std::array<float, 16> vertex{};
+    std::array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{};
     std::array<uint32_t, 3> indices{0,0,0};
     auto bone=math::matrix4x4::identity();
     EnhancedDrawItem item;
@@ -4319,7 +4319,7 @@ static bool ValidateBase0DrawReplay(std::string& error)
 
 static bool ValidateBase0LatticeReplay(std::string& error)
 {
-    std::array<float,16> vertex{}; std::array<uint32_t,3> indices{0,0,0};
+    std::array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{}; std::array<uint32_t,3> indices{0,0,0};
     EnhancedDrawItem item;
     assets::TryParseCanonicalUuidV8("11111111-1111-8111-8111-111111111111",item.modelMeshView.handle.modelId);
     assets::TryParseCanonicalUuidV8("22222222-2222-8222-8222-222222222222",item.modelMeshView.handle.meshId);

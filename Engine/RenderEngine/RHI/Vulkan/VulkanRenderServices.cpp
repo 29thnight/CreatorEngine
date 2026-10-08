@@ -827,19 +827,39 @@ RHIMeshBinding VulkanMeshCache::GetOrUpload(Mesh* mesh, std::string& outError)
         static_cast<uint32_t>(indices.size()), outError);
 }
 
+RHIMeshBinding VulkanMeshCache::FindModel(const assets::ModelMeshHandle& handle) const
+{
+    if (!m_impl || !m_impl->resources || !handle.IsValid())
+    {
+        return {};
+    }
+    const auto found = m_impl->modelEntries.find(handle);
+    return found != m_impl->modelEntries.end() &&
+        found->second.state == RHIUploadTransactionState::Resident
+        ? found->second.binding : RHIMeshBinding{};
+}
+
 RHIMeshBinding VulkanMeshCache::GetOrUploadModel(
     const RHIModelMeshView& view, std::string& outError)
 {
-    RHIMeshBinding empty{};
-    if (view.sourceLodIndex != 0)
+    if (!m_impl || !m_impl->resources || !view.IsMetadataComplete() || view.sourceLodIndex != 0)
     {
-        outError = "Vulkan model mesh cache requires the base LOD view.";
-        return empty;
+        outError = "Vulkan mesh cache requires valid base-LOD model metadata.";
+        return {};
     }
-    if (!m_impl || nullptr == m_impl->resources || !view.IsComplete())
+    // The immutable descriptor is enough to reuse GPU bytes after CPU eviction.
+    const auto found = m_impl->modelEntries.find(view.handle);
+    if (found != m_impl->modelEntries.end())
     {
-        outError = "Vulkan 메시 캐시: ModelAssetGeneration 뷰가 완비되지 않았다";
-        return empty;
+        ++m_impl->stats.hits;
+        found->second.lastUsedFrame = m_impl->frameIndex;
+        outError.clear();
+        return found->second.binding;
+    }
+    if (!view.IsComplete())
+    {
+        outError = "Vulkan mesh geometry preparation is required before upload: no compatible CPU payload is pinned.";
+        return {};
     }
     return UploadResolved(0, &view.handle, view.vertexData, view.vertexBytes,
         view.vertexStride, view.vertexAttributeMask, view.indexData,

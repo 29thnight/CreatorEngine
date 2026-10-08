@@ -36,11 +36,14 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
     m_LightMapping(component->m_LightMapping),
     m_isSkinnedMesh(component->m_isSkinnedMesh)
 {
+    component->EnsureMeshBinding();
     CopyWorldTransform(*this, component->GetOwner());
 
     // PHASE 3.75 MBC7/MBC9 — typed 정본이 유일한 지오메트리 출처다. 프록시 갱신
     // 커맨드는 메시를 바꾸지 않으므로 스냅샷 시점 한 번이면 된다.
     m_modelGeneration = component->m_modelGeneration;
+    m_meshDescriptor = component->m_meshDescriptor;
+    m_isSkinnedMesh = component->m_isSkinnedMesh;
     m_modelMeshIndex = component->m_modelMeshIndex;
 
 	Entity* meshOwner = component->GetOwner();
@@ -57,8 +60,10 @@ MeshRenderProxy::MeshRenderProxy(MeshRenderer* component) :
             {
                 // Independent v3 clips may only animate transitional geometry
                 // after its ordered bones and complete bind transforms match.
-                m_isAnimationEnabled = component->m_modelGeneration
-                    && animator->IsSkinBindingCompatible(*component->m_modelGeneration);
+                m_isAnimationEnabled = component->m_meshDescriptor
+                    ? animator->IsSkinBindingCompatible(*component->m_meshDescriptor)
+                    : component->m_modelGeneration
+                        && animator->IsSkinBindingCompatible(*component->m_modelGeneration);
                 if (m_isAnimationEnabled)
                 {
                     m_animatorGuid = animator->GetInstanceID();

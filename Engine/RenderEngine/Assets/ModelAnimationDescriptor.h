@@ -5,8 +5,8 @@
 
 namespace assets
 {
-    // v3 animation metadata only. CEMCv11 ModelAssetGeneration remains a
-    // transitional mesh/render adapter, not the payload owner for this path.
+    // v3 model enumeration metadata only; children stay lazy and do not
+    // retain geometry, skeleton, animation or image bulk.
     struct ModelAnimationDescriptor final
     {
         experiment::cooked::ModelDescriptorArtifact summary{};
@@ -15,6 +15,7 @@ namespace assets
         // A typed entry with no byteSource records absence in this snapshot.
         experiment::cooked::ResolvedAssetEntry skeleton{};
         std::vector<experiment::cooked::ResolvedAssetEntry> clips{};
+        std::vector<experiment::cooked::ResolvedAssetEntry> meshes{};
         std::size_t metadataBytes{};
 
         // Selected children open only in their payload workers; the resulting
@@ -25,7 +26,7 @@ namespace assets
         // hashes prevent admitting changed bytes or using the latest resolver.
         // Future managed artifact GC must honor a store/root lifetime lease;
         // absence of open child files is not permission to delete a release.
-        // No skeleton/clip bulk owner or per-child file handle is kept here.
+        // No mesh/skeleton/clip bulk owner or per-child file handle is kept here.
         [[nodiscard]] std::size_t ByteSize() const noexcept { return metadataBytes; }
     };
 }

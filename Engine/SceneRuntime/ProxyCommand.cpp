@@ -39,9 +39,11 @@ Animator* FindEnabledAnimator(MeshRenderer* component)
         {
             // The nearest enabled Animator is the binding target. An incompatible
             // v3 skeleton must not fall through to a different ancestor's palette.
-            return component->m_modelGeneration
-                && animator->IsSkinBindingCompatible(*component->m_modelGeneration)
-                ? animator : nullptr;
+            const bool compatible = component->m_meshDescriptor
+                ? animator->IsSkinBindingCompatible(*component->m_meshDescriptor)
+                : component->m_modelGeneration
+                    && animator->IsSkinBindingCompatible(*component->m_modelGeneration);
+            return compatible ? animator : nullptr;
         }
 
 		ownerIndex = owner->GetParentIndex();
@@ -60,7 +62,12 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 
 	auto material = component->m_Material;
 
+    component->EnsureMeshBinding();
 	MeshUpdate update{};
+    update.modelGeneration = component->m_modelGeneration;
+    update.meshDescriptor = component->m_meshDescriptor;
+    update.modelMeshIndex = component->m_modelMeshIndex;
+    update.skinned = component->IsSkinnedMesh();
 	update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();
 	update.worldPosition = owner->Transform_().GetRenderWorldPosition();
 	update.hasWorldBounds = !component->IsSkinnedMesh() && component->HasRenderableMesh();
@@ -459,6 +466,10 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 		{
 			if (auto* proxy = it->second->As<MeshRenderProxy>())
 			{
+                proxy->m_modelGeneration = update->modelGeneration;
+                proxy->m_meshDescriptor = update->meshDescriptor;
+                proxy->m_modelMeshIndex = update->modelMeshIndex;
+                proxy->m_isSkinnedMesh = update->skinned;
 				proxy->m_worldMatrix = update->worldMatrix;
 				proxy->m_worldPosition = update->worldPosition;
 				proxy->m_worldBounds = update->worldBounds;

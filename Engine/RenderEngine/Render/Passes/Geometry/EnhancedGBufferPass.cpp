@@ -342,6 +342,10 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
     //
     // 예전에는 메시 중복 제거 블록 안에서 재질까지 올렸는데, 그러면 같은 메시를
     // 다른 재질로 두 번 그릴 때 두 번째 재질이 통째로 건너뛰어진다. 중복 제거의
+    if (!enhanced_draw::ValidateGeometryIdentities(*context.draws, outError))
+    {
+        return false;
+    }
     // 단위가 둘이 다르다 — 지오메트리는 메시별로, 재질은 재질별로 한 번이다.
     for (const auto& draw : *context.draws)
     {
@@ -388,7 +392,7 @@ bool EnhancedGBufferPass::PrepareFrame(const EnhancedFrameContext& context, std:
             // I5-D4b: 핸들이 실린 아이템은 legacy Mesh 없이 완결되는 핸들
             // 진입점으로 올린다(키=experiment 자산 신원). mesh 포인터는 정렬·
             // 지오메트리 맵 키로 남는다(은퇴는 D4f).
-            const auto entry = draw.modelMeshView.IsComplete()
+            const auto entry = draw.modelMeshView.handle.IsValid()
                 ? context.meshCache->GetOrUploadModel(draw.modelMeshView, uploadError)
                 : context.meshCache->GetOrUpload(draw.mesh, uploadError);
             if (!entry.IsValid())
@@ -907,7 +911,10 @@ bool EnhancedGBufferPass::HasSafeSkinningBounds(
     auto& contract = found->second;
     if (inserted)
     {
-        contract.vertices = mesh.vertexData;
+        // Granular storage can be evicted and rehydrated at a different address.
+        // SourceMesh has already matched the exact descriptor and raw payload;
+        // only the legacy aggregate adapter needs persistent address equality.
+        contract.vertices = mesh.sourceDescriptor ? nullptr : mesh.vertexData;
         contract.bytes = mesh.vertexBytes;
         contract.mask = mesh.vertexAttributeMask;
         contract.stride = mesh.vertexStride;
@@ -941,7 +948,8 @@ bool EnhancedGBufferPass::HasSafeSkinningBounds(
             }
         }
     }
-    if (contract.vertices != mesh.vertexData || contract.bytes != mesh.vertexBytes ||
+    if ((!mesh.sourceDescriptor && contract.vertices != mesh.vertexData) ||
+        contract.bytes != mesh.vertexBytes ||
         contract.mask != mesh.vertexAttributeMask || contract.stride != mesh.vertexStride ||
         contract.requiredBones > draw.boneCount)
     {
@@ -1097,7 +1105,7 @@ bool EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context, std:
         const auto& coverage = key.snapshot ? key.snapshot->coverage : draw.coverage;
         RHIPipelineHandle meshletPipeline;
         math::vector4 meshletLocalSphere{};
-        const auto* authoredMeshlets = draw.modelMeshView.Meshlets();
+        const bool authoredMeshlets = draw.modelMeshView.HasMeshlets();
         if (safePose && draw.boneCount == 0 && geometry->second.meshlets.IsValid()
             && authoredMeshlets && draw.modelMeshView.sourceLodIndex == 0
             && geometry->second.meshlets.profileVersion == experiment::kMeshletProfileVersion
@@ -1116,7 +1124,14 @@ bool EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context, std:
                 auto [bounds, inserted] = m_meshletLocalBounds.try_emplace(draw.modelMeshView.handle);
                 if (inserted)
                 {
-                    bounds->second = GBufferMeshletLocalBounds(*authoredMeshlets);
+                    if (draw.modelMeshView.sourceDescriptor)
+                    {
+                        bounds->second = draw.modelMeshView.sourceDescriptor->meshlets.localBoundsSphere;
+                    }
+                    else if (const auto* payload = draw.modelMeshView.Meshlets())
+                    {
+                        bounds->second = GBufferMeshletLocalBounds(*payload);
+                    }
                 }
                 meshletLocalSphere = bounds->second;
             }
@@ -1131,7 +1146,7 @@ bool EnhancedGBufferPass::BuildBatches(const EnhancedFrameContext& context, std:
             occlusionEligible = GBufferStandardDepthSource(*sourceGeneration)
                 && (coverage.flags & EnhancedMaterialCoverage::Blended) == 0;
         }
-        if ((gpuEligible || meshletPipeline.IsValid()) && safePose && draw.modelMeshView.SourceMesh()
+        if ((gpuEligible || meshletPipeline.IsValid()) && safePose && draw.modelMeshView.HasSourceMetadata()
             && (coverage.flags & (EnhancedMaterialCoverage::Masked | EnhancedMaterialCoverage::Blended)) == 0)
         {
             std::string diagnostic;

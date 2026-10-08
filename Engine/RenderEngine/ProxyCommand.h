@@ -63,6 +63,10 @@ public:
 		math::vector3 worldPosition{};
 		math::aabb worldBounds{};
 		own::shared_owner<const Material> material{};
+        own::shared_owner<const assets::ModelAssetGeneration> modelGeneration{};
+        own::shared_owner<const assets::ModelMeshDescriptor> meshDescriptor{};
+        std::uint32_t modelMeshIndex{};
+        bool skinned{};
         std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
 		// I5-D5c3 — 저작 정본의 값 스냅샷과 그 세대. 프록시의 authored는 값이라
 		// legacy(shared_ptr 공유)와 달리 편집이 저절로 보이지 않는다 — 갱신

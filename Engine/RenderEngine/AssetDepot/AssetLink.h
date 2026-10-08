@@ -14,6 +14,8 @@ namespace assets
     struct ModelAnimationDescriptor;
     struct ModelSkeletonPayload;
     struct ModelAnimationPayload;
+    struct ModelMeshDescriptor;
+    struct ModelGeometryPayload;
 }
 namespace experiment
 {
@@ -73,6 +75,19 @@ namespace AssetDepot
     struct AssetTypeTraits<assets::ModelAnimationPayload>
     {
         static constexpr auto kKind = experiment::cooked::CookedAssetKind::AnimationClip;
+    };
+
+    template<>
+    struct AssetTypeTraits<assets::ModelMeshDescriptor>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::Mesh;
+    };
+
+    // Internal exact-payload dispatch only. Current links acquire descriptors.
+    template<>
+    struct AssetTypeTraits<assets::ModelGeometryPayload>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::Mesh;
     };
 
     // Persist only the asset/subasset IDs plus the expected kind at the wire

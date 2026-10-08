@@ -136,7 +136,8 @@ public:
         {
             static_assert(std::is_same_v<T, assets::ModelAnimationDescriptor>
                 || std::is_same_v<T, assets::ModelSkeletonPayload>
-                || std::is_same_v<T, assets::ModelAnimationPayload>, "Unsupported AssetDepot type.");
+                || std::is_same_v<T, assets::ModelAnimationPayload>
+                || std::is_same_v<T, assets::ModelMeshDescriptor>, "Unsupported AssetDepot type.");
             return TryAcquireCurrentModelAsset(link);
         }
     }
@@ -153,10 +154,22 @@ public:
         {
             static_assert(std::is_same_v<T, assets::ModelAnimationDescriptor>
                 || std::is_same_v<T, assets::ModelSkeletonPayload>
-                || std::is_same_v<T, assets::ModelAnimationPayload>, "Unsupported AssetDepot type.");
+                || std::is_same_v<T, assets::ModelAnimationPayload>
+                || std::is_same_v<T, assets::ModelMeshDescriptor>, "Unsupported AssetDepot type.");
             return RequestCurrentModelAssetAsync(link);
         }
     }
+
+    [[nodiscard]] AssetDepot::AssetRequest<assets::ModelGeometryPayload> RequestAsync(
+        own::shared_owner<const assets::ModelMeshDescriptor> descriptor);
+    [[nodiscard]] own::shared_owner<const assets::ModelGeometryPayload> TryAcquire(
+        const own::shared_owner<const assets::ModelMeshDescriptor>& descriptor);
+    [[nodiscard]] AssetDepot::AssetRequest<assets::ModelMeshDescriptor> RequestAsync(
+        own::shared_owner<const assets::ModelAnimationDescriptor> descriptor, std::size_t meshIndex);
+    [[nodiscard]] own::shared_owner<const assets::ModelMeshDescriptor> TryAcquire(
+        const own::shared_owner<const assets::ModelAnimationDescriptor>& descriptor, std::size_t meshIndex);
+    [[nodiscard]] bool HasModelMeshDescriptor(AssetDepot::AssetLink<assets::ModelMeshDescriptor> link) const;
+    void SetModelGeometryCacheBudgets(std::size_t descriptors, std::size_t geometry);
 
     // Exact payload access requires an already-owned descriptor. These overloads
     // never resolve a child against the latest catalog and survive logical unmount.

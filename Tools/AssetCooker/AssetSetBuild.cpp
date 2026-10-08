@@ -12,6 +12,7 @@
 #include <chrono>
 #include <fstream>
 #include <initializer_list>
+#include <iostream>
 #include <map>
 #include <set>
 #include <span>
@@ -35,8 +36,8 @@ namespace AssetCooking
         constexpr std::size_t kMaxEdges = 262144u;
         // Bump for producer/decoder behavior or normalization changes.
         constexpr std::string_view kTextureImporterVersion = "texture-source-image-v1";
-        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v1";
-        constexpr std::string_view kBuildVersion = "asset-set-build-v2";
+        constexpr std::string_view kModelImporterVersion = "model-source-subassets-v2";
+        constexpr std::string_view kBuildVersion = "asset-set-build-v3";
         constexpr std::uint32_t kTextureSourceImage = 1u;
 
         struct AssetSource final
@@ -137,6 +138,10 @@ namespace AssetCooking
             {
                 kind = ck::CookedAssetKind::Model;
             }
+            else if (name == "Mesh")
+            {
+                kind = ck::CookedAssetKind::Mesh;
+            }
             else if (name == "Skeleton")
             {
                 kind = ck::CookedAssetKind::Skeleton;
@@ -147,7 +152,7 @@ namespace AssetCooking
             }
             else
             {
-                Fail("Unsupported AssetSet source kind: " + name + "; supported: Texture, Model, Skeleton, AnimationClip");
+                Fail("Unsupported AssetSet source kind: " + name + "; supported: Texture, Model, Mesh, Skeleton, AnimationClip");
             }
             const auto text = Text(node, "assetId");
             Uuid::Uuid16 parsed{};
@@ -511,19 +516,31 @@ namespace AssetCooking
             case ck::CookedAssetKind::Model:
             {
                 ck::ModelDescriptorArtifact value;
-                valid = ck::ReadModelDescriptorArtifact(bytes, value, failure);
+                valid = extension == ".cemd" && ck::ReadModelDescriptorArtifact(bytes, value, failure);
+                break;
+            }
+            case ck::CookedAssetKind::Mesh:
+            {
+                ck::ModelGeometryArtifact value;
+                std::vector<std::string> warnings;
+                valid = extension == ".cege" && ck::ReadModelGeometryArtifact(bytes, value, failure, &warnings);
+                if (valid && !warnings.empty())
+                {
+                    failure = warnings.front();
+                    valid = false; // 게시/CAS 검증에서는 derived fallback으로 손상을 숨기지 않는다.
+                }
                 break;
             }
             case ck::CookedAssetKind::Skeleton:
             {
                 ck::SkeletonArtifact value;
-                valid = ck::ReadSkeletonArtifact(bytes, value, failure);
+                valid = extension == ".cesl" && ck::ReadSkeletonArtifact(bytes, value, failure);
                 break;
             }
             case ck::CookedAssetKind::AnimationClip:
             {
                 ck::AnimationClipArtifact value;
-                valid = ck::ReadAnimationClipArtifact(bytes, value, failure);
+                valid = extension == ".cean" && ck::ReadAnimationClipArtifact(bytes, value, failure);
                 break;
             }
             default:
@@ -531,7 +548,7 @@ namespace AssetCooking
             }
             if (!valid)
             {
-                Fail("Typed AssetSet payload validation failed: " + failure);
+                Fail("Typed AssetSet payload/extension validation failed: " + failure);
             }
         }
 
@@ -706,6 +723,10 @@ namespace AssetCooking
                 {
                     Fail("Model source cook failed: " + relativeSource + ": " + cooked.failure);
                 }
+                for (const auto& warning : cooked.warnings)
+                {
+                    std::cerr << "AssetSet source warning: " << relativeSource << ": " << warning << '\n';
+                }
                 for (auto& product : cooked.products)
                 {
                     const auto& authored = definition.sources.at(product.asset.key);
@@ -713,7 +734,8 @@ namespace AssetCooking
                     {
                         Fail("Authored typed dependencies differ from source: " + relativeSource + " [" +
                             Label(product.asset.key) + "]; skeleton requires [], clip requires exactly Hard skeleton, "
-                            "Model requires exactly Loadable skeleton and all authored clips");
+                            "static Mesh requires [], skinned Mesh requires exactly Hard skeleton; "
+                            "Model requires exactly Loadable skeleton, all authored clips and meshes");
                     }
                     PreparedArtifact value;
                     value.bytes = std::move(product.artifactBytes);
@@ -725,30 +747,87 @@ namespace AssetCooking
                     result.emplace(product.asset.key, std::move(value));
                 }
             }
-            // Bind against the actual selected skeleton artifact, not merely
-            // the producer-local skeleton. Two source paths may not smuggle
-            // incompatible bytes behind a copied authored identity.
+            // producer 내부 값만 비교하면 복사된 UUID 뒤의 다른 skeleton을 놓친다.
+            // 실제 선택 artifact끼리 연결을 검증한다.
             for (const auto& identity : included)
             {
                 const auto& authored = definition.sources.at(identity);
-                if (authored.asset.kind != ck::CookedAssetKind::AnimationClip)
-                {
-                    continue;
-                }
-                ck::AnimationClipArtifact clip;
-                ck::SkeletonArtifact skeleton;
                 std::string failure;
-                if (!ck::ReadAnimationClipArtifact(result.at(identity).bytes, clip, failure))
+                if (authored.asset.kind == ck::CookedAssetKind::AnimationClip)
                 {
-                    Fail("Prepared clip validation failed: " + failure);
+                    ck::AnimationClipArtifact clip;
+                    ck::SkeletonArtifact skeleton;
+                    if (!ck::ReadAnimationClipArtifact(result.at(identity).bytes, clip, failure))
+                    {
+                        Fail("Prepared clip validation failed: " + failure);
+                    }
+                    const ck::AssetIdentity skeletonKey{ clip.skeletonAssetId, {} };
+                    const auto found = result.find(skeletonKey);
+                    if (found == result.end() || definition.sources.at(skeletonKey).asset.kind != ck::CookedAssetKind::Skeleton ||
+                        !ck::ReadSkeletonArtifact(found->second.bytes, skeleton, failure) ||
+                        !ck::ValidateAnimationClipBinding(clip, skeleton, failure))
+                    {
+                        Fail("Selected clip/skeleton layout binding failed: " + authored.source + ": " + failure);
+                    }
                 }
-                const ck::AssetIdentity skeletonKey{ clip.skeletonAssetId, {} };
-                const auto found = result.find(skeletonKey);
-                if (found == result.end() || definition.sources.at(skeletonKey).asset.kind != ck::CookedAssetKind::Skeleton ||
-                    !ck::ReadSkeletonArtifact(found->second.bytes, skeleton, failure) ||
-                    !ck::ValidateAnimationClipBinding(clip, skeleton, failure))
+                else if (authored.asset.kind == ck::CookedAssetKind::Mesh)
                 {
-                    Fail("Selected clip/skeleton layout binding failed: " + authored.source + ": " + failure);
+                    ck::ModelGeometryArtifact geometry;
+                    if (!ck::ReadModelGeometryArtifact(result.at(identity).bytes, geometry, failure))
+                    {
+                        Fail("Prepared geometry validation failed: " + failure);
+                    }
+                    if (geometry.requiredBoneCount == 0u)
+                    {
+                        if (!authored.dependencies.empty())
+                        {
+                            Fail("Static geometry must not have a skeleton hard edge: " + authored.source);
+                        }
+                        continue;
+                    }
+                    if (authored.dependencies.size() != 1u ||
+                        authored.dependencies[0].kind != ck::AssetDependencyKind::Hard ||
+                        authored.dependencies[0].target.kind != ck::CookedAssetKind::Skeleton)
+                    {
+                        Fail("Skinned geometry requires exactly one typed Hard skeleton edge: " + authored.source);
+                    }
+                    const auto key = authored.dependencies[0].target.key;
+                    const auto found = result.find(key);
+                    ck::SkeletonArtifact skeleton;
+                    if (found == result.end() || definition.sources.at(key).asset.kind != ck::CookedAssetKind::Skeleton ||
+                        !ck::ReadSkeletonArtifact(found->second.bytes, skeleton, failure) ||
+                        !ck::ValidateModelGeometryBinding(geometry, skeleton, failure))
+                    {
+                        Fail("Selected geometry/skeleton full binding failed: " + authored.source + ": " + failure);
+                    }
+                }
+                else if (authored.asset.kind == ck::CookedAssetKind::Model)
+                {
+                    ck::ModelDescriptorArtifact descriptor;
+                    if (!ck::ReadModelDescriptorArtifact(result.at(identity).bytes, descriptor, failure) ||
+                        descriptor.modelAssetId != identity.assetId ||
+                        !ck::ValidateModelDescriptorDependencies(descriptor, authored.dependencies, failure))
+                    {
+                        Fail("Selected model descriptor closure failed: " + authored.source + ": " + failure);
+                    }
+                    for (const auto& summary : descriptor.meshes)
+                    {
+                        const ck::AssetIdentity key{ summary.meshAssetId, {} };
+                        const auto found = result.find(key);
+                        ck::ModelGeometryArtifact geometry;
+                        if (found == result.end() || definition.sources.at(key).asset.kind != ck::CookedAssetKind::Mesh ||
+                            !ck::ReadModelGeometryArtifact(found->second.bytes, geometry, failure) ||
+                            !ck::ValidateModelMeshSummary(summary, geometry, failure))
+                        {
+                            Fail("Selected model/mesh summary mismatch: " + authored.source + ": " + failure);
+                        }
+                        const auto& edges = definition.sources.at(key).dependencies;
+                        if (summary.skinned && (edges.size() != 1u ||
+                            edges[0].target.key.assetId != descriptor.skeletonAssetId))
+                        {
+                            Fail("Selected model and mesh disagree on logical skeleton identity: " + authored.source);
+                        }
+                    }
                 }
             }
             return result;

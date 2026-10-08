@@ -98,7 +98,7 @@ public:
 
 	void SaveSceneAsync(std::string_view name = "SampleScene");
     // Owner thread only. Parsing/assets use engine jobs; entities are constructed at
-    // ApplyPendingSceneStructureChange or WaitForSceneLoad (scene structure boundary).
+    // ApplyPendingSceneStructureChange or PollSceneLoads (scene structure boundary).
     // future is only a result channel: do not block the owner with get() before pumping.
     // SceneManager owns successful results, including an abandoned future. Failure or
     // cancellation yields nullptr. Callback requests replace earlier pending callbacks.
@@ -107,8 +107,10 @@ public:
     void ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete = true);
 	void BeforeAwakeSceneLoad();
 	bool IsSceneLoading() const;
-    // Blocks for preparation and constructs results; activation remains frame-boundary work.
-    void WaitForSceneLoad();
+    // Owner-thread, nonblocking completion pump. Returns true once every pending
+    // request has produced its result; activation remains frame-boundary work.
+    // Poll again while false. Never wait on an incomplete asset job on GT/RT.
+    bool PollSceneLoads();
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }

@@ -30,6 +30,7 @@ namespace experiment::cooked
         // Length-framed ordered path+hash inventory: root source, canonical
         // sidecar, epoch header and every captured external importer input.
         Sha256Digest sourceInputsSha256{};
+        std::vector<std::string> warnings{};
         std::string failure{};
         [[nodiscard]] bool Succeeded() const noexcept
         {

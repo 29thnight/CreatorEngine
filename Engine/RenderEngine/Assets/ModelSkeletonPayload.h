@@ -10,6 +10,7 @@ namespace assets
     {
         ModelSkeletonAsset skeleton{};
         experiment::cooked::Sha256Digest boneLayoutSha256{};
+        experiment::cooked::Sha256Digest skinBindingSha256{};
         experiment::cooked::ResolvedAssetEntry origin{};
         std::size_t decodedBytes{};
 

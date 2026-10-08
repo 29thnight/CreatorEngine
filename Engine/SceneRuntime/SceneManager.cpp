@@ -1298,10 +1298,11 @@ void SceneManager::CompleteSceneLoads(bool wait)
     }
 }
 
-void SceneManager::WaitForSceneLoad()
+bool SceneManager::PollSceneLoads()
 {
     RequireSceneLoadOwner();
-    CompleteSceneLoads(true);
+    CompleteSceneLoads(false);
+    return m_pendingSceneLoads.empty();
 }
 
 void SceneManager::DrainSceneLoads()
