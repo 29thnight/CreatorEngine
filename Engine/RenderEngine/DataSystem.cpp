@@ -954,6 +954,19 @@ bool DataSystem::PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& p
                         throw std::runtime_error("Required texture could not be prepared: " + entry.assetName);
                     }
                     break;
+                case ManagedAssetType::SpriteFont:
+                {
+                    std::string failure;
+                    if (!LoadFontShared(entry.assetName, failure))
+                    {
+                        throw std::runtime_error("Required font could not be prepared: " + entry.assetName + ": " + failure);
+                    }
+                    if (!failure.empty())
+                    {
+                        Debug::PrintLog(spdlog::level::warn, "SDF font preparation: " + failure);
+                    }
+                    break;
+                }
                 default:
                     break;
                 }
@@ -3745,7 +3758,6 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 	std::lock_guard retainedGuard(m_retainedAssetsMutex);
 	for (const auto& entry : bundle.assets)
 	{
-		file::path name = entry.assetName;
 		// G2 — 텍스처 캐시는 경로 키다. 적재와 같은 해석으로 키를 만들지 않으면
 		// UnloadUnusedAssets 가 번들이 붙든 텍스처를 전부 "안 쓰는 것" 으로 지운다.
 		std::string key;
@@ -3767,7 +3779,7 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::SpriteSheet)));
 			break;
 		default:
-			key = name.stem().string();
+			key = file::path(entry.assetName).stem().string();
 			break;
 		}
 		m_retainedAssets[entry.assetTypeID].insert(std::move(key));
