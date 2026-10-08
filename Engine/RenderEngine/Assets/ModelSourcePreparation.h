@@ -9,6 +9,7 @@ namespace assets
     {
         bool buildMeshlets{};
         std::uint32_t lodLevels{};
+        bool createMeshCollider{};
     };
 
     // 캡처한 sidecar만 읽어 저작과 cook의 기본값·설정 해석이 갈라지지 않게 한다.

@@ -30,9 +30,13 @@ namespace ModelSceneInstantiation
     struct Options final
     {
         // Worker prepares triangle values; the owner-thread host publishes/resolves a shared asset.
+        // Applies to legacy generation preparation. Typed inputs carry their
+        // effective collider policy from DataSystem::PrepareModelAsset.
         bool createMeshCollider{ false };
         std::function<ce::physics::result<ce::physics::geometry_asset_key>(
             Scene&, std::uint32_t, const ce::physics::triangle_mesh_source&)> collisionGeometry;
+        // Source compatibility only; typed inputs already resolve this choice.
+        bool useCookedColliderDefault{ true };
 
     };
 

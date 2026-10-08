@@ -2,6 +2,7 @@
 
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
+#include <algorithm>
 
 namespace assets
 {
@@ -16,7 +17,15 @@ namespace assets
         experiment::cooked::ResolvedAssetEntry skeleton{};
         std::vector<experiment::cooked::ResolvedAssetEntry> clips{};
         std::vector<experiment::cooked::ResolvedAssetEntry> meshes{};
+        // Sorted, unique source-node uses, derived once from summary.nodes.
+        // Declared but uninstantiated meshes do not demand collider geometry.
+        std::vector<experiment::AssetId> instantiatedMeshes{};
         std::size_t metadataBytes{};
+
+        [[nodiscard]] bool Instantiates(const experiment::AssetId& mesh) const noexcept
+        {
+            return std::ranges::binary_search(instantiatedMeshes, mesh);
+        }
 
         // Selected children open only in their payload workers; the resulting
         // payload origins retain exact file pins. Unselected locators retain the

@@ -28,6 +28,7 @@
 #include <optional>
 #include <span>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 template <typename T>
@@ -280,7 +281,9 @@ public:
     ModelPreparation PrepareModelAssetByPath(std::string_view path);
     // Full model scene preparation is explicit. Root enumeration/acquisition
     // remains metadata-only and individual mesh/clip requests stay independent.
-    ModelPreparation PrepareModelAsset(AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link);
+    // Collider demand is fixed per ticket; construction uses its effective choice.
+    ModelPreparation PrepareModelAsset(AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link,
+        assets::ModelColliderPreparationPolicy colliderPolicy = assets::ModelColliderPreparationPolicy::CookedDefault);
     [[nodiscard]] bool HasPreparedModelScene(const ModelPreparation& preparation) const;
     bool ReadPreparedModelScene(const ModelPreparation& preparation,
         assets::ModelSceneAssetInputs& result, std::string& error) const;
@@ -621,7 +624,12 @@ private:
     AssetDepot::AssetRequest<T> RequestModelAssetFromSnapshot(AssetDepot::AssetLink<T> link,
         own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch);
     ModelPreparation PrepareModelAssetFromSnapshot(AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link,
-        own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch);
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch,
+        assets::ModelColliderPreparationPolicy colliderPolicy = assets::ModelColliderPreparationPolicy::CookedDefault);
+    AssetDepot::AssetRequest<assets::ModelGeometryPayload> RequestModelColliderGeometry(
+        experiment::cooked::ResolvedAssetEntry resolved,
+        AssetDepot::AssetRequest<assets::ModelAnimationDescriptor> descriptor, std::uint64_t epoch,
+        assets::ModelColliderPreparationPolicy colliderPolicy);
     template<class T>
     AssetDepot::AssetRequest<T> RequestResolvedModelAssetAsync(
         experiment::cooked::ResolvedAssetEntry resolved,
@@ -692,7 +700,10 @@ private:
     bool ValidatePreparedMaterialTextures(Material& material, std::string& error);
     std::vector<assets::ModelAssetGeneration::Shared> SnapshotPreparedModelAssets() const;
     mutable std::mutex m_assetPreparationMutex;
-    std::map<FileGuid, own::weak_owner<PreparedRuntimeAsset>> m_assetPreparations;
+    // Policy is a request recipe, not another asset generation. Each policy's
+    // valid preparation ticket remains independently publishable.
+    using AssetPreparationKey = std::pair<FileGuid, assets::ModelColliderPreparationPolicy>;
+    std::map<AssetPreparationKey, own::weak_owner<PreparedRuntimeAsset>> m_assetPreparations;
     std::vector<own::weak_owner<SceneAssetPreparation>> m_sceneAssetPreparations;
     std::vector<own::shared_owner<PreparedRuntimeAsset>> m_retiredAssetPreparations;
     std::vector<own::weak_owner<AssetBundlePreparation>> m_assetBundlePreparations;
@@ -790,7 +801,7 @@ private:
         std::unordered_map<FileGuid, std::uint32_t> shaderSlotsByGuid;
         std::vector<ShaderMetaCacheSlot> shaderSlots;
         std::vector<std::uint32_t> shaderFreeSlots;
-        std::map<FileGuid, own::weak_owner<PreparedRuntimeAsset>> preparations;
+        std::map<AssetPreparationKey, own::weak_owner<PreparedRuntimeAsset>> preparations;
         std::vector<own::weak_owner<SceneAssetPreparation>> scenes;
         std::vector<own::weak_owner<AssetBundlePreparation>> bundles;
         std::vector<own::shared_owner<PreparedRuntimeAsset>> preparationPins;

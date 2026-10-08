@@ -315,6 +315,7 @@ struct DataSystem::PreparedRuntimeAsset
     job_handle work;
     assets::ModelAssetGeneration::Shared model;
     bool granularModel{};
+    assets::ModelColliderPreparationPolicy colliderPolicy{ assets::ModelColliderPreparationPolicy::CookedDefault };
     assets::ModelSceneAssetInputs modelScene;
     own::shared_owner<const material_graph::PreparedGeneration> graph;
     std::string error;
@@ -505,7 +506,8 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
     {
         return {};
     }
-    if (const auto found = m_assetPreparations.find(guid); found != m_assetPreparations.end())
+    const AssetPreparationKey preparationKey{ guid, assets::ModelColliderPreparationPolicy::CookedDefault };
+    if (const auto found = m_assetPreparations.find(preparationKey); found != m_assetPreparations.end())
     {
         if (const auto existing = found->second.lock(); existing
             && existing->epoch == m_assetPreparationEpoch && existing->resolverRevision == m_assetDepotRevision
@@ -599,7 +601,7 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
         ? SubmitAssetWorkLocked(std::move(work), dependencies)
         : SubmitAssetWorkLocked(std::move(work));
     lane = asset->work;
-    m_assetPreparations.emplace(guid, asset);
+    m_assetPreparations.emplace(AssetPreparationKey{ guid, asset->colliderPolicy }, asset);
     return asset;
 }
 
@@ -608,7 +610,7 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
     // No file reads, compilation or waits under the publication lock. Asset
     // changes erase their request before a stale completion can publish.
     std::lock_guard lock(m_assetPreparationMutex);
-    const auto found = m_assetPreparations.find(asset->guid);
+    const auto found = m_assetPreparations.find({ asset->guid, asset->colliderPolicy });
     const auto current = found == m_assetPreparations.end()
         ? own::shared_owner<PreparedRuntimeAsset>{} : found->second.lock();
     if (asset->cancelled.load(std::memory_order_acquire) ||
@@ -664,7 +666,8 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
 }
 
 DataSystem::ModelPreparation DataSystem::PrepareModelAsset(
-    AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link)
+    AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link,
+    assets::ModelColliderPreparationPolicy colliderPolicy)
 {
     own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog;
     std::uint64_t epoch{};
@@ -678,12 +681,13 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAsset(
         catalog = m_cookedCatalog;
         epoch = m_assetPreparationEpoch;
     }
-    return PrepareModelAssetFromSnapshot(link, std::move(catalog), epoch);
+    return PrepareModelAssetFromSnapshot(link, std::move(catalog), epoch, colliderPolicy);
 }
 
 DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
     AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link,
-    own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch)
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch,
+    assets::ModelColliderPreparationPolicy colliderPolicy)
 {
     namespace cooked = experiment::cooked;
     auto asset = own::make_shared<PreparedRuntimeAsset>();
@@ -692,6 +696,7 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
     asset->projectRoot = PathFinder::Relative();
     asset->type = RuntimeAssetType::Model;
     asset->granularModel = true;
+    asset->colliderPolicy = colliderPolicy;
     asset->epoch = epoch;
     asset->resolverRevision = catalog ? catalog->ResolverRevision() : 0u;
     const auto fail = [&](std::string message)
@@ -699,6 +704,12 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
         asset->error = std::move(message);
         return asset;
     };
+    if (colliderPolicy != assets::ModelColliderPreparationPolicy::CookedDefault &&
+        colliderPolicy != assets::ModelColliderPreparationPolicy::Enabled &&
+        colliderPolicy != assets::ModelColliderPreparationPolicy::Disabled)
+    {
+        return fail("Typed model collider preparation policy is invalid.");
+    }
     cooked::ResolvedAssetEntry root;
     if (!link.IsValid() || link.identity.subassetId.IsValid() || !catalog ||
         catalog->Find(link.ToReference(), root) != cooked::AssetLookupStatus::Found)
@@ -713,7 +724,8 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
         {
             return fail("Typed model preparation was superseded before admission.");
         }
-        if (const auto found = m_assetPreparations.find(asset->guid); found != m_assetPreparations.end())
+        if (const auto found = m_assetPreparations.find({ asset->guid, asset->colliderPolicy });
+            found != m_assetPreparations.end())
         {
             existingAtDiscovery = found->second.lock();
             if (existingAtDiscovery && existingAtDiscovery->granularModel &&
@@ -726,8 +738,10 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
         }
     }
     using MeshRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelMeshDescriptor>>;
+    using GeometryRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelGeometryPayload>>;
     using MaterialRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<Material>>;
     std::vector<MeshRequest> meshes;
+    std::vector<GeometryRequest> geometry;
     std::vector<MaterialRequest> materials;
     AssetDepot::AssetRequest<assets::ModelSkeletonPayload> skeleton;
     std::vector<job_handle> dependencies;
@@ -747,7 +761,7 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
                 edge.target.kind != cooked::CookedAssetKind::Skeleton &&
                 edge.target.kind != cooked::CookedAssetKind::AnimationClip))
         {
-            return fail("Typed model scene preparation requires schema3 Loadable child declarations.");
+            return fail("Typed model scene preparation requires current-schema Loadable child declarations.");
         }
     }
     auto descriptor = RequestModelAssetFromSnapshot(link, catalog, epoch);
@@ -756,6 +770,17 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
     {
         if (edge.target.kind == cooked::CookedAssetKind::Mesh)
         {
+            cooked::ResolvedAssetEntry resolved;
+            if (catalog->Find(edge.target, resolved) != cooked::AssetLookupStatus::Found)
+            {
+                return fail("Typed model mesh is absent from the captured resolver.");
+            }
+            // Collider-only data waits for the selected policy and source-node
+            // use. Cold descriptions still demand ordinary decode; disabled
+            // preparation adds neither a raw flight nor a resident payload pin.
+            auto payload = RequestModelColliderGeometry(std::move(resolved), descriptor, epoch, colliderPolicy);
+            add(payload);
+            geometry.emplace_back(edge.target.key.assetId, std::move(payload));
             auto request = RequestModelAssetFromSnapshot(
                 AssetDepot::AssetLink<assets::ModelMeshDescriptor>{ edge.target.key }, catalog, epoch);
             add(request);
@@ -777,9 +802,11 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
         // Animation clips remain Loadable. Animator requests only selected clips.
     }
     std::ranges::sort(meshes, {}, &MeshRequest::first);
+    std::ranges::sort(geometry, {}, &GeometryRequest::first);
     std::ranges::sort(materials, {}, &MaterialRequest::first);
     job_group work;
-    work.add([this, asset, descriptor, meshes = std::move(meshes), materials = std::move(materials), skeleton]()
+    work.add([this, asset, descriptor, meshes = std::move(meshes), geometry = std::move(geometry),
+        materials = std::move(materials), skeleton]()
     {
         try
         {
@@ -792,6 +819,9 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
             assets::ModelSceneAssetInputs candidate;
             candidate.descriptor = model.asset;
             const auto& summary = model.asset->summary;
+            candidate.colliderPolicy = asset->colliderPolicy;
+            candidate.createMeshCollider = assets::ShouldPrepareModelCollider(
+                candidate.colliderPolicy, summary.createMeshCollider);
             if (summary.skeletonAssetId.IsValid())
             {
                 const auto result = skeleton.Snapshot();
@@ -804,6 +834,10 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
                 candidate.skeleton = result.asset;
             }
             candidate.meshes.reserve(summary.meshes.size());
+            if (candidate.createMeshCollider)
+            {
+                candidate.geometry.resize(summary.meshes.size());
+            }
             for (const auto& expected : summary.meshes)
             {
                 const auto found = std::ranges::lower_bound(meshes, expected.meshAssetId, {}, &MeshRequest::first);
@@ -819,6 +853,21 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
                         result.asset->requiredSkinBindingSha256 != candidate.skeleton->skinBindingSha256)))
                 {
                     throw std::runtime_error("Typed model mesh or skin binding differs from its captured summary.");
+                }
+                if (candidate.createMeshCollider && model.asset->Instantiates(expected.meshAssetId))
+                {
+                    const auto raw = std::ranges::lower_bound(geometry, expected.meshAssetId, {}, &GeometryRequest::first);
+                    if (raw == geometry.end() || raw->first != expected.meshAssetId)
+                    {
+                        throw std::runtime_error("Typed model mesh is missing its exact collider geometry preparation.");
+                    }
+                    const auto payload = raw->second.Snapshot();
+                    if (payload.status != AssetDepot::AssetRequestStatus::Ready || !payload.asset ||
+                        !payload.asset->Matches(*result.asset))
+                    {
+                        throw std::runtime_error("Typed model collider geometry differs from its exact description.");
+                    }
+                    candidate.geometry[candidate.meshes.size()] = payload.asset;
                 }
                 candidate.meshes.push_back(result.asset);
             }
@@ -877,7 +926,8 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
     }
     // A concurrent caller may have registered the same preparation while child
     // requests were admitted. Child generation work is independently joined.
-    if (const auto found = m_assetPreparations.find(asset->guid); found != m_assetPreparations.end())
+    if (const auto found = m_assetPreparations.find({ asset->guid, asset->colliderPolicy });
+        found != m_assetPreparations.end())
     {
         existingAtSubmission = found->second.lock();
         if (existingAtSubmission && existingAtSubmission->granularModel &&
@@ -888,7 +938,7 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
             return existingAtSubmission;
         }
     }
-    m_assetPreparations[asset->guid] = asset;
+    m_assetPreparations[{ asset->guid, asset->colliderPolicy }] = asset;
     try
     {
         asset->work = SubmitAssetWorkLocked(std::move(work), dependencies);
@@ -3361,7 +3411,7 @@ std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedMo
                 && !preparation->cancelled.load(std::memory_order_acquire)
                 && preparation->work.is_complete() && preparation->error.empty() && preparation->model)
             {
-                auto& candidate = byModel[id.m_guid];
+                auto& candidate = byModel[id.first.m_guid];
                 if (!candidate || candidate->Identity().generation <= preparation->model->Identity().generation)
                 {
                     candidate = preparation->model;
@@ -4486,7 +4536,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
                 asset->cancelled.store(true, std::memory_order_release);
                 if (asset->type == RuntimeAssetType::MaterialGraph)
                 {
-                    m_materialGraphGenerations.InvalidatePreparation(experiment::AssetId{guid.m_guid});
+                    m_materialGraphGenerations.InvalidatePreparation(experiment::AssetId{guid.first.m_guid});
                 }
                 if (!asset->work.is_complete())
                 {

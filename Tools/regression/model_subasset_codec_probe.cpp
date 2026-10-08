@@ -4,6 +4,7 @@
 #include "Experiment/Cooked/ModelAssetSetProducer.h"
 #include "Experiment/Cooked/CookSupport.h"
 #include "Assets/ModelSourcePreparation.h"
+#include "Assets/ModelSceneAssetInputs.h"
 #include "Experiment/Import/SceneToModelDraft.h"
 #include "Experiment/Import/MeshletBuilder.h"
 #include "Experiment/Import/MeshLodBuilder.h"
@@ -22,6 +23,13 @@
 namespace
 {
     namespace ck = experiment::cooked;
+
+    static_assert(!assets::ShouldPrepareModelCollider(assets::ModelColliderPreparationPolicy::CookedDefault, false));
+    static_assert(assets::ShouldPrepareModelCollider(assets::ModelColliderPreparationPolicy::CookedDefault, true));
+    static_assert(assets::ShouldPrepareModelCollider(assets::ModelColliderPreparationPolicy::Enabled, false));
+    static_assert(assets::ShouldPrepareModelCollider(assets::ModelColliderPreparationPolicy::Enabled, true));
+    static_assert(!assets::ShouldPrepareModelCollider(assets::ModelColliderPreparationPolicy::Disabled, false));
+    static_assert(!assets::ShouldPrepareModelCollider(assets::ModelColliderPreparationPolicy::Disabled, true));
 
     void Require(bool condition, const char* message)
     {
@@ -294,6 +302,7 @@ namespace
             descriptor.nodes.push_back({ "Root", {}, math::matrix4x4::identity(), { summary.meshAssetId } });
             descriptor.materials.push_back({ V8(98u), "Surface", experiment::MaterialBlendMode::Opaque });
             descriptor.meshes[0].materialAssetId = V8(98u);
+            descriptor.createMeshCollider = true;
             std::vector<ck::AssetDependency> edges{
                 { { { summary.meshAssetId, {} }, ck::CookedAssetKind::Mesh }, ck::AssetDependencyKind::Loadable,
                     ck::AssetDependencyScope::External } };
@@ -310,11 +319,17 @@ namespace
             Require(ck::WriteModelDescriptorArtifact(descriptor, renamed, failure), "geometry descriptor encode");
             ck::ModelDescriptorArtifact restored;
             Require(ck::ReadModelDescriptorArtifact(renamed, restored, failure) && restored.meshes.size() == 1u &&
-                restored.nodes[0].meshAssetIds[0] == summary.meshAssetId, "geometry descriptor roundtrip");
+                restored.nodes[0].meshAssetIds[0] == summary.meshAssetId && restored.createMeshCollider,
+                "geometry descriptor/collider policy roundtrip");
+            auto invalidPolicy = renamed;
+            invalidPolicy.back() = std::byte{ 2u };
+            Require(!ck::ReadModelDescriptorArtifact(invalidPolicy, restored, failure), "invalid collider flag accepted");
             renamed[4] = std::byte{ 1u };
             Require(!ck::ReadModelDescriptorArtifact(renamed, restored, failure), "descriptor v1 accepted without recook");
             renamed[4] = std::byte{ 2u };
             Require(!ck::ReadModelDescriptorArtifact(renamed, restored, failure), "descriptor v2 accepted without material-edge recook");
+            renamed[4] = std::byte{ 3u };
+            Require(!ck::ReadModelDescriptorArtifact(renamed, restored, failure), "descriptor v3 accepted without collider-policy recook");
             edges[0].kind = ck::AssetDependencyKind::Hard;
             Require(!ck::ValidateModelDescriptorDependencies(descriptor, edges, failure), "eager geometry descriptor edge accepted");
             descriptor.nodes[0].meshAssetIds[0] = V8(99u);

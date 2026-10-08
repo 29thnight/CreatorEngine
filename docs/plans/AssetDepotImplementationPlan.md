@@ -44,7 +44,7 @@ design. A foundation slice is not completion of the runtime migration.
   descriptors/skeletons/clips, plus small Mesh descriptors and exact geometry payloads.
   Requests have independent cancellation, resolver-bound
   keys, stale publication gates and bounded weak-current/retained caches.
-- A schema3 model descriptor reads no mesh/skeleton/clip files. It captures ordered child identity
+- A schema4 model descriptor reads no mesh/skeleton/clip files. It captures ordered child identity
   and locator metadata, including absent Loadable children. Only a selected child
   worker opens and verifies its payload; absent captured children fail without resolving
   a newer mount. Acquired origins retain exact per-artifact backing, not every file in
@@ -55,8 +55,8 @@ design. A foundation slice is not completion of the runtime migration.
 - Independent CEGE mesh artifacts omit logical identity/name/material fields. Their
   bounded codec validates the packed rendering contract and full skin binding; optional
   invalid meshlet/LOD data falls back to indexed geometry. Earlier model descriptor
-  schemas require recook into schema3, which adds explicit Loadable Material edges
-  beside ordered mesh/node/material summaries.
+  schemas require recook into schema4, which includes explicit Loadable Material edges
+  and the captured collider policy beside ordered mesh/node/material summaries.
 - MeshRenderer recognizes mounted typed meshes before legacy paths. Components,
   proxies and durable frame tables retain small descriptors; a separate 128 MiB raw
   geometry cache shares compatible reads/decodes across logical IDs. Each descriptor
@@ -81,12 +81,18 @@ design. A foundation slice is not completion of the runtime migration.
 - Animator owns only selected/current/transition/layer clips and skeletons through
   scheduled evaluation. Both granular and transitional legacy geometry require the
   full compatible skin-binding contract before accepting its current palette.
-- Explicit mounted-model placement prepares schema3 hierarchy, Mesh descriptors,
+- Explicit mounted-model placement prepares schema4 hierarchy, Mesh descriptors,
   Material templates and Skeleton from one resolver snapshot through existing model
   tickets. Child owners travel in a construction input value packet; clips stay lazy.
   Source-node anchors apply transforms once, including meshless roots and multi-mesh
   siblings. Components receive descriptor/Material/Animator owners without source or
-  legacy whole-model fallback. Explicit collider preparation remains queued.
+  legacy whole-model fallback. Collider preparation accepts CookedDefault, Enabled or
+  Disabled before work admission. Policy-specific tickets do not supersede each other;
+  optional raw geometry gates skip disabled/uninstantiated collision demand. Cold mesh
+  descriptors can still decode their own source artifact to derive metadata. Collision
+  triangles are copied before scene mutation, published through native physics ownership,
+  and released after handoff; repeated meshes reuse the same geometry publication key.
+  Animated static-triangle colliders fail closed.
 - Scene preparation pins selected mesh descriptors through construction. The public
   completion pump is nonblocking `PollSceneLoads`; canceled tickets finish without
   waiting for shared mesh jobs, which still participate in service shutdown drain.
@@ -137,11 +143,10 @@ design. A foundation slice is not completion of the runtime migration.
 
 ## Remaining integration and support boundaries
 
-- Granular rendering is available after explicit `MountAssetSet` activation and with
-  an explicitly prepared material. General source-free authored-model instantiation,
-  general material binding/instantiation and legacy aggregate embedded texture
-  consumers are not yet fully cut over. Independent producers and typed Lattice
-  runtime requests exist; source-free hierarchy/consumer handoff is the next slice.
+- Granular rendering and source-free mounted-model placement use the typed hierarchy,
+  independent Lattice materials/embedded textures and exact collider preparation.
+  Saved-scene inline material restoration and authored/code material views are the next
+  integration slice. Other legacy aggregate embedded texture consumers remain adapters.
   Automatic set activation is connected to the existing package bootstrap, which still
   requires the legacy scene/audio/source-identity closure; a v3-only package is pending. CEMCv11 remains a transitional adapter for other legacy consumers.
 - Legacy source/generated Texture adapters explicitly retain non-rehydratable images.

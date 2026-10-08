@@ -127,7 +127,34 @@ namespace Editor
                 if (DataSystems->ReadPreparedModelScene(request->modelPreparation, inputs, request->error) &&
                     !request->cancelled.load(std::memory_order_acquire))
                 {
-                    request->prepared = ModelSceneInstantiation::PendingInstance::Prepare(std::move(inputs), {});
+                    ModelSceneInstantiation::Options options;
+                    options.createMeshCollider = inputs.createMeshCollider;
+                    if (options.createMeshCollider)
+                    {
+                        const auto assetRoot = request->assetRoot;
+                        const auto expectedProject = request->project;
+                        const auto model = inputs.descriptor->summary.modelAssetId.value;
+                        std::vector<Uuid::Uuid16> meshes;
+                        for (const auto& mesh : inputs.descriptor->summary.meshes)
+                        {
+                            meshes.push_back(mesh.meshAssetId.value);
+                        }
+                        options.collisionGeometry = [assetRoot, expectedProject, model, meshes = std::move(meshes)](
+                            Scene& scene, std::uint32_t meshIndex, const ce::physics::triangle_mesh_source& source)
+                            -> ce::physics::result<ce::physics::geometry_asset_key>
+                        {
+                            const auto current = expectedProject.lock();
+                            if (!current || current != SceneManagers->ProjectLayers() ||
+                                assetRoot != PathFinder::Relative() || SceneManagers->IsPlayCommitted() ||
+                                meshIndex >= meshes.size())
+                            {
+                                return std::unexpected(ce::physics::error{ ce::physics::error_code::wrong_phase, 0,
+                                    "Model collision project changed or Play is active" });
+                            }
+                            return PublishModelCollisionGeometry(scene, assetRoot, model, meshes[meshIndex], source);
+                        };
+                    }
+                    request->prepared = ModelSceneInstantiation::PendingInstance::Prepare(std::move(inputs), options);
                     if (!request->prepared)
                     {
                         request->error = "Typed model hierarchy/material preparation failed: " + request->path;

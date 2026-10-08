@@ -220,7 +220,7 @@ namespace ModelSceneInstantiation
             ModelConsumptionDiagnostics::NoteInstantiateRejected();
             return {};
         };
-        if (!inputs.descriptor || options.createMeshCollider)
+        if (!inputs.descriptor)
         {
             return reject();
         }
@@ -228,6 +228,20 @@ namespace ModelSceneInstantiation
         const auto& nodes = summary.nodes;
         const auto& meshes = summary.meshes;
         const auto& materials = summary.materials;
+        // The typed preparation ticket already fixed geometry demand. Options
+        // cannot silently enable a late decode or override an explicit disable.
+        const bool createMeshCollider = inputs.createMeshCollider;
+        if ((inputs.colliderPolicy != assets::ModelColliderPreparationPolicy::CookedDefault &&
+                inputs.colliderPolicy != assets::ModelColliderPreparationPolicy::Enabled &&
+                inputs.colliderPolicy != assets::ModelColliderPreparationPolicy::Disabled) ||
+            createMeshCollider != assets::ShouldPrepareModelCollider(inputs.colliderPolicy, summary.createMeshCollider))
+        {
+            return reject();
+        }
+        if (createMeshCollider && (!options.collisionGeometry || inputs.geometry.size() != meshes.size()))
+        {
+            return reject();
+        }
         if (nodes.empty() || nodes[0].parent.IsValid() || inputs.meshes.size() != meshes.size() ||
             inputs.materials.size() != materials.size())
         {
@@ -264,6 +278,11 @@ namespace ModelSceneInstantiation
         impl->options = options;
         const auto* skeleton = impl->granular.skeleton ? &impl->granular.skeleton->skeleton : nullptr;
         impl->hasBones = skeleton && !skeleton->bones.empty() && skeleton->rootBone < skeleton->bones.size();
+        impl->options.createMeshCollider = createMeshCollider;
+        if (createMeshCollider && impl->hasBones)
+        {
+            return reject();
+        }
         std::map<experiment::AssetId, std::uint32_t> meshIndices;
         std::map<experiment::AssetId, std::uint32_t> materialIndices;
         for (std::uint32_t index = 0u; index < meshes.size(); ++index)
@@ -380,6 +399,35 @@ namespace ModelSceneInstantiation
                 }
             }
         }
+        if (createMeshCollider)
+        {
+            impl->collisionMeshes.resize(meshes.size());
+            impl->collisionKeys.resize(meshes.size());
+            for (const auto object : impl->renderers)
+            {
+                const auto meshIndex = impl->objects[object].mesh;
+                if (!impl->collisionMeshes[meshIndex].points.empty())
+                {
+                    continue;
+                }
+                const auto& geometry = impl->granular.geometry[meshIndex];
+                if (!geometry || !geometry->Matches(*impl->granular.meshes[meshIndex]))
+                {
+                    return reject();
+                }
+                const auto& mesh = geometry->mesh;
+                auto collision = ce::physics::BuildModelCollisionMesh(mesh.vertexBytes, mesh.indices,
+                    mesh.vertexAttributeMask, mesh.vertexStride, mesh.vertexLayoutHash);
+                if (!collision)
+                {
+                    return reject();
+                }
+                impl->collisionMeshes[meshIndex] = std::move(*collision);
+            }
+        }
+        // Collision recipes now own their copied triangle inputs; renderers
+        // retain descriptions and reacquire exact geometry only when needed.
+        impl->granular.geometry.clear();
         impl->handles.resize(impl->objects.size());
         return own::make_unique<PendingInstance>(ConstructionKey{}, std::move(impl));
     }
@@ -516,6 +564,9 @@ namespace ModelSceneInstantiation
                         Debug::PrintLog(spdlog::level::err, std::string(registered.error().message));
                         return fail();
                     }
+                    // The scene/native collision publication has taken ownership.
+                    // A repeated mesh instance reuses collisionKeys, not CPU arrays.
+                    state.collisionMeshes[meshIndex] = {};
                 }
                 object->GetComponent<MeshRenderer>()->SetEnabled(true);
                 ++state.activated;

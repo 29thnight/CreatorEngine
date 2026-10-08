@@ -11,8 +11,8 @@ namespace experiment::cooked
     inline constexpr std::uint32_t kModelGeometryArtifactVersion = 1u;
     inline constexpr std::uint32_t kSkeletonRepresentation = 1u;
     inline constexpr std::uint32_t kAnimationClipRepresentation = 1u;
-    // Version 3 declares independent Material records as Loadable dependencies.
-    inline constexpr std::uint32_t kModelDescriptorVersion = 3u;
+    // Version 4 retains v3 Material edges and persists the captured collider policy.
+    inline constexpr std::uint32_t kModelDescriptorVersion = 4u;
     inline constexpr std::uint32_t kSkeletonArtifactVersion = 1u;
     inline constexpr std::uint32_t kAnimationClipArtifactVersion = 1u;
     inline constexpr std::size_t kModelSubAssetMaxBytes = 256u * 1024u * 1024u;
@@ -91,6 +91,7 @@ namespace experiment::cooked
         std::vector<ModelMeshSummary> meshes{};
         std::vector<ModelNodeSummary> nodes{};
         std::vector<ModelMaterialSummary> materials{};
+        bool createMeshCollider{};
     };
 
     // Ordered, unambiguous bone names/parents/root. Bind matrices and transforms

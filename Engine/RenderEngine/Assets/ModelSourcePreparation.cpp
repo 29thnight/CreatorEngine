@@ -46,6 +46,23 @@ namespace assets
             }
             value.lodLevels = static_cast<std::uint32_t>(text[0] - '0');
         }
+        const auto importer = document.Root()["ModelImporter"];
+        if (importer && !importer.IsMap())
+        {
+            failure = "ModelImporter: expected a map";
+            return false;
+        }
+        const auto collider = importer ? importer["CreateMeshCollider"] : Authoring::ReadNode{};
+        if (collider)
+        {
+            const auto text = collider.IsScalar() ? collider.AsString() : std::string{};
+            if (text != "true" && text != "false")
+            {
+                failure = "ModelImporter.CreateMeshCollider: expected true or false";
+                return false;
+            }
+            value.createMeshCollider = text == "true";
+        }
         out = value;
         failure.clear();
         return true;

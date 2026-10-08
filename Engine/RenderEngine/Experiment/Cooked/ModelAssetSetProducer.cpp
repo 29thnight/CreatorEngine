@@ -440,6 +440,7 @@ namespace experiment::cooked
                     descriptor.modelAssetId = modelId;
                     descriptor.skeletonAssetId = skeletonId;
                     descriptor.name = conversion.modelName;
+                    descriptor.createMeshCollider = geometrySettings.createMeshCollider;
                     if (skeletonId.IsValid())
                     {
                         product.dependencies.push_back(SourceEdge(skeletonId, CookedAssetKind::Skeleton, AssetDependencyKind::Loadable));

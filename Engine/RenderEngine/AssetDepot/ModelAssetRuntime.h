@@ -5,6 +5,7 @@
 #include "../Assets/ModelAnimationDescriptor.h"
 #include "../Assets/ModelAnimationPayload.h"
 #include "../Assets/ModelGeometryPayload.h"
+#include "../Assets/ModelSceneAssetInputs.h"
 
 #include <map>
 
@@ -29,6 +30,22 @@ namespace AssetDepot
 
     template<class T>
     struct ModelAssetDependencies {};
+
+    template<>
+    struct ModelAssetDependencies<assets::ModelGeometryPayload>
+    {
+        // Conditional collider flights have a fixed root/predecessor dependency
+        // graph. Different root gates serialize instead of sharing a decision.
+        own::shared_owner<ModelAssetWork<assets::ModelGeometryPayload>> predecessor{};
+        AssetRequest<assets::ModelAnimationDescriptor> colliderDescriptor{};
+        experiment::AssetId colliderMesh{};
+        assets::ModelColliderPreparationPolicy colliderPolicy{ assets::ModelColliderPreparationPolicy::CookedDefault };
+        std::vector<own::weak_owner<AssetRequestState<assets::ModelGeometryPayload>>> colliderConsumers{};
+        bool colliderOnly{};
+        bool ordinaryDemand{};
+        bool colliderGateEvaluated{};
+        bool colliderRequired{};
+    };
 
     template<>
     struct ModelAssetDependencies<assets::ModelAnimationPayload>

@@ -1097,6 +1097,7 @@ namespace experiment::cooked
                 wire.Text(material.name);
                 wire.Integer(static_cast<std::uint8_t>(material.blendMode));
             }
+            wire.Integer(static_cast<std::uint8_t>(value.createMeshCollider));
             out = std::move(wire.bytes);
         }, failure);
     }
@@ -1169,6 +1170,9 @@ namespace experiment::cooked
                 material.blendMode = static_cast<MaterialBlendMode>(wire.Integer<std::uint8_t>());
                 value.materials.push_back(std::move(material));
             }
+            const auto createMeshCollider = wire.Integer<std::uint8_t>();
+            Require(createMeshCollider <= 1u, "Invalid model collider policy flag");
+            value.createMeshCollider = createMeshCollider != 0u;
             wire.End();
             Descriptor(value);
             out = std::move(value);
