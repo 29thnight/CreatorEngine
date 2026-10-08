@@ -1,5 +1,9 @@
 # PHASE 4.x 공수 재산정 원장
 
+2026-10-07 PR 감사 당시: RG6·RG-V는 병합된 소스를 반영해 progress로 표시하되 기성 0, 추정/잔여 공수는 유지한다. [감사 근거](../analysis/MergedPrReview20261007.md).
+
+2026-10-07 후속: 최종 조합·reference·실제 Editor capture/fixture 수용을 완료해 RG5를 done, 기성 10인일로 회수했다. [최종 증거](../analysis/RenderRg5FinalAcceptance20261007.md). 이후 RG6의 별도 진단/기본 제품 D/R 독립 live 전후 비교·100회 결정성·비용·validation·정상 종료를 수용하여 기성 4인일을 추가 회수했다. [RG6 증거](../analysis/RenderRg6Acceptance20261007.md). 이후 RG-V 기본 native viewer의 D/R 실제 reader·scene/resize·변이·비용·정상 종료를 수용해 4인일을 추가 회수했다. [RG-V 증거](../analysis/GraphRecoveryRgV20261007.md). MAT-9와 C# 연결·alias/queue/range 확장·Vulkan runtime은 올리지 않는다.
+
 **2026-10-01 사용자 요청 · 계획 추정 · 1인 전담 엔지니어 기준 인일.**
 
 Vulkan 비교는 PHASE 4.9의 RenderDoc 작업으로만 산정한다. RHI 중립 타입·변환·capability·수명 구현을
@@ -9,7 +13,7 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 
 ## 집계 규칙
 
-2026-10-03 BASE-0 최종 완료로 기성 4인일을 회수했다. RG1도 검증 완료로 기성 8인일을 회수했다. RG2도 검증 완료로 기성 10인일을 회수했다. RG3도 검증 완료로 기성 8인일을 회수했다. RG4도 검증 완료로 기성 6인일을 회수했다. 총 추정 355인일은 유지하며 현재 기성 88·잔여 267인일이다.
+2026-10-03 BASE-0 4·RG1 8·RG2 10·RG3 8·RG4 6인일을 회수했고, 2026-10-07 RG5 최종 수용으로 10인일을 추가 회수했다. 총 추정 355인일은 유지하며 RG6 4·RG-V 4인일을 추가 회수해 현재 기성 106·잔여 249인일이다. 계획 공수 회수이며 실제 소요 시간 역산이 아니다.
 
 - 완료 기반의 기존 52인일(4=18, MAT-0~6/MAT-7-BASE/MAT-8=32, L0=2)은 그대로 보존한다. 2026-10-02 MAT-7의 기존 3인일을 검증된 LX 기반 MAT-7-BASE로 옮긴 뒤 공통 재질 통합·혼합 transport·제품 회귀를 완료했다. 재개방한 MAT-7의 `days:null`/기성 추가 0은 유지한다. 진행/미착수 행의 새 값은 남은 완료 조건의 예산이다. 이미 소모한 미기록 작업 시간을 역산하지 않는다.
 - 구현 범위가 같으면 유지한다. 비교 제거를 이유로 모든 행에 같은 할인율을 적용하지 않는다.
@@ -23,14 +27,14 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 |---|---:|---:|---:|---:|---|
 | 4 | 18 | 18 | 18 | 0 | 완료 이력 유지 |
 | 4.25 | 34 | 40 + 미산정 | 32 | 8 + 미산정 | 기존 기반 보존, 공통 재질 통합 재개방과 SSS/투과·Blender/route·성능 회수 |
-| 4.3 | 119 + Q0/RG-V 미산정 | 100 | 36 | 64 | BASE-0 및 RG1~RG4 현행 두 구성 최종 게이트 회수; Q0 6·viewer 4와 범위 유지 |
+| 4.3 | 119 + Q0/RG-V 미산정 | 100 | 54 | 46 | BASE-0·RG1~RG6·RG-V 기본 viewer 두 구성 수용 회수; Q0 6과 잔여 범위 유지 |
 | 4.5 | 86 | 71 | 0 | 71 | 중립 SDK 계약 유지, DX12 구현/수용, Vulkan 비교 제외 |
 | 4.6 | 미산정 | 32 | 0 | 32 | native IR부터 C#/Roslyn/제품 전환까지 7행 최초 산정 |
 | 4.7 | 35 | 35 | 2 | 33 | 원래 DX12 베이크 범위; UV1/BVH/취소·progressive 범위 유지 |
 | 4.75 | 20 + ENV 미산정 | 28 | 0 | 28 | DX12 품질 18 + ENV 전체 route 10 |
 | 4.8 | 5.5 + 구현 미산정 | 9 + 구현 미산정 | 0 | 9 + 구현 미산정 | GPU Scene/IBL/AS 공유 설계와 실제 구현 공수 확정 보강 |
 | 4.9 | 미산정 | 22 | 0 | 22 | RenderDoc 6행, 캡처/리소스/픽셀/수정/재캡처 |
-| **합계** | **317.5 + 미산정** | **355 + 별도 미산정** | **88** | **267 + 별도 미산정** | **신규 산정 74 - 기존 범위 조정 36.5 = +37.5; BASE-0 4·RG1 8·RG2 10·RG3 8·RG4 6 회수** |
+| **합계** | **317.5 + 미산정** | **355 + 별도 미산정** | **106** | **249 + 별도 미산정** | **신규 산정 74 - 기존 범위 조정 36.5 = +37.5; BASE-0 4·RG1 8·RG2 10·RG3 8·RG4 6·RG5 10·RG6 4·RG-V 4 회수** |
 
 ## ID별 재산정
 
@@ -62,13 +66,13 @@ BASE-0 snapshot/readback/변이, 단일 queue·version 미구현 표면, 현재 
 | 4.3 | `RG2` | 10 | 10 | done | version/Modify·RAW/WAR/WAW·stale/fork 거부·texture/buffer 240 shuffle 및 Debug/Release GPU/제품 회귀 완료; 기성 10인일 |
 | 4.3 | `RG3` | 8 | 8 | done | version producer 컬링·WAR/WAW 재연결·sorted lifetime/Transition/UAV, 120 shuffle 및 Debug/Release GPU/제품 회귀 완료; 기성 8인일 |
 | 4.3 | `RG4` | 7 | 6 | done | wave·target append·critical path, 24 shuffle·Debug/Release 1/2/4 워커 GPU·제품 16개 이미지 오차 0; 기성 6인일 |
-| 4.3 | `RG5` | 12 | 10 | progress | GBuffer·Shadow·정책 분리·Deferred/SkyBox·SSAO/SSGI·Forward Code·Lookup·Refraction·SSS·Volume·GraphSurface/Draw/반환 출력 및 실제 versioned 혼합 GPU/guard 회수·Decal·Sprite·화면 SSS/SSR 접근/출력 버전 묶음 완료; 전체 이관/수용은 열림, 기성 0. 현재 제품 59·게이트 224 호출(cpp/h·신규 검사 헤더 포함); 잠정 10인일 유지 |
-| 4.3 | `RG6` | 8 | 4 | todo | DX12 제품 전환·별도 프로세스 전후 회귀 4; 교차 캡처 제외 |
+| 4.3 | `RG5` | 12 | 10 | done | 2026-10-07 reference 및 최종 Fog/PostChain/UI/Editor 명시 접근/반환 출력·3정책 129 frames·개별 기능 수용, 독립 4프로세스/8캡처·16개 이미지 오차 0·validation 0·현재 해시 계약·14개 변이 거부. 제품 69·fixture 253 위치 감사와 임시 추론 adapter 잔여 0, 의도한 legacy 비교 보존. 기성 10인일; RG6 전환 전후 수용은 별도 |
+| 4.3 | `RG6` | 8 | 4 | done | D/R legacy/기본 제품 독립 8프로세스·408캡처·각 100회 graph 결정성·final 색상 오차 0·depth 오차 기준 통과·CPU/GPU 산출물·validation 0·exit 0; 기성 4인일, Vulkan 제외 |
 | 4.3 | `RG7` | 20 | 14 | todo | 기존 transient pool 위 buffer/alias 계획 9 + poison/수명·DX12 검증 5 |
 | 4.3 | `Q0` | 미산정 | 6 | todo | 중립 queue/capability·fence/ownership 계약 4 + DX12 실패/수명 검증 2; 공통 기반 한 번만 계산 |
 | 4.3 | `RG8` | 25 | 16 | todo | Q0 소비 scheduler/ownership 10 + DX12 fallback·겹침/수명 검증 6 |
 | 4.3 | `RG9` | 15 | 10 | todo | range/subresource/split 7 + Inspector 확장/회귀 3; 기본 viewer는 RG-V |
-| 4.3 | `RG-V` | 미산정 | 4 | todo | compiled snapshot reader/UI 3 + generation·변이·비용 검증 1 |
+| 4.3 | `RG-V` | 미산정 | 4 | done | 기본 native snapshot reader/UI·D/R 실제 view/scene/resize·변이·비용·exit 0 수용. C# IR/alias/queue/range는 후속 페이즈 |
 | 4.5 | `TR0` | 4 | 3 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
 | 4.5 | `TR1` | 10 | 8 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |
 | 4.5 | `TR2` | 6 | 5 | todo | DX12 구현·지원 하드웨어·실프레임 회귀로 범위 한정; 중립 SDK/시간축 계약 유지 |

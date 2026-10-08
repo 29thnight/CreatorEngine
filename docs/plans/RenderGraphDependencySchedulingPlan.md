@@ -1,20 +1,65 @@
 # RenderGraph 리소스 의존성 스케줄링 계획 (PHASE 4.3 · 트랙 RG)
 
+## 2026-10-07 RG6 제품 수용 완료
+
+**수용 뒤 후속 변경:** live 재질 fallback 제거로 Shadow/GBuffer는 타깃 초기화만 수행하고 graph가 재질을 기록한다. 준비 중/실패 요청에 이전 instance를 선택하지 않는다. 이 절의 RG6 전후 비교는 보관된 수용 소스 해시에 한정되며, 후속 변경의 검사 결과는 [graph-only 재질 패스 기록](../analysis/GraphOnlyMaterialPasses20261007.md)을 따른다. CSM depth-content cache 수용이나 RG6 성능 전후 비교 재측정으로 확대하지 않는다.
+
+**RG6 done·기성 4인일 회수.** 동일 현재 소스의 별도 DeclarationOrder 진단 빌드와 제품 ExplicitVersioned/DependencyOrder를 D/R 각각 독립 2프로세스로 실행했다. 총 408 accepted capture, 구성/정책별 동일 입력 100회 compiled order/dependency hash 결정성, final 색상 오차 0·깊이 기존 오차 기준 통과·16개 첨부/단계, CPU record/pass GPU/compile/graph 통계, GPU validation 0·drop 0·8프로세스 정상 exit 0을 확인했다. 기본 제품 두 live 생성자는 버전 의존성 경로이고 런타임 legacy 스위치가 없다. reference는 명시 진단 빌드 옵션에서만 활성화된다.
+
+reference 59 pass/51 resource, 제품 65 pass/59 resource의 차이는 모드에 따른 Geometry Occlusion 및 icon 명시 read다. 비용을 순수 스케줄러 overhead나 역사적 전체 PR 효과로 귀속하지 않는다. CPU/GPU 분포와 깊이 readback 버전 차이는 [RG6 수용 보고서](../analysis/RenderRg6Acceptance20261007.md)에 기록했다. 통신 소켓 실패를 제외하고 하네스 수정 후 v2 전체 재검증 및 현재 기본 D/R 공동 BASE-0 phaseComplete를 확인했다. RG-V UI·MAT-9 품질/성능·Vulkan 4.9는 별도다. 아래 PR 감사/이전 날짜 기록은 수용 전 이력이며 이 절이 최신 판정이다.
+
+
+## 2026-10-07 RG5 종결 검사 후속
+
+현재 Debug/Release `dx12.rendergraph`·`dx12.decal`은 GPU validation 활성/문제 0, 정상 종료 exit 0으로 통과했다. 두 검사의 visibility 준비 누락을 수정했고, 현재 셰이더를 갖춘 독립 fixture에서 재검증했다. Decal의 구식 3패스 단정은 지원 장치의 reset/cull을 포함한 5패스·후보 1개로 보완했다. 아래 10월 6일 예외 기록은 해결 전 역사이며 현재 차단 사유가 아니다.
+
+**RG5 완료·기성 10인일 회수.** IblBakeResult·SurfaceBatch·RasterSurfaceBatch의 명시 Read/Write·생산 버전 반환은 D/R 3정책·일반 63 frames·공유 depth 72 frames로 수용했다. 최종 Fog/PostChain/UI/Editor는 D/R 각각 3정책·43 fixture/129 frames·9단계 오차 0, 개별 기능 검사·GPU validation 0·exit 0으로 수용했다. 실제 Editor도 D/R 각각 독립 2프로세스×2캡처, 같은/독립 프로세스·구성 간 16개 이미지 오차 0 및 현재 소스/실행 파일 해시 계약을 통과했다. 선언 목록 제품 69·fixture 253과 명시 경로의 임시 추론 adapter 잔여 0을 감사했다. 의도한 legacy 비교 fixture/호환 분기는 보존한다. 제품 live 두 생성자는 ExplicitVersioned/DependencyOrder다. [최종 수용 보고서](../analysis/RenderRg5FinalAcceptance20261007.md), [reference 이관 보고서](../analysis/RenderRg5ReferenceMigration20261007.md). RG6는 위 후속 절에서 별도 수용했으며 RG-V UI 수용은 남는다.
+
+검사·수정·증거 범위: [RG5 종결 검사 보고서](../analysis/RenderRg5Closure20261007.md).
+
+
+## 2026-10-07 최근 병합 반영
+
+PR #122(`33f44d6c`)의 RG6 ExplicitVersioned/DependencyOrder 및 RG-V immutable snapshot/UI 소스를 현재 HEAD에서 확인했다. 따라서 대시보드의 RG6·RG-V를 todo에서 **progress(earnedDays=0)**로 정정한다. 이는 아래 10월 6일 기록의 완료/기성 불변 원칙을 유지하면서 구현 착수 표기만 바로잡는 것이다.
+
+기존 dx12.rendergraph·dx12.decal 예외와 RG5 선언/adapter·최종 조합·capture/fixture 수용은 후속 검사로 닫았다. 다음은 RG6 별도 프로세스 전환 전후 픽셀·validation·CPU/GPU 증거, RG-V 실제 generation·resize·stale/missing-edge·UI/비용 검사다. RG7~RG9/Q0를 이 PR들의 완료 범위로 추가하지 않는다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 **2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
 
 
 2026-08-28 작성. `EnhancedRenderGraph`를 교체하지 않고, 명시적 리소스 접근과
 버전 계보로 실행 순서를 컴파일하는 그래프로 단계적으로 확장하는 구현 계획이다.
 
-상태: **2026-10-05 BASE-0·RG1~RG4 및 RG5-1~RG5-12의 기존 수용 기록 유지. 요청 범위의 RG5 후속·RG6·RG-V 소스 구현 완료·동결, 영역별 및 전체 diff 독립 최종 정적 검토 완료. 신규 수용 검증 전부 미실행. RG7~RG9·Q0 미착수.** 소스 구현 완료는 빌드·실행·픽셀·성능 수용 완료를 뜻하지 않으며 게시 반영 여부는 PR #122 이력에서 별도 확인한다.
+상태: **2026-10-05 BASE-0·RG1~RG4 및 RG5-1~RG5-12의 기존 수용 기록 유지. 요청 범위의 RG5 후속·RG6·RG-V 소스 구현 완료·동결, 영역별 및 전체 diff 독립 최종 정적 검토 완료. 신규 수용 검증 전부 미실행. RG7~RG9·Q0 미착수.** 소스 구현 완료는 빌드·실행·픽셀·성능 수용 완료를 뜻하지 않는다. 2026-10-06 PR #122(`33f44d6c`)로 master 병합, 병합 뒤 첫 실행 결과는 아래 2026-10-06 절을 따른다.
+
+## 2026-10-06 병합 뒤 첫 실행 — 성능 회귀 하나 수정, 붉은 검사 남음
+
+PR #122 로 제품 일정이 `ExplicitVersioned` + `DependencyOrder` 로 바뀌면서 RG4 의 의존 차례
+병렬 기록이 제품에서 처음 켜졌다. 의존이 줄줄이 이어진 제품 그래프는 패스 37개에 차례 33개가
+생겼고, 차례마다 워커를 깨워 합류시키는 비용 때문에 명령 기록이 프레임당 0.33 → 2.45 ms,
+무제한 렌더가 초당 994 → 315장으로 떨어졌다(GPU 시간 0.23 ms 는 같음).
+`ef829373` 이 워커 하나만 일하는 연속 차례를 Job 하나로 묶어 Release 같은 장면 초당 688장으로
+되돌렸다. 전환 전 994장에는 아직 못 미치며 남은 차이는 측정하지 않았다. 같은 시점 DX12 자가 검증
+28종 중 26종 통과, `dx12.ibl`·`dx12.scene` 실패는 병합 전부터 같았다.
+
+PR #123(`5ca4e82a`)은 그래프 상태 어휘에 버퍼 읽기 전용 `VertexAndShaderResource` 를 더하고
+(`IndirectArgument` 와 같은 규칙: 버퍼·읽기 전용, 가져온 최종 상태로는 금지) GPU 가시성 자원과
+간접 인자 전이를 그래프에 올렸다. 그 결과 **`dx12.rendergraph`·`dx12.decal` 은 패스를 직접 몰면서
+GPU 가시성 준비가 없어 예외로 끝나며 아직 고치지 않았다**(병합 기록). 이 페이즈의 검사가 붉은
+상태이므로 RG5·RG6 수용 전에 먼저 고친다.
+
+RG6 완료선(같은 밀봉 입력의 별도 프로세스 전후 픽셀·검증 0·CPU/GPU 계측 산출물)은 여전히
+실행하지 않았다. 위 초당 장수는 전환 수용 산출물이 아니다. RG5·RG6·RG-V 상태와 기성은 바꾸지 않는다.
 
 ## 2026-10-05 소스 구현 동결·독립 최종 정적 검토 완료 — 실행 수용과 분리
 
 이번 작업은 GPU-driven geometry와 Unreal RDG의 명시적 의존성·수명 원칙을 참고한
 runtime lookup/조명 분리를 같은 `EnhancedRenderGraph`에 연결하는 코드 이관이다.
 요청 범위의 소스 구현과 영역별·전체 diff 독립 최종 정적 검토는 끝났다.
-게시 반영 여부는 PR #122 커밋 이력과 원격 head를 대조해 별도 확인한다. 이 문서는
-소스·정적 검토 범위를 기록하며 게시·실행 수용 완료를 선언하지 않는다.
+(2026-10-06 PR #122 로 병합됨.) 이 문서는
+소스·정적 검토 범위를 기록하며 실행 수용 완료를 선언하지 않는다.
 빌드·테스트·renderer 실행·capture·GPU validation·성능 측정은 사용자 요청에 따라 실행하지 않는다.
 기존 `BASE-0`·`RG1~RG4`·`RG5-1~RG5-12` 증거는 해당 소스의 역사적 수용 기록이며,
 이번 변경의 통과 증거로 재사용하지 않는다. 후속 RG5·RG6·RG-V의 완료 판정과 기성은 올리지 않는다.
@@ -382,6 +427,8 @@ UV/BVH/직접광 준비는 독립적으로 진행할 수 있다. 현재 통합 �
 `RG6`가 세운 제품 RenderGraph를 declaration-order로 되돌리지 않는다.
 
 ## RG-V — compiled graph 읽기 전용 viewer (2026-10-01 추가)
+
+2026-10-07 기본 native viewer 수용 완료: scene epoch·history·view/extent/inactive 검사, 완료 후 preview reader admission, 24개 순서/edge/stale/retention 변이, D/R 실제 3 view·동일 뷰 씬 교체·resize·UI off/on·capacity/copy/p95 비용·validation 0·exit 0을 수용해 기성 4를 회수한다. graph 오류 복구·메시 배치/편집/재로드도 수용했다. C# IR 연결은 PHASE 4.6 CSRP-5/6이며 RG7~9 확장·Vulkan runtime은 별도다. [검증 기록](../analysis/GraphRecoveryRgV20261007.md).
 
 PHASE 4.3의 별도 todo 4인일 행이다. RG9의 subresource/split barrier 구현 완료까지
 기본 graph viewer를 미루지 않는다. RG3 compiled DAG/culling/lifetime/barrier 결과를 입력으로

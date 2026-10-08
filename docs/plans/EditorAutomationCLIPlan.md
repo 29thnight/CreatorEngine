@@ -1,5 +1,13 @@
 # Editor 명령 / Commandlet 경계
 
+## 2026-10-07 최근 병합 반영
+
+PR #125의 `scene.open_async`는 준비 접수 성공과 Scene 활성 완료를 구분하며 기존 동기 명령의 의미를 보존한다. PR #127의 `profile.deep.start`, `profile.deep.status`, `profile.deep.stop <session-id>`는 기존 인증/서비스 큐를 통해 엔진 소유 .cedx 세션을 제어한다. sessionId는 uint64를 보존하는 십진 문자열이며 accepted/in_progress/stopping/finalized/failed/permission_denied/unavailable을 구분한다. 새 HTTP 리스너·승격·사용자 출력 경로 입력은 없다.
+
+PR #117의 `profile.save`는 비동기 요청과 status 확인으로 전체 finalized spool을 저장한다. PR #129의 하단 Cmd 입력칸은 명령 실행 표면이 아니다. 남은 검증은 descriptor/golden 및 실제 접수→완료·stale ID·멱등 Stop·permission failure·Shipping 격리이며 소스 등록만으로 통과 처리하지 않는다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 > 통합 기준: 원격 `2c056012`와 로컬 `709eafe5`. `light.proxy` 제품 조회·텍스처 Commandlet과 로컬 PBR·비동기 모델 검사를 함께 보존한다. 앞선 CLI 병합 후보의 근거는 [병합 준비 기록](../analysis/Phase14_5MergePreparation.md)에 남긴다.
 
 2026-09-06 · 저장소 동기화 통합 기준

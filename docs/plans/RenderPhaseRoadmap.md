@@ -1,5 +1,19 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
+## 2026-10-07 최근 병합 반영
+
+**같은 날 후속 — 재질 fallback 제거:** live Shadow/GBuffer/Forward의 native 재질 대체와 SceneHost의 이전 graph instance 대체를 제거했다. 그래프 준비 중에는 프레임을 대기시키고 실패한 요청은 거부한다. 타깃 clear와 graph 재질 기록을 분리했으며, CSM depth-content cache는 별도 미구현이다. 아래 RG5/RG6 수용은 해당 보고서에 보관된 소스 해시의 증거다. 후속 변경의 빌드·실행·capture 증거는 [graph-only 재질 패스 기록](../analysis/GraphOnlyMaterialPasses20261007.md)이 소유한다.
+
+**같은 날 후속 — 그래프 오류 복구·RG-V 수용 완료:** 실패한 원본을 보존하고 별도 Principled→Output 기본 graph로 메시를 유지한다. D/R 빌드·편집/배치/저장·재로드·5개 graph draw·7개 원본 hash 보존을 수용했다. RG-V는 24개 변이/retention·실제 3 view·늦은 preview reader·scene epoch/resize·UI off/on 비용·GPU validation 0·exit 0을 통과해 기본 native viewer 4인일을 회수한다. C# 연결·alias/queue/range 확장·Vulkan runtime은 각 후속 페이즈에 남는다. [수용 기록](../analysis/GraphRecoveryRgV20261007.md).
+
+PR #122/#123의 versioned 제품 graph·compiled viewer·GPU indirect/meshlet/static LOD/HZB와 재질 보존 경로가 master에 적용됐다. **RG5·RG6·RG-V 기본 native viewer는 후속 최종 수용으로 완료**이다. GD/HY 전체 제품 수용은 미완료다. 기존 로컬 병합 후 기록의 codec 466/466·단일 DX12 장면 비교를 보존한다. decal/rendergraph 예외는 [2026-10-07 검사](../analysis/RenderRg5Closure20261007.md)에서 fixture 수정 후 D/R 정상 종료·validation 0으로 해소했다.
+
+MAT-9는 live split-sum·타일 SSS/투과의 품질/성능 수용을 계속 소유한다. GPU LOD는 적격 mesh-shader 자산/장치 범위이며 indexed 경로는 LOD0, skinned mesh-shader LOD·DXR은 미완료다. #118/#120의 표시 수명/native Present는 FG 기반일 뿐 FG 완료가 아니다. 총 355인일은 유지하고 RG5 10·RG6 4·RG-V 4인일 회수로 기성 106/잔여 249(+미산정)이다.
+
+IBL/Surface/Raster reference API는 D/R 각각 3정책·일반 63 frames·공유 depth 72 frames·GPU validation 0으로 수용했다. [reference 이관 기록](../analysis/RenderRg5ReferenceMigration20261007.md). 최종 Fog/PostChain/UI/Editor도 D/R 각각 129 frames·9단계 오차 0, 실제 Editor 독립 4프로세스/8캡처·구성 간 16개 이미지 오차 0·현재 해시 계약·14개 변이 거부로 RG5를 종결했다. [최종 수용 기록](../analysis/RenderRg5FinalAcceptance20261007.md). RG6도 동일 현재 소스의 진단 legacy/기본 제품 D/R 독립 8프로세스·408캡처·각 100회 graph 결정성, final 색상 오차 0·깊이 기존 오차 기준 통과·CPU/GPU 산출물·validation 0·exit 0으로 수용했다. [RG6 수용 기록](../analysis/RenderRg6Acceptance20261007.md). Geometry Occlusion/명시 icon read 차이를 기록했으며 순수 스케줄러 비용이나 MAT-9 성능 완료로 확대하지 않는다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 **정본 2026-10-03 · Material 구현 기반 보존 · MAT-7 공통 재질 통합 완료 · LX 마감/MAT-9 품질·성능 수용 잔여 · RND-ENV/GPU 상태 유지.**
 이 문서는 PHASE 4 계열의 현재 소유권·표시 순서·공수 원장이다. 이전 Asset-first SRP
 분할의 근거·이력은 [`Phase4UnifiedPlan.md`](Phase4UnifiedPlan.md)에 보존했다.
@@ -12,14 +26,14 @@
 |---|---|---:|---:|---:|---:|
 | **4** | 현행 DX12 PBR 제품 배선 | 10 | 18 | 18 | 0 |
 | **4.25** | Graph→ShaderMeta/Slang·공통 재질·Blender 수용 | 11 | 40 + 미산정 | 32 | 8 + 미산정 |
-| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 36 | 64 |
+| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 54 | 46 |
 | **4.5** | 모션/히스토리·업스케일·프레임 생성, DX12 수용 | 16 | 71 | 0 | 71 |
 | **4.6** | C# Pipeline IR·PassSchema/Roslyn·native 조립 | 7 | 32 | 0 | 32 |
 | **4.7** | UV1·BVH·DX12 백그라운드 라이트맵 | 8 | 35 | 2 | 33 |
 | **4.75** | probe/AO·shadow·display/post·Environment | 4 | 28 | 0 | 28 |
 | **4.8** | GPU-driven·확률 조명·DXR 설계·구현 공수 확정 | 4 | 9 | 0 | 9 |
 | **4.9** | RenderDoc DX12/Vulkan 캡처 → 리소스 확인 → 픽셀별 비교 | 6 | 22 | 0 | 22 |
-| **현재 합계** | | **78** | **355 + 미산정** | **88** | **267 + 미산정** |
+| **현재 합계** | | **78** | **355 + 미산정** | **106** | **249 + 미산정** |
 
 **2026-10-01 사용자 지시 반영:** Vulkan 실행 비교·교차 동등성·픽셀 수용은 4.9가 단독 소유한다.
 4~4.8은 RHI 중립 구현을 유지하면서 **DX12 Debug/Release의 변경 전후 회귀**로 닫는다.
@@ -131,7 +145,7 @@ Pass/graph에 얹을 때의 `RG6`, `Q0`, `MAT-9`, 시간축 입력은 **항목�
 | 라이트맵 | [`LightmapBakerPlan.md`](LightmapBakerPlan.md) |
 | renderer probe/AO·shadow·display/post·Environment | [`RendererQualityPlan.md`](RendererQualityPlan.md) |
 | GPU-driven·확률 조명·DXR 설계 | [`GpuFeaturePlanningPlan.md`](GpuFeaturePlanningPlan.md) |
-| Meshlet/Mesh Shader raster + DXR 상세 배선 계약 | [`GpuDrivenMeshletDxrWiring.md`](../design/GpuDrivenMeshletDxrWiring.md) — GPU-1/GPU-3 설계 작성·진행, 구현/실측 미검증 |
+| Meshlet/Mesh Shader raster + DXR 상세 배선 계약 | [`GpuDrivenMeshletDxrWiring.md`](../design/GpuDrivenMeshletDxrWiring.md) — GPU-1/GPU-3 설계 작성·진행. GD0~GD3 소스는 PR #123 으로 병합, 실행 증거는 DX12 한 장면뿐([구현 계획](GpuDrivenGeometryImplementationPlan.md)) |
 | 셰이더 탐색 DXR 전환의 가설·채택 실험 | [`DxrShaderTraversalExperimentPlan.md`](DxrShaderTraversalExperimentPlan.md) — GPU-3/GPU-9 판정 입력, 실험 미착수·공수 미산정 |
 | 백엔드 패리티 | [`BackendParityPlan.md`](BackendParityPlan.md) |
 | 분리 전 4.75 항목 감사 | [`Phase475AxisClassification.md`](../analysis/Phase475AxisClassification.md) |

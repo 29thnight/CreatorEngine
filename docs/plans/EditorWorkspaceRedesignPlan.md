@@ -1,5 +1,15 @@
 # 에디터 워크스페이스 · 도킹 · ViewportHost 재설계 (PHASE 21)
 
+## 2026-10-07 최근 병합 반영
+
+PR #125/#128/#129로 W2 셸·하단 바와 W8 검증 대상이 바뀌었다. 현재 제목 행은 **배율 적용 후 최소 45 물리 px**이며, #125의 45 logical px 및 과거 20 logical px 설명을 현재 사양으로 사용하지 않는다. 하단 순서는 Content Browser → Output Log/심각도 개수 → Cmd → 작업 진행 → Profiler → Revision Control → 디버그 기즈모다. Cmd는 편집 가능한 입력 UI만 있고 실행/이력/완성은 미연결, Revision Control도 비활성이다.
+
+Open Scene은 `scene.open_async`로 CPU 준비를 요청하고 모델 드롭과 준비 결과를 공유한다. 환경 cache/hash/decode도 비동기 준비하며 owner 게시·취소/세대 거부를 유지한다. CPU 준비와 업로드 명령 기록은 GPU fence 완료가 아니다. 동기 CLI·Player 기동·hot-reload·Material Graph apply/preview는 여전히 별도 경로다.
+
+W2/W7/W8의 잔여는 작은 worker 풀·오래된 완료/취소/실패, 진행 표시·좁은 폭/DPI, 현재 chrome golden, 명시적 Profiler 열기와 저장 상태/preset 복원 무실행의 실제 Windows 회귀다. 기존 W0~W6 완료 슬라이스를 취소하거나 최신 셸의 실행 수용으로 확장하지 않는다. 별도 viewer의 창/프로세스 gate는 PHASE 14의 14-VIEW가 소유한다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 - 수립일: 2026-08-24
 - 설정 표면 추가: 2026-10-01 — **W9**(공수 미산정, progress)의 Preferences/Project Settings,
   저장소·default profile·Quality·draft 복구 계약을 추가했다. 현재 적용과 남은 완료 조건은

@@ -284,6 +284,11 @@ trace의 ticket 완료까지 지연한다. memory pressure가 owner를 강제 �
 | GD3 | 안전 Hi-Z/history; GD2 | depth convention·near plane·cut/resize/moving occluder에서 누락 0 | null |
 | HY1 | 변형·Masked·LOD·RT update 후속 | 변형 세대 일치/alpha coverage/LOD 오차·AS update/rebuild 판정 | null |
 
+2026-10-06 진행: GD0~GD3과 HY1 의 정적 LOD·색인 스키닝 가시성은 PR #123 으로 소스가
+병합됐다. 실행 증거는 DX12 한 장면의 메시렛/색인 비트 동일·HZB 켬/끔 동일·검증 오류 0 뿐이며
+위 표의 완료 증거는 아직 어느 행도 채우지 않았다. RT0·RT1·HY0 은 미착수다. 슬라이스별 대응은
+[구현 계획](../plans/GpuDrivenGeometryImplementationPlan.md#merge-and-first-execution-2026-10-06)을 따른다.
+
 GD와 RT 가지는 공통 GD0/RG6 뒤 독립 착수할 수 있다. HY0에서 결합하며 GPU-2 완료나
 C# CSRP 전체 완료를 선행으로 묶지 않는다. RHI 인터페이스를 한 번에 전체 교체하지 않고
 각 소비 슬라이스와 DX12/Vulkan unsupported 처리까지 buildable 단위로 추가한다.

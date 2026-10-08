@@ -49,4 +49,17 @@ GPU-1/GPU-3는 상세 설계 작성 후 **진행**이다. 실제 capability prob
 미검증이므로 완료 처리하지 않는다. GPU-2는 미착수, GPU-9는 교차 설계·실측 예산·구현
 공수 확정이 남는다. 후속 슬라이스의 공수는 `null`이며 현재 4행 9일·완료 0일을 유지한다.
 
+### 2026-10-06 GD 구현 병합(PR #123)
+
+GD0~GD3과 HY1 일부(정적 LOD·색인 스키닝 가시성)의 소스가 PR #123(`5ca4e82a`)으로
+master 에 들어갔다. 병합 때 실행한 확인은 DX12 한 장면뿐이다: 메시렛 GBuffer 가 색인
+경로와 비트 동일, 거친 LOD 전환, HZB 켬/끔 동일, DX12 검증 오류 0, `experiment.cooked`
+466/466. `dx12.decal`·`dx12.rendergraph` 검사는 GPU 가시성 준비가 없어 예외로 끝나는
+붉은 상태였으나 2026-10-07 visibility 준비·패스 수 fixture를 수정해 Debug/Release 두 명령 정상 종료·GPU validation 0으로 통과했다. 별도 재질 Decal probe도 각 3정책·342프레임 오차 0으로 통과했다. [검사 범위](../analysis/RenderRg5Closure20261007.md)는 전체 GPU-driven 수용과 구분한다. 슬라이스별 증거·잔여는
+[구현 계획](GpuDrivenGeometryImplementationPlan.md#merge-and-first-execution-2026-10-06)이 정본이다.
+
+이 병합은 GPU-1(설계)을 닫지 않는다. 기준선 성능·메모리 실측이 없고 GPU-9의 공수 산정
+전에 구현이 먼저 들어왔으므로, GPU-9는 GD 실제 투입분을 사후 기록하고 남은
+GD 수용·RT·HY 공수만 산정한다. 4행 9일·완료 0일은 그대로 둔다.
+
 2026-10-01 재산정: GPU-1 3 + GPU-2 2 + GPU-3 2 + GPU-9 2 = 9인일. 기존 5.5일은 역사 산정이며 실제 구현/실험은 여전히 별도 미산정이다. [공수 근거](RenderPhaseEffortEstimate.md).

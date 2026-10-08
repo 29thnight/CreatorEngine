@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한 프레임의 일생</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 18h36M14 32h36M14 46h36' stroke='%23596b87' stroke-width='3'/%3E%3Cpath d='M20 18v14h24v14' fill='none' stroke='%23ffb547' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<!-- visual-explainer(nicobailon/visual-explainer v0.12.0)의 청사진 양식을 따라 만든 문서. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* 색 토큰: 청사진 양식 · 어두운 쪽이 기본 */
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', 'Malgun Gothic', monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 4px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+
+  /* 바탕 */
+  html { font-size: 17px; scroll-behavior: smooth; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .shell { display: grid; grid-template-columns: minmax(0, 1fr); }
+  main { width: 100%; max-width: 64rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+  section, figure, header { min-width: 0; scroll-margin-top: 4rem; }
+  header { display: grid; gap: var(--s-4); }
+  header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+  h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.12; font-weight: 600; letter-spacing: -.03em; text-wrap: balance; max-width: 20ch; margin-bottom: var(--s-2); }
+  h1 .num { color: var(--accent); }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: var(--t-body); line-height: 1.35; font-weight: 600; }
+  .sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  .caps { letter-spacing: .08em; font-weight: 600; color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.55; color: var(--text-dim); max-width: 46ch; }
+  .lead b { color: var(--text); font-weight: 600; }
+  .meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; overflow-wrap: anywhere; }
+  p + p { margin-top: var(--s-3); }
+  .prose { max-width: 65ch; }
+
+  /* 목차: 넓은 화면은 왼쪽 고정, 좁은 화면은 위쪽 띠 */
+  nav.toc { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 92%, transparent); border-bottom: 1px solid var(--border); backdrop-filter: none; }
+  nav.toc ol { list-style: none; padding: var(--s-3) var(--s-5); display: flex; gap: var(--s-4); overflow-x: auto; scrollbar-width: none; mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  nav.toc ol::-webkit-scrollbar { display: none; }
+  nav.toc a { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); text-decoration: none; white-space: nowrap; padding: var(--s-1) 0; border-bottom: 2px solid transparent; transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+  nav.toc a:hover, nav.toc a:focus-visible, nav.toc a.is-active { color: var(--text); border-color: var(--accent); }
+  @media (min-width: 1180px) {
+    .shell { grid-template-columns: 13rem minmax(0, 1fr); }
+    nav.toc { height: 100vh; border-bottom: 0; border-right: 1px solid var(--border); background: var(--bg); }
+    nav.toc ol { flex-direction: column; gap: var(--s-2); padding: var(--s-7) var(--s-5); mask-image: none; }
+    nav.toc a { border-bottom: 0; border-left: 2px solid transparent; padding: var(--s-1) var(--s-3); display: block; white-space: normal; }
+    nav.toc a.is-active, nav.toc a:hover, nav.toc a:focus-visible { border-left-color: var(--accent); }
+  }
+
+  /* 그림 무대: 청사진 24px 격자 */
+  .frame { background-color: var(--bg); background-image: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px); background-size: 24px 24px; border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* 도해 부품 */
+  .ve-svg { width: 100%; min-width: 760px; height: auto; display: block; font: 600 17px var(--font-body); }
+  .ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+  .ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+  .ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+  .ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+  .ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+  .ve-n.pass text { font: 500 13px var(--font-mono); }
+  .ve-n.opt .sh { stroke-dasharray: 5 4; }
+  .ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+  .ve-e.plain { marker-end: none; }
+  .ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+  .ve-e.is-async { stroke-dasharray: 6 5; }
+  .ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+  .ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+  .lane { fill: none; stroke: var(--border-bright); stroke-width: 1; stroke-dasharray: 4 4; }
+  .lane-tag { fill: var(--text-dim); font: 500 13px var(--font-mono); }
+
+  /* 연결 강조 */
+  .ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); cursor: default; }
+  .ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+  svg [data-ref] { transition: opacity var(--med) var(--ease); }
+  svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+  svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+  .ve-n.is-lit .sh { stroke: var(--accent); }
+  .ve-e.is-lit { stroke: var(--accent); }
+  .ve-el.is-lit { fill: var(--text); }
+
+  /* 단계 재생 */
+  .ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+  .ve-steps [data-s]:not(.on) { opacity: .15; }
+  .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .ve-steps path[pathLength][data-s].is-async { stroke-dasharray: none; }
+  .ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+  .ve-steps:not(.is-full) .ve-n.now .sh { stroke: var(--accent); }
+  .ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+  .ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+  .ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+  .ve-player input { accent-color: var(--accent); min-width: 0; }
+  button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+  button:hover, button:focus-visible { border-color: var(--accent); }
+
+  /* 한도 띠 */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 11.5rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+  .kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+  .pips { align-self: end; width: 100%; max-width: 12rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+  .pips text { fill: var(--text-dim); dominant-baseline: central; }
+  .pips .on { fill: var(--accent); }
+  .pips .mid { fill: var(--border-bright); }
+  .pips .off { fill: none; stroke: var(--border-bright); stroke-width: 1.5; }
+  .ve-bars { align-self: end; width: 100%; max-width: 13rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+  .ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+  .ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+  .ve-bars .hot { fill: var(--accent); }
+
+  /* 작은 그림 여럿 */
+  .cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+  .case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; }
+  .case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=info] { --st: var(--info); }
+  .ve-mini { width: 100%; height: auto; }
+  .ve-mini rect { fill: var(--bg); stroke: var(--border-bright); stroke-width: 1.5; }
+  .ve-mini text { fill: var(--text); font: 500 13px var(--font-body); dominant-baseline: central; }
+  .ve-mini .nt { text-anchor: end; fill: var(--text-dim); font: 500 12px var(--font-mono); }
+  .ve-mini .off rect { stroke-dasharray: 5 4; opacity: .55; }
+  .ve-mini .off text { fill: var(--text-dim); }
+  .ve-mini .is-st rect { stroke: var(--st); stroke-width: 2; }
+  .ve-mini .is-st .nt { fill: var(--st); }
+
+  /* 상태 표 */
+  .chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.info { color: var(--info); } .chip.info::before { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1px solid currentColor; }
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); }
+  table { border-collapse: collapse; width: 100%; min-width: 46rem; }
+  th { background: var(--surface); font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); letter-spacing: .04em; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; font-size: var(--t-small); line-height: 1.55; }
+  td:first-child { font-weight: 600; white-space: nowrap; font-size: var(--t-body); }
+  td .chip { margin-bottom: var(--s-1); }
+  td.same { color: var(--text-dim); }
+
+  /* 머메이드 상세 순서도 */
+  .mmd { min-height: 6rem; }
+  .mmd svg { max-width: none !important; display: block; }
+  .frame:has(.mmd) { max-height: 80vh; overflow: auto; cursor: grab; overscroll-behavior: contain; }
+  .frame:has(.mmd).is-dragging { cursor: grabbing; user-select: none; }
+  .mmd-fallback { font: var(--t-small)/1.5 var(--font-mono); white-space: pre; color: var(--text-dim); }
+  .mmd-tools { display: flex; gap: var(--s-2); margin-top: var(--s-3); }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); }
+  summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); }
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); font-size: var(--t-small); color: var(--text-dim); }
+  .sources code { color: var(--text); }
+  .note { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-2); max-width: 65ch; }
+
+  /* 등장 동작: 허용될 때만 JS가 .js-motion 을 붙인다 */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  .js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } html { scroll-behavior: auto; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    nav.toc, .ve-player button, .ve-player input, .mmd-tools { display: none; }
+    .shell { display: block; }
+    .frame { overflow: visible; background: #fff; } .ve-svg { min-width: 0; }
+    .frame, .case, .kpi, tr { break-inside: avoid; } h2 { break-after: avoid; }
+    svg * { filter: none !important; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    .js-motion .ve-bars rect { transform: none !important; }
+    .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+    .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+  </defs>
+</svg>
+<div class="shell">
+<nav class="toc" aria-label="목차">
+  <ol>
+    <li><a href="#overview">개요</a></li>
+    <li><a href="#limits">프레임을 묶는 한도</a></li>
+    <li><a href="#branches">시뮬레이션 분기</a></li>
+    <li><a href="#diff">플레이어와 에디터</a></li>
+    <li><a href="#passes">렌더 패스</a></li>
+    <li><a href="#player-detail">상세 순서도 · 플레이어</a></li>
+    <li><a href="#editor-detail">상세 순서도 · 에디터</a></li>
+    <li><a href="#sources">출처</a></li>
+  </ol>
+</nav>
+<main>
+
+  <header id="overview">
+    <p class="eyebrow">프레임 구조 · CreatorEngine</p>
+    <h1>한 프레임은 <span class="num">스레드 셋</span>을 건너고, 화면에는 GPU가 끝낸 지난 슬롯이 뜬다</h1>
+    <p class="lead">게임 스레드가 시뮬레이션을 돌리고 패킷을 <span class="ve-ref" data-ref="seal" tabindex="0">밀봉해 발행</span>한다. 렌더 스레드가 <span class="ve-ref" data-ref="queue" tabindex="0">렌더 큐</span>에서 그것을 꺼내 GPU에 제출한다. 표시 스레드는 <b class="ve-ref" data-ref="display" tabindex="0">펜스가 끝난 슬롯</b>을 화면에 올린다.</p>
+    <p class="meta">기준 커밋 a5f6d4d8 · 2026-10-05 · 플레이어와 에디터 실행 파일 · DX12 경로</p>
+  </header>
+
+  <figure class="ve-steps">
+    <div class="frame">
+      <svg class="ve-svg" viewBox="0 0 1000 684" role="img" aria-label="게임 스레드는 메시지 펌프, 시뮬레이션, 프레임 끝, 밀봉과 발행을 차례로 돈다. 발행은 렌더 큐에 패킷을 넣고 표시 스레드를 깨운다. 렌더 스레드는 큐에서 꺼내 TickLive와 RenderOnce로 GPU에 제출한다. 펜스가 끝난 슬롯은 다음 TickLive가 표시 텍스처로 게시하고, 표시 스레드가 그것을 ImGui 셸로 화면에 띄운다.">
+        <rect class="lane" x="12" y="14" width="288" height="656" rx="4"/>
+        <text class="lane-tag" x="24" y="38">① 게임 스레드</text>
+        <rect class="lane" x="340" y="14" width="310" height="656" rx="4"/>
+        <text class="lane-tag" x="352" y="38">② 렌더 스레드</text>
+        <rect class="lane" x="690" y="14" width="298" height="656" rx="4"/>
+        <text class="lane-tag" x="702" y="38">③ 표시 스레드</text>
+
+        <path class="ve-e" data-s="1" pathLength="1" d="M160 120V150"/>
+        <text class="ve-el r" data-s="1" x="172" y="136">메시지 없음</text>
+        <path class="ve-e" data-s="1" pathLength="1" d="M160 210V240"/>
+        <text class="ve-el r" data-s="1" x="172" y="226">구조 변경 적용</text>
+        <path class="ve-e" data-s="2" pathLength="1" d="M160 300V330"/>
+        <text class="ve-el r" data-s="2" x="172" y="316">카메라 스냅샷</text>
+        <path class="ve-e" data-s="1" pathLength="1" d="M40 375H26V90H40"/>
+        <text class="ve-el" data-s="1" x="26" y="232" transform="rotate(-90 26 232)">다음 프레임</text>
+
+        <path class="ve-e is-async" data-s="4" data-ref="seal" d="M280 345H720"/>
+        <text class="ve-el" data-s="4" data-ref="seal" x="505" y="335">NotifyRenderFramePublished</text>
+        <path class="ve-e" data-s="3" data-ref="seal queue" pathLength="1" d="M280 375H500V420"/>
+        <text class="ve-el" data-s="3" data-ref="seal queue" x="420" y="366">밀어 넣음</text>
+
+        <path class="ve-e" data-s="5" data-ref="queue" pathLength="1" d="M500 480V510"/>
+        <text class="ve-el r" data-s="5" x="512" y="496">꺼냄</text>
+        <path class="ve-e" data-s="5" pathLength="1" d="M500 570V600"/>
+        <text class="ve-el r" data-s="5" x="512" y="586">뷰마다</text>
+        <path class="ve-e is-async" data-s="5" data-ref="display" d="M380 630H362V545H380"/>
+        <text class="ve-el" data-s="5" data-ref="display" x="362" y="588" transform="rotate(-90 362 588)">펜스 완료</text>
+        <path class="ve-e is-hot" data-s="6" data-ref="display" pathLength="1" d="M620 540H720"/>
+        <text class="ve-el" data-s="6" data-ref="display" x="670" y="530">슬롯 게시</text>
+
+        <path class="ve-e" data-s="6" pathLength="1" d="M840 390V420"/>
+        <text class="ve-el r" data-s="6" x="852" y="406">BeginFrame</text>
+        <path class="ve-e" data-s="6" pathLength="1" d="M840 480V510"/>
+        <text class="ve-el r" data-s="6" x="852" y="496">읽음</text>
+        <path class="ve-e" data-s="6" pathLength="1" d="M840 570V600"/>
+        <text class="ve-el r" data-s="6" x="852" y="586">EndFrame</text>
+
+        <g class="ve-n" data-s="1" transform="translate(40 60)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">메시지 펌프</text><text class="sub" x="120" y="42">PeekMessage</text></g>
+        <g class="ve-n" data-s="1" transform="translate(40 150)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">시뮬레이션</text><text class="sub" x="120" y="42">TickSimulationFrame</text></g>
+        <g class="ve-n" data-s="1" transform="translate(40 240)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">프레임 끝</text><text class="sub" x="120" y="42">EndFramePass</text></g>
+        <g class="ve-n" data-s="2" data-ref="seal" transform="translate(40 330)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">밀봉 · 발행</text><text class="sub" x="120" y="42">PublishLiveFrame</text></g>
+
+        <g class="ve-n" data-s="3" data-ref="queue" transform="translate(380 420)"><rect class="sh" width="240" height="60" rx="4"/><path class="gl" d="M196 12V48M208 12V48M220 12V48"/><text x="104" y="20">렌더 큐</text><text class="sub" x="104" y="42">용량 2</text></g>
+        <g class="ve-n" data-s="5" transform="translate(380 510)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">TickLive</text><text class="sub" x="120" y="42">프록시 반영 · 승격</text></g>
+        <g class="ve-n" data-s="5" transform="translate(380 600)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">RenderOnce</text><text class="sub" x="120" y="42">그래프 기록 · 제출</text></g>
+
+        <g class="ve-n" data-s="4" data-ref="seal" transform="translate(720 330)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">깨어남</text><text class="sub" x="120" y="42">최신 frameId만</text></g>
+        <g class="ve-n" data-s="6" transform="translate(720 420)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">ImGui 셸</text><text class="sub" x="120" y="42">IImGuiHost</text></g>
+        <g class="ve-n is-key" data-s="6" data-ref="display" transform="translate(720 510)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">표시 텍스처</text><text class="sub" x="120" y="42">완료 슬롯</text></g>
+        <g class="ve-n" data-s="6" transform="translate(720 600)"><rect class="sh" width="240" height="60" rx="4"/><text x="120" y="20">화면 표시</text><text class="sub" x="120" y="42">RenderAndPresent</text></g>
+      </svg>
+    </div>
+    <div class="ve-player">
+      <ol class="ve-cap">
+        <li data-n="1/6">메시지가 없을 때마다 게임 스레드가 시뮬레이션과 프레임 끝 처리를 돈다.</li>
+        <li data-n="2/6">갱신이 끝나면 카메라 스냅샷과 셰이더 메타를 모아 프레임 패킷을 밀봉한다.</li>
+        <li data-n="3/6">패킷과 쌓인 프록시 델타가 렌더 큐에 들어간다. 큐는 둘까지 담고, 넘치면 병합하거나 기다린다.</li>
+        <li data-n="4/6">같은 순간 표시 스레드를 깨운다. 밀린 알림은 버리고 가장 새 frameId 하나만 남긴다.</li>
+        <li data-n="5/6">렌더 스레드가 패킷을 꺼내 프록시를 반영하고, 뷰마다 렌더 그래프를 기록해 GPU에 제출한다.</li>
+        <li data-n="6/6">펜스가 끝난 슬롯은 다음 TickLive가 게시한다. 표시 스레드는 그 슬롯을 ImGui 셸로 화면에 띄운다.</li>
+      </ol>
+      <button data-go="-1" aria-label="이전 단계">←</button>
+      <button data-play>재생</button>
+      <input type="range" min="0" value="0" aria-label="단계">
+      <button data-go="1" aria-label="다음 단계">→</button>
+    </div>
+    <figcaption><span class="fig-n">그림 1</span>이번 패킷의 그림은 바로 뜨지 않는다. 화면에 보이는 것은 펜스가 끝나 승격된 지난 슬롯이다.</figcaption>
+  </figure>
+
+  <section id="limits">
+    <div class="sec-head"><p class="ve-label caps">한도</p><h2>앞서 달리는 프레임은 최대 둘이다</h2></div>
+    <figure>
+      <div class="kpis">
+        <div class="kpi"><span class="ve-label">렌더 큐 용량</span><span class="val"><span data-count="2">2</span><span class="unit"> 패킷</span></span>
+          <svg class="pips" viewBox="0 0 190 24" role="img" aria-label="렌더 큐는 패킷 두 개를 담는다"><rect class="on" x="0" y="4" width="16" height="16" rx="2"/><rect class="on" x="22" y="4" width="16" height="16" rx="2"/><text x="48" y="12">넘치면 병합</text></svg></div>
+        <div class="kpi"><span class="ve-label">뷰마다 표시 슬롯</span><span class="val"><span data-count="3">3</span><span class="unit"> 슬롯</span></span>
+          <svg class="pips" viewBox="0 0 190 24" role="img" aria-label="슬롯 셋 중 하나는 표시, 둘은 진행 중"><rect class="on" x="0" y="4" width="16" height="16" rx="2"/><rect class="off" x="22.75" y="4.75" width="14.5" height="14.5" rx="2"/><rect class="off" x="44.75" y="4.75" width="14.5" height="14.5" rx="2"/><text x="70" y="12">표시 1 · 진행 2</text></svg></div>
+        <div class="kpi"><span class="ve-label">진행 중 제출 한도</span><span class="val"><span data-count="2">2</span><span class="unit"> 제출</span></span>
+          <svg class="pips" viewBox="0 0 190 24" role="img" aria-label="진행 중 제출이 둘이면 이번 뷰는 건너뛴다"><rect class="on" x="0" y="4" width="16" height="16" rx="2"/><rect class="on" x="22" y="4" width="16" height="16" rx="2"/><text x="48" y="12">닿으면 건너뜀</text></svg></div>
+        <div class="kpi"><span class="ve-label">명령 기록 작업자</span><span class="val"><span data-count="4">4</span><span class="unit"> 스레드</span></span>
+          <svg class="pips" viewBox="0 0 190 24" role="img" aria-label="RecordParallel 은 작업자 넷으로 기록한다"><rect class="mid" x="0" y="4" width="16" height="16" rx="2"/><rect class="mid" x="22" y="4" width="16" height="16" rx="2"/><rect class="mid" x="44" y="4" width="16" height="16" rx="2"/><rect class="mid" x="66" y="4" width="16" height="16" rx="2"/><text x="92" y="12">RecordParallel</text></svg></div>
+        <div class="kpi"><span class="ve-label">프레임마다 밀봉하는 뷰</span><span class="val"><span data-count="3">3</span><span class="unit"> 최대</span></span>
+          <svg class="ve-bars" viewBox="0 0 220 52" role="img" aria-label="플레이어는 뷰 하나, 에디터는 최대 셋을 밀봉한다"><text y="12">플레이어</text><rect x="64" y="5" width="40" height="14" rx="2"/><text x="112" y="12">1</text><text y="40">에디터</text><rect class="hot" x="64" y="33" width="120" height="14" rx="2"/><text x="192" y="40">3</text></svg></div>
+      </div>
+      <figcaption><span class="fig-n">그림 2</span>큐 둘과 진행 중 제출 둘이 게임 스레드와 화면 사이의 지연을 묶는다. 연속 실패가 60번이면 렌더 파이프라인을 접는다.</figcaption>
+    </figure>
+  </section>
+
+  <section id="branches">
+    <div class="sec-head"><p class="ve-label caps">시뮬레이션 분기</p><h2>같은 <code>TickSimulationFrame</code> 안에서 상태에 따라 단계가 빠진다</h2></div>
+    <figure>
+      <div class="cases">
+        <div class="case" data-st="ok"><span class="chip ok">정상 재생</span><h3>재생이 확정된 프레임</h3>
+          <svg class="ve-mini" viewBox="0 0 240 120" role="img" aria-label="수명주기, 관리 틱 앞, 물리, 게임 로직, 관리 틱 뒤가 모두 돈다">
+            <g><rect x="1" y="2" width="238" height="20" rx="3"/><text x="10" y="12">수명주기</text><text class="nt" x="230" y="12">Drain</text></g>
+            <g><rect x="1" y="26" width="238" height="20" rx="3"/><text x="10" y="36">관리 틱 앞</text><text class="nt" x="230" y="36">PrePhysics</text></g>
+            <g><rect x="1" y="50" width="238" height="20" rx="3"/><text x="10" y="60">물리</text><text class="nt" x="230" y="60">FixedUpdate</text></g>
+            <g><rect x="1" y="74" width="238" height="20" rx="3"/><text x="10" y="84">게임 로직</text><text class="nt" x="230" y="84">Update·Late</text></g>
+            <g><rect x="1" y="98" width="238" height="20" rx="3"/><text x="10" y="108">관리 틱 뒤</text><text class="nt" x="230" y="108">PostPhysics</text></g>
+          </svg></div>
+        <div class="case" data-st="warn"><span class="chip warn">일시정지</span><h3>IsGamePaused 가 참</h3>
+          <svg class="ve-mini" viewBox="0 0 240 120" role="img" aria-label="수명주기만 돌고, 게임 로직 자리에 렌더 자료 갱신만 남는다. 델타는 0이다">
+            <g><rect x="1" y="2" width="238" height="20" rx="3"/><text x="10" y="12">수명주기</text><text class="nt" x="230" y="12">Drain</text></g>
+            <g class="off"><rect x="1" y="26" width="238" height="20" rx="3"/><text x="10" y="36">관리 틱 앞</text></g>
+            <g class="off"><rect x="1" y="50" width="238" height="20" rx="3"/><text x="10" y="60">물리</text></g>
+            <g class="is-st"><rect x="1" y="74" width="238" height="20" rx="3"/><text x="10" y="84">게임 로직</text><text class="nt" x="230" y="84">렌더 자료만</text></g>
+            <g class="off"><rect x="1" y="98" width="238" height="20" rx="3"/><text x="10" y="108">관리 틱 뒤</text></g>
+          </svg></div>
+        <div class="case" data-st="warn"><span class="chip warn">구조 변경 대기</span><h3>재생 전환·씬 교체 직전</h3>
+          <svg class="ve-mini" viewBox="0 0 240 120" role="img" aria-label="관리 틱 둘과 물리가 빠지고 수명주기와 게임 로직만 돈다">
+            <g><rect x="1" y="2" width="238" height="20" rx="3"/><text x="10" y="12">수명주기</text><text class="nt" x="230" y="12">Drain</text></g>
+            <g class="off"><rect x="1" y="26" width="238" height="20" rx="3"/><text x="10" y="36">관리 틱 앞</text></g>
+            <g class="off is-st"><rect x="1" y="50" width="238" height="20" rx="3"/><text x="10" y="60">물리</text><text class="nt" x="230" y="60">대기 중 막힘</text></g>
+            <g><rect x="1" y="74" width="238" height="20" rx="3"/><text x="10" y="84">게임 로직</text><text class="nt" x="230" y="84">Update·Late</text></g>
+            <g class="off"><rect x="1" y="98" width="238" height="20" rx="3"/><text x="10" y="108">관리 틱 뒤</text></g>
+          </svg></div>
+        <div class="case" data-st="info"><span class="chip info">에디터 편집</span><h3>재생이 확정되지 않은 에디터</h3>
+          <svg class="ve-mini" viewBox="0 0 240 120" role="img" aria-label="TickSimulationFrame 대신 Editor, InputEvents, GameLogic(0, dt)가 돈다. 스크립트 수명주기는 미뤄지고 갱신 델타는 0, 애니메이션 델타는 dt다">
+            <g class="is-st"><rect x="1" y="2" width="238" height="20" rx="3"/><text x="10" y="12">수명주기</text><text class="nt" x="230" y="12">스크립트 제외</text></g>
+            <g class="off"><rect x="1" y="26" width="238" height="20" rx="3"/><text x="10" y="36">관리 틱 앞</text></g>
+            <g class="off"><rect x="1" y="50" width="238" height="20" rx="3"/><text x="10" y="60">물리</text></g>
+            <g class="is-st"><rect x="1" y="74" width="238" height="20" rx="3"/><text x="10" y="84">게임 로직</text><text class="nt" x="230" y="84">Δ 0 · 애니 dt</text></g>
+            <g class="off"><rect x="1" y="98" width="238" height="20" rx="3"/><text x="10" y="108">관리 틱 뒤</text></g>
+          </svg></div>
+      </div>
+      <figcaption><span class="fig-n">그림 3</span>물리와 관리 틱은 재생이 확정되고 구조 변경이 없는 프레임에서만 돈다. 에디터 편집 모드는 이 함수를 아예 타지 않는다.</figcaption>
+    </figure>
+  </section>
+
+  <section id="diff">
+    <div class="sec-head"><p class="ve-label caps">플레이어와 에디터</p><h2>시뮬레이션은 같은 코드이고, 차이는 그 앞뒤와 표시 쪽에 있다</h2></div>
+    <figure>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>단계 · 게임 스레드 순서</th><th>플레이어</th><th>에디터</th></tr></thead>
+          <tbody>
+            <tr><td>프레임 앞</td><td><span class="chip warn">플레이어만</span><br><code>PlayerCmd::CommandHost::Pump</code> — 종료 요청이면 <code>WM_CLOSE</code></td><td><span class="chip info">에디터만</span><br><code>DataSystems-&gt;DrainQueuedAssetChanges</code> — 감시 스레드가 게시한 자산 변경을 반영</td></tr>
+            <tr><td>시간 · 입력</td><td><code>Time-&gt;Tick</code> → <code>ResolveFrameDelta</code> → <code>InputManagement-&gt;Update</code></td><td>같음. 입력 앞에 <code>UpdateTitleBar</code></td></tr>
+            <tr><td>재생 상태기</td><td class="same"><span class="chip dim">없음</span></td><td><code>PlayModeController::Tick</code> — 정지 · 진입 · 재생 상태 전이와 뷰포트 모드 요청</td></tr>
+            <tr><td>시뮬레이션</td><td>늘 <code>Runtime::TickSimulationFrame</code></td><td>재생 확정이면 <code>SceneManager::Editor</code> → <code>TickSimulationFrame</code>.<br>아니면 <code>Editor</code> → <code>InputEvents</code> → <code>GameLogic(0, dt)</code></td></tr>
+            <tr><td>입력 사건 구독</td><td><code>UIManagers-&gt;Update</code> · <code>Sound-&gt;update</code></td><td>같음. 입력 주인이 게임이 아니면 Ctrl+Z · Ctrl+Y 되돌리기를 먼저</td></tr>
+            <tr><td>단축키</td><td class="same"><span class="chip dim">없음</span></td><td>F5 게임 뷰 숨김 · Ctrl+W 와이어프레임</td></tr>
+            <tr><td>구조 변경</td><td><code>ApplyPendingSceneStructureChange</code></td><td>씬 구조 잠금 안에서 <code>ModelPlacement::Tick</code> → <code>EditorScriptAuthoring::Tick</code> → <code>ApplyPendingSceneStructureChange</code> → <code>CaptureSelectionForSimulation</code></td></tr>
+            <tr><td>프레임 끝</td><td><code>yield_OnRender</code> → <code>DisableOrEnable</code> → <code>EndOfFrame</code></td><td>같음. 씬 구조 잠금 안에서</td></tr>
+            <tr><td>계측</td><td><code>publish_frame</code> — Shipping 이 아닐 때만</td><td>자원 계수기 창 · 메모리 프로파일러 · 관리 GC 계수기 → <code>publish_frame</code></td></tr>
+            <tr><td>종료 검사</td><td>시뮬레이션 실패 수 · 스모크 한도 → <code>WM_CLOSE</code></td><td><code>IsDecommissioning</code> → <code>WM_CLOSE</code>. 발행 뒤 명령줄 종료 요청</td></tr>
+            <tr><td>명령 처리</td><td>프레임 앞의 <code>Pump</code></td><td>갱신 뒤 <code>ConsoleCommandSystem::Pump</code></td></tr>
+            <tr><td>밀봉하는 뷰</td><td>게임 카메라 하나</td><td>화면 수요가 있는 것만: 에디터 카메라 · 게임 카메라 · 재질 미리보기, 최대 셋. 밀봉은 씬 잠금 안, 발행은 잠금 밖</td></tr>
+            <tr><td>표시 스레드</td><td>크기 변경이면 <code>CreateWindowSizeDependentResources</code>. 전체 화면 <code>ImGui::Image</code> 한 장</td><td><code>WinProcProxy</code> 메시지 → ImGui 입력 처리 · <code>HandleWindowResize</code> · <code>ApplyViewportRenderExtent</code> · 도킹 에디터 셸 전체</td></tr>
+            <tr><td>렌더 그래프</td><td class="same"><span class="chip dim">기여자 없음</span></td><td><code>EditorSceneOverlayContributor</code> 가 Grid · WireFrame · GizmoIcon · GizmoLine 을 덧붙인다</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figcaption><span class="fig-n">그림 4</span>에디터는 시뮬레이션 앞에 재생 상태기를, 뒤에 씬 구조 잠금과 편집 도구를 둔다. 렌더 스레드 코드는 두 실행 파일이 같다.</figcaption>
+    </figure>
+  </section>
+
+  <section id="passes">
+    <div class="sec-head"><p class="ve-label caps">렌더 패스</p><h2>뷰 하나는 패스 열여덟 개를 차례로 선언한다</h2></div>
+    <figure>
+      <div class="frame">
+        <svg class="ve-svg" viewBox="0 0 1000 400" role="img" aria-label="Shadow, GBuffer, LX.Scene.GBuffer, Decal, SSAO, Deferred, LX.Scene.Color, SkyBox, SSGI, Forward+, Sprite, SSS, SSR, LX.Scene.Volume, VolumetricFog, PostChain, UI, live_present 순서. 에디터는 UI와 live_present 사이에 Grid, WireFrame, GizmoIcon, GizmoLine을 넣는다.">
+          <path class="ve-e" d="M180 62H198"/><path class="ve-e" d="M338 62H356"/><path class="ve-e" d="M496 62H514"/><path class="ve-e" d="M654 62H672"/><path class="ve-e" d="M812 62H830"/>
+          <path class="ve-e" d="M900 84V106H110V128"/>
+          <path class="ve-e" d="M180 150H198"/><path class="ve-e" d="M338 150H356"/><path class="ve-e" d="M496 150H514"/><path class="ve-e" d="M654 150H672"/><path class="ve-e" d="M812 150H830"/>
+          <path class="ve-e" d="M900 172V194H110V216"/>
+          <path class="ve-e" d="M180 238H198"/><path class="ve-e" d="M338 238H356"/><path class="ve-e" d="M496 238H514"/><path class="ve-e" d="M654 238H672"/><path class="ve-e is-hot" d="M812 238H830"/>
+
+          <rect class="lane" x="182" y="296" width="648" height="88" rx="4"/>
+          <text class="lane-tag" x="194" y="314">에디터만 · EditorSceneOverlayContributor</text>
+          <path class="ve-e is-async" d="M742 260V284H268V322"/>
+          <text class="ve-el" x="505" y="275">에디터 뷰</text>
+          <path class="ve-e is-async" d="M338 344H356"/><path class="ve-e is-async" d="M496 344H514"/><path class="ve-e is-async" d="M654 344H672"/>
+          <path class="ve-e is-async" d="M812 344H900V260"/>
+
+          <g class="ve-n pass" transform="translate(40 40)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">Shadow</text></g>
+          <g class="ve-n pass" transform="translate(198 40)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">GBuffer</text></g>
+          <g class="ve-n pass" transform="translate(356 40)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">LX.Scene.GBuffer</text></g>
+          <g class="ve-n pass opt" transform="translate(514 40)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">Decal</text></g>
+          <g class="ve-n pass" transform="translate(672 40)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">SSAO</text></g>
+          <g class="ve-n pass" transform="translate(830 40)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">Deferred</text></g>
+
+          <g class="ve-n pass" transform="translate(40 128)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">LX.Scene.Color</text></g>
+          <g class="ve-n pass opt" transform="translate(198 128)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">SkyBox</text></g>
+          <g class="ve-n pass opt" transform="translate(356 128)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">SSGI</text></g>
+          <g class="ve-n pass opt" transform="translate(514 128)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">Forward+</text></g>
+          <g class="ve-n pass opt" transform="translate(672 128)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">Sprite</text></g>
+          <g class="ve-n pass opt" transform="translate(830 128)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">SSS</text></g>
+
+          <g class="ve-n pass opt" transform="translate(40 216)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">SSR</text></g>
+          <g class="ve-n pass" transform="translate(198 216)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">LX.Scene.Volume</text></g>
+          <g class="ve-n pass opt" transform="translate(356 216)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">VolumetricFog</text></g>
+          <g class="ve-n pass" transform="translate(514 216)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">PostChain</text></g>
+          <g class="ve-n pass opt" transform="translate(672 216)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">UI</text></g>
+          <g class="ve-n pass is-key" transform="translate(830 216)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">live_present</text></g>
+
+          <g class="ve-n pass opt" transform="translate(198 322)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">Grid</text></g>
+          <g class="ve-n pass opt" transform="translate(356 322)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">WireFrame</text></g>
+          <g class="ve-n pass opt" transform="translate(514 322)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">GizmoIcon</text></g>
+          <g class="ve-n pass opt" transform="translate(672 322)"><rect class="sh" width="140" height="44" rx="4"/><text x="70" y="22">GizmoLine</text></g>
+        </svg>
+      </div>
+      <figcaption><span class="fig-n">그림 5</span>점선 상자는 조건이 맞을 때만 그래프에 들어간다. 플레이어는 UI에서 live_present로 곧장 가고, 에디터는 덧그림 넷을 거친다.</figcaption>
+    </figure>
+    <div class="prose">
+      <p><code>PostChain</code> 안은 블룸 사용 시 <code>BloomThreshold → BloomDown → BloomUp</code>, 그다음 <code>Uber</code>(톤 매핑) → <code>Output</code>(FXAA) 순서다. 선언이 끝나면 <code>graph.Compile</code> → <code>RecordParallel</code>(작업자 넷) → <code>EnqueueRecordedBatch</code> → <code>dx12.EndFrame</code> 으로 제출한다.</p>
+    </div>
+  </section>
+
+  <section id="player-detail">
+    <div class="sec-head"><p class="ve-label caps">상세 · 플레이어</p><h2>플레이어 프레임의 함수 단위 순서</h2></div>
+    <div class="prose"><p>아래 셋은 <code>Player/PlayerApp.cpp</code> 의 <code>App::Run</code> 에서 시작해 한 프레임이 지나는 객체와 함수를 빠짐없이 적은 순서도다. 그림이 크면 상자 안에서 옆으로 밀어 본다.</p></div>
+    <figure id="p1">
+      <div class="frame"><div class="mmd" data-src="mmd-p1" role="img" aria-label="플레이어 전체 순서도: 게임 스레드, 렌더 큐 발행, 렌더 스레드, 표시 스레드"></div></div>
+      <figcaption><span class="fig-n">그림 6</span>플레이어 전체: 게임 스레드가 발행하고, 렌더 스레드와 표시 스레드가 각자 깨어난다.</figcaption>
+    </figure>
+    <figure id="p2">
+      <div class="frame"><div class="mmd" data-src="mmd-p2" role="img" aria-label="게임 스레드 시뮬레이션 상세 순서도"></div></div>
+      <figcaption><span class="fig-n">그림 7</span>시뮬레이션 상세: 수명주기, 물리, 게임 로직, 애니메이션, 렌더 프록시 반영, 파괴가 이 순서로 돈다.</figcaption>
+    </figure>
+    <figure id="p3">
+      <div class="frame"><div class="mmd" data-src="mmd-p3" role="img" aria-label="렌더 스레드 TickLive 상세 순서도, DX12 경로"></div></div>
+      <figcaption><span class="fig-n">그림 8</span>렌더 스레드 상세: 지난 슬롯을 수거한 뒤에야 이번 패킷의 뷰를 그린다. 에디터도 같은 코드를 탄다.</figcaption>
+    </figure>
+  </section>
+
+  <section id="editor-detail">
+    <div class="sec-head"><p class="ve-label caps">상세 · 에디터</p><h2>에디터 프레임의 함수 단위 순서</h2></div>
+    <div class="prose"><p>에디터는 <code>Editor/EngineEntry/App.cpp</code> 의 <code>Core::App::Run</code> 에서 시작한다. 렌더 스레드는 그림 8과 같으므로 다시 그리지 않고, 게임 스레드와 표시 스레드만 펼친다.</p></div>
+    <figure id="e1">
+      <div class="frame"><div class="mmd" data-src="mmd-e1" role="img" aria-label="에디터 전체 순서도"></div></div>
+      <figcaption><span class="fig-n">그림 9</span>에디터 전체: 갱신 뒤 명령줄을 처리하고, 화면 수요가 있는 뷰만 씬 잠금 안에서 밀봉한다.</figcaption>
+    </figure>
+    <figure id="e2">
+      <div class="frame"><div class="mmd" data-src="mmd-e2" role="img" aria-label="에디터 게임 스레드 갱신 상세 순서도"></div></div>
+      <figcaption><span class="fig-n">그림 10</span>에디터 갱신: 재생 확정 여부가 시뮬레이션 경로를 가르고, 구조 변경은 씬 구조 잠금 안에서만 한다.</figcaption>
+    </figure>
+    <figure id="e3">
+      <div class="frame"><div class="mmd" data-src="mmd-e3" role="img" aria-label="에디터 표시 스레드와 OnGui 상세 순서도"></div></div>
+      <figcaption><span class="fig-n">그림 11</span>에디터 표시: 창 메시지와 렌더 해상도를 먼저 맞춘 뒤 도킹 셸 전체를 그리고 화면에 올린다.</figcaption>
+    </figure>
+    <div class="note">
+      <span class="chip info">덧붙임</span>
+      <p>창을 보이기 전 <code>WarmUpFirstRenderedFrame</code> 이 같은 <code>PublishRenderFrame</code> 을 따로 돌려 첫 그림이 설 때까지 기다린다. 이 예열 순환은 매 프레임 경로가 아니라 위 그림에서 뺐다.</p>
+    </div>
+  </section>
+
+  <section class="sources" id="sources" aria-label="출처">
+    <p class="ve-label caps">출처</p>
+    <p><code>Player/PlayerApp.cpp:332–368</code> · <code>Player/PlayerMain.cpp:375–437, 499–541, 829–874</code> · <code>Engine/Utility_Framework/CoreWindow.h:70–100</code> · <code>Engine/Utility_Framework/TimeSystem.h:75–124</code></p>
+    <p><code>Engine/SceneRuntime/RuntimeFrame.cpp</code> · <code>Engine/SceneRuntime/SceneManager.cpp:337–530, 1412–1435</code> · <code>Engine/SceneRuntime/Scene.cpp:860–890, 1941–2060, 2136–2230, 2357–2630, 2876–3120, 5094–5172</code> · <code>Engine/SceneRuntime/AnimationScheduler.cpp:505–880</code></p>
+    <p><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:2435–3040, 3299, 4003–4740, 5049–5380, 5663–5864, 5970–6733</code> · <code>Engine/RenderEngine/Render/Passes/PostProcess/EnhancedPostChainPass.cpp:160–440</code></p>
+    <p><code>Editor/EngineEntry/App.cpp:345–420, 580–601</code> · <code>Editor/EngineEntry/EditorMain.cpp:136, 312–330, 417–520, 603–892</code> · <code>Editor/EngineEntry/EditorPlayModeController.cpp:200</code> · <code>Editor/EngineGUIWindow/EditorRenderer.cpp:269–505</code> · <code>Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp:147–200</code> · <code>Editor/EngineEntry/EditorSceneOverlayContributor.cpp:58–193</code></p>
+    <p>문서 양식: <code>nicobailon/visual-explainer</code> 0.12.0 청사진 양식.</p>
+  </section>
+
+</main>
+</div>
+
+<script type="text/x-mermaid" id="mmd-p1">
+flowchart TD
+    subgraph GT["게임 스레드 · Player::App::Run → CoreWindow::Then"]
+        M0["PeekMessage"] --> M1{"메시지?"}
+        M1 -- "WM_QUIT" --> MX["순환 종료 → PlayerMain::Finalize"]
+        M1 -- "있음" --> M2["DispatchMessage<br/>WM_SIZE → App::HandleResizeEvent → PlayerMain::InvokeResizeFlag"]
+        M2 --> M0
+        M1 -- "없음" --> U0["PlayerMain::Update"]
+        U0 --> U1["PlayerCmd::CommandHost::Pump"]
+        U1 --> U2{"IsQuitRequested?"}
+        U2 -- "예" --> U2a["PostMessage WM_CLOSE → 반환"]
+        U2 -- "아니오" --> T0["Time->Tick<br/>QueryPerformanceCounter · 최대 델타 제한 · UpdateTimeScale · m_frameCount++"]
+        T0 --> T1["Runtime::ResolveFrameDelta<br/>일시정지면 0, 아니면 Time->GetElapsedSeconds"]
+        T1 --> T2["InputManagement->Update"]
+        T2 --> SIM["Runtime::TickSimulationFrame<br/>그림 7"]
+        SIM --> P0["SceneManager::ApplyPendingSceneStructureChange"]
+        P0 --> P1["CoroutineManagers->yield_OnRender"]
+        P1 --> P2["SceneManager::DisableOrEnable → Scene::EndFramePass"]
+        P2 --> P3["SceneManager::EndOfFrame<br/>yield_WaitForEndOfFrame · endOfFrameEvent.Broadcast · DDOL 목록 정리"]
+        P3 --> P4["ce::profiler().publish_frame — Shipping 이 아닐 때만"]
+        P4 --> P5{"PlayFailureCount != 0?"}
+        P5 -- "예" --> P5a["SetExitCode 3 · WM_CLOSE"]
+        P5 -- "아니오" --> P6["스모크 검사 · 프레임 한도면 WM_CLOSE"]
+        P6 --> SEAL0["Scene::Cameras().GetPrimaryCamera → CameraComponent::CaptureFrameSnapshot<br/>EnhancedLiveViewRequest 1개 · Game · ScreenSpaceUI"]
+        SEAL0 --> SEAL1["SceneManager::CaptureRequiredRenderMaterials<br/>MeshRenderer · FoliageComponent 재질 중복 제거"]
+        SEAL1 --> SEAL2["EnhancedSceneRenderer::BuildRequiredAssetPacket<br/>투명 → Forward, 나머지 → GBuffer 셰이더 메타"]
+        SEAL2 --> SEAL3["EnhancedSceneRenderer::BuildLiveFramePacket<br/>frameId++ · sceneEpoch · 누적 시간 · 화면 크기 · 스카이박스<br/>GBuffer · Forward.shadermeta → DataSystems->LoadShaderMetaHandle · ResolveShaderMeta<br/>resizeGeneration · 뷰마다 CaptureEnhancedGizmoSceneData"]
+        SEAL3 --> SEAL4["EnhancedSceneRenderer::PublishLiveFrame<br/>ProxyCommandQueue->CapturePending → LiveState::PublishFrame"]
+        SEAL4 --> SEAL5{"발행 성공?"}
+        SEAL5 -- "예" --> SEAL6["PlayerMain::NotifyRenderFramePublished(frameId)"]
+        SEAL5 -- "아니오" --> M0
+        SEAL6 --> M0
+    end
+
+    subgraph PUB["LiveState::PublishFrame"]
+        Q0["CompactProxyUpdates → MarkSuperseded"] --> Q1{"renderQueue 여유?"}
+        Q1 -- "있음" --> Q2["renderQueue.push_back"]
+        Q1 -- "가득 · 합쳐도 한도 이하" --> Q3["가장 새 제출과 델타 병합<br/>CompactProxyUpdates 한 번 더"]
+        Q1 -- "가득 · 한도 초과" --> Q4["역압 대기 renderQueueWake.wait → push_back"]
+        Q2 --> Q5["renderQueueWake.notify_one"]
+        Q3 --> Q5
+        Q4 --> Q5
+    end
+
+    subgraph RT["렌더 스레드 · LiveState::StartRenderThread 람다"]
+        R0["renderQueueWake.wait_for 100ms"] --> R1["renderQueue.pop_front · renderInProgress = 1"]
+        R1 --> R2["activeDeltaBatch = submission.deltas"]
+        R2 --> R3["EnhancedSceneRenderer::TickLive(frame)<br/>그림 8"]
+        R3 --> R4["계수기 훅 OnCounters · 영상 메모리 훅 OnVideoMemory"]
+        R4 --> R5["renderConsumed++ · renderCompletedFrameId 기록"]
+        R5 --> R0
+    end
+
+    subgraph PT["표시 스레드 · PlayerMain::PresentationThreadMain"]
+        D0["m_presentationWake.wait<br/>정지 · 크기 변경 · 새 frameId"] --> D1{"m_isInvokeResize?"}
+        D1 -- "예" --> D2["CreateWindowSizeDependentResources<br/>OnResizeReleaseEvent → ScreenResizeBus::BroadcastRelease<br/>GetClientRect → OnResizeEvent → ScreenResizeBus::BroadcastResize"]
+        D1 -- "아니오" --> D3
+        D2 --> D3["PresentFrame → OnGui"]
+        D3 --> D4["IImGuiHost::BeginFrame<br/>renderer Resize · NewFrame · ImGui_ImplWin32_NewFrame · ImGui::NewFrame"]
+        D4 --> D5["전체 화면 창 PlayerGameView<br/>GetLiveDisplayImTextureId(Game) → ImGui::Image"]
+        D5 --> D6["IImGuiHost::EndFrame<br/>ImGui::Render · ImGuiWin32Cursor::PublishFrameCursor<br/>renderer RenderAndPresent · UpdatePlatformWindows"]
+        D6 --> D0
+    end
+
+    SEAL4 -.-> Q0
+    Q5 -.-> R0
+    SEAL6 -.-> D0
+    R3 -.->|"완료 슬롯 승격 PublishDisplayResultLocked"| D5
+</script>
+
+<script type="text/x-mermaid" id="mmd-p2">
+flowchart TD
+    S0["Runtime::TickSimulationFrame"] --> S1["SceneManager::Initialization<br/>Scene::DrainPendingLifecycle → DrainPendingPhases"]
+    S1 --> S1a["PendingInitialize 큐를 통째로 옮김<br/>비활성 · 재생 전 ScriptComponent는 다시 대기열로<br/>ScriptComponent::EnsureInstance"]
+    S1a --> S1b["Component::OnInitialized → OnAddedToScene"]
+    S1b --> S1c["PendingSimulation 큐 → OnBeginSimulation"]
+    S1c --> S2["SceneManager::InputEvents → InputEvent.Broadcast<br/>UIManagers->Update · Sound->update"]
+    S2 --> S3{"IsGamePaused?"}
+    S3 -- "예" --> S3a["SceneManager::Pausing → Scene::UpdateRenderData<br/>InternalPauseUpdateForUI: AllUIUpdateWorldMatrix · Image · Text · SpriteSheet TickLayout · PlayerInput TickInput<br/>CommitRenderProxies"]
+    S3a --> OUT["반환 → ApplyPendingSceneStructureChange"]
+    S3 -- "아니오" --> S4{"HasPendingSceneStructureChange?"}
+    S4 -- "없음" --> CL0["ClrHost::TickPrePhysics"]
+    S4 -- "있음" --> PH0
+    CL0 --> PH0
+
+    PH0["SceneManager::Physics<br/>재생 확정 · 일시정지 아님 · 구조 변경 없음일 때만"] --> PH1["Scene::FixedUpdate"]
+    PH1 --> PH2["AllUpdateWorldMatrix FixedUpdate"]
+    PH2 --> PH3["CommitPhysicsLayers → CommitPhysicsTransforms"]
+    PH3 --> PH4["m_physicsSimulation.Advance(dt) → 진행한 틱 수"]
+    PH4 --> PH5["ChangedPoses · ChangedCharacters → m_physicsTransformWrites<br/>ApplyWorldWriteBatch Physics · m_observedWorld 갱신"]
+    PH5 --> PH6["틱 수만큼 CoroutineManagers->yield_WaitForFixedUpdate"]
+    PH3 -. "실패" .-> PHF["SceneManager::ReportSimulationFailure"]
+
+    PH6 --> GL0["SceneManager::GameLogic"]
+    GL0 --> UP0["Scene::Update"]
+    UP0 --> UP1["AllUpdateWorldMatrix PreUpdate<br/>SyncDerivedState: EnsureExecutionGraphsCompiled → UpdateUILayout → ResolveSpatialTransforms"]
+    UP1 --> UP2["AnimatorSystems → DecalSystems → FoliageSystems → UITickSystems → SoundSystems"]
+    UP2 --> UP3["CameraSystem::Update → PumpReentrancyStress Update"]
+    UP3 --> UP4["LightSystems → PlayerInputSystems → TweenManager::Update"]
+    UP4 --> UP5["AllUpdateWorldMatrix LateUpdate"]
+    UP5 --> YN["Scene::YieldNull<br/>yield_Null → yield_WaitForSeconds → yield_OtherEvent → yield_StartCoroutine"]
+    YN --> AN0["InternalAnimationUpdateEvent.Broadcast → AnimationScheduler::Update"]
+    AN0 --> AN1["SnapshotAnimators → 작업 항목<br/>SnapshotTwoBoneIK · SnapshotBoneTransforms · 품질 요구 판정"]
+    AN1 --> AN2["job submit_indexed PrepareGeneration → UpdateWait"]
+    AN2 --> AN3["CPU 예산 순 정렬 → CommitQuality · FinalizeGenerationQuality"]
+    AN3 --> AN4["실행 작업 제출 → ExecuteWait"]
+    AN4 --> LU0["Scene::LateUpdate"]
+    LU0 --> LU1["PumpReentrancyStress LateUpdate → SoundSystems->LateUpdate"]
+    LU1 --> LU2["Scene::UpdateRenderData → CommitRenderProxies"]
+    LU2 --> LU3["물리 보간 대상과 자손 → PublishRenderProxyDirty Transform"]
+    LU3 --> LU4["dirtyQueue → drainQueue 교환 · 세대 불일치 버림<br/>종류별 RenderScene::UpdateCommand<br/>Light · Mesh · Terrain · Foliage · Decal · Sprite · Image · Text · SpriteSheet"]
+    LU4 --> LU5["Scene::ApplyAIUpdate<br/>CollectAIUpdate(false) → AIManagers->ApplyAIUpdate · m_aiTickBoundaryReached = true"]
+    LU5 --> S5{"HasPendingSceneStructureChange?"}
+    S5 -- "없음" --> CL1["ClrHost::FlushRegistrations → FlushPhysicsEvents → FlushAniEvents<br/>→ FlushScriptMessages → FlushAITicks → TickPostPhysics"]
+    S5 -- "있음" --> OUT
+    CL1 --> OUT
+
+    OUT --> AP0["SceneManager::ApplyPendingSceneStructureChange<br/>CompleteSceneLoads(false)"]
+    AP0 --> AP1{"재생 종료 요청?"}
+    AP1 -- "예" --> AP1a["EndPlayTransaction"]
+    AP1 -- "아니오" --> AP2
+    AP1a --> AP2{"m_sceneToActivate?"}
+    AP2 -- "예" --> AP2a["BeforeAwakeSceneLoad"]
+    AP2 -- "아니오" --> AP3
+    AP2a --> AP3{"재생 시작 요청?"}
+    AP3 -- "예" --> AP3a["BeginPlayTransaction → 실패면 SetGameStart(false)<br/>성공이면 Scene::Reset · m_isPlayCommitted = true"]
+    AP3 -- "아니오" --> EF0
+    AP3a --> EF0
+
+    EF0["Scene::EndFramePass"] --> EF1{"AI 틱 경계 도달 · 갱신 가능?"}
+    EF1 -- "예" --> EF1a["CollectAIUpdate(true)"]
+    EF1 -- "아니오" --> EF1b["DrainAIUpdate"]
+    EF1a --> EF2
+    EF1b --> EF2["FlushPendingDestroy<br/>OnEndSimulation → OnRemovingFromScene → OnUninitializing → UnregisterComponent"]
+    EF2 --> EF3["DestroyLight → DestroyComponents → DestroyEntities"]
+    EF3 --> EF4["AIManagers->CaptureAIUpdate(주 카메라 절두체)<br/>job AIManager::CullAIUpdate 제출 → 다음 프레임 LateUpdate에서 회수"]
+</script>
+
+<script type="text/x-mermaid" id="mmd-p3">
+flowchart TD
+    L0["TickLive(frame)<br/>renderStateMutex 잠금"] --> L1["PBR 캡처면 고정 프레임 · 카메라 재생 적용"]
+    L1 --> L2["consumedFrameId 기록 → BeginDisplaySnapshot → PublishDebugSnapshot"]
+    L2 --> L3["ApplyAndPublishTuning · fogTeardownPending이면 ReleaseFogResources"]
+    L3 --> L4{"enabled?"}
+    L4 -- "아니오" --> L4a["ProxyCommandQueue->DeferBatch → 반환"]
+    L4 -- "예" --> L5{"초기화됨 · 씬 로딩 아님?"}
+    L5 -- "예" --> L6["RenderScene::BeginProxyFrame(sceneEpoch)<br/>→ ProxyCommandQueue->ExecuteBatch, 실패면 DeferBatch"]
+    L6 --> L7["BuildDrawPool<br/>그리기 · 데칼 · 스프라이트 · UI 프록시 풀"]
+    L5 -- "아니오" --> L5a["DeferBatch · 풀 비움"]
+    L7 --> VK{"백엔드?"}
+    L5a --> VK
+    VK -- "Vulkan" --> VK1["PromoteCompleted → 같은 단계를 Vulkan 파이프라인으로"]
+    VK -- "DX12" --> C0["gpu_collect: dx12.MaintainAssetCaches"]
+    C0 --> C1["뷰마다 pendingQueue 앞 슬롯의 펜스 완료 확인"]
+    C1 --> C2["완료 → displaySlot 승격 → PublishDisplayResultLocked<br/>slot.graph.reset · DrainDebugMessages"]
+    C2 --> C3["dx12.CollectProfiler → GPU 패스 시간 · GpuSpanSink 전달"]
+    C3 --> C4{"씬 로딩 · 뷰 0 · 크기 0?"}
+    C4 -- "예" --> C4a["framesIdle++ → 반환"]
+    C4 -- "아니오" --> C5["크기 바뀌면 ResizePipeline · 없으면 BuildPipeline"]
+    C5 --> C6["ApplyGBufferShaderMeta → ApplyForwardShaderMeta<br/>→ SealForwardMaterials → SealGBufferMaterials"]
+    C6 --> V0["뷰 순회, 시작 뷰를 돌려 가며"]
+    V0 --> V1{"진행 중 제출 2개 이상?"}
+    V1 -- "예" --> V1a["framesInFlight++ · 건너뜀"]
+    V1 -- "아니오" --> V2["CameraView 배정 · displaySlot도 진행 중도 아닌 슬롯 선택<br/>재질 미리보기가 이미 완성됐으면 캐시 게시 후 건너뜀"]
+    V2 --> V3["CaptureFromView<br/>카메라 스냅샷 · 기즈모 · 월드 스프라이트 · EnhancedUIPass::BuildRectsFromQueue<br/>BuildViewFrustum → SelectLightsForView → 절두체 컬링 · 그림자 대상 분류"]
+    V3 --> R0["RenderOnce"]
+    R0 --> R1["ibl.FinishCookedCapture → dx12.BeginFrame → BeginProfilerFrame"]
+    R1 --> R2["PreparePipelineFrame<br/>graphMaterials.SelectReadyInput · IBL InstallCooked · Generate · TouchCooked<br/>skyBox.SetCubeMap · deferred · forward SetIBL · sprite.SetItems · ui.SetRects<br/>animationPalettes.Prepare → desc.PrepareAll"]
+    R2 --> R3["EnhancedRenderGraph 생성 · SetProfiler · SetTransientPool"]
+    R3 --> R4["graphMaterials.PrepareResidency → graph.PrepareParallel → graphMaterials.Prepare"]
+    R4 --> R5["blackboard.Reset → desc.DeclareAll<br/>그림 5의 패스 선언"]
+    R5 --> R6["graph.Compile"]
+    R6 --> R7["graph.RecordParallel(CommandPool, 작업자 4)"]
+    R7 --> R8["dx12.EnqueueRecordedBatch → ResolveProfilerFrame → dx12.EndFrame"]
+    R8 --> R9["graphMaterials.PublishSubmittedCache<br/>slot.fenceValue · ibl.MarkCookedCaptureSubmitted · pendingQueue.push_back"]
+    R9 --> V0
+    R0 -. "연속 실패 60회" .-> RF["TeardownPipeline · enabled = false"]
+</script>
+
+<script type="text/x-mermaid" id="mmd-e1">
+flowchart TD
+    subgraph GT["게임 스레드 · Core::App::Run → CoreWindow::Then"]
+        M0["PeekMessage"] --> M1{"메시지?"}
+        M1 -- "WM_QUIT" --> MX["순환 종료 → EditorMain::Finalize"]
+        M1 -- "있음" --> M2["DispatchMessage<br/>WndProc → WinProcProxy::PushMessage<br/>WM_SIZE · Alt+Enter → EditorMain::InvokeResizeFlag"]
+        M2 --> M0
+        M1 -- "없음" --> A0{"m_windowClosed?"}
+        A0 -- "예" --> M0
+        A0 -- "아니오" --> A1["DataSystems->DrainQueuedAssetChanges"]
+        A1 --> U0["EditorMain::Update<br/>그림 10"]
+        U0 --> C0["ConsoleCommandSystem::Pump"]
+        C0 --> PR0["App::PublishRenderFrame"]
+        PR0 --> PR1["EditorMain::LockSceneStructure"]
+        PR1 --> PR2["IsEditorCameraFollowing → MatchEditorCameraToGameCamera"]
+        PR2 --> PR3["editor::windows::read_viewport_demand<br/>호스트가 아직 게시 안 했으면 둘 다 요구"]
+        PR3 --> PR4["에디터 뷰: EditorSessionState CameraRig → CaptureFrameSnapshot<br/>Editor · SceneOverlay · CanvasPreview, 스카이박스 숨김이면 HideSkyBox"]
+        PR4 --> PR5["게임 뷰: Cameras().GetPrimaryCamera → CaptureFrameSnapshot<br/>Game · ScreenSpaceUI"]
+        PR5 --> PR6["material_editing::CapturePreviewRequest → 재질 미리보기 뷰"]
+        PR6 --> PR7["editor::windows::note_view_submission"]
+        PR7 --> PR8["CaptureRequiredRenderMaterials → BuildRequiredAssetPacket → BuildLiveFramePacket"]
+        PR8 --> PR9["씬 잠금 해제 → PublishLiveFrame → EditorMain::NotifyRenderFramePublished"]
+        PR9 --> Q0{"cli.IsQuitRequested?"}
+        Q0 -- "예" --> Q1["m_windowClosed = true · PostQuitMessage"]
+        Q0 -- "아니오" --> M0
+        Q1 --> M0
+    end
+
+    subgraph RT["렌더 스레드 · 플레이어와 같은 코드"]
+        R0["renderQueue 꺼냄 → TickLive<br/>그림 8 · 뷰 최대 3"] --> R1["에디터 뷰 그래프에는 EditorSceneOverlayContributor 노드<br/>Grid · WireFrame · GizmoIcon · GizmoLine"]
+    end
+
+    subgraph PT["표시 스레드 · EditorMain::PresentationThreadMain"]
+        D0["m_presentationWake.wait<br/>정지 · 크기 변경 · 새 frameId"] --> D1["WinProcProxy 큐 비우기 → ImGui_ImplWin32_WndProcHandler"]
+        D1 --> D2{"m_isInvokeResize?"}
+        D2 -- "예" --> D3["HandleWindowResize<br/>뷰포트 호스트가 없을 때만 GetClientRect → ApplyScreenSize"]
+        D2 -- "아니오" --> D4
+        D3 --> D4["ApplyViewportRenderExtent<br/>캔버스 크기 × 렌더 배율 양자화 · 8프레임 안정 뒤 ApplyScreenSize"]
+        D4 --> D5["PresentFrame → OnGui<br/>그림 11"]
+        D5 --> D0
+    end
+
+    PR9 -.-> R0
+    PR9 -.-> D0
+    R0 -.->|"완료 슬롯 게시"| D5
+</script>
+
+<script type="text/x-mermaid" id="mmd-e2">
+flowchart TD
+    T0["EditorMain::Update → Time->Tick"] --> T1["Runtime::ResolveFrameDelta"]
+    T1 --> T2["UpdateTitleBar → SetWindowText, 제목이 바뀌었을 때만"]
+    T2 --> T3["InputManagement->Update"]
+    T3 --> T4["PlayModeController::Tick<br/>정지 → 진입 → 재생 상태 전이 · 뷰포트 모드 요청"]
+    T4 --> B0{"SceneManager::IsPlayCommitted?"}
+    B0 -- "아니오" --> E0["SceneManager::Editor<br/>DDOL 정리 · m_isInitialized = false · Scene::DrainPendingLifecycle<br/>재생 전 스크립트는 대기열로 되돌림"]
+    E0 --> E1["SceneManager::InputEvents → InputEvent.Broadcast<br/>입력 주인이 게임이 아니면 Ctrl+Z · Ctrl+Y → EditorObjectOperations::UndoRedo<br/>UIManagers->Update · Sound->update"]
+    E1 --> E2["SceneManager::GameLogic(0, dt)<br/>Scene::Update Δ0 · YieldNull · AnimationScheduler Δ dt · Scene::LateUpdate Δ0<br/>LateUpdate 안에서 UpdateRenderData · ApplyAIUpdate"]
+    B0 -- "예" --> P0["SceneManager::Editor"]
+    P0 --> P1["Runtime::TickSimulationFrame<br/>그림 7과 같음"]
+    E2 --> K0
+    P1 --> K0["F5 → ToggleGameViewHidden · Ctrl+W → GizmoRenderer::SetWireFrame"]
+    K0 --> L0["m_sceneStructureMutex 잠금"]
+    L0 --> L1["Editor::ModelPlacement::Tick"]
+    L1 --> L2["EditorScriptAuthoring::Tick"]
+    L2 --> L3["SceneManager::ApplyPendingSceneStructureChange<br/>그림 7 끝과 같음"]
+    L3 --> L4["Scene::CaptureSelectionForSimulation"]
+    L4 --> L5["CoroutineManagers->yield_OnRender"]
+    L5 --> L6["SceneManager::DisableOrEnable → Scene::EndFramePass"]
+    L6 --> L7["SceneManager::EndOfFrame"]
+    L7 --> L8["잠금 해제"]
+    L8 --> N0["ResourceCounterWindow::PublishFromGameThread"]
+    N0 --> N1["memory_profiler::snapshot_service::poll_game_thread"]
+    N1 --> N2{"관리 계수기 켜짐?"}
+    N2 -- "예" --> N3["ClrHost::GetManagedGcStats → publish_counters"]
+    N2 -- "아니오" --> N4
+    N3 --> N4["ce::profiler().publish_frame"]
+    N4 --> N5{"IsDecommissioning?"}
+    N5 -- "예" --> N6["PostMessage WM_CLOSE"]
+</script>
+
+<script type="text/x-mermaid" id="mmd-e3">
+flowchart TD
+    G0["EditorMain::OnGui<br/>씬 구조 잠금"] --> G1{"IsGameViewHidden?"}
+    G1 -- "예" --> G1a["CameraRig::BeginPresentationFrame(false) → 반환"]
+    G1 -- "아니오" --> B0["EditorRenderer::BeginRender"]
+    B0 --> B1["workspace BeforeFrame · 배율이나 DPI가 바뀌면 ApplyEditorScale"]
+    B1 --> B2["IImGuiHost::BeginFrame<br/>renderer Resize · NewFrame · ImGui_ImplWin32_NewFrame · ImGui::NewFrame"]
+    B2 --> B3["첫 표시 텍스처 확인 → warmup display_texture 표시"]
+    B3 --> B4["editor::nav::apply_injected_pointer"]
+    B4 --> B5["Main DockSpace Window · ImGui::DockSpace · 중앙 노드 설정<br/>작업 공간 초기화 요청이면 BuildInitialDockLayout"]
+    B5 --> G2["씬 잠금 해제 → EditorRenderer::RenderProfiler<br/>apply_pending_window_requests → draw_windows 프로파일러 단계"]
+    G2 --> G3["씬 잠금 다시 → CameraRig::BeginPresentationFrame<br/>창이 앞에 있고 최소화가 아닐 때 입력 받음"]
+    G3 --> G4["MenuBarWindow::RenderMenuBar"]
+    G4 --> R0["EditorRenderer::Render"]
+    R0 --> R1["SelectionHistory().Observe · OpenPendingTextureImportSelector"]
+    R1 --> R2["editor::draw_windows 씬 단계<br/>등록된 에디터 창 전부"]
+    R2 --> R3["draw_workspace_dialog · 첫 빌드 탭과 씬 창 포커스"]
+    R3 --> E0["EditorRenderer::EndRender"]
+    E0 --> E1["publish_viewport_demand · publish_panel_costs"]
+    E1 --> E2["nav::observe_frame · deliver_pending_key · clipping · state observe_frame"]
+    E2 --> E3["workspace EndFrame · capture_chrome_snapshot · record_ui_frame_ms"]
+    E3 --> E4["IImGuiHost::EndFrame<br/>ImGui::Render · PublishFrameCursor · RenderAndPresent<br/>UpdatePlatformWindows · RenderPlatformWindowsDefault"]
+</script>
+
+<script>
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // 연결 강조: 같은 data-ref 를 가진 요소가 함께 켜진다.
+  const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+  let hovered = null, focused = null;
+  const paint = () => {
+    const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+    for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+    for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+  };
+  for (const el of linked) {
+    el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+    el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+    el.addEventListener('focus', () => { focused = el; paint(); });
+    el.addEventListener('blur', () => { focused = null; paint(); });
+  }
+
+  // 단계 재생: 전체 그림으로 열고, 재생은 1단계부터 다시 돈다.
+  for (const root of document.querySelectorAll('.ve-steps')) {
+    const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+    const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+    const n = caps.length; let i = 0, timer = null;
+    if (range) range.max = n - 1;
+    const show = (k) => {
+      i = Math.max(0, Math.min(n - 1, k));
+      for (const el of parts) { el.classList.toggle('on', +el.dataset.s <= i + 1); el.classList.toggle('now', +el.dataset.s === i + 1); }
+      caps.forEach((c, j) => c.hidden = j !== i);
+      root.classList.toggle('is-full', i === n - 1);
+      if (range) range.value = i;
+    };
+    const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = '재생'; };
+    root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+    range?.addEventListener('input', () => { stop(); show(+range.value); });
+    play?.addEventListener('click', () => {
+      if (timer) return stop();
+      if (i === n - 1) show(0);
+      play.textContent = '멈춤';
+      timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+    });
+    show(n - 1);
+  }
+
+  // 목차: 지금 읽는 구역 표시
+  const tocLinks = [...document.querySelectorAll('nav.toc a')];
+  const byId = new Map(tocLinks.map((a) => [a.getAttribute('href').slice(1), a]));
+  const spy = new IntersectionObserver((entries) => {
+    for (const e of entries) if (e.isIntersecting) {
+      for (const a of tocLinks) a.classList.toggle('is-active', a === byId.get(e.target.id));
+      try { history.replaceState(null, '', '#' + e.target.id); } catch (_) {}
+    }
+  }, { rootMargin: '-10% 0px -80% 0px' });
+  for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+
+  if (!still) {
+    document.documentElement.classList.add('js-motion');
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (!e.isIntersecting) continue;
+        io.unobserve(e.target); e.target.classList.add('in');
+        for (const el of e.target.querySelectorAll('[data-count]')) {
+          const end = +el.dataset.count, t0 = performance.now();
+          const step = (t) => {
+            const k = Math.min(1, (t - t0) / 900);
+            el.textContent = Math.round(end * (1 - (1 - k) ** 3));
+            if (k < 1) requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        }
+      }
+    }, { rootMargin: '0px 0px -10% 0px' });
+    for (const el of document.querySelectorAll('main > *')) io.observe(el);
+  }
+</script>
+<script type="module">
+  // 머메이드는 CSS 변수를 못 읽으므로 계산된 토큰 값을 넘기고, 색 구성이 바뀌면 다시 그린다.
+  const hosts = [...document.querySelectorAll('.mmd')];
+  const fallback = () => {
+    for (const host of hosts) {
+      const pre = document.createElement('pre');
+      pre.className = 'mmd-fallback';
+      pre.textContent = document.getElementById(host.dataset.src).textContent.trim();
+      host.replaceChildren(pre);
+    }
+  };
+  let mermaid;
+  try {
+    mermaid = (await import('https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs')).default;
+  } catch (_) {
+    fallback();
+  }
+  const tokens = () => {
+    const cs = getComputedStyle(document.documentElement), v = (n) => cs.getPropertyValue(n).trim();
+    return {
+      background: v('--bg'), mainBkg: v('--surface'), primaryColor: v('--surface'), primaryTextColor: v('--text'),
+      primaryBorderColor: v('--border-bright'), secondaryColor: v('--surface'), tertiaryColor: v('--bg'),
+      lineColor: v('--text-dim'), textColor: v('--text'), nodeTextColor: v('--text'), titleColor: v('--text-dim'),
+      clusterBkg: 'transparent', clusterBorder: v('--border-bright'), edgeLabelBackground: v('--bg'),
+      fontFamily: "'IBM Plex Sans KR', 'Malgun Gothic', sans-serif", fontSize: '15px',
+    };
+  };
+  // 확대·축소와 끌어서 이동. 원래 크기가 기본이고, 폭 맞춤은 읽는 사람이 고른다.
+  const zoomState = new Map();
+  const applyZoom = (host) => {
+    const svg = host.querySelector('svg'), state = zoomState.get(host);
+    if (!svg || !state) return;
+    svg.style.width = `${state.w * state.k}px`;
+    svg.style.height = `${state.h * state.k}px`;
+    state.label.textContent = `${Math.round(state.k * 100)}%`;
+  };
+  const attachTools = (host) => {
+    const frame = host.closest('.frame');
+    if (frame.nextElementSibling?.classList.contains('mmd-tools')) return;
+    const bar = document.createElement('div');
+    bar.className = 'mmd-tools';
+    const label = document.createElement('span');
+    label.className = 've-label';
+    const make = (text, aria, fn) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.setAttribute('aria-label', aria); b.addEventListener('click', () => { fn(zoomState.get(host)); applyZoom(host); }); return b; };
+    bar.append(
+      make('폭 맞춤', '상자 폭에 맞춰 줄이기', (s) => { s.k = Math.min(1, (frame.clientWidth - 48) / s.w); }),
+      make('−', '축소', (s) => { s.k = Math.max(.2, s.k / 1.25); }),
+      make('+', '확대', (s) => { s.k = Math.min(3, s.k * 1.25); }),
+      make('원래 크기', '원래 크기로', (s) => { s.k = 1; }),
+      label);
+    frame.after(bar);
+    zoomState.set(host, { w: 0, h: 0, k: 1, label });
+    let drag = null;
+    frame.addEventListener('pointerdown', (e) => { if (e.button !== 0) return; drag = { x: e.clientX, y: e.clientY, l: frame.scrollLeft, t: frame.scrollTop }; frame.classList.add('is-dragging'); frame.setPointerCapture(e.pointerId); });
+    frame.addEventListener('pointermove', (e) => { if (!drag) return; frame.scrollLeft = drag.l - (e.clientX - drag.x); frame.scrollTop = drag.t - (e.clientY - drag.y); });
+    const end = () => { drag = null; frame.classList.remove('is-dragging'); };
+    frame.addEventListener('pointerup', end); frame.addEventListener('pointercancel', end);
+  };
+  let generation = 0;
+  const render = async () => {
+    if (!mermaid) return;
+    const mine = ++generation;
+    mermaid.initialize({ startOnLoad: false, theme: 'base', themeVariables: tokens(), securityLevel: 'strict',
+      flowchart: { htmlLabels: true, curve: 'basis', useMaxWidth: false, nodeSpacing: 34, rankSpacing: 42 } });
+    for (const [index, host] of hosts.entries()) {
+      try {
+        const { svg } = await mermaid.render(`mmd-out-${mine}-${index}`, document.getElementById(host.dataset.src).textContent.trim());
+        if (mine !== generation) return;
+        host.innerHTML = svg;
+        attachTools(host);
+        const node = host.querySelector('svg'), box = node.viewBox.baseVal, state = zoomState.get(host);
+        state.w = box.width; state.h = box.height;
+        applyZoom(host);
+      } catch (error) {
+        const pre = document.createElement('pre');
+        pre.className = 'mmd-fallback';
+        pre.textContent = '그리기 실패: ' + error.message + '\n\n' + document.getElementById(host.dataset.src).textContent.trim();
+        host.replaceChildren(pre);
+      }
+    }
+  };
+  await document.fonts.ready;
+  await render();
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', render);
+</script>
+</body>
+</html>

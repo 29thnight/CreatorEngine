@@ -6,6 +6,12 @@
 
 ## 1. 수행 순서
 
+### 2026-10-07 graph-only 재질 전환 인계
+
+live Shadow/GBuffer/Forward의 native 재질 대체와 이전 graph instance 선택을 제거했다. DX12 D/R 장면 검사와 Release 전체 raster·shadow/decal·refraction·SSS·volume 검사는 통과했다. [변경 및 증거](../analysis/GraphOnlyMaterialPasses20261007.md). Release Vulkan probe는 빌드를 통과했지만 `--scene-only` 최초 재질의 `WaitSceneProgram` 준비 단계에서 `Scene asynchronous preparation`으로 exit 1, 첫 장면 fixture 실행 전에 종료했다. 이 검사의 SPIR-V 준비 제한은 600초이며 구체적인 shader/driver 오류 문자열은 비어 있다. 실행·픽셀·validation 수용은 미완료다. 실패 로그는 `Build/Verification/GraphOnlyMaterials20261007/scene-Vulkan-Release.log`에 보존한다.
+
+BP-0/1에서 같은 입력의 cold pipeline 준비 위치와 worker/PSO 단계별 시간을 분리하고 재현한다. 준비 실패/제한 초과를 구분한 뒤, 준비 완료 상태에서 새 Shadow/GBuffer clear와 exact-generation 거부·graph 재질의 실제 리소스/픽셀을 검사한다. 타임아웃 증가나 native/이전 재질 fallback 복원으로 수용하지 않는다. 이 Vulkan 잔여를 RG6의 기존 DX12 수용 선행으로 역연결하지 않는다.
+
 1. 동일 입력을 밀봉한다. 정지 fixture는 BASE-0의 자산·카메라·광원·재질·샘플·히스토리 초기화 계약을 재사용한다. 움직이는 fixture는 simulation tick, delta, jitter seed, 애니메이션 pose, 이전 프레임과 history warmup 길이까지 기록한다. 재현 불가 입력은 비교 전에 거부한다.
 2. **RenderDoc으로 DX12와 Vulkan의 실제 제품 프레임을 각각 캡처한다.** 사용한 RenderDoc 버전·GPU·driver·binary와 `.rdc`를 보존한다. 두 backend의 event 번호는 같다고 가정하지 않고 Pass 이름/역할/입출력으로 대응표를 만든다. 캡처 파일을 열어 재생할 수 있어야 한다.
 3. **리소스를 먼저 확인한다.** 대응 event의 geometry/index/vertex 입력, constant buffer 값·layout, texture format/extent/mip/layer/색공간/초기값, SRV/UAV/RT/depth binding, sampler, PSO, blend/cull/depth, 이전 history·barrier/ownership을 추적한다. 잘못된 리소스나 입력을 이미지 허용치로 덮지 않는다.

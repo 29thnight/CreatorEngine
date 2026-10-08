@@ -1,5 +1,13 @@
 # PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation
 
+## 2026-10-07 최근 병합 반영
+
+PR #118/#120은 consumer lease를 GPU 완료까지 유지하는 표시 수명, 최신 packet/Host GPU 진입 제한과 Player native Present 기반을 적용했다. 이 변경은 FG provider/SDK·생성 프레임 구현 또는 PHASE 4.5 완료 공수가 아니다. 16행 71인일 및 TR/TU/FG 미완료 판정을 유지한다.
+
+FG는 shell/RHI Present·pacing와 게임 루프가 소유하고 Editor viewport live_present는 삽입 지점이 아니다. 향후 provider의 최종 소비까지 lease를 연장하며 GT/실프레임과 생성 출력 신원을 구분한다. 50/250ms admission과 queue 상한은 지연/VRAM 최대 보장이 아니고, 실제 전후 지연·resize·device loss·종료 수용은 남는다. 계약: [OwnedBoundedPresentation](../design/OwnedBoundedPresentation.md), [PlayerNativePresentation](../design/PlayerNativePresentation.md).
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 **2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
 
 

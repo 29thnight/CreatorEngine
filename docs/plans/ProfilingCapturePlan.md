@@ -1,5 +1,68 @@
 # 프레임 프로파일러 수집·녹화·구간 분석 계획
 
+## 2026-10-07 CPU 성능 개선 우선 적용
+
+사용자 지정 [CPU Performance Engineering](https://github.com/usamahz/cpu-performance-engineering)의
+측정 → 원인 식별 → 동일 의미의 변경 → 전후 비교 순서를 CPU 코드 개선에 먼저 적용한다.
+[성능 수치의 7개 증거 조건](https://github.com/usamahz/cpu-performance-engineering/blob/main/CONTRIBUTING.md#step-3-if-the-line-carries-a-number)은
+CPU/마이크로아키텍처, 사용 코어 수, 실효 주파수·turbo/SMT, 컴파일러·옵션, 입력,
+기준 구현, 측정 반복·통계를 기록하는 기준으로 사용한다. 미확인 필드는 미확인으로 남기고
+그 측정은 수용된 개선율 대신 관측 자료로만 취급한다.
+
+첫 적용은 `ProfileAggregate.cpp::aggregate_frames`의 스레드 요약이다.
+`ProfileReader.cpp`의 비동기 timeline 준비와 선택 구간 Hierarchy/Flat 집계가 이 함수를 소비한다.
+이미 `thread_slot`로 정렬된 이벤트마다 기존 요약 전체를 찾던 O(events × lanes) 순회를,
+연속된 스레드 구간별 로컬 누적으로 바꿔 이 단계만 O(events + lanes)로 만든다.
+전체 집계의 이벤트 정렬·분포 정렬 비용은 그대로 남는다. 수집·파일 ABI·프레임 귀속은 바꾸지 않는다.
+
+재현 도구: `Tools/regression/measure-profile-aggregate.ps1` 및
+`profile_aggregate_benchmark.cpp`. 120프레임, 1/8/64/256개 희소 슬롯,
+끝난 순서의 중첩 이벤트·instant·truncated·등록되지 않은 슬롯을 입력으로 사용한다.
+동일 MSVC Release 옵션과 나머지 코어 소스로 기준/후보를 한 실행 파일에 함께 빌드하고,
+각 입력에서 호출 순서를 번갈아 바꿔 비교한다. 기준 함수와 결과 타입만 별도 이름으로 생성한다.
+각 경우 2회 warmup, 각 구현 14표본의 원시 시간과 모든 공개 집계 필드의 digest를 보존한다.
+작은 입력은 표본 내 반복을 사용한다. 생성·digest·소멸은 시간 측정에서 제외한다.
+기본 기준 소스는 `3afe1daaee7b75f644ac10b12d96fb684a0e74c8`이며 `-BaselineRef`로 명시한다.
+전체 코어 검사에는 변경 전후 Debug/Release에서 동일한 `pool-growth/events` 실패가 있어
+전체 통과로 기록하지 않는다. 해당 검사 실패와 집계 동등성은 별도로 판단한다.
+최종 코드도 `/W4 /WX` Debug/Release 빌드가 통과했고, 전체 코어 각 1,236개 검사에서
+위 기존 실패 1건만 재현됐다. 정렬 제거 변이는 집계 합계·자식 범위·레인 경계 검사에서
+거부됐다. 로그는 `Artifacts/cpu-profile-aggregate-final/core-after/`에 보존한다.
+
+로컬 관측 산출물은 `Artifacts/cpu-profile-aggregate-paired/report.json`이다.
+Xeon W-2223(4코어/8논리 프로세서), 벤치마크 자체는 단일 스레드, 균형 조정 전원 계획,
+MSVC Release `/O2 /MD /DNDEBUG /std:c++latest`, 합성 120프레임 입력이다.
+`spans_only` 중앙값은 8레인 2.908→2.788ms, 64레인 30.270→28.380ms,
+256레인 162.346→133.004ms였다. 전체 집계의 64레인은 57.864→58.120ms로
+개선 관측이 없으며 256레인은 259.858→228.189ms였다. 모든 경우 공개 필드 digest가 같다.
+마이크로아키텍처·실효 주파수·turbo/SMT 상태·백그라운드 부하는 통제/확정하지 못했으므로
+이 수치는 관측이며 제품 FPS 개선이나 7개 증거 조건의 수용 완료가 아니다.
+빌드와 겹쳤던 초기 측정 및 별도 프로세스의 후보 측정은 최종 개선 근거로 사용하지 않는다.
+
+후속 수용은 기존 **14-REC**에 편입한다: 실제 v3 캡처의 선택/스크롤 응답,
+Debug/Release 집계·레인 경계·분포 동등성, 코어의 기존 실패 해소, 실효 주파수·turbo/SMT와
+계측 자체의 비용을 기록한 반복 측정. CPU prepare/record·배칭·업로드 개선은
+`GpuDrivenGeometryImplementationPlan.md`의 GD 성능 수용에서 동일 자산/바이너리로 비교하고,
+씬 잠금·스케줄러 변경은 실제 CPU/대기 캡처의 임계 경로가 확인된 뒤 별도 슬라이스로 진행한다.
+SIMD·prefetch·lock-free·전역 컴파일 옵션 변경은 병목 근거와 출력 동등성 없이 일괄 적용하지 않는다.
+이 우선 적용으로 14-REC나 GPU-1의 완료 공수는 올리지 않는다.
+
+## 2026-10-07 최근 병합 반영
+
+현재 엔진은 수집·최근 600프레임/128 MiB live 보존·전체 세션 CEPROF v3 writer를 소유하고, 별도 `ProfilerViewer.exe`가 파일 색인·구간 조회·집계와 15개 분석 페이지를 소유한다. PR #117/#126/#127/#128/#129가 병합됐다. 기존 P0~P6 완료 이력은 유지하되 아래 후속 수용까지 통과했다는 뜻으로 읽지 않는다. 아래 §0.5의 4프레임 링·옛 CPUProfiler 관측은 과거 교체 근거다.
+
+| 대시보드 ID | 현재 구현 | 남은 완료 조건 | 상태·공수 |
+|---|---|---|---|
+| 14-REC | v3 연속 spool·전체 세션 Save, 비동기 reader, CPU scope publication·Stop/GPU tail 및 incomplete 진단 | D/R 반복 Record/Stop/Clear/Open/Save, 긴 녹화·파일 오류/CRC/recovery·queue 포화, DX12 실제 fence/abort/종료, 지원 mutation 69개 실행 및 손실/비용 기록 | progress · 미산정 · 기성 0 |
+| 14-VIEW | 독립 Win32/D3D11 viewer, 인증 IPC·Memory/Animation/Rendering Live, 명시적 열기, 소유 job·전용 아이콘·셸 | Windows 빌드·기동/재사용·DPI/입력/좁은 창, Editor 정상/비정상 종료·offline 독립 수명, stale 세대/끊김/큰 캡처와 직렬화 비용 | progress · 미산정 · 기성 0 |
+| 14-DX | 일반 권한 ETW helper·엔진 제출 연결·.cedx, profile.deep.start/status/stop | opt-in SDK 구성 빌드, permission_denied/unavailable, 세션/손실/종료·crash 후 ETW 정리와 실제 수집 비용 | progress · 미산정 · 기성 0 |
+
+계약: [연속 녹화](../design/ProfilerContinuousRecording.md), [viewer 소유권](../design/ProfilerViewerProcess.md), [심층 수집](../design/Dx12DeepCapture.md). Viewer 표시 요청은 Profiler 메뉴·Window·Rendering Live·CLI open/focus에서만 발생하며 저장된 패널 열림/preset 복원으로 프로세스를 띄우지 않는다. `accepted`는 요청 접수이며 finalized/무손실이 아니다. Vulkan live timestamp는 unavailable이고 Vulkan 심층 수집은 구현 범위 밖이다.
+
+PR #117 본문의 실행 미수행 선언과 checked checklist가 상충한다. 이 감사에서는 산출물 없는 체크 표시를 실행 통과로 승격하지 않는다. #126~129의 추가 fixture/checklist 역시 작성과 실행을 구분한다.
+
+근거: [10월 4~7일 PR 적용 감사](../analysis/MergedPrReview20261007.md). 아래 과거 날짜의 검증 기록은 해당 시점의 증거이며 최신 HEAD의 통과를 뜻하지 않는다.
+
 작성: 2026-08-10
 목표: 현재의 표시 중심 프로파일러를 **프레임 단위로 녹화하고, 멈춘 뒤 특정 구간을 재현 가능하게 분석하는 도구**로 승격한다.
 
