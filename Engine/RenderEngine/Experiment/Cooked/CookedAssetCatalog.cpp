@@ -270,6 +270,48 @@ namespace experiment::cooked
         std::uint64_t nextResolverRevision, const AssetSetMountOptions& options,
         CookedAssetCatalog& outCatalog, std::vector<AssetManifestIssue>& outIssues) const
     {
+        return AddMountedAssetSetCandidate(manifest, std::move(byteSource), mountId,
+            nextResolverRevision, options, true, outCatalog, outIssues);
+    }
+
+    bool CookedAssetCatalog::WithMountedAssetSets(std::span<const AssetSetMountInput> inputs,
+        std::uint64_t nextResolverRevision, CookedAssetCatalog& outCatalog,
+        std::vector<AssetManifestIssue>& outIssues) const
+    {
+        outIssues.clear();
+        if (&outCatalog == this || inputs.empty() || inputs.size() > 64u
+            || nextResolverRevision <= m_resolverRevision
+            || nextResolverRevision - m_resolverRevision < inputs.size())
+        {
+            return MountIssue(outIssues, "catalog.mountGroup",
+                "Mount group requires 1..64 inputs, an independent output and a monotonic revision range.");
+        }
+        auto candidate = *this;
+        auto revision = nextResolverRevision - inputs.size();
+        for (const auto& input : inputs)
+        {
+            CookedAssetCatalog next;
+            if (!candidate.AddMountedAssetSetCandidate(input.manifest, input.byteSource,
+                input.mountId, ++revision, input.options, false, next, outIssues))
+            {
+                return false;
+            }
+            candidate = std::move(next);
+        }
+        AssetCatalogLookupIssue lookupIssue;
+        if (!candidate.ValidateMountedHardGraph(lookupIssue))
+        {
+            return MountIssue(outIssues, "catalog.hardClosure", std::move(lookupIssue.message));
+        }
+        outCatalog = std::move(candidate);
+        return true;
+    }
+
+    bool CookedAssetCatalog::AddMountedAssetSetCandidate(const AssetSetManifest& manifest,
+        own::shared_owner<const ArtifactByteSource> byteSource, AssetDepot::AssetMountId mountId,
+        std::uint64_t nextResolverRevision, const AssetSetMountOptions& options, bool validateHardGraph,
+        CookedAssetCatalog& outCatalog, std::vector<AssetManifestIssue>& outIssues) const
+    {
         outIssues.clear();
         if (&outCatalog == this)
         {
@@ -366,7 +408,7 @@ namespace experiment::cooked
         candidate.m_targetAbi = options.expectedTargetAbi;
         candidate.RebuildMountedIndex();
         AssetCatalogLookupIssue lookupIssue;
-        if (!candidate.ValidateMountedHardGraph(lookupIssue))
+        if (validateHardGraph && !candidate.ValidateMountedHardGraph(lookupIssue))
         {
             return MountIssue(outIssues, "catalog.hardClosure", std::move(lookupIssue.message));
         }

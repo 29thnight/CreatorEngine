@@ -260,6 +260,47 @@ namespace
         Require(counters->captureCalls == 0u && counters->sizeCalls == 0u && counters->readCalls == 0u, "mount/list/closure read artifact bulk");
     }
 
+    void VerifyAtomicMountGroups()
+    {
+        const auto counters = own::make_shared<SourceCounters>();
+        const own::shared_owner<const Cooked::ArtifactByteSource> source =
+            own::make_shared<CountingByteSource>(counters);
+        const auto a1 = Link(601u), a2 = Link(602u), b1 = Link(603u), b2 = Link(604u);
+        auto left = MakeManifest(610u, a1, 1u,
+            { { b1, Cooked::AssetDependencyKind::Hard, Cooked::AssetDependencyScope::External } });
+        const auto leftLeaf = MakeManifest(611u, a2, 2u);
+        left.blobs.push_back(leftLeaf.blobs.front());
+        left.entries.push_back({ a2, 1u, {} });
+        auto right = MakeManifest(620u, b2, 3u,
+            { { a2, Cooked::AssetDependencyKind::Hard, Cooked::AssetDependencyScope::External } });
+        const auto rightLeaf = MakeManifest(621u, b1, 4u);
+        right.blobs.push_back(rightLeaf.blobs.front());
+        right.entries.push_back({ b1, 1u, {} });
+        const Cooked::CookedAssetCatalog empty;
+        Cooked::CookedAssetCatalog unchanged;
+        std::vector<Cooked::AssetManifestIssue> issues;
+        Require(!empty.WithMountedAssetSet(left, source, { 1u }, 1u, Options(), unchanged, issues)
+            && !empty.WithMountedAssetSet(right, source, { 2u }, 1u, Options(), unchanged, issues),
+            "Individual incomplete sets bypassed external closure validation");
+        std::vector<Cooked::AssetSetMountInput> inputs{
+            { left, source, { 1u }, Options() }, { right, source, { 2u }, Options() } };
+        Require(empty.WithMountedAssetSets(inputs, 2u, unchanged, issues),
+            "Acyclic asset graph with cyclic set ordering failed atomic activation");
+        Require(unchanged.MountCount() == 2u && Closure(unchanged, a1).size() == 2u
+            && Closure(unchanged, b2).size() == 2u, "Atomic group lost a cross-set dependency");
+        inputs[1].manifest.entries[1].dependencies.push_back(
+            { a1, Cooked::AssetDependencyKind::Hard, Cooked::AssetDependencyScope::External });
+        Require(!empty.WithMountedAssetSets(inputs, 2u, unchanged, issues)
+            && unchanged.MountCount() == 2u && Closure(unchanged, a1).size() == 2u,
+            "Hard cycle published a partial mount group or replaced the old output");
+        inputs[1].manifest.entries[1].dependencies.clear();
+        inputs[1].mountId = inputs[0].mountId;
+        Require(!empty.WithMountedAssetSets(inputs, 2u, unchanged, issues),
+            "Duplicate mount identity was accepted within one group");
+        Require(counters->captureCalls == 0u && counters->sizeCalls == 0u && counters->readCalls == 0u,
+            "Atomic metadata activation accessed artifact payloads");
+    }
+
     void VerifyMergedOverrideAndValueIndices()
     {
         const auto counters = own::make_shared<SourceCounters>();
@@ -541,6 +582,7 @@ int main()
     try
     {
         VerifyTransactionsAndClosures();
+        VerifyAtomicMountGroups();
         VerifyMergedOverrideAndValueIndices();
         VerifySourceOwnerSurvivesLogicalRemoval();
         VerifyAbsentModelLoadableRemainsMetadataOnly();

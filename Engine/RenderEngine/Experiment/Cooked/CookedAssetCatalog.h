@@ -63,6 +63,14 @@ namespace experiment::cooked
         std::vector<AssetIdentity> overrideIdentities{};
     };
 
+    struct AssetSetMountInput final
+    {
+        AssetSetManifest manifest{};
+        own::shared_owner<const ArtifactByteSource> byteSource{};
+        AssetDepot::AssetMountId mountId{};
+        AssetSetMountOptions options{};
+    };
+
     // CEMF 하나를 읽어 **GUID 로 묻는** 런타임 경계.
     //
     // ★ 이것이 대체하려는 것은 `DataSystem::LoadAssetCatalog` 다. 지금은 부팅
@@ -168,6 +176,13 @@ namespace experiment::cooked
             const AssetSetMountOptions& options, CookedAssetCatalog& outCatalog,
             std::vector<AssetManifestIssue>& outIssues) const;
 
+        // Bootstrap publishes one complete resolver. Cross-set hard edges are
+        // validated only after every candidate is present; no partial snapshot
+        // escapes. Individual manifests and duplicate/override rules still apply.
+        [[nodiscard]] bool WithMountedAssetSets(std::span<const AssetSetMountInput> inputs,
+            std::uint64_t nextResolverRevision, CookedAssetCatalog& outCatalog,
+            std::vector<AssetManifestIssue>& outIssues) const;
+
         // Logical removal always advances the resolver. It may leave another
         // mount's external hard edge unresolved: its next acquisition reports
         // NotMounted. Old snapshots/results retain their exact source owners.
@@ -210,6 +225,11 @@ namespace experiment::cooked
             std::size_t entryIndex{};
         };
 
+        [[nodiscard]] bool AddMountedAssetSetCandidate(const AssetSetManifest& manifest,
+            own::shared_owner<const ArtifactByteSource> byteSource,
+            AssetDepot::AssetMountId mountId, std::uint64_t nextResolverRevision,
+            const AssetSetMountOptions& options, bool validateHardGraph,
+            CookedAssetCatalog& outCatalog, std::vector<AssetManifestIssue>& outIssues) const;
         void RebuildMountedIndex();
         [[nodiscard]] ResolvedAssetEntry ResolveMountedEntry(const MountedEntryLocation& location) const;
         [[nodiscard]] bool ValidateMountedHardGraph(AssetCatalogLookupIssue& outIssue) const;

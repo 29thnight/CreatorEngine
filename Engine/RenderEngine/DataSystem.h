@@ -545,6 +545,9 @@ private:
 	// I7-C1 — cooked catalog. immutable 표라 교체는 포인터 하나 바꾸기다.
 	own::shared_owner<const experiment::cooked::CookedAssetCatalog> m_cookedCatalog;
 	mutable std::mutex m_cookedCatalogMutex;
+    // Boot-only I/O, before asset consumers start. Publishes the complete configured
+    // set group or preserves the old resolver; never exposed as a cache-hit path.
+    [[nodiscard]] bool MountConfiguredAssetSets(const file::path& assetRoot, std::string& failure);
     // Guarded with m_cookedCatalogMutex; never reset/reused on reinitialize.
     std::uint64_t m_assetDepotRevision{};
     std::uint64_t m_nextAssetMountId{ 1u };

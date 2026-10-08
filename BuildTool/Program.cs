@@ -78,7 +78,7 @@ internal sealed class Options
     private static readonly HashSet<string> Switches = new(["build", "shipping", "buildnative", "skipverify", "smokeoffscreen", "selectengine", "json", "nopointer"], StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> Names = new(["repository", "config", "outputroot", "output", "project", "developmentproject",
         "enginedistribution", "prebuiltassembly", "gamescriptsassembly", "stageroot", "inputmode", "startupscene", "renderbackend",
-        "smokeframes", "smokepromotions", "smoketimeoutsec", "logpath", "target", "assetlist", "assetset", "artifactcache"], StringComparer.OrdinalIgnoreCase);
+        "smokeframes", "smokepromotions", "smoketimeoutsec", "logpath", "target", "assetlist", "assetset", "artifactcache", "assetsetlist", "assetsetabi"], StringComparer.OrdinalIgnoreCase);
     public string Command { get; }
     private static string Key(string name) => name.TrimStart('-').Replace("-", "");
     public Options(string[] args)

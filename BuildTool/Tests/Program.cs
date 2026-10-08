@@ -31,6 +31,39 @@ try
     }
     Metadata.AssertSourceOnlyAudio(["Runtime/Common/normal.dll", "Licenses/ThirdParty/miniaudio/LICENSE"]);
     ++checks;
+    // Unrun source fixture for independent AssetSet packaging. Native CEMF
+    // semantic/closure validation is covered by asset_set_activation_probe.cpp.
+    var assetSet = Path.Combine(root, "standalone-set");
+    var setManifest = Paths.Child(assetSet, "Derived/asset-set-manifest.cemf");
+    Directory.CreateDirectory(Path.GetDirectoryName(setManifest)!);
+    File.WriteAllBytes(setManifest, [67, 69, 77, 70, 3, 0]);
+    var setKeys = Paths.Child(assetSet, "build-keys.txt");
+    File.WriteAllText(setKeys, "fixture");
+    var blobBytes = new byte[] { 12, 34, 56 };
+    var blobHash = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(blobBytes));
+    var setBlob = Paths.Child(assetSet, "Derived/AssetBlobs/" + new string('0', 64) + "/" + blobHash + ".png");
+    Directory.CreateDirectory(Path.GetDirectoryName(setBlob)!);
+    File.WriteAllBytes(setBlob, blobBytes);
+    File.WriteAllText(Paths.Child(assetSet, "build-report.txt"), "format=CEMF3\nassets=1\nblobs=1\nmanifestSha256="
+        + Metadata.Hash(setManifest) + "\nbuildKeysSha256=" + Metadata.Hash(setKeys) + "\n");
+    var setList = Path.Combine(root, "sets.txt");
+    File.WriteAllText(setList, "standalone-set\n");
+    var packagedAssets = Path.Combine(root, "asset-set-package/Assets");
+    using (var setContext = new BuildContext(new Options(["package-game", "--asset-set-list", setList,
+        "--asset-set-abi", "fixture-v1"]), CancellationToken.None))
+    {
+        var hashes = AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets);
+        Check(hashes.SequenceEqual(new[] { Metadata.Hash(setManifest) }), "Package changed the immutable manifest identity");
+        var activationText = File.ReadAllText(Paths.Child(packagedAssets, "Derived/asset-set-activation.ceas"));
+        Check(activationText == "CEAS1\nwin-x64\nfixture-v1\n" + hashes[0] + "\n", "Activation policy was not canonical");
+        Check(Metadata.Hash(Paths.Child(packagedAssets, "AssetSets/" + hashes[0] + "/Derived/asset-set-manifest.cemf"))
+            == hashes[0], "Copied manifest is not the validated content");
+        Reject(() => AssetSetPackaging.CopyConfiguredSets(setContext, packagedAssets), "Existing package activation was replaced");
+        File.WriteAllBytes(setBlob, [99]);
+        Reject(() => AssetSetPackaging.CopyConfiguredSets(setContext, Path.Combine(root, "damaged-set-package/Assets")),
+            "Damaged source CAS blob was packaged");
+    }
+
     var textureCook = Path.Combine(root, "texture-cook");
     var textureDerived = Path.Combine(textureCook, "Derived");
     var modelTextures = Path.Combine(textureDerived, "Models/11/11111111-1111-4111-8111-111111111111/1/textures");

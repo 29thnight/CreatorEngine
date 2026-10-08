@@ -1,4 +1,5 @@
 #include "AssetSetBuild.h"
+#include "AssetDepot/AssetSetActivation.h"
 #include "SoundAssetCookProducer.h"
 #include "CollisionGeometryCookProducer.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
@@ -61,6 +62,7 @@ namespace
             IssueModelIdentityEpoch,
             CompileRuntimeDocuments,
             BuildAssetSet,
+            ValidateAssetSets,
         };
 
         Mode mode{ Mode::Cook };
@@ -101,6 +103,7 @@ namespace
                "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
                "--runtime-root <package-input-root>\n"
+            << "       AssetCooker --validate-asset-set-activation --asset-root <runtime Assets>\n"
             << "       AssetCooker --build-asset-set --asset-root <Assets> --asset-set <source.yml> "
                "--output <new-dir> --artifact-cache <cache-dir> --tool-fingerprint <sha256>\n"
             << "       AssetCooker --arguments-file <UTF-8 file; one argument per line>\n";
@@ -160,6 +163,16 @@ namespace
             {
                 PrintUsage();
                 return false;
+            }
+            if (option == L"--validate-asset-set-activation")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::ValidateAssetSets;
+                continue;
             }
             if (option == L"--build-asset-set")
             {
@@ -365,6 +378,21 @@ namespace
             }
         }
 
+        if (out.mode == Arguments::Mode::ValidateAssetSets)
+        {
+            if (out.assetRoot.empty() || !out.outputRoot.empty() || !out.assetSetDefinition.empty()
+                || !out.artifactCache.empty() || !out.toolFingerprint.empty() || !out.runtimeRoot.empty()
+                || !out.generationRoot.empty() || !out.models.empty() || !out.textures.empty()
+                || !out.shaderMetas.empty() || !out.shaderGraphs.empty() || !out.materials.empty()
+                || !out.scenes.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty()
+                || !out.identityEpoch.empty() || out.buildMeshlets.has_value() || out.lodLevels.has_value()
+                || out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
+            {
+                failure = "validate-asset-set-activation accepts only --asset-root <runtime Assets>.";
+                return false;
+            }
+            return true;
+        }
         if (out.mode == Arguments::Mode::BuildAssetSet)
         {
             if (out.assetRoot.empty() || out.outputRoot.empty() || out.assetSetDefinition.empty() ||
@@ -2154,6 +2182,24 @@ int wmain(int argc, wchar_t** argv)
         std::cerr << "asset-cooker error: " << failure << '\n';
         PrintUsage();
         return 2;
+    }
+    if (arguments.mode == Arguments::Mode::ValidateAssetSets)
+    {
+        try
+        {
+            if (!AssetDepot::ValidateConfiguredAssetSets(arguments.assetRoot, failure))
+            {
+                std::cerr << "asset-cooker error: " << failure << '\n';
+                return 9;
+            }
+            std::cout << "asset-cooker asset-set activation metadata validated\n";
+            return 0;
+        }
+        catch (const std::exception& exception)
+        {
+            std::cerr << "asset-cooker error: " << exception.what() << '\n';
+            return 9;
+        }
     }
     if (arguments.mode == Arguments::Mode::BuildAssetSet)
     {

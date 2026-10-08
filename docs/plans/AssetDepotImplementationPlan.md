@@ -94,6 +94,11 @@ design. A foundation slice is not completion of the runtime migration.
   Model, texture and graph-instance frame tables deduplicate exact stable identities;
   draw records carry indices/anchored borrows. Native GPU completion, abort and
   completion-zero quarantine paths remain responsible for physical retirement.
+- Packages can attach independently built immutable AssetSets via an explicit
+  directory list and host ABI token. Receipts/CAS bytes are reverified after copy;
+  native preflight checks the complete typed union. Startup publishes all configured
+  sets atomically before consumers run, including acyclic asset graphs whose set-level
+  dependency ordering has a cycle. Runtime activation reads no root payloads.
 - Authored ShaderMeta has a v3 fresh-source CEDO producer and typed asynchronous
   source-free descriptor loader. Captured source/sidecar bytes must match the product;
   the immutable result retains only its exact artifact source. This is metadata
@@ -114,8 +119,9 @@ design. A foundation slice is not completion of the runtime migration.
 
 - Granular rendering is available after explicit `MountAssetSet` activation and with
   an explicitly prepared material. General source-free authored-model instantiation,
-  material production/binding, embedded textures and automatic Player bootstrap are
-  not yet cut over. CEMCv11 remains a transitional adapter for other legacy consumers.
+  material production/binding and embedded textures are not yet fully cut over.
+  Automatic set activation is connected to the existing package bootstrap, which still
+  requires the legacy scene/audio/source-identity closure; a v3-only package is pending. CEMCv11 remains a transitional adapter for other legacy consumers.
 - Legacy source/generated Texture adapters explicitly retain non-rehydratable images.
   In particular, legacy material property/name loads and embedded ModelTextureAsset
   pixel/subresource storage are not yet fully cut over to standalone image recipes.

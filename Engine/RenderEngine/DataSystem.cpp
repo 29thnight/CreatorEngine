@@ -1627,6 +1627,12 @@ void DataSystem::Initialize()
 		std::printf("[asset.catalog] source=cemf identities=%zu metaParsed=0\n",
 			sourceAssets);
 	}
+    std::string activationFailure;
+    if (!MountConfiguredAssetSets(PathFinder::Relative(), activationFailure))
+    {
+        throw std::runtime_error("Configured AssetSet activation failed: " + activationFailure);
+    }
+
 }
 
 void DataSystem::Finalize()

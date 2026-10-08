@@ -116,6 +116,11 @@ internal static class GamePackager
             PackageInputs.RemoveAudioSources(merged);
             var mergedCook = AssetCooking.Validate(Path.Combine(merged, "Assets"), cook.ArtifactCount);
             if (mergedCook.ManifestSha256 != cook.ManifestSha256 || mergedCook.ArtifactBytes != cook.ArtifactBytes) throw new BuildException("Merged cook output changed.");
+            var assetSetManifests = AssetSetPackaging.CopyConfiguredSets(context, Path.Combine(merged, "Assets"));
+            if (assetSetManifests.Length != 0)
+            {
+                await context.Run(cooker, ["--validate-asset-set-activation", "--asset-root", Path.Combine(merged, "Assets")], engine.Root);
+            }
             var settingsFile = Path.Combine(merged, "ProjectSetting/EngineSettings.asset"); var settingsHash = Metadata.Hash(settingsFile);
             var preflight = PackageInputs.Validate(merged, settingsFile);
             var documents = await AssetCooking.Documents(context, cooker, merged);
@@ -125,6 +130,7 @@ internal static class GamePackager
             var manifest = Metadata.Object(new { schemaVersion = 2, workspaceHead = gitCommit, workspaceDirty = dirty, packageInputRevision = packageRevision,
                 nativeSource = "ENGINE_DISTRIBUTION", engineVersion = engine.Manifest.Text("version"), engineBuildId = engine.Manifest.Text("buildId"), nativeBuildRequested = options.Flag("build-native"),
                 config, shipping, developmentBuild = !shipping, inputMode = mode, selectedAssetPaths = selectedAssets?.Order(StringComparer.Ordinal).ToArray(), baseFileCount = baseCount, generatedFileCount = 1 + cook.DerivedFileCount, entryCount = entries.Length, contentDigest,
+                assetSetManifests, assetSetAbi = options.Get("asset-set-abi"),
                 settingsTemplateSha256 = Metadata.Hash(template), runtimeSettingsSha256 = Metadata.Hash(settingsFile), authoringRuntimeSettingsSha256 = settingsHash,
                 startupScene = preflight.StartupScene, renderBackend = preflight.RuntimeBackend, startupSceneSha256 = Metadata.Hash(Path.Combine(merged, "Assets/Scenes/" + preflight.StartupScene)),
                 startupSceneScriptComponentCount = preflight.SceneCounts["Script"], managedLifecycleRequired = preflight.RequiresManagedLifecycle,

@@ -247,6 +247,7 @@
     <ClCompile Include="AssetDepot\MaterialAssetRuntime.cpp" />
     <ClCompile Include="Experiment\Cooked\ModelAssetSetProducer.cpp" />
     <ClCompile Include="AssetDepot\ModelAssetRuntime.cpp" />
+    <ClCompile Include="AssetDepot\AssetSetActivation.cpp" />
     <ClCompile Include="AssetDepot\AssetDepot.cpp" />
     <ClCompile Include="AssetDepot\TextureAssetRuntime.cpp" />
     <ClCompile Include="AssetAuthoringPort.cpp">
@@ -610,6 +611,7 @@
     <ClInclude Include="TextureFramePins.h" />
     <ClInclude Include="MaterialGraphInstancePins.h" />
     <ClInclude Include="AssetDepot\ModelAssetRuntime.h" />
+    <ClInclude Include="AssetDepot\AssetSetActivation.h" />
     <ClInclude Include="AssetDepot\AssetLink.h" />
     <ClInclude Include="AssetDepot\AssetRequest.h" />
     <ClInclude Include="AssetDepot\TextureAssetRuntime.h" />

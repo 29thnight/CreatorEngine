@@ -256,3 +256,24 @@ The default CAS is `<project>/Library/AssetSetArtifacts`; override with `--artif
 Build keys include source SHA256, sidecar SHA256, importer/build version pins, verified toolchain payload digest, build-tool implementation digest, normalized settings, container extension, representation/schema and target platform/ABI. Roots, revision, and dependency hashes do not perturb texture payload keys because source-image bytes contain no dependency hashes. Their typed declarations still update the new manifest. Texture passthrough rereads source and metadata on every invocation. Granular model builds separately record a source-import key and a selected typed artifact build key; unrelated sibling or sidecar-generation changes do not perturb unchanged selected mesh/clip artifact records. Incremental storage reuse avoids rewriting an existing compatible CAS payload; it does not imply that all source/import/validation work was skipped.
 
 Source/static implementation only until explicitly validated on Windows: no build, executable test, or source-free runtime result is implied by the presence of this command.
+
+### Attach prebuilt AssetSets to a game package
+
+`package-game --asset-set-list <directories.txt> --asset-set-abi <host-token>` attaches
+1–64 already-built immutable AssetSet outputs. Each nonempty UTF-8 list line is a
+source output directory (relative entries resolve beside the list file). The ABI is
+an explicit host choice; it is never inferred from an untrusted incoming manifest.
+
+The packager verifies receipts and every CAS byte hash before and after copying,
+records exact manifest identities under `Assets/AssetSets/<sha256>`, and emits a
+bounded `Assets/Derived/asset-set-activation.ceas` policy. Native preflight validates
+schema, ABI, duplicate definitions and the complete cross-set hard graph before the
+existing final package transaction can publish. The Player mounts the whole group
+atomically during DataSystem initialization; it reads policy/manifests, not root
+payloads. A cyclic set-level ordering is legal if the actual hard asset graph is a DAG.
+
+This is currently an overlay on the existing package closure: legacy scene/audio
+content and CEMF v2 source-identity boot remain. It does not claim a v3-only package
+or eliminate the legacy package cook. Runtime async startup separately prepares cold
+mesh/image/material work before scene activation. Copied/extracted store roots are
+unenrolled and noncollectible until freshly published under the storage lease protocol.
