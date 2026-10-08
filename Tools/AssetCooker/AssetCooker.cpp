@@ -1,3 +1,4 @@
+#include "AssetSetBuild.h"
 #include "SoundAssetCookProducer.h"
 #include "CollisionGeometryCookProducer.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
@@ -59,12 +60,16 @@ namespace
             AuthorModelAsset,
             IssueModelIdentityEpoch,
             CompileRuntimeDocuments,
+            BuildAssetSet,
         };
 
         Mode mode{ Mode::Cook };
         std::filesystem::path assetRoot{};
         std::filesystem::path outputRoot{};
         std::filesystem::path runtimeRoot{};
+        std::filesystem::path assetSetDefinition{};
+        std::filesystem::path artifactCache{};
+        std::string toolFingerprint{};
         // MBC11 — 게시된 generation 루트. 비우면 <asset-root>/../Library/ModelAssetGenerations.
         std::filesystem::path generationRoot{};
         std::vector<std::filesystem::path> models{};
@@ -96,6 +101,8 @@ namespace
                "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
                "--runtime-root <package-input-root>\n"
+            << "       AssetCooker --build-asset-set --asset-root <Assets> --asset-set <source.yml> "
+               "--output <new-dir> --artifact-cache <cache-dir> --tool-fingerprint <sha256>\n"
             << "       AssetCooker --arguments-file <UTF-8 file; one argument per line>\n";
     }
 
@@ -154,6 +161,16 @@ namespace
                 PrintUsage();
                 return false;
             }
+            if (option == L"--build-asset-set")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::BuildAssetSet;
+                continue;
+            }
             if (option == L"--author-model-asset")
             {
                 if (out.mode != Arguments::Mode::Cook)
@@ -208,6 +225,33 @@ namespace
                     return false;
                 }
                 out.outputRoot = value;
+            }
+            else if (option == L"--asset-set")
+            {
+                if (!out.assetSetDefinition.empty())
+                {
+                    failure = "--asset-set may appear once.";
+                    return false;
+                }
+                out.assetSetDefinition = value;
+            }
+            else if (option == L"--artifact-cache")
+            {
+                if (!out.artifactCache.empty())
+                {
+                    failure = "--artifact-cache may appear once.";
+                    return false;
+                }
+                out.artifactCache = value;
+            }
+            else if (option == L"--tool-fingerprint")
+            {
+                if (!out.toolFingerprint.empty())
+                {
+                    failure = "--tool-fingerprint may appear once.";
+                    return false;
+                }
+                out.toolFingerprint = value.string();
             }
             else if (option == L"--runtime-root")
             {
@@ -319,6 +363,27 @@ namespace
                 failure = "알 수 없는 option이다.";
                 return false;
             }
+        }
+
+        if (out.mode == Arguments::Mode::BuildAssetSet)
+        {
+            if (out.assetRoot.empty() || out.outputRoot.empty() || out.assetSetDefinition.empty() ||
+                out.artifactCache.empty() || out.toolFingerprint.empty() || !out.runtimeRoot.empty() ||
+                !out.generationRoot.empty() || !out.models.empty() || !out.textures.empty() ||
+                !out.shaderMetas.empty() || !out.shaderGraphs.empty() || !out.materials.empty() ||
+                !out.scenes.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty() ||
+                !out.identityEpoch.empty() || out.buildMeshlets.has_value() || out.lodLevels.has_value() ||
+                out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
+            {
+                failure = "build-asset-set requires only source root, definition, new output, cache and tool fingerprint.";
+                return false;
+            }
+            return true;
+        }
+        if (!out.assetSetDefinition.empty() || !out.artifactCache.empty() || !out.toolFingerprint.empty())
+        {
+            failure = "--asset-set, --artifact-cache and --tool-fingerprint require --build-asset-set.";
+            return false;
         }
 
         if ((!out.shaderGraphs.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty()) &&
@@ -2089,6 +2154,24 @@ int wmain(int argc, wchar_t** argv)
         std::cerr << "asset-cooker error: " << failure << '\n';
         PrintUsage();
         return 2;
+    }
+    if (arguments.mode == Arguments::Mode::BuildAssetSet)
+    {
+        if (FAILED(comInit))
+        {
+            std::cerr << "asset-cooker error: COM initialization failed for texture validation.\n";
+            return 9;
+        }
+        const auto result = AssetCooking::BuildAssetSet({ arguments.assetRoot, arguments.assetSetDefinition,
+            arguments.outputRoot, arguments.artifactCache, arguments.toolFingerprint });
+        if (!result.succeeded)
+        {
+            std::cerr << "asset-cooker error: " << result.failure << '\n';
+            return 9;
+        }
+        std::cout << "asset-cooker asset-set format=CEMF3 assets=" << result.assets
+            << " blobs=" << result.blobs << " reusedBlobs=" << result.reusedBlobs << '\n';
+        return 0;
     }
     if ((arguments.buildMeshlets.has_value() || arguments.lodLevels.has_value())
         && arguments.mode != Arguments::Mode::AuthorModelAsset)
