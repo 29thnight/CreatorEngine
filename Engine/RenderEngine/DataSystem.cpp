@@ -314,6 +314,8 @@ struct DataSystem::PreparedRuntimeAsset
     std::atomic<bool> cancelled{};
     job_handle work;
     assets::ModelAssetGeneration::Shared model;
+    bool granularModel{};
+    assets::ModelSceneAssetInputs modelScene;
     own::shared_owner<const material_graph::PreparedGeneration> graph;
     std::string error;
     bool published{}; // Scene owner only.
@@ -466,6 +468,33 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
     std::optional<std::uint64_t> expectedEpoch,
     std::optional<std::uint64_t> expectedResolverRevision)
 {
+    if (type == RuntimeAssetType::Model)
+    {
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog> snapshot;
+        std::uint64_t epoch{};
+        {
+            std::lock_guard admissionLock(m_assetPreparationMutex);
+            std::lock_guard catalogLock(m_cookedCatalogMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u ||
+                (expectedEpoch && *expectedEpoch != m_assetPreparationEpoch) ||
+                (expectedResolverRevision && *expectedResolverRevision != m_assetDepotRevision))
+            {
+                return {};
+            }
+            snapshot = m_cookedCatalog;
+            epoch = m_assetPreparationEpoch;
+        }
+        const AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link{
+            { experiment::AssetId{ guid.m_guid }, {} } };
+        experiment::cooked::ResolvedAssetEntry resolved;
+        if (snapshot && snapshot->Find(link.ToReference(), resolved)
+            != experiment::cooked::AssetLookupStatus::NotMounted)
+        {
+            // An explicit v3 winner, including a wrong-kind winner, never
+            // falls through to source import or the transitional CEMC path.
+            return PrepareModelAssetFromSnapshot(link, std::move(snapshot), epoch);
+        }
+    }
     std::lock_guard lock(m_assetPreparationMutex);
     if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
     {
@@ -606,6 +635,16 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
             return false;
         }
     }
+    else if (asset->granularModel)
+    {
+        if (!asset->modelScene.descriptor)
+        {
+            error = "Typed model scene preparation produced no descriptor.";
+            return false;
+        }
+        // Every immutable child was published by its own typed loader. This
+        // boundary accepts the coherent scene recipe, not a legacy aggregate.
+    }
     else
     {
         auto result = m_modelAssetGenerations.Publish(asset->model);
@@ -624,8 +663,281 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
     return true;
 }
 
+DataSystem::ModelPreparation DataSystem::PrepareModelAsset(
+    AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link)
+{
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog;
+    std::uint64_t epoch{};
+    {
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u)
+        {
+            return {};
+        }
+        catalog = m_cookedCatalog;
+        epoch = m_assetPreparationEpoch;
+    }
+    return PrepareModelAssetFromSnapshot(link, std::move(catalog), epoch);
+}
+
+DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
+    AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link,
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch)
+{
+    namespace cooked = experiment::cooked;
+    auto asset = own::make_shared<PreparedRuntimeAsset>();
+    asset->guid = FileGuid{ link.identity.assetId.value };
+    asset->path = Uuid::ToString(link.identity.assetId.value);
+    asset->projectRoot = PathFinder::Relative();
+    asset->type = RuntimeAssetType::Model;
+    asset->granularModel = true;
+    asset->epoch = epoch;
+    asset->resolverRevision = catalog ? catalog->ResolverRevision() : 0u;
+    const auto fail = [&](std::string message)
+    {
+        asset->error = std::move(message);
+        return asset;
+    };
+    cooked::ResolvedAssetEntry root;
+    if (!link.IsValid() || link.identity.subassetId.IsValid() || !catalog ||
+        catalog->Find(link.ToReference(), root) != cooked::AssetLookupStatus::Found)
+    {
+        return fail("Typed model is not mounted with the expected whole-asset identity.");
+    }
+    ModelPreparation existingAtDiscovery;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch ||
+            asset->resolverRevision != m_assetDepotRevision)
+        {
+            return fail("Typed model preparation was superseded before admission.");
+        }
+        if (const auto found = m_assetPreparations.find(asset->guid); found != m_assetPreparations.end())
+        {
+            existingAtDiscovery = found->second.lock();
+            if (existingAtDiscovery && existingAtDiscovery->granularModel &&
+                existingAtDiscovery->epoch == epoch && existingAtDiscovery->resolverRevision == asset->resolverRevision &&
+                !existingAtDiscovery->cancelled.load(std::memory_order_acquire) &&
+                (!existingAtDiscovery->work.is_complete() || existingAtDiscovery->error.empty()))
+            {
+                return existingAtDiscovery;
+            }
+        }
+    }
+    using MeshRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelMeshDescriptor>>;
+    using MaterialRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<Material>>;
+    std::vector<MeshRequest> meshes;
+    std::vector<MaterialRequest> materials;
+    AssetDepot::AssetRequest<assets::ModelSkeletonPayload> skeleton;
+    std::vector<job_handle> dependencies;
+    const auto add = [&](const auto& request)
+    {
+        const auto completion = request.Completion();
+        if (completion.valid())
+        {
+            dependencies.push_back(completion);
+        }
+    };
+    for (const auto& edge : root.entry.dependencies)
+    {
+        if (edge.kind != cooked::AssetDependencyKind::Loadable || edge.target.key.subassetId.IsValid() ||
+            (edge.target.kind != cooked::CookedAssetKind::Mesh &&
+                edge.target.kind != cooked::CookedAssetKind::Material &&
+                edge.target.kind != cooked::CookedAssetKind::Skeleton &&
+                edge.target.kind != cooked::CookedAssetKind::AnimationClip))
+        {
+            return fail("Typed model scene preparation requires schema3 Loadable child declarations.");
+        }
+    }
+    auto descriptor = RequestModelAssetFromSnapshot(link, catalog, epoch);
+    add(descriptor);
+    for (const auto& edge : root.entry.dependencies)
+    {
+        if (edge.target.kind == cooked::CookedAssetKind::Mesh)
+        {
+            auto request = RequestModelAssetFromSnapshot(
+                AssetDepot::AssetLink<assets::ModelMeshDescriptor>{ edge.target.key }, catalog, epoch);
+            add(request);
+            meshes.emplace_back(edge.target.key.assetId, std::move(request));
+        }
+        else if (edge.target.kind == cooked::CookedAssetKind::Material)
+        {
+            auto request = RequestMaterialPipelineAssetFromSnapshot(
+                AssetDepot::AssetLink<Material>{ edge.target.key }, catalog, epoch);
+            add(request);
+            materials.emplace_back(edge.target.key.assetId, std::move(request));
+        }
+        else if (edge.target.kind == cooked::CookedAssetKind::Skeleton)
+        {
+            skeleton = RequestModelAssetFromSnapshot(
+                AssetDepot::AssetLink<assets::ModelSkeletonPayload>{ edge.target.key }, catalog, epoch);
+            add(skeleton);
+        }
+        // Animation clips remain Loadable. Animator requests only selected clips.
+    }
+    std::ranges::sort(meshes, {}, &MeshRequest::first);
+    std::ranges::sort(materials, {}, &MaterialRequest::first);
+    job_group work;
+    work.add([this, asset, descriptor, meshes = std::move(meshes), materials = std::move(materials), skeleton]()
+    {
+        try
+        {
+            const auto model = descriptor.Snapshot();
+            if (model.status != AssetDepot::AssetRequestStatus::Ready || !model.asset ||
+                model.asset->origin.resolverRevision != asset->resolverRevision)
+            {
+                throw std::runtime_error(model.message.empty() ? "Typed model descriptor was not ready." : model.message);
+            }
+            assets::ModelSceneAssetInputs candidate;
+            candidate.descriptor = model.asset;
+            const auto& summary = model.asset->summary;
+            if (summary.skeletonAssetId.IsValid())
+            {
+                const auto result = skeleton.Snapshot();
+                if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset ||
+                    result.asset->origin.resolverRevision != asset->resolverRevision ||
+                    result.asset->origin.entry.asset.key.assetId != summary.skeletonAssetId)
+                {
+                    throw std::runtime_error("Typed model skeleton was not ready in its captured snapshot.");
+                }
+                candidate.skeleton = result.asset;
+            }
+            candidate.meshes.reserve(summary.meshes.size());
+            for (const auto& expected : summary.meshes)
+            {
+                const auto found = std::ranges::lower_bound(meshes, expected.meshAssetId, {}, &MeshRequest::first);
+                if (found == meshes.end() || found->first != expected.meshAssetId)
+                {
+                    throw std::runtime_error("Typed model mesh is missing its declared preparation.");
+                }
+                const auto result = found->second.Snapshot();
+                if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset ||
+                    result.asset->origin.resolverRevision != asset->resolverRevision || !result.asset->Matches(expected) ||
+                    (expected.skinned && (!candidate.skeleton || !result.asset->skeleton ||
+                        result.asset->skeleton->origin.entry.asset.key.assetId != summary.skeletonAssetId ||
+                        result.asset->requiredSkinBindingSha256 != candidate.skeleton->skinBindingSha256)))
+                {
+                    throw std::runtime_error("Typed model mesh or skin binding differs from its captured summary.");
+                }
+                candidate.meshes.push_back(result.asset);
+            }
+            candidate.materials.reserve(summary.materials.size());
+            for (const auto& expected : summary.materials)
+            {
+                const auto found = std::ranges::lower_bound(materials, expected.materialAssetId, {}, &MaterialRequest::first);
+                if (found == materials.end() || found->first != expected.materialAssetId)
+                {
+                    throw std::runtime_error("Typed model material is missing its declared preparation.");
+                }
+                const auto result = found->second.Snapshot();
+                if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset ||
+                    !result.asset->GetAssetOrigin() ||
+                    result.asset->GetAssetOrigin()->resolved.resolverRevision != asset->resolverRevision ||
+                    result.asset->m_fileGuid.m_guid != expected.materialAssetId.value || !result.asset->GetLXMaterialInstance())
+                {
+                    throw std::runtime_error("Typed model material was not ready in its captured snapshot.");
+                }
+                candidate.materials.push_back(result.asset);
+            }
+            {
+                std::lock_guard lock(m_assetPreparationMutex);
+                if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u ||
+                    asset->epoch != m_assetPreparationEpoch || asset->resolverRevision != m_assetDepotRevision ||
+                    asset->cancelled.load(std::memory_order_acquire))
+                {
+                    asset->error = "Typed model scene preparation was cancelled or superseded.";
+                    return;
+                }
+                asset->modelScene = std::move(candidate);
+            }
+        }
+        catch (const std::exception& error)
+        {
+            asset->error = error.what();
+        }
+        catch (...)
+        {
+            asset->error = "Typed model scene preparation failed.";
+        }
+    });
+    work.on_complete([asset](std::exception_ptr failure)
+    {
+        if (failure)
+        {
+            asset->error = "Typed model preparation dependency or scheduler failed.";
+        }
+    });
+    ModelPreparation existingAtSubmission;
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch ||
+        asset->resolverRevision != m_assetDepotRevision)
+    {
+        return fail("Typed model preparation was superseded before submission.");
+    }
+    // A concurrent caller may have registered the same preparation while child
+    // requests were admitted. Child generation work is independently joined.
+    if (const auto found = m_assetPreparations.find(asset->guid); found != m_assetPreparations.end())
+    {
+        existingAtSubmission = found->second.lock();
+        if (existingAtSubmission && existingAtSubmission->granularModel &&
+            existingAtSubmission->epoch == epoch && existingAtSubmission->resolverRevision == asset->resolverRevision &&
+            !existingAtSubmission->cancelled.load(std::memory_order_acquire) &&
+            (!existingAtSubmission->work.is_complete() || existingAtSubmission->error.empty()))
+        {
+            return existingAtSubmission;
+        }
+    }
+    m_assetPreparations[asset->guid] = asset;
+    try
+    {
+        asset->work = SubmitAssetWorkLocked(std::move(work), dependencies);
+    }
+    catch (...)
+    {
+        asset->error = "Typed model preparation submission failed.";
+    }
+    return asset;
+}
+
+bool DataSystem::HasPreparedModelScene(const ModelPreparation& preparation) const
+{
+    return preparation && preparation->granularModel;
+}
+
+bool DataSystem::ReadPreparedModelScene(const ModelPreparation& preparation,
+    assets::ModelSceneAssetInputs& result, std::string& error) const
+{
+    assets::ModelSceneAssetInputs candidate;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (!preparation || !preparation->granularModel || !preparation->work.is_complete() ||
+            m_assetPreparationStopping || m_assetInvalidationDepth != 0u ||
+            preparation->epoch != m_assetPreparationEpoch || preparation->resolverRevision != m_assetDepotRevision ||
+            preparation->projectRoot != PathFinder::Relative() || preparation->cancelled.load(std::memory_order_acquire))
+        {
+            error = "Typed model preparation is incomplete or invalidated.";
+            return false;
+        }
+        error = preparation->error;
+        if (!error.empty() || !preparation->modelScene.descriptor)
+        {
+            return false;
+        }
+        candidate = preparation->modelScene;
+    }
+    result = std::move(candidate);
+    return true;
+}
+
 DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_view path)
 {
+    Uuid::Uuid16 explicitIdentity;
+    if (assets::TryParseCanonicalUuidV8(path, explicitIdentity))
+    {
+        return PrepareModelAsset(AssetDepot::AssetLink<assets::ModelAnimationDescriptor>{
+            { experiment::AssetId{ explicitIdentity }, {} } });
+    }
     std::uint64_t epoch{}, resolverRevision{};
     own::shared_owner<AssetMetaRegistry> registry;
     {
@@ -1056,6 +1368,12 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
             if (!PublishRuntimeAsset(asset, error))
             {
                 return finish(error);
+            }
+            if (asset->granularModel)
+            {
+                // Its typed Material/Program/Texture closure is already ready.
+                // Never rediscover source graph paths for a cooked model recipe.
+                continue;
             }
             for (const auto& material : asset->model->Materials())
             {

@@ -19,6 +19,7 @@
 #include <functional>
 #include "CollisionGeometrySource.h"
 #include "EntityHandle.h"
+#include "Assets/ModelSceneAssetInputs.h"
 
 class Entity;
 class Scene;
@@ -53,6 +54,10 @@ namespace ModelSceneInstantiation
         static own::unique_owner<PendingInstance> Prepare(
             own::shared_owner<const assets::ModelAssetGeneration> generation,
             const Options& options);
+        // Already prepared typed children from one resolver snapshot. No source
+        // loading, shader compilation, image decode or scene mutation occurs here.
+        static own::unique_owner<PendingInstance> Prepare(
+            assets::ModelSceneAssetInputs inputs, const Options& options);
         ~PendingInstance();
         Status Advance(Scene& scene, std::size_t maxSteps = 16,
             std::chrono::microseconds budget = std::chrono::milliseconds(2),

@@ -1608,3 +1608,6 @@ template AssetDepot::AssetRequest<material_graph::Generation> DataSystem::Reques
     AssetDepot::AssetLink<material_graph::Generation>);
 template AssetDepot::AssetRequest<Material> DataSystem::RequestCurrentMaterialPipelineAssetAsync(
     AssetDepot::AssetLink<Material>);
+
+template AssetDepot::AssetRequest<Material> DataSystem::RequestMaterialPipelineAssetFromSnapshot(
+    AssetDepot::AssetLink<Material>, own::shared_owner<const experiment::cooked::CookedAssetCatalog>, std::uint64_t);

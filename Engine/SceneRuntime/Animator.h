@@ -317,6 +317,8 @@ public:
     // retains the transitional aggregate load. Buffers belong to the instance.
     void EnsureAnimationBinding();
     void BindModelGeneration(own::shared_owner<const assets::ModelAssetGeneration> generation);
+    bool BindModelDescriptor(own::shared_owner<const assets::ModelAnimationDescriptor> descriptor,
+        own::shared_owner<const assets::ModelSkeletonPayload> skeleton);
     // Render bridge guard for the transitional CEMCv11 geometry consumer. No I/O
     // or new aggregate pin: compare the already-owned geometry skin contract.
     [[nodiscard]] bool IsSkinBindingCompatible(const assets::ModelAssetGeneration& geometry) const noexcept;

@@ -608,6 +608,7 @@
     <ClInclude Include="Assets\ModelSkeletonPayload.h" />
     <ClInclude Include="Assets\ModelAnimationPayload.h" />
     <ClInclude Include="Assets\ModelMeshDescriptor.h" />
+    <ClInclude Include="Assets\ModelSceneAssetInputs.h" />
     <ClInclude Include="Assets\ModelGeometryPayload.h" />
     <ClInclude Include="Assets\ModelAnimationDescriptor.h" />
     <ClInclude Include="AssetDepot\LegacyResourceCache.h" />

@@ -495,6 +495,39 @@ void Animator::ResetAnimationPose()
     instance.boneRegions.clear();
 }
 
+bool Animator::BindModelDescriptor(
+    own::shared_owner<const assets::ModelAnimationDescriptor> descriptor,
+    own::shared_owner<const assets::ModelSkeletonPayload> skeleton)
+{
+    if (!descriptor || !skeleton || descriptor->summary.modelAssetId.value != m_Motion.m_guid ||
+        descriptor->summary.skeletonAssetId != skeleton->origin.entry.asset.key.assetId ||
+        descriptor->origin.resolverRevision != skeleton->origin.resolverRevision ||
+        descriptor->skeleton.blob != skeleton->origin.blob || skeleton->skeleton.bones.empty() ||
+        skeleton->skeleton.rootBone >= skeleton->skeleton.bones.size())
+    {
+        return false;
+    }
+    ResetAnimationPose();
+    m_descriptorRequest.Cancel();
+    m_skeletonRequest.Cancel();
+    m_descriptorRequest = {};
+    m_skeletonRequest = {};
+    m_requestedClips.clear();
+    m_modelGeneration.reset();
+    m_animationDescriptor = std::move(descriptor);
+    m_skeletonPayload = std::move(skeleton);
+    m_animationBindingMotion = m_Motion;
+    m_animationBindingInitialized = true;
+    m_granularAnimationBinding = true;
+    m_skeletonRequested = true;
+    auto& instance = GetInstance();
+    instance.layerTrackTables.clear();
+    instance.boneRegions = DeriveTypedBoneRegions(m_skeletonPayload->skeleton);
+    m_poseSkeletonSerial = GetSkeletonSerial();
+    RestoreDeferredAvatarMasks();
+    return true;
+}
+
 void Animator::BindModelGeneration(
     assets::ModelAssetGeneration::Shared generation)
 {

@@ -37,6 +37,8 @@ namespace ModelSceneInstantiation
         };
         // Incremental construction keeps the source alive between Advance calls.
         assets::ModelAssetGeneration::Shared generation;
+        assets::ModelSceneAssetInputs granular;
+        std::string name;
         Options options;
         std::vector<ObjectRecipe> objects;
         std::vector<own::shared_owner<Material>> materials;
@@ -77,6 +79,7 @@ namespace ModelSceneInstantiation
 
         auto impl = own::make_unique<Impl>();
         impl->generation = std::move(generation);
+        impl->name = impl->generation->Name();
         impl->options = options;
         const auto* skeleton = impl->generation->Skeleton();
         impl->hasBones = skeleton && !skeleton->bones.empty()
@@ -209,6 +212,178 @@ namespace ModelSceneInstantiation
         return own::make_unique<PendingInstance>(ConstructionKey{}, std::move(impl));
     }
 
+    own::unique_owner<PendingInstance> PendingInstance::Prepare(
+        assets::ModelSceneAssetInputs inputs, const Options& options)
+    {
+        const auto reject = []() -> own::unique_owner<PendingInstance>
+        {
+            ModelConsumptionDiagnostics::NoteInstantiateRejected();
+            return {};
+        };
+        if (!inputs.descriptor || options.createMeshCollider)
+        {
+            return reject();
+        }
+        const auto& summary = inputs.descriptor->summary;
+        const auto& nodes = summary.nodes;
+        const auto& meshes = summary.meshes;
+        const auto& materials = summary.materials;
+        if (nodes.empty() || nodes[0].parent.IsValid() || inputs.meshes.size() != meshes.size() ||
+            inputs.materials.size() != materials.size())
+        {
+            return reject();
+        }
+        const auto revision = inputs.descriptor->origin.resolverRevision;
+        for (std::size_t index = 0u; index < meshes.size(); ++index)
+        {
+            if (!inputs.meshes[index] || !inputs.meshes[index]->Matches(meshes[index]) ||
+                inputs.meshes[index]->origin.resolverRevision != revision)
+            {
+                return reject();
+            }
+        }
+        for (std::size_t index = 0u; index < materials.size(); ++index)
+        {
+            if (!inputs.materials[index] || !inputs.materials[index]->GetAssetOrigin() ||
+                inputs.materials[index]->GetAssetOrigin()->resolved.resolverRevision != revision ||
+                inputs.materials[index]->m_fileGuid.m_guid != materials[index].materialAssetId.value ||
+                !inputs.materials[index]->GetLXMaterialInstance())
+            {
+                return reject();
+            }
+        }
+        if (summary.skeletonAssetId.IsValid() && (!inputs.skeleton ||
+            inputs.skeleton->origin.resolverRevision != revision ||
+            inputs.skeleton->origin.entry.asset.key.assetId != summary.skeletonAssetId))
+        {
+            return reject();
+        }
+        auto impl = own::make_unique<Impl>();
+        impl->granular = std::move(inputs);
+        impl->name = summary.name;
+        impl->options = options;
+        const auto* skeleton = impl->granular.skeleton ? &impl->granular.skeleton->skeleton : nullptr;
+        impl->hasBones = skeleton && !skeleton->bones.empty() && skeleton->rootBone < skeleton->bones.size();
+        std::map<experiment::AssetId, std::uint32_t> meshIndices;
+        std::map<experiment::AssetId, std::uint32_t> materialIndices;
+        for (std::uint32_t index = 0u; index < meshes.size(); ++index)
+        {
+            meshIndices.emplace(meshes[index].meshAssetId, index);
+        }
+        for (std::uint32_t index = 0u; index < materials.size(); ++index)
+        {
+            materialIndices.emplace(materials[index].materialAssetId, index);
+        }
+        impl->meshMaterials.resize(meshes.size(), assets::kInvalidModelAssetIndex);
+        for (std::size_t index = 0u; index < meshes.size(); ++index)
+        {
+            if (const auto found = materialIndices.find(meshes[index].materialAssetId); found != materialIndices.end())
+            {
+                impl->meshMaterials[index] = found->second;
+            }
+        }
+        impl->objects.push_back({ impl->name });
+        std::unordered_map<std::string, std::size_t> boneCandidates;
+        std::vector<std::size_t> attachPoints(nodes.size());
+        for (std::size_t index = 0u; index < nodes.size(); ++index)
+        {
+            const auto& node = nodes[index];
+            if (index != 0u && (!node.parent.IsValid() || node.parent.Value() >= index))
+            {
+                return reject();
+            }
+            // Every source node owns one transform anchor. A meshless root still
+            // contributes its transform, and multiple meshes never multiply it.
+            std::size_t anchor{};
+            if (index == 0u)
+            {
+                impl->objects[0].transform = node.localTransform;
+                impl->objects[0].writeTransform = true;
+            }
+            else
+            {
+                anchor = impl->objects.size();
+                impl->objects.push_back({ node.name, attachPoints[node.parent.Value()],
+                    assets::kInvalidModelAssetIndex, node.localTransform, true });
+            }
+            attachPoints[index] = anchor;
+            boneCandidates.try_emplace(node.name, anchor);
+            for (const auto& meshId : node.meshAssetIds)
+            {
+                const auto mesh = meshIndices.find(meshId);
+                if (mesh == meshIndices.end() || impl->meshMaterials[mesh->second] >= materials.size())
+                {
+                    // A source-free instance never repairs absent material input
+                    // through source/default-material recovery on the scene thread.
+                    return reject();
+                }
+                if (node.meshAssetIds.size() == 1u)
+                {
+                    impl->objects[anchor].mesh = mesh->second;
+                }
+                else
+                {
+                    const auto& meshName = meshes[mesh->second].name;
+                    impl->objects.push_back({ meshName.empty() ? node.name : meshName,
+                        anchor, mesh->second, math::matrix4x4::identity(), false });
+                }
+            }
+        }
+        if (impl->hasBones)
+        {
+            std::vector<std::size_t> boneAttach(skeleton->bones.size());
+            for (std::size_t index = 0u; index < skeleton->bones.size(); ++index)
+            {
+                if (index == skeleton->rootBone)
+                {
+                    continue;
+                }
+                const auto& bone = skeleton->bones[index];
+                if (bone.parent != assets::kInvalidModelAssetIndex && bone.parent >= index)
+                {
+                    return reject();
+                }
+                const auto found = boneCandidates.find(bone.name);
+                std::size_t object{};
+                if (found != boneCandidates.end())
+                {
+                    object = found->second;
+                }
+                else
+                {
+                    object = impl->objects.size();
+                    const auto parent = bone.parent < boneAttach.size() ? boneAttach[bone.parent] : 0u;
+                    impl->objects.push_back({ bone.name, parent, assets::kInvalidModelAssetIndex,
+                        math::matrix4x4::identity(), false, true, GameObjectType::Bone });
+                }
+                impl->objects[object].bone = true;
+                boneAttach[index] = object;
+            }
+        }
+        impl->materials.resize(materials.size());
+        impl->authored.resize(materials.size());
+        for (std::size_t index = 0u; index < impl->objects.size(); ++index)
+        {
+            const auto& object = impl->objects[index];
+            if (object.name.empty())
+            {
+                return reject();
+            }
+            if (object.mesh != assets::kInvalidModelAssetIndex)
+            {
+                impl->renderers.push_back(index);
+                const auto material = impl->meshMaterials[object.mesh];
+                if (!impl->materials[material])
+                {
+                    const auto& source = impl->granular.materials[material];
+                    impl->materials[material] = Material::InstantiateShared(&*source.borrow(), source->m_name);
+                }
+            }
+        }
+        impl->handles.resize(impl->objects.size());
+        return own::make_unique<PendingInstance>(ConstructionKey{}, std::move(impl));
+    }
+
     PendingInstance::Status PendingInstance::Advance(Scene& scene, std::size_t maxSteps,
         std::chrono::microseconds budget, std::size_t maxRendererActivations)
     {
@@ -257,7 +432,17 @@ namespace ModelSceneInstantiation
                     renderer->m_isSkinnedMesh = state.hasBones;
                     // 새 renderer는 아직 재질이 없다. 텍스처 owner가 준비된 재질을
                     // 뒤에 붙여, 이 스레드에서 이미지 캐시 miss를 처리하지 않는다.
-                    if (!renderer->BindModelGeneration(state.generation, recipe.mesh)) return fail();
+                    if (state.granular.descriptor)
+                    {
+                        if (!renderer->BindMeshDescriptor(state.granular.meshes.at(recipe.mesh)))
+                        {
+                            return fail();
+                        }
+                    }
+                    else if (!renderer->BindModelGeneration(state.generation, recipe.mesh))
+                    {
+                        return fail();
+                    }
                     const auto materialIndex = state.meshMaterials[recipe.mesh];
                     if (materialIndex < state.materials.size())
                     {
@@ -271,8 +456,19 @@ namespace ModelSceneInstantiation
                 if (state.hasBones)
                 {
                     auto* animator = scene.Resolve(Root())->AddComponent<Animator>();
-                    animator->m_Motion = FileGuid(state.generation->Identity().modelId);
-                    animator->BindModelGeneration(state.generation);
+                    if (state.granular.descriptor)
+                    {
+                        animator->m_Motion = FileGuid(state.granular.descriptor->summary.modelAssetId.value);
+                        if (!animator->BindModelDescriptor(state.granular.descriptor, state.granular.skeleton))
+                        {
+                            return fail();
+                        }
+                    }
+                    else
+                    {
+                        animator->m_Motion = FileGuid(state.generation->Identity().modelId);
+                        animator->BindModelGeneration(state.generation);
+                    }
                     animator->SetEnabled(true);
                 }
                 state.animatorReady = true;
@@ -330,7 +526,7 @@ namespace ModelSceneInstantiation
                 scene.EndIncrementalConstruction();
                 state.constructionScene = 0;
                 state.status = Status::Complete;
-                ModelConsumptionDiagnostics::NoteInstantiated(state.generation->Name());
+                ModelConsumptionDiagnostics::NoteInstantiated(state.name);
                 break;
             }
             ++steps;

@@ -11,6 +11,7 @@
 #include "AssetDepot/AssetLink.h"
 #include "AssetDepot/AssetMountId.h"
 #include "Assets/ModelAssetGeneration.h"
+#include "Assets/ModelSceneAssetInputs.h"
 #include "MaterialGraphRuntime.h"
 #include "../Utility_Framework/Ownership.h"
 #include "AssetDepot/TextureAssetRuntime.h"
@@ -277,6 +278,12 @@ public:
     struct PreparedRuntimeAsset;
     using ModelPreparation = own::shared_owner<PreparedRuntimeAsset>;
     ModelPreparation PrepareModelAssetByPath(std::string_view path);
+    // Full model scene preparation is explicit. Root enumeration/acquisition
+    // remains metadata-only and individual mesh/clip requests stay independent.
+    ModelPreparation PrepareModelAsset(AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link);
+    [[nodiscard]] bool HasPreparedModelScene(const ModelPreparation& preparation) const;
+    bool ReadPreparedModelScene(const ModelPreparation& preparation,
+        assets::ModelSceneAssetInputs& result, std::string& error) const;
     job_handle ModelPreparationCompletion(const ModelPreparation& preparation) const;
     assets::ModelAssetGeneration::Shared ReadPreparedModel(
         const ModelPreparation& preparation, std::string& error) const;
@@ -610,6 +617,11 @@ private:
     own::shared_owner<const T> TryAcquireCurrentModelAsset(AssetDepot::AssetLink<T> link);
     template<class T>
     AssetDepot::AssetRequest<T> RequestCurrentModelAssetAsync(AssetDepot::AssetLink<T> link);
+    template<class T>
+    AssetDepot::AssetRequest<T> RequestModelAssetFromSnapshot(AssetDepot::AssetLink<T> link,
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch);
+    ModelPreparation PrepareModelAssetFromSnapshot(AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link,
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog, std::uint64_t epoch);
     template<class T>
     AssetDepot::AssetRequest<T> RequestResolvedModelAssetAsync(
         experiment::cooked::ResolvedAssetEntry resolved,

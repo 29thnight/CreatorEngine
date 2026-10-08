@@ -118,6 +118,35 @@ namespace Editor
             request->ready.store(true, std::memory_order_release);
             return;
         }
+        if (DataSystems->HasPreparedModelScene(request->modelPreparation))
+        {
+            const auto prepareStart = std::chrono::steady_clock::now();
+            try
+            {
+                assets::ModelSceneAssetInputs inputs;
+                if (DataSystems->ReadPreparedModelScene(request->modelPreparation, inputs, request->error) &&
+                    !request->cancelled.load(std::memory_order_acquire))
+                {
+                    request->prepared = ModelSceneInstantiation::PendingInstance::Prepare(std::move(inputs), {});
+                    if (!request->prepared)
+                    {
+                        request->error = "Typed model hierarchy/material preparation failed: " + request->path;
+                    }
+                }
+            }
+            catch (const std::exception& error)
+            {
+                request->error = error.what();
+            }
+            catch (...)
+            {
+                request->error = "Typed model scene preparation failed.";
+            }
+            request->prepareMs = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - prepareStart).count();
+            request->ready.store(true, std::memory_order_release);
+            return;
+        }
         // The shared pool does not promise a COM apartment; balance this job's
         // initialization without changing a shared worker's name or priority.
         const HRESULT com = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -334,7 +363,15 @@ namespace Editor
                 if (!request->ready.load(std::memory_order_acquire))
                 {
                     std::string assetError;
-                    (void)DataSystems->ReadPreparedModel(request->modelPreparation, assetError);
+                    if (DataSystems->HasPreparedModelScene(request->modelPreparation))
+                    {
+                        assets::ModelSceneAssetInputs ignored;
+                        (void)DataSystems->ReadPreparedModelScene(request->modelPreparation, ignored, assetError);
+                    }
+                    else
+                    {
+                        (void)DataSystems->ReadPreparedModel(request->modelPreparation, assetError);
+                    }
                     request->error = assetError.empty()
                         ? "Model preparation job completed without a result" : std::move(assetError);
                     request->ready.store(true, std::memory_order_release);

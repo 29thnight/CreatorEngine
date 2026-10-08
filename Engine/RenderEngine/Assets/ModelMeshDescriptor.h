@@ -103,6 +103,13 @@ namespace assets
         std::uint32_t coarseLodCount{};
         std::size_t metadataBytes{};
 
+        [[nodiscard]] bool Matches(const experiment::cooked::ModelMeshSummary& summary) const noexcept
+        {
+            return meshId == summary.meshAssetId.value && bounds == summary.bounds &&
+                vertexAttributeMask == summary.attributes && vertexStride == summary.stride &&
+                vertexCount == summary.vertexCount && indexCount == summary.indexCount && skinned == summary.skinned;
+        }
+
         // Cache retention conservatively charges the hard closure, even when
         // another descriptor shares the same skeleton. metadataBytes remains
         // the independently reportable small descriptor allocation estimate.

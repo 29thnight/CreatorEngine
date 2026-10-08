@@ -583,10 +583,7 @@ namespace
     bool MatchesModelMeshSummary(const assets::ModelMeshDescriptor& mesh,
         const model_cooked::ModelMeshSummary& summary) noexcept
     {
-        return mesh.meshId == summary.meshAssetId.value && mesh.bounds == summary.bounds
-            && mesh.vertexAttributeMask == summary.attributes && mesh.vertexStride == summary.stride
-            && mesh.vertexCount == summary.vertexCount && mesh.indexCount == summary.indexCount
-            && mesh.skinned == summary.skinned;
+        return mesh.Matches(summary);
     }
 
     template<class T>
@@ -727,6 +724,24 @@ AssetDepot::AssetRequest<T> DataSystem::RequestCurrentModelAssetAsync(AssetDepot
         std::lock_guard catalogLock(m_cookedCatalogMutex);
         catalog = m_cookedCatalog;
         epoch = m_assetPreparationEpoch;
+    }
+    return RequestModelAssetFromSnapshot(link, std::move(catalog), epoch);
+}
+
+template<class T>
+AssetDepot::AssetRequest<T> DataSystem::RequestModelAssetFromSnapshot(AssetDepot::AssetLink<T> link,
+    own::shared_owner<const model_cooked::CookedAssetCatalog> catalog, std::uint64_t epoch)
+{
+    auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>();
+    AssetDepot::AssetRequest<T> failed(consumer);
+    const auto fail = [&](Status status, Error error, const std::string& message)
+    {
+        NotifyModelConsumer(consumer, status, error, message);
+        return failed;
+    };
+    if (!link.IsValid())
+    {
+        return fail(Status::Failed, Error::InvalidLink, "Invalid same-snapshot model link.");
     }
     if (!catalog)
     {
@@ -1507,7 +1522,9 @@ AssetDepot::ModelAssetCacheSnapshot DataSystem::SnapshotModelAssetCache() const
 // Current-link dispatch returns logical descriptors, never raw geometry.
 #define INSTANTIATE_MODEL_ASSET(Type) \
     template own::shared_owner<const Type> DataSystem::TryAcquireCurrentModelAsset(AssetDepot::AssetLink<Type>); \
-    template AssetDepot::AssetRequest<Type> DataSystem::RequestCurrentModelAssetAsync(AssetDepot::AssetLink<Type>);
+    template AssetDepot::AssetRequest<Type> DataSystem::RequestCurrentModelAssetAsync(AssetDepot::AssetLink<Type>); \
+    template AssetDepot::AssetRequest<Type> DataSystem::RequestModelAssetFromSnapshot(AssetDepot::AssetLink<Type>, \
+        own::shared_owner<const experiment::cooked::CookedAssetCatalog>, std::uint64_t);
 INSTANTIATE_MODEL_ASSET(assets::ModelAnimationDescriptor)
 INSTANTIATE_MODEL_ASSET(assets::ModelSkeletonPayload)
 INSTANTIATE_MODEL_ASSET(assets::ModelAnimationPayload)

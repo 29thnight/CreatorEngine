@@ -81,6 +81,12 @@ design. A foundation slice is not completion of the runtime migration.
 - Animator owns only selected/current/transition/layer clips and skeletons through
   scheduled evaluation. Both granular and transitional legacy geometry require the
   full compatible skin-binding contract before accepting its current palette.
+- Explicit mounted-model placement prepares schema3 hierarchy, Mesh descriptors,
+  Material templates and Skeleton from one resolver snapshot through existing model
+  tickets. Child owners travel in a construction input value packet; clips stay lazy.
+  Source-node anchors apply transforms once, including meshless roots and multi-mesh
+  siblings. Components receive descriptor/Material/Animator owners without source or
+  legacy whole-model fallback. Explicit collider preparation remains queued.
 - Scene preparation pins selected mesh descriptors through construction. The public
   completion pump is nonblocking `PollSceneLoads`; canceled tickets finish without
   waiting for shared mesh jobs, which still participate in service shutdown drain.
