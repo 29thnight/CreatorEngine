@@ -1,9 +1,10 @@
 #pragma once
 
-#include "MaterialGraphIblBake.h"
-#include "MaterialGraphSurfaceBatch.h"
-#include "MaterialGraphRenderBindings.h"
-#include "Render/Graph/EnhancedRenderPass.h"
+#include "../../../Engine/RenderEngine/MaterialGraphSceneCoverage.h"
+#include "../../../Engine/RenderEngine/MaterialGraphIblBake.h"
+#include "../../../Engine/RenderEngine/MaterialGraphSurfaceBatch.h"
+#include "../../../Engine/RenderEngine/MaterialGraphRenderBindings.h"
+#include "../../../Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h"
 
 namespace material_graph
 {
@@ -22,17 +23,6 @@ struct SceneSurfaceEvaluation
 
 bool BuildSceneSurfaceEvaluation(std::shared_ptr<const SurfaceBatch> gpu, SceneSurfaceEvaluation& result,
                                  std::string& error);
-
-enum class SceneCoverage : std::uint8_t
-{
-    Opaque,
-    Masked,
-    Blended
-};
-
-// Route answers how the material is shaded; coverage answers where it sorts
-// and whether depth is written. An opaque Core material still uses Forward.
-bool ClassifySceneCoverage(const EnhancedMaterialCoverage& coverage, SceneCoverage& result, std::string& error);
 
 struct ScenePassLayout
 {

@@ -544,6 +544,7 @@ namespace material_graph
         std::vector<bool> referenced(cost.sourceVertices);
         std::shared_ptr<MeshSurfaceInput> chunk;
         MeshSurfaceChunk description;
+        std::shared_ptr<std::vector<std::uint32_t>> sourceVertices;
         const auto start = [&](std::uint32_t firstTriangle) {
             chunk = std::shared_ptr<MeshSurfaceInput>(new MeshSurfaceInput);
             chunk->geometry_ = source.geometry_;
@@ -551,6 +552,7 @@ namespace material_graph
             chunk->view_ = source.view_;
             chunk->bones_ = source.bones_;
             description = {};
+            sourceVertices = std::make_shared<std::vector<std::uint32_t>>();
             description.firstTriangle = firstTriangle;
         };
         const auto finish = [&]() {
@@ -558,11 +560,13 @@ namespace material_graph
             chunk->geometry_.vertexBytes = chunk->vertices_.size();
             chunk->geometry_.indexData = chunk->indices_.data();
             chunk->geometry_.indexCount = static_cast<std::uint32_t>(chunk->indices_.size());
-            for (auto index : description.sourceVertices)
+            for (auto index : *sourceVertices)
             {
                 remap[index] = unused;
             }
             description.input = std::move(chunk);
+            description.sourceVerticesOwner_ = sourceVertices;
+            description.sourceVertices = *sourceVertices;
             candidate->chunks_.push_back(std::move(description));
         };
         start(0);
@@ -612,7 +616,7 @@ namespace material_graph
                 if (remap[index] == unused)
                 {
                     remap[index] = chunk->Count();
-                    description.sourceVertices.push_back(index);
+                    sourceVertices->push_back(index);
                     const auto* vertex = sourceBytes + std::size_t(index) * geometry.vertexStride;
                     chunk->vertices_.insert(chunk->vertices_.end(), vertex, vertex + geometry.vertexStride);
                     chunk->lods_.push_back(source.lods_[index]);
@@ -803,6 +807,7 @@ namespace material_graph
             MeshSurfaceChunk chunk;
             chunk.input = bind(previous.input);
             chunk.sourceVertices = previous.sourceVertices;
+            chunk.sourceVerticesOwner_ = previous.sourceVerticesOwner_;
             chunk.firstTriangle = previous.firstTriangle;
             candidate->chunks_.push_back(std::move(chunk));
         }
@@ -959,6 +964,20 @@ namespace material_graph
         const auto& source = *candidate->input_;
         if (cacheStatic)
         {
+            // Drop completed, unreferenced output owners before static admission;
+            // otherwise each retained output pins an otherwise evictable static entry.
+            if (transformedCache_.size() >= 256)
+            {
+                std::erase_if(transformedCache_, [&](const auto& batch)
+                {
+                    if (batch.use_count() != 1)
+                    {
+                        return false;
+                    }
+                    transformedBytes_ -= std::uint64_t(batch->Count()) * sizeof(SurfacePoint);
+                    return true;
+                });
+            }
             if (!staticCache_)
             {
                 staticCache_ = std::make_shared<MeshSurfaceStaticCache>(device);

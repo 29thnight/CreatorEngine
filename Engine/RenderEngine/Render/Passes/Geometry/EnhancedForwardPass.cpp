@@ -37,7 +37,6 @@
 #include <functional>
 #include <limits>
 #include <stdexcept>
-#include <sstream>
 #include <string_view>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -55,14 +54,6 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string FwdHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── 광원 컬링 ──
     //
     // 스레드 그룹 하나가 타일 하나다(16x16 = 256스레드). 세 단계:
@@ -1280,11 +1271,16 @@ std::uint32_t EnhancedForwardPass::CommitShaderMetaFrame(
 bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     std::string& outError)
 {
+    if (!context.resources || !m_resourceRetirement.Attach(*context.resources))
+    {
+        outError = "Forward tile buffers require their owning device.";
+        return false;
+    }
     const uint32_t tileTotal = m_tileCountX * m_tileCountY;
     if (0 == tileTotal) return true;
 
     // 크기가 그대로면 다시 만들지 않는다(SSGI 히스토리와 같은 계약).
-    if (m_tileCountBuffer.IsValid())
+    if (m_tileCountBuffer.IsValid() && m_tileListBuffer.IsValid())
     {
         if (m_allocatedTiles >= tileTotal) return true;
     }
@@ -1299,20 +1295,34 @@ bool EnhancedForwardPass::EnsureTileBuffers(const EnhancedFrameContext& context,
     // UAV를 초기 상태로 주면 검증 레이어가 '무시한다'고 경고만 남긴다.
     desc.bytes = static_cast<uint64_t>(tileTotal) * 2ull * sizeof(uint32_t);
     desc.debugName = L"Forward+.TileCount";
-    if (!context.resources->CreateBuffer(desc, m_tileCountBuffer, outError))
+    RHIBufferHandle count{}, list{};
+    if (!context.resources->CreateBuffer(desc, count, outError))
     {
+        if (count.IsValid())
+        {
+            context.resources->ReleaseBuffer(count);
+        }
         outError = "타일 카운트 버퍼 — " + outError;
         return false;
     }
 
     desc.bytes = static_cast<uint64_t>(tileTotal) * kMaxLightsPerTile * sizeof(uint32_t);
     desc.debugName = L"Forward+.TileList";
-    if (!context.resources->CreateBuffer(desc, m_tileListBuffer, outError))
+    if (!context.resources->CreateBuffer(desc, list, outError))
     {
+        context.resources->ReleaseBuffer(count);
+        if (list.IsValid())
+        {
+            context.resources->ReleaseBuffer(list);
+        }
         outError = "타일 목록 버퍼 — " + outError;
         return false;
     }
 
+    m_resourceRetirement.Retire(m_tileCountBuffer);
+    m_resourceRetirement.Retire(m_tileListBuffer);
+    m_tileCountBuffer = count;
+    m_tileListBuffer = list;
     m_allocatedTiles = tileTotal;
 
     // 새 리소스는 COMMON이다. 상태 멤버가 이전 버퍼의 끝 상태를 들고 있으면
@@ -1339,6 +1349,12 @@ bool EnhancedForwardPass::PrepareFrame(const EnhancedFrameContext& context, std:
     // W8: GBuffer와 같은 장부를 같은 자리에서 연다.
     m_sealLedger.Begin(context.frameId, context.sceneEpoch);
     m_rejectedSnapshots.clear();
+
+    if (!context.forwardLightingConsumer)
+    {
+        outError.clear();
+        return true;
+    }
 
     if (nullptr != context.forwardDraws)
     {
@@ -1568,7 +1584,7 @@ void EnhancedForwardPass::Declare(EnhancedRenderGraph& graph, const EnhancedFram
             "Forward+ Graph stream requires ExplicitVersioned resource declarations.");
     }
 
-    if (!m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)
+    if (!context.forwardLightingConsumer || !m_inputs.depth.IsValid() || !m_cullPSO.IsValid() || !m_tileCountBuffer.IsValid() || nullptr == context.lights)
     {
         return;
     }
@@ -2323,6 +2339,18 @@ bool EnhancedForwardPass::RecordShading(RHIEncoder& encoder, const EnhancedFrame
 
 void EnhancedForwardPass::Shutdown()
 {
+    if (auto* device = m_resourceRetirement.Device())
+    {
+        if (m_tileCountBuffer.IsValid())
+        {
+            device->ReleaseBuffer(m_tileCountBuffer);
+        }
+        if (m_tileListBuffer.IsValid())
+        {
+            device->ReleaseBuffer(m_tileListBuffer);
+        }
+    }
+    m_resourceRetirement.ClearAfterIdle();
     m_visibility.ShutdownAfterIdle();
     m_visibilityStats = {};
     m_graphMaterials = nullptr;
@@ -2335,8 +2363,6 @@ void EnhancedForwardPass::Shutdown()
     m_tileListState = RHIResourceState::Common;
     m_tileCountX = 0;
     m_tileCountY = 0;
-    m_lastCulledLights = 0;
-    m_lastOverflowTiles = 0;
     m_lastDrawCount = 0;
     m_lastMaterialCount = 0;
     m_lastBatchCount = 0;

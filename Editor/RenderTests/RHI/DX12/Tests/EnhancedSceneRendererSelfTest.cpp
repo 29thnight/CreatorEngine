@@ -1,3 +1,4 @@
+#include "RHI/DX12/DX12Format.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -485,8 +486,22 @@ passes:
             std::span<RHIBufferSlice>, std::string&) override { return false; }
         RHIBufferSlice AllocateUpload(const RHIUploadRequest&) override { return {}; }
         uint64_t GetCurrentUploadRecordingId() const override { return 1; }
-        void RegisterUploadTransactionListener(IRHIUploadTransactionListener*) override {}
-        void UnregisterUploadTransactionListener(IRHIUploadTransactionListener*) override {}
+        void RegisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
+        {
+            listeners.push_back(listener);
+        }
+        void UnregisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
+        {
+            std::erase(listeners, listener);
+        }
+        void AcceptRecording()
+        {
+            for (auto* listener : listeners)
+            {
+                listener->OnUploadAccepted(GetCurrentUploadRecordingId(), {1});
+            }
+        }
+        std::vector<IRHIUploadTransactionListener*> listeners;
         RHIBufferSlice UploadConstants(const void*, size_t) override { return {}; }
         RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc>) override { return {}; }
         RHIEncoder& GetImmediateEncoder() override { return encoder; }
@@ -2021,7 +2036,10 @@ passes:
             R6bFakeReadbackEncoder::CopyRecord::Kind::Buffer == copies[3].kind &&
             buffer == copies[3].buffer && bufferReadback.buffer == copies[3].readback &&
             16 == copies[3].sourceOffset && 64 == copies[3].bytes;
-        const bool transitioned = 1 == services.encoder.barrierBatches &&
+        const bool unsubmitted = RHIResourceState::Common == textureFinal &&
+            RHIResourceState::Common == bufferFinal;
+        services.AcceptRecording();
+        const bool transitioned = unsubmitted && 1 == services.encoder.barrierBatches &&
             1 == services.encoder.textureTransitions &&
             1 == services.encoder.bufferTransitions &&
             RHIResourceState::CopySource == textureFinal &&
@@ -4211,6 +4229,8 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     error.clear(); return true;
 }
 
+#include "EnhancedTransientRg7Tests.h"
+
 bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
 {
     std::string rg1Error;
@@ -4481,7 +4501,7 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         const uint32_t readBarriers = graph.GetPassBarrierCount(read);
         const bool correct = tracked.IsValid() && 1 == firstBarriers &&
             1 == uavBarriers && 1 == readBarriers &&
-            RHIResourceState::ShaderResource == finalState;
+            RHIResourceState::Common == finalState;
         if (!correct) passed = false;
 
         outLog += "[4/7] 중립 buffer transition/UAV 유도 "

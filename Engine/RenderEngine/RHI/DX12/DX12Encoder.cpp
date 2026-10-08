@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cmath>
+#include <stdexcept>
 
 static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(D3D12_DRAW_ARGUMENTS));
 static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==
@@ -440,8 +441,29 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 {
     if (nullptr == m_commandList || nullptr == m_resources || batch.IsEmpty()) return;
 
-    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    auto& barriers = m_barrierScratch;
+    barriers.clear();
     barriers.reserve(batch.GetBarrierCount());
+
+    const auto activate = [&barriers](ID3D12Resource* resource)
+    {
+        if (!resource)
+        {
+            throw std::runtime_error("Aliasing activation refers to a stale resource");
+        }
+        D3D12_RESOURCE_BARRIER barrier{};
+        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
+        barrier.Aliasing.pResourceAfter = resource;
+        barriers.push_back(barrier);
+    };
+    for (const auto texture : batch.aliasTextures)
+    {
+        activate(m_resources->Resolve(texture));
+    }
+    for (const auto buffer : batch.aliasBuffers)
+    {
+        activate(m_resources->Resolve(buffer));
+    }
 
     for (const RHITransition& transition : batch.textureTransitions)
     {

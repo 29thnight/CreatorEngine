@@ -109,16 +109,20 @@ struct RHIBarrierBatch
     std::span<const RHIBufferTransition> bufferTransitions;
     std::span<const RHITextureHandle> uavTextures;
     std::span<const RHIBufferHandle> uavBuffers;
+    // Activation precedes state transitions; the previous occupant is unknown
+    // across recordings. Backend uses an all-previous alias barrier.
+    std::span<const RHITextureHandle> aliasTextures;
+    std::span<const RHIBufferHandle> aliasBuffers;
 
     bool IsEmpty() const
     {
         return textureTransitions.empty() && bufferTransitions.empty() &&
-            uavTextures.empty() && uavBuffers.empty();
+            uavTextures.empty() && uavBuffers.empty() && aliasTextures.empty() && aliasBuffers.empty();
     }
 
     std::size_t GetBarrierCount() const
     {
         return textureTransitions.size() + bufferTransitions.size() +
-            uavTextures.size() + uavBuffers.size();
+            uavTextures.size() + uavBuffers.size() + aliasTextures.size() + aliasBuffers.size();
     }
 };

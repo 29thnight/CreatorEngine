@@ -90,8 +90,6 @@ public:
 
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};

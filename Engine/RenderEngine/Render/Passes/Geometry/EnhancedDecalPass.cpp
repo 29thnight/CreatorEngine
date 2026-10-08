@@ -9,21 +9,12 @@
 
 #include <algorithm>
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string DecalHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // DX11 Decal.vs.hlsl + Decal.ps.hlsl의 이식.
     //
     // 좌표 복원·상자 판정·아틀라스 계산·채널 마스크를 전부 그대로 옮겼다.
@@ -229,14 +220,18 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
     // 그래도 성립하고, 그리지 않고 묶음만 확인하는 검증이 이 경로를 쓴다.
     const auto upload = [&](Texture* texture, RHITextureHandle& outResource, RHIFormat& outFormat,
                             uint32_t& outMips) -> bool {
-        if (nullptr == texture || nullptr == context.textureCache)
+        if (nullptr == texture)
         {
             return true;
+        }
+        if (nullptr == context.textureCache)
+        {
+            return false;
         }
 
         std::string textureError;
         const auto entry = context.textureCache->GetOrUpload(texture, textureError);
-        if (!entry.IsValid())
+        if (!entry.IsValid() || !textureError.empty())
         {
             return false;
         }

@@ -1,5 +1,7 @@
 # EnhancedSceneRenderer 기반 Meshlet·Mesh Shader·DXR 상세 배선 계약
 
+**2026-10-08 제품 범위 확장:** 실제 RT 구현은 [PHASE 4.85 Path Tracing·Hybrid RT](../plans/PathTracingHybridPipelinePlan.md)가 소유한다. 공통 RT scene/material 기반 위에 독립 PathTracing graph 구성과 기존 raster+RT Hybrid 구성을 같은 renderer 수명 아래 연결한다. 본 문서의 hard shadow는 첫 Hybrid 슬라이스이며 전체 목표가 아니다. RT0→RTP-1/2, RT1→RTP-4, HY0→RTP-12로 대응하고 구현 공수/완료를 중복 계상하지 않는다. ReSTIR PT Enhanced·tetrahedral cages는 신규 계획의 연구 구현/평가 트랙이다.
+
 **설계 결정 2026-10-01 · GPU-1/GPU-3 상세 계약 · 구현/빌드/GPU 런타임 미검증.**
 목표는 기존 Scene 렌더러의 프레임·뷰·표시 수명을 유지하면서 GPU-driven 래스터와
 DXR 직접광 그림자를 같은 RenderGraph에 연결하는 것이다. 이 문서의 새 타입·Pass·API는

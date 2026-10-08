@@ -96,7 +96,8 @@ namespace material_graph
         }
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
         EnhancedGBufferPass::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
-                                                    const EnhancedGBufferPass::Outputs& inputs) const;
+                                                    const EnhancedGBufferPass::Outputs& inputs,
+                                                    bool hasOccluderDepth = true) const;
         // Baseline is the existing Decal pass snapshot, ordered diffuse, ORM, normal.
         // Register after Decal.Declare and before Color; unchanged channels retain
         // the graph's full precision values instead of the quantized GBuffer.
@@ -145,6 +146,7 @@ namespace material_graph
         };
         bool PrepareProgram(const EnhancedFrameContext& context, const Instance& instance,
                             std::shared_ptr<const Program>& result, std::string& error);
+        void PruneFailedPreparations(const std::shared_ptr<const Generation>& requested = {});
         IRenderDeviceServices* device_{};
         MeshSurfaceEvaluator geometry_;
         GpuGeometryVisibility visibility_;

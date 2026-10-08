@@ -31,6 +31,9 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         DisplayToken token{ kInvalidDisplayToken };
         ComPtr<ID3D12Resource> texture;
         HANDLE sharedHandle{ nullptr };
+        uint64_t producerCompletion{};
+        bool producerComplete{};
+        bool producerCompletionLost{};
         std::shared_ptr<RHIDisplayConsumerLease> consumerLease{
             std::make_shared<RHIDisplayConsumerLease>() };
     };
@@ -140,9 +143,24 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
     // 부분 초기화 실패에서도 누락되지 않도록 여기서 남은 항목을 격리한다.
     for (Impl::DisplayResource& display : impl.activeDisplays)
     {
+        display.producerCompletion = impl.resources.GetLastSignaledFenceValue();
         impl.retiredDisplays.push_back(std::move(display));
     }
     impl.activeDisplays.clear();
+    if (!GetRHISubmissionThread().GetOwnerStats(&impl.resources).faulted)
+    {
+        for (auto& display : impl.retiredDisplays)
+        {
+            display.producerComplete = true;
+        }
+    }
+    else
+    {
+        for (auto& display : impl.retiredDisplays)
+        {
+            display.producerCompletionLost = !display.producerComplete;
+        }
+    }
     impl.fogCloudNeutral.Reset();
 
     if (impl.resources.IsInitialized())
@@ -391,10 +409,32 @@ void EnhancedSceneRendererLiveDX12Adapter::RetireDisplayTexture(DisplayToken tok
     for (auto it = impl.activeDisplays.begin(); it != impl.activeDisplays.end(); ++it)
     {
         if (it->token != token) continue;
+        it->producerCompletion = impl.resources.GetLastSignaledFenceValue();
         impl.retiredDisplays.push_back(std::move(*it));
         impl.activeDisplays.erase(it);
         return;
     }
+}
+
+void EnhancedSceneRendererLiveDX12Adapter::CollectRetiredDisplays()
+{
+    Impl& impl = *m_impl;
+    const auto completed = impl.resources.GetCompletedFenceValue();
+    std::erase_if(impl.retiredDisplays, [&](auto& display)
+    {
+        if (display.producerCompletionLost || (!display.producerComplete && display.producerCompletion > completed)
+            || display.consumerLease.use_count() != 1
+            || display.consumerLease->m_completionLost.load(std::memory_order_acquire))
+        {
+            return false;
+        }
+        if (display.sharedHandle)
+        {
+            CloseHandle(display.sharedHandle);
+            display.sharedHandle = nullptr;
+        }
+        return true;
+    });
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::CanReuseDisplayTexture(DisplayToken token) const

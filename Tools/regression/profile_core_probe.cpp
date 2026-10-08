@@ -630,6 +630,64 @@ namespace
 		(void)sink;
 	}
 
+	void test_aggregate_nested_ranges()
+	{
+		ce::profiler_service service;
+		service.initialize();
+		service.register_thread("Nested");
+		record_sync(service, 1);
+		{
+			ce::profile_scope root{ service, ce::marker<"NestedRoot">() };
+			{
+				ce::profile_scope branch{ service, ce::marker<"NestedBranch">() };
+				{
+					ce::profile_scope leaf{ service, ce::marker<"NestedLeaf">() };
+					busy_ticks(2);
+				}
+			}
+			{
+				ce::profile_scope branch{ service, ce::marker<"NestedLastBranch">() };
+				{
+					ce::profile_scope child{ service, ce::marker<"NestedChild">() };
+					{
+						ce::profile_scope leaf{ service, ce::marker<"NestedGrandchild">() };
+						busy_ticks(1);
+					}
+				}
+			}
+		}
+		publish_frame_sync(service, 1);
+		pause_sync(service);
+		const auto capture = service.capture();
+		check(capture != nullptr, "aggregate/nested-capture");
+		if (!capture)
+		{
+			return;
+		}
+		const auto aggregate = ce::aggregate_frames(*capture, 1, 1);
+		const auto& rows = aggregate.hierarchy();
+		check_eq(rows.size(), std::size_t{ 6 }, "aggregate/nested-rows");
+		for (std::size_t i = 0; i < rows.size(); ++i)
+		{
+			std::size_t end = i + 1;
+			while (end < rows.size() && rows[end].depth > rows[i].depth)
+			{
+				++end;
+			}
+			check_eq(rows[i].child_begin, static_cast<std::uint32_t>(i + 1), "aggregate/nested-begin");
+			check_eq(rows[i].child_end, static_cast<std::uint32_t>(end), "aggregate/nested-end");
+		}
+		std::size_t roots = 0;
+		std::uint64_t rootTicks = 0;
+		for (std::size_t i = 0; i < rows.size(); i = rows[i].child_end)
+		{
+			++roots;
+			rootTicks += rows[i].total_ticks;
+		}
+		check_eq(roots, std::size_t{ 1 }, "aggregate/nested-root-traversal");
+		check_eq(rootTicks, rows[0].total_ticks, "aggregate/nested-flame-root-total");
+	}
+
 	void test_aggregate_tree()
 	{
 		ce::profiler_service service;
@@ -5443,9 +5501,24 @@ namespace
     }
 }
 
-int main()
+int main(int argc, char** argv)
 {
 	silence_crt_dialogs();
+	if (argc == 2 && std::strcmp(argv[1], "--aggregate-only") == 0)
+	{
+		test_aggregate_tree();
+		test_aggregate_nested_ranges();
+		test_aggregate_range();
+		test_aggregate_threads();
+		test_aggregate_flat();
+		test_aggregate_truncated();
+		std::printf("profile aggregate probe: %d checks, %d failures\n", g_checks, g_failures);
+		if (g_failures == 0)
+		{
+			std::printf("PROFILE_CORE_OK=true scope=aggregate-only\n");
+		}
+		return g_failures == 0 ? 0 : 1;
+	}
 
 	test_marker_identity();
 	test_disabled_parent_enabled_child_pairing();
@@ -5475,6 +5548,7 @@ int main()
 	test_recorder_states();
 	test_rolling_retention();
 	test_aggregate_tree();
+	test_aggregate_nested_ranges();
 	test_aggregate_range();
 	test_aggregate_threads();
 	test_aggregate_flat();

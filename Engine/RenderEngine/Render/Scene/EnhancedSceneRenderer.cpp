@@ -617,6 +617,50 @@ namespace
         RGTransientPool transientPool;
     };
 
+    // Residency precedes the recording boundary. Recording-owned palettes,
+    // visibility and material packets must all be allocated after that boundary.
+    template <typename PipelineT, typename CommandPoolT>
+    bool PrepareSceneRecording(PipelineT& pipeline, EnhancedRenderGraph& graph,
+        CommandPoolT& commandPool, RHIShaderBinary output, bool& preparationDeferred,
+        EnhancedPbrCapture* capture, std::string& error)
+    {
+        RHIShaderCompiler::ScopedOutput outputScope(output);
+        auto& context = pipeline.frameContext;
+        if (!pipeline.graphMaterials.PrepareResidency(context, pipeline.graphInput, error))
+        {
+            return false;
+        }
+        if (!graph.PrepareParallel(commandPool, error))
+        {
+            return false;
+        }
+        if (!pipeline.animationPalettes.UploadForCurrentRecording(*context.resources))
+        {
+            error = "Sealed animation palette upload failed after the upload-prefix boundary.";
+            return false;
+        }
+        if (!pipeline.decal.PrepareGpuVisibility(context, error)
+            || !pipeline.sprite.PrepareGpuVisibility(context, error))
+        {
+            return false;
+        }
+        if (!pipeline.graphMaterials.Prepare(context, pipeline.graphInput,
+                pipeline.ibl.GetCubeMap(), pipeline.ibl.GetIrradianceMap(),
+                pipeline.ibl.GetPrefilteredMap(), pipeline.shadow.GetShadowData(),
+                material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate,
+                    .lookupRuntimeEvaluation = true}, error, pipeline.ibl.GetGeneration(),
+                pipeline.ibl.GetImportanceMaps(), pipeline.ibl.GetSourceMap()))
+        {
+            preparationDeferred = pipeline.graphMaterials.PreparationDeferred();
+            return false;
+        }
+        if (capture)
+        {
+            capture->RecordLatticeInput(pipeline.graphInput);
+        }
+        return true;
+    }
+
     // Vulkan 공용 scene graph 라이브 경로. 에디터 창 자체는 아직 DX12 ImGui
     // 셸이므로 최종 LDR를 비동기 리드백한 뒤 셸에 넘긴다.
     // 그래프와 리드백 슬롯은 timeline completion까지 살아 있어 D3D12 경로의
@@ -774,8 +818,8 @@ namespace
         }
 
         bool Initialize(uint32_t newWidth, uint32_t newHeight,
-            FrameCameraSnapshot& camera, std::vector<EnhancedDrawItem>& draws,
-            std::vector<EnhancedDrawItem>& forwardDraws,
+            FrameCameraSnapshot& camera, const std::vector<EnhancedDrawItem>& draws,
+            const std::vector<EnhancedDrawItem>& forwardDraws,
             std::vector<EnhancedLight>& lights, std::string& outError)
         {
             if (!VulkanApi::LoadLoader(outError)) return false;
@@ -1161,35 +1205,10 @@ namespace
                 kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
+            if (!PrepareSceneRecording(*this, graph, commandPool, RHIShaderBinary::SpirV,
+                    preparationDeferred, capture, outError))
             {
-                RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::SpirV);
-                if (!graphMaterials.PrepareResidency(frameContext, graphInput, outError)) return false;
-                // RecordParallel always consumes this boundary. Establish it
-                // before any recording-owned palette/visibility allocation,
-                // including CPU-only/custom geometry views.
-                if (!graph.PrepareParallel(commandPool, outError))
-                {
-                    return false;
-                }
-                if (!animationPalettes.UploadForCurrentRecording(*frameContext.resources))
-                {
-                    outError = "Sealed animation palette upload failed after the upload-prefix boundary.";
-                    return false;
-                }
-                if (!decal.PrepareGpuVisibility(frameContext, outError)
-                    || !sprite.PrepareGpuVisibility(frameContext, outError))
-                {
-                    return false;
-                }
-                if (!graphMaterials.Prepare(frameContext, graphInput, ibl.GetCubeMap(),
-                        ibl.GetIrradianceMap(), ibl.GetPrefilteredMap(),
-                        shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate, .lookupRuntimeEvaluation = true},
-                        outError, ibl.GetGeneration(),ibl.GetImportanceMaps(),ibl.GetSourceMap()))
-                {
-                    preparationDeferred = graphMaterials.PreparationDeferred();
-                    return false;
-                }
-                if (capture) capture->RecordLatticeInput(graphInput);
+                return false;
             }
             double compileMs = 0.0;
             LiveStopwatch compileWatch;
@@ -1296,7 +1315,6 @@ namespace
             commandPoolFrame = (commandPoolFrame + 1u) % VulkanDeviceResources::kFrameCount;
 
             slot->fenceValue = resources.GetLastSignaledFenceValue();
-            ibl.MarkCookedCaptureSubmitted(slot->fenceValue);
             slot->viewIndex = viewIndex;
             slot->key = viewPacket.key;
             slot->frameId = sourceFrameId;
@@ -1639,7 +1657,7 @@ namespace
             if (!pbrCapture || pbrCapture->result.state != EnhancedPbrCaptureState::Pending
                 || pbrCapture->target != view.displayTarget
                 || frame.frameId <= pbrCapture->afterFrameId) return nullptr;
-            try { pbrCapture->Begin(frame, view, backend, draws, forwardDraws, lights, skyBoxPath); }
+            try { pbrCapture->Begin(frame, view, backend, emptyReferenceDraws, emptyReferenceDraws, lights, skyBoxPath); }
             catch (const std::exception& error)
             {
                 pbrCapture->Fail(error.what());
@@ -2085,7 +2103,7 @@ namespace
         FrameCameraSnapshot           cameraSnapshot{};
 
         // 카메라와 무관한 수집 결과(BuildDrawPool). 뷰는 여기서 골라
-        // draws/forwardDraws로 옮긴다 — 재질·본 팔레트 해석을 뷰마다
+        // graphDraws/shadowDraws로 옮긴다 — 재질·본 팔레트 해석을 뷰마다
         // 반복하지 않기 위해서다.
         struct PooledDraw
         {
@@ -2093,24 +2111,11 @@ namespace
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
             std::shared_ptr<Mesh> meshSource{};
-            // MBC7 — item.modelMeshView의 정점·인덱스 저장소를 소유하는 immutable
-            // generation. sealing은 이것으로 재질의 embedded texture를 closure에서 푼다.
+            // item.modelMeshView의 정점·인덱스 저장소를 소유하는 immutable generation.
             std::shared_ptr<const assets::ModelAssetGeneration> generationSource{};
-            // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
-            // The identified graph source is retained with its model generation.
-            // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
-            std::shared_ptr<const Material> materialSource{};
             std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
-            // I5-D5c2-2 — 재질 저작 정본의 값 스냅샷. 있으면 sealing이
-            // properties·keywords·blendMode를 이것으로 덮는다(부속은 legacy).
-            std::shared_ptr<const experiment::Material> authoredMaterialSource{};
-            // W8 — 그 값 스냅샷을 만든 MaterialInstance의 Revision. 프록시까지만
-            // 오고 렌더 스냅샷에는 없어서, 인스턴스 편집이 화면에 닿았는지를
-            // 밖에서 물을 수 없었다. seal 신원의 일부로 운반한다.
-            std::uint64_t        authoredRevision{};
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
-            bool                 isTransparent{ false };
         };
         std::vector<PooledDraw>       drawPool;
 
@@ -2133,12 +2138,15 @@ namespace
         uint32_t                      lastPoolDraws{ 0 };
         uint32_t                      lastCulledDraws{ 0 };
 
-        std::vector<EnhancedDrawItem> draws;
+        // Empty live native lists retained for the standalone capture/replay
+        // and common pass-input contracts. Scene materials use graphViewInput.
+        // Legacy reference and capture APIs receive an explicitly empty stream.
+        const std::vector<EnhancedDrawItem> emptyReferenceDraws;
         std::vector<EnhancedDrawItem> shadowDraws;
-        std::vector<EnhancedDrawItem> forwardDraws;
+
         std::vector<EnhancedDrawItem> graphDraws;
-        // Same ordering as graphDraws/SceneDrawInput::sourceIndex. These sealed
-        // legacy draws keep the entire model visible during a cold graph compile.
+        // Same ordering as graphDraws/SceneDrawInput::sourceIndex. Eligibility
+        // remains aligned when optional graph candidates are removed.
         std::vector<bool> graphShadowEligible;
         std::vector<bool> graphViewRequired;
         std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
@@ -2555,8 +2563,8 @@ namespace
             p.frameContext.width = p.width;
             p.frameContext.height = p.height;
             p.frameContext.camera = &cameraSnapshot;
-            p.frameContext.draws = &draws;
-            p.frameContext.forwardDraws = &forwardDraws;
+            p.frameContext.draws = &emptyReferenceDraws;
+            p.frameContext.forwardDraws = &emptyReferenceDraws;
             p.frameContext.animationPalettes = &p.animationPalettes;
             p.frameContext.lights = &lights;
 
@@ -2704,6 +2712,7 @@ namespace
                 }
             }
             p.transientPool.freeList.clear();
+            p.transientPool.ClearAliasingCache();
         }
 
         bool ResizePipeline(uint32_t newWidth, uint32_t newHeight, std::string& outError)
@@ -2752,7 +2761,7 @@ namespace
                 return false;
             }
             if (!vulkanPipeline->Initialize(newWidth, newHeight, cameraSnapshot,
-                draws, forwardDraws, lights, outError))
+                emptyReferenceDraws, emptyReferenceDraws, lights, outError))
             {
                 std::string shutdownError;
                 if (!vulkanPipeline->Shutdown(shutdownError))
@@ -3055,7 +3064,7 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
                 {
-                    const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb));
+                    const auto outputs = p.graphMaterials.DeclareGBuffer(graph, GatherGBufferOutputs(bb), false);
                     bb.Set(LiveSlots::kGBufferDiffuse, outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
                     bb.Set(LiveSlots::kGBufferNormal, outputs.normal);
@@ -3973,19 +3982,6 @@ namespace
                     pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
                     pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
                     pooled.item.coverage = pooled.graphMaterialSource->coverage;
-                    pooled.materialSource = proxy->m_Material;
-                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
-                    pooled.authoredRevision = proxy->m_authoredRevision;
-                    pooled.isTransparent =
-                        (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
-                }
-                else if (const auto* material = proxy->m_Material.get())
-                {
-                    pooled.materialSource = proxy->m_Material;
-                    pooled.authoredMaterialSource = proxy->m_authoredMaterial;
-                    pooled.authoredRevision = proxy->m_authoredRevision;
-                    pooled.isTransparent =
-                        (MaterialRenderingMode::Transparent == material->m_renderingMode);
                 }
 
                 pooled.worldBounds = proxy->m_worldBounds;
@@ -4023,21 +4019,6 @@ namespace
                         pooled.item.materialGraphInstance = pooled.graphMaterialSource->instance;
                         pooled.item.materialGraphSlot = pooled.graphMaterialSource->materialSlot;
                         pooled.item.coverage = pooled.graphMaterialSource->coverage;
-                        pooled.materialSource = std::move(source.material);
-                        pooled.authoredMaterialSource = std::move(source.authoredMaterial);
-                        pooled.isTransparent =
-                            (pooled.item.coverage.flags & EnhancedMaterialCoverage::Blended) != 0;
-                    }
-                    else if (source.material)
-                    {
-                        pooled.materialSource = std::move(source.material);
-                        // I5-D5c4 — Foliage도 저작 정본을 나른다(poolMesh와 같은
-                        // 규약). sealing 직행·texture 해석에 그대로 합류한다.
-                        pooled.authoredMaterialSource =
-                            std::move(source.authoredMaterial);
-                        const Material* material = pooled.materialSource.get();
-                        pooled.isTransparent =
-                            MaterialRenderingMode::Transparent == material->m_renderingMode;
                     }
 
                     // I6-C — poolMesh와 같은 규약: 신원 키와 반경을 값으로
@@ -4128,9 +4109,7 @@ namespace
             gizmoData = viewPacket.gizmos
                 ? *viewPacket.gizmos : EnhancedGizmoSceneData{};
 
-            draws.clear();
             shadowDraws.clear();
-            forwardDraws.clear();
             graphDraws.clear();
             graphShadowEligible.clear();
             graphViewRequired.clear();
@@ -4318,7 +4297,7 @@ namespace
             const bool gpuVisibility = backend == EnhancedLiveBackend::DX12
                 ? dx12.Resources().GetIndirectDrawCapabilities().indexedDraw
                 : (vulkanPipeline && vulkanPipeline->resources.GetIndirectDrawCapabilities().indexedDraw);
-            std::vector<size_t> opaqueShadowIndices, graphShadowIndices;
+            std::vector<size_t> graphShadowIndices;
             uint32_t culled = 0;
             const material_graph::SceneInputBudget sceneInputBudget;
             uint32_t optionalGpuCandidates = 0;
@@ -4330,19 +4309,7 @@ namespace
                 // Resolve the exact already-sealed generation before CPU rejection,
                 // including on devices without indirect support and before the
                 // optional offscreen candidate budget can discard a custom draw.
-                // Native Forward has no authored deformation/bounds contract.
-                // Transparent is an ordering class, never a position proof.
                 bool knownPositionContract = bool(pooled.graphMaterialSource);
-                if (pooled.item.materialSnapshot)
-                {
-                    const auto& material = *pooled.item.materialSnapshot;
-                    const auto generation = LX::Runtime::ResolveGraphicsGeneration(
-                        material.pipelineGenerations, material.shaderMetaHandle,
-                        material.permutationKey, material.bindingLayout,
-                        pooled.item.modelMeshView.vertexAttributeMask, false);
-                    knownPositionContract = generation && generation->shader.compile.geometryVisibility ==
-                        ShaderGeometryVisibility::IndexedInstanceV1;
-                }
                 const bool conservative = !knownPositionContract || !shadow_math::FinitePose(pooled.item);
                 const bool sourceVisible = conservative || !cullDraws || !pooled.hasBounds || pooled.worldBounds.is_empty()
                     || math::intersects(frustum, pooled.worldBounds);
@@ -4390,7 +4357,7 @@ namespace
                     hasOptionalGraphCandidates |= bool(pooled.graphMaterialSource);
                 }
                 size_t shadowIndex = static_cast<size_t>(-1);
-                if (relevantToShadow && (pooled.graphMaterialSource || !pooled.isTransparent))
+                if (relevantToShadow)
                 {
                     shadowIndex = shadowDraws.size();
                     shadowDraws.push_back(pooled.item);
@@ -4416,11 +4383,10 @@ namespace
                 EnhancedLatticeReplayInput selectedMaterials;
                 // Stage both slices: a material rejection must not leave an
                 // otherwise valid world/pose replay partly applied to live draws.
-                auto stagedOpaque=draws, stagedForward=forwardDraws;
                 auto stagedGraph=graphDraws;
                 bool passed = pbrCapture->drawReplay
-                    ? pbrCapture->drawReplay->Apply(stagedOpaque, stagedForward, stagedGraph, replayError)
-                    : EnhancedDrawReplayInput::Seal(draws, forwardDraws, graphDraws, selected, replayError);
+                    ? pbrCapture->drawReplay->Apply({}, {}, stagedGraph, replayError)
+                    : EnhancedDrawReplayInput::Seal({}, {}, graphDraws, selected, replayError);
                 if (passed && pbrCapture->latticeReplayExtension) passed = pbrCapture->latticeReplay
                     ? pbrCapture->latticeReplay->Apply(stagedGraph, replayError)
                     : EnhancedLatticeReplayInput::Seal(graphDraws, selectedMaterials, replayError);
@@ -4432,15 +4398,7 @@ namespace
                 }
                 else
                 {
-                    draws.swap(stagedOpaque); forwardDraws.swap(stagedForward);
                     graphDraws.swap(stagedGraph);
-                    for (size_t i = 0; i < draws.size(); ++i)
-                    {
-                        if (opaqueShadowIndices[i] < shadowDraws.size())
-                        {
-                            shadowDraws[opaqueShadowIndices[i]] = draws[i];
-                        }
-                    }
                     for (size_t i = 0; i < graphDraws.size(); ++i)
                     {
                         if (graphShadowIndices[i] < shadowDraws.size())
@@ -4506,44 +4464,6 @@ namespace
                 graphDraws.clear();
             }
 
-            // ── 투명은 먼 것부터 ──
-            //
-            // 알파 블렌딩은 순서 의존이라 정렬하지 않으면 겹친 투명면이
-            // 수집 순서에 따라 달라진다(프록시 순회 순서 = 임의). 카메라를
-            // 아는 이 단계에서 정렬하므로 패스는 받은 순서대로 그리기만
-            // 하면 되고, 그래서 패스의 자가 검증이 결정적으로 남는다.
-            //
-            // 기준은 오브젝트 원점의 카메라 전방 거리다. 물체 단위 근사라
-            // 서로 관통하는 투명면은 여전히 어긋날 수 있는데, 그것을 고치려면
-            // 삼각형 단위 정렬이나 OIT가 필요하다 — 여기서 할 일이 아니다.
-            if (forwardDraws.size() > 1)
-            {
-                const math::vector3 eye = cameraSnapshot.eyePosition;
-                const math::vector3 forward = cameraSnapshot.forward;
-
-                // 월드 행렬의 translation row가 오브젝트 원점이다.
-                const auto viewDepth = [eye, forward](const EnhancedDrawItem& item)
-                {
-                    const math::vector3 delta = item.worldMatrix.translation() - eye;
-                    return math::dot(delta, forward);
-                };
-                // ★ 깊이가 같을 때를 메시 포인터로 가른다.
-                //
-                //   같은 원점을 쓰는 투명면(십자 빌보드, 같은 피벗의 유리
-                //   여러 장)은 깊이가 정확히 같다. 그때 비교자가 false만
-                //   돌려주면 순서가 미정이라, 프록시 스냅샷 순서가 바뀔
-                //   때마다 앞뒤가 뒤집혀 깜빡인다 — 정렬을 넣은 이유가
-                //   '순서를 고정한다'인데 그 자리에서 새는 셈이다.
-                std::stable_sort(forwardDraws.begin(), forwardDraws.end(),
-                    [&viewDepth](const EnhancedDrawItem& a, const EnhancedDrawItem& b)
-                    {
-                        const float depthA = viewDepth(a);
-                        const float depthB = viewDepth(b);
-                        if (depthA != depthB) return depthA > depthB;
-                        return a.mesh < b.mesh;
-                    });
-            }
-
             // 광원도 프리미티브와 같은 규약으로 밀봉한다 — 맵을 직접 훑지
             // 않고 스냅샷(shared_ptr 복사)을 받아 값만 옮겨 담는다.
             //
@@ -4567,6 +4487,8 @@ namespace
             RHIShaderCompiler::ScopedOutput environmentOutput(output);
             p.frameContext.shadowDraws = &shadowDraws;
             p.graphInput = graphViewInput;
+            p.frameContext.viewFlags = HasViewFlag(p.views[viewIndex].viewFlags,
+                EnhancedLiveViewFlags::SceneOverlay) ? LiveViewFlags::kSceneOverlay : LiveViewFlags::kScreenSpaceUI;
             {
                 RHIShaderCompiler::ScopedOutput outputScope(output);
                 if (!p.graphMaterials.SelectReadyInput(p.frameContext, p.graphInput, p.graphInput, outError))
@@ -4574,6 +4496,12 @@ namespace
                     return false;
                 }
             }
+            p.frameContext.graphSceneInput = p.graphInput;
+            p.frameContext.forwardLightingConsumer = p.graphInput && std::ranges::any_of(p.graphInput->Draws(), [](const auto& draw)
+            {
+                const auto& program = draw.material->generation->cooked.product.program;
+                return program.surface && (draw.queue == material_graph::SceneCoverage::Blended || (program.features & 0x0800u));
+            });
             if (!p.iblGenerated || skyBoxDirty)
             {
                 const auto prepareIbl = [&]() -> bool
@@ -4657,7 +4585,7 @@ namespace
                         std::string skyUploadError;
                         const RHITextureEntry skyEntry = p.frameContext.textureCache->GetOrUpload(
                             skyEquirect.get(), skyUploadError);
-                        if (!skyEntry.IsValid() || skyEntry.isCube)
+                        if (!skyEntry.IsValid() || skyEntry.isCube || !skyUploadError.empty())
                         {
                             outError = "equirect HDR 운반 실패";
                             if (!skyUploadError.empty())
@@ -4679,6 +4607,13 @@ namespace
                         Debug::PrintLog(spdlog::level::info, "[EnvironmentCache] generated; queued " + skyCookCachePath.string());
                     }
 
+                    const bool previouslyGenerated = p.iblGenerated;
+                    const bool previouslyDirty = skyBoxDirty;
+                    p.ibl.WatchPreparationRejected([this, &p, previouslyGenerated, previouslyDirty]
+                    {
+                        p.iblGenerated = previouslyGenerated;
+                        skyBoxDirty = previouslyDirty;
+                    });
                     p.iblGenerated = true;
                     skyBoxDirty = false;
                     std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
@@ -4837,33 +4772,12 @@ namespace
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(dx12.Profiler());
             graph.SetTransientPool(&p.transientPool);
+            graph.SetTransientAliasing(ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false),
+                ReadLivePostFlag("CREATOR_RENDERGRAPH_EXTEND_LIFETIMES", false));
+            if (!PrepareSceneRecording(p, graph, dx12.CommandPool(), RHIShaderBinary::Dxil,
+                    preparationDeferred, capture, outError))
             {
-                RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::Dxil);
-                if (!p.graphMaterials.PrepareResidency(p.frameContext, p.graphInput, outError)) return false;
-                // The later RecordParallel consumes this already-prepared
-                // boundary; it must not retire a palette allocated above it.
-                if (!graph.PrepareParallel(dx12.CommandPool(), outError))
-                {
-                    return false;
-                }
-                if (!p.animationPalettes.UploadForCurrentRecording(*p.frameContext.resources))
-                {
-                    outError = "Sealed animation palette upload failed after the upload-prefix boundary.";
-                    return false;
-                }
-                if (!p.decal.PrepareGpuVisibility(p.frameContext, outError)
-                    || !p.sprite.PrepareGpuVisibility(p.frameContext, outError))
-                {
-                    return false;
-                }
-                if (!p.graphMaterials.Prepare(p.frameContext, p.graphInput, p.ibl.GetCubeMap(),
-                        p.ibl.GetIrradianceMap(), p.ibl.GetPrefilteredMap(),
-                        p.shadow.GetShadowData(), material_graph::SceneHostBudget{.lookupApproximate = kLiveLookupApproximate, .lookupRuntimeEvaluation = true}, outError, p.ibl.GetGeneration(),p.ibl.GetImportanceMaps(),p.ibl.GetSourceMap()))
-                {
-                    preparationDeferred = p.graphMaterials.PreparationDeferred();
-                    return false;
-                }
-                if (capture) capture->RecordLatticeInput(p.graphInput);
+                return false;
             }
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
@@ -4972,7 +4886,6 @@ namespace
             // 먹어 총 대기를 58ms로 만들었다(실제 GPU는 3.7ms) — 그 벽을
             // 여기서 없앤다.
             slot.fenceValue = dx12.GetLastSignaledFenceValue();
-            p.ibl.MarkCookedCaptureSubmitted(slot.fenceValue);
             slot.frameId = sourceFrameId;
             slot.sourceCaptureNanoseconds = sourceCaptureNanoseconds;
             slot.sceneEpoch = p.frameContext.sceneEpoch;
@@ -5417,6 +5330,10 @@ namespace
                 // 프레임 번호 통지, pressure 은퇴, 펜스 완료 묘지 sweep은 backend가
                 // 자기 캐시 구현을 아는 한 경계에서 수행한다.
                 state.dx12.MaintainAssetCaches(state.frameCounter);
+                {
+                    std::lock_guard displayLock(state.displayLifetimeMutex);
+                    state.dx12.CollectRetiredDisplays();
+                }
 
                 for (LivePipeline::CameraView& view : p.views)
                 {
@@ -6750,6 +6667,10 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
             continue;
         }
 
+        if (!HasViewFlag(view.viewFlags, EnhancedLiveViewFlags::SceneOverlay))
+        {
+            continue;
+        }
         auto gizmos = std::make_shared<EnhancedGizmoSceneData>();
         CaptureEnhancedGizmoSceneData(view.camera, collectColliders,
             gizmoIconTextures, *gizmos);

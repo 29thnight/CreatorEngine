@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Core/PassResourceRetirement.h"
 #include "../../../RHI/RHIFormat.h"
 #include <array>
 #include <cstddef>
@@ -164,10 +165,6 @@ public:
 
     RGHandle GetOutput() const { return m_output; }
 
-    /// 컬링 통계. 타일 목록이 실제로 채워지는지 밖에서 본다 —
-    /// SSGI의 누적 카운터와 같은 역할이다. 늘 0이면 컬링이 죽은 것이다.
-    uint32_t GetLastCulledLightCount() const { return m_lastCulledLights; }
-    uint32_t GetLastOverflowTileCount() const { return m_lastOverflowTiles; }
     uint32_t GetLastDrawCount() const { return m_lastDrawCount; }
     uint32_t GetLastMaterialCount() const { return m_lastMaterialCount; }
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
@@ -187,13 +184,11 @@ public:
     /// ★ 핸들을 돌려준다(V2-a). 읽는 쪽은 디바이스에 물어 실제 리소스를 얻는다 —
     ///   패스가 백엔드 리소스를 들고 다니지 않는다는 것이 이 변경의 뜻이다.
     RHIBufferHandle GetTileCountBuffer() const { return m_tileCountBuffer; }
-    RHIBufferHandle GetTileListBuffer() const { return m_tileListBuffer; }
 
     /// Declare가 그래프에 들인 타일 버퍼의 핸들. 자가 검증의 리드백 패스가
     /// 자기 usage를 선언하는 데 쓴다 — 예전처럼 손 배리어로 before=UAV를
     /// 단정하면 셰이딩이 SRV로 바꾼 프레임에서 어긋난다(실제로 그렇게 잡혔다).
     RGHandle GetTileCountHandle() const { return m_tileCountHandle; }
-    RGHandle GetTileListHandle() const { return m_tileListHandle; }
 
     /// 셰이딩 파이프라인. 자가 검증이 컬링 경로와 참조 경로를 같은 기하로
     /// 그려 픽셀을 대조한다 — 둘이 다르면 컬링이 광원을 잘못 떨어뜨린 것이다.
@@ -250,8 +245,7 @@ public:
     }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
+    PassResourceRetirement m_resourceRetirement;
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError, bool nativeMaterials = true);
     bool BuildShadePipelineDesc(const EnhancedFrameContext& context,
         const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
@@ -295,8 +289,6 @@ private:
     material_graph::SceneHost* m_graphMaterials{};
     Inputs   m_inputs{};
     RGHandle m_output;
-    RGHandle m_tileList;     // 타일별 광원 인덱스 (고정 슬롯)
-    RGHandle m_tileCount;    // 타일별 광원 수
 
     uint32_t m_tileCountX{ 0 };
     uint32_t m_tileCountY{ 0 };
@@ -330,8 +322,6 @@ private:
     // 셰이딩 출력의 RTV 자리. RTV는 CBV/SRV/UAV 링에서 자를 수 없어
     // 별도 힙이 필요하다(GBuffer도 같은 이유로 자체 힙을 든다).
 
-    uint32_t m_lastCulledLights{ 0 };
-    uint32_t m_lastOverflowTiles{ 0 };
     uint32_t m_lastDrawCount{ 0 };
     uint32_t m_lastMaterialCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };

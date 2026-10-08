@@ -5,7 +5,6 @@
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
 
-#include <sstream>
 #include <cstddef>
 #include "../../../RHI/RHIShaderCompiler.h"
 
@@ -14,14 +13,6 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string SsaoHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     constexpr const char* kAOShaderFile = "SsaoAO.slang";
     constexpr const char* kFilterShaderFile = "SsaoFilter.slang";
 

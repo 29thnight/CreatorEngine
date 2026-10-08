@@ -252,7 +252,7 @@ public:
 	// 그 원본을 함께 돌려준다. legacy 표기 문서에는 원본이 없으므로
 	// outAuthored는 채워지지 않는다(반환값은 그대로 성공).
 	bool DeserializeMaterialPayload(Material& material,
-		const Authoring::NodeView& node, experiment::Material* outAuthored);
+        const Authoring::NodeView& node, experiment::Material* outAuthored, bool persistRecovery = true);
 	// I5-D5c1 — base 재질 자산의 저작 원본. 씬의 ref 표기가 base를 legacy로만
 	// 로드해 왔다(LoadMaterialShared). 실패·legacy 표기 자산은 nullptr다.
 	std::shared_ptr<const experiment::Material> LoadAuthoredMaterialShared(

@@ -1,4 +1,5 @@
 #include "VulkanDeviceResources.h"
+#include "../RHIRecordedBatch.h"
 #include "VulkanPipelineCache.h"
 
 #include <Windows.h>
@@ -70,6 +71,7 @@ void VulkanDeviceResources::AccumulateEncoderDiagnostics()
     const uint32_t count = m_encoder->GetUnimplementedCount();
     m_encoderUnimplementedTotal += count;
     if (0 != count) m_encoderLastUnimplemented = m_encoder->GetLastUnimplemented();
+    m_encoder->ClearUnimplemented();
 }
 
 VKAPI_ATTR VkBool32 VKAPI_CALL VulkanDeviceResources::DebugCallback(
@@ -813,6 +815,7 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
 
     m_frameOpen = true;
     m_acquireConsumed = false;
+    RHIRecordingAdmissionGuard beginGuard([this] { AbortFrame(); });
 
     // ★ 렌더 타깃 표는 프레임 수명이다 (5c-4c). 위에서 이 슬롯의 펜스를 이미
     //   기다렸으므로 표가 만든 부분 뷰를 여기서 놓아도 GPU 가 쓰는 중이 아니다
@@ -834,7 +837,6 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
     if (!m_descriptorRecycler.BeginRecording(
         m_device, m_currentRecordingId, outError))
     {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
         return false;
     }
     AccumulateEncoderDiagnostics();
@@ -871,6 +873,7 @@ bool VulkanDeviceResources::BeginFrame(std::string& outError)
         m_imageAcquired = true;
     }
 
+    beginGuard.Accept();
     return true;
 }
 
@@ -960,6 +963,10 @@ bool VulkanDeviceResources::EndFrame(std::string& outError)
         return false;
     }
     admission.Accept();
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+    }
     RetireCurrentCommandContext(fenceValue);
     m_frameSubmissionTickets[frameSlot] = ticket;
     m_frameFenceValues[frameSlot] = fenceValue;
@@ -1297,6 +1304,10 @@ bool VulkanDeviceResources::FlushCommandList(std::string& outError)
         return false;
     }
     admission.Accept();
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+    }
     RetireCurrentCommandContext(fenceValue);
     m_frameSubmissionTickets[frameSlot] = ticket;
     m_frameFenceValues[frameSlot] = fenceValue;
@@ -1361,6 +1372,13 @@ bool VulkanDeviceResources::PrepareParallelSubmission(
 
 void VulkanDeviceResources::AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
 {
+    if (const auto batch = ticket.GetRecordedBatch())
+    {
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadAccepted(batch->GetRecordingId(), completion);
+        }
+    }
     m_frameFenceValues[m_frameIndex] = completion.value;
     m_frameSubmissionTickets[m_frameIndex] = ticket;
     m_lastAdmittedFenceValue = completion.value;

@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include "RHI/RHIFormat.h"
 #include <cstdint>
 #include <unordered_map>
@@ -96,7 +97,8 @@ public:
     }
 
 private:
-    bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
+    bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError,
+                         assets::VertexAttributeMask mask = 0);
     void CollectDraws(const EnhancedFrameContext& context,
         const std::vector<EnhancedDrawItem>* draws);
 
@@ -156,4 +158,5 @@ private:
     uint32_t m_height{ 0 };
 
     RHIPipelineHandle m_pso;
+    std::map<assets::VertexAttributeMask, RHIPipelineHandle> m_modelPsos;
 };

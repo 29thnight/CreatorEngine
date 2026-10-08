@@ -85,6 +85,8 @@ public:
         RHITextureHandle& outTexture, DisplayToken& outToken,
         std::string& outError);
     void RetireDisplayTexture(DisplayToken token);
+    // Caller holds displayLifetimeMutex, as for retire/open/reuse.
+    void CollectRetiredDisplays();
     // 생산자 슬롯 선점과 함께 표시 수명 뮤텍스 아래에서 호출한다.
     // 생산 완료와 소비자 소유권 해제는 서로 별개의 조건이다.
     bool CanReuseDisplayTexture(DisplayToken token) const;

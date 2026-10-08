@@ -1,5 +1,5 @@
 #include "MaterialGraphMeshSurface.h"
-#include "MaterialGraphScenePacket.h"
+#include "support/MaterialGraphScenePacket.h"
 #include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -500,6 +500,11 @@ std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
                   sceneNext->Source()->View().eye == nextView.eye &&
                   !sceneNext->Matches(*sceneFirst),
               "Scene reuse retains immutable bytes while sealing current world and camera");
+        for (size_t chunk = 0; chunk < sceneFirst->Chunks().size(); ++chunk)
+        {
+            Check(sceneNext->Chunks()[chunk].sourceVertices.data() == sceneFirst->Chunks()[chunk].sourceVertices.data(),
+                  "Scene cache hits share immutable remap storage");
+        }
         std::shared_ptr<const MeshSurfacePlan> rasterPlan;
         Check(MeshSurfacePlan::BuildForScene(movedDraw, nextView, {}, rasterPlan, error) &&
                   rasterPlan->Matches(*sceneNext),
@@ -685,6 +690,66 @@ void VerifyPartitionGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& evalu
         Check(device.DrainDebugMessages(messages) == 0, "Partition GPU validation: " + messages);
         device.ReleaseReadback(readback);
     }
+}
+
+void VerifyCacheAdmissionGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& evaluator, SurfaceView view)
+{
+    auto geometry = GeometryFixture(assets::kCoreVertexAttributes, 0);
+    const auto baseline = evaluator.CacheStats();
+    std::shared_ptr<const MeshSurfaceBatch> retained;
+    std::string error;
+    for (unsigned entry = 0; entry < 260; ++entry)
+    {
+        geometry.draw.modelMeshView.handle.generation = 10000 + entry;
+        std::shared_ptr<const MeshSurfaceInput> input;
+        Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, input, error), "Cache admission seal");
+        Check(device.BeginFrame(error), "Cache admission begin");
+        EnhancedRenderGraph graph(device);
+        std::shared_ptr<const MeshSurfaceBatch> batch;
+        Check(evaluator.Prepare(device, input, batch, error, true), "Cache admission prepare " + error);
+        Check(batch->Indices().IsValid() && !batch->Indices().IsWritable(), "Cache admission stays resident");
+        Check(batch->Declare(graph, error), "Cache admission declaration");
+        const auto output = batch->GraphOutput(graph);
+        graph.AddPass("Test.CacheAdmission.Read", {{output, RHIResourceState::ShaderResource}}, [](const auto&) {}, true);
+        Check(graph.Compile(error) && graph.Execute(error), "Cache admission graph " + error);
+        Check(device.EndFrame(error), "Cache admission submit");
+        Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Cache admission drain");
+        device.WaitForGpu();
+        batch->MarkSubmitted({device.GetLastSignaledFenceValue()});
+        evaluator.NotifyCompleted(device.GetCompletedFenceValue());
+        if (entry == 0)
+        {
+            retained = batch;
+        }
+    }
+    Check(evaluator.CacheStats().uploads == baseline.uploads + 260, "Completed outputs cannot pin static cache admission");
+    Check(evaluator.CacheStats().entries <= 256, "Static cache remains bounded");
+    Check(retained->Indices().IsValid() && retained->Buffer().IsValid(), "Externally retained geometry survives eviction");
+    RHIReadback readback;
+    Check(device.CreateBufferReadback(retained->Count() * sizeof(SurfacePoint), readback, error), "Retained cache readback");
+    Check(device.BeginFrame(error), "Retained cache begin");
+    EnhancedRenderGraph graph(device);
+    const auto output = graph.ImportBuffer(retained->Buffer(), RHIResourceState::ShaderResource, "Test.RetainedCache");
+    graph.AddPass("Test.RetainedCache.Read", {{output, RHIResourceState::CopySource}}, [&](const auto& context)
+    {
+        context.encoder->CopyBufferToReadback(readback, retained->Buffer());
+    }, true);
+    Check(graph.Compile(error) && graph.Execute(error), "Retained cache graph " + error);
+    Check(device.EndFrame(error), "Retained cache submit");
+    Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Retained cache drain");
+    device.WaitForGpu();
+    RHIReadbackImage mapped;
+    Check(device.MapReadback(readback, mapped, error), "Retained cache map");
+    const auto actual = std::bit_cast<std::array<float, 20>>(mapped.Elements<SurfacePoint>()[0]);
+    const auto expected = std::bit_cast<std::array<float, 20>>(WorldReference(geometry, 0));
+    for (unsigned component = 0; component < actual.size(); ++component)
+    {
+        Near(actual[component], expected[component], "Retained cache remains readable after eviction");
+    }
+    device.ReleaseReadback(readback);
+    std::string messages;
+    Check(device.DrainDebugMessages(messages) == 0, "Cache admission GPU validation: " + messages);
+    std::cout << "ISSUE_CACHE_ADMISSION_OK completed=260 retained=1 validation=0\n";
 }
 
 void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& evaluator, SurfaceView view)
@@ -1148,6 +1213,7 @@ void Run(const std::filesystem::path& root)
               "Large raster mesh prepares one draw");
         VerifyPartitionGpu(device, meshEvaluator, *rasterPlan, true);
         VerifyResidentInputsGpu(device, meshEvaluator, view);
+        VerifyCacheAdmissionGpu(device, meshEvaluator, view);
         for (unsigned mask : assets::kModelVertexMasks)
         {
             for (unsigned pose = 0; pose < 3; ++pose)

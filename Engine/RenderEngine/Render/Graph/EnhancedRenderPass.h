@@ -23,6 +23,7 @@
 #include "../../LXMaterialRuntime.h"
 
 namespace LX::Runtime { struct GraphicsGeneration; }
+namespace material_graph { class SceneViewInput; }
 #include "PackedBoneMatrix.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
@@ -529,6 +530,9 @@ private:
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext
 {
+    uint32_t viewFlags{};
+    bool forwardLightingConsumer{true}; // Isolated cull/readback fixtures remain explicit consumers.
+    std::shared_ptr<const material_graph::SceneViewInput> graphSceneInput;
     IRenderDeviceServices*     resources{ nullptr };
     IRenderPipelineCache*      psoManager{ nullptr };
     IRenderRootSignatureCache* rootSignatures{ nullptr };

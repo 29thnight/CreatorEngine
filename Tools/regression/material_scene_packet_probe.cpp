@@ -1,4 +1,4 @@
-#include "MaterialGraphScenePacket.h"
+#include "support/MaterialGraphScenePacket.h"
 #include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"

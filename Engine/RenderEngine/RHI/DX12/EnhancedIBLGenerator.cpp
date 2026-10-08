@@ -7,6 +7,7 @@
 #include "../RHIShaderCompiler.h"
 #include "../../Texture.h"
 #include "../IRenderTextureCache.h"
+#include "../RHISubmissionThread.h"
 
 namespace
 {
@@ -85,7 +86,17 @@ bool EnhancedIBLGenerator::Initialize(const EnhancedFrameContext& context,
         return false;
     }
 
-    m_resources = context.resources;
+    if (m_resources && m_resources != context.resources)
+    {
+        outError = "IBL generator must be shut down before changing devices";
+        return false;
+    }
+    if (!m_resources)
+    {
+        m_resources = context.resources;
+        m_retirement.Attach(*m_resources);
+        m_resources->RegisterUploadTransactionListener(this);
+    }
 
     // Cooked startup never needs generation shaders/PSOs.
     return true;
@@ -237,7 +248,7 @@ bool EnhancedIBLGenerator::CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         !makeTarget(1,1,1,L"IBL.SceneImportanceMarginal",m_sceneImportanceMarginal,6*cubeSize,kImportanceFormat) ||
         !makeTarget(kSceneImportanceSampleCount,1,1,L"IBL.SceneImportanceSamples",m_sceneImportanceSamples,2,kImportanceFormat))
     {
-        ReleaseTargets();
+      ReleaseTargets();
         return false;
     }
 
@@ -262,6 +273,8 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
     }
 
     if (!m_rectToCubePso.IsValid() && !CreatePipelines(context, outError)) return false;
+    if (!BeginReplacement(outError)) return false;
+    RHIRecordingAdmissionGuard replacement([this] { RollbackReplacement(); });
     m_cubeSize = cubeSize;
     m_brdfSize = brdfSize;
     m_importanceSize = cubeSize;
@@ -525,6 +538,7 @@ bool EnhancedIBLGenerator::Generate(const EnhancedFrameContext& context,
         {outError="Scene importance generation failed";return false;}
 
     ++m_generation;
+    replacement.Accept();
     return true;
 }
 
@@ -542,10 +556,130 @@ void EnhancedIBLGenerator::ReleaseTargets()
             (handle == &m_cubeMapHandle || handle == &m_irradianceHandle ||
              handle == &m_prefilteredHandle || handle == &m_brdfLutHandle ||
              handle == &m_sceneImportanceRows || handle == &m_sceneImportanceMarginal || handle == &m_sceneImportanceSamples || handle == &m_sourceHandle);
-        if (m_resources && !cookedHandle) m_resources->ReleaseTexture(*handle);
+        if (m_resources && !cookedHandle) m_retirement.Retire(*handle);
         *handle = {};
     }
     m_cookedTextures = {};
+}
+
+std::array<RHITextureHandle*, 12> EnhancedIBLGenerator::Targets()
+{
+    return {&m_cubeMapHandle, &m_cubeSourceHandle, &m_irradianceHandle, &m_prefilteredHandle,
+        &m_brdfLutHandle, &m_importanceRows, &m_importanceMarginal, &m_importanceSamples,
+        &m_sceneImportanceRows, &m_sceneImportanceMarginal, &m_sceneImportanceSamples, &m_sourceHandle};
+}
+
+bool EnhancedIBLGenerator::BeginReplacement(std::string& error)
+{
+    if (!m_resources || !m_resources->GetCurrentUploadRecordingId())
+    {
+        error = "Environment replacement requires an open recording";
+        return false;
+    }
+    if (m_previousTargets)
+    {
+        error = "Environment replacement is still awaiting its recording decision";
+        return false;
+    }
+    TargetSnapshot snapshot;
+    const auto targets = Targets();
+    for (size_t i = 0; i < targets.size(); ++i)
+    {
+        snapshot.handles[i] = *targets[i];
+        *targets[i] = {};
+    }
+    snapshot.cooked = std::move(m_cookedTextures);
+    m_cookedTextures = {};
+    snapshot.generation = m_generation;
+    snapshot.recording = m_resources->GetCurrentUploadRecordingId();
+    snapshot.cube = m_cubeSize;
+    snapshot.brdf = m_brdfSize;
+    snapshot.importanceSize = m_importanceSize;
+    snapshot.importanceMip = m_importanceMip;
+    m_previousTargets = std::move(snapshot);
+    return true;
+}
+
+void EnhancedIBLGenerator::RetireSnapshot(const TargetSnapshot& snapshot)
+{
+    for (size_t i = 0; i < snapshot.handles.size(); ++i)
+    {
+        const bool cacheOwned = snapshot.cooked[0] && (i == 0 || i == 2 || i == 3 || i == 4 || i >= 8);
+        if (!cacheOwned)
+        {
+            m_retirement.Retire(snapshot.handles[i]);
+        }
+    }
+}
+
+void EnhancedIBLGenerator::RollbackReplacement()
+{
+    if (!m_previousTargets)
+    {
+        return;
+    }
+    ReleaseTargets();
+    const auto targets = Targets();
+    for (size_t i = 0; i < targets.size(); ++i)
+    {
+        *targets[i] = m_previousTargets->handles[i];
+    }
+    m_cookedTextures = std::move(m_previousTargets->cooked);
+    m_generation = m_previousTargets->generation;
+    m_cubeSize = m_previousTargets->cube;
+    m_brdfSize = m_previousTargets->brdf;
+    m_importanceSize = m_previousTargets->importanceSize;
+    m_importanceMip = m_previousTargets->importanceMip;
+    m_previousTargets.reset();
+}
+
+void EnhancedIBLGenerator::OnUploadAccepted(uint64_t recording, RHICompletionPoint completion)
+{
+    if (m_previousTargets && m_previousTargets->recording == recording)
+    {
+        m_previousTargets->completion = completion.value;
+        RetireSnapshot(*m_previousTargets);
+        m_retiredOwners.push_back(std::move(*m_previousTargets));
+        m_previousTargets.reset();
+        m_preparationRejected = {};
+    }
+    for (auto& capture : m_cookedCaptures)
+    {
+        if (capture.recording == recording && !capture.fence)
+        {
+            capture.fence = completion.value;
+        }
+    }
+}
+
+void EnhancedIBLGenerator::OnUploadCompleted(uint64_t completion)
+{
+    std::erase_if(m_retiredOwners, [&](const auto& snapshot) { return snapshot.completion <= completion; });
+}
+
+void EnhancedIBLGenerator::OnUploadAborted(uint64_t recording)
+{
+    std::erase_if(m_cookedCaptures, [&](auto& capture)
+    {
+        if (capture.recording != recording || capture.fence)
+        {
+            return false;
+        }
+        for (auto& slice : capture.slices)
+        {
+            m_resources->ReleaseReadback(slice.readback);
+        }
+        return true;
+    });
+    if (m_previousTargets && m_previousTargets->recording == recording)
+    {
+        RollbackReplacement();
+        if (m_preparationRejected)
+        {
+            auto rejected = std::move(m_preparationRejected);
+            rejected();
+        }
+    }
 }
 
 bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
@@ -554,6 +688,8 @@ bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
     ce::profile_scope profile{ ce::marker<"Environment.InstallCooked">() };
     if (!m_resources || m_resources != context.resources || !context.textureCache || m_generation == UINT64_MAX)
     { error = "Cooked environment context is invalid"; return false; }
+    if (!BeginReplacement(error)) return false;
+    RHIRecordingAdmissionGuard replacement([this] { RollbackReplacement(); });
     ReleaseTargets();
     m_cubeSize = value.cubeSize; m_brdfSize = value.brdfSize;
     if (!value.importance[0].IsValid() && !assets::BuildEnvironmentImportance(value,error)) return false;
@@ -572,7 +708,9 @@ bool EnhancedIBLGenerator::InstallCooked(const EnhancedFrameContext& context,
         m_cookedTextures[7]=Texture::CreateSharedFromImage("CookedEnvironmentSource",std::move(value.source));
         if (!m_cookedTextures[7]) {error="Cooked source image is invalid";return false;}
     }
-    return TouchCooked(context,error);
+    if (!TouchCooked(context,error)) return false;
+    replacement.Accept();
+    return true;
 }
 
 bool EnhancedIBLGenerator::TouchCooked(const EnhancedFrameContext& context, std::string& error)
@@ -635,14 +773,10 @@ bool EnhancedIBLGenerator::QueueCookedCapture(const std::filesystem::path& file,
         m_resources->TransitionResources({&toSample,1});
     }
     capture.path=file; capture.identity=identity; capture.fence=0;
+    capture.recording = m_resources->GetCurrentUploadRecordingId();
     capture.cube=m_cubeSize; capture.brdf=m_brdfSize;
     m_cookedCaptures.push_back(std::move(capture));
     error.clear(); return true;
-}
-
-void EnhancedIBLGenerator::MarkCookedCaptureSubmitted(uint64_t fence)
-{
-    for (auto& capture : m_cookedCaptures) if (!capture.fence) capture.fence=fence;
 }
 
 bool EnhancedIBLGenerator::FinishCookedCapture(uint64_t completedFence,std::string& error)
@@ -718,7 +852,13 @@ void EnhancedIBLGenerator::Shutdown()
     for (auto& capture:m_cookedCaptures)
         for (auto& slice:capture.slices) if (m_resources) m_resources->ReleaseReadback(slice.readback);
     m_cookedCaptures.clear();
+    RollbackReplacement();
     ReleaseTargets();
+    m_previousTargets.reset();
+    m_retiredOwners.clear();
+    m_preparationRejected = {};
+    if (m_resources) m_resources->UnregisterUploadTransactionListener(this);
+    m_retirement.ClearAfterIdle();
     m_resources = nullptr;
     m_sourceCopyPso = {};
     m_rectToCubePso = {};

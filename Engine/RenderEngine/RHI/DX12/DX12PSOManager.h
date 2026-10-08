@@ -1,7 +1,7 @@
 #pragma once
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIPipelineState.h"
-#include "RenderFrameServices.h"
+#include "../IRenderPipelineCache.h"
 #include "JobScheduler.h"
 #include <cstdint>
 #include <string>

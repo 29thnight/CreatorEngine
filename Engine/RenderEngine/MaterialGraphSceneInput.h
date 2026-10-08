@@ -2,7 +2,7 @@
 
 #include "FrameCameraSnapshot.h"
 #include "MaterialGraphMeshSurface.h"
-#include "MaterialGraphScenePacket.h"
+#include "MaterialGraphSceneCoverage.h"
 
 class Material;
 

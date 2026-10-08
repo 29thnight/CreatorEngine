@@ -838,6 +838,7 @@ namespace ConsoleCmd
                 item.Set("after", CommandData::Int(static_cast<int>(barrier.after)));
                 item.Set("uav", CommandData::Bool(barrier.uav));
                 item.Set("afterPass", CommandData::Bool(barrier.afterPass));
+                item.Set("aliasing", CommandData::Bool(barrier.aliasing));
                 barriers.Append(std::move(item));
             }
             row.Set("barriers", std::move(barriers));
@@ -857,6 +858,8 @@ namespace ConsoleCmd
             row.Set("lastUse", CommandData::Int(resource.lastUse));
             row.Set("initialState", CommandData::Int(static_cast<int>(resource.initialState)));
             row.Set("finalState", CommandData::Int(static_cast<int>(resource.finalState)));
+            row.Set("aliasGroup", CommandData::Int(resource.aliasGroup == UINT32_MAX ? int64_t(-1) : int64_t(resource.aliasGroup)));
+            row.Set("allocationBytes", CommandData::Int(resource.allocationBytes));
             resources.Append(std::move(row));
         }
         data.Set("resources", std::move(resources));
@@ -873,6 +876,7 @@ namespace ConsoleCmd
         }
         data.Set("edges", std::move(edges));
         data.Set("aliasQueueRangesSupported", CommandData::Bool(false));
+        data.Set("aliasMetadataSupported", CommandData::Bool(true));
         return Ok("Immutable compiled graph; sampled submitted frame", std::move(data));
     }
 

@@ -1,3 +1,4 @@
+#include "support/MaterialPipelineSlot.h"
 #include "MaterialGraphRenderBindings.h"
 #include "PathFinder.h"
 #include "Texture.h"
@@ -218,9 +219,8 @@ void Run(const std::filesystem::path& root)
         {
             Check(!RenderBindingCache::Bind(device, encoder, RHIBindPoint::Graphics, *packet, error),
                   "Reject stale-frame packet");
-            auto rebound = packet;
-            Check(!RenderBindingCache::RebindPass(device, *packet, layout, rebound, error) && rebound == packet,
-                  "Pass rebind rejects stale recordings and retains the accepted packet");
+            Check(!RenderBindingCache::ValidatePass(device, *packet, layout, error),
+                  "Pass binding rejects stale recordings");
         }
         const double roughness = frame % 2 ? .81 : .31;
         Check(BuildInstance(
@@ -232,17 +232,15 @@ void Run(const std::filesystem::path& root)
         Check(bindings.SamplerTableCount() == 1 && packet->resources.samplers.size() == 4,
               "Sampler table is shared across repeated frames and value edits");
         const auto accepted = packet;
-        std::shared_ptr<const RenderBindings> rebound;
-        Check(RenderBindingCache::RebindPass(device, *packet, layout, rebound, error) &&
-                  RenderBindingCache::Validate(device, *rebound, error) && rebound->instance == packet->instance &&
-                  rebound->resources.uniforms == packet->resources.uniforms &&
-                  rebound->recordingId == packet->recordingId && rebound->descriptorVersion == packet->descriptorVersion,
-              "Second pass shares current immutable material resources");
+        std::shared_ptr<const RenderBindings> repeated;
+        Check(bindings.Prepare(device, textures, instance, layout, repeated, error) && repeated == packet,
+              "Same immutable instance and complete layout reuse one packet in this recording");
+        Check(RenderBindingCache::ValidatePass(device, *packet, layout, error),
+              "Second pass validates the shared material resources without copying");
         auto wrongLayout = layout;
         wrongLayout.samplerSlot.reset();
-        const auto acceptedRebind = rebound;
-        Check(!RenderBindingCache::RebindPass(device, *packet, wrongLayout, rebound, error) && rebound == acceptedRebind,
-              "Pass rebind rejects a missing reflected slot without replacing accepted resources");
+        Check(!RenderBindingCache::ValidatePass(device, *packet, wrongLayout, error),
+              "Pass binding rejects a missing reflected slot");
         Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && packet == accepted,
               "Missing sampler root retains accepted render packet");
         wrongLayout = layout;

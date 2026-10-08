@@ -74,20 +74,6 @@ bool BuildSceneSurfaceEvaluation(std::shared_ptr<const SurfaceBatch> gpu, SceneS
     return true;
 }
 
-bool ClassifySceneCoverage(const EnhancedMaterialCoverage& coverage, SceneCoverage& result, std::string& error)
-{
-    error.clear();
-    if (!coverage.IsValid() || !(coverage.flags & EnhancedMaterialCoverage::Enabled) || coverage.baseAlpha < 0 ||
-        coverage.baseAlpha > 1)
-    {
-        return Fail(error, "Scene material needs a valid enabled coverage policy.");
-    }
-    result = coverage.flags & EnhancedMaterialCoverage::Blended  ? SceneCoverage::Blended
-             : coverage.flags & EnhancedMaterialCoverage::Masked ? SceneCoverage::Masked
-                                                                 : SceneCoverage::Opaque;
-    return true;
-}
-
 bool CreateScenePassLayout(IRenderRootSignatureCache& cache, const BindingLayout& material,
                            std::span<const RHIPipelineLayoutParam> hostParameters,
                            std::span<const RHIStaticSamplerDesc> hostSamplers, bool inputAssembler,

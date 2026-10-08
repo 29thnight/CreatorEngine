@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Core/PassResourceRetirement.h"
 
 class Texture;
 
@@ -147,7 +148,12 @@ public:
 
     /// 프레임 번호. 지터의 씨앗이다(DX11은 Time->GetFrameCount()).
     void SetFrameIndex(uint32_t frameIndex) { m_frameIndex = frameIndex; }
-    void ResetHistory() { m_historyValid = false; }
+    void ResetHistory()
+    {
+        m_historyValid = false;
+        m_useHistoryThisFrame = false;
+        m_readIndex = 0;
+    }
 
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
 
@@ -161,6 +167,7 @@ public:
     uint32_t GetLastLightCount() const { return m_lastLightCount; }
 
 private:
+    PassResourceRetirement m_resourceRetirement;
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool CreateVolumes(const EnhancedFrameContext& context, std::string& outError);
 
@@ -173,8 +180,8 @@ private:
 
     math::matrix4x4 m_shadowMatrix{};
     uint32_t      m_frameIndex{ 0 };
-    bool m_historyValid{ true };
-    bool m_useHistoryThisFrame{ true };
+    bool m_historyValid{ false };
+    bool m_useHistoryThisFrame{ false };
 
     // 프레임 밀봉 값(3-2).
     math::matrix4x4 m_inverseViewProjection{};

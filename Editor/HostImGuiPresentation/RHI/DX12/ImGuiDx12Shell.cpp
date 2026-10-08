@@ -2,6 +2,7 @@
 #include "ImGuiDx12Shell.h"
 
 #include "RHI/DX12/DX12DeviceResources.h"
+#include "RHI/DX12/DX12Format.h"
 #include "RHI/DX12/DX12TextureCache.h"
 #include "RHI/RHICompletionRetireQueue.h"
 #include "Texture.h"

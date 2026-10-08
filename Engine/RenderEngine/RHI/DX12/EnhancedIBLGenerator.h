@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Render/Core/PassResourceRetirement.h"
+#include <optional>
 #include "../RHIFormat.h"
 #include <cstdint>
 #include <array>
@@ -36,7 +38,7 @@
 //   큐브 메시 + 면별 직교 카메라(DX11 방식)는 두지 않는다 — 면 기저를
 //   상수로 넘겨 풀스크린 삼각형의 uv에서 방향을 만든다. 만들어지는
 //   방향 집합은 D3D 큐브 면 규약과 동일하므로 결과 텍셀은 같다.
-class EnhancedIBLGenerator
+class EnhancedIBLGenerator : private IRHIUploadTransactionListener
 {
 public:
     static constexpr RHIFormat kFormat = RHIFormat::RGBA16Float;
@@ -69,6 +71,16 @@ public:
         return mips;
     }
 
+    EnhancedIBLGenerator() = default;
+    EnhancedIBLGenerator(const EnhancedIBLGenerator&) = delete;
+    EnhancedIBLGenerator& operator=(const EnhancedIBLGenerator&) = delete;
+    ~EnhancedIBLGenerator()
+    {
+        if (m_resources)
+        {
+            m_resources->UnregisterUploadTransactionListener(this);
+        }
+    }
     bool Initialize(const EnhancedFrameContext& context, std::string& outError);
     void Shutdown();
 
@@ -87,7 +99,7 @@ public:
     // Record copies in the current upload frame; publish only after its fence.
     bool QueueCookedCapture(const std::filesystem::path& file, const assets::EnvironmentIdentity& identity,
         std::string& error);
-    void MarkCookedCaptureSubmitted(uint64_t fence);
+    void WatchPreparationRejected(std::function<void()> rejected) { m_preparationRejected = std::move(rejected); }
     bool FinishCookedCapture(uint64_t completedFence, std::string& error);
     bool HasPendingCookedCapture() const { return !m_cookedCaptures.empty() || m_cookedWrite.valid(); }
 
@@ -114,12 +126,33 @@ private:
         std::filesystem::path path;
         assets::EnvironmentIdentity identity;
         uint64_t fence{};
+        uint64_t recording{};
         uint32_t cube{}, brdf{}, sourceWidth{}, sourceHeight{}, sampleCount{};
     };
     // Selections may change while the preceding GPU copy/disk write is pending.
     std::vector<CookedCapture> m_cookedCaptures;
     std::future<std::string> m_cookedWrite;
     void ReleaseTargets();
+    struct TargetSnapshot
+    {
+        std::array<RHITextureHandle, 12> handles;
+        std::array<std::shared_ptr<class Texture>, 8> cooked;
+        uint64_t generation{}, recording{}, completion{};
+        uint32_t cube{}, brdf{}, importanceSize{}, importanceMip{};
+    };
+    std::array<RHITextureHandle*, 12> Targets();
+    bool BeginReplacement(std::string& error);
+    void RollbackReplacement();
+    void RetireSnapshot(const TargetSnapshot& snapshot);
+    void OnUploadSubmitted(uint64_t, RHICompletionPoint) override {}
+    void OnUploadCompleted(uint64_t completion) override;
+    void OnUploadAborted(uint64_t recording) override;
+    void OnUploadSubmissionRejected(uint64_t recording, RHICompletionPoint) override { OnUploadAborted(recording); }
+    void OnUploadAccepted(uint64_t recording, RHICompletionPoint completion) override;
+    PassResourceRetirement m_retirement;
+    std::optional<TargetSnapshot> m_previousTargets;
+    std::vector<TargetSnapshot> m_retiredOwners;
+    std::function<void()> m_preparationRejected;
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         std::string& outError);

@@ -3,21 +3,12 @@
 #include "RHI/RHIEncoder.h"
 
 #include <cstring>
-#include <sstream>
 #include <string>
 #include <vector>
 #include "RHI/RHIShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string GridHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── 그리드 셰이더 ──
     //
     // 로직은 DX11 Grid.vs/ps.hlsl의 이식이다. 옮기며 바꾼 것은 셋뿐이다:

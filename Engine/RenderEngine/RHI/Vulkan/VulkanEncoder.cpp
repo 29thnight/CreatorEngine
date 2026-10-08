@@ -793,8 +793,10 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
         return;
     EndRenderTargets();
 
-    std::vector<VkImageMemoryBarrier2> imageBarriers;
-    std::vector<VkBufferMemoryBarrier2> bufferBarriers;
+    auto& imageBarriers = m_imageBarrierScratch;
+    auto& bufferBarriers = m_bufferBarrierScratch;
+    imageBarriers.clear();
+    bufferBarriers.clear();
     imageBarriers.reserve(batch.textureTransitions.size() + batch.uavTextures.size());
     bufferBarriers.reserve(batch.bufferTransitions.size() + batch.uavBuffers.size());
 

@@ -17,6 +17,7 @@ struct PassLayout
     std::optional<std::uint32_t> uniformSlot;
     std::optional<std::uint32_t> textureSlot;
     std::optional<std::uint32_t> samplerSlot;
+    bool operator==(const PassLayout&) const = default;
 };
 
 // Host ranges are kept intact. Material ranges are appended only when used;
@@ -56,9 +57,10 @@ class RenderBindingCache
     static bool Validate(const IRenderDeviceServices& device, const RenderBindings& bindings, std::string& error);
     // A second pass in the same recording can consume the same material uploads
     // with another host root layout. No cross-frame descriptor reuse is allowed.
-    static bool RebindPass(const IRenderDeviceServices& device, const RenderBindings& source,
-                           const PassLayout& layout, std::shared_ptr<const RenderBindings>& result,
-                           std::string& error);
+    static bool ValidatePass(const IRenderDeviceServices& device, const RenderBindings& source,
+                             const PassLayout& layout, std::string& error);
+    static bool BindPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
+                         const RenderBindings& source, const PassLayout& layout, std::string& error);
 
     // Clear after device idle, before device recreation. Sampler registrations
     // are device-owned; the RHI has no per-table release operation.
@@ -68,5 +70,7 @@ class RenderBindingCache
   private:
     IRenderDeviceServices* device_{};
     std::map<std::vector<std::string>, RHISamplerTable> samplers_;
+    std::map<const Instance*, std::vector<std::weak_ptr<const RenderBindings>>> prepared_;
+    std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
 };
 } // namespace material_graph

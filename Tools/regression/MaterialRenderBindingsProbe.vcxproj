@@ -87,6 +87,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="material_render_bindings_probe.cpp" />
+    <ClCompile Include="support\MaterialPipelineSlot.cpp" />
 
   </ItemGroup>
   <ItemGroup>

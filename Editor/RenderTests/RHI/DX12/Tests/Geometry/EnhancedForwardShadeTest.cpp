@@ -1,3 +1,4 @@
+#include "RHI/DX12/DX12Format.h"
 #include "Render/Passes/Geometry/EnhancedForwardPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12MeshCache.h"

@@ -127,6 +127,25 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
     if (recording == 0)
         return Fail(error, "Material render binding requires an active frame recording.");
 
+    const auto descriptorVersion = device.GetDescriptorVersionToken();
+    if (preparedRecording_ != recording || preparedDescriptorVersion_ != descriptorVersion)
+    {
+        prepared_.clear();
+        preparedRecording_ = recording;
+        preparedDescriptorVersion_ = descriptorVersion;
+    }
+    if (const auto found = prepared_.find(instance.get()); found != prepared_.end())
+    {
+        for (const auto& cached : found->second)
+        {
+            if (auto packet = cached.lock(); packet && packet->layout == layout && Validate(device, *packet, error))
+            {
+                result = std::move(packet);
+                return true;
+            }
+        }
+    }
+
     auto candidate = std::make_shared<RenderBindings>();
     candidate->instance = std::move(instance);
     candidate->layout = layout;
@@ -184,21 +203,44 @@ bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCa
     }
     device_ = &device;
     candidate->descriptorVersion = device.GetDescriptorVersionToken();
+    prepared_[candidate->instance.get()].push_back(candidate);
     result = std::move(candidate);
     return true;
 }
 
-bool RenderBindingCache::RebindPass(const IRenderDeviceServices& device, const RenderBindings& source,
-                                   const PassLayout& layout, std::shared_ptr<const RenderBindings>& result,
-                                   std::string& error)
+bool RenderBindingCache::ValidatePass(const IRenderDeviceServices& device, const RenderBindings& source,
+                                      const PassLayout& layout, std::string& error)
 {
-    if (!Validate(device, source, error)) return false;
+    if (!Validate(device, source, error))
+    {
+        return false;
+    }
     if (!layout.handle.IsValid() || !MatchingSlots(layout) || layout.material != source.layout.material)
+    {
         return Fail(error, "Material pass rebind requires the same reflected resources and a valid host layout.");
-    auto candidate = std::make_shared<RenderBindings>(source);
-    candidate->layout = layout;
-    result = std::move(candidate);
-    error.clear();
+    }
+    return true;
+}
+
+bool RenderBindingCache::BindPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
+                                  const RenderBindings& source, const PassLayout& layout, std::string& error)
+{
+    if (!ValidatePass(device, source, layout, error))
+    {
+        return false;
+    }
+    if (layout.uniformSlot)
+    {
+        encoder.SetConstantBuffer(point, *layout.uniformSlot, source.uniforms);
+    }
+    if (layout.textureSlot)
+    {
+        encoder.SetBindings(point, *layout.textureSlot, source.textures);
+    }
+    if (layout.samplerSlot)
+    {
+        encoder.SetSamplers(point, *layout.samplerSlot, source.samplers);
+    }
     return true;
 }
 
@@ -238,6 +280,8 @@ bool RenderBindingCache::Bind(IRenderDeviceServices& device, RHIEncoder& encoder
 void RenderBindingCache::Clear()
 {
     samplers_.clear();
+    prepared_.clear();
+    preparedRecording_ = preparedDescriptorVersion_ = 0;
     device_ = nullptr;
 }
 } // namespace material_graph

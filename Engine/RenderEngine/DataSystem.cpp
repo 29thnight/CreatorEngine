@@ -343,8 +343,7 @@ std::shared_ptr<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAsse
             else
             {
                 auto current = m_modelAssetGenerations.ResolveCurrent(asset->guid.m_guid);
-                if (current && (!PathFinder::IsAssetAuthoringEnabled() ||
-                    assets::ModelMaterialGraphsPresent(PathFinder::Relative(), *current)))
+                if (current)
                 {
                     asset->model = std::move(current);
                 }
@@ -656,6 +655,12 @@ std::shared_ptr<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAsset
         const auto document = Authoring::ParsedDocument::ParseFile(resolved.string(), error);
         if (!document)
         {
+            if (PathFinder::IsAssetAuthoringEnabled() && Lowercase(path.extension().string()) == ".shadergraph")
+            {
+                Debug::PrintLog(spdlog::level::warn, "Graph dependency discovery failed; material construction will recover: "
+                    + path.string() + " " + error);
+                continue;
+            }
             throw std::runtime_error("Asset dependency document could not be read: " + path.string() + " " + error);
         }
         walk(document.Root(), 0);
@@ -812,7 +817,7 @@ bool DataSystem::PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& p
                 else
                 {
                     Material material;
-                    if (!DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(node)) ||
+                    if (!DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(node), nullptr, false) ||
                         !ValidatePreparedMaterialTextures(material, error))
                     {
                         throw std::runtime_error("Required inline material could not be prepared: " + error);
@@ -1192,11 +1197,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(FileGu
         return {};
     if (auto current = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
     {
-        if (!PathFinder::IsAssetAuthoringEnabled() || GetFilePath(guid).empty() ||
-            assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *current))
-        {
-            return current;
-        }
+        return current;
     }
     return LoadAndPublishModelAssetGeneration(guid, true);
 }
@@ -1265,8 +1266,6 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
     if (PathFinder::IsAssetAuthoringEnabled() && !GetFilePath(guid).empty() &&
         !assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *loaded.generation))
     {
-        if (allowEditorRecovery && AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
-            return LoadAndPublishModelAssetGeneration(guid, false, publish);
         Debug::PrintLog(spdlog::level::err,
                         "Model material graphs are missing; retain geometry and create editable default graphs.");
     }
@@ -2387,7 +2386,7 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
 }
 
 bool DataSystem::DeserializeMaterialPayload(Material& material,
-	const Authoring::NodeView& view, experiment::Material* outAuthored)
+	const Authoring::NodeView& view, experiment::Material* outAuthored, bool persistRecovery)
 {
 	const Authoring::ReadNode readNode = Authoring::NodeViewAccess::Node(view);
 	if (!readNode || !readNode.IsMap()) return false;
@@ -2403,6 +2402,11 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
         }
         if (!ConfigureMaterialGraph(material, document.description, error))
         {
+            if (!persistRecovery && PathFinder::IsAssetAuthoringEnabled())
+            {
+                Debug::PrintLog(spdlog::level::warn, "Inline material prewarm deferred recovery to its owner: " + error);
+                return true;
+            }
             const std::string cause = error;
             if (!ConfigureEditableDefaultMaterialGraph(material, cause, error))
             {
