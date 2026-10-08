@@ -387,6 +387,8 @@ struct EnhancedPbrCapture
             entry["versionCount"] << resource.versionCount;
             entry["initialState"] << static_cast<uint32_t>(resource.initialState);
             entry["finalState"] << static_cast<uint32_t>(resource.finalState);
+            entry["aliasGroup"] << resource.aliasGroup;
+            entry["allocationBytes"] << resource.allocationBytes;
         }
         node["passes"] |= ryml::SEQ;
         for (const auto& pass : snapshot.passes)
@@ -457,6 +459,7 @@ struct EnhancedPbrCapture
                 item["after"] << static_cast<uint32_t>(barrier.after);
                 item["uav"] << barrier.uav;
                 item["afterPass"] << barrier.afterPass;
+                item["aliasing"] << barrier.aliasing;
             }
         }
         root["measurement"] |= ryml::MAP;
@@ -633,6 +636,10 @@ struct EnhancedPbrCapture
             graphNode["culled"] << stats.passesCulled;
             graphNode["executed"] << stats.passesExecuted;
             graphNode["barriers"] << stats.barriersEmitted;
+            graphNode["transientAllocationQueries"] << stats.transientAllocationQueries;
+            graphNode["aliasHeapCreates"] << stats.aliasHeapCreates;
+            graphNode["aliasHeapReuses"] << stats.aliasHeapReuses;
+            graphNode["aliasResourceReuses"] << stats.aliasResourceReuses;
             rootNode["finite"] << (finite ? "true" : "false");
             std::ofstream output(root / "manifest.json", std::ios::trunc);
             output << ryml::emitrs_json<std::string>(manifest) << '\n';

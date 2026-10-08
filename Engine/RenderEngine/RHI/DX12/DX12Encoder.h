@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 #include <wrl/client.h>
 #include <d3d12.h>   // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
 #include "../RHIEncoder.h"
@@ -60,6 +61,7 @@ public:
     void SetIndexBuffer(const D3D12_INDEX_BUFFER_VIEW& view);
 
 private:
+    std::vector<D3D12_RESOURCE_BARRIER> m_barrierScratch;
     /// 슬라이스를 GPU 주소로 푼다. 링은 리소스가 하나라 표 조회가 배열
     /// 인덱싱 한 번이다 — Allocate 의 175ns 에 비하면 묻힌다(encoderbench 로 잰다).
     D3D12_GPU_VIRTUAL_ADDRESS ResolveSlice(const RHIBufferSlice& slice) const;

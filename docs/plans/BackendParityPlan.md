@@ -35,6 +35,8 @@ BP-0/1에서 같은 입력의 cold pipeline 준비 위치와 worker/PSO 단계�
 
 ## 3. 이관 목록
 
+2026-10-08 신설 [PHASE 4.85](PathTracingHybridPipelinePlan.md)의 RT/PT/Hybrid·ReSTIR PT Enhanced·tetrahedral cages는 지원 가능한 구현이 DX12 기준선·fixture·raw radiance/history/AS 신원을 확보한 뒤 비교 대상으로 인계한다. 본 문서의 기존 22인일에 신규 RT 연구/기능 구현이나 미확인 교차 비교 비용을 포함한 것으로 해석하지 않는다. 지원 행렬·캡처 도구 제약·추가 비교 범위를 BP-0에서 확인하고 필요 공수를 별도 산정한다. 4.9 완료는 4.85 DX12 착수/수용의 선행이 아니다.
+
 | 인계하는 페이즈 | 4.9에서 비교할 대상 | 원 페이즈 완료 조건 |
 |---|---|---|
 | 4 / 4.25 | PBR, Standard/LX, GBuffer/Deferred/Forward, material routes, SSS·투과·volume, `vk.shadow/gbuffer/forward/deferred` | DX12 배선·Blender/reference 의미·품질·성능. Blender 비교를 Vulkan 비교와 혼동하지 않음 |
@@ -44,6 +46,7 @@ BP-0/1에서 같은 입력의 cold pipeline 준비 위치와 worker/PSO 단계�
 | 4.7 | bake 입력·UV1/geometry·직접/간접광 출력·큐 | DX12 베이크 정확도·취소/재개·Editor 비차단 |
 | 4.75 / ENV | probe/AO·shadow·post/display·환경의 background/IBL 의미·package | DX12 기능별 golden·성능 |
 | 4.8 후속 구현 | GPU Scene·indirect·meshlet·RT capability/fallback과 실제 출력 | 설계는 중립 계약과 구현 공수; 실제 기능은 별도 DX12 구현 게이트 |
+| 4.85 | RT scene/AS·hit material·Hybrid/PT radiance·denoise/reservoir·cage geometry·지원/fallback | 두 파이프라인 DX12 수용과 연구별 판정; Vulkan 실행 비교는 본 페이즈에만 인계 |
 | Editor/기타 렌더 소비 페이즈 | viewport/UI·DPI/resize·present의 Vulkan 화면/리소스 차이 | 각 페이즈의 DX12 제품 게이트 |
 
 기존 자동 비교기와 `vk.*` 검사는 보조 자료로 재사용한다. 원 페이즈의 기본 실행을 `dx12,vulkan`으로 되돌리지 않는다. `.f32` 자동 비교만으로 이 계획의 RenderDoc 리소스 확인을 통과시킬 수 없다.

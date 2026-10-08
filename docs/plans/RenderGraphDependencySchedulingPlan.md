@@ -328,6 +328,20 @@ RG7 이후는 최적화 트랙이다. RG6을 통과하면 리소스 의존성으
 
 ### RG7 — aliasing은 정확성 완료 뒤 연다
 
+2026-10-08 구현 착수: graph-owned buffer·DX12 placed heap 공유·활성화/전체 RT·DS 초기화·
+강제 수명 연장·기본 committed fallback과 Editor 검사를 추가했다. VS 2026 Debug/Release 빌드와
+Editor 기존 전체 회귀·GPU 5모드·배치/초기 상태/재컴파일 거부 검사를 통과했다. 검사 그래프의
+할당량은 384→128 KiB이며 실제 제품 성능·VRAM 수용과 구분한다. 기성은 0, 아직 완료가 아니다.
+수정 소스의 Release 64×64 LX 실제 Editor OFF/ON은 모드별 2프로세스·16출력 오차 0을 통과했다.
+그래프 할당은 384 KiB(0.76%) 줄었지만 CPU 기록 중앙값은 2.041→2.252ms로 증가해 기본 OFF를 유지한다.
+실제품 해상도·다중 view·poison/실패·peak VRAM 수용과 힙/자원 준비 비용 개선은 다음 RG7 작업이다.
+완료된 공유 힙/자원 묶음과 네이티브 할당 정보의 제한된 캐시를 추가했고, VS 2026 D/R 빌드·
+Editor 전체 회귀와 9모드 GPU 검사를 통과했다. 재사용 구간의 새 힙 생성·할당 조회는 0이며
+해제·재생성·최종 drain을 확인했다. 캐시 변경 후 Release 64×64 LX OFF/ON 4프로세스·16출력 오차 0,
+warm ON 4힙/10자원 재사용·네이티브 생성/조회 0을 확인했다. 이번 CPU 기록 중앙값은
+2.5795→2.163ms이며 실제품 성능 보장은 아니다. 기본 OFF와 기성 0을 유지한다.
+[구현 및 잔여 수용](../analysis/RenderRg7Implementation20261008.md).
+
 - 먼저 transient buffer를 texture와 같은 lifetime 모델에 넣는다.
 - 서로 겹치지 않는 compiled lifetime만 같은 heap 영역을 공유한다.
 - alias barrier, alignment, format/usage compatibility, imported/history 제외 규칙을 명시한다.

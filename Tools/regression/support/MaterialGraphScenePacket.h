@@ -1,9 +1,10 @@
 #pragma once
 
-#include "MaterialGraphIblBake.h"
-#include "MaterialGraphSurfaceBatch.h"
-#include "MaterialGraphRenderBindings.h"
-#include "Render/Graph/EnhancedRenderPass.h"
+#include "../../../Engine/RenderEngine/MaterialGraphSceneCoverage.h"
+#include "../../../Engine/RenderEngine/MaterialGraphIblBake.h"
+#include "../../../Engine/RenderEngine/MaterialGraphSurfaceBatch.h"
+#include "../../../Engine/RenderEngine/MaterialGraphRenderBindings.h"
+#include "../../../Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h"
 
 namespace material_graph
 {
@@ -22,17 +23,6 @@ namespace material_graph
 
     bool BuildSceneSurfaceEvaluation(std::shared_ptr<const SurfaceBatch> gpu, SceneSurfaceEvaluation& result,
                                      std::string& error);
-
-    enum class SceneCoverage : std::uint8_t
-    {
-        Opaque,
-        Masked,
-        Blended
-    };
-
-    // Route answers how the material is shaded; coverage answers where it sorts
-    // and whether depth is written. An opaque Core material still uses Forward.
-    bool ClassifySceneCoverage(const EnhancedMaterialCoverage& coverage, SceneCoverage& result, std::string& error);
 
     struct ScenePassLayout
     {
@@ -64,6 +54,7 @@ namespace material_graph
         SceneCoverage queue{};
         EnhancedMaterialCoverage coverage;
         own::shared_owner<InstanceFramePins> instancePins;
+        std::size_t instancePinIndex{ InstanceFramePins::InvalidIndex };
         SceneSurfaceSnapshot evaluation;
         IblEnvironment environment;
         std::shared_ptr<const RenderBindings> bindings;
@@ -119,11 +110,12 @@ namespace material_graph
             std::shared_ptr<const SceneMaterialPacket> accepted;
             std::shared_ptr<const SceneMaterialPacket> submitted;
             std::uint64_t completion{};
-            bool submissionNotified{};
+            bool submissionNotified{}, submissionAccepted{};
             bool publicationDecided{};
         };
 
         void OnUploadSubmitted(std::uint64_t recordingId, RHICompletionPoint completion) override;
+        void OnUploadAccepted(std::uint64_t recordingId, RHICompletionPoint completion) override;
         void OnUploadCompleted(std::uint64_t completed) override;
         void OnUploadAborted(std::uint64_t recordingId) override;
         void OnUploadSubmissionRejected(std::uint64_t recordingId, RHICompletionPoint reservedCompletion) override;

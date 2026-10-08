@@ -27,7 +27,9 @@ namespace material_graph
             for (const auto& resource : resources)
             {
                 if (resource.slot >= limit || !slots.insert(resource.slot).second)
+                {
                     return false;
+                }
                 count = (std::max)(count, resource.slot + 1);
             }
             return true;
@@ -41,7 +43,9 @@ namespace material_graph
                                              std::pair{layout.samplerSlot, !layout.material.samplers.empty()}})
             {
                 if (slot.has_value() != used || (used && *slot != next++))
+                {
                     return false;
+                }
             }
             return next <= 64;
         }
@@ -56,7 +60,9 @@ namespace material_graph
         std::uint32_t textures{}, samplers{};
         if (hostParameters.size() > 64 || material.uniformBytes > 65536 ||
             !ResourceCount(material.textures, 64, textures) || !ResourceCount(material.samplers, 64, samplers))
+        {
             return Fail(error, "Invalid material uniform size or texture/sampler slots.");
+        }
         const auto constantConflict = [&](const RHIPipelineLayoutParam& parameter) {
             return material.uniformBytes && parameter.shaderRegister == UniformRegister &&
                    (parameter.kind == RHILayoutParamKind::ConstantBuffer ||
@@ -65,22 +71,34 @@ namespace material_graph
         for (const auto& parameter : hostParameters)
         {
             if (constantConflict(parameter))
+            {
                 return Fail(error, "Host constant binding overlaps LX material b2.");
+            }
             if (parameter.kind == RHILayoutParamKind::ShaderResourceBuffer &&
                 Overlaps(TextureRegister, textures, parameter.shaderRegister, 1))
+            {
                 return Fail(error, "Host SRV buffer overlaps LX material textures.");
+            }
             if (parameter.kind != RHILayoutParamKind::DescriptorTable)
+            {
                 continue;
+            }
             const auto& table = parameter.table;
             if ((table.type == RHIDescriptorType::ShaderResource && textures &&
                  Overlaps(TextureRegister, textures, table.baseRegister, table.count)) ||
                 (table.type == RHIDescriptorType::Sampler && samplers &&
                  Overlaps(SamplerRegister, samplers, table.baseRegister, table.count)))
+            {
                 return Fail(error, "Host descriptor table overlaps LX material resources.");
+            }
         }
         for (const auto& sampler : hostSamplers)
+        {
             if (samplers && Overlaps(SamplerRegister, samplers, sampler.shaderRegister, 1))
+            {
                 return Fail(error, "Host static sampler overlaps LX material samplers.");
+            }
+        }
 
         PassLayout candidate;
         candidate.material = material;
@@ -107,7 +125,9 @@ namespace material_graph
         description.allowInputAssembler = inputAssembler;
         candidate.handle = cache.GetOrCreate(description, error);
         if (!candidate.handle.IsValid())
+        {
             return Fail(error, error.empty() ? "Material pass layout creation failed." : error);
+        }
         result = std::move(candidate);
         return true;
     }
@@ -121,12 +141,42 @@ namespace material_graph
         error.clear();
         if ((device_ && device_ != &device) || !layout.handle.IsValid() || !instance || !instance->generation ||
             layout.material != instance->generation->cooked.product.layout)
+        {
             return Fail(error, "Material render binding requires the matching device, instance and pass layout.");
+        }
         if (!MatchingSlots(layout))
+        {
             return Fail(error, "Material pass layout omits or adds a reflected binding slot.");
+        }
         const auto recording = device.GetCurrentUploadRecordingId();
         if (recording == 0)
+        {
             return Fail(error, "Material render binding requires an active frame recording.");
+        }
+
+        const auto descriptorVersion = device.GetDescriptorVersionToken();
+        if (preparedRecording_ != recording || preparedDescriptorVersion_ != descriptorVersion)
+        {
+            prepared_.clear();
+            preparedRecording_ = recording;
+            preparedDescriptorVersion_ = descriptorVersion;
+        }
+        const auto identity = InstanceFramePins::Identity(*instance);
+        // Both objects remain pinned during the address check. Keep forged or
+        // copied representation IDs from bypassing resource validation.
+        if (const auto found = prepared_.find(identity); found != prepared_.end())
+        {
+            for (const auto& cached : found->second)
+            {
+                if (auto packet = cached.lock(); packet && packet->layout == layout &&
+                    std::addressof(*packet->instance) == std::addressof(*instance) && Validate(device, *packet, error))
+                {
+                    result = std::move(packet);
+                    return true;
+                }
+            }
+        }
+        error.clear();
 
         auto candidate = std::make_shared<RenderBindings>();
         if (!instancePins)
@@ -137,7 +187,7 @@ namespace material_graph
         }
         candidate->instancePinIndex = instancePins->Find(*instance);
         candidate->instance = instancePins->Borrow(candidate->instancePinIndex);
-        if (!candidate->instance)
+        if (!candidate->instance || std::addressof(*candidate->instance) != std::addressof(*instance))
         {
             return Fail(error, "Material bindings require the exact instance in the frame pin table.");
         }
@@ -149,12 +199,16 @@ namespace material_graph
         for (const auto& texture : candidate->instance->textures)
         {
             if (!texture.owner)
+            {
                 return Fail(error, "Material render texture has no CPU generation owner.");
+            }
             const auto failures = textures.GetUploadFailureCount();
             const auto entry = textures.GetOrUpload((texture.owner ? &*texture.owner.borrow() : nullptr), error);
             if (!entry.IsValid() || !error.empty() || textures.GetUploadFailureCount() != failures)
+            {
                 return Fail(error,
                             error.empty() ? "LX material texture upload failed; neutral substitution rejected." : error);
+            }
             uploaded.push_back({texture.slot, entry, texture.owner});
         }
         std::vector<LX::LXMaterialDiagnostic> diagnostics;
@@ -163,8 +217,10 @@ namespace material_graph
             : PrepareResources(layout.material, candidate->instance->description.parameters, uploaded, candidate->resources, diagnostics);
         if (!prepared ||
             candidate->resources.uniforms != candidate->instance->uniforms)
+        {
             return Fail(error, diagnostics.empty() ? "Material instance differs from its reflected uniform layout."
                                                    : diagnostics.front().message);
+        }
 
         // The exact immutable instance already owns every texture dependency.
         // A binding packet borrows that closure through its frame table rather
@@ -174,14 +230,20 @@ namespace material_graph
         {
             std::vector<std::string> key(candidate->resources.samplers.size(), "nearest-clamp");
             for (const auto& resource : layout.material.samplers)
+            {
                 key[resource.slot] = resource.reference;
+            }
             if (const auto found = samplers_.find(key); found != samplers_.end())
+            {
                 candidate->samplers = found->second;
+            }
             else
             {
                 candidate->samplers = device.CreateSamplers(candidate->resources.samplers);
                 if (!candidate->samplers.IsValid())
+                {
                     return Fail(error, "LX material sampler table allocation failed.");
+                }
                 samplers_.emplace(std::move(key), candidate->samplers);
                 device_ = &device;
             }
@@ -190,32 +252,59 @@ namespace material_graph
         {
             candidate->textures = device.CreateBindings(candidate->resources.textures);
             if (!candidate->textures.IsValid())
+            {
                 return Fail(error, "LX material texture descriptor allocation failed.");
+            }
         }
         if (layout.uniformSlot)
         {
             candidate->uniforms =
                 device.UploadConstants(candidate->resources.uniforms.data(), candidate->resources.uniforms.size());
             if (!candidate->uniforms.IsValid())
+            {
                 return Fail(error, "LX material uniform upload allocation failed.");
+            }
         }
         device_ = &device;
         candidate->descriptorVersion = device.GetDescriptorVersionToken();
+        prepared_[identity].push_back(candidate);
         result = std::move(candidate);
         return true;
     }
 
-    bool RenderBindingCache::RebindPass(const IRenderDeviceServices& device, const RenderBindings& source,
-                                       const PassLayout& layout, std::shared_ptr<const RenderBindings>& result,
-                                       std::string& error)
+    bool RenderBindingCache::ValidatePass(const IRenderDeviceServices& device, const RenderBindings& source,
+                                          const PassLayout& layout, std::string& error)
     {
-        if (!Validate(device, source, error)) return false;
+        if (!Validate(device, source, error))
+        {
+            return false;
+        }
         if (!layout.handle.IsValid() || !MatchingSlots(layout) || layout.material != source.layout.material)
+        {
             return Fail(error, "Material pass rebind requires the same reflected resources and a valid host layout.");
-        auto candidate = std::make_shared<RenderBindings>(source);
-        candidate->layout = layout;
-        result = std::move(candidate);
-        error.clear();
+        }
+        return true;
+    }
+
+    bool RenderBindingCache::BindPass(IRenderDeviceServices& device, RHIEncoder& encoder, RHIBindPoint point,
+                                      const RenderBindings& source, const PassLayout& layout, std::string& error)
+    {
+        if (!ValidatePass(device, source, layout, error))
+        {
+            return false;
+        }
+        if (layout.uniformSlot)
+        {
+            encoder.SetConstantBuffer(point, *layout.uniformSlot, source.uniforms);
+        }
+        if (layout.textureSlot)
+        {
+            encoder.SetBindings(point, *layout.textureSlot, source.textures);
+        }
+        if (layout.samplerSlot)
+        {
+            encoder.SetSamplers(point, *layout.samplerSlot, source.samplers);
+        }
         return true;
     }
 
@@ -227,11 +316,15 @@ namespace material_graph
             !MatchingSlots(bindings.layout) || bindings.recordingId == 0 ||
             bindings.recordingId != device.GetCurrentUploadRecordingId() ||
             bindings.descriptorVersion != device.GetDescriptorVersionToken())
+        {
             return Fail(error, "Material render bindings belong to a different frame recording.");
+        }
         const auto& layout = bindings.layout;
         if ((layout.uniformSlot && !bindings.uniforms.IsValid()) || (layout.textureSlot && !bindings.textures.IsValid()) ||
             (layout.samplerSlot && !bindings.samplers.IsValid()))
+        {
             return Fail(error, "Material render bindings contain an invalid upload or descriptor table.");
+        }
         return true;
     }
 
@@ -244,17 +337,25 @@ namespace material_graph
         }
         const auto& layout = bindings.layout;
         if (layout.uniformSlot)
+        {
             encoder.SetConstantBuffer(point, *layout.uniformSlot, bindings.uniforms);
+        }
         if (layout.textureSlot)
+        {
             encoder.SetBindings(point, *layout.textureSlot, bindings.textures);
+        }
         if (layout.samplerSlot)
+        {
             encoder.SetSamplers(point, *layout.samplerSlot, bindings.samplers);
+        }
         return true;
     }
 
     void RenderBindingCache::Clear()
     {
         samplers_.clear();
+        prepared_.clear();
+        preparedRecording_ = preparedDescriptorVersion_ = 0;
         device_ = nullptr;
     }
 } // namespace material_graph

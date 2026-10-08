@@ -1,4 +1,5 @@
 #include "DataSystem.h"
+#include <cassert>
 #include "AssetDepot/LegacyResourceCharges.h"
 
 #include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1 (MBC9: ExperimentModelMigration.cpp에서 이주)
@@ -291,6 +292,7 @@ struct DataSystem::PreparedRuntimeAsset
     file::path projectRoot;
     RuntimeAssetType type{};
     std::uint64_t epoch{};
+    std::uint64_t resolverRevision{};
     std::atomic<bool> cancelled{};
     job_handle work;
     assets::ModelAssetGeneration::Shared model;
@@ -365,17 +367,26 @@ job_handle DataSystem::SubmitAssetWorkLocked(job_group work,
 }
 
 own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAsset(
-    FileGuid guid, const file::path& path, RuntimeAssetType type)
+    FileGuid guid, const file::path& path, RuntimeAssetType type,
+    std::optional<std::uint64_t> expectedEpoch,
+    std::optional<std::uint64_t> expectedResolverRevision)
 {
     std::lock_guard lock(m_assetPreparationMutex);
     if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
     {
         throw std::runtime_error("Asset preparation is shutting down.");
     }
+    if ((expectedEpoch && *expectedEpoch != m_assetPreparationEpoch)
+        || (expectedResolverRevision && *expectedResolverRevision != m_assetDepotRevision))
+    {
+        return {};
+    }
     if (const auto found = m_assetPreparations.find(guid); found != m_assetPreparations.end())
     {
-        if (const auto existing = found->second.lock(); existing &&
-            (!existing->work.is_complete() || existing->error.empty()))
+        if (const auto existing = found->second.lock(); existing
+            && existing->epoch == m_assetPreparationEpoch && existing->resolverRevision == m_assetDepotRevision
+            && !existing->cancelled.load(std::memory_order_acquire)
+            && (!existing->work.is_complete() || existing->error.empty()))
         {
             return existing;
         }
@@ -389,6 +400,7 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
     asset->projectRoot = PathFinder::Relative();
     asset->type = type;
     asset->epoch = m_assetPreparationEpoch;
+    asset->resolverRevision = m_assetDepotRevision;
     const auto request = type == RuntimeAssetType::MaterialGraph
         ? m_materialGraphGenerations.BeginPreparation(experiment::AssetId{guid.m_guid}, false, asset->error)
         : material_graph::GenerationPreparationRequest{};
@@ -408,7 +420,8 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
             {
                 std::lock_guard lock(m_assetPreparationMutex);
                 if (asset->cancelled.load(std::memory_order_acquire) ||
-                    m_assetPreparationStopping || asset->epoch != m_assetPreparationEpoch)
+                    m_assetPreparationStopping || asset->epoch != m_assetPreparationEpoch
+                    || asset->resolverRevision != m_assetDepotRevision)
                 {
                     asset->error = "Asset preparation was cancelled or invalidated.";
                     return;
@@ -425,15 +438,22 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
             }
             else
             {
-                auto current = m_modelAssetGenerations.ResolveCurrent(asset->guid.m_guid);
-                if (current && (!PathFinder::IsAssetAuthoringEnabled() ||
-                    assets::ModelMaterialGraphsPresent(PathFinder::Relative(), *current)))
                 {
-                    asset->model = std::move(current);
+                    std::lock_guard admissionLock(m_assetPreparationMutex);
+                    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0
+                        || asset->epoch != m_assetPreparationEpoch || asset->resolverRevision != m_assetDepotRevision
+                        || asset->cancelled.load(std::memory_order_acquire))
+                    {
+                        asset->error = "Model preparation resolver changed.";
+                        return;
+                    }
+                    // Root changes clear this current index under the same lock.
+                    asset->model = m_modelAssetGenerations.ResolveCurrent(asset->guid.m_guid);
                 }
-                else
+                if (!asset->model)
                 {
-                    asset->model = LoadAndPublishModelAssetGeneration(asset->guid, true, false, asset->epoch);
+                    asset->model = LoadAndPublishModelAssetGeneration(asset->guid, true, false,
+                        asset->epoch, asset->resolverRevision);
                 }
                 if (!asset->model)
                 {
@@ -468,7 +488,7 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
     const auto current = found == m_assetPreparations.end()
         ? own::shared_owner<PreparedRuntimeAsset>{} : found->second.lock();
     if (asset->cancelled.load(std::memory_order_acquire) ||
-        m_assetPreparationStopping || m_assetInvalidationDepth != 0 || asset->epoch != m_assetPreparationEpoch ||
+        m_assetPreparationStopping || m_assetInvalidationDepth != 0 || asset->epoch != m_assetPreparationEpoch || asset->resolverRevision != m_assetDepotRevision ||
         asset->projectRoot != PathFinder::Relative() ||
         !current || current.borrow().unsafe_get() != asset.borrow().unsafe_get())
     {
@@ -511,17 +531,29 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
 
 DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_view path)
 {
-    const auto source = ResolveRuntimeAssetPath(path, "Models\\");
-    auto guid = GetFileGuid(source);
-    if (guid == FileGuid{})
+    std::uint64_t epoch{}, resolverRevision{};
+    own::shared_owner<AssetMetaRegistry> registry;
     {
-        guid = GetFilenameToGuid(file::path(path).filename().string());
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+        {
+            return {};
+        }
+        epoch = m_assetPreparationEpoch;
+        resolverRevision = m_assetDepotRevision;
+        registry = SnapshotAssetMetaRegistry();
+    }
+    const auto source = ResolveRuntimeAssetPath(path, "Models\\");
+    auto guid = registry ? registry->GetGuid(source) : FileGuid{};
+    if (guid == FileGuid{} && registry)
+    {
+        guid = registry->GetFilenameToGuid(file::path(path).filename().string());
     }
     if (guid == FileGuid{} || !assets::IsUuidV8(guid.m_guid))
     {
         return {};
     }
-    return PrepareRuntimeAsset(guid, source, RuntimeAssetType::Model);
+    return PrepareRuntimeAsset(guid, source, RuntimeAssetType::Model, epoch, resolverRevision);
 }
 
 job_handle DataSystem::ModelPreparationCompletion(const ModelPreparation& preparation) const
@@ -536,6 +568,7 @@ assets::ModelAssetGeneration::Shared DataSystem::ReadPreparedModel(
     std::lock_guard lock(m_assetPreparationMutex);
     if (!preparation || m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
         preparation->cancelled.load(std::memory_order_acquire) || preparation->epoch != m_assetPreparationEpoch ||
+        preparation->resolverRevision != m_assetDepotRevision ||
         preparation->projectRoot != PathFinder::Relative() || !preparation->work.is_complete())
     {
         error = "Model preparation is incomplete or invalidated.";
@@ -748,6 +781,12 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         const auto document = Authoring::ParsedDocument::ParseFile(resolved.string(), error);
         if (!document)
         {
+            if (PathFinder::IsAssetAuthoringEnabled() && Lowercase(path.extension().string()) == ".shadergraph")
+            {
+                Debug::PrintLog(spdlog::level::warn, "Graph dependency discovery failed; material construction will recover: "
+                    + path.string() + " " + error);
+                continue;
+            }
             throw std::runtime_error("Asset dependency document could not be read: " + path.string() + " " + error);
         }
         walk(document.Root(), 0);
@@ -924,11 +963,14 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 else
                 {
                     Material material;
-                    if (!DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(node)) ||
+                    if (!DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(node), nullptr, false) ||
                         !ValidatePreparedMaterialTextures(material, error))
                     {
                         throw std::runtime_error("Required inline material could not be prepared: " + error);
                     }
+                    // Preserve successfully prepared dependencies until owner construction.
+                    // A deferred default graph remains the owner's recovery decision.
+                    preparation->materialPins.push_back(own::make_shared<const Material>(std::move(material)));
                 }
                 ++preparation->completed;
             }
@@ -948,6 +990,10 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                     {
                         throw std::runtime_error(failure);
                     }
+                    // The model/inline owner constructs and persists its replacement.
+                }
+                else
+                {
                     preparation->materialPins.push_back(own::make_shared<const Material>(std::move(material)));
                 }
                 ++preparation->completed;
@@ -1241,48 +1287,30 @@ void DataSystem::Initialize()
 void DataSystem::Finalize()
 {
     DrainAssetPreparations();
-    m_materialGraphGenerations.Clear();
-    m_modelAssetGenerations.Clear();
-	{
-		std::lock_guard lock(m_modelGenerationTextureMutex);
-		m_modelGenerationTextures.clear();
-		m_modelGenerationTextureOwners.clear();
-		m_modelGenerationTextureStats = {};
-	}
-    {
-        std::lock_guard lock(m_textureMutex);
-        Textures.clear();
-        UITextures.clear();
-        SpriteSheets.clear();
-    }
-    {
-        std::lock_guard lock(m_materialMutex);
-        Materials.clear();
-    }
-    {
-        std::lock_guard lock(m_authoredMaterialMutex);
-        m_authoredMaterials.clear();
-    }
 	{
 		std::lock_guard retainedGuard(m_retainedAssetsMutex);
 		m_retainedAssets.clear();
 	}
-    ClearShaderMetaCache();
 	{
 		std::lock_guard lock(m_pendingAssetChangeMutex);
 		m_pendingAssetChanges.clear();
 	}
     own::shared_owner<const experiment::cooked::CookedAssetCatalog> retiredCatalog;
     own::shared_owner<AssetMetaRegistry> retiredRegistry;
-    AssetDepot::TextureAssetEntries retiredTextures;
+    AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
+    LegacyCacheRetirement retiredLegacy;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
+        StageLegacyCacheRetirementLocked(retiredLegacy);
+        StageTextureAssetRetirementLocked(retiredTextures);
+        StageModelAssetRetirementLocked(retiredModels);
         retiredCatalog = std::move(m_cookedCatalog);
         retiredRegistry = std::move(m_assetMetaRegistry);
-        retiredTextures = InvalidateTextureAssetsLocked();
-        retiredModels = InvalidateModelAssetsLocked();
+        InvalidateTextureAssetsLocked(retiredTextures);
+        InvalidateModelAssetsLocked(retiredModels);
+        DetachLegacyCachesLocked(retiredLegacy);
         m_cookedStaleAssets.clear();
         if (m_assetDepotRevision != (std::numeric_limits<std::uint64_t>::max)())
         {
@@ -1377,29 +1405,49 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGeneration(FileGuid guid)
 {
     if (FileGuid{} == guid || !assets::IsUuidV8(guid.m_guid))
-        return {};
-    if (auto current = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
     {
-        if (!PathFinder::IsAssetAuthoringEnabled() || GetFilePath(guid).empty() ||
-            assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *current))
+        return {};
+    }
+    std::uint64_t epoch{}, resolverRevision{};
+    {
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
         {
+            return {};
+        }
+        epoch = m_assetPreparationEpoch;
+        resolverRevision = m_assetDepotRevision;
+        if (auto current = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
+        {
+            // Missing authoring graphs recover at their material owner boundary,
+            // never by forcing a geometry reimport on an otherwise valid hit.
             return current;
         }
     }
-    return LoadAndPublishModelAssetGeneration(guid, true);
+    return LoadAndPublishModelAssetGeneration(guid, true, true, epoch, resolverRevision);
 }
 
 assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGeneration(
-	FileGuid guid, bool allowEditorRecovery, bool publish, std::optional<std::uint64_t> expectedEpoch)
+	FileGuid guid, bool allowEditorRecovery, bool publish, std::optional<std::uint64_t> expectedEpoch,
+    std::optional<std::uint64_t> expectedResolverRevision)
 {
-    std::uint64_t loadEpoch;
+    std::uint64_t loadEpoch{}, resolverRevision{};
+    own::shared_owner<AssetMetaRegistry> registry;
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog;
+    bool cookedStale{};
     {
         std::lock_guard lock(m_assetPreparationMutex);
-        if (m_assetPreparationStopping || (expectedEpoch && *expectedEpoch != m_assetPreparationEpoch))
+        if (m_assetPreparationStopping || (expectedEpoch && *expectedEpoch != m_assetPreparationEpoch)
+            || (expectedResolverRevision && *expectedResolverRevision != m_assetDepotRevision))
         {
             return {};
         }
         loadEpoch = m_assetPreparationEpoch;
+        resolverRevision = m_assetDepotRevision;
+        std::lock_guard catalogLock(m_cookedCatalogMutex);
+        registry = m_assetMetaRegistry;
+        catalog = m_cookedCatalog;
+        cookedStale = m_cookedStaleAssets.contains(guid);
     }
 	ce::profile_scope profile{ ce::marker<"Asset.ModelGeneration">() };
 	// MBC11 — cooked catalog가 마운트돼 있고 이 모델의 generation 레코드가 신선하면
@@ -1411,10 +1459,12 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 	request.expectedModelId = guid.m_guid;
     if (PathFinder::IsAssetAuthoringEnabled())
         request.decodedTextureCacheRoot = PathFinder::CachePath("ModelTextures");
-	const file::path cookedRecord = ResolveCookedArtifact(experiment::AssetId{ guid.m_guid });
+	const file::path cookedRecord = catalog && !cookedStale
+        ? catalog->ResolveArtifactPath(experiment::AssetId{ guid.m_guid }) : file::path{};
 	const bool fromCatalog = !cookedRecord.empty()
 		&& cookedRecord.filename() == file::path("generation.asset");
 	std::string sourceLabel;
+    const file::path sourcePath = registry ? registry->GetPath(guid) : file::path{};
 	if (fromCatalog)
 	{
 		request.generationPath = cookedRecord.parent_path();
@@ -1423,7 +1473,6 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 	}
 	else
 	{
-		const file::path sourcePath = GetFilePath(guid);
 		if (sourcePath.empty()) return {};
 		file::path sidecarPath = sourcePath;
 		sidecarPath += ".meta";
@@ -1436,14 +1485,22 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 		assets::LoadModelAssetGeneration(request);
 	if (!loaded.Succeeded())
 	{
+        {
+            std::lock_guard admissionLock(m_assetPreparationMutex);
+            if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch
+                || resolverRevision != m_assetDepotRevision)
+            {
+                return {};
+            }
+        }
 		m_generationLoadFailed.fetch_add(1, std::memory_order_relaxed);
 		// Uncooked loads/reloads may ask the Editor to repair derived data, then
 		// retry this strict reader exactly once. Callers release authoring locks
 		// before applying a reload; the repair itself never calls this loader.
 		if (allowEditorRecovery && !fromCatalog && PathFinder::IsAssetAuthoringEnabled()
-			&& AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
+			&& AssetAuthoringPort::RecoverModel(sourcePath, guid))
         {
-            return LoadAndPublishModelAssetGeneration(guid, false, publish, loadEpoch);
+            return LoadAndPublishModelAssetGeneration(guid, false, publish, loadEpoch, resolverRevision);
         }
 		const std::string detail = loaded.issues.empty()
 			? "알 수 없는 generation load 실패"
@@ -1461,27 +1518,24 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
     }
     // Authoring graphs are required even when an Editor project mounts a
     // previously cooked geometry generation. Player needs only the cooked closure.
-    if (PathFinder::IsAssetAuthoringEnabled() && !GetFilePath(guid).empty() &&
+    if (PathFinder::IsAssetAuthoringEnabled() && !sourcePath.empty() &&
         !assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *loaded.generation))
     {
-        if (allowEditorRecovery && AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
-        {
-            return LoadAndPublishModelAssetGeneration(guid, false, publish, loadEpoch);
-        }
         Debug::PrintLog(spdlog::level::err,
                         "Model material graphs are missing; retain geometry and create editable default graphs.");
     }
     (fromCatalog ? m_generationFromCatalog : m_generationFromLibrary).fetch_add(1, std::memory_order_relaxed);
-    if (!publish)
-    {
-        return std::move(loaded.generation);
-    }
     const std::string sourcePathString = sourceLabel;
 
     std::lock_guard preparationLock(m_assetPreparationMutex);
-    if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
+    if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch
+        || resolverRevision != m_assetDepotRevision)
     {
         return {};
+    }
+    if (!publish)
+    {
+        return std::move(loaded.generation);
     }
     assets::ModelAssetPublishResult published =
 		m_modelAssetGenerations.Publish(std::move(loaded.generation));
@@ -1670,6 +1724,96 @@ DataSystem::SnapshotModelGenerationTextures() const
 	return snapshot;
 }
 
+void DataSystem::StageLegacyCacheRetirementLocked(LegacyCacheRetirement& retired)
+{
+    assert(retired.preparationPins.empty() && retired.scenePins.empty() && retired.bundlePins.empty());
+    // Reserve everything before taking cancellation pins. On failure the caller's
+    // staged storage unwinds only after its outer guards, leaving live state intact.
+    retired.preparationPins.reserve(m_assetPreparations.size());
+    retired.scenePins.reserve(m_sceneAssetPreparations.size());
+    retired.bundlePins.reserve(m_assetBundlePreparations.size());
+    for (const auto& [id, weak] : m_assetPreparations)
+    {
+        if (auto request = weak.lock())
+        {
+            retired.preparationPins.push_back(std::move(request));
+        }
+    }
+    for (const auto& weak : m_sceneAssetPreparations)
+    {
+        if (auto scene = weak.lock())
+        {
+            retired.scenePins.push_back(std::move(scene));
+        }
+    }
+    for (const auto& weak : m_assetBundlePreparations)
+    {
+        if (auto bundle = weak.lock())
+        {
+            retired.bundlePins.push_back(std::move(bundle));
+        }
+    }
+}
+
+void DataSystem::DetachLegacyCachesLocked(LegacyCacheRetirement& retired) noexcept
+{
+    // Every map shell and strong cancellation pin already exists. This phase
+    // swaps only into empty caller-owned storage and never destroys retired owners.
+    assert(retired.materials.empty() && retired.authoredMaterials.empty()
+        && retired.textures.empty() && retired.uiTextures.empty() && retired.spriteSheets.empty()
+        && retired.modelTextures.empty() && retired.modelTextureOwners.empty()
+        && retired.shaderSlots.empty() && retired.shaderSlotsByGuid.empty() && retired.shaderFreeSlots.empty()
+        && retired.preparations.empty() && retired.scenes.empty() && retired.bundles.empty());
+    m_modelAssetGenerations.DetachAll(retired.models);
+    m_materialGraphGenerations.DetachAll(retired.graphs);
+    {
+        std::lock_guard lock(m_materialMutex);
+        static_assert(noexcept(Materials.swap(retired.materials)));
+        Materials.swap(retired.materials);
+    }
+    {
+        std::lock_guard lock(m_authoredMaterialMutex);
+        static_assert(noexcept(m_authoredMaterials.swap(retired.authoredMaterials)));
+        m_authoredMaterials.swap(retired.authoredMaterials);
+    }
+    {
+        std::lock_guard lock(m_textureMutex);
+        Textures.swap(retired.textures);
+        UITextures.swap(retired.uiTextures);
+        SpriteSheets.swap(retired.spriteSheets);
+    }
+    {
+        std::lock_guard lock(m_modelGenerationTextureMutex);
+        m_modelGenerationTextures.swap(retired.modelTextures);
+        m_modelGenerationTextureOwners.swap(retired.modelTextureOwners);
+        m_modelGenerationTextureStats = {};
+    }
+    {
+        std::lock_guard lock(m_shaderMetaMutex);
+        m_shaderMetaSlots.swap(retired.shaderSlots);
+        m_shaderMetaSlotByGuid.swap(retired.shaderSlotsByGuid);
+        m_shaderMetaFreeSlots.swap(retired.shaderFreeSlots);
+        m_shaderMetaRetainedBytes = 0u;
+        m_shaderMetaUseSerial = 0u;
+        // The generation serial is global identity and deliberately never reset.
+    }
+    for (const auto& request : retired.preparationPins)
+    {
+        request->cancelled.store(true, std::memory_order_release);
+    }
+    for (const auto& scene : retired.scenePins)
+    {
+        scene->cancelled.store(true, std::memory_order_release);
+    }
+    for (const auto& bundle : retired.bundlePins)
+    {
+        bundle->cancelled.store(true, std::memory_order_release);
+    }
+    m_assetPreparations.swap(retired.preparations);
+    m_sceneAssetPreparations.swap(retired.scenes);
+    m_assetBundlePreparations.swap(retired.bundles);
+}
+
 void DataSystem::RetireModelGenerationTextures(
 	assets::ModelAssetGenerationHandle handle)
 {
@@ -1705,18 +1849,29 @@ std::size_t DataSystem::BindModelGenerationTextures(Material& material,
 assets::ModelAssetGeneration::Shared DataSystem::ResolveModelAssetGeneration(
 	assets::ModelAssetGenerationHandle handle) const
 {
+    std::lock_guard admissionLock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+    {
+        return {};
+    }
 	return m_modelAssetGenerations.Resolve(handle);
 }
 
 assets::ModelAssetGenerationCacheSnapshot
 DataSystem::SnapshotModelAssetGenerations() const
 {
+    std::lock_guard admissionLock(m_assetPreparationMutex);
 	return m_modelAssetGenerations.Snapshot();
 }
 
 std::vector<assets::ModelAssetGeneration::Shared>
 DataSystem::SnapshotCurrentModelAssetGenerations() const
 {
+    std::lock_guard admissionLock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+    {
+        return {};
+    }
 	return m_modelAssetGenerations.SnapshotCurrent();
 }
 
@@ -2514,6 +2669,11 @@ own::shared_owner<const material_graph::Generation> DataSystem::ResolveMaterialG
 
 std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedModelAssets() const
 {
+    std::lock_guard admissionLock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+    {
+        return {};
+    }
     auto current = m_modelAssetGenerations.SnapshotCurrent();
     std::map<Uuid::Uuid16, assets::ModelAssetGeneration::Shared> byModel;
     for (auto& model : current)
@@ -2521,12 +2681,13 @@ std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedMo
         byModel.emplace(model->Identity().modelId, std::move(model));
     }
     {
-        std::lock_guard lock(m_assetPreparationMutex);
         for (const auto& [id, weak] : m_assetPreparations)
         {
             const auto preparation = weak.lock();
-            if (preparation && preparation->type == RuntimeAssetType::Model &&
-                preparation->work.is_complete() && preparation->model)
+            if (preparation && preparation->type == RuntimeAssetType::Model
+                && preparation->epoch == m_assetPreparationEpoch && preparation->resolverRevision == m_assetDepotRevision
+                && !preparation->cancelled.load(std::memory_order_acquire)
+                && preparation->work.is_complete() && preparation->error.empty() && preparation->model)
             {
                 auto& candidate = byModel[id.m_guid];
                 if (!candidate || candidate->Identity().generation <= preparation->model->Identity().generation)
@@ -2793,7 +2954,7 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
 }
 
 bool DataSystem::DeserializeMaterialPayload(Material& material,
-	const Authoring::NodeView& view, experiment::Material* outAuthored)
+	const Authoring::NodeView& view, experiment::Material* outAuthored, bool persistRecovery)
 {
 	const Authoring::ReadNode readNode = Authoring::NodeViewAccess::Node(view);
 	if (!readNode || !readNode.IsMap()) return false;
@@ -2809,6 +2970,11 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
         }
         if (!ConfigureMaterialGraph(material, document.description, error))
         {
+            if (!persistRecovery && PathFinder::IsAssetAuthoringEnabled())
+            {
+                Debug::PrintLog(spdlog::level::warn, "Inline material prewarm deferred recovery to its owner: " + error);
+                return true;
+            }
             const std::string cause = error;
             if (!ConfigureEditableDefaultMaterialGraph(material, cause, error))
             {
@@ -3559,7 +3725,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
             }
         }
     } invalidation;
-    AssetDepot::TextureAssetEntries retiredTextures;
+    AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
     own::shared_owner<AssetMetaRegistry> registry;
     {
@@ -3580,9 +3746,11 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         // graphs or texture overrides. Invalidate the batch, keeping old accepted
         // owners alive; the next scene request rediscovers the revised closure.
         std::lock_guard lock(m_assetPreparationMutex);
+        StageTextureAssetRetirementLocked(retiredTextures);
+        StageModelAssetRetirementLocked(retiredModels);
         ++m_assetPreparationEpoch;
-        retiredTextures = InvalidateTextureAssetsLocked();
-        retiredModels = InvalidateModelAssetsLocked();
+        InvalidateTextureAssetsLocked(retiredTextures);
+        InvalidateModelAssetsLocked(retiredModels);
         std::erase_if(m_retiredAssetPreparations, [](const auto& asset)
         {
             return asset->work.is_complete();
@@ -3632,7 +3800,12 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         }
         else if (assetType == RuntimeAssetType::Model)
         {
-            if (const auto model = m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
+            assets::ModelAssetGeneration::Shared model;
+            {
+                std::lock_guard admissionLock(m_assetPreparationMutex);
+                model = m_modelAssetGenerations.ResolveCurrent(guid.m_guid);
+            }
+            if (model)
             {
                 for (const auto& material : model->Materials())
                 {
@@ -3671,8 +3844,18 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 			// Keep unused assets lazy. For a resident model, validate a candidate
 			// before Publish atomically replaces current. Only successful replacement
 			// retires embedded textures; failed and duplicate reloads keep their owners.
-			if (m_modelAssetGenerations.ResolveCurrent(guid.m_guid))
-				return !!LoadAndPublishModelAssetGeneration(guid, true);
+            bool hasCurrent{};
+            std::uint64_t epoch{}, resolverRevision{};
+            {
+                std::lock_guard admissionLock(m_assetPreparationMutex);
+                hasCurrent = !!m_modelAssetGenerations.ResolveCurrent(guid.m_guid);
+                epoch = m_assetPreparationEpoch;
+                resolverRevision = m_assetDepotRevision;
+            }
+            if (hasCurrent)
+            {
+                return !!LoadAndPublishModelAssetGeneration(guid, true, true, epoch, resolverRevision);
+            }
 			return true;
 		}
 		// 파일 게시는 이미 끝났다. 먼저 이전 generation을 cache lookup에서
@@ -3744,6 +3927,7 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 		if (FileGuid{} != guid)
 		{
 			// MBC7 — generation과 그 embedded texture owner는 한 단위로 은퇴한다.
+            std::lock_guard admissionLock(m_assetPreparationMutex);
             assets::ModelAssetGenerationHandle retiredHandle;
             const auto retired = m_modelAssetGenerations.Retire(guid.m_guid, &retiredHandle);
             if (retiredHandle.IsValid())
@@ -4241,8 +4425,9 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 	const std::size_t staleCount = stale.size();
     own::shared_owner<const experiment::cooked::CookedAssetCatalog> retiredCatalog;
     own::shared_owner<AssetMetaRegistry> retiredRegistry;
-    AssetDepot::TextureAssetEntries retiredTextures;
+    AssetDepot::TextureAssetRetiredEntries retiredTextures;
     AssetDepot::ModelAssetRetiredEntries retiredModels;
+    LegacyCacheRetirement retiredLegacy;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
@@ -4252,21 +4437,24 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
             outError = "Catalog changed before publication; legacy mount is stale.";
             return false;
         }
+        StageLegacyCacheRetirementLocked(retiredLegacy);
+        StageTextureAssetRetirementLocked(retiredTextures);
+        StageModelAssetRetirementLocked(retiredModels);
         retiredCatalog = std::move(m_cookedCatalog);
-        retiredTextures = InvalidateTextureAssetsLocked();
-        retiredModels = InvalidateModelAssetsLocked();
+        InvalidateTextureAssetsLocked(retiredTextures);
+        InvalidateModelAssetsLocked(retiredModels);
         m_cookedCatalog = std::move(catalog);
         m_cookedStaleAssets = std::move(stale);
         ++m_assetDepotRevision;
+        DetachLegacyCachesLocked(retiredLegacy);
         if (packagedRegistry)
         {
             retiredRegistry = std::move(m_assetMetaRegistry);
             m_assetMetaRegistry = std::move(packagedRegistry);
         }
     }
-    // A new cook transaction must be observable to subsequent GUID loads.
-    // Existing Material snapshots continue to own their accepted generation.
-    m_materialGraphGenerations.Clear();
+    // Current model/material-graph indexes were detached in the root commit;
+    // existing scene owners continue to own their accepted generations.
     std::printf("[cooked.catalog] mount %s entries=%zu sources=%zu stale=%zu\n",
 		manifestPath.string().c_str(), entryCount, sourceAssetCount, staleCount);
 	return true;
@@ -4324,34 +4512,68 @@ std::size_t DataSystem::CookedCatalogSourceAssetCount() const
 
 // ── PHASE 3.75 MBC9 — 모델 generation 창구(경로·stem·sidecar 옵션) ─────────────
 
-assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGenerationByPath(
-	std::string_view filePath)
+assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGenerationByPath(std::string_view filePath)
 {
-	const file::path path = ResolveRuntimeAssetPath(filePath, "Models\\");
-    const auto registry = SnapshotAssetMetaRegistry();
-    FileGuid guid;
-    if (registry)
+    std::uint64_t epoch{}, resolverRevision{};
+    own::shared_owner<AssetMetaRegistry> registry;
     {
-        guid = registry->GetGuid(path);
-        if (FileGuid{} == guid)
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
         {
-            guid = registry->GetFilenameToGuid(path.filename().string());
+            return {};
         }
+        epoch = m_assetPreparationEpoch;
+        resolverRevision = m_assetDepotRevision;
+        registry = SnapshotAssetMetaRegistry();
     }
-	if (FileGuid{} == guid)
-	{
-		Debug::PrintLog(spdlog::level::err, "[model.generation] registry에 없는 모델 경로: " + path.string());
-		return {};
-	}
-	return LoadModelAssetGeneration(guid);
+    const file::path path = ResolveRuntimeAssetPath(filePath, "Models\\");
+    auto guid = registry ? registry->GetGuid(path) : FileGuid{};
+    if (guid == FileGuid{} && registry)
+    {
+        guid = registry->GetFilenameToGuid(path.filename().string());
+    }
+    if (guid == FileGuid{})
+    {
+        Debug::PrintLog(spdlog::level::err, "[model.generation] registry has no model path: " + path.string());
+        return {};
+    }
+    auto model = LoadModelAssetGeneration(guid);
+    std::lock_guard admissionLock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0
+        || epoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
+    {
+        return {};
+    }
+    return model;
 }
 
-assets::ModelAssetGeneration::Shared DataSystem::FindModelAssetGenerationByStem(
-	std::string_view stem)
+assets::ModelAssetGeneration::Shared DataSystem::FindModelAssetGenerationByStem(std::string_view stem)
 {
-	const FileGuid guid = GetStemToGuid(std::string(stem));
-	if (FileGuid{} == guid) return {};
-	return LoadModelAssetGeneration(guid);
+    std::uint64_t epoch{}, resolverRevision{};
+    own::shared_owner<AssetMetaRegistry> registry;
+    {
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+        {
+            return {};
+        }
+        epoch = m_assetPreparationEpoch;
+        resolverRevision = m_assetDepotRevision;
+        registry = SnapshotAssetMetaRegistry();
+    }
+    const FileGuid guid = registry ? registry->GetStemToGuid(std::string(stem)) : FileGuid{};
+    if (guid == FileGuid{})
+    {
+        return {};
+    }
+    auto model = LoadModelAssetGeneration(guid);
+    std::lock_guard admissionLock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping || m_assetInvalidationDepth != 0
+        || epoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
+    {
+        return {};
+    }
+    return model;
 }
 
 bool DataSystem::ReadModelCreateMeshCollider(FileGuid guid) const

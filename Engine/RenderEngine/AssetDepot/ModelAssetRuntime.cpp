@@ -3,6 +3,8 @@
 #include "../Assets/ModelAnimationSampler.h"
 
 #include <algorithm>
+#include <cassert>
+#include <stdexcept>
 #include <exception>
 #include <limits>
 #include <utility>
@@ -870,17 +872,58 @@ void DataSystem::TrimModelAssetsLocked()
     TrimModelCache(m_modelAssets.animations);
 }
 
-AssetDepot::ModelAssetRetiredEntries DataSystem::InvalidateModelAssetsLocked()
+void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEntries& retired)
 {
-    AssetDepot::ModelAssetRetiredEntries retired;
-    const auto invalidate = [&](auto& cache, auto& detached)
+    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty());
+    const auto stage = [&](const auto& cache, auto& consumers)
+    {
+        assert(consumers.empty());
+        std::size_t count{};
+        for (const auto& [key, entry] : cache.entries)
+        {
+            if ((!key.exactGeneration || m_assetPreparationStopping)
+                && entry.inFlight && entry.inFlight->status == Status::Pending)
+            {
+                if (entry.inFlight->consumers.size() > consumers.max_size() - count)
+                {
+                    throw std::length_error("Model retirement consumer capacity exceeded.");
+                }
+                count += entry.inFlight->consumers.size();
+            }
+        }
+        consumers.reserve(count);
+        for (const auto& [key, entry] : cache.entries)
+        {
+            if ((!key.exactGeneration || m_assetPreparationStopping)
+                && entry.inFlight && entry.inFlight->status == Status::Pending)
+            {
+                for (const auto& weak : entry.inFlight->consumers)
+                {
+                    if (auto consumer = weak.lock())
+                    {
+                        consumers.push_back(std::move(consumer));
+                    }
+                }
+            }
+        }
+    };
+    stage(m_modelAssets.descriptors, retired.descriptorConsumers);
+    stage(m_modelAssets.skeletons, retired.skeletonConsumers);
+    stage(m_modelAssets.animations, retired.animationConsumers);
+}
+
+void DataSystem::InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntries& retired) noexcept
+{
+    assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty());
+    const auto status = m_assetPreparationStopping ? Status::Cancelled : Status::Stale;
+    const auto error = m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged;
+    const auto invalidate = [&](auto& cache, auto& detached, const auto& consumers)
     {
         for (auto item = cache.entries.begin(); item != cache.entries.end();)
         {
             if (item->first.exactGeneration && !m_assetPreparationStopping)
             {
-                // Exact-owner requests continue from captured locators. Only
-                // shutdown can revoke admission; logical unmount is not shutdown.
+                // Exact-owner requests survive remount from captured locators.
                 ++item;
                 continue;
             }
@@ -891,28 +934,28 @@ AssetDepot::ModelAssetRetiredEntries DataSystem::InvalidateModelAssetsLocked()
             {
                 ++cache.logicalEvictions;
             }
-            const auto& work = entry.inFlight;
-            if (work && work->status == Status::Pending)
+            if (entry.inFlight && entry.inFlight->status == Status::Pending)
             {
-                work->status = m_assetPreparationStopping ? Status::Cancelled : Status::Stale;
-                work->error = m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged;
-                work->message.clear();
-                for (const auto& weak : work->consumers)
-                {
-                    if (const auto consumer = weak.lock())
-                    {
-                        NotifyModelConsumer(consumer, work->status, work->error, {});
-                    }
-                }
-                work->consumers.clear();
+                entry.inFlight->status = status;
+                entry.inFlight->error = error;
+                entry.inFlight->message.clear();
             }
-            detached.insert(std::move(node));
+            // Node transfer between equal default allocators cannot allocate.
+            // The preconstructed destination is empty and all source keys unique.
+            const auto inserted = detached.insert(std::move(node));
+            if (!inserted.inserted)
+            {
+                std::terminate();
+            }
+        }
+        for (const auto& consumer : consumers)
+        {
+            NotifyModelConsumer(consumer, status, error, {});
         }
     };
-    invalidate(m_modelAssets.descriptors, retired.descriptors);
-    invalidate(m_modelAssets.skeletons, retired.skeletons);
-    invalidate(m_modelAssets.animations, retired.animations);
-    return retired;
+    invalidate(m_modelAssets.descriptors, retired.descriptors, retired.descriptorConsumers);
+    invalidate(m_modelAssets.skeletons, retired.skeletons, retired.skeletonConsumers);
+    invalidate(m_modelAssets.animations, retired.animations, retired.animationConsumers);
 }
 
 void DataSystem::SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips)

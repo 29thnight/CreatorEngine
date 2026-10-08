@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Core/PassResourceRetirement.h"
 #include "../../../RHI/RHIFormat.h"
 #include <array>
 #include <cstdint>
@@ -194,20 +195,8 @@ public:
     RGHandle GetResolvedResult() const { return m_resolved; }
     RGHandle GetFilteredResult() const { return m_filtered; }
 
-    /// 시간적 누적이 실제로 도는가.
-    ///
-    /// 이 값이 늘 1이면 재투영이 죽은 것이고, 그러면 '시간축이 샘플 수를
-    /// 대신한다'는 전제가 무너진 채로 프레임당 소수 샘플만 쓰게 된다 —
-    /// 조용히 품질만 나빠진다. 그래서 밖에서 볼 수 있게 둔다.
-    uint32_t GetLastAccumFrames() const { return m_lastAccumFrames; }
-
-    /// 히스토리를 버린 픽셀의 비율(0~1). 카메라가 크게 움직이면 올라가는
-    /// 것이 정상이고, 정지 상태에서 높으면 재투영이 어긋난 것이다.
-    float GetLastRejectRatio() const { return m_lastRejectRatio; }
-
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
+    PassResourceRetirement m_resourceRetirement;
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     Inputs   m_inputs{};
@@ -255,8 +244,6 @@ private:
     uint32_t m_giWidth{ 0 };
     uint32_t m_giHeight{ 0 };
 
-    uint32_t m_lastAccumFrames{ 0 };
-    float    m_lastRejectRatio{ 0.f };
     uint32_t m_frameIndex{ 0 };
 
     RHIPipelineHandle m_hiZBuildPSO;

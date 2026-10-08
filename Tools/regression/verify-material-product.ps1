@@ -19,7 +19,7 @@ $dependencies = Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
 if (!(Test-Path -LiteralPath (Join-Path $dependencies 'include/reflgen/runtime/registry.h'))) {
     $dependencies = Join-Path $repo 'vcpkg_installed/x64-windows'
 }
-$sources = @('Tools/regression/material_product_probe.cpp', 'Engine/RenderEngine/MaterialGraphProduct.cpp',
+$sources = @('Tools/regression/material_product_probe.cpp', 'Tools/regression/support/MaterialPipelineSlot.cpp', 'Engine/RenderEngine/MaterialGraphProduct.cpp',
     'Engine/RenderEngine/LXMaterialRuntime.cpp',
     'Engine/Utility_Framework/TypeTrait.cpp',
     'Engine/RenderEngine/MaterialGraphShaderMeta.cpp', 'Engine/RenderEngine/ShaderMeta.cpp',

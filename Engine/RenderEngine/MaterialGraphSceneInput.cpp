@@ -159,7 +159,8 @@ namespace material_graph
                 ? collectedPins->Retain(draw.materialGraphInstance)
                 : candidate->materialPins_->Find(*instance);
             input.material = candidate->materialPins_->Borrow(input.materialPinIndex);
-            if (!input.material || InstanceFramePins::Identity(*input.material) != InstanceFramePins::Identity(*instance))
+            if (!input.material || &*input.material != &*instance
+                || InstanceFramePins::Identity(*input.material) != InstanceFramePins::Identity(*instance))
             {
                 return Fail(error, "Scene graph draw has no exact instance in its frame pin table.");
             }

@@ -456,7 +456,37 @@ namespace assets
 
     class ModelAssetGenerationCache final
     {
+    private:
+        using Key = ModelAssetGenerationHandle;
+
+        struct Entry final
+        {
+            ModelAssetGenerationIdentity identity{};
+            own::weak_owner<const ModelAssetGeneration> live{};
+            ModelAssetGeneration::Shared retained{};
+            std::size_t estimatedBytes{};
+            std::uint64_t lastAccess{};
+        };
+
     public:
+        // Construct before taking outer admission locks, and destroy after those
+        // locks are released. Empty map construction may allocate on some STLs.
+        class RetiredEntries final
+        {
+        public:
+            RetiredEntries() = default;
+            RetiredEntries(const RetiredEntries&) = delete;
+            RetiredEntries& operator=(const RetiredEntries&) = delete;
+            RetiredEntries(RetiredEntries&&) = delete;
+            RetiredEntries& operator=(RetiredEntries&&) = delete;
+            ~RetiredEntries() = default;
+
+        private:
+            friend class ModelAssetGenerationCache;
+            std::map<Key, Entry> generations_{};
+            std::map<Uuid::Uuid16, Key> currentByAsset_{};
+        };
+
         [[nodiscard]] ModelAssetPublishResult Publish(
             ModelAssetGeneration::Shared generation);
         [[nodiscard]] ModelAssetGeneration::Shared ResolveCurrent(
@@ -470,23 +500,15 @@ namespace assets
             ModelAssetGenerationHandle* outRetiredHandle = nullptr);
         // Drops only cache-owned pins. Consumer/frame/job owners stay valid.
         void SetRetentionBudgetBytes(std::size_t bytes);
+        // Requires empty caller-owned storage; detaches without allocating or
+        // destroying retained owners under this cache or outer admission locks.
+        void DetachAll(RetiredEntries& retired) noexcept;
         void Clear();
         [[nodiscard]] ModelAssetGenerationCacheSnapshot Snapshot() const;
         // MBC9 — current generation 전수(에디터 목록용). 정렬은 ModelId 순.
         [[nodiscard]] std::vector<ModelAssetGeneration::Shared> SnapshotCurrent() const;
 
     private:
-        using Key = ModelAssetGenerationHandle;
-
-        struct Entry final
-        {
-            ModelAssetGenerationIdentity identity{};
-            own::weak_owner<const ModelAssetGeneration> live{};
-            ModelAssetGeneration::Shared retained{};
-            std::size_t estimatedBytes{};
-            std::uint64_t lastAccess{};
-        };
-
         [[nodiscard]] ModelAssetGeneration::Shared AcquireLocked(
             const Key& key, Entry& entry) const;
         void RetainLocked(Entry& entry, const ModelAssetGeneration::Shared& generation,

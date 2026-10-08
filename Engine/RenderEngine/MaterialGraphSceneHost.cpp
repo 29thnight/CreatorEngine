@@ -36,6 +36,8 @@ namespace material_graph
             }
         }
 
+        constexpr char PreparationAdmissionError[] =
+            "LX Scene program preparation exceeds its 64-request admission budget.";
         bool Fail(std::string& error, std::string message)
         {
             error = std::move(message);
@@ -97,7 +99,7 @@ namespace material_graph
         {
             std::shared_ptr<const Program> program;
             std::shared_ptr<const RenderBindings> bindings;
-            std::shared_ptr<const RenderBindings> shadowBindings;
+            bool shadowEnabled{};
             std::shared_ptr<const MeshSurfaceBatch> geometry;
             RHIBufferSlice indices, constants, referenceConstants;
             RHIBufferSlice visibleOwner;
@@ -113,6 +115,20 @@ namespace material_graph
         std::uint64_t recording{}, descriptors{};
         std::shared_ptr<const SceneViewInput> input;
         std::vector<Draw> draws;
+        std::vector<std::pair<size_t, size_t>> inputRanges;
+        std::span<const Draw> DrawsFor(std::optional<size_t> inputIndex) const
+        {
+            if (!inputIndex)
+            {
+                return draws;
+            }
+            if (*inputIndex >= inputRanges.size())
+            {
+                return {};
+            }
+            const auto [first, count] = inputRanges[*inputIndex];
+            return std::span<const Draw>(draws).subspan(first, count);
+        }
         std::shared_ptr<const GpuGeometryVisibility::Frame> visibility;
         std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, 3> shadowVisibility;
         RHITextureHandle environment;
@@ -393,6 +409,36 @@ namespace material_graph
         return result;
     }
 
+    void SceneHost::PruneFailedPreparations(const own::shared_owner<const Generation>& requested)
+    {
+        std::size_t retainedFailures = std::ranges::count_if(preparations_, [](const auto& item)
+        {
+            return !item->error.empty();
+        });
+        std::erase_if(preparations_, [&](const auto& preparation)
+        {
+            if (retainedFailures <= 16 || preparation->error.empty()
+                || SamePinnedObject(preparation->generation, requested)
+                || (preparation->job.valid() && !preparation->job.is_complete()))
+            {
+                return false;
+            }
+            const bool referenced = std::ranges::any_of(slots_, [&](const auto& item)
+            {
+                return (item.second->requested
+                        && SamePinnedObject(item.second->requested->generation, preparation->generation))
+                    || (item.second->active
+                        && SamePinnedObject(item.second->active->generation, preparation->generation));
+            });
+            if (referenced)
+            {
+                return false;
+            }
+            --retainedFailures;
+            return true;
+        });
+    }
+
     bool SceneHost::RequestProgram(const EnhancedFrameContext& context, own::shared_owner<const Generation> generation,
                                    std::string& error)
     {
@@ -416,9 +462,15 @@ namespace material_graph
                 return error.empty();
             }
         }
+        PruneFailedPreparations(generation);
         if (preparations_.size() >= 64)
         {
-            return Fail(error, "LX Scene program preparation exceeds its 64-request admission budget.");
+            PollPrograms(context);
+            PruneFailedPreparations(generation);
+            if (preparations_.size() >= 64)
+            {
+                return Fail(error, PreparationAdmissionError);
+            }
         }
         auto preparation = std::make_shared<Preparation>();
         preparation->generation = std::move(generation);
@@ -920,6 +972,8 @@ namespace material_graph
         if (requested->Draws().empty())
         {
             std::erase_if(slots_, [&](const auto& item) { return std::get<1>(item.first) == view.viewId; });
+            PruneFailedPreparations();
+            PollPrograms(context);
             PollSubmittedFrames();
             result = std::move(requested);
             error.clear();
@@ -969,17 +1023,16 @@ namespace material_graph
                 std::string preparationError;
                 if (!RequestProgram(context, draw->material->generation, preparationError))
                 {
+                    selectionDeferred_ = preparationError == PreparationAdmissionError;
                     return Fail(error, preparationError);
                 }
             }
         }
         PollPrograms(context);
-        auto selected = std::shared_ptr<SceneViewInput>(new SceneViewInput(*requested));
-        selected->draws_.clear();
         const auto backend = RHIShaderCompiler::GetOutput();
         // Every pass consumes the exact requested graph instance. Preparation
         // may defer a frame, but must never substitute a previous or native material.
-        for (auto draw : requested->Draws())
+        for (const auto& draw : requested->Draws())
         {
             if (!IsProgramReady(draw.material->generation, backend))
             {
@@ -995,9 +1048,14 @@ namespace material_graph
                 selectionDeferred_ = true;
                 return Fail(error, "LX Scene requested material program is still preparing.");
             }
+        }
+        // Copy only after every requested program is ready. Geometry owners stay
+        // shared, and each draw record is copied exactly once.
+        auto selected = std::shared_ptr<SceneViewInput>(new SceneViewInput(*requested));
+        for (auto& draw : selected->draws_)
+        {
             const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
             draw.selectionRevision = slot->revision;
-            selected->draws_.push_back(std::move(draw));
         }
         // Only the cache's CPU record is pruned. Shared native handles stay in the
         // backend cache; global cache eviction remains a separate lifetime policy.
@@ -1008,12 +1066,7 @@ namespace material_graph
                               (item.second->requested && SamePinnedObject(item.second->requested->generation, program->generation));
                    });
         });
-        std::erase_if(preparations_, [&](const auto& preparation) {
-            return preparations_.size() > 16 && !preparation->error.empty() &&
-                   std::ranges::none_of(slots_, [&](const auto& item) {
-                       return item.second->requested && SamePinnedObject(item.second->requested->generation, preparation->generation);
-                   });
-        });
+        PruneFailedPreparations();
         result = std::move(selected);
         error.clear();
         return true;
@@ -1272,14 +1325,15 @@ namespace material_graph
             {
                 return Fail(error, "LX reference constants allocation failed.");
             }
-            std::shared_ptr<const RenderBindings> shadowBindings;
+            bool shadowEnabled{};
             std::array<RHIBufferSlice, 3> shadowConstants;
             if (program->hasSurface && shadow.enabled && draw.queue != SceneCoverage::Blended)
             {
-                if (!RenderBindingCache::RebindPass(*device_, *bindings, program->shadowLayout, shadowBindings, error))
+                if (!RenderBindingCache::ValidatePass(*device_, *bindings, program->shadowLayout, error))
                 {
                     return false;
                 }
+                shadowEnabled = true;
                 for (unsigned cascade = 0; cascade < shadowConstants.size(); ++cascade)
                 {
                     if (!indexedIndirect &&
@@ -1306,7 +1360,7 @@ namespace material_graph
                 item.blended = ordered;
                 item.inputIndex = static_cast<std::size_t>(&draw - candidate->input->Draws().data());
                 item.bindings = bindings;
-                item.shadowBindings = shadowBindings;
+                item.shadowEnabled = shadowEnabled;
                 item.shadowConstants = shadowConstants;
                 for (unsigned cascade = 0; cascade < 3; ++cascade)
                 {
@@ -1349,7 +1403,7 @@ namespace material_graph
                         item.visibilityBin, constants.owner, item.visibleIdOffset,
                         ordered ? GpuGeometryVisibility::kNoOcclusion : 0u});
                 }
-                if (indexedIndirect && shadowBindings)
+                if (indexedIndirect && shadowEnabled)
                 {
                     // Independent caster candidates are not camera/HZB filtered.
                     // Each cascade keeps the existing light clip-volume contract.
@@ -1379,6 +1433,16 @@ namespace material_graph
         {
             return false;
         }
+        candidate->inputRanges.resize(candidate->input->Draws().size());
+        for (size_t i = 0; i < candidate->draws.size(); ++i)
+        {
+            auto& range = candidate->inputRanges[candidate->draws[i].inputIndex];
+            if (range.second == 0)
+            {
+                range.first = i;
+            }
+            ++range.second;
+        }
         for (unsigned cascade = 0; cascade < candidate->shadowVisibility.size(); ++cascade)
         {
             if (!visibility_.Prepare(context, shadow.lightViewProjection[cascade], shadowCandidates, shadowBins,
@@ -1400,8 +1464,8 @@ namespace material_graph
             std::lock_guard lock(recordingMutex_);
             recordings_[candidate->recording].owners.push_back(candidate);
             std::erase_if(recordings_, [&](const auto& item) {
-                return item.first != candidate->recording && !item.second.publication && item.second.submitted &&
-                       item.second.completion <= completed_;
+                return item.first != candidate->recording && !item.second.publication && item.second.accepted &&
+                       item.second.completion != 0 && item.second.completion <= completed_;
             });
         }
         {
@@ -1483,7 +1547,7 @@ namespace material_graph
         }
         for (const auto& draw : frame_->draws)
         {
-            if (!draw.shadowBindings)
+            if (!draw.shadowEnabled)
             {
                 continue;
             }
@@ -1529,12 +1593,12 @@ namespace material_graph
         }
         for (const auto& draw : frame->draws)
         {
-            if (!draw.shadowBindings)
+            if (!draw.shadowEnabled)
             {
                 continue;
             }
             uses.push_back({draw.geometry->GraphOutput(graph), RHIResourceState::ShaderResource, readAccess});
-            for (const auto& texture : draw.shadowBindings->resources.textures)
+            for (const auto& texture : draw.bindings->resources.textures)
             {
                 uses.push_back(
                     {graph.FindImportedTexture(texture.resource), RHIResourceState::PixelShaderResource, readAccess});
@@ -1567,7 +1631,7 @@ namespace material_graph
                 {
                     const auto& visibility = frame->shadowVisibility[cascade];
                     const bool indirect = visibility && draw.shadowVisibilityBin != UINT32_MAX;
-                    if (!draw.shadowBindings || (!indirect && !draw.shadowVisible[cascade]))
+                    if (!draw.shadowEnabled || (!indirect && !draw.shadowVisible[cascade]))
                     {
                         continue;
                     }
@@ -1579,13 +1643,14 @@ namespace material_graph
                         boundBindings = nullptr;
                     }
                     std::string error;
-                    if (boundBindings != draw.shadowBindings.get() &&
-                        !RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.shadowBindings,
+                    if (boundBindings != draw.bindings.get() &&
+                        !RenderBindingCache::BindPass(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
+                                                  draw.program->shadowLayout,
                                                   error))
                     {
                         throw std::runtime_error(error);
                     }
-                    boundBindings = draw.shadowBindings.get();
+                    boundBindings = draw.bindings.get();
                     encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.shadowConstants[cascade]);
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, 1, RHIBufferSlice::Whole(draw.geometry->Buffer()));
                     encoder.SetIndexBuffer(draw.indices, RHIFormat::R32Uint);
@@ -1610,7 +1675,8 @@ namespace material_graph
     }
 
     EnhancedGBufferPass::Outputs SceneHost::DeclareGBuffer(EnhancedRenderGraph& graph,
-                                                           const EnhancedGBufferPass::Outputs& incoming) const
+                                                           const EnhancedGBufferPass::Outputs& incoming,
+                                                           bool hasOccluderDepth) const
     {
         const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
         const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
@@ -1630,7 +1696,7 @@ namespace material_graph
         DeclareGeometry(graph);
         if (frame->visibility)
         {
-            if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+            if (hasOccluderDepth && graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
             {
                 // Cull LX against the native GBuffer's earlier depth version.
                 // Declare before Modify: this must never consume LX's own depth.
@@ -2048,7 +2114,7 @@ namespace material_graph
         const auto selected = [blended](const Frame::Draw& draw) {
             return blended ? draw.blended && draw.inputIndex == *blended : !draw.blended;
         };
-        const bool ordinary = !frame->runtimeEffects || std::ranges::any_of(frame->draws, [&](const auto& draw) {
+        const bool ordinary = !frame->runtimeEffects || std::ranges::any_of(frame->DrawsFor(blended), [&](const auto& draw) {
             return selected(draw) && draw.program->hasSurface && !draw.program->hasSpecial &&
                    draw.program->hasTransmission == transmissionStage;
         });
@@ -2091,7 +2157,7 @@ namespace material_graph
         {
             uses.push_back({shadowMap, RHIResourceState::ShaderResource, readAccess});
         }
-        for (const auto& draw : frame->draws)
+        for (const auto& draw : frame->DrawsFor(blended))
         {
             if (!selected(draw))
             {
@@ -2119,7 +2185,7 @@ namespace material_graph
             {
                 captureUses.push_back({lookupInputs[i], RHIResourceState::RenderTarget, lookupWrite});
             }
-            for (const auto& draw : frame->draws)
+            for (const auto& draw : frame->DrawsFor(blended))
             {
                 if (!selected(draw))
                 {
@@ -2162,7 +2228,7 @@ namespace material_graph
                     encoder.ClearRenderTargets(targets, clear);
                     encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
                     encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                    for (const auto& draw : frame->draws)
+                    for (const auto& draw : frame->DrawsFor(blended))
                     {
                         if (!draw.program->hasSurface || !selected(draw))
                         {
@@ -2197,7 +2263,7 @@ namespace material_graph
             frame->refraction->DeclareBake(graph, *lookup, inputs.bitmask, shadowMap);
             uses.push_back({frame->refraction->GraphSamples(graph), RHIResourceState::PixelShaderResource, readAccess});
         }
-        const bool special = std::ranges::any_of(frame->draws, [&](const auto& draw) {
+        const bool special = std::ranges::any_of(frame->DrawsFor(blended), [&](const auto& draw) {
             return selected(draw) && draw.program->hasSpecial && draw.program->hasTransmission == transmissionStage;
         });
         if (frame->subsurface && special)
@@ -2227,7 +2293,7 @@ namespace material_graph
             {
                 captureUses.push_back({shadowMap, RHIResourceState::ShaderResource, readAccess});
             }
-            for (const auto& draw : frame->draws)
+            for (const auto& draw : frame->DrawsFor(blended))
             {
                 if (!draw.program->hasSubsurface)
                 {
@@ -2279,7 +2345,7 @@ namespace material_graph
                     encoder.ClearRenderTargets(targets, clear);
                     encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
                     encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                    for (const auto& draw : frame->draws)
+                    for (const auto& draw : frame->DrawsFor(blended))
                     {
                         if (!selected(draw) || !draw.program->hasSubsurface ||
                             (draw.program->hasTransmission && !transmissionStage))
@@ -2368,7 +2434,7 @@ namespace material_graph
                     encoder.BindRenderTargets(target);
                     encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
                     encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-                    for (const auto& draw : frame->draws)
+                    for (const auto& draw : frame->DrawsFor(blended))
                     {
                         if (!selected(draw) || !draw.program->hasSurface ||
                             draw.program->hasTransmission != transmissionStage ||
@@ -2455,7 +2521,7 @@ namespace material_graph
             {
                 uses.push_back({shadowMap, RHIResourceState::ShaderResource, read});
             }
-            for (const auto& draw : frame->draws)
+            for (const auto& draw : frame->DrawsFor(blended))
             {
                 if (!selected(draw))
                 {
@@ -2504,7 +2570,7 @@ namespace material_graph
                 }
             }
             encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-            for (const auto& draw : frame->draws)
+            for (const auto& draw : frame->DrawsFor(blended))
             {
                 if (!selected(draw))
                 {
@@ -2611,8 +2677,9 @@ namespace material_graph
         {
             std::lock_guard lock(recordingMutex_);
             const auto found = recordings_.find(frame_->recording);
-            if (found == recordings_.end() || !found->second.submitted || found->second.decided ||
-                found->second.publication || found->second.completion != completion.value ||
+            if (!completion.value || found == recordings_.end() || !found->second.submitted ||
+                !found->second.accepted || found->second.decided || found->second.publication ||
+                found->second.completion != completion.value ||
                 frame_->input->View().frameId != frameId)
             {
                 return Fail(error, "LX Scene material publication needs its exact successful native submission.");
@@ -2622,7 +2689,8 @@ namespace material_graph
         if (ticket.IsValid())
         {
             const auto* batch = ticket.GetRecordedBatch();
-            if (!batch || batch->GetFrameId() != frameId || batch->GetCompletionPoint().value != completion.value)
+            if (!batch || batch->GetFrameId() != frameId || batch->GetRecordingId() != frame_->recording ||
+                batch->GetCompletionPoint().value != completion.value)
             {
                 return Fail(error, "LX Scene publication ticket must identify its exact recorded graph batch.");
             }
@@ -2631,8 +2699,6 @@ namespace material_graph
         {
             std::lock_guard lock(recordingMutex_);
             auto& recording = recordings_.at(frame_->recording);
-            recording.accepted = true;
-            recording.completion = completion.value;
             recording.ticket = ticket;
             if (pending)
             {
@@ -2731,7 +2797,7 @@ namespace material_graph
             recording.decided = true;
             recording.publication.reset();
             recording.ticket = {};
-            if (recording.completion <= completed_)
+            if (recording.completion != 0 && recording.completion <= completed_)
             {
                 recordings_.erase(frame->recording);
             }
@@ -2776,7 +2842,7 @@ namespace material_graph
                 found->second.decided = true;
                 found->second.publication.reset();
                 found->second.ticket = {};
-                if (found->second.completion <= completed_)
+                if (found->second.completion != 0 && found->second.completion <= completed_)
                 {
                     recordings_.erase(found);
                 }
@@ -2865,8 +2931,29 @@ namespace material_graph
         if (found != recordings_.end())
         {
             found->second.submitted = true;
-            found->second.completion = completion.value;
+            if (!found->second.accepted)
+            {
+                found->second.completion = completion.value;
+            }
         }
+    }
+
+    void SceneHost::OnUploadAccepted(std::uint64_t recording, RHICompletionPoint completion)
+    {
+        std::lock_guard lock(recordingMutex_);
+        const auto found = recordings_.find(recording);
+        if (found == recordings_.end())
+        {
+            return;
+        }
+        auto& owner = found->second;
+        // Queue admission owns the frame even when later publication or tail
+        // work fails. An accepted unknown completion stays quarantined to idle.
+        owner.completion = owner.accepted
+            ? (owner.completion == 0 || completion.value == 0 ? 0 : (std::max)(owner.completion, completion.value))
+            : completion.value;
+        owner.submitted = true;
+        owner.accepted = true;
     }
 
     void SceneHost::OnUploadCompleted(std::uint64_t completed)
@@ -2876,13 +2963,14 @@ namespace material_graph
         completed_ = (std::max)(completed_, completed);
         for (auto& [recording, owner] : recordings_)
         {
-            if (owner.submitted && owner.completion <= completed_)
+            if (owner.accepted && owner.completion != 0 && owner.completion <= completed_)
             {
                 owner.owners.clear();
             }
         }
         std::erase_if(recordings_, [&](const auto& item) {
-            return item.second.submitted && item.second.decided && item.second.completion <= completed_;
+            return item.second.accepted && item.second.decided && item.second.completion != 0 &&
+                   item.second.completion <= completed_;
         });
     }
 

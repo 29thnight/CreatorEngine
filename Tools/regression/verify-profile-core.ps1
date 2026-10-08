@@ -8,7 +8,8 @@ param(
     # ★ 이름이 `$Mutation` 이면 안 된다. PowerShell 변수는 대소문자를 안 가려
     #   아래 foreach 의 `$mutation` 과 같은 변수가 되고, [string[]] 형 제약이
     #   변이 표를 문자열로 바꿔 버린다.
-    [string[]]$Only = @()
+    [string[]]$Only = @(),
+    [switch]$AggregateOnly
 )
 
 # PHASE 14 P1+P2 — 새 프로파일러 코어의 계약 검사.
@@ -75,7 +76,7 @@ $mutations = @(
         File   = 'ProfileAggregate.cpp'
         Old    = "`t`t`tconst node_key key{ stack.empty() ? 0u : stack.back(),"
         New    = "`t`t`tconst node_key key{ 0u,"
-        Expect = 'aggregate/'
+        Expect = 'aggregate-flat/hierarchy'
         Why    = '깊이를 무시하고 접으면 자식이 루트로 올라와 트리가 사라진다'
     },
     @{
@@ -98,6 +99,15 @@ $mutations = @(
         New    = "`t`tif (events.size() > 1000000) std::sort(events.begin(), events.end(), precedes);"
         Expect = 'aggregate/'
         Why    = '이벤트는 끝난 순서로 들어오므로 정렬 없이는 자식이 부모보다 먼저 나온다'
+    },
+
+    @{
+        Name   = 'aggregate-nested-range'
+        File   = 'ProfileAggregate.cpp'
+        Old    = "`t`t`t`tnextSibling.push_back(row);"
+        New    = "`t`t`t`tif (node.child_end > row + 2) { node.child_end = row + 2; }`n`t`t`t`tnextSibling.push_back(row);"
+        Expect = 'aggregate/nested-'
+        Why    = 'A subtree range must include grandchildren and cannot stop after the direct child'
     },
 
     # ── PHASE 14 P3 reader ──────────────────────────────────────────────────
@@ -885,6 +895,10 @@ $sources = @(
     (Join-Path $PSScriptRoot 'profile_core_probe.cpp')
 )
 
+if ($AggregateOnly -and @($mutations | Where-Object { $_.Name -notlike 'aggregate-*' }).Count -gt 0) {
+    throw '-AggregateOnly requires -Only aggregate-* or a specific aggregate mutation'
+}
+
 function Invoke-Probe {
     param(
         [string]   $Config,
@@ -909,8 +923,12 @@ function Invoke-Probe {
 
     $outFile = Join-Path $OutDir "$Name.out"
     $errFile = Join-Path $OutDir "$Name.err"
-    $proc = Start-Process -FilePath $exe -WindowStyle Hidden -PassThru `
-        -RedirectStandardOutput $outFile -RedirectStandardError $errFile
+    $processOptions = @{
+        FilePath = $exe; WindowStyle = 'Hidden'; PassThru = $true
+        RedirectStandardOutput = $outFile; RedirectStandardError = $errFile
+    }
+    if ($AggregateOnly) { $processOptions.ArgumentList = @('--aggregate-only') }
+    $proc = Start-Process @processOptions
     if (-not $proc.WaitForExit(60000)) {
         $proc.Kill()
         $proc.WaitForExit()

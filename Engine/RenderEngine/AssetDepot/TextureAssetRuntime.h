@@ -84,6 +84,14 @@ namespace AssetDepot
 
     using TextureAssetEntries = std::map<TextureAssetKey, TextureAssetCacheEntry>;
 
+    // Caller constructs this before a root transaction. Stage fills consumerPins
+    // before mutation; detached nodes and cancellation pins die after outer unlock.
+    struct TextureAssetRetiredEntries final
+    {
+        TextureAssetEntries entries;
+        std::vector<own::shared_owner<AssetRequestState<Texture>>> consumerPins;
+    };
+
     struct TextureAssetCacheSnapshot final
     {
         std::size_t entries{};

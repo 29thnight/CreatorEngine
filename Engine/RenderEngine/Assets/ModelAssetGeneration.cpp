@@ -14,6 +14,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <fstream>
 #include <limits>
 #include <optional>
@@ -1484,17 +1485,22 @@ namespace assets
         TrimRetainedLocked(retentionBudgetBytes_, released);
     }
 
+    void ModelAssetGenerationCache::DetachAll(RetiredEntries& retired) noexcept
+    {
+        assert(retired.generations_.empty());
+        assert(retired.currentByAsset_.empty());
+        std::lock_guard lock(mutex_);
+        retired.generations_.swap(generations_);
+        retired.currentByAsset_.swap(currentByAsset_);
+        retainedBytes_ = 0;
+        accessSerial_ = 0;
+        stats_ = {};
+    }
+
     void ModelAssetGenerationCache::Clear()
     {
-        std::map<Key, Entry> released;
-        {
-            std::lock_guard lock(mutex_);
-            released.swap(generations_);
-            currentByAsset_.clear();
-            retainedBytes_ = 0;
-            accessSerial_ = 0;
-            stats_ = {};
-        }
+        RetiredEntries retired;
+        DetachAll(retired);
     }
 
     ModelAssetGenerationCacheSnapshot ModelAssetGenerationCache::Snapshot() const

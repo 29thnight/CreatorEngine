@@ -78,8 +78,11 @@ struct MeshSurfaceChunk
 {
     std::shared_ptr<const MeshSurfaceInput> input;
     // First-appearance local -> original vertex index. No welding across seams.
-    std::vector<std::uint32_t> sourceVertices;
+    std::span<const std::uint32_t> sourceVertices;
     std::uint32_t firstTriangle{};
+  private:
+    friend class MeshSurfacePlan;
+    std::shared_ptr<const std::vector<std::uint32_t>> sourceVerticesOwner_;
 };
 
 // Stable triangle-order partition. Every triangle appears exactly once; shared

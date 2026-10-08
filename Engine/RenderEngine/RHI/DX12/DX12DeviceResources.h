@@ -1,5 +1,5 @@
 #pragma once
-#include "RenderFrameServices.h"
+#include "../IRenderDeviceServices.h"
 #include "../IRHIDeviceResources.h"
 #include <cstdint>
 #include <string>
@@ -45,6 +45,14 @@ class DX12Encoder;
 class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServices
 {
 public:
+    bool SupportsTransientAliasing() const override { return true; }
+    bool DescribeTransientAllocation(const RHITransientResourceDesc& desc,
+        RHITransientAllocationInfo& info, std::string& error) const override;
+    bool CreateTransientHeap(const RHITransientAllocationInfo& info,
+        std::shared_ptr<RHITransientHeap>& heap, std::string& error) override;
+    bool CreatePlacedTransient(const RHITransientResourceDesc& desc,
+        RHITransientHeap& heap, RHITextureHandle& texture, RHIBufferHandle& buffer,
+        std::string& error) override;
     /// 정의는 둘 다 .cpp 에 있다 — 즉시 인코더를 불완전 타입으로 들기
     /// 때문이다(A-3).
     ///

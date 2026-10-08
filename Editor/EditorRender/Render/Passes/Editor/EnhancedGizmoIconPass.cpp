@@ -5,20 +5,11 @@
 
 #include <cstring>
 #include <algorithm>
-#include <sstream>
 #include <string>
 #include "RHI/RHIShaderCompiler.h"
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 합쳐지므로 이름을 고유하게 둔다.
-    std::string GizmoIconHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── 빌보드 셰이더 ──
     //
     // DX11 Gizmo_billboard.vs/gs/ps의 이식. GS의 쿼드 확장을 VS로 옮겼다 —
@@ -178,7 +169,7 @@ bool EnhancedGizmoIconPass::PrepareFrame(const EnhancedFrameContext& context,
         {
             std::string uploadError;
             batch.uploaded = context.textureCache->GetOrUpload((*m_icons)[batch.first].texture, uploadError);
-            if (!batch.uploaded.IsValid() && !uploadError.empty())
+            if (!batch.uploaded.IsValid() || !uploadError.empty())
             {
                 outError = "기즈모 아이콘 텍스처 업로드 실패: " + uploadError;
                 return false;

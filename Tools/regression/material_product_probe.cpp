@@ -1,4 +1,5 @@
 #include "../../Engine/RenderEngine/Texture.h"
+#include "support/MaterialPipelineSlot.h"
 #include "../../Engine/RenderEngine/MaterialGraphProduct.h"
 #include "../../Engine/RenderEngine/RHI/RHIShaderCompiler.h"
 #include "../../Engine/RenderEngine/RHI/RHIShaderSource.h"

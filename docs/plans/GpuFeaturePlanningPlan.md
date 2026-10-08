@@ -1,5 +1,11 @@
 # GPU 기능 설계·구현 공수 확정 계획 (PHASE 4.8)
 
+## 2026-10-08 RT/PT/Hybrid 구현 페이즈 분리
+
+사용자 목표는 Path Tracing 환경과 기존 래스터에 RT 로직을 결합하는 Hybrid 환경의 구성이다. 실제 구현 정본은 [PHASE 4.85](PathTracingHybridPipelinePlan.md)로 신설하며 ReSTIR PT Enhanced와 AMD tetrahedral cages의 구현·평가·채택을 포함한다. 첫 directional hard shadow는 Hybrid의 초기 슬라이스로 유지한다. GPU-3는 두 환경의 공통 RT·재질·지원/fallback 설계를, GPU-9는 신규 RTP-0~13과 기존 RT0/RT1/HY0·EXP의 중복 없는 공수·지원·실행 순서 확정을 담당한다. GPU-2 확률 tile lighting은 ReSTIR PT와 별도 설계 축이다.
+
+14행 전부 미착수·기성 0이며 중앙 추정 208인일(기본 환경 116 + 효과 확장/연구 92)을 별도 구현 페이즈에 산정했다. 기존 설계 4행 9인일은 유지한다. RTP-0/첫 prototype 뒤 GPU-9에서 추정을 재검토하며 이 공수 산정만으로 GPU-9를 완료하지 않는다. 기본 두 환경 구축은 필수이고 연구의 제품 채택은 oracle·품질·전체 CPU/GPU/VRAM 비용으로 판정한다. 외부 Spartan 코드는 정확한 버전/라이선스·상업 허가를 확인한 경우만 도입한다.
+
 **2026-10-01 사용자 결정:** 이 페이즈의 실행·픽셀·성능 완료 판정은 DX12 Debug/Release다. RHI 중립 계약과 필요한 backend 구현은 유지한다. Vulkan 실행 비교·동등성·교차 픽셀 수용은 [PHASE 4.9](BackendParityPlan.md)의 RenderDoc 캡처 → 리소스 확인 → 픽셀별 비교가 단독 소유하며 이 페이즈의 선행·잔여·실패 조건으로 사용하지 않는다.
 
 

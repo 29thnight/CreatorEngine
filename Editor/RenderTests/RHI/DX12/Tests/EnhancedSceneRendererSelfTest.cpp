@@ -1,4 +1,5 @@
 #include "../../../../../Tools/regression/material_owner_checks.h"
+#include "RHI/DX12/DX12Format.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -12,6 +13,7 @@
 #include "Render/Scene/EnhancedDrawReplayInput.h"
 #include "Render/Scene/EnhancedLatticeReplayInput.h"
 #include "Render/Core/EnhancedLivePipelineDesc.h"
+#include "Render/Core/PassResourceRetirement.h"
 #include "Render/Passes/Geometry/EnhancedGBufferPass.h"
 #include "Render/Passes/Geometry/EnhancedDeferredPass.h"
 #include "MaterialGraphSceneLookup.h"
@@ -486,9 +488,24 @@ passes:
         bool ReserveUploadBatch(std::span<const RHIUploadRequest>,
             std::span<RHIBufferSlice>, std::string&) override { return false; }
         RHIBufferSlice AllocateUpload(const RHIUploadRequest&) override { return {}; }
-        uint64_t GetCurrentUploadRecordingId() const override { return 1; }
-        void RegisterUploadTransactionListener(IRHIUploadTransactionListener*) override {}
-        void UnregisterUploadTransactionListener(IRHIUploadTransactionListener*) override {}
+        uint64_t GetCurrentUploadRecordingId() const override { return currentRecording; }
+        void RegisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
+        {
+            listeners.push_back(listener);
+        }
+        void UnregisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
+        {
+            std::erase(listeners, listener);
+        }
+        void AcceptRecording(RHICompletionPoint completion = {1})
+        {
+            const auto recording = GetCurrentUploadRecordingId();
+            for (auto* listener : listeners)
+            {
+                listener->OnUploadAccepted(recording, completion);
+            }
+        }
+        std::vector<IRHIUploadTransactionListener*> listeners;
         RHIBufferSlice UploadConstants(const void*, size_t) override { return {}; }
         RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc>) override { return {}; }
         RHIEncoder& GetImmediateEncoder() override { return encoder; }
@@ -501,8 +518,16 @@ passes:
         RHIRenderTargetBinding CreateRenderTargets(
             std::span<const RHIColorTargetDesc>, const RHIDepthTargetDesc*) override { return {}; }
         RHITextureInfo DescribeTexture(RHITextureHandle) const override { return {}; }
-        void ReleaseTexture(RHITextureHandle) override {}
-        void ReleaseBuffer(RHIBufferHandle) override {}
+        void ReleaseTexture(RHITextureHandle handle) override
+        {
+            if (textureReleaseFailures)
+            {
+                --textureReleaseFailures;
+                throw 1;
+            }
+            releasedTextures.push_back(handle);
+        }
+        void ReleaseBuffer(RHIBufferHandle handle) override { releasedBuffers.push_back(handle); }
         void TransitionResources(std::span<const RHITransition>) override {}
         void TransitionBuffers(std::span<const RHIBufferTransition>) override {}
 
@@ -574,10 +599,155 @@ passes:
         }
 
         R6bFakeReadbackEncoder encoder;
+        uint64_t currentRecording{ 1 };
+        std::vector<RHITextureHandle> releasedTextures;
+        std::vector<RHIBufferHandle> releasedBuffers;
+        uint32_t textureReleaseFailures{};
         uint32_t nextHandle{ 100 };
         uint32_t liveReadbacks{ 0 };
         uint32_t releasedReadbacks{ 0 };
     };
+
+    bool ValidatePassResourceRetirement(std::string& error)
+    {
+        const auto fail = [&](const char* reason) { error = reason; return false; };
+        const auto texture = [](uint32_t slot) { return RHITextureHandle{RHIHandleBits::Encode(slot, 1)}; };
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            retirement.ReserveRetirements(4);
+            auto* listener = services.listeners.front();
+            retirement.Retire(texture(1));
+            services.AcceptRecording({7});
+            // The retirement listener has already run, as it does before IBL's
+            // acceptance callback. The device can still report the old recording.
+            retirement.RetireAccepted(texture(2), {7});
+            retirement.Retire(texture(3));
+            services.currentRecording = 2;
+            retirement.RetireAccepted(texture(4), {7});
+            listener->OnUploadCompleted(6);
+            if (retirement.PendingCount() != 4 || !services.releasedTextures.empty())
+                return fail("accepted targets released before their exact completion");
+            listener->OnUploadCompleted(7);
+            listener->OnUploadAborted(1);
+            listener->OnUploadCompleted(8);
+            if (retirement.PendingCount() || services.releasedTextures.size() != 4)
+                return fail("post-accept retirement missed its decision or released twice");
+            for (uint32_t i = 0; i < 4; ++i)
+                if (services.releasedTextures[i] != texture(i + 1))
+                    return fail("retirement did not preserve the exact native handles");
+            retirement.ClearAfterIdle();
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            auto* listener = services.listeners.front();
+            retirement.Retire(texture(1));
+            retirement.Retire(texture(2));
+            services.AcceptRecording({7});
+            services.textureReleaseFailures = 1;
+            listener->OnUploadCompleted(7);
+            if (retirement.PendingCount() != 1 || services.releasedTextures.size() != 1
+                || services.releasedTextures.front() != texture(2))
+                return fail("one release exception interrupted collection of other owners");
+            listener->OnUploadCompleted(7);
+            if (retirement.PendingCount() || services.releasedTextures.size() != 2
+                || services.releasedTextures.back() != texture(1))
+                return fail("failed release lost its retained handle before retry");
+            retirement.ClearAfterIdle();
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            retirement.ReserveRetirements(4);
+            auto* listener = services.listeners.front();
+            retirement.Retire(texture(1));
+            services.AcceptRecording({});
+            retirement.RetireAccepted(texture(2), {});
+            retirement.Retire(RHIBufferHandle{RHIHandleBits::Encode(3, 1)});
+            listener->OnUploadAborted(1);
+            listener->OnUploadSubmissionRejected(1, {});
+            listener->OnUploadCompleted(UINT64_MAX);
+            services.currentRecording = 2;
+            retirement.Retire(texture(4));
+            listener->OnUploadSubmissionRejected(2, {9});
+            listener->OnUploadCompleted(UINT64_MAX);
+            if (retirement.PendingCount() != 4 || !services.releasedTextures.empty()
+                || !services.releasedBuffers.empty())
+                return fail("accepted completion zero escaped idle quarantine");
+            retirement.ClearAfterIdle();
+            if (retirement.PendingCount() || services.releasedTextures.size() != 3
+                || services.releasedBuffers.size() != 1)
+                return fail("idle teardown did not release quarantined native owners");
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            auto* listener = services.listeners.front();
+            uint32_t accepted = 0, rejected = 0;
+            struct AcceptanceProbe final : IRHIUploadTransactionListener
+            {
+                uint32_t count{};
+                void OnUploadSubmitted(uint64_t, RHICompletionPoint) override {}
+                void OnUploadCompleted(uint64_t) override {}
+                void OnUploadAborted(uint64_t) override {}
+                void OnUploadAccepted(uint64_t, RHICompletionPoint) override { ++count; }
+            } probe;
+            services.RegisterUploadTransactionListener(&probe);
+            retirement.WatchRecording([&] { ++rejected; }, [&]
+            {
+                ++accepted;
+                services.currentRecording = 2;
+                retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+                throw 1;
+            });
+            retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+            services.AcceptRecording({5});
+            listener->OnUploadAborted(1);
+            listener->OnUploadSubmissionRejected(1, {5});
+            if (accepted != 2 || rejected || probe.count != 1)
+                return fail("throwing accepted watch interrupted or rolled back acceptance");
+            services.AcceptRecording({6});
+            if (accepted != 3 || rejected || probe.count != 2)
+                return fail("reentrant watch registration lost its next recording decision");
+            services.UnregisterUploadTransactionListener(&probe);
+            retirement.ClearAfterIdle();
+        }
+        {
+            R6bFakeReadbackServices services;
+            PassResourceRetirement retirement;
+            retirement.Attach(services);
+            auto* listener = services.listeners.front();
+            uint32_t rejected = 0, accepted = 0;
+            services.AcceptRecording({3});
+            services.currentRecording = 2;
+            retirement.Retire(texture(1));
+            retirement.WatchRecording([&] { ++rejected; throw 1; }, [&] { ++accepted; });
+            retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+            listener->OnUploadSubmitted(2, {9});
+            listener->OnUploadSubmissionRejected(2, {9});
+            listener->OnUploadAborted(2);
+            listener->OnUploadCompleted(2);
+            if (rejected != 2 || accepted || retirement.PendingCount() != 1
+                || !services.releasedTextures.empty())
+                return fail("genuine rejection did not consume rollback watches exactly once");
+            listener->OnUploadCompleted(3);
+            if (retirement.PendingCount() || services.releasedTextures.size() != 1)
+                return fail("rejected reservation replaced the preceding accepted completion");
+            services.currentRecording = 3;
+            retirement.WatchRecording([&] { ++rejected; }, [&] { ++accepted; });
+            services.AcceptRecording({10});
+            if (accepted != 1 || rejected != 2)
+                return fail("rejection prevented a clean retry recording");
+            retirement.ClearAfterIdle();
+        }
+        error.clear();
+        return true;
+    }
 
     bool ValidateRg1GraphFixtures(std::string& error)
     {
@@ -2028,7 +2198,10 @@ passes:
             R6bFakeReadbackEncoder::CopyRecord::Kind::Buffer == copies[3].kind &&
             buffer == copies[3].buffer && bufferReadback.buffer == copies[3].readback &&
             16 == copies[3].sourceOffset && 64 == copies[3].bytes;
-        const bool transitioned = 1 == services.encoder.barrierBatches &&
+        const bool unsubmitted = RHIResourceState::Common == textureFinal &&
+            RHIResourceState::Common == bufferFinal;
+        services.AcceptRecording();
+        const bool transitioned = unsubmitted && 1 == services.encoder.barrierBatches &&
             1 == services.encoder.textureTransitions &&
             1 == services.encoder.bufferTransitions &&
             RHIResourceState::CopySource == textureFinal &&
@@ -3189,6 +3362,13 @@ bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& ou
 
 bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& outLog)
 {
+    std::string retirementError;
+    if (!ValidatePassResourceRetirement(retirementError))
+    {
+        outLog += "[common] pass resource retirement failed: " + retirementError + "\n";
+        return false;
+    }
+    outLog += "[common] pass retirement acceptance, quarantine, and retry contracts passed\n";
     if (!ValidateCompletionRetireQueue())
     {
         outLog += "[공통] completion retire queue 경계 검증 실패\n";
@@ -4237,6 +4417,8 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     error.clear(); return true;
 }
 
+#include "EnhancedTransientRg7Tests.h"
+
 bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
 {
     std::string rg1Error;
@@ -4507,7 +4689,7 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         const uint32_t readBarriers = graph.GetPassBarrierCount(read);
         const bool correct = tracked.IsValid() && 1 == firstBarriers &&
             1 == uavBarriers && 1 == readBarriers &&
-            RHIResourceState::ShaderResource == finalState;
+            RHIResourceState::Common == finalState;
         if (!correct) passed = false;
 
         outLog += "[4/7] 중립 buffer transition/UAV 유도 "

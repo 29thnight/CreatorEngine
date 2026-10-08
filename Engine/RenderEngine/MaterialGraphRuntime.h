@@ -83,7 +83,37 @@ namespace material_graph
     // Existing instances retain their own immutable owner after reload or removal.
     class GenerationStore
     {
+    private:
+        struct Entry
+        {
+            own::weak_owner<const Generation> current;
+            own::shared_owner<const Generation> retained;
+            experiment::cooked::Sha256Digest digest{};
+            own::weak_owner<GenerationPreparationState> request;
+            std::uint64_t currentGeneration{}, requestGeneration{};
+            mutable std::uint64_t lastUse{};
+            std::size_t retainedBytes{};
+            bool dirty{};
+        };
+
     public:
+        // Construct before taking outer admission locks, and destroy after those
+        // locks are released. Empty map construction may allocate on some STLs.
+        class RetiredEntries final
+        {
+        public:
+            RetiredEntries() = default;
+            RetiredEntries(const RetiredEntries&) = delete;
+            RetiredEntries& operator=(const RetiredEntries&) = delete;
+            RetiredEntries(RetiredEntries&&) = delete;
+            RetiredEntries& operator=(RetiredEntries&&) = delete;
+            ~RetiredEntries() = default;
+
+        private:
+            friend class GenerationStore;
+            std::map<experiment::AssetId, Entry> entries_;
+        };
+
         // Non-reload requests share one preparation for the current revision.
         // Reloads supersede its ticket without removing the accepted owner;
         // dirty entries must prepare successfully before they are cache hits.
@@ -103,6 +133,9 @@ namespace material_graph
         // and make subsequent loads prepare/join the changed source revision.
         void InvalidatePreparation(const experiment::AssetId& id);
         void Remove(const experiment::AssetId& id);
+        // Requires empty caller-owned storage; detaches without allocating or
+        // destroying retained owners under this cache or outer admission locks.
+        void DetachAll(RetiredEntries& retired) noexcept;
         void Clear();
         // Eviction only releases this cache's references; consumers and requests
         // keep their exact generations. Zero disables cache retention.
@@ -111,17 +144,6 @@ namespace material_graph
         std::size_t RetainedBudgetBytes() const;
 
     private:
-        struct Entry
-        {
-            own::weak_owner<const Generation> current;
-            own::shared_owner<const Generation> retained;
-            experiment::cooked::Sha256Digest digest{};
-            own::weak_owner<GenerationPreparationState> request;
-            std::uint64_t currentGeneration{}, requestGeneration{};
-            mutable std::uint64_t lastUse{};
-            std::size_t retainedBytes{};
-            bool dirty{};
-        };
         void RetainLocked(Entry& entry, const own::shared_owner<const Generation>& owner,
                           std::vector<own::shared_owner<const Generation>>& released);
         void TrimRetainedLocked(std::vector<own::shared_owner<const Generation>>& released);

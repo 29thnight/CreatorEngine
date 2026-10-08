@@ -367,7 +367,7 @@ public:
 	// 그 원본을 함께 돌려준다. legacy 표기 문서에는 원본이 없으므로
 	// outAuthored는 채워지지 않는다(반환값은 그대로 성공).
 	bool DeserializeMaterialPayload(Material& material,
-		const Authoring::NodeView& node, experiment::Material* outAuthored);
+        const Authoring::NodeView& node, experiment::Material* outAuthored, bool persistRecovery = true);
 	// I5-D5c1 — base 재질 자산의 저작 원본. 씬의 ref 표기가 base를 legacy로만
 	// 로드해 왔다(LoadMaterialShared). 실패·legacy 표기 자산은 nullptr다.
 	own::shared_owner<const experiment::Material> LoadAuthoredMaterialShared(
@@ -504,7 +504,8 @@ private:
         AssetDepot::AssetRequestStatus status, AssetDepot::AssetRequestError error,
         std::string message = {}, own::shared_owner<const Texture> texture = {});
     void TrimTextureAssetsLocked();
-    [[nodiscard]] AssetDepot::TextureAssetEntries InvalidateTextureAssetsLocked();
+    void StageTextureAssetRetirementLocked(AssetDepot::TextureAssetRetiredEntries& retired);
+    void InvalidateTextureAssetsLocked(AssetDepot::TextureAssetRetiredEntries& retired) noexcept;
     AssetDepot::TextureAssetRuntimeState m_textureAssets{};
 
     template<class T>
@@ -535,7 +536,8 @@ private:
     own::shared_owner<const T> TryAcquireResolvedModelAssetLocked(
         const experiment::cooked::ResolvedAssetEntry& resolved, bool exactGeneration);
     void TrimModelAssetsLocked();
-    [[nodiscard]] AssetDepot::ModelAssetRetiredEntries InvalidateModelAssetsLocked();
+    void StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEntries& retired);
+    void InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntries& retired) noexcept;
     AssetDepot::ModelAssetRuntimeState m_modelAssets{};
 
     own::shared_owner<AssetBundlePreparation> SubmitAssetBundle(const AssetBundle& bundle);
@@ -545,7 +547,9 @@ private:
     job_handle SubmitAssetWorkLocked(job_group work,
         std::span<const job_handle> dependencies = {}, bool exactGeneration = false);
     own::shared_owner<PreparedRuntimeAsset> PrepareRuntimeAsset(
-        FileGuid guid, const file::path& path, RuntimeAssetType type);
+        FileGuid guid, const file::path& path, RuntimeAssetType type,
+        std::optional<std::uint64_t> expectedEpoch = {},
+        std::optional<std::uint64_t> expectedResolverRevision = {});
     bool PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsset>& asset, std::string& error);
     void DrainAssetPreparations();
     bool ValidatePreparedMaterialTextures(Material& material, std::string& error);
@@ -565,7 +569,8 @@ private:
 	void LoadAssetCatalog(const file::path& root);
 	[[nodiscard]] assets::ModelAssetGeneration::Shared LoadAndPublishModelAssetGeneration(
 		FileGuid guid, bool allowEditorRecovery = false, bool publish = true,
-        std::optional<std::uint64_t> expectedEpoch = {});
+        std::optional<std::uint64_t> expectedEpoch = {},
+        std::optional<std::uint64_t> expectedResolverRevision = {});
 	DataContainer<Texture>& TextureCacheFor(TextureFileType type);
 	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
 		FileGuid guid, bool remove);
@@ -573,6 +578,11 @@ private:
 	// 이미 그 owner를 붙든 Material은 자기 shared_ptr로 살려 두므로 그리는 중에
 	// 사라지지 않는다 — 새로 해석하는 쪽만 새 generation의 것을 받는다.
 	void RetireModelGenerationTextures(assets::ModelAssetGenerationHandle handle);
+    struct LegacyCacheRetirement;
+    // Retirement storage is constructed before outer locks. Stage may allocate
+    // but mutates no cache/status; Detach is the nonthrowing root-commit phase.
+    void StageLegacyCacheRetirementLocked(LegacyCacheRetirement& retired);
+    void DetachLegacyCachesLocked(LegacyCacheRetirement& retired) noexcept;
 	void InvalidateShaderMeta(FileGuid guid, bool remove);
 	void SynchronizeLegacyMaterialProperties(Material& material) const;
 
@@ -626,6 +636,30 @@ private:
     std::vector<std::pair<FileGuid, file::path>> m_sceneMaterials;
     std::mutex m_pendingAssetChangeMutex;
 	std::vector<RuntimeAssetChange> m_pendingAssetChanges;
+
+    // Private transaction-local values only, never another cache/manager.
+    // Destruction is deliberately after all outer admission/catalog guards.
+    struct LegacyCacheRetirement final
+    {
+        assets::ModelAssetGenerationCache::RetiredEntries models;
+        material_graph::GenerationStore::RetiredEntries graphs;
+        DataContainer<Material> materials;
+        std::unordered_map<FileGuid, asset_cache_detail::Entry<experiment::Material>> authoredMaterials;
+        DataContainer<Texture> textures;
+        DataContainer<Texture> uiTextures;
+        DataContainer<Texture> spriteSheets;
+        std::map<assets::ModelTextureHandle, asset_cache_detail::Entry<Texture>> modelTextures;
+        std::map<assets::ModelAssetGenerationHandle, std::vector<assets::ModelTextureHandle>> modelTextureOwners;
+        std::unordered_map<FileGuid, std::uint32_t> shaderSlotsByGuid;
+        std::vector<ShaderMetaCacheSlot> shaderSlots;
+        std::vector<std::uint32_t> shaderFreeSlots;
+        std::map<FileGuid, own::weak_owner<PreparedRuntimeAsset>> preparations;
+        std::vector<own::weak_owner<SceneAssetPreparation>> scenes;
+        std::vector<own::weak_owner<AssetBundlePreparation>> bundles;
+        std::vector<own::shared_owner<PreparedRuntimeAsset>> preparationPins;
+        std::vector<own::shared_owner<SceneAssetPreparation>> scenePins;
+        std::vector<own::shared_owner<AssetBundlePreparation>> bundlePins;
+    };
 
 };
 

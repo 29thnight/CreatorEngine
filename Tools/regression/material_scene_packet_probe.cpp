@@ -1,5 +1,5 @@
 #include "material_owner_checks.h"
-#include "MaterialGraphScenePacket.h"
+#include "support/MaterialGraphScenePacket.h"
 #include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -213,7 +213,7 @@ void Run(const std::filesystem::path& root)
             true, error);
     };
     const auto core = generation(false), layered = generation(true);
-    Check(core && layered && core != layered, "Immutable compiled generations");
+    Check(core && layered && !material_graph_test::SamePinnedObject(core, layered), "Immutable compiled generations");
     const auto texture = TextureFixture(false), environmentTexture = TextureFixture(true);
     const float base = std::pow((128.f / 255.f + .055f) / 1.055f, 2.4f);
     const auto evaluation = [&](float ior, bool coat, std::uint64_t view = 1) {
@@ -397,6 +397,10 @@ void Run(const std::filesystem::path& root)
             currentEvaluation = evaluation(frame ? 2.7f : 1.3f, frame != 0, frame + 1);
             Check(prepare(pipelines, currentEvaluation, coverage, environment, packet),
                   "Native Scene prepare: " + error);
+            Check(packet->instancePins && packet->instancePinIndex != InstanceFramePins::InvalidIndex &&
+                      material_graph_test::SamePinnedObject(
+                          packet->instancePins->Borrow(packet->instancePinIndex), currentEvaluation.instance),
+                  "Scene packet's borrowed evaluation retains the exact source through its frame pin index");
             Check(packet->queue == SceneCoverage::Opaque && packet->selection.route == Route::Forward,
                   "Opaque queue remains separate from Forward shading");
             Check((frame == 0 && !slot.Active()) || (frame == 1 && slot.Active()->serial != packet->serial),

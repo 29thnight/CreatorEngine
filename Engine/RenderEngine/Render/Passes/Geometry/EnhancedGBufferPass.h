@@ -173,8 +173,6 @@ public:
     }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     // I5-D34a/b: experimentMask가 0이 아니면 그 마스크에서 유도한 입력
     // 레이아웃 + 대응 퍼뮤테이션(core→EXPERIMENT_STATIC_VERTEX,
     // core|skin→EXPERIMENT_SKINNED_VERTEX)으로 desc를 만든다. 0이면 legacy 96B.

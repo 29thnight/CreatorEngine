@@ -2,7 +2,7 @@
 #include "MaterialGraphRasterSurface.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "Render/Graph/ShadowCasterBounds.h"
-#include "MaterialGraphScenePacket.h"
+#include "support/MaterialGraphScenePacket.h"
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphSceneHost.h"
 #include "MaterialGraphSceneCompiler.h"
@@ -13,6 +13,10 @@
 #include "Render/Scene/ExperimentMaterialSealing.h"
 #include "Render/Graph/EnhancedMaterialSealHash.h"
 #include "Render/Passes/Geometry/EnhancedDecalPass.h"
+#include "Render/Passes/Lighting/EnhancedSSGIPass.h"
+#include "Render/Passes/Lighting/EnhancedVolumetricFogPass.h"
+#include "RHI/DX12/EnhancedIBLGenerator.h"
+#include <set>
 #include "RHI/DX12/DX12MeshCache.h"
 #include "PathFinder.h"
 #include "Texture.h"
@@ -593,7 +597,56 @@ class RecordingChangeDevice : public ProbeDevice
 {
   public:
     bool flushOnUpload{};
-    bool forbidAllocations{}, forbidImmediate{};
+      bool forbidAllocations{}, forbidImmediate{};
+      bool trackOwnedResources{};
+      unsigned textureAttempt{}, bufferAttempt{}, failTextureAt{}, failBufferAt{};
+      std::set<std::uint32_t> ownedTextures, ownedBuffers;
+      IRHIUploadTransactionListener* lastListener{};
+      void RegisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
+      {
+          lastListener = listener;
+          ProbeDevice::RegisterUploadTransactionListener(listener);
+      }
+      bool CreateTexture(const RHITextureDesc& desc, RHITextureHandle& result, std::string& error) override
+      {
+          if (trackOwnedResources && ++textureAttempt == failTextureAt)
+          {
+              result = {};
+              error = "Injected texture allocation failure";
+              return false;
+          }
+          const bool success = ProbeDevice::CreateTexture(desc, result, error);
+          if (trackOwnedResources && result.IsValid())
+          {
+              ownedTextures.insert(result.id);
+          }
+          return success;
+      }
+      bool CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandle& result, std::string& error) override
+      {
+          if (trackOwnedResources && ++bufferAttempt == failBufferAt)
+          {
+              result = {};
+              error = "Injected buffer allocation failure";
+              return false;
+          }
+          const bool success = ProbeDevice::CreateBuffer(desc, result, error);
+          if (trackOwnedResources && result.IsValid())
+          {
+              ownedBuffers.insert(result.id);
+          }
+          return success;
+      }
+      void ReleaseTexture(RHITextureHandle texture) override
+      {
+          ownedTextures.erase(texture.id);
+          ProbeDevice::ReleaseTexture(texture);
+      }
+      void ReleaseBuffer(RHIBufferHandle buffer) override
+      {
+          ownedBuffers.erase(buffer.id);
+          ProbeDevice::ReleaseBuffer(buffer);
+      }
     RHIBufferSlice AllocateUpload(const RHIUploadRequest& request) override
     {
         if (forbidAllocations)
@@ -2725,6 +2778,295 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 #include "material_forward_blend_tests.inl"
 #include "material_forward_transport_tests.inl"
 
+void RunIssueAdmission(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
+                       const std::shared_ptr<const Generation>& generation)
+{
+    EnhancedFrameContext context{};
+    context.resources = &device;
+    context.rootSignatures = &roots;
+    context.psoManager = &pipelines;
+    std::string error;
+    {
+        SceneHost host;
+        for (unsigned revision = 0; revision < 80; ++revision)
+        {
+            auto invalid = std::make_shared<Generation>(*generation);
+            invalid->cooked.product.program.volume = true;
+            invalid->cooked.product.program.slang.clear();
+            Check(!host.RequestProgram(context, invalid, error), "Invalid volume revision is rejected");
+            const auto failed = host.ProgramStats().failedPreparations;
+            Check(!host.RequestProgram(context, invalid, error)
+                      && host.ProgramStats().failedPreparations == failed,
+                  "Repeated failed revision preserves its memoized error");
+        }
+        Check(host.RequestProgram(context, generation, error), "Corrected generation enters after 80 failures");
+        const auto failures = host.ProgramStats().failedPreparations;
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(90);
+        while (!host.IsProgramReady(generation, RHIShaderCompiler::GetOutput()))
+        {
+            host.PollPrograms(context);
+            Check(host.ProgramStats().failedPreparations == failures,
+                  "Corrected generation introduces no new preparation failure");
+            Check(std::chrono::steady_clock::now() < deadline, "Corrected generation completes preparation");
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
+        Check(host.IsProgramReady(generation, RHIShaderCompiler::GetOutput()),
+              "Corrected generation prepares without recreating host");
+        host.ShutdownAfterIdle();
+    }
+    {
+        SceneHost host;
+        for (unsigned request = 0; request < 64; ++request)
+        {
+            Check(host.RequestProgram(context, std::make_shared<Generation>(*generation), error),
+                  "Pending request fits admission budget");
+        }
+        const auto overflow = std::make_shared<Generation>(*generation);
+        Check(!host.RequestProgram(context, overflow, error) && host.ProgramStats().compileSubmissions > 0,
+              "Admission overflow starts existing jobs instead of deadlocking before PollPrograms");
+        host.ShutdownAfterIdle();
+    }
+    std::cout << "ISSUE_ADMISSION_OK failedRevisions=80 pendingRequests=64 overflowProgress=1\n";
+}
+
+void RunIssueResourceLifetime(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
+                             ProbeTextures& textures, ProbePool& pool)
+{
+    std::string error;
+    EnhancedFrameContext context{};
+    context.resources = &device;
+    context.rootSignatures = &roots;
+    context.psoManager = &pipelines;
+    context.textureCache = &textures;
+    context.width = context.height = 64;
+    device.trackOwnedResources = true;
+    {
+        RHIBufferHandle buffer;
+        RHIBufferDesc desc{};
+        desc.bytes = 64;
+        Check(device.CreateBuffer(desc, buffer, error), "Graph state test buffer");
+        RHIResourceState state = RHIResourceState::Common;
+        for (unsigned decision = 0; decision < 4; ++decision)
+        {
+            const auto initial = state;
+            const auto finalState = decision == 3 ? RHIResourceState::ShaderResource : RHIResourceState::CopyDest;
+            Check(device.BeginFrame(error), "Graph state recording opens");
+            EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitSingleWriter);
+            if (decision == 3)
+            {
+                pool.BeginFrame(0);
+                Check(graph.PrepareParallel(pool, error), "Graph state parallel preparation");
+            }
+            const auto imported = graph.ImportBuffer(buffer, state, "StateAcceptance", &state);
+            graph.AddPass("StateAcceptance", {{imported, finalState,
+                decision == 3 ? RGAccessMode::Read : RGAccessMode::Write}},
+                [decision](const EnhancedRenderGraph::ExecuteContext&)
+                {
+                    if (decision == 1)
+                    {
+                        throw std::runtime_error("Injected graph recording failure");
+                    }
+                }, true);
+            Check(graph.Compile(error) && state == initial,
+                  "Compile never commits planned external resource state decision=" + std::to_string(decision)
+                      + " error=" + error);
+            if (decision == 0)
+            {
+                device.AbortFrame();
+            }
+            else if (decision == 1)
+            {
+                Check(!graph.Execute(error), "Callback failure is reported");
+                device.AbortFrame();
+            }
+            else
+            {
+                if (decision == 3)
+                {
+                    graph.SetParallelRecordCostThreshold(0);
+                    RHIRecordedBatch batch;
+                    RHIRecordedBatchDesc description;
+                    description.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&device);
+                    Check(graph.RecordParallel(pool, 2, description, batch, error) && state == initial,
+                          "Parallel recording alone never commits external state");
+                    RHISubmissionTicket ticket;
+                    Check(GetRHISubmissionThread().EnqueueRecordedBatch(&device, device, std::move(batch), ticket, error)
+                              && state == finalState, "Parallel queue acceptance commits external state");
+                }
+                else
+                {
+                    Check(graph.Execute(error) && state == initial,
+                          "Recording alone never commits external resource state");
+                }
+                Check(device.EndFrame(error) && state == finalState,
+                      "Queue acceptance commits external resource state");
+                Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Graph state submission");
+                device.WaitForGpu();
+                Check(GetRHISubmissionThread().Drain(&device, error), "Graph state retirement");
+            }
+            if (decision < 2)
+            {
+                Check(state == RHIResourceState::Common, "Aborted graph preserves initial external state");
+            }
+        }
+        device.ReleaseBuffer(buffer);
+    }
+    for (unsigned fail = 2; fail <= 4; ++fail)
+    {
+        EnhancedSSGIPass pass;
+        device.textureAttempt = 0;
+        device.failTextureAt = fail;
+        Check(!pass.PrepareFrame(context, error) && device.ownedTextures.empty(),
+              "SSGI partial allocation is rolled back");
+        device.failTextureAt = 0;
+        Check(pass.PrepareFrame(context, error) && device.ownedTextures.size() == 4,
+              "SSGI retries the complete four-texture set");
+        pass.Shutdown();
+        Check(device.ownedTextures.empty(), "SSGI shutdown releases owned textures");
+    }
+    for (unsigned fail = 2; fail <= 3; ++fail)
+    {
+        EnhancedVolumetricFogPass pass;
+        device.textureAttempt = 0;
+        device.failTextureAt = fail;
+        Check(!pass.Initialize(context, error) && device.ownedTextures.empty(),
+              "Fog partial allocation is rolled back");
+        device.failTextureAt = 0;
+        for (unsigned cycle = 0; cycle < 3; ++cycle)
+        {
+            Check(pass.Initialize(context, error) && device.ownedTextures.size() == 3,
+                  "Fog on/off creates exactly three owned volumes");
+            pass.Shutdown();
+            Check(device.ownedTextures.empty(), "Fog off releases all owned volumes");
+        }
+    }
+    {
+        EnhancedForwardPass pass;
+        auto opaqueOnly = context;
+        opaqueOnly.forwardLightingConsumer = false;
+        Check(pass.PrepareFrame(opaqueOnly, error) && device.ownedBuffers.empty(),
+              "Opaque graph-only view does not allocate Forward light-culling buffers");
+        EnhancedRenderGraph graph(device);
+        pass.Declare(graph, opaqueOnly);
+        Check(device.ownedBuffers.empty(), "Opaque graph-only view does not declare Forward culling work");
+        pass.Shutdown();
+    }
+    for (unsigned fail = 1; fail <= 2; ++fail)
+    {
+        EnhancedForwardPass pass;
+        device.bufferAttempt = 0;
+        device.failBufferAt = fail;
+        Check(!pass.PrepareFrame(context, error) && device.ownedBuffers.empty(),
+              "Forward partial buffer allocation is rolled back");
+        device.failBufferAt = 0;
+        Check(pass.PrepareFrame(context, error) && device.ownedBuffers.size() == 2,
+              "Forward retries the complete tile-buffer pair");
+        Check(device.BeginFrame(error), "Forward growth recording opens");
+        context.width = context.height = 128;
+        Check(pass.PrepareFrame(context, error) && device.ownedBuffers.size() == 4,
+              "Forward growth retains previous buffers until recording decision");
+        device.AbortFrame();
+        Check(device.ownedBuffers.size() == 2, "Aborted unused recording releases retired pair");
+        pass.Shutdown();
+        Check(device.ownedBuffers.empty(), "Forward shutdown releases tile buffers");
+        context.width = context.height = 64;
+    }
+    {
+        PassResourceRetirement retirement;
+        Check(retirement.Attach(device), "Retirement attaches to owning device");
+        auto* listener = device.lastListener;
+        RHIBufferHandle buffer{};
+        RHIBufferDesc desc{};
+        desc.bytes = 64;
+        Check(device.CreateBuffer(desc, buffer, error), "Retirement test buffer");
+        Check(device.BeginFrame(error), "Retirement test recording");
+        const auto recording = device.GetCurrentUploadRecordingId();
+        unsigned acceptedMetadata{}, rejectedMetadata{};
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.Retire(buffer);
+        listener->OnUploadSubmitted(recording, RHICompletionPoint{100});
+        Check(acceptedMetadata == 0 && rejectedMetadata == 0,
+              "Submission reservation cannot publish temporal metadata");
+        listener->OnUploadAccepted(recording, RHICompletionPoint{100});
+        Check(acceptedMetadata == 2 && rejectedMetadata == 0,
+              "Acceptance commits every metadata transaction in its recording");
+        listener->OnUploadCompleted(99);
+        Check(device.ownedBuffers.size() == 1, "In-flight retirement waits for exact completion");
+        listener->OnUploadCompleted(100);
+        Check(device.ownedBuffers.empty(), "Completed retirement releases its resource");
+        device.AbortFrame();
+        listener->OnUploadSubmitted(999, RHICompletionPoint{200});
+        listener->OnUploadAccepted(999, RHICompletionPoint{200});
+        Check(device.CreateBuffer(desc, buffer, error), "Rejected recording retirement buffer");
+        Check(device.BeginFrame(error), "Rejected retirement recording");
+        const auto rejectedRecording = device.GetCurrentUploadRecordingId();
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.WatchRecording([&] { ++rejectedMetadata; }, [&] { ++acceptedMetadata; });
+        retirement.Retire(buffer);
+        listener->OnUploadSubmissionRejected(rejectedRecording, RHICompletionPoint{201});
+        Check(acceptedMetadata == 2 && rejectedMetadata == 2,
+              "Rejection rolls back initialization and temporal metadata together");
+        listener->OnUploadCompleted(199);
+        Check(device.ownedBuffers.size() == 1, "Rejected recording still preserves prior in-flight use");
+        listener->OnUploadCompleted(200);
+        Check(device.ownedBuffers.empty(), "Prior completion releases rejected-recording retirement");
+        device.AbortFrame();
+        retirement.ClearAfterIdle();
+    }
+    device.trackOwnedResources = false;
+    {
+        const auto cooked = []
+        {
+            assets::CookedEnvironment value;
+            value.cubeSize = value.brdfSize = 1;
+            for (unsigned image = 0; image < value.images.size(); ++image)
+            {
+                value.images[image] = TextureImage::Allocate(EnhancedIBLGenerator::CookedImageFormat(image),
+                    1, 1, image < 3 ? 6 : 1, 1, image < 3);
+            }
+            for (auto& importance : value.importance)
+            {
+                importance = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 1, 1);
+            }
+            value.source = TextureImage::Allocate(RHIFormat::RGBA32Float, 1, 1, 1, 1);
+            return value;
+        };
+        EnhancedIBLGenerator generator;
+        Check(generator.Initialize(context, error), "IBL transaction initialization");
+        Check(device.BeginFrame(error), "IBL initial cooked recording");
+        Check(generator.InstallCooked(context, cooked(), error), "IBL initial cooked preparation: " + error);
+        Check(device.EndFrame(error) && GetRHISubmissionThread().DrainSubmissions(&device, error),
+              "IBL initial environment accepted");
+        device.WaitForGpu();
+        const auto previousCube = generator.GetCubeMap();
+        const auto previousGeneration = generator.GetGeneration();
+        Check(device.BeginFrame(error), "IBL replacement recording");
+        Check(generator.InstallCooked(context, cooked(), error), "IBL replacement preparation");
+        bool prepared = true;
+        generator.WatchPreparationRejected([&prepared] { prepared = false; });
+        const auto capturePath = std::filesystem::path("Build/Verification/GitHubIssueAudit20261008/aborted-ibl.ceibl");
+        Check(generator.QueueCookedCapture(capturePath, {}, error) && generator.HasPendingCookedCapture(),
+              "IBL replacement capture is recorded");
+        device.AbortFrame();
+        Check(!prepared && generator.GetCubeMap() == previousCube
+                  && generator.GetGeneration() == previousGeneration && !generator.HasPendingCookedCapture(),
+              "Aborted IBL restores previous environment and discards unsubmitted capture");
+        Check(!std::filesystem::exists(capturePath), "Aborted IBL capture is never published");
+        Check(device.BeginFrame(error), "IBL partial preparation recording");
+        auto invalid = cooked();
+        invalid.images[3] = {};
+        Check(!generator.InstallCooked(context, std::move(invalid), error)
+                  && generator.GetCubeMap() == previousCube && generator.GetGeneration() == previousGeneration,
+              "Partial IBL preparation preserves previous environment");
+        device.AbortFrame();
+        generator.Shutdown();
+    }
+    std::string validation;
+    Check(device.DrainDebugMessages(validation) == 0, "Resource lifetime GPU validation: " + validation);
+    std::cout << "ISSUE_RESOURCE_LIFETIME_OK ssgiFailurePoints=3 fogFailurePoints=2 fogCycles=6 forwardFailurePoints=2 validation=0\n";
+}
+
 void Run(const std::filesystem::path& root, std::string_view mode = {}, const std::filesystem::path& cookedRoot = {})
 {
 #ifdef LX_PROBE_VULKAN
@@ -2811,6 +3153,18 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
 #endif
           "Native caches " + error);
     Check(pool.Initialize(device, 4, ProbeDevice::kFrameCount, error), "Native command pool " + error);
+    if (mode == "--issue-resource-lifetime")
+    {
+        RunIssueResourceLifetime(device, roots, pipelines, textures, pool);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--issue-admission")
+    {
+        RunIssueAdmission(device, roots, pipelines, instances[0]->generation);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
     if (mode == "--forward-blend")
     {
         RunForwardBlend(root, device, roots, pipelines, textures, pool, instances, cube);
@@ -3417,6 +3771,8 @@ int main(int argc, char** argv)
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
                    (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
+                    std::string_view(argv[2]) == "--issue-resource-lifetime" ||
+                    std::string_view(argv[2]) == "--issue-admission" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
                     std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),

@@ -24,19 +24,10 @@
 #include <cstring>
 #include <functional>
 #include <limits>
-#include <sstream>
 #include <stdexcept>
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string GBufferHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // 첫 슬라이스의 셰이더는 소스에 담는다. 재질 셰이더 연결은 씬 연결
     // 슬라이스에서 ShaderSystem·PSOManager와 함께 붙인다.
     //

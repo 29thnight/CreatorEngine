@@ -103,7 +103,6 @@ int wmain(int argc,wchar_t** argv)
         EnvironmentRequire(generator.QueueCookedCapture(output,identity,error),error);
         EnvironmentRequire(device.EndFrame(error),error);
         EnvironmentRequire(GetRHISubmissionThread().DrainSubmissions(&device,error),error);
-        generator.MarkCookedCaptureSubmitted(device.GetLastSignaledFenceValue());
         device.WaitForGpu();
         const auto generationMs=EnvironmentElapsed(start);
         do
@@ -123,7 +122,7 @@ int wmain(int argc,wchar_t** argv)
         EnvironmentRequire(generator.QueueCookedCapture(roundtrip,identity,error),error);
         EnvironmentRequire(device.EndFrame(error),error);
         EnvironmentRequire(GetRHISubmissionThread().DrainSubmissions(&device,error),error);
-        generator.MarkCookedCaptureSubmitted(device.GetLastSignaledFenceValue()); device.WaitForGpu();
+        device.WaitForGpu();
         const auto uploadMs=EnvironmentElapsed(uploadStart);
         do { EnvironmentRequire(generator.FinishCookedCapture(device.GetCompletedFenceValue(),error),error);
             if (generator.HasPendingCookedCapture()) std::this_thread::sleep_for(std::chrono::milliseconds(5));

@@ -214,9 +214,6 @@
     <ClCompile Include="MaterialGraphRasterSurface.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="MaterialGraphScenePacket.cpp">
-      <IncludeInUnityFile>false</IncludeInUnityFile>
-    </ClCompile>
     <ClCompile Include="MaterialGraphSceneInput.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
@@ -692,7 +689,7 @@
     <ClInclude Include="MaterialGraphSurfaceBatch.h" />
     <ClInclude Include="MaterialGraphMeshSurface.h" />
     <ClInclude Include="MaterialGraphRasterSurface.h" />
-    <ClInclude Include="MaterialGraphScenePacket.h" />
+    <ClInclude Include="MaterialGraphSceneCoverage.h" />
     <ClInclude Include="MaterialGraphSceneInput.h" />
     <ClInclude Include="MaterialGraphSceneHost.h" />
     <ClInclude Include="GpuGeometryVisibility.h" />
@@ -821,7 +818,8 @@
     <ClInclude Include="TextureImage.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
     <ClInclude Include="RHI\IRenderDeviceServices.h" />
-    <ClInclude Include="RHI\DX12\RenderFrameServices.h" />
+    <ClInclude Include="RHI\RHITransientHeap.h" />
+    <ClInclude Include="Render\Core\PassResourceRetirement.h" />
     <ClInclude Include="RHI\IRHIDeviceResources.h" />
     <ClInclude Include="RHI\ScreenSizedResource.h" />
     <ClInclude Include="UIClipping.h" />

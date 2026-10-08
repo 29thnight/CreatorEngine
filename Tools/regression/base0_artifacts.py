@@ -100,7 +100,39 @@ def audit_graph(graph):
     for resource in topology["resources"]:
         resource.pop("initialState", None)
         resource.pop("finalState", None)
+        resource.pop("aliasGroup", None)
+        resource.pop("allocationBytes", None)
     return digest(topology)
+
+
+def audit_aliasing(graph):
+    resources = graph['resources']
+    groups, activations = {}, {}
+    for resource in resources:
+        group = resource.get('aliasGroup', 0xffffffff)
+        require(resource.get('allocationBytes', 0) >= 0, 'negative allocation size')
+        if group != 0xffffffff:
+            require(group >= 0 and truth(resource['used']) and not truth(resource['imported']) and
+                    resource.get('allocationBytes', 0) > 0, 'invalid shared heap member')
+            groups.setdefault(group, []).append(resource)
+    for position, index in enumerate(graph['executeOrder']):
+        for barrier in graph['passes'][index]['barriers']:
+            if truth(barrier.get('aliasing', False)):
+                resource = resources[barrier['resource']]
+                require(resource.get('aliasGroup', 0xffffffff) in groups and
+                        resource['firstUse'] == position and barrier['before'] == barrier['after'] == 0 and
+                        not truth(barrier['uav']) and not truth(barrier.get('afterPass', False)),
+                        'invalid heap activation')
+                require(any(u['resource'] == resource['id'] and u['access'] == 2
+                            for u in graph['passes'][index]['usages']), 'activation without explicit write')
+                activations[resource['id']] = activations.get(resource['id'], 0) + 1
+    for members in groups.values():
+        require(len(members) >= 2, 'single-member shared heap')
+        require(len({r['kind'] for r in members}) == 1, 'mixed buffer/texture heap')
+        ordered = sorted(members, key=lambda r: r['firstUse'])
+        require(all(a['lastUse'] < b['firstUse'] for a, b in zip(ordered, ordered[1:])),
+                'overlapping shared heap lifetimes')
+        require(all(activations.get(r['id'], 0) == 1 for r in members), 'missing/repeated heap activation')
 
 
 def audit_versioned_graph(graph):
@@ -195,6 +227,7 @@ def audit_versioned_graph(graph):
     require(len(waves) == len(passes), "dependency wave count")
     require(all(waves[i] >= 0 if i in live else waves[i] == -1 for i in range(len(passes))), "dependency wave liveness")
     require(all(waves[e["producer"]] < waves[e["consumer"]] for e in expected), "dependency wave order")
+    audit_aliasing(graph)
     topology = copy.deepcopy(graph)
     topology.pop("generation")
     topology.pop("graphEpoch")
@@ -206,6 +239,8 @@ def audit_versioned_graph(graph):
     for resource in topology["resources"]:
         resource.pop("initialState")
         resource.pop("finalState")
+        resource.pop("aliasGroup", None)
+        resource.pop("allocationBytes", None)
     return digest(topology)
 
 

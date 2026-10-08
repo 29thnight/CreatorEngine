@@ -476,22 +476,19 @@ namespace ce
 
 			// 전위 순서에서 한 노드의 서브트리는 연속이다. 직속 자식의 범위는
 			// 첫 자식부터 마지막 자식의 서브트리 끝까지다.
-			for (std::uint32_t source = 0; source < result.m_hierarchy.size(); ++source)
+			std::vector<std::uint32_t> nextSibling;
+			for (std::size_t remaining = ordered.size(); remaining > 0; --remaining)
 			{
-				const auto& children = childrenOf[source + 1];
-				aggregate_row& node = ordered[remap[source]];
-				if (children.empty())
+				const auto row = static_cast<std::uint32_t>(remaining - 1);
+				aggregate_row& node = ordered[row];
+				while (!nextSibling.empty() && ordered[nextSibling.back()].depth > node.depth)
 				{
-					node.child_begin = node.child_end = remap[source] + 1;
-					continue;
+					nextSibling.pop_back();
 				}
-				node.child_begin = remap[children.front()];
-				std::uint32_t last = node.child_begin;
-				for (std::uint32_t child : children)
-				{
-					last = (std::max)(last, remap[child]);
-				}
-				node.child_end = last + 1;
+				node.child_begin = row + 1;
+				node.child_end = nextSibling.empty()
+					? static_cast<std::uint32_t>(ordered.size()) : nextSibling.back();
+				nextSibling.push_back(row);
 			}
 
 			// 표본도 함께 옮긴다. Flat 이 같은 표본을 다시 쓰는데, 옮기지 않으면

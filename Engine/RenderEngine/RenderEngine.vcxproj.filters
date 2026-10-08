@@ -1065,7 +1065,7 @@
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h">
       <Filter>RHI\DX12\Lighting</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\RenderFrameServices.h">
+    <ClInclude Include="Render\Core\PassResourceRetirement.h">
       <Filter>RHI\DX12\Compatibility</Filter>
     </ClInclude>
     <ClInclude Include="RHI\IDisplayPresentationSink.h">

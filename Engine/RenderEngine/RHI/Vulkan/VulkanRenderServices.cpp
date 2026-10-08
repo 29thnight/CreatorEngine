@@ -90,25 +90,22 @@ struct VulkanTextureCache::Impl
         uint64_t completionValue{ 0 };
         RHIUploadTransactionState state{ RHIUploadTransactionState::Recording };
     };
-    std::vector<Transaction> transactions;
+    std::unordered_map<uint32_t, Transaction> transactions;
 
     void Track(RHITextureHandle handle)
     {
         if (!handle.IsValid() || nullptr == resources) return;
-        transactions.push_back(Transaction{
+        transactions.insert_or_assign(handle.id, Transaction{
             handle, resources->GetCurrentUploadRecordingId(), 0,
             RHIUploadTransactionState::Recording });
     }
 
     bool IsUploadPending(RHITextureHandle handle) const
     {
-        for (const Transaction& transaction : transactions)
-        {
-            if (transaction.handle.id != handle.id) continue;
-            return transaction.state == RHIUploadTransactionState::Recording ||
-                transaction.state == RHIUploadTransactionState::Queued;
-        }
-        return false;
+        const auto found = transactions.find(handle.id);
+        return found != transactions.end() &&
+            (found->second.state == RHIUploadTransactionState::Recording ||
+             found->second.state == RHIUploadTransactionState::Queued);
     }
 
     // 여기 있던 FormatOf 와 BGRA 스위즐을 걷었다(축 A).
@@ -532,7 +529,7 @@ uint64_t VulkanTextureCache::SweepGraveyard(uint64_t completedValue)
 void VulkanTextureCache::OnUploadSubmitted(uint64_t recordingId,
     RHICompletionPoint completion)
 {
-    for (Impl::Transaction& transaction : m_impl->transactions)
+    for (auto& [id, transaction] : m_impl->transactions)
     {
         if (transaction.state != RHIUploadTransactionState::Recording ||
             transaction.recordingId != recordingId) continue;
@@ -545,12 +542,12 @@ void VulkanTextureCache::OnUploadSubmitted(uint64_t recordingId,
 
 void VulkanTextureCache::OnUploadCompleted(uint64_t completedValue)
 {
-    for (Impl::Transaction& transaction : m_impl->transactions)
+    std::erase_if(m_impl->transactions, [&](const auto& entry)
     {
-        if (transaction.state == RHIUploadTransactionState::Queued &&
-            transaction.completionValue <= completedValue)
-            transaction.state = RHIUploadTransactionState::Resident;
-    }
+        const auto& transaction = entry.second;
+        return transaction.state == RHIUploadTransactionState::Queued &&
+            transaction.completionValue <= completedValue;
+    });
 }
 
 void VulkanTextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICompletionPoint completion)
@@ -559,7 +556,7 @@ void VulkanTextureCache::OnUploadSubmissionRejected(uint64_t recordingId, RHICom
     {
         return;
     }
-    for (Impl::Transaction& transaction : m_impl->transactions)
+    for (auto& [id, transaction] : m_impl->transactions)
     {
         if (transaction.recordingId == recordingId && transaction.completionValue == completion.value &&
             (transaction.state == RHIUploadTransactionState::Queued ||
@@ -576,14 +573,14 @@ void VulkanTextureCache::OnUploadAborted(uint64_t recordingId)
     auto transaction = m_impl->transactions.begin();
     while (transaction != m_impl->transactions.end())
     {
-        if (transaction->state != RHIUploadTransactionState::Recording ||
-            transaction->recordingId != recordingId)
+        if (transaction->second.state != RHIUploadTransactionState::Recording ||
+            transaction->second.recordingId != recordingId)
         {
             ++transaction;
             continue;
         }
 
-        const RHITextureHandle handle = transaction->handle;
+        const RHITextureHandle handle = transaction->second.handle;
         m_impl->resources->ReleaseTexture(handle);
         for (auto entry = m_impl->entries.begin(); entry != m_impl->entries.end();)
         {
@@ -2062,17 +2059,15 @@ VkImageView VulkanDeviceResources::ResolveDepthView(const RHIDepthTargetDesc& de
 
 RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
 {
-    // ★ 커맨드 버퍼가 슬롯마다 다른 객체라 **갈아 끼운다**. `DX12Encoder` 는
-    //   제자리 되감기(`ResetState`)로 힙 할당을 피하는데, 이쪽은 되감을 것이
-    //   아니라 바꿀 것이라 그 최적화가 성립하지 않는다.
-    //
-    //   프레임당 한 번이면 무해하다. 프레임마다 여러 번 부르면 그때 재사용을
-    //   넣는다 — 지금 넣으면 어떤 조건에서 갈아야 하는지를 소비자 없이 정한다.
     const VkCommandBuffer current = m_frameOpen
         ? GetCommandBuffer() : VK_NULL_HANDLE;
 
     AccumulateEncoderDiagnostics();
-    m_encoder = std::make_unique<VulkanEncoder>(
+    if (!m_encoder)
+    {
+        m_encoder = std::make_unique<VulkanEncoder>(VK_NULL_HANDLE, nullptr);
+    }
+    m_encoder->Rebind(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTables[m_frameIndex],
         m_device, &m_descriptorRecycler, &m_bindingTable, &m_samplerTable,
         GetIndirectDrawCapabilities(), m_viewportLimits, GetMeshShaderCapabilities());

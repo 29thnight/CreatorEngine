@@ -79,8 +79,6 @@ public:
     uint32_t GetLastBatchCount() const { return m_lastBatchCount; }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     /// 인스턴스 자료. 셰이더의 구조체와 정확히 같아야 한다.

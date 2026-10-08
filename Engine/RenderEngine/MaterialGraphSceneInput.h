@@ -4,7 +4,7 @@
 #include "MaterialGraphInstancePins.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "MaterialGraphMeshSurface.h"
-#include "MaterialGraphScenePacket.h"
+#include "MaterialGraphSceneCoverage.h"
 
 class Material;
 

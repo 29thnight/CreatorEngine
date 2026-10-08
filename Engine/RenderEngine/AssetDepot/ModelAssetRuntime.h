@@ -78,6 +78,9 @@ namespace AssetDepot
         ModelAssetEntries<assets::ModelAnimationDescriptor> descriptors{};
         ModelAssetEntries<assets::ModelSkeletonPayload> skeletons{};
         ModelAssetEntries<assets::ModelAnimationPayload> animations{};
+        std::vector<own::shared_owner<AssetRequestState<assets::ModelAnimationDescriptor>>> descriptorConsumers;
+        std::vector<own::shared_owner<AssetRequestState<assets::ModelSkeletonPayload>>> skeletonConsumers;
+        std::vector<own::shared_owner<AssetRequestState<assets::ModelAnimationPayload>>> animationConsumers;
     };
 
     struct ModelAssetCacheSnapshot final

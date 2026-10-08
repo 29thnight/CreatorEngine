@@ -193,7 +193,8 @@ namespace EnhancedRenderDebugUi
                             ImGui::BulletText("%s r%u %s: %s -> %s%s",
                                 barrier.afterPass ? "After" : "Before", barrier.resource,
                                 resourceName(barrier.resource), GraphStateName(barrier.before),
-                                GraphStateName(barrier.after), barrier.uav ? " (UAV ordering)" : "");
+                                GraphStateName(barrier.after), barrier.aliasing ? " (heap activation)" :
+                                (barrier.uav ? " (UAV ordering)" : ""));
                         }
                     }
                     if (!pass.phases.empty())

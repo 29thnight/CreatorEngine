@@ -1,4 +1,5 @@
 #include "material_owner_checks.h"
+#include "support/MaterialPipelineSlot.h"
 #include "MaterialGraphRenderBindings.h"
 #include "PathFinder.h"
 #include "Texture.h"
@@ -219,9 +220,8 @@ void Run(const std::filesystem::path& root)
         {
             Check(!RenderBindingCache::Bind(device, encoder, RHIBindPoint::Graphics, *packet, error),
                   "Reject stale-frame packet");
-            auto rebound = packet;
-            Check(!RenderBindingCache::RebindPass(device, *packet, layout, rebound, error) && rebound == packet,
-                  "Pass rebind rejects stale recordings and retains the accepted packet");
+            Check(!RenderBindingCache::ValidatePass(device, *packet, layout, error),
+                  "Pass binding rejects stale recordings");
         }
         const double roughness = frame % 2 ? .81 : .31;
         Check(BuildInstance(
@@ -233,17 +233,26 @@ void Run(const std::filesystem::path& root)
         Check(bindings.SamplerTableCount() == 1 && packet->resources.samplers.size() == 4,
               "Sampler table is shared across repeated frames and value edits");
         const auto accepted = packet;
-        std::shared_ptr<const RenderBindings> rebound;
-        Check(RenderBindingCache::RebindPass(device, *packet, layout, rebound, error) &&
-                  RenderBindingCache::Validate(device, *rebound, error) && material_graph_test::SamePinnedObject(rebound->instance, packet->instance) &&
-                  rebound->resources.uniforms == packet->resources.uniforms &&
-                  rebound->recordingId == packet->recordingId && rebound->descriptorVersion == packet->descriptorVersion,
-              "Second pass shares current immutable material resources");
+        std::shared_ptr<const RenderBindings> repeated;
+        Check(bindings.Prepare(device, textures, instance, layout, repeated, error) && repeated == packet,
+              "Same immutable instance and complete layout reuse one packet in this recording");
+        Check(packet->instancePins && packet->instancePinIndex != InstanceFramePins::InvalidIndex &&
+                  material_graph_test::SamePinnedObject(packet->instance, instance) &&
+                  material_graph_test::SamePinnedObject(packet->instancePins->Borrow(packet->instancePinIndex), instance) &&
+                  packet->resources.owners.empty(),
+              "Binding packet borrows the exact instance and texture closure through its frame pin index");
+        auto otherViewPins = own::make_shared<InstanceFramePins>();
+        otherViewPins->Retain(instance);
+        Check(bindings.Prepare(device, textures, instance, layout, repeated, error, otherViewPins) &&
+                  repeated == packet &&
+                  !material_graph_test::SamePinnedObject(repeated->instancePins, otherViewPins),
+              "Same-recording reuse retains its original independent frame pin table");
+        Check(RenderBindingCache::ValidatePass(device, *packet, layout, error),
+              "Second pass validates the shared material resources without copying");
         auto wrongLayout = layout;
         wrongLayout.samplerSlot.reset();
-        const auto acceptedRebind = rebound;
-        Check(!RenderBindingCache::RebindPass(device, *packet, wrongLayout, rebound, error) && rebound == acceptedRebind,
-              "Pass rebind rejects a missing reflected slot without replacing accepted resources");
+        Check(!RenderBindingCache::ValidatePass(device, *packet, wrongLayout, error),
+              "Pass binding rejects a missing reflected slot");
         Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && packet == accepted,
               "Missing sampler root retains accepted render packet");
         wrongLayout = layout;
@@ -253,6 +262,9 @@ void Run(const std::filesystem::path& root)
         Instance wrongInstanceValue(*instance);
         wrongInstanceValue.uniforms.clear();
         const auto wrongInstance = own::make_shared<const Instance>(std::move(wrongInstanceValue));
+        Check(!bindings.Prepare(device, textures, wrongInstance, layout, packet, error, accepted->instancePins) &&
+                  packet == accepted,
+              "Copied representation identity cannot substitute a different object in the frame pin table");
         Check(!bindings.Prepare(device, textures, wrongInstance, layout, packet, error) && packet == accepted,
               "Invalid packed values retain accepted render packet");
         if (frame == 0)

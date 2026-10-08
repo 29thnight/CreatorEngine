@@ -3,6 +3,8 @@
 #include "../Texture.h"
 
 #include <algorithm>
+#include <cassert>
+#include <stdexcept>
 #include <exception>
 #include <limits>
 #include <utility>
@@ -602,44 +604,67 @@ void DataSystem::TrimTextureAssetsLocked()
     });
 }
 
-AssetDepot::TextureAssetEntries DataSystem::InvalidateTextureAssetsLocked()
+void DataSystem::StageTextureAssetRetirementLocked(AssetDepot::TextureAssetRetiredEntries& retired)
+{
+    assert(retired.entries.empty() && retired.consumerPins.empty());
+    std::size_t count{};
+    for (const auto& [key, entry] : m_textureAssets.entries)
+    {
+        if (entry.inFlight && entry.inFlight->status == AssetDepot::AssetRequestStatus::Pending)
+        {
+            if (entry.inFlight->consumers.size() > retired.consumerPins.max_size() - count)
+            {
+                throw std::length_error("Texture retirement consumer capacity exceeded.");
+            }
+            count += entry.inFlight->consumers.size();
+        }
+    }
+    retired.consumerPins.reserve(count);
+    for (const auto& [key, entry] : m_textureAssets.entries)
+    {
+        if (entry.inFlight && entry.inFlight->status == AssetDepot::AssetRequestStatus::Pending)
+        {
+            for (const auto& weak : entry.inFlight->consumers)
+            {
+                if (auto consumer = weak.lock())
+                {
+                    retired.consumerPins.push_back(std::move(consumer));
+                }
+            }
+        }
+    }
+}
+
+void DataSystem::InvalidateTextureAssetsLocked(AssetDepot::TextureAssetRetiredEntries& retired) noexcept
 {
     using namespace AssetDepot;
-    TextureAssetEntries detached;
-    detached.swap(m_textureAssets.entries);
+    assert(retired.entries.empty());
+    static_assert(noexcept(retired.entries.swap(m_textureAssets.entries)));
+    retired.entries.swap(m_textureAssets.entries);
     m_textureAssets.retainedChargeBytes = 0u;
     const auto status = m_assetPreparationStopping
         ? AssetRequestStatus::Cancelled : AssetRequestStatus::Stale;
     const auto error = m_assetPreparationStopping
         ? AssetRequestError::ShuttingDown : AssetRequestError::RevisionChanged;
-    for (auto& [key, entry] : detached)
+    for (auto& [key, entry] : retired.entries)
     {
         if (entry.retained)
         {
             ++m_textureAssets.logicalEvictions;
         }
-        if (!entry.inFlight || entry.inFlight->status != AssetRequestStatus::Pending)
+        if (entry.inFlight && entry.inFlight->status == AssetRequestStatus::Pending)
         {
-            continue;
+            // Captured jobs retain work and sources. Keep their weak subscriber
+            // lists intact until the detached work is destroyed after outer unlock.
+            entry.inFlight->status = status;
+            entry.inFlight->error = error;
+            entry.inFlight->message.clear();
         }
-        // Do not call the normal commit path here: lifecycle callers can already
-        // hold the catalog lock. Captured jobs still own and drain this work.
-        const auto& work = entry.inFlight;
-        work->status = status;
-        work->error = error;
-        work->message.clear();
-        for (const auto& weakConsumer : work->consumers)
-        {
-            if (const auto consumer = weakConsumer.lock())
-            {
-                TextureDepotNotify(consumer, status, error, {}, {});
-            }
-        }
-        work->consumers.clear();
     }
-    // Lifecycle caller keeps this return value outside both locks, so final
-    // descriptor/source/codec destruction is not part of the mount transaction.
-    return detached;
+    for (const auto& consumer : retired.consumerPins)
+    {
+        TextureDepotNotify(consumer, status, error, {}, {});
+    }
 }
 
 void DataSystem::SetTextureAssetCacheBudget(std::size_t bytes)

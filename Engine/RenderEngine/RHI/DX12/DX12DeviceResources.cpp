@@ -1,6 +1,8 @@
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../../EngineDiagnostics/DxCaptureSubmission.h"
 #include "DX12DeviceResources.h"
+#include "DX12Format.h"
+#include "../RHIRecordedBatch.h"
 #include "DX12Encoder.h"   // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <vector>
 
@@ -758,6 +760,8 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     }
     ResetImmediateEncoder();
 
+    RHIRecordingAdmissionGuard beginGuard([this] { AbortFrame(); });
+
     // frame index가 아니라 실제 fence 완료값으로 업로드 세그먼트를 회수한다.
     RefreshUploadBudget();
     RefreshPersistentMemoryBudget();
@@ -772,7 +776,6 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     m_descriptorRecycler.Collect(RHICompletionPoint{ completed });
     if (!m_descriptorRecycler.BeginRecording(m_currentRecordingId, outError))
     {
-        m_uploadAllocator.AbortRecording(m_currentRecordingId);
         return false;
     }
 
@@ -784,6 +787,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
     m_dsvViewHeap.BeginFrame();
     m_clearViewHeap.BeginFrame();
 
+    beginGuard.Accept();
     return true;
 }
 
@@ -852,6 +856,10 @@ bool DX12DeviceResources::FlushCommandList(std::string& outError)
         return false;
     }
     admission.Accept();
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+    }
     m_frameSubmissionTickets[frameSlot] = ticket;
     m_frameFenceValues[frameSlot] = fenceValue;
     m_lastAdmittedFenceValue = fenceValue;
@@ -909,6 +917,13 @@ bool DX12DeviceResources::PrepareParallelSubmission(
 
 void DX12DeviceResources::AcceptParallelSubmission(RHICompletionPoint completion, const RHISubmissionTicket& ticket)
 {
+    if (const auto batch = ticket.GetRecordedBatch())
+    {
+        for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+        {
+            listener->OnUploadAccepted(batch->GetRecordingId(), completion);
+        }
+    }
     m_frameFenceValues[m_frameIndex] = completion.value;
     m_frameSubmissionTickets[m_frameIndex] = ticket;
     m_lastAdmittedFenceValue = completion.value;
@@ -1037,6 +1052,10 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
         return false;
     }
     admission.Accept();
+    for (IRHIUploadTransactionListener* listener : m_uploadTransactionListeners)
+    {
+        listener->OnUploadAccepted(recordingId, RHICompletionPoint{fenceValue});
+    }
     m_frameSubmissionTickets[frameSlot] = ticket;
     m_frameFenceValues[frameSlot] = fenceValue;
     m_lastAdmittedFenceValue = fenceValue;
@@ -2274,6 +2293,179 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc,
     if (!outHandle.IsValid())
     {
         outError = "버퍼 핸들 표가 가득 찼다";
+        return false;
+    }
+    return true;
+}
+
+namespace
+{
+    struct DX12GraphTransientHeap final : RHITransientHeap
+    {
+        Microsoft::WRL::ComPtr<ID3D12Heap> native;
+        ID3D12Device* owner{nullptr};
+        RHITransientAllocationInfo allocation{};
+    };
+
+    D3D12_RESOURCE_DESC DX12GraphTransientDesc(const RHITransientResourceDesc& desc)
+    {
+        D3D12_RESOURCE_DESC result{};
+        result.SampleDesc.Count = 1;
+        if (desc.buffer)
+        {
+            result.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+            result.Width = desc.bufferDesc.bytes;
+            result.Height = result.DepthOrArraySize = result.MipLevels = 1;
+            result.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+            result.Flags = desc.bufferDesc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
+        }
+        else
+        {
+            const auto& texture = desc.textureDesc;
+            result.Dimension = texture.dim == RHITextureDesc::Dim::Texture3D
+                ? D3D12_RESOURCE_DIMENSION_TEXTURE3D : D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+            result.Width = texture.width;
+            result.Height = texture.height;
+            result.DepthOrArraySize = static_cast<UINT16>(texture.depthOrArraySize);
+            result.MipLevels = static_cast<UINT16>(texture.mipLevels);
+            result.Format = ToDXGI(texture.format);
+            if (texture.allowRenderTarget)
+            {
+                result.Flags |= D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+            }
+            if (texture.allowDepthStencil)
+            {
+                result.Flags |= D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+            }
+            if (texture.allowUnorderedAccess)
+            {
+                result.Flags |= D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
+            }
+        }
+        return result;
+    }
+
+    D3D12_HEAP_FLAGS DX12GraphHeapFlags(uint32_t heapClass)
+    {
+        switch (heapClass)
+        {
+        case 1: return D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS;
+        case 2: return D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES;
+        case 3: return D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES;
+        default: return D3D12_HEAP_FLAG_NONE;
+        }
+    }
+}
+
+bool DX12DeviceResources::DescribeTransientAllocation(const RHITransientResourceDesc& desc,
+    RHITransientAllocationInfo& info, std::string& error) const
+{
+    info = {};
+    if (!m_device || (desc.buffer ? desc.bufferDesc.bytes == 0 :
+        desc.textureDesc.width == 0 || desc.textureDesc.height == 0 ||
+        desc.textureDesc.depthOrArraySize == 0 || desc.textureDesc.depthOrArraySize > UINT16_MAX ||
+        desc.textureDesc.mipLevels == 0 || desc.textureDesc.mipLevels > UINT16_MAX ||
+        desc.textureDesc.format == RHIFormat::Unknown ||
+        (desc.textureDesc.allowRenderTarget && desc.textureDesc.allowDepthStencil)))
+    {
+        error = "Invalid transient allocation description";
+        return false;
+    }
+    const auto nativeDesc = DX12GraphTransientDesc(desc);
+    const auto nativeInfo = m_device->GetResourceAllocationInfo(0, 1, &nativeDesc);
+    if (nativeInfo.SizeInBytes == UINT64_MAX || !nativeInfo.SizeInBytes || !nativeInfo.Alignment)
+    {
+        error = "Cannot query transient resource allocation";
+        return false;
+    }
+    info.bytes = nativeInfo.SizeInBytes;
+    info.alignment = nativeInfo.Alignment;
+    // Homogeneous heaps also work on resource heap tier 1 hardware.
+    info.heapClass = desc.buffer ? 1 :
+        (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil ? 3 : 2);
+    return true;
+}
+
+bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& info,
+    std::shared_ptr<RHITransientHeap>& heap, std::string& error)
+{
+    heap.reset();
+    if (!m_device || !info.bytes || info.alignment != D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT ||
+        info.bytes % info.alignment != 0 || info.heapClass < 1 || info.heapClass > 3)
+    {
+        error = "Invalid transient heap allocation";
+        return false;
+    }
+    auto result = std::make_shared<DX12GraphTransientHeap>();
+    D3D12_HEAP_DESC desc{};
+    desc.SizeInBytes = info.bytes;
+    desc.Alignment = info.alignment;
+    desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    desc.Properties.CreationNodeMask = desc.Properties.VisibleNodeMask = 1;
+    desc.Flags = DX12GraphHeapFlags(info.heapClass);
+    const auto hr = m_device->CreateHeap(&desc, IID_PPV_ARGS(&result->native));
+    if (FAILED(hr))
+    {
+        error = "Transient heap creation failed " + HrToString(hr);
+        return false;
+    }
+    result->owner = m_device.Get();
+    result->allocation = info;
+    heap = std::move(result);
+    return true;
+}
+
+bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& desc,
+    RHITransientHeap& heap, RHITextureHandle& texture, RHIBufferHandle& buffer, std::string& error)
+{
+    texture = {};
+    buffer = {};
+    auto* nativeHeap = dynamic_cast<DX12GraphTransientHeap*>(&heap);
+    RHITransientAllocationInfo info{};
+    if (!DescribeTransientAllocation(desc, info, error))
+    {
+        return false;
+    }
+    if (!nativeHeap || nativeHeap->owner != m_device.Get() || !nativeHeap->native ||
+        info.heapClass != nativeHeap->allocation.heapClass || info.bytes > nativeHeap->allocation.bytes ||
+        (desc.buffer ? desc.bufferDesc.initialState : desc.textureDesc.initialState) != RHIResourceState::Common)
+    {
+        error = "Placed transient resource does not fit its heap or initial state";
+        return false;
+    }
+    const auto nativeDesc = DX12GraphTransientDesc(desc);
+    D3D12_CLEAR_VALUE clear{};
+    clear.Format = nativeDesc.Format;
+    if (desc.textureDesc.allowDepthStencil)
+    {
+        clear.DepthStencil.Depth = desc.textureDesc.clearDepth;
+    }
+    else
+    {
+        std::copy_n(desc.textureDesc.clearColor, 4, clear.Color);
+    }
+    const bool hasClear = !desc.buffer && (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil);
+    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    const auto hr = m_device->CreatePlacedResource(nativeHeap->native.Get(), 0, &nativeDesc,
+        D3D12_RESOURCE_STATE_COMMON, hasClear ? &clear : nullptr, IID_PPV_ARGS(&resource));
+    if (FAILED(hr))
+    {
+        error = "Placed transient creation failed " + HrToString(hr);
+        return false;
+    }
+    if (desc.buffer)
+    {
+        DevResApplyDebugName(resource.Get(), desc.bufferDesc.debugName);
+        buffer = m_resourceTable.AddBuffer(std::move(resource), desc.bufferDesc.allowIndirectArguments);
+    }
+    else
+    {
+        DevResApplyDebugName(resource.Get(), desc.textureDesc.debugName);
+        texture = m_resourceTable.AddTexture(std::move(resource));
+    }
+    if (!buffer.IsValid() && !texture.IsValid())
+    {
+        error = "Placed transient resource table is full";
         return false;
     }
     return true;

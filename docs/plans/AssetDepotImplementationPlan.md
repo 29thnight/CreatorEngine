@@ -1,6 +1,11 @@
 # AssetDepot implementation
 
-Baseline: CreatorEngine `50eff63b31eba108a48adadc115a7f564635a40e`.
+Design source baseline: CreatorEngine `50eff63b31eba108a48adadc115a7f564635a40e`.
+The feature branch also integrates upstream master
+`4602aff1c469b8d4af8a18a178b70f3e9ed3c37a` without rewriting either history.
+Its graph-only live path, material recovery boundaries and RG7 APIs are retained;
+new acceptance notifications distinguish accepted work from abortable preparation.
+Completion-zero retirement remains quarantined until explicit GPU idle.
 Ownership dependency: `ownership_cpp` `5889a32c58a49fcfded3a9d61484867849cc7dbb`.
 
 This is an incremental implementation of the approved asset-management and ownership

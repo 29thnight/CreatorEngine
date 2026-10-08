@@ -114,6 +114,44 @@ public:
 
     ~VulkanEncoder() override { EndRenderTargets(); }
 
+    void Rebind(VkCommandBuffer commandBuffer, const VulkanPipelineCache* pipelines,
+        VulkanResourceTable* resources, const VulkanRenderTargetTable* renderTargets,
+        VkDevice device, VulkanDescriptorPoolRecycler* descriptors,
+        const VulkanBindingTable* bindingTables, const VulkanSamplerTable* samplerTables,
+        RHIIndirectDrawCapabilities indirectDrawCapabilities, VulkanViewportLimits viewportLimits,
+        RHIMeshShaderCapabilities meshShaderCapabilities)
+    {
+        EndRenderTargets();
+        m_commandBuffer = commandBuffer;
+        m_pipelines = pipelines;
+        m_resources = resources;
+        m_renderTargets = renderTargets;
+        m_device = device;
+        m_descriptors = descriptors;
+        m_bindingTables = bindingTables;
+        m_samplerTables = samplerTables;
+        m_indirectDrawCapabilities = indirectDrawCapabilities;
+        m_viewportLimits = viewportLimits;
+        m_meshShaderCapabilities = meshShaderCapabilities;
+        for (size_t i = 0; i < 2; ++i)
+        {
+            m_boundPipeline[i] = {};
+            m_pending[i].clear();
+            m_descriptorsDirty[i] = false;
+            m_boundSetLayout[i] = VK_NULL_HANDLE;
+            m_boundLayoutHandle[i] = {};
+            m_boundLayout[i] = VK_NULL_HANDLE;
+        }
+        m_recordedImageLayouts.clear();
+        ClearUnimplemented();
+    }
+
+    void ClearUnimplemented()
+    {
+        m_unimplemented = 0;
+        m_lastUnimplemented = nullptr;
+    }
+
     VulkanEncoder(const VulkanEncoder&) = delete;
     VulkanEncoder& operator=(const VulkanEncoder&) = delete;
 
@@ -238,6 +276,8 @@ public:
     void EndRenderTargets();
 
 private:
+    std::vector<VkImageMemoryBarrier2> m_imageBarrierScratch;
+    std::vector<VkBufferMemoryBarrier2> m_bufferBarrierScratch;
     // ★ 여기 "백엔드 전용 경로 (계약 밖)" 공개 구간이 있었다 — 렌더 타깃
     //   셋(`VulkanRenderTargetBinding` 오버로드)과 `SetConstantBuffer
     //   (VkDescriptorSet)`. `VulkanTrianglePass` 가 유일한 소비자였고 5 가

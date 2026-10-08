@@ -144,8 +144,6 @@ private:
     bool m_gpuVisibilityEnabled{ false };
     std::vector<math::vector4> m_visibilitySpheres;
 
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
-
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
     /// 셰이더가 읽는 데칼 하나. HLSL의 StructuredBuffer 원소와 배치가 같아야

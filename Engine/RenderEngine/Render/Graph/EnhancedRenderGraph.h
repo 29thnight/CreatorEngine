@@ -1,4 +1,5 @@
 #pragma once
+#include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
 #include <cstddef>
 #include <cstdint>
@@ -6,6 +7,7 @@
 #include <vector>
 #include <unordered_map>
 #include <functional>
+#include <array>
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
@@ -92,6 +94,14 @@ struct RGTextureDesc
     std::string name;
 };
 
+struct RGBufferDesc
+{
+    uint64_t bytes{0};
+    bool allowUnorderedAccess{false};
+    bool allowIndirectArguments{false};
+    std::string name;
+};
+
 // transient 리소스 풀 (PHASE 3-9, 상시 러너의 프레임당 생성 비용 제거).
 //
 // 그래프는 프레임마다 새로 만들어지는데 transient도 매번 CreateCommittedResource로
@@ -114,9 +124,49 @@ public:
     // 대여·반납·비우기는 동일한 producer 스레드가 소유한다. GPU 완료 토큰도 그
     // 스레드에서 회수해 graph를 파괴하며, 풀 소유자는 모든 토큰을 drain한 뒤 파괴한다.
     std::unordered_map<uint64_t, std::vector<Entry>> freeList;
+    struct AliasedEntry
+    {
+        RHITextureHandle texture;
+        RHIBufferHandle buffer;
+        RHIResourceState state{RHIResourceState::Common};
+    };
+    struct AliasedGroup
+    {
+        AliasedGroup() = default;
+        AliasedGroup(const AliasedGroup&) = delete;
+        AliasedGroup& operator=(const AliasedGroup&) = delete;
+        IRenderDeviceServices* owner{nullptr};
+        std::shared_ptr<RHITransientHeap> heap;
+        RHITransientAllocationInfo allocation;
+        std::vector<RHITransientResourceDesc> descriptions;
+        std::vector<AliasedEntry> entries;
+        ~AliasedGroup();
+    };
+    using AllocationKey = std::array<uint64_t, 6>;
+    struct AllocationKeyHash
+    {
+        size_t operator()(const AllocationKey& key) const noexcept
+        {
+            size_t hash = 0;
+            for (auto value : key)
+            {
+                hash ^= std::hash<uint64_t>{}(value) + 0x9e3779b9u + (hash << 6) + (hash >> 2);
+            }
+            return hash;
+        }
+    };
+    // Free groups enter only after the caller's graph-completion contract.
+    // Clear before the owning device shuts down, on the same producer thread.
+    void ClearAliasingCache();
+    IRenderDeviceServices* aliasOwner{nullptr};
+    std::vector<std::shared_ptr<AliasedGroup>> freeAliasedGroups;
+    std::unordered_map<AllocationKey, RHITransientAllocationInfo, AllocationKeyHash> allocationCache;
+    uint64_t freeAliasBytes{0};
+    uint64_t maxFreeAliasBytes{128ull * 1024 * 1024};
+    size_t maxFreeAliasGroups{32};
 };
 
-class EnhancedRenderGraph
+class EnhancedRenderGraph : private IRHIUploadTransactionListener
 {
 public:
     // 패스가 기록할 때 받는 것. 커맨드 리스트는 호출부가 준 것을 그대로 넘긴다 —
@@ -180,6 +230,11 @@ public:
         uint32_t barriersEmitted{ 0 };
         uint32_t barrierBatches{ 0 };   // 배리어를 몇 번에 나눠 넣었는가 — 적을수록 좋다
         uint32_t transientCreated{ 0 };
+        uint32_t aliasReuseCount{0};
+        uint64_t transientCommittedBytes{0};
+        uint64_t transientUnaliasedBytes{0};
+        uint32_t transientAllocationQueries{0};
+        uint32_t aliasHeapCreates{0}, aliasHeapReuses{0}, aliasResourceReuses{0};
 
         // 병렬 기록에서만 채워진다. batch의 기록 리스트 수가 워커 수보다 적으면
         // 놀고 있는 워커가 있다는 뜻이다(패스가 워커보다 적을 때 정상).
@@ -260,6 +315,12 @@ public:
     /// 소멸자가 반납한다 — 호출부는 소멸 시점에 GPU 완료를 보장해야 한다
     /// (그래프 수명 규칙과 같은 계약).
     void SetTransientPool(RGTransientPool* pool) { m_transientPool = pool; }
+    // Configure before declaration. Defaults preserve the committed/pool path.
+    void SetTransientAliasing(bool enabled, bool extendLifetimes = false)
+    {
+        m_aliasing = enabled;
+        m_extendLifetimes = extendLifetimes;
+    }
 
     /// 디바이스 서비스는 필수다 — 인코더가 이것 없이는 아무것도 못 건다.
     ///
@@ -296,6 +357,8 @@ public:
     bool PrepareParallel(IRHIParallelCommandPool& pool, std::string& outError);
 
     ~EnhancedRenderGraph();
+    EnhancedRenderGraph(const EnhancedRenderGraph&) = delete;
+    EnhancedRenderGraph& operator=(const EnhancedRenderGraph&) = delete;
 
     /// 이미 표에 있는 리소스를 들인다 — 패스가 소유한 것(V2-a로 핸들이 된 것들).
     RGHandle ImportTexture(RHITextureHandle resource, RHIResourceState currentState,
@@ -310,6 +373,7 @@ public:
     // 그래프가 소유할 리소스를 선언한다. 실제 생성은 Compile에서 한다 —
     // 컬링으로 사라진 패스만 쓰던 리소스는 만들지 않기 위해서다.
     RGHandle CreateTexture(const RGTextureDesc& desc);
+    RGHandle CreateBuffer(const RGBufferDesc& desc);
     // Version declarations do not mutate the physical resource. Compile validates
     // their producer usages and rejects forks; old versions remain readable.
     RGHandle Write(RGHandle previous);
@@ -400,6 +464,7 @@ public:
         RHIResourceState before, after;
         bool uav;
         bool afterPass{false};
+        bool aliasing{false};
     };
     struct DiagnosticPass
     {
@@ -427,6 +492,8 @@ public:
         uint32_t versionCount{0};
         RHIResourceState initialState{RHIResourceState::Common};
         RHIResourceState finalState{RHIResourceState::Common};
+        uint32_t aliasGroup{UINT32_MAX};
+        uint64_t allocationBytes{0};
     };
     struct DiagnosticSnapshot
     {
@@ -509,19 +576,27 @@ public:
     bool GetTransientLifetime(RGHandle handle, uint32_t& outFirst, uint32_t& outLast) const;
 
 private:
+    void OnUploadSubmitted(uint64_t, RHICompletionPoint) override {}
+    void OnUploadCompleted(uint64_t) override {}
+    void OnUploadAborted(uint64_t) override {}
+    void OnUploadAccepted(uint64_t recording, RHICompletionPoint) override;
+    uint64_t m_recordedRecording{};
+    bool m_statesCommitted{};
     IRenderDeviceServices* m_deviceServices{ nullptr };   // 생성자가 반드시 채운다
 
 private:
     struct Resource
     {
         RGTextureDesc    desc;
+        RGBufferDesc bufferDesc;
+        bool bufferKind{false};
 
         // 표 안의 자리. 임포트든 transient든 같은 표를 쓴다 (V2-c2) —
         // 예전의 external 포인터 / owned ComPtr 두 갈래가 이 한 칸이 됐다.
         RHITextureHandle handle;
         RHIBufferHandle  buffer;
 
-        bool IsBuffer() const { return buffer.IsValid(); }
+        bool IsBuffer() const { return bufferKind; }
         bool IsValid() const { return handle.IsValid() || buffer.IsValid(); }
 
         uint64_t poolKey{ 0 };                          // 풀 반납용 desc 해시
@@ -532,6 +607,9 @@ private:
         bool used{ false };          // 살아남은 패스가 쓰는가 — 아니면 만들지 않는다
         uint32_t firstUse{ 0xFFFFFFFF };
         uint32_t lastUse{ 0 };
+        uint32_t aliasGroup{UINT32_MAX};
+        uint32_t aliasMember{UINT32_MAX};
+        uint64_t allocationBytes{0};
         std::string name;
         struct Version { uint16_t parent; bool modify; };
         std::vector<Version> versions;
@@ -562,6 +640,9 @@ private:
         std::vector<RHITextureHandle> uavBarriers;
         std::vector<RHIBufferHandle>  uavBufferBarriers;
         std::vector<RHITransition> finalTransitions;
+        std::vector<RHITextureHandle> aliasTextures;
+        std::vector<RHIBufferHandle> aliasBuffers;
+        std::vector<std::pair<uint16_t, RHIRenderTargetBinding>> aliasClears;
         uint32_t repeatCount{1};
         std::vector<RepeatedPhase> phases;
         bool repeated{false};
@@ -583,6 +664,8 @@ private:
     /// 〃 (G-1). 이제 `IRenderDeviceServices::CreateTexture` 로 만든다 —
     /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
     bool CreateTransients(std::string& outError);
+    bool CreateAliasedTransients(std::string& outError);
+    RHITransientResourceDesc TransientDescription(const Resource& resource) const;
     void PlanBarriers();
     bool ValidateFinalStates(std::string& outError) const;
     bool ValidateRepeatedPasses(std::string& outError) const;
@@ -597,6 +680,8 @@ private:
 
     std::vector<Resource> m_resources;
     RGTransientPool* m_transientPool{ nullptr };
+    std::vector<std::shared_ptr<RGTransientPool::AliasedGroup>> m_transientHeaps;
+    bool m_aliasing{false}, m_extendLifetimes{false};
     std::vector<Pass>     m_passes;
     std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;

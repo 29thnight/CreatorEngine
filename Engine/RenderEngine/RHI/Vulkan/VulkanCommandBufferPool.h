@@ -51,7 +51,7 @@ private:
         bool opened{ false };
     };
 
-    void RetireEncoder(Slot& slot);
+    void RetireEncoder(Slot& slot, bool destroy = false);
     uint32_t GetCurrentFrameSlot() const override { return m_frameIndex; }
     uint64_t GetCurrentRecordingId() const override;
     void RejectPreparedCommands(uint64_t recordingId, RHICompletionPoint completion) override;

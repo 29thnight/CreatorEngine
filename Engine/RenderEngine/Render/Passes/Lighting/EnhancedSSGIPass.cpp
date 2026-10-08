@@ -8,7 +8,6 @@
 #include "EnhancedSSGIShaders.h"
 
 #include <algorithm>
-#include <sstream>
 #include "../../../RHI/RHIShaderCompiler.h"
 
 // 남은 단계(순서대로 채운다):
@@ -29,14 +28,6 @@
 
 namespace
 {
-    // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
-    std::string SsgiHrToString(HRESULT hr)
-    {
-        std::ostringstream oss;
-        oss << "HRESULT 0x" << std::hex << static_cast<unsigned long>(hr);
-        return oss.str();
-    }
-
     // ── Hi-Z 빌드 ──
     //
     // 깊이 한 밉에서 다음 밉을 만든다. 2x2를 min으로 줄인다 — 화면 공간
@@ -252,62 +243,82 @@ bool EnhancedSSGIPass::CreatePipelines(const EnhancedFrameContext& context, std:
 bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
     std::string& outError)
 {
-    // 크기가 그대로면 다시 만들지 않는다. 매 프레임 만들면 그것만으로
-    // 프레임 예산을 먹고, 히스토리가 매번 비어 누적이 성립하지 않는다.
-    if (m_history[0].IsValid())
+    if (!context.resources || !m_resourceRetirement.Attach(*context.resources))
     {
-        const RHITextureInfo existing = context.resources->DescribeTexture(m_history[0]);
-        if (existing.width == m_giWidth && existing.height == m_giHeight) return true;
+        outError = "SSGI history requires its owning device.";
+        return false;
+    }
+    bool complete = true;
+    for (uint32_t i = 0; i < kHistoryCount; ++i)
+    {
+        for (const auto texture : {m_history[i], m_historyDepth[i]})
+        {
+            if (!texture.IsValid())
+            {
+                complete = false;
+                continue;
+            }
+            const auto info = context.resources->DescribeTexture(texture);
+            complete = complete && info.width == m_giWidth && info.height == m_giHeight
+                && info.format == (texture == m_history[i] ? kGIFormat : kHiZFormat);
+        }
+    }
+    if (complete)
+    {
+        return true;
     }
 
-    // 크기가 바뀌었다 — 히스토리를 버린다. 낡은 크기의 값을 새 크기에
-    // 섞으면 화면이 어긋난 채로 번진다.
-    m_historyValid = false;
-
-    // 새 리소스는 아래 initialState로 만들어진다. 상태 멤버가 옛 리소스의
-    // 끝 상태를 들고 있으면 다음 Import의 첫 배리어가 틀린 before로 나간다.
-    m_historyState.fill(RHIResourceState::ShaderResource);
-    m_historyDepthState.fill(RHIResourceState::ShaderResource);
-
+    std::array<RHITextureHandle, kHistoryCount> history{}, depth{};
+    const auto rollback = [&]()
+    {
+        for (uint32_t i = 0; i < kHistoryCount; ++i)
+        {
+            if (history[i].IsValid())
+            {
+                context.resources->ReleaseTexture(history[i]);
+            }
+            if (depth[i].IsValid())
+            {
+                context.resources->ReleaseTexture(depth[i]);
+            }
+        }
+    };
     RHITextureDesc desc{};
     desc.width = m_giWidth;
     desc.height = m_giHeight;
     desc.allowUnorderedAccess = true;
-
-    // 히스토리는 만들자마자 다음 프레임의 셰이더가 읽는다 — Common에서
-    // 출발시키면 첫 읽기 앞에 전이가 하나 더 붙는다.
-    //
-    // ★ 위 m_historyState와 같은 값이어야 한다(예전엔 NON_PIXEL만 쓰다가
-    //   히스토리가 그래프에 들어오면서 R4-2b에서 맞췄다). 그래프가 아는 상태와
-    //   실제 상태가 어긋나면 첫 배리어의 before가 틀린다.
-    //
-    //   A-2 전에는 이 줄이 D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE였고,
-    //   그것이 위의 ShaderResource와 같은 값이라는 것을 주석으로 적어 둬야
-    //   했다. 이제 같은 어휘라 두 줄을 눈으로 대조할 수 있다.
     desc.initialState = RHIResourceState::ShaderResource;
-
     for (uint32_t i = 0; i < kHistoryCount; ++i)
     {
         desc.format = kGIFormat;
-        desc.debugName = (0 == i) ? L"SSGI.History0" : L"SSGI.History1";
-        if (!context.resources->CreateTexture(desc, m_history[i], outError))
+        desc.debugName = i == 0 ? L"SSGI.History0" : L"SSGI.History1";
+        if (!context.resources->CreateTexture(desc, history[i], outError))
         {
-            outError = "SSGI 히스토리 — " + outError;
+            rollback();
+            outError = "SSGI history: " + outError;
             return false;
         }
-
         desc.format = kHiZFormat;
-        desc.debugName = (0 == i) ? L"SSGI.HistoryDepth0" : L"SSGI.HistoryDepth1";
-        if (!context.resources->CreateTexture(desc, m_historyDepth[i], outError))
+        desc.debugName = i == 0 ? L"SSGI.HistoryDepth0" : L"SSGI.HistoryDepth1";
+        if (!context.resources->CreateTexture(desc, depth[i], outError))
         {
-            outError = "SSGI 히스토리 깊이 — " + outError;
+            rollback();
+            outError = "SSGI history depth: " + outError;
             return false;
         }
     }
-
+    for (uint32_t i = 0; i < kHistoryCount; ++i)
+    {
+        m_resourceRetirement.Retire(m_history[i]);
+        m_resourceRetirement.Retire(m_historyDepth[i]);
+    }
+    m_history = history;
+    m_historyDepth = depth;
+    m_historyValid = false;
+    m_historyState.fill(RHIResourceState::ShaderResource);
+    m_historyDepthState.fill(RHIResourceState::ShaderResource);
     return true;
 }
-
 bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::string& outError)
 {
     (void)outError;
@@ -336,7 +347,6 @@ bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::st
 
     // 히스토리 슬롯을 번갈아 쓴다. 이번 프레임이 쓰는 것과 지난 프레임이
     // 쓴 것이 달라야 한다 — 같으면 읽으면서 쓰게 된다.
-    m_historyIndex = (m_historyIndex + 1) % kHistoryCount;
 
     // ★ 이전 프레임 행렬은 여기서 갱신하지 않는다.
     //
@@ -356,8 +366,6 @@ void EnhancedSSGIPass::ResetHistory()
     m_hasPreviousFrame = false;
     m_historyIndex = 0;
     m_frameIndex = 0;
-    m_lastAccumFrames = 0;
-    m_lastRejectRatio = 0.f;
     m_previousViewProjection = {};
 }
 
@@ -374,6 +382,7 @@ void EnhancedSSGIPass::ReleaseHistory(const EnhancedFrameContext& context)
     m_historyDepthHandle.fill({});
     m_historyState.fill(RHIResourceState::ShaderResource);
     m_historyDepthState.fill(RHIResourceState::ShaderResource);
+    m_resourceRetirement.ClearAfterIdle();
     ResetHistory();
 }
 
@@ -390,6 +399,20 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         m_output = RGHandle{};
         return;
     }
+
+    const bool hasCamera = context.camera != nullptr;
+    const auto viewProjection = hasCamera
+        ? context.camera->view * context.camera->projection : math::matrix4x4{};
+    m_resourceRetirement.WatchRecording([this] { ResetHistory(); }, [this, hasCamera, viewProjection]
+    {
+        if (hasCamera)
+        {
+            m_previousViewProjection = viewProjection;
+            m_hasPreviousFrame = true;
+        }
+        m_historyValid = true;
+    });
+    m_historyIndex = (m_historyIndex + 1) % kHistoryCount;
 
     // ── 히스토리를 그래프에 들인다 (R4-2b) ──
     //
@@ -907,18 +930,25 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
             true);
     }
 
-    // 이번 프레임 행렬을 다음 프레임의 '이전'으로 남긴다. Declare가 끝난
-    // 뒤라야 이번 프레임 리졸브가 진짜 지난 프레임 값을 쓴다.
-    if (nullptr != context.camera)
-    {
-        m_previousViewProjection = context.camera->view * context.camera->projection;
-        m_hasPreviousFrame = true;
-    }
-    m_historyValid = true;
 }
 
 void EnhancedSSGIPass::Shutdown()
 {
+    if (auto* device = m_resourceRetirement.Device())
+    {
+        for (uint32_t i = 0; i < kHistoryCount; ++i)
+        {
+            if (m_history[i].IsValid())
+            {
+                device->ReleaseTexture(m_history[i]);
+            }
+            if (m_historyDepth[i].IsValid())
+            {
+                device->ReleaseTexture(m_historyDepth[i]);
+            }
+        }
+    }
+    m_resourceRetirement.ClearAfterIdle();
     m_history.fill(RHITextureHandle{});
     m_historyDepth.fill(RHITextureHandle{});
 

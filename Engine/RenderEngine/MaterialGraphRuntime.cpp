@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <charconv>
 #include <cmath>
 #include <limits>
@@ -637,14 +638,18 @@ namespace material_graph
         }
     }
 
+    void GenerationStore::DetachAll(RetiredEntries& retired) noexcept
+    {
+        assert(retired.entries_.empty());
+        std::lock_guard lock(mutex_);
+        retired.entries_.swap(entries_);
+        retainedBytes_ = 0;
+    }
+
     void GenerationStore::Clear()
     {
-        decltype(entries_) removed;
-        {
-            std::lock_guard lock(mutex_);
-            removed.swap(entries_);
-            retainedBytes_ = 0;
-        }
+        RetiredEntries retired;
+        DetachAll(retired);
     }
 
     void GenerationStore::SetRetainedBudgetBytes(std::size_t bytes)
