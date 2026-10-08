@@ -4,6 +4,7 @@
     <ClInclude Include="Tasks\WorkerPoolSelfTest.h" />
     <ClInclude Include="Tasks\SceneLoadJobsSelfTest.h" />
     <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h" />
+    <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp" />
     <ClCompile Include="Tasks\WorkerPoolSelfTest.cpp" />
     <ClCompile Include="Tasks\SceneLoadJobsSelfTest.cpp" />
     <ClInclude Include="Animation\AnimationBaselineProbe.h" />

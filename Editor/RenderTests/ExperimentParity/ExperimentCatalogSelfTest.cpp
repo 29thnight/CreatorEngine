@@ -239,6 +239,7 @@ namespace RenderTest
         std::snprintf(summary, sizeof(summary),
             "  합성 단정 %zu/%zu\n", check.passed, check.passed + check.failed);
         outLog += summary;
+        check.Check(RunExperimentAssetSetManifestSelfTest(outLog), "CEMF v3 AssetSet schema contract");
         return check.failed == 0u;
     }
 
