@@ -338,9 +338,9 @@ public:
 	// resolve되지 않는다. 값 복사 API는 기존 호출 호환 경계다.
 	ShaderMetaHandle LoadShaderMetaHandle(FileGuid guid, std::string& outError);
 
-    std::shared_ptr<const material_graph::Generation> LoadMaterialGraphGeneration(FileGuid guid, std::string& error,
+    own::shared_owner<const material_graph::Generation> LoadMaterialGraphGeneration(FileGuid guid, std::string& error,
                                                                                   bool reload = false);
-    std::shared_ptr<const material_graph::Generation> ResolveMaterialGraphGeneration(FileGuid guid) const;
+    own::shared_owner<const material_graph::Generation> ResolveMaterialGraphGeneration(FileGuid guid) const;
     file::path GetMaterialGraphSourcePath(FileGuid guid) const;
     // Explicit synchronous warm-up retains verified graph generations, so later
     // entity loads consume the prepared owners without a second cache decode.

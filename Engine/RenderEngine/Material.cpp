@@ -7,6 +7,7 @@
 #include "StandardMaterialProperty.h"
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstring>
 #include <type_traits>
 
@@ -118,62 +119,32 @@ bool Material::TrySetMaterialGraphParameters(std::span<const material_graph::Par
 std::shared_ptr<Material> Material::InstantiateShared(const Material* origin, std::string_view newName)
 {
     if (!origin)
+    {
         return nullptr;
+    }
 
-    // Create a new Material instance
-	auto cloneMaterial = std::make_shared<Material>(*origin);
+    auto cloneMaterial = std::make_shared<Material>(*origin);
+    const std::string cloneSuffix = "_Clone";
+    std::string baseName = newName.empty() ? origin->m_name : std::string(newName);
+    if (newName.empty())
+    {
+        const auto suffix = baseName.rfind(cloneSuffix);
+        if (suffix != std::string::npos)
+        {
+            const auto digits = suffix + cloneSuffix.size();
+            if (digits == baseName.size() ||
+                std::all_of(baseName.begin() + digits, baseName.end(), [](unsigned char c) { return std::isdigit(c); }))
+            {
+                baseName.erase(suffix);
+            }
+        }
+        baseName += cloneSuffix;
+    }
+    cloneMaterial->m_name = std::move(baseName);
 
-	const std::string cloneSuffix = "_Clone";
-
-	// Determine the base name depending on whether a new name was provided
-	std::string baseName = newName.empty() ? std::string(origin->m_name) : std::string(newName);
-
-	auto stripCloneSuffix = [&](std::string& name)
-	{
-		auto pos = name.rfind(cloneSuffix);
-		if (pos != std::string::npos)
-		{
-			auto digitsPos = pos + cloneSuffix.size();
-			if (digitsPos == name.size() ||
-				std::all_of(name.begin() + digitsPos, name.end(), [](unsigned char c) { return std::isdigit(c); }))
-			{
-				name.erase(pos);
-			}
-		}
-	};
-
-	// If no name was provided, start with the base name plus the clone suffix
-	std::string finalName;
-	if (newName.empty())
-	{
-		stripCloneSuffix(baseName);
-		finalName = baseName + cloneSuffix;
-	}
-	else
-	{
-		finalName = baseName;
-	}
-
-	// Ensure the name is unique and avoid nested clone suffixes
-	std::lock_guard<std::mutex> materialCacheGuard(DataSystems->m_materialMutex);
-	if (DataSystems->Materials.contains(finalName))
-	{
-		stripCloneSuffix(baseName);
-		finalName = baseName + cloneSuffix;
-		int cloneIndex = 0;
-		while (DataSystems->Materials.contains(finalName))
-		{
-			finalName = baseName + cloneSuffix + std::to_string(++cloneIndex);
-		}
-	}
-
-	cloneMaterial->m_name = finalName;
-
-	// 캐시에도 등록해 에디터·직렬화가 이름으로 찾을 수 있게 한다.
-	// 캐시가 정리되더라도 호출자가 반환된 shared_ptr을 보관하는 한 클론은 살아 있다.
-	DataSystems->Materials[cloneMaterial->m_name] = cloneMaterial;
-
-	return cloneMaterial;
+    // Runtime clones are caller-owned values, not implicitly published assets.
+    // Their local display names do not reserve or probe DataSystem cache keys.
+    return cloneMaterial;
 }
 
 Material& Material::SetBaseColor(math::vector3 color)
@@ -424,7 +395,7 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
     }
 
     std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
-    std::shared_ptr<const LX::Runtime::Instance> instance;
+    own::shared_owner<const LX::Runtime::Instance> instance;
     std::vector<MaterialTextureOwner> owners;
     for (const auto& owner : m_textureOwners)
     {

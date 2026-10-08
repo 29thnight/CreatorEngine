@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include <cstdint>
 #include <memory>
@@ -36,7 +37,7 @@ struct [[reflgen::reflect]] FoliageType
     // (experiment 핸들·legacy Mesh보다 먼저 소비된다). 재질의 embedded texture는
     // 같은 generation closure에서 푼다.
     [[reflgen::ignore]]
-    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+    own::shared_owner<const assets::ModelAssetGeneration> m_modelGeneration{};
 
     [[reflgen::ignore]]
     std::uint32_t m_modelMeshIndex{ 0 };

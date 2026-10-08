@@ -18,6 +18,12 @@ namespace material_graph
 {
     namespace
     {
+        template<class T>
+        bool SamePinnedObject(const own::shared_owner<const T>& left, const own::shared_owner<const T>& right)
+        {
+            return left && right ? std::addressof(*left) == std::addressof(*right) : !left && !right;
+        }
+
         bool Fail(std::string& error, std::string message)
         {
             error = std::move(message);
@@ -57,7 +63,7 @@ namespace material_graph
 
     struct SceneHost::Program
     {
-        std::shared_ptr<const Generation> generation;
+        own::shared_owner<const Generation> generation;
         RHIShaderBinary backend{};
         PassLayout layout;
         PassLayout shadowLayout;
@@ -322,14 +328,14 @@ namespace material_graph
     {
         struct Work : SceneShaderSet
         {
-            std::shared_ptr<const Generation> generation;
+            own::shared_owner<const Generation> generation;
             std::shared_ptr<const VerifiedProduct> verified;
             RHIShaderBinary backend{};
             std::filesystem::path file, shaderDirectory;
             std::string error;
             bool worker{}, cooked{};
         };
-        std::shared_ptr<const Generation> generation;
+        own::shared_owner<const Generation> generation;
         RHIShaderBinary backend{};
         std::shared_ptr<Work> work;
         job_handle job;
@@ -340,7 +346,7 @@ namespace material_graph
 
     struct SceneHost::Slot
     {
-        std::shared_ptr<const Instance> requested, active;
+        own::shared_owner<const Instance> requested, active;
         EnhancedMaterialCoverage requestedCoverage, activeCoverage;
         std::uint64_t revision{};
     };
@@ -357,10 +363,10 @@ namespace material_graph
         }
     }
 
-    bool SceneHost::IsProgramReady(const std::shared_ptr<const Generation>& generation, RHIShaderBinary backend) const
+    bool SceneHost::IsProgramReady(const own::shared_owner<const Generation>& generation, RHIShaderBinary backend) const
     {
         return std::ranges::any_of(programs_, [&](const auto& program) {
-            return program->generation == generation && program->backend == backend;
+            return SamePinnedObject(program->generation, generation) && program->backend == backend;
         });
     }
 
@@ -375,7 +381,7 @@ namespace material_graph
         return result;
     }
 
-    bool SceneHost::RequestProgram(const EnhancedFrameContext& context, std::shared_ptr<const Generation> generation,
+    bool SceneHost::RequestProgram(const EnhancedFrameContext& context, own::shared_owner<const Generation> generation,
                                    std::string& error)
     {
         const auto backend = RHIShaderCompiler::GetOutput();
@@ -392,7 +398,7 @@ namespace material_graph
         }
         for (const auto& item : preparations_)
         {
-            if (item->generation == generation && item->backend == backend)
+            if (SamePinnedObject(item->generation, generation) && item->backend == backend)
             {
                 error = item->error;
                 return error.empty();
@@ -872,7 +878,7 @@ namespace material_graph
         const auto backend = RHIShaderCompiler::GetOutput();
         for (const auto& program : programs_)
         {
-            if (program->generation == instance.generation && program->backend == backend)
+            if (SamePinnedObject(program->generation, instance.generation) && program->backend == backend)
             {
                 result = program;
                 error.clear();
@@ -919,7 +925,7 @@ namespace material_graph
         for (const auto& draw : requested->Draws())
         {
             const auto [entry, inserted] = sources.emplace(draw.materialSlot, &draw);
-            if (!draw.materialSlot || (!inserted && (entry->second->material != draw.material ||
+            if (!draw.materialSlot || (!inserted && (!SamePinnedObject(entry->second->material, draw.material) ||
                                                      !sameCoverage(entry->second->coverage, draw.coverage))))
             {
                 return Fail(error, "LX Scene Material slots must identify one exact instance and coverage per view.");
@@ -936,7 +942,7 @@ namespace material_graph
             {
                 slot = std::make_shared<Slot>();
             }
-            if (slot->requested != draw->material || !sameCoverage(slot->requestedCoverage, draw->coverage))
+            if (!SamePinnedObject(slot->requested, draw->material) || !sameCoverage(slot->requestedCoverage, draw->coverage))
             {
                 slot->requested = draw->material;
                 slot->requestedCoverage = draw->coverage;
@@ -967,7 +973,7 @@ namespace material_graph
             {
                 const auto failed = std::ranges::find_if(preparations_, [&](const auto& item)
                 {
-                    return item->generation == draw.material->generation && item->backend == backend
+                    return SamePinnedObject(item->generation, draw.material->generation) && item->backend == backend
                         && !item->error.empty();
                 });
                 if (failed != preparations_.end())
@@ -986,14 +992,14 @@ namespace material_graph
         std::erase_if(programs_, [&](const auto& program) {
             return programs_.size() > 32 && program.use_count() == 1 &&
                    std::ranges::none_of(slots_, [&](const auto& item) {
-                       return (item.second->active && item.second->active->generation == program->generation) ||
-                              (item.second->requested && item.second->requested->generation == program->generation);
+                       return (item.second->active && SamePinnedObject(item.second->active->generation, program->generation)) ||
+                              (item.second->requested && SamePinnedObject(item.second->requested->generation, program->generation));
                    });
         });
         std::erase_if(preparations_, [&](const auto& preparation) {
             return preparations_.size() > 16 && !preparation->error.empty() &&
                    std::ranges::none_of(slots_, [&](const auto& item) {
-                       return item.second->requested && item.second->requested->generation == preparation->generation;
+                       return item.second->requested && SamePinnedObject(item.second->requested->generation, preparation->generation);
                    });
         });
         result = std::move(selected);

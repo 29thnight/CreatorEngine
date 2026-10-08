@@ -282,12 +282,12 @@ namespace ExperimentMaterialSealing
         std::vector<std::uint8_t>& outPropertyBytes,
         std::vector<EnhancedMaterialTextureBinding>& outTextureBindings,
         std::string& outError,
-        std::shared_ptr<const LX::Runtime::Instance>* outRuntime,
+        own::shared_owner<const LX::Runtime::Instance>* outRuntime,
         ShaderMetaHandle handle)
     {
         std::vector<MaterialTextureOwner> owners;
         for (const auto& texture : source.textures) owners.push_back({texture.propertyName, texture.owner});
-        std::shared_ptr<const LX::Runtime::Instance> runtime;
+        own::shared_owner<const LX::Runtime::Instance> runtime;
         bool prepared;
         if (source.hasCodeValues)
         {

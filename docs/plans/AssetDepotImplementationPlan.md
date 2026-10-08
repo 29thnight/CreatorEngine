@@ -23,6 +23,33 @@ design. A foundation slice is not completion of the runtime migration.
 8. Complete source-free Player/content compatibility, managed native-owner handles,
    NativeAOT registration and removal of temporary legacy lifetime paths.
 
+## Implemented source slices (2026-10-08)
+
+- The pinned ownership dependency, CEMF v3 link/manifest schema, immutable catalog
+  transactions and generic loose/pak range sources are present.
+- `build-asset-set` produces source-recooked TextureSourceImage artifacts only. It
+  includes both hard/loadable edges, verifies immutable CAS reuse and publishes a
+  new output directory transactionally. The OS owns the cache lock so forced
+  cancellation does not permanently block later builds. Incomplete work directories
+  are never reused as published output.
+- DataSystem exposes `MountAssetSet`, `UnmountAssetSet`, `ListRootLinks<T>`,
+  `RequestAsync<Texture>` and I/O-free `TryAcquire<Texture>`. Texture requests have
+  independent cancellation, exact backing/dependency pins, stale publication gates,
+  and a default 64 MiB conservative retained-graph charge budget.
+- All accepted DataSystem preparation/bundle/prewarm jobs share one shutdown barrier.
+  Scheduler terminal observers also finish requests whose dependent body never runs.
+- Model generations and graph/LX instances use actual own owners through their
+  consumers. Model cache retention defaults to 256 MiB; graph retention to 128 MiB.
+  These are explicit cache-pin budgets, not estimates of allocator/GPU bytes freed.
+  Model pins are deduplicated per sealed scene input; draw records keep indices.
+- Runtime material clones no longer silently publish themselves into Materials.
+
+The Texture descriptor still pins its CodecImage; models still use whole-model
+aggregate storage. Granular mesh/skeleton/clip/image artifacts, independently evictable
+bulk, cross-ID blob decode sharing, typed model acquisition and the remaining
+Material/Texture/ShaderMeta/UI/Terrain ownership migration are not complete. Managed
+asset handles and independent Player/content cutover are separate slices in progress.
+
 ## Invariants
 
 - `AssetLink<T>` stores stable asset/subasset identity and expected type, not residency.

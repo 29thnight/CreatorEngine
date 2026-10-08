@@ -10,6 +10,7 @@
 #include "ModelVertexLayout.h"
 #include "TextureCoordinates.h"
 #include "TextureSampler.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "../RHI/RHIFormat.h"
 #include "../Experiment/MeshletData.h"
 #include "../Experiment/MeshLodData.h"
@@ -26,7 +27,6 @@
 #include <filesystem>
 #include <limits>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <optional>
 #include <span>
@@ -326,7 +326,28 @@ namespace assets
     class ModelAssetGeneration final
     {
     public:
-        using Shared = std::shared_ptr<const ModelAssetGeneration>;
+        using Shared = own::shared_owner<const ModelAssetGeneration>;
+
+        // Public construction is factory-compatible; only the validated loader
+        // can create this non-aggregate key. No raw-owner adoption is required.
+        class LoadKey final
+        {
+        private:
+            friend ModelAssetGenerationLoadResult LoadModelAssetGeneration(
+                const ModelAssetGenerationLoadRequest& request);
+            LoadKey() {}
+        };
+
+        ModelAssetGeneration(LoadKey, ModelAssetGenerationIdentity identity,
+            std::string name, std::filesystem::path sourcePath,
+            std::vector<ModelNodeAsset> nodes,
+            std::vector<ModelMeshAsset> meshes,
+            std::vector<ModelMaterialAsset> materials,
+            std::vector<ModelTextureAsset> textures,
+            std::optional<ModelSkeletonAsset> skeleton,
+            std::vector<ModelAnimationAsset> animations,
+            std::optional<ModelAnimatorAsset> animator,
+            std::vector<ModelGpuUploadDescriptor> gpuDescriptors);
 
         ModelAssetGeneration(const ModelAssetGeneration&) = delete;
         ModelAssetGeneration& operator=(const ModelAssetGeneration&) = delete;
@@ -336,6 +357,9 @@ namespace assets
 
         [[nodiscard]] const ModelAssetGenerationIdentity& Identity() const noexcept;
         [[nodiscard]] ModelAssetGenerationHandle Handle() const noexcept;
+        // Aggregate estimate includes nested capacities, not allocator/control
+        // block overhead. It is a cache retention charge, never reclaimed bytes.
+        [[nodiscard]] std::size_t EstimatedCpuBytes() const noexcept;
         [[nodiscard]] const std::string& Name() const noexcept;
         [[nodiscard]] const std::filesystem::path& SourcePath() const noexcept;
         [[nodiscard]] std::span<const ModelNodeAsset> Nodes() const noexcept;
@@ -354,20 +378,6 @@ namespace assets
         [[nodiscard]] const ModelTextureAsset* FindTexture(const Uuid::Uuid16& textureId) const noexcept;
 
     private:
-        friend ModelAssetGenerationLoadResult LoadModelAssetGeneration(
-            const ModelAssetGenerationLoadRequest& request);
-
-        ModelAssetGeneration(ModelAssetGenerationIdentity identity,
-            std::string name, std::filesystem::path sourcePath,
-            std::vector<ModelNodeAsset> nodes,
-            std::vector<ModelMeshAsset> meshes,
-            std::vector<ModelMaterialAsset> materials,
-            std::vector<ModelTextureAsset> textures,
-            std::optional<ModelSkeletonAsset> skeleton,
-            std::vector<ModelAnimationAsset> animations,
-            std::optional<ModelAnimatorAsset> animator,
-            std::vector<ModelGpuUploadDescriptor> gpuDescriptors);
-
         ModelAssetGenerationIdentity identity_{};
         std::string name_{};
         std::filesystem::path sourcePath_{};
@@ -380,6 +390,13 @@ namespace assets
         std::vector<std::vector<const ModelAnimationTrack*>> m_animationTracks{};
         std::optional<ModelAnimatorAsset> animator_{};
         std::vector<ModelGpuUploadDescriptor> gpuDescriptors_{};
+    };
+
+    // One immutable owner table per recorded frame, shared by its selected views.
+    // Draw records carry a table index or a stable handle, never another owner.
+    struct ModelAssetGenerationPins final
+    {
+        std::vector<ModelAssetGeneration::Shared> generations{};
     };
 
     struct ModelAssetGenerationLoadResult final
@@ -412,6 +429,7 @@ namespace assets
         ModelAssetPublishOutcome outcome{ ModelAssetPublishOutcome::RejectedInvalid };
         ModelAssetGeneration::Shared current{};
         ModelAssetGeneration::Shared retired{};
+        ModelAssetGenerationHandle retiredHandle{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -423,13 +441,17 @@ namespace assets
 
     struct ModelAssetGenerationCacheSnapshot final
     {
-        std::size_t currentAssets{};
-        std::size_t addressableGenerations{};
+        std::size_t currentAssets{}; // Published identities, including expired residents.
+        std::size_t addressableGenerations{}; // Current identities whose weak owner can lock.
         std::uint64_t publishes{};
         std::uint64_t replacements{};
         std::uint64_t retires{};
         std::uint64_t hits{};
         std::uint64_t misses{};
+        std::size_t retainedGenerations{};
+        std::size_t retainedBytes{};
+        std::size_t retentionBudgetBytes{};
+        std::uint64_t retentionEvictions{};
     };
 
     class ModelAssetGenerationCache final
@@ -444,7 +466,10 @@ namespace assets
         [[nodiscard]] const ModelMeshAsset* ResolveMesh(ModelMeshHandle handle,
             ModelAssetGeneration::Shared& outOwner) const;
         [[nodiscard]] ModelAssetGeneration::Shared Retire(
-            const Uuid::Uuid16& modelId);
+            const Uuid::Uuid16& modelId,
+            ModelAssetGenerationHandle* outRetiredHandle = nullptr);
+        // Drops only cache-owned pins. Consumer/frame/job owners stay valid.
+        void SetRetentionBudgetBytes(std::size_t bytes);
         void Clear();
         [[nodiscard]] ModelAssetGenerationCacheSnapshot Snapshot() const;
         // MBC9 — current generation 전수(에디터 목록용). 정렬은 ModelId 순.
@@ -453,9 +478,28 @@ namespace assets
     private:
         using Key = ModelAssetGenerationHandle;
 
+        struct Entry final
+        {
+            ModelAssetGenerationIdentity identity{};
+            own::weak_owner<const ModelAssetGeneration> live{};
+            ModelAssetGeneration::Shared retained{};
+            std::size_t estimatedBytes{};
+            std::uint64_t lastAccess{};
+        };
+
+        [[nodiscard]] ModelAssetGeneration::Shared AcquireLocked(
+            const Key& key, Entry& entry) const;
+        void RetainLocked(Entry& entry, const ModelAssetGeneration::Shared& generation,
+            std::vector<ModelAssetGeneration::Shared>& released) const;
+        void TrimRetainedLocked(std::size_t budget,
+            std::vector<ModelAssetGeneration::Shared>& released) const;
+
         mutable std::mutex mutex_{};
-        std::map<Key, ModelAssetGeneration::Shared> generations_{};
+        mutable std::map<Key, Entry> generations_{};
         std::map<Uuid::Uuid16, Key> currentByAsset_{};
+        std::size_t retentionBudgetBytes_{ 256u * 1024u * 1024u };
+        mutable std::size_t retainedBytes_{};
+        mutable std::uint64_t accessSerial_{};
         mutable ModelAssetGenerationCacheSnapshot stats_{};
     };
 }

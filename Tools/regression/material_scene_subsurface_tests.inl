@@ -128,7 +128,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
         },
         true, error);
     Check(bool(generation), "SSS immutable generation " + error);
-    std::array<std::shared_ptr<const Instance>, 3> instances;
+    std::array<own::shared_owner<const Instance>, 3> instances;
     for (unsigned i = 0; i < instances.size(); ++i)
     {
         InstanceDescription description{graphId, {{904, i == 1 ? 0.0 : 1.0}, {905, i == 2 ? .45 : 0.0}}, {}};
@@ -157,9 +157,10 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     WaitSceneProgram(host, context, generation);
     for (unsigned features : {0x3000u})
     {
-        auto unsupported = std::make_shared<Generation>(*generation);
-        unsupported->cooked.product.program.features = features;
-        unsupported->cooked.product.program.volume = (features & 0x2000u) != 0;
+        Generation unsupportedValue(*generation);
+        unsupportedValue.cooked.product.program.features = features;
+        unsupportedValue.cooked.product.program.volume = (features & 0x2000u) != 0;
+        const auto unsupported = own::make_shared<const Generation>(std::move(unsupportedValue));
         Check(!host.RequestProgram(context, unsupported, error), "Uninstalled Volume remains rejected");
     }
     std::uint64_t pixels{}, spread{}, boundaries{}, maskedHoles{}, frames{};

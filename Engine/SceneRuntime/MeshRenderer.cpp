@@ -476,7 +476,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	}
 	step.reset();
 	step.emplace(ce::marker<"MeshRenderer.BindModel">());
-	const std::shared_ptr<const assets::ModelAssetGeneration> generation =
+	const assets::ModelAssetGeneration::Shared generation =
 		DataSystems->LoadModelAssetGeneration(m_modelGuid);
 
 	// 구 씬은 메시를 이름으로 적었다(m_Mesh.m_name) — 영속 MeshId가 없으면 이름으로
@@ -575,7 +575,7 @@ void MeshRenderer::OnAfterSerialize(const Authoring::MutableNodeView& view)
 }
 
 bool MeshRenderer::BindModelGeneration(
-	std::shared_ptr<const assets::ModelAssetGeneration> generation,
+	assets::ModelAssetGeneration::Shared generation,
 	std::uint32_t meshIndex)
 {
 	if (!generation || meshIndex >= generation->Meshes().size()) return false;

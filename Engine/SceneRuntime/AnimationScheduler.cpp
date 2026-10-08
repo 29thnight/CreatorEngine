@@ -64,7 +64,8 @@ namespace
     struct AnimationWork final
     {
         Animator* animator{};
-        std::shared_ptr<const assets::ModelAssetGeneration> generation{};
+        // Pins every skeleton/clip/track view through both worker batch joins.
+        assets::ModelAssetGeneration::Shared generation{};
         animation::quality_observation observation{};
         animation::quality_stage maximumStage{ animation::quality_stage::l0 };
         animation::quality_stage previousStage{ animation::quality_stage::l0 };

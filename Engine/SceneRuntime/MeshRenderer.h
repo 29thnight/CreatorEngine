@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "AuthoringNodeView.h"
 #include "Core.Minimal.h"
 #include "Component.h"
@@ -76,7 +77,7 @@ public:
         return static_cast<bool>(m_modelGeneration);
     }
     bool BindModelGeneration(
-        std::shared_ptr<const assets::ModelAssetGeneration> generation,
+        own::shared_owner<const assets::ModelAssetGeneration> generation,
         std::uint32_t meshIndex);
     [[nodiscard]] assets::ModelMeshHandle GetModelMeshHandle() const;
 
@@ -131,7 +132,7 @@ public:
     // embedded texture는 이 generation closure에서 푼다. 비직렬화 — 영속 신원은
     // m_modelGuid + m_meshAssetId가 진다. null이면 legacy(v4)·해석 실패 모델이다.
     [[reflgen::ignore]]
-    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+    own::shared_owner<const assets::ModelAssetGeneration> m_modelGeneration{};
 
     [[reflgen::ignore]]
     std::uint32_t m_modelMeshIndex{ 0 };

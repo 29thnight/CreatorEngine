@@ -173,7 +173,7 @@ void FoliageComponent::BindModelGeneration(FoliageType& type)
     if (type.m_modelName.empty()) return;
 
     const FileGuid modelGuid = DataSystems->GetStemToGuid(type.m_modelName);
-    std::shared_ptr<const assets::ModelAssetGeneration> generation =
+    assets::ModelAssetGeneration::Shared generation =
         DataSystems->LoadModelAssetGeneration(modelGuid);
     if (!generation || generation->Meshes().empty())
     {

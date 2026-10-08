@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "MaterialGraphScenePacket.h"
 #include "PathFinder.h"
 #include "Texture.h"
@@ -306,7 +307,7 @@ void Run(const std::filesystem::path& root)
         const auto prepare = [&](IRenderPipelineCache& cache, const SceneSurfaceEvaluation& values,
                                  const EnhancedMaterialCoverage& policy, const IblEnvironment& env,
                                  std::shared_ptr<const SceneMaterialPacket>& result) {
-            const bool coat = values.instance->generation == layered;
+            const bool coat = material_graph_test::SamePinnedObject(values.instance->generation, layered);
             const auto& layout = layouts[coat ? 1 : 0];
             RHIGraphicsPipelineDesc pipeline;
             pipeline.layout = layout.material.handle;
@@ -410,7 +411,7 @@ void Run(const std::filesystem::path& root)
             Check((frame == 0 && !slot.Active()) || (frame == 1 && slot.Active()->serial != packet->serial),
                   "RHI allocation submission callback alone is not publication");
             publish(recording);
-            Check(slot.Active() == packet && slot.Active()->evaluation.instance == currentEvaluation.instance,
+            Check(slot.Active() == packet && material_graph_test::SamePinnedObject(slot.Active()->evaluation.instance, currentEvaluation.instance),
                   "Publish complete owning generation");
             fences[frame] = device.GetLastSignaledFenceValue();
             packet.reset();

@@ -181,7 +181,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& mode
 
     const file::path scenePath = file::path(modelPath);
     // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
-    const std::shared_ptr<const assets::ModelAssetGeneration> sceneModel =
+    const assets::ModelAssetGeneration::Shared sceneModel =
         DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
     std::vector<RHIModelMeshView> sceneMeshes;
     RHIModelMeshView sceneMesh{};

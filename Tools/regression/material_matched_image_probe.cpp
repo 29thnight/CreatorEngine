@@ -90,7 +90,7 @@ MatchedGeometry ReadMatchedGeometry(const std::filesystem::path& file)
     return result;
 }
 
-std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& root,
+own::shared_owner<const Instance> MatchedInstance(const std::filesystem::path& root,
                                                const std::filesystem::path& shaderRoot,
                                                const std::filesystem::path& inputs,
                                                const std::filesystem::path& output,
@@ -153,7 +153,7 @@ std::shared_ptr<const Instance> MatchedInstance(const std::filesystem::path& roo
         cooked = {product, WriteMaterialProgramMetadata(product.program), BuildBoundSource(product.program)};
         return true;
     }, true, error);
-    std::shared_ptr<const Instance> result;
+    own::shared_owner<const Instance> result;
     CheckWith(generation && BuildInstance(generation, {id, {}, {}}, {}, result, error), "Matched instance ", error);
     return result;
 }

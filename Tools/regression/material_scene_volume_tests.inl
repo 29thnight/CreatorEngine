@@ -218,14 +218,14 @@ VolumeGeometry VolumeBoxes(std::span<const std::array<float, 2>> depths, std::ui
 void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const std::shared_ptr<Texture>& image, const std::shared_ptr<Texture>& cube,
-                    const std::shared_ptr<const Instance>& background)
+                    const own::shared_owner<const Instance>& background)
 {
     const std::array products{VolumeProduct(root, false), VolumeProduct(root, true)};
     GenerationStore store;
     experiment::AssetId graphId;
     Check(Uuid::TryParse("BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB", graphId.value), "Volume graph identity");
     std::string error;
-    std::array<std::shared_ptr<const Generation>, 2> generations;
+    std::array<own::shared_owner<const Generation>, 2> generations;
     for (unsigned i = 0; i < 2; ++i)
     {
         generations[i] = store.Load(
@@ -257,8 +257,9 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     context.camera = &camera;
     VolumeReflectionContracts();
     VolumeContextProgram(false);
-    auto spatial = std::make_shared<Generation>(*generations[0]);
-    spatial->cooked.product.program = VolumeContextProgram(true);
+    Generation spatialValue(*generations[0]);
+    spatialValue.cooked.product.program = VolumeContextProgram(true);
+    const auto spatial = own::make_shared<const Generation>(std::move(spatialValue));
     SceneHost rejectedHost;
     Check(!rejectedHost.RequestProgram(context, spatial, error) && error.find("homogeneous") != std::string::npos,
           "Spatial Volume is rejected before native preparation");
@@ -290,7 +291,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             const double density = fixture == 9 ? 0 : 2;
             const double color = fixture == 6 || fixture == 7 || fixture == 10 ? .6 : 0;
             const auto instance = [&](double scale) {
-                std::shared_ptr<const Instance> value;
+                own::shared_owner<const Instance> value;
                 Check(BuildInstance(
                           generations[hybrid],
                           {graphId,

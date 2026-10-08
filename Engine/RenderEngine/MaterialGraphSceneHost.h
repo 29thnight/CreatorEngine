@@ -55,10 +55,10 @@ namespace material_graph
 
         // Shader verification runs on the scheduler. Poll admits a bounded batch
         // of PSO requests; D3D12/Vulkan create them asynchronously.
-        bool RequestProgram(const EnhancedFrameContext& context, std::shared_ptr<const Generation> generation,
+        bool RequestProgram(const EnhancedFrameContext& context, own::shared_owner<const Generation> generation,
                             std::string& error);
         void PollPrograms(const EnhancedFrameContext& context);
-        bool IsProgramReady(const std::shared_ptr<const Generation>& generation, RHIShaderBinary backend) const;
+        bool IsProgramReady(const own::shared_owner<const Generation>& generation, RHIShaderBinary backend) const;
         SceneProgramStats ProgramStats() const;
         // Submitted commands, not a GPU-visible draw count.
         uint32_t ShadowDrawCount() const;

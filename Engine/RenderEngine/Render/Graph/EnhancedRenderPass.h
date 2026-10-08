@@ -22,7 +22,10 @@
 #include "EnhancedMaterialSealIdentity.h"
 #include "../../LXMaterialRuntime.h"
 
-namespace LX::Runtime { struct GraphicsGeneration; }
+namespace LX::Runtime
+{
+    struct GraphicsGeneration;
+}
 #include "PackedBoneMatrix.h"
 #include "EnhancedRenderGraph.h"
 #include "../../RHI/IRenderDeviceServices.h"
@@ -39,7 +42,7 @@ class Mesh;
 class Texture;
 namespace material_graph
 {
-struct Instance;
+    struct Instance;
 }
 
 // M6-P1b2a: Texture*의 배열 순서가 shader register를 암묵적으로 뜻하지 않게 한다.
@@ -118,7 +121,7 @@ struct EnhancedMaterialCoverage
 
 struct EnhancedForwardMaterialDrawSnapshot
 {
-    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
     std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 이 packet이 어느 저작 값·어느 프레임의 것인지. 값 검증(IsValid)과는
     // 축이 다르다 — 값이 멀쩡해도 지난 프레임 것이면 섞인 것이다.
@@ -155,7 +158,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 // 어느 논리 property/GUID/register의 generation인지 함께 고정한다.
 struct EnhancedMaterialDrawSnapshot
 {
-    std::shared_ptr<const LX::Runtime::Instance> runtimeInstance;
+    own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
     std::vector<std::shared_ptr<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 위 Forward packet과 같은 뜻이다. 밀봉한 쪽이 적고 패스가 대조한다.
     EnhancedMaterialSealIdentity seal{};
@@ -270,7 +273,7 @@ struct EnhancedDrawItem
 
     // Scene input sealing retains the exact typed LX generation/instance.
     // A graph draw is selected separately from the ShaderMeta queues.
-    std::shared_ptr<const material_graph::Instance> materialGraphInstance{};
+    own::shared_owner<const material_graph::Instance> materialGraphInstance{};
     // Runtime Material identity, stable across instance/generation replacement.
     std::uint64_t materialGraphSlot{};
 

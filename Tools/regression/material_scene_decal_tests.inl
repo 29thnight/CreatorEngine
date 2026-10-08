@@ -15,7 +15,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     experiment::AssetId id;
     Check(Uuid::TryParse("EEEEEEEE-EEEE-4EEE-8EEE-EEEEEEEEEEEE", id.value), "Decal graph identity");
     std::string error;
-    std::array<std::shared_ptr<const Generation>, 2> generations;
+    std::array<own::shared_owner<const Generation>, 2> generations;
     for (unsigned i = 0; i < 2; ++i)
     {
         generations[i] = store.Load(

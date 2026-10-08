@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "AuthoringNodeView.h"
 #include "../Utility_Framework/Core.Minimal.h"
 #include "Component.h"
@@ -62,7 +63,7 @@ struct [[reflgen::reflect]] BoneTransformConstraint final
 class AnimationController;
 class Socket;
 class ScriptComponent;
-namespace assets // PHASE 3.75 MBC8: typed 재생 정본(shared_ptr 보관용)
+namespace assets // PHASE 3.75 MBC8: typed 재생 정본(shared_owner 보관용)
 {
     class ModelAssetGeneration;
     struct ModelSkeletonAsset;
@@ -283,11 +284,11 @@ public:
     // PHASE 3.75 MBC8/MBC9 — typed 재생 정본. m_Motion(ModelId)으로
     // EnsureAnimationBinding이 채운다. 비직렬화 — 영속 신원은 m_Motion이 진다.
     [[reflgen::ignore]]
-    std::shared_ptr<const assets::ModelAssetGeneration> m_modelGeneration{};
+    own::shared_owner<const assets::ModelAssetGeneration> m_modelGeneration{};
 
     // Evaluation buffers, playback time and cursors live in the instance.
     void EnsureAnimationBinding();
-    void BindModelGeneration(std::shared_ptr<const assets::ModelAssetGeneration> generation);
+    void BindModelGeneration(own::shared_owner<const assets::ModelAssetGeneration> generation);
 
     // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.

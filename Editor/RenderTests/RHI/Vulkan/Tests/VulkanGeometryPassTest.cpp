@@ -2735,7 +2735,7 @@ bool RunVulkanForwardTest(std::string& outLog)
     {
         // MBC9 — Foliage 지오메트리는 typed generation이 유일한 출처다. 코퍼스의
         // Prim_Cube generation을 붙든다(없으면 fixture 실패).
-        const std::shared_ptr<const assets::ModelAssetGeneration> foliageGeneration =
+        const assets::ModelAssetGeneration::Shared foliageGeneration =
             DataSystems->FindModelAssetGenerationByStem("Prim_Cube");
         if (!foliageGeneration)
         {
@@ -2781,7 +2781,11 @@ bool RunVulkanForwardTest(std::string& outLog)
         for (std::size_t index = 0; index < sources.size(); ++index)
         {
             const FoliageRenderProxy::DrawSource& source = sources[index];
-            if (source.modelGeneration != foliageGeneration) foliageWhy += " generation";
+            if (!source.modelGeneration || !foliageGeneration
+                || source.modelGeneration->Handle() != foliageGeneration->Handle())
+            {
+                foliageWhy += " generation";
+            }
             if (0u != source.modelMeshIndex) foliageWhy += " meshIndex";
             if (source.material != foliageMaterialOwner) foliageWhy += " material";
             if (0u != source.foliageTypeID) foliageWhy += " typeID";

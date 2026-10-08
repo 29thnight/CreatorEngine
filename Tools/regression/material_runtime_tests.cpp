@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "material_runtime_tests.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
 #include "../../Engine/Utility_Framework/AuthoringWriteNode.h"
@@ -7,6 +8,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <type_traits>
 
 void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct,
                            const experiment::cooked::CookedAssetCatalog& catalog,
@@ -22,13 +24,18 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
             throw std::runtime_error("Runtime: " + message);
     };
     std::string error;
+    static_assert(std::is_same_v<decltype(GenerationStore::Prepare(
+        std::declval<const GenerationPreparationRequest&>(), std::declval<const GenerationLoader&>(),
+        std::declval<std::string&>())), own::shared_owner<const PreparedGeneration>>);
+    static_assert(!std::is_default_constructible_v<PreparedGeneration::ConstructionKey>);
+    static_assert(std::is_same_v<decltype(Instance::generation), own::shared_owner<const Generation>>);
     GenerationStore store;
     const GenerationLoader loader = [&](CookedProgram& product, std::string& failure) {
         return LoadCookedGeneration(catalog, loose, graphId, &source, product, failure);
     };
     const auto first = store.Load(graphId, loader, false, error);
     check(first && first->assetId == graphId && first->generation == 1, "GUID generation load: " + error);
-    check(store.Load(graphId, loader, true, error) == first, "Identical full payload retains generation identity");
+    check(material_graph_test::SamePinnedObject(store.Load(graphId, loader, true, error), first), "Identical full payload retains generation identity");
     const auto changed = [&]() {
         auto graph = source;
         graph.blackboard[0].value = .234;
@@ -37,14 +44,14 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     const GenerationLoader stale = [&](CookedProgram& product, std::string& failure) {
         return LoadCookedGeneration(catalog, loose, graphId, &changed, product, failure);
     };
-    check(!store.Load(graphId, stale, true, error) && store.Current(graphId) == first && !error.empty(),
+    check(!store.Load(graphId, stale, true, error) && material_graph_test::SamePinnedObject(store.Current(graphId), first) && !error.empty(),
           "Stale graph cannot replace the accepted generation");
     const GenerationLoader invalid = [&](CookedProgram& product, std::string&) {
         product = first->cooked;
         product.metadata.clear();
         return true;
     };
-    check(!store.Load(graphId, invalid, true, error) && store.Current(graphId) == first,
+    check(!store.Load(graphId, invalid, true, error) && material_graph_test::SamePinnedObject(store.Current(graphId), first),
           "Invalid candidate retains the complete accepted generation");
     GenerationStore packaged;
     const auto pakGeneration = packaged.Load(
@@ -67,45 +74,45 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     };
     InstanceDescription description{
         graphId, {{900, .12345678901234567}, {901, std::array<double, 4>{.2, .3, .4, 1.}}}, {}};
-    std::shared_ptr<const Instance> instance;
+    own::shared_owner<const Instance> instance;
     check(BuildInstance(first, description, textureLoader, instance, error), "Pack graph instance: " + error);
     auto acceptedInstance = instance;
     check(instance->textures.size() == 1 && instance->textures[0].owner && !instance->uniforms.empty(),
           "CPU snapshot owns texture generation and reflected uniform values");
     auto other = description;
     other.parameters[0].value = .7;
-    std::shared_ptr<const Instance> secondInstance;
+    own::shared_owner<const Instance> secondInstance;
     check(BuildInstance(first, other, textureLoader, secondInstance, error) &&
-              secondInstance->generation == instance->generation && secondInstance->uniforms != instance->uniforms,
+              material_graph_test::SamePinnedObject(secondInstance->generation, instance->generation) && secondInstance->uniforms != instance->uniforms,
           "Instances share a graph and retain independent values");
     for (const auto badParameter : {ParameterOverride{900, true}, ParameterOverride{99999, .3},
                                     ParameterOverride{900, std::numeric_limits<double>::infinity()}})
     {
         auto bad = description;
         bad.parameters.push_back(badParameter);
-        check(!BuildInstance(first, bad, textureLoader, instance, error) && instance == acceptedInstance,
+        check(!BuildInstance(first, bad, textureLoader, instance, error) && material_graph_test::SamePinnedObject(instance, acceptedInstance),
               "Duplicate/unknown/type-invalid edits preserve snapshot");
     }
     auto badType = description;
     badType.parameters[0].value = true;
-    check(!BuildInstance(first, badType, textureLoader, instance, error) && instance == acceptedInstance,
+    check(!BuildInstance(first, badType, textureLoader, instance, error) && material_graph_test::SamePinnedObject(instance, acceptedInstance),
           "Mismatched scalar type rejected without duplicate ID");
-    check(!BuildInstance(first, description, {}, instance, error) && instance == acceptedInstance,
+    check(!BuildInstance(first, description, {}, instance, error) && material_graph_test::SamePinnedObject(instance, acceptedInstance),
           "Missing texture loader preserves all values and owners");
     auto wrongGraph = description;
     wrongGraph.graphId = {};
-    check(!BuildInstance(first, wrongGraph, textureLoader, instance, error) && instance == acceptedInstance,
+    check(!BuildInstance(first, wrongGraph, textureLoader, instance, error) && material_graph_test::SamePinnedObject(instance, acceptedInstance),
           "Graph identity mismatch cannot bind another generation");
     auto unknownTexture = description;
     unknownTexture.textures = {{900, instance->textures[0].assetId}};
-    check(!BuildInstance(first, unknownTexture, textureLoader, instance, error) && instance == acceptedInstance,
+    check(!BuildInstance(first, unknownTexture, textureLoader, instance, error) && material_graph_test::SamePinnedObject(instance, acceptedInstance),
           "Non-texture parameter cannot receive a texture override");
     experiment::AssetId replacementTexture;
     check(experiment::TryParseCanonicalAssetId("44444444-4444-4444-8444-444444444444", replacementTexture),
           "Replacement texture GUID");
     auto textureDescription = description;
     textureDescription.textures = {{905, replacementTexture}};
-    std::shared_ptr<const Instance> textureInstance;
+    own::shared_owner<const Instance> textureInstance;
     check(BuildInstance(first, textureDescription, textureLoader, textureInstance, error) &&
               textureInstance->textures[0].assetId == replacementTexture &&
               instance->textures[0].assetId != replacementTexture,
@@ -116,7 +123,7 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     };
     const auto priorTextureInstance = textureInstance;
     check(!BuildInstance(first, textureDescription, missingTexture, textureInstance, error) &&
-              textureInstance == priorTextureInstance,
+              material_graph_test::SamePinnedObject(textureInstance, priorTextureInstance),
           "Failed texture reload retains all previous texture owners");
 
     InstanceDocument document{"LX instance", {}, true, description};
@@ -162,9 +169,9 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
         return true;
     };
     const auto next = store.Load(graphId, numeric, true, error);
-    check(next && next->generation > first->generation && instance->generation == first,
+    check(next && next->generation > first->generation && material_graph_test::SamePinnedObject(instance->generation, first),
           "Reload publishes a new owner while old instances retain their previous owner");
-    std::shared_ptr<const Instance> numericInstance;
+    own::shared_owner<const Instance> numericInstance;
     check(BuildInstance(next, decoded.description, textureLoader, numericInstance, error),
           "All five typed overrides repack against actual reflection: " + error);
     auto privateProduct = numericProduct;
@@ -207,7 +214,7 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
               "Malformed document preserves accepted description: " + std::string(failure));
     }
     store.Remove(graphId);
-    check(!store.Current(graphId) && instance->generation == first && instance->textures[0].owner,
+    check(!store.Current(graphId) && material_graph_test::SamePinnedObject(instance->generation, first) && instance->textures[0].owner,
           "Removal invalidates lookup while existing snapshots remain usable");
     const auto restored = store.Load(graphId, loader, false, error);
     check(restored && restored->generation > next->generation, "Remove/reload cannot reuse a generation number");
@@ -222,7 +229,7 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
         product = first->cooked;
         return true;
     };
-    std::vector<std::future<std::shared_ptr<const Generation>>> jobs;
+    std::vector<std::future<own::shared_owner<const Generation>>> jobs;
     for (unsigned index = 0; index < 8; ++index)
         jobs.push_back(std::async(std::launch::async, [&]() {
             std::string failure;
@@ -230,7 +237,7 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
         }));
     const auto shared = jobs.front().get();
     for (std::size_t index = 1; index < jobs.size(); ++index)
-        check(jobs[index].get() == shared, "Concurrent GUID loads observe one owner");
+        check(material_graph_test::SamePinnedObject(jobs[index].get(), shared), "Concurrent GUID loads observe one owner");
     check(loads == 1, "Concurrent cold load executes one candidate loader");
 
     // Split preparation is private until the owning publication boundary. A
@@ -243,10 +250,15 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
         return true;
     };
     const auto accepted = staged.Load(graphId, originalSnapshot, false, error);
-    check(accepted && staged.Current(graphId) == accepted, "Seed split preparation owner: " + error);
+    check(accepted && material_graph_test::SamePinnedObject(staged.Current(graphId), accepted), "Seed split preparation owner: " + error);
+    const auto cachedRequest = staged.BeginPreparation(graphId, false, error);
+    const auto cachedPrepared = GenerationStore::Prepare(cachedRequest, {}, error);
+    check(cachedRequest && cachedPrepared &&
+              material_graph_test::SamePinnedObject(staged.Publish(*cachedPrepared, error), accepted),
+          "A clean cache ticket owns its generation without a live request-state entry or loader");
     const auto replacementRequest = staged.BeginPreparation(graphId, true, error);
     const auto sharedRequest = staged.BeginPreparation(graphId, false, error);
-    check(replacementRequest && sharedRequest && staged.Current(graphId) == accepted,
+    check(replacementRequest && sharedRequest && material_graph_test::SamePinnedObject(staged.Current(graphId), accepted),
           "Reload ticket preserves Current and allows same-revision callers to join");
     std::size_t preparedLoads = 0;
     bool readCurrentDuringPreparation = false;
@@ -255,7 +267,7 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
         ++preparedLoads;
         // This lookup also guards against restoring the global lock around the
         // loader: Current must remain callable while expensive work is running.
-        readCurrentDuringPreparation = staged.Current(graphId) == accepted;
+        readCurrentDuringPreparation = material_graph_test::SamePinnedObject(staged.Current(graphId), accepted);
         failure.clear();
         product = next->cooked;
         return true;
@@ -263,23 +275,25 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     const auto replacementPrepared = GenerationStore::Prepare(replacementRequest, replacementSnapshot, error);
     const auto sharedPrepared = GenerationStore::Prepare(sharedRequest, replacementSnapshot, error);
     check(replacementPrepared && sharedPrepared && preparedLoads == 1 && readCurrentDuringPreparation &&
-              staged.Current(graphId) == accepted,
+              material_graph_test::SamePinnedObject(staged.Current(graphId), accepted),
           "Shared preparation validates once without publishing or locking out Current: " + error);
     const auto replacementOwner = staged.Publish(*replacementPrepared, error);
-    check(replacementOwner && replacementOwner != accepted &&
-              replacementOwner->generation > accepted->generation && staged.Current(graphId) == replacementOwner,
+    check(replacementOwner && !material_graph_test::SamePinnedObject(replacementOwner, accepted) &&
+              replacementOwner->generation > accepted->generation && material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "Owner publication atomically replaces the complete prepared generation: " + error);
-    check(staged.Publish(*sharedPrepared, error) == replacementOwner &&
-              staged.Load(graphId, replacementSnapshot, false, error) == replacementOwner && preparedLoads == 1,
+    check(material_graph_test::SamePinnedObject(staged.Publish(*sharedPrepared, error), replacementOwner) &&
+              material_graph_test::SamePinnedObject(staged.Load(graphId, replacementSnapshot, false, error), replacementOwner) && preparedLoads == 1,
           "Repeated publication and clean cache hits retain one owner without another loader");
 
     const auto invalidatedRequest = staged.BeginPreparation(graphId, true, error);
     staged.InvalidatePreparation(graphId);
     const auto invalidatedPrepared = GenerationStore::Prepare(invalidatedRequest, originalSnapshot, error);
-    check(invalidatedPrepared && staged.Current(graphId) == replacementOwner,
+    check(!staged.Publish(*cachedPrepared, error) && !error.empty(),
+          "A superseded cached preparation cannot revive an older accepted generation");
+    check(invalidatedPrepared && material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "Invalidated work can finish privately while the accepted owner remains usable");
     check(!staged.Publish(*invalidatedPrepared, error) && !error.empty() &&
-              staged.Current(graphId) == replacementOwner,
+              material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "Completion after invalidation cannot publish or replace Current");
 
     std::size_t failedLoads = 0;
@@ -290,7 +304,7 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
         return false;
     };
     check(!staged.Load(graphId, failedSnapshot, false, error) && failedLoads == 1 && !error.empty() &&
-              staged.Current(graphId) == replacementOwner,
+              material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "A dirty non-reload cannot return a stale cache hit or erase the accepted owner on failure");
     const auto retryRequest = staged.BeginPreparation(graphId, false, error);
     const auto sharedRetryRequest = staged.BeginPreparation(graphId, false, error);
@@ -302,23 +316,23 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     };
     const auto retryPrepared = GenerationStore::Prepare(retryRequest, retrySnapshot, error);
     const auto sharedRetryPrepared = GenerationStore::Prepare(sharedRetryRequest, retrySnapshot, error);
-    check(retryPrepared && sharedRetryPrepared && retryLoads == 1 && staged.Current(graphId) == replacementOwner,
+    check(retryPrepared && sharedRetryPrepared && retryLoads == 1 && material_graph_test::SamePinnedObject(staged.Current(graphId), replacementOwner),
           "Failed dirty preparation permits a fresh shared retry without early publication: " + error);
     const auto retryOwner = staged.Publish(*retryPrepared, error);
-    check(retryOwner && retryOwner != replacementOwner && retryOwner->generation > replacementOwner->generation &&
-              staged.Publish(*sharedRetryPrepared, error) == retryOwner,
+    check(retryOwner && !material_graph_test::SamePinnedObject(retryOwner, replacementOwner) && retryOwner->generation > replacementOwner->generation &&
+              material_graph_test::SamePinnedObject(staged.Publish(*sharedRetryPrepared, error), retryOwner),
           "Successful dirty retry accepts one new owner: " + error);
-    check(staged.Load(graphId, failedSnapshot, false, error) == retryOwner && failedLoads == 1 && error.empty(),
+    check(material_graph_test::SamePinnedObject(staged.Load(graphId, failedSnapshot, false, error), retryOwner) && failedLoads == 1 && error.empty(),
           "Successful publication clears dirty state and restores the cached-read fast path");
 
     const auto supersededRequest = staged.BeginPreparation(graphId, true, error);
     const auto latestRequest = staged.BeginPreparation(graphId, true, error);
     const auto supersededPrepared = GenerationStore::Prepare(supersededRequest, replacementSnapshot, error);
     check(supersededPrepared && !staged.Publish(*supersededPrepared, error) && !error.empty() &&
-              staged.Current(graphId) == retryOwner,
+              material_graph_test::SamePinnedObject(staged.Current(graphId), retryOwner),
           "A newer request rejects an older completion even before the newer request publishes");
     const auto latestPrepared = GenerationStore::Prepare(latestRequest, originalSnapshot, error);
-    check(latestPrepared && staged.Publish(*latestPrepared, error) == retryOwner,
+    check(latestPrepared && material_graph_test::SamePinnedObject(staged.Publish(*latestPrepared, error), retryOwner),
           "An unchanged latest payload keeps the accepted owner and completes its dirty revision");
 
     const auto removedRequest = staged.BeginPreparation(graphId, true, error);
@@ -338,5 +352,48 @@ void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct
     check(afterClear && afterClear->generation > afterRemove->generation &&
               accepted->cooked.metadata == first->cooked.metadata,
           "Clear preserves retained immutable owners and never reuses a generation number: " + error);
+    // Cache eviction releases only the retained cache reference, including the
+    // completed preparation state that previously kept every generation alive.
+    GenerationStore bounded;
+    bounded.SetRetainedBudgetBytes(SIZE_MAX);
+    own::weak_owner<const Generation> cachedLifetime;
+    std::uint64_t cachedGeneration{};
+    {
+        auto resident = bounded.Load(graphId, originalSnapshot, false, error);
+        check(bool(resident), "Budgeted graph generation load: " + error);
+        cachedLifetime = resident;
+        cachedGeneration = resident->generation;
+        check(resident->RetainedPayloadBytes() > sizeof(Generation) &&
+                  bounded.RetainedBytes() == resident->RetainedPayloadBytes(),
+              "Graph cache charges shader/source and metadata capacities, not only its descriptor");
+    }
+    check(!cachedLifetime.expired(), "Unused preload survives through explicit cache retention");
+    {
+        auto cacheHit = bounded.Load(graphId, failedSnapshot, false, error);
+        check(cacheHit && cacheHit->generation == cachedGeneration && error.empty(),
+              "Retained preload does not rerun its loader");
+        bounded.SetRetainedBudgetBytes(0);
+        check(bounded.RetainedBudgetBytes() == 0 && bounded.RetainedBytes() == 0 &&
+                  material_graph_test::SamePinnedObject(bounded.Current(graphId), cacheHit),
+              "Zero retention budget drops cache bytes while a consumer still owns Current");
+    }
+    check(cachedLifetime.expired() && !bounded.Current(graphId),
+          "Weak current and completed requests do not secretly retain an evicted graph payload");
+    own::weak_owner<const Generation> preparedLifetime;
+    {
+        const auto request = bounded.BeginPreparation(graphId, false, error);
+        const auto prepared = GenerationStore::Prepare(request, originalSnapshot, error);
+        check(bool(prepared), "Prepare generation with zero retained budget: " + error);
+        auto published = bounded.Publish(*prepared, error);
+        check(published && published->generation > cachedGeneration && bounded.RetainedBytes() == 0,
+              "A new resident generation reserves a fresh identity after eviction");
+        preparedLifetime = published;
+        published.reset();
+        check(!preparedLifetime.expired(), "Prepared ticket pins its exact result through publication handoff");
+        bounded.Clear();
+        check(!bounded.Current(graphId) && !preparedLifetime.expired(),
+              "Clear removes lookup but cannot revoke a prepared consumer's exact generation");
+    }
+    check(preparedLifetime.expired(), "No store-owned request survives its final ticket and consumer");
     std::cout << "LX_MATERIAL_RUNTIME_OK checks=" << checks << " concurrentLoads=8\n";
 }

@@ -318,7 +318,7 @@ namespace ConsoleCmd
 		// 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
 		const std::string path = CommandCore::JoinFrom(parts, 1);
 		const std::string modelName = file::path(path).stem().string();
-		const std::shared_ptr<const assets::ModelAssetGeneration> previousGeneration =
+		const assets::ModelAssetGeneration::Shared previousGeneration =
 			DataSystems->FindModelAssetGenerationByStem(modelName);
 		const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
 			path, EditorAssetDatabase::ImportKind::Model);
@@ -327,7 +327,7 @@ namespace ConsoleCmd
 			std::printf("[CLI] 모델 임포트 실패: %s\n", path.c_str());
 			return Fail("model.import_failed", "Model import failed: " + path);
 		}
-		const std::shared_ptr<const assets::ModelAssetGeneration> loadedGeneration =
+		const assets::ModelAssetGeneration::Shared loadedGeneration =
 			DataSystems->LoadModelAssetGenerationByPath(imported.string());
 		if (!loadedGeneration)
 		{
@@ -335,7 +335,7 @@ namespace ConsoleCmd
 			return Fail("model.load_failed", "Model generation load failed: " + imported.string());
 		}
 		const char* cacheResult = previousGeneration &&
-			previousGeneration != loadedGeneration ? "reloaded" : "loaded";
+			previousGeneration->Handle() != loadedGeneration->Handle() ? "reloaded" : "loaded";
 		std::printf("[CLI] 모델 임포트 및 로드 요청: %s (runtime-cache=%s)\n",
 			imported.string().c_str(), cacheResult);
         auto data = CommandData::Object();

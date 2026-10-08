@@ -71,6 +71,8 @@
 #include <unordered_set>
 #include <mutex>
 #include <array>
+#include <limits>
+#include <map>
 #include <cassert>
 #include <thread>
 #include <deque>
@@ -2093,9 +2095,9 @@ namespace
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
             std::shared_ptr<Mesh> meshSource{};
-            // MBC7 — item.modelMeshView의 정점·인덱스 저장소를 소유하는 immutable
-            // generation. sealing은 이것으로 재질의 embedded texture를 closure에서 푼다.
-            std::shared_ptr<const assets::ModelAssetGeneration> generationSource{};
+            // Borrowed mesh bytes are covered by the frame's single model pin
+            // table. Copies of this draw carry only the stable table index.
+            std::size_t modelPinIndex{ (std::numeric_limits<std::size_t>::max)() };
             // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
             // The identified graph source is retained with its model generation.
             // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
@@ -2113,6 +2115,7 @@ namespace
             bool                 isTransparent{ false };
         };
         std::vector<PooledDraw>       drawPool;
+        own::shared_owner<const assets::ModelAssetGenerationPins> modelFramePins{};
 
         struct PooledSprite
         {
@@ -3891,6 +3894,9 @@ namespace
         void BuildDrawPool()
         {
             drawPool.clear();
+            draws.clear();
+            shadowDraws.clear();
+            forwardDraws.clear();
             graphDraws.clear();
             graphShadowEligible.clear();
             graphViewRequired.clear();
@@ -3899,8 +3905,55 @@ namespace
             spritePool.clear();
             uiProxySnapshot.clear();
             uiProxyPointers.clear();
+            modelFramePins.reset();
 
-            if (nullptr == renderScene) return;
+            if (nullptr == renderScene)
+            {
+                return;
+            }
+
+            assets::ModelAssetGenerationPins modelPins;
+            std::map<assets::ModelAssetGenerationHandle, std::size_t> modelPinIndices;
+            struct BuildGuard final
+            {
+                std::vector<PooledDraw>& draws;
+                own::shared_owner<const assets::ModelAssetGenerationPins>& pins;
+                bool published{};
+                ~BuildGuard()
+                {
+                    if (!published)
+                    {
+                        // Clear every persistent raw view before local model
+                        // pins unwind, including pin-table allocation failure.
+                        draws.clear();
+                        pins.reset();
+                    }
+                }
+            };
+            BuildGuard buildGuard{ drawPool, modelFramePins };
+            const auto pinModel = [&modelPins, &modelPinIndices](
+                const assets::ModelAssetGeneration::Shared& generation)
+            {
+                const auto handle = generation->Handle();
+                const auto [position, inserted] = modelPinIndices.emplace(
+                    handle, modelPins.generations.size());
+                if (inserted)
+                {
+                    modelPins.generations.push_back(generation);
+                }
+                else
+                {
+                    const auto& identity = generation->Identity();
+                    const auto& pinned = modelPins.generations[position->second]->Identity();
+                    if (identity.sourceFingerprint != pinned.sourceFingerprint
+                        || identity.identityProfile != pinned.identityProfile
+                        || identity.identityEpoch != pinned.identityEpoch)
+                    {
+                        return (std::numeric_limits<std::size_t>::max)();
+                    }
+                }
+                return position->second;
+            };
 
             const auto poolDecal = [this](const DecalRenderProxy* proxy)
             {
@@ -3924,7 +3977,7 @@ namespace
                 decals.push_back(item);
             };
 
-            const auto poolMesh = [this](const MeshRenderProxy* proxy)
+            const auto poolMesh = [this, &pinModel, &modelPins](const MeshRenderProxy* proxy)
             {
                 // Visibility is published by Scene even when the Animator is disabled.
                 // Exclude the mesh before building draws for any render pass.
@@ -3933,9 +3986,20 @@ namespace
                 // PHASE 3.75 MBC7 — typed generation 뷰가 정본이다. generation
                 // descriptor와 immutable 저장소를 대조해 뷰를 짓고(BuildRHIModelMeshView),
                 // 실패·부재면 experiment 핸들 → legacy Mesh 순으로 내려간다(MBC9 은퇴).
+                if (!proxy->m_modelGeneration)
+                {
+                    return;
+                }
+                const auto modelPinIndex = pinModel(proxy->m_modelGeneration);
+                if (modelPinIndex == (std::numeric_limits<std::size_t>::max)())
+                {
+                    return;
+                }
+                // A retired/reloaded identity can have distinct allocations.
+                // Build every raw view from the canonical table owner itself.
+                const auto& modelGeneration = modelPins.generations[modelPinIndex];
                 RHIModelMeshView modelView{};
-                if (!proxy->m_modelGeneration
-                    || !BuildRHIModelMeshView(*proxy->m_modelGeneration,
+                if (!BuildRHIModelMeshView(*modelGeneration,
                         proxy->m_modelMeshIndex, modelView))
                 {
                     return;
@@ -3944,11 +4008,11 @@ namespace
                 PooledDraw pooled{};
                 pooled.item.worldMatrix = proxy->m_worldMatrix;
                 pooled.item.modelMeshView = modelView;
-                pooled.generationSource = proxy->m_modelGeneration;
+                pooled.modelPinIndex = modelPinIndex;
                 // I6-C — 신원 키와 반경을 값으로 싣는다.
                 pooled.item.geometryKey = MakeGeometryKey(pooled.item);
                 {
-                    const math::aabb& bounds = proxy->m_modelGeneration
+                    const math::aabb& bounds = modelGeneration
                         ->Meshes()[proxy->m_modelMeshIndex].bounds;
                     pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
                     pooled.item.boundRadius = bounds.is_empty()
@@ -3994,7 +4058,7 @@ namespace
                 drawPool.push_back(pooled);
             };
 
-            const auto poolFoliage = [this](const FoliageRenderProxy* proxy)
+            const auto poolFoliage = [this, &pinModel, &modelPins](const FoliageRenderProxy* proxy)
             {
                 if (!proxy->m_isEnabled || proxy->m_isCulled) return;
 
@@ -4002,9 +4066,18 @@ namespace
                     proxy->CaptureDrawSources())
                 {
                     // PHASE 3.75 MBC8 — poolMesh와 같은 typed 축이 첫째다.
+                    if (!source.modelGeneration)
+                    {
+                        continue;
+                    }
+                    const auto modelPinIndex = pinModel(source.modelGeneration);
+                    if (modelPinIndex == (std::numeric_limits<std::size_t>::max)())
+                    {
+                        continue;
+                    }
+                    const auto& modelGeneration = modelPins.generations[modelPinIndex];
                     RHIModelMeshView modelView{};
-                    if (!source.modelGeneration
-                        || !BuildRHIModelMeshView(*source.modelGeneration,
+                    if (!BuildRHIModelMeshView(*modelGeneration,
                             source.modelMeshIndex, modelView))
                     {
                         continue;
@@ -4015,7 +4088,7 @@ namespace
                     pooled.worldBounds = source.worldBounds;
                     pooled.hasBounds = !source.worldBounds.is_empty();
                     pooled.item.modelMeshView = modelView;
-                    pooled.generationSource = source.modelGeneration;
+                    pooled.modelPinIndex = modelPinIndex;
 
                     if (source.graphMaterialSource)
                     {
@@ -4044,7 +4117,7 @@ namespace
                     //   싣는다(패스가 Mesh를 역참조하지 않게).
                     pooled.item.geometryKey = MakeGeometryKey(pooled.item);
                     {
-                        const math::aabb& bounds = source.modelGeneration
+                        const math::aabb& bounds = modelGeneration
                             ->Meshes()[source.modelMeshIndex].bounds;
                         pooled.item.boundCenter = bounds.is_empty() ? math::vector3{} : bounds.center;
                     pooled.item.boundRadius = bounds.is_empty()
@@ -4105,12 +4178,17 @@ namespace
                 }
             }
 
+            // Publish only after every raw draw view has an owning table slot.
+            // No mutable table alias survives this conversion.
+            modelFramePins = own::make_shared<const assets::ModelAssetGenerationPins>(
+                std::move(modelPins));
             uiProxySnapshot = renderScene->GetUIProxySnapshot();
             uiProxyPointers.reserve(uiProxySnapshot.size());
             for (const auto& proxy : uiProxySnapshot)
             {
                 if (proxy) uiProxyPointers.push_back(proxy.get());
             }
+            buildGuard.published = true;
         }
 
         // ── 렌더 입력 소비: 이 뷰의 몫 ──
@@ -4467,7 +4545,7 @@ namespace
                 inputView.camera = cameraSnapshot;
                 std::string inputError;
                 bool sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                    sceneInputBudget, graphViewInput, inputError);
+                    sceneInputBudget, graphViewInput, inputError, modelFramePins);
                 if (!sealed && hasOptionalGraphCandidates)
                 {
                     // Aggregate geometry budgets can be tighter than the draw
@@ -4493,7 +4571,7 @@ namespace
                     graphShadowEligible.resize(retained);
                     graphViewRequired.resize(retained);
                     sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
-                        sceneInputBudget, graphViewInput, inputError);
+                        sceneInputBudget, graphViewInput, inputError, modelFramePins);
                 }
                 if (!sealed)
                 {
@@ -7026,10 +7104,14 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             //   프레임에 이전 씬의 draw를 재사용하면 scene epoch가 달라진 뒤에도
             //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
             state.drawPool.clear();
+            state.draws.clear();
+            state.shadowDraws.clear();
+            state.forwardDraws.clear();
             state.graphDraws.clear();
             state.graphShadowEligible.clear();
             state.graphViewRequired.clear();
             state.graphViewInput.reset();
+            state.modelFramePins.reset();
             state.decals.clear();
         }
     }

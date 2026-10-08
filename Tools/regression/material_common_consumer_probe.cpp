@@ -11,6 +11,7 @@
 #include <cmath>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <limits>
 #include <sstream>
 #include <stdexcept>
@@ -18,6 +19,19 @@
 void RunMaterialCodeRuntimeTests(const std::filesystem::path& root);
 void RunCookedGraphicsIdentityTests(const material_graph::VerifiedProduct& product);
 void RunMaterialPipelineRuntimeTests(const std::filesystem::path& repository);
+
+namespace
+{
+    template<class T>
+    bool SameGraphOwner(const own::shared_owner<T>& left, const own::shared_owner<T>& right)
+    {
+        if (left && right)
+        {
+            return std::addressof(*left) == std::addressof(*right);
+        }
+        return !left && !right;
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -65,7 +79,7 @@ int main(int argc, char** argv)
             "Common typed getter reads stable-ID graph override");
         const auto before = material.GetMaterialGraphInstance();
         check(material.TrySetFloat("LXMaterialProperties.lx_bound_p900", .47f) &&
-            material.GetMaterialGraphInstance() != before && material.TryGetFloat("LXMaterialProperties.lx_bound_p900", roughness) && roughness == .47f,
+            !SameGraphOwner(material.GetMaterialGraphInstance(), before) && material.TryGetFloat("LXMaterialProperties.lx_bound_p900", roughness) && roughness == .47f,
             "Common typed setter publishes a new graph instance");
         check(material.GetMaterialGraphInstance()->description.parameters[0].id == 900 &&
             std::get<double>(material.GetMaterialGraphInstance()->description.parameters[0].value) == double(.47f),
@@ -75,15 +89,15 @@ int main(int argc, char** argv)
             std::ranges::equal(bytes, material.GetConstantBufferData()), "Common frame property block equals accepted instance bytes");
         const auto accepted = material.GetMaterialGraphInstance();
         check(!material.TrySetFloat("LXMaterialProperties.lx_bound_p900", std::numeric_limits<float>::quiet_NaN()) &&
-            material.GetMaterialGraphInstance() == accepted, "Invalid common edit preserves accepted generation");
+            SameGraphOwner(material.GetMaterialGraphInstance(), accepted), "Invalid common edit preserves accepted generation");
         auto foreign = shader.meta;
         foreign.generatedMaterial->generation[0] = foreign.generatedMaterial->generation[0] == '0' ? '1' : '0';
         const auto retainedBytes = bytes;
         check(!material.BuildShaderPropertyBlock(foreign, shader.layout, bytes, error) && bytes == retainedBytes,
             "Property block rejects a different generated schema without replacing bytes");
         Material clone(material);
-        check(clone.TrySetFloat("LXMaterialProperties.lx_bound_p900", .82f) && material.GetMaterialGraphInstance() == accepted &&
-            clone.GetMaterialGraphInstance()->generation == generation, "Clone editing preserves original values and shared shader owner");
+        check(clone.TrySetFloat("LXMaterialProperties.lx_bound_p900", .82f) && SameGraphOwner(material.GetMaterialGraphInstance(), accepted) &&
+            SameGraphOwner(clone.GetMaterialGraphInstance()->generation, generation), "Clone editing preserves original values and shared shader owner");
         data->FinalizeMaterialRuntime(clone);
         check(clone.GetGeneratedShaderMeta() == &shader.meta, "Scene clone finalization preserves generated common schema");
         Authoring::WriteDocument saved;
@@ -125,7 +139,7 @@ int main(int argc, char** argv)
         const auto generatedRoot = sourcePath.parent_path() / (sourcePath.stem().string() + ".generated");
         std::filesystem::rename(generatedRoot, generatedRoot.string() + ".offline");
         check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
-            authored.GetMaterialGraphInstance()->generation == cold->generation && !std::filesystem::exists(sourcePath) &&
+            SameGraphOwner(authored.GetMaterialGraphInstance()->generation, cold->generation) && !std::filesystem::exists(sourcePath) &&
             !std::filesystem::exists(generatedRoot) && std::filesystem::last_write_time(cachePath) == cacheTime,
             "Warm authoring cache restores common generation without recompiling or source pair access");
         check(authored.GetGeneratedShaderMeta() && authored.TryGetFloat("LXMaterialProperties.lx_bound_p900", roughness) && roughness == .31f,

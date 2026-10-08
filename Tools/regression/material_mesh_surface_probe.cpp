@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "MaterialGraphMeshSurface.h"
 #include "MaterialGraphScenePacket.h"
 #include "PathFinder.h"
@@ -811,7 +812,7 @@ void VerifyResidentInputsGpu(DX12DeviceResources& device, MeshSurfaceEvaluator& 
 
 void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, RenderBindingCache& bindings,
                       MeshSurfaceEvaluator& meshEvaluator, SurfaceEvaluator& evaluator, IblBaker& baker,
-                      const std::shared_ptr<const Instance>& instance, const std::shared_ptr<Texture>& cube,
+                      const own::shared_owner<const Instance>& instance, const std::shared_ptr<Texture>& cube,
                       const Environment& environmentColors, const SheenTable& table, const SurfaceView& view,
                       unsigned tier, unsigned& frames)
 {
@@ -900,7 +901,7 @@ void VerifySamplesGpu(DX12DeviceResources& device, DX12TextureCache& textures, R
     Check(surface->ValidateReadback({actualMaterial, kSamples}, error), "Sample material accepted " + error);
     SceneSurfaceEvaluation evaluation;
     Check(BuildSceneSurfaceEvaluation(surface, evaluation, error) && evaluation.gpu->Count() == kSamples &&
-              evaluation.instance == instance && evaluation.sceneEpoch == view.sceneEpoch &&
+              material_graph_test::SamePinnedObject(evaluation.instance, instance) && evaluation.sceneEpoch == view.sceneEpoch &&
               evaluation.viewRevision == view.viewRevision && evaluation.geometryRevision == view.geometryRevision,
           "Sampled batch retains its exact count and view/material identity at the Scene boundary");
     double endpointInterpolationError = 0;
@@ -1026,7 +1027,7 @@ void Run(const std::filesystem::path& root)
     experiment::AssetId graph;
     Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
     std::string error;
-    std::array<std::shared_ptr<const Instance>, 2> instances;
+    std::array<own::shared_owner<const Instance>, 2> instances;
     for (unsigned i = 0; i < 2; ++i)
     {
         const auto generation = store.Load(

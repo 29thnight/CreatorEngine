@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "MaterialGraphRenderBindings.h"
 #include "PathFinder.h"
 #include "Texture.h"
@@ -152,7 +153,7 @@ void Run(const std::filesystem::path& root)
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), pixels.data(), pixels.size());
     const auto texture = Texture::CreateSharedFromImage("LX.RenderBindings.SRGB", std::move(image));
     Check(!!texture, "Actual CPU texture");
-    std::shared_ptr<const Instance> instance;
+    own::shared_owner<const Instance> instance;
     Check(BuildInstance(
               generation, {graph, {{900, .31}}, {}},
               [&](const experiment::AssetId&, LXColorSpace, std::string&) { return texture; }, instance, error),
@@ -234,7 +235,7 @@ void Run(const std::filesystem::path& root)
         const auto accepted = packet;
         std::shared_ptr<const RenderBindings> rebound;
         Check(RenderBindingCache::RebindPass(device, *packet, layout, rebound, error) &&
-                  RenderBindingCache::Validate(device, *rebound, error) && rebound->instance == packet->instance &&
+                  RenderBindingCache::Validate(device, *rebound, error) && material_graph_test::SamePinnedObject(rebound->instance, packet->instance) &&
                   rebound->resources.uniforms == packet->resources.uniforms &&
                   rebound->recordingId == packet->recordingId && rebound->descriptorVersion == packet->descriptorVersion,
               "Second pass shares current immutable material resources");
@@ -249,14 +250,16 @@ void Run(const std::filesystem::path& root)
         wrongLayout.samplerSlot = layout.uniformSlot;
         Check(!bindings.Prepare(device, textures, instance, wrongLayout, packet, error) && packet == accepted,
               "Aliased root slots retain accepted render packet");
-        auto wrongInstance = std::make_shared<Instance>(*instance);
-        wrongInstance->uniforms.clear();
+        Instance wrongInstanceValue(*instance);
+        wrongInstanceValue.uniforms.clear();
+        const auto wrongInstance = own::make_shared<const Instance>(std::move(wrongInstanceValue));
         Check(!bindings.Prepare(device, textures, wrongInstance, layout, packet, error) && packet == accepted,
               "Invalid packed values retain accepted render packet");
         if (frame == 0)
         {
-            auto missingPixels = std::make_shared<Instance>(*instance);
-            missingPixels->textures.front().owner = std::make_shared<Texture>();
+            Instance missingPixelsValue(*instance);
+            missingPixelsValue.textures.front().owner = std::make_shared<Texture>();
+            const auto missingPixels = own::make_shared<const Instance>(std::move(missingPixelsValue));
             Check(!bindings.Prepare(device, textures, missingPixels, layout, packet, error) && packet == accepted &&
                       textures.GetUploadFailureCount() == 1,
                   "Actual cache neutral substitution is rejected and retains the accepted packet");

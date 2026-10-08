@@ -238,7 +238,7 @@ struct EnhancedLatticeReplayInput
         EnhancedLatticeReplayInput current;
         if(!Seal(graph,current,error)) return false;
         if(draws.size()!=graph.size()) { error="Lattice replay selected draw count mismatch"; return false; }
-        std::vector<std::shared_ptr<const material_graph::Instance>> instances;
+        std::vector<own::shared_owner<const material_graph::Instance>> instances;
         std::map<uint64_t,size_t> sharedSlots;
         for(size_t i=0;i<draws.size();++i)
         {
@@ -251,7 +251,7 @@ struct EnhancedLatticeReplayInput
                 for(const auto& t:source->textures) if(t.assetId==id && t.colorSpace==colorSpace) return t.owner;
                 why="Lattice replay texture override escaped current closure"; return {};
             };
-            std::shared_ptr<const material_graph::Instance> instance;
+            own::shared_owner<const material_graph::Instance> instance;
             if(!material_graph::BuildInstance(source->generation,saved.description,loader,instance,error)) return false;
             if(instance->textures.size()!=saved.textures.size()) { error="Lattice replay rebuilt texture count mismatch"; return false; }
             for(const auto& t:instance->textures)

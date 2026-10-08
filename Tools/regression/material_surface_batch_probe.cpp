@@ -232,7 +232,7 @@ void Run(const std::filesystem::path& root)
     GenerationStore store;
     experiment::AssetId graph;
     Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
-    std::array<std::shared_ptr<const Generation>, 2> generations;
+    std::array<own::shared_owner<const Generation>, 2> generations;
     std::string error;
     for (unsigned i = 0; i < 2; ++i)
     {
@@ -314,7 +314,7 @@ void Run(const std::filesystem::path& root)
     std::shared_ptr<const IblBakeResult> baked;
     std::shared_ptr<const SurfaceBatch> lastGoodBatch;
     std::shared_ptr<const IblBakeResult> lastGoodBake;
-    std::shared_ptr<const Instance> previousInstance;
+    own::shared_owner<const Instance> previousInstance;
     std::shared_ptr<const RenderBindings> staleBindings;
     auto points = Points();
     SurfaceView view{{0, 0, 2, 0}, 1, 1, 1};
@@ -354,7 +354,7 @@ void Run(const std::filesystem::path& root)
                 view.eye[2] = 2;
                 ++view.viewRevision;
             }
-            std::shared_ptr<const Instance> instance;
+            own::shared_owner<const Instance> instance;
             if (frame == 1)
             {
                 instance = previousInstance;

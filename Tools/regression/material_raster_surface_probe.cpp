@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "MaterialGraphRasterSurface.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "Render/Graph/ShadowCasterBounds.h"
@@ -663,7 +664,7 @@ void CheckReferenceDeclarations(const EnhancedRenderGraph& graph)
 }
 void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                    MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings, RasterSurfaceCollector& collector,
-                   SurfaceEvaluator& evaluator, IblBaker& baker, std::shared_ptr<const Instance> instance,
+                   SurfaceEvaluator& evaluator, IblBaker& baker, own::shared_owner<const Instance> instance,
                    std::shared_ptr<Texture> cube, const RasterSurfaceRequest& request,
                    std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources,
                    std::span<const SurfacePoint> expectedGeometry, std::span<const IblBakePoint> expectedSurface,
@@ -871,13 +872,13 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
 unsigned sharedDepthFrames{}, sharedDepthPixels{}, coplanarPixels{}, skinnedDepthFrames{}, meshFailures{};
 unsigned sceneInputFrames{}, sceneInputFailures{};
 
-void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>& instances)
+void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2>& instances)
 {
     auto currentInstance = instances[0];
     auto source = SceneMaterialSource::Capture(currentInstance, SceneCoverage::Opaque, true);
     currentInstance = instances[1];
     const auto replacement = SceneMaterialSource::Capture(currentInstance, SceneCoverage::Masked, false);
-    Check(source && replacement && source->instance == instances[0] && replacement->instance == instances[1] &&
+    Check(source && replacement && material_graph_test::SamePinnedObject(source->instance, instances[0]) && material_graph_test::SamePinnedObject(replacement->instance, instances[1]) &&
               (source->coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0 &&
               (replacement->coverage.flags & EnhancedMaterialCoverage::Masked) != 0 &&
               (replacement->coverage.flags & EnhancedMaterialCoverage::DoubleSided) == 0,
@@ -885,7 +886,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
     Check(!SceneMaterialSource::Capture({}, SceneCoverage::Opaque, false),
           "Producer graph removal explicitly clears the source");
     const auto invalidSource = SceneMaterialSource::Capture(instances[0], static_cast<SceneCoverage>(255), false);
-    Check(invalidSource && invalidSource->instance == instances[0] && !invalidSource->coverage.flags,
+    Check(invalidSource && material_graph_test::SamePinnedObject(invalidSource->instance, instances[0]) && !invalidSource->coverage.flags,
           "Invalid producer coverage keeps graph ownership and cannot choose legacy");
     auto geometry = MakeGeometry(false, false);
     auto& draw = geometry.draw;
@@ -904,7 +905,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
     std::shared_ptr<const SceneViewInput> accepted;
     std::string error;
     Check(SceneViewInput::Seal(view, {&draw, 1}, {}, accepted, error), "Scene input seal " + error);
-    Check(accepted->Draws().size() == 1 && accepted->Draws()[0].material == instances[0] &&
+    Check(accepted->Draws().size() == 1 && material_graph_test::SamePinnedObject(accepted->Draws()[0].material, instances[0]) &&
               accepted->View().frameId == 10 && accepted->View().sceneEpoch == 2,
           "Scene frame retains its exact typed instance and identity");
     const auto& firstMesh = accepted->Draws()[0].geometry->Chunks()[0].input;
@@ -928,7 +929,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
     std::shared_ptr<const SceneViewInput> changed;
     Check(SceneViewInput::Seal(view, {&draw, 1}, {}, changed, error), "Changed world/instance seal");
     Check(changed->Surface().geometryRevision != accepted->Surface().geometryRevision &&
-              changed->Draws()[0].material == instances[1] && accepted->Draws()[0].material == instances[0] &&
+              material_graph_test::SamePinnedObject(changed->Draws()[0].material, instances[1]) && material_graph_test::SamePinnedObject(accepted->Draws()[0].material, instances[0]) &&
               changed->Draws()[0].geometry->Chunks()[0].input->World().m[3][0] == 3 && firstMesh->World().m[3][0] == 0,
           "World or instance replacement does not relabel the previous snapshot");
     std::fill(geometry.vertices.begin(), geometry.vertices.end(), std::byte{});
@@ -983,15 +984,15 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
             invalid.materialGraphInstance.reset();
             break;
         case 11: {
-            auto instance = std::make_shared<Instance>(*instances[0]);
-            instance->generation.reset();
-            invalid.materialGraphInstance = std::move(instance);
+            Instance instanceValue(*instances[0]);
+            instanceValue.generation.reset();
+            invalid.materialGraphInstance = own::make_shared<const Instance>(std::move(instanceValue));
             break;
         }
         case 12: {
-            auto instance = std::make_shared<Instance>(*instances[0]);
-            instance->description.graphId = {};
-            invalid.materialGraphInstance = std::move(instance);
+            Instance instanceValue(*instances[0]);
+            instanceValue.description.graphId = {};
+            invalid.materialGraphInstance = own::make_shared<const Instance>(std::move(instanceValue));
             break;
         }
         case 13:
@@ -1101,7 +1102,7 @@ void RunSceneInputFailures(const std::array<std::shared_ptr<const Instance>, 2>&
 void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                          MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings,
                          RasterSurfaceCollector& collector, std::array<SurfaceEvaluator, 2>& evaluators,
-                         IblBaker& baker, const std::array<std::shared_ptr<const Instance>, 2>& instances,
+                         IblBaker& baker, const std::array<own::shared_owner<const Instance>, 2>& instances,
                          std::shared_ptr<Texture> cube, const Environment& colors, const SheenTable& table,
                          unsigned fixture, bool reverseOrder, unsigned workers,
                          RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
@@ -1197,7 +1198,7 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     for (unsigned i = 0; i < inputs.size(); ++i)
     {
         inputs[i] = sceneInput->Draws()[i].geometry->Chunks()[0].input;
-        Check(sceneInput->Draws()[i].material == instances[i] && inputs[i]->Count() == 3,
+        Check(material_graph_test::SamePinnedObject(sceneInput->Draws()[i].material, instances[i]) && inputs[i]->Count() == 3,
               "Scene instance identity and referenced triangle partition");
     }
     ++sceneInputFrames;
@@ -1527,7 +1528,7 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
 
 void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                           RenderBindingCache& bindings, RasterSurfaceCollector& collector, SurfaceEvaluator& evaluator,
-                          IblBaker& baker, std::shared_ptr<const Instance> instance, std::shared_ptr<Texture> cube,
+                          IblBaker& baker, own::shared_owner<const Instance> instance, std::shared_ptr<Texture> cube,
                           const RasterSurfaceRequest& request,
                           std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources)
 {
@@ -1730,22 +1731,27 @@ struct SceneSubmissionGate
     ~SceneSubmissionGate() { Release(); }
 };
 
-std::shared_ptr<const Instance> SceneReload(const std::shared_ptr<const Instance>& original, double offset,
+own::shared_owner<const Instance> SceneReload(const own::shared_owner<const Instance>& original, double offset,
                                             bool invalid = false)
 {
-    auto generation = std::make_shared<Generation>(*original->generation);
-    generation->generation += 1000 + unsigned(offset * 100);
-    auto& program = generation->cooked.product.program;
-    const std::string needle = ".ior = parameters.lx_p900;";
-    const auto position = program.slang.find(needle);
-    Check(position != std::string::npos, "Reload fixture owns the IOR expression");
-    program.slang.replace(position, needle.size(), ".ior = parameters.lx_p900 + " + std::to_string(offset) + ";");
-    if (invalid)
-        program.slang += "\nthis is an invalid Scene shader;\n";
-    program.semanticKey += "|scene-reload:" + std::to_string(offset) + (invalid ? ":invalid" : "");
-    generation->cooked.boundSource = BuildBoundSource(program);
-    generation->cooked.metadata = WriteMaterialProgramMetadata(program);
-    std::shared_ptr<const Instance> result;
+    Generation generationValue(*original->generation);
+    generationValue.generation += 1000 + unsigned(offset * 100);
+    {
+        auto& program = generationValue.cooked.product.program;
+        const std::string needle = ".ior = parameters.lx_p900;";
+        const auto position = program.slang.find(needle);
+        Check(position != std::string::npos, "Reload fixture owns the IOR expression");
+        program.slang.replace(position, needle.size(), ".ior = parameters.lx_p900 + " + std::to_string(offset) + ";");
+        if (invalid)
+        {
+            program.slang += "\nthis is an invalid Scene shader;\n";
+        }
+        program.semanticKey += "|scene-reload:" + std::to_string(offset) + (invalid ? ":invalid" : "");
+        generationValue.cooked.boundSource = BuildBoundSource(program);
+        generationValue.cooked.metadata = WriteMaterialProgramMetadata(program);
+    }
+    const auto generation = own::make_shared<const Generation>(std::move(generationValue));
+    own::shared_owner<const Instance> result;
     std::string error;
     Check(BuildInstance(
               generation, original->description,
@@ -1761,7 +1767,7 @@ std::shared_ptr<const Instance> SceneReload(const std::shared_ptr<const Instance
 }
 
 void WaitSceneFailure(SceneHost& host, const EnhancedFrameContext& context,
-                      const std::shared_ptr<const Generation>& generation, std::uint64_t previousFailures)
+                      const own::shared_owner<const Generation>& generation, std::uint64_t previousFailures)
 {
     std::string error;
     host.RequestProgram(context, generation, error);
@@ -1778,7 +1784,7 @@ void WaitSceneFailure(SceneHost& host, const EnhancedFrameContext& context,
 }
 
 void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
-                      const std::shared_ptr<const Generation>& generation)
+                      const own::shared_owner<const Generation>& generation)
 {
     std::string error;
     Check(host.RequestProgram(context, generation, error), "Scene asynchronous request " + error);
@@ -1798,7 +1804,7 @@ void WaitSceneProgram(SceneHost& host, const EnhancedFrameContext& context,
 
 void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
                          ProbeTextures& textures, ProbePool& pool,
-                         const std::array<std::shared_ptr<const Instance>, 2>& instances, std::shared_ptr<Texture> cube,
+                         const std::array<own::shared_owner<const Instance>, 2>& instances, std::shared_ptr<Texture> cube,
                          const Environment& environmentColors, const SheenTable& table, unsigned expanded = 0)
 {
     std::string error;
@@ -1832,7 +1838,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         WaitSceneProgram(host, context, instance->generation);
     Check(host.ProgramStats().workerExecutions == (PathFinder::IsAssetAuthoringEnabled() ? 2u : 0u),
           "Editor uses workers and cooked Player skips Scene shader compilation");
-    std::shared_ptr<const Instance> reloadB, reloadC, badShader, badPso, changedReload;
+    own::shared_owner<const Instance> reloadB, reloadC, badShader, badPso, changedReload;
     std::unique_ptr<SceneWorkerGate> preparationGate;
     if (expanded == 4)
     {
@@ -1930,7 +1936,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     };
     auto maskedDescription = instances[0]->description;
     maskedDescription.parameters.push_back({902, 0.0});
-    std::shared_ptr<const Instance> maskedCore;
+    own::shared_owner<const Instance> maskedCore;
     Check(BuildInstance(instances[0]->generation, maskedDescription, loadExisting, maskedCore, error),
           "Scene masked alpha override");
     auto changedDescription = instances[0]->description;
@@ -1940,10 +1946,10 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     {
         changedDescription.parameters = {{903, std::array<double, 3>{.73, .82, 0}}};
     }
-    std::shared_ptr<const Instance> changedCore;
+    own::shared_owner<const Instance> changedCore;
     Check(BuildInstance(instances[0]->generation, changedDescription, loadExisting, changedCore, error),
           "Scene lookup parameter mutation");
-    std::shared_ptr<const Instance> resizedCore;
+    own::shared_owner<const Instance> resizedCore;
     if (expanded == 3)
     {
         const auto resized = FootprintImage(true, true);
@@ -1964,7 +1970,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
     for (unsigned fixture = 0; fixture < (expanded ? 1u : 8u); ++fixture)
     {
         unsigned step = 0;
-        std::shared_ptr<const Instance> previousSelectedCore;
+        own::shared_owner<const Instance> previousSelectedCore;
         for (unsigned workers : workerModes)
         {
             std::cerr << "LX_SCENE_LOOKUP_FRAME expanded=" << expanded << " fixture=" << fixture << " step=" << step
@@ -2091,7 +2097,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 std::swap(graphDraws[0], graphDraws[1]);
             std::shared_ptr<const SceneViewInput> input;
             Check(SceneViewInput::Seal(view, graphDraws, {}, input, error), "Scene composition seal " + error);
-            std::shared_ptr<const Instance> selectedCore;
+            own::shared_owner<const Instance> selectedCore;
             if (expanded == 4)
             {
                 auto conflicting = graphDraws;
@@ -2125,7 +2131,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 const auto coreInput =
                     std::ranges::find_if(input->Draws(), [](const auto& draw) { return draw.materialSlot == 11; });
                 Check(coreInput != input->Draws().end() &&
-                          coreInput->material == core.draw.materialGraphInstance &&
+                          material_graph_test::SamePinnedObject(coreInput->material, core.draw.materialGraphInstance) &&
                           coreInput->coverage.flags == core.draw.coverage.flags,
                       "Every accepted pass uses the exact requested material and coverage");
                 selectedCore = coreInput->material;
@@ -2425,7 +2431,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             }
             const bool warm = approximate     ? false
                               : expanded == 4 ? step > 0 && step != 2 && step != 3 && step != 11 &&
-                                                  selectedCore == previousSelectedCore
+                                                  material_graph_test::SamePinnedObject(selectedCore, previousSelectedCore)
                               : expanded == 1 ? step == 1 || step == 3 || step == 6 || step == 8
                               : expanded == 3 ? step == 1 || step == 2 || step == 4 || step == 7
                                               : step > 0;
@@ -2440,7 +2446,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             if (expanded == 3 && (step == 3 || step == 5))
                 Check(stats.baked > 0 && stats.reused > 0, "Per-image Vector/extent updates affect only owning pixels");
             if (expanded == 4 && selectedCore && previousSelectedCore &&
-                selectedCore != previousSelectedCore && step != 2 && step != 3)
+                !material_graph_test::SamePinnedObject(selectedCore, previousSelectedCore) && step != 2 && step != 3)
                 Check(stats.baked > 0 && stats.reused > 0,
                       "Generation or instance replacement preserves the other slot's exact lookup");
             if (expanded == 4) previousSelectedCore = selectedCore;
@@ -2510,9 +2516,9 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                         float((x + .5) / context.width * 2 - 1), float(1 - (y + .5) / context.height * 2),
                         (tier == 0 || coplanar ? .3f : .4f) + (expanded == 1 && step >= 9 ? .02f : 0.f), 0};
                     spatial.uvLod = {expanded == 1 && tier == 0 && step >= 5 ? .7f : .1f, .2f, 0, 0};
-                    const float ior = expanded == 4 && tier == 0                ? (selectedCore == changedReload ? 2.2f
-                                                                                   : selectedCore == reloadC    ? 1.9f
-                                                                                   : selectedCore == reloadB    ? 1.7f
+                    const float ior = expanded == 4 && tier == 0                ? (material_graph_test::SamePinnedObject(selectedCore, changedReload) ? 2.2f
+                                                                                   : material_graph_test::SamePinnedObject(selectedCore, reloadC)    ? 1.9f
+                                                                                   : material_graph_test::SamePinnedObject(selectedCore, reloadB)    ? 1.7f
                                                                                                                 : 1.3f)
                                       : expanded == 1 && tier == 0 && step >= 4 ? 1.7f
                                                                                 : 1.3f;
@@ -2738,8 +2744,8 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graphId.value), "Graph GUID");
     GenerationStore store;
     std::string error;
-    std::array<std::shared_ptr<const Instance>, 2> instances;
-    std::array<std::shared_ptr<const Instance>, 2> footprintInstances;
+    std::array<own::shared_owner<const Instance>, 2> instances;
+    std::array<own::shared_owner<const Instance>, 2> footprintInstances;
     for (unsigned tier = 0; tier < 2; ++tier)
     {
         const auto generation = store.Load(
@@ -2861,10 +2867,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
             Check(!LoadSceneShaders(incomplete, RHIShaderBinary::Dxil, accepted, error) &&
                       accepted.color.bytecode.Size() == acceptedSize,
                   "Incomplete cooked stage set preserves accepted shaders");
-            auto generation = std::make_shared<Generation>();
-            generation->assetId = id;
-            generation->generation = 1;
-            generation->cooked = std::move(packed);
+            Generation generationValue;
+            generationValue.assetId = id;
+            generationValue.generation = 1;
+            generationValue.cooked = std::move(packed);
+            const auto generation = own::make_shared<const Generation>(std::move(generationValue));
             Check(BuildInstance(
                       generation, {id, {}, {}},
                       [&](const experiment::AssetId&, LXColorSpace, std::string&) { return image; }, instances[tier],

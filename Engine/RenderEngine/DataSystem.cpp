@@ -271,7 +271,7 @@ struct DataSystem::PreparedRuntimeAsset
     std::atomic<bool> cancelled{};
     job_handle work;
     assets::ModelAssetGeneration::Shared model;
-    std::shared_ptr<const material_graph::PreparedGeneration> graph;
+    own::shared_owner<const material_graph::PreparedGeneration> graph;
     std::string error;
     bool published{}; // Scene owner only.
 };
@@ -457,9 +457,9 @@ bool DataSystem::PublishRuntimeAsset(const std::shared_ptr<PreparedRuntimeAsset>
             return false;
         }
         asset->model = result.current;
-        if (result.retired)
+        if (result.retiredHandle.IsValid())
         {
-            RetireModelGenerationTextures(result.retired->Handle());
+            RetireModelGenerationTextures(result.retiredHandle);
         }
     }
     asset->published = true;
@@ -1413,9 +1413,9 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 	}
 	// MBC7 — 교체된 generation의 embedded texture owner는 새 generation과
 	// 섞이지 않는다(§6.2 "이전 texture generation 재사용 금지").
-    if (published.retired)
+    if (published.retiredHandle.IsValid())
     {
-        RetireModelGenerationTextures(published.retired->Handle());
+        RetireModelGenerationTextures(published.retiredHandle);
     }
 	return published.current;
 }
@@ -2069,7 +2069,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
 }
 }
 
-std::shared_ptr<const material_graph::Generation> DataSystem::LoadMaterialGraphGeneration(FileGuid guid,
+own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGraphGeneration(FileGuid guid,
                                                                                           std::string& error,
                                                                                           bool reload)
 {
@@ -2321,7 +2321,7 @@ void DataSystem::CommitSceneMaterials(const file::path& scene)
     }
 }
 
-std::shared_ptr<const material_graph::Generation> DataSystem::ResolveMaterialGraphGeneration(FileGuid guid) const
+own::shared_owner<const material_graph::Generation> DataSystem::ResolveMaterialGraphGeneration(FileGuid guid) const
 {
     return m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid});
 }
@@ -2527,7 +2527,7 @@ bool DataSystem::ConfigureMaterialGraphAuthoring(Material& material, const LX::L
     {
         return false;
     }
-    std::shared_ptr<const material_graph::Generation> generation;
+    own::shared_owner<const material_graph::Generation> generation;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         if (m_assetPreparationStopping || loadEpoch != m_assetPreparationEpoch)
@@ -2585,7 +2585,7 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
             failure = "LX texture load failed: " + textureGuid.ToString();
         return owner;
     };
-    std::shared_ptr<const material_graph::Instance> candidate;
+    own::shared_owner<const material_graph::Instance> candidate;
     if (!material_graph::BuildInstance(std::move(generation), description, textureLoader, candidate, error))
         return false;
 
@@ -3611,9 +3611,11 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 		if (FileGuid{} != guid)
 		{
 			// MBC7 — generation과 그 embedded texture owner는 한 단위로 은퇴한다.
-            if (const auto retired = m_modelAssetGenerations.Retire(guid.m_guid))
+            assets::ModelAssetGenerationHandle retiredHandle;
+            const auto retired = m_modelAssetGenerations.Retire(guid.m_guid, &retiredHandle);
+            if (retiredHandle.IsValid())
             {
-                RetireModelGenerationTextures(retired->Handle());
+                RetireModelGenerationTextures(retiredHandle);
             }
 		}
 		break;

@@ -35,7 +35,8 @@ namespace ModelSceneInstantiation
             bool bone{ false };
             GameObjectType type{ GameObjectType::Mesh };
         };
-        std::shared_ptr<const assets::ModelAssetGeneration> generation;
+        // Incremental construction keeps the source alive between Advance calls.
+        assets::ModelAssetGeneration::Shared generation;
         Options options;
         std::vector<ObjectRecipe> objects;
         std::vector<std::shared_ptr<Material>> materials;
@@ -57,7 +58,7 @@ namespace ModelSceneInstantiation
     PendingInstance::~PendingInstance() = default;
 
     std::unique_ptr<PendingInstance> PendingInstance::Prepare(
-        std::shared_ptr<const assets::ModelAssetGeneration> generation, const Options& options)
+        assets::ModelAssetGeneration::Shared generation, const Options& options)
     {
         const auto reject = []() -> std::unique_ptr<PendingInstance>
         {
@@ -357,7 +358,7 @@ namespace ModelSceneInstantiation
     { return m_impl->objects.size() + 1 + m_impl->renderers.size(); }
 
     Entity* Instantiate(Scene& scene,
-        const std::shared_ptr<const assets::ModelAssetGeneration>& generation, const Options& options)
+        const assets::ModelAssetGeneration::Shared& generation, const Options& options)
     {
         auto pending = PendingInstance::Prepare(generation, options);
         if (!pending) return nullptr;

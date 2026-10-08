@@ -14,6 +14,7 @@
 // 것의 공통)가 들고, 타입별 필드는 파생이 든다. ③은 As<T>()가 받는다 —
 // 태그가 맞을 때만 그 타입 포인터를 돌려주므로 태그와 필드가 한 자리에서
 // 함께 검사된다.
+#include "Ownership.h"
 #include "RenderProxy.h"
 #include "AnimationPaletteArena.h"
 #include "LightMapping.h"
@@ -125,9 +126,9 @@ public:
     std::shared_ptr<const material_graph::SceneMaterialSource> m_graphMaterialSource;
 	// PHASE 3.75 MBC7/MBC9 — typed 정본이 유일한 지오메트리 출처다. 컴포넌트가
 	// 붙든 immutable generation과 메시 인덱스의 사본. drawPool이 이것으로
-	// RHIModelMeshView를 만들어 패스에 싣고, shared_ptr이 뷰가 가리키는 정점·인덱스
+	// RHIModelMeshView를 만들어 패스에 싣고, shared_owner가 뷰가 가리키는 정점·인덱스
 	// 저장소의 수명을 이 프레임 동안 잡아 준다. null이면 그릴 것이 없다.
-	std::shared_ptr<const assets::ModelAssetGeneration>	m_modelGeneration{};
+	own::shared_owner<const assets::ModelAssetGeneration>	m_modelGeneration{};
 	uint32							m_modelMeshIndex{ 0 };
 	// I5-D5c2-2 — 재질 저작 정본의 **값 스냅샷**(base+override 합성 결과).
 	// MeshRenderer의 MaterialInstance에서 프록시 생성 시 한 번 만든다 —
@@ -205,7 +206,7 @@ public:
 		std::shared_ptr<const experiment::Material> authoredMaterial{};
 		// PHASE 3.75 MBC8/MBC9 — typed 정본(FoliageType 필드의 사본). drawPool이
 		// 이것으로 RHIModelMeshView를 만들어 싣는다 — 유일한 지오메트리 출처다.
-		std::shared_ptr<const assets::ModelAssetGeneration> modelGeneration{};
+		own::shared_owner<const assets::ModelAssetGeneration> modelGeneration{};
 		uint32 modelMeshIndex{ 0 };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::aabb worldBounds{};

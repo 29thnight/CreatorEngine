@@ -184,7 +184,7 @@ void Animator::EnsureAnimationBinding()
 }
 
 void Animator::BindModelGeneration(
-    std::shared_ptr<const assets::ModelAssetGeneration> generation)
+    assets::ModelAssetGeneration::Shared generation)
 {
 	auto& instance = GetInstance();
 	instance.layerTrackTables.clear();

@@ -1,3 +1,4 @@
+#include "material_owner_checks.h"
 #include "../../Engine/RenderEngine/MaterialGraphShaderMeta.h"
 #include "../../Engine/RenderEngine/MaterialGraphSceneCompiler.h"
 #include "../../Engine/RenderEngine/MaterialGraphRuntime.h"
@@ -136,18 +137,19 @@ RWStructuredBuffer<float4> result : register(u0);
             MaterialPropertyPacker::PackProperty(property, *binding, value, packed, error), "Common default pack: " + error);
     }
     Check(packed == expected, "Common and previous numeric packing match bit for bit");
-    auto owning = std::make_shared<Generation>();
-    owning->assetId.value = guid.m_guid;
-    owning->generation = 1;
-    owning->cooked.product.program = program;
-    owning->cooked.product.layout = legacy;
-    owning->cooked.product.materialShader = std::make_shared<GeneratedMaterialShader>(accepted);
+    Generation generationValue;
+    generationValue.assetId.value = guid.m_guid;
+    generationValue.generation = 1;
+    generationValue.cooked.product.program = program;
+    generationValue.cooked.product.layout = legacy;
+    generationValue.cooked.product.materialShader = std::make_shared<GeneratedMaterialShader>(accepted);
+    const auto owning = own::make_shared<const Generation>(std::move(generationValue));
     const auto lifetime = std::make_shared<int>(1);
     const TextureLoader loader = [&lifetime](const experiment::AssetId&, LXColorSpace, std::string&) {
         return std::shared_ptr<Texture>(lifetime, reinterpret_cast<Texture*>(lifetime.get()));
     };
     InstanceDescription instanceDescription{owning->assetId, {}, {}};
-    std::shared_ptr<const Instance> instance;
+    own::shared_owner<const Instance> instance;
     Check(BuildInstance(owning, instanceDescription, loader, instance, error) && instance->uniforms == expected &&
         instance->properties.size() == 8 && instance->textureOwners.size() == 2,
         "Runtime instance uses common property packing and texture ownership");
@@ -165,10 +167,10 @@ RWStructuredBuffer<float4> result : register(u0);
         "Stable texture override changes every SRGB/data resource alias");
     const auto retainedInstance = instance;
     instanceDescription.parameters.push_back({16, std::array<double, 4>{1, 0, 0, 1}});
-    Check(!BuildInstance(owning, instanceDescription, loader, instance, error) && instance == retainedInstance,
+    Check(!BuildInstance(owning, instanceDescription, loader, instance, error) && material_graph_test::SamePinnedObject(instance, retainedInstance),
         "Private common property edit preserves accepted snapshot");
     instanceDescription.parameters.back() = {13, true};
-    Check(!BuildInstance(owning, instanceDescription, loader, instance, error) && instance == retainedInstance,
+    Check(!BuildInstance(owning, instanceDescription, loader, instance, error) && material_graph_test::SamePinnedObject(instance, retainedInstance),
         "Duplicate/type-invalid common edit preserves accepted snapshot");
 
     const auto document = Authoring::ParsedDocument::ParseText(acceptedText, error);

@@ -12,6 +12,7 @@
 // 게시 계약(parent < index) 덕에 노드·본 모두 단일 순회다. 계약을 어기는
 // generation이면 아무것도 만들지 않고 nullptr — 반쪽 시공은 없다.
 
+#include "Ownership.h"
 #include <memory>
 #include <string>
 #include <chrono>
@@ -42,7 +43,7 @@ namespace ModelSceneInstantiation
     public:
         enum class Status { Building, Complete, Failed };
         static std::unique_ptr<PendingInstance> Prepare(
-            std::shared_ptr<const assets::ModelAssetGeneration> generation,
+            own::shared_owner<const assets::ModelAssetGeneration> generation,
             const Options& options);
         ~PendingInstance();
         Status Advance(Scene& scene, std::size_t maxSteps = 16,
@@ -62,6 +63,6 @@ namespace ModelSceneInstantiation
     // 성공하면 루트 엔티티. 관측은 ModelConsumptionDiagnostics 계수(읽기 전용)로만
     // 남긴다 — stdout 토큰은 MBC10에서 은퇴했다.
     Entity* Instantiate(Scene& scene,
-        const std::shared_ptr<const assets::ModelAssetGeneration>& generation,
+        const own::shared_owner<const assets::ModelAssetGeneration>& generation,
         const Options& options);
 }

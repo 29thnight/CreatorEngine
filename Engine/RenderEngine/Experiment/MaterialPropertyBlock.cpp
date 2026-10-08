@@ -104,7 +104,7 @@ namespace experiment
             return false;
         }
 
-        std::shared_ptr<const LX::Runtime::Instance> instance;
+        own::shared_owner<const LX::Runtime::Instance> instance;
         if (!BuildMaterialRuntimeInstance(material, meta, layout, {}, {}, instance, outError)) return false;
         outBytes = instance->uniforms;
         outError.clear();
@@ -114,7 +114,7 @@ namespace experiment
     bool BuildMaterialRuntimeInstance(const Material& material, const ShaderMeta& meta,
         const ShaderMetaBindingLayout& layout, ShaderMetaHandle handle,
         std::span<const MaterialTextureOwner> textures,
-        std::shared_ptr<const LX::Runtime::Instance>& outInstance, std::string& outError)
+        own::shared_owner<const LX::Runtime::Instance>& outInstance, std::string& outError)
     {
         std::shared_ptr<const LX::Runtime::ShaderGeneration> shader;
         if (!LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError)) return false;

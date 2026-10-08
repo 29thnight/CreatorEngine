@@ -1,3 +1,4 @@
+#include "../../../../../Tools/regression/material_owner_checks.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -1092,12 +1093,14 @@ passes:
         frame.frameId = 1;
         // A closed tetrahedron and retained synthetic material identify two media.
         // These fixtures compile declarations; they do not dispatch material coefficients.
-        auto generation = std::make_shared<Generation>();
-        generation->generation = 1;
-        generation->cooked.product.program.volume = true;
-        auto instance = std::make_shared<Instance>();
-        instance->generation = generation;
-        instance->description.graphId = generation->assetId;
+        Generation generationValue;
+        generationValue.generation = 1;
+        generationValue.cooked.product.program.volume = true;
+        const auto generation = own::make_shared<const Generation>(std::move(generationValue));
+        Instance instanceValue;
+        instanceValue.generation = generation;
+        instanceValue.description.graphId = generation->assetId;
+        const auto instance = own::make_shared<const Instance>(std::move(instanceValue));
         EnhancedDrawItem draw{};
         draw.geometryKey = 1;
         draw.materialGraphInstance = instance;
@@ -3623,7 +3626,7 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
         {
             const file::path scenePath = file::path(modelPath);
             // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
-            const std::shared_ptr<const assets::ModelAssetGeneration> sceneModel =
+            const assets::ModelAssetGeneration::Shared sceneModel =
                 DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
             std::vector<RHIModelMeshView> sceneMeshes;
             uint64_t sceneUploadBytes = 0;
@@ -4141,27 +4144,42 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     item.modelMeshView.vertexAttributeMask=assets::kCoreVertexAttributes;
     item.modelMeshView.vertexLayoutHash=assets::VertexLayoutHash(assets::kCoreVertexAttributes);
     item.modelMeshView.indexData=indices.data(); item.modelMeshView.indexCount=3; item.materialGraphSlot=7;
-    auto generation=std::make_shared<material_graph::Generation>();
-    experiment::TryParseCanonicalAssetId("11111111-1111-4111-8111-111111111111",generation->assetId);
-    generation->generation=1; auto& product=generation->cooked.product;
-    product.program.semanticKey="base0-native-lattice-fixture";
-    const auto parameter=[&](LX::Id id,LX::PinType type,LX::LXSocketValue value,uint32_t offset,uint32_t bytes) {
-        LX::LXMaterialParameter p; p.id=id; p.type=type; p.value=std::move(value); p.identifier="param"+std::to_string(id); p.exposed=true;
-        product.program.parameters.push_back(p); product.layout.parameters.push_back({p,offset,bytes});
-    };
-    parameter(900,LX::PinType::Float,0.5,0,4); parameter(902,LX::PinType::Bool,true,4,4);
-    parameter(903,LX::PinType::Int,int64_t(7),8,4);
-    parameter(904,LX::PinType::Vector,std::array<double,3>{1,2,3},12,12);
-    parameter(905,LX::PinType::Color,std::array<double,4>{1,.5,.25,1},24,16);
-    product.layout.uniformBytes=40;
-    experiment::AssetId textureId;
-    experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222",textureId);
-    LX::LXMaterialResource resource; resource.slot=0; resource.reference=Uuid::ToString(textureId.value); resource.colorSpace=LX::LXColorSpace::Data;
-    product.layout.textures.push_back(resource);
+    material_graph::Generation generationValue;
+    experiment::TryParseCanonicalAssetId("11111111-1111-4111-8111-111111111111", generationValue.assetId);
+    generationValue.generation = 1;
+    {
+        auto& product = generationValue.cooked.product;
+        product.program.semanticKey = "base0-native-lattice-fixture";
+        const auto parameter = [&](LX::Id id, LX::PinType type, LX::LXSocketValue value,
+                                   uint32_t offset, uint32_t bytes) {
+            LX::LXMaterialParameter p;
+            p.id = id;
+            p.type = type;
+            p.value = std::move(value);
+            p.identifier = "param" + std::to_string(id);
+            p.exposed = true;
+            product.program.parameters.push_back(p);
+            product.layout.parameters.push_back({p, offset, bytes});
+        };
+        parameter(900, LX::PinType::Float, 0.5, 0, 4);
+        parameter(902, LX::PinType::Bool, true, 4, 4);
+        parameter(903, LX::PinType::Int, int64_t(7), 8, 4);
+        parameter(904, LX::PinType::Vector, std::array<double, 3>{1, 2, 3}, 12, 12);
+        parameter(905, LX::PinType::Color, std::array<double, 4>{1, .5, .25, 1}, 24, 16);
+        product.layout.uniformBytes = 40;
+        experiment::AssetId textureId;
+        experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222", textureId);
+        LX::LXMaterialResource resource;
+        resource.slot = 0;
+        resource.reference = Uuid::ToString(textureId.value);
+        resource.colorSpace = LX::LXColorSpace::Data;
+        product.layout.textures.push_back(resource);
+    }
+    const auto generation = own::make_shared<const material_graph::Generation>(std::move(generationValue));
     const uint32_t pixel=0xff4080c0;
     auto texture=std::shared_ptr<Texture>(Texture::CreateFromPixels(1,1,"base0-lattice-owner",RHIFormat::RGBA8Unorm,&pixel));
     material_graph::InstanceDescription description; description.graphId=generation->assetId;
-    std::shared_ptr<const material_graph::Instance> source;
+    own::shared_owner<const material_graph::Instance> source;
     if(!texture || !material_graph::BuildInstance(generation,description,[&](const auto&,auto,std::string&){return texture;},source,error)) return false;
     item.materialGraphInstance=source;
     std::array<EnhancedDrawItem,2> graph{item,item};
@@ -4192,7 +4210,7 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     bad=bytes; std::fill_n(bad.begin()+48,16,0); if(!reject(bad,true)) return false;
     const auto rejectApply=[&](EnhancedLatticeReplayInput badInput) {
         std::string why;
-        return !badInput.Apply(graph,why) && !why.empty() && graph[0].materialGraphInstance==source && graph[1].materialGraphInstance==source;
+        return !badInput.Apply(graph,why) && !why.empty() && material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, source) && material_graph_test::SamePinnedObject(graph[1].materialGraphInstance, source);
     };
     auto mutation=sealed; mutation.draws[0].program^=1; if(!rejectApply(mutation)) return false;
     mutation=sealed; mutation.draws[0].textures[0].content^=1; if(!rejectApply(mutation)) return false;
@@ -4202,9 +4220,9 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     mutation=sealed; mutation.draws[0].description.parameters[0].value=.25;
     mutation.draws[1].description.graphId.value.data[0]^=1; if(!rejectApply(mutation)) return false; // late rejection is atomic
     for(auto& d:accepted.draws) d.description.parameters[0].value=.25;
-    if(!accepted.Apply(graph,error) || graph[0].materialGraphInstance==source
-        || graph[0].materialGraphInstance!=graph[1].materialGraphInstance
-        || graph[0].materialGraphInstance->generation!=generation
+    if(!accepted.Apply(graph,error) || material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, source)
+        || !material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, graph[1].materialGraphInstance)
+        || !material_graph_test::SamePinnedObject(graph[0].materialGraphInstance->generation, generation)
         || graph[0].materialGraphInstance->textures[0].owner!=texture) return false;
     float replayed{}; std::memcpy(&replayed,graph[0].materialGraphInstance->uniforms.data(),sizeof(replayed));
     if(replayed!=.25f || source->uniforms==graph[0].materialGraphInstance->uniforms) return false;

@@ -1,7 +1,7 @@
 // Pixel-level alpha composition across the real Code and cooked Graph consumers.
 void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                      ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
-                     std::array<std::shared_ptr<const Instance>, 2> instances, std::shared_ptr<Texture> cube)
+                     std::array<own::shared_owner<const Instance>, 2> instances, std::shared_ptr<Texture> cube)
 {
     std::string error;
     for (unsigned tier = 0; tier < 2; ++tier)
@@ -12,10 +12,11 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
                   root / "Build/Obj/MaterialProductProbe" / (tier ? "alpha-layered.slang" : "alpha-core.slang"),
                   {}, cooked, error, instances[tier]->description.graphId.value);
         Check(compiled, "Compile complete alpha product " + error);
-        auto generation = std::make_shared<Generation>();
-        generation->assetId = instances[tier]->description.graphId;
-        generation->generation = tier + 1;
-        generation->cooked = {std::move(cooked), {}, {}};
+        Generation generationValue;
+        generationValue.assetId = instances[tier]->description.graphId;
+        generationValue.generation = tier + 1;
+        generationValue.cooked = {std::move(cooked), {}, {}};
+        const auto generation = own::make_shared<const Generation>(std::move(generationValue));
         Check(BuildInstance(generation, instances[tier]->description,
                   [&](const experiment::AssetId&, LXColorSpace, std::string&) { return instances[tier]->textures[0].owner; },
                   instances[tier], error), "Cooked alpha instance " + error);

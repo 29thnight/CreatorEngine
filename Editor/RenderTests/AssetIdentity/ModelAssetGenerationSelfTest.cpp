@@ -14,12 +14,24 @@
 #include <set>
 #include <ranges>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace RenderTest
 {
     namespace
     {
+        static_assert(std::is_same_v<assets::ModelAssetGeneration::Shared,
+            own::shared_owner<const assets::ModelAssetGeneration>>);
+        static_assert(!std::is_default_constructible_v<assets::ModelAssetGeneration::LoadKey>);
+
+        [[nodiscard]] bool SameGeneration(const assets::ModelAssetGeneration::Shared& left,
+            const assets::ModelAssetGeneration::Shared& right)
+        {
+            return left && right && left->Handle() == right->Handle()
+                && left->Identity().sourceFingerprint == right->Identity().sourceFingerprint;
+        }
+
         struct GenerationChecker final
         {
             std::string& log;
@@ -192,8 +204,8 @@ namespace RenderTest
                 const auto after = DataSystems->LoadModelAssetGeneration(guid);
                 const auto cacheAfter = DataSystems->SnapshotModelAssetGenerations();
                 const bool rejected = DataSystems->SnapshotModelGenerationSources().failed > sourcesBefore.failed;
-                const bool held = after == before
-                    && DataSystems->ResolveModelAssetGeneration(before->Handle()) == before
+                const bool held = SameGeneration(after, before)
+                    && SameGeneration(DataSystems->ResolveModelAssetGeneration(before->Handle()), before)
                     && cacheAfter.retires == cacheBefore.retires
                     && cacheAfter.replacements == cacheBefore.replacements;
                 bool texturesHeld = DataSystems->SnapshotModelGenerationTextures().retired == texturesBefore.retired;
@@ -201,7 +213,7 @@ namespace RenderTest
                     texturesHeld &= owners[i] == DataSystems->ResolveModelGenerationTexture(
                         *before, before->Textures()[i].textureId);
                 RHIModelMeshView view;
-                const bool instanceHeld = instance.m_modelGeneration == before
+                const bool instanceHeld = SameGeneration(instance.m_modelGeneration, before)
                     && instance.GetModelMeshHandle() == instanceHandle
                     && BuildRHIModelMeshView(*instance.m_modelGeneration, 0, view) && view.IsComplete();
                 check.Check(rejected, std::string(name) + " reload failure observed");
@@ -247,7 +259,7 @@ namespace RenderTest
                 && cacheAfter.replacements == cacheBefore.replacements + 1
                 && !DataSystems->ResolveModelAssetGeneration(before->Handle()) && newOwners
                 && DataSystems->SnapshotModelGenerationTextures().retired == texturesBefore.retired + oldOwners.size()
-                && instance.m_modelGeneration == before
+                && SameGeneration(instance.m_modelGeneration, before)
                 && BuildRHIModelMeshView(*before, 0, oldView) && oldView.IsComplete()
                 && fresh.BindModelGeneration(after, 0) && fresh.GetModelMeshHandle().generation == after->Handle().generation;
             check.Check(report.runtimeRecovered, "valid candidate atomically replaces current; old instance lives, fresh uses new");
@@ -260,7 +272,7 @@ namespace RenderTest
             const auto duplicateCache = DataSystems->SnapshotModelAssetGenerations();
             const auto duplicateTextures = DataSystems->SnapshotModelGenerationTextures();
             reload();
-            report.runtimeDuplicateStable = stable && DataSystems->LoadModelAssetGeneration(guid) == stable
+            report.runtimeDuplicateStable = stable && SameGeneration(DataSystems->LoadModelAssetGeneration(guid), stable)
                 && DataSystems->SnapshotModelAssetGenerations().retires == duplicateCache.retires
                 && DataSystems->SnapshotModelGenerationTextures().retired == duplicateTextures.retired;
             check.Check(report.runtimeDuplicateStable, "duplicate current notification does not recreate aggregate or textures");
@@ -508,19 +520,19 @@ namespace RenderTest
         assets::ModelAssetGenerationCache cache;
         const assets::ModelAssetPublishResult publishOne = cache.Publish(first);
         check.Check(publishOne.outcome == assets::ModelAssetPublishOutcome::Published
-            && publishOne.current == first, "generation 1 최초 원자 게시");
-        check.Check(cache.ResolveCurrent(modelId) == first, "current generation 1 resolve");
+            && SameGeneration(publishOne.current, first), "generation 1 최초 원자 게시");
+        check.Check(SameGeneration(cache.ResolveCurrent(modelId), first), "current generation 1 resolve");
         const assets::ModelMeshHandle oldMeshHandle{ modelId,
             first->Meshes().front().meshId, generationOne };
         assets::ModelAssetGeneration::Shared oldMeshOwner;
         check.Check(cache.ResolveMesh(oldMeshHandle, oldMeshOwner) != nullptr
-            && oldMeshOwner == first, "{ModelId,MeshId,generation} mesh binding");
+            && SameGeneration(oldMeshOwner, first), "{ModelId,MeshId,generation} mesh binding");
 
         const assets::ModelAssetPublishResult publishTwo = cache.Publish(second);
         check.Check(publishTwo.outcome == assets::ModelAssetPublishOutcome::Replaced
-            && publishTwo.current == second && publishTwo.retired == first,
+            && SameGeneration(publishTwo.current, second) && SameGeneration(publishTwo.retired, first),
             "generation 2가 generation 1 전체를 교체");
-        check.Check(cache.ResolveCurrent(modelId) == second,
+        check.Check(SameGeneration(cache.ResolveCurrent(modelId), second),
             "교체 뒤 current generation 2 resolve");
         check.Check(!cache.Resolve(first->Handle()),
             "교체 뒤 이전 generation handle은 cache에서 해석되지 않음");
@@ -533,6 +545,66 @@ namespace RenderTest
         check.Check(cache.Publish(second).outcome
             == assets::ModelAssetPublishOutcome::AlreadyCurrent,
             "동일 generation 멱등 게시");
+
+        // Retention is bounded independently from a consumer's lifetime, and
+        // an expired resident cannot erase the published identity contract.
+        {
+            assets::ModelAssetGenerationCache bounded;
+            auto isolated = Load(header, onePath, modelId, generationOne);
+            check.Check(isolated.Succeeded(), "retention fixture loads independently");
+            if (isolated.generation)
+            {
+                const auto handle = isolated.generation->Handle();
+                own::weak_owner<const assets::ModelAssetGeneration> observer(isolated.generation);
+                bounded.SetRetentionBudgetBytes(isolated.generation->EstimatedCpuBytes());
+                check.Check(bounded.Publish(isolated.generation).Succeeded(), "bounded current publishes");
+                isolated.generation.reset();
+                auto consumer = bounded.ResolveCurrent(modelId);
+                check.Check(consumer && bounded.Snapshot().retainedBytes != 0,
+                    "cache retention survives an unused preload's caller");
+                bounded.SetRetentionBudgetBytes(0);
+                const auto trimmed = bounded.Snapshot();
+                check.Check(trimmed.retainedBytes == 0 && trimmed.retainedGenerations == 0
+                    && SameGeneration(bounded.Resolve(handle), consumer)
+                    && consumer && !consumer->Meshes().empty(),
+                    "zero budget drops only cache pins and preserves live consumer bytes");
+                assets::ModelAssetGenerationPins pins;
+                pins.generations.push_back(consumer);
+                auto framePins = own::make_shared<const assets::ModelAssetGenerationPins>(std::move(pins));
+                RHIModelMeshView frameView;
+                const bool frameReady = consumer && BuildRHIModelMeshView(*consumer, 0, frameView);
+                consumer.reset();
+                check.Check(frameReady && frameView.IsComplete() && observer.lock()
+                    && !framePins->generations.front()->Meshes().empty(),
+                    "frame owner table preserves borrowed geometry after consumer release");
+                framePins.reset();
+                check.Check(!observer.lock() && !bounded.ResolveCurrent(modelId)
+                    && bounded.Snapshot().currentAssets == 1
+                    && bounded.Snapshot().addressableGenerations == 0,
+                    "expired resident misses while current identity remains protected");
+                auto reloaded = Load(header, onePath, modelId, generationOne);
+                check.Check(reloaded.Succeeded()
+                    && bounded.Publish(reloaded.generation).outcome
+                        == assets::ModelAssetPublishOutcome::AlreadyCurrent
+                    && SameGeneration(bounded.Resolve(handle), reloaded.generation),
+                    "exact current identity can republish after residency expires");
+                reloaded.generation.reset();
+                check.Check(!bounded.ResolveCurrent(modelId),
+                    "zero-budget republish does not turn the weak index into a permanent pin");
+                const auto replacement = bounded.Publish(second);
+                check.Check(replacement.outcome == assets::ModelAssetPublishOutcome::Replaced
+                    && !replacement.retired && replacement.retiredHandle == handle
+                    && !bounded.Resolve(handle),
+                    "expired old generation still returns value identity for dependent retirement");
+                check.Check(bounded.Publish(first).outcome == assets::ModelAssetPublishOutcome::RejectedStale,
+                    "weak residency never revives a replaced old handle");
+                assets::ModelAssetGenerationHandle retiredHandle;
+                const auto owner = bounded.Retire(modelId, &retiredHandle);
+                check.Check(SameGeneration(owner, second) && retiredHandle == second->Handle()
+                    && !bounded.Resolve(second->Handle()),
+                    "explicit retirement separates lookup identity and consumer ownership");
+            }
+        }
 
         TemporaryTree temporary;
         temporary.path = std::filesystem::temp_directory_path()
@@ -560,7 +632,7 @@ namespace RenderTest
             // ★ W8 계약이 걸린 자리는 여기다. "거부됐다" 와 "거부된 뒤에도 current 가
             //   그대로다" 는 다른 단정이다 — 합쳐 세면 거부는 되는데 current 가
             //   날아가는 회귀를 못 본다.
-            const bool currentHeld = cache.ResolveCurrent(modelId) == second;
+            const bool currentHeld = SameGeneration(cache.ResolveCurrent(modelId), second);
             check.Check(currentHeld, std::string(name) + " 실패 뒤 current generation 불변");
             if (currentHeld) ++tamperCurrentHeld;
         };
@@ -598,7 +670,7 @@ namespace RenderTest
             }, assets::ModelAssetGenerationIssueCode::FingerprintMismatch);
 
         const assets::ModelAssetGeneration::Shared retired = cache.Retire(modelId);
-        check.Check(retired == second && !cache.ResolveCurrent(modelId),
+        check.Check(SameGeneration(retired, second) && !cache.ResolveCurrent(modelId),
             "retire가 model/subasset/descriptor generation 전체를 cache에서 분리");
         check.Check(second->Identity().generation == generationTwo
             && !second->GpuDescriptors().empty(),
