@@ -20,6 +20,11 @@ namespace Authoring
     class ReadNode;
 }
 
+namespace experiment::cooked
+{
+    struct CodeProgram;
+}
+
 namespace AssetDepot
 {
     struct ShaderMetaAssetOrigin;
@@ -176,6 +181,10 @@ struct ShaderMeta
     std::optional<ShaderGeneratedMaterial> generatedMaterial;
     // Exact immutable artifact source pin. It holds no bulk image or GPU data.
     own::shared_owner<const AssetDepot::ShaderMetaAssetOrigin> assetOrigin{};
+    // Non-null only for a verified source-free code generation. Descriptor
+    // readiness alone never fills this field or authorizes shader compilation.
+    own::shared_owner<const experiment::cooked::CodeProgram> codeProgram{};
+    std::string codeProgramIdentity; // Exact immutable blob SHA-256, runtime only.
 
     bool operator==(const ShaderMeta& other) const
     {

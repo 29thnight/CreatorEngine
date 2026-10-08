@@ -155,6 +155,15 @@ own::shared_owner<const ShaderMeta> DataSystem::LoadShaderMetaOwner(FileGuid gui
     ShaderMetaHandle& outHandle, std::string& outError)
 {
     outHandle = {};
+    const auto catalog = GetCookedCatalog();
+    const AssetDepot::AssetLink<ShaderMeta> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+    experiment::cooked::ResolvedAssetEntry resolved;
+    if (catalog && catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::NotMounted)
+    {
+        outError = "Mounted metadata requires an explicit prepared code-program owner; a descriptor is not shader readiness.";
+        return {};
+    }
+
     std::uint64_t loadEpoch{};
     std::uint64_t resolverRevision{};
     ShaderMetaHandle requested;
@@ -353,7 +362,7 @@ own::shared_owner<const ShaderMeta> DataSystem::ResolveShaderMeta(ShaderMetaHand
     const auto& slot = m_shaderMetaSlots[slotIndex];
     const auto current = m_shaderMetaSlotByGuid.find(slot.guid);
     if (!slot.occupied || slot.generation != handle.generation || slot.resolverRevision != m_assetDepotRevision ||
-        current == m_shaderMetaSlotByGuid.end() || current->second != slotIndex)
+        (!slot.codeProgram && (current == m_shaderMetaSlotByGuid.end() || current->second != slotIndex)))
     {
         return {};
     }

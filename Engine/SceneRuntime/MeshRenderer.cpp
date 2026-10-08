@@ -17,6 +17,7 @@
 #include <mathematics/transform.hpp>
 
 #include <algorithm>
+#include <limits>
 #include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 계수(무조건 stdout 출력 제거)
 
 namespace
@@ -41,7 +42,8 @@ namespace
 	[[nodiscard]] bool DecodeMaterialReferenceNode(
 		const Authoring::ReadNode materialNode, own::shared_owner<Material>& outMaterial,
 		FileGuid& outBaseGuid, std::string& outError,
-		experiment::MaterialInstance* outInstance = nullptr)
+		experiment::MaterialInstance* outInstance = nullptr,
+        std::span<const own::shared_owner<const Texture>> preparedTextures = {})
 	{
 		const Authoring::ReadNode ref = materialNode["ref"];
 		if (!ref || !ref.IsScalar())
@@ -55,19 +57,12 @@ namespace
 			outError = "ref가 nil GUID다";
 			return false;
 		}
-		const file::path basePath = DataSystems->GetFilePath(baseGuid);
-		if (basePath.empty())
-		{
-			outError = "base 자산 경로 미해석: " + ref.AsString();
-			return false;
-		}
-		const own::shared_owner<const Material> base =
-			DataSystems->LoadMaterialShared(basePath.stem().string());
-		if (!base)
-		{
-			outError = "base 재질 로드 실패: " + basePath.stem().string();
-			return false;
-		}
+        const auto base = DataSystems->LoadMaterialByGuid(baseGuid);
+        if (!base)
+        {
+            outError = "Base material requires completed asynchronous preparation: " + baseGuid.ToString();
+            return false;
+        }
 
 		auto owned = own::make_shared<Material>(*base);
 		if (const Authoring::ReadNode blend = materialNode["blendMode"];
@@ -88,11 +83,43 @@ namespace
 			values.reserve(selections.Size());
 			for (const Authoring::ReadNode selection : selections)
 			{
-				values.push_back(
-					static_cast<std::uint16_t>(selection.As<std::uint32_t>()));
+                if (!selection.IsScalar())
+                {
+                    outError = "Keyword selection must be an unsigned scalar.";
+                    return false;
+                }
+                const auto value = selection.As<std::uint32_t>();
+                if (value > (std::numeric_limits<std::uint16_t>::max)())
+                {
+                    outError = "Keyword selection exceeds uint16 range.";
+                    return false;
+                }
+                values.push_back(static_cast<std::uint16_t>(value));
 			}
+            if (outInstance && outInstance->Base() && outInstance->Base()->assetOrigin)
+            {
+                const auto program = outInstance->Base()->assetOrigin->codeProgram;
+                if (!program || values.size() != program->meta.keywords.size())
+                {
+                    outError = "Cooked keyword override count differs from its program.";
+                    return false;
+                }
+                for (std::size_t axis = 0; axis < values.size(); ++axis)
+                {
+                    if (values[axis] >= program->meta.keywords[axis].values.size())
+                    {
+                        outError = "Cooked keyword override is outside its exact program domain.";
+                        return false;
+                    }
+                }
+            }
+            if (outInstance && outInstance->Base())
+            {
+                outInstance->SetKeywordSelectionOverrides(values);
+            }
 			owned->m_keywordSelections = std::move(values);
 		}
+        std::vector<experiment::MaterialProperty> propertyOverrides;
 		if (const Authoring::ReadNode overrides = materialNode["overrides"];
 			overrides && overrides.IsSequence())
 		{
@@ -113,6 +140,7 @@ namespace
 				{
 					return false;
 				}
+                propertyOverrides.push_back(property);
 				// 같은 값을 experiment 인스턴스에도 얹는다 — 두 표현이 같은
 				// 파싱 결과를 공유해야 병행 대조가 의미를 갖는다.
 				if (nullptr != outInstance
@@ -125,7 +153,21 @@ namespace
 			}
 		}
 
-		DataSystems->FinalizeMaterialRuntime(*owned);
+        if (outInstance && !outInstance->BindPreparedTextureOwners(preparedTextures, outError))
+        {
+            return false;
+        }
+        if (owned->GetAssetOrigin() && !owned->HasMaterialGraph())
+        {
+            if (!DataSystems->RebuildCookedMaterialInstance(*owned, outError, preparedTextures, propertyOverrides))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            DataSystems->FinalizeMaterialRuntime(*owned);
+        }
 		outMaterial = std::move(owned);
 		outBaseGuid = baseGuid;
 		return true;
@@ -138,37 +180,57 @@ namespace
 	[[nodiscard]] bool BuildMaterialReferenceNode(const Material& current,
 		FileGuid baseGuid, Authoring::WriteNode outNode, std::string& outError)
 	{
-		const file::path basePath = DataSystems->GetFilePath(baseGuid);
-		if (basePath.empty())
-		{
-			outError = "base 자산 경로 미해석";
-			return false;
-		}
-		const own::shared_owner<const Material> base =
-			DataSystems->LoadMaterialShared(basePath.stem().string());
-		if (!base)
-		{
-			outError = "base 재질 로드 실패: " + basePath.stem().string();
-			return false;
-		}
-		std::string metaError;
-		ShaderMetaHandle handle;
-		const auto meta = DataSystems->LoadShaderMetaOwner(
-			current.m_shaderMetaGuid, handle, metaError);
-		if (!meta)
-		{
-			outError = "diff 타이핑용 ShaderMeta 미해석: " + metaError;
-			return false;
-		}
-		experiment::Material currentConverted;
-		experiment::Material baseConverted;
-		if (!ExperimentMaterialMigration::ConvertLegacyMaterial(current, *meta,
-				currentConverted, outError)
-			|| !ExperimentMaterialMigration::ConvertLegacyMaterial(*base, *meta,
-				baseConverted, outError))
-		{
-			return false;
-		}
+        const auto base = DataSystems->LoadMaterialByGuid(baseGuid);
+        if (!base)
+        {
+            outError = "Base material requires completed asynchronous preparation: " + baseGuid.ToString();
+            return false;
+        }
+        std::string metaError;
+        ShaderMetaHandle handle;
+        own::shared_owner<const ShaderMeta> meta;
+        if (const auto origin = current.GetAssetOrigin(); origin && origin->codeProgram)
+        {
+            meta = origin->codeProgram->assetOrigin->shaderMetadata;
+            handle = origin->codeProgram->codeHandle;
+        }
+        else
+        {
+            meta = DataSystems->LoadShaderMetaOwner(current.m_shaderMetaGuid, handle, metaError);
+        }
+        if (!meta)
+        {
+            outError = "Material reference typing requires prepared metadata: " + metaError;
+            return false;
+        }
+        experiment::Material currentConverted;
+        experiment::Material baseConverted;
+        if (!ExperimentMaterialMigration::ConvertLegacyMaterial(current, *meta, currentConverted, outError)
+            || !ExperimentMaterialMigration::ConvertLegacyMaterial(*base, *meta, baseConverted, outError))
+        {
+            return false;
+        }
+        if (meta->codeProgram)
+        {
+            const auto preserveColors = [](const Material& source, experiment::Material& converted)
+            {
+                for (auto& property : converted.properties)
+                {
+                    auto* reference = std::get_if<experiment::TextureReference>(&property.value);
+                    const auto owner = reference ? source.GetTextureMapShared(property.name) : nullptr;
+                    if (!reference || !owner)
+                    {
+                        continue;
+                    }
+                    const auto format = owner->GetImageDescription().Format();
+                    const bool srgb = format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
+                        || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+                    reference->colorSpace = srgb ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
+                }
+            };
+            preserveColors(current, currentConverted);
+            preserveColors(*base, baseConverted);
+        }
 
 		const auto findByName = [](const experiment::Material& material,
 			const std::string& name) -> const experiment::MaterialProperty*
@@ -376,6 +438,10 @@ math::aabb MeshRenderer::GetBoundingBox(const math::matrix4x4& world) const
 void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 {
 	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
+    const auto scenePins = GetOwner() && GetOwner()->GetScene()
+        ? GetOwner()->GetScene()->PreparedTextureImagePins() : nullptr;
+    const auto preparedTextures = scenePins ? scenePins->Owners() : std::vector<own::shared_owner<const Texture>>{};
+
     // Graph textures may be embedded in this model. Publish the immutable
     // model owner before resolving an inline graph instance's texture GUIDs.
     const AssetDepot::AssetLink<assets::ModelMeshDescriptor> meshLink{
@@ -415,7 +481,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 				FileGuid(ref.AsString())));
 		}
 		if (DecodeMaterialReferenceNode(materialNode, resolved, baseGuid,
-			error, GetMaterialInstance()))
+			error, GetMaterialInstance(), preparedTextures))
 		{
 			m_Material = std::move(resolved);
 			m_materialBaseGuid = baseGuid;
@@ -449,7 +515,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
         auto decoded = own::make_shared<Material>();
         auto authored = own::make_shared<experiment::Material>();
 		if (DataSystems->DeserializeMaterialPayload(*decoded,
-			Authoring::NodeViewAccess::Make(materialNode), (authored ? &*authored.borrow() : nullptr)))
+			Authoring::NodeViewAccess::Make(materialNode), (authored ? &*authored.borrow() : nullptr), true, preparedTextures))
 		{
 			// FinalizeMaterialRuntime은 이중화 경로 안에서 이미 수행됐다.
 			m_Material = std::move(decoded);

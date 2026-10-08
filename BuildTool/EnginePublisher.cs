@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Reflection;
+using System.Reflection.Metadata;
+using System.Reflection.PortableExecutable;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -110,9 +113,26 @@ internal static class EnginePublisher
             Copy(viewerRecordPath, Paths.Child(binaryTarget, "Tools/ProfilerViewer/deployment.json"));
             var api = hosts["Player"]!.Int("scriptApi");
             var expected = Regex.Match(File.ReadAllText(Path.Combine(repository, "ScriptCore/Native.cs")), @"ExpectedVersion\s*=\s*(\d+)");
-            if (!expected.Success || int.Parse(expected.Groups[1].Value) != api || hosts.Any(h => h.Value!.Int("scriptApi") != api))
-                throw new BuildException("Native and managed script API versions differ.");
-            foreach (var name in GameCompiler.CoreFiles) Copy(Path.Combine(binarySource, "Managed", name), Path.Combine(binaryTarget, "Managed", name));
+            var nativeExpected = Regex.Match(File.ReadAllText(Path.Combine(repository,
+                "Engine/Utility_Framework/ScriptApiVersion.h")), @"CreatorScriptApiVersion\s*=\s*(\d+)");
+            if (!expected.Success || !nativeExpected.Success
+                || !int.TryParse(expected.Groups[1].Value, out int managedApi)
+                || !int.TryParse(nativeExpected.Groups[1].Value, out int nativeApi)
+                || managedApi != nativeApi || nativeApi != api
+                || hosts.Any(h => h.Value!.Int("scriptApi") != api))
+            {
+                throw new BuildException("Native source, managed source and built host script API versions differ. Rebuild all hosts and ScriptCore together.");
+            }
+            foreach (var name in GameCompiler.CoreFiles)
+            {
+                Copy(Path.Combine(binarySource, "Managed", name), Path.Combine(binaryTarget, "Managed", name));
+            }
+            // Inspect the copied assembly bytes without loading or executing it.
+            // Matching source versions cannot prove an old ScriptCore was rebuilt.
+            if (ReadManagedApiVersion(Path.Combine(binaryTarget, "Managed", "ScriptCore.dll")) != api)
+            {
+                throw new BuildException("Built ScriptCore.dll script API differs from the native hosts. Rebuild ScriptCore before publishing.");
+            }
             Tree(Path.Combine(binarySource, "Resources"), Path.Combine(binaryTarget, "Resources"));
             var dotnetRoot = Path.GetDirectoryName(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory().TrimEnd(Path.DirectorySeparatorChar))!;
             dotnetRoot = Directory.GetParent(dotnetRoot)!.Parent!.FullName;
@@ -178,4 +198,50 @@ internal static class EnginePublisher
         }
         catch { context.Error($"Unpublished engine candidate retained: {candidate}"); throw; }
     }
+
+    private static int ReadManagedApiVersion(string assemblyPath)
+    {
+        using var stream = File.OpenRead(assemblyPath);
+        using var image = new PEReader(stream);
+        if (!image.HasMetadata)
+        {
+            throw new BuildException("ScriptCore.dll has no managed metadata.");
+        }
+        var metadata = image.GetMetadataReader();
+        if (!metadata.IsAssembly || metadata.GetString(metadata.GetAssemblyDefinition().Name) != "ScriptCore")
+        {
+            throw new BuildException("Expected the compiled ScriptCore assembly.");
+        }
+        foreach (var typeHandle in metadata.TypeDefinitions)
+        {
+            var type = metadata.GetTypeDefinition(typeHandle);
+            if (metadata.GetString(type.Namespace) != "CreatorEngine" || metadata.GetString(type.Name) != "Native")
+            {
+                continue;
+            }
+            foreach (var fieldHandle in type.GetFields())
+            {
+                var field = metadata.GetFieldDefinition(fieldHandle);
+                if (metadata.GetString(field.Name) != "ExpectedVersion")
+                {
+                    continue;
+                }
+                var constantHandle = field.GetDefaultValue();
+                if ((field.Attributes & (FieldAttributes.Static | FieldAttributes.Literal))
+                    != (FieldAttributes.Static | FieldAttributes.Literal) || constantHandle.IsNil)
+                {
+                    throw new BuildException("ScriptCore Native.ExpectedVersion is not a compile-time constant.");
+                }
+                var constant = metadata.GetConstant(constantHandle);
+                var value = metadata.GetBlobReader(constant.Value);
+                if (constant.TypeCode != ConstantTypeCode.Int32 || value.Length != sizeof(int))
+                {
+                    throw new BuildException("ScriptCore Native.ExpectedVersion has an invalid metadata type.");
+                }
+                return value.ReadInt32();
+            }
+        }
+        throw new BuildException("ScriptCore Native.ExpectedVersion is missing; its script API cannot be verified.");
+    }
+
 }

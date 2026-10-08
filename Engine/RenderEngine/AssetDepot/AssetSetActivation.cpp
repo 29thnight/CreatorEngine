@@ -220,7 +220,7 @@ bool DataSystem::MountConfiguredAssetSets(const file::path& assetRoot, std::stri
         {
             std::lock_guard admissionLock(m_assetPreparationMutex);
             std::lock_guard catalogLock(m_cookedCatalogMutex);
-            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u
                 || inputs.size() > (std::numeric_limits<std::uint64_t>::max)() - m_assetDepotRevision
                 || inputs.size() > (std::numeric_limits<std::uint64_t>::max)() - m_nextAssetMountId)
             {
@@ -256,7 +256,7 @@ bool DataSystem::MountConfiguredAssetSets(const file::path& assetRoot, std::stri
         {
             std::lock_guard admissionLock(m_assetPreparationMutex);
             std::lock_guard catalogLock(m_cookedCatalogMutex);
-            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u
                 || m_assetPreparationEpoch != epoch || m_assetDepotRevision != revision)
             {
                 throw std::runtime_error("AssetSet activation resolver changed before publication.");

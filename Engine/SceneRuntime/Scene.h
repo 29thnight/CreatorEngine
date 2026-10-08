@@ -288,6 +288,10 @@ public:
     {
         m_preparedTextureImagePins = std::move(pins);
     }
+    own::shared_owner<TextureFramePins> PreparedTextureImagePins() const
+    {
+        return m_preparedTextureImagePins;
+    }
     own::shared_owner<TextureFramePins> TakePreparedTextureImagePins()
     {
         return std::exchange(m_preparedTextureImagePins, {});

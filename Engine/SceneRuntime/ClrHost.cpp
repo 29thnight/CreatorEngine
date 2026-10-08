@@ -38,6 +38,7 @@
 
 #include <windows.h>
 #include <cstring>
+#include <cstddef>
 
 // nethost.lib는 get_hostfxr_path 하나만 제공하는 얇은 import 라이브러리다.
 // 헤더·lib·DLL은 ThirdParty\DotNetHost\에 고정한 사본이고, 경로는 EngineOutput.props의
@@ -387,9 +388,17 @@ namespace
         int (__stdcall* Asset_Release)(ScriptAssetToken token);
         int (__stdcall* Asset_ReadTexture)(ScriptAssetToken token, ScriptTextureDescriptor* descriptor);
         int (__stdcall* Asset_ListRoots)(std::uint64_t mount, std::uint32_t kind, ScriptAssetLink* links, int capacity, int* count);
+        // Append-only v35: concrete-view selection never changes serialized links.
+        int (__stdcall* Asset_RequestTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
+        int (__stdcall* Asset_TryAcquireTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
 
 
 	};
+
+    static_assert(offsetof(ScriptApiTable, Asset_RequestTyped)
+        == offsetof(ScriptApiTable, Asset_ListRoots) + sizeof(decltype(ScriptApiTable::Asset_ListRoots)));
+    static_assert(offsetof(ScriptApiTable, Asset_TryAcquireTyped)
+        == offsetof(ScriptApiTable, Asset_RequestTyped) + sizeof(decltype(ScriptApiTable::Asset_RequestTyped)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -413,6 +422,40 @@ namespace
         {
             return static_cast<int>(ScriptAssetResult::InternalError);
         }
+    }
+
+    int RequestTypedAsset(const ScriptAssetLink* link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant* variant, bool residentOnly, ScriptAssetToken* token)
+    {
+        if (token != nullptr)
+        {
+            *token = {};
+        }
+        if (link == nullptr || variant == nullptr || token == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().RequestAssetTyped(
+                *link, concreteType, *variant, residentOnly, *token));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_RequestTyped(const ScriptAssetLink* link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant* variant, ScriptAssetToken* token)
+    {
+        return RequestTypedAsset(link, concreteType, variant, false, token);
+    }
+
+    int __stdcall Api_Asset_TryAcquireTyped(const ScriptAssetLink* link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant* variant, ScriptAssetToken* token)
+    {
+        return RequestTypedAsset(link, concreteType, variant, true, token);
     }
 
     int __stdcall Api_Asset_Snapshot(ScriptAssetToken token, ScriptAssetRequestSnapshot* snapshot, char* message, int capacity)
@@ -2996,6 +3039,8 @@ namespace
         g_apiTable.Asset_Release = &Api_Asset_Release;
         g_apiTable.Asset_ReadTexture = &Api_Asset_ReadTexture;
         g_apiTable.Asset_ListRoots = &Api_Asset_ListRoots;
+        g_apiTable.Asset_RequestTyped = &Api_Asset_RequestTyped;
+        g_apiTable.Asset_TryAcquireTyped = &Api_Asset_TryAcquireTyped;
 
 	}
 

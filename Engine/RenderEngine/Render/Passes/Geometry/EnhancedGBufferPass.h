@@ -182,7 +182,8 @@ private:
         const RHIShaderPermutation& permutation, uint32_t experimentMask,
         RHIGraphicsPipelineDesc& outDesc,
         RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr,
-        ShaderGeometryVisibility visibilityContract = ShaderGeometryVisibility::Direct);
+        ShaderGeometryVisibility visibilityContract = ShaderGeometryVisibility::Direct,
+        const LX::Runtime::CompiledGraphics* prepared = nullptr);
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,
         const ShaderMeta& meta,
         std::span<const std::uint16_t> keywordSelections,

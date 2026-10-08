@@ -45,6 +45,9 @@
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="ExperimentParity\ExperimentCodeMaterialCodecSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>

@@ -2,6 +2,8 @@
 
 #include "../ShaderMeta.h"
 #include "../StandardMaterialProperty.h"
+#include "../AssetDepot/MaterialAssetRuntime.h"
+#include "../Texture.h"
 
 #include <algorithm>
 
@@ -74,11 +76,128 @@ namespace experiment
         return true;
     }
 
+    bool BindPreparedMaterialTextures(Material& material,
+        std::span<const own::shared_owner<const Texture>> textures, std::string& outError)
+    {
+        if (!material.assetOrigin)
+        {
+            outError.clear();
+            return true;
+        }
+        own::shared_owner<AssetDepot::MaterialDocumentAssetOrigin> extended;
+        for (const auto& property : material.properties)
+        {
+            const auto* reference = std::get_if<TextureReference>(&property.value);
+            if (!reference || !reference->assetId.IsValid()
+                || std::ranges::any_of(material.assetOrigin->textures,
+                    [&](const auto& pin) { return pin.assetId == reference->assetId; }))
+            {
+                continue;
+            }
+            const auto found = std::ranges::find_if(textures, [&](const auto& texture)
+            {
+                const auto origin = texture ? texture->GetAssetOrigin() : nullptr;
+                return origin && origin->resolved.entry.asset.key.assetId == reference->assetId
+                    && origin->resolved.resolverRevision == material.assetOrigin->resolved.resolverRevision
+                    && origin->variant == AssetDepot::TextureAssetVariant{}
+                    && origin->imageKey.recipe.mipPolicy == AssetDepot::TextureMipPolicy::PreserveAuthored;
+            });
+            if (found == textures.end())
+            {
+                outError = "Runtime texture override lacks an explicit untransformed descriptor from the captured scene snapshot: " + property.name;
+                return false;
+            }
+            if (!extended)
+            {
+                extended = own::make_shared<AssetDepot::MaterialDocumentAssetOrigin>(*material.assetOrigin);
+            }
+            if (std::ranges::none_of(extended->textures, [&](const auto& pin) { return pin.assetId == reference->assetId; }))
+            {
+                extended->textures.push_back({ reference->assetId, LX::LXColorSpace::Data, *found });
+            }
+        }
+        if (extended)
+        {
+            material.assetOrigin = std::move(extended);
+        }
+        outError.clear();
+        return true;
+    }
+
     bool ResolveMaterial(const Material& material,
         const MaterialResolveServices& services,
         ResolvedMaterial& outResolved, std::string& outError)
     {
         outResolved = {};
+        if (material.assetOrigin)
+        {
+            const auto& origin = *material.assetOrigin;
+            const auto& program = origin.codeProgram;
+            const auto metadata = program && program->assetOrigin ? program->assetOrigin->shaderMetadata : nullptr;
+            if (!program || !program->codeProgram || !program->codeHandle.IsValid() || !metadata
+                || metadata->guid.m_guid != material.shaderAssetId.value)
+            {
+                outError = "Cooked authored Material has no exact prepared code generation.";
+                return false;
+            }
+            ResolvedMaterial candidate;
+            candidate.assetId = material.assetId;
+            candidate.shaderMetaHandle = program->codeHandle;
+            candidate.shaderMeta = metadata;
+            if (!NormalizeMaterialKeywordSelections(material, metadata->keywords, candidate.keywordSelections, outError))
+            {
+                return false;
+            }
+            for (const auto& property : metadata->properties)
+            {
+                if (property.type != ShaderPropertyType::Texture2D)
+                {
+                    continue;
+                }
+                const auto found = std::ranges::find(material.properties, property.name, &MaterialProperty::name);
+                AssetId id;
+                auto color = property.colorSpace == "srgb" ? TextureColorSpace::Srgb : TextureColorSpace::Linear;
+                if (found != material.properties.end())
+                {
+                    const auto* reference = std::get_if<TextureReference>(&found->value);
+                    if (!reference)
+                    {
+                        outError = "Cooked texture property has an incompatible value: " + property.name;
+                        return false;
+                    }
+                    id = reference->assetId;
+                    color = reference->colorSpace;
+                }
+                else if (const auto* defaultId = std::get_if<FileGuid>(&property.defaultValue))
+                {
+                    id.value = defaultId->m_guid;
+                }
+                if (!id.IsValid())
+                {
+                    continue;
+                }
+                const auto pin = std::ranges::find(origin.textures, id, &AssetDepot::MaterialAssetTexturePin::assetId);
+                if (pin == origin.textures.end() || !pin->owner)
+                {
+                    outError = "Cooked texture override is outside the pinned material closure: " + property.name;
+                    return false;
+                }
+                auto owner = Texture::WithColorSpace(pin->owner, color == TextureColorSpace::Srgb);
+                if (owner)
+                {
+                    owner = Texture::WithMipChain(owner, outError);
+                }
+                if (!owner)
+                {
+                    return false;
+                }
+                candidate.textures.push_back({ property.name, id, std::move(owner), true, true });
+                ++candidate.notes.generationTextures;
+            }
+            outResolved = std::move(candidate);
+            outError.clear();
+            return true;
+        }
         if (!services.loadShaderMetaOwner
             || !services.loadTexture || !services.resolveSourcePath)
         {

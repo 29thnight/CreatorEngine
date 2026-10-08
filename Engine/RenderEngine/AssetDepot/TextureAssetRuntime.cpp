@@ -113,7 +113,7 @@ namespace
         {
             return;
         }
-        consumer->status = status;
+        consumer->SetTerminalLocked(status);
         consumer->error = error;
         consumer->asset = asset;
         try
@@ -184,7 +184,7 @@ AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsyncFromSnapshot(
     own::shared_owner<const texture_cooked::CookedAssetCatalog> catalog, std::uint64_t epoch)
 {
     using namespace AssetDepot;
-    auto consumer = own::make_shared<AssetRequestState<Texture>>();
+    auto consumer = own::make_shared<AssetRequestState<Texture>>(m_assetRequestCounters);
     AssetRequest<Texture> request(consumer);
     const auto fail = [&](AssetRequestStatus status, AssetRequestError error, const std::string& message)
     {
@@ -922,7 +922,7 @@ AssetDepot::AssetRequest<Texture::CodecImage> DataSystem::RequestTextureImageAsy
     const own::shared_owner<const Texture>& descriptor)
 {
     using namespace AssetDepot;
-    auto consumer = own::make_shared<AssetRequestState<Texture::CodecImage>>();
+    auto consumer = own::make_shared<AssetRequestState<Texture::CodecImage>>(m_assetRequestCounters);
     AssetRequest<Texture::CodecImage> request(consumer);
     if (!descriptor)
     {
@@ -1094,10 +1094,13 @@ void DataSystem::RunTextureImageWork(own::shared_owner<AssetDepot::TextureImageW
             error = AssetRequestError::IntegrityFailed;
             failure = "Texture image size does not match the bounded exact source record.";
         }
+        AssetByteObservation inputObservation(m_textureAssets.imageInputStagingBytes);
+        AssetByteObservation resultObservation(m_textureAssets.imageDecodedResultStagingBytes);
         std::vector<std::byte> bytes;
         if (error == AssetRequestError::None)
         {
             bytes.resize(static_cast<std::size_t>(byteSize));
+            inputObservation.Set(bytes.capacity());
             if (!captured->byteSource->ReadAt(captured->artifactPath, 0u, bytes, failure))
             {
                 error = AssetRequestError::ReadFailed;
@@ -1116,6 +1119,7 @@ void DataSystem::RunTextureImageWork(own::shared_owner<AssetDepot::TextureImageW
         if (error == AssetRequestError::None)
         {
             image = Texture::DecodeOwnedImage(bytes, work->key, failure);
+            resultObservation.Set(Texture::ImageByteSize(image));
             if (!image)
             {
                 error = AssetRequestError::DecodeFailed;
@@ -1271,6 +1275,8 @@ AssetDepot::TextureImageCacheSnapshot DataSystem::SnapshotTextureImageCache() co
     result.liveBytes = live.liveBytes;
     result.nonRehydratableBytes = live.nonRehydratableBytes;
     result.livePayloads = live.livePayloads;
+    result.inputStagingBytes = m_textureAssets.imageInputStagingBytes.load(std::memory_order_relaxed);
+    result.decodedResultStagingBytes = m_textureAssets.imageDecodedResultStagingBytes.load(std::memory_order_relaxed);
     for (const auto& [key, entry] : m_textureAssets.images)
     {
         result.retainedEntries += entry.retained ? 1u : 0u;

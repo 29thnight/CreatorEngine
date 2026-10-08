@@ -193,7 +193,15 @@ namespace AssetDepot
         std::size_t liveBytes{};
         std::size_t nonRehydratableBytes{};
         std::size_t livePayloads{};
+        // Conservative sum of result pins, possibly counting the same image for
+        // several consumers. liveBytes is the separate unique payload measure.
         std::size_t inFlightResultBytes{};
+        std::size_t inputStagingBytes{};
+        std::size_t decodedResultStagingBytes{};
+        // Observed owned input capacity and decoded worker-result pixels, not
+        // SDK-internal decode scratch or allocator overhead. Result staging is
+        // also part of liveBytes; these diagnostic categories are not additive.
+
         std::uint64_t logicalEvictions{};
         // Live pixel accounting follows payload lifetime, including old owners.
         // Retained charge conservatively adds SDK/table/key/source metadata and
@@ -210,6 +218,8 @@ namespace AssetDepot
         std::vector<own::weak_owner<AssetRequestState<Texture::CodecImage>>> imageRequests{};
         std::size_t imageBudgetBytes{ 64u * 1024u * 1024u };
         std::size_t retainedImageBytes{};
+        std::atomic<std::size_t> imageInputStagingBytes{};
+        std::atomic<std::size_t> imageDecodedResultStagingBytes{};
         std::uint64_t imageEvictions{};
         std::size_t retainedChargeBytes{};
         std::uint64_t clock{};

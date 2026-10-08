@@ -111,7 +111,7 @@ namespace CreatorBuildTool
                     continue;
                 }
                 var match = Regex.Match(relative,
-                    @"^Derived/AssetBlobs/[0-9a-f]{64}/([0-9a-f]{64})\.(png|jpg|hdr|dds|cemd|cesl|cean|cege|shadermeta|asset|lxmaterial)$");
+                    @"^Derived/AssetBlobs/[0-9a-f]{64}/([0-9a-f]{64})\.(png|jpg|hdr|dds|cemd|cesl|cean|cege|shadermeta|asset|lxmaterial|cecp)$");
                 if (!match.Success || new FileInfo(path).Length <= 0 || Metadata.Hash(path) != match.Groups[1].Value)
                 {
                     throw new BuildException($"Unexpected or damaged AssetSet blob: {relative}");

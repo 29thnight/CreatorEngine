@@ -1,5 +1,6 @@
 #include "LXMaterialRuntime.h"
 #include "MaterialPropertyPacker.h"
+#include "Experiment/Cooked/CookedCodeMaterial.h"
 
 #include <algorithm>
 #include <cmath>
@@ -98,10 +99,19 @@ namespace LX::Runtime
         }
     }
 
+    bool ValidateShaderGeneration(const ShaderGeneration& shader, std::string& error)
+    {
+        return ValidateShader(shader, error);
+    }
+
     bool CreateCodeShader(const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
                           ShaderMetaHandle handle, own::shared_owner<const ShaderGeneration>& result,
                           std::string& error)
     {
+        if (meta.assetOrigin && !meta.codeProgram)
+        {
+            return Fail(error, "Mounted metadata is not a prepared code shader program.");
+        }
         if (meta.generatedMaterial)
         {
             return Fail(error, "Generated Graph contracts require their owning graph generation.");
@@ -133,6 +143,12 @@ namespace LX::Runtime
         candidate.meta = meta;
         candidate.layout = layout;
         candidate.codeHandle = handle;
+        candidate.codeProgram = meta.codeProgram;
+        if (meta.codeProgram && (meta.codeProgram->layout != layout
+            || meta.codeProgram->shaderMetaAssetId.value != meta.guid.m_guid))
+        {
+            return Fail(error, "Cooked code shader does not match its verified metadata/layout.");
+        }
         if (!ValidateShader(candidate, error))
         {
             return false;

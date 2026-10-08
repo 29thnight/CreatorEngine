@@ -5,6 +5,8 @@
 #include "../RenderEngine/Material.h"
 #include "../RenderEngine/ShaderMeta.h"
 #include "../RenderEngine/MaterialGraphRuntime.h"
+#include "../RenderEngine/LXMaterialRuntime.h"
+#include "../RenderEngine/Experiment/ModelData.h"
 #include "../RenderEngine/Assets/ModelAnimationDescriptor.h"
 #include "../RenderEngine/Assets/ModelAnimationPayload.h"
 #include "../RenderEngine/Assets/ModelMeshDescriptor.h"
@@ -197,9 +199,9 @@ namespace
         return kScriptAssetConcreteType<T> | kScriptAssetRequestBit;
     }
 
-    // The manifest kind chooses one explicitly registered public runtime view.
-    // Do not derive a C++ owner type from AssetTypeTraits alone: Model aggregate,
-    // geometry bulk and experiment::Material deliberately are not registered.
+    // ABI v34 keeps the original default view for each manifest kind. Do not
+    // change this mapping when a kind gains another concrete runtime view. Root
+    // enumeration also uses this identity-only path, without selecting payloads.
     template<class F>
     ScriptAssetResult DispatchScriptAssetKind(std::uint32_t kind, F&& invoke)
     {
@@ -214,6 +216,27 @@ namespace
         case static_cast<std::uint32_t>(Kind::ShaderMeta): return invoke.template operator()<ShaderMeta>();
         case static_cast<std::uint32_t>(Kind::MaterialProgram): return invoke.template operator()<material_graph::Generation>();
         case static_cast<std::uint32_t>(Kind::Material): return invoke.template operator()<::Material>();
+        default: return ScriptAssetResult::UnsupportedType;
+        }
+    }
+
+    // Only explicitly registered concrete IDs may select a C++ alternative.
+    // Request-role bits, manifest kinds and unknown IDs are not selectors.
+    template<class F>
+    ScriptAssetResult DispatchScriptAssetConcreteType(std::uint32_t concreteType, F&& invoke)
+    {
+        switch (concreteType)
+        {
+        case kScriptAssetConcreteType<Texture>: return invoke.template operator()<Texture>();
+        case kScriptAssetConcreteType<assets::ModelAnimationDescriptor>: return invoke.template operator()<assets::ModelAnimationDescriptor>();
+        case kScriptAssetConcreteType<assets::ModelMeshDescriptor>: return invoke.template operator()<assets::ModelMeshDescriptor>();
+        case kScriptAssetConcreteType<assets::ModelSkeletonPayload>: return invoke.template operator()<assets::ModelSkeletonPayload>();
+        case kScriptAssetConcreteType<assets::ModelAnimationPayload>: return invoke.template operator()<assets::ModelAnimationPayload>();
+        case kScriptAssetConcreteType<ShaderMeta>: return invoke.template operator()<ShaderMeta>();
+        case kScriptAssetConcreteType<material_graph::Generation>: return invoke.template operator()<material_graph::Generation>();
+        case kScriptAssetConcreteType<::Material>: return invoke.template operator()<::Material>();
+        case kScriptAssetConcreteType<LX::Runtime::ShaderGeneration>: return invoke.template operator()<LX::Runtime::ShaderGeneration>();
+        case kScriptAssetConcreteType<experiment::Material>: return invoke.template operator()<experiment::Material>();
         default: return ScriptAssetResult::UnsupportedType;
         }
     }
@@ -400,6 +423,24 @@ ScriptAssetResult ScriptObjectRegistry::RequestAsset(const ScriptAssetLink& link
     }
     return DispatchScriptAssetKind(link.kind, [&]<class T>()
     {
+        return RequestTypedAssetLocked<T>(link, variant, residentOnly, token);
+    });
+}
+
+ScriptAssetResult ScriptObjectRegistry::RequestAssetTyped(const ScriptAssetLink& link,
+    std::uint32_t concreteType, const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token)
+{
+    token = {};
+    std::lock_guard lock(m_assetMutex);
+    const auto available = CheckAssetSessionLocked();
+    if (available != ScriptAssetResult::Success)
+    {
+        return available;
+    }
+    return DispatchScriptAssetConcreteType(concreteType, [&]<class T>()
+    {
+        // RequestTypedAssetLocked verifies the selected T against link.kind;
+        // matching kinds alone never authorize a cast between native owners.
         return RequestTypedAssetLocked<T>(link, variant, residentOnly, token);
     });
 }

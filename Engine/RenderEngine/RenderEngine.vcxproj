@@ -175,6 +175,10 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
     </ClCompile>
+    <ClCompile Include="Experiment\Cooked\CookedCodeMaterial.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="Experiment\Cooked\MaterialAssetSetProducer.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <ObjectFileName>$(IntDir)ExperimentCooked_%(Filename).obj</ObjectFileName>
@@ -613,6 +617,7 @@
     <ClInclude Include="TextureFramePins.h" />
     <ClInclude Include="MaterialGraphInstancePins.h" />
     <ClInclude Include="Experiment\Cooked\MaterialAssetSetCodec.h" />
+    <ClInclude Include="Experiment\Cooked\CookedCodeMaterial.h" />
     <ClInclude Include="Experiment\Cooked\MaterialAssetSetProducer.h" />
     <ClInclude Include="Experiment\Cooked\CookedShaderMeta.h" />
     <ClInclude Include="AssetDepot\MaterialAssetRuntime.h" />

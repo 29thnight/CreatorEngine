@@ -136,8 +136,8 @@ public:
         return false;
     }
 
-    // Typed CPU acquisition. ::Material is the Lattice document runtime view;
-    // experiment::Material authoring values have no acquisition dispatch here.
+    // Typed CPU acquisition validates each concrete representation separately.
+    // Metadata Ready is distinct from a verified graph/code program generation.
     // Current links never resurrect an old generation.
     // Misses are I/O-free; callers request work explicitly and poll its state.
     template<class T>
@@ -153,7 +153,8 @@ public:
         {
             return TryAcquireShaderMeta(link);
         }
-        else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>)
+        else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>
+            || std::is_same_v<T, experiment::Material> || std::is_same_v<T, LX::Runtime::ShaderGeneration>)
         {
             return TryAcquireCurrentMaterialPipelineAsset(link);
         }
@@ -180,7 +181,8 @@ public:
         {
             return RequestShaderMetaAsync(link);
         }
-        else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>)
+        else if constexpr (std::is_same_v<T, Material> || std::is_same_v<T, material_graph::Generation>
+            || std::is_same_v<T, experiment::Material> || std::is_same_v<T, LX::Runtime::ShaderGeneration>)
         {
             return RequestCurrentMaterialPipelineAssetAsync(link);
         }
@@ -219,6 +221,11 @@ public:
         AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link) const;
     void SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips);
     [[nodiscard]] AssetDepot::ModelAssetCacheSnapshot SnapshotModelAssetCache() const;
+    [[nodiscard]] AssetDepot::AssetRequestStatistics SnapshotAssetRequests() const noexcept
+    {
+        return m_assetRequestCounters->Snapshot();
+    }
+
 
     template<class T>
         requires std::is_same_v<T, Texture::CodecImage>
@@ -247,6 +254,7 @@ public:
     void SetShaderMetaAssetCacheBudget(std::size_t bytes);
     [[nodiscard]] AssetDepot::ShaderMetaAssetCacheSnapshot SnapshotShaderMetaAssetCache() const;
     void SetMaterialAssetCacheBudgets(std::size_t programs, std::size_t materials);
+    void SetCodeMaterialAssetCacheBudgets(std::size_t programs, std::size_t materials);
     [[nodiscard]] AssetDepot::MaterialAssetCacheSnapshot SnapshotMaterialAssetCache() const;
 
 	void Initialize();
@@ -292,6 +300,27 @@ public:
         const ModelPreparation& preparation, std::string& error) const;
     bool PublishPreparedModel(const ModelPreparation& preparation, std::string& error);
     struct SceneAssetPreparation;
+    // A short root-publication linearization guard, not an asset residency pin.
+    // No mutex stays held while scene deserializers/callbacks run. Its caller must
+    // stay on the scene owner and destroy it before DataSystem lifecycle teardown.
+    class SceneAssetHandoff final
+    {
+    public:
+        SceneAssetHandoff() = default;
+        SceneAssetHandoff(const SceneAssetHandoff&) = delete;
+        SceneAssetHandoff& operator=(const SceneAssetHandoff&) = delete;
+        SceneAssetHandoff(SceneAssetHandoff&& other) noexcept;
+        SceneAssetHandoff& operator=(SceneAssetHandoff&&) = delete;
+        ~SceneAssetHandoff();
+        explicit operator bool() const noexcept { return m_system != nullptr; }
+    private:
+        friend class DataSystem;
+        explicit SceneAssetHandoff(DataSystem& system) noexcept : m_system(&system) {}
+        DataSystem* m_system{};
+    };
+    [[nodiscard]] SceneAssetHandoff BeginSceneAssetHandoff(
+        const own::shared_owner<SceneAssetPreparation>& preparation, AssetDepot::AssetRequestStatus& status);
+
     struct AssetPreparationProgress
     {
         std::size_t activeRequests{};
@@ -305,6 +334,8 @@ public:
     bool PollSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation,
         bool wait, bool publish, std::string& error);
     void CancelSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation);
+    [[nodiscard]] bool IsSceneAssetPreparationCurrent(
+        const own::shared_owner<SceneAssetPreparation>& preparation) const;
     [[nodiscard]] own::shared_owner<TextureFramePins> SceneTextureImagePins(
         const own::shared_owner<SceneAssetPreparation>& preparation) const;
     [[nodiscard]] AssetPreparationProgress SnapshotAssetPreparationProgress() const;
@@ -452,9 +483,14 @@ public:
 	// 그 원본을 함께 돌려준다. legacy 표기 문서에는 원본이 없으므로
 	// outAuthored는 채워지지 않는다(반환값은 그대로 성공).
 	bool DeserializeMaterialPayload(Material& material,
-        const Authoring::NodeView& node, experiment::Material* outAuthored, bool persistRecovery = true);
+        const Authoring::NodeView& node, experiment::Material* outAuthored, bool persistRecovery = true,
+        std::span<const own::shared_owner<const Texture>> preparedTextures = {});
 	// I5-D5c1 — base 재질 자산의 저작 원본. 씬의 ref 표기가 base를 legacy로만
 	// 로드해 왔다(LoadMaterialShared). 실패·legacy 표기 자산은 nullptr다.
+    [[nodiscard]] own::shared_owner<const Material> LoadMaterialByGuid(FileGuid guid);
+    [[nodiscard]] bool RebuildCookedMaterialInstance(Material& material, std::string& error,
+        std::span<const own::shared_owner<const Texture>> preparedTextures = {},
+        std::span<const experiment::MaterialProperty> propertyOverrides = {});
 	own::shared_owner<const experiment::Material> LoadAuthoredMaterialShared(
 		FileGuid assetGuid);
 	// Model cache는 이 versioned envelope 안에 위 YAML payload를 넣는다. 기존
@@ -699,7 +735,10 @@ private:
     void DrainAssetPreparations();
     bool ValidatePreparedMaterialTextures(Material& material, std::string& error);
     std::vector<assets::ModelAssetGeneration::Shared> SnapshotPreparedModelAssets() const;
+    const own::shared_owner<AssetDepot::AssetRequestCounters> m_assetRequestCounters{
+        own::make_shared<AssetDepot::AssetRequestCounters>() };
     mutable std::mutex m_assetPreparationMutex;
+    std::size_t m_assetRootHandoffs{};
     // Policy is a request recipe, not another asset generation. Each policy's
     // valid preparation ticket remains independently publishable.
     using AssetPreparationKey = std::pair<FileGuid, assets::ModelColliderPreparationPolicy>;
@@ -753,6 +792,7 @@ private:
         std::uint32_t generation{};
         std::uint64_t resolverRevision{};
         bool occupied{};
+        bool codeProgram{};
         own::weak_owner<const ShaderMeta> current;
         own::shared_owner<const ShaderMeta> retained;
         std::array<std::uint8_t, 32> documentDigest{};
@@ -767,6 +807,8 @@ private:
         std::vector<own::shared_owner<const ShaderMeta>>& released);
     std::uint64_t NextShaderMetaUseLocked() const noexcept;
     void ClearShaderMetaCache();
+    [[nodiscard]] bool RegisterCodeShaderMetadataLocked(LX::Runtime::ShaderGeneration& shader,
+        AssetDepot::MaterialProgramAssetOrigin& origin, std::string& failure);
     mutable std::mutex m_shaderMetaMutex;
     std::unordered_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
     std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;

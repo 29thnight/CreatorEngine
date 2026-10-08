@@ -81,6 +81,8 @@ namespace CreatorEngine
     public sealed class ShaderMeta { private ShaderMeta() { } }
     public sealed class MaterialProgram { private MaterialProgram() { } }
     public sealed class Material { private Material() { } }
+    public sealed class CodeMaterialProgram { private CodeMaterialProgram() { } }
+    public sealed class AuthoredMaterial { private AuthoredMaterial() { } }
 
     // Stable manifest kinds, persisted by AssetLink<T>. Not residency/type tokens.
     public enum AssetKind : uint
@@ -107,14 +109,46 @@ namespace CreatorEngine
 
         private static (AssetKind, uint) Register()
         {
-            if (typeof(T) == typeof(Texture)) return (AssetKind.Texture, 3u);
-            if (typeof(T) == typeof(Model)) return (AssetKind.Model, 0x00010001u);
-            if (typeof(T) == typeof(Mesh)) return (AssetKind.Mesh, 0x00010002u);
-            if (typeof(T) == typeof(Skeleton)) return (AssetKind.Skeleton, 0x00010003u);
-            if (typeof(T) == typeof(AnimationClip)) return (AssetKind.AnimationClip, 0x00010004u);
-            if (typeof(T) == typeof(ShaderMeta)) return (AssetKind.ShaderMeta, 0x00010005u);
-            if (typeof(T) == typeof(MaterialProgram)) return (AssetKind.MaterialProgram, 0x00010006u);
-            if (typeof(T) == typeof(Material)) return (AssetKind.Material, 0x00010007u);
+            if (typeof(T) == typeof(Texture))
+            {
+                return (AssetKind.Texture, 3u);
+            }
+            if (typeof(T) == typeof(Model))
+            {
+                return (AssetKind.Model, 0x00010001u);
+            }
+            if (typeof(T) == typeof(Mesh))
+            {
+                return (AssetKind.Mesh, 0x00010002u);
+            }
+            if (typeof(T) == typeof(Skeleton))
+            {
+                return (AssetKind.Skeleton, 0x00010003u);
+            }
+            if (typeof(T) == typeof(AnimationClip))
+            {
+                return (AssetKind.AnimationClip, 0x00010004u);
+            }
+            if (typeof(T) == typeof(ShaderMeta))
+            {
+                return (AssetKind.ShaderMeta, 0x00010005u);
+            }
+            if (typeof(T) == typeof(MaterialProgram))
+            {
+                return (AssetKind.MaterialProgram, 0x00010006u);
+            }
+            if (typeof(T) == typeof(Material))
+            {
+                return (AssetKind.Material, 0x00010007u);
+            }
+            if (typeof(T) == typeof(CodeMaterialProgram))
+            {
+                return (AssetKind.MaterialProgram, 0x00010008u);
+            }
+            if (typeof(T) == typeof(AuthoredMaterial))
+            {
+                return (AssetKind.Material, 0x00010009u);
+            }
             throw new NotSupportedException("This concrete type has no AssetDepot runtime binding.");
         }
 
@@ -390,13 +424,13 @@ namespace CreatorEngine
         public static AssetRequest<T> RequestAsync<T>(AssetLink<T> link, TextureAssetVariant variant = default)
         {
             ValidateVariant<T>(variant);
-            return AssetRequest<T>.FromToken(Native.AssetRequest(link.ToABI(), variant, residentOnly: false));
+            return AssetRequest<T>.FromToken(Native.AssetRequestTyped(link.ToABI(), AssetType<T>.TokenType, variant, residentOnly: false));
         }
 
         public static bool TryAcquire<T>(AssetLink<T> link, out AssetHandle<T>? asset, TextureAssetVariant variant = default)
         {
             ValidateVariant<T>(variant);
-            AssetToken token = Native.AssetRequest(link.ToABI(), variant, residentOnly: true);
+            AssetToken token = Native.AssetRequestTyped(link.ToABI(), AssetType<T>.TokenType, variant, residentOnly: true);
             if (token.Generation == 0)
             {
                 asset = null;

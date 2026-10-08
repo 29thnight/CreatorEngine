@@ -4,6 +4,7 @@
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
 #include "../Experiment/Cooked/CookedShaderMeta.h"
 #include "../Experiment/Cooked/MaterialAssetSetCodec.h"
+#include "../Experiment/Cooked/CookedCodeMaterial.h"
 
 
 #include <limits>
@@ -47,12 +48,16 @@ namespace AssetDepot
                 schema = cooked::kShaderMetaDocumentVersion;
                 break;
             case cooked::CookedAssetKind::Material:
-                representation = cooked::kMaterialDocumentRepresentation;
-                schema = cooked::kMaterialArtifactVersion;
+                representation = blob.representation == cooked::kAuthoredMaterialRepresentation
+                    ? cooked::kAuthoredMaterialRepresentation : cooked::kMaterialDocumentRepresentation;
+                schema = blob.representation == cooked::kAuthoredMaterialRepresentation
+                    ? cooked::kAuthoredMaterialVersion : cooked::kMaterialArtifactVersion;
                 break;
             case cooked::CookedAssetKind::MaterialProgram:
-                representation = cooked::kMaterialProgramRepresentation;
-                schema = cooked::kMaterialProgramArtifactVersion;
+                representation = blob.representation == cooked::kCodeProgramRepresentation
+                    ? cooked::kCodeProgramRepresentation : cooked::kMaterialProgramRepresentation;
+                schema = blob.representation == cooked::kCodeProgramRepresentation
+                    ? cooked::kCodeProgramVersion : cooked::kMaterialProgramArtifactVersion;
                 break;
             default:
                 break;
@@ -94,7 +99,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
         // validation and storage I/O never run under these locks.
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
-        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u)
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u)
         {
             outIssues.push_back({ "mount", "asset admission has stopped" });
             return {};
@@ -130,7 +135,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
-        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetPreparationEpoch != epoch
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u || m_assetPreparationEpoch != epoch
             || m_assetDepotRevision != revision)
         {
             outIssues.push_back({ "mount", "resolver changed before publication; mount is stale" });
@@ -162,7 +167,7 @@ bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
-        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || !m_cookedCatalog)
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u || !m_cookedCatalog)
         {
             outIssues.push_back({ "unmount", "asset set is not mounted or admission has stopped" });
             return false;
@@ -190,7 +195,7 @@ bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
-        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetPreparationEpoch != epoch
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u || m_assetPreparationEpoch != epoch
             || m_assetDepotRevision != revision)
         {
             outIssues.push_back({ "unmount", "resolver changed before publication; unmount is stale" });

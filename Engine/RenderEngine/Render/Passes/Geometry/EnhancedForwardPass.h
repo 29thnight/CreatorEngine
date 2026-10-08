@@ -252,7 +252,8 @@ private:
         const ShaderRenderState* renderState,
         const RHIShaderPermutation& permutation, uint32_t modelVertexMask,
         RHIGraphicsPipelineDesc& outDesc, RHIShaderBlob& outVs,
-        RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr);
+        RHIShaderBlob& outPs, std::string& outError, LX::Runtime::CompiledGraphics* compiled = nullptr,
+        const LX::Runtime::CompiledGraphics* prepared = nullptr);
     // modelVertexMask가 0이 아니면 동일 mask에서 입력 레이아웃과 shader 축을
     // 유도한다. color/skin 조합을 bool로 축약하지 않는다.
     bool BuildShaderMetaPipelineDesc(const EnhancedFrameContext& context,

@@ -33,7 +33,8 @@ design. A foundation slice is not completion of the runtime migration.
 - The pinned ownership dependency, CEMF v3 link/manifest schema, immutable catalog
   transactions and generic loose/pak range sources are present.
 - `build-asset-set` source-recooks TextureSourceImage, authored ShaderMeta, Lattice
-  Material and verified MaterialProgram documents, plus selected Model descriptor,
+  Material, authored Code Material and verified graph/Code MaterialProgram documents,
+  plus selected Model descriptor,
   Mesh, Skeleton, AnimationClip, model Material and embedded Texture artifacts. Import roots and external buffer inputs are
   captured immutably and hashed. Selected child build identities do not depend on
   unrelated siblings. Verified CAS reuse and transactional unique output directories
@@ -116,7 +117,11 @@ design. A foundation slice is not completion of the runtime migration.
   Texture → Program → Material job DAG. Separate concrete stores prevent manifest-kind
   aliasing. Default/override texture recipes retain color-space and full-mip policy;
   their real descriptor/hard-closure charges count toward bounded retention. Authored
-  `experiment::Material` is not falsely advertised as the same concrete runtime type.
+  `experiment::Material` and `LX::Runtime::ShaderGeneration` now have separate concrete
+  requests/stores for authored Code representations. Their verified carried variants
+  retain metadata, reflection/layout, executable stages and exact dependency owners;
+  restored CPU programs never trigger source compilation. Supplied compiler bundles
+  remain an explicit trusted build input, not an authenticated executable format.
 - Packages can attach independently built immutable AssetSets via an explicit
   directory list and host ABI token. Receipts/CAS bytes are reverified after copy;
   native preflight checks the complete typed union. Startup publishes all configured
@@ -133,7 +138,19 @@ design. A foundation slice is not completion of the runtime migration.
   distinct from manifest kinds. Generation/session tombstones, deterministic Dispose
   and POD-only deferred finalizer release remain. Static closed-type registration and
   AssetLink authoring serialization include aliases/two-digit kinds for NativeAOT;
-  the v34 function table/POD ABI is unchanged.
+  ABI35 adds CodeMaterialProgram (`LX::Runtime::ShaderGeneration`) and AuthoredMaterial
+  (`experiment::Material`) using separate concrete-view request/resident-acquire entry
+  points appended after v34. Stable links/kinds and every old table offset/POD remain
+  unchanged; kind-only root enumeration does not promise a compatible representation.
+  Matching native/managed API versions and built distribution metadata are required;
+  ScriptCore.dll's compiled version is checked without executing the assembly. The
+  same-kind view fixtures are source-only and unrun.
+- Request statistics count independent consumer states and distinguish Ready, Failed,
+  Cancelled, Stale and abandoned Pending outcomes. Their counter owner survives service
+  teardown with outstanding handles. Image/metadata/program snapshots distinguish
+  observed input-vector staging, decoded worker results, unique live payloads and
+  retained cache charge. SDK-internal scratch/allocator overhead is not measured;
+  overlapping pin/result categories must not be added as physical memory usage.
 - Reflection/authoring serializers understand own shared/exclusive owners. Deserialization
   builds a candidate before replacement; immutable reflected payloads are copied for
   legacy mutable serialization hooks and shown read-only in the editor. Nested
@@ -145,8 +162,11 @@ design. A foundation slice is not completion of the runtime migration.
 
 - Granular rendering and source-free mounted-model placement use the typed hierarchy,
   independent Lattice materials/embedded textures and exact collider preparation.
-  Saved-scene inline material restoration and authored/code material views are the next
-  integration slice. Other legacy aggregate embedded texture consumers remain adapters.
+  Saved-scene material references/inline overrides and authored/Code views now restore
+  from the captured mounted closure, preserving explicit color/mip recipes and numeric
+  keyword axis choices. Other legacy aggregate consumers, including Foliage, are still
+  undergoing cutover. Upstream live rendering remains graph-only; carried Code programs
+  serve existing explicit Code-capable passes, not an invented live rendering route.
   Automatic set activation is connected to the existing package bootstrap, which still
   requires the legacy scene/audio/source-identity closure; a v3-only package is pending. CEMCv11 remains a transitional adapter for other legacy consumers.
 - Legacy source/generated Texture adapters explicitly retain non-rehydratable images.
@@ -157,8 +177,9 @@ design. A foundation slice is not completion of the runtime migration.
   for image payload jobs on the caller. Cold mounted-content activation must use the
   asynchronous scene preparation path. Player startup now polls that path, commits
   activation/play before opening its command service, and excludes preparation time
-  from its first simulation delta. Legacy synchronous command callers still need
-  cutover; no synchronous readiness guarantee is claimed for that bridge.
+  from its first simulation delta. scene.load/scene.switch now use queued admission
+  and expose request IDs with a bounded scene.load.status terminal query. Synchronous
+  C++ legacy helpers remain explicit transitional APIs, with no cold-readiness promise.
 - BuildAssetSet now checks immutable import receipts before invoking source producers.
   A hit revalidates the complete captured file inventory, recipe/tool/target/schema
   identity and every typed CAS product, then bypasses that importer/converter. Rejected
@@ -170,9 +191,10 @@ design. A foundation slice is not completion of the runtime migration.
   operation runs automatically; logical unmount/eviction never delete storage.
   Newly copied outputs need fresh prepublication enrollment; extracted unenrolled
   package content remains explicitly noncollectible.
-- Some legacy Material/Texture/ShaderMeta APIs are synchronous transitional loaders;
-  full typed asynchronous acquisition and independent cooked producers for every
-  supported resource kind are not complete.
+- Legacy Material/Texture/ShaderMeta APIs remain synchronous source/editor adapters.
+  Mounted supported resource views have typed asynchronous acquisition and independent
+  cooked producers. Geometry/images share compatible physical decode; Skeleton/Clip
+  raw-storage sharing across distinct logical identities remains queued.
 - General source-free Player/content cutover and removal of superseded compatibility
   paths remain separate implementation slices. Managed/NativeAOT execution and all
   source-free runtime acceptance gates remain unrun, including the expanded kinds.
@@ -195,6 +217,12 @@ design. A foundation slice is not completion of the runtime migration.
 - Strong ownership cycles fail with a dependency path. Loadable links remain values.
 - Cache eviction releases only cache-owned references. Components, jobs and accepted
   frames retain their own pins; reference counts are not GPU-completion evidence.
+- Scene preparation captures the resolver revision as well as epoch. Mesh/image/program
+  admission and each phase reject supersession. A short owner-construction guard blocks
+  root publication without holding a mutex through callbacks. New DDOL entities stay
+  in the candidate scene until successful handoff; accepted scenes keep independent
+  owners across subsequent mount changes. Root-changing callbacks fail fast or queue
+  their asset-change event for the next owner drain.
 - New requests stop before draining every DataSystem-capturing job outside locks.
 - Native COM/SDK destruction and the existing GPU completion/quarantine path remain.
 

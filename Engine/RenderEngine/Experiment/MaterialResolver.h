@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -84,6 +85,12 @@ namespace experiment
         std::vector<ResolvedMaterialTexture> textures{};
         ResolvedMaterialNotes notes{};
     };
+
+    // Extends only a runtime instance copy with explicitly supplied prepared
+    // texture owners. IDs/revision must match its captured program snapshot;
+    // this never queries a catalog, starts work or changes an asset-cache root.
+    [[nodiscard]] bool BindPreparedMaterialTextures(Material& material,
+        std::span<const own::shared_owner<const Texture>> textures, std::string& outError);
 
     [[nodiscard]] bool ResolveMaterial(const Material& material,
         const MaterialResolveServices& services,

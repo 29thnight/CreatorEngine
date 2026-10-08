@@ -1,5 +1,6 @@
 ﻿#include "ProjectLayerSettings.h"
 #include "SceneManager.h"
+#include <limits>
 #include "RenderScene.h"
 #include "AnimationScheduler.h"
 #include "Scene.h"
@@ -1078,6 +1079,8 @@ void SceneManager::SaveSceneAsync(std::string_view name)
 
 struct SceneManager::PendingSceneLoad
 {
+    std::uint64_t m_requestId{};
+    bool m_superseded{};
     std::string m_path;
     Authoring::ParsedDocument m_document;
     AssetBundle m_bundle;
@@ -1095,16 +1098,27 @@ void SceneManager::RequireSceneLoadOwner() const
         throw std::logic_error("Scene loading must be driven by the SceneManager owner thread");
 }
 
-std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool autoActivate)
+std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool autoActivate,
+    std::uint64_t* requestId)
 {
     RequireSceneLoadOwner();
-    auto load = std::make_shared<PendingSceneLoad>();
+    if (m_nextSceneLoadRequestId == (std::numeric_limits<std::uint64_t>::max)())
+    {
+        throw std::overflow_error("Scene request identity space exhausted");
+    }
+    auto load = own::make_shared<PendingSceneLoad>();
+    load->m_requestId = m_nextSceneLoadRequestId++;
+    if (requestId)
+    {
+        *requestId = load->m_requestId;
+    }
     load->m_path = std::string(path);
     load->m_autoActivate = autoActivate;
     auto result = load->m_result.get_future();
     if (m_exitCommand)
     {
         load->m_result.set_value(nullptr);
+        RecordSceneLoadResult(*load, SceneLoadRequestState::Cancelled);
         return result;
     }
     if (autoActivate)
@@ -1113,7 +1127,13 @@ std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool aut
         if (m_asyncSceneToActivate == m_sceneToActivate) m_sceneToActivate = nullptr;
         m_asyncSceneToActivate = nullptr;
         for (const auto& pending : m_pendingSceneLoads)
-            if (pending->m_autoActivate) pending->m_cancelled = true;
+        {
+            if (pending->m_autoActivate)
+            {
+                pending->m_cancelled = true;
+                pending->m_superseded = true;
+            }
+        }
     }
 
     m_pendingSceneLoads.push_back(load);
@@ -1150,9 +1170,43 @@ std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool aut
         m_pendingSceneLoads.pop_back();
         --m_pendingSceneLoadCount;
         load->m_result.set_value(nullptr);
+        RecordSceneLoadResult(*load, SceneLoadRequestState::Failed, e.what());
         Debug::PrintLog(spdlog::level::err, e.what());
     }
     return result;
+}
+
+void SceneManager::RecordSceneLoadResult(PendingSceneLoad& load, SceneLoadRequestState state, std::string message)
+{
+    // All strings are moved into a preconstructed bounded slot. No scene/resource
+    // owner survives here, and overwriting an old diagnostic never changes loading.
+    m_completedSceneLoads[load.m_requestId % m_completedSceneLoads.size()] =
+        { load.m_requestId, state, std::move(load.m_path), std::move(message), load.m_autoActivate };
+}
+
+std::uint64_t SceneManager::QueueSceneLoad(std::string_view path, bool activate)
+{
+    std::uint64_t requestId{};
+    (void)BeginSceneLoad(path, activate, &requestId);
+    return requestId;
+}
+
+SceneManager::SceneLoadRequestStatus SceneManager::QuerySceneLoad(std::uint64_t requestId) const
+{
+    RequireSceneLoadOwner();
+    if (requestId == 0u)
+    {
+        return {};
+    }
+    for (const auto& pending : m_pendingSceneLoads)
+    {
+        if (pending->m_requestId == requestId)
+        {
+            return { requestId, SceneLoadRequestState::Pending, pending->m_path, {}, pending->m_autoActivate };
+        }
+    }
+    const auto& completed = m_completedSceneLoads[requestId % m_completedSceneLoads.size()];
+    return completed.id == requestId ? completed : SceneLoadRequestStatus{};
 }
 
 std::future<Scene*> SceneManager::LoadSceneAsync(std::string_view name)
@@ -1171,12 +1225,13 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
     scene->m_requiredLoadAssetsBundle = load.m_bundle;
     const auto root = load.m_document.Root();
     LoadIndexBatch batch;
-    LoadIndexBatch ddolBatch;
-    // Preserve each API's DDOL target: callback loads stage DDOL in the active
-    // scene for its later transfer; result-only loads keep them in the result.
-    Scene* ddolScene = load.m_autoActivate && m_activeScene ? m_activeScene.load() : scene.get();
+    // New DDOL entities remain in this candidate until acceptance. Existing
+    // persistent identities are skipped by the DDOL loader; failed candidates
+    // cannot leave entities or image roots behind in the active scene.
+    Scene* ddolScene = scene.get();
+    const auto preparedTextures = DataSystems->SceneTextureImagePins(load.m_assets);
+    scene->SetPreparedTextureImagePins(preparedTextures);
     auto hierarchy = scene->BeginHierarchyBulkBuild();
-    auto ddolHierarchy = ddolScene->BeginHierarchyBulkBuild();
     auto deserialize = [&](const Authoring::ReadNode& node, bool ddol)
     {
         try
@@ -1184,10 +1239,13 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
             const auto* type = Meta::ExtractTypeFromYAML(node);
             if (!type) throw std::runtime_error("Failed to extract scene entity type");
             if (ddol)
-                DesirealizeDontDestroyOnLoadObjects(ddolScene, type, Authoring::NodeViewAccess::Make(node),
-                    ddolScene == scene.get() ? &batch : &ddolBatch);
+            {
+                DesirealizeDontDestroyOnLoadObjects(ddolScene, type, Authoring::NodeViewAccess::Make(node), &batch);
+            }
             else
+            {
                 DesirealizeGameObject(scene.get(), type, Authoring::NodeViewAccess::Make(node), &batch);
+            }
         }
         catch (const std::exception& e)
         {
@@ -1208,12 +1266,15 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
         for (const auto node : root["DontDestroyOnLoadObjects"]) deserialize(node, true);
 
         RemapLoadBatchIndices(scene.get(), batch);
-        RemapLoadBatchIndices(ddolScene, ddolBatch);
         for (const auto& entry : batch) ReconnectPrefabInstance(scene.get(), entry.object);
-        for (const auto& entry : ddolBatch) ReconnectPrefabInstance(ddolScene, entry.object);
-        ddolHierarchy.Complete();
         hierarchy.Complete();
         scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
+        if (load.m_cancelled || m_exitCommand
+            || (load.m_autoActivate && load.m_activationEpoch != m_sceneLoadEpoch)
+            || !DataSystems->IsSceneAssetPreparationCurrent(load.m_assets))
+        {
+            throw std::runtime_error("Scene construction was cancelled or superseded before handoff.");
+        }
         m_scenes.push_back(scene.get());
     }
     catch (...)
@@ -1245,9 +1306,10 @@ void SceneManager::CompleteSceneLoads(bool wait)
         auto load = m_pendingSceneLoads[i];
         if (!wait && !load->m_preparation.is_complete()) { ++i; continue; }
         bool failed = false;
+        std::string failure;
         try { load->m_preparation.wait(); }
-        catch (const std::exception& e) { failed = true; Debug::PrintLog(spdlog::level::err, e.what()); }
-        catch (...) { failed = true; Debug::PrintLog(spdlog::level::err, "Scene preparation failed"); }
+        catch (const std::exception& e) { failed = true; failure = e.what(); Debug::PrintLog(spdlog::level::err, e.what()); }
+        catch (...) { failed = true; failure = "Scene preparation failed"; Debug::PrintLog(spdlog::level::err, failure); }
         try
         {
             std::string error;
@@ -1260,6 +1322,7 @@ void SceneManager::CompleteSceneLoads(bool wait)
             if (!error.empty())
             {
                 failed = true;
+                failure = error;
                 if (!load->m_cancelled)
                 {
                     Debug::PrintLog(spdlog::level::err, error);
@@ -1269,17 +1332,29 @@ void SceneManager::CompleteSceneLoads(bool wait)
         catch (const std::exception& e)
         {
             failed = true;
+            failure = e.what();
             DataSystems->CancelSceneAssets(load->m_assets);
             Debug::PrintLog(spdlog::level::err, e.what());
         }
         catch (...)
         {
             failed = true;
+            failure = "Scene asset preparation failed";
             DataSystems->CancelSceneAssets(load->m_assets);
             Debug::PrintLog(spdlog::level::err, "Scene asset preparation failed");
         }
 
+        AssetDepot::AssetRequestStatus handoffStatus{ AssetDepot::AssetRequestStatus::Failed };
+        auto handoff = !load->m_cancelled && !m_exitCommand
+            ? DataSystems->BeginSceneAssetHandoff(load->m_assets, handoffStatus)
+            : DataSystem::SceneAssetHandoff{};
+        if (!failed && !load->m_cancelled && !m_exitCommand && !handoff)
+        {
+            failed = true;
+            failure = "Scene preparation was cancelled or superseded before construction.";
+        }
         // Remove before callbacks/component construction can enqueue another request.
+        // handoff stays alive through construction, result delivery and activation admission.
         m_pendingSceneLoads.erase(m_pendingSceneLoads.begin() + i);
         --m_pendingSceneLoadCount;
         Scene* scene = nullptr;
@@ -1293,8 +1368,8 @@ void SceneManager::CompleteSceneLoads(bool wait)
                     scene->SetPreparedTextureImagePins(DataSystems->SceneTextureImagePins(load->m_assets));
                 }
             }
-            catch (const std::exception& e) { Debug::PrintLog(spdlog::level::err, e.what()); }
-            catch (...) { Debug::PrintLog(spdlog::level::err, "Scene construction failed"); }
+            catch (const std::exception& e) { failure = e.what(); Debug::PrintLog(spdlog::level::err, e.what()); }
+            catch (...) { failure = "Scene construction failed"; Debug::PrintLog(spdlog::level::err, failure); }
         }
         load->m_result.set_value(scene);
         if (scene && load->m_autoActivate && load->m_activationEpoch == m_sceneLoadEpoch && !m_exitCommand)
@@ -1302,6 +1377,12 @@ void SceneManager::CompleteSceneLoads(bool wait)
             ActivateScene(scene);
             m_asyncSceneToActivate = scene;
         }
+        const auto state = (load->m_superseded || (load->m_autoActivate && load->m_activationEpoch != m_sceneLoadEpoch))
+            ? SceneLoadRequestState::Superseded
+            : load->m_cancelled || m_exitCommand ? SceneLoadRequestState::Cancelled
+            : handoffStatus == AssetDepot::AssetRequestStatus::Stale ? SceneLoadRequestState::Stale
+            : scene ? SceneLoadRequestState::Ready : SceneLoadRequestState::Failed;
+        RecordSceneLoadResult(*load, state, std::move(failure));
     }
 }
 

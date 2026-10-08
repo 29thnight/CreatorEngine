@@ -1,4 +1,6 @@
 #include "DataSystem.h"
+#include "Experiment/Cooked/CookedCodeMaterial.h"
+#include "Experiment/Cooked/MaterialAssetSetCodec.h"
 #include <cassert>
 #include "AssetDepot/LegacyResourceCharges.h"
 
@@ -7,6 +9,7 @@
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelMaterialGraph.h"
 #include "Interfaces/AssetAuthoringPort.h"
+#include "MaterialPropertyPacker.h"
 #include "Material.h" // MBC9: Model.h 전이 include가 사라져 직접 든다
 #include "MaterialGraphSceneCompiler.h"
 #include "Mesh.h"
@@ -35,6 +38,8 @@
 #include "ShaderPermutationDomain.h"
 #include "StandardMaterialProperty.h"
 #include "Experiment/MaterialAuthoringCodec.h"
+#include "Experiment/MaterialPropertyBlock.h"
+#include "Experiment/MaterialResolver.h"
 #include "ExperimentMaterialMigration.h"
 #include "Assets/ModelSidecarV2.h"
 #include "RHI/RHIFormat.h" // MBC7: generation embedded texture 포맷
@@ -46,6 +51,7 @@
 #include <chrono>
 #include <istream>
 #include <limits>
+#include <utility>
 #include <optional>
 #include <ostream>
 #include <sstream>
@@ -327,12 +333,18 @@ struct DataSystem::SceneAssetPreparation
     file::path projectRoot;
     std::string name;
     std::uint64_t epoch{};
+    std::uint64_t resolverRevision{};
     std::atomic<bool> cancelled{}, finished{};
     std::atomic<unsigned> phase{}; // Discovery, models, graphs, resources, ready.
     std::atomic<std::size_t> completed{}, total{};
     std::vector<own::shared_owner<PreparedRuntimeAsset>> models, graphs;
     std::vector<AssetDepot::AssetRequest<assets::ModelMeshDescriptor>> meshRequests;
     std::vector<own::shared_owner<const assets::ModelMeshDescriptor>> meshPins;
+    own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog;
+    std::map<FileGuid, AssetDepot::AssetRequest<Material>> materialRequests;
+    std::map<FileGuid, AssetDepot::AssetRequest<experiment::Material>> authoredRequests;
+    std::map<FileGuid, AssetDepot::AssetRequest<material_graph::Generation>> programRequests;
+    std::vector<own::shared_owner<const material_graph::Generation>> programPins;
     std::map<FileGuid, file::path> graphPaths;
     std::vector<std::vector<std::byte>> materialDocuments;
     AssetBundle resources;
@@ -1059,6 +1071,11 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             throw std::runtime_error("Scene asset preparation is shutting down or invalidated.");
         }
         preparation->epoch = m_assetPreparationEpoch;
+        preparation->resolverRevision = m_assetDepotRevision;
+        {
+            std::lock_guard catalogLock(m_cookedCatalogMutex);
+            preparation->catalog = m_cookedCatalog;
+        }
         std::erase_if(m_sceneAssetPreparations, [](const auto& weak) { return weak.expired(); });
         m_sceneAssetPreparations.emplace_back(preparation);
     }
@@ -1079,16 +1096,10 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         }
         const AssetDepot::AssetLink<assets::ModelMeshDescriptor> meshLink{
             { experiment::AssetId{ guid.m_guid }, {} } };
-        auto meshStatus = experiment::cooked::AssetLookupStatus::NotMounted;
-        {
-            std::lock_guard lock(m_assetPreparationMutex);
-            std::lock_guard catalogLock(m_cookedCatalogMutex);
-            experiment::cooked::ResolvedAssetEntry resolved;
-            if (m_cookedCatalog)
-            {
-                meshStatus = m_cookedCatalog->Find(meshLink.ToReference(), resolved);
-            }
-        }
+        const auto& captured = preparation->catalog;
+        experiment::cooked::ResolvedAssetEntry meshEntry;
+        const auto meshStatus = captured ? captured->Find(meshLink.ToReference(), meshEntry)
+            : experiment::cooked::AssetLookupStatus::NotMounted;
         if (meshStatus == experiment::cooked::AssetLookupStatus::Found
             || (meshReference && meshStatus == experiment::cooked::AssetLookupStatus::TypeMismatch))
         {
@@ -1097,19 +1108,46 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             // textures or models and must not be reinterpreted as Mesh requests.
             if (requestedMeshes.insert(guid).second)
             {
-                preparation->meshRequests.push_back(RequestAsync(meshLink));
+                preparation->meshRequests.push_back(RequestModelAssetFromSnapshot(
+                    meshLink, captured, preparation->epoch));
             }
             return;
         }
+        const AssetDepot::AssetLink<Material> materialLink{ { experiment::AssetId{ guid.m_guid }, {} } };
+        experiment::cooked::ResolvedAssetEntry materialEntry;
+        if (captured && captured->Find(materialLink.ToReference(), materialEntry)
+            == experiment::cooked::AssetLookupStatus::Found)
+        {
+            preparation->materialRequests.try_emplace(guid,
+                RequestMaterialPipelineAssetFromSnapshot(materialLink, captured, preparation->epoch));
+            if (materialEntry.blob.representation == experiment::cooked::kAuthoredMaterialRepresentation)
+            {
+                preparation->authoredRequests.try_emplace(guid, RequestMaterialPipelineAssetFromSnapshot(
+                    AssetDepot::AssetLink<experiment::Material>{ materialLink.identity }, captured, preparation->epoch));
+            }
+            return;
+        }
+        const AssetDepot::AssetLink<material_graph::Generation> programLink{ materialLink.identity };
+        experiment::cooked::ResolvedAssetEntry programEntry;
+        if (captured && captured->Find(programLink.ToReference(), programEntry)
+            == experiment::cooked::AssetLookupStatus::Found)
+        {
+            if (programEntry.blob.representation == experiment::cooked::kMaterialProgramRepresentation)
+            {
+                preparation->programRequests.try_emplace(guid,
+                    RequestMaterialPipelineAssetFromSnapshot(programLink, captured, preparation->epoch));
+            }
+            return; // Code programs are owned by authored Material requests.
+        }
         const AssetDepot::AssetLink<Texture> imageLink{ { experiment::AssetId{ guid.m_guid }, {} } };
-        const auto catalog = GetCookedCatalog();
+        const auto& catalog = preparation->catalog;
         experiment::cooked::ResolvedAssetEntry imageEntry;
         if (catalog && catalog->Find(imageLink.ToReference(), imageEntry)
             == experiment::cooked::AssetLookupStatus::Found)
         {
             const AssetDepot::TextureAssetVariant variant;
             preparation->descriptorRequests.try_emplace(std::pair{ imageLink, variant },
-                RequestAsync<Texture>(imageLink, variant));
+                RequestTextureAsyncFromSnapshot(imageLink, variant, captured, preparation->epoch));
             return;
         }
         const auto path = GetFilePath(guid);
@@ -1166,8 +1204,14 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                 FileGuid meshId;
                 if (Uuid::TryParse(meshNode.AsString(), meshId.m_guid))
                 {
-                    granularMesh = HasModelMeshDescriptor(AssetDepot::AssetLink<assets::ModelMeshDescriptor>{
-                        { experiment::AssetId{ meshId.m_guid }, {} } });
+                    const AssetDepot::AssetLink<assets::ModelMeshDescriptor> link{
+                        { experiment::AssetId{ meshId.m_guid }, {} } };
+                    experiment::cooked::ResolvedAssetEntry resolved;
+                    const auto status = link.IsValid() && preparation->catalog
+                        ? preparation->catalog->Find(link.ToReference(), resolved)
+                        : experiment::cooked::AssetLookupStatus::NotMounted;
+                    granularMesh = status == experiment::cooked::AssetLookupStatus::Found
+                        || status == experiment::cooked::AssetLookupStatus::TypeMismatch;
                     if (granularMesh)
                     {
                         discover(meshId, true);
@@ -1321,7 +1365,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
     }
     for (const auto& [guid, path] : models)
     {
-        preparation->models.push_back(PrepareRuntimeAsset(guid, path, RuntimeAssetType::Model));
+        preparation->models.push_back(PrepareRuntimeAsset(guid, path, RuntimeAssetType::Model, preparation->epoch, preparation->resolverRevision));
     }
     preparation->total.store(preparation->models.size() + preparation->meshRequests.size(), std::memory_order_relaxed);
     preparation->phase.store(1, std::memory_order_release);
@@ -1339,7 +1383,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     {
         std::lock_guard lock(m_assetPreparationMutex);
         if (!publish || m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
-            preparation->epoch != m_assetPreparationEpoch ||
+            preparation->epoch != m_assetPreparationEpoch || preparation->resolverRevision != m_assetDepotRevision ||
             preparation->projectRoot != PathFinder::Relative())
         {
             preparation->cancelled.store(true, std::memory_order_release);
@@ -1347,6 +1391,34 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     }
     const auto finish = [&](std::string message)
     {
+        if (!message.empty())
+        {
+            preparation->cancelled.store(true, std::memory_order_release);
+            for (const auto& request : preparation->meshRequests)
+            {
+                request.Cancel();
+            }
+            const auto cancel = [](const auto& requests)
+            {
+                for (const auto& [key, request] : requests)
+                {
+                    request.Cancel();
+                }
+            };
+            cancel(preparation->materialRequests);
+            cancel(preparation->authoredRequests);
+            cancel(preparation->programRequests);
+            cancel(preparation->descriptorRequests);
+            // The resource worker alone appends image subscribers. Never traverse
+            // that vector until scheduler completion establishes the handoff.
+            if (!preparation->resourceWork.valid() || preparation->resourceWork.is_complete())
+            {
+                for (const auto& image : preparation->imageRequests)
+                {
+                    image.request.Cancel();
+                }
+            }
+        }
         preparation->error = std::move(message);
         preparation->finished.store(true, std::memory_order_release);
         error = preparation->error;
@@ -1369,11 +1441,17 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     };
     if (preparation->finished.load(std::memory_order_acquire))
     {
-        error = preparation->error;
+        error = preparation->cancelled.load(std::memory_order_acquire)
+            ? "Scene asset preparation was cancelled or superseded." : preparation->error;
         return true;
     }
     if (preparation->phase.load(std::memory_order_acquire) == 1)
     {
+        if (!IsSceneAssetPreparationCurrent(preparation))
+        {
+            CancelSceneAssets(preparation);
+            return finish("Scene asset preparation was cancelled or superseded.");
+        }
         if (preparation->cancelled.load(std::memory_order_acquire))
         {
             for (const auto& mesh : preparation->meshRequests)
@@ -1435,7 +1513,19 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
         }
         for (const auto& [guid, path] : preparation->graphPaths)
         {
-            preparation->graphs.push_back(PrepareRuntimeAsset(guid, path, RuntimeAssetType::MaterialGraph));
+            const AssetDepot::AssetLink<material_graph::Generation> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+            experiment::cooked::ResolvedAssetEntry resolved;
+            if (preparation->catalog && preparation->catalog->Find(link.ToReference(), resolved)
+                != experiment::cooked::AssetLookupStatus::NotMounted)
+            {
+                if (!preparation->programRequests.contains(guid))
+                {
+                    preparation->programRequests.emplace(guid,
+                        RequestMaterialPipelineAssetFromSnapshot(link, preparation->catalog, preparation->epoch));
+                }
+                continue;
+            }
+            preparation->graphs.push_back(PrepareRuntimeAsset(guid, path, RuntimeAssetType::MaterialGraph, preparation->epoch, preparation->resolverRevision));
         }
         preparation->completed.store(0, std::memory_order_relaxed);
         preparation->total.store(preparation->graphs.size(), std::memory_order_relaxed);
@@ -1443,6 +1533,61 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     }
     if (preparation->phase.load(std::memory_order_acquire) == 2)
     {
+        if (!IsSceneAssetPreparationCurrent(preparation))
+        {
+            CancelSceneAssets(preparation);
+            return finish("Scene asset preparation was cancelled or superseded.");
+        }
+        if (preparation->cancelled.load(std::memory_order_acquire))
+        {
+            for (const auto& [id, request] : preparation->materialRequests)
+            {
+                request.Cancel();
+            }
+            for (const auto& [id, request] : preparation->authoredRequests)
+            {
+                request.Cancel();
+            }
+            for (const auto& [id, request] : preparation->programRequests)
+            {
+                request.Cancel();
+            }
+            return finish("Scene asset preparation was cancelled.");
+        }
+        const auto poll = [&](const auto& requests, auto& pins) -> int
+        {
+            for (const auto& [id, request] : requests)
+            {
+                const auto result = request.Snapshot();
+                if (result.status == AssetDepot::AssetRequestStatus::Pending)
+                {
+                    return 0;
+                }
+                if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+                {
+                    error = result.message.empty() ? "Mounted material/program preparation failed." : result.message;
+                    return -1;
+                }
+            }
+            pins.clear();
+            pins.reserve(requests.size());
+            for (const auto& [id, request] : requests)
+            {
+                pins.push_back(request.Snapshot().asset);
+            }
+            return 1;
+        };
+        const int materials = poll(preparation->materialRequests, preparation->materialPins);
+        const int authored = poll(preparation->authoredRequests, preparation->authoredMaterialPins);
+        const int programs = poll(preparation->programRequests, preparation->programPins);
+        if (materials < 0 || authored < 0 || programs < 0)
+        {
+            return finish(error);
+        }
+        if (!materials || !authored || !programs)
+        {
+            return false;
+        }
         if (!ready(preparation->graphs))
         {
             return false;
@@ -1463,7 +1608,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 error.clear();
             }
         }
-        const auto catalog = GetCookedCatalog();
+        const auto& catalog = preparation->catalog;
         for (const auto& graph : preparation->graphs)
         {
             const auto generation = m_materialGraphGenerations.Current(experiment::AssetId{ graph->guid.m_guid });
@@ -1491,7 +1636,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 const auto key = std::pair{ link, variant };
                 if (!preparation->descriptorRequests.contains(key))
                 {
-                    preparation->descriptorRequests.emplace(key, RequestAsync<Texture>(link, variant));
+                    preparation->descriptorRequests.emplace(key, RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
                 }
             }
         }
@@ -1523,7 +1668,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 const auto key = std::pair{ link, variant };
                 if (!preparation->descriptorRequests.contains(key))
                 {
-                    preparation->descriptorRequests.emplace(key, RequestAsync<Texture>(link, variant));
+                    preparation->descriptorRequests.emplace(key, RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
                 }
             }
         }
@@ -1531,6 +1676,11 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     }
     if (preparation->phase.load(std::memory_order_acquire) == 5)
     {
+        if (!IsSceneAssetPreparationCurrent(preparation))
+        {
+            CancelSceneAssets(preparation);
+            return finish("Scene asset preparation was cancelled or superseded.");
+        }
         if (preparation->cancelled.load(std::memory_order_acquire))
         {
             return finish("Scene asset preparation was cancelled.");
@@ -1558,7 +1708,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
         std::lock_guard lock(m_assetPreparationMutex);
         if (preparation->cancelled.load(std::memory_order_acquire) ||
             m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
-            preparation->epoch != m_assetPreparationEpoch)
+            preparation->epoch != m_assetPreparationEpoch || preparation->resolverRevision != m_assetDepotRevision)
         {
             return finish("Scene asset preparation was cancelled or invalidated.");
         }
@@ -1568,11 +1718,34 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
         job_group work;
         work.add([this, preparation]
         {
+            const auto requireCurrent = [&]()
+            {
+                if (!IsSceneAssetPreparationCurrent(preparation))
+                {
+                    throw std::runtime_error("Scene asset preparation was superseded during resource preparation.");
+                }
+            };
+            requireCurrent();
             const AssetDecoderApartment apartment;
             // Only CPU texture owners/material instances. RHI upload/fences and
             // Scene/Entity construction stay on their existing owning threads.
+            std::vector<own::shared_owner<const Texture>> preparedTextures;
+            preparedTextures.reserve(preparation->descriptorRequests.size());
+            for (const auto& [key, request] : preparation->descriptorRequests)
+            {
+                const auto result = request.Snapshot();
+                if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+                {
+                    throw std::runtime_error("Scene override texture descriptor did not remain ready.");
+                }
+                preparedTextures.push_back(result.asset);
+                // Preserve untransformed source descriptors for constructing
+                // independently colored/mipped runtime override projections.
+                preparation->textureImages->Retain(result.asset);
+            }
             for (const auto& bytes : preparation->materialDocuments)
             {
+                requireCurrent();
                 if (preparation->cancelled.load(std::memory_order_acquire))
                 {
                     return;
@@ -1586,8 +1759,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 const auto node = document.Root();
                 if (const auto reference = node["ref"]; reference && reference.IsScalar())
                 {
-                    const auto path = GetFilePath(FileGuid(reference.AsString()));
-                    const auto base = LoadMaterialShared(path.stem().string());
+                    const auto base = LoadMaterialByGuid(FileGuid(reference.AsString()));
                     if (!base)
                     {
                         throw std::runtime_error("Required base material could not be prepared.");
@@ -1598,6 +1770,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                         preparation->authoredMaterialPins.push_back(std::move(authored));
                     }
                     Material material(*base);
+                    std::vector<experiment::MaterialProperty> propertyOverrides;
                     for (const auto override : node["overrides"])
                     {
                         experiment::MaterialProperty property;
@@ -1607,8 +1780,19 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                         {
                             throw std::runtime_error(error);
                         }
+                        propertyOverrides.push_back(std::move(property));
                     }
-                    FinalizeMaterialRuntime(material);
+                    if (material.GetAssetOrigin() && !material.HasMaterialGraph())
+                    {
+                        if (!RebuildCookedMaterialInstance(material, error, preparedTextures, propertyOverrides))
+                        {
+                            throw std::runtime_error(error);
+                        }
+                    }
+                    else
+                    {
+                        FinalizeMaterialRuntime(material);
+                    }
                     if (!ValidatePreparedMaterialTextures(material, error))
                     {
                         throw std::runtime_error(error);
@@ -1618,7 +1802,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 else
                 {
                     Material material;
-                    if (!DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(node), nullptr, false) ||
+                    if (!DeserializeMaterialPayload(material, Authoring::NodeViewAccess::Make(node), nullptr, false, preparedTextures) ||
                         !ValidatePreparedMaterialTextures(material, error))
                     {
                         throw std::runtime_error("Required inline material could not be prepared: " + error);
@@ -1631,6 +1815,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
             }
             for (const auto& graph : preparation->graphs)
             {
+                requireCurrent();
                 if (preparation->cancelled.load(std::memory_order_acquire))
                 {
                     return;
@@ -1655,6 +1840,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
             }
             for (const auto& entry : preparation->resources.assets)
             {
+                requireCurrent();
                 if (preparation->cancelled.load(std::memory_order_acquire))
                 {
                     return;
@@ -1719,6 +1905,16 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 }
                 ++preparation->completed;
             }
+            for (const auto& program : preparation->programPins)
+            {
+                if (program->assetOrigin)
+                {
+                    for (const auto& texture : program->assetOrigin->defaultTextures)
+                    {
+                        preparation->textureImages->Retain(texture.owner);
+                    }
+                }
+            }
             for (const auto& texture : preparation->texturePins)
             {
                 preparation->textureImages->Retain(texture);
@@ -1737,6 +1933,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                     }
                 }
             }
+            requireCurrent();
             for (const auto& descriptor : preparation->textureImages->Owners())
             {
                 preparation->imageRequests.push_back({ descriptor,
@@ -1782,6 +1979,11 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
     if (imagesPending)
     {
         return false; // Never wait for an incomplete image job on the scene owner.
+    }
+    if (!IsSceneAssetPreparationCurrent(preparation))
+    {
+        CancelSceneAssets(preparation);
+        return finish("Scene asset preparation was superseded before handoff.");
     }
     preparation->phase.store(4, std::memory_order_release);
     return finish({});
@@ -1830,11 +2032,79 @@ void DataSystem::CancelSceneAssets(const own::shared_owner<SceneAssetPreparation
     }
 }
 
+DataSystem::SceneAssetHandoff::SceneAssetHandoff(SceneAssetHandoff&& other) noexcept
+    : m_system(std::exchange(other.m_system, nullptr))
+{
+}
+
+DataSystem::SceneAssetHandoff::~SceneAssetHandoff()
+{
+    if (m_system)
+    {
+        std::lock_guard lock(m_system->m_assetPreparationMutex);
+        assert(m_system->m_assetRootHandoffs != 0u);
+        --m_system->m_assetRootHandoffs;
+    }
+}
+
+DataSystem::SceneAssetHandoff DataSystem::BeginSceneAssetHandoff(
+    const own::shared_owner<SceneAssetPreparation>& preparation, AssetDepot::AssetRequestStatus& status)
+{
+    status = AssetDepot::AssetRequestStatus::Failed;
+    if (!preparation)
+    {
+        return {};
+    }
+    std::lock_guard lock(m_assetPreparationMutex);
+    if (m_assetPreparationStopping)
+    {
+        status = AssetDepot::AssetRequestStatus::Cancelled;
+        return {};
+    }
+    if (m_assetInvalidationDepth != 0u || preparation->epoch != m_assetPreparationEpoch
+        || preparation->resolverRevision != m_assetDepotRevision || preparation->projectRoot != PathFinder::Relative())
+    {
+        status = AssetDepot::AssetRequestStatus::Stale;
+        return {};
+    }
+    if (preparation->cancelled.load(std::memory_order_acquire))
+    {
+        status = AssetDepot::AssetRequestStatus::Cancelled;
+        return {};
+    }
+    if (!preparation->finished.load(std::memory_order_acquire) || !preparation->error.empty())
+    {
+        return {};
+    }
+    if (m_assetRootHandoffs == (std::numeric_limits<std::size_t>::max)())
+    {
+        return {};
+    }
+    ++m_assetRootHandoffs;
+    status = AssetDepot::AssetRequestStatus::Ready;
+    return SceneAssetHandoff(*this);
+}
+
+bool DataSystem::IsSceneAssetPreparationCurrent(
+    const own::shared_owner<SceneAssetPreparation>& preparation) const
+{
+    if (!preparation)
+    {
+        return false;
+    }
+    std::lock_guard lock(m_assetPreparationMutex);
+    return !m_assetPreparationStopping && m_assetInvalidationDepth == 0u
+        && !preparation->cancelled.load(std::memory_order_acquire)
+        && preparation->epoch == m_assetPreparationEpoch
+        && preparation->resolverRevision == m_assetDepotRevision
+        && preparation->projectRoot == PathFinder::Relative();
+}
+
 own::shared_owner<TextureFramePins> DataSystem::SceneTextureImagePins(
     const own::shared_owner<SceneAssetPreparation>& preparation) const
 {
-    if (!preparation || !preparation->finished.load(std::memory_order_acquire)
-        || preparation->cancelled.load(std::memory_order_acquire) || !preparation->error.empty())
+    if (!IsSceneAssetPreparationCurrent(preparation) || !preparation->finished.load(std::memory_order_acquire)
+        || !preparation->error.empty())
     {
         return {};
     }
@@ -1881,6 +2151,10 @@ void DataSystem::DrainAssetPreparations()
     std::vector<job_handle> work;
     {
         std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetRootHandoffs != 0u)
+        {
+            throw std::logic_error("Cannot tear down DataSystem during scene handoff.");
+        }
         m_assetPreparationStopping = true;
         ++m_assetPreparationEpoch;
         assets = m_retiredAssetPreparations;
@@ -1950,6 +2224,10 @@ void DataSystem::Initialize()
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
+        if (m_assetRootHandoffs != 0u)
+        {
+            throw std::logic_error("Cannot replace the asset registry during scene handoff.");
+        }
         retiredRegistry = std::move(m_assetMetaRegistry);
         m_assetMetaRegistry = std::move(registry);
         m_assetPreparationStopping = false;
@@ -2841,6 +3119,55 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
         Debug::PrintLog(spdlog::level::err, "LX material save failed: " + error);
         return false;
     }
+    if (const auto origin = material.GetAssetOrigin(); origin && origin->codeProgram)
+    {
+        const auto& program = *origin->codeProgram;
+        ShaderMeta serializable = program.meta;
+        std::string error;
+        for (const auto& property : program.meta.properties)
+        {
+            if (property.type != ShaderPropertyType::Float4x4)
+            {
+                continue;
+            }
+            const auto value = std::ranges::find(material.m_propertyValues, property.name, &MaterialPropertyValue::m_name);
+            MaterialPropertyValue defaultValue;
+            if (!MaterialPropertyPacker::ApplyDefault(property, defaultValue, error)
+                || (value != material.m_propertyValues.end() && value->m_numericValue != defaultValue.m_numericValue))
+            {
+                // The authored value schema has no matrix variant. Never hide
+                // an edited matrix in a source-only fallback document.
+                return false;
+            }
+        }
+        std::erase_if(serializable.properties, [](const auto& property)
+        {
+            return property.type == ShaderPropertyType::Float4x4;
+        });
+        experiment::Material authored;
+        if (!ExperimentMaterialMigration::ConvertLegacyMaterial(material, serializable, authored, error))
+        {
+            return false;
+        }
+        for (auto& property : authored.properties)
+        {
+            auto* reference = std::get_if<experiment::TextureReference>(&property.value);
+            if (!reference)
+            {
+                continue;
+            }
+            const auto owner = material.GetTextureMapShared(property.name);
+            if (!owner)
+            {
+                continue;
+            }
+            const auto format = owner->GetImageDescription().Format();
+            const bool srgb = format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
+                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+            reference->colorSpace = srgb ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
+        }
+        return experiment::SerializeMaterialAuthoring(authored, outNode, error);
+    }
     SynchronizeLegacyMaterialProperties(material);
 	Authoring::WriteDocument staging;
 	const Authoring::WriteNode node = staging.Root();
@@ -3136,6 +3463,20 @@ own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGrap
                                                                                           std::string& error,
                                                                                           bool reload)
 {
+    const AssetDepot::AssetLink<material_graph::Generation> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+    const auto catalog = GetCookedCatalog();
+    experiment::cooked::ResolvedAssetEntry resolved;
+    const auto lookup = catalog ? catalog->Find(link.ToReference(), resolved)
+        : experiment::cooked::AssetLookupStatus::NotMounted;
+    if (lookup != experiment::cooked::AssetLookupStatus::NotMounted)
+    {
+        auto owner = lookup == experiment::cooked::AssetLookupStatus::Found ? TryAcquire(link) : nullptr;
+        if (!owner)
+        {
+            error = "Mounted graph requires its typed asynchronous program preparation.";
+        }
+        return owner;
+    }
     ce::profile_scope profile{ ce::marker<"Material.GraphGeneration">() };
     const experiment::AssetId id{guid.m_guid};
     std::uint64_t loadEpoch;
@@ -3622,8 +3963,32 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
         error = "Graph material requires a cooked/generated ShaderMeta contract; regenerate the material cook.";
         return false;
     }
-    const auto textureLoader = [this, model](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
+    const auto textureLoader = [this, model, generation](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
                                       std::string& failure) -> own::shared_owner<const Texture> {
+        if (generation->assetOrigin)
+        {
+            const auto& defaults = generation->assetOrigin->defaultTextures;
+            const auto captured = std::ranges::find_if(defaults, [&](const auto& pin)
+            {
+                return pin.assetId == id && pin.colorSpace == colorSpace;
+            });
+            if (captured != defaults.end())
+            {
+                return captured->owner;
+            }
+            // Inline overrides were requested by scene discovery. Lookup must
+            // stay within the same resolver snapshot as the pinned program.
+            const AssetDepot::AssetLink<Texture> link{ { id, {} } };
+            auto owner = TryAcquire<Texture>(link);
+            const auto origin = owner ? owner->GetAssetOrigin() : nullptr;
+            if (!origin || origin->resolved.resolverRevision != generation->assetOrigin->resolved.resolverRevision)
+            {
+                failure = "Inline graph override needs an exact asynchronously prepared texture descriptor.";
+                return {};
+            }
+            owner = Texture::WithColorSpace(owner, colorSpace == LX::LXColorSpace::SRGB);
+            return owner ? Texture::WithMipChain(owner, failure) : nullptr;
+        }
         if (model && model->FindTexture(id.value))
         {
             return ResolveModelGenerationTexture(*model, id.value);
@@ -3699,7 +4064,8 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
 }
 
 bool DataSystem::DeserializeMaterialPayload(Material& material,
-	const Authoring::NodeView& view, experiment::Material* outAuthored, bool persistRecovery)
+	const Authoring::NodeView& view, experiment::Material* outAuthored, bool persistRecovery,
+    std::span<const own::shared_owner<const Texture>> preparedTextures)
 {
 	const Authoring::ReadNode readNode = Authoring::NodeViewAccess::Node(view);
 	if (!readNode || !readNode.IsMap()) return false;
@@ -3715,6 +4081,14 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
         }
         if (!ConfigureMaterialGraph(material, document.description, error))
         {
+            const auto catalog = GetCookedCatalog();
+            experiment::cooked::ResolvedAssetEntry mounted;
+            if (catalog && catalog->Find(AssetDepot::AssetLink<material_graph::Generation>{
+                { document.description.graphId, {} } }.ToReference(), mounted)
+                != experiment::cooked::AssetLookupStatus::NotMounted)
+            {
+                return false;
+            }
             if (!persistRecovery && PathFinder::IsAssetAuthoringEnabled())
             {
                 Debug::PrintLog(spdlog::level::warn, "Inline material prewarm deferred recovery to its owner: " + error);
@@ -3755,6 +4129,54 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 			Debug::PrintLog(spdlog::level::err, "Material 새 정본 decode 실패: " + error);
 			return false;
 		}
+        const auto catalog = GetCookedCatalog();
+        experiment::cooked::ResolvedAssetEntry mounted;
+        const AssetDepot::AssetLink<experiment::Material> link{ { authored.assetId, {} } };
+        if (catalog && authored.assetId.IsValid()
+            && catalog->Find(link.ToReference(), mounted) != experiment::cooked::AssetLookupStatus::NotMounted)
+        {
+            const auto base = TryAcquire(link);
+            if (!base || !base->assetOrigin || !base->assetOrigin->codeProgram
+                || base->shaderAssetId != authored.shaderAssetId)
+            {
+                return false;
+            }
+            authored.assetOrigin = base->assetOrigin;
+            const auto& program = authored.assetOrigin->codeProgram;
+            if (!ExperimentMaterialMigration::ConvertToLegacyMaterial(authored, &program->meta, material, error))
+            {
+                return false;
+            }
+            if (!experiment::BindPreparedMaterialTextures(authored, preparedTextures, error))
+            {
+                return false;
+            }
+            experiment::ResolvedMaterial resolved;
+            if (!experiment::ResolveMaterial(authored, {}, resolved, error))
+            {
+                return false;
+            }
+            std::vector<MaterialTextureOwner> textures;
+            for (const auto& texture : resolved.textures)
+            {
+                textures.push_back({ texture.propertyName, texture.owner });
+            }
+            own::shared_owner<const LX::Runtime::Instance> instance;
+            if (!experiment::BuildMaterialRuntimeInstance(authored, program->meta, program->layout,
+                program->codeHandle, textures, instance, error))
+            {
+                return false;
+            }
+            material.m_assetOrigin = authored.assetOrigin;
+            material.m_runtimeInstance = std::move(instance);
+            material.m_shaderMetaHandle = program->codeHandle;
+            material.SynchronizeCodeRuntime();
+            if (outAuthored)
+            {
+                *outAuthored = std::move(authored);
+            }
+            return true;
+        }
 		const ShaderMeta* metaForKeywords = nullptr;
 		own::shared_owner<const ShaderMeta> metaOwner;
 		if (!authored.keywords.empty())
@@ -3906,7 +4328,18 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
     // Scene binding finalizes cloned materials too. An LX snapshot is already
     // complete and must not be erased by the legacy ShaderMeta finalizer.
     if (material.HasMaterialGraph())
+    {
         return;
+    }
+    if (material.GetAssetOrigin())
+    {
+        std::string failure;
+        if (!RebuildCookedMaterialInstance(material, failure))
+        {
+            throw std::runtime_error(failure);
+        }
+        return;
+    }
     // 디스크/scene 논리 값이 바뀌면 기존 schema가 가리키는 applied generation도
 	// 더는 유효한 runtime 상태가 아니다. legacy CB bytes는 Configure에서 새 layout에
 	// repack할 입력이므로 ResetShaderRuntime은 그것을 보존한다.
@@ -3984,6 +4417,15 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 
 own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name)
 {
+    const auto guid = GetStemToGuid(file::path(name).stem().string());
+    const auto catalog = GetCookedCatalog();
+    const AssetDepot::AssetLink<Material> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+    experiment::cooked::ResolvedAssetEntry resolved;
+    if (guid != FileGuid{} && catalog
+        && catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::NotMounted)
+    {
+        return TryAcquire(link);
+    }
     std::uint64_t loadEpoch;
     std::uint64_t resolverRevision;
     {
@@ -4074,6 +4516,13 @@ own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name
 own::shared_owner<const experiment::Material> DataSystem::LoadAuthoredMaterialShared(
 	FileGuid assetGuid)
 {
+    const AssetDepot::AssetLink<experiment::Material> link{ { experiment::AssetId{ assetGuid.m_guid }, {} } };
+    const auto catalog = GetCookedCatalog();
+    experiment::cooked::ResolvedAssetEntry resolved;
+    if (catalog && catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::NotMounted)
+    {
+        return TryAcquire(link);
+    }
     std::uint64_t loadEpoch;
     std::uint64_t resolverRevision;
     {
@@ -4505,6 +4954,13 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         std::lock_guard catalogLock(m_cookedCatalogMutex);
         if (m_assetPreparationStopping || !m_assetMetaRegistry)
         {
+            return false;
+        }
+        if (m_assetRootHandoffs != 0u)
+        {
+            // Keep a callback/watcher publication for the next owner drain;
+            // rejection must not silently discard an otherwise valid change.
+            QueueAssetChange(change);
             return false;
         }
         registry = m_assetMetaRegistry;
@@ -5185,7 +5641,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
-        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u)
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u)
         {
             outError = "Catalog admission is stopped or invalidating.";
             return false;
@@ -5347,7 +5803,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         std::lock_guard catalogLock(m_cookedCatalogMutex);
-        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u || m_assetRootHandoffs != 0u
             || m_assetPreparationEpoch != expectedEpoch || m_assetDepotRevision != expectedRevision)
         {
             outError = "Catalog changed before publication; legacy mount is stale.";
@@ -5507,4 +5963,118 @@ bool DataSystem::ReadModelCreateMeshCollider(FileGuid guid) const
 	const Authoring::ReadNode importer = document.Root()["ModelImporter"];
 	if (!importer || !importer["CreateMeshCollider"]) return false;
 	return importer["CreateMeshCollider"].As<bool>();
+}
+
+
+own::shared_owner<const Material> DataSystem::LoadMaterialByGuid(FileGuid guid)
+{
+    const AssetDepot::AssetLink<Material> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+    const auto catalog = GetCookedCatalog();
+    experiment::cooked::ResolvedAssetEntry resolved;
+    if (catalog && catalog->Find(link.ToReference(), resolved) != experiment::cooked::AssetLookupStatus::NotMounted)
+    {
+        return TryAcquire(link);
+    }
+    const auto path = GetFilePath(guid);
+    return path.empty() ? nullptr : LoadMaterialShared(path.stem().string());
+}
+
+bool DataSystem::RebuildCookedMaterialInstance(Material& material, std::string& error,
+    std::span<const own::shared_owner<const Texture>> preparedTextures,
+    std::span<const experiment::MaterialProperty> propertyOverrides)
+{
+    const auto origin = material.GetAssetOrigin();
+    const auto program = origin ? origin->codeProgram : nullptr;
+    if (!program || !program->codeProgram)
+    {
+        error = "Cooked material has no prepared code program.";
+        return false;
+    }
+    // Only reference/keyword resolution uses the authored value view. Numeric
+    // and matrix values stay in the existing LX logical property representation.
+    experiment::Material references;
+    references.assetId.value = material.m_fileGuid.m_guid;
+    references.shaderAssetId.value = material.m_shaderMetaGuid.m_guid;
+    references.keywordSelections = material.m_keywordSelections;
+    references.assetOrigin = origin;
+    for (const auto& desc : program->meta.properties)
+    {
+        if (desc.type != ShaderPropertyType::Texture2D)
+        {
+            continue;
+        }
+        const auto value = std::ranges::find(material.m_propertyValues, desc.name, &MaterialPropertyValue::m_name);
+        if (value == material.m_propertyValues.end())
+        {
+            continue;
+        }
+        experiment::TextureReference reference;
+        reference.assetId.value = value->m_textureGuid.m_guid;
+        reference.colorSpace = desc.colorSpace == "srgb" ? experiment::TextureColorSpace::Srgb
+            : experiment::TextureColorSpace::Linear;
+        const auto existing = material.GetTextureMapShared(desc.name);
+        const auto captured = existing ? existing->GetAssetOrigin() : nullptr;
+        if (captured && captured->resolved.entry.asset.key.assetId == reference.assetId)
+        {
+            const auto format = existing->GetImageDescription().Format();
+            const bool sourceSrgb = format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
+                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+            const bool srgb = captured->variant.colorSpace == AssetDepot::TextureAssetColorSpace::Srgb
+                || (captured->variant.colorSpace == AssetDepot::TextureAssetColorSpace::Source && sourceSrgb);
+            reference.colorSpace = srgb ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
+        }
+        references.properties.push_back({ desc.name, std::move(reference) });
+    }
+    for (const auto& property : propertyOverrides)
+    {
+        if (property.name == standard_material::property::DoubleSided && std::holds_alternative<bool>(property.value))
+        {
+            continue;
+        }
+        const auto desc = std::ranges::find(program->meta.properties, property.name, &ShaderPropertyDesc::name);
+        MaterialPropertyValue checked;
+        if (desc == program->meta.properties.end()
+            || !experiment::TryConvertMaterialProperty(property, *desc, checked, error))
+        {
+            error = "Cooked material override differs from its exact shader schema: " + property.name;
+            return false;
+        }
+        if (std::holds_alternative<experiment::TextureReference>(property.value))
+        {
+            const auto found = std::ranges::find(references.properties, property.name, &experiment::MaterialProperty::name);
+            if (found == references.properties.end())
+            {
+                references.properties.push_back(property);
+            }
+            else
+            {
+                *found = property;
+            }
+        }
+    }
+    if (!experiment::BindPreparedMaterialTextures(references, preparedTextures, error))
+    {
+        return false;
+    }
+    experiment::ResolvedMaterial resolved;
+    if (!experiment::ResolveMaterial(references, {}, resolved, error))
+    {
+        return false;
+    }
+    std::vector<MaterialTextureOwner> owners;
+    for (const auto& texture : resolved.textures)
+    {
+        owners.push_back({ texture.propertyName, texture.owner });
+    }
+    own::shared_owner<const LX::Runtime::Instance> candidate;
+    if (!LX::Runtime::BuildInstance(program, material.m_propertyValues, resolved.keywordSelections, owners, candidate, error))
+    {
+        return false;
+    }
+    material.m_assetOrigin = references.assetOrigin;
+    material.m_runtimeInstance = std::move(candidate);
+    material.m_shaderMetaHandle = program->codeHandle;
+    material.m_materialGraphInstance.reset();
+    material.SynchronizeCodeRuntime();
+    return true;
 }

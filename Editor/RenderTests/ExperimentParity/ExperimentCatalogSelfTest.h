@@ -4,6 +4,8 @@
 
 namespace RenderTest
 {
+    [[nodiscard]] bool RunExperimentCodeMaterialCodecSelfTest(std::string& outLog);
+
     [[nodiscard]] bool RunExperimentAssetSetManifestSelfTest(std::string& outLog);
 
     // `CookedAssetCatalog` 의 합성 검사. 손으로 만든 manifest 로 조회·폐포·

@@ -8,6 +8,11 @@
 #include <memory>
 #include <span>
 
+namespace AssetDepot
+{
+    struct MaterialProgramAssetOrigin;
+}
+
 class Texture;
 struct MaterialTextureOwner
 {
@@ -28,6 +33,8 @@ namespace LX::Runtime
         ShaderMetaBindingLayout layout;
         // Registry identity for authored Code inputs; graphics requests are LX-owned.
         ShaderMetaHandle codeHandle;
+        own::shared_owner<const experiment::cooked::CodeProgram> codeProgram{};
+        own::shared_owner<const AssetDepot::MaterialProgramAssetOrigin> assetOrigin{};
     };
 
     struct Instance
@@ -59,6 +66,8 @@ namespace LX::Runtime
         std::vector<MaterialTextureOwner> textureOwners;
         std::vector<std::uint16_t> keywordSelections;
     };
+
+    [[nodiscard]] bool ValidateShaderGeneration(const ShaderGeneration& shader, std::string& error);
 
     bool CreateCodeShader(const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
                           ShaderMetaHandle handle, own::shared_owner<const ShaderGeneration>& result,

@@ -1,8 +1,12 @@
 # CPU asset preparation and scene publication
 
-The editor Open Scene action queues `scene.open_async`. Its command result means
-`queued: true`, not scene completion or GPU readiness. Existing `scene.load` and
-`scene.switch` retain their synchronous command contracts.
+The editor Open Scene action, `scene.load`, `scene.switch` and `scene.open_async`
+queue CPU preparation and return `queued: true` plus a `requestId`. The load command
+leaves activation unchanged; switch/open request the existing frame-boundary
+activation. Query `scene.load.status <requestId>` for Pending, Ready, Failed,
+Cancelled, Stale or Superseded. Ready means scene construction completed, not GPU
+readiness or completed activation. The last 64 terminal value records are kept;
+expired IDs report an explicit unknown-request error and retain no scene owners.
 
 ## Preparation boundary
 
@@ -45,8 +49,14 @@ publication and does not attempt to preempt a compiler/decoder already running.
 
 The request index is weak, so it does not keep another permanent copy of resident
 model/graph owners. Superseded work remains drainable until its callbacks finish.
-Asset changes invalidate request epochs; CPU resource cache insertion validates
-its source epoch and is blocked across the cache invalidation boundary.
+Asset changes invalidate request epochs; mount/root changes advance the captured
+resolver revision. Every scene phase and final handoff validates both. Typed mesh,
+image and material requests use the captured catalog. A short construction guard
+blocks root publication using the existing admission mutex, while deserializers
+and callbacks run without a held mutex. Asset-change callbacks defer their event
+until the next drain. Candidate DDOL entities stay in the candidate scene, so a
+rejected construction cannot leave them in the active scene. Once Ready handoff
+succeeds, those actual scene owners remain valid through later mount changes.
 Shutdown drains accepted work before clearing catalogs and caches.
 
 Texture and Material runtime identities use one out-of-line atomic allocator.
@@ -67,10 +77,10 @@ their existing ownership and readiness contracts. Entity construction remains on
 the scene owner and may still take a long frame. A small shared worker pool can
 also delay other jobs while non-preemptible decoding/compilation is running.
 
-Player startup, explicit synchronous scene commands, watcher hot-reload
-acceptance, and Material Graph authoring apply/preview compilation remain
-synchronous entry points. This change does not claim zero game-thread stalls or
-move mixed RHI initialization onto arbitrary workers.
+Player startup and scene commands use nonblocking preparation. Explicit legacy
+C++ scene helpers, watcher hot-reload acceptance and Material Graph authoring
+apply/preview remain separate synchronous entry points. This does not claim zero
+game-thread stalls or move mixed RHI initialization onto arbitrary workers.
 
 ## Verification scope
 

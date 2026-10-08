@@ -5,10 +5,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <vector>
+
+class Texture;
 
 namespace experiment
 {
@@ -70,7 +73,16 @@ namespace experiment
         bool AddKeywordOverride(std::string_view keywordValue);
         bool ClearKeywordOverride(std::string_view keywordValue);
 
+        // Full axis-ordered selection override. Never flatten values to names:
+        // different axes may legally use the same OFF/ON names. This replaces
+        // base keyword names and earlier named overrides; later named edits
+        // still layer on top. Domain/range validation stays in the resolver.
+        void SetKeywordSelectionOverrides(std::span<const std::uint16_t> selections);
+        bool ClearKeywordSelectionOverrides();
+
         void ClearAllOverrides();
+        [[nodiscard]] bool BindPreparedTextureOwners(
+            std::span<const own::shared_owner<const Texture>> textures, std::string& outError);
 
         // base 위에 override를 겹친 **완전 소유 사본**. base는 변형하지 않는다.
         // base가 없으면 false다 — 빈 머테리얼을 지어내지 않는다.
@@ -81,6 +93,7 @@ namespace experiment
         own::shared_owner<const Material> base_{};
         std::vector<MaterialProperty> propertyOverrides_{};
         std::vector<std::string> keywordOverrides_{};
+        std::optional<std::vector<std::uint16_t>> keywordSelectionOverrides_{};
         std::uint64_t revision_{};
     };
 }

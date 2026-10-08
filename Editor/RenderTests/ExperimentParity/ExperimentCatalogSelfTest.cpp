@@ -240,6 +240,7 @@ namespace RenderTest
             "  합성 단정 %zu/%zu\n", check.passed, check.passed + check.failed);
         outLog += summary;
         check.Check(RunExperimentAssetSetManifestSelfTest(outLog), "CEMF v3 AssetSet schema contract");
+        check.Check(RunExperimentCodeMaterialCodecSelfTest(outLog), "source-free authored code material contract");
         return check.failed == 0u;
     }
 

@@ -188,6 +188,8 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         "CreatorEngine.AssetLink<CreatorEngine.ShaderMeta>" => FieldKind.AssetLink,
         "CreatorEngine.AssetLink<CreatorEngine.MaterialProgram>" => FieldKind.AssetLink,
         "CreatorEngine.AssetLink<CreatorEngine.Material>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.CodeMaterialProgram>" => FieldKind.AssetLink,
+        "CreatorEngine.AssetLink<CreatorEngine.AuthoredMaterial>" => FieldKind.AssetLink,
         _                          => FieldKind.Unsupported,
     };
 

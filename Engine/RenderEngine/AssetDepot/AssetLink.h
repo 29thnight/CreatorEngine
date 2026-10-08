@@ -26,6 +26,11 @@ namespace material_graph
     struct Generation;
 }
 
+namespace LX::Runtime
+{
+    struct ShaderGeneration;
+}
+
 namespace AssetDepot
 {
     // Register an engine type explicitly. Type identity is stable manifest data;
@@ -48,8 +53,8 @@ namespace AssetDepot
     template<>
     struct AssetTypeTraits<experiment::Material>
     {
-        // Authoring reference type only. It is not the Lattice ::Material
-        // runtime view; DataSystem does not advertise an acquire overload.
+        // Authored Material representation only; same kind is not proof that
+        // another representation can be decoded into this concrete type.
         static constexpr auto kKind = experiment::cooked::CookedAssetKind::Material;
     };
 
@@ -61,6 +66,12 @@ namespace AssetDepot
 
     template<>
     struct AssetTypeTraits<material_graph::Generation>
+    {
+        static constexpr auto kKind = experiment::cooked::CookedAssetKind::MaterialProgram;
+    };
+
+    template<>
+    struct AssetTypeTraits<LX::Runtime::ShaderGeneration>
     {
         static constexpr auto kKind = experiment::cooked::CookedAssetKind::MaterialProgram;
     };

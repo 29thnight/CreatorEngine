@@ -11,7 +11,14 @@
 class Entity;
 class Texture;
 class DataSystem;
-namespace material_graph { struct Generation; }
+namespace material_graph
+{
+    struct Generation;
+}
+namespace LX::Runtime
+{
+    struct ShaderGeneration;
+}
 
 // Closed concrete-type registration for this ABI adapter, not manifest kinds.
 // Several native types share a manifest kind (for example ::Material and
@@ -26,6 +33,8 @@ template<> inline constexpr std::uint32_t kScriptAssetConcreteType<assets::Model
 template<> inline constexpr std::uint32_t kScriptAssetConcreteType<ShaderMeta> = 0x00010005u;
 template<> inline constexpr std::uint32_t kScriptAssetConcreteType<material_graph::Generation> = 0x00010006u;
 template<> inline constexpr std::uint32_t kScriptAssetConcreteType<::Material> = 0x00010007u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<LX::Runtime::ShaderGeneration> = 0x00010008u;
+template<> inline constexpr std::uint32_t kScriptAssetConcreteType<experiment::Material> = 0x00010009u;
 inline constexpr std::uint32_t kScriptAssetRequestBit = 0x80000000u;
 
 // 관리 코드에 넘기는 객체 핸들.
@@ -168,6 +177,9 @@ public:
     void EndAssetSession();
     ScriptAssetResult RequestAsset(const ScriptAssetLink& link, const ScriptTextureAssetVariant& variant,
         bool residentOnly, ScriptAssetToken& token);
+    // ABI v35 selects the concrete runtime view separately from stable link data.
+    ScriptAssetResult RequestAssetTyped(const ScriptAssetLink& link, std::uint32_t concreteType,
+        const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token);
     ScriptAssetResult SnapshotAssetRequest(ScriptAssetToken token, ScriptAssetRequestSnapshot& snapshot,
         char* message, int capacity);
     ScriptAssetResult AcquireAssetResult(ScriptAssetToken request, ScriptAssetToken& owner);
@@ -196,7 +208,11 @@ private:
         AssetDepot::AssetRequest<assets::ModelAnimationPayload>,
         AssetDepot::AssetRequest<ShaderMeta>,
         AssetDepot::AssetRequest<material_graph::Generation>,
-        AssetDepot::AssetRequest<::Material>>;
+        AssetDepot::AssetRequest<::Material>,
+        own::shared_owner<const LX::Runtime::ShaderGeneration>,
+        own::shared_owner<const experiment::Material>,
+        AssetDepot::AssetRequest<LX::Runtime::ShaderGeneration>,
+        AssetDepot::AssetRequest<experiment::Material>>;
 
     struct AssetSlot
     {

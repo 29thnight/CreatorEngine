@@ -74,7 +74,7 @@ namespace
         {
             return;
         }
-        consumer->status = status;
+        consumer->SetTerminalLocked(status);
         consumer->error = error;
         consumer->asset = asset;
         try
@@ -728,12 +728,11 @@ own::shared_owner<const T> DataSystem::TryAcquireCurrentModelAsset(AssetDepot::A
 template<class T>
 AssetDepot::AssetRequest<T> DataSystem::RequestCurrentModelAssetAsync(AssetDepot::AssetLink<T> link)
 {
-    auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>();
-    AssetDepot::AssetRequest<T> failed(consumer);
     const auto fail = [&](Status status, Error error, const std::string& message)
     {
+        auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>(m_assetRequestCounters);
         NotifyModelConsumer(consumer, status, error, message);
-        return failed;
+        return AssetDepot::AssetRequest<T>(std::move(consumer));
     };
     if (!link.IsValid())
     {
@@ -759,12 +758,11 @@ template<class T>
 AssetDepot::AssetRequest<T> DataSystem::RequestModelAssetFromSnapshot(AssetDepot::AssetLink<T> link,
     own::shared_owner<const model_cooked::CookedAssetCatalog> catalog, std::uint64_t epoch)
 {
-    auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>();
-    AssetDepot::AssetRequest<T> failed(consumer);
     const auto fail = [&](Status status, Error error, const std::string& message)
     {
+        auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>(m_assetRequestCounters);
         NotifyModelConsumer(consumer, status, error, message);
-        return failed;
+        return AssetDepot::AssetRequest<T>(std::move(consumer));
     };
     if (!link.IsValid())
     {
@@ -820,7 +818,7 @@ AssetDepot::AssetRequest<T> DataSystem::RequestResolvedModelAssetAsync(
     own::shared_owner<const model_cooked::CookedAssetCatalog> catalog,
     bool exactGeneration, std::uint64_t epoch, model_cooked::ResolvedAssetEntry skeleton)
 {
-    auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>();
+    auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>(m_assetRequestCounters);
     AssetDepot::AssetRequest<T> request(consumer);
     std::lock_guard lock(m_assetPreparationMutex);
     const auto fail = [&](Status status, Error error)
@@ -897,7 +895,7 @@ AssetDepot::AssetRequest<assets::ModelGeometryPayload> DataSystem::RequestModelC
     assets::ModelColliderPreparationPolicy colliderPolicy)
 {
     using Payload = assets::ModelGeometryPayload;
-    auto consumer = own::make_shared<AssetDepot::AssetRequestState<Payload>>();
+    auto consumer = own::make_shared<AssetDepot::AssetRequestState<Payload>>(m_assetRequestCounters);
     AssetDepot::AssetRequest<Payload> request(consumer);
     own::shared_owner<AssetDepot::ModelAssetWork<Payload>> work;
     const auto knownRoot = descriptor.Snapshot();
@@ -1448,7 +1446,7 @@ AssetDepot::AssetRequest<assets::ModelGeometryPayload> DataSystem::RequestAsync(
             || descriptor->requiredBoneCount != descriptor->skeleton->skeleton.bones.size()
             || descriptor->requiredSkinBindingSha256 != descriptor->skeleton->skinBindingSha256)))
     {
-        auto consumer = own::make_shared<AssetDepot::AssetRequestState<assets::ModelGeometryPayload>>();
+        auto consumer = own::make_shared<AssetDepot::AssetRequestState<assets::ModelGeometryPayload>>(m_assetRequestCounters);
         NotifyModelConsumer(consumer, Status::Failed, Error::InvalidLink, "Invalid exact mesh descriptor.");
         return AssetDepot::AssetRequest<assets::ModelGeometryPayload>(std::move(consumer));
     }
@@ -1473,7 +1471,7 @@ own::shared_owner<const assets::ModelGeometryPayload> DataSystem::TryAcquire(
 AssetDepot::AssetRequest<assets::ModelMeshDescriptor> DataSystem::RequestAsync(
     own::shared_owner<const assets::ModelAnimationDescriptor> descriptor, std::size_t meshIndex)
 {
-    auto consumer = own::make_shared<AssetDepot::AssetRequestState<assets::ModelMeshDescriptor>>();
+    auto consumer = own::make_shared<AssetDepot::AssetRequestState<assets::ModelMeshDescriptor>>(m_assetRequestCounters);
     AssetDepot::AssetRequest<assets::ModelMeshDescriptor> request(consumer);
     if (!descriptor || meshIndex >= descriptor->meshes.size() || meshIndex >= descriptor->summary.meshes.size())
     {

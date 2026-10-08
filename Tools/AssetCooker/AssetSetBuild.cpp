@@ -48,7 +48,9 @@ namespace AssetCooking
         constexpr std::string_view kShaderMetaImporterVersion = "shadermeta-source-document-v1";
         constexpr std::string_view kMaterialImporterVersion = "lattice-material-source-document-v1";
         constexpr std::string_view kMaterialProgramImporterVersion = "lattice-source-verified-program-v1";
-        constexpr std::string_view kBuildVersion = "asset-set-build-v3";
+        constexpr std::string_view kAuthoredMaterialImporterVersion = "authored-material-source-document-v1";
+        constexpr std::string_view kCodeProgramImporterVersion = "code-source-verified-program-v1";
+        constexpr std::string_view kBuildVersion = "asset-set-build-v4";
         constexpr std::uint32_t kTextureSourceImage = 1u;
 
         struct AssetSource final
@@ -56,6 +58,7 @@ namespace AssetCooking
             ck::TypedAssetReference asset{};
             std::string source{};
             std::string verifiedProgram{};
+            experiment::AssetId codeProgram{};
             std::vector<ck::AssetDependency> dependencies{};
         };
 
@@ -468,7 +471,7 @@ namespace AssetCooking
             std::size_t edgeCount{};
             for (const auto node : sources)
             {
-                RequireMap(node, { "assetId", "kind", "source", "verifiedProgram", "dependencies" }, "asset source");
+                RequireMap(node, { "assetId", "kind", "source", "verifiedProgram", "codeProgram", "dependencies" }, "asset source");
                 AssetSource source;
                 source.asset = Reference(node);
                 source.source = Text(node, "source");
@@ -476,7 +479,20 @@ namespace AssetCooking
                 {
                     Fail("Asset source must be normalized relative to Assets: " + source.source);
                 }
-                if (source.asset.kind == ck::CookedAssetKind::MaterialProgram)
+                if (node["codeProgram"])
+                {
+                    if (source.asset.kind != ck::CookedAssetKind::Material || !node["codeProgram"].IsScalar() ||
+                        (!experiment::TryParseCanonicalAssetId(node["codeProgram"].Scalar(), source.codeProgram) &&
+                            !assets::TryParseCanonicalUuidV8(node["codeProgram"].Scalar(), source.codeProgram.value)))
+                    {
+                        Fail("codeProgram requires a Material source and explicit canonical program UUIDv4/v8");
+                    }
+                }
+                if (source.codeProgram.IsValid() && assets::IsUuidV8(source.asset.key.assetId.value))
+                {
+                    Fail("Standalone authored Code Material sources require UUIDv4; model UUIDv8 materials use their model recipe.");
+                }
+                if (source.asset.kind == ck::CookedAssetKind::MaterialProgram || source.codeProgram.IsValid())
                 {
                     source.verifiedProgram = Text(node, "verifiedProgram");
                     if (!RelativePath(source.verifiedProgram))
@@ -486,7 +502,7 @@ namespace AssetCooking
                 }
                 else if (node["verifiedProgram"])
                 {
-                    Fail("verifiedProgram is only valid for MaterialProgram sources: " + source.source);
+                    Fail("verifiedProgram requires MaterialProgram or authored Material with codeProgram: " + source.source);
                 }
                 const auto dependencies = node["dependencies"];
                 if (!dependencies.IsSequence())
@@ -682,7 +698,8 @@ namespace AssetCooking
         }
 
         void ValidatePayload(std::span<const std::byte> bytes, const ck::TypedAssetReference& asset,
-            std::span<const ck::AssetDependency> dependencies, const std::string& extension)
+            std::span<const ck::AssetDependency> dependencies, const std::string& extension,
+            std::uint32_t representation, std::uint32_t schema)
         {
             std::string failure;
             bool valid{};
@@ -700,16 +717,30 @@ namespace AssetCooking
             }
             case ck::CookedAssetKind::Material:
             {
-                material_graph::InstanceDocument value;
-                valid = extension == ".asset" &&
-                    ck::ReadMaterialAssetSetDocument(bytes, asset, dependencies, value, failure);
+                if (representation == ck::kAuthoredMaterialRepresentation && schema == ck::kAuthoredMaterialVersion)
+                {
+                    ck::AuthoredMaterialDocument value;
+                    valid = extension == ".asset" && ck::ReadAuthoredMaterialArtifact(bytes, asset, dependencies, value, failure);
+                }
+                else if (representation == ck::kMaterialDocumentRepresentation && schema == ck::kMaterialArtifactVersion)
+                {
+                    material_graph::InstanceDocument value;
+                    valid = extension == ".asset" && ck::ReadMaterialAssetSetDocument(bytes, asset, dependencies, value, failure);
+                }
                 break;
             }
             case ck::CookedAssetKind::MaterialProgram:
             {
-                material_graph::CookedProgram value;
-                valid = extension == ".lxmaterial" &&
-                    ck::ReadMaterialProgramAssetSetArtifact(bytes, asset, dependencies, {}, value, failure);
+                if (representation == ck::kCodeProgramRepresentation && schema == ck::kCodeProgramVersion)
+                {
+                    ck::CodeProgram value;
+                    valid = extension == ".cecp" && ck::ReadCodeProgramArtifact(bytes, asset, dependencies, value, failure);
+                }
+                else if (representation == ck::kMaterialProgramRepresentation && schema == ck::kMaterialProgramArtifactVersion)
+                {
+                    material_graph::CookedProgram value;
+                    valid = extension == ".lxmaterial" && ck::ReadMaterialProgramAssetSetArtifact(bytes, asset, dependencies, {}, value, failure);
+                }
                 break;
             }
             case ck::CookedAssetKind::Model:
@@ -753,14 +784,15 @@ namespace AssetCooking
 
         void VerifyBytes(const std::filesystem::path& path, std::uint64_t size,
             const std::string& digest, const ck::TypedAssetReference& asset,
-            std::span<const ck::AssetDependency> dependencies, const std::string& extension)
+            std::span<const ck::AssetDependency> dependencies, const std::string& extension,
+            std::uint32_t representation, std::uint32_t schema)
         {
             const auto bytes = Read(path);
             if (bytes.size() != size || Hash(bytes) != digest)
             {
                 Fail("Immutable AssetSet blob hash/size mismatch: " + path.string());
             }
-            ValidatePayload(bytes, asset, dependencies, extension);
+            ValidatePayload(bytes, asset, dependencies, extension, representation, schema);
         }
 
         void WriteNew(const std::filesystem::path& path, std::span<const std::byte> bytes)
@@ -935,10 +967,25 @@ namespace AssetCooking
                 value.representation = ck::kShaderMetaDocumentRepresentation; value.schema = ck::kShaderMetaDocumentVersion;
                 value.extension = ".shadermeta"; break;
             case ck::CookedAssetKind::Material:
-                if (!model) value.importer = kMaterialImporterVersion;
+                if (source.codeProgram.IsValid())
+                {
+                    value.importer = kAuthoredMaterialImporterVersion;
+                    value.representation = ck::kAuthoredMaterialRepresentation; value.schema = ck::kAuthoredMaterialVersion;
+                    value.extension = ".asset"; break;
+                }
+                if (!model)
+                {
+                    value.importer = kMaterialImporterVersion;
+                }
                 value.representation = ck::kMaterialDocumentRepresentation; value.schema = ck::kMaterialArtifactVersion;
                 value.extension = ".asset"; break;
             case ck::CookedAssetKind::MaterialProgram:
+                if (std::filesystem::u8path(source.source).extension() == ".codeprogram")
+                {
+                    value.importer = kCodeProgramImporterVersion;
+                    value.representation = ck::kCodeProgramRepresentation; value.schema = ck::kCodeProgramVersion;
+                    value.extension = ".cecp"; break;
+                }
                 value.importer = kMaterialProgramImporterVersion;
                 value.representation = ck::kMaterialProgramRepresentation; value.schema = ck::kMaterialProgramArtifactVersion;
                 value.extension = ".lxmaterial"; break;
@@ -996,6 +1043,7 @@ namespace AssetCooking
                 ReceiptNumber(bytes, static_cast<unsigned>(selection.kind));
                 ReceiptText(bytes, source.source);
                 ReceiptText(bytes, source.verifiedProgram);
+                ReceiptText(bytes, source.codeProgram.IsValid() ? FileGuid{ source.codeProgram.value }.ToString() : "");
                 ReceiptText(bytes, expected.importer);
                 ReceiptNumber(bytes, expected.representation);
                 ReceiptNumber(bytes, expected.schema);
@@ -1117,7 +1165,7 @@ namespace AssetCooking
                             value.bytes = Read(blob);
                             if (value.bytes.size() != size || Hash(value.bytes) != digest)
                                 Fail("Import receipt CAS blob hash/size mismatch: " + blob.string());
-                            ValidatePayload(value.bytes, authored.asset, authored.dependencies, value.extension);
+                            ValidatePayload(value.bytes, authored.asset, authored.dependencies, value.extension, value.representation, value.schema);
                             restored.emplace(selection.key, std::move(value));
                         }
                     }
@@ -1301,9 +1349,10 @@ namespace AssetCooking
             const std::filesystem::path& assetRoot, InputCapture& capture)
         {
             const bool program = authored.asset.kind == ck::CookedAssetKind::MaterialProgram;
+            const bool codeProgram = program && std::filesystem::u8path(authored.source).extension() == ".codeprogram";
             const auto source = Canonical(assetRoot / std::filesystem::u8path(authored.source));
             if (!ck::IsContainedPath(assetRoot, source) ||
-                source.extension() != (program ? ".shadergraph" : ".asset"))
+                source.extension() != (codeProgram ? ".codeprogram" : program ? ".shadergraph" : ".asset"))
             {
                 Fail("Material source has an unsupported extension or escapes Assets: " + authored.source);
             }
@@ -1314,7 +1363,7 @@ namespace AssetCooking
             std::filesystem::path verifiedPath;
             std::vector<std::byte> verifiedInput;
             ck::MaterialAssetSetCookResult cooked;
-            if (program)
+            if (program || authored.codeProgram.IsValid())
             {
                 verifiedPath = Canonical(assetRoot / std::filesystem::u8path(authored.verifiedProgram));
                 if (!ck::IsContainedPath(assetRoot, verifiedPath))
@@ -1322,12 +1371,42 @@ namespace AssetCooking
                     Fail("Verified program escapes Assets: " + authored.verifiedProgram);
                 }
                 verifiedInput = capture.Capture(verifiedPath, ck::kMaterialProgramAssetSetMaxBytes).bytes;
+            }
+            std::vector<ck::CodeProgramCapturedInput> codeInputs;
+            if (codeProgram || authored.codeProgram.IsValid())
+            {
+                ck::CodeProgram bundle;
+                std::vector<ck::AssetDependency> edges;
+                std::string failure;
+                if (!ck::ReadVerifiedCodeProgram(verifiedInput, bundle, edges, failure))
+                {
+                    Fail("Cannot read explicit verified code program: " + failure);
+                }
+                for (const auto& input : bundle.inputs)
+                {
+                    const auto path = Canonical(assetRoot / std::filesystem::u8path(input.path));
+                    if (!ck::IsContainedPath(assetRoot, path))
+                    {
+                        Fail("Code shader input escapes Assets: " + input.path);
+                    }
+                    const auto& captured = capture.Capture(path, 32u * 1024u * 1024u);
+                    ck::Sha256Digest digest;
+                    if (captured.bytes.size() != input.byteSize || !ck::ComputeSha256(captured.bytes, digest, failure) || digest != input.sha256)
+                    {
+                        Fail("Verified code shader input changed: " + input.path);
+                    }
+                    codeInputs.push_back({input.path, captured.bytes});
+                }
+            }
+            if (program)
+            {
                 cooked = ck::BuildMaterialProgramAssetSetProduct({ authored.asset.key.assetId,
-                    sourceInput, metaInput, verifiedInput, {} });
+                    sourceInput, metaInput, verifiedInput, {}, codeInputs });
             }
             else
             {
-                cooked = ck::BuildMaterialAssetSetProduct({ authored.asset.key.assetId, sourceInput, metaInput });
+                cooked = ck::BuildMaterialAssetSetProduct({ authored.asset.key.assetId, sourceInput, metaInput,
+                    authored.codeProgram, {}, verifiedInput, codeInputs });
             }
             if (!cooked.Succeeded())
             {
@@ -1340,7 +1419,7 @@ namespace AssetCooking
             }
             if (Read(source, ck::kMaterialGraphSourceMaxBytes) != sourceInput ||
                 Read(metaPath, ck::kMaterialAssetSetMetaMaxBytes) != metaInput ||
-                (program && Read(verifiedPath, ck::kMaterialProgramAssetSetMaxBytes) != verifiedInput))
+                (!verifiedInput.empty() && Read(verifiedPath, ck::kMaterialProgramAssetSetMaxBytes) != verifiedInput))
             {
                 Fail("Material source/meta/verified program changed during source cook: " + authored.source);
             }
@@ -1352,7 +1431,8 @@ namespace AssetCooking
             value.inputDigest = Hash("sourcePath=" + Hash(authored.source) + "\nverifiedPath=" +
                 Hash(authored.verifiedProgram) + "\ninputs=" +
                 Hash(std::as_bytes(std::span(cooked.sourceInputsSha256))) + "\n");
-            value.importer = program ? kMaterialProgramImporterVersion : kMaterialImporterVersion;
+            value.importer = codeProgram ? kCodeProgramImporterVersion : authored.codeProgram.IsValid() ?
+                kAuthoredMaterialImporterVersion : program ? kMaterialProgramImporterVersion : kMaterialImporterVersion;
             value.representation = product.representation;
             value.schema = product.schemaVersion;
             return value;
@@ -1605,6 +1685,53 @@ namespace AssetCooking
                         }
                     }
                 }
+                else if (authored.asset.kind == ck::CookedAssetKind::MaterialProgram &&
+                    result.at(identity).representation == ck::kCodeProgramRepresentation)
+                {
+                    ck::CodeProgram program;
+                    if (!ck::ReadCodeProgramArtifact(result.at(identity).bytes, authored.asset, authored.dependencies, program, failure))
+                    {
+                        Fail("Selected code program validation failed: " + failure);
+                    }
+                    const ck::AssetIdentity metaKey{program.shaderMetaAssetId, {}};
+                    if (IsExternalDependency(authored, {metaKey, ck::CookedAssetKind::ShaderMeta}))
+                    {
+                        continue;
+                    }
+                    const auto meta = result.find(metaKey);
+                    if (meta == result.end() || definition.sources.at(metaKey).asset.kind != ck::CookedAssetKind::ShaderMeta ||
+                        meta->second.representation != ck::kShaderMetaDocumentRepresentation ||
+                        meta->second.schema != ck::kShaderMetaDocumentVersion || meta->second.bytes != program.metadataBytes)
+                    {
+                        Fail("Selected code program metadata differs from its independently cooked ShaderMeta dependency");
+                    }
+                }
+                else if (authored.asset.kind == ck::CookedAssetKind::Material &&
+                    result.at(identity).representation == ck::kAuthoredMaterialRepresentation)
+                {
+                    ck::AuthoredMaterialDocument document;
+                    if (!ck::ReadAuthoredMaterialArtifact(result.at(identity).bytes, authored.asset,
+                        authored.dependencies, document, failure))
+                    {
+                        Fail("Selected authored material validation failed: " + failure);
+                    }
+                    const ck::AssetIdentity programKey{document.programAssetId, {}};
+                    if (IsExternalDependency(authored, {programKey, ck::CookedAssetKind::MaterialProgram}))
+                    {
+                        continue;
+                    }
+                    const auto selected = result.find(programKey);
+                    const auto programSource = definition.sources.find(programKey);
+                    ck::CodeProgram program;
+                    if (selected == result.end() || programSource == definition.sources.end() ||
+                        selected->second.representation != ck::kCodeProgramRepresentation || selected->second.schema != ck::kCodeProgramVersion ||
+                        !ck::ReadCodeProgramArtifact(selected->second.bytes, programSource->second.asset,
+                            programSource->second.dependencies, program, failure) ||
+                        !ck::ValidateAuthoredMaterialBinding(document, program, failure))
+                    {
+                        Fail("Selected authored Material/Code MaterialProgram binding failed: " + failure);
+                    }
+                }
                 else if (authored.asset.kind == ck::CookedAssetKind::Material)
                 {
                     material_graph::InstanceDocument document;
@@ -1739,16 +1866,16 @@ namespace AssetCooking
                 const bool cached = std::filesystem::exists(cachedBlob);
                 if (cached)
                 {
-                    VerifyBytes(cachedBlob, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension);
+                    VerifyBytes(cachedBlob, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension, product.representation, product.schema);
                 }
                 else
                 {
-                    ValidatePayload(product.bytes, authored.asset, authored.dependencies, product.extension);
+                    ValidatePayload(product.bytes, authored.asset, authored.dependencies, product.extension, product.representation, product.schema);
                     // Cache-local temporary storage keeps rename on the same
                     // volume, even when the requested output uses another drive.
                     const auto cacheTemporary = cacheWork / "payload.tmp";
                     WriteNew(cacheTemporary, product.bytes);
-                    VerifyBytes(cacheTemporary, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension);
+                    VerifyBytes(cacheTemporary, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension, product.representation, product.schema);
                     std::filesystem::create_directories(cachedBlob.parent_path());
                     NoReparse(cachedBlob);
                     std::filesystem::rename(cacheTemporary, cachedBlob);
@@ -1782,7 +1909,7 @@ namespace AssetCooking
                     std::filesystem::create_directories(outputBlob.parent_path());
                     // Output owns independent immutable files, so cache GC cannot break a release.
                     std::filesystem::copy_file(cachedBlob, outputBlob);
-                    VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension);
+                    VerifyBytes(outputBlob, product.bytes.size(), digest, authored.asset, authored.dependencies, product.extension, product.representation, product.schema);
                     if (cached)
                     {
                         ++result.reusedBlobs;

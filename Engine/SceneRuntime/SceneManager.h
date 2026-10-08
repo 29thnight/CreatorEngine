@@ -13,6 +13,8 @@
 #include "ScenePhase.h"
 #include "SimulationSessionPolicy.h"
 #include "SoundSystem.h"
+#include <array>
+#include <cstdint>
 #include <future>
 #include <memory>
 #include <thread>
@@ -102,6 +104,23 @@ public:
     // future is only a result channel: do not block the owner with get() before pumping.
     // SceneManager owns successful results, including an abandoned future. Failure or
     // cancellation yields nullptr. Callback requests replace earlier pending callbacks.
+    enum class SceneLoadRequestState : std::uint8_t
+    {
+        Unknown, Pending, Ready, Failed, Cancelled, Stale, Superseded,
+    };
+    struct SceneLoadRequestStatus final
+    {
+        std::uint64_t id{};
+        SceneLoadRequestState state{ SceneLoadRequestState::Unknown };
+        std::string path;
+        std::string message;
+        bool activationRequested{};
+    };
+    // Owner-thread admission/query only. Ready means Scene construction has
+    // completed; requested activation still commits at the existing frame boundary.
+    // The last 64 terminal value records are retained, with no resource/Scene pins.
+    [[nodiscard]] std::uint64_t QueueSceneLoad(std::string_view path, bool activate);
+    [[nodiscard]] SceneLoadRequestStatus QuerySceneLoad(std::uint64_t requestId) const;
 	std::future<Scene*> LoadSceneAsync(std::string_view name = "SampleScene");
     void LoadSceneAsyncAndWaitCallback(std::string_view name = "SampleScene");
     void ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete = true);
@@ -223,14 +242,18 @@ private:
     SoundSystem::AssetResolver m_audioResolver;
     wave::PlaybackScope m_audioSession;
     struct PendingSceneLoad;
-    std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate);
+    std::future<Scene*> BeginSceneLoad(std::string_view path, bool autoActivate,
+        std::uint64_t* requestId = nullptr);
+    void RecordSceneLoadResult(PendingSceneLoad& load, SceneLoadRequestState state, std::string message = {});
     void CompleteSceneLoads(bool wait);
     Scene* BuildPreparedScene(const PendingSceneLoad& load);
     bool PreparePhysicsSceneExit(Scene* scene);
     bool ResumePhysicsAfterSceneActivation();
     void RequireSceneLoadOwner() const;
     std::thread::id m_sceneLoadOwner{std::this_thread::get_id()};
-    std::vector<std::shared_ptr<PendingSceneLoad>> m_pendingSceneLoads;
+    std::vector<own::shared_owner<PendingSceneLoad>> m_pendingSceneLoads;
+    std::array<SceneLoadRequestStatus, 64u> m_completedSceneLoads{};
+    std::uint64_t m_nextSceneLoadRequestId{ 1u };
     std::atomic_size_t m_pendingSceneLoadCount{0};
     size_t m_sceneLoadEpoch = 0;
     Scene* m_asyncSceneToActivate = nullptr;

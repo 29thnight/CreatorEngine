@@ -78,6 +78,8 @@ namespace
         const auto& identity = source.shader.compile;
         const auto& indexed = source.pipeline.GetDesc();
         return source.pipeline.IsValid() && identity.visibleInstanceIds && !identity.referencePath
+            && identity.sealedProgramIdentity.empty()
+            && !(source.shader.shader && source.shader.shader->codeProgram)
             && identity.geometryVisibility == ShaderGeometryVisibility::IndexedInstanceV1
             && assets::IsSupportedModelVertexLayout(identity.vertexAttributeMask)
             && std::filesystem::path(identity.source).lexically_normal() == std::filesystem::path(kGBufferShaderFile)
@@ -1307,7 +1309,8 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     const RHIShaderPermutation& permutation, uint32_t experimentMask,
     RHIGraphicsPipelineDesc& outDesc,
     RHIShaderBlob& outVs, RHIShaderBlob& outPs, std::string& outError,
-    LX::Runtime::CompiledGraphics* compiled, ShaderGeometryVisibility visibilityContract)
+    LX::Runtime::CompiledGraphics* compiled, ShaderGeometryVisibility visibilityContract,
+    const LX::Runtime::CompiledGraphics* prepared)
 {
     // I5-D34a/b: experiment 짝은 호출자의 퍼뮤테이션 위에 레이아웃 매크로를
     // 얹는다. 키워드 축과 독립인 별도 축이라 여기서 합성한다 — 호출자마다
@@ -1326,8 +1329,23 @@ bool EnhancedGBufferPass::BuildPipelineDesc(const EnhancedFrameContext& context,
     }
 
     LX::Runtime::CompiledGraphics verified;
-    if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
-            *effectivePermutation, {}, verified, outError)) return false;
+    if (prepared)
+    {
+        if (prepared->identity.backend != RHIShaderCompiler::GetOutput()
+            || prepared->identity.vertexEntry != vertexEntry || prepared->identity.pixelEntry != pixelEntry
+            || prepared->identity.permutation.Entries() != effectivePermutation->Entries()
+            || prepared->identity.sealedProgramIdentity.empty())
+        {
+            outError = "Prepared code graphics does not match the exact pipeline request.";
+            return false;
+        }
+        verified = *prepared;
+    }
+    else if (!LX::Runtime::CompileGraphics(shaderFile, vertexEntry, pixelEntry,
+        *effectivePermutation, {}, verified, outError))
+    {
+        return false;
+    }
     verified.identity.vertexAttributeMask = experimentMask;
     outVs = std::move(verified.vertex.bytecode);
     outPs = std::move(verified.pixel.bytecode);
@@ -1535,7 +1553,7 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
     }
 
     std::filesystem::path shaderPath = meta.source;
-    if (!meta.originPath.empty())
+    if (!meta.codeProgram && !meta.originPath.empty())
     {
         std::error_code pathError;
         shaderPath = std::filesystem::relative(meta.ResolveSource(meta.originPath),
@@ -1556,10 +1574,21 @@ bool EnhancedGBufferPass::BuildShaderMetaPipelineDesc(
         return false;
     }
 
+    if (meta.assetOrigin && !meta.codeProgram)
+    {
+        outError = "Mounted ShaderMeta descriptor has no prepared code program.";
+        return false;
+    }
+    LX::Runtime::CompiledGraphics prepared;
+    if (meta.codeProgram && !LX::Runtime::RestoreCodeGraphics(meta, passIndex, keywordSelections,
+        experimentMask, false, prepared, outError))
+    {
+        return false;
+    }
     LX::Runtime::CompiledGraphics compiled;
     if (!BuildPipelineDesc(context, shaderFile.c_str(), pass.vertex->entry.c_str(),
             pass.pixel->entry.c_str(), &pass.state, permutation.defines,
-            experimentMask, outDesc, outVs, outPs, outError, &compiled, pass.geometryVisibility))
+            experimentMask, outDesc, outVs, outPs, outError, &compiled, pass.geometryVisibility, meta.codeProgram ? &prepared : nullptr))
     {
         return false;
     }

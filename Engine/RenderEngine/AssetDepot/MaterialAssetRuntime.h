@@ -9,6 +9,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -28,6 +29,10 @@ namespace AssetDepot
     struct ShaderMetaAssetOrigin final
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
+        // Present only on accepted code-program metadata snapshots. The
+        // descriptor identity stays separate; this pins compiled blob backing.
+        std::optional<experiment::cooked::ResolvedAssetEntry> codeProgramSource{};
+        std::vector<own::shared_owner<const Texture>> codeProgramTextures{};
     };
 
     struct ShaderMetaAssetWork final
@@ -81,11 +86,15 @@ namespace AssetDepot
         // Calculated from the actual immutable Texture pins before publication.
         // Shared representations can be overcharged, never hidden as pointers.
         std::size_t defaultTextureChargeBytes{};
+        // The code program owns the exact independently decoded descriptor.
+        own::shared_owner<const ShaderMeta> shaderMetadata{};
     };
 
     struct MaterialDocumentAssetOrigin final
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
+        own::shared_owner<const LX::Runtime::ShaderGeneration> codeProgram{};
+        std::vector<MaterialAssetTexturePin> textures{};
     };
 
     struct MaterialAssetTextureRequest final
@@ -103,6 +112,10 @@ namespace AssetDepot
         std::vector<MaterialAssetTextureRequest> textures{};
         // Empty for a Program leaf; a Material owns its exact Program request.
         AssetRequest<material_graph::Generation> program{};
+        AssetRequest<LX::Runtime::ShaderGeneration> codeProgram{};
+        AssetRequest<experiment::Material> authoredMaterial{};
+        // Captured typed metadata leaf, read only by the accepted CPU worker.
+        std::optional<experiment::cooked::ResolvedAssetEntry> shaderMetadata{};
         std::vector<own::weak_owner<AssetRequestState<T>>> consumers{};
         std::uint64_t epoch{};
         std::uint64_t requestId{};
@@ -146,12 +159,17 @@ namespace AssetDepot
         std::vector<own::shared_owner<AssetRequestState<ShaderMeta>>> shaderMetaConsumers{};
         MaterialPipelineAssetEntries<material_graph::Generation> programs{};
         MaterialPipelineAssetEntries<Material> materials{};
+        MaterialPipelineAssetEntries<LX::Runtime::ShaderGeneration> codePrograms{};
+        MaterialPipelineAssetEntries<experiment::Material> authoredMaterials{};
         std::vector<own::shared_owner<AssetRequestState<material_graph::Generation>>> programConsumers{};
         std::vector<own::shared_owner<AssetRequestState<Material>>> materialConsumers{};
+        std::vector<own::shared_owner<AssetRequestState<LX::Runtime::ShaderGeneration>>> codeProgramConsumers{};
+        std::vector<own::shared_owner<AssetRequestState<experiment::Material>>> authoredMaterialConsumers{};
     };
 
     struct ShaderMetaAssetCacheSnapshot final
     {
+        std::size_t inputStagingBytes{};
         std::size_t entries{};
         std::size_t retainedEntries{};
         std::size_t liveEntries{};
@@ -177,19 +195,26 @@ namespace AssetDepot
 
     struct MaterialAssetCacheSnapshot final
     {
+        std::size_t inputStagingBytes{};
         MaterialPipelineAssetCacheStatistics programs{};
         MaterialPipelineAssetCacheStatistics materials{};
+        MaterialPipelineAssetCacheStatistics codePrograms{};
+        MaterialPipelineAssetCacheStatistics authoredMaterials{};
         // Conservative reachable CPU capacity charges include hard owners;
         // shared dependencies can be charged more than once. No GPU/bulk bytes
         // are claimed reclaimed when a retained cache owner is released.
     };
 
     // Concrete typed value state in DataSystem, not another manager. This first
-    // material pipeline supports authored ShaderMeta, verified Programs, and
-    // Lattice Material documents. experiment::Material is not this runtime view.
+    // material pipeline supports metadata, graph and verified code Programs,
+    // Lattice facades and authored experiment::Material values.
     // All accesses use DataSystem's existing m_assetPreparationMutex.
     struct MaterialAssetRuntimeState final
     {
+        // Actual observed input vector capacity during accepted reads/decodes;
+        // independent of retained closure charges and shared payload residency.
+        std::atomic<std::size_t> shaderMetaInputStagingBytes{};
+        std::atomic<std::size_t> materialInputStagingBytes{};
         ShaderMetaAssetEntries shaderMetadata{};
         std::size_t shaderMetaBudgetBytes{ 4u * 1024u * 1024u };
         std::size_t shaderMetaRetainedChargeBytes{};
@@ -198,5 +223,7 @@ namespace AssetDepot
         std::uint64_t shaderMetaLogicalEvictions{};
         MaterialPipelineAssetCache<material_graph::Generation> programs{ {}, 0u, 128u * 1024u * 1024u };
         MaterialPipelineAssetCache<Material> materials{ {}, 0u, 32u * 1024u * 1024u };
+        MaterialPipelineAssetCache<LX::Runtime::ShaderGeneration> codePrograms{ {}, 0u, 128u * 1024u * 1024u };
+        MaterialPipelineAssetCache<experiment::Material> authoredMaterials{ {}, 0u, 32u * 1024u * 1024u };
     };
 }
