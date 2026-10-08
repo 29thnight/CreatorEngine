@@ -148,9 +148,11 @@ design. A foundation slice is not completion of the runtime migration.
   activation/play before opening its command service, and excludes preparation time
   from its first simulation delta. Legacy synchronous command callers still need
   cutover; no synchronous readiness guarantee is claimed for that bridge.
-- BuildAssetSet currently imports/converts before verified CAS reuse. Skipping unchanged
-  CPU imports still needs complete source/external/settings/tool/version receipt keys
-  and validation of every referenced schema/blob; blob reuse alone is not that optimization.
+- BuildAssetSet now checks immutable import receipts before invoking source producers.
+  A hit revalidates the complete captured file inventory, recipe/tool/target/schema
+  identity and every typed CAS product, then bypasses that importer/converter. Rejected
+  candidate captures do not contaminate later inputs. Reused-import and recooked-import
+  metrics are distinct from reused blobs; no warm-build timing has been measured.
 - Shared store guards protect mounted/retired roots, narrowed artifacts and pak
   archives. A held exclusive capability plus exact backing-incarnation revalidation
   is required for cooperative deletion/repack eligibility. No collector or destructive

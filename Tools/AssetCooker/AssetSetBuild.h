@@ -23,6 +23,10 @@ namespace AssetCooking
         std::size_t assets{};
         std::size_t blobs{};
         std::size_t reusedBlobs{};
+        // Source transactions, not CAS deduplication. A model selection group
+        // is one transaction; typed artifact readback still runs on a hit.
+        std::size_t reusedImports{};
+        std::size_t recookedImports{};
         std::string failure{};
     };
 

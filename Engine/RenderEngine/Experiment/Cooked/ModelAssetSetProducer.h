@@ -2,6 +2,7 @@
 
 #include "CookedModelSubAssetCodec.h"
 #include <filesystem>
+#include <functional>
 
 namespace experiment::cooked
 {
@@ -12,6 +13,11 @@ namespace experiment::cooked
         std::filesystem::path identityHeaderPath{};
         // Already-authored global UUIDv8 model/subasset identities. No ordinals.
         std::vector<TypedAssetReference> selected{};
+        // Optional build-local stable capture. Every source, sidecar, epoch and
+        // importer dependency goes through this reader. No filesystem fallback
+        // is allowed after a supplied reader fails.
+        std::function<bool(const std::filesystem::path&, std::vector<std::byte>&,
+            std::string&)> captureSource{};
     };
 
     struct ModelAssetSetProduct final

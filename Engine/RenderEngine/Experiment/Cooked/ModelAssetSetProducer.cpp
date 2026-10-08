@@ -79,6 +79,7 @@ namespace experiment::cooked
             std::filesystem::path root{};
             std::map<std::filesystem::path, im::ImportSourceBytes> files{};
             std::uint64_t totalBytes{};
+            const ModelAssetSetCookRequest* request{};
 
             im::ImportSourceBytes Capture(const std::filesystem::path& path, bool external = true)
             {
@@ -90,7 +91,19 @@ namespace experiment::cooked
                     return found->second;
                 }
                 RequireSource(files.size() < kMaxSourceFiles, "Too many external model source inputs");
-                auto bytes = SourceRead(canonical);
+                std::vector<std::byte> bytes;
+                if (request != nullptr && request->captureSource)
+                {
+                    std::string failure;
+                    const bool captured = request->captureSource(canonical, bytes, failure);
+                    RequireSource(captured,
+                        "Cannot capture model source input: " + canonical.string() + ": " + failure);
+                    RequireSource(bytes.size() <= kMaxInputBytes, "Oversized captured model input");
+                }
+                else
+                {
+                    bytes = SourceRead(canonical);
+                }
                 RequireSource(bytes.size() <= kMaxTotalInputBytes - totalBytes, "Total model source byte budget exceeded");
                 totalBytes += bytes.size();
                 im::ImportSourceBytes owned = own::make_shared<std::vector<std::byte>>(std::move(bytes));
@@ -154,6 +167,7 @@ namespace experiment::cooked
             RequireSource(!request.selected.empty() && request.selected.size() <= 65536u,
                 "Model source cook requires a bounded, explicit nonempty selection");
             SourceSnapshot snapshot;
+            snapshot.request = &request;
             snapshot.root = SourceCanonical(request.assetRoot);
             const auto source = SourceCanonical(request.sourcePath);
             const auto input = snapshot.Capture(source);
