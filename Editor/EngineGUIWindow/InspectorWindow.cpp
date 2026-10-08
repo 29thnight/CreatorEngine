@@ -848,6 +848,26 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 			}
 			break;
 		}
+        case ClrHost::ScriptFieldType::AssetLink:
+        {
+            std::string value = clr.GetFieldString(instanceId, i);
+            if (ImGui::InputText("##Value", &value, ImGuiInputTextFlags_EnterReturnsTrue))
+            {
+                if (clr.SetFieldAssetLink(instanceId, i, value))
+                {
+                    script->CaptureFields();
+                }
+                else
+                {
+                    Debug::PrintLog(spdlog::level::warn, "[ScriptCore] Invalid AssetLink; expected 1:3:<asset UUID>:<subasset UUID>.");
+                }
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::SetTooltip("Texture link: 1:3:<asset UUID>:<subasset UUID>. Press Enter to apply. Nil/nil clears the link.");
+            }
+            break;
+        }
 		case ClrHost::ScriptFieldType::String:
 		{
 			std::string value = clr.GetFieldString(instanceId, i);

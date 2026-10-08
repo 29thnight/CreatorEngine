@@ -29,6 +29,7 @@
 #include "MeshRenderer.h"
 #include "LightComponent.h"
 #include "../RenderEngine/Material.h"
+#include "../RenderEngine/DataSystem.h"
 #include "InputManager.h"
 
 #include <nethost.h>
@@ -378,10 +379,132 @@ namespace
         int (__stdcall* Audio_LastError)(char* buffer, int capacity);
         int (__stdcall* Audio_Configure)(std::uint32_t id, int cap, int policy, int group);
         int (__stdcall* Audio_SetReverbPreset)(int preset);
+        // Append-only v34 AssetDepot ABI. All ownership stays in this module.
+        int (__stdcall* Asset_Request)(const ScriptAssetLink* link, const ScriptTextureAssetVariant* variant, int residentOnly, ScriptAssetToken* token);
+        int (__stdcall* Asset_Snapshot)(ScriptAssetToken token, ScriptAssetRequestSnapshot* snapshot, char* message, int capacity);
+        int (__stdcall* Asset_AcquireResult)(ScriptAssetToken request, ScriptAssetToken* owner);
+        int (__stdcall* Asset_Cancel)(ScriptAssetToken request);
+        int (__stdcall* Asset_Release)(ScriptAssetToken token);
+        int (__stdcall* Asset_ReadTexture)(ScriptAssetToken token, ScriptTextureDescriptor* descriptor);
+        int (__stdcall* Asset_ListRoots)(std::uint64_t mount, std::uint32_t kind, ScriptAssetLink* links, int capacity, int* count);
+
 
 	};
 
 	ScriptApiTable g_apiTable{};
+
+    // These adapters catch all C++ exceptions before returning to managed code.
+    int __stdcall Api_Asset_Request(const ScriptAssetLink* link, const ScriptTextureAssetVariant* variant,
+        int residentOnly, ScriptAssetToken* token)
+    {
+        if (token != nullptr)
+        {
+            *token = {};
+        }
+        if (link == nullptr || variant == nullptr || token == nullptr || (residentOnly != 0 && residentOnly != 1))
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().RequestAsset(*link, *variant, residentOnly != 0, *token));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_Snapshot(ScriptAssetToken token, ScriptAssetRequestSnapshot* snapshot, char* message, int capacity)
+    {
+        if (snapshot == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().SnapshotAssetRequest(token, *snapshot, message, capacity));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_AcquireResult(ScriptAssetToken request, ScriptAssetToken* owner)
+    {
+        if (owner == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        *owner = {};
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().AcquireAssetResult(request, *owner));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_Cancel(ScriptAssetToken request)
+    {
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().CancelAssetRequest(request));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_Release(ScriptAssetToken token)
+    {
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().ReleaseAsset(token));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_ReadTexture(ScriptAssetToken token, ScriptTextureDescriptor* descriptor)
+    {
+        if (descriptor == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().ReadTexture(token, *descriptor));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+    int __stdcall Api_Asset_ListRoots(std::uint64_t mount, std::uint32_t kind, ScriptAssetLink* links, int capacity, int* count)
+    {
+        if (count == nullptr)
+        {
+            return static_cast<int>(ScriptAssetResult::InvalidArgument);
+        }
+        try
+        {
+            return static_cast<int>(ScriptObjectRegistry::Get().ListAssetRoots(mount, kind, links, capacity, *count));
+        }
+        catch (...)
+        {
+            return static_cast<int>(ScriptAssetResult::InternalError);
+        }
+    }
+
+
 
 	std::uint32_t __stdcall Api_Profiler_Register(const char* name)
 	{
@@ -2866,6 +2989,13 @@ namespace
         g_apiTable.Audio_LastError = &Api_Audio_LastError;
         g_apiTable.Audio_Configure = &Api_Audio_Configure;
         g_apiTable.Audio_SetReverbPreset = &Api_Audio_SetReverbPreset;
+        g_apiTable.Asset_Request = &Api_Asset_Request;
+        g_apiTable.Asset_Snapshot = &Api_Asset_Snapshot;
+        g_apiTable.Asset_AcquireResult = &Api_Asset_AcquireResult;
+        g_apiTable.Asset_Cancel = &Api_Asset_Cancel;
+        g_apiTable.Asset_Release = &Api_Asset_Release;
+        g_apiTable.Asset_ReadTexture = &Api_Asset_ReadTexture;
+        g_apiTable.Asset_ListRoots = &Api_Asset_ListRoots;
 
 	}
 
@@ -3065,9 +3195,11 @@ bool ClrHost::Initialize()
 	if (!BindEntryPoints(assemblyPath)) return false;
 
 	FillApiTable();
+    ScriptObjectRegistry::Get().BeginAssetSession(DataSystem::GetIfAlive());
 	const int initResult = m_fnInitialize(&g_apiTable);
 	if (0 != initResult)
 	{
+        ScriptObjectRegistry::Get().EndAssetSession();
 		char buffer[256]{};
 		std::snprintf(buffer, sizeof(buffer),
 			"[CLR] 관리 초기화 실패 (result=%d) — API 표 버전이 어긋났을 수 있습니다", initResult);
@@ -3211,9 +3343,14 @@ ClrHost::InvokeResult ClrHost::InvokeCallableStatic(const std::string& typeName,
 
 void ClrHost::Shutdown()
 {
-	if (!m_ready) return;
+    if (!m_ready)
+    {
+        ScriptObjectRegistry::Get().EndAssetSession();
+        return;
+    }
 
 	if (nullptr != m_fnShutdown) m_fnShutdown();
+    ScriptObjectRegistry::Get().EndAssetSession();
 
 	m_ready = false;
 	ScriptObjectRegistry::Get().Clear();
@@ -3636,6 +3773,22 @@ std::string ClrHost::GetFieldString(int instanceId, int index)
 void ClrHost::SetFieldString(int instanceId, int index, const std::string& value)
 {
 	if (m_ready && nullptr != m_fnSetFieldString) m_fnSetFieldString(instanceId, index, value.c_str());
+}
+
+bool ClrHost::SetFieldAssetLink(int instanceId, int index, const std::string& value)
+{
+    // v1 Texture wire format: "1:3:" + UUID + ":" + UUID. Nil/nil is
+    // the canonical empty link; arbitrary strings never become asset links.
+    if (!m_ready || m_fnSetFieldString == nullptr || m_fnGetFieldString == nullptr
+        || GetFieldType(instanceId, index) != ScriptFieldType::AssetLink
+        || value.size() != 77u || value.find('\0') != std::string::npos)
+    {
+        return false;
+    }
+    m_fnSetFieldString(instanceId, index, value.c_str());
+    // The generated setter changes the field only when typed TryParse succeeds.
+    // Comparing canonical serialization also rejects malformed/version/type text.
+    return GetFieldString(instanceId, index) == value;
 }
 
 ClrHost::ScriptFloat2 ClrHost::GetFieldFloat2(int instanceId, int index)

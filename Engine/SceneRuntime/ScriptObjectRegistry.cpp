@@ -1,5 +1,11 @@
 #include "ScriptObjectRegistry.h"
 #include "Entity.h"
+#include "../RenderEngine/DataSystem.h"
+#include "../RenderEngine/Texture.h"
+#include <algorithm>
+#include <cstring>
+#include <limits>
+#include <stdexcept>
 
 ScriptObjectRegistry& ScriptObjectRegistry::Get()
 {
@@ -164,4 +170,283 @@ size_t ScriptObjectRegistry::LiveCount() const
 		}
 	}
 	return count;
+}
+
+namespace
+{
+    constexpr std::uint32_t kTextureAssetType =
+        static_cast<std::uint32_t>(experiment::cooked::CookedAssetKind::Texture);
+    constexpr std::uint32_t kTextureRequestType = 0x80000000u | kTextureAssetType;
+
+    experiment::AssetId DecodeScriptAssetId(ScriptAssetId value)
+    {
+        experiment::AssetId result{};
+        // Explicit byte order, matching AssetId in ScriptCore. Do not memcpy a
+        // platform Guid layout or depend on the CPU's integer endianness.
+        for (std::size_t index = 0; index < 8u; ++index)
+        {
+            result.value.data[index] = static_cast<std::uint8_t>(value.first >> (index * 8u));
+            result.value.data[index + 8u] = static_cast<std::uint8_t>(value.second >> (index * 8u));
+        }
+        return result;
+    }
+
+    ScriptAssetId EncodeScriptAssetId(const experiment::AssetId& value)
+    {
+        ScriptAssetId result{};
+        for (std::size_t index = 0; index < 8u; ++index)
+        {
+            result.first |= static_cast<std::uint64_t>(value.value.data[index]) << (index * 8u);
+            result.second |= static_cast<std::uint64_t>(value.value.data[index + 8u]) << (index * 8u);
+        }
+        return result;
+    }
+}
+
+void ScriptObjectRegistry::BeginAssetSession(DataSystem* dataSystem)
+{
+    EndAssetSession();
+    std::lock_guard lock(m_assetMutex);
+    m_assetDataSystem = dataSystem;
+    m_assetThread = std::this_thread::get_id();
+    m_assetsActive = true;
+}
+
+void ScriptObjectRegistry::EndAssetSession()
+{
+    std::lock_guard lock(m_assetMutex);
+    m_assetsActive = false;
+    m_assetDataSystem = nullptr;
+    for (auto& slot : m_assetSlots)
+    {
+        if (slot.type != 0u)
+        {
+            ReleaseAssetLocked(slot);
+        }
+    }
+    // Keep tombstones and their generations across CLR reinitialization.
+}
+
+ScriptAssetResult ScriptObjectRegistry::CheckAssetSessionLocked() const
+{
+    if (!m_assetsActive || m_assetDataSystem == nullptr
+        || DataSystem::GetIfAlive() != m_assetDataSystem)
+    {
+        return ScriptAssetResult::Unavailable;
+    }
+    if (m_assetThread != std::this_thread::get_id())
+    {
+        return ScriptAssetResult::WrongThread;
+    }
+    return ScriptAssetResult::Success;
+}
+
+ScriptObjectRegistry::AssetSlot* ScriptObjectRegistry::FindAssetLocked(ScriptAssetToken token)
+{
+    if (token.generation == 0u || token.index >= m_assetSlots.size()
+        || (token.type != kTextureAssetType && token.type != kTextureRequestType))
+    {
+        return nullptr;
+    }
+    auto& slot = m_assetSlots[token.index];
+    return slot.generation == token.generation && slot.type == token.type ? &slot : nullptr;
+}
+
+ScriptAssetToken ScriptObjectRegistry::InsertAssetLocked(own::shared_owner<const Texture> texture,
+    AssetDepot::AssetRequest<Texture> request, bool isRequest)
+{
+    std::size_t index = 0u;
+    for (; index < m_assetSlots.size(); ++index)
+    {
+        if (m_assetSlots[index].type == 0u && m_assetSlots[index].generation != 0u)
+        {
+            break;
+        }
+    }
+    if (index == m_assetSlots.size())
+    {
+        if (index >= std::numeric_limits<std::uint32_t>::max())
+        {
+            throw std::length_error("Managed asset owner slots exhausted.");
+        }
+        m_assetSlots.emplace_back();
+    }
+    auto& slot = m_assetSlots[index];
+    slot.texture = std::move(texture);
+    slot.request = std::move(request);
+    slot.type = isRequest ? kTextureRequestType : kTextureAssetType;
+    return { static_cast<std::uint32_t>(index), slot.generation, slot.type };
+}
+
+void ScriptObjectRegistry::ReleaseAssetLocked(AssetSlot& slot)
+{
+    slot.request.Cancel();
+    slot.request = {};
+    slot.texture.reset();
+    slot.type = 0u;
+    // On wrap retire this slot permanently instead of reviving an ancient token.
+    ++slot.generation;
+}
+
+ScriptAssetResult ScriptObjectRegistry::RequestAsset(const ScriptAssetLink& link,
+    const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token)
+{
+    token = {};
+    std::lock_guard lock(m_assetMutex);
+    const auto available = CheckAssetSessionLocked();
+    if (available != ScriptAssetResult::Success)
+    {
+        return available;
+    }
+    if (link.kind != kTextureAssetType)
+    {
+        return ScriptAssetResult::UnsupportedType;
+    }
+    AssetDepot::AssetLink<Texture> typed{
+        { DecodeScriptAssetId(link.asset), DecodeScriptAssetId(link.subasset) } };
+    if (link.reserved != 0u || !typed.IsValid())
+    {
+        return ScriptAssetResult::InvalidLink;
+    }
+    if (variant.colorSpace > static_cast<std::uint32_t>(AssetDepot::TextureAssetColorSpace::Srgb)
+        || variant.compress > 1u)
+    {
+        return ScriptAssetResult::InvalidArgument;
+    }
+    const AssetDepot::TextureAssetVariant options{
+        static_cast<AssetDepot::TextureAssetColorSpace>(variant.colorSpace), variant.compress != 0u, variant.role };
+    if (residentOnly)
+    {
+        auto texture = m_assetDataSystem->TryAcquire<Texture>(typed, options);
+        if (!texture)
+        {
+            return ScriptAssetResult::NotResident;
+        }
+        token = InsertAssetLocked(std::move(texture), {}, false);
+    }
+    else
+    {
+        token = InsertAssetLocked({}, m_assetDataSystem->RequestAsync<Texture>(typed, options), true);
+    }
+    return ScriptAssetResult::Success;
+}
+
+ScriptAssetResult ScriptObjectRegistry::SnapshotAssetRequest(ScriptAssetToken token,
+    ScriptAssetRequestSnapshot& snapshot, char* message, int capacity)
+{
+    snapshot = {};
+    if (capacity < 0 || (capacity > 0 && message == nullptr))
+    {
+        return ScriptAssetResult::InvalidArgument;
+    }
+    std::lock_guard lock(m_assetMutex);
+    auto* slot = FindAssetLocked(token);
+    if (slot == nullptr || token.type != kTextureRequestType)
+    {
+        return ScriptAssetResult::InvalidToken;
+    }
+    const auto result = slot->request.Snapshot();
+    const auto completion = slot->request.Completion();
+    snapshot.status = static_cast<std::int32_t>(result.status);
+    snapshot.error = static_cast<std::int32_t>(result.error);
+    snapshot.workComplete = !completion.valid() || completion.is_complete() ? 1 : 0;
+    snapshot.messageBytes = static_cast<std::int32_t>(std::min<std::size_t>(
+        result.message.size(), static_cast<std::size_t>(std::numeric_limits<std::int32_t>::max())));
+    if (capacity > 0)
+    {
+        const auto count = std::min<std::size_t>(result.message.size(), static_cast<std::size_t>(capacity - 1));
+        std::memcpy(message, result.message.data(), count);
+        message[count] = '\0';
+    }
+    return ScriptAssetResult::Success;
+}
+
+ScriptAssetResult ScriptObjectRegistry::AcquireAssetResult(ScriptAssetToken request, ScriptAssetToken& owner)
+{
+    owner = {};
+    std::lock_guard lock(m_assetMutex);
+    auto* slot = FindAssetLocked(request);
+    if (slot == nullptr || request.type != kTextureRequestType)
+    {
+        return ScriptAssetResult::InvalidToken;
+    }
+    const auto result = slot->request.Snapshot();
+    if (result.status != AssetDepot::AssetRequestStatus::Ready || !result.asset)
+    {
+        return ScriptAssetResult::NotResident;
+    }
+    owner = InsertAssetLocked(result.asset, {}, false);
+    return ScriptAssetResult::Success;
+}
+
+ScriptAssetResult ScriptObjectRegistry::CancelAssetRequest(ScriptAssetToken request)
+{
+    std::lock_guard lock(m_assetMutex);
+    auto* slot = FindAssetLocked(request);
+    if (slot == nullptr || request.type != kTextureRequestType)
+    {
+        return ScriptAssetResult::InvalidToken;
+    }
+    slot->request.Cancel();
+    return ScriptAssetResult::Success;
+}
+
+ScriptAssetResult ScriptObjectRegistry::ReleaseAsset(ScriptAssetToken token)
+{
+    std::lock_guard lock(m_assetMutex);
+    auto* slot = FindAssetLocked(token);
+    if (slot == nullptr)
+    {
+        return ScriptAssetResult::InvalidToken;
+    }
+    // Never fetch/recreate DataSystem here, including after engine shutdown.
+    // This drops only CPU owners. GPU retirement remains the renderer's job.
+    ReleaseAssetLocked(*slot);
+    return ScriptAssetResult::Success;
+}
+
+ScriptAssetResult ScriptObjectRegistry::ReadTexture(ScriptAssetToken token, ScriptTextureDescriptor& descriptor)
+{
+    descriptor = {};
+    std::lock_guard lock(m_assetMutex);
+    auto* slot = FindAssetLocked(token);
+    if (slot == nullptr || token.type != kTextureAssetType || !slot->texture)
+    {
+        return ScriptAssetResult::InvalidToken;
+    }
+    const auto image = slot->texture->GetImageView();
+    descriptor = { image.Width(), image.Height(), image.MipLevels(), image.ArraySize(), image.IsCube() ? 1u : 0u };
+    return ScriptAssetResult::Success;
+}
+
+ScriptAssetResult ScriptObjectRegistry::ListAssetRoots(std::uint64_t mount, std::uint32_t kind,
+    ScriptAssetLink* links, int capacity, int& count)
+{
+    count = 0;
+    if (capacity < 0 || (capacity > 0 && links == nullptr))
+    {
+        return ScriptAssetResult::InvalidArgument;
+    }
+    std::lock_guard lock(m_assetMutex);
+    const auto available = CheckAssetSessionLocked();
+    if (available != ScriptAssetResult::Success)
+    {
+        return available;
+    }
+    if (kind != kTextureAssetType)
+    {
+        return ScriptAssetResult::UnsupportedType;
+    }
+    const auto roots = m_assetDataSystem->ListRootLinks<Texture>({ mount });
+    if (roots.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+    {
+        return ScriptAssetResult::InternalError;
+    }
+    count = static_cast<int>(roots.size());
+    for (int index = 0; index < std::min(count, capacity); ++index)
+    {
+        links[index] = { EncodeScriptAssetId(roots[index].identity.assetId),
+            EncodeScriptAssetId(roots[index].identity.subassetId), kTextureAssetType, 0u };
+    }
+    return ScriptAssetResult::Success;
 }

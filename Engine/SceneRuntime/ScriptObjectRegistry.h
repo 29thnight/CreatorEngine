@@ -2,8 +2,12 @@
 #include "Core.Minimal.h"
 #include <vector>
 #include <mutex>
+#include <thread>
+#include "../RenderEngine/AssetDepot/AssetRequest.h"
 
 class Entity;
+class Texture;
+class DataSystem;
 
 // 관리 코드에 넘기는 객체 핸들.
 //
@@ -43,6 +47,72 @@ struct ScriptObjectHandle
 	bool IsValid() const { return generation != 0; }
 };
 
+// Flat AssetDepot ABI values. No C++ owner, string, job or Texture* crosses CLR.
+struct ScriptAssetId
+{
+    std::uint64_t first{};
+    std::uint64_t second{};
+};
+
+struct ScriptAssetLink
+{
+    ScriptAssetId asset{};
+    ScriptAssetId subasset{};
+    std::uint32_t kind{};
+    std::uint32_t reserved{};
+};
+
+struct ScriptAssetToken
+{
+    std::uint32_t index{};
+    std::uint32_t generation{};
+    // The high bit distinguishes requests from owned results of the same kind.
+    std::uint32_t type{};
+};
+
+struct ScriptTextureAssetVariant
+{
+    std::uint32_t colorSpace{};
+    std::uint32_t compress{};
+    std::uint32_t role{};
+};
+
+struct ScriptAssetRequestSnapshot
+{
+    std::int32_t status{};
+    std::int32_t error{};
+    std::int32_t workComplete{};
+    std::int32_t messageBytes{};
+};
+
+struct ScriptTextureDescriptor
+{
+    std::uint32_t width{};
+    std::uint32_t height{};
+    std::uint32_t mipLevels{};
+    std::uint32_t arraySize{};
+    std::uint32_t isCube{};
+};
+
+static_assert(sizeof(ScriptAssetLink) == 40);
+static_assert(sizeof(ScriptAssetToken) == 12);
+static_assert(sizeof(ScriptTextureAssetVariant) == 12);
+static_assert(sizeof(ScriptAssetRequestSnapshot) == 16);
+static_assert(sizeof(ScriptTextureDescriptor) == 20);
+
+enum class ScriptAssetResult : std::int32_t
+{
+    Success,
+    Unavailable,
+    InvalidToken,
+    InvalidLink,
+    UnsupportedType,
+    WrongThread,
+    InvalidArgument,
+    NotResident,
+    InternalError,
+};
+
 // 스크립트가 참조하는 GameObject만 담는 슬롯 테이블.
 //
 // 씬의 모든 오브젝트를 넣지 않는다 — 스크립트가 실제로 잡고 있는 것만 등록하므로
@@ -72,7 +142,41 @@ public:
 	void Clear();
 	size_t LiveCount() const;
 
+    // Minimal ownership adapter in the existing opaque registry. The host owns
+    // its GT session; shutdown invalidates tokens without touching DataSystem.
+    void BeginAssetSession(DataSystem* dataSystem);
+    void EndAssetSession();
+    ScriptAssetResult RequestAsset(const ScriptAssetLink& link, const ScriptTextureAssetVariant& variant,
+        bool residentOnly, ScriptAssetToken& token);
+    ScriptAssetResult SnapshotAssetRequest(ScriptAssetToken token, ScriptAssetRequestSnapshot& snapshot,
+        char* message, int capacity);
+    ScriptAssetResult AcquireAssetResult(ScriptAssetToken request, ScriptAssetToken& owner);
+    ScriptAssetResult CancelAssetRequest(ScriptAssetToken request);
+    ScriptAssetResult ReleaseAsset(ScriptAssetToken token);
+    ScriptAssetResult ReadTexture(ScriptAssetToken token, ScriptTextureDescriptor& descriptor);
+    ScriptAssetResult ListAssetRoots(std::uint64_t mount, std::uint32_t kind,
+        ScriptAssetLink* links, int capacity, int& count);
+
 private:
+    struct AssetSlot
+    {
+        std::uint32_t generation{ 1u };
+        std::uint32_t type{};
+        own::shared_owner<const Texture> texture{};
+        AssetDepot::AssetRequest<Texture> request{};
+    };
+
+    [[nodiscard]] ScriptAssetResult CheckAssetSessionLocked() const;
+    [[nodiscard]] AssetSlot* FindAssetLocked(ScriptAssetToken token);
+    [[nodiscard]] ScriptAssetToken InsertAssetLocked(own::shared_owner<const Texture> texture,
+        AssetDepot::AssetRequest<Texture> request, bool isRequest);
+    void ReleaseAssetLocked(AssetSlot& slot);
+    std::mutex m_assetMutex;
+    std::vector<AssetSlot> m_assetSlots;
+    DataSystem* m_assetDataSystem{};
+    std::thread::id m_assetThread{};
+    bool m_assetsActive{};
+
 	struct Slot
 	{
 		Entity* object{ nullptr };

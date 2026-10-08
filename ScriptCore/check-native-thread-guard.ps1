@@ -38,7 +38,7 @@ $exempt = @('Log')
 
 # _bound 원본을 읽어도 되는 자리. 표 연결 그 자체를 다루거나(Bind·IsReady),
 # 검사의 구현이거나(Entered), 면제 대상(Log)이다.
-$boundAllowed = @('Bind', 'IsReady', 'Entered', 'Log')
+$boundAllowed = @('Bind', 'Unbind', 'IsReady', 'Entered', 'Log')
 
 # 메서드 경계: 들여쓰기 4칸의 정적 멤버 선언.
 $starts = @()
