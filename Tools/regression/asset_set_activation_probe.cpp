@@ -83,6 +83,17 @@ namespace
         const cooked::TypedAssetReference asset{ { Id(2u), {} }, cooked::CookedAssetKind::Texture };
         manifest.entries.push_back({ asset, 0u, {} });
         manifest.roots.push_back(asset);
+        std::vector<cooked::AssetManifestIssue> issues;
+        Require(AssetDepot::ValidateAssetSetRuntimeCompatibility(manifest, issues),
+            "Supported Texture schema was rejected before mount");
+        auto incompatible = manifest;
+        ++incompatible.blobs.front().schemaVersion;
+        Require(!AssetDepot::ValidateAssetSetRuntimeCompatibility(incompatible, issues) && !issues.empty(),
+            "Unknown decoder schema passed mount preflight");
+        incompatible = manifest;
+        incompatible.blobs.front().kind = cooked::CookedAssetKind::Scene;
+        Require(!AssetDepot::ValidateAssetSetRuntimeCompatibility(incompatible, issues),
+            "Future unimplemented asset kind passed mount preflight");
         const auto encoded = cooked::WriteAssetSetManifest(manifest);
         Require(encoded.Succeeded(), "Fixture manifest failed");
         const auto manifestHash = Hash(encoded.bytes);

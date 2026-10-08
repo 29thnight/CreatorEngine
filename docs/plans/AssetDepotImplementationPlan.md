@@ -181,6 +181,9 @@ design. A foundation slice is not completion of the runtime migration.
 - `AssetRequest<T>` is a consumer request; joined worker lifetime/cancellation is separate.
 - Runtime-bound keys include resolver revision or closure digest, not only parent bytes.
 - Mount/root enumeration does not read or decode root payloads.
+- Direct/configured runtime mount rejects unsupported installed kind/representation/
+  schema pairs before publication. Generic catalog candidate builders stay format-
+  neutral; future declared kinds do not imply an installed runtime loader.
 - Unmount blocks new resolution and advances resolver revision. Dependent acquisition
   may fail until its external hard dependency is mounted again. Existing consumers keep
   their exact old snapshot and artifact backing. Unmount does not delete storage.

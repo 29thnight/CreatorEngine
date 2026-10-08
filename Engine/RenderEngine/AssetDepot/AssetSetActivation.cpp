@@ -125,6 +125,15 @@ namespace AssetDepot
                 {
                     throw std::runtime_error("AssetSet activation manifest hash/schema mismatch: " + hash);
                 }
+                if (!ValidateAssetSetRuntimeCompatibility(input.manifest, issues))
+                {
+                    std::string detail = "AssetSet activation has unsupported Player content: " + hash;
+                    for (const auto& issue : issues)
+                    {
+                        detail += " | " + issue.context + ": " + issue.message;
+                    }
+                    throw std::runtime_error(detail);
+                }
                 input.options.expectedTargetPlatform = "win-x64";
                 input.options.expectedTargetAbi = abi;
                 inputs.push_back(std::move(input));

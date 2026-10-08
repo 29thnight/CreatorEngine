@@ -1,8 +1,74 @@
 #include "../DataSystem.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
+#include "AssetSetActivation.h"
+#include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
+#include "../Experiment/Cooked/CookedShaderMeta.h"
+#include "../Experiment/Cooked/MaterialAssetSetCodec.h"
+
 
 #include <limits>
 #include <utility>
+
+namespace AssetDepot
+{
+    bool ValidateAssetSetRuntimeCompatibility(const experiment::cooked::AssetSetManifest& manifest,
+        std::vector<experiment::cooked::AssetManifestIssue>& issues)
+    {
+        namespace cooked = experiment::cooked;
+        issues.clear();
+        for (const auto& blob : manifest.blobs)
+        {
+            std::uint32_t representation{};
+            std::uint32_t schema{};
+            switch (blob.kind)
+            {
+            case cooked::CookedAssetKind::Texture:
+                representation = 1u;
+                schema = cooked::kTextureArtifactVersion;
+                break;
+            case cooked::CookedAssetKind::Model:
+                representation = cooked::kModelDescriptorRepresentation;
+                schema = cooked::kModelDescriptorVersion;
+                break;
+            case cooked::CookedAssetKind::Mesh:
+                representation = cooked::kModelGeometryRepresentation;
+                schema = cooked::kModelGeometryArtifactVersion;
+                break;
+            case cooked::CookedAssetKind::Skeleton:
+                representation = cooked::kSkeletonRepresentation;
+                schema = cooked::kSkeletonArtifactVersion;
+                break;
+            case cooked::CookedAssetKind::AnimationClip:
+                representation = cooked::kAnimationClipRepresentation;
+                schema = cooked::kAnimationClipArtifactVersion;
+                break;
+            case cooked::CookedAssetKind::ShaderMeta:
+                representation = cooked::kShaderMetaDocumentRepresentation;
+                schema = cooked::kShaderMetaDocumentVersion;
+                break;
+            case cooked::CookedAssetKind::Material:
+                representation = cooked::kMaterialDocumentRepresentation;
+                schema = cooked::kMaterialArtifactVersion;
+                break;
+            case cooked::CookedAssetKind::MaterialProgram:
+                representation = cooked::kMaterialProgramRepresentation;
+                schema = cooked::kMaterialProgramArtifactVersion;
+                break;
+            default:
+                break;
+            }
+            if (representation == 0u || blob.representation != representation || blob.schemaVersion != schema)
+            {
+                issues.push_back({ "mount.compatibility." + blob.artifactPath,
+                    "No installed CPU asset decoder for kind=" + std::to_string(static_cast<unsigned>(blob.kind))
+                    + " representation=" + std::to_string(blob.representation)
+                    + " schema=" + std::to_string(blob.schemaVersion) + "; recook for this Player." });
+                return false;
+            }
+        }
+        return true;
+    }
+}
 
 AssetDepot::AssetMountId DataSystem::MountAssetSet(
     std::span<const std::byte> manifestBytes,
@@ -13,7 +79,8 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
     namespace cooked = experiment::cooked;
     outIssues.clear();
     cooked::AssetSetManifest manifest;
-    if (!cooked::ReadAssetSetManifest(manifestBytes, manifest, outIssues))
+    if (!cooked::ReadAssetSetManifest(manifestBytes, manifest, outIssues)
+        || !AssetDepot::ValidateAssetSetRuntimeCompatibility(manifest, outIssues))
     {
         return {};
     }
