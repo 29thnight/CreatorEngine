@@ -29,7 +29,14 @@ public:
    void SetCanvas(Canvas* canvas);
 	// 캔버스가 이미 파괴됐으면 널이다 — 호출부는 항상 널을 각오해야 한다.
 	Canvas* GetOwnerCanvas();
-	void SetOrder(int index) { _layerorder = index; }
+	void SetOrder(int index)
+	{
+		if (_layerorder != index)
+		{
+			_layerorder = index;
+			PublishRenderProxyDirty(ProxyDirty::Payload);
+		}
+	}
 	int GetLayerOrder() const { return _layerorder; }
 	void SetNavi(Direction dir, Entity* otherUI);
 	void OnAddedToScene() override;

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <utility>
 #include <vector>
 
 namespace
@@ -141,6 +142,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         instance.world = math::transpose(item.world);
         instance.uv = item.uv;
         instance.color = item.color;
+        instance.sampling.x = item.signedDistance ? 1.f : 0.f;
         m_instances.push_back(instance);
         EnhancedDrawItem bounds{};
         bounds.worldMatrix = item.world;
@@ -149,19 +151,25 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         const auto sphere = shadow_math::WorldBounds(bounds);
         m_visibilitySpheres.push_back({sphere.center.x, sphere.center.y, sphere.center.z, sphere.radius});
 
-        if (!m_batches.empty() && m_batches.back().texture == item.texture &&
+        Texture* const texture = item.textureOwner ? item.textureOwner.get() : item.texture;
+        if (!m_batches.empty() && m_batches.back().texture == texture &&
             m_batches.back().enableDepth == item.enableDepth)
         {
             ++m_batches.back().count;
+            if (!m_batches.back().textureOwner)
+            {
+                m_batches.back().textureOwner = item.textureOwner;
+            }
         }
         else
         {
             Batch batch{};
             batch.first = static_cast<uint32_t>(m_instances.size() - 1);
             batch.count = 1;
-            batch.texture = item.texture;
+            batch.texture = texture;
+            batch.textureOwner = item.textureOwner;
             batch.enableDepth = item.enableDepth;
-            m_batches.push_back(batch);
+            m_batches.push_back(std::move(batch));
         }
     }
 

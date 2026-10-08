@@ -3,6 +3,7 @@
 #include "../../../RHI/RHIFormat.h"
 #include <cstdint>
 #include <mathematics/color.hpp>
+#include <memory>
 #include <vector>
 
 #include "../../Graph/EnhancedRenderPass.h"
@@ -10,7 +11,7 @@
 
 class Texture;
 
-// SpriteRenderer와 3D Canvas 이미지를 함께 그리는 RHI 공용 월드 쿼드 패스.
+// SpriteRenderer와 3D Canvas 이미지·SDF 글리프를 함께 그리는 RHI 공용 월드 쿼드 패스.
 class EnhancedSpritePass : public EnhancedRenderPass
 {
 public:
@@ -23,9 +24,12 @@ public:
         math::vector4 uv{ 0.f, 0.f, 1.f, 1.f };
         math::color   color{ 1.f, 1.f, 1.f, 1.f };
         Texture* texture{ nullptr };
+        // 소유자가 있으면 raw 포인터보다 우선한다. 프레임 배치가 복사해 보존한다.
+        std::shared_ptr<Texture> textureOwner;
         int canvasOrder{ 0 };
         int layerOrder{ 0 };
         bool enableDepth{ false };
+        bool signedDistance{ false };
     };
 
     static_assert(std::is_same_v<decltype(Item::world), math::matrix4x4>);
@@ -69,10 +73,12 @@ private:
         math::matrix4x4 world{};
         math::vector4 uv{};
         math::color   color{};
+        math::vector4 sampling{}; // x = signed-distance flag; WorldSprite.slang과 동일
     };
 
-    static_assert(sizeof(Instance) == 96);
+    static_assert(sizeof(Instance) == 112u);
     static_assert(offsetof(Instance, color) == 80u);
+    static_assert(offsetof(Instance, sampling) == 96u);
     static_assert(std::is_same_v<decltype(Instance::color), math::color>);
     static_assert(std::is_trivially_copyable_v<Instance>);
 
@@ -81,6 +87,7 @@ private:
         uint32_t first{ 0 };
         uint32_t count{ 0 };
         Texture* texture{ nullptr };
+        std::shared_ptr<Texture> textureOwner;
         bool enableDepth{ false };
         RHITextureEntry uploaded;
     };

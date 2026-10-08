@@ -48,6 +48,8 @@
 #include "BoneRegion.h" // kMaxBones
 #include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
+#include "FontAsset.h"
+#include "Render/Passes/UI/EnhancedUIPass.h"
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
 #include "FoliageComponent.h"      // I5: Foliage 게이트
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
@@ -800,6 +802,159 @@ namespace ConsoleCmd
         return CommandCore::Ok("ui.status", std::move(data));
     }
 
+    static CommandCore::CommandResult Cmd_ui_drawitems(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1)
+        {
+            return InvalidArguments("ui.drawitems takes no arguments");
+        }
+        RenderScene* renderScene = SceneManagers->GetRenderScene();
+        if (!renderScene || !renderScene->GetScene())
+        {
+            return PreconditionFailed("ui.drawitems.no_scene", "No render scene is available");
+        }
+
+        // The command never ticks layouts or consumes proxy commands. Copy values
+        // under the same lock used by RT updates, then inspect them outside it.
+        const auto snapshot = renderScene->GetUIDrawSnapshot();
+        size_t enabledProxies = 0;
+        size_t images = 0;
+        size_t texts = 0;
+        size_t spriteSheets = 0;
+        size_t overlayProxies = 0;
+        size_t cameraProxies = 0;
+        size_t worldProxies = 0;
+        size_t unknownModeProxies = 0;
+        size_t missingLayouts = 0;
+        size_t emptyLayouts = 0;
+        size_t invalidLayouts = 0;
+        size_t truncatedLayouts = 0;
+        size_t fallbackGlyphs = 0;
+        size_t invalidUtf8 = 0;
+        size_t layoutGlyphs = 0;
+        size_t overlayGlyphRects = 0;
+        size_t cameraGlyphRects = 0;
+        size_t worldGlyphRects = 0;
+        size_t unknownModeGlyphRects = 0;
+        std::vector<EnhancedUIPass::Rect> glyphRects;
+        for (const auto& state : snapshot)
+        {
+            if (!state.enabled)
+            {
+                continue;
+            }
+            ++enabledProxies;
+            CanvasRenderMode mode{};
+            if (const auto* text = std::get_if<UIRenderProxy::TextData>(&state.data))
+            {
+                ++texts;
+                mode = text->renderMode;
+                if (!text->layout)
+                {
+                    ++missingLayouts;
+                }
+                else
+                {
+                    const TextLayout& layout = *text->layout;
+                    layoutGlyphs += layout.glyphs.size();
+                    fallbackGlyphs += layout.fallbackCount;
+                    invalidUtf8 += layout.invalidUtf8Count;
+                    truncatedLayouts += layout.truncated ? 1u : 0u;
+                    emptyLayouts += layout.glyphs.empty() ? 1u : 0u;
+                    glyphRects.clear();
+                    if (!EnhancedUIPass::AppendTextRects(*text, glyphRects))
+                    {
+                        ++invalidLayouts;
+                    }
+                    switch (mode)
+                    {
+                    case CanvasRenderMode::ScreenSpaceOverlay:
+                        overlayGlyphRects += glyphRects.size();
+                        break;
+                    case CanvasRenderMode::ScreenSpaceCamera:
+                        cameraGlyphRects += glyphRects.size();
+                        break;
+                    case CanvasRenderMode::WorldSpace:
+                        worldGlyphRects += glyphRects.size();
+                        break;
+                    default:
+                        unknownModeGlyphRects += glyphRects.size();
+                        break;
+                    }
+                }
+            }
+            else if (const auto* image = std::get_if<UIRenderProxy::ImageData>(&state.data))
+            {
+                ++images;
+                mode = image->renderMode;
+            }
+            else
+            {
+                // SpriteSheetData has no Canvas-mode payload in the neutral path.
+                ++spriteSheets;
+                continue;
+            }
+            switch (mode)
+            {
+            case CanvasRenderMode::ScreenSpaceOverlay:
+                ++overlayProxies;
+                break;
+            case CanvasRenderMode::ScreenSpaceCamera:
+                ++cameraProxies;
+                break;
+            case CanvasRenderMode::WorldSpace:
+                ++worldProxies;
+                break;
+            default:
+                ++unknownModeProxies;
+                break;
+            }
+        }
+
+        auto data = CommandData::Object();
+        const auto count = [&data](const char* name, size_t value)
+        {
+            data.Set(name, CommandData::Int(static_cast<int64_t>(value)));
+        };
+        count("proxyCount", snapshot.size());
+        count("enabledProxyCount", enabledProxies);
+        count("disabledProxyCount", snapshot.size() - enabledProxies);
+        count("imageCount", images);
+        count("textCount", texts);
+        count("spriteSheetCount", spriteSheets);
+        count("overlayProxyCount", overlayProxies);
+        count("cameraProxyCount", cameraProxies);
+        count("worldProxyCount", worldProxies);
+        count("unknownModeProxyCount", unknownModeProxies);
+        count("missingTextLayouts", missingLayouts);
+        count("emptyTextLayouts", emptyLayouts);
+        count("invalidTextLayouts", invalidLayouts);
+        count("truncatedTextLayouts", truncatedLayouts);
+        count("fallbackGlyphs", fallbackGlyphs);
+        count("invalidUtf8Sequences", invalidUtf8);
+        count("layoutGlyphs", layoutGlyphs);
+        count("glyphRects", overlayGlyphRects + cameraGlyphRects + worldGlyphRects + unknownModeGlyphRects);
+        count("overlayGlyphRects", overlayGlyphRects);
+        count("planeGlyphRects", cameraGlyphRects + worldGlyphRects);
+        count("cameraGlyphRects", cameraGlyphRects);
+        count("worldGlyphRects", worldGlyphRects);
+        count("unknownModeGlyphRects", unknownModeGlyphRects);
+        data.Set("gpuDrawsMeasured", CommandData::Bool(false));
+        data.Set("measurement", CommandData::String(
+            "Copied UI proxy snapshot; enabled CPU glyph candidates only. "
+            "Plane counts do not validate cameras, Canvas transforms or visibility."));
+        std::printf("[ui.drawitems] CPU candidates: proxies=%zu enabled=%zu image=%zu text=%zu spriteSheet=%zu "
+            "glyphRects=%zu overlay=%zu camera=%zu world=%zu\n",
+            snapshot.size(), enabledProxies, images, texts, spriteSheets,
+            overlayGlyphRects + cameraGlyphRects + worldGlyphRects + unknownModeGlyphRects,
+            overlayGlyphRects, cameraGlyphRects, worldGlyphRects);
+        std::printf("[ui.drawitems] layouts: missing=%zu empty=%zu invalid=%zu truncated=%zu "
+            "fallbackGlyphs=%zu invalidUtf8=%zu (not GPU draw counts)\n",
+            missingLayouts, emptyLayouts, invalidLayouts, truncatedLayouts, fallbackGlyphs, invalidUtf8);
+        return Ok("ui.drawitems: current CPU candidates, not submitted GPU draws", std::move(data));
+    }
+
 
 
 
@@ -1106,6 +1261,7 @@ namespace ConsoleCmd
         reg.Result({ "ui.hitbox" }, &Cmd_ui_hitbox);
         reg.Result({ "ui.navprobe" }, &Cmd_ui_navprobe);
         reg.Result({ "ui.status" }, &Cmd_ui_status);
+        reg.Result({ "ui.drawitems" }, &Cmd_ui_drawitems);
         reg.Result({ "animation.baseline.probe" }, &Cmd_animation_baseline_probe);
         reg.Result({ "animation.playback.probe" }, &Cmd_animation_playback_probe);
         reg.Result({ "animation.visual.probe" }, &Cmd_animation_visual_probe);

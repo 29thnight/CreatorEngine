@@ -189,6 +189,7 @@ public sealed class TextComponent : UIComponent
         set => Native.TextSetAlpha(OwnerHandle, value);
     }
 
+    /// <summary>Canvas 배율 적용 전 글자 높이(픽셀). 기본값은 32다.</summary>
     public float FontSize
     {
         get => Native.TextGetFontSize(OwnerHandle);

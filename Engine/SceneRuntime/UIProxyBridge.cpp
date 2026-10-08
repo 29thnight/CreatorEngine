@@ -57,6 +57,7 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     TextData data{};
     data.fontPath = text->GetFontPath();
     data.message = text->message;
+    data.layout = text->GetTextLayout();
     data.color = text->color;
 
     data.position = { text->pos.x, text->pos.y };
@@ -65,6 +66,18 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     if (canvas)
     {
         data.canvasOrder = canvas->GetCanvasOrder();
+        data.renderMode = canvas->GetRenderMode();
+        data.canvasId = canvas->GetInstanceID();
+        data.planeDistance = canvas->GetPlaneDistance();
+        if (auto* owner = canvas->GetOwner())
+        {
+            data.canvasWorld = owner->Transform_().GetWorldMatrix();
+            if (auto* rect = owner->GetComponent<RectTransformComponent>())
+            {
+                const auto& root = rect->GetWorldRect();
+                data.canvasRect = { root.x, root.y, root.width, root.height };
+            }
+        }
     }
     data.layerOrder = text->GetLayerOrder();
     data.maxSize = text->stretchSize;
@@ -72,6 +85,7 @@ UIRenderProxy::UIRenderProxy(TextComponent* text) noexcept
     data.stretchY = text->isStretchY;
     data.alignment = text->GetHorizontalAlignment();
     data.filpEffect = text->uiEffects;
+    m_isEnabled = text->IsEnabled() && text->GetOwner() && text->GetOwner()->IsEnabled();
     m_data = data;
     m_instancedID = text->GetInstanceID();
 }

@@ -1,5 +1,7 @@
 #pragma once
 #include <mathematics/vector2.hpp>
+#include <mathematics/vector4.hpp>
+#include <mathematics/matrix4x4.hpp>
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/color.hpp>
 #include <mathematics/rect.hpp>
@@ -7,6 +9,11 @@
 #include "IRenderable.h"
 #include "Canvas.h"
 #include "UIComponent.h"
+#include <memory>
+#include <cstdint>
+
+class FontAsset;
+struct TextLayout;
 
 class [[reflgen::reflect]] TextComponent : public meta::identity<TextComponent, UIComponent>
 {
@@ -32,34 +39,38 @@ public:
 	// 함께 철거됐다.
 	void TickLayout(float tick);
 
-	//한글이 안나올시 sfont 제대로 만들었는지 확인
-	void SetMessage(std::string _message) { message = _message; }
+	// UTF-8 is laid out on the scene owner thread; render snapshots only share
+	// immutable glyph geometry and atlas owners.
+	void SetMessage(std::string value);
 	std::string GetTextMessage() { return message; }
 	void SetFont(const file::path& path);
-	void OnDeserialized(); // CT6-d: 폰트 로드(구 팩토리 분기)
+	void OnDeserialized();
+	void OnPropertyChanged(std::string_view propertyName, Meta::PropertyChangeSource source) override;
+	void PrepareTextLayout();
+	const std::shared_ptr<const TextLayout>& GetTextLayout() const { return m_textLayout; }
 
 	const std::string& GetFontPath() const { return fontPath; }
 
 	math::color GetColor() const { return color; }
-	void SetColor(const math::color& col) { color = col; }
+	void SetColor(const math::color& col);
 
 	float GetAlpha() const { return color.a; }
-	void SetAlpha(float alpha) { color.a = alpha; }
+	void SetAlpha(float alpha);
 
 	float GetFontSize() const { return fontSize; }
-	void SetFontSize(float size) { fontSize = size; }
+	void SetFontSize(float size);
 
 	math::vector2 GetRelativePosition() const { return relpos; }
-	void SetRelativePosition(const math::vector2& pos) { relpos = pos; }
+	void SetRelativePosition(const math::vector2& position);
 
-	void SetHorizontalAlignment(TextAlignment alignment) { horizontalAlignment = alignment; }
+	void SetHorizontalAlignment(TextAlignment alignment);
 	TextAlignment GetHorizontalAlignment() const { return horizontalAlignment; }
 
 	math::rect GetManualRect() const { return manualRect; }
-	void SetManualRect(const math::rect& rect) { manualRect = rect; }
+	void SetManualRect(const math::rect& rect);
 
 	bool IsUsingManualRect() const { return useManualRect; }
-	void SetUseManualRect(bool use) { useManualRect = use; }
+	void SetUseManualRect(bool use);
 
 	math::vector2 GetStretchSize() const { return stretchSize; }
 
@@ -78,7 +89,8 @@ private:
     [[reflgen::ignore]]
     math::vector2 stretchSize{ 0.f, 0.f };
 
-    float fontSize{ 1.f };
+    // Pixel height before CanvasScaler. Existing authored numeric values remain unchanged.
+    float fontSize{ 32.f };
 
     // 캔버스에서 물려받은 배율. Update에서 RectTransform으로부터 채워지고,
     // 렌더 프록시가 fontSize에 곱한다. 파생값이라 직렬화하지 않는다(PHASE 7-3).
@@ -93,7 +105,37 @@ private:
 
     [[reflgen::ignore]]
     bool isStretchY{ false };
+
+    [[reflgen::ignore]]
+    std::shared_ptr<FontAsset> m_font;
+    [[reflgen::ignore]]
+    std::shared_ptr<const TextLayout> m_textLayout;
+    [[reflgen::ignore]]
+    std::string m_loadedFontPath;
+    [[reflgen::ignore]]
+    std::uint64_t m_fontCacheRevision{};
+    [[reflgen::ignore]]
+    float m_layoutPixelSize{};
+    [[reflgen::ignore]]
+    float m_layoutWidth{};
+    [[reflgen::ignore]]
+    bool m_textLayoutDirty{ true };
+    [[reflgen::ignore]]
+    bool m_fontLoadAttempted{ false };
+    [[reflgen::ignore]]
+    HashedGuid m_layoutCanvasId{};
+    [[reflgen::ignore]]
+    int m_layoutCanvasOrder{};
+    [[reflgen::ignore]]
+    CanvasRenderMode m_layoutRenderMode{ CanvasRenderMode::ScreenSpaceOverlay };
+    [[reflgen::ignore]]
+    float m_layoutPlaneDistance{ 100.f };
+    [[reflgen::ignore]]
+    math::matrix4x4 m_layoutCanvasWorld{ math::matrix4x4::identity() };
+    [[reflgen::ignore]]
+    math::vector4 m_layoutCanvasRect{};
 public:
+	[[reflgen::ignore]]
 	math::vector2 m_textMeasureSize{ 0.f };
 };
 

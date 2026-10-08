@@ -87,7 +87,7 @@ ResourceCounterWindow::Snapshot ResourceCounterWindow::Capture() const
 			snapshot.uiTextures = dataSystem->UITextures.size();
 			snapshot.spriteSheets = dataSystem->SpriteSheets.size();
 		}
-		snapshot.spriteFonts = 0; // 폰트 컨테이너는 D4에서 은퇴, SDF 계통에서 복원
+		snapshot.fonts = dataSystem->SnapshotFontCount();
 		snapshot.retainedAssets = dataSystem->SnapshotRetainedAssetCount();
 	}
 
@@ -231,7 +231,7 @@ void ResourceCounterWindow::Draw()
 			DrawCountRow("Textures", displayed.textures, m_baseline.textures);
 			DrawCountRow("UITextures", displayed.uiTextures, m_baseline.uiTextures);
 			DrawCountRow("SpriteSheets", displayed.spriteSheets, m_baseline.spriteSheets);
-			DrawCountRow("SpriteFonts", displayed.spriteFonts, m_baseline.spriteFonts);
+			DrawCountRow("Fonts", displayed.fonts, m_baseline.fonts);
 			DrawCountRow("Retained(보존 표시)", displayed.retainedAssets, m_baseline.retainedAssets);
 			ImGui::EndTable();
 		}

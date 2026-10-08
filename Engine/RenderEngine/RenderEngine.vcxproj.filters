@@ -246,6 +246,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Objects\Camera</Filter>
     </ClCompile>
+    <ClCompile Include="FontAsset.cpp">
+      <Filter>Resources</Filter>
+    </ClCompile>
     <ClCompile Include="DataSystem.cpp">
       <Filter>Asset\ManagerSystem</Filter>
     </ClCompile>
@@ -602,6 +605,9 @@
       <Filter>Objects\Camera</Filter>
     </ClInclude>
     <ClInclude Include="CanvasRenderMode.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="FontAsset.h">
       <Filter>Resources</Filter>
     </ClInclude>
     <ClInclude Include="DataSystem.h">

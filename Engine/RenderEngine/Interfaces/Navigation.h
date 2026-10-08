@@ -87,4 +87,5 @@ enum class TextAlignment : std::uint8_t
 {
 	Left,
 	Center,
+	Right,
 };

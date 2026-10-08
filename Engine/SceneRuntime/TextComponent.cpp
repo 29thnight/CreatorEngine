@@ -9,6 +9,18 @@
 #include "RectTransformComponent.h"
 #include "Entity.h"
 #include "UITickSystem.h"
+#include "FontAsset.h"
+#include <algorithm>
+#include <cmath>
+#include <utility>
+
+namespace
+{
+    bool same_layout_value(float left, float right)
+    {
+        return left == right || (std::isnan(left) && std::isnan(right));
+    }
+}
 
 TextComponent::TextComponent()
 {
@@ -32,11 +44,22 @@ void TextComponent::OnInitialized()
 
 void TextComponent::TickLayout(float tick)
 {
-    const float currentZ = pos.z;
+    (void)tick;
+    if (nullptr == GetOwner())
+    {
+        return;
+    }
+
+    const math::vector3 previousPosition = pos;
+    const math::vector2 previousSize = stretchSize;
+    const float previousScale = layoutScale;
+    const int previousLayer = _layerorder;
+    const float currentZ = std::isfinite(pos.z) ? pos.z : 0.f;
 
     isStretchX = false;
     isStretchY = false;
     stretchSize = { 0.f, 0.f };
+    layoutScale = 1.f;
 
     math::vector2 topLeft{};
     math::vector2 size{};
@@ -57,11 +80,16 @@ void TextComponent::TickLayout(float tick)
 
         // 글자 크기도 캔버스 배율을 따른다(PHASE 7-3). rect만 줄어들고 글자는
         // 그대로면 화면이 작아질수록 글자가 상자를 뚫고 나온다.
-        layoutScale = rect->GetLayoutScale();
+        const float scale = rect->GetLayoutScale();
+        layoutScale = std::isfinite(scale) && scale > 0.f ? scale : 0.f;
     }
 
     if (hasLayout)
     {
+        topLeft.x = std::isfinite(topLeft.x) ? topLeft.x : 0.f;
+        topLeft.y = std::isfinite(topLeft.y) ? topLeft.y : 0.f;
+        size.x = std::isfinite(size.x) ? (std::max)(size.x, 0.f) : 0.f;
+        size.y = std::isfinite(size.y) ? (std::max)(size.y, 0.f) : 0.f;
         const float verticalCenter = topLeft.y + size.y * 0.5f;
         float horizontalPos = topLeft.x;
 
@@ -69,17 +97,80 @@ void TextComponent::TickLayout(float tick)
         {
             horizontalPos += size.x * 0.5f;
         }
+        else if (horizontalAlignment == TextAlignment::Right)
+        {
+            horizontalPos += size.x;
+        }
 
-        pos = { horizontalPos, verticalCenter, currentZ };
+        const float offsetX = std::isfinite(relpos.x) ? relpos.x * layoutScale : 0.f;
+        const float offsetY = std::isfinite(relpos.y) ? relpos.y * layoutScale : 0.f;
+        pos = { horizontalPos + offsetX, verticalCenter + offsetY, currentZ };
         stretchSize = size;
         isStretchX = size.x > 0.f;
         isStretchY = size.y > 0.f;
     }
-    //pos += relpos;
-
     auto  image = GetOwner()->GetComponent<ImageComponent>();
     if (image)
+    {
         _layerorder = image->GetLayerOrder();
+    }
+
+    if (previousPosition.x != pos.x || previousPosition.y != pos.y || previousPosition.z != pos.z
+        || previousSize.x != stretchSize.x || previousSize.y != stretchSize.y
+        || previousScale != layoutScale || previousLayer != _layerorder)
+    {
+        PublishRenderProxyDirty(ProxyDirty::Transform | ProxyDirty::Payload);
+    }
+
+    // Linking is deferred by UIManager, and a Canvas mode/order change can leave
+    // the rectangle unchanged. Include its render state in the text publication boundary.
+    HashedGuid canvasId{};
+    int canvasOrder = 0;
+    CanvasRenderMode renderMode = CanvasRenderMode::ScreenSpaceOverlay;
+    float planeDistance = 100.f;
+    math::matrix4x4 canvasWorld = math::matrix4x4::identity();
+    math::vector4 canvasRect{};
+    if (auto* canvas = GetOwnerCanvas())
+    {
+        canvasId = canvas->GetInstanceID();
+        canvasOrder = canvas->GetCanvasOrder();
+        renderMode = canvas->GetRenderMode();
+        planeDistance = canvas->GetPlaneDistance();
+        if (auto* owner = canvas->GetOwner())
+        {
+            canvasWorld = owner->Transform_().GetRenderWorldMatrix();
+            if (auto* root = owner->GetComponent<RectTransformComponent>())
+            {
+                const auto& rect = root->GetWorldRect();
+                canvasRect = { rect.x, rect.y, rect.width, rect.height };
+            }
+        }
+    }
+    bool canvasChanged = m_layoutCanvasId != canvasId || m_layoutCanvasOrder != canvasOrder
+        || m_layoutRenderMode != renderMode || !same_layout_value(m_layoutPlaneDistance, planeDistance)
+        || !same_layout_value(m_layoutCanvasRect.x, canvasRect.x)
+        || !same_layout_value(m_layoutCanvasRect.y, canvasRect.y)
+        || !same_layout_value(m_layoutCanvasRect.z, canvasRect.z)
+        || !same_layout_value(m_layoutCanvasRect.w, canvasRect.w);
+    for (int row = 0; row < 4; ++row)
+    {
+        for (int column = 0; column < 4; ++column)
+        {
+            canvasChanged = canvasChanged
+                || !same_layout_value(m_layoutCanvasWorld(row, column), canvasWorld(row, column));
+        }
+    }
+    m_layoutCanvasId = canvasId;
+    m_layoutCanvasOrder = canvasOrder;
+    m_layoutRenderMode = renderMode;
+    m_layoutPlaneDistance = planeDistance;
+    m_layoutCanvasWorld = canvasWorld;
+    m_layoutCanvasRect = canvasRect;
+    if (canvasChanged)
+    {
+        PublishRenderProxyDirty(ProxyDirty::Transform | ProxyDirty::Payload);
+    }
+    PrepareTextLayout();
 }
 
 void TextComponent::OnUninitializing()
@@ -140,39 +231,145 @@ void TextComponent::OnRemovingFromScene()
 
 void TextComponent::SetFont(const file::path& path)
 {
-	// ★ 폰트 경로만 든다 (D4, 2026-08-09).
-	//
-	//   예전에는 여기서 DataSystem::LoadSFont로 DirectXTK SpriteFont를
-	//   만들었다. 그것은 ID3D11Device를 요구하는 DX11 타입이고, 만든 뒤에
-	//   그 포인터를 프록시까지 날랐지만 그리는 쪽은 T6에서 사라졌다 -
-	//   즉 아무도 읽지 않는 포인터를 위해 DX11 디바이스를 붙들고 있었다.
-	//
-	//   ★ 게다가 읽을 자산도 없었다. Assets/Font/ 가 비어 있어 LoadSFont는
-	//     존재하지 않는 파일로 SpriteFont를 만들려 하고 있었다.
-	//
-	//   경로는 저작 데이터라 그대로 둔다 - 앞으로 세울 SDF 폰트 계통이
-	//   이 경로에서 아틀라스를 만든다.
-	fontPath = path.filename().string();
-	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    // Registered project assets store their relocation-safe identity. Unregistered
+    // and engine resource requests retain directories, never a colliding basename.
+    FileGuid guid = DataSystems->GetFileGuid(path);
+    if (guid == FileGuid{} && path.is_relative() && !path.empty())
+    {
+        guid = DataSystems->GetFileGuid((PathFinder::Relative() / path).lexically_normal());
+    }
+    const auto utf8 = path.generic_u8string();
+    fontPath = guid != FileGuid{} ? guid.ToString() : std::string(utf8.begin(), utf8.end());
+    m_fontLoadAttempted = false;
+    m_textLayoutDirty = true;
+    PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
 }
-
-
-
-
 
 void TextComponent::OnDeserialized()
 {
-	// CT6-d: 구 ComponentFactory 분기 이동. navigations 수동 복원 루프는
-	// 이식하지 않는다 — typed 역직렬화가 반영 멤버를 채우므로 그 루프는
-	// 이중 적재 버그였다(레거시 벡터 경로의 침묵 실패가 가리던 자리).
-	std::string path = GetFontPath();
-	if (!path.empty())
-	{
-		SetFont(path);
-	}
-	else
-	{
-		Debug::PrintLog(spdlog::level::err, "Text Component is missing font path");
-	}
+    // Empty authoring path selects the packaged runtime font. CPU work happens
+    // at the scene owner boundary, never in a noexcept render proxy constructor.
+    m_fontLoadAttempted = false;
+    m_textLayoutDirty = true;
+}
+
+void TextComponent::SetMessage(std::string value)
+{
+    if (message == value)
+    {
+        return;
+    }
+    message = std::move(value);
+    m_textLayoutDirty = true;
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+}
+
+void TextComponent::SetColor(const math::color& value)
+{
+    color = value;
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+}
+
+void TextComponent::SetAlpha(float alpha)
+{
+    color.a = std::isfinite(alpha) ? std::clamp(alpha, 0.f, 1.f) : 0.f;
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+}
+
+void TextComponent::SetFontSize(float size)
+{
+    fontSize = std::isfinite(size) && size > 0.f ? size : 0.f;
+    m_textLayoutDirty = true;
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+}
+
+void TextComponent::SetRelativePosition(const math::vector2& position)
+{
+    relpos = position;
+    PublishRenderProxyDirty(ProxyDirty::Transform);
+}
+
+void TextComponent::SetHorizontalAlignment(TextAlignment alignment)
+{
+    horizontalAlignment = alignment;
+    m_textLayoutDirty = true;
+    PublishRenderProxyDirty(ProxyDirty::Payload);
+}
+
+void TextComponent::SetManualRect(const math::rect& rect)
+{
+    manualRect = rect;
+    PublishRenderProxyDirty(ProxyDirty::Transform);
+}
+
+void TextComponent::SetUseManualRect(bool use)
+{
+    useManualRect = use;
+    PublishRenderProxyDirty(ProxyDirty::Transform);
+}
+
+void TextComponent::OnPropertyChanged(std::string_view propertyName, Meta::PropertyChangeSource source)
+{
+    // Reflection, undo and CLI property edits use the same invalidation as script setters.
+    if (propertyName == "fontPath")
+    {
+        m_fontLoadAttempted = false;
+    }
+    if (propertyName == "fontPath" || propertyName == "message" || propertyName == "fontSize"
+        || propertyName == "horizontalAlignment")
+    {
+        m_textLayoutDirty = true;
+    }
+    UIComponent::OnPropertyChanged(propertyName, source);
+}
+
+void TextComponent::PrepareTextLayout()
+{
+    const float requestedSize = fontSize * layoutScale;
+    const float pixelSize = std::isfinite(requestedSize) && requestedSize > 0.f ? requestedSize : 0.f;
+    const float width = isStretchX && std::isfinite(stretchSize.x) ? (std::max)(stretchSize.x, 0.f) : 0.f;
+    const std::uint64_t cacheRevision = DataSystems->GetFontCacheRevision();
+    const bool reloadFont = !m_fontLoadAttempted || m_loadedFontPath != fontPath
+        || cacheRevision != m_fontCacheRevision;
+    const bool retryAtlas = m_textLayout && m_textLayout->retryWhenAtlasAvailable
+        && m_font && m_font->CanRetryAtlas();
+    if (!reloadFont && !retryAtlas && !m_textLayoutDirty
+        && pixelSize == m_layoutPixelSize && width == m_layoutWidth)
+    {
+        return;
+    }
+
+    m_textLayoutDirty = false;
+    m_layoutPixelSize = pixelSize;
+    m_layoutWidth = width;
+    m_fontCacheRevision = cacheRevision;
+    std::string error;
+    if (reloadFont)
+    {
+        m_loadedFontPath = fontPath;
+        m_fontLoadAttempted = true;
+        m_font = DataSystems->LoadFontShared(fontPath, error);
+        if (!error.empty())
+        {
+            Debug::PrintLog(spdlog::level::warn, "Text font '{}': {}", fontPath, error);
+            error.clear();
+        }
+    }
+
+    m_textLayout.reset();
+    m_textMeasureSize = { 0.f, 0.f };
+    if (m_font && !message.empty() && std::isfinite(pixelSize) && pixelSize > 0.f)
+    {
+        m_textLayout = m_font->BuildLayout(message, pixelSize, width, horizontalAlignment, error);
+        if (m_textLayout)
+        {
+            m_textMeasureSize = { m_textLayout->width, m_textLayout->height };
+        }
+    }
+    if (!error.empty())
+    {
+        Debug::PrintLog(spdlog::level::warn, "Text font '{}': {}", fontPath, error);
+    }
+    PublishRenderProxyDirty(ProxyDirty::Payload);
 }
 

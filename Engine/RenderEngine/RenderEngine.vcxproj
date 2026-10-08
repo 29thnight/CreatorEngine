@@ -302,6 +302,10 @@
     <ClCompile Include="TerrainMaterial.cpp" />
 	<ClCompile Include="AssetAuthoringPort.cpp" />
     <ClCompile Include="DataSystem.cpp" />
+    <ClCompile Include="FontAsset.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="GpuDiagnostics.cpp" />
     <ClCompile Include="Material.cpp" />
     <ClCompile Include="MaterialPropertyPacker.cpp" />
@@ -628,6 +632,7 @@
     <ClInclude Include="TerrainMesh.h" />
     <ClInclude Include="Interfaces\ToneMapPassSetting.h" />
     <ClInclude Include="DataSystem.h" />
+    <ClInclude Include="FontAsset.h" />
     <ClInclude Include="RHI\IDisplayPresentationSink.h" />
     <ClInclude Include="RHI\RHIDisplayFrame.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "purpose": "Unmodified standalone runtime SDF text faces; Latin default and Korean fallback",
+  "retrieved": "2026-10-08",
+  "files": [
+    {
+      "file": "Inter-Regular.ttf",
+      "family": "Inter",
+      "version": "4.1",
+      "upstream": "https://rsms.me/inter/",
+      "sourceUrl": "https://github.com/rsms/inter/releases/download/v4.1/Inter-4.1.zip",
+      "archiveEntry": "extras/ttf/Inter-Regular.ttf",
+      "archiveSha256": "9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e",
+      "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82",
+      "bytes": 411640,
+      "license": "OFL-1.1",
+      "licenseFile": "LICENSE-Inter.txt",
+      "licenseSha256": "262481e844521b326f5ecd053e59b98c8b2da78c8ee1bdbb6e8174305e54935a",
+      "modifications": "none; byte-identical to Resources/Editor/Fonts/Inter-Regular.ttf"
+    },
+    {
+      "file": "NanumGothic-Regular.ttf",
+      "family": "Nanum Gothic",
+      "upstream": "https://github.com/google/fonts/tree/16680f8688ffcd467d2eb2146a9ce0343404581d/ofl/nanumgothic",
+      "commit": "16680f8688ffcd467d2eb2146a9ce0343404581d",
+      "sourceUrl": "https://raw.githubusercontent.com/google/fonts/16680f8688ffcd467d2eb2146a9ce0343404581d/ofl/nanumgothic/NanumGothic-Regular.ttf",
+      "gitBlob": "2aa2b20905b4136808a0126d8e36e5c0f576715c",
+      "sha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31",
+      "bytes": 2054744,
+      "license": "OFL-1.1",
+      "licenseFile": "LICENSE-NanumGothic.txt",
+      "licenseSourceUrl": "https://raw.githubusercontent.com/google/fonts/16680f8688ffcd467d2eb2146a9ce0343404581d/ofl/nanumgothic/OFL.txt",
+      "licenseGitBlob": "69ff40157d0bba4c65e4ecf77564e1f01d0b02a5",
+      "licenseSha256": "eeacf16032901d0ed0456876ec77b8f0fda6b3fecec7d972f8543eb602e6c30f",
+      "modifications": "none; original static TrueType file, not subset or converted"
+    }
+  ]
+}

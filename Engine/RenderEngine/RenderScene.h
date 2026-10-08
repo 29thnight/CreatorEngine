@@ -32,6 +32,15 @@ public:
 	using LightProxySnapshot	= std::vector<std::shared_ptr<LightRenderProxy>>;
 	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
 	using UIProxySnapshot		= std::vector<std::shared_ptr<UIRenderProxy>>;
+
+    struct UIDrawState
+    {
+        HashedGuid instanceId{};
+        bool enabled{ false };
+        std::variant<UIRenderProxy::ImageData, UIRenderProxy::TextData,
+            UIRenderProxy::SpriteSheetData> data;
+    };
+    using UIDrawSnapshot = std::vector<UIDrawState>;
 public:
 	RenderScene() = default;
 	~RenderScene();
@@ -96,6 +105,9 @@ public:
 	// 값 읽기는 락 밖에서 한다.
 	LightProxySnapshot GetLightProxySnapshot();
 	UIProxySnapshot GetUIProxySnapshot();
+    // 진단은 GT에서 실행될 수 있으므로 live proxy 대신 락 안에서 복사한
+    // 값만 반환한다. RT의 ProxyCommand::Apply와 같은 락을 사용한다.
+    UIDrawSnapshot GetUIDrawSnapshot();
 	Scene* GetScene() const { return m_currentScene.load(std::memory_order_acquire); }
 
 	// 진단용 컨테이너 크기 스냅샷.

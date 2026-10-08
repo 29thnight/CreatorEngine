@@ -32,6 +32,7 @@ struct AssetBundleLoadResult
 class ModelLoader;
 class Model;
 class Material;
+class FontAsset;
 struct ShaderMeta;
 namespace Authoring { class WriteNode; }
 namespace experiment { struct Material; } // I5-D5c1 저작 원본 보관
@@ -49,6 +50,7 @@ enum class RuntimeAssetType
 	SpriteSheet,
 	ShaderMeta,
     MaterialGraph,
+    Font,
 };
 
 enum class RuntimeAssetChangeKind
@@ -235,6 +237,16 @@ public:
 	// Texture 의 m_assetPath 가 그 키이고, 저장하면 같은 파일로 돌아온다.
 	std::shared_ptr<Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
 	std::vector<std::pair<std::string, std::shared_ptr<Texture>>> SnapshotTextures();
+    // CPU SDF fonts use catalog GUID + normalized resolved path identity, never
+    // the basename. Accepts a catalog GUID or a source path; an empty path
+    // selects the bundled engine default.
+    std::shared_ptr<FontAsset> LoadFontShared(std::string_view path, std::string& error);
+    std::vector<std::pair<std::string, std::shared_ptr<FontAsset>>> SnapshotFonts() const;
+    std::size_t SnapshotFontCount() const;
+    std::uint64_t GetFontCacheRevision() const noexcept
+    {
+        return m_fontCacheRevision.load(std::memory_order_acquire);
+    }
 	//Resource Material
 	void InsertMaterial(std::shared_ptr<Material> material);
 	std::shared_ptr<Material> FindCachedMaterial(std::string_view name);
@@ -323,12 +335,12 @@ public:
 	// 캐시별 보호 규약(모델 generation cache는 자체 동기화 — ModelAssetGenerationCache).
 	//   m_materialMutex : Materials
 	//   m_textureMutex  : Textures / UITextures / SpriteSheets
-	//   m_fontMutex     : SFonts
+	//   m_fontMutex     : m_fonts
 	// 이 맵들은 LoadAssetBundle이 스레드풀로 병렬 로딩하므로,
 	// 조회·삽입 시 반드시 해당 뮤텍스를 잡아야 한다.
 	std::mutex m_textureMutex;
 	std::mutex m_materialMutex;
-	std::mutex m_fontMutex;
+	mutable std::mutex m_fontMutex;
 	mutable std::mutex m_retainedAssetsMutex;
 
 	// I5-D5c1 — base 재질 자산의 저작 원본 캐시(GUID 키). legacy Materials
@@ -361,6 +373,11 @@ public:
 	std::atomic<std::uint64_t> m_generationLoadFailed{ 0 };
 
 private:
+    static constexpr std::size_t kMaxCachedFonts = 32u;
+    DataContainer<FontAsset> m_fonts;
+    std::atomic<std::uint64_t> m_fontCacheRevision{ 1 };
+    std::shared_ptr<FontAsset> LoadFontFile(const file::path& path, std::string& error) const;
+    bool ReloadCachedFont(const file::path& path, FileGuid guid, std::string& error);
     std::shared_ptr<PreparedRuntimeAsset> PrepareRuntimeAsset(
         FileGuid guid, const file::path& path, RuntimeAssetType type);
     bool PublishRuntimeAsset(const std::shared_ptr<PreparedRuntimeAsset>& asset, std::string& error);

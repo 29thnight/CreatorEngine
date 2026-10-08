@@ -8,6 +8,7 @@
 #include "MaterialGraphSceneCompiler.h"
 #include "Mesh.h"
 #include "Texture.h"
+#include "FontAsset.h"
 #include "Sha256.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <fstream> // I7-C1: manifest 읽기
@@ -171,6 +172,10 @@ namespace
 			if (parent == "spritesheets") return RuntimeAssetType::SpriteSheet;
 			return RuntimeAssetType::Texture;
 		}
+        if (extension == ".ttf" || extension == ".otf")
+        {
+            return RuntimeAssetType::Font;
+        }
 		if (extension == ".shadermeta") return RuntimeAssetType::ShaderMeta;
         if (extension == ".shadergraph")
             return RuntimeAssetType::MaterialGraph;
@@ -194,6 +199,80 @@ namespace
 		}
 		return PathFinder::Relative(std::string(fallbackDirectory)) / requested.filename();
 	}
+
+    file::path normalize_font_path(const file::path& path)
+    {
+        std::error_code error;
+        const auto canonical = file::weakly_canonical(path, error);
+        if (!error)
+        {
+            return canonical.lexically_normal();
+        }
+        return file::absolute(path).lexically_normal();
+    }
+
+    file::path resolve_font_path(std::string_view requestedPath, const DataSystem& data)
+    {
+        if (requestedPath.empty())
+        {
+            return normalize_font_path(PathFinder::EngineResourcePath("Fonts/Runtime/Inter-Regular.ttf"));
+        }
+        if (requestedPath.size() == 36u && requestedPath[8] == '-' && requestedPath[13] == '-'
+            && requestedPath[18] == '-' && requestedPath[23] == '-')
+        {
+            const FileGuid guid{ std::string(requestedPath) };
+            const auto resolved = data.GetFilePath(guid);
+            if (resolved.empty())
+            {
+                throw std::runtime_error("Font catalog GUID is unresolved: " + std::string(requestedPath));
+            }
+            return normalize_font_path(resolved);
+        }
+        const file::path requested(std::u8string(requestedPath.begin(), requestedPath.end()));
+        if (requested.is_absolute())
+        {
+            return normalize_font_path(requested);
+        }
+        std::error_code error;
+        // Folder-qualified requests retain their full identity even on failure.
+        // Never redirect a missing A/font.ttf to an unrelated B/font.ttf.
+        if (requested.has_parent_path())
+        {
+            const auto underAssets = PathFinder::Relative() / requested;
+            if (file::is_regular_file(underAssets, error))
+            {
+                return normalize_font_path(underAssets);
+            }
+            error.clear();
+            const auto underResources = PathFinder::EngineResourcePath() / requested;
+            if (file::is_regular_file(underResources, error))
+            {
+                return normalize_font_path(underResources);
+            }
+            return normalize_font_path(underAssets);
+        }
+        for (const auto& candidate : { PathFinder::Relative("Fonts") / requested,
+            PathFinder::Relative("Font") / requested,
+            PathFinder::EngineResourcePath("Fonts/Runtime") / requested })
+        {
+            error.clear();
+            if (file::is_regular_file(candidate, error))
+            {
+                return normalize_font_path(candidate);
+            }
+        }
+        return normalize_font_path(PathFinder::Relative("Fonts") / requested);
+    }
+
+    std::string font_cache_key(const file::path& path, FileGuid guid)
+    {
+        const auto utf8Path = normalize_font_path(path).generic_u8string();
+        std::string normalized(utf8Path.begin(), utf8Path.end());
+#ifdef _WIN32
+        normalized = Lowercase(std::move(normalized));
+#endif
+        return guid.ToString() + "|" + normalized;
+    }
 
 	// G2 — 텍스처 캐시의 신원. stem 은 신원이 아니다: 다른 폴더의 같은 이름,
 	// 같은 이름의 다른 확장자가 한 칸을 나눠 먼저 온 쪽이 이겼다.
@@ -630,6 +709,7 @@ std::shared_ptr<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAsset
         const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
         const auto path = type == ManagedAssetType::Material
             ? PathFinder::Relative("Materials\\") / (file::path(entry.assetName).stem().string() + ".asset")
+            : type == ManagedAssetType::SpriteFont ? resolve_font_path(entry.assetName, *this)
             : ResolveRuntimeAssetPath(entry.assetName, type == ManagedAssetType::Model ? "Models\\" : "Textures\\");
         auto guid = GetFileGuid(path);
         if (guid == FileGuid{} && type == ManagedAssetType::Model)
@@ -645,7 +725,7 @@ std::shared_ptr<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAsset
     std::erase_if(preparation->resources.assets, [](const AssetEntry& entry)
     {
         const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
-        return type == ManagedAssetType::Model || type == ManagedAssetType::SpriteFont;
+        return type == ManagedAssetType::Model;
     });
     for (std::size_t index = 0; index < documents.size(); ++index)
     {
@@ -1082,6 +1162,11 @@ void DataSystem::Finalize()
     }
 	UITextures.clear();
 	SpriteSheets.clear();
+    {
+        std::lock_guard lock(m_fontMutex);
+        m_fonts.clear();
+        m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+    }
 	{
 		std::lock_guard retainedGuard(m_retainedAssetsMutex);
 		m_retainedAssets.clear();
@@ -2949,10 +3034,173 @@ Material* DataSystem::CreateMaterial()
 	return nullptr;
 }
 
-// ★ LoadSFont(DirectXTK SpriteFont)를 걷었다 (D4, 2026-08-09).
-//   ID3D11Device로 폰트를 만들던 유일한 자리였고, 그 결과를 그리는 쪽은
-//   T6에서 사라졌다. 게다가 Assets/Font/ 가 비어 있어 읽을 자산도 없었다.
-//   폰트는 SDF 계통으로 새로 세운다.
+std::shared_ptr<FontAsset> DataSystem::LoadFontFile(const file::path& path, std::string& error) const
+{
+    const auto extension = Lowercase(path.extension().string());
+    if (extension != ".ttf" && extension != ".otf")
+    {
+        error = "SDF fonts require TTF/OTF; legacy .spritefont binaries are not supported: " + path.string();
+        return {};
+    }
+    auto font = FontAsset::Load(path, error);
+    if (!font)
+    {
+        return {};
+    }
+    const auto fallback = normalize_font_path(PathFinder::EngineResourcePath("Fonts/Runtime/NanumGothic-Regular.ttf"));
+    if (path != fallback)
+    {
+        std::string fallbackError;
+        if (!font->AddFallback(fallback, fallbackError))
+        {
+            error = "Font loaded without its bundled Korean fallback: " + fallbackError;
+        }
+    }
+    return font;
+}
+
+std::shared_ptr<FontAsset> DataSystem::LoadFontShared(std::string_view requestedPath, std::string& error)
+{
+    error.clear();
+    try
+    {
+        const auto path = resolve_font_path(requestedPath, *this);
+        const auto key = font_cache_key(path, GetFileGuid(path));
+        std::uint64_t loadEpoch;
+        {
+            std::lock_guard preparationLock(m_assetPreparationMutex);
+            if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
+            {
+                error = "Font loading is unavailable while the asset cache is changing.";
+                return {};
+            }
+            loadEpoch = m_assetPreparationEpoch;
+            std::lock_guard lock(m_fontMutex);
+            if (const auto found = m_fonts.find(key); found != m_fonts.end())
+            {
+                return found->second;
+            }
+            // A catalog upsert may attach a GUID to an already loaded path.
+            // Re-key that owner instead of duplicating its bytes and atlas.
+            for (auto iterator = m_fonts.begin(); iterator != m_fonts.end(); ++iterator)
+            {
+                if (iterator->second->GetPath() == path)
+                {
+                    auto font = iterator->second;
+                    const auto oldKey = iterator->first;
+                    m_fonts.emplace(key, font);
+                    m_fonts.erase(oldKey);
+                    return font;
+                }
+            }
+            if (m_fonts.size() >= kMaxCachedFonts)
+            {
+                error = "Font cache reached its 32-font budget.";
+                return {};
+            }
+        }
+        // Never hold the preparation/cache locks across disk or parser work.
+        // Concurrent misses may prepare duplicate candidates; one owner wins.
+        auto font = LoadFontFile(path, error);
+        if (!font)
+        {
+            return {};
+        }
+        std::lock_guard preparationLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0 || loadEpoch != m_assetPreparationEpoch)
+        {
+            error = "Font asset changed while its bytes were being prepared.";
+            return {};
+        }
+        std::lock_guard lock(m_fontMutex);
+        if (const auto found = m_fonts.find(key); found != m_fonts.end())
+        {
+            error.clear(); // The accepted winner, not this discarded candidate, is returned.
+            return found->second;
+        }
+        if (m_fonts.size() >= kMaxCachedFonts)
+        {
+            error = "Font cache reached its 32-font budget.";
+            return {};
+        }
+        m_fonts.emplace(key, font);
+        return font;
+    }
+    catch (const std::exception& exception)
+    {
+        error = std::string("Font load failed: ") + exception.what();
+        return {};
+    }
+}
+
+std::vector<std::pair<std::string, std::shared_ptr<FontAsset>>> DataSystem::SnapshotFonts() const
+{
+    std::lock_guard lock(m_fontMutex);
+    return { m_fonts.begin(), m_fonts.end() };
+}
+
+std::size_t DataSystem::SnapshotFontCount() const
+{
+    std::lock_guard lock(m_fontMutex);
+    return m_fonts.size();
+}
+
+bool DataSystem::ReloadCachedFont(const file::path& source, FileGuid guid, std::string& error)
+{
+    try
+    {
+        const auto path = normalize_font_path(source);
+        const auto prefix = guid.ToString() + "|";
+        std::vector<std::string> keys;
+        {
+            std::lock_guard lock(m_fontMutex);
+            for (const auto& [key, font] : m_fonts)
+            {
+                if (font->GetPath() == path || (guid != FileGuid{} && key.starts_with(prefix)))
+                {
+                    keys.push_back(key);
+                }
+            }
+        }
+        if (keys.empty())
+        {
+            // A previously missing/invalid requested font may now exist. Wake
+            // failed component loads too, without reading unused font bytes.
+            m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+            return true;
+        }
+        auto replacement = LoadFontFile(path, error);
+        if (!replacement)
+        {
+            return false; // Keep the last valid font and layouts.
+        }
+        const auto replacementKey = font_cache_key(path, guid);
+        std::lock_guard lock(m_fontMutex);
+        const bool stillResident = std::any_of(keys.begin(), keys.end(), [this](const std::string& key)
+        {
+            return m_fonts.contains(key);
+        });
+        if (stillResident)
+        {
+            // Insert before detach: allocation failure preserves accepted owners.
+            m_fonts.insert_or_assign(replacementKey, std::move(replacement));
+            for (const auto& key : keys)
+            {
+                if (key != replacementKey)
+                {
+                    m_fonts.erase(key);
+                }
+            }
+        }
+        m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+        return true;
+    }
+    catch (const std::exception& exception)
+    {
+        error = std::string("Font reload failed: ") + exception.what();
+        return false;
+    }
+}
 
 // ★ 콘텐츠 브라우저 UI 전체가 여기 있었다 (PHASE 4-3 슬라이스 2).
 //   창 등록과 그리기 함수 일곱, 그리고 그 상태(현재 폴더·검색 필터·
@@ -3212,9 +3460,30 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 	switch (change.kind)
 	{
 	case RuntimeAssetChangeKind::CatalogUpsert:
-		return RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
+    {
+        const bool registered = RegisterAssetMeta(*m_assetMetaRegistry, change.guid, change.path);
+        if (registered && assetType == RuntimeAssetType::Font)
+        {
+            m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+        }
+        return registered;
+    }
 	case RuntimeAssetChangeKind::ContentReload:
-
+        if (assetType == RuntimeAssetType::Font)
+        {
+            const auto guid = change.guid != FileGuid{} ? change.guid : GetFileGuid(change.path);
+            std::string error;
+            if (!ReloadCachedFont(change.path, guid, error))
+            {
+                Debug::PrintLog(spdlog::level::err, "SDF font reload retained the accepted font: " + error);
+                return false;
+            }
+            if (!error.empty())
+            {
+                Debug::PrintLog(spdlog::level::warn, "SDF font reload: " + error);
+            }
+            return guid == FileGuid{} || RegisterAssetMeta(*m_assetMetaRegistry, guid, change.path);
+        }
         if (assetType == RuntimeAssetType::MaterialGraph)
         {
             const FileGuid guid = change.guid != FileGuid{} ? change.guid : m_assetMetaRegistry->GetGuid(change.path);
@@ -3261,6 +3530,25 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
 	if (RuntimeAssetType::Auto == assetType)
 		assetType = ResolveRuntimeAssetType(path);
 	if (RuntimeAssetType::CatalogOnly == assetType) return;
+    if (assetType == RuntimeAssetType::Font)
+    {
+        const auto normalized = normalize_font_path(path);
+        if (guid == FileGuid{})
+        {
+            guid = GetFileGuid(path);
+        }
+        const auto prefix = guid.ToString() + "|";
+        std::lock_guard lock(m_fontMutex);
+        const auto removed = std::erase_if(m_fonts, [&](const auto& item)
+        {
+            return item.second->GetPath() == normalized || (guid != FileGuid{} && item.first.starts_with(prefix));
+        });
+        if (removed != 0u)
+        {
+            m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+        }
+        return;
+    }
     if (assetType == RuntimeAssetType::MaterialGraph)
     {
         if (guid == FileGuid{} && m_assetMetaRegistry)
@@ -3416,10 +3704,14 @@ job_group MakeAssetBundleJobs(DataSystem& data, const AssetBundle& bundle,
 				data.LoadTexture(name.string());
 				break;
 			case ManagedAssetType::SpriteFont:
-				// 폰트 로딩은 D4에서 은퇴했다(DX11 SpriteFont). 번들에 옛
-				// 항목이 남아 있어도 조용히 건너뛴다 - SDF 계통이 서면
-				// 그때 새 타입으로 받는다.
-				break;
+            {
+                std::string error;
+                if (!data.LoadFontShared(name.string(), error) || !error.empty())
+                {
+                    Debug::PrintLog(spdlog::level::warn, "SDF font bundle load: " + error);
+                }
+                break;
+            }
 			default:
 				break;
 			}
@@ -3455,6 +3747,12 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 		std::string key;
 		switch (static_cast<ManagedAssetType>(entry.assetTypeID))
 		{
+        case ManagedAssetType::SpriteFont:
+        {
+            const auto path = resolve_font_path(entry.assetName, *this);
+            key = font_cache_key(path, GetFileGuid(path));
+            break;
+        }
 		case ManagedAssetType::Texture:
 			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::Texture)));
 			break;
@@ -3524,6 +3822,12 @@ void DataSystem::UnloadUnusedAssets()
 		}
 	};
 
+    const auto fontCount = SnapshotFontCount();
+    removeUnused(m_fonts, static_cast<int>(ManagedAssetType::SpriteFont), m_fontMutex);
+    if (fontCount != SnapshotFontCount())
+    {
+        m_fontCacheRevision.fetch_add(1, std::memory_order_release);
+    }
 	removeUnused(Materials,    static_cast<int>(ManagedAssetType::Material),    m_materialMutex);
 	removeUnused(Textures,     static_cast<int>(ManagedAssetType::Texture),     m_textureMutex);
 	// 예전에는 이 두 캐시가 ManagedAssetType에 없어 언로드 대상에서 아예 빠져 있었다(12.2-②).

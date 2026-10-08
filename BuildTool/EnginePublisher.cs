@@ -113,6 +113,7 @@ internal static class EnginePublisher
             if (!expected.Success || int.Parse(expected.Groups[1].Value) != api || hosts.Any(h => h.Value!.Int("scriptApi") != api))
                 throw new BuildException("Native and managed script API versions differ.");
             foreach (var name in GameCompiler.CoreFiles) Copy(Path.Combine(binarySource, "Managed", name), Path.Combine(binaryTarget, "Managed", name));
+            RuntimeFonts.Require(binarySource);
             Tree(Path.Combine(binarySource, "Resources"), Path.Combine(binaryTarget, "Resources"));
             var dotnetRoot = Path.GetDirectoryName(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory().TrimEnd(Path.DirectorySeparatorChar))!;
             dotnetRoot = Directory.GetParent(dotnetRoot)!.Parent!.FullName;
