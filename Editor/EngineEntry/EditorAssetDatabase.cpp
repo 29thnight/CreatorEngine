@@ -1641,12 +1641,32 @@ private:
 		for (const auto& entry : file::recursive_directory_iterator(
 			m_root, file::directory_options::skip_permission_denied))
 		{
-			if (!entry.is_regular_file() || !IsTargetFile(entry.path())) continue;
+			if (!entry.is_regular_file() || !IsTargetFile(entry.path()))
+			{
+				continue;
+			}
 			const file::path metaPath = entry.path().string() + ".meta";
 			if (file::exists(metaPath))
+			{
+				// Existing GUID-only audio sidecars predate the import policy.
+				// Migrate them through the normal validated importer, preserving
+				// their identity; malformed/current policies still fail closed.
+				if (assets::IsAudioClipSource(entry.path()))
+				{
+					std::string parseError;
+					const auto prior = Authoring::WriteDocument::ParseFile(metaPath, &parseError);
+					if (prior && prior->Root().IsMap() && !prior->Root().HasChild("audioClip"))
+					{
+						CreateMeta(entry.path());
+						continue;
+					}
+				}
 				RegisterMetaFile(metaPath);
+			}
 			else
+			{
 				CreateMeta(entry.path());
+			}
 		}
 	}
 
@@ -2131,7 +2151,7 @@ private:
 	const std::unordered_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
-		".hlsl", ".slang", ".shadermeta", ".shader", ".cpp", ".cs",
+		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".cs",
 		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont",
 		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서

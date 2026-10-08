@@ -12,6 +12,9 @@ internal static class GamePackager
         var frames = options.Number("smoke-frames", 120, 1, 1000000); var timeout = options.Number("smoke-timeout-sec", 180, 10, 3600);
         var repository = Paths.Repository(options.Get("repository"));
         var project = Paths.Canonical(options.Get("project", Path.Combine(repository, "Dynamic_CPP")), true);
+        if (mode != "Project" && options.Get("asset-list").Length > 0)
+            throw new BuildException("--asset-list supports only Project input mode.");
+        var selectedAssets = PackageInputs.ReadAssetList(project, options.Get("asset-list"), options.Get("startup-scene"));
         var stageDefault = File.Exists(Path.Combine(repository, "engine.manifest.json")) ? Path.Combine(project, "Build/Staging") : Path.Combine(repository, "Build/Staging");
         var stage = Paths.Canonical(options.Get("stage-root", stageDefault));
         var assets = Paths.Canonical(Path.Combine(project, "Assets"), true); var settings = Paths.Canonical(Path.Combine(project, "ProjectSetting"), true);
@@ -55,7 +58,7 @@ internal static class GamePackager
                 baseCount = PackageInputs.CopyProject(Path.Combine(snapshot, "Dynamic_CPP"), baseRoot, context.Cancellation);
             }
             else if (mode == "Workspace") baseCount = await PackageInputs.CopyWorkspace(context, repository, project, baseRoot);
-            else baseCount = PackageInputs.CopyProject(project, baseRoot, context.Cancellation);
+            else baseCount = PackageInputs.CopyProject(project, baseRoot, context.Cancellation, selectedAssets);
             var packageAssets = Path.Combine(baseRoot, "Assets");
             if (Directory.Exists(Path.Combine(packageAssets, "Derived"))) throw new BuildException("Package source contains a stale/authored Derived tree.");
             var generation = await AssetCooking.Generations(context, cooker, packageAssets, generations, mode == "Tracked" ? "" : Path.Combine(project, "Library/ModelAssetGenerations"));
@@ -121,7 +124,7 @@ internal static class GamePackager
             var contentDigest = Metadata.Digest(entries); var distributionDigest = Metadata.Digest(runtimeEntries.Append(new("GameAssets.logical", 0, contentDigest)));
             var manifest = Metadata.Object(new { schemaVersion = 2, workspaceHead = gitCommit, workspaceDirty = dirty, packageInputRevision = packageRevision,
                 nativeSource = "ENGINE_DISTRIBUTION", engineVersion = engine.Manifest.Text("version"), engineBuildId = engine.Manifest.Text("buildId"), nativeBuildRequested = options.Flag("build-native"),
-                config, shipping, developmentBuild = !shipping, inputMode = mode, baseFileCount = baseCount, generatedFileCount = 1 + cook.DerivedFileCount, entryCount = entries.Length, contentDigest,
+                config, shipping, developmentBuild = !shipping, inputMode = mode, selectedAssetPaths = selectedAssets?.Order(StringComparer.Ordinal).ToArray(), baseFileCount = baseCount, generatedFileCount = 1 + cook.DerivedFileCount, entryCount = entries.Length, contentDigest,
                 settingsTemplateSha256 = Metadata.Hash(template), runtimeSettingsSha256 = Metadata.Hash(settingsFile), authoringRuntimeSettingsSha256 = settingsHash,
                 startupScene = preflight.StartupScene, renderBackend = preflight.RuntimeBackend, startupSceneSha256 = Metadata.Hash(Path.Combine(merged, "Assets/Scenes/" + preflight.StartupScene)),
                 startupSceneScriptComponentCount = preflight.SceneCounts["Script"], managedLifecycleRequired = preflight.RequiresManagedLifecycle,

@@ -15,6 +15,13 @@
 #include <span>
 #include <string>
 #include <string_view>
+#if defined(_WIN32)
+#include <cstdio>
+#include <io.h>
+#include <share.h>
+#include <mutex>
+#include <unordered_map>
+#endif
 
 namespace experiment::cooked
 {
@@ -97,6 +104,22 @@ namespace experiment::cooked
         [[nodiscard]] bool Size(std::string_view path,
             std::uint64_t& out, std::string& failure) const override
         {
+#if defined(_WIN32)
+            const auto pinned = Pin(path, failure);
+            if (!pinned)
+            {
+                return false;
+            }
+            std::lock_guard lock(pinned->mutex);
+            const auto size = _filelengthi64(_fileno(pinned->file));
+            if (size < 0)
+            {
+                failure = "pinned cooked artifact size cannot be read";
+                return false;
+            }
+            out = static_cast<std::uint64_t>(size);
+            return true;
+#else
             std::filesystem::path file;
             if (!Resolve(path, file, failure)) return false;
             std::error_code error;
@@ -112,6 +135,7 @@ namespace experiment::cooked
                 return false;
             }
             return true;
+#endif
         }
 
         [[nodiscard]] bool ReadAt(std::string_view path,
@@ -130,6 +154,21 @@ namespace experiment::cooked
                 return false;
             }
             if (out.empty()) return true;
+#if defined(_WIN32)
+            const auto pinned = Pin(path, failure);
+            if (!pinned)
+            {
+                return false;
+            }
+            std::lock_guard lock(pinned->mutex);
+            if (_fseeki64(pinned->file, static_cast<__int64>(offset), SEEK_SET) != 0 ||
+                std::fread(out.data(), 1, out.size(), pinned->file) != out.size())
+            {
+                failure = "pinned cooked artifact range cannot be read";
+                return false;
+            }
+            return true;
+#else
             std::filesystem::path file;
             if (!Resolve(path, file, failure)) return false;
             std::ifstream input(file, std::ios::binary);
@@ -142,9 +181,55 @@ namespace experiment::cooked
                 return false;
             }
             return true;
+#endif
         }
 
     private:
+#if defined(_WIN32)
+        struct PinnedFile
+        {
+            std::FILE* file{};
+            std::mutex mutex;
+
+            ~PinnedFile()
+            {
+                if (file)
+                {
+                    std::fclose(file);
+                }
+            }
+        };
+
+        // A clip retains this byte source. Denying writers pins the validated
+        // file identity and bytes until the last consumer releases the mount.
+        [[nodiscard]] std::shared_ptr<PinnedFile> Pin(std::string_view path,
+            std::string& failure) const
+        {
+            std::lock_guard lock(filesMutex_);
+            const std::string key(path);
+            if (const auto existing = files_.find(key); existing != files_.end())
+            {
+                return existing->second;
+            }
+            std::filesystem::path resolved;
+            if (!Resolve(path, resolved, failure))
+            {
+                return {};
+            }
+            auto pinned = std::make_shared<PinnedFile>();
+            pinned->file = _wfsopen(resolved.c_str(), L"rb", _SH_DENYWR);
+            if (!pinned->file)
+            {
+                failure = "cooked artifact cannot be pinned against writes";
+                return {};
+            }
+            files_.emplace(key, pinned);
+            return pinned;
+        }
+
+        mutable std::mutex filesMutex_;
+        mutable std::unordered_map<std::string, std::shared_ptr<PinnedFile>> files_;
+#endif
         [[nodiscard]] bool Resolve(std::string_view virtualPath,
             std::filesystem::path& out, std::string& failure) const
         {
@@ -231,8 +316,9 @@ namespace experiment::cooked
 
     // Opening streams through the artifact once to verify both the CEMF
     // digest and CEAC payload digest. Later reads remain bounded by CEAC.
-    // The caller must keep the mounted bytes immutable for the clip lifetime;
-    // these path-based readers do not pin an OS file identity across reads.
+    // The caller must keep the mounted bytes immutable for the clip lifetime.
+    // Windows loose mounts pin a read handle denying writes; other byte sources
+    // retain their own immutability contract.
     [[nodiscard]] inline bool OpenCookedAudioClipEntry(
         const CookedAssetManifestEntry& entry,
         std::shared_ptr<const ArtifactByteSource> bytes,

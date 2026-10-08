@@ -297,6 +297,34 @@ ModelMaterialGraphPublication::~ModelMaterialGraphPublication()
     }
 }
 
+    std::optional<LX::LXMaterialAsset> BuildDefaultMaterialGraph(std::string& error)
+    {
+        LXMaterialAsset graph;
+        const auto surface = graph.CreateNode("ShaderNodeBsdfPrincipled", 0, 0);
+        graph.activeOutput = graph.CreateNode("ShaderNodeOutputMaterial", 510, 50);
+        const auto* bsdf = graph.graph.FindNode(surface);
+        const auto* output = graph.graph.FindNode(graph.activeOutput);
+        if (!bsdf || !output)
+        {
+            error = "Cannot create default material graph nodes";
+            return {};
+        }
+        const auto source = std::ranges::find_if(bsdf->pins, [](const auto& pin) { return pin.Identifier() == "BSDF"; });
+        const auto target = std::ranges::find_if(output->pins, [](const auto& pin) { return pin.Identifier() == "Surface"; });
+        if (source == bsdf->pins.end() || target == output->pins.end() || !graph.graph.Connect(source->id, target->id, &error))
+        {
+            return {};
+        }
+        std::vector<LXMaterialDiagnostic> diagnostics;
+        if (!GenerateMaterialSlang(graph, &diagnostics))
+        {
+            error = diagnostics.empty() ? "Default graph generation failed" : diagnostics.front().message;
+            return {};
+        }
+        error.clear();
+        return graph;
+    }
+
 bool ModelMaterialGraphPublication::Prepare(const std::filesystem::path& assets, const Uuid::Uuid16& modelId,
                                             std::span<const experiment::Material> materials, std::string& error)
 {
@@ -314,18 +342,20 @@ bool ModelMaterialGraphPublication::Prepare(const std::filesystem::path& assets,
         const bool hasMeta = std::filesystem::exists(meta);
         if (hasGraph || hasMeta)
         {
-            const auto document = Authoring::ParsedDocument::ParseText(ReadText(meta), error);
-            if (!hasGraph || !hasMeta || !document || document.Root()["guid"].AsString() != Uuid::ToString(graphId) ||
-                !LXMaterialAsset::Load(path, CreateMaterialDefinitions(), &error))
-            {
-                error = "Existing model material graph or identity is invalid: " + path.string() + ". " + error;
-                return false;
-            }
+            // Authored graph failures must not reject valid geometry or overwrite the source.
+            // The consuming Editor material publishes a separate editable default graph.
             continue;
         }
-        const auto graph = BuildModelMaterialGraph(material, error);
+        auto graph = BuildModelMaterialGraph(material, error);
         if (!graph)
-            return false;
+        {
+            graph = BuildDefaultMaterialGraph(error);
+            if (!graph)
+            {
+                return false;
+            }
+            error.clear();
+        }
         const auto text = LXMaterialArchive::Write(*graph);
         const auto restored = LXMaterialArchive::Read(text, graph->Definitions(), &error);
         if (!restored || !graph->Equals(*restored))

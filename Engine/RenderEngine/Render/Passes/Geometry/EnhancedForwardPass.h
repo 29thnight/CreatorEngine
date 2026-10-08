@@ -120,6 +120,7 @@ public:
     const char* GetName() const override { return "Forward+"; }
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
+    bool InitializeGraphLighting(const EnhancedFrameContext& context, std::string& outError);
     /// frame packet의 primary Forward ShaderMeta generation을 일반/Reference
     /// graphics request 쌍으로 전환한다. 두 후보가 모두 준비된 뒤에만 현재
     /// generation을 바꾸므로 한쪽 compile 실패가 기존 대조 쌍을 끊지 않는다.
@@ -251,7 +252,7 @@ public:
 private:
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
+    bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError, bool nativeMaterials = true);
     bool BuildShadePipelineDesc(const EnhancedFrameContext& context,
         const char* shaderFile, const char* vertexEntry, const char* pixelEntry,
         const ShaderRenderState* renderState,

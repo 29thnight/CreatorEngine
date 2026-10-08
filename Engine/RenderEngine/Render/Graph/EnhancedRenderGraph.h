@@ -445,8 +445,32 @@ public:
         RGSchedulingMode scheduling{RGSchedulingMode::DeclarationOrder};
         RGOrderPolicy orderPolicy{RGOrderPolicy::DependencyOrder};
         // 뷰 귀속은 게시자가 채운다. 그래프 복사본은 GPU 리소스를 소유하지 않는다.
-        uint64_t viewId{0}, frameId{0};
+        uint64_t viewId{0}, frameId{0}, historyRevision{0}, sceneEpoch{0};
         uint32_t width{0}, height{0};
+        uint64_t copyNanoseconds{0};
+        // Vector/string capacities; allocator bookkeeping is excluded.
+        size_t StorageBytes() const
+        {
+            size_t bytes = sizeof(*this) + passes.capacity() * sizeof(DiagnosticPass) +
+                resources.capacity() * sizeof(DiagnosticResource) + executeOrder.capacity() * sizeof(uint16_t) +
+                reachabilityEdges.capacity() * sizeof(ReachabilityEdge) + versionEdges.capacity() * sizeof(VersionEdge) +
+                dependencyWaves.capacity() * sizeof(int32_t) + criticalPath.capacity() * sizeof(uint16_t);
+            for (const auto& resource : resources)
+            {
+                bytes += resource.name.capacity();
+            }
+            for (const auto& pass : passes)
+            {
+                bytes += pass.name.capacity() + pass.usages.capacity() * sizeof(DiagnosticUsage) +
+                    pass.barriers.capacity() * sizeof(DiagnosticBarrier) + pass.phases.capacity() * sizeof(DiagnosticPass::Phase);
+                for (const auto& phase : pass.phases)
+                {
+                    bytes += phase.name.capacity() + phase.usages.capacity() * sizeof(DiagnosticUsage) +
+                        (phase.firstBarriers.capacity() + phase.repeatBarriers.capacity()) * sizeof(DiagnosticBarrier);
+                }
+            }
+            return bytes;
+        }
     };
     bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 

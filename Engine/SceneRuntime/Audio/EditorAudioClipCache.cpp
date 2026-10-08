@@ -167,10 +167,10 @@ namespace wave
                 unlinkat(m_handle, leaf.c_str(), 0);
 #endif
             }
-            void RemoveDirectory(const std::filesystem::path& leaf) const noexcept
+            void RemoveChildDirectory(const std::filesystem::path& leaf) const noexcept
             {
 #if defined(_WIN32)
-                RemoveDirectoryW((m_path / leaf).c_str());
+                ::RemoveDirectoryW((m_path / leaf).c_str());
 #else
                 unlinkat(m_handle, leaf.c_str(), AT_REMOVEDIR);
 #endif
@@ -361,7 +361,7 @@ namespace wave
                 staging->RemoveFile("artifact.ceac");
                 staging->Close();
                 staging.reset();
-                root->RemoveDirectory(name);
+                root->RemoveChildDirectory(name);
             }
         };
 

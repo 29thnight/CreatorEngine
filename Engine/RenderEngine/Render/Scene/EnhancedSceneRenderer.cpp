@@ -39,7 +39,6 @@
 #include "../../RHI/ScreenSizedResource.h"
 #include "../../RHI/RHISubmissionThread.h"
 #include "../../EnhancedGizmoSceneBinding.h"
-#include "ExperimentMaterialSealing.h"
 #include "../../DataSystem.h"
 #include "../../ShaderMeta.h"
 #include "../../StandardMaterialProperty.h"
@@ -102,17 +101,23 @@ namespace EnhancedSceneRenderer
     using LiveGraphSnapshot = std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>;
 
     LiveGraphSnapshot CaptureLiveGraphSnapshot(const EnhancedRenderGraph& graph,
-        uint64_t viewId, uint64_t frameId, uint32_t width, uint32_t height)
+        uint64_t viewId, uint64_t historyRevision, uint64_t frameId, uint64_t sceneEpoch,
+        uint32_t width, uint32_t height)
     {
+        const auto started = std::chrono::steady_clock::now();
         auto snapshot = std::make_shared<EnhancedRenderGraph::DiagnosticSnapshot>();
         if (!graph.CaptureDiagnosticSnapshot(*snapshot))
         {
             return {};
         }
         snapshot->viewId = viewId;
+        snapshot->sceneEpoch = sceneEpoch;
+        snapshot->historyRevision = historyRevision;
         snapshot->frameId = frameId;
         snapshot->width = width;
         snapshot->height = height;
+        snapshot->copyNanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now() - started).count();
         return snapshot;
     }
 
@@ -179,6 +184,13 @@ void SetEnhancedLiveGpuSpanSink(const EnhancedLiveGpuSpanSink& sink)
 namespace
 {
     const EnhancedLiveGpuSpanSink& GpuSpanSink() { return g_gpuSpanSink; }
+
+    // Diagnostic A/B build only. Ordinary builds contain no runtime rollback switch.
+#if defined(CE_RG6_REFERENCE_DECLARATION_ORDER)
+    constexpr auto kLiveGraphScheduling = RGSchedulingMode::DeclarationOrder;
+#else
+    constexpr auto kLiveGraphScheduling = RGSchedulingMode::ExplicitVersioned;
+#endif
 
     void finish_gpu_capture(GpuFrameToken& token, bool complete, const char* reason)
     {
@@ -399,7 +411,6 @@ namespace
         return fallback;
     }
 
-    // P2d-c texture 밀봉의 정본은 ExperimentMaterialSealing::SealCore로 이전됐다
     // (I5-M4). legacy Material을 읽던 SealMaterialTextureBindings는 그 치환으로
     // 소비자가 0이 되어 제거됐다.
 
@@ -1138,12 +1149,16 @@ namespace
                     &evictionPass);
                 meshCache.RetireUnused(resources.GetLastSignaledFenceValue(),
                     &evictionPass);
-                if (!prepareFrame(outError)) return false;
+                if (!prepareFrame(outError))
+                {
+                    preparationDeferred = graphMaterials.SelectionDeferred();
+                    return false;
+                }
             }
 
             slot->graph = std::make_shared<EnhancedRenderGraph>(
                 static_cast<IRenderDeviceServices&>(resources),
-                RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+                kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot->graph;
             graph.SetTransientPool(&transientPool);
             {
@@ -1159,18 +1174,6 @@ namespace
                 if (!animationPalettes.UploadForCurrentRecording(*frameContext.resources))
                 {
                     outError = "Sealed animation palette upload failed after the upload-prefix boundary.";
-                    return false;
-                }
-                if (!gbuffer.PrepareGpuVisibility(frameContext, outError))
-                {
-                    return false;
-                }
-                if (!shadow.PrepareGpuVisibility(frameContext, outError))
-                {
-                    return false;
-                }
-                if (!forward.PrepareGpuVisibility(frameContext, outError))
-                {
                     return false;
                 }
                 if (!decal.PrepareGpuVisibility(frameContext, outError)
@@ -1226,7 +1229,7 @@ namespace
             if (diagnosticOutput)
             {
                 *diagnosticOutput = CaptureLiveGraphSnapshot(graph, viewPacket.key.viewId,
-                    sourceFrameId, width, height);
+                    viewPacket.key.historyRevision, sourceFrameId, frameContext.sceneEpoch, width, height);
             }
 
             // The pipeline retains a query owner if a capture cannot prove idle.
@@ -2094,7 +2097,7 @@ namespace
             // generation. sealing은 이것으로 재질의 embedded texture를 closure에서 푼다.
             std::shared_ptr<const assets::ModelAssetGeneration> generationSource{};
             // BuildDrawPool의 안정된 프록시 읽기 동안만 Material owner를 유지한다.
-            // SealForwardMaterials/SealGBufferMaterials가 값 snapshot을 만든 뒤
+            // The identified graph source is retained with its model generation.
             // 즉시 놓으며, 최종 EnhancedDrawItem에는 Material 객체 주소가 남지 않는다.
             std::shared_ptr<const Material> materialSource{};
             std::shared_ptr<const material_graph::SceneMaterialSource> graphMaterialSource;
@@ -2136,9 +2139,8 @@ namespace
         std::vector<EnhancedDrawItem> graphDraws;
         // Same ordering as graphDraws/SceneDrawInput::sourceIndex. These sealed
         // legacy draws keep the entire model visible during a cold graph compile.
-        std::vector<EnhancedDrawItem> graphFallbackDraws;
-        std::vector<bool> graphFallbackShadowEligible;
-        std::vector<bool> graphFallbackViewRequired;
+        std::vector<bool> graphShadowEligible;
+        std::vector<bool> graphViewRequired;
         std::shared_ptr<const material_graph::SceneViewInput> graphViewInput;
         std::vector<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
@@ -2241,35 +2243,6 @@ namespace
         uint64_t nativeRecordSamples{ 0 };
         std::string lastError;
 
-        // GBuffer는 현재 제품에서 ShaderMeta→PSO를 잇는 첫 representative pass다.
-        // 이 값들은 RT만 쓰며 status가 renderStateMutex 아래 읽는다.
-        ShaderMetaHandle gbufferShaderMetaHandle{};
-        ShaderMetaHandle rejectedGBufferShaderMetaHandle{};
-        RHIPipelineHandle gbufferPipelineHandle{};
-        uint64_t gbufferShaderMetaApplies{ 0 };
-        uint64_t gbufferShaderMetaTargetedReplaces{ 0 };
-        uint64_t gbufferShaderMetaFailures{ 0 };
-        std::string gbufferShaderMetaError;
-
-        // M6-P2b: Forward도 GBuffer와 독립된 primary generation과 normal/reference
-        // PSO pair를 가진다. 한쪽만 교체된 상태는 pass가 게시하지 않는다.
-        ShaderMetaHandle forwardShaderMetaHandle{};
-        ShaderMetaHandle rejectedForwardShaderMetaHandle{};
-        RHIPipelineHandle forwardShadePipelineHandle{};
-        RHIPipelineHandle forwardReferencePipelineHandle{};
-        // Apply가 새 generation을 거부해도 기존 pass가 material property block을
-        // 계속 밀봉할 수 있도록 마지막으로 게시한 immutable Meta owner를 잡는다.
-        // incoming candidate와 섞지 않고 active pass handle과 같은 owner만 쓴다.
-        EnhancedShaderMetaFrameSnapshot activeForwardShaderMeta{};
-        // P2c: material별 Forward generation도 pass variant만 남겨 두고 Meta value를
-        // 놓으면 다음 reload 실패 때 직전 accepted variant를 다시 밀봉할 수 없다.
-        // 이번 frame에서 실제 사용한 secondary owner만 Commit 뒤 이 배열에 남긴다.
-        std::vector<EnhancedShaderMetaFrameSnapshot> activeForwardMaterialShaderMetas;
-        uint64_t forwardShaderMetaApplies{ 0 };
-        uint64_t forwardShaderMetaTargetedReplaces{ 0 };
-        uint64_t forwardShaderMetaFailures{ 0 };
-        std::string forwardShaderMetaError;
-
         void AddNativeRecordSample(double milliseconds)
         {
             lastNativeRecordMs = milliseconds;
@@ -2285,173 +2258,14 @@ namespace
                 : 0.0;
         }
 
-        bool ApplyGBufferShaderMeta(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& snapshots,
-            EnhancedGBufferPass& pass, const EnhancedFrameContext& context,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
+        void AppendGBufferMaterialStatus(std::string& status) const
         {
-            const auto recordFailure = [this](const std::string& error)
-            {
-                if (gbufferShaderMetaError != error)
-                {
-                    ++gbufferShaderMetaFailures;
-                    Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] GBuffer ShaderMeta 적용 실패: " + error);
-                }
-                gbufferShaderMetaError = error;
-            };
-
-            if (snapshots.empty())
-            {
-                outError = "GBuffer ShaderMeta frame snapshot 집합이 비었다";
-                recordFailure(outError);
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-            const EnhancedShaderMetaFrameSnapshot& snapshot = snapshots.front();
-
-            if (!snapshot.IsValid())
-            {
-                outError = snapshot.error.empty()
-                    ? "GBuffer ShaderMeta frame snapshot이 비었다" : snapshot.error;
-                recordFailure(outError);
-                // reload 중 잘못 게시된 파일은 현재 request를 끊지 않는다. 다만
-                // 최초 제품 generation조차 적용되지 않았다면 static bootstrap PSO로
-                // 조용히 그리지 않고 fail-closed한다.
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-
-            if (snapshot.handle == pass.GetShaderMetaHandle())
-            {
-                gbufferShaderMetaError.clear();
-                return true;
-            }
-            if (snapshot.handle == rejectedGBufferShaderMetaHandle)
-            {
-                outError = gbufferShaderMetaError;
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-
-            const RHIPipelineHandle previousPipeline = pass.GetPipelineHandle();
-            const bool hadProductGeneration = pass.GetShaderMetaHandle().IsValid();
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-            std::string applyError;
-            if (!pass.ApplyShaderMeta(context, snapshot.handle, *snapshot.value,
-                    retireAfter, applyError))
-            {
-                rejectedGBufferShaderMetaHandle = snapshot.handle;
-                outError = applyError;
-                recordFailure(applyError);
-                return hadProductGeneration;
-            }
-
-            const RHIPipelineHandle currentPipeline = pass.GetPipelineHandle();
-            gbufferShaderMetaHandle = snapshot.handle;
-            gbufferPipelineHandle = currentPipeline;
-            rejectedGBufferShaderMetaHandle = {};
-            gbufferShaderMetaError.clear();
-            ++gbufferShaderMetaApplies;
-            if (hadProductGeneration && previousPipeline != currentPipeline)
-                ++gbufferShaderMetaTargetedReplaces;
-            return true;
+            status += "\n  GBuffer material route — Graph only";
         }
 
-        void AppendGBufferShaderMetaStatus(std::string& status) const
+        void AppendForwardMaterialStatus(std::string& status) const
         {
-            status += "\n  GBuffer ShaderMeta — handle " +
-                std::to_string(gbufferShaderMetaHandle.slot) + ":" +
-                std::to_string(gbufferShaderMetaHandle.generation) +
-                " · apply " + std::to_string(gbufferShaderMetaApplies) +
-                " · targeted replace " +
-                std::to_string(gbufferShaderMetaTargetedReplaces) +
-                " · failure " + std::to_string(gbufferShaderMetaFailures);
-            if (!gbufferShaderMetaError.empty())
-                status += " · last " + gbufferShaderMetaError;
-        }
-
-        bool ApplyForwardShaderMeta(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& snapshots,
-            EnhancedForwardPass& pass, const EnhancedFrameContext& context,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
-        {
-            const auto recordFailure = [this](const std::string& error)
-            {
-                if (forwardShaderMetaError != error)
-                {
-                    ++forwardShaderMetaFailures;
-                    Debug::PrintLog(spdlog::level::err, "[EnhancedRenderer] Forward ShaderMeta 적용 실패: " + error);
-                }
-                forwardShaderMetaError = error;
-            };
-
-            if (snapshots.empty())
-            {
-                outError = "Forward ShaderMeta frame snapshot 집합이 비었다";
-                recordFailure(outError);
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-            const EnhancedShaderMetaFrameSnapshot& snapshot = snapshots.front();
-            if (!snapshot.IsValid())
-            {
-                outError = snapshot.error.empty()
-                    ? "Forward ShaderMeta frame snapshot이 비었다" : snapshot.error;
-                recordFailure(outError);
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-            if (snapshot.handle == pass.GetShaderMetaHandle())
-            {
-                activeForwardShaderMeta = snapshot;
-                forwardShaderMetaError.clear();
-                return true;
-            }
-            if (snapshot.handle == rejectedForwardShaderMetaHandle
-                && pass.GetShaderMetaHandle().IsValid())
-            {
-                outError = forwardShaderMetaError;
-                return pass.GetShaderMetaHandle().IsValid();
-            }
-
-            const RHIPipelineHandle previousShade = pass.GetShadePSO();
-            const RHIPipelineHandle previousReference = pass.GetReferencePSO();
-            const bool hadProductGeneration = pass.GetShaderMetaHandle().IsValid();
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-            std::string applyError;
-            if (!pass.ApplyShaderMeta(context, snapshot.handle, *snapshot.value,
-                    retireAfter, applyError))
-            {
-                rejectedForwardShaderMetaHandle = snapshot.handle;
-                outError = applyError;
-                recordFailure(applyError);
-                return hadProductGeneration;
-            }
-
-            forwardShaderMetaHandle = snapshot.handle;
-            forwardShadePipelineHandle = pass.GetShadePSO();
-            forwardReferencePipelineHandle = pass.GetReferencePSO();
-            activeForwardShaderMeta = snapshot;
-            rejectedForwardShaderMetaHandle = {};
-            forwardShaderMetaError.clear();
-            ++forwardShaderMetaApplies;
-            if (hadProductGeneration &&
-                (previousShade != forwardShadePipelineHandle
-                    || previousReference != forwardReferencePipelineHandle))
-            {
-                ++forwardShaderMetaTargetedReplaces;
-            }
-            return true;
-        }
-
-        void AppendForwardShaderMetaStatus(std::string& status) const
-        {
-            status += "\n  Forward ShaderMeta — handle " +
-                std::to_string(forwardShaderMetaHandle.slot) + ":" +
-                std::to_string(forwardShaderMetaHandle.generation) +
-                " · apply " + std::to_string(forwardShaderMetaApplies) +
-                " · targeted replace " +
-                std::to_string(forwardShaderMetaTargetedReplaces) +
-                " · failure " + std::to_string(forwardShaderMetaFailures);
-            if (!forwardShaderMetaError.empty())
-                status += " · last " + forwardShaderMetaError;
+            status += "\n  Forward material route — Graph only";
         }
 
         // 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 수집은 매
@@ -2467,6 +2281,12 @@ namespace
         EnhancedLiveDebugSnapshot debugSnapshot;
         std::array<LiveGraphSnapshot, kEnhancedLiveDisplayTargetCount> graphSnapshots{};
         std::array<bool, kEnhancedLiveDisplayTargetCount> graphSnapshotRequests{};
+
+        bool HasGraphSnapshotRequest(EnhancedLiveDisplayTarget target)
+        {
+            std::lock_guard<std::mutex> lock(debugMutex);
+            return graphSnapshotRequests[DisplayTargetIndex(target)];
+        }
 
         bool ConsumeGraphSnapshotRequest(EnhancedLiveDisplayTarget target)
         {
@@ -2946,24 +2766,11 @@ namespace
             return true;
         }
 
-        void ReleaseForwardShaderMetaOwnerIfUnused()
-        {
-            if (pipeline || vulkanPipeline) return;
-            activeForwardShaderMeta = {};
-            activeForwardMaterialShaderMetas.clear();
-            forwardShaderMetaHandle = {};
-            rejectedForwardShaderMetaHandle = {};
-            forwardShadePipelineHandle = {};
-            forwardReferencePipelineHandle = {};
-            forwardShaderMetaError.clear();
-        }
-
         bool TeardownVulkanPipeline()
         {
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (!vulkanPipeline)
             {
-                ReleaseForwardShaderMetaOwnerIfUnused();
                 return true;
             }
             InvalidateDisplayResultsLocked();
@@ -2975,7 +2782,6 @@ namespace
                 return false;
             }
             vulkanPipeline.reset();
-            ReleaseForwardShaderMetaOwnerIfUnused();
             return true;
         }
 
@@ -2985,7 +2791,6 @@ namespace
             std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
             if (nullptr == pipeline)
             {
-                ReleaseForwardShaderMetaOwnerIfUnused();
                 return true;
             }
             InvalidateDisplayResultsLocked();
@@ -3035,7 +2840,6 @@ namespace
             dx12.ShutdownPipeline();
 
             pipeline.reset();
-            ReleaseForwardShaderMetaOwnerIfUnused();
             return true;
         }
 
@@ -3198,11 +3002,16 @@ namespace
                 LivePassNode node;
                 node.name = "Shadow";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.shadow; };
+                node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
+                node.prepare = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
+                {
+                    return p.shadow.PrepareGraphFrame(ctx, error);
+                };
                 node.writes = { LiveSlots::kShadowMap };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
-                    p.shadow.Declare(graph, ctx);
+                    p.shadow.DeclareGraphTargets(graph, ctx);
                     bb.Set(LiveSlots::kShadowMap, p.graphMaterials.DeclareShadow(graph, p.shadow.GetShadowMap()));
                 };
                 p.desc.AddNode(std::move(node));
@@ -3213,6 +3022,8 @@ namespace
                 LivePassNode node;
                 node.name = "GBuffer";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.gbuffer; };
+                node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
+                node.prepare = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
                 node.writes = {
                     LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
                     LiveSlots::kGBufferNormal,  LiveSlots::kGBufferEmissive,
@@ -3221,7 +3032,7 @@ namespace
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding&)
                 {
-                    p.gbuffer.Declare(graph, ctx);
+                    p.gbuffer.DeclareGraphTargets(graph, ctx);
                     const auto outputs = p.gbuffer.GetOutputs();
                     bb.Set(LiveSlots::kGBufferDiffuse,    outputs.diffuse);
                     bb.Set(LiveSlots::kGBufferMetalRough, outputs.metalRough);
@@ -3447,6 +3258,10 @@ namespace
                 LivePassNode node;
                 node.name = "Forward+";
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.forward; };
+                node.initialize = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
+                {
+                    return p.forward.InitializeGraphLighting(ctx, error);
+                };
                 node.reads = { LiveSlots::kGBufferDepth };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -4077,9 +3892,8 @@ namespace
         {
             drawPool.clear();
             graphDraws.clear();
-            graphFallbackDraws.clear();
-            graphFallbackShadowEligible.clear();
-            graphFallbackViewRequired.clear();
+            graphShadowEligible.clear();
+            graphViewRequired.clear();
             graphViewInput.reset();
             decals.clear();
             spritePool.clear();
@@ -4299,484 +4113,6 @@ namespace
             }
         }
 
-        bool SealForwardMaterials(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& shaders,
-            float frameTotalSeconds, float frameDeltaSeconds,
-            EnhancedForwardPass& pass, const EnhancedFrameContext& context,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
-        {
-            const EnhancedShaderMetaFrameSnapshot* effective = nullptr;
-            if (activeForwardShaderMeta.IsValid()
-                && activeForwardShaderMeta.handle == pass.GetShaderMetaHandle())
-            {
-                effective = &activeForwardShaderMeta;
-            }
-            else if (!shaders.empty() && shaders.front().IsValid()
-                && shaders.front().handle == pass.GetShaderMetaHandle())
-            {
-                effective = &shaders.front();
-            }
-            if (nullptr == effective)
-            {
-                outError = "Forward material sealing의 ShaderMeta generation이 active pass와 다르다";
-                return false;
-            }
-            const EnhancedShaderMetaFrameSnapshot& primary = *effective;
-            std::vector<ShaderMetaHandle> activeHandles{ primary.handle };
-            // Commit 전까지 직전 accepted owner를 유지한다. 새 candidate가 실패하면
-            // pass 안에 남은 variant와 immutable Meta value로 다시 밀봉하고,
-            // Commit 뒤 이번 frame에서 안 쓴 secondary owner만 놓는다.
-            std::vector<EnhancedShaderMetaFrameSnapshot> nextActiveMaterialOwners;
-            // W8: GBuffer와 같은 이유로 주소가 아니라 값으로 합친다.
-            std::unordered_map<std::uint64_t,
-                std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>> sealed;
-            sealed.reserve(drawPool.size());
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-
-            for (PooledDraw& pooled : drawPool)
-            {
-                if (pooled.graphMaterialSource) continue;
-                const size_t shadowIndex = shadowDraws.size();
-                if (pooled.graphMaterialSource || !pooled.isTransparent) continue;
-                if (!pooled.materialSource)
-                {
-                    outError = "Forward transparent draw에 owning Material source가 없다";
-                    return false;
-                }
-
-                const Material* source = pooled.materialSource.get();
-                const std::uint64_t authoredDigest = pooled.authoredMaterialSource
-                    ? EnhancedAuthoredMaterialDigest::Compute(
-                        *pooled.authoredMaterialSource) : 0ull;
-                const std::uint64_t modelGeneration = pooled.generationSource
-                    ? pooled.generationSource->Identity().generation : 0ull;
-                EnhancedSealDigest keyDigest;
-                keyDigest.U64(reinterpret_cast<std::uintptr_t>(source));
-                keyDigest.U64(authoredDigest);
-                keyDigest.U64(modelGeneration);
-                const std::uint64_t sealKey = keyDigest.Value();
-
-                const auto found = sealed.find(sealKey);
-                if (found != sealed.end())
-                {
-                    pooled.item.forwardMaterialSnapshot = found->second;
-                    pooled.materialSource.reset();
-                    continue;
-                }
-
-                const FileGuid materialShaderGuid =
-                    FileGuid{} == source->m_shaderMetaGuid
-                    ? primary.guid : source->m_shaderMetaGuid;
-                const EnhancedShaderMetaFrameSnapshot* incoming = nullptr;
-                if (materialShaderGuid == primary.guid)
-                {
-                    incoming = &primary;
-                }
-                else
-                {
-                    const auto shaderIt = std::find_if(shaders.begin(), shaders.end(),
-                        [&materialShaderGuid](const auto& candidate)
-                        {
-                            return candidate.guid == materialShaderGuid;
-                        });
-                    if (shaderIt != shaders.end()) incoming = &*shaderIt;
-                }
-
-                std::vector<const EnhancedShaderMetaFrameSnapshot*> candidates;
-                if (nullptr != incoming) candidates.push_back(incoming);
-                if (materialShaderGuid != primary.guid)
-                {
-                    for (const EnhancedShaderMetaFrameSnapshot& accepted :
-                        activeForwardMaterialShaderMetas)
-                    {
-                        if (accepted.guid != materialShaderGuid) continue;
-                        const bool duplicate = std::any_of(candidates.begin(),
-                            candidates.end(), [&accepted](const auto* candidate)
-                            {
-                                // resolve가 실패한 incoming은 같은 handle처럼 보여도
-                                // accepted immutable owner를 가리면 안 된다.
-                                return candidate->IsValid()
-                                    && candidate->handle == accepted.handle;
-                            });
-                        if (!duplicate) candidates.push_back(&accepted);
-                    }
-                }
-
-                const auto trySeal = [&](const EnhancedShaderMetaFrameSnapshot& materialShader,
-                    std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot>& outSnapshot,
-                    std::string& error)
-                {
-                    if (!materialShader.IsValid())
-                    {
-                        error = materialShader.error.empty()
-                            ? "Forward material ShaderMeta generation이 invalid다: "
-                                + materialShaderGuid.ToString()
-                            : materialShader.error;
-                        return false;
-                    }
-
-                    // I5-D5c5 — 저작 정본이 있으면 legacy Material을 **아예
-                    // 읽지 않는다**. c2-2/c3-2는 legacy로 시공한 뒤 덮어썼는데,
-                    // 그 시공(ConvertLegacyMaterial + 이름 맵 순회)은 결과가
-                    // 통째로 버려지는 왕복이었다. 실패만 legacy로 내려간다.
-                    ExperimentMaterialSealing::SealSource sealSource;
-                    bool sealBuilt = false;
-                    if (pooled.authoredMaterialSource)
-                    {
-                        std::string authoredError;
-                        sealBuilt = ExperimentMaterialSealing::
-                            BuildSealSourceFromAuthored(
-                                *pooled.authoredMaterialSource,
-                                *materialShader.value, sealSource,
-                                authoredError, pooled.generationSource.get());
-                        if (!sealBuilt)
-                        {
-                            Debug::PrintLog(spdlog::level::warn, "Forward 저작 seal 시공 실패 —"
-                                " legacy 폴백: " + authoredError);
-                        }
-                    }
-                    // I5-M4: legacy Material은 seal source 변환에서 **한 번만**
-                    // 읽는다. 이후 keyword 정규화·propertyBytes·textureBindings는
-                    // experiment 정본(M1 packer·M2 정규화)을 탄다.
-                    if (!sealBuilt)
-                    {
-                        if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
-                                *source, *materialShader.value, sealSource, error))
-                        {
-                            return false;
-                        }
-                        // 폴백이라도 저작 값은 지킨다 — c2-2의 의미론이다. 실패한 것은
-                        // texture 해석뿐이고 legacy 맵이 그 자리를 받는다. 여기서 저작
-                        // properties까지 버리면 폴백이 c2-2 이전으로 되돌아간다.
-                        if (pooled.authoredMaterialSource)
-                        {
-                            ExperimentMaterialSealing::ApplyAuthoredMaterial(
-                                sealSource, *pooled.authoredMaterialSource);
-                        }
-                    }
-
-                    auto snapshot =
-                        std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
-                    snapshot->shaderMetaHandle = materialShader.handle;
-                    if (!experiment::NormalizeMaterialKeywordSelections(
-                            sealSource.material, materialShader.value->keywords,
-                            snapshot->keywordSelections, error))
-                    {
-                        if (!sealSource.debugName.empty())
-                            error += " (material " + sealSource.debugName + ")";
-                        return false;
-                    }
-
-                    std::shared_ptr<const ShaderMetaBindingLayout> layout;
-                    if (!pass.EnsureShaderMetaVariant(context, materialShader.handle,
-                            *materialShader.value, snapshot->keywordSelections,
-                            snapshot->permutationKey, layout, error)
-                        || !layout)
-                    {
-                        return false;
-                    }
-                    snapshot->bindingLayout = *layout;
-                    if (!pass.CaptureShaderVariant(*snapshot))
-                    { error = "Forward LX graphics generation capture failed."; return false; }
-                    snapshot->flow = sealSource.flow;
-                    snapshot->flow.totalSeconds = frameTotalSeconds;
-                    snapshot->flow.deltaSeconds = frameDeltaSeconds;
-                    snapshot->baseColorFactor = sealSource.baseColorFactor;
-                    snapshot->metallic = sealSource.metallic;
-                    snapshot->roughness = sealSource.roughness;
-                    snapshot->useNormalMap = sealSource.useNormalMap;
-
-                    if (!ExperimentMaterialSealing::SealCore(sealSource,
-                            *materialShader.value, *layout,
-                            snapshot->propertyBytes, snapshot->textureBindings,
-                            error, &snapshot->runtimeInstance, materialShader.handle))
-                    {
-                        if (!sealSource.debugName.empty())
-                            error += " (material " + sealSource.debugName + ")";
-                        return false;
-                    }
-
-                    if (!ExperimentMaterialSealing::SealCoverage(sealSource, *layout,
-                            snapshot->propertyBytes, snapshot->coverage, error)) return false;
-                    if (!snapshot->IsValid())
-                    {
-                        error = "Forward material snapshot sealing 결과가 invalid다";
-                        return false;
-                    }
-                    // W8: immutable로 넘기기 직전에 값 digest와 프레임 도장.
-                    EnhancedMaterialSeal::Stamp(*snapshot, authoredDigest,
-                        pooled.authoredRevision, modelGeneration,
-                        context.sceneEpoch, context.frameId);
-
-                    outSnapshot = std::move(snapshot);
-                    return true;
-                };
-
-                const EnhancedShaderMetaFrameSnapshot* selectedShader = nullptr;
-                std::shared_ptr<const EnhancedForwardMaterialDrawSnapshot> immutable;
-                std::string firstCandidateError;
-                for (const EnhancedShaderMetaFrameSnapshot* candidate : candidates)
-                {
-                    std::string candidateError;
-                    if (trySeal(*candidate, immutable, candidateError))
-                    {
-                        selectedShader = candidate;
-                        break;
-                    }
-                    if (firstCandidateError.empty())
-                        firstCandidateError = std::move(candidateError);
-                }
-
-                if (nullptr == selectedShader || !immutable)
-                {
-                    outError = firstCandidateError.empty()
-                        ? "Forward material ShaderMeta generation이 frame packet에 없고 accepted fallback도 없다: "
-                            + materialShaderGuid.ToString()
-                        : std::move(firstCandidateError);
-                    if (!source->m_name.empty())
-                        outError += " (material " + source->m_name + ")";
-                    return false;
-                }
-
-                if (std::find(activeHandles.begin(), activeHandles.end(),
-                        selectedShader->handle) == activeHandles.end())
-                    activeHandles.push_back(selectedShader->handle);
-                if (selectedShader->guid != primary.guid)
-                {
-                    const bool alreadyOwned = std::any_of(
-                        nextActiveMaterialOwners.begin(), nextActiveMaterialOwners.end(),
-                        [selectedShader](const auto& owner)
-                        {
-                            return owner.handle == selectedShader->handle;
-                        });
-                    if (!alreadyOwned)
-                        nextActiveMaterialOwners.push_back(*selectedShader);
-                }
-
-                sealed.emplace(sealKey, immutable);
-                pooled.item.forwardMaterialSnapshot = std::move(immutable);
-                pooled.materialSource.reset();
-            }
-            pass.CommitShaderMetaFrame(context, activeHandles, retireAfter);
-            activeForwardMaterialShaderMetas = std::move(nextActiveMaterialOwners);
-            return true;
-        }
-
-        bool SealGBufferMaterials(
-            const std::vector<EnhancedShaderMetaFrameSnapshot>& shaders,
-            EnhancedGBufferPass& pass, const EnhancedFrameContext& context,
-            material_graph::SceneHost& graphMaterials,
-            RHICompletionPoint retireAfter, RHIShaderBinary output,
-            std::string& outError)
-        {
-            if (shaders.empty() || !shaders.front().IsValid()
-                || shaders.front().handle != pass.GetShaderMetaHandle())
-            {
-                outError = "GBuffer material sealing의 ShaderMeta generation이 active pass와 다르다";
-                return false;
-            }
-            const EnhancedShaderMetaFrameSnapshot& primary = shaders.front();
-            std::vector<ShaderMetaHandle> activeHandles{ primary.handle };
-            Material defaultMaterial;
-            // W8: 중복 제거 키가 legacy `Material*` 하나였다. DataSystem이 이름으로
-            // 캐시한 같은 객체를 여러 MeshRenderer가 공유하는데 인스턴스 override는
-            // 렌더러마다 다르므로, 주소가 같다는 이유로 먼저 밀봉된 스냅샷을 뒤의
-            // draw가 받아 override가 통째로 사라졌다. 키를 값으로 바꾼다.
-            std::unordered_map<std::uint64_t,
-                std::shared_ptr<const EnhancedMaterialDrawSnapshot>> sealed;
-            sealed.reserve(drawPool.size());
-            RHIShaderCompiler::ScopedOutput outputScope(output);
-            std::set<assets::ModelAssetGenerationHandle> pendingGraphModels;
-            for (const PooledDraw& pooled : drawPool)
-            {
-                if (!pooled.graphMaterialSource || pooled.isTransparent) continue;
-                const auto& instance = pooled.graphMaterialSource->instance;
-                if (!instance || !graphMaterials.IsProgramReady(instance->generation, output))
-                {
-                    const auto& handle = pooled.item.modelMeshView.handle;
-                    pendingGraphModels.insert({handle.modelId, handle.generation});
-                }
-            }
-            std::vector<std::pair<Uuid::Uuid16, std::uint64_t>> drawnGenerations;
-            drawnGenerations.reserve(drawPool.size());
-
-            for (PooledDraw& pooled : drawPool)
-            {
-                if (pooled.graphMaterialSource)
-                {
-                    const auto& handle = pooled.item.modelMeshView.handle;
-                    if (!pendingGraphModels.contains({handle.modelId, handle.generation})) continue;
-                }
-                // P2a Forward snapshot은 앞의 SealForwardMaterials가 별도로
-                // 밀봉했다. GBuffer ShaderMeta 계약을 투명 draw에 섞지 않는다.
-                if (pooled.isTransparent)
-                {
-                    continue;
-                }
-
-                const Material* source = pooled.materialSource
-                    ? pooled.materialSource.get() : &defaultMaterial;
-                const FileGuid materialShaderGuid =
-                    FileGuid{} == source->m_shaderMetaGuid
-                    ? primary.guid : source->m_shaderMetaGuid;
-                const auto shaderIt = std::find_if(shaders.begin(), shaders.end(),
-                    [&materialShaderGuid](const auto& candidate)
-                    {
-                        return candidate.guid == materialShaderGuid;
-                    });
-                if (shaderIt == shaders.end() || !shaderIt->IsValid())
-                {
-                    outError = "GBuffer material ShaderMeta generation이 frame packet에 없거나 invalid다: "
-                        + materialShaderGuid.ToString();
-                    if (shaderIt != shaders.end() && !shaderIt->error.empty())
-                        outError += " (" + shaderIt->error + ")";
-                    if (!source->m_name.empty()) outError += " (material "
-                        + source->m_name + ")";
-                    return false;
-                }
-                const EnhancedShaderMetaFrameSnapshot& materialShader = *shaderIt;
-                if (std::find(activeHandles.begin(), activeHandles.end(),
-                        materialShader.handle) == activeHandles.end())
-                    activeHandles.push_back(materialShader.handle);
-
-                // 저작 정본이 있으면 그 값이 신원이고, 없으면 legacy 객체가
-                // 값의 출처이므로 주소를 쓴다. 둘을 한 키에 함께 접어 어느
-                // 쪽이든 다른 값이 같은 스냅샷을 받지 않게 한다.
-                const std::uint64_t authoredDigest = pooled.authoredMaterialSource
-                    ? EnhancedAuthoredMaterialDigest::Compute(
-                        *pooled.authoredMaterialSource) : 0ull;
-                const std::uint64_t modelGeneration = pooled.generationSource
-                    ? pooled.generationSource->Identity().generation : 0ull;
-                if (pooled.generationSource)
-                    drawnGenerations.emplace_back(
-                        pooled.generationSource->Identity().modelId, modelGeneration);
-                EnhancedSealDigest keyDigest;
-                keyDigest.U64(reinterpret_cast<std::uintptr_t>(source));
-                keyDigest.U64(authoredDigest);
-                keyDigest.U64(modelGeneration);
-                keyDigest.U32(materialShader.handle.slot);
-                keyDigest.U32(materialShader.handle.generation);
-                const std::uint64_t sealKey = keyDigest.Value();
-
-                const auto found = sealed.find(sealKey);
-                if (found != sealed.end())
-                {
-                    pooled.item.materialSnapshot = found->second;
-                    pooled.materialSource.reset();
-                    continue;
-                }
-
-                // I5-D5c5 — Forward와 같은 처방: 저작 정본이 있으면 legacy를
-                // 읽지 않고 저작본만으로 시공한다. 실패만 legacy로 내려간다.
-                ExperimentMaterialSealing::SealSource sealSource;
-                bool sealBuilt = false;
-                if (pooled.authoredMaterialSource)
-                {
-                    std::string authoredError;
-                    sealBuilt = ExperimentMaterialSealing::
-                        BuildSealSourceFromAuthored(
-                            *pooled.authoredMaterialSource,
-                            *materialShader.value, sealSource, authoredError,
-                            pooled.generationSource.get());
-                    if (!sealBuilt)
-                    {
-                        Debug::PrintLog(spdlog::level::warn, "GBuffer 저작 seal 시공 실패 —"
-                            " legacy 폴백: " + authoredError);
-                    }
-                }
-                // I5-M4: legacy 읽기는 변환 한 번, 이후는 experiment 정본이다.
-                if (!sealBuilt)
-                {
-                    if (!ExperimentMaterialSealing::BuildSealSourceFromLegacy(
-                            *source, *materialShader.value, sealSource, outError))
-                    {
-                        return false;
-                    }
-                    // 폴백이라도 저작 값은 지킨다 — c2-2의 의미론이다. 실패한 것은
-                    // texture 해석뿐이고 legacy 맵이 그 자리를 받는다. 여기서 저작
-                    // properties까지 버리면 폴백이 c2-2 이전으로 되돌아간다.
-                    if (pooled.authoredMaterialSource)
-                    {
-                        ExperimentMaterialSealing::ApplyAuthoredMaterial(
-                            sealSource, *pooled.authoredMaterialSource);
-                    }
-                }
-
-                auto snapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();
-                snapshot->shaderMetaHandle = materialShader.handle;
-                if (!experiment::NormalizeMaterialKeywordSelections(
-                        sealSource.material, materialShader.value->keywords,
-                        snapshot->keywordSelections, outError))
-                {
-                    if (!sealSource.debugName.empty())
-                        outError += " (material " + sealSource.debugName + ")";
-                    return false;
-                }
-
-                std::shared_ptr<const ShaderMetaBindingLayout> layout;
-                if (!pass.EnsureShaderMetaVariant(context, materialShader.handle,
-                        *materialShader.value,
-                        snapshot->keywordSelections, snapshot->permutationKey,
-                        layout, outError))
-                {
-                    if (!sealSource.debugName.empty())
-                        outError += " (material " + sealSource.debugName + ")";
-                    return false;
-                }
-                snapshot->bindingLayout = *layout;
-                if (!pass.CaptureShaderVariant(*snapshot))
-                { outError = "GBuffer LX graphics generation capture failed."; return false; }
-                snapshot->useNormalMap = sealSource.useNormalMap;
-                if (!ExperimentMaterialSealing::SealCore(sealSource,
-                        *materialShader.value, *layout, snapshot->propertyBytes,
-                        snapshot->textureBindings, outError, &snapshot->runtimeInstance, materialShader.handle))
-                {
-                    if (!sealSource.debugName.empty())
-                        outError += " (material " + sealSource.debugName + ")";
-                    return false;
-                }
-                if (!ExperimentMaterialSealing::SealCoverage(sealSource, *layout,
-                        snapshot->propertyBytes, snapshot->coverage, outError)) return false;
-                if (!snapshot->IsValid())
-                {
-                    outError = "GBuffer material snapshot sealing 결과가 invalid다";
-                    return false;
-                }
-                // W8: 값 digest와 프레임 도장은 immutable로 넘기기 직전에 찍는다.
-                // 이 뒤로는 아무도 값을 바꾸지 않으므로 digest가 계약이 된다.
-                EnhancedMaterialSeal::Stamp(*snapshot, authoredDigest,
-                    pooled.authoredRevision, modelGeneration,
-                    context.sceneEpoch, context.frameId);
-
-                std::shared_ptr<const EnhancedMaterialDrawSnapshot> immutable = snapshot;
-                sealed.emplace(sealKey, immutable);
-                pooled.item.materialSnapshot = std::move(immutable);
-                pooled.materialSource.reset();
-            }
-
-            std::sort(drawnGenerations.begin(), drawnGenerations.end());
-            drawnGenerations.erase(
-                std::unique(drawnGenerations.begin(), drawnGenerations.end()),
-                drawnGenerations.end());
-            uint32_t mixedModels = 0;
-            uint64_t mixedNewest = 0;
-            for (std::size_t i = 1; i < drawnGenerations.size(); ++i)
-            {
-                if (drawnGenerations[i].first != drawnGenerations[i - 1].first) continue;
-                // 정렬돼 있으므로 같은 modelId 의 둘째 원소에서만 모델 하나를 센다.
-                if (i < 2 || drawnGenerations[i - 2].first != drawnGenerations[i].first)
-                    ++mixedModels;
-                mixedNewest = (std::max)(mixedNewest, drawnGenerations[i].second);
-            }
-            lastModelGenerationPairs = static_cast<uint32_t>(drawnGenerations.size());
-            lastMixedGenerationModels = mixedModels;
-            lastMixedNewestGeneration = mixedNewest;
-
-            pass.CommitShaderMetaFrame(context, activeHandles, retireAfter);
-            return true;
-        }
-
         // ── 렌더 입력 소비: 이 뷰의 몫 ──
         /// Camera/Scene을 다시 읽지 않고 게임 스레드가 밀봉한 값만 소비한다.
         bool CaptureFromView(const EnhancedLiveFramePacket& frame,
@@ -4796,9 +4132,8 @@ namespace
             shadowDraws.clear();
             forwardDraws.clear();
             graphDraws.clear();
-            graphFallbackDraws.clear();
-            graphFallbackShadowEligible.clear();
-            graphFallbackViewRequired.clear();
+            graphShadowEligible.clear();
+            graphViewRequired.clear();
             graphViewInput.reset();
             lights.clear();
             worldSprites.clear();
@@ -5015,6 +4350,12 @@ namespace
                 // every skinned CAMERA candidate before CPU rejection/budgeting;
                 // a bind-pose/proxy box is not a proof for arbitrary current skin.
                 const bool visible = pooled.item.boneCount != 0 || sourceVisible;
+                if (!pooled.graphMaterialSource || !pooled.item.materialGraphInstance)
+                {
+                    lastError = "Live scene draw requires a prepared material graph source.";
+                    ++frameFailures;
+                    return false;
+                }
                 // Shadow relevance is independent from camera admission. Weight
                 // normalization is not proven here, so skin geometry cannot use
                 // the convex-hull pose bound as an upstream rejection proof.
@@ -5054,31 +4395,13 @@ namespace
                     shadowIndex = shadowDraws.size();
                     shadowDraws.push_back(pooled.item);
                 }
-                if (!pooled.graphMaterialSource && !visible && !gpuCandidate)
-                {
-                    ++culled;
-                    continue;
-                }
-                if (pooled.graphMaterialSource)
-                {
-                    auto graphDraw = pooled.item;
-                    graphDraw.materialSnapshot.reset();
-                    graphDraw.forwardMaterialSnapshot.reset();
-                    graphDraws.push_back(std::move(graphDraw));
-                    graphShadowIndices.push_back(shadowIndex);
-                    auto fallback = pooled.item;
-                    fallback.materialGraphInstance.reset();
-                    fallback.materialGraphSlot = 0;
-                    graphFallbackDraws.push_back(std::move(fallback));
-                    graphFallbackShadowEligible.push_back(relevantToShadow);
-                    graphFallbackViewRequired.push_back(visible);
-                }
-                else if (pooled.isTransparent) forwardDraws.push_back(pooled.item);
-                else
-                {
-                    draws.push_back(pooled.item);
-                    opaqueShadowIndices.push_back(shadowIndex);
-                }
+                auto graphDraw = pooled.item;
+                graphDraw.materialSnapshot.reset();
+                graphDraw.forwardMaterialSnapshot.reset();
+                graphDraws.push_back(std::move(graphDraw));
+                graphShadowIndices.push_back(shadowIndex);
+                graphShadowEligible.push_back(relevantToShadow);
+                graphViewRequired.push_back(visible);
             }
 
             lastPoolDraws = static_cast<uint32_t>(drawPool.size());
@@ -5094,9 +4417,9 @@ namespace
                 // Stage both slices: a material rejection must not leave an
                 // otherwise valid world/pose replay partly applied to live draws.
                 auto stagedOpaque=draws, stagedForward=forwardDraws;
-                auto stagedGraph=graphDraws, stagedFallback=graphFallbackDraws;
+                auto stagedGraph=graphDraws;
                 bool passed = pbrCapture->drawReplay
-                    ? pbrCapture->drawReplay->Apply(stagedOpaque, stagedForward, stagedGraph, stagedFallback, replayError)
+                    ? pbrCapture->drawReplay->Apply(stagedOpaque, stagedForward, stagedGraph, replayError)
                     : EnhancedDrawReplayInput::Seal(draws, forwardDraws, graphDraws, selected, replayError);
                 if (passed && pbrCapture->latticeReplayExtension) passed = pbrCapture->latticeReplay
                     ? pbrCapture->latticeReplay->Apply(stagedGraph, replayError)
@@ -5110,7 +4433,7 @@ namespace
                 else
                 {
                     draws.swap(stagedOpaque); forwardDraws.swap(stagedForward);
-                    graphDraws.swap(stagedGraph); graphFallbackDraws.swap(stagedFallback);
+                    graphDraws.swap(stagedGraph);
                     for (size_t i = 0; i < draws.size(); ++i)
                     {
                         if (opaqueShadowIndices[i] < shadowDraws.size())
@@ -5149,11 +4472,11 @@ namespace
                 {
                     // Aggregate geometry budgets can be tighter than the draw
                     // limit. Retry the original selection, keeping source-index
-                    // aligned fallback owners and shadow eligibility together.
+                    // aligned view and shadow eligibility together.
                     size_t retained = 0;
                     for (size_t i = 0; i < graphDraws.size(); ++i)
                     {
-                        if (!graphFallbackShadowEligible[i] && !graphFallbackViewRequired[i])
+                        if (!graphShadowEligible[i] && !graphViewRequired[i])
                         {
                             ++lastCulledDraws;
                             continue;
@@ -5161,16 +4484,14 @@ namespace
                         if (retained != i)
                         {
                             graphDraws[retained] = std::move(graphDraws[i]);
-                            graphFallbackDraws[retained] = std::move(graphFallbackDraws[i]);
-                            graphFallbackShadowEligible[retained] = graphFallbackShadowEligible[i];
-                            graphFallbackViewRequired[retained] = graphFallbackViewRequired[i];
+                            graphShadowEligible[retained] = graphShadowEligible[i];
+                            graphViewRequired[retained] = graphViewRequired[i];
                         }
                         ++retained;
                     }
                     graphDraws.resize(retained);
-                    graphFallbackDraws.resize(retained);
-                    graphFallbackShadowEligible.resize(retained);
-                    graphFallbackViewRequired.resize(retained);
+                    graphShadowEligible.resize(retained);
+                    graphViewRequired.resize(retained);
                     sealed = material_graph::SceneViewInput::Seal(inputView, graphDraws,
                         sceneInputBudget, graphViewInput, inputError);
                 }
@@ -5249,39 +4570,8 @@ namespace
             {
                 RHIShaderCompiler::ScopedOutput outputScope(output);
                 if (!p.graphMaterials.SelectReadyInput(p.frameContext, p.graphInput, p.graphInput, outError))
-                    return false;
-            }
-            if (pbrCapture && pbrCapture->latticeReplay
-                && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
-            {
-                const auto requested = graphViewInput->Draws();
-                if (!p.graphInput || p.graphInput->Draws().size() != requested.size())
-                { outError = "Lattice replay program is not ready; diagnostic fallback is forbidden"; return false; }
-                for (const auto& draw : p.graphInput->Draws())
-                    if (draw.sourceIndex >= requested.size()
-                        || draw.material != requested[draw.sourceIndex].material)
-                    { outError = "Lattice replay selected a stale material instance"; return false; }
-            }
-            // The graph selection is a subsequence of the sealed source view.
-            // Draw the missing opaque slots through the existing PBR pass until
-            // every graph program for their model generation is ready.
-            std::vector<bool> graphSelected(graphFallbackDraws.size());
-            if (p.graphInput)
-                for (const auto& draw : p.graphInput->Draws())
-                    if (draw.sourceIndex < graphSelected.size()) graphSelected[draw.sourceIndex] = true;
-            for (std::size_t i = 0; i < graphFallbackDraws.size(); ++i)
-            {
-                if (!graphSelected[i] && graphFallbackDraws[i].materialSnapshot)
                 {
-                    draws.push_back(graphFallbackDraws[i]);
-                    if (i < graphFallbackShadowEligible.size() && graphFallbackShadowEligible[i])
-                    {
-                        shadowDraws.push_back(graphFallbackDraws[i]);
-                    }
-                    if (pbrCapture && pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
-                    {
-                        pbrCapture->RecordPendingLatticeFallback(graphFallbackDraws[i]);
-                    }
+                    return false;
                 }
             }
             if (!p.iblGenerated || skyBoxDirty)
@@ -5521,7 +4811,11 @@ namespace
             if (historyGuard.active) historyGuard.Reset();
             {
                 RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
-                if (!PreparePipelineFrame(p, viewIndex, RHIShaderBinary::Dxil, outError)) return false;
+                if (!PreparePipelineFrame(p, viewIndex, RHIShaderBinary::Dxil, outError))
+                {
+                    preparationDeferred = p.graphMaterials.SelectionDeferred();
+                    return false;
+                }
             }
 
             lastDrawCount = p.gbuffer.GetLastDrawCount();
@@ -5539,7 +4833,7 @@ namespace
             viewUICounts[targetIndex] = lastUIRectCount;
 
             slot.graph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
-                RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+                kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetProfiler(dx12.Profiler());
             graph.SetTransientPool(&p.transientPool);
@@ -5555,18 +4849,6 @@ namespace
                 if (!p.animationPalettes.UploadForCurrentRecording(*p.frameContext.resources))
                 {
                     outError = "Sealed animation palette upload failed after the upload-prefix boundary.";
-                    return false;
-                }
-                if (!p.gbuffer.PrepareGpuVisibility(p.frameContext, outError))
-                {
-                    return false;
-                }
-                if (!p.shadow.PrepareGpuVisibility(p.frameContext, outError))
-                {
-                    return false;
-                }
-                if (!p.forward.PrepareGpuVisibility(p.frameContext, outError))
-                {
                     return false;
                 }
                 if (!p.decal.PrepareGpuVisibility(p.frameContext, outError)
@@ -5632,7 +4914,7 @@ namespace
             if (diagnosticOutput)
             {
                 *diagnosticOutput = CaptureLiveGraphSnapshot(graph, view.key.viewId,
-                    sourceFrameId, p.width, p.height);
+                    view.key.historyRevision, sourceFrameId, p.frameContext.sceneEpoch, p.width, p.height);
             }
 
             RHIRecordedBatchDesc batchDesc{};
@@ -7439,115 +6721,6 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     frame.requiredAssets = requiredAssets;
     frame.requiredAssets.Canonicalize();
 
-    // M6-P2d-d/e: watcher 변경은 App 프레임 시작의
-    // DrainQueuedAssetChanges에서 이미 DataSystem generation을 전진시켰다. GT가
-    // primary GBuffer와 Host가 required-asset packet에 선언한 ShaderMeta의 현재
-    // generation/value만 밀봉한다. cache 전체 스캔은 활성 Scene과 무관한 재질까지
-    // frame 수명에 붙들었으므로 P2d-e에서 은퇴했고, RT는 catalog/file/DataSystem을
-    // 다시 읽지 않는다.
-    {
-        const std::filesystem::path metaPath =
-            RHIShaderSource::Resolve("GBuffer.shadermeta");
-        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
-        std::vector<FileGuid> guids;
-        guids.push_back(guid);
-
-        for (const EnhancedRequiredShaderMetaAsset& required :
-            frame.requiredAssets.shaderMetas)
-        {
-            if (EnhancedShaderMetaDomain::GBuffer != required.domain
-                || std::find(guids.begin(), guids.end(), required.guid)
-                    != guids.end())
-            {
-                continue;
-            }
-            guids.push_back(required.guid);
-        }
-
-        if (guids.size() > 1)
-            std::sort(guids.begin() + 1, guids.end());
-
-        frame.gbufferShaderMetas.reserve(guids.size());
-        for (std::size_t index = 0; index < guids.size(); ++index)
-        {
-            EnhancedShaderMetaFrameSnapshot snapshot{};
-            snapshot.guid = guids[index];
-            if (FileGuid{} == snapshot.guid)
-            {
-                snapshot.error = "GBuffer.shadermeta catalog GUID를 찾지 못했다: "
-                    + metaPath.string();
-                frame.gbufferShaderMetas.push_back(std::move(snapshot));
-                continue;
-            }
-            std::string loadError;
-            snapshot.handle = DataSystems->LoadShaderMetaHandle(
-                snapshot.guid, loadError);
-            snapshot.value = DataSystems->ResolveShaderMeta(snapshot.handle);
-            if (!snapshot.IsValid())
-            {
-                snapshot.error = loadError.empty()
-                    ? "GBuffer ShaderMeta generation을 resolve하지 못했다: "
-                        + snapshot.guid.ToString()
-                    : loadError;
-            }
-            frame.gbufferShaderMetas.push_back(std::move(snapshot));
-        }
-    }
-
-    // M6-P2d-d: Forward는 GBuffer와 다른 primary catalog slot을 소유한다. 첫
-    // 항목은 항상 Standard primary이고, 뒤에는 Host required-asset packet이
-    // 선택한 ShaderMeta generation/value를 GUID 순서로 함께 밀봉한다. RT는
-    // catalog나 DataSystem을 다시 읽지 않는다.
-    {
-        const std::filesystem::path metaPath =
-            RHIShaderSource::Resolve("Forward.shadermeta");
-        const FileGuid guid = DataSystems->GetFileGuid(metaPath);
-        std::vector<FileGuid> guids;
-        guids.push_back(guid);
-
-        for (const EnhancedRequiredShaderMetaAsset& required :
-            frame.requiredAssets.shaderMetas)
-        {
-            if (EnhancedShaderMetaDomain::Forward != required.domain
-                || std::find(guids.begin(), guids.end(), required.guid)
-                    != guids.end())
-            {
-                continue;
-            }
-            guids.push_back(required.guid);
-        }
-        if (guids.size() > 1)
-            std::sort(guids.begin() + 1, guids.end());
-
-        frame.forwardShaderMetas.reserve(guids.size());
-        for (std::size_t index = 0; index < guids.size(); ++index)
-        {
-            EnhancedShaderMetaFrameSnapshot snapshot{};
-            snapshot.guid = guids[index];
-            if (FileGuid{} == snapshot.guid)
-            {
-                snapshot.error = 0 == index
-                    ? "Forward.shadermeta catalog GUID를 찾지 못했다: "
-                        + metaPath.string()
-                    : "Forward material ShaderMeta GUID가 비었다";
-                frame.forwardShaderMetas.push_back(std::move(snapshot));
-                continue;
-            }
-            std::string loadError;
-            snapshot.handle = DataSystems->LoadShaderMetaHandle(
-                snapshot.guid, loadError);
-            snapshot.value = DataSystems->ResolveShaderMeta(snapshot.handle);
-            if (!snapshot.IsValid())
-            {
-                snapshot.error = loadError.empty()
-                    ? "Forward ShaderMeta generation을 resolve하지 못했다: "
-                        + snapshot.guid.ToString()
-                    : loadError;
-            }
-            frame.forwardShaderMetas.push_back(std::move(snapshot));
-        }
-    }
-
     if (frame.width != state.publishedWidth ||
         frame.height != state.publishedHeight)
     {
@@ -7854,9 +7027,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             //   낡은 화면이 남는다. "이번 프레임에 모은 것만 그린다"로 둔다.
             state.drawPool.clear();
             state.graphDraws.clear();
-            state.graphFallbackDraws.clear();
-            state.graphFallbackShadowEligible.clear();
-            state.graphFallbackViewRequired.clear();
+            state.graphShadowEligible.clear();
+            state.graphViewRequired.clear();
             state.graphViewInput.reset();
             state.decals.clear();
         }
@@ -7918,53 +7090,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         }
 
         VulkanLivePipeline& p = *state.vulkanPipeline;
-        {
-            // W8: DX12 경로와 같은 자리에 같은 도장을 찍는다. 한쪽만 찍으면
-            // backend마다 신원 축이 달라진다.
-            p.frameContext.frameId = frame.frameId;
-            p.frameContext.sceneEpoch = frame.sceneEpoch;
-            std::string shaderError;
-            if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
-                    p.frameContext,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV, shaderError))
-            {
-                state.lastError = "Vulkan GBuffer ShaderMeta 초기 적용 실패: " + shaderError;
-                state.TeardownVulkanPipeline();
-                state.enabled = false;
-                return;
-            }
-            if (!state.ApplyForwardShaderMeta(frame.forwardShaderMetas, p.forward,
-                    p.frameContext,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV, shaderError))
-            {
-                state.lastError = "Vulkan Forward ShaderMeta 초기 적용 실패: " + shaderError;
-                state.TeardownVulkanPipeline();
-                state.enabled = false;
-                return;
-            }
-            if (!state.SealForwardMaterials(frame.forwardShaderMetas,
-                    frame.totalSeconds, frame.deltaSeconds,
-                    p.forward, p.frameContext,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV, shaderError))
-            {
-                state.lastError = "Vulkan Forward Material snapshot 실패: " + shaderError;
-                ++state.frameFailures;
-                return;
-            }
-            if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
-                    p.gbuffer, p.frameContext, p.graphMaterials,
-                    RHICompletionPoint{ p.resources.GetLastSignaledFenceValue() },
-                    RHIShaderBinary::SpirV,
-                    shaderError))
-            {
-                state.lastError = "Vulkan GBuffer Material snapshot 실패: " + shaderError;
-                ++state.frameFailures;
-                return;
-            }
-        }
+        p.frameContext.frameId = frame.frameId;
+        p.frameContext.sceneEpoch = frame.sceneEpoch;
         if (state.ShouldSkipScenePixels(frame))
         {
             return;
@@ -7996,7 +7123,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             }
             if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
                 p.views[viewIndex].ready && p.views[viewIndex].previewComplete &&
-                p.views[viewIndex].completedSceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame)
+                p.views[viewIndex].completedSceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame &&
+                !state.HasGraphSnapshotRequest(viewPacket.displayTarget))
             {
                 continue;
             }
@@ -8191,49 +7319,6 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // staleness를 못 잰다.
         p.frameContext.frameId = frame.frameId;
         p.frameContext.sceneEpoch = frame.sceneEpoch;
-        std::string shaderError;
-        if (!state.ApplyGBufferShaderMeta(frame.gbufferShaderMetas, p.gbuffer,
-                p.frameContext,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil, shaderError))
-        {
-            state.lastError = "DX12 GBuffer ShaderMeta 초기 적용 실패: " + shaderError;
-            state.TeardownPipeline();
-            state.enabled = false;
-            return;
-        }
-        // 예열 장부: 셰이더 반영·재질 밀봉이 끝난 때(실측 9.36s 구간의 끝).
-        engine::warmup::mark(engine::warmup::stage::shader_meta);
-        if (!state.ApplyForwardShaderMeta(frame.forwardShaderMetas, p.forward,
-                p.frameContext,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil, shaderError))
-        {
-            state.lastError = "DX12 Forward ShaderMeta 초기 적용 실패: " + shaderError;
-            state.TeardownPipeline();
-            state.enabled = false;
-            return;
-        }
-        if (!state.SealForwardMaterials(frame.forwardShaderMetas,
-                frame.totalSeconds, frame.deltaSeconds,
-                p.forward, p.frameContext,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil, shaderError))
-        {
-            state.lastError = "DX12 Forward Material snapshot 실패: " + shaderError;
-            ++state.frameFailures;
-            return;
-        }
-        if (!state.SealGBufferMaterials(frame.gbufferShaderMetas,
-                p.gbuffer, p.frameContext, p.graphMaterials,
-                RHICompletionPoint{ state.dx12.GetLastSignaledFenceValue() },
-                RHIShaderBinary::Dxil,
-                shaderError))
-        {
-            state.lastError = "DX12 GBuffer Material snapshot 실패: " + shaderError;
-            ++state.frameFailures;
-            return;
-        }
     }
 
     traceProgress("seal.end");
@@ -8339,7 +7424,8 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         // 표시 중도 인플라이트도 아닌 슬롯에 그린다.
         if (viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview &&
             view->displaySlot >= 0 && view->slots[view->displaySlot].previewComplete &&
-            view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame)
+            view->slots[view->displaySlot].sceneEpoch == frame.sceneEpoch && !state.controlledCaptureFrame &&
+            !state.HasGraphSnapshotRequest(viewPacket.displayTarget))
         {
             // Reopening a hidden preview reuses its completed image. The public
             // demand snapshot was cleared while hidden, so publish it again.
@@ -9036,8 +8122,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
             static_cast<double>(rhiStats.producerWaitNanoseconds) / 1.0e6,
             static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
         status += producerWaitLine;
-        state.AppendGBufferShaderMetaStatus(status);
-        state.AppendForwardShaderMetaStatus(status);
+        state.AppendGBufferMaterialStatus(status);
+        state.AppendForwardMaterialStatus(status);
         if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
         return status;
     }
@@ -9290,8 +8376,8 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
         static_cast<double>(rhiStats.maxProducerWaitNanoseconds) / 1.0e6);
     status += producerWaitLine;
     if (!state.lastError.empty()) status += "\n  마지막 오류: " + state.lastError;
-        state.AppendGBufferShaderMetaStatus(status);
-        state.AppendForwardShaderMetaStatus(status);
+        state.AppendGBufferMaterialStatus(status);
+        state.AppendForwardMaterialStatus(status);
     return status;
 }
 
@@ -9313,8 +8399,15 @@ EnhancedSceneRenderer::GetLiveGraphSnapshot(EnhancedLiveDisplayTarget target)
     {
         return {};
     }
+    const auto display = GetLiveDisplaySnapshot();
     std::lock_guard<std::mutex> lock(state.debugMutex);
-    state.graphSnapshotRequests[index] = true;
+    // Completed previews reuse their image. Sample once when the retained graph
+    // is absent or stale, then preserve both the image and its CPU snapshot.
+    if (target != EnhancedLiveDisplayTarget::MaterialPreview || !state.graphSnapshots[index] ||
+        !EnhancedGraphSnapshotMatchesView(*state.graphSnapshots[index], display.Get(target)))
+    {
+        state.graphSnapshotRequests[index] = true;
+    }
     return state.graphSnapshots[index];
 }
 

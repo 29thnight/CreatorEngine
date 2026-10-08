@@ -20,10 +20,11 @@ namespace wave
             "Audio.Stolen total", "Audio.Dropped total", "Audio.Backend failures total", "Audio.Playback instances",
             "Audio.Runtime update", "Audio.Stream bytes total", "Audio.Stream read failures total",
             "Audio.Callback p99 upper", "Audio.Callback maximum", "Audio.Callback over half period total",
-            "Audio.Completion drops total", "Audio.Output mode" };
+            "Audio.Completion drops total", "Audio.Output mode",
+            "Audio.Stream PCM reads total", "Audio.Stream starvation reads total" };
         static constexpr std::array units{
             "voices", "voices", "voices", "voices", "voices", "voices", "count", "instances",
-            "us", "B", "count", "us", "us", "count", "count", "mode" };
+            "us", "B", "count", "us", "us", "count", "count", "mode", "count", "count" };
         static const auto ids = []
         {
             std::array<ce::profile_counter_id, names.size()> result{};
@@ -44,12 +45,13 @@ namespace wave
             static_cast<double>(counters.callbackP99Nanoseconds) / 1000.0,
             static_cast<double>(counters.callbackMaxNanoseconds) / 1000.0,
             static_cast<double>(counters.callbackOverHalfPeriod), static_cast<double>(playback.DroppedCompletions()),
-            static_cast<double>(host.Mode()) };
+            static_cast<double>(host.Mode()), static_cast<double>(counters.streamPcmReads),
+            static_cast<double>(counters.streamStarvationReads) };
         std::array<ce::profile_counter_sample, names.size()> samples{};
         std::size_t count = 0u;
         for (std::size_t index = 0u; index < values.size(); ++index)
         {
-            if ((index == 9u || index == 10u) && !counters.backendCountersAvailable)
+            if ((index == 9u || index == 10u || index >= 16u) && !counters.backendCountersAvailable)
             {
                 continue;
             }

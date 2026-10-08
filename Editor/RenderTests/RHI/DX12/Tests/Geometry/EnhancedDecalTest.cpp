@@ -433,7 +433,8 @@ bool DX12Test::RunDecalTest(std::string& outLog)
 
         decal.SetDecals({ item });
 
-        if (!resources.BeginFrame(error) || !decal.PrepareFrame(frameContext, error))
+        if (!resources.BeginFrame(error) || !decal.PrepareFrame(frameContext, error) ||
+            !decal.PrepareGpuVisibility(frameContext, error))
         {
             outLog += "[3/5] 준비 실패: " + error + "\n";
             resources.Shutdown();
@@ -572,11 +573,14 @@ bool DX12Test::RunDecalTest(std::string& outLog)
             outLog += "하늘에 데칼이 얹혔다 — depth>=1 게이트가 죽었다\n";
             passed = false;
         }
-        // 사본 + 덧칠 + 리드백 셋이다. 깊이 사본이 없어야 셋이다 —
-        // 넷이면 깊이까지 복사하고 있다는 뜻이다.
-        if (3 != stats.passesExecuted)
+        // 사본 + 덧칠 + 리드백에 지원 장치의 GPU reset/cull 두 패스가 더해진다.
+        // 깊이 사본 등 의도하지 않은 추가 패스는 여전히 거부한다.
+        const bool indirect = resources.GetIndirectDrawCapabilities().nonIndexedDraw;
+        const uint32_t expectedPasses = indirect ? 5u : 3u;
+        if (stats.passesExecuted != expectedPasses ||
+            (indirect && decal.GetGpuVisibilityStats().candidateCount != 1))
         {
-            outLog += "패스가 셋(사본·덧칠·리드백)이 아니다\n";
+            outLog += "사본·덧칠·리드백 및 GPU visibility 패스/후보 수가 계약과 다르다\n";
             passed = false;
         }
     }

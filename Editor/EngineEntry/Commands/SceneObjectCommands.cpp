@@ -1,4 +1,5 @@
 #include "../EditorDiagnostics.h"
+#include "SoundGraphEditor.h"
 // LC6 (PHASE 14.5) — SceneObject 도메인 명령.
 //
 // `object.*` · `scene.*` · `prefab.*` · `component.*` · `camera.*` · `undo.*` ·
@@ -41,6 +42,8 @@
 #include "SceneManager.h"
 #include "Scene.h"
 #include "CameraComponent.h"
+#include "SoundComponent.h"
+#include "SoundSystem.h"
 #include "CharacterMovementComponent.h"
 #include "CameraSystem.h"
 #include "ClrHost.h"
@@ -418,6 +421,75 @@ namespace ConsoleCmd
         return EditorObjectOperations::RemoveComponent(target, ctx.parts[2]);
     }
 
+    static CommandCore::CommandResult Cmd_audio_authoringprobe(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() != 1 && ctx.parts.size() != 4)
+        {
+            return InvalidArguments("audio.authoringprobe [directory name clip-guid]");
+        }
+        if (ctx.parts.size() == 4)
+        {
+            std::string error;
+            if (!editor::sound_graph_editing::QueueAuthoringAcceptance(
+                ctx.parts[1], ctx.parts[2], ctx.parts[3], error))
+            {
+                return Fail("audio.authoring.rejected", error);
+            }
+        }
+        auto data = CommandData::Object();
+        data.Set("authoring", CommandData::String(editor::sound_graph_editing::AuthoringAcceptanceStatus()));
+        data.Set("preview", CommandData::String(editor::sound_graph_editing::PreviewStatus()));
+        return Ok("Sound Graph presentation-owner acceptance", std::move(data));
+    }
+
+    static CommandCore::CommandResult Cmd_audio_status(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        if (ctx.parts.size() > 2)
+        {
+            return InvalidArguments("audio.status [target]");
+        }
+        auto* playback = SceneManagers->AudioPlayback();
+        if (!playback)
+        {
+            return PreconditionFailed("audio.unavailable", "Audio playback service is unavailable");
+        }
+        auto data = CommandData::Object();
+        const auto metrics = playback->Audio().Metrics();
+        data.Set("activeVoices", CommandData::Int(metrics.active));
+        data.Set("physicalVoices", CommandData::Int(metrics.physical));
+        data.Set("virtualVoices", CommandData::Int(metrics.virtualized));
+        data.Set("pausedVoices", CommandData::Int(metrics.paused));
+        data.Set("backendFailures", CommandData::Int(metrics.backendFailures));
+        data.Set("playbackInstances", CommandData::Int(playback->AliveCount()));
+        data.Set("loadedClips", CommandData::Int(playback->Audio().ListClipKeys().size()));
+        data.Set("lastAudioError", CommandData::String(playback->Audio().LastError()));
+        data.Set("lastPlaybackError", CommandData::String(playback->LastError()));
+        data.Set("host", ctx.system.ReadAudioDiagnostics());
+        if (ctx.parts.size() == 2)
+        {
+            EntityHandle target;
+            auto resolved = EditorObjectOperations::ResolveTarget(ctx.parts[1], target);
+            if (!resolved.IsSuccess())
+            {
+                return resolved;
+            }
+            auto* scene = SceneManagers->GetActiveScene();
+            auto* owner = scene ? scene->Resolve(target) : nullptr;
+            auto* sound = owner ? owner->GetComponent<SoundComponent>() : nullptr;
+            if (!sound)
+            {
+                return PreconditionFailed("audio.no_component", "Target has no SoundComponent");
+            }
+            const auto handle = sound->CurrentPlayback();
+            data.Set("playbackHandle", CommandData::String(std::to_string(handle.Value())));
+            data.Set("playing", CommandData::Bool(sound->IsPlaying()));
+            data.Set("childVoices", CommandData::Int(playback->ChildVoiceCount(handle)));
+            data.Set("worldScopeAlive", CommandData::Bool(playback->IsScopeAlive(scene->Sounds().WorldScope())));
+        }
+        return Ok("Current audio playback state", std::move(data));
+    }
     static CommandCore::CommandResult Cmd_object_create(const ConsoleCommandContext& ctx)
     {
         if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return CommandCore::InvalidArguments("object.create <name> [type]");
@@ -1608,6 +1680,8 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         reg.Result({ "scene.ddol" }, &Cmd_scene_ddol);
         reg.Result({ "ai.status" }, &Cmd_ai_status);
         reg.Result({ "scene.save" }, &Cmd_scene_save);
+        reg.Result({ "audio.status" }, &Cmd_audio_status);
+        reg.Result({ "audio.authoringprobe" }, &Cmd_audio_authoringprobe);
         reg.Result({ "object.create" }, &Cmd_object_create);
         reg.Result({ "object.delete" }, &Cmd_object_delete);
         reg.Result({ "object.properties" }, &Cmd_object_properties);

@@ -318,6 +318,8 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
 
     bool passed = true;
     uint32_t lastPassCount = 0;
+    std::array<RHIResourceState, 5> inputStates;
+    inputStates.fill(RHIResourceState::PixelShaderResource);
 
     // 한 프레임을 돌려 격자와 합성 결과를 받아 온다. 그래프는 매번 새로 만든다.
     const auto renderFrame = [&](const EnhancedVolumetricFogPass::Tuning& tuning,
@@ -356,15 +358,15 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
 
         EnhancedVolumetricFogPass::Inputs inputs{};
         inputs.color = graph.ImportTexture(colorRegistration.Handle(),
-            RHIResourceState::ShaderResource, "Fog.SceneColor");
+            inputStates[0], "Fog.SceneColor", &inputStates[0]);
         inputs.depth = graph.ImportTexture(depthRegistration.Handle(),
-            RHIResourceState::ShaderResource, "Fog.SceneDepth");
+            inputStates[1], "Fog.SceneDepth", &inputStates[1]);
         inputs.shadowMap = graph.ImportTexture(shadowRegistration.Handle(),
-            RHIResourceState::ShaderResource, "Fog.ShadowMap");
+            inputStates[2], "Fog.ShadowMap", &inputStates[2]);
         inputs.cloudShadow = graph.ImportTexture(cloudRegistration.Handle(),
-            RHIResourceState::ShaderResource, "Fog.CloudMap");
+            inputStates[3], "Fog.CloudMap", &inputStates[3]);
         inputs.blueNoise = graph.ImportTexture(noiseRegistration.Handle(),
-            RHIResourceState::ShaderResource, "Fog.BlueNoise");
+            inputStates[4], "Fog.BlueNoise", &inputStates[4]);
 
         fog.SetInputs(inputs);
         fog.Declare(graph, frameContext);

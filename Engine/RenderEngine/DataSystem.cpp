@@ -754,7 +754,12 @@ bool DataSystem::PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& p
         {
             if (!PublishRuntimeAsset(asset, error))
             {
-                return finish(error);
+                if (!PathFinder::IsAssetAuthoringEnabled())
+                {
+                    return finish(error);
+                }
+                Debug::PrintLog(spdlog::level::warn, "Scene graph will use an editable default material: " + error);
+                error.clear();
             }
         }
         preparation->completed.store(0, std::memory_order_relaxed);
@@ -827,7 +832,11 @@ bool DataSystem::PollSceneAssets(const std::shared_ptr<SceneAssetPreparation>& p
                 std::string failure;
                 if (!ConfigureMaterialGraph(material, description, failure))
                 {
-                    throw std::runtime_error(failure);
+                    if (!PathFinder::IsAssetAuthoringEnabled())
+                    {
+                        throw std::runtime_error(failure);
+                    }
+                    // The actual model/inline material owner creates and persists its replacement during construction.
                 }
                 ++preparation->completed;
             }
@@ -1259,8 +1268,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
         if (allowEditorRecovery && AssetAuthoringPort::RecoverModel(GetFilePath(guid), guid))
             return LoadAndPublishModelAssetGeneration(guid, false, publish);
         Debug::PrintLog(spdlog::level::err,
-                        "Model material graphs are missing; import the model before publishing it.");
-        return {};
+                        "Model material graphs are missing; retain geometry and create editable default graphs.");
     }
     (fromCatalog ? m_generationFromCatalog : m_generationFromLibrary).fetch_add(1, std::memory_order_relaxed);
     if (!publish)
@@ -2194,7 +2202,10 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
     description.graphId.value = assets::ModelMaterialGraphId(source.materialId);
     const auto generation = LoadMaterialGraphGeneration(FileGuid(description.graphId.value), error);
     if (!generation)
-        return false;
+    {
+        const std::string cause = error;
+        return ConfigureEditableDefaultMaterialGraph(material, cause, error);
+    }
     experiment::Material imported;
     ExperimentMaterialMigration::ConvertModelMaterialAsset(source, model, imported);
     SynchronizeLegacyMaterialProperties(material);
@@ -2241,9 +2252,53 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
     }
     if (!ConfigureMaterialGraph(material, description, error, false, &model))
     {
-        return false;
+        const std::string cause = error;
+        return ConfigureEditableDefaultMaterialGraph(material, cause, error);
     }
     material.m_fileGuid = FileGuid(source.materialId);
+    return true;
+}
+
+bool DataSystem::ConfigureEditableDefaultMaterialGraph(Material& material, std::string_view cause, std::string& error)
+{
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        error = std::string(cause);
+        return false;
+    }
+    const auto graph = assets::BuildDefaultMaterialGraph(error);
+    if (!graph)
+    {
+        return false;
+    }
+    const FileGuid guid = FileGuid::CreateRandomV4();
+    const auto path = PathFinder::RelativeToMaterial("") / ("Recovered_" + guid.ToString() + ".shadergraph");
+    if (AssetAuthoringPort::WriteTextAssetWithMeta(path, LX::LXMaterialArchive::Write(*graph), guid) != guid)
+    {
+        error = "Cannot publish editable default graph: " + path.string();
+        return false;
+    }
+    if (!ApplyAssetChange({RuntimeAssetChangeKind::CatalogUpsert, RuntimeAssetType::MaterialGraph, guid, path}))
+    {
+        error = "Cannot register editable default graph: " + path.string();
+        return false;
+    }
+    material_graph::InstanceDescription description;
+    description.graphId.value = guid.m_guid;
+    if (!ConfigureMaterialGraphAuthoring(material, *graph, description, error))
+    {
+        return false;
+    }
+    material.m_name = "Recovered Material";
+    if (material.m_fileGuid == FileGuid{})
+    {
+        material.m_fileGuid = guid;
+    }
+    material.m_renderingMode = MaterialRenderingMode::Opaque;
+    material.m_doubleSided = false;
+    Debug::PrintLog(spdlog::level::warn, "Material graph failed: " + std::string(cause) +
+        ". Mesh retained with editable graph: " + path.string());
+    error.clear();
     return true;
 }
 
@@ -2341,11 +2396,24 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
     {
         material_graph::InstanceDocument document;
         std::string error;
-        if (!material_graph::ReadInstanceDocument(readNode, document, error) ||
-            !ConfigureMaterialGraph(material, document.description, error))
+        if (!material_graph::ReadInstanceDocument(readNode, document, error))
         {
             Debug::PrintLog(spdlog::level::err, "LX material load failed: " + error);
             return false;
+        }
+        if (!ConfigureMaterialGraph(material, document.description, error))
+        {
+            const std::string cause = error;
+            if (!ConfigureEditableDefaultMaterialGraph(material, cause, error))
+            {
+                Debug::PrintLog(spdlog::level::err, "LX default graph recovery failed: " + error);
+                return false;
+            }
+            if (outAuthored)
+            {
+                *outAuthored = {};
+            }
+            return true;
         }
         material.m_name = std::move(document.name);
         material.m_fileGuid.m_guid = document.materialId.value;

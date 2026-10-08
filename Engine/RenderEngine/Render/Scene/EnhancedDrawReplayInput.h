@@ -168,11 +168,11 @@ struct EnhancedDrawReplayInput
     // The archive itself owns palette storage until frame preparation finishes.
     // Validate the ENTIRE closure before changing any item (transactional apply).
     bool Apply(std::span<EnhancedDrawItem> opaque, std::span<EnhancedDrawItem> forward,
-        std::span<EnhancedDrawItem> graph, std::span<EnhancedDrawItem> fallback, std::string& error) const
+        std::span<EnhancedDrawItem> graph, std::string& error) const
     {
         EnhancedDrawReplayInput current;
         if (!Seal(opaque,forward,graph,current,error)) return false;
-        if (fallback.size()!=graph.size() || current.draws.size()!=draws.size())
+        if (current.draws.size()!=draws.size())
         { error="draw replay selected closure count mismatch"; return false; }
         for (size_t i=0; i<draws.size(); ++i)
         {
@@ -192,11 +192,6 @@ struct EnhancedDrawReplayInput
                 item.bonePalette=saved.bones.empty() ? nullptr : saved.bones.data();
                 item.boneCount=static_cast<uint32_t>(saved.bones.size());
                 item.animatorKey=saved.bones.empty() ? 0 : index+1;
-                if (route==2)
-                {
-                    fallback[j].worldMatrix=item.worldMatrix; fallback[j].bonePalette=item.bonePalette;
-                    fallback[j].boneCount=item.boneCount; fallback[j].animatorKey=item.animatorKey;
-                }
             }
         }
         error.clear(); return true;

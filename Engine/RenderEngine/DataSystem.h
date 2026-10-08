@@ -289,6 +289,8 @@ public:
     void CommitSceneMaterials(const file::path& scene);
     bool ConfigureModelMaterialGraph(Material& material, const assets::ModelAssetGeneration& model,
                                       const assets::ModelMaterialAsset& source, std::string& error);
+    // Editor import/load recovery publishes a separate editable graph; never a native pass fallback.
+    bool ConfigureEditableDefaultMaterialGraph(Material& material, std::string_view cause, std::string& error);
     bool ConfigureMaterialGraph(Material& material, const material_graph::InstanceDescription& description,
                                  std::string& error, bool reload = false,
                                  const assets::ModelAssetGeneration* model = nullptr);

@@ -220,49 +220,37 @@ namespace ce
 		//
 		// root_ticks 는 depth 0 만 더한다. 그 구간들은 서로 겹치지 않으므로
 		// 합이 그대로 그 스레드가 이 범위에서 계측된 시간이다.
-		for (const profile_event& event : events)
+		// Sorted slots form contiguous runs. Accumulate each lane locally once;
+		// this avoids both prior-lane searches and vector access per event.
+		std::size_t eventIndex = 0;
+		while (eventIndex < events.size())
 		{
-			if (is_truncated(event))
+			thread_summary summary;
+			summary.thread_slot = events[eventIndex].thread_slot;
+			do
 			{
-				++result.m_truncatedEvents;
-			}
-
-			thread_summary* summary = nullptr;
-			for (thread_summary& candidate : result.m_threads)
-			{
-				if (candidate.thread_slot == event.thread_slot)
+				const profile_event& event = events[eventIndex++];
+				if (is_truncated(event))
 				{
-					summary = &candidate;
-					break;
+					++result.m_truncatedEvents;
+				}
+				++summary.event_count;
+				summary.max_depth = (std::max)(summary.max_depth, event.depth);
+
+				// Instants remain in the timeline but contribute no duration.
+				if (is_instant(event))
+				{
+					result.m_instants.push_back(event);
+					continue;
+				}
+				if (event.depth == 0)
+				{
+					summary.root_ticks += span_ticks(event);
 				}
 			}
-			if (!summary)
-			{
-				thread_summary fresh;
-				fresh.thread_slot = event.thread_slot;
-				result.m_threads.push_back(fresh);
-				summary = &result.m_threads.back();
-			}
-
-			++summary->event_count;
-			summary->max_depth = (std::max)(summary->max_depth, event.depth);
-
-			// ★ 길이가 없는 사건은 합에도 트리에도 넣지 않는다. Hierarchy·Flat
-			//   이 세는 것은 **걸린 시간**이고 점에는 그것이 없다.
-			//
-			//   길이가 0 이라 더해도 0 이지만, 넣고 안 넣고를 **두 곳에서
-			//   다르게** 정하면 timeline_total 과 hierarchy_total 의 동치가
-			//   깨진다. 한 자리에서 가르고 아래 트리도 같은 기준을 쓴다.
-			if (is_instant(event))
-			{
-				result.m_instants.push_back(event);
-				continue;
-			}
-
-			if (event.depth == 0)
-			{
-				summary->root_ticks += span_ticks(event);
-			}
+			while (eventIndex < events.size() &&
+			       events[eventIndex].thread_slot == summary.thread_slot);
+			result.m_threads.push_back(summary);
 		}
 
 		// 사건은 **시각 순**으로 세운다. 위에서는 스팬 순서(슬롯 먼저)로 모았고,

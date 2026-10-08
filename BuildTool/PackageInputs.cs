@@ -11,7 +11,26 @@ internal static class PackageInputs
     // Script identities belong to the managed assembly. Keeping their sidecars
     // in cook input would create CEMF entries for source files omitted from PAK.
     private static bool ScriptSource(string relative) => relative.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase);
-    public static int CopyProject(string project, string destination, CancellationToken token)
+    public static HashSet<string>? ReadAssetList(string project, string listFile, string startupScene)
+    {
+        if (listFile.Length == 0) return null;
+        Paths.NoReparseAncestors(listFile);
+        var assets = Path.Combine(project, "Assets");
+        var selected = new HashSet<string>(Paths.Comparer);
+        foreach (var line in File.ReadAllLines(listFile))
+        {
+            var relative = line.Trim().Replace('\\', '/');
+            if (relative.Length == 0) continue;
+            var source = Paths.Child(assets, relative);
+            if (!File.Exists(source)) throw new BuildException($"Selected asset missing: {relative}");
+            selected.Add(Paths.Relative(assets, source));
+            if (File.Exists(source + ".meta")) selected.Add(Paths.Relative(assets, source + ".meta"));
+        }
+        if (startupScene.Length == 0 || !selected.Contains("Scenes/" + startupScene))
+            throw new BuildException("--asset-list requires an explicitly selected --startup-scene included in the list.");
+        return selected;
+    }
+    public static int CopyProject(string project, string destination, CancellationToken token, HashSet<string>? selectedAssets = null)
     {
         ProjectLayerAsset.Require(project);
 
@@ -24,6 +43,7 @@ internal static class PackageInputs
                 token.ThrowIfCancellationRequested(); var relative = Paths.Relative(root, file);
                 if (name == "ProjectSetting" && Generated(relative)) continue;
                 if (name == "Assets" && ScriptSource(relative)) continue;
+                if (name == "Assets" && selectedAssets != null && !selectedAssets.Contains(relative)) continue;
                 Paths.Copy(file, Paths.Child(destination, name + "/" + relative)); ++count;
             }
         }

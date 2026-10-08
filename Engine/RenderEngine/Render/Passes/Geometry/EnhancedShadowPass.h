@@ -59,6 +59,8 @@ public:
 
     bool Initialize(const EnhancedFrameContext& context, std::string& outError) override;
     bool PrepareFrame(const EnhancedFrameContext& context, std::string& outError) override;
+    bool PrepareGraphFrame(const EnhancedFrameContext& context, std::string& outError);
+    void DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
     bool HasGpuVisibilityCandidates() const { return m_hasGpuVisibilityCandidates; }
     // Call after the upload prefix/PrepareParallel boundary, before Declare.
     // Optional GPU prerequisites may deliberately retain the CPU route.

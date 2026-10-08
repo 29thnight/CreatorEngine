@@ -26,6 +26,8 @@ namespace wave
         std::uint64_t callbackOverHalfPeriod{};
         std::uint64_t streamBytesRead{};
         std::uint64_t streamReadFailures{};
+        std::uint64_t streamPcmReads{};
+        std::uint64_t streamStarvationReads{};
         bool backendCountersAvailable{};
     };
 

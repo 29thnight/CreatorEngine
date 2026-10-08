@@ -16,6 +16,7 @@
 #include "InputManager.h"
 #include "ImGui.h"
 #include "Audio/AudioHost.h"
+#include "ConsoleCommandSystem.h"
 #include "Audio/AudioProfileProvider.h"
 #include "Audio/MiniaudioBackend.h"
 #include "Audio/PlaybackService.h"
@@ -284,6 +285,41 @@ void Editor::EditorMain::Initialize()
         Debug::PrintLog(spdlog::level::warn, "[audio.device.degraded] Output device unavailable; graph retained and output recovery will retry");
     }
     m_audioPlayback = std::make_unique<wave::PlaybackService>(*m_audioHost->Service());
+    ConsoleCommandSystem::Get().SetAudioDiagnosticsReader([this]
+    {
+        using CommandCore::CommandData;
+        const auto counters = m_audioHost->Counters();
+        auto data = CommandData::Object();
+        data.Set("available", CommandData::Bool(counters.backendCountersAvailable));
+        data.Set("outputMode", CommandData::Int(static_cast<int>(m_audioHost->Mode())));
+        data.Set("runtimeUpdateNs", CommandData::Int(counters.runtimeUpdateNanoseconds));
+        const auto rank = (m_audioUpdateSamples * 99u + 99u) / 100u;
+        std::uint64_t cumulative{};
+        std::uint64_t p99{};
+        for (std::size_t index = 0u; index < m_audioUpdateHistogram.size(); ++index)
+        {
+            cumulative += m_audioUpdateHistogram[index];
+            if (rank > 0u && cumulative >= rank)
+            {
+                p99 = index == m_audioUpdateHistogram.size() - 1u
+                    ? UINT64_MAX : (index + 1u) * 1000u;
+                break;
+            }
+        }
+        data.Set("runtimeUpdateSamples", CommandData::Int(m_audioUpdateSamples));
+        data.Set("runtimeUpdateP99UpperNs", CommandData::String(std::to_string(p99)));
+        data.Set("runtime128UpdateSamples", CommandData::Int(m_audio128UpdateSamples));
+        data.Set("runtime128UpdatesOverOneMillisecond", CommandData::Int(m_audio128UpdatesOverOneMillisecond));
+        data.Set("callbackCount", CommandData::Int(counters.callbackCount));
+        data.Set("callbackP99Ns", CommandData::Int(counters.callbackP99Nanoseconds));
+        data.Set("callbackMaxNs", CommandData::Int(counters.callbackMaxNanoseconds));
+        data.Set("callbackOverHalfPeriod", CommandData::Int(counters.callbackOverHalfPeriod));
+        data.Set("streamBytesRead", CommandData::Int(counters.streamBytesRead));
+        data.Set("streamReadFailures", CommandData::Int(counters.streamReadFailures));
+        data.Set("streamPcmReads", CommandData::Int(counters.streamPcmReads));
+        data.Set("streamStarvationReads", CommandData::Int(counters.streamStarvationReads));
+        return data;
+    });
     m_audioCatalog = std::make_unique<wave::AudioCatalog>(*m_audioHost->Service(), *m_audioPlayback);
     SceneManagers->BindAudioPlayback(m_audioPlayback.get(), [this](std::string_view key)
     {
@@ -643,6 +679,7 @@ void Editor::EditorMain::Finalize()
 
 	// 여기서부터는 표시/렌더 소비 스레드가 없다. 이제 해체해도 안전하다.
     SceneManagers->BindAudioPlayback(nullptr);
+    ConsoleCommandSystem::Get().SetAudioDiagnosticsReader({});
     m_audioPlayback->Shutdown();
     m_audioCatalog->Clear();
     m_audioHost->Shutdown();
@@ -864,6 +901,19 @@ void Editor::EditorMain::Update()
     }
     editor::sound_graph_editing::TickPreview(m_audioPlayback.get());
     m_audioHost->Update(static_cast<float>(m_frameDeltaTime));
+    const auto audioCounters = m_audioHost->Counters();
+    const auto updateNanoseconds = audioCounters.runtimeUpdateNanoseconds;
+    const auto histogramIndex = std::min<std::size_t>(updateNanoseconds / 1000u, m_audioUpdateHistogram.size() - 1u);
+    ++m_audioUpdateHistogram[histogramIndex];
+    ++m_audioUpdateSamples;
+    if (audioCounters.voices.physical == 128u)
+    {
+        ++m_audio128UpdateSamples;
+        if (updateNanoseconds > 1000000u)
+        {
+            ++m_audio128UpdatesOverOneMillisecond;
+        }
+    }
     m_audioPlayback->Update();
     wave::PublishAudioProfile(*m_audioHost, *m_audioPlayback);
 

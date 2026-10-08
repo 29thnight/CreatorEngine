@@ -91,6 +91,7 @@ public:
     bool PrepareGpuVisibility(const EnhancedFrameContext& context, std::string& outError);
     bool HasGpuVisibilityCandidates() const;
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
+    void DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);
     void Shutdown() override;
 
     // Prepared CPU candidates, not the post-cull GPU-visible instance count.

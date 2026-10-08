@@ -17,7 +17,6 @@ internal static class AssetCooking
     private static string[] Models(string assets)
     {
         var models = Paths.Files(assets).Where(p => Path.GetExtension(p).ToLowerInvariant() is ".fbx" or ".glb" or ".gltf").Order(StringComparer.Ordinal).ToArray();
-        if (models.Length == 0) throw new BuildException($"No model sources in package assets: {assets}");
         return models;
     }
     public static async Task<GenerationResult> Generations(BuildContext context, string cooker, string assets, string output, string library)

@@ -121,6 +121,7 @@ void Check(bool condition, const std::string& message)
     ++checks;
     if (!condition)
     {
+        std::cerr << "PROBE_CHECK_FAIL " << message << std::endl;
         throw std::runtime_error(message);
     }
 }
@@ -640,13 +641,35 @@ struct Drain
 };
 
 unsigned graphFrames{}, graphLists{}, graphFailures{};
+void CheckReferenceDeclarations(const EnhancedRenderGraph& graph)
+{
+    if (graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
+    {
+        return;
+    }
+    EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+    Check(graph.CaptureDiagnosticSnapshot(snapshot), "Reference compiled diagnostic snapshot");
+    for (const auto& pass : snapshot.passes)
+    {
+        for (const auto& usage : pass.usages)
+        {
+            Check(usage.access == RGAccessMode::Read || usage.access == RGAccessMode::Write,
+                  "Reference graph has no implicit accesses");
+            Check(usage.access != RGAccessMode::Write || usage.version == 1,
+                  "Reference outputs use their produced version");
+        }
+    }
+    Check(!snapshot.versionEdges.empty(), "Reference producer/consumer version dependencies are present");
+}
 void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures& textures,
                    MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings, RasterSurfaceCollector& collector,
                    SurfaceEvaluator& evaluator, IblBaker& baker, std::shared_ptr<const Instance> instance,
                    std::shared_ptr<Texture> cube, const RasterSurfaceRequest& request,
                    std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources,
                    std::span<const SurfacePoint> expectedGeometry, std::span<const IblBakePoint> expectedSurface,
-                   std::span<const IblBakeSample> expectedBake, unsigned workers)
+                   std::span<const IblBakeSample> expectedBake, unsigned workers,
+                   RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
+                   RGOrderPolicy order = RGOrderPolicy::DependencyOrder)
 {
     std::string error;
     const auto count = request.width * request.height;
@@ -656,7 +679,8 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     std::shared_ptr<const IblBakeResult> baked;
     std::vector<std::shared_ptr<const MeshSurfaceBatch>> currentSources;
     std::vector<RHIReadback> meshReadbacks(sources.size());
-    auto graph = std::make_shared<EnhancedRenderGraph>(device);
+    auto graph = std::make_shared<EnhancedRenderGraph>(device, scheduling, order);
+    const auto read = scheduling == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
     std::array<RHIReadback, 3> readbacks;
     Check(device.CreateBufferReadback(expectedGeometry.size_bytes(), readbacks[0], error), "Graph geometry readback");
     Check(device.CreateBufferReadback(expectedSurface.size_bytes(), readbacks[1], error), "Graph surface readback");
@@ -723,7 +747,7 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
         Check(handles[i].IsValid() && graph->ResolveBufferHandle(handles[i]) == owners[i],
               "Exact graph buffer identity");
         graph->AddPass(
-            "Probe.Readback", {{handles[i], RHIResourceState::CopySource}},
+            "Probe.Readback", {{handles[i], RHIResourceState::CopySource, read}},
             [readback = readbacks[i], buffer = owners[i]](const auto& context) {
                 context.encoder->CopyBufferToReadback(readback, buffer);
             },
@@ -733,13 +757,14 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     {
         const auto source = currentSources[i];
         graph->AddPass(
-            "Probe.MeshReadback", {{source->GraphOutput(*graph), RHIResourceState::CopySource}},
+            "Probe.MeshReadback", {{source->GraphOutput(*graph), RHIResourceState::CopySource, read}},
             [source, readback = meshReadbacks[i]](const auto& context) {
                 context.encoder->CopyBufferToReadback(readback, source->Buffer());
             },
             true);
     }
     Check(graph->Compile(error), "Graph chain compile " + error);
+    CheckReferenceDeclarations(*graph);
     Check(graph->GetStats().passesExecuted == 10 + 3 * currentSources.size(),
           "Current mesh and all consumer/readback passes are retained");
     device.forbidAllocations = true;
@@ -788,8 +813,10 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
         surface.reset();
         baked.reset();
         material.reset();
-        Check(ticket.GetRecordedBatch() && ticket.GetRecordedBatch()->HasLifetimeToken(), "Submission retained graph");
+        // Enqueue transfers the token from the ticket's batch to GPU retirement.
+        Check(!ownedByGraph.expired(), "GPU retirement retained graph");
         ticket = {};
+        Check(!ownedByGraph.expired(), "Graph lifetime is independent of submission ticket");
     }
     Check(device.EndFrame(error), "Graph chain frame submit " + error);
     Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Graph chain native submission " + error);
@@ -1076,7 +1103,9 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
                          RasterSurfaceCollector& collector, std::array<SurfaceEvaluator, 2>& evaluators,
                          IblBaker& baker, const std::array<std::shared_ptr<const Instance>, 2>& instances,
                          std::shared_ptr<Texture> cube, const Environment& colors, const SheenTable& table,
-                         unsigned fixture, bool reverseOrder, unsigned workers)
+                         unsigned fixture, bool reverseOrder, unsigned workers,
+                         RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
+                         RGOrderPolicy order = RGOrderPolicy::DependencyOrder)
 {
     std::string error;
     auto geometry = MakeGeometry(fixture == 1, false);
@@ -1204,7 +1233,8 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
         Check(device.CreateReadback(request.width, request.height, RHIFormat::D32Float, 1, readback, error),
               "Shared depth readback " + error);
     }
-    auto graph = std::make_shared<EnhancedRenderGraph>(device);
+    auto graph = std::make_shared<EnhancedRenderGraph>(device, scheduling, order);
+    const auto read = scheduling == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
     std::array<std::shared_ptr<const MeshSurfaceBatch>, 2> meshes;
     std::array<std::shared_ptr<const RasterSurfaceBatch>, 2> raster;
     std::array<std::shared_ptr<const SurfaceBatch>, 2> surface;
@@ -1273,9 +1303,9 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
         Check(mesh->Declare(*graph, error), "Shared current mesh declaration");
     }
     Check(depth->Declare(*graph, error), "Shared depth declaration");
-    const auto depthHandle = graph->FindImportedTexture(depth->Depth());
+    const auto depthHandle = depth->GraphDepth(*graph);
     graph->AddPass(
-        "Probe.DepthBefore", {{depthHandle, RHIResourceState::CopySource}},
+        "Probe.DepthBefore", {{depthHandle, RHIResourceState::CopySource, read}},
         [depth, readback = depthReadbacks[0]](const auto& context) {
             context.encoder->CopyToReadback(readback, depth->Depth());
         },
@@ -1292,22 +1322,26 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     const std::array buffers{meshes[0]->Buffer(),  meshes[1]->Buffer(), depth->Buffer(),
                              raster[0]->Buffer(),  raster[1]->Buffer(), surface[0]->Buffer(),
                              surface[1]->Buffer(), bake[0]->Buffer(),   bake[1]->Buffer()};
+    const std::array handles{meshes[0]->GraphOutput(*graph), meshes[1]->GraphOutput(*graph), depth->GraphOutput(*graph),
+                            raster[0]->GraphOutput(*graph), raster[1]->GraphOutput(*graph), surface[0]->GraphOutput(*graph),
+                            surface[1]->GraphOutput(*graph), bake[0]->GraphOutput(*graph), bake[1]->GraphOutput(*graph)};
     for (unsigned i = 0; i < buffers.size(); ++i)
     {
         graph->AddPass(
-            "Probe.SharedReadback", {{graph->FindImportedBuffer(buffers[i]), RHIResourceState::CopySource}},
+            "Probe.SharedReadback", {{handles[i], RHIResourceState::CopySource, read}},
             [buffer = buffers[i], readback = readbacks[i]](const auto& context) {
                 context.encoder->CopyBufferToReadback(readback, buffer);
             },
             true);
     }
     graph->AddPass(
-        "Probe.DepthAfter", {{depthHandle, RHIResourceState::CopySource}},
+        "Probe.DepthAfter", {{depthHandle, RHIResourceState::CopySource, read}},
         [depth, readback = depthReadbacks[1]](const auto& context) {
             context.encoder->CopyToReadback(readback, depth->Depth());
         },
         true);
     Check(graph->Compile(error), "Shared graph compile " + error);
+    CheckReferenceDeclarations(*graph);
     device.forbidAllocations = true;
     device.forbidImmediate = workers != 0;
     RHISubmissionTicket ticket;
@@ -1594,7 +1628,7 @@ unsigned sceneLookupFullFrames{}, sceneLookupFullPixels{}, sceneLookupMutationFr
 unsigned sceneLookupApproximateFrames{}, sceneLookupApproximatePixels{};
 std::uint64_t sceneLookupApproximated{};
 unsigned sceneTextureFrames{}, sceneTexturePixels{}, sceneTextureFractionalLods{}, sceneTextureClampedLods{};
-unsigned sceneGenerationFrames{}, sceneGenerationFallbacks{}, sceneGenerationAborts{},
+unsigned sceneGenerationFrames{}, sceneGenerationFallbacks{}, sceneGenerationRejectedRequests{}, sceneGenerationAborts{},
     sceneGenerationPendingSubmissions{};
 std::uint64_t sceneGenerationStale{}, sceneGenerationCompiles{}, sceneGenerationWorkers{}, sceneGenerationPsoWorkers{};
 double maxTextureFilterError{};
@@ -1833,9 +1867,60 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         std::shared_ptr<const SceneViewInput> cold;
         const auto coldSealed = SceneViewInput::Seal(coldView, coldDraws, {}, cold, error);
         Check(coldSealed, "Cold pending slot seal " + error);
-        Check(host.SelectReadyInput(context, cold, cold, error) && cold->Draws().empty() &&
-                  host.ProgramStats().activeSlots == 0,
-              "Cold pending material keeps the entire model hidden until all slots are ready");
+        // Target initialization must work without any native material pipeline.
+        Check(device.BeginFrame(error), "Graph-only target frame begin");
+        EnhancedGBufferPass graphTargets;
+        EnhancedShadowPass graphShadow;
+        std::vector<EnhancedDrawItem> graphCasters(coldDraws.begin(), coldDraws.end());
+        const auto previousCasters = context.shadowDraws;
+        context.shadowDraws = &graphCasters;
+        Check(graphShadow.PrepareGraphFrame(context, error), "Graph-only cascade preparation");
+        EnhancedRenderGraph clearGraph(device, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+        graphTargets.DeclareGraphTargets(clearGraph, context);
+        graphShadow.DeclareGraphTargets(clearGraph, context);
+        std::array<RHIReadback, 2> cleared;
+        Check(device.CreateReadback(context.width, context.height, RHIFormat::D32Float, 1, cleared[0], error) &&
+                  device.CreateReadback(EnhancedShadowPass::kShadowMapSize, EnhancedShadowPass::kShadowMapSize,
+                      RHIFormat::D32Float, 3, cleared[1], error), "Graph-only depth readbacks");
+        const std::array clearHandles{graphTargets.GetOutputs().depth, graphShadow.GetShadowMap()};
+        for (unsigned index = 0; index < clearHandles.size(); ++index)
+        {
+            const auto handle = clearHandles[index];
+            clearGraph.AddPass("Probe.GraphOnly.Clear", {{handle, RHIResourceState::CopySource, RGAccessMode::Read}},
+                [handle, target = cleared[index]](const auto& execution)
+                {
+                    for (unsigned layer = 0; layer < target.sliceCount; ++layer)
+                    {
+                        execution.encoder->CopyToReadback(target, execution.ResolveHandle(handle), layer, layer);
+                    }
+                }, true);
+        }
+        Check(clearGraph.Compile(error) && clearGraph.Execute(error) && device.EndFrame(error) &&
+                  GetRHISubmissionThread().DrainSubmissions(&device, error), "Graph-only target submission");
+        device.WaitForGpu();
+        Check(GetRHISubmissionThread().Drain(&device, error), "Graph-only target retirement");
+        for (unsigned index = 0; index < cleared.size(); ++index)
+        {
+            RHIReadbackImage image;
+            Check(device.MapReadback(cleared[index], image, error) && image.sliceCount == (index ? 3u : 1u),
+                  "Graph-only cleared depth layers");
+            for (unsigned layer = 0; layer < image.sliceCount; ++layer)
+            {
+                float depth{};
+                std::memcpy(&depth, image.data.data() + layer * image.sliceBytes, sizeof(depth));
+                Check(depth == 1.f, "Each graph-only depth layer starts neutral index=" + std::to_string(index) +
+                      " layer=" + std::to_string(layer) + " depth=" + std::to_string(depth));
+            }
+            device.ReleaseReadback(cleared[index]);
+        }
+        std::string clearValidation;
+        Check(device.DrainDebugMessages(clearValidation) == 0,
+              "Graph-only clear needs no native PSO and emits no validation errors " + clearValidation);
+        context.shadowDraws = previousCasters;
+        const auto requestedCold = cold;
+        Check(!host.SelectReadyInput(context, cold, cold, error) && host.SelectionDeferred() &&
+                  cold == requestedCold && host.ProgramStats().activeSlots == 0,
+              "Cold pending material defers the frame without substituting or dropping requested draws");
     }
     const auto loadExisting = [&](const experiment::AssetId& id, LXColorSpace space, std::string&) {
         const auto found = std::ranges::find_if(instances[0]->textures, [&](const auto& texture) {
@@ -1891,6 +1976,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             {
                 preparationGate->Release();
                 WaitSceneProgram(host, context, reloadB->generation);
+                WaitSceneProgram(host, context, reloadC->generation);
             }
             if (expanded == 4 && step == 5)
                 WaitSceneProgram(host, context, reloadC->generation);
@@ -2022,39 +2108,27 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 Check(SceneViewInput::Seal(staleView, {}, {}, staleEmpty, error) &&
                           !host.SelectReadyInput(context, staleEmpty, retained, error) && retained == input,
                       "A stale empty view cannot clear current Material slots");
-                Check(host.SelectReadyInput(context, input, input, error),
-                      "Select async ready/fallback input " + error);
+                const auto requestedInput = input;
+                const bool accepted = host.SelectReadyInput(context, input, input, error);
+                if (!accepted)
+                {
+                    const bool pending = step >= 1 && step <= 3;
+                    Check(input == requestedInput && host.SelectionDeferred() == pending && !error.empty(),
+                          "Pending or failed request cannot substitute a previously submitted material step=" + std::to_string(step) +
+                          " selectionDeferred=" + std::to_string(host.SelectionDeferred()) + " error=" + error);
+                    Check(step == 1 || step == 2 || step == 3 || step == 6 || step == 7 || step == 9 || step == 11,
+                          "Only known pending/failed fixtures defer recording");
+                    ++sceneGenerationRejectedRequests;
+                    ++step;
+                    continue;
+                }
                 const auto coreInput =
                     std::ranges::find_if(input->Draws(), [](const auto& draw) { return draw.materialSlot == 11; });
-                if (coreInput != input->Draws().end()) selectedCore = coreInput->material;
-                const auto expected = step == 5 || step == 8 || step == 9 ? reloadC
-                                      : step == 10                        ? changedReload
-                                                                          : instances[0];
-                if (step == 11)
-                    Check(coreInput == input->Draws().end(),
-                          "A new Scene epoch cannot fall back to the previous epoch's material");
-                else
-                {
-                    const bool requestedReady = coreInput != input->Draws().end() &&
-                                                coreInput->material == core.draw.materialGraphInstance;
-                    const bool submittedFallback = coreInput != input->Draws().end() &&
-                        (coreInput->material == expected ||
-                         (step >= 5 && coreInput->material == reloadC) ||
-                         (step >= 3 && coreInput->material == reloadB));
-                    Check(requestedReady || submittedFallback,
-                          "Current request selects its ready instance or an exact submitted fallback step=" +
-                              std::to_string(step) + " selected=" + std::to_string(input->Draws().size()) +
-                              " active=" + std::to_string(host.ProgramStats().activeSlots));
-                    if (!requestedReady)
-                        ++sceneGenerationFallbacks;
-                    const auto expectedCoverage = requestedReady ? core.draw.coverage.flags :
-                        (EnhancedMaterialCoverage::Enabled |
-                         (coreInput->material == reloadC || coreInput->material == changedReload
-                              ? EnhancedMaterialCoverage::DoubleSided
-                              : coreInput->material == reloadB ? EnhancedMaterialCoverage::Masked : 0u));
-                    Check(coreInput->coverage.flags == expectedCoverage,
-                          "Fallback preserves submitted coverage with its exact generation");
-                }
+                Check(coreInput != input->Draws().end() &&
+                          coreInput->material == core.draw.materialGraphInstance &&
+                          coreInput->coverage.flags == core.draw.coverage.flags,
+                      "Every accepted pass uses the exact requested material and coverage");
+                selectedCore = coreInput->material;
                 if (step == 8)
                 {
                     Check(device.BeginFrame(error), "Unsubmitted replacement begin");
@@ -2070,12 +2144,6 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     ++sceneGenerationAborts;
                     error.clear();
                 }
-            }
-            if (expanded == 4 && step == 11)
-            {
-                Check(input->Draws().empty(), "A new Scene epoch with one pending material hides the whole model");
-                ++step;
-                continue;
             }
             Check(device.BeginFrame(error), "Scene composition begin");
             textures.BeginFrame(context.frameId);
@@ -2279,8 +2347,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 newerDraws[0].materialGraphInstance = badShader;
                 std::shared_ptr<const SceneViewInput> newer;
                 Check(SceneViewInput::Seal(view, newerDraws, {}, newer, error) &&
-                          host.SelectReadyInput(context, newer, newer, error),
-                      "A newer request supersedes an already recorded replacement");
+                          !host.SelectReadyInput(context, newer, newer, error),
+                      "An unready newer request supersedes publication without selecting a fallback");
             }
             // Worker submission already happened above. Sequential recording
             // must not be authorized by a previous frame's completed fence.
@@ -2615,6 +2683,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         Check(stats.stalePublications == 1 && stats.failedSubmissions == 0 && stats.activeSlots == 0 &&
                   stats.retainedRecordings == 0,
               "Stale submission cannot replace an active slot and completion releases owners");
+        Check(sceneGenerationFallbacks == 0 && sceneGenerationRejectedRequests == 7,
+              "All seven pending/failed requests are rejected with zero material fallbacks");
         sceneGenerationCompiles = stats.compileSubmissions;
         sceneGenerationWorkers = stats.workerExecutions;
         sceneGenerationStale = stats.stalePublications;
@@ -2829,7 +2899,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                   << " fallbacks=" << sceneGenerationFallbacks << " aborts=" << sceneGenerationAborts << '\n';
         return;
     }
-    if (!mode.empty())
+    if (!mode.empty() && mode != "--rg5-reference")
     {
         if (mode == "--refraction-only")
         {
@@ -2883,13 +2953,15 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Texture retry drain");
         device.WaitForGpu();
     }
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 4);
-    RunSceneComposition(device, roots, pipelines, textures, pool, footprintInstances, cube, environmentColors, table,
-                        3);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 1);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 5);
-    RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 2);
+    if (mode != "--rg5-reference")
+    {
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 4);
+        RunSceneComposition(device, roots, pipelines, textures, pool, footprintInstances, cube, environmentColors, table, 3);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 1);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 5);
+        RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table, 2);
+    }
     RHIShaderBlob transform, vertex, pixel, sharedPixel, resolve, bake;
     for (auto backend : {RHIShaderBinary::SpirV, RHIShaderBinary::Dxil})
     {
@@ -3181,9 +3253,14 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
               "Background payload corruption is rejected without erasing accepted coverage");
         for (const unsigned workers : {0u, 1u, 4u})
         {
-            RunGraphChain(device, pool, textures, meshEvaluator, bindings, collector, evaluators[tier], baker,
-                          instances[tier], cube, request, sources, {actual, count}, {actualMaterial, count},
-                          {actualBake, count}, workers);
+            for (unsigned policy = 0; policy < (mode == "--rg5-reference" ? 3u : 1u); ++policy)
+            {
+                RunGraphChain(device, pool, textures, meshEvaluator, bindings, collector, evaluators[tier], baker,
+                              instances[tier], cube, request, sources, {actual, count}, {actualMaterial, count},
+                              {actualBake, count}, workers,
+                              policy == 0 ? RGSchedulingMode::DeclarationOrder : RGSchedulingMode::ExplicitVersioned,
+                              policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
+            }
         }
         if (frame == 6)
         {
@@ -3206,8 +3283,13 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         {
             for (unsigned workers : {0u, 1u, 4u})
             {
-                RunSharedDepthChain(device, pool, textures, meshEvaluator, bindings, collectors[0], evaluators, baker,
-                                    instances, cube, environmentColors, table, fixture, reverseOrder, workers);
+                for (unsigned policy = 0; policy < (mode == "--rg5-reference" ? 3u : 1u); ++policy)
+                {
+                    RunSharedDepthChain(device, pool, textures, meshEvaluator, bindings, collectors[0], evaluators, baker,
+                                        instances, cube, environmentColors, table, fixture, reverseOrder, workers,
+                                        policy == 0 ? RGSchedulingMode::DeclarationOrder : RGSchedulingMode::ExplicitVersioned,
+                                        policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
+                }
             }
         }
     }
@@ -3274,6 +3356,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
               << " maxTextureFilterError=" << maxTextureFilterError
               << " sceneGenerationFrames=" << sceneGenerationFrames
               << " sceneGenerationFallbacks=" << sceneGenerationFallbacks
+               << " sceneGenerationRejectedRequests=" << sceneGenerationRejectedRequests
               << " sceneGenerationAborts=" << sceneGenerationAborts
               << " sceneGenerationPendingSubmissions=" << sceneGenerationPendingSubmissions
               << " sceneGenerationStale=" << sceneGenerationStale
@@ -3318,7 +3401,7 @@ int main(int argc, char** argv)
         }
         Check(argc == 2 || (argc == 4 && std::string_view(argv[2]) == "--cooked-scene") ||
                   (argc == 3 &&
-                   (std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
+                   (std::string_view(argv[2]) == "--rg5-reference" || std::string_view(argv[2]) == "--rg5-decal" || std::string_view(argv[2]) == "--rg5-mixed" || std::string_view(argv[2]) == "--forward-transport" || std::string_view(argv[2]) == "--forward-blend" || std::string_view(argv[2]) == "--scene-only" || std::string_view(argv[2]) == "--scene-full-only" ||
                     std::string_view(argv[2]) == "--subsurface-only" ||
                     std::string_view(argv[2]) == "--refraction-only" || std::string_view(argv[2]) == "--volume-only" ||
                     std::string_view(argv[2]) == "--shadow-decal-only" || std::string_view(argv[2]) == "--decal-only")),

@@ -1,5 +1,14 @@
 # 사전 빌드 엔진·도구 개발 환경
 
+씬별 패키징 검증에는 `package-game --input-mode Project --startup-scene NAME.creator
+--asset-list FILE`을 사용할 수 있다. 목록은 `Assets` 기준 파일 경로를 한 줄씩 적으며,
+기존 `.meta`는 자동 포함한다. 목록에 시작 씬과 필요한 셰이더·음원 등 의존 파일을
+명시한다. 선택되지 않은 프로젝트 에셋은 복사하지 않으며 원본을 변경하지 않는다.
+의존성 검증은 그대로 적용되므로 선택한 콘텐츠의 누락 참조는 패키징 오류로 거부한다.
+스크립트는 기존처럼 프로젝트 전체에서 컴파일한다. 선택 목록과 실제 포함된 경로는
+`package-manifest.json`의 `selectedAssetPaths`에 기록된다. 목록 없이 실행하면 기존의
+전체 프로젝트 패키징 동작을 유지한다. 모델이 없는 씬도 패키징할 수 있다.
+
 엔진 유지보수자는 C++/ScriptCore/도구를 빌드해 배포본을 만든다. 게임 제작 환경에서는 그 배포본의
 Player·cooker·packer와 포함된 C# 컴파일러를 사용한다. 게임 패키징 과정에서 Visual Studio, vcpkg,
 엔진 소스 또는 시스템 .NET SDK를 호출하지 않는다. 현재 스크립트 입력은 `Assets/Script/**/*.cs`와

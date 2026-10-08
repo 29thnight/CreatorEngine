@@ -629,7 +629,18 @@ bool EnhancedForwardPass::Initialize(const EnhancedFrameContext& context, std::s
     return CreatePipelines(context, outError);
 }
 
-bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError)
+bool EnhancedForwardPass::InitializeGraphLighting(const EnhancedFrameContext& context, std::string& outError)
+{
+    if (!context.resources || !context.psoManager || !context.rootSignatures)
+    {
+        outError = "Graph Forward+ requires device, pipeline and layout services.";
+        return false;
+    }
+    return CreatePipelines(context, outError, false);
+}
+
+bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, std::string& outError,
+    bool nativeMaterials)
 {
     const auto traceForward = [](const char* phase, uint32_t mask = 0, bool reference = false) {
         static const bool trace = [] {
@@ -682,6 +693,12 @@ bool EnhancedForwardPass::CreatePipelines(const EnhancedFrameContext& context, s
     traceForward("cull.pso.begin");
     LX::Runtime::ComputePipeline cullCandidate;
     if (!cullCandidate.Create(*context.psoManager, desc, std::move(blob.description), outError)) return false;
+
+    if (!nativeMaterials)
+    {
+        m_cullPSO = std::move(cullCandidate);
+        return true;
+    }
 
     traceForward("texture.reflect.begin");
     if (!MaterialTextureTable::Reflect(kShadeShaderFile, "PSMain", forwardPermutation,

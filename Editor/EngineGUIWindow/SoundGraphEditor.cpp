@@ -81,6 +81,15 @@ namespace editor::sound_graph_editing
         std::optional<Session> g_pendingSession;
         PreviewMailbox g_previewMailbox;
         PreviewRuntime g_previewRuntime;
+        struct AuthoringAcceptanceRequest final
+        {
+            std::filesystem::path directory;
+            std::string name;
+            std::string clipGuid;
+        };
+        std::mutex g_acceptanceMutex;
+        std::optional<AuthoringAcceptanceRequest> g_acceptanceRequest;
+        std::string g_acceptanceStatus{ "Idle" };
 
         std::string PathText(const std::filesystem::path& path)
         {
@@ -1026,8 +1035,82 @@ namespace editor::sound_graph_editing
         return true;
     }
 
+    bool QueueAuthoringAcceptance(const std::filesystem::path& directory,
+        std::string_view name, std::string_view clipGuid, std::string& error)
+    {
+        Uuid::Uuid16 guid;
+        if (!Uuid::TryParse(clipGuid, guid) || !FileGuid(guid).IsRandomV4())
+        {
+            error = "A canonical clip GUID is required.";
+            return false;
+        }
+        std::lock_guard lock(g_acceptanceMutex);
+        if (g_acceptanceRequest)
+        {
+            error = "An authoring request is already queued.";
+            return false;
+        }
+        g_acceptanceRequest = AuthoringAcceptanceRequest{ directory, std::string(name), std::string(clipGuid) };
+        g_acceptanceStatus = "Queued";
+        editor::queue_window_request(kWindowID, editor::window_request::open);
+        return true;
+    }
+
+    std::string AuthoringAcceptanceStatus()
+    {
+        std::lock_guard lock(g_acceptanceMutex);
+        return g_acceptanceStatus;
+    }
+
+    std::string PreviewStatus()
+    {
+        std::lock_guard lock(g_previewMailbox.m_mutex);
+        return g_previewMailbox.m_status;
+    }
+
     void Draw()
     {
+        std::optional<AuthoringAcceptanceRequest> acceptance;
+        {
+            std::lock_guard lock(g_acceptanceMutex);
+            acceptance = std::move(g_acceptanceRequest);
+            g_acceptanceRequest.reset();
+        }
+        if (acceptance)
+        {
+            std::string error;
+            std::filesystem::path created;
+            bool passed = false;
+            if (g_session && (g_session->m_dirty || g_session->m_sourceDirty))
+            {
+                error = "Save the current sound asset before running acceptance.";
+            }
+            else if (CreateAsset(acceptance->directory, acceptance->name, false, created, error))
+            {
+                Uuid::Uuid16 clip;
+                Uuid::TryParse(acceptance->clipGuid, clip);
+                g_session->m_graph.nodes.front().clip = wave::ClipKey::FromGuid(clip);
+                g_session->m_graph.nodes.front().gain = 0.001f;
+                g_session->m_dirty = true;
+                const auto identity = g_session->m_guid;
+                if (Save(*g_session))
+                {
+                    const auto payload = Serialize(*g_session);
+                    passed = OpenAsset(created, error) && g_session->m_guid == identity
+                        && Serialize(*g_session) == payload && Validate(*g_session);
+                    if (passed)
+                    {
+                        QueuePreview(*g_session);
+                    }
+                }
+                if (!passed && error.empty())
+                {
+                    error = g_session->m_message;
+                }
+            }
+            std::lock_guard lock(g_acceptanceMutex);
+            g_acceptanceStatus = passed ? "Saved/reloaded; preview queued: " + PathText(created) : "Failed: " + error;
+        }
         {
             std::lock_guard lock(g_previewMailbox.m_mutex);
             g_previewMailbox.m_lastVisible = std::chrono::steady_clock::now();

@@ -295,6 +295,7 @@
     <ClCompile Include="RHI\DX12\DX12Encoder.cpp" />
     <ClCompile Include="Render\Scene\EnhancedSceneRenderer.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PreprocessorDefinitions Condition="'$(CreatorRg6ReferenceBuild)' == 'true'">CE_RG6_REFERENCE_DECLARATION_ORDER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile Include="Render\Scene\ExperimentMaterialSealing.cpp" />
     <ClCompile Include="RHI\DX12\EnhancedSceneRendererLiveDX12Adapter.cpp" />

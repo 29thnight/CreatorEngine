@@ -20,6 +20,11 @@ namespace editor::sound_graph_editing
     void Draw();
     void TickPreview(wave::PlaybackService* playback);
     void ShutdownPreview(wave::PlaybackService* playback);
+    // A bounded regression request, serviced by the presentation owner in Draw.
+    [[nodiscard]] bool QueueAuthoringAcceptance(const std::filesystem::path& directory,
+        std::string_view name, std::string_view clipGuid, std::string& error);
+    [[nodiscard]] std::string AuthoringAcceptanceStatus();
+    [[nodiscard]] std::string PreviewStatus();
 }
 
 namespace editor::windows

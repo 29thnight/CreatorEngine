@@ -81,6 +81,7 @@
 #include "Render/Passes/Lighting/EnhancedSSRPass.h"
 #include "EnhancedSpriteRg5Tests.h"
 #include "EnhancedScreenRg5Tests.h"
+#include "EnhancedFinalRg5Tests.h"
 
 namespace
 {
@@ -845,6 +846,94 @@ passes:
                 for(const auto& e:s.versionEdges) dump+=" edge="+s.passes[e.producer].name+"->"+s.passes[e.consumer].name+
                     ":resource"+std::to_string(e.resource)+":v"+std::to_string(e.version)+":reason"+std::to_string(static_cast<int>(e.reason));
                 dump+="\n";
+            }
+            const auto validViewerGraph = [](const EnhancedRenderGraph::DiagnosticSnapshot& snapshot) {
+                if (snapshot.passes.size() != 5 || snapshot.versionEdges.size() != 2 || snapshot.executeOrder.size() != 4)
+                {
+                    return false;
+                }
+                for (const auto& edge : snapshot.versionEdges)
+                {
+                    if (edge.producer >= snapshot.passes.size() || edge.consumer >= snapshot.passes.size() ||
+                        edge.reason != EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason::RAW)
+                    {
+                        return false;
+                    }
+                    const auto producer = std::ranges::find(snapshot.executeOrder, edge.producer);
+                    const auto consumer = std::ranges::find(snapshot.executeOrder, edge.consumer);
+                    if (producer == snapshot.executeOrder.end() || consumer == snapshot.executeOrder.end() || producer >= consumer)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            };
+            if (!validViewerGraph(s))
+            {
+                error = "RG-V snapshot lost compiled ordering/edges";
+                return false;
+            }
+            auto missingEdge = s;
+            missingEdge.versionEdges.pop_back();
+            auto wrongOrder = s;
+            std::reverse(wrongOrder.executeOrder.begin(), wrongOrder.executeOrder.end());
+            if (validViewerGraph(missingEdge) || validViewerGraph(wrongOrder))
+            {
+                error = "RG-V mutation accepted";
+                return false;
+            }
+            s.viewId = 17;
+            s.frameId = 3;
+            s.historyRevision = 8;
+            s.sceneEpoch = 19;
+            s.width = 640;
+            s.height = 480;
+            EnhancedLiveDisplayEntrySnapshot view;
+            view.active = view.ready = true;
+            view.key.viewId = 17;
+            view.key.historyRevision = 8;
+            view.completedSceneEpoch = 19;
+            view.completedWidth = 640;
+            view.completedHeight = 480;
+            if (!EnhancedGraphSnapshotMatchesView(s, view))
+            {
+                error = "RG-V matching view rejected";
+                return false;
+            }
+            auto stale = s;
+            stale.sceneEpoch++;
+            if (EnhancedGraphSnapshotMatchesView(stale, view))
+            {
+                error = "RG-V stale scene accepted";
+                return false;
+            }
+            stale = s;
+            stale.historyRevision++;
+            if (EnhancedGraphSnapshotMatchesView(stale, view))
+            {
+                error = "RG-V stale history accepted";
+                return false;
+            }
+            stale = s;
+            stale.width++;
+            if (EnhancedGraphSnapshotMatchesView(stale, view))
+            {
+                error = "RG-V stale resize accepted";
+                return false;
+            }
+            view.key.viewId++;
+            if (EnhancedGraphSnapshotMatchesView(s, view))
+            {
+                error = "RG-V wrong view accepted";
+                return false;
+            }
+            const auto bytes = s.StorageBytes();
+            g.Reset();
+            EnhancedRenderGraph::DiagnosticSnapshot unavailable;
+            if (g.CaptureDiagnosticSnapshot(unavailable) || !validViewerGraph(s) || s.StorageBytes() != bytes)
+            {
+                error = "RG-V snapshot mutated after graph reset";
+                return false;
             }
         } while(std::next_permutation(permutation.begin(),permutation.end()));
         error.clear(); return true;
@@ -3985,7 +4074,7 @@ static bool ValidateBase0DrawReplay(std::string& error)
     item.modelMeshView.vertexLayoutHash=assets::VertexLayoutHash(assets::kCoreVertexAttributes);
     item.modelMeshView.indexData=indices.data(); item.modelMeshView.indexCount=3;
     item.worldMatrix=math::matrix4x4::identity(); item.bonePalette=&bone; item.boneCount=1;
-    std::array<EnhancedDrawItem,1> opaque{item},forward{item},graph{item},fallback{item};
+    std::array<EnhancedDrawItem,1> opaque{item},forward{item},graph{item};
     EnhancedDrawReplayInput sealed;
     if (!EnhancedDrawReplayInput::Seal(opaque,forward,graph,sealed,error)) return false;
     bone=math::matrix4x4{}; // Producer storage can change after sealing.
@@ -4014,18 +4103,30 @@ static bool ValidateBase0DrawReplay(std::string& error)
     bad=bytes; bad[128]=0;bad[129]=0;bad[130]=128;bad[131]=127; if(!reject(bad,true)) return false;
     // Late closure mismatch must not partially replace the first draw or pose.
     accepted.draws.back().assetIds[0]^=1;
-    if(accepted.Apply(opaque,forward,graph,fallback,error) || opaque[0].bonePalette!=&bone) return false;
+    if (accepted.Apply(opaque,forward,graph,error) || opaque[0].bonePalette!=&bone)
+    {
+        return false;
+    }
     accepted=sealed;
     vertex[0]=1.f;
-    if(accepted.Apply(opaque,forward,graph,fallback,error) || opaque[0].bonePalette!=&bone) return false;
+    if (accepted.Apply(opaque,forward,graph,error) || opaque[0].bonePalette!=&bone)
+    {
+        return false;
+    }
     vertex[0]=0.f;
     opaque[0].boneCount=0;
-    if(accepted.Apply(opaque,forward,graph,fallback,error)) return false;
+    if (accepted.Apply(opaque,forward,graph,error))
+    {
+        return false;
+    }
     opaque[0].boneCount=1;
-    if(!accepted.Apply(opaque,forward,graph,fallback,error)
-        || opaque[0].bonePalette==&bone || graph[0].bonePalette!=fallback[0].bonePalette
+    if(!accepted.Apply(opaque,forward,graph,error)
+        || opaque[0].bonePalette==&bone || graph[0].bonePalette!=accepted.draws[2].bones.data()
         || std::memcmp(opaque[0].bonePalette,&accepted.draws[0].bones[0],sizeof(bone))!=0
-        || opaque[0].animatorKey==forward[0].animatorKey) return false;
+        || opaque[0].animatorKey==forward[0].animatorKey)
+    {
+        return false;
+    }
     error.clear(); return true;
 }
 
@@ -4122,6 +4223,7 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
     std::string rg4Dump;
     if(!ValidateRg4GraphFixtures(rg1Error,rg4Dump)) { outLog += "RG4_WAVES_FAILED "+rg1Error+"\n"; return false; }
     outLog += "RG4_WAVES_OK shuffles=24 critical-path culled\n"+rg4Dump;
+    outLog += "RGV_READER_OK shuffles=24 missing-edge wrong-order stale-scene stale-history stale-resize wrong-view immutable-reset\n";
     if (!ValidateRg5ProducerDeclarations(rg1Error))
     { outLog += "RG5_PRODUCERS_FAILED " + rg1Error + "\n"; return false; }
     outLog += "RG5_PRODUCERS_OK passes=GBuffer/Shadow modes=3 orders=2 outputs=7 RAW=7\n";
@@ -4210,6 +4312,12 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         return false;
     }
     outLog += "RG5_SCREEN_GPU_OK policies=3 frames=48 maxError=0 SSS/SSR enabled bypass mask missing sealed-inputs\n";
+    if (!ValidateRg5FinalGpu(resources, error))
+    {
+        outLog += "RG5_FINAL_FAILED " + error + "\n";
+        return false;
+    }
+    outLog += "RG5_FINAL_GPU_OK policies=3 frames=129 stages=9 maxError=0 Fog/PostChain/UI/Grid/Wire/Icon/Line capture-present history-reset missing owned-inputs\n";
     DX12TestTextureRegistration backbufferRegistration(
         resources, resources.GetRenderTarget());
     if (!backbufferRegistration.IsValid())

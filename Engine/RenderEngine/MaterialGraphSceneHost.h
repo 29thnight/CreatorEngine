@@ -73,9 +73,8 @@ namespace material_graph
         {
             return geometry_.CacheStats();
         }
-        // Current geometry/camera stay current. Pending/failed replacements use the
-        // submitted instance and coverage for the same epoch/view/Material slot.
-        // A cold slot has no accepted material and is omitted until preparation ends.
+        // Select only exact requested graph instances and coverage for the current
+        // view. Pending requests defer the whole frame; failed requests reject it.
         bool SelectReadyInput(const EnhancedFrameContext& context, std::shared_ptr<const SceneViewInput> requested,
                               std::shared_ptr<const SceneViewInput>& result, std::string& error);
         // Texture copy commands must precede the native parallel prefix. Uniforms
@@ -89,7 +88,11 @@ namespace material_graph
                      RHITextureHandle source = {});
         bool PreparationDeferred() const
         {
-            return lookup_.PreparationDeferred() || runtimeEffects_.PreparationDeferred();
+            return selectionDeferred_ || lookup_.PreparationDeferred() || runtimeEffects_.PreparationDeferred();
+        }
+        bool SelectionDeferred() const
+        {
+            return selectionDeferred_;
         }
         RGHandle DeclareShadow(EnhancedRenderGraph& graph, RGHandle shadowMap) const;
         EnhancedGBufferPass::Outputs DeclareGBuffer(EnhancedRenderGraph& graph,
@@ -157,6 +160,7 @@ namespace material_graph
         IRenderDeviceServices* programDevice_{};
         std::vector<std::shared_ptr<Preparation>> preparations_;
         std::map<SlotKey, std::shared_ptr<Slot>> slots_;
+        bool selectionDeferred_{};
         std::map<std::uint64_t, Recording> recordings_;
         mutable std::mutex recordingMutex_;
         std::uint64_t completed_{}, selectionSerial_{};

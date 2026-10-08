@@ -47,6 +47,7 @@
 //   할 일이 아니다. 없는 기능을 있는 것처럼 적어 두지 않는 것이 지금 할 일이다.
 
 #include "CommandRegistrar.h"
+#include "EnhancedRenderDebugWindow.h"
 #include "SceneViewportOverlay.h"
 #include "RHI/RHIValidationLedger.h"
 #include "CommandSupport.h"
@@ -752,6 +753,129 @@ namespace ConsoleCmd
     //   안 하는 것" 보다 "없는 것" 이 정직하다 — 앞서 같은 이유로 지운
     //   `render.post` 와 같은 처분이다.
 
+    static CommandCore::CommandResult Cmd_render_graph(const ConsoleCommandContext& ctx)
+    {
+        using namespace CommandCore;
+        const auto& args = ctx.parts;
+        const bool selectViewer = args.size() == 3 && args[1] == "view";
+        if (args.size() > 2 && !selectViewer)
+        {
+            return InvalidArguments("render.graph [scene|game|preview]");
+        }
+        const std::string target = selectViewer ? args[2] : args.size() == 2 ? args[1] : "scene";
+        const auto view = target == "scene" ? EnhancedLiveDisplayTarget::Editor :
+            target == "game" ? EnhancedLiveDisplayTarget::Game : EnhancedLiveDisplayTarget::MaterialPreview;
+        if (target != "scene" && target != "game" && target != "preview")
+        {
+            return InvalidArguments("render.graph [scene|game|preview]");
+        }
+        if (selectViewer)
+        {
+            editor::RequestCompiledGraphViewerTarget(view);
+            return Ok("Graph viewer target queued for the next UI frame");
+        }
+        const auto snapshot = EnhancedSceneRenderer::GetLiveGraphSnapshot(view);
+        auto data = CommandData::Object();
+        const auto viewer = editor::ReadCompiledGraphViewerStats();
+        data.Set("uiFrames", CommandData::Int(viewer.frames));
+        data.Set("uiMatchingFrames", CommandData::Int(viewer.matchingFrames));
+        data.Set("uiStaleFrames", CommandData::Int(viewer.staleFrames));
+        data.Set("uiTarget", CommandData::Int(viewer.target));
+        const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
+        data.Set("ready", CommandData::Bool(snapshot && EnhancedGraphSnapshotMatchesView(*snapshot, display.Get(view))));
+        if (!snapshot)
+        {
+            return Ok("Compiled graph requested; poll on a later frame", std::move(data));
+        }
+        data.Set("generation", CommandData::Int(snapshot->generation));
+        data.Set("epoch", CommandData::Int(snapshot->graphEpoch));
+        data.Set("frame", CommandData::Int(snapshot->frameId));
+        data.Set("sceneEpoch", CommandData::Int(snapshot->sceneEpoch));
+        data.Set("view", CommandData::Int(snapshot->viewId));
+        data.Set("historyRevision", CommandData::Int(snapshot->historyRevision));
+        data.Set("width", CommandData::Int(snapshot->width));
+        data.Set("height", CommandData::Int(snapshot->height));
+        data.Set("dependencyHash", CommandData::String(std::to_string(snapshot->dependencyHash)));
+        data.Set("copyMs", CommandData::Double(snapshot->copyNanoseconds / 1000000.0));
+        data.Set("storageBytes", CommandData::Int(snapshot->StorageBytes()));
+        const auto indices = [](const auto& source) {
+            auto array = CommandData::Array();
+            for (const auto value : source)
+            {
+                array.Append(CommandData::Int(value));
+            }
+            return array;
+        };
+        data.Set("executeOrder", indices(snapshot->executeOrder));
+        data.Set("waves", indices(snapshot->dependencyWaves));
+        data.Set("criticalPath", indices(snapshot->criticalPath));
+        auto passes = CommandData::Array();
+        for (const auto& pass : snapshot->passes)
+        {
+            auto row = CommandData::Object();
+            row.Set("name", CommandData::String(pass.name));
+            row.Set("authored", CommandData::Int(pass.authoredIndex));
+            row.Set("compiled", CommandData::Int(pass.compiledIndex));
+            row.Set("culled", CommandData::Bool(pass.culled));
+            row.Set("sideEffect", CommandData::Bool(pass.sideEffect));
+            auto usages = CommandData::Array();
+            for (const auto& usage : pass.usages)
+            {
+                auto item = CommandData::Object();
+                item.Set("resource", CommandData::Int(usage.resource));
+                item.Set("version", CommandData::Int(usage.version));
+                item.Set("access", CommandData::Int(static_cast<int>(usage.access)));
+                item.Set("state", CommandData::Int(static_cast<int>(usage.state)));
+                usages.Append(std::move(item));
+            }
+            row.Set("usages", std::move(usages));
+            auto barriers = CommandData::Array();
+            for (const auto& barrier : pass.barriers)
+            {
+                auto item = CommandData::Object();
+                item.Set("resource", CommandData::Int(barrier.resource));
+                item.Set("before", CommandData::Int(static_cast<int>(barrier.before)));
+                item.Set("after", CommandData::Int(static_cast<int>(barrier.after)));
+                item.Set("uav", CommandData::Bool(barrier.uav));
+                item.Set("afterPass", CommandData::Bool(barrier.afterPass));
+                barriers.Append(std::move(item));
+            }
+            row.Set("barriers", std::move(barriers));
+            passes.Append(std::move(row));
+        }
+        data.Set("passes", std::move(passes));
+        auto resources = CommandData::Array();
+        for (const auto& resource : snapshot->resources)
+        {
+            auto row = CommandData::Object();
+            row.Set("name", CommandData::String(resource.name));
+            row.Set("imported", CommandData::Bool(resource.imported));
+            row.Set("buffer", CommandData::Bool(resource.buffer));
+            row.Set("used", CommandData::Bool(resource.used));
+            row.Set("versions", CommandData::Int(resource.versionCount));
+            row.Set("firstUse", CommandData::Int(resource.firstUse));
+            row.Set("lastUse", CommandData::Int(resource.lastUse));
+            row.Set("initialState", CommandData::Int(static_cast<int>(resource.initialState)));
+            row.Set("finalState", CommandData::Int(static_cast<int>(resource.finalState)));
+            resources.Append(std::move(row));
+        }
+        data.Set("resources", std::move(resources));
+        auto edges = CommandData::Array();
+        for (const auto& edge : snapshot->versionEdges)
+        {
+            auto row = CommandData::Object();
+            row.Set("producer", CommandData::Int(edge.producer));
+            row.Set("consumer", CommandData::Int(edge.consumer));
+            row.Set("resource", CommandData::Int(edge.resource));
+            row.Set("version", CommandData::Int(edge.version));
+            row.Set("reason", CommandData::Int(static_cast<int>(edge.reason)));
+            edges.Append(std::move(row));
+        }
+        data.Set("edges", std::move(edges));
+        data.Set("aliasQueueRangesSupported", CommandData::Bool(false));
+        return Ok("Immutable compiled graph; sampled submitted frame", std::move(data));
+    }
+
     static CommandCore::CommandResult Cmd_pipeline_nodes(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
@@ -930,6 +1054,7 @@ namespace ConsoleCmd
         reg.Result({ "dx12.validation" }, &Cmd_dx12_validation);
         reg.Result({ "render.rtinfo" }, &Cmd_render_rtinfo);
         reg.Result({ "pipeline.nodes" }, &Cmd_pipeline_nodes);
+        reg.Result({ "render.graph" }, &Cmd_render_graph);
         reg.Result({ "render.shadowinfo" }, &Cmd_render_shadowinfo);
     }
 }

@@ -1,4 +1,4 @@
-void CheckCsmContracts()
+void CheckCsmContracts(RecordingChangeDevice& device)
 {
     EnhancedDrawItem caster;
     caster.boundCenter = {4, 0, 0};
@@ -30,6 +30,7 @@ void CheckCsmContracts()
     for (auto& light : lights) light.direction = {direction.x, direction.y, direction.z, 0};
     lights[0].color.a = 1; lights[1].color.a = 2;
     EnhancedFrameContext context;
+    context.resources = &device;
     context.camera = &camera; context.lights = &lights; context.shadowDraws = &casters;
     EnhancedShadowPass pass;
     std::string error;
@@ -240,7 +241,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                     ProbeTextures& textures, ProbePool& pool, const std::filesystem::path& root,
                     const std::shared_ptr<Texture>& image)
 {
-    CheckCsmContracts();
+    CheckCsmContracts(device);
     RunCsmLegacyBatches(device, roots, pipelines, textures);
     const auto product = ShadowDecalProduct(root, false);
     GenerationStore store;
@@ -448,7 +449,14 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             SubmitShadowDecal(device, pool, graph, host, context.frameId, workers, false);
             RHIReadbackImage mapped;
             Check(device.MapReadback(readback, mapped, error), "Shadow map");
-            if (fixture == 14) Check(host.ShadowDrawCount() == 2, "Rejected cascade submits no draw");
+            if (fixture == 14)
+            {
+                const bool indirect = device.GetIndirectDrawCapabilities().indexedDraw;
+                Check(host.ShadowDrawCount() == (indirect ? 3u : 2u),
+                      "Shadow count measures submitted commands, including GPU-culled indirect candidates");
+                Check(host.ShadowCasterCounts()[2] == (indirect ? 1u : 0u),
+                      "Rejected cascade is a GPU candidate or excluded from the direct stream");
+            }
             const bool casts = fixture == 0 || fixture == 2 || fixture == 4 || fixture == 7 || fixture == 9 ||
                                fixture == 10 || fixture == 13 || fixture == 14;
             for (unsigned cascade = 0; cascade < 3; ++cascade)

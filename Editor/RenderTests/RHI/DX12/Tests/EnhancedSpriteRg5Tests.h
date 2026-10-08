@@ -139,7 +139,7 @@ namespace
                 items[1].world(3, 2) = 0.5f;
                 sprite.SetItems(&items);
                 sprite.SetInputs({inputColor, depth});
-                if (!sprite.PrepareFrame(frame, error))
+                if (!sprite.PrepareFrame(frame, error) || !sprite.PrepareGpuVisibility(frame, error))
                 {
                     return false;
                 }

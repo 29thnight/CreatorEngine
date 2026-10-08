@@ -2349,7 +2349,7 @@ namespace
     /// HasPendingSceneStructureChange는 정확히 그 창(재생 표시는 섰고 트랜잭션은
     /// 아직)에 참이다. 그래서 스크립트는 한 프레임 뒤부터 시작한다 — 관리 틱이
     /// 같은 조건으로 건너뛰는 것과도 짝이 맞는다(RuntimeFrame.cpp).
-    bool IsManagedScriptSimulationActive()
+    bool IsSimulationLifecycleActive()
     {
         return SceneManagers->IsGameStart()
             && !SceneManagers->HasPendingSceneStructureChange();
@@ -2406,7 +2406,7 @@ void Scene::DrainPendingPhases()
             // 편집이 이 인스턴스를 통해서만 동작한다(ScriptComponent::EnsureInstance).
             static_cast<ScriptComponent*>(component)->EnsureInstance();
 
-            if (!IsManagedScriptSimulationActive())
+            if (!IsSimulationLifecycleActive())
             {
                 m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingInitialize);
                 continue;
@@ -2435,6 +2435,13 @@ void Scene::DrainPendingPhases()
         {
             m_schedule.SubscribeImplicit(component, SystemSchedule::Phase::PendingSimulation);
         }
+    }
+
+    // Native components initialize in the Editor for previews, but simulation
+    // hooks must remain pending until Play, just like managed components.
+    if (!IsSimulationLifecycleActive())
+    {
+        return;
     }
 
     std::vector<Component*> beginningSimulation;

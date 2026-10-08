@@ -374,12 +374,69 @@ namespace wave
 
         struct Source final
         {
+            struct ObservedStream final
+            {
+                ma_data_source_base base{};
+                ma_data_source* underlying{ nullptr };
+                std::atomic<std::uint64_t>* reads{ nullptr };
+                std::atomic<std::uint64_t>* starvation{ nullptr };
+
+                static ma_result Read(ma_data_source* data, void* output, ma_uint64 frames, ma_uint64* read)
+                {
+                    auto& self = *static_cast<ObservedStream*>(data);
+                    self.reads->fetch_add(1u, std::memory_order_relaxed);
+                    const ma_result result = ma_data_source_read_pcm_frames(self.underlying, output, frames, read);
+                    // EOF is normal. MA_BUSY means the asynchronous stream/seek
+                    // has no decoded page available to the mixer at this read.
+                    if (result == MA_BUSY || result == MA_NO_DATA_AVAILABLE)
+                    {
+                        self.starvation->fetch_add(1u, std::memory_order_relaxed);
+                    }
+                    return result;
+                }
+                static ma_result Seek(ma_data_source* data, ma_uint64 frame)
+                {
+                    return ma_data_source_seek_to_pcm_frame(static_cast<ObservedStream*>(data)->underlying, frame);
+                }
+                static ma_result Format(ma_data_source* data, ma_format* format, ma_uint32* channels,
+                    ma_uint32* rate, ma_channel* map, size_t capacity)
+                {
+                    return ma_data_source_get_data_format(static_cast<ObservedStream*>(data)->underlying,
+                        format, channels, rate, map, capacity);
+                }
+                static ma_result Cursor(ma_data_source* data, ma_uint64* cursor)
+                {
+                    return ma_data_source_get_cursor_in_pcm_frames(static_cast<ObservedStream*>(data)->underlying, cursor);
+                }
+                static ma_result Length(ma_data_source* data, ma_uint64* length)
+                {
+                    return ma_data_source_get_length_in_pcm_frames(static_cast<ObservedStream*>(data)->underlying, length);
+                }
+                static ma_result Loop(ma_data_source* data, ma_bool32 looping)
+                {
+                    return ma_data_source_set_looping(static_cast<ObservedStream*>(data)->underlying, looping);
+                }
+                bool Initialize(ma_data_source* source, std::atomic<std::uint64_t>& readCount,
+                    std::atomic<std::uint64_t>& starvationCount)
+                {
+                    static const ma_data_source_vtable table{
+                        &Read, &Seek, &Format, &Cursor, &Length, &Loop,
+                        MA_DATA_SOURCE_SELF_MANAGED_RANGE_AND_LOOP_POINT };
+                    auto config = ma_data_source_config_init();
+                    config.vtable = &table;
+                    underlying = source;
+                    reads = &readCount;
+                    starvation = &starvationCount;
+                    return ma_data_source_init(&config, &base) == MA_SUCCESS;
+                }
+            } observedStream;
             ma_sound sound{};
             ma_audio_buffer buffer{};
             ma_splitter_node splitter{};
             bool initialized{ false };
             bool bufferInitialized{ false };
             bool splitterInitialized{ false };
+            bool observedStreamInitialized{ false };
         };
 
         // Stable addresses are required by the graph and pending resource jobs.
@@ -431,6 +488,8 @@ namespace wave
         std::atomic<std::uint64_t> callbacksOverFullPeriod{ 0u };
         std::atomic<std::uint32_t> callbackMinimumFrames{ std::numeric_limits<std::uint32_t>::max() };
         std::atomic<std::uint32_t> callbackMaximumFrames{ 0u };
+        std::atomic<std::uint64_t> streamPcmReads{ 0u };
+        std::atomic<std::uint64_t> streamStarvationReads{ 0u };
 
         void ResetCallbackMetrics() noexcept
         {
@@ -439,6 +498,8 @@ namespace wave
                 bin.store(0u, std::memory_order_relaxed);
             }
             callbackNanoseconds.store(0u, std::memory_order_relaxed);
+            streamPcmReads.store(0u, std::memory_order_relaxed);
+            streamStarvationReads.store(0u, std::memory_order_relaxed);
             callbackMaximumNs.store(0u, std::memory_order_relaxed);
             callbacksOverHalfPeriod.store(0u, std::memory_order_relaxed);
             callbacksOverFullPeriod.store(0u, std::memory_order_relaxed);
@@ -655,6 +716,13 @@ namespace wave
                     ma_sound_uninit(&source.sound);
                     source.initialized = false;
                 }
+                if (source.observedStreamInitialized)
+                {
+                    // ma_sound_uninit detached the node before freeing its owned
+                    // resource-manager source, so the observer is no longer read.
+                    ma_data_source_uninit(&source.observedStream.base);
+                    source.observedStreamInitialized = false;
+                }
                 if (source.splitterInitialized)
                 {
                     ma_splitter_node_uninit(&source.splitter, nullptr);
@@ -760,6 +828,19 @@ namespace wave
                 return false;
             }
             source.initialized = true;
+            if (clip->info.streaming)
+            {
+                if (!source.observedStream.Initialize(ma_sound_get_data_source(&source.sound),
+                    streamPcmReads, streamStarvationReads))
+                {
+                    lastError = "Cannot initialize stream read observer";
+                    return false;
+                }
+                source.observedStreamInitialized = true;
+                // NO_DEFAULT_ATTACHMENT keeps this sound inaudible until routing
+                // below. Ownership remains with sound.pResourceManagerDataSource.
+                source.sound.pDataSource = &source.observedStream.base;
+            }
             const ma_splitter_node_config config = ma_splitter_node_config_init(actual.channels);
             if (ma_splitter_node_init(ma_engine_get_node_graph(&engine), &config, nullptr, &source.splitter) != MA_SUCCESS)
             {
@@ -779,6 +860,43 @@ namespace wave
             return true;
         }
     };
+
+#if defined(WAVE_AUDIO_PROBE)
+    bool MiniaudioBackend::ValidateStreamReadObservation()
+    {
+        std::array<float, 4u> pcm{};
+        ma_audio_buffer buffer{};
+        auto config = ma_audio_buffer_config_init(ma_format_f32, 1u, pcm.size(), pcm.data(), nullptr);
+        config.sampleRate = 48000u;
+        if (ma_audio_buffer_init(&config, &buffer) != MA_SUCCESS)
+        {
+            return false;
+        }
+        const auto* original = buffer.ref.ds.vtable;
+        auto blocked = *original;
+        blocked.onRead = [](ma_data_source*, void*, ma_uint64, ma_uint64* read)
+        {
+            *read = 0u;
+            return MA_BUSY;
+        };
+        buffer.ref.ds.vtable = &blocked;
+        std::atomic<std::uint64_t> reads{}, starvation{};
+        Implementation::Source::ObservedStream observer;
+        const bool initialized = observer.Initialize(&buffer, reads, starvation);
+        ma_uint64 read{};
+        const auto busy = initialized ? ma_data_source_read_pcm_frames(&observer, pcm.data(), 4u, &read) : MA_ERROR;
+        buffer.ref.ds.vtable = original;
+        const auto recovered = initialized ? ma_data_source_read_pcm_frames(&observer, pcm.data(), 4u, &read) : MA_ERROR;
+        const auto ended = initialized ? ma_data_source_read_pcm_frames(&observer, pcm.data(), 4u, &read) : MA_ERROR;
+        if (initialized)
+        {
+            ma_data_source_uninit(&observer.base);
+        }
+        ma_audio_buffer_uninit(&buffer);
+        return busy == MA_BUSY && recovered == MA_SUCCESS && ended == MA_AT_END
+            && reads.load() == 3u && starvation.load() == 1u;
+    }
+#endif
 
     bool InspectAudioSource(const std::filesystem::path& source, ClipInfo& decoded, std::string& error)
     {
@@ -1617,6 +1735,16 @@ namespace wave
     std::uint64_t MiniaudioBackend::StreamReadFailures() const noexcept
     {
         return m_implementation->vfs.readFailures.load(std::memory_order_relaxed);
+    }
+
+    std::uint64_t MiniaudioBackend::StreamPcmReads() const noexcept
+    {
+        return m_implementation->streamPcmReads.load(std::memory_order_relaxed);
+    }
+
+    std::uint64_t MiniaudioBackend::StreamStarvationReads() const noexcept
+    {
+        return m_implementation->streamStarvationReads.load(std::memory_order_relaxed);
     }
 
     std::uint64_t MiniaudioBackend::StreamBytesRead() const noexcept

@@ -347,6 +347,16 @@ struct EnhancedLiveDisplayEntrySnapshot
     bool ready{ false };
 };
 
+// A sampled submitted graph can be older than the displayed frame, but never belong to another view/extent/history.
+inline bool EnhancedGraphSnapshotMatchesView(const EnhancedRenderGraph::DiagnosticSnapshot& graph,
+    const EnhancedLiveDisplayEntrySnapshot& view)
+{
+    return view.active && view.ready && graph.frameId != 0 && graph.viewId == view.key.viewId &&
+        graph.historyRevision == view.key.historyRevision && graph.sceneEpoch == view.completedSceneEpoch &&
+        graph.width == view.completedWidth &&
+        graph.height == view.completedHeight;
+}
+
 /// RenderThread -> Host presentation의 불변 출력 경계. sourceFrameId의 입력 역할과
 /// GPU 완료된 표시 결과를 함께 담되 Camera*, DX12/Vulkan 객체는 담지 않는다.
 struct EnhancedLiveDisplaySnapshot

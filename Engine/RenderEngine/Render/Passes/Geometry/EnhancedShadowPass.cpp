@@ -819,6 +819,72 @@ bool EnhancedShadowPass::PrepareFrame(const EnhancedFrameContext& context, std::
     return true;
 }
 
+bool EnhancedShadowPass::PrepareGraphFrame(const EnhancedFrameContext& context, std::string& outError)
+{
+    m_casterBounds.clear();
+    const auto* casters = context.shadowDraws;
+    if (!context.resources || !casters)
+    {
+        outError = "Graph shadow requires device services and the identified caster stream.";
+        return false;
+    }
+    for (const auto& draw : *casters)
+    {
+        if (!draw.materialGraphInstance)
+        {
+            outError = "Graph shadow caster has no material graph instance.";
+            return false;
+        }
+        m_casterBounds.push_back(shadow_math::WorldBounds(draw));
+    }
+    m_lastCasterCandidates = static_cast<uint32_t>(casters->size());
+    m_lastDrawCount = 0;
+    m_lastCulledCount = 0;
+    m_lastBatchCount = 0;
+    m_lastSkinnedDrawCount = 0;
+    m_lastGpuSubmittedCandidates = 0;
+    m_lastGpuSubmittedBins = 0;
+    ComputeCascades(context);
+    outError.clear();
+    return true;
+}
+
+void EnhancedShadowPass::DeclareGraphTargets(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
+{
+    RGTextureDesc desc{};
+    desc.width = kShadowMapSize;
+    desc.height = kShadowMapSize;
+    desc.arraySize = kCascadeCount;
+    desc.format = kShadowFormat;
+    desc.allowDepthStencil = true;
+    desc.name = "Shadow.Cascades";
+    m_shadowMap = graph.CreateTexture(desc);
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        m_shadowMap = graph.Write(m_shadowMap);
+    }
+    const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
+        ? RGAccessMode::LegacyState : RGAccessMode::Write;
+    graph.AddPass("Shadow.Clear", {{m_shadowMap, RHIResourceState::DepthWrite, access}},
+        [this, &context](const EnhancedRenderGraph::ExecuteContext& execution)
+        {
+            auto& encoder = *execution.encoder;
+            for (uint32_t cascade = 0; cascade < kCascadeCount; ++cascade)
+            {
+                const auto depth = RHIDepthTargetDesc::DepthSlice(
+                    execution.ResolveHandle(m_shadowMap), kShadowFormat, cascade);
+                const auto targets = context.resources->CreateRenderTargets(
+                    std::span<const RHITextureHandle>{}, &depth);
+                if (!targets.IsValid())
+                {
+                    throw std::runtime_error("Graph shadow clear target is unavailable.");
+                }
+                encoder.BindRenderTargets(targets);
+                encoder.ClearDepthTarget(targets, 1.f);
+            }
+        });
+}
+
 void EnhancedShadowPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
 {
     RGTextureDesc desc{};

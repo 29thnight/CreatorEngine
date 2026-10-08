@@ -1,4 +1,4 @@
-﻿#include "CommandDescriptorSeeds.h"
+#include "CommandDescriptorSeeds.h"
 
 #include <algorithm>
 #include <iterator>
@@ -47,6 +47,8 @@ namespace CommandCore
             { "assets.texture", CommandCost::Immediate, "[load <texture|ui|spritesheet> <경로>]", "텍스처 캐시 키와 앉은 이미지를 읽고 경로 하나를 적재한다", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "assets.texturebench", CommandCost::Long, "[limit]", "Measure texture decode mip and compression stages", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "assets.unload", CommandCost::Frames, "", "사용하지 않는 에셋 캐시 정리", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
+            { "audio.authoringprobe", CommandCost::Frames, "[directory name clip-guid]", "Queue Sound Graph create/save/reload/preview acceptance on its presentation owner", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
+            { "audio.status", CommandCost::Immediate, "[target]", "Read current audio voices, playback handles and source errors", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "target", false },
             { "blackboard.authoring.probe", CommandCost::Frames, "<이름> [empty|noname]", "Blackboard 저장·재로드 왕복으로 키 값이 살아 돌아오는지 본다", CommandClass::RawFixture, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },
             { "bt.status", CommandCost::Immediate, "", "행동 트리 지표(트리 수·틱 누계·프레임당 경계 통과)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "()" },
             { "camera.editor", CommandCost::Frames, "match | follow [on|off] | status", "에디터 카메라를 게임 카메라와 같은 시점으로", CommandClass::EngineService, CommandLiveness::Live },
@@ -231,6 +233,7 @@ namespace CommandCore
             { "quit", CommandCost::Immediate, "", "호스트를 종료한다", CommandClass::EngineService, CommandLiveness::TerminatesProcess, false, CommandRoles::Both },
             { "render.backend", CommandCost::Immediate, "status", "Editor scene/ImGui DX12 고정 상태 조회(Player 백엔드는 Build Settings)", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "action=status" },
             { "render.environment", CommandCost::Immediate, "<HDR-or-ceibl-path> | status | background on|off", "Select environment; reuse cooked maps or generate and cache once", CommandClass::EditorOperation, CommandLiveness::Live, false, CommandRoles::Editor, "path", true },
+            { "render.graph", CommandCost::Immediate, "[scene|game|preview] | view <scene|game|preview>", "Read an immutable compiled graph or select the read-only viewer target", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.capture", CommandCost::Long, "<new-absolute-directory> [game|editor|material] [controlled|controlled-replay|controlled-lattice-replay [camera-input-absolute-path [draw-input-absolute-path [lattice-input-absolute-path]]]]", "Capture actual product attachments through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.fence", CommandCost::Long, "[timeout-seconds]", "Wait for a product frame through the live HTTP service", CommandClass::EngineService, CommandLiveness::Live, false, CommandRoles::Editor, "" },
             { "render.live.wait", CommandCost::Long, "[timeout-seconds]", "라이브 렌더러가 이 명령 뒤 발행된 프레임을 끝낼 때까지 다음 명령을 미룬다(프레임 수 대기 대신 예열 판정)", CommandClass::Probe, CommandLiveness::Live, false, CommandRoles::Editor, "", false, true },

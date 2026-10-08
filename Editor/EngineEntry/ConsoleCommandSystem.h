@@ -66,6 +66,15 @@ class ConsoleCommandSystem
 {
 public:
     static ConsoleCommandSystem& Get();
+    // Installed and cleared by the Editor host; accessed on the game thread.
+    void SetAudioDiagnosticsReader(std::function<CommandCore::CommandData()> reader)
+    {
+        m_audioDiagnosticsReader = std::move(reader);
+    }
+    [[nodiscard]] CommandCore::CommandData ReadAudioDiagnostics() const
+    {
+        return m_audioDiagnosticsReader ? m_audioDiagnosticsReader() : CommandCore::CommandData::Object();
+    }
 
     // 실행 인자를 해석해 --exec / --script / --console 을 처리한다.
     void InitializeFromCommandLine();
@@ -358,6 +367,7 @@ private:
 
     // --script가 파일을 못 열었는가. 명령이 하나도 없는 무인 실행은 종료시킨다.
     bool m_scriptLoadFailed{ false };
+    std::function<CommandCore::CommandData()> m_audioDiagnosticsReader;
 
     // ── LC9: 배치 결과 JSONL ────────────────────────────────────────────
     //

@@ -1142,6 +1142,12 @@ int main(int argc, char** argv)
     }
     if (mode == "core")
     {
+        if (!wave::MiniaudioBackend::ValidateStreamReadObservation())
+        {
+            std::fprintf(stderr, "STREAM_OBSERVER_CANARY_FAILED\n");
+            return kExitFail;
+        }
+        std::printf("STREAM_OBSERVER_CANARY_PASS busy=1 recovered=1 eof=normal\n");
         RunVoiceTable();
         RunWaveNullBackend();
         RunWaveHost();

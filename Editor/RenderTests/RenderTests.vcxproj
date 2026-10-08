@@ -245,7 +245,7 @@
       <LanguageStandard>stdcpp23</LanguageStandard>
       <AdditionalIncludeDirectories>$(SolutionDir)ThirdParty\Mathematics\include\;$(ProjectDir);$(SolutionDir)Engine\RenderEngine\;$(SolutionDir)Engine\SceneRuntime\;$(SolutionDir)Editor\EditorRender\;$(SolutionDir)Engine\RenderEngine\Interfaces\;$(SolutionDir)ThirdParty\Vulkan-Headers\include\;$(SolutionDir)Engine\Utility_Framework\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <MinFilesInUnityFile>5</MinFilesInUnityFile>
       <MaxFilesInUnityFile>10</MaxFilesInUnityFile>
     </ClCompile>

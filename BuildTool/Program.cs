@@ -19,6 +19,7 @@ internal static class Program
                         "  compile-game --engine-distribution PATH --project PATH --output PATH [--config Release] [--prebuilt-assembly FILE]\n" +
                         "  package-game --engine-distribution PATH --project PATH [--config Debug] [--stage-root PATH]\n" +
                         "    [--input-mode Project|Workspace|Tracked] [--startup-scene NAME.creator] [--render-backend dx12|vulkan]\n" +
+                        "    [--asset-list FILE: exact paths relative to Assets, one per line; Project mode only]\n" +
                         "    [--shipping] [--build-native] [--skip-verify] [--smoke-offscreen] [--smoke-frames 120] [--smoke-promotions 2] [--smoke-timeout-sec 180]\n" +
                         "  verify-engine | select-engine --engine-distribution PATH [--project PATH]\n" +
                         "  open-project --engine-distribution PATH --development-project PATH [--select-engine]\n" +
@@ -74,7 +75,7 @@ internal sealed class Options
     private static readonly HashSet<string> Switches = new(["build", "shipping", "buildnative", "skipverify", "smokeoffscreen", "selectengine", "json", "nopointer"], StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> Names = new(["repository", "config", "outputroot", "output", "project", "developmentproject",
         "enginedistribution", "prebuiltassembly", "gamescriptsassembly", "stageroot", "inputmode", "startupscene", "renderbackend",
-        "smokeframes", "smokepromotions", "smoketimeoutsec", "logpath", "target"], StringComparer.OrdinalIgnoreCase);
+        "smokeframes", "smokepromotions", "smoketimeoutsec", "logpath", "target", "assetlist"], StringComparer.OrdinalIgnoreCase);
     public string Command { get; }
     private static string Key(string name) => name.TrimStart('-').Replace("-", "");
     public Options(string[] args)

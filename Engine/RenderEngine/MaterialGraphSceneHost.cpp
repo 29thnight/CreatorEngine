@@ -886,6 +886,7 @@ namespace material_graph
                                      std::shared_ptr<const SceneViewInput> requested,
                                      std::shared_ptr<const SceneViewInput>& result, std::string& error)
     {
+        selectionDeferred_ = false;
         if (!requested)
         {
             result = std::move(requested);
@@ -943,14 +944,14 @@ namespace material_graph
             }
             if (!supported(*draw))
             {
-                stats_.lastError = "LX Scene material has no Surface or Volume output.";
+                return Fail(error, "LX Scene material has no Surface or Volume output.");
             }
             else
             {
                 std::string preparationError;
                 if (!RequestProgram(context, draw->material->generation, preparationError))
                 {
-                    stats_.lastError = std::move(preparationError);
+                    return Fail(error, preparationError);
                 }
             }
         }
@@ -958,43 +959,25 @@ namespace material_graph
         auto selected = std::shared_ptr<SceneViewInput>(new SceneViewInput(*requested));
         selected->draws_.clear();
         const auto backend = RHIShaderCompiler::GetOutput();
-        // Publish an asset generation as a whole. On a cold load, one pending
-        // material must not reveal only the already prepared meshes. On a reload,
-        // keep the previous complete generation visible until every replacement
-        // material is ready.
-        std::map<assets::ModelAssetGenerationHandle, std::pair<bool, bool>> modelReadiness;
-        for (const auto& draw : requested->Draws())
-        {
-            const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
-            auto& readiness = modelReadiness[draw.model];
-            const bool requestedReady = supported(draw) && IsProgramReady(draw.material->generation, backend);
-            const bool activeReady = slot->active && IsProgramReady(slot->active->generation, backend);
-            if (!requestedReady)
-            {
-                readiness.first = true;
-            }
-            if (!activeReady)
-            {
-                readiness.second = true;
-            }
-        }
+        // Every pass consumes the exact requested graph instance. Preparation
+        // may defer a frame, but must never substitute a previous or native material.
         for (auto draw : requested->Draws())
         {
-            const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
-            const auto [hasPending, hasMissingActive] = modelReadiness.at(draw.model);
-            if (hasPending && hasMissingActive)
+            if (!IsProgramReady(draw.material->generation, backend))
             {
-                continue;
-            }
-            if (hasPending)
-            {
-                draw.material = slot->active;
-                draw.coverage = slot->activeCoverage;
-                if (!ClassifySceneCoverage(draw.coverage, draw.queue, error))
+                const auto failed = std::ranges::find_if(preparations_, [&](const auto& item)
                 {
-                    return false;
+                    return item->generation == draw.material->generation && item->backend == backend
+                        && !item->error.empty();
+                });
+                if (failed != preparations_.end())
+                {
+                    return Fail(error, (*failed)->error);
                 }
+                selectionDeferred_ = true;
+                return Fail(error, "LX Scene requested material program is still preparing.");
             }
+            const auto& slot = slots_.at({view.sceneEpoch, view.viewId, draw.materialSlot});
             draw.selectionRevision = slot->revision;
             selected->draws_.push_back(std::move(draw));
         }
@@ -2853,6 +2836,7 @@ namespace material_graph
         }
         stats_ = {};
         selectionSerial_ = 0;
+        selectionDeferred_ = false;
     }
 
     void SceneHost::OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion)

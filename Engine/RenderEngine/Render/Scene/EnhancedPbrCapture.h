@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedCameraReplayInput.h"
@@ -264,21 +264,6 @@ struct EnhancedPbrCapture
         }
     }
 
-    // Begin captures the legacy list before graph readiness is known. Record
-    // the temporary PBR draws selected later in PreparePipelineFrame as well.
-    void RecordPendingLatticeFallback(const EnhancedDrawItem& draw)
-    {
-        if (result.state != EnhancedPbrCaptureState::Recording || !draw.materialSnapshot)
-            return;
-        auto item = manifest.rootref()["draws"].append_child();
-        item |= ryml::MAP;
-        item["route"] << "gbuffer-pending-lattice";
-        item["modelId"] << FileGuid(draw.modelMeshView.handle.modelId).ToString();
-        item["meshId"] << FileGuid(draw.modelMeshView.handle.meshId).ToString();
-        item["modelGeneration"] << draw.modelMeshView.handle.generation;
-        item["shaderMetaSlot"] << draw.materialSnapshot->shaderMetaHandle.slot;
-        item["sealHash"] << draw.materialSnapshot->seal.sealHash;
-    }
     // 패스가 이번 프레임의 배치를 확정한 뒤에 부른다. draw snapshot만으로는
     // 알 수 없는 축(어느 PSO로 그렸는가, 어떤 sampler를 걸었는가, descriptor
     // 배치가 갈리지 않았는가)을 여기서 적는다.

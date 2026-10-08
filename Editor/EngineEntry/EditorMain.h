@@ -20,6 +20,7 @@ namespace wave
 #include "EditorPlayModeController.h"
 
 #include <atomic>
+#include <array>
 #include <condition_variable>
 #include <cstdint>
 #include <memory>
@@ -81,6 +82,10 @@ namespace Editor
 	private:
         std::shared_ptr<ProjectLayerSettings> m_projectLayers;
         std::unique_ptr<wave::AudioHost> m_audioHost;
+        std::array<std::uint64_t, 1025u> m_audioUpdateHistogram{};
+        std::uint64_t m_audioUpdateSamples{};
+        std::uint64_t m_audio128UpdateSamples{};
+        std::uint64_t m_audio128UpdatesOverOneMillisecond{};
         std::unique_ptr<wave::PlaybackService> m_audioPlayback;
         std::unique_ptr<wave::AudioCatalog> m_audioCatalog;
         std::uint64_t m_audioRevision{};

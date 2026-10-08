@@ -300,10 +300,17 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
     graph_ = &graph;
     graphEpoch_ = graph.ResourceEpoch();
     graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.IBL.Result");
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        graphOutput_ = graph.Write(graphOutput_);
+    }
     graph.AddPass("LX.BakePhysicalIBL",
-                  {{input, RHIResourceState::ShaderResource},
-                   {environment, RHIResourceState::ShaderResource},
-                   {graphOutput_, RHIResourceState::UnorderedAccess}},
+                  {{input, RHIResourceState::ShaderResource, read},
+                   {environment, RHIResourceState::ShaderResource, read},
+                   {graphOutput_, RHIResourceState::UnorderedAccess, write}},
                   [owner](const auto& context) {
                       std::string error;
                       if (!context.graph || !context.encoder || !owner->GraphOutput(*context.graph).IsValid() ||
@@ -314,7 +321,7 @@ bool IblBakeResult::Declare(EnhancedRenderGraph& graph, std::string& error) cons
                       }
                   });
     graph.AddPass(
-        "LX.PhysicalIBLReady", {{graphOutput_, RHIResourceState::ShaderResource}},
+        "LX.PhysicalIBLReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
         [owner](const auto&) {
             if (!owner->IsCurrent())
             {

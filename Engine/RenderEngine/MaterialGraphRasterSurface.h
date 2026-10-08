@@ -34,6 +34,10 @@ class RasterSurfaceBatch final : public SurfaceGeometrySource
     }
     bool IsPreparedForGraph() const override { return IsCurrent(); }
     RGHandle GraphOutput(const EnhancedRenderGraph& graph) const override;
+    RGHandle GraphDepth(const EnhancedRenderGraph& graph) const
+    {
+        return GraphOutput(graph).IsValid() ? graphDepth_ : RGHandle{};
+    }
     bool IsCovered(std::uint32_t index) const override;
     bool ValidateReadback(std::span<const SurfacePoint> points, std::string& error) const override;
     const RasterSurfaceRequest& Request() const { return request_; }
@@ -71,6 +75,8 @@ class RasterSurfaceBatch final : public SurfaceGeometrySource
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
     mutable RGHandle graphOutput_;
+    mutable RGHandle graphDepth_;
+    mutable std::array<RGHandle, 6> graphTargets_;
     mutable std::vector<std::uint8_t> coverage_;
     mutable bool validated_{};
     std::weak_ptr<const RasterSurfaceBatch> self_;

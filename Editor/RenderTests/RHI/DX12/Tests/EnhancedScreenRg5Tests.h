@@ -144,7 +144,7 @@ namespace
                 sss.SetEnabled(enableSss);
                 ssr.SetEnabled(enableSsr);
                 if (!sprite.PrepareFrame(frame, error) || !sss.PrepareFrame(frame, error) ||
-                    !ssr.PrepareFrame(frame, error))
+                    !ssr.PrepareFrame(frame, error) || !sprite.PrepareGpuVisibility(frame, error))
                 {
                     return false;
                 }

@@ -122,6 +122,8 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                         pool.BeginFrame(static_cast<unsigned>(context.frameId));
                         Check(graph->PrepareParallel(pool, error), "Decal prefix " + error);
                     }
+                    Check(gbuffer.PrepareGpuVisibility(context, error) && decal.PrepareGpuVisibility(context, error),
+                          "Decal GPU visibility preparation " + error);
                     Check(host.Prepare(context, input, environment, {}, {}, {}, {}, error, 1),
                           "Decal host prepare " + error);
                     gbuffer.Declare(*graph, context);

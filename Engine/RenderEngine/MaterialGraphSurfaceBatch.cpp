@@ -383,8 +383,15 @@ bool SurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const
     graph_ = &graph;
     graphEpoch_ = graph.ResourceEpoch();
     graphOutput_ = graph.ImportBuffer(buffer_, RHIResourceState::Common, "LX.Surface.Evaluated");
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages{{input, RHIResourceState::ShaderResource},
-                                                         {graphOutput_, RHIResourceState::UnorderedAccess}};
+    const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
+    const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
+    const auto write = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
+    if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
+    {
+        graphOutput_ = graph.Write(graphOutput_);
+    }
+    std::vector<EnhancedRenderGraph::RGPassUsage> usages{{input, RHIResourceState::ShaderResource, read},
+                                                         {graphOutput_, RHIResourceState::UnorderedAccess, write}};
     for (const auto& binding : bindings_->resources.textures)
     {
         auto texture = graph.FindImportedTexture(binding.resource);
@@ -394,7 +401,7 @@ bool SurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const
         }
         if (std::ranges::none_of(usages, [&](const auto& usage) { return usage.handle.index == texture.index; }))
         {
-            usages.push_back({texture, RHIResourceState::ShaderResource});
+            usages.push_back({texture, RHIResourceState::ShaderResource, read});
         }
     }
     graph.AddPass("LX.EvaluateMaterialSurface", usages, [owner](const auto& context) {
@@ -407,7 +414,7 @@ bool SurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error) const
         }
     });
     graph.AddPass(
-        "LX.EvaluatedSurfaceReady", {{graphOutput_, RHIResourceState::ShaderResource}},
+        "LX.EvaluatedSurfaceReady", {{graphOutput_, RHIResourceState::ShaderResource, read}},
         [owner](const auto&) {
             if (!owner->IsPreparedForGraph())
             {
