@@ -35,6 +35,26 @@ namespace
         return right > maximum - left ? maximum : left + right;
     }
 
+    struct ModelStagingCharge final
+    {
+        explicit ModelStagingCharge(std::atomic<std::size_t>& target) noexcept : value(target) {}
+        ~ModelStagingCharge() { Set(0u); }
+        void Set(std::size_t bytes) noexcept { value.store(bytes, std::memory_order_relaxed); }
+        std::atomic<std::size_t>& value;
+    };
+
+    std::size_t AnimationScratchVectorBytes(const model_cooked::AnimationClipArtifact& decoded) noexcept
+    {
+        auto charge = decoded.clip.channels.capacity() * sizeof(experiment::AnimationChannel);
+        for (const auto& channel : decoded.clip.channels)
+        {
+            charge = AddModelCharge(charge, channel.translations.capacity() * sizeof(experiment::TranslationKey));
+            charge = AddModelCharge(charge, channel.rotations.capacity() * sizeof(experiment::RotationKey));
+            charge = AddModelCharge(charge, channel.scales.capacity() * sizeof(experiment::ScaleKey));
+        }
+        return charge;
+    }
+
     std::size_t ModelOriginDynamicCharge(const model_cooked::ResolvedAssetEntry& origin) noexcept
     {
         auto charge = origin.entry.dependencies.capacity() * sizeof(model_cooked::AssetDependency);
@@ -58,6 +78,13 @@ namespace
             auto blob = resolved.blob;
             blob.artifactPath.clear();
             return { { {}, model_cooked::CookedAssetKind::Mesh }, std::move(blob), 0u, true, 1u };
+        }
+        else if constexpr (std::is_same_v<T, assets::ModelSkeletonStorage>
+            || std::is_same_v<T, assets::ModelAnimationStorage>)
+        {
+            // Skeleton wire is identity-free. Clip wire includes its hard binding;
+            // hashing the whole artifact therefore keeps distinct bindings apart.
+            return AssetDepot::MakeModelStorageKey(resolved.blob);
         }
         else
         {
@@ -205,7 +232,7 @@ namespace
     }
 
     Error ReadModelBytes(model_cooked::ResolvedAssetEntry& resolved,
-        std::vector<std::byte>& bytes, std::string& failure)
+        std::vector<std::byte>& bytes, std::string& failure, ModelStagingCharge& staging)
     {
         std::uint64_t size{};
         constexpr std::uint64_t maxArtifactBytes = model_cooked::kModelSubAssetMaxBytes;
@@ -221,6 +248,7 @@ namespace
             return Error::IntegrityFailed;
         }
         bytes.resize(static_cast<std::size_t>(size));
+        staging.Set(bytes.capacity());
         if (!resolved.byteSource->ReadAt(resolved.blob.artifactPath, 0u, bytes, failure))
         {
             return Error::ReadFailed;
@@ -234,30 +262,33 @@ namespace
         return Error::None;
     }
 
-    own::shared_owner<const assets::ModelSkeletonPayload> DecodeModelSkeleton(
+    own::shared_owner<const assets::ModelSkeletonStorage> DecodeModelSkeleton(
         const model_cooked::ResolvedAssetEntry& resolved, std::span<const std::byte> bytes,
-        std::string& failure)
+        std::string& failure, ModelStagingCharge& staging)
     {
         model_cooked::SkeletonArtifact decoded;
         if (!model_cooked::ReadSkeletonArtifact(bytes, decoded, failure))
         {
             return {};
         }
-        auto result = own::make_shared<assets::ModelSkeletonPayload>();
-        result->origin = resolved;
+        const auto scratchBytes = decoded.skeleton.bones.capacity() * sizeof(experiment::Bone);
+        staging.Set(scratchBytes);
+        auto result = own::make_shared<assets::ModelSkeletonStorage>();
+        result->byteSource = resolved.byteSource;
+        result->artifactPath = resolved.blob.artifactPath;
         result->boneLayoutSha256 = decoded.boneLayoutSha256;
         if (!model_cooked::ComputeSkinBindingDigest(decoded.skeleton, result->skinBindingSha256, failure))
         {
             return {};
         }
         auto& target = result->skeleton;
-        target.skeletonId = resolved.entry.asset.key.assetId.value;
         target.rootBone = decoded.skeleton.rootBone.Value();
         target.rootTransform = decoded.skeleton.rootTransform;
         target.globalInverseTransform = decoded.skeleton.globalInverseTransform;
         target.bones.reserve(decoded.skeleton.bones.size());
-        result->decodedBytes = AddModelCharge(sizeof(assets::ModelSkeletonPayload),
-            ModelOriginDynamicCharge(result->origin));
+        staging.Set(AddModelCharge(scratchBytes, target.bones.capacity() * sizeof(assets::ModelBoneAsset)));
+        result->decodedBytes = AddModelCharge(sizeof(assets::ModelSkeletonStorage),
+            result->artifactPath.capacity());
         result->decodedBytes = AddModelCharge(result->decodedBytes,
             target.bones.capacity() * sizeof(assets::ModelBoneAsset));
         for (auto& bone : decoded.skeleton.bones)
@@ -268,34 +299,33 @@ namespace
         return result;
     }
 
-    own::shared_owner<const assets::ModelAnimationPayload> DecodeModelAnimation(
+    own::shared_owner<const assets::ModelAnimationStorage> DecodeModelAnimation(
         const model_cooked::ResolvedAssetEntry& resolved, std::span<const std::byte> bytes,
-        own::shared_owner<const assets::ModelSkeletonPayload> skeleton, std::string& failure)
+        std::string& failure, ModelStagingCharge& staging)
     {
         model_cooked::AnimationClipArtifact decoded;
         if (!model_cooked::ReadAnimationClipArtifact(bytes, decoded, failure))
         {
             return {};
         }
-        if (!skeleton || decoded.skeletonAssetId.value != skeleton->skeleton.skeletonId
-            || decoded.requiredBoneCount != skeleton->skeleton.bones.size()
-            || decoded.requiredBoneLayoutSha256 != skeleton->boneLayoutSha256)
-        {
-            failure = "Clip hard dependency has a different ordered bone layout or skeleton identity.";
-            return {};
-        }
-        auto result = own::make_shared<assets::ModelAnimationPayload>();
-        result->origin = resolved;
-        result->skeleton = std::move(skeleton);
+        const auto scratchBytes = AnimationScratchVectorBytes(decoded);
+        staging.Set(scratchBytes);
+        auto result = own::make_shared<assets::ModelAnimationStorage>();
+        result->byteSource = resolved.byteSource;
+        result->artifactPath = resolved.blob.artifactPath;
+        result->skeletonAssetId = decoded.skeletonAssetId;
+        result->requiredBoneCount = decoded.requiredBoneCount;
+        result->requiredBoneLayoutSha256 = decoded.requiredBoneLayoutSha256;
         auto& clip = result->clip;
-        clip.animationId = resolved.entry.asset.key.assetId.value;
         clip.name = std::move(decoded.clip.name);
         clip.durationTicks = decoded.clip.durationTicks;
         clip.ticksPerSecond = decoded.clip.ticksPerSecond;
         clip.looping = decoded.clip.looping;
         clip.tracks.reserve(decoded.clip.channels.size());
-        std::size_t charge = AddModelCharge(sizeof(assets::ModelAnimationPayload), clip.name.capacity());
-        charge = AddModelCharge(charge, ModelOriginDynamicCharge(result->origin));
+        auto targetVectorBytes = clip.tracks.capacity() * sizeof(assets::ModelAnimationTrack);
+        staging.Set(AddModelCharge(scratchBytes, targetVectorBytes));
+        std::size_t charge = AddModelCharge(sizeof(assets::ModelAnimationStorage), clip.name.capacity());
+        charge = AddModelCharge(charge, result->artifactPath.capacity());
         charge = AddModelCharge(charge, clip.tracks.capacity() * sizeof(assets::ModelAnimationTrack));
         const auto interpolation = [](experiment::InterpolationMode mode)
         {
@@ -312,6 +342,13 @@ namespace
             track.translations.reserve(channel.translations.size());
             track.rotations.reserve(channel.rotations.size());
             track.scales.reserve(channel.scales.size());
+            targetVectorBytes = AddModelCharge(targetVectorBytes,
+                track.translations.capacity() * sizeof(assets::ModelTranslationKey));
+            targetVectorBytes = AddModelCharge(targetVectorBytes,
+                track.rotations.capacity() * sizeof(assets::ModelRotationKey));
+            targetVectorBytes = AddModelCharge(targetVectorBytes,
+                track.scales.capacity() * sizeof(assets::ModelScaleKey));
+            staging.Set(AddModelCharge(scratchBytes, targetVectorBytes));
             for (const auto& key : channel.translations)
             {
                 track.translations.push_back({ key.time, key.value });
@@ -329,10 +366,49 @@ namespace
             charge = AddModelCharge(charge, track.scales.capacity() * sizeof(assets::ModelScaleKey));
             clip.tracks.push_back(std::move(track));
         }
-        assets::animation::BuildTrackTable(clip, result->skeleton->skeleton.bones.size(), result->tracks);
+        assets::animation::BuildTrackTable(clip, result->requiredBoneCount, result->tracks);
+        targetVectorBytes = AddModelCharge(targetVectorBytes,
+            result->tracks.capacity() * sizeof(const assets::ModelAnimationTrack*));
+        staging.Set(AddModelCharge(scratchBytes, targetVectorBytes));
         charge = AddModelCharge(charge, result->tracks.capacity() * sizeof(const assets::ModelAnimationTrack*));
-        result->decodedBytes = AddModelCharge(charge, result->skeleton->ByteSize());
+        result->decodedBytes = charge;
         return result;
+    }
+
+    own::shared_owner<const assets::ModelSkeletonPayload> BindModelSkeleton(
+        const model_cooked::ResolvedAssetEntry& resolved,
+        own::shared_owner<const assets::ModelSkeletonStorage> storage, std::string& failure)
+    {
+        if (!storage || !storage->skeleton.skeletonId.IsNil() || !HasNoHardDependencies(resolved))
+        {
+            failure = "Skeleton logical generation has incompatible decoded storage or dependencies.";
+            return {};
+        }
+        auto charge = AddModelCharge(sizeof(assets::ModelSkeletonPayload), ModelOriginDynamicCharge(resolved));
+        charge = AddModelCharge(charge, storage->ByteSize());
+        return own::make_shared<assets::ModelSkeletonPayload>(std::move(storage), resolved, charge);
+    }
+
+    own::shared_owner<const assets::ModelAnimationPayload> BindModelAnimation(
+        const model_cooked::ResolvedAssetEntry& resolved,
+        own::shared_owner<const assets::ModelAnimationStorage> storage,
+        own::shared_owner<const assets::ModelSkeletonPayload> skeleton, std::string& failure)
+    {
+        // This validation runs for EVERY logical wrapper, including raw-cache
+        // hits. Sharing read/decode must not share another alias's hard closure.
+        if (!storage || !skeleton || !storage->clip.animationId.IsNil()
+            || !ValidateClipDependency(resolved, skeleton->origin)
+            || storage->skeletonAssetId != skeleton->origin.entry.asset.key.assetId
+            || storage->requiredBoneCount != skeleton->skeleton.bones.size()
+            || storage->requiredBoneLayoutSha256 != skeleton->boneLayoutSha256)
+        {
+            failure = "Clip hard dependency has a different ordered bone layout or skeleton identity.";
+            return {};
+        }
+        auto charge = AddModelCharge(sizeof(assets::ModelAnimationPayload), ModelOriginDynamicCharge(resolved));
+        charge = AddModelCharge(charge, storage->ByteSize());
+        charge = AddModelCharge(charge, skeleton->ByteSize());
+        return own::make_shared<assets::ModelAnimationPayload>(std::move(storage), std::move(skeleton), resolved, charge);
     }
 
     std::size_t MeshletDynamicCharge(const experiment::MeshletPayload& meshlets) noexcept
@@ -614,6 +690,13 @@ namespace
     }
 
     template<class T>
+    struct ModelSnapshotPins final
+    {
+        std::vector<own::shared_owner<const T>> assets;
+        std::vector<own::shared_owner<AssetDepot::ModelAssetWork<T>>> works;
+    };
+
+    template<class T>
     void TrimModelCache(AssetDepot::ModelAssetCache<T>& cache,
         std::vector<own::shared_owner<const T>>* retired = nullptr)
     {
@@ -671,6 +754,14 @@ AssetDepot::ModelAssetCache<T>& DataSystem::ModelAssetCacheLocked()
     else if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
     {
         return m_modelAssets.meshes;
+    }
+    else if constexpr (std::is_same_v<T, assets::ModelSkeletonStorage>)
+    {
+        return m_modelAssets.skeletonStorage;
+    }
+    else if constexpr (std::is_same_v<T, assets::ModelAnimationStorage>)
+    {
+        return m_modelAssets.animationStorage;
     }
     else
     {
@@ -820,6 +911,9 @@ AssetDepot::AssetRequest<T> DataSystem::RequestResolvedModelAssetAsync(
 {
     auto consumer = own::make_shared<AssetDepot::AssetRequestState<T>>(m_assetRequestCounters);
     AssetDepot::AssetRequest<T> request(consumer);
+    // Even a failed inline submission may own resident dependency results.
+    // Keep that admission capture alive until the preparation lock is gone.
+    own::shared_owner<AssetDepot::ModelAssetWork<T>> work;
     std::lock_guard lock(m_assetPreparationMutex);
     const auto fail = [&](Status status, Error error)
     {
@@ -870,7 +964,7 @@ AssetDepot::AssetRequest<T> DataSystem::RequestResolvedModelAssetAsync(
     }
     try
     {
-        auto work = StartModelAssetWorkLocked<T>(resolved, catalog, exactGeneration,
+        work = StartModelAssetWorkLocked<T>(resolved, catalog, exactGeneration,
             exactGeneration ? m_assetPreparationEpoch : epoch, skeleton);
         consumer->completion = work->completion;
         if (work->status == Status::Pending)
@@ -959,6 +1053,7 @@ AssetDepot::AssetRequest<assets::ModelGeometryPayload> DataSystem::RequestModelC
             dependencies.push_back(rootCompletion);
         }
         auto& cache = m_modelAssets.geometry;
+        cache.works.emplace_back(work);
         auto& entry = cache.entries[work->key];
         if (entry.inFlight)
         {
@@ -1017,6 +1112,9 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
     bool exactGeneration, std::uint64_t epoch, const model_cooked::ResolvedAssetEntry& skeleton)
 {
     auto& cache = ModelAssetCacheLocked<T>();
+    // Resident-only requests have no terminal callback to prune their weak work
+    // records. Keep repeated cache hits from growing diagnostic metadata forever.
+    std::erase_if(cache.works, [](const auto& weak) { return weak.expired(); });
     const auto key = ModelKey<T>(resolved, exactGeneration);
     const auto previous = cache.entries.find(key);
     if (previous != cache.entries.end() && previous->second.inFlight)
@@ -1026,14 +1124,19 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
         {
             // A queued conditional gate need not delay an ordinary consumer
             // when an earlier flight has already published compatible data.
-            auto resident = previous->second.retained ? previous->second.retained : previous->second.live.lock();
-            if (resident)
+            if (previous->second.retained || !previous->second.live.expired())
             {
+                // Allocate/register before a weak upgrade, which could become
+                // the last resident owner while another thread drops its pin.
                 auto ready = own::make_shared<AssetDepot::ModelAssetWork<T>>();
                 ready->key = key;
-                ready->status = Status::Ready;
-                ready->asset = std::move(resident);
-                return ready;
+                cache.works.emplace_back(ready);
+                ready->asset = previous->second.retained ? previous->second.retained : previous->second.live.lock();
+                if (ready->asset)
+                {
+                    ready->status = Status::Ready;
+                    return ready;
+                }
             }
             // This is ordinary descriptor/payload demand, never an optional
             // collider subscriber. Admission and the skip decision share a lock.
@@ -1042,6 +1145,7 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
         return previous->second.inFlight;
     }
     auto work = own::make_shared<AssetDepot::ModelAssetWork<T>>();
+    cache.works.emplace_back(work);
     work->key = key;
     work->resolved = resolved;
     work->catalog = catalog;
@@ -1064,36 +1168,58 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
     }
     work->requestId = m_modelAssets.nextRequestId++;
     std::vector<job_handle> dependencies;
-    if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>
-        || std::is_same_v<T, assets::ModelMeshDescriptor>)
+    try
     {
-        if (skeleton.byteSource)
+        if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>
+            || std::is_same_v<T, assets::ModelMeshDescriptor>)
         {
-            work->dependencies.skeletonWork = StartModelAssetWorkLocked<assets::ModelSkeletonPayload>(
-                skeleton, catalog, exactGeneration, epoch, {});
-            if (work->dependencies.skeletonWork->completion.valid())
+            if (skeleton.byteSource)
             {
-                dependencies.push_back(work->dependencies.skeletonWork->completion);
+                work->dependencies.skeletonWork = StartModelAssetWorkLocked<assets::ModelSkeletonPayload>(
+                    skeleton, catalog, exactGeneration, epoch, {});
+                if (work->dependencies.skeletonWork->completion.valid())
+                {
+                    dependencies.push_back(work->dependencies.skeletonWork->completion);
+                }
             }
         }
-    }
-    if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
-    {
-        // Accepted compatible raw work survives current-link invalidation. Each
-        // bound descriptor still revalidates its own revision before publishing.
-        work->dependencies.geometryWork = StartModelAssetWorkLocked<assets::ModelGeometryPayload>(
-            resolved, {}, true, epoch, {});
-        if (work->dependencies.geometryWork->completion.valid())
+        if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
         {
-            dependencies.push_back(work->dependencies.geometryWork->completion);
+            // Accepted compatible raw work survives current-link invalidation. Each
+            // bound descriptor still revalidates its own revision before publishing.
+            work->dependencies.geometryWork = StartModelAssetWorkLocked<assets::ModelGeometryPayload>(
+                resolved, {}, true, epoch, {});
+            if (work->dependencies.geometryWork->completion.valid())
+            {
+                dependencies.push_back(work->dependencies.geometryWork->completion);
+            }
         }
+        if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>
+            || std::is_same_v<T, assets::ModelAnimationPayload>)
+        {
+            using Storage = std::conditional_t<std::is_same_v<T, assets::ModelSkeletonPayload>,
+                assets::ModelSkeletonStorage, assets::ModelAnimationStorage>;
+            // Content work is accepted independently of any current logical request.
+            // Stale/cancelled aliases cannot poison another alias or exact-owner use.
+            work->dependencies.storageWork = StartModelAssetWorkLocked<Storage>(resolved, {}, true, epoch, {});
+            if (work->dependencies.storageWork->completion.valid())
+            {
+                dependencies.push_back(work->dependencies.storageWork->completion);
+            }
+        }
+        // A dependency's inline terminal callback can trim expired parent entries.
+        // Reacquire this node only after dependency submission; never retain an
+        // iterator/reference across that callback boundary.
+        auto& entry = cache.entries[key];
+        entry.lastUse = ++m_modelAssets.clock;
+        entry.inFlight = work;
     }
-    // A dependency's inline terminal callback can trim expired parent entries.
-    // Reacquire this node only after dependency submission; never retain an
-    // iterator/reference across that callback boundary.
-    auto& entry = cache.entries[key];
-    entry.lastUse = ++m_modelAssets.clock;
-    entry.inFlight = work;
+    catch (...)
+    {
+        work->status = Status::Failed;
+        work->error = Error::SubmissionFailed;
+        return work;
+    }
     ModelSubmissionScope submitting(work->requestId);
     try
     {
@@ -1133,6 +1259,8 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
     try
     {
         own::shared_owner<const assets::ModelSkeletonPayload> skeleton;
+        own::shared_owner<const assets::ModelSkeletonStorage> skeletonStorage;
+        own::shared_owner<const assets::ModelAnimationStorage> animationStorage;
         own::shared_owner<const assets::ModelGeometryPayload> geometry;
         own::shared_owner<AssetDepot::ModelAssetWork<assets::ModelGeometryPayload>> predecessor;
         AssetDepot::AssetRequest<assets::ModelAnimationDescriptor> colliderRequest;
@@ -1215,6 +1343,26 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
                     return;
                 }
             }
+            if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>
+                || std::is_same_v<T, assets::ModelAnimationPayload>)
+            {
+                const auto& dependency = work->dependencies.storageWork;
+                if (!dependency || dependency->status != Status::Ready || !dependency->asset)
+                {
+                    CompleteModelAssetWorkLocked(work, Status::Failed,
+                        dependency ? dependency->error : Error::DependencyFailed,
+                        dependency ? dependency->message : std::string{});
+                    return;
+                }
+                if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>)
+                {
+                    skeletonStorage = dependency->asset;
+                }
+                else
+                {
+                    animationStorage = dependency->asset;
+                }
+            }
             if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
             {
                 const auto& dependency = work->dependencies.geometryWork;
@@ -1230,6 +1378,8 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
         }
         std::string failure;
         Error error = Error::None;
+        // The guard outlives candidates, including rejected/stale results.
+        ModelStagingCharge decodeStaging(work->decodeStagingChargeBytes);
         own::shared_owner<const T> candidate;
         if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>)
         {
@@ -1243,29 +1393,43 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
             }
             else
             {
+                ModelStagingCharge inputStaging(work->inputStagingBytes);
                 std::vector<std::byte> bytes;
                 auto resolved = work->resolved;
-                error = ReadModelBytes(resolved, bytes, failure);
+                error = ReadModelBytes(resolved, bytes, failure, inputStaging);
                 if (error == Error::None)
                 {
                     candidate = DecodeModelGeometry(resolved, bytes, failure);
                 }
             }
         }
+        else if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>)
+        {
+            candidate = BindModelSkeleton(work->resolved, std::move(skeletonStorage), failure);
+        }
+        else if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
+        {
+            candidate = BindModelAnimation(work->resolved, std::move(animationStorage), std::move(skeleton), failure);
+            if (!candidate)
+            {
+                error = Error::DependencyFailed;
+            }
+        }
         else
         {
+            ModelStagingCharge inputStaging(work->inputStagingBytes);
             std::vector<std::byte> bytes;
             auto resolved = work->resolved;
-            error = ReadModelBytes(resolved, bytes, failure);
+            error = ReadModelBytes(resolved, bytes, failure, inputStaging);
             if (error == Error::None)
             {
-                if constexpr (std::is_same_v<T, assets::ModelSkeletonPayload>)
+                if constexpr (std::is_same_v<T, assets::ModelSkeletonStorage>)
                 {
-                    candidate = DecodeModelSkeleton(resolved, bytes, failure);
+                    candidate = DecodeModelSkeleton(resolved, bytes, failure, decodeStaging);
                 }
-                else if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>)
+                else if constexpr (std::is_same_v<T, assets::ModelAnimationStorage>)
                 {
-                    candidate = DecodeModelAnimation(resolved, bytes, std::move(skeleton), failure);
+                    candidate = DecodeModelAnimation(resolved, bytes, failure, decodeStaging);
                 }
                 else
                 {
@@ -1277,9 +1441,28 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
         {
             error = Error::DecodeFailed;
         }
+        // Only raw candidates own newly decoded bulk; logical wrappers merely
+        // borrow their already-published raw dependency and are not staging.
+        if constexpr (std::is_same_v<T, assets::ModelSkeletonStorage>
+            || std::is_same_v<T, assets::ModelAnimationStorage>)
+        {
+            decodeStaging.Set(candidate ? candidate->ByteSize() : 0u);
+        }
+        else if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
+        {
+            // A collider predecessor/resident handoff reuses an existing owner;
+            // it did not allocate a new candidate and is not decode staging.
+            decodeStaging.Set(!geometry && candidate ? candidate->ByteSize() : 0u);
+        }
         std::lock_guard lock(m_assetPreparationMutex);
         CompleteModelAssetWorkLocked(work, error == Error::None ? Status::Ready : Status::Failed,
             error, std::move(failure), candidate);
+        if (work->asset)
+        {
+            // Publication transfers the observed candidate charge to result pins
+            // atomically with respect to snapshot readers of the admission lock.
+            decodeStaging.Set(0u);
+        }
         // candidate keeps rejected/stale bulk alive until this lock is gone.
     }
     catch (...)
@@ -1336,23 +1519,19 @@ void DataSystem::CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot
         error = Error::DecodeFailed;
     }
     bool retainCandidate = true;
-    if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>
-        || std::is_same_v<T, assets::ModelGeometryPayload>)
+    try
     {
-        try
+        // Every allocation precedes work/cache publication. If retirement
+        // staging cannot allocate, deliver an unretained ready result instead.
+        const auto charge = asset ? asset->ByteSize() : 0u;
+        if (charge <= cache.budgetBytes && cache.retainedBytes > cache.budgetBytes - charge)
         {
-            // Every allocation precedes work/cache publication. If retirement
-            // staging cannot allocate, deliver an unretained ready result instead.
-            const auto charge = asset ? asset->ByteSize() : 0u;
-            if (charge <= cache.budgetBytes && cache.retainedBytes > cache.budgetBytes - charge)
-            {
-                work->retiredAssets.reserve(cache.entries.size());
-            }
+            work->retiredAssets.reserve(cache.entries.size());
         }
-        catch (...)
-        {
-            retainCandidate = false;
-        }
+    }
+    catch (...)
+    {
+        retainCandidate = false;
     }
     work->status = status;
     work->error = error;
@@ -1427,13 +1606,9 @@ void DataSystem::CompleteModelAssetWorkLocked(const own::shared_owner<AssetDepot
         }
         work->dependencies.colliderConsumers.clear();
     }
-    if constexpr (std::is_same_v<T, assets::ModelMeshDescriptor>
-        || std::is_same_v<T, assets::ModelGeometryPayload>)
+    if (retainCandidate)
     {
-        if (retainCandidate)
-        {
-            TrimModelCache(cache, &work->retiredAssets);
-        }
+        TrimModelCache(cache, &work->retiredAssets);
     }
     TrimModelAssetsLocked();
 }
@@ -1634,17 +1809,30 @@ bool DataSystem::HasModelAnimationDescriptor(AssetDepot::AssetLink<assets::Model
 
 void DataSystem::TrimModelAssetsLocked()
 {
-    TrimModelCache(m_modelAssets.descriptors);
-    TrimModelCache(m_modelAssets.skeletons);
-    TrimModelCache(m_modelAssets.animations);
-    // Mesh/geometry retention is trimmed by its publishing work or the budget
-    // setter, both with staged owners disposed outside this lock.
+    // All retained-owner drops are staged by publishing work or a budget setter.
+    // This maintenance path only forgets weak nodes that no longer own anything.
+    const auto prune = [](auto& cache)
+    {
+        std::erase_if(cache.entries, [](const auto& item)
+        {
+            return !item.second.retained && !item.second.inFlight && item.second.live.expired();
+        });
+        std::erase_if(cache.works, [](const auto& weak) { return weak.expired(); });
+    };
+    prune(m_modelAssets.descriptors);
+    prune(m_modelAssets.skeletons);
+    prune(m_modelAssets.animations);
+    prune(m_modelAssets.meshes);
+    prune(m_modelAssets.geometry);
+    prune(m_modelAssets.skeletonStorage);
+    prune(m_modelAssets.animationStorage);
 }
 
 void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEntries& retired)
 {
     assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty()
-        && retired.meshes.empty() && retired.geometry.empty());
+        && retired.meshes.empty() && retired.geometry.empty()
+        && retired.skeletonStorage.empty() && retired.animationStorage.empty());
     const auto stage = [&](const auto& cache, auto& consumers)
     {
         assert(consumers.empty());
@@ -1710,12 +1898,15 @@ void DataSystem::StageModelAssetRetirementLocked(AssetDepot::ModelAssetRetiredEn
     stage(m_modelAssets.animations, retired.animationConsumers);
     stage(m_modelAssets.meshes, retired.meshConsumers);
     stage(m_modelAssets.geometry, retired.geometryConsumers);
+    stage(m_modelAssets.skeletonStorage, retired.skeletonStorageConsumers);
+    stage(m_modelAssets.animationStorage, retired.animationStorageConsumers);
 }
 
 void DataSystem::InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntries& retired) noexcept
 {
     assert(retired.descriptors.empty() && retired.skeletons.empty() && retired.animations.empty()
-        && retired.meshes.empty() && retired.geometry.empty());
+        && retired.meshes.empty() && retired.geometry.empty()
+        && retired.skeletonStorage.empty() && retired.animationStorage.empty());
     const auto status = m_assetPreparationStopping ? Status::Cancelled : Status::Stale;
     const auto error = m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged;
     const auto invalidate = [&](auto& cache, auto& detached, const auto& consumers)
@@ -1762,68 +1953,158 @@ void DataSystem::InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntrie
     invalidate(m_modelAssets.animations, retired.animations, retired.animationConsumers);
     invalidate(m_modelAssets.meshes, retired.meshes, retired.meshConsumers);
     invalidate(m_modelAssets.geometry, retired.geometry, retired.geometryConsumers);
+    invalidate(m_modelAssets.skeletonStorage, retired.skeletonStorage, retired.skeletonStorageConsumers);
+    invalidate(m_modelAssets.animationStorage, retired.animationStorage, retired.animationStorageConsumers);
 }
 
 void DataSystem::SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips)
 {
-    std::lock_guard lock(m_assetPreparationMutex);
-    m_modelAssets.descriptors.budgetBytes = descriptors;
-    m_modelAssets.skeletons.budgetBytes = skeletons;
-    m_modelAssets.animations.budgetBytes = clips;
-    TrimModelAssetsLocked();
+    std::vector<own::shared_owner<const assets::ModelAnimationDescriptor>> retiredDescriptors;
+    std::vector<own::shared_owner<const assets::ModelSkeletonPayload>> retiredSkeletons;
+    std::vector<own::shared_owner<const assets::ModelAnimationPayload>> retiredClips;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        // Reserve before mutation so an allocation failure preserves all budgets.
+        retiredDescriptors.reserve(m_modelAssets.descriptors.entries.size());
+        retiredSkeletons.reserve(m_modelAssets.skeletons.entries.size());
+        retiredClips.reserve(m_modelAssets.animations.entries.size());
+        m_modelAssets.descriptors.budgetBytes = descriptors;
+        m_modelAssets.skeletons.budgetBytes = skeletons;
+        m_modelAssets.animations.budgetBytes = clips;
+        TrimModelCache(m_modelAssets.descriptors, &retiredDescriptors);
+        TrimModelCache(m_modelAssets.skeletons, &retiredSkeletons);
+        TrimModelCache(m_modelAssets.animations, &retiredClips);
+        TrimModelAssetsLocked();
+    }
+}
+
+void DataSystem::SetModelAnimationStorageCacheBudgets(std::size_t skeletons, std::size_t clips)
+{
+    std::vector<own::shared_owner<const assets::ModelSkeletonStorage>> retiredSkeletons;
+    std::vector<own::shared_owner<const assets::ModelAnimationStorage>> retiredClips;
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        retiredSkeletons.reserve(m_modelAssets.skeletonStorage.entries.size());
+        retiredClips.reserve(m_modelAssets.animationStorage.entries.size());
+        m_modelAssets.skeletonStorage.budgetBytes = skeletons;
+        m_modelAssets.animationStorage.budgetBytes = clips;
+        TrimModelCache(m_modelAssets.skeletonStorage, &retiredSkeletons);
+        TrimModelCache(m_modelAssets.animationStorage, &retiredClips);
+        TrimModelAssetsLocked();
+    }
 }
 
 AssetDepot::ModelAssetCacheSnapshot DataSystem::SnapshotModelAssetCache() const
 {
+    // Weak upgrades can race the final external release. Keep those temporary
+    // diagnostic pins beyond the lock rather than destroying bulk under it.
+    ModelSnapshotPins<assets::ModelAnimationDescriptor> descriptorPins;
+    ModelSnapshotPins<assets::ModelSkeletonPayload> skeletonPins;
+    ModelSnapshotPins<assets::ModelAnimationPayload> animationPins;
+    ModelSnapshotPins<assets::ModelMeshDescriptor> meshPins;
+    ModelSnapshotPins<assets::ModelGeometryPayload> geometryPins;
+    ModelSnapshotPins<assets::ModelSkeletonStorage> skeletonStoragePins;
+    ModelSnapshotPins<assets::ModelAnimationStorage> animationStoragePins;
     std::lock_guard lock(m_assetPreparationMutex);
     AssetDepot::ModelAssetCacheSnapshot result;
-    const auto append = [&](const auto& cache)
+    std::set<const void*> resultPins;
+    const auto append = [&](const auto& cache, auto& pins)
     {
+        using Cache = std::remove_cvref_t<decltype(cache)>;
+        // Allocate before any weak upgrade. Subsequent pushes cannot allocate.
+        pins.assets.reserve(cache.entries.size());
+        pins.works.reserve(cache.works.size());
         result.entries += cache.entries.size();
         result.retainedChargeBytes = AddModelCharge(result.retainedChargeBytes, cache.retainedBytes);
         result.budgetBytes = AddModelCharge(result.budgetBytes, cache.budgetBytes);
         result.logicalEvictions += cache.logicalEvictions;
+        for (const auto& weak : cache.works)
+        {
+            if (auto work = weak.lock())
+            {
+                pins.works.push_back(std::move(work));
+                const auto& observed = pins.works.back();
+                result.inputStagingBytes = AddModelCharge(result.inputStagingBytes,
+                    observed->inputStagingBytes.load(std::memory_order_relaxed));
+                result.decodeStagingChargeBytes = AddModelCharge(result.decodeStagingChargeBytes,
+                    observed->decodeStagingChargeBytes.load(std::memory_order_relaxed));
+                if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelSkeletonStorage>>
+                    || std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelAnimationStorage>>
+                    || std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelGeometryPayload>>)
+                {
+                    // Address deduplication is diagnostic-only, never an asset key.
+                    if (observed->status == Status::Ready && observed->asset
+                        && resultPins.insert(&*observed->asset).second)
+                    {
+                        result.completedWorkResultPinBytes = AddModelCharge(result.completedWorkResultPinBytes,
+                            observed->asset->ByteSize());
+                    }
+                }
+                if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelSkeletonStorage>>)
+                {
+                    result.skeletonStorageInFlight += observed->status == Status::Pending ? 1u : 0u;
+                }
+                else if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelAnimationStorage>>)
+                {
+                    result.animationStorageInFlight += observed->status == Status::Pending ? 1u : 0u;
+                }
+            }
+        }
         for (const auto& [key, entry] : cache.entries)
         {
-            result.liveEntries += entry.live.lock() ? 1u : 0u;
+            if (auto owner = entry.live.lock())
+            {
+                pins.assets.push_back(std::move(owner));
+                const auto& observed = pins.assets.back();
+                ++result.liveEntries;
+                if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelMeshDescriptor>>)
+                {
+                    result.meshDescriptorLiveBytes = AddModelCharge(result.meshDescriptorLiveBytes, observed->metadataBytes);
+                    if (observed->skeleton)
+                    {
+                        result.skeletonDependencyBytes = AddModelCharge(result.skeletonDependencyBytes,
+                            observed->skeleton->ByteSize());
+                    }
+                }
+                else if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelGeometryPayload>>)
+                {
+                    result.geometryLiveBytes = AddModelCharge(result.geometryLiveBytes, observed->ByteSize());
+                }
+                else if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelSkeletonStorage>>)
+                {
+                    result.skeletonStorageLiveBytes = AddModelCharge(result.skeletonStorageLiveBytes, observed->ByteSize());
+                }
+                else if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelAnimationStorage>>)
+                {
+                    result.animationStorageLiveBytes = AddModelCharge(result.animationStorageLiveBytes, observed->ByteSize());
+                }
+            }
             result.retainedEntries += entry.retained ? 1u : 0u;
             VisitModelFlights(entry.inFlight, [&](const auto& flight)
             {
-                result.inFlight += flight->status == Status::Pending ? 1u : 0u;
+                const auto pending = flight->status == Status::Pending ? 1u : 0u;
+                result.inFlight += pending;
+                if constexpr (std::is_same_v<Cache, AssetDepot::ModelAssetCache<assets::ModelGeometryPayload>>)
+                {
+                    result.geometryInFlight += pending;
+                }
             });
         }
     };
-    append(m_modelAssets.descriptors);
-    append(m_modelAssets.skeletons);
-    append(m_modelAssets.animations);
-    append(m_modelAssets.meshes);
-    append(m_modelAssets.geometry);
+    append(m_modelAssets.descriptors, descriptorPins);
+    append(m_modelAssets.skeletons, skeletonPins);
+    append(m_modelAssets.animations, animationPins);
+    append(m_modelAssets.meshes, meshPins);
+    append(m_modelAssets.geometry, geometryPins);
+    append(m_modelAssets.skeletonStorage, skeletonStoragePins);
+    append(m_modelAssets.animationStorage, animationStoragePins);
+    result.skeletonStorageRetainedBytes = m_modelAssets.skeletonStorage.retainedBytes;
+    result.animationStorageRetainedBytes = m_modelAssets.animationStorage.retainedBytes;
+    result.skeletonStorageBudgetBytes = m_modelAssets.skeletonStorage.budgetBytes;
+    result.animationStorageBudgetBytes = m_modelAssets.animationStorage.budgetBytes;
     result.meshDescriptorRetainedBytes = m_modelAssets.meshes.retainedBytes;
     result.geometryRetainedBytes = m_modelAssets.geometry.retainedBytes;
     result.geometryBudgetBytes = m_modelAssets.geometry.budgetBytes;
-    for (const auto& [key, entry] : m_modelAssets.meshes.entries)
-    {
-        if (const auto owner = entry.live.lock())
-        {
-            result.meshDescriptorLiveBytes = AddModelCharge(result.meshDescriptorLiveBytes, owner->metadataBytes);
-            if (owner->skeleton)
-            {
-                result.skeletonDependencyBytes = AddModelCharge(result.skeletonDependencyBytes,
-                    owner->skeleton->ByteSize());
-            }
-        }
-    }
-    for (const auto& [key, entry] : m_modelAssets.geometry.entries)
-    {
-        if (const auto owner = entry.live.lock())
-        {
-            result.geometryLiveBytes = AddModelCharge(result.geometryLiveBytes, owner->ByteSize());
-        }
-        VisitModelFlights(entry.inFlight, [&](const auto& flight)
-        {
-            result.geometryInFlight += flight->status == Status::Pending ? 1u : 0u;
-        });
-    }
     return result;
 }
 

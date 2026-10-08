@@ -220,6 +220,10 @@ public:
     [[nodiscard]] bool HasModelAnimationDescriptor(
         AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link) const;
     void SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips);
+    // Independent compatible-decode retention; zero both animation budget APIs
+    // to remove their retained owners. Separate skinned-mesh cache entries and
+    // consumer/work pins can still keep skeleton storage alive.
+    void SetModelAnimationStorageCacheBudgets(std::size_t skeletons, std::size_t clips);
     [[nodiscard]] AssetDepot::ModelAssetCacheSnapshot SnapshotModelAssetCache() const;
     [[nodiscard]] AssetDepot::AssetRequestStatistics SnapshotAssetRequests() const noexcept
     {

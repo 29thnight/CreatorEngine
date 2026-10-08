@@ -410,14 +410,14 @@ AnimatorAnimationBinding Animator::CaptureAnimationBinding()
             const auto& clip = payload.clip;
             const auto& expected = m_animationDescriptor->clips[static_cast<std::size_t>(index)];
             const auto& skeleton = m_animationDescriptor->skeleton;
-            if (clip.animationId != summary.clipAssetId.value || clip.name != summary.name
+            if (payload.origin.entry.asset.key.assetId != summary.clipAssetId || clip.name != summary.name
                 || clip.durationTicks != summary.durationTicks
                 || clip.ticksPerSecond != summary.ticksPerSecond || clip.looping != summary.looping
                 || payload.origin.entry.asset != expected.entry.asset
                 || payload.origin.blob != expected.blob
                 || payload.origin.resolverRevision != expected.resolverRevision
                 || !payload.skeleton
-                || payload.skeleton->skeleton.skeletonId != m_animationDescriptor->summary.skeletonAssetId.value
+                || payload.skeleton->origin.entry.asset.key.assetId != m_animationDescriptor->summary.skeletonAssetId
                 || payload.skeleton->origin.entry.asset != skeleton.entry.asset
                 || payload.skeleton->origin.blob != skeleton.blob
                 || payload.skeleton->origin.resolverRevision != skeleton.resolverRevision

@@ -193,8 +193,10 @@ design. A foundation slice is not completion of the runtime migration.
   package content remains explicitly noncollectible.
 - Legacy Material/Texture/ShaderMeta APIs remain synchronous source/editor adapters.
   Mounted supported resource views have typed asynchronous acquisition and independent
-  cooked producers. Geometry/images share compatible physical decode; Skeleton/Clip
-  raw-storage sharing across distinct logical identities remains queued.
+  cooked producers. Geometry/images and Skeleton/Clip raw stores share compatible
+  physical decode while each logical wrapper retains its exact origin and hard closure.
+  Independent raw animation budgets and logical wrapper budgets are both explicit;
+  setting one cache budget to zero does not erase another cache's retained owner.
 - General source-free Player/content cutover and removal of superseded compatibility
   paths remain separate implementation slices. Managed/NativeAOT execution and all
   source-free runtime acceptance gates remain unrun, including the expanded kinds.
