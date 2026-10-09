@@ -48,7 +48,9 @@
     <ClCompile Include="ExperimentParity\ExperimentCodeMaterialCodecSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp" />
+    <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>

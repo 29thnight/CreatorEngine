@@ -235,12 +235,13 @@ namespace RenderTest
             check.Check(!bad.empty(), "derived root 누락은 issue 를 남긴다");
         }
 
+        check.Check(RunExperimentAssetSetManifestSelfTest(outLog), "CEMF v3 AssetSet schema contract");
+        check.Check(RunExperimentCodeMaterialCodecSelfTest(outLog), "source-free authored code material contract");
+
         char summary[160]{};
         std::snprintf(summary, sizeof(summary),
             "  합성 단정 %zu/%zu\n", check.passed, check.passed + check.failed);
         outLog += summary;
-        check.Check(RunExperimentAssetSetManifestSelfTest(outLog), "CEMF v3 AssetSet schema contract");
-        check.Check(RunExperimentCodeMaterialCodecSelfTest(outLog), "source-free authored code material contract");
         return check.failed == 0u;
     }
 
