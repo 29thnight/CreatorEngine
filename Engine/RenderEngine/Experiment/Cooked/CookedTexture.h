@@ -37,6 +37,8 @@ namespace experiment::cooked
     // are rejected. A complete validated table precedes any pixel allocation.
     [[nodiscard]] bool EncodeCookedTexture(TextureImageView image,
         std::vector<std::byte>& artifact, std::string& failure, CookedTextureInfo info = {});
+    // Shares the strict decoder's parser without allocating image storage.
+    [[nodiscard]] bool ValidateCookedTexture(std::span<const std::byte> artifact, std::string& failure);
     [[nodiscard]] bool DecodeCookedTexture(std::span<const std::byte> artifact,
         TextureImage& image, std::string& failure, CookedTextureInfo* info = nullptr);
 

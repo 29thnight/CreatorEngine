@@ -6,6 +6,7 @@
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../Graph/ShadowCasterBounds.h"
 #include "../../../RHI/RHIEncoder.h"
+#include "../../../TextureCodecImage.h"
 
 #include <algorithm>
 #include <cstring>
@@ -29,6 +30,25 @@ namespace
     //   · decalForward를 뺀다. 원본이 계산하지만 그것을 쓰던 discard가 주석
     //     처리돼 있어 결과에 닿지 않는 죽은 값이다.
     constexpr const char* kDecalShaderFile = "Decal.slang";
+    // Per-instance interpretation only. Batch.channel remains the 0..7 PSO
+    // channel mask; these bits never index m_pipelines or affect blending.
+    constexpr uint32_t kNormalBc5 = 1u << 3u;
+    constexpr uint32_t kDiffuseLinearSample = 1u << 4u;
+
+    bool IsSrgbTexture(RHIFormat format)
+    {
+        switch (format)
+        {
+        case RHIFormat::RGBA8UnormSrgb:
+        case RHIFormat::BGRA8UnormSrgb:
+        case RHIFormat::BC1UnormSrgb:
+        case RHIFormat::BC3UnormSrgb:
+        case RHIFormat::BC7UnormSrgb:
+            return true;
+        default:
+            return false;
+        }
+    }
 
     struct DecalFrameConstants
     {
@@ -292,6 +312,17 @@ bool EnhancedDecalPass::PrepareFrame(const EnhancedFrameContext& context, std::s
         instance.world = math::transpose(decal.worldMatrix);
         instance.inverseWorld = math::transpose(math::inverse(decal.worldMatrix));
         instance.useFlags = channel;
+        if (candidate.formats[1] == RHIFormat::BC5Unorm)
+        {
+            instance.useFlags |= kNormalBc5;
+        }
+        // Native sRGB reads and explicitly locked cooked Linear reads are
+        // already linear samples. Only unlocked legacy UNORM keeps its pow path.
+        const auto diffuseImage = context.TextureImage(decal.diffuse);
+        if (IsSrgbTexture(candidate.formats[0]) || (diffuseImage && diffuseImage->colorSpaceLocked))
+        {
+            instance.useFlags |= kDiffuseLinearSample;
+        }
         instance.sliceX = (std::max)(1u, decal.sliceX);
         instance.sliceY = (std::max)(1u, decal.sliceY);
         instance.sliceNum = decal.sliceNum;

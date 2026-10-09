@@ -6,8 +6,8 @@
 
 대시보드: **PHASE 12**
 
-대상: 기존 `Engine/RenderEngine`, `Engine/SceneRuntime`, `Engine/AssetPipeline`,
-`Engine/Experiment/Cooked`, `Editor/EngineEntry`, `Tools/AssetCooker`
+대상: 기존 `Engine/RenderEngine`, `Engine/SceneRuntime`,
+`Engine/RenderEngine/Experiment/Cooked`, `Editor/EngineEntry`, `Tools/AssetCooker`, `BuildTool`
 
 관련 문서: `TextureCodecBoundaryDesign.md`, `BuildPipelinePlan.md`(PHASE 12.5),
 `MaterialPipelinePlan.md`, `SerializationPlan.md`, `ModelAssetBigBangCutoverPlan.md`,
@@ -101,7 +101,8 @@ RHI 포맷·블록 피치 어휘를 사용한다. DirectXTex 타입을 새 런�
 - 높이 PNG는 float 비트 31..24, 23..16, 15..8, 7..0을 순서대로 RGBA8에 저장한다
 - **알파도 데이터다.** 감마 변환, premultiply/unpremultiply, 불투명 판정에 따른
   알파 제거, BGRA/RGBA 혼동을 허용하지 않는다
-- PNG 저장 형식을 RGBA8 또는 gray8로 명시한다. 높이는 정규화된 RGBA8 바이트를
+- PNG 입력을 RGBA8 또는 gray8로 명시한다. Windows PNG 인코더가 지원하는
+  straight BGRA8 target으로 저장하고 읽을 때 FORCE_RGB로 RGBA 순서를 복원한다. 높이는 정규화된 RGBA8 바이트를
   행 피치에 맞춰 읽고 float 비트로 복원한다
 - splat의 `uint8_t(clamp(weight, 0, 1) * 255)` 절삭과 `/255.0f` 복원은 유지한다
 - 컬러 brush의 회색 변환은 기존 정수 식 `(77*R + 150*G + 29*B) >> 8`을 유지한다.
@@ -132,13 +133,56 @@ import settings, target policy, format version이 cooked 결과 식별에 반영
 - 편집은 에디터의 소유 경계를 통해 저장하고 변경된 설정을 재cook/재로드에 반영한다
 - 기본값, material slot 추론 및 명시 설정의 우선순위를 일관되게 적용한다
 
+
+### 이번 구현의 정책과 남는 범위
+
+- **독립 텍스처 기본값:** `.meta`에 설정이 없으면 `Source / None / PreserveAuthored`다.
+  `None`은 추가 압축을 하지 않는다는 의미로 원본 DDS 블록은 유지한다. 기존 재질의
+  런타임 compress/mip 요청으로 cooked 바이트를 다시 가공하지 않는다. 따라서 기존
+  역할별 자동 BC1·밉 생성과 VRAM/필터링 결과가 같다고 주장하지 않는다. 원하는 정책을
+  임포트 설정으로 명시하고 재cook해야 한다
+- **모델 임베디드:** 단일 역할은 역할 기반 색공간·밉 기본값을 추론하고 명시 설정이
+  이를 덮어쓴다. 동일 이미지의 혼합 역할은 중립·무가공 표현을 공유하거나, 이미 필터링된
+  서로 충돌하는 정책을 명확한 오류로 거부한다. 첫 역할의 정책으로 나머지를 조용히 처리하지 않는다
+- **변형의 한계:** 현재 카탈로그의 한 논리 텍스처는 하나의 authored cook 정책을 갖는다.
+  같은 이미지의 서로 다른 필터·압축 결과를 역할별로 동시에 선택하는 다중 artifact
+  참조 확장은 이 변경의 완료 범위가 아니다. 같은 유효 산출물의 decoded payload 공유는 유지한다
+- **설정 반영:** 기존 job 시스템에서 소유한 입력으로 재cook하고 최신 요청만 새 세대로
+  게시한다. 열린 씬의 강한 참조를 임의로 바꾸지 않는다. 새 세대 준비 후 Inspector의
+  명시적 `Reload Saved Scene` 동작과 미저장 편집 확인으로 반영한다. 임의 컴포넌트를
+  자동 재바인딩하는 hot-reload는 별도 잔여 항목이다
+- **버전:** CECT texture representation/schema는 2다. AssetSet의 CEMF manifest 3과
+  다른 계약이다. 기존 원본 pass-through artifact와 receipt는 다시 cook해야 한다
+- **BC5 그래프:** 표준 재질과 생성 재질 그래프의 노멀 복원 및 private encoding uniform을
+  함께 다룬다. 그래프 compiler 3 / program artifact 5로 이전 캐시를 무효화한다.
+  private word 외의 immutable uniform 비교는 유지한다
+- **Player 경계:** DirectXTex 소스 처리는 Editor·AssetCooker 등의 오프라인 프로젝트만
+  컴파일하도록 분리한다. 공유 런타임은 기존 AssetAuthoringPort의 중립 콜백을 사용하며
+  Player에는 소스 이미지 디코더를 등록하지 않는다. 실제 바이너리의 링크 결과는 미검증이다
+- **Terrain 패키지:** 기존 저작 파일과 구분한 cooked terrain v2가 높이 float, gray8 splat,
+  레이어 정보·참조 및 GPU-ready diffuse를 보관한다. 새 패키지에는 cooked 표현을 넣고
+  Player는 이미지 코덱 없이 읽어야 한다. 원본 PNG 소비를 남긴 채 링크만 제거하지 않는다
+  중첩 CECT와 파생 CPU 작업 집합(최대 1 GiB)을 할당 전에 검사하며, 같은 reader를
+  producer 검증에도 사용해 런타임이 항상 거부할 대형 지형을 게시하지 않는다
+- **기본 blue noise:** 기존 BC3 DDS의 8개 authored mip를 그대로 CECT로 옮겨
+  `Resources/VolumetricFog/blueNoise.cetex`에 배포한다. Player는 이 cooked 리소스만
+  소비한다. 새 Editor 개발 환경에서 아직 리소스가 없으면 설치된 authoring 콜백을
+  통해 기존 worker에서 원본 DDS를 읽을 수 있으며, Player에는 그 fallback이 없다
+- **Decal:** 기존 이름 필드는 오프라인에서 정확한 `Textures/<filename>.meta` 신원으로
+  낮춘다. 런타임은 비동기 typed 요청과 이전 owner 유지 정책을 쓰며, BC5 노멀과
+  native sRGB/명시 Linear 입력은 별도 셰이더 비트로 해석한다
+- **입력 지원 차이:** PSD/PIC/PNM은 설치된 WIC 코덱에 의존한다. HDR/JPEG brush의
+  이전 stb 디코더 대비 픽셀 일치는 미검증이다. DirectXTex 왕복은 독립 디코더와의
+  패리티를 증명하지 않는다
+
 ### T1a — DirectXTex cook 트랜스코딩 (구현 중)
 
 - 기존 `TextureCookProducer`의 pass-through를 GPU-ready 산출물 생성으로 전환한다
 - 디코드 → 정책 적용/리사이즈 → 밉 생성 → 압축 → artifact 기록 순서를 구현한다
 - 압축 실패·지원하지 않는 포맷·선택한 밉 정책과 다른 chain을 성공으로 게시하지 않는다.
   `PreserveAuthored`의 유효한 부분 mip chain은 그대로 보존한다. `GenerateFull`은
-  전체 chain을 생성해야 하며 잘못된 metadata·피치·개수는 어느 정책에서도 거부한다
+  기존 authored level의 바이트를 유지하며 누락된 tail을 추가해 전체 chain을 만든다.
+  잘못된 metadata·피치·개수는 어느 정책에서도 거부한다
 - artifact 버전 및 producer 식별자를 갱신하고 구버전/정책 불일치 산출물을 거부한다
 - 모델 임베디드 텍스처도 같은 GPU-ready 표현과 검증 정책으로 연결한다
 - 새 코덱 프로젝트나 추상화의 선행 설치 없이 기존 프로젝트 경계를 유지한다
@@ -162,6 +206,11 @@ BC5/BC7의 구조적 형식·백엔드 업로드·노멀 Z 복원 지원은 T0~T
 해당 형식의 품질 튜닝·시간·메모리 수용 측정은 미실행이며 별도 판단으로 남긴다.
 BC6H는 실제 필요를 확인한 뒤 기존 DirectXTex 안에서 판단한다. DirectXTex 청산,
 다른 압축기 도입, 자체 DDS 파서는 범위가 아니다.
+
+현재 desktop Vulkan 타깃은 장치 선택 시 `textureCompressionBC`를 요구하고 생성 시
+활성화한다. 지원하지 않는 장치는 명시적 진단으로 거부하며 runtime 압축 해제를 하지
+않는다. DX12와 공유하는 BC artifact의 최상위 폭·높이는 4의 배수여야 한다.
+이 계약을 향후 모바일/Web의 공통 RHI 요구로 확대하지 않는다.
 
 ### T3 — 모바일/Web (착수 조건 미충족)
 

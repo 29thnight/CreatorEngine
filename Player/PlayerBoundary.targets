@@ -28,6 +28,8 @@
       <_PlayerBoundaryDependency Include="@(ProjectReference);@(ReflgenReference);@(ClCompile);@(ClInclude)" />
       <_PlayerForbiddenDependency Include="@(_PlayerBoundaryDependency)"
           Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(_PlayerBoundaryDependency.FullPath)', '(?i)[\\/]Editor[\\/]'))" />
+      <_PlayerForbiddenImageSource Include="@(ClCompile)"
+          Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(ClCompile.FullPath)', '(?i)(TextureCooker|TextureSourceProcessing|TerrainSourceProcessing)\.cpp$'))" />
       <_PlayerBoundaryInclude Include="@(ClCompile->'%(AdditionalIncludeDirectories)');$(IncludePath);$(ExternalIncludePath)" />
       <_PlayerForbiddenInclude Include="@(_PlayerBoundaryInclude)"
           Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(_PlayerBoundaryInclude.Identity)', '(?i)(^|[\\/])Editor([\\/]|$)'))" />
@@ -35,6 +37,8 @@
       <_PlayerForbiddenReference Include="@(_PlayerRuntimeReference)"
           Condition="!$([System.String]::Copy('%(_PlayerRuntimeReference.FullPath)').StartsWith('$(SolutionDir)Engine\'))" />
     </ItemGroup>
+    <Error Condition="'@(_PlayerForbiddenImageSource)' != ''"
+           Text="$(MSBuildProjectName) cannot compile offline texture source processors: @(_PlayerForbiddenImageSource). Compile these only in Editor/AssetCooker targets." />
     <Error Condition="'@(_PlayerForbiddenDependency)' != ''"
            Text="$(MSBuildProjectName) belongs to Player's runtime closure and cannot depend on Editor/Host sources, projects or generated reflection: @(_PlayerForbiddenDependency). Put role-neutral code under Engine." />
     <Error Condition="'@(_PlayerForbiddenInclude)' != ''"

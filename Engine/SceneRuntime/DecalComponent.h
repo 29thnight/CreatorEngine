@@ -2,6 +2,8 @@
 #include "Ownership.h"
 #include "Core.Minimal.h"
 #include "Component.h"
+#include "AssetDepot/AssetRequest.h"
+#include <array>
 
 class Texture;
 class [[reflgen::reflect]] DecalComponent : public meta::identity<DecalComponent, Component>
@@ -36,6 +38,10 @@ public:
     void SetORMTexture(const std::string_view& fileName);
     void SetORMTexture(const FileGuid& fileGuid);
 
+    // Owner-thread polling also runs for paused/editor scenes before proxy publication.
+    [[reflgen::ignore]]
+    void PollTextureRequests();
+
     const Texture* GetDecalTexture() { return m_decalTexture; }
     const Texture* GetNormalTexture() { return m_normalTexture; }
     // Occlusion, Roughness, Metallic
@@ -45,6 +51,21 @@ public:
 	const own::shared_owner<const Texture>& GetORMTextureShared() const { return m_ormTextureOwner; }
 
 private:
+    [[reflgen::ignore]]
+    void RequestTexture(std::string_view reference, std::size_t slot,
+        own::shared_owner<const Texture>& owner, const Texture*& alias);
+    [[reflgen::ignore]]
+    void ReleaseManagedResources() override;
+
+    [[reflgen::ignore]]
+    std::array<AssetDepot::AssetRequest<Texture>, 3> m_textureRequests{};
+    [[reflgen::ignore]]
+    std::array<bool, 3> m_texturePending{};
+    [[reflgen::ignore]]
+    std::array<bool, 3> m_textureRetryOnRevision{};
+    [[reflgen::ignore]]
+    std::array<std::uint64_t, 3> m_textureResolverRevisions{};
+
     std::string m_diffusefileName{};
     std::string m_normalFileName{};
     std::string m_ormFileName{};

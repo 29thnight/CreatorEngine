@@ -74,7 +74,8 @@ void Replace(std::string& source, const std::string& from, const std::string& to
 bool IsSrgb(RHIFormat format)
 {
     return format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb ||
-           format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+           format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb ||
+           format == RHIFormat::BC7UnormSrgb;
 }
 
 bool IsFloatTextureFormat(RHIFormat format)
@@ -97,6 +98,9 @@ bool IsFloatTextureFormat(RHIFormat format)
     case RHIFormat::BC1UnormSrgb:
     case RHIFormat::BC3Unorm:
     case RHIFormat::BC3UnormSrgb:
+    case RHIFormat::BC5Unorm:
+    case RHIFormat::BC7Unorm:
+    case RHIFormat::BC7UnormSrgb:
     case RHIFormat::BGRA8Unorm:
     case RHIFormat::BGRA8UnormSrgb:
         return true;
@@ -151,6 +155,35 @@ bool Pack(const ParameterBinding& binding, const LX::LXSocketValue& value, std::
     std::memcpy(bytes.data() + binding.offset, words.data(), binding.bytes);
     return true;
 }
+
+        bool ValidateTextureEncodings(const BindingLayout& layout, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+        {
+            if (layout.textureEncodings.size() != layout.textures.size() || layout.textureEncodings.size() > 112u)
+            {
+                return Fail(diagnostics, "product.textureEncoding", "Texture encoding count differs from material textures.");
+            }
+            std::set<std::uint32_t> slots;
+            std::set<std::uint32_t> offsets;
+            for (const auto& binding : layout.textureEncodings)
+            {
+                if (binding.slot >= 112u || binding.offset % 4u != 0 ||
+                    static_cast<std::uint64_t>(binding.offset) + 4u > layout.uniformBytes ||
+                    !slots.insert(binding.slot).second || !offsets.insert(binding.offset).second ||
+                    std::ranges::count(layout.textures, binding.slot, &LX::LXMaterialResource::slot) != 1)
+                {
+                    return Fail(diagnostics, "product.textureEncoding", "Invalid runtime texture encoding slot or offset.");
+                }
+                for (const auto& parameter : layout.parameters)
+                {
+                    if (binding.offset < static_cast<std::uint64_t>(parameter.offset) + parameter.bytes &&
+                        parameter.offset < static_cast<std::uint64_t>(binding.offset) + 4u)
+                    {
+                        return Fail(diagnostics, "product.textureEncoding", "Runtime texture encoding overlaps a parameter.");
+                    }
+                }
+            }
+            return true;
+        }
 
 constexpr std::uint32_t CookMagic = 0x434D584Cu; // LXMC, little endian
 constexpr std::uint32_t TextLimit = 16u * 1024u * 1024u;
@@ -350,6 +383,11 @@ RHIShaderReflection LayoutReflection(const BindingLayout& layout)
         for (const auto& binding : layout.parameters)
             cb.fields.push_back({"lx_bound_p" + std::to_string(binding.parameter.id), ValueType(binding.parameter.type),
                                  binding.offset, binding.bytes});
+        for (const auto& binding : layout.textureEncodings)
+        {
+            cb.fields.push_back({TextureEncodingUniformName(binding.slot),
+                {RHIShaderScalarKind::UInt32, 1, 1, 1}, binding.offset, 4u});
+        }
         reflection.resources.push_back(std::move(cb));
     }
     const auto append = [&](const auto& table, bool texture) {
@@ -533,13 +571,23 @@ std::string BuildBoundSource(const LX::LXMaterialProgram& program)
     }
     const bool numeric =
         std::ranges::any_of(program.parameters, [](const auto& parameter) { return Numeric(parameter.type); });
-    if (numeric)
+    const bool textures = std::ranges::any_of(program.resources, [](const auto& resource) {
+        return resource.kind == LX::LXMaterialResourceKind::Texture;
+    });
+    if (numeric || textures)
     {
         source += "\ncbuffer LXMaterialProperties : register(b2)\n{\n";
         for (const auto& parameter : program.parameters)
             if (Numeric(parameter.type))
                 source += "    " + std::string(TypeName(parameter.type)) + " lx_bound_p" +
                           std::to_string(parameter.id) + ";\n";
+        for (const auto& resource : program.resources)
+        {
+            if (resource.kind == LX::LXMaterialResourceKind::Texture)
+            {
+                source += "    uint " + TextureEncodingUniformName(resource.slot) + ";\n";
+            }
+        }
         source += "};\n";
     }
     source += "\nLXMaterialParameters LXBoundMaterialParameters()\n{\n";
@@ -548,6 +596,14 @@ std::string BuildBoundSource(const LX::LXMaterialProgram& program)
         if (Numeric(parameter.type))
             source += "    parameters.lx_p" + std::to_string(parameter.id) + " = lx_bound_p" +
                       std::to_string(parameter.id) + ";\n";
+    for (const auto& resource : program.resources)
+    {
+        if (resource.kind == LX::LXMaterialResourceKind::Texture)
+        {
+            source += "    parameters.lx_texture_" + std::to_string(resource.slot) + "_encoding = " +
+                TextureEncodingUniformName(resource.slot) + ";\n";
+        }
+    }
     source += "    return parameters;\n}\n";
     return source;
 }
@@ -611,9 +667,42 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
                 return Fail(diagnostics, "product.parameter", "Reflected material parameters overlap.");
         candidate.parameters.push_back({parameter, field->byteOffset, field->byteSize});
     }
-    if (uniforms && uniforms->fields.size() != candidate.parameters.size())
+    for (const auto& resource : candidate.textures)
+    {
+        if (!uniforms)
+        {
+            return Fail(diagnostics, "product.uniform", "Generated texture encoding has no reflected constant buffer.");
+        }
+        const auto field = std::ranges::find(uniforms->fields, TextureEncodingUniformName(resource.slot),
+            &RHIShaderFieldReflection::name);
+        const RHIShaderValueType type{RHIShaderScalarKind::UInt32, 1, 1, 1};
+        if (field == uniforms->fields.end() || field->type != type || field->byteSize != 4u ||
+            field->byteOffset % 4u != 0 || static_cast<std::uint64_t>(field->byteOffset) + 4u > candidate.uniformBytes)
+        {
+            return Fail(diagnostics, "product.textureEncoding", "Invalid reflected texture encoding field.", resource.source);
+        }
+        for (const auto& other : candidate.parameters)
+        {
+            if (field->byteOffset < other.offset + other.bytes && other.offset < field->byteOffset + 4u)
+            {
+                return Fail(diagnostics, "product.textureEncoding", "Texture encoding overlaps a material parameter.");
+            }
+        }
+        for (const auto& other : candidate.textureEncodings)
+        {
+            if (field->byteOffset == other.offset)
+            {
+                return Fail(diagnostics, "product.textureEncoding", "Reflected texture encoding fields overlap.");
+            }
+        }
+        candidate.textureEncodings.push_back({resource.slot, field->byteOffset});
+    }
+    if (uniforms && uniforms->fields.size() != candidate.parameters.size() + candidate.textureEncodings.size())
+    {
         return Fail(diagnostics, "product.uniform", "Unexpected field in LX uniform buffer.");
+    }
     const auto sorted = [](const auto& a, const auto& b) { return a.slot < b.slot; };
+    std::ranges::sort(candidate.textureEncodings, sorted);
     std::ranges::sort(candidate.textures, sorted);
     std::ranges::sort(candidate.samplers, sorted);
     result = std::move(candidate);
@@ -855,6 +944,10 @@ bool PrepareUniforms(const BindingLayout& layout, std::span<const ParameterOverr
 {
     if (layout.uniformBytes > 65536)
         return Fail(diagnostics, "product.override", "Material constant buffer exceeds 64 KiB.");
+    if (!ValidateTextureEncodings(layout, diagnostics))
+    {
+        return false;
+    }
     std::vector<std::uint8_t> candidate(layout.uniformBytes);
     std::set<LX::Id> overridden;
     for (const auto& parameter : parameters)
@@ -891,6 +984,10 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
 {
     if (uniforms.size() != layout.uniformBytes || uniforms.size() > 65536)
         return Fail(diagnostics, "product.uniform", "Prepared common material uniform block has an invalid size.");
+    if (!ValidateTextureEncodings(layout, diagnostics))
+    {
+        return false;
+    }
     ResourcePacket candidate;
     candidate.uniforms.assign(uniforms.begin(), uniforms.end());
     if (textures.size() != layout.textures.size())
@@ -913,6 +1010,14 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
             (resource.colorSpace != LX::LXColorSpace::SRGB && srgb))
             return Fail(diagnostics, "product.textureEncoding",
                         "Texture storage/view encoding differs from graph intent.", resource.source);
+        const auto encoding = std::ranges::find(layout.textureEncodings, resource.slot, &TextureEncodingBinding::slot);
+        if (encoding == layout.textureEncodings.end())
+        {
+            return Fail(diagnostics, "product.textureEncoding", "Missing runtime texture encoding binding.", resource.source);
+        }
+        const auto value = static_cast<std::uint32_t>(found->texture.format == RHIFormat::BC5Unorm
+            ? TextureSampleEncoding::BC5Normal : TextureSampleEncoding::Rgba);
+        std::memcpy(candidate.uniforms.data() + encoding->offset, &value, sizeof(value));
         while (candidate.textures.size() <= resource.slot)
             candidate.textures.push_back(RHIBindingDesc::Srv2D({}, RHIFormat::RGBA8Unorm).OrNull());
         candidate.textures[resource.slot] =
@@ -1006,6 +1111,12 @@ bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, st
         Wide(bytes, binding.parameter.id);
         Word(bytes, binding.offset);
         Word(bytes, binding.bytes);
+    }
+    Word(bytes, static_cast<std::uint32_t>(product.layout.textureEncodings.size()));
+    for (const auto& binding : product.layout.textureEncodings)
+    {
+        Word(bytes, binding.slot);
+        Word(bytes, binding.offset);
     }
     auto ordered = product.targets;
     std::ranges::sort(ordered, [](const auto& a, const auto& b) {
@@ -1121,8 +1232,23 @@ bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget
         binding.parameter = *parameter;
         product.layout.parameters.push_back(std::move(binding));
     }
-    if (!reader.Word(count) || count == 0 || count > 32)
+    if (!reader.Word(count) || count > 112 || count != product.layout.textures.size())
+    {
         return invalid();
+    }
+    for (std::uint32_t index = 0; index < count; ++index)
+    {
+        TextureEncodingBinding binding;
+        if (!reader.Word(binding.slot) || !reader.Word(binding.offset))
+        {
+            return invalid();
+        }
+        product.layout.textureEncodings.push_back(binding);
+    }
+    if (!reader.Word(count) || count == 0 || count > 32)
+    {
+        return invalid();
+    }
     std::uint64_t total = 0;
     for (std::uint32_t index = 0; index < count; ++index)
     {

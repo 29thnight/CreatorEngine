@@ -5,12 +5,14 @@
 #include "../../Engine/RenderEngine/RHI/RHIShaderSource.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedMaterialProgram.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
+#include "../../Engine/RenderEngine/Experiment/Cooked/CookedTexture.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h"
 #include "../../Engine/Utility_Framework/PathFinder.h"
 #include "material_probe_gpu.h"
 #include "material_runtime_tests.h"
 
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -130,6 +132,65 @@ float Decode(float encoded)
 {
     return encoded <= .04045f ? encoded / 12.92f : std::pow((encoded + .055f) / 1.055f, 2.4f);
 }
+
+    void RepairCookChecksum(std::vector<std::uint8_t>& bytes)
+    {
+        std::uint64_t checksum = 14695981039346656037ull;
+        for (const auto byte : std::span(bytes).first(bytes.size() - 8))
+        {
+            checksum = (checksum ^ byte) * 1099511628211ull;
+        }
+        for (unsigned index = 0; index < 8; ++index)
+        {
+            bytes[bytes.size() - 8 + index] = static_cast<std::uint8_t>(checksum >> (8 * index));
+        }
+    }
+
+    std::size_t TextureEncodingTableOffset(const VerifiedProduct& product)
+    {
+        const auto& program = product.program;
+        const auto textBytes = [](const std::string& text) { return 4u + text.size(); };
+        const auto locationBytes = [&textBytes](const LXMaterialSource& source) {
+            return 28u + source.instances.size() * 8u + textBytes(source.property);
+        };
+        std::size_t offset = 12u + textBytes(program.semanticKey) + textBytes(WriteMaterialProgramMetadata(program)) +
+            textBytes(BuildBoundSource(program)) + textBytes(program.slang) + 24u + textBytes(product.selection.reason) + 4u;
+        for (const auto& parameter : program.parameters)
+        {
+            offset += 20u + textBytes(parameter.identifier) + textBytes(parameter.name);
+            if (parameter.type == PinType::Texture || parameter.type == PinType::Sampler)
+            {
+                offset += textBytes(std::get<std::string>(parameter.value));
+            }
+            else if (parameter.type == PinType::Bool)
+            {
+                offset += 4u;
+            }
+            else if (parameter.type == PinType::Color)
+            {
+                offset += 32u;
+            }
+            else if (parameter.type == PinType::Normal || parameter.type == PinType::Vector)
+            {
+                offset += 24u;
+            }
+            else
+            {
+                offset += 8u;
+            }
+        }
+        offset += 4u;
+        for (const auto& resource : program.resources)
+        {
+            offset += 20u + textBytes(resource.reference) + locationBytes(resource.source);
+        }
+        offset += 4u;
+        for (const auto& range : program.sourceMap)
+        {
+            offset += 8u + locationBytes(range.source);
+        }
+        return offset + 8u + product.layout.parameters.size() * 16u;
+    }
 
 void Run(const std::filesystem::path& root)
 {
@@ -266,8 +327,46 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     BindingLayout layout;
     Budget budget;
     Check(ResolveBindings(program, reflection, budget, layout, diagnostics), "Resolve actual product reflection");
-    Check(layout.parameters.size() == 5 && layout.textures.size() == 1 && layout.samplers.size() == 1,
-          "Reflected logical resources");
+    Check(layout.parameters.size() == 5 && layout.textures.size() == 1 && layout.samplers.size() == 1 &&
+        layout.textureEncodings.size() == 1 && layout.textureEncodings[0].slot == 0,
+        "Reflected logical resources include a private uint encoding per texture slot");
+    Check(program.slang.find("uint lx_texture_0_encoding;") != std::string::npos &&
+        program.slang.find("context.lod, parameters.lx_texture_0_encoding)") != std::string::npos &&
+        program.slang.find("parameters.lx_texture_0_encoding = 0u;") != std::string::npos,
+        "Generated sample explicitly carries runtime storage encoding with an RGBA default");
+    for (const unsigned mutation : {0u, 1u, 2u, 3u, 4u})
+    {
+        auto invalidReflection = reflection;
+        auto uniforms = std::ranges::find(invalidReflection.resources, "LXMaterialProperties",
+            &RHIShaderResourceReflection::name);
+        Check(uniforms != invalidReflection.resources.end(), "Find reflected private uniform buffer");
+        auto field = std::ranges::find(uniforms->fields, TextureEncodingUniformName(0),
+            &RHIShaderFieldReflection::name);
+        Check(field != uniforms->fields.end(), "Find reflected encoding field");
+        if (mutation == 0)
+        {
+            uniforms->fields.erase(field);
+        }
+        else if (mutation == 1)
+        {
+            field->type.scalar = RHIShaderScalarKind::Float32;
+        }
+        else if (mutation == 2)
+        {
+            field->byteOffset = layout.parameters[0].offset;
+        }
+        else if (mutation == 3)
+        {
+            field->byteOffset = uniforms->byteSize;
+        }
+        else
+        {
+            uniforms->fields.push_back(*field);
+        }
+        BindingLayout retainedLayout = layout;
+        Check(!ResolveBindings(program, invalidReflection, budget, retainedLayout, diagnostics) && retainedLayout == layout,
+            "Missing, mistyped, overlapping, overflowing or duplicate encoding fields preserve accepted layout");
+    }
     Capabilities capabilities;
     capabilities.coreForward = true;
     VerifiedProduct verified;
@@ -353,6 +452,74 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     ResourcePacket packet;
     Check(PrepareResources(layout, overrides, std::span(&texture, 1), packet, diagnostics), "Prepare resources");
     Check(packet.owners.size() == 1 && packet.owners[0]->m_assetId == owner->m_assetId, "Own texture generation");
+    const auto encodingAt = [](const ResourcePacket& resources, const BindingLayout& bindings, std::uint32_t slot) {
+        const auto binding = std::ranges::find(bindings.textureEncodings, slot, &TextureEncodingBinding::slot);
+        Check(binding != bindings.textureEncodings.end(), "Find packed texture encoding");
+        std::uint32_t encoding{};
+        std::memcpy(&encoding, resources.uniforms.data() + binding->offset, sizeof(encoding));
+        return encoding;
+    };
+    Check(encodingAt(packet, layout, 0) == static_cast<std::uint32_t>(TextureSampleEncoding::Rgba),
+        "Ordinary sampled textures retain RGBA decoding");
+    auto normalLayout = layout;
+    normalLayout.textures[0].colorSpace = LXColorSpace::Data;
+    auto normalTexture = texture;
+    normalTexture.texture.format = RHIFormat::BC5Unorm;
+    ResourcePacket normalPacket;
+    Check(PrepareResources(normalLayout, overrides, std::span(&normalTexture, 1), normalPacket, diagnostics) &&
+        encodingAt(normalPacket, normalLayout, 0) == static_cast<std::uint32_t>(TextureSampleEncoding::BC5Normal),
+        "BC5 graph textures select the two-channel normal decoder from the bound format");
+    const auto normalBytes = normalPacket.uniforms;
+    normalTexture.texture.format = RHIFormat::BC7Unorm;
+    Check(PrepareResourcesWithUniforms(normalLayout, normalBytes, std::span(&normalTexture, 1), normalPacket, diagnostics) &&
+        encodingAt(normalPacket, normalLayout, 0) == static_cast<std::uint32_t>(TextureSampleEncoding::Rgba),
+        "BC5 to BC7 rebind clears stale encoding metadata without changing instance parameters");
+    const auto ordinaryBytes = normalPacket.uniforms;
+    auto aliasLayout = normalLayout;
+    auto aliasResource = aliasLayout.textures.front();
+    aliasResource.slot = 1;
+    aliasLayout.textures.push_back(aliasResource);
+    aliasLayout.textureEncodings.push_back({1, aliasLayout.uniformBytes});
+    aliasLayout.uniformBytes += 16;
+    auto aliasSampler = aliasLayout.samplers.front();
+    aliasSampler.slot = 1;
+    aliasSampler.reference = "nearest-clamp";
+    aliasLayout.samplers.push_back(aliasSampler);
+    std::array<TextureBinding, 2> aliases{normalTexture, normalTexture};
+    aliases[0].texture.format = RHIFormat::BC5Unorm;
+    aliases[1].slot = 1;
+    ResourcePacket aliasesPacket;
+    Check(PrepareResources(aliasLayout, overrides, aliases, aliasesPacket, diagnostics) &&
+        encodingAt(aliasesPacket, aliasLayout, 0) == static_cast<std::uint32_t>(TextureSampleEncoding::BC5Normal) &&
+        encodingAt(aliasesPacket, aliasLayout, 1) == static_cast<std::uint32_t>(TextureSampleEncoding::Rgba) &&
+        aliasesPacket.owners.size() == 1 && aliasesPacket.samplers.size() == 2 &&
+        aliasesPacket.samplers[0].minMag == RHIFilterMode::Linear &&
+        aliasesPacket.samplers[1].minMag == RHIFilterMode::Point &&
+        aliasesPacket.samplers[1].addressU == RHIAddressMode::Clamp,
+        "Shared image aliases retain per-slot storage encoding and independent sampler state");
+    for (const unsigned mutation : {0u, 1u, 2u, 3u})
+    {
+        auto malformed = normalLayout;
+        if (mutation == 0)
+        {
+            malformed.textureEncodings.clear();
+        }
+        else if (mutation == 1)
+        {
+            malformed.textureEncodings[0].offset = malformed.uniformBytes;
+        }
+        else if (mutation == 2)
+        {
+            malformed.textureEncodings[0].offset = malformed.parameters[0].offset;
+        }
+        else
+        {
+            malformed.textureEncodings[0].slot = 99;
+        }
+        Check(!PrepareResourcesWithUniforms(malformed, ordinaryBytes, std::span(&normalTexture, 1), normalPacket,
+            diagnostics) && normalPacket.uniforms == ordinaryBytes,
+            "Malformed private encoding layout cannot write uniforms or replace a valid resource packet");
+    }
     MaterialProbe::TextureFixture tex;
     tex.width = tex.height = 2;
     tex.srgb8 = true;
@@ -459,6 +626,60 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
               restored.product.program.resources == verified.program.resources &&
               restored.product.selection.route == verified.selection.route,
           "Cook restores typed defaults, encoding, reflected offsets and selected route");
+    static_assert(CookedProgramVersion == 5 && LXMaterialProgram::CompilerVersion == 3);
+    auto stale = cooked;
+    stale[4] = 4; // Previous material envelope, with a repaired checksum.
+    RepairCookChecksum(stale);
+    Check(!ReadCookedProgram(stale, budget, restored, error) &&
+        restored.product.program.semanticKey == verifiedIdentity,
+        "Version-4 cached material bytecode is rejected after the private texture encoding ABI change");
+    stale = cooked;
+    stale[8] = 2; // Previous graph compiler, otherwise a version-5 envelope.
+    RepairCookChecksum(stale);
+    Check(!ReadCookedProgram(stale, budget, restored, error) &&
+        restored.product.program.semanticKey == verifiedIdentity,
+        "Version-2 generated code cannot enter a version-5 cooked material envelope");
+    const auto encodingTableOffset = TextureEncodingTableOffset(verified);
+    Check(cooked.at(encodingTableOffset) == 1 && cooked.at(encodingTableOffset + 4) == 0 &&
+        cooked.at(encodingTableOffset + 8) == verified.layout.textureEncodings[0].offset,
+        "Locate version-5 encoding table before mutating the checksummed wire contract");
+    for (const unsigned mutation : {0u, 1u, 2u})
+    {
+        auto malformedWire = cooked;
+        const auto position = encodingTableOffset + mutation * 4u;
+        const std::uint32_t value = mutation == 0 ? 113u : mutation == 1 ? 99u : verified.layout.uniformBytes;
+        for (unsigned index = 0; index < 4; ++index)
+        {
+            malformedWire.at(position + index) = static_cast<std::uint8_t>(value >> (8 * index));
+        }
+        RepairCookChecksum(malformedWire);
+        Check(!ReadCookedProgram(malformedWire, budget, restored, error) &&
+            restored.product.program.semanticKey == verifiedIdentity,
+            "Malformed wire encoding count, slot or offset cannot replace the accepted material");
+    }
+    for (const unsigned mutation : {0u, 1u, 2u, 3u})
+    {
+        auto malformed = verified;
+        if (mutation == 0)
+        {
+            malformed.layout.textureEncodings.clear();
+        }
+        else if (mutation == 1)
+        {
+            malformed.layout.textureEncodings[0].slot = 99;
+        }
+        else if (mutation == 2)
+        {
+            malformed.layout.textureEncodings[0].offset = malformed.layout.uniformBytes;
+        }
+        else
+        {
+            malformed.layout.textureEncodings[0].offset = malformed.layout.parameters[0].offset;
+        }
+        auto retainedCook = cooked;
+        Check(!WriteCookedProgram(malformed, budget, retainedCook, error) && retainedCook == cooked,
+            "Malformed internal encoding bindings cannot replace the accepted cooked artifact");
+    }
     auto damaged = cooked;
     damaged[damaged.size() / 2] ^= 1;
     Check(!ReadCookedProgram(damaged, budget, restored, error) &&
@@ -647,9 +868,11 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     textureEntry.assetId = textureId;
     textureEntry.kind = ck::CookedAssetKind::Texture;
     textureEntry.formatVersion = ck::kTextureArtifactVersion;
-    textureEntry.byteSize = 1;
-    textureEntry.artifactPath = ck::MakeDerivedTextureArtifactPath(textureId, ".png");
-    const std::array<std::byte, 1> textureBytes{std::byte{1}};
+    const auto textureImage = TextureImage::Allocate(RHIFormat::RGBA8Unorm, 1u, 1u, 1u, 1u);
+    std::vector<std::byte> textureBytes;
+    Check(ck::EncodeCookedTexture(textureImage.View(), textureBytes, error, { true }), "Encode valid CECT texture fixture");
+    textureEntry.byteSize = textureBytes.size();
+    textureEntry.artifactPath = ck::MakeDerivedTextureArtifactPath(textureId, ".cetex");
     Check(ck::ComputeSha256(textureBytes, textureEntry.contentSha256, error), "Hash texture manifest fixture");
     manifest.entries.push_back(textureEntry);
     manifest.sourceAssets = {{graphId, "Materials/fixture.shadergraph"}, {textureId, "Textures/fixture.png"}};

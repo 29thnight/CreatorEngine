@@ -224,7 +224,8 @@ namespace
                     }
                     const auto format = owner->GetImageDescription().Format();
                     const bool srgb = format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
-                        || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+                        || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb
+                        || format == RHIFormat::BC7UnormSrgb;
                     reference->colorSpace = srgb ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
                 }
             };

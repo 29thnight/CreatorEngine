@@ -196,6 +196,9 @@ namespace assets
         std::uint32_t mipLevels{};
         std::uint32_t arraySize{};
         bool isCube{};
+        bool cookedPayload{};
+        bool cookedHasAlpha{};
+        bool cookedColorSpaceLocked{};
         std::vector<ModelTextureSubresource> subresources{};
         std::vector<std::byte> pixels{};
     };
@@ -326,6 +329,9 @@ namespace assets
         std::filesystem::path decodedTextureCacheRoot{};
         Uuid::Uuid16 expectedModelId{};
         std::uint64_t expectedGeneration{};
+        // Offline export may validate old authoring generations before cooking.
+        // Player leaves this false and accepts GPU-ready texture records only.
+        bool allowSourceTextureProcessing{};
     };
 
     enum class ModelAssetGenerationIssueCode : std::uint8_t

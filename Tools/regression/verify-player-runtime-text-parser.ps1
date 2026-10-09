@@ -140,10 +140,20 @@ try {
     foreach ($document in $allCedoDocuments) {
         $stream = [IO.File]::OpenRead($document.FullName)
         try {
-            $magic = [byte[]]::new(4)
-            if ($stream.Read($magic, 0, 4) -ne 4 -or
-                [Text.Encoding]::ASCII.GetString($magic) -ne 'CEDO') {
-                throw "D6 runtime artifact is not CEDO: $($document.FullName)"
+            if ($document.Extension -eq '.terrain') {
+                $header = [byte[]]::new(48)
+                if ($stream.Read($header, 0, 48) -ne 48 -or
+                    [BitConverter]::ToUInt32($header, 0) -ne 0x5442524e -or
+                    [BitConverter]::ToUInt32($header, 4) -ne 2 -or
+                    [BitConverter]::ToUInt64($header, 8) -ne $stream.Length) {
+                    throw "Runtime terrain artifact is not complete TRBN2: $($document.FullName)"
+                }
+            } else {
+                $magic = [byte[]]::new(4)
+                if ($stream.Read($magic, 0, 4) -ne 4 -or
+                    [Text.Encoding]::ASCII.GetString($magic) -ne 'CEDO') {
+                    throw "D6 runtime artifact is not CEDO: $($document.FullName)"
+                }
             }
         } finally {
             $stream.Dispose()

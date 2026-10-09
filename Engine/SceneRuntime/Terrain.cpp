@@ -3,173 +3,15 @@
 #include "Terrain.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
+#include "Experiment/Cooked/CookedTerrain.h"
 #include "AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
-#include <DirectXTex.h>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
 #include <cstring>
 #include <limits>
-
-namespace
-{
-	bool load_terrain_image(const std::filesystem::path& path, DirectX::ScratchImage& image)
-	{
-		// Treat PNG channels as stored bytes: neither sRGB metadata nor alpha
-		// opacity is permission to transform Terrain height or mask data.
-		const auto flags = static_cast<DirectX::WIC_FLAGS>(
-			DirectX::WIC_FLAGS_IGNORE_SRGB | DirectX::WIC_FLAGS_FORCE_RGB);
-		std::string extension = path.extension().string();
-		for (char& character : extension)
-		{
-			character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-		}
-		HRESULT loaded{};
-		if (extension == ".hdr")
-		{
-			loaded = DirectX::LoadFromHDRFile(path.c_str(), nullptr, image);
-		}
-		else if (extension == ".tga")
-		{
-			loaded = DirectX::LoadFromTGAFile(path.c_str(),
-				static_cast<DirectX::TGA_FLAGS>(DirectX::TGA_FLAGS_IGNORE_SRGB |
-					DirectX::TGA_FLAGS_ALLOW_ALL_ZERO_ALPHA), nullptr, image);
-		}
-		else
-		{
-			loaded = DirectX::LoadFromWICFile(path.c_str(), flags, nullptr, image);
-		}
-		if (FAILED(loaded))
-		{
-			return false;
-		}
-		const auto& metadata = image.GetMetadata();
-		return metadata.dimension == DirectX::TEX_DIMENSION_TEXTURE2D &&
-			metadata.arraySize == 1 && metadata.mipLevels == 1 &&
-			metadata.width > 0 && metadata.height > 0 &&
-			metadata.width <= static_cast<size_t>((std::numeric_limits<int>::max)()) &&
-			metadata.height <= static_cast<size_t>((std::numeric_limits<int>::max)());
-	}
-
-	const DirectX::Image* terrain_rgba8(const DirectX::ScratchImage& source,
-		DirectX::ScratchImage& converted)
-	{
-		const auto* image = source.GetImage(0, 0, 0);
-		if (!image || !image->pixels)
-		{
-			return nullptr;
-		}
-		if (image->format == DXGI_FORMAT_R8G8B8A8_UNORM)
-		{
-			return image;
-		}
-		if (FAILED(DirectX::Convert(*image, DXGI_FORMAT_R8G8B8A8_UNORM,
-			DirectX::TEX_FILTER_FORCE_NON_WIC, DirectX::TEX_THRESHOLD_DEFAULT, converted)))
-		{
-			return nullptr;
-		}
-		return converted.GetImage(0, 0, 0);
-	}
-
-	bool terrain_gray8(const DirectX::ScratchImage& source, std::vector<uint8_t>& gray)
-	{
-		const auto* image = source.GetImage(0, 0, 0);
-		if (!image || !image->pixels)
-		{
-			return false;
-		}
-		gray.resize(image->width * image->height);
-		// Authored splats are gray8. Preserve their byte values and respect pitch.
-		if (image->format == DXGI_FORMAT_R8_UNORM)
-		{
-			for (size_t row = 0; row < image->height; ++row)
-			{
-				std::memcpy(gray.data() + row * image->width,
-					image->pixels + row * image->rowPitch, image->width);
-			}
-			return true;
-		}
-		// The former mask decoder reduced 16-bit samples only after integer
-		// luminance conversion, then discarded the low byte (no rounding).
-		if (image->format == DXGI_FORMAT_R16_UNORM ||
-			image->format == DXGI_FORMAT_R16G16B16A16_UNORM)
-		{
-			for (size_t row = 0; row < image->height; ++row)
-			{
-				const auto* pixels = reinterpret_cast<const uint16_t*>(
-					image->pixels + row * image->rowPitch);
-				for (size_t column = 0; column < image->width; ++column)
-				{
-					const uint32_t value = image->format == DXGI_FORMAT_R16_UNORM
-						? pixels[column]
-						: (77u * pixels[column * 4] + 150u * pixels[column * 4 + 1] +
-							29u * pixels[column * 4 + 2]) >> 8;
-					gray[row * image->width + column] = static_cast<uint8_t>(value >> 8);
-				}
-			}
-			return true;
-		}
-		if (image->format == DXGI_FORMAT_R32G32B32A32_FLOAT)
-		{
-			// Keep the HDR mask policy (average RGB, then gamma 1/2.2).
-			// DirectXTex RGBE samples differ from the historical decoder;
-			// cross-decoder HDR/JPEG parity remains unverified.
-			for (size_t row = 0; row < image->height; ++row)
-			{
-				const auto* pixels = reinterpret_cast<const float*>(
-					image->pixels + row * image->rowPitch);
-				for (size_t column = 0; column < image->width; ++column)
-				{
-					const auto* pixel = pixels + column * 4;
-					const float average = (pixel[0] + pixel[1] + pixel[2]) / 3.0f;
-					if (!std::isfinite(average))
-					{
-						return false;
-					}
-					const float value = std::pow((std::max)(average, 0.0f), 1.0f / 2.2f) *
-						255.0f + 0.5f;
-					gray[row * image->width + column] = static_cast<uint8_t>(
-						std::clamp(value, 0.0f, 255.0f));
-				}
-			}
-			return true;
-		}
-		DirectX::ScratchImage converted;
-		image = terrain_rgba8(source, converted);
-		if (!image || !image->pixels)
-		{
-			return false;
-		}
-		for (size_t row = 0; row < image->height; ++row)
-		{
-			const auto* pixels = image->pixels + row * image->rowPitch;
-			for (size_t column = 0; column < image->width; ++column)
-			{
-				const auto* pixel = pixels + column * 4;
-				// Keep the previous integer grayscale rule; WIC/DirectXTex's
-				// color-to-luminance conversion has a different weighting.
-				gray[row * image->width + column] = static_cast<uint8_t>(
-					(77u * pixel[0] + 150u * pixel[1] + 29u * pixel[2]) >> 8);
-			}
-		}
-		return true;
-	}
-}
-
-#pragma pack(push, 1) // 1 byte alignment for DirectX structures
-struct TerrainBinHeader {
-	uint32_t magic; // 'TRBN'
-	uint32_t version; // 1
-	uint32_t terrainID; // Unique ID for the terrain
-	uint32_t width; // Width of the terrain
-	uint32_t height; // Height of the terrain
-	float minHeight; // Minimum height value
-	float maxHeight; // Maximum height value
-	uint32_t layers; // Number of layers in the terrain
-};
-#pragma pack(pop) // Restore previous alignment
 
 static std::string Utf8Encode(const std::wstring& wstr)
 {
@@ -591,6 +433,19 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		return false;
 	}
 
+    std::ifstream kindStream(descriptorPath, std::ios::binary);
+    std::array<unsigned char, 4> magic{};
+    kindStream.read(reinterpret_cast<char*>(magic.data()), magic.size());
+    if (kindStream && magic == std::array<unsigned char, 4>{ 0x4eu, 0x52u, 0x42u, 0x54u })
+    {
+        return LoadRunTimeTerrain(filePath);
+    }
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        Debug::PrintLog(spdlog::level::err, "Terrain requires its neutral v2 package artifact; recook: " + descriptorPath.string());
+        return false;
+    }
+
 	std::string parseError;
 	const Authoring::ParsedDocument document =
 		Authoring::ParsedDocument::ParseFile(descriptorPath.string(), parseError);
@@ -791,62 +646,34 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 
 bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out)
 {
-	DirectX::ScratchImage source;
-	if (!load_terrain_image(pngPath, source))
-	{
-		return false;
-	}
-	DirectX::ScratchImage converted;
-	const auto* image = terrain_rgba8(source, converted);
-	if (!image || !image->pixels || static_cast<float>(image->width) != dataWidth ||
-		static_cast<float>(image->height) != dataHeight)
-	{
-		return false;
-	}
-
-	out.resize(image->width * image->height);
-	for (size_t row = 0; row < image->height; ++row)
-	{
-		const auto* pixels = image->pixels + row * image->rowPitch;
-		for (size_t column = 0; column < image->width; ++column)
-		{
-			const auto* pixel = pixels + column * 4;
-			const uint32_t bits = (static_cast<uint32_t>(pixel[0]) << 24) |
-				(static_cast<uint32_t>(pixel[1]) << 16) |
-				(static_cast<uint32_t>(pixel[2]) << 8) | pixel[3];
-			// Height PNG alpha is the low byte of the float, never opacity.
-			static_assert(sizeof(float) == sizeof(bits));
-			std::memcpy(&out[row * image->width + column], &bits, sizeof(bits));
-		}
-	}
-	return true;
+    TerrainSourceImage image;
+    if (!AssetAuthoringPort::ReadTerrainSourceImage(pngPath, TerrainSourceImageKind::HeightBits, image)
+        || static_cast<float>(image.width) != dataWidth || static_cast<float>(image.height) != dataHeight)
+    {
+        return false;
+    }
+    out = std::move(image.heights);
+    return true;
 }
 
 bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out)
 {
-	if (dataWidth <= 0 || dataHeight <= 0 || layerIndex < 0 ||
-		static_cast<size_t>(layerIndex) >= out.size())
-	{
-		return false;
-	}
-	DirectX::ScratchImage source;
-	if (!load_terrain_image(pngPath, source) ||
-		source.GetMetadata().width != static_cast<size_t>(dataWidth) ||
-		source.GetMetadata().height != static_cast<size_t>(dataHeight))
-	{
-		return false;
-	}
-	std::vector<uint8_t> bytes;
-	if (!terrain_gray8(source, bytes))
-	{
-		return false;
-	}
-	out[layerIndex].resize(bytes.size());
-	for (size_t index = 0; index < bytes.size(); ++index)
-	{
-		out[layerIndex][index] = bytes[index] / 255.0f;
-	}
-	return true;
+    if (dataWidth <= 0 || dataHeight <= 0 || layerIndex < 0 || static_cast<size_t>(layerIndex) >= out.size())
+    {
+        return false;
+    }
+    TerrainSourceImage image;
+    if (!AssetAuthoringPort::ReadTerrainSourceImage(pngPath, TerrainSourceImageKind::Gray8, image)
+        || image.width != static_cast<uint32_t>(dataWidth) || image.height != static_cast<uint32_t>(dataHeight))
+    {
+        return false;
+    }
+    out[layerIndex].resize(image.gray.size());
+    for (size_t index = 0; index < image.gray.size(); ++index)
+    {
+        out[layerIndex][index] = image.gray[index] / 255.0f;
+    }
+    return true;
 }
 
 void TerrainComponent::UpdateLayerDesc()
@@ -1039,6 +866,10 @@ void TerrainComponent::ClearLayers()
 
 void TerrainComponent::RefreshTexture()
 {
+    if (!PathFinder::IsAssetAuthoringEnabled())
+    {
+        return;
+    }
 	for (auto& layer : m_layers) {
 		layer.diffuseTexture = Texture::LoadFormPath(layer.diffuseTexturePath);
 	}
@@ -1048,19 +879,15 @@ void TerrainComponent::RefreshTexture()
 /// 브러쉬 마스크 텍스쳐 로드
 bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight)
 {
-	// PNG/TGA and WIC-supported mask formats retain the byte-to-gray policy.
-	// PSD/PIC/PNM need an installed WIC codec; no private decoder is added.
-	DirectX::ScratchImage source;
-	std::vector<uint8_t> bytes;
-	if (!load_terrain_image(std::filesystem::path(path), source) ||
-		!terrain_gray8(source, bytes))
-	{
-		return false;
-	}
-	outMask = std::move(bytes);
-	dataWidth = static_cast<int>(source.GetMetadata().width);
-	dataHeight = static_cast<int>(source.GetMetadata().height);
-	return true;
+    TerrainSourceImage image;
+    if (!AssetAuthoringPort::ReadTerrainSourceImage(file::path(path), TerrainSourceImageKind::Gray8, image))
+    {
+        return false;
+    }
+    outMask = std::move(image.gray);
+    dataWidth = static_cast<int>(image.width);
+    dataHeight = static_cast<int>(image.height);
+    return true;
 }
 
 void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path)
@@ -1096,92 +923,116 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 
 bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
 {
-	//debug용
-	Debug::PrintLog(spdlog::level::debug, "Loading runtime terrain from: " + Utf8Encode(filePath));
-	namespace fs = std::filesystem;
-	fs::path terrainPath = filePath;
-	if (!fs::exists(terrainPath)) {
-		Debug::PrintLog(spdlog::level::err, "Terrain file does not exist: " + Utf8Encode(terrainPath.wstring()));
-		return false;
-	}
-	std::ifstream ifs(terrainPath, std::ios::binary);
-	if (!ifs) {
-		Debug::PrintLog(spdlog::level::err, "Failed to open terrain file for reading: " + Utf8Encode(terrainPath.wstring()));
-		return false;
-	}
-
-	//파일 헤더 읽기
-	TerrainBinHeader header;
-	ifs.read(reinterpret_cast<char*>(&header), sizeof(header));
-	if (header.magic != 0x5442524E || header.version != 1) {
-		Debug::PrintLog(spdlog::level::err, "Invalid terrain file format: " + Utf8Encode(terrainPath.wstring()));
-		return false;
-	}
-	m_terrainID = header.terrainID;
-	m_width = header.width;
-	m_height = header.height;
-	m_minHeight = header.minHeight;
-	m_maxHeight = header.maxHeight;
-	size_t N = size_t(m_width) * size_t(m_height);
-
-	//높이맵
-	m_heightMap.assign(N, 0.0f);
-	ifs.read(reinterpret_cast<char*>(m_heightMap.data()), sizeof(float) * N);
-
-	//스플렛맵
-	std::vector<uint8_t> splatMapData(N * 4); // RGBA 4채널
-	ifs.read(reinterpret_cast<char*>(splatMapData.data()), splatMapData.size());
-	m_layerHeightMap.assign(header.layers, std::vector<float>(N));
-	for (size_t i = 0; i < N; ++i) {
-		for (int c = 0; c < header.layers; ++c) {
-			m_layerHeightMap[c][i] = splatMapData[i * 4 + c] / 255.0f; // RGBA 채널에서 가중치 추출
-		}
-	}
-
-	//path offset
-	std::vector<uint32_t> textureOffsets(header.layers);
-	ifs.read(reinterpret_cast<char*>(textureOffsets.data()), sizeof(uint32_t) * header.layers);
-
-	//텍스쳐 이름 읽기
-	std::streampos cur = ifs.tellg();
-	ifs.seekg(0, std::ios::end);
-	size_t remain = static_cast<size_t>(ifs.tellg() - cur);
-	ifs.seekg(cur);
-
-	std::vector<char> namesBuf(remain);
-	ifs.read(namesBuf.data(), remain);
-
-	std::vector<std::string> textureNames(header.layers);
-
-	m_layers.clear();
-	for (uint32_t i = 0; i < header.layers; ++i) {
-		uint32_t offset = textureOffsets[i];
-		const char* namePtr = namesBuf.data() + offset;
-		textureNames[i] = std::string(namePtr); // null terminator로 자동 종료됨
-	}
-
-	// ★ 여기 있던 DX11 레이어 텍스처 배열 조립을 걷었다(PHASE 11 착수,
-	//   2026-08-08). 512×512 배열을 만들고 CopySubresourceRegion으로 슬라이스를
-	//   채운 뒤 m_pMaterial->m_layerSRV에 꽂던 자리인데, 그 SRV를 읽는 코드가
-	//   0이었다 — DX12에 지형 렌더 경로가 없다.
-	//
-	//   대신 레이어를 CPU 자료로 세운다. 배열을 굽는 것은 새 지형 패스의 몫이고
-	//   그때 필요한 입력이 바로 이 목록이다. 예전에는 m_layers를 비우기만 하고
-	//   채우지 않아, 로드 직후 레이어 정보가 어디에도 남지 않았다.
-	for (uint32_t i = 0; i < header.layers; ++i)
-	{
-		TerrainLayer layer;
-		layer.m_layerID = m_nextLayerID++;
-		layer.layerName = textureNames[i];
-		layer.diffuseTexturePath = std::wstring(textureNames[i].begin(), textureNames[i].end());
-		layer.diffuseTexture = DataSystems->LoadTexture(textureNames[i]);
-		layer.tilling = 1.0f;
-		m_layers.push_back(layer);
-	}
-
-	m_layerHeightMap.resize(m_layers.size(),
-		std::vector<float>(static_cast<size_t>(m_width) * m_height, 0.0f));
-	m_pMaterial->MateialDataUpdate(m_width, m_height, m_layers, m_layerHeightMap);
+    namespace ck = experiment::cooked;
+    static_assert(sizeof(Vertex) == ck::kCookedTerrainVertexBytes, "Update terrain working-set admission when the vertex layout changes");
+    try
+    {
+        std::ifstream input(file::path(filePath), std::ios::binary | std::ios::ate);
+        const auto size = input.tellg();
+        if (!input || size <= 0 || static_cast<std::uint64_t>(size) > ck::kCookedTerrainMaxBytes)
+        {
+            return false;
+        }
+        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        input.seekg(0);
+        input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        ck::CookedTerrainView terrain;
+        std::string failure;
+        if (!input || input.peek() != std::char_traits<char>::eof() || !ck::ReadCookedTerrain(bytes, terrain, failure))
+        {
+            Debug::PrintLog(spdlog::level::err, "Terrain artifact rejected: " + failure);
+            return false;
+        }
+        // All offsets, dimensions, scalar values and trailing bytes are checked
+        // before image/vector allocation. No source callback participates here.
+        const auto pixels = static_cast<std::size_t>(terrain.width) * terrain.height;
+        std::vector<float> heights(pixels);
+        for (std::size_t index = 0u; index < pixels; ++index)
+        {
+            heights[index] = ck::CookedTerrainHeight(terrain.heights, index);
+        }
+        std::vector<std::vector<float>> weights(terrain.layerCount);
+        std::vector<TerrainLayer> layers;
+        layers.reserve(terrain.layerCount);
+        std::uint32_t nextLayerId{};
+        for (std::size_t index = 0u; index < terrain.layerCount; ++index)
+        {
+            const auto& source = terrain.layers[index];
+            TerrainLayer layer;
+            layer.m_layerID = source.id;
+            layer.layerName = std::string(source.name);
+            layer.diffuseTexturePath = file::u8path(source.diffuseReference).wstring();
+            layer.tilling = source.tiling;
+            layer.diffuseTexture = Texture::LoadSharedFromMemory(source.texture);
+            if (!layer.diffuseTexture)
+            {
+                Debug::PrintLog(spdlog::level::err, "Terrain contains an invalid cooked diffuse texture: " + layer.layerName);
+                return false;
+            }
+            weights[index].resize(pixels);
+            for (std::size_t pixel = 0u; pixel < pixels; ++pixel)
+            {
+                weights[index][pixel] = static_cast<std::uint8_t>(source.gray[pixel]) / 255.0f;
+            }
+            nextLayerId = (std::max)(nextLayerId, source.id + 1u);
+            layers.push_back(std::move(layer));
+        }
+        // Build replacement render inputs before publishing any live state.
+        const auto width = static_cast<int>(terrain.width);
+        const auto height = static_cast<int>(terrain.height);
+        std::vector<math::vector3> normals(pixels);
+        std::vector<Vertex> vertices;
+        vertices.reserve(pixels);
+        std::vector<std::uint32_t> indices;
+        indices.reserve(static_cast<std::size_t>(width - 1) * (height - 1) * 6u);
+        for (int row = 0; row < height; ++row)
+        {
+            for (int column = 0; column < width; ++column)
+            {
+                const auto index = static_cast<std::size_t>(row) * width + column;
+                const double left = heights[column > 0 ? index - 1u : index];
+                const double right = heights[column + 1 < width ? index + 1u : index];
+                const double down = heights[row > 0 ? index - width : index];
+                const double up = heights[row + 1 < height ? index + width : index];
+                const double x = left - right;
+                const double z = down - up;
+                const double length = std::sqrt(x * x + 4.0 + z * z);
+                normals[index] = { float(x / length), float(2.0 / length), float(z / length) };
+                vertices.emplace_back(math::vector3{ float(column), heights[index], float(row) },
+                    normals[index], math::vector2{ float(column) / width, float(row) / height });
+                if (column + 1 < width && row + 1 < height)
+                {
+                    const auto top = static_cast<std::uint32_t>(index);
+                    const auto bottom = top + terrain.width;
+                    indices.insert(indices.end(), { top, bottom, top + 1u, bottom, bottom + 1u, top + 1u });
+                }
+            }
+        }
+        auto mesh = std::make_shared<TerrainMesh>(m_name.ToString(), vertices, indices, terrain.width);
+        auto material = std::make_shared<TerrainMaterial>();
+        material->MateialDataUpdate(width, height, layers, weights);
+        std::wstring targetPath = filePath;
+        m_width = width;
+        m_height = height;
+        m_terrainID = terrain.terrainId;
+        m_minHeight = terrain.minHeight;
+        m_maxHeight = terrain.maxHeight;
+        m_heightMap = std::move(heights);
+        m_vNormalMap = std::move(normals);
+        m_layerHeightMap = std::move(weights);
+        m_layers = std::move(layers);
+        m_nextLayerID = nextLayerId;
+        m_pTerrainMesh = std::move(mesh);
+        m_pMaterial = std::move(material);
+        m_terrainTargetPath = std::move(targetPath);
+        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+        return true;
+    }
+    catch (const std::exception& error)
+    {
+        Debug::PrintLog(spdlog::level::err, "Terrain artifact load failed: " + std::string(error.what()));
+        return false;
+    }
 }
 
 

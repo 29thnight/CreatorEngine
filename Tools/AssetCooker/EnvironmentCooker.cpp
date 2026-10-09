@@ -1,3 +1,4 @@
+#include "../../Editor/EngineEntry/TextureSourceProcessing.h"
 #include "Assets/CookedEnvironment.h"
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -28,6 +29,12 @@ double EnvironmentElapsed(std::chrono::steady_clock::time_point start)
 }
 int wmain(int argc,wchar_t** argv)
 {
+    Authoring::InstallTextureSourceProcessing();
+    struct TextureSourceScope
+    {
+        ~TextureSourceScope() { Authoring::UninstallTextureSourceProcessing(); }
+    } textureSourceScope;
+
     if (argc<4 || argc>5) { std::cerr<<"EnvironmentCooker <repo> <source-HDR/EXR> <output.ceibl> [decoded-RGBA32F|--check-cache|--check-shaders]\n"; return 2; }
     const HRESULT com=CoInitializeEx(nullptr,COINIT_MULTITHREADED);
     try

@@ -10,6 +10,8 @@
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/ModelLoader.h"
 #include "../Texture.h"
+#include "../Experiment/Cooked/CookedTexture.h"
+#include "PathFinder.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 #include "../Interfaces/AssetAuthoringPort.h"
 
@@ -289,27 +291,57 @@ namespace assets
 
         [[nodiscard]] bool CopyTexturePixels(const std::vector<std::byte>& encoded,
             ModelTextureColorSpace colorSpace, ModelTextureAsset& out,
-            std::string& failure)
+            std::string& failure, bool cooked, bool allowSource)
         {
-            // ★ 디코드는 Texture 가 한다(축 A). 여기 있던 DirectXTex 호출
-            //   — LoadSharedFromMemory 로 한 번 텍스처를 세운 뒤 Convert ·
-            //   Decompress · IsSRGB 를 직접 부르던 것 — 은 전부
-            //   Texture::DecodeToRgba8 로 옮겼다. "색공간은 라벨로만 정한다"
-            //   는 규약과 그것이 생긴 사연(43% 탈색)도 그 함수의 주석에 함께
-            //   있다. cook 경로가 필요한 것은 "바이트 -> 중립 RGBA8" 하나였고,
-            //   그것 때문에 디코더를 아는 파일이 둘이었다.
             TextureImage decoded;
-            if (!Texture::DecodeToRgba8(encoded, decoded, failure)) return false;
-            auto owner = Texture::CreateSharedFromImage("Model.embedded", std::move(decoded));
-            owner = Texture::WithColorSpace(owner, colorSpace == ModelTextureColorSpace::Srgb);
-            owner = Texture::WithMipChain(owner, failure);
-            if (!owner) return false;
-            const auto imagePayload = owner->NonRehydratableImage();
-            const auto image = owner->GetImageView(imagePayload);
-
+            own::shared_owner<const Texture> owner;
+            own::shared_owner<const Texture::CodecImage> imagePayload;
+            TextureImageView image;
+            if (cooked)
+            {
+                ck::CookedTextureInfo info;
+                if (!ck::DecodeCookedTexture(encoded, decoded, failure, &info))
+                {
+                    return false;
+                }
+                owner = Texture::CreateSharedFromCookedImage("Model.cooked", std::move(decoded), info);
+                out.cookedPayload = true;
+                out.cookedHasAlpha = info.hasAlpha;
+                out.cookedColorSpaceLocked = info.colorSpaceLocked;
+                owner = Texture::WithColorSpace(owner, colorSpace == ModelTextureColorSpace::Srgb);
+                if (!owner)
+                {
+                    failure = "Model texture role conflicts with its cooked color-space recipe.";
+                    return false;
+                }
+                // Preserve the complete offline payload, including intentional
+                // single/partial mip chains, BC blocks and HDR precision.
+                imagePayload = owner->NonRehydratableImage();
+                image = owner->GetImageView(imagePayload);
+            }
+            else
+            {
+                if (!allowSource)
+                {
+                    failure = "Packaged model texture is not GPU-ready; recook its generation.";
+                    return false;
+                }
+                if (!Texture::DecodeToRgba8(encoded, decoded, failure))
+                {
+                    return false;
+                }
+                owner = Texture::CreateSharedFromImage("Model.embedded", std::move(decoded));
+                owner = Texture::WithColorSpace(owner, colorSpace == ModelTextureColorSpace::Srgb);
+                owner = Texture::WithMipChain(owner, failure);
+                if (!owner)
+                {
+                    return false;
+                }
+                imagePayload = owner->NonRehydratableImage();
+                image = owner->GetImageView(imagePayload);
+            }
             out.colorSpace = colorSpace;
-            out.format = colorSpace == ModelTextureColorSpace::Srgb
-                ? RHIFormat::RGBA8UnormSrgb : RHIFormat::RGBA8Unorm;
+            out.format = image.Format();
             out.width = image.Width();
             out.height = image.Height();
             out.mipLevels = image.MipLevels();
@@ -1148,8 +1180,10 @@ namespace assets
             const auto color = textureColorSpaces.find(texture.textureId);
             const ModelTextureColorSpace colorSpace = color != textureColorSpaces.end()
                 ? color->second : ModelTextureColorSpace::Linear;
+            const bool cookedTexture = std::filesystem::path(generationRecord->artifactPath).extension() == ".cetex";
             std::filesystem::path decodedCache;
-            if (!request.decodedTextureCacheRoot.empty())
+            if (!cookedTexture && PathFinder::IsAssetAuthoringEnabled()
+                && !request.decodedTextureCacheRoot.empty())
             {
                 const auto digest = generationRecord->artifactFingerprint.substr(
                     generationRecord->artifactFingerprint.find(':') + 1);
@@ -1162,7 +1196,8 @@ namespace assets
             const bool cached = !decodedCache.empty() && ReadDecodedTextureCache(decodedCache, colorSpace, texture);
             textureStep.reset();
             if (!cached) textureStep.emplace(ce::marker<"ModelGen.TextureDecode">());
-            if (!cached && !CopyTexturePixels(encoded, colorSpace, texture, failure))
+            if (!cached && !CopyTexturePixels(encoded, colorSpace, texture, failure, cookedTexture,
+                request.allowSourceTextureProcessing || PathFinder::IsAssetAuthoringEnabled()))
             {
                 AddIssue(result, ModelAssetGenerationIssueCode::TextureDecodeFailed,
                     "textures." + textureRecord->stableKey, failure);

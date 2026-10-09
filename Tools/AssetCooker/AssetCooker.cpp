@@ -1,3 +1,6 @@
+#include "../../Editor/EngineEntry/TextureSourceProcessing.h"
+#include "Experiment/Cooked/CookedTerrain.h"
+#include "Experiment/Cooked/CookedTexture.h"
 #include "AssetSetBuild.h"
 #include "AssetDepot/AssetSetActivation.h"
 #include "AssetDepot/RuntimeBootstrap.h"
@@ -33,6 +36,7 @@
 #include <chrono>
 #include <array>
 #include <cstddef>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -69,12 +73,16 @@ namespace
             ValidateAssetSets,
             CopyAssetSet,
             BuildRuntimeBootstrap,
+            CookBuiltinTextures,
         };
 
         Mode mode{ Mode::Cook };
         std::filesystem::path assetRoot{};
         std::filesystem::path outputRoot{};
         std::filesystem::path runtimeRoot{};
+        std::filesystem::path terrainSourceRoot{};
+        std::filesystem::path textureIdentityRoot{};
+        std::filesystem::path blueNoiseSource{};
         std::filesystem::path assetSetDefinition{};
         std::filesystem::path artifactCache{};
         std::string toolFingerprint{};
@@ -108,9 +116,11 @@ namespace
             << "       AssetCooker --issue-model-identity-epoch "
                "--asset-root <Assets> --identity-epoch <name>\n"
             << "       AssetCooker --compile-runtime-documents "
-               "--runtime-root <package-input-root>\n"
+               "--runtime-root <package-input-root> [--terrain-source-root <Assets/Terrain>]\n"
+            << "       AssetCooker --cook-builtin-textures --blue-noise-source <blueNoise.dds> "
+               "--output <Resources/VolumetricFog/blueNoise.cetex>\n"
             << "       AssetCooker --build-runtime-bootstrap --asset-root <document Assets> --output <new output> "
-               "--runtime-root <activated AssetSets Assets> --scene <source> ...\n"
+               "--runtime-root <activated AssetSets Assets> [--texture-identity-root <original Assets>] --scene <source> ...\n"
             << "       AssetCooker --copy-asset-set --asset-root <immutable output> --output <new staging directory>\n"
             << "       AssetCooker --validate-asset-set-activation --asset-root <runtime Assets>\n"
             << "       AssetCooker --build-asset-set --asset-root <Assets> --asset-set <source.yml> "
@@ -181,6 +191,16 @@ namespace
                     return false;
                 }
                 out.mode = Arguments::Mode::BuildRuntimeBootstrap;
+                continue;
+            }
+            if (option == L"--cook-builtin-textures")
+            {
+                if (out.mode != Arguments::Mode::Cook)
+                {
+                    failure = "AssetCooker accepts exactly one mode.";
+                    return false;
+                }
+                out.mode = Arguments::Mode::CookBuiltinTextures;
                 continue;
             }
             if (option == L"--copy-asset-set")
@@ -304,6 +324,33 @@ namespace
                 }
                 out.runtimeRoot = value;
             }
+            else if (option == L"--texture-identity-root")
+            {
+                if (!out.textureIdentityRoot.empty())
+                {
+                    failure = "--texture-identity-root must be specified once.";
+                    return false;
+                }
+                out.textureIdentityRoot = value;
+            }
+            else if (option == L"--terrain-source-root")
+            {
+                if (!out.terrainSourceRoot.empty())
+                {
+                    failure = "--terrain-source-root must be specified once.";
+                    return false;
+                }
+                out.terrainSourceRoot = value;
+            }
+            else if (option == L"--blue-noise-source")
+            {
+                if (!out.blueNoiseSource.empty())
+                {
+                    failure = "--blue-noise-source may appear once.";
+                    return false;
+                }
+                out.blueNoiseSource = value;
+            }
             else if (option == L"--generation-root")
             {
                 if (!out.generationRoot.empty())
@@ -407,6 +454,32 @@ namespace
             }
         }
 
+        if (!out.textureIdentityRoot.empty() && out.mode != Arguments::Mode::BuildRuntimeBootstrap)
+        {
+            failure = "--texture-identity-root is an offline bootstrap metadata lookup option only.";
+            return false;
+        }
+        if (!out.blueNoiseSource.empty() && out.mode != Arguments::Mode::CookBuiltinTextures)
+        {
+            failure = "--blue-noise-source requires --cook-builtin-textures.";
+            return false;
+        }
+        if (out.mode == Arguments::Mode::CookBuiltinTextures)
+        {
+            if (out.blueNoiseSource.empty() || out.outputRoot.empty() || !out.assetRoot.empty()
+                || !out.runtimeRoot.empty() || !out.terrainSourceRoot.empty() || !out.textureIdentityRoot.empty()
+                || !out.assetSetDefinition.empty() || !out.artifactCache.empty() || !out.toolFingerprint.empty()
+                || !out.generationRoot.empty() || !out.models.empty() || !out.textures.empty()
+                || !out.shaderMetas.empty() || !out.shaderGraphs.empty() || !out.materials.empty()
+                || !out.scenes.empty() || !out.materialProgramRoot.empty() || !out.materialShaderRoot.empty()
+                || !out.identityEpoch.empty() || out.buildMeshlets.has_value() || out.lodLevels.has_value()
+                || out.modelAuthoringFailurePoint != assets::ModelAuthoringFailurePoint::None)
+            {
+                failure = "Built-in texture cook accepts only --blue-noise-source and --output <blueNoise.cetex>.";
+                return false;
+            }
+            return true;
+        }
         if (out.mode == Arguments::Mode::BuildRuntimeBootstrap)
         {
             if (out.assetRoot.empty() || out.outputRoot.empty() || out.runtimeRoot.empty() || out.scenes.empty()
@@ -464,6 +537,11 @@ namespace
              (!out.materialProgramRoot.empty() && !out.materialShaderRoot.empty())))
         {
             failure = "Material options require cook mode and shader graphs; select automatic compilation or preverified input.";
+            return false;
+        }
+        if (!out.terrainSourceRoot.empty() && out.mode != Arguments::Mode::CompileRuntimeDocuments)
+        {
+            failure = "--terrain-source-root is valid only for offline runtime-document compilation.";
             return false;
         }
         if (out.mode == Arguments::Mode::CompileRuntimeDocuments)
@@ -678,6 +756,110 @@ namespace
         return true;
     }
 
+    [[nodiscard]] int CookBuiltinTextures(const Arguments& arguments)
+    {
+        // Engine resources have a fixed runtime path, not an invented asset GUID.
+        // The tracked source is a legacy DXT5 DDS with a complete authored chain.
+        constexpr std::size_t sourceBytes = 22000u;
+        constexpr std::size_t ddsHeaderBytes = 128u;
+        std::array<std::byte, sourceBytes> source{};
+        std::ifstream input(LongPath(arguments.blueNoiseSource), std::ios::binary);
+        if (!input.read(reinterpret_cast<char*>(source.data()), static_cast<std::streamsize>(source.size()))
+            || input.peek() != std::char_traits<char>::eof() || input.bad()
+            || std::memcmp(source.data(), "DDS ", 4u) != 0
+            || std::memcmp(source.data() + 84u, "DXT5", 4u) != 0)
+        {
+            std::cerr << "asset-cooker error: built-in blue noise requires the tracked 22000-byte DXT5 DDS: "
+                << arguments.blueNoiseSource << '\n';
+            return 3;
+        }
+        input.close();
+
+        std::error_code error;
+        const auto output = ResolveOutputIntent(arguments.outputRoot, error);
+        if (error || output.empty() || output.extension() != ".cetex")
+        {
+            std::cerr << "asset-cooker error: built-in blue-noise output must be a .cetex file.\n";
+            return 2;
+        }
+        const bool outputExists = std::filesystem::exists(output, error);
+        if (error)
+        {
+            std::cerr << "asset-cooker error: built-in blue-noise output cannot be inspected.\n";
+            return 2;
+        }
+        const bool sameSource = outputExists && std::filesystem::equivalent(output, arguments.blueNoiseSource, error);
+        if (error || sameSource)
+        {
+            std::cerr << "asset-cooker error: built-in blue-noise output must be distinct from the source.\n";
+            return 2;
+        }
+        ck::TextureImportSettings settings;
+        settings.colorSpace = ck::TextureColorSpace::Source;
+        settings.compression = ck::TextureCompression::None;
+        settings.mipPolicy = ck::TextureMipPolicy::PreserveAuthored;
+        std::vector<std::byte> artifact;
+        TextureImage decoded;
+        std::string failure;
+        if (!ck::CookTexture(source, settings, artifact, failure)
+            || !ck::DecodeCookedTexture(artifact, decoded, failure))
+        {
+            std::cerr << "asset-cooker error: built-in blue-noise cook failed: " << failure << '\n';
+            return 3;
+        }
+        const auto image = decoded.View();
+        if (image.Format() != RHIFormat::BC3Unorm || image.Width() != 128u || image.Height() != 128u
+            || image.MipLevels() != 8u || image.ArraySize() != 1u || image.IsCube()
+            || image.SubresourceCount() != 8u)
+        {
+            std::cerr << "asset-cooker error: built-in blue noise must retain BC3Unorm, 128x128, eight mips and one 2D slice.\n";
+            return 3;
+        }
+        std::size_t sourceOffset = ddsHeaderBytes;
+        for (std::uint32_t mip = 0u; mip < image.MipLevels(); ++mip)
+        {
+            const auto* subresource = image.At(mip);
+            if (!subresource || subresource->slicePitch > source.size() - sourceOffset
+                || std::memcmp(source.data() + sourceOffset, subresource->pixels, subresource->slicePitch) != 0)
+            {
+                std::cerr << "asset-cooker error: built-in blue-noise authored BC3 mip bytes changed.\n";
+                return 3;
+            }
+            sourceOffset += subresource->slicePitch;
+        }
+        if (sourceOffset != source.size())
+        {
+            std::cerr << "asset-cooker error: built-in blue-noise authored mip payload is incomplete.\n";
+            return 3;
+        }
+
+        auto temporary = output;
+        temporary += ".tmp-" + std::to_string(_getpid());
+        std::vector<std::byte> persisted;
+        TextureImage verified;
+        if (!WriteBinaryFile(temporary, artifact, failure)
+            || !ReadBinaryFile(temporary, persisted, failure) || persisted != artifact
+            || !ck::DecodeCookedTexture(persisted, verified, failure))
+        {
+            std::filesystem::remove(temporary, error);
+            std::cerr << "asset-cooker error: built-in blue-noise publication verification failed: " << failure << '\n';
+            return 4;
+        }
+        // Repeated developer preparation replaces only a completely verified
+        // artifact. A failed cook leaves the previous resource intact.
+        if (!MoveFileExW(LongPath(temporary).c_str(), LongPath(output).c_str(),
+            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+        {
+            const auto moveError = GetLastError();
+            std::filesystem::remove(temporary, error);
+            std::cerr << "asset-cooker error: built-in blue-noise replace failed (win32=" << moveError << ").\n";
+            return 4;
+        }
+        std::cout << "asset-cooker builtin-blue-noise=1 bytes=" << artifact.size()
+            << " format=CECT2 pixelFormat=BC3Unorm width=128 height=128 mipLevels=8\n";
+        return 0;
+    }
+
     [[nodiscard]] bool IsRuntimeTextDocument(
         const std::filesystem::path& root, const std::filesystem::path& path)
     {
@@ -739,6 +921,24 @@ namespace
         std::uint64_t totalBytes{};
         for (const std::filesystem::path& path : paths)
         {
+            if (path.extension() == ".terrain")
+            {
+                Encoded item;
+                item.path = path;
+                std::string failure;
+                const auto terrainRoot = arguments.terrainSourceRoot.empty()
+                    ? root / "Assets" / "Terrain" : arguments.terrainSourceRoot;
+                ck::CookedTerrainView verified;
+                if (!Authoring::CookTerrainSource(path, terrainRoot, item.bytes, failure)
+                    || !ck::ReadCookedTerrain(item.bytes, verified, failure))
+                {
+                    std::cerr << "asset-cooker error: terrain source cook failed: " << path << " (" << failure << ")\n";
+                    return 3;
+                }
+                totalBytes += item.bytes.size();
+                encoded.push_back(std::move(item));
+                continue;
+            }
             std::string parseError;
             const Authoring::ParsedDocument source =
                 Authoring::ParsedDocument::ParseFile(path.string(), parseError);
@@ -785,6 +985,18 @@ namespace
                 std::cerr << "asset-cooker error: " << writeError << '\n';
                 return 4;
             }
+            if (item.path.extension() == ".terrain")
+            {
+                std::vector<std::byte> persisted;
+                ck::CookedTerrainView verified;
+                if (!ReadBinaryFile(temporary, persisted, writeError) || persisted != item.bytes
+                    || !ck::ReadCookedTerrain(persisted, verified, writeError))
+                {
+                    std::filesystem::remove(temporary, error);
+                    std::cerr << "asset-cooker error: terrain publication verification failed: " << writeError << '\n';
+                    return 4;
+                }
+            }
             if (!MoveFileExW(temporary.c_str(), item.path.c_str(),
                 MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
             {
@@ -798,7 +1010,7 @@ namespace
 
         std::cout << "asset-cooker runtime-documents=" << encoded.size()
             << " bytes=" << totalBytes
-            << " format=CEDO" << Authoring::kCookedDocumentVersion << '\n';
+            << " format=CEDO" << Authoring::kCookedDocumentVersion << "+TRBN2" << '\n';
         return 0;
     }
 
@@ -1577,7 +1789,7 @@ namespace
         for (const std::filesystem::path& scene : arguments.scenes)
         {
             ck::SceneCookProductResult result =
-                ck::BuildSceneCookProduct({ scene, assetRoot, bootstrap });
+                ck::BuildSceneCookProduct({ scene, assetRoot, bootstrap, arguments.textureIdentityRoot });
             if (!result.Succeeded())
             {
                 for (const ck::SceneCookProductIssue& issue : result.issues)
@@ -2484,6 +2696,12 @@ namespace
 
 int wmain(int argc, wchar_t** argv)
 {
+    Authoring::InstallTextureSourceProcessing();
+    struct TextureSourceScope
+    {
+        ~TextureSourceScope() { Authoring::UninstallTextureSourceProcessing(); }
+    } textureSourceScope;
+
     // MBC11 — generation 검증(LoadModelAssetGeneration)이 embedded texture를 WIC로
     // 디코드한다. 에디터는 부팅이 COM을 올리지만 cooker는 여기서 올린다.
     const HRESULT comInit = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
@@ -2611,5 +2829,9 @@ int wmain(int argc, wchar_t** argv)
     }
     if (arguments.mode == Arguments::Mode::CompileRuntimeDocuments)
         return CompileRuntimeDocuments(arguments);
+    if (arguments.mode == Arguments::Mode::CookBuiltinTextures)
+    {
+        return CookBuiltinTextures(arguments);
+    }
     return Run(arguments);
 }

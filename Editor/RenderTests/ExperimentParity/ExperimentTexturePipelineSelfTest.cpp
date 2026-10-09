@@ -1,6 +1,8 @@
 #include "ExperimentParity/ExperimentTexturePipelineSelfTest.h"
 
 #include "Experiment/Cooked/CookedTexture.h"
+#include "Experiment/Cooked/CookedTerrain.h"
+#include "Texture.h"
 
 #include <d3d11.h>
 #include <DirectXTex.h>
@@ -110,6 +112,95 @@ namespace RenderTest
                 && experiment::cooked::DecodeCookedTexture(artifact, image, failure, info);
         }
 
+        void TexturePipelineTerrain(TexturePipelineChecker& check, const std::vector<std::byte>& texture)
+        {
+            namespace ck = experiment::cooked;
+            if (texture.empty())
+            {
+                check.Check(false, "terrain fixture needs a valid embedded CECT image");
+                return;
+            }
+            const std::array<std::uint32_t, 4> heightBits{ 0x80000000u, 0x3f800001u, 0xbe99999au, 0x42c80000u };
+            std::vector<std::byte> heights(16u);
+            for (std::size_t index = 0u; index < heightBits.size(); ++index)
+            {
+                TexturePipelinePut32(heights, index * 4u, heightBits[index]);
+            }
+            const std::array<std::byte, 4> gray{ std::byte{ 0 }, std::byte{ 1 }, std::byte{ 127 }, std::byte{ 255 } };
+            ck::CookedTerrainView source;
+            source.terrainId = 91u;
+            source.width = 2u;
+            source.height = 2u;
+            source.minHeight = -1.0f;
+            source.maxHeight = 100.0f;
+            source.layerCount = 2u;
+            source.heights = heights;
+            source.layers[0] = { 41u, 1.25f, "Layer one", "Stone/original.png", gray, texture };
+            source.layers[1] = { 7u, -2.0f, "Layer two", "Grass/original.png", gray, texture };
+            std::vector<std::byte> artifact;
+            std::string failure;
+            ck::CookedTerrainView decoded;
+            const bool read = ck::EncodeCookedTerrain(source, artifact, failure)
+                && ck::ReadCookedTerrain(artifact, decoded, failure);
+            check.Check(read, "terrain neutral v2 roundtrip validates without image allocations");
+            if (!read)
+            {
+                return;
+            }
+            bool exact = decoded.terrainId == source.terrainId && decoded.width == 2u && decoded.height == 2u;
+            for (std::size_t index = 0u; index < heightBits.size(); ++index)
+            {
+                exact = exact && std::bit_cast<std::uint32_t>(ck::CookedTerrainHeight(decoded.heights, index)) == heightBits[index];
+            }
+            for (std::size_t index = 0u; index < source.layerCount; ++index)
+            {
+                const auto& layer = decoded.layers[index];
+                exact = exact && layer.id == source.layers[index].id && layer.tiling == source.layers[index].tiling
+                    && layer.name == source.layers[index].name && layer.diffuseReference == source.layers[index].diffuseReference
+                    && std::ranges::equal(layer.gray, gray) && std::ranges::equal(layer.texture, texture);
+            }
+            check.Check(exact, "terrain preserves float bits, gray8, layer identity/name/tiling/reference and embedded CECT bytes");
+            const auto reject = [&](std::vector<std::byte> bytes, const char* message)
+            {
+                ck::CookedTerrainView invalid;
+                check.Check(!ck::ReadCookedTerrain(bytes, invalid, failure) && invalid.width == 0u, message);
+            };
+            auto changed = artifact;
+            TexturePipelinePut32(changed, 4u, 1u);
+            reject(std::move(changed), "terrain rejects legacy v1 instead of invoking a source decoder");
+            changed = artifact;
+            changed.pop_back();
+            reject(std::move(changed), "terrain rejects truncated payloads");
+            changed = artifact;
+            changed.push_back(std::byte{});
+            reject(std::move(changed), "terrain rejects trailing bytes");
+            changed = artifact;
+            TexturePipelinePut32(changed, 28u, 5u);
+            reject(std::move(changed), "terrain rejects excessive layer counts before allocations");
+            changed = artifact;
+            TexturePipelinePut32(changed, 20u, 4096u);
+            TexturePipelinePut32(changed, 24u, 4096u);
+            ck::CookedTerrainView excessive;
+            check.Check(!ck::ReadCookedTerrain(changed, excessive, failure)
+                && failure.find("working") != std::string::npos && excessive.width == 0u,
+                "terrain bounds its expanded CPU working set before payload allocation");
+            changed = artifact;
+            TexturePipelinePut32(changed, 48u, 0x7fc00000u);
+            reject(std::move(changed), "terrain rejects non-finite height samples");
+            constexpr std::size_t firstLayer = 48u + 16u;
+            changed = artifact;
+            TexturePipelinePut32(changed, firstLayer + 20u, UINT32_MAX);
+            reject(std::move(changed), "terrain rejects overflowing embedded image lengths");
+            const auto firstTexture = firstLayer + 24u + source.layers[0].name.size()
+                + source.layers[0].diffuseReference.size() + gray.size();
+            changed = artifact;
+            TexturePipelinePut32(changed, firstTexture + 4u, 1u);
+            reject(std::move(changed), "terrain validates nested CECT schema before runtime allocations");
+            changed = artifact;
+            TexturePipelinePut32(changed, firstTexture + texture.size(), source.layers[0].id);
+            reject(std::move(changed), "terrain rejects duplicate layer identities");
+        }
+
         float TexturePipelineFloat(const std::byte* bytes)
         {
             float value = 0.0f;
@@ -137,6 +228,18 @@ namespace RenderTest
         } apartment;
         check.Check(SUCCEEDED(apartment.result) || apartment.result == RPC_E_CHANGED_MODE,
             "source-codec test COM initialization succeeds");
+        auto authoredImage = TextureImage::Allocate(RHIFormat::RGBA8UnormSrgb, 2u, 2u, 1u, 1u);
+        const auto authoredTexture = Texture::CreateSharedFromCookedImage(
+            "AuthoredPolicy", std::move(authoredImage), ck::CookedTextureInfo{ false, true });
+        const auto authoredMips = Texture::WithMipChain(authoredTexture, failure);
+        check.Check(authoredTexture && !authoredTexture->IsTextureAlpha()
+            && !Texture::WithColorSpace(authoredTexture, false) && authoredMips
+            && authoredMips->GetImageDescription().MipLevels() == 1u && failure.empty(),
+            "neutral cooked adoption preserves alpha metadata, locked color and intentional single mip");
+        auto alphaImage = TextureImage::Allocate(RHIFormat::RGBA8Unorm, 1u, 1u, 1u, 1u);
+        const auto alphaTexture = Texture::CreateSharedFromCookedImage(
+            "AuthoredAlpha", std::move(alphaImage), ck::CookedTextureInfo{ true, false });
+        check.Check(alphaTexture && alphaTexture->IsTextureAlpha(), "neutral cooked adoption retains true alpha metadata");
         ck::TextureImportSettings settings;
         settings.colorSpace = ck::TextureColorSpace::Srgb;
         settings.mipPolicy = ck::TextureMipPolicy::GenerateFull;
@@ -373,6 +476,7 @@ namespace RenderTest
             }
             check.Check(count == 2u, "representable half-coverage remains half-coverage at the first mip");
         }
+        TexturePipelineTerrain(check, srgbArtifact);
         outLog += "  passed " + std::to_string(check.passed) + ", failed " + std::to_string(check.failed) + '\n';
         return check.failed == 0u;
     }

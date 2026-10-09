@@ -43,6 +43,10 @@ internal static class PackageInputs
                 token.ThrowIfCancellationRequested(); var relative = Paths.Relative(root, file);
                 if (name == "ProjectSetting" && Generated(relative)) continue;
                 if (name == "Assets" && ScriptSource(relative)) continue;
+                if (name == "Assets" && BlueNoiseResource.IsSource(relative))
+                {
+                    continue;
+                }
                 if (name == "Assets" && selectedAssets != null && !selectedAssets.Contains(relative)) continue;
                 Paths.Copy(file, Paths.Child(destination, name + "/" + relative)); ++count;
             }
@@ -97,6 +101,10 @@ internal static class PackageInputs
             var relative = path["Dynamic_CPP/".Length..];
             if (relative.StartsWith("ProjectSetting/") && Generated(relative["ProjectSetting/".Length..])) continue;
             if (relative.StartsWith("Assets/") && ScriptSource(relative)) continue;
+            if (relative.StartsWith("Assets/", StringComparison.Ordinal) && BlueNoiseResource.IsSource(relative["Assets/".Length..]))
+            {
+                continue;
+            }
             Paths.Copy(Paths.Child(project, relative), Paths.Child(destination, relative)); copied.Add(relative);
         }
         const string scene = "Assets/Scenes/FT_Primitives.creator";

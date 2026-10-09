@@ -393,10 +393,17 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
         // WireFrame 공용 패스는 polygonMode=LINE을 사용하므로 non-solid fill도
         // 장치 선택 때 계약한다. 지원 여부를 파이프라인 생성까지 미루면 editor
         // 토글 시점에야 실패한다.
+        // The desktop cooked-texture profile includes BC1/3/5/7. Require the
+        // aggregate format guarantee instead of assuming support or decompressing
+        // authored GPU blocks during runtime upload.
         if (props.apiVersion < VK_API_VERSION_1_3 ||
             !coreFeatures.features.independentBlend ||
             !coreFeatures.features.fillModeNonSolid ||
-            !features11.shaderDrawParameters) continue;
+            !coreFeatures.features.textureCompressionBC ||
+            !features11.shaderDrawParameters)
+        {
+            continue;
+        }
 
         // 그래픽 큐가 있어야 한다.
         uint32_t familyCount = 0;
@@ -424,7 +431,7 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 
     if (VK_NULL_HANDLE == best)
     {
-        outError = "쓸 수 있는 물리 디바이스가 없다 — Vulkan 1.3, 그래픽 큐, non-solid fill, shaderDrawParameters가 필요하다";
+        outError = "쓸 수 있는 물리 디바이스가 없다 — Vulkan 1.3, 그래픽 큐, non-solid fill, shaderDrawParameters, BC texture compression이 필요하다";
         return false;
     }
 
@@ -562,6 +569,8 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     // EnhancedWireFramePass의 RHIFillMode::Wireframe은
     // VkPipelineRasterizationStateCreateInfo::polygonMode=LINE으로 번역된다.
     features2.features.fillModeNonSolid = VK_TRUE;
+    // Selected above: the desktop CECT profile requires sampled/filterable BC formats.
+    features2.features.textureCompressionBC = VK_TRUE;
     // 선택 기능이 없는 장치도 firstInstance=0인 단건 경로는 사용할 수 있다.
     features2.features.drawIndirectFirstInstance = availableFeatures.features.drawIndirectFirstInstance;
     features2.pNext = &features11;

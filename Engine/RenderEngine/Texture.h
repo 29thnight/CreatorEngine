@@ -6,15 +6,7 @@
 #include "Delegate.h"
 // m_assetId의 HashedGuid·MakeRuntimeResourceId()가 여기서 온다 — 전이 include에 기대지 않는다.
 #include "TypeTrait.h"
-// ★ 여기 있던 <d3d11.h> + <DirectXTex.h> 를 걷었다(축 A).
-//
-//   그 둘은 m_cpuPixels 가 DirectX::ScratchImage 였기 때문에 있었고,
-//   DirectXTex.h 가 __d3d11_h__ 가 켜진 채로 읽혀야 한다는 규약 때문에
-//   d3d11.h 를 앞세워야 했다. 결과는 Texture.h 를 읽는 모든 TU 가 —
-//   Vulkan 백엔드 구현 파일까지 — DX11 헤더를 컴파일하는 것이었다.
-//
-//   지금 CPU 픽셀은 백엔드 중립 타입이 든다. 디코더와 BC 압축기는 여전히
-//   DirectXTex 이지만 Texture.cpp 안에만 있다.
+// Image storage and runtime loading are SDK-free; source processing is authoring-only.
 #include "TextureImage.h"
 #include "../Utility_Framework/Ownership.h"
 #include <mathematics/vector2.hpp>
@@ -45,6 +37,11 @@
 //   pinned explicitly for CPU staging. Legacy/procedural constructors retain an
 //   explicitly non-rehydratable image until an exact source adapter is provided.
 //-----------------------------------------------------------------------------
+
+namespace experiment::cooked
+{
+    struct CookedTextureInfo;
+}
 
 namespace AssetDepot
 {
@@ -89,7 +86,7 @@ public:
         const own::shared_owner<const Texture>& source, bool srgb);
 
     // Call after choosing the material color space. Retains authored chains and
-    // 1x1 owners; otherwise generates a full chain with linear-light RGB filtering
+    // 1x1 owners; the authoring host otherwise generates a full chain with linear-light RGB filtering
     // for sRGB formats and independent linear alpha. Preserves mip 0 exactly.
     static own::shared_owner<const Texture> WithMipChain(
         const own::shared_owner<const Texture>& source, std::string& outFailure);
@@ -115,23 +112,21 @@ public:
 	static own::shared_owner<const Texture> CreateSharedFromImage(
 		std::string_view name, TextureImage image);
 
-	// ── 디코드 전용 창구 (축 A) ──
-	//
-	// 인코딩된 이미지 바이트를 RGBA8 중립 이미지로 푼다. 압축(BC)이면 풀고,
-	// 색공간 전달 함수는 건드리지 않는다 — 레이아웃만 RGBA8로 맞춘다.
-	//
-	// ★ 이 함수가 있는 이유는 ModelAssetGeneration 의 cook 경로다. 그쪽은
-	//   "바이트 → 중립 RGBA8"만 필요한데 그것 하나 때문에 DirectXTex 의
-	//   Convert·Decompress·IsSRGB 를 직접 불렀다. 디코더를 갈아 끼우려면
-	//   봐야 할 파일이 둘이 되는 자리였고, 지금은 Texture.cpp 하나다.
+    // Adopt an already validated GPU-ready image without losing its offline policy.
+    static own::shared_owner<const Texture> CreateSharedFromCookedImage(
+        std::string_view name, TextureImage image,
+        const experiment::cooked::CookedTextureInfo& info, std::string_view assetPath = {});
+
+    // Authoring-only neutral RGBA layout conversion for model imports and
+    // thumbnails. Player has no callback, so encoded source bytes fail closed.
 	static bool DecodeToRgba8(std::span<const std::byte> bytes,
 		TextureImage& outImage, std::string& outFailure);
 
 	static own::shared_owner<const Texture> LoadManagedFromPath(
 		const file::path& path, bool isCompress = false);
 
-    // Codec-owned SDK arrays remain opaque and are never copied into a generic
-    // byte wrapper. Reproducible descriptors do not strongly own this payload.
+    // Neutral storage; authoring-only derived images may retain SDK allocations.
+    // Reproducible descriptors do not strongly own this payload.
     struct CodecImage;
     [[nodiscard]] TextureImageDescription GetImageDescription() const noexcept;
     [[nodiscard]] TextureImageView GetImageView(
@@ -201,12 +196,19 @@ private:
     [[nodiscard]] static own::shared_owner<const Texture> CreateOwnedDescriptor(
         const own::shared_owner<const CodecImage>& image,
         own::shared_owner<const AssetDepot::TextureAssetOrigin> origin, std::string& failure);
+    [[nodiscard]] static own::shared_owner<const Texture> CreateFromSourceImage(
+        own::shared_owner<const CodecImage> image, std::string_view name,
+        std::string_view extension, std::string_view assetPath);
     void SetNonRehydratableImage(own::shared_owner<const CodecImage> image);
     own::shared_owner<const CodecImage> m_nonRehydratableImage{};
     own::shared_owner<const AssetDepot::TextureAssetOrigin> m_assetOrigin{};
     TextureImageDescription m_imageDescription{};
     std::size_t m_decodedBytes{};
 
+    [[nodiscard]] static own::shared_owner<const Texture> LoadCookedFromBytes(
+        std::span<const std::byte> bytes, std::string_view name, std::string_view assetPath);
+    bool m_cookedPayload{};
+    bool m_cookedColorSpaceLocked{};
 	RHIFormat m_samplingFormat{ RHIFormat::Unknown };
 	math::vector2 m_size{};
 	static_assert(std::is_same_v<decltype(m_size), math::vector2>);

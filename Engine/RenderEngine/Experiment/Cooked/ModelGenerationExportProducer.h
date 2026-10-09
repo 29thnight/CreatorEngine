@@ -4,14 +4,15 @@
 // legacy `ModelCookProducer`는 v1 sidecar(`guid` + subAssets schema 1)를 읽어 CEMC 하나를
 // Derived에 구웠다. MBC3부터 모델의 정본 산출물은 authoring transaction이 게시한
 // **generation**(`Library/ModelAssetGenerations/<ModelId>/<generation>/`)이고, 런타임은
-// 그것만 읽는다(`DataSystem::LoadModelAssetGeneration`). 그래서 cook은 다시 굽지 않는다 —
-// 이미 게시된 generation을 검증한 뒤 Derived로 내보낸다. 검증용 record와
-// sidecar는 런타임 텍스트 파서를 쓰지 않도록 CEDO로 변환한다.
+// 그것만 읽는다(`DataSystem::LoadModelAssetGeneration`). Cook validates the
+// published generation and exports it to Derived. Records/sidecars become CEDO;
+// embedded images become GPU-ready CECT using the shared offline texture cooker.
+// The exported record keeps the same identities/generation with cooked fingerprints.
 //
 //   Derived/Models/<xx>/<ModelId>/<generation>/generation.asset   ← manifest entry(kind Model)
 //   Derived/Models/<xx>/<ModelId>/<generation>/model.cemc
 //   Derived/Models/<xx>/<ModelId>/<generation>/sidecar.meta
-//   Derived/Models/<xx>/<ModelId>/<generation>/textures/<TextureId>.png …
+//   Derived/Models/<xx>/<ModelId>/<generation>/textures/<TextureId>.cetex
 //
 // 게시되지 않은 모델(generation 부재)·sidecar와 어긋난 generation·closure 검증 실패는
 // 전부 cook 실패다 — source에서 다시 만드는 폴백은 없다(§0.1-4).
@@ -49,7 +50,7 @@ namespace experiment::cooked
         std::vector<ModelGenerationExportFile> files{};
         CookedAssetManifestEntry manifestEntry{};
         // 모델 subasset entry — 재질(kind Material, record를 가리킴)·embedded texture
-        // (kind Texture, textures/<TextureId>.png). 씬·재질 문서의 의존 GUID가 manifest
+        // (kind Texture, textures/<TextureId>.cetex). 씬·재질 문서의 의존 GUID가 manifest
         // 안에서 해소되려면 legacy cook과 같이 이 entry들이 있어야 한다.
         std::vector<CookedAssetManifestEntry> subAssetEntries{};
         std::size_t materialCount{};

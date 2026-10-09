@@ -105,6 +105,12 @@ internal static class GamePackager
                 var relative = "Resources/Environment/" + Paths.Relative(environments, source);
                 Paths.Copy(source, Paths.Child(candidate, relative)); rootFiles.Add(relative);
             }
+            // Both legacy and source-free AssetSet packages use the immutable
+            // engine resource, outside the Assets/ProjectSetting PAK mounts.
+            var blueNoise = Paths.Child(engine.BinaryRoot, BlueNoiseResource.RelativePath);
+            BlueNoiseResource.Validate(blueNoise);
+            Paths.Copy(blueNoise, Paths.Child(candidate, BlueNoiseResource.RelativePath));
+            rootFiles.Add(BlueNoiseResource.RelativePath);
             foreach (var source in runtimeSources)
             {
                 var relative = source.Path.StartsWith("Player/", StringComparison.Ordinal) ? source.Path[7..] : source.Path;

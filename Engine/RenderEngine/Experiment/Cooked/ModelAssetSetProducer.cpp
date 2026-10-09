@@ -2,6 +2,8 @@
 #include "CookSupport.h"
 #include "MaterialAssetSetCodec.h"
 #include "TextureCookProducer.h"
+#include "CookedTexture.h"
+#include "TextureImportSettings.h"
 #include "../../Assets/ModelSourcePreparation.h"
 #include "../../Assets/ModelMaterialGraph.h"
 #include "../Import/SceneToModelDraft.h"
@@ -221,6 +223,28 @@ namespace experiment::cooked
             };
             auto imported = importer->Import(importRequest);
             RequireSource(imported.Succeeded(), imported.notes.empty() ? "Model source import failed" : imported.notes.front().message);
+            // A glTF image is one authored identity even when several material
+            // roles reference it. Scan every slot instead of trusting whichever
+            // role happened to populate ImportedTexture first.
+            constexpr std::uint8_t kLinearRole = 1u;
+            constexpr std::uint8_t kSrgbRole = 2u;
+            std::vector<std::uint8_t> textureRoles(imported.scene->textures.size());
+            const auto addTextureRole = [&](const im::TextureSlot& slot, std::uint8_t role)
+            {
+                if (slot.IsValid())
+                {
+                    RequireSource(slot.texture.Value() < textureRoles.size(), "Material texture index is out of range");
+                    textureRoles[slot.texture.Value()] |= role;
+                }
+            };
+            for (const auto& material : imported.scene->materials)
+            {
+                addTextureRole(material.baseColor, kSrgbRole);
+                addTextureRole(material.emissive, kSrgbRole);
+                addTextureRole(material.normal, kLinearRole);
+                addTextureRole(material.metallicRoughness, kLinearRole);
+                addTextureRole(material.occlusion, kLinearRole);
+            }
             std::vector<assets::StableKeyAssignment> assignments;
             RequireSource(assets::ReconcileAuthoredModelBindings(*imported.scene, sidecar, assignments, failure), failure);
             std::map<AssetId, std::size_t> clipIndices;
@@ -344,14 +368,42 @@ namespace experiment::cooked
                 product.asset = selection;
                 if (selection.kind == CookedAssetKind::Texture)
                 {
-                    auto& texture = imported.scene->textures.at(textureIndices.at(selection.key.assetId));
+                    const auto textureIndex = textureIndices.at(selection.key.assetId);
+                    const auto& texture = imported.scene->textures.at(textureIndex);
+                    const auto roles = textureRoles[textureIndex];
+                    const bool mixedRoles = roles == (kLinearRole | kSrgbRole);
                     const auto extension = SniffTextureExtension(texture.embeddedBytes);
                     RequireSource(!extension.empty() && IsSupportedTextureExtension(extension),
                         "Selected embedded texture has an unsupported encoded image format");
-                    product.representation = 1u;
-                    product.schemaVersion = kTextureArtifactVersion;
-                    product.extension = extension;
-                    product.artifactBytes = std::move(texture.embeddedBytes);
+                    TextureImportSettings settings;
+                    if (!mixedRoles)
+                    {
+                        settings.colorSpace = roles == kSrgbRole || (roles == 0u &&
+                            texture.colorSpace == experiment::TextureColorSpace::Srgb)
+                            ? TextureColorSpace::Srgb : TextureColorSpace::Linear;
+                        settings.mipPolicy = TextureMipPolicy::GenerateFull;
+                    }
+                    RequireSource(ParseTextureImportSettings(SourceText(meta), settings, failure), failure);
+                    RequireSource(!mixedRoles || (settings.colorSpace == TextureColorSpace::Source &&
+                        settings.mipPolicy == TextureMipPolicy::PreserveAuthored &&
+                        settings.compression == TextureCompression::None && settings.maxDimension == 0u &&
+                        !settings.normalMap && !settings.preserveAlphaCoverage),
+                        "Embedded texture " + texture.sourceKey + " is used as both sRGB and linear data. "
+                        "Keep Source/PreserveAuthored/None with no resizing, or author separate images for those roles.");
+                    product.representation = kCookedTextureRepresentationVersion;
+                    product.schemaVersion = kCookedTextureSchemaVersion;
+                    product.extension = ".cetex";
+                    product.textureImportRecipe = TextureImportRecipe(settings);
+                    RequireSource(CookTexture(texture.embeddedBytes, settings, product.artifactBytes, failure), failure);
+                    if (mixedRoles)
+                    {
+                        TextureImage image;
+                        CookedTextureInfo info;
+                        RequireSource(DecodeCookedTexture(product.artifactBytes, image, failure, &info), failure);
+                        RequireSource(!info.colorSpaceLocked,
+                            "Embedded texture " + texture.sourceKey + " has authored role-specific mips/format and "
+                            "is used as both sRGB and linear data; author separate images for those roles.");
+                    }
                 }
                 else if (selection.kind == CookedAssetKind::Material)
                 {

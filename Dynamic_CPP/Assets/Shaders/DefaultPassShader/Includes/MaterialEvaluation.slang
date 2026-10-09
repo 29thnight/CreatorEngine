@@ -65,15 +65,20 @@ MaterialInputs MakeStandardMaterialInputs(float4 baseSample, float3 mrSample,
 }
 
 float3 EvaluatePbrNormal(float3 normal, float3 tangent, float3 bitangent,
-    float3 normalSample, float normalScale, bool useNormalMap, bool reduced)
+    float3 normalSample, float normalScale, uint normalMapEncoding, bool reduced)
 {
     const float3 geometricNormal = normalize(normal);
     float3 result = geometricNormal;
-    if (useNormalMap)
+    if ((normalMapEncoding & 1u) != 0u)
     {
+        float3 tangentNormal = normalSample * 2.0 - 1.0;
+        if ((normalMapEncoding & 2u) != 0u)
+        {
+            // BC5 stores unsigned XY only; reconstruct the positive hemisphere.
+            tangentNormal.z = sqrt(saturate(1.0 - dot(tangentNormal.xy, tangentNormal.xy)));
+        }
         const TangentFrame frame = BuildTangentFrame(normal, tangent, bitangent);
-        result = ApplyTangentSpaceNormal(frame, geometricNormal,
-            normalSample * 2.0 - 1.0, normalScale);
+        result = ApplyTangentSpaceNormal(frame, geometricNormal, tangentNormal, normalScale);
     }
     return reduced ? normalize(result + geometricNormal) : result;
 }

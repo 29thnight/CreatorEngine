@@ -55,7 +55,7 @@ struct LXMaterialSourceRange
 
 struct LXMaterialProgram
 {
-    static constexpr std::uint32_t CompilerVersion = 2;
+    static constexpr std::uint32_t CompilerVersion = 3;
     std::string slang;
     // Exact canonical payload, not std::hash. MAT-7 adds common shader/compiler
     // dependency digests when deriving the cooked artifact cache identity.

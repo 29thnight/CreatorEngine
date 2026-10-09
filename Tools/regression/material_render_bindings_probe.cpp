@@ -154,6 +154,36 @@ void Run(const std::filesystem::path& root)
     std::memcpy(image.MutablePixelsAt(*image.Find(0, 0)), pixels.data(), pixels.size());
     const auto texture = Texture::CreateSharedFromImage("LX.RenderBindings.SRGB", std::move(image));
     Check(!!texture, "Actual CPU texture");
+    auto normalProduct = product;
+    normalProduct.program.semanticKey += "|bc5-storage-binding-fixture";
+    for (auto& resource : normalProduct.program.resources)
+    {
+        if (resource.kind == LXMaterialResourceKind::Texture)
+        {
+            resource.colorSpace = LXColorSpace::Data;
+        }
+    }
+    for (auto& resource : normalProduct.layout.textures)
+    {
+        resource.colorSpace = LXColorSpace::Data;
+    }
+    experiment::AssetId normalGraph;
+    Check(Uuid::TryParse("33333333-3333-4333-8333-333333333333", normalGraph.value), "Normal graph identity");
+    const auto normalGeneration = store.Load(normalGraph, [&](CookedProgram& cooked, std::string&) {
+        cooked = {normalProduct, WriteMaterialProgramMetadata(normalProduct.program), BuildBoundSource(normalProduct.program)};
+        return true;
+    }, false, error);
+    Check(!!normalGeneration, "Own graph generation for runtime BC5 binding: " + error);
+    auto normalImage = TextureImage::Allocate(RHIFormat::BC5Unorm, 4, 4, 1, 1);
+    auto* block = normalImage.MutablePixelsAt(*normalImage.Find(0, 0));
+    std::memset(block, 0, 16);
+    block[0] = block[1] = block[8] = block[9] = std::byte{128};
+    const auto normalTexture = Texture::CreateSharedFromImage("LX.RenderBindings.BC5", std::move(normalImage));
+    Check(!!normalTexture, "Actual CPU BC5 normal block");
+    own::shared_owner<const Instance> normalInstance;
+    Check(BuildInstance(normalGeneration, {normalGraph, {{900, .31}}, {}},
+        [&](const experiment::AssetId&, LXColorSpace, std::string&) { return normalTexture; }, normalInstance, error),
+        "Build immutable instance with zero-default private encoding fields: " + error);
     own::shared_owner<const Instance> instance;
     Check(BuildInstance(
               generation, {graph, {{900, .31}}, {}},
@@ -175,6 +205,9 @@ void Run(const std::filesystem::path& root)
           "Append independent material root ranges");
     Check(layout.uniformSlot == 1u && layout.textureSlot == 2u && layout.samplerSlot == 3u,
           "Exact appended root slots");
+    PassLayout normalLayout;
+    Check(CreatePassLayout(roots, normalProduct.layout, host, {}, false, normalLayout, error),
+        "Create BC5 graph pass layout");
     const auto acceptedLayout = layout.handle;
     for (const auto conflict : {RHILayout::Cbv(2), RHILayout::Constants(2, 1), RHILayout::Srv(16),
                                 RHILayout::SrvTable(3, 15), RHILayout::SamplerTable(5, 1)})
@@ -216,6 +249,27 @@ void Run(const std::filesystem::path& root)
         Check(device.BeginFrame(error), "Actual BeginFrame");
         textures.BeginFrame(frame);
         auto& encoder = device.GetImmediateEncoder();
+        if (frame == 0)
+        {
+            own::shared_owner<const RenderBindings> normalPacket;
+            Check(bindings.Prepare(device, textures, normalInstance, normalLayout, normalPacket, error),
+                "BC5 render-binding cache accepts authoritative runtime encoding uniforms: " + error);
+            const auto offset = normalProduct.layout.textureEncodings.front().offset;
+            std::uint32_t encoded{}, defaultEncoding{};
+            std::memcpy(&encoded, normalPacket->resources.uniforms.data() + offset, sizeof(encoded));
+            std::memcpy(&defaultEncoding, normalInstance->uniforms.data() + offset, sizeof(defaultEncoding));
+            Check(encoded == static_cast<std::uint32_t>(TextureSampleEncoding::BC5Normal) && defaultEncoding == 0 &&
+                normalPacket->resources.uniforms != normalInstance->uniforms &&
+                RenderBindingCache::ValidatePass(device, *normalPacket, normalLayout, error),
+                "Runtime BC5 metadata may differ while immutable numeric properties remain sealed");
+            Instance corruptValue(*normalInstance);
+            corruptValue.uniforms[normalProduct.layout.parameters.front().offset] ^= 1;
+            const auto corrupt = own::make_shared<const Instance>(std::move(corruptValue));
+            auto retained = normalPacket;
+            Check(!bindings.Prepare(device, textures, corrupt, normalLayout, normalPacket, error) &&
+                material_graph_test::SamePinnedObject(normalPacket, retained),
+                "Encoding exceptions cannot hide corruption of immutable numeric parameter bytes");
+        }
         if (packet)
         {
             Check(!RenderBindingCache::Bind(device, encoder, RHIBindPoint::Graphics, *packet, error),

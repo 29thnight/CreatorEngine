@@ -28,6 +28,9 @@ namespace experiment::cooked
         std::uint32_t representation{};
         std::uint32_t schemaVersion{};
         std::string extension{};
+        // Effective role-inferred settings after explicit metadata overrides.
+        // Empty for products that are not textures.
+        std::string textureImportRecipe{};
     };
 
     struct ModelAssetSetCookResult final

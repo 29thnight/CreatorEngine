@@ -1,5 +1,6 @@
 #include "DataSystem.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
+#include "Experiment/Cooked/CookedTexture.h"
 #include "Experiment/Cooked/MaterialAssetSetCodec.h"
 #include <cassert>
 #include "AssetDepot/LegacyResourceCharges.h"
@@ -1365,6 +1366,56 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             documents.emplace_back(guid, path);
         }
     };
+    const auto isDecalTextureField = [](std::string_view name)
+    {
+        return name == "m_diffusefileName" || name == "m_normalFileName" || name == "m_ormFileName";
+    };
+    const auto discoverDecalTexture = [&](std::string_view field, const std::string& reference)
+    {
+        if (reference.empty())
+        {
+            return;
+        }
+        FileGuid guid;
+        const bool canonicalIdentity = Uuid::TryParse(reference, guid.m_guid);
+        if (!canonicalIdentity)
+        {
+            if (!PathFinder::IsAssetAuthoringEnabled())
+            {
+                throw std::runtime_error("Cooked decal texture reference must be a GUID: " + reference);
+            }
+            // Match DecalComponent exactly; a global basename match is ambiguous.
+            guid = GetFileGuid(PathFinder::Relative("Textures\\") / file::path(reference).filename());
+        }
+        if (guid == FileGuid{})
+        {
+            if (canonicalIdentity)
+            {
+                return; // Optional nil reference.
+            }
+            throw std::runtime_error("Decal texture identity could not be resolved: " + reference);
+        }
+        discover(guid);
+        const AssetDepot::AssetLink<Texture> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+        experiment::cooked::ResolvedAssetEntry resolved;
+        const auto status = preparation->catalog
+            ? preparation->catalog->Find(link.ToReference(), resolved)
+            : experiment::cooked::AssetLookupStatus::NotMounted;
+        if (status == experiment::cooked::AssetLookupStatus::Found)
+        {
+            AssetDepot::TextureAssetVariant variant;
+            variant.role = static_cast<std::uint32_t>(TextureFileType::Texture) + 1u;
+            variant.colorSpace = field == "m_diffusefileName"
+                ? AssetDepot::TextureAssetColorSpace::Source : AssetDepot::TextureAssetColorSpace::Linear;
+            preparation->descriptorRequests.try_emplace(std::pair{ link, variant },
+                RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
+        }
+        else if (status == experiment::cooked::AssetLookupStatus::TypeMismatch
+            || !PathFinder::IsAssetAuthoringEnabled())
+        {
+            throw std::runtime_error("Decal texture is absent or has the wrong cooked asset kind: " + guid.ToString());
+        }
+    };
     std::function<void(const Authoring::ReadNode&, std::size_t)> walk;
     walk = [&](const Authoring::ReadNode& node, std::size_t depth)
     {
@@ -1440,6 +1491,15 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                         }
                         preparation->materialDocuments.push_back(std::move(bytes));
                     }
+                    if (isDecalTextureField(node["m_propertyName"].Scalar()))
+                    {
+                        const auto value = document->Root().Read();
+                        if (!value.IsScalar())
+                        {
+                            throw std::runtime_error("Decal texture override must be a scalar reference");
+                        }
+                        discoverDecalTexture(node["m_propertyName"].Scalar(), value.AsString());
+                    }
                     walk(document->Root().Read(), depth + 1);
                 }
                 else
@@ -1457,6 +1517,14 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                                 }
                             }
                         }
+                    }
+                    if (isDecalTextureField(key))
+                    {
+                        if (!entry.value.IsScalar())
+                        {
+                            throw std::runtime_error("Decal texture reference must be a scalar");
+                        }
+                        discoverDecalTexture(key, entry.value.AsString());
                     }
                     if (key == "m_modelName" && entry.value.IsScalar() && !entry.value.Scalar().empty())
                     {
@@ -1546,7 +1614,18 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         {
             const auto textureType = type == ManagedAssetType::UITexture ? TextureFileType::UITexture
                 : (type == ManagedAssetType::SpriteSheet ? TextureFileType::SpriteSheet : TextureFileType::Texture);
-            discover(RegisteredTextureGuid(*this, resource.assetName, textureType));
+            const auto guid = RegisteredTextureGuid(*this, resource.assetName, textureType);
+            discover(guid);
+            const AssetDepot::AssetLink<Texture> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+            experiment::cooked::ResolvedAssetEntry resolved;
+            if (preparation->catalog && preparation->catalog->Find(link.ToReference(), resolved)
+                == experiment::cooked::AssetLookupStatus::Found)
+            {
+                AssetDepot::TextureAssetVariant variant;
+                variant.role = static_cast<std::uint32_t>(textureType) + 1u;
+                preparation->descriptorRequests.try_emplace(std::pair{ link, variant },
+                    RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
+            }
         }
     }
     for (const auto& [guid, path] : models)
@@ -1818,7 +1897,6 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 AssetDepot::TextureAssetVariant variant;
                 variant.colorSpace = binding.colorSpace == LX::LXColorSpace::SRGB
                     ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
-                variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
                 const auto key = std::pair{ link, variant };
                 if (!preparation->descriptorRequests.contains(key))
                 {
@@ -1850,7 +1928,6 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 AssetDepot::TextureAssetVariant variant;
                 variant.colorSpace = binding->colorSpace == LX::LXColorSpace::SRGB
                     ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
-                variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
                 const auto key = std::pair{ link, variant };
                 if (!preparation->descriptorRequests.contains(key))
                 {
@@ -2498,6 +2575,7 @@ void DataSystem::Finalize()
         InvalidateMaterialAssetsLocked(retiredMaterials);
         DetachLegacyCachesLocked(retiredLegacy);
         m_cookedStaleAssets.clear();
+        m_authoredTextureMounts.clear();
         if (m_assetDepotRevision != (std::numeric_limits<std::uint64_t>::max)())
         {
             ++m_assetDepotRevision;
@@ -2744,7 +2822,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 
 namespace
 {
-	// generation이 검증·디코드해 둔 RGBA8 subresource를 텍스처 캐시가 읽는
+	// generation이 검증해 둔 GPU-ready subresource를 텍스처 캐시가 읽는
 	// 중립 CPU 이미지로 옮긴다. 두 번째 디코드는 없다 — 바이트를 옮길 뿐이다.
 	//
 	// ★ 예전에는 이 자리가 왕복이었다(축 A 전). generation 의 텍스처는 이미
@@ -2752,62 +2830,99 @@ namespace
 	//   되돌려 DirectX::ScratchImage 를 세웠고, Vulkan 캐시가 그 DXGI_FORMAT
 	//   을 다시 RHIFormat 으로 환원했다. 포맷 왕복 두 번이 순수한 어댑터
 	//   비용이었다 — 지금은 양쪽 어휘가 처음부터 같아 옮기기만 한다.
-	[[nodiscard]] TextureImage BuildGenerationCpuImage(
-		const assets::ModelTextureAsset& texture, std::string& outError)
-	{
-		if (RHIFormat::RGBA8Unorm != texture.format
-			&& RHIFormat::RGBA8UnormSrgb != texture.format)
-		{
-			outError = "generation texture 포맷이 RGBA8 계열이 아니다";
-			return {};
-		}
-		if (texture.isCube || 0 == texture.width || 0 == texture.height
-			|| 0 == texture.mipLevels || 0 == texture.arraySize
-			|| texture.subresources.size()
-				!= static_cast<std::size_t>(texture.mipLevels) * texture.arraySize)
-		{
-			outError = "generation texture descriptor와 subresource 수가 맞지 않는다";
-			return {};
-		}
+    [[nodiscard]] TextureImage BuildGenerationCpuImage(
+        const assets::ModelTextureAsset& texture, std::string& outError)
+    {
+        namespace cooked = experiment::cooked;
+        outError.clear();
+        switch (texture.format)
+        {
+        case RHIFormat::RGBA8Unorm:
+        case RHIFormat::RGBA8UnormSrgb:
+        case RHIFormat::BGRA8Unorm:
+        case RHIFormat::BGRA8UnormSrgb:
+        case RHIFormat::RGBA16Float:
+        case RHIFormat::RGBA32Float:
+        case RHIFormat::BC1Unorm:
+        case RHIFormat::BC1UnormSrgb:
+        case RHIFormat::BC3Unorm:
+        case RHIFormat::BC3UnormSrgb:
+        case RHIFormat::BC5Unorm:
+        case RHIFormat::BC7Unorm:
+        case RHIFormat::BC7UnormSrgb:
+            break;
+        default:
+            outError = "Unsupported cooked model texture format";
+            return {};
+        }
+        std::uint32_t maximumMips = 1u;
+        for (auto extent = (std::max)(texture.width, texture.height); extent > 1u; extent >>= 1u)
+        {
+            ++maximumMips;
+        }
+        if (texture.width == 0u || texture.height == 0u
+            || texture.width > cooked::kCookedTextureMaxDimension
+            || texture.height > cooked::kCookedTextureMaxDimension
+            || texture.arraySize == 0u || texture.arraySize > cooked::kCookedTextureMaxArraySize
+            || texture.mipLevels == 0u || texture.mipLevels > maximumMips
+            || (texture.isCube && (texture.width != texture.height || texture.arraySize % 6u != 0u))
+            || texture.pixels.size() > cooked::kCookedTextureMaxBytes
+            || texture.subresources.size() != static_cast<std::size_t>(texture.arraySize) * texture.mipLevels)
+        {
+            outError = "Cooked model texture descriptor exceeds its shape or byte bounds";
+            return {};
+        }
+        // Validate every byte range and exact block pitch before allocating.
+        std::uint64_t end{};
+        for (std::size_t index = 0u; index < texture.subresources.size(); ++index)
+        {
+            const auto mip = static_cast<std::uint32_t>(index % texture.mipLevels);
+            const auto& source = texture.subresources[index];
+            const auto width = (std::max)(1u, texture.width >> mip);
+            const auto height = (std::max)(1u, texture.height >> mip);
+            if (source.width != width || source.height != height || source.offset != end
+                || source.rowPitch != RHIFormatRowPitch(texture.format, width)
+                || source.slicePitch != RHIFormatSlicePitch(texture.format, width, height)
+                || source.offset > texture.pixels.size()
+                || source.slicePitch > texture.pixels.size() - source.offset)
+            {
+                outError = "Cooked model texture subresource range or block pitch is invalid";
+                return {};
+            }
+            end += source.slicePitch;
+        }
+        if (end != texture.pixels.size())
+        {
+            outError = "Cooked model texture has trailing pixel bytes";
+            return {};
+        }
+        auto image = TextureImage::Allocate(texture.format, texture.width,
+            texture.height, texture.arraySize, texture.mipLevels, texture.isCube);
+        if (!image.IsValid())
+        {
+            outError = "Could not allocate cooked model texture storage";
+            return {};
+        }
+        for (std::uint32_t item = 0u; item < texture.arraySize; ++item)
+        {
+            for (std::uint32_t mip = 0u; mip < texture.mipLevels; ++mip)
+            {
+                const auto& source = texture.subresources[static_cast<std::size_t>(item) * texture.mipLevels + mip];
+                const auto* destination = image.Find(mip, item);
+                auto* pixels = destination ? image.MutablePixelsAt(*destination) : nullptr;
+                if (!destination || !pixels)
+                {
+                    outError = "Allocated cooked texture is missing a subresource";
+                    return {};
+                }
+                CopyImageRows(pixels, destination->rowPitch, texture.pixels.data() + source.offset,
+                    static_cast<std::size_t>(source.rowPitch), RHIFormatRowCount(texture.format, source.height),
+                    destination->rowPitch);
+            }
+        }
+        return image;
+    }
 
-		TextureImage image = TextureImage::Allocate(texture.format, texture.width,
-			texture.height, texture.arraySize, texture.mipLevels);
-		if (!image.IsValid())
-		{
-			outError = "중립 CPU 이미지 초기화 실패";
-			return {};
-		}
-		for (std::uint32_t item = 0; item < texture.arraySize; ++item)
-		{
-			for (std::uint32_t mip = 0; mip < texture.mipLevels; ++mip)
-			{
-				// CopyTexturePixels(ModelAssetGeneration.cpp)의 적재 순서와 같다:
-				// item 바깥, mip 안쪽. TextureImage 도 같은 규약이다.
-				const assets::ModelTextureSubresource& source =
-					texture.subresources[static_cast<std::size_t>(item) * texture.mipLevels + mip];
-				const TextureSubimage* destination = image.Find(mip, item);
-				std::byte* destinationPixels = (nullptr != destination)
-					? image.MutablePixelsAt(*destination) : nullptr;
-				if (nullptr == destination || nullptr == destinationPixels
-					|| 0 == source.rowPitch
-					|| source.offset + source.slicePitch > texture.pixels.size()
-					|| destination->width != source.width
-					|| destination->height != source.height)
-				{
-					outError = "generation texture subresource가 이미지 기술과 어긋난다";
-					return {};
-				}
-				const std::uint32_t sourceRows = static_cast<std::uint32_t>(
-					source.slicePitch / source.rowPitch);
-				CopyImageRows(destinationPixels, destination->rowPitch,
-					texture.pixels.data() + source.offset,
-					static_cast<std::size_t>(source.rowPitch),
-					(std::min)(sourceRows, destination->height),
-					destination->rowPitch);
-			}
-		}
-		return image;
-	}
 }
 
 own::shared_owner<const Texture> DataSystem::ResolveModelGenerationTexture(
@@ -2843,9 +2958,14 @@ own::shared_owner<const Texture> DataSystem::ResolveModelGenerationTexture(
 	ce::profile_scope profile{ ce::marker<"Asset.GenerationTextureImage">() };
 	std::string error;
 	TextureImage image = BuildGenerationCpuImage(*texture, error);
-	own::shared_owner<const Texture> owner = image.IsValid()
-		? Texture::CreateSharedFromImage(texture->name, std::move(image))
-		: nullptr;
+    own::shared_owner<const Texture> owner;
+    if (image.IsValid())
+    {
+        owner = texture->cookedPayload
+            ? Texture::CreateSharedFromCookedImage(texture->name, std::move(image),
+                { texture->cookedHasAlpha, texture->cookedColorSpaceLocked })
+            : Texture::CreateSharedFromImage(texture->name, std::move(image));
+    }
 	if (!owner)
 	{
 		std::lock_guard lock(m_modelGenerationTextureMutex);
@@ -3349,7 +3469,8 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
             }
             const auto format = owner->GetImageDescription().Format();
             const bool srgb = format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
-                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb
+                || format == RHIFormat::BC7UnormSrgb;
             reference->colorSpace = srgb ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;
         }
         return experiment::SerializeMaterialAuthoring(authored, outNode, error);
@@ -4195,7 +4316,6 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
             AssetDepot::TextureAssetVariant variant;
             variant.colorSpace = colorSpace == LX::LXColorSpace::SRGB
                 ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
-            variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
             auto owner = TryAcquire<Texture>(imageLink, variant);
             const auto currentCatalog = GetCookedCatalog();
             if (!currentCatalog || currentCatalog->ResolverRevision() != catalog->ResolverRevision())
@@ -4797,7 +4917,14 @@ own::shared_owner<const Texture> DataSystem::LoadTextureGUID(FileGuid guid)
     if (catalog && catalog->Find(imageLink.ToReference(), resolvedImage)
         == experiment::cooked::AssetLookupStatus::Found)
     {
-        return TryAcquire<Texture>(imageLink);
+        AssetDepot::TextureAssetVariant variant;
+        variant.role = static_cast<std::uint32_t>(TextureFileType::Texture) + 1u;
+        auto owner = TryAcquire<Texture>(imageLink, variant);
+        if (!owner)
+        {
+            (void)RequestAsync<Texture>(imageLink, variant);
+        }
+        return owner;
     }
     std::uint64_t loadEpoch{};
     std::uint64_t resolverRevision{};
@@ -4869,7 +4996,15 @@ own::shared_owner<const Texture> DataSystem::LoadSharedTexture(std::string_view 
         == experiment::cooked::AssetLookupStatus::Found)
     {
         // No synchronous fallback to a newer loose path for a mounted typed ID.
-        auto owner = TryAcquire<Texture>(imageLink);
+        AssetDepot::TextureAssetVariant variant;
+        variant.role = static_cast<std::uint32_t>(type) + 1u;
+        auto owner = TryAcquire<Texture>(imageLink, variant);
+        if (!owner)
+        {
+            // A current cooked generation is asynchronous even on this legacy
+            // entry point. Existing consumers keep their last accepted owner.
+            (void)RequestAsync<Texture>(imageLink, variant);
+        }
         std::lock_guard admissionLock(m_assetPreparationMutex);
         if (m_assetPreparationStopping || m_assetInvalidationDepth != 0
             || loadEpoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
@@ -4961,6 +5096,32 @@ own::shared_owner<const Texture> DataSystem::LoadSharedMaterialTexture(std::stri
 		destination = PathFinder::Relative("Materials\\")
 			/ destination.filename();
 	}
+    const auto guid = GetFileGuid(destination);
+    const AssetDepot::AssetLink<Texture> imageLink{ { experiment::AssetId{ guid.m_guid }, {} } };
+    const auto catalog = GetCookedCatalog();
+    experiment::cooked::ResolvedAssetEntry imageEntry;
+    if (catalog && catalog->Find(imageLink.ToReference(), imageEntry)
+        == experiment::cooked::AssetLookupStatus::Found)
+    {
+        // Import settings own compression, mips and transfer function. Material
+        // usage cannot silently reinterpret or recook this accepted artifact.
+        AssetDepot::TextureAssetVariant variant;
+        variant.colorSpace = srgb.has_value()
+            ? (*srgb ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear)
+            : AssetDepot::TextureAssetColorSpace::Source;
+        auto owner = TryAcquire<Texture>(imageLink, variant);
+        if (!owner)
+        {
+            (void)RequestAsync<Texture>(imageLink, variant);
+        }
+        std::lock_guard admissionLock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping || m_assetInvalidationDepth != 0u
+            || loadEpoch != m_assetPreparationEpoch || resolverRevision != m_assetDepotRevision)
+        {
+            return {};
+        }
+        return owner;
+    }
 	// G2 — 경로·압축·색공간이 모두 결과를 바꾼다. 색공간을 안 준 호출은 원본 그대로를
 	// 받으므로 "source" 로 가른다. 예전 이 자리의 stem 키는 일반 텍스처 캐시와 같은
 	// 맵에서 같은 stem 을 나눠 다른 파일·다른 압축 결과를 돌려줄 수 있었다.
@@ -5113,9 +5274,39 @@ std::size_t DataSystem::DrainQueuedAssetChanges()
 
 bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 {
+    if (change.texturePublication)
+    {
+        return PublishAuthoredTexture(change);
+    }
+
     if (change.path.empty())
     {
         return false;
+    }
+
+    if (change.kind == RuntimeAssetChangeKind::Removed)
+    {
+        const auto guid = change.guid != FileGuid{} ? change.guid : GetFileGuid(change.path);
+        AssetDepot::AssetMountId retired;
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            if (const auto found = m_authoredTextureMounts.find(guid); found != m_authoredTextureMounts.end())
+            {
+                retired = found->second;
+                m_authoredTextureMounts.erase(found);
+            }
+        }
+        if (retired.IsValid())
+        {
+            std::vector<experiment::cooked::AssetManifestIssue> issues;
+            if (!UnmountAssetSet(retired, issues))
+            {
+                QueueAssetChange(change);
+                std::lock_guard lock(m_assetPreparationMutex);
+                m_authoredTextureMounts[guid] = retired;
+                return false;
+            }
+        }
     }
 
     struct InvalidationScope
@@ -5495,7 +5686,9 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
         {
             continue;
         }
-        auto descriptor = RequestAsync<Texture>(link);
+        AssetDepot::TextureAssetVariant variant;
+        variant.role = static_cast<std::uint32_t>(textureType) + 1u;
+        auto descriptor = RequestAsync<Texture>(link, variant);
         if (const auto completion = descriptor.Completion(); completion.valid())
         {
             descriptorDependencies.push_back(completion);
@@ -6004,6 +6197,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
         InvalidateModelAssetsLocked(retiredModels);
         InvalidateMaterialAssetsLocked(retiredMaterials);
         m_cookedCatalog = std::move(catalog);
+        m_authoredTextureMounts.clear();
         m_cookedStaleAssets = std::move(stale);
         ++m_assetDepotRevision;
         DetachLegacyCachesLocked(retiredLegacy);
@@ -6204,7 +6398,8 @@ bool DataSystem::RebuildCookedMaterialInstance(Material& material, std::string& 
         {
             const auto format = existing->GetImageDescription().Format();
             const bool sourceSrgb = format == RHIFormat::RGBA8UnormSrgb || format == RHIFormat::BGRA8UnormSrgb
-                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb;
+                || format == RHIFormat::BC1UnormSrgb || format == RHIFormat::BC3UnormSrgb
+                || format == RHIFormat::BC7UnormSrgb;
             const bool srgb = captured->variant.colorSpace == AssetDepot::TextureAssetColorSpace::Srgb
                 || (captured->variant.colorSpace == AssetDepot::TextureAssetColorSpace::Source && sourceSrgb);
             reference.colorSpace = srgb ? experiment::TextureColorSpace::Srgb : experiment::TextureColorSpace::Linear;

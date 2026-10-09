@@ -373,11 +373,15 @@ PSOut EvaluateGBufferSurface(VSOut input, bool frontFace)
     // metallicRoughness.R has no AO meaning unless also authored as aoMap.
     materialInputs.occlusion = EvaluatePbrOcclusion(aoMap.Sample(gSampler, MaterialUv(20, input.uv, input.uv1)).r,
         usePropertyBlock ? occlusionStrength : 1.0);
-    const bool useNormalMap = input.material.z != 0.0;
+    const uint normalMapEncoding = uint(input.material.z);
+    const bool useNormalMap = (normalMapEncoding & 1u) != 0u;
     float3 normalSample = float3(0.5, 0.5, 1.0);
-    if (useNormalMap) normalSample = normalMap.Sample(gSampler, MaterialUv(17, input.uv, input.uv1)).rgb;
+    if (useNormalMap)
+    {
+        normalSample = normalMap.Sample(gSampler, MaterialUv(17, input.uv, input.uv1)).rgb;
+    }
     const float3 normal = EvaluatePbrNormal(input.normal, input.tangent,
-        input.bitangent, normalSample, materialNormalScale, useNormalMap,
+        input.bitangent, normalSample, materialNormalScale, normalMapEncoding,
         SHADING_QUALITY == 1);
 
     materialInputs.normal = OrientPbrNormal(normal, input.coverageFlags, frontFace);

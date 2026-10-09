@@ -65,6 +65,28 @@ $tool = "$engine\Bin\x64-Debug\Tools\CreatorBuildTool\CreatorBuildTool.exe"
 `--input-mode Workspace|Tracked`는 엔진 소스 checkout의 `Dynamic_CPP`만 지원한다.
 `--build-native`는 엔진 유지보수자용이며 일반 게임 패키징에서는 지정하지 않는다.
 
+### 내장 볼류메트릭 blue noise
+
+PHASE12의 내장 리소스는 `Resources/VolumetricFog/blueNoise.cetex`다. `publish-engine`은 추적된
+`Dynamic_CPP/Assets/VolumetricFog/blueNoise.dds`를 AssetCooker로 cook하고 배포 해시에 포함한다.
+원본에는 GUID sidecar가 없으므로 일반 프로젝트 텍스처로 등록하지 않는다. `Source` 색 공간,
+`None` 추가 압축, `PreserveAuthored` 정책으로 BC3Unorm 128×128의 8개 authored mip을 보존하며,
+cooker가 각 mip의 바이트 동일성과 게시 전 재열기를 검증한다.
+
+Legacy 및 PrebuiltAssetSets 게임 패키지는 동일한 엔진 배포본의 cooked 리소스를 PAK 밖으로 복사한다.
+bootstrap 생성과 패키징은 누락되거나 잘못된 CECT2를 거부하며 프로젝트 DDS에 의존하지 않는다.
+소스 checkout에서는 AssetCooker의 표준 빌드 후 배치가 같은 구성의 `Bin/x64-<Config>/Resources`에
+리소스를 준비한다. 네이티브 host를 빌드하지 않고 다시 준비하거나 Shipping Player용으로 배치하려면
+이미 빌드한 cooker에 명시적 출력 경로를 전달한다.
+
+```powershell
+& .\Bin\x64-Release\Tools\AssetCooker\AssetCooker.exe --cook-builtin-textures `
+  --blue-noise-source .\Dynamic_CPP\Assets\VolumetricFog\blueNoise.dds `
+  --output .\Bin\x64-Release-Shipping\Resources\VolumetricFog\blueNoise.cetex
+```
+
+반복 실행은 검증된 결과만 원자적으로 교체한다. Player는 DDS 디코딩이나 런타임 cook으로 복구하지 않는다.
+
 ## 실패·취소·진단
 
 - `--log-path <파일>`은 오류와 하위 도구 출력을 기록한다. `--json`은 schemaVersion 1의 JSON Lines를 출력한다.

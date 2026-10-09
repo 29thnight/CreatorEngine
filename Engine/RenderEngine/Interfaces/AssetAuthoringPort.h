@@ -1,7 +1,8 @@
-﻿#pragma once
+#pragma once
 
 #include "Core.Minimal.h"
 #include "TypeTrait.h"
+#include "Texture.h"
 
 #include <cstddef>
 #include <span>
@@ -65,11 +66,60 @@ struct UncatalogedAuthoringRequest
 	std::string payload;
 };
 
+// Legacy source-image policies are authoring operations, never runtime fallbacks.
+enum class TextureSourceCompression
+{
+    None,
+    LegacyColor,
+    MaterialColor,
+    LegacyLinear
+};
+
+enum class TerrainSourceImageKind
+{
+    HeightBits,
+    Gray8
+};
+
+struct TerrainSourceImage
+{
+    uint32_t width{};
+    uint32_t height{};
+    std::vector<float> heights;
+    std::vector<uint8_t> gray;
+};
+
 // Optional Host adapter for source-asset authoring requests made by runtime
 // types. Player never installs handlers; missing handlers return null/false.
 class AssetAuthoringPort final
 {
 public:
+    using SourceTextureLoader = own::shared_owner<const Texture::CodecImage> (*)(
+        const file::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression);
+    using SourceTextureMipGenerator = own::shared_owner<const Texture::CodecImage> (*)(
+        const TextureImageView& image, std::string& failure);
+    using SourceTextureRgbaDecoder = bool (*)(std::span<const std::byte> bytes,
+        TextureImage& image, std::string& failure);
+    using TerrainSourceImageReader = bool (*)(const file::path& path,
+        TerrainSourceImageKind kind, TerrainSourceImage& result);
+
+    static void InstallSourceTextureLoader(SourceTextureLoader handler) noexcept;
+    static void UninstallSourceTextureLoader(SourceTextureLoader handler) noexcept;
+    static own::shared_owner<const Texture::CodecImage> LoadSourceTexture(
+        const file::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression) noexcept;
+    static void InstallSourceTextureMipGenerator(SourceTextureMipGenerator handler) noexcept;
+    static void UninstallSourceTextureMipGenerator(SourceTextureMipGenerator handler) noexcept;
+    static own::shared_owner<const Texture::CodecImage> GenerateSourceTextureMips(
+        const TextureImageView& image, std::string& failure) noexcept;
+    static void InstallSourceTextureRgbaDecoder(SourceTextureRgbaDecoder handler) noexcept;
+    static void UninstallSourceTextureRgbaDecoder(SourceTextureRgbaDecoder handler) noexcept;
+    static bool DecodeSourceTextureRgba8(std::span<const std::byte> bytes,
+        TextureImage& image, std::string& failure) noexcept;
+    static void InstallTerrainSourceImageReader(TerrainSourceImageReader handler) noexcept;
+    static void UninstallTerrainSourceImageReader(TerrainSourceImageReader handler) noexcept;
+    static bool ReadTerrainSourceImage(const file::path& path,
+        TerrainSourceImageKind kind, TerrainSourceImage& result) noexcept;
+
 	using CreateMetaHandler = FileGuid (*)(const file::path& filepath,
 		const FileGuid& preferredGuid);
 	using WriteTextAssetWithMetaHandler = FileGuid (*)(

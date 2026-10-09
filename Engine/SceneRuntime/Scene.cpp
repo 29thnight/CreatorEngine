@@ -2150,6 +2150,13 @@ void Scene::CommitRenderProxies()
             renderer->EnsureMeshBinding();
         }
     }
+    for (DecalComponent* decal : registry.decals)
+    {
+        if (decal && !decal->IsDestroyMark())
+        {
+            decal->PollTextureRequests();
+        }
+    }
 
     // Even a frame with no fixed step advances render alpha. Queue only bodies
     // retained by the last completed tick, plus their render descendants.

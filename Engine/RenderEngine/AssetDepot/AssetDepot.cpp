@@ -1,5 +1,6 @@
 #include "../DataSystem.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
+#include "../Experiment/Cooked/CookedTexture.h"
 #include "AssetSetActivation.h"
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
 #include "../Experiment/Cooked/CookedShaderMeta.h"
@@ -9,6 +10,103 @@
 
 #include <limits>
 #include <utility>
+#include "../../Utility_Framework/ContentAbi.h"
+
+bool DataSystem::PublishAuthoredTexture(const RuntimeAssetChange& change)
+{
+    namespace cooked = experiment::cooked;
+    const auto& publication = change.texturePublication;
+    if (!publication || !publication->latestRevision
+        || publication->latestRevision->load(std::memory_order_acquire) != publication->revision)
+    {
+        if (publication)
+        {
+            publication->state.store(RuntimeTexturePublication::State::Superseded, std::memory_order_release);
+        }
+        return false;
+    }
+    if (publication->manifest.entries.size() != 1u || publication->manifest.blobs.size() != 1u
+        || publication->manifest.entries.front().asset.key.assetId != experiment::AssetId{ change.guid.m_guid }
+        || publication->manifest.entries.front().asset.kind != cooked::CookedAssetKind::Texture)
+    {
+        publication->state.store(RuntimeTexturePublication::State::Failed, std::memory_order_release);
+        return false;
+    }
+    {
+        std::lock_guard lock(m_assetPreparationMutex);
+        if (m_assetPreparationStopping)
+        {
+            publication->state.store(RuntimeTexturePublication::State::Failed, std::memory_order_release);
+            return false;
+        }
+        if (m_assetRootHandoffs != 0u || m_assetInvalidationDepth != 0u)
+        {
+            QueueAssetChange(change);
+            return false;
+        }
+    }
+    if (!ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+        RuntimeAssetType::Texture, change.guid, change.path }))
+    {
+        publication->state.store(RuntimeTexturePublication::State::Failed, std::memory_order_release);
+        return false;
+    }
+    cooked::AssetSetMountOptions options;
+    options.expectedTargetPlatform = "win-x64";
+    options.expectedTargetAbi = CreatorContentAbi::Token;
+    const auto reference = publication->manifest.entries.front().asset;
+    const auto catalog = GetCookedCatalog();
+    cooked::ResolvedAssetEntry previous;
+    const bool hasPrevious = catalog
+        && catalog->Find(reference, previous) == cooked::AssetLookupStatus::Found;
+    auto comparableBlob = previous.blob;
+    // Locators belong to their immutable mount backing, not typed byte identity.
+    // Match CookedAssetCatalog's identical-definition test across package/editor paths.
+    comparableBlob.artifactPath = publication->manifest.blobs.front().artifactPath;
+    const bool identical = hasPrevious
+        && comparableBlob == publication->manifest.blobs.front()
+        && previous.entry.dependencies == publication->manifest.entries.front().dependencies;
+    if (!identical)
+    {
+        if (hasPrevious)
+        {
+            options.overrideIdentities.push_back(reference.key);
+        }
+        std::vector<cooked::AssetManifestIssue> issues;
+        AssetDepot::AssetMountId previousMount;
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            if (const auto found = m_authoredTextureMounts.find(change.guid); found != m_authoredTextureMounts.end())
+            {
+                previousMount = found->second;
+            }
+        }
+        const auto mounted = MountAssetSet(publication->manifestBytes, publication->byteSource,
+            options, issues, previousMount);
+        if (!mounted.IsValid())
+        {
+            for (const auto& issue : issues)
+            {
+                if (issue.context == "mount" && issue.message.find("stale") != std::string::npos)
+                {
+                    QueueAssetChange(change);
+                    return false;
+                }
+                Debug::PrintLog(spdlog::level::err,
+                    "Texture generation publication failed [" + issue.context + "]: " + issue.message);
+            }
+            publication->state.store(RuntimeTexturePublication::State::Failed, std::memory_order_release);
+            return false;
+        }
+        {
+            std::lock_guard lock(m_assetPreparationMutex);
+            m_authoredTextureMounts[change.guid] = mounted;
+        }
+    }
+    publication->request = RequestAsync<Texture>(AssetDepot::AssetLink<Texture>{ reference.key });
+    publication->state.store(RuntimeTexturePublication::State::Loading, std::memory_order_release);
+    return true;
+}
 
 namespace AssetDepot
 {
@@ -24,7 +122,7 @@ namespace AssetDepot
             switch (blob.kind)
             {
             case cooked::CookedAssetKind::Texture:
-                representation = 1u;
+                representation = cooked::kCookedTextureRepresentationVersion;
                 schema = cooked::kTextureArtifactVersion;
                 break;
             case cooked::CookedAssetKind::Model:
@@ -79,7 +177,8 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
     std::span<const std::byte> manifestBytes,
     own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource,
     const experiment::cooked::AssetSetMountOptions& options,
-    std::vector<experiment::cooked::AssetManifestIssue>& outIssues)
+    std::vector<experiment::cooked::AssetManifestIssue>& outIssues,
+    AssetDepot::AssetMountId replaceMount)
 {
     namespace cooked = experiment::cooked;
     outIssues.clear();
@@ -104,7 +203,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
             outIssues.push_back({ "mount", "asset admission has stopped" });
             return {};
         }
-        if (m_assetDepotRevision == (std::numeric_limits<std::uint64_t>::max)()
+        if (m_assetDepotRevision > (std::numeric_limits<std::uint64_t>::max)() - (replaceMount.IsValid() ? 2u : 1u)
             || m_nextAssetMountId == (std::numeric_limits<std::uint64_t>::max)())
         {
             outIssues.push_back({ "mount", "asset mount identity/revision space exhausted" });
@@ -126,6 +225,18 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
     {
         return {};
     }
+    const auto publishedRevision = revision + (replaceMount.IsValid() ? 2u : 1u);
+    if (replaceMount.IsValid())
+    {
+        cooked::CookedAssetCatalog replacement;
+        if (!candidate.WithoutMountedAssetSet(replaceMount, publishedRevision, replacement, outIssues))
+        {
+            return {};
+        }
+        candidate = std::move(replacement);
+    }
+    // No intermediate resolver exposes both the replacement and its retired
+    // logical definition. Old descriptor/source owners pin backing independently.
     auto published = own::make_shared<const cooked::CookedAssetCatalog>(std::move(candidate));
     own::shared_owner<const cooked::CookedAssetCatalog> retired;
     AssetDepot::TextureAssetRetiredEntries retiredTextures;
@@ -147,7 +258,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
         StageMaterialAssetRetirementLocked(retiredMaterials);
         retired = std::move(m_cookedCatalog);
         m_cookedCatalog = std::move(published);
-        m_assetDepotRevision = revision + 1u;
+        m_assetDepotRevision = publishedRevision;
         DetachLegacyCachesLocked(retiredLegacy);
         InvalidateTextureAssetsLocked(retiredTextures);
         InvalidateModelAssetsLocked(retiredModels);

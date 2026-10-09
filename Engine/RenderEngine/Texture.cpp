@@ -1,30 +1,15 @@
 #include "Texture.h"
+#include "TextureCodecImage.h"
 #include "AssetDepot/TextureAssetRuntime.h"
+#include "Experiment/Cooked/CookedTexture.h"
+#include "Interfaces/AssetAuthoringPort.h"
 #include "PathFinder.h"
 #include "Core.Memory.hpp"
-// Win32::ThrowIfFailed가 여기 있다. 유니티 빌드에서는 같은 블롭의 앞선
-// 파일이 공급했다.
-#include "DirectXHelper.h"
-#include "../EngineDiagnostics/ProfileScope.h"
-#include <optional>
+#include "LogSystem.h"
 #include <limits>
 #include <atomic>
-#include <DirectXTex.h>
-#include <objbase.h>
+#include <fstream>
 
-// 유니티 빌드에서는 같은 블롭의 앞선 파일이 이 using을 공급했다.
-// ASan 구성은 블롭을 끄므로 직접 받는다(PHASE 9-9).
-using namespace DirectX;
-
-// ── 코덱 산출물 (축 A) ────────────────────────────────────────────────────
-//
-// Texture 가 드는 것은 이 struct 이고, 정의는 이 파일에만 있다. 헤더는
-// 전방선언만 알므로 DirectXTex 도 DirectX:: 이름도 나가지 않는다.
-//
-// ★ 픽셀을 옮기지 않는다. 디코더가 낸 자리에 그대로 두고 서브리소스 표만
-//   만든다 — 그 표가 가리키는 것이 scratch(또는 owned)의 내부 버퍼다.
-//   컨테이너로 옮기면 로드마다 전량 복사가 붙는데, 4K HDR equirect 한 장이
-//   128MB 라 그 한 번이 무시되지 않는다.
 namespace
 {
     std::atomic<std::size_t> TextureLiveImageBytes{};
@@ -32,339 +17,80 @@ namespace
     std::atomic<std::size_t> TextureLiveImageCount{};
 }
 
-struct Texture::CodecImage
+void Texture::CodecImage::Account()
 {
-    /// 출처 A — 파일·메모리 디코드. DirectXTex 가 픽셀을 소유한 채 남는다.
-    ScratchImage scratch;
-
-    /// 출처 B — 이미 중립인 픽셀을 받아 든 것(cooked generation · 합성 픽셀).
-    TextureImage owned;
-
-    /// 위 둘 중 살아 있는 쪽의 내부를 가리킨다.
-    std::vector<TextureSubimage> subresources;
-
-    RHIFormat format{ RHIFormat::Unknown };
-    uint32_t  width{ 0 };
-    uint32_t  height{ 0 };
-    uint32_t  mipLevels{ 0 };
-    uint32_t  arraySize{ 0 };
-    bool      isCube{ false };
-    bool hasAlpha{};
-    std::optional<AssetDepot::TextureImageKey> key{};
-    std::size_t accountedBytes{};
-
-    void Account()
+    for (const auto& subresource : subresources)
     {
-        for (const auto& subresource : subresources)
-        {
-            accountedBytes += subresource.slicePitch;
-        }
-        TextureLiveImageBytes.fetch_add(accountedBytes, std::memory_order_relaxed);
-        TextureLiveImageCount.fetch_add(1u, std::memory_order_relaxed);
+        accountedBytes += subresource.slicePitch;
+    }
+    TextureLiveImageBytes.fetch_add(accountedBytes, std::memory_order_relaxed);
+    TextureLiveImageCount.fetch_add(1u, std::memory_order_relaxed);
+    if (!key)
+    {
+        TextureNonRehydratableBytes.fetch_add(accountedBytes, std::memory_order_relaxed);
+    }
+}
+
+Texture::CodecImage::~CodecImage()
+{
+    if (accountedBytes != 0u)
+    {
+        TextureLiveImageBytes.fetch_sub(accountedBytes, std::memory_order_relaxed);
+        TextureLiveImageCount.fetch_sub(1u, std::memory_order_relaxed);
         if (!key)
         {
-            TextureNonRehydratableBytes.fetch_add(accountedBytes, std::memory_order_relaxed);
+            TextureNonRehydratableBytes.fetch_sub(accountedBytes, std::memory_order_relaxed);
         }
     }
-    ~CodecImage()
-    {
-        if (accountedBytes != 0u)
-        {
-            TextureLiveImageBytes.fetch_sub(accountedBytes, std::memory_order_relaxed);
-            TextureLiveImageCount.fetch_sub(1u, std::memory_order_relaxed);
-            if (!key)
-            {
-                TextureNonRehydratableBytes.fetch_sub(accountedBytes, std::memory_order_relaxed);
-            }
-        }
-    }
-};
+}
 
-// ── DirectXTex 와 나머지 엔진의 유일한 접점 (축 A) ──────────────────────
-//
-// 이 파일 위쪽(로더 넷)은 DirectXTex 로 디코드·압축하고, 아래 헬퍼가 그
-// 결과를 중립 서술로 감싼다. 그 지점부터는 저장소 어디에도
-// DirectX::ScratchImage 가 없다 — 디코더나 압축기를 갈아 끼우는 날 봐야
-// 할 파일은 이것 하나다.
-//
-// ★ 익명 네임스페이스인데 이름이 긴 이유: 유니티 빌드가 여러 .cpp 를 한
-//   TU 로 합치므로 흔한 이름은 옆 파일과 충돌한다.
 namespace
 {
-	/// DirectXTex 디코더·압축기가 실제로 내는 포맷만 담은 표.
-	///
-	/// ★ 백엔드 대응표(DX12Format.h · VulkanFormat.h)와 성격이 다르다.
-	///   저쪽은 "엔진 어휘 <-> API 어휘"이고 이것은 "디코더 어휘 -> 엔진
-	///   어휘"다. 축 B 에서 디코더가 바뀌면 이 표는 함께 사라진다.
-	RHIFormat TextureDecodedFormatToRHI(DXGI_FORMAT format)
-	{
-		switch (format)
-		{
-		case DXGI_FORMAT_R8G8B8A8_UNORM:      return RHIFormat::RGBA8Unorm;
-		case DXGI_FORMAT_R8G8B8A8_UNORM_SRGB: return RHIFormat::RGBA8UnormSrgb;
-		case DXGI_FORMAT_B8G8R8A8_UNORM:      return RHIFormat::BGRA8Unorm;
-		case DXGI_FORMAT_B8G8R8A8_UNORM_SRGB: return RHIFormat::BGRA8UnormSrgb;
-		case DXGI_FORMAT_R16G16B16A16_FLOAT:  return RHIFormat::RGBA16Float;
-		case DXGI_FORMAT_R32G32B32A32_FLOAT:  return RHIFormat::RGBA32Float;
-		case DXGI_FORMAT_BC1_UNORM:           return RHIFormat::BC1Unorm;
-		case DXGI_FORMAT_BC1_UNORM_SRGB:      return RHIFormat::BC1UnormSrgb;
-		case DXGI_FORMAT_BC3_UNORM:           return RHIFormat::BC3Unorm;
-        case DXGI_FORMAT_BC3_UNORM_SRGB:      return RHIFormat::BC3UnormSrgb;
-		default:                              return RHIFormat::Unknown;
-		}
-	}
-
-    DXGI_FORMAT TextureMipFormatFromRHI(RHIFormat format)
+    bool TextureAdoptImage(Texture::CodecImage& out, TextureImage&& image)
     {
-        switch (format)
+        if (!image.IsValid())
         {
-        case RHIFormat::RGBA8Unorm: return DXGI_FORMAT_R8G8B8A8_UNORM;
-        case RHIFormat::RGBA8UnormSrgb: return DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-        case RHIFormat::BGRA8Unorm: return DXGI_FORMAT_B8G8R8A8_UNORM;
-        case RHIFormat::BGRA8UnormSrgb: return DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
-        case RHIFormat::RGBA16Float: return DXGI_FORMAT_R16G16B16A16_FLOAT;
-        case RHIFormat::RGBA32Float: return DXGI_FORMAT_R32G32B32A32_FLOAT;
-        case RHIFormat::BC1Unorm: return DXGI_FORMAT_BC1_UNORM;
-        case RHIFormat::BC1UnormSrgb: return DXGI_FORMAT_BC1_UNORM_SRGB;
-        case RHIFormat::BC3Unorm: return DXGI_FORMAT_BC3_UNORM;
-        case RHIFormat::BC3UnormSrgb: return DXGI_FORMAT_BC3_UNORM_SRGB;
-        default: return DXGI_FORMAT_UNKNOWN;
+            return false;
         }
+        out.owned = std::move(image);
+
+        out.format = out.owned.Format();
+        out.width = out.owned.Width();
+        out.height = out.owned.Height();
+        out.mipLevels = out.owned.MipLevels();
+        out.arraySize = out.owned.ArraySize();
+        out.isCube = out.owned.IsCube();
+
+        out.subresources.clear();
+        out.subresources.reserve(
+            static_cast<size_t>(out.arraySize) * out.mipLevels);
+        for (uint32_t item = 0; item < out.arraySize; ++item)
+        {
+            for (uint32_t mip = 0; mip < out.mipLevels; ++mip)
+            {
+                const TextureSubimage* source = out.owned.Find(mip, item);
+                if (nullptr == source || nullptr == source->pixels)
+                {
+                    return false;
+                }
+                out.subresources.push_back(*source);
+            }
+        }
+        return !out.subresources.empty();
     }
 
-	/// 2D 밉·배열 체인으로 다룰 수 있는 이미지인지.
-	bool TextureIsUploadableShape(const TexMetadata& metadata)
-	{
-		return TEX_DIMENSION_TEXTURE2D == metadata.dimension
-			&& 0 != metadata.width && 0 != metadata.height
-			&& 0 != metadata.mipLevels && 0 != metadata.arraySize
-			&& metadata.width <= UINT32_MAX && metadata.height <= UINT32_MAX;
-	}
-
-	/// scratch 를 CodecImage 로 **옮긴 뒤** 서브리소스 표를 채운다.
-	///
-	/// ★ 옮긴 뒤여야 한다. ScratchImage 의 이동은 내부 버퍼를 넘기므로,
-	///   옮기기 전에 얻은 GetImage() 포인터는 그 뒤로 유효를 보장하지 않는다.
-	bool TextureAdoptScratch(Texture::CodecImage& out, ScratchImage&& image,
-		RHIFormat format)
-	{
-		out.scratch = std::move(image);
-		const TexMetadata& metadata = out.scratch.GetMetadata();
-
-		out.format = format;
-		out.width = static_cast<uint32_t>(metadata.width);
-		out.height = static_cast<uint32_t>(metadata.height);
-		out.mipLevels = static_cast<uint32_t>(metadata.mipLevels);
-		out.arraySize = static_cast<uint32_t>(metadata.arraySize);
-		out.isCube = metadata.IsCubemap();
-
-		out.subresources.clear();
-		out.subresources.reserve(
-			static_cast<size_t>(out.arraySize) * out.mipLevels);
-		// item 바깥, mip 안쪽 — TextureImage.h 의 레이아웃 규약과 같다.
-		for (uint32_t item = 0; item < out.arraySize; ++item)
-		{
-			for (uint32_t mip = 0; mip < out.mipLevels; ++mip)
-			{
-				const Image* source = out.scratch.GetImage(mip, item, 0);
-				if (nullptr == source || nullptr == source->pixels) return false;
-				TextureSubimage subresource;
-				subresource.pixels = reinterpret_cast<const std::byte*>(source->pixels);
-				subresource.rowPitch = source->rowPitch;
-				subresource.slicePitch = source->slicePitch;
-				subresource.width = static_cast<uint32_t>(source->width);
-				subresource.height = static_cast<uint32_t>(source->height);
-				out.subresources.push_back(subresource);
-			}
-		}
-		return !out.subresources.empty();
-	}
-
-	/// 이미 중립인 이미지를 CodecImage 로 옮긴다(cooked generation · 합성 픽셀).
-	bool TextureAdoptImage(Texture::CodecImage& out, TextureImage&& image)
-	{
-		if (!image.IsValid()) return false;
-		out.owned = std::move(image);
-
-		out.format = out.owned.Format();
-		out.width = out.owned.Width();
-		out.height = out.owned.Height();
-		out.mipLevels = out.owned.MipLevels();
-		out.arraySize = out.owned.ArraySize();
-		out.isCube = out.owned.IsCube();
-
-		out.subresources.clear();
-		out.subresources.reserve(
-			static_cast<size_t>(out.arraySize) * out.mipLevels);
-		for (uint32_t item = 0; item < out.arraySize; ++item)
-		{
-			for (uint32_t mip = 0; mip < out.mipLevels; ++mip)
-			{
-				const TextureSubimage* source = out.owned.Find(mip, item);
-				if (nullptr == source || nullptr == source->pixels) return false;
-				out.subresources.push_back(*source);
-			}
-		}
-		return !out.subresources.empty();
-	}
-
-	/// 표에 없는 디코더 산출 포맷을 RGBA8 로 내린다.
-	///
-	/// ★ 거절하지 않는 이유: 거절하면 그 자산이 화면에서 통째로 사라진다.
-	///   어휘에 이름이 없다는 이유로 그림을 잃는 것보다 한 번 변환하는 편이
-	///   낫고, 여기 걸리는 포맷이 실제로 나오면 그것이 어휘에 더할 후보다.
-	///   전달 함수는 건드리지 않는다 — 목표의 sRGB 성질을 소스와 같게 두면
-	///   DirectXTex 가 감마에 손대지 않는다(Texture::DecodeToRgba8 주석 참고).
-	bool TextureLowerToRgba8(const ScratchImage& image, ScratchImage& out)
-	{
-		const TexMetadata& metadata = image.GetMetadata();
-		const DXGI_FORMAT target = IsSRGB(metadata.format)
-			? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-		const HRESULT lowering = IsCompressed(metadata.format)
-			? Decompress(image.GetImages(), image.GetImageCount(), metadata,
-				target, out)
-			: Convert(image.GetImages(), image.GetImageCount(), metadata, target,
-				TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, out);
-		return SUCCEEDED(lowering) && 0 != out.GetImageCount();
-	}
-
-	/// 디코드 결과를 Texture 가 들 형태로 감싼다. 픽셀 복사 0.
-	own::shared_owner<const Texture::CodecImage> TextureMakeCodecImage(ScratchImage&& image,
-        const std::optional<AssetDepot::TextureImageKey>& key = {})
-	{
-		if (!TextureIsUploadableShape(image.GetMetadata()))
-		{
-			return {};
-		}
-
-		auto codec = own::make_shared<Texture::CodecImage>();
-        codec->key = key;
-        codec->hasAlpha = !image.IsAlphaAllOpaque();
-		const RHIFormat known = TextureDecodedFormatToRHI(image.GetMetadata().format);
-		if (RHIFormat::Unknown != known)
-		{
-			if (!TextureAdoptScratch(*codec, std::move(image), known))
-			{
-				return {};
-			}
-			codec->Account();
-			return std::move(codec);
-		}
-
-		ScratchImage lowered;
-		if (!TextureLowerToRgba8(image, lowered))
-		{
-			return {};
-		}
-		const RHIFormat loweredFormat =
-			TextureDecodedFormatToRHI(lowered.GetMetadata().format);
-		if (RHIFormat::Unknown == loweredFormat)
-		{
-			return {};
-		}
-		if (!TextureAdoptScratch(*codec, std::move(lowered), loweredFormat))
-		{
-			return {};
-		}
-		codec->Account();
-		return std::move(codec);
-	}
-
-	/// 이미 중립인 이미지를 Texture 가 들 형태로 감싼다.
-	own::shared_owner<const Texture::CodecImage> TextureMakeCodecImage(TextureImage&& image)
-	{
-		auto codec = own::make_shared<Texture::CodecImage>();
-		if (!TextureAdoptImage(*codec, std::move(image)))
-		{
-			return {};
-		}
-		codec->hasAlpha = RHIFormatChannels(codec->format) == 4u
+    own::shared_owner<const Texture::CodecImage> TextureMakeCodecImage(TextureImage&& image)
+    {
+        auto codec = own::make_shared<Texture::CodecImage>();
+        if (!TextureAdoptImage(*codec, std::move(image)))
+        {
+            return {};
+        }
+        codec->hasAlpha = RHIFormatChannels(codec->format) == 4u
             || RHIFormatIsBlockCompressed(codec->format);
         codec->Account();
         return std::move(codec);
-	}
-
-	/// 디코드 결과를 소유 컨테이너로 **복사한다**. cook 경로 전용이다 —
-	/// 그쪽은 픽셀을 ModelTextureAsset 으로 다시 옮기므로 어차피 한 번 복사가
-	/// 필요하고, 런타임 로드 경로처럼 128MB 를 다루지 않는다.
-	bool TextureCopyScratchToImage(const ScratchImage& image, RHIFormat format,
-		TextureImage& out)
-	{
-		const TexMetadata& metadata = image.GetMetadata();
-		out = TextureImage::Allocate(format,
-			static_cast<uint32_t>(metadata.width),
-			static_cast<uint32_t>(metadata.height),
-			static_cast<uint32_t>(metadata.arraySize),
-			static_cast<uint32_t>(metadata.mipLevels),
-			metadata.IsCubemap());
-		if (!out.IsValid()) return false;
-
-		for (uint32_t item = 0; item < out.ArraySize(); ++item)
-		{
-			for (uint32_t mip = 0; mip < out.MipLevels(); ++mip)
-			{
-				const TextureSubimage* destination = out.Find(mip, item);
-				const Image* source = image.GetImage(mip, item, 0);
-				if (nullptr == destination || nullptr == source
-					|| nullptr == source->pixels) return false;
-				std::byte* destinationPixels = out.MutablePixelsAt(*destination);
-				if (nullptr == destinationPixels) return false;
-
-				CopyImageRows(destinationPixels, destination->rowPitch,
-					reinterpret_cast<const std::byte*>(source->pixels),
-					source->rowPitch,
-					RHIFormatRowCount(format, destination->height),
-					destination->rowPitch);
-			}
-		}
-		return true;
-	}
-
-	/// 인코딩된 바이트를 매직으로 갈라 디코드한다.
-	///
-	/// DDS·HDR 는 매직이 있고, 나머지는 WIC 가 스스로 판별한다. TGA 는
-	/// 매직이 없어 WIC 가 거절한 뒤에만 시도한다.
-	bool TextureDecodeImageBytes(std::span<const std::byte> bytes,
-		TexMetadata& metadata, ScratchImage& image, bool& outAlreadyFinal)
-	{
-		ce::profile_scope profile{ ce::marker<"Texture.Decode">() };
-		outAlreadyFinal = false;
-		if (bytes.empty()) return false;
-
-		const auto startsWith = [&bytes](std::string_view magic)
-		{
-			if (bytes.size() < magic.size()) return false;
-			for (size_t index = 0; index < magic.size(); ++index)
-			{
-				if (static_cast<char>(bytes[index]) != magic[index]) return false;
-			}
-			return true;
-		};
-
-		HRESULT result = E_FAIL;
-		if (startsWith("DDS "))
-		{
-			result = LoadFromDDSMemory(bytes.data(), bytes.size(),
-				DDS_FLAGS_FORCE_RGB, &metadata, image);
-			outAlreadyFinal = true;
-		}
-		else if (startsWith("#?RADIANCE") || startsWith("#?RGBE"))
-		{
-			result = LoadFromHDRMemory(bytes.data(), bytes.size(), &metadata, image);
-			outAlreadyFinal = true;
-		}
-		else
-		{
-			result = LoadFromWICMemory(bytes.data(), bytes.size(),
-				WIC_FLAGS_IGNORE_SRGB, &metadata, image);
-			if (FAILED(result))
-			{
-				result = LoadFromTGAMemory(bytes.data(), bytes.size(),
-					TGA_FLAGS_NONE, &metadata, image);
-			}
-		}
-		return SUCCEEDED(result) && 0 != image.GetImageCount();
-	}
+    }
 }
 
 TextureImageDescription Texture::GetImageDescription() const noexcept
@@ -429,6 +155,8 @@ own::shared_owner<const Texture> Texture::WithColorSpace(
         target = srgb ? RHIFormat::BC1UnormSrgb : RHIFormat::BC1Unorm; break;
     case RHIFormat::BC3Unorm: case RHIFormat::BC3UnormSrgb:
         target = srgb ? RHIFormat::BC3UnormSrgb : RHIFormat::BC3Unorm; break;
+    case RHIFormat::BC7Unorm: case RHIFormat::BC7UnormSrgb:
+        target = srgb ? RHIFormat::BC7UnormSrgb : RHIFormat::BC7Unorm; break;
     // Floating-point HDR images are already linear radiance.
     case RHIFormat::RGBA16Float: case RHIFormat::RGBA32Float: break;
     default:
@@ -442,11 +170,19 @@ own::shared_owner<const Texture> Texture::WithColorSpace(
     {
         return source;
     }
+    if (source->m_cookedColorSpaceLocked)
+    {
+        // Filtering/compression was performed under an explicit offline recipe.
+        // A role requiring different pixels needs a separately cooked asset.
+        return {};
+    }
     auto texture = own::make_shared<Texture>();
     texture->m_nonRehydratableImage = source->m_nonRehydratableImage;
     texture->m_imageDescription = source->m_imageDescription;
     texture->m_imageDescription.format = target;
     texture->m_decodedBytes = source->m_decodedBytes;
+    texture->m_cookedPayload = source->m_cookedPayload;
+    texture->m_cookedColorSpaceLocked = source->m_cookedColorSpaceLocked;
     if (source->m_assetOrigin)
     {
         auto origin = *source->m_assetOrigin;
@@ -464,119 +200,6 @@ own::shared_owner<const Texture> Texture::WithColorSpace(
     return std::move(texture);
 }
 
-namespace
-{
-    own::shared_owner<const Texture::CodecImage> TextureGenerateMipImage(
-        const TextureImageView& view, const std::optional<AssetDepot::TextureImageKey>& key,
-        std::string& outFailure)
-    {
-        const auto fail = [&](std::string_view message) -> own::shared_owner<const Texture::CodecImage>
-        {
-            outFailure = message;
-            return {};
-        };
-        const DXGI_FORMAT format = TextureMipFormatFromRHI(view.Format());
-        if (format == DXGI_FORMAT_UNKNOWN)
-        {
-            return fail("Unsupported material mip format");
-        }
-        TexMetadata metadata{};
-        metadata.width = view.Width(); metadata.height = view.Height(); metadata.depth = 1;
-        metadata.arraySize = view.ArraySize(); metadata.mipLevels = 1;
-        metadata.dimension = TEX_DIMENSION_TEXTURE2D; metadata.format = format;
-        if (view.IsCube())
-        {
-            metadata.miscFlags = TEX_MISC_TEXTURECUBE;
-        }
-        std::vector<Image> images;
-        for (uint32_t item = 0; item < view.ArraySize(); ++item)
-        {
-            const auto* base = view.Find(0, item);
-            if (!base || !base->pixels)
-            {
-                return fail("Mip source subresource is empty");
-            }
-            images.push_back({base->width, base->height, format, base->rowPitch,
-                base->slicePitch, const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(base->pixels))});
-        }
-        ScratchImage decoded;
-        const Image* input = images.data();
-        size_t count = images.size();
-        if (IsCompressed(format))
-        {
-            // Keep the encoded transfer function while unpacking BC blocks.
-            const auto rgba = IsSRGB(format) ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-            if (FAILED(Decompress(input, count, metadata, rgba, decoded)))
-            {
-                return fail("Mip source decompression failed");
-            }
-            input = decoded.GetImages(); count = decoded.GetImageCount(); metadata = decoded.GetMetadata();
-        }
-        ScratchImage chain;
-        // Non-WIC keeps alpha independent and HDR unclamped. DirectXTex chooses box
-        // for power-of-two sizes and linear for NPOT; sRGB formats imply RGB decode/encode.
-        if (FAILED(GenerateMipMaps(input, count, metadata, TEX_FILTER_FORCE_NON_WIC, 0, chain)))
-        {
-            return fail("Material mip generation failed");
-        }
-        if (IsCompressed(format))
-        {
-            ScratchImage compressed;
-            auto targetMetadata = chain.GetMetadata();
-            targetMetadata.format = format;
-            if (FAILED(compressed.Initialize(targetMetadata)))
-            {
-                return fail("Material mip allocation failed");
-            }
-            // Recompress only the added levels. Reprocessing mip 0 would spend most
-            // of the compression time on blocks that must be copied back unchanged.
-            for (uint32_t item = 0; item < view.ArraySize(); ++item)
-            {
-                for (size_t mip = 1; mip < targetMetadata.mipLevels; ++mip)
-                {
-                    ScratchImage level;
-                    const auto* inputLevel = chain.GetImage(mip, item, 0);
-                    if (!inputLevel || FAILED(Compress(*inputLevel, format, TEX_COMPRESS_DEFAULT,
-                            TEX_THRESHOLD_DEFAULT, level)))
-                    {
-                        return fail("Material mip compression failed");
-                    }
-                    const auto* from = level.GetImage(0, 0, 0);
-                    const auto* to = compressed.GetImage(mip, item, 0);
-                    if (!from || !to)
-                    {
-                        return fail("Compressed mip level is missing");
-                    }
-                    CopyImageRows(reinterpret_cast<std::byte*>(to->pixels), to->rowPitch,
-                        reinterpret_cast<const std::byte*>(from->pixels), from->rowPitch,
-                        RHIFormatRowCount(view.Format(), static_cast<uint32_t>(to->height)), to->rowPitch);
-                }
-            }
-            chain = std::move(compressed);
-        }
-        // Compression may choose different endpoints even for the same input. Restore
-        // the original base bytes; only the added levels may have new BC blocks.
-        for (uint32_t item = 0; item < view.ArraySize(); ++item)
-        {
-            const auto* base = view.Find(0, item);
-            const auto* target = chain.GetImage(0, item, 0);
-            if (!target)
-            {
-                return fail("Generated mip base is missing");
-            }
-            CopyImageRows(reinterpret_cast<std::byte*>(target->pixels), target->rowPitch,
-                base->pixels, base->rowPitch, RHIFormatRowCount(view.Format(), base->height),
-                static_cast<size_t>(RHIFormatRowPitch(view.Format(), base->width)));
-        }
-        auto codec = TextureMakeCodecImage(std::move(chain), key);
-        if (!codec)
-        {
-            return fail("Generated mip chain is invalid");
-        }
-        return codec;
-    }
-}
-
 own::shared_owner<const Texture> Texture::WithMipChain(
     const own::shared_owner<const Texture>& source, std::string& outFailure)
 {
@@ -585,6 +208,12 @@ own::shared_owner<const Texture> Texture::WithMipChain(
     {
         outFailure = "Mip source is empty";
         return {};
+    }
+    // Cooked imports own their mip policy, including an intentional single mip
+    // or authored partial chain. Runtime never changes their exact image recipe.
+    if (source->m_assetOrigin || source->m_cookedPayload)
+    {
+        return source;
     }
     const auto description = source->GetImageDescription();
     if (description.MipLevels() > 1u || (description.Width() == 1u && description.Height() == 1u))
@@ -599,516 +228,262 @@ own::shared_owner<const Texture> Texture::WithMipChain(
     texture->m_size = source->m_size;
     texture->m_isTextureAlpha = source->m_isTextureAlpha;
     texture->m_samplingFormat = source->m_samplingFormat;
-    if (source->m_assetOrigin)
+    const auto image = source->NonRehydratableImage();
+    const auto codec = AssetAuthoringPort::GenerateSourceTextureMips(source->GetImageView(image), outFailure);
+    if (!codec)
     {
-        // Descriptor-only recipe transformation. Exact rehydration regenerates
-        // this chain with its filtering color space, never the original image.
-        auto origin = *source->m_assetOrigin;
-        origin.variant.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
-        origin.imageKey.recipe.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
-        origin.imageKey.recipe.mipColorSpace = IsSRGB(TextureMipFormatFromRHI(description.Format()))
-            ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
-        texture->m_assetOrigin = own::make_shared<const AssetDepot::TextureAssetOrigin>(std::move(origin));
-        texture->m_imageDescription = description;
-        texture->m_imageDescription.mipLevels = 1u;
-        for (auto size = (std::max)(description.Width(), description.Height()); size > 1u; size >>= 1u)
-        {
-            ++texture->m_imageDescription.mipLevels;
-        }
-        for (uint32_t mip = 0u; mip < texture->m_imageDescription.MipLevels(); ++mip)
-        {
-            texture->m_decodedBytes += static_cast<std::size_t>(RHIFormatSlicePitch(description.Format(),
-                (std::max)(1u, description.Width() >> mip), (std::max)(1u, description.Height() >> mip)))
-                * description.ArraySize();
-        }
+        return {};
     }
-    else
-    {
-        const auto image = source->NonRehydratableImage();
-        const auto codec = TextureGenerateMipImage(source->GetImageView(image), {}, outFailure);
-        if (!codec)
-        {
-            return {};
-        }
-        texture->SetNonRehydratableImage(codec);
-    }
+    texture->SetNonRehydratableImage(codec);
     return std::move(texture);
 }
 
 own::shared_owner<const Texture> Texture::CreateFromPixels(_In_ uint32 width, _In_ uint32 height,
-	_In_ std::string_view name, _In_ RHIFormat textureFormat,
-	_In_reads_bytes_(rowPitch* height) const void* pixels, _In_opt_ size_t rowPitch)
+    _In_ std::string_view name, _In_ RHIFormat textureFormat,
+    _In_reads_bytes_(rowPitch* height) const void* pixels, _In_opt_ size_t rowPitch)
 {
-	if (0 == width || 0 == height || nullptr == pixels) return nullptr;
+    if (0 == width || 0 == height || nullptr == pixels)
+    {
+        return nullptr;
+    }
 
-	// ★ 예전에는 여기서도 ScratchImage 를 세웠다(축 A 전). 만들려는 것이
-	//   CPU 픽셀 한 장뿐인데 디코더 라이브러리의 컨테이너를 거칠 이유가
-	//   없다 — 지금은 중립 이미지를 직접 잡는다.
-	TextureImage image = TextureImage::Allocate(textureFormat, width, height, 1, 1);
-	if (!image.IsValid()) return nullptr;
+    // ★ 예전에는 여기서도 ScratchImage 를 세웠다(축 A 전). 만들려는 것이
+    //   CPU 픽셀 한 장뿐인데 디코더 라이브러리의 컨테이너를 거칠 이유가
+    //   없다 — 지금은 중립 이미지를 직접 잡는다.
+    TextureImage image = TextureImage::Allocate(textureFormat, width, height, 1, 1);
+    if (!image.IsValid())
+    {
+        return nullptr;
+    }
 
-	const TextureSubimage* destination = image.Find(0, 0);
-	if (nullptr == destination) return nullptr;
-	std::byte* destinationPixels = image.MutablePixelsAt(*destination);
-	if (nullptr == destinationPixels) return nullptr;
+    const TextureSubimage* destination = image.Find(0, 0);
+    if (nullptr == destination)
+    {
+        return nullptr;
+    }
+    std::byte* destinationPixels = image.MutablePixelsAt(*destination);
+    if (nullptr == destinationPixels)
+    {
+        return nullptr;
+    }
 
-	// 원본 행 간격을 안 주면 빈틈없이 채워진 것으로 본다.
-	//
-	// ★ 행 단위로 옮긴다. 대상의 행 간격은 정렬 때문에 원본보다 클 수
-	//   있고, 그때 통째로 memcpy하면 그림이 한 행씩 밀려 비스듬해진다 —
-	//   1x1에서는 안 드러나고 폭이 커지는 순간 나타나는 부류다.
-	const size_t sourcePitch = (0 != rowPitch)
-		? rowPitch : static_cast<size_t>(RHIFormatRowPitch(textureFormat, width));
+    // 원본 행 간격을 안 주면 빈틈없이 채워진 것으로 본다.
+    //
+    // ★ 행 단위로 옮긴다. 대상의 행 간격은 정렬 때문에 원본보다 클 수
+    //   있고, 그때 통째로 memcpy하면 그림이 한 행씩 밀려 비스듬해진다 —
+    //   1x1에서는 안 드러나고 폭이 커지는 순간 나타나는 부류다.
+    const size_t sourcePitch = (0 != rowPitch)
+        ? rowPitch : static_cast<size_t>(RHIFormatRowPitch(textureFormat, width));
 
-	CopyImageRows(destinationPixels, destination->rowPitch,
-		static_cast<const std::byte*>(pixels), sourcePitch,
-		RHIFormatRowCount(textureFormat, height), destination->rowPitch);
+    CopyImageRows(destinationPixels, destination->rowPitch,
+        static_cast<const std::byte*>(pixels), sourcePitch,
+        RHIFormatRowCount(textureFormat, height), destination->rowPitch);
 
-	auto texture = own::make_shared<Texture>();
-	texture->m_name = std::string(name);
-	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { float(width), float(height) };
+    auto texture = own::make_shared<Texture>();
+    texture->m_name = std::string(name);
+    texture->m_textureType = TextureType::ImageTexture;
+    texture->m_size = { float(width), float(height) };
 
-	// 파일 로더가 남기는 자리와 같다 — 텍스처 캐시가 여기서 가져간다(T1·T4).
-	texture->SetNonRehydratableImage(TextureMakeCodecImage(std::move(image)));
-	if (!texture->m_nonRehydratableImage)
-	{
-		return nullptr;
-	}
+    // 파일 로더가 남기는 자리와 같다 — 텍스처 캐시가 여기서 가져간다(T1·T4).
+    texture->SetNonRehydratableImage(TextureMakeCodecImage(std::move(image)));
+    if (!texture->m_nonRehydratableImage)
+    {
+        return nullptr;
+    }
 
-	return std::move(texture);
+    return std::move(texture);
 }
 
 own::shared_owner<const Texture> Texture::CreateSharedFromImage(
-	std::string_view name, TextureImage image)
+    std::string_view name, TextureImage image)
 {
-	if (!image.IsValid()) return nullptr;
+    if (!image.IsValid())
+    {
+        return nullptr;
+    }
 
-	const bool isCube = image.IsCube();
-	const uint32_t arraySize = image.ArraySize();
-	const float width = float(image.Width());
-	const float height = float(image.Height());
-	const RHIFormat format = image.Format();
+    const bool isCube = image.IsCube();
+    const uint32_t arraySize = image.ArraySize();
+    const float width = float(image.Width());
+    const float height = float(image.Height());
+    const RHIFormat format = image.Format();
 
-	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
-	if (!codecImage) return nullptr;
+    own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
+    if (!codecImage)
+    {
+        return nullptr;
+    }
 
-	auto texture = own::make_shared<Texture>();
-	texture->m_name = std::string(name);
-	texture->m_textureType = isCube
-		? TextureType::TextureCube
-		: (arraySize > 1 ? TextureType::TextureArray : TextureType::ImageTexture);
-	texture->m_size = { width, height };
-	// ★ 예전에는 DirectX::HasAlpha(포맷)를 물었다. 그 물음은 "이 포맷에
-	//   알파 채널이 있는가"이지 "이 그림에 투명한 데가 있는가"가 아니다 —
-	//   중립 어휘의 8비트 색 포맷은 전부 알파를 가지므로 답이 늘 참이었다.
-	//   지금은 채널 수로 같은 답을 준다(뜻이 바뀌지 않는다).
-	texture->m_isTextureAlpha = (4 == RHIFormatChannels(format))
-		|| RHIFormatIsBlockCompressed(format);
-	texture->SetNonRehydratableImage(std::move(codecImage));
-	return std::move(texture);
+    auto texture = own::make_shared<Texture>();
+    texture->m_name = std::string(name);
+    texture->m_textureType = isCube
+        ? TextureType::TextureCube
+        : (arraySize > 1 ? TextureType::TextureArray : TextureType::ImageTexture);
+    texture->m_size = { width, height };
+    // ★ 예전에는 DirectX::HasAlpha(포맷)를 물었다. 그 물음은 "이 포맷에
+    //   알파 채널이 있는가"이지 "이 그림에 투명한 데가 있는가"가 아니다 —
+    //   중립 어휘의 8비트 색 포맷은 전부 알파를 가지므로 답이 늘 참이었다.
+    //   지금은 채널 수로 같은 답을 준다(뜻이 바뀌지 않는다).
+    texture->m_isTextureAlpha = (4 == RHIFormatChannels(format))
+        || RHIFormatIsBlockCompressed(format);
+    texture->SetNonRehydratableImage(std::move(codecImage));
+    return std::move(texture);
+}
+
+own::shared_owner<const Texture> Texture::CreateFromSourceImage(
+    own::shared_owner<const CodecImage> image, std::string_view name,
+    std::string_view extension, std::string_view assetPath)
+{
+    if (!image || image->subresources.empty())
+    {
+        return {};
+    }
+    auto texture = own::make_shared<Texture>();
+    texture->m_name = std::string(name);
+    texture->m_extension = std::string(extension);
+    texture->m_assetPath = std::string(assetPath);
+    texture->m_textureType = image->isCube ? TextureType::TextureCube
+        : (image->arraySize > 1u ? TextureType::TextureArray : TextureType::ImageTexture);
+    texture->m_size = { float(image->width), float(image->height) };
+    texture->m_isTextureAlpha = image->hasAlpha;
+    texture->SetNonRehydratableImage(std::move(image));
+    return std::move(texture);
 }
 
 own::shared_owner<const Texture> Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
 {
-	file::path matPath = PathFinder::RelativeToMaterial(path.string());
-	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
-	// 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
-	if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
-	{
-		return nullptr;
-	}
-
-	file::path preparePath{};
-	if (file::is_regular_file(matPath))
-	{
-		preparePath = matPath;
-	}
-	else
-	{
-		preparePath = path;
-	}
-
-	ScratchImage image{};
-	TexMetadata metadata{};
-
-    Benchmark banch3;
-    std::optional<ce::profile_scope> decodeProfile{ std::in_place, ce::marker<"Texture.Decode">() };
-	if (path.extension() == ".dds")
-	{
-		//load dds
-		Win32::ThrowIfFailed(
-			LoadFromDDSFile(
-				preparePath.c_str(),
-				DDS_FLAGS_FORCE_RGB,
-				&metadata,
-				image
-			)
-		);
-	}
-	else if (path.extension() == ".tga")
-	{
-		//load tga
-		Win32::ThrowIfFailed(
-			LoadFromTGAFile(
-				preparePath.c_str(),
-				&metadata,
-				image
-			)
-		);
-	}
-	else if (path.extension() == ".hdr")
-	{
-		//load hdr
-		Win32::ThrowIfFailed(
-			LoadFromHDRFile(
-				preparePath.c_str(),
-				&metadata,
-				image
-			)
-		);
-	}
-	else
-	{
-		//load wic
-		Win32::ThrowIfFailed(
-			LoadFromWICFile(
-				preparePath.c_str(),
-				WIC_FLAGS_IGNORE_SRGB,
-				&metadata,
-				image
-			)
-		);
-	}
-	decodeProfile.reset();
-	if (isCompress)
-	{
-		ScratchImage compressedImage{};
-		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
-		{
-			ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
-			DirectX::TexMetadata tempMetadata = metadata;
-
-			// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨)
-			Win32::ThrowIfFailed(
-				DirectX::Compress(
-					image.GetImages(),
-					image.GetImageCount(),
-					metadata,
-					DXGI_FORMAT_BC1_UNORM_SRGB,
-					TEX_COMPRESS_PARALLEL,
-					0.5f,
-					compressedImage
-				)
-			);
-
-			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
-			image = std::move(compressedImage); // 압축된 이미지로 교체
-		}
-	}
-
-	// 코덱 산출물을 감싼 뒤에 자산을 세운다 — 감싸지 못하면 텍스처 자체를
-	// 만들지 않는다(픽셀 없는 Texture는 캐시에서 흰색으로 나온다).
-	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
-	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = [&image] {
-		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
-		return !image.IsAlphaAllOpaque();
-	}();
-
-	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
-	if (!codecImage) return nullptr;
-
-    auto texture = own::make_shared<Texture>();
-	// ★ 여기 있던 DX11 SRV 생성을 걷었다 (T6, 2026-08-08).
-	//
-	//   이 로더가 만들던 것은 둘이었다 - CPU 픽셀(m_cpuPixels)과 DX11
-	//   SRV. 앞의 것은 DX12TextureCache가 읽어 올리고, 뒤의 것은
-	//   에디터 썸네일의 폴백 하나가 마지막 소비자였다(EditorImGuiTexture).
-	//   그 폴백이 사라지면서 소비자가 0이 됐다.
-
-	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { float(metadata.width),float(metadata.height) };
-	texture->m_isTextureAlpha = hasAlpha;
-	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
-	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->SetNonRehydratableImage(std::move(codecImage));
-
-	return std::move(texture);
+    const file::path materialPath = PathFinder::RelativeToMaterial(path.string());
+    const file::path resolved = file::is_regular_file(materialPath) ? materialPath : path;
+    if (resolved.extension() == ".cetex")
+    {
+        return LoadSharedFromPath(resolved, false);
+    }
+    if (!file::is_regular_file(resolved))
+    {
+        return {};
+    }
+    return CreateFromSourceImage(AssetAuthoringPort::LoadSourceTexture(resolved, {},
+        isCompress ? TextureSourceCompression::LegacyColor : TextureSourceCompression::None), {}, {}, {});
 }
 
 own::shared_owner<const Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress, std::string_view assetPath)
 {
-	file::path matPath = PathFinder::RelativeToMaterial(path.string());
-	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
-	// 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
-	if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
-	{
-		return nullptr;
-	}
+    file::path matPath = PathFinder::RelativeToMaterial(path.string());
+    // 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
+    // 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
+    if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
+    {
+        return nullptr;
+    }
 
-	const file::path preparePath = file::is_regular_file(path) ? path : matPath;
+    const file::path preparePath = file::is_regular_file(path) ? path : matPath;
+    if (preparePath.extension() == ".cetex")
+    {
+        std::ifstream stream(preparePath, std::ios::binary | std::ios::ate);
+        const auto size = stream.tellg();
+        if (!stream || size <= 0 || static_cast<std::uint64_t>(size) > experiment::cooked::kCookedTextureMaxBytes)
+        {
+            return {};
+        }
+        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        stream.seekg(0);
+        stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
+        if (!stream || stream.peek() != std::char_traits<char>::eof())
+        {
+            return {};
+        }
+        return LoadCookedFromBytes(bytes, path.stem().string(), assetPath);
+    }
 
-	ScratchImage image{};
-	TexMetadata metadata{};
-
-	Benchmark banch3;
-	std::optional<ce::profile_scope> decodeProfile{ std::in_place, ce::marker<"Texture.Decode">() };
-	if (path.extension() == ".dds")
-	{
-		//load dds
-		Win32::ThrowIfFailed(
-			LoadFromDDSFile(
-				preparePath.c_str(),
-				DDS_FLAGS_FORCE_RGB,
-				&metadata,
-				image
-			)
-		);
-	}
-	else if (path.extension() == ".tga")
-	{
-		//load tga
-		Win32::ThrowIfFailed(
-			LoadFromTGAFile(
-				preparePath.c_str(),
-				&metadata,
-				image
-			)
-		);
-	}
-	else if (path.extension() == ".hdr")
-	{
-		//load hdr
-		Win32::ThrowIfFailed(
-			LoadFromHDRFile(
-				preparePath.c_str(),
-				&metadata,
-				image
-			)
-		);
-	}
-	else
-	{
-		//load wic
-		Win32::ThrowIfFailed(
-			LoadFromWICFile(
-				preparePath.c_str(),
-				WIC_FLAGS_IGNORE_SRGB,
-				&metadata,
-				image
-			)
-		);
-	}
-
-	decodeProfile.reset();
-	if (isCompress)
-	{
-		ScratchImage compressedImage{};
-		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
-		{
-			ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
-			DirectX::TexMetadata tempMetadata = metadata;
-
-			// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨)
-			Win32::ThrowIfFailed(
-					// ★ _SRGB 라벨을 단다. isCompress 가 켜지는 자리는 baseColorMap
-					// 하나뿐이고(FinalizeMaterialRuntime · MaterialResolver 모두
-					// 그 property 에서만 true 를 넘긴다), 그 텍스처의 바이트는
-					// sRGB 로 인코딩돼 있다. 예전처럼 BC1_UNORM 으로 라벨하면
-					// 샘플러가 감마 디코드를 하지 않아 셰이더가 받는 알베도가
-					// sRGB 값 그대로였다 — 밝고 탈색된 그림의 legacy 경로판이다.
-					// 아래 TEX_COMPRESS_SRGB 도 같은 전제를 이미 깔고 있었다.
-				DirectX::Compress(
-					image.GetImages(),
-					image.GetImageCount(),
-					image.GetMetadata(),
-					DXGI_FORMAT_BC1_UNORM_SRGB,
-					TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM,
-					0.5f,
-					compressedImage
-				)
-			);
-
-			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
-			image = std::move(compressedImage); // 압축된 이미지로 교체
-		}
-	}
-
-	const float imageWidth = float(image.GetMetadata().width);
-	const float imageHeight = float(image.GetMetadata().height);
-	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
-	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = [&image] {
-		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
-		return !image.IsAlphaAllOpaque();
-	}();
-
-	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
-	if (!codecImage) return nullptr;
-
-	auto texture = own::make_shared<Texture>();
-    texture->m_name = path.stem().string();
-    texture->m_extension = path.extension().string();
-    texture->m_assetPath = assetPath.empty() ? path.lexically_normal().generic_string() : std::string(assetPath);
-
-	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
-
-	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { imageWidth, imageHeight };
-	texture->m_isTextureAlpha = hasAlpha;
-	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
-	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->SetNonRehydratableImage(std::move(codecImage));
-
-	return std::move(texture);
+    const auto image = AssetAuthoringPort::LoadSourceTexture(preparePath, {},
+        isCompress ? TextureSourceCompression::MaterialColor : TextureSourceCompression::None);
+    return CreateFromSourceImage(image, path.stem().string(), path.extension().string(),
+        assetPath.empty() ? path.lexically_normal().generic_string() : std::string(assetPath));
 }
 
 
 own::shared_owner<const Texture> Texture::LoadSharedFromMemory(
-	std::span<const std::byte> bytes, bool isCompress)
+    std::span<const std::byte> bytes, bool isCompress)
 {
-	ScratchImage image{};
-	TexMetadata metadata{};
-	// DDS/HDR 는 LoadSharedFromPath 와 같이 재압축하지 않는다.
-	bool alreadyFinal = false;
-	if (!TextureDecodeImageBytes(bytes, metadata, image, alreadyFinal)) return nullptr;
+    if (bytes.size() >= 4u && bytes[0] == std::byte{ 'C' } && bytes[1] == std::byte{ 'E' }
+        && bytes[2] == std::byte{ 'C' } && bytes[3] == std::byte{ 'T' })
+    {
+        return LoadCookedFromBytes(bytes, {}, {});
+    }
+    return CreateFromSourceImage(AssetAuthoringPort::LoadSourceTexture({}, bytes,
+        isCompress ? TextureSourceCompression::MaterialColor : TextureSourceCompression::None), {}, {}, {});
+}
 
-	if (isCompress && !alreadyFinal && !IsCompressed(metadata.format))
-	{
-		ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
-		ScratchImage compressedImage{};
-		// DXGI_FORMAT_BC1_UNORM_SRGB (== DXT1, 감마 디코드 라벨) — LoadSharedFromPath 와 같은 정책.
-		if (SUCCEEDED(DirectX::Compress(image.GetImages(), image.GetImageCount(),
-			image.GetMetadata(), DXGI_FORMAT_BC1_UNORM_SRGB,
-			TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM,
-			0.5f, compressedImage)))
-		{
-			metadata = compressedImage.GetMetadata();
-			image = std::move(compressedImage);
-		}
-	}
+own::shared_owner<const Texture> Texture::LoadCookedFromBytes(
+    std::span<const std::byte> bytes, std::string_view name, std::string_view assetPath)
+{
+    TextureImage image;
+    experiment::cooked::CookedTextureInfo info;
+    std::string failure;
+    if (!experiment::cooked::DecodeCookedTexture(bytes, image, failure, &info))
+    {
+        return {};
+    }
+    return CreateSharedFromCookedImage(name, std::move(image), info, assetPath);
+}
 
-	const float imageWidth = float(image.GetMetadata().width);
-	const float imageHeight = float(image.GetMetadata().height);
-	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
-	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = [&image] {
-		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
-		return !image.IsAlphaAllOpaque();
-	}();
-
-	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
-	if (!codecImage) return nullptr;
-
-	auto texture = own::make_shared<Texture>();
-	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { imageWidth, imageHeight };
-	texture->m_isTextureAlpha = hasAlpha;
-	texture->SetNonRehydratableImage(std::move(codecImage));
-	return std::move(texture);
+own::shared_owner<const Texture> Texture::CreateSharedFromCookedImage(
+    std::string_view name, TextureImage image,
+    const experiment::cooked::CookedTextureInfo& info, std::string_view assetPath)
+{
+    if (!image.IsValid())
+    {
+        return {};
+    }
+    auto codec = own::make_shared<CodecImage>();
+    codec->hasAlpha = info.hasAlpha;
+    codec->colorSpaceLocked = info.colorSpaceLocked;
+    if (!TextureAdoptImage(*codec, std::move(image)))
+    {
+        return {};
+    }
+    codec->Account();
+    auto texture = own::make_shared<Texture>();
+    texture->m_name = std::string(name);
+    texture->m_assetPath = std::string(assetPath);
+    texture->m_extension = ".cetex";
+    texture->m_textureType = codec->isCube ? TextureType::TextureCube
+        : (codec->arraySize > 1u ? TextureType::TextureArray : TextureType::ImageTexture);
+    texture->m_size = { float(codec->width), float(codec->height) };
+    texture->m_isTextureAlpha = codec->hasAlpha;
+    texture->m_cookedPayload = true;
+    texture->m_cookedColorSpaceLocked = info.colorSpaceLocked;
+    texture->SetNonRehydratableImage(std::move(codec));
+    return std::move(texture);
 }
 
 own::shared_owner<const Texture::CodecImage> Texture::DecodeOwnedImage(
     std::span<const std::byte> bytes, const AssetDepot::TextureImageKey& key, std::string& failure)
 {
     failure.clear();
-    struct DecoderApartment final
+    if (key.representation != experiment::cooked::kCookedTextureRepresentationVersion
+        || key.schemaVersion != experiment::cooked::kCookedTextureSchemaVersion)
     {
-        HRESULT result{ CoInitializeEx(nullptr, COINIT_MULTITHREADED) };
-        ~DecoderApartment()
-        {
-            if (SUCCEEDED(result))
-            {
-                CoUninitialize();
-            }
-        }
-    } apartment;
-    if (FAILED(apartment.result) && apartment.result != RPC_E_CHANGED_MODE)
-    {
-        failure = "Texture decoder COM initialization failed.";
+        failure = "Texture requires a GPU-ready CECT artifact; recook this asset.";
         return {};
     }
-    ScratchImage image{};
-    TexMetadata metadata{};
-    bool alreadyFinal = false;
-    if (!TextureDecodeImageBytes(bytes, metadata, image, alreadyFinal))
+    TextureImage image;
+    experiment::cooked::CookedTextureInfo info;
+    if (!experiment::cooked::DecodeCookedTexture(bytes, image, failure, &info))
     {
-        failure = "Texture source-image decoding failed.";
         return {};
     }
-    if (!TextureIsUploadableShape(metadata))
+    auto codec = own::make_shared<CodecImage>();
+    codec->key = key;
+    codec->hasAlpha = info.hasAlpha;
+    codec->colorSpaceLocked = info.colorSpaceLocked;
+    if (!TextureAdoptImage(*codec, std::move(image)))
     {
-        failure = "Texture source-image shape is unsupported.";
+        failure = "Validated cooked texture could not be adopted.";
         return {};
     }
-    if (key.recipe.forceRgba8 && metadata.format != DXGI_FORMAT_R8G8B8A8_UNORM
-        && metadata.format != DXGI_FORMAT_R8G8B8A8_UNORM_SRGB)
-    {
-        ScratchImage lowered;
-        if (!TextureLowerToRgba8(image, lowered))
-        {
-            failure = "Texture RGBA8 lowering failed.";
-            return {};
-        }
-        image = std::move(lowered);
-        metadata = image.GetMetadata();
-    }
-    if (key.recipe.compress && !alreadyFinal && !IsCompressed(metadata.format))
-    {
-        ScratchImage compressed{};
-        const bool srgb = key.recipe.compressionColorSpace == AssetDepot::TextureAssetColorSpace::Srgb
-            || (key.recipe.compressionColorSpace == AssetDepot::TextureAssetColorSpace::Source && IsSRGB(metadata.format));
-        const auto format = srgb ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
-        const auto flags = srgb
-            ? TEX_COMPRESS_SRGB | TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM
-            : TEX_COMPRESS_DITHER | TEX_COMPRESS_UNIFORM;
-        if (FAILED(DirectX::Compress(image.GetImages(), image.GetImageCount(), metadata,
-            format, flags, 0.5f, compressed)))
-        {
-            failure = "Texture compression failed.";
-            return {};
-        }
-        metadata = compressed.GetMetadata();
-        image = std::move(compressed);
-    }
-    auto codec = TextureMakeCodecImage(std::move(image), key);
-    if (!codec)
-    {
-        failure = "Texture decoded pixels are invalid.";
-        return {};
-    }
-    if (key.recipe.mipPolicy == AssetDepot::TextureMipPolicy::GenerateFull
-        && codec->mipLevels == 1u && (codec->width != 1u || codec->height != 1u))
-    {
-        auto format = TextureMipFormatFromRHI(codec->format);
-        if (key.recipe.mipColorSpace != AssetDepot::TextureAssetColorSpace::Source)
-        {
-            const bool srgb = key.recipe.mipColorSpace == AssetDepot::TextureAssetColorSpace::Srgb;
-            switch (codec->format)
-            {
-            case RHIFormat::RGBA8Unorm: case RHIFormat::RGBA8UnormSrgb:
-                format = srgb ? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB : DXGI_FORMAT_R8G8B8A8_UNORM;
-                break;
-            case RHIFormat::BGRA8Unorm: case RHIFormat::BGRA8UnormSrgb:
-                format = srgb ? DXGI_FORMAT_B8G8R8A8_UNORM_SRGB : DXGI_FORMAT_B8G8R8A8_UNORM;
-                break;
-            case RHIFormat::BC1Unorm: case RHIFormat::BC1UnormSrgb:
-                format = srgb ? DXGI_FORMAT_BC1_UNORM_SRGB : DXGI_FORMAT_BC1_UNORM;
-                break;
-            case RHIFormat::BC3Unorm: case RHIFormat::BC3UnormSrgb:
-                format = srgb ? DXGI_FORMAT_BC3_UNORM_SRGB : DXGI_FORMAT_BC3_UNORM;
-                break;
-            default:
-                break;
-            }
-        }
-        const TextureImageView view(TextureDecodedFormatToRHI(format), codec->width, codec->height,
-            codec->mipLevels, codec->arraySize, codec->isCube, codec->subresources.data(),
-            static_cast<uint32_t>(codec->subresources.size()));
-        return TextureGenerateMipImage(view, key, failure);
-    }
-    return codec;
+    codec->Account();
+    return std::move(codec);
 }
 
 own::shared_owner<const Texture> Texture::CreateOwnedDescriptor(
@@ -1139,6 +514,16 @@ own::shared_owner<const Texture> Texture::CreateOwnedDescriptor(
         case RHIFormat::BC3Unorm: case RHIFormat::BC3UnormSrgb:
             samplingFormat = srgb ? RHIFormat::BC3UnormSrgb : RHIFormat::BC3Unorm;
             break;
+        case RHIFormat::BC7Unorm: case RHIFormat::BC7UnormSrgb:
+            samplingFormat = srgb ? RHIFormat::BC7UnormSrgb : RHIFormat::BC7Unorm;
+            break;
+        case RHIFormat::BC5Unorm:
+            if (srgb)
+            {
+                failure = "BC5 normal/data texture cannot use sRGB sampling.";
+                return {};
+            }
+            break;
         case RHIFormat::RGBA16Float: case RHIFormat::RGBA32Float:
             if (srgb)
             {
@@ -1151,7 +536,31 @@ own::shared_owner<const Texture> Texture::CreateOwnedDescriptor(
             return {};
         }
     }
+    if (codec->colorSpaceLocked && samplingFormat != codec->format)
+    {
+        failure = "Texture role conflicts with its cooked color-space policy; cook a separate texture recipe.";
+        return {};
+    }
+    if (variant.forceRgba8 && codec->format != RHIFormat::RGBA8Unorm
+        && codec->format != RHIFormat::RGBA8UnormSrgb)
+    {
+        failure = "RGBA8 must be selected at cook time; runtime texture conversion is disabled.";
+        return {};
+    }
+    const bool ignoresMipHint = variant.mipPolicy == AssetDepot::TextureMipPolicy::GenerateFull
+        && codec->mipLevels == 1u && (codec->width > 1u || codec->height > 1u);
+    const bool ignoresCompressionHint = variant.compress && !RHIFormatIsBlockCompressed(codec->format);
+    if (ignoresMipHint || ignoresCompressionHint)
+    {
+        // One diagnostic at descriptor publication, never in the rehydration or
+        // upload hot path. Authored bytes and intentional mip policy stay exact.
+        Debug::PrintLog(spdlog::level::warn,
+            "Cooked texture " + Uuid::ToString(origin->resolved.entry.assetId.value)
+            + " preserves its offline mip/compression policy; legacy runtime hints were ignored.");
+    }
     auto texture = own::make_shared<Texture>();
+    texture->m_cookedPayload = true;
+    texture->m_cookedColorSpaceLocked = codec->colorSpaceLocked;
     texture->m_textureType = codec->isCube ? TextureType::TextureCube
         : (codec->arraySize > 1u ? TextureType::TextureArray : TextureType::ImageTexture);
     texture->m_size = { float(codec->width), float(codec->height) };
@@ -1191,9 +600,7 @@ std::size_t Texture::ImageRetainedCharge(const own::shared_owner<const CodecImag
     {
         bytes = charge > maximum - bytes ? maximum : bytes + charge;
     };
-    add(image->scratch.GetPixelsSize());
-    add(image->scratch.GetImageCount() > maximum / sizeof(DirectX::Image)
-        ? maximum : image->scratch.GetImageCount() * sizeof(DirectX::Image));
+    add(image->sourceRetainedBytes);
     add(image->owned.RetainedBytes());
     add(image->subresources.capacity() > maximum / sizeof(TextureSubimage)
         ? maximum : image->subresources.capacity() * sizeof(TextureSubimage));
@@ -1259,207 +666,25 @@ Texture::ImageMemorySnapshot Texture::SnapshotImageMemory() noexcept
 
 own::shared_owner<const Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
 {
-	file::path matPath = PathFinder::RelativeToMaterial(path.string());
-	// 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
-	// 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
-	if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
-	{
-		return nullptr;
-	}
-
-	file::path preparePath{};
-	if (file::is_regular_file(matPath))
-	{
-		preparePath = matPath;
-	}
-	else
-	{
-		preparePath = path;
-	}
-
-	ScratchImage image{};
-	TexMetadata metadata{};
-
-	Benchmark banch3;
-	std::optional<ce::profile_scope> decodeProfile{ std::in_place, ce::marker<"Texture.Decode">() };
-	if (path.extension() == ".dds")
-	{
-		//load dds
-		Win32::ThrowIfFailed(
-			LoadFromDDSFile(
-				preparePath.c_str(),
-				DDS_FLAGS_FORCE_RGB,
-				&metadata,
-				image
-			)
-		);
-	}
-	else if (path.extension() == ".tga")
-	{
-		//load tga
-		Win32::ThrowIfFailed(
-			LoadFromTGAFile(
-				preparePath.c_str(),
-				&metadata,
-				image
-			)
-		);
-	}
-	else if (path.extension() == ".hdr")
-	{
-		//load hdr
-		Win32::ThrowIfFailed(
-			LoadFromHDRFile(
-				preparePath.c_str(),
-				&metadata,
-				image
-			)
-		);
-	}
-	else
-	{
-		//load wic
-		Win32::ThrowIfFailed(
-			LoadFromWICFile(
-				preparePath.c_str(),
-				WIC_FLAGS_IGNORE_SRGB,
-				&metadata,
-				image
-			)
-		);
-	}
-
-	decodeProfile.reset();
-	if (isCompress)
-	{
-		ScratchImage compressedImage{};
-		if (!IsCompressed(metadata.format) && path.extension() != ".hdr" && path.extension() != ".dds")
-		{
-			ce::profile_scope compressProfile{ ce::marker<"Texture.CompressBC1">() };
-			DirectX::TexMetadata tempMetadata = metadata;
-
-			// DXGI_FORMAT_BC1_UNORM (== DXT1)
-			Win32::ThrowIfFailed(
-				DirectX::Compress(
-					image.GetImages(),
-					image.GetImageCount(),
-					metadata,
-					DXGI_FORMAT_BC1_UNORM,
-					TEX_COMPRESS_PARALLEL,
-					0.5f,
-					compressedImage
-				)
-			);
-
-			metadata = compressedImage.GetMetadata(); // 메타데이터 갱신
-			image = std::move(compressedImage); // 압축된 이미지로 교체
-		}
-	}
-
-	// image 를 옮기기 전에 읽어 둔다 — 옮긴 뒤로는 원본이 비어 있다.
-	// (코덱 산출물을 복사하지 않고 그대로 넘기는 것이 축 A 의 요점이다)
-	const bool hasAlpha = [&image] {
-		ce::profile_scope alphaProfile{ ce::marker<"Texture.AlphaScan">() };
-		return !image.IsAlphaAllOpaque();
-	}();
-
-	own::shared_owner<const CodecImage> codecImage = TextureMakeCodecImage(std::move(image));
-	if (!codecImage) return nullptr;
-
-	auto texture = own::make_shared<Texture>();
-
-	// ★ DX11 SRV 생성 제거 (T6) - 위 LoadFormPath의 주석과 같은 이유다.
-
-	texture->m_textureType = TextureType::ImageTexture;
-	texture->m_size = { float(metadata.width),float(metadata.height) };
-	texture->m_isTextureAlpha = hasAlpha;
-	// 압축까지 끝난 최종 이미지를 캐시가 가져가도록 남긴다(T1).
-	// 예전에는 여기서 버렸고 DX12는 방금 만든 DX11 텍스처에서 되읽었다.
-	texture->SetNonRehydratableImage(std::move(codecImage));
-
-	return std::move(texture);
+    const file::path materialPath = PathFinder::RelativeToMaterial(path.string());
+    const file::path resolved = file::is_regular_file(materialPath) ? materialPath : path;
+    if (resolved.extension() == ".cetex")
+    {
+        return LoadSharedFromPath(resolved, false);
+    }
+    if (!file::is_regular_file(resolved))
+    {
+        return {};
+    }
+    return CreateFromSourceImage(AssetAuthoringPort::LoadSourceTexture(resolved, {},
+        isCompress ? TextureSourceCompression::LegacyLinear : TextureSourceCompression::None), {}, {}, {});
 }
 
-// ── cook 경로의 디코드 창구 (축 A) ──────────────────────────────────────
-//
-// ★ 이 함수의 몸통은 ModelAssetGeneration::CopyTexturePixels 에 있던 것이다.
-//   그쪽이 필요한 것은 "인코딩된 바이트 -> 중립 RGBA8" 하나였는데, 그것
-//   때문에 DirectXTex 의 Convert·Decompress·IsSRGB 를 직접 불렀다. 디코더를
-//   갈아 끼우려면 봐야 할 파일이 둘이 되는 자리였다.
+// Source decoding exists only while an authoring host installs its adapter.
 bool Texture::DecodeToRgba8(std::span<const std::byte> bytes,
-	TextureImage& outImage, std::string& outFailure)
+    TextureImage& outImage, std::string& outFailure)
 {
-	ScratchImage image{};
-	TexMetadata metadata{};
-	bool alreadyFinal = false;
-	if (!TextureDecodeImageBytes(bytes, metadata, image, alreadyFinal))
-	{
-		outFailure = "image decoder가 픽셀을 만들지 못했다.";
-		return false;
-	}
-
-	// ── 색공간은 라벨로만 정한다 ──────────────────────────────────
-	//
-	// ★ 여기 있던 코드는 target 을 semantic(_UNORM_SRGB)으로 잡고
-	//   Convert 를 불렀다. DirectXTex 는 **출력 포맷이 IsSRGB 면
-	//   SRGB_OUT 이 기본 on** 이라고 스스로 문서화한다
-	//   (DirectXTex.h "if the output format type is IsSRGB(), then
-	//   SRGB_OUT is on by default"). 입력은 _UNORM 이라 SRGB_IN 이
-	//   꺼진 채로, 이미 sRGB 로 인코딩된 PNG 바이트에 linear→sRGB
-	//   인코드가 한 번 더 먹었다.
-	//
-	//   런타임 SRV 는 호출자가 정하는 semantic 포맷을 쓰므로 하드웨어가
-	//   디코드를 한 번 한다. 두 연산이 정확히 상쇄돼 **셰이더가 받는
-	//   알베도가 sRGB 바이트값 그대로**였다 — Gunner 본체 텍스처
-	//   기준 밝기 2.1~3.7 배, 채도비 2.96 → 1.70 (43% 탈색).
-	//
-	//   고침은 "바이트를 건드리지 않는다"다. 레이아웃만 RGBA8 로
-	//   맞추되 목표 포맷의 sRGB 성질을 **소스와 같게** 두면
-	//   DirectXTex 가 전달 함수에 손대지 않는다. 최종 라벨은 호출자가
-	//   색공간으로 따로 정한다.
-	const DXGI_FORMAT layoutTarget = IsSRGB(metadata.format)
-		? DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
-		: DXGI_FORMAT_R8G8B8A8_UNORM;
-
-	ScratchImage converted;
-	const ScratchImage* finalImage = &image;
-	HRESULT conversion = S_OK;
-	if (IsCompressed(metadata.format))
-	{
-		conversion = Decompress(image.GetImages(), image.GetImageCount(),
-			metadata, layoutTarget, converted);
-		finalImage = &converted;
-	}
-	else if (metadata.format != layoutTarget)
-	{
-		conversion = Convert(image.GetImages(), image.GetImageCount(), metadata,
-			layoutTarget, TEX_FILTER_DEFAULT, TEX_THRESHOLD_DEFAULT, converted);
-		finalImage = &converted;
-	}
-	if (FAILED(conversion) || 0 == finalImage->GetImageCount())
-	{
-		outFailure = "image를 backend-neutral RGBA8로 변환하지 못했다.";
-		return false;
-	}
-
-	const TexMetadata& finalMetadata = finalImage->GetMetadata();
-	if (TEX_DIMENSION_TEXTURE2D != finalMetadata.dimension
-		|| 0 == finalMetadata.width || 0 == finalMetadata.height
-		|| 0 == finalMetadata.mipLevels || 0 == finalMetadata.arraySize
-		|| finalMetadata.width > UINT32_MAX || finalMetadata.height > UINT32_MAX)
-	{
-		outFailure = "2D texture descriptor 범위를 벗어났다.";
-		return false;
-	}
-
-	const RHIFormat format = TextureDecodedFormatToRHI(finalMetadata.format);
-	if (RHIFormat::Unknown == format
-		|| !TextureCopyScratchToImage(*finalImage, format, outImage))
-	{
-		outFailure = "decoded texture subresource가 비었다.";
-		return false;
-	}
-	return true;
+    return AssetAuthoringPort::DecodeSourceTextureRgba8(bytes, outImage, outFailure);
 }
 
 // ★ DX11 생성자·뷰 이관을 걷어낸 뒤의 수명 (T6, 2026-08-08).
@@ -1471,31 +696,33 @@ bool Texture::DecodeToRgba8(std::span<const std::byte> bytes,
 //   남은 것은 CPU 자료뿐이고, 그것은 shared_ptr과 값이라 옮기기만 하면 된다.
 Texture::Texture(Texture&& texture) noexcept
 {
-	m_nonRehydratableImage = std::move(texture.m_nonRehydratableImage);
+    m_nonRehydratableImage = std::move(texture.m_nonRehydratableImage);
     m_imageDescription = texture.m_imageDescription;
     m_decodedBytes = texture.m_decodedBytes;
     m_assetOrigin = std::move(texture.m_assetOrigin);
     m_samplingFormat = texture.m_samplingFormat;
-	m_assetId = texture.m_assetId;
-	m_textureType = texture.m_textureType;
-	m_name = std::move(texture.m_name);
-	m_extension = std::move(texture.m_extension);
+    m_cookedPayload = texture.m_cookedPayload;
+    m_cookedColorSpaceLocked = texture.m_cookedColorSpaceLocked;
+    m_assetId = texture.m_assetId;
+    m_textureType = texture.m_textureType;
+    m_name = std::move(texture.m_name);
+    m_extension = std::move(texture.m_extension);
     m_assetPath = std::move(texture.m_assetPath);
-	m_size = texture.m_size;
-	m_isTextureAlpha = texture.m_isTextureAlpha;
+    m_size = texture.m_size;
+    m_isTextureAlpha = texture.m_isTextureAlpha;
 
-	texture.m_textureType = TextureType::Unknown;
-	texture.m_size = {};
-	texture.m_isTextureAlpha = false;
+    texture.m_textureType = TextureType::Unknown;
+    texture.m_size = {};
+    texture.m_isTextureAlpha = false;
 }
 
 
 math::vector2 Texture::GetImageSize() const
 {
-	// ★ 예전에는 m_sizeRatio로 나눴다 (T6에서 정리).
-	//   그 비율은 '화면의 1/N 해상도로 따라가는 렌더 타깃'을 위한 것이었고,
-	//   화면 추종 정책과 함께 사라졌다. 파일에서 읽은 텍스처의 비율은 늘
-	//   1이었으므로 이 함수가 돌려주던 값은 그대로다.
-	return m_size;
+    // ★ 예전에는 m_sizeRatio로 나눴다 (T6에서 정리).
+    //   그 비율은 '화면의 1/N 해상도로 따라가는 렌더 타깃'을 위한 것이었고,
+    //   화면 추종 정책과 함께 사라졌다. 파일에서 읽은 텍스처의 비율은 늘
+    //   1이었으므로 이 함수가 돌려주던 값은 그대로다.
+    return m_size;
 }
 

@@ -262,6 +262,17 @@
           SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- PHASE12: the offline host owns built-in source-image decoding. Preparing
+       AssetCooker also prepares the shared development Editor/Player resource.
+       Run only after its launcher and native dependencies have been deployed. -->
+  <Target Name="CookBuiltinTextureResources"
+          AfterTargets="DeploySharedEngineRuntime"
+          Condition="'$(MSBuildProjectName)' == 'AssetCooker' and '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="!Exists('$(SolutionDir)Dynamic_CPP\Assets\VolumetricFog\blueNoise.dds')"
+           Text="Built-in volumetric blue-noise DDS source is missing." />
+    <Exec Command="&quot;$(OutDir)AssetCooker.exe&quot; --cook-builtin-textures --blue-noise-source &quot;$(SolutionDir)Dynamic_CPP\Assets\VolumetricFog\blueNoise.dds&quot; --output &quot;$(EngineResourceOutDir)VolumetricFog\blueNoise.cetex&quot;" />
+  </Target>
+
   <Target Name="DeployEditorResources"
           AfterTargets="Build"
           Condition="'$(MSBuildProjectName)' == 'CreatorEditor'">

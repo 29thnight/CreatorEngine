@@ -53,7 +53,7 @@ internal static class AssetCooking
     public static CookResult Validate(string output, int expected, bool bootstrap = false)
     {
         const string guid = "([0-9a-f]{8}-[0-9a-f]{4}-[48][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
-        var rules = new Dictionary<string, string> { ["Models"] = "", ["Textures"] = "png|hdr|dds|jpg", ["ShaderMeta"] = "shadermeta", ["Materials"] = "asset", ["MaterialPrograms"] = "lxmaterial", ["Scenes"] = "creator", ["Prefabs"] = "prefab", ["CollisionGeometry"] = "cepg", ["Audio"] = "ceac", ["SoundGraphs"] = "cesg", ["SoundPresets"] = "cesp" };
+        var rules = new Dictionary<string, string> { ["Models"] = "", ["Textures"] = "cetex", ["ShaderMeta"] = "shadermeta", ["Materials"] = "asset", ["MaterialPrograms"] = "lxmaterial", ["Scenes"] = "creator", ["Prefabs"] = "prefab", ["CollisionGeometry"] = "cepg", ["Audio"] = "ceac", ["SoundGraphs"] = "cesg", ["SoundPresets"] = "cesp" };
         var derived = Path.Combine(output, "Derived"); var manifest = Path.Combine(derived, "asset-manifest.cemf");
         if (!File.Exists(manifest)) throw new BuildException("Cooked asset manifest missing.");
         var files = Paths.Files(derived).ToArray(); var byFolder = rules.Keys.ToDictionary(k => k, _ => 0);
@@ -64,7 +64,7 @@ internal static class AssetCooking
             bytes += new FileInfo(file).Length;
             var relative = Paths.Relative(derived, file); var folder = relative.Split('/')[0];
             if (!rules.TryGetValue(folder, out var extensions)) throw new BuildException($"Unexpected Derived folder: {relative}");
-            var pattern = folder == "Models" ? "^Models/([0-9a-f]{2})/" + guid + "/[0-9]+/(generation\\.asset|model\\.cemc|sidecar\\.meta|textures/" + guid + "\\.(png|jpg))$"
+            var pattern = folder == "Models" ? "^Models/([0-9a-f]{2})/" + guid + "/[0-9]+/(generation\\.asset|model\\.cemc|sidecar\\.meta|textures/" + guid + "\\.cetex)$"
                 : "^" + folder + "/([0-9a-f]{2})/" + guid + "\\.(" + extensions + ")$";
             var match = Regex.Match(relative, pattern);
             if (!match.Success || match.Groups[1].Value != match.Groups[2].Value[..2]) throw new BuildException($"Cook artifact violates GUID path contract: {relative}");
@@ -78,7 +78,7 @@ internal static class AssetCooking
         if (artifacts != expected || companions != 2 * generations) throw new BuildException($"Cook artifact/companion count mismatch: {artifacts}/{expected}, companions={companions}, models={generations}");
         return new(artifacts, companions, bytes, new FileInfo(manifest).Length, Metadata.Hash(manifest), files.Length, byFolder);
     }
-    public static async Task<CookResult> Cook(BuildContext context, string cooker, string assets, string output, string generations, string bootstrapAssetSets = "")
+    public static async Task<CookResult> Cook(BuildContext context, string cooker, string assets, string output, string generations, string bootstrapAssetSets = "", string textureIdentityRoot = "")
     {
         if (Directory.Exists(output)) throw new BuildException("Cook output must be a new directory.");
         var models = Models(assets); var all = Paths.Files(assets).Order(StringComparer.Ordinal).ToArray();
@@ -87,8 +87,13 @@ internal static class AssetCooking
         var arguments = new List<string> { "--asset-root", assets, "--output", output };
         if (bootstrap) arguments.AddRange(["--build-runtime-bootstrap", "--runtime-root", bootstrapAssetSets]);
         else arguments.AddRange(["--generation-root", generations]);
+        if (textureIdentityRoot.Length != 0)
+        {
+            if (!bootstrap) throw new BuildException("Texture identity lookup is only valid for bootstrap documents.");
+            arguments.AddRange(["--texture-identity-root", Paths.Canonical(textureIdentityRoot, true)]);
+        }
         var counts = new Dictionary<string, int>();
-        foreach (var (option, extensions) in new (string, string[])[] { ("--model", [".fbx", ".glb", ".gltf"]), ("--texture", [".png", ".hdr", ".dds"]), ("--shadermeta", [".shadermeta"]), ("--shadergraph", [".shadergraph"]), ("--material", [".asset"]), ("--scene", [".creator", ".prefab"]) })
+        foreach (var (option, extensions) in new (string, string[])[] { ("--model", [".fbx", ".glb", ".gltf"]), ("--texture", [".png", ".jpg", ".jpeg", ".hdr", ".dds"]), ("--shadermeta", [".shadermeta"]), ("--shadergraph", [".shadergraph"]), ("--material", [".asset"]), ("--scene", [".creator", ".prefab"]) })
         {
             if (bootstrap && option != "--scene") continue;
             var sources = all.Where(p => extensions.Contains(Path.GetExtension(p).ToLowerInvariant()) && !stale.Contains(p)).ToArray(); counts[option] = sources.Length;
@@ -110,10 +115,12 @@ internal static class AssetCooking
         result.ModelCount = models.Length; result.SourceCounts = counts; result.LegacyModelCookCaches = stale.Count; result.LegacyTextureNameRefs = Metric("legacyTextureNameRefs");
         return result;
     }
-    public static async Task<DocumentResult> Documents(BuildContext context, string cooker, string root)
+    public static async Task<DocumentResult> Documents(BuildContext context, string cooker, string root, string terrainSourceRoot = "")
     {
-        var log = await context.Run(cooker, ["--compile-runtime-documents", "--runtime-root", root]);
-        var summary = Regex.Match(log.Output, @"(?m)^asset-cooker runtime-documents=(\d+) bytes=(\d+) format=CEDO1\r?$");
+        var arguments = new List<string> { "--compile-runtime-documents", "--runtime-root", root };
+        if (terrainSourceRoot.Length != 0) arguments.AddRange(["--terrain-source-root", terrainSourceRoot]);
+        var log = await context.Run(cooker, arguments);
+        var summary = Regex.Match(log.Output, @"(?m)^asset-cooker runtime-documents=(\d+) bytes=(\d+) format=CEDO1\+TRBN2\r?$");
         if (!summary.Success) throw new BuildException("Runtime document cook summary missing.");
         var extensions = new[] { ".inputmap", ".bt", ".blackboard", ".renderprofile", ".terrain", ".foliage" };
         var documents = Paths.Files(Path.Combine(root, "ProjectSetting")).Where(p => Path.GetExtension(p).Equals(".asset", StringComparison.OrdinalIgnoreCase))
@@ -122,9 +129,23 @@ internal static class AssetCooking
         if (documents.Length != count || documents.Sum(p => new FileInfo(p).Length) != bytes) throw new BuildException("Runtime document count/size differs from cook output.");
         foreach (var document in documents)
         {
-            using var file = File.OpenRead(document); var magic = new byte[4];
-            if (file.Read(magic) != 4 || !magic.AsSpan().SequenceEqual("CEDO"u8)) throw new BuildException($"Runtime document is not CEDO: {document}");
+            using var file = File.OpenRead(document);
+            if (Path.GetExtension(document).Equals(".terrain", StringComparison.OrdinalIgnoreCase))
+            {
+                var header = new byte[48];
+                if (file.Read(header) != header.Length
+                    || System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header) != 0x5442524e
+                    || System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(4)) != 2
+                    || System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(header.AsSpan(8)) != (ulong)file.Length)
+                    throw new BuildException($"Runtime terrain is not a complete TRBN2 artifact: {document}");
+            }
+            else
+            {
+                var magic = new byte[4];
+                if (file.Read(magic) != 4 || !magic.AsSpan().SequenceEqual("CEDO"u8))
+                    throw new BuildException($"Runtime document is not CEDO: {document}");
+            }
         }
-        return new(count, bytes, "CEDO1");
+        return new(count, bytes, "CEDO1+TRBN2");
     }
 }

@@ -1,6 +1,7 @@
 #include "TextureAssetRuntime.h"
 #include "../DataSystem.h"
 #include "../Texture.h"
+#include "../Experiment/Cooked/CookedTexture.h"
 
 #include <algorithm>
 #include <cassert>
@@ -249,11 +250,11 @@ AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsyncFromSnapshot(
                 "A texture hard dependency requires a runtime decoder that is not implemented.");
         }
         if (resolved.blob.kind != texture_cooked::CookedAssetKind::Texture
-            || resolved.blob.representation != 1u
+            || resolved.blob.representation != texture_cooked::kCookedTextureRepresentationVersion
             || resolved.blob.schemaVersion != texture_cooked::kTextureArtifactVersion)
         {
             return fail(AssetRequestStatus::Failed, AssetRequestError::UnsupportedRepresentation,
-                "Texture acquisition requires TextureSourceImage representation 1, schema 1.");
+                "Texture acquisition requires GPU-ready CECT representation 2, schema 2; recook this asset.");
         }
     }
 
@@ -852,13 +853,12 @@ namespace AssetDepot
     TextureImageKey MakeTextureImageKey(const experiment::cooked::AssetBlobRecord& blob,
         const TextureAssetVariant& variant)
     {
+        // The artifact already embodies all byte-affecting import settings.
+        // Role/sampler labels and obsolete runtime processing hints do not split
+        // identical payloads; distinct recipes are represented by distinct blobs.
+        (void)variant;
         TextureImageRecipe recipe;
-        recipe.compress = variant.compress;
-        recipe.forceRgba8 = variant.forceRgba8;
-        recipe.compressionColorSpace = variant.compress ? variant.colorSpace : TextureAssetColorSpace::Source;
-        recipe.mipPolicy = variant.mipPolicy;
-        recipe.mipColorSpace = variant.mipPolicy == TextureMipPolicy::GenerateFull
-            ? variant.colorSpace : TextureAssetColorSpace::Source;
+        recipe.version = 2u;
         return { blob.contentSha256, blob.byteSize, blob.kind, blob.representation,
             blob.schemaVersion, blob.targetPlatform, blob.targetAbi, recipe };
     }
@@ -1081,7 +1081,7 @@ void DataSystem::RunTextureImageWork(own::shared_owner<AssetDepot::TextureImageW
         captured->artifactPath = work->source ? work->source->artifactPath : work->resolved.blob.artifactPath;
         std::string failure;
         std::uint64_t byteSize{};
-        constexpr std::uint64_t maxSourceBytes = 512ull * 1024ull * 1024ull;
+        constexpr std::uint64_t maxSourceBytes = texture_cooked::kCookedTextureMaxBytes;
         AssetRequestError error = AssetRequestError::None;
         if (!texture_cooked::CaptureArtifactSource(captured->byteSource, captured->artifactPath, failure)
             || !captured->byteSource->Size(captured->artifactPath, byteSize, failure))

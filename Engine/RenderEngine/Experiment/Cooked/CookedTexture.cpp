@@ -174,10 +174,13 @@ namespace experiment::cooked
         }
     }
 
-    bool DecodeCookedTexture(std::span<const std::byte> artifact, TextureImage& image,
+    static bool ReadCookedTexture(std::span<const std::byte> artifact, TextureImage* image,
         std::string& failure, CookedTextureInfo* info)
     {
-        image = {};
+        if (image)
+        {
+            *image = {};
+        }
         failure.clear();
         if (info)
         {
@@ -249,6 +252,10 @@ namespace experiment::cooked
         {
             return fail("CECT: trailing or missing payload bytes.");
         }
+        if (!image)
+        {
+            return true;
+        }
         try
         {
             auto decoded = TextureImage::Allocate(format, width, height, arraySize, mipLevels, cube);
@@ -267,7 +274,7 @@ namespace experiment::cooked
                     offset += subimage->slicePitch;
                 }
             }
-            image = std::move(decoded);
+            *image = std::move(decoded);
             if (info)
             {
                 info->hasAlpha = (flags & 2u) != 0u;
@@ -280,4 +287,16 @@ namespace experiment::cooked
             return fail("CECT: pixel allocation failed.");
         }
     }
+
+    bool ValidateCookedTexture(std::span<const std::byte> artifact, std::string& failure)
+    {
+        return ReadCookedTexture(artifact, nullptr, failure, nullptr);
+    }
+
+    bool DecodeCookedTexture(std::span<const std::byte> artifact, TextureImage& image,
+        std::string& failure, CookedTextureInfo* info)
+    {
+        return ReadCookedTexture(artifact, &image, failure, info);
+    }
+
 }

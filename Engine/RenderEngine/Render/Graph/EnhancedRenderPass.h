@@ -147,7 +147,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 
     bool IsValid() const noexcept
     {
-        return coverage.IsValid() && useNormalMap <= 1u
+        return coverage.IsValid() && (useNormalMap == 0u || useNormalMap == 1u || useNormalMap == 3u)
             && flow.IsFinite()
             && shaderMetaHandle.IsValid()
             && !bindingLayout.constantBufferName.empty()
@@ -185,7 +185,7 @@ struct EnhancedMaterialDrawSnapshot
 
     bool IsValid() const noexcept
     {
-        return coverage.IsValid() && useNormalMap <= 1u
+        return coverage.IsValid() && (useNormalMap == 0u || useNormalMap == 1u || useNormalMap == 3u)
             && shaderMetaHandle.IsValid()
             && !bindingLayout.constantBufferName.empty()
             && bindingLayout.constantBufferByteSize == propertyBytes.size();

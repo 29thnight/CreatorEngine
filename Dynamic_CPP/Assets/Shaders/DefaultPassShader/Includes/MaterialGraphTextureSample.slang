@@ -6,7 +6,7 @@
 #define LX_MATERIAL_PIXEL_FOOTPRINT 0
 #endif
 
-float4 LXSampleMaterialImage(Texture2D<float4> image, SamplerState sampler, float2 uv, float explicitLod)
+float4 LXSampleMaterialImage(Texture2D<float4> image, SamplerState sampler, float2 uv, float explicitLod, uint encoding)
 {
 #if LX_MATERIAL_PIXEL_FOOTPRINT
     uint width, height, levels;
@@ -19,5 +19,14 @@ float4 LXSampleMaterialImage(Texture2D<float4> image, SamplerState sampler, floa
 #else
     const float lod = explicitLod;
 #endif
-    return image.SampleLevel(sampler, uv, lod);
+    float4 sampled = image.SampleLevel(sampler, uv, lod);
+    // Runtime storage metadata selects the decode; a zero blue channel is not
+    // evidence of BC5. Re-encode positive Z for the graph's RGB Normal Map node.
+    // Keep RG and alpha exactly as sampled, including filtered/mipmapped values.
+    if (encoding == 1u)
+    {
+        const float2 xy = sampled.xy * 2.0 - 1.0;
+        sampled.z = sqrt(saturate(1.0 - dot(xy, xy))) * 0.5 + 0.5;
+    }
+    return sampled;
 }

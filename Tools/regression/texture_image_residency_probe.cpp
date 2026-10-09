@@ -3,6 +3,7 @@
 #include "../../Engine/RenderEngine/DataSystem.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/ArtifactByteSource.h"
 #include "../../Engine/RenderEngine/TextureFramePins.h"
+#include "../../Engine/RenderEngine/Experiment/Cooked/CookedTexture.h"
 
 #include <atomic>
 #include <condition_variable>
@@ -131,8 +132,8 @@ namespace
         Cooked::AssetBlobRecord blob;
         blob.kind = Cooked::CookedAssetKind::Texture;
         blob.byteSize = 34u;
-        blob.representation = 1u;
-        blob.schemaVersion = 1u;
+        blob.representation = Cooked::kCookedTextureRepresentationVersion;
+        blob.schemaVersion = Cooked::kCookedTextureSchemaVersion;
         blob.targetPlatform = "probe";
         blob.targetAbi = "probe";
         AssetDepot::TextureAssetVariant linear;
@@ -144,14 +145,14 @@ namespace
             "Sampling-only labels or roles split compatible bytes");
         linear.compress = true;
         srgb.compress = true;
-        Require(AssetDepot::MakeTextureImageKey(blob, linear) != AssetDepot::MakeTextureImageKey(blob, srgb),
-            "Compression color space collapsed");
+        Require(AssetDepot::MakeTextureImageKey(blob, linear) == AssetDepot::MakeTextureImageKey(blob, srgb),
+            "Runtime compression hint split already-cooked bytes");
         linear.compress = false;
         srgb.compress = false;
         linear.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
         srgb.mipPolicy = AssetDepot::TextureMipPolicy::GenerateFull;
-        Require(AssetDepot::MakeTextureImageKey(blob, linear) != AssetDepot::MakeTextureImageKey(blob, srgb),
-            "Mip filtering color space collapsed");
+        Require(AssetDepot::MakeTextureImageKey(blob, linear) == AssetDepot::MakeTextureImageKey(blob, srgb),
+            "Runtime mip hint split already-cooked bytes");
         const auto original = AssetDepot::MakeTextureImageKey(blob, linear);
         blob.artifactPath = "Derived/Another/path.tga";
         Require(original == AssetDepot::MakeTextureImageKey(blob, linear), "Path entered compatible image identity");
@@ -161,17 +162,15 @@ namespace
 
     void VerifyExactResidency(DataSystem& data)
     {
-        std::vector<std::byte> tga(18u + 16u, std::byte{});
-        tga[2] = std::byte{ 2u };
-        tga[12] = std::byte{ 2u };
-        tga[14] = std::byte{ 2u };
-        tga[16] = std::byte{ 32u };
-        tga[17] = std::byte{ 0x28u };
-        for (std::size_t index = 18u; index < tga.size(); ++index)
-        {
-            tga[index] = std::byte{ 0x80u };
-        }
-        const auto bytes = own::make_shared<const std::vector<std::byte>>(std::move(tga));
+        auto fixtureImage = TextureImage::Allocate(RHIFormat::RGBA8Unorm, 2u, 2u, 1u, 1u);
+        Require(fixtureImage.IsValid(), "Fixture image allocation failed");
+        const auto* subresource = fixtureImage.Find(0u, 0u);
+        std::memset(fixtureImage.MutablePixelsAt(*subresource), 0x80, subresource->slicePitch);
+        std::vector<std::byte> artifact;
+        std::string encodeFailure;
+        Require(Cooked::EncodeCookedTexture(fixtureImage.View(), artifact, encodeFailure, { true, false }),
+            "Fixture cooked encoding failed");
+        const auto bytes = own::make_shared<const std::vector<std::byte>>(std::move(artifact));
         const auto reads = own::make_shared<Reads>();
         struct ReleaseGate final
         {
@@ -195,15 +194,15 @@ namespace
         Cooked::AssetBlobRecord blob;
         blob.byteSize = bytes->size();
         blob.kind = Cooked::CookedAssetKind::Texture;
-        blob.representation = 1u;
-        blob.schemaVersion = 1u;
+        blob.representation = Cooked::kCookedTextureRepresentationVersion;
+        blob.schemaVersion = Cooked::kCookedTextureSchemaVersion;
         blob.targetPlatform = manifest.targetPlatform;
         blob.targetAbi = manifest.targetAbi;
         std::string error;
         Require(Cooked::ComputeSha256(*bytes, blob.contentSha256, error), "Fixture SHA failed");
         for (std::uint8_t index = 0u; index < 2u; ++index)
         {
-            blob.artifactPath = "Derived/Image/" + std::to_string(index) + ".tga";
+            blob.artifactPath = "Derived/Image/" + std::to_string(index) + ".cetex";
             manifest.blobs.push_back(blob);
             const Cooked::TypedAssetReference asset{ { Id(2u + index), {} }, Cooked::CookedAssetKind::Texture };
             manifest.entries.push_back({ asset, index, {} });
