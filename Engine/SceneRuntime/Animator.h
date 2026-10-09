@@ -111,6 +111,12 @@ enum class AnimatorDataPath : std::uint8_t
 class [[reflgen::reflect]] Animator : public meta::identity<Animator, Component>
 {
     public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
     Animator();
     // I5-D4e-1: 본문은 cpp로 — shared_ptr<const experiment::Model> 멤버가
@@ -122,6 +128,7 @@ public:
     // DDOL 재부착에는 OnInitialized가 다시 호출되지 않기 때문이다.
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;
+    void OnUninitializing() override;
     void OnPropertyChanged(std::string_view propertyName,
         Meta::PropertyChangeSource source) override;
     void SetAnimation(int index);
@@ -325,6 +332,9 @@ public:
     [[nodiscard]] bool IsSkinBindingCompatible(const assets::ModelMeshDescriptor& geometry) const noexcept;
 
 private:
+    [[reflgen::ignore]]
+    void ReleaseManagedResources() override;
+
     struct RequestedAnimationClip final
     {
         int clipIndex{ -1 };

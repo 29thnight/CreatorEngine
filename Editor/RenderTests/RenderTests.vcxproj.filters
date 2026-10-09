@@ -3,11 +3,13 @@
   <ItemGroup>
     <ClInclude Include="Tasks\WorkerPoolSelfTest.h" />
     <ClInclude Include="Tasks\SceneLoadJobsSelfTest.h" />
+    <ClInclude Include="Tasks\SceneGCSelfTest.h" />
     <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h" />
     <ClCompile Include="ExperimentParity\ExperimentCodeMaterialCodecSelfTest.cpp" />
     <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp" />
     <ClCompile Include="Tasks\WorkerPoolSelfTest.cpp" />
     <ClCompile Include="Tasks\SceneLoadJobsSelfTest.cpp" />
+    <ClCompile Include="Tasks\SceneGCSelfTest.cpp" />
     <ClInclude Include="Animation\AnimationBaselineProbe.h" />
     <ClInclude Include="Animation\AnimationPlaybackSelfTest.h" />
     <ClInclude Include="Animation\AnimationVisualProbe.h" />

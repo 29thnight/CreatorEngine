@@ -54,9 +54,12 @@ struct FoliageComponent::AssetBinding
 };
 
 FoliageComponent::FoliageComponent() = default;
-FoliageComponent::~FoliageComponent()
+FoliageComponent::~FoliageComponent() = default;
+
+void FoliageComponent::ReleaseManagedResources()
 {
     CancelAssetBindings();
+    m_assetBindings.clear();
 }
 
 void FoliageComponent::CancelAssetBindings()
@@ -126,8 +129,8 @@ void FoliageComponent::OnRemovingFromScene()
 
 void FoliageComponent::OnUninitializing()
 {
-    CancelAssetBindings();
-    auto scene = GetOwner()->m_ownerScene;
+    ReleaseManagedResources();
+    auto scene = GetOwner() ? GetOwner()->m_ownerScene : nullptr;
     auto renderScene = SceneManagers->GetRenderScene();
     if(scene)
     {

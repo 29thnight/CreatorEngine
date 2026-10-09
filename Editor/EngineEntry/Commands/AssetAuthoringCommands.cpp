@@ -1,3 +1,4 @@
+#include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "../EditorModelPlacement.h"
 #include <DirectXTex.h>
 #include <stb_image.h>
@@ -380,7 +381,10 @@ namespace ConsoleCmd
         std::size_t layers = 0;
         if (written)
         {
-            TerrainComponent restored;
+            gc::domain restoredDomain;
+            auto restoredRoot = Component::CreateManaged<TerrainComponent>(restoredDomain);
+            TerrainComponent& restored = *restoredRoot;
+            gcce_probe::cleanup restoredCleanup(restored);
             roundTrip = restored.Load(result.descriptorPath.wstring());
             layers = restored.GetLayerCount().size();
             const float* heights = restored.GetHeightMap();
@@ -1976,7 +1980,7 @@ namespace ConsoleCmd
             data.Set("passed", CommandData::Bool(passed));
             data.Set("log", CommandData::String(resultLog));
             return passed ? Ok(resultLog, std::move(data)) : Fail("scene.loadjobs.failed", resultLog, std::move(data));
-        });
+        }, true); // Completion performs owner-thread scene teardown, not only polling.
         return Ok(log);
     }
 

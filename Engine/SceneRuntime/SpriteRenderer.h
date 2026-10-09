@@ -12,6 +12,12 @@ class [[reflgen::reflect]] SpriteRenderer : public meta::identity<SpriteRenderer
 {
    friend struct reflgen::access;
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
     SpriteRenderer() = default;
 

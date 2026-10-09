@@ -9,6 +9,12 @@ class [[reflgen::reflect]] AudioListenerComponent
     : public meta::identity<AudioListenerComponent, Component>
 {
 public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;
 

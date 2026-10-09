@@ -18,6 +18,12 @@ class Camera;
 class [[reflgen::reflect]] MeshRenderer : public meta::identity<MeshRenderer, Component>
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
    // shared_ptr·중첩 구조체·비트플래그 혼합 케이스의 대표. 멤버 선언 순서가 곧 직렬화 키 순서다
    // (reflgen 은 선언 순서로 서술한다) — 구 generated.h 의 순서(골든 전제)를 지킨다.
 public:
@@ -175,4 +181,8 @@ public:
     {
         return (m_materialInstance ? &*m_materialInstance.borrow() : nullptr);
     }
+private:
+    [[reflgen::ignore]]
+    void ReleaseManagedResources() override;
+
 };

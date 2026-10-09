@@ -68,6 +68,12 @@ class [[reflgen::reflect]] Transform : public meta::identity<Transform, Componen
 {
    friend struct reflgen::access;
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
 	void CaptureSceneTransferState();
 	void RestoreSceneTransferState();

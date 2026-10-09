@@ -11,6 +11,12 @@ class [[reflgen::reflect]] BehaviorTreeComponent :
 	public meta::identity<BehaviorTreeComponent, Component>, public IAIComponent
 {
    public:
+    [[reflgen::ignore]]
+    void gc_trace(gc::tracer& tracer) const override
+    {
+        Component::gc_trace(tracer);
+    }
+
 public:
 	BehaviorTreeComponent() = default;
 

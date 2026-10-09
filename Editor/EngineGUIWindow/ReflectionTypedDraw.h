@@ -758,7 +758,7 @@ namespace Meta::TypedDraw
         {
             using E = meta::container::ValueT<MemberT>;
 
-            if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E> || is_unique_ptr_v<E>)
+            if constexpr (std::is_pointer_v<E> || is_shared_ptr_v<E> || is_unique_ptr_v<E> || is_gc_strong_ref_v<E>)
             {
                 // 포인터 원소 목록(Entity::m_components 등)은 여기 몫이 아니다 —
                 // 소유자 인스펙터가 따로 그린다. 종전과 같이 넘어간다.
@@ -867,7 +867,7 @@ namespace Meta::TypedDraw
             }
             ImGui::PopID();
         }
-        else if constexpr (std::is_pointer_v<MemberT> || is_shared_ptr_v<MemberT> || is_unique_ptr_v<MemberT>)
+        else if constexpr (std::is_pointer_v<MemberT> || is_shared_ptr_v<MemberT> || is_unique_ptr_v<MemberT> || is_gc_strong_ref_v<MemberT>)
         {
             using U = Meta::Typed::PointeeT<MemberT>;
             auto* p = Meta::Typed::RawPtrOf(value);

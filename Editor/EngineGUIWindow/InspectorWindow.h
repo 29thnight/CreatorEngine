@@ -5,6 +5,7 @@
 #include "CurvePoint.h"
 #include "EditorPropertyRow.h" // 배치 계약 (W2-I2)
 #include "EntityHandle.h"
+#include <cstdint>
 #include "EditorComponentCatalog.h"
 
 class Entity;
@@ -63,7 +64,8 @@ private:
 
 private:
 	bool            m_openClipPicker{ false };
-	SoundComponent* m_clipPickerTarget{ nullptr };
+    EntityHandle m_clipPickerOwner{};
+    std::uint64_t m_clipPickerComponent{};
 	std::string     m_clipSearch;                 // 검색어
 	std::vector<std::string> m_clipKeyCache;      // 캐시
 };

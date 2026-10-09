@@ -21,6 +21,7 @@ vcpkg_from_github(
     REF v1.0.0
     SHA512 dcd60bd1744d505a6dd8a11013b1b8b29aab81996fc3e7e8b39b93896dee1f13b0a10ced8c4b5b8b1199f9600de5d52d35231aae3c6ca23609512fa6d8756b8d
     HEAD_REF main
+    PATCHES respect-class-allocation.patch
 )
 # REFLGEN_SOURCE_END
 

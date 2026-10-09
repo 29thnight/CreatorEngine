@@ -5,6 +5,7 @@
 #include "TransCondition.h"
 #include "AniTransition.h"
 #include "AnimationState.h"
+#include "ManagedAniBehavior.h"
 #include "AvatarMask.h"
 #include "ConditionParameter.h"
 #include "ReflectionYml.h"
@@ -39,23 +40,77 @@ const AnimInstance& Animator::GetInstance() const noexcept
 
 Animator::~Animator()
 {
-	AnimatorSystems->DestroyInstance(m_instance);
-	m_animationControllers.clear();
+    // These containers/handles were retired on the owner thread. Sweeping
+    // must never reach AnimatorSystem, SceneManager or CLR callbacks.
+    assert(m_instance.slot == UINT32_MAX);
+    assert(m_animationControllers.empty());
+    assert(socketvec.empty());
+    for (auto* parameter : Parameters)
+    {
+        delete parameter;
+    }
+}
 
-	{
-		std::unique_lock lock(m_paramMutex);
-		for (auto& param : Parameters)
-		{
-			delete param; // 하나씩 해제
-		}
-		Parameters.clear(); // 벡터 비우기
-	}
+void Animator::OnUninitializing()
+{
+    ReleaseManagedResources();
+}
 
-	for (auto& socket : socketvec)
-	{
-		delete socket;
-	}
-	socketvec.clear();
+void Animator::ReleaseManagedResources()
+{
+    m_descriptorRequest.Cancel();
+    m_skeletonRequest.Cancel();
+    for (auto& clip : m_requestedClips)
+    {
+        clip.request.Cancel();
+    }
+    m_descriptorRequest = {};
+    m_skeletonRequest = {};
+    m_requestedClips.clear();
+    m_deferredAvatarMasks.clear();
+
+    const auto releaseState = [](const std::shared_ptr<AnimationState>& state)
+    {
+        if (!state)
+        {
+            return;
+        }
+        if (auto* behavior = dynamic_cast<ManagedAniBehavior*>(state->behaviour.get()))
+        {
+            behavior->ReleaseInstance();
+        }
+        state->behaviour.reset();
+        state->m_ownerController = nullptr;
+    };
+    for (const auto& controller : m_animationControllers)
+    {
+        if (!controller)
+        {
+            continue;
+        }
+        for (const auto& state : controller->StateVec)
+        {
+            releaseState(state);
+        }
+        releaseState(controller->m_anyState);
+        controller->m_owner = nullptr;
+    }
+    m_animationControllers.clear();
+
+    for (auto* socket : socketvec)
+    {
+        if (socket)
+        {
+            socket->ReleaseManagedResources();
+            delete socket;
+        }
+    }
+    socketvec.clear();
+    if (auto* system = AnimatorSystem::GetIfAlive())
+    {
+        system->DestroyInstance(m_instance);
+    }
+    m_instance = {};
 }
 
 namespace

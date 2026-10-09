@@ -275,7 +275,9 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 	FoliageComponent* foliage = owner->GetComponent<FoliageComponent>();
 	if (!foliage)
 	{
-		foliage = owner->AddComponent<FoliageComponent>();
+        EditorObjectOperations::AddComponent(owner->GetScene()->HandleOf(owner->m_index), "FoliageComponent");
+        ImGui::TextDisabled("Preparing foliage component...");
+        return;
 	}
 
 	std::vector<const char*> typeNames;

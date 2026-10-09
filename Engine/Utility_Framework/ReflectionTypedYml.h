@@ -38,6 +38,7 @@
 // 맵은 거부한다 — 시퀀스의 포인터 원소는 SceneManager 가 복원하지만 맵에는 그
 // 복원자가 없어 "적기만 하고 못 읽는" 한쪽 방향이 된다.
 #include "ReflectionYml.h"
+#include "../SceneRuntime/SceneGC.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
 #include "AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "AuthoringReadNode.h" // D3-b-2b-1b
@@ -275,6 +276,8 @@ namespace Meta::Typed
     template<class U, class D> struct Pointee<std::unique_ptr<U, D>> { using type = std::remove_cv_t<U>; };
     template<class U> struct Pointee<own::shared_owner<U>> { using type = std::remove_cv_t<U>; };
     template<class U> struct Pointee<own::unique_owner<U>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<gc::trace_ref<U>> { using type = std::remove_cv_t<U>; };
+    template<class U> struct Pointee<gc::root_ref<U>> { using type = std::remove_cv_t<U>; };
     template<class T> using PointeeT = typename Pointee<std::remove_cv_t<T>>::type;
 
     template<class P>

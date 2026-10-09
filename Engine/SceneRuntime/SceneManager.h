@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "Ownership.h"
+#include "SceneGC.h"
 #include "Object.h"
 #include "AssetBundle.h"
 #include "ReflectionYml.h"
@@ -31,12 +32,25 @@ class InputActionManager;
 class SceneManager : public Singleton<SceneManager>
 {
 private:
+    // Declared first: every root, callback and graph object is released before
+    // the one shared GameThread domain is destroyed. DDOL never crosses domains.
+    gc::domain m_gcDomain;
+
     friend class Singleton<SceneManager>;
     SceneManager();
     ~SceneManager();
 
 public:
 	void ManagerInitialize();
+    gc::domain& ManagedDomain();
+    // Transfer an external root to the manager and expose a borrowed Scene*.
+    Scene* AdoptScene(gc::root_ref<Scene> scene);
+    // Owner thread and scene-structure barrier only; cleanup precedes root release.
+    void RetireScene(Scene* scene);
+    // Only the host's joined render/scene-structure boundary may drive collection.
+    void CollectManagedAtFrameBoundary();
+    gc::statistics ManagedStatistics() const;
+
     void Editor();
 
     // ── 씬 구조 변경 (렌더 정지 구간에서만 수행) ──
@@ -138,9 +152,13 @@ public:
 	void RemoveDontDestroyOnLoad(Object* objPtr);
 	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
     
-	std::vector<Scene*>& GetScenes() { return m_scenes; }
+	const std::vector<Scene*>& GetScenes() const { return m_scenes; }
 	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
-	void SetActiveScene(Scene* scene) { m_activeScene = scene; }
+    void SetActiveScene(Scene* scene);
+    [[nodiscard]] std::uint64_t SceneContextEpoch() const noexcept
+    {
+        return m_sceneContextEpoch.load(std::memory_order_acquire);
+    }
 	void SetActiveSceneIndex(size_t index) { m_activeSceneIndex = index; }
 	size_t GetActiveSceneIndex() { return m_activeSceneIndex; }
 	bool IsGameStart() const { return m_isGameStart; }
@@ -250,6 +268,8 @@ private:
     bool PreparePhysicsSceneExit(Scene* scene);
     bool ResumePhysicsAfterSceneActivation();
     void RequireSceneLoadOwner() const;
+    void SetCommittedSimulation(bool committed);
+    void AdvanceSceneContextEpoch();
     std::thread::id m_sceneLoadOwner{std::this_thread::get_id()};
     std::vector<own::shared_owner<PendingSceneLoad>> m_pendingSceneLoads;
     std::array<SceneLoadRequestStatus, 64u> m_completedSceneLoads{};
@@ -301,8 +321,11 @@ private:
     // SceneManager.cpp의 각 호출부 주석 참고).
     void RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& batch);
 private:
+    std::atomic<std::uint64_t>          m_sceneContextEpoch{ 1u };
     std::atomic<Scene*>                 m_sceneToActivate{};
+    // Compatibility enumeration only, never a lifetime owner.
     std::vector<Scene*>                 m_scenes{};
+    std::vector<gc::root_ref<Scene>>     m_sceneRoots{};
 
     // 재생 시작 직전의 에디터 씬 스냅샷. 정지하면 이 노드로 같은 Scene 객체를
     // 되채운다(EnterPlayMode/ExitPlayMode 주석 참조).
