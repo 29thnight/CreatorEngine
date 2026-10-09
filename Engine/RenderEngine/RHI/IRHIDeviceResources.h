@@ -56,6 +56,8 @@
 /// 백엔드 타입 없이 옮긴 것이다 — 원래도 어댑터 질의라 백엔드와 무관했다.
 struct RHIVideoMemoryInfo
 {
+    uint64_t usedBytes{0}, budgetBytes{0};
+    bool usageAvailable{false}, budgetAvailable{false};
     uint64_t usedMB{ 0 };
     uint64_t budgetMB{ 0 };
 };

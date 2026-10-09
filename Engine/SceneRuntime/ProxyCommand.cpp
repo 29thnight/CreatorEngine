@@ -9,6 +9,7 @@
 #include "SpriteSheetComponent.h"
 #include "TextComponent.h"
 #include "RenderScene.h"
+#include "Scene.h"
 #include "ProxyCommandQueue.h"
 #include "Material.h"
 #include "MaterialGraphSceneInput.h"
@@ -20,6 +21,23 @@
 #include "RectTransformComponent.h"
 #include <algorithm>
 #include <array>
+
+own::shared_owner<TextureFramePins> RenderScene::TakePreparedTextureImagePins()
+{
+    if (auto* scene = GetScene())
+    {
+        return scene->TakePreparedTextureImagePins();
+    }
+    return {};
+}
+
+void RenderScene::RestorePreparedTextureImagePins(own::shared_owner<TextureFramePins> pins)
+{
+    if (auto* scene = GetScene())
+    {
+        scene->SetPreparedTextureImagePins(std::move(pins));
+    }
+}
 
 namespace
 {

@@ -4,7 +4,9 @@ param(
     [Parameter(Mandatory)][string]$FixtureProject,
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$CompilerFixtureDirectory = '',
-    [switch]$ShowEditor
+    [switch]$ShowEditor,
+    [ValidateRange(0,32)][int]$PreparationSamples = 0,
+    [switch]$MemorySampling
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -75,6 +77,10 @@ $start.UseShellExecute = $false
 $start.CreateNoWindow = $true
 $start.RedirectStandardOutput = $true
 $start.RedirectStandardError = $true
+if ($MemorySampling)
+{
+    $start.Environment['CREATOR_GPU_MEMORY_SAMPLES'] = Join-Path $out 'memory-continuous.jsonl'
+}
 $process = [Diagnostics.Process]::Start($start)
 $stdout = $process.StandardOutput.ReadToEndAsync()
 $stderr = $process.StandardError.ReadToEndAsync()
@@ -93,6 +99,11 @@ try {
     $headers = @{Authorization="Bearer $($endpoint.token)"}
     $session = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
     function Cmd([string]$name, [string[]]$arguments=@(), [bool]$allowPreparing=$false) {
+        if ($MemorySampling)
+        {
+            @{command=$name; args=@($arguments); utcMs=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()} |
+                ConvertTo-Json -Compress | Add-Content "$out/memory-stages.jsonl" -Encoding utf8
+        }
         $body = @{command=$name;args=@($arguments);mode='async'} | ConvertTo-Json -Compress
         $result = Invoke-RestMethod "$base/command" -Headers $headers -WebSession $session -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 650
         if ($name -eq 'quit' -and $result.operationId) {
@@ -180,6 +191,23 @@ try {
     $modelDraws = @($capture.draws | Where-Object modelId -eq $modelLoaded.modelId)
     if ($modelDraws.Count -ne 4 -or @($modelDraws.meshId | Select-Object -Unique).Count -ne 4) { throw 'CreatorRobot mesh capture is incomplete' }
     $report.captures += @{path=$capturePath;draws=$capture.draws.Count;modelDraws=$modelDraws.Count}
+    $report.preparationSamples = @()
+    for ($sample = 0; $sample -lt $PreparationSamples; ++$sample)
+    {
+        Cmd 'render.live.fence' @('600') | Out-Null
+        $started = [DateTime]::UtcNow.ToString('o')
+        $samplePath = "$out/preparation-sample-$sample"
+        Cmd 'render.live.capture' @($samplePath,'editor','controlled') | Out-Null
+        $measured = Get-Content "$samplePath/manifest.json" -Raw | ConvertFrom-Json
+        if (!($measured.measurement.cpuTransientPrepareMs -gt 0) -or
+            [double]::IsInfinity([double]$measured.measurement.cpuTransientPrepareMs))
+        {
+            throw 'Capture is missing a finite positive transient preparation measurement.'
+        }
+        $report.preparationSamples += @{index=$sample; path=$samplePath; startedUtc=$started;
+            completedUtc=[DateTime]::UtcNow.ToString('o'); measurement=$measured.measurement;
+            graph=$measured.graph; width=$measured.width; height=$measured.height}
+    }
     Cmd 'editor.panelcost' @('reset') | Out-Null
     Cmd 'editor.window' @('###Editor.RenderPass','open') | Out-Null
     foreach ($target in @('scene','game','preview')) {

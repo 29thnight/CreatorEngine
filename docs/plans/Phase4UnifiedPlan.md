@@ -1,5 +1,11 @@
 # PHASE 4 계열 통합 계획 — PBR 안정화에서 차세대 렌더링까지
 
+> 2026-10-09 후속 구조 재감사: RG8 제품 완료를 철회하고 progress·기성 0으로 정정한다. [감사 근거](../analysis/RenderRg7Rg8StructuralAudit20261009.md). 아래 종료 문구보다 이 판정과 현재 공수 원장이 우선한다.
+
+> 2026-10-09 현재: RG8 구현/검증/성능·메모리 채택 판정을 완료했다. [최종 근거](../analysis/RenderRg8Closure20261009.md). 개선 미입증으로 기본 OFF·기성 16인일이며 PHASE 4.3에는 RG9만 남는다. 아래 과거 계획과 추정은 당시 스냅샷이다.
+
+> 2026-10-08 현재: Q0의 DX12 고정 3단계 수용을 완료했다(기성 6인일). [최종 증거](../analysis/RhiQueueContractQ0_20261008.md)와 [현재 공수 원장](RenderPhaseEffortEstimate.md)을 따른다. RG8/L4 소비와 Vulkan runtime은 별도이며, 아래 이전 공수 문구는 당시 계획 스냅샷이다.
+
 **역사 설계 문서 — 2026-10-01 우선 정본:** 현재 작업/공수는 [RenderPhaseRoadmap](RenderPhaseRoadmap.md)과 [공수 원장](RenderPhaseEffortEstimate.md)을 따른다. 이 문서의 옛 4~4.8 검증 조건 중 Vulkan 비교는 모두 PHASE 4.9로 이관했으며 착수/완료 게이트로 재사용하지 않는다.
 
 

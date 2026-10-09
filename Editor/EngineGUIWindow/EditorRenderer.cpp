@@ -134,7 +134,9 @@ void EditorRenderer::BuildInitialDockLayout(unsigned int dockspaceId, float widt
     const ImVec2 nodePos{ posX, posY };
 
     ImGui::DockBuilderRemoveNode(id);
-    ImGui::DockBuilderAddNode(id);
+    // Persist this root as a dockspace, not a floating dock node. Restoring a
+    // floating root before its host exists can expose a zero-size ancestor.
+    ImGui::DockBuilderAddNode(id, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(id, size);
     ImGui::DockBuilderSetNodePos(id, nodePos);
 

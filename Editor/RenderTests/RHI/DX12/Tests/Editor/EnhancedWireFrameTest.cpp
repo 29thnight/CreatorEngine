@@ -512,6 +512,11 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
             std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::Tangent), tangent, sizeof(tangent));
             if (skin)
             {
+                // Match cooked product vertices: unused influences use 255,
+                // which must never be read from this one-bone palette.
+                const std::uint8_t boneIndices[]{0, 255, 255, 255};
+                std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::BoneIndices),
+                    boneIndices, sizeof(boneIndices));
                 std::memcpy(bytes + assets::OffsetOf(mask, assets::VertexAttribute::BoneWeights), weights, sizeof(weights));
             }
         }
@@ -541,6 +546,10 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
             item.modelMeshView = model;
             item.materialGraphInstance = instance;
             item.coverage.flags = EnhancedMaterialCoverage::Enabled;
+            if (draw)
+            {
+                item.coverage.flags |= EnhancedMaterialCoverage::Blended;
+            }
             item.worldMatrix = draw ? math::translation_matrix(math::vector3{3, 0, 0}) : math::matrix4x4::identity();
             item.bonePalette = skin ? palette : nullptr;
             item.boneCount = skin;
@@ -556,11 +565,13 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         frameContext.draws = nullptr;
         frameContext.forwardDraws = nullptr;
         WireCapture capture;
-        uint32_t edgeX{}, edgeY{}, bindX{}, bindY{};
+        uint32_t edgeX{}, edgeY{}, blendedX{}, blendedY{}, bindX{}, bindY{};
         if (!renderOnce(front, capture)
             || !WireProjectToPixel(front.view, front.projection, 0, skin ? 2.5f : 1.f, 0, edgeX, edgeY)
+            || !WireProjectToPixel(front.view, front.projection, 3, skin ? 2.5f : 1.f, 0, blendedX, blendedY)
             || !WireProjectToPixel(front.view, front.projection, 0, -1.f, 0, bindX, bindY)
             || capture.MaxInWindow(edgeX, edgeY, 2, 1) < .9f
+            || capture.MaxInWindow(blendedX, blendedY, 2, 1) < .9f
             || (skin && capture.MaxInWindow(bindX, bindY, 2, 1) > .05f)
             || wireframe.GetLastDrawItemCount() != 2 || wireframe.GetLastBatchCount() != 1
             || (skin && (wireframe.GetLastSkinnedCount() != 2 || wireframe.GetLastBonePaletteCount() != 1)))
@@ -570,7 +581,8 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         }
         frameContext.graphSceneInput.reset();
     }
-    outLog += passed ? "Graph WireFrame static/skinned transport passed\n" : "Graph WireFrame transport failed\n";
+    outLog += passed ? "Graph WireFrame static/skinned transport passed (opaque/blended, unused bone index 255)\n"
+                    : "Graph WireFrame transport failed\n";
 
     std::string validation;
     const uint32_t problems = resources.DrainDebugMessages(validation);

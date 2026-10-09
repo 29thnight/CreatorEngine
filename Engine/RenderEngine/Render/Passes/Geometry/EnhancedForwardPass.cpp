@@ -593,7 +593,7 @@ bool EnhancedForwardPass::ResolveShaderVariant(
     if (!shade || !reference) return false;
     outShadePipeline = shade->pipeline.GetHandle();
     outReferencePipeline = reference->pipeline.GetHandle();
-    outLayout = {shade->shader.shader, &shade->shader.shader->layout};
+    outLayout = {shade, &shade->shader.shader->layout};
     return true;
 }
 RHIPipelineHandle EnhancedForwardPass::GetShaderVariantPipeline(

@@ -212,6 +212,7 @@
     <ClCompile Include="PrimitiveRenderProxy.cpp" />
     <ClCompile Include="LightRenderProxy.cpp" />
     <ClCompile Include="RHI\DX12\DX12DeviceResources.cpp" />
+    <ClCompile Include="RHI\DX12\DX12QueueService.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\ScreenSizedResource.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
@@ -317,6 +318,7 @@
     <ClCompile Include="RHI\DX12\DX12CommandListPool.cpp" />
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp" />
+    <ClCompile Include="Render\Graph\EnhancedRenderGraphQueues.cpp" />
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp" />
     <ClCompile Include="Render\Passes\Geometry\EnhancedGBufferPass.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -666,6 +668,8 @@
     <ClInclude Include="PrimitiveRenderProxy.h" />
     <ClInclude Include="LightRenderProxy.h" />
     <ClInclude Include="RHI\DX12\DX12DeviceResources.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueService.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueBatchAdapter.h" />
     <ClInclude Include="RHI\RHIShaderCompiler.h" />
     <ClInclude Include="RHI\RHIShaderPermutation.h" />
     <ClInclude Include="RHI\RHIShaderReflection.h" />
@@ -707,6 +711,9 @@
     <ClInclude Include="RHI\IDisplayPresentationSink.h" />
     <ClInclude Include="RHI\RHIDisplayFrame.h" />
     <ClInclude Include="RHI\RHICompletionRetireQueue.h" />
+    <ClInclude Include="RHI\RHIQueueContract.h" />
+    <ClInclude Include="RHI\RHIQueueRecorder.h" />
+    <ClInclude Include="RHI\DX12\DX12QueueRecorder.h" />
     <ClInclude Include="RHI\RHIDescriptorVersionPolicy.h" />
     <ClInclude Include="RHI\RHIAssetEvictionPolicy.h" />
     <ClInclude Include="RHI\RHIDeviceMemoryBudgetCoordinator.h" />

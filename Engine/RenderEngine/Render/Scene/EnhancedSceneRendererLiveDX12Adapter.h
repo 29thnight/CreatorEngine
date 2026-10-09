@@ -21,6 +21,8 @@ class IRenderRootSignatureCache;
 class IRenderTextureCache;
 class RHIRecordedBatch;
 class RHISubmissionTicket;
+class EnhancedRenderGraph;
+struct RHIVideoMemoryInfo;
 enum class RHILifecycleCommand : uint8_t;
 
 /// EnhancedSceneRenderer의 공용 라이브 러너와 DX12 구현 사이의 경계.
@@ -51,6 +53,7 @@ public:
 
     bool IsInitialized() const;
     bool QueryVideoMemory(uint64_t& usedMB, uint64_t& budgetMB) const;
+    RHIVideoMemoryInfo QueryVideoMemory() const;
     struct CounterSnapshot
     {
         uint64_t uploadBytes = 0;
@@ -62,6 +65,10 @@ public:
     bool BeginFrame(std::string& outError);
     void AbortFrame();
     bool EndFrame(std::string& outError);
+    bool UsesOwnedQueueExecution() const;
+    bool BeginOwnedQueueRecording(std::string& outError);
+    bool SubmitOwnedGraph(const std::shared_ptr<EnhancedRenderGraph>& graph,
+        std::shared_ptr<const void> owner, double& recordingMilliseconds, std::string& outError);
     IRHIParallelCommandPool& CommandPool();
     uint64_t GetBackendGeneration() const;
     bool EnqueueRecordedBatch(RHIRecordedBatch&& batch,

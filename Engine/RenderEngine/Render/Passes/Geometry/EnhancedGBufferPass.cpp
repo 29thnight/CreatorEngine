@@ -279,7 +279,7 @@ bool EnhancedGBufferPass::ResolveShaderVariant(
         snapshot.shaderMetaHandle, snapshot.permutationKey, snapshot.bindingLayout, vertexAttributeMask, false);
     if (!generation) return false;
     outPipeline = generation->pipeline.GetHandle();
-    outLayout = {generation->shader.shader, &generation->shader.shader->layout};
+    outLayout = {generation, &generation->shader.shader->layout};
     return true;
 }
 RHIPipelineHandle EnhancedGBufferPass::GetShaderVariantPipeline(

@@ -10,6 +10,7 @@
 #include "../Passes/Geometry/EnhancedGBufferPass.h"
 #include "../Graph/EnhancedDrawSealLedger.h"
 #include "../../Texture.h"
+#include "../../RHI/IRHIDeviceResources.h"
 #include "../../MaterialGraphSceneInput.h"
 #include <AuthoringRymlErrorPolicy.h>
 #include <ryml/ryml.hpp>
@@ -488,6 +489,20 @@ struct EnhancedPbrCapture
         root["measurement"] |= ryml::MAP;
         root["measurement"]["cpuRecordMs"] << recordMs;
         root["measurement"]["cpuGraphCompileMs"] << compileMs;
+        root["measurement"]["cpuTransientPrepareMs"] << graph.GetStats().transientPrepareCpuMs;
+        root["measurement"]["transientPrepareScope"] << "lifetime-discovery-allocation-cache-resource-creation";
+        const auto heapMemory = graph.GetAliasHeapMemory();
+        auto heaps = root["measurement"]["aliasHeapMemory"];
+        heaps |= ryml::MAP;
+        heaps["scope"] << "unique-group-owned-native-heaps-not-resident";
+        heaps["domainId"] << heapMemory.domainId;
+        heaps["retainedBytes"] << heapMemory.retainedBytes;
+        heaps["cachedBytes"] << heapMemory.cachedBytes;
+        heaps["leasedBytes"] << heapMemory.leasedBytes;
+        heaps["peakRetainedBytes"] << heapMemory.peakRetainedBytes;
+        heaps["retainedHeaps"] << heapMemory.retainedHeaps;
+        heaps["cachedHeaps"] << heapMemory.cachedHeaps;
+        heaps["leasedHeaps"] << heapMemory.leasedHeaps;
         root["measurement"]["scope"] << "capture-submission-including-readbacks";
         root["measurement"]["gpuStatus"] << "unsupported";
         root["measurement"]["gpuReason"] << "backend has no product pass timestamp collector";
@@ -504,14 +519,18 @@ struct EnhancedPbrCapture
         node["proposalHeight"] << info.height;
     }
 
-    void RecordMemory(uint64_t usedMB, uint64_t budgetMB, bool available)
+    void RecordMemory(const RHIVideoMemoryInfo& memory)
     {
         auto node = manifest.rootref()["measurement"]["memory"];
         node |= ryml::MAP;
         node["scope"] << "device-budget-snapshot-not-transient-peak";
-        node["available"] << available;
-        node["usedMB"] << usedMB;
-        node["budgetMB"] << budgetMB;
+        node["available"] << (memory.usageAvailable && memory.budgetAvailable);
+        node["usageAvailable"] << memory.usageAvailable;
+        node["budgetAvailable"] << memory.budgetAvailable;
+        node["usedBytes"] << memory.usedBytes;
+        node["budgetBytes"] << memory.budgetBytes;
+        node["usedMB"] << memory.usedMB;
+        node["budgetMB"] << memory.budgetMB;
     }
 
     void RecordGpuTiming(const std::vector<EnhancedLivePassTiming>& passes,
@@ -526,6 +545,7 @@ struct EnhancedPbrCapture
         node["queryOverflow"] << span.queryOverflowPasses;
         node["droppedSlices"] << span.droppedSlices;
         node["sliceCount"] << span.sliceCount;
+        node["computeSliceCount"] << span.computeSliceCount;
         node["passes"] |= ryml::SEQ;
         for (const auto& pass : passes)
         {
@@ -663,6 +683,8 @@ struct EnhancedPbrCapture
             graphNode["aliasHeapCreates"] << stats.aliasHeapCreates;
             graphNode["aliasHeapReuses"] << stats.aliasHeapReuses;
             graphNode["aliasResourceReuses"] << stats.aliasResourceReuses;
+            graphNode["poisonInitializations"] << stats.poisonInitializations;
+            graphNode["transientPrepareCpuMs"] << stats.transientPrepareCpuMs;
             rootNode["finite"] << (finite ? "true" : "false");
             std::ofstream output(root / "manifest.json", std::ios::trunc);
             output << ryml::emitrs_json<std::string>(manifest) << '\n';

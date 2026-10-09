@@ -1,6 +1,11 @@
 #include "../../../../../Tools/regression/material_owner_checks.h"
 #include "RHI/DX12/DX12Format.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
+#include "RHIQueueContractTests.h"
+#include "RHIQueueNativeTests.h"
+#include "RHIQueueOwnershipTests.h"
+#include "RenderQueueScheduleRg8Tests.h"
+#include "RenderQueueExecutionRg8Tests.h"
 #include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -5557,7 +5562,7 @@ bool DX12Test::RunSceneBindingTest(std::string& outLog, SceneBindingReport* repo
             + " · 큐 " + std::to_string(flat.size()) + "\n";
 
         uiSkipped = EnhancedUIPass::BuildRectsFromQueue(
-            flat.data(), flat.size(), uiRects, &*sceneTexturePins.borrow());
+            flat.data(), flat.size(), uiRects, 0.f, 0.f, &*sceneTexturePins.borrow());
     }
 
     if (report) { report->drawCandidates = draws.size(); report->lights = lights.size(); }

@@ -1,6 +1,10 @@
 #pragma once
 #include <array>
+#include <cmath>
 #include <stdexcept>
+#include "EnhancedTransientFailureRg7Tests.h"
+#include "EnhancedTransientLifetimeRg7Tests.h"
+#include "EnhancedTransientDeviceLossRg7Tests.h"
 
 // Included by the existing Editor render-test translation unit. No test project.
 bool DX12Test::RunTransientAliasingTest(std::string& outLog)
@@ -21,13 +25,14 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
     uint64_t baselineBytes = 0;
     RGTransientPool aliasPool;
     RHIBufferHandle cachedBuffer;
+    uint64_t cacheDomain = 0;
     DX12CommandListPool pool;
     if (!pool.Initialize(resources, 2, DX12DeviceResources::kFrameCount, error))
     {
         outLog += error;
         return false;
     }
-    for (uint32_t mode = 0; mode < 9; ++mode)
+    for (uint32_t mode = 0; mode < 11; ++mode)
     {
         if (!resources.BeginFrame(error))
         {
@@ -36,12 +41,13 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
         }
         EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned);
         graph.SetTransientAliasing(mode != 0, mode == 2);
-        if (mode >= 5)
+        graph.SetPlacedTransientPoison(mode >= 9);
+        if (mode >= 5 && mode < 9)
         {
             graph.SetTransientPool(&aliasPool);
             aliasPool.maxFreeAliasGroups = mode == 7 ? 0 : 32;
         }
-        if (mode == 4)
+        if ((mode == 4 || mode == 10))
         {
             pool.BeginFrame(0);
             graph.SetParallelRecordCostThreshold(0);
@@ -122,13 +128,17 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                     {
                         if (buffer)
                         {
-                            auto view = RHIBindingDesc::UavBuffer(context.graph->ResolveBufferHandle(written), 64, 0);
+                            auto view = RHIBindingDesc::UavBuffer(context.graph->ResolveBufferHandle(written), mode >= 9 ? 32 : 64, 0);
                             view.format = RHIFormat::R32Float;
                             const float values[]{index < 3 ? 2.0f : 6.0f, 0, 0, 0};
                             context.encoder->ClearUnorderedAccess(view, values);
                         }
                         else
                         {
+                            if (mode >= 9)
+                            {
+                                return; // An omitted producer must expose the poison, not old heap contents.
+                            }
                             RHIRenderTargetBinding binding;
                             if (depth)
                             {
@@ -179,6 +189,10 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                 throw std::runtime_error(error);
             }
             const auto stats = graph.GetStats();
+            if (stats.poisonInitializations != (mode >= 9 ? 6u : 0u))
+            {
+                throw std::runtime_error("RG7 poison coverage mismatch");
+            }
             const uint32_t expectedReuse = mode == 1 || mode >= 4 ? 4 : (mode == 3 ? 3 : 0);
             if (stats.aliasReuseCount != expectedReuse || graph.ResolveBufferHandle(unused).IsValid())
             {
@@ -194,9 +208,20 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
             {
                 throw std::runtime_error("RG7 committed memory did not match allocation plan");
             }
-            if (mode >= 5)
+            if (mode >= 5 && mode < 9)
             {
                 const bool warm = mode == 6 || mode == 7;
+                const auto memory = aliasPool.GetAliasHeapMemory();
+                if (memory.domainId == 0 || (cacheDomain != 0 && cacheDomain != memory.domainId))
+                {
+                    throw std::runtime_error("RG7 warm cache accounting domain changed");
+                }
+                cacheDomain = memory.domainId;
+                if (memory.retainedBytes != 131072 || memory.leasedBytes != 131072 || memory.cachedBytes != 0 ||
+                    memory.retainedHeaps != 2 || memory.peakRetainedBytes != 131072)
+                {
+                    throw std::runtime_error("RG7 warm reuse counted native heaps more than once");
+                }
                 if (stats.aliasHeapCreates != (warm ? 0 : 2) || stats.aliasHeapReuses != (warm ? 2 : 0) ||
                     stats.aliasResourceReuses != (warm ? 6 : 0) ||
                     (mode > 5 && stats.transientAllocationQueries != 0) ||
@@ -236,7 +261,7 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                 }
             }
             RHISubmissionTicket ticket;
-            if (mode == 4)
+            if ((mode == 4 || mode == 10))
             {
                 RHIRecordedBatchDesc desc{};
                 desc.frameId = mode;
@@ -257,7 +282,7 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                 throw std::runtime_error(error);
             }
             resources.WaitForGpu();
-            if (mode == 4 && !GetRHISubmissionThread().Wait(ticket, error))
+            if ((mode == 4 || mode == 10) && !GetRHISubmissionThread().Wait(ticket, error))
             {
                 throw std::runtime_error(error);
             }
@@ -276,7 +301,8 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                     const auto* values = reinterpret_cast<const float*>(pixels.data());
                     for (uint32_t value = 0; value < 64; ++value)
                     {
-                        if (values[value] != (index < 3 ? 2.0f : 6.0f))
+                        if (mode >= 9 && value >= 32 ? !std::isnan(values[value]) :
+                            values[value] != (index < 3 ? 2.0f : 6.0f))
                         {
                             throw std::runtime_error("RG7 buffer payload mismatch");
                         }
@@ -298,13 +324,13 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                         {
                             float depth = 0;
                             std::memcpy(&depth, pixels.data() + pixel, sizeof(depth));
-                            if (depth != 1.0f)
+                            if (depth != (mode >= 9 ? 0.125f : 1.0f))
                             {
                                 throw std::runtime_error("RG7 depth payload mismatch");
                             }
                         }
-                        else if (std::abs(int(pixels[pixel]) - (index < 3 ? 64 : 191)) > 1 ||
-                            pixels[pixel + 1] != 0 || pixels[pixel + 2] != 0 || pixels[pixel + 3] != 255)
+                        else if (std::abs(int(pixels[pixel]) - (mode >= 9 ? 255 : (index < 3 ? 64 : 191))) > 1 ||
+                            pixels[pixel + 1] != 0 || pixels[pixel + 2] != (mode >= 9 ? 255 : 0) || pixels[pixel + 3] != 255)
                         {
                             throw std::runtime_error("RG7 color payload mismatch");
                         }
@@ -314,7 +340,7 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                 {
                     baseline[index] = pixels;
                 }
-                else if (baseline[index] != pixels)
+                else if (mode < 9 && baseline[index] != pixels)
                 {
                     throw std::runtime_error("RG7 alias off/on payload mismatch");
                 }
@@ -326,8 +352,15 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
             }
             graph.Reset();
             const bool retained = mode == 5 || mode == 6 || mode == 8;
+            const auto memoryAfterReset = graph.GetAliasHeapMemory();
+            if (memoryAfterReset.leasedBytes != 0 || memoryAfterReset.leasedHeaps != 0 ||
+                memoryAfterReset.retainedBytes != (retained ? 131072 : 0) ||
+                memoryAfterReset.cachedBytes != (retained ? 131072 : 0))
+            {
+                throw std::runtime_error("RG7 reset/eviction heap bytes do not match ownership");
+            }
             if (bool(resources.Resolve(released)) != retained ||
-                (mode >= 5 && (aliasPool.freeAliasBytes != (retained ? 131072 : 0) ||
+                (mode >= 5 && mode < 9 && (aliasPool.freeAliasBytes != (retained ? 131072 : 0) ||
                     aliasPool.freeAliasedGroups.size() != (retained ? 2 : 0))))
             {
                 throw std::runtime_error("RG7 cache retention/eviction did not match completion ownership");
@@ -345,7 +378,13 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
             outLog += "RG7_TRANSIENT_MODE_OK mode=" + std::to_string(mode) + " reuse=" +
                 std::to_string(stats.aliasReuseCount) + " bytes=" + std::to_string(mode == 0 ? baselineBytes : stats.transientCommittedBytes) +
                 " baseline=" + std::to_string(baselineBytes) + "\n";
-            if (mode >= 5)
+            if (!(stats.transientPrepareCpuMs > 0.0) || !std::isfinite(stats.transientPrepareCpuMs))
+            {
+                throw std::runtime_error("Missing finite RG7 transient preparation timing");
+            }
+            outLog += "RG7_PREPARE_CPU mode=" + std::to_string(mode) + " milliseconds=" +
+                std::to_string(stats.transientPrepareCpuMs) + "\n";
+            if (mode >= 5 && mode < 9)
             {
                 outLog += "RG7_CACHE_MODE_OK mode=" + std::to_string(mode) + " heapsCreated=" +
                     std::to_string(stats.aliasHeapCreates) + " heapsReused=" + std::to_string(stats.aliasHeapReuses) +
@@ -361,7 +400,29 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
             return false;
         }
     }
+    auto extraOwner = aliasPool.freeAliasedGroups.front();
     aliasPool.ClearAliasingCache();
+    const auto externallyRetained = aliasPool.GetAliasHeapMemory();
+    if (externallyRetained.retainedBytes != extraOwner->allocation.bytes || externallyRetained.cachedBytes != 0 ||
+        externallyRetained.leasedBytes != extraOwner->allocation.bytes || externallyRetained.retainedHeaps != 1)
+    {
+        outLog += "RG7 cache clear lost an externally retained unique heap";
+        return false;
+    }
+    extraOwner.reset();
+    const auto drainedHeapMemory = aliasPool.GetAliasHeapMemory();
+    if (drainedHeapMemory.domainId != cacheDomain)
+    {
+        outLog += "RG7 cache drain reset its accounting domain";
+        return false;
+    }
+    if (drainedHeapMemory.retainedBytes != 0 || drainedHeapMemory.cachedBytes != 0 ||
+        drainedHeapMemory.retainedHeaps != 0 || drainedHeapMemory.peakRetainedBytes != 131072)
+    {
+        outLog += "RG7 heap memory counters did not drain exactly once";
+        return false;
+    }
+    outLog += "RG7_HEAP_CACHE_MEMORY_OK peakBytes=131072 drainedBytes=0 warm=unique externalOwner=retained\n";
     if (resources.Resolve(cachedBuffer) || !aliasPool.allocationCache.empty() || aliasPool.freeAliasBytes != 0)
     {
         outLog += "RG7 cache drain retained resources or allocation metadata";
@@ -495,6 +556,18 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
     }
     pool.Shutdown();
     resources.Shutdown();
-    outLog += "RG7_TRANSIENT_OK modes=9 arrays=2 bufferPayload=64 parallel=2 cache=warm/evict/drain inferredAccess=reject invalidUsed=reject imported=retained placementGuards=5 recompile=reject validation=0\n";
+    if (!RunRg7FailureTests(outLog))
+    {
+        return false;
+    }
+    if (!RunRg7LifetimeTests(outLog))
+    {
+        return false;
+    }
+    if (!RunRg7DeviceLossTest(outLog))
+    {
+        return false;
+    }
+    outLog += "RG7_TRANSIENT_OK modes=11 arrays=2 bufferPayload=64 parallel=2 poison=rt/ds/buffer-partial cache=warm/evict/drain inferredAccess=reject invalidUsed=reject imported=retained placementGuards=5 recompile=reject validation=0\n";
     return true;
 }

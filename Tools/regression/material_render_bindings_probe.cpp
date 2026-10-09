@@ -3,6 +3,7 @@
 #include "MaterialGraphRenderBindings.h"
 #include "PathFinder.h"
 #include "Texture.h"
+#include "TextureFramePins.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -278,6 +279,13 @@ void Run(const std::filesystem::path& root)
             missingPixelsValue.textures.front().owner = own::make_shared<const Texture>();
             const auto missingPixels = own::make_shared<const Instance>(std::move(missingPixelsValue));
             Check(!bindings.Prepare(device, textures, missingPixels, layout, packet, error) && material_graph_test::SamePinnedObject(packet, accepted) &&
+                      textures.GetUploadFailureCount() == 0,
+                  "Missing image preparation retains the accepted packet without an upload failure");
+            TextureFramePins invalidImagePins;
+            invalidImagePins.RetainImage(missingPixels->textures.front().owner,
+                                        texture->NonRehydratableImage());
+            Check(!bindings.Prepare(device, textures, missingPixels, layout, packet, error, {}, &invalidImagePins) &&
+                      material_graph_test::SamePinnedObject(packet, accepted) && !error.empty() &&
                       textures.GetUploadFailureCount() == 1,
                   "Actual cache neutral substitution is rejected and retains the accepted packet");
         }

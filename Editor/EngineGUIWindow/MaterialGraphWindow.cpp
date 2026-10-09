@@ -978,7 +978,10 @@ bool CapturePreviewRequest(EnhancedLiveViewRequest& request)
         lock.lock();
     }
     ReconcileSceneLocked();
-    if (inspectorPreview && std::chrono::steady_clock::now() - inspectorPreviewVisible <= std::chrono::milliseconds(250))
+    // A pinned node-editor preview owns the shared preview view until unpinned.
+    // The visible Inspector must not keep replacing its requested revision.
+    if ((!active || !active->previewPinned) && inspectorPreview &&
+        std::chrono::steady_clock::now() - inspectorPreviewVisible <= std::chrono::milliseconds(250))
     {
         if (inspectorPreview->coverage.flags & EnhancedMaterialCoverage::Blended) return false;
         request = {};

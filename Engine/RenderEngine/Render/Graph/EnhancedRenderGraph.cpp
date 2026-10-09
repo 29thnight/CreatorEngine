@@ -6,9 +6,31 @@
 #include <unordered_set>
 #include <atomic>
 #include <queue>
+#include <limits>
+#include <chrono>
+#include <mutex>
 
 namespace
 {
+    class TransientPreparationTimer
+    {
+    public:
+        explicit TransientPreparationTimer(double& milliseconds)
+            : m_milliseconds(milliseconds), m_start(std::chrono::steady_clock::now())
+        {
+        }
+        ~TransientPreparationTimer()
+        {
+            m_milliseconds = std::chrono::duration<double, std::milli>(
+                std::chrono::steady_clock::now() - m_start).count();
+        }
+        TransientPreparationTimer(const TransientPreparationTimer&) = delete;
+        TransientPreparationTimer& operator=(const TransientPreparationTimer&) = delete;
+    private:
+        double& m_milliseconds;
+        std::chrono::steady_clock::time_point m_start;
+    };
+
     RGTransientPool::AllocationKey TransientAllocationKey(const RHITransientResourceDesc& desc)
     {
         // Graph descriptions normalize dimension, mip count and creation state.
@@ -26,8 +48,9 @@ namespace
     bool SamePlacedDescription(const RHITransientResourceDesc& left, const RHITransientResourceDesc& right)
     {
         return TransientAllocationKey(left) == TransientAllocationKey(right) &&
-            (left.buffer || std::equal(std::begin(left.textureDesc.clearColor), std::end(left.textureDesc.clearColor),
-                std::begin(right.textureDesc.clearColor)));
+            (left.buffer || (left.textureDesc.clearDepth == right.textureDesc.clearDepth &&
+                std::equal(std::begin(left.textureDesc.clearColor), std::end(left.textureDesc.clearColor),
+                    std::begin(right.textureDesc.clearColor))));
     }
     // An address may be reused while a packet still retains an old graph output.
     // Epochs must distinguish both Reset and reconstruction at the same address.
@@ -81,9 +104,11 @@ RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle han
 
 void EnhancedRenderGraph::Reset()
 {
+    RequireQueueIdle();
     ReleaseResources();
     m_recordedRecording = 0;
     m_statesCommitted = false;
+    m_queueExecutionAttempted = false;
     m_resources.clear();
     m_passes.clear();
     m_finalStateRequirements.clear();
@@ -178,6 +203,7 @@ RGHandle EnhancedRenderGraph::ImportBuffer(RHIBufferHandle resource,
     RHIResourceState currentState, const std::string& name,
     RHIResourceState* stateWriteback)
 {
+    RequireQueueIdle();
     RGHandle handle{};
     if (!resource.IsValid()) return handle;
     if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", name))
@@ -205,6 +231,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
     RHIResourceState currentState, const std::string& name,
     RHIResourceState* stateWriteback)
 {
+    RequireQueueIdle();
     RGHandle handle{};
     if (!resource.IsValid()) return handle;
     if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", name))
@@ -229,6 +256,7 @@ RGHandle EnhancedRenderGraph::ImportTexture(RHITextureHandle resource,
 
 RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
 {
+    RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", desc.name))
     {
         return {};
@@ -249,6 +277,7 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
 
 RGHandle EnhancedRenderGraph::CreateBuffer(const RGBufferDesc& desc)
 {
+    RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_resources.size(), RGHandle::kInvalid, "resource", desc.name))
     {
         return {};
@@ -262,6 +291,82 @@ RGHandle EnhancedRenderGraph::CreateBuffer(const RGBufferDesc& desc)
     m_compiled = false;
     return m_scheduling == RGSchedulingMode::ExplicitVersioned
         ? VersionHandle(index, RGHandle::kInvalid) : RGHandle{index};
+}
+
+struct RGTransientPool::AliasHeapAccounting
+{
+    AliasHeapAccounting()
+    {
+        static std::atomic<uint64_t> next{1};
+        memory.domainId = next.fetch_add(1, std::memory_order_relaxed);
+    }
+    mutable std::mutex mutex;
+    AliasHeapMemory memory;
+};
+
+RGTransientPool::AliasHeapMemory RGTransientPool::GetAliasHeapMemory() const
+{
+    if (!aliasHeapAccounting)
+    {
+        return {};
+    }
+    std::lock_guard lock{aliasHeapAccounting->mutex};
+    auto result = aliasHeapAccounting->memory;
+    result.leasedBytes = result.retainedBytes - result.cachedBytes;
+    result.leasedHeaps = result.retainedHeaps - result.cachedHeaps;
+    return result;
+}
+
+RGTransientPool::AliasHeapMemory EnhancedRenderGraph::GetAliasHeapMemory() const
+{
+    if (m_transientPool)
+    {
+        return m_transientPool->GetAliasHeapMemory();
+    }
+    if (!m_aliasHeapAccounting)
+    {
+        return {};
+    }
+    std::lock_guard lock{m_aliasHeapAccounting->mutex};
+    auto result = m_aliasHeapAccounting->memory;
+    result.leasedBytes = result.retainedBytes;
+    result.leasedHeaps = result.retainedHeaps;
+    return result;
+}
+
+void RGTransientPool::AliasedGroup::TrackHeap(const std::shared_ptr<AliasHeapAccounting>& accounting)
+{
+    if (!heap || !accounting || m_accounting)
+    {
+        throw std::logic_error("Alias heap accounting requires one successful native heap registration");
+    }
+    m_accounting = accounting;
+    std::lock_guard lock{m_accounting->mutex};
+    auto& memory = m_accounting->memory;
+    memory.retainedBytes += allocation.bytes;
+    ++memory.retainedHeaps;
+    memory.peakRetainedBytes = (std::max)(memory.peakRetainedBytes, memory.retainedBytes);
+}
+
+void RGTransientPool::AliasedGroup::SetCached(bool cached)
+{
+    std::lock_guard lock{m_accounting->mutex};
+    if (m_cached == cached)
+    {
+        return;
+    }
+    auto& memory = m_accounting->memory;
+    if (cached)
+    {
+        memory.cachedBytes += allocation.bytes;
+        ++memory.cachedHeaps;
+    }
+    else
+    {
+        memory.cachedBytes -= allocation.bytes;
+        --memory.cachedHeaps;
+    }
+    m_cached = cached;
 }
 
 RGTransientPool::AliasedGroup::~AliasedGroup()
@@ -278,10 +383,26 @@ RGTransientPool::AliasedGroup::~AliasedGroup()
         }
     }
     heap.reset();
+    if (m_accounting)
+    {
+        std::lock_guard lock{m_accounting->mutex};
+        auto& memory = m_accounting->memory;
+        if (m_cached)
+        {
+            memory.cachedBytes -= allocation.bytes;
+            --memory.cachedHeaps;
+        }
+        memory.retainedBytes -= allocation.bytes;
+        --memory.retainedHeaps;
+    }
 }
 
 void RGTransientPool::ClearAliasingCache()
 {
+    for (const auto& group : freeAliasedGroups)
+    {
+        group->SetCached(false);
+    }
     freeAliasedGroups.clear();
     allocationCache.clear();
     freeAliasBytes = 0;
@@ -304,6 +425,7 @@ bool EnhancedRenderGraph::ValidVersionHandle(RGHandle h, bool allowUnwritten) co
 
 RGHandle EnhancedRenderGraph::AdvanceVersion(RGHandle previous, bool modify)
 {
+    RequireQueueIdle();
     m_compiled = false;
     if (m_scheduling != RGSchedulingMode::ExplicitVersioned || !ValidVersionHandle(previous, !modify)) return {};
     auto& r = m_resources[previous.index];
@@ -320,6 +442,7 @@ RGHandle EnhancedRenderGraph::Modify(RGHandle previous) { return AdvanceVersion(
 
 void EnhancedRenderGraph::RequireImportedFinalState(RGHandle handle, RHIResourceState state)
 {
+    RequireQueueIdle();
     m_finalStateRequirements.push_back({handle, state});
     m_compiled = false;
 }
@@ -327,6 +450,7 @@ void EnhancedRenderGraph::RequireImportedFinalState(RGHandle handle, RHIResource
 RGPassId EnhancedRenderGraph::AddPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, ExecuteCallback execute, bool hasSideEffect)
 {
+    RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
     {
         return {};
@@ -348,6 +472,7 @@ RGPassId EnhancedRenderGraph::AddRepeatedPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, const std::vector<RepeatedPhase>& phases,
     uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
 {
+    RequireQueueIdle();
     const auto id = AddPass(name, usages, {}, hasSideEffect);
     if (!id.IsValid())
     {
@@ -366,6 +491,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(const std::string& name,
     const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
     uint32_t maxSlices, bool hasSideEffect, uint32_t recordCost)
 {
+    RequireQueueIdle();
     if (!CheckDeclarationCapacity(m_passes.size(), RGPassId::kInvalid, "pass", name))
     {
         return {};
@@ -807,6 +933,12 @@ RHITransientResourceDesc EnhancedRenderGraph::TransientDescription(const Resourc
     result.textureDesc.allowDepthStencil = resource.desc.allowDepthStencil;
     result.textureDesc.allowUnorderedAccess = resource.desc.allowUnorderedAccess;
     std::copy_n(resource.desc.clearColor, 4, result.textureDesc.clearColor);
+    if (m_poison)
+    {
+        const float color[]{1.0f, 0.0f, 1.0f, 1.0f};
+        std::copy_n(color, 4, result.textureDesc.clearColor);
+        result.textureDesc.clearDepth = 0.125f;
+    }
     return result;
 }
 
@@ -935,6 +1067,21 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
         descriptions.reserve(group.members.size());
         for (auto index : group.members)
         {
+            const auto& resource = m_resources[index];
+            const auto& usages = m_passes[m_executeOrder[resource.firstUse]].usages;
+            const auto first = std::ranges::find_if(usages, [index](const auto& usage)
+            {
+                return usage.handle.index == index;
+            });
+            if (m_poison && ((resource.IsBuffer() &&
+                (!resource.bufferDesc.allowUnorderedAccess || resource.bufferDesc.bytes % 4 != 0 ||
+                    resource.bufferDesc.bytes / 4 > UINT32_MAX || first == usages.end() ||
+                    first->state != RHIResourceState::UnorderedAccess)) ||
+                (!resource.IsBuffer() && !resource.desc.allowRenderTarget && !resource.desc.allowDepthStencil)))
+            {
+                outError = "Placed poison supports RT/DS targets and float-view UAV buffers only";
+                return false;
+            }
             descriptions.push_back(TransientDescription(m_resources[index]));
         }
         std::shared_ptr<RGTransientPool::AliasedGroup> lease;
@@ -952,6 +1099,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
             if (match != free.end())
             {
                 lease = std::move(*match);
+                lease->SetCached(false);
                 m_transientPool->freeAliasBytes -= lease->allocation.bytes;
                 free.erase(match);
                 ++m_stats.aliasHeapReuses;
@@ -970,6 +1118,12 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
                 return false;
             }
             ++m_stats.aliasHeapCreates;
+            auto& accounting = m_transientPool ? m_transientPool->aliasHeapAccounting : m_aliasHeapAccounting;
+            if (!accounting)
+            {
+                accounting = std::make_shared<RGTransientPool::AliasHeapAccounting>();
+            }
+            lease->TrackHeap(accounting);
             for (size_t member = 0; member < group.members.size(); ++member)
             {
                 auto description = lease->descriptions[member];
@@ -1008,6 +1162,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
 bool EnhancedRenderGraph::CreateTransients(std::string& outError)
 {
     ce::profile_scope profile{ce::marker<"RenderGraphTransients">()};
+    TransientPreparationTimer timer{m_stats.transientPrepareCpuMs};
     // 살아남은 패스가 실제로 쓰는 리소스만 만든다. 컬링된 패스만 쓰던 것을
     // 만드는 것은 낭비이고, 그 낭비는 프레임마다 반복된다.
     for (auto& resource : m_resources)
@@ -1237,6 +1392,7 @@ void EnhancedRenderGraph::ReleaseResources()
             {
                 m_transientPool->freeAliasedGroups.push_back(std::move(group));
                 m_transientPool->freeAliasBytes += m_transientPool->freeAliasedGroups.back()->allocation.bytes;
+                m_transientPool->freeAliasedGroups.back()->SetCached(true);
             }
         }
     }
@@ -1452,12 +1608,45 @@ void EnhancedRenderGraph::PlanRepeatedBarriers(Pass& pass, std::vector<bool>& pr
     }
 }
 
-void EnhancedRenderGraph::PlanBarriers()
+void EnhancedRenderGraph::PlanBarriers(const std::vector<bool>* batchEnds,
+    PhaseBarrierPlan* prologue, PhaseBarrierPlan* epilogue)
 {
+    const bool queuePlan = batchEnds != nullptr;
+    m_stats.barriersEmitted = 0;
+    m_stats.barrierBatches = 0;
     std::vector<bool> previousWrite(m_resources.size(),true);
+    std::vector<RHIResourceState> finalStates;
+    const auto appendTransition = [](PhaseBarrierPlan& plan, const Resource& resource,
+        RHIResourceState before, RHIResourceState after)
+    {
+        if (before == after)
+        {
+            return;
+        }
+        if (resource.IsBuffer())
+        {
+            plan.bufferTransitions.push_back({resource.buffer, before, after});
+        }
+        else
+        {
+            plan.transitions.push_back({resource.handle, before, after});
+        }
+    };
     for (auto& resource : m_resources)
     {
-        resource.initialState = resource.state;
+        if (queuePlan)
+        {
+            finalStates.push_back(resource.state);
+            if (resource.used)
+            {
+                appendTransition(*prologue, resource, resource.initialState, RHIResourceState::Common);
+                resource.state = RHIResourceState::Common;
+            }
+        }
+        else
+        {
+            resource.initialState = resource.state;
+        }
     }
     for (auto& pass : m_passes)
     {
@@ -1466,10 +1655,12 @@ void EnhancedRenderGraph::PlanBarriers()
         pass.uavBarriers.clear();
         pass.uavBufferBarriers.clear();
         pass.finalTransitions.clear();
+        pass.finalBufferTransitions.clear();
         pass.firstPhaseBarriers.clear();
         pass.repeatPhaseBarriers.clear();
         pass.aliasTextures.clear();
         pass.aliasBuffers.clear();
+        pass.poisonBuffers.clear();
         pass.aliasClears.clear();
     }
 
@@ -1484,10 +1675,19 @@ void EnhancedRenderGraph::PlanBarriers()
         if (resource.IsBuffer())
         {
             pass.aliasBuffers.push_back(resource.buffer);
+            if (m_poison)
+            {
+                pass.poisonBuffers.push_back(index);
+                ++m_stats.poisonInitializations;
+            }
         }
         else
         {
             pass.aliasTextures.push_back(resource.handle);
+            if (m_poison)
+            {
+                ++m_stats.poisonInitializations;
+            }
             if (resource.desc.allowDepthStencil)
             {
                 RHIDepthTargetDesc depth{};
@@ -1517,56 +1717,118 @@ void EnhancedRenderGraph::PlanBarriers()
         if (pass.repeated)
         {
             PlanRepeatedBarriers(pass, previousWrite);
-            continue;
         }
-
-        for (const auto& usage : pass.usages)
+        else
         {
-            if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size()) continue;
-            Resource& resource = m_resources[usage.handle.index];
-
-            // ★ 핸들이 유효한가만 본다 (G-2). 예전에는 여기서 `Resolve` 로
-            //   포인터를 풀어 배리어 구조체에 박았는데, 그 한 줄 때문에
-            //   계획 단계가 DX12 를 알아야 했다. 실물은 기록 시점에 백엔드가
-            //   푼다 — `RHIEncoder::ResourceBarriers` 가 핸들을 받는다.
-            if (!resource.IsValid()) continue;
-
-            if (resource.state == usage.state)
+            for (const auto& usage : pass.usages)
             {
-                // 같은 상태로 연속해서 쓰는 경우, UAV만은 배리어가 필요하다 —
-                // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
-                if (RHIResourceState::UnorderedAccess == usage.state &&
-                    (m_scheduling!=RGSchedulingMode::ExplicitVersioned || previousWrite[usage.handle.index] || Writes(usage)))
+                if (!usage.handle.IsValid() || usage.handle.index >= m_resources.size())
                 {
-                    if (resource.IsBuffer())
-                        pass.uavBufferBarriers.push_back(resource.buffer);
-                    else
-                        pass.uavBarriers.push_back(resource.handle);
+                    continue;
                 }
+                Resource& resource = m_resources[usage.handle.index];
+
+                // ★ 핸들이 유효한가만 본다 (G-2). 예전에는 여기서 `Resolve` 로
+                //   포인터를 풀어 배리어 구조체에 박았는데, 그 한 줄 때문에
+                //   계획 단계가 DX12 를 알아야 했다. 실물은 기록 시점에 백엔드가
+                //   푼다 — `RHIEncoder::ResourceBarriers` 가 핸들을 받는다.
+                if (!resource.IsValid())
+                {
+                    continue;
+                }
+
+                if (resource.state == usage.state)
+                {
+                    // 같은 상태로 연속해서 쓰는 경우, UAV만은 배리어가 필요하다 —
+                    // 상태는 그대로지만 앞 패스의 쓰기가 끝났음을 알려야 한다.
+                    if (RHIResourceState::UnorderedAccess == usage.state &&
+                        (m_scheduling!=RGSchedulingMode::ExplicitVersioned || previousWrite[usage.handle.index] || Writes(usage)))
+                    {
+                        if (resource.IsBuffer())
+                        {
+                            pass.uavBufferBarriers.push_back(resource.buffer);
+                        }
+                        else
+                        {
+                            pass.uavBarriers.push_back(resource.handle);
+                        }
+                    }
+                    previousWrite[usage.handle.index]=Writes(usage);
+                    continue;
+                }
+
+                if (resource.IsBuffer())
+                {
+                    pass.bufferTransitions.push_back(RHIBufferTransition{
+                        resource.buffer, resource.state, usage.state });
+                }
+                else
+                {
+                    pass.transitions.push_back(RHITransition{
+                        resource.handle, resource.state, usage.state });
+                }
+
+                resource.state = usage.state;
                 previousWrite[usage.handle.index]=Writes(usage);
-                continue;
             }
 
-            if (resource.IsBuffer())
+            const size_t barrierCount = pass.transitions.size() +
+                pass.bufferTransitions.size() + pass.uavBarriers.size() +
+                pass.uavBufferBarriers.size() + pass.aliasTextures.size() + pass.aliasBuffers.size() + pass.poisonBuffers.size();
+            m_stats.barriersEmitted += static_cast<uint32_t>(barrierCount);
+            m_stats.barrierBatches += static_cast<uint32_t>(pass.poisonBuffers.size());
+            if (0 != barrierCount)
             {
-                pass.bufferTransitions.push_back(RHIBufferTransition{
-                    resource.buffer, resource.state, usage.state });
+                ++m_stats.barrierBatches;
             }
-            else
-            {
-                pass.transitions.push_back(RHITransition{
-                    resource.handle, resource.state, usage.state });
-            }
-
-            resource.state = usage.state;
-            previousWrite[usage.handle.index]=Writes(usage);
         }
 
-        const size_t barrierCount = pass.transitions.size() +
-            pass.bufferTransitions.size() + pass.uavBarriers.size() +
-            pass.uavBufferBarriers.size() + pass.aliasTextures.size() + pass.aliasBuffers.size();
-        m_stats.barriersEmitted += static_cast<uint32_t>(barrierCount);
-        if (0 != barrierCount) ++m_stats.barrierBatches;
+        if (queuePlan && (*batchEnds)[passIndex])
+        {
+            // Only resources touched by this batch have left COMMON. Ending their
+            // states here preserves cross-queue handoff and buffer decay contracts.
+            PhaseBarrierPlan boundary;
+            for (auto& resource : m_resources)
+            {
+                if (resource.used)
+                {
+                    appendTransition(boundary, resource, resource.state, RHIResourceState::Common);
+                    resource.state = RHIResourceState::Common;
+                }
+            }
+            pass.finalTransitions = std::move(boundary.transitions);
+            pass.finalBufferTransitions = std::move(boundary.bufferTransitions);
+            const auto count = pass.finalTransitions.size() + pass.finalBufferTransitions.size();
+            m_stats.barriersEmitted += static_cast<uint32_t>(count);
+            if (count != 0)
+            {
+                ++m_stats.barrierBatches;
+            }
+            std::fill(previousWrite.begin(), previousWrite.end(), true);
+        }
+    }
+
+    if (queuePlan)
+    {
+        for (size_t index = 0; index < m_resources.size(); ++index)
+        {
+            auto& resource = m_resources[index];
+            if (resource.used)
+            {
+                appendTransition(*epilogue, resource, RHIResourceState::Common, finalStates[index]);
+            }
+            resource.state = finalStates[index];
+        }
+        for (const auto* boundary : {prologue, epilogue})
+        {
+            const auto count = boundary->transitions.size() + boundary->bufferTransitions.size();
+            m_stats.barriersEmitted += static_cast<uint32_t>(count);
+            if (count != 0)
+            {
+                ++m_stats.barrierBatches;
+            }
+        }
+        return;
     }
 
     // 다른 뷰·다음 프레임도 같은 캐시 상태로 시작하도록 마지막 소비 뒤 복구한다.
@@ -1601,6 +1863,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
     }
     output.generation = m_compileGeneration;
     output.graphEpoch = m_resourceEpoch;
+    output.aliasHeapMemory = GetAliasHeapMemory();
     output.scheduling = m_scheduling;
     output.orderPolicy = m_orderPolicy;
     output.executeOrder = m_executeOrder;
@@ -1657,6 +1920,11 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
             copy.barriers.push_back({bufferIndex(handle), RHIResourceState::Common,
                 RHIResourceState::Common, false, false, true});
         }
+        for (const auto index : pass.poisonBuffers)
+        {
+            copy.barriers.push_back({index, RHIResourceState::UnorderedAccess,
+                RHIResourceState::UnorderedAccess, true});
+        }
         for (const auto& barrier : pass.transitions)
         {
             copy.barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false});
@@ -1678,6 +1946,10 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         for (const auto& barrier : pass.finalTransitions)
         {
             copy.barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false, true});
+        }
+        for (const auto& barrier : pass.finalBufferTransitions)
+        {
+            copy.barriers.push_back({bufferIndex(barrier.buffer), barrier.before, barrier.after, false, true});
         }
         copy.repeatCount = pass.repeatCount;
         for (size_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
@@ -1881,6 +2153,11 @@ void EnhancedRenderGraph::BuildDependencyWaves()
 
 bool EnhancedRenderGraph::Compile(std::string& outError)
 {
+    if (!m_queueLease.expired() || m_queueExecutionAttempted)
+    {
+        outError = "Queue execution requires completion collection and Reset before reuse";
+        return false;
+    }
     ce::profile_scope profile{ce::marker<"RenderGraphCompile">()};
     // ★ 디바이스를 인자로 받지 않는다 (G-1). 생성자에서 받은 중립 service를
     //   그대로 쓰므로 호출부가 같은 값을 도로 넘기지 않는다.
@@ -1940,8 +2217,120 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     return true;
 }
 
+void EnhancedRenderGraph::DeclareComputeCompatible(RGPassId pass)
+{
+    RequireQueueIdle();
+    if (!pass.IsValid() || pass.index >= m_passes.size() || m_compiled)
+    {
+        throw std::logic_error("Compute compatibility must be declared before compilation on a valid pass");
+    }
+    m_passes[pass.index].computeCompatible = true;
+}
+
+std::vector<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHints(
+    const std::function<uint64_t(const std::string&)>& measurement) const
+{
+    std::vector<QueueHint> hints;
+    for (const auto index : m_executeOrder)
+    {
+        const auto& pass = m_passes[index];
+        if (pass.computeCompatible)
+        {
+            hints.push_back({RGPassId{index}, true, measurement(pass.name)});
+        }
+    }
+    return hints;
+}
+
+bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
+    const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
+    QueueSchedule& output, std::string& outError) const
+{
+    output = {};
+    outError.clear();
+    if (!m_compiled || !capabilities.graphics)
+    {
+        outError = "Queue planning requires a compiled graph and graphics capability";
+        return false;
+    }
+    std::vector<const QueueHint*> byPass(m_passes.size(), nullptr);
+    for (const auto& hint : hints)
+    {
+        if (!hint.pass.IsValid() || hint.pass.index >= m_passes.size() || byPass[hint.pass.index])
+        {
+            outError = "Queue hint references an invalid or duplicate pass";
+            return false;
+        }
+        byPass[hint.pass.index] = &hint;
+    }
+    QueueSchedule plan;
+    plan.compileGeneration = m_compileGeneration;
+    // RG7 lifetimes and alias barriers currently assume a single total order.
+    const bool allowCompute = capabilities.compute && capabilities.crossQueueTimeline &&
+        minimumGpuNanoseconds > 0 && !m_aliasing && m_scheduling == RGSchedulingMode::ExplicitVersioned;
+    std::vector<RHIQueueKind> queues(m_passes.size(), RHIQueueKind::Graphics);
+    for (const auto pass : m_executeOrder)
+    {
+        const auto* hint = byPass[pass];
+        if (allowCompute && hint && hint->computeCompatible &&
+            hint->measuredGpuNanoseconds >= minimumGpuNanoseconds)
+        {
+            queues[pass] = RHIQueueKind::Compute;
+            plan.usesCompute = true;
+        }
+        plan.entries.push_back({pass, queues[pass]});
+    }
+    if (!plan.usesCompute)
+    {
+        output = std::move(plan);
+        return true;
+    }
+    const auto addWait = [&](uint16_t producer, uint16_t consumer, uint32_t resource)
+    {
+        if (producer == consumer || m_passes[producer].culled || m_passes[consumer].culled ||
+            queues[producer] == queues[consumer])
+        {
+            return;
+        }
+        const auto duplicate = std::find_if(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
+        {
+            return wait.producer == producer && wait.consumer == consumer && wait.resource == resource;
+        });
+        if (duplicate == plan.waits.end())
+        {
+            plan.waits.push_back({producer, consumer, resource});
+        }
+    };
+    for (const auto& edge : m_versionEdges)
+    {
+        addWait(static_cast<uint16_t>(edge.producer), static_cast<uint16_t>(edge.consumer), edge.resource);
+    }
+    // Logical versions share physical storage. State ownership cannot overlap even
+    // when the DAG allows concurrent readers; serialize every physical use for now.
+    std::vector<uint16_t> previous(m_resources.size(), RGPassId::kInvalid);
+    for (const auto pass : m_executeOrder)
+    {
+        for (const auto& usage : m_passes[pass].usages)
+        {
+            const auto resource = usage.handle.index;
+            if (previous[resource] != RGPassId::kInvalid)
+            {
+                addWait(previous[resource], pass, resource);
+            }
+            previous[resource] = pass;
+        }
+    }
+    output = std::move(plan);
+    return true;
+}
+
 bool EnhancedRenderGraph::Execute(std::string& outError)
 {
+    if (!m_queueLease.expired() || m_queueExecutionAttempted)
+    {
+        outError = "Queue execution requires completion collection and Reset before reuse";
+        return false;
+    }
     if (!m_compiled)
     {
         outError = "Compile을 먼저 불러야 한다";
@@ -1982,30 +2371,33 @@ bool EnhancedRenderGraph::Execute(std::string& outError)
 
         // 네 부류를 하나의 batch로 건다. 인코더가 감싼 command target에
         // 기록하므로 순차와 병렬 경로의 배리어 구현이 갈리지 않는다(G-2).
-        RecordPassBarriers(encoder, pass);
-
         // 분할 패스는 조각 하나로 부른다 — 통째로 기록하는 것과 같아야 한다는
         // 것이 계약이고, 순차 경로가 그 계약의 기준이 된다.
         try
         {
+            RecordPassBarriers(encoder, pass);
             RecordPassBody(context, pass, 0, 1);
+            RecordPassFinalBarriers(encoder, pass);
         }
         catch (const std::exception& exception)
         {
             if (nullptr != m_profiler)
+            {
                 m_profiler->EndPass(encoder, timerSlot);
+            }
             outError = pass.name + ": " + exception.what();
             return false;
         }
         catch (...)
         {
             if (nullptr != m_profiler)
+            {
                 m_profiler->EndPass(encoder, timerSlot);
+            }
             outError = pass.name + ": unknown recording failure";
             return false;
         }
 
-        RecordPassFinalBarriers(encoder, pass);
         if (nullptr != m_profiler) m_profiler->EndPass(encoder, timerSlot);
     }
 
@@ -2035,12 +2427,23 @@ void EnhancedRenderGraph::RecordPassBarriers(RHIEncoder& encoder, const Pass& pa
         const auto& resource = m_resources[index];
         if (resource.desc.allowDepthStencil)
         {
-            encoder.ClearDepthTarget(binding, 1.0f);
+            encoder.ClearDepthTarget(binding, m_poison ? 0.125f : 1.0f);
         }
         else
         {
-            encoder.ClearRenderTargets(binding, resource.desc.clearColor);
+            const auto description = TransientDescription(resource);
+            encoder.ClearRenderTargets(binding, description.textureDesc.clearColor);
         }
+    }
+    for (const auto index : pass.poisonBuffers)
+    {
+        const auto& resource = m_resources[index];
+        auto view = RHIBindingDesc::UavBuffer(resource.buffer,
+            static_cast<uint32_t>(resource.bufferDesc.bytes / 4), 0);
+        view.format = RHIFormat::R32Float;
+        const float values[]{std::numeric_limits<float>::quiet_NaN(), 0, 0, 0};
+        encoder.ClearUnorderedAccess(view, values);
+        encoder.UavBarrierBuffers(std::span<const RHIBufferHandle>{&resource.buffer, 1});
     }
 }
 
@@ -2080,12 +2483,13 @@ void EnhancedRenderGraph::RecordPassBody(const ExecuteContext& context, const Pa
 
 void EnhancedRenderGraph::RecordPassFinalBarriers(RHIEncoder& encoder, const Pass& pass) const
 {
-    if (pass.finalTransitions.empty())
+    if (pass.finalTransitions.empty() && pass.finalBufferTransitions.empty())
     {
         return;
     }
     RHIBarrierBatch batch{};
     batch.textureTransitions = pass.finalTransitions;
+    batch.bufferTransitions = pass.finalBufferTransitions;
     encoder.ResourceBarriers(batch);
 }
 
@@ -2093,6 +2497,11 @@ bool EnhancedRenderGraph::RecordParallel(IRHIParallelCommandPool& pool,
     uint32_t workerCount, const RHIRecordedBatchDesc& batchDesc,
     RHIRecordedBatch& outBatch, std::string& outError)
 {
+    if (!m_queueLease.expired() || m_queueExecutionAttempted)
+    {
+        outError = "Queue execution requires completion collection and Reset before reuse";
+        return false;
+    }
     if (outBatch.IsValid() ||
         (m_preparedPool && (m_preparedPool != &pool || m_preparedRecordingConsumed || m_preparedRecording == 0 ||
                             m_preparedRecording != m_deviceServices->GetCurrentUploadRecordingId() ||
@@ -2457,8 +2866,8 @@ uint32_t EnhancedRenderGraph::GetPassBarrierCount(RGPassId pass) const
     const Pass& planned = m_passes[pass.index];
     uint64_t count = planned.transitions.size() +
         planned.bufferTransitions.size() + planned.uavBarriers.size() +
-        planned.uavBufferBarriers.size() + planned.finalTransitions.size() +
-        planned.aliasTextures.size() + planned.aliasBuffers.size();
+        planned.uavBufferBarriers.size() + planned.finalTransitions.size() + planned.finalBufferTransitions.size() +
+        planned.aliasTextures.size() + planned.aliasBuffers.size() + planned.poisonBuffers.size();
     const auto phaseCount = [](const std::vector<PhaseBarrierPlan>& plans)
     {
         uint64_t total = 0;

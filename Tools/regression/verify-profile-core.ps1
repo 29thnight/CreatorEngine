@@ -36,6 +36,22 @@ $configs = if ($Configuration -eq 'All') { @('Debug','Release') } else { @($Conf
 # 이번 앵커 이관은 소스만 대조했다. 컴파일 성공과 각 변이의 검출 여부는 실행으로 확인해야 한다.
 $mutations = @(
     @{
+        Name   = 'gpu-admit-before-first-boundary'
+        File   = 'ProfileService.cpp'
+        Old    = '!m_gpuFrameRangeReady.load(std::memory_order_acquire) ||'
+        New    = 'false ||'
+        Expect = 'gpu-first-boundary/not-ready'
+        Why    = 'GPU admission must wait for the actual first collected frame'
+    },
+    @{
+        Name   = 'sparse-pages-retain-pool'
+        File   = 'ProfileCapture.cpp'
+        Old    = 'if (count < kEventsPerChunk / 2)'
+        New    = 'if (false)'
+        Expect = 'sparse-pages/reuse'
+        Why    = 'Sparse retained events must not exhaust the bounded producer page pool'
+    },
+    @{
         Name   = 'close-open-scopes'
         File   = 'ProfileThreadStream.cpp'
         Old    = "        honor_seal_request();`n        seal_current();`n    }`n`n    void thread_stream::freeze_self"

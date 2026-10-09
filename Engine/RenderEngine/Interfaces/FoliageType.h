@@ -2,7 +2,7 @@
 #include "Ownership.h"
 #include "Reflection.hpp"
 #include "TypeTrait.h"
-#include "AssetDepot/AssetLink.h"
+#include "../AssetDepot/AssetLink.h"
 #include <cstdint>
 #include <memory>
 #include <string>

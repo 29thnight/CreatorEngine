@@ -1,5 +1,14 @@
 # PHASE 4 계열 재배치 — C# 저작·그래프·기능 완료선
 
+2026-10-09 구조 수정 2: 단일 큐는 기존 compiled barrier 계획을 그대로 사용하고, 다중 큐는 공통 계획기로 배치 내부 상태를 유지한다. D/R 최종 실행 150검사·계획 24검사·전체 RG 회귀 통과. 제품 검증은 [배리어 수정 기록](../analysis/RenderRg8Barriers20261009.md)을 따른다. RG8 progress·기성 0·기본 OFF 및 기존 공수 집계 유지.
+
+2026-10-09 구조 수정 1: 패스별 제출을 의존 경계별 batch로 합치고 queue endpoint 소유 allocator/list 풀을 추가했다. D/R 실행 147검사·계획 24검사·전체 RenderGraph 회귀 통과. COMMON 전이 단일화·overlap 후보 선택·RG7 조합은 잔여이며 RG8 progress·기성 0·기본 OFF를 유지한다. [수정과 제품 검증](../analysis/RenderRg8Batching20261009.md).
+
+2026-10-09 구조 재감사: RG8 제품 완료 판정을 철회한다. 패스별 allocator/list 생성·제출/Signal, 중복 COMMON 전이, TestShadow의 overlap 없는 큐 배치 및 RG7 조합 거부를 확인했다. RG8 progress·기성 0, PHASE 4.3 기성 74/잔여 26(RG8 16 + RG9 10), 전체 기성 126/잔여 437로 정정한다. RG7의 제한된 aliasing 구현/실험 종료와 기본 OFF는 유지한다. [상세 감사](../analysis/RenderRg7Rg8StructuralAudit20261009.md). 아래 종료 문구는 재감사 전 이력이다.
+
+2026-10-09 RG8 종료: D/R 큐 실행·수명·SSAO compute 수용 후 Release TestShadow 1496×692의 336출력 오차 0·일반 GPU 192프레임·메모리 1846표본과 최신 Release 전체 RG 회귀를 확인했다. 두 순서 모두 GPU span 증가·메모리 절감 일관성 미확보로 기본 OFF를 유지한다. [종료·채택 판정](../analysis/RenderRg8Closure20261009.md). RG8 done·기성 16, 총계 142/421, PHASE 4.3 기성 90/잔여 10(RG9). RG7·Q0 완료 유지.
+
+
 ## 2026-10-07 최근 병합 반영
 
 **같은 날 후속 — 재질 fallback 제거:** live Shadow/GBuffer/Forward의 native 재질 대체와 SceneHost의 이전 graph instance 대체를 제거했다. 그래프 준비 중에는 프레임을 대기시키고 실패한 요청은 거부한다. 타깃 clear와 graph 재질 기록을 분리했으며, CSM depth-content cache는 별도 미구현이다. 아래 RG5/RG6 수용은 해당 보고서에 보관된 소스 해시의 증거다. 후속 변경의 빌드·실행·capture 증거는 [graph-only 재질 패스 기록](../analysis/GraphOnlyMaterialPasses20261007.md)이 소유한다.
@@ -22,13 +31,17 @@ IBL/Surface/Raster reference API는 D/R 각각 3정책·일반 63 frames·공유
 
 ## 1. 페이즈와 회계
 
+**2026-10-08 RG7 종료:** [측정·기본 OFF 채택 판정](../analysis/RenderRg7Closure20261008.md) 완료로 기성 14인일을 회수했다. 당시 총 추정 563·기성 120·잔여 443(+미산정), PHASE 4.3 기성 68·잔여 32였으며, 후속 하드닝/확장 수용을 RG7 완료로 간주하지 않는다.
+
+**2026-10-08 Q0 종료:** 중립 계약·DX12 큐 서비스·큐별 제출/수명 고정 3단계를 D/R에서 수용했다. [검증 기록](../analysis/RhiQueueContractQ0_20261008.md). 총 추정 563·기성 126·잔여 437(+미산정), PHASE 4.3 기성 74·잔여 26. RG7 기본 OFF 유지, RG8/RG9·L4 소비는 미완료다.
+
 **2026-10-08 범위 확장:** PHASE 4.85 [Path Tracing·Hybrid RT 파이프라인](PathTracingHybridPipelinePlan.md)을 신설한다. 공통 RT 기반, 두 제품 파이프라인, ReSTIR PT Enhanced·AMD tetrahedral cages 연구 구현/평가를 14행으로 분리했다. 구현/실험은 미착수이며 중앙 추정 208인일·기성 0이다. 4.8 설계 9인일·기성 106은 유지하며 산정 총계 563·잔여 457인일(+별도 미산정)로 갱신한다. 기본 환경 116·효과 확장/연구 92, 관리 범위 약 130~290인일이다. GPU-9는 prototype 뒤 변경 추정을 검토한다.
 
 | 표시 순서 | 단일 완료선 | 활성 행 | 재산정 인일 | 완료 | 잔여 인일 |
 |---|---|---:|---:|---:|---:|
 | **4** | 현행 DX12 PBR 제품 배선 | 10 | 18 | 18 | 0 |
 | **4.25** | Graph→ShaderMeta/Slang·공통 재질·Blender 수용 | 11 | 40 + 미산정 | 32 | 8 + 미산정 |
-| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 54 | 46 |
+| **4.3** | BASE-0 → DAG·버전/Modify·RHI queue·viewer, DX12 수용 | 12 | 100 | 74 | 26 |
 | **4.5** | 모션/히스토리·업스케일·프레임 생성, DX12 수용 | 16 | 71 | 0 | 71 |
 | **4.6** | C# Pipeline IR·PassSchema/Roslyn·native 조립 | 7 | 32 | 0 | 32 |
 | **4.7** | UV1·BVH·DX12 백그라운드 라이트맵 | 8 | 35 | 2 | 33 |
@@ -36,7 +49,7 @@ IBL/Surface/Raster reference API는 D/R 각각 3정책·일반 63 frames·공유
 | **4.8** | GPU-driven·확률 조명·DXR 설계·구현 공수 확정 | 4 | 9 | 0 | 9 |
 | **4.85** | 공통 RT·Path Tracing·Hybrid·ReSTIR PT Enhanced·tetrahedral cages | 14 | 208 | 0 | 208 |
 | **4.9** | RenderDoc DX12/Vulkan 캡처 → 리소스 확인 → 픽셀별 비교 | 6 | 22 | 0 | 22 |
-| **현재 합계** | | **92** | **563 + 미산정** | **106** | **457 + 미산정** |
+| **현재 합계** | | **92** | **563 + 미산정** | **126** | **437 + 미산정** |
 
 **2026-10-01 사용자 지시 반영:** Vulkan 실행 비교·교차 동등성·픽셀 수용은 4.9가 단독 소유한다.
 4~4.85는 RHI 중립 구현을 유지하면서 **DX12 Debug/Release의 변경 전후 회귀**로 닫는다.

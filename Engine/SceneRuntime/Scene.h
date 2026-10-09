@@ -281,6 +281,7 @@ struct TransformWriteMetrics
 class [[reflgen::reflect]] Scene
 {
 private:
+    [[reflgen::ignore]]
     own::shared_owner<TextureFramePins> m_preparedTextureImagePins;
 public:
     // Scene-owner handoff only. The first queued packet owns these preload pins.

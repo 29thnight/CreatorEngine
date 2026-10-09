@@ -1186,14 +1186,24 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
     {
-        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions" && ctx.parts[1] != "transient"))
+        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions" && ctx.parts[1] != "transient" && ctx.parts[1] != "queue-contract" && ctx.parts[1] != "queue-native" && ctx.parts[1] != "queue-ownership" && ctx.parts[1] != "queue-schedule" && ctx.parts[1] != "queue-execution"))
         {
-            return CommandCore::InvalidArguments("dx12.rendergraph [replay-extensions|transient]");
+            return CommandCore::InvalidArguments("dx12.rendergraph [replay-extensions|transient|queue-contract|queue-native|queue-ownership|queue-schedule|queue-execution]");
         }
         // 렌더 그래프 자가 검증(PHASE 3-5).
         std::string log;
-        const bool passed = ctx.parts.size() == 2 && ctx.parts[1] == "transient"
-            ? DX12Test::RunTransientAliasingTest(log) : DX12Test::RunRenderGraphTest(log, ctx.parts.size() == 2);
+        const bool passed = ctx.parts.size() == 2 && ctx.parts[1] == "queue-execution"
+            ? DX12Test::RunQueueExecutionTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-schedule"
+            ? DX12Test::RunQueueScheduleTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-ownership"
+            ? DX12Test::RunQueueOwnershipTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-native"
+            ? DX12Test::RunQueueNativeTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-contract"
+            ? DX12Test::RunQueueContractTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "transient"
+                ? DX12Test::RunTransientAliasingTest(log) : DX12Test::RunRenderGraphTest(log, ctx.parts.size() == 2);
 
         std::printf("%s", log.c_str());
         Debug::PrintLog(spdlog::level::warn, std::string("[dx12.rendergraph] ") + (passed ? "통과" : "실패") + "\n" + log);

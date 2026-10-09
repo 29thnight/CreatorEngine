@@ -12,9 +12,13 @@
 #include "../../RHI/DX12/DX12PSOManager.h"
 #include "../../RHI/DX12/DX12RootSignatureCache.h"
 #include "../../RHI/DX12/DX12TextureCache.h"
+#include "../../RHI/DX12/DX12QueueRecorder.h"
+#include "../../Render/Graph/EnhancedRenderGraph.h"
 #include "PathFinder.h"
 
 #include <cstdio>
+#include <unordered_map>
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <exception>
@@ -45,6 +49,20 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     DX12MeshCache meshCache;
     DX12TextureCache textureCache;
     DX12GpuProfiler profiler;
+    DX12GpuProfiler computeProfiler;
+    EnhancedRenderGraph::QueueEndpoint compute;
+    bool asyncCompute{false};
+    uint64_t profilerView{0};
+    uint64_t computeSubmissions{0};
+    std::unordered_map<uint64_t, std::unordered_map<std::string, uint64_t>> gpuMeasurements;
+    DX12GpuProfiler::FrameTimings computeTimings;
+    std::vector<DX12GpuProfiler::PassTiming> computeMerged;
+    EnhancedRenderGraph::QueueEndpoint graphics;
+    bool ownedQueueExecution{false};
+    uint64_t queueSubmissions{0};
+    uint64_t queueBatches{0};
+    uint64_t queueBarriers{0};
+    uint32_t lastQueueBarriers{0};
     // 프레임마다 재사용하는 수집물. 문자열 버퍼를 지켜 할당을 없앤다.
     DX12GpuProfiler::FrameTimings profilerTimings;
     std::vector<DX12GpuProfiler::PassTiming> profilerMerged;
@@ -72,6 +90,33 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
 {
     Impl& impl = *m_impl;
     if (!impl.resources.Initialize(width, height, outError)) return false;
+    char queueFlag[8]{};
+    size_t queueFlagBytes = 0;
+    const bool queueFlagValid = getenv_s(&queueFlagBytes, queueFlag, sizeof(queueFlag),
+        "CREATOR_RENDERGRAPH_QUEUE_EXECUTION") == 0;
+    impl.asyncCompute = queueFlagValid && std::strcmp(queueFlag, "2") == 0;
+    impl.ownedQueueExecution = impl.asyncCompute || (queueFlagValid && std::strcmp(queueFlag, "1") == 0);
+    impl.compute = {};
+    impl.computeSubmissions = 0;
+    impl.gpuMeasurements.clear();
+    impl.graphics = {};
+    impl.queueSubmissions = impl.queueBatches = 0;
+    impl.queueBarriers = impl.lastQueueBarriers = 0;
+    ID3D12CommandQueue* profilerQueue = impl.resources.GetCommandQueue();
+    if (impl.ownedQueueExecution)
+    {
+        if (!impl.resources.CreateQueue(RHIQueueKind::Graphics, impl.graphics.queue, outError))
+        {
+            return false;
+        }
+        profilerQueue = DX12QueueService::NativeQueue(impl.graphics.queue);
+        if (!profilerQueue)
+        {
+            outError = "Owned graphics queue is unavailable for profiler calibration.";
+            return false;
+        }
+        std::printf("[rg8.live] enabled=true profilerQueue=graphics\n");
+    }
     constexpr uint32_t defaultProfilerPassCapacity = 256;
     uint32_t profilerPassCapacity = defaultProfilerPassCapacity;
 #if defined(_DEBUG)
@@ -99,9 +144,21 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
         !impl.meshCache.Initialize(&impl.resources, outError) ||
         !impl.textureCache.Initialize(&impl.resources, outError) ||
         !impl.profiler.Initialize(impl.resources.GetDevice(),
-            impl.resources.GetCommandQueue(), profilerPassCapacity, kFrameCount, outError))
+            profilerQueue, profilerPassCapacity, kFrameCount, outError))
     {
         return false;
+    }
+    if (impl.asyncCompute)
+    {
+        if (!impl.resources.CreateQueue(RHIQueueKind::Compute, impl.compute.queue, outError) ||
+            !impl.computeProfiler.Initialize(impl.resources.GetDevice(),
+                DX12QueueService::NativeQueue(impl.compute.queue), profilerPassCapacity, kFrameCount, outError))
+        {
+            return false;
+        }
+        impl.graphics.profiler = &impl.profiler;
+        impl.compute.profiler = &impl.computeProfiler;
+        std::printf("[rg8.compute] enabled=true clocks=per-queue minimumNs=1000\n");
     }
     impl.commandPoolFrame = 0;
 
@@ -127,6 +184,10 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
         if (!drained && GetRHISubmissionThread().GetOwnerStats(&impl.resources).faulted)
         {
             drained = impl.resources.DrainForLifecycle(RHILifecycleCommand::UnrecoverableDeviceError, lifecycleError);
+        }
+        if (drained)
+        {
+            drained = impl.resources.ShutdownQueueService(lifecycleError);
         }
         if (!drained)
         {
@@ -169,7 +230,31 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
     }
     SetDiagnosticsDeviceResources(nullptr);
 
+    impl.computeProfiler.Shutdown();
+    if (impl.ownedQueueExecution)
+    {
+        const auto graphicsPool = DX12QueueService::QueryRecordingPool(impl.graphics.queue);
+        const auto computePool = DX12QueueService::QueryRecordingPool(impl.compute.queue);
+        std::printf("[rg8.pool] created=%llu reused=%llu leased=%llu cached=%llu\n",
+            static_cast<unsigned long long>(graphicsPool.created + computePool.created),
+            static_cast<unsigned long long>(graphicsPool.reused + computePool.reused),
+            static_cast<unsigned long long>(graphicsPool.leased + computePool.leased),
+            static_cast<unsigned long long>(graphicsPool.cached + computePool.cached));
+    }
+    if (impl.asyncCompute)
+    {
+        std::printf("[rg8.compute] submissions=%llu\n", static_cast<unsigned long long>(impl.computeSubmissions));
+    }
+    impl.compute = {};
     impl.profiler.Shutdown();
+    if (impl.ownedQueueExecution)
+    {
+        std::printf("[rg8.live] submissions=%llu batches=%llu profilerQueue=graphics\n",
+            static_cast<unsigned long long>(impl.queueSubmissions), static_cast<unsigned long long>(impl.queueBatches));
+        std::printf("[rg8.barriers] total=%llu last=%u\n",
+            static_cast<unsigned long long>(impl.queueBarriers), impl.lastQueueBarriers);
+    }
+    impl.graphics = {};
     impl.commandPool.Shutdown();
     impl.textureCache.Shutdown();
     impl.meshCache.Shutdown();
@@ -200,6 +285,15 @@ bool EnhancedSceneRendererLiveDX12Adapter::IsInitialized() const
     return m_impl->resources.IsInitialized();
 }
 
+RHIVideoMemoryInfo EnhancedSceneRendererLiveDX12Adapter::QueryVideoMemory() const
+{
+    if (!IsInitialized())
+    {
+        return {};
+    }
+    return m_impl->resources.QueryVideoMemory();
+}
+
 bool EnhancedSceneRendererLiveDX12Adapter::QueryVideoMemory(uint64_t& usedMB,
     uint64_t& budgetMB) const
 {
@@ -228,6 +322,14 @@ EnhancedSceneRendererLiveDX12Adapter::GetCounterSnapshot() const
 bool EnhancedSceneRendererLiveDX12Adapter::BeginFrame(std::string& outError)
 {
     Impl& impl = *m_impl;
+    if (impl.graphics.queue)
+    {
+        impl.graphics.queue->CollectCompleted();
+    }
+    if (impl.compute.queue)
+    {
+        impl.compute.queue->CollectCompleted();
+    }
     if (!impl.resources.BeginFrame(outError)) return false;
     impl.commandPool.BeginFrame(impl.commandPoolFrame);
     return true;
@@ -243,7 +345,52 @@ bool EnhancedSceneRendererLiveDX12Adapter::EndFrame(std::string& outError)
     Impl& impl = *m_impl;
     if (!impl.resources.EndFrame(outError)) return false;
     impl.commandPoolFrame = (impl.commandPoolFrame + 1u) % kFrameCount;
+    if (impl.ownedQueueExecution && !impl.resources.WaitForLastFrameSubmission(outError))
+    {
+        return false;
+    }
     return true;
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::UsesOwnedQueueExecution() const
+{
+    return m_impl->ownedQueueExecution;
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::BeginOwnedQueueRecording(std::string& outError)
+{
+    return m_impl->resources.BeginQueueFrame(m_impl->graphics.queue, outError);
+}
+
+bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(
+    const std::shared_ptr<EnhancedRenderGraph>& graph, std::shared_ptr<const void> owner,
+    double& recordingMilliseconds, std::string& outError)
+{
+    Impl& impl = *m_impl;
+    DX12QueueRecorder recorder(impl.resources);
+    EnhancedRenderGraph::QueueExecution execution;
+    const auto hints = graph->MeasuredQueueHints([&](const std::string& name)
+    {
+        const auto view = impl.gpuMeasurements.find(impl.profilerView);
+        if (view == impl.gpuMeasurements.end())
+        {
+            return uint64_t{0};
+        }
+        const auto measurement = view->second.find(name);
+        return measurement == view->second.end() ? uint64_t{0} : measurement->second;
+    });
+    if (!graph->SubmitQueues(graph, recorder, impl.graphics, impl.asyncCompute ? &impl.compute : nullptr, hints, 1000,
+        std::move(owner), execution, outError))
+    {
+        return false;
+    }
+    recordingMilliseconds = execution.recordingMilliseconds;
+    ++impl.queueSubmissions;
+    impl.computeSubmissions += execution.computeBatches;
+    impl.queueBatches += execution.submittedBatches;
+    impl.queueBarriers += execution.plannedBarriers;
+    impl.lastQueueBarriers = execution.plannedBarriers;
+    return impl.resources.JoinQueueFrame(execution.completion, outError);
 }
 
 IRHIParallelCommandPool& EnhancedSceneRendererLiveDX12Adapter::CommandPool()
@@ -273,8 +420,27 @@ void EnhancedSceneRendererLiveDX12Adapter::WaitForGpu()
 bool EnhancedSceneRendererLiveDX12Adapter::DrainForLifecycle(
     RHILifecycleCommand command, std::string& outError)
 {
-    return !IsInitialized() ||
-        m_impl->resources.DrainForLifecycle(command, outError);
+    if (!IsInitialized())
+    {
+        return true;
+    }
+    if (!m_impl->resources.DrainForLifecycle(command, outError))
+    {
+        return false;
+    }
+    if (command == RHILifecycleCommand::BackendShutdown || command == RHILifecycleCommand::UnrecoverableDeviceError)
+    {
+        return m_impl->resources.ShutdownQueueService(outError);
+    }
+    if (m_impl->graphics.queue)
+    {
+        m_impl->graphics.queue->CollectCompleted();
+    }
+    if (m_impl->compute.queue)
+    {
+        m_impl->compute.queue->CollectCompleted();
+    }
+    return true;
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::HasDeviceLossProof() const
@@ -300,6 +466,11 @@ uint64_t EnhancedSceneRendererLiveDX12Adapter::GetLastSignaledFenceValue() const
 bool EnhancedSceneRendererLiveDX12Adapter::ConsumeSubmissionFailure(std::string& outError)
 {
     Impl& impl = *m_impl;
+    if (impl.ownedQueueExecution && !impl.resources.QueryQueueCapabilities().graphics)
+    {
+        outError = "Owned queue service was revoked; backend reinitialization is required.";
+        return true;
+    }
     if (GetRHISubmissionThread().ConsumeFailure(&impl.resources, outError))
     {
         return true;
@@ -562,94 +733,201 @@ void EnhancedSceneRendererLiveDX12Adapter::ReleaseFogCloudNeutral(
 GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
     uint64_t engineFrameId, uint64_t submissionId, uint64_t renderViewId, uint64_t captureGeneration)
 {
+    m_impl->profilerView = renderViewId;
+    if (m_impl->asyncCompute)
+    {
+        m_impl->computeProfiler.BeginFrame(engineFrameId, submissionId, renderViewId, captureGeneration);
+    }
     return m_impl->profiler.BeginFrame(engineFrameId, submissionId, renderViewId, captureGeneration);
 }
 
 void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameToken& token)
 {
     m_impl->profiler.ResolveFrame(m_impl->resources.GetCommandList(), token);
+    if (m_impl->asyncCompute)
+    {
+        m_impl->computeProfiler.ResolveFrame(m_impl->resources.GetCommandList(), token);
+    }
+}
+
+namespace
+{
+    bool CollectQueueProfiler(DX12GpuProfiler& profiler,
+        DX12GpuProfiler::FrameTimings& scratch, std::vector<DX12GpuProfiler::PassTiming>& merged,
+        const GpuFrameToken& token,
+        std::vector<EnhancedLivePassTiming>& outTimings,
+        std::vector<EnhancedLiveGpuSlice>& outSlices,
+        EnhancedLiveGpuSpan& outSpan,
+        double& outTotalMilliseconds, std::string& outError)
+    {
+        // 수집물은 멤버로 둔다. 지역 변수면 조각마다 std::string 을 프레임마다
+        // 새로 할당하게 된다 — Collect 가 제자리 대입을 쓰는 이유가 그것이다.
+        outSpan = {};
+        DX12GpuProfiler::FrameTimings& timings = scratch;
+        if (!profiler.Collect(token, timings, outError)) return false;
+
+        // ★ raw 조각은 timings 에 그대로 남아 있다. 이름으로 묶는 것은 **표시용**이고,
+        //   GPU 타임라인은 묶지 않은 쪽을 그릴 것이다.
+        std::vector<DX12GpuProfiler::PassTiming> nativeTimings;
+        nativeTimings.swap(merged);
+        profiler.MergeSlices(timings, nativeTimings);
+
+        outTimings.clear();
+        outTimings.reserve(nativeTimings.size());
+        for (DX12GpuProfiler::PassTiming& timing : nativeTimings)
+        {
+            outTimings.push_back({ timing.name, timing.milliseconds, timing.spanMilliseconds });
+        }
+        outTotalMilliseconds = profiler.GetLastTotalMilliseconds();
+        merged.swap(nativeTimings);
+
+        const double toMs = (timings.ticksPerSecond > 0)
+            ? (1000.0 / static_cast<double>(timings.ticksPerSecond)) : 0.0;
+        outSpan.queueSpanMs = (timings.queueEndTicks > timings.queueBeginTicks)
+            ? static_cast<double>(timings.queueEndTicks - timings.queueBeginTicks) * toMs : 0.0;
+        outSpan.busyMs = static_cast<double>(timings.busyTicks) * toMs;
+        outSpan.sliceCount = static_cast<uint32_t>(timings.slices.size());
+        outSpan.queryOverflowPasses = timings.overflowedPasses;
+        outSpan.droppedSlices = timings.droppedSlices;
+        outSpan.droppedSliceName = timings.droppedSliceName;
+        outSpan.droppedSliceDeltaTicks = timings.droppedSliceDeltaTicks;
+        outSpan.zeroLengthSlices = timings.zeroLengthSlices;
+
+        // 통합 축. 표본이 없으면 옮기지 않았다는 것을 그대로 전한다 — 0 을 시각처럼
+        // 내보내면 정렬된 것과 구별되지 않는다.
+        outSpan.cpuAligned = timings.cpuAligned;
+        outSpan.queueBeginCpuTicks = timings.queueBeginCpuTicks;
+        outSpan.queueEndCpuTicks = timings.queueEndCpuTicks;
+        if (timings.cpuAligned)
+        {
+            LARGE_INTEGER collectTick{};
+            QueryPerformanceCounter(&collectTick);
+            const double cpuToMs = (profiler.Calibration().cpuTicksPerSecond > 0)
+                ? (1000.0 / static_cast<double>(profiler.Calibration().cpuTicksPerSecond))
+                : 0.0;
+
+            // ★ 부호를 살려서 뺀다. uint64 끼리 빼면 음수가 천문학적 양수가 되어
+            //   "여유가 아주 많다" 로 읽히고, 어긋남이 통째로 숨는다.
+            const int64_t submitToBegin = static_cast<int64_t>(timings.queueBeginCpuTicks) -
+                static_cast<int64_t>(token.cpuSubmitTick);
+            const int64_t endToCollect = static_cast<int64_t>(collectTick.QuadPart) -
+                static_cast<int64_t>(timings.queueEndCpuTicks);
+            outSpan.submitToGpuBeginMs = static_cast<double>(submitToBegin) * cpuToMs;
+            outSpan.gpuEndToCollectMs = static_cast<double>(endToCollect) * cpuToMs;
+            const int64_t submitToCollect = static_cast<int64_t>(collectTick.QuadPart) -
+                static_cast<int64_t>(token.cpuSubmitTick);
+            outSpan.submitToCollectMs = static_cast<double>(submitToCollect) * cpuToMs;
+
+            // raw 조각을 CPU 축으로 옮겨 내준다. 묶은 것이 아니라 이것이 타임라인의
+            // 자료다 — 묶으면 분할 패스가 한 덩어리로 보인다.
+            outSlices.resize(timings.slices.size());
+            for (size_t i = 0; i < timings.slices.size(); ++i)
+            {
+                outSlices[i].queueId = 0;
+                outSlices[i].name.assign(timings.slices[i].name);
+                outSlices[i].beginCpuTick =
+                    profiler.GpuTickToCpuTick(timings.slices[i].beginTicks);
+                outSlices[i].endCpuTick =
+                    profiler.GpuTickToCpuTick(timings.slices[i].endTicks);
+            }
+        }
+        else
+        {
+            // 옮기지 못한 틱을 내보내지 않는다. 받는 쪽은 이것을 CPU 시각으로 읽고,
+            // 그러면 GPU 레인이 엉뚱한 곳에 그려진다.
+            outSlices.clear();
+        }
+        return true;
+    }
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& token,
-    std::vector<EnhancedLivePassTiming>& outTimings,
-    std::vector<EnhancedLiveGpuSlice>& outSlices,
-    EnhancedLiveGpuSpan& outSpan,
-    double& outTotalMilliseconds, std::string& outError)
+    std::vector<EnhancedLivePassTiming>& outTimings, std::vector<EnhancedLiveGpuSlice>& outSlices,
+    EnhancedLiveGpuSpan& outSpan, double& outTotalMilliseconds, std::string& outError)
 {
-    // 수집물은 멤버로 둔다. 지역 변수면 조각마다 std::string 을 프레임마다
-    // 새로 할당하게 된다 — Collect 가 제자리 대입을 쓰는 이유가 그것이다.
-    DX12GpuProfiler::FrameTimings& timings = m_impl->profilerTimings;
-    if (!m_impl->profiler.Collect(token, timings, outError)) return false;
-
-    // ★ raw 조각은 timings 에 그대로 남아 있다. 이름으로 묶는 것은 **표시용**이고,
-    //   GPU 타임라인은 묶지 않은 쪽을 그릴 것이다.
-    std::vector<DX12GpuProfiler::PassTiming> nativeTimings;
-    nativeTimings.swap(m_impl->profilerMerged);
-    m_impl->profiler.MergeSlices(timings, nativeTimings);
-
-    outTimings.clear();
-    outTimings.reserve(nativeTimings.size());
-    for (DX12GpuProfiler::PassTiming& timing : nativeTimings)
+    auto& impl = *m_impl;
+    if (!CollectQueueProfiler(impl.profiler, impl.profilerTimings, impl.profilerMerged,
+        token, outTimings, outSlices, outSpan, outTotalMilliseconds, outError))
     {
-        outTimings.push_back({ timing.name, timing.milliseconds, timing.spanMilliseconds });
+        return false;
     }
-    outTotalMilliseconds = m_impl->profiler.GetLastTotalMilliseconds();
-    m_impl->profilerMerged.swap(nativeTimings);
-
-    const double toMs = (timings.ticksPerSecond > 0)
-        ? (1000.0 / static_cast<double>(timings.ticksPerSecond)) : 0.0;
-    outSpan.queueSpanMs = (timings.queueEndTicks > timings.queueBeginTicks)
-        ? static_cast<double>(timings.queueEndTicks - timings.queueBeginTicks) * toMs : 0.0;
-    outSpan.busyMs = static_cast<double>(timings.busyTicks) * toMs;
-    outSpan.sliceCount = static_cast<uint32_t>(timings.slices.size());
-    outSpan.queryOverflowPasses = timings.overflowedPasses;
-    outSpan.droppedSlices = timings.droppedSlices;
-    outSpan.droppedSliceName = timings.droppedSliceName;
-    outSpan.droppedSliceDeltaTicks = timings.droppedSliceDeltaTicks;
-    outSpan.zeroLengthSlices = timings.zeroLengthSlices;
-
-    // 통합 축. 표본이 없으면 옮기지 않았다는 것을 그대로 전한다 — 0 을 시각처럼
-    // 내보내면 정렬된 것과 구별되지 않는다.
-    outSpan.cpuAligned = timings.cpuAligned;
-    outSpan.queueBeginCpuTicks = timings.queueBeginCpuTicks;
-    outSpan.queueEndCpuTicks = timings.queueEndCpuTicks;
-    if (timings.cpuAligned)
+    if (impl.asyncCompute)
     {
-        LARGE_INTEGER collectTick{};
-        QueryPerformanceCounter(&collectTick);
-        const double cpuToMs = (m_impl->profiler.Calibration().cpuTicksPerSecond > 0)
-            ? (1000.0 / static_cast<double>(m_impl->profiler.Calibration().cpuTicksPerSecond))
-            : 0.0;
-
-        // ★ 부호를 살려서 뺀다. uint64 끼리 빼면 음수가 천문학적 양수가 되어
-        //   "여유가 아주 많다" 로 읽히고, 어긋남이 통째로 숨는다.
-        const int64_t submitToBegin = static_cast<int64_t>(timings.queueBeginCpuTicks) -
-            static_cast<int64_t>(token.cpuSubmitTick);
-        const int64_t endToCollect = static_cast<int64_t>(collectTick.QuadPart) -
-            static_cast<int64_t>(timings.queueEndCpuTicks);
-        outSpan.submitToGpuBeginMs = static_cast<double>(submitToBegin) * cpuToMs;
-        outSpan.gpuEndToCollectMs = static_cast<double>(endToCollect) * cpuToMs;
-        const int64_t submitToCollect = static_cast<int64_t>(collectTick.QuadPart) -
-            static_cast<int64_t>(token.cpuSubmitTick);
-        outSpan.submitToCollectMs = static_cast<double>(submitToCollect) * cpuToMs;
-
-        // raw 조각을 CPU 축으로 옮겨 내준다. 묶은 것이 아니라 이것이 타임라인의
-        // 자료다 — 묶으면 분할 패스가 한 덩어리로 보인다.
-        outSlices.resize(timings.slices.size());
-        for (size_t i = 0; i < timings.slices.size(); ++i)
+        std::vector<EnhancedLivePassTiming> computePasses;
+        std::vector<EnhancedLiveGpuSlice> computeSlices;
+        EnhancedLiveGpuSpan computeSpan;
+        double computeTotal = 0;
+        if (!CollectQueueProfiler(impl.computeProfiler, impl.computeTimings, impl.computeMerged,
+            token, computePasses, computeSlices, computeSpan, computeTotal, outError))
         {
-            outSlices[i].name.assign(timings.slices[i].name);
-            outSlices[i].beginCpuTick =
-                m_impl->profiler.GpuTickToCpuTick(timings.slices[i].beginTicks);
-            outSlices[i].endCpuTick =
-                m_impl->profiler.GpuTickToCpuTick(timings.slices[i].endTicks);
+            return false;
+        }
+        outSpan.computeSliceCount = computeSpan.sliceCount;
+        outSpan.queryOverflowPasses += computeSpan.queryOverflowPasses;
+        outSpan.droppedSlices += computeSpan.droppedSlices;
+        outSpan.zeroLengthSlices += computeSpan.zeroLengthSlices;
+        if (outSpan.droppedSliceName.empty())
+        {
+            outSpan.droppedSliceName = computeSpan.droppedSliceName;
+            outSpan.droppedSliceDeltaTicks = computeSpan.droppedSliceDeltaTicks;
+        }
+        outSpan.sliceCount += computeSpan.sliceCount;
+        outTotalMilliseconds += computeTotal; // Sum of pass durations, not critical path.
+        outTimings.insert(outTimings.end(), computePasses.begin(), computePasses.end());
+        if (computeSpan.sliceCount > 0)
+        {
+            if (!outSpan.cpuAligned || !computeSpan.cpuAligned)
+            {
+                outSlices.clear();
+                outSpan.cpuAligned = false;
+                outSpan.queueSpanMs = outSpan.busyMs = 0;
+                outError = "Cross-queue timing requires both calibrated clocks";
+                return false;
+            }
+            for (auto& slice : computeSlices)
+            {
+                slice.queueId = 1;
+                outSlices.push_back(std::move(slice));
+            }
+            // Union in QPC domain: never subtract raw ticks from different queues.
+            std::vector<std::pair<uint64_t, uint64_t>> intervals;
+            for (const auto& slice : outSlices)
+            {
+                intervals.emplace_back(slice.beginCpuTick, slice.endCpuTick);
+            }
+            std::sort(intervals.begin(), intervals.end());
+            auto begin = intervals.front().first;
+            auto end = intervals.front().second;
+            uint64_t busy = 0;
+            outSpan.queueBeginCpuTicks = begin;
+            for (const auto& interval : intervals)
+            {
+                if (interval.first > end)
+                {
+                    busy += end - begin;
+                    begin = interval.first;
+                }
+                end = (std::max)(end, interval.second);
+            }
+            busy += end - begin;
+            outSpan.queueEndCpuTicks = end;
+            const double toMs = 1000.0 / impl.profiler.Calibration().cpuTicksPerSecond;
+            outSpan.queueSpanMs = (end - outSpan.queueBeginCpuTicks) * toMs;
+            outSpan.busyMs = busy * toMs;
+            outSpan.submitToGpuBeginMs = (static_cast<int64_t>(outSpan.queueBeginCpuTicks) -
+                static_cast<int64_t>(token.cpuSubmitTick)) * toMs;
+            outSpan.gpuEndToCollectMs = computeSpan.queueEndCpuTicks > impl.profilerTimings.queueEndCpuTicks
+                ? computeSpan.gpuEndToCollectMs : outSpan.gpuEndToCollectMs;
         }
     }
-    else
+    // Only completed, valid measurements from the same view can drive the next schedule.
+    if (impl.asyncCompute && outSpan.queryOverflowPasses == 0 && outSpan.droppedSlices == 0)
     {
-        // 옮기지 못한 틱을 내보내지 않는다. 받는 쪽은 이것을 CPU 시각으로 읽고,
-        // 그러면 GPU 레인이 엉뚱한 곳에 그려진다.
-        outSlices.clear();
+        auto& measurements = impl.gpuMeasurements[token.renderViewId];
+        for (const auto& pass : outTimings)
+        {
+            measurements[pass.name] = static_cast<uint64_t>((std::max)(0.0, pass.milliseconds) * 1000000.0);
+        }
     }
     return true;
 }

@@ -3,6 +3,7 @@
 #include "../ShaderMeta.h"
 #include "../StandardMaterialProperty.h"
 #include "../AssetDepot/MaterialAssetRuntime.h"
+#include "../AssetDepot/TextureAssetRuntime.h"
 #include "../Texture.h"
 
 #include <algorithm>

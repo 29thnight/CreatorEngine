@@ -2881,16 +2881,19 @@ void RunIssueAdmission(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
         SceneHost host;
         for (unsigned revision = 0; revision < 80; ++revision)
         {
-            auto invalid = std::make_shared<Generation>(*generation);
-            invalid->cooked.product.program.volume = true;
-            invalid->cooked.product.program.slang.clear();
+            auto invalidValue = *generation;
+            invalidValue.generation = generation->generation + revision + 1;
+            invalidValue.cooked.product.program.volume = true;
+            invalidValue.cooked.product.program.slang.clear();
+            const auto invalid = own::make_shared<const Generation>(std::move(invalidValue));
             Check(!host.RequestProgram(context, invalid, error), "Invalid volume revision is rejected");
             const auto failed = host.ProgramStats().failedPreparations;
             Check(!host.RequestProgram(context, invalid, error)
                       && host.ProgramStats().failedPreparations == failed,
                   "Repeated failed revision preserves its memoized error");
         }
-        Check(host.RequestProgram(context, generation, error), "Corrected generation enters after 80 failures");
+        const bool correctedEntered = host.RequestProgram(context, generation, error);
+        Check(correctedEntered, "Corrected generation enters after 80 failures: " + error);
         const auto failures = host.ProgramStats().failedPreparations;
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(90);
         while (!host.IsProgramReady(generation, RHIShaderCompiler::GetOutput()))
@@ -2909,10 +2912,14 @@ void RunIssueAdmission(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
         SceneHost host;
         for (unsigned request = 0; request < 64; ++request)
         {
-            Check(host.RequestProgram(context, std::make_shared<Generation>(*generation), error),
+            auto pendingValue = *generation;
+            pendingValue.generation = generation->generation + request + 1;
+            Check(host.RequestProgram(context, own::make_shared<const Generation>(std::move(pendingValue)), error),
                   "Pending request fits admission budget");
         }
-        const auto overflow = std::make_shared<Generation>(*generation);
+        auto overflowValue = *generation;
+        overflowValue.generation = generation->generation + 65;
+        const auto overflow = own::make_shared<const Generation>(std::move(overflowValue));
         Check(!host.RequestProgram(context, overflow, error) && host.ProgramStats().compileSubmissions > 0,
               "Admission overflow starts existing jobs instead of deadlocking before PollPrograms");
         host.ShutdownAfterIdle();

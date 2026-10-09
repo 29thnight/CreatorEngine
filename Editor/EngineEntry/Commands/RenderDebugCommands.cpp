@@ -788,6 +788,15 @@ namespace ConsoleCmd
             return Ok("Compiled graph requested; poll on a later frame", std::move(data));
         }
         data.Set("generation", CommandData::Int(snapshot->generation));
+        const auto& heapMemory = snapshot->aliasHeapMemory;
+        auto heaps = CommandData::Object();
+        heaps.Set("domainId", CommandData::Int(heapMemory.domainId));
+        heaps.Set("retainedBytes", CommandData::Int(heapMemory.retainedBytes));
+        heaps.Set("cachedBytes", CommandData::Int(heapMemory.cachedBytes));
+        heaps.Set("leasedBytes", CommandData::Int(heapMemory.leasedBytes));
+        heaps.Set("peakRetainedBytes", CommandData::Int(heapMemory.peakRetainedBytes));
+        heaps.Set("scope", CommandData::String("unique-group-owned-native-heaps-not-resident"));
+        data.Set("aliasHeapMemory", std::move(heaps));
         data.Set("epoch", CommandData::Int(snapshot->graphEpoch));
         data.Set("frame", CommandData::Int(snapshot->frameId));
         data.Set("sceneEpoch", CommandData::Int(snapshot->sceneEpoch));

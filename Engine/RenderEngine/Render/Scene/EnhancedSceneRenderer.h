@@ -413,6 +413,7 @@ struct EnhancedLiveGpuSpan
     double   queueSpanMs{ 0.0 };
     double   busyMs{ 0.0 };
     uint32_t sliceCount{ 0 };
+    uint32_t computeSliceCount{ 0 };
     uint32_t queryOverflowPasses{ 0 };
     uint32_t droppedSlices{ 0 };
 
@@ -460,6 +461,7 @@ struct EnhancedLiveGpuSlice
     std::string name;
     uint64_t    beginCpuTick{ 0 };
     uint64_t    endCpuTick{ 0 };
+    uint8_t     queueId{ 0 }; // 0 graphics, 1 compute; timestamps already in QPC domain.
 };
 
 /// GPU 구간을 밖으로 흘리는 자리(§7.3 의 GPU Graphics queue).

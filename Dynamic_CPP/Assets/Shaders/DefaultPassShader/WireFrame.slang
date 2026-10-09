@@ -42,8 +42,14 @@ VSOut TransformWire(float3 inputPosition, float4 boneIndices, float4 boneWeights
         [unroll]
         for (int i = 1; i < 4; ++i)
         {
-            boneTransform += boneWeights[i]
-                * UnpackBone(gBones[instance.boneOffset + (uint)boneIndices[i]]);
+            // Unused product influences carry index 255. Do not read a bone
+            // outside this palette merely to multiply it by a zero weight.
+            [branch]
+            if (boneWeights[i] > 0.0f)
+            {
+                boneTransform += boneWeights[i]
+                    * UnpackBone(gBones[instance.boneOffset + (uint)boneIndices[i]]);
+            }
         }
 
         position = mul(float4(position, 1.0f), boneTransform).xyz;
